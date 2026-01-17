@@ -24,6 +24,9 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_HTML_FORMS_HTML_BUTTON_ELEMENT_H_
 #define THIRD_PARTY_BLINK_RENDERER_CORE_HTML_FORMS_HTML_BUTTON_ELEMENT_H_
 
+#include <utility>
+
+#include "third_party/blink/renderer/bindings/core/v8/script_iterator.h"
 #include "third_party/blink/renderer/core/dom/events/simulated_click_options.h"
 #include "third_party/blink/renderer/core/html/forms/html_form_control_element.h"
 
@@ -49,17 +52,7 @@ class CORE_EXPORT HTMLButtonElement final : public HTMLFormControlElement {
   // child of a <select>.
   HTMLSelectElement* OwnerSelect() const;
 
-  // Invoker Commands (https://github.com/whatwg/html/pull/9841)
-  Element* commandForElement() const;
-  AtomicString command() const;
-  void setCommand(const AtomicString& type);
-  CommandEventType GetCommandEventType(const AtomicString& type) const;
-
-  // Override for inertness in order to make customizable <select> button inert.
-  // TODO(crbug.com/1511354): Replace this with interactivity:inert in
-  // UA stylesheet after CSSInert feature has been enabled by default and remove
-  // virtual from HTMLElement::IsInertRoot.
-  bool IsInertRoot() const override;
+  bool CanBeCommandInvoker() const override;
 
  private:
   // The type attribute of HTMLButtonElement is an enumerated attribute:
@@ -67,9 +60,9 @@ class CORE_EXPORT HTMLButtonElement final : public HTMLFormControlElement {
   // These values are a subset of the `FormControlType` enum. They have the same
   // binary representation so that FormControlType() reduces to a type cast.
   enum Type : std::underlying_type_t<mojom::blink::FormControlType> {
-    kSubmit = base::to_underlying(mojom::blink::FormControlType::kButtonSubmit),
-    kReset = base::to_underlying(mojom::blink::FormControlType::kButtonReset),
-    kButton = base::to_underlying(mojom::blink::FormControlType::kButtonButton),
+    kSubmit = std::to_underlying(mojom::blink::FormControlType::kButtonSubmit),
+    kReset = std::to_underlying(mojom::blink::FormControlType::kButtonReset),
+    kButton = std::to_underlying(mojom::blink::FormControlType::kButtonButton),
   };
 
   mojom::blink::FormControlType FormControlType() const override;
@@ -112,6 +105,11 @@ class CORE_EXPORT HTMLButtonElement final : public HTMLFormControlElement {
   bool RecalcWillValidate() const override;
 
   int DefaultTabIndex() const override;
+
+  static Element* RetrieveCommandForTargetElement(const HTMLElement& invoker);
+  static AtomicString GetCommand(const AtomicString& action,
+                                 ExecutionContext* execution_context);
+  bool IsFormAssociatedSubmitButton() const;
 
   static std::optional<Type> TypeFromString(const AtomicString&);
 

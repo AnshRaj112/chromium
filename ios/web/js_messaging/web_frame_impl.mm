@@ -11,6 +11,7 @@
 #import "base/debug/dump_without_crashing.h"
 #import "base/feature_list.h"
 #import "base/functional/bind.h"
+#import "base/functional/callback_helpers.h"
 #import "base/ios/ios_util.h"
 #import "base/json/json_writer.h"
 #import "base/logging.h"
@@ -27,6 +28,7 @@
 #import "ios/web/public/js_messaging/web_view_js_utils.h"
 #import "ios/web/public/thread/web_task_traits.h"
 #import "ios/web/public/thread/web_thread.h"
+#import "net/base/apple/url_conversions.h"
 #import "url/gurl.h"
 
 namespace {
@@ -39,8 +41,7 @@ NSString* CreateFunctionCallWithParameters(
   NSMutableArray* parameter_strings = [[NSMutableArray alloc] init];
 
   for (const auto& value : parameters) {
-    std::string string_value;
-    base::JSONWriter::Write(value, &string_value);
+    std::string string_value = base::WriteJson(value).value_or("");
     [parameter_strings addObject:base::SysUTF8ToNSString(string_value)];
   }
 
@@ -119,6 +120,10 @@ bool WebFrameImpl::IsMainFrame() const {
 
 url::Origin WebFrameImpl::GetSecurityOrigin() const {
   return security_origin_;
+}
+
+GURL WebFrameImpl::GetUrl() const {
+  return net::GURLWithNSURL(frame_info_.request.URL);
 }
 
 BrowserState* WebFrameImpl::GetBrowserState() {
@@ -285,18 +290,13 @@ void WebFrameImpl::LogScriptWarning(NSString* script, NSError* error) {
         << "JavaScript error occurred with kAssertOnJavaScriptErrors enabled.";
   }
 
-  UMA_HISTOGRAM_BOOLEAN("IOS.JavaScript.ScriptExecutionFailed", true);
-
-  if (!base::FeatureList::IsEnabled(features::kLogJavaScriptErrors)) {
-    return;
-  }
-
   // Do not log invalid target frame errors. This error means that the frame is
   // no longer valid. This is an expected failure state as native code only has
   // an outdated view of the web frames (updated asyncronously via JS messages
   // or navigation callbacks).
   if (error.domain == WKErrorDomain &&
       error.code == WKErrorJavaScriptInvalidFrameTarget) {
+    UMA_HISTOGRAM_BOOLEAN("IOS.JavaScript.InterestingScriptError", false);
     return;
   }
 
@@ -304,6 +304,14 @@ void WebFrameImpl::LogScriptWarning(NSString* script, NSError* error) {
   // this as an error as it is an expected case.
   if (error.domain == WKErrorDomain &&
       [kCannotExecuteJSInDocumentErrorMessage isEqualToString:ns_exception]) {
+    UMA_HISTOGRAM_BOOLEAN("IOS.JavaScript.InterestingScriptError", false);
+    return;
+  }
+
+  UMA_HISTOGRAM_BOOLEAN("IOS.JavaScript.InterestingScriptError", true);
+
+  if (!base::FeatureList::IsEnabled(features::kLogJavaScriptErrors) &&
+      !base::FeatureList::IsEnabled(features::kLogCrWebJavaScriptErrors)) {
     return;
   }
 

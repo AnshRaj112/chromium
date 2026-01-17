@@ -27,15 +27,17 @@ import org.mockito.MockitoAnnotations;
 import org.robolectric.annotation.Config;
 
 import org.chromium.base.Callback;
-import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.ObservableSuppliers;
 import org.chromium.base.supplier.OneshotSupplierImpl;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController.StateChangeReason;
 import org.chromium.components.browser_ui.desktop_windowing.AppHeaderState;
 import org.chromium.components.browser_ui.desktop_windowing.DesktopWindowStateManager;
 import org.chromium.components.browser_ui.widget.scrim.ScrimManager;
 import org.chromium.ui.KeyboardVisibilityDelegate;
+
+import java.util.function.Supplier;
 
 /** Unit tests for {@link BottomSheetControllerImpl}. */
 @RunWith(BaseRobolectricTestRunner.class)
@@ -58,8 +60,8 @@ public class BottomSheetControllerImplUnitTest {
     private final Callback<View> mInitializedCallback = view -> {};
     private Window mWindow;
     private final OneshotSupplierImpl<ViewGroup> mRootSupplier = new OneshotSupplierImpl<>();
-    private final ObservableSupplierImpl<Integer> mEdgeToEdgeBottomInsetSupplier =
-            new ObservableSupplierImpl<>();
+    private final SettableMonotonicObservableSupplier<Integer> mEdgeToEdgeBottomInsetSupplier =
+            ObservableSuppliers.createMonotonic();
 
     @Before
     public void setUp() {

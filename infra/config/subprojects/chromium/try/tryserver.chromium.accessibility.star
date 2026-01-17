@@ -18,7 +18,11 @@ try_.defaults.set(
     os = os.LINUX_DEFAULT,
     compilator_cores = 16,
     execution_timeout = try_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     service_account = try_constants.DEFAULT_SERVICE_ACCOUNT,
+    siso_keep_going = siso.KEEP_GOING,
     siso_project = siso.project.DEFAULT_UNTRUSTED,
     siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
 )

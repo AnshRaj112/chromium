@@ -66,22 +66,16 @@ export class SettingsCrostiniSubpageElement extends
         },
       },
 
-      showArcAdbSideloading_: {
-        type: Boolean,
-        computed: 'and_(isArcAdbSideloadingSupported_, isAndroidEnabled_)',
-      },
-
-      isArcAdbSideloadingSupported_: {
-        type: Boolean,
-        value() {
-          return loadTimeData.getBoolean('arcAdbSideloadingSupported');
-        },
-      },
-
+      /**
+       * Whether port-forwarding UI should be displayed.
+       * Determined by policy setting and if current termina guest is of
+       * baguette type.
+       */
       showCrostiniPortForwarding_: {
         type: Boolean,
         value() {
-          return loadTimeData.getBoolean('showCrostiniPortForwarding');
+          return loadTimeData.getBoolean('showCrostiniPortForwarding') &&
+              !loadTimeData.getBoolean('isBaguette');
         },
       },
 
@@ -92,29 +86,6 @@ export class SettingsCrostiniSubpageElement extends
         },
       },
 
-      isAndroidEnabled_: {
-        type: Boolean,
-      },
-
-      /**
-       * Whether the uninstall options should be displayed.
-       */
-      hideCrostiniUninstall_: {
-        type: Boolean,
-        computed: 'or_(installerShowing_, upgraderDialogShowing_)',
-      },
-
-      /**
-       * Whether the button to launch the Crostini container upgrade flow should
-       * be shown.
-       */
-      showCrostiniContainerUpgrade_: {
-        type: Boolean,
-        value() {
-          return loadTimeData.getBoolean('showCrostiniContainerUpgrade');
-        },
-      },
-
       showDiskResizeConfirmationDialog_: {
         type: Boolean,
         value: false,
@@ -122,19 +93,6 @@ export class SettingsCrostiniSubpageElement extends
 
       installerShowing_: {
         type: Boolean,
-      },
-
-      upgraderDialogShowing_: {
-        type: Boolean,
-      },
-
-      /**
-       * Whether the button to launch the Crostini container upgrade flow should
-       * be disabled.
-       */
-      disableUpgradeButton_: {
-        type: Boolean,
-        computed: 'or_(installerShowing_, upgraderDialogShowing_)',
       },
 
       /**
@@ -175,7 +133,6 @@ export class SettingsCrostiniSubpageElement extends
   static get observers() {
     return [
       'onCrostiniEnabledChanged_(prefs.crostini.enabled.value)',
-      'onArcEnabledChanged_(prefs.arc.enabled.value)',
     ];
   }
 
@@ -184,30 +141,22 @@ export class SettingsCrostiniSubpageElement extends
     Setting.kUninstallCrostini,
     Setting.kCrostiniDiskResize,
     Setting.kCrostiniMicAccess,
-    Setting.kCrostiniContainerUpgrade,
   ]);
 
   private browserProxy_: CrostiniBrowserProxy;
   private canDiskResize_: boolean;
-  private disableUpgradeButton_: boolean;
   private diskResizeButtonAriaLabel_: string;
   private diskResizeButtonLabel_: string;
   private diskResizeConfirmationState_: ConfirmationState;
   private diskSizeLabel_: string;
-  private hideCrostiniUninstall_: boolean;
   private installerShowing_: boolean;
-  private readonly isArcAdbSideloadingSupported_: boolean;
-  private isAndroidEnabled_: boolean;
   private isDiskUserChosenSize_: boolean;
-  private showArcAdbSideloading_: boolean;
-  private showCrostiniContainerUpgrade_: boolean;
   private readonly showCrostiniExportImport_: boolean;
   private readonly showCrostiniExtraContainers_: boolean;
   private showCrostiniMicPermissionDialog_: boolean;
   private readonly showCrostiniPortForwarding_: boolean;
   private showDiskResizeConfirmationDialog_: boolean;
   private showDiskResizeDialog_: boolean;
-  private upgraderDialogShowing_: boolean;
 
   constructor() {
     super();
@@ -229,18 +178,7 @@ export class SettingsCrostiniSubpageElement extends
         'crostini-installer-status-changed', (status: boolean) => {
           this.installerShowing_ = status;
         });
-    this.addWebUiListener(
-        'crostini-upgrader-status-changed', (status: boolean) => {
-          this.upgraderDialogShowing_ = status;
-        });
-    this.addWebUiListener(
-        'crostini-container-upgrade-available-changed',
-        (canUpgrade: boolean) => {
-          this.showCrostiniContainerUpgrade_ = canUpgrade;
-        });
     this.browserProxy_.requestCrostiniInstallerStatus();
-    this.browserProxy_.requestCrostiniUpgraderDialogStatus();
-    this.browserProxy_.requestCrostiniContainerUpgradeAvailable();
     this.loadDiskInfo_();
   }
 
@@ -252,7 +190,6 @@ export class SettingsCrostiniSubpageElement extends
     this.addFocusConfig(
         r.CROSTINI_SHARED_USB_DEVICES, '#crostiniSharedUsbDevicesRow');
     this.addFocusConfig(r.CROSTINI_EXPORT_IMPORT, '#crostiniExportImportRow');
-    this.addFocusConfig(r.CROSTINI_ANDROID_ADB, '#crostiniEnableArcAdbRow');
     this.addFocusConfig(
         r.CROSTINI_PORT_FORWARDING, '#crostiniPortForwardingRow');
     this.addFocusConfig(
@@ -282,16 +219,8 @@ export class SettingsCrostiniSubpageElement extends
     }
   }
 
-  private onArcEnabledChanged_(enabled: boolean): void {
-    this.isAndroidEnabled_ = enabled;
-  }
-
   private onExportImportClick_(): void {
     Router.getInstance().navigateTo(routes.CROSTINI_EXPORT_IMPORT);
-  }
-
-  private onEnableArcAdbClick_(): void {
-    Router.getInstance().navigateTo(routes.CROSTINI_ANDROID_ADB);
   }
 
   private loadDiskInfo_(): void {
@@ -370,14 +299,6 @@ export class SettingsCrostiniSubpageElement extends
   private onRemoveClick_(): void {
     this.browserProxy_.requestRemoveCrostini();
     recordSettingChange(Setting.kUninstallCrostini);
-  }
-
-  /**
-   * Shows the upgrade flow dialog.
-   */
-  private onContainerUpgradeClick_(): void {
-    this.browserProxy_.requestCrostiniContainerUpgradeView();
-    recordSettingChange(Setting.kCrostiniContainerUpgrade);
   }
 
   private onSharedPathsClick_(): void {

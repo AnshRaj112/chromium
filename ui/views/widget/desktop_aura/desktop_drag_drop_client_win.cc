@@ -37,6 +37,7 @@ class SourceWindowObserver : public aura::WindowObserver {
   // aura::WindowObserver:
   void OnWindowDestroying(aura::Window* window) override {
     source_window_alive_ = false;
+    scoped_observation_.Reset();
   }
 
   bool source_window_alive() { return source_window_alive_; }
@@ -74,7 +75,7 @@ ui::mojom::DragOperation DesktopDragDropClientWin::StartDragAndDrop(
   gfx::Point touch_screen_point;
   if (source == ui::mojom::DragEventSource::kTouch) {
     source_window->GetHost()->ConvertDIPToPixels(&touch_screen_point);
-    display::Screen* screen = display::Screen::GetScreen();
+    display::Screen* screen = display::Screen::Get();
     CHECK(screen);
     aura::Window* window =
         screen->GetWindowAtScreenPoint(screen->GetCursorScreenPoint());

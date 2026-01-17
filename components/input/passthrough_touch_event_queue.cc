@@ -9,11 +9,15 @@
 #include <utility>
 
 #include "base/auto_reset.h"
+#include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/typed_macros.h"
 #include "components/input/touch_timeout_handler.h"
 #include "components/input/web_touch_event_traits.h"
+#include "third_party/blink/public/common/features.h"
+#include "ui/base/ui_base_features.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/gfx/geometry/point_f.h"
 
@@ -117,18 +121,53 @@ void PassthroughTouchEventQueue::QueueEvent(
   SendTouchEventImmediately(&cloned_event, true, dispatch_callback);
 }
 
-void PassthroughTouchEventQueue::PrependTouchScrollNotification() {
+void PassthroughTouchEventQueue::PrependTouchScrollNotification(
+    uint32_t primary_unique_touch_event_id) {
   TRACE_EVENT0("input",
                "PassthroughTouchEventQueue::PrependTouchScrollNotification");
+
+  if (base::FeatureList::IsEnabled(
+          blink::features::kAsyncTouchMovesImmediatelyAfterScroll)) {
+    send_touch_events_async_ = true;
+    SetAckStateForPendingTouchMovesFromSequence(primary_unique_touch_event_id);
+  }
 
   TouchEventWithLatencyInfo touch(
       WebInputEvent::Type::kTouchScrollStarted, WebInputEvent::kNoModifiers,
       ui::EventTimeForNow(), LatencyInfo());
   touch.event.dispatch_type = WebInputEvent::DispatchType::kEventNonBlocking;
+  touch.event.unique_touch_event_id = ui::GetNextTouchEventId();
   {
     ScopedDispatchToRendererCallback dispatch_callback(
         client_->GetDispatchToRendererCallback());
     SendTouchEventImmediately(&touch, true, dispatch_callback.callback);
+  }
+}
+
+void PassthroughTouchEventQueue::SetAckStateForPendingTouchMovesFromSequence(
+    uint32_t primary_unique_touch_event_id) {
+  if (curr_sequence_down_event_id_ != primary_unique_touch_event_id) {
+    // The touch sequence that started scroll has ended.
+    return;
+  }
+
+  // Ack all outstanding touches in the current sequence to unblock the
+  // browser.
+  for (auto& it : outstanding_touches_) {
+    if (it.event.GetType() != WebInputEvent::Type::kTouchMove) {
+      break;
+    }
+
+    auto& outstanding_touch =
+        const_cast<TouchEventWithLatencyInfoAndAckState&>(it);
+    if (it.ack_state() == blink::mojom::InputEventResultState::kUnknown) {
+      // Based on the CHECK above we are already in middle of processing acks,
+      // we can just set them ignored here and the existing loop can process
+      // acks for these events as well.
+      outstanding_touch.set_ack_info(
+          blink::mojom::InputEventResultSource::kBrowser,
+          blink::mojom::InputEventResultState::kIgnored);
+    }
   }
 }
 
@@ -223,6 +262,17 @@ void PassthroughTouchEventQueue::FlushQueue() {
   }
 }
 
+void PassthroughTouchEventQueue::OnTouchActionFromMain() {
+  if (base::FeatureList::IsEnabled(
+          blink::features::kAsyncTouchMovesImmediatelyAfterScroll)) {
+    // It's possible a deferred scroll might have actually started upon
+    // receiving touch action from main. And as a result ack of some touch moves
+    // would have been set locally in Browser itself in
+    // `SetAckStateForPendingTouchMovesFromSequence`.
+    AckCompletedEvents();
+  }
+}
+
 void PassthroughTouchEventQueue::StopTimeoutMonitor() {
   if (timeout_handler_)
     timeout_handler_->StopTimeoutMonitor();
@@ -271,15 +321,22 @@ void PassthroughTouchEventQueue::SendTouchEventImmediately(
       touch->event.GetType() != WebInputEvent::Type::kTouchStart)
     touch->event.dispatch_type = WebInputEvent::DispatchType::kEventNonBlocking;
 
-  if (touch->event.GetType() == WebInputEvent::Type::kTouchStart)
+  if (touch->event.GetType() == WebInputEvent::Type::kTouchStart) {
     touch->event.touch_start_or_first_touch_move = true;
+    any_touchmove_moved_beyond_slop_region_ = false;
+  }
 
   // For touchmove events, compare touch points position from current event
   // to last sent event and update touch points state.
   if (touch->event.GetType() == WebInputEvent::Type::kTouchMove) {
     CHECK(last_sent_touchevent_);
-    if (last_sent_touchevent_->GetType() == WebInputEvent::Type::kTouchStart)
+    if (last_sent_touchevent_->GetType() == WebInputEvent::Type::kTouchStart ||
+        (last_sent_touchevent_->GetType() == WebInputEvent::Type::kTouchMove &&
+         !any_touchmove_moved_beyond_slop_region_)) {
       touch->event.touch_start_or_first_touch_move = true;
+      any_touchmove_moved_beyond_slop_region_ |=
+          touch->event.moved_beyond_slop_region;
+    }
     for (unsigned int i = 0; i < last_sent_touchevent_->touches_length; ++i) {
       const WebTouchPoint& last_touch_point = last_sent_touchevent_->touches[i];
       // Touches with same id may not have same index in Touches array.
@@ -302,6 +359,12 @@ void PassthroughTouchEventQueue::SendTouchEventImmediately(
       *last_sent_touchevent_ = touch->event;
     else
       last_sent_touchevent_ = std::make_unique<WebTouchEvent>(touch->event);
+  }
+
+  if (touch->event.IsTouchSequenceStart()) {
+    curr_sequence_down_event_id_ = touch->event.unique_touch_event_id;
+  } else if (touch->event.IsTouchSequenceEnd()) {
+    curr_sequence_down_event_id_.reset();
   }
 
   if (timeout_handler_)
@@ -427,7 +490,13 @@ PassthroughTouchEventQueue::FilterBeforeForwardingImpl(
     }
   }
 
-  return PreFilterResult::kFilteredNoNonstationaryPointers;
+  // If SendEmptyGestureScrollUpdate is enabled, GestureScrollUpdates will be
+  // generated from zero delta touch moves. We need to send these events to the
+  // renderer so that we don't generate unnecessary scrolls if the touch moves
+  // were consumed (e.g. preventDefault() was called).
+  return base::FeatureList::IsEnabled(features::kSendEmptyGestureScrollUpdate)
+             ? PreFilterResult::kUnfiltered
+             : PreFilterResult::kFilteredNoNonstationaryPointers;
 }
 
 void PassthroughTouchEventQueue::UpdateTouchConsumerStates(

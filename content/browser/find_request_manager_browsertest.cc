@@ -114,7 +114,7 @@ class FindRequestManagerTestBase : public ContentBrowserTest {
   void MakeChildFrameCrossProcess() {
     FrameTreeNode* child = first_child();
     GURL url =
-        embedded_test_server()->GetURL("b.com", child->current_url().path());
+        embedded_test_server()->GetURL("b.com", child->current_url().GetPath());
     EXPECT_TRUE(NavigateToURLFromRenderer(child, url));
   }
 
@@ -1173,7 +1173,7 @@ IN_PROC_BROWSER_TEST_P(FindRequestManagerTest, FindInPageDisabledForOrigin) {
   // Navigate child frame to b.com.
   EXPECT_TRUE(NavigateToURLFromRenderer(
       first_child(), embedded_test_server()->GetURL(
-                         "b.com", first_child()->current_url().path())));
+                         "b.com", first_child()->current_url().GetPath())));
   root_origin = GetOriginForFrameTreeNode(root());
   child_origin = GetOriginForFrameTreeNode(first_child());
   EXPECT_EQ("a.com", root_origin.host());
@@ -1887,6 +1887,41 @@ IN_PROC_BROWSER_TEST_P(FindRequestManagerTest, DelayThenStop) {
   EXPECT_FALSE(contents()
                    ->GetFindRequestManagerForTesting()
                    ->RunDelayedFindTaskForTesting());
+}
+
+// Tests that find-in-page doesn't crash when trying to find on a crashed page.
+// This test ensures that the fix for the DCHECK failure when attempting
+// find-next on a page like chrome://crash works correctly.
+IN_PROC_BROWSER_TEST_F(FindRequestManagerTest, FindNextOnCrashedPage) {
+  // 1) Start with a normal page and begin a find session.
+  LoadAndWait("/find_in_simple_page.html");
+
+  auto options = blink::mojom::FindOptions::New();
+  options->run_synchronously_for_testing = true;
+  Find("result", options->Clone());
+  delegate()->WaitForFinalReply();
+
+  // Verify the initial find session has matches.
+  FindResults results = delegate()->GetFindResults();
+  EXPECT_EQ(last_request_id(), results.request_id);
+  EXPECT_EQ(5, results.number_of_matches);
+  EXPECT_EQ(1, results.active_match_ordinal);
+
+  // 2) Navigate to chrome://crash to crash the renderer.
+  content::ScopedAllowRendererCrashes scoped_allow_renderer_crashes;
+  GURL crash_url("chrome://crash");
+  EXPECT_FALSE(NavigateToURL(shell(), crash_url));
+
+  // 3) Try to perform a find-next operation on the crashed page.
+  // This should not trigger a DCHECK failure.
+  options->new_session = false;
+  Find("result", options->Clone());
+
+  // The find operation should complete without crashing, but there should be
+  // no matches since the page is crashed.
+  results = delegate()->GetFindResults();
+  EXPECT_EQ(0, results.number_of_matches);
+  EXPECT_EQ(0, results.active_match_ordinal);
 }
 
 }  // namespace content

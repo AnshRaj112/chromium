@@ -63,27 +63,31 @@ class MetricsRenderFrameObserver : public content::RenderFrameObserver,
       const blink::UseCounterFeature& feature) override;
   void DidObserveSoftNavigation(
       blink::SoftNavigationMetricsForReporting metrics) override;
+  void DidObserveSoftLargestContentfulPaint(
+      const blink::LargestContentfulPaintDetailsForReporting& lcp) override;
   void DidObserveLayoutShift(double score, bool after_input_or_scroll) override;
   void DidStartResponse(const url::SchemeHostPort& final_response_url,
                         int request_id,
                         const network::mojom::URLResponseHead& response_head,
                         network::mojom::RequestDestination request_destination,
                         bool is_ad_resource) override;
-  void DidReceiveTransferSizeUpdate(int request_id,
-                                    int received_data_length) override;
+  void DidReceiveTransferSizeUpdate(
+      int request_id,
+      base::ByteCount received_data_length) override;
   void DidCompleteResponse(
       int request_id,
       const network::URLLoaderCompletionStatus& status) override;
   void DidCancelResponse(int request_id) override;
   void DidLoadResourceFromMemoryCache(const GURL& response_url,
                                       int request_id,
-                                      int64_t encoded_body_length,
+                                      base::ByteCount encoded_body_length,
                                       const std::string& mime_type,
                                       bool from_archive) override;
   void DidStartNavigation(
       const GURL& url,
       std::optional<blink::WebNavigationType> navigation_type) override;
-  void DidSetPageLifecycleState(bool restoring_from_bfcache) override;
+  void DidSetPageLifecycleState(
+      blink::BFCacheStateChange bfcache_change) override;
 
   void ReadyToCommitNavigation(
       blink::WebDocumentLoader* document_loader) override;
@@ -100,9 +104,8 @@ class MetricsRenderFrameObserver : public content::RenderFrameObserver,
       const gfx::Rect& main_frame_intersection_rect) override;
   void OnMainFrameViewportRectangleChanged(
       const gfx::Rect& main_frame_viewport_rect) override;
-  void OnMainFrameImageAdRectangleChanged(
-      int element_id,
-      const gfx::Rect& image_ad_rect) override;
+  void OnMainFrameAdRectangleChanged(int element_id,
+                                     const gfx::Rect& ad_rect) override;
 
   // blink::WebLocalFrameObserver implementation
   void OnFrameDetached() override;
@@ -134,8 +137,11 @@ class MetricsRenderFrameObserver : public content::RenderFrameObserver,
 
   void SendMetrics();
   void OnMetricsSenderCreated();
+
+  // Start of the (hard) navigation, as seen by PerformanceMetricsForReporting,
+  // in seconds since the Unix Epoch.
+  virtual double GetNavigationStart() const;
   virtual Timing GetTiming() const;
-  virtual mojom::SoftNavigationMetricsPtr GetSoftNavigationMetrics() const;
   virtual mojom::CustomUserTimingMarkPtr GetCustomUserTimingMark() const;
   virtual std::unique_ptr<base::OneShotTimer> CreateTimer();
   virtual std::unique_ptr<PageTimingSender> CreatePageTimingSender(

@@ -4,14 +4,17 @@
 
 #include "chrome/browser/ash/login/screens/gaia_screen.h"
 
+#include <algorithm>
+
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
 #include "ash/public/cpp/reauth_reason.h"
 #include "ash/shell.h"
-#include "base/containers/contains.h"
+#include "base/check_is_test.h"
 #include "base/memory/weak_ptr.h"
 #include "base/values.h"
 #include "chrome/browser/ash/login/demo_mode/demo_setup_controller.h"
+#include "chrome/browser/ash/login/startup_utils.h"
 #include "chrome/browser/ash/login/wizard_context.h"
 #include "chrome/browser/ash/login/wizard_controller.h"
 #include "chrome/browser/ash/policy/enrollment/account_status_check_fetcher.h"
@@ -58,7 +61,7 @@ bool ShouldPrepareForRecovery(const AccountId& account_id) {
   user_manager::KnownUser known_user(g_browser_process->local_state());
   std::optional<int> reauth_reason = known_user.FindReauthReason(account_id);
   return reauth_reason.has_value() &&
-         base::Contains(kPossibleReasons, reauth_reason.value());
+         std::ranges::contains(kPossibleReasons, reauth_reason.value());
 }
 
 bool ShouldUseReauthEndpoint(const AccountId& account_id) {
@@ -83,6 +86,7 @@ std::string GaiaScreen::GetResultString(Result result) {
       return "EnterpriseEnroll";
     case Result::ENTER_QUICK_START:
       return "EnterQuickStart";
+    case Result::ERROR_OOBE_NOT_COMPLETED:
     case Result::QUICK_START_ONGOING:
       return BaseScreen::kNotApplicable;
   }
@@ -106,6 +110,12 @@ bool GaiaScreen::MaybeSkip(WizardContext& context) {
       context.gaia_config.gaia_path !=
           WizardContext::GaiaPath::kQuickStartFallback) {
     exit_callback_.Run(Result::QUICK_START_ONGOING);
+    return true;
+  }
+
+  if (features::IsOobeAutoEnrollmentCheckForcedEnabled() &&
+      !StartupUtils::IsOobeCompleted()) {
+    exit_callback_.Run(Result::ERROR_OOBE_NOT_COMPLETED);
     return true;
   }
 
@@ -313,13 +323,21 @@ void GaiaScreen::HandleIdentifierEntered(const std::string& user_email) {
 void GaiaScreen::OnGetAuthFactorsConfiguration(
     std::unique_ptr<UserContext> user_context,
     std::optional<AuthenticationError> error) {
-  bool is_recovery_configured = false;
-  bool is_gaia_password_configured = true;
   if (!view_) {
     LOG(WARNING) << "The view is nullptr during OnGetAuthFactorsConfiguration";
     return;
   }
+
+  if (is_hidden()) {
+    LOG(WARNING) << "The Gaia screen is already hidden";
+    return;
+  } else {
+    CHECK(context());
+  }
+
   CHECK(user_context);
+  bool is_recovery_configured = false;
+  bool is_gaia_password_configured = true;
   if (error.has_value()) {
     LOG(WARNING) << "Failed to get auth factors configuration, code "
                  << error->get_cryptohome_error()
@@ -338,7 +356,6 @@ void GaiaScreen::OnGetAuthFactorsConfiguration(
 
   // Disallow passwordless login when Gaia password is configured during
   // reauthentication or recovery flow.
-  CHECK(context());
   auto flow = context()->knowledge_factor_setup.auth_setup_flow;
   if ((flow == WizardContext::AuthChangeFlow::kReauthentication ||
        flow == WizardContext::AuthChangeFlow::kRecovery) &&

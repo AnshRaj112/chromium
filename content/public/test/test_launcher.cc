@@ -15,7 +15,6 @@
 #include "base/base_paths.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/debug/debugger.h"
 #include "base/environment.h"
@@ -74,6 +73,7 @@
 #undef GetCommandLine
 #elif BUILDFLAG(IS_MAC)
 #include "base/apple/scoped_nsautorelease_pool.h"
+#include "base/mac/mac_util.h"
 #include "sandbox/mac/seatbelt_exec.h"
 #endif
 
@@ -233,7 +233,7 @@ base::CommandLine WrapperTestLauncherDelegate::GetCommandLine(
   new_cmd_line.AppendSwitchPath(switches::kTestLauncherOutput, *output_file);
 
   // Selecting sample tests to enable switches::kEnableTracing.
-  if (base::Contains(switches, switches::kEnableTracingFraction)) {
+  if (switches.contains(switches::kEnableTracingFraction)) {
     double enable_tracing_fraction = 0;
     if (!base::StringToDouble(switches[switches::kEnableTracingFraction],
                               &enable_tracing_fraction) ||
@@ -307,6 +307,15 @@ void AppendCommandLineSwitches() {
   // Always disable the unsandbox GPU process for DX12 Info collection to avoid
   // interference. This GPU process is launched 120 seconds after chrome starts.
   command_line->AppendSwitch(switches::kDisableGpuProcessForDX12InfoCollection);
+
+#if BUILDFLAG(IS_MAC)
+  // TODO(crbug.com/439820682): Remove this when the issue is fixed.
+  // This is a temporary workaround for an issue where GPU video decoding
+  // is slow on Mac VMs, causing test flakiness.
+  if (base::mac::IsVirtualMachine()) {
+    command_line->AppendSwitch(switches::kDisableAcceleratedVideoDecode);
+  }
+#endif
 }
 
 }  // namespace

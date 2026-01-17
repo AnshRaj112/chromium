@@ -4,6 +4,8 @@
 
 #include "components/facilitated_payments/core/browser/pix_account_linking_manager.h"
 
+#include <utility>
+
 #include "base/check_deref.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/functional/bind.h"
@@ -26,13 +28,7 @@ PixAccountLinkingManager::PixAccountLinkingManager(
     FacilitatedPaymentsClient* client)
     : client_(CHECK_DEREF(client)) {}
 
-PixAccountLinkingManager::~PixAccountLinkingManager() {
-  if (is_prompt_showing_) {
-    // The prompt closed unexpectedly, so the internal state is not updated. The
-    // event listener would log metrics accordingly.
-    client_->DismissPrompt();
-  }
-}
+PixAccountLinkingManager::~PixAccountLinkingManager() = default;
 
 void PixAccountLinkingManager::MaybeShowPixAccountLinkingPrompt(
     const url::Origin& pix_payment_page_origin) {
@@ -68,7 +64,7 @@ void PixAccountLinkingManager::MaybeShowPixAccountLinkingPrompt(
     return;
   }
 
-  // Make a request to payments backend to check if user is eligible for pix
+  // Make a request to payments backend to check if user is eligible for Pix
   // account linking.
   auto billing_customer_id = autofill::payments::GetBillingCustomerId(
       CHECK_DEREF(client_->GetPaymentsDataManager()));
@@ -79,7 +75,7 @@ void PixAccountLinkingManager::MaybeShowPixAccountLinkingPrompt(
   } else {
     // The user is an existing payments customer. Make a backend call to check
     // eligibility for Pix account linking.
-    client_->GetMultipleRequestFacilitatedPaymentsNetworkInterface()
+    client_->GetFacilitatedPaymentsNetworkInterface()
         ->GetDetailsForCreatePaymentInstrument(
             billing_customer_id,
             base::BindOnce(
@@ -215,8 +211,7 @@ void PixAccountLinkingManager::OnUiScreenEvent(UiEvent ui_event_type) {
       break;
     }
     default:
-      NOTREACHED() << "Unhandled UiEvent "
-                   << base::to_underlying(ui_event_type);
+      NOTREACHED() << "Unhandled UiEvent " << std::to_underlying(ui_event_type);
   }
 }
 

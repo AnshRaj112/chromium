@@ -20,6 +20,9 @@ try_.defaults.set(
     build_numbers = True,
     cq_group = "cq",
     execution_timeout = 2 * time.hour,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     # Max. pending time for builds. CQ considers builds pending >2h as timed
     # out: http://shortn/_8PaHsdYmlq. Keep this in sync.
     expiration_timeout = 2 * time.hour,
@@ -33,7 +36,7 @@ try_.defaults.set(
 def angle_mac_builder(*, name, **kwargs):
     kwargs.setdefault("builderless", True)
     kwargs.setdefault("cores", None)
-    kwargs.setdefault("os", os.MAC_ANY)
+    kwargs.setdefault("os", os.MAC_DEFAULT)
     kwargs.setdefault("ssd", None)
     return try_.builder(name = name, **kwargs)
 

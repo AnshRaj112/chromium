@@ -4,39 +4,55 @@
 
 #include "chrome/browser/web_applications/jobs/manifest_to_web_app_install_info_job.h"
 
-#include <functional>
+#include <algorithm>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
+#include "base/check.h"
+#include "base/check_op.h"
 #include "base/containers/flat_map.h"
+#include "base/feature_list.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
+#include "base/functional/function_ref.h"
+#include "base/location.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/notreached.h"
+#include "base/strings/to_string.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/synchronization/lock.h"
+#include "base/task/sequenced_task_runner.h"
+#include "base/values.h"
+#include "chrome/browser/browser_process.h"
+#include "chrome/browser/global_features.h"
 #include "chrome/browser/web_applications/icons/trusted_icon_filter.h"
+#include "chrome/browser/web_applications/model/display_override.h"
 #include "chrome/browser/web_applications/scope_extension_info.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
-#include "chrome/browser/web_applications/web_app_icon_generator.h"
 #include "chrome/browser/web_applications/web_app_icon_operations.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
 #include "chrome/browser/web_applications/web_app_install_utils.h"
 #include "chrome/browser/web_applications/web_app_utils.h"
 #include "chrome/browser/web_applications/web_contents/web_app_data_retriever.h"
 #include "chrome/common/chrome_features.h"
+#include "components/application_locale_storage/application_locale_storage.h"
 #include "components/services/app_service/public/cpp/icon_info.h"
 #include "components/services/app_service/public/cpp/protocol_handler_info.h"
 #include "components/services/app_service/public/cpp/share_target.h"
 #include "components/webapps/browser/installable/installable_evaluator.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
 #include "content/public/browser/web_contents.h"
+#include "services/network/public/cpp/permissions_policy/permissions_policy_declaration.h"
 #include "third_party/blink/public/common/features.h"
-#include "third_party/blink/public/mojom/manifest/manifest.mojom-data-view.h"
+#include "third_party/blink/public/common/manifest/manifest.h"
 #include "third_party/blink/public/mojom/manifest/manifest.mojom.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/geometry/size.h"
 #include "url/gurl.h"
 
@@ -49,6 +65,95 @@ namespace {
 constexpr int kMaxIcons = 20;
 constexpr SquareSizePx kMaxIconSize =
     webapps::InstallableEvaluator::kMaximumIconSizeInPx;
+
+// Matches a localized text object from a map based on |application_locale|.
+blink::mojom::ManifestLocalizedTextObjectPtr MatchLocalizedText(
+    const base::flat_map<icu::Locale,
+                         blink::mojom::ManifestLocalizedTextObjectPtr>&
+        localized_map,
+    const icu::Locale& application_locale) {
+  if (localized_map.empty()) {
+    return nullptr;
+  }
+
+  auto it = localized_map.find(application_locale);
+  if (it != localized_map.end()) {
+    return it->second.Clone();
+  }
+
+  // Fall back to language-only ("en") match if no exact match ("en-US") found.
+  icu::Locale language_only(application_locale.getLanguage());
+  it = localized_map.find(language_only);
+  if (it != localized_map.end()) {
+    return it->second.Clone();
+  }
+  return nullptr;
+}
+
+LocalizedText GetLocalizedTitleFromManifestFields(
+    const blink::mojom::Manifest& manifest) {
+  if (base::FeatureList::IsEnabled(
+          blink::features::kWebAppManifestLocalization)) {
+    const icu::Locale application_locale(g_browser_process->GetFeatures()
+                                             ->application_locale_storage()
+                                             ->Get()
+                                             .c_str());
+
+    blink::mojom::ManifestLocalizedTextObjectPtr localized_name;
+    if (manifest.name_localized.has_value()) {
+      localized_name =
+          MatchLocalizedText(*manifest.name_localized, application_locale);
+    }
+    if (!localized_name && manifest.short_name_localized.has_value()) {
+      localized_name = MatchLocalizedText(*manifest.short_name_localized,
+                                          application_locale);
+    }
+
+    if (localized_name && !localized_name->value.empty()) {
+      return LocalizedText(localized_name->value, localized_name->lang,
+                           localized_name->dir);
+    }
+  }
+  // Fall back to non-localized fields. Use assignment operator which handles
+  // clearing lang/dir fields.
+  LocalizedText result;
+  std::u16string name = manifest.name.value_or(std::u16string());
+  if (!name.empty()) {
+    result = name;
+  } else if (manifest.short_name) {
+    result = *manifest.short_name;
+  }
+  return result;
+}
+
+LocalizedText GetLocalizedDescriptionFromManifestFields(
+    const blink::mojom::Manifest& manifest) {
+  if (base::FeatureList::IsEnabled(
+          blink::features::kWebAppManifestLocalization)) {
+    const icu::Locale application_locale(g_browser_process->GetFeatures()
+                                             ->application_locale_storage()
+                                             ->Get()
+                                             .c_str());
+
+    if (manifest.description_localized.has_value()) {
+      blink::mojom::ManifestLocalizedTextObjectPtr localized_description =
+          MatchLocalizedText(*manifest.description_localized,
+                             application_locale);
+      if (localized_description && !localized_description->value.empty()) {
+        return LocalizedText(localized_description->value,
+                             localized_description->lang,
+                             localized_description->dir);
+      }
+    }
+  }
+  // Fall back to non-localized field. Use assignment operator which handles
+  // clearing lang/dir fields.
+  LocalizedText result;
+  if (manifest.description.has_value()) {
+    result = *manifest.description;
+  }
+  return result;
+}
 
 // Construct a list of icons from the parsed icons field of the manifest
 // *outside* of |web_app_info|, and update the current web_app_info if found.
@@ -67,7 +172,7 @@ void UpdateWebAppInstallInfoIconsFromManifestIfNeeded(
       apps::IconInfo info;
 
       if (!icon.sizes.empty()) {
-        if (base::Contains(icon.sizes, gfx::Size()) &&
+        if (std::ranges::contains(icon.sizes, gfx::Size()) &&
             icon.src.spec().find(".svg") != std::string::npos) {
           web_app_info->icons_with_size_any.manifest_icons[purpose] = icon.src;
         }
@@ -135,7 +240,6 @@ void PopulateWebAppShortcutsMenuItemInfos(
   int num_shortcut_icons = 0;
   for (const auto& shortcut : shortcuts) {
     if (web_app_shortcut_infos.size() >= kMaxApplicationDockMenuItems) {
-      DLOG(ERROR) << "Too many shortcuts";
       break;
     }
 
@@ -147,13 +251,13 @@ void PopulateWebAppShortcutsMenuItemInfos(
       std::vector<WebAppShortcutsMenuItemInfo::Icon> shortcut_icons;
       for (const auto& icon : shortcut.icons) {
         CHECK(!icon.purpose.empty());
-        if (!base::Contains(icon.purpose, purpose)) {
+        if (!std::ranges::contains(icon.purpose, purpose)) {
           continue;
         }
 
         WebAppShortcutsMenuItemInfo::Icon info;
 
-        if (base::Contains(icon.sizes, gfx::Size()) &&
+        if (std::ranges::contains(icon.sizes, gfx::Size()) &&
             icon.src.spec().find(".svg") != std::string::npos) {
           web_app_info->icons_with_size_any.shortcut_menu_icons[purpose] =
               icon.src;
@@ -325,7 +429,7 @@ void PopulateHomeTabIconsFromHomeTabManifestParams(
     CHECK(!icon.purpose.empty());
 
     if (!icon.sizes.empty()) {
-      if (base::Contains(icon.sizes, gfx::Size()) &&
+      if (std::ranges::contains(icon.sizes, gfx::Size()) &&
           icon.src.spec().find(".svg") != std::string::npos) {
         for (const auto& purpose : icon.purpose) {
           web_app_info->icons_with_size_any.home_tab_icons[purpose] = icon.src;
@@ -372,7 +476,7 @@ void PopulateHomeTabIconsFromHomeTabManifestParams(
 // It is the duty of the callsites to perform the necessary checks to ensure
 // that `from_info` and `to_info` is valid.
 void MergeFallbackInstallInfoIntoNewInfo(const WebAppInstallInfo& from_info,
-                                         WebAppInstallInfo* to_info,
+                                         WebAppInstallInfo& to_info,
                                          bool force_override_name) {
   // Merge fields from `from_info` onto `to_info` if required.
   // `from` is generated from the `WebAppDataRetriever` and populates
@@ -387,20 +491,22 @@ void MergeFallbackInstallInfoIntoNewInfo(const WebAppInstallInfo& from_info,
   // `mobile_capable` needs to be moved over to `to_info`. `start_url` and
   // `manifest_id` has to be valid for the job to run.
   if ((force_override_name && !from_info.title.empty()) ||
-      to_info->title.empty()) {
-    to_info->title = from_info.title;
+      to_info.title.empty()) {
+    to_info.title = from_info.title;
   }
-  if (to_info->description.empty()) {
-    to_info->description = from_info.description;
+  if (to_info.description.empty()) {
+    to_info.description = from_info.description;
   }
-  to_info->mobile_capable = from_info.mobile_capable;
-  if (to_info->manifest_icons.empty() && !from_info.manifest_icons.empty()) {
-    to_info->manifest_icons = from_info.manifest_icons;
+  to_info.mobile_capable = from_info.mobile_capable;
+  if (to_info.manifest_icons.empty() && !from_info.manifest_icons.empty()) {
+    to_info.manifest_icons = from_info.manifest_icons;
   }
 }
 
-void RecordIconUpdateMetrics(IconsDownloadedResult result,
-                             DownloadedIconsHttpResults icons_http_results) {
+void RecordIconUpdateMetrics(
+    IconsDownloadedResult result,
+    const IconsMap& icons_map,
+    const DownloadedIconsHttpResults& icons_http_results) {
   // TODO(crbug.com/40193545): Report `result` and `icons_http_results` in
   // internals.
   base::UmaHistogramEnumeration("WebApp.Icon.DownloadedResultOnUpdate", result);
@@ -408,6 +514,17 @@ void RecordIconUpdateMetrics(IconsDownloadedResult result,
       "WebApp.Icon.DownloadedHttpStatusCodeOnUpdate", icons_http_results);
   RecordDownloadedIconsHttpResultsCodeClass(
       "WebApp.Icon.HttpStatusCodeClassOnUpdate", result, icons_http_results);
+
+  size_t total_icon_sizes_downloaded = 0;
+  for (const auto& [_, icons] : icons_map) {
+    for (const SkBitmap& bitmap : icons) {
+      total_icon_sizes_downloaded += bitmap.computeByteSize();
+    }
+  }
+
+  // The total size is stored in bytes, so convert to MB.
+  base::UmaHistogramMemoryMB("WebApp.TotalIconsMemory.DownloadedForUpdate",
+                             (total_icon_sizes_downloaded / 1024 / 1024));
 }
 
 }  // namespace
@@ -435,12 +552,26 @@ ManifestToWebAppInstallInfoJob::CreateAndStart(
   return job;
 }
 
-base::Value::Dict
-ManifestToWebAppInstallInfoJob::GetManifestToWebAppInfoGenerationErrors() {
-  if (!install_error_log_entry_.HasErrorDict()) {
-    return base::Value::Dict();
-  }
-  return install_error_log_entry_.TakeErrorDict();
+void ManifestToWebAppInstallInfoJob::FetchIcons(
+    WebAppInstallInfo& install_info,
+    content::WebContents& web_contents,
+    base::OnceClosure callback,
+    std::optional<base::FunctionRef<void(IconUrlSizeSet&)>>
+        icon_url_modifications,
+    IconUrlExtractionOptions icon_url_options) {
+  CHECK(creation_callback_.is_null());
+  CHECK(options_.defer_icon_fetching);
+  install_info_for_icon_fetch_ = &install_info;
+  // The final callback will be called with a blank unique ptr, that is fine and
+  // we ignore it.
+  creation_callback_ =
+      base::IgnoreArgs<std::unique_ptr<WebAppInstallInfo>>(std::move(callback));
+  FetchIconsInternal(web_contents, icon_url_modifications, icon_url_options);
+}
+
+IconsDownloadedResult ManifestToWebAppInstallInfoJob::icon_download_result()
+    const {
+  return icon_fetch_result_;
 }
 
 ManifestToWebAppInstallInfoJob::ManifestToWebAppInstallInfoJob(
@@ -454,11 +585,10 @@ ManifestToWebAppInstallInfoJob::ManifestToWebAppInstallInfoJob(
     std::optional<WebAppInstallInfo> fallback_info)
     : manifest_(manifest.Clone()),
       data_retriever_(data_retriever),
-      install_error_log_entry_(background_installation, install_source),
-      debug_data_(debug_data),
       creation_callback_(std::move(creation_callback)),
       options_(options),
-      fallback_info_(std::move(fallback_info)) {
+      fallback_info_(std::move(fallback_info)),
+      debug_data_(debug_data) {
   // These are the pre-requisites for constructing a WebAppInstallInfo from a
   // valid manifest id and start url.
   CHECK(manifest_->id.is_valid());
@@ -467,12 +597,18 @@ ManifestToWebAppInstallInfoJob::ManifestToWebAppInstallInfoJob(
 
   debug_data_->Set("manifest_id", manifest_->id.spec());
   debug_data_->Set("start_url", manifest_->start_url.spec());
+  debug_data_->Set("background_installation", background_installation);
+  debug_data_->Set("install_source", base::ToString(install_source));
   if (manifest_->name && !manifest_->name->empty()) {
     debug_data_->Set("manifest_name", *manifest_->name);
   }
   if (manifest_->short_name && !manifest_->short_name->empty()) {
     debug_data_->Set("manifest_short_name", *manifest_->short_name);
   }
+}
+
+WebAppInstallInfo& ManifestToWebAppInstallInfoJob::install_info() {
+  return install_info_ ? *install_info_ : *install_info_for_icon_fetch_;
 }
 
 void ManifestToWebAppInstallInfoJob::Start(
@@ -491,23 +627,45 @@ void ManifestToWebAppInstallInfoJob::Start(
   install_info_ =
       std::make_unique<WebAppInstallInfo>(manifest_->id, manifest_->start_url);
 
-  // First, populate the `install_info_` by parsing the fields provided in the
+  // First, populate the `install_info()` by parsing the fields provided in the
   // manifest.
   ParseManifestAndPopulateInfo();
   if (fallback_info_) {
-    CHECK(install_info_);
-    MergeFallbackInstallInfoIntoNewInfo(fallback_info_.value(),
-                                        install_info_.get(),
+    MergeFallbackInstallInfoIntoNewInfo(fallback_info_.value(), install_info(),
                                         options_.force_override_name);
   }
 
-  // Second, fetch icons, and populate them inside the `install_info_`. Exit
-  // early if icon generation needs to be bypassed.
-  // Since the `trusted_icons` metadata is populated from the icons provided in
-  // the manifest, it is guaranteed to exist in `icon_urls_to_download`.
+  // Second, fetch icons from the URLs in the install_info().
+  if (options_.defer_icon_fetching) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            &ManifestToWebAppInstallInfoJob::CompleteJobAndRunCallback,
+            weak_ptr_factory_.GetWeakPtr()));
+    return;
+  }
+  FetchIconsInternal(*web_contents, icon_url_modifications,
+                     IconUrlExtractionOptions());
+}
+
+void ManifestToWebAppInstallInfoJob::FetchIconsInternal(
+    content::WebContents& web_contents,
+    std::optional<base::FunctionRef<void(IconUrlSizeSet&)>>
+        icon_url_modifications,
+    IconUrlExtractionOptions icon_url_options) {
+  debug_data_->Set(
+      "icon_url_options",
+      base::DictValue()
+          .Set("product_icons", icon_url_options.product_icons)
+          .Set("shortcut_menu_item_icons",
+               icon_url_options.shortcut_menu_item_icons)
+          .Set("file_handling_icons", icon_url_options.file_handling_icons)
+          .Set("home_tab_icons", icon_url_options.home_tab_icons));
   IconUrlSizeSet icon_urls_to_download =
-      GetValidIconUrlsToDownload(*install_info_.get());
-  icon_url_modifications(icon_urls_to_download);
+      GetValidIconUrlsToDownload(install_info(), icon_url_options);
+  if (icon_url_modifications.has_value()) {
+    (*icon_url_modifications)(icon_urls_to_download);
+  }
   for (const IconUrlWithSize& icon_with_size : icon_urls_to_download) {
     debug_data_->EnsureList("icon_urls_from_manifest")
         ->Append(icon_with_size.ToString());
@@ -527,109 +685,123 @@ void ManifestToWebAppInstallInfoJob::Start(
   }
 
   data_retriever_->GetIcons(
-      web_contents.get(), icon_urls_to_download,
-      options_.download_page_favicons, options_.fail_all_if_any_fail,
+      &web_contents, icon_urls_to_download, options_.download_page_favicons,
+      options_.fail_all_if_any_fail,
       base::BindOnce(
           &ManifestToWebAppInstallInfoJob::OnIconsFetchedGetInstallInfo,
           weak_ptr_factory_.GetWeakPtr()));
 }
 
 void ManifestToWebAppInstallInfoJob::ParseManifestAndPopulateInfo() {
-  // Give the full length name priority if it's not empty.
-  std::u16string name = manifest_->name.value_or(std::u16string());
-  if (!name.empty()) {
-    install_info_->title = name;
-  } else if (manifest_->short_name) {
-    install_info_->title = *manifest_->short_name;
-  }
+  install_info().title = GetLocalizedTitleFromManifestFields(*manifest_);
 
   // Clean up.
   if (manifest_->scope.is_valid()) {
-    install_info_->scope = manifest_->scope;
+    install_info().scope = manifest_->scope;
   }
   // Ensure scope is derived if empty after processing manifest.
-  if (install_info_->scope.is_empty()) {
-    install_info_->scope = install_info_->start_url().GetWithoutFilename();
+  if (install_info().scope.is_empty()) {
+    install_info().scope = install_info().start_url().GetWithoutFilename();
   }
-  CHECK(!install_info_->scope.is_empty());
+  CHECK(!install_info().scope.is_empty());
 
   if (manifest_->has_theme_color) {
-    install_info_->theme_color = SkColorSetA(
+    install_info().theme_color = SkColorSetA(
         static_cast<SkColor>(manifest_->theme_color), SK_AlphaOPAQUE);
   }
 
   if (manifest_->has_background_color) {
-    install_info_->background_color = SkColorSetA(
+    install_info().background_color = SkColorSetA(
         static_cast<SkColor>(manifest_->background_color), SK_AlphaOPAQUE);
   }
 
   if (manifest_->display != DisplayMode::kUndefined) {
-    install_info_->display_mode = manifest_->display;
+    install_info().display_mode = manifest_->display;
+  }
+  for (const auto& override_item : manifest_->display_override) {
+    install_info().display_override.push_back(
+        override_item.display() == DisplayMode::kBorderless
+            ? DisplayOverride::CreateUnframed(override_item.url_patterns())
+            : DisplayOverride::Create(override_item.display()));
+    if (override_item.display() == DisplayMode::kBorderless &&
+        !override_item.url_patterns().empty()) {
+      // TODO(crbug.com/467939520): Remove `borderless_url_patterns`.
+      install_info().borderless_url_patterns = override_item.url_patterns();
+    }
   }
 
-  if (!manifest_->display_override.empty()) {
-    install_info_->display_override = manifest_->display_override;
-  }
-
-  if (!options_.skip_primary_icon_download) {
-    UpdateWebAppInstallInfoIconsFromManifestIfNeeded(manifest_->icons,
-                                                     install_info_.get());
-    if (base::FeatureList::IsEnabled(features::kWebAppUsePrimaryIcon)) {
+  UpdateWebAppInstallInfoIconsFromManifestIfNeeded(manifest_->icons,
+                                                   &install_info());
+  if (base::FeatureList::IsEnabled(features::kWebAppUsePrimaryIcon)) {
+    if (options_.use_manifest_icons_as_trusted) {
+      install_info().trusted_icons = install_info().manifest_icons;
+    } else {
       std::optional<apps::IconInfo> primary_icon_metadata =
           GetTrustedIconsFromManifest(manifest_->icons);
       if (primary_icon_metadata) {
-        install_info_->trusted_icons = {*primary_icon_metadata};
+        install_info().trusted_icons = {*primary_icon_metadata};
       }
     }
   }
 
   // TODO(crbug.com/40185556): Confirm incoming icons to write to install_info_.
-  PopulateFileHandlerInfoFromManifest(
-      manifest_->file_handlers, install_info_->scope, install_info_.get());
+  PopulateFileHandlerInfoFromManifest(manifest_->file_handlers,
+                                      install_info().scope, &install_info());
 
-  install_info_->share_target = ToWebAppShareTarget(manifest_->share_target);
+  if (!manifest_->borderless_url_patterns.empty()) {
+    // TODO(crbug.com/467939520): Remove `borderless_url_patterns`.
+    install_info().borderless_url_patterns = manifest_->borderless_url_patterns;
+  }
 
-  install_info_->protocol_handlers =
+  install_info().share_target = ToWebAppShareTarget(manifest_->share_target);
+
+  install_info().protocol_handlers =
       ToWebAppProtocolHandlers(manifest_->protocol_handlers);
 
-  install_info_->scope_extensions =
+  install_info().scope_extensions =
       ToWebAppScopeExtensions(manifest_->scope_extensions);
 
-  GURL inferred_scope = install_info_->scope.is_valid()
-                            ? install_info_->scope
-                            : install_info_->start_url().GetWithoutFilename();
+  GURL inferred_scope = install_info().scope.is_valid()
+                            ? install_info().scope
+                            : install_info().start_url().GetWithoutFilename();
   if (base::FeatureList::IsEnabled(
           blink::features::kWebAppManifestLockScreen) &&
       manifest_->lock_screen && manifest_->lock_screen->start_url.is_valid() &&
       IsInScope(manifest_->lock_screen->start_url, inferred_scope)) {
-    install_info_->lock_screen_start_url = manifest_->lock_screen->start_url;
+    install_info().lock_screen_start_url = manifest_->lock_screen->start_url;
   }
 
   if (manifest_->note_taking &&
       manifest_->note_taking->new_note_url.is_valid() &&
       IsInScope(manifest_->note_taking->new_note_url, inferred_scope)) {
-    install_info_->note_taking_new_note_url =
+    install_info().note_taking_new_note_url =
         manifest_->note_taking->new_note_url;
   }
 
-  CHECK(install_info_->shortcuts_menu_item_infos.empty());
-  PopulateWebAppShortcutsMenuItemInfos(manifest_->shortcuts,
-                                       install_info_.get());
-
-  install_info_->capture_links = manifest_->capture_links;
+  CHECK(install_info().shortcuts_menu_item_infos.empty());
+  PopulateWebAppShortcutsMenuItemInfos(manifest_->shortcuts, &install_info());
 
   if (manifest_->manifest_url.is_valid()) {
-    install_info_->manifest_url = manifest_->manifest_url;
+    install_info().manifest_url = manifest_->manifest_url;
   }
 
-  install_info_->launch_handler = manifest_->launch_handler;
-  if (manifest_->description.has_value()) {
-    install_info_->description = manifest_->description.value();
+  if (manifest_->update_manifest_url &&
+      manifest_->update_manifest_url->is_valid()) {
+    install_info().iwa_update_manifest_url =
+        manifest_->update_manifest_url.value();
   }
 
-  install_info_->translations = ToWebAppTranslations(manifest_->translations);
+  install_info().launch_handler = manifest_->launch_handler;
 
-  install_info_->permissions_policy.clear();
+  LocalizedText description =
+      GetLocalizedDescriptionFromManifestFields(*manifest_);
+  if (!description.empty()) {
+    install_info().description = std::move(description);
+  }
+
+  install_info().translations = ToWebAppTranslations(manifest_->translations);
+
+  install_info().permissions_policy.clear();
   for (const auto& decl : manifest_->permissions_policy) {
     network::ParsedPermissionsPolicyDeclaration copy;
     copy.feature = decl.feature;
@@ -639,22 +811,23 @@ void ManifestToWebAppInstallInfoJob::ParseManifestAndPopulateInfo() {
     }
     copy.matches_all_origins = decl.matches_all_origins;
     copy.matches_opaque_src = decl.matches_opaque_src;
-    install_info_->permissions_policy.push_back(std::move(copy));
+    install_info().permissions_policy.push_back(std::move(copy));
   }
 
-  install_info_->tab_strip = manifest_->tab_strip;
+  install_info().tab_strip = manifest_->tab_strip;
 
   if (HomeTabIconsExistInTabStrip(*install_info_)) {
-    PopulateHomeTabIconsFromHomeTabManifestParams(install_info_.get());
+    PopulateHomeTabIconsFromHomeTabManifestParams(&install_info());
   }
 
-  install_info_->related_applications = manifest_->related_applications;
+  install_info().related_applications = manifest_->related_applications;
 }
 
 void ManifestToWebAppInstallInfoJob::OnIconsFetchedGetInstallInfo(
     IconsDownloadedResult result,
     IconsMap icons_map,
     DownloadedIconsHttpResults icons_http_results) {
+  icon_fetch_result_ = result;
   base::Value::Dict* icons_downloaded =
       debug_data_->EnsureDict("icons_retrieved");
   for (const auto& [url, bitmap_vector] : icons_map) {
@@ -668,25 +841,35 @@ void ManifestToWebAppInstallInfoJob::OnIconsFetchedGetInstallInfo(
   // TODO(crbug.com/429929887): Return results via callback using a result
   // struct/class.
   if (options_.record_icon_results_on_update) {
-    RecordIconUpdateMetrics(result, icons_http_results);
+    RecordIconUpdateMetrics(result, icons_map, icons_http_results);
   }
 
   // Bypass populating product icons, even generated ones, if icons have not
   // been downloaded.
-  if (!options_.skip_primary_icon_download) {
-    PopulateProductIcons(install_info_.get(), &icons_map);
-    if (base::FeatureList::IsEnabled(features::kWebAppUsePrimaryIcon)) {
-      PopulateTrustedIconBitmaps(*install_info_.get(), icons_map);
+  PopulateProductIcons(&install_info(), &icons_map);
+  if (install_info().is_generated_icon) {
+    debug_data_->Set("is_generated_icon", true);
+  }
+  if (base::FeatureList::IsEnabled(features::kWebAppUsePrimaryIcon)) {
+    if (options_.use_manifest_icons_as_trusted) {
+      install_info().trusted_icon_bitmaps = install_info().icon_bitmaps;
+    } else {
+      PopulateTrustedIconBitmaps(install_info(), icons_map);
     }
   }
-  PopulateOtherIcons(install_info_.get(), icons_map);
+  PopulateOtherIcons(&install_info(), icons_map);
   RecordDownloadedIconsResultAndHttpStatusCodes(result, icons_http_results);
-  install_error_log_entry_.LogDownloadedIconsErrors(
-      *install_info_.get(), result, icons_map, icons_http_results);
+
+  base::DictValue icon_errors =
+      LogDownloadedIconsErrors(result, icons_map, icons_http_results);
+  if (!icon_errors.empty()) {
+    debug_data_->Set("icon_errors", std::move(icon_errors));
+  }
   CompleteJobAndRunCallback();
 }
 
 void ManifestToWebAppInstallInfoJob::CompleteJobAndRunCallback() {
+  install_info_for_icon_fetch_ = nullptr;
   std::move(creation_callback_).Run(std::move(install_info_));
 }
 

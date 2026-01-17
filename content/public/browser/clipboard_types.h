@@ -6,13 +6,13 @@
 #define CONTENT_PUBLIC_BROWSER_CLIPBOARD_TYPES_H_
 
 #include "base/containers/flat_map.h"
-#include "base/functional/callback_helpers.h"
+#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/types/optional_ref.h"
 #include "content/common/content_export.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/base/clipboard/clipboard_buffer.h"
 #include "ui/base/clipboard/clipboard_format_type.h"
-#include "ui/base/clipboard/clipboard_sequence_number_token.h"
 #include "ui/base/data_transfer_policy/data_transfer_endpoint.h"
 
 namespace base {
@@ -130,26 +130,23 @@ class CONTENT_EXPORT ClipboardEndpoint {
   base::WeakPtr<WebContents> web_contents_;
 };
 
-// Struct that holds metadata for data being copied or pasted that is relevant
-// to evaluating enterprise policies.
-struct ClipboardMetadata {
-  // Size of the clipboard data. null when files are copied, or sometimes when
-  // created from Android JNI.
-  // TODO(crbug.com/344593255): Ensure that Android JNI consistently passes in
-  //  non-null size.
-  std::optional<size_t> size;
-
-  // Format type of clipboard data.
-  ui::ClipboardFormatType format_type;
-
-  // Sequence number of the clipboard interaction.
-  ui::ClipboardSequenceNumberToken seqno;
-};
-
 // Chromium-only type to associate clipboard data to the RFH it originated from.
 // This should only be used internally by the browser process to retrieve RFHs,
 // renderers should never have access to a serialized token.
 const ui::ClipboardFormatType& SourceRFHTokenType();
+
+// Returns a representation of the last source ClipboardEndpoint. This will
+// either match the last clipboard write if there is an RFH token in the
+// clipboard, or an endpoint built from `Clipboard::GetSource()` called with
+// `clipboard_buffer` otherwise.
+//
+// //content maintains additional metadata on top of what the //ui layer already
+// tracks about clipboard data's source, e.g. the WebContents that provided the
+// data. This function allows retrieving both the //ui metadata and the
+// //content metadata in a single call.
+CONTENT_EXPORT ClipboardEndpoint
+GetSourceClipboardEndpoint(const ui::DataTransferEndpoint* data_dst,
+                           ui::ClipboardBuffer clipboard_buffer);
 
 }  // namespace content
 

@@ -7,17 +7,14 @@
 
 #include <memory>
 
+#include "base/containers/flat_map.h"
 #include "base/functional/callback_forward.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/sequence_checker.h"
 #include "base/types/expected.h"
+#include "chrome/updater/ipc/update_service_proxy_impl.h"
+#include "chrome/updater/registration_data.h"
 #include "chrome/updater/update_service.h"
-
-#if BUILDFLAG(IS_POSIX)
-#include "chrome/updater/ipc/update_service_proxy_posix.h"
-#elif BUILDFLAG(IS_WIN)
-#include "chrome/updater/ipc/update_service_proxy_win.h"
-#endif
 
 namespace base {
 class FilePath;
@@ -29,8 +26,6 @@ enum class PolicyFetchReason;
 }  // namespace policy
 
 namespace updater {
-
-struct RegistrationRequest;
 
 // UpdateServiceProxy is an UpdateService that connects to the active updater
 // instance server and runs its implementation of UpdateService methods. All
@@ -84,6 +79,17 @@ class UpdateServiceProxy : public UpdateService {
       const std::string& language,
       base::RepeatingCallback<void(const UpdateState&)> state_update,
       base::OnceCallback<void(Result)> callback) override;
+  void GetUpdaterState(base::OnceCallback<void(const UpdaterState&)>) override;
+  void GetUpdaterPolicies(
+      base::OnceCallback<void(const base::flat_map<std::string, PolicyValue>&)>
+          callback) override;
+  void GetAppPolicies(
+      base::OnceCallback<
+          void(const base::flat_map<std::string,
+                                    base::flat_map<std::string, PolicyValue>>&)>
+          callback) override;
+  void GetPoliciesJson(
+      base::OnceCallback<void(const std::string&)> callback) override;
 
  private:
   ~UpdateServiceProxy() override;

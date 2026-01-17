@@ -2425,6 +2425,11 @@ EGL_FUNCTIONS = [
   'names': ['eglPostSubBufferNV'],
   'arguments': 'EGLDisplay dpy, EGLSurface surface, '
     'EGLint x, EGLint y, EGLint width, EGLint height', },
+{ 'return_type': 'EGLBoolean',
+  'versions': [{'name': 'eglPresentationTimeANDROID',
+                'extensions': ['EGL_ANDROID_presentation_time']}],
+  'arguments': 'EGLDisplay dpy, EGLSurface surface, EGLnsecsANDROID time',
+},
 { 'return_type': 'EGLenum',
   'names': ['eglQueryAPI'],
   'arguments': 'void', },
@@ -2708,6 +2713,11 @@ LICENSE_AND_HEADER = """\
 // It's formatted by clang-format using chromium coding style:
 //    clang-format -i -style=chromium filename
 // DO NOT EDIT!
+
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
 
 """
 

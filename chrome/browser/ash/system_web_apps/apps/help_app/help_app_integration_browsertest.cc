@@ -138,20 +138,6 @@ class HelpAppIntegrationTestWithAutoTriggerDisabled
   base::test::ScopedFeatureList scoped_feature_list_;
 };
 
-class HelpAppIntegrationTestWithAppMallEnabled : public HelpAppIntegrationTest {
- public:
-  HelpAppIntegrationTestWithAppMallEnabled() {
-    scoped_feature_list_.InitWithFeatures(
-        {
-            chromeos::features::kCrosMall,
-        },
-        {});
-  }
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
-};
-
 class HelpAppIntegrationTestWithFirstRunEnabled
     : public HelpAppIntegrationTest {
  public:
@@ -204,7 +190,7 @@ IN_PROC_BROWSER_TEST_P(HelpAppIntegrationTest, HelpAppV2DefaultWindowBounds) {
   Browser* browser;
   LaunchApp(SystemWebAppType::HELP, &browser);
   gfx::Rect work_area =
-      display::Screen::GetScreen()->GetDisplayForNewWindows().work_area();
+      display::Screen::Get()->GetDisplayForNewWindows().work_area();
   int x = (work_area.width() - 960) / 2;
   int y = (work_area.height() - 600) / 2;
   EXPECT_EQ(browser->window()->GetBounds(), gfx::Rect(x, y, 960, 600));
@@ -273,7 +259,7 @@ IN_PROC_BROWSER_TEST_P(HelpAppAllProfilesIntegrationTest, HelpAppV2ShowHelp) {
   content::TestNavigationObserver navigation_observer(expected_url);
   navigation_observer.StartWatchingNewWebContents();
 
-  chrome::ShowHelp(browser(), chrome::HELP_SOURCE_KEYBOARD);
+  chrome::ShowHelp(browser(), chrome::HelpSource::kKeyboard);
 
 #if BUILDFLAG(ENABLE_CROS_HELP_APP)
   EXPECT_NO_FATAL_FAILURE(navigation_observer.Wait());
@@ -723,8 +709,7 @@ IN_PROC_BROWSER_TEST_P(HelpAppIntegrationTest, HelpAppV2ShowParentalControls) {
 }
 
 // Test that the Help App's `openAppMallPath` opens the App Mall SWA.
-IN_PROC_BROWSER_TEST_P(HelpAppIntegrationTestWithAppMallEnabled,
-                       HelpAppV2ShowAppMallSWA) {
+IN_PROC_BROWSER_TEST_P(HelpAppIntegrationTest, HelpAppV2ShowAppMallSWA) {
   WaitForTestSystemAppInstall();
   content::WebContents* web_contents = LaunchApp(SystemWebAppType::HELP);
 
@@ -765,7 +750,7 @@ IN_PROC_BROWSER_TEST_P(HelpAppIntegrationTestWithAutoTriggerDisabled,
 
   // There should be only be one regular browser with one tab.
   EXPECT_EQ(1u, chrome::GetTotalBrowserCount());
-  EXPECT_EQ(1, browser()->tab_strip_model()->GetTabCount());
+  EXPECT_EQ(1, browser()->tab_strip_model()->count());
 
   WaitForTestSystemAppInstall();
   content::WebContents* web_contents = LaunchApp(SystemWebAppType::HELP);
@@ -797,7 +782,7 @@ IN_PROC_BROWSER_TEST_P(HelpAppIntegrationTestWithAutoTriggerDisabled,
   // There should still be two browser windows.
   EXPECT_EQ(2u, chrome::GetTotalBrowserCount());
   // The regular browser should only have 2 tabs.
-  EXPECT_EQ(2, browser()->tab_strip_model()->GetTabCount());
+  EXPECT_EQ(2, browser()->tab_strip_model()->count());
   // After opening the URL, the regular browser should be the most recently
   // active browser.
   EXPECT_EQ(browser(), chrome::FindLastActive());
@@ -817,7 +802,7 @@ IN_PROC_BROWSER_TEST_P(HelpAppIntegrationTest,
 
   // There should be only be one regular browser with one tab.
   EXPECT_EQ(1u, chrome::GetTotalBrowserCount());
-  EXPECT_EQ(1, browser()->tab_strip_model()->GetTabCount());
+  EXPECT_EQ(1, browser()->tab_strip_model()->count());
 
   WaitForTestSystemAppInstall();
   content::WebContents* web_contents = LaunchApp(SystemWebAppType::HELP);
@@ -851,7 +836,7 @@ IN_PROC_BROWSER_TEST_P(HelpAppIntegrationTest,
   // There should still be two browser windows.
   EXPECT_EQ(2u, chrome::GetTotalBrowserCount());
   // The regular browser should only have 2 tabs.
-  EXPECT_EQ(2, browser()->tab_strip_model()->GetTabCount());
+  EXPECT_EQ(2, browser()->tab_strip_model()->count());
   // After opening the URL, the regular browser should be the most recently
   // active browser.
   EXPECT_EQ(browser(), chrome::FindLastActive());
@@ -870,7 +855,7 @@ IN_PROC_BROWSER_TEST_P(HelpAppIntegrationTest,
   // There should be only be one regular browser with one tab.
   EXPECT_EQ(1u, chrome::GetTotalBrowserCount());
   // The regular browser should only have 1 tab.
-  EXPECT_EQ(1, browser()->tab_strip_model()->GetTabCount());
+  EXPECT_EQ(1, browser()->tab_strip_model()->count());
   // The tab should be the default "about:blank" URL.
   EXPECT_TRUE(GetActiveWebContents()->GetVisibleURL().IsAboutBlank());
 
@@ -921,7 +906,7 @@ IN_PROC_BROWSER_TEST_P(HelpAppIntegrationTest,
     // There should only be 1 regular browser.
     EXPECT_EQ(1u, chrome::GetTotalBrowserCount());
     // The regular browser should still only have 1 tab.
-    EXPECT_EQ(1, browser()->tab_strip_model()->GetTabCount());
+    EXPECT_EQ(1, browser()->tab_strip_model()->count());
     // The tab should still be the default "about:blank" URL.
     EXPECT_TRUE(GetActiveWebContents()->GetVisibleURL().IsAboutBlank());
   }
@@ -1252,7 +1237,4 @@ INSTANTIATE_SYSTEM_WEB_APP_MANAGER_TEST_SUITE_ALL_PROFILE_TYPES_P(
 
 INSTANTIATE_SYSTEM_WEB_APP_MANAGER_TEST_SUITE_REGULAR_PROFILE_P(
     HelpAppIntegrationTestWithHelpAppOpensInsteadOfReleaseNotesNotification);
-
-INSTANTIATE_SYSTEM_WEB_APP_MANAGER_TEST_SUITE_REGULAR_PROFILE_P(
-    HelpAppIntegrationTestWithAppMallEnabled);
 }  // namespace ash

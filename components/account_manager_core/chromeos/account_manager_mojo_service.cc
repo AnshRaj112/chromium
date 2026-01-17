@@ -10,10 +10,8 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/functional/callback_forward.h"
 #include "base/logging.h"
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
@@ -280,10 +278,10 @@ void AccountManagerMojoService::MaybeNotifyAuthErrorObservers(
     const account_manager::AccountKey& account_key,
     const GoogleServiceAuthError& error,
     const std::vector<account_manager::Account>& known_accounts) {
-  if (!base::Contains(known_accounts, account_key,
-                      [](const account_manager::Account& account) {
-                        return account.key;
-                      })) {
+  if (!std::ranges::contains(known_accounts, account_key,
+                             [](const account_manager::Account& account) {
+                               return account.key;
+                             })) {
     // Ignore if the account is not known.
     return;
   }

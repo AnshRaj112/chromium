@@ -11,6 +11,7 @@
 #include "base/strings/strcat.h"
 #include "components/autofill/core/browser/data_model/addresses/autofill_profile_comparator.h"
 #include "components/autofill/core/browser/field_types.h"
+#include "components/autofill/core/browser/metrics/autofill_metrics_utils.h"
 #include "components/autofill/core/common/autofill_clock.h"
 #include "components/autofill/core/common/autofill_features.h"
 
@@ -71,35 +72,20 @@ void LogStoredProfileMetrics(
   count_and_log(AutofillProfileRecordTypeCategory::kAccountNonChrome);
   count_and_log(AutofillProfileRecordTypeCategory::kAccountHome);
   count_and_log(AutofillProfileRecordTypeCategory::kAccountWork);
+  count_and_log(AutofillProfileRecordTypeCategory::kAccountNameEmail);
+
+  // Update the metrics when adding a new address type.
+  static_assert(AutofillProfile::RecordType::kMaxValue ==
+                AutofillProfile::RecordType::kAccountNameEmail);
+
   base::UmaHistogramCounts1M("Autofill.StoredProfileCount.Total",
                              profiles.size());
-}
 
-void LogLocalProfileSupersetMetrics(
-    std::vector<const AutofillProfile*> profiles,
-    std::string_view app_locale) {
-  // Place all local profiles before all account profiles.
-  auto account_profiles = std::ranges::partition(
-      profiles, std::not_fn(&AutofillProfile::IsAccountProfile));
-  // Determines if a given `profile` is a strict superset of any account
-  // profile.
-  auto is_account_superset = [&, comparator =
-                                     AutofillProfileComparator(app_locale)](
-                                 const AutofillProfile* profile) {
-    return std::ranges::any_of(account_profiles,
-                               [&](const AutofillProfile* account_profile) {
-                                 return profile->IsStrictSupersetOf(
-                                     comparator, *account_profile);
-                               });
-  };
-  // Count the number of local profiles which are a superset of some account
-  // profile.
-  base::UmaHistogramCounts100(
-      "Autofill.Leipzig.Duplication.NumberOfLocalSupersetProfilesOnStartup",
-      std::ranges::count_if(profiles.begin(), account_profiles.begin(),
-                            [&](const AutofillProfile* local_profile) {
-                              return is_account_superset(local_profile);
-                            }));
+  base::UmaHistogramCounts1M(
+      "Autofill.StoredProfileCount.TotalPostalAddressProfiles",
+      std::ranges::count_if(profiles, [](const AutofillProfile* p) {
+        return autofill_metrics::IsPostalAddress(*p);
+      }));
 }
 
 void LogStoredProfileCountWithAlternativeName(

@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/numerics/checked_math.h"
 #include "components/performance_manager/public/graph/process_node.h"
 
@@ -27,6 +26,9 @@ void CheckDecrement(size_t& num) {
 }
 
 }  // namespace
+
+LoadingScenarioCounts::LoadingScenarioCounts() = default;
+LoadingScenarioCounts::LoadingScenarioCounts(LoadingScenarioCounts&&) = default;
 
 void LoadingScenarioCounts::IncrementLoadingPageCounts(bool visible,
                                                        bool focused) {
@@ -81,7 +83,7 @@ size_t LoadingScenarioPageFrameCounts::DecrementFrameCountForProcess(
 
 bool LoadingScenarioPageFrameCounts::ProcessHasFramesInPage(
     const ProcessNode* process_node) const {
-  return base::Contains(process_frame_counts_, process_node);
+  return process_frame_counts_.contains(process_node);
 }
 
 std::vector<const ProcessNode*>

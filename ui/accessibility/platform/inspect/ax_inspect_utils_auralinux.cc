@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "ui/accessibility/platform/inspect/ax_inspect_utils_auralinux.h"
 
 #include <array>
@@ -14,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/compiler_specific.h"
 #include "base/containers/span.h"
 #include "base/logging.h"
 #include "base/strings/pattern.h"
@@ -33,14 +29,8 @@ struct PlatformConstantToNameEntry {
 
 const char* GetNameForPlatformConstant(
     base::span<const PlatformConstantToNameEntry> table,
-    size_t spanification_suspected_redundant_table_size,
     int32_t value) {
-  // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-  // redundant in M143.
-  CHECK(spanification_suspected_redundant_table_size == table.size(),
-        base::NotFatalUntil::M143);
-  for (size_t i = 0; i < spanification_suspected_redundant_table_size; ++i) {
-    auto& entry = table[i];
+  for (const auto& entry : table) {
     if (entry.value == value)
       return entry.name;
   }
@@ -119,7 +109,7 @@ const char* ATSPIStateToString(AtspiStateType state) {
 #endif
   };
 
-  return GetNameForPlatformConstant(state_table, std::size(state_table), state);
+  return GetNameForPlatformConstant(state_table, state);
 }
 
 const char* ATSPIRelationToString(AtspiRelationType relation) {
@@ -149,8 +139,7 @@ const char* ATSPIRelationToString(AtspiRelationType relation) {
       QUOTE(ATSPI_RELATION_LAST_DEFINED),
   };
 
-  return GetNameForPlatformConstant(relation_table, std::size(relation_table),
-                                    relation);
+  return GetNameForPlatformConstant(relation_table, relation);
 }
 
 const char* ATSPIRoleToString(AtspiRole role) {
@@ -291,7 +280,7 @@ const char* ATSPIRoleToString(AtspiRole role) {
 #endif
   };
 
-  return GetNameForPlatformConstant(role_table, std::size(role_table), role);
+  return GetNameForPlatformConstant(role_table, role);
 }
 
 // This is used to ensure a standard set of AtkRole name conversions between
@@ -474,7 +463,8 @@ AtspiAccessible* FindActiveDocument(AtspiAccessible* node) {
     }
 
     for (guint idx = 0; idx < relations->len; idx++) {
-      AtspiRelation* relation = g_array_index(relations, AtspiRelation*, idx);
+      AtspiRelation* relation =
+          UNSAFE_TODO(g_array_index(relations, AtspiRelation*, idx));
       if (atspi_relation_get_relation_type(relation) == ATSPI_RELATION_EMBEDS &&
           atspi_relation_get_n_targets(relation) > 0) {
         return atspi_relation_get_target(relation, 0);
@@ -594,7 +584,7 @@ std::string GetDOMId(AtspiAccessible* node) {
 
     g_hash_table_iter_init(&i, attributes);
     while (g_hash_table_iter_next(&i, &key, &value)) {
-      if (strcmp(static_cast<char*>(key), "id") == 0) {
+      if (UNSAFE_TODO(strcmp(static_cast<char*>(key), "id")) == 0) {
         id = static_cast<char*>(value);
         break;
       }

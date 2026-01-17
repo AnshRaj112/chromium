@@ -27,6 +27,7 @@
 #include "ui/views/layout/box_layout_view.h"
 #include "ui/views/layout/flex_layout.h"
 #include "ui/views/layout/table_layout_view.h"
+#include "ui/views/metadata/view_factory.h"
 #include "ui/views/style/typography.h"
 
 namespace autofill {
@@ -168,7 +169,7 @@ bool HasAddressEntry(const std::vector<ProfileValueDifference>& diff) {
 }  // namespace
 
 UpdateAddressProfileView::UpdateAddressProfileView(
-    views::View* anchor_view,
+    views::BubbleAnchor anchor_view,
     std::unique_ptr<UpdateAddressBubbleController> controller,
     content::WebContents* web_contents)
     : AddressBubbleBaseView(anchor_view, web_contents),
@@ -194,20 +195,10 @@ UpdateAddressProfileView::UpdateAddressProfileView(
   SetTitle(controller_->GetWindowTitle(has_empty_original_values_));
   SetButtonLabel(
       ui::mojom::DialogButton::kOk,
-      l10n_util::GetStringUTF16(
-          has_empty_original_values_ &&
-                  base::FeatureList::IsEnabled(
-                      features::kAutofillEnableSupportForHomeAndWork)
-              ? IDS_AUTOFILL_UPDATE_ADDRESS_ADD_NEW_INFO_PROMPT_OK_BUTTON_LABEL
-              : IDS_AUTOFILL_UPDATE_ADDRESS_PROMPT_OK_BUTTON_LABEL));
+      controller_->GetPositiveButtonText(has_empty_original_values_));
   SetButtonLabel(
       ui::mojom::DialogButton::kCancel,
-      l10n_util::GetStringUTF16(
-          has_empty_original_values_ &&
-                  base::FeatureList::IsEnabled(
-                      features::kAutofillEnableSupportForHomeAndWork)
-              ? IDS_AUTOFILL_UPDATE_ADDRESS_ADD_NEW_INFO_PROMPT_CANCEL_BUTTON_LABEL
-              : IDS_AUTOFILL_UPDATE_ADDRESS_PROMPT_CANCEL_BUTTON_LABEL));
+      controller_->GetNegativeButtonText(has_empty_original_values_));
 
   SetLayoutManager(std::make_unique<views::FlexLayout>())
       ->SetOrientation(views::LayoutOrientation::kVertical)

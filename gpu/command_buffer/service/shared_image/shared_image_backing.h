@@ -74,7 +74,6 @@ class RasterImageRepresentation;
 class MemoryTracker;
 class VideoImageRepresentation;
 class MemoryTypeTracker;
-class SharedImageFactory;
 class WebNNTensorRepresentation;
 
 #if BUILDFLAG(ENABLE_VULKAN)
@@ -103,7 +102,8 @@ enum class SharedImageBackingType {
   kDCompSurface = 16,
   kDXGISwapChain = 17,
   kWrappedGraphiteTexture = 18,
-  kMaxValue = kWrappedGraphiteTexture
+  kDawn = 19,
+  kMaxValue = kDawn
 };
 
 #if BUILDFLAG(IS_WIN)
@@ -142,7 +142,7 @@ class GPU_GLES2_EXPORT SharedImageBacking {
   const Mailbox& mailbox() const { return mailbox_; }
   bool is_thread_safe() const { return !!lock_; }
   bool is_ref_counted() const { return is_ref_counted_; }
-  gfx::BufferUsage buffer_usage() const { return buffer_usage_.value(); }
+  std::optional<gfx::BufferUsage> buffer_usage() const { return buffer_usage_; }
   const std::string& debug_label() const { return debug_label_; }
 
   void OnContextLost();
@@ -162,15 +162,6 @@ class GPU_GLES2_EXPORT SharedImageBacking {
 
   // Returns the memory tracker this backing is registering memory with.
   const MemoryTracker* GetMemoryTracker() const;
-
-  // This factory is registered when creating backing to help
-  // create intermediate interop backing buffer
-  // and share resource from gl backing buffer to dawn.
-  // The factory pointer needs to be reset if the origin
-  // factory is destructed. This will handled by destructor of
-  // SharedImageRepresentationFactoryRef.
-  void RegisterImageFactory(SharedImageFactory* factory);
-  void UnregisterImageFactory();
 
   // Sets the SharedImagePoolId on the backing.
   void SetSharedImagePoolId(SharedImagePoolId pool_id);
@@ -224,10 +215,6 @@ class GPU_GLES2_EXPORT SharedImageBacking {
   // Returns true on success.
   virtual void CopyToGpuMemoryBufferAsync(
       base::OnceCallback<void(bool)> callback);
-
-  // Present the swap chain corresponding to this backing. Presents only if the
-  // backing is the back buffer of the swap chain. Returns true on success.
-  virtual bool PresentSwapChain();
 
   virtual void MarkForDestruction() {}
 
@@ -313,7 +300,8 @@ class GPU_GLES2_EXPORT SharedImageBacking {
       SharedImageManager* manager,
       MemoryTypeTracker* tracker,
       const wgpu::Device& device,
-      wgpu::BackendType backend_type);
+      wgpu::BackendType backend_type,
+      scoped_refptr<SharedContextState> context_state);
   virtual std::unique_ptr<WebNNTensorRepresentation> ProduceWebNNTensor(
       SharedImageManager* manager,
       MemoryTypeTracker* tracker);
@@ -358,12 +346,6 @@ class GPU_GLES2_EXPORT SharedImageBacking {
 
   // Used by subclasses during destruction.
   bool have_context() const EXCLUSIVE_LOCKS_REQUIRED(lock_);
-
-  // Used by GLTextureImageBackingFactory to get register factory.
-  SharedImageFactory* factory() {
-    DCHECK_CALLED_ON_VALID_THREAD(factory_thread_checker_);
-    return factory_;
-  }
 
   void AssertLockAcquired() const {
     if (lock_) {
@@ -416,8 +398,6 @@ class GPU_GLES2_EXPORT SharedImageBacking {
   std::optional<SharedImagePoolId> pool_id_;
 
   bool is_ref_counted_ = true;
-
-  raw_ptr<SharedImageFactory> factory_ = nullptr;
 
   // Bound to the thread on which the backing is created. The |factory_|
   // can only be used from this thread.

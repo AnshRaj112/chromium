@@ -24,7 +24,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.chromium.base.Callback;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -45,9 +45,11 @@ import java.util.List;
 
 /** A custom RecyclerView implementation for the tab grid, to handle show/hide logic in class. */
 @NullMarked
-class TabListRecyclerView extends RecyclerView
+public class TabListRecyclerView extends RecyclerView
         implements TabListMediator.TabGridAccessibilityHelper, RunOnNextLayout {
+    private static final float SMOOTH_SCROLL_SPEED_FACTOR = 0.8f;
     private boolean mBlockTouchInput;
+    private boolean mIsSmoothScrolling;
     // Null unless item animations are disabled.
     private RecyclerView.@Nullable ItemAnimator mDisabledAnimatorHolder;
 
@@ -147,8 +149,7 @@ class TabListRecyclerView extends RecyclerView
     /**
      * Returns a boolean indicating whether any animator in {@link TabListItemAnimator} is running.
      */
-    @Nullable
-    ObservableSupplier<Boolean> getIsAnimatorRunningSupplier() {
+    @Nullable MonotonicObservableSupplier<Boolean> getIsAnimatorRunningSupplier() {
         return mIsAnimatorRunningSupplier;
     }
 
@@ -380,5 +381,17 @@ class TabListRecyclerView extends RecyclerView
                 || action == R.id.move_tab_right
                 || action == R.id.move_tab_up
                 || action == R.id.move_tab_down;
+    }
+
+    @Override
+    public boolean fling(int velocityX, int velocityY) {
+        if (mIsSmoothScrolling) {
+            velocityY = (int) (velocityY * SMOOTH_SCROLL_SPEED_FACTOR);
+        }
+        return super.fling(velocityX, velocityY);
+    }
+
+    public void setSmoothScrolling(boolean isSmoothScrolling) {
+        mIsSmoothScrolling = isSmoothScrolling;
     }
 }

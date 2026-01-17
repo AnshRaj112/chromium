@@ -60,6 +60,7 @@
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/hats/hats_service.h"
 #include "chrome/browser/ui/hats/hats_service_factory.h"
 #include "chrome/browser/ui/layout_constants.h"
@@ -67,9 +68,12 @@
 #include "chrome/browser/ui/lens/lens_searchbox_controller.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
 #include "chrome/browser/ui/omnibox/chrome_omnibox_navigation_observer.h"
+#include "chrome/browser/ui/omnibox/omnibox_next_features.h"
 #include "chrome/browser/ui/omnibox/omnibox_tab_helper.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+#include "chrome/browser/ui/views/omnibox/omnibox_popup_closer.h"
+#include "chrome/browser/ui/views/search_engines/dse_reset_dialog.h"
 #include "chrome/common/channel_info.h"
 #include "chrome/common/pref_names.h"
 #include "components/bookmarks/browser/bookmark_model.h"
@@ -89,13 +93,17 @@
 #include "components/omnibox/common/omnibox_feature_configs.h"
 #include "components/omnibox/common/omnibox_features.h"
 #include "components/profile_metrics/browser_profile_type.h"
+#include "components/safe_browsing/buildflags.h"
 #include "components/search_engines/template_url_service.h"
 #include "components/search_engines/template_url_starter_pack_data.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/strings/grit/components_strings.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/render_view_host.h"
+#include "content/public/browser/render_widget_host.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/buildflags/buildflags.h"
 #include "extensions/common/constants.h"
@@ -116,6 +124,10 @@
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/ui/extensions/settings_api_bubble_helpers.h"
+#endif
+
+#if BUILDFLAG(ENABLE_EXTENSIONS) && BUILDFLAG(SAFE_BROWSING_AVAILABLE)
+#include "chrome/browser/safe_browsing/extension_telemetry/extension_telemetry_service.h"
 #endif
 
 namespace {
@@ -240,6 +252,17 @@ AutocompleteClassifier* ChromeOmniboxClient::GetAutocompleteClassifier() {
   return AutocompleteClassifierFactory::GetForProfile(profile_);
 }
 
+omnibox::OmniboxPopupCloser* ChromeOmniboxClient::GetOmniboxPopupCloser() {
+  if (!browser_) {
+    return nullptr;
+  }
+  auto* bwf = browser_->browser_window_features();
+  if (!bwf) {
+    return nullptr;
+  }
+  return bwf->omnibox_popup_closer();
+}
+
 bool ChromeOmniboxClient::ShouldDefaultTypedNavigationsToHttps() const {
   return base::FeatureList::IsEnabled(omnibox::kDefaultTypedNavigationsToHttps);
 }
@@ -264,15 +287,15 @@ gfx::Image ChromeOmniboxClient::GetSizedIcon(
     const gfx::VectorIcon& vector_icon_type,
     SkColor vector_icon_color) const {
   return gfx::Image(gfx::CreateVectorIcon(
-      vector_icon_type, GetLayoutConstant(LOCATION_BAR_ICON_SIZE),
+      vector_icon_type, GetLayoutConstant(LayoutConstant::kLocationBarIconSize),
       vector_icon_color));
 }
 
 gfx::Image ChromeOmniboxClient::GetSizedIcon(const SkBitmap* bitmap) const {
   CHECK(bitmap);
 
-  // First, resize the bitmap to `LOCATION_BAR_ICON_SIZE`.
-  const int icon_size = GetLayoutConstant(LOCATION_BAR_ICON_SIZE);
+  // First, resize the bitmap to `kLocationBarIconSize`.
+  const int icon_size = GetLayoutConstant(LayoutConstant::kLocationBarIconSize);
   return gfx::Image(gfx::ImageSkiaOperations::CreateResizedImage(
       gfx::ImageSkia::CreateFrom1xBitmap(*bitmap),
       skia::ImageOperations::ResizeMethod::RESIZE_LANCZOS3,
@@ -284,7 +307,7 @@ gfx::Image ChromeOmniboxClient::GetSizedIcon(const gfx::Image& icon) const {
     return icon;
   }
 
-  const int icon_size = GetLayoutConstant(LOCATION_BAR_ICON_SIZE);
+  const int icon_size = GetLayoutConstant(LayoutConstant::kLocationBarIconSize);
   // In touch mode, icons are 20x20. FaviconCache and ExtensionIconManager both
   // guarantee favicons and extension icons will be 16x16, so add extra padding
   // around them to align them vertically with the other vector icons.
@@ -315,6 +338,12 @@ metrics::OmniboxEventProto::PageClassification
 ChromeOmniboxClient::GetPageClassification(bool is_prefetch) const {
   return location_bar_->GetLocationBarModel()->GetPageClassification(
       is_prefetch);
+}
+
+metrics::OmniboxEventProto::PageClassification
+ChromeOmniboxClient::GetOmniboxComposeboxPageClassification() const {
+  return location_bar_->GetLocationBarModel()
+      ->GetOmniboxComposeboxPageClassification();
 }
 
 security_state::SecurityLevel ChromeOmniboxClient::GetSecurityLevel() const {
@@ -558,11 +587,11 @@ void ChromeOmniboxClient::OnResultChanged(
           base::BindOnce(on_bitmap_fetched, result_index, match.icon_url)));
     } else {
       const TemplateURL* turl = nullptr;
-      if (match.associated_keyword) {
-        turl = match.associated_keyword->GetTemplateURL(GetTemplateURLService(),
-                                                        false);
+      if (!match.associated_keyword.empty()) {
+        turl = AutocompleteMatch::GetTemplateURLWithKeyword(
+            GetTemplateURLService(), match.associated_keyword, "");
       } else if (!match.keyword.empty()) {
-        turl = match.GetTemplateURL(GetTemplateURLService(), false);
+        turl = match.GetTemplateURL(GetTemplateURLService());
       }
       // Fetch the favicon if the `TemplateURL` is from the enterprise search
       // aggregator policy. This covers both cases:
@@ -589,10 +618,19 @@ void ChromeOmniboxClient::OnResultChanged(
         if (view && view->IsSurfaceAvailableForCopy()) {
           view->CopyFromSurface(
               /*src_rect=*/gfx::Rect(),
-              /*output_size=*/gfx::Size(),
+              /*output_size=*/gfx::Size(), base::TimeDelta(),
               base::BindPostTask(
                   base::SequencedTaskRunner::GetCurrentDefault(),
-                  base::BindOnce(on_bitmap_fetched, result_index, GURL())));
+                  base::BindOnce(
+                      [](const content::CopyFromSurfaceResult& result) {
+                        // TODO(crbug.com/466199824): Update callsite to handle
+                        // error case.
+                        return result
+                            .value_or(viz::CopyOutputBitmapWithMetadata())
+                            .bitmap;
+                      })
+                      .Then(base::BindOnce(on_bitmap_fetched, result_index,
+                                           GURL()))));
         }
       }
     }
@@ -788,12 +826,23 @@ void ChromeOmniboxClient::OnAutocompleteAccept(
     auto navigation = chrome::OpenCurrentURL(browser_);
     ChromeOmniboxNavigationObserver::Create(navigation.get(), profile_, text,
                                             match, alternative_nav_match);
+    search_engines::MaybeShowSearchEngineResetNotification(browser_,
+                                                           match_type);
   }
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   extensions::MaybeShowExtensionControlledSearchNotification(
       location_bar_->GetWebContents(), match_type);
-#endif
+
+#if BUILDFLAG(SAFE_BROWSING_AVAILABLE)
+  if (AutocompleteMatch::IsSearchType(match_type)) {
+    if (auto* telemetry_service =
+            safe_browsing::ExtensionTelemetryService::Get(profile_)) {
+      telemetry_service->OnOmniboxSearch(match);
+    }
+  }
+#endif  // BUILDFLAG(SAFE_BROWSING_AVAILABLE)
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 }
 
 void ChromeOmniboxClient::OnInputInProgress(bool in_progress) {
@@ -808,7 +857,6 @@ void ChromeOmniboxClient::OnInputInProgress(bool in_progress) {
 }
 
 void ChromeOmniboxClient::OnPopupVisibilityChanged(bool popup_is_open) {
-  location_bar_->OnPopupVisibilityChanged();
   content::WebContents* const web_contents = location_bar_->GetWebContents();
   if (web_contents) {
     auto* const helper =
@@ -817,6 +865,13 @@ void ChromeOmniboxClient::OnPopupVisibilityChanged(bool popup_is_open) {
     helper->OnPopupVisibilityChanged(
         popup_is_open, GetPageClassification(/*is_prefetch=*/false));
   }
+}
+
+void ChromeOmniboxClient::OpenUrl(GURL gurl) {
+  CHECK(browser_);
+  NavigateParams params(browser_, gurl, ui::PAGE_TRANSITION_GENERATED);
+  params.disposition = WindowOpenDisposition::CURRENT_TAB;
+  Navigate(&params);
 }
 
 void ChromeOmniboxClient::OpenIphLink(GURL gurl) {
@@ -831,6 +886,10 @@ bool ChromeOmniboxClient::IsHistoryEmbeddingsEnabled() const {
   return history_embeddings::IsHistoryEmbeddingsEnabledForProfile(profile_);
 }
 
+bool ChromeOmniboxClient::IsAimPopupEnabled() const {
+  return omnibox::IsAimPopupEnabled(profile_);
+}
+
 std::optional<lens::proto::LensOverlaySuggestInputs>
 ChromeOmniboxClient::GetLensOverlaySuggestInputs() const {
   if (LensSearchController* lens_search_controller =
@@ -841,12 +900,15 @@ ChromeOmniboxClient::GetLensOverlaySuggestInputs() const {
   return std::nullopt;
 }
 
-void ChromeOmniboxClient::MaybePrewarmForDefaultSearchEngine() {
-  if (!features::kPrewarmZeroSuggestTrigger.Get()) {
-    // TODO(https://crbug.com/423465927): Consider to add a TriggerPlace enum
-    // argument for this method on adding another triggers, and gate triggers
-    // per the enum.
-    return;
+void ChromeOmniboxClient::MaybePrewarmForDefaultSearchEngine(
+    PrewarmTrigger trigger) {
+  switch (trigger) {
+    case PrewarmTrigger::kZeroSuggest:
+      CHECK(features::kPrewarmZeroSuggestTrigger.Get());
+      break;
+    case PrewarmTrigger::kUserInteraction:
+      CHECK(features::kPrewarmUserInteractionTrigger.Get());
+      break;
   }
 
   auto* prerender_manager = PrerenderManager::GetOrCreateForWebContents(

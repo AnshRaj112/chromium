@@ -31,7 +31,6 @@
 #include "content/public/test/test_navigation_observer.h"
 #include "content/public/test/test_utils.h"
 #include "ipc/constants.mojom.h"
-#include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/test_support/test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "third_party/blink/public/mojom/choosers/file_chooser.mojom-forward.h"
@@ -661,8 +660,8 @@ class EffectiveURLContentBrowserTestContentBrowserClient
   void AddTranslation(const GURL& url_to_modify, const GURL& url_to_return);
 
  private:
-  GURL GetEffectiveURL(BrowserContext* browser_context,
-                       const GURL& url) override;
+  std::optional<GURL> GetEffectiveURL(BrowserContext* browser_context,
+                                      const GURL& url) override;
   bool DoesSiteRequireDedicatedProcess(BrowserContext* browser_context,
                                        const GURL& effective_site_url) override;
 

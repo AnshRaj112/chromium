@@ -33,26 +33,32 @@ class SessionServiceMock : public SessionService {
               (override));
   MOCK_METHOD(std::optional<SessionService::DeferralParams>,
               ShouldDefer,
-              (URLRequest * request,
+              (DbscRequest & request,
                HttpRequestHeaders* extra_headers,
                const FirstPartySetMetadata& first_party_set_metadata),
               (override));
   MOCK_METHOD(void,
               DeferRequestForRefresh,
-              (URLRequest * request,
+              (DbscRequest & request,
                DeferralParams deferral,
                RefreshCompleteCallback callback),
               (override));
   MOCK_METHOD(void,
               SetChallengeForBoundSession,
               (OnAccessCallback on_access_callback,
-               const GURL& request_url,
+               DbscRequest& request,
+               const FirstPartySetMetadata& first_party_set_metadata,
                const SessionChallengeParam& challenge_param),
               (override));
   MOCK_METHOD(
       void,
       GetAllSessionsAsync,
       (base::OnceCallback<void(const std::vector<SessionKey>&)> callback),
+      (override));
+  MOCK_METHOD(
+      void,
+      GetAllSessionDisplaysAsync,
+      (base::OnceCallback<void(const std::vector<SessionDisplay>&)> callback),
       (override));
   MOCK_METHOD(void,
               DeleteSessionAndNotify,
@@ -74,6 +80,38 @@ class SessionServiceMock : public SessionService {
               AddObserver,
               (const GURL& url,
                base::RepeatingCallback<void(const SessionAccess&)> callback),
+              (override));
+  MOCK_METHOD(base::CallbackListSubscription,
+              AddEventObserver,
+              (base::RepeatingCallback<void(const SessionEvent&)> callback),
+              (override));
+  MOCK_METHOD(const Session*,
+              GetSession,
+              (const SessionKey& session_key),
+              (const override));
+  MOCK_METHOD(void,
+              AddSession,
+              (const SchemefulSite& site,
+               SessionParams params,
+               base::span<const uint8_t> wrapped_key,
+               base::OnceCallback<void(SessionError::ErrorType)> callback),
+              (override));
+  MOCK_METHOD(const SignedRefreshChallenge*,
+              GetLatestSignedRefreshChallenge,
+              (const SessionKey& session_key),
+              (override));
+  MOCK_METHOD(void,
+              SetLatestSignedRefreshChallenge,
+              (SessionKey session_key,
+               SignedRefreshChallenge signed_refresh_challenge),
+              (override));
+  MOCK_METHOD(bool,
+              SigningQuotaExceeded,
+              (const SchemefulSite& site),
+              (override));
+  MOCK_METHOD(void,
+              AddSigningOccurrence,
+              (const SchemefulSite& site),
               (override));
 };
 

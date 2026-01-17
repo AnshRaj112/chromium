@@ -37,9 +37,9 @@ export interface EntityDataManagerProxy {
   getEntityInstanceByGuid(guid: string): Promise<EntityInstance>;
 
   /**
-   * Returns a list of all enabled entity types.
+   * Returns a list of all enabled entity types which are not read only.
    */
-  getAllEntityTypes(): Promise<EntityType[]>;
+  getWritableEntityTypes(): Promise<EntityType[]>;
 
   /**
    * Returns a list of all attribute types that can be set on an entity
@@ -61,6 +61,12 @@ export interface EntityDataManagerProxy {
       listener: EntityInstancesChangedListener): void;
 
   /**
+   * Authenticates the user before viewing entity data. Returns true if
+   * authentication was successful or if no authentication was required.
+   */
+  authenticateUserBeforeViewingEntityData(): Promise<boolean>;
+
+  /**
    * Gets the opt-in status for AutofillAi for the current user.
    */
   getOptInStatus(): Promise<boolean>;
@@ -71,6 +77,16 @@ export interface EntityDataManagerProxy {
    * eligible to opt into Autofill AI.
    */
   setOptInStatus(optedIn: boolean): Promise<boolean>;
+
+  /**
+   * Gets the opt-in status for walletable pass detection for the current user.
+   */
+  getWalletablePassDetectionOptInStatus(): Promise<boolean>;
+
+  /**
+   * Sets the opt-in status for walletable pass detection for the current user.
+   */
+  setWalletablePassDetectionOptInStatus(optedIn: boolean): Promise<boolean>;
 }
 
 export class EntityDataManagerProxyImpl implements EntityDataManagerProxy {
@@ -90,8 +106,8 @@ export class EntityDataManagerProxyImpl implements EntityDataManagerProxy {
     return chrome.autofillPrivate.getEntityInstanceByGuid(guid);
   }
 
-  getAllEntityTypes() {
-    return chrome.autofillPrivate.getAllEntityTypes();
+  getWritableEntityTypes() {
+    return chrome.autofillPrivate.getWritableEntityTypes();
   }
 
   getAllAttributeTypesForEntityTypeName(entityTypeName: number) {
@@ -108,12 +124,25 @@ export class EntityDataManagerProxyImpl implements EntityDataManagerProxy {
     chrome.autofillPrivate.onEntityInstancesChanged.removeListener(listener);
   }
 
+  authenticateUserBeforeViewingEntityData() {
+    return chrome.autofillPrivate.authenticateUserBeforeViewingEntityData();
+  }
+
   getOptInStatus() {
     return chrome.autofillPrivate.getAutofillAiOptInStatus();
   }
 
   setOptInStatus(optedIn: boolean) {
     return chrome.autofillPrivate.setAutofillAiOptInStatus(optedIn);
+  }
+
+  getWalletablePassDetectionOptInStatus() {
+    return chrome.autofillPrivate.getWalletablePassDetectionOptInStatus();
+  }
+
+  setWalletablePassDetectionOptInStatus(optedIn: boolean) {
+    return chrome.autofillPrivate.setWalletablePassDetectionOptInStatus(
+        optedIn);
   }
 
   static getInstance() {

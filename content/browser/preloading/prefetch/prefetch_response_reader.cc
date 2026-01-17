@@ -4,18 +4,17 @@
 
 #include "content/browser/preloading/prefetch/prefetch_response_reader.h"
 
-#include <algorithm>
-
 #include "base/debug/alias.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/notreached.h"
 #include "base/strings/string_util.h"
 #include "base/task/sequenced_task_runner.h"
-#include "content/browser/preloading/prefetch/prefetch_features.h"
+#include "content/browser/preloading/prefetch/prefetch_data_pipe_tee.h"
 #include "content/browser/preloading/prefetch/prefetch_params.h"
 #include "content/browser/preloading/prefetch/prefetch_streaming_url_loader.h"
 #include "content/browser/service_worker/service_worker_main_resource_handle.h"
 #include "net/http/http_cookie_indices.h"
+#include "net/http/http_response_headers.h"
 #include "services/metrics/public/cpp/metrics_utils.h"
 #include "services/metrics/public/cpp/ukm_builders.h"
 #include "services/network/public/mojom/early_hints.mojom.h"
@@ -101,11 +100,13 @@ bool PrefetchResponseReader::MatchesCookieIndices(
 }
 
 PrefetchResponseReader::PrefetchResponseReader(
-    base::OnceClosure on_determined_head_callback,
-    OnPrefetchResponseCompletedCallback on_prefetch_response_completed_callback)
+    OnPrefetchDeterminedHeadCallback on_determined_head_callback,
+    OnPrefetchResponseCompletedCallback on_prefetch_response_completed_callback,
+    perfetto::Flow flow)
     : on_determined_head_callback_(std::move(on_determined_head_callback)),
       on_prefetch_response_completed_callback_(
-          std::move(on_prefetch_response_completed_callback)) {
+          std::move(on_prefetch_response_completed_callback)),
+      flow_(std::move(flow)) {
   serving_url_loader_receivers_.set_disconnect_handler(base::BindRepeating(
       &PrefetchResponseReader::OnServingURLLoaderMojoDisconnect,
       weak_ptr_factory_.GetWeakPtr()));
@@ -481,7 +482,7 @@ void PrefetchResponseReader::OnReceiveResponse(
 
   head_ = std::move(head);
   body_tee_ = base::MakeRefCounted<PrefetchDataPipeTee>(
-      std::move(body), GetPrefetchDataPipeTeeBodySizeLimit());
+      std::move(body), GetPrefetchDataPipeTeeBodySizeLimit(), flow_);
 
   SetLoadStateAndAddEventToQueue(
       new_load_state,
@@ -687,10 +688,16 @@ void PrefetchResponseReader::SetLoadStateAndAddEventToQueue(
       break;
 
     case LoadState::kResponseReceived:
+      CHECK(on_determined_head_callback_);
+      std::move(on_determined_head_callback_)
+          .Run(/*is_successful_determined_head=*/true);
+      break;
+
     case LoadState::kFailedResponseReceived:
     case LoadState::kFailedRedirect:
       CHECK(on_determined_head_callback_);
-      std::move(on_determined_head_callback_).Run();
+      std::move(on_determined_head_callback_)
+          .Run(/*is_successful_determined_head=*/false);
       break;
 
     case LoadState::kFailed:
@@ -698,7 +705,8 @@ void PrefetchResponseReader::SetLoadStateAndAddEventToQueue(
         // Directly transitioning to `kFailed`, so
         // `on_determined_head_callback_` hasn't been notified yet.
         CHECK(on_determined_head_callback_);
-        std::move(on_determined_head_callback_).Run();
+        std::move(on_determined_head_callback_)
+            .Run(/*is_successful_determined_head=*/false);
       } else {
         // Otherwise, `on_determined_head_callback_` should have already been
         // notified.
@@ -713,7 +721,8 @@ void PrefetchResponseReader::SetLoadStateAndAddEventToQueue(
       CHECK(on_prefetch_response_completed_callback_);
       CHECK(completion_status_);
       std::move(on_prefetch_response_completed_callback_)
-          .Run(*completion_status_);
+          .Run(/*is_success=*/load_state() == LoadState::kCompleted,
+               *completion_status_);
       break;
   }
 }

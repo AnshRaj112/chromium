@@ -27,11 +27,15 @@
 
 namespace performance_manager::policies {
 
+namespace {
+
 struct MockPageGraph {
   TestNodeWrapper<ProcessNodeImpl> process;
   TestNodeWrapper<PageNodeImpl> page;
   TestNodeWrapper<FrameNodeImpl> frame;
 };
+
+}  // namespace
 
 class ProcessRankPolicyAndroidTest : public ChromeRenderViewHostTestHarness {
  public:
@@ -90,9 +94,22 @@ TEST_F(ProcessRankPolicyAndroidTest, FocusedPage) {
   DefaultNavigation(page_graph.page.get());
 
   page_graph.page.get()->SetIsFocused(true);
+  page_graph.page.get()->SetIsVisible(true);
 
   EXPECT_EQ(web_contents()->GetPrimaryMainFrameImportanceForTesting(),
             content::ChildProcessImportance::IMPORTANT);
+}
+
+TEST_F(ProcessRankPolicyAndroidTest, FocusedNotVisiblePage) {
+  graph_->PassToGraph(std::make_unique<ProcessRankPolicyAndroid>());
+  MockPageGraph page_graph = CreateDefaultPage();
+  DefaultNavigation(page_graph.page.get());
+
+  page_graph.page.get()->SetIsFocused(true);
+  page_graph.page.get()->SetIsVisible(false);
+
+  EXPECT_EQ(web_contents()->GetPrimaryMainFrameImportanceForTesting(),
+            content::ChildProcessImportance::NORMAL);
 }
 
 TEST_F(ProcessRankPolicyAndroidTest,
@@ -803,6 +820,40 @@ TEST_F(ProcessRankPolicyAndroidTest,
 
   EXPECT_EQ(web_contents()->GetPrimaryPageSubframeImportanceForTesting(),
             content::ChildProcessImportance::MODERATE);
+}
+
+TEST_F(ProcessRankPolicyAndroidTest, ProtectRecentlyVisibleTab) {
+  if (!content::IsPerceptibleImportanceSupported()) {
+    GTEST_SKIP() << "Perceptible importance is not supported.";
+  }
+  const base::TimeDelta kDuration = base::Seconds(10);
+  scoped_feature_list_.InitWithFeaturesAndParameters(
+      /*enabled_features=*/
+      {{chrome::android::kProtectedTabsAndroid, {}},
+       {chrome::android::kProtectRecentlyVisibleTab,
+        {{"duration_in_seconds", base::ToString(kDuration.InSeconds())}}}},
+      /*disabled_features=*/{});
+  graph_->PassToGraph(std::make_unique<ProcessRankPolicyAndroid>(true));
+  MockPageGraph page_graph = CreateDefaultPage();
+  DefaultNavigation(page_graph.page.get());
+
+  page_graph.page.get()->SetIsFocused(false);
+
+  // Make the page visible then invisible.
+  page_graph.page.get()->SetIsVisible(true);
+  page_graph.page.get()->SetIsVisible(false);
+
+  // The page should be protected because it was recently visible.
+  EXPECT_EQ(web_contents()->GetPrimaryMainFrameImportanceForTesting(),
+            content::ChildProcessImportance::PERCEPTIBLE);
+
+  // Advance time by the protection duration.
+  task_environment()->FastForwardBy(kDuration);
+  base::RunLoop().QuitWhenIdle();
+
+  // The page should no longer be protected.
+  EXPECT_EQ(web_contents()->GetPrimaryMainFrameImportanceForTesting(),
+            content::ChildProcessImportance::NORMAL);
 }
 
 }  // namespace performance_manager::policies

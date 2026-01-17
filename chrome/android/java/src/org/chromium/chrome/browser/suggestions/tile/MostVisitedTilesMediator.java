@@ -9,6 +9,7 @@ import static org.chromium.chrome.browser.suggestions.tile.MostVisitedTilesPrope
 import static org.chromium.chrome.browser.suggestions.tile.MostVisitedTilesProperties.HORIZONTAL_INTERVAL_PADDINGS;
 import static org.chromium.chrome.browser.suggestions.tile.MostVisitedTilesProperties.IS_VISIBLE;
 
+import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 
@@ -42,6 +43,7 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
      */
     private static final double MVT_CUSTOMIZATION_IPH_TILE_SCORE_THRESHOULD = 1.3;
 
+    private final Context mContext;
     private final Resources mResources;
     private final UiConfig mUiConfig;
     private final MostVisitedTilesLayout mMvTilesLayout;
@@ -65,7 +67,7 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
     private final int mTileViewIntervalPaddingForTablet;
 
     public MostVisitedTilesMediator(
-            Resources resources,
+            Context context,
             UiConfig uiConfig,
             MostVisitedTilesLayout mvTilesLayout,
             TileRenderer renderer,
@@ -73,7 +75,8 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
             boolean isTablet,
             @Nullable Runnable snapshotTileGridChangedRunnable,
             @Nullable Runnable tileCountChangedRunnable) {
-        mResources = resources;
+        mContext = context;
+        mResources = context.getResources();
         mUiConfig = uiConfig;
         mRenderer = renderer;
         mModel = propertyModel;
@@ -111,7 +114,8 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
                         updateMvtVisibility();
                     }
                 };
-        NtpCustomizationConfigManager.getInstance().addListener(mMvtVisibilityListener);
+        NtpCustomizationConfigManager.getInstance()
+                .addListener(mMvtVisibilityListener, mContext, /* skipNotify= */ false);
     }
 
     /** Called to initialize this mediator when native is ready. */
@@ -163,14 +167,38 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
     }
 
     /**
-     * Updates the visibility of the Most Visited Tiles section. The section is visible if and only
-     * if the user has chosen to show it and there are tiles to display.
+     * Sets the visibility of the Most Visited Tiles (MVT) section.
+     *
+     * <p>If the `NewTabPageCustomizationForMvt` feature is disabled: The section is visible as long
+     * as it has content, which means there are either tiles to show or custom links are enabled
+     * (showing the "Add new" button).
+     *
+     * <p>If the `NewTabPageCustomizationForMvt` feature is enabled: Visibility is also controlled
+     * by a user accessible toggle. The section will only be visible if the user has the toggle
+     * turned on and the section has content.
+     *
+     * <p>Once the MVT customization feature flag is enabled by default, the code should be changed
+     * to:
+     *
+     * <p>boolean isMvtVisible = !ChromeFeatureList.sNewTabPageCustomizationForMvt.isEnabled() ||
+     * NtpCustomizationConfigManager.getInstance().getPrefIsMvtToggleOn();
+     *
+     * <p>mModel.set(IS_VISIBLE, isMvtVisible);
      */
     void updateMvtVisibility() {
-        mModel.set(
-                IS_VISIBLE,
-                NtpCustomizationConfigManager.getInstance().getPrefIsMvtToggleOn()
-                        && !mTileGroup.isEmpty());
+        // The section has content if the "Add new" button is present or there are tiles.
+        boolean hasContent =
+                ChromeFeatureList.sMostVisitedTilesCustomization.isEnabled()
+                        || (mTileGroup != null && !mTileGroup.isEmpty());
+
+        boolean isMvtVisible = hasContent;
+        if (ChromeFeatureList.sNewTabPageCustomizationForMvt.isEnabled()) {
+            // The toggle turns off the whole MVT section regardless the section has something to
+            // show.
+            isMvtVisible &= NtpCustomizationConfigManager.getInstance().getPrefIsMvtToggleOn();
+        }
+
+        mModel.set(IS_VISIBLE, isMvtVisible);
     }
 
     @Override
@@ -191,11 +219,8 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
     }
 
     @Override
-    public void onCustomTileNonReorderChange() {
-        SuggestionsTileVerticalDivider divider = mMvTilesLayout.getDividerMaybeNull();
-        if (divider != null) {
-            divider.showThenHide();
-        }
+    public void onCustomTileReorder(int newPos) {
+        mMvTilesLayout.ensureTileIsInViewOnNextLayout(newPos);
     }
 
     public void onConfigurationChanged() {

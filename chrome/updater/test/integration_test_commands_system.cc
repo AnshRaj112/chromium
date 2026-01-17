@@ -60,16 +60,19 @@ std::string RegistrationRequestToString(
   value.Set("brand_code", registration.brand_code);
   value.Set("brand_path", registration.brand_path.AsUTF8Unsafe());
   value.Set("ap", registration.ap);
-  value.Set("ap_path", registration.ap_path.AsUTF8Unsafe());
-  value.Set("ap_key", registration.ap_key);
-  value.Set("version", registration.version.GetString());
-  value.Set("version_path", registration.version_path.AsUTF8Unsafe());
-  value.Set("version_key", registration.version_key);
+  value.Set("ap_path",
+            registration.ap_path.value_or(base::FilePath()).AsUTF8Unsafe());
+  value.Set("ap_key", registration.ap_key.value_or(""));
+  value.Set("version", registration.version);
+  value.Set(
+      "version_path",
+      registration.version_path.value_or(base::FilePath()).AsUTF8Unsafe());
+  value.Set("version_key", registration.version_key.value_or(""));
   value.Set("existence_checker_path",
             registration.existence_checker_path.AsUTF8Unsafe());
-  value.Set("cohort", registration.cohort);
-  value.Set("cohort_name", registration.cohort_name);
-  value.Set("cohort_hint", registration.cohort_hint);
+  value.Set("cohort", registration.cohort.value_or(""));
+  value.Set("cohort_name", registration.cohort_name.value_or(""));
+  value.Set("cohort_hint", registration.cohort_hint.value_or(""));
   return StringFromValue(base::Value(value.Clone()));
 }
 
@@ -195,19 +198,25 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
                {Param("managed", BoolToString(is_managed_device))});
   }
 
-  void ExpectSelfUpdateSequence(ScopedServer* test_server) const override {
+  void ExpectSelfUpdateSequence(ScopedServer& test_server) const override {
     updater::test::ExpectSelfUpdateSequence(updater_scope_, test_server);
   }
 
-  void ExpectPing(ScopedServer* test_server,
+  void ExpectPing(ScopedServer& test_server,
                   int event_type,
                   std::optional<GURL> target_url) const override {
     updater::test::ExpectPing(updater_scope_, test_server, event_type,
                               target_url);
   }
 
+  void ExpectInstallSource(ScopedServer& test_server,
+                           const std::string& install_source) const override {
+    updater::test::ExpectInstallSource(updater_scope_, test_server,
+                                       install_source);
+  }
+
   void ExpectAppCommandPing(
-      ScopedServer* test_server,
+      ScopedServer& test_server,
       const std::string& appid,
       const std::string& appcommandid,
       int errorcode,
@@ -220,12 +229,12 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
                                         event_type, version, updater_version);
   }
 
-  void ExpectUpdateCheckRequest(ScopedServer* test_server) const override {
+  void ExpectUpdateCheckRequest(ScopedServer& test_server) const override {
     updater::test::ExpectUpdateCheckRequest(updater_scope_, test_server);
   }
 
   void ExpectUpdateCheckSequence(
-      ScopedServer* test_server,
+      ScopedServer& test_server,
       const std::string& app_id,
       UpdateService::Priority priority,
       const base::Version& from_version,
@@ -236,7 +245,7 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
                                              to_version, updater_version);
   }
 
-  void ExpectUpdateSequence(ScopedServer* test_server,
+  void ExpectUpdateSequence(ScopedServer& test_server,
                             const std::string& app_id,
                             const std::string& install_data_index,
                             UpdateService::Priority priority,
@@ -245,15 +254,16 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
                             bool do_fault_injection,
                             bool skip_download,
                             const base::Version& updater_version,
-                            const std::string& event_regex) const override {
+                            const std::string& event_regex,
+                            bool use_xz) const override {
     updater::test::ExpectUpdateSequence(
         updater_scope_, test_server, app_id, install_data_index, priority,
         from_version, to_version, do_fault_injection, skip_download,
-        updater_version, event_regex);
+        updater_version, event_regex, use_xz);
   }
 
   void ExpectUpdateSequenceBadHash(
-      ScopedServer* test_server,
+      ScopedServer& test_server,
       const std::string& app_id,
       const std::string& install_data_index,
       UpdateService::Priority priority,
@@ -264,7 +274,7 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
         from_version, to_version);
   }
 
-  void ExpectInstallSequence(ScopedServer* test_server,
+  void ExpectInstallSequence(ScopedServer& test_server,
                              const std::string& app_id,
                              const std::string& install_data_index,
                              UpdateService::Priority priority,
@@ -281,7 +291,7 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
   }
 
   void ExpectEnterpriseCompanionAppOTAInstallSequence(
-      ScopedServer* test_server) const override {
+      ScopedServer& test_server) const override {
     updater::test::ExpectEnterpriseCompanionAppOTAInstallSequence(test_server);
   }
 
@@ -384,6 +394,13 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
                 Param("exit_code", base::NumberToString(expected_exit_code))});
   }
 
+  void RunUpdateApps(int expected_exit_code,
+                     const base::Version& version) const override {
+    RunCommand("run_update_apps",
+               {Param("exit_code", base::NumberToString(expected_exit_code)),
+                Param("version", version.GetString())});
+  }
+
   void RegisterApp(const RegistrationRequest& registration) const override {
     RunCommand(
         "register_app",
@@ -466,6 +483,10 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
     RunCommand("expect_legacy_process_launcher_succeeds");
   }
 
+  void ExpectProcessLauncherLaunchCmdLineSucceeds() const override {
+    RunCommand("expect_process_launcher_launch_cmd_line_succeeds");
+  }
+
   void ExpectLegacyAppCommandWebSucceeds(
       const std::string& app_id,
       const std::string& command_id,
@@ -498,6 +519,31 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
 
   void RunHandoff(const std::string& app_id) const override {
     RunCommand("run_handoff", {Param("app_id", app_id)});
+  }
+
+  void InstallScheduledTask(bool run_elevated,
+                            const std::string& task_name,
+                            bool use_task_subfolders) const override {
+    RunCommand(
+        run_elevated, "install_scheduled_task",
+        {Param("task_name", task_name),
+         Param("use_task_subfolders", BoolToString(use_task_subfolders))});
+  }
+  void IsScheduledTaskRegistered(bool run_elevated,
+                                 const std::string& task_name,
+                                 bool use_task_subfolders) const override {
+    RunCommand(
+        run_elevated, "is_scheduled_task_registered",
+        {Param("task_name", task_name),
+         Param("use_task_subfolders", BoolToString(use_task_subfolders))});
+  }
+  void DeleteScheduledTask(bool run_elevated,
+                           const std::string& task_name,
+                           bool use_task_subfolders) const override {
+    RunCommand(
+        run_elevated, "delete_scheduled_task",
+        {Param("task_name", task_name),
+         Param("use_task_subfolders", BoolToString(use_task_subfolders))});
   }
 #endif  // BUILDFLAG(IS_WIN)
 
@@ -609,12 +655,14 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
   void RunOfflineInstall(bool is_legacy_install,
                          bool is_silent_install,
                          int installer_result,
-                         int installer_error) override {
+                         int installer_error,
+                         const std::string& install_source) override {
     RunCommand("run_offline_install",
                {Param("legacy_install", BoolToString(is_legacy_install)),
                 Param("silent", BoolToString(is_silent_install)),
                 Param("installer_result", base::ToString(installer_result)),
-                Param("installer_error", base::ToString(installer_error))});
+                Param("installer_error", base::ToString(installer_error)),
+                Param("install_source", install_source)});
   }
 
   void RunOfflineInstallOsNotSupported(bool is_legacy_install,
@@ -699,11 +747,9 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
     std::string value;
   };
 
-  // Invokes the test helper command by running a unit test from the
-  // "updater_integration_tests_helper" program. The program returns 0 if
-  // the unit test passes.
-  void RunCommand(const std::string& command_switch,
-                  const std::vector<Param>& params) const {
+  base::CommandLine GenerateHelperCommand(
+      const std::string& command_switch,
+      const std::vector<Param>& params) const {
     const base::CommandLine command_line =
         *base::CommandLine::ForCurrentProcess();
     base::FilePath path(command_line.GetProgram());
@@ -740,9 +786,17 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
                                           command_line.GetSwitchValueNative(s));
       }
     }
+    return helper_command;
+  }
 
+  // Invokes the test helper command by running a unit test from the
+  // "updater_integration_tests_helper" program. The program returns 0 if
+  // the unit test passes.
+  void RunCommand(const std::string& command_switch,
+                  const std::vector<Param>& params) const {
     int exit_code = -1;
-    Run(updater_scope_, helper_command, &exit_code);
+    Run(updater_scope_, GenerateHelperCommand(command_switch, params),
+        &exit_code);
 
     // A failure here indicates that the integration test helper
     // process ran but the invocation of the test helper command was not
@@ -756,6 +810,22 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
 
   void RunCommand(const std::string& command_switch) const {
     RunCommand(command_switch, {});
+  }
+
+  // Similar to `RunCommand` above, but runs the test helper de-elevated.
+  void RunCommandDeElevated(const std::string& command_switch,
+                            const std::vector<Param>& params) const {
+    int exit_code = -1;
+    RunDeElevated(updater_scope_, GenerateHelperCommand(command_switch, params),
+                  &exit_code);
+    ASSERT_EQ(exit_code, 0);
+  }
+
+  void RunCommand(bool run_elevated,
+                  const std::string& command_switch,
+                  const std::vector<Param>& params) const {
+    run_elevated ? RunCommand(command_switch, params)
+                 : RunCommandDeElevated(command_switch, params);
   }
 
   const UpdaterScope updater_scope_;

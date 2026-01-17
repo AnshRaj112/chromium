@@ -104,7 +104,6 @@ static_library("update_client") {
     "crx_downloader_factory.cc",
     "crx_downloader_factory.h",
     "crx_update_item.h",
-    "network.cc",
     "network.h",
     "op_download.cc",
     "op_download.h",
@@ -222,11 +221,6 @@ if (is_mac) {
 
 source_set("test_support") {
   testonly = true
-  visibility = [
-    ":unit_tests",
-    "//chrome/test:test_support",
-    "//components/component_updater:unit_tests",
-  ]
   sources = [
     "net/url_loader_post_interceptor.cc",
     "net/url_loader_post_interceptor.h",
@@ -310,6 +304,7 @@ source_set("unit_tests") {
     "op_puffin_unittest.cc",
     "op_xz_unittest.cc",
     "op_zucchini_unittest.cc",
+    "patch/patch_impl_unittest.cc",
     "persisted_data_unittest.cc",
     "ping_manager_unittest.cc",
     "protocol_parser_json_unittest.cc",
@@ -350,6 +345,7 @@ source_set("unit_tests") {
     "//components/prefs",
     "//components/prefs:test_support",
     "//components/services/patch:in_process",
+    "//components/services/patch/public/mojom",
     "//components/services/unzip:in_process",
     "//components/version_info",
     "//net:test_support",

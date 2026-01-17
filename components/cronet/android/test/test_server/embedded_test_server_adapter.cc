@@ -23,6 +23,7 @@
 #include "base/path_service.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/strings/string_view_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/test_support_android.h"
 #include "net/http/http_status_code.h"
@@ -59,6 +60,15 @@ class NativeTestServerHandleRequestCallback final {
   jni_zero::ScopedJavaGlobalRef<jobject> java_callback_;
 };
 
+struct NativeTestServerOCSPConfig final {
+  net::test_server::EmbeddedTestServer::OCSPConfig ocsp_config;
+};
+
+struct NativeTestServerServerCertificateConfig final {
+  net::test_server::EmbeddedTestServer::ServerCertificateConfig
+      server_certificate_config;
+};
+
 }  // namespace cronet
 
 namespace jni_zero {
@@ -80,6 +90,18 @@ std::unique_ptr<cronet::NativeTestServerHandleRequestCallback>
 FromJniType<std::unique_ptr<cronet::NativeTestServerHandleRequestCallback>>(
     JNIEnv* env,
     const JavaRef<jobject>& java_handle_request_callback);
+
+template <>
+cronet::NativeTestServerOCSPConfig
+FromJniType<cronet::NativeTestServerOCSPConfig>(
+    JNIEnv* env,
+    const JavaRef<jobject>& java_ocsp_config);
+
+template <>
+cronet::NativeTestServerServerCertificateConfig
+FromJniType<cronet::NativeTestServerServerCertificateConfig>(
+    JNIEnv* env,
+    const JavaRef<jobject>& java_server_certificate_config);
 
 }  // namespace jni_zero
 
@@ -123,6 +145,38 @@ FromJniType<std::unique_ptr<cronet::NativeTestServerHandleRequestCallback>>(
       java_handle_request_callback);
 }
 
+template <>
+cronet::NativeTestServerOCSPConfig
+FromJniType<cronet::NativeTestServerOCSPConfig>(
+    JNIEnv* env,
+    const JavaRef<jobject>& java_ocsp_config) {
+  const auto response_type =
+      cronet::Java_NativeTestServer_getOCSPConfigResponseType(env,
+                                                              java_ocsp_config);
+  cronet::NativeTestServerOCSPConfig ocsp_config = {
+      .ocsp_config =
+          net::test_server::EmbeddedTestServer::OCSPConfig(response_type)};
+  if (response_type == net::test_server::EmbeddedTestServer::OCSPConfig::
+                           ResponseType::kSuccessful) {
+    // See the documentation of OCSPConfig#responseType for why we do this.
+    ocsp_config.ocsp_config.single_responses.push_back({});
+  }
+  return ocsp_config;
+}
+
+template <>
+cronet::NativeTestServerServerCertificateConfig
+FromJniType<cronet::NativeTestServerServerCertificateConfig>(
+    JNIEnv* env,
+    const JavaRef<jobject>& java_server_certificate_config) {
+  cronet::NativeTestServerServerCertificateConfig server_certificate_config;
+  server_certificate_config.server_certificate_config.stapled_ocsp_config =
+      cronet::Java_NativeTestServer_getServerCertificateConfigStapledOCSPConfig(
+          env, java_server_certificate_config)
+          .ocsp_config;
+  return server_certificate_config;
+}
+
 }  // namespace jni_zero
 
 namespace cronet {
@@ -130,10 +184,10 @@ namespace cronet {
 std::unique_ptr<net::test_server::HttpResponse>
 NativeTestServerHandleRequestCallback::operator()(
     const net::test_server::HttpRequest& http_request) const {
-  cronet::Java_NativeTestServer_handleRequest(jni_zero::AttachCurrentThread(),
-                                              java_callback_,
-                                              {.http_request = http_request});
-  return nullptr;
+  return cronet::Java_NativeTestServer_handleRequest(
+             jni_zero::AttachCurrentThread(), java_callback_,
+             {.http_request = http_request})
+      .raw_http_response;
 }
 
 }  // namespace cronet
@@ -289,30 +343,35 @@ std::unique_ptr<net::test_server::HttpResponse> CronetTestRequestHandler(
 
 namespace cronet {
 
-long JNI_NativeTestServer_Create(
-    JNIEnv* env,
-    std::string& test_files_root,
-    std::string& test_data_dir,
-    bool use_https,
-    net::EmbeddedTestServer::ServerCertificate certificate) {
+static long JNI_NativeTestServer_Create(JNIEnv* env,
+                                        std::string& test_files_root,
+                                        std::string& test_data_dir,
+                                        net::EmbeddedTestServer::Type type) {
   base::InitAndroidTestPaths(base::FilePath(test_data_dir));
-  return reinterpret_cast<long>(new EmbeddedTestServerAdapter(
-      base::FilePath(test_files_root),
-      (use_https ? net::test_server::EmbeddedTestServer::TYPE_HTTPS
-                 : net::test_server::EmbeddedTestServer::TYPE_HTTP),
-      certificate));
+  return reinterpret_cast<long>(
+      new EmbeddedTestServerAdapter(base::FilePath(test_files_root), type));
 }
 
 EmbeddedTestServerAdapter::EmbeddedTestServerAdapter(
     const base::FilePath& test_files_root,
-    net::EmbeddedTestServer::Type server_type,
-    net::EmbeddedTestServer::ServerCertificate server_certificate)
+    net::EmbeddedTestServer::Type server_type)
     : test_server(net::EmbeddedTestServer(server_type)) {
   test_server.RegisterRequestHandler(
       base::BindRepeating(&CronetTestRequestHandler, &test_server));
   test_server.ServeFilesFromDirectory(test_files_root);
   net::test_server::RegisterDefaultHandlers(&test_server);
+}
+
+void EmbeddedTestServerAdapter::SetSSLConfigWithServerCertificate(
+    JNIEnv* env,
+    net::EmbeddedTestServer::ServerCertificate server_certificate) {
   test_server.SetSSLConfig(server_certificate);
+}
+
+void EmbeddedTestServerAdapter::SetSSLConfigWithServerCertificateConfig(
+    JNIEnv* env,
+    const NativeTestServerServerCertificateConfig& server_certificate_config) {
+  test_server.SetSSLConfig(server_certificate_config.server_certificate_config);
 }
 
 EmbeddedTestServerAdapter::~EmbeddedTestServerAdapter() = default;
@@ -400,3 +459,5 @@ void EmbeddedTestServerAdapter::RegisterRequestHandler(
 }
 
 }  // namespace cronet
+
+DEFINE_JNI(NativeTestServer)

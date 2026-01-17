@@ -35,6 +35,7 @@
 <translation id="1249250836236328755">Zvrst</translation>
 <translation id="1254593899333212300">Neposredna internetna povezava</translation>
 <translation id="1272293450992660632">Vrednosti PIN se ne ujemajo.</translation>
+<translation id="1279040297980392566">Čakanje na dokončanje pregleda, poskusite znova pozneje</translation>
 <translation id="1280820357415527819">Iskanje mobilnih omrežij</translation>
 <translation id="1293556467332435079">Datoteke</translation>
 <translation id="1297922636971898492">Google Drive trenutno ni na voljo. Ko bo spet na voljo, se bo prenos samodejno začel znova.</translation>
@@ -109,7 +110,6 @@
 <translation id="1813278315230285598">Storitve</translation>
 <translation id="181434555916624618">Rezultati z osebami za zdaj ne bodo prikazani. Poskusite uporabiti drug poziv.</translation>
 <translation id="1829129547161959350">Pingvin</translation>
-<translation id="183183971458492120">Nalaganje podatkov …</translation>
 <translation id="1832073788765803750">Katakana polovične širine</translation>
 <translation id="1834290891154666894">Neveljaven vnos za ujemanje nadomestnega imena subjekta</translation>
 <translation id="1838709767668011582">Googlovo spletno mesto</translation>
@@ -146,13 +146,13 @@
 <translation id="2142680004883808240">ruščina s fonetično tipkovnico YaZHert</translation>
 <translation id="2143778271340628265">Ročna konfiguracija strežnika proxy</translation>
 <translation id="2148716181193084225">Danes</translation>
+<translation id="2161573825856688200">Googlov projekt</translation>
 <translation id="2163152940313951844">Neveljavni znak: <ph name="CHARACTER_NAME" /></translation>
 <translation id="2178056538281447670">Microsoft 365</translation>
 <translation id="2184934335987813305">portugalščina z mednarodno angleško tipkovnico (ZDA – za računalnike s sistemom Windows)</translation>
 <translation id="2193661397560634290">Porabljeno: <ph name="SPACE_USED" /></translation>
 <translation id="2198315389084035571">poenostavljena kitajščina</translation>
 <translation id="22085916256174561">korejščina</translation>
-<translation id="2208919847696382164">Namestitev z Linuxom</translation>
 <translation id="2215692307449050019">Baterija je skoraj prazna. Sinhronizacija datotek se bo nadaljevala, ko boste napravo priklopili na napajanje.</translation>
 <translation id="2225536596944493418">Ali ste prepričani, da želite izbrisati toliko elementov: <ph name="NUMBER_OF_ITEMS" />?</translation>
 <translation id="2230062665678605299">Ni bilo mogoče ustvariti mape »<ph name="FOLDER_NAME" />«. <ph name="ERROR_MESSAGE" /></translation>
@@ -213,7 +213,6 @@
 <translation id="2653059201992392941">Imate še toliko poskusov: <ph name="RETRIES" />.</translation>
 <translation id="2663066752008346276">burmanščina/mjanmarščina s tipkovnico za mjanmarščino</translation>
 <translation id="2664412712123763093">Mesto datoteke</translation>
-<translation id="2718540689505416944">Namestitev aplikacije z Linuxom</translation>
 <translation id="2719020180254996569">Omrežje <ph name="NETWORK_INDEX" /> od <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, podrobnosti</translation>
 <translation id="2724954091494693138">turščina s tipkovnico F</translation>
 <translation id="2732288874651063549">Uredite deljenje z: <ph name="VM_NAME" /></translation>
@@ -222,7 +221,6 @@
 <translation id="2764206540577097904">Porabili ste ves posamezen prostor za shranjevanje za Google Workspace.</translation>
 <translation id="2771816809568414714">Sir</translation>
 <translation id="2781645665747935084">belgijska</translation>
-<translation id="2782104745158847185">Napaka pri nameščanju aplikacije za Linux</translation>
 <translation id="2802583107108007218">Preberite več o teh omejitvah.</translation>
 <translation id="2803375539583399270">Vnesite kodo PIN</translation>
 <translation id="2819519502129272135">Sinhronizacija datotek je izklopljena</translation>
@@ -345,7 +343,6 @@
 <translation id="3786301125658655746">Povezava ni vzpostavljena</translation>
 <translation id="3789841737615482174">Namesti</translation>
 <translation id="3793469551756281394">Preostali čas: Približno <ph name="REMAINING_TIME_HOUR" /> <ph name="REMAINING_TIME_MINUTE" /></translation>
-<translation id="3798449238516105146">Različica</translation>
 <translation id="3801082500826908679">ferščina</translation>
 <translation id="3809272675881623365">Zajec</translation>
 <translation id="3810973564298564668">Upravljaj</translation>
@@ -353,14 +350,12 @@
 <translation id="3811494700605067549">Izbrana je ena datoteka</translation>
 <translation id="3817579325494460411">Ni navedeno</translation>
 <translation id="3819448694985509187">Napačna koda PIN. Imate še 1 poskus.</translation>
-<translation id="3822559385185038546">Ta strežnik proxy je uveljavil skrbnik</translation>
 <translation id="3830674330436234648">Predvajanje ni na voljo</translation>
 <translation id="383652340667548381">srbščina</translation>
 <translation id="3839045880592694915">Operater ne dovoljuje povezave modema. Za več podrobnosti se obrnite na operaterja.</translation>
 <translation id="385051799172605136">Nazaj</translation>
 <translation id="3855472144336161447">nemščina (Neo 2)</translation>
 <translation id="3858860766373142691">Ime</translation>
-<translation id="3866249974567520381">Opis</translation>
 <translation id="3899991606604168269">francoščina (Kanada) z večjezično tipkovnico</translation>
 <translation id="3901991538546252627">Vzpostavljanje povezave z omrežjem <ph name="NAME" /></translation>
 <translation id="3906232975181435906">Nameščanje profila v mobilni napravi, omrežje <ph name="NETWORK_INDEX" /> od <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" /></translation>
@@ -438,7 +433,6 @@
 <translation id="4477219268485577442">bolgarščina (fonetična)</translation>
 <translation id="4508265954913339219">Aktiviranje ni uspelo</translation>
 <translation id="4509667233588080747">angleščina (ZDA) z mednarodno tipkovnico Workman</translation>
-<translation id="4522570452068850558">Podrobnosti</translation>
 <translation id="4527800702232535228">Ta mapa je deljena s programom Parallels Desktop.</translation>
 <translation id="4552678318981539154">Nakup dodatnega prostora za shranjevanje ...</translation>
 <translation id="4552759165874948005">Omrežje <ph name="NETWORK_TYPE" />, moč signala je <ph name="SIGNAL_STRENGTH" /> %</translation>
@@ -596,13 +590,13 @@
 <translation id="5596627076506792578">Več možnosti</translation>
 <translation id="5602622065581044566">bolgarščina s fonetično tipkovnico</translation>
 <translation id="5605830556594064952">Združene države – Dvorak</translation>
+<translation id="560739212255190568">Skrbnik je poleg uveljavljanja tega strežnika proxy nastavil pravila za preglasitev strežnika proxy</translation>
 <translation id="5618330573454123917">Ta datoteka je zasnovana za računalnike s programsko opremo Macintosh, in ni združljiva z vašo napravo, ki uporablja sistem Chrome OS. <ph name="BEGIN_LINK_HELP" />Preberite več<ph name="END_LINK_HELP" /> o odpiranju datotek v sistemu Chrome OS.</translation>
 <translation id="5625294776298156701">tamilščina s tipkovnico Tamil99</translation>
 <translation id="5633226425545095130">Če boste premaknili ta element, bo deljen z vsemi osebami, ki jim je vidna deljena mapa »<ph name="DESTINATION_NAME" />«.</translation>
 <translation id="5649768706273821470">Poslušajte</translation>
 <translation id="5650895901941743674">Preverite konfiguracijo APN-ja</translation>
 <translation id="5669691691057771421">Vnos nove kode PIN</translation>
-<translation id="5678784840044122290">Aplikacija za Linux bo na voljo v terminalu in morda bo zanjo tudi prikazana ikona v zaganjalniku.</translation>
 <translation id="5686799162999241776"><ph name="BEGIN_BOLD" />Ni mogoče prekiniti povezave z arhivom ali navideznim diskom<ph name="END_BOLD" />
    <ph name="LINE_BREAKS" />
    Zaprite vse datoteke v arhivu ali navideznem disku, nato poskusite znova.</translation>
@@ -637,7 +631,6 @@
 <translation id="5861477046012235702">Igričar</translation>
 <translation id="5864471791310927901">Iskanje DHCP-ja ni uspelo</translation>
 <translation id="5896749729057314184"><ph name="NETWORK_INDEX" />. omrežje od <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, neaktivirano, moč signala <ph name="SIGNAL_STRENGTH" /> %, podrobnosti</translation>
-<translation id="5911887972742538906">Med nameščanjem aplikacije za Linux je prišlo do napake.</translation>
 <translation id="5912396950572065471">Oblika</translation>
 <translation id="5918480239180455431">Na voljo so nove oblike iskanja</translation>
 <translation id="5926082595146149752">nizozemščina (Nizozemska) z mednarodno angleško tipkovnico (ZDA – za računalnike s sistemom Windows)</translation>
@@ -806,7 +799,6 @@
 <translation id="7238097264433196391">Ime pogona</translation>
 <translation id="7238643356913091553"><ph name="NETWORK_NAME" />, podrobnosti</translation>
 <translation id="7246947237293279874">Proxy FTP</translation>
-<translation id="7248671827512403053">Aplikacija</translation>
 <translation id="7256405249507348194">Neprepoznana napaka: <ph name="DESC" /></translation>
 <translation id="7268659760406822741">Razpoložljive storitve</translation>
 <translation id="7291818353625820805">Želite, da se tipke ponovijo? Izklopite naglasna znamenja v nastavitvah tipkovnice</translation>
@@ -921,7 +913,7 @@
 <translation id="8055538340801153769">Ta mapa</translation>
 <translation id="807187749540895545">Razširjanje datoteke <ph name="FILE_NAME" /> …</translation>
 <translation id="8087576439476816834">Prenos, <ph name="PROFILE_NAME" /></translation>
-<translation id="8106045200081704138">V skupni rabi z menoj</translation>
+<translation id="8106045200081704138">Deljeno z mano</translation>
 <translation id="8116072619078571545">Voda z ledom</translation>
 <translation id="8120392982188717723">Omogočanje sinhronizacije v omrežjih z omejenim prenosom podatkov</translation>
 <translation id="8124093710070495550">Težava s sinhronizacijo</translation>
@@ -933,7 +925,6 @@
 <translation id="8151638057146502721">Konfiguriraj</translation>
 <translation id="8154666764013920974">{NUM_ERROR,plural, =1{1 napaka.}one{# napaka.}two{# napaki.}few{# napake.}other{# napak.}}</translation>
 <translation id="8154842056504218462">Izbrani so vsi vnosi.</translation>
-<translation id="8157684860301034423">Prenos podatkov aplikacije ni uspel.</translation>
 <translation id="8175731104491895765">francoščina (Belgija)</translation>
 <translation id="8175799081768705361">Sinhroniziranje tega števila datotek v Googlu Drive: <ph name="NUMBER_OF_FILES_SYNCING" /></translation>
 <translation id="8179976553408161302">Enter</translation>
@@ -995,6 +986,7 @@
 <translation id="8540608333167683902">Omrežje <ph name="NETWORK_INDEX" /> od <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, moč signala je <ph name="SIGNAL_STRENGTH" /> %, podrobnosti</translation>
 <translation id="8545476925160229291">angleščina (ZDA)</translation>
 <translation id="854655314928502177">URL za samodejno odkrivanje spletnega strežnika proxy:</translation>
+<translation id="8547747809824590510">Skrbnik je nastavil pravila za preglasitev strežnika proxy</translation>
 <translation id="8549186985808798022">italijanščina</translation>
 <translation id="8551494947769799688">latvijščina</translation>
 <translation id="8560515948038859357">kantonščina</translation>
@@ -1055,6 +1047,7 @@
 <translation id="9038620279323455325">Datoteka z imenom »<ph name="FILE_NAME" />« že obstaja. Izberite drugo ime.</translation>
 <translation id="9046895021617826162">Vzpostavljanje povezave ni uspelo</translation>
 <translation id="9065512565307033593">Če ne preverite, bo dostop do omrežja onemogočen.</translation>
+<translation id="9079844694307518094">Skrbnik uveljavlja ta strežnik proxy</translation>
 <translation id="908378762078012445">ruščina s fonetično tipkovnico AATSEEL</translation>
 <translation id="9086302186042011942">Sinhroniziranje</translation>
 <translation id="9099674669267916096">Število strani</translation>
@@ -1075,9 +1068,9 @@
 <translation id="9183302530794969518">Google Dokumenti</translation>
 <translation id="9189836632794948435">kazaščina</translation>
 <translation id="9200427192836333033">Št. razširjenih elementov: <ph name="NUMBER_OF_ITEMS" />.</translation>
-<translation id="9213073329713032541">Namestitev je bila uspešno začeta.</translation>
 <translation id="9219103736887031265">Slike</translation>
 <translation id="9219908252191632183">Mesečeva pokrajina</translation>
+<translation id="931652069802536959">Omrežje je blokirano s pravilnikom</translation>
 <translation id="938470336146445890">Namestite uporabniško potrdilo.</translation>
 <translation id="939736085109172342">Nova mapa</translation>
 <translation id="943972244133411984">Spremenil(-a):</translation>

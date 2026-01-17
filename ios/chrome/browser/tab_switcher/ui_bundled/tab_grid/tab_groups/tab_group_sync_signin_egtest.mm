@@ -10,7 +10,8 @@
 #import "components/data_sharing/public/features.h"
 #import "components/sync/base/command_line_switches.h"
 #import "components/sync/base/data_type.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/tab_groups/tab_groups_eg_utils.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey.h"
@@ -92,6 +93,7 @@ void WaitForEntitiesOnFakeServer(int entity_count) {
                                    syncer::kSyncShortNudgeDelayForTest);
   config.features_enabled.push_back(
       data_sharing::features::kDataSharingFeature);
+  config.features_disabled.push_back(kIOSAutoOpenRemoteTabGroupsSettings);
   return config;
 }
 
@@ -350,6 +352,11 @@ void WaitForEntitiesOnFakeServer(int entity_count) {
   // Close the second group.
   [[EarlGrey selectElementWithMatcher:TabGridCloseButtonForGroupCellAtIndex(1)]
       performAction:grey_tap()];
+  // Tap the snackbar to make it disappear.
+  id<GREYMatcher> snackbarMatcher = chrome_test_util::SnackbarViewMatcher();
+  [[EarlGrey selectElementWithMatcher:snackbarMatcher]
+      performAction:grey_tap()];
+
   [[EarlGrey selectElementWithMatcher:TabGridGroupCellWithName(kGroup2Name, 1)]
       assertWithMatcher:grey_nil()];
 

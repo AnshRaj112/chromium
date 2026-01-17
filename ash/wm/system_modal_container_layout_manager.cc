@@ -14,7 +14,6 @@
 #include "ash/shell.h"
 #include "ash/wm/window_dimmer.h"
 #include "ash/wm/window_util.h"
-#include "base/containers/contains.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/window.h"
 #include "ui/base/mojom/ui_base_types.mojom-shared.h"
@@ -69,7 +68,7 @@ void SystemModalContainerLayoutManager::OnChildWindowVisibilityChanged(
   }
 
   if (window->IsVisible()) {
-    DCHECK(!base::Contains(modal_windows_, window));
+    DCHECK(!std::ranges::contains(modal_windows_, window));
     AddModalWindow(window);
   } else {
     if (RemoveModalWindow(window))
@@ -127,7 +126,7 @@ void SystemModalContainerLayoutManager::OnWindowPropertyChanged(
 
   if (window->GetProperty(aura::client::kModalKey) ==
       ui::mojom::ModalType::kSystem) {
-    if (base::Contains(modal_windows_, window))
+    if (std::ranges::contains(modal_windows_, window))
       return;
     AddModalWindow(window);
   } else {
@@ -204,7 +203,7 @@ bool SystemModalContainerLayoutManager::IsModalBackground(
 void SystemModalContainerLayoutManager::OnDisplayMetricsChanged(
     const display::Display& display,
     uint32_t changed_metrics) {
-  if (display::Screen::GetScreen()->GetDisplayNearestWindow(container_).id() !=
+  if (display::Screen::Get()->GetDisplayNearestWindow(container_).id() !=
       display.id()) {
     return;
   }
@@ -225,7 +224,7 @@ void SystemModalContainerLayoutManager::AddModalWindow(aura::Window* window) {
       capture_window->ReleaseCapture();
   }
   DCHECK(window->IsVisible());
-  DCHECK(!base::Contains(modal_windows_, window));
+  DCHECK(!std::ranges::contains(modal_windows_, window));
 
   modal_windows_.push_back(window);
   // Create the modal background on all displays for |window|.
@@ -287,7 +286,7 @@ gfx::Rect SystemModalContainerLayoutManager::GetUsableDialogArea() const {
   // keyboard will not fill left to right, the background is still covered.
   gfx::Rect valid_bounds = container_->bounds();
   const auto& display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(container_);
+      display::Screen::Get()->GetDisplayNearestWindow(container_);
   gfx::Rect work_area = display.work_area();
   // Convert work area in screen global coordinates to root local coordinates.
   wm::ConvertRectFromScreen(container_->GetRootWindow(), &work_area);

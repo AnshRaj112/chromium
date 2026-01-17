@@ -6,6 +6,7 @@
 #define EXTENSIONS_BROWSER_SUPERVISED_USER_EXTENSIONS_DELEGATE_H_
 
 #include "base/functional/callback.h"
+#include "extensions/browser/supervised_extension_approval_result.h"
 #include "extensions/common/extension.h"
 
 namespace content {
@@ -16,46 +17,14 @@ namespace gfx {
 class ImageSkia;
 }  // namespace gfx
 
-// These enum values represent the supervised user flows that lead to
-// displaying the Extensions parent approval dialog.
-// These values are logged to UMA. Entries should not be renumbered and
-// numeric values should never be reused.
-// LINT.IfChange(SupervisedUserExtensionParentApprovalEntryPoint)
-enum class SupervisedUserExtensionParentApprovalEntryPoint : int {
-  // Recorded when the dialog appears as part of installing a new extension
-  // from Webstore.
-  kOnWebstoreInstallation = 0,
-  // Recorded when the dialog appears on enabling an existing extension which
-  // is missing parent approval from the extension management page.
-  kOnExtensionManagementSetEnabledOperation = 1,
-  // Recorded the dialog appears on enabling an existing disabled/terminated
-  // extension which is missing parent approval through the extension enable
-  // flow.
-  kOnTerminatedExtensionEnableFlowOperation = 2,
-  // Add future entries above this comment, in sync with
-  // "SupervisedUserExtensionParentApprovalEntryPoint" in
-  // src/tools/metrics/histograms/metadata/families/enums.xml.
-  // Update kMaxValue to the last value.
-  kMaxValue = kOnTerminatedExtensionEnableFlowOperation
-};
-// LINT.ThenChange(//tools/metrics/histograms/metadata/families/enums.xml:SupervisedUserExtensionParentApprovalEntryPoint)
-
 namespace extensions {
 
 // Interface for the supervised user extensions delegate. The interface has
 // stub implementations so it can be used in test code.
 class SupervisedUserExtensionsDelegate {
  public:
-  // Result of the extension approval flow.
-  enum class ExtensionApprovalResult {
-    kApproved,  // Extension installation was approved.
-    kCanceled,  // Extension approval flow was canceled.
-    kFailed,    // Extension approval failed due to an error.
-    kBlocked,   // Extension installation has been blocked by a parent.
-  };
-
   using ExtensionApprovalDoneCallback =
-      base::OnceCallback<void(ExtensionApprovalResult)>;
+      base::OnceCallback<void(SupervisedExtensionApprovalResult)>;
 
   SupervisedUserExtensionsDelegate() = default;
   virtual ~SupervisedUserExtensionsDelegate() = default;
@@ -83,8 +52,6 @@ class SupervisedUserExtensionsDelegate {
       const extensions::Extension& extension,
       content::WebContents* web_contents,
       const gfx::ImageSkia& icon,
-      SupervisedUserExtensionParentApprovalEntryPoint
-          extension_approval_entry_point,
       ExtensionApprovalDoneCallback extension_approval_callback);
 
   // Similar to RequestToAddExtensionOrShowError except for enabling already
@@ -92,8 +59,6 @@ class SupervisedUserExtensionsDelegate {
   virtual void RequestToEnableExtensionOrShowError(
       const extensions::Extension& extension,
       content::WebContents* web_contents,
-      SupervisedUserExtensionParentApprovalEntryPoint
-          extension_approval_entry_point,
       ExtensionApprovalDoneCallback extension_approval_callback);
 
   // Returns true if the primary account represents a supervised child account

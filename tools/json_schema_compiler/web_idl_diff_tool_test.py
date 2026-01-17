@@ -15,8 +15,41 @@ import web_idl_diff_tool
 class WebIdlDiffToolTest(unittest.TestCase):
 
   def testIdlToWebIdlConversion(self):
+    # Note: the following schemas were copied over at the time of their
+    # conversion and are not intended to be kept up to date with any more recent
+    # updates. Once all the old IDL has been converted and we are ready to
+    # remove the old parser, these can all be deleted and this test removed.
     converted_schemas = [
         ('alarms.idl', 'alarms.webidl'),
+        ('app_current_window_internal.idl',
+         'app_current_window_internal.webidl'),
+        ('bluetooth.idl', 'bluetooth.webidl'),
+        ('dns.idl', 'dns.webidl'),
+        ('audio.idl', 'audio.webidl'),
+        ('cec_private.idl', 'cec_private.webidl'),
+        ('diagnostics.idl', 'diagnostics.webidl'),
+        ('virtual_keyboard.idl', 'virtual_keyboard.webidl'),
+        ('webcam_private.idl', 'webcam_private.webidl'),
+        ('extension_options_internal.idl', 'extension_options_internal.webidl'),
+        ('system_cpu.idl', 'system_cpu.webidl'),
+        ('system_memory.idl', 'system_memory.webidl'),
+        ('system_network.idl', 'system_network.webidl'),
+        ('system_storage.idl', 'system_storage.webidl'),
+        ('app_runtime.idl', 'app_runtime.webidl'),
+        ('bluetooth_low_energy.idl', 'bluetooth_low_energy.webidl'),
+        ('bluetooth_socket.idl', 'bluetooth_socket.webidl'),
+        ('clipboard.idl', 'clipboard.webidl'),
+        ('system_display.idl', 'system_display.webidl'),
+        ('usb.idl', 'usb.webidl'),
+        ('chrome_url_overrides.idl', 'chrome_url_overrides.webidl'),
+        ('cross_origin_isolation.idl', 'cross_origin_isolation.webidl'),
+        ('file_handlers.idl', 'file_handlers.webidl'),
+        ('oauth2.idl', 'oauth2.webidl'),
+        ('protocol_handlers.idl', 'protocol_handlers.webidl'),
+        ('shared_module.idl', 'shared_module.webidl'),
+        ('web_accessible_resources.idl', 'web_accessible_resources.webidl'),
+        ('web_accessible_resources_mv2.idl',
+         'web_accessible_resources_mv2.webidl'),
     ]
     # LoadAndReturnUnifiedDiff expects file paths relative to the repo root.
     converted_schema_path = 'tools/json_schema_compiler/test/converted_schemas/'

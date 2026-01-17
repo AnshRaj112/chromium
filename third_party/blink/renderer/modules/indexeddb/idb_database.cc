@@ -31,7 +31,9 @@
 #include <utility>
 
 #include "base/atomic_sequence_num.h"
+#include "base/byte_size.h"
 #include "base/feature_list.h"
+#include "base/metrics/histogram_functions.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/mojom/frame/lifecycle.mojom-blink.h"
 #include "third_party/blink/public/mojom/indexeddb/indexeddb.mojom-blink.h"
@@ -60,8 +62,16 @@
 #include "third_party/blink/renderer/platform/wtf/assertions.h"
 #include "third_party/blink/renderer/platform/wtf/functional.h"
 #include "third_party/blink/renderer/platform/wtf/std_lib_extras.h"
+#include "third_party/blink/renderer/platform/wtf/text/strcat.h"
 
 namespace blink {
+
+namespace {
+
+BASE_FEATURE(kIDBDatabaseExternalMemoryAccounting,
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+}  // namespace
 
 const char IDBDatabase::kIndexDeletedErrorMessage[] =
     "The index or its object store has been deleted.";
@@ -109,6 +119,19 @@ IDBDatabase::IDBDatabase(
       database_remote_(context),
       scheduling_priority_(connection_priority),
       callbacks_receiver_(this, context) {
+  if (base::FeatureList::IsEnabled(kIDBDatabaseExternalMemoryAccounting)) {
+    if (v8::Isolate* isolate = v8::Isolate::TryGetCurrent()) {
+      // This object indirectly retains memory in the browser process via
+      // `database_remote_` (mostly internal Mojo structures for
+      // IndexedDBClientStateChecker, IDBDatabase, and DatabaseCallbacks). The
+      // size was derived empirically by measuring the browser process memory
+      // delta from retaining 100k connections in a renderer process.
+      constexpr base::ByteSize kExternalMemorySize = base::KiBU(90);
+      external_memory_accounter_.Increase(isolate,
+                                          kExternalMemorySize.InBytes());
+    }
+  }
+
   database_remote_.Bind(std::move(pending_database),
                         context->GetTaskRunner(TaskType::kDatabaseAccess));
   callbacks_receiver_.Bind(std::move(callbacks_receiver),
@@ -117,10 +140,14 @@ IDBDatabase::IDBDatabase(
   // Invokes the callback immediately.
   scheduler_observer_ = context->GetScheduler()->AddLifecycleObserver(
       FrameOrWorkerScheduler::ObserverType::kWorkerScheduler,
-      WTF::BindRepeating(&IDBDatabase::OnSchedulerLifecycleStateChanged,
-                         WrapWeakPersistent(this)));
+      BindRepeating(&IDBDatabase::OnSchedulerLifecycleStateChanged,
+                    WrapWeakPersistent(this)));
 
   UpdateStateIfNeeded();
+}
+
+IDBDatabase::~IDBDatabase() {
+  ClearExternalMemory();
 }
 
 void IDBDatabase::Trace(Visitor* visitor) const {
@@ -149,9 +176,30 @@ void IDBDatabase::SetDatabaseMetadata(const IDBDatabaseMetadata& metadata) {
 }
 
 void IDBDatabase::TransactionCreated(IDBTransaction* transaction) {
+  TRACE_EVENT0("IndexedDB", "IDBDatabase::TransactionCreated");
   DCHECK(transaction);
   DCHECK(!transactions_.Contains(transaction->Id()));
   transactions_.insert(transaction->Id(), transaction);
+
+  // Log a histogram when the number of active transactions becomes unusually
+  // large, to help diagnose crbug.com/381086791.
+  //
+  // We plan to:
+  // - Set a trace recording *start* trigger when the 10001th transaction is
+  //   created.
+  // - Set a trace recording *stop* trigger when the 11000th transaction is
+  //   created. This will give us a timeline of events that occur between the
+  //   10001th and 11000th transactions are created.
+  //
+  // TODO(crbug.com/381086791): Remove this diagnostic code once the issue is
+  // understood and resolved.
+  constexpr size_t kHighTransactionCount = 10000;
+  if (transactions_.size() > kHighTransactionCount) {
+    base::UmaHistogramCounts100000(
+        "IndexedDB.NumTransactionsInIDBDatabaseOnTransactionCreated."
+        "10kTransactions",
+        transactions_.size());
+  }
 
   if (transaction->IsVersionChange()) {
     DCHECK(!version_change_transaction_);
@@ -211,7 +259,7 @@ void IDBDatabase::VersionChange(int64_t old_version, int64_t new_version) {
 
 void IDBDatabase::Abort(int64_t transaction_id,
                         mojom::blink::IDBException code,
-                        const WTF::String& message) {
+                        const String& message) {
   DCHECK(transactions_.Contains(transaction_id));
   DOMException* dom_exception;
   if (code == mojom::blink::IDBException::kQuotaError &&
@@ -377,8 +425,8 @@ IDBTransaction* IDBDatabase::transaction(
   if (mode != mojom::blink::IDBTransactionMode::ReadOnly &&
       mode != mojom::blink::IDBTransactionMode::ReadWrite) {
     exception_state.ThrowTypeError(
-        "The mode provided ('" + v8_mode.AsString() +
-        "') is not one of 'readonly' or 'readwrite'.");
+        StrCat({"The mode provided ('", v8_mode.AsStringView(),
+                "') is not one of 'readonly' or 'readwrite'."}));
     return nullptr;
   }
 
@@ -460,6 +508,7 @@ void IDBDatabase::CloseConnection() {
   DCHECK(transactions_.empty());
 
   if (database_remote_.is_bound()) {
+    ClearExternalMemory();
     database_remote_.reset();
   }
 
@@ -558,6 +607,7 @@ void IDBDatabase::ContextDestroyed() {
   // normal close() since that may wait on transactions which require a
   // round trip to the back-end to abort.
   if (database_remote_.is_bound()) {
+    ClearExternalMemory();
     database_remote_.reset();
   }
 }
@@ -632,18 +682,18 @@ void IDBDatabase::GetAll(int64_t transaction_id,
                          int64_t index_id,
                          const IDBKeyRange* key_range,
                          mojom::blink::IDBGetAllResultType result_type,
-                         int64_t max_count,
+                         uint32_t max_count,
                          mojom::blink::IDBCursorDirection direction,
                          IDBRequest* request) {
   IDBCursor::ResetCursorPrefetchCaches(transaction_id, nullptr);
 
   mojom::blink::IDBKeyRangePtr key_range_ptr =
       mojom::blink::IDBKeyRange::From(key_range);
-  database_remote_->GetAll(
-      transaction_id, object_store_id, index_id, std::move(key_range_ptr),
-      result_type, max_count, direction,
-      WTF::BindOnce(&IDBRequest::OnGetAll, WrapWeakPersistent(request),
-                    result_type));
+  database_remote_->GetAll(transaction_id, object_store_id, index_id,
+                           std::move(key_range_ptr), result_type, max_count,
+                           direction,
+                           BindOnce(&IDBRequest::OnGetAll,
+                                    WrapWeakPersistent(request), result_type));
 }
 
 void IDBDatabase::OpenCursor(int64_t object_store_id,
@@ -660,7 +710,7 @@ void IDBDatabase::OpenCursor(int64_t object_store_id,
   database_remote_->OpenCursor(
       request->transaction()->Id(), object_store_id, index_id,
       std::move(key_range_ptr), direction, key_only, task_type,
-      WTF::BindOnce(&IDBRequest::OnOpenCursor, WrapWeakPersistent(request)));
+      BindOnce(&IDBRequest::OnOpenCursor, WrapWeakPersistent(request)));
 }
 
 void IDBDatabase::Count(int64_t transaction_id,
@@ -761,6 +811,12 @@ void IDBDatabase::OnSchedulerLifecycleStateChanged(
   scheduling_priority_ = new_priority;
   if (database_remote_) {
     database_remote_->UpdatePriority(scheduling_priority_);
+  }
+}
+
+void IDBDatabase::ClearExternalMemory() {
+  if (v8::Isolate* isolate = v8::Isolate::TryGetCurrent()) {
+    external_memory_accounter_.Clear(isolate);
   }
 }
 

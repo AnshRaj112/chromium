@@ -55,19 +55,53 @@ OpenXrViewProperties::OpenXrViewProperties(
 }
 OpenXrViewProperties::~OpenXrViewProperties() = default;
 
-uint32_t OpenXrViewProperties::Width() const {
+uint32_t OpenXrViewProperties::ClampWidth(uint32_t val) const {
   return std::min(
-      xr_properties_.recommendedImageRectWidth,
-      static_cast<uint32_t>(max_texture_size_.width()) / view_count_);
+      val, static_cast<uint32_t>(max_texture_size_.width()) / view_count_);
+}
+
+uint32_t OpenXrViewProperties::ClampHeight(uint32_t val) const {
+  return std::min(val, static_cast<uint32_t>(max_texture_size_.height()));
+}
+
+uint32_t OpenXrViewProperties::Width() const {
+  // TODO(crbug.com/40918787):Windows cannot support framebuffer scaling, so
+  // must use the recommended size.
+  if constexpr (BUILDFLAG(IS_WIN)) {
+    return ClampWidth(xr_properties_.recommendedImageRectWidth);
+  } else {
+    return ClampWidth(xr_properties_.maxImageRectWidth);
+  }
 }
 
 uint32_t OpenXrViewProperties::Height() const {
-  return std::min(static_cast<uint32_t>(max_texture_size_.height()),
-                  xr_properties_.recommendedImageRectHeight);
+  // TODO(crbug.com/40918787):Windows cannot support framebuffer scaling, so
+  // must use the recommended size.
+  if constexpr (BUILDFLAG(IS_WIN)) {
+    return ClampHeight(xr_properties_.recommendedImageRectHeight);
+  } else {
+    return ClampHeight(xr_properties_.maxImageRectHeight);
+  }
 }
 
 uint32_t OpenXrViewProperties::RecommendedSwapchainSampleCount() const {
   return xr_properties_.recommendedSwapchainSampleCount;
+}
+
+float OpenXrViewProperties::RecommendedViewportScale() const {
+  // TODO(crbug.com/40918787):Windows cannot support framebuffer scaling, so
+  // must use the recommended size.
+  if constexpr (BUILDFLAG(IS_WIN)) {
+    return 1.0f;
+  } else {
+    float width_scale = static_cast<float>(ClampWidth(
+                            xr_properties_.recommendedImageRectWidth)) /
+                        Width();
+    float height_scale = static_cast<float>(ClampHeight(
+                             xr_properties_.recommendedImageRectHeight)) /
+                         Height();
+    return std::min(width_scale, height_scale);
+  }
 }
 
 uint32_t OpenXrViewProperties::MaxSwapchainSampleCount() const {
@@ -124,7 +158,6 @@ void OpenXrViewConfiguration::Initialize(
   viewport_ = gfx::Rect();
   SetProperties(std::move(properties), max_texture_size);
   local_from_view_.resize(properties_.size(), kDefaultView);
-  projection_views_.resize(properties_.size());
 
   initialized_ = true;
 }
@@ -187,17 +220,6 @@ const std::vector<XrView>& OpenXrViewConfiguration::Views() const {
 void OpenXrViewConfiguration::SetViews(std::vector<XrView> views) {
   DCHECK_EQ(views.size(), local_from_view_.size());
   local_from_view_ = std::move(views);
-}
-
-const std::vector<XrCompositionLayerProjectionView>&
-OpenXrViewConfiguration::ProjectionViews() const {
-  return projection_views_;
-}
-
-XrCompositionLayerProjectionView& OpenXrViewConfiguration::GetProjectionView(
-    uint32_t view_index) {
-  DCHECK_LT(view_index, projection_views_.size());
-  return projection_views_[view_index];
 }
 
 bool OpenXrViewConfiguration::CanEnableAntiAliasing() const {

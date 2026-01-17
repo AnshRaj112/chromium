@@ -48,7 +48,6 @@
 #include "third_party/blink/public/platform/web_graphics_context_3d_provider.h"
 #include "third_party/blink/renderer/platform/bindings/parkable_string_manager.h"
 #include "third_party/blink/renderer/platform/font_family_names.h"
-#include "third_party/blink/renderer/platform/fonts/font_cache_memory_dump_provider.h"
 #include "third_party/blink/renderer/platform/geometry/length.h"
 #include "third_party/blink/renderer/platform/graphics/parkable_image_manager.h"
 #include "third_party/blink/renderer/platform/heap/blink_gc_memory_dump_provider.h"
@@ -66,6 +65,7 @@
 #include "third_party/blink/renderer/platform/scheduler/public/non_main_thread.h"
 #include "third_party/blink/renderer/platform/scheduler/public/thread_scheduler.h"
 #include "third_party/blink/renderer/platform/theme/web_theme_engine_helper.h"
+#include "third_party/blink/renderer/platform/wtf/functional.h"
 
 namespace blink {
 
@@ -108,9 +108,9 @@ class IdleDelayedTaskHelper : public base::SingleThreadTaskRunner {
     DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
     ThreadScheduler::Current()->PostDelayedIdleTask(
         from_here, delay,
-        base::BindOnce([](base::OnceClosure task,
-                          base::TimeTicks deadline) { std::move(task).Run(); },
-                       std::move(task)));
+        blink::BindOnce([](base::OnceClosure task,
+                           base::TimeTicks deadline) { std::move(task).Run(); },
+                        std::move(task)));
     return true;
   }
 
@@ -183,9 +183,6 @@ void Platform::InitializeMainThreadCommon(
 
   base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
       PartitionAllocMemoryDumpProvider::Instance(), "PartitionAlloc",
-      base::SingleThreadTaskRunner::GetCurrentDefault());
-  base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
-      FontCacheMemoryDumpProvider::Instance(), "FontCaches",
       base::SingleThreadTaskRunner::GetCurrentDefault());
   base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
       MemoryCacheDumpProvider::Instance(), "MemoryCache",
@@ -271,10 +268,18 @@ Platform::CompositorThreadTaskRunner() {
 }
 
 std::unique_ptr<WebGraphicsContext3DProvider>
-Platform::CreateOffscreenGraphicsContext3DProvider(
-    const Platform::ContextAttributes&,
+Platform::CreateWebGLGraphicsContextProvider(
+    bool prefer_low_power_gpu,
+    bool fail_if_major_performance_caveat,
+    WebGLContextType context_type,
     const WebURL& document_url,
-    Platform::GraphicsInfo*) {
+    WebGLContextInfo*) {
+  return nullptr;
+}
+
+std::unique_ptr<WebGraphicsContext3DProvider>
+Platform::CreateRasterGraphicsContextProvider(const WebURL& document_url,
+                                              RasterContextType context_type) {
   return nullptr;
 }
 
@@ -284,12 +289,15 @@ Platform::CreateSharedOffscreenGraphicsContext3DProvider() {
 }
 
 std::unique_ptr<WebGraphicsContext3DProvider>
-Platform::CreateWebGPUGraphicsContext3DProvider(const WebURL& document_url) {
+Platform::CreateWebGPUGraphicsContext3DProvider(
+    const WebURL& document_url,
+    WebGPUReplyThread reply_thread) {
   return nullptr;
 }
 
 void Platform::CreateWebGPUGraphicsContext3DProviderAsync(
     const blink::WebURL& document_url,
+    WebGPUReplyThread reply_thread,
     base::OnceCallback<
         void(std::unique_ptr<blink::WebGraphicsContext3DProvider>)> callback) {}
 

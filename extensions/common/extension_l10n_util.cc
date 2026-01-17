@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "base/auto_reset.h"
-#include "base/containers/contains.h"
 #include "base/containers/extend.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_util.h"
@@ -86,7 +85,8 @@ std::optional<base::Value::Dict> LoadMessageFile(
         return dictionary;
       }
       base::JSONReader::Result value =
-          base::JSONReader::ReadAndReturnValueWithError(data);
+          base::JSONReader::ReadAndReturnValueWithError(
+              data, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
       if (value.has_value()) {
         dictionary = std::move(*value).TakeDict();
       } else {
@@ -387,7 +387,7 @@ bool AddLocale(const std::set<std::string>& chrome_locales,
   // locales.
   if (base::StartsWith(locale_name, ".", base::CompareCase::SENSITIVE))
     return true;
-  if (!base::Contains(chrome_locales, locale_name)) {
+  if (!chrome_locales.contains(locale_name)) {
     // Warn if there is an extension locale that's not in the Chrome list,
     // but don't fail.
     DLOG(WARNING) << base::StringPrintf("Supplied locale %s is not supported.",
@@ -506,17 +506,27 @@ extensions::MessageBundle* LoadMessageCatalogs(
 
 bool ValidateExtensionLocales(const base::FilePath& extension_path,
                               const base::Value::Dict& manifest,
-                              std::string* error) {
-  std::string default_locale = GetDefaultLocaleFromManifest(manifest, error);
+                              std::u16string* error) {
+  // TODO(crbug.com/41317803): Continue removing std::string errors and
+  // replacing with std::u16string.
+  std::string utf8_error;
+  std::string default_locale =
+      GetDefaultLocaleFromManifest(manifest, &utf8_error);
 
-  if (default_locale.empty())
+  if (default_locale.empty()) {
+    *error = base::UTF8ToUTF16(utf8_error);
     return true;
+  }
 
   base::FilePath locale_path = extension_path.Append(extensions::kLocaleFolder);
 
   std::set<std::string> valid_locales;
-  if (!GetValidLocales(locale_path, &valid_locales, error))
+  // TODO(crbug.com/41317803): Continue removing std::string errors and
+  // replacing with std::u16string.
+  if (!GetValidLocales(locale_path, &valid_locales, &utf8_error)) {
+    *error = base::UTF8ToUTF16(utf8_error);
     return false;
+  }
 
   // Load each available localization file and check for errors within. This
   // entire method only gets used when reloading unpacked or packing extensions.
@@ -530,17 +540,22 @@ bool ValidateExtensionLocales(const base::FilePath& extension_path,
     if (locale_error.empty()) {
       continue;
     }
-    if (!error->empty()) {
-      *error += '\n';
+    if (!utf8_error.empty()) {
+      utf8_error += '\n';
     }
     base::FilePath file_path =
         locale_path.AppendASCII(locale).Append(extensions::kMessagesFilename);
-    error->append(extensions::ErrorUtils::FormatErrorMessage(
+    utf8_error.append(extensions::ErrorUtils::FormatErrorMessage(
         errors::kLocalesInvalidLocale,
         base::UTF16ToUTF8(file_path.LossyDisplayName()), locale_error));
   }
 
-  return error->empty();
+  if (!utf8_error.empty()) {
+    *error = base::UTF8ToUTF16(utf8_error);
+    return false;
+  }
+
+  return true;
 }
 
 bool ShouldSkipValidation(const base::FilePath& locales_path,
@@ -557,7 +572,7 @@ bool ShouldSkipValidation(const base::FilePath& locales_path,
   if (subdir.empty())
     return true;  // Non-ASCII.
 
-  if (base::Contains(subdir, '.'))
+  if (subdir.contains('.'))
     return true;
 
   // On case-insensitive file systems we will load messages by matching them

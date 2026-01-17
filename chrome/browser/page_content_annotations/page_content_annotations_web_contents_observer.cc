@@ -11,12 +11,9 @@
 #include "chrome/browser/page_content_annotations/page_content_annotations_service_factory.h"
 #include "chrome/browser/page_content_annotations/page_content_extraction_service.h"
 #include "chrome/browser/page_content_annotations/page_content_extraction_service_factory.h"
-#include "chrome/browser/preloading/prefetch/no_state_prefetch/no_state_prefetch_manager_factory.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "components/content_extraction/content/browser/inner_text.h"
 #include "components/google/core/common/google_util.h"
-#include "components/no_state_prefetch/browser/no_state_prefetch_manager.h"
 #include "components/optimization_guide/content/browser/page_content_proto_provider.h"
 #include "components/optimization_guide/core/optimization_guide_features.h"
 #include "components/optimization_guide/core/optimization_guide_logger.h"
@@ -24,7 +21,7 @@
 #include "components/page_content_annotations/core/page_content_annotations_features.h"
 #include "components/page_content_annotations/core/page_content_annotations_service.h"
 #include "components/pdf/common/constants.h"
-#include "components/search_engines/template_url_service.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
 #include "third_party/blink/public/mojom/opengraph/metadata.mojom.h"
@@ -55,9 +52,8 @@ PageContentAnnotationsWebContentsObserver::
   page_content_annotations_service_ =
       PageContentAnnotationsServiceFactory::GetForProfile(profile);
   CHECK(page_content_annotations_service_);
-  no_state_prefetch_manager_ =
-      prerender::NoStatePrefetchManagerFactory::GetForBrowserContext(profile);
-  template_url_service_ = TemplateURLServiceFactory::GetForProfile(profile);
+  page_content_annotations_service_->AddObserver(
+      AnnotationType::kContentVisibility, this);
 }
 
 AnnotatedPageContentRequest*
@@ -82,7 +78,10 @@ PageContentAnnotationsWebContentsObserver::GetAnnotatedPageContentRequest() {
 }
 
 PageContentAnnotationsWebContentsObserver::
-    ~PageContentAnnotationsWebContentsObserver() = default;
+    ~PageContentAnnotationsWebContentsObserver() {
+  page_content_annotations_service_->RemoveObserver(
+      AnnotationType::kContentVisibility, this);
+}
 
 void PageContentAnnotationsWebContentsObserver::
     DocumentOnLoadCompletedInPrimaryMainFrame() {
@@ -126,11 +125,21 @@ void PageContentAnnotationsWebContentsObserver::
   }
 }
 
+void PageContentAnnotationsWebContentsObserver::OnVisibilityChanged(
+    content::Visibility visibility) {
+  if (auto* annotated_page_content_request = GetAnnotatedPageContentRequest()) {
+    annotated_page_content_request->OnVisibilityChanged(visibility);
+  }
+}
+
 void PageContentAnnotationsWebContentsObserver::DidFinishNavigation(
     content::NavigationHandle* navigation_handle) {
   if (auto* annotated_page_content_request = GetAnnotatedPageContentRequest()) {
     annotated_page_content_request->DidFinishNavigation(navigation_handle);
   }
+
+  // New navigation. Reset the content visibility score.
+  content_visibility_score_ = std::nullopt;
 }
 
 void PageContentAnnotationsWebContentsObserver::OnRelatedSearchesExtracted(
@@ -139,6 +148,20 @@ void PageContentAnnotationsWebContentsObserver::OnRelatedSearchesExtracted(
     continuous_search::mojom::CategoryResultsPtr results) {
   page_content_annotations_service_->OnRelatedSearchesExtracted(
       visit, status, std::move(results));
+}
+
+void PageContentAnnotationsWebContentsObserver::OnPageContentAnnotated(
+    const HistoryVisit& annotated_visit,
+    const PageContentAnnotationsResult& result) {
+  HistoryVisit history_visit =
+      CreateHistoryVisitFromWebContents(web_contents());
+  if (history_visit.nav_entry_timestamp !=
+          annotated_visit.nav_entry_timestamp ||
+      history_visit.url != annotated_visit.url) {
+    return;
+  }
+
+  content_visibility_score_ = result.GetContentVisibilityScore();
 }
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(PageContentAnnotationsWebContentsObserver);

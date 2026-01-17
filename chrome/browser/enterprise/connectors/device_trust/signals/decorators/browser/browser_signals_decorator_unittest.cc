@@ -35,7 +35,6 @@
 #endif
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::StrictMock;
 
@@ -148,17 +147,35 @@ class BrowserSignalsDecoratorTest : public testing::Test {
     auto mock_browser_cloud_policy_store =
         std::make_unique<policy::MockCloudPolicyStore>();
     mock_browser_cloud_policy_store_ = mock_browser_cloud_policy_store.get();
+    std::unique_ptr<policy::MockCloudPolicyStore>
+        mock_browser_cloud_policy_extension_install_store;
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+    mock_browser_cloud_policy_extension_install_store =
+        std::make_unique<policy::MockCloudPolicyStore>();
+#endif
+    mock_browser_cloud_policy_extension_install_store_ =
+        mock_browser_cloud_policy_extension_install_store.get();
     mock_browser_cloud_policy_manager_ =
         std::make_unique<policy::MockCloudPolicyManager>(
             std::move(mock_browser_cloud_policy_store),
+            std::move(mock_browser_cloud_policy_extension_install_store),
             task_environment_.GetMainThreadTaskRunner());
 
     auto mock_user_cloud_policy_store =
         std::make_unique<policy::MockCloudPolicyStore>();
     mock_user_cloud_policy_store_ = mock_user_cloud_policy_store.get();
+    std::unique_ptr<policy::MockCloudPolicyStore>
+        mock_user_cloud_policy_extension_install_store;
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+    mock_user_cloud_policy_extension_install_store =
+        std::make_unique<policy::MockCloudPolicyStore>();
+#endif
+    mock_user_cloud_policy_extension_install_store_ =
+        mock_user_cloud_policy_extension_install_store.get();
     mock_user_cloud_policy_manager_ =
         std::make_unique<policy::MockCloudPolicyManager>(
             std::move(mock_user_cloud_policy_store),
+            std::move(mock_user_cloud_policy_extension_install_store),
             task_environment_.GetMainThreadTaskRunner());
   }
 
@@ -202,12 +219,12 @@ class BrowserSignalsDecoratorTest : public testing::Test {
 
   void SetUpAggregatorExpectations() {
     EXPECT_CALL(mock_aggregator_, GetSignals(CreateExpectedRequest(), _))
-        .WillOnce(Invoke(
+        .WillOnce(
             [this](const device_signals::SignalsAggregationRequest& request,
                    base::OnceCallback<void(
                        device_signals::SignalsAggregationResponse)> callback) {
               std::move(callback).Run(CreateFilledResponse());
-            }));
+            });
   }
 
   virtual device_signals::SignalsAggregationResponse CreateFilledResponse() {
@@ -230,7 +247,11 @@ class BrowserSignalsDecoratorTest : public testing::Test {
   std::unique_ptr<policy::MockCloudPolicyManager>
       mock_user_cloud_policy_manager_;
   raw_ptr<policy::MockCloudPolicyStore> mock_browser_cloud_policy_store_;
+  raw_ptr<policy::MockCloudPolicyStore>
+      mock_browser_cloud_policy_extension_install_store_;
   raw_ptr<policy::MockCloudPolicyStore> mock_user_cloud_policy_store_;
+  raw_ptr<policy::MockCloudPolicyStore>
+      mock_user_cloud_policy_extension_install_store_;
   StrictMock<device_signals::MockSignalsAggregator> mock_aggregator_;
 };
 
@@ -362,13 +383,12 @@ TEST_F(BrowserSignalsDecoratorTest, Decorate_NoAgentSignals) {
   SetFakeUserPolicyData();
 
   EXPECT_CALL(mock_aggregator_, GetSignals(CreateExpectedRequest(), _))
-      .WillOnce(
-          Invoke([](const device_signals::SignalsAggregationRequest& request,
-                    base::OnceCallback<void(
-                        device_signals::SignalsAggregationResponse)> callback) {
-            device_signals::SignalsAggregationResponse empty_response;
-            std::move(callback).Run(std::move(empty_response));
-          }));
+      .WillOnce([](const device_signals::SignalsAggregationRequest& request,
+                   base::OnceCallback<void(
+                       device_signals::SignalsAggregationResponse)> callback) {
+        device_signals::SignalsAggregationResponse empty_response;
+        std::move(callback).Run(std::move(empty_response));
+      });
 
   auto decorator = CreateDecorator();
   base::RunLoop run_loop;

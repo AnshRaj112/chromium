@@ -11,12 +11,13 @@
 #import "base/metrics/histogram_functions.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/signin/public/identity_manager/identity_manager.h"
-#import "ios/chrome/browser/browser_container/ui_bundled/browser_edit_menu_utils.h"
+#import "ios/chrome/browser/browser_content/ui_bundled/browser_edit_menu_utils.h"
 #import "ios/chrome/browser/explain_with_gemini/coordinator/explain_with_gemini_constants.h"
 #import "ios/chrome/browser/intelligence/features/features.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/signin/model/authentication_service.h"
 #import "ios/chrome/browser/web_selection/model/web_selection_response.h"
 #import "ios/chrome/browser/web_selection/model/web_selection_tab_helper.h"
@@ -65,13 +66,12 @@ typedef void (^ProceduralBlockWithBlockWithItemArray)(
   }
   WebSelectionTabHelper* tabHelper =
       WebSelectionTabHelper::FromWebState(webState);
-  return tabHelper && tabHelper->CanRetrieveSelectedText() &&
-         self.applicationCommandHandler;
+  return tabHelper && tabHelper->CanRetrieveSelectedText() && self.sceneHandler;
 }
 
 // Returns YES if the user is signIn.
 - (BOOL)isSignIn {
-  return _authService->HasPrimaryIdentity(signin::ConsentLevel::kSignin);
+  return _identityManager->HasPrimaryAccount(signin::ConsentLevel::kSignin);
 }
 
 // Returns YES if account is eligible for model execution.
@@ -103,6 +103,27 @@ typedef void (^ProceduralBlockWithBlockWithItemArray)(
   return [NSString
       stringWithFormat:@"✦ %@", l10n_util::GetNSString(
                                     IDS_IOS_EXPLAIN_GEMINI_EDIT_MENU)];
+}
+
+// Fetches the selection in the web page. On success, trigger a "Explain with
+// Gemini" on the selection. This is used on iOS26 where the action must be
+// added before the selection is retrieved.
+- (void)fetchSelectionForWebState:(base::WeakPtr<web::WebState>)weakWebState {
+  if (!weakWebState) {
+    return;
+  }
+  web::WebState* webState = weakWebState.get();
+  if (![self canPerformExplainWithGeminiInWebState:webState]) {
+    return;
+  }
+  WebSelectionTabHelper* tabHelper =
+      WebSelectionTabHelper::FromWebState(webState);
+  __weak __typeof(self) weakSelf = self;
+  tabHelper->GetSelectedText(base::BindOnce(^(WebSelectionResponse* response) {
+    if (weakSelf && response.valid && response.selectedText.length) {
+      [weakSelf triggerExplainWithGeminiForText:response.selectedText];
+    }
+  }));
 }
 
 // Adds Explain With Gemini item to the menu with a completion block.
@@ -138,7 +159,6 @@ typedef void (^ProceduralBlockWithBlockWithItemArray)(
     return;
   }
   NSString* text = response.selectedText;
-  NSString* explainWithGeminiMenuTitle = [self buttonTitle];
   if ([[text
           stringByTrimmingCharactersInSet:[NSCharacterSet
                                               whitespaceAndNewlineCharacterSet]]
@@ -147,15 +167,10 @@ typedef void (^ProceduralBlockWithBlockWithItemArray)(
     return;
   }
 
-  NSString* explainWithGeminiMenuId = @"chromeAction.explainGemini";
   __weak __typeof(self) weakSelf = self;
-  UIAction* action =
-      [UIAction actionWithTitle:explainWithGeminiMenuTitle
-                          image:nil
-                     identifier:explainWithGeminiMenuId
-                        handler:^(UIAction* a) {
-                          [weakSelf triggerExplainWithGeminiForText:text];
-                        }];
+  UIAction* action = [self actionWithHandler:^(UIAction* a) {
+    [weakSelf triggerExplainWithGeminiForText:text];
+  }];
   completion(@[ action ]);
 }
 
@@ -187,7 +202,18 @@ typedef void (^ProceduralBlockWithBlockWithItemArray)(
   };
   base::UmaHistogramCounts10000("IOS.ExplainWithGemini.CharSelected",
                                 [text length]);
-  [self.applicationCommandHandler openURLInNewTab:command];
+  [self.sceneHandler openURLInNewTab:command];
+}
+
+// Returns the action to trigger the search with feature. Calls `handler` on
+// activation.
+- (UIAction*)actionWithHandler:(void (^)(UIAction*))handler {
+  NSString* explainWithGeminiMenuId = @"chromeAction.explainGemini";
+  NSString* explainWithGeminiMenuTitle = [self buttonTitle];
+  return [UIAction actionWithTitle:explainWithGeminiMenuTitle
+                             image:nil
+                        identifier:explainWithGeminiMenuId
+                           handler:handler];
 }
 
 #pragma mark - EditMenuBuilder
@@ -204,22 +230,28 @@ typedef void (^ProceduralBlockWithBlockWithItemArray)(
 
   base::WeakPtr<web::WebState> weakWebState = webState->GetWeakPtr();
   __weak __typeof(self) weakSelf = self;
-  ProceduralBlockWithBlockWithItemArray provider =
-      ^(ProceduralBlockWithItemArray completion) {
-        [weakSelf addItemForWebState:weakWebState withCompletion:completion];
-      };
-  UIDeferredMenuElement* deferredMenuElement =
-      [UIDeferredMenuElement elementWithProvider:provider];
+  UIMenuElement* menuElement = nil;
+  if (ShouldShowEditMenuItemsSynchronously()) {
+    menuElement = [self actionWithHandler:^(UIAction* a) {
+      [weakSelf fetchSelectionForWebState:weakWebState];
+    }];
+  } else {
+    ProceduralBlockWithBlockWithItemArray provider =
+        ^(ProceduralBlockWithItemArray completion) {
+          [weakSelf addItemForWebState:weakWebState withCompletion:completion];
+        };
+    menuElement = [UIDeferredMenuElement elementWithProvider:provider];
+  }
 
   if (ExplainGeminiEditMenuPosition() ==
       PositionForExplainGeminiEditMenu::kAfterSearch) {
-    edit_menu::AddElementToChromeMenu(builder, deferredMenuElement,
+    edit_menu::AddElementToChromeMenu(builder, menuElement,
                                       /*primary*/ YES);
     return;
   }
   if (ExplainGeminiEditMenuPosition() ==
       PositionForExplainGeminiEditMenu::kAfterEdit) {
-    edit_menu::AddElementToChromeMenu(builder, deferredMenuElement,
+    edit_menu::AddElementToChromeMenu(builder, menuElement,
                                       /*primary*/ NO);
     return;
   }

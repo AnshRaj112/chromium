@@ -5,6 +5,7 @@
 package org.chromium.components.signin.identitymanager;
 
 import org.jni_zero.CalledByNative;
+import org.jni_zero.JNINamespace;
 import org.jni_zero.JniType;
 import org.jni_zero.NativeMethods;
 
@@ -22,6 +23,7 @@ import java.util.List;
  * information.
  */
 @NullMarked
+@JNINamespace("signin")
 public class IdentityMutator {
     // Pointer to native IdentityMutator, not final because of destroy().
     private long mNativeIdentityMutator;
@@ -60,12 +62,12 @@ public class IdentityMutator {
                         prefsSavedCallback);
     }
 
-    /**
-     * Clears the primary account, revokes all consent, removes all accounts and returns whether the
-     * operation succeeded .
-     */
-    public boolean clearPrimaryAccount(@SignoutReason int sourceMetric) {
-        return IdentityMutatorJni.get().clearPrimaryAccount(mNativeIdentityMutator, sourceMetric);
+    // Removes the primary account and revokes the sync consent, but keep the
+    // accounts signed in to the web and the tokens. Returns true if the action
+    // was successful and false if there was no primary account set.
+    public boolean removePrimaryAccountButKeepTokens(@SignoutReason int sourceMetric) {
+        return IdentityMutatorJni.get()
+                .removePrimaryAccountButKeepTokens(mNativeIdentityMutator, sourceMetric);
     }
 
     /** Revokes sync consent for the primary account. */
@@ -73,6 +75,10 @@ public class IdentityMutator {
         IdentityMutatorJni.get().revokeSyncConsent(mNativeIdentityMutator, sourceMetric);
     }
 
+    /**
+     * Seeds and reloads the given `accounts`. If `primaryAccountId` is not null then it must exist
+     * in the given `accounts`.
+     */
     public void seedAccountsThenReloadAllAccountsWithPrimaryAccount(
             List<AccountInfo> accounts, @Nullable CoreAccountId primaryAccountId) {
         IdentityMutatorJni.get()
@@ -84,20 +90,20 @@ public class IdentityMutator {
 
     @NativeMethods
     interface Natives {
-        public @PrimaryAccountError int setPrimaryAccount(
+        @PrimaryAccountError
+        int setPrimaryAccount(
                 long nativeJniIdentityMutator,
                 @JniType("CoreAccountId") CoreAccountId accountId,
                 @ConsentLevel int consentLevel,
                 @SigninAccessPoint int accessPoint,
                 Runnable prefsSavedCallback);
 
-        public boolean clearPrimaryAccount(
+        boolean removePrimaryAccountButKeepTokens(
                 long nativeJniIdentityMutator, @SignoutReason int sourceMetric);
 
-        public void revokeSyncConsent(
-                long nativeJniIdentityMutator, @SignoutReason int sourceMetric);
+        void revokeSyncConsent(long nativeJniIdentityMutator, @SignoutReason int sourceMetric);
 
-        public void seedAccountsThenReloadAllAccountsWithPrimaryAccount(
+        void seedAccountsThenReloadAllAccountsWithPrimaryAccount(
                 long nativeJniIdentityMutator,
                 AccountInfo[] accounts,
                 @Nullable CoreAccountId primaryAccountId);

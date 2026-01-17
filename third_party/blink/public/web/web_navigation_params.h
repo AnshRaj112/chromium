@@ -48,16 +48,13 @@
 #include "third_party/blink/public/platform/web_url.h"
 #include "third_party/blink/public/platform/web_url_request.h"
 #include "third_party/blink/public/platform/web_url_response.h"
+#include "third_party/blink/public/web/web_agent_cluster_key.h"
 #include "third_party/blink/public/web/web_form_element.h"
 #include "third_party/blink/public/web/web_frame_load_type.h"
 #include "third_party/blink/public/web/web_history_item.h"
 #include "third_party/blink/public/web/web_navigation_policy.h"
 #include "third_party/blink/public/web/web_navigation_timings.h"
 #include "third_party/blink/public/web/web_navigation_type.h"
-
-#if INSIDE_BLINK
-#include "base/memory/scoped_refptr.h"
-#endif
 
 namespace base {
 class TickClock;
@@ -461,14 +458,10 @@ struct BLINK_EXPORT WebNavigationParams {
   // A list of origin trial names to enable for the document being loaded.
   std::vector<WebString> force_enabled_origin_trials;
 
-  // Whether the page is in an origin-keyed agent cluster.
-  // https://html.spec.whatwg.org/C/#is-origin-keyed
-  bool origin_agent_cluster = false;
-
-  // Whether the decision to use origin-keyed or site-keyed agent clustering
-  // (which itself is recorded in origin_agent_cluster, above) has been
-  // made based on absent Origin-Agent-Cluster http header.
-  bool origin_agent_cluster_left_as_default = true;
+  // The AgentClusterKey to use to obtain an agent cluster to commit the
+  // navigation.
+  // https://html.spec.whatwg.org/multipage/webappapis.html#agent-cluster-key
+  WebAgentClusterKey agent_cluster_key;
 
   // List of client hints enabled for top-level frame. These still need to be
   // checked against permissions policy before use.
@@ -569,9 +562,6 @@ struct BLINK_EXPORT WebNavigationParams {
   // For each document, the browser passes along state for each
   // renderer-enforced content setting.
   mojom::RendererContentSettingsPtr content_settings;
-
-  // The cookie deprecation label for cookie deprecation facilitated testing.
-  WebString cookie_deprecation_label;
 
   // The :visited link hashtable is stored in shared memory and contains salted
   // hashes for all visits. Each salt corresponds to a unique origin, and

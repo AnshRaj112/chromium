@@ -30,7 +30,6 @@
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/memory/memory_pressure_listener.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ptr_exclusion.h"
@@ -69,11 +68,6 @@ static inline bool operator==(const DecoderCacheKey& a,
                               const DecoderCacheKey& b) {
   return a.gen_ == b.gen_ && a.size_ == b.size_ &&
          a.alpha_option_ == b.alpha_option_ && a.client_id_ == b.client_id_;
-}
-
-static inline bool operator!=(const DecoderCacheKey& a,
-                              const DecoderCacheKey& b) {
-  return !(a == b);
 }
 
 // Base class for all cache entries.
@@ -258,10 +252,6 @@ class PLATFORM_EXPORT ImageDecodingStore final {
  private:
   void Prune();
 
-  // Called by the memory pressure listener when the memory pressure rises.
-  void OnMemoryPressure(
-      base::MemoryPressureListener::MemoryPressureLevel level);
-
   // These helper methods are called while |lock_| is held.
   template <class T, class U, class V>
   void InsertCacheInternal(std::unique_ptr<T> cache_entry,
@@ -322,9 +312,6 @@ class PLATFORM_EXPORT ImageDecodingStore final {
 
   size_t heap_limit_in_bytes_ GUARDED_BY(lock_);
   size_t heap_memory_usage_in_bytes_ GUARDED_BY(lock_);
-
-  // A listener to global memory pressure events.
-  base::MemoryPressureListener memory_pressure_listener_;
 
   // Also protects:
   // - the CacheEntry in |decoder_cache_map_|.

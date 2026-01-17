@@ -9,14 +9,12 @@
 #include <string>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/callback.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "components/omnibox/browser/actions/omnibox_action_in_suggest.h"
-#include "components/omnibox/browser/actions/omnibox_answer_action.h"
 #include "components/omnibox/browser/autocomplete_match.h"
 #include "components/omnibox/browser/autocomplete_match_type.h"
 #include "components/omnibox/browser/autocomplete_scheme_classifier.h"
@@ -206,10 +204,6 @@ TEST_F(BaseSearchProviderTest, PreserveAnswersWhenDeduplicating) {
 }
 
 TEST_F(BaseSearchProviderTest, PreserveImageWhenDeduplicating) {
-  // Ensure categorical suggestions are enabled.
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(omnibox::kCategoricalSuggestions);
-
   TemplateURLData data;
   data.SetURL("http://foo.com/url?bar={searchTerms}");
   auto template_url = std::make_unique<TemplateURL>(data);
@@ -296,10 +290,6 @@ TEST_F(BaseSearchProviderTest, PreserveImageWhenDeduplicating) {
 }
 
 TEST_F(BaseSearchProviderTest, PreserveSubtypesWhenDeduplicating) {
-  // Ensure categorical suggestions are enabled.
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitWithFeatures({omnibox::kCategoricalSuggestions}, {});
-
   TemplateURLData data;
   data.SetURL("http://foo.com/url?bar={searchTerms}");
   auto template_url = std::make_unique<TemplateURL>(data);
@@ -336,8 +326,8 @@ TEST_F(BaseSearchProviderTest, PreserveSubtypesWhenDeduplicating) {
   EXPECT_EQ(AutocompleteMatchType::SEARCH_HISTORY, match.type);
   EXPECT_EQ(omnibox::TYPE_NATIVE_CHROME, match.suggest_type);
   ASSERT_EQ(2U, match.subtypes.size());
-  EXPECT_TRUE(base::Contains(match.subtypes, omnibox::SUBTYPE_PERSONAL));
-  EXPECT_TRUE(base::Contains(match.subtypes, omnibox::SUBTYPE_TRENDS));
+  EXPECT_TRUE(match.subtypes.contains(omnibox::SUBTYPE_PERSONAL));
+  EXPECT_TRUE(match.subtypes.contains(omnibox::SUBTYPE_TRENDS));
   EXPECT_EQ(1300, match.relevance);
 
   ASSERT_EQ(1U, match.duplicate_matches.size());
@@ -345,7 +335,7 @@ TEST_F(BaseSearchProviderTest, PreserveSubtypesWhenDeduplicating) {
   EXPECT_EQ(AutocompleteMatchType::SEARCH_SUGGEST_ENTITY, duplicate.type);
   EXPECT_EQ(omnibox::TYPE_CATEGORICAL_QUERY, duplicate.suggest_type);
   ASSERT_EQ(1U, duplicate.subtypes.size());
-  EXPECT_TRUE(base::Contains(duplicate.subtypes, omnibox::SUBTYPE_TRENDS));
+  EXPECT_TRUE(duplicate.subtypes.contains(omnibox::SUBTYPE_TRENDS));
   EXPECT_EQ(850, duplicate.relevance);
 }
 
@@ -729,58 +719,7 @@ TEST_F(BaseSearchProviderTest, CreateActionInSuggest_BuildActionURL) {
   }
 }
 
-TEST_F(BaseSearchProviderTest, CreateAnswerAction) {
-  struct {
-    std::string query;
-    std::vector<std::pair<std::string, std::string>> query_cgi_params;
-    std::vector<std::string> possible_param_variations;
-  } test_cases[]{
-      // No additional params.
-      {/*query=*/"Alphabet Inc Class C compare", /*query_cgi_params=*/{},
-       /*possible_param_variations=*/{}},
-      // One additional param.
-      {/*query=*/"Alphabet Inc Class C financials",
-       /*query_cgi_params=*/{{"name", "value"}},
-       /*possible_param_variations=*/{"name=value"}},
-      // Multiple additional params.
-      {/*query=*/"About Alphabet Inc Class C",
-       /*query_cgi_params=*/{{"name1", "value1"}, {"name2", "value2"}},
-       /*possible_param_variations=*/
-       {"name1=value1&name2=value2", "name2=value2&name1=value1"}},
-  };
-  omnibox::RichAnswerTemplate answer_template;
-  for (const auto& test_case : test_cases) {
-    omnibox::SuggestionEnhancement* enhancement =
-        answer_template.mutable_enhancements()->add_enhancements();
-    enhancement->set_query(test_case.query);
-    for (const auto& param : test_case.query_cgi_params) {
-      enhancement->mutable_query_cgi_params()->insert(
-          {param.first, param.second});
-    }
-    TemplateURLRef::SearchTermsArgs search_terms_args;
-    SearchTermsData search_terms_data;
-    TemplateURLData template_url_data;
-    template_url_data.SetURL("https://www.google.com/search?q={searchTerms}");
-    auto template_url = std::make_unique<TemplateURL>(template_url_data);
 
-    auto action = BaseSearchProvider::CreateAnswerAction(
-        std::move(*enhancement), search_terms_args,
-        omnibox::ANSWER_TYPE_FINANCE);
-
-    auto* answer_action = OmniboxAnswerAction::FromAction(action.get());
-    // Ensure search terms additional params match. Checking the exact value is
-    // not easily possible as param order is not guaranteed.
-    bool found_matching_param_sequence =
-        test_case.possible_param_variations.empty();
-    for (const std::string& param_sequence :
-         test_case.possible_param_variations) {
-      found_matching_param_sequence |=
-          answer_action->search_terms_args.additional_query_params ==
-          param_sequence;
-    }
-    EXPECT_TRUE(found_matching_param_sequence);
-  }
-}
 
 TEST_F(BaseSearchProviderTest, SuggestTemplateInfoPopulatesMatch) {
   TemplateURLData data;

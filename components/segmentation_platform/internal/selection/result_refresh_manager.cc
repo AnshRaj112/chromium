@@ -5,6 +5,7 @@
 #include "components/segmentation_platform/internal/selection/result_refresh_manager.h"
 
 #include "base/metrics/field_trial_params.h"
+#include "base/task/single_thread_task_runner.h"
 #include "components/segmentation_platform/internal/selection/selection_utils.h"
 #include "components/segmentation_platform/internal/stats.h"
 #include "components/segmentation_platform/public/config.h"
@@ -16,12 +17,6 @@ namespace segmentation_platform {
 namespace {
 
 const int kModelInitializationTimeoutMs = 5000;
-
-int GetModelInitializationTimeoutMs() {
-  return base::GetFieldTrialParamByFeatureAsInt(
-      features::kSegmentationPlatformModelInitializationDelay,
-      kModelInitializationDelay, kModelInitializationTimeoutMs);
-}
 
 // Checks if the model result supports multi output model.
 bool SupportMultiOutput(SegmentResultProvider::SegmentResult* result) {
@@ -75,7 +70,7 @@ void ResultRefreshManager::RefreshModelResults(bool is_startup) {
         FROM_HERE,
         base::BindOnce(&ResultRefreshManager::RefreshModelResultsInternal,
                        weak_ptr_factory_.GetWeakPtr()),
-        base::Milliseconds(GetModelInitializationTimeoutMs()));
+        base::Milliseconds(kModelInitializationTimeoutMs));
     return;
   }
   if (delay_state_ == DelayState::DELAY_EXECUTED) {

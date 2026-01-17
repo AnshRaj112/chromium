@@ -7,6 +7,7 @@
 #include <climits>
 #include <memory>
 #include <string_view>
+#include <utility>
 
 #include "ash/calendar/calendar_client.h"
 #include "ash/calendar/calendar_controller.h"
@@ -31,7 +32,6 @@
 #include "ash/test/ash_test_base.h"
 #include "ash/test/ash_test_util.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -39,7 +39,6 @@
 #include "base/test/task_environment.h"
 #include "base/time/time.h"
 #include "base/time/time_override.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "chromeos/ash/components/settings/scoped_timezone_settings.h"
 #include "components/account_id/account_id.h"
 #include "google_apis/calendar/calendar_api_requests.h"
@@ -47,9 +46,9 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/compositor/test/layer_animation_stopped_waiter.h"
 #include "ui/events/base_event_utils.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/focus/focus_manager.h"
@@ -1331,8 +1330,8 @@ TEST_F(CalendarViewTest, RecordDwellTimeMetricWhenScrolling) {
 
 // Tests that EventListView has proper bounds when shown.
 TEST_F(CalendarViewTest, EventListBoundsTest) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
   base::Time date;
   // Create a monthview based on Jun,7th 2021.
   ASSERT_TRUE(base::Time::FromString("7 Jun 2021 10:00 GMT", &date));
@@ -1641,8 +1640,8 @@ INSTANTIATE_TEST_SUITE_P(MultiCalendar,
 // The header should show the new header with animation once there's an update
 // when the event list view is shown.
 TEST_P(CalendarViewAnimationTest, HeaderAnimation) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
   base::Time date;
   ASSERT_TRUE(base::Time::FromString("24 Oct 2021 10:00 GMT", &date));
   GetSessionControllerClient()->SetSessionState(
@@ -1712,8 +1711,8 @@ TEST_P(CalendarViewAnimationTest, HeaderAnimation) {
 }
 
 TEST_P(CalendarViewAnimationTest, HeaderAnimationDirection) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
   base::Time date;
   ASSERT_TRUE(base::Time::FromString("24 Aug 2023 10:00 GMT", &date));
   GetSessionControllerClient()->SetSessionState(
@@ -1763,8 +1762,8 @@ TEST_P(CalendarViewAnimationTest, HeaderAnimationDirection) {
 
 // The month views and header should animate when scrolling up or down.
 TEST_P(CalendarViewAnimationTest, MonthAndHeaderAnimation) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
 
   base::Time date;
   ASSERT_TRUE(base::Time::FromString("24 Oct 2021 10:00 GMT", &date));
@@ -1873,8 +1872,8 @@ TEST_P(CalendarViewAnimationTest, MonthAndHeaderAnimation) {
 
 // The content view should not be scrollable when the month view is animating.
 TEST_P(CalendarViewAnimationTest, NotScrollableWhenAnimating) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
 
   base::Time date;
   ASSERT_TRUE(base::Time::FromString("24 Oct 2021 10:00 GMT", &date));
@@ -1951,8 +1950,8 @@ TEST_P(CalendarViewAnimationTest, NotScrollableWhenAnimating) {
 }
 
 TEST_P(CalendarViewAnimationTest, ResetToTodayWithAnimation) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   // Create calendar view and wait for the animation to finish.
   CreateCalendarView();
@@ -2062,7 +2061,7 @@ TEST_P(CalendarViewAnimationTest, LoadingBarVisibilityForOneMonthOnScreen) {
 
   EXPECT_EQ(1U, on_screen_month().size());
   const auto* progress_bar = calendar_view()->GetViewByID(
-      base::to_underlying(GlanceablesViewId::kProgressBar));
+      std::to_underlying(GlanceablesViewId::kProgressBar));
   EXPECT_TRUE(progress_bar->GetVisible());
 
   // Waits until the events are fetched, and tests the loading bar is invisible.
@@ -2083,7 +2082,7 @@ TEST_P(CalendarViewAnimationTest, LoadingBarVisibility) {
       calendar_test_utils::kAnimationSettleDownDuration);
 
   const auto* progress_bar = calendar_view()->GetViewByID(
-      base::to_underlying(GlanceablesViewId::kProgressBar));
+      std::to_underlying(GlanceablesViewId::kProgressBar));
   EXPECT_TRUE(progress_bar->GetVisible());
 
   // Waits until the events are fetched, and tests the loading bar is invisible.
@@ -2118,7 +2117,7 @@ TEST_P(CalendarViewAnimationTest,
       calendar_test_utils::kAnimationSettleDownDuration);
   EXPECT_TRUE(
       calendar_view()
-          ->GetViewByID(base::to_underlying(GlanceablesViewId::kProgressBar))
+          ->GetViewByID(std::to_underlying(GlanceablesViewId::kProgressBar))
           ->GetVisible());
 
   // Tests when the screen is locked, the loading bar is invisible.
@@ -2132,7 +2131,7 @@ TEST_P(CalendarViewAnimationTest,
       calendar_test_utils::kAnimationSettleDownDuration);
   EXPECT_FALSE(
       calendar_view()
-          ->GetViewByID(base::to_underlying(GlanceablesViewId::kProgressBar))
+          ->GetViewByID(std::to_underlying(GlanceablesViewId::kProgressBar))
           ->GetVisible());
 
   // Tests when the user starts the login process, the loading bar is invisible.
@@ -2144,7 +2143,7 @@ TEST_P(CalendarViewAnimationTest,
       calendar_test_utils::kAnimationSettleDownDuration);
   EXPECT_FALSE(
       calendar_view()
-          ->GetViewByID(base::to_underlying(GlanceablesViewId::kProgressBar))
+          ->GetViewByID(std::to_underlying(GlanceablesViewId::kProgressBar))
           ->GetVisible());
 }
 
@@ -2181,7 +2180,7 @@ TEST_P(CalendarViewAnimationTest, LoadingBarVisibilityForErrorFetchingEvents) {
   task_environment()->FastForwardBy(
       calendar_test_utils::kAnimationSettleDownDuration);
   const auto* progress_bar = calendar_view()->GetViewByID(
-      base::to_underlying(GlanceablesViewId::kProgressBar));
+      std::to_underlying(GlanceablesViewId::kProgressBar));
   EXPECT_TRUE(progress_bar->GetVisible());
 
   // Waits until the events are fetched, and tests the loading bar is invisible.
@@ -2223,7 +2222,7 @@ TEST_P(CalendarViewAnimationTest,
   task_environment()->FastForwardBy(
       calendar_test_utils::kAnimationSettleDownDuration);
   const auto* progress_bar = calendar_view()->GetViewByID(
-      base::to_underlying(GlanceablesViewId::kProgressBar));
+      std::to_underlying(GlanceablesViewId::kProgressBar));
   EXPECT_TRUE(progress_bar->GetVisible());
 
   // Waits until the events are fetched, and tests the loading bar is invisible.
@@ -2233,8 +2232,8 @@ TEST_P(CalendarViewAnimationTest,
 
 // Tests that the EventListView does not crash if shown during the initial open.
 TEST_P(CalendarViewAnimationTest, QuickShowEventListInitialOpen) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
 
   // Creates calendar view, which will trigger an animation.
   CreateCalendarView();
@@ -2255,8 +2254,8 @@ TEST_P(CalendarViewAnimationTest, QuickShowEventListInitialOpen) {
 
 // Tests that the EventListView does not show during the month change animation.
 TEST_P(CalendarViewAnimationTest, DontShowEventListDuringMonthAnimation) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
 
   CreateCalendarView();
   task_environment()->FastForwardBy(
@@ -2281,8 +2280,8 @@ TEST_P(CalendarViewAnimationTest, DontShowEventListDuringMonthAnimation) {
 // when closing the event list right after opening it, do nothing since the
 // animation is not finished.
 TEST_P(CalendarViewAnimationTest, OpenAndCloseEventList) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   // Sets the timezone to "America/Los_Angeles".
   ash::system::ScopedTimezoneSettings timezone_settings(u"America/Los_Angeles");
 
@@ -3128,8 +3127,8 @@ INSTANTIATE_TEST_SUITE_P(MultiCalendar,
 TEST_P(CalendarViewWithUpNextViewAnimationTest,
        UpNextViewShouldNotCoversToday) {
   auto histogram_tester = std::make_unique<base::HistogramTester>();
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   base::Time date;
   // Pick a date towards the end of the month so it's initial position is not on
   // the top when it's created.
@@ -3176,8 +3175,8 @@ TEST_P(CalendarViewWithUpNextViewAnimationTest,
 
 TEST_P(CalendarViewWithUpNextViewAnimationTest,
        ShouldNotScrollToShowTodaysCell_WhenUpNextViewDoesNotCoverIt) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   base::Time date;
   // Pick a date at the start of the month so up next doesn't cover it.
   ASSERT_TRUE(base::Time::FromString("1 Apr 2023 10:00 GMT", &date));
@@ -3214,8 +3213,8 @@ TEST_P(CalendarViewWithUpNextViewAnimationTest,
 TEST_P(
     CalendarViewWithUpNextViewAnimationTest,
     ShouldNotScrollToShowTodaysCell_WhenUserHasScrolled_AndAnUpcomingEventAppears) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   base::Time date;
   // Pick a date towards the end of the month so up next covers the bottom row.
   ASSERT_TRUE(base::Time::FromString("25 Apr 2023 10:00 GMT", &date));
@@ -3256,8 +3255,8 @@ TEST_P(
 
 TEST_P(CalendarViewWithUpNextViewAnimationTest,
        ShouldNotScroll_WhenAnUpcomingEventAppears) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   base::Time date;
   // Pick a date towards the end of the month so up next covers the bottom row.
   ASSERT_TRUE(base::Time::FromString("25 Apr 2023 10:00 GMT", &date));
@@ -3292,8 +3291,8 @@ TEST_P(CalendarViewWithUpNextViewAnimationTest,
 
 TEST_P(CalendarViewWithUpNextViewAnimationTest,
        ShouldNotScrollToShowTodaysCell_WhenTodaysDateCellIsNull) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   base::Time date;
   // Pick a date towards the end of the month.
   ASSERT_TRUE(base::Time::FromString("25 Apr 2023 10:00 GMT", &date));
@@ -3338,8 +3337,8 @@ TEST_P(CalendarViewWithUpNextViewAnimationTest,
 // view.
 TEST_P(CalendarViewWithUpNextViewAnimationTest,
        ShouldScrollToToday_WithoutUpNextView) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   base::Time date;
 
   // Pick a date towards the end of the month so that it need to scroll up to
@@ -3356,8 +3355,8 @@ TEST_P(CalendarViewWithUpNextViewAnimationTest,
 // Tests that the scroll view scrolls up to today's row with the up-next view.
 TEST_P(CalendarViewWithUpNextViewAnimationTest,
        ShouldScrollToToday_WithUpNextView) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   base::Time date;
   // Pick a date towards the end of the month so that it need to scroll up to
   // today's row.
@@ -3383,8 +3382,8 @@ TEST_P(CalendarViewWithUpNextViewAnimationTest,
 // first. Regression test for b/336722659.
 TEST_P(CalendarViewWithUpNextViewAnimationTest,
        ShowUpNextViewAfterEventListViewCorrectly) {
-  ui::ScopedAnimationDurationScaleMode test_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode test_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   base::Time date;
   ASSERT_TRUE(base::Time::FromString("30 Nov 2023 10:00 GMT", &date));
   task_environment()->AdvanceClock(date - base::Time::Now());

@@ -4,6 +4,8 @@
 
 #include "components/global_media_controls/public/views/media_item_ui_updated_view.h"
 
+#include <algorithm>
+
 #include "base/metrics/histogram_functions.h"
 #include "components/global_media_controls/media_view_utils.h"
 #include "components/global_media_controls/public/format_duration.h"
@@ -11,6 +13,8 @@
 #include "components/media_message_center/media_notification_item.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/vector_icons/vector_icons.h"
+#include "third_party/skia/include/core/SkPath.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/gfx/geometry/skia_conversions.h"
@@ -99,9 +103,9 @@ MediaItemUIUpdatedView::MediaItemUIUpdatedView(
   artwork_view_ =
       artwork_row->AddChildView(std::make_unique<views::ImageView>());
   artwork_view_->SetPreferredSize(kArtworkSize);
-  artwork_view_->SetClipPath(
-      SkPath().addRoundRect(RectToSkRect(gfx::Rect(kArtworkSize)),
-                            kArtworkCornerRadius, kArtworkCornerRadius));
+  artwork_view_->SetClipPath(SkPath::RRect(
+      SkRRect::MakeRectXY(RectToSkRect(gfx::Rect(kArtworkSize)),
+                          kArtworkCornerRadius, kArtworkCornerRadius)));
   artwork_view_->SetVisible(false);
 
   // |info_column| inside |artwork_row| right to the |artwork_view| holds the
@@ -130,9 +134,9 @@ MediaItemUIUpdatedView::MediaItemUIUpdatedView(
   favicon_view_ =
       favicon_source->AddChildView(std::make_unique<views::ImageView>());
   favicon_view_->SetPreferredSize(kFaviconSize);
-  favicon_view_->SetClipPath(
-      SkPath().addRoundRect(RectToSkRect(gfx::Rect(kFaviconSize)),
-                            kFaviconCornerRadius, kFaviconCornerRadius));
+  favicon_view_->SetClipPath(SkPath::RRect(
+      SkRRect::MakeRectXY(RectToSkRect(gfx::Rect(kFaviconSize)),
+                          kFaviconCornerRadius, kFaviconCornerRadius)));
   UpdateWithFavicon(gfx::ImageSkia());
 
   // Create the media source label.
@@ -599,8 +603,8 @@ void MediaItemUIUpdatedView::MediaActionButtonPressed(views::Button* button) {
 
   // Make the screen reader announce the button text for accessibility since
   // there are only visual changes outside these buttons when they are clicked.
-  if (base::Contains(kProgressRowMediaActions,
-                     static_cast<MediaSessionAction>(button->GetID()))) {
+  if (std::ranges::contains(kProgressRowMediaActions,
+                            static_cast<MediaSessionAction>(button->GetID()))) {
     GetViewAccessibility().AnnouncePolitely(button->GetTooltipText());
   }
 
@@ -622,20 +626,22 @@ void MediaItemUIUpdatedView::UpdateMediaActionButtonsVisibility() {
   bool should_invalidate_layout = false;
 
   for (views::Button* button : media_action_buttons_) {
-    bool should_show = base::Contains(
-        media_actions_, static_cast<MediaSessionAction>(button->GetID()));
+    bool should_show = media_actions_.contains(
+        static_cast<MediaSessionAction>(button->GetID()));
     // Do not show the picture-in-picture button for a casting media item.
     if (button == picture_in_picture_button_ && footer_view_) {
       should_show = false;
     }
 
-    if (base::Contains(kProgressRowMediaActions,
-                       static_cast<MediaSessionAction>(button->GetID()))) {
+    if (std::ranges::contains(
+            kProgressRowMediaActions,
+            static_cast<MediaSessionAction>(button->GetID()))) {
       if (is_live_) {
         // For live media, the seek progress buttons are always hidden and the
         // other buttons are visible if their media actions are supported.
-        if (base::Contains(kProgressRowSeekMediaActions,
-                           static_cast<MediaSessionAction>(button->GetID()))) {
+        if (std::ranges::contains(
+                kProgressRowSeekMediaActions,
+                static_cast<MediaSessionAction>(button->GetID()))) {
           should_show = false;
         }
       } else {

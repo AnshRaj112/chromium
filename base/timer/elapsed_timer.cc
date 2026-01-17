@@ -14,13 +14,6 @@ bool g_mock_elapsed_timers_for_test = false;
 
 ElapsedTimer::ElapsedTimer() : start_time_(TimeTicks::Now()) {}
 
-ElapsedTimer::ElapsedTimer(ElapsedTimer&& other)
-    : start_time_(other.start_time_) {}
-
-void ElapsedTimer::operator=(ElapsedTimer&& other) {
-  start_time_ = other.start_time_;
-}
-
 TimeDelta ElapsedTimer::Elapsed() const {
   if (g_mock_elapsed_timers_for_test) {
     return ScopedMockElapsedTimersForTest::kMockElapsedTime;
@@ -40,6 +33,15 @@ TimeDelta ElapsedThreadTimer::Elapsed() const {
     return ScopedMockElapsedTimersForTest::kMockElapsedTime;
   }
   return ThreadTicks::Now() - begin_;
+}
+
+ElapsedLiveTimer::ElapsedLiveTimer() : start_time_(LiveTicks::Now()) {}
+
+TimeDelta ElapsedLiveTimer::Elapsed() const {
+  if (g_mock_elapsed_timers_for_test) {
+    return ScopedMockElapsedTimersForTest::kMockElapsedTime;
+  }
+  return LiveTicks::Now() - start_time_;
 }
 
 // static

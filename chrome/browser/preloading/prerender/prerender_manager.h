@@ -84,8 +84,6 @@ class PrerenderManager : public content::WebContentsObserver,
 
   // Cancels the prerender that is prerendering the given
   // `canonical_search_url`.
-  // TODO(crbug.com/40214220): Use the creator's address to identify the
-  // owner that can cancels the corresponding prerendering?
   void StopPrerenderSearchResult(const GURL& canonical_search_url);
 
   // The entry of direct url input prerender.
@@ -112,11 +110,40 @@ class PrerenderManager : public content::WebContentsObserver,
  private:
   class SearchPrerenderTask;
 
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
+  //
+  // LINT.IfChange(PrewarmDecision)
+  enum class PrewarmDecision {
+    kReady = 0,
+    kAlreadyExists = 1,
+    kDisabled = 2,
+    kInHeadlessMode = 3,
+    kDebuggerAttached = 4,
+    kInvalidUrl = 5,
+    kNoTemplateUrlService = 6,
+    kNoDefaultSearchProvider = 7,
+    kNotSameOriginWithDSE = 8,
+    kInPictureInPicture = 9,
+    kInIsolatedWebApp = 10,
+    kInKioskSession = 11,
+    kLowMemory = 12,
+    kMaxValue = kLowMemory,
+  };
+  // LINT.ThenChange(//tools/metrics/histograms/metadata/navigation/enums.xml:PrerenderPrewarmDecision)
+
   explicit PrerenderManager(content::WebContents* web_contents);
   friend class content::WebContentsUserData<PrerenderManager>;
 
   void ResetPrerenderHandlesOnPrimaryPageChanged(
       content::NavigationHandle* navigation_handle);
+
+  // Decides if prewarm should be triggered. If not, returns the reason why.
+  // Otherwise, returns kReady and sets `prewarm_url`.
+  PrewarmDecision ShouldPrewarm(GURL& prewarm_url);
+
+  void OnSearchPrewarmPrerenderNavigationHandle(
+      content::NavigationHandle& navigation_handle);
 
   std::unique_ptr<content::PrerenderHandle> search_prewarm_handle_;
   std::optional<GURL> prewarm_url_for_testing_;

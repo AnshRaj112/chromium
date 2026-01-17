@@ -7,6 +7,7 @@
 #include <array>
 #include <functional>
 
+#include "base/containers/adapters.h"
 #include "ui/base/interaction/element_tracker.h"
 
 namespace ui::test {
@@ -19,7 +20,7 @@ ActionResult Simulate(
         simulators,
     ActionResult (InteractionTestUtil::Simulator::*method)(Args...),
     Args... args) {
-  for (const auto& simulator : simulators) {
+  for (const auto& simulator : base::Reversed(simulators)) {
     const auto result = std::invoke(method, simulator.get(), args...);
     if (result != ActionResult::kNotAttempted) {
       return result;
@@ -164,6 +165,16 @@ ActionResult InteractionTestUtil::Confirm(TrackedElement* element) {
   return Simulate(simulators_, &Simulator::Confirm, element);
 }
 
+void PrintTo(ActionResult action_result, std::ostream* os) {
+  static constexpr auto kActionResults = std::to_array<const char*>(
+      {"ActionResult::kNotAttempted", "ActionResult::kSucceeded",
+       "ActionResult::kFailed", "ActionResult::kKnownIncompatible"});
+  constexpr size_t kCount = kActionResults.size();
+  static_assert(kCount == static_cast<size_t>(ActionResult::kMaxValue) + 1);
+  const size_t value = base::checked_cast<size_t>(action_result);
+  *os << (value >= kCount ? "[invalid ActionResult]" : kActionResults[value]);
+}
+
 void PrintTo(InteractionTestUtil::InputType input_type, std::ostream* os) {
   static constexpr auto kInputTypeNames =
       std::to_array<const char*>({"InputType::kDontCare", "InputType::kMouse",
@@ -176,6 +187,10 @@ void PrintTo(InteractionTestUtil::InputType input_type, std::ostream* os) {
   *os << (value >= kCount ? "[invalid InputType]" : kInputTypeNames[value]);
 }
 
+std::ostream& operator<<(std::ostream& os, ActionResult action_result) {
+  PrintTo(action_result, &os);
+  return os;
+}
 std::ostream& operator<<(std::ostream& os,
                          InteractionTestUtil::InputType input_type) {
   PrintTo(input_type, &os);

@@ -4,12 +4,13 @@
 
 #include "components/optimization_guide/core/model_execution/safety_config.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <iterator>
 #include <optional>
 #include <string>
+#include <string_view>
 
-#include "base/containers/contains.h"
 #include "base/no_destructor.h"
 #include "components/optimization_guide/core/model_execution/multimodal_message.h"
 #include "components/optimization_guide/core/model_execution/substitution.h"
@@ -19,6 +20,7 @@
 #include "components/optimization_guide/proto/substitution.pb.h"
 #include "components/optimization_guide/proto/text_safety_model_metadata.pb.h"
 #include "services/on_device_model/public/mojom/on_device_model.mojom.h"
+#include "third_party/re2/src/re2/re2.h"
 
 namespace optimization_guide {
 
@@ -86,6 +88,21 @@ const CheckTemplate& GetRawOutputCheckTemplate(
   return config.raw_output_check().input_template();
 }
 
+bool IsBlockedByRegexFilter(const proto::RegexFilter& regex_filter,
+                            std::string_view text) {
+  switch (regex_filter.type()) {
+    case optimization_guide::proto::RegexFilterType::
+        REGEX_FILTER_TYPE_UNSPECIFIED:
+      return false;
+    case optimization_guide::proto::RegexFilterType::
+        REGEX_FILTER_TYPE_BLOCK_ON_MATCH:
+      return RE2::PartialMatch(text, regex_filter.regex());
+    case optimization_guide::proto::RegexFilterType::
+        REGEX_FILTER_TYPE_BLOCK_ON_NO_MATCH:
+      return !RE2::PartialMatch(text, regex_filter.regex());
+  }
+}
+
 }  // namespace
 
 SafetyConfig::SafetyConfig() = default;
@@ -139,7 +156,7 @@ bool SafetyConfig::IsTextInUnsupportedOrUndeterminedLanguage(
     return true;
   }
 
-  if (!base::Contains(allowed_languages, safety_info->language->code)) {
+  if (!std::ranges::contains(allowed_languages, safety_info->language->code)) {
     // Unsupported language.
     return true;
   }
@@ -166,6 +183,12 @@ std::optional<SubstitutionResult> SafetyConfig::GetRequestCheckInput(
 
 bool SafetyConfig::IsRequestCheckLanguageOnly(int check_idx) const {
   return proto_.request_check(check_idx).check_language_only();
+}
+
+bool SafetyConfig::IsRequestBlockedByRegexFilter(int check_idx,
+                                                 std::string_view text) const {
+  return IsBlockedByRegexFilter(proto_.request_check(check_idx).regex_filter(),
+                                text);
 }
 
 bool SafetyConfig::IsRequestUnsafe(
@@ -209,6 +232,11 @@ std::optional<SubstitutionResult> SafetyConfig::GetRawOutputCheckInput(
                              GetRawOutputCheckTemplate(proto_));
 }
 
+bool SafetyConfig::IsRawOutputBlockedByRegexFilter(
+    std::string_view text) const {
+  return IsBlockedByRegexFilter(proto_.raw_output_check().regex_filter(), text);
+}
+
 bool SafetyConfig::IsRawOutputUnsafe(
     const on_device_model::mojom::SafetyInfoPtr& safety_info) const {
   if (proto_.safety_category_thresholds().size() == 0) {
@@ -229,6 +257,12 @@ bool SafetyConfig::IsRawOutputUnsupportedLanguage(
 
 int SafetyConfig::NumResponseChecks() const {
   return proto_.response_check_size();
+}
+
+bool SafetyConfig::IsResponseBlockedByRegexFilter(int check_idx,
+                                                  std::string_view text) const {
+  return IsBlockedByRegexFilter(proto_.response_check(check_idx).regex_filter(),
+                                text);
 }
 
 bool SafetyConfig::IsResponseUnsafe(

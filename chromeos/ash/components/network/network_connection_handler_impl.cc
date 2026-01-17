@@ -10,7 +10,6 @@
 
 #include "ash/constants/ash_features.h"
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
@@ -42,6 +41,7 @@
 #include "chromeos/ash/components/network/shill_property_util.h"
 #include "dbus/object_path.h"
 #include "net/cert/x509_certificate.h"
+#include "network_connection_observer.h"
 #include "third_party/cros_system_api/dbus/service_constants.h"
 
 namespace ash {
@@ -198,7 +198,7 @@ bool IsVpnProhibited() {
       NetworkHandler::Get()
           ->prohibited_technologies_handler()
           ->GetCurrentlyProhibitedTechnologies();
-  return base::Contains(prohibited_technologies, shill::kTypeVPN);
+  return std::ranges::contains(prohibited_technologies, shill::kTypeVPN);
 }
 
 bool IsBuiltInVpnType(const std::string& vpn_type) {
@@ -308,8 +308,31 @@ void NetworkConnectionHandlerImpl::ConnectToNetwork(
     bool check_error_state,
     ConnectCallbackMode mode) {
   NET_LOG(USER) << "ConnectToNetworkRequested: " << NetworkPathId(service_path);
-  for (auto& observer : observers_)
-    observer.ConnectToNetworkRequested(service_path);
+
+  // If an observer vetoes the connection attempt, continue notifying
+  // subsequente observers, treating this case consistently with other failure
+  // modes such as `kErrorBlockedByPolicy`.
+  // If multiple observers veto the connection attempt, the last verdict will
+  // win at the moment. That is not an issue currently because there's only one
+  // blocking verdict.
+  ConnectToNetworkRequestVerdict verdict =
+      ConnectToNetworkRequestVerdict::kProceed;
+  for (auto& observer : observers_) {
+    ConnectToNetworkRequestVerdict current_verdict =
+        observer.ConnectToNetworkRequested(service_path);
+    if (current_verdict != ConnectToNetworkRequestVerdict::kProceed) {
+      verdict = current_verdict;
+    }
+  }
+
+  switch (verdict) {
+    case ConnectToNetworkRequestVerdict::kProceed:
+      break;
+    case ConnectToNetworkRequestVerdict::kVetoWaitingForScan:
+      InvokeConnectErrorCallback(service_path, std::move(error_callback),
+                                 kErrorWaitingForScan);
+      return;
+  }
 
   // Clear any existing queued connect request.
   if (queued_connect_) {
@@ -744,8 +767,8 @@ void NetworkConnectionHandlerImpl::VerifyConfiguredAndConnect(
       return;
     }
     if (network_state_handler_->OnlyManagedWifiNetworksAllowed() ||
-        base::Contains(managed_configuration_handler_->GetBlockedHexSSIDs(),
-                       *hex_ssid)) {
+        std::ranges::contains(
+            managed_configuration_handler_->GetBlockedHexSSIDs(), *hex_ssid)) {
       ErrorCallbackForPendingRequest(service_path, kErrorBlockedByPolicy);
       return;
     }

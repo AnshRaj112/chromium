@@ -1,8 +1,10 @@
 // Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #include "chrome/browser/ui/performance_controls/tab_resource_usage_collector.h"
 
+#include "base/byte_size.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/performance_controls/tab_resource_usage_tab_helper.h"
 #include "chrome/browser/ui/performance_controls/test_support/resource_usage_collector_observer.h"
@@ -46,13 +48,13 @@ IN_PROC_BROWSER_TEST_F(TabResourceUsageCollectorBrowserTest,
   AddAndWaitForTabReady();
   AddAndWaitForTabReady();
   TabStripModel* const model = GetTabStripModel();
-  uint64_t bytes_used = 100;
+  base::ByteSize bytes_used = base::ByteSize(100);
   TabResourceUsageTabHelper* const first_tab_helper =
-      model->GetTabAtIndex(0)->GetTabFeatures()->resource_usage_helper();
-  first_tab_helper->SetMemoryUsageInBytes(bytes_used);
+      TabResourceUsageTabHelper::From(model->GetTabAtIndex(0));
+  first_tab_helper->SetMemoryUsage(bytes_used);
   TabResourceUsageTabHelper* const second_tab_helper =
-      model->GetTabAtIndex(1)->GetTabFeatures()->resource_usage_helper();
-  second_tab_helper->SetMemoryUsageInBytes(bytes_used);
+      TabResourceUsageTabHelper::From(model->GetTabAtIndex(1));
+  second_tab_helper->SetMemoryUsage(bytes_used);
 
   // Collector refresh memory usage data for all tabs
   base::RunLoop run_loop(base::RunLoop::Type::kNestableTasksAllowed);
@@ -60,8 +62,8 @@ IN_PROC_BROWSER_TEST_F(TabResourceUsageCollectorBrowserTest,
   TabResourceUsageCollector::Get()->ImmediatelyRefreshMetricsForAllTabs();
   run_loop.Run();
 
-  EXPECT_NE(bytes_used, first_tab_helper->GetMemoryUsageInBytes());
-  EXPECT_NE(bytes_used, second_tab_helper->GetMemoryUsageInBytes());
+  EXPECT_NE(bytes_used, first_tab_helper->GetMemoryUsage());
+  EXPECT_NE(bytes_used, second_tab_helper->GetMemoryUsage());
 }
 
 // TODO - crbug.com/368862390: flaky on Mac builds
@@ -76,13 +78,13 @@ IN_PROC_BROWSER_TEST_F(TabResourceUsageCollectorBrowserTest,
   AddAndWaitForTabReady();
   AddAndWaitForTabReady();
   TabStripModel* const model = GetTabStripModel();
-  uint64_t bytes_used = 100;
+  base::ByteSize bytes_used = base::ByteSize(100);
   TabResourceUsageTabHelper* const first_tab_helper =
-      model->GetTabAtIndex(0)->GetTabFeatures()->resource_usage_helper();
-  first_tab_helper->SetMemoryUsageInBytes(bytes_used);
+      TabResourceUsageTabHelper::From(model->GetTabAtIndex(0));
+  first_tab_helper->SetMemoryUsage(bytes_used);
   TabResourceUsageTabHelper* const second_tab_helper =
-      model->GetTabAtIndex(1)->GetTabFeatures()->resource_usage_helper();
-  second_tab_helper->SetMemoryUsageInBytes(bytes_used);
+      TabResourceUsageTabHelper::From(model->GetTabAtIndex(1));
+  second_tab_helper->SetMemoryUsage(bytes_used);
 
   // Collector refresh memory usage data for the first web contents
   base::RunLoop run_loop(base::RunLoop::Type::kNestableTasksAllowed);
@@ -91,6 +93,6 @@ IN_PROC_BROWSER_TEST_F(TabResourceUsageCollectorBrowserTest,
       model->GetWebContentsAt(0));
   run_loop.Run();
 
-  EXPECT_NE(bytes_used, first_tab_helper->GetMemoryUsageInBytes());
-  EXPECT_EQ(bytes_used, second_tab_helper->GetMemoryUsageInBytes());
+  EXPECT_NE(bytes_used, first_tab_helper->GetMemoryUsage());
+  EXPECT_EQ(bytes_used, second_tab_helper->GetMemoryUsage());
 }

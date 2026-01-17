@@ -12,7 +12,8 @@
 #include "components/policy/core/common/policy_pref_names.h"
 #include "components/prefs/testing_pref_store.h"
 #include "components/safe_search_api/safe_search_util.h"
-#include "components/supervised_user/core/browser/supervised_user_content_filters_service.h"
+#include "components/supervised_user/core/browser/device_parental_controls.h"
+#include "components/supervised_user/core/browser/device_parental_controls_noop_impl.h"
 #include "components/supervised_user/core/browser/supervised_user_settings_service.h"
 #include "components/supervised_user/core/common/pref_names.h"
 #include "components/supervised_user/core/common/supervised_user_constants.h"
@@ -21,6 +22,10 @@
 #include "testing/gmock/include/gmock/gmock-matchers.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
+#if BUILDFLAG(IS_ANDROID)
+#include "components/supervised_user/core/browser/android/android_parental_controls.h"
+#endif  // BUILDFLAG(IS_ANDROID)
+
 namespace {
 
 using ::testing::Eq;
@@ -28,10 +33,9 @@ using ::testing::Optional;
 
 class SupervisedUserPrefStoreFixture : public PrefStore::Observer {
  public:
-  explicit SupervisedUserPrefStoreFixture(
+  SupervisedUserPrefStoreFixture(
       supervised_user::SupervisedUserSettingsService* settings_service,
-      supervised_user::SupervisedUserContentFiltersService*
-          content_filters_service);
+      supervised_user::DeviceParentalControls& device_parental_controls);
   ~SupervisedUserPrefStoreFixture() override;
 
   base::Value::Dict* changed_prefs() { return &changed_prefs_; }
@@ -50,10 +54,9 @@ class SupervisedUserPrefStoreFixture : public PrefStore::Observer {
 
 SupervisedUserPrefStoreFixture::SupervisedUserPrefStoreFixture(
     supervised_user::SupervisedUserSettingsService* settings_service,
-    supervised_user::SupervisedUserContentFiltersService*
-        content_filters_service)
+    supervised_user::DeviceParentalControls& device_parental_controls)
     : pref_store_(new SupervisedUserPrefStore(settings_service,
-                                              content_filters_service)),
+                                              device_parental_controls)),
       initialization_completed_(pref_store_->IsInitializationComplete()) {
   pref_store_->AddObserver(this);
 }
@@ -88,13 +91,19 @@ class SupervisedUserPrefStoreTest : public ::testing::Test {
 
  protected:
   supervised_user::SupervisedUserSettingsService service_;
-  supervised_user::SupervisedUserContentFiltersService content_filters_service_;
-  scoped_refptr<TestingPrefStore> pref_store_;
+  // Backend of the SupervisedUserSettingsService.
+  scoped_refptr<TestingPrefStore> service_pref_store_;
+
+#if BUILDFLAG(IS_ANDROID)
+  supervised_user::AndroidParentalControls device_parental_controls_;
+#else
+  supervised_user::DeviceParentalControlsNoOpImpl device_parental_controls_;
+#endif  // BUILDFLAG(IS_ANDROID)
 };
 
 void SupervisedUserPrefStoreTest::SetUp() {
-  pref_store_ = new TestingPrefStore();
-  service_.Init(pref_store_);
+  service_pref_store_ = new TestingPrefStore();
+  service_.Init(service_pref_store_);
 }
 
 void SupervisedUserPrefStoreTest::TearDown() {
@@ -102,17 +111,16 @@ void SupervisedUserPrefStoreTest::TearDown() {
 }
 
 TEST_F(SupervisedUserPrefStoreTest, ConfigureSettings) {
-  SupervisedUserPrefStoreFixture fixture(&service_, &content_filters_service_);
+  SupervisedUserPrefStoreFixture fixture(&service_, device_parental_controls_);
   EXPECT_FALSE(fixture.initialization_completed());
 
   // Prefs should not change yet when the service is ready, but not
   // activated yet.
-  pref_store_->SetInitializationCompleted();
+  service_pref_store_->SetInitializationCompleted();
   EXPECT_TRUE(fixture.initialization_completed());
   EXPECT_EQ(0u, fixture.changed_prefs()->size());
 
   service_.SetActive(true);
-
   // kIncognitoModeAvailability must be disabled for all supervised users.
   EXPECT_THAT(
       fixture.changed_prefs()->FindIntByDottedPath(
@@ -199,12 +207,12 @@ TEST_F(SupervisedUserPrefStoreTest, ConfigureSettings) {
 }
 
 TEST_F(SupervisedUserPrefStoreTest, IsEmptyAfterDeactivation) {
-  SupervisedUserPrefStoreFixture fixture(&service_, &content_filters_service_);
+  SupervisedUserPrefStoreFixture fixture(&service_, device_parental_controls_);
   EXPECT_FALSE(fixture.initialization_completed());
 
   // Prefs should not change yet when the service is ready, but not
   // activated yet.
-  pref_store_->SetInitializationCompleted();
+  service_pref_store_->SetInitializationCompleted();
   EXPECT_TRUE(fixture.initialization_completed());
   EXPECT_EQ(0u, fixture.changed_prefs()->size());
 
@@ -218,12 +226,12 @@ TEST_F(SupervisedUserPrefStoreTest, IsEmptyAfterDeactivation) {
 }
 
 TEST_F(SupervisedUserPrefStoreTest, LocalOverridesAreClearedAfterDeactivation) {
-  SupervisedUserPrefStoreFixture fixture(&service_, &content_filters_service_);
+  SupervisedUserPrefStoreFixture fixture(&service_, device_parental_controls_);
   EXPECT_FALSE(fixture.initialization_completed());
 
   // Prefs should not change yet when the service is ready, but not
   // activated yet.
-  pref_store_->SetInitializationCompleted();
+  service_pref_store_->SetInitializationCompleted();
   EXPECT_TRUE(fixture.initialization_completed());
   EXPECT_EQ(0u, fixture.changed_prefs()->size());
 
@@ -242,45 +250,43 @@ TEST_F(SupervisedUserPrefStoreTest, LocalOverridesAreClearedAfterDeactivation) {
 }
 
 TEST_F(SupervisedUserPrefStoreTest, ActivateSettingsBeforeInitialization) {
-  SupervisedUserPrefStoreFixture fixture(&service_, &content_filters_service_);
+  SupervisedUserPrefStoreFixture fixture(&service_, device_parental_controls_);
   EXPECT_FALSE(fixture.initialization_completed());
 
   service_.SetActive(true);
   EXPECT_FALSE(fixture.initialization_completed());
   EXPECT_EQ(0u, fixture.changed_prefs()->size());
 
-  pref_store_->SetInitializationCompleted();
+  service_pref_store_->SetInitializationCompleted();
   EXPECT_TRUE(fixture.initialization_completed());
-  EXPECT_EQ(0u, fixture.changed_prefs()->size());
+
+  // This assertion is a bit weak, but here's its sense: the settings service
+  // was active before the initialization of pref store was complete. When
+  // `SetInitializationCompleted` is called, the settings service first notifies
+  // its observers about completed initialization, and then immediately sends
+  // notifications about resulting prefs (for an active settings service, that's
+  // a non-zero number).
+  EXPECT_LT(0u, fixture.changed_prefs()->size());
 }
 
 TEST_F(SupervisedUserPrefStoreTest, CreatePrefStoreAfterInitialization) {
-  pref_store_->SetInitializationCompleted();
+  service_pref_store_->SetInitializationCompleted();
   service_.SetActive(true);
 
-  SupervisedUserPrefStoreFixture fixture(&service_, &content_filters_service_);
+  SupervisedUserPrefStoreFixture fixture(&service_, device_parental_controls_);
   EXPECT_TRUE(fixture.initialization_completed());
-  EXPECT_EQ(0u, fixture.changed_prefs()->size());
 }
 
-TEST_F(SupervisedUserPrefStoreTest, ContentFiltersDontChangePrefsOnStartup) {
-  SupervisedUserPrefStoreFixture fixture(&service_, &content_filters_service_);
-  EXPECT_FALSE(fixture.initialization_completed());
-
-  pref_store_->SetInitializationCompleted();
-  EXPECT_TRUE(fixture.initialization_completed());
-  EXPECT_EQ(0u, fixture.changed_prefs()->size());
-}
-
+#if BUILDFLAG(IS_ANDROID)
 TEST_F(SupervisedUserPrefStoreTest,
        ContentFiltersServiceEnablesBrowserFilters) {
-  SupervisedUserPrefStoreFixture fixture(&service_, &content_filters_service_);
+  SupervisedUserPrefStoreFixture fixture(&service_, device_parental_controls_);
   EXPECT_FALSE(fixture.initialization_completed());
 
-  pref_store_->SetInitializationCompleted();
+  service_pref_store_->SetInitializationCompleted();
   EXPECT_TRUE(fixture.initialization_completed());
 
-  content_filters_service_.SetBrowserFiltersEnabled(true);
+  device_parental_controls_.SetBrowserContentFiltersEnabledForTesting(true);
   EXPECT_THAT(
       fixture.changed_prefs()->FindIntByDottedPath(
           policy::policy_prefs::kIncognitoModeAvailability),
@@ -290,7 +296,7 @@ TEST_F(SupervisedUserPrefStoreTest,
               Optional(true));
 
   // The other filter is not affecting incognito mode.
-  content_filters_service_.SetSearchFiltersEnabled(false);
+  device_parental_controls_.SetSearchContentFiltersEnabledForTesting(false);
   EXPECT_THAT(
       fixture.changed_prefs()->FindIntByDottedPath(
           policy::policy_prefs::kIncognitoModeAvailability),
@@ -298,13 +304,13 @@ TEST_F(SupervisedUserPrefStoreTest,
 }
 
 TEST_F(SupervisedUserPrefStoreTest, ContentFiltersServiceEnablesSearchFilters) {
-  SupervisedUserPrefStoreFixture fixture(&service_, &content_filters_service_);
+  SupervisedUserPrefStoreFixture fixture(&service_, device_parental_controls_);
   EXPECT_FALSE(fixture.initialization_completed());
 
-  pref_store_->SetInitializationCompleted();
+  service_pref_store_->SetInitializationCompleted();
   EXPECT_TRUE(fixture.initialization_completed());
 
-  content_filters_service_.SetSearchFiltersEnabled(true);
+  device_parental_controls_.SetSearchContentFiltersEnabledForTesting(true);
 
   EXPECT_THAT(
       fixture.changed_prefs()->FindIntByDottedPath(
@@ -315,38 +321,40 @@ TEST_F(SupervisedUserPrefStoreTest, ContentFiltersServiceEnablesSearchFilters) {
               Optional(true));
 
   // The other filter is not affecting incognito mode.
-  content_filters_service_.SetBrowserFiltersEnabled(false);
+  device_parental_controls_.SetBrowserContentFiltersEnabledForTesting(false);
   EXPECT_THAT(
       fixture.changed_prefs()->FindIntByDottedPath(
           policy::policy_prefs::kIncognitoModeAvailability),
       Optional(static_cast<int>(policy::IncognitoModeAvailability::kDisabled)));
 }
 
-TEST_F(SupervisedUserPrefStoreTest, SuspendedSettingsServiceCannotAlterContentFilters) {
-  SupervisedUserPrefStoreFixture fixture(&service_, &content_filters_service_);
+TEST_F(SupervisedUserPrefStoreTest, InactiveSettingsServiceDoesNotAffectPrefs) {
+  SupervisedUserPrefStoreFixture fixture(&service_, device_parental_controls_);
   EXPECT_FALSE(fixture.initialization_completed());
 
-  pref_store_->SetInitializationCompleted();
+  service_pref_store_->SetInitializationCompleted();
   EXPECT_TRUE(fixture.initialization_completed());
 
-  service_.SetActive(false);
-  service_.SetSuspended(true);
-  content_filters_service_.SetSearchFiltersEnabled(true);
+  // After set search is set, one pref is expected to change.
+  device_parental_controls_.SetSearchContentFiltersEnabledForTesting(true);
+  base::Value::Dict prefs;
+  EXPECT_EQ(2u, fixture.changed_prefs()->size());
+  EXPECT_TRUE(fixture.changed_prefs()->FindBoolByDottedPath(
+      policy::policy_prefs::kForceGoogleSafeSearch));
+  EXPECT_TRUE(fixture.changed_prefs()->FindIntByDottedPath(
+      policy::policy_prefs::kIncognitoModeAvailability));
 
-  // ==2, which is incognito mode and search setting.
-  unsigned int size = fixture.changed_prefs()->size();
-  EXPECT_EQ(2u, size);
-
-  service_.SetActive(false);
-  // the value is still unchanged
-  EXPECT_EQ(size, fixture.changed_prefs()->size());
-
-  // The following demonstrates what would happen if the service was
-  // unsuspended after the content filters were set. This is not a valid
-  // sequence of calls, but we test it anyway.
-  service_.SetSuspended(false);
-  service_.SetActive(true);
-  // And now we expect more changes, because the service is active again and is
-  // sending notifications.
-  EXPECT_LT(size, fixture.changed_prefs()->size());
+  // service_ is still inactive. On each SetLocalSetting, service_ wants to emit
+  // empty dict (empty dict because it's inactive) that would normally clear the
+  // prefs, but this happens only once (subsequent attempts to emit empty
+  // settings are vetoed). This means that prefs coming from
+  // SetSearchFiltersEnabled are maintained.
+  service_.SetLocalSetting(supervised_user::kGeolocationDisabled,
+                           base::Value(true));
+  EXPECT_EQ(2u, fixture.changed_prefs()->size());
+  EXPECT_TRUE(fixture.changed_prefs()->FindBoolByDottedPath(
+      policy::policy_prefs::kForceGoogleSafeSearch));
+  EXPECT_TRUE(fixture.changed_prefs()->FindIntByDottedPath(
+      policy::policy_prefs::kIncognitoModeAvailability));
 }
+#endif  // BUILDFLAG(IS_ANDROID)

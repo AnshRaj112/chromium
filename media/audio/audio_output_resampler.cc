@@ -20,11 +20,13 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/not_fatal_until.h"
 #include "base/numerics/safe_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
 #include "media/audio/audio_manager.h"
 #include "media/audio/audio_output_dispatcher_impl.h"
 #include "media/audio/audio_output_proxy.h"
+#include "media/base/audio_bus.h"
 #if BUILDFLAG(IS_WIN)
 #include "media/audio/win/core_audio_util_win.h"
 #endif  // BUILDFLAG(IS_WIN)

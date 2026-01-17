@@ -41,7 +41,7 @@ const int kMaxNicknameChars = 25;
 
 }  // namespace
 
-SaveIbanBubbleView::SaveIbanBubbleView(views::View* anchor_view,
+SaveIbanBubbleView::SaveIbanBubbleView(views::BubbleAnchor anchor_view,
                                        content::WebContents* web_contents,
                                        IbanBubbleController* controller)
     : AutofillLocationBarBubble(anchor_view, web_contents),
@@ -79,7 +79,7 @@ void SaveIbanBubbleView::Hide() {
 void SaveIbanBubbleView::AddedToWidget() {
   ui::ResourceBundle& bundle = ui::ResourceBundle::GetSharedInstance();
   auto image_view = std::make_unique<views::ImageView>(
-      bundle.GetThemedLottieImageNamed(IDR_AUTOFILL_SAVE_CARD_LOTTIE));
+      bundle.GetThemedLottieImageNamed(IDR_AUTOFILL_SAVE_CARD_LOCAL_LOTTIE));
   image_view->GetViewAccessibility().SetIsInvisible(true);
 
   GetBubbleFrameView()->SetHeaderView(std::move(image_view));
@@ -270,17 +270,17 @@ void SaveIbanBubbleView::Init() {
   CreateMainContentView();
 
   if (controller_ &&
-      (controller_->GetBubbleType() == IbanBubbleType::kUploadSave ||
-       controller_->GetBubbleType() == IbanBubbleType::kUploadInProgress)) {
+      (controller_->GetIbanBubbleType() == IbanBubbleType::kUploadSave ||
+       controller_->GetIbanBubbleType() == IbanBubbleType::kUploadInProgress)) {
     loading_row_ = AddChildView(CreateLoadingRow());
-    if (controller_->GetBubbleType() == IbanBubbleType::kUploadInProgress) {
+    if (controller_->GetIbanBubbleType() == IbanBubbleType::kUploadInProgress) {
       ShowThrobber();
     }
   }
 }
 
 bool SaveIbanBubbleView::Accept() {
-  bool show_throbber = controller_ && controller_->GetBubbleType() ==
+  bool show_throbber = controller_ && controller_->GetIbanBubbleType() ==
                                           IbanBubbleType::kUploadSave;
 
   if (show_throbber) {

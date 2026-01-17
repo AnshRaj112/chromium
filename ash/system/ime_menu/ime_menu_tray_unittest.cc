@@ -4,6 +4,7 @@
 
 #include "ash/system/ime_menu/ime_menu_tray.h"
 
+#include <algorithm>
 #include <string_view>
 
 #include "ash/accelerators/accelerator_controller_impl.h"
@@ -20,11 +21,11 @@
 #include "ash/system/status_area_widget.h"
 #include "ash/system/status_area_widget_test_helper.h"
 #include "ash/test/ash_test_base.h"
-#include "base/containers/contains.h"
 #include "base/run_loop.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
+#include "components/session_manager/session_manager_types.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_node_data.h"
@@ -102,8 +103,8 @@ class ImeMenuTrayTest : public AshTestBase {
   }
 
   views::View* GetSettingsButton() const {
-    return static_cast<views::View*>(
-        GetTray()->bubble_->bubble_view()->GetViewByID(kSettingsButtonId));
+    auto* bubble = GetTray()->GetBubbleView();
+    return bubble == nullptr ? nullptr : bubble->GetViewByID(kSettingsButtonId);
   }
 
   views::View* GetVoiceButton() const {
@@ -114,6 +115,7 @@ class ImeMenuTrayTest : public AshTestBase {
   void SetUpKioskSession() {
     SessionInfo info;
     info.is_running_in_app_mode = true;
+    info.state = session_manager::SessionState::ACTIVE;
     Shell::Get()->session_controller()->SetSessionInfo(info);
   }
 
@@ -130,7 +132,7 @@ class ImeMenuTrayTest : public AshTestBase {
     }
     for (const auto& ime : ime_map) {
       // Tests that all the IMEs on the view is in the list of selected IMEs.
-      EXPECT_TRUE(base::Contains(expected_ime_ids, ime.second));
+      EXPECT_TRUE(std::ranges::contains(expected_ime_ids, ime.second));
 
       // Tests that the checked IME is the current IME.
       ui::AXNodeData node_data;

@@ -130,6 +130,10 @@ class BASE_EXPORT HistogramBase {
     // MemoryAllocator, and that loaded into the Histogram module before this
     // histogram is created.
     kIsPersistent = 0x40,
+
+    // Indicates that the histogram should be collected by PUMA, and its type is
+    // PUMA for Regional Capabilities.
+    kPumaRcTargetedHistogramFlag = 0x80,
   };
 
   // Histogram data inconsistency types.
@@ -241,7 +245,7 @@ class BASE_EXPORT HistogramBase {
   // WARNING: This may be called from a background thread by the metrics
   // collection system. Do not make a call to this unless it was properly vetted
   // by someone familiar with the system.
-  // TODO(crbug.com/40119012): Consider gating this behind a PassKey, so that
+  // TODO(crbug.com/466140649): Consider gating this behind a PassKey, so that
   // eventually, only StatisticsRecorder can use this.
   virtual std::unique_ptr<HistogramSamples> SnapshotUnloggedSamples() const = 0;
 
@@ -254,7 +258,7 @@ class BASE_EXPORT HistogramBase {
   // WARNING: This may be called from a background thread by the metrics
   // collection system. Do not make a call to this unless it was properly vetted
   // by someone familiar with the system.
-  // TODO(crbug.com/40119012): Consider gating this behind a PassKey, so that
+  // TODO(crbug.com/466140649): Consider gating this behind a PassKey, so that
   // eventually, only StatisticsRecorder can use this.
   virtual void MarkSamplesAsLogged(const HistogramSamples& samples) = 0;
 

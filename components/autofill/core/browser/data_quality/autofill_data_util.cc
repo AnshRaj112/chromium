@@ -10,7 +10,6 @@
 #include <string_view>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/i18n/char_iterator.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_split.h"
@@ -287,8 +286,9 @@ bool ContainsPhone(uint32_t groups) {
 uint32_t DetermineGroups(const FormStructure& form) {
   uint32_t group_bitmask = 0;
   for (const auto& field : form) {
-    FieldType type = field->Type().GetStorableType();
-    AddGroupToBitmask(&group_bitmask, type);
+    for (FieldType type : field->Type().GetTypes()) {
+      AddGroupToBitmask(&group_bitmask, type);
+    }
   }
   return group_bitmask;
 }
@@ -482,7 +482,7 @@ std::u16string JoinNameParts(std::u16string_view given,
   const char* separator = " ";
   if (IsCJKName(given) && IsCJKName(family) && middle.empty()) {
     // LastFirst
-    std::reverse(full_name.begin(), full_name.end());
+    std::ranges::reverse(full_name);
     separator = "";
   }
 
@@ -510,8 +510,8 @@ const char* GetIssuerNetworkForBasicCardIssuerNetwork(
 }
 
 bool IsValidBasicCardIssuerNetwork(std::string_view basic_card_issuer_network) {
-  return base::Contains(kPaymentRequestData, basic_card_issuer_network,
-                        &PaymentRequestData::basic_card_issuer_network);
+  return std::ranges::contains(kPaymentRequestData, basic_card_issuer_network,
+                               &PaymentRequestData::basic_card_issuer_network);
 }
 
 bool IsValidCountryCode(std::string_view country_code) {

@@ -202,9 +202,16 @@ message FormatString {
     // The format string represents a date as documented
     // autofill::data_util::IsValidDateFormat().
     DATE = 0;
-    // The format string the length of a prefix or suffix as documented
+    // The format string is the length of a prefix or suffix as documented
     // autofill::data_util::IsValidAffixFormat().
     AFFIX = 1;
+    // The format string represents the components of a flight number. See
+    // autofill::data_util::IsValidFlightNumberFormat().
+    FLIGHT_NUMBER = 2;
+    // The format string represents a date as documented in
+    // https://unicode.org/reports/tr35/tr35-dates.html#Date_Format_Patterns.
+    // This format cannot be used for setting the value.
+    ICU_DATE = 3;
   }
   optional Type type = 49;
   optional string format_string = 50;
@@ -233,8 +240,7 @@ message ThreeBitHashedFieldMetadata {
   // Input field placeholder attribute hash.
   optional int32 placeholder = 7;
 
-  // Input field initial value hash.
-  optional int32 initial_value = 8;
+  reserved 8;
 
   // Input field autocomplete attribute hash.
   optional int32 autocomplete = 9;
@@ -251,8 +257,7 @@ message ThreeBitHashedFormMetadata {
   // Form element name attribute hash.
   optional int32 name = 2;
 
-  // Form element action attribute hash.
-  optional int32 action = 3;
+  reserved 3;
 
   // Hash of all button titles in the form.
   optional int32 button_titles_concatenated = 4;

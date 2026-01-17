@@ -13,6 +13,7 @@
 #include "base/component_export.h"
 #include "base/functional/callback.h"
 #include "base/observer_list.h"
+#include "base/observer_list_types.h"
 #include "base/time/time.h"
 #include "base/types/expected.h"
 #include "chromeos/dbus/common/dbus_callback.h"
@@ -99,10 +100,8 @@ class COMPONENT_EXPORT(SESSION_MANAGER) SessionManagerClient {
   };
 
   // Interface for observing changes from the session manager.
-  class Observer {
+  class Observer : public base::CheckedObserver {
    public:
-    virtual ~Observer() {}
-
     // Called when the owner key is set.
     virtual void OwnerKeySet(bool success) {}
 
@@ -127,6 +126,9 @@ class COMPONENT_EXPORT(SESSION_MANAGER) SessionManagerClient {
 
     // Called when session stopping signal is received
     virtual void SessionStopping() {}
+
+   protected:
+    ~Observer() override = default;
   };
 
   // Interface for performing actions on behalf of the stub implementation.
@@ -289,23 +291,6 @@ class COMPONENT_EXPORT(SESSION_MANAGER) SessionManagerClient {
 
   // Notifies session_manager that Chrome has hidden the lock screen.
   virtual void NotifyLockScreenDismissed() = 0;
-
-  // Makes session_manager add some flags to carry out browser data migration
-  // upon next ash-chrome restart. The method returns true if the DBus call was
-  // successful. The callback is passed true if the DBus call is successful and
-  // false otherwise.
-  // This method is blocking. Do not use unless necessary.
-  virtual bool BlockingRequestBrowserDataMigration(
-      const cryptohome::AccountIdentifier& cryptohome_id,
-      const std::string& mode) = 0;
-
-  // Makes session_manager add some flags to carry out browser data backward
-  // migration upon next ash-chrome restart. The method returns true if the DBus
-  // call was successful. The callback is passed true if the DBus call is
-  // successful and false otherwise.
-  // This method is blocking. Do not use unless necessary.
-  virtual bool BlockingRequestBrowserDataBackwardMigration(
-      const cryptohome::AccountIdentifier& cryptohome_id) = 0;
 
   // Map that is used to describe the set of active user sessions where |key|
   // is cryptohome id and |value| is user_id_hash.

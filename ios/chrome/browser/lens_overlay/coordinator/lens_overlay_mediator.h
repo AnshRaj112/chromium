@@ -9,13 +9,12 @@
 
 #import "ios/chrome/browser/lens_overlay/coordinator/lens_omnibox_client_delegate.h"
 #import "ios/chrome/browser/lens_overlay/coordinator/lens_result_page_mediator_delegate.h"
-#import "ios/chrome/browser/lens_overlay/ui/lens_overlay_bottom_sheet_presentation_delegate.h"
+#import "ios/chrome/browser/lens_overlay/ui/lens_overlay_bottom_sheet_presentation_commands.h"
 #import "ios/chrome/browser/lens_overlay/ui/lens_overlay_result_consumer.h"
 #import "ios/chrome/browser/lens_overlay/ui/lens_toolbar_mutator.h"
 #import "ios/chrome/browser/omnibox/ui/omnibox_focus_delegate.h"
 #import "ios/public/provider/chrome/browser/lens/lens_overlay_api.h"
 
-@protocol ApplicationCommands;
 @protocol ChromeLensOverlay;
 class LensOmniboxClient;
 @protocol LensOverlayCommands;
@@ -24,6 +23,7 @@ class LensOmniboxClient;
 @protocol LensToolbarConsumer;
 @class OmniboxCoordinator;
 class PrefService;
+@protocol SceneCommands;
 class TemplateURLService;
 class WebStateList;
 
@@ -40,8 +40,8 @@ class WebStateList;
 
 @property(nonatomic, weak) id<LensOverlayResultConsumer> resultConsumer;
 
-/// Application commands handler.
-@property(nonatomic, weak) id<ApplicationCommands> applicationHandler;
+/// Scene commands handler.
+@property(nonatomic, weak) id<SceneCommands> sceneHandler;
 
 // Handler for the Lens Overlay commands;
 @property(nonatomic, weak) id<LensOverlayCommands> commandsHandler;
@@ -55,9 +55,9 @@ class WebStateList;
 /// Lens backend handler.
 @property(nonatomic, weak) id<ChromeLensOverlay> lensHandler;
 
-/// Presentation delegate for requesting bottom sheet resizing.
-@property(nonatomic, weak) id<LensOverlayBottomSheetPresentationDelegate>
-    presentationDelegate;
+/// Presentation commands for requesting bottom sheet resizing.
+@property(nonatomic, weak) id<LensOverlayBottomSheetPresentationCommands>
+    bottomSheetCommands;
 
 /// Utility for recoding Lens Overlay metrics.
 @property(nonatomic, weak) LensOverlayMetricsRecorder* metricsRecorder;

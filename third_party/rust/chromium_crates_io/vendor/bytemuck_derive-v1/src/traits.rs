@@ -80,7 +80,7 @@ impl Derivable for Pod {
     match &input.data {
       Data::Struct(_) => {
         let assert_no_padding = if !completly_packed {
-          Some(generate_assert_no_padding(input, None)?)
+          Some(generate_assert_no_padding(input, None, "Pod")?)
         } else {
           None
         };
@@ -263,7 +263,8 @@ impl Derivable for NoUninit {
 
     match &input.data {
       Data::Struct(DataStruct { .. }) => {
-        let assert_no_padding = generate_assert_no_padding(&input, None)?;
+        let assert_no_padding =
+          generate_assert_no_padding(&input, None, "NoUninit")?;
         let assert_fields_are_no_padding = generate_fields_are_trait(
           &input,
           None,
@@ -281,7 +282,7 @@ impl Derivable for NoUninit {
           // There's `#[repr(C)]`/`[repr(C, int)]` and `#[repr(int)]`.
           // `#[repr(C)]` is equivalent to a struct containing the discriminant
           // and a union of structs representing each variant's fields.
-          // `#[repr(C)]` is equivalent to a union containing structs of the
+          // `#[repr(int)]` is equivalent to a union containing structs of the
           // discriminant and the fields.
           //
           // See https://doc.rust-lang.org/reference/type-layout.html#r-layout.repr.c.adt
@@ -312,7 +313,7 @@ impl Derivable for NoUninit {
             .iter()
             .map(|variant| {
               let assert_no_padding =
-                generate_assert_no_padding(&input, Some(variant))?;
+                generate_assert_no_padding(&input, Some(variant), "NoUninit")?;
               let assert_fields_are_no_padding = generate_fields_are_trait(
                 &input,
                 Some(variant),
@@ -422,19 +423,29 @@ impl Derivable for CheckedBitPattern {
 
 pub struct TransparentWrapper;
 
+struct WrappedType {
+  wrapped_type: syn::Type,
+  /// Was the type given with a #[transparent(Type)] attribute.
+  explicit: bool,
+}
+
 impl TransparentWrapper {
-  fn get_wrapper_type(
+  fn get_wrapped_type(
     attributes: &[Attribute], fields: &Fields,
-  ) -> Option<TokenStream> {
-    let transparent_param = get_simple_attr(attributes, "transparent");
-    transparent_param.map(|ident| ident.to_token_stream()).or_else(|| {
+  ) -> Option<WrappedType> {
+    let transparent_param =
+      get_type_from_simple_attr(attributes, "transparent")
+        .map(|wrapped_type| WrappedType { wrapped_type, explicit: true });
+    transparent_param.or_else(|| {
       let mut types = get_field_types(&fields);
       let first_type = types.next();
       if let Some(_) = types.next() {
         // can't guess param type if there is more than one field
         return None;
       } else {
-        first_type.map(|ty| ty.to_token_stream())
+        first_type
+          .cloned()
+          .map(|wrapped_type| WrappedType { wrapped_type, explicit: false })
       }
     })
   }
@@ -444,15 +455,13 @@ impl Derivable for TransparentWrapper {
   fn ident(input: &DeriveInput, crate_name: &TokenStream) -> Result<syn::Path> {
     let fields = get_struct_fields(input)?;
 
-    let ty = match Self::get_wrapper_type(&input.attrs, &fields) {
-      Some(ty) => ty,
-      None => bail!(
-        "\
-        when deriving TransparentWrapper for a struct with more than one field \
-        you need to specify the transparent field using #[transparent(T)]\
-      "
-      ),
-    };
+    let WrappedType { wrapped_type: ty, .. } =
+      match Self::get_wrapped_type(&input.attrs, &fields) {
+        Some(ty) => ty,
+        None => bail!("when deriving TransparentWrapper for a struct with more \
+                       than one field, you need to specify the transparent field \
+                       using #[transparent(T)]"),
+      };
 
     Ok(syn::parse_quote!(#crate_name::TransparentWrapper<#ty>))
   }
@@ -463,19 +472,27 @@ impl Derivable for TransparentWrapper {
     let (impl_generics, _ty_generics, where_clause) =
       input.generics.split_for_impl();
     let fields = get_struct_fields(input)?;
-    let wrapped_type = match Self::get_wrapper_type(&input.attrs, &fields) {
-      Some(wrapped_type) => wrapped_type.to_string(),
-      None => unreachable!(), /* other code will already reject this derive */
-    };
+    let (wrapped_type, explicit) =
+      match Self::get_wrapped_type(&input.attrs, &fields) {
+        Some(WrappedType { wrapped_type, explicit }) => {
+          (wrapped_type.to_token_stream().to_string(), explicit)
+        }
+        None => unreachable!(), /* other code will already reject this derive */
+      };
     let mut wrapped_field_ty = None;
     let mut nonwrapped_field_tys = vec![];
     for field in fields.iter() {
       let field_ty = &field.ty;
       if field_ty.to_token_stream().to_string() == wrapped_type {
         if wrapped_field_ty.is_some() {
-          bail!(
-            "TransparentWrapper can only have one field of the wrapped type"
-          );
+          if explicit {
+            bail!("TransparentWrapper must have one field of the wrapped type. \
+                   The type given in `#[transparent(Type)]` must match tokenwise \
+                   with the type in the struct definition, not just be the same type. \
+                   You may be able to use a type alias to work around this limitation.");
+          } else {
+            bail!("TransparentWrapper must have one field of the wrapped type");
+          }
         }
         wrapped_field_ty = Some(field_ty);
       } else {
@@ -1046,7 +1063,7 @@ fn generate_checked_bit_pattern_enum_with_fields(
 /// the type is equal to the sum of the size of it's fields and discriminant
 /// (for enums, this must be asserted for each variant).
 fn generate_assert_no_padding(
-  input: &DeriveInput, enum_variant: Option<&Variant>,
+  input: &DeriveInput, enum_variant: Option<&Variant>, for_trait: &str,
 ) -> Result<TokenStream> {
   let struct_type = &input.ident;
   let fields = get_fields(input, enum_variant)?;
@@ -1073,10 +1090,14 @@ fn generate_assert_no_padding(
     quote!(0)
   };
 
-  Ok(quote! {const _: fn() = || {
-    #[doc(hidden)]
-    struct TypeWithoutPadding([u8; #size_sum]);
-    let _ = ::core::mem::transmute::<#struct_type, TypeWithoutPadding>;
+  let message =
+    format!("derive({for_trait}) was applied to a type with padding");
+
+  Ok(quote! {const _: () = {
+    assert!(
+        ::core::mem::size_of::<#struct_type>() == (#size_sum),
+        #message,
+    );
   };})
 }
 
@@ -1177,21 +1198,31 @@ fn generate_enum_discriminant(input: &DeriveInput) -> Result<TokenStream> {
   })
 }
 
-fn get_ident_from_stream(tokens: TokenStream) -> Option<Ident> {
-  match tokens.into_iter().next() {
-    Some(TokenTree::Group(group)) => get_ident_from_stream(group.stream()),
-    Some(TokenTree::Ident(ident)) => Some(ident),
-    _ => None,
+fn get_wrapped_type_from_stream(tokens: TokenStream) -> Option<syn::Type> {
+  let mut tokens = tokens.into_iter().peekable();
+  match tokens.peek() {
+    Some(TokenTree::Group(group)) => {
+      let res = get_wrapped_type_from_stream(group.stream());
+      tokens.next(); // remove the peeked token tree
+      match tokens.next() {
+        // If there were more tokens, the input was invalid
+        Some(_) => None,
+        None => res,
+      }
+    }
+    _ => syn::parse2(tokens.collect()).ok(),
   }
 }
 
-/// get a simple #[foo(bar)] attribute, returning "bar"
-fn get_simple_attr(attributes: &[Attribute], attr_name: &str) -> Option<Ident> {
+/// get a simple `#[foo(bar)]` attribute, returning `bar`
+fn get_type_from_simple_attr(
+  attributes: &[Attribute], attr_name: &str,
+) -> Option<syn::Type> {
   for attr in attributes {
     if let (AttrStyle::Outer, Meta::List(list)) = (&attr.style, &attr.meta) {
       if list.path.is_ident(attr_name) {
-        if let Some(ident) = get_ident_from_stream(list.tokens.clone()) {
-          return Some(ident);
+        if let Some(ty) = get_wrapped_type_from_stream(list.tokens.clone()) {
+          return Some(ty);
         }
       }
     }

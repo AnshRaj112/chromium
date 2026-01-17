@@ -30,7 +30,6 @@
 #import "ios/chrome/browser/feature_engagement/model/tracker_factory.h"
 #import "ios/chrome/browser/incognito_reauth/ui_bundled/features.h"
 #import "ios/chrome/browser/policy/model/policy_util.h"
-#import "ios/chrome/browser/settings/ui_bundled/privacy/privacy_guide/features.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
 #import "ios/chrome/browser/shared/model/prefs/browser_prefs.h"
@@ -64,13 +63,14 @@ BOOL DeviceSupportsAuthentication() {
 }
 
 std::unique_ptr<KeyedService> BuildFeatureEngagementMockTracker(
-    web::BrowserState* context) {
+    ProfileIOS* profile) {
   return std::make_unique<feature_engagement::test::MockTracker>();
 }
 
 class PrivacyTableViewControllerTest
     : public LegacyChromeTableViewControllerTest,
-      public testing::WithParamInterface<std::tuple<IncognitoModePrefs, bool>> {
+      public testing::WithParamInterface<
+          std::tuple<IncognitoModePrefs, bool, bool>> {
  protected:
   PrivacyTableViewControllerTest() {}
 
@@ -80,13 +80,13 @@ class PrivacyTableViewControllerTest
     TestProfileIOS::Builder builder;
     builder.AddTestingFactory(
         SyncServiceFactory::GetInstance(),
-        base::BindRepeating(
-            [](web::BrowserState*) -> std::unique_ptr<KeyedService> {
+        base::BindOnce(
+            [](ProfileIOS* profile) -> std::unique_ptr<KeyedService> {
               return std::make_unique<syncer::TestSyncService>();
             }));
     builder.AddTestingFactory(
         feature_engagement::TrackerFactory::GetInstance(),
-        base::BindRepeating(&BuildFeatureEngagementMockTracker));
+        base::BindOnce(&BuildFeatureEngagementMockTracker));
     profile_ = std::move(builder).Build();
 
     test_sync_service()->SetSignedOut();
@@ -105,7 +105,9 @@ class PrivacyTableViewControllerTest
             static_cast<int>(IncognitoModeAvailability())));
 
     feature_list_.InitWithFeatureStates(
-        {{kPrivacyGuideIos, YES}, {kIOSSoftLock, SoftLockEnabled()}});
+        {{kIOSSoftLock, SoftLockEnabled()},
+         {safe_browsing::kMovePasswordLeakDetectionToggleIos,
+          PasswordLeakCheckMoveEnabled()}});
   }
 
   void TearDown() override {
@@ -153,6 +155,8 @@ class PrivacyTableViewControllerTest
 
   bool SoftLockEnabled() { return std::get<1>(GetParam()); }
 
+  bool PasswordLeakCheckMoveEnabled() { return std::get<2>(GetParam()); }
+
   web::WebTaskEnvironment task_environment_;
   IOSChromeScopedTestingLocalState scoped_testing_local_state_;
   std::unique_ptr<TestProfileIOS> profile_;
@@ -169,9 +173,9 @@ TEST_P(PrivacyTableViewControllerTest, TestModel) {
   CheckController();
 
   int expectedNumberOfSections = 7;
-
-  // IncognitoInterstitial section.
-  expectedNumberOfSections++;
+  if (PasswordLeakCheckMoveEnabled()) {
+    expectedNumberOfSections += 1;
+  }
   EXPECT_EQ(expectedNumberOfSections, NumberOfSections());
 
   int currentSection = 0;
@@ -180,13 +184,6 @@ TEST_P(PrivacyTableViewControllerTest, TestModel) {
   CheckTextCellTextAndDetailText(
       l10n_util::GetNSString(IDS_IOS_CLEAR_BROWSING_DATA_TITLE), nil,
       currentSection, 0);
-
-  // PrivacyGuide section.
-  currentSection++;
-  EXPECT_EQ(1, NumberOfItemsInSection(currentSection));
-  CheckTextCellTextAndDetailText(
-      l10n_util::GetNSString(IDS_IOS_PRIVACY_GUIDE_TITLE), nil, currentSection,
-      0);
 
   // SafeBrowsing section.
   currentSection++;
@@ -200,6 +197,15 @@ TEST_P(PrivacyTableViewControllerTest, TestModel) {
   EXPECT_EQ(1, NumberOfItemsInSection(currentSection));
   CheckSwitchCellStateAndTextWithId(NO, IDS_IOS_SETTINGS_HTTPS_ONLY_MODE_TITLE,
                                     currentSection, 0);
+
+  // Password leak check section.
+  if (PasswordLeakCheckMoveEnabled()) {
+    currentSection++;
+    EXPECT_EQ(1, NumberOfItemsInSection(currentSection));
+    CheckSwitchCellStateAndTextWithId(
+        YES, IDS_IOS_SAFE_BROWSING_STANDARD_PROTECTION_LEAK_CHECK_TITLE,
+        currentSection, 0);
+  }
 
   // WebServices section.
   currentSection++;
@@ -264,7 +270,7 @@ TEST_P(PrivacyTableViewControllerTest, TestModel) {
 
   // Testing section index and text of the privacy footer.
   CheckSectionFooter(l10n_util::GetNSString(IDS_IOS_PRIVACY_SIGNED_OUT_FOOTER),
-                     /* section= */ expectedNumberOfSections - 1);
+                     /* section= */ NumberOfSections() - 1);
 }
 
 // Tests PrivacyTableViewController sets the correct privacy footer for a
@@ -274,14 +280,14 @@ TEST_P(PrivacyTableViewControllerTest, TestModelFooterSignedOut) {
   CheckController();
 
   int expectedNumberOfSections = 7;
-
-  // IncognitoInterstitial section.
-  expectedNumberOfSections++;
+  if (PasswordLeakCheckMoveEnabled()) {
+    expectedNumberOfSections += 1;
+  }
   EXPECT_EQ(expectedNumberOfSections, NumberOfSections());
 
   // Testing section index and text of the privacy footer.
   CheckSectionFooter(l10n_util::GetNSString(IDS_IOS_PRIVACY_SIGNED_OUT_FOOTER),
-                     /* section= */ expectedNumberOfSections - 1);
+                     /* section= */ NumberOfSections() - 1);
 }
 
 // Tests that the Enhanced Safe Browsing Inline Promo is triggered when a
@@ -316,5 +322,6 @@ INSTANTIATE_TEST_SUITE_P(
                          IncognitoModePrefs::kEnabled,
                          IncognitoModePrefs::kDisabled,
                          IncognitoModePrefs::kForced),
-                     /*softLockEnabled*/ testing::Bool()));
+                     /*softLockEnabled*/ testing::Bool(),
+                     /*passwordLeakCheckMoveEnabled*/ testing::Bool()));
 }  // namespace

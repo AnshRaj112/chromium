@@ -14,7 +14,9 @@
 #import "ios/chrome/browser/menu/ui_bundled/menu_histograms.h"
 #import "ios/chrome/browser/net/model/crurl.h"
 #import "ios/chrome/browser/shared/model/web_state_list/tab_group.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
+#import "ios/chrome/grit/ios_branded_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "testing/gmock/include/gmock/gmock.h"
 #import "testing/gtest/include/gtest/gtest.h"
@@ -364,8 +366,12 @@ TEST_F(ActionFactoryTest, CloseAllTabsAction) {
 
   UIImage* expectedImage =
       DefaultSymbolWithPointSize(kXMarkSymbol, kSymbolActionPointSize);
-  NSString* expectedTitle =
-      l10n_util::GetNSString(IDS_IOS_CONTENT_CONTEXT_CLOSEALLTABSANDGROUPS);
+
+  int titleID = base::FeatureList::IsEnabled(kTabSwitcherOverflowMenu)
+                    ? IDS_IOS_INACTIVE_TABS_CLOSE_ALL_CONFIRMATION_OPTION
+                    : IDS_IOS_CONTENT_CONTEXT_CLOSEALLTABSANDGROUPS;
+
+  NSString* expectedTitle = l10n_util::GetNSString(titleID);
 
   UIAction* action = [factory actionToCloseAllTabsWithBlock:^{
   }];
@@ -677,4 +683,18 @@ TEST_F(ActionFactoryTest, DeleteSharedTabGroup) {
   EXPECT_NSEQ(expectedTitle, action.title);
   EXPECT_EQ(expectedImage, action.image);
   EXPECT_EQ(UIMenuElementAttributesDestructive, action.attributes);
+}
+
+// Tests that the open image in Gemini action has the correct attributes.
+TEST_F(ActionFactoryTest, OpenImageInGemini) {
+  ActionFactory* factory =
+      [[ActionFactory alloc] initWithScenario:kTestMenuScenario];
+
+  NSString* expectedTitle =
+      l10n_util::GetNSString(IDS_IOS_GEMINI_IMAGE_CONTEXT_MENU_ENTRY_POINT);
+
+  UIAction* action = [factory actionToOpenImageInGeminiWithBlock:nil];
+
+  EXPECT_NSEQ(expectedTitle, action.title);
+  EXPECT_NE(nil, action.image);
 }

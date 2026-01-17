@@ -60,12 +60,15 @@ class OpenXrViewProperties {
   uint32_t Height() const;
   uint32_t RecommendedSwapchainSampleCount() const;
   uint32_t MaxSwapchainSampleCount() const;
+  float RecommendedViewportScale() const;
 
   XrViewConfigurationView GetPropertiesForTest() const {
     return xr_properties_;
   }
 
  private:
+  uint32_t ClampWidth(uint32_t val) const;
+  uint32_t ClampHeight(uint32_t val) const;
   XrViewConfigurationView xr_properties_;
 
   // Because our textures are created as single side-by-side textures, this
@@ -111,9 +114,6 @@ class OpenXrViewConfiguration {
   const std::vector<XrView>& Views() const;
   void SetViews(std::vector<XrView> views);
 
-  const std::vector<XrCompositionLayerProjectionView>& ProjectionViews() const;
-  XrCompositionLayerProjectionView& GetProjectionView(uint32_t view_index);
-
   bool CanEnableAntiAliasing() const;
 
  private:
@@ -128,7 +128,6 @@ class OpenXrViewConfiguration {
   std::vector<OpenXrViewProperties> properties_;
 
   std::vector<XrView> local_from_view_;
-  std::vector<XrCompositionLayerProjectionView> projection_views_;
 };
 
 }  // namespace device

@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include "base/task/single_thread_task_runner.h"
 #include "third_party/blink/public/platform/browser_interface_broker_proxy.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_background_fetch_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_image_resource.h"
@@ -59,19 +60,19 @@ void BackgroundFetchBridge::Fetch(
     const SkBitmap& icon,
     mojom::blink::BackgroundFetchUkmDataPtr ukm_data,
     RegistrationCallback callback) {
-  GetService()->Fetch(GetSupplementable()->RegistrationId(), developer_id,
-                      std::move(requests), std::move(options), icon,
-                      std::move(ukm_data),
-                      WTF::BindOnce(&BackgroundFetchBridge::DidGetRegistration,
-                                    WrapPersistent(this), std::move(callback)));
+  GetService()->Fetch(
+      GetSupplementable()->RegistrationId(), developer_id, std::move(requests),
+      std::move(options), icon, std::move(ukm_data),
+      blink::BindOnce(&BackgroundFetchBridge::DidGetRegistration,
+                      WrapPersistent(this), std::move(callback)));
 }
 
 void BackgroundFetchBridge::GetRegistration(const String& developer_id,
                                             RegistrationCallback callback) {
   GetService()->GetRegistration(
       GetSupplementable()->RegistrationId(), developer_id,
-      WTF::BindOnce(&BackgroundFetchBridge::DidGetRegistration,
-                    WrapPersistent(this), std::move(callback)));
+      blink::BindOnce(&BackgroundFetchBridge::DidGetRegistration,
+                      WrapPersistent(this), std::move(callback)));
 }
 
 void BackgroundFetchBridge::DidGetRegistration(

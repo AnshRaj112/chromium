@@ -5,7 +5,7 @@
 #ifndef COMPONENTS_VISITED_URL_RANKING_INTERNAL_URL_GROUPING_TAB_EVENT_TRACKER_IMPL_H_
 #define COMPONENTS_VISITED_URL_RANKING_INTERNAL_URL_GROUPING_TAB_EVENT_TRACKER_IMPL_H_
 
-#include "base/functional/callback_forward.h"
+#include "base/functional/callback.h"
 #include "base/time/time.h"
 #include "components/visited_url_ranking/public/url_grouping/tab_event_tracker.h"
 #include "ui/base/page_transition_types.h"
@@ -30,7 +30,7 @@ class TabEventTrackerImpl : public TabEventTracker {
   void DidAddTab(int tab_id, int tab_launch_type) override;
   void DidSelectTab(int tab_id,
                     const GURL& url,
-                    TabSelectionType tab_selection_type,
+                    TabSelectionCause tab_selection_cause,
                     int last_tab_id) override;
   void WillCloseTab(int tab_id) override;
   void TabClosureUndone(int tab_id) override;
@@ -46,12 +46,12 @@ class TabEventTrackerImpl : public TabEventTracker {
   struct TabSelection {
     TabSelection();
     TabSelection(int tab_id,
-                 TabSelectionType tab_selection_type,
+                 TabSelectionCause tab_selection_cause,
                  base::Time time);
     ~TabSelection();
 
     int tab_id{-1};
-    TabSelectionType tab_selection_type{TabSelectionType::kUnknown};
+    TabSelectionCause tab_selection_cause{TabSelectionCause::kUnknown};
     base::Time time;
     // Whether this selection has been committed to the the TabEventTracker to
     // store.

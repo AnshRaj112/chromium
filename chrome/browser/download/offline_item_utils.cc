@@ -9,6 +9,7 @@
 #include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/download/public/common/download_item_impl.h"
 #include "components/download/public/common/download_utils.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/download_item_utils.h"
@@ -260,6 +261,8 @@ std::u16string OfflineItemUtils::GetFailStateMessage(FailState fail_state) {
     case FailState::FILE_TRANSIENT_ERROR:
       string_id = IDS_DOWNLOAD_INTERRUPTED_STATUS_TEMPORARY_PROBLEM;
       break;
+    // TODO(alshawwa): add custom local download blocked string
+    case FailState::LOCAL_DOWNLOAD_BLOCKED:
     case FailState::FILE_BLOCKED:
       string_id = IDS_DOWNLOAD_INTERRUPTED_STATUS_BLOCKED;
       break;

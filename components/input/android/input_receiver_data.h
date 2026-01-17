@@ -35,6 +35,9 @@ class COMPONENT_EXPORT(INPUT) InputReceiverData
   // AndroidInputCallback::Observer:
   void OnMotionEvent(
       const base::android::ScopedInputEvent& input_event) override;
+  // InputReceiverData owns the AndroidInputCallback, so it's responsible for
+  // its destruction.
+  void OnCallbackDestroyed() override {}
 
   // `receiver` is only set for Android 16+, where the receiver could be either
   // destroyed right away or waits for touch sequence to have finished before
@@ -73,8 +76,7 @@ class COMPONENT_EXPORT(INPUT) InputReceiverData
   ScopedInputReceiver receiver_;
   ScopedInputTransferToken viz_input_token_;
   bool pending_destruction_ = false;
-  int last_motion_event_action_ = -1;
-  base::TimeTicks last_motion_event_ts_;
+  bool has_seen_events_ = false;
   base::WeakPtrFactory<InputReceiverData> weak_ptr_factory_{this};
 };
 

@@ -11,16 +11,22 @@
 #include <type_traits>
 #include <vector>
 
-#include "base/metrics/field_trial_params.h"
+#include "base/base64.h"
+#include "base/strings/strcat.h"
 #include "base/test/test_future.h"
 #include "base/time/time.h"
-#include "chrome/browser/actor/task_id.h"
+#include "base/types/expected.h"
+#include "chrome/browser/actor/execution_engine.h"
+#include "chrome/browser/actor/tools/media_control_tool_request.h"
 #include "chrome/browser/actor/tools/tool_request.h"
 #include "chrome/browser/actor/ui/event_dispatcher.h"
 #include "chrome/common/actor.mojom-forward.h"
+#include "chrome/common/actor/action_result.h"
+#include "chrome/common/actor/task_id.h"
 #include "components/optimization_guide/proto/features/actions_data.pb.h"
 #include "components/sessions/core/session_id.h"
 #include "components/tabs/public/tab_interface.h"
+#include "third_party/protobuf/src/google/protobuf/descriptor.h"
 #include "ui/gfx/geometry/point.h"
 
 namespace base {
@@ -46,50 +52,89 @@ auto UiEventDispatcherCallback(
   };
 }
 
+using ActResultFuture =
+    base::test::TestFuture<mojom::ActionResultPtr,
+                           std::optional<size_t>,
+                           std::vector<ActionResultWithLatencyInfo>>;
+using PerformActionsFuture =
+    base::test::TestFuture<mojom::ActionResultCode,
+                           std::optional<size_t>,
+                           std::vector<ActionResultWithLatencyInfo>>;
+
 /////////////////////////
 // Proto action makers
 
-optimization_guide::proto::BrowserAction MakeClick(
-    content::RenderFrameHost& rfh,
-    int content_node_id);
-optimization_guide::proto::BrowserAction MakeClick(
-    tabs::TabHandle tab_handle,
-    const gfx::Point& click_point);
-optimization_guide::proto::BrowserAction MakeHistoryBack(
-    tabs::TabHandle tab_handle);
-optimization_guide::proto::BrowserAction MakeHistoryForward(
-    tabs::TabHandle tab_handle);
-optimization_guide::proto::BrowserAction MakeMouseMove(
-    content::RenderFrameHost& rfh,
-    int content_node_id);
-optimization_guide::proto::BrowserAction MakeMouseMove(
-    const gfx::Point& move_point);
-optimization_guide::proto::BrowserAction MakeNavigate(
-    tabs::TabHandle tab_handle,
-    std::string_view target_url);
-optimization_guide::proto::BrowserAction MakeCreateTab(SessionID window_id,
-                                                       bool foreground);
-optimization_guide::proto::BrowserAction MakeType(content::RenderFrameHost& rfh,
-                                                  int content_node_id,
-                                                  std::string_view text,
-                                                  bool follow_by_enter);
-optimization_guide::proto::BrowserAction MakeType(const gfx::Point& type_point,
-                                                  std::string_view text,
-                                                  bool follow_by_enter);
-optimization_guide::proto::BrowserAction MakeSelect(
+optimization_guide::proto::Actions MakeClick(
     content::RenderFrameHost& rfh,
     int content_node_id,
-    std::string_view value);
-optimization_guide::proto::BrowserAction MakeScroll(
+    optimization_guide::proto::ClickAction::ClickType click_type,
+    optimization_guide::proto::ClickAction::ClickCount click_count);
+optimization_guide::proto::Actions MakeClick(
+    tabs::TabHandle tab_handle,
+    const gfx::Point& click_point,
+    optimization_guide::proto::ClickAction::ClickType click_type,
+    optimization_guide::proto::ClickAction::ClickCount click_count);
+optimization_guide::proto::Actions MakeHistoryBack(tabs::TabHandle tab_handle);
+optimization_guide::proto::Actions MakeHistoryForward(
+    tabs::TabHandle tab_handle);
+optimization_guide::proto::Actions MakeMouseMove(content::RenderFrameHost& rfh,
+                                                 int content_node_id);
+optimization_guide::proto::Actions MakeMouseMove(tabs::TabHandle tab_handle,
+                                                 const gfx::Point& move_point);
+optimization_guide::proto::Actions MakeNavigate(tabs::TabHandle tab_handle,
+                                                std::string_view target_url);
+optimization_guide::proto::Actions MakeCreateTab(SessionID window_id,
+                                                 bool foreground);
+optimization_guide::proto::Actions MakeActivateWindow(SessionID window_id);
+optimization_guide::proto::Actions MakeCreateWindow();
+optimization_guide::proto::Actions MakeCloseWindow(SessionID window_id);
+
+optimization_guide::proto::Actions MakeType(
+    content::RenderFrameHost& rfh,
+    int content_node_id,
+    std::string_view text,
+    bool follow_by_enter,
+    optimization_guide::proto::TypeAction::TypeMode mode =
+        optimization_guide::proto::TypeAction_TypeMode_DELETE_EXISTING);
+optimization_guide::proto::Actions MakeType(
+    tabs::TabHandle tab_handle,
+    const gfx::Point& type_point,
+    std::string_view text,
+    bool follow_by_enter,
+    optimization_guide::proto::TypeAction::TypeMode mode =
+        optimization_guide::proto::TypeAction_TypeMode_DELETE_EXISTING);
+optimization_guide::proto::Actions MakeSelect(content::RenderFrameHost& rfh,
+                                              int content_node_id,
+                                              std::string_view value);
+optimization_guide::proto::Actions MakeScroll(
     content::RenderFrameHost& rfh,
     std::optional<int> content_node_id,
     float scroll_offset_x,
     float scroll_offset_y);
-optimization_guide::proto::BrowserAction MakeDragAndRelease(
+optimization_guide::proto::Actions MakeScroll(content::RenderFrameHost& rfh,
+                                              const gfx::Point& scroll_point,
+                                              float scroll_offset_x,
+                                              float scroll_offset_y);
+optimization_guide::proto::Actions MakeScrollTo(content::RenderFrameHost& rfh,
+                                                int content_node_id);
+optimization_guide::proto::Actions MakeDragAndRelease(
+    tabs::TabHandle tab_handle,
     const gfx::Point& from_point,
     const gfx::Point& to_point);
-optimization_guide::proto::BrowserAction MakeWait();
-optimization_guide::proto::BrowserAction MakeAttemptLogin();
+optimization_guide::proto::Actions MakeDragAndRelease(
+    content::RenderFrameHost& rfh,
+    int from_node_id,
+    int to_node_id);
+optimization_guide::proto::Actions MakeWait(
+    std::optional<base::TimeDelta> duration = std::nullopt,
+    std::optional<tabs::TabHandle> observe_tab_handle = std::nullopt);
+optimization_guide::proto::Actions MakeAttemptLogin();
+optimization_guide::proto::Actions MakeScriptTool(
+    content::RenderFrameHost& rfh,
+    const std::string& name,
+    const std::string& input_arguments);
+optimization_guide::proto::Actions MakeMediaControl(tabs::TabHandle tab_handle,
+                                                    MediaControl media_control);
 
 /////////////////////////
 // ToolRequest action makers
@@ -122,14 +167,24 @@ std::unique_ptr<ToolRequest> MakeScrollRequest(
     std::optional<int> content_node_id,
     float scroll_offset_x,
     float scroll_offset_y);
+std::unique_ptr<ToolRequest> MakeScrollToRequest(content::RenderFrameHost& rfh,
+                                                 int content_node_id);
 std::unique_ptr<ToolRequest> MakeDragAndReleaseRequest(
     tabs::TabInterface& tab,
     const gfx::Point& from_point,
     const gfx::Point& to_point);
-std::unique_ptr<ToolRequest> MakeWaitRequest();
+std::unique_ptr<ToolRequest> MakeWaitRequest(
+    tabs::TabInterface* observe_tab = nullptr);
 std::unique_ptr<ToolRequest> MakeCreateTabRequest(SessionID window_id,
                                                   bool foreground);
 std::unique_ptr<ToolRequest> MakeAttemptLoginRequest(tabs::TabInterface& tab);
+std::unique_ptr<ToolRequest> MakeScriptToolRequest(
+    content::RenderFrameHost& rfh,
+    const std::string& name,
+    const std::string& input_arguments);
+std::unique_ptr<ToolRequest> MakeMediaControlRequest(
+    tabs::TabInterface& tab,
+    MediaControl media_control);
 
 // A helper to create a vector of ToolRequests suitable for passing to
 // ExecutionEngine::Act. Note that this will necessarily move the ToolRequest
@@ -158,15 +213,56 @@ std::vector<std::unique_ptr<ToolRequest>> ToRequestList(T&& first,
 }
 
 void ExpectOkResult(const mojom::ActionResult& result);
-void ExpectOkResult(base::test::TestFuture<mojom::ActionResultPtr,
-                                           std::optional<size_t>>& future);
-void ExpectErrorResult(base::test::TestFuture<mojom::ActionResultPtr,
-                                              std::optional<size_t>>& future,
+void ExpectOkResult(base::test::TestFuture<mojom::ActionResultPtr>& future);
+void ExpectOkResult(ActResultFuture& future);
+void ExpectErrorResult(ActResultFuture& future,
                        mojom::ActionResultCode expected_code);
+void ExpectOkResult(PerformActionsFuture& future);
+void ExpectErrorResult(PerformActionsFuture& future,
+                       mojom::ActionResultCode expected_code);
+void PrintTo(const mojom::ActionResultCode& code, std::ostream* os);
 
 // Sets up GLIC_ACTION_PAGE_BLOCK to block the given host.
 void SetUpBlocklist(base::CommandLine* command_line,
                     const std::string& blocked_host);
+
+// For tests with link pages whose destination is encoded in URL parameters.
+std::string EncodeURI(const std::string& component);
+
+// Helper to parse a Base64 string into a protobuf of type `ProtoType`.
+template <typename ProtoType>
+base::expected<ProtoType, std::string> ParseBase64Proto(
+    std::string_view base64_string) {
+  std::string decoded_result;
+  if (!base::Base64Decode(base64_string, &decoded_result)) {
+    return base::unexpected(
+        base::StrCat({"Failed to Base64-decode the result (", base64_string,
+                      ") from JavaScript."}));
+  }
+  ProtoType proto_result;
+  proto_result.ParseFromString(decoded_result);
+  return base::ok(proto_result);
+}
+
+// Helper used to wait on an ExecutionEngine state transition. The provided
+// callback is synchronously invoked when ExecutionEngine transitions to the
+// target state.
+class ExecutionEngineStateWaiter : public ExecutionEngine::StateObserver {
+ public:
+  ExecutionEngineStateWaiter(base::OnceClosure callback,
+                             ExecutionEngine& execution_engine,
+                             ExecutionEngine::State target_state);
+  ~ExecutionEngineStateWaiter() override;
+
+  // `ExecutionEngine::StateObserver`:
+  void OnStateChanged(ExecutionEngine::State old_state,
+                      ExecutionEngine::State new_state) override;
+
+ private:
+  base::OnceClosure callback_;
+  const base::WeakPtr<ExecutionEngine> execution_engine_;
+  ExecutionEngine::State target_state_;
+};
 
 }  // namespace actor
 

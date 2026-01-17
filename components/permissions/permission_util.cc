@@ -4,10 +4,10 @@
 
 #include "components/permissions/permission_util.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
@@ -79,19 +79,19 @@ constexpr const char* kIsFileURLHistogram =
 
 RequestTypeForUma GetUmaValueForRequests(const RequestType first_request) {
   if (
-#if !BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
       first_request == RequestType::kCameraPanTiltZoom ||
-#endif
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
       first_request == RequestType::kCameraStream ||
       first_request == RequestType::kMicStream) {
     return RequestTypeForUma::MULTIPLE_AUDIO_AND_VIDEO_CAPTURE;
   }
-#if !BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   if (first_request == RequestType::kKeyboardLock ||
       first_request == RequestType::kPointerLock) {
     return RequestTypeForUma::MULTIPLE_KEYBOARD_AND_POINTER_LOCK;
   }
-#endif
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   return RequestTypeForUma::UNKNOWN;
 }
 
@@ -103,7 +103,7 @@ std::string PermissionUtil::GetPermissionString(
     ContentSettingsType content_type) {
   PermissionType permission;
   bool success = PermissionUtil::GetPermissionType(content_type, &permission);
-  DCHECK(success);
+  DCHECK(success) << content_type;
 
   return blink::GetPermissionString(permission);
 }
@@ -133,57 +133,61 @@ RequestTypeForUma PermissionUtil::GetUmaValueForRequestType(
   switch (request_type) {
     case RequestType::kArSession:
       return RequestTypeForUma::PERMISSION_AR;
-#if !BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     case RequestType::kCameraPanTiltZoom:
       return RequestTypeForUma::PERMISSION_CAMERA_PAN_TILT_ZOOM;
-#endif
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     case RequestType::kCameraStream:
       return RequestTypeForUma::PERMISSION_MEDIASTREAM_CAMERA;
     case RequestType::kClipboard:
       return RequestTypeForUma::PERMISSION_CLIPBOARD_READ_WRITE;
     case RequestType::kDiskQuota:
       return RequestTypeForUma::QUOTA;
-#if !BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     // TODO(crbug.com/40214907): Enable on Android
     case RequestType::kLocalFonts:
       return RequestTypeForUma::PERMISSION_LOCAL_FONTS;
-#endif
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     case RequestType::kLocalNetworkAccess:
       return RequestTypeForUma::PERMISSION_LOCAL_NETWORK_ACCESS;
+    case RequestType::kLocalNetwork:
+      return RequestTypeForUma::PERMISSION_LOCAL_NETWORK;
+    case RequestType::kLoopbackNetwork:
+      return RequestTypeForUma::PERMISSION_LOOPBACK_NETWORK;
     case RequestType::kGeolocation:
       return RequestTypeForUma::PERMISSION_GEOLOCATION;
     case RequestType::kHandTracking:
       return RequestTypeForUma::PERMISSION_HAND_TRACKING;
     case RequestType::kIdleDetection:
       return RequestTypeForUma::PERMISSION_IDLE_DETECTION;
-#if !BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     case RequestType::kKeyboardLock:
       return RequestTypeForUma::PERMISSION_KEYBOARD_LOCK;
-#endif
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     case RequestType::kMicStream:
       return RequestTypeForUma::PERMISSION_MEDIASTREAM_MIC;
     case RequestType::kMidiSysex:
       return RequestTypeForUma::PERMISSION_MIDI_SYSEX;
     case RequestType::kMultipleDownloads:
       return RequestTypeForUma::DOWNLOAD;
-#if BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
     case RequestType::kNfcDevice:
       return RequestTypeForUma::PERMISSION_NFC;
-#endif
-#if !BUILDFLAG(IS_ANDROID)
+#endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     case RequestType::kPointerLock:
       return RequestTypeForUma::PERMISSION_POINTER_LOCK;
-#endif
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     case RequestType::kNotifications:
       return RequestTypeForUma::PERMISSION_NOTIFICATIONS;
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_WIN)
     case RequestType::kProtectedMediaIdentifier:
       return RequestTypeForUma::PERMISSION_PROTECTED_MEDIA_IDENTIFIER;
 #endif
-#if !BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     case RequestType::kRegisterProtocolHandler:
       return RequestTypeForUma::REGISTER_PROTOCOL_HANDLER;
-#endif
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 #if BUILDFLAG(IS_CHROMEOS)
     case RequestType::kSmartCard:
       return RequestTypeForUma::PERMISSION_SMART_CARD;
@@ -202,12 +206,12 @@ RequestTypeForUma PermissionUtil::GetUmaValueForRequestType(
       return RequestTypeForUma::PERMISSION_TOP_LEVEL_STORAGE_ACCESS;
     case RequestType::kFileSystemAccess:
       return RequestTypeForUma::PERMISSION_FILE_SYSTEM_ACCESS;
-#if !BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     case RequestType::kCapturedSurfaceControl:
       return RequestTypeForUma::CAPTURED_SURFACE_CONTROL;
     case RequestType::kWebAppInstallation:
       return RequestTypeForUma::PERMISSION_WEB_APP_INSTALLATION;
-#endif
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     case RequestType::kIdentityProvider:
       return RequestTypeForUma::PERMISSION_IDENTITY_PROVIDER;
   }
@@ -233,11 +237,21 @@ bool PermissionUtil::GetPermissionType(ContentSettingsType type,
                                        PermissionType* out) {
   switch (type) {
     case ContentSettingsType::GEOLOCATION:
-      *out = PermissionType::GEOLOCATION;
-      break;
+      if (!base::FeatureList::IsEnabled(
+              content_settings::features::kApproximateGeolocationPermission)) {
+        *out = PermissionType::GEOLOCATION;
+        break;
+      } else {
+        return false;
+      }
     case ContentSettingsType::GEOLOCATION_WITH_OPTIONS:
-      *out = PermissionType::GEOLOCATION;
-      break;
+      if (base::FeatureList::IsEnabled(
+              content_settings::features::kApproximateGeolocationPermission)) {
+        *out = PermissionType::GEOLOCATION;
+        break;
+      } else {
+        return false;
+      }
     case ContentSettingsType::NOTIFICATIONS:
       *out = PermissionType::NOTIFICATIONS;
       break;
@@ -349,6 +363,12 @@ bool PermissionUtil::GetPermissionType(ContentSettingsType type,
     case ContentSettingsType::LOCAL_NETWORK_ACCESS:
       *out = PermissionType::LOCAL_NETWORK_ACCESS;
       break;
+    case ContentSettingsType::LOCAL_NETWORK:
+      *out = PermissionType::LOCAL_NETWORK;
+      break;
+    case ContentSettingsType::LOOPBACK_NETWORK:
+      *out = PermissionType::LOOPBACK_NETWORK;
+      break;
     default:
       return false;
   }
@@ -368,7 +388,9 @@ bool PermissionUtil::IsLowPriorityPermissionRequest(
 
 bool PermissionUtil::ShouldCurrentRequestUsePermissionElementSecondaryUI(
     PermissionPrompt::Delegate* delegate) {
-  if (!base::FeatureList::IsEnabled(blink::features::kPermissionElement)) {
+  if (!base::FeatureList::IsEnabled(blink::features::kPermissionElement) &&
+      !base::FeatureList::IsEnabled(blink::features::kGeolocationElement) &&
+      !base::FeatureList::IsEnabled(blink::features::kUserMediaElement)) {
     return false;
   }
 
@@ -402,12 +424,13 @@ bool PermissionUtil::IsGuardContentSetting(ContentSettingsType type) {
 }
 
 bool PermissionUtil::DoesSupportTemporaryGrants(ContentSettingsType type) {
-  return base::Contains(content_settings::GetTypesWithTemporaryGrants(), type);
+  return std::ranges::contains(content_settings::GetTypesWithTemporaryGrants(),
+                               type);
 }
 
 bool PermissionUtil::DoesStoreTemporaryGrantsInHcsm(ContentSettingsType type) {
-  return base::Contains(content_settings::GetTypesWithTemporaryGrantsInHcsm(),
-                        type);
+  return std::ranges::contains(
+      content_settings::GetTypesWithTemporaryGrantsInHcsm(), type);
 }
 
 // Due to dependency issues, this method is duplicated in
@@ -451,6 +474,7 @@ ContentSettingsType PermissionUtil::PermissionTypeToContentSettingsTypeSafe(
     case PermissionType::NOTIFICATIONS:
       return ContentSettingsType::NOTIFICATIONS;
     case PermissionType::GEOLOCATION:
+    case PermissionType::GEOLOCATION_APPROXIMATE:
       return base::FeatureList::IsEnabled(
                  content_settings::features::kApproximateGeolocationPermission)
                  ? ContentSettingsType::GEOLOCATION_WITH_OPTIONS
@@ -526,6 +550,10 @@ ContentSettingsType PermissionUtil::PermissionTypeToContentSettingsTypeSafe(
       return ContentSettingsType::WEB_APP_INSTALLATION;
     case PermissionType::LOCAL_NETWORK_ACCESS:
       return ContentSettingsType::LOCAL_NETWORK_ACCESS;
+    case PermissionType::LOCAL_NETWORK:
+      return ContentSettingsType::LOCAL_NETWORK;
+    case PermissionType::LOOPBACK_NETWORK:
+      return ContentSettingsType::LOOPBACK_NETWORK;
     case PermissionType::NUM:
       break;
   }
@@ -666,21 +694,24 @@ bool PermissionUtil::HasUserGesture(PermissionPrompt::Delegate* delegate) {
 bool PermissionUtil::CanPermissionRequestIgnoreStatus(
     const std::unique_ptr<PermissionRequestData>& request,
     content::PermissionStatusSource source) {
-  if (!request->embedded_permission_element_initiated) {
+  if (!request->IsEmbeddedPermissionElementInitiated()) {
     return false;
   }
 
   switch (source) {
     case content::PermissionStatusSource::KILL_SWITCH:
+    case content::PermissionStatusSource::ACTOR_OVERRIDE:
     case content::PermissionStatusSource::FEATURE_POLICY:
     case content::PermissionStatusSource::FENCED_FRAME:
     case content::PermissionStatusSource::INSECURE_ORIGIN:
     case content::PermissionStatusSource::VIRTUAL_URL_DIFFERENT_ORIGIN:
+    case content::PermissionStatusSource::HEURISTIC_GRANT:
       return false;
     case content::PermissionStatusSource::MULTIPLE_DISMISSALS:
     case content::PermissionStatusSource::MULTIPLE_IGNORES:
     case content::PermissionStatusSource::RECENT_DISPLAY:
     case content::PermissionStatusSource::UNSPECIFIED:
+    case content::PermissionStatusSource::APP_LEVEL_SETTINGS:
       return true;
   }
 
@@ -689,11 +720,21 @@ bool PermissionUtil::CanPermissionRequestIgnoreStatus(
 
 // static
 bool PermissionUtil::DoesPlatformSupportChip() {
-#if BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
   return false;
 #else
   return true;
-#endif
+#endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+}
+
+// static
+ContentSettingsType PermissionUtil::GetGeolocationType() {
+  if (base::FeatureList::IsEnabled(
+          content_settings::features::kApproximateGeolocationPermission)) {
+    return ContentSettingsType::GEOLOCATION_WITH_OPTIONS;
+  } else {
+    return ContentSettingsType::GEOLOCATION;
+  }
 }
 
 }  // namespace permissions

@@ -114,14 +114,15 @@ void SliderThumbElement::SetPositionFromPoint(const PhysicalOffset& point) {
   PhysicalOffset thumb_offset =
       thumb_box->LocalToAncestorPoint(PhysicalOffset(), input_box) -
       track_box->LocalToAncestorPoint(PhysicalOffset(), input_box);
+  PhysicalSize size = thumb_box->StitchedSize();
   if (!writing_direction.IsHorizontal()) {
-    track_size = track_box->ContentHeight() - thumb_box->Size().height;
-    position = point_in_track.top - thumb_box->Size().height / 2;
+    track_size = track_box->ContentHeight() - size.height;
+    position = point_in_track.top - size.height / 2;
     position -= is_flipped ? thumb_box->MarginBottom() : thumb_box->MarginTop();
     current_position = thumb_offset.top;
   } else {
-    track_size = track_box->ContentWidth() - thumb_box->Size().width;
-    position = point_in_track.left - thumb_box->Size().width / 2;
+    track_size = track_box->ContentWidth() - size.width;
+    position = point_in_track.left - size.width / 2;
     position -= is_flipped ? thumb_box->MarginRight() : thumb_box->MarginLeft();
     current_position = thumb_offset.left;
   }
@@ -407,7 +408,11 @@ bool SliderContainerElement::CanSlide() {
       }
     }
   }
-  bool is_horizontal = GetComputedStyle()->IsHorizontalWritingMode();
+  const ComputedStyle* container_style = GetComputedStyle();
+  if (!container_style) {
+    return false;
+  }
+  bool is_horizontal = container_style->IsHorizontalWritingMode();
   if ((sliding_direction_ == Direction::kVertical && is_horizontal) ||
       (sliding_direction_ == Direction::kHorizontal && !is_horizontal)) {
     return false;
@@ -448,6 +453,7 @@ void SliderContainerElement::UpdateTouchEventHandlerRegistry() {
 }
 
 void SliderContainerElement::DidMoveToNewDocument(Document& old_document) {
+  has_touch_event_handler_ = false;
   UpdateTouchEventHandlerRegistry();
   HTMLElement::DidMoveToNewDocument(old_document);
 }

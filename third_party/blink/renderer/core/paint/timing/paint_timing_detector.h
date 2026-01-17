@@ -10,6 +10,7 @@
 #include "base/time/time.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/renderer/core/core_export.h"
+#include "third_party/blink/renderer/core/paint/timing/largest_contentful_paint_calculator.h"
 #include "third_party/blink/renderer/core/paint/timing/lcp_objects.h"
 #include "third_party/blink/renderer/core/paint/timing/paint_timing_visualizer.h"
 #include "third_party/blink/renderer/core/scroll/scroll_types.h"
@@ -23,7 +24,6 @@ namespace blink {
 class Image;
 class ImagePaintTimingDetector;
 class ImageResourceContent;
-class LargestContentfulPaintCalculator;
 class LayoutBoxModelObject;
 class LayoutObject;
 class LocalFrameView;
@@ -44,7 +44,8 @@ class StyleImage;
 // See also:
 // https://bit.ly/lcp-explainer
 class CORE_EXPORT PaintTimingDetector
-    : public GarbageCollected<PaintTimingDetector> {
+    : public GarbageCollected<PaintTimingDetector>,
+      public LargestContentfulPaintCalculator::Delegate {
   friend class ImagePaintTimingDetectorTest;
   friend class TextPaintTimingDetectorTest;
 
@@ -81,6 +82,17 @@ class CORE_EXPORT PaintTimingDetector
   // is attributable to an interaction.
   static void NotifyInteractionTriggeredVideoSrcChange(const LayoutObject&);
 
+  // LargestContentfulPaintCalculator::Delegate:
+  void EmitLcpPerformanceEntry(const DOMPaintTimingInfo& paint_timing_info,
+                               uint64_t paint_size,
+                               base::TimeTicks load_time,
+                               const AtomicString& id,
+                               const String& url,
+                               Element* element) override;
+  void OnLcpMetricsForReportingChanged() override;
+  bool IsHardNavigation() const override { return true; }
+  void Trace(Visitor* visitor) const override;
+
   void NotifyImageFinished(const LayoutObject&, const MediaTiming*);
   void LayoutObjectWillBeDestroyed(const LayoutObject&);
   void NotifyImageRemoved(const LayoutObject&, const ImageResourceContent*);
@@ -91,9 +103,7 @@ class CORE_EXPORT PaintTimingDetector
   void DidChangePerformanceTiming();
 
   inline static bool IsTracing() {
-    bool tracing_enabled;
-    TRACE_EVENT_CATEGORY_GROUP_ENABLED("loading", &tracing_enabled);
-    return tracing_enabled;
+    return TRACE_EVENT_CATEGORY_ENABLED("loading");
   }
 
   gfx::RectF BlinkSpaceToDIPs(const gfx::RectF& float_rect) const;
@@ -127,9 +137,7 @@ class CORE_EXPORT PaintTimingDetector
   // opacity layer.
   void ReportIgnoredContent();
 
-  std::optional<PaintTimingVisualizer>& Visualizer() { return visualizer_; }
-
-  void Trace(Visitor* visitor) const;
+  PaintTimingVisualizer* Visualizer() { return visualizer_.get(); }
 
  private:
   FRIEND_TEST_ALL_PREFIXES(ImagePaintTimingDetectorTest,
@@ -138,7 +146,8 @@ class CORE_EXPORT PaintTimingDetector
   // Method called to stop recording the Largest Contentful Paint.
   void OnInputOrScroll();
 
-  void UpdateMetricsLcp();
+  LocalDOMWindow* DomWindow() const;
+
   Member<LocalFrameView> frame_view_;
   // This member lives forever because it is also used for Text Element
   // Timing.
@@ -156,7 +165,10 @@ class CORE_EXPORT PaintTimingDetector
   // nullptr.
   base::TimeTicks first_input_or_scroll_notified_timestamp_;
 
-  std::optional<PaintTimingVisualizer> visualizer_;
+  // Because PaintTimingVisualizer is a TraceSessionObserver, unique_ptr is
+  // needed to avoid having a reference back into GCed memory, which is
+  // forbidden by oilpan.
+  std::unique_ptr<PaintTimingVisualizer> visualizer_;
 
   // The LCP details reported to metrics (UKM).
   LargestContentfulPaintDetails lcp_details_for_metrics_;
@@ -194,12 +206,8 @@ class ScopedPaintTimingDetectorBlockPaintHook {
  private:
   friend class PaintTimingDetector;
   inline static void AggregateTextPaint(const gfx::Rect& visual_rect) {
-    // Ideally we'd assert that |top_| exists, but there may be text nodes that
-    // do not have an ancestor non-anonymous block layout objects in the layout
-    // tree. An example of this is a multicol div, since the
-    // LayoutMultiColumnFlowThread is in a different layer from the DIV. In
-    // these cases, |top_| will be null. This is a known bug, see the related
-    // crbug.com/933479.
+    // TODO(crbug.com/40614549): This check was allegedly needed for legacy
+    // multicol, but that implementation is now gone. Turn into DCHECK?
     if (top_ && top_->data_) {
       top_->data_->aggregated_visual_rect_.Union(visual_rect);
     }

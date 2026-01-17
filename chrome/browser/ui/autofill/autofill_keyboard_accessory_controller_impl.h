@@ -62,7 +62,9 @@ class AutofillKeyboardAccessoryControllerImpl
 
   // AutofillSuggestionController:
   void OnSuggestionsChanged() override;
-  void AcceptSuggestion(int index) override;
+  void AcceptSuggestion(int index,
+                        autofill::AutofillMetrics::SuggestionAcceptedMethod
+                            accept_method) override;
   bool RemoveSuggestion(
       int index,
       AutofillMetrics::SingleEntryRemovalMethod removal_method) override;
@@ -70,8 +72,6 @@ class AutofillKeyboardAccessoryControllerImpl
   const std::vector<Suggestion>& GetSuggestions() const override;
   const Suggestion& GetSuggestionAt(int row) const override;
   FillingProduct GetMainFillingProduct() const override;
-  std::optional<AutofillClient::PopupScreenLocation> GetPopupScreenLocation()
-      const override;
   void Show(UiSessionId ui_session_id,
             std::vector<Suggestion> suggestions,
             AutofillSuggestionTriggerSource trigger_source,

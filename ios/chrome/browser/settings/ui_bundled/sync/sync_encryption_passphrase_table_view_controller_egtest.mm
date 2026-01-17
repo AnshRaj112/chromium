@@ -7,9 +7,9 @@
 #import "base/ios/ios_util.h"
 #import "components/feature_engagement/public/feature_list.h"
 #import "components/strings/grit/components_strings.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey_ui_test_util.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_matchers.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey_ui_test_util.h"
+#import "ios/chrome/browser/authentication/test/signin_matchers.h"
 #import "ios/chrome/browser/metrics/model/metrics_app_interface.h"
 #import "ios/chrome/browser/settings/ui_bundled/google_services/google_services_settings_constants.h"
 #import "ios/chrome/browser/settings/ui_bundled/google_services/manage_sync_settings_constants.h"
@@ -54,8 +54,7 @@ NSString* const kPassphrase = @"hello";
 }
 
 // Tests to open the sync passphrase view, and to close it.
-// TODO(crbug.com/330012240): The test is flaky.
-- (void)DISABLED_testShowSyncPassphraseAndDismiss {
+- (void)testShowSyncPassphraseAndDismiss {
   [ChromeEarlGrey addSyncPassphrase:kPassphrase];
   // Signin.
   FakeSystemIdentity* fakeIdentity = [FakeSystemIdentity fakeIdentity1];
@@ -108,8 +107,7 @@ NSString* const kPassphrase = @"hello";
 
 // Tests Sync is on after opening settings from the Infobar and entering the
 // passphrase.
-// TODO(crbug.com/330012240): Reenable this test.
-- (void)DISABLED_testShowAddSyncPassphrase {
+- (void)testShowAddSyncPassphrase {
   [ChromeEarlGrey addSyncPassphrase:kPassphrase];
   // Signin.
   FakeSystemIdentity* fakeIdentity = [FakeSystemIdentity fakeIdentity1];

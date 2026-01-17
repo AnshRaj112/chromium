@@ -11,7 +11,6 @@
 #include "base/functional/callback.h"
 #include "base/values.h"
 #include "content/public/browser/digital_identity_provider.h"
-#include "third_party/blink/public/mojom/webid/digital_identity_request.mojom.h"
 #include "url/origin.h"
 
 namespace content {
@@ -37,7 +36,7 @@ class DigitalIdentityProviderAndroid : public content::DigitalIdentityProvider {
   void OnReceive(JNIEnv*,
                  std::optional<std::string> protocol,
                  std::string result,
-                 jint j_status_for_metrics);
+                 int32_t j_status_for_metrics);
 
   bool IsLastCommittedOriginLowRisk(
       content::RenderFrameHost& render_frame_host) const override;

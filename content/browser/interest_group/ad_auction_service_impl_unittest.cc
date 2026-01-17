@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <optional>
@@ -18,7 +19,6 @@
 #include "base/barrier_closure.h"
 #include "base/base64.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
 #include "base/features.h"
@@ -30,6 +30,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/notreached.h"
 #include "base/run_loop.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/to_string.h"
@@ -271,11 +272,6 @@ class AllowInterestGroupContentBrowserClient : public TestContentBrowserClient {
     return allow_list_->contains(destination_origin);
   }
 
-  bool IsCookieDeprecationLabelAllowed(
-      content::BrowserContext* browser_context) override {
-    return true;
-  }
-
  private:
   // If not present, all origins are allowed.
   std::optional<base::flat_set<url::Origin>> allow_list_;
@@ -449,7 +445,7 @@ class NetworkResponder {
   // Returns true if the network request for path received a response.
   bool ReportSent(const std::string& path) const {
     base::AutoLock auto_lock(lock_);
-    return base::Contains(sent_reports_, path);
+    return std::ranges::contains(sent_reports_, path);
   }
 
   // Indicates whether `stored_url_loader_client_` is connected to a receiver.
@@ -485,14 +481,14 @@ class NetworkResponder {
     base::AutoLock auto_lock(lock_);
     // Check if there is a registered repeat callback.
     const auto callback_it =
-        net_callback_map_.find(params->url_request.url.path());
+        net_callback_map_.find(params->url_request.url.GetPath());
     if (callback_it != net_callback_map_.end()) {
       callback_it->second.Run(params);
     }
 
     // Check deferred responses map.
     const auto deferred_it =
-        deferred_responses_map_.find(params->url_request.url.path());
+        deferred_responses_map_.find(params->url_request.url.GetPath());
     if (deferred_it != deferred_responses_map_.end()) {
       CHECK(!deferred_it->second.url_loader_client);
       deferred_it->second.url_loader_client = std::move(params->client);
@@ -504,13 +500,13 @@ class NetworkResponder {
 
     // Cross-origin iframe handling is covered by integration tests, for cases
     // that request .well-known URLs.
-    if (params->url_request.url.path_piece() ==
+    if (params->url_request.url.path() ==
         "/.well-known/interest-group/permissions/") {
       NOTREACHED();
     }
 
     // Check if this is a non-update error.
-    if (params->url_request.url.path() == non_update_error_path_) {
+    if (params->url_request.url.GetPath() == non_update_error_path_) {
       CHECK(non_update_error_ != net::OK);
       params->client->OnComplete(
           network::URLLoaderCompletionStatus(non_update_error_));
@@ -518,7 +514,7 @@ class NetworkResponder {
     }
 
     // Not a non-update error, check if this is a script request.
-    const auto script_it = script_map_.find(params->url_request.url.path());
+    const auto script_it = script_map_.find(params->url_request.url.GetPath());
     if (script_it != script_map_.end()) {
       URLLoaderInterceptor::WriteResponse(
           kFledgeScriptHeaders, script_it->second, params->client.get());
@@ -527,11 +523,11 @@ class NetworkResponder {
 
     // Not a non-update error or script request, check if it's a reporting
     // request.
-    const auto report_it = report_map_.find(params->url_request.url.path());
+    const auto report_it = report_map_.find(params->url_request.url.GetPath());
     if (report_it != report_map_.end()) {
       URLLoaderInterceptor::WriteResponse(
           kFledgeReportHeaders, report_it->second, params->client.get());
-      sent_reports_.push_back(params->url_request.url.path());
+      sent_reports_.push_back(params->url_request.url.GetPath());
       OnReportSent();
       return true;
     }
@@ -550,7 +546,8 @@ class NetworkResponder {
     }
 
     // Check if it's a trusted bidding/scoring signals response.
-    const auto signals_it = signals_map_.find(params->url_request.url.path());
+    const auto signals_it =
+        signals_map_.find(params->url_request.url.GetPath());
     if (signals_it != signals_map_.end()) {
       signals_it->second.Run(params);
       return true;
@@ -559,14 +556,15 @@ class NetworkResponder {
     // Check if it's a Bidding and Auction Server key request. These can be
     // triggered by the Prefetch feature when JoinAdInterestGroup is called
     // It's safe to just fail them.
-    if (params->url_request.url.path() ==
-        GURL(kBiddingAndAuctionGCPCoordinatorKeyURL).path()) {
+    if (params->url_request.url.GetPath() ==
+        GURL(kBiddingAndAuctionGCPCoordinatorKeyURL).GetPath()) {
       params->client->OnComplete(
           network::URLLoaderCompletionStatus(net::ERR_FAILED));
       return true;
     }
 
-    if ((params->url_request.url.path() == store_url_loader_client_url_path_)) {
+    if ((params->url_request.url.GetPath() ==
+         store_url_loader_client_url_path_)) {
       CHECK(!stored_url_loader_client_);
       stored_url_loader_client_ = std::move(params->client);
       OnReportSent();
@@ -577,14 +575,14 @@ class NetworkResponder {
     // this an update request.
     OnUpdateRequestReceived(params);
     const auto update_it =
-        json_update_map_.find(params->url_request.url.path());
+        json_update_map_.find(params->url_request.url.GetPath());
     if (update_it != json_update_map_.end()) {
       URLLoaderInterceptor::WriteResponse(
           kFledgeUpdateHeaders, update_it->second, params->client.get());
       return true;
     }
 
-    if (params->url_request.url.path() == update_error_path_) {
+    if (params->url_request.url.GetPath() == update_error_path_) {
       CHECK(update_error_ != net::OK);
       params->client->OnComplete(
           network::URLLoaderCompletionStatus(update_error_));
@@ -5956,7 +5954,7 @@ TEST_F(AdAuctionServiceImplTest, CancelsLongstandingUpdatesComplex) {
     // Set a long expiration delta so that we can advance to update cancellation
     // without the interest group expiring.
     interest_group.expiry = base::Time::Now() + base::Days(30);
-    interest_group.name = update_url.path();
+    interest_group.name = update_url.GetPath();
     interest_group.update_url = update_url;
     interest_group.ads.emplace();
     blink::InterestGroup::Ad ad(
@@ -5964,7 +5962,7 @@ TEST_F(AdAuctionServiceImplTest, CancelsLongstandingUpdatesComplex) {
         /*metadata=*/std::nullopt);
     interest_group.ads->emplace_back(std::move(ad));
     JoinInterestGroupAndFlush(interest_group);
-    EXPECT_EQ(1, GetJoinCount(kOriginA, /*name=*/update_url.path()));
+    EXPECT_EQ(1, GetJoinCount(kOriginA, /*name=*/update_url.GetPath()));
   }
 
   // Create interest group for kOriginB.
@@ -6000,12 +5998,12 @@ TEST_F(AdAuctionServiceImplTest, CancelsLongstandingUpdatesComplex) {
     const blink::InterestGroup& group = a_group->interest_group;
     ASSERT_TRUE(group.ads.has_value());
     ASSERT_EQ(group.ads->size(), 1u);
-    if (group.name == kUpdateUrlA.path()) {
+    if (group.name == kUpdateUrlA.GetPath()) {
       EXPECT_EQ(group.ads.value()[0].render_url(),
                 "https://example.com/render2");
       seen_succeeded = true;
       continue;
-    } else if (group.name == kUpdateUrlA2.path()) {
+    } else if (group.name == kUpdateUrlA2.GetPath()) {
       seen_failed = true;
     }
     // Failed and deferred interest groups shouldn't have updated.
@@ -6044,7 +6042,7 @@ TEST_F(AdAuctionServiceImplTest, CancelsLongstandingUpdatesComplex) {
     const blink::InterestGroup& group = a_group->interest_group;
     ASSERT_TRUE(group.ads.has_value());
     ASSERT_EQ(group.ads->size(), 1u);
-    if (group.name == kUpdateUrlA3.path()) {
+    if (group.name == kUpdateUrlA3.GetPath()) {
       EXPECT_EQ(group.ads.value()[0].render_url(),
                 "https://example.com/render2");
       break;
@@ -6071,7 +6069,7 @@ TEST_F(AdAuctionServiceImplTest, CancelsLongstandingUpdatesComplex) {
     const blink::InterestGroup& group = a_group->interest_group;
     ASSERT_TRUE(group.ads.has_value());
     ASSERT_EQ(group.ads->size(), 1u);
-    if (group.name == kUpdateUrlA4.path()) {
+    if (group.name == kUpdateUrlA4.GetPath()) {
       EXPECT_EQ(group.ads.value()[0].render_url(),
                 "https://example.com/render2");
       break;
@@ -9910,7 +9908,7 @@ function scoreAd(
 
   base::RunLoop run_loop;
   EXPECT_CALL(mock_private_aggregation_cb_, Run)
-      .WillOnce(testing::Invoke(
+      .WillOnce(
           [&](PrivateAggregationHost::ReportRequestGenerator generator,
               PrivateAggregationPendingContributions::Wrapper contributions,
               PrivateAggregationBudgetKey budget_key,
@@ -9935,7 +9933,7 @@ function scoreAd(
                 null_report_behavior,
                 PrivateAggregationHost::NullReportBehavior::kDontSendReport);
             run_loop.Quit();
-          }));
+          });
 
   std::optional<GURL> auction_result = RunAdAuctionAndFlush(auction_config);
   EXPECT_NE(auction_result, std::nullopt);
@@ -14335,7 +14333,7 @@ TEST_F(AdAuctionServiceImplBAndATest,
 
   base::RunLoop run_loop;
   EXPECT_CALL(mock_private_aggregation_cb_, Run)
-      .WillOnce(testing::Invoke(
+      .WillOnce(
           [&](PrivateAggregationHost::ReportRequestGenerator generator,
               PrivateAggregationPendingContributions::Wrapper contributions,
               PrivateAggregationBudgetKey budget_key,
@@ -14353,7 +14351,7 @@ TEST_F(AdAuctionServiceImplBAndATest,
                         /*filtering_id=*/std::nullopt)));
             EXPECT_EQ(request.shared_info().reporting_origin, kOriginA);
             run_loop.Quit();
-          }));
+          });
 
   std::optional<GURL> result = RunAdAuctionWithPromiseAndFlushForFrame(
       auction_config,
@@ -14498,7 +14496,7 @@ function reportResult(auctionConfig, browserSignals) {
 
   base::RunLoop run_loop;
   EXPECT_CALL(mock_private_aggregation_cb_, Run)
-      .WillOnce(testing::Invoke(
+      .WillOnce(
           [&](PrivateAggregationHost::ReportRequestGenerator generator,
               PrivateAggregationPendingContributions::Wrapper contributions,
               PrivateAggregationBudgetKey budget_key,
@@ -14519,7 +14517,7 @@ function reportResult(auctionConfig, browserSignals) {
                         /*filtering_id=*/std::nullopt)));
             EXPECT_EQ(request.shared_info().reporting_origin, kOriginA);
             run_loop.Quit();
-          }));
+          });
 
   std::optional<GURL> result = RunAdAuctionWithPromiseAndFlushForFrame(
       auction_config,
@@ -14631,7 +14629,7 @@ TEST_F(AdAuctionServiceImplBAndATest,
 
   base::RunLoop run_loop;
   EXPECT_CALL(mock_private_aggregation_cb_, Run)
-      .WillOnce(testing::Invoke(
+      .WillOnce(
           [&](PrivateAggregationHost::ReportRequestGenerator generator,
               PrivateAggregationPendingContributions::Wrapper contributions,
               PrivateAggregationBudgetKey budget_key,
@@ -14652,7 +14650,7 @@ TEST_F(AdAuctionServiceImplBAndATest,
                         /*filtering_id=*/std::nullopt)));
             EXPECT_EQ(request.shared_info().reporting_origin, kOriginA);
             run_loop.Quit();
-          }));
+          });
 
   std::optional<GURL> result = RunAdAuctionWithPromiseAndFlushForFrame(
       auction_config,
@@ -17897,7 +17895,6 @@ class AdAuctionServiceImplBAndAKAnonEnabledTest
             /*enabled_features=*/{features::kEnableBandAKAnonEnforcement,
                                   blink::features::kFledgeConsiderKAnonymity},
             /*disabled_features=*/{blink::features::kFledgeEnforceKAnonymity});
-
         break;
       case KAnonState::kEnforceOnDeviceEnforceOnServer:
         feature_list_.InitWithFeatures(
@@ -18727,7 +18724,7 @@ TEST_P(AdAuctionServiceImplBAndAKAnonEnabledTest,
   base::RunLoop run_loop;
   if (GetParam() == KAnonState::kEnforceOnDeviceEnforceOnServer) {
     EXPECT_CALL(mock_private_aggregation_cb_, Run)
-        .WillOnce(testing::Invoke(
+        .WillOnce(
             [&](PrivateAggregationHost::ReportRequestGenerator generator,
                 PrivateAggregationPendingContributions::Wrapper contributions,
                 PrivateAggregationBudgetKey budget_key,
@@ -18743,7 +18740,7 @@ TEST_P(AdAuctionServiceImplBAndAKAnonEnabledTest,
                           /*filtering_id=*/std::nullopt)));
               EXPECT_EQ(request.shared_info().reporting_origin, kOriginA);
               run_loop.Quit();
-            }));
+            });
   }
 
   blink::AuctionConfig auction_config;
@@ -18977,6 +18974,176 @@ TEST_P(AdAuctionServiceImplBAndAKAnonEnabledTest,
       break;
     }
   }
+}
+
+TEST_P(AdAuctionServiceImplBAndAKAnonEnabledTest,
+       WinnerAndGhostWinnerWithMissingAdComponents) {
+  ProvideKeys();
+  NavigateAndCommit(kUrlA);
+  blink::InterestGroup interest_group1 =
+      blink::TestInterestGroupBuilder(kOriginA, "cars")
+          .SetAds({{{GURL("https://c.test/ad.html"), /*metadata=*/std::nullopt,
+                     /*size_group=*/std::nullopt,
+                     /*buyer_reporting_id=*/std::nullopt,
+                     /*buyer_and_seller_reporting_id=*/std::nullopt,
+                     /*selectable_buyer_and_seller_reporting_ids=*/std::nullopt,
+                     "1234"}}})
+          .SetAdComponents(
+              {{{GURL("https://c.test/ad_component.html"),
+                 /*metadata=*/std::nullopt,
+                 /*size_group=*/std::nullopt,
+                 /*buyer_reporting_id=*/std::nullopt,
+                 /*buyer_and_seller_reporting_id=*/std::nullopt,
+                 /*selectable_buyer_and_seller_reporting_ids=*/std::nullopt,
+                 "abcd"}}})
+          .SetBiddingUrl(kBiddingLogicUrlA)
+          .Build();
+  manager_->JoinInterestGroup(interest_group1,
+                              GURL("https://a.test/example.html"));
+  blink::InterestGroup interest_group2 =
+      blink::TestInterestGroupBuilder(kOriginA, "bikes")
+          .SetAds({{{GURL("https://c.test/ad2.html"), /*metadata=*/std::nullopt,
+                     /*size_group=*/std::nullopt,
+                     /*buyer_reporting_id=*/std::nullopt,
+                     /*buyer_and_seller_reporting_id=*/std::nullopt,
+                     /*selectable_buyer_and_seller_reporting_ids=*/std::nullopt,
+                     "5678"}}})
+          .SetAdComponents(
+              {{{GURL("https://c.test/ad_component2.html"),
+                 /*metadata=*/std::nullopt,
+                 /*size_group=*/std::nullopt,
+                 /*buyer_reporting_id=*/std::nullopt,
+                 /*buyer_and_seller_reporting_id=*/std::nullopt,
+                 /*selectable_buyer_and_seller_reporting_ids=*/std::nullopt,
+                 "efgh"}}})
+          .SetBiddingUrl(kBiddingLogicUrlA)
+          .Build();
+  manager_->JoinInterestGroup(interest_group2,
+                              GURL("https://a.test/example.html"));
+  task_environment()->FastForwardBy(base::Seconds(1));
+
+  std::optional<AdAuctionDataAndId> auction_data =
+      GetAdAuctionDataAndFlushForFrame(kOriginA);
+  EXPECT_TRUE(auction_data.has_value());
+
+  AdAuctionPageData* page_data = PageUserData<AdAuctionPageData>::GetForPage(
+      static_cast<RenderFrameHostImpl*>(main_rfh())->GetPage());
+  ASSERT_TRUE(page_data);
+  ASSERT_TRUE(auction_data->request_id);
+  AdAuctionRequestContext* request_context =
+      page_data->GetContextForAdAuctionRequest(
+          ContextMapKey(*auction_data->request_id, kOriginA));
+
+  ASSERT_EQ(request_context->group_names.begin()->second.size(), 2u);
+  int win_idx =
+      request_context->group_names.begin()->second[0] == "bikes" ? 0 : 1;
+  base::Value response_value = base::Value(
+      base::Value::Dict()
+          .Set("adRenderURL", interest_group1.ads.value()[0].render_url())
+          .Set("components", base::Value(base::Value::List().Append(
+                                 "https://c.test/ad_component.html")))
+          .Set("interestGroupName", "cars")
+          .Set("interestGroupOwner", kOriginA.Serialize())
+          .Set("biddingGroups",
+               base::Value(base::Value::Dict().Set(
+                   "https://a.test/",
+                   base::Value(base::Value::List().Append(0).Append(1)))))
+          .Set("kAnonWinnerJoinCandidates",
+               base::Value(
+                   base::Value::Dict()
+                       .Set("adRenderURLHash",
+                            AsBlobValue(HashedKAnonKeyForAdBid(
+                                interest_group1,
+                                interest_group1.ads.value()[0].render_url())))
+                       .Set("adComponentRenderURLsHash",
+                            base::Value(base::Value::List().Append(AsBlobValue(
+                                blink::HashedKAnonKeyForAdComponentBid(
+                                    interest_group1.ad_components.value()[0]
+                                        .render_url())))))
+                       .Set("reportingIdHash",
+                            AsBlobValue(HashedKAnonKeyForAdNameReporting(
+                                interest_group1, interest_group1.ads.value()[0],
+                                /*selected_buyer_and_seller_reporting_id=*/
+                                std::nullopt)))))
+          .Set(
+              "kAnonGhostWinners",
+              base::Value(base::Value::List().Append(base::Value(
+                  base::Value::Dict()
+                      .Set(
+                          "kAnonJoinCandidates",
+                          base::Value(
+                              base::Value::Dict()
+                                  .Set("adRenderURLHash",
+                                       AsBlobValue(HashedKAnonKeyForAdBid(
+                                           interest_group2,
+                                           interest_group2.ads.value()[0]
+                                               .render_url())))
+                                  .Set(
+                                      "adComponentRenderURLsHash",
+                                      base::Value(base::Value::List().Append(
+                                          AsBlobValue(
+                                              blink::
+                                                  HashedKAnonKeyForAdComponentBid(
+                                                      "InvalidComponent")))))
+
+                                  .Set(
+                                      "reportingIdHash",
+                                      AsBlobValue(
+                                          HashedKAnonKeyForAdNameReporting(
+                                              interest_group2,
+                                              interest_group2.ads.value()[0],
+                                              /*selected_buyer_and_seller_reporting_id=*/
+                                              std::nullopt)))))
+                      .Set("interestGroupIndex", base::Value(win_idx))
+                      .Set("owner", base::Value("https://a.test/")))))));
+  std::string unframed_response;
+  ASSERT_TRUE(compression::GzipCompress(
+      auction_worklet::test::ToCborVector(response_value), &unframed_response));
+
+  uint32_t request_size = unframed_response.size();
+  std::string response = {0x02, static_cast<char>(request_size >> 24),
+                          static_cast<char>(request_size >> 16),
+                          static_cast<char>(request_size >> 8),
+                          static_cast<char>(request_size >> 0)};
+  response += unframed_response;
+
+  std::string encrypted_response =
+      quiche::ObliviousHttpResponse::CreateServerObliviousResponse(
+          response, request_context->context,
+          kBiddingAndAuctionEncryptionResponseMediaType)
+          ->EncapsulateAndSerialize();
+
+  page_data->AddAuctionResultWitnessForOrigin(
+      kOriginA, crypto::SHA256HashString(encrypted_response));
+
+  blink::AuctionConfig auction_config;
+  auction_config.seller = kOriginA;
+  auction_config.non_shared_params.interest_group_buyers = {kOriginA};
+  auction_config.server_response.emplace();
+  auction_config.server_response->request_id = *auction_data->request_id;
+  std::optional<GURL> result = RunAdAuctionWithPromiseAndFlushForFrame(
+      auction_config,
+      base::BindLambdaForTesting(
+          [&](mojo::Remote<blink::mojom::AbortableAdAuction>& runner) {
+            runner->ResolvedAuctionAdResponsePromise(
+                blink::mojom::AuctionAdConfigAuctionId::NewMainAuction(0),
+                mojo_base::BigBuffer(base::as_byte_span(encrypted_response)));
+          }),
+      main_rfh());
+
+  ASSERT_TRUE(result);
+  InvokeCallbackForURN(*result);
+  task_environment()->FastForwardBy(base::Hours(1));
+  EXPECT_THAT(
+      GetKAnonJoinedIds(),
+      ::testing::UnorderedElementsAre(
+          HashedKAnonKeyForAdBid(interest_group1,
+                                 interest_group1.ads.value()[0].render_url()),
+          blink::HashedKAnonKeyForAdComponentBid(
+              interest_group1.ad_components.value()[0].render_url()),
+          HashedKAnonKeyForAdNameReporting(
+              interest_group1, interest_group1.ads.value()[0],
+              /*selected_buyer_and_seller_reporting_id=*/std::nullopt)));
 }
 
 TEST_P(AdAuctionServiceImplBAndAKAnonEnabledTest,
@@ -20114,10 +20281,9 @@ class AdAuctionServiceImplFacilitatedTestingTest
  public:
   AdAuctionServiceImplFacilitatedTestingTest() {
     features_.InitWithFeaturesAndParameters(
-        {{features::kCookieDeprecationFacilitatedTesting,
-          {{"label", "LabelForTesting"}}},
-         {features::kFledgeFacilitatedTestingSignalsHeaders, {}}},
-        {});
+        /*enabled_features=*/
+        {{features::kFledgeFacilitatedTestingSignalsHeaders, {}}},
+        /*disabled_features=*/{});
   }
 
  private:
@@ -20149,9 +20315,6 @@ function scoreAd(
       kTrustedBiddingSignalsUrlPath,
       base::BindLambdaForTesting(
           [&](URLLoaderInterceptor::RequestParams* params) {
-            EXPECT_THAT(
-                params->url_request.headers.GetHeader("Sec-Cookie-Deprecation"),
-                testing::Optional(std::string("LabelForTesting")));
             bidding_kv_called = true;
             URLLoaderInterceptor::WriteResponse(kFledgeSignalsHeaders, "{}",
                                                 params->client.get());
@@ -20160,9 +20323,6 @@ function scoreAd(
       kTrustedScoringSignalsUrlPath,
       base::BindLambdaForTesting(
           [&](URLLoaderInterceptor::RequestParams* params) {
-            EXPECT_THAT(
-                params->url_request.headers.GetHeader("Sec-Cookie-Deprecation"),
-                testing::Optional(std::string("LabelForTesting")));
             scoring_kv_called = true;
             URLLoaderInterceptor::WriteResponse(kFledgeSignalsHeaders, "{}",
                                                 params->client.get());

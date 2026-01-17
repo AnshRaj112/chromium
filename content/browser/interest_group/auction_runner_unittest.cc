@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 
+#include <algorithm>
 #include <array>
 #include <functional>
 #include <limits>
@@ -20,7 +21,6 @@
 
 #include "base/base64.h"
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/feature_list.h"
 #include "base/functional/callback_helpers.h"
@@ -78,6 +78,7 @@
 #include "content/services/auction_worklet/auction_worklet_service_impl.h"
 #include "content/services/auction_worklet/public/cpp/auction_downloader.h"
 #include "content/services/auction_worklet/public/cpp/auction_network_events_delegate.h"
+#include "content/services/auction_worklet/public/cpp/auction_worklet_features.h"
 #include "content/services/auction_worklet/public/cpp/cbor_test_util.h"
 #include "content/services/auction_worklet/public/cpp/real_time_reporting.h"
 #include "content/services/auction_worklet/public/cpp/test_bid_builder.h"
@@ -3049,9 +3050,6 @@ class AuctionRunnerTest : public RenderViewHostTestHarness,
   }
   network::mojom::ClientSecurityStatePtr GetClientSecurityState() override {
     return network::mojom::ClientSecurityState::New();
-  }
-  std::optional<std::string> GetCookieDeprecationLabel() override {
-    return std::nullopt;
   }
   void GetTrustedKeyValueServerKey(
       const url::Origin& scope_origin,
@@ -14423,7 +14421,11 @@ TEST_F(AuctionRunnerTest, ExecutionModeGroupByOriginClickiness) {
   feature_list.InitWithFeatures(
       /*enabled_features=*/{network::features::kAdAuctionEventRegistration,
                             blink::features::kFledgeClickiness},
-      /*disabled_features=*/{});
+      // The balancing thread selector will split same-origin same-execution
+      // mode across multiple worklets, which messes with the results of this
+      // test.
+      /*disabled_features=*/{
+          features::kFledgeBidderUseBalancingThreadSelector});
   // Test of group-by-origin execution mode at AuctionRunner level;
   // this primarily shows that the sorting actually groups things, and that
   // distinct groups are kept separate.
@@ -17022,8 +17024,8 @@ TEST_F(AuctionRunnerTest, PrivateAggregationReservedOnceRandomlyChosen) {
     auto pa_requests_map =
         private_aggregation_manager_.TakePrivateAggregationRequests();
     ASSERT_EQ(pa_requests_map.size(), 2u);
-    ASSERT_TRUE(base::Contains(pa_requests_map, kBidder1));
-    ASSERT_TRUE(base::Contains(pa_requests_map, kSeller));
+    ASSERT_TRUE(pa_requests_map.contains(kBidder1));
+    ASSERT_TRUE(pa_requests_map.contains(kSeller));
 
     const auto& bidder_requests = pa_requests_map[kBidder1];
     const auto& seller_requests = pa_requests_map[kSeller];
@@ -17162,7 +17164,7 @@ TEST_F(AuctionRunnerTest, PrivateAggregationReservedOnceAdditionalBid) {
     auto pa_requests_map =
         private_aggregation_manager_.TakePrivateAggregationRequests();
     ASSERT_EQ(pa_requests_map.size(), 1u);
-    ASSERT_TRUE(base::Contains(pa_requests_map, kSeller));
+    ASSERT_TRUE(pa_requests_map.contains(kSeller));
 
     const auto& seller_requests = pa_requests_map[kSeller];
 
@@ -21776,7 +21778,7 @@ TEST_F(AuctionRunnerTest, ModelingSignalsPassed) {
     EXPECT_EQ(GURL("https://ad1.com/"), result_.ad_descriptor->url);
 
     ASSERT_EQ(result_.report_urls.size(), 1u);
-    std::string_view query = result_.report_urls[0].query_piece();
+    std::string_view query = result_.report_urls[0].query();
     std::vector<std::string_view> split = base::SplitStringPiece(
         query, "=", base::KEEP_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
     ASSERT_EQ(split.size(), 2u);
@@ -21901,7 +21903,7 @@ TEST_F(AuctionRunnerTest, JoinCountPassedToReportWin) {
     EXPECT_EQ(GURL("https://ad1.com/"), result_.ad_descriptor->url);
 
     ASSERT_EQ(result_.report_urls.size(), 1u);
-    std::string_view query = result_.report_urls[0].query_piece();
+    std::string_view query = result_.report_urls[0].query();
     std::vector<std::string_view> split = base::SplitStringPiece(
         query, "=", base::KEEP_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
     ASSERT_EQ(split.size(), 2u);
@@ -21985,7 +21987,7 @@ TEST_F(AuctionRunnerTest, RecencyPassedReportWin) {
     EXPECT_EQ(GURL("https://ad1.com/"), result_.ad_descriptor->url);
 
     ASSERT_EQ(result_.report_urls.size(), 1u);
-    std::string_view query = result_.report_urls[0].query_piece();
+    std::string_view query = result_.report_urls[0].query();
     std::vector<std::string_view> split = base::SplitStringPiece(
         query, "=", base::KEEP_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
     ASSERT_EQ(split.size(), 2u);
@@ -22850,31 +22852,31 @@ TEST_P(AuctionRunnerBiddingAndScoringDebugReportingAPIEnabledTest,
     RunAuctionAndWait(kSellerUrl, std::move(bidders));
 
     double highest_scoring_other_bid = 0.0;
-    if (base::Contains(result_.report_urls,
-                       "https://reporting.example.com/"
-                       "?highestScoringOtherBid=1&"
-                       "highestScoringOtherBidCurrency=???&"
-                       "bidCurrency=USD&bid=3",
-                       &GURL::spec) ||
-        base::Contains(result_.report_urls,
-                       "https://reporting.example.com/"
-                       "?highestScoringOtherBid=10&"
-                       "highestScoringOtherBidCurrency=EUR&"
-                       "bidCurrency=USD&bid=3",
-                       &GURL::spec)) {
-      highest_scoring_other_bid = 1;
-    } else if (base::Contains(result_.report_urls,
+    if (std::ranges::contains(result_.report_urls,
                               "https://reporting.example.com/"
-                              "?highestScoringOtherBid=2&"
+                              "?highestScoringOtherBid=1&"
                               "highestScoringOtherBidCurrency=???&"
                               "bidCurrency=USD&bid=3",
                               &GURL::spec) ||
-               base::Contains(result_.report_urls,
+        std::ranges::contains(result_.report_urls,
                               "https://reporting.example.com/"
-                              "?highestScoringOtherBid=20&"
+                              "?highestScoringOtherBid=10&"
                               "highestScoringOtherBidCurrency=EUR&"
                               "bidCurrency=USD&bid=3",
                               &GURL::spec)) {
+      highest_scoring_other_bid = 1;
+    } else if (std::ranges::contains(result_.report_urls,
+                                     "https://reporting.example.com/"
+                                     "?highestScoringOtherBid=2&"
+                                     "highestScoringOtherBidCurrency=???&"
+                                     "bidCurrency=USD&bid=3",
+                                     &GURL::spec) ||
+               std::ranges::contains(result_.report_urls,
+                                     "https://reporting.example.com/"
+                                     "?highestScoringOtherBid=20&"
+                                     "highestScoringOtherBidCurrency=EUR&"
+                                     "bidCurrency=USD&bid=3",
+                                     &GURL::spec)) {
       highest_scoring_other_bid = 2;
     }
 
@@ -23098,31 +23100,31 @@ TEST_P(AuctionRunnerBiddingAndScoringDebugReportingAPIEnabledTest,
     EXPECT_EQ(2u, result_.debug_win_report_urls.size());
     EXPECT_EQ(2u, result_.report_urls.size());
     double highest_scoring_other_bid = 0.0;
-    if (base::Contains(result_.report_urls,
-                       "https://reporting.example.com/"
-                       "?highestScoringOtherBid=1&"
-                       "highestScoringOtherBidCurrency=???&"
-                       "bidCurrency=USD&bid=3",
-                       &GURL::spec) ||
-        base::Contains(result_.report_urls,
-                       "https://reporting.example.com/"
-                       "?highestScoringOtherBid=10&"
-                       "highestScoringOtherBidCurrency=EUR&"
-                       "bidCurrency=USD&bid=3",
-                       &GURL::spec)) {
-      highest_scoring_other_bid = 1;
-    } else if (base::Contains(result_.report_urls,
+    if (std::ranges::contains(result_.report_urls,
                               "https://reporting.example.com/"
-                              "?highestScoringOtherBid=2&"
+                              "?highestScoringOtherBid=1&"
                               "highestScoringOtherBidCurrency=???&"
                               "bidCurrency=USD&bid=3",
                               &GURL::spec) ||
-               base::Contains(result_.report_urls,
+        std::ranges::contains(result_.report_urls,
                               "https://reporting.example.com/"
-                              "?highestScoringOtherBid=20&"
+                              "?highestScoringOtherBid=10&"
                               "highestScoringOtherBidCurrency=EUR&"
                               "bidCurrency=USD&bid=3",
                               &GURL::spec)) {
+      highest_scoring_other_bid = 1;
+    } else if (std::ranges::contains(result_.report_urls,
+                                     "https://reporting.example.com/"
+                                     "?highestScoringOtherBid=2&"
+                                     "highestScoringOtherBidCurrency=???&"
+                                     "bidCurrency=USD&bid=3",
+                                     &GURL::spec) ||
+               std::ranges::contains(result_.report_urls,
+                                     "https://reporting.example.com/"
+                                     "?highestScoringOtherBid=20&"
+                                     "highestScoringOtherBidCurrency=EUR&"
+                                     "bidCurrency=USD&bid=3",
+                                     &GURL::spec)) {
       highest_scoring_other_bid = 2;
     }
 
@@ -25358,7 +25360,10 @@ class AuctionRunnerKAnonTest : public AuctionRunnerTest,
       : AuctionRunnerTest(
             /*should_enable_private_aggregation=*/true,
             kanon_mode()) {
-    feature_list_.InitAndEnableFeature(blink::features::kFledgeMultiBid);
+    std::vector<base::test::FeatureRef> disabled_features;
+    feature_list_.InitWithFeatures(
+        /*enabled_features=*/{blink::features::kFledgeMultiBid},
+        disabled_features);
   }
 
   using KAnonMode = auction_worklet::mojom::KAnonymityBidMode;
@@ -27283,79 +27288,6 @@ TEST_P(AuctionRunnerKAnonTest, AdditionalBidBuyerReporting) {
                   "https://contextual.test/?additionalPseudoIG"));
 }
 
-TEST_P(AuctionRunnerKAnonTest, CookieDeprecationFacilitatedTestingExcluded) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(
-      features::kCookieDeprecationFacilitatedTesting);
-  auction_worklet::AddJavascriptResponse(
-      &url_loader_factory_, kBidder1Url,
-      // bidding script tries to bid with ad that is not k-anonymous.
-      // The interest group name should still be available for reporting.
-      std::string(R"(
-        function generateBid(interestGroup, auctionSignals, perBuyerSignals,
-                         trustedBiddingSignals, browserSignals) {
-          privateAggregation.contributeToHistogramOnEvent("reserved.loss", {
-              bucket: {baseValue: "bid-reject-reason"},
-              value: 0,
-            });
-          privateAggregation.contributeToHistogramOnEvent("reserved.loss", {
-              bucket: {baseValue: "winning-bid"},
-              value: 2,
-            });
-          return {ad: {},
-              bid: 1,
-              render: "https://ad1.com",
-              allowComponentAuction: true};
-        }
-
-        function reportWin(auctionSignals, perBuyerSignals, sellerSignals,
-                       browserSignals) {
-          sendReportTo("https://buyer-reporting.example.com/" +
-            browserSignals.interestGroupName);
-        })"));
-  auction_worklet::AddJavascriptResponse(
-      &url_loader_factory_, kSellerUrl,
-      std::string(kMinimumDecisionScript) + kBasicReportResult);
-
-  std::vector<StorageInterestGroup> bidders;
-  bidders.emplace_back(MakeInterestGroup(
-      kBidder1, kBidder1Name, kBidder1Url,
-      /*trusted_bidding_signals_url=*/std::nullopt,
-      /*trusted_bidding_signals_keys=*/{}, GURL("https://ad1.com")));
-
-  // No k-anon authorizations.
-  StartAuction(kSellerUrl, bidders);
-  auction_run_loop_->Run();
-  // Have to spin all message loops to flush any k-anon set join events.
-  task_environment()->RunUntilIdle();
-  EXPECT_THAT(
-      interest_group_manager_->TakeJoinedKAnonSets(),
-      testing::UnorderedElementsAre(
-          blink::HashedKAnonKeyForAdBid(
-              bidders[0].interest_group,
-              bidders[0].interest_group.ads.value()[0].render_url()),
-          blink::HashedKAnonKeyForAdNameReporting(
-              bidders[0].interest_group,
-              bidders[0].interest_group.ads.value()[0],
-              /*selected_buyer_and_seller_reporting_id=*/std::nullopt)));
-  histogram_tester_->ExpectUniqueSample(
-      "Ads.InterestGroup.Auction.NonKAnonWinnerIsKAnon", false, 1);
-
-  // Always act like the k-anonymity mode is `KAnonMode::kNone`
-  ASSERT_TRUE(result_.ad_descriptor.has_value());
-  EXPECT_EQ(GURL("https://ad1.com"), result_.ad_descriptor->url);
-  EXPECT_THAT(result_.errors, testing::ElementsAre());
-  EXPECT_THAT(result_.report_urls,
-              testing::UnorderedElementsAre(
-                  "https://reporting.example.com/1",
-                  "https://buyer-reporting.example.com/Ad%20Platform"));
-  EXPECT_THAT(
-      private_aggregation_manager_.TakePrivateAggregationRequests(),
-      testing::UnorderedElementsAre(testing::Pair(
-          kSeller, ElementsAreRequests(
-                       kExpectedReportResultPrivateAggregationRequest))));
-}
-
 INSTANTIATE_TEST_SUITE_P(
     /* no label */,
     AuctionRunnerKAnonTest,
@@ -28760,6 +28692,11 @@ TEST_F(AuctionRunnerTest, TrustedBiddingSignalsSplitBatchedRequests) {
 }
 
 TEST_F(AuctionRunnerTest, TrustedScoringSignalsJointBatchedRequests) {
+  // Requesting signals one at a time interferes with batching, so disable it
+  // for this test.
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndDisableFeature(
+      features::kFledgeSellerSignalsRequestsOneAtATime);
   url_loader_factory_.ClearResponses();
   trusted_scoring_signals_url_ =
       GURL("https://adstuff.publisher1.com/seller_signals");

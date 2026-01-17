@@ -12,10 +12,10 @@
 #include "base/memory/raw_ptr.h"
 #include "components/password_manager/core/browser/password_form.h"
 #include "components/password_manager/core/browser/password_manager_metrics_util.h"
+#include "components/password_manager/core/browser/password_store/interactions_stats.h"
 
 namespace password_manager {
 
-struct InteractionsStats;
 struct PasswordForm;
 class PasswordFormMetricsRecorder;
 
@@ -81,12 +81,6 @@ class PasswordFormManagerForUI {
   // password and modifies internal state accordingly.
   virtual void OnUpdatePasswordFromPrompt(
       const std::u16string& new_password) = 0;
-
-  // To be called if the newly saved password is overriding a
-  // password saved previously as a backup password.
-  // It sets an empty backup password note to the submitted
-  // form, which means the backup should be deleted.
-  virtual void OnRemovePasswordBackupNote() = 0;
 
   // Called when the user chose not to update password.
   virtual void OnNopeUpdateClicked() = 0;

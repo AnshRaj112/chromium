@@ -23,9 +23,8 @@ namespace media {
 class AudioManagerAndroid;
 
 // Class which uses the AAudio library to playback output.
-class REQUIRES_ANDROID_API(AAUDIO_MIN_API) AAudioOutputStream
-    : public MuteableAudioOutputStream,
-      public AAudioStreamWrapper::DataCallback {
+class AAudioOutputStream : public MuteableAudioOutputStream,
+                           public AAudioStreamWrapper::DataCallback {
  public:
   AAudioOutputStream(AudioManagerAndroid* manager,
                      const AudioParameters& params,
@@ -49,7 +48,7 @@ class REQUIRES_ANDROID_API(AAUDIO_MIN_API) AAudioOutputStream
   void SetMute(bool muted) override;
 
   // AAudioStreamWrapper::DataCallback implementation.
-  bool OnAudioDataRequested(void* audio_data, int32_t num_frames) override;
+  bool OnAudioDataRequested(base::span<float> audio_data) override;
   void OnError() override;
   void OnDeviceChange() override;
 

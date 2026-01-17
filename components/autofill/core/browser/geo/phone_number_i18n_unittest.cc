@@ -28,17 +28,17 @@ using i18n::PhoneNumbersMatch;
 TEST(PhoneNumberI18NTest, NormalizePhoneNumber) {
   // "Large" digits; these are not ASCII.
   std::u16string phone1(u"１６５０７４９８３２３");
-  EXPECT_EQ(NormalizePhoneNumber(phone1, "US"), u"16507498323");
+  EXPECT_EQ(NormalizePhoneNumber(phone1, "US"), u"+16507498323");
 
   // Devanagari script digits.
   std::u16string phone2(u"١٦٥٠٨٣٢٣٧٤٩");
-  EXPECT_EQ(NormalizePhoneNumber(phone2, "US"), u"16508323749");
+  EXPECT_EQ(NormalizePhoneNumber(phone2, "US"), u"+16508323749");
 
   std::u16string phone3(u"16503334２5٥");
-  EXPECT_EQ(NormalizePhoneNumber(phone3, "US"), u"16503334255");
+  EXPECT_EQ(NormalizePhoneNumber(phone3, "US"), u"+16503334255");
 
   std::u16string phone4(u"+1(650)2346789");
-  EXPECT_EQ(NormalizePhoneNumber(phone4, "US"), u"16502346789");
+  EXPECT_EQ(NormalizePhoneNumber(phone4, "US"), u"+16502346789");
 
   std::u16string phone5(u"6502346789");
   EXPECT_EQ(NormalizePhoneNumber(phone5, "US"), u"6502346789");
@@ -46,7 +46,7 @@ TEST(PhoneNumberI18NTest, NormalizePhoneNumber) {
 
 struct ParseNumberTestCase {
   // Expected parsing result.
-  bool isPossibleNumber;
+  bool is_possible_number;
   // Inputs.
   std::u16string input;
   std::string assumed_region;
@@ -71,7 +71,7 @@ TEST_P(ParseNumberTest, ParsePhoneNumber) {
   std::u16string country_code, city_code, number;
   std::string deduced_region;
   ::i18n::phonenumbers::PhoneNumber unused_i18n_number;
-  EXPECT_EQ(test_case.isPossibleNumber,
+  EXPECT_EQ(test_case.is_possible_number,
             ParsePhoneNumber(test_case.input, test_case.assumed_region,
                              &country_code, &city_code, &number,
                              &deduced_region, &unused_i18n_number));
@@ -177,7 +177,7 @@ INSTANTIATE_TEST_SUITE_P(
 TEST(PhoneNumberI18NTest, ConstructPhoneNumber) {
   std::u16string number;
   EXPECT_TRUE(ConstructPhoneNumber(u"16502345678", "US", &number));
-  EXPECT_EQ(u"1 650-234-5678", number);
+  EXPECT_EQ(u"+1 650-234-5678", number);
   EXPECT_TRUE(ConstructPhoneNumber(u"6502345678", "US", &number));
   EXPECT_EQ(u"(650) 234-5678", number);
 

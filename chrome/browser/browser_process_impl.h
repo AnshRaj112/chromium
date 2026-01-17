@@ -25,6 +25,7 @@
 #include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/common/buildflags.h"
+#include "components/activity_reporter/activity_reporter.h"
 #include "components/keep_alive_registry/keep_alive_state_observer.h"
 #include "components/metrics_services_manager/metrics_services_manager.h"
 #include "components/prefs/persistent_pref_store.h"
@@ -34,7 +35,7 @@
 #include "media/media_buildflags.h"
 #include "printing/buildflags/buildflags.h"
 #include "services/network/public/cpp/network_quality_tracker.h"
-#include "services/network/public/mojom/network_service.mojom-forward.h"
+#include "ui/base/unowned_user_data/unowned_user_data_host.h"
 
 #if !BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/upgrade_detector/build_state.h"
@@ -75,7 +76,7 @@ class GCMDriver;
 namespace os_crypt_async {
 class KeyProvider;
 class OSCryptAsync;
-}
+}  // namespace os_crypt_async
 
 namespace policy {
 class ChromeBrowserPolicyConnector;
@@ -94,6 +95,10 @@ namespace screen_ai {
 class ScreenAIInstallState;
 }  // namespace screen_ai
 
+namespace supervised_user {
+class DeviceParentalControls;
+}  // namespace supervised_user
+
 // Real implementation of BrowserProcess that creates and returns the services.
 class BrowserProcessImpl : public BrowserProcess,
                            public KeepAliveStateObserver {
@@ -107,6 +112,9 @@ class BrowserProcessImpl : public BrowserProcess,
   BrowserProcessImpl& operator=(const BrowserProcessImpl&) = delete;
 
   ~BrowserProcessImpl() override;
+
+  ui::UnownedUserDataHost& GetUnownedUserDataHost() override;
+  const ui::UnownedUserDataHost& GetUnownedUserDataHost() const override;
 
   // Called to complete initialization.
   void Init();
@@ -184,6 +192,7 @@ class BrowserProcessImpl : public BrowserProcess,
   printing::PrintPreviewDialogController* print_preview_dialog_controller()
       override;
   printing::BackgroundPrintingManager* background_printing_manager() override;
+  supervised_user::DeviceParentalControls& device_parental_controls() override;
 #if !BUILDFLAG(IS_ANDROID)
   IntranetRedirectDetector* intranet_redirect_detector() override;
 #endif
@@ -202,8 +211,6 @@ class BrowserProcessImpl : public BrowserProcess,
 #endif
   subresource_filter::RulesetService* subresource_filter_ruleset_service()
       override;
-  subresource_filter::RulesetService*
-  fingerprinting_protection_ruleset_service() override;
 
   StartupData* startup_data() override;
 
@@ -211,8 +218,11 @@ class BrowserProcessImpl : public BrowserProcess,
   void StartAutoupdateTimer() override;
 #endif
 
+  activity_reporter::ActivityReporter* activity_reporter() override;
   component_updater::ComponentUpdateService* component_updater() override;
+#if BUILDFLAG(IS_CHROMEOS)
   MediaFileSystemRegistry* media_file_system_registry() override;
+#endif
   WebRtcLogUploader* webrtc_log_uploader() override;
   network_time::NetworkTimeTracker* network_time_tracker() override;
 #if !BUILDFLAG(IS_ANDROID)
@@ -238,7 +248,6 @@ class BrowserProcessImpl : public BrowserProcess,
 
   static void RegisterPrefs(PrefRegistrySimple* registry);
   GlobalFeatures* GetFeatures() override;
-  void CreateGlobalFeaturesForTesting() override;
 
  private:
   using WebRtcEventLogManager = webrtc_event_logging::WebRtcEventLogManager;
@@ -266,7 +275,7 @@ class BrowserProcessImpl : public BrowserProcess,
   void CreateStatusTray();
   void CreateBackgroundModeManager();
   void CreateGCMDriver();
-  void CreateNetworkTimeTracker();
+  void InitializeNetworkTimeTracker();
 
   void ApplyDefaultBrowserPolicy();
 
@@ -335,7 +344,7 @@ class BrowserProcessImpl : public BrowserProcess,
       extensions_browser_client_;
 #endif
 
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(IS_CHROMEOS)
   std::unique_ptr<MediaFileSystemRegistry> media_file_system_registry_;
 #endif
 
@@ -351,6 +360,9 @@ class BrowserProcessImpl : public BrowserProcess,
   std::unique_ptr<printing::BackgroundPrintingManager>
       background_printing_manager_;
 #endif
+
+  std::unique_ptr<supervised_user::DeviceParentalControls>
+      device_parental_controls_;
 
 #if BUILDFLAG(ENABLE_CHROME_NOTIFICATIONS)
   // Manager for desktop notification UI.
@@ -386,10 +398,6 @@ class BrowserProcessImpl : public BrowserProcess,
   std::unique_ptr<subresource_filter::RulesetService>
       subresource_filter_ruleset_service_;
 
-  bool created_fingerprinting_protection_ruleset_service_ = false;
-  std::unique_ptr<subresource_filter::RulesetService>
-      fingerprinting_protection_ruleset_service_;
-
   bool shutting_down_ = false;
 
   bool tearing_down_ = false;
@@ -424,6 +432,8 @@ class BrowserProcessImpl : public BrowserProcess,
   void OnPendingRestartResult(bool is_update_pending_restart);
   void RestartBackgroundInstance();
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
+
+  std::unique_ptr<activity_reporter::ActivityReporter> activity_reporter_;
 
   // component updater is normally not used under ChromeOS due
   // to concerns over integrity of data shared between profiles,
@@ -476,6 +486,9 @@ class BrowserProcessImpl : public BrowserProcess,
   std::unique_ptr<base::android::ApplicationStatusListener> app_state_listener_;
 #endif
 
+  ui::UnownedUserDataHost unowned_user_data_host_;
+
+  // This must be destroyed before UnownedUserDataHost.
   std::unique_ptr<GlobalFeatures> features_;
 
   // Observes application-wide events and logs them to breadcrumbs. Null if

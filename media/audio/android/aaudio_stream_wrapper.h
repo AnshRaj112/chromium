@@ -8,25 +8,21 @@
 #include <aaudio/AAudio.h>
 
 #include "base/android/requires_api.h"
+#include "base/containers/span.h"
 #include "base/memory/raw_ptr.h"
-#include "base/memory/raw_ptr_exclusion.h"
+#include "base/memory/raw_ref.h"
 #include "base/sequence_checker.h"
 #include "base/synchronization/lock.h"
 #include "media/audio/android/audio_device.h"
-#include "media/base/audio_bus.h"
 #include "media/base/audio_parameters.h"
-
-// For use with REQUIRES_ANDROID_API() and __builtin_available().
-// We need APIs that weren't added until API Level 28. Also, AAudio crashes
-// on P, so only consider Q and above.
-#define AAUDIO_MIN_API 29
 
 namespace media {
 
 class AAudioDestructionHelper;
+class AAudioGlitchReporter;
 
 // Small wrapper around AAudioStream which handles its lifetime.
-class REQUIRES_ANDROID_API(AAUDIO_MIN_API) AAudioStreamWrapper {
+class AAudioStreamWrapper {
  public:
   enum class StreamType {
     kInput,
@@ -41,7 +37,10 @@ class REQUIRES_ANDROID_API(AAUDIO_MIN_API) AAudioStreamWrapper {
    public:
     virtual ~DataCallback() = default;
 
-    virtual bool OnAudioDataRequested(void* audio_data, int32_t num_frames) = 0;
+    // `audio_data` will be exactly big enough to contain `frames * channels`
+    // interleaved samples, in accordance with the `params` passed to
+    // `AAudioStreamWrapper` at construction time.
+    virtual bool OnAudioDataRequested(base::span<float> audio_data) = 0;
     virtual void OnError() = 0;
     virtual void OnDeviceChange() = 0;
   };
@@ -69,6 +68,12 @@ class REQUIRES_ANDROID_API(AAUDIO_MIN_API) AAudioStreamWrapper {
                                                      int32_t num_frames);
   void OnStreamError(aaudio_result_t error);
 
+  // Returns the ID of the "actual" device the stream was opened with, in
+  // particular resolving to a non-default device ID if the default device was
+  // requested. Returns `std::nullopt` if the actual device ID cannot be
+  // resolved, for instance if the stream is not open.
+  std::optional<android::AudioDeviceId> GetActualDeviceId();
+
   // Returns the amount of unplayed audio relative to |delay_timestamp|.
   base::TimeDelta GetOutputDelay(base::TimeTicks delay_timestamp);
 
@@ -80,9 +85,12 @@ class REQUIRES_ANDROID_API(AAUDIO_MIN_API) AAudioStreamWrapper {
   SEQUENCE_CHECKER(sequence_checker_);
 
   void EmitSetDeviceIdResultToHistogram(bool success);
+  void LogFramesPerBurstChangesToUma();
 
   const AudioParameters params_;
-  const android::AudioDevice device_;
+  const android::AudioDevice requested_device_;
+
+  int32_t frames_per_burst_on_open_;
 
   // Whether this class is using an input or an output stream.
   StreamType stream_type_;
@@ -90,7 +98,7 @@ class REQUIRES_ANDROID_API(AAUDIO_MIN_API) AAudioStreamWrapper {
   aaudio_usage_t usage_;
   aaudio_performance_mode_t performance_mode_;
 
-  const raw_ptr<DataCallback> callback_;
+  const raw_ref<DataCallback> callback_;
 
   bool is_closed_ = false;
 
@@ -98,6 +106,9 @@ class REQUIRES_ANDROID_API(AAUDIO_MIN_API) AAudioStreamWrapper {
 
   // Constant used for calculating latency. Amount of nanoseconds per frame.
   const double ns_per_frame_;
+
+  // Helper to log underruns/overruns to UMAs.
+  std::unique_ptr<AAudioGlitchReporter> glitch_reporter_;
 
   // Bound to the audio data callback. Outlives |this| in case the callbacks
   // continue after |this| is destroyed. See crbug.com/1183255.

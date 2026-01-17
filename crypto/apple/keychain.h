@@ -7,7 +7,6 @@
 
 #include <Security/Security.h>
 
-#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -18,7 +17,6 @@
 
 namespace crypto::apple {
 
-// DEPRECATED: use `KeychainV2` instead.
 // Wraps the KeychainServices API in a very thin layer, to allow it to be
 // mocked out for testing.
 
@@ -26,7 +24,7 @@ namespace crypto::apple {
 // through directly to their Keychain Services equivalents (Foo ->
 // SecKeychainFoo).
 //
-// New code should use KeychainV2.
+// TODO(https://crbug.com/441317288): Unify with KeychainV2.
 class CRYPTO_EXPORT Keychain {
  public:
   // Returns an object suitable for accessing the platform's default type of
@@ -56,34 +54,6 @@ class CRYPTO_EXPORT Keychain {
  protected:
   Keychain();
 };
-
-#if BUILDFLAG(IS_MAC)
-
-// Sets whether Keychain Services is permitted to display UI if needed by
-// calling SecKeychainSetUserInteractionAllowed. This operates in a scoped
-// fashion: on destruction, the previous state will be restored. This is useful
-// to interact with the Keychain on a best-effort basis, without displaying any
-// Keychain Services UI (which is beyond the application's control) to the user.
-class CRYPTO_EXPORT ScopedKeychainUserInteractionAllowed {
- public:
-  ScopedKeychainUserInteractionAllowed(
-      const ScopedKeychainUserInteractionAllowed&) = delete;
-  ScopedKeychainUserInteractionAllowed& operator=(
-      const ScopedKeychainUserInteractionAllowed&) = delete;
-
-  explicit ScopedKeychainUserInteractionAllowed(Boolean allowed,
-                                                OSStatus* status = nullptr);
-
-  ~ScopedKeychainUserInteractionAllowed();
-
- private:
-  // The previous value of whether user interaction was allowed, for
-  // restoration. If this is nullopt, this scoper did not succeed in its
-  // constructor, so it must not attempt to restore the value.
-  std::optional<Boolean> was_allowed_;
-};
-
-#endif  // BUILDFLAG(IS_MAC)
 
 }  // namespace crypto::apple
 

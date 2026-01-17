@@ -22,9 +22,10 @@
 #include "cc/paint/paint_op_buffer_serializer.h"
 #include "third_party/abseil-cpp/absl/container/inlined_vector.h"
 #include "third_party/skia/include/core/SkImageInfo.h"
+#include "third_party/skia/include/core/SkPathTypes.h"
 #include "third_party/skia/include/core/SkRefCnt.h"
 #include "third_party/skia/include/core/SkYUVAInfo.h"
-#include "third_party/skia/include/effects/SkGradientShader.h"
+#include "third_party/skia/include/effects/SkGradient.h"
 
 struct SkGainmapInfo;
 struct SkHighContrastConfig;
@@ -266,7 +267,7 @@ class CC_PAINT_EXPORT PaintOpWriter {
   void Write(SkYUVAInfo::Subsampling subsampling);
   void Write(const gpu::Mailbox& mailbox);
   void Write(const SkHighContrastConfig& config);
-  void Write(const SkGradientShader::Interpolation& interpolation);
+  void Write(const SkGradient::Interpolation& interpolation);
 
   // Shaders and filters need to know the current transform in order to lock in
   // the scale factor they will be evaluated at after deserialization. This is
@@ -301,6 +302,7 @@ class CC_PAINT_EXPORT PaintOpWriter {
   void Write(SkTileMode tile_mode) { WriteEnum(tile_mode); }
   void Write(SkFilterMode filter_mode) { WriteEnum(filter_mode); }
   void Write(SkMipmapMode mipmap_mode) { WriteEnum(mipmap_mode); }
+  void Write(SkPathFillType fill_type) { WriteEnum(fill_type); }
 
   void Write(bool data) { Write(static_cast<uint8_t>(data)); }
 

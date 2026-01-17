@@ -13,11 +13,13 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/logging.h"
-#include "base/memory/memory_pressure_monitor.h"
 #include "base/metrics/field_trial_params.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
+#include "base/time/time.h"
+#include "base/timer/elapsed_timer.h"
 #include "components/omnibox/browser/on_device_tail_model_executor.h"
 #include "components/optimization_guide/core/delivery/optimization_guide_model_provider.h"
 #include "components/optimization_guide/core/optimization_guide_util.h"
@@ -73,7 +75,20 @@ std::vector<OnDeviceTailModelExecutor::Prediction> RunTailModelExecutor(
     return predictions;
   }
 
+  auto elapsed_timer = base::ElapsedTimer();
   predictions = executor->GenerateSuggestionsForPrefix(input);
+
+  // Logs some useful histograms for model performance analysis.
+  base::UmaHistogramCustomTimes("Omnibox.OnDeviceBrainModel.Latency",
+                                elapsed_timer.Elapsed(), base::Milliseconds(10),
+                                base::Seconds(2), 50);
+  base::UmaHistogramExactLinear("Omnibox.OnDeviceBrainModel.NumResults",
+                                static_cast<int>(predictions.size()), 4);
+  for (const auto& p : predictions) {
+    base::UmaHistogramCounts100("Omnibox.OnDeviceBrainModel.ResultLength",
+                                static_cast<int>(p.suggestion.size()));
+  }
+
   return predictions;
 }
 
@@ -88,11 +103,10 @@ void MaybeUnloadModelExecutor(OnDeviceTailModelExecutor* executor) {
 
 OnDeviceTailModelService::OnDeviceTailModelService(
     optimization_guide::OptimizationGuideModelProvider* model_provider)
-    : model_executor_task_runner_(base::ThreadPool::CreateSequencedTaskRunner(
+    : model_task_runner_(base::ThreadPool::CreateSequencedTaskRunner(
           {base::MayBlock(), base::TaskPriority::BEST_EFFORT})),
-      tail_model_executor_(
-          new OnDeviceTailModelExecutor(),
-          base::OnTaskRunnerDeleter(model_executor_task_runner_)),
+      tail_model_executor_(new OnDeviceTailModelExecutor(),
+                           base::OnTaskRunnerDeleter(model_task_runner_)),
       model_provider_(model_provider) {
   if (model_provider_ == nullptr) {
     return;
@@ -101,12 +115,12 @@ OnDeviceTailModelService::OnDeviceTailModelService(
   model_provider_->AddObserverForOptimizationTargetModel(
       optimization_guide::proto::
           OPTIMIZATION_TARGET_OMNIBOX_ON_DEVICE_TAIL_SUGGEST,
-      /* model_metadata= */ std::nullopt, this);
+      /* model_metadata= */ std::nullopt, model_task_runner_, this);
 
-  memory_pressure_listener_ = std::make_unique<base::MemoryPressureListener>(
-      FROM_HERE,
-      base::BindRepeating(&OnDeviceTailModelService::OnMemoryPressure,
-                          weak_ptr_factory_.GetWeakPtr()));
+  memory_pressure_listener_registration_ =
+      std::make_unique<base::MemoryPressureListenerRegistration>(
+          FROM_HERE, base::MemoryPressureListenerTag::kOnDeviceTailModelService,
+          this);
 }
 
 OnDeviceTailModelService::OnDeviceTailModelService()
@@ -123,10 +137,7 @@ OnDeviceTailModelService::~OnDeviceTailModelService() {
 }
 
 void OnDeviceTailModelService::Shutdown() {
-  if (memory_pressure_listener_) {
-    memory_pressure_listener_.reset();
-  }
-  weak_ptr_factory_.InvalidateWeakPtrs();
+  memory_pressure_listener_registration_.reset();
 }
 
 void OnDeviceTailModelService::OnModelUpdated(
@@ -138,7 +149,7 @@ void OnDeviceTailModelService::OnModelUpdated(
     return;
   }
   if (!model_info.has_value()) {
-    model_executor_task_runner_->PostTask(
+    model_task_runner_->PostTask(
         FROM_HERE,
         base::BindOnce(&OnDeviceTailModelExecutor::Reset,
                        base::Unretained(tail_model_executor_.get())));
@@ -159,7 +170,7 @@ void OnDeviceTailModelService::OnModelUpdated(
     DVLOG(1) << "Failed to fetch metadata for Omnibox on device tail model";
     return;
   }
-  model_executor_task_runner_->PostTask(
+  model_task_runner_->PostTask(
       FROM_HERE,
       base::BindOnce(&InitializeTailModelExecutor, tail_model_executor_.get(),
                      model_info->GetModelFilePath(),
@@ -168,13 +179,13 @@ void OnDeviceTailModelService::OnModelUpdated(
 }
 
 void OnDeviceTailModelService::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel level) {
-  if (level != base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL) {
+    base::MemoryPressureLevel level) {
+  if (level != base::MEMORY_PRESSURE_LEVEL_CRITICAL) {
     return;
   }
 
-  if (model_executor_task_runner_) {
-    model_executor_task_runner_->PostTask(
+  if (model_task_runner_) {
+    model_task_runner_->PostTask(
         FROM_HERE,
         base::BindOnce(&MaybeUnloadModelExecutor, tail_model_executor_.get()));
   }
@@ -183,13 +194,10 @@ void OnDeviceTailModelService::OnMemoryPressure(
 void OnDeviceTailModelService::GetPredictionsForInput(
     const OnDeviceTailModelExecutor::ModelInput& input,
     ResultCallback result_callback) {
-  if (model_executor_task_runner_) {
-    base::MemoryPressureMonitor* monitor = base::MemoryPressureMonitor::Get();
+  if (model_task_runner_) {
     // Do not call the model if memory pressure level is too high.
-    if (!monitor ||
-        monitor->GetCurrentPressureLevel() !=
-            base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL) {
-      model_executor_task_runner_->PostTaskAndReplyWithResult(
+    if (memory_pressure_level() != base::MEMORY_PRESSURE_LEVEL_CRITICAL) {
+      model_task_runner_->PostTaskAndReplyWithResult(
           FROM_HERE,
           base::BindOnce(&RunTailModelExecutor, tail_model_executor_.get(),
                          input),

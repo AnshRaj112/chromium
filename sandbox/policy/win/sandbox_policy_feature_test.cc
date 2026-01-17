@@ -21,6 +21,8 @@ SandboxFeatureTest::SandboxFeatureTest() {
   feature_list_.InitWithFeatures(enabled_features, disabled_features);
 }
 
+SandboxFeatureTest::~SandboxFeatureTest() = default;
+
 IntegrityLevel SandboxFeatureTest::GetExpectedIntegrityLevel() {
   return IntegrityLevel::INTEGRITY_LEVEL_LOW;
 }
@@ -52,8 +54,12 @@ MitigationFlags SandboxFeatureTest::GetExpectedMitigationFlags() {
 }
 
 MitigationFlags SandboxFeatureTest::GetExpectedDelayedMitigationFlags() {
-  return ::sandbox::MITIGATION_DLL_SEARCH_ORDER |
-         ::sandbox::MITIGATION_FORCE_MS_SIGNED_BINS;
+  ::sandbox::MitigationFlags flags = ::sandbox::MITIGATION_DLL_SEARCH_ORDER |
+                                     ::sandbox::MITIGATION_FORCE_MS_SIGNED_BINS;
+  if (base::FeatureList::IsEnabled(features::kWinSboxStrictHandleChecks)) {
+    flags |= ::sandbox::MITIGATION_STRICT_HANDLE_CHECKS;
+  }
+  return flags;
 }
 
 AppContainerType SandboxFeatureTest::GetExpectedAppContainerType() {

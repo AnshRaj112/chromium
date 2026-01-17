@@ -4,7 +4,6 @@
 
 #include "components/signin/core/browser/mirror_account_reconcilor_delegate.h"
 
-#include "base/containers/contains.h"
 #include "base/logging.h"
 #include "build/build_config.h"
 #include "components/signin/core/browser/account_reconcilor.h"
@@ -44,11 +43,7 @@ ConsentLevel MirrorAccountReconcilorDelegate::GetConsentLevelForPrimaryAccount()
   // Ash.
   return ConsentLevel::kSync;
 #else
-  // For mobile (iOS, Android) and Lacros.
-  //
-  // Whenever Mirror is enabled on a Lacros Profile, the Primary Account may or
-  // may not have consented to Chrome Sync. But we want to enable
-  // `AccountReconcilor` regardless - for minting Gaia cookies.
+  // For mobile (iOS, Android).
   return ConsentLevel::kSignin;
 #endif
 }

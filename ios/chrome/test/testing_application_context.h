@@ -12,10 +12,22 @@
 #include "base/sequence_checker.h"
 #include "ios/chrome/browser/shared/model/application_context/application_context.h"
 
+namespace activity_reporter {
+class ActivityReporter;
+}
+
+namespace metrics_services_manager {
+class MetricsServicesManager;
+}  // namespace metrics_services_manager
+
 namespace network {
 class TestNetworkConnectionTracker;
 class TestURLLoaderFactory;
 }  // namespace network
+
+namespace supervised_user {
+class DeviceParentalControls;
+}  // namespace supervised_user
 
 class MockPromosManager;
 
@@ -52,6 +64,10 @@ class TestingApplicationContext : public ApplicationContext {
 
   // Sets the VariationsService.
   void SetVariationsService(variations::VariationsService* variations_service);
+
+  // Sets the MetricsServicesManager.
+  void SetMetricsServicesManager(
+      metrics_services_manager::MetricsServicesManager* manager);
 
   // Sets the SystemIdentityManager.
   // Must be set before `GetSystemIdentityManager` is called (i.e. before
@@ -90,15 +106,19 @@ class TestingApplicationContext : public ApplicationContext {
   variations::VariationsService* GetVariationsService() override;
   net::NetLog* GetNetLog() override;
   net_log::NetExportFileWriter* GetNetExportFileWriter() override;
+  network_time::NetworkTimeTracker* GetNetworkTimeTrackerMaybeUninitialized()
+      override;
   network_time::NetworkTimeTracker* GetNetworkTimeTracker() override;
   IOSChromeIOThread* GetIOSChromeIOThread() override;
   gcm::GCMDriver* GetGCMDriver() override;
+  activity_reporter::ActivityReporter* GetActivityReporter() override;
   component_updater::ComponentUpdateService* GetComponentUpdateService()
       override;
   SafeBrowsingService* GetSafeBrowsingService() override;
   network::NetworkConnectionTracker* GetNetworkConnectionTracker() override;
   BrowserPolicyConnectorIOS* GetBrowserPolicyConnector() override;
   id<SingleSignOnService> GetSingleSignOnService() override;
+  signin::AvatarProvider* GetIdentityAvatarProvider() override;
   SystemIdentityManager* GetSystemIdentityManager() override;
   AccountProfileMapper* GetAccountProfileMapper() override;
   IncognitoSessionTracker* GetIncognitoSessionTracker() override;
@@ -106,12 +126,9 @@ class TestingApplicationContext : public ApplicationContext {
   os_crypt_async::OSCryptAsync* GetOSCryptAsync() override;
   AdditionalFeaturesController* GetAdditionalFeaturesController() override;
   auto_deletion::AutoDeletionService* GetAutoDeletionService() override;
-#if BUILDFLAG(BUILD_WITH_INTERNAL_OPTIMIZATION_GUIDE)
-  optimization_guide::OnDeviceModelServiceController*
-  GetOnDeviceModelServiceController(
-      base::WeakPtr<optimization_guide::OnDeviceModelComponentStateManager>
-          on_device_component_manager) override;
-#endif  // BUILD_WITH_INTERNAL_OPTIMIZATION_GUIDE
+  optimization_guide::OptimizationGuideGlobalState*
+  GetOptimizationGuideGlobalState() override;
+  supervised_user::DeviceParentalControls& GetDeviceParentalControls() override;
 
  private:
   SEQUENCE_CHECKER(sequence_checker_);
@@ -134,15 +151,23 @@ class TestingApplicationContext : public ApplicationContext {
   std::unique_ptr<network::TestNetworkConnectionTracker>
       test_network_connection_tracker_;
   __strong id<SingleSignOnService> single_sign_on_service_ = nil;
+  std::unique_ptr<signin::AvatarProvider> resized_avatar_caches_;
   std::unique_ptr<SystemIdentityManager> system_identity_manager_;
   std::unique_ptr<AccountProfileMapper> default_account_profile_mapper_;
   std::unique_ptr<PushNotificationService> push_notification_service_;
   raw_ptr<variations::VariationsService> variations_service_;
+  raw_ptr<metrics_services_manager::MetricsServicesManager>
+      metrics_services_manager_;
   std::unique_ptr<os_crypt_async::OSCryptAsync> os_crypt_async_;
   std::unique_ptr<AdditionalFeaturesController> additional_features_controller_;
   raw_ptr<IOSChromeIOThread> ios_chrome_io_thread_;
   std::unique_ptr<auto_deletion::AutoDeletionService> auto_deletion_service_;
+  std::unique_ptr<optimization_guide::OptimizationGuideGlobalState>
+      optimization_guide_global_state_;
+  std::unique_ptr<supervised_user::DeviceParentalControls>
+      device_parental_controls_;
   std::unique_ptr<ApplicationLocaleStorage> application_locale_storage_;
+  std::unique_ptr<activity_reporter::ActivityReporter> activity_reporter_;
 };
 
 #endif  // IOS_CHROME_TEST_TESTING_APPLICATION_CONTEXT_H_

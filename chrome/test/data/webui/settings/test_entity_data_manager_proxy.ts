@@ -21,19 +21,26 @@ export class TestEntityDataManagerProxy extends TestBrowserProxy implements
       null;
   private optInStatus_: boolean = false;
   private setOptInStatusResponse_: boolean = true;
+  private walletOptInStatus_: boolean = false;
+  private setWalletablePassDetectionOptInStatusResponse_: boolean = true;
+  private authenticateUserBeforeViewingEntityDataResponse_: boolean = true;
 
   constructor() {
     super([
       'addEntityInstancesChangedListener',
       'addOrUpdateEntityInstance',
+      'authenticateUserBeforeViewingEntityData',
       'getAllAttributeTypesForEntityTypeName',
-      'getAllEntityTypes',
       'getEntityInstanceByGuid',
+      'getOptInStatus',
+      'getWalletablePassDetectionOptInStatus',
+      'getWritableEntityTypes',
       'loadEntityInstances',
       'removeEntityInstance',
       'removeEntityInstancesChangedListener',
       'setOptInStatus',
-      'getOptInStatus',
+      'setWalletablePassDetectionOptInStatus',
+      'authenticateUserBeforeViewingEntityData',
     ]);
   }
 
@@ -42,11 +49,15 @@ export class TestEntityDataManagerProxy extends TestBrowserProxy implements
     this.entityInstancesWithLabels_ = entityInstancesWithLabels;
   }
 
+  setAuthenticateUserBeforeViewingEntityDataResponse(success: boolean): void {
+    this.authenticateUserBeforeViewingEntityDataResponse_ = success;
+  }
+
   setGetEntityInstanceByGuidResponse(entityInstance: EntityInstance): void {
     this.entityInstance_ = entityInstance;
   }
 
-  setGetAllEntityTypesResponse(entityTypes: EntityType[]): void {
+  setGetWritableEntityTypesResponse(entityTypes: EntityType[]): void {
     this.entityTypes_ = entityTypes;
   }
 
@@ -61,6 +72,10 @@ export class TestEntityDataManagerProxy extends TestBrowserProxy implements
 
   setSetOptInStatusResponse(setOptInStatus: boolean): void {
     this.setOptInStatusResponse_ = setOptInStatus;
+  }
+
+  setSetWalletablePassDetectionOptInStatusResponse(success: boolean): void {
+    this.setWalletablePassDetectionOptInStatusResponse_ = success;
   }
 
   callEntityInstancesChangedListener(
@@ -89,8 +104,8 @@ export class TestEntityDataManagerProxy extends TestBrowserProxy implements
     return Promise.resolve(structuredClone(this.entityInstance_));
   }
 
-  getAllEntityTypes(): Promise<EntityType[]> {
-    this.methodCalled('getAllEntityTypes');
+  getWritableEntityTypes(): Promise<EntityType[]> {
+    this.methodCalled('getWritableEntityTypes');
     return Promise.resolve(structuredClone(this.entityTypes_));
   }
 
@@ -120,5 +135,21 @@ export class TestEntityDataManagerProxy extends TestBrowserProxy implements
   setOptInStatus(optInStatus: boolean): Promise<boolean> {
     this.methodCalled('setOptInStatus', optInStatus);
     return Promise.resolve(this.setOptInStatusResponse_);
+  }
+
+  getWalletablePassDetectionOptInStatus(): Promise<boolean> {
+    this.methodCalled('getWalletablePassDetectionOptInStatus');
+    return Promise.resolve(this.walletOptInStatus_);
+  }
+
+  setWalletablePassDetectionOptInStatus(optedIn: boolean): Promise<boolean> {
+    this.methodCalled('setWalletablePassDetectionOptInStatus', optedIn);
+    return Promise.resolve(this.setWalletablePassDetectionOptInStatusResponse_);
+  }
+
+  authenticateUserBeforeViewingEntityData(): Promise<boolean> {
+    this.methodCalled('authenticateUserBeforeViewingEntityData');
+    return Promise.resolve(
+        this.authenticateUserBeforeViewingEntityDataResponse_);
   }
 }

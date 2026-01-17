@@ -9,16 +9,12 @@
 #include <array>
 #include <utility>
 
-#include "base/strings/string_util.h"
-#include "base/metrics/field_trial.h"
 #include "base/compiler_specific.h"
 #include "base/metrics/field_trial.h"
+#include "base/strings/string_util.h"
 #include "chrome/browser/performance_manager/public/background_tab_loading_policy.h"
 #include "chrome/browser/sessions/session_restore_stats_collector.h"
-#include "chrome/browser/sessions/tab_loader.h"
 #include "chrome/common/url_constants.h"
-#include "components/favicon/content/content_favicon_driver.h"
-#include "components/performance_manager/public/features.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "content/public/browser/web_contents.h"
@@ -91,40 +87,18 @@ void SessionRestoreDelegate::RestoreTabs(
   if (tabs.empty())
     return;
 
-  // Restore the favicon for all tabs. Any tab may end up being deferred due
-  // to memory pressure so it's best to have some visual indication of its
-  // contents.
-  for (const auto& restored_tab : tabs) {
-    CHECK(restored_tab.contents());
-    // Restore the favicon for deferred tabs.
-    favicon::ContentFaviconDriver* favicon_driver =
-        favicon::ContentFaviconDriver::FromWebContents(restored_tab.contents());
-    if (favicon_driver) {
-      favicon_driver->FetchFavicon(favicon_driver->GetActiveURL(),
-                                   /*is_same_document=*/false);
-    }
-  }
-
   SessionRestoreStatsCollector::GetOrCreateInstance(
       restore_started,
       std::make_unique<
           SessionRestoreStatsCollector::UmaStatsReportingDelegate>())
       ->TrackTabs(tabs);
 
-  // Don't start a TabLoader here if background tab loading is done by
-  // PerformanceManager.
-  if (!base::FeatureList::IsEnabled(
-          performance_manager::features::
-              kBackgroundTabLoadingFromPerformanceManager)) {
-    TabLoader::RestoreTabs(tabs, restore_started);
-  } else {
-    std::vector<content::WebContents*> web_contents_vector;
-    web_contents_vector.reserve(tabs.size());
-    for (const auto& tab : tabs) {
-      CHECK(tab.contents());
-      web_contents_vector.push_back(tab.contents());
-    }
-    performance_manager::policies::ScheduleLoadForRestoredTabs(
-        std::move(web_contents_vector));
+  std::vector<content::WebContents*> web_contents_vector;
+  web_contents_vector.reserve(tabs.size());
+  for (const auto& tab : tabs) {
+    CHECK(tab.contents());
+    web_contents_vector.push_back(tab.contents());
   }
+  performance_manager::policies::ScheduleLoadForRestoredTabs(
+      std::move(web_contents_vector));
 }

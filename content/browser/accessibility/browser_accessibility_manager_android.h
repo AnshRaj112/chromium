@@ -5,6 +5,7 @@
 #ifndef CONTENT_BROWSER_ACCESSIBILITY_BROWSER_ACCESSIBILITY_MANAGER_ANDROID_H_
 #define CONTENT_BROWSER_ACCESSIBILITY_BROWSER_ACCESSIBILITY_MANAGER_ANDROID_H_
 
+#include <optional>
 #include <utility>
 
 #include "content/common/content_export.h"
@@ -41,6 +42,15 @@ enum {
   ANDROID_ACCESSIBILITY_EVENT_TEXT_SELECTION_CHANGED = 8192,
   ANDROID_ACCESSIBILITY_EVENT_CONTENT_CHANGE_TYPE_EXPANDED = 16384,
   ANDROID_ACCESSIBILITY_EVENT_TEXT_TRAVERSED_AT_MOVEMENT_GRANULARITY = 131072
+};
+
+// From android.view.accessibility.AccessibilityEvent in Java:
+enum {
+  ANDROID_ACCESSIBILITY_EVENT_TEXT_CHANGE_TYPE_UNDEFINED = 0,
+  ANDROID_ACCESSIBILITY_EVENT_TEXT_CHANGE_TYPE_IN_COMPOSITION = 1,
+  ANDROID_ACCESSIBILITY_EVENT_TEXT_CHANGE_TYPE_COMMITTED_BY_IME = 2,
+  ANDROID_ACCESSIBILITY_EVENT_TEXT_CHANGE_TYPE_CONVERSION_SUGGESTION_SELECTED_BY_IME =
+      4,
 };
 
 class BrowserAccessibilityAndroid;
@@ -116,9 +126,9 @@ class CONTENT_EXPORT BrowserAccessibilityManagerAndroid
       const std::vector<ui::AXLocationChange>& changes) override;
   ui::AXNode* RetargetForEvents(ui::AXNode* node,
                                 RetargetEventType type) const override;
-  void FireBlinkEvent(ax::mojom::Event event_type,
-                      ui::BrowserAccessibility* node,
-                      int action_request_id) override;
+  void FireSourceEvent(ax::mojom::Event event_type,
+                       ui::BrowserAccessibility* node,
+                       int action_request_id) override;
   void FireGeneratedEvent(ui::AXEventGenerator::Event event_type,
                           const ui::AXNode* node) override;
 
@@ -153,7 +163,7 @@ class CONTENT_EXPORT BrowserAccessibilityManagerAndroid
 
   std::u16string GenerateAccessibilityNodeInfoString(int32_t unique_id);
 
-  std::vector<std::string> GetMetadataForTree() const;
+  std::optional<std::vector<std::string>> GetMetadataForTree() const;
 
  protected:
   std::unique_ptr<ui::BrowserAccessibility> CreateBrowserAccessibility(

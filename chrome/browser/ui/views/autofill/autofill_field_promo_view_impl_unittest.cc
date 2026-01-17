@@ -41,7 +41,9 @@ class TestPictureInPictureWindowController
   content::WebContents* GetChildWebContents() override { return nullptr; }
   std::optional<url::Origin> GetOrigin() override { return std::nullopt; }
 
-  std::optional<gfx::Rect> GetWindowBounds() override { return bounds_; }
+  std::optional<gfx::Rect> GetWindowBoundsInScreen() override {
+    return bounds_;
+  }
   void SetWindowBounds(gfx::Rect bounds) { bounds_ = bounds; }
 
  private:
@@ -129,7 +131,7 @@ TEST_F(AutofillFieldPromoViewImplTest, BoundsAreCorrect) {
 #else
   web_contents()->GetNativeView()->SetBoundsInScreen(
       gfx::Rect(300, 300, 1000, 1000),
-      display::Screen::GetScreen()->GetDisplayForNewWindows());
+      display::Screen::Get()->GetDisplayForNewWindows());
 #endif  // BUILDFLAG(IS_MAC)
 
   // Element is within the boundaries of `web_contents()`.

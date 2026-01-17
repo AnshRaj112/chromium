@@ -16,7 +16,8 @@ struct CoreAccountInfo;
 class Profile;
 class ProfilePickerWebContentsHost;
 class ProfileManagementStepController;
-class ProfilePickerSignedInFlowController;
+class ProfilePickerPostSignInAdapter;
+class SigninUIError;
 
 namespace content {
 class WebContents;
@@ -33,11 +34,10 @@ class ProfileManagementFlowControllerImpl
   ~ProfileManagementFlowControllerImpl() override;
 
  protected:
-  virtual std::unique_ptr<ProfilePickerSignedInFlowController>
-  CreateSignedInFlowController(
-      Profile* signed_in_profile,
-      const CoreAccountInfo& account_info,
-      std::unique_ptr<content::WebContents> contents) = 0;
+  virtual std::unique_ptr<ProfilePickerPostSignInAdapter>
+  CreatePostSignInAdapter(Profile* signed_in_profile,
+                          const CoreAccountInfo& account_info,
+                          std::unique_ptr<content::WebContents> contents) = 0;
 
   // To be called when the sign-in and/or sync steps of the flow are completed
   // (or skipped), to proceed with additional steps or finish the flow.
@@ -96,6 +96,10 @@ class ProfileManagementFlowControllerImpl
       const CoreAccountInfo& account_info,
       std::unique_ptr<content::WebContents> contents,
       StepSwitchFinishedCallback step_switch_finished_callback);
+
+  void HandleSigninError(Profile* profile,
+                         content::WebContents* contents,
+                         const SigninUIError& error);
 
   // The list of steps that are added to the flow.
   // It is populated by the return value of `RegisterPostIdentitySteps` that

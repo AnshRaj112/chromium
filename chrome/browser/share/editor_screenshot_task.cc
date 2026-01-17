@@ -15,7 +15,6 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/android/chrome_jni_headers/EditorScreenshotTask_jni.h"
 
-using base::android::JavaParamRef;
 using base::android::JavaRef;
 using base::android::ScopedJavaGlobalRef;
 using base::android::ScopedJavaLocalRef;
@@ -28,7 +27,7 @@ namespace android {
  * TODO(crbug.com/40107491): Remove this temporary class and instead move
  * chrome/browser/android/feedback/screenshot_task.cc.
  */
-void JNI_EditorScreenshotTask_SnapshotCallback(
+static void JNI_EditorScreenshotTask_SnapshotCallback(
     JNIEnv* env,
     const JavaRef<jobject>& callback,
     scoped_refptr<base::RefCountedMemory> png_data) {
@@ -43,12 +42,12 @@ void JNI_EditorScreenshotTask_SnapshotCallback(
   }
 }
 
-void JNI_EditorScreenshotTask_GrabWindowSnapshotAsync(
+static void JNI_EditorScreenshotTask_GrabWindowSnapshotAsync(
     JNIEnv* env,
-    const JavaParamRef<jobject>& jcallback,
-    const JavaParamRef<jobject>& jwindow_android,
-    jint window_width,
-    jint window_height) {
+    const JavaRef<jobject>& jcallback,
+    const JavaRef<jobject>& jwindow_android,
+    int32_t window_width,
+    int32_t window_height) {
   ui::WindowAndroid* window_android =
       ui::WindowAndroid::FromJavaWindowAndroid(jwindow_android);
   gfx::Rect window_bounds(window_width, window_height);
@@ -59,3 +58,5 @@ void JNI_EditorScreenshotTask_GrabWindowSnapshotAsync(
 }
 
 }  // namespace android
+
+DEFINE_JNI(EditorScreenshotTask)

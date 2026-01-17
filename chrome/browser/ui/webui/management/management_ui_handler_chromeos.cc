@@ -32,7 +32,6 @@
 #include "chrome/browser/chromeos/reporting/metric_reporting_prefs.h"
 #include "chrome/browser/enterprise/browser_management/management_service_factory.h"
 #include "chrome/browser/enterprise/reporting/prefs.h"
-#include "chrome/browser/media/webrtc/capture_policy_utils.h"
 #include "chrome/browser/net/stub_resolver_config_reader.h"
 #include "chrome/browser/net/system_network_context_manager.h"
 #include "chrome/browser/policy/networking/policy_cert_service.h"
@@ -60,6 +59,8 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/chromeos/devicetype_utils.h"
 #include "ui/webui/webui_util.h"
+
+using policy::local_user_files::FileSaveDestination;
 
 namespace {
 
@@ -294,14 +295,8 @@ void AddDeviceReportingInfo(base::Value::List* report_sources,
   }
 
   if (crostini::CrostiniFeatures::Get()->IsAllowedNow(profile)) {
-    if (!profile->GetPrefs()
-             ->GetFilePath(crostini::prefs::kCrostiniAnsiblePlaybookFilePath)
-             .empty()) {
-      AddDeviceReportingElement(report_sources,
-                                kManagementCrostiniContainerConfiguration,
-                                DeviceReportingType::kCrostini);
-    } else if (profile->GetPrefs()->GetBoolean(
-                   crostini::prefs::kReportCrostiniUsageEnabled)) {
+    if (profile->GetPrefs()->GetBoolean(
+            crostini::prefs::kReportCrostiniUsageEnabled)) {
       AddDeviceReportingElement(report_sources, kManagementCrostini,
                                 DeviceReportingType::kCrostini);
     }
@@ -358,9 +353,9 @@ void AddDeviceReportingInfo(base::Value::List* report_sources,
       ::reporting::kReportWebsiteTelemetryAllowlist);
   const auto& website_activity_allowlist = profile->GetPrefs()->GetList(
       ::reporting::kReportWebsiteActivityAllowlist);
-  if (base::Contains(website_activity_allowlist, wildcard_pattern_string) ||
+  if (website_activity_allowlist.contains(wildcard_pattern_string) ||
       (!website_telemetry_types.empty() &&
-       base::Contains(website_telemetry_allowlist, wildcard_pattern_string))) {
+       website_telemetry_allowlist.contains(wildcard_pattern_string))) {
     // One or more website metrics reporting policies allowlists all website
     // URLs.
     AddDeviceReportingElement(report_sources,
@@ -417,11 +412,6 @@ void AddStatusOverviewManagedDeviceAndAccount(
                     base::UTF8ToUTF16(device_manager),
                     base::UTF8ToUTF16(account_manager))));
   }
-}
-
-bool IsCloudDestination(policy::local_user_files::FileSaveDestination dest) {
-  return dest == policy::local_user_files::FileSaveDestination::kGoogleDrive ||
-         dest == policy::local_user_files::FileSaveDestination::kOneDrive;
 }
 
 bool IsActiveProfile(const Profile* profile) {
@@ -487,8 +477,6 @@ void ManagementUIHandlerChromeOS::RegisterMessages() {
           &ManagementUIHandlerChromeOS::HandleGetFilesUploadToCloudInfo,
           base::Unretained(this)));
 
-  set_is_get_all_screens_media_allowed_for_any_origin(
-      capture_policy::IsMultiScreenCaptureAllowed(std::nullopt));
   if (IsJavascriptAllowed()) {
     NotifyThreatProtectionInfoUpdated();
   }
@@ -828,41 +816,91 @@ void ManagementUIHandlerChromeOS::HandleGetLocalTrustRootsInfo(
 
 std::u16string ManagementUIHandlerChromeOS::GetFilesUploadToCloudInfo(
     Profile* profile) {
-  policy::local_user_files::FileSaveDestination download_destination =
+  FileSaveDestination camera_destination =
+      policy::local_user_files::GetCameraDestination(profile);
+  FileSaveDestination download_destination =
       policy::local_user_files::GetDownloadsDestination(profile);
-  policy::local_user_files::FileSaveDestination screenshot_destination =
+  FileSaveDestination screenshot_destination =
       policy::local_user_files::GetScreenCaptureDestination(profile);
+  const bool is_camera_gdrive =
+      camera_destination == FileSaveDestination::kGoogleDrive;
+  const bool is_downloads_gdrive =
+      download_destination == FileSaveDestination::kGoogleDrive;
+  const bool is_screenshot_gdrive =
+      screenshot_destination == FileSaveDestination::kGoogleDrive;
+  const bool is_camera_onedrive =
+      camera_destination == FileSaveDestination::kOneDrive;
+  const bool is_downloads_onedrive =
+      download_destination == FileSaveDestination::kOneDrive;
+  const bool is_screenshot_onedrive =
+      screenshot_destination == FileSaveDestination::kOneDrive;
+
+  const bool is_camera_cloud = is_camera_gdrive || is_camera_onedrive;
+  const bool is_downloads_cloud = is_downloads_gdrive || is_downloads_onedrive;
+  const bool is_screenshot_cloud =
+      is_screenshot_gdrive || is_screenshot_onedrive;
+
   int uploads_id = -1;
   int destination_id = -1;
-  if (IsCloudDestination(download_destination) &&
-      IsCloudDestination(screenshot_destination)) {
-    uploads_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_DOWNLOADS_AND_SCREENSHOTS;
-    if (download_destination ==
-            policy::local_user_files::FileSaveDestination::kGoogleDrive &&
-        screenshot_destination ==
-            policy::local_user_files::FileSaveDestination::kGoogleDrive) {
+  if (is_camera_cloud && is_downloads_cloud && is_screenshot_cloud) {
+    uploads_id =
+        IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_CAMERA_DOWNLOADS_AND_SCREENSHOTS;
+    if (is_camera_gdrive && is_downloads_gdrive && is_screenshot_gdrive) {
       destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE;
-    } else if (download_destination ==
-                   policy::local_user_files::FileSaveDestination::kOneDrive &&
-               screenshot_destination ==
-                   policy::local_user_files::FileSaveDestination::kOneDrive) {
+    } else if (is_camera_onedrive && is_downloads_onedrive &&
+               is_screenshot_onedrive) {
       destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_ONEDRIVE;
     } else {
       destination_id =
           IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE_AND_ONEDRIVE;
     }
-  } else if (IsCloudDestination(download_destination)) {
-    uploads_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_DOWNLOADS;
-    if (download_destination ==
-        policy::local_user_files::FileSaveDestination::kGoogleDrive) {
+  } else if (is_camera_cloud && is_downloads_cloud) {
+    uploads_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_CAMERA_AND_DOWNLOADS;
+    if (is_camera_gdrive && is_downloads_gdrive) {
+      destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE;
+    } else if (is_camera_onedrive && is_downloads_onedrive) {
+      destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_ONEDRIVE;
+    } else {
+      destination_id =
+          IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE_AND_ONEDRIVE;
+    }
+  } else if (is_camera_cloud && is_screenshot_cloud) {
+    uploads_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_CAMERA_AND_SCREENSHOTS;
+    if (is_camera_gdrive && is_screenshot_gdrive) {
+      destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE;
+    } else if (is_camera_onedrive && is_screenshot_onedrive) {
+      destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_ONEDRIVE;
+    } else {
+      destination_id =
+          IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE_AND_ONEDRIVE;
+    }
+  } else if (is_downloads_cloud && is_screenshot_cloud) {
+    uploads_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_DOWNLOADS_AND_SCREENSHOTS;
+    if (is_downloads_gdrive && is_screenshot_gdrive) {
+      destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE;
+    } else if (is_downloads_onedrive && is_screenshot_onedrive) {
+      destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_ONEDRIVE;
+    } else {
+      destination_id =
+          IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE_AND_ONEDRIVE;
+    }
+  } else if (is_camera_cloud) {
+    uploads_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_CAMERA;
+    if (is_camera_gdrive) {
       destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE;
     } else {
       destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_ONEDRIVE;
     }
-  } else if (IsCloudDestination(screenshot_destination)) {
+  } else if (is_downloads_cloud) {
+    uploads_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_DOWNLOADS;
+    if (is_downloads_gdrive) {
+      destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE;
+    } else {
+      destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_ONEDRIVE;
+    }
+  } else if (is_screenshot_cloud) {
     uploads_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_SCREENSHOTS;
-    if (screenshot_destination ==
-        policy::local_user_files::FileSaveDestination::kGoogleDrive) {
+    if (is_screenshot_gdrive) {
       destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_GOOGLE_DRIVE;
     } else {
       destination_id = IDS_MANAGEMENT_FILES_CLOUD_UPLOAD_ONEDRIVE;
@@ -912,14 +950,6 @@ void ManagementUIHandlerChromeOS::HandleGetPluginVmDataCollectionStatus(
   AllowJavascript();
   ResolveJavascriptCallback(args[0] /* callback_id */,
                             plugin_vm_data_collection_enabled);
-}
-
-void ManagementUIHandlerChromeOS::
-    CheckGetAllScreensMediaAllowedForAnyOriginResultReceived(bool is_allowed) {
-  set_is_get_all_screens_media_allowed_for_any_origin(is_allowed);
-  if (IsJavascriptAllowed()) {
-    NotifyThreatProtectionInfoUpdated();
-  }
 }
 
 std::unique_ptr<ManagementUIHandler> ManagementUIHandler::Create(

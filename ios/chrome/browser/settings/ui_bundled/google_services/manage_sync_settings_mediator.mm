@@ -10,7 +10,6 @@
 #import "base/apple/foundation_util.h"
 #import "base/auto_reset.h"
 #import "base/check_op.h"
-#import "base/containers/contains.h"
 #import "base/containers/enum_set.h"
 #import "base/containers/fixed_flat_map.h"
 #import "base/i18n/message_formatter.h"
@@ -28,8 +27,8 @@
 #import "components/sync/service/local_data_description.h"
 #import "components/sync/service/sync_service.h"
 #import "components/sync/service/sync_user_settings.h"
+#import "ios/chrome/browser/authentication/history_sync/model/history_sync_utils.h"
 #import "ios/chrome/browser/authentication/ui_bundled/cells/central_account_view.h"
-#import "ios/chrome/browser/authentication/ui_bundled/history_sync/history_sync_utils.h"
 #import "ios/chrome/browser/net/model/crurl.h"
 #import "ios/chrome/browser/policy/ui_bundled/management_util.h"
 #import "ios/chrome/browser/settings/model/sync/utils/account_error_ui_info.h"
@@ -37,11 +36,11 @@
 #import "ios/chrome/browser/settings/model/sync/utils/sync_util.h"
 #import "ios/chrome/browser/settings/ui_bundled/cells/settings_image_detail_text_item.h"
 #import "ios/chrome/browser/settings/ui_bundled/cells/sync_switch_item.h"
-#import "ios/chrome/browser/settings/ui_bundled/google_services/features.h"
 #import "ios/chrome/browser/settings/ui_bundled/google_services/manage_sync_settings_command_handler.h"
 #import "ios/chrome/browser/settings/ui_bundled/google_services/manage_sync_settings_constants.h"
 #import "ios/chrome/browser/settings/ui_bundled/google_services/manage_sync_settings_consumer.h"
 #import "ios/chrome/browser/settings/ui_bundled/google_services/sync_error_settings_command_handler.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/profile/features.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/list_model/list_model.h"
@@ -54,6 +53,7 @@
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_item.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/signin/model/authentication_service.h"
+#import "ios/chrome/browser/signin/model/avatar_provider.h"
 #import "ios/chrome/browser/signin/model/chrome_account_manager_service.h"
 #import "ios/chrome/browser/signin/model/constants.h"
 #import "ios/chrome/browser/sync/model/enterprise_utils.h"
@@ -234,7 +234,7 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
     return;
   }
   UIImage* avatarImage =
-      _chromeAccountManagerService->GetIdentityAvatarWithIdentity(
+      GetApplicationContext()->GetIdentityAvatarProvider()->GetIdentityAvatar(
           _signedInIdentity, IdentityAvatarSize::Large);
   NSString* managementDescription =
       GetManagementDescription([self managementState]);
@@ -336,52 +336,33 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
   [model addItem:self.encryptionItem
       toSectionWithIdentifier:AdvancedSettingsSectionIdentifier];
 
-  if (IsLinkedServicesSettingIosEnabled()) {
-    // PersonalizeGoogleServicesItemType.
-    TableViewImageItem* personalizeGoogleServicesItem =
-        [[TableViewImageItem alloc]
-            initWithType:PersonalizeGoogleServicesItemType];
-    if (self.isEEAAccount) {
-      personalizeGoogleServicesItem.title = GetNSString(
-          IDS_IOS_MANAGE_SYNC_PERSONALIZE_GOOGLE_SERVICES_TITLE_EEA);
-      personalizeGoogleServicesItem.accessoryView = [[UIImageView alloc]
-          initWithImage:DefaultAccessorySymbolConfigurationWithRegularWeight(
-                            kChevronForwardSymbol)];
-    } else {
-      personalizeGoogleServicesItem.title =
-          GetNSString(IDS_IOS_MANAGE_SYNC_PERSONALIZE_GOOGLE_SERVICES_TITLE);
-      personalizeGoogleServicesItem.accessoryView = [[UIImageView alloc]
-          initWithImage:DefaultAccessorySymbolConfigurationWithRegularWeight(
-                            kExternalLinkSymbol)];
-    }
-    personalizeGoogleServicesItem.accessoryView.tintColor =
-        [UIColor colorNamed:kTextQuaternaryColor];
-    personalizeGoogleServicesItem.detailText = GetNSString(
-        IDS_IOS_MANAGE_SYNC_PERSONALIZE_GOOGLE_SERVICES_DESCRIPTION);
-    personalizeGoogleServicesItem.accessibilityIdentifier =
-        kPersonalizeGoogleServicesIdentifier;
-    personalizeGoogleServicesItem.accessibilityTraits |=
-        UIAccessibilityTraitButton;
-    [model addItem:personalizeGoogleServicesItem
-        toSectionWithIdentifier:AdvancedSettingsSectionIdentifier];
+  // PersonalizeGoogleServicesItemType.
+  TableViewImageItem* personalizeGoogleServicesItem =
+      [[TableViewImageItem alloc]
+          initWithType:PersonalizeGoogleServicesItemType];
+  if (self.isEEAAccount) {
+    personalizeGoogleServicesItem.title =
+        GetNSString(IDS_IOS_MANAGE_SYNC_PERSONALIZE_GOOGLE_SERVICES_TITLE_EEA);
+    personalizeGoogleServicesItem.accessoryView = [[UIImageView alloc]
+        initWithImage:DefaultAccessorySymbolConfigurationWithRegularWeight(
+                          kChevronForwardSymbol)];
   } else {
-    // GoogleActivityControlsItemType.
-    TableViewImageItem* googleActivityControlsItem = [[TableViewImageItem alloc]
-        initWithType:GoogleActivityControlsItemType];
-    googleActivityControlsItem.accessoryView = [[UIImageView alloc]
+    personalizeGoogleServicesItem.title =
+        GetNSString(IDS_IOS_MANAGE_SYNC_PERSONALIZE_GOOGLE_SERVICES_TITLE);
+    personalizeGoogleServicesItem.accessoryView = [[UIImageView alloc]
         initWithImage:DefaultAccessorySymbolConfigurationWithRegularWeight(
                           kExternalLinkSymbol)];
-    googleActivityControlsItem.accessoryView.tintColor =
-        [UIColor colorNamed:kTextQuaternaryColor];
-    googleActivityControlsItem.title =
-        GetNSString(IDS_IOS_MANAGE_SYNC_GOOGLE_ACTIVITY_CONTROLS_TITLE);
-    googleActivityControlsItem.detailText =
-        GetNSString(IDS_IOS_MANAGE_SYNC_GOOGLE_ACTIVITY_CONTROLS_DESCRIPTION);
-    googleActivityControlsItem.accessibilityTraits |=
-        UIAccessibilityTraitButton;
-    [model addItem:googleActivityControlsItem
-        toSectionWithIdentifier:AdvancedSettingsSectionIdentifier];
   }
+  personalizeGoogleServicesItem.accessoryView.tintColor =
+      [UIColor colorNamed:kTextQuaternaryColor];
+  personalizeGoogleServicesItem.detailText =
+      GetNSString(IDS_IOS_MANAGE_SYNC_PERSONALIZE_GOOGLE_SERVICES_DESCRIPTION);
+  personalizeGoogleServicesItem.accessibilityIdentifier =
+      kPersonalizeGoogleServicesIdentifier;
+  personalizeGoogleServicesItem.accessibilityTraits |=
+      UIAccessibilityTraitButton;
+  [model addItem:personalizeGoogleServicesItem
+      toSectionWithIdentifier:AdvancedSettingsSectionIdentifier];
 
   // AdvancedSettingsSectionIdentifier.
   TableViewImageItem* dataFromChromeSyncItem =
@@ -497,16 +478,13 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
   [model addItem:item
       toSectionWithIdentifier:ManageAndSignOutSectionIdentifier];
 
-  if (base::FeatureList::IsEnabled(kIOSManageAccountStorage)) {
-    // Manage account storage item.
-    item = [[TableViewTextItem alloc] initWithType:ManageAccountStorageType];
-    item.text =
-        GetNSString(IDS_IOS_GOOGLE_ACCOUNT_SETTINGS_MANAGE_STORAGE_ITEM);
-    item.textColor = [UIColor colorNamed:kBlueColor];
-    item.accessibilityTraits |= UIAccessibilityTraitButton;
-    [model addItem:item
-        toSectionWithIdentifier:ManageAndSignOutSectionIdentifier];
-  }
+  // Manage account storage item.
+  item = [[TableViewTextItem alloc] initWithType:ManageAccountStorageType];
+  item.text = GetNSString(IDS_IOS_GOOGLE_ACCOUNT_SETTINGS_MANAGE_STORAGE_ITEM);
+  item.textColor = [UIColor colorNamed:kBlueColor];
+  item.accessibilityTraits |= UIAccessibilityTraitButton;
+  [model addItem:item
+      toSectionWithIdentifier:ManageAndSignOutSectionIdentifier];
 
   // Manage accounts on this device item.
   item = [[TableViewTextItem alloc] initWithType:ManageAccountsItemType];
@@ -557,6 +535,7 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
   item.text = l10n_util::GetNSString(
       IDS_IOS_GOOGLE_ACCOUNT_SETTINGS_SWITCH_ACCOUNT_ITEM);
   item.textColor = [UIColor colorNamed:kBlueColor];
+  item.accessibilityTraits |= UIAccessibilityTraitButton;
   [model addItem:item
       toSectionWithIdentifier:SwitchAccountAndSignOutSectionIdentifier];
 
@@ -564,6 +543,7 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
   item = [[TableViewTextItem alloc] initWithType:SignOutItemType];
   item.text = GetNSString(IDS_IOS_GOOGLE_ACCOUNT_SETTINGS_SIGN_OUT_ITEM);
   item.textColor = [UIColor colorNamed:kBlueColor];
+  item.accessibilityTraits |= UIAccessibilityTraitButton;
   [model addItem:item
       toSectionWithIdentifier:SwitchAccountAndSignOutSectionIdentifier];
   if (self.forcedSigninEnabled) {
@@ -622,6 +602,7 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
 - (SettingsImageDetailTextItem*)batchUploadRecommendationItem {
   SettingsImageDetailTextItem* item = [[SettingsImageDetailTextItem alloc]
       initWithType:BatchUploadRecommendationItemType];
+  item.selectionStyle = UITableViewCellSelectionStyleNone;
   item.detailText = [self itemsToUploadRecommendationString];
   item.image = CustomSymbolWithPointSize(kCloudAndArrowUpSymbol,
                                          kBatchUploadSymbolPointSize);
@@ -791,7 +772,7 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
       break;
     case syncer::UserSelectableType::kPayments:
       itemType = PaymentsDataTypeItemType;
-      textStringID = IDS_SYNC_DATATYPE_PAYMENTS;
+      textStringID = IDS_SYNC_DATATYPE_PAYMENTS_AND_INFO;
       accessibilityIdentifier = kSyncPaymentsIdentifier;
       break;
     case syncer::UserSelectableType::kPreferences:
@@ -832,14 +813,22 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
     SyncSwitchItem* switchItem = [[SyncSwitchItem alloc] initWithType:itemType];
     switchItem.text = GetNSString(textStringID);
     switchItem.dataType = static_cast<NSInteger>(dataType);
+    switchItem.target = self;
+    switchItem.selector = @selector(itemSwitchToggled:);
+    switchItem.tag = itemType;
+    switchItem.accessibilityTraits = UIAccessibilityTraitToggleButton;
     switchItem.accessibilityIdentifier = accessibilityIdentifier;
     return switchItem;
   } else {
     TableViewInfoButtonItem* button =
         [[TableViewInfoButtonItem alloc] initWithType:itemType];
     button.text = GetNSString(textStringID);
+    button.textColor = [UIColor colorNamed:kTextSecondaryColor];
     button.statusText = GetNSString(IDS_IOS_SETTING_OFF);
     button.accessibilityIdentifier = accessibilityIdentifier;
+    button.accessibilityTraits = UIAccessibilityTraitButton;
+    button.target = self;
+    button.selector = @selector(itemButtonTapped:);
     return button;
   }
 }
@@ -847,6 +836,101 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
 // Updates the consumer when the content size is updated.
 - (void)preferredContentSizeChanged:(NSNotification*)notification {
   [self updatePrimaryAccountDetails];
+}
+
+// Called when the user taps on the button of an info cell.
+- (void)itemButtonTapped:(UIButton*)button {
+  [self.consumer showManagedUIInfoForButton:button];
+}
+
+// Called when the user toggle the switch of a switch cell.
+- (void)itemSwitchToggled:(UISwitch*)sender {
+  TableViewItem* item;
+  for (TableViewItem* dataItem in self.syncSwitchItems) {
+    if (dataItem.type == sender.tag) {
+      item = dataItem;
+      break;
+    }
+  }
+  BOOL value = sender.on;
+  SyncSwitchItem* syncSwitchItem = base::apple::ObjCCast<SyncSwitchItem>(item);
+  syncSwitchItem.on = value;
+  if (value &&
+      static_cast<syncer::UserSelectableType>(syncSwitchItem.dataType) ==
+          syncer::UserSelectableType::kAutofill &&
+      _syncService->GetUserSettings()->IsUsingExplicitPassphrase()) {
+    [self.commandHandler showAdressesNotEncryptedDialog];
+    return;
+  }
+
+  // The notifications should be ignored to get smooth switch animations.
+  // Notifications are sent by SyncObserverModelBridge while changing
+  // settings.
+  base::AutoReset<BOOL> autoReset(&_ignoreSyncStateChanges, YES);
+  SyncSettingsItemType itemType = static_cast<SyncSettingsItemType>(item.type);
+  switch (itemType) {
+    case HistoryDataTypeItemType: {
+      DCHECK(syncSwitchItem);
+      // Update History Sync decline prefs.
+      value ? history_sync::ResetDeclinePrefs(_prefService)
+            : history_sync::RecordDeclinePrefs(_prefService);
+      // Don't try to toggle the managed item.
+      if (![self isManagedSyncSettingsDataType:syncer::UserSelectableType::
+                                                   kHistory]) {
+        _syncService->GetUserSettings()->SetSelectedType(
+            syncer::UserSelectableType::kHistory, value);
+      }
+      // The kTabs toggle does not exist. Instead it's
+      // controlled by the history toggle.
+      if (![self isManagedSyncSettingsDataType:syncer::UserSelectableType::
+                                                   kTabs]) {
+        _syncService->GetUserSettings()->SetSelectedType(
+            syncer::UserSelectableType::kTabs, value);
+      }
+      break;
+    }
+    case PaymentsDataTypeItemType:
+    case AutofillDataTypeItemType:
+    case BookmarksDataTypeItemType:
+    case OpenTabsDataTypeItemType:
+    case PasswordsDataTypeItemType:
+    case ReadingListDataTypeItemType:
+    case SettingsDataTypeItemType: {
+      // Don't try to toggle if item is managed.
+      DCHECK(syncSwitchItem);
+      syncer::UserSelectableType dataType =
+          static_cast<syncer::UserSelectableType>(syncSwitchItem.dataType);
+      if ([self isManagedSyncSettingsDataType:dataType]) {
+        break;
+      }
+
+      _syncService->GetUserSettings()->SetSelectedType(dataType, value);
+      break;
+    }
+    case ManageGoogleAccountItemType:
+    case ManageAccountsItemType:
+    case SwitchAccountItemType:
+    case SignOutItemType:
+    case EncryptionItemType:
+    case DataFromChromeSync:
+    case PersonalizeGoogleServicesItemType:
+    case PrimaryAccountReauthErrorItemType:
+    case ShowPassphraseDialogErrorItemType:
+    case SyncNeedsTrustedVaultKeyErrorItemType:
+    case SyncTrustedVaultRecoverabilityDegradedErrorItemType:
+    case SyncDisabledByAdministratorErrorItemType:
+    case BookmarksLimitExceededErrorItemType:
+    case SignOutItemFooterType:
+    case TypesListHeaderOrFooterType:
+    case AccountErrorMessageItemType:
+    case BatchUploadButtonItemType:
+    case BatchUploadRecommendationItemType:
+    case ManageAccountStorageType:
+      NOTREACHED();
+  }
+  [self updateSyncItemsNotifyConsumer:YES];
+  // Switching toggles might affect the batch upload recommendation.
+  [self fetchLocalDataDescriptionsForBatchUploadWithFirstLoad:NO];
 }
 
 #pragma mark - Properties
@@ -964,91 +1048,6 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
 
 #pragma mark - ManageSyncSettingsServiceDelegate
 
-- (void)toggleSwitchItem:(TableViewItem*)item withValue:(BOOL)value {
-  {
-    SyncSwitchItem* syncSwitchItem =
-        base::apple::ObjCCast<SyncSwitchItem>(item);
-    syncSwitchItem.on = value;
-    if (value &&
-        static_cast<syncer::UserSelectableType>(syncSwitchItem.dataType) ==
-            syncer::UserSelectableType::kAutofill &&
-        _syncService->GetUserSettings()->IsUsingExplicitPassphrase()) {
-      [self.commandHandler showAdressesNotEncryptedDialog];
-      return;
-    }
-
-    // The notifications should be ignored to get smooth switch animations.
-    // Notifications are sent by SyncObserverModelBridge while changing
-    // settings.
-    base::AutoReset<BOOL> autoReset(&_ignoreSyncStateChanges, YES);
-    SyncSettingsItemType itemType =
-        static_cast<SyncSettingsItemType>(item.type);
-    switch (itemType) {
-      case HistoryDataTypeItemType: {
-        DCHECK(syncSwitchItem);
-        // Update History Sync decline prefs.
-        value ? history_sync::ResetDeclinePrefs(_prefService)
-              : history_sync::RecordDeclinePrefs(_prefService);
-        // Don't try to toggle the managed item.
-        if (![self isManagedSyncSettingsDataType:syncer::UserSelectableType::
-                                                     kHistory]) {
-          _syncService->GetUserSettings()->SetSelectedType(
-              syncer::UserSelectableType::kHistory, value);
-        }
-        // The kTabs toggle does not exist. Instead it's
-        // controlled by the history toggle.
-        if (![self isManagedSyncSettingsDataType:syncer::UserSelectableType::
-                                                     kTabs]) {
-          _syncService->GetUserSettings()->SetSelectedType(
-              syncer::UserSelectableType::kTabs, value);
-        }
-        break;
-      }
-      case PaymentsDataTypeItemType:
-      case AutofillDataTypeItemType:
-      case BookmarksDataTypeItemType:
-      case OpenTabsDataTypeItemType:
-      case PasswordsDataTypeItemType:
-      case ReadingListDataTypeItemType:
-      case SettingsDataTypeItemType: {
-        // Don't try to toggle if item is managed.
-        DCHECK(syncSwitchItem);
-        syncer::UserSelectableType dataType =
-            static_cast<syncer::UserSelectableType>(syncSwitchItem.dataType);
-        if ([self isManagedSyncSettingsDataType:dataType]) {
-          break;
-        }
-
-        _syncService->GetUserSettings()->SetSelectedType(dataType, value);
-        break;
-      }
-      case ManageGoogleAccountItemType:
-      case ManageAccountsItemType:
-      case SwitchAccountItemType:
-      case SignOutItemType:
-      case EncryptionItemType:
-      case GoogleActivityControlsItemType:
-      case DataFromChromeSync:
-      case PersonalizeGoogleServicesItemType:
-      case PrimaryAccountReauthErrorItemType:
-      case ShowPassphraseDialogErrorItemType:
-      case SyncNeedsTrustedVaultKeyErrorItemType:
-      case SyncTrustedVaultRecoverabilityDegradedErrorItemType:
-      case SyncDisabledByAdministratorErrorItemType:
-      case SignOutItemFooterType:
-      case TypesListHeaderOrFooterType:
-      case AccountErrorMessageItemType:
-      case BatchUploadButtonItemType:
-      case BatchUploadRecommendationItemType:
-      case ManageAccountStorageType:
-        NOTREACHED();
-    }
-  }
-  [self updateSyncItemsNotifyConsumer:YES];
-  // Switching toggles might affect the batch upload recommendation.
-  [self fetchLocalDataDescriptionsForBatchUploadWithFirstLoad:NO];
-}
-
 - (void)didSelectItem:(TableViewItem*)item cellRect:(CGRect)cellRect {
   SyncSettingsItemType itemType = static_cast<SyncSettingsItemType>(item.type);
   switch (itemType) {
@@ -1065,9 +1064,6 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
       [self.syncErrorHandler openPassphraseDialogWithModalPresentation:NO];
       break;
     }
-    case GoogleActivityControlsItemType:
-      [self.commandHandler openWebAppActivityDialog];
-      break;
     case DataFromChromeSync:
       [self.commandHandler openDataFromChromeSyncWebPage];
       break;
@@ -1096,6 +1092,9 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
       break;
     case SyncTrustedVaultRecoverabilityDegradedErrorItemType:
       [self.syncErrorHandler openTrustedVaultReauthForDegradedRecoverability];
+      break;
+    case BookmarksLimitExceededErrorItemType:
+      [self.syncErrorHandler openBookmarksLimitExceededHelp];
       break;
     case SignOutItemType:
       [self.commandHandler signOutFromTargetRect:cellRect];
@@ -1140,6 +1139,7 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
   SettingsImageDetailTextItem* syncErrorItem =
       [[SettingsImageDetailTextItem alloc]
           initWithType:AccountErrorMessageItemType];
+  syncErrorItem.selectionStyle = UITableViewCellSelectionStyleNone;
   syncErrorItem.detailText = l10n_util::GetNSString(messageID);
   syncErrorItem.image =
       DefaultSymbolWithPointSize(kErrorCircleFillSymbol, kErrorSymbolPointSize);
@@ -1156,7 +1156,8 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
   CHECK((itemType == PrimaryAccountReauthErrorItemType) ||
         (itemType == ShowPassphraseDialogErrorItemType) ||
         (itemType == SyncNeedsTrustedVaultKeyErrorItemType) ||
-        (itemType == SyncTrustedVaultRecoverabilityDegradedErrorItemType))
+        (itemType == SyncTrustedVaultRecoverabilityDegradedErrorItemType) ||
+        (itemType == BookmarksLimitExceededErrorItemType))
       << "itemType: " << itemType;
   CHECK(self.accountStateSignedIn);
   TableViewTextItem* item = [[TableViewTextItem alloc] initWithType:itemType];
@@ -1296,7 +1297,11 @@ constexpr CGFloat kBatchUploadSymbolPointSize = 22.;
     case syncer::SyncService::UserActionableError::
         kTrustedVaultRecoverabilityDegradedForEverything:
       return SyncTrustedVaultRecoverabilityDegradedErrorItemType;
+    case syncer::SyncService::UserActionableError::kBookmarksLimitExceeded:
+      return BookmarksLimitExceededErrorItemType;
     case syncer::SyncService::UserActionableError::kNone:
+    // UI not implemented for this case.
+    case syncer::SyncService::UserActionableError::kNeedsClientUpgrade:
       return std::nullopt;
   }
   NOTREACHED();

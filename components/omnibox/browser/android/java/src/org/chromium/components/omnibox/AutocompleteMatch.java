@@ -89,7 +89,7 @@ public class AutocompleteMatch {
     private byte @Nullable [] mPostData;
     private final int mGroupId;
     private byte @Nullable [] mClipboardImageData;
-    private boolean mHasTabMatch;
+    private final boolean mHasTabMatch;
     private long mNativeMatch;
     private final List<OmniboxAction> mActions;
     private final boolean mAllowedToBeDefaultMatch;
@@ -303,8 +303,14 @@ public class AutocompleteMatch {
     }
 
     @CalledByNative
-    private void setDestinationUrl(GURL url) {
+    @VisibleForTesting
+    void updateNavigationDetails(GURL url, String[] headerKeys, String[] headerVals) {
         mUrl = url;
+        assert headerKeys.length == headerVals.length;
+
+        for (int i = 0; i < headerKeys.length; i++) {
+            mExtraHeaders.put(headerKeys[i], headerVals[i]);
+        }
     }
 
     @CalledByNative
@@ -337,11 +343,6 @@ public class AutocompleteMatch {
                             descriptionClassificationOffsets[i],
                             descriptionClassificationStyles[i]));
         }
-    }
-
-    @CalledByNative
-    private void updateMatchingTab(boolean hasTabMatch) {
-        mHasTabMatch = hasTabMatch;
     }
 
     public @OmniboxSuggestionType int getType() {

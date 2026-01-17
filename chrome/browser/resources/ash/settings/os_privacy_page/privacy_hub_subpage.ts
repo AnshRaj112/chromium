@@ -17,6 +17,7 @@ import './metrics_consent_toggle_button.js';
 import {PrefsMixin} from '/shared/settings/prefs/prefs_mixin.js';
 import {I18nMixin} from 'chrome://resources/ash/common/cr_elements/i18n_mixin.js';
 import {WebUiListenerMixin} from 'chrome://resources/ash/common/cr_elements/web_ui_listener_mixin.js';
+import {assertNotReached} from 'chrome://resources/js/assert.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
@@ -30,7 +31,6 @@ import {Router, routes} from '../router.js';
 import type {PrivacyHubBrowserProxy} from './privacy_hub_browser_proxy.js';
 import {PrivacyHubBrowserProxyImpl} from './privacy_hub_browser_proxy.js';
 import {GeolocationAccessLevel} from './privacy_hub_geolocation_subpage.js';
-import {PrivacyHubSensorSubpageUserAction} from './privacy_hub_metrics_util.js';
 import {getTemplate} from './privacy_hub_subpage.html.js';
 
 /**
@@ -253,29 +253,14 @@ export class SettingsPrivacyHubSubpage extends SettingsPrivacyHubSubpageBase {
   }
 
   private onCameraSubpageLinkClick_(): void {
-    chrome.metricsPrivate.recordEnumerationValue(
-        'ChromeOS.PrivacyHub.CameraSubpage.UserAction',
-        PrivacyHubSensorSubpageUserAction.SUBPAGE_OPENED,
-        Object.keys(PrivacyHubSensorSubpageUserAction).length);
-
     Router.getInstance().navigateTo(routes.PRIVACY_HUB_CAMERA);
   }
 
   private onMicrophoneSubpageLinkClick_(): void {
-    chrome.metricsPrivate.recordEnumerationValue(
-        'ChromeOS.PrivacyHub.MicrophoneSubpage.UserAction',
-        PrivacyHubSensorSubpageUserAction.SUBPAGE_OPENED,
-        Object.keys(PrivacyHubSensorSubpageUserAction).length);
-
     Router.getInstance().navigateTo(routes.PRIVACY_HUB_MICROPHONE);
   }
 
   private onGeolocationAreaClick_(): void {
-    chrome.metricsPrivate.recordEnumerationValue(
-        'ChromeOS.PrivacyHub.LocationSubpage.UserAction',
-        PrivacyHubSensorSubpageUserAction.SUBPAGE_OPENED,
-        Object.keys(PrivacyHubSensorSubpageUserAction).length);
-
     Router.getInstance().navigateTo(routes.PRIVACY_HUB_GEOLOCATION);
   }
 
@@ -296,6 +281,8 @@ export class SettingsPrivacyHubSubpage extends SettingsPrivacyHubSubpageBase {
         return this.i18n('geolocationAreaOnlyAllowedForSystemSubtext');
       case GeolocationAccessLevel.DISALLOWED:
         return this.i18n('geolocationAreaDisallowedSubtext');
+      default:
+        assertNotReached();
     }
   }
 

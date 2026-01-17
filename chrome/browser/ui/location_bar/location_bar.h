@@ -13,12 +13,20 @@
 #include "base/time/time.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/size.h"
 #include "url/gurl.h"
 
+class ChipController;
 class CommandUpdater;
 class LocationBarModel;
 class LocationBarTesting;
+class OmniboxController;
 class OmniboxView;
+
+namespace bubble_anchor_util {
+struct AnchorConfiguration;
+}
 
 namespace content {
 class WebContents;
@@ -76,24 +84,55 @@ class LocationBar {
 
   virtual OmniboxView* GetOmniboxView() = 0;
 
+  // Returns the OmniboxController owned by this LocationBar.
+  virtual OmniboxController* GetOmniboxController() = 0;
+
   // Returns the WebContents of the currently active tab.
   virtual content::WebContents* GetWebContents() = 0;
 
   virtual LocationBarModel* GetLocationBarModel() = 0;
+
+  // If chip is visible in this LocationBar, return a bubble anchor config that
+  // can be used to anchor to the chip.
+  virtual std::optional<bubble_anchor_util::AnchorConfiguration>
+  GetChipAnchor() = 0;
+
+  // Controls the chip in the LocationBar.
+  virtual ChipController* GetChipController() = 0;
 
   // Called when anything has changed that might affect the layout or contents
   // of the views around the edit, including the text of the edit and the
   // status of any keyword- or hint-related state.
   virtual void OnChanged() = 0;
 
-  // Called when the omnibox popup is shown or hidden.
-  virtual void OnPopupVisibilityChanged() = 0;
-
   // Called when the edit should update itself without restoring any tab state.
   virtual void UpdateWithoutTabRestore() = 0;
 
   CommandUpdater* command_updater() { return command_updater_; }
   const CommandUpdater* command_updater() const { return command_updater_; }
+
+  // Returns true if the location bar is visible.
+  virtual bool IsVisible() const = 0;
+
+  // Returns the the location bar's bounds; see views::View::bounds().
+  virtual gfx::Rect Bounds() const = 0;
+
+  // Returns the minimum size of the location bar.
+  virtual gfx::Size MinimumSize() const = 0;
+
+  // Returns the preferred size of the location bar.
+  virtual gfx::Size PreferredSize() const = 0;
+
+  // Updates the controller, and, if `contents` is non-null, restores saved
+  // state that the tab holds.
+  virtual void Update(content::WebContents* contents) = 0;
+
+  // Clears the location bar's state for `contents`.
+  virtual void ResetTabState(content::WebContents* contents) = 0;
+
+  // Returns true if the location bar's current security state does not match
+  // the currently visible state.
+  virtual bool HasSecurityStateChanged() = 0;
 
   // Returns a pointer to the testing interface.
   virtual LocationBarTesting* GetLocationBarForTesting() = 0;

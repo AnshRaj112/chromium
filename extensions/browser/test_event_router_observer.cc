@@ -24,7 +24,17 @@ void TestEventRouterObserver::ClearEvents() {
 }
 
 void TestEventRouterObserver::WaitForEventWithName(const std::string& name) {
-  while (!base::Contains(events_, name)) {
+  while (!events_.contains(name)) {
+    // Create a new `RunLoop` since reuse is not supported.
+    run_loop_ = std::make_unique<base::RunLoop>();
+    run_loop_->Run();
+    run_loop_.reset();
+  }
+}
+
+void TestEventRouterObserver::WaitForDispatchedEventWithName(
+    const std::string& name) {
+  while (!dispatched_events_.contains(name)) {
     // Create a new `RunLoop` since reuse is not supported.
     run_loop_ = std::make_unique<base::RunLoop>();
     run_loop_->Run();

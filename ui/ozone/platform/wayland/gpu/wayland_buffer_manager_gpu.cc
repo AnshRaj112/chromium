@@ -4,6 +4,9 @@
 
 #include "ui/ozone/platform/wayland/gpu/wayland_buffer_manager_gpu.h"
 
+#include <drm_fourcc.h>
+
+#include <algorithm>
 #include <utility>
 
 #include "base/functional/bind.h"
@@ -12,6 +15,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/trace_event/trace_event.h"
 #include "base/version.h"
+#include "components/viz/common/resources/shared_image_format_utils.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/rrect_f.h"
 #include "ui/gfx/linux/drm_util_linux.h"
@@ -71,8 +75,8 @@ WaylandBufferManagerGpu::~WaylandBufferManagerGpu() = default;
 
 void WaylandBufferManagerGpu::Initialize(
     mojo::PendingRemote<ozone::mojom::WaylandBufferManagerHost> remote_host,
-    const base::flat_map<::gfx::BufferFormat, std::vector<uint64_t>>&
-        buffer_formats_with_modifiers,
+    const base::flat_map<::viz::SharedImageFormat, std::vector<uint64_t>>&
+        shared_image_formats_with_modifiers,
     bool supports_dma_buf,
     bool supports_viewporter,
     bool supports_acquire_fence,
@@ -84,7 +88,7 @@ void WaylandBufferManagerGpu::Initialize(
   if (!gpu_thread_runner_)
     gpu_thread_runner_ = base::SingleThreadTaskRunner::GetCurrentDefault();
 
-  supported_buffer_formats_with_modifiers_ = buffer_formats_with_modifiers;
+  supported_formats_with_modifiers_ = shared_image_formats_with_modifiers;
   supports_viewporter_ = supports_viewporter;
   supports_acquire_fence_ = supports_acquire_fence;
   supports_dmabuf_ = supports_dma_buf;
@@ -194,6 +198,8 @@ void WaylandBufferManagerGpu::CreateDmabufBasedBuffer(
     const std::vector<uint64_t>& modifiers,
     uint32_t current_format,
     uint32_t planes_count,
+    const gfx::ColorSpace& color_space,
+    const gfx::HDRMetadata& hdr_metadata,
     uint32_t buffer_id) {
   DCHECK(gpu_thread_runner_);
   if (!gpu_thread_runner_->BelongsToCurrentThread()) {
@@ -204,14 +210,15 @@ void WaylandBufferManagerGpu::CreateDmabufBasedBuffer(
                        base::Unretained(this), std::move(dmabuf_fd),
                        std::move(size), std::move(strides), std::move(offsets),
                        std::move(modifiers), current_format, planes_count,
-                       buffer_id));
+                       color_space, hdr_metadata, buffer_id));
     return;
   }
 
-  base::OnceClosure task = base::BindOnce(
-      &WaylandBufferManagerGpu::CreateDmabufBasedBufferTask,
-      base::Unretained(this), std::move(dmabuf_fd), size, strides, offsets,
-      modifiers, current_format, planes_count, buffer_id);
+  base::OnceClosure task =
+      base::BindOnce(&WaylandBufferManagerGpu::CreateDmabufBasedBufferTask,
+                     base::Unretained(this), std::move(dmabuf_fd), size,
+                     strides, offsets, modifiers, current_format, planes_count,
+                     color_space, hdr_metadata, buffer_id);
   RunOrQueueTask(std::move(task));
 }
 
@@ -342,17 +349,25 @@ void WaylandBufferManagerGpu::AddBindingWaylandBufferManagerGpu(
   receiver_set_.Add(this, std::move(receiver));
 }
 
-const std::vector<uint64_t>
-WaylandBufferManagerGpu::GetModifiersForBufferFormat(
-    gfx::BufferFormat buffer_format) const {
-  auto it = supported_buffer_formats_with_modifiers_.find(buffer_format);
-  if (it != supported_buffer_formats_with_modifiers_.end()) {
+const std::vector<uint64_t> WaylandBufferManagerGpu::GetModifiersForFormat(
+    viz::SharedImageFormat format) const {
+  auto it = supported_formats_with_modifiers_.find(format);
+  if (it != supported_formats_with_modifiers_.end()) {
     if (drm_modifiers_filter_) {
-      return drm_modifiers_filter_->Filter(buffer_format, it->second);
+      return drm_modifiers_filter_->Filter(format, it->second);
     }
     return it->second;
   }
   return {};
+}
+
+bool WaylandBufferManagerGpu::AllowsImplicitModifierForFormat(
+    viz::SharedImageFormat format) const {
+  auto it = supported_formats_with_modifiers_.find(format);
+  if (it != supported_formats_with_modifiers_.end()) {
+    return std::ranges::contains(it->second, DRM_FORMAT_MOD_INVALID);
+  }
+  return false;
 }
 
 uint32_t WaylandBufferManagerGpu::AllocateBufferID() {
@@ -360,8 +375,8 @@ uint32_t WaylandBufferManagerGpu::AllocateBufferID() {
 }
 
 bool WaylandBufferManagerGpu::SupportsFormat(
-    gfx::BufferFormat buffer_format) const {
-  return supported_buffer_formats_with_modifiers_.contains(buffer_format);
+    viz::SharedImageFormat format) const {
+  return supported_formats_with_modifiers_.contains(format);
 }
 
 void WaylandBufferManagerGpu::BindHostInterface(
@@ -508,13 +523,16 @@ void WaylandBufferManagerGpu::CreateDmabufBasedBufferTask(
     const std::vector<uint64_t>& modifiers,
     uint32_t current_format,
     uint32_t planes_count,
+    const gfx::ColorSpace& color_space,
+    const gfx::HDRMetadata& hdr_metadata,
     uint32_t buffer_id) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(gpu_sequence_checker_);
   DCHECK(remote_host_);
 
   remote_host_->CreateDmabufBasedBuffer(
       mojo::PlatformHandle(std::move(dmabuf_fd)), size, strides, offsets,
-      modifiers, current_format, planes_count, buffer_id);
+      modifiers, current_format, planes_count, color_space, hdr_metadata,
+      buffer_id);
 }
 
 void WaylandBufferManagerGpu::CreateShmBasedBufferTask(base::ScopedFD shm_fd,

@@ -15,6 +15,7 @@
 
 #include "base/check_deref.h"
 #include "base/i18n/case_conversion.h"
+#include "base/i18n/unicodestring.h"
 #include "base/notreached.h"
 #include "base/time/time.h"
 #include "components/autofill/core/browser/webdata/autocomplete/autocomplete_entry_label_sensitive.h"
@@ -26,6 +27,10 @@
 #include "sql/statement.h"
 #include "sql/transaction.h"
 #include "third_party/abseil-cpp/absl/container/flat_hash_set.h"
+#include "third_party/icu/source/common/unicode/normalizer2.h"
+#include "third_party/icu/source/common/unicode/uchar.h"
+#include "third_party/icu/source/common/unicode/unistr.h"
+#include "third_party/icu/source/common/unicode/utypes.h"
 #include "ui/base/l10n/l10n_util.h"
 
 namespace autofill {
@@ -69,17 +74,46 @@ time_t GetEndTime(base::Time end) {
   return end.ToTimeT();
 }
 
-// TODO(crbug.com/346507576): Make it work for all charsets, implement ICU.
-std::u16string NormalizeLabel(std::u16string_view label) {
-  // Trim all non-alpha-numeric characters from the beginning and end.
-  while (!label.empty() && !base::IsAsciiAlphaNumeric(label.front())) {
-    label.remove_prefix(1);
-  }
-  while (!label.empty() && !base::IsAsciiAlphaNumeric(label.back())) {
-    label.remove_suffix(1);
+// Normalizes a given label string according to the following rules.
+//
+//   1. Trims leading and trailing non-alphanumeric characters.
+//   2. Converts to lowercase.
+//   3. Caps length at 50 characters.
+//   4. ICU-aware: correctly handles characters from scripts such as emojis,
+//   Kanji, Hangul, Greek, Cyrillic, etc.
+//   5. Unicode NFKC normalization - canonicalization for string comparison.
+std::u16string NormalizeLabel(std::u16string_view label_view) {
+  icu::UnicodeString uni_label(label_view.data(), label_view.length());
+
+  UErrorCode status = U_ZERO_ERROR;
+  const icu::Normalizer2* normalizer =
+      icu::Normalizer2::getNFKCInstance(status);
+  if (U_SUCCESS(status)) {
+    uni_label = normalizer->normalize(uni_label, status);
   }
 
-  return base::i18n::ToLower(label.substr(0, 50));
+  int32_t start = 0;
+  int32_t end = uni_label.length() - 1;
+
+  while (start <= end && !(u_isalnum(uni_label[start]))) {
+    start++;
+  }
+  while (end >= start && !(u_isalnum(uni_label[end]))) {
+    end--;
+  }
+
+  if (start > end) {  // Label became empty after trimming
+    return u"";
+  }
+
+  int32_t truncated_label_length = end - start + 1;
+  if (truncated_label_length > 50) {
+    truncated_label_length = 50;
+  }
+
+  uni_label = icu::UnicodeString(uni_label, start, truncated_label_length);
+  uni_label.toLower();
+  return base::i18n::UnicodeStringToString16(uni_label);
 }
 
 }  // namespace
@@ -468,6 +502,11 @@ bool AutocompleteTableLabelSensitive::InitMainTable() {
            // Used by query in GetFormValuesForElementNameAndLabel
            && CreateIndex(db(), kAutocompleteTableLabelSensitive,
                           {kLabelNormalized, kValueLower})
+
+           // Used by query in RemoveFormElement,
+           // GetCountOfValuesContainedBetween, AddFormFieldValueTime
+           && CreateIndex(db(), kAutocompleteTableLabelSensitive,
+                          {kValue, kDateLastUsed})
 
            // Used by query in GetAutocompleteEntryLabelSensitive
            && CreateIndex(db(), kAutocompleteTableLabelSensitive,

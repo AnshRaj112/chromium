@@ -43,6 +43,8 @@ build_webui("build") {
     "theme_snapshot.ts",
     "themes.html.ts",
     "themes.ts",
+    "tools.html.ts",
+    "tools.ts",
     "wallpaper_search/combobox/customize_chrome_combobox.html.ts",
     "wallpaper_search/combobox/customize_chrome_combobox.ts",
     "wallpaper_search/wallpaper_search.html.ts",
@@ -67,16 +69,21 @@ build_webui("build") {
     "theme_snapshot.css",
     "themes.css",
     "toggle_container_shared.css",
+    "tools.css",
     "wallpaper_search/combobox/customize_chrome_combobox.css",
     "wallpaper_search/wallpaper_search.css",
     "wallpaper_search/wallpaper_search_tile.css",
   ]
 
-  mojo_files_deps = [ "//chrome/browser/ui/webui/side_panel/customize_chrome:mojo_bindings_ts__generator" ]
+  mojo_files_deps = [
+    "//chrome/browser/ui/webui/side_panel/customize_chrome:mojo_bindings_ts__generator",
+    "//components/ntp_tiles:mojo_bindings_ts__generator",
+  ]
   mojo_files = [
     "$root_gen_dir/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome.mojom-webui.ts",
     "$root_gen_dir/chrome/browser/ui/webui/side_panel/customize_chrome/customize_toolbar/customize_toolbar.mojom-webui.ts",
     "$root_gen_dir/chrome/browser/ui/webui/side_panel/customize_chrome/wallpaper_search/wallpaper_search.mojom-webui.ts",
+    "$root_gen_dir/components/ntp_tiles/tile_type.mojom-webui.ts",
   ]
 
   ts_composite = true

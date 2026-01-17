@@ -36,14 +36,17 @@ namespace {
 template <typename T>
 T* GetOrCreateRenditionGroup(
     base::PassKey<MultivariantPlaylist> pass_key,
-    base::flat_map<std::string_view, scoped_refptr<T>>& groups,
-    std::string_view id) {
+    base::flat_map<std::optional<std::string_view>, scoped_refptr<T>>& groups,
+    std::optional<std::string_view> id) {
   auto iter = groups.find(id);
 
   // If the group wasn't found, create it.
   if (iter == groups.end()) {
-    auto group =
-        base::MakeRefCounted<RenditionGroup>(pass_key, std::string(id));
+    std::optional<std::string> group_id;
+    if (id.has_value()) {
+      group_id = std::string(*id);
+    }
+    auto group = base::MakeRefCounted<RenditionGroup>(pass_key, group_id);
     iter = groups.insert(std::make_pair(id, std::move(group))).first;
   }
 
@@ -54,16 +57,11 @@ T* GetOrCreateRenditionGroup(
 
 MultivariantPlaylist::~MultivariantPlaylist() = default;
 
-Playlist::Kind MultivariantPlaylist::GetKind() const {
-  return Kind::kMultivariantPlaylist;
-}
-
 // static
 ParseStatus::Or<scoped_refptr<MultivariantPlaylist>>
 MultivariantPlaylist::Parse(std::string_view source,
                             GURL uri,
-                            types::DecimalInteger version,
-                            TagRecorder* tag_recorder) {
+                            types::DecimalInteger version) {
   DCHECK(version != 0);
   if (version < Playlist::kMinSupportedVersion ||
       version > Playlist::kMaxSupportedVersion) {
@@ -88,9 +86,10 @@ MultivariantPlaylist::Parse(std::string_view source,
   VariableDictionary::SubstitutionBuffer sub_buffer;
   std::optional<XStreamInfTag> inf_tag;
   std::vector<VariantStream> variants;
-  base::flat_map<std::string_view, scoped_refptr<RenditionGroup>>
+  base::flat_map<std::optional<std::string_view>, scoped_refptr<RenditionGroup>>
       audio_rendition_groups;
-  uint64_t rendition_unique_id = 0;
+  base::flat_map<GURL, RenditionGroup::RenditionTrackId> rendition_uri_map;
+  RenditionGroup::RenditionTrackId::Generator rendition_id_generator;
 
   // Get variants out of the playlist
   while (true) {
@@ -117,9 +116,6 @@ MultivariantPlaylist::Parse(std::string_view source,
       }
 
       if (!tag->GetName().has_value()) {
-        if (tag_recorder) {
-          tag_recorder->SetMetric(TagRecorder::Metric::kUnknownTag);
-        }
         HandleUnknownTag(*tag);
         continue;
       }
@@ -144,9 +140,6 @@ MultivariantPlaylist::Parse(std::string_view source,
 
       switch (static_cast<MultivariantPlaylistTagName>(*tag->GetName())) {
         case MultivariantPlaylistTagName::kXContentSteering: {
-          if (tag_recorder) {
-            tag_recorder->SetMetric(TagRecorder::Metric::kContentSteering);
-          }
           // TODO(crbug.com/40057824): Implement the EXT-X-CONTENT-STEERING tag
           break;
         }
@@ -167,9 +160,29 @@ MultivariantPlaylist::Parse(std::string_view source,
             case MediaType::kAudio: {
               auto* group = GetOrCreateRenditionGroup(
                   {}, audio_rendition_groups, media_tag.group_id.Str());
+
+              std::optional<RenditionGroup::RenditionTrackId> rendition_id;
+              std::optional<GURL> resolved_playlist_uri;
+              if (!media_tag.uri.has_value()) {
+                rendition_id = rendition_id_generator.GenerateNextId();
+              } else {
+                resolved_playlist_uri = uri.Resolve(media_tag.uri->Str());
+                if (!resolved_playlist_uri->is_valid()) {
+                  return ParseStatusCode::kInvalidUri;
+                }
+                auto id_iter = rendition_uri_map.find(*resolved_playlist_uri);
+                if (id_iter == rendition_uri_map.end()) {
+                  rendition_id = rendition_id_generator.GenerateNextId();
+                  rendition_uri_map.emplace(*resolved_playlist_uri,
+                                            *rendition_id);
+                } else {
+                  rendition_id = id_iter->second;
+                }
+              }
+
               auto rendition_result = group->AddRendition(
                   base::PassKey<MultivariantPlaylist>(), std::move(media_tag),
-                  uri, ++rendition_unique_id);
+                  uri, std::move(resolved_playlist_uri), *rendition_id);
               if (!rendition_result.has_value()) {
                 return std::move(rendition_result).error();
               }
@@ -195,9 +208,6 @@ MultivariantPlaylist::Parse(std::string_view source,
           break;
         }
         case MultivariantPlaylistTagName::kXSessionKey: {
-          if (tag_recorder) {
-            tag_recorder->SetMetric(TagRecorder::Metric::kSessionKey);
-          }
           // TODO(crbug.com/40057824): Implement the EXT-X-SESSION-KEY tag
           break;
         }
@@ -235,6 +245,9 @@ MultivariantPlaylist::Parse(std::string_view source,
     if (inf_tag->audio.has_value()) {
       audio_renditions = GetOrCreateRenditionGroup({}, audio_rendition_groups,
                                                    inf_tag->audio->Str());
+    } else {
+      audio_renditions =
+          GetOrCreateRenditionGroup({}, audio_rendition_groups, std::nullopt);
     }
 
     // TODO(crbug.com/402566477): Support multiple video renditions - for now
@@ -243,15 +256,17 @@ MultivariantPlaylist::Parse(std::string_view source,
     scoped_refptr<RenditionGroup> video_renditions =
         base::MakeRefCounted<RenditionGroup>(
             base::PassKey<MultivariantPlaylist>{}, "DEFAULT");
-    RenditionGroup::RenditionTrack implicit_rendition =
-        video_renditions->MakeImplicitRendition({}, variant_uri,
-                                                ++rendition_unique_id);
 
-    variants.emplace_back(
-        std::move(variant_uri), inf_tag->bandwidth, inf_tag->average_bandwidth,
-        inf_tag->score, std::move(inf_tag->codecs), inf_tag->resolution,
-        inf_tag->frame_rate, std::move(audio_renditions),
-        std::move(video_renditions), std::move(implicit_rendition));
+    variants.emplace_back(std::move(variant_uri), inf_tag->bandwidth,
+                          inf_tag->average_bandwidth, inf_tag->score,
+                          std::move(inf_tag->codecs), inf_tag->resolution,
+                          inf_tag->frame_rate,
+                          audio_renditions->MakeImplicitView(
+                              {}, MediaType::kAudio, variant_uri,
+                              rendition_id_generator.GenerateNextId()),
+                          video_renditions->MakeImplicitView(
+                              {}, MediaType::kVideo, variant_uri,
+                              rendition_id_generator.GenerateNextId()));
 
     // Reset per-variant tags
     inf_tag.reset();
@@ -269,9 +284,10 @@ MultivariantPlaylist::Parse(std::string_view source,
   // Ensure that each rendition group has at least one rendition
   // If there were none, then a variant stream referenced a group that does not
   // exist. The inverse (a rendition group that was not referenced by any
-  // variant) is not considered an error.
+  // variant) is not considered an error. If this represents the implicit
+  // virtual group, we should expect that there are no tracks at all.
   for (const auto& group : audio_rendition_groups) {
-    if (group.second->GetRenditions().empty()) {
+    if (group.first.has_value() != group.second->HasTracks()) {
       return ParseStatusCode::kRenditionGroupDoesNotExist;
     }
   }

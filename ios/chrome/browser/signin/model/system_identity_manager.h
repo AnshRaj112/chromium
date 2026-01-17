@@ -21,6 +21,7 @@
 #include "ios/chrome/browser/signin/model/capabilities_types.h"
 #include "ios/chrome/browser/signin/model/system_identity_manager_observer.h"
 
+class GaiaId;
 @protocol RefreshAccessTokenError;
 @protocol SystemIdentity;
 @protocol SystemIdentityInteractionManager;
@@ -96,9 +97,6 @@ class SystemIdentityManager {
   // Callback invoked when the `FetchTokenAuthURL()` operation completes.
   using AuthenticatedURLCallback = base::OnceCallback<void(NSURL*, NSError*)>;
 
-  // Callback invoked when `IsSubjectToParentalControls()` operations complete.
-  using FetchCapabilityCallback = base::OnceCallback<void(CapabilityResult)>;
-
   // Callback invoked when the `FetchCapabilitie()` operation completes.
   using FetchCapabilitiesCallback =
       base::OnceCallback<void(std::map<std::string, CapabilityResult>)>;
@@ -113,13 +111,6 @@ class SystemIdentityManager {
   SystemIdentityManager& operator=(const SystemIdentityManager&) = delete;
 
   virtual ~SystemIdentityManager();
-
-  // Asynchronously returns the value of the account capability that determines
-  // whether parental controls should be applied to `identity`.
-  //
-  // This is a wrapper around `FetchCapabilities()`.
-  void IsSubjectToParentalControls(id<SystemIdentity> identity,
-                                   FetchCapabilityCallback callback);
 
   // Adds/removes observers.
   void AddObserver(SystemIdentityManagerObserver* observer);
@@ -194,7 +185,7 @@ class SystemIdentityManager {
   // Returns true if the identity was removed by calling `ForgetIdentity()`.
   // Returns false If the identity was not removed or disappeared without
   // calling `ForgetIdentity()`.
-  virtual bool IdentityRemovedByUser(NSString* gaia_id) = 0;
+  virtual bool IdentityRemovedByUser(const GaiaId& gaia_id) = 0;
 
   // Asynchronously retrieves access tokens for `identity` with `scopes`. The
   // callback is invoked on the calling sequence when the operation completes.
@@ -246,6 +237,11 @@ class SystemIdentityManager {
       NSArray<id<SystemIdentity>>* active_identities,
       id<RefreshAccessTokenError> error,
       HandleMDMCallback callback) = 0;
+
+  // Returns whether the `error` is due to restricted access to the scopes in
+  // the access token request.
+  // TODO(crbug.com/425592221): Convert to pure virtual method.
+  virtual bool IsScopeLimitedError(id<RefreshAccessTokenError> error);
 
   // Returns whether the `error` associated with `identity` is due to MDM
   // (Mobile Device Management) or not.

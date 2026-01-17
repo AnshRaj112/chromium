@@ -21,7 +21,6 @@
 #include "base/check_is_test.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/dcheck_is_on.h"
 #include "base/debug/crash_logging.h"
@@ -107,9 +106,6 @@ namespace {
 
 SystemWebAppDelegateMap CreateSystemWebApps(Profile* profile) {
   std::vector<std::unique_ptr<SystemWebAppDelegate>> info_vec;
-  // TODO(crbug.com/40118385): Currently unused, will be hooked up
-  // post-migration. We're making delegates for everything, and will then use
-  // them in place of SystemAppInfos.
   info_vec.push_back(std::make_unique<CameraSystemAppDelegate>(profile));
   info_vec.push_back(std::make_unique<DemoModeSystemAppDelegate>(profile));
   info_vec.push_back(std::make_unique<DiagnosticsSystemAppDelegate>(profile));
@@ -161,8 +157,7 @@ SystemWebAppDelegateMap CreateSystemWebApps(Profile* profile) {
 
   SystemWebAppDelegateMap delegate_map;
   for (auto& info : info_vec) {
-    if (info->IsAppEnabled() ||
-        base::FeatureList::IsEnabled(features::kEnableAllSystemWebApps)) {
+    if (info->IsAppEnabled()) {
       // Gets `type` before std::move().
       SystemWebAppType type = info->GetType();
       delegate_map.emplace(type, std::move(info));
@@ -181,8 +176,8 @@ web_app::ExternalInstallOptions CreateInstallOptionsForSystemApp(
     const SystemWebAppDelegate& delegate,
     bool force_update,
     bool is_disabled) {
-  DCHECK(delegate.GetInstallUrl().scheme() == content::kChromeUIScheme ||
-         delegate.GetInstallUrl().scheme() ==
+  DCHECK(delegate.GetInstallUrl().GetScheme() == content::kChromeUIScheme ||
+         delegate.GetInstallUrl().GetScheme() ==
              content::kChromeUIUntrustedScheme);
 
   web_app::ExternalInstallOptions install_options(
@@ -200,7 +195,8 @@ web_app::ExternalInstallOptions CreateInstallOptionsForSystemApp(
   install_options.add_to_search = delegate.ShouldShowInSearchAndShelf();
   install_options.add_to_management = false;
   install_options.is_disabled = is_disabled;
-  install_options.force_reinstall = force_update;
+  install_options.force_reinstall =
+      force_update || delegate.ShouldForceReinstall();
   install_options.uninstall_and_replace =
       delegate.GetAppIdsToUninstallAndReplace();
   install_options.system_app_type = type;
@@ -315,10 +311,6 @@ void SystemWebAppManager::StopBackgroundTasksForTesting() {
 }
 
 bool SystemWebAppManager::IsAppEnabled(SystemWebAppType type) const {
-  if (base::FeatureList::IsEnabled(features::kEnableAllSystemWebApps)) {
-    return true;
-  }
-
   const SystemWebAppDelegate* delegate =
       GetSystemWebApp(system_app_delegates_, type);
   if (!delegate) {
@@ -376,7 +368,7 @@ void SystemWebAppManager::Start() {
       provider_->policy_manager().GetDisabledSystemWebApps();
 
   for (const auto& app : system_app_delegates_) {
-    bool is_disabled = base::Contains(disabled_system_apps, app.first);
+    bool is_disabled = disabled_system_apps.contains(app.first);
     install_options_list.push_back(CreateInstallOptionsForSystemApp(
         app.first, *app.second, should_force_install_apps, is_disabled));
   }

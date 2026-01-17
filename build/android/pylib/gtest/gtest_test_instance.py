@@ -18,6 +18,7 @@ from pylib import constants
 from pylib.constants import host_paths
 from pylib.base import base_test_result
 from pylib.base import test_instance
+from pylib.symbols import deobfuscator
 from pylib.symbols import stack_symbolizer
 from pylib.utils import test_filter
 
@@ -396,6 +397,8 @@ class GtestTestInstance(test_instance.TestInstance):
     self._wait_for_java_debugger = args.wait_for_java_debugger
     self._use_existing_test_data = args.use_existing_test_data
     self._deploy_mock_openxr_runtime = args.deploy_mock_openxr_runtime
+    self._proguard_mapping_path = args.proguard_mapping_path
+    self._deobfuscator = None
 
     # GYP:
     if args.executable_dist_dir:
@@ -630,8 +633,26 @@ class GtestTestInstance(test_instance.TestInstance):
   #override
   def SetUp(self):
     """Map data dependencies via isolate."""
+    if self.wait_for_java_debugger:
+      if self._apk_helper and not self._apk_helper.GetIsDebuggable():
+        raise Exception('Passed --wait-for-java-debugger flag but did not set '
+                        'debuggable_apks = true in GN args')
     self._data_deps.extend(
         self._data_deps_delegate(self._runtime_deps_path))
+    if self._proguard_mapping_path:
+      self._deobfuscator = deobfuscator.DeobfuscatorPool(
+          self._proguard_mapping_path)
+
+  def GetLogcatPackageNames(self):
+    ret = {x.GetPackageName() for x in self._additional_apks}
+    if pkg := self.package:
+      ret.add(pkg)
+    return ','.join(sorted(ret))
+
+  def MaybeDeobfuscateLines(self, lines):
+    if not self._deobfuscator:
+      return lines
+    return self._deobfuscator.TransformLines(lines)
 
   def GetDataDependencies(self):
     """Returns the test suite's data dependencies.
@@ -706,3 +727,7 @@ class GtestTestInstance(test_instance.TestInstance):
   #override
   def TearDown(self):
     """Do nothing."""
+    self.symbolizer.CleanUp()
+    if self._deobfuscator:
+      self._deobfuscator.Close()
+      self._deobfuscator = None

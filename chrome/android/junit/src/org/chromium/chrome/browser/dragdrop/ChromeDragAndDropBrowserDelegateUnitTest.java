@@ -40,6 +40,7 @@ import org.chromium.base.IntentUtils;
 import org.chromium.base.Token;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Features;
+import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.app.tabwindow.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -136,6 +137,7 @@ public class ChromeDragAndDropBrowserDelegateUnitTest {
 
     @Test
     @Config(sdk = 30)
+    @EnableFeatures(ChromeFeatureList.ROBUST_WINDOW_MANAGEMENT)
     public void testDragAndDropBrowserDelegate_createLinkIntent_PostR() {
         MultiWindowTestUtils.enableMultiInstance();
         Intent intent =
@@ -333,6 +335,7 @@ public class ChromeDragAndDropBrowserDelegateUnitTest {
     private ChromeDropDataAndroid createTabGroupDropData(boolean allowDragToCreateNewInstance) {
         return new ChromeTabGroupDropDataAndroid.Builder()
                 .withTabGroupMetadata(buildTabGroupMetadata())
+                .withTabs(new ArrayList<Tab>()) // Unimportant for this test; must be non-null.
                 .withAllowDragToCreateInstance(allowDragToCreateNewInstance)
                 .build();
     }
@@ -353,7 +356,7 @@ public class ChromeDragAndDropBrowserDelegateUnitTest {
                         ? new Item(
                                 DragAndDropLauncherActivity.buildTabOrGroupIntent(
                                         dropData,
-                                        mApplicationContext,
+                                        mActivity,
                                         sourceWindowId,
                                         /* destWindowId= */ TabWindowManager.INVALID_WINDOW_ID))
                         : null;

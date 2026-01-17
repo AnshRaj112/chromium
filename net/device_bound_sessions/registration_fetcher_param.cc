@@ -11,17 +11,21 @@
 #include "base/strings/escape.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
+#include "net/base/features.h"
 #include "net/base/schemeful_site.h"
+#include "net/device_bound_sessions/session.h"
 #include "net/device_bound_sessions/session_binding_utils.h"
 #include "net/http/structured_headers.h"
 
 namespace {
-// TODO(kristianm): See if these can be used with
-// services/network/sec_header_helpers.cc
-constexpr char kRegistrationHeaderName[] = "Sec-Session-Registration";
+
+constexpr char kRegistrationHeaderName[] = "Secure-Session-Registration";
 constexpr char kChallengeParamKey[] = "challenge";
 constexpr char kPathParamKey[] = "path";
 constexpr char kAuthCodeParamKey[] = "authorization";
+constexpr char kProviderKeyParamKey[] = "provider_key";
+constexpr char kProviderUrlParamKey[] = "provider_url";
+constexpr char kProviderSessionIdParamKey[] = "provider_session_id";
 
 constexpr char kES256[] = "ES256";
 constexpr char kRS256[] = "RS256";
@@ -38,6 +42,7 @@ std::optional<crypto::SignatureVerifier::SignatureAlgorithm> AlgoFromString(
 
   return std::nullopt;
 }
+
 }  // namespace
 
 namespace net::device_bound_sessions {
@@ -53,12 +58,18 @@ RegistrationFetcherParam::~RegistrationFetcherParam() = default;
 RegistrationFetcherParam::RegistrationFetcherParam(
     GURL registration_endpoint,
     std::vector<crypto::SignatureVerifier::SignatureAlgorithm> supported_algos,
-    std::string challenge,
-    std::optional<std::string> authorization)
+    std::optional<std::string> challenge,
+    std::optional<std::string> authorization,
+    std::optional<std::string> provider_key,
+    std::optional<GURL> provider_url,
+    std::optional<Session::Id> provider_session_id)
     : registration_endpoint_(std::move(registration_endpoint)),
       supported_algos_(std::move(supported_algos)),
       challenge_(std::move(challenge)),
-      authorization_(std::move(authorization)) {}
+      authorization_(std::move(authorization)),
+      provider_key_(std::move(provider_key)),
+      provider_url_(std::move(provider_url)),
+      provider_session_id_(std::move(provider_session_id)) {}
 
 std::optional<RegistrationFetcherParam> RegistrationFetcherParam::ParseItem(
     const GURL& request_url,
@@ -78,17 +89,19 @@ std::optional<RegistrationFetcherParam> RegistrationFetcherParam::ParseItem(
   }
 
   GURL registration_endpoint;
-  std::string challenge;
+  std::optional<std::string> challenge;
   std::optional<std::string> authorization;
+  std::optional<std::string> provider_key;
+  std::optional<GURL> provider_url;
+  std::optional<Session::Id> provider_session_id;
   for (const auto& [key, value] : session_registration.params) {
     // The keys for the parameters are unique and must be lower case.
     // Quiche (https://quiche.googlesource.com/quiche), used here,
     // will currently pick the last if there is more than one.
     if (key == kPathParamKey) {
       if (!value.is_string()) {
-        continue;
+        return std::nullopt;
       }
-      // TODO(kristianm): Update this as same site requirements are solidified
       std::string unescaped_path = base::UnescapeURLComponent(
           value.GetString(),
           base::UnescapeRule::PATH_SEPARATORS |
@@ -105,22 +118,54 @@ std::optional<RegistrationFetcherParam> RegistrationFetcherParam::ParseItem(
                                          request_url)) {
         registration_endpoint = std::move(candidate_registration_endpoint);
       }
-    } else if (key == kChallengeParamKey && value.is_string()) {
+    } else if (key == kChallengeParamKey) {
+      if (!value.is_string()) {
+        return std::nullopt;
+      }
       challenge = value.GetString();
-    } else if (key == kAuthCodeParamKey && value.is_string()) {
+    } else if (key == kAuthCodeParamKey) {
+      if (!value.is_string()) {
+        return std::nullopt;
+      }
       authorization = value.GetString();
+    } else if (key == kProviderKeyParamKey) {
+      if (!value.is_string()) {
+        return std::nullopt;
+      }
+      provider_key = value.GetString();
+    } else if (key == kProviderUrlParamKey) {
+      if (!value.is_string()) {
+        return std::nullopt;
+      }
+      provider_url = GURL(value.GetString());
+    } else if (key == kProviderSessionIdParamKey) {
+      if (!value.is_string()) {
+        return std::nullopt;
+      }
+      provider_session_id = Session::Id(value.GetString());
     }
 
     // Other params are ignored
   }
 
-  if (!registration_endpoint.is_valid() || challenge.empty()) {
+  if (!registration_endpoint.is_valid()) {
+    return std::nullopt;
+  }
+
+  if (provider_key.has_value() != provider_url.has_value() ||
+      provider_key.has_value() != provider_session_id.has_value()) {
+    return std::nullopt;
+  }
+
+  if (provider_url.has_value() &&
+      (!provider_url->is_valid() || !IsSecure(*provider_url))) {
     return std::nullopt;
   }
 
   return RegistrationFetcherParam(
       std::move(registration_endpoint), std::move(supported_algos),
-      std::move(challenge), std::move(authorization));
+      std::move(challenge), std::move(authorization), std::move(provider_key),
+      std::move(provider_url), std::move(provider_session_id));
 }
 
 std::vector<RegistrationFetcherParam> RegistrationFetcherParam::CreateIfValid(
@@ -163,11 +208,15 @@ std::vector<RegistrationFetcherParam> RegistrationFetcherParam::CreateIfValid(
 RegistrationFetcherParam RegistrationFetcherParam::CreateInstanceForTesting(
     GURL registration_endpoint,
     std::vector<crypto::SignatureVerifier::SignatureAlgorithm> supported_algos,
-    std::string challenge,
-    std::optional<std::string> authorization) {
+    std::optional<std::string> challenge,
+    std::optional<std::string> authorization,
+    std::optional<std::string> provider_key,
+    std::optional<GURL> provider_url,
+    std::optional<Session::Id> provider_session_id) {
   return RegistrationFetcherParam(
       std::move(registration_endpoint), std::move(supported_algos),
-      std::move(challenge), std::move(authorization));
+      std::move(challenge), std::move(authorization), std::move(provider_key),
+      std::move(provider_url), std::move(provider_session_id));
 }
 
 }  // namespace net::device_bound_sessions

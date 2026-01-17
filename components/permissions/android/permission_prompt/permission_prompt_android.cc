@@ -77,20 +77,30 @@ PermissionPromptAndroid::GetEmbeddedPromptVariant() const {
   return EmbeddedPermissionPromptFlowModel::Variant::kUninitialized;
 }
 
-void PermissionPromptAndroid::Closing() {
+void PermissionPromptAndroid::Dismiss(const PromptOptions& prompt_options) {
+  delegate_->SetPromptOptions(prompt_options);
   delegate_->Dismiss();
 }
 
-void PermissionPromptAndroid::Accept() {
+void PermissionPromptAndroid::Accept(const PromptOptions& prompt_options) {
+  delegate_->SetPromptOptions(prompt_options);
   delegate_->Accept();
 }
 
-void PermissionPromptAndroid::AcceptThisTime() {
+void PermissionPromptAndroid::AcceptThisTime(
+    const PromptOptions& prompt_options) {
+  delegate_->SetPromptOptions(prompt_options);
   delegate_->AcceptThisTime();
 }
 
-void PermissionPromptAndroid::Deny() {
+void PermissionPromptAndroid::Deny(const PromptOptions& prompt_options) {
+  delegate_->SetPromptOptions(prompt_options);
   delegate_->Deny();
+}
+
+void PermissionPromptAndroid::Ignore(const PromptOptions& prompt_options) {
+  delegate_->SetPromptOptions(prompt_options);
+  delegate_->Ignore();
 }
 
 void PermissionPromptAndroid::SetManageClicked() {
@@ -226,9 +236,9 @@ PermissionPromptAndroid::GetBoldRanges(JNIEnv* env) const {
   return base::android::ToJavaIntArray(env, bolded_ranges);
 }
 
-void PermissionPromptAndroid::SetPromptOptions(
-    PromptOptions prompt_options) {
-  delegate_->SetPromptOptions(std::move(prompt_options));
+GeolocationAccuracy
+PermissionPromptAndroid::GetInitialGeolocationAccuracySelection() const {
+  return delegate_->GetInitialGeolocationAccuracySelection();
 }
 
 }  // namespace permissions

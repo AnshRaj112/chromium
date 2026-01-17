@@ -5,6 +5,7 @@
 #include "third_party/blink/renderer/modules/compute_pressure/pressure_observer_manager.h"
 
 #include "base/notreached.h"
+#include "base/task/single_thread_task_runner.h"
 #include "mojo/public/cpp/bindings/pending_flush.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "services/device/public/mojom/pressure_update.mojom-blink.h"
@@ -76,8 +77,8 @@ void PressureObserverManager::AddObserver(V8PressureSource::Enum source,
     pressure_manager_->AddClient(
         V8PressureSourceToPressureSource(source),
         client->BindNewEndpointAndPassRemote(task_runner),
-        WTF::BindOnce(&PressureObserverManager::DidAddClient,
-                      WrapWeakPersistent(this), source));
+        BindOnce(&PressureObserverManager::DidAddClient,
+                 WrapWeakPersistent(this), source));
   } else if (state == PressureClientImpl::State::kInitialized) {
     observer->OnBindingSucceeded(source);
   }
@@ -120,7 +121,7 @@ void PressureObserverManager::EnsureConnection(
   if (!pressure_manager_.is_bound()) {
     GetExecutionContext()->GetBrowserInterfaceBroker().GetInterface(
         pressure_manager_.BindNewPipeAndPassReceiver(task_runner));
-    pressure_manager_.set_disconnect_handler(WTF::BindOnce(
+    pressure_manager_.set_disconnect_handler(BindOnce(
         &PressureObserverManager::OnConnectionError, WrapWeakPersistent(this)));
   }
 }

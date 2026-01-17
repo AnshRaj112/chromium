@@ -76,10 +76,8 @@ bool CanStartOneFingerDrag(int window_component) {
 void ShowResizeShadow(aura::Window* window, int component) {
   // Don't show resize shadow if
   // 1) the window is not toplevel.
-  // 2) the device is in tablet mode.
-  // 3) the window is not resizable.
-  if (display::Screen::GetScreen()->InTabletMode() ||
-      window != window->GetToplevelWindow() ||
+  // 2) the window is not resizable.
+  if (window != window->GetToplevelWindow() ||
       ((window->GetProperty(aura::client::kResizeBehaviorKey) &
         aura::client::kResizeBehaviorCanResize) == 0)) {
     return;
@@ -250,7 +248,7 @@ void ToplevelWindowEventHandler::OnDisplayMetricsChanged(
     return;
 
   display::Display current_display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(
+      display::Screen::Get()->GetDisplayNearestWindow(
           window_resizer_->resizer()->GetTarget());
   if (display.id() != current_display.id())
     return;
@@ -851,7 +849,7 @@ aura::Window* ToplevelWindowEventHandler::GetTargetForClientAreaGesture(
 
   aura::Window* toplevel = widget->GetNativeWindow();
 
-  if (!display::Screen::GetScreen()->InTabletMode()) {
+  if (!display::Screen::Get()->InTabletMode()) {
     return nullptr;
   }
   WindowState* window_state = WindowState::Get(toplevel);
@@ -872,7 +870,7 @@ aura::Window* ToplevelWindowEventHandler::GetTargetForClientAreaGesture(
   const gfx::Point location_in_screen =
       event->target()->GetScreenLocation(*event);
   const gfx::Rect work_area_bounds =
-      display::Screen::GetScreen()
+      display::Screen::Get()
           ->GetDisplayNearestWindow(static_cast<aura::Window*>(event->target()))
           .work_area();
 

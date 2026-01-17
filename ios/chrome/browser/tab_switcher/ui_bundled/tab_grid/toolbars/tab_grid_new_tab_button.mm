@@ -30,7 +30,8 @@ const CGFloat kLargeSize = 44;
 const CGFloat kLargeSymbolSizeIPad = 34;
 // Size of the button when using a large symbol.
 const CGFloat kLargeSizeIPad = 52;
-
+// The corner radius to display the button in a square container.
+const CGFloat kSquareCornerRadius = 10;
 }  // namespace
 
 @implementation TabGridNewTabButton {
@@ -61,13 +62,14 @@ const CGFloat kLargeSizeIPad = 52;
 
     _symbol = CustomSymbolWithPointSize(kPlusCircleFillSymbol, symbolSize);
 
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
-    if (@available(iOS 26, *)) {
-      self.configuration = [UIButtonConfiguration glassButtonConfiguration];
+    if (@available(iOS 18, *)) {
+      self.configuration = [UIButtonConfiguration filledButtonConfiguration];
       _symbol = DefaultSymbolWithPointSize(kPlusSymbol, symbolSize);
       self.tintColor = UIColor.blackColor;
+      if (@available(iOS 26, *)) {
+        self.configuration = [UIButtonConfiguration glassButtonConfiguration];
+      }
     }
-#endif
 
     _imageContainer = [[UIImageView alloc] initWithImage:_symbol];
     _imageContainer.translatesAutoresizingMaskIntoConstraints = NO;
@@ -104,40 +106,58 @@ const CGFloat kLargeSizeIPad = 52;
     case TabGridPageIncognitoTabs:
       self.accessibilityLabel =
           l10n_util::GetNSString(IDS_IOS_TAB_GRID_CREATE_NEW_INCOGNITO_TAB);
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
-      if (@available(iOS 26, *)) {
+
+      if (@available(iOS 18, *)) {
         UIButtonConfiguration* config = self.configuration;
-        config.background.backgroundColor = UIColor.grayColor;
+        config.background.backgroundColor = UIColor.whiteColor;
+        // Set the corner style to display a circle button.
+        config.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
         self.configuration = config;
       } else {
-#endif
         _imageContainer.image = SymbolWithPalette(_symbol, @[
           UIColor.blackColor,
-          self.enabled ? UIColor.whiteColor : UIColor.grayColor
+          self.enabled ? UIColor.whiteColor : UIColor.whiteColor
         ]);
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
       }
-#endif
+
       break;
     case TabGridPageRegularTabs:
       self.accessibilityLabel =
           l10n_util::GetNSString(IDS_IOS_TAB_GRID_CREATE_NEW_TAB);
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
-      if (@available(iOS 26, *)) {
+
+      if (@available(iOS 18, *)) {
         UIButtonConfiguration* config = self.configuration;
         config.background.backgroundColor =
             [UIColor colorNamed:kStaticBlue400Color];
+        // Set the corner style to display a circle button.
+        config.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
         self.configuration = config;
       } else {
-#endif
         _imageContainer.image = SymbolWithPalette(
             _symbol,
             @[ UIColor.blackColor, [UIColor colorNamed:kStaticBlue400Color] ]);
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
       }
-#endif
+
       break;
     case TabGridPageTabGroups:
+      if (base::FeatureList::IsEnabled(kTabRecallNewTabGroupButton)) {
+        self.accessibilityLabel =
+            l10n_util::GetNSString(IDS_IOS_TAB_GRID_CREATE_NEW_TAB_GROUP);
+
+        if (@available(iOS 18, *)) {
+          UIButtonConfiguration* config = self.configuration;
+          config.background.backgroundColor =
+              [UIColor colorNamed:kStaticBlue400Color];
+          // Set the corner style and radius to display a square button.
+          config.cornerStyle = UIButtonConfigurationCornerStyleFixed;
+          config.background.cornerRadius = kSquareCornerRadius;
+          self.configuration = config;
+        } else {
+          _imageContainer.image = SymbolWithPalette(_symbol, @[
+            UIColor.blackColor, [UIColor colorNamed:kStaticBlue400Color]
+          ]);
+        }
+      }
       break;
   }
   _page = page;

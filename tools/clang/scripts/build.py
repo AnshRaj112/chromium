@@ -37,7 +37,8 @@ import time
 import urllib
 
 from update import (CDS_URL, CHROMIUM_DIR, CLANG_REVISION, LLVM_BUILD_DIR,
-                    FORCE_HEAD_REVISION_FILE, PACKAGE_VERSION, RELEASE_VERSION,
+                    FORCE_HEAD_REVISION_FILENAME, FORCE_HEAD_REVISION_FILE,
+                    PACKAGE_VERSION, RELEASE_VERSION, STAMP_FILENAME,
                     STAMP_FILE, THIS_DIR, DownloadUrl, DownloadAndUnpack,
                     DownloadAndUnpackPackage, EnsureDirExists, GetDefaultHostOs,
                     ReadStampFile, RmTree, WriteStampFile)
@@ -182,24 +183,57 @@ def CheckoutGitRepo(name, git_url, commit, dir):
   print('CheckoutGitRepo failed.')
   sys.exit(1)
 
+# Git commits include timing metadata in their hash.
+# To ensure we get a consistent hash when applying local changes,
+# set the dates to a specific value via environment variable
+MODIFICATION_DATES = {
+    'GIT_AUTHOR_DATE': '2099-01-01 10:10:10',
+    'GIT_COMMITTER_DATE': '2099-01-01 10:10:10'
+}
 
-def GitCherryPick(git_repository, git_remote, commit, git_remote_name='github'):
+
+def IsGitAncestorToHead(git_repository, commit):
+  """Returns if commit is an ancestor of HEAD."""
+  return RunCommand([
+      'git', '-C', git_repository, 'merge-base', '--is-ancestor', commit, 'HEAD'
+  ],
+                           fail_hard=False)
+
+
+def GitCherryPick(git_repository,
+                  commit,
+                  git_remote=None,
+                  git_remote_name='github'):
   print(f'Cherry-picking {commit} in {git_repository} from {git_remote}')
   git_cmd = ['git', '-C', git_repository]
-  RunCommand(git_cmd + ['remote', 'add', git_remote_name, git_remote],
-             fail_hard=False)
-  RunCommand(git_cmd +
-             ['fetch', '--recurse-submodules=no', git_remote_name, commit])
-  is_ancestor = RunCommand(git_cmd +
-                           ['merge-base', '--is-ancestor', commit, 'HEAD'],
-                           fail_hard=False)
-  if is_ancestor:
+  if git_remote is not None:
+    RunCommand(git_cmd + ['remote', 'add', git_remote_name, git_remote],
+               fail_hard=False)
+    RunCommand(git_cmd +
+               ['fetch', '--recurse-submodules=no', git_remote_name, commit])
+
+  if IsGitAncestorToHead(git_repository, commit):
     print('Commit already an ancestor; skipping.')
     return
+
+  env = os.environ.copy()
+  env.update(MODIFICATION_DATES)
   RunCommand([
       'git', '-C', git_repository, 'cherry-pick', '--keep-redundant-commits',
       commit
-  ])
+  ],
+             env=env)
+
+
+def GitRevert(git_repository, commit):
+  print(f'Reverting {commit} in {git_repository}')
+  if not IsGitAncestorToHead(git_repository, commit):
+    print('Commit not an ancestor; skipping.')
+    return
+  env = os.environ.copy()
+  env.update(MODIFICATION_DATES)
+  RunCommand(['git', '-C', git_repository, 'revert', '--no-edit', commit],
+             env=env)
 
 
 def GetLatestLLVMCommit():
@@ -731,22 +765,25 @@ def main():
                       help='don\'t build Fuchsia clang_rt runtime (linux/mac)',
                       dest='with_fuchsia',
                       default=sys.platform in ('linux2', 'darwin'))
-  parser.add_argument('--with-ccache',
-                      action='store_true',
-                      help='Use ccache to build the stage 1 compiler')
+  parser.add_argument('--with-compiler-wrapper',
+                      metavar='WRAPPER',
+                      help='Use a compiler wrapper (like ccache) to build the '
+                      'stage 1 compiler')
   parser.add_argument('--without-zstd',
                       dest='with_zstd',
                       action='store_false',
                       help='Disable zstd in the build')
+  parser.add_argument('--preserve-gcs-signature',
+                      action='store_true',
+                      help='By default, this script removes gcs hash files '
+                      'so that third_party/llvm-build is clobbered on the next'
+                      'run of gclient sync. This disables that, so that the'
+                      'directory will be preserved when syncing. Useful for'
+                      'local development.')
 
   args = parser.parse_args()
 
-  global CLANG_REVISION, PACKAGE_VERSION, LLVM_BUILD_DIR
-
-  # TODO(crbug.com/432036065): Remove in next Clang roll.
-  if args.llvm_force_head_revision:
-    global RELEASE_VERSION
-    RELEASE_VERSION = '22'
+  global CLANG_REVISION, PACKAGE_VERSION, LLVM_BUILD_DIR, STAMP_FILE, FORCE_HEAD_REVISION_FILE
 
   if (args.pgo or args.thinlto) and not args.bootstrap:
     print('--pgo/--thinlto requires --bootstrap')
@@ -793,6 +830,12 @@ def main():
 
   if args.build_dir:
     LLVM_BUILD_DIR = args.build_dir
+    # These files record that we've done a local build of clang, and may be
+    # checked by the build system to validate the compiler. If we have a custom
+    # build directory, make sure they appear there instead of the default one.
+    STAMP_FILE = os.path.normpath(os.path.join(LLVM_BUILD_DIR, STAMP_FILENAME))
+    FORCE_HEAD_REVISION_FILE = os.path.normpath(
+        os.path.join(LLVM_BUILD_DIR, "..", FORCE_HEAD_REVISION_FILENAME))
 
   if args.llvm_force_head_revision:
     checkout_revision = GetLatestLLVMCommit()
@@ -802,14 +845,20 @@ def main():
   if not args.skip_checkout:
     with timer.time('checkout llvm'):
       CheckoutGitRepo('LLVM monorepo', LLVM_GIT_URL, checkout_revision, LLVM_DIR)
+      # TODO(crbug.com/461828767): remove once we roll past this revision
+      GitCherryPick(LLVM_DIR, '10e97641f53a6eba5ad9430dc25f1ad6e5e8abed')
 
   if args.llvm_force_head_revision:
     CLANG_REVISION = GetCommitDescription(checkout_revision)
     PACKAGE_VERSION = '%s-0' % CLANG_REVISION
 
   print('Locally building clang %s...' % PACKAGE_VERSION)
-  WriteStampFile('', STAMP_FILE)
-  WriteStampFile('', FORCE_HEAD_REVISION_FILE)
+  WriteStampFile('',
+                 STAMP_FILE,
+                 preserve_hash_files=args.preserve_gcs_signature)
+  WriteStampFile('',
+                 FORCE_HEAD_REVISION_FILE,
+                 preserve_hash_files=args.preserve_gcs_signature)
 
   if not args.use_system_cmake:
     AddCMakeToPath()
@@ -862,6 +911,7 @@ def main():
       '-GNinja',
       '-DCMAKE_BUILD_TYPE=Release',
       '-DLLVM_ENABLE_ASSERTIONS=%s' % ('OFF' if args.disable_asserts else 'ON'),
+      '-DLLVM_ENABLE_IO_SANDBOX=OFF',
       f'-DLLVM_ENABLE_PROJECTS={projects}',
       f'-DLLVM_ENABLE_RUNTIMES={runtimes}',
       f'-DLLVM_TARGETS_TO_BUILD={targets}',
@@ -898,10 +948,12 @@ def main():
                                        universal_newlines=True).rstrip()
   base_cmake_args += ['-DLLVM_ENABLE_UNWIND_TABLES=OFF']
 
-  ccache_cmake_args = []
-  if args.with_ccache:
-    ccache_cmake_args.append('-DCMAKE_C_COMPILER_LAUNCHER=ccache')
-    ccache_cmake_args.append('-DCMAKE_CXX_COMPILER_LAUNCHER=ccache')
+  compiler_wrapper_cmake_args = []
+  if args.with_compiler_wrapper:
+    compiler_wrapper_cmake_args.append('-DCMAKE_C_COMPILER_LAUNCHER=' +
+                                       args.with_compiler_wrapper)
+    compiler_wrapper_cmake_args.append('-DCMAKE_CXX_COMPILER_LAUNCHER=' +
+                                       args.with_compiler_wrapper)
 
   if args.host_cc or args.host_cxx:
     assert args.host_cc and args.host_cxx, \
@@ -979,6 +1031,8 @@ def main():
         '^.*Sanitizer-.*sunrpc.*cpp$',
         # sysroot/host glibc version mismatch, crbug.com/1506551
         '^.*Sanitizer.*mallinfo2.cpp$',
+        # This BOLT test hangs in lit's internal shell, crbug.com/442483657
+        '^BOLT.*runtime/instrumentation-indirect-2.c$',
     ]
   elif sys.platform == 'darwin':
     lit_excludes += [
@@ -996,6 +1050,13 @@ def main():
     lit_excludes += [
         # TODO(https://crbug.com/404547503): fix and re-enable
         '^.*Profile-x86_64.*ContinuousSyncMode/online-merging-windows.c$',
+    ]
+  if not sys.platform.startswith('linux'):
+    lit_excludes += [
+        # TODO(https://crbug.com/474402846): fix and re-enable
+        '^Builtins-.*ctor_dtor.c$',
+        '^Builtins-.*dso_handle.cpp$',
+        '^Builtins-i386-windows.*$',
     ]
 
   test_env = os.environ.copy()
@@ -1025,7 +1086,7 @@ def main():
     if sys.platform == 'darwin':
       # Need ARM and AArch64 for building the ios clang_rt.
       bootstrap_targets += ';ARM;AArch64'
-    bootstrap_args = base_cmake_args + ccache_cmake_args + [
+    bootstrap_args = base_cmake_args + compiler_wrapper_cmake_args + [
         '-DLLVM_TARGETS_TO_BUILD=' + bootstrap_targets,
         '-DLLVM_ENABLE_PROJECTS=clang;lld',
         '-DLLVM_ENABLE_RUNTIMES=' + ';'.join(runtimes),
@@ -1121,7 +1182,7 @@ def main():
 
     # Train by building some C++ code.
     #
-    # pgo_training-1.ii is a preprocessed (on Linux) version of
+    # pgo_training-3.ii is a preprocessed (on Linux) version of
     # src/third_party/blink/renderer/core/layout/layout_object.cc, selected
     # because it's a large translation unit in Blink, which is normally the
     # slowest part of Chromium to compile. Using this, we get ~20% shorter
@@ -1142,11 +1203,11 @@ def main():
     # from PGO as well. Perhaps the training could be done asynchronously by
     # dedicated buildbots that upload profiles to the cloud.
     with timer.time('pgo training'):
-      training_source = 'pgo_training-1.ii'
+      training_source = 'pgo_training-3.ii'
       with open(training_source, 'wb') as f:
         DownloadUrl(CDS_URL + '/' + training_source, f)
       train_cmd = [os.path.join(LLVM_INSTRUMENTED_DIR, 'bin', 'clang++'),
-                  '-target', 'x86_64-unknown-unknown', '-O2', '-g', '-std=c++14',
+                  '-target', 'x86_64-unknown-unknown', '-O2', '-g', '-std=c++23',
                    '-fno-exceptions', '-fno-rtti', '-w', '-c', training_source]
       if sys.platform == 'darwin':
         train_cmd.extend(['-isysroot', isysroot])
@@ -1294,6 +1355,11 @@ def main():
             'CMAKE_SYSROOT=%s' % sysroot_arm64,
             # Can't run tests on x86 host.
             'LLVM_INCLUDE_TESTS=OFF',
+
+            # Make sure libraries are compiled with PAC/BTI enabled
+            'CMAKE_C_FLAGS=-mbranch-protection=standard',
+            'CMAKE_CXX_FLAGS=-mbranch-protection=standard',
+            'CMAKE_ASM_FLAGS=-mbranch-protection=standard',
         ],
         "profile":
         True,
@@ -1507,7 +1573,7 @@ def main():
   cmake_args.append('-DLLVM_RUNTIME_TARGETS=' + all_triples)
 
   if not args.bootstrap:
-    cmake_args.extend(ccache_cmake_args)
+    cmake_args.extend(compiler_wrapper_cmake_args)
 
   if os.path.exists(LLVM_BUILD_DIR):
     RmTree(LLVM_BUILD_DIR)
@@ -1610,8 +1676,12 @@ def main():
     with timer.time('install'):
       RunCommand(['ninja', 'install'], setenv=True)
 
-  WriteStampFile(PACKAGE_VERSION, STAMP_FILE)
-  WriteStampFile(PACKAGE_VERSION, FORCE_HEAD_REVISION_FILE)
+  WriteStampFile(PACKAGE_VERSION,
+                 STAMP_FILE,
+                 preserve_hash_files=args.preserve_gcs_signature)
+  WriteStampFile(PACKAGE_VERSION,
+                 FORCE_HEAD_REVISION_FILE,
+                 preserve_hash_files=args.preserve_gcs_signature)
 
   print('Clang build was successful.')
 

@@ -2011,7 +2011,8 @@ TEST_P(PaintPropertyTreeUpdateTest, ChangeMaskOutputClip) {
   SetBodyInnerHTML(R"HTML(
     <div id="container" style="width: 100px; height: 10px; overflow: hidden">
       <div id="masked"
-           style="height: 100px; background: red; -webkit-mask: url()"></div>
+           style="height: 100px; background: red;
+                  -webkit-mask: linear-gradient(red, blue)"></div>
     </div>
   )HTML");
 
@@ -2273,72 +2274,6 @@ TEST_P(PaintPropertyTreeUpdateTest, ElementCaptureUpdate) {
   paint_properties =
       element->GetLayoutObject()->FirstFragment().PaintProperties();
   EXPECT_TRUE(paint_properties && paint_properties->ElementCaptureEffect());
-}
-
-TEST_P(PaintPropertyTreeUpdateTest, BorderShapeChangesUpdateOverflowClip) {
-  SetBodyInnerHTML(R"HTML(
-    <style>
-      body { margin: 0; }
-      #div { overflow:hidden; width: 100px; height: 100px; border-radius: 10px; }
-      .stroke-10 { stroke-width: 10px; stroke: black; }
-    </style>
-    <div id=div></div>
-  )HTML");
-  UpdateAllLifecyclePhasesForTest();
-  auto* div = GetDocument().getElementById(AtomicString("div"));
-  auto* clip_properties = div->GetLayoutObject()
-                              ->FirstFragment()
-                              .PaintProperties()
-                              ->InnerBorderShapeClip();
-  EXPECT_FALSE(clip_properties);
-  EXPECT_TRUE(div->GetLayoutObject()
-                  ->FirstFragment()
-                  .PaintProperties()
-                  ->InnerBorderRadiusClip());
-  div->setAttribute(html_names::kStyleAttr,
-                    AtomicString("border-shape: circle()"));
-  UpdateAllLifecyclePhasesForTest();
-  EXPECT_FALSE(div->GetLayoutObject()
-                   ->FirstFragment()
-                   .PaintProperties()
-                   ->InnerBorderRadiusClip());
-  clip_properties = div->GetLayoutObject()
-                        ->FirstFragment()
-                        .PaintProperties()
-                        ->InnerBorderShapeClip();
-  EXPECT_TRUE(clip_properties);
-  EXPECT_TRUE(clip_properties->ClipPath());
-  EXPECT_FALSE(clip_properties->ClipPath()->GetSkPath().isRect(nullptr));
-  div->setAttribute(html_names::kStyleAttr,
-                    AtomicString("border-shape: inset(30px)"));
-  UpdateAllLifecyclePhasesForTest();
-  clip_properties = div->GetLayoutObject()
-                        ->FirstFragment()
-                        .PaintProperties()
-                        ->InnerBorderShapeClip();
-  SkRect rect;
-  EXPECT_TRUE(clip_properties->ClipPath()->GetSkPath().isRect(&rect));
-  EXPECT_EQ(rect, SkRect::MakeLTRB(30, 30, 70, 70))
-      << rect.dumpToString(/*asHex=*/false).c_str();
-  div->classList().Add(AtomicString("stroke-10"));
-  UpdateAllLifecyclePhasesForTest();
-  clip_properties = div->GetLayoutObject()
-                        ->FirstFragment()
-                        .PaintProperties()
-                        ->InnerBorderShapeClip();
-  EXPECT_TRUE(clip_properties->ClipPath()->GetSkPath().isRect(&rect));
-  EXPECT_EQ(rect, SkRect::MakeLTRB(35, 35, 65, 65))
-      << rect.dumpToString(/*asHex=*/false).c_str();
-  div->removeAttribute(html_names::kStyleAttr);
-  UpdateAllLifecyclePhasesForTest();
-  EXPECT_TRUE(div->GetLayoutObject()
-                  ->FirstFragment()
-                  .PaintProperties()
-                  ->InnerBorderRadiusClip());
-  EXPECT_FALSE(div->GetLayoutObject()
-                   ->FirstFragment()
-                   .PaintProperties()
-                   ->InnerBorderShapeClip());
 }
 
 }  // namespace blink

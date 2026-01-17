@@ -28,6 +28,7 @@
 #include "chrome/browser/ash/crostini/crostini_shared_devices_factory.h"
 #include "chrome/browser/ash/crostini/crostini_types.mojom.h"
 #include "chrome/browser/ash/crostini/crostini_util.h"
+#include "chrome/browser/ash/guest_os/guest_id.h"
 #include "chrome/browser/ash/guest_os/guest_os_pref_names.h"
 #include "chrome/browser/ash/guest_os/guest_os_session_tracker.h"
 #include "chrome/browser/ash/guest_os/guest_os_session_tracker_factory.h"
@@ -38,7 +39,6 @@
 #include "chrome/browser/ui/views/bruschetta/bruschetta_installer_view.h"
 #include "chrome/browser/ui/views/bruschetta/bruschetta_uninstaller_view.h"
 #include "chrome/browser/ui/views/crostini/crostini_uninstaller_view.h"
-#include "chrome/browser/ui/webui/ash/crostini_upgrader/crostini_upgrader_dialog.h"
 #include "chrome/common/pref_names.h"
 #include "chromeos/ash/components/network/network_handler.h"
 #include "components/prefs/pref_service.h"
@@ -89,6 +89,14 @@ void CrostiniHandler::RegisterMessages() {
       base::BindRepeating(&CrostiniHandler::HandleImportCrostiniContainer,
                           handler_weak_ptr_factory_.GetWeakPtr()));
   web_ui()->RegisterMessageCallback(
+      "exportDiskImage",
+      base::BindRepeating(&CrostiniHandler::HandleExportDiskImage,
+                          handler_weak_ptr_factory_.GetWeakPtr()));
+  web_ui()->RegisterMessageCallback(
+      "importDiskImage",
+      base::BindRepeating(&CrostiniHandler::HandleImportDiskImage,
+                          handler_weak_ptr_factory_.GetWeakPtr()));
+  web_ui()->RegisterMessageCallback(
       "requestCrostiniInstallerStatus",
       base::BindRepeating(
           &CrostiniHandler::HandleCrostiniInstallerStatusRequest,
@@ -115,20 +123,6 @@ void CrostiniHandler::RegisterMessages() {
       "disableArcAdbSideload",
       base::BindRepeating(&CrostiniHandler::HandleDisableArcAdbRequest,
                           handler_weak_ptr_factory_.GetWeakPtr()));
-  web_ui()->RegisterMessageCallback(
-      "requestCrostiniContainerUpgradeView",
-      base::BindRepeating(&CrostiniHandler::HandleRequestContainerUpgradeView,
-                          handler_weak_ptr_factory_.GetWeakPtr()));
-  web_ui()->RegisterMessageCallback(
-      "requestCrostiniUpgraderDialogStatus",
-      base::BindRepeating(
-          &CrostiniHandler::HandleCrostiniUpgraderDialogStatusRequest,
-          handler_weak_ptr_factory_.GetWeakPtr()));
-  web_ui()->RegisterMessageCallback(
-      "requestCrostiniContainerUpgradeAvailable",
-      base::BindRepeating(
-          &CrostiniHandler::HandleCrostiniContainerUpgradeAvailableRequest,
-          handler_weak_ptr_factory_.GetWeakPtr()));
   web_ui()->RegisterMessageCallback(
       "getCrostiniDiskInfo",
       base::BindRepeating(&CrostiniHandler::HandleGetCrostiniDiskInfo,
@@ -234,7 +228,6 @@ void CrostiniHandler::RegisterMessages() {
 void CrostiniHandler::OnJavascriptAllowed() {
   auto* crostini_manager = crostini::CrostiniManager::GetForProfile(profile_);
   crostini_manager->AddCrostiniDialogStatusObserver(this);
-  crostini_manager->AddCrostiniContainerPropertiesObserver(this);
   crostini_manager->AddContainerShutdownObserver(this);
   crostini::CrostiniExportImportFactory::GetForProfile(profile_)->AddObserver(
       this);
@@ -268,7 +261,6 @@ void CrostiniHandler::OnJavascriptAllowed() {
 void CrostiniHandler::OnJavascriptDisallowed() {
   auto* crostini_manager = crostini::CrostiniManager::GetForProfile(profile_);
   crostini_manager->RemoveCrostiniDialogStatusObserver(this);
-  crostini_manager->RemoveCrostiniContainerPropertiesObserver(this);
   crostini_manager->RemoveContainerShutdownObserver(this);
   crostini::CrostiniExportImportFactory::GetForProfile(profile_)
       ->RemoveObserver(this);
@@ -342,6 +334,23 @@ void CrostiniHandler::HandleImportCrostiniContainer(
       ->ImportContainer(container_id, web_ui()->GetWebContents());
 }
 
+void CrostiniHandler::HandleExportDiskImage(const base::Value::List& args) {
+  CHECK_EQ(1U, args.size());
+  guest_os::GuestId container_id(args[0]);
+  VLOG(1) << "Exporting  = " << container_id;
+
+  crostini::CrostiniExportImportFactory::GetForProfile(profile_)
+      ->ExportDiskImageFlow(container_id, web_ui()->GetWebContents());
+}
+
+void CrostiniHandler::HandleImportDiskImage(const base::Value::List& args) {
+  CHECK_EQ(1U, args.size());
+  guest_os::GuestId container_id(args[0]);
+  VLOG(1) << "Importing  = " << container_id;
+  crostini::CrostiniExportImportFactory::GetForProfile(profile_)
+      ->ImportDiskImageFlow(container_id, web_ui()->GetWebContents());
+}
+
 void CrostiniHandler::HandleCrostiniInstallerStatusRequest(
     const base::Value::List& args) {
   AllowJavascript();
@@ -373,10 +382,6 @@ void CrostiniHandler::OnCrostiniDialogStatusChanged(
         FireWebUIListener("crostini-installer-status-changed",
                           base::Value(status));
         break;
-      case crostini::DialogType::UPGRADER:
-        FireWebUIListener("crostini-upgrader-status-changed",
-                          base::Value(status));
-        break;
       case crostini::DialogType::REMOVER:
         FireWebUIListener("crostini-remover-status-changed",
                           base::Value(status));
@@ -384,17 +389,6 @@ void CrostiniHandler::OnCrostiniDialogStatusChanged(
       default:
         NOTREACHED();
     }
-  }
-}
-
-void CrostiniHandler::OnContainerOsReleaseChanged(
-    const guest_os::GuestId& container_id,
-    bool can_upgrade) {
-  if (crostini::CrostiniFeatures::Get()->IsContainerUpgradeUIAllowed(
-          profile_) &&
-      container_id == crostini::DefaultContainerId()) {
-    FireWebUIListener("crostini-container-upgrade-available-changed",
-                      base::Value(can_upgrade));
   }
 }
 
@@ -463,21 +457,8 @@ void CrostiniHandler::OnCanDisableArcAdbSideloading(
 
 void CrostiniHandler::LaunchTerminal(apps::IntentPtr intent) {
   guest_os::LaunchTerminalWithIntent(
-      profile_, display::Screen::GetScreen()->GetPrimaryDisplay().id(),
+      profile_, display::Screen::Get()->GetPrimaryDisplay().id(),
       std::move(intent), base::DoNothing());
-}
-
-void CrostiniHandler::HandleRequestContainerUpgradeView(
-    const base::Value::List& args) {
-  CHECK_EQ(0U, args.size());
-  CrostiniUpgraderDialog::Show(
-      profile_,
-      base::BindOnce(&CrostiniHandler::LaunchTerminal,
-                     handler_weak_ptr_factory_.GetWeakPtr(),
-                     /*intent=*/nullptr),
-      // If the user cancels the upgrade, we won't need to restart Crostini and
-      // we don't want to run the launch closure which would launch Terminal.
-      /*only_run_launch_closure_on_restart=*/true);
 }
 
 void CrostiniHandler::OnCrostiniExportImportOperationStatusChanged(
@@ -515,23 +496,6 @@ void CrostiniHandler::OnCanChangeArcAdbSideloading(
     bool can_change_arc_adb_sideloading) {
   FireWebUIListener("crostini-can-change-arc-adb-sideload-changed",
                     base::Value(can_change_arc_adb_sideloading));
-}
-
-void CrostiniHandler::HandleCrostiniUpgraderDialogStatusRequest(
-    const base::Value::List& args) {
-  AllowJavascript();
-  CHECK_EQ(0U, args.size());
-  bool is_open = crostini::CrostiniManager::GetForProfile(profile_)
-                     ->GetCrostiniDialogStatus(crostini::DialogType::UPGRADER);
-  OnCrostiniDialogStatusChanged(crostini::DialogType::UPGRADER, is_open);
-}
-
-void CrostiniHandler::HandleCrostiniContainerUpgradeAvailableRequest(
-    const base::Value::List& args) {
-  AllowJavascript();
-
-  bool can_upgrade = crostini::ShouldAllowContainerUpgrade(profile_);
-  OnContainerOsReleaseChanged(crostini::DefaultContainerId(), can_upgrade);
 }
 
 void CrostiniHandler::OnActivePortsChanged(
@@ -822,11 +786,6 @@ void CrostiniHandler::HandleCreateContainer(const base::Value::List& args) {
     options.image_alias = image_alias;
     VLOG(1) << "image_alias = " << image_alias;
   }
-  if (!container_file.empty() &&
-      container_file.Extension() == FILE_PATH_LITERAL(".yaml")) {
-    options.ansible_playbook = container_file;
-    VLOG(1) << "ansible_playbook = " << container_file;
-  }
 
   crostini::CrostiniManager::GetForProfile(profile_)
       ->RestartCrostiniWithOptions(
@@ -891,8 +850,15 @@ void CrostiniHandler::HandleRequestContainerInfo(
 
   base::Value::List container_info_list;
 
-  for (const auto& container_id :
-       guest_os::GetContainers(profile_, guest_os::VmType::TERMINA)) {
+  // Realistically there should only be either a termina or baguette container.
+  std::vector<guest_os::GuestId> containers =
+      guest_os::GetContainers(profile_, guest_os::VmType::TERMINA);
+  std::vector<guest_os::GuestId> baguette_containers =
+      guest_os::GetContainers(profile_, guest_os::VmType::BAGUETTE);
+  containers.insert(containers.end(), baguette_containers.begin(),
+                    baguette_containers.end());
+
+  for (const auto& container_id : containers) {
     base::Value::Dict container_info_value;
     container_info_value.Set(kIdKey, container_id.ToDictValue());
     auto info = guest_os::GuestOsSessionTrackerFactory::GetForProfile(profile_)

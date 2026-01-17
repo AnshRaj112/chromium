@@ -9,7 +9,6 @@
 
 #include <memory>
 
-#include "base/containers/contains.h"
 #include "base/fuchsia/fuchsia_logging.h"
 #include "base/fuchsia/process_context.h"
 #include "base/functional/bind.h"
@@ -30,6 +29,7 @@
 #include "ui/ozone/platform/flatland/flatland_window.h"
 #include "ui/ozone/platform/flatland/flatland_window_manager.h"
 #include "ui/ozone/platform/flatland/vulkan_implementation_flatland.h"
+#include "ui/ozone/public/native_pixmap_usage_utils.h"
 #include "ui/ozone/public/surface_ozone_canvas.h"
 
 namespace ui {
@@ -168,21 +168,23 @@ scoped_refptr<gfx::NativePixmap> FlatlandSurfaceFactory::CreateNativePixmap(
     gfx::AcceleratedWidget widget,
     gpu::VulkanDeviceQueue* device_queue,
     gfx::Size size,
-    gfx::BufferFormat format,
+    viz::SharedImageFormat format,
     gfx::BufferUsage usage,
     std::optional<gfx::Size> framebuffer_size) {
   DCHECK(!framebuffer_size || framebuffer_size == size);
 
   VkDevice vk_device = device_queue->GetVulkanDevice();
-  return flatland_sysmem_buffer_manager_.CreateNativePixmap(vk_device, size,
-                                                            format, usage);
+  NativePixmapUsageSet native_pixmap_usage =
+      BufferUsageToNativePixmapUsage(usage);
+  return flatland_sysmem_buffer_manager_.CreateNativePixmap(
+      vk_device, size, format, native_pixmap_usage);
 }
 
 scoped_refptr<gfx::NativePixmap>
 FlatlandSurfaceFactory::CreateNativePixmapFromHandle(
     gfx::AcceleratedWidget widget,
     gfx::Size size,
-    gfx::BufferFormat format,
+    viz::SharedImageFormat format,
     gfx::NativePixmapHandle handle) {
   auto collection = flatland_sysmem_buffer_manager_.GetCollectionByHandle(
       handle.buffer_collection_handle);
@@ -201,23 +203,22 @@ FlatlandSurfaceFactory::CreateVulkanImplementation(
       allow_protected_memory);
 }
 
-std::vector<gfx::BufferFormat>
-FlatlandSurfaceFactory::GetSupportedFormatsForTexturing() const {
-  return {
-      gfx::BufferFormat::R_8,
-      gfx::BufferFormat::RG_88,
-      gfx::BufferFormat::RGBA_8888,
-      gfx::BufferFormat::RGBX_8888,
-      gfx::BufferFormat::BGRA_8888,
-      gfx::BufferFormat::BGRX_8888,
-      gfx::BufferFormat::YUV_420_BIPLANAR,
-  };
+bool FlatlandSurfaceFactory::IsFormatSupportedForTexturing(
+    viz::SharedImageFormat format) const {
+  base::flat_set<viz::SharedImageFormat> kSupportedFormats =
+      base::MakeFlatSet<viz::SharedImageFormat>(std::vector(
+          {viz::SinglePlaneFormat::kR_8, viz::SinglePlaneFormat::kRG_88,
+           viz::SinglePlaneFormat::kRGBA_8888,
+           viz::SinglePlaneFormat::kBGRA_8888,
+           viz::SinglePlaneFormat::kRGBX_8888,
+           viz::SinglePlaneFormat::kBGRX_8888, viz::MultiPlaneFormat::kNV12}));
+  return kSupportedFormats.contains(format);
 }
 
 void FlatlandSurfaceFactory::AddSurface(gfx::AcceleratedWidget widget,
                                         FlatlandSurface* surface) {
   base::AutoLock lock(surface_lock_);
-  DCHECK(!base::Contains(surface_map_, widget));
+  DCHECK(!surface_map_.contains(widget));
   surface->AssertBelongsToCurrentThread();
   surface_map_.emplace(widget, surface);
 }

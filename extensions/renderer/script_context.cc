@@ -7,7 +7,6 @@
 #include <algorithm>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/logging.h"
 #include "base/no_destructor.h"
@@ -173,9 +172,9 @@ bool ScriptContext::IsSandboxedPage(const GURL& url) {
   // HasAccessOrThrowError.
   if (url.SchemeIs(kExtensionScheme)) {
     const Extension* extension =
-        RendererExtensionRegistry::Get()->GetByID(url.host());
+        RendererExtensionRegistry::Get()->GetByID(url.GetHost());
     if (extension) {
-      return SandboxedPageInfo::IsSandboxedPage(extension, url.path());
+      return SandboxedPageInfo::IsSandboxedPage(extension, url.GetPath());
     }
   }
   return false;
@@ -212,6 +211,9 @@ void ScriptContext::Invalidate() {
 
 void ScriptContext::AddInvalidationObserver(base::OnceClosure observer) {
   DCHECK(thread_checker_.CalledOnValidThread());
+  // `Invalidate()` assumes that an `observer` is not added while it's notifying
+  // observers so let's be sure of that.
+  DCHECK(is_valid_);
   invalidate_observers_.push_back(std::move(observer));
 }
 
@@ -266,12 +268,12 @@ void ScriptContext::SafeCallFunction(
 }
 
 Feature::Availability ScriptContext::GetAvailability(
-    const std::string& api_name) {
+    std::string_view api_name) {
   return GetAvailability(api_name, CheckAliasStatus::ALLOWED);
 }
 
 Feature::Availability ScriptContext::GetAvailability(
-    const std::string& api_name,
+    std::string_view api_name,
     CheckAliasStatus check_alias) {
   DCHECK(thread_checker_.CalledOnValidThread());
 
@@ -284,7 +286,8 @@ Feature::Availability ScriptContext::GetAvailability(
                         switches::kExtensionTestApiOnWebPages) &&
                     context_type_ == mojom::ContextType::kWebPage);
     Feature::AvailabilityResult result =
-        allowed ? Feature::IS_AVAILABLE : Feature::MISSING_COMMAND_LINE_SWITCH;
+        allowed ? Feature::AvailabilityResult::kIsAvailable
+                : Feature::AvailabilityResult::kMissingCommandLineSwitch;
     return Feature::Availability(result,
                                  allowed ? "" : "Only allowed in tests");
   }
@@ -309,7 +312,7 @@ Feature::Availability ScriptContext::GetAvailability(
               .IsMessagingEnabledInUserScriptWorld(*blink_isolated_world_id_);
       if (!is_available) {
         return Feature::Availability(
-            Feature::INVALID_CONTEXT,
+            Feature::AvailabilityResult::kInvalidContext,
             "Messaging APIs are not enabled for this user script world.");
       }
     }
@@ -442,7 +445,7 @@ bool ScriptContext::HasAPIPermission(mojom::APIPermissionID permission) const {
     // Only web page contexts may be granted content capabilities. Other
     // contexts are either privileged WebUI or extensions with their own set of
     // permissions.
-    return base::Contains(content_capabilities_, permission);
+    return content_capabilities_.count(permission);
   }
   return false;
 }
@@ -461,7 +464,7 @@ bool ScriptContext::HasAccessOrThrowError(const std::string& name) {
   // [1] citation needed. This ScriptContext should already be in a state that
   // doesn't allow this, from ScriptContextSet::ClassifyJavaScriptContext.
   if (extension() &&
-      SandboxedPageInfo::IsSandboxedPage(extension(), url_.path())) {
+      SandboxedPageInfo::IsSandboxedPage(extension(), url_.GetPath())) {
     static const char kMessage[] =
         "%s cannot be used within a sandboxed frame.";
     std::string error_msg = base::StringPrintf(kMessage, name.c_str());

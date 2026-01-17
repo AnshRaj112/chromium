@@ -30,6 +30,9 @@ ci.defaults.set(
     main_console_view = "main",
     cq_mirrors_console_view = "mirrors",
     execution_timeout = ci_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     health_spec = health_spec.default(),
     notifies = ["cr-fuchsia"],
     service_account = ci_constants.DEFAULT_SERVICE_ACCOUNT,
@@ -106,7 +109,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.FUCHSIA,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -130,7 +132,7 @@ ci.builder(
         mixins = [
             "arm64",
             "docker",
-            "linux-jammy-or-focal",
+            "linux-jammy",
         ],
         per_test_modifications = {
             "context_lost_validating_tests": targets.remove(
@@ -188,7 +190,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.FUCHSIA,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -279,7 +280,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.FUCHSIA,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -309,6 +309,7 @@ ci.builder(
             "fuchsia-large-device-spec",
             "isolate_profile_data",
             "linux-jammy",
+            "retry_only_failed_tests",
             targets.mixin(
                 swarming = targets.swarming(
                     dimensions = {

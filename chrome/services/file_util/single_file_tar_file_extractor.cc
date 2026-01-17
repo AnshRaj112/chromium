@@ -11,6 +11,7 @@
 #include "base/containers/span.h"
 #include "chrome/services/file_util/public/mojom/constants.mojom.h"
 #include "chrome/services/file_util/single_file_tar_reader.h"
+#include "mojo/public/cpp/bindings/remote.h"
 
 namespace {
 
@@ -67,18 +68,16 @@ class TarExtractorInner {
   // Returned vector is resized to actual bytes read.
   std::vector<uint8_t> ReadTarFile() {
     std::vector<uint8_t> tar_buffer(kTarBufferSize);
-    const int bytes_read = UNSAFE_TODO(src_file_.ReadAtCurrentPos(
-        reinterpret_cast<char*>(tar_buffer.data()), kTarBufferSize));
+    const std::optional<size_t> bytes_read =
+        src_file_.ReadAtCurrentPos(tar_buffer);
 
-    if (bytes_read < 0)
-      return std::vector<uint8_t>();
-    if (bytes_read == 0) {
+    if (bytes_read.value_or(0) == 0) {
       // After reading the last chunk of file content, it is expected that
       // tar_reader_.IsComplete() in the Extract function returns true and the
       // .tar.xz file extraction ends.
-      return std::vector<uint8_t>();
+      return {};
     }
-    tar_buffer.resize(bytes_read);
+    tar_buffer.resize(*bytes_read);
     return tar_buffer;
   }
 

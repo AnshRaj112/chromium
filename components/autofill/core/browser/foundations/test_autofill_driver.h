@@ -5,6 +5,7 @@
 #ifndef COMPONENTS_AUTOFILL_CORE_BROWSER_FOUNDATIONS_TEST_AUTOFILL_DRIVER_H_
 #define COMPONENTS_AUTOFILL_CORE_BROWSER_FOUNDATIONS_TEST_AUTOFILL_DRIVER_H_
 
+#include <algorithm>
 #include <concepts>
 #include <map>
 #include <string>
@@ -51,7 +52,6 @@ class TestAutofillDriverTemplate : public T {
 
   // AutofillDriver:
   LocalFrameToken GetFrameToken() const override { return frame_token_; }
-  TestAutofillDriverTemplate* GetParent() override { return parent_; }
   std::optional<LocalFrameToken> Resolve(FrameToken query) override {
     if (auto* local_frame_token = std::get_if<LocalFrameToken>(&query)) {
       return *local_frame_token;
@@ -62,15 +62,22 @@ class TestAutofillDriverTemplate : public T {
     }
     return std::nullopt;
   }
+  TestAutofillDriverTemplate* GetParent() override { return parent_; }
   bool IsActive() const override { return is_active_; }
-  bool HasSharedAutofillPermission() const override { return shared_autofill_; }
+  bool IsEmbedded() const override { return is_embedded_; }
+  bool IsPolicyControlledFeatureAutofillEnabled() const override {
+    return policy_controlled_feature_autofill_enabled_;
+  }
+  bool IsPolicyControlledFeatureManualTextEnabled() const override {
+    return policy_controlled_feature_manual_text_enabled_;
+  }
   bool CanShowAutofillUi() const override { return true; }
   void ApplyFieldAction(mojom::FieldActionType action_type,
                         mojom::ActionPersistence action_persistence,
                         const FieldGlobalId& field,
                         const std::u16string& value) override {}
   void SendTypePredictionsToRenderer(const FormStructure& form) override {}
-  void ExposeDomNodeIDs() override {}
+  void ExposeDomNodeIdsInAllFrames() override {}
   void RendererShouldAcceptDataListSuggestion(
       const FieldGlobalId& field,
       const std::u16string& value) override {}
@@ -96,8 +103,8 @@ class TestAutofillDriverTemplate : public T {
   void TriggerFormExtractionInAllFrames(
       base::OnceCallback<void(bool)> form_extraction_finished_callback)
       override {}
-  void ExtractForm(
-      FormGlobalId form,
+  void ExtractFormWithField(
+      FieldGlobalId field_id,
       AutofillDriver::BrowserFormHandler response_handler) override {}
   void GetFourDigitCombinationsFromDom(
       base::OnceCallback<void(const std::vector<std::string>&)>
@@ -108,6 +115,9 @@ class TestAutofillDriverTemplate : public T {
       uint32_t number_of_ancestor_levels_to_search,
       base::OnceCallback<void(const std::string& amount)> response_callback)
       override {}
+  void DispatchEmailVerifiedEvent(
+      FieldGlobalId field_id,
+      const std::string& presentation_token) override {}
 
   // The return value contains the FieldGlobalIds of all elements (field_id,
   // type) of `field_type_map` for which
@@ -117,6 +127,8 @@ class TestAutofillDriverTemplate : public T {
       mojom::FormActionType action_type,
       mojom::ActionPersistence action_persistence,
       base::span<const FormFieldData> fields,
+      const FillId& fill_id,
+      bool supports_refill,
       const url::Origin& triggered_origin,
       const base::flat_map<FieldGlobalId, FieldType>& field_type_map,
       const Section& section_for_clear_form_on_ios) override {
@@ -127,7 +139,7 @@ class TestAutofillDriverTemplate : public T {
     for (const auto& [id, type] : field_type_map) {
       if ((!field_type_map_filter_ ||
            field_type_map_filter_.Run(triggered_origin, id, type)) &&
-          base::Contains(fields, id, &FormFieldData::global_id)) {
+          std::ranges::contains(fields, id, &FormFieldData::global_id)) {
         result.push_back(id);
       }
     }
@@ -150,8 +162,14 @@ class TestAutofillDriverTemplate : public T {
 
   void SetIsActive(bool is_active) { is_active_ = is_active; }
 
-  void SetSharedAutofill(bool shared_autofill) {
-    shared_autofill_ = shared_autofill;
+  void SetIsEmbedded(bool is_embedded) { is_embedded_ = is_embedded; }
+
+  void SetPolicyControlledFeatureAutofillEnabled(bool enabled) {
+    policy_controlled_feature_autofill_enabled_ = enabled;
+  }
+
+  void SetPolicyControlledFeatureManualTextEnabled(bool enabled) {
+    policy_controlled_feature_manual_text_enabled_ = enabled;
   }
 
   void SetIsolationInfo(const net::IsolationInfo& isolation_info) {
@@ -179,7 +197,9 @@ class TestAutofillDriverTemplate : public T {
   std::map<RemoteFrameToken, LocalFrameToken> remote_frame_tokens_;
   raw_ptr<TestAutofillDriverTemplate> parent_ = nullptr;
   bool is_active_ = true;
-  bool shared_autofill_ = false;
+  bool is_embedded_ = false;
+  bool policy_controlled_feature_autofill_enabled_ = false;
+  bool policy_controlled_feature_manual_text_enabled_ = false;
   net::IsolationInfo isolation_info_;
   base::RepeatingCallback<bool(const url::Origin&, FieldGlobalId, FieldType)>
       field_type_map_filter_;

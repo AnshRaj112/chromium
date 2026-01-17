@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "base/base64.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
@@ -21,6 +20,7 @@
 #include "base/no_destructor.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
+#include "base/strings/to_string.h"
 #include "base/time/time.h"
 #include "base/values.h"
 #include "components/google/core/common/google_util.h"
@@ -28,6 +28,7 @@
 #include "components/manta/manta_status.h"
 #include "net/base/load_flags.h"
 #include "net/base/net_errors.h"
+#include "net/http/http_response_headers.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "services/image_annotation/image_annotation_metrics.h"
 #include "services/image_annotation/public/mojom/image_annotation.mojom-forward.h"
@@ -641,8 +642,8 @@ void Annotator::AnnotateImage(
                      true /* canceled */));
 
   // Don't start local work if it would duplicate some already-ongoing work.
-  if (base::Contains(local_processors_, request_key) ||
-      base::Contains(pending_requests_, request_key)) {
+  if (local_processors_.contains(request_key) ||
+      pending_requests_.contains(request_key)) {
     return;
   }
 
@@ -753,8 +754,7 @@ std::string Annotator::FormatJsonRequest(
   base::Value::Dict request;
   request.Set("imageRequests", std::move(image_request_list));
 
-  std::string json_request;
-  base::JSONWriter::Write(request, &json_request);
+  std::string json_request = base::WriteJson(request).value_or("");
 
   ReportServerRequestSizeKB(json_request.size() / 1024);
 
@@ -1097,9 +1097,9 @@ std::string Annotator::ComputePreferredLanguage(
 
   // If the page language is a server language and it's in the list of accept
   // languages or top languages for this user, return that.
-  if (base::Contains(server_languages_, page_language) &&
-      (base::Contains(accept_languages, page_language) ||
-       base::Contains(top_languages, page_language))) {
+  if (std::ranges::contains(server_languages_, page_language) &&
+      (std::ranges::contains(accept_languages, page_language) ||
+       std::ranges::contains(top_languages, page_language))) {
     return page_language;
   }
 
@@ -1109,8 +1109,8 @@ std::string Annotator::ComputePreferredLanguage(
   // top language and a server language.
   if (!top_languages.empty()) {
     for (const std::string& accept_language : accept_languages) {
-      if (base::Contains(server_languages_, accept_language) &&
-          base::Contains(top_languages, accept_language)) {
+      if (std::ranges::contains(server_languages_, accept_language) &&
+          std::ranges::contains(top_languages, accept_language)) {
         return accept_language;
       }
     }
@@ -1119,14 +1119,14 @@ std::string Annotator::ComputePreferredLanguage(
   // Sometimes the top languages are empty. Try any accept language that's
   // a server language.
   for (const std::string& accept_language : accept_languages) {
-    if (base::Contains(server_languages_, accept_language)) {
+    if (std::ranges::contains(server_languages_, accept_language)) {
       return accept_language;
     }
   }
 
   // If that still fails, try any top language that's a server language.
   for (const std::string& top_language : top_languages) {
-    if (base::Contains(server_languages_, top_language)) {
+    if (std::ranges::contains(server_languages_, top_language)) {
       return top_language;
     }
   }
@@ -1193,7 +1193,7 @@ void Annotator::OnServerLangsResponseReceived(
     new_server_languages.push_back(lang.GetString());
   }
 
-  if (!base::Contains(new_server_languages, "en")) {
+  if (!std::ranges::contains(new_server_languages, "en")) {
     DVLOG(1) << "Server langs don't even include 'en', rejecting";
     return;
   }

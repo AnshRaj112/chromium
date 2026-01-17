@@ -55,6 +55,13 @@ class ClipboardHistoryTest : public AshTestBase {
         ash::Shell::GetPrimaryRootWindow());
   }
 
+  // AshTestBase:
+  void TearDown() override {
+    event_generator_.reset();
+    clipboard_history_ = nullptr;
+    AshTestBase::TearDown();
+  }
+
   const std::list<ClipboardHistoryItem>& GetClipboardHistoryItems() {
     return clipboard_history_->GetItems();
   }
@@ -159,7 +166,7 @@ class ClipboardHistoryTest : public AshTestBase {
  private:
   std::unique_ptr<ui::test::EventGenerator> event_generator_;
   // Owned by ClipboardHistoryControllerImpl.
-  raw_ptr<ClipboardHistory, DanglingUntriaged> clipboard_history_ = nullptr;
+  raw_ptr<ClipboardHistory> clipboard_history_ = nullptr;
 };
 
 // Tests that with nothing copied, nothing is shown.
@@ -207,7 +214,7 @@ TEST_F(ClipboardHistoryTest, HistoryIsReverseChronological) {
                                             u"test4"};
   std::vector<std::u16string> expected_strings = input_strings;
   // Reverse the vector, history should match this ordering.
-  std::reverse(std::begin(expected_strings), std::end(expected_strings));
+  std::ranges::reverse(expected_strings);
   WriteAndEnsureTextHistory(input_strings, expected_strings);
 }
 
@@ -295,7 +302,7 @@ TEST_F(ClipboardHistoryTest, HistoryLimit) {
   // The result should be a reversal of the last five elements.
   std::vector<std::u16string> expected_strings{input_strings.begin() + 1,
                                                input_strings.end()};
-  std::reverse(expected_strings.begin(), expected_strings.end());
+  std::ranges::reverse(expected_strings);
   WriteAndEnsureTextHistory(input_strings, expected_strings);
 }
 

@@ -23,9 +23,10 @@
 #include "components/autofill/core/browser/suggestions/suggestion_type.h"
 #include "components/autofill/core/common/aliases.h"
 #include "components/autofill/core/common/autofill_test_utils.h"
-#include "components/plus_addresses/fake_plus_address_allocator.h"
-#include "components/plus_addresses/plus_address_suggestion_generator.h"
-#include "components/plus_addresses/settings/fake_plus_address_setting_service.h"
+#include "components/plus_addresses/core/browser/fake_plus_address_allocator.h"
+#include "components/plus_addresses/core/browser/fake_plus_address_service.h"
+#include "components/plus_addresses/core/browser/plus_address_test_utils.h"
+#include "components/plus_addresses/core/browser/settings/fake_plus_address_setting_service.h"
 #include "components/strings/grit/components_strings.h"
 #include "content/public/test/browser_test.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -170,7 +171,7 @@ std::vector<Suggestion> CreateWebAuthnSuggestions(
   suggestions.back().acceptability = acceptability;
 
   suggestions.emplace_back(
-      l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_USE_DIFFERENT_PASSKEY),
+      l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_USE_PASSKEY_OTHER_DEVICE),
       SuggestionType::kWebauthnSignInWithAnotherDevice);
   suggestions.back().acceptability = acceptability;
   suggestions.emplace_back(
@@ -269,82 +270,30 @@ class PopupViewViewsBrowsertestBase
   std::unique_ptr<PopupViewViews> popup_parent_;
 };
 
-class PopupViewViewsBrowsertestNewFopOn : public PopupViewViewsBrowsertestBase {
- protected:
-  base::test::ScopedFeatureList feature_list_{
-      features::kAutofillEnableNewFopDisplayDesktop};
-};
-
-IN_PROC_BROWSER_TEST_P(PopupViewViewsBrowsertestNewFopOn, InvokeUi_CreditCard) {
-  PrepareSuggestions(CreateCreditCardSuggestions());
-  ShowAndVerifyUi();
-}
-
-IN_PROC_BROWSER_TEST_P(PopupViewViewsBrowsertestNewFopOn,
-                       InvokeUi_CreditCard_MultipleLabels) {
-  Suggestion suggestion1(
-      "Visa",
-      {{Suggestion::Text(u"Filling credit card - your card for payments"),
-        Suggestion::Text(u"Alexander Joseph Ricardo Park")},
-       {Suggestion::Text(u"Full credit card"), Suggestion::Text(u"Alex Park")}},
-      Suggestion::Icon::kCardVisa, SuggestionType::kCreditCardEntry);
-
-  // Also create a 1 label line suggestion to make sure they work well together.
-  Suggestion suggestion2(
-      "Visa",
-      {{Suggestion::Text(u"Filling credit card - your card for payments")}},
-      Suggestion::Icon::kCardVisa, SuggestionType::kCreditCardEntry);
-  PrepareSuggestions({suggestion1, suggestion2});
-  ShowAndVerifyUi();
-}
-
-INSTANTIATE_TEST_SUITE_P(All,
-                         PopupViewViewsBrowsertestNewFopOn,
-                         Combine(Bool(), Bool()),
-                         PopupViewViewsBrowsertestBase::GetTestSuffix);
-
-class PopupViewViewsBrowsertestNewFopOff
-    : public PopupViewViewsBrowsertestBase {
- public:
-  PopupViewViewsBrowsertestNewFopOff() {
-    feature_list_.InitAndDisableFeature(
-        features::kAutofillEnableNewFopDisplayDesktop);
-  }
-
- protected:
-  base::test::ScopedFeatureList feature_list_;
-};
-
-IN_PROC_BROWSER_TEST_P(PopupViewViewsBrowsertestNewFopOff,
-                       InvokeUi_CreditCard) {
-  PrepareSuggestions(CreateCreditCardSuggestions());
-  ShowAndVerifyUi();
-}
-
-IN_PROC_BROWSER_TEST_P(PopupViewViewsBrowsertestNewFopOff,
-                       InvokeUi_CreditCard_MultipleLabels) {
-  Suggestion suggestion1(
-      "Visa",
-      {{Suggestion::Text(u"Filling credit card - your card for payments"),
-        Suggestion::Text(u"Alexander Joseph Ricardo Park")},
-       {Suggestion::Text(u"Full credit card"), Suggestion::Text(u"Alex Park")}},
-      Suggestion::Icon::kCardVisa, SuggestionType::kCreditCardEntry);
-
-  // Also create a 1 label line suggestion to make sure they work well together.
-  Suggestion suggestion2(
-      "Visa",
-      {{Suggestion::Text(u"Filling credit card - your card for payments")}},
-      Suggestion::Icon::kCardVisa, SuggestionType::kCreditCardEntry);
-  PrepareSuggestions({suggestion1, suggestion2});
-  ShowAndVerifyUi();
-}
-
-INSTANTIATE_TEST_SUITE_P(All,
-                         PopupViewViewsBrowsertestNewFopOff,
-                         Combine(Bool(), Bool()),
-                         PopupViewViewsBrowsertestBase::GetTestSuffix);
-
 using PopupViewViewsBrowsertest = PopupViewViewsBrowsertestBase;
+
+IN_PROC_BROWSER_TEST_P(PopupViewViewsBrowsertest, InvokeUi_CreditCard) {
+  PrepareSuggestions(CreateCreditCardSuggestions());
+  ShowAndVerifyUi();
+}
+
+IN_PROC_BROWSER_TEST_P(PopupViewViewsBrowsertest,
+                       InvokeUi_CreditCard_MultipleLabels) {
+  Suggestion suggestion1(
+      "Visa",
+      {{Suggestion::Text(u"Filling credit card - your card for payments"),
+        Suggestion::Text(u"Alexander Joseph Ricardo Park")},
+       {Suggestion::Text(u"Full credit card"), Suggestion::Text(u"Alex Park")}},
+      Suggestion::Icon::kCardVisa, SuggestionType::kCreditCardEntry);
+
+  // Also create a 1 label line suggestion to make sure they work well together.
+  Suggestion suggestion2(
+      "Visa",
+      {{Suggestion::Text(u"Filling credit card - your card for payments")}},
+      Suggestion::Icon::kCardVisa, SuggestionType::kCreditCardEntry);
+  PrepareSuggestions({suggestion1, suggestion2});
+  ShowAndVerifyUi();
+}
 
 IN_PROC_BROWSER_TEST_P(PopupViewViewsBrowsertest, InvokeUi_Autocomplete) {
   PrepareSuggestions(CreateAutocompleteSuggestions());
@@ -591,46 +540,22 @@ class PopupViewViewsPlusAddressSuggestionBrowsertest
 
   std::vector<Suggestion> GetPlusAddressSuggestion(
       const std::vector<std::string>& affiliated_plus_addresses) {
-    plus_addresses::PlusAddressSuggestionGenerator generator(
-        &setting_service(), &allocator(),
-        url::Origin::Create(GURL("https://foo.bar")));
-    FormData form = autofill::test::CreateTestSignupFormData();
-    return generator.GetSuggestions(
-        affiliated_plus_addresses,
-        /*is_creation_enabled=*/true, form, form.fields()[0],
-        /*form_field_type_groups=*/{}, PasswordFormClassification(),
-        AutofillSuggestionTriggerSource::kFormControlElementClicked);
+    return service_.GetSuggestionsFromPlusAddresses(affiliated_plus_addresses);
   }
 
  private:
-  autofill::test::AutofillUnitTestEnvironment autofill_env_;
+  autofill::test::AutofillBrowserTestEnvironment autofill_env_;
 
   plus_addresses::FakePlusAddressAllocator allocator_;
   plus_addresses::FakePlusAddressSettingService setting_service_;
+  plus_addresses::FakePlusAddressService service_;
 };
-
-IN_PROC_BROWSER_TEST_P(PopupViewViewsPlusAddressSuggestionBrowsertest,
-                       FirstTimeCreation) {
-  setting_service().set_has_accepted_notice(false);
-  PrepareSuggestions(
-      GetPlusAddressSuggestion(/*affiliated_plus_addresses=*/{}));
-  ShowAndVerifyUi();
-}
-
-IN_PROC_BROWSER_TEST_P(PopupViewViewsPlusAddressSuggestionBrowsertest,
-                       InlineGenerationWithPreallocatedAddresses) {
-  setting_service().set_has_accepted_notice(true);
-  allocator().set_is_next_allocation_synchronous(true);
-  PrepareSuggestions(
-      GetPlusAddressSuggestion(/*affiliated_plus_addresses=*/{}));
-  ShowAndVerifyUi();
-}
 
 IN_PROC_BROWSER_TEST_P(PopupViewViewsPlusAddressSuggestionBrowsertest,
                        Filling) {
   setting_service().set_has_accepted_notice(true);
   PrepareSuggestions(
-      GetPlusAddressSuggestion(/*affiliated_plus_addresses=*/{"foo@moo.com"}));
+      GetPlusAddressSuggestion({plus_addresses::test::kFakePlusAddress}));
   ShowAndVerifyUi();
 }
 

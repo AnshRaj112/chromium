@@ -24,7 +24,6 @@
 #include "media/capture/video/apple/video_capture_device_apple.h"
 #import "media/capture/video/apple/video_capture_device_avfoundation.h"
 #import "media/capture/video/apple/video_capture_device_avfoundation_utils.h"
-#include "media/capture/video/video_capture_metrics.h"
 
 #if BUILDFLAG(IS_MAC)
 #import <IOKit/audio/IOAudioTypes.h>
@@ -34,7 +33,6 @@
 #endif
 
 BASE_FEATURE(kVideoCaptureDeviceFactoryAppleLogging,
-             "VideoCaptureDeviceFactoryAppleLogging",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 namespace {
@@ -81,7 +79,7 @@ media::VideoCaptureFormats GetDeviceSupportedFormats(AVCaptureDevice* device) {
 
 // Blocked devices are identified by a characteristic trailing substring of
 // uniqueId. At the moment these are just Blackmagic devices.
-const char* kBlockedCamerasIdSignature[] = {"-01FDA82C8A9C"};
+constexpr const char* kBlockedCamerasIdSignature[] = {"-01FDA82C8A9C"};
 
 bool IsDeviceBlockedForAVFoundation(const std::string& device_id) {
   bool is_device_blocked = false;
@@ -99,6 +97,88 @@ bool IsDeviceBlocked(const media::VideoCaptureDeviceDescriptor& descriptor) {
       << "Blocked camera: " << descriptor.display_name()
       << ", id: " << descriptor.device_id;
   return is_device_blocked;
+}
+
+// TODO(crbug.com/436126054) remove these functions after issue is resolved.
+void API_AVAILABLE(macos(14.0)) ListAvailableCaptureDevices() {
+  NSArray* deviceTypes = @[
+    AVCaptureDeviceTypeBuiltInWideAngleCamera,
+    AVCaptureDeviceTypeContinuityCamera, AVCaptureDeviceTypeExternal,
+    AVCaptureDeviceTypeMicrophone
+  ];
+
+  AVCaptureDeviceDiscoverySession* deviceDiscoverySession =
+      [AVCaptureDeviceDiscoverySession
+          discoverySessionWithDeviceTypes:deviceTypes
+                                mediaType:nil
+                                 position:AVCaptureDevicePositionUnspecified];
+
+  if ([deviceDiscoverySession.devices count] == 0) {
+    LOG(ERROR) << "Simple Query - No AVCaptureDevices found.";
+  } else {
+    for (AVCaptureDevice* device in deviceDiscoverySession.devices) {
+      LOG(ERROR) << "Simple Query - Device Name:"
+                 << base::SysNSStringToUTF8(device.localizedName)
+                 << " Unique ID:" << base::SysNSStringToUTF8(device.uniqueID)
+                 << " Model ID:" << base::SysNSStringToUTF8(device.modelID)
+                 << " Type:" << base::SysNSStringToUTF8(device.deviceType)
+                 << " Position:" << [device position];
+    }
+  }
+}
+
+// TODO(crbug.com/436126054) remove these functions after issue is resolved.
+void API_AVAILABLE(macos(14.0)) ListAvailableCaptureDevicesNoMic() {
+  NSArray* deviceTypes = @[
+    AVCaptureDeviceTypeBuiltInWideAngleCamera,
+    AVCaptureDeviceTypeContinuityCamera, AVCaptureDeviceTypeExternal
+  ];
+
+  AVCaptureDeviceDiscoverySession* deviceDiscoverySession =
+      [AVCaptureDeviceDiscoverySession
+          discoverySessionWithDeviceTypes:deviceTypes
+                                mediaType:nil
+                                 position:AVCaptureDevicePositionUnspecified];
+
+  if ([deviceDiscoverySession.devices count] == 0) {
+    LOG(ERROR) << "Simple Query NoMic - No AVCaptureDevices found.";
+  } else {
+    for (AVCaptureDevice* device in deviceDiscoverySession.devices) {
+      LOG(ERROR) << "Simple Query NoMic - Device Name:"
+                 << base::SysNSStringToUTF8(device.localizedName)
+                 << " Unique ID:" << base::SysNSStringToUTF8(device.uniqueID)
+                 << " Model ID:" << base::SysNSStringToUTF8(device.modelID)
+                 << " Type:" << base::SysNSStringToUTF8(device.deviceType)
+                 << " Position:" << [device position];
+    }
+  }
+}
+
+// TODO(crbug.com/436126054) remove these functions after issue is resolved.
+void API_AVAILABLE(macos(14.0)) ListAvailableCaptureDevicesMediaType() {
+  NSArray* deviceTypes = @[
+    AVCaptureDeviceTypeBuiltInWideAngleCamera,
+    AVCaptureDeviceTypeContinuityCamera, AVCaptureDeviceTypeExternal
+  ];
+
+  AVCaptureDeviceDiscoverySession* deviceDiscoverySession =
+      [AVCaptureDeviceDiscoverySession
+          discoverySessionWithDeviceTypes:deviceTypes
+                                mediaType:AVMediaTypeVideo
+                                 position:AVCaptureDevicePositionUnspecified];
+
+  if ([deviceDiscoverySession.devices count] == 0) {
+    LOG(ERROR) << "Simple Query MediaType - No AVCaptureDevices found.";
+  } else {
+    for (AVCaptureDevice* device in deviceDiscoverySession.devices) {
+      LOG(ERROR) << "Simple Query MediaType - Device Name:"
+                 << base::SysNSStringToUTF8(device.localizedName)
+                 << " Unique ID:" << base::SysNSStringToUTF8(device.uniqueID)
+                 << " Model ID:" << base::SysNSStringToUTF8(device.modelID)
+                 << " Type:" << base::SysNSStringToUTF8(device.deviceType)
+                 << " Position:" << [device position];
+    }
+  }
 }
 
 }  // anonymous namespace
@@ -134,12 +214,11 @@ VideoCaptureErrorOrDevice VideoCaptureDeviceFactoryApple::CreateDevice(
   }
 #endif
 
-  if (capture_device) {
-    LogCaptureDeviceHashedModelId(descriptor);
 #if BUILDFLAG(IS_MAC)
+  if (capture_device) {
     LogReactionEffectsGesturesState();
-#endif
   }
+#endif
 
   return capture_device ? VideoCaptureErrorOrDevice(std::move(capture_device))
                         : VideoCaptureErrorOrDevice(
@@ -166,6 +245,15 @@ void VideoCaptureDeviceFactoryApple::GetDevicesInfo(
 #if BUILDFLAG(IS_IOS)
   bool default_set = false;
 #endif
+  // available() must be in it's own separate if statement.
+  if (@available(macOS 14.0, *)) {
+    if (debug_logging_enabled) {
+      ListAvailableCaptureDevices();
+      ListAvailableCaptureDevicesNoMic();
+      ListAvailableCaptureDevicesMediaType();
+    }
+  }
+
   for (AVCaptureDevice* device in devices) {
     if ([device hasMediaType:AVMediaTypeVideo] ||
         [device hasMediaType:AVMediaTypeMuxed]) {

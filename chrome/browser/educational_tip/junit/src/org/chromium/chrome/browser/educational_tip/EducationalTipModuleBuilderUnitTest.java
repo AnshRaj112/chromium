@@ -25,7 +25,8 @@ import org.mockito.junit.MockitoRule;
 import org.robolectric.annotation.Config;
 
 import org.chromium.base.Callback;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.Features.EnableFeatures;
@@ -35,9 +36,9 @@ import org.chromium.chrome.browser.magic_stack.ModuleDelegate;
 import org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType;
 import org.chromium.chrome.browser.magic_stack.ModuleProvider;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.setup_list.SetupListManager;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
-import org.chromium.chrome.browser.tabmodel.TabGroupModelFilterProvider;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.ui.default_browser_promo.DefaultBrowserPromoUtils;
@@ -59,35 +60,34 @@ public class EducationalTipModuleBuilderUnitTest {
     @Mock private ModuleDelegate mModuleDelegate;
     @Mock private Callback<ModuleProvider> mBuildCallback;
     @Mock private EducationTipModuleActionDelegate mActionDelegate;
-    @Mock private ObservableSupplier<Profile> mProfileSupplier;
     @Mock private Profile mProfile;
     @Mock private Tracker mTracker;
     @Mock private DefaultBrowserPromoUtils mMockDefaultBrowserPromoUtils;
     @Mock private TabModelSelector mTabModelSelector;
-    @Mock private TabGroupModelFilterProvider mProvider;
     @Mock private TabGroupModelFilter mNormalFilter;
     @Mock private TabGroupModelFilter mIncognitoFilter;
     @Mock private TabModel mNormalModel;
     @Mock private TabModel mIncognitoModel;
     @Mock private IdentityServicesProvider mIdentityServicesProvider;
     @Mock private IdentityManager mIdentityManagerMock;
+    @Mock private SetupListManager mSetupListManager;
 
+    private MonotonicObservableSupplier<Profile> mProfileSupplier;
     private EducationalTipModuleBuilder mModuleBuilder;
 
     @Before
     public void setUp() {
+        mProfileSupplier = new ObservableSupplierImpl(mProfile);
         when(mActionDelegate.getProfileSupplier()).thenReturn(mProfileSupplier);
-        when(mProfileSupplier.hasValue()).thenReturn(true);
-        when(mProfileSupplier.get()).thenReturn(mProfile);
         when(mProfile.getOriginalProfile()).thenReturn(mProfile);
         DefaultBrowserPromoUtils.setInstanceForTesting(mMockDefaultBrowserPromoUtils);
         TrackerFactory.setTrackerForTests(mTracker);
         when(mTracker.wouldTriggerHelpUi(FeatureConstants.DEFAULT_BROWSER_PROMO_MAGIC_STACK))
                 .thenReturn(true);
         when(mActionDelegate.getTabModelSelector()).thenReturn(mTabModelSelector);
-        when(mTabModelSelector.getTabGroupModelFilterProvider()).thenReturn(mProvider);
-        when(mProvider.getTabGroupModelFilter(/* isIncognito= */ false)).thenReturn(mNormalFilter);
-        when(mProvider.getTabGroupModelFilter(/* isIncognito= */ true))
+        when(mTabModelSelector.getTabGroupModelFilter(/* isIncognito= */ false))
+                .thenReturn(mNormalFilter);
+        when(mTabModelSelector.getTabGroupModelFilter(/* isIncognito= */ true))
                 .thenReturn(mIncognitoFilter);
         when(mNormalFilter.getTabGroupCount()).thenReturn(0);
         when(mIncognitoFilter.getTabGroupCount()).thenReturn(0);
@@ -99,6 +99,7 @@ public class EducationalTipModuleBuilderUnitTest {
         when(IdentityServicesProvider.get().getIdentityManager(any()))
                 .thenReturn(mIdentityManagerMock);
         when(mIdentityManagerMock.hasPrimaryAccount(ConsentLevel.SIGNIN)).thenReturn(false);
+        when(mSetupListManager.isSetupListActive()).thenReturn(false);
 
         mModuleBuilder =
                 new EducationalTipModuleBuilder(ModuleType.QUICK_DELETE_PROMO, mActionDelegate);
@@ -188,5 +189,30 @@ public class EducationalTipModuleBuilderUnitTest {
         assertNotNull(inputContextForTest.getEntryValue("tab_group_exists"));
         assertNotNull(inputContextForTest.getEntryValue("number_of_tabs"));
         assertNotNull(inputContextForTest.getEntryValue("is_user_signed_in"));
+    }
+
+    @Test
+    @SmallTest
+    @EnableFeatures({ChromeFeatureList.ANDROID_SETUP_LIST})
+    public void testHasManualOrdering_ReturnsTrueForSetupListModuleWhenActive() {
+        when(mSetupListManager.isSetupListActive()).thenReturn(true);
+        SetupListManager.setInstanceForTesting(mSetupListManager);
+
+        EducationalTipModuleBuilder builder =
+                new EducationalTipModuleBuilder(
+                        ModuleType.ENHANCED_SAFE_BROWSING_PROMO, mActionDelegate);
+        assertTrue(builder.hasManualOrdering());
+    }
+
+    @Test
+    @SmallTest
+    @EnableFeatures({ChromeFeatureList.ANDROID_SETUP_LIST})
+    public void testHasManualOrdering_ReturnsFalseForNonSetupListModuleWhenActive() {
+        when(mSetupListManager.isSetupListActive()).thenReturn(true);
+        SetupListManager.setInstanceForTesting(mSetupListManager);
+
+        EducationalTipModuleBuilder builder =
+                new EducationalTipModuleBuilder(ModuleType.QUICK_DELETE_PROMO, mActionDelegate);
+        assertFalse(builder.hasManualOrdering());
     }
 }

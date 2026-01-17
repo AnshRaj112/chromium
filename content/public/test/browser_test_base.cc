@@ -93,14 +93,18 @@
 #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/compositor/compositor_switches.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/display/display_switches.h"
 #include "ui/gfx/animation/animation_test_api.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/gl/gl_implementation.h"
 #include "ui/gl/gl_switches.h"
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 #include "ui/platform_window/common/platform_window_defaults.h"  // nogncheck
+#endif
+
+#if BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_CHROMEOS_DEVICE)
+#include "ui/events/ozone/events_ozone.h"
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
@@ -141,7 +145,6 @@
 #if BUILDFLAG(IS_WIN)
 #include <shlobj.h>
 
-#include "base/files/file_util.h"
 #include "base/test/test_reg_util_win.h"
 #endif  // BUILDFLAG(IS_WIN)
 
@@ -273,6 +276,13 @@ BrowserTestBase::BrowserTestBase() {
   ui::test::EnableTestConfigForPlatformWindows();
 #endif
 
+#if BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_CHROMEOS_DEVICE)
+  // Events used in tests on CrOS are generated either at aura level, or ozone
+  // level, except for Crosier tests that run on a device.  Disable native
+  // events handling as they can cause unexpected behavior.
+  ui::DisableNativeUiEventDispatchForTest();
+#endif
+
 #if BUILDFLAG(IS_POSIX)
   handle_sigterm_ = true;
 #endif
@@ -311,11 +321,6 @@ BrowserTestBase::BrowserTestBase() {
 }
 
 BrowserTestBase::~BrowserTestBase() {
-#if BUILDFLAG(IS_ANDROID)
-  // DiscardableSharedMemoryManager destruction can block the current thread.
-  base::ScopedAllowBaseSyncPrimitivesForTesting allow_wait;
-  discardable_shared_memory_manager_.reset();
-#endif
   CHECK(set_up_called_ || IsSkipped() || HasFatalFailure())
       << "SetUp was not called. This probably means that the "
          "developer has overridden the method and not called "
@@ -345,11 +350,13 @@ void BrowserTestBase::SetUp() {
   // Don't overwrite any IP address overrides that test have already set.
   if (!command_line->HasSwitch(network::switches::kIpAddressSpaceOverrides)) {
     command_line->AppendSwitchASCII(network::switches::kIpAddressSpaceOverrides,
-                                    "127.0.0.1:0=public");
+                                    "127.0.0.1:0=public,[::1]:0=public");
   }
 
-  if (!command_line->HasSwitch(switches::kUseFakeDeviceForMediaStream))
+  if (use_fake_media_stream_devices_ &&
+      !command_line->HasSwitch(switches::kUseFakeDeviceForMediaStream)) {
     command_line->AppendSwitch(switches::kUseFakeDeviceForMediaStream);
+  }
 
   // Features that depend on external factors (e.g. memory pressure monitor) can
   // disable themselves based on the switch below (to ensure that browser tests
@@ -378,6 +385,9 @@ void BrowserTestBase::SetUp() {
     command_line->AppendSwitch(switches::kDisableGpu);
     command_line->RemoveSwitch(switches::kDisableSoftwareCompositingFallback);
   }
+
+  // Disable D3D11 WARP for consistent cross-platform software rendering.
+  command_line->AppendSwitch(switches::kDisableD3D11Warp);
 
   // The layout of windows on screen is unpredictable during tests, so disable
   // occlusion when running browser tests.
@@ -423,8 +433,8 @@ void BrowserTestBase::SetUp() {
   // Disable animations when verifying pixel output, as they make tests flaky.
   if (command_line->HasSwitch(switches::kVerifyPixels)) {
     disable_layer_animations_ =
-        std::make_unique<ui::ScopedAnimationDurationScaleMode>(
-            ui::ScopedAnimationDurationScaleMode::ZERO_DURATION);
+        std::make_unique<gfx::ScopedAnimationDurationScaleMode>(
+            gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
     disable_rich_animations_ =
         gfx::AnimationTestApi::SetRichAnimationRenderMode(
             gfx::Animation::RichAnimationRenderMode::FORCE_DISABLED);
@@ -610,6 +620,7 @@ void BrowserTestBase::SetUp() {
   // things up manually. A meager re-implementation of ContentMainRunnerImpl
   // follows.
 
+  base::MemoryPressureListenerRegistry memory_pressure_listener_registry;
   base::ScopedMemoryConsumerRegistry<BrowserMemoryConsumerRegistry> registry;
 
   // Unlike other platforms, android_browsertests can reuse the same process for
@@ -655,8 +666,9 @@ void BrowserTestBase::SetUp() {
 
     auto* provider = delegate->CreateVariationsIdsProvider();
     if (!provider) {
-      variations::VariationsIdsProvider::Create(
-          variations::VariationsIdsProvider::Mode::kUseSignedInState);
+      variations::VariationsIdsProvider::CreateInstance(
+          variations::VariationsIdsProvider::Mode::kUseSignedInState,
+          std::make_unique<base::DefaultClock>());
     }
 
     std::optional<int> post_early_initialization_exit_code =
@@ -719,7 +731,9 @@ void BrowserTestBase::SetUp() {
 
     // Waits for Java to finish initialization, then we can run the test.
     loop.Run();
+  }
 
+  {
     // The BrowserMainLoop startup tasks will call DisallowUnresponsiveTasks().
     // So when we run the ProxyRunTestOnMainThreadLoop() we no longer can block,
     // but tests should be allowed to. So we undo that blocking inside here.
@@ -732,11 +746,26 @@ void BrowserTestBase::SetUp() {
   }
 
   {
+    // We need to finish the Activity before this function returns because
+    // otherwise we will crash when finishing the Activity as too much
+    // infrastructure has been torn down.
+    base::RunLoop loop{base::RunLoop::Type::kNestableTasksAllowed};
+    testing::android::RunActivityTeardownCallback();
+    WaitUntilActivityTeardownIsFinished(loop.QuitClosure(),
+                                        TestTimeouts::action_max_timeout());
+    loop.Run();
+  }
+
+  {
     base::ScopedAllowBaseSyncPrimitivesForTesting allow_wait;
     // Shutting these down will block the thread.
     ShutDownNetworkService();
     ipc_support.reset();
   }
+
+  // Can hang if run after BrowserTaskExecutor is shut down.
+  base::ScopedAllowBaseSyncPrimitivesForTesting allow_wait;
+  discardable_shared_memory_manager_.reset();
 
   // Like in BrowserMainLoop::ShutdownThreadsAndCleanUp(), allow IO during main
   // thread tear down.
@@ -824,7 +853,26 @@ void BrowserTestBase::WaitUntilJavaIsReady(
                      base::Unretained(this), std::move(quit_closure),
                      wait_retry_left - retry_interval),
       retry_interval);
-  return;
+}
+
+void BrowserTestBase::WaitUntilActivityTeardownIsFinished(
+    base::OnceClosure quit_closure,
+    const base::TimeDelta& wait_retry_left) {
+  CHECK_GE(wait_retry_left.InMilliseconds(), 0)
+      << "WaitUntilActivityTeardownIsFinished() timed out.";
+
+  if (testing::android::JavaActivityTeardownCompleteForBrowserTests()) {
+    std::move(quit_closure).Run();
+    return;
+  }
+
+  base::TimeDelta retry_interval = base::Milliseconds(100);
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE,
+      base::BindOnce(&BrowserTestBase::WaitUntilActivityTeardownIsFinished,
+                     base::Unretained(this), std::move(quit_closure),
+                     wait_retry_left - retry_interval),
+      retry_interval);
 }
 #endif
 
@@ -1079,6 +1127,11 @@ void BrowserTestBase::PostTaskToInProcessRendererAndWait(
 void BrowserTestBase::EnablePixelOutput(float force_device_scale_factor) {
   enable_pixel_output_ = true;
   force_device_scale_factor_ = force_device_scale_factor;
+}
+
+void BrowserTestBase::SetUseFakeMediaStreamDevices(
+    bool use_fake_media_stream_devices) {
+  use_fake_media_stream_devices_ = use_fake_media_stream_devices;
 }
 
 void BrowserTestBase::UseSoftwareCompositing() {

@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "ui/events/ash/keyboard_capability.h"
 
 #include <fcntl.h>
@@ -23,7 +18,7 @@
 #include "ash/constants/ash_switches.h"
 #include "base/check_is_test.h"
 #include "base/check_op.h"
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/containers/flat_set.h"
@@ -36,6 +31,7 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/system/sys_info.h"
+#include "base/task/current_thread.h"
 #include "device/udev_linux/scoped_udev.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/events/ash/event_rewriter_ash.h"
@@ -238,7 +234,7 @@ std::optional<uint32_t> ConvertScanCodeToEvdevKey(const base::ScopedFD& fd,
   struct input_keymap_entry keymap_entry {
     .flags = 0, .len = sizeof(scancode), .keycode = 0
   };
-  memcpy(keymap_entry.scancode, &scancode, sizeof(scancode));
+  UNSAFE_TODO(memcpy(keymap_entry.scancode, &scancode, sizeof(scancode)));
 
   int ret = ioctl(fd.get(), EVIOCGKEYCODE_V2, &keymap_entry);
   if (ret < 0) {
@@ -596,7 +592,7 @@ std::optional<KeyboardCode> KeyboardCapability::ConvertToKeyboardCode(
 
 // static
 bool KeyboardCapability::IsSixPackKey(const KeyboardCode& key_code) {
-  return base::Contains(kSixPackKeyToSearchSystemKeyMap, key_code);
+  return kSixPackKeyToSearchSystemKeyMap.contains(key_code);
 }
 
 std::optional<KeyboardCode> KeyboardCapability::GetMappedFKeyIfExists(
@@ -607,19 +603,22 @@ std::optional<KeyboardCode> KeyboardCapability::GetMappedFKeyIfExists(
   KeyboardTopRowLayout layout = GetTopRowLayout(keyboard);
   switch (layout) {
     case KeyboardTopRowLayout::kKbdTopRowLayout1:
-      if (kLayout1TopRowKeyToFKeyMap.contains(key_code)) {
-        return kLayout1TopRowKeyToFKeyMap.at(key_code);
+      if (auto it = kLayout1TopRowKeyToFKeyMap.find(key_code);
+          it != kLayout1TopRowKeyToFKeyMap.end()) {
+        return it->second;
       }
       break;
     case KeyboardTopRowLayout::kKbdTopRowLayout2:
-      if (kLayout2TopRowKeyToFKeyMap.contains(key_code)) {
-        return kLayout2TopRowKeyToFKeyMap.at(key_code);
+      if (auto it = kLayout2TopRowKeyToFKeyMap.find(key_code);
+          it != kLayout2TopRowKeyToFKeyMap.end()) {
+        return it->second;
       }
       break;
     case KeyboardTopRowLayout::kKbdTopRowLayoutWilco:
     case KeyboardTopRowLayout::kKbdTopRowLayoutDrallion:
-      if (kLayoutWilcoDrallionTopRowKeyToFKeyMap.contains(key_code)) {
-        return kLayoutWilcoDrallionTopRowKeyToFKeyMap.at(key_code);
+      if (auto it = kLayoutWilcoDrallionTopRowKeyToFKeyMap.find(key_code);
+          it != kLayoutWilcoDrallionTopRowKeyToFKeyMap.end()) {
+        return it->second;
       }
       break;
     case KeyboardTopRowLayout::kKbdTopRowLayoutCustom:
@@ -643,8 +642,8 @@ std::optional<KeyboardCode> KeyboardCapability::GetCorrespondingFunctionKey(
     return std::nullopt;
   }
 
-  return kFunctionKeys[std::distance(keyboard_info->top_row_action_keys.begin(),
-                                     iter)];
+  return UNSAFE_TODO(kFunctionKeys)[std::distance(
+      keyboard_info->top_row_action_keys.begin(), iter)];
 }
 
 std::optional<TopRowActionKey>
@@ -828,6 +827,17 @@ const KeyboardCapability::KeyboardInfo* KeyboardCapability::GetKeyboardInfo(
   auto iter = keyboard_info_map_.find(keyboard.id);
   if (iter != keyboard_info_map_.end()) {
     return &iter->second;
+  }
+
+  // Usually calls to this function are done on the UI thread, but there are
+  // rare edge case scenarios in which this is not true and can cause a race
+  // condition. A nullptr indicates a default keyboard and results are not
+  // cached. The good thread/path will correctly process the keyboard and cache
+  // the information.
+  // TODO(crbug.com/319951891): Refactor this to be thread safe after
+  // confirmation that this race condition no longer happens.
+  if (!base::CurrentUIThread::IsSet()) {
+    return nullptr;
   }
 
   // Insert new keyboard info into the map.
@@ -1322,10 +1332,10 @@ bool KeyboardCapability::HasTopRowActionKey(const KeyboardDevice& keyboard,
                                             TopRowActionKey action_key) const {
   const auto* keyboard_info = GetKeyboardInfo(keyboard);
   if (!keyboard_info) {
-    return base::Contains(kLayout1TopRowActionKeys, action_key);
+    return std::ranges::contains(kLayout1TopRowActionKeys, action_key);
   }
 
-  return base::Contains(keyboard_info->top_row_action_keys, action_key);
+  return std::ranges::contains(keyboard_info->top_row_action_keys, action_key);
 }
 
 bool KeyboardCapability::HasTopRowActionKey(int device_id,

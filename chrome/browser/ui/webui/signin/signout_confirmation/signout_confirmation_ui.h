@@ -6,6 +6,8 @@
 #define CHROME_BROWSER_UI_WEBUI_SIGNIN_SIGNOUT_CONFIRMATION_SIGNOUT_CONFIRMATION_UI_H_
 
 #include "base/functional/callback.h"
+#include "base/observer_list.h"
+#include "base/observer_list_types.h"
 #include "chrome/browser/ui/signin/chrome_signout_confirmation_prompt.h"
 #include "chrome/browser/ui/webui/signin/signout_confirmation/signout_confirmation.mojom.h"
 #include "chrome/common/webui_url_constants.h"
@@ -14,15 +16,10 @@
 #include "content/public/common/url_constants.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "ui/webui/mojo_web_ui_controller.h"
-#include "ui/webui/resources/cr_components/color_change_listener/color_change_listener.mojom.h"
 
 namespace content {
 class WebUI;
 }  // namespace content
-
-namespace ui {
-class ColorChangeHandler;
-}  // namespace ui
 
 class Browser;
 class SignoutConfirmationHandler;
@@ -40,20 +37,29 @@ class SignoutConfirmationUI
     : public ui::MojoWebUIController,
       public signout_confirmation::mojom::PageHandlerFactory {
  public:
+  class Observer : public base::CheckedObserver {
+   public:
+    // Called when the `handler_` is set and ready to be used.
+    // TODO(crbug.com/469344442): This method is only used in tests.
+    // Once an alterinative observer is used for the tests that need this,
+    // remove this method (and observer).
+    virtual void OnSignoutConfirmationUIHandlerReady() = 0;
+  };
+
   explicit SignoutConfirmationUI(content::WebUI* web_ui);
   ~SignoutConfirmationUI() override;
 
   SignoutConfirmationUI(const SignoutConfirmationUI&) = delete;
   SignoutConfirmationUI& operator=(const SignoutConfirmationUI&) = delete;
 
+  void AddObserver(Observer* observer);
+  void RemoveObserver(Observer* observer);
+
   // Prepares the information to be given to the handler once ready.
   void Initialize(Browser* browser,
                   ChromeSignoutConfirmationPromptVariant variant,
+                  size_t unsynced_data_count,
                   SignoutConfirmationCallback callback);
-
-  void BindInterface(
-      mojo::PendingReceiver<color_change_listener::mojom::PageHandler>
-          pending_receiver);
 
   // Instantiates the implementor of the
   // `signout_confirmation::mojom::PageHandlerFactory` mojo interface passing
@@ -74,6 +80,8 @@ class SignoutConfirmationUI
   // to the `handler_`.
   void CancelDialogForTesting();
 
+  bool IsHandlerReadyForTesting() { return handler_.get(); }
+
  private:
   // signout_confirmation::mojom::SignoutConfirmationFactory:
   void CreateSignoutConfirmationHandler(
@@ -86,6 +94,7 @@ class SignoutConfirmationUI
   void OnMojoHandlersReady(
       Browser* browser,
       ChromeSignoutConfirmationPromptVariant variant,
+      size_t unsynced_data_count,
       SignoutConfirmationCallback callback,
       mojo::PendingRemote<signout_confirmation::mojom::Page> page,
       mojo::PendingReceiver<signout_confirmation::mojom::PageHandler> receiver);
@@ -97,9 +106,7 @@ class SignoutConfirmationUI
       mojo::PendingReceiver<signout_confirmation::mojom::PageHandler>)>
       initialize_handler_callback_;
 
-  // Handler that notifies WebUI to fetch new stylesheets containing color
-  // variables if the color provider changes.
-  std::unique_ptr<ui::ColorChangeHandler> color_provider_handler_;
+  base::ObserverList<Observer> observers_;
 
   // Handler implementing Mojo interface to communicate with the WebUI.
   std::unique_ptr<SignoutConfirmationHandler> handler_;

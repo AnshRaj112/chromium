@@ -6,6 +6,7 @@
 
 #include <stddef.h>
 
+#include <memory>
 #include <string_view>
 #include <vector>
 
@@ -18,8 +19,11 @@
 #include "base/strings/string_util.h"
 #include "base/types/optional_util.h"
 #include "base/values.h"
+#include "extensions/buildflags/buildflags.h"
 #include "net/http/http_request_headers.h"
 #include "third_party/re2/src/re2/re2.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 using re2::RE2;
 
@@ -340,7 +344,7 @@ std::unique_ptr<FormDataParser> FormDataParser::CreateFromContentTypeHeader(
 
   switch (choice) {
     case URL_ENCODED:
-      return std::unique_ptr<FormDataParser>(new FormDataParserUrlEncoded());
+      return std::make_unique<FormDataParserUrlEncoded>();
     case MULTIPART:
       return std::unique_ptr<FormDataParser>(
           new FormDataParserMultipart(boundary));

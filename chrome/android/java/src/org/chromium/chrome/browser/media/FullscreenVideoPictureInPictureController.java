@@ -16,6 +16,7 @@ import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.Rational;
 
+import androidx.annotation.IntDef;
 import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Callback;
@@ -38,8 +39,10 @@ import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
 import org.chromium.ui.base.WindowAndroid;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -51,16 +54,27 @@ public class FullscreenVideoPictureInPictureController {
 
     // Metrics
 
+    @IntDef({
+        MetricsEndReason.RESUME,
+        MetricsEndReason.CLOSE,
+        MetricsEndReason.CRASH,
+        MetricsEndReason.NEW_TAB,
+        MetricsEndReason.REPARENT,
+        MetricsEndReason.LEFT_FULLSCREEN,
+        MetricsEndReason.WEB_CONTENTS_LEFT_FULLSCREEN,
+        MetricsEndReason.START
+    })
+    @Retention(RetentionPolicy.SOURCE)
     private @interface MetricsEndReason {
-        static final int RESUME = 0;
+        int RESUME = 0;
         // Obsolete: NAVIGATION = 1;
-        static final int CLOSE = 2;
-        static final int CRASH = 3;
-        static final int NEW_TAB = 4;
-        static final int REPARENT = 5;
-        static final int LEFT_FULLSCREEN = 6;
-        static final int WEB_CONTENTS_LEFT_FULLSCREEN = 7;
-        static final int START = 8;
+        int CLOSE = 2;
+        int CRASH = 3;
+        int NEW_TAB = 4;
+        int REPARENT = 5;
+        int LEFT_FULLSCREEN = 6;
+        int WEB_CONTENTS_LEFT_FULLSCREEN = 7;
+        int START = 8;
     }
 
     private static final float MIN_ASPECT_RATIO = 1 / 2.39f;
@@ -93,7 +107,7 @@ public class FullscreenVideoPictureInPictureController {
     private static final boolean sUseSourceRectHint = false;
 
     /** Callbacks to cleanup after leaving PiP. */
-    private final List<Runnable> mOnLeavePipCallbacks = new LinkedList<>();
+    private final List<Runnable> mOnLeavePipCallbacks = new ArrayList<>();
 
     /** Current observers, if any. */
     @Nullable DismissActivityOnTabChangeObserver mActivityTabObserver;
@@ -643,12 +657,6 @@ public class FullscreenVideoPictureInPictureController {
         }
 
         @Override
-        public void webContentsWillSwap(Tab tab) {
-            dismissActivityIfNeeded(mActivity, MetricsEndReason.WEB_CONTENTS_LEFT_FULLSCREEN);
-            cleanupWebContentsObserver();
-        }
-
-        @Override
         public void onContentChanged(Tab tab) {
             if (tab != mTab) return;
             // While webContentsWillSwap() probably did this, doesn't hurt to do it again.
@@ -675,7 +683,7 @@ public class FullscreenVideoPictureInPictureController {
         private DismissActivityOnTabChangeObserver(Activity activity) {
             mActivity = activity;
             mCurrentTab = mActivityTabProvider.get();
-            mActivityTabProvider.addObserver(this);
+            mActivityTabProvider.asObservable().addObserver(this);
             registerTabEventObserver();
         }
 
@@ -692,7 +700,7 @@ public class FullscreenVideoPictureInPictureController {
                 mTabEventObserver = null;
             }
             mCurrentTab = null;
-            mActivityTabProvider.removeObserver(this);
+            mActivityTabProvider.asObservable().removeObserver(this);
         }
 
         @Override
@@ -735,7 +743,7 @@ public class FullscreenVideoPictureInPictureController {
         }
 
         @Override
-        public void mediaStartedPlaying() {
+        public void mediaStartedPlaying(int id, boolean hasAudio, boolean hasVideo) {
             // We have no idea if the effectively fullscreen video started playing, but this will
             // check if we have an active one.
             updateAutoPictureInPictureStatusIfNeeded();
@@ -746,7 +754,7 @@ public class FullscreenVideoPictureInPictureController {
         }
 
         @Override
-        public void mediaStoppedPlaying() {
+        public void mediaStoppedPlaying(int id) {
             // As above, we don't know if it was the effectively fullscreen video that stopped. Even
             // if it is, note that this won't cause us to exit Picture in Picture mode if we're in
             // it.
@@ -775,6 +783,7 @@ public class FullscreenVideoPictureInPictureController {
     /** Protected to allow tests to override, since mocking statics is error-prone. */
     @VisibleForTesting
     /* package */ @Nullable InfoBarContainer getInfoBarContainerForTab(@Nullable Tab tab) {
+        if (tab == null) return null;
         return InfoBarContainer.get(tab);
     }
 

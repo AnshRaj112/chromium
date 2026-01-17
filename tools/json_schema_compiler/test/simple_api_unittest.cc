@@ -32,7 +32,8 @@ static base::Value::Dict CreateTestTypeDictionary() {
 }
 
 void GetManifestParseError(std::string_view manifest_json, std::string* error) {
-  std::optional<base::Value> manifest = base::JSONReader::Read(manifest_json);
+  std::optional<base::Value> manifest = base::JSONReader::Read(
+      manifest_json, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ASSERT_TRUE(manifest) << "Invalid json \n" << manifest_json;
 
   simple_api::ManifestKeys manifest_keys;
@@ -46,7 +47,8 @@ void GetManifestParseError(std::string_view manifest_json, std::string* error) {
 
 void PopulateManifestKeys(std::string_view manifest_json,
                           simple_api::ManifestKeys* manifest_keys) {
-  std::optional<base::Value> manifest = base::JSONReader::Read(manifest_json);
+  std::optional<base::Value> manifest = base::JSONReader::Read(
+      manifest_json, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ASSERT_TRUE(manifest.has_value());
 
   std::u16string error_16;
@@ -453,17 +455,17 @@ TEST(JsonSchemaCompilerSimpleTest, ManifestKeyParsing_Success_AllKeys) {
 
   EXPECT_EQ(simple_api::TestEnum::kOne, manifest_keys.key_enum);
 
-  EXPECT_EQ("ref_string", manifest_keys.key_ref.string);
-  EXPECT_EQ(true, manifest_keys.key_ref.boolean);
-  EXPECT_DOUBLE_EQ(25.4, manifest_keys.key_ref.number);
-  EXPECT_EQ(32, manifest_keys.key_ref.integer);
-  ASSERT_TRUE(manifest_keys.key_ref.object);
-  EXPECT_EQ(42, manifest_keys.key_ref.object->foo);
-  ASSERT_TRUE(manifest_keys.key_ref.array);
-  EXPECT_THAT(*manifest_keys.key_ref.array,
+  EXPECT_EQ("ref_string", manifest_keys.key_ref->string);
+  EXPECT_EQ(true, manifest_keys.key_ref->boolean);
+  EXPECT_DOUBLE_EQ(25.4, manifest_keys.key_ref->number);
+  EXPECT_EQ(32, manifest_keys.key_ref->integer);
+  ASSERT_TRUE(manifest_keys.key_ref->object);
+  EXPECT_EQ(42, manifest_keys.key_ref->object->foo);
+  ASSERT_TRUE(manifest_keys.key_ref->array);
+  EXPECT_THAT(*manifest_keys.key_ref->array,
               ::testing::ElementsAre("one", "two"));
-  EXPECT_EQ(enums::Enumeration::kTwo, manifest_keys.key_ref.opt_external_enum);
-  EXPECT_THAT(manifest_keys.key_enum_array,
+  EXPECT_EQ(enums::Enumeration::kTwo, manifest_keys.key_ref->opt_external_enum);
+  EXPECT_THAT(manifest_keys.key_enum_array.value(),
               ::testing::ElementsAre(simple_api::TestEnum::kTwo,
                                      simple_api::TestEnum::kOne));
   EXPECT_EQ(simple_api::_3D::kYes, manifest_keys._3d_key);
@@ -492,11 +494,12 @@ TEST(JsonSchemaCompilerSimpleTest,
   EXPECT_FALSE(manifest_keys.key_obj);
   EXPECT_EQ(simple_api::TestEnum::kTwo, manifest_keys.key_enum);
 
-  EXPECT_EQ("ref_string", manifest_keys.key_ref.string);
-  EXPECT_EQ(true, manifest_keys.key_ref.boolean);
-  EXPECT_DOUBLE_EQ(25.4, manifest_keys.key_ref.number);
-  EXPECT_EQ(32, manifest_keys.key_ref.integer);
-  EXPECT_FALSE(manifest_keys.key_ref.array);
-  EXPECT_EQ(enums::Enumeration::kNone, manifest_keys.key_ref.opt_external_enum);
+  EXPECT_EQ("ref_string", manifest_keys.key_ref->string);
+  EXPECT_EQ(true, manifest_keys.key_ref->boolean);
+  EXPECT_DOUBLE_EQ(25.4, manifest_keys.key_ref->number);
+  EXPECT_EQ(32, manifest_keys.key_ref->integer);
+  EXPECT_FALSE(manifest_keys.key_ref->array);
+  EXPECT_EQ(enums::Enumeration::kNone,
+            manifest_keys.key_ref->opt_external_enum);
   EXPECT_EQ(simple_api::_3D::kNone, manifest_keys._3d_key);
 }

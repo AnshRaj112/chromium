@@ -4,10 +4,10 @@
 
 #include "chrome/browser/ash/net/system_proxy_manager.h"
 
+#include <algorithm>
 #include <string>
 
 #include "ash/constants/ash_features.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
@@ -19,9 +19,6 @@
 #include "chrome/browser/ash/notifications/system_proxy_notification.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/ash/login/login_display_host.h"
-#include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/login/login_handler.h"
 #include "chrome/common/pref_names.h"
 #include "chromeos/ash/components/dbus/system_proxy/system_proxy_client.h"
@@ -46,7 +43,6 @@
 #include "net/http/http_util.h"
 #include "services/network/public/mojom/network_context.mojom.h"
 #include "ui/aura/window.h"
-#include "ui/gfx/native_widget_types.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/dialog_delegate.h"
 
@@ -490,7 +486,8 @@ bool SystemProxyManager::CanUsePolicyCredentials(
     return false;
 
   if (!policy_credentials_auth_schemes_.empty()) {
-    if (!base::Contains(policy_credentials_auth_schemes_, auth_info.scheme)) {
+    if (!std::ranges::contains(policy_credentials_auth_schemes_,
+                               auth_info.scheme)) {
       VLOG(1) << "Auth scheme not allowed by policy";
       return false;
     }

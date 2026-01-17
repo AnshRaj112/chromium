@@ -4,10 +4,10 @@
 
 #include "chrome/browser/ash/login/screens/locale_switch_screen.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 
-#include "base/containers/contains.h"
 #include "base/functional/callback.h"
 #include "base/json/json_reader.h"
 #include "base/time/time.h"
@@ -33,7 +33,6 @@
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/primary_account_access_token_fetcher.h"
-#include "components/signin/public/identity_manager/scope_set.h"
 #include "components/user_manager/user_manager.h"
 #include "google_apis/gaia/gaia_constants.h"
 #include "google_apis/gaia/google_service_auth_error.h"
@@ -74,8 +73,8 @@ class GetLocaleOAuth2PeopleAPICall : public OAuth2ApiCallFlow {
       response_body.emplace();
     }
 
-    std::optional<base::Value::Dict> value =
-        base::JSONReader::ReadDict(*response_body);
+    std::optional<base::Value::Dict> value = base::JSONReader::ReadDict(
+        *response_body, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
     if (!value) {
       LOG(ERROR) << __func__ << " Bad response format";
       std::move(failure_callback_).Run();
@@ -312,12 +311,6 @@ void LocaleSwitchScreen::OnRefreshTokensLoaded() {
 }
 
 void LocaleSwitchScreen::FetchPreferredUserLocaleAndSwitchAsync() {
-  // Choose scopes to obtain for the access token.
-  signin::ScopeSet scopes;
-  scopes.insert(GaiaConstants::kPeopleApiReadOnlyOAuth2Scope);
-  scopes.insert(GaiaConstants::kGoogleUserInfoProfile);
-  scopes.insert(GaiaConstants::kProfileLanguageReadOnlyOAuth2Scope);
-
   // Choose the mode in which to fetch the access token:
   // see AccessTokenFetcher::Mode below for definitions.
   auto mode =
@@ -326,7 +319,7 @@ void LocaleSwitchScreen::FetchPreferredUserLocaleAndSwitchAsync() {
   // Create the fetcher.
   access_token_fetcher_ =
       std::make_unique<signin::PrimaryAccountAccessTokenFetcher>(
-          "LocaleSwitchScreen", identity_manager_, scopes,
+          signin::OAuthConsumerId::kLocaleSwitchScreen, identity_manager_,
           base::BindOnce(&LocaleSwitchScreen::OnAccessTokenRequestCompleted,
                          weak_factory_.GetWeakPtr()),
           mode, signin::ConsentLevel::kSignin);
@@ -392,7 +385,7 @@ void LocaleSwitchScreen::SwitchLocale() {
   // flow.
   if (!chrome_user_manager_util::IsManagedGuestSessionOrEphemeralLogin() &&
       context()->is_add_person_flow &&
-      base::Contains(kAddPersonUserTypes, user->GetType())) {
+      std::ranges::contains(kAddPersonUserTypes, user->GetType())) {
     VLOG(1) << "Add Person flow detected, delegating locale switch decision"
             << " to the user.";
     // Delegate language switch to the notification. User will be able to

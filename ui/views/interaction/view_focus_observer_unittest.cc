@@ -27,13 +27,13 @@ DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kButton1Id);
 DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kTextFieldId);
 }  // namespace
 
-class ViewFocusObserverTest : public InteractiveViewsTest {
+class ViewFocusObserverTest : public InteractiveViewsTestMixin<ViewsTestBase> {
  public:
   ViewFocusObserverTest() = default;
   ~ViewFocusObserverTest() override = default;
 
   void SetUp() override {
-    InteractiveViewsTest::SetUp();
+    InteractiveViewsTestMixin::SetUp();
     widget_ = std::make_unique<Widget>();
     Widget::InitParams params =
         CreateParams(Widget::InitParams::CLIENT_OWNS_WIDGET,
@@ -68,7 +68,7 @@ class ViewFocusObserverTest : public InteractiveViewsTest {
     button2_ = nullptr;
     text_ = nullptr;
     widget_.reset();
-    InteractiveViewsTest::TearDown();
+    InteractiveViewsTestMixin::TearDown();
   }
 
   auto Focus(View* view) {
@@ -82,7 +82,13 @@ class ViewFocusObserverTest : public InteractiveViewsTest {
   std::unique_ptr<Widget> widget_;
 };
 
-TEST_F(ViewFocusObserverTest, TracksFocus) {
+#if BUILDFLAG(IS_FUCHSIA) && defined(ARCH_CPU_ARM64) && !defined(NDEBUG)
+// TODO(https://crbug.com/464455929): Crash on Fuchsia on arm64 in debug.
+#define MAYBE_TracksFocus DISABLED_TracksFocus
+#else
+#define MAYBE_TracksFocus TracksFocus
+#endif
+TEST_F(ViewFocusObserverTest, MAYBE_TracksFocus) {
   RunTestSequence(
       ObserveState(kCurrentFocusedView, widget_.get()),
       ObserveState(kCurrentFocusedViewId, widget_.get()), Focus(button1_),

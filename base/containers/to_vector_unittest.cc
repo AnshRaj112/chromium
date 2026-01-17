@@ -14,18 +14,24 @@
 
 namespace base::test {
 
+namespace {
+
+using ::testing::ElementsAre;
+using ::testing::IsNull;
+using ::testing::Pointee;
+
 template <class C>
 void IdentityTest() {
   C c = {1, 2, 3, 4, 5};
   auto vec = ToVector(c);
-  EXPECT_THAT(vec, testing::ElementsAre(1, 2, 3, 4, 5));
+  EXPECT_THAT(vec, ElementsAre(1, 2, 3, 4, 5));
 }
 
 template <class C>
 void ProjectionTest() {
   C c = {1, 2, 3, 4, 5};
   auto vec = ToVector(c, [](int x) { return x + 1; });
-  EXPECT_THAT(vec, testing::ElementsAre(2, 3, 4, 5, 6));
+  EXPECT_THAT(vec, ElementsAre(2, 3, 4, 5, 6));
 }
 
 TEST(ToVectorTest, Identity) {
@@ -42,6 +48,22 @@ TEST(ToVectorTest, Projection) {
   ProjectionTest<base::flat_set<int>>();
 }
 
+TEST(ToVectorTest, IdentityWithCustomType) {
+  std::set<int> v = {1, 2, 3};
+  auto vec = base::ToVector<int64_t>(v);
+  static_assert(std::same_as<decltype(vec), std::vector<int64_t>>);
+
+  EXPECT_THAT(vec, ElementsAre(1L, 2L, 3L));
+}
+
+TEST(ToVectorTest, IdentityWithCustomTypeAndProjection) {
+  std::set<int> v = {1, 2, 3};
+  auto vec = base::ToVector<int64_t>(v, [](int x) { return x * 2; });
+  static_assert(std::same_as<decltype(vec), std::vector<int64_t>>);
+
+  EXPECT_THAT(vec, ElementsAre(2L, 4L, 6L));
+}
+
 TEST(ToVectorTest, MoveOnly) {
   std::vector<std::unique_ptr<int>> v;
   v.push_back(std::make_unique<int>(1));
@@ -49,23 +71,19 @@ TEST(ToVectorTest, MoveOnly) {
   v.push_back(std::make_unique<int>(3));
 
   auto v2 = base::ToVector(base::RangeAsRvalues(std::move(v)));
-  EXPECT_THAT(v2, testing::ElementsAre(testing::Pointee(1), testing::Pointee(2),
-                                       testing::Pointee(3)));
+  EXPECT_THAT(v2, ElementsAre(Pointee(1), Pointee(2), Pointee(3)));
 
   // The old vector should be consumed. The standard guarantees that a
   // moved-from std::unique_ptr will be null.
   // NOLINT(bugprone-use-after-move)
-  EXPECT_THAT(v, testing::ElementsAre(testing::IsNull(), testing::IsNull(),
-                                      testing::IsNull()));
+  EXPECT_THAT(v, ElementsAre(IsNull(), IsNull(), IsNull()));
 
   // Another method which is more verbose so not preferable.
   auto v3 = base::ToVector(
       std::move(v2), [](std::unique_ptr<int>& p) { return std::move(p); });
-  EXPECT_THAT(v3, testing::ElementsAre(testing::Pointee(1), testing::Pointee(2),
-                                       testing::Pointee(3)));
+  EXPECT_THAT(v3, ElementsAre(Pointee(1), Pointee(2), Pointee(3)));
   // NOLINT(bugprone-use-after-move)
-  EXPECT_THAT(v2, testing::ElementsAre(testing::IsNull(), testing::IsNull(),
-                                       testing::IsNull()));
+  EXPECT_THAT(v2, ElementsAre(IsNull(), IsNull(), IsNull()));
 }
 
 template <typename C, typename Proj, typename T>
@@ -84,5 +102,27 @@ TEST(ToVectorTest, CorrectlyProjected) {
       CorrectlyProjected<std::set<std::string>, decltype(&std::string::length),
                          std::size_t>);
 }
+
+TEST(ToVectorTest, MoveConstructionFromArray) {
+  auto vec = base::ToVector({
+      std::make_unique<int>(1),
+      std::make_unique<int>(2),
+      std::make_unique<int>(3),
+  });
+  EXPECT_THAT(vec, ElementsAre(Pointee(1), Pointee(2), Pointee(3)));
+}
+
+TEST(ToVectorTest, CustomTypeWithArray) {
+  auto vec = base::ToVector<std::string_view>({
+      "foo",
+      "bar",
+      "baz",
+  });
+
+  static_assert(std::same_as<decltype(vec), std::vector<std::string_view>>);
+  EXPECT_THAT(vec, ElementsAre("foo", "bar", "baz"));
+}
+
+}  // namespace
 
 }  // namespace base::test

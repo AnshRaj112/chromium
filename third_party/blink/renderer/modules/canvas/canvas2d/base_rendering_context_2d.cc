@@ -22,7 +22,6 @@
 #include "base/numerics/safe_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
-#include "base/trace_event/trace_event.h"
 #include "cc/paint/paint_canvas.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_image.h"
@@ -40,8 +39,6 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_canvas_font_variant_caps.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_canvas_text_rendering.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_texture_format.h"
-#include "third_party/blink/renderer/core/canvas_interventions/canvas_interventions_enums.h"
-#include "third_party/blink/renderer/core/canvas_interventions/canvas_interventions_helper.h"
 #include "third_party/blink/renderer/core/css/properties/computed_style_utils.h"
 #include "third_party/blink/renderer/core/css/style_change_reason.h"
 #include "third_party/blink/renderer/core/dom/events/event.h"
@@ -61,7 +58,6 @@
 #include "third_party/blink/renderer/core/style/computed_style.h"
 #include "third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.h"
 #include "third_party/blink/renderer/modules/canvas/canvas2d/canvas_rendering_context_2d_state.h"
-#include "third_party/blink/renderer/modules/canvas/canvas2d/identifiability_study_helper.h"
 #include "third_party/blink/renderer/modules/canvas/htmlcanvas/canvas_context_creation_attributes_helpers.h"
 #include "third_party/blink/renderer/modules/webgpu/dawn_conversions.h"
 #include "third_party/blink/renderer/modules/webgpu/dawn_enum_conversions.h"
@@ -74,11 +70,11 @@
 #include "third_party/blink/renderer/platform/fonts/font_selector.h"
 #include "third_party/blink/renderer/platform/fonts/plain_text_painter.h"
 #include "third_party/blink/renderer/platform/fonts/simple_font_data.h"
-#include "third_party/blink/renderer/platform/fonts/text_run_paint_info.h"
 #include "third_party/blink/renderer/platform/geometry/path.h"
 #include "third_party/blink/renderer/platform/graphics/bitmap_image.h"
 #include "third_party/blink/renderer/platform/graphics/blend_mode.h"
 #include "third_party/blink/renderer/platform/graphics/canvas_deferred_paint_record.h"
+#include "third_party/blink/renderer/platform/graphics/canvas_high_entropy_op_type.h"
 #include "third_party/blink/renderer/platform/graphics/flush_reason.h"
 #include "third_party/blink/renderer/platform/graphics/gpu/shared_gpu_context.h"
 #include "third_party/blink/renderer/platform/graphics/gpu/webgpu_cpp.h"
@@ -91,7 +87,6 @@
 #include "third_party/blink/renderer/platform/graphics/video_frame_image_util.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
-#include "third_party/blink/renderer/platform/privacy_budget/identifiability_digest_helpers.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 #include "third_party/blink/renderer/platform/text/layout_locale.h"
 #include "third_party/blink/renderer/platform/text/text_direction.h"
@@ -210,8 +205,8 @@ void BaseRenderingContext2D::DispatchContextLostEvent(TimerBase*) {
   if (context_lost_mode_ == CanvasRenderingContext::kRealLostContext ||
       context_lost_mode_ == CanvasRenderingContext::kSyntheticLostContext) {
     try_restore_context_attempt_count_ = 0;
-    try_restore_context_event_timer_.StartRepeating(
-        try_restore_context_interval_, FROM_HERE);
+    try_restore_context_event_timer_.StartRepeating(kTryRestoreContextInterval,
+                                                    FROM_HERE);
   }
 }
 
@@ -273,7 +268,7 @@ void BaseRenderingContext2D::TryRestoreContextEvent(TimerBase* timer) {
       (!SharedGpuContext::IsGpuCompositingEnabled() &&
        SharedGpuContext::SharedImageInterfaceProvider())) {
     RestoreGuard context_is_being_restored(*this);
-    if (GetOrCreateCanvas2DResourceProvider()) {
+    if (GetOrCreateResourceProvider()) {
       try_restore_context_event_timer_.Stop();
       DispatchContextRestoredEvent(nullptr);
       return;
@@ -295,7 +290,7 @@ void BaseRenderingContext2D::RestoreFromInvalidSizeIfNeeded() {
       !host) {
     return;
   }
-  DCHECK(!GetResourceProviderForCanvas2D());
+  DCHECK(!GetResourceProvider());
 
   if (host->IsValidImageSize()) {
     if (dispatch_context_lost_event_timer_.IsActive()) {
@@ -393,7 +388,8 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
   } else if (!sw || !sh) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kIndexSizeError,
-        String::Format("The source %s is 0.", sw ? "height" : "width"));
+        UNSAFE_TODO(
+            String::Format("The source %s is 0.", sw ? "height" : "width")));
   }
 
   if (exception_state.HadException())
@@ -437,7 +433,7 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
 
   // Deferred offscreen canvases might have recorded commands, make sure
   // that those get drawn here
-  FinalizeFrame(FlushReason::kGetImageData);
+  FinalizeFrame(FlushReason::kOther);
 
   num_readbacks_performed_++;
   CanvasContextCreationAttributesCore::WillReadFrequently
@@ -481,33 +477,7 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
     }
   }
 
-  scoped_refptr<StaticBitmapImage> snapshot =
-      GetImage(FlushReason::kGetImageData);
-
-  bool noised = false;
-  if (auto* host = GetCanvasRenderingContextHost()) {
-    if (snapshot) {
-      noised = CanvasInterventionsHelper::MaybeNoiseSnapshot(
-          host->RenderingContext(), GetTopExecutionContext(), snapshot);
-    }
-  }
-
-  TRACE_EVENT_INSTANT(
-      TRACE_DISABLED_BY_DEFAULT("identifiability.high_entropy_api"),
-      "CanvasReadback", perfetto::Flow::FromPointer(this),
-      [&](perfetto::EventContext ctx) {
-        String data = "data:,";
-        if (snapshot) {
-          std::unique_ptr<ImageDataBuffer> data_buffer =
-              ImageDataBuffer::Create(snapshot);
-          if (data_buffer) {
-            data = data_buffer->ToDataURL(ImageEncodingMimeType::kMimeTypePng,
-                                          -1.0);
-          }
-        }
-        ctx.AddDebugAnnotation("data_url", data.Utf8());
-        ctx.AddDebugAnnotation("noised", noised);
-      });
+  scoped_refptr<StaticBitmapImage> snapshot = GetImage();
 
   // Determine if the array should be zero initialized, or if it will be
   // completely overwritten.
@@ -592,16 +562,8 @@ void BaseRenderingContext2D::putImageData(ImageData* data,
     return;
   }
 
-  if (isContextLost() || !CanCreateCanvas2dResourceProvider()) [[unlikely]] {
+  if (isContextLost() || !CanCreateResourceProvider()) [[unlikely]] {
     return;
-  }
-
-  if (identifiability_study_helper_.ShouldUpdateBuilder()) [[unlikely]] {
-    identifiability_study_helper_.UpdateBuilder(
-        CanvasOps::kPutImageData, data->width(), data->height(),
-        data->GetPredefinedColorSpace(), data->GetSkColorType(), dx, dy,
-        dirty_x, dirty_y, dirty_width, dirty_height);
-    identifiability_study_helper_.set_encountered_partially_digested_image();
   }
 
   if (dirty_width < 0) {
@@ -706,34 +668,24 @@ String BaseRenderingContext2D::wordSpacing() const {
 }
 
 V8CanvasTextRendering BaseRenderingContext2D::textRendering() const {
-  return GetState().GetTextRendering();
+  return V8CanvasTextRendering(GetState().GetTextRendering());
 }
 
 V8CanvasTextAlign BaseRenderingContext2D::textAlign() const {
-  return GetState().GetTextAlign();
+  return V8CanvasTextAlign(GetState().GetTextAlign());
 }
 
 void BaseRenderingContext2D::setTextAlign(const V8CanvasTextAlign align) {
-  if (identifiability_study_helper_.ShouldUpdateBuilder()) [[unlikely]] {
-    identifiability_study_helper_.UpdateBuilder(
-        CanvasOps::kSetTextAlign,
-        IdentifiabilityBenignStringToken(align.AsString()));
-  }
-  GetState().SetTextAlign(align);
+  GetState().SetTextAlign(align.AsEnum());
 }
 
 V8CanvasTextBaseline BaseRenderingContext2D::textBaseline() const {
-  return GetState().GetTextBaseline();
+  return V8CanvasTextBaseline(GetState().GetTextBaseline());
 }
 
 void BaseRenderingContext2D::setTextBaseline(
     const V8CanvasTextBaseline baseline) {
-  if (identifiability_study_helper_.ShouldUpdateBuilder()) [[unlikely]] {
-    identifiability_study_helper_.UpdateBuilder(
-        CanvasOps::kSetTextBaseline,
-        IdentifiabilityBenignStringToken(baseline.AsString()));
-  }
-  GetState().SetTextBaseline(baseline);
+  GetState().SetTextBaseline(baseline.AsEnum());
 }
 
 V8CanvasFontKerning BaseRenderingContext2D::fontKerning() const {
@@ -748,7 +700,7 @@ V8CanvasFontKerning BaseRenderingContext2D::fontKerning() const {
 }
 
 V8CanvasFontStretch BaseRenderingContext2D::fontStretch() const {
-  return GetState().GetFontStretch();
+  return V8CanvasFontStretch(GetState().GetFontStretch());
 }
 
 V8CanvasFontVariantCaps BaseRenderingContext2D::fontVariantCaps() const {
@@ -784,7 +736,11 @@ void BaseRenderingContext2D::Trace(Visitor* visitor) const {
 }
 
 bool BaseRenderingContext2D::Is2DCanvasAccelerated() const {
-  auto* resource_provider = GetResourceProviderForCanvas2D();
+  if (IsHibernating()) {
+    return false;
+  }
+
+  auto* resource_provider = GetResourceProvider();
   return resource_provider ? resource_provider->IsAccelerated()
                            : Host()->ShouldTryToUseGpuRaster();
 }
@@ -800,10 +756,18 @@ void BaseRenderingContext2D::Reset() {
 
 scoped_refptr<StaticBitmapImage>
 BaseRenderingContext2D::PaintRenderingResultsToSnapshot(
-    SourceDrawingBuffer source_buffer,
-    FlushReason reason) {
-  CanvasResourceProvider* provider = GetResourceProviderForCanvas2D();
-  return provider ? provider->Snapshot(reason) : nullptr;
+    SourceDrawingBuffer source_buffer) {
+  if (!IsResourceProviderValid()) {
+    return nullptr;
+  }
+
+  CanvasResourceProvider* provider = GetResourceProvider();
+  provider->FlushCanvas();
+  return provider->Snapshot();
+}
+
+bool BaseRenderingContext2D::IsResourceProviderValid() {
+  return GetResourceProvider() && GetResourceProvider()->IsValid();
 }
 
 void BaseRenderingContext2D::WillUseCurrentFont() const {
@@ -861,11 +825,6 @@ void BaseRenderingContext2D::setFont(const String& new_font) {
     return;
   }
 
-  if (identifiability_study_helper_.ShouldUpdateBuilder()) [[unlikely]] {
-    identifiability_study_helper_.UpdateBuilder(
-        CanvasOps::kSetFont, IdentifiabilityBenignStringToken(new_font));
-  }
-
   CanvasRenderingContext2DState& state = GetState();
   if (new_font == state.UnparsedFont() && CurrentFontResolvedAndUpToDate()) {
     return;
@@ -880,10 +839,10 @@ void BaseRenderingContext2D::setFont(const String& new_font) {
 }
 
 static inline TextDirection ToTextDirection(
-    V8CanvasDirection direction,
+    V8CanvasDirection::Enum direction,
     CanvasRenderingContextHost* host,
     const ComputedStyle* style = nullptr) {
-  switch (direction.AsEnum()) {
+  switch (direction) {
     case V8CanvasDirection::Enum::kInherit:
       return host ? host->GetTextDirection(style) : TextDirection::kLtr;
     case V8CanvasDirection::Enum::kRtl:
@@ -919,7 +878,7 @@ void BaseRenderingContext2D::setDirection(const V8CanvasDirection direction) {
   }
 
   CanvasRenderingContext2DState& state = GetState();
-  state.SetDirection(direction);
+  state.SetDirection(direction.AsEnum());
 }
 
 void BaseRenderingContext2D::fillText(const String& text, double x, double y) {
@@ -951,8 +910,9 @@ void BaseRenderingContext2D::fillTextCluster(
     double y,
     const TextClusterOptions* cluster_options) {
   DCHECK(text_cluster);
-  V8CanvasTextAlign cluster_align = text_cluster->align();
-  V8CanvasTextBaseline cluster_baseline = text_cluster->baseline();
+  V8CanvasTextAlign::Enum cluster_align = text_cluster->align().AsEnum();
+  V8CanvasTextBaseline::Enum cluster_baseline =
+      text_cluster->baseline().AsEnum();
   double cluster_x = text_cluster->x();
   double cluster_y = text_cluster->y();
   if (cluster_options != nullptr) {
@@ -963,10 +923,10 @@ void BaseRenderingContext2D::fillTextCluster(
       cluster_y = cluster_options->y();
     }
     if (cluster_options->hasAlign()) {
-      cluster_align = cluster_options->align();
+      cluster_align = cluster_options->align().AsEnum();
     }
     if (cluster_options->hasBaseline()) {
-      cluster_baseline = cluster_options->baseline();
+      cluster_baseline = cluster_options->baseline().AsEnum();
     }
   }
   DrawTextInternal(text_cluster->text(), cluster_x + x, cluster_y + y,
@@ -1006,8 +966,9 @@ void BaseRenderingContext2D::strokeTextCluster(
     double y,
     const TextClusterOptions* cluster_options) {
   DCHECK(text_cluster);
-  V8CanvasTextAlign cluster_align = text_cluster->align();
-  V8CanvasTextBaseline cluster_baseline = text_cluster->baseline();
+  V8CanvasTextAlign::Enum cluster_align = text_cluster->align().AsEnum();
+  V8CanvasTextBaseline::Enum cluster_baseline =
+      text_cluster->baseline().AsEnum();
   double cluster_x = text_cluster->x();
   double cluster_y = text_cluster->y();
   if (cluster_options != nullptr) {
@@ -1018,10 +979,10 @@ void BaseRenderingContext2D::strokeTextCluster(
       cluster_y = cluster_options->y();
     }
     if (cluster_options->hasAlign()) {
-      cluster_align = cluster_options->align();
+      cluster_align = cluster_options->align().AsEnum();
     }
     if (cluster_options->hasBaseline()) {
-      cluster_baseline = cluster_options->baseline();
+      cluster_baseline = cluster_options->baseline().AsEnum();
     }
   }
   DrawTextInternal(text_cluster->text(), cluster_x + x, cluster_y + y,
@@ -1036,8 +997,8 @@ void BaseRenderingContext2D::DrawTextInternal(
     double x,
     double y,
     CanvasRenderingContext2DState::PaintType paint_type,
-    V8CanvasTextAlign align,
-    V8CanvasTextBaseline baseline,
+    V8CanvasTextAlign::Enum align,
+    V8CanvasTextBaseline::Enum baseline,
     unsigned run_start,
     unsigned run_end,
     double* max_width,
@@ -1070,17 +1031,6 @@ void BaseRenderingContext2D::DrawTextInternal(
     return;
   }
 
-  // TODO(crbug.com/40191831): Remove once identifiability study is removed.
-  if (identifiability_study_helper_.ShouldUpdateBuilder()) [[unlikely]] {
-    identifiability_study_helper_.UpdateBuilder(
-        paint_type == CanvasRenderingContext2DState::kFillPaintType
-            ? CanvasOps::kFillText
-            : CanvasOps::kStrokeText,
-        IdentifiabilitySensitiveStringToken(text), x, y,
-        max_width ? *max_width : -1);
-    identifiability_study_helper_.set_encountered_sensitive_ops();
-  }
-
   const Font* font =
       (cluster_font != nullptr) ? cluster_font : AccessFont(canvas);
   const SimpleFontData* font_data = font->PrimaryFont();
@@ -1101,55 +1051,44 @@ void BaseRenderingContext2D::DrawTextInternal(
   bool bidi_override =
       computed_style ? IsOverride(computed_style->GetUnicodeBidi()) : false;
 
-  PlainTextPainter* text_painter = RuntimeEnabledFeatures::CanvasTextNgEnabled(
-                                       host->GetTopExecutionContext())
-                                       ? &host->GetPlainTextPainter()
-                                       : nullptr;
-  TextRun text_run(text, direction, bidi_override, /* normalize_space */ true);
+  PlainTextPainter& text_painter = host->GetPlainTextPainter();
+  TextRun text_run(text, direction, bidi_override);
   // Draw the item text at the correct point.
   gfx::PointF location(ClampTo<float>(x), ClampTo<float>(y));
   gfx::RectF bounds;
   double font_width = 0;
-  if (text_painter) {
-    if (run_start == 0 && run_end == text.length()) [[likely]] {
-      font_width = text_painter->ComputeInlineSize(text_run, *font, &bounds);
-    } else {
-      font_width = text_painter->ComputeSubInlineSize(text_run, run_start,
-                                                      run_end, *font, &bounds);
-    }
+  if (run_start == 0 && run_end == text.length()) [[likely]] {
+    font_width = text_painter.ComputeInlineSize(text_run, *font, &bounds);
   } else {
-    if (run_start == 0 && run_end == text.length()) [[likely]] {
-      font_width = font->DeprecatedWidth(text_run, &bounds);
-    } else {
-      font_width =
-          font->DeprecatedSubRunWidth(text_run, run_start, run_end, &bounds);
-    }
+    font_width = text_painter.ComputeSubInlineSize(text_run, run_start, run_end,
+                                                   *font, &bounds);
   }
 
   bool use_max_width = (max_width && *max_width < font_width);
   double width = use_max_width ? *max_width : font_width;
 
   if (align == V8CanvasTextAlign::Enum::kStart) {
-    align = is_rtl ? V8CanvasTextAlign(V8CanvasTextAlign::Enum::kRight)
-                   : V8CanvasTextAlign(V8CanvasTextAlign::Enum::kLeft);
+    align = is_rtl ? V8CanvasTextAlign::Enum::kRight
+                   : V8CanvasTextAlign::Enum::kLeft;
   } else if (align == V8CanvasTextAlign::Enum::kEnd) {
-    align = is_rtl ? V8CanvasTextAlign(V8CanvasTextAlign::Enum::kLeft)
-                   : V8CanvasTextAlign(V8CanvasTextAlign::Enum::kRight);
+    align = is_rtl ? V8CanvasTextAlign::Enum::kLeft
+                   : V8CanvasTextAlign::Enum::kRight;
   }
 
-  switch (align.AsEnum()) {
+  switch (align) {
     case V8CanvasTextAlign::Enum::kCenter:
       location.set_x(location.x() - width / 2);
       break;
     case V8CanvasTextAlign::Enum::kRight:
       location.set_x(location.x() - width);
       break;
-    default:
+    case V8CanvasTextAlign::Enum::kEnd:
+    case V8CanvasTextAlign::Enum::kLeft:
+    case V8CanvasTextAlign::Enum::kStart:
       break;
   }
 
-  location.Offset(0,
-                  TextMetrics::GetFontBaseline(baseline.AsEnum(), *font_data));
+  location.Offset(0, TextMetrics::GetFontBaseline(baseline, *font_data));
 
   bounds.Offset(location.x(), location.y());
   if (paint_type == CanvasRenderingContext2DState::kStrokePaintType) {
@@ -1166,19 +1105,12 @@ void BaseRenderingContext2D::DrawTextInternal(
     location.set_x(location.x() / ClampTo<float>(width / font_width));
   }
 
-  // Only fill and stroke are used for DrawTextInternal.
-  AddTriggersForCanvasIntervention(
-      paint_type == CanvasRenderingContext2DState::kFillPaintType
-          ? CanvasOperationType::kFillText
-          : CanvasOperationType::kStrokeText);
-
   Draw<OverdrawOp::kNone>(
       /*draw_func=*/
       [font, text = std::move(text), direction, bidi_override, location,
-       run_start, run_end, canvas,
-       text_painter](MemoryManagedPaintCanvas* c, const cc::PaintFlags* flags) {
-        TextRun text_run(text, direction, bidi_override,
-                         /* normalize_space */ true);
+       run_start, run_end, canvas, &text_painter,
+       paint_type](MemoryManagedPaintCanvas* c, const cc::PaintFlags* flags) {
+        TextRun text_run(text, direction, bidi_override);
         // Font::DrawType::kGlyphsAndClusters is required for printing to PDF,
         // otherwise the character to glyph mapping will not be reversible,
         // which prevents text data from being extracted from PDF files or
@@ -1191,18 +1123,14 @@ void BaseRenderingContext2D::DrawTextInternal(
         Font::DrawType draw_type = (canvas && canvas->IsPrinting())
                                        ? Font::DrawType::kGlyphsAndClusters
                                        : Font::DrawType::kGlyphsOnly;
-        if (text_painter) {
-          text_painter->DrawWithBidiReorder(text_run, run_start, run_end, *font,
-                                            Font::kUseFallbackIfFontNotReady,
-                                            *c, location, *flags, draw_type);
-        } else {
-          TextRunPaintInfo text_run_paint_info(text_run);
-          text_run_paint_info.from = run_start;
-          text_run_paint_info.to = run_end;
-          font->DeprecatedDrawBidiText(c, text_run_paint_info, location,
-                                       Font::kUseFallbackIfFontNotReady, *flags,
-                                       draw_type);
-        }
+        // Only fill and stroke are used for DrawTextInternal.
+        c->AddHighEntropyCanvasOpTypes(
+            paint_type == CanvasRenderingContext2DState::kFillPaintType
+                ? HighEntropyCanvasOpType::kFillText
+                : HighEntropyCanvasOpType::kStrokeText);
+        text_painter.DrawWithBidiReorder(text_run, run_start, run_end, *font,
+                                         Font::kUseFallbackIfFontNotReady, *c,
+                                         location, *flags, draw_type);
       },
       NoOverdraw, bounds, paint_type, CanvasRenderingContext2DState::kNoImage,
       CanvasPerformanceMonitor::DrawType::kText);
@@ -1244,12 +1172,8 @@ TextMetrics* BaseRenderingContext2D::measureText(const String& text) {
       ToTextDirection(state.GetDirection(), host, computed_style);
 
   return MakeGarbageCollected<TextMetrics>(
-      font, direction, state.GetTextBaseline().AsEnum(),
-      state.GetTextAlign().AsEnum(), text,
-      RuntimeEnabledFeatures::CanvasTextNgEnabled(
-          host->GetTopExecutionContext())
-          ? &host->GetPlainTextPainter()
-          : nullptr);
+      font, direction, state.GetTextBaseline(), state.GetTextAlign(), text,
+      host->GetPlainTextPainter());
 }
 
 String BaseRenderingContext2D::lang() const {
@@ -1261,9 +1185,6 @@ void BaseRenderingContext2D::setLang(const String& lang_string) {
   if (state.GetLang() == lang_string) {
     return;
   }
-
-  // TODO(crbug.com/40191831): Instrument new canvas APIs.
-  identifiability_study_helper_.set_encountered_skipped_ops();
 
   state.SetLang(lang_string);
 
@@ -1288,8 +1209,6 @@ const LayoutLocale* BaseRenderingContext2D::LocaleFromLang() {
 void BaseRenderingContext2D::setLetterSpacing(const String& letter_spacing) {
   UseCounter::Count(GetTopExecutionContext(),
                     WebFeature::kCanvasRenderingContext2DLetterSpacing);
-  // TODO(crbug.com/40191831): Instrument new canvas APIs.
-  identifiability_study_helper_.set_encountered_skipped_ops();
   CanvasRenderingContext2DState& state = GetState();
   if (!state.HasRealizedFont()) {
     setFont(font());
@@ -1301,9 +1220,6 @@ void BaseRenderingContext2D::setLetterSpacing(const String& letter_spacing) {
 void BaseRenderingContext2D::setWordSpacing(const String& word_spacing) {
   UseCounter::Count(GetTopExecutionContext(),
                     WebFeature::kCanvasRenderingContext2DWordSpacing);
-  // TODO(crbug.com/1234113): Instrument new canvas APIs.
-  identifiability_study_helper_.set_encountered_skipped_ops();
-
   CanvasRenderingContext2DState& state = GetState();
   if (!state.HasRealizedFont()) {
     setFont(font());
@@ -1316,8 +1232,6 @@ void BaseRenderingContext2D::setTextRendering(
     const V8CanvasTextRendering& text_rendering) {
   UseCounter::Count(GetTopExecutionContext(),
                     WebFeature::kCanvasRenderingContext2DTextRendering);
-  // TODO(crbug.com/1234113): Instrument new canvas APIs.
-  identifiability_study_helper_.set_encountered_skipped_ops();
   CanvasRenderingContext2DState& state = GetState();
   if (!state.HasRealizedFont()) {
     setFont(font());
@@ -1326,15 +1240,13 @@ void BaseRenderingContext2D::setTextRendering(
   if (state.GetTextRendering() == text_rendering) {
     return;
   }
-  state.SetTextRendering(text_rendering, GetFontSelector());
+  state.SetTextRendering(text_rendering.AsEnum(), GetFontSelector());
 }
 
 void BaseRenderingContext2D::setFontKerning(
     const V8CanvasFontKerning font_kerning) {
   UseCounter::Count(GetTopExecutionContext(),
                     WebFeature::kCanvasRenderingContext2DFontKerning);
-  // TODO(crbug.com/1234113): Instrument new canvas APIs.
-  identifiability_study_helper_.set_encountered_skipped_ops();
   CanvasRenderingContext2DState& state = GetState();
   if (!state.HasRealizedFont()) {
     setFont(font());
@@ -1359,8 +1271,6 @@ void BaseRenderingContext2D::setFontStretch(
     const V8CanvasFontStretch& font_stretch) {
   UseCounter::Count(GetTopExecutionContext(),
                     WebFeature::kCanvasRenderingContext2DFontStretch);
-  // TODO(crbug.com/1234113): Instrument new canvas APIs.
-  identifiability_study_helper_.set_encountered_skipped_ops();
   CanvasRenderingContext2DState& state = GetState();
   if (!state.HasRealizedFont()) {
     setFont(font());
@@ -1369,15 +1279,13 @@ void BaseRenderingContext2D::setFontStretch(
   if (state.GetFontStretch() == font_stretch) {
     return;
   }
-  state.SetFontStretch(font_stretch, GetFontSelector());
+  state.SetFontStretch(font_stretch.AsEnum(), GetFontSelector());
 }
 
 void BaseRenderingContext2D::setFontVariantCaps(
     const V8CanvasFontVariantCaps& font_variant_caps) {
   UseCounter::Count(GetTopExecutionContext(),
                     WebFeature::kCanvasRenderingContext2DFontVariantCaps);
-  // TODO(crbug.com/1234113): Instrument new canvas APIs.
-  identifiability_study_helper_.set_encountered_skipped_ops();
   CanvasRenderingContext2DState& state = GetState();
   if (!state.HasRealizedFont()) {
     setFont(font());
@@ -1473,7 +1381,7 @@ GPUTexture* BaseRenderingContext2D::transferToGPUTexture(
   }
 
   // Prepare to flush the canvas to a WebGPU texture.
-  FinalizeFrame(FlushReason::kWebGPUTexture);
+  FinalizeFrame();
 
   // We will need to access the canvas' resource provider.
   CanvasRenderingContextHost* host = GetCanvasRenderingContextHost();
@@ -1490,10 +1398,11 @@ GPUTexture* BaseRenderingContext2D::transferToGPUTexture(
   // want to behave differently here?
   EnableAccelerationIfPossible();
 
-  // A texture needs to exist on the GPU. If we aren't able to enable
-  // acceleration, the canvas pixels live on the CPU and we weren't able to
-  // transfer them; in that case, WebGPU access is not possible.
-  CanvasResourceProvider* provider = GetOrCreateCanvas2DResourceProvider();
+  // A texture needs to exist on the GPU. If we aren't able to create an
+  // accelerated SharedImage provider, we won't be able to transfer the canvas.
+  // In that case, WebGPU access is not possible.
+  CanvasResourceProviderSharedImage* provider =
+      GetOrCreateResourceProvider()->AsSharedImageProvider();
   if (!provider || !provider->IsAccelerated()) {
     exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
                                       "Unable to transfer canvas to GPU.");
@@ -1507,12 +1416,10 @@ GPUTexture* BaseRenderingContext2D::transferToGPUTexture(
   gpu::SyncToken canvas_access_sync_token;
   bool performed_copy = false;
   scoped_refptr<gpu::ClientSharedImage> client_si =
-      GetResourceProviderForCanvas2D()
-          ->GetBackingClientSharedImageForExternalWrite(
-              &canvas_access_sync_token,
-              gpu::SHARED_IMAGE_USAGE_WEBGPU_READ |
-                  gpu::SHARED_IMAGE_USAGE_WEBGPU_WRITE,
-              &performed_copy);
+      provider->GetBackingClientSharedImageForExternalWrite(
+          gpu::SHARED_IMAGE_USAGE_WEBGPU_READ |
+              gpu::SHARED_IMAGE_USAGE_WEBGPU_WRITE,
+          canvas_access_sync_token, &performed_copy);
   if (access_options->requireZeroCopy() && performed_copy) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kInvalidStateError,
@@ -1553,8 +1460,13 @@ GPUTexture* BaseRenderingContext2D::transferToGPUTexture(
   // canvas to be treated as a brand new surface if additional draws occur.
   // It also gives us a mechanism to detect post-transfer-out draws, which is
   // used in `transferBackFromWebGPU` to raise an exception.
+  auto owned_provider = ReplaceResourceProvider(nullptr);
+
+  // Note: This must be a CRPSI since this method would have bailed out earlier
+  // otherwise.
   resource_provider_from_webgpu_access_ =
-      ReplaceResourceProviderForCanvas2D(nullptr);
+      base::WrapUnique<CanvasResourceProviderSharedImage>(
+          owned_provider.release()->AsSharedImageProvider());
 
   // The user isn't obligated to ever transfer back, which means this resource
   // provider might stick around for while. Jettison any unnecessary resources.
@@ -1590,7 +1502,7 @@ void BaseRenderingContext2D::transferBackFromGPUTexture(
   // If this canvas already has a resource provider, this means that drawing has
   // occurred after `transferToWebGPU`. We disallow transferring back in this
   // case, and raise an exception instead.
-  if (GetResourceProviderForCanvas2D()) {
+  if (GetResourceProvider()) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kInvalidStateError,
         "The canvas was touched after transferToGPUTexture.");
@@ -1611,10 +1523,9 @@ void BaseRenderingContext2D::transferBackFromGPUTexture(
 
   // Restore the canvas' resource provider back onto the canvas host,
   // surrendering our temporary ownership of the provider.
-  CanvasResourceProvider* resource_provider =
+  CanvasResourceProviderSharedImage* resource_provider =
       resource_provider_from_webgpu_access_.get();
-  ReplaceResourceProviderForCanvas2D(
-      std::move(resource_provider_from_webgpu_access_));
+  ReplaceResourceProvider(std::move(resource_provider_from_webgpu_access_));
   resource_provider->SetDelegate(host);
 
   // Disassociate the WebGPU texture from the SharedImage to end its

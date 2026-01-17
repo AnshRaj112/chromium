@@ -11,11 +11,9 @@
 
 #include "base/android/scoped_java_ref.h"
 #include "base/files/file_path.h"
-#include "base/functional/callback.h"
 #include "components/image_fetcher/core/request_metadata.h"
 #include "ui/gfx/image/image.h"
 
-using base::android::JavaParamRef;
 using base::android::JavaRef;
 using base::android::ScopedJavaGlobalRef;
 using base::android::ScopedJavaLocalRef;
@@ -32,38 +30,38 @@ class ImageFetcherBridge {
 
   static ScopedJavaLocalRef<jstring> GetFilePath(
       JNIEnv* j_env,
-      const JavaParamRef<jobject>& j_simple_factory_key,
-      const JavaParamRef<jstring>& j_url);
+      const JavaRef<jobject>& j_simple_factory_key,
+      const JavaRef<jstring>& j_url);
 
   static void FetchImageData(JNIEnv* j_env,
-                             const JavaParamRef<jobject>& j_simple_factory_key,
-                             const jint j_image_fetcher_config,
-                             const JavaParamRef<jstring>& j_url,
-                             const JavaParamRef<jstring>& j_client_name,
-                             const jint j_expiration_interval_mins,
-                             const JavaParamRef<jobject>& j_callback);
+                             const JavaRef<jobject>& j_simple_factory_key,
+                             const int32_t j_image_fetcher_config,
+                             const JavaRef<jstring>& j_url,
+                             const JavaRef<jstring>& j_client_name,
+                             const int32_t j_expiration_interval_mins,
+                             const JavaRef<jobject>& j_callback);
 
   static void FetchImage(JNIEnv* j_env,
-                         const JavaParamRef<jobject>& j_simple_factory_key,
-                         const jint j_image_fetcher_config,
-                         const JavaParamRef<jstring>& j_url,
-                         const JavaParamRef<jstring>& j_client_name,
-                         const jint j_frame_width,
-                         const jint j_frame_height,
-                         const jint j_expiration_interval_mins,
-                         const JavaParamRef<jobject>& j_callback);
+                         const JavaRef<jobject>& j_simple_factory_key,
+                         const int32_t j_image_fetcher_config,
+                         const JavaRef<jstring>& j_url,
+                         const JavaRef<jstring>& j_client_name,
+                         const int32_t j_frame_width,
+                         const int32_t j_frame_height,
+                         const int32_t j_expiration_interval_mins,
+                         const JavaRef<jobject>& j_callback);
 
   static void ReportEvent(JNIEnv* j_env,
-                          const JavaParamRef<jstring>& j_client_name,
-                          const jint j_event_id);
+                          const JavaRef<jstring>& j_client_name,
+                          const int32_t j_event_id);
 
   static void ReportCacheHitTime(JNIEnv* j_env,
-                                 const JavaParamRef<jstring>& j_client_name,
+                                 const JavaRef<jstring>& j_client_name,
                                  const jlong start_time_millis);
 
   static void ReportTotalFetchTimeFromNative(
       JNIEnv* j_env,
-      const JavaParamRef<jstring>& j_client_name,
+      const JavaRef<jstring>& j_client_name,
       const jlong start_time_millis);
 
  private:

@@ -8,11 +8,11 @@
 
 #include "base/command_line.h"
 #include "build/build_config.h"
-#include "components/policy/core/common/policy_switches.h"
 
 #if BUILDFLAG(IS_ANDROID)
-#include "base/android/build_info.h"
+#include "base/android/device_info.h"
 #endif
+#include "components/policy/core/common/policy_switches.h"
 
 namespace policy {
 
@@ -125,6 +125,16 @@ const char kChromeBrowserRemoteCommandType[] =
     "google/chrome/browser/remotecommand";
 const char kChromeUserRemoteCommandType[] = "google/chrome/user/remotecommand";
 
+const char kChromeExtensionInstallUserCloudPolicyType[] =
+#if BUILDFLAG(IS_CHROMEOS)
+    "google/chromeos/user-level-extension-install";
+#else
+    "google/chrome/user-level-extension-install";
+#endif
+
+const char kChromeExtensionInstallMachineLevelCloudPolicyType[] =
+    "google/chrome/machine-level-extension-install";
+
 const char kChromeMachineLevelUserCloudPolicyTypeBase64[] =
     "Z29vZ2xlL2Nocm9tZS9tYWNoaW5lLWxldmVsLXVzZXI=";
 
@@ -132,7 +142,7 @@ const char* GetChromeUserPolicyType() {
 #if BUILDFLAG(IS_CHROMEOS)
   return "google/chromeos/user";
 #elif BUILDFLAG(IS_ANDROID)
-  if (base::android::BuildInfo::GetInstance()->is_desktop()) {
+  if (base::android::device_info::is_desktop()) {
     return "google/chrome/user";
   } else {
     return "google/android/user";

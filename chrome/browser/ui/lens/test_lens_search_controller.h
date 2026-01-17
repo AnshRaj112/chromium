@@ -5,13 +5,51 @@
 #ifndef CHROME_BROWSER_UI_LENS_TEST_LENS_SEARCH_CONTROLLER_H_
 #define CHROME_BROWSER_UI_LENS_TEST_LENS_SEARCH_CONTROLLER_H_
 
+#include "chrome/browser/ui/lens/lens_overlay_query_controller.h"
+#include "chrome/browser/ui/lens/lens_search_contextualization_controller.h"
 #include "chrome/browser/ui/lens/lens_search_controller.h"
+#include "testing/gmock/include/gmock/gmock.h"
 
 namespace variations {
 class VariationsClient;
 }  // namespace variations
 
 namespace lens {
+
+class MockLensSearchController : public LensSearchController {
+ public:
+  explicit MockLensSearchController(tabs::TabInterface* tab);
+  ~MockLensSearchController() override;
+
+  MOCK_METHOD(lens::LensOverlayQueryController*,
+              lens_overlay_query_controller,
+              (),
+              (override));
+
+  MOCK_METHOD(lens::LensSearchContextualizationController*,
+              lens_search_contextualization_controller,
+              (),
+              (override));
+
+  MOCK_METHOD(LensOverlayController*, lens_overlay_controller, (), (override));
+
+  MOCK_METHOD(bool, should_route_to_contextual_tasks, (), (const, override));
+
+  MOCK_METHOD(lens::LensOverlayGen204Controller*,
+              gen204_controller,
+              (),
+              (override));
+
+  MOCK_METHOD(std::optional<lens::LensOverlayInvocationSource>,
+              invocation_source,
+              (),
+              (override));
+
+  MOCK_METHOD(void,
+              HandleInteractionResponse,
+              (lens::mojom::TextPtr text),
+              (override));
+};
 
 class TestLensSearchController : public LensSearchController {
  public:
@@ -31,7 +69,6 @@ class TestLensSearchController : public LensSearchController {
       lens::LensOverlayFullImageResponseCallback full_image_callback,
       lens::LensOverlayUrlResponseCallback url_callback,
       lens::LensOverlayInteractionResponseCallback interaction_callback,
-      lens::LensOverlaySuggestInputsCallback suggest_inputs_callback,
       lens::LensOverlayThumbnailCreatedCallback thumbnail_created_callback,
       lens::UploadProgressCallback upload_progress_callback,
       variations::VariationsClient* variations_client,
@@ -40,6 +77,9 @@ class TestLensSearchController : public LensSearchController {
       lens::LensOverlayInvocationSource invocation_source,
       bool use_dark_mode,
       lens::LensOverlayGen204Controller* gen204_controller) override;
+
+  std::unique_ptr<lens::LensSearchContextualizationController>
+  CreateLensSearchContextualizationController() override;
 };
 
 }  // namespace lens

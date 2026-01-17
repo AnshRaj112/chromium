@@ -13,7 +13,6 @@
 #import "ios/chrome/browser/search_engines/model/template_url_service_factory.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/lens_commands.h"
@@ -23,6 +22,8 @@
 #import "ios/chrome/browser/shared/public/commands/qr_scanner_commands.h"
 #import "ios/chrome/browser/shared/public/commands/save_image_to_photos_command.h"
 #import "ios/chrome/browser/shared/public/commands/save_to_photos_commands.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
+#import "ios/chrome/browser/shared/public/commands/search_image_with_lens_command.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/pasteboard_util.h"
@@ -98,8 +99,8 @@
 - (UIAction*)actionToOpenInNewWindowWithURL:(const GURL)URL
                              activityOrigin:
                                  (WindowActivityOrigin)activityOrigin {
-  id<ApplicationCommands> windowOpener = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> windowOpener =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
 
   UIImage* image = DefaultSymbolWithPointSize(kNewWindowActionSymbol,
                                               kSymbolActionPointSize);
@@ -114,8 +115,8 @@
 }
 
 - (UIAction*)actionToOpenInNewWindowWithActivity:(NSUserActivity*)activity {
-  id<ApplicationCommands> windowOpener = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> windowOpener =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
 
   UIImage* image = DefaultSymbolWithPointSize(kNewWindowActionSymbol,
                                               kSymbolActionPointSize);
@@ -169,8 +170,8 @@
 }
 
 - (UIAction*)actionToOpenNewTab {
-  id<ApplicationCommands> handler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> handler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
   UIAction* action =
       [self actionWithTitle:l10n_util::GetNSString(IDS_IOS_TOOLS_MENU_NEW_TAB)
                       image:DefaultSymbolWithPointSize(kNewTabActionSymbol,
@@ -187,8 +188,8 @@
 }
 
 - (UIAction*)actionToOpenNewIncognitoTab {
-  id<ApplicationCommands> handler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> handler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
   UIAction* action =
       [self actionWithTitle:l10n_util::GetNSString(
                                 IDS_IOS_TOOLS_MENU_NEW_INCOGNITO_TAB)
@@ -265,7 +266,7 @@
                                                 referrer:referrer
                                                 webState:webState];
 
-#if BUILDFLAG(IOS_USE_BRANDED_SYMBOLS)
+#if BUILDFLAG(IOS_USE_BRANDED_ASSETS)
   UIImage* image =
       CustomSymbolWithPointSize(kGooglePhotosSymbol, kSymbolActionPointSize);
 #else
@@ -286,8 +287,8 @@
 }
 
 - (UIAction*)actionToStartVoiceSearch {
-  id<ApplicationCommands> handler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> handler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
   return [self
       actionWithTitle:l10n_util::GetNSString(IDS_IOS_TOOLS_MENU_VOICE_SEARCH)
                 image:DefaultSymbolWithPointSize(kMicrophoneSymbol,
@@ -299,8 +300,8 @@
 }
 
 - (UIAction*)actionToStartNewSearch {
-  id<ApplicationCommands> handler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> handler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
   UIAction* action = [self
       actionWithTitle:l10n_util::GetNSString(IDS_IOS_TOOLS_MENU_NEW_SEARCH)
                 image:DefaultSymbolWithPointSize(kSearchSymbol,
@@ -323,8 +324,8 @@
 }
 
 - (UIAction*)actionToStartNewIncognitoSearch {
-  id<ApplicationCommands> handler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> handler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
   UIAction* action =
       [self actionWithTitle:l10n_util::GetNSString(
                                 IDS_IOS_TOOLS_MENU_NEW_INCOGNITO_SEARCH)
@@ -345,6 +346,36 @@
   }
 
   return action;
+}
+
+- (UIAction*)actionToLensCopiedImage {
+  __weak id<LensCommands> handler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), LensCommands);
+  void (^clipboardAction)(std::optional<gfx::Image>) =
+      ^(std::optional<gfx::Image> optionalImage) {
+        if (!optionalImage || !handler) {
+          return;
+        }
+
+        UIImage* image = [optionalImage.value().ToUIImage() copy];
+        SearchImageWithLensCommand* command =
+            [[SearchImageWithLensCommand alloc]
+                initWithImage:image
+                   entryPoint:LensEntrypoint::PlusButton];
+        [handler searchImageWithLens:command];
+      };
+
+  return
+      [self actionWithTitle:l10n_util::GetNSString(
+                                IDS_IOS_SEARCH_COPIED_IMAGE_WITH_LENS)
+                      image:DefaultSymbolWithPointSize(kClipboardActionSymbol,
+                                                       kSymbolActionPointSize)
+                       type:MenuActionType::SearchCopiedImage
+                      block:^{
+                        ClipboardRecentContent::GetInstance()
+                            ->GetRecentImageFromClipboard(
+                                base::BindOnce(clipboardAction));
+                      }];
 }
 
 - (UIAction*)actionToSearchCopiedImage {
@@ -441,8 +472,8 @@
 }
 
 - (UIAction*)actionToOpenAIMenu {
-  id<ApplicationCommands> handler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> handler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
   return [self actionWithTitle:@"Open AI menu"
                          image:DefaultSymbolWithPointSize(
                                    kMagicStackSymbol, kSymbolActionPointSize)

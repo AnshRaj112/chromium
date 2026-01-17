@@ -5,7 +5,6 @@
 #import "ios/chrome/browser/crash_report/model/breadcrumbs/breadcrumb_manager_browser_agent.h"
 
 #import "base/containers/circular_deque.h"
-#import "base/containers/contains.h"
 #import "base/functional/bind.h"
 #import "components/breadcrumbs/core/breadcrumb_manager.h"
 #import "ios/chrome/browser/crash_report/model/breadcrumbs/breadcrumb_manager_tab_helper.h"
@@ -55,17 +54,20 @@ class BreadcrumbManagerBrowserAgentTest : public PlatformTest {
     profile_ = std::move(test_profile_builder).Build();
     browser_ = std::make_unique<TestBrowser>(profile_.get());
 
-    OverlayPresenter::FromBrowser(browser_.get(),
-                                  OverlayModality::kWebContentArea)
-        ->SetPresentationContext(&presentation_context_);
+    overlay_presenter_ = OverlayPresenter::FromBrowser(
+        browser_.get(), OverlayModality::kWebContentArea);
+    overlay_presenter_->SetPresentationContext(&presentation_context_);
   }
 
-  ~BreadcrumbManagerBrowserAgentTest() override { browser_.reset(); }
+  ~BreadcrumbManagerBrowserAgentTest() override {
+    overlay_presenter_->SetPresentationContext(nullptr);
+  }
 
   web::WebTaskEnvironment task_env_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   std::unique_ptr<TestProfileIOS> profile_;
   std::unique_ptr<Browser> browser_;
+  raw_ptr<OverlayPresenter> overlay_presenter_ = nullptr;
   FakeOverlayPresentationContext presentation_context_;
 };
 
@@ -137,8 +139,7 @@ TEST_F(BreadcrumbManagerBrowserAgentTest, BatchOperations) {
 
   const auto& events = GetEvents();
   ASSERT_EQ(1u, events.size());
-  EXPECT_TRUE(base::Contains(events.front(), "Inserted 2 tabs"))
-      << events.front();
+  EXPECT_TRUE(events.front().contains("Inserted 2 tabs")) << events.front();
 
   // Close multiple WebStates in a batch operation.
   {
@@ -151,7 +152,7 @@ TEST_F(BreadcrumbManagerBrowserAgentTest, BatchOperations) {
   }
 
   ASSERT_EQ(2u, events.size());
-  EXPECT_TRUE(base::Contains(events.back(), "Closed 2 tabs")) << events.back();
+  EXPECT_TRUE(events.back().contains("Closed 2 tabs")) << events.back();
 }
 
 // Tests logging kBreadcrumbOverlayJsAlert.
@@ -172,9 +173,8 @@ TEST_F(BreadcrumbManagerBrowserAgentTest, JavaScriptAlertOverlay) {
   const auto& events = GetEvents();
   ASSERT_EQ(1u, events.size());
 
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlay))
-      << events.back();
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlayJsAlert))
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlay)) << events.back();
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlayJsAlert))
       << events.back();
 }
 
@@ -196,9 +196,8 @@ TEST_F(BreadcrumbManagerBrowserAgentTest, JavaScriptConfirmOverlay) {
   const auto& events = GetEvents();
   ASSERT_EQ(1u, events.size());
 
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlay))
-      << events.back();
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlayJsConfirm))
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlay)) << events.back();
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlayJsConfirm))
       << events.back();
 }
 
@@ -221,9 +220,8 @@ TEST_F(BreadcrumbManagerBrowserAgentTest, JavaScriptPromptOverlay) {
   const auto& events = GetEvents();
   ASSERT_EQ(1u, events.size());
 
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlay))
-      << events.back();
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlayJsPrompt))
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlay)) << events.back();
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlayJsPrompt))
       << events.back();
 }
 
@@ -244,9 +242,8 @@ TEST_F(BreadcrumbManagerBrowserAgentTest, HttpAuthOverlay) {
   const auto& events = GetEvents();
   ASSERT_EQ(1u, events.size());
 
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlay))
-      << events.back();
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlayHttpAuth))
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlay)) << events.back();
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlayHttpAuth))
       << events.back();
 }
 
@@ -267,9 +264,8 @@ TEST_F(BreadcrumbManagerBrowserAgentTest, AppLaunchOverlay) {
   const auto& events = GetEvents();
   ASSERT_EQ(1u, events.size());
 
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlay))
-      << events.back();
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlayAppLaunch))
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlay)) << events.back();
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlayAppLaunch))
       << events.back();
 }
 
@@ -289,26 +285,21 @@ TEST_F(BreadcrumbManagerBrowserAgentTest, AlertOverlay) {
   const auto& events = GetEvents();
   ASSERT_EQ(1u, events.size());
 
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlay))
-      << events.back();
-  EXPECT_TRUE(base::Contains(events.back(), kBreadcrumbOverlayAlert))
-      << events.back();
-  EXPECT_FALSE(base::Contains(events.back(), kBreadcrumbOverlayActivated))
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlay)) << events.back();
+  EXPECT_TRUE(events.back().contains(kBreadcrumbOverlayAlert)) << events.back();
+  EXPECT_FALSE(events.back().contains(kBreadcrumbOverlayActivated))
       << events.back();
 
   // Switching tabs should log new overlay presentations.
   InsertWebState(browser_.get());
   ASSERT_EQ(2u, events.size());
-  EXPECT_TRUE(base::Contains(events.back(), "Insert active Tab"))
-      << events.back();
+  EXPECT_TRUE(events.back().contains("Insert active Tab")) << events.back();
 
   browser_->GetWebStateList()->ActivateWebStateAt(0);
   ASSERT_EQ(4u, events.size());
   auto activation = std::next(events.begin(), 2);
-  EXPECT_TRUE(base::Contains(*activation, kBreadcrumbOverlay)) << *activation;
-  EXPECT_TRUE(base::Contains(*activation, kBreadcrumbOverlayAlert))
-      << *activation;
-  EXPECT_TRUE(base::Contains(*activation, kBreadcrumbOverlayActivated))
-      << *activation;
+  EXPECT_TRUE(activation->contains(kBreadcrumbOverlay)) << *activation;
+  EXPECT_TRUE(activation->contains(kBreadcrumbOverlayAlert)) << *activation;
+  EXPECT_TRUE(activation->contains(kBreadcrumbOverlayActivated)) << *activation;
   queue->CancelAllRequests();
 }

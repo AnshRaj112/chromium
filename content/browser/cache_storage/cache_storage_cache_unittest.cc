@@ -2,23 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/342213636): Remove this and spanify to fix the errors.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "content/browser/cache_storage/cache_storage_cache.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
 #include "base/containers/span.h"
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_dir.h"
@@ -32,6 +28,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
+#include "base/strings/string_view_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
@@ -40,6 +37,7 @@
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/test_future.h"
 #include "base/time/time.h"
+#include "base/types/expected.h"
 #include "build/build_config.h"
 #include "components/services/storage/public/cpp/buckets/constants.h"
 #include "components/services/storage/public/mojom/cache_storage_control.mojom.h"
@@ -57,6 +55,7 @@
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "mojo/public/cpp/system/data_pipe.h"
 #include "mojo/public/cpp/system/data_pipe_drainer.h"
+#include "net/base/net_errors.h"
 #include "net/base/test_completion_callback.h"
 #include "net/base/url_util.h"
 #include "net/disk_cache/disk_cache.h"
@@ -119,8 +118,8 @@ class DelayableBackend : public disk_cache::Backend {
         delay_open_entry_(false) {}
 
   // disk_cache::Backend overrides
-  int32_t GetEntryCount(
-      net::Int32CompletionOnceCallback callback) const override {
+  base::expected<int32_t, net::Error> GetEntryCount(
+      GetEntryCountCallback callback) const override {
     return backend_->GetEntryCount(std::move(callback));
   }
 
@@ -282,8 +281,8 @@ class FailableBackend : public disk_cache::Backend {
         stage_(stage) {}
 
   // disk_cache::Backend overrides
-  int32_t GetEntryCount(
-      net::Int32CompletionOnceCallback callback) const override {
+  base::expected<int32_t, net::Error> GetEntryCount(
+      GetEntryCountCallback callback) const override {
     return backend_->GetEntryCount(std::move(callback));
   }
 
@@ -367,7 +366,7 @@ std::string CopySideData(blink::mojom::Blob* actual_blob) {
   actual_blob->ReadSideData(base::BindLambdaForTesting(
       [&](const std::optional<mojo_base::BigBuffer> data) {
         if (data)
-          output.append(data->data(), data->data() + data->size());
+          output.append(base::as_string_view(data->byte_span()));
         loop.Quit();
       }));
   loop.Run();
@@ -1313,7 +1312,7 @@ TEST_P(CacheStorageCacheTestP, PutReplaceInBatchFails) {
   // A duplicate operation error should provide an informative message
   // containing the URL of the duplicate request.
   ASSERT_TRUE(callback_message_);
-  EXPECT_TRUE(base::Contains(callback_message_.value(), BodyUrl().spec()));
+  EXPECT_TRUE(callback_message_.value().contains(BodyUrl().spec()));
 
   // Neither operation should have completed.
   EXPECT_FALSE(Match(body_request_));
@@ -1981,7 +1980,7 @@ TEST_P(CacheStorageCacheTestP, WriteSideData_QuotaExceeded) {
 
   const size_t kSize = 1024 * 1024;
   auto buffer = base::MakeRefCounted<net::IOBufferWithSize>(kSize);
-  memset(buffer->data(), 0, kSize);
+  std::ranges::fill(buffer->span(), 0);
   EXPECT_FALSE(
       WriteSideData(no_body_request_->url, response_time, buffer, kSize));
   EXPECT_EQ(CacheStorageError::kErrorQuotaExceeded, callback_error_);
@@ -2001,7 +2000,7 @@ TEST_P(CacheStorageCacheTestP, WriteSideData_QuotaManagerModified) {
 
   const size_t kSize = 10;
   auto buffer = base::MakeRefCounted<net::IOBufferWithSize>(kSize);
-  memset(buffer->data(), 0, kSize);
+  std::ranges::fill(buffer->span(), 0);
   EXPECT_TRUE(
       WriteSideData(no_body_request_->url, response_time, buffer, kSize));
   base::RunLoop().RunUntilIdle();
@@ -2017,7 +2016,7 @@ TEST_P(CacheStorageCacheTestP, WriteSideData_DifferentTimeStamp) {
 
   const size_t kSize = 10;
   auto buffer = base::MakeRefCounted<net::IOBufferWithSize>(kSize);
-  memset(buffer->data(), 0, kSize);
+  std::ranges::fill(buffer->span(), 0);
   EXPECT_FALSE(WriteSideData(no_body_request_->url,
                              response_time + base::Seconds(1), buffer, kSize));
   EXPECT_EQ(CacheStorageError::kErrorNotFound, callback_error_);
@@ -2027,7 +2026,7 @@ TEST_P(CacheStorageCacheTestP, WriteSideData_DifferentTimeStamp) {
 TEST_P(CacheStorageCacheTestP, WriteSideData_NotFound) {
   const size_t kSize = 10;
   auto buffer = base::MakeRefCounted<net::IOBufferWithSize>(kSize);
-  memset(buffer->data(), 0, kSize);
+  std::ranges::fill(buffer->span(), 0);
   EXPECT_FALSE(WriteSideData(GURL("http://www.example.com/not_exist"),
                              base::Time::Now(), buffer, kSize));
   EXPECT_EQ(CacheStorageError::kErrorNotFound, callback_error_);

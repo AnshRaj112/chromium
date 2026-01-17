@@ -4,41 +4,22 @@
 
 #include "chrome/browser/ui/android/tab_model/tab_model_observer_jni_bridge.h"
 
+#include <vector>
+
+#include "base/android/jni_android.h"
+#include "base/android/token_android.h"
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/android/tab_android.h"
 #include "chrome/browser/ui/android/tab_model/tab_model.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_jni_bridge.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_observer.h"
+#include "components/tab_groups/tab_group_id.h"
 
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/android/chrome_jni_headers/TabModelObserverJniBridge_jni.h"
 
 using base::android::AttachCurrentThread;
-using base::android::JavaObjectArrayReader;
-using base::android::JavaParamRef;
 using base::android::JavaRef;
-using base::android::ScopedJavaLocalRef;
-
-namespace {
-
-// Converts from a Java TabModel.TabClosingSource to a C++
-// TabModel::TabClosingSource.
-TabModel::TabClosingSource GetTabClosingSource(JNIEnv* env, int source) {
-  return static_cast<TabModel::TabClosingSource>(source);
-}
-
-// Converts from a Java TabModel.TabLaunchType to a C++ TabModel::TabLaunchType.
-TabModel::TabLaunchType GetTabLaunchType(JNIEnv* env, int type) {
-  return static_cast<TabModel::TabLaunchType>(type);
-}
-
-// Converts from a Java TabModel.TabSelectionType to a C++
-// TabModel::TabSelectionType.
-TabModel::TabSelectionType GetTabSelectionType(JNIEnv* env, int type) {
-  return static_cast<TabModel::TabSelectionType>(type);
-}
-
-}  // namespace
 
 TabModelObserverJniBridge::TabModelObserverJniBridge(
     JNIEnv* env,
@@ -57,70 +38,59 @@ TabModelObserverJniBridge::~TabModelObserverJniBridge() {
 }
 
 void TabModelObserverJniBridge::DidSelectTab(JNIEnv* env,
-                                             const JavaParamRef<jobject>& jtab,
-                                             int jtype,
+                                             TabAndroid* tab,
+                                             int type,
                                              int last_id) {
-  TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
   CHECK(tab);
-  TabModel::TabSelectionType type = GetTabSelectionType(env, jtype);
   for (auto& observer : model_observers_) {
-    observer.DidSelectTab(tab, type);
+    observer.DidSelectTab(tab, static_cast<TabModel::TabSelectionType>(type));
+  }
+  for (auto& observer : interface_observers_) {
+    observer.OnActiveTabChanged(tab);
   }
 }
 
-void TabModelObserverJniBridge::WillCloseTab(
-    JNIEnv* env,
-    const JavaParamRef<jobject>& jtab) {
-  TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
+void TabModelObserverJniBridge::WillCloseTab(JNIEnv* env, TabAndroid* tab) {
   CHECK(tab);
   for (auto& observer : model_observers_) {
     observer.WillCloseTab(tab);
   }
 }
 
-void TabModelObserverJniBridge::OnFinishingTabClosure(
-    JNIEnv* env,
-    const JavaParamRef<jobject>& jtab,
-    int jsource) {
-  TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
+void TabModelObserverJniBridge::OnFinishingTabClosure(JNIEnv* env,
+                                                      TabAndroid* tab,
+                                                      int source) {
   CHECK(tab);
-  TabModel::TabClosingSource source = GetTabClosingSource(env, jsource);
   for (auto& observer : model_observers_) {
-    observer.OnFinishingTabClosure(tab, source);
+    observer.OnFinishingTabClosure(
+        tab, static_cast<TabModel::TabClosingSource>(source));
   }
 }
 
 void TabModelObserverJniBridge::OnFinishingMultipleTabClosure(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobjectArray>& jtabs,
-    bool canRestore) {
-  std::vector<raw_ptr<TabAndroid, VectorExperimental>> tabs =
-      TabAndroid::GetAllNativeTabs(env,
-                                   ScopedJavaLocalRef<jobjectArray>(jtabs));
+    const std::vector<TabAndroid*>& tabs,
+    bool can_restore) {
   for (auto& observer : model_observers_) {
-    observer.OnFinishingMultipleTabClosure(tabs, canRestore);
+    observer.OnFinishingMultipleTabClosure(tabs, can_restore);
   }
 }
 
 void TabModelObserverJniBridge::WillAddTab(JNIEnv* env,
-                                           const JavaParamRef<jobject>& jtab,
-                                           int jtype) {
-  TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
+                                           TabAndroid* tab,
+                                           int type) {
   CHECK(tab);
-  TabModel::TabLaunchType type = GetTabLaunchType(env, jtype);
   for (auto& observer : model_observers_) {
-    observer.WillAddTab(tab, type);
+    observer.WillAddTab(tab, static_cast<TabModel::TabLaunchType>(type));
   }
 }
 
 void TabModelObserverJniBridge::DidAddTab(JNIEnv* env,
-                                          const JavaParamRef<jobject>& jtab,
-                                          int jtype) {
-  TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
+                                          TabAndroid* tab,
+                                          int type) {
   CHECK(tab);
-  TabModel::TabLaunchType type = GetTabLaunchType(env, jtype);
   for (auto& observer : model_observers_) {
-    observer.DidAddTab(tab, type);
+    observer.DidAddTab(tab, static_cast<TabModel::TabLaunchType>(type));
   }
 
   int index = tab_model_->GetIndexOfTab(tab->GetHandle());
@@ -130,32 +100,29 @@ void TabModelObserverJniBridge::DidAddTab(JNIEnv* env,
 }
 
 void TabModelObserverJniBridge::DidMoveTab(JNIEnv* env,
-                                           const JavaParamRef<jobject>& jtab,
+                                           TabAndroid* tab,
                                            int new_index,
                                            int cur_index) {
-  TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
   CHECK(tab);
   for (auto& observer : model_observers_) {
     observer.DidMoveTab(tab, new_index, cur_index);
   }
-}
-
-void TabModelObserverJniBridge::TabPendingClosure(
-    JNIEnv* env,
-    const JavaParamRef<jobject>& jtab,
-    int jsource) {
-  TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
-  CHECK(tab);
-  TabModel::TabClosingSource source = GetTabClosingSource(env, jsource);
-  for (auto& observer : model_observers_) {
-    observer.TabPendingClosure(tab, source);
+  for (auto& observer : interface_observers_) {
+    observer.OnTabMoved(tab, cur_index, new_index);
   }
 }
 
-void TabModelObserverJniBridge::TabClosureUndone(
+void TabModelObserverJniBridge::OnTabClosePending(
     JNIEnv* env,
-    const JavaParamRef<jobject>& jtab) {
-  TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
+    const std::vector<TabAndroid*>& tabs,
+    int source) {
+  for (auto& observer : model_observers_) {
+    observer.OnTabClosePending(tabs,
+                               static_cast<TabModel::TabClosingSource>(source));
+  }
+}
+
+void TabModelObserverJniBridge::TabClosureUndone(JNIEnv* env, TabAndroid* tab) {
   CHECK(tab);
   for (auto& observer : model_observers_) {
     observer.TabClosureUndone(tab);
@@ -164,33 +131,17 @@ void TabModelObserverJniBridge::TabClosureUndone(
 
 void TabModelObserverJniBridge::OnTabCloseUndone(
     JNIEnv* env,
-    const JavaParamRef<jobjectArray>& jtabs) {
-  std::vector<raw_ptr<TabAndroid, VectorExperimental>> tabs =
-      TabAndroid::GetAllNativeTabs(env,
-                                   ScopedJavaLocalRef<jobjectArray>(jtabs));
+    const std::vector<TabAndroid*>& tabs) {
   for (auto& observer : model_observers_) {
     observer.OnTabCloseUndone(tabs);
   }
 }
 
-void TabModelObserverJniBridge::TabClosureCommitted(
-    JNIEnv* env,
-    const JavaParamRef<jobject>& jtab) {
-  TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
+void TabModelObserverJniBridge::TabClosureCommitted(JNIEnv* env,
+                                                    TabAndroid* tab) {
   CHECK(tab);
   for (auto& observer : model_observers_) {
     observer.TabClosureCommitted(tab);
-  }
-}
-
-void TabModelObserverJniBridge::AllTabsPendingClosure(
-    JNIEnv* env,
-    const JavaParamRef<jobjectArray>& jtabs) {
-  std::vector<raw_ptr<TabAndroid, VectorExperimental>> tabs =
-      TabAndroid::GetAllNativeTabs(env,
-                                   ScopedJavaLocalRef<jobjectArray>(jtabs));
-  for (auto& observer : model_observers_) {
-    observer.AllTabsPendingClosure(tabs);
   }
 }
 
@@ -200,12 +151,41 @@ void TabModelObserverJniBridge::AllTabsClosureCommitted(JNIEnv* env) {
   }
 }
 
-void TabModelObserverJniBridge::TabRemoved(JNIEnv* env,
-                                           const JavaParamRef<jobject>& jtab) {
-  TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
+void TabModelObserverJniBridge::TabRemoved(JNIEnv* env, TabAndroid* tab) {
   CHECK(tab);
   for (auto& observer : model_observers_) {
     observer.TabRemoved(tab);
+  }
+  for (auto& observer : interface_observers_) {
+    observer.OnTabRemoved(tab);
+  }
+}
+
+void TabModelObserverJniBridge::OnTabGroupCreated(JNIEnv* env,
+                                                  base::Token group_id) {
+  auto tab_group_id = tab_groups::TabGroupId::FromRawToken(group_id);
+  CHECK(!tab_group_id.is_empty());
+  for (auto& observer : model_observers_) {
+    observer.OnTabGroupCreated(tab_group_id);
+  }
+}
+
+void TabModelObserverJniBridge::OnTabGroupRemoving(JNIEnv* env,
+                                                   base::Token group_id) {
+  auto tab_group_id = tab_groups::TabGroupId::FromRawToken(group_id);
+  CHECK(!tab_group_id.is_empty());
+  for (auto& observer : model_observers_) {
+    observer.OnTabGroupRemoving(tab_group_id);
+  }
+}
+
+void TabModelObserverJniBridge::OnTabGroupMoved(JNIEnv* env,
+                                                base::Token group_id,
+                                                int old_index) {
+  auto tab_group_id = tab_groups::TabGroupId::FromRawToken(group_id);
+  CHECK(!tab_group_id.is_empty());
+  for (auto& observer : model_observers_) {
+    observer.OnTabGroupMoved(tab_group_id, old_index);
   }
 }
 
@@ -226,3 +206,11 @@ void TabModelObserverJniBridge::RemoveTabListInterfaceObserver(
     TabListInterfaceObserver* observer) {
   interface_observers_.RemoveObserver(observer);
 }
+
+void TabModelObserverJniBridge::NotifyShutdown() {
+  for (auto& observer : interface_observers_) {
+    observer.OnTabListDestroyed(*tab_model_);
+  }
+}
+
+DEFINE_JNI(TabModelObserverJniBridge)

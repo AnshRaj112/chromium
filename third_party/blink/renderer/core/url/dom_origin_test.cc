@@ -5,8 +5,14 @@
 #include "third_party/blink/renderer/core/url/dom_origin.h"
 
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/blink/renderer/bindings/core/v8/script_value.h"
+#include "third_party/blink/renderer/bindings/core/v8/v8_binding_for_testing.h"
+#include "third_party/blink/renderer/core/dom/document.h"
+#include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/testing/dummy_page_holder.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
+#include "third_party/blink/renderer/platform/bindings/script_state.h"
+#include "third_party/blink/renderer/platform/bindings/v8_binding.h"
 #include "third_party/blink/renderer/platform/testing/unit_test_helpers.h"
 #include "third_party/blink/renderer/platform/weborigin/security_origin.h"
 
@@ -14,38 +20,35 @@ namespace blink {
 
 namespace {
 
+ScriptValue ScriptValueFromString(V8TestingScope& scope, String blink_string) {
+  return ScriptValue(scope.GetIsolate(),
+                     V8String(scope.GetIsolate(), blink_string));
+}
+
+DOMOrigin* DOMOriginFromString(V8TestingScope& scope, String blink_string) {
+  return DOMOrigin::from(scope.GetScriptState(),
+                         ScriptValueFromString(scope, blink_string),
+                         scope.GetExceptionState());
+}
+
 using DOMOriginTest = testing::Test;
 
 //
 // Construction and parsing:
 //
 TEST_F(DOMOriginTest, BuildOpaqueOrigins) {
-  DummyExceptionStateForTesting exception_state;
+  test::TaskEnvironment environment;
+  V8TestingScope scope;
 
-  {
-    DOMOrigin* origin = DOMOrigin::Create();
-    ASSERT_TRUE(origin);
-    EXPECT_TRUE(origin->opaque());
-    EXPECT_EQ(origin->toJSON(), "null");
-  }
-
-  {
-    DOMOrigin* origin = DOMOrigin::Create("null", exception_state);
-    ASSERT_TRUE(origin);
-    EXPECT_TRUE(origin->opaque());
-    EXPECT_FALSE(exception_state.HadException());
-    EXPECT_EQ(origin->toJSON(), "null");
-  }
-
-  {
-    DOMOrigin* origin = DOMOrigin::parse("null");
-    ASSERT_TRUE(origin);
-    EXPECT_TRUE(origin->opaque());
-    EXPECT_EQ(origin->toJSON(), "null");
-  }
+  DOMOrigin* origin = DOMOrigin::Create();
+  ASSERT_TRUE(origin);
+  EXPECT_TRUE(origin->opaque());
 }
 
 TEST_F(DOMOriginTest, BuildTupleOrigins) {
+  test::TaskEnvironment environment;
+  V8TestingScope scope;
+
   const char* test_cases[] = {
       "http://site.example",      "https://site.example",
       "https://site.example:123", "http://sub.site.example",
@@ -53,22 +56,13 @@ TEST_F(DOMOriginTest, BuildTupleOrigins) {
   };
 
   for (const char* test : test_cases) {
-    SCOPED_TRACE(testing::Message() << "Construction(" << test << ")");
+    SCOPED_TRACE(testing::Message() << "from(\"" << test << "\")");
 
-    DummyExceptionStateForTesting exception_state;
-    DOMOrigin* origin = DOMOrigin::Create(test, exception_state);
+    DOMOrigin* origin = DOMOriginFromString(scope, test);
     ASSERT_TRUE(origin);
-    EXPECT_FALSE(exception_state.HadException());
-    EXPECT_EQ(origin->toJSON(), test);
-  }
-
-  for (const char* test : test_cases) {
-    SCOPED_TRACE(testing::Message() << "Parsing(" << test << ")");
-
-    DummyExceptionStateForTesting exception_state;
-    DOMOrigin* origin = DOMOrigin::parse(test);
-    ASSERT_TRUE(origin);
-    EXPECT_EQ(origin->toJSON(), test);
+    EXPECT_FALSE(scope.GetExceptionState().HadException());
+    EXPECT_TRUE(SecurityOrigin::CreateFromString(test)->IsSameOriginWith(
+        origin->GetOriginForTesting()));
   }
 }
 
@@ -76,10 +70,11 @@ TEST_F(DOMOriginTest, BuildTupleOrigins) {
 // Comparison
 //
 TEST_F(DOMOriginTest, CompareOpaqueOrigins) {
-  DummyExceptionStateForTesting exception_state;
+  test::TaskEnvironment environment;
+  V8TestingScope scope;
 
-  DOMOrigin* opaque_a = DOMOrigin::Create("null", exception_state);
-  DOMOrigin* opaque_b = DOMOrigin::Create("null", exception_state);
+  DOMOrigin* opaque_a = DOMOrigin::Create();
+  DOMOrigin* opaque_b = DOMOrigin::Create();
 
   EXPECT_TRUE(opaque_a->isSameOrigin(opaque_a));
   EXPECT_TRUE(opaque_a->isSameSite(opaque_a));
@@ -90,14 +85,14 @@ TEST_F(DOMOriginTest, CompareOpaqueOrigins) {
 }
 
 TEST_F(DOMOriginTest, CompareTupleOrigins) {
-  DummyExceptionStateForTesting exception_state;
+  test::TaskEnvironment environment;
+  V8TestingScope scope;
 
-  DOMOrigin* a = DOMOrigin::Create("https://a.example", exception_state);
-  DOMOrigin* a_a = DOMOrigin::Create("https://a.a.example", exception_state);
-  DOMOrigin* b_a = DOMOrigin::Create("https://b.a.example", exception_state);
-  DOMOrigin* b = DOMOrigin::Create("https://b.example", exception_state);
-  DOMOrigin* b_b = DOMOrigin::Create("https://b.b.example", exception_state);
-  ASSERT_FALSE(exception_state.HadException());
+  DOMOrigin* a = DOMOriginFromString(scope, "https://a.example");
+  DOMOrigin* a_a = DOMOriginFromString(scope, "https://a.a.example");
+  DOMOrigin* b_a = DOMOriginFromString(scope, "https://b.a.example");
+  DOMOrigin* b = DOMOriginFromString(scope, "https://b.example");
+  DOMOrigin* b_b = DOMOriginFromString(scope, "https://b.b.example");
 
   EXPECT_TRUE(a->isSameOrigin(a));
   EXPECT_FALSE(a->isSameOrigin(a_a));
@@ -121,33 +116,58 @@ TEST_F(DOMOriginTest, CompareTupleOrigins) {
 //
 // Invalid
 //
-TEST_F(DOMOriginTest, InvalidOrigins) {
+TEST_F(DOMOriginTest, InvalidURLs) {
+  test::TaskEnvironment environment;
+  V8TestingScope scope;
+
   const char* test_cases[] = {
       "",
       "invalid",
-      "about:blank",
-      "https://trailing.slash/",
-      "https://user:pass@site.example",
       "https://very.long.port:123456789",
   };
 
   for (auto* test : test_cases) {
-    SCOPED_TRACE(testing::Message() << "Construction(" << test << ")");
+    SCOPED_TRACE(testing::Message() << "from(\"" << test << "\")");
 
-    DummyExceptionStateForTesting exception_state;
-    DOMOrigin* origin = DOMOrigin::Create(test, exception_state);
+    DOMOrigin* origin = DOMOriginFromString(scope, test);
     EXPECT_EQ(origin, nullptr);
+
+    DummyExceptionStateForTesting& exception_state = scope.GetExceptionState();
     EXPECT_TRUE(exception_state.HadException());
     EXPECT_EQ(exception_state.Code(), ToExceptionCode(ESErrorType::kTypeError));
-    EXPECT_EQ(exception_state.Message(), "Invalid serialized origin");
+    EXPECT_EQ(exception_state.Message(),
+              "The string provided cannot be parsed as a serialized URL.");
   }
+}
+
+TEST_F(DOMOriginTest, ParsingValidURLs) {
+  test::TaskEnvironment environment;
+  V8TestingScope scope;
+
+  const char* test_cases[] = {
+      "https://trailing.slash/",
+      "https://user:pass@site.example",
+      "https://has.a.port:1234/and/path",
+      "https://ümlauted.example",
+      "file:///path/to/a/file.txt",
+      "blob:https://example.com/some-guid",
+      "data:text/plain,hello",
+      "ftp://example.com/",
+      "https://example.com/path?query#fragment",
+      "https://127.0.0.1/",
+      "https://[::1]/",
+      "https://xn--ls8h.example/",
+  };
 
   for (auto* test : test_cases) {
-    SCOPED_TRACE(testing::Message() << "Parsing(" << test << ")");
+    SCOPED_TRACE(testing::Message() << "from(\"" << test << "\")");
 
-    DummyExceptionStateForTesting exception_state;
-    DOMOrigin* origin = DOMOrigin::parse(test);
-    EXPECT_EQ(origin, nullptr);
+    DOMOrigin* origin = DOMOriginFromString(scope, test);
+    ASSERT_TRUE(origin);
+    EXPECT_FALSE(scope.GetExceptionState().HadException());
+    EXPECT_EQ(!origin->opaque(),
+              SecurityOrigin::CreateFromString(test)->IsSameOriginWith(
+                  origin->GetOriginForTesting()));
   }
 }
 

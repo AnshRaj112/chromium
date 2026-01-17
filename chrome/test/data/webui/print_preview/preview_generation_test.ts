@@ -4,6 +4,7 @@
 
 import type {NativeInitialSettings, PreviewTicket, PrintPreviewAppElement, PrintPreviewDestinationSettingsElement, Range, Settings} from 'chrome://print/print_preview.js';
 import {ColorMode, CustomMarginsOrientation, Destination, DestinationOrigin, Margins, MarginsType, NativeLayerImpl, PluginProxyImpl, ScalingType} from 'chrome://print/print_preview.js';
+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {microtasksFinished} from 'chrome://webui-test/test_util.js';
 
@@ -410,6 +411,7 @@ suite('PreviewGenerationTest', function() {
   test('ScalingPdf', function() {
     // Set PDF document so setting is available.
     initialSettings.previewModifiable = false;
+    loadTimeData.overrideValues({alignPdfDefaultPrintSettingsWithHTML: false});
     return initialize()
         .then(function(args) {
           validateScalingChange({
@@ -533,6 +535,114 @@ suite('PreviewGenerationTest', function() {
             printTicket: args.printTicket,
             scalingTypeKey: 'scalingTypePdf',
             expectedTicketId: 8,
+            expectedTicketScaleFactor: 100,
+            expectedScalingValue: '120',
+            expectedScalingType: ScalingType.DEFAULT,
+          });
+        });
+  });
+
+  /**
+   * Validate changing the scalingTypePdf setting updates the preview with
+   * alignPdfDefaultPrintSettingsWithHTML on.
+   */
+  test('ScalingPdfAlignPdfDefaultPrintSettingsWithHTML', function() {
+    // Set PDF document so setting is available.
+    initialSettings.previewModifiable = false;
+    loadTimeData.overrideValues({alignPdfDefaultPrintSettingsWithHTML: true});
+    return initialize()
+        .then(function(args) {
+          validateScalingChange({
+            printTicket: args.printTicket,
+            scalingTypeKey: 'scalingTypePdf',
+            expectedTicketId: 0,
+            expectedTicketScaleFactor: 100,
+            expectedScalingValue: '100',
+            expectedScalingType: ScalingType.DEFAULT,
+          });
+          nativeLayer.resetResolver('getPreview');
+          // DEFAULT -> CUSTOM
+          page.setSetting('scalingTypePdf', ScalingType.CUSTOM);
+          return nativeLayer.whenCalled('getPreview');
+        })
+        .then(function(args) {
+          validateScalingChange({
+            printTicket: args.printTicket,
+            scalingTypeKey: 'scalingTypePdf',
+            expectedTicketId: 1,
+            expectedTicketScaleFactor: 100,
+            expectedScalingValue: '100',
+            expectedScalingType: ScalingType.CUSTOM,
+          });
+          nativeLayer.resetResolver('getPreview');
+          // CUSTOM -> DEFAULT
+          page.setSetting('scalingTypePdf', ScalingType.DEFAULT);
+          return nativeLayer.whenCalled('getPreview');
+        })
+        .then(function(args) {
+          validateScalingChange({
+            printTicket: args.printTicket,
+            scalingTypeKey: 'scalingTypePdf',
+            expectedTicketId: 2,
+            expectedTicketScaleFactor: 100,
+            expectedScalingValue: '100',
+            expectedScalingType: ScalingType.DEFAULT,
+          });
+          nativeLayer.resetResolver('getPreview');
+          // DEFAULT -> ACTUAL_SIZE
+          page.setSetting('scalingTypePdf', ScalingType.ACTUAL_SIZE);
+          return nativeLayer.whenCalled('getPreview');
+        })
+        .then(function(args) {
+          validateScalingChange({
+            printTicket: args.printTicket,
+            scalingTypeKey: 'scalingTypePdf',
+            expectedTicketId: 3,
+            expectedTicketScaleFactor: 100,
+            expectedScalingValue: '100',
+            expectedScalingType: ScalingType.ACTUAL_SIZE,
+          });
+          nativeLayer.resetResolver('getPreview');
+          // ACTUAL_SIZE -> CUSTOM
+          page.setSetting('scalingTypePdf', ScalingType.CUSTOM);
+          // ACTUAL_SIZE is equal to CUSTOM with scaling value 100, to
+          // regenerate preview, we need to make scaling value != 100.
+          page.setSetting('scaling', '120');
+          return nativeLayer.whenCalled('getPreview');
+        })
+        .then(function(args) {
+          validateScalingChange({
+            printTicket: args.printTicket,
+            scalingTypeKey: 'scalingTypePdf',
+            expectedTicketId: 4,
+            expectedTicketScaleFactor: 120,
+            expectedScalingValue: '120',
+            expectedScalingType: ScalingType.CUSTOM,
+          });
+          nativeLayer.resetResolver('getPreview');
+          // CUSTOM -> ACTUAL_SIZE
+          page.setSetting('scalingTypePdf', ScalingType.ACTUAL_SIZE);
+          return nativeLayer.whenCalled('getPreview');
+        })
+        .then(function(args) {
+          validateScalingChange({
+            printTicket: args.printTicket,
+            scalingTypeKey: 'scalingTypePdf',
+            expectedTicketId: 5,
+            expectedTicketScaleFactor: 100,
+            expectedScalingValue: '120',
+            expectedScalingType: ScalingType.ACTUAL_SIZE,
+          });
+          nativeLayer.resetResolver('getPreview');
+          // ACTUAL_SIZE -> DEFAULT
+          page.setSetting('scalingTypePdf', ScalingType.DEFAULT);
+          return nativeLayer.whenCalled('getPreview');
+        })
+        .then(function(args) {
+          validateScalingChange({
+            printTicket: args.printTicket,
+            scalingTypeKey: 'scalingTypePdf',
+            expectedTicketId: 6,
             expectedTicketScaleFactor: 100,
             expectedScalingValue: '120',
             expectedScalingType: ScalingType.DEFAULT,

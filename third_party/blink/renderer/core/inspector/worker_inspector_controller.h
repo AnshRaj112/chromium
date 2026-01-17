@@ -31,7 +31,6 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_INSPECTOR_WORKER_INSPECTOR_CONTROLLER_H_
 #define THIRD_PARTY_BLINK_RENDERER_CORE_INSPECTOR_WORKER_INSPECTOR_CONTROLLER_H_
 
-#include "base/functional/callback.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/unguessable_token.h"
 #include "third_party/blink/renderer/core/inspector/devtools_agent.h"
@@ -47,13 +46,14 @@ namespace blink {
 
 class CoreProbeSink;
 class InspectedFrames;
+class InspectorInspectorAgent;
 class WorkerThread;
 class WorkerThreadDebugger;
 struct WorkerDevToolsParams;
 
 class WorkerInspectorController final
     : public GarbageCollected<WorkerInspectorController>,
-      public trace_event::EnabledStateObserver,
+      public trace_event::TraceSessionObserver,
       public DevToolsAgent::Client,
       private Thread::TaskObserver {
  public:
@@ -79,15 +79,15 @@ class WorkerInspectorController final
   void Dispose();
   void FlushProtocolNotifications();
   void WaitForDebuggerIfNeeded();
+  void WorkerScriptLoaded();
 
  private:
   // Thread::TaskObserver implementation.
   void WillProcessTask(const base::PendingTask&, bool) override;
   void DidProcessTask(const base::PendingTask&) override;
 
-  // blink::trace_event::EnabledStateObserver implementation:
-  void OnTraceLogEnabled() override;
-  void OnTraceLogDisabled() override;
+  // trace_event::TraceSessionObserver implementation:
+  void OnStart(const perfetto::DataSourceBase::StartArgs&) override;
 
   void EmitTraceEvent();
 
@@ -103,7 +103,8 @@ class WorkerInspectorController final
   WorkerThread* thread_;
   Member<InspectedFrames> inspected_frames_;
   Member<CoreProbeSink> probe_sink_;
-  int session_count_ = 0;
+  HeapHashMap<Member<DevToolsSession>, Member<InspectorInspectorAgent>>
+      inspector_agents_;
   bool wait_for_debugger_ = false;
 
   // These fields are set up in the constructor and then read

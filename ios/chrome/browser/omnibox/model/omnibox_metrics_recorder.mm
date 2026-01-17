@@ -27,6 +27,7 @@
 #import "components/search_engines/template_url_service.h"
 #import "ios/chrome/browser/omnibox/model/omnibox_autocomplete_controller.h"
 #import "ios/chrome/browser/omnibox/model/omnibox_text_model.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "net/cookies/cookie_util.h"
 #import "third_party/metrics_proto/omnibox_event.pb.h"
 #import "third_party/metrics_proto/omnibox_focus_type.pb.h"
@@ -44,11 +45,14 @@ constexpr base::TimeDelta kDefaultTimeDelta = base::Milliseconds(-1);
 
 @implementation OmniboxMetricsRecorder {
   /// The omnibox client.
-  raw_ptr<OmniboxClient> _omniboxClient;
+  raw_ptr<OmniboxClient, DanglingUntriaged> _omniboxClient;
   /// The omnibox text model used to retrieve the text state.
-  raw_ptr<const OmniboxTextModel> _omniboxTextModel;
+  raw_ptr<const OmniboxTextModel, DanglingUntriaged> _omniboxTextModel;
   /// The autocomplete controller.
-  raw_ptr<const AutocompleteController> _autocompleteController;
+  raw_ptr<const AutocompleteController, DanglingUntriaged>
+      _autocompleteController;
+  /// The number of lines in the omnibox text view.
+  NSInteger _numberOfLines;
 }
 
 - (instancetype)initWithClient:(OmniboxClient*)omniboxClient
@@ -73,6 +77,10 @@ constexpr base::TimeDelta kDefaultTimeDelta = base::Milliseconds(-1);
   _autocompleteController = autocompleteController;
 }
 
+- (void)setNumberOfLines:(NSInteger)numberOfLines {
+  _numberOfLines = numberOfLines;
+}
+
 - (void)recordOpenMatch:(AutocompleteMatch)match
            destinationURL:(GURL)destinationURL
                 inputText:(const std::u16string&)inputText
@@ -80,13 +88,13 @@ constexpr base::TimeDelta kDefaultTimeDelta = base::Milliseconds(-1);
     windowOpenDisposition:(WindowOpenDisposition)disposition
                  isAction:(BOOL)isAction
              isPastedText:(BOOL)isPastedText {
+  if (_numberOfLines) {
+    base::UmaHistogramExactLinear("IOS.Omnibox.NumberOfLines", _numberOfLines,
+                                  20);
+  }
   const base::TimeTicks& now(base::TimeTicks::Now());
-  base::TimeDelta elapsedTimeSinceUserFirstModifiedOmnibox(
-      now - _omniboxTextModel->time_user_first_modified_omnibox);
-
-  _autocompleteController
-      ->UpdateMatchDestinationURLWithAdditionalSearchboxStats(
-          elapsedTimeSinceUserFirstModifiedOmnibox, &match);
+  base::TimeDelta elapsedTimeSinceUserFirstModifiedOmnibox = [self
+      elapsedTimeSinceUserFirstModifiedOmniboxWithPastedText:isPastedText];
 
   omnibox::RecordActionShownForAllActions(_autocompleteController->result(),
                                           selection);
@@ -104,7 +112,6 @@ constexpr base::TimeDelta kDefaultTimeDelta = base::Milliseconds(-1);
   // cases when this happens, the user never modified the omnibox.)
   const bool popupIsOpen = self.omniboxAutocompleteController.hasSuggestions;
   if (_omniboxTextModel->input.IsZeroSuggest() || isPastedText) {
-    elapsedTimeSinceUserFirstModifiedOmnibox = kDefaultTimeDelta;
     elapsedTimeSinceLastChangeToDefaultMatch = kDefaultTimeDelta;
   }
 
@@ -187,7 +194,7 @@ constexpr base::TimeDelta kDefaultTimeDelta = base::Milliseconds(-1);
   omnibox::answer_data_parser::LogAnswerUsed(match.answer_type);
 
   TemplateURLService* service = _omniboxClient->GetTemplateURLService();
-  TemplateURL* templateURL = match.GetTemplateURL(service, false);
+  TemplateURL* templateURL = match.GetTemplateURL(service);
   if (templateURL) {
     // `match` is a Search navigation; log search engine usage metrics.
     AutocompleteMatch::LogSearchEngineUsed(match, service);
@@ -236,6 +243,23 @@ constexpr base::TimeDelta kDefaultTimeDelta = base::Milliseconds(-1);
       _omniboxClient->OnBookmarkLaunched();
     }
   }
+}
+
+- (base::TimeDelta)elapsedTimeSinceUserFirstModifiedOmniboxWithPastedText:
+    (BOOL)isPastedText {
+  const base::TimeTicks& now(base::TimeTicks::Now());
+  base::TimeDelta elapsedTimeSinceUserFirstModifiedOmnibox(
+      now - _omniboxTextModel->time_user_first_modified_omnibox);
+  // These elapsed times don't really make sense for matches that come from
+  // omnibox focus (because the user did not modify the omnibox), so for those
+  // we set the elapsed times to something that will be ignored by
+  // metrics_log.cc.  They also don't necessarily make sense if the omnibox
+  // dropdown is closed or the user used paste-and-go.  (In most
+  // cases when this happens, the user never modified the omnibox.)
+  if (_omniboxTextModel->input.IsZeroSuggest() || isPastedText) {
+    elapsedTimeSinceUserFirstModifiedOmnibox = kDefaultTimeDelta;
+  }
+  return elapsedTimeSinceUserFirstModifiedOmnibox;
 }
 
 @end

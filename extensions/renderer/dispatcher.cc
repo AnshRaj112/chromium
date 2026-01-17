@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/debug/alias.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
@@ -128,11 +127,9 @@ namespace {
 
 // A feature flag for the crash issue in crbug.com/389971360.
 BASE_FEATURE(kSpeculativeFixForServiceWorkerDataInDidStartServiceWorkerContext,
-             "SpeculativeFixForServiceWorkerDataInDidStartServiceWorkerContext",
              base::FEATURE_ENABLED_BY_DEFAULT);
 // A feature flag for the crash issue in crbug.com/424476776.
 BASE_FEATURE(kSpeculativeFixForNoExtensionInDidStartServiceWorkerContext,
-             "SpeculativeFixForNoExtensionInDidStartServiceWorkerContext",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 static const char kOnSuspendEvent[] = "runtime.onSuspend";
@@ -179,10 +176,13 @@ bool ExtensionAPIEnabledForServiceWorkerScript(const GURL& scope,
     return false;
   }
 
-  const Extension* extension =
-      RendererExtensionRegistry::Get()->GetExtensionOrAppByURL(script_url);
+  // This code runs on the service worker thread, so it needs to use the
+  // thread-safe refcounted version of GetExtensionOrAppByURL.
+  scoped_refptr<const Extension> extension =
+      RendererExtensionRegistry::Get()->GetRefCountedExtensionOrAppByURL(
+          script_url);
 
-  if (!extension || !BackgroundInfo::IsServiceWorkerBased(extension)) {
+  if (!extension || !BackgroundInfo::IsServiceWorkerBased(extension.get())) {
     return false;
   }
 
@@ -190,7 +190,7 @@ bool ExtensionAPIEnabledForServiceWorkerScript(const GURL& scope,
     return false;
   }
 
-  return BackgroundInfo::GetBackgroundServiceWorkerScriptURL(extension) ==
+  return BackgroundInfo::GetBackgroundServiceWorkerScriptURL(extension.get()) ==
          script_url;
 }
 
@@ -240,7 +240,7 @@ base::LazyInstance<WorkerScriptContextSet>::DestructorAtExit
 scoped_refptr<Extension> ConvertToExtension(
     mojom::ExtensionLoadedParamsPtr params,
     int context_id,
-    std::string* error) {
+    std::u16string* error) {
   // We pass in the |id| to the create call because it will save work in the
   // normal case, and because in tests, extensions may not have paths or keys,
   // but it's important to retain the same id.
@@ -484,7 +484,7 @@ void Dispatcher::OnRenderFrameCreated(content::RenderFrame* render_frame) {
 }
 
 bool Dispatcher::IsExtensionActive(const ExtensionId& extension_id) const {
-  const bool is_active = base::Contains(active_extension_ids_, extension_id);
+  const bool is_active = active_extension_ids_.contains(extension_id);
   if (is_active)
     CHECK(RendererExtensionRegistry::Get()->Contains(extension_id));
   return is_active;
@@ -642,14 +642,17 @@ void Dispatcher::WillEvaluateServiceWorkerOnWorkerThread(
       },
       context_proxy));
 
-  const Extension* extension =
-      RendererExtensionRegistry::Get()->GetExtensionOrAppByURL(script_url);
+  // This function is called from a service worker thread, so we use the
+  // thread-safe refcounted version of GetExtensionOrAppByURL.
+  scoped_refptr<const Extension> extension =
+      RendererExtensionRegistry::Get()->GetRefCountedExtensionOrAppByURL(
+          script_url);
 
   ExtensionRendererLoadStatus load_status =
       ExtensionRendererLoadStatus::kUnknownExtension;
   if (extension) {
     load_status = ExtensionRendererLoadStatus::kExtensionLoaded;
-  } else if (base::Contains(unloaded_extensions_, script_url.host())) {
+  } else if (unloaded_extensions_.contains(script_url.GetHost())) {
     // script_url.host() is the extension's ID.
     load_status = ExtensionRendererLoadStatus::kExtensionUnloaded;
   }
@@ -706,8 +709,8 @@ void Dispatcher::WillEvaluateServiceWorkerOnWorkerThread(
   // them to service workers that aren't registered by extensions.
   ScriptContext* context = new ScriptContext(
       v8_context, nullptr, GenerateHostIdFromExtensionId(extension->id()),
-      extension, /*blink_isolated_world_id=*/std::nullopt,
-      mojom::ContextType::kPrivilegedExtension, extension,
+      extension.get(), /*blink_isolated_world_id=*/std::nullopt,
+      mojom::ContextType::kPrivilegedExtension, extension.get(),
       mojom::ContextType::kPrivilegedExtension);
   context->set_url(script_url);
   context->set_service_worker_scope(service_worker_scope);
@@ -860,6 +863,8 @@ void Dispatcher::WillDestroyServiceWorkerContextOnWorkerThread(
         service_worker_data->bindings_system();
     if (worker_bindings_system) {
       worker_bindings_system->WillReleaseScriptContext(script_context);
+      worker_bindings_system->messaging_service()->InvalidatePorts(
+          script_context);
       service_worker_data->GetServiceWorkerHost()->DidStopServiceWorkerContext(
           extension_id, *service_worker_data->activation_sequence(),
           service_worker_scope, service_worker_version_id, thread_id);
@@ -1044,9 +1049,7 @@ void Dispatcher::OnEventDispatcherRequest(
 void Dispatcher::ActivateExtension(const ExtensionId& extension_id) {
   TRACE_RENDERER_EXTENSION_EVENT("Dispatcher::ActivateExtension", extension_id);
 
-  // TODO(crbug.com/414486674): upgrade to CHECK once we ensure that validation
-  // is always working.
-  DCHECK(!extension_id.empty());
+  CHECK(!extension_id.empty());
   const Extension* extension =
       RendererExtensionRegistry::Get()->GetByID(extension_id);
   if (!extension) {
@@ -1086,7 +1089,7 @@ void Dispatcher::ActivateExtension(const ExtensionId& extension_id) {
 void Dispatcher::LoadExtensions(
     std::vector<mojom::ExtensionLoadedParamsPtr> loaded_extensions) {
   for (auto& param : loaded_extensions) {
-    std::string error;
+    std::u16string error;
     ExtensionId id = param->id;
     std::optional<base::UnguessableToken> worker_activation_token =
         param->worker_activation_token;
@@ -1157,9 +1160,7 @@ void Dispatcher::LoadExtensions(
 void Dispatcher::UnloadExtension(const ExtensionId& extension_id) {
   TRACE_RENDERER_EXTENSION_EVENT("Dispatcher::UnloadExtension", extension_id);
 
-  // TODO(crbug.com/414486674): upgrade to CHECK once we ensure that validation
-  // is always working.
-  DCHECK(!extension_id.empty());
+  CHECK(!extension_id.empty());
   // An extension should be in the registry if we are unloading it. Otherwise we
   // might be doing something out of the expected order.
   CHECK(RendererExtensionRegistry::Get()->Remove(extension_id));
@@ -1215,9 +1216,7 @@ void Dispatcher::SuspendExtension(
     mojom::Renderer::SuspendExtensionCallback callback) {
   TRACE_RENDERER_EXTENSION_EVENT("Dispatcher::SuspendExtension", extension_id);
 
-  // TODO(crbug.com/414486674): upgrade to CHECK once we ensure that validation
-  // is always working.
-  DCHECK(!extension_id.empty());
+  CHECK(!extension_id.empty());
   // Dispatch the suspend event. This doesn't go through the standard event
   // dispatch machinery because it requires special handling. We need to let
   // the browser know when we are starting and stopping the event dispatch, so
@@ -1229,9 +1228,7 @@ void Dispatcher::SuspendExtension(
 }
 
 void Dispatcher::CancelSuspendExtension(const ExtensionId& extension_id) {
-  // TODO(crbug.com/414486674): upgrade to CHECK once we ensure that validation
-  // is always working.
-  DCHECK(!extension_id.empty());
+  CHECK(!extension_id.empty());
   DispatchEventHelper(GenerateHostIdFromExtensionId(extension_id),
                       kOnSuspendCanceledEvent, base::Value::List(), nullptr);
 }
@@ -1250,9 +1247,7 @@ void Dispatcher::SetWebViewPartitionID(const std::string& partition_id) {
 
 void Dispatcher::SetScriptingAllowlist(
     const std::vector<ExtensionId>& extension_ids) {
-  // TODO(crbug.com/414486674): upgrade to CHECK once we ensure that validation
-  // is always working.
-  DCHECK(std::all_of(
+  CHECK(std::all_of(
       extension_ids.begin(), extension_ids.end(),
       [](const ExtensionId& extension_id) { return !extension_id.empty(); }));
   ExtensionsClient::Get()->SetScriptingAllowlist(extension_ids);
@@ -1288,9 +1283,7 @@ void Dispatcher::UpdateUserScriptWorlds(
 void Dispatcher::ClearUserScriptWorldConfig(
     const ExtensionId& extension_id,
     const std::optional<std::string>& world_id) {
-  // TODO(crbug.com/414486674): upgrade to CHECK once we ensure that validation
-  // is always working.
-  DCHECK(!extension_id.empty());
+  CHECK(!extension_id.empty());
   IsolatedWorldManager::GetInstance().ClearUserScriptWorldProperties(
       extension_id, world_id);
 }
@@ -1311,9 +1304,7 @@ void Dispatcher::UpdateTabSpecificPermissions(const ExtensionId& extension_id,
                                               URLPatternSet new_hosts,
                                               int tab_id,
                                               bool update_origin_allowlist) {
-  // TODO(crbug.com/414486674): upgrade to CHECK once we ensure that validation
-  // is always working.
-  DCHECK(!extension_id.empty());
+  CHECK(!extension_id.empty());
   const Extension* extension =
       RendererExtensionRegistry::Get()->GetByID(extension_id);
   if (!extension)
@@ -1340,9 +1331,7 @@ void Dispatcher::ClearTabSpecificPermissions(
     int tab_id,
     bool update_origin_allowlist) {
   for (const ExtensionId& id : extension_ids) {
-    // TODO(crbug.com/414486674): upgrade to CHECK once we ensure that
-    // validation is always working.
-    DCHECK(!id.empty());
+    CHECK(!id.empty());
     const Extension* extension = RendererExtensionRegistry::Get()->GetByID(id);
     if (extension) {
       extension->permissions_data()->ClearTabSpecificPermissions(tab_id);
@@ -1405,9 +1394,7 @@ void Dispatcher::SetDeveloperMode(bool current_developer_mode) {
 
 void Dispatcher::SetUserScriptsAllowed(const ExtensionId& extension_id,
                                        bool enabled) {
-  // TODO(crbug.com/414486674): upgrade to CHECK once we ensure that validation
-  // is always working.
-  DCHECK(!extension_id.empty());
+  CHECK(!extension_id.empty());
   SetCurrentUserScriptAllowedState(kRendererProfileId, extension_id, enabled);
   const Extension* extension =
       RendererExtensionRegistry::Get()->GetByID(extension_id);
@@ -1437,9 +1424,7 @@ void Dispatcher::UpdatePermissions(const ExtensionId& extension_id,
                                    URLPatternSet policy_blocked_hosts,
                                    URLPatternSet policy_allowed_hosts,
                                    bool uses_default_policy_host_restrictions) {
-  // TODO(crbug.com/414486674): upgrade to CHECK once we ensure that validation
-  // is always working.
-  DCHECK(!extension_id.empty());
+  CHECK(!extension_id.empty());
   const Extension* extension =
       RendererExtensionRegistry::Get()->GetByID(extension_id);
   if (!extension)

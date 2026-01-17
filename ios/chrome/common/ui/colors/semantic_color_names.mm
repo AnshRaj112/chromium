@@ -5,9 +5,14 @@
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 
 #pragma mark - Element Colors
+NSString* const kAimInputItemTopBackgroundColor =
+    @"aim_input_item_top_background_color";
+NSString* const kAimComposeboxButtonBackgroundColor =
+    @"aim_composebox_button_background_color";
 NSString* const kBackgroundColor = @"background_color";
 NSString* const kCloseButtonColor = @"close_button_color";
 NSString* const kDisabledTintColor = @"disabled_tint_color";
+NSString* const kDestinationHighlightColor = @"destination_highlight_color";
 NSString* const kFaviconBackgroundColor = @"favicon_background_color";
 NSString* const kGroupedPrimaryBackgroundColor =
     @"grouped_primary_background_color";
@@ -18,6 +23,8 @@ NSString* const kMDCInkColor = @"mdc_ink_color";
 NSString* const kMDCSecondaryInkColor = @"mdc_secondary_ink_color";
 NSString* const kPlaceholderImageTintColor = @"placeholder_image_tint_color";
 NSString* const kPrimaryBackgroundColor = @"primary_background_color";
+NSString* const kInvertedPrimaryBackgroundColor =
+    @"inverted_primary_background_color";
 NSString* const kScrimBackgroundColor = @"scrim_background_color";
 NSString* const kDarkerScrimBackgroundColor = @"darker_scrim_background_color";
 NSString* const kSecondaryBackgroundColor = @"secondary_background_color";

@@ -8,7 +8,6 @@
 #include <string>
 
 #include "base/android/path_utils.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/memory/singleton.h"
 #include "base/strings/utf_string_conversions.h"
@@ -23,7 +22,7 @@
 #include "ui/android/window_android.h"
 #include "ui/base/l10n/l10n_util.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 // static
 DuplicateDownloadDialogBridgeDelegate*
@@ -49,7 +48,7 @@ void DuplicateDownloadDialogBridgeDelegate::CreateDialog(
         file_selected_callback) {
   DCHECK(web_contents);
   // Don't shown duplicate dialog again if it is already showing.
-  if (base::Contains(download_items_, download_item)) {
+  if (std::ranges::contains(download_items_, download_item)) {
     return;
   }
   download_item->AddObserver(this);

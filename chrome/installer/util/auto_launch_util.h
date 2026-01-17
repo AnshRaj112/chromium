@@ -11,13 +11,16 @@
 // to launch at user login.
 namespace auto_launch_util {
 
+// Different launch modes that can be registered with the OS.
+enum class StartupLaunchMode { kBackground, kForeground };
+
 std::wstring GetAutoLaunchKeyName();
 
-// Requests that Chrome start in Background Mode at user login.
-void EnableBackgroundStartAtLogin();
+// Requests that Chrome start in the given mode at user login.
+void EnableStartAtLogin(StartupLaunchMode startup_launch_mode);
 
-// Disables auto-starting Chrome in background mode at user login.
-void DisableBackgroundStartAtLogin();
+// Disables auto-starting Chrome in at user login.
+void DisableStartAtLogin();
 
 }  // namespace auto_launch_util
 

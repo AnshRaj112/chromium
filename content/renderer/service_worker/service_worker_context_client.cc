@@ -66,6 +66,8 @@
 #include "third_party/blink/public/web/modules/service_worker/web_navigation_preload_request.h"
 #include "third_party/blink/public/web/modules/service_worker/web_service_worker_context_client.h"
 #include "third_party/blink/public/web/modules/service_worker/web_service_worker_context_proxy.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
+#include "third_party/perfetto/include/perfetto/tracing/track_event_args.h"
 
 using blink::WebURLRequest;
 using blink::MessagePortChannel;
@@ -179,13 +181,13 @@ ServiceWorkerContextClient::ServiceWorkerContextClient(
 
   service_worker_provider_info_ = std::move(provider_info);
 
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN1("ServiceWorker",
-                                    "ServiceWorkerContextClient", this,
-                                    "script_url", script_url_.spec());
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN1(
-      "ServiceWorker", "LOAD_SCRIPT", this, "Source",
-      (is_starting_installed_worker_ ? "InstalledScriptsManager"
-                                     : "ResourceLoader"));
+  TRACE_EVENT_BEGIN("ServiceWorker", "ServiceWorkerContextClient",
+                    perfetto::Track::FromPointer(this), "script_url",
+                    script_url_.spec());
+  TRACE_EVENT_BEGIN("ServiceWorker", "LOAD_SCRIPT",
+                    perfetto::Track::FromPointer(this), "Source",
+                    (is_starting_installed_worker_ ? "InstalledScriptsManager"
+                                                   : "ResourceLoader"));
 }
 
 ServiceWorkerContextClient::~ServiceWorkerContextClient() {
@@ -251,8 +253,9 @@ void ServiceWorkerContextClient::FailedToFetchClassicScript() {
            ComposeAlreadyInstalledString(is_starting_installed_worker_),
            ".Time"}),
       base::TimeTicks::Now() - top_level_script_loading_start_time_);
-  TRACE_EVENT_NESTABLE_ASYNC_END1("ServiceWorker", "LOAD_SCRIPT", this,
-                                  "Status", "FailedToFetchClassicScript");
+  // End "LOAD_SCRIPT" trace event.
+  TRACE_EVENT_END("ServiceWorker", perfetto::Track::FromPointer(this), "Status",
+                  "FailedToFetchClassicScript");
   // The caller is responsible for terminating the thread which
   // eventually destroys |this|.
 }
@@ -265,8 +268,9 @@ void ServiceWorkerContextClient::FailedToFetchModuleScript() {
            ComposeAlreadyInstalledString(is_starting_installed_worker_),
            ".Time"}),
       base::TimeTicks::Now() - top_level_script_loading_start_time_);
-  TRACE_EVENT_NESTABLE_ASYNC_END1("ServiceWorker", "LOAD_SCRIPT", this,
-                                  "Status", "FailedToFetchModuleScript");
+  // End "LOAD_SCRIPT" trace event.
+  TRACE_EVENT_END("ServiceWorker", perfetto::Track::FromPointer(this), "Status",
+                  "FailedToFetchModuleScript");
   // The caller is responsible for terminating the thread which
   // eventually destroys |this|.
 }
@@ -280,7 +284,8 @@ void ServiceWorkerContextClient::WorkerScriptLoadedOnWorkerThread() {
            ComposeAlreadyInstalledString(is_starting_installed_worker_),
            ".Time"}),
       base::TimeTicks::Now() - top_level_script_loading_start_time_);
-  TRACE_EVENT_NESTABLE_ASYNC_END0("ServiceWorker", "LOAD_SCRIPT", this);
+  // End "LOAD_SCRIPT" trace event.
+  TRACE_EVENT_END("ServiceWorker", perfetto::Track::FromPointer(this));
 }
 
 void ServiceWorkerContextClient::WorkerContextStarted(
@@ -462,12 +467,10 @@ void ServiceWorkerContextClient::OnNavigationPreloadResponse(
     std::unique_ptr<blink::WebURLResponse> response,
     mojo::ScopedDataPipeConsumerHandle data_pipe) {
   DCHECK(worker_task_runner_->RunsTasksInCurrentSequence());
-  TRACE_EVENT_WITH_FLOW0(
-      "ServiceWorker",
-      "ServiceWorkerContextClient::OnNavigationPreloadResponse",
-      TRACE_ID_WITH_SCOPE(kServiceWorkerContextClientScope,
-                          TRACE_ID_LOCAL(fetch_event_id)),
-      TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT);
+  TRACE_EVENT("ServiceWorker",
+              "ServiceWorkerContextClient::OnNavigationPreloadResponse",
+              perfetto::Flow::ProcessScoped(fetch_event_id,
+                                            kServiceWorkerContextClientScope));
   proxy_->OnNavigationPreloadResponse(fetch_event_id, std::move(response),
                                       std::move(data_pipe));
 }
@@ -478,11 +481,10 @@ void ServiceWorkerContextClient::OnNavigationPreloadError(
   DCHECK(worker_task_runner_->RunsTasksInCurrentSequence());
   // |context_| owns WebNavigationPreloadRequest which calls this.
   DCHECK(context_);
-  TRACE_EVENT_WITH_FLOW0("ServiceWorker",
-                         "ServiceWorkerContextClient::OnNavigationPreloadError",
-                         TRACE_ID_WITH_SCOPE(kServiceWorkerContextClientScope,
-                                             TRACE_ID_LOCAL(fetch_event_id)),
-                         TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT);
+  TRACE_EVENT("ServiceWorker",
+              "ServiceWorkerContextClient::OnNavigationPreloadError",
+              perfetto::Flow::ProcessScoped(fetch_event_id,
+                                            kServiceWorkerContextClientScope));
   proxy_->OnNavigationPreloadError(fetch_event_id, std::move(error));
   context_->preload_requests.Remove(fetch_event_id);
 }
@@ -496,12 +498,10 @@ void ServiceWorkerContextClient::OnNavigationPreloadComplete(
   DCHECK(worker_task_runner_->RunsTasksInCurrentSequence());
   // |context_| owns WebNavigationPreloadRequest which calls this.
   DCHECK(context_);
-  TRACE_EVENT_WITH_FLOW0(
-      "ServiceWorker",
-      "ServiceWorkerContextClient::OnNavigationPreloadComplete",
-      TRACE_ID_WITH_SCOPE(kServiceWorkerContextClientScope,
-                          TRACE_ID_LOCAL(fetch_event_id)),
-      TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT);
+  TRACE_EVENT("ServiceWorker",
+              "ServiceWorkerContextClient::OnNavigationPreloadComplete",
+              perfetto::Flow::ProcessScoped(fetch_event_id,
+                                            kServiceWorkerContextClientScope));
   proxy_->OnNavigationPreloadComplete(fetch_event_id, completion_time,
                                       encoded_data_length, encoded_body_length,
                                       decoded_body_length);
@@ -542,8 +542,8 @@ void ServiceWorkerContextClient::SendWorkerStarted(
       proxy_->HasUsbEventHandlers(), WorkerThread::GetCurrentId(),
       std::move(start_timing_));
 
-  TRACE_EVENT_NESTABLE_ASYNC_END0("ServiceWorker", "ServiceWorkerContextClient",
-                                  this);
+  // End "ServiceWorkerContextClient" trace event.
+  TRACE_EVENT_END("ServiceWorker", perfetto::Track::FromPointer(this));
 }
 
 void ServiceWorkerContextClient::SetupNavigationPreload(

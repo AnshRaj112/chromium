@@ -42,7 +42,7 @@ class ModelExecutionValidationBrowserTestBase : public InProcessBrowserTest {
         net::EmbeddedTestServer::TYPE_HTTPS);
     net::EmbeddedTestServer::ServerCertificateConfig cert_config;
     cert_config.dns_names = {
-        GURL(kOptimizationGuideServiceModelExecutionDefaultURL).host()};
+        GURL(kOptimizationGuideServiceModelExecutionDefaultURL).GetHost()};
     model_execution_server_->SetSSLConfig(cert_config);
     model_execution_server_->RegisterRequestHandler(
         base::BindRepeating(&ModelExecutionValidationBrowserTestBase::
@@ -56,9 +56,9 @@ class ModelExecutionValidationBrowserTestBase : public InProcessBrowserTest {
     cmd->AppendSwitchASCII(
         switches::kOptimizationGuideServiceModelExecutionURL,
         model_execution_server_
-            ->GetURL(
-                GURL(kOptimizationGuideServiceModelExecutionDefaultURL).host(),
-                "/")
+            ->GetURL(GURL(kOptimizationGuideServiceModelExecutionDefaultURL)
+                         .GetHost(),
+                     "/")
             .spec());
   }
 
@@ -105,8 +105,8 @@ class ModelExecutionValidationBrowserTestBase : public InProcessBrowserTest {
     auto response = std::make_unique<net::test_server::BasicHttpResponse>();
     EXPECT_EQ(request.method, net::test_server::METHOD_POST);
     EXPECT_NE(request.headers.end(), request.headers.find("X-Client-Data"));
-    EXPECT_TRUE(base::Contains(request.headers,
-                               net::HttpRequestHeaders::kAuthorization));
+    EXPECT_TRUE(
+        request.headers.contains(net::HttpRequestHeaders::kAuthorization));
     std::move(model_execution_request_closure_).Run();
 
     if (should_server_fail_model_execution_) {

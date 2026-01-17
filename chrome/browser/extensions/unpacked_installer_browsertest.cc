@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/extensions/unpacked_installer.h"
+#include "extensions/browser/unpacked_installer.h"
 
 #include "base/files/file_path.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "build/build_config.h"
+#include "chrome/browser/extensions/chrome_extensions_browser_client.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
@@ -14,8 +15,11 @@
 #include "content/public/test/browser_test.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/test_extension_registry_observer.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension.h"
 #include "extensions/test/test_extension_dir.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -80,7 +84,8 @@ IN_PROC_BROWSER_TEST_F(UnpackedInstallerBrowserTest,
   // Verify kNoOverride is logged.
   histograms.ExpectUniqueSample(
       /*name=*/"Extensions.CommandLineManifestSettingsOverride",
-      /*sample=*/UnpackedInstaller::ManifestSettingsOverrideType::kNoOverride,
+      /*sample=*/
+      ChromeExtensionsBrowserClient::ManifestSettingsOverrideType::kNoOverride,
       /*expected_bucket_count=*/1);
 }
 
@@ -116,7 +121,8 @@ IN_PROC_BROWSER_TEST_F(UnpackedInstallerBrowserTest,
   // Verify kNewTabPage is logged.
   histograms.ExpectUniqueSample(
       /*name=*/"Extensions.CommandLineManifestSettingsOverride",
-      /*sample=*/UnpackedInstaller::ManifestSettingsOverrideType::kNewTabPage,
+      /*sample=*/
+      ChromeExtensionsBrowserClient::ManifestSettingsOverrideType::kNewTabPage,
       /*expected_bucket_count=*/1);
 }
 
@@ -159,7 +165,9 @@ IN_PROC_BROWSER_TEST_F(UnpackedInstallerBrowserTest,
   // Verify kSearchEngine is logged.
   histograms.ExpectUniqueSample(
       /*name=*/"Extensions.CommandLineManifestSettingsOverride",
-      /*sample=*/UnpackedInstaller::ManifestSettingsOverrideType::kSearchEngine,
+      /*sample=*/
+      ChromeExtensionsBrowserClient::ManifestSettingsOverrideType::
+          kSearchEngine,
       /*expected_bucket_count=*/1);
 }
 
@@ -208,7 +216,7 @@ IN_PROC_BROWSER_TEST_F(
   histograms.ExpectUniqueSample(
       /*name=*/"Extensions.CommandLineManifestSettingsOverride",
       /*sample=*/
-      UnpackedInstaller::ManifestSettingsOverrideType::
+      ChromeExtensionsBrowserClient::ManifestSettingsOverrideType::
           kSearchEngineAndNewTabPage,
       /*expected_bucket_count=*/1);
 }

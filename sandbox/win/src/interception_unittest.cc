@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 // This file contains unit tests for InterceptionManager.
 // The tests require private information so the whole interception.cc file is
 // included from this file.
@@ -21,6 +16,7 @@
 #include <bit>
 #include <set>
 
+#include "base/compiler_specific.h"
 #include "base/containers/heap_array.h"
 #include "sandbox/win/src/interception_internal.h"
 #include "sandbox/win/src/interceptors.h"
@@ -39,15 +35,10 @@ size_t GetGranularAlignedRandomOffset(size_t size);
 // buffer (in): the buffer to walk.
 // num_dlls (out): count of the dlls on the buffer.
 // num_function (out): count of intercepted functions.
-// num_names (out): count of named interceptor functions.
-void WalkBuffer(base::span<BYTE> buffer,
-                int* num_dlls,
-                int* num_functions,
-                int* num_names) {
+void WalkBuffer(base::span<BYTE> buffer, int* num_dlls, int* num_functions) {
   ASSERT_TRUE(buffer.data());
   ASSERT_TRUE(num_functions);
-  ASSERT_TRUE(num_names);
-  *num_dlls = *num_functions = *num_names = 0;
+  *num_dlls = *num_functions = 0;
   SharedMemory* memory = reinterpret_cast<SharedMemory*>(buffer.data());
 
   ASSERT_GT(buffer.size(), sizeof(SharedMemory));
@@ -60,7 +51,7 @@ void WalkBuffer(base::span<BYTE> buffer,
     ASSERT_NE(0u, dll->num_functions);
 
     FunctionInfo* function = reinterpret_cast<FunctionInfo*>(
-        reinterpret_cast<char*>(dll) + dll->offset_to_functions);
+        UNSAFE_TODO(reinterpret_cast<char*>(dll) + dll->offset_to_functions));
 
     for (size_t j = 0; j < dll->num_functions; j++) {
       ASSERT_EQ(0u, function->record_bytes % sizeof(size_t));
@@ -68,28 +59,21 @@ void WalkBuffer(base::span<BYTE> buffer,
       char* name = function->function;
       size_t length = strlen(name);
       ASSERT_NE(0u, length);
-      name += length + 1;
 
       // look for overflows
-      ASSERT_GT(reinterpret_cast<char*>(buffer.data()) + buffer.size(),
-                name + strlen(name));
-
-      // look for a named interceptor
-      if (strlen(name)) {
-        (*num_names)++;
-        EXPECT_TRUE(!function->interceptor_address);
-      } else {
-        EXPECT_TRUE(function->interceptor_address);
-      }
+      ASSERT_GT(
+          UNSAFE_TODO(reinterpret_cast<char*>(buffer.data()) + buffer.size()),
+          UNSAFE_TODO(name + length));
+      EXPECT_TRUE(function->interceptor_address);
 
       (*num_functions)++;
-      function = reinterpret_cast<FunctionInfo*>(
-          reinterpret_cast<char*>(function) + function->record_bytes);
+      function = reinterpret_cast<FunctionInfo*>(UNSAFE_TODO(
+          reinterpret_cast<char*>(function) + function->record_bytes));
     }
 
     (*num_dlls)++;
-    dll = reinterpret_cast<DllPatchInfo*>(reinterpret_cast<char*>(dll) +
-                                          dll->record_bytes);
+    dll = reinterpret_cast<DllPatchInfo*>(
+        UNSAFE_TODO(reinterpret_cast<char*>(dll) + dll->record_bytes));
   }
 }
 
@@ -134,11 +118,9 @@ TEST(InterceptionManagerTest, GetGranularAlignedRandomOffset) {
 TEST(InterceptionManagerTest, BufferLayout1) {
   wchar_t exe_name[MAX_PATH];
   ASSERT_NE(0u, GetModuleFileName(nullptr, exe_name, MAX_PATH - 1));
+  TargetProcess target;
 
-  auto target = TargetProcess::MakeTargetProcessForTesting(
-      ::GetCurrentProcess(), ::GetModuleHandle(exe_name));
-
-  InterceptionManager interceptions(*target);
+  InterceptionManager interceptions(target);
 
   // Any pointer will do for a function pointer.
   void* function = &interceptions;
@@ -155,9 +137,6 @@ TEST(InterceptionManagerTest, BufferLayout1) {
                                       INTERCEPTION_EAT, function, OPEN_KEY_ID);
   interceptions.AddToPatchedFunctions(L"user32.dll", "PostMsg",
                                       INTERCEPTION_EAT, function, OPEN_KEY_ID);
-  interceptions.AddToPatchedFunctions(L"user32.dll", "PostMsg",
-                                      INTERCEPTION_EAT, "replacement",
-                                      OPEN_KEY_ID);
   interceptions.AddToPatchedFunctions(L"comctl.dll", "SaveAsDlg",
                                       INTERCEPTION_EAT, function, OPEN_KEY_ID);
   interceptions.AddToPatchedFunctions(L"ntdll.dll", "NtClose",
@@ -165,10 +144,6 @@ TEST(InterceptionManagerTest, BufferLayout1) {
                                       OPEN_KEY_ID);
   interceptions.AddToPatchedFunctions(L"some.dll", "Superfn", INTERCEPTION_EAT,
                                       function, OPEN_KEY_ID);
-  interceptions.AddToPatchedFunctions(L"comctl.dll", "SaveAsDlg",
-                                      INTERCEPTION_EAT, "a", OPEN_KEY_ID);
-  interceptions.AddToPatchedFunctions(L"comctl.dll", "SaveAsDlg",
-                                      INTERCEPTION_EAT, "abc", OPEN_KEY_ID);
   interceptions.AddToPatchedFunctions(L"a.dll", "p", INTERCEPTION_EAT, function,
                                       OPEN_KEY_ID);
   interceptions.AddToPatchedFunctions(L"b.dll",
@@ -180,7 +155,7 @@ TEST(InterceptionManagerTest, BufferLayout1) {
                                       function, OPEN_KEY_ID);
 
   // Verify that all interceptions were added
-  ASSERT_EQ(15u, interceptions.interceptions_.size());
+  ASSERT_EQ(12u, interceptions.interceptions_.size());
 
   auto local_buffer =
       base::HeapArray<BYTE>::Uninit(interceptions.GetBufferSize());
@@ -195,28 +170,25 @@ TEST(InterceptionManagerTest, BufferLayout1) {
   // patched on the client. The second group lives on local_buffer, and the
   // first group remains on the list of interceptions (inside the object
   // "interceptions"). There are 2 local interceptions (of ntdll); the
-  // other 13 have to be sent to the child to be performed "hot".
+  // other 10 have to be sent to the child to be performed "hot".
   EXPECT_EQ(2u, interceptions.interceptions_.size());
 
-  int num_dlls, num_functions, num_names;
-  WalkBuffer(local_buffer, &num_dlls, &num_functions, &num_names);
+  int num_dlls, num_functions;
+  WalkBuffer(local_buffer, &num_dlls, &num_functions);
 
-  // The 13 interceptions on the buffer (to the child) should be grouped on 6
-  // dlls. Only four interceptions are using an explicit name for the
-  // interceptor function.
+  // The 10 interceptions on the buffer (to the child) should be grouped on 6
+  // dlls.
   EXPECT_EQ(6, num_dlls);
-  EXPECT_EQ(13, num_functions);
-  EXPECT_EQ(3, num_names);
+  EXPECT_EQ(10, num_functions);
 }
 
 TEST(InterceptionManagerTest, BufferLayout2) {
   wchar_t exe_name[MAX_PATH];
   ASSERT_NE(0u, GetModuleFileName(nullptr, exe_name, MAX_PATH - 1));
 
-  auto target = TargetProcess::MakeTargetProcessForTesting(
-      ::GetCurrentProcess(), ::GetModuleHandle(exe_name));
+  TargetProcess target;
 
-  InterceptionManager interceptions(*target);
+  InterceptionManager interceptions(target);
 
   // Any pointer will do for a function pointer.
   void* function = &interceptions;
@@ -244,12 +216,11 @@ TEST(InterceptionManagerTest, BufferLayout2) {
   // first group remains on the list of interceptions, in this case just one.
   EXPECT_EQ(1u, interceptions.interceptions_.size());
 
-  int num_dlls, num_functions, num_names;
-  WalkBuffer(local_buffer, &num_dlls, &num_functions, &num_names);
+  int num_dlls, num_functions;
+  WalkBuffer(local_buffer, &num_dlls, &num_functions);
 
   EXPECT_EQ(3, num_dlls);
   EXPECT_EQ(3, num_functions);
-  EXPECT_EQ(0, num_names);
 }
 
 }  // namespace sandbox

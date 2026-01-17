@@ -8,6 +8,7 @@ for more details about the presubmit API built into depot_tools.
 """
 
 import os
+import subprocess
 import xml.etree.ElementTree as ElementTree
 
 NULLABILITY_PATTERN = r'(nonnull|nullable|_Nullable|_Nonnull)'
@@ -19,6 +20,7 @@ PIPE_IN_COMMENT_PATTERN = r'//.*[^|]\|(?!\|)'
 IOS_PACKAGE_PATTERN = r'^ios'
 BOXED_BOOL_PATTERN = r'@\((YES|NO)\)'
 USER_DEFAULTS_PATTERN = r'\[NSUserDefaults standardUserDefaults]'
+UMBRELLA_HEADER_PATTERN = r'#import\s+<([\w]+)\/(?!\1\.h)[^>]+>'
 
 # Color management constants
 COLOR_SHARED_DIR = 'ios/chrome/common/ui/colors/'
@@ -320,6 +322,35 @@ def _CheckOrderedStringFile(input_api, output_api):
     return [output_api.PresubmitPromptWarning(warning_message)]
 
 
+def _CheckOrderedFlagsFile(input_api, output_api):
+    """ Checks that the flag description files are alphabetically ordered"""
+    h_file = None
+    cc_file = None
+    for f in input_api.AffectedFiles(include_deletes=False):
+        if f.LocalPath().endswith('ios_chrome_flag_descriptions.h'):
+            h_file = f.LocalPath()
+        elif f.LocalPath().endswith('ios_chrome_flag_descriptions.cc'):
+            cc_file = f.LocalPath()
+
+    if h_file or cc_file:
+        try:
+            command = [
+                input_api.python3_executable, 'tools/order_flags.py', '--check'
+            ]
+            if h_file:
+                command.extend(['--h-file', h_file])
+            if cc_file:
+                command.extend(['--cc-file', cc_file])
+            subprocess.check_output(command, stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            message = 'Flag description files not alphabetically sorted.\n'
+            message += e.output.decode('utf-8')
+            message += '\nPlease run: python3 ios/tools/order_flags.py'
+            return [output_api.PresubmitError(message)]
+
+    return []
+
+
 def _CheckNotUsingNSUserDefaults(input_api, output_api):
     """ Checks the added code to limit new usage of NSUserDefaults """
     user_defaults_regex = input_api.re.compile(USER_DEFAULTS_PATTERN)
@@ -415,19 +446,19 @@ def _CheckNewColorIntroduction(input_api, output_api):
     return output
 
 def _CheckStyleESLint(input_api, output_api):
-  results = []
+    results = []
 
-  try:
-    import sys
-    old_sys_path = sys.path[:]
-    cwd = input_api.PresubmitLocalPath()
-    sys.path += [input_api.os_path.join(cwd, '..', 'tools')]
-    from web_dev_style import presubmit_support
-    results += presubmit_support.CheckStyleESLint(input_api, output_api)
-  finally:
-    sys.path = old_sys_path
+    try:
+        import sys
+        old_sys_path = sys.path[:]
+        cwd = input_api.PresubmitLocalPath()
+        sys.path += [input_api.os_path.join(cwd, '..', 'tools')]
+        from web_dev_style import presubmit_support
+        results += presubmit_support.CheckStyleESLint(input_api, output_api)
+    finally:
+        sys.path = old_sys_path
 
-  return results
+    return results
 
 def _CheckUIGraphicsBeginImageContextWithOptions(input_api, output_api):
     """ Checks that UIGraphicsBeginImageContextWithOptions is not used"""
@@ -451,6 +482,58 @@ def _CheckUIGraphicsBeginImageContextWithOptions(input_api, output_api):
 
     return [output_api.PresubmitError(error_message)]
 
+
+def _CheckOmniboxTextInEgtest(input_api, output_api):
+    """Checks use of OmniboxText or chrome_test_util::OmniboxText in egtests.
+    """
+    pattern = input_api.re.compile(r'(OmniboxText)')
+
+    errors = []
+    for f in input_api.AffectedFiles():
+        if not f.LocalPath().endswith('_egtest.mm'):
+            continue
+        for line_num, line in f.ChangedContents():
+            if pattern.search(line):
+                errors.append('%s:%s' % (f.LocalPath(), line_num))
+
+    if not errors:
+        return []
+    warning_message = '\n'.join([
+        'Please use [ChromeEarlGrey waitForWebStateVisibleURL:] to check for '
+        'URL load in the browser'
+    ] + errors) + '\n'
+
+    return [output_api.PresubmitPromptWarning(warning_message)]
+
+def _CheckUmbrellaHeaderUsage(input_api, output_api):
+    """Checks for individual system header imports instead of umbrella headers.
+    """
+    umbrella_regex = input_api.re.compile(UMBRELLA_HEADER_PATTERN)
+
+    errors = []
+    file_filter = lambda f: f.LocalPath().endswith(('.mm', '.h'))
+
+    for f in input_api.AffectedSourceFiles(file_filter):
+        for line_num, line in f.ChangedContents():
+            match = umbrella_regex.search(line)
+            if match:
+                framework_name = match.group(1)
+                errors.append('%s:%s (Found: %s. Use <%s/%s.h> instead)' %
+                              (f.LocalPath(), line_num, line.strip(),
+                               framework_name, framework_name))
+    if not errors:
+        return []
+
+    warning_message = (
+        'Always use Umbrella Headers for system frameworks. Importing '
+        'individual headers increases compilation time and breaks module '
+        'optimization.'
+    )
+
+    return [
+        output_api.PresubmitPromptWarning(warning_message, items=errors)
+    ]
+
 def CheckChange(input_api, output_api):
     results = []
     results.extend(_CheckBugInToDo(input_api, output_api))
@@ -461,15 +544,18 @@ def CheckChange(input_api, output_api):
     results.extend(_CheckNoTearDownEGTest(input_api, output_api))
     results.extend(_CheckCanImproveTestUsingExpectNSEQ(input_api, output_api))
     results.extend(_CheckOrderedStringFile(input_api, output_api))
+    results.extend(_CheckOrderedFlagsFile(input_api, output_api))
     results.extend(_CheckNotUsingNSUserDefaults(input_api, output_api))
     results.extend(_CheckNewColorIntroduction(input_api, output_api))
     results.extend(_CheckStyleESLint(input_api, output_api))
     results.extend(
         _CheckUIGraphicsBeginImageContextWithOptions(input_api, output_api))
+    results.extend(_CheckOmniboxTextInEgtest(input_api, output_api))
+    results.extend(_CheckUmbrellaHeaderUsage(input_api, output_api))
     return results
 
 def CheckChangeOnUpload(input_api, output_api):
-  return CheckChange(input_api, output_api)
+    return CheckChange(input_api, output_api)
 
 def CheckChangeOnCommit(input_api, output_api):
-  return CheckChange(input_api, output_api)
+    return CheckChange(input_api, output_api)

@@ -14,6 +14,7 @@
 #include "extensions/renderer/api/messaging/gin_port.h"
 #include "extensions/renderer/api/messaging/one_time_message_handler.h"
 #include "extensions/renderer/bindings/api_binding_types.h"
+#include "gin/handle.h"
 #include "mojo/public/cpp/bindings/associated_receiver_set.h"
 #include "v8/include/v8-forward.h"
 
@@ -30,7 +31,7 @@ enum class SerializationFormat;
 
 class NativeExtensionBindingsSystem;
 class ScriptContextSetIterable;
-struct Message;
+class Message;
 struct MessageTarget;
 struct PortId;
 
@@ -181,6 +182,9 @@ class NativeRendererMessagingService : public GinPort::Delegate {
   mojom::MessagePortHost* GetMessagePortHostIfExists(
       ScriptContext* script_context,
       const PortId& port_id);
+
+  // Invalidates any ports associated with the given `context`.
+  void InvalidatePorts(ScriptContext* context);
 
  private:
   class MessagePortScope;

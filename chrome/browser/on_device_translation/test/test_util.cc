@@ -9,16 +9,15 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/on_device_translation/language_pack_util.h"
-#include "chrome/browser/on_device_translation/pref_names.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/on_device_translation/public/language_pack.h"
+#include "components/on_device_translation/public/pref_names.h"
+#include "components/on_device_translation/service/test/test_util.h"
 #include "components/prefs/pref_service.h"
-#include "components/services/on_device_translation/test/test_util.h"
 #include "content/public/test/browser_test_utils.h"
 
 using ::testing::_;
-using ::testing::Invoke;
 
 namespace on_device_translation {
 
@@ -32,8 +31,9 @@ void MockComponentManager::DoNotExpectCallRegisterTranslateKitComponent() {
 }
 
 void MockComponentManager::ExpectCallRegisterTranslateKitComponentAndInstall() {
-  EXPECT_CALL(*this, RegisterTranslateKitComponentImpl())
-      .WillOnce(Invoke([&]() { InstallMockTranslateKitComponentLater(); }));
+  EXPECT_CALL(*this, RegisterTranslateKitComponentImpl()).WillOnce([&]() {
+    InstallMockTranslateKitComponentLater();
+  });
 }
 
 void MockComponentManager::DoNotExpectCallRegisterLanguagePackComponent() {
@@ -45,10 +45,10 @@ void MockComponentManager::ExpectCallRegisterLanguagePackComponentAndInstall(
   auto& expectation =
       EXPECT_CALL(*this, RegisterTranslateKitLanguagePackComponent(_));
   for (const auto expected_key : language_pack_keys) {
-    expectation.WillOnce(Invoke([&, expected_key](LanguagePackKey key) {
+    expectation.WillOnce([&, expected_key](LanguagePackKey key) {
       EXPECT_EQ(key, expected_key);
       InstallMockLanguagePackLater(key);
-    }));
+    });
   }
 }
 
@@ -140,8 +140,12 @@ void MockComponentManager::InstallMockLanguagePackLater(
 MockTranslationManagerImpl::MockTranslationManagerImpl(
     content::RenderProcessHost* process_host,
     content::BrowserContext* browser_context,
-    const url::Origin& origin)
-    : TranslationManagerImpl(process_host, browser_context, origin),
+    const url::Origin& origin,
+    component_updater::ComponentUpdateService* component_update_service)
+    : TranslationManagerImpl(process_host,
+                             browser_context,
+                             origin,
+                             component_update_service),
       mock_translation_manager_impl_(
           TranslationManagerImpl::SetForTesting(this)) {}
 
@@ -237,6 +241,10 @@ void TestTranslationAvailable(Browser* browser,
                                       sourceLang, targetLang))
                 .ExtractString(),
             result);
+}
+
+bool MockTranslationManagerImpl::CrashesAllowed() {
+  return crashes_allowed_;
 }
 
 }  // namespace on_device_translation

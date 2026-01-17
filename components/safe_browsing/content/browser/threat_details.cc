@@ -9,12 +9,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <algorithm>
 #include <memory>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
@@ -33,7 +33,6 @@
 #include "components/safe_browsing/content/browser/threat_details_history.h"
 #include "components/safe_browsing/content/browser/web_contents_key.h"
 #include "components/safe_browsing/content/browser/web_ui/safe_browsing_ui.h"
-#include "components/safe_browsing/core/browser/db/hit_report.h"
 #include "components/safe_browsing/core/browser/referrer_chain_provider.h"
 #include "components/safe_browsing/core/common/features.h"
 #include "components/safe_browsing/core/common/proto/csd.pb.h"
@@ -193,7 +192,7 @@ void TrimElements(const std::set<int> target_ids,
     // Otherwise, insert the parent ID into the list of ids to keep. This will
     // capture the parent and siblings of the target element, as well as each of
     // their children.
-    if (!base::Contains(element_ids_to_keep, parent_id)) {
+    if (!std::ranges::contains(element_ids_to_keep, parent_id)) {
       element_ids_to_keep.push_back(parent_id);
 
       // Check if this element has a resource. If so, remember to also keep the
@@ -236,12 +235,12 @@ void TrimElements(const std::set<int> target_ids,
     const HTMLElement& element = *element_iter->second;
 
     // Delete any elements that we do not want to keep.
-    if (!base::Contains(element_ids_to_keep, element.id())) {
+    if (!std::ranges::contains(element_ids_to_keep, element.id())) {
       // If this element has a resource then maybe delete the resouce too. Some
       // resources may be shared between kept and trimmed elements, and those
       // ones should not be deleted.
       if (element.has_resource_id() &&
-          !base::Contains(kept_resource_ids, element.resource_id())) {
+          !std::ranges::contains(kept_resource_ids, element.resource_id())) {
         const std::string& resource_url =
             resource_id_to_url[element.resource_id()];
         resources->erase(resource_url);
@@ -488,8 +487,8 @@ void ThreatDetails::AddDomElement(
     // of our current frame. We can easily lookup our parent.
     const std::string& parent_key =
         GetElementKey(frame_tree_node_id, parent_element_node_id);
-    if (base::Contains(elements_, parent_key)) {
-      parent_element = elements_[parent_key].get();
+    if (auto it = elements_.find(parent_key); it != elements_.end()) {
+      parent_element = it->second.get();
     }
   }
 
@@ -692,9 +691,9 @@ void ThreatDetails::FinishCollection(
   for (auto& element_pair : elements_) {
     const std::string& element_key = element_pair.first;
     HTMLElement* element = element_pair.second.get();
-    if (base::Contains(iframe_key_to_frame_tree_id_map_, element_key)) {
-      content::FrameTreeNodeId frame_tree_id_of_iframe_renderer =
-          iframe_key_to_frame_tree_id_map_[element_key];
+    if (auto it = iframe_key_to_frame_tree_id_map_.find(element_key);
+        it != iframe_key_to_frame_tree_id_map_.end()) {
+      content::FrameTreeNodeId frame_tree_id_of_iframe_renderer = it->second;
       const std::unordered_set<int>& child_ids =
           frame_tree_id_to_children_map_[frame_tree_id_of_iframe_renderer];
       for (const int child_id : child_ids) {
@@ -811,7 +810,7 @@ bool ThreatDetails::ShouldFillReferrerChain() {
       base::MakeFixedFlatSet<ClientSafeBrowsingReportRequest::ReportType>(
           {ClientSafeBrowsingReportRequest::URL_SUSPICIOUS,
            ClientSafeBrowsingReportRequest::APK_DOWNLOAD});
-  return base::Contains(valid_report_types, report_->type());
+  return valid_report_types.contains(report_->type());
 }
 
 void ThreatDetails::FillReferrerChain(
@@ -832,7 +831,7 @@ bool ThreatDetails::ShouldFillInterstitialInteractions() {
       base::MakeFixedFlatSet<ClientSafeBrowsingReportRequest::ReportType>(
           {ClientSafeBrowsingReportRequest::URL_PHISHING,
            ClientSafeBrowsingReportRequest::URL_CLIENT_SIDE_PHISHING});
-  return base::Contains(valid_report_types, report_->type());
+  return valid_report_types.contains(report_->type());
 }
 
 void ThreatDetails::MaybeAttachThreatDetailsAndLaunchSurvey() {

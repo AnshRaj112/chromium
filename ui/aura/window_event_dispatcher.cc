@@ -15,6 +15,7 @@
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
 #include "cc/metrics/custom_metrics_recorder.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/client/capture_client.h"
 #include "ui/aura/client/cursor_client.h"
@@ -24,7 +25,6 @@
 #include "ui/aura/env.h"
 #include "ui/aura/env_input_state_controller.h"
 #include "ui/aura/window_delegate.h"
-#include "ui/aura/window_event_dispatcher_observer.h"
 #include "ui/aura/window_targeter.h"
 #include "ui/aura/window_tracker.h"
 #include "ui/aura/window_tree_host.h"
@@ -77,22 +77,6 @@ bool IsEventCandidateForHold(const ui::Event& event) {
 }
 
 }  // namespace
-
-WindowEventDispatcher::ObserverNotifier::ObserverNotifier(
-    WindowEventDispatcher* dispatcher,
-    const ui::Event& event)
-    : dispatcher_(dispatcher) {
-  Env::GetInstance()->window_event_dispatcher_observers().Notify(
-      &WindowEventDispatcherObserver::OnWindowEventDispatcherStartedProcessing,
-      dispatcher, event);
-}
-
-WindowEventDispatcher::ObserverNotifier::~ObserverNotifier() {
-  Env::GetInstance()->window_event_dispatcher_observers().Notify(
-      &WindowEventDispatcherObserver::
-          OnWindowEventDispatcherFinishedProcessingEvent,
-      dispatcher_);
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // WindowEventDispatcher, public:
@@ -208,8 +192,8 @@ void WindowEventDispatcher::HoldPointerMoves() {
     held_event_factory_.InvalidateWeakPtrs();
   }
   ++move_hold_count_;
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN0(
-      "ui", "WindowEventDispatcher::HoldPointerMoves", TRACE_ID_LOCAL(this));
+  TRACE_EVENT_BEGIN("ui", "WindowEventDispatcher::HoldPointerMoves",
+                    perfetto::Track::FromPointer(this));
 }
 
 void WindowEventDispatcher::ReleasePointerMoves() {
@@ -242,8 +226,8 @@ void WindowEventDispatcher::ReleasePointerMoves() {
       }
     }
   }
-  TRACE_EVENT_NESTABLE_ASYNC_END0(
-      "ui", "WindowEventDispatcher::HoldPointerMoves", TRACE_ID_LOCAL(this));
+  TRACE_EVENT_END("ui", /*"WindowEventDispatcher::HoldPointerMoves"*/
+                  perfetto::Track::FromPointer(this));
 }
 
 gfx::Point WindowEventDispatcher::GetLastMouseLocationInRoot() const {
@@ -519,17 +503,9 @@ void WindowEventDispatcher::OnEventProcessingStarted(ui::Event* event) {
   // The held events are already in |window()|'s coordinate system. So it is
   // not necessary to apply the transform to convert from the host's
   // coordinate system to |window()|'s coordinate system.
-  if (event->IsLocatedEvent() && !is_dispatched_held_event(*event))
+  if (event->IsLocatedEvent() && !is_dispatched_held_event(*event)) {
     TransformEventForDeviceScaleFactor(static_cast<ui::LocatedEvent*>(event));
-
-  observer_notifiers_.push(std::make_unique<ObserverNotifier>(this, *event));
-}
-
-void WindowEventDispatcher::OnEventProcessingFinished(ui::Event* event) {
-  if (in_shutdown_)
-    return;
-
-  observer_notifiers_.pop();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -838,10 +814,6 @@ ui::EventDispatchDetails WindowEventDispatcher::DispatchHeldEvents() {
 
   if (!dispatch_details.dispatcher_destroyed) {
     dispatching_held_event_ = nullptr;
-    Env::GetInstance()->window_event_dispatcher_observers().Notify(
-        &WindowEventDispatcherObserver::
-            OnWindowEventDispatcherDispatchedHeldEvents,
-        this);
     if (did_dispatch_held_move_event_callback_)
       std::move(did_dispatch_held_move_event_callback_).Run();
   }
@@ -860,10 +832,9 @@ void WindowEventDispatcher::PostSynthesizeMouseMove(Window* window) {
 
 #if BUILDFLAG(IS_WIN)
   // Gets the window at the current cursor point.
-  gfx::Point cursor_point =
-      display::Screen::GetScreen()->GetCursorScreenPoint();
+  gfx::Point cursor_point = display::Screen::Get()->GetCursorScreenPoint();
   gfx::NativeWindow window_under_cursor =
-      display::Screen::GetScreen()->GetWindowAtScreenPoint(cursor_point);
+      display::Screen::Get()->GetWindowAtScreenPoint(cursor_point);
 
   ConvertPointFromScreen(&cursor_point);
   // If the mouse cursor is within the |window|, but |window_under_cursor| is
@@ -920,8 +891,7 @@ ui::EventDispatchDetails WindowEventDispatcher::SynthesizeMouseMoveEvent() {
 
   // Do not use GetLastMouseLocationInRoot here because it's not updated when
   // the mouse is not over the window or when the window is minimized.
-  gfx::Point mouse_location =
-      display::Screen::GetScreen()->GetCursorScreenPoint();
+  gfx::Point mouse_location = display::Screen::Get()->GetCursorScreenPoint();
   ConvertPointFromScreen(&mouse_location);
   if (!window()->bounds().Contains(mouse_location))
     return details;
@@ -1095,9 +1065,6 @@ DispatchDetails WindowEventDispatcher::PreDispatchTouchEvent(
     // The event is invalid - ignore it.
     event->StopPropagation();
     event->DisableSynchronousHandling();
-    env->window_event_dispatcher_observers().Notify(
-        &WindowEventDispatcherObserver::OnWindowEventDispatcherIgnoredEvent,
-        this);
     return DispatchDetails();
   }
 

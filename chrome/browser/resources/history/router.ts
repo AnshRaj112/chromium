@@ -46,9 +46,14 @@ export class HistoryRouterElement extends CrLitElement {
     };
   }
 
-  accessor lastSelectedTab: number;
-  accessor selectedPage: string;
-  accessor queryState: QueryState;
+  accessor lastSelectedTab: number = -1;
+  accessor selectedPage: string = '';
+  accessor queryState: QueryState = {
+    incremental: false,
+    querying: false,
+    searchTerm: '',
+    after: null,
+  };
   timeRangeStart?: Date;
 
   private eventTracker_: EventTracker = new EventTracker();
@@ -81,9 +86,11 @@ export class HistoryRouterElement extends CrLitElement {
 
   override willUpdate(changedProperties: PropertyValues<this>) {
     super.willUpdate(changedProperties);
-    if (changedProperties.has('selectedPage') &&
-        changedProperties.get('selectedPage')) {
-      this.selectedPageChanged_();
+    if ((changedProperties.has('queryState') &&
+         changedProperties.get('queryState')) ||
+        (changedProperties.has('selectedPage') &&
+         changedProperties.get('selectedPage'))) {
+      this.serializeUrl();
     }
   }
 
@@ -113,10 +120,6 @@ export class HistoryRouterElement extends CrLitElement {
     router.setQueryParams(queryParams);
   }
 
-  private selectedPageChanged_() {
-    this.serializeUrl();
-  }
-
   private onPathChanged_(newPath: string) {
     const sections = newPath.substr(1).split('/');
     const page = sections[0] ||
@@ -125,7 +128,7 @@ export class HistoryRouterElement extends CrLitElement {
     // TODO(b/338245900): This is kind of nasty. Without cr-tabs to constrain
     //   `selectedPage`, this can be set to an arbitrary value from the URL.
     //   To fix this, we should constrain the selected pages to an actual enum.
-    this.selectedPage = page;
+    this.selectedPage = page!;
   }
 
   private onQueryParamsChanged_(newParams: URLSearchParams) {

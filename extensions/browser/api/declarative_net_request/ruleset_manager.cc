@@ -11,7 +11,6 @@
 
 #include "base/check_op.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
@@ -187,7 +186,19 @@ std::vector<RequestAction> RulesetManager::EvaluateRequestWithHeaders(
     const net::HttpResponseHeaders* response_headers,
     bool is_incognito_context) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  CHECK(response_headers);
+
+  if (!response_headers) {
+    // NOTE: This can happen for auth challenges from CORS preflight requests
+    // that get routed to the respective main request's handler (since they
+    // share the same `request_id`), which happens when `extraHeaders` is
+    // enabled.
+    //
+    // At this point, the main request is paused waiting for the preflight, and
+    // has not received its own headers, so `response_headers` is null. We must
+    // return early. See https://crbug.com/444248440.
+    return {};
+  }
+
   return EvaluateRequestInternal(request, response_headers,
                                  is_incognito_context);
 }
@@ -216,8 +227,8 @@ bool RulesetManager::HasExtraHeadersMatcherForRequest(
   // request would potentially match any onHeadersReceived rules based on
   // non-header parameters.
   return HasRulesets(RulesetMatchingStage::kOnHeadersReceived) ||
-         base::Contains(actions, RequestAction::Type::MODIFY_HEADERS,
-                        &RequestAction::type);
+         std::ranges::contains(actions, RequestAction::Type::MODIFY_HEADERS,
+                               &RequestAction::type);
 }
 
 void RulesetManager::OnRenderFrameCreated(content::RenderFrameHost* host) {
@@ -506,6 +517,12 @@ bool RulesetManager::ShouldEvaluateRequest(
   // modify its own resources (The extension wouldn't have the permission to
   // other extension origins anyway).
   if (request.url.SchemeIs(kExtensionScheme)) {
+    return false;
+  }
+
+  // Declarative Net Request rules should not be matched against requests
+  // originating from WebViews.
+  if (request.is_web_view) {
     return false;
   }
 

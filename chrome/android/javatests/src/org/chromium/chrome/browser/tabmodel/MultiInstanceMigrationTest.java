@@ -101,14 +101,15 @@ public class MultiInstanceMigrationTest {
                             new MockTabModelSelector(mProfile, mIncognitoProfile, 0, 0, null);
                     TabbedModeTabPersistencePolicy persistencePolicy =
                             new TabbedModeTabPersistencePolicy(0, false, true);
-                    TabPersistentStore store =
-                            new TabPersistentStore(
-                                    TabPersistentStore.CLIENT_TAG_REGULAR,
+                    TabPersistentStoreImpl store =
+                            new TabPersistentStoreImpl(
+                                    TabPersistentStoreImpl.CLIENT_TAG_REGULAR,
                                     persistencePolicy,
                                     selector,
                                     null,
                                     TabWindowManagerSingleton.getInstance(),
-                                    mCipherFactory);
+                                    mCipherFactory,
+                                    /* recordLegacyTabCountMetrics= */ true);
                     store.waitForMigrationToFinish();
                 });
     }

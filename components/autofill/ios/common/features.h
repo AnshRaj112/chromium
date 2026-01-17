@@ -10,13 +10,6 @@
 
 // Features that are exclusive to iOS go here in alphabetical order.
 
-// Feature flag to control whether the Add Address Manually bottom sheet is
-// enabled.
-BASE_DECLARE_FEATURE(kAddAddressManually);
-
-// Returns true if the AddAddressManually feature is enabled
-bool IsAddAddressManuallyEnabled();
-
 // Allows detecting form submissions that are `defaultPrevented` by the page
 // content.
 BASE_DECLARE_FEATURE(kAutofillAllowDefaultPreventedSubmission);
@@ -36,11 +29,6 @@ BASE_DECLARE_FEATURE(kAutofillCountFormSubmissionInRenderer);
 // prevented.
 BASE_DECLARE_FEATURE(kAutofillDedupeFormSubmission);
 
-// Controls whether to dynamically load the address input fields in the save
-// flow and settings based on the country value.
-// TODO(crbug.com/40281788): Remove once launched.
-BASE_DECLARE_FEATURE(kAutofillDynamicallyLoadsFieldsForAddressInput);
-
 // Fix for XHR form submission detection when autofill across iframes is
 // enabled.
 BASE_DECLARE_FEATURE(kAutofillFixXhrForXframe);
@@ -48,12 +36,6 @@ BASE_DECLARE_FEATURE(kAutofillFixXhrForXframe);
 // Listen to form submission events in capture mode before the events are
 // propagated.
 BASE_DECLARE_FEATURE(kAutofillFormSubmissionEventsInCaptureMode);
-
-// Controls whether to use the isolated content world instead of the page
-// content world for the Autofill JS feature scripts.
-// TODO(crbug.com/40747550) Remove once the isolated content world is launched
-// for Autofill.
-BASE_DECLARE_FEATURE(kAutofillIsolatedWorldForJavascriptIos);
 
 // Enables the second version of the payments suggestion bottom sheet to prevent
 // bugs that we've seen in production on other transaction sheets (e.g. some

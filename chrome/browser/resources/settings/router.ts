@@ -33,7 +33,6 @@ export interface SettingsRoutes {
   GEMINI: Route;
   GLIC_SECTION: Route;
   HISTORY_SEARCH: Route;
-  INCOGNITO_TRACKING_PROTECTIONS: Route;
   LANGUAGES: Route;
   MANAGE_PROFILE: Route;
   OFFER_WRITING_HELP: Route;
@@ -80,7 +79,9 @@ export interface SettingsRoutes {
   SITE_SETTINGS_IMAGES: Route;
   SITE_SETTINGS_KEYBOARD_LOCK: Route;
   SITE_SETTINGS_LOCAL_FONTS: Route;
+  SITE_SETTINGS_LOCAL_NETWORK: Route;
   SITE_SETTINGS_LOCAL_NETWORK_ACCESS: Route;
+  SITE_SETTINGS_LOOPBACK_NETWORK: Route;
   SITE_SETTINGS_MIXEDSCRIPT: Route;
   SITE_SETTINGS_JAVASCRIPT: Route;
   SITE_SETTINGS_JAVASCRIPT_OPTIMIZER: Route;
@@ -113,6 +114,10 @@ export interface SettingsRoutes {
   SYNC_ADVANCED: Route;
   SYSTEM: Route;
   TRIGGERED_RESET_DIALOG: Route;
+  YOUR_SAVED_INFO: Route;
+  YOUR_SAVED_INFO_CONTACT_INFO: Route;
+  YOUR_SAVED_INFO_IDENTITY_DOCS: Route;
+  YOUR_SAVED_INFO_TRAVEL: Route;
 
   // <if expr="not is_chromeos">
   ACCOUNT: Route;
@@ -128,10 +133,6 @@ export class Route {
   parent: Route|null = null;
   depth: number = 0;
   title: string|undefined;
-
-  // Whether this route's contents have migrated to the new Settings plugin
-  // architecture. See crug.com/424223101 for details.
-  hasMigratedToPlugin: boolean = false;
 
   /**
    * Whether this route corresponds to a navigable dialog. Those routes must

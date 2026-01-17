@@ -7,7 +7,6 @@
 #include <stddef.h>
 
 #include <memory>
-#include <set>
 #include <string>
 #include <utility>
 
@@ -61,7 +60,8 @@ const char kOnEvent[] = "tts.onEvent";
 const char kOnVoicesChanged[] = "tts.onVoicesChanged";
 }  // namespace events
 
-const char* TtsEventTypeToString(content::TtsEventType event_type) {
+[[nodiscard]] std::string_view TtsEventTypeToString(
+    content::TtsEventType event_type) {
   switch (event_type) {
     case content::TTS_EVENT_START:
       return constants::kEventTypeStart;
@@ -88,7 +88,7 @@ const char* TtsEventTypeToString(content::TtsEventType event_type) {
   }
 }
 
-content::TtsEventType TtsEventTypeFromString(const std::string& str) {
+content::TtsEventType TtsEventTypeFromString(std::string_view str) {
   if (str == constants::kEventTypeStart)
     return content::TTS_EVENT_START;
   if (str == constants::kEventTypeEnd)
@@ -133,7 +133,7 @@ class TtsExtensionEventHandler : public content::UtteranceEventDelegate {
       return;
     }
 
-    const std::set<content::TtsEventType>& desired_event_types =
+    const base::flat_set<content::TtsEventType>& desired_event_types =
         utterance->GetDesiredEventTypes();
     if (!desired_event_types.empty() &&
         desired_event_types.find(event_type) == desired_event_types.end()) {
@@ -232,7 +232,7 @@ ExtensionFunction::ResponseAction TtsSpeakFunction::Run() {
     EXTENSION_FUNCTION_VALIDATE(value->is_bool());
   }
 
-  std::set<content::TtsEventType> required_event_types;
+  base::flat_set<content::TtsEventType> required_event_types;
   if (options.contains(constants::kRequiredEventTypesKey)) {
     base::Value::List* list =
         options.FindList(constants::kRequiredEventTypesKey);
@@ -240,13 +240,12 @@ ExtensionFunction::ResponseAction TtsSpeakFunction::Run() {
     for (const base::Value& i : *list) {
       const std::string* event_type = i.GetIfString();
       if (event_type) {
-        required_event_types.insert(
-            TtsEventTypeFromString(event_type->c_str()));
+        required_event_types.insert(TtsEventTypeFromString(*event_type));
       }
     }
   }
 
-  std::set<content::TtsEventType> desired_event_types;
+  base::flat_set<content::TtsEventType> desired_event_types;
   if (options.contains(constants::kDesiredEventTypesKey)) {
     base::Value::List* list =
         options.FindList(constants::kDesiredEventTypesKey);
@@ -254,7 +253,7 @@ ExtensionFunction::ResponseAction TtsSpeakFunction::Run() {
     for (const base::Value& i : *list) {
       const std::string* event_type = i.GetIfString();
       if (event_type)
-        desired_event_types.insert(TtsEventTypeFromString(event_type->c_str()));
+        desired_event_types.insert(TtsEventTypeFromString(*event_type));
     }
   }
 
@@ -274,7 +273,7 @@ ExtensionFunction::ResponseAction TtsSpeakFunction::Run() {
 
 #if BUILDFLAG(IS_CHROMEOS)
   UMATextToSpeechSource source = UMATextToSpeechSource::kOther;
-  const std::string host = source_url().host();
+  const std::string host = source_url().GetHost();
   if (host == extension_misc::kSelectToSpeakExtensionId) {
     source = UMATextToSpeechSource::kSelectToSpeak;
   } else if (host == extension_misc::kChromeVoxExtensionId) {
@@ -367,8 +366,7 @@ ExtensionFunction::ResponseAction TtsGetVoicesFunction::Run() {
 
     base::Value::List event_types;
     for (auto& event : voice.events) {
-      const char* event_name_constant = TtsEventTypeToString(event);
-      event_types.Append(event_name_constant);
+      event_types.Append(TtsEventTypeToString(event));
     }
     result_voice.Set(constants::kEventTypesKey, std::move(event_types));
 

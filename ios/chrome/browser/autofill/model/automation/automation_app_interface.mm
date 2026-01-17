@@ -7,7 +7,6 @@
 #import <map>
 #import <string_view>
 
-#import "base/containers/contains.h"
 #import "base/json/json_reader.h"
 #import "base/strings/string_util.h"
 #import "base/strings/sys_string_conversions.h"
@@ -42,17 +41,17 @@ autofill::FieldType FieldTypeFromString(std::string_view str, NSError** error) {
   // creating the recipe either type can be returned from predictions.
   // Therefore, store both in this map.
   if (string_to_field_type_map.empty()) {
-    for (autofill::FieldType ft : autofill::kAllFieldTypes) {
+    for (autofill::FieldType ft : autofill::FieldTypeSet::all()) {
       string_to_field_type_map[autofill::FieldTypeToStringView(ft)] = ft;
     }
 
-    for (autofill::HtmlFieldType hft : autofill::kAllHtmlFieldTypes) {
+    for (autofill::HtmlFieldType hft : autofill::HtmlFieldTypeSet::all()) {
       string_to_field_type_map[autofill::FieldTypeToStringView(hft)] =
           autofill::HtmlFieldTypeToBestCorrespondingFieldType(hft);
     }
   }
 
-  if (!base::Contains(string_to_field_type_map, str)) {
+  if (!string_to_field_type_map.contains(str)) {
     NSString* error_description = [NSString
         stringWithFormat:@"Unable to recognize autofill field type %@!",
                          base::SysUTF8ToNSString(str)];
@@ -152,7 +151,8 @@ NSError* PrepareAutofillProfileWithValues(
 
 + (NSError*)setAutofillAutomationProfile:(NSString*)profileJSON {
   std::optional<base::Value> readResult =
-      base::JSONReader::Read(base::SysNSStringToUTF8(profileJSON));
+      base::JSONReader::Read(base::SysNSStringToUTF8(profileJSON),
+                             base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!readResult.has_value()) {
     return testing::NSErrorWithLocalizedDescription(
         @"Unable to parse JSON string in app side.");

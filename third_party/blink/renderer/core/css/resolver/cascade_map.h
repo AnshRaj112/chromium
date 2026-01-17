@@ -42,13 +42,13 @@ class CORE_EXPORT CascadeMap {
   const CascadePriority* Find(const CSSPropertyName&, CascadeOrigin) const;
   CascadePriority* FindKnownToExist(const CSSPropertyID id) {
     DCHECK(native_properties_.Bits().Has(id));
-    return UNSAFE_TODO(
+    return UNSAFE_BUFFERS(
         &native_properties_.Buffer()[static_cast<size_t>(id)].Top(
             backing_vector_));
   }
   const CascadePriority* FindKnownToExist(const CSSPropertyID id) const {
     DCHECK(native_properties_.Bits().Has(id));
-    return UNSAFE_TODO(
+    return UNSAFE_BUFFERS(
         &native_properties_.Buffer()[static_cast<size_t>(id)].Top(
             backing_vector_));
   }
@@ -57,6 +57,8 @@ class CORE_EXPORT CascadeMap {
   // CascadePriority::ForLayerComparison().
   const CascadePriority* FindRevertLayer(const CSSPropertyName&,
                                          uint64_t) const;
+  const CascadePriority* FindRevertRule(const CSSPropertyName&,
+                                        wtf_size_t) const;
   // Similar to Find(), if you already have the right CascadePriorityList.
   CascadePriority& Top(CascadePriorityList&);
   // Adds an entry to the map if the incoming priority is greater than or equal

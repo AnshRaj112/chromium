@@ -75,7 +75,7 @@ base::android::ScopedJavaLocalRef<jobject> CreateFastCheckoutAutofillProfile(
       ConvertUTF16ToJavaString(env,
                                profile.GetRawInfo(autofill::EMAIL_ADDRESS)),
       ConvertUTF8ToJavaString(env, profile.language_code()),
-      static_cast<jint>(profile.record_type()));
+      static_cast<int32_t>(profile.record_type()));
 }
 
 base::android::ScopedJavaLocalRef<jobject> CreateFastCheckoutCreditCard(
@@ -99,23 +99,24 @@ base::android::ScopedJavaLocalRef<jobject> CreateFastCheckoutCreditCard(
           env, credit_card.GetRawInfo(autofill::CREDIT_CARD_EXP_4_DIGIT_YEAR)),
       ConvertUTF8ToJavaString(env,
                               payment_request_data.basic_card_issuer_network),
-      static_cast<jint>(credit_card.CardIconForAutofillSuggestion()),
+      static_cast<int32_t>(credit_card.CardIconForAutofillSuggestion()),
       ConvertUTF8ToJavaString(env, credit_card.billing_address_id()),
       ConvertUTF8ToJavaString(env, credit_card.server_id()),
       credit_card.instrument_id(),
       ConvertUTF16ToJavaString(env, credit_card.nickname()),
       url::GURLAndroid::FromNativeGURL(env, credit_card.card_art_url()),
-      static_cast<jint>(credit_card.virtual_card_enrollment_state()),
+      static_cast<int32_t>(credit_card.virtual_card_enrollment_state()),
       ConvertUTF16ToJavaString(env, credit_card.product_description()));
 }
 
 std::unique_ptr<autofill::AutofillProfile>
 CreateFastCheckoutAutofillProfileFromJava(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& jprofile,
+    const base::android::JavaRef<jobject>& jprofile,
     const std::string& locale) {
-  AddressCountryCode country_code = AddressCountryCode(ConvertJavaStringToUTF8(
-      Java_FastCheckoutAutofillProfile_getCountryCode(env, jprofile)));
+  autofill::AddressCountryCode country_code =
+      autofill::AddressCountryCode(ConvertJavaStringToUTF8(
+          Java_FastCheckoutAutofillProfile_getCountryCode(env, jprofile)));
   auto profile = std::make_unique<autofill::AutofillProfile>(country_code);
   // Only set the guid if it is an existing profile (Java guid not empty).
   // Otherwise, keep the generated one.
@@ -161,7 +162,7 @@ CreateFastCheckoutAutofillProfileFromJava(
 
 std::unique_ptr<autofill::CreditCard> CreateFastCheckoutCreditCardFromJava(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& jcredit_card) {
+    const base::android::JavaRef<jobject>& jcredit_card) {
   auto credit_card = std::make_unique<autofill::CreditCard>();
   // Only set the guid if it is an existing card (java guid not empty).
   // Otherwise, keep the generated one.
@@ -223,3 +224,6 @@ std::unique_ptr<autofill::CreditCard> CreateFastCheckoutCreditCardFromJava(
       Java_FastCheckoutCreditCard_getProductDescription(env, jcredit_card)));
   return credit_card;
 }
+
+DEFINE_JNI(FastCheckoutAutofillProfile)
+DEFINE_JNI(FastCheckoutCreditCard)

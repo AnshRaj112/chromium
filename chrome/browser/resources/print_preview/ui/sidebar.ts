@@ -7,6 +7,7 @@ import './advanced_options_settings.js';
 import './button_strip.js';
 import './color_settings.js';
 import './copies_settings.js';
+import './destination_settings.js';
 import './dpi_settings.js';
 import './duplex_settings.js';
 import './header.js';
@@ -22,7 +23,6 @@ import './scaling_settings.js';
 import '/strings.m.js';
 import './link_container.js';
 
-import {CrContainerShadowMixinLit} from 'chrome://resources/cr_elements/cr_container_shadow_mixin_lit.js';
 import {WebUiListenerMixinLit} from 'chrome://resources/cr_elements/web_ui_listener_mixin_lit.js';
 import {assert} from 'chrome://resources/js/assert.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
@@ -71,8 +71,8 @@ export interface PrintPreviewSidebarElement {
   };
 }
 
-const PrintPreviewSidebarElementBase = CrContainerShadowMixinLit(
-    WebUiListenerMixinLit(SettingsMixin(DarkModeMixin(CrLitElement))));
+const PrintPreviewSidebarElementBase =
+    WebUiListenerMixinLit(SettingsMixin(DarkModeMixin(CrLitElement)));
 
 export class PrintPreviewSidebarElement extends PrintPreviewSidebarElementBase {
   static get is() {

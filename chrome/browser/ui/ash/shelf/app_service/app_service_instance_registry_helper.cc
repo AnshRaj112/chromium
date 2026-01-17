@@ -8,19 +8,17 @@
 #include <string>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/stl_util.h"
 #include "base/time/time.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
+#include "chrome/browser/ash/browser_delegate/browser_controller.h"
+#include "chrome/browser/ash/browser_delegate/browser_delegate.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/ash/shelf/app_service/app_service_app_window_shelf_controller.h"
 #include "chrome/browser/ui/ash/shelf/chrome_shelf_controller.h"
-#include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/browser_list.h"
 #include "chromeos/ui/base/app_types.h"
 #include "chromeos/ui/base/window_properties.h"
 #include "components/app_constants/constants.h"
@@ -160,11 +158,11 @@ void AppServiceInstanceRegistryHelper::OnTabClosing(
 void AppServiceInstanceRegistryHelper::OnBrowserRemoved() {
   auto instances = GetInstances(app_constants::kChromeAppId);
   for (const auto* instance : instances) {
-    if (!chrome::FindBrowserWithWindow(instance->Window())) {
+    if (!ash::BrowserController::GetInstance()->GetBrowserForWindow(
+            instance->Window())) {
       // The tabs in the browser should be closed, and tab windows have been
       // removed from |browser_window_to_tab_windows_|.
-      DCHECK(
-          !base::Contains(browser_window_to_tab_windows_, instance->Window()));
+      DCHECK(!browser_window_to_tab_windows_.contains(instance->Window()));
 
       // The browser is removed if the window can't be found, so update the
       // Chrome window instance as destroyed.
@@ -281,7 +279,7 @@ void AppServiceInstanceRegistryHelper::OnWindowVisibilityChanged(
   OnInstances(app_constants::kChromeAppId, window, std::string(),
               CalculateVisibilityState(window, visible));
 
-  if (!base::Contains(browser_window_to_tab_windows_, window)) {
+  if (!browser_window_to_tab_windows_.contains(window)) {
     return;
   }
 
@@ -329,20 +327,20 @@ void AppServiceInstanceRegistryHelper::SetWindowActivated(
   OnInstances(app_constants::kChromeAppId, window, std::string(),
               CalculateActivatedState(window, active));
 
-  if (!base::Contains(browser_window_to_tab_windows_, window)) {
+  if (!browser_window_to_tab_windows_.contains(window)) {
     return;
   }
 
   // For the Chrome browser, when the window is activated, the active tab is set
   // as started, running, visible and active state.
   if (active) {
-    Browser* browser = chrome::FindBrowserWithWindow(window);
+    ash::BrowserDelegate* browser =
+        ash::BrowserController::GetInstance()->GetBrowserForWindow(window);
     if (!browser) {
       return;
     }
 
-    content::WebContents* contents =
-        browser->tab_strip_model()->GetActiveWebContents();
+    content::WebContents* contents = browser->GetActiveWebContents();
     if (!contents) {
       return;
     }

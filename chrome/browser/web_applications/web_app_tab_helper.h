@@ -17,6 +17,7 @@
 #include "chrome/browser/web_applications/web_app_install_manager_observer.h"
 #include "components/tabs/public/tab_interface.h"
 #include "components/webapps/common/web_app_id.h"
+#include "content/public/browser/page_manifest_manager.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/browser/web_contents_user_data.h"
 
@@ -31,6 +32,7 @@ class LaunchQueue;
 namespace web_app {
 
 class WebAppProvider;
+class WebAppBrowserController;
 
 // Per-tab web app helper. Allows to associate a tab (web page) with a web app.
 class WebAppTabHelper : public content::WebContentsUserData<WebAppTabHelper>,
@@ -72,6 +74,9 @@ class WebAppTabHelper : public content::WebContentsUserData<WebAppTabHelper>,
   // is currently being displayed inside an app window. `window_app_id` is the
   // id of the app.
   void SetIsInAppWindow(std::optional<webapps::AppId> window_app_id);
+
+  void NotifyIsFirstWebContentsInAppWindow(
+      base::PassKey<WebAppBrowserController>);
 
   void SetCallbackToRunOnTabChanges(base::OnceClosure callback);
 
@@ -153,8 +158,6 @@ class WebAppTabHelper : public content::WebContentsUserData<WebAppTabHelper>,
       const webapps::AppId& uninstalled_app_id) override;
   void OnWebAppInstallManagerDestroyed() override;
 
-  void ResetTabSubscriptions(tabs::TabInterface* tab);
-
   // Sets the state of this tab helper. This will call
   // `WebAppUiManager::OnAssociatedAppChanged` if the id has changed, and
   // `UpdateAudioFocusGroupId()` if either has changed.
@@ -190,6 +193,13 @@ class WebAppTabHelper : public content::WebContentsUserData<WebAppTabHelper>,
   // happens only once.
   void MaybeRecordManifestAppliedUseCounter();
 
+  // Schedules a preinstall update if the current page is not in-scope of the
+  // app, and we are in the window of the preinstall app.
+  void MaybeSchedulePreinstallUpdate();
+
+  void OnManifestSpecifiedOnPrimaryPage(
+      const content::PageManifestManager::ManifestResult& result);
+
   std::optional<webapps::AppId> app_id_;
   std::optional<webapps::AppId> window_app_id_;
 
@@ -219,9 +229,13 @@ class WebAppTabHelper : public content::WebContentsUserData<WebAppTabHelper>,
   // Cache the information that an app launch `UseCounter` needs to be measured.
   bool meaure_manifest_applied_use_counter_ = false;
 
+  bool check_preinstall_for_update_on_next_navigation_ = false;
+
   base::ScopedObservation<WebAppInstallManager, WebAppInstallManagerObserver>
       observation_{this};
   raw_ptr<WebAppProvider> provider_ = nullptr;
+
+  base::CallbackListSubscription get_all_specified_manifests_subscription_;
 
   base::WeakPtrFactory<WebAppTabHelper> weak_factory_{this};
 

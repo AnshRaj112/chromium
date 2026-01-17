@@ -4,7 +4,6 @@
 
 #include "chrome/browser/enterprise/connectors/analysis/content_analysis_downloads_delegate.h"
 
-#include "chrome/browser/enterprise/connectors/analysis/content_analysis_features.h"
 #include "chrome/browser/enterprise/connectors/common.h"
 #include "chrome/browser/enterprise/connectors/connectors_service.h"
 #include "chrome/browser/safe_browsing/cloud_content_scanning/deep_scanning_utils.h"
@@ -146,6 +145,14 @@ void ContentAnalysisDownloadsDelegate::OnDownloadDestroyed(
   DCHECK_EQ(download, download_item_);
   download->RemoveObserver(this);
   download_item_ = nullptr;
+}
+
+std::optional<std::u16string> ContentAnalysisDownloadsDelegate::GetFilename()
+    const {
+  if (filename_.empty()) {
+    return std::nullopt;
+  }
+  return filename_;
 }
 
 }  // namespace enterprise_connectors

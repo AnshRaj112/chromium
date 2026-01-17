@@ -13,7 +13,8 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
-#include "ash/public/cpp/multi_user_window_manager.h"
+#include "ash/multi_user/multi_user_window_manager.h"
+#include "ash/shell.h"
 #include "ash/webui/settings/public/constants/routes_util.h"
 #include "base/command_line.h"
 #include "base/files/file.h"
@@ -30,8 +31,6 @@
 #include "chrome/browser/ash/crostini/crostini_export_import.h"
 #include "chrome/browser/ash/crostini/crostini_export_import_factory.h"
 #include "chrome/browser/ash/crostini/crostini_features.h"
-#include "chrome/browser/ash/crostini/crostini_package_service.h"
-#include "chrome/browser/ash/crostini/crostini_package_service_factory.h"
 #include "chrome/browser/ash/drive/drive_integration_service.h"
 #include "chrome/browser/ash/drive/drive_integration_service_factory.h"
 #include "chrome/browser/ash/drive/file_system_util.h"
@@ -66,7 +65,6 @@
 #include "chrome/browser/profiles/profiles_state.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/ui/ash/multi_user/multi_user_util.h"
-#include "chrome/browser/ui/ash/multi_user/multi_user_window_manager_helper.h"
 #include "chrome/browser/ui/ash/system_web_apps/system_web_app_ui_utils.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/chrome_pages.h"
@@ -431,8 +429,7 @@ ExtensionFunction::ResponseAction FileManagerPrivateGetProfilesFunction::Run() {
 
   // Obtains the display profile ID.
   AppWindow* const app_window = GetCurrentAppWindow(this);
-  ash::MultiUserWindowManager* const window_manager =
-      MultiUserWindowManagerHelper::GetWindowManager();
+  auto* const window_manager = ash::Shell::Get()->multi_user_window_manager();
   const AccountId current_profile_id = multi_user_util::GetAccountIdFromProfile(
       Profile::FromBrowserContext(browser_context()));
   const AccountId display_profile_id =
@@ -897,86 +894,6 @@ FileManagerPrivateInternalGetCrostiniSharedPathsFunction::Run() {
   return RespondNow(WithArguments(response.ToValue()));
 }
 
-ExtensionFunction::ResponseAction
-FileManagerPrivateInternalGetLinuxPackageInfoFunction::Run() {
-  using fmpi::GetLinuxPackageInfo::Params;
-  const optional<Params> params = Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-
-  Profile* profile = Profile::FromBrowserContext(browser_context());
-  const scoped_refptr<storage::FileSystemContext> file_system_context =
-      file_manager::util::GetFileSystemContextForRenderFrameHost(
-          profile, render_frame_host());
-
-  crostini::CrostiniPackageServiceFactory::GetForProfile(profile)
-      ->GetLinuxPackageInfo(
-          crostini::DefaultContainerId(),
-          file_system_context->CrackURLInFirstPartyContext(GURL(params->url)),
-          base::BindOnce(
-              &FileManagerPrivateInternalGetLinuxPackageInfoFunction::
-                  OnGetLinuxPackageInfo,
-              this));
-  return RespondLater();
-}
-
-void FileManagerPrivateInternalGetLinuxPackageInfoFunction::
-    OnGetLinuxPackageInfo(
-        const crostini::LinuxPackageInfo& linux_package_info) {
-  fmp::LinuxPackageInfo result;
-  if (!linux_package_info.success) {
-    Respond(Error(linux_package_info.failure_reason));
-    return;
-  }
-
-  result.name = linux_package_info.name;
-  result.version = linux_package_info.version;
-  result.summary = linux_package_info.summary;
-  result.description = linux_package_info.description;
-
-  Respond(ArgumentList(fmpi::GetLinuxPackageInfo::Results::Create(result)));
-}
-
-ExtensionFunction::ResponseAction
-FileManagerPrivateInternalInstallLinuxPackageFunction::Run() {
-  using fmpi::InstallLinuxPackage::Params;
-  const optional<Params> params = Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-
-  Profile* profile = Profile::FromBrowserContext(browser_context());
-  const scoped_refptr<storage::FileSystemContext> file_system_context =
-      file_manager::util::GetFileSystemContextForRenderFrameHost(
-          profile, render_frame_host());
-
-  crostini::CrostiniPackageServiceFactory::GetForProfile(profile)
-      ->QueueInstallLinuxPackage(
-          crostini::DefaultContainerId(),
-          file_system_context->CrackURLInFirstPartyContext(GURL(params->url)),
-          base::BindOnce(
-              &FileManagerPrivateInternalInstallLinuxPackageFunction::
-                  OnInstallLinuxPackage,
-              this));
-  return RespondLater();
-}
-
-void FileManagerPrivateInternalInstallLinuxPackageFunction::
-    OnInstallLinuxPackage(crostini::CrostiniResult result) {
-  fmp::InstallLinuxPackageStatus response;
-  switch (result) {
-    case crostini::CrostiniResult::SUCCESS:
-      response = fmp::InstallLinuxPackageStatus::kStarted;
-      break;
-    case crostini::CrostiniResult::INSTALL_LINUX_PACKAGE_FAILED:
-      response = fmp::InstallLinuxPackageStatus::kFailed;
-      break;
-    case crostini::CrostiniResult::BLOCKING_OPERATION_ALREADY_ACTIVE:
-      response = fmp::InstallLinuxPackageStatus::kInstallAlreadyActive;
-      break;
-    default:
-      NOTREACHED();
-  }
-  Respond(ArgumentList(fmpi::InstallLinuxPackage::Results::Create(response)));
-}
-
 FileManagerPrivateInternalGetCustomActionsFunction::
     FileManagerPrivateInternalGetCustomActionsFunction() = default;
 
@@ -1181,8 +1098,7 @@ void FileManagerPrivateInternalGetRecentFilesFunction::
 
 ExtensionFunction::ResponseAction
 FileManagerPrivateIsTabletModeEnabledFunction::Run() {
-  return RespondNow(
-      WithArguments(display::Screen::GetScreen()->InTabletMode()));
+  return RespondNow(WithArguments(display::Screen::Get()->InTabletMode()));
 }
 
 ExtensionFunction::ResponseAction FileManagerPrivateOpenWindowFunction::Run() {

@@ -2,24 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <array>
 #include <map>
 #include <sstream>
 #include <string_view>
 #include <utility>
+#include <vector>
 
-#include "base/containers/contains.h"
 #include "base/containers/heap_array.h"
 #include "base/containers/queue.h"
+#include "base/containers/span.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/logging.h"
@@ -151,8 +148,9 @@ class TestNode : public NodeDelegate {
   int SendMultipleMessages(const PortRef& port, size_t num_messages) {
     for (size_t i = 0; i < num_messages; ++i) {
       int result = SendStringMessage(port, "");
-      if (result != OK)
+      if (result != OK) {
         return result;
+      }
     }
     return OK;
   }
@@ -188,8 +186,9 @@ class TestNode : public NodeDelegate {
   bool ReadMultipleMessages(const PortRef& port, size_t num_messages) {
     for (size_t i = 0; i < num_messages; ++i) {
       ScopedMessage message;
-      if (!ReadMessage(port, &message))
+      if (!ReadMessage(port, &message)) {
         return false;
+      }
     }
     return true;
   }
@@ -240,15 +239,17 @@ class TestNode : public NodeDelegate {
   void PortStatusChanged(const PortRef& port) override {
     // The port may be closed, in which case we ignore the notification.
     base::AutoLock lock(lock_);
-    if (!save_messages_)
+    if (!save_messages_) {
       return;
+    }
 
     for (;;) {
       ScopedMessage message;
       {
         base::AutoUnlock unlock(lock_);
-        if (!ReadMessage(port, &message))
+        if (!ReadMessage(port, &message)) {
           break;
+        }
       }
 
       saved_messages_.emplace(std::move(message));
@@ -256,21 +257,23 @@ class TestNode : public NodeDelegate {
   }
 
   void ClosePortsInEvent(Event* event) {
-    if (event->type() != Event::Type::kUserMessage)
+    if (event->type() != Event::Type::kUserMessage) {
       return;
+    }
 
     UserMessageEvent* message_event = static_cast<UserMessageEvent*>(event);
-    for (size_t i = 0; i < message_event->num_ports(); ++i) {
+    for (const auto& port_name : message_event->ports()) {
       PortRef port;
-      ASSERT_EQ(OK, node_.GetPort(message_event->ports()[i], &port));
+      ASSERT_EQ(OK, node_.GetPort(port_name, &port));
       EXPECT_EQ(OK, node_.ClosePort(port));
     }
   }
 
   uint64_t GetUnacknowledgedMessageCount(const PortRef& port_ref) {
     PortStatus status;
-    if (node_.GetStatus(port_ref, &status) != OK)
+    if (node_.GetStatus(port_ref, &status) != OK) {
       return 0;
+    }
 
     return status.unacknowledged_message_count;
   }
@@ -286,8 +289,9 @@ class TestNode : public NodeDelegate {
       events_available_event_.Wait();
       base::AutoLock lock(lock_);
 
-      if (should_quit_)
+      if (should_quit_) {
         return;
+      }
 
       dispatching_ = true;
       while (!incoming_events_.empty()) {
@@ -353,8 +357,9 @@ class PortsTest : public testing::Test, public MessageRouter {
       nodes_.erase(node->name());
     }
 
-    for (const auto& entry : nodes_)
+    for (const auto& entry : nodes_) {
       entry.second->node().LostConnectionToNode(node->name());
+    }
   }
 
   // Waits until all known Nodes are idle. Message forwarding and processing
@@ -367,19 +372,22 @@ class PortsTest : public testing::Test, public MessageRouter {
       base::AutoLock global_lock(global_lock_);
       bool all_nodes_idle = true;
       for (const auto& entry : nodes_) {
-        if (!entry.second->IsIdle())
+        if (!entry.second->IsIdle()) {
           all_nodes_idle = false;
+        }
         entry.second->WakeUp();
       }
-      if (all_nodes_idle)
+      if (all_nodes_idle) {
         return;
+      }
 
       // Wait for any Node to signal that it's idle.
       base::AutoUnlock global_unlock(global_lock_);
       std::vector<base::WaitableEvent*> events;
-      for (const auto& entry : nodes_)
+      for (const auto& entry : nodes_) {
         events.push_back(&entry.second->idle_event());
-      base::WaitableEvent::WaitMany(events.data(), events.size());
+      }
+      base::WaitableEvent::WaitMany(events);
     }
   }
 
@@ -409,7 +417,7 @@ class PortsTest : public testing::Test, public MessageRouter {
     base::AutoLock global_lock(global_lock_);
     base::AutoLock lock(lock_);
     // Drop messages from nodes that have been removed.
-    if (!base::Contains(nodes_, from_node->name())) {
+    if (!nodes_.contains(from_node->name())) {
       from_node->ClosePortsInEvent(event.get());
       return;
     }
@@ -448,15 +456,16 @@ class PortsTest : public testing::Test, public MessageRouter {
     base::AutoLock lock(lock_);
 
     // Drop messages from nodes that have been removed.
-    if (!base::Contains(nodes_, from_node->name())) {
+    if (!nodes_.contains(from_node->name())) {
       return;
     }
 
     for (const auto& entry : nodes_) {
       TestNode* node = entry.second;
       // Broadcast doesn't deliver to the local node.
-      if (node == from_node)
+      if (node == from_node) {
         continue;
+      }
       node->EnqueueEvent(from_node->name(), event->CloneForBroadcast());
     }
   }
@@ -865,16 +874,17 @@ TEST_F(PortsTest, GetMessage3) {
   PortRef a0, a1;
   EXPECT_EQ(OK, node.node().CreatePortPair(&a0, &a1));
 
-  const char* kStrings[] = {"1", "2", "3"};
+  const std::array<const char*, 3> kStrings = {"1", "2", "3"};
 
-  for (size_t i = 0; i < sizeof(kStrings) / sizeof(kStrings[0]); ++i)
-    EXPECT_EQ(OK, node.SendStringMessage(a1, kStrings[i]));
+  for (const char* s : kStrings) {
+    EXPECT_EQ(OK, node.SendStringMessage(a1, s));
+  }
 
   ScopedMessage message;
-  for (size_t i = 0; i < sizeof(kStrings) / sizeof(kStrings[0]); ++i) {
+  for (const char* s : kStrings) {
     EXPECT_EQ(OK, node.node().GetMessage(a0, &message, nullptr));
     ASSERT_TRUE(message);
-    EXPECT_TRUE(MessageEquals(message, kStrings[i]));
+    EXPECT_TRUE(MessageEquals(message, s));
   }
 
   EXPECT_EQ(OK, node.node().ClosePort(a0));

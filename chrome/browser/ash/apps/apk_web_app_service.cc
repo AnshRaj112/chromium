@@ -8,7 +8,6 @@
 #include <optional>
 #include <utility>
 
-#include "ash/constants/ash_features.h"
 #include "base/containers/flat_map.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
@@ -596,8 +595,8 @@ void ApkWebAppService::SyncArcAndWebApps() {
        migration_packages) {
     // We only perform a migration if both packages are installed and both
     // trying to install the same web app.
-    if (!base::Contains(arc_packages, canonical_package) ||
-        !base::Contains(arc_packages, deprecated_package)) {
+    if (!arc_packages.contains(canonical_package) ||
+        !arc_packages.contains(deprecated_package)) {
       continue;
     }
 
@@ -671,7 +670,7 @@ void ApkWebAppService::SyncArcAndWebApps() {
       RemoveObsoletePrefValues(web_app_id);
     }
 
-    if (base::Contains(arc_packages, *package_name)) {
+    if (arc_packages.contains(*package_name)) {
       if (web_app_info_dict.FindBool(kShouldRemoveKey).value_or(false)) {
         // ARC app should be uninstalled.
         arc_apps_to_uninstall.push_back(*package_name);
@@ -707,7 +706,7 @@ void ApkWebAppService::AddInstallingWebApkPackageName(
 void ApkWebAppService::RemoveInstallingWebApkPackageName(
     const std::string& app_id) {
   std::string package_name = currently_installing_apks_[app_id];
-  if (ash::features::ArePromiseIconsEnabled() && !package_name.empty()) {
+  if (!package_name.empty()) {
     apps::AppServiceProxyFactory::GetForProfile(profile_)
         ->PromiseAppService()
         ->OnApkWebAppInstallationFinished(package_name);

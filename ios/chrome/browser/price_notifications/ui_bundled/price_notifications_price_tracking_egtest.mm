@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #import "components/commerce/core/commerce_feature_list.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey_ui_test_util.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey_ui_test_util.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller_constants.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey.h"
@@ -45,19 +45,15 @@
   CGFloat const kMenuScrollDisplacement = 150;
   id<GREYAction> scrollRight =
       grey_scrollInDirection(kGREYDirectionRight, kMenuScrollDisplacement);
-  id<GREYAction> scrollDown =
-      grey_scrollInDirection(kGREYDirectionDown, kMenuScrollDisplacement);
   id<GREYMatcher> interactableSettingsButton =
       grey_allOf(chrome_test_util::PriceNotificationsDestinationButton(),
                  grey_interactable(), nil);
-  id<GREYAction> scrollAction =
-      [ChromeEarlGrey isNewOverflowMenuEnabled] ? scrollRight : scrollDown;
 
   [self signinPriceTrackingUser];
   [ChromeEarlGreyUI openNewIncognitoTab];
   [ChromeEarlGreyUI openToolsMenu];
   [[[EarlGrey selectElementWithMatcher:interactableSettingsButton]
-         usingSearchAction:scrollAction
+         usingSearchAction:scrollRight
       onElementWithMatcher:chrome_test_util::ToolsMenuView()]
       assertWithMatcher:grey_nil()];
 }

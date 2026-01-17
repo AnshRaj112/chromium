@@ -34,6 +34,7 @@
 #include "mojo/public/cpp/bindings/message.h"
 #include "mojo/public/cpp/system/buffer.h"
 #include "mojo/public/cpp/system/handle.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
 
 namespace media {
 
@@ -86,32 +87,34 @@ class VideoFrameHandleReleaserImpl final
   // mojom::MojoVideoFrameHandleReleaser implementation
   void ReleaseVideoFrame(
       const base::UnguessableToken& release_token,
-      const std::optional<gpu::SyncToken>& release_sync_token) final {
+      std::optional<gpu::SharedImageExportResult> release_export_result) final {
     DVLOG(3) << __func__ << "(" << release_token.ToString() << ")";
-    TRACE_EVENT2("media", "VideoFrameHandleReleaserImpl::ReleaseVideoFrame",
-                 "release_token", release_token.ToString(),
-                 "release_sync_token",
-                 release_sync_token
-                     ? (release_sync_token->ToDebugString() + ", has_data: " +
-                        (release_sync_token->HasData() ? "true" : "false"))
-                     : "null");
+    TRACE_EVENT2(
+        "media", "VideoFrameHandleReleaserImpl::ReleaseVideoFrame",
+        "release_token", release_token.ToString(), "release_export_result",
+        release_export_result
+            ? (release_export_result->ToDebugString() + ", has_data: " +
+               (release_export_result->HasData() ? "true" : "false"))
+            : "null");
     auto it = video_frames_.find(release_token);
     if (it == video_frames_.end()) {
       mojo::ReportBadMessage("Unknown |release_token|.");
       return;
     }
     if (it->second->HasReleaseMailboxCB()) {
-      if (!release_sync_token) {
+      if (!release_export_result) {
         mojo::ReportBadMessage(
             "A SyncToken is required to release frames that have a callback "
             "for releasing mailboxes.");
         return;
       }
-      // An empty *|release_sync_token| can be taken as a signal that the
+      // An empty |release_sync_token| can be taken as a signal that the
       // about-to-be-released VideoFrame was never used by the client.
       // Therefore, we should let that frame retain whatever SyncToken it has.
-      if (release_sync_token->HasData()) {
-        SimpleSyncTokenClient client(*release_sync_token);
+      gpu::SyncToken release_sync_token = it->second->shared_image()->EndExport(
+          std::move(*release_export_result));
+      if (release_sync_token.HasData()) {
+        SimpleSyncTokenClient client(release_sync_token);
         it->second->UpdateReleaseSyncToken(&client);
       }
     }
@@ -169,7 +172,11 @@ void MojoVideoDecoderService::GetSupportedConfigs(
   DVLOG(3) << __func__;
   TRACE_EVENT0("media", "MojoVideoDecoderService::GetSupportedConfigs");
 
-  std::move(callback).Run(mojo_media_client_->GetSupportedVideoDecoderConfigs(),
+  auto configs = mojo_media_client_->GetSupportedVideoDecoderConfigs();
+  DCHECK(std::all_of(configs.begin(), configs.end(),
+                     [](const auto& config) { return config.IsValid(); }));
+
+  std::move(callback).Run(std::move(configs),
                           mojo_media_client_->GetDecoderImplementationType());
 }
 
@@ -246,10 +253,10 @@ void MojoVideoDecoderService::Initialize(const VideoDecoderConfig& config,
   DCHECK(!init_cb_);
   DCHECK(callback);
 
-  TRACE_EVENT_ASYNC_BEGIN2(
-      "media", kInitializeTraceName, this, "config",
-      config.AsHumanReadableString(), "cdm_id",
-      CdmContext::CdmIdToString(base::OptionalToPtr(cdm_id)));
+  TRACE_EVENT_BEGIN("media", kInitializeTraceName,
+                    perfetto::Track::FromPointer(this), "config",
+                    config.AsHumanReadableString(), "cdm_id",
+                    CdmContext::CdmIdToString(base::OptionalToPtr(cdm_id)));
 
   init_cb_ = std::move(callback);
 
@@ -297,13 +304,13 @@ void MojoVideoDecoderService::Initialize(const VideoDecoderConfig& config,
   auto gfx_cs = config.color_space_info().ToGfxColorSpace();
   codec_string_ = base::StringPrintf(
       "name=%s:codec=%s:profile=%d:size=%s:cs=[%d,%d,%d,%d]:hdrm=%d",
-      GetDecoderName(decoder_->GetDecoderType()).c_str(),
+      GetDecoderName(decoder_->GetDecoderType()),
       GetCodecName(config.codec()).c_str(), config.profile(),
       config.coded_size().ToString().c_str(),
       static_cast<int>(gfx_cs.GetPrimaryID()),
       static_cast<int>(gfx_cs.GetTransferID()),
       static_cast<int>(gfx_cs.GetMatrixID()),
-      static_cast<int>(gfx_cs.GetRangeID()), config.hdr_metadata().has_value());
+      static_cast<int>(gfx_cs.GetRangeID()), !config.hdr_metadata().IsEmpty());
 
   using Self = MojoVideoDecoderService;
   decoder_->Initialize(
@@ -369,7 +376,8 @@ void MojoVideoDecoderService::Decode(mojom::DecoderBufferPtr buffer,
 
 void MojoVideoDecoderService::Reset(ResetCallback callback) {
   DVLOG(2) << __func__;
-  TRACE_EVENT_ASYNC_BEGIN0("media", kResetTraceName, this);
+  TRACE_EVENT_BEGIN("media", kResetTraceName,
+                    perfetto::Track::FromPointer(this));
   DCHECK(callback);
   DCHECK(!reset_cb_);
 
@@ -389,8 +397,8 @@ void MojoVideoDecoderService::OnDecoderInitialized(DecoderStatus status) {
   DVLOG(1) << __func__;
   DCHECK(!status.is_ok() || decoder_);
   DCHECK(init_cb_);
-  TRACE_EVENT_ASYNC_END1("media", kInitializeTraceName, this, "success",
-                         status.code());
+  TRACE_EVENT_END("media", perfetto::Track::FromPointer(this), "success",
+                  status.code());
 
   if (!status.is_ok()) {
     std::move(init_cb_).Run(
@@ -412,9 +420,10 @@ void MojoVideoDecoderService::OnReaderRead(
     scoped_refptr<DecoderBuffer> buffer) {
   DVLOG(3) << __func__;
   if (trace_event) {
-    TRACE_EVENT_ASYNC_STEP_PAST1(
-        "media", kDecodeTraceName, trace_event.get(), "ReadDecoderBuffer",
-        "decoder_buffer", buffer ? buffer->AsHumanReadableString() : "null");
+    TRACE_EVENT_INSTANT("media", "ReadDecoderBuffer",
+                        perfetto::Track::FromPointer(trace_event.get()),
+                        "decoder_buffer",
+                        buffer ? buffer->AsHumanReadableString() : "null");
   }
 
   if (!buffer) {
@@ -447,8 +456,8 @@ void MojoVideoDecoderService::OnDecoderDecoded(
     media::DecoderStatus status) {
   DVLOG(3) << __func__;
   if (trace_event) {
-    TRACE_EVENT_ASYNC_STEP_PAST0("media", kDecodeTraceName, trace_event.get(),
-                                 "Decode");
+    TRACE_EVENT_INSTANT("media", "Decode",
+                        perfetto::Track::FromPointer(trace_event.get()));
     trace_event->EndTrace(status);
   }
 
@@ -458,7 +467,7 @@ void MojoVideoDecoderService::OnDecoderDecoded(
 void MojoVideoDecoderService::OnDecoderReset() {
   DVLOG(2) << __func__;
   DCHECK(reset_cb_);
-  TRACE_EVENT_ASYNC_END0("media", kResetTraceName, this);
+  TRACE_EVENT_END("media", perfetto::Track::FromPointer(this));
   std::move(reset_cb_).Run();
 }
 
@@ -510,7 +519,6 @@ void MojoVideoDecoderService::OnOverlayInfoChanged(
 }
 
 void MojoVideoDecoderService::OnDecoderRequestedOverlayInfo(
-    bool restart_for_transitions,
     ProvideOverlayInfoCB provide_overlay_info_cb) {
   DVLOG(2) << __func__;
   DCHECK(client_);
@@ -520,7 +528,7 @@ void MojoVideoDecoderService::OnDecoderRequestedOverlayInfo(
                "MojoVideoDecoderService::OnDecoderRequestedOverlayInfo");
 
   provide_overlay_info_cb_ = std::move(provide_overlay_info_cb);
-  client_->RequestOverlayInfo(restart_for_transitions);
+  client_->RequestOverlayInfo();
 }
 
 }  // namespace media

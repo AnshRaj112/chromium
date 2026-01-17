@@ -23,6 +23,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import android.content.Context;
 import android.view.ContextThemeWrapper;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 
 import org.junit.Before;
@@ -162,5 +163,77 @@ public class BaseSuggestionViewUnitTest {
         mView.setActionButtonsCount(1);
         assertEquals(1, mView.getActionButtons().size());
         assertEquals(btn0, mView.getActionButtons().get(0));
+    }
+
+    @Test
+    public void showOnlyOnFocusActionButton_toggleVisibility() {
+        mView.setActionButtonsCount(2);
+
+        ActionButtonView actionButtonWithShowOnFocus = mView.getActionButtons().get(0);
+        actionButtonWithShowOnFocus.enableShowOnlyOnFocus(true);
+        ActionButtonView actionButtonWithoutShowOnFocus = mView.getActionButtons().get(1);
+
+        // Initial visibility is invisible for the showOnlyOnFocus button.
+        assertEquals(View.GONE, actionButtonWithShowOnFocus.getVisibility());
+        assertEquals(View.VISIBLE, actionButtonWithoutShowOnFocus.getVisibility());
+
+        // Select the view. The showOnlyOnFocus button should become visible.
+        mView.setSelected(true);
+        assertEquals(View.VISIBLE, actionButtonWithShowOnFocus.getVisibility());
+        assertEquals(View.VISIBLE, actionButtonWithoutShowOnFocus.getVisibility());
+
+        // Deselect the view. The showOnlyOnFocus button should become invisible.
+        mView.setSelected(false);
+        assertEquals(View.GONE, actionButtonWithShowOnFocus.getVisibility());
+        assertEquals(View.VISIBLE, actionButtonWithoutShowOnFocus.getVisibility());
+
+        // Hover over the view. The showOnlyOnFocus button should become invisible.
+        mView.onHoverEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_HOVER_ENTER, 1.f, 1.f, 0));
+        assertEquals(View.VISIBLE, actionButtonWithShowOnFocus.getVisibility());
+        assertEquals(View.VISIBLE, actionButtonWithoutShowOnFocus.getVisibility());
+
+        // Hover away from the view. The showOnlyOnFocus button should become invisible.
+        mView.onHoverEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_HOVER_EXIT, 1.f, 1.f, 0));
+        assertEquals(View.GONE, actionButtonWithShowOnFocus.getVisibility());
+        assertEquals(View.VISIBLE, actionButtonWithoutShowOnFocus.getVisibility());
+    }
+
+    @Test
+    public void actionButton_hoverUpdate() {
+        View innerView = new View(mContext);
+        // Don't use the spy version of BaseSuggestionView.
+        BaseSuggestionView<View> view = new BaseSuggestionView<>(innerView);
+
+        view.setActionButtonsCount(1);
+        ActionButtonView actionButton = view.getActionButtons().get(0);
+        assertFalse(view.isHovered());
+
+        view.onHoverEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_HOVER_ENTER, 1.f, 1.f, 0));
+        assertTrue(view.isHovered());
+
+        view.onHoverEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_HOVER_EXIT, 1.f, 1.f, 0));
+        assertFalse(view.isHovered());
+
+        // The hover change in action button should affect BaseSuggestionView.
+        actionButton.dispatchHoverEventForTesting(
+                MotionEvent.obtain(0, 0, MotionEvent.ACTION_HOVER_ENTER, 1.f, 1.f, 0));
+        view.setHovered(false);
+        assertTrue(view.isHovered());
+
+        actionButton.dispatchHoverEventForTesting(
+                MotionEvent.obtain(0, 0, MotionEvent.ACTION_HOVER_EXIT, 1.f, 1.f, 0));
+        view.setHovered(false);
+        assertFalse(view.isHovered());
+
+        // The pressed change in action button should affect BaseSuggestionView.
+        actionButton.dispatchTouchEvent(
+                MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 1.f, 1.f, 0));
+        view.setHovered(false);
+        assertTrue(view.isHovered());
+
+        actionButton.dispatchTouchEvent(
+                MotionEvent.obtain(0, 0, MotionEvent.ACTION_UP, 1.f, 1.f, 0));
+        view.setHovered(false);
+        assertFalse(view.isHovered());
     }
 }

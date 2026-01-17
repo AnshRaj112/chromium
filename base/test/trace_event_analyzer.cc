@@ -785,7 +785,8 @@ size_t FindMatchingEvents(const std::vector<TraceEvent>& events,
 
 bool ParseEventsFromJson(const std::string& json,
                          std::vector<TraceEvent>* output) {
-  std::optional<base::Value> root = base::JSONReader::Read(json);
+  std::optional<base::Value> root =
+      base::JSONReader::Read(json, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
 
   if (!root) {
     return false;
@@ -824,7 +825,7 @@ TraceAnalyzer::~TraceAnalyzer() = default;
 // static
 std::unique_ptr<TraceAnalyzer> TraceAnalyzer::Create(
     const std::string& json_events) {
-  std::unique_ptr<TraceAnalyzer> analyzer(new TraceAnalyzer());
+  auto analyzer = base::WrapUnique(new TraceAnalyzer());
   if (analyzer->SetEvents(json_events)) {
     return analyzer;
   }
@@ -982,13 +983,13 @@ void TraceAnalyzer::ParseMetadata() {
 // |TraceAnalyzer| from the result.
 
 void Start(const std::string& category_filter_string) {
-  DCHECK(!base::trace_event::TraceLog::GetInstance()->IsEnabled());
+  DCHECK(!base::TrackEvent::IsEnabled());
   base::trace_event::TraceLog::GetInstance()->SetEnabled(
       base::trace_event::TraceConfig(category_filter_string, ""));
 }
 
 std::unique_ptr<TraceAnalyzer> Stop() {
-  DCHECK(base::trace_event::TraceLog::GetInstance()->IsEnabled());
+  DCHECK(base::TrackEvent::IsEnabled());
   base::trace_event::TraceLog::GetInstance()->SetDisabled();
 
   base::trace_event::TraceResultBuffer buffer;

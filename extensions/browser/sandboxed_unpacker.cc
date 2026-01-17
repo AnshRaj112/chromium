@@ -490,7 +490,7 @@ void SandboxedUnpacker::Unpack(const base::FilePath& directory) {
 }
 
 void SandboxedUnpacker::ReadManifestDone(
-    base::expected<base::Value, std::string> result) {
+    base::expected<base::Value, std::u16string> result) {
   DCHECK(unpacker_io_task_runner_->RunsTasksInCurrentSequence());
   if (!result.has_value()) {
     ReportUnpackExtensionFailed(result.error());
@@ -502,18 +502,18 @@ void SandboxedUnpacker::ReadManifestDone(
     return;
   }
 
-  std::string error_msg;
+  std::u16string error;
   scoped_refptr<Extension> extension(
       Extension::Create(extension_root_, location_, *dict, creation_flags_,
-                        extension_id_, &error_msg));
+                        extension_id_, &error));
   if (!extension) {
-    ReportUnpackExtensionFailed(error_msg);
+    ReportUnpackExtensionFailed(error);
     return;
   }
 
   std::vector<InstallWarning> warnings;
-  if (!file_util::ValidateExtension(extension.get(), &error_msg, &warnings)) {
-    ReportUnpackExtensionFailed(error_msg);
+  if (!file_util::ValidateExtension(extension.get(), &error, &warnings)) {
+    ReportUnpackExtensionFailed(error);
     return;
   }
   extension->AddInstallWarnings(std::move(warnings));
@@ -551,13 +551,14 @@ void SandboxedUnpacker::UnpackExtensionSucceeded(base::Value::Dict manifest) {
     return;
   }
 
+  std::u16string utf16_error;
   extension_ =
       Extension::Create(extension_root_, location_, final_manifest.value(),
-                        Extension::REQUIRE_KEY | creation_flags_, &utf8_error);
+                        Extension::REQUIRE_KEY | creation_flags_, &utf16_error);
 
   if (!extension_.get()) {
     ReportFailure(SandboxedUnpackerFailureReason::INVALID_MANIFEST,
-                  u"Manifest is invalid: " + ASCIIToUTF16(utf8_error));
+                  u"Manifest is invalid: " + utf16_error);
     return;
   }
 
@@ -783,11 +784,12 @@ void SandboxedUnpacker::MaybeComputeHashes(bool should_compute) {
   ReportSuccess();
 }
 
-void SandboxedUnpacker::ReportUnpackExtensionFailed(std::string_view error) {
+void SandboxedUnpacker::ReportUnpackExtensionFailed(
+    const std::u16string& error) {
   DCHECK(unpacker_io_task_runner_->RunsTasksInCurrentSequence());
-  ReportFailure(SandboxedUnpackerFailureReason::UNPACKER_CLIENT_FAILED,
-                l10n_util::GetStringFUTF16(IDS_EXTENSION_PACKAGE_ERROR_MESSAGE,
-                                           base::UTF8ToUTF16(error)));
+  ReportFailure(
+      SandboxedUnpackerFailureReason::UNPACKER_CLIENT_FAILED,
+      l10n_util::GetStringFUTF16(IDS_EXTENSION_PACKAGE_ERROR_MESSAGE, error));
 }
 
 std::u16string SandboxedUnpacker::FailureReasonToString16(
@@ -1047,14 +1049,17 @@ void SandboxedUnpacker::ParseJsonFile(const base::FilePath& path) {
   DCHECK(unpacker_io_task_runner_->RunsTasksInCurrentSequence());
   std::string contents;
   if (!base::ReadFileToString(path, &contents)) {
-    ReadManifestDone(base::unexpected("File doesn't exist."));
+    ReadManifestDone(base::unexpected(u"File doesn't exist."));
     return;
   }
 
   base::JSONReader::Result result =
-      base::JSONReader::ReadAndReturnValueWithError(contents);
+      base::JSONReader::ReadAndReturnValueWithError(
+          contents, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ReadManifestDone(std::move(result).transform_error(
-      [](const base::JSONReader::Error& error) { return error.ToString(); }));
+      [](const base::JSONReader::Error& error) {
+        return base::UTF8ToUTF16(error.ToString());
+      }));
 }
 
 }  // namespace extensions

@@ -13,6 +13,7 @@
 #include "base/containers/span.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/i18n/rtl.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/stringprintf.h"
@@ -51,6 +52,7 @@
 #include "ui/views/controls/menu/menu_scroll_view_container.h"
 #include "ui/views/controls/menu/menu_types.h"
 #include "ui/views/controls/menu/submenu_view.h"
+#include "ui/views/style/platform_style.h"
 #include "ui/views/test/ax_event_counter.h"
 #include "ui/views/test/menu_test_utils.h"
 #include "ui/views/test/views_test_base.h"
@@ -67,7 +69,6 @@
 #include "ui/aura/test/test_windows.h"
 #include "ui/aura/window.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
-#include "ui/base/dragdrop/mojom/drag_drop_types.mojom-shared.h"
 #include "ui/views/controls/menu/menu_pre_target_handler.h"
 #endif
 
@@ -324,6 +325,12 @@ class MenuControllerTest : public ViewsTestBase,
 
   void DispatchKey(ui::KeyboardCode key_code);
 
+  void DispatchKeyWithFlags(ui::KeyboardCode key_code,
+                            bool alt,
+                            bool shift,
+                            bool control_or_command,
+                            bool caps_lock);
+
   gfx::Rect CalculateMenuBounds(const MenuBoundsOptions& options);
 
   gfx::Rect CalculateBubbleMenuBoundsWithoutInsets(
@@ -577,7 +584,29 @@ void MenuControllerTest::PressKey(ui::KeyboardCode key_code) {
 }
 
 void MenuControllerTest::DispatchKey(ui::KeyboardCode key_code) {
-  ui::KeyEvent event(ui::EventType::kKeyPressed, key_code, 0);
+  DispatchKeyWithFlags(key_code, false, false, false, false);
+}
+
+void MenuControllerTest::DispatchKeyWithFlags(ui::KeyboardCode key_code,
+                                              bool alt,
+                                              bool shift,
+                                              bool control_or_command,
+                                              bool caps_lock) {
+  bool control = control_or_command;
+  bool command = false;
+
+  // By default, swap control and command for native events on Mac. This
+  // handles most cases.
+#if BUILDFLAG(IS_MAC)
+  std::swap(control, command);
+#endif
+
+  int flags =
+      (shift ? ui::EF_SHIFT_DOWN : 0) | (control ? ui::EF_CONTROL_DOWN : 0) |
+      (alt ? ui::EF_ALT_DOWN : 0) | (command ? ui::EF_COMMAND_DOWN : 0) |
+      (caps_lock ? ui::EF_CAPS_LOCK_ON : 0);
+
+  ui::KeyEvent event(ui::EventType::kKeyPressed, key_code, flags);
   menu_controller_->OnWillDispatchKeyEvent(&event);
 }
 
@@ -2699,6 +2728,68 @@ TEST_F(MenuControllerTest, RepostEventToEmptyMenuItem) {
   EXPECT_EQ(menu_controller_delegate(), current_controller_delegate());
 }
 
+#if BUILDFLAG(IS_OZONE)
+// Tests that if a context menu is opened above a submenu from a top level
+// bookmark folder with no parent, and a right-click occurs over the submenu,
+// the folder does not get dismissed. This is a regression test for
+// https://crbug.com/446633193 and https://crbug.com/446647004 where a top level
+// empty folder causes issues.
+TEST_F(MenuControllerTest,
+       TopLevelBookmarkFolderContextMenuShouldNotDismissFolder) {
+  // Override the platform property to force
+  // PlatformSetsParentForNonTopLevelWindows()
+  // to return true for this test.
+  using SupportsForTest =
+      ui::OzonePlatform::PlatformProperties::SupportsForTest;
+  base::AutoReset<SupportsForTest> auto_reset(
+      &ui::OzonePlatform::PlatformProperties::
+          override_set_parent_for_non_top_level_windows_for_test,
+      SupportsForTest::kYes);
+
+  MenuItemView* root_item = menu_item();
+  ASSERT_EQ(nullptr, root_item->GetParentMenuItem());
+
+  // Setup a submenu. Additionally hook up appropriate Widget and View
+  // containers, with bounds, so that hit testing works.
+  SubmenuView* const root_submenu = root_item->GetSubmenu();
+  const auto insets = root_submenu->GetScrollViewContainer()->GetInsets();
+  const gfx::Rect bounds(0, 50, 80 + insets.width(), 40 + insets.height());
+  ShowSubmenu(root_submenu, [&](auto& params) { params.bounds = bounds; });
+  menu_host_for_submenu(root_submenu)
+      ->SetContentsView(root_submenu->GetScrollViewContainer());
+
+  // Create context menu
+  auto context_menu = std::make_unique<MenuItemView>(menu_delegate());
+  context_menu->AppendMenuItem(1, u"Action");
+  context_menu->set_controller(menu_controller());
+
+  auto context_delegate = std::make_unique<TestMenuControllerDelegate>();
+  menu_controller()->AddNestedDelegate(context_delegate.get());
+
+  SetState(root_item);
+
+  menu_controller()->Run(
+      owner(), nullptr, context_menu.get(), gfx::Rect(100, 100, 80, 60),
+      MenuAnchorPosition::kTopLeft, ui::mojom::MenuSourceType::kMouse,
+      MenuController::MenuType::kMenuItemContextMenu);
+
+  EXPECT_TRUE(menu_controller()->IsContextMenu());
+  EXPECT_TRUE(root_item->SubmenuIsShowing());
+  EXPECT_TRUE(context_menu->SubmenuIsShowing());
+
+  gfx::Rect submenu_bounds = context_menu->GetSubmenu()->GetBoundsInScreen();
+  gfx::Point outside_point =
+      submenu_bounds.bottom_right() + gfx::Vector2d(60, 60);
+  ProcessMousePressed(
+      context_menu->GetSubmenu(),
+      ui::MouseEvent(ui::EventType::kMousePressed, outside_point, outside_point,
+                     ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0));
+
+  EXPECT_FALSE(context_menu->SubmenuIsShowing());
+  EXPECT_FALSE(root_item->SubmenuIsShowing());
+}
+#endif  // BUILDFLAG(IS_OZONE)
+
 // Drag the mouse from an external view into a menu
 // When the mouse leaves the menu while still in the process of dragging
 // the menu item view highlight should turn off
@@ -3293,6 +3384,56 @@ TEST_F(MenuControllerTest, BrowserHotkeysCancelMenusAndAreRedispatched) {
   EXPECT_FALSE(press_f.handled());
   EXPECT_FALSE(press_f.stopped_propagation());
 }
+
+// This test verifies that releasing keys with modifiers does not close the
+// menu. This prevents the menu from flashing open and immediately closing when
+// users release keys after opening a menu with a keyboard shortcut containing
+// multiple modifiers.
+TEST_F(MenuControllerTest, KeyReleaseDoesNotCancelMenu) {
+  // Open the menu (simulating that it was opened by a keyboard shortcut).
+  menu_controller()->Run(owner(), nullptr, menu_item(), gfx::Rect(),
+                         MenuAnchorPosition::kTopLeft,
+                         ui::mojom::MenuSourceType::kKeyboard);
+  ASSERT_TRUE(showing());
+
+  // Simulate releasing a key while still holding modifiers (Cmd+Ctrl).
+  // This simulates the user releasing keys after opening the menu with a
+  // multi-modifier keyboard shortcut. This should NOT cancel the menu.
+  int options = ui::EF_COMMAND_DOWN | ui::EF_CONTROL_DOWN;
+  ui::KeyEvent release_key(ui::EventType::kKeyReleased, ui::VKEY_A, options);
+  menu_controller()->OnWillDispatchKeyEvent(&release_key);
+  EXPECT_TRUE(showing());
+
+  // Release Ctrl key while still holding Cmd.
+  // This should also NOT cancel the menu.
+  ui::KeyEvent release_ctrl(ui::EventType::kKeyReleased, ui::VKEY_CONTROL,
+                            ui::EF_COMMAND_DOWN);
+  menu_controller()->OnWillDispatchKeyEvent(&release_ctrl);
+  EXPECT_TRUE(showing());
+
+  // Release Cmd key.
+  // This should also NOT cancel the menu.
+  ui::KeyEvent release_cmd(ui::EventType::kKeyReleased, ui::VKEY_COMMAND, 0);
+  menu_controller()->OnWillDispatchKeyEvent(&release_cmd);
+  EXPECT_TRUE(showing());
+}
+
+// This test verifies that pressing a new accelerator while a menu is open
+// still closes the menu as expected.
+TEST_F(MenuControllerTest, KeyPressWithModifierCancelsMenu) {
+  // Open the menu.
+  menu_controller()->Run(owner(), nullptr, menu_item(), gfx::Rect(),
+                         MenuAnchorPosition::kTopLeft,
+                         ui::mojom::MenuSourceType::kKeyboard);
+  ASSERT_TRUE(showing());
+
+  // Press a key with a modifier - this SHOULD close the menu.
+  ui::KeyEvent press_key(ui::EventType::kKeyPressed, ui::VKEY_T,
+                         ui::EF_COMMAND_DOWN);
+  menu_controller()->OnWillDispatchKeyEvent(&press_key);
+  views::test::WaitForMenuClosureAnimation();
+  EXPECT_FALSE(showing());
+}
 #endif
 
 TEST_F(MenuControllerTest, SubmenuOpenByKey) {
@@ -3458,10 +3599,10 @@ TEST_F(MenuControllerTest, RemoveEmptyMenuMenuItemWhileSelected) {
   EXPECT_EQ(item, submenu->children()[0]);
 }
 
-#if BUILDFLAG(IS_WIN)
-// The following tests are only relevant on platforms that select the first
-// menu item when a menu is opened via keyboard input.
 TEST_F(MenuControllerTest, FirstMenuItemSelectedWhenOpenedFromKeyboard) {
+  if (!PlatformStyle::kAutoSelectFirstMenuItemFromKeyboard) {
+    GTEST_SKIP() << "Behavior not present on this platform";
+  }
   // Use existing menu items from the test setup.
   MenuItemView* root = menu_item();
   MenuItemView* item1 = root->GetSubmenu()->GetMenuItemAt(0);
@@ -3481,6 +3622,9 @@ TEST_F(MenuControllerTest, FirstMenuItemSelectedWhenOpenedFromKeyboard) {
 }
 
 TEST_F(MenuControllerTest, NoItemSelectedWhenOpenedFromMouse) {
+  if (!PlatformStyle::kAutoSelectFirstMenuItemFromKeyboard) {
+    GTEST_SKIP() << "Behavior not present on this platform";
+  }
   // Use existing menu items from the test setup.
   MenuItemView* root = menu_item();
   MenuItemView* item1 = root->GetSubmenu()->GetMenuItemAt(0);
@@ -3501,6 +3645,10 @@ TEST_F(MenuControllerTest, NoItemSelectedWhenOpenedFromMouse) {
 
 TEST_F(MenuControllerTest,
        FirstMenuItemButtonHotTrackedWhenOpenedFromKeyboard) {
+  if (!PlatformStyle::kAutoSelectFirstMenuItemFromKeyboard) {
+    GTEST_SKIP() << "Behavior not present on this platform";
+  }
+
   // Set up a menu with one button in the first menu item.
   SubmenuView* const submenu = menu_item()->GetSubmenu();
   MenuItemView* first_item = submenu->GetMenuItemAt(0);
@@ -3529,6 +3677,9 @@ TEST_F(MenuControllerTest,
 
 TEST_F(MenuControllerTest,
        FirstMenuItemButtonNotHotTrackedWhenOpenedFromMouse) {
+  if (!PlatformStyle::kAutoSelectFirstMenuItemFromKeyboard) {
+    GTEST_SKIP() << "Behavior not present on this platform";
+  }
   // Set up a menu with one button in the first menu item.
   SubmenuView* const submenu = menu_item()->GetSubmenu();
   MenuItemView* first_item = submenu->GetMenuItemAt(0);
@@ -3554,6 +3705,44 @@ TEST_F(MenuControllerTest,
 
   EXPECT_FALSE(button1->IsHotTracked());
 }
-#endif  // BUILDFLAG(IS_WIN)
+
+// Pressing the APPS key should show the context menu for the selected item
+// (keyboard-initiated). Verifies that MenuDelegate::ShowContextMenu is called
+// with the currently selected menu item as source.
+TEST_F(MenuControllerTest, ContextMenuShownOnAppsKey) {
+  // Ensure menu is open and a selection exists.
+  ShowSubmenu();
+  SubmenuView* const submenu = menu_item()->GetSubmenu();
+  SetPendingStateItem(submenu->GetMenuItemAt(0));
+
+  // Dispatch APPS key and expect a context menu request routed to delegate.
+  DispatchKey(ui::VKEY_APPS);
+
+#if !BUILDFLAG(IS_MAC)
+  EXPECT_EQ(1, menu_delegate()->show_context_menu_count());
+  EXPECT_EQ(pending_state_item(), menu_delegate()->show_context_menu_source());
+#else
+  EXPECT_EQ(0, menu_delegate()->show_context_menu_count());
+#endif
+}
+
+// Pressing Shift+F10 should show the context menu for the selected item
+TEST_F(MenuControllerTest, ContextMenuShownOnShiftF10Key) {
+  // Ensure menu is open and a selection exists.
+  ShowSubmenu();
+  SubmenuView* const submenu = menu_item()->GetSubmenu();
+  SetPendingStateItem(submenu->GetMenuItemAt(0));
+
+  // Dispatch Shift+F10 key and expect a context menu request routed to
+  // delegate.
+  DispatchKeyWithFlags(ui::VKEY_F10, false, true, false, false);
+
+#if BUILDFLAG(IS_WIN)
+  EXPECT_EQ(1, menu_delegate()->show_context_menu_count());
+  EXPECT_EQ(pending_state_item(), menu_delegate()->show_context_menu_source());
+#else
+  EXPECT_EQ(0, menu_delegate()->show_context_menu_count());
+#endif
+}
 
 }  // namespace views

@@ -21,7 +21,8 @@ enum class FormType {
   kPasswordForm = 3,
   kStandaloneCvcForm = 4,
   kLoyaltyCardForm = 5,
-  kMaxValue = kLoyaltyCardForm
+  kOneTimePasswordForm = 6,
+  kMaxValue = kOneTimePasswordForm
 };
 
 // Enum for UMA metrics of the style
@@ -48,7 +49,9 @@ enum class FormTypeNameForLogging {
   kPostalAddressForm = 6,
   // Forms that contain a loyalty card field.
   kLoyaltyCardForm = 7,
-  kMaxValue = kLoyaltyCardForm
+  // Forms that contain a one time password field.
+  kOneTimePasswordForm = 8,
+  kMaxValue = kOneTimePasswordForm
 };
 
 // The strings returned by this function are persisted to logs. Don't change the
@@ -61,6 +64,8 @@ std::string_view FormTypeNameForLoggingToStringView(
 bool FormHasAllCreditCardFields(const FormStructure& form_structure);
 
 FormType FieldTypeGroupToFormType(FieldTypeGroup field_type_group);
+
+std::ostream& operator<<(std::ostream& o, DenseSet<FormType> form_type_set);
 
 std::string_view FormTypeToStringView(FormType form_type);
 

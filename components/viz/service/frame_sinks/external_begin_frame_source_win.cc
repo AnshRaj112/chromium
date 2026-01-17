@@ -15,7 +15,6 @@ namespace viz {
 namespace {
 
 BASE_FEATURE(kExternalBeginFrameSourceWinUsesRunOrPostTask,
-             "ExternalBeginFrameSourceWinUsesRunOrPostTask",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace
@@ -120,7 +119,8 @@ void ExternalBeginFrameSourceWin::OnNeedsBeginFrames(bool needs_begin_frames) {
   }
 }
 
-void ExternalBeginFrameSourceWin::SetVSyncDisplayID(int64_t display_id) {
+void ExternalBeginFrameSourceWin::SetVSyncDisplayID(int64_t display_id,
+                                                    bool force_update) {
   // TODO(sunnyps): See if we should use non-primary displays for driving vsync.
 }
 

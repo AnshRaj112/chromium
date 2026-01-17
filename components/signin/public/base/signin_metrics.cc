@@ -176,6 +176,10 @@ void LogSignInStarted(AccessPoint access_point) {
   base::UmaHistogramEnumeration("Signin.SignIn.Started", access_point);
 }
 
+void LogSigninPendingOffered(AccessPoint access_point) {
+  base::UmaHistogramEnumeration("Signin.SigninPending.Offered", access_point);
+}
+
 #if BUILDFLAG(IS_IOS)
 void LogSigninWithAccountType(SigninAccountType account_type) {
   base::UmaHistogramEnumeration("Signin.AccountType.SigninConsent",
@@ -189,6 +193,11 @@ void LogSyncOptInStarted(AccessPoint access_point) {
 
 void LogSyncOptInOffered(AccessPoint access_point) {
   base::UmaHistogramEnumeration("Signin.SyncOptIn.Offered", access_point);
+}
+
+void LogHistorySyncOptInOffered(AccessPoint access_point) {
+  base::UmaHistogramEnumeration("Signin.HistorySyncOptIn.Offered",
+                                access_point);
 }
 
 void LogSyncSettingsOpened(AccessPoint access_point) {
@@ -392,18 +401,15 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromStartPage"));
       break;
-    case AccessPoint::kNtpLink:
-      base::RecordAction(base::UserMetricsAction("Signin_Signin_FromNTP"));
-      break;
     case AccessPoint::kMenu:
       base::RecordAction(base::UserMetricsAction("Signin_Signin_FromMenu"));
       break;
     case AccessPoint::kSettings:
       base::RecordAction(base::UserMetricsAction("Signin_Signin_FromSettings"));
       break;
-    case AccessPoint::kSupervisedUser:
+    case AccessPoint::kSettingsYourSavedInfo:
       base::RecordAction(
-          base::UserMetricsAction("Signin_Signin_FromSupervisedUser"));
+          base::UserMetricsAction("Signin_Signin_FromYourSavedInfo"));
       break;
     case AccessPoint::kExtensionInstallBubble:
       base::RecordAction(
@@ -429,11 +435,7 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromUserManager"));
       break;
-    case AccessPoint::kDevicesPage:
-      base::RecordAction(
-          base::UserMetricsAction("Signin_Signin_FromDevicesPage"));
-      break;
-    case AccessPoint::kSigninPromo:
+    case AccessPoint::kFullscreenSigninPromo:
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromSigninPromo"));
       break;
@@ -457,21 +459,9 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromReSigninInfobar"));
       break;
-    case AccessPoint::kTabSwitcher:
-      base::RecordAction(
-          base::UserMetricsAction("Signin_Signin_FromTabSwitcher"));
-      break;
     case AccessPoint::kMachineLogon:
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromMachineLogon"));
-      break;
-    case AccessPoint::kGoogleServicesSettings:
-      base::RecordAction(
-          base::UserMetricsAction("Signin_Signin_FromGoogleServicesSettings"));
-      break;
-    case AccessPoint::kEnterpriseSignoutCoordinator:
-      base::RecordAction(
-          base::UserMetricsAction("Signin_Signin_FromEnterpriseSignoutSheet"));
       break;
     case AccessPoint::kSigninInterceptFirstRunExperience:
       base::RecordAction(base::UserMetricsAction(
@@ -481,14 +471,7 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromNTPFeedTopPromo"));
       break;
-    case AccessPoint::kKaleidoscope:
-      NOTREACHED() << "Access point " << static_cast<int>(access_point)
-                   << " is only used to trigger non-sync sign-in and this"
-                   << " action should only be triggered for sync-enabled"
-                   << " sign-ins.";
-    case AccessPoint::kSyncErrorCard:
     case AccessPoint::kForcedSignin:
-    case AccessPoint::kAccountRenamed:
     case AccessPoint::kWebSignin:
     case AccessPoint::kSaveToDriveIos:
     case AccessPoint::kSaveToPhotosIos:
@@ -564,10 +547,6 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(base::UserMetricsAction(
           "Signin_Signin_FromAccountConsistencyService"));
       break;
-    case AccessPoint::kSearchCompanion:
-      base::RecordAction(
-          base::UserMetricsAction("Signin_Signin_FromSearchCompanion"));
-      break;
     case AccessPoint::kSetUpList:
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromSetUpList"));
@@ -588,10 +567,6 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(base::UserMetricsAction(
           "Signin_Signin_FromNotificationsOptInScreenContentToggle"));
       break;
-    case AccessPoint::kNtpIdentityDisc:
-      base::RecordAction(
-          base::UserMetricsAction("Signin_Signin_FromNtpIdentityDisc"));
-      break;
     case AccessPoint::kOidcRedirectionInterception:
       base::RecordAction(base::UserMetricsAction(
           "Signin_Signin_FromOidcRedirectionInterception"));
@@ -600,7 +575,7 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(base::UserMetricsAction(
           "Signin_Signin_FromAvatarBubbleSigninWithSyncPromo"));
       break;
-    case AccessPoint::kAccountMenu:
+    case AccessPoint::kAccountMenuSwitchAccount:
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromAccountMenu"));
       break;
@@ -608,7 +583,7 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromProductSpecifications"));
       break;
-    case AccessPoint::kAccountMenuFailedSwitch:
+    case AccessPoint::kAccountMenuSwitchAccountFailed:
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromAccountMenuFailedSwitch"));
       break;
@@ -623,10 +598,6 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
     case AccessPoint::kHistorySyncOptinExpansionPillOnStartup:
       base::RecordAction(base::UserMetricsAction(
           "Signin_Signin_FromHistorySyncOptinExpansionPillOnStartup"));
-      break;
-    case AccessPoint::kHistorySyncOptinExpansionPillOnInactivity:
-      base::RecordAction(base::UserMetricsAction(
-          "Signin_Signin_FromHistorySyncOptinExpansionPillOnInactivity"));
       break;
     case AccessPoint::kNonModalSigninPasswordPromo:
       base::RecordAction(base::UserMetricsAction(
@@ -656,6 +627,14 @@ void RecordSigninUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(
           base::UserMetricsAction("Signin_Signin_FromNtpFeaturePromo"));
       break;
+    case AccessPoint::kEnterpriseDialogAfterSigninInterception:
+      base::RecordAction(base::UserMetricsAction(
+          "Signin_Signin_FromEnterpriseDialogAfterSigninInterception"));
+      break;
+    case AccessPoint::kCredentialExchangeImport:
+      base::RecordAction(base::UserMetricsAction(
+          "Signin_Signin_FromCredentialExchangeImport"));
+      break;
   }
 }
 
@@ -665,15 +644,16 @@ void RecordSigninImpressionUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(
           base::UserMetricsAction("Signin_Impression_FromStartPage"));
       break;
-    case AccessPoint::kNtpLink:
-      base::RecordAction(base::UserMetricsAction("Signin_Impression_FromNTP"));
-      break;
     case AccessPoint::kMenu:
       base::RecordAction(base::UserMetricsAction("Signin_Impression_FromMenu"));
       break;
     case AccessPoint::kSettings:
       base::RecordAction(
           base::UserMetricsAction("Signin_Impression_FromSettings"));
+      break;
+    case AccessPoint::kSettingsYourSavedInfo:
+      base::RecordAction(
+          base::UserMetricsAction("Signin_Impression_FromYourSavedInfo"));
       break;
     case AccessPoint::kExtensionInstallBubble:
       base::RecordAction(base::UserMetricsAction(
@@ -691,11 +671,7 @@ void RecordSigninImpressionUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(
           base::UserMetricsAction("Signin_Impression_FromAvatarBubbleSignin"));
       break;
-    case AccessPoint::kDevicesPage:
-      base::RecordAction(
-          base::UserMetricsAction("Signin_Impression_FromDevicesPage"));
-      break;
-    case AccessPoint::kSigninPromo:
+    case AccessPoint::kFullscreenSigninPromo:
       base::RecordAction(
           base::UserMetricsAction("Signin_Impression_FromSigninPromo"));
       break;
@@ -714,18 +690,6 @@ void RecordSigninImpressionUserActionForAccessPoint(AccessPoint access_point) {
     case AccessPoint::kResigninInfobar:
       base::RecordAction(
           base::UserMetricsAction("Signin_Impression_FromReSigninInfobar"));
-      break;
-    case AccessPoint::kTabSwitcher:
-      base::RecordAction(
-          base::UserMetricsAction("Signin_Impression_FromTabSwitcher"));
-      break;
-    case AccessPoint::kGoogleServicesSettings:
-      base::RecordAction(base::UserMetricsAction(
-          "Signin_Impression_FromGoogleServicesSettings"));
-      break;
-    case AccessPoint::kKaleidoscope:
-      base::RecordAction(
-          base::UserMetricsAction("Signin_Impression_FromKaleidoscope"));
       break;
     case AccessPoint::kUserManager:
       base::RecordAction(
@@ -759,10 +723,6 @@ void RecordSigninImpressionUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(
           base::UserMetricsAction("Signin_Impression_FromReadingList"));
       break;
-    case AccessPoint::kSearchCompanion:
-      base::RecordAction(
-          base::UserMetricsAction("Signin_Impression_FromSearchCompanion"));
-      break;
     case AccessPoint::kSetUpList:
       base::RecordAction(
           base::UserMetricsAction("Signin_Impression_FromSetUpList"));
@@ -791,14 +751,18 @@ void RecordSigninImpressionUserActionForAccessPoint(AccessPoint access_point) {
       base::RecordAction(base::UserMetricsAction(
           "Signin_Impression_FromUserManagerWithPrefilledEmail"));
       break;
-    case AccessPoint::kEnterpriseSignoutCoordinator:
+    case AccessPoint::kEnterpriseDialogAfterSigninInterception:
+      base::RecordAction(base::UserMetricsAction(
+          "Signin_Impression_FromEnterpriseDialogAfterSigninInterception"));
+      break;
+    case AccessPoint::kCredentialExchangeImport:
+      base::RecordAction(base::UserMetricsAction(
+          "Signin_Impression_FromCredentialExchangeImport"));
+      break;
     case AccessPoint::kExtensions:
-    case AccessPoint::kSupervisedUser:
     case AccessPoint::kUnknown:
     case AccessPoint::kMachineLogon:
-    case AccessPoint::kSyncErrorCard:
     case AccessPoint::kForcedSignin:
-    case AccessPoint::kAccountRenamed:
     case AccessPoint::kWebSignin:
     case AccessPoint::kSigninChoiceRemembered:
     case AccessPoint::kSafetyCheck:
@@ -816,12 +780,11 @@ void RecordSigninImpressionUserActionForAccessPoint(AccessPoint access_point) {
     case AccessPoint::kTabOrganization:
     case AccessPoint::kProfileMenuSignoutConfirmationPrompt:
     case AccessPoint::kSettingsSignoutConfirmationPrompt:
-    case AccessPoint::kNtpIdentityDisc:
     case AccessPoint::kOidcRedirectionInterception:
     case AccessPoint::kWebauthnModalDialog:
     case AccessPoint::kAvatarBubbleSignInWithSyncPromo:
-    case AccessPoint::kAccountMenu:
-    case AccessPoint::kAccountMenuFailedSwitch:
+    case AccessPoint::kAccountMenuSwitchAccount:
+    case AccessPoint::kAccountMenuSwitchAccountFailed:
     case AccessPoint::kCctAccountMismatchNotification:
     case AccessPoint::kDriveFilePickerIos:
     case AccessPoint::kCollaborationShareTabGroup:
@@ -831,7 +794,6 @@ void RecordSigninImpressionUserActionForAccessPoint(AccessPoint access_point) {
     case AccessPoint::kHistorySyncOptinExpansionPillOnStartup:
     case AccessPoint::kWidget:
     case AccessPoint::kCollaborationLeaveOrDeleteTabGroup:
-    case AccessPoint::kHistorySyncOptinExpansionPillOnInactivity:
     case AccessPoint::kHistorySyncEducationalTip:
     case AccessPoint::kManagedProfileAutoSigninIos:
     case AccessPoint::kNonModalSigninPasswordPromo:

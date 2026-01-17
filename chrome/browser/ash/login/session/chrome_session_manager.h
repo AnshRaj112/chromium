@@ -26,7 +26,8 @@ class SessionLengthLimiter;
 
 class ChromeSessionManager : public session_manager::SessionManager {
  public:
-  ChromeSessionManager();
+  ChromeSessionManager(
+      std::unique_ptr<session_manager::SessionManagerDelegate> delegate);
 
   ChromeSessionManager(const ChromeSessionManager&) = delete;
   ChromeSessionManager& operator=(const ChromeSessionManager&) = delete;
@@ -53,9 +54,6 @@ class ChromeSessionManager : public session_manager::SessionManager {
   void OnUserManagerCreated(user_manager::UserManager* user_manager) override;
   void SessionStarted() override;
   void OnSessionCreated(bool browser_restart) override;
-
-  // user_manager::UserManager::Observer:
-  void OnUsersSignInConstraintsChanged() override;
 
   SessionLengthLimiter* GetSessionLengthLimiterForTesting() {
     return session_length_limiter_.get();

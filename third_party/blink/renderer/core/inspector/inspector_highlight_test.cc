@@ -396,7 +396,7 @@ TEST_F(InspectorHighlightTest, GridLineNames) {
       protocol::DictionaryValue* current_value =
           static_cast<protocol::DictionaryValue*>(row_or_column_list->at(i));
 
-      WTF::String string_value;
+      String string_value;
       EXPECT_TRUE(current_value->getString("name", &string_value));
       ret.push_back(string_value);
     }
@@ -450,8 +450,8 @@ TEST_F(InspectorHighlightTest, GridAreaNames) {
   GetDocument().View()->UpdateAllLifecyclePhasesForTest();
 
   auto CompareAreaNames = [](protocol::DictionaryValue* area_names,
-                             WTF::Vector<WTF::String>& expected_names) -> void {
-    for (WTF::String& name : expected_names) {
+                             Vector<String>& expected_names) -> void {
+    for (String& name : expected_names) {
       EXPECT_TRUE(area_names->get(name));
     }
   };
@@ -465,7 +465,7 @@ TEST_F(InspectorHighlightTest, GridAreaNames) {
       grid_info->getObject("areaNames");
   EXPECT_EQ(grid_area_names->size(), 3u);
 
-  WTF::Vector<WTF::String> expected_grid_area_names = {"a", "b", "c"};
+  Vector<String> expected_grid_area_names = {"a", "b", "c"};
   CompareAreaNames(grid_area_names, expected_grid_area_names);
 
   Node* subgrid = GetDocument().getElementById(AtomicString("subgrid"));
@@ -478,9 +478,63 @@ TEST_F(InspectorHighlightTest, GridAreaNames) {
       subgrid_info->getObject("areaNames");
   EXPECT_EQ(subgrid_area_names->size(), 6u);
 
-  WTF::Vector<WTF::String> expected_subgrid_area_names = {"a", "b", "c",
-                                                          "d", "e", "f"};
+  Vector<String> expected_subgrid_area_names = {"a", "b", "c", "d", "e", "f"};
   CompareAreaNames(subgrid_area_names, expected_subgrid_area_names);
+}
+
+TEST_F(InspectorHighlightTest, FieldsetGrid) {
+  GetDocument().body()->SetInnerHTMLWithoutTrustedTypes(R"HTML(
+    <style>
+    #grid {
+      display: grid;
+      width: 200px;
+      height: 200px;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+    </style>
+    <fieldset id="grid">
+      <legend>legend</legend>
+      <div></div>
+      <div></div>
+      <div></div>
+      <div></div>
+    </fieldset>
+  )HTML");
+  GetDocument().View()->UpdateAllLifecyclePhasesForTest();
+  Node* grid = GetDocument().getElementById(AtomicString("grid"));
+  EXPECT_TRUE(grid);
+  auto info =
+      InspectorGridHighlight(grid, InspectorHighlight::DefaultGridConfig());
+  EXPECT_TRUE(info);
+  EXPECT_TRUE(info->get("gridBorder"));
+  EXPECT_EQ(2u, info->getArray("rowTrackSizes")->size());
+  EXPECT_EQ(2u, info->getArray("columnTrackSizes")->size());
+}
+
+TEST_F(InspectorHighlightTest, FieldsetFlex) {
+  GetDocument().body()->SetInnerHTMLWithoutTrustedTypes(R"HTML(
+    <style>
+    #flex {
+      display: flex;
+      width: 200px;
+      height: 200px;
+    }
+    </style>
+    <fieldset id="flex">
+      <legend>legend</legend>
+      <div></div>
+      <div></div>
+    </fieldset>
+  )HTML");
+  GetDocument().View()->UpdateAllLifecyclePhasesForTest();
+  Element* flex = GetDocument().getElementById(AtomicString("flex"));
+  EXPECT_TRUE(flex);
+  auto info = InspectorFlexContainerHighlight(
+      flex, InspectorHighlight::DefaultFlexContainerConfig());
+  EXPECT_TRUE(info);
+  EXPECT_TRUE(info->get("containerBorder"));
+  EXPECT_EQ(1u, info->getArray("lines")->size());
 }
 
 }  // namespace blink

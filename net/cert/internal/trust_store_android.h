@@ -9,6 +9,7 @@
 
 #include "base/memory/ptr_util.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/sequence_checker.h"
 #include "base/synchronization/lock.h"
 #include "net/base/net_export.h"
 #include "net/cert/cert_database.h"
@@ -36,6 +37,8 @@ class NET_EXPORT TrustStoreAndroid : public PlatformTrustStore,
   void SyncGetIssuersOf(const bssl::ParsedCertificate* cert,
                         bssl::ParsedCertificateList* issuers) override;
   bssl::CertificateTrust GetTrust(const bssl::ParsedCertificate* cert) override;
+  std::shared_ptr<const bssl::MTCAnchor> GetTrustedMTCIssuerOf(
+      const bssl::ParsedCertificate* cert) override;
 
   // net::PlatformTrustStore implementation:
   std::vector<net::PlatformTrustStore::CertWithTrust> GetAllUserAddedCerts()

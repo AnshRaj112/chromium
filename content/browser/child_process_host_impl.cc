@@ -26,14 +26,13 @@
 #include "content/common/content_constants_internal.h"
 #include "content/common/pseudonymization_salt.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/child_process_host.h"
 #include "content/public/browser/child_process_host_delegate.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_paths.h"
 #include "content/public/common/content_switches.h"
-#include "ipc/ipc.mojom.h"
 #include "ipc/ipc_channel.h"
-#include "ipc/ipc_channel_mojo.h"
 #include "services/resource_coordinator/public/mojom/memory_instrumentation/constants.mojom.h"
 #include "services/service_manager/public/cpp/interface_provider.h"
 
@@ -41,7 +40,9 @@
 #include "base/linux_util.h"
 #elif BUILDFLAG(IS_MAC)
 #include "base/apple/foundation_util.h"
+#include "base/feature_list.h"
 #include "content/browser/mac_helpers.h"
+#include "content/common/features.h"
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 
 namespace content {
@@ -77,6 +78,14 @@ base::FilePath ChildProcessHost::GetChildPath(int flags) {
 
 #if BUILDFLAG(IS_MAC)
   std::string child_base_name = child_path.BaseName().value();
+
+  // An emergency override switch to re-allow third-party plugins;
+  // TODO(https://crbug.com/461717105): remove this.
+  if (base::FeatureList::IsEnabled(
+          features::kBlockThirdPartyInProcessPlugins) &&
+      flags == CHILD_PLUGIN) {
+    flags = CHILD_NORMAL;
+  }
 
   if (flags != CHILD_NORMAL && base::apple::AmIBundled()) {
     // This is a specialized helper, with the |child_path| at
@@ -163,13 +172,13 @@ ChildProcessHostImpl::GetMojoInvitation() {
   return mojo_invitation_;
 }
 
-void ChildProcessHostImpl::CreateChannelMojo() {
+void ChildProcessHostImpl::CreateChannel() {
   DCHECK(!channel_);
   DCHECK(child_process_);
 
   mojo::ScopedMessagePipeHandle bootstrap =
       mojo_invitation_->AttachMessagePipe(kLegacyIpcBootstrapAttachmentName);
-  channel_ = IPC::ChannelMojo::Create(
+  channel_ = IPC::Channel::Create(
       std::move(bootstrap), IPC::Channel::MODE_SERVER, this,
       base::SingleThreadTaskRunner::GetCurrentDefault(),
       base::SingleThreadTaskRunner::GetCurrentDefault());
@@ -288,8 +297,8 @@ void ChildProcessHostImpl::OnChannelError() {
   OnDisconnectedFromChildProcess();
 }
 
-void ChildProcessHostImpl::OnBadMessageReceived(const IPC::Message& message) {
-  delegate_->OnBadMessageReceived(message);
+void ChildProcessHostImpl::OnBadMessageReceived() {
+  delegate_->OnBadMessageReceived();
 }
 
 #if BUILDFLAG(CLANG_PROFILING_INSIDE_SANDBOX)
@@ -299,14 +308,6 @@ void ChildProcessHostImpl::DumpProfilingData(base::OnceClosure callback) {
 
 void ChildProcessHostImpl::SetProfilingFile(base::File file) {
   child_process_->SetProfilingFile(std::move(file));
-}
-#endif
-
-#if BUILDFLAG(IS_ANDROID)
-// Notifies the child process of memory pressure level.
-void ChildProcessHostImpl::NotifyMemoryPressureToChildProcess(
-    base::MemoryPressureListener::MemoryPressureLevel level) {
-  child_process()->OnMemoryPressure(level);
 }
 #endif
 

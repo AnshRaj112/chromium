@@ -78,11 +78,23 @@ extern GuideName* const kLensOverlayEntrypointGuide;
 // A guide that is constrained to match the frame of the PageActionMenu
 // entrypoint.
 extern GuideName* const kPageActionMenuEntrypointGuide;
+// A guide that is constrained to match the frame of the Reader Mode options.
+extern GuideName* const kReaderModeOptionsEntrypointGuide;
 // A guide that is constrained to match the frame of the identity disc button on
 // the New Tab page.
 extern GuideName* const kNTPIdentityDiscButtonGuide;
+// A guide that is constrained to match the frame of the first most visited
+// tile.
+extern GuideName* const kNTPFirstMostVisitedTileGuide;
 // A guide that is constrained to match the frame of the current active regular
 // tab. It is not registered if the selected cell is not visible.
 extern GuideName* const kSelectedRegularCellGuide;
+// A guide that is constrained to match the frame of the Location Bar Badge when
+// it is large, otherwise this stays nil.
+extern GuideName* const kLocationBarBadgeLargeEntrypointGuide;
+// A guide tracking the input accessory view being presented.
+extern GuideName* const kInputAccessoryViewLayoutGuide;
+// A guide that is constrained to match the frame of the app bar.
+extern GuideName* const kAppBarGuide;
 
 #endif  // IOS_CHROME_BROWSER_SHARED_UI_UTIL_LAYOUT_GUIDE_NAMES_H_

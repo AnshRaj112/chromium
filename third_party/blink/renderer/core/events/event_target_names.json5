@@ -10,7 +10,6 @@
   data: [
     "Animation",
     "Clipboard",
-    "CSSPseudoElement",
     "EditContext",
     "FontFaceSet",
     "MediaQueryList",
@@ -53,6 +52,7 @@
     "XMLHttpRequest",
     "XMLHttpRequestUpload",
     "CloseWatcher",
-    "PreferenceObject"
+    "PreferenceObject",
+    "Route"
   ],
 }

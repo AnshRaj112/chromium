@@ -11,7 +11,6 @@
 #include "base/memory/raw_ptr.h"
 #include "cc/paint/paint_shader.h"
 #include "third_party/skia/include/core/SkColor.h"
-#include "third_party/skia/include/effects/SkGradientShader.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
@@ -115,7 +114,8 @@ void CocoaScrollBarThumb::OnPaint(gfx::Canvas* canvas) {
           ? ui::NativeTheme::kScrollbarHorizontalThumb
           : ui::NativeTheme::kScrollbarVerticalThumb;
   GetNativeTheme()->Paint(canvas->sk_canvas(), GetColorProvider(), thumb_part,
-                          ui::NativeTheme::kNormal, GetLocalBounds(), params);
+                          ui::NativeTheme::kNormal, GetLocalBounds(), params,
+                          /*forced_colors=*/false, GetColorScheme());
 }
 
 bool CocoaScrollBarThumb::OnMousePressed(const ui::MouseEvent& event) {
@@ -226,7 +226,8 @@ void CocoaScrollBar::OnPaint(gfx::Canvas* canvas) {
           ? ui::NativeTheme::kScrollbarHorizontalTrack
           : ui::NativeTheme::kScrollbarVerticalTrack;
   GetNativeTheme()->Paint(canvas->sk_canvas(), GetColorProvider(), track_part,
-                          ui::NativeTheme::kNormal, GetLocalBounds(), params);
+                          ui::NativeTheme::kNormal, GetLocalBounds(), params,
+                          /*forced_colors=*/false, GetColorScheme());
 }
 
 bool CocoaScrollBar::GetCanProcessEventsWithinSubtree() const {

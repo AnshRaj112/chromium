@@ -15,7 +15,6 @@
 #include <vector>
 
 #include "base/base64.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
@@ -39,7 +38,6 @@
 #include "base/time/time.h"
 #include "base/types/expected.h"
 #include "components/content_settings/core/common/features.h"
-#include "components/network_session_configurator/common/network_switches.h"
 #include "components/ukm/content/source_url_recorder.h"
 #include "content/browser/btm/btm_browsertest_utils.h"
 #include "content/browser/btm/btm_service_impl.h"
@@ -52,7 +50,7 @@
 #include "content/public/browser/attribution_data_model.h"
 #include "content/public/browser/back_forward_cache.h"
 #include "content/public/browser/browser_context.h"
-#include "content/public/browser/btm_redirect_info.h"
+#include "content/public/browser/btm_redirect.h"
 #include "content/public/browser/btm_service.h"
 #include "content/public/browser/cookie_access_details.h"
 #include "content/public/browser/global_routing_id.h"
@@ -126,24 +124,24 @@ using blink::mojom::StorageTypeAccessed;
 // Returns a simplified URL representation for ease of comparison in tests.
 // Just host+path.
 std::string FormatURL(const GURL& url) {
-  return base::StrCat({url.host_piece(), url.path_piece()});
+  return base::StrCat({url.host(), url.path()});
 }
 
 void AppendRedirect(std::vector<std::string>* redirects,
-                    const BtmRedirectInfo& redirect,
-                    const BtmRedirectChainInfo& chain,
+                    const BtmRedirect& redirect,
+                    const BtmRedirectChain& chain,
                     size_t redirect_index) {
   redirects->push_back(base::StringPrintf(
       "[%zu/%zu] %s -> %s (%s) -> %s", redirect_index + 1, chain.length,
-      FormatURL(chain.initial_url.url).c_str(),
-      FormatURL(redirect.redirector.url).c_str(),
+      FormatURL(chain.initial_url).c_str(),
+      FormatURL(redirect.redirector_url).c_str(),
       std::string(BtmDataAccessTypeToString(redirect.access_type)).c_str(),
-      FormatURL(chain.final_url.url).c_str()));
+      FormatURL(chain.final_url).c_str()));
 }
 
 void AppendRedirects(std::vector<std::string>* vec,
-                     std::vector<BtmRedirectInfoPtr> redirects,
-                     BtmRedirectChainInfoPtr chain) {
+                     std::vector<BtmRedirectPtr> redirects,
+                     BtmRedirectChainPtr chain) {
   size_t redirect_index = chain->length - redirects.size();
   for (const auto& redirect : redirects) {
     AppendRedirect(vec, *redirect, *chain, redirect_index);
@@ -171,7 +169,7 @@ bool ContainsWrite(BtmDataAccessType access) {
 
 // Waits for BTM to know that a cookie was written by a redirect at
 // `redirect_url`, which must be the last redirect that was performed in the
-// currenly-in-progress redirect chain.
+// currently-in-progress redirect chain.
 testing::AssertionResult WaitForRedirectCookieWrite(WebContents* web_contents,
                                                     const GURL& redirect_url) {
   RedirectChainDetector* detector =
@@ -182,13 +180,13 @@ testing::AssertionResult WaitForRedirectCookieWrite(WebContents* web_contents,
   }
 
   // Make sure the last redirect was at the expected URL.
-  const BtmRedirectInfo& redirect =
+  const BtmRedirect& redirect =
       detector->CommittedRedirectContext()
           [detector->CommittedRedirectContext().size() - 1];
-  if (redirect.redirector.url != redirect_url) {
+  if (redirect.redirector_url != redirect_url) {
     return testing::AssertionFailure()
            << "Expected redirect at " << redirect_url << "; found "
-           << redirect.redirector.url;
+           << redirect.redirector_url;
   }
 
   if (!ContainsWrite(redirect.access_type)) {
@@ -293,7 +291,7 @@ void WCOCallbackLogger::OnCookiesAccessed(RenderFrameHost* render_frame_host,
                                           const CookieAccessDetails& details) {
   // Callbacks for favicons are ignored only in testing logs because their
   // ordering is variable and would cause flakiness
-  if (details.url.path() == "/favicon.ico") {
+  if (details.url.GetPath() == "/favicon.ico") {
     return;
   }
 
@@ -964,7 +962,7 @@ IN_PROC_BROWSER_TEST_F(BtmBounceDetectorBrowserTest,
 
   const GURL prerendering_url =
       embedded_test_server()->GetURL("a.test", "/title2.html");
-  const FrameTreeNodeId host_id =
+  const PrerenderHostId host_id =
       prerender_test_helper()->AddPrerender(prerendering_url);
   prerender_test_helper()->WaitForPrerenderLoadCompletion(prerendering_url);
   test::PrerenderHostObserver observer(*GetActiveWebContents(), host_id);
@@ -1005,7 +1003,7 @@ IN_PROC_BROWSER_TEST_F(BtmBounceDetectorBrowserTest,
       embedded_test_server()->GetURL("a.test", "/set_cookie_header.html");
   URLCookieAccessObserver observer(GetActiveWebContents(), prerendering_url,
                                    CookieOperation::kChange);
-  const FrameTreeNodeId host_id =
+  const PrerenderHostId host_id =
       prerender_test_helper()->AddPrerender(prerendering_url);
   prerender_test_helper()->WaitForPrerenderLoadCompletion(prerendering_url);
   observer.Wait();
@@ -2395,7 +2393,7 @@ IN_PROC_BROWSER_TEST_P(BtmSiteDataAccessDetectorTest,
 
   const GURL prerendering_url =
       embedded_https_test_server().GetURL("a.test", "/title2.html");
-  const FrameTreeNodeId host_id =
+  const PrerenderHostId host_id =
       prerender_test_helper()->AddPrerender(prerendering_url);
   prerender_test_helper()->WaitForPrerenderLoadCompletion(prerendering_url);
   test::PrerenderHostObserver observer(*GetActiveWebContents(), host_id);
@@ -2460,7 +2458,6 @@ class BtmWebAuthnBrowserTest : public ContentBrowserTest {
     mock_cert_verifier_.SetUpCommandLine(command_line);
     command_line->AppendSwitch(
         switches::kEnableExperimentalWebPlatformFeatures);
-    command_line->AppendSwitch(switches::kIgnoreCertificateErrors);
   }
 
   void SetUpInProcessBrowserTestFixture() override {
@@ -2481,6 +2478,7 @@ class BtmWebAuthnBrowserTest : public ContentBrowserTest {
     https_server_.ServeFilesFromSourceDirectory(GetTestDataFilePath());
     https_server_.RegisterDefaultHandler(base::BindRepeating(
         &HandleCrossSiteSameSiteNoneCookieRedirect, &https_server_));
+    https_server_.SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
     ASSERT_TRUE(https_server_.Start());
 
     auto virtual_device_factory =
@@ -2974,70 +2972,6 @@ IN_PROC_BROWSER_TEST_F(BtmThrottlingBrowserTest,
                                               start_time + base::Seconds(1))));
 }
 
-// TODO(crbug.com/325196134): Re-enable the test.
-IN_PROC_BROWSER_TEST_F(BtmThrottlingBrowserTest,
-                       DISABLED_StorageRecording_Throttled) {
-  WebContents* web_contents = GetActiveWebContents();
-  const base::Time start_time = test_clock_.Now();
-
-  // Record client-side storage access on a.test.
-  const GURL url = embedded_test_server()->GetURL("a.test", "/title1.html");
-  ASSERT_TRUE(NavigateToURL(web_contents, url));
-  SimulateCookieWrite();
-  // Verify the write was recorded in the BTM DB.
-  std::optional<StateValue> state =
-      GetBtmState(GetBtmService(web_contents), url);
-  ASSERT_THAT(state->site_storage_times,
-              testing::Optional(testing::Pair(start_time, start_time)));
-
-  // Write a cookie again, just before kBtmTimestampUpdateInterval elapses.
-  test_clock_.Advance(kBtmTimestampUpdateInterval - base::Seconds(1));
-  SimulateCookieWrite();
-  // Verify the second write was NOT recorded, due to throttling.
-  state = GetBtmState(GetBtmService(web_contents), url);
-  ASSERT_THAT(state->site_storage_times,
-              testing::Optional(testing::Pair(start_time, start_time)));
-
-  // Write a third time, after kBtmTimestampUpdateInterval has passed since the
-  // first write.
-  test_clock_.Advance(base::Seconds(1));
-  SimulateCookieWrite();
-  // Verify the third write WAS recorded.
-  state = GetBtmState(GetBtmService(web_contents), url);
-  ASSERT_THAT(state->site_storage_times,
-              testing::Optional(testing::Pair(
-                  start_time, start_time + kBtmTimestampUpdateInterval)));
-}
-
-// TODO(crbug.com/325196134): Re-enable the test.
-IN_PROC_BROWSER_TEST_F(BtmThrottlingBrowserTest,
-                       DISABLED_StorageRecording_NotThrottled_AfterRefresh) {
-  WebContents* web_contents = GetActiveWebContents();
-  const base::Time start_time = test_clock_.Now();
-
-  // Record client-side storage access on a.test.
-  const GURL url = embedded_test_server()->GetURL("a.test", "/title1.html");
-  ASSERT_TRUE(NavigateToURL(web_contents, url));
-  SimulateCookieWrite();
-  // Verify the write was recorded in the BTM DB.
-  std::optional<StateValue> state =
-      GetBtmState(GetBtmService(web_contents), url);
-  ASSERT_THAT(state->site_storage_times,
-              testing::Optional(testing::Pair(start_time, start_time)));
-
-  // Navigate to a new page and write cookies again, only a second after the
-  // previous write.
-  test_clock_.Advance(base::Seconds(1));
-  const GURL url2 = embedded_test_server()->GetURL("b.test", "/title1.html");
-  ASSERT_TRUE(NavigateToURL(web_contents, url2));
-  SimulateCookieWrite();
-  // Verify the second write was also recorded (not throttled).
-  state = GetBtmState(GetBtmService(web_contents), url2);
-  ASSERT_THAT(state->site_storage_times,
-              testing::Optional(testing::Pair(start_time + base::Seconds(1),
-                                              start_time + base::Seconds(1))));
-}
-
 class AllSitesFollowingFirstPartyTest : public ContentBrowserTest {
  public:
   void SetUpOnMainThread() override {
@@ -3193,9 +3127,9 @@ class BtmPrivacySandboxDataPreservationTest : public ContentBrowserTest {
               if (request.relative_url != "/issue") {
                 return nullptr;
               }
-              if (!base::Contains(request.headers, "Sec-Private-State-Token") ||
-                  !base::Contains(request.headers,
-                                  "Sec-Private-State-Token-Crypto-Version")) {
+              if (!request.headers.contains("Sec-Private-State-Token") ||
+                  !request.headers.contains(
+                      "Sec-Private-State-Token-Crypto-Version")) {
                 return MakeTrustTokenFailureResponse();
               }
 
@@ -3266,7 +3200,7 @@ IN_PROC_BROWSER_TEST_F(BtmPrivacySandboxDataPreservationTest,
   base::test::TestFuture<void> record_bounce;
   btm_service->storage()
       ->AsyncCall(&BtmStorage::RecordBounce)
-      .WithArgs(attribution_url, base::Time::Now(), /*stateful=*/true)
+      .WithArgs(attribution_url, base::Time::Now())
       .Then(record_bounce.GetCallback());
   ASSERT_TRUE(record_bounce.Wait());
 
@@ -3721,8 +3655,8 @@ class BtmBounceDetectorBFCacheTest : public BtmBounceDetectorBrowserTest,
   }
 };
 
-// Confirm that BTM records a bounce that writes a cookie as stateful, even if
-// the user immediately navigates away.
+// Confirm that BTM records a bounce, even if the user immediately navigates
+// away.
 // TODO(https://crbug.com/425717555): Very flaky if BF Cache is disabled.
 #if BUILDFLAG(IS_ANDROID)
 #define MAYBE_LateCookieAccessTest DISABLED_LateCookieAccessTest
@@ -3760,48 +3694,13 @@ IN_PROC_BROWSER_TEST_P(BtmBounceDetectorBFCacheTest,
 
   const BtmRedirectContext& context = wco->CommittedRedirectContext();
   ASSERT_EQ(context.size(), 1u);
-  const BtmRedirectInfo& redirect = context[0];
-  EXPECT_EQ(redirect.redirector.url, bounce_url);
+  const BtmRedirect& redirect = context[0];
+  EXPECT_EQ(redirect.redirector_url, bounce_url);
   // A request to /favicon.ico may cause a cookie read in addition to the write
   // we explicitly performed.
   EXPECT_THAT(
       redirect.access_type,
       testing::AnyOf(BtmDataAccessType::kWrite, BtmDataAccessType::kReadWrite));
-}
-
-// Confirm that BTM records a bounce that writes a cookie as stateful, even if
-// the chain ends immediately afterwards.
-// TODO(https://crbug.com/425717555): Very flaky if BF Cache is disabled.
-#if BUILDFLAG(IS_ANDROID)
-#define MAYBE_QuickEndChainTest DISABLED_QuickEndChainTest
-#else
-#define MAYBE_QuickEndChainTest QuickEndChainTest
-#endif
-IN_PROC_BROWSER_TEST_P(BtmBounceDetectorBFCacheTest, MAYBE_QuickEndChainTest) {
-  // Block 3PCs so BTM will record bounces.
-  browser_client().SetBlockThirdPartyCookiesByDefault(true);
-
-  const GURL initial_url =
-      embedded_test_server()->GetURL("a.test", "/empty.html");
-  const GURL bounce_url =
-      embedded_test_server()->GetURL("b.test", "/empty.html");
-  const GURL final_url =
-      embedded_test_server()->GetURL("c.test", "/empty.html");
-  WebContents* const web_contents = GetActiveWebContents();
-
-  ASSERT_TRUE(NavigateToURL(web_contents, initial_url));
-  ASSERT_TRUE(NavigateToURLFromRenderer(web_contents, bounce_url));
-  ASSERT_TRUE(ExecJs(web_contents, "document.cookie = 'bounce=true';",
-                     EXECUTE_SCRIPT_NO_USER_GESTURE));
-  ASSERT_TRUE(
-      NavigateToURLFromRendererWithoutUserGesture(web_contents, final_url));
-  // End the redirect chain without waiting for the cookie access notification.
-  EndRedirectChain();
-
-  std::optional<StateValue> state =
-      GetBtmState(GetBtmService(web_contents), bounce_url);
-  ASSERT_TRUE(state.has_value());
-  ASSERT_TRUE(state->stateful_bounce_times.has_value());
 }
 
 // Confirm that WCO::OnCookiesAccessed() is always called even if the user
@@ -3881,8 +3780,8 @@ IN_PROC_BROWSER_TEST_P(BtmBounceDetectorBFCacheTest,
 
   const BtmRedirectContext& context = wco->CommittedRedirectContext();
   ASSERT_EQ(context.size(), 1u);
-  const BtmRedirectInfo& redirect = context[0];
-  EXPECT_EQ(redirect.redirector.url, bounce_url);
+  const BtmRedirect& redirect = context[0];
+  EXPECT_EQ(redirect.redirector_url, bounce_url);
   EXPECT_THAT(redirect.has_sticky_activation, true);
 }
 

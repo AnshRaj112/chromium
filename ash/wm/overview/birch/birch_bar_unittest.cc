@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <utility>
+
 #include "ash/birch/birch_item.h"
 #include "ash/birch/birch_item_remover.h"
 #include "ash/birch/birch_model.h"
@@ -43,12 +45,11 @@
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/scoped_mock_clock_override.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "ui/base/models/image_model.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/compositor/test/layer_animation_stopped_waiter.h"
 #include "ui/display/manager/display_manager.h"
 #include "ui/display/test/display_manager_test_api.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/controls/menu/submenu_view.h"
@@ -419,14 +420,6 @@ TEST_F(BirchBarTest, RecordsHistogramWhenChipsShown) {
                                BirchItemType::kFile, 1);
   histograms.ExpectBucketCount("Ash.Birch.Chip.Impression",
                                BirchItemType::kCalendar, 1);
-
-  // Two rankings were recorded for the current time slot histogram.
-  histograms.ExpectBucketCount("Ash.Birch.Ranking.1200to1700", 1, 1);
-  histograms.ExpectBucketCount("Ash.Birch.Ranking.1200to1700", 12, 1);
-
-  // The same ranking were recorded for the all-day total histogram.
-  histograms.ExpectBucketCount("Ash.Birch.Ranking.Total", 1, 1);
-  histograms.ExpectBucketCount("Ash.Birch.Ranking.Total", 12, 1);
 }
 
 // Tests that we get expected records when showing/hiding/activating the coral
@@ -478,10 +471,6 @@ TEST_F(BirchBarTest, RecordsHistogramForCoralChips) {
   // Hide the one chip.
   BirchBarController::Get()->OnItemHiddenByUser(in_session_chips[0]->GetItem());
   ASSERT_EQ(in_session_chips.size(), 1u);
-
-  // One cluster hidden was recorded.
-  histograms.ExpectBucketCount("Ash.Birch.Chip.Hidden", BirchItemType::kCoral,
-                               1);
 
   // Clicking on the in-session chip to launch the group.
   LeftClickOn(in_session_chips[0]);
@@ -562,8 +551,8 @@ TEST_F(BirchBarTest, NoCrashOnSettingIconAfterShutdown) {
 
   BirchChipButton* chip = views::AsViewClass<BirchChipButton>(chips[0].get());
 
-  ui::ScopedAnimationDurationScaleMode non_zero_duration(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   // Create a set icon callback to simulate the case of setting icon after
   // shutting down the chip.
@@ -698,7 +687,7 @@ TEST_F(BirchBarMenuTest, RemoveChip) {
   const auto* hide_suggestion_item =
       model_adapter->root_for_testing()->GetSubmenu()->GetMenuItemAt(0);
   EXPECT_EQ(hide_suggestion_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchChipContextMenuModel::CommandId::kHideSuggestion));
 
   LeftClickOn(hide_suggestion_item);
@@ -748,7 +737,7 @@ TEST_F(BirchBarMenuTest, NoCrashOnRemovingChipFromTwoRowsBar) {
   const auto* hide_suggestion_item =
       model_adapter->root_for_testing()->GetSubmenu()->GetMenuItemAt(0);
   EXPECT_EQ(hide_suggestion_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchChipContextMenuModel::CommandId::kHideSuggestion));
 
   LeftClickOn(hide_suggestion_item);
@@ -901,25 +890,25 @@ TEST_F(BirchBarMenuTest, CustomizeSuggestions) {
   auto* sub_menu = model_adapter->root_for_testing()->GetSubmenu();
   auto* weather_item = sub_menu->GetMenuItemAt(2);
   EXPECT_EQ(weather_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kWeatherSuggestions));
   type_to_item[BirchItemType::kWeather] = weather_item;
 
   auto* calendar_item = sub_menu->GetMenuItemAt(3);
   EXPECT_EQ(calendar_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kCalendarSuggestions));
   type_to_item[BirchItemType::kCalendar] = calendar_item;
 
   auto* file_item = sub_menu->GetMenuItemAt(4);
   EXPECT_EQ(file_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kDriveSuggestions));
   type_to_item[BirchItemType::kFile] = file_item;
 
   auto* tab_item = sub_menu->GetMenuItemAt(5);
   EXPECT_EQ(tab_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kChromeTabSuggestions));
   type_to_item[BirchItemType::kTab] = tab_item;
 
@@ -979,7 +968,7 @@ TEST_F(BirchBarMenuTest, CustomizeSuggestionsExtended) {
   auto* sub_menu = model_adapter->root_for_testing()->GetSubmenu();
   auto* tab_item = sub_menu->GetMenuItemAt(5);
   EXPECT_EQ(tab_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kChromeTabSuggestions));
 
   // Deselect tab suggestions.
@@ -995,7 +984,7 @@ TEST_F(BirchBarMenuTest, CustomizeSuggestionsExtended) {
   // Find the media suggestions menu item.
   auto* media_item = sub_menu->GetMenuItemAt(6);
   EXPECT_EQ(media_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kMediaSuggestions));
 
   // Deselect media suggestions.
@@ -1047,7 +1036,7 @@ TEST_F(BirchBarMenuTest, CustomizeSuggestionsExtended2) {
   auto* sub_menu = model_adapter->root_for_testing()->GetSubmenu();
   auto* coral_item = sub_menu->GetMenuItemAt(1);
   EXPECT_EQ(coral_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kCoralSuggestions));
 
   // Deselect coral suggestion.
@@ -1117,7 +1106,7 @@ TEST_F(BirchBarMenuTest, ResetSuggestions) {
   auto* sub_menu = model_adapter->root_for_testing()->GetSubmenu();
   auto* reset_item = sub_menu->GetMenuItemAt(7);
   EXPECT_EQ(reset_item->GetCommand(),
-            base::to_underlying(BirchBarContextMenuModel::CommandId::kReset));
+            std::to_underlying(BirchBarContextMenuModel::CommandId::kReset));
 
   // Clicking on the reset button to enable all suggestions pref and all four
   // types of suggestion chips should be shown on the bar.
@@ -1170,7 +1159,7 @@ TEST_F(BirchBarMenuTest, ResetSuggestionsExtended) {
   auto* sub_menu = model_adapter->root_for_testing()->GetSubmenu();
   auto* reset_item = sub_menu->GetMenuItemAt(7);
   EXPECT_EQ(reset_item->GetCommand(),
-            base::to_underlying(BirchBarContextMenuModel::CommandId::kReset));
+            std::to_underlying(BirchBarContextMenuModel::CommandId::kReset));
 
   // Clicking on the reset button to enable all suggestions pref and all types
   // of suggestion chips should be shown on the bar.
@@ -1214,7 +1203,7 @@ TEST_F(BirchBarMenuTest, ToggleFahrenheitCelsiusPref) {
   auto* chip_menu = model_adapter->root_for_testing()->GetSubmenu();
   auto* toggle_temperature_units = chip_menu->GetMenuItemAt(2);
   EXPECT_EQ(toggle_temperature_units->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchChipContextMenuModel::CommandId::kToggleTemperatureUnits));
   LeftClickOn(toggle_temperature_units);
 
@@ -1253,7 +1242,7 @@ TEST_F(BirchBarMenuTest, NoCrashHideSuggestionsByChipSubmenu) {
   auto* sub_menu = customize_suggestions_item->GetSubmenu();
   auto* sub_show_suggestions_item = sub_menu->GetMenuItemAt(0);
   EXPECT_EQ(sub_show_suggestions_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kShowSuggestions));
   auto switch_container = sub_show_suggestions_item->children()[0];
   auto* switch_button = AsViewClass<Switch>(switch_container->children()[2]);
@@ -1294,7 +1283,7 @@ TEST_F(BirchBarMenuTest, NoCrashCustomizeSuggestionsByChipSubmenu) {
   auto* sub_menu = customize_suggestions_item->GetSubmenu();
   auto* calendar_item = sub_menu->GetMenuItemAt(3);
   EXPECT_EQ(calendar_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kCalendarSuggestions));
   auto* calendar_checkbox =
       views::AsViewClass<Checkbox>(calendar_item->children()[0]);
@@ -1380,27 +1369,27 @@ TEST_F(BirchBarMenuTest, HideSuggestionTypes) {
     std::string pref_name;
     switch (item_type) {
       case BirchItemType::kWeather:
-        hide_suggestions_item_id = base::to_underlying(
+        hide_suggestions_item_id = std::to_underlying(
             BirchChipContextMenuModel::CommandId::kHideWeatherSuggestions);
         pref_name = prefs::kBirchUseWeather;
         break;
       case BirchItemType::kCalendar:
-        hide_suggestions_item_id = base::to_underlying(
+        hide_suggestions_item_id = std::to_underlying(
             BirchChipContextMenuModel::CommandId::kHideCalendarSuggestions);
         pref_name = prefs::kBirchUseCalendar;
         break;
       case BirchItemType::kFile:
-        hide_suggestions_item_id = base::to_underlying(
+        hide_suggestions_item_id = std::to_underlying(
             BirchChipContextMenuModel::CommandId::kHideDriveSuggestions);
         pref_name = prefs::kBirchUseFileSuggest;
         break;
       case BirchItemType::kTab:
-        hide_suggestions_item_id = base::to_underlying(
+        hide_suggestions_item_id = std::to_underlying(
             BirchChipContextMenuModel::CommandId::kHideChromeTabSuggestions);
         pref_name = prefs::kBirchUseChromeTabs;
         break;
       case BirchItemType::kLostMedia:
-        hide_suggestions_item_id = base::to_underlying(
+        hide_suggestions_item_id = std::to_underlying(
             BirchChipContextMenuModel::CommandId::kHideMediaSuggestions);
         pref_name = prefs::kBirchUseLostMedia;
         break;
@@ -1478,7 +1467,7 @@ TEST_F(BirchBarMenuTest, HideSuggestionsByTappingChipMenu) {
   auto* sub_menu = customize_suggestions_item->GetSubmenu();
   auto* sub_show_suggestions_item = sub_menu->GetMenuItemAt(0);
   EXPECT_EQ(sub_show_suggestions_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kShowSuggestions));
   auto switch_container = sub_show_suggestions_item->children()[0];
   auto* switch_button = AsViewClass<Switch>(switch_container->children()[2]);
@@ -1518,7 +1507,7 @@ TEST_F(BirchBarMenuTest, CustomizeSuggestionsByTappingChipMenu) {
   auto* sub_menu = customize_suggestions_item->GetSubmenu();
   auto* calendar_item = sub_menu->GetMenuItemAt(3);
   EXPECT_EQ(calendar_item->GetCommand(),
-            base::to_underlying(
+            std::to_underlying(
                 BirchBarContextMenuModel::CommandId::kCalendarSuggestions));
   auto* calendar_checkbox =
       views::AsViewClass<Checkbox>(calendar_item->children()[0]);
@@ -1578,7 +1567,7 @@ TEST_F(BirchBarMenuTest, ActivateCoralChipWithContextMenu) {
   auto* open_chip_item = chip_menu->GetMenuItemAt(0);
   ASSERT_EQ(
       open_chip_item->GetCommand(),
-      base::to_underlying(BirchChipContextMenuModel::CommandId::kCoralNewDesk));
+      std::to_underlying(BirchChipContextMenuModel::CommandId::kCoralNewDesk));
 
   // There should be only one desk before activating the coral chip.
   EXPECT_EQ(DesksController::Get()->GetNumberOfDesks(), 1);
@@ -1619,8 +1608,8 @@ TEST_F(BirchBarAnimationTest, NoCrashOnRemovingChip) {
   // Cache the third chip before removing.
   auto* chip_3 = chips[2].get();
 
-  ui::ScopedAnimationDurationScaleMode non_zero_duration(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   RemoveItem(2);
   WaitLayerAnimationEnd(chip_3->layer());
 
@@ -1661,8 +1650,8 @@ TEST_F(BirchBarAnimationTest, RemoveMultipleChips) {
       grid_test_api.GetBirchChips(),
       [&item_6](const auto& chip) { return chip->GetItem() == item_6; }));
 
-  ui::ScopedAnimationDurationScaleMode non_zero_duration(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   // Cache the third chip view before removing.
   auto* chip_4 = grid_test_api.GetBirchChips()[3].get();
@@ -1693,8 +1682,8 @@ TEST_F(BirchBarAnimationTest, NoCrashOnRemovingFirstChipWithPrivacyNudge) {
   EXPECT_TRUE(
       Shell::Get()->anchored_nudge_manager()->IsNudgeShown("BirchPrivacyId"));
 
-  ui::ScopedAnimationDurationScaleMode non_zero_duration(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   // Cache the first chip before removing.
   auto* first_chip = OverviewGridTestApi(Shell::GetPrimaryRootWindow())
@@ -1742,8 +1731,7 @@ class BirchBarLayoutTest
     // Here, we simulate changing the shelf alignment from context menu which
     // will update the user's pref. Otherwise, it will exit the Overview and
     // reset shelf alignment when we rotate the display.
-    const int64_t display_id =
-        display::Screen::GetScreen()->GetPrimaryDisplay().id();
+    const int64_t display_id = display::Screen::Get()->GetPrimaryDisplay().id();
     scoped_internal_display_id_ =
         std::make_unique<display::test::ScopedSetInternalDisplayId>(
             Shell::Get()->display_manager(), display_id);

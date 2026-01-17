@@ -17,6 +17,7 @@
 #include "base/threading/thread.h"
 #include "components/cronet/cronet_context.h"
 #include "components/prefs/json_pref_store.h"
+#include "net/base/completion_once_callback.h"
 #include "net/base/network_handle.h"
 #include "net/http/http_request_headers.h"
 #include "net/http/http_response_headers.h"
@@ -50,7 +51,7 @@ class CronetContextAdapter : public CronetContext::Callback {
   // Called on init Java thread to initialize URLRequestContext.
   void InitRequestContextOnInitThread(
       JNIEnv* env,
-      const base::android::JavaParamRef<jobject>& jcaller);
+      const base::android::JavaRef<jobject>& jcaller);
 
   // Releases all resources for the request context and deletes the object.
   // Blocks until network thread is destroyed after running all pending tasks.
@@ -72,15 +73,15 @@ class CronetContextAdapter : public CronetContext::Callback {
   // Starts NetLog logging to file. This can be called on any thread.
   // Return false if |jfile_name| cannot be opened.
   bool StartNetLogToFile(JNIEnv* env,
-                         const base::android::JavaParamRef<jstring>& jfile_name,
-                         jboolean jlog_all);
+                         const base::android::JavaRef<jstring>& jfile_name,
+                         bool jlog_all);
 
   // Starts NetLog logging to disk with a bounded amount of disk space. This
   // can be called on any thread.
   void StartNetLogToDisk(JNIEnv* env,
-                         const base::android::JavaParamRef<jstring>& jdir_name,
-                         jboolean jlog_all,
-                         jint jmax_size);
+                         const base::android::JavaRef<jstring>& jdir_name,
+                         bool jlog_all,
+                         int32_t jmax_size);
 
   // Stops NetLog logging to file. This can be called on any thread. This will
   // flush any remaining writes to disk.
@@ -99,11 +100,10 @@ class CronetContextAdapter : public CronetContext::Callback {
   // device offline checks when computing the effective connection type or when
   // writing the prefs. This should only be used for testing. This can be
   // called only after the network quality estimator has been enabled.
-  void ConfigureNetworkQualityEstimatorForTesting(
-      JNIEnv* env,
-      jboolean use_local_host_requests,
-      jboolean use_smaller_responses,
-      jboolean disable_offline_check);
+  void ConfigureNetworkQualityEstimatorForTesting(JNIEnv* env,
+                                                  bool use_local_host_requests,
+                                                  bool use_smaller_responses,
+                                                  bool disable_offline_check);
 
   bool URLRequestContextExistsForTesting(jlong network);
 
@@ -131,11 +131,12 @@ class CronetContextAdapter : public CronetContext::Callback {
       int32_t timestamp_ms,
       net::NetworkQualityObservationSource source) override;
   void OnStopNetLogCompleted() override;
-  bool OnBeforeTunnelRequest(int chain_id,
-                             net::HttpRequestHeaders* extra_headers) override;
-  bool OnTunnelHeadersReceived(
+  void OnBeforeTunnelRequest(
       int chain_id,
-      const net::HttpResponseHeaders& response_headers) override;
+      net::ProxyDelegate::OnBeforeTunnelRequestCallback callback) override;
+  void OnTunnelHeadersReceived(int chain_id,
+                               const net::HttpResponseHeaders& response_headers,
+                               net::CompletionOnceCallback callback) override;
 
  private:
   friend class TestUtil;

@@ -20,6 +20,7 @@ def GetIosDir():
 sys.path.append(os.path.join(GetIosDir(), 'build', 'bots', 'scripts'))
 
 import constants
+import exception_utils
 import iossim_util
 import test_apps
 import xcodebuild_runner
@@ -47,11 +48,18 @@ parser.add_argument('--asan-build', help='Use ASan-related libraries',
 parser.set_defaults(asan_build=False)
 parser.add_argument('--version', help='Get the version of current browser app.',
     action='store_true')
+parser.add_argument('--verbose', help='Enable verbose logging.',
+    action='store_true')
 args, _ = parser.parse_known_args()
 
-test_app = os.path.join(
-    args.build_dir, 'ios_cwt_chromedriver_tests_module-Runner.app')
-host_app = os.path.join(args.build_dir, 'ios_cwt_chromedriver_tests.app')
+if args.verbose:
+  import logging
+  logging.basicConfig(level=logging.DEBUG)
+
+test_app = os.path.abspath(os.path.join(
+    args.build_dir, 'ios_cwt_chromedriver_tests_module-Runner.app'))
+host_app = os.path.abspath(os.path.join(
+    args.build_dir, 'ios_cwt_chromedriver_tests.app'))
 
 if args.version:
     plist_path = os.path.join(host_app, 'Info.plist')
@@ -84,10 +92,13 @@ egtests_app = test_apps.EgtestsApp(
 if iossim_util.is_device_with_udid_simulator(destination):
     xcodebuild_runner.shutdown_all_simulators()
     xcodebuild_runner.erase_all_simulators()
+cert_path = os.path.join(GetChromiumSrcDir(), 'third_party',
+                         'wpt_tools', 'wpt', 'tools', 'certs', 'cacert.pem')
 launch_command = xcodebuild_runner.LaunchCommand(egtests_app, destination,
     clones=1, retries=1, readline_timeout=constants.READLINE_TIMEOUT,
+    exception_checker=exception_utils.ExceptionChecker(),
     out_dir=output_directory,
-    cert_path='../../wpt_tools/wpt/tools/certs/cacert.pem',
+    cert_path=cert_path,
     erase_simulators=False)
 
 launch_command.launch()

@@ -30,10 +30,9 @@
 
 #include <iomanip>
 #include <memory>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "base/containers/heap_array.h"
+#include "base/containers/span.h"
 #include "base/functional/bind.h"
 #include "base/scoped_generic.h"
 #include "base/strings/string_util.h"
@@ -44,6 +43,8 @@
 #include "base/win/winrt_storage_util.h"
 #include "media/midi/midi_service.h"
 #include "media/midi/task_service.h"
+#include "third_party/abseil-cpp/absl/container/flat_hash_map.h"
+#include "third_party/abseil-cpp/absl/container/flat_hash_set.h"
 
 namespace midi {
 namespace {
@@ -615,15 +616,15 @@ class MidiManagerWinrt::MidiPortManager {
                          token_Updated_ = {kInvalidTokenValue};
 
   // All manipulations to these fields should be done on kComTaskRunner.
-  std::unordered_map<std::string, std::unique_ptr<MidiPort<InterfaceType>>>
+  absl::flat_hash_map<std::string, std::unique_ptr<MidiPort<InterfaceType>>>
       ports_;
   std::vector<std::string> port_ids_;
-  std::unordered_map<std::string, std::string> port_names_;
+  absl::flat_hash_map<std::string, std::string> port_names_;
 
   // Keeps AsyncOperation references before the operation completes. Note that
   // raw pointers are used here and the COM interfaces should be released
   // manually.
-  std::unordered_set<IAsyncOperation<RuntimeType*>*> async_ops_;
+  absl::flat_hash_set<IAsyncOperation<RuntimeType*>*> async_ops_;
 
   // Set when device enumeration is completed but OnPortManagerReady() is not
   // called since some ports are not yet ready (i.e. |async_ops_| is not empty).
@@ -682,15 +683,12 @@ class MidiManagerWinrt::MidiInPortManager final
                 return hr;
               }
 
-              uint8_t* p_buffer_data = nullptr;
-              uint32_t data_length = 0;
-              hr = base::win::GetPointerToBufferData(
-                  buffer.Get(), &p_buffer_data, &data_length);
+              base::span<uint8_t> buffer_span;
+              hr = base::win::GetPointerToBufferData(buffer.Get(), buffer_span);
               if (FAILED(hr))
                 return hr;
 
-              std::vector<uint8_t> data(p_buffer_data,
-                                        p_buffer_data + data_length);
+              std::vector<uint8_t> data(buffer_span.begin(), buffer_span.end());
 
               task_service->PostBoundTask(
                   kComTaskRunner,
@@ -739,7 +737,7 @@ class MidiManagerWinrt::MidiInPortManager final
     MidiPort<Win::Devices::Midi::IMidiInPort>* port = GetPortByDeviceId(dev_id);
     CHECK(port);
 
-    midi_manager_->ReceiveMidiData(port->index, &data[0], data.size(), time);
+    midi_manager_->ReceiveMidiData(port->index, data, time);
   }
 };
 
@@ -856,8 +854,7 @@ void MidiManagerWinrt::SendOnComRunner(uint32_t port_index,
   }
 
   WRL::ComPtr<Win::Storage::Streams::IBuffer> buffer;
-  HRESULT hr = base::win::CreateIBufferFromData(
-      data.data(), static_cast<UINT32>(data.size()), &buffer);
+  HRESULT hr = base::win::CreateIBufferFromData(data, &buffer);
   if (FAILED(hr)) {
     VLOG(1) << "CreateIBufferFromData failed: " << PrintHr(hr);
     return;

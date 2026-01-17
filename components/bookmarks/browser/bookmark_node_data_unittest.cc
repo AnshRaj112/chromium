@@ -157,11 +157,11 @@ TEST_F(BookmarkNodeDataTest, MAYBE_URL) {
               nullptr);
 
   // Writing should also put the URL and title on the clipboard.
-  std::optional<ui::OSExchangeData::UrlInfo> url_info =
-      data2.GetURLAndTitle(ui::FilenameToURLPolicy::CONVERT_FILENAMES);
-  ASSERT_TRUE(url_info.has_value());
-  EXPECT_EQ(url, url_info->url);
-  EXPECT_EQ(title, url_info->title);
+  std::vector<ui::ClipboardUrlInfo> url_infos =
+      data2.GetURLsAndTitles(ui::FilenameToURLPolicy::CONVERT_FILENAMES);
+  ASSERT_FALSE(url_infos.empty());
+  EXPECT_EQ(url, url_infos[0].url);
+  EXPECT_EQ(title, url_infos[0].title);
 }
 
 // Tests writing a folder to the clipboard.
@@ -484,6 +484,21 @@ TEST_F(BookmarkNodeDataTest, ReadFromPickleTooManyNodes) {
   const uint8_t pickled_data[] = {0x08, 0x00, 0x00, 0x00, 0x00, 0x00,
                                   0x00, 0x00, 0xff, 0x03, 0x03, 0x41};
   base::Pickle pickle = base::Pickle::WithUnownedBuffer(pickled_data);
+  BookmarkNodeData bookmark_node_data;
+  EXPECT_FALSE(bookmark_node_data.ReadFromPickle(&pickle));
+}
+
+TEST_F(BookmarkNodeDataTest, ReadFromPickleNoNodes) {
+  base::Pickle pickle;
+  BookmarkNodeData().WriteToPickle(base::FilePath(), &pickle);
+  BookmarkNodeData bookmark_node_data;
+  EXPECT_FALSE(bookmark_node_data.ReadFromPickle(&pickle));
+}
+
+TEST_F(BookmarkNodeDataTest, ReadFromPickleInvalidData) {
+  base::Pickle pickle;
+  pickle.WriteInt(1);
+  pickle.WriteString("somevalue");
   BookmarkNodeData bookmark_node_data;
   EXPECT_FALSE(bookmark_node_data.ReadFromPickle(&pickle));
 }

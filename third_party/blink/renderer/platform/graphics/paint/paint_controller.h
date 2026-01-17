@@ -5,6 +5,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_PLATFORM_GRAPHICS_PAINT_PAINT_CONTROLLER_H_
 #define THIRD_PARTY_BLINK_RENDERER_PLATFORM_GRAPHICS_PAINT_PAINT_CONTROLLER_H_
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -53,12 +54,12 @@ enum class PaintBenchmarkMode {
 struct FrameFirstPaint {
   DISALLOW_NEW();
   explicit FrameFirstPaint(const void* frame)
-      : frame(frame),
+      : frame(reinterpret_cast<uintptr_t>(frame)),
         first_painted(false),
         text_painted(false),
         image_painted(false) {}
 
-  const void* frame = nullptr;
+  uintptr_t frame = 0u;
   bool first_painted : 1;
   bool text_painted : 1;
   bool image_painted : 1;
@@ -177,6 +178,10 @@ class PLATFORM_EXPORT PaintController {
   void RecordRegionCaptureData(const DisplayItemClient& client,
                                const RegionCaptureCropId& crop_id,
                                const gfx::Rect& rect);
+
+  void RecordTrackedElementData(const DisplayItemClient& client,
+                                const TrackedElementId& highlight_id,
+                                const gfx::Rect& rect);
 
   void RecordScrollHitTestData(
       const DisplayItemClient&,

@@ -1,4 +1,3 @@
-
 // Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -6,7 +5,9 @@
 #ifndef CHROME_BROWSER_PERMISSIONS_TEST_ENUMS_TO_STRING_H_
 #define CHROME_BROWSER_PERMISSIONS_TEST_ENUMS_TO_STRING_H_
 
-#include "chrome/browser/permissions/prediction_service/prediction_based_permission_ui_selector.h"
+#include <string_view>
+
+#include "components/permissions/permission_request_enums.h"
 
 // Contains methods that convert permission relevant enums into strings. As
 // there is no elegant C++ support for this, this provides methods to quickly
@@ -14,7 +15,7 @@
 // for parametrized test name generators or for simple logging.
 namespace test {
 std::string_view ToString(
-    PredictionBasedPermissionUiSelector::PredictionSource prediction_source);
+    permissions::PermissionPredictionSource prediction_source);
 }  // namespace test
 
 #endif  // CHROME_BROWSER_PERMISSIONS_TEST_ENUMS_TO_STRING_H_

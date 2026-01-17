@@ -8,9 +8,11 @@
 #include <string>
 #include <vector>
 
+#include "base/containers/flat_map.h"
 #include "base/functional/callback_forward.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/sequence_checker.h"
+#include "chrome/updater/registration_data.h"
 #include "chrome/updater/update_service.h"
 #include "chrome/updater/update_service_impl_impl.h"
 
@@ -25,7 +27,6 @@ enum class PolicyFetchReason;
 
 namespace updater {
 class Configurator;
-struct RegistrationRequest;
 
 // All functions and callbacks must be called on the same sequence.
 class UpdateServiceImpl : public UpdateService {
@@ -75,6 +76,18 @@ class UpdateServiceImpl : public UpdateService {
       const std::string& language,
       base::RepeatingCallback<void(const UpdateState&)> state_update,
       base::OnceCallback<void(Result)> callback) override;
+  void GetUpdaterState(
+      base::OnceCallback<void(const UpdaterState&)> callback) override;
+  void GetUpdaterPolicies(
+      base::OnceCallback<void(const base::flat_map<std::string, PolicyValue>&)>
+          callback) override;
+  void GetAppPolicies(
+      base::OnceCallback<
+          void(const base::flat_map<std::string,
+                                    base::flat_map<std::string, PolicyValue>>&)>
+          callback) override;
+  void GetPoliciesJson(
+      base::OnceCallback<void(const std::string&)> callback) override;
 
  private:
   ~UpdateServiceImpl() override;

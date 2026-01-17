@@ -14,13 +14,13 @@
 #include <vector>
 
 #include "ash/constants/ash_features.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
+#include "base/strings/stringprintf.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -38,7 +38,6 @@
 #include "chrome/browser/printing/print_preview_sticky_settings.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/testing_browser_process.h"
-#include "chromeos/ash/components/dbus/debug_daemon/debug_daemon_client.h"
 #include "chromeos/ash/components/dbus/dlcservice/fake_dlcservice_client.h"
 #include "chromeos/ash/components/dbus/printscanmgr/printscanmgr_client.h"
 #include "chromeos/ash/components/network/network_state_handler.h"
@@ -52,6 +51,7 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/cros_system_api/dbus/dlcservice/dbus-constants.h"
 #include "third_party/cros_system_api/dbus/shill/dbus-constants.h"
+#include "third_party/metrics_proto/printer_event.pb.h"
 
 namespace ash {
 namespace {
@@ -61,6 +61,10 @@ using ::chromeos::PpdProvider;
 using ::chromeos::Printer;
 using ::chromeos::PrinterClass;
 using ::chromeos::PrinterSearchData;
+using DetectedPrinter = PrinterDetector::DetectedPrinter;
+using ::chromeos::CupsPrinterStatus;
+using CupsPrinterStatusReason =
+    ::chromeos::CupsPrinterStatus::CupsPrinterStatusReason;
 
 constexpr base::TimeDelta kMetricsDelayTimerInterval = base::Seconds(60);
 
@@ -189,7 +193,7 @@ class FakeSyncedPrintersManager : public SyncedPrintersManager {
   void RemovePrinters(const std::unordered_set<std::string>& ids,
                       std::vector<Printer>* target) {
     std::erase_if(*target, [&ids](const Printer& printer) {
-      return base::Contains(ids, printer.id());
+      return ids.contains(printer.id());
     });
   }
 
@@ -241,7 +245,7 @@ class FakePrinterDetector : public PrinterDetector {
   // Remove printers that have ids in ids.
   void RemoveDetections(const std::unordered_set<std::string>& ids) {
     std::erase_if(detections_, [&ids](const DetectedPrinter& detection) {
-      return base::Contains(ids, detection.printer.id());
+      return ids.contains(detection.printer.id());
     });
     on_printers_found_callback_.Run(detections_);
   }
@@ -436,6 +440,8 @@ class CupsPrintersManagerTest : public testing::Test,
         std::move(enterprise_printers_provider), &event_tracker_,
         &pref_service_);
     manager_->AddObserver(this);
+
+    event_tracker_.set_logging(true);
   }
 
   ~CupsPrintersManagerTest() override {
@@ -445,15 +451,11 @@ class CupsPrintersManagerTest : public testing::Test,
   }
 
   void SetUp() override {
-    // TODO(b/257070388): Once the kAddPrinterViaPrintscanmgr feature is stable,
-    // remove the DebugDaemonClient and its test variants.
-    DebugDaemonClient::InitializeFake();
     PrintscanmgrClient::InitializeFake();
   }
 
   void TearDown() override {
     PrintscanmgrClient::Shutdown();
-    DebugDaemonClient::Shutdown();
   }
 
   // CupsPrintersManager::Observer implementation
@@ -485,6 +487,24 @@ class CupsPrintersManagerTest : public testing::Test,
     return print_server;
   }
 
+  void ExpectPrinterStatusReason(
+      const std::string& printer_id,
+      CupsPrinterStatusReason::Reason expected_reason) {
+    manager_->FetchPrinterStatus(
+        printer_id,
+        base::BindLambdaForTesting([&](const CupsPrinterStatus& status) {
+          ASSERT_EQ(status.GetStatusReasons().size(), 1u);
+          EXPECT_EQ(status.GetStatusReasons().begin()->GetReason(),
+                    expected_reason);
+        }));
+  }
+
+  std::vector<metrics::PrinterEventProto> GetLoggedEvents() {
+    std::vector<metrics::PrinterEventProto> events;
+    event_tracker_.FlushPrinterEvents(&events);
+    return events;
+  }
+
  protected:
   // Everything from PrintServersProvider must be called on Chrome_UIThread
   // Note: MainThreadType::IO is strictly about requesting a specific
@@ -503,7 +523,7 @@ class CupsPrintersManagerTest : public testing::Test,
   // Backend fakes driving the CupsPrintersManager.
   FakeSyncedPrintersManager synced_printers_manager_;
   raw_ptr<FakeEnterprisePrintersProvider, DanglingUntriaged>
-      enterprise_printers_provider_;  // Not owned.
+      enterprise_printers_provider_;                              // Not owned.
   raw_ptr<FakePrinterDetector, DanglingUntriaged> usb_detector_;  // Not owned.
   raw_ptr<FakePrinterDetector, DanglingUntriaged>
       zeroconf_detector_;  // Not owned.
@@ -605,18 +625,6 @@ TEST_F(CupsPrintersManagerTest, GetUsbPrinters) {
   ExpectPrintersInClassAre(PrinterClass::kAutomatic, {"AutomaticPrinter"});
 }
 
-// Same as GetUsbPrinters, using debugd.
-TEST_F(CupsPrintersManagerTest, GetUsbPrintersDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
-  usb_detector_->AddDetections({MakeDiscoveredPrinter("DiscoveredPrinter"),
-                                MakeAutomaticPrinter("AutomaticPrinter")});
-  task_environment_.RunUntilIdle();
-  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {"DiscoveredPrinter"});
-  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {"AutomaticPrinter"});
-}
-
 // Same as GetUsbPrinters, only for Zeroconf printers.
 TEST_F(CupsPrintersManagerTest, GetZeroconfPrinters) {
   zeroconf_detector_->AddDetections({MakeDiscoveredPrinter("DiscoveredPrinter"),
@@ -631,22 +639,6 @@ TEST_F(CupsPrintersManagerTest, GetZeroconfPrinters) {
 // Test that USB printers that prefer IPP-USB end up in the automatic class
 // instead of the discovered class.
 TEST_F(CupsPrintersManagerTest, GetIppUsbPrinters) {
-  PrinterDetector::DetectedPrinter printer;
-  printer.printer.set_id("IppUsbPrinter");
-  printer.printer.SetUri("usb://1234/5678");
-  printer.printer.set_make_and_model("EPSON WF-110 Series");
-
-  usb_detector_->AddDetections({printer});
-  task_environment_.RunUntilIdle();
-  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {});
-  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {"IppUsbPrinter"});
-}
-
-// Same as GetIppUsbPrinters, using debugd.
-TEST_F(CupsPrintersManagerTest, GetIppUsbPrintersDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
   PrinterDetector::DetectedPrinter printer;
   printer.printer.set_id("IppUsbPrinter");
   printer.printer.SetUri("usb://1234/5678");
@@ -702,51 +694,6 @@ TEST_F(CupsPrintersManagerTest, SyncedPrintersTrumpDetections) {
                            {"DiscoveredPrinter0", "AutomaticPrinter0"});
 }
 
-// Same as SyncedPrintersTrumpDetections, using debugd.
-TEST_F(CupsPrintersManagerTest, SyncedPrintersTrumpDetectionsDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
-  PrinterDetector::DetectedPrinter disc0 =
-      MakeDiscoveredPrinter("DiscoveredPrinter0");
-  PrinterDetector::DetectedPrinter disc1 =
-      MakeDiscoveredPrinter("DiscoveredPrinter1");
-  PrinterDetector::DetectedPrinter auto0 =
-      MakeAutomaticPrinter("AutomaticPrinter0");
-  PrinterDetector::DetectedPrinter auto1 =
-      MakeAutomaticPrinter("AutomaticPrinter1");
-  zeroconf_detector_->AddDetections({disc0, disc1, auto0, auto1});
-  task_environment_.RunUntilIdle();
-  // Before we muck with anything else, check that automatic and discovered
-  // classes are what we intended to set up.
-  ExpectPrintersInClassAre(PrinterClass::kDiscovered,
-                           {"DiscoveredPrinter0", "DiscoveredPrinter1"});
-  ExpectPrintersInClassAre(PrinterClass::kAutomatic,
-                           {"AutomaticPrinter0", "AutomaticPrinter1"});
-
-  // Save both the Discovered and Automatic printers.  This should put them
-  // into the Saved class and thus *remove* them from their previous
-  // classes.
-  base::RunLoop run_loop_1;
-  manager_->SetUpPrinter(disc0.printer,
-                         /*is_automatic_installation=*/true,
-                         CallQuitOnRunLoop(&run_loop_1));
-  run_loop_1.Run();
-  manager_->SavePrinter(disc0.printer);
-
-  base::RunLoop run_loop_2;
-  manager_->SetUpPrinter(auto0.printer,
-                         /*is_automatic_installation=*/true,
-                         CallQuitOnRunLoop(&run_loop_2));
-  run_loop_2.Run();
-  manager_->SavePrinter(auto0.printer);
-
-  task_environment_.RunUntilIdle();
-  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {"DiscoveredPrinter1"});
-  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {"AutomaticPrinter1"});
-  ExpectPrintersInClassAre(PrinterClass::kSaved,
-                           {"DiscoveredPrinter0", "AutomaticPrinter0"});
-}
 // Test updates of saved printers.  Updates of existing saved printers
 // should propagate.  Updates of printers in other classes should result in
 // those printers becoming saved.  Updates of unknown printers should
@@ -964,60 +911,9 @@ TEST_F(CupsPrintersManagerTest, PrinterIsInstalled) {
   EXPECT_TRUE(manager_->IsPrinterInstalled(printer));
 }
 
-// Same as PrinterIsInstalled, using debugd.
-TEST_F(CupsPrintersManagerTest, PrinterIsInstalledDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
-  Printer printer(kPrinterId);
-  printer.SetUri("ipp://manual.uri");
-  base::RunLoop run_loop;
-  manager_->SetUpPrinter(printer, /*is_automatic_installation=*/true,
-                         CallQuitOnRunLoop(&run_loop));
-  run_loop.Run();
-  EXPECT_TRUE(manager_->IsPrinterInstalled(printer));
-}
-
 // Test that we detect that the configuration is stale when any of the
 // relevant fields change.
 TEST_F(CupsPrintersManagerTest, UpdatedPrinterConfiguration) {
-  Printer printer(kPrinterId);
-  printer.SetUri("ipp://manual.uri");
-  base::RunLoop run_loop;
-  manager_->SetUpPrinter(printer, /*is_automatic_installation=*/true,
-                         CallQuitOnRunLoop(&run_loop));
-  run_loop.Run();
-
-  Printer updated(printer);
-  updated.SetUri("ipp://different.value");
-  EXPECT_FALSE(manager_->IsPrinterInstalled(updated));
-
-  updated = printer;
-  updated.mutable_ppd_reference()->autoconf = true;
-  EXPECT_FALSE(manager_->IsPrinterInstalled(updated));
-
-  updated = printer;
-  updated.mutable_ppd_reference()->user_supplied_ppd_url = "different value";
-  EXPECT_FALSE(manager_->IsPrinterInstalled(updated));
-
-  updated = printer;
-  updated.mutable_ppd_reference()->effective_make_and_model = "different value";
-  EXPECT_FALSE(manager_->IsPrinterInstalled(updated));
-
-  updated = printer;
-  updated.mutable_ppd_reference()->autoconf = true;
-  EXPECT_FALSE(manager_->IsPrinterInstalled(updated));
-
-  // Sanity check, configuration for the original printers should still be
-  // current.
-  EXPECT_TRUE(manager_->IsPrinterInstalled(printer));
-}
-
-// Same as UpdatedPrinterConfiguration, using debugd.
-TEST_F(CupsPrintersManagerTest, UpdatedPrinterConfigurationDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
   Printer printer(kPrinterId);
   printer.SetUri("ipp://manual.uri");
   base::RunLoop run_loop;
@@ -1074,55 +970,9 @@ TEST_F(CupsPrintersManagerTest, PrinterInstalledDoesNotSavePrinter) {
   EXPECT_EQ(0u, saved_printers.size());
 }
 
-// Same as PrinterInstalledDoesNotSavePrinter, using debugd.
-TEST_F(CupsPrintersManagerTest, PrinterInstalledDoesNotSavePrinterDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
-  Printer printer(kPrinterId);
-  EXPECT_TRUE(printer.SetUri("ipp://abcde/ipp/print"));
-  base::RunLoop run_loop;
-  manager_->SetUpPrinter(printer, /*is_automatic_installation=*/true,
-                         CallQuitOnRunLoop(&run_loop));
-  run_loop.Run();
-
-  auto saved_printers = manager_->GetPrinters(PrinterClass::kSaved);
-  EXPECT_EQ(0u, saved_printers.size());
-}
-
 // Test that calling SavePrinter() when printer configuration change updates
 // the saved printer but does not install the updated printer.
 TEST_F(CupsPrintersManagerTest, SavePrinterUpdatesPreviouslyInstalledPrinter) {
-  Printer printer(kPrinterId);
-  printer.SetUri("http://ble");
-  base::RunLoop run_loop;
-  manager_->SetUpPrinter(printer, /*is_automatic_installation=*/true,
-                         CallQuitOnRunLoop(&run_loop));
-  run_loop.Run();
-
-  manager_->SavePrinter(printer);
-  EXPECT_TRUE(manager_->IsPrinterInstalled(printer));
-
-  Printer updated(printer);
-  updated.SetUri("ipps://different/value");
-  EXPECT_FALSE(manager_->IsPrinterInstalled(updated));
-
-  manager_->SavePrinter(updated);
-  auto saved_printers = manager_->GetPrinters(PrinterClass::kSaved);
-  ASSERT_EQ(1u, saved_printers.size());
-  EXPECT_EQ(updated.uri(), saved_printers[0].uri());
-
-  // Even though the updated printer was saved, it still needs to be marked as
-  // installed again.
-  EXPECT_FALSE(manager_->IsPrinterInstalled(updated));
-}
-
-// same as SavePrinterUpdatesPreviouslyInstalledPrinter, using debugd.
-TEST_F(CupsPrintersManagerTest,
-       SavePrinterUpdatesPreviouslyInstalledPrinterDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
   Printer printer(kPrinterId);
   printer.SetUri("http://ble");
   base::RunLoop run_loop;
@@ -1162,57 +1012,8 @@ TEST_F(CupsPrintersManagerTest, AutomaticUsbPrinterIsInstalledAutomatically) {
   EXPECT_TRUE(manager_->IsPrinterInstalled(*printer));
 }
 
-// Same as AutomaticUsbPrinterIsInstalledAutomatically, using debugd.
-TEST_F(CupsPrintersManagerTest,
-       AutomaticUsbPrinterIsInstalledAutomaticallyDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
-  auto automatic_printer = MakeAutomaticPrinter(kPrinterId);
-  automatic_printer.printer.SetUri("usb://host/path");
-
-  usb_detector_->AddDetections({automatic_printer});
-
-  task_environment_.RunUntilIdle();
-
-  std::optional<chromeos::Printer> printer =
-      manager_->GetPrinter(automatic_printer.printer.id());
-  ASSERT_TRUE(printer);
-  EXPECT_TRUE(manager_->IsPrinterInstalled(*printer));
-}
-
 // Can handle four different USB printers at the same time.
 TEST_F(CupsPrintersManagerTest, CanHandleManyUsbPrinters) {
-  // Printer without PPD file and not supporting IPPUSB.
-  auto p1 = MakeUsbDiscoveredPrinter("id1");
-  // Printer with PPD file but not supporting IPPUSB.
-  auto p2 = MakeUsbDiscoveredPrinter("id2");
-  p2.ppd_search_data.make_and_model.push_back("make-and-model");
-  // Printer without PPD file but supporting IPPUSB.
-  auto p3 = MakeUsbDiscoveredPrinter("id3");
-  p3.printer.set_supports_ippusb(true);
-  // Printer with PPD file and supporting IPPUSB.
-  auto p4 = MakeUsbDiscoveredPrinter("id4");
-  p4.ppd_search_data.make_and_model.push_back("make-and-model");
-  p4.printer.set_supports_ippusb(true);
-
-  usb_detector_->AddDetections({p1, p2, p3, p4});
-
-  task_environment_.RunUntilIdle();
-
-  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {"id1"});
-  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {"id2", "id3", "id4"});
-  EXPECT_FALSE(manager_->IsPrinterInstalled(*manager_->GetPrinter("id1")));
-  EXPECT_TRUE(manager_->IsPrinterInstalled(*manager_->GetPrinter("id2")));
-  EXPECT_TRUE(manager_->IsPrinterInstalled(*manager_->GetPrinter("id3")));
-  EXPECT_TRUE(manager_->IsPrinterInstalled(*manager_->GetPrinter("id4")));
-}
-
-// Same as CanHandleManyUsbPrinters, using debugd.
-TEST_F(CupsPrintersManagerTest, CanHandleManyUsbPrintersDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
   // Printer without PPD file and not supporting IPPUSB.
   auto p1 = MakeUsbDiscoveredPrinter("id1");
   // Printer with PPD file but not supporting IPPUSB.
@@ -1327,70 +1128,9 @@ TEST_F(CupsPrintersManagerTest, RecordTotalNetworkPrinterCounts) {
       "Printing.CUPS.TotalNetworkPrintersCount2.SettingsOpened", 4, 1);
 }
 
-// Same as RecordTotalNetworkPrinterCounts, using debgud.
-TEST_F(CupsPrintersManagerTest, RecordTotalNetworkPrinterCountsDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
-  base::HistogramTester histogram_tester;
-  manager_->SavePrinter(Printer("DiscoveredNetworkPrinter0"));
-  usb_detector_->AddDetections({MakeDiscoveredPrinter("DiscoveredUSBPrinter"),
-                                MakeAutomaticPrinter("AutomaticUSBPrinter")});
-  task_environment_.FastForwardBy(kMetricsDelayTimerInterval);
-  histogram_tester.ExpectBucketCount("Printing.CUPS.TotalNetworkPrintersCount2",
-                                     0, 1);
-  manager_->RecordNearbyNetworkPrinterCounts();
-  task_environment_.RunUntilIdle();
-  histogram_tester.ExpectBucketCount(
-      "Printing.CUPS.TotalNetworkPrintersCount2.SettingsOpened", 0, 1);
-  zeroconf_detector_->AddDetections(
-      {MakeDiscoveredPrinter("DiscoveredNetworkPrinter0"),
-       MakeDiscoveredPrinter("DiscoveredNetworkPrinter1"),
-       MakeAutomaticPrinter("AutomaticNetworkPrinter0"),
-       MakeAutomaticPrinter("AutomaticNetworkPrinter1")});
-  task_environment_.FastForwardBy(kMetricsDelayTimerInterval);
-  histogram_tester.ExpectBucketCount("Printing.CUPS.TotalNetworkPrintersCount2",
-                                     4, 1);
-  manager_->RecordNearbyNetworkPrinterCounts();
-  task_environment_.RunUntilIdle();
-  histogram_tester.ExpectBucketCount(
-      "Printing.CUPS.TotalNetworkPrintersCount2.SettingsOpened", 4, 1);
-}
-
 // Test that RecordNearbyNetworkPrinterCounts logs the number of
 // all nearby (not already saved) detected network printers.
 TEST_F(CupsPrintersManagerTest, RecordNearbyNetworkPrinterCounts) {
-  base::HistogramTester histogram_tester;
-  usb_detector_->AddDetections({MakeDiscoveredPrinter("DiscoveredUSBPrinter"),
-                                MakeAutomaticPrinter("AutomaticUSBPrinter")});
-  manager_->RecordNearbyNetworkPrinterCounts();
-  task_environment_.RunUntilIdle();
-  histogram_tester.ExpectBucketCount("Printing.CUPS.NearbyNetworkPrintersCount",
-                                     0, 1);
-  manager_->SavePrinter(Printer("DiscoveredNetworkPrinter0"));
-  zeroconf_detector_->AddDetections(
-      {MakeDiscoveredPrinter("DiscoveredNetworkPrinter0"),
-       MakeDiscoveredPrinter("DiscoveredNetworkPrinter1"),
-       MakeAutomaticPrinter("AutomaticNetworkPrinter0"),
-       MakeAutomaticPrinter("AutomaticNetworkPrinter1")});
-  manager_->RecordNearbyNetworkPrinterCounts();
-  task_environment_.RunUntilIdle();
-  histogram_tester.ExpectBucketCount("Printing.CUPS.NearbyNetworkPrintersCount",
-                                     3, 1);
-
-  // Save one more network printer.
-  manager_->SavePrinter(Printer("AutomaticNetworkPrinter1"));
-  manager_->RecordNearbyNetworkPrinterCounts();
-  task_environment_.RunUntilIdle();
-  histogram_tester.ExpectBucketCount("Printing.CUPS.NearbyNetworkPrintersCount",
-                                     2, 1);
-}
-
-// Same as RecordNearbyNetworkPrinterCounts, using debugd.
-TEST_F(CupsPrintersManagerTest, RecordNearbyNetworkPrinterCountsDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
   base::HistogramTester histogram_tester;
   usb_detector_->AddDetections({MakeDiscoveredPrinter("DiscoveredUSBPrinter"),
                                 MakeAutomaticPrinter("AutomaticUSBPrinter")});
@@ -1597,71 +1337,504 @@ TEST_F(CupsPrintersManagerTest, PrinterWithHplipPluginLicenseDlcFails) {
   EXPECT_FALSE(manager_->IsPrinterInstalled(printer));
 }
 
-TEST_F(CupsPrintersManagerTest, PrinterWithHplipPluginLicenseDlcSucceeds) {
-  feature_list_.InitAndEnableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
-
-  Printer printer(kPrinterId);
-  printer.SetUri("ipp://manual.uri");
-  printer.mutable_ppd_reference()->effective_make_and_model = "Make and model";
-  ppd_provider_->SetLicenseName("hplip-plugin");
-  ppd_provider_->SetPpdContent("*hpPrinterLanguage: lang\nsomething else\n");
-  dlc_service_client_.set_install_error(dlcservice::kErrorNone);
-  dlc_service_client_.set_install_root_path("/root/path");
-
-  base::RunLoop run_loop;
-  PrinterSetupResult result;
-  manager_->SetUpPrinter(printer, /*is_automatic_installation=*/true,
-                         CallQuitOnRunLoop(&run_loop, &result));
-  run_loop.Run();
-
-  EXPECT_EQ(result, PrinterSetupResult::kSuccess);
-  EXPECT_TRUE(manager_->IsPrinterInstalled(printer));
-
-  // Check if the PPD content was updated.
-  base::RunLoop run_loop_2;
-  std::string ppd_content;
-  printscanmgr::CupsRetrievePpdRequest request;
-  request.set_name(kPrinterId);
-  PrintscanmgrClient::Get()->CupsRetrievePrinterPpd(
-      request,
-      base::BindLambdaForTesting(
-          [&run_loop_2, &ppd_content](
-              std::optional<printscanmgr::CupsRetrievePpdResponse> response) {
-            if (response) {
-              ppd_content = response->ppd();
-            }
-            run_loop_2.Quit();
-          }),
-      base::BindLambdaForTesting([&run_loop_2]() { run_loop_2.Quit(); }));
-  run_loop_2.Run();
-
-  EXPECT_EQ(ppd_content,
-            "*hpPrinterLanguage: lang\n*chromeOSHplipPluginPath: "
-            "\"/root/path\"\nsomething else\n");
+DetectedPrinter CreateDetectedUsbPrinter(const std::string& id,
+                                         const std::string& uri,
+                                         int vendor_id,
+                                         int product_id) {
+  DetectedPrinter ret;
+  ret.printer.set_id(id);
+  ret.printer.SetUri(uri);
+  ret.printer.set_usb_device_id(Printer::UsbDeviceId(vendor_id, product_id));
+  // Add make and model to make it automatic.
+  ret.ppd_search_data.make_and_model.push_back("make and model");
+  return ret;
 }
 
-// Same as PrinterWithHplipPluginLicenseDlcSucceeds, using debugd.
-TEST_F(CupsPrintersManagerTest,
-       PrinterWithHplipPluginLicenseDlcSucceedsDebugd) {
-  feature_list_.InitAndDisableFeature(
-      printing::features::kAddPrinterViaPrintscanmgr);
+Printer CreateEnterpriseUsbPrinter(const std::string& id,
+                                   int vendor_id,
+                                   int product_id,
+                                   bool is_ippusb = false) {
+  Printer printer(id);
+  printer.set_usb_device_id(Printer::UsbDeviceId(vendor_id, product_id));
+  if (is_ippusb) {
+    EXPECT_TRUE(printer.SetUri(base::StringPrintf(
+        "ippusb://%04x_%04x/ipp/print", vendor_id, product_id)));
+  } else {
+    EXPECT_TRUE(printer.SetUri(
+        base::StringPrintf("usb://%04x/%04x?serial", vendor_id, product_id)));
+  }
+  printer.set_source(Printer::SRC_POLICY);
+  return printer;
+}
 
-  Printer printer(kPrinterId);
-  printer.SetUri("ipp://manual.uri");
-  printer.mutable_ppd_reference()->effective_make_and_model = "Make and model";
-  ppd_provider_->SetLicenseName("hplip-plugin");
-  dlc_service_client_.set_install_error(dlcservice::kErrorNone);
-  dlc_service_client_.set_install_root_path("/root/path");
+Printer CreateEnterpriseIppUsbPrinter(const std::string& id,
+                                      int vendor_id,
+                                      int product_id) {
+  return CreateEnterpriseUsbPrinter(id, vendor_id, product_id, true);
+}
+
+TEST_F(CupsPrintersManagerTest, EnterprisePrinter_DetectUsbPrinter) {
+  feature_list_.InitAndEnableFeature(features::kManagedUsbPrinters);
+
+  // Enterprise printer.
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EnterpriseUsb", 0x1234, 0x5678);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  ExpectPrintersInClassAre(PrinterClass::kEnterprise, {"EnterpriseUsb"});
+
+  // Detected USB printer matching the enterprise one.
+  DetectedPrinter detected_printer = CreateDetectedUsbPrinter(
+      "DetectedUsb", "usb://1234/5678?serial=ABC", 0x1234, 0x5678);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
+
+  // Detected printer is suppressed, still only see the Enterprise one.
+  ExpectPrintersInClassAre(PrinterClass::kEnterprise, {"EnterpriseUsb"});
+  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {});
+  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {});
+
+  // The Enterprise printer's URI should be updated.
+  std::optional<Printer> updated_enterprise =
+      manager_->GetPrinter("EnterpriseUsb");
+  ASSERT_TRUE(updated_enterprise.has_value());
+  EXPECT_EQ("usb://1234/5678?serial=ABC",
+            updated_enterprise->uri().GetNormalized());
+}
+
+TEST_F(CupsPrintersManagerTest, DetectUsbPrinter_EnterprisePrinter) {
+  feature_list_.InitAndEnableFeature(features::kManagedUsbPrinters);
+
+  // Detected USB printer.
+  DetectedPrinter detected_printer = CreateDetectedUsbPrinter(
+      "DetectedUsb", "usb://1234/5678?serial=ABC", 0x1234, 0x5678);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
+
+  // The detected printer should be in Automatic.
+  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {"DetectedUsb"});
+  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {});
+
+  // Enterprise printer matching detected one.
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EnterpriseUsb", 0x1234, 0x5678);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  // Detected printer gets suppressed now, see only Enterprise one.
+  ExpectPrintersInClassAre(PrinterClass::kEnterprise, {"EnterpriseUsb"});
+  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {});
+  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {});
+
+  // The Enterprise printer's URI should be updated.
+  std::optional<Printer> updated_enterprise =
+      manager_->GetPrinter("EnterpriseUsb");
+  ASSERT_TRUE(updated_enterprise.has_value());
+  EXPECT_EQ("usb://1234/5678?serial=ABC",
+            updated_enterprise->uri().GetNormalized());
+}
+
+TEST_F(CupsPrintersManagerTest, EnterprisePrinter_DetectDifferentUsbPrinter) {
+  feature_list_.InitAndEnableFeature(features::kManagedUsbPrinters);
+
+  // Enterprise printer with a DIFFERENT VID/PID identifier.
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EnterpriseUsb", 0xAAAA, 0xBBBB);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  // Detected USB printer NOT matching the enterprise printer.
+  DetectedPrinter detected_printer = CreateDetectedUsbPrinter(
+      "DetectedUsb", "usb://1234/5678?serial=ABC", 0x1234, 0x5678);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
+
+  // The detected printer should be in Automatic
+  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {"DetectedUsb"});
+  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {});
+  ExpectPrintersInClassAre(PrinterClass::kEnterprise, {"EnterpriseUsb"});
+
+  // The Enterprise printer's URI should NOT be updated.
+  std::optional<Printer> updated_enterprise =
+      manager_->GetPrinter("EnterpriseUsb");
+  ASSERT_TRUE(updated_enterprise.has_value());
+  EXPECT_EQ("usb://aaaa/bbbb?serial",
+            updated_enterprise->uri().GetNormalized());
+}
+
+TEST_F(CupsPrintersManagerTest, EnterprisePrinter_DetectUsbPrinter_Ipp) {
+  feature_list_.InitAndEnableFeature(features::kManagedUsbPrinters);
+
+  // Enterprise printer with ippusb.
+  Printer enterprise_printer =
+      CreateEnterpriseIppUsbPrinter("EnterpriseIppUsb", 0x1234, 0x5678);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  ExpectPrintersInClassAre(PrinterClass::kEnterprise, {"EnterpriseIppUsb"});
+
+  // Detected USB printer matching.
+  DetectedPrinter detected_printer = CreateDetectedUsbPrinter(
+      "DetectedUsb", "usb://1234/5678?serial=ABC", 0x1234, 0x5678);
+  detected_printer.printer.set_supports_ippusb(true);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
+
+  // Detected printer is suppressed, only the Enterprise one shows.
+  ExpectPrintersInClassAre(PrinterClass::kEnterprise, {"EnterpriseIppUsb"});
+  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {});
+  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {});
+
+  // Enterprise printer's URI should NOT be updated in the ippusb case.
+  std::optional<Printer> updated_enterprise =
+      manager_->GetPrinter("EnterpriseIppUsb");
+  ASSERT_TRUE(updated_enterprise.has_value());
+  EXPECT_EQ("ippusb://1234_5678/ipp/print",
+            updated_enterprise->uri().GetNormalized());
+}
+
+TEST_F(CupsPrintersManagerTest, DetectUsbPrinter_EnterprisePrinter_Race) {
+  feature_list_.InitAndEnableFeature(features::kManagedUsbPrinters);
+
+  // Detected USB printer
+  DetectedPrinter detected_printer = CreateDetectedUsbPrinter(
+      "RacePrinter", "usb://8888/9999?serial=XYZ", 0x8888, 0x9999);
+  usb_detector_->AddDetections({detected_printer});
+  // Note that we don't call `task_environment_.RunUntilIdle()` here yet.
+
+  // Enterprise printer comes in after setup started, but before it finished.
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EnterpriseRace", 0x8888, 0x9999);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  // The race should be detected and the detected printer should be uninstalled.
+  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {});
+  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {});
+  ExpectPrintersInClassAre(PrinterClass::kEnterprise, {"EnterpriseRace"});
+  EXPECT_FALSE(manager_->IsPrinterInstalled(detected_printer.printer));
+
+  // Enterprise printer URI should be updated.
+  std::optional<Printer> updated_enterprise =
+      manager_->GetPrinter("EnterpriseRace");
+  ASSERT_TRUE(updated_enterprise.has_value());
+  EXPECT_EQ("usb://8888/9999?serial=XYZ",
+            updated_enterprise->uri().GetNormalized());
+}
+
+TEST_F(CupsPrintersManagerTest,
+       EnterprisePrinter_DetectUsbPrinter_FeatureDisabled) {
+  feature_list_.InitAndDisableFeature(features::kManagedUsbPrinters);
+
+  // Enterprise printer.
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EnterpriseUsb", 0x1234, 0x5678);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  ExpectPrintersInClassAre(PrinterClass::kEnterprise, {"EnterpriseUsb"});
+
+  // Detected USB printer matching the enterprise VID/PID
+  DetectedPrinter detected_printer = CreateDetectedUsbPrinter(
+      "DetectedUsb", "usb://1234/5678?serial=ABC", 0x1234, 0x5678);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
+
+  // With the flag off, the detected printer should appear in Automatic.
+  ExpectPrintersInClassAre(PrinterClass::kAutomatic, {"DetectedUsb"});
+  ExpectPrintersInClassAre(PrinterClass::kDiscovered, {});
+  ExpectPrintersInClassAre(PrinterClass::kEnterprise, {"EnterpriseUsb"});
+
+  // Enterprise printer's URI should NOT be updated.
+  std::optional<Printer> enterprise = manager_->GetPrinter("EnterpriseUsb");
+  ASSERT_TRUE(enterprise.has_value());
+  EXPECT_EQ("usb://1234/5678?serial", enterprise->uri().GetNormalized());
+}
+
+TEST_F(CupsPrintersManagerTest, Status_DetectedUsbPrinter) {
+  // Add a detected USB printer.
+  DetectedPrinter detected_usb = CreateDetectedUsbPrinter(
+      "DetectedUsb", "usb://1234/5678?serial=ABC", 0x1234, 0x5678);
+  usb_detector_->AddDetections({detected_usb});
+  task_environment_.RunUntilIdle();
+
+  // It should be connected and have NoError status.
+  ExpectPrinterStatusReason("DetectedUsb",
+                            CupsPrinterStatusReason::Reason::kNoError);
+
+  // Remove the detection
+  usb_detector_->RemoveDetections({"DetectedUsb"});
+  task_environment_.RunUntilIdle();
+
+  // Now it should be unreachable.
+  ExpectPrinterStatusReason(
+      "DetectedUsb", CupsPrinterStatusReason::Reason::kPrinterUnreachable);
+}
+
+TEST_F(CupsPrintersManagerTest, Status_EnterpriseUsbPrinter) {
+  feature_list_.InitAndEnableFeature(features::kManagedUsbPrinters);
+
+  // Enterprise printer.
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EnterpriseUsb", 0xAAAA, 0xBBBB);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  // Initially, the enterprise printer is not detected via USB.
+  ExpectPrinterStatusReason(
+      "EnterpriseUsb", CupsPrinterStatusReason::Reason::kPrinterUnreachable);
+
+  // Detected USB printer matching the enterprise one.
+  DetectedPrinter detected_usb = CreateDetectedUsbPrinter(
+      "MatchedUsb", "usb://AAAA/BBBB?serial=XYZ", 0xAAAA, 0xBBBB);
+  usb_detector_->AddDetections({detected_usb});
+  task_environment_.RunUntilIdle();
+
+  // Now the enterprise printer should be considered connected.
+  ExpectPrinterStatusReason("EnterpriseUsb",
+                            CupsPrinterStatusReason::Reason::kNoError);
+
+  // Remove the USB detection.
+  usb_detector_->RemoveDetections({"MatchedUsb"});
+  task_environment_.RunUntilIdle();
+
+  // Should be unreachable again.
+  ExpectPrinterStatusReason(
+      "EnterpriseUsb", CupsPrinterStatusReason::Reason::kPrinterUnreachable);
+}
+
+TEST_F(CupsPrintersManagerTest, Status_EnterpriseUsbPrinter_FeatureDisabled) {
+  feature_list_.InitAndDisableFeature(features::kManagedUsbPrinters);
+
+  // Enterprise printer.
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EnterpriseUsb", 0xCCCC, 0xDDDD);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  // Detected USB printer matching the enterprise VID/PID.
+  DetectedPrinter detected_usb = CreateDetectedUsbPrinter(
+      "MatchedUsb", "usb://CCCC/DDDD?serial=123", 0xCCCC, 0xDDDD);
+  usb_detector_->AddDetections({detected_usb});
+  task_environment_.RunUntilIdle();
+
+  // The enterprise printer is unreachable since the feature is disabled.
+  ExpectPrinterStatusReason(
+      "EnterpriseUsb", CupsPrinterStatusReason::Reason::kPrinterUnreachable);
+}
+
+TEST_F(CupsPrintersManagerTest, Status_MixUsbPrinters) {
+  feature_list_.InitAndEnableFeature(features::kManagedUsbPrinters);
+
+  // Regular Detected USB that is also saved.
+  DetectedPrinter detected_usb = CreateDetectedUsbPrinter(
+      "DetectedUsb", "usb://1111/2222?serial=A", 0x1111, 0x2222);
+  usb_detector_->AddDetections({detected_usb});
+  manager_->SavePrinter(detected_usb.printer);
+
+  // Enterprise USB - Connected.
+  Printer enterprise_conn =
+      CreateEnterpriseUsbPrinter("EnterpriseConn", 0x3333, 0x4444);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_conn});
+  DetectedPrinter detected_enterprise = CreateDetectedUsbPrinter(
+      "MatchedEnterprise", "usb://3333/4444?serial=B", 0x3333, 0x4444);
+  usb_detector_->AddDetections({detected_enterprise});
+
+  // Enterprise USB - Disconnected.
+  Printer enterprise_disconn =
+      CreateEnterpriseUsbPrinter("EnterpriseDisconn", 0x5555, 0x6666);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_disconn});
+
+  task_environment_.RunUntilIdle();
+
+  ExpectPrinterStatusReason("DetectedUsb",
+                            CupsPrinterStatusReason::Reason::kNoError);
+  ExpectPrinterStatusReason("EnterpriseConn",
+                            CupsPrinterStatusReason::Reason::kNoError);
+  ExpectPrinterStatusReason(
+      "EnterpriseDisconn",
+      CupsPrinterStatusReason::Reason::kPrinterUnreachable);
+}
+
+DetectedPrinter CreateDetectedUsbPrinterWithPpdData(const std::string& id,
+                                                    const std::string& uri,
+                                                    int vendor_id,
+                                                    int product_id) {
+  DetectedPrinter ret =
+      CreateDetectedUsbPrinter(id, uri, vendor_id, product_id);
+
+  // Populate ppd_search data.
+  ret.ppd_search_data.usb_vendor_id = vendor_id;
+  ret.ppd_search_data.usb_product_id = product_id;
+  ret.ppd_search_data.usb_manufacturer = "ACME";
+  ret.ppd_search_data.usb_model = "Anvil";
+
+  // Populate ppd_reference.
+  ret.printer.mutable_ppd_reference()->effective_make_and_model =
+      "Invisible paint";
+  return ret;
+}
+
+TEST_F(CupsPrintersManagerTest, Metrics_RecordInstallRegularUsb) {
+  auto detected_printer = CreateDetectedUsbPrinterWithPpdData(
+      "RegUsb", "usb://1111/2222?serial=A", 0x1111, 0x2222);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
+
+  // This will trigger the call to MaybeRecordInstallation in
+  // OnPrinterSetupResult
+  base::RunLoop run_loop;
+  manager_->SetUpPrinter(detected_printer.printer,
+                         /*is_automatic_installation=*/true,
+                         CallQuitOnRunLoop(&run_loop));
+  run_loop.Run();
+  task_environment_.RunUntilIdle();
+
+  auto events = GetLoggedEvents();
+  ASSERT_THAT(events.size(), 1);
+  const auto& event = events[0];
+  EXPECT_EQ(event.event_type(), metrics::PrinterEventProto::SETUP_AUTOMATIC);
+  EXPECT_EQ(event.usb_vendor_id(), 0x1111);
+  EXPECT_EQ(event.usb_model_id(), 0x2222);
+  EXPECT_EQ(event.usb_printer_manufacturer(), "ACME");
+  EXPECT_EQ(event.usb_printer_model(), "Anvil");
+  EXPECT_EQ(event.ppd_identifier(), "Invisible paint");
+}
+
+TEST_F(CupsPrintersManagerTest, Metrics_RecordInstallEnterpriseUsb) {
+  feature_list_.InitAndEnableFeature(features::kManagedUsbPrinters);
+
+  // Enterprise printer.
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EntUsb", 0x3333, 0x4444);
+  enterprise_printer.mutable_ppd_reference()->effective_make_and_model =
+      "Jet-Propelled Unicycle";
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  // Matching detected USB printer.
+  auto detected_printer = CreateDetectedUsbPrinterWithPpdData(
+      "MatchUsb", "usb://3333/4444?serial=B", 0x3333, 0x4444);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
+
+  // Setup the *enterprise* printer. MaybeRecordInstallation should find the
+  // matching detected printer for PPD info.
+  base::RunLoop run_loop;
+  manager_->SetUpPrinter(enterprise_printer,
+                         /*is_automatic_installation=*/false,
+                         CallQuitOnRunLoop(&run_loop));
+  run_loop.Run();
+  task_environment_.RunUntilIdle();
+
+  auto events = GetLoggedEvents();
+  ASSERT_THAT(events.size(), 1);
+  const auto& event = events[0];
+  EXPECT_EQ(event.event_type(), metrics::PrinterEventProto::SETUP_MANUAL);
+  // The usb_* information should come from the detected printer, while the
+  // ppd_* information should come from the enterprise printer itself.
+  EXPECT_EQ(event.usb_vendor_id(), 0x3333);
+  EXPECT_EQ(event.usb_model_id(), 0x4444);
+  EXPECT_EQ(event.usb_printer_manufacturer(), "ACME");
+  EXPECT_EQ(event.usb_printer_model(), "Anvil");
+  EXPECT_EQ(event.ppd_identifier(), "Jet-Propelled Unicycle");
+}
+
+// Test metrics when a regular USB printer setup is abandoned.
+TEST_F(CupsPrintersManagerTest, Metrics_RecordAbandonRegularUsb) {
+  auto detected_printer = CreateDetectedUsbPrinterWithPpdData(
+      "RegUsb", "usb://5555/6666?serial=C", 0x5555, 0x6666);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
+
+  manager_->RecordSetupAbandoned(detected_printer.printer);
+  task_environment_.RunUntilIdle();
+
+  auto events = GetLoggedEvents();
+  ASSERT_THAT(events.size(), 1);
+  const auto& event = events[0];
+  EXPECT_EQ(event.event_type(), metrics::PrinterEventProto::SETUP_ABANDONED);
+  EXPECT_EQ(event.usb_vendor_id(), 0x5555);
+  EXPECT_EQ(event.usb_model_id(), 0x6666);
+  EXPECT_EQ(event.usb_printer_manufacturer(), "ACME");
+  EXPECT_EQ(event.usb_printer_model(), "Anvil");
+}
+
+// Test metrics when an enterprise USB printer setup is abandoned.
+TEST_F(CupsPrintersManagerTest, Metrics_RecordAbandonEnterpriseUsb) {
+  feature_list_.InitAndEnableFeature(features::kManagedUsbPrinters);
+
+  // Enterprise printer.
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EntUsb", 0x7777, 0x8888);
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  // Matching detected USB printer.
+  auto detected_printer = CreateDetectedUsbPrinterWithPpdData(
+      "MatchUsb", "usb://7777/8888?serial=D", 0x7777, 0x8888);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
+
+  manager_->RecordSetupAbandoned(enterprise_printer);
+  task_environment_.RunUntilIdle();
+
+  auto events = GetLoggedEvents();
+  ASSERT_THAT(events.size(), 1);
+  const auto& event = events[0];
+  EXPECT_EQ(event.event_type(), metrics::PrinterEventProto::SETUP_ABANDONED);
+  // The ppd information should come from the detected printer.
+  EXPECT_EQ(event.usb_vendor_id(), 0x7777);
+  EXPECT_EQ(event.usb_model_id(), 0x8888);
+  EXPECT_EQ(event.usb_printer_manufacturer(), "ACME");
+  EXPECT_EQ(event.usb_printer_model(), "Anvil");
+}
+
+TEST_F(CupsPrintersManagerTest,
+       Metrics_NoRecordInstallEnterpriseUsb_FeatureDisabled) {
+  feature_list_.InitAndDisableFeature(features::kManagedUsbPrinters);
+
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EntUsb", 0x9999, 0xAAAA);
+  enterprise_printer.set_make_and_model("Enterprise Make");
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  auto detected_printer = CreateDetectedUsbPrinterWithPpdData(
+      "MatchUsb", "usb://9999/AAAA?serial=E", 0x9999, 0xAAAA);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
 
   base::RunLoop run_loop;
-  PrinterSetupResult result;
-  manager_->SetUpPrinter(printer, /*is_automatic_installation=*/true,
-                         CallQuitOnRunLoop(&run_loop, &result));
+  manager_->SetUpPrinter(enterprise_printer,
+                         /*is_automatic_installation=*/true,
+                         CallQuitOnRunLoop(&run_loop));
   run_loop.Run();
+  task_environment_.RunUntilIdle();
 
-  EXPECT_EQ(result, PrinterSetupResult::kSuccess);
-  EXPECT_TRUE(manager_->IsPrinterInstalled(printer));
+  EXPECT_EQ(GetLoggedEvents().size(), 0u);
+}
+
+TEST_F(CupsPrintersManagerTest,
+       Metrics_NoRecordAbandonEnterpriseUsb_FeatureDisabled) {
+  feature_list_.InitAndDisableFeature(features::kManagedUsbPrinters);
+
+  Printer enterprise_printer =
+      CreateEnterpriseUsbPrinter("EntUsb", 0xBBBB, 0xCCCC);
+  enterprise_printer.set_make_and_model("Enterprise Make Abandon");
+  enterprise_printers_provider_->AddEnterprisePrinters({enterprise_printer});
+  task_environment_.RunUntilIdle();
+
+  auto detected_printer = CreateDetectedUsbPrinterWithPpdData(
+      "MatchUsb", "usb://BBBB/CCCC?serial=F", 0xBBBB, 0xCCCC);
+  usb_detector_->AddDetections({detected_printer});
+  task_environment_.RunUntilIdle();
+
+  manager_->RecordSetupAbandoned(enterprise_printer);
+  task_environment_.RunUntilIdle();
+
+  EXPECT_EQ(GetLoggedEvents().size(), 0u);
 }
 
 }  // namespace

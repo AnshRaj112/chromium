@@ -188,15 +188,6 @@ class CORE_EXPORT VisualViewport : public GarbageCollected<VisualViewport>,
 
   // ScrollableArea implementation
   ChromeClient* GetChromeClient() const override;
-  bool SetScrollOffset(const ScrollOffset&,
-                       mojom::blink::ScrollType,
-                       mojom::blink::ScrollBehavior,
-                       ScrollCallback on_finish,
-                       bool targeted_scroll = false) override;
-  bool SetScrollOffset(const ScrollOffset&,
-                       mojom::blink::ScrollType,
-                       mojom::blink::ScrollBehavior =
-                           mojom::blink::ScrollBehavior::kInstant) override;
   PhysicalRect ScrollIntoView(
       const PhysicalRect&,
       const PhysicalBoxStrut& scroll_margin,
@@ -229,7 +220,8 @@ class CORE_EXPORT VisualViewport : public GarbageCollected<VisualViewport>,
   bool ScrollAnimatorEnabled() const override;
   void ScrollControlWasSetNeedsPaintInvalidation() override {}
   void UpdateScrollOffset(const ScrollOffset&,
-                          mojom::blink::ScrollType) override;
+                          mojom::blink::ScrollType,
+                          cc::ScrollSourceType) override;
   cc::Layer* LayerForScrolling() const;
   cc::Layer* LayerForHorizontalScrollbar() const override;
   cc::Layer* LayerForVerticalScrollbar() const override;
@@ -250,7 +242,9 @@ class CORE_EXPORT VisualViewport : public GarbageCollected<VisualViewport>,
   // WebViewImpl explicitly rather than via
   // ScrollingCoordinator::DidCompositorScroll() since it needs to be set in
   // tandem with the page scale delta.
-  void DidCompositorScroll(const gfx::PointF&) final { NOTREACHED(); }
+  void DidCompositorScroll(const gfx::PointF&, cc::ScrollSourceType) final {
+    NOTREACHED();
+  }
 
   // Visual Viewport API implementation.
   double OffsetLeft() const;
@@ -315,6 +309,14 @@ class CORE_EXPORT VisualViewport : public GarbageCollected<VisualViewport>,
   std::optional<blink::Color> CSSScrollbarThumbColor() const;
 
   void DropCompositorScrollDeltaNextCommit() override;
+
+ protected:
+  // ScrollableArea implementation
+  bool SetScrollOffsetInternal(const ScrollOffset&,
+                               mojom::blink::ScrollType,
+                               cc::ScrollSourceType,
+                               mojom::blink::ScrollBehavior,
+                               bool targeted_scroll) override;
 
  private:
   bool DidSetScaleOrLocation(float scale,

@@ -27,6 +27,7 @@
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
 #include "url/gurl.h"
@@ -43,13 +44,6 @@ constexpr int kMinTabCountForInactiveTabNudge = 15;
 // Minimum percentage of stale tabs in the tabstrip to show the nudge.
 constexpr double kStaleTabPercentageThreshold = 0.10;
 }  // namespace
-
-// static
-void TabDeclutterController::EmitEntryPointHistogram(
-    tab_search::mojom::TabDeclutterEntryPoint entry_point) {
-  base::UmaHistogramEnumeration("Tab.Organization.Declutter.EntryPoint",
-                                entry_point);
-}
 
 TabDeclutterController::TabDeclutterController(
     BrowserWindowInterface* browser_window_interface)
@@ -120,10 +114,7 @@ TabDeclutterController::GetDuplicateTabs() {
   std::map<GURL, std::vector<tabs::TabInterface*>> duplicate_tabs;
   CHECK(features::IsTabstripDedupeEnabled());
 
-  for (int tab_index = 0; tab_index < tab_strip_model_->GetTabCount();
-       tab_index++) {
-    tabs::TabInterface* tab = tab_strip_model_->GetTabAtIndex(tab_index);
-
+  for (tabs::TabInterface* tab : *tab_strip_model_) {
     if (IsTabExcluded(tab)) {
       continue;
     }
@@ -161,10 +152,7 @@ std::vector<tabs::TabInterface*> TabDeclutterController::GetStaleTabs() {
   std::vector<tabs::TabInterface*> tabs;
 
   const base::Time now = base::Time::Now();
-  for (int tab_index = 0; tab_index < tab_strip_model_->GetTabCount();
-       tab_index++) {
-    tabs::TabInterface* tab = tab_strip_model_->GetTabAtIndex(tab_index);
-
+  for (tabs::TabInterface* tab : *tab_strip_model_) {
     if (IsTabExcluded(tab)) {
       continue;
     }
@@ -190,45 +178,17 @@ std::vector<tabs::TabInterface*> TabDeclutterController::GetStaleTabs() {
   return tabs;
 }
 
-void TabDeclutterController::LogExcludedDuplicateTabMetrics() {
-  int excluded_tab_count = 0;
 
-  if (!excluded_urls_.empty()) {
-    for (int index = 0; index < tab_strip_model_->GetTabCount(); index++) {
-      if (excluded_urls_.contains(tab_strip_model_->GetTabAtIndex(index)
-                                      ->GetContents()
-                                      ->GetLastCommittedURL()
-                                      .GetWithoutRef())) {
-        excluded_tab_count++;
-      }
-    }
-  }
-
-  base::UmaHistogramCounts1000("Tab.Organization.Dedupe.ExcludedTabCount",
-                               excluded_tab_count);
-}
 
 void TabDeclutterController::DeclutterTabs(
     std::vector<tabs::TabInterface*> tabs,
     const std::vector<GURL>& urls) {
-  base::UmaHistogramCounts1000("Tab.Organization.Declutter.DeclutterTabCount",
-                               tabs.size());
-  base::UmaHistogramCounts1000("Tab.Organization.Declutter.TotalTabCount",
-                               tab_strip_model_->count());
-  base::UmaHistogramCounts1000("Tab.Organization.Declutter.ExcludedTabCount",
-                               excluded_tabs_.size());
-
-  LogExcludedDuplicateTabMetrics();
-
   PrefService* prefs =
       Profile::FromBrowserContext(tab_strip_model_->profile())->GetPrefs();
 
   int usage_count =
       prefs->GetInteger(tab_search_prefs::kTabDeclutterUsageCount);
   prefs->SetInteger(tab_search_prefs::kTabDeclutterUsageCount, ++usage_count);
-
-  base::UmaHistogramCounts1000("Tab.Organization.Declutter.TotalUsageCount",
-                               usage_count);
 
   for (tabs::TabInterface* tab : tabs) {
     if (tab_strip_model_->GetIndexOfTab(tab) == TabStripModel::kNoTab) {
@@ -240,16 +200,12 @@ void TabDeclutterController::DeclutterTabs(
         TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB);
   }
 
-  int duplicate_tabs_decluttered = 0;
   for (const GURL& url : urls) {
     // Sort the tabs with `url` based on the last committed navigation time and
     // close all the tabs except the oldest tab.
     std::vector<std::pair<tabs::TabInterface*, base::Time>> url_matching_tabs;
 
-    for (int tab_index = 0; tab_index < tab_strip_model_->GetTabCount();
-         ++tab_index) {
-      tabs::TabInterface* tab = tab_strip_model_->GetTabAtIndex(tab_index);
-
+    for (tabs::TabInterface* tab : *tab_strip_model_) {
       if (tab->GetContents()->GetLastCommittedURL().GetWithoutRef() != url) {
         continue;
       }
@@ -281,12 +237,8 @@ void TabDeclutterController::DeclutterTabs(
       tab_strip_model_->CloseWebContentsAt(
           tab_strip_model_->GetIndexOfWebContents(tab->GetContents()),
           TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB);
-      duplicate_tabs_decluttered++;
     }
   }
-
-  base::UmaHistogramCounts1000("Tab.Organization.Dedupe.DeclutterTabCount",
-                               duplicate_tabs_decluttered);
 
   excluded_tabs_.clear();
   excluded_urls_.clear();
@@ -377,7 +329,7 @@ bool TabDeclutterController::DeclutterStaleTabsNudgeCriteriaMet(
     return false;
   }
 
-  const int total_tab_count = tab_strip_model_->GetTabCount();
+  const int total_tab_count = tab_strip_model_->count();
 
   if (total_tab_count < kMinTabCountForInactiveTabNudge) {
     return false;

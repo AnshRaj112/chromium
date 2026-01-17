@@ -43,8 +43,15 @@ class AdHocCodeSigningForPWAsEnabledTest
     policy::BrowserPolicyConnector::SetPolicyProviderForTesting(
         &policy_provider_);
 
-    feature_list_.InitWithFeatureState(features::kUseAdHocSigningForWebAppShims,
-                                       GetFeatureValue());
+    if (GetFeatureValue()) {
+      // Init with a dummy field trial parameter to make sure this override is
+      // treated as a field trial override rather than a command line override.
+      feature_list_.InitAndEnableFeatureWithParameters(
+          features::kUseAdHocSigningForWebAppShims, {{"dummy", "value"}});
+    } else {
+      feature_list_.InitWithFeatureState(
+          features::kUseAdHocSigningForWebAppShims, false);
+    }
     override_registration_ =
         web_app::OsIntegrationTestOverrideImpl::OverrideForTesting();
     destination_dir_ =
@@ -64,21 +71,21 @@ class AdHocCodeSigningForPWAsEnabledTest
   base::FilePath destination_dir_;
 };
 
-// TODO(crbug.com/369346087): Deflake and re-enable.
-IN_PROC_BROWSER_TEST_P(AdHocCodeSigningForPWAsEnabledTest,
-                       DISABLED_IsRespected) {
+IN_PROC_BROWSER_TEST_P(AdHocCodeSigningForPWAsEnabledTest, IsRespected) {
   webapps::AppId app_id = web_app::test::InstallDummyWebApp(
       browser()->profile(), "Example", GURL("https://www.example.com"));
 
   base::FilePath info_plist_path = destination_dir_.Append("Example.app")
                                        .Append("Contents")
                                        .Append("Info.plist");
-  NSDictionary* infoPlist =
-      [NSDictionary dictionaryWithContentsOfURL:base::apple::FilePathToNSURL(
-                                                    info_plist_path)];
-  ASSERT_TRUE(infoPlist);
+  NSError* error;
+  NSDictionary* info_plist = [NSDictionary
+      dictionaryWithContentsOfURL:base::apple::FilePathToNSURL(info_plist_path)
+                            error:&error];
+  ASSERT_FALSE(error);
+  ASSERT_TRUE(info_plist);
   bool is_ad_hoc_signed =
-      [infoPlist[app_mode::kCrAppModeIsAdHocSignedKey] boolValue];
+      [info_plist[app_mode::kCrAppModeIsAdHocSignedKey] boolValue];
 
   // If the feature is disabled, the policy can never override it.
   if (!GetFeatureValue()) {

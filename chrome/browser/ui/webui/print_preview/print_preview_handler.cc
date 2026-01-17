@@ -13,8 +13,6 @@
 
 #include "ash/constants/ash_features.h"
 #include "base/check.h"
-#include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/dcheck_is_on.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
@@ -47,7 +45,6 @@
 #include "chrome/browser/ui/webui/print_preview/print_preview_ui.h"
 #include "chrome/browser/ui/webui/print_preview/print_preview_utils.h"
 #include "chrome/browser/ui/webui/print_preview/printer_handler.h"
-#include "chrome/common/chrome_switches.h"
 #include "chrome/common/crash_keys.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/printing/printer_capabilities.h"
@@ -200,7 +197,8 @@ const char kPrintPdfAsImage[] = "printPdfAsImage";
 // Gets the print job settings dictionary from |json_str|. Assumes the Print
 // Preview WebUI does not send over invalid data.
 base::Value::Dict GetSettingsDictionary(const std::string& json_str) {
-  std::optional<base::Value> settings = base::JSONReader::Read(json_str);
+  std::optional<base::Value> settings =
+      base::JSONReader::Read(json_str, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   base::Value::Dict dict = std::move(*settings).TakeDict();
   CHECK(!dict.empty());
   return dict;
@@ -556,7 +554,7 @@ bool PrintPreviewHandler::ShouldReceiveRendererMessage(int request_id) {
     return false;
   }
 
-  if (!base::Contains(preview_callbacks_, request_id)) {
+  if (!preview_callbacks_.contains(request_id)) {
     BadMessageReceived();
     return false;
   }
@@ -590,7 +588,7 @@ void PrintPreviewHandler::HandleGetPrinters(const base::Value::List& args) {
 
   // Immediately resolve the callback without fetching printers if the printer
   // type is on the deny list.
-  if (base::Contains(printer_type_deny_list_, printer_type)) {
+  if (printer_type_deny_list_.contains(printer_type)) {
     ResolveJavascriptCallback(base::Value(callback_id), base::Value());
     return;
   }
@@ -629,7 +627,7 @@ void PrintPreviewHandler::HandleGetPrinterCapabilities(
   mojom::PrinterType printer_type = static_cast<mojom::PrinterType>(*type);
 
   // Reject the callback if the printer type is on the deny list.
-  if (base::Contains(printer_type_deny_list_, printer_type)) {
+  if (printer_type_deny_list_.contains(printer_type)) {
     RejectJavascriptCallback(base::Value(callback_id), base::Value());
     return;
   }
@@ -653,7 +651,7 @@ void PrintPreviewHandler::HandleGetPreview(const base::Value::List& args) {
   int request_id = settings.FindInt(kPreviewRequestID).value();
   CHECK_GT(request_id, -1);
 
-  CHECK(!base::Contains(preview_callbacks_, request_id));
+  CHECK(!preview_callbacks_.contains(request_id));
   preview_callbacks_[request_id] = callback_id;
   print_preview_ui()->OnPrintPreviewRequest(request_id);
   // Add an additional key in order to identify |print_preview_ui| later on
@@ -720,9 +718,9 @@ void PrintPreviewHandler::HandleDoPrint(const base::Value::List& args) {
     return;
   }
 
-  scoped_refptr<base::RefCountedMemory> data;
-  print_preview_ui()->GetPrintPreviewDataForIndex(
-      COMPLETE_PREVIEW_DOCUMENT_INDEX, &data);
+  scoped_refptr<base::RefCountedMemory> data =
+      print_preview_ui()->GetPrintPreviewDataForIndex(
+          COMPLETE_PREVIEW_DOCUMENT_INDEX);
   if (!data) {
     // Nothing to print, no preview available.
     RejectJavascriptCallback(base::Value(callback_id), base::Value("NO_DATA"));
@@ -972,18 +970,15 @@ void PrintPreviewHandler::SendInitialSettings(
     initial_settings.Set(kPolicies, std::move(policies));
   }
 
-  initial_settings.Set(
-      kPdfPrinterDisabled,
-      base::Contains(printer_type_deny_list_, mojom::PrinterType::kPdf));
+  initial_settings.Set(kPdfPrinterDisabled, printer_type_deny_list_.contains(
+                                                mojom::PrinterType::kPdf));
 
   const bool destinations_managed =
       !printer_type_deny_list_.empty() &&
       prefs->IsManagedPreference(prefs::kPrinterTypeDenyList);
   initial_settings.Set(kDestinationsManaged, destinations_managed);
 
-  base::CommandLine* cmdline = base::CommandLine::ForCurrentProcess();
-  initial_settings.Set(kIsInKioskAutoPrintMode,
-                       cmdline->HasSwitch(switches::kKioskModePrinting));
+  initial_settings.Set(kIsInKioskAutoPrintMode, SilentPrintingEnabled());
   initial_settings.Set(kIsInAppKioskMode, IsRunningInForcedAppMode());
   const std::string rules_str =
       prefs->GetString(prefs::kPrintPreviewDefaultDestinationSelectionRules);
@@ -1125,7 +1120,7 @@ void PrintPreviewHandler::SendPagePreviewReady(int page_index,
   // gets called, the print preview may have failed. Since the failure message
   // may have arrived first, check for this case and bail out instead of
   // thinking this may be a bad IPC message.
-  if (base::Contains(preview_failures_, preview_request_id)) {
+  if (preview_failures_.contains(preview_request_id)) {
     return;
   }
 

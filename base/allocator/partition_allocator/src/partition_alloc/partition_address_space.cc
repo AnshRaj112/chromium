@@ -12,6 +12,7 @@
 #include <string>
 
 #include "partition_alloc/address_pool_manager.h"
+#include "partition_alloc/allocator_config.h"
 #include "partition_alloc/build_config.h"
 #include "partition_alloc/buildflags.h"
 #include "partition_alloc/compressed_pointer.h"
@@ -142,7 +143,8 @@ bool PartitionAddressSpace::IsIOSTestProcess() {
       return false;
     }
     return std::char_traits<char>::compare(
-               executable_path + (executable_path_length - suffix_length),
+               PA_UNSAFE_TODO(executable_path +
+                              (executable_path_length - suffix_length)),
                suffix, suffix_length) == 0;
   };
 
@@ -314,9 +316,14 @@ void PartitionAddressSpace::InitThreadIsolatedPool(
                                     pool_size));
 
 #if PA_CONFIG(MOVE_METADATA_OUT_OF_GIGACAGE)
-  offsets_to_metadata_[kThreadIsolatedPoolHandle] =
-      metadata_region_start_ - setup_.thread_isolated_pool_base_address_ +
-      MetadataInnerOffset(kThreadIsolatedPoolHandle);
+  if (metadata_region_start_ != kUninitializedPoolBaseAddress) {
+    offsets_to_metadata_[kThreadIsolatedPoolHandle] =
+        metadata_region_start_ - setup_.thread_isolated_pool_base_address_ +
+        MetadataInnerOffset(kThreadIsolatedPoolHandle);
+  } else {
+    // If no metadata region is available, use `SystemPageSize()`.
+    offsets_to_metadata_[kThreadIsolatedPoolHandle] = SystemPageSize();
+  }
 #endif  // PA_CONFIG(MOVE_METADATA_OUT_OF_GIGACAGE)
 }
 #endif  // PA_BUILDFLAG(ENABLE_THREAD_ISOLATION)
@@ -388,6 +395,9 @@ void PartitionAddressSpace::UninitThreadIsolatedPoolForTesting() {
     setup_.thread_isolated_pool_base_address_ = kUninitializedPoolBaseAddress;
     setup_.thread_isolation_.enabled = false;
   }
+#if PA_CONFIG(MOVE_METADATA_OUT_OF_GIGACAGE)
+  offsets_to_metadata_[kThreadIsolatedPoolHandle] = SystemPageSize();
+#endif  // PA_CONFIG(MOVE_METADATA_OUT_OF_GIGACAGE)
 }
 #endif
 
@@ -399,6 +409,19 @@ void PartitionAddressSpace::InitMetadataRegionAndOffsets() {
   if (metadata_region_start_ != kUninitializedPoolBaseAddress) {
     return;
   }
+
+#if PA_BUILDFLAG(ENABLE_MOVE_METADATA_OUT_OF_GIGACAGE_TRIAL)
+  if (ExternalMetadataTrialGroup::kUndefined ==
+      GetExternalMetadataTrialGroup()) {
+    if (SelectExternalMetadataTrialGroup() !=
+        ExternalMetadataTrialGroup::kEnabled) {
+      for (size_t i = 0; i < kMaxPoolHandle; ++i) {
+        offsets_to_metadata_[i] = SystemPageSize();
+      }
+      return;
+    }
+  }
+#endif  // PA_BUILDFLAG(ENABLE_MOVE_METADATA_OUT_OF_GIGACAGE_TRIAL)
 
 #if PA_CONFIG(DYNAMICALLY_SELECT_POOL_SIZE)
   metadata_region_size_ = std::max(kConfigurablePoolMaxSize, CorePoolSize());
@@ -425,6 +448,9 @@ void PartitionAddressSpace::InitMetadataRegionAndOffsets() {
 
   // ConfigurablePool has not been initialized yet at this time.
   offsets_to_metadata_[kConfigurablePoolHandle] = SystemPageSize();
+#if PA_BUILDFLAG(ENABLE_THREAD_ISOLATION)
+  offsets_to_metadata_[kThreadIsolatedPoolHandle] = SystemPageSize();
+#endif  // PA_BUILDFLAG(ENABLE_THREAD_ISOLATION)
 }
 #endif  // PA_CONFIG(MOVE_METADATA_OUT_OF_GIGACAGE)
 

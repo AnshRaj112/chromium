@@ -6,19 +6,30 @@
 #define CHROME_BROWSER_UI_WEBID_IDENTITY_DIALOG_CONTROLLER_H_
 
 #include <memory>
-#include <utility>
+#include <optional>
+#include <string>
 #include <vector>
 
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
-#include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
 #include "chrome/browser/ui/webid/account_selection_view.h"
 #include "chrome/browser/webid/proto/fedcm_clickthrough_rate_metadata.pb.h"
-#include "components/segmentation_platform/public/segmentation_platform_service.h"
-#include "components/segmentation_platform/public/trigger.h"
-#include "content/public/browser/web_contents.h"
+#include "components/segmentation_platform/public/result.h"
+#include "content/public/browser/page_user_data.h"
 #include "content/public/browser/webid/identity_request_dialog_controller.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
+
+namespace content {
+class WebContents;
+}
+
+namespace optimization_guide {
+class OptimizationGuideDecider;
+}
+
+namespace segmentation_platform {
+class SegmentationPlatformService;
+}
 
 using AccountSelectionCallback =
     content::IdentityRequestDialogController::AccountSelectionCallback;
@@ -27,6 +38,7 @@ using DismissCallback =
 using IdentityProviderDataPtr = scoped_refptr<content::IdentityProviderData>;
 using IdentityRequestAccountPtr =
     scoped_refptr<content::IdentityRequestAccount>;
+using OnFederatedTokenReceivedCallback = base::OnceCallback<void(bool)>;
 using TokenError = content::IdentityCredentialTokenError;
 
 // The IdentityDialogController controls the views that are used across
@@ -48,28 +60,31 @@ class IdentityDialogController
   // This enum describes the user action taken when the UI shown uses
   // segmentation platform's UI volume recommendation and is used for
   // histograms. Do not remove or modify existing values, but you may add new
-  // values at the end. This enum should be kept in sync with FedCmUserAction in
-  // tools/metrics/histograms/enums.xml.
+  // values at the end.
+  // LINT.IfChange(UserAction)
+
   enum class UserAction {
     // kSuccess = 0,  // Deprecated.
     kIgnored = 1,
     kClosed = 2,
     kSuccess = 3,
-
     kMaxValue = kSuccess
   };
+
+  // LINT.ThenChange(//tools/metrics/histograms/metadata/blink/enums.xml:FedCmUserAction)
 
   // content::IdentityRequestDelegate
   int GetBrandIconMinimumSize(blink::mojom::RpMode rp_mode) override;
   int GetBrandIconIdealSize(blink::mojom::RpMode rp_mode) override;
 
   // content::IdentityRequestDialogController
+  void ShouldShowAccountsPassiveDialog(
+      ShouldShowAccountsPassiveDialogCallback cb) override;
   bool ShowAccountsDialog(
       content::RelyingPartyData rp_data,
       const std::vector<IdentityProviderDataPtr>& identity_provider_data,
       const std::vector<IdentityRequestAccountPtr>& accounts,
       blink::mojom::RpMode rp_mode,
-      const std::vector<IdentityRequestAccountPtr>& new_accounts,
       AccountSelectionCallback on_selected,
       LoginToIdPCallback on_add_account,
       DismissCallback dismiss_callback,
@@ -112,7 +127,12 @@ class IdentityDialogController
       blink::mojom::RpMode rp_mode,
       DismissCallback dismiss_callback) override;
   void CloseModalDialog() override;
+  void OnFlowCompleted(bool success) override;
   content::WebContents* GetRpWebContents() override;
+  void RequestIdPRegistrationPermision(
+      const url::Origin& origin,
+      base::OnceCallback<void(bool accepted)> callback) override;
+  bool DidShowUi() const override;
 
   // AccountSelectionView::Delegate:
   void OnAccountSelected(
@@ -127,11 +147,6 @@ class IdentityDialogController
   gfx::NativeView GetNativeView() override;
   content::WebContents* GetWebContents() override;
 
-  // Request the IdP Registration permission.
-  void RequestIdPRegistrationPermision(
-      const url::Origin& origin,
-      base::OnceCallback<void(bool accepted)> callback) override;
-
   // Allows setting a mock AccountSelectionView for testing purposes.
   void SetAccountSelectionViewForTesting(
       std::unique_ptr<AccountSelectionView> account_view);
@@ -142,17 +157,50 @@ class IdentityDialogController
 
   // Called when |RequestUiVolumeRecommendation| returns a result.
   void OnRequestUiVolumeRecommendationResultReceived(
-      const content::RelyingPartyData& rp_data,
-      const std::vector<IdentityProviderDataPtr>& identity_provider_data,
-      const std::vector<IdentityRequestAccountPtr>& accounts,
-      blink::mojom::RpMode rp_mode,
-      const std::vector<IdentityRequestAccountPtr>& new_accounts,
+      ShouldShowAccountsPassiveDialogCallback cb,
       const segmentation_platform::ClassificationResult&
           ui_volume_recommendation);
 
   // Records the action the user has taken on the UI shown when a UI volume
   // recommendation from |segmentation_platform_service_| is used.
   void CollectTrainingData(UserAction user_action);
+
+  // Represents an actor login request. The actor may choose to request
+  // a federated token from a specific account, and request to be notified when
+  // the request is completed.
+  class ActorLoginRequest : public content::PageUserData<ActorLoginRequest> {
+   public:
+    ActorLoginRequest(content::Page& page,
+                      const GURL& idp_url,
+                      const std::string& account_id,
+                      OnFederatedTokenReceivedCallback callback);
+    ActorLoginRequest(const ActorLoginRequest&) = delete;
+    ActorLoginRequest& operator=(const ActorLoginRequest&) = delete;
+    ~ActorLoginRequest() override;
+
+    const GURL& idp_url() const { return idp_url_; }
+    const std::string& account_id() const { return account_id_; }
+    OnFederatedTokenReceivedCallback on_federated_token_received_callback() {
+      return std::move(on_federated_token_received_callback_);
+    }
+
+    PAGE_USER_DATA_KEY_DECL();
+
+   private:
+    GURL idp_url_;
+    std::string account_id_;
+    OnFederatedTokenReceivedCallback on_federated_token_received_callback_;
+  };
+
+  // Sets the actor login request information. This is used to know whether a
+  // current pending web identity request is an actor login request, which
+  // account to automatically select, and how to notify the actor.
+  static void SetActorLoginRequest(content::Page& page,
+                                   const GURL& idp_url,
+                                   const std::string& account_id,
+                                   OnFederatedTokenReceivedCallback callback);
+  static void UnsetActorLoginRequest(content::Page& page);
+  ActorLoginRequest* GetActorLoginRequest() const;
 
  private:
   // Attempts to set `account_view_` if it is not already set -- directly on
@@ -162,6 +210,9 @@ class IdentityDialogController
   // Gets the clickthrough rate on the RP aggregated across all users.
   webid::FedCmClickthroughRateMetadata GetFedCmClickthroughRateMetadata();
 
+  // Whether to show FedCM UI or not.
+  bool ShouldShowFedCmUi();
+
   std::unique_ptr<AccountSelectionView> account_view_{nullptr};
   AccountSelectionCallback on_account_selection_;
   DismissCallback on_dismiss_;
@@ -170,6 +221,9 @@ class IdentityDialogController
   AccountsDisplayedCallback on_accounts_displayed_;
   raw_ptr<content::WebContents> rp_web_contents_{nullptr};
   blink::mojom::RpMode rp_mode_;
+  // Whether we show any FedCM UI or not. Excludes the loading dialog since that
+  // one is not something that modifies user state or is actionable by the user.
+  bool did_show_ui_ = false;
 
   // Request ID associated with a |GetClassificationResult| call to
   // |segmentation_platform_service_|. This is nullopt when the

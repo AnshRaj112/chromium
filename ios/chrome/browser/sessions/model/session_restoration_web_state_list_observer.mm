@@ -5,10 +5,9 @@
 #import "ios/chrome/browser/sessions/model/session_restoration_web_state_list_observer.h"
 
 #import "base/check.h"
-#import "base/containers/contains.h"
 #import "ios/chrome/browser/sessions/model/session_restoration_web_state_observer.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/tabs/model/features.h"
+#import "ios/web/common/features.h"
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "ios/web/public/web_state.h"
 
@@ -160,7 +159,7 @@ void SessionRestorationWebStateListObserver::DetachWebState(
   // (this allow deleting data when a WebState is moved between Browsers and
   // then closed before it the session could be saved).
   const web::WebStateID identifier = detached_web_state->GetUniqueIdentifier();
-  if (base::Contains(inserted_web_states_, identifier)) {
+  if (inserted_web_states_.contains(identifier)) {
     inserted_web_states_.erase(identifier);
   } else if (!is_closing && !detached_web_state->IsRealized()) {
     detached_web_states_.insert(identifier);
@@ -175,7 +174,7 @@ void SessionRestorationWebStateListObserver::DetachWebState(
 
 void SessionRestorationWebStateListObserver::DetachObserver(
     web::WebState* web_state) {
-  if (CreateTabHelperOnlyForRealizedWebStates()) {
+  if (web::features::CreateTabHelperOnlyForRealizedWebStates()) {
     if (!web_state->IsRealized()) {
       web_state_observations_.RemoveObservation(web_state);
       return;
@@ -199,9 +198,9 @@ void SessionRestorationWebStateListObserver::AttachWebState(
     MarkWebStateDirty(attached_web_state);
   } else {
     const auto web_state_id = attached_web_state->GetUniqueIdentifier();
-    if (base::Contains(expected_web_states_, web_state_id)) {
+    if (expected_web_states_.contains(web_state_id)) {
       expected_web_states_.erase(web_state_id);
-    } else if (base::Contains(detached_web_states_, web_state_id)) {
+    } else if (detached_web_states_.contains(web_state_id)) {
       detached_web_states_.erase(web_state_id);
     } else {
       inserted_web_states_.insert(web_state_id);
@@ -211,7 +210,7 @@ void SessionRestorationWebStateListObserver::AttachWebState(
 
 void SessionRestorationWebStateListObserver::AttachObserver(
     web::WebState* web_state) {
-  if (CreateTabHelperOnlyForRealizedWebStates()) {
+  if (web::features::CreateTabHelperOnlyForRealizedWebStates()) {
     if (!web_state->IsRealized()) {
       web_state_observations_.AddObservation(web_state);
       return;
@@ -235,7 +234,7 @@ void SessionRestorationWebStateListObserver::MarkWebStateDirty(
     return;
   }
 
-  if (!base::Contains(dirty_web_states_, web_state)) {
+  if (!dirty_web_states_.contains(web_state)) {
     inserted_web_states_.erase(web_state->GetUniqueIdentifier());
     dirty_web_states_.insert(web_state);
 

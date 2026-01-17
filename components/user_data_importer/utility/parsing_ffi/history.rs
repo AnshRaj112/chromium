@@ -3,21 +3,28 @@
 // found in the LICENSE file.
 
 use crate::ffi;
-use crate::json::{self, ZipEntryBufReader, STREAM_BUFFER_SIZE};
-use crate::models::{SafariHistoryJSONEntry, StablePortabilityHistoryJSONEntry};
+use crate::json::{self, ZipEntryBufReader};
+use crate::models::SafariHistoryJSONEntry;
 use crate::{utils::has_extension, ZipFileArchive};
-use anyhow::Result;
 use cxx::{CxxVector, UniquePtr};
-use std::fs;
-use std::io::{BufReader, Read};
+use std::io::Read;
 use std::mem;
 use std::pin::Pin;
-use zip;
+
+#[cfg(target_family = "unix")]
+use crate::json::STREAM_BUFFER_SIZE;
+#[cfg(target_family = "unix")]
+use crate::models::StablePortabilityHistoryJSONEntry;
+#[cfg(target_family = "unix")]
+use std::fs;
+#[cfg(target_family = "unix")]
+use std::io::BufReader;
 
 // A trait for history callbacks to allow for generic implementation of
 // batching.
 pub trait HistoryCallback<T: cxx::vector::VectorElement> {
     fn import_entries(self: Pin<&mut Self>, entries: UniquePtr<CxxVector<T>>, completed: bool);
+    fn fail(self: Pin<&mut Self>);
 }
 
 impl HistoryCallback<ffi::SafariHistoryEntry> for ffi::SafariHistoryCallbackFromRust {
@@ -27,6 +34,10 @@ impl HistoryCallback<ffi::SafariHistoryEntry> for ffi::SafariHistoryCallbackFrom
         completed: bool,
     ) {
         self.ImportSafariHistoryEntries(entries, completed);
+    }
+
+    fn fail(self: Pin<&mut Self>) {
+        self.Fail();
     }
 }
 
@@ -39,6 +50,10 @@ impl HistoryCallback<ffi::StablePortabilityHistoryEntry>
         completed: bool,
     ) {
         self.ImportStablePortabilityHistoryEntries(entries, completed);
+    }
+
+    fn fail(self: Pin<&mut Self>) {
+        self.Fail();
     }
 }
 
@@ -83,10 +98,10 @@ pub fn parse_safari_history(
     history_size_threshold: usize,
 ) {
     let mut history = CxxVector::<ffi::SafariHistoryEntry>::new();
-    archive.fold_files((), |(), file, outpath| {
+    let result = archive.fold_files(true, |acc, file, outpath| {
         if has_extension(outpath, ffi::FileType::SafariHistory) {
             let stream_reader = ZipEntryBufReader::new(file);
-            let _ = json::deserialize_top_level::<SafariHistoryJSONEntry, _>(
+            let result = json::deserialize_top_level::<SafariHistoryJSONEntry, _>(
                 stream_reader.inner,
                 ffi::FileType::SafariHistory,
                 |history_item| {
@@ -99,22 +114,40 @@ pub fn parse_safari_history(
                 },
                 /* metadata_only= */ false,
             );
+
+            match result {
+                Ok(_) => acc,
+                Err(e) => {
+                    if e.contains("Unexpected data type") {
+                        // This is not a real error, just the wrong data type (e.g., PaymentCards).
+                        acc
+                    } else {
+                        false
+                    }
+                }
+            }
+        } else {
+            acc
         }
     });
-    history_callback.as_mut().unwrap().import_entries(history, /* completed= */ true);
+
+    if result {
+        history_callback.as_mut().unwrap().import_entries(history, /* completed= */ true);
+    } else {
+        history_callback.as_mut().unwrap().fail();
+    }
 }
 
 // Attempts to parse a file in the stable portability history format. Returns
 // whether parsing was successful.
+#[cfg(target_family = "unix")]
 pub fn parse_stable_portability_history(
-    json_filename: &[u8],
+    file: fs::File,
     mut history_callback: UniquePtr<ffi::StablePortabilityHistoryCallbackFromRust>,
     history_size_threshold: usize,
-) -> bool {
+) {
     let mut history = CxxVector::<ffi::StablePortabilityHistoryEntry>::new();
-    let result = (|| -> Result<()> {
-        let path_str = std::str::from_utf8(json_filename)?;
-        let file = fs::File::open(path_str)?;
+    let result = {
         let stream_reader = BufReader::with_capacity(STREAM_BUFFER_SIZE, file);
         json::deserialize_top_level::<StablePortabilityHistoryJSONEntry, std::fs::File>(
             stream_reader,
@@ -129,19 +162,23 @@ pub fn parse_stable_portability_history(
             },
             /* metadata_only= */ false,
         )
-    })();
-    // Send final batch if any, and completion signal.
-    history_callback.as_mut().unwrap().import_entries(history, true);
-    return result.is_ok();
+    };
+    if result.is_ok() {
+        // Send final batch if any, and completion signal.
+        history_callback.as_mut().unwrap().import_entries(history, true);
+    } else {
+        // Signal failure.
+        history_callback.as_mut().unwrap().fail();
+    }
 }
 
 // Returns whether the file used by the stream reader is a history file.
 pub fn is_safari_history_file<'a, R: Read>(stream_reader: ZipEntryBufReader<'a, R>) -> bool {
-    return json::deserialize_top_level::<SafariHistoryJSONEntry, zip::read::ZipFile<'a, R>>(
+    json::deserialize_top_level::<SafariHistoryJSONEntry, zip::read::ZipFile<'a, R>>(
         stream_reader.inner,
         ffi::FileType::SafariHistory,
         |_| {},
         /* metadata_only= */ true,
     )
-    .is_ok();
+    .is_ok()
 }

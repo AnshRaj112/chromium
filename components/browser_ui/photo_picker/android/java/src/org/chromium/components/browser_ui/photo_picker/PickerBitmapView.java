@@ -4,6 +4,7 @@
 
 package org.chromium.components.browser_ui.photo_picker;
 
+import static org.chromium.build.NullUtil.assertNonNull;
 import static org.chromium.build.NullUtil.assumeNonNull;
 
 import android.animation.AnimatorSet;
@@ -207,7 +208,7 @@ public class PickerBitmapView extends SelectableItemViewBase<PickerBitmap> {
     }
 
     @Override
-    protected boolean toggleSelectionForItem(@Nullable PickerBitmap item) {
+    protected boolean toggleSelectionForItem(PickerBitmap item) {
         if (isGalleryTile() || isCameraTile()) return false;
         if (mCategoryView.isZoomSwitchingInEffect()) return false;
         return super.toggleSelectionForItem(item);
@@ -239,6 +240,7 @@ public class PickerBitmapView extends SelectableItemViewBase<PickerBitmap> {
     }
 
     private void updateSelectionBorder(boolean animate) {
+        assertNonNull(mBitmapDetails);
         if (!isAttachedToWindow()) {
             // No need to update something that's not attached to a window. As soon as the view is
             // re-attached, it will be updated.
@@ -407,7 +409,7 @@ public class PickerBitmapView extends SelectableItemViewBase<PickerBitmap> {
         } else if (isGalleryTile()) {
             image =
                     TraceEventVectorDrawableCompat.create(
-                            resources, R.drawable.ic_collections_grey, mContext.getTheme());
+                            resources, R.drawable.ic_photo_library_fill_24dp, mContext.getTheme());
             labelStringId = R.string.photo_picker_browse;
         } else {
             assert false;

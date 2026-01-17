@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 import {loadTimeData} from '//resources/js/load_time_data.js';
+import {assert, assertNotReachedCase} from 'chrome://resources/js/assert.js';
 import {getRequiredElement} from 'chrome://resources/js/util.js';
 
-import {BrowserProxyImpl} from './browser_proxy.js';
-import {PrepareForClientResult, ProfileReadyState, WebUiState} from './glic.mojom-webui.js';
-import type {PageInterface} from './glic.mojom-webui.js';
-import type {ApiHostEmbedder} from './glic_api_impl/glic_api_host.js';
-import {WebClientState} from './glic_api_impl/glic_api_host.js';
+import type {BrowserProxyImpl} from './browser_proxy.js';
+import {PanelStateKind, PrepareForClientResult, ProfileReadyState, WebUiState} from './glic.mojom-webui.js';
+import type {ApiHostEmbedder} from './glic_api_impl/host/glic_api_host.js';
+import {WebClientState} from './glic_api_impl/host/glic_api_host.js';
 import type {PageType, WebviewDelegate} from './webview.js';
 import {WebviewController, WebviewPersistentState} from './webview.js';
 
@@ -50,6 +50,7 @@ interface PageElementTypes {
   disabledByAdminCloseButton: HTMLButtonElement;
   signInButton: HTMLButtonElement;
   unresponsiveOverlay: HTMLElement;
+  reload: HTMLButtonElement;
 }
 
 const $: PageElementTypes = new Proxy({}, {
@@ -96,8 +97,7 @@ export enum LoadingStage {
 }
 // LINT.ThenChange(//tools/metrics/histograms/metadata/glic/enums.xml:LoadingStage,//tools/metrics/histograms/metadata/glic/histograms.xml:LoadingStage)
 
-export class GlicAppController implements PageInterface, WebviewDelegate,
-                                          ApiHostEmbedder {
+export class GlicAppController implements WebviewDelegate, ApiHostEmbedder {
   loadingTimer: number|undefined;
 
   // This is used to simulate no connection for tests.
@@ -106,8 +106,12 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
 
   private guestResizeEnabled: boolean = false;
 
-  // Width for non-resizable panel.
-  private defaultWidth: number = 352;
+  // Width and height for non-resizable panel.
+  private defaultWidth: number = 400;
+  private defaultHeight: number = 252;
+
+  // Height for floating loading panel.
+  private floatingLoadingHeight: number = 80;
 
   // Last seen width and height of guest panel.
   private lastWidth: number = 400;
@@ -125,6 +129,8 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
   private loadingStage: LoadingStage = LoadingStage.NOT_LOADING;
   private loadingStageStartTimestampMs?: DOMHighResTimeStamp;
 
+  private panelStateKind: PanelStateKind = PanelStateKind.kHidden;
+
   state: WebUiState|undefined;
 
   // When entering loading state, this represents the earliest timestamp at
@@ -134,17 +140,19 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
 
   browserProxy: BrowserProxyImpl;
 
-  constructor() {
-    this.browserProxy = new BrowserProxyImpl(this);
+  constructor(browserProxy: BrowserProxyImpl) {
+    this.browserProxy = browserProxy;
 
     window.addEventListener('online', () => {
       this.online();
     });
     window.addEventListener('offline', () => {
-      this.offline();
+      if (!this.isOnline()) {
+        this.offline();
+      }
     });
 
-    if (navigator.onLine && !this.simulateNoConnection) {
+    if (this.isOnline()) {
       this.setState(WebUiState.kBeginLoad);
     } else {
       this.setState(WebUiState.kOffline);
@@ -152,8 +160,14 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
     $.profilePickerButton.addEventListener('click', () => {
       this.openProfilePicker();
     });
+    $.reload.addEventListener('click', () => {
+      this.reload();
+    });
     $.disabledByAdminCloseButton.addEventListener('click', () => {
-      this.browserProxy.handler.closePanel();
+      this.browserProxy.pageHandler.closePanel();
+    });
+    $.disabledByAdminPanel.querySelector('a')?.addEventListener('click', () => {
+      this.openDisabledByAdminLink();
     });
     $.signInButton.addEventListener('click', () => {
       this.signIn();
@@ -164,7 +178,7 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
         if (ev.code === 'Escape') {
           ev.stopPropagation();
           ev.preventDefault();
-          this.browserProxy.handler.closePanel();
+          this.browserProxy.pageHandler.closePanel();
         }
       }
     });
@@ -206,7 +220,8 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
             unresponsiveDuration);
         this.enteredUnresponsiveTimestampMs = undefined;
       } else {
-        console.error('Unresponsive state exited without an entering timestamp');
+        console.error(
+            'Unresponsive state exited without an entering timestamp');
       }
     }
 
@@ -231,6 +246,7 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
         this.showPanel('guestPanel');
         break;
       case 'guestError':
+      case 'guestCaaError':
         this.setState(WebUiState.kGuestError);
         break;
       case 'regular':
@@ -240,7 +256,18 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
           this.setState(WebUiState.kBeginLoad);
         }
         break;
+      case 'loadError':
+        this.setState(WebUiState.kError);
+        break;
+      default:
+        assertNotReachedCase(type);
     }
+  }
+
+  webviewDeniedByAdmin() {
+    $.disabledByAdminPanel.classList.toggle(
+        'show-disabled-by-admin-link', true);
+    this.setState(WebUiState.kDisabledByAdmin);
   }
 
   private setState(newState: WebUiState): void {
@@ -252,8 +279,8 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
     }
     this.state = newState;
     this.states.get(this.state)!.onEnter?.call(this);
-    this.browserProxy.handler.webUiStateChanged(this.state);
-    this.browserProxy.handler.enableDragResize(
+    this.browserProxy.pageHandler.webUiStateChanged(this.state);
+    this.browserProxy.pageHandler.enableDragResize(
         this.state === WebUiState.kReady && this.guestResizeEnabled);
   }
 
@@ -419,12 +446,15 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
     this.trackLoadingStageEnd();
 
     const readyState = this.profileReadyState;
+    assert(readyState !== undefined);
     switch (readyState) {
       case ProfileReadyState.kIneligible:
       case ProfileReadyState.kUnknownError:
         this.setState(WebUiState.kUnavailable);
         return;
       case ProfileReadyState.kDisabledByAdmin:
+        $.disabledByAdminPanel.classList.toggle(
+            'show-disabled-by-admin-link', false);
         this.setState(WebUiState.kDisabledByAdmin);
         return;
       case ProfileReadyState.kSignInRequired:
@@ -432,12 +462,16 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
         return;
       case ProfileReadyState.kReady:
         break;
+      default:
+        assertNotReachedCase(readyState);
     }
 
     // Blocking on cookie syncing here introduces latency, we should consider
     // ways to avoid it.
     this.trackLoadingStageStart(LoadingStage.AWAITING_COOKIE_SYNC);
-    const {result} = await this.browserProxy.handler.prepareForClient();
+    const {result} = this.browserProxy.glicPreloadHandler ?
+        await this.browserProxy.glicPreloadHandler.prepareForClient() :
+        await this.browserProxy.pageHandler.prepareForClient();
     this.trackLoadingStageEnd();
 
     switch (result) {
@@ -450,6 +484,8 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
       case PrepareForClientResult.kRequiresSignIn:
         this.setState(WebUiState.kSignIn);
         return;
+      default:
+        assertNotReachedCase(result);
     }
 
     // Load the web client only after cookie sync is complete.
@@ -489,7 +525,8 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
     // `kMaxWaitTimeMs`. Switch to error state at that time unless interrupted
     // by `webClientReady`.
     this.loadingTimer = setTimeout(() => {
-      if (this.webview?.waitingOnPanelWillOpen()) {
+      if (!loadTimeData.getBoolean('glicWebContentsWarming') &&
+          this.webview?.waitingOnPanelWillOpen()) {
         console.warn('Exceeded timeout waiting for notifyPanelWillOpen');
         this.setState(WebUiState.kError);
       } else if (
@@ -518,16 +555,27 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
     for (const panel of document.querySelectorAll<HTMLElement>('.panel')) {
       panel.hidden = panel.id !== id;
     }
+
+    const panelStateKindSection = getRequiredElement('localPanels');
+    panelStateKindSection.classList.toggle('hidden', id === 'guestPanel');
     // Resize widget to size of new panel.
     if (id === 'guestPanel') {
       // For the guest webview, use the most recently requested size.
-      this.browserProxy.handler.resizeWidget(
+      this.browserProxy.pageHandler.resizeWidget(
           {width: this.lastWidth, height: this.lastHeight}, transitionDuration);
-    } else {
-      this.browserProxy.handler.resizeWidget(
+    }
+    if (id === 'loadingPanel') {
+      this.browserProxy.pageHandler.resizeWidget(
           {
             width: this.defaultWidth,
-            height: $[id].getBoundingClientRect().height,
+            height: this.floatingLoadingHeight,
+          },
+          transitionDuration);
+    } else {
+      this.browserProxy.pageHandler.resizeWidget(
+          {
+            width: this.defaultWidth,
+            height: this.defaultHeight,
           },
           transitionDuration);
     }
@@ -588,7 +636,7 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
   enableDragResize(enabled: boolean) {
     this.guestResizeEnabled = enabled;
     if (this.state === WebUiState.kReady) {
-      this.browserProxy.handler.enableDragResize(this.guestResizeEnabled);
+      this.browserProxy.pageHandler.enableDragResize(this.guestResizeEnabled);
     }
   }
 
@@ -614,8 +662,9 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
           case WebUiState.kShowLoading:
           case WebUiState.kHoldLoading:
             return;
+          default:
+            this.setState(WebUiState.kReady);
         }
-        this.setState(WebUiState.kReady);
         break;
       case WebClientState.UNRESPONSIVE:
         this.trackUnresponsiveState(
@@ -628,6 +677,10 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
         this.guestResizeEnabled = false;
         this.setState(WebUiState.kError);
         break;
+      case WebClientState.UNINITIALIZED:
+        break;
+      default:
+        assertNotReachedCase(state);
     }
   }
 
@@ -649,8 +702,15 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
         $.guestPanel.classList.contains('debug')) {
       $.guestPanel.classList.toggle('debug', false);
       this.setState(WebUiState.kError);
+    } else if (this.state === WebUiState.kReady) {
+      this.browserProxy.pageHandler.closePanel();
     } else {
-      this.browserProxy.handler.closePanel();
+      // Reload in the background if user closes window while web client is not
+      // ready. This is an escape hatch for situation where we're stuck in a
+      // loading state caused by an error.
+      this.browserProxy.pageHandler.closePanel().then(() => {
+        this.reload();
+      });
     }
   }
 
@@ -662,14 +722,26 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
   }
 
   private openProfilePicker(): void {
-    this.browserProxy.handler.openProfilePickerAndClosePanel();
+    this.browserProxy.pageHandler.openProfilePickerAndClosePanel();
   }
 
   private signIn(): void {
-    this.browserProxy.handler.signInAndClosePanel();
+    this.browserProxy.pageHandler.signInAndClosePanel();
   }
 
   // PageInterface implementation.
+  updatePageState(panelStateKind: PanelStateKind) {
+    if (this.panelStateKind === panelStateKind) {
+      return;
+    }
+    this.panelStateKind = panelStateKind;
+
+    const panelStateKindSection = getRequiredElement('localPanels');
+    panelStateKindSection.classList.toggle(
+        'sidePanel', this.panelStateKind === PanelStateKind.kAttached);
+    panelStateKindSection.classList.toggle(
+        'floating', this.panelStateKind === PanelStateKind.kDetached);
+  }
 
   // Called before the WebUI is shown. If we're in an error state, automatically
   // try to reload.
@@ -696,6 +768,8 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
           this.setState(WebUiState.kUnavailable);
           break;
         case ProfileReadyState.kDisabledByAdmin:
+          $.disabledByAdminPanel.classList.toggle(
+              'show-disabled-by-admin-link', false);
           this.setState(WebUiState.kDisabledByAdmin);
           break;
         case ProfileReadyState.kSignInRequired:
@@ -706,7 +780,19 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
             this.setState(WebUiState.kBeginLoad);
           }
           break;
+        default:
+          assertNotReachedCase(this.profileReadyState);
       }
     }
+  }
+
+  openDisabledByAdminLink(): void {
+    this.browserProxy.pageHandler.openDisabledByAdminLinkAndClosePanel();
+  }
+
+  isOnline() {
+    return loadTimeData.getBoolean('ignoreOfflineState') ?
+        true :
+        navigator.onLine && !this.simulateNoConnection;
   }
 }

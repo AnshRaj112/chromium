@@ -113,6 +113,7 @@ class CORE_EXPORT SVGElement : public Element {
   virtual bool IsTextContent() const { return false; }
   virtual bool IsTextPositioning() const { return false; }
   virtual bool IsStructurallyExternal() const { return false; }
+  virtual bool IsViewportContainerElement() const { return false; }
 
   // For SVGTests
   virtual bool IsValid() const { return true; }
@@ -207,6 +208,8 @@ class CORE_EXPORT SVGElement : public Element {
 
   void ParseAttribute(const AttributeModificationParams&) override;
   void AttributeChanged(const AttributeModificationParams&) override;
+  void InvalidateStyleAttribute(
+      bool only_changed_independent_properties) override;
   void InvalidateInstances();
 
   void UpdatePresentationAttributeStyle(const SVGAnimatedPropertyBase&);

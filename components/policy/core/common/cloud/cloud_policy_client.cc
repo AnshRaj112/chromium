@@ -9,14 +9,15 @@
 #include <variant>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
 #include "base/observer_list.h"
+#include "base/strings/strcat.h"
 #include "base/strings/stringprintf.h"
 #include "base/time/time.h"
 #include "base/uuid.h"
@@ -32,6 +33,7 @@
 #include "components/policy/core/common/cloud/realtime_reporting_job_configuration.h"
 #include "components/policy/core/common/cloud/signing_service.h"
 #include "components/policy/core/common/policy_logger.h"
+#include "components/policy/core/common/policy_proto_decoders.h"
 #include "components/policy/core/common/policy_types.h"
 #include "components/policy/core/common/remote_commands/remote_commands_fetch_reason.h"
 #include "components/policy/proto/device_management_backend.pb.h"
@@ -47,9 +49,14 @@ using PsmExecutionResult = em::DeviceRegisterRequest::PsmExecutionResult;
 
 namespace policy {
 
-BASE_FEATURE(kPolicyFetchWithSha256,
-             "PolicyFetchWithSha256",
+BASE_FEATURE(kPolicyFetchWithSha256, base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kEnableReregistration,
+#if BUILDFLAG(IS_CHROMEOS)
              base::FEATURE_ENABLED_BY_DEFAULT);
+#else
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
 
 namespace {
 
@@ -150,6 +157,8 @@ em::DevicePolicyRequest::Reason TranslateFetchReason(PolicyFetchReason reason) {
       return Request::UNNECESSARY_SCHEMA_UPDATED;
     case PolicyFetchReason::kDisconnect:
       return Request::UNNECESSARY_DISCONNECT;
+    case PolicyFetchReason::kExtensionInstall:
+      return Request::EXTENSION_INSTALL;
   }
   NOTREACHED();
 }
@@ -272,6 +281,44 @@ std::string FormatMacAddress(const CloudPolicyClient::MacAddress& mac_address) {
   return mac_address_string;
 }
 
+// Returns a string representation of the given `type_to_fetch`, for logging.
+// Does not include the `extension_ids_and_version` field.
+std::string TypeToFetchToDebugString(const PolicyTypeToFetch& type_to_fetch) {
+  std::string result = "{ policy_type: '";
+  result += type_to_fetch.policy_type();
+  result += "'";
+  if (!type_to_fetch.settings_entity_id().empty()) {
+    result += ", settings_entity_id: '";
+    result += type_to_fetch.settings_entity_id();
+    result += "'";
+  }
+  result += " }";
+  return result;
+}
+
+// Returns a string representation of the given `extension_ids_and_versions`,
+// for logging.
+std::string JoinExtensionIdsAndVersions(
+    const std::set<ExtensionIdAndVersion>& extension_ids_and_versions) {
+  std::string result;
+  if (extension_ids_and_versions.empty()) {
+    return result;
+  }
+
+  auto it = extension_ids_and_versions.begin();
+  CHECK(it != extension_ids_and_versions.end());
+  result += base::StringPrintf("'%s@%s'", it->extension_id.c_str(),
+                               it->extension_version.c_str());
+  ++it;
+
+  for (; it != extension_ids_and_versions.end(); ++it) {
+    result += ", ";
+    result += base::StringPrintf("'%s@%s'", it->extension_id.c_str(),
+                                 it->extension_version.c_str());
+  }
+  return result;
+}
+
 // Returns the histogram variant for the corresponding `type`. Returns nullopt
 // if there is no variant for the type.
 std::optional<std::string_view> HistogramVariantForType(std::string_view type) {
@@ -284,6 +331,18 @@ std::optional<std::string_view> HistogramVariantForType(std::string_view type) {
   }
   return std::nullopt;
 }
+
+class SingleExtensionProvider : public PolicyTypeToFetch::ExtensionsProvider {
+ public:
+  explicit SingleExtensionProvider(const ExtensionIdAndVersion& extension)
+      : extension_(extension) {}
+  std::set<ExtensionIdAndVersion> GetExtensions() override {
+    return {extension_.get()};
+  }
+
+ private:
+  const raw_ref<const ExtensionIdAndVersion> extension_;
+};
 
 }  // namespace
 
@@ -353,6 +412,9 @@ CloudPolicyClient::CloudPolicyClient(
     std::optional<MacAddress> ethernet_mac_address,
     std::optional<MacAddress> dock_mac_address,
     std::string_view manufacture_date,
+    std::string_view flex_sys_vendor,
+    std::string_view flex_product_name,
+    std::string_view flex_product_version,
     DeviceManagementService* service,
     scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
     DeviceDMTokenCallback device_dm_token_callback)
@@ -366,6 +428,9 @@ CloudPolicyClient::CloudPolicyClient(
       dock_mac_address_(dock_mac_address ? FormatMacAddress(*dock_mac_address)
                                          : std::string()),
       manufacture_date_(manufacture_date),
+      flex_sys_vendor_(flex_sys_vendor),
+      flex_product_name_(flex_product_name),
+      flex_product_version_(flex_product_version),
       service_(service),  // Can be null for unit tests.
       device_dm_token_callback_(device_dm_token_callback),
       url_loader_factory_(url_loader_factory) {}
@@ -528,7 +593,7 @@ void CloudPolicyClient::RegisterBrowserOrPolicyAgentWithEnrollmentToken(
     config->SetTimeoutDuration(base::Seconds(30));
   }
 
-  enterprise_management::RegisterBrowserRequest* request =
+  em::RegisterBrowserRequest* request =
       config->request()->mutable_register_browser_request();
   client_data_delegate.FillRegisterBrowserRequest(
       request, base::BindOnce(&CloudPolicyClient::CreateUniqueRequestJob,
@@ -691,21 +756,81 @@ CloudPolicyClient::GetPolicyFetchRequestSignatureType() {
   return em::PolicyFetchRequest::SHA1_RSA;
 }
 
-void CloudPolicyClient::FetchPolicy(PolicyFetchReason reason) {
+em::PolicyFetchRequest* CloudPolicyClient::AddPolicyFetchRequest(
+    em::DevicePolicyRequest* policy_request,
+    const PolicyTypeToFetch& type_to_fetch) {
+  em::PolicyFetchRequest* fetch_request = policy_request->add_requests();
+  fetch_request->set_policy_type(type_to_fetch.policy_type());
+  VLOG_POLICY(2, POLICY_FETCHING)
+      << "Fetching policy: " << TypeToFetchToDebugString(type_to_fetch);
+
+  if (!type_to_fetch.settings_entity_id().empty()) {
+    fetch_request->set_settings_entity_id(type_to_fetch.settings_entity_id());
+  }
+
+  std::set<ExtensionIdAndVersion> extension_ids_and_version =
+      type_to_fetch.extension_ids_and_version();
+  if (!extension_ids_and_version.empty()) {
+    VLOG_POLICY(2, POLICY_FETCHING)
+        << "extension_ids_and_version = ["
+        << JoinExtensionIdsAndVersions(extension_ids_and_version) << "]";
+  }
+  for (const auto& [extension_id, extension_version] :
+       extension_ids_and_version) {
+    if (!extension_id.empty()) {
+      em::ExtensionIdAndVersion* extension_id_and_version =
+          fetch_request->add_extension_ids_and_version();
+      extension_id_and_version->set_extension_id(extension_id);
+      extension_id_and_version->set_extension_version(extension_version);
+    }
+  }
+
+  // Request signed policy blobs to help prevent tampering on the client.
+  fetch_request->set_signature_type(GetPolicyFetchRequestSignatureType());
+  if (public_key_version_valid_) {
+    fetch_request->set_public_key_version(public_key_version_);
+  }
+
+  fetch_request->set_verification_key_hash(kPolicyVerificationKeyHash);
+
+  // These fields are included only in requests for chrome policy.
+  if (IsChromePolicy(type_to_fetch.policy_type())) {
+    if (!device_dm_token_.empty()) {
+      fetch_request->set_device_dm_token(device_dm_token_);
+    }
+    if (!last_policy_timestamp_.is_null()) {
+      fetch_request->set_timestamp(
+          last_policy_timestamp_.InMillisecondsSinceUnixEpoch());
+    }
+    if (!invalidation_payload_.empty()) {
+      fetch_request->set_invalidation_version(invalidation_version_);
+      fetch_request->set_invalidation_payload(invalidation_payload_);
+    }
+  }
+  return fetch_request;
+}
+
+void CloudPolicyClient::FetchPolicyInternal(
+    PolicyFetchReason reason,
+    const PolicyTypeToFetchSet& types_to_fetch,
+    base::OnceCallback<void(DMServerJobResult)> callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   CHECK(is_registered());
-  CHECK(!types_to_fetch_.empty());
+  CHECK(!types_to_fetch.empty());
 
-  VLOG(2) << "Policy fetch starting";
+  VLOG_POLICY(2, POLICY_FETCHING) << "Policy fetch starting";
   auto params = DMServerJobConfiguration::CreateParams::WithClient(
       DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH, this);
   params.auth_data = DMAuth::FromDMToken(dm_token_);
   params.oauth_token = oauth_token_;
   params.profile_id = profile_id_;
-  params.callback =
-      base::BindOnce(&CloudPolicyClient::OnPolicyFetchCompleted,
-                     weak_ptr_factory_.GetWeakPtr(), base::Time::Now());
+
+  if (reason == PolicyFetchReason::kExtensionInstall) {
+    CHECK_EQ(types_to_fetch.size(), 1u)
+        << "Only one extension install policy can be fetched at a time";
+  }
+  params.callback = std::move(callback);
   // Marking a small number of fetch reasons critical helps on DMServer, see for
   // instance https://crbug.com/660009.
   if (reason == PolicyFetchReason::kDeviceEnrollment) {
@@ -722,53 +847,26 @@ void CloudPolicyClient::FetchPolicy(PolicyFetchReason reason) {
 
   // Build policy fetch requests.
   em::DevicePolicyRequest* policy_request = request->mutable_policy_request();
-  const em::PolicyFetchRequest::SignatureType signature_type =
-      GetPolicyFetchRequestSignatureType();
-  for (const auto& type_to_fetch : types_to_fetch_) {
-    VLOG_POLICY(2, POLICY_FETCHING)
-        << "Fetching policy type: " << type_to_fetch.first << " -> "
-        << type_to_fetch.second;
-    em::PolicyFetchRequest* fetch_request = policy_request->add_requests();
-    fetch_request->set_policy_type(type_to_fetch.first);
-    if (!type_to_fetch.second.empty()) {
-      fetch_request->set_settings_entity_id(type_to_fetch.second);
-    }
-
-    // Request signed policy blobs to help prevent tampering on the client.
-    fetch_request->set_signature_type(signature_type);
-    if (public_key_version_valid_) {
-      fetch_request->set_public_key_version(public_key_version_);
-    }
-
-    fetch_request->set_verification_key_hash(kPolicyVerificationKeyHash);
-
-    // These fields are included only in requests for chrome policy.
-    if (IsChromePolicy(type_to_fetch.first)) {
-      if (!device_dm_token_.empty()) {
-        fetch_request->set_device_dm_token(device_dm_token_);
-      }
-      if (!last_policy_timestamp_.is_null()) {
-        fetch_request->set_timestamp(
-            last_policy_timestamp_.InMillisecondsSinceUnixEpoch());
-      }
-      if (!invalidation_payload_.empty()) {
-        fetch_request->set_invalidation_version(invalidation_version_);
-        fetch_request->set_invalidation_payload(invalidation_payload_);
-      }
-    }
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+  em::PolicyFetchRequest* fetch_request = nullptr;
+#endif
+  for (const auto& type_to_fetch : types_to_fetch) {
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+    fetch_request = AddPolicyFetchRequest(policy_request, type_to_fetch);
     // Only set browser device identifier for CBCM Chrome cloud policy on
     // desktop.
-    if (type_to_fetch.first ==
+    if (type_to_fetch.policy_type() ==
         dm_protocol::kChromeMachineLevelUserCloudPolicyType) {
 #if BUILDFLAG(IS_WIN)
         cbcm_policy_fetch_request = fetch_request;
 #else
-        fetch_request->set_allocated_browser_device_identifier(
-            GetBrowserDeviceIdentifier().release());
+      fetch_request->set_allocated_browser_device_identifier(
+          GetBrowserDeviceIdentifier().release());
 #endif  // BUILDFLAG(IS_WIN)
     }
-#endif
+#else
+    AddPolicyFetchRequest(policy_request, type_to_fetch);
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
   }
 
   void OnPromotionEligibilityDetermined(
@@ -803,7 +901,28 @@ void CloudPolicyClient::FetchPolicy(PolicyFetchReason reason) {
     return;
   }
 #endif  // BUILDFLAG(IS_WIN)
-  unique_request_job_ = service_->CreateJob(std::move(config));
+  if (reason == PolicyFetchReason::kExtensionInstall) {
+    request_jobs_.push_back(service_->CreateJob(std::move(config)));
+  } else {
+    unique_request_job_ = service_->CreateJob(std::move(config));
+  }
+}
+
+void CloudPolicyClient::FetchExtensionInstallPolicy(
+    const std::string& policy_type,
+    PolicyFetchReason reason,
+    const ExtensionIdAndVersion& extension_id_and_version,
+    base::OnceCallback<void(DMServerJobResult)> callback) {
+  SingleExtensionProvider provider(extension_id_and_version);
+  FetchPolicyInternal(reason, {PolicyTypeToFetch(policy_type, &provider)},
+                      std::move(callback));
+}
+
+void CloudPolicyClient::FetchPolicy(PolicyFetchReason reason) {
+  FetchPolicyInternal(
+      reason, types_to_fetch_,
+      base::BindOnce(&CloudPolicyClient::OnPolicyFetchCompleted,
+                     weak_ptr_factory_.GetWeakPtr(), base::Time::Now()));
 }
 
 void CloudPolicyClient::DeterminePromotionEligibility(
@@ -894,8 +1013,7 @@ void CloudPolicyClient::UploadPolicyValidationReport(
 
 void CloudPolicyClient::FetchRobotAuthCodes(
     DMAuth auth,
-    enterprise_management::DeviceServiceApiAccessRequest::DeviceType
-        device_type,
+    em::DeviceServiceApiAccessRequest::DeviceType device_type,
     const std::set<std::string>& oauth_scopes,
     RobotAuthCodeCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -1290,7 +1408,7 @@ void CloudPolicyClient::UpdateGcmId(
 }
 
 void CloudPolicyClient::UploadEuiccInfo(
-    std::unique_ptr<enterprise_management::UploadEuiccInfoRequest> request,
+    std::unique_ptr<em::UploadEuiccInfoRequest> request,
     CloudPolicyClient::StatusCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   CHECK(is_registered());
@@ -1345,7 +1463,7 @@ void CloudPolicyClient::ClientCertProvisioningRequest(
 }
 
 void CloudPolicyClient::UploadFmRegistrationToken(
-    enterprise_management::FmRegistrationTokenUploadRequest request,
+    em::FmRegistrationTokenUploadRequest request,
     ResultCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
@@ -1412,15 +1530,25 @@ void CloudPolicyClient::AddPolicyTypeToFetch(
     const std::string& settings_entity_id) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  types_to_fetch_.insert(std::make_pair(policy_type, settings_entity_id));
+  AddPolicyTypeToFetch(PolicyTypeToFetch(policy_type, settings_entity_id));
+}
+
+void CloudPolicyClient::AddPolicyTypeToFetch(const PolicyTypeToFetch& params) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  types_to_fetch_.insert(params);
 }
 
 void CloudPolicyClient::RemovePolicyTypeToFetch(
     const std::string& policy_type,
     const std::string& settings_entity_id) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  RemovePolicyTypeToFetch(PolicyTypeToFetch(policy_type, settings_entity_id));
+}
 
-  types_to_fetch_.erase(std::make_pair(policy_type, settings_entity_id));
+void CloudPolicyClient::RemovePolicyTypeToFetch(
+    const PolicyTypeToFetch& params) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  types_to_fetch_.erase(params);
 }
 
 void CloudPolicyClient::SetStateKeysToUpload(
@@ -1436,7 +1564,7 @@ const em::PolicyFetchResponse* CloudPolicyClient::GetPolicyFor(
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   auto it = last_policy_fetch_responses_.find(
-      std::make_pair(policy_type, settings_entity_id));
+      PolicyTypeToFetch(policy_type, settings_entity_id));
   return it == last_policy_fetch_responses_.end() ? nullptr : &it->second;
 }
 
@@ -1477,8 +1605,7 @@ void CloudPolicyClient::UploadCertificate(
 void CloudPolicyClient::PrepareCertUploadRequest(
     DMServerJobConfiguration* config,
     const std::string& certificate_data,
-    enterprise_management::DeviceCertUploadRequest::CertificateType
-        certificate_type) {
+    em::DeviceCertUploadRequest::CertificateType certificate_type) {
   em::DeviceManagementRequest* request = config->request();
   em::DeviceCertUploadRequest* upload_request =
       request->mutable_cert_upload_request();
@@ -1641,8 +1768,8 @@ void CloudPolicyClient::OnFetchRobotAuthCodesCompleted(
 }
 
 void CloudPolicyClient::RecordFetchStatus(DeviceManagementStatus status) {
-  for (const auto& [type, _] : types_to_fetch_) {
-    const auto variant = HistogramVariantForType(type);
+  for (const auto& type_to_fetch : types_to_fetch_) {
+    const auto variant = HistogramVariantForType(type_to_fetch.policy_type());
     if (variant) {
       base::UmaHistogramSparse(
           base::StrCat(
@@ -1694,8 +1821,8 @@ void CloudPolicyClient::OnPolicyFetchCompleted(base::Time start_time,
       if (policy_data.has_settings_entity_id()) {
         entity_id = policy_data.settings_entity_id();
       }
-      std::pair<std::string, std::string> key(type, entity_id);
-      if (base::Contains(last_policy_fetch_responses_, key)) {
+      PolicyTypeToFetch key(type, entity_id);
+      if (last_policy_fetch_responses_.contains(key)) {
         LOG_POLICY(WARNING, CBCM_ENROLLMENT)
             << "Duplicate PolicyFetchResponse for type: " << type
             << ", entity: " << entity_id << ", ignoring";
@@ -1716,9 +1843,16 @@ void CloudPolicyClient::OnPolicyFetchCompleted(base::Time start_time,
     if (result.dm_status == DM_STATUS_SERVICE_DEVICE_NOT_FOUND ||
         result.dm_status == DM_STATUS_SERVICE_DEVICE_NEEDS_RESET) {
       // Mark as unregistered and initialize re-registration flow.
-      reregistration_dm_token_ = dm_token_;
-      dm_token_.clear();
-      NotifyRegistrationStateChanged();
+      // This re-registration flow is only used by ChromeOS. Using an
+      // experiemntal flag to turn it off on other platforms.
+      // TODO(b/437175703): Once we have verified that it's safe to remove such
+      // logic on other platforms, we will remove the experiment and guarded all
+      // related logic behind the #if condition.
+      if (base::FeatureList::IsEnabled(kEnableReregistration)) {
+        reregistration_dm_token_ = dm_token_;
+        dm_token_.clear();
+        NotifyRegistrationStateChanged();
+      }
     }
   }
 }
@@ -1884,9 +2018,10 @@ void CloudPolicyClient::OnPromotionEligibilityDetermined(
     NotifyClientError();
   }
 
+  RemoveJob(result.job);
+
   std::move(callback).Run(
       result.response.get_user_eligible_promotions_response());
-  RemoveJob(result.job);
 }
 
 void CloudPolicyClient::NotifyPolicyFetched() {
@@ -1945,6 +2080,15 @@ void CloudPolicyClient::CreateDeviceRegisterRequest(
   }
   if (!manufacture_date_.empty()) {
     request->set_manufacture_date(manufacture_date_);
+  }
+  if (!flex_sys_vendor_.empty()) {
+    request->mutable_smbios_info()->set_sys_vendor(flex_sys_vendor_);
+  }
+  if (!flex_product_name_.empty()) {
+    request->mutable_smbios_info()->set_product_name(flex_product_name_);
+  }
+  if (!flex_product_version_.empty()) {
+    request->mutable_smbios_info()->set_product_version(flex_product_version_);
   }
   if (!params.requisition.empty()) {
     request->set_requisition(params.requisition);

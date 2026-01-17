@@ -12,12 +12,9 @@
 #include <vector>
 
 #include "build/build_config.h"
+#include "components/viz/common/resources/shared_image_format.h"
 #include "gpu/config/gpu_config_export.h"
 #include "gpu/config/gpu_feature_type.h"
-
-namespace gfx {
-enum class BufferFormat : uint8_t;
-}
 
 namespace gl {
 class GLContext;
@@ -67,14 +64,14 @@ struct GPU_CONFIG_EXPORT GpuFeatureInfo {
   // Applied gpu driver bug list entry indices.
   std::vector<uint32_t> applied_gpu_driver_bug_list_entries;
 
-  // BufferFormats that can be allocated and then bound, if known and provided
-  // by the platform.
-  std::vector<gfx::BufferFormat>
-      supported_buffer_formats_for_allocation_and_texturing;
+  // NV12 / P010 formats that can be allocated and then bound, if known and
+  // provided by the platform.
+  bool supports_nv12_for_allocation_and_texturing = false;
+  bool supports_p010_for_allocation_and_texturing = false;
 #if BUILDFLAG(IS_OZONE)
-  // BufferFormats of native pixmaps that can be imported in GL context.
-  std::vector<gfx::BufferFormat>
-      supported_buffer_formats_for_gl_native_pixmap_import;
+  // SharedImageFormats of native pixmaps that can be imported in GL context.
+  std::vector<viz::SharedImageFormat>
+      supported_formats_for_gl_native_pixmap_import;
 #endif  // BUILDFLAG(IS_OZONE)
 };
 

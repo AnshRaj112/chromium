@@ -20,6 +20,10 @@ class OptionalButtonViewBinder {
         } else if (OptionalButtonProperties.TRANSITION_STARTED_CALLBACK.equals(propertyKey)) {
             view.setTransitionStartedCallback(
                     model.get(OptionalButtonProperties.TRANSITION_STARTED_CALLBACK));
+        } else if (OptionalButtonProperties.ON_BEFORE_WIDTH_TRANSITION_CALLBACK.equals(
+                propertyKey)) {
+            view.setOnBeforeWidthTransitionCallback(
+                    model.get(OptionalButtonProperties.ON_BEFORE_WIDTH_TRANSITION_CALLBACK));
         } else if (OptionalButtonProperties.TRANSITION_FINISHED_CALLBACK.equals(propertyKey)) {
             view.setTransitionFinishedCallback(
                     model.get(OptionalButtonProperties.TRANSITION_FINISHED_CALLBACK));
@@ -27,6 +31,14 @@ class OptionalButtonViewBinder {
                 propertyKey)) {
             view.setOnBeforeHideTransitionCallback(
                     model.get(OptionalButtonProperties.ON_BEFORE_HIDE_TRANSITION_CALLBACK));
+        } else if (OptionalButtonProperties.ON_BEFORE_SHOW_TRANSITION_CALLBACK.equals(
+                propertyKey)) {
+            view.setOnBeforeShowTransitionCallback(
+                    model.get(OptionalButtonProperties.ON_BEFORE_SHOW_TRANSITION_CALLBACK));
+        } else if (OptionalButtonProperties.ON_BEFORE_DELAYED_TRANSITION_CALLBACK.equals(
+                propertyKey)) {
+            view.setOnBeforeDelayedTransitionCallback(
+                    model.get(OptionalButtonProperties.ON_BEFORE_DELAYED_TRANSITION_CALLBACK));
         } else if (OptionalButtonProperties.TRANSITION_ROOT.equals(propertyKey)) {
             view.setTransitionRoot(model.get(OptionalButtonProperties.TRANSITION_ROOT));
         } else if (OptionalButtonProperties.ICON_TINT_LIST.equals(propertyKey)) {

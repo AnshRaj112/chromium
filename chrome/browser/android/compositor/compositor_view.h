@@ -33,6 +33,7 @@ class UIResourceProvider;
 
 namespace android {
 
+class CompositorViewTest;
 class SceneLayer;
 class TabContentManager;
 
@@ -41,7 +42,6 @@ class CompositorView : public content::CompositorClient,
  public:
   CompositorView(JNIEnv* env,
                  const base::android::JavaRef<jobject>& obj,
-                 jboolean low_mem_device,
                  ui::WindowAndroid* window_android,
                  TabContentManager* tab_content_manager);
 
@@ -59,28 +59,28 @@ class CompositorView : public content::CompositorClient,
   void SurfaceDestroyed(JNIEnv* env);
   std::optional<int> SurfaceChanged(
       JNIEnv* env,
-      jint format,
-      jint width,
-      jint height,
+      int32_t format,
+      int32_t width,
+      int32_t height,
       bool can_be_used_with_surface_control,
-      const base::android::JavaParamRef<jobject>& surface,
-      const base::android::JavaParamRef<jobject>& browser_input_token);
+      const base::android::JavaRef<jobject>& surface,
+      const base::android::JavaRef<jobject>& browser_input_token);
   void OnPhysicalBackingSizeChanged(
       JNIEnv* env,
-      const base::android::JavaParamRef<jobject>& jweb_contents,
-      jint width,
-      jint height);
+      const base::android::JavaRef<jobject>& jweb_contents,
+      int32_t width,
+      int32_t height);
   void OnControlsResizeViewChanged(
       JNIEnv* env,
-      const base::android::JavaParamRef<jobject>& jweb_contents,
-      jboolean controls_resize_view);
+      const base::android::JavaRef<jobject>& jweb_contents,
+      bool controls_resize_view);
   void NotifyVirtualKeyboardOverlayRect(
       JNIEnv* env,
-      const base::android::JavaParamRef<jobject>& jweb_contents,
-      jint x,
-      jint y,
-      jint width,
-      jint height);
+      const base::android::JavaRef<jobject>& jweb_contents,
+      int32_t x,
+      int32_t y,
+      int32_t width,
+      int32_t height);
 
   void SetOverlayVideoMode(JNIEnv* env,
                            bool enabled);
@@ -91,15 +91,15 @@ class CompositorView : public content::CompositorClient,
       JNIEnv* env,
       bool enabled);
   void SetSceneLayer(JNIEnv* env,
-                     const base::android::JavaParamRef<jobject>& jscene_layer);
+                     const base::android::JavaRef<jobject>& jscene_layer);
   void SetCompositorWindow(
       JNIEnv* env,
-      const base::android::JavaParamRef<jobject>& window_android);
+      const base::android::JavaRef<jobject>& window_android);
   void CacheBackBufferForCurrentSurface(JNIEnv* env);
   void EvictCachedBackBuffer(JNIEnv* env);
   void OnTabChanged(JNIEnv* env);
   void PreserveChildSurfaceControls(JNIEnv* env);
-  void SetDidSwapBuffersCallbackEnabled(JNIEnv* env, jboolean enable);
+  void SetDidSwapBuffersCallbackEnabled(JNIEnv* env, bool enable);
 
   // CompositorClient implementation:
   void RecreateSurface() override;
@@ -109,6 +109,8 @@ class CompositorView : public content::CompositorClient,
   base::WeakPtr<ui::UIResourceProvider> GetUIResourceProvider();
 
  private:
+  friend class CompositorViewTest;
+
   ~CompositorView() override;
 
   // content::BrowserChildProcessObserver implementation:
@@ -117,7 +119,13 @@ class CompositorView : public content::CompositorClient,
       const content::ChildProcessTerminationInfo& info) override;
 
   void SetBackground(bool visible, SkColor color);
-  void OnSurfaceControlFeatureStatusUpdate(bool available);
+
+  // Constructor for testing.
+  CompositorView(JNIEnv* env,
+                 const base::android::JavaRef<jobject>& obj,
+                 ui::WindowAndroid* window_android,
+                 TabContentManager* tab_content_manager,
+                 std::unique_ptr<content::Compositor> compositor);
 
   base::android::ScopedJavaGlobalRef<jobject> obj_;
   std::unique_ptr<content::Compositor> compositor_;
@@ -137,8 +145,6 @@ class CompositorView : public content::CompositorClient,
   bool overlay_video_mode_;
   bool overlay_immersive_ar_mode_;
   bool overlay_xr_full_screen_mode_;
-
-  base::WeakPtrFactory<CompositorView> weak_factory_{this};
 };
 
 }  // namespace android

@@ -11,26 +11,27 @@
 
 namespace blink {
 
-UniqueFontSelector::UniqueFontSelector(FontSelector* base_selector,
-                                       bool enable_cache)
-    : base_selector_(base_selector), enable_cache_(enable_cache) {
-  if (base_selector != nullptr && IsMainThread()) {
-    MemoryPressureListenerRegistry::Instance().RegisterClient(this);
+UniqueFontSelector::UniqueFontSelector(FontSelector* base_selector)
+    : base_selector_(base_selector) {
+  if (base_selector_) {
+    memory_pressure_listener_registration_.emplace(
+        FROM_HERE, base::MemoryPressureListenerTag::kUniqueFontSelector, this);
   }
 }
 
 void UniqueFontSelector::Trace(Visitor* visitor) const {
   visitor->Trace(base_selector_);
   visitor->Trace(font_cache_);
-  MemoryPressureListener::Trace(visitor);
+}
+
+void UniqueFontSelector::Dispose() {
+  if (memory_pressure_listener_registration_) {
+    memory_pressure_listener_registration_->Dispose();
+  }
 }
 
 const Font* UniqueFontSelector::FindOrCreateFont(
     const FontDescription& description) {
-  if (!enable_cache_) {
-    return MakeGarbageCollected<Font>(description, base_selector_);
-  }
-
   const Font* font;
   {
     auto add_result = font_cache_.insert(description, CacheValue());
@@ -47,18 +48,9 @@ const Font* UniqueFontSelector::FindOrCreateFont(
     add_result.stored_value->value.list_index = lru_list_.begin().GetIndex();
   }
 
-  wtf_size_t max_size = CanvasFontCache::MaxFonts();
-  while (lru_list_.size() > max_size) {
-    auto& value = lru_list_.back();
-    // Allow the cache size to exceed MaxFonts() within the same frame.
-    if (value.generation == frame_generation_) {
-      break;
-    }
-    font_cache_.erase(value.description);
-    lru_list_.pop_back();
-  }
+  // We might have exceeded the size limit of the cache.
+  EvictExcessEntries();
 
-  DCHECK_EQ(font_cache_.size(), lru_list_.size());
   return font;
 }
 
@@ -73,9 +65,33 @@ void UniqueFontSelector::RegisterForInvalidationCallbacks(
   }
 }
 
-void UniqueFontSelector::OnPurgeMemory() {
-  font_cache_.clear();
-  lru_list_.clear();
+void UniqueFontSelector::OnMemoryPressure(
+    base::MemoryPressureLevel memory_pressure_level) {
+  // Memory pressure has changed, so the max number of fonts may have been
+  // updated. Evict excess entries to match the new limit.
+  EvictExcessEntries();
+}
+
+unsigned UniqueFontSelector::GetCurrentMaxFonts() const {
+  return CanvasFontCache::MaxFonts() * GetMemoryLimitRatio();
+}
+
+void UniqueFontSelector::EvictExcessEntries() {
+  wtf_size_t max_size = GetCurrentMaxFonts();
+  while (lru_list_.size() > max_size) {
+    auto& value = lru_list_.back();
+    // Allow the cache size to exceed `max_size` within the same frame.
+    if (value.generation == frame_generation_) {
+      // However, it should not exceed `max_size` * 2.
+      if (lru_list_.size() <= max_size * 2) {
+        break;
+      }
+    }
+    font_cache_.erase(value.description);
+    lru_list_.pop_back();
+  }
+
+  DCHECK_EQ(font_cache_.size(), lru_list_.size());
 }
 
 void UniqueFontSelector::CacheValue::Trace(Visitor* visitor) const {

@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40284755): Remove this and spanify to fix the errors.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "base/values.h"
 
 #include <stddef.h>
@@ -26,8 +21,8 @@
 #include <vector>
 
 #include "base/bits.h"
+#include "base/compiler_specific.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/gtest_util.h"
@@ -1232,6 +1227,26 @@ TEST(ValuesTest, RvalueSet) {
   EXPECT_EQ(dict, expected);
 }
 
+TEST(ValuesTest, DictSetHintAtEnd) {
+  // Set values with keys not all in order, to validate correctness for both the
+  // "hint was correct" and "hint was incorrect" cases.
+  Value::Dict dict;
+  dict.Set_HintAtEnd("a", Value("a"));
+  dict.Set_HintAtEnd("b", Value("b"));
+  dict.Set_HintAtEnd("c", Value("c"));
+  dict.Set_HintAtEnd("e", Value("e"));
+  dict.Set_HintAtEnd("d", Value("d"));
+
+  Value::Dict expected;
+  expected.Set("a", Value("a"));
+  expected.Set("b", Value("b"));
+  expected.Set("c", Value("c"));
+  expected.Set("e", Value("e"));
+  expected.Set("d", Value("d"));
+
+  EXPECT_EQ(dict, expected);
+}
+
 TEST(ValuesTest, FindPath) {
   // Construct a dictionary path {root}.foo.bar = 123
   Value::Dict foo;
@@ -1504,8 +1519,8 @@ TEST(ValuesTest, List) {
   EXPECT_EQ("foo", mixed_list[3]);
 
   // Try searching in the mixed list.
-  ASSERT_TRUE(Contains(mixed_list, 42, &Value::GetIfInt));
-  ASSERT_FALSE(Contains(mixed_list, false, &Value::GetIfBool));
+  ASSERT_TRUE(std::ranges::contains(mixed_list, 42, &Value::GetIfInt));
+  ASSERT_FALSE(std::ranges::contains(mixed_list, false, &Value::GetIfBool));
 }
 
 TEST(ValuesTest, RvalueAppend) {
@@ -1567,16 +1582,16 @@ TEST(ValuesTest, BinaryValue) {
   ASSERT_NE(stack_buffer.data(),
             reinterpret_cast<const char*>(binary.GetBlob().data()));
   ASSERT_EQ(42U, binary.GetBlob().size());
-  ASSERT_EQ(0, memcmp(stack_buffer.data(), binary.GetBlob().data(),
-                      binary.GetBlob().size()));
+  ASSERT_EQ(0, UNSAFE_TODO(memcmp(stack_buffer.data(), binary.GetBlob().data(),
+                                  binary.GetBlob().size())));
 }
 
 TEST(ValuesTest, StringValue) {
   // Test overloaded StringValue constructor.
-  std::unique_ptr<Value> narrow_value(new Value("narrow"));
+  auto narrow_value = std::make_unique<Value>("narrow");
   ASSERT_TRUE(narrow_value.get());
   ASSERT_TRUE(narrow_value->is_string());
-  std::unique_ptr<Value> utf16_value(new Value(u"utf16"));
+  auto utf16_value = std::make_unique<Value>(u"utf16");
   ASSERT_TRUE(utf16_value.get());
   ASSERT_TRUE(utf16_value->is_string());
 

@@ -26,7 +26,6 @@
 #include "gpu/ipc/common/surface_handle.h"
 #include "mojo/public/cpp/bindings/associated_receiver.h"
 #include "mojo/public/cpp/bindings/pending_associated_receiver.h"
-#include "mojo/public/cpp/bindings/pending_associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
@@ -151,9 +150,9 @@ class ArCoreGl : public mojom::XRFrameDataProvider,
   // XRPresentationProvider
   void SubmitFrameMissing(int16_t frame_index, const gpu::SyncToken&) override;
   void SubmitFrame(int16_t frame_index,
-                   const gpu::MailboxHolder& mailbox,
                    base::TimeDelta time_waited) override;
   void SubmitFrameDrawnIntoTexture(int16_t frame_index,
+                                   const std::vector<LayerId>& layer_ids,
                                    const gpu::SyncToken&,
                                    base::TimeDelta time_waited) override;
   void UpdateLayerBounds(int16_t frame_index,
@@ -175,25 +174,20 @@ class ArCoreGl : public mojom::XRFrameDataProvider,
       mojom::XREnvironmentIntegrationProvider::
           SubscribeToHitTestForTransientInputCallback callback) override;
 
-  void UnsubscribeFromHitTest(uint64_t subscription_id) override;
+  void UnsubscribeFromHitTest(
+      const HitTestSubscriptionId& subscription_id) override;
 
   void CreateAnchor(
       mojom::XRNativeOriginInformationPtr native_origin_information,
       const device::Pose& native_origin_from_anchor,
+      const std::optional<PlaneId>& plane_id,
       CreateAnchorCallback callback) override;
-  void CreatePlaneAnchor(
-      mojom::XRNativeOriginInformationPtr native_origin_information,
-      const device::Pose& native_origin_from_anchor,
-      uint64_t plane_id,
-      CreatePlaneAnchorCallback callback) override;
 
-  void DetachAnchor(uint64_t anchor_id) override;
+  void DetachAnchor(const AnchorId& anchor_id) override;
 
   // mojom::XRSessionController
   void SetFrameDataRestricted(bool restricted) override;
 
-  void ProcessFrameFromMailbox(int16_t frame_index,
-                               const gpu::MailboxHolder& mailbox);
   void ProcessFrameDrawnIntoTexture(int16_t frame_index,
                                     const gpu::SyncToken& sync_token);
   // Notifies that the screen was touched at |touch_point| using a pointer.

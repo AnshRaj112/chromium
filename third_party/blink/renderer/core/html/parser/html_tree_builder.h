@@ -28,7 +28,6 @@
 #define THIRD_PARTY_BLINK_RENDERER_CORE_HTML_PARSER_HTML_TREE_BUILDER_H_
 
 #include "base/dcheck_is_on.h"
-#include "base/memory/scoped_refptr.h"
 #include "third_party/blink/renderer/core/html/parser/html_construction_site.h"
 #include "third_party/blink/renderer/core/html/parser/html_element_stack.h"
 #include "third_party/blink/renderer/core/html/parser/html_parser_options.h"
@@ -62,7 +61,8 @@ class HTMLTreeBuilder final : public GarbageCollected<HTMLTreeBuilder> {
                   Element* context_element,
                   ParserContentPolicy,
                   const HTMLParserOptions&,
-                  bool include_shadow_roots);
+                  bool include_shadow_roots,
+                  CustomElementRegistry* registry);
 
  private:
   HTMLTreeBuilder(HTMLDocumentParser*,
@@ -71,7 +71,8 @@ class HTMLTreeBuilder final : public GarbageCollected<HTMLTreeBuilder> {
                   const HTMLParserOptions&,
                   bool include_shadow_roots,
                   ContainerNode* fragment_target,
-                  Element* fragment_context_element);
+                  Element* fragment_context_element,
+                  CustomElementRegistry* registry);
 
  public:
   HTMLTreeBuilder(const HTMLTreeBuilder&) = delete;
@@ -118,10 +119,6 @@ class HTMLTreeBuilder final : public GarbageCollected<HTMLTreeBuilder> {
     should_skip_leading_newline_ = should_skip;
   }
 
-  void SetPatchScope(ContainerNode* scope) {
-    tree_.SetPatchScope(scope);
-  }
-
  private:
   class CharacterTokenBuffer;
   // Represents HTML5 "insertion mode"
@@ -143,8 +140,6 @@ class HTMLTreeBuilder final : public GarbageCollected<HTMLTreeBuilder> {
     kInTableBodyMode,
     kInRowMode,
     kInCellMode,
-    kInSelectMode,
-    kInSelectInTableMode,
     kAfterBodyMode,
     kInFramesetMode,
     kAfterFramesetMode,

@@ -4,28 +4,29 @@
 
 package org.chromium.chrome.browser.identity_disc;
 
+import static org.chromium.build.NullUtil.assumeNonNull;
+
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 
-import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.content.res.AppCompatResources;
 
 import org.chromium.base.Callback;
 import org.chromium.base.ObserverList;
 import org.chromium.base.metrics.RecordUserAction;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.build.annotations.EnsuresNonNull;
+import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
-import org.chromium.chrome.browser.lifecycle.NativeInitObserver;
 import org.chromium.chrome.browser.ntp.NewTabPage;
 import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.profiles.Profile;
-import org.chromium.chrome.browser.settings.MainSettings;
 import org.chromium.chrome.browser.settings.SettingsNavigationFactory;
 import org.chromium.chrome.browser.signin.SigninAndHistorySyncActivityLauncherImpl;
 import org.chromium.chrome.browser.signin.services.DisplayableProfileData;
@@ -33,7 +34,6 @@ import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.signin.services.ProfileDataCache;
 import org.chromium.chrome.browser.sync.SyncServiceFactory;
 import org.chromium.chrome.browser.sync.settings.SyncSettingsUtils;
-import org.chromium.chrome.browser.sync.settings.SyncSettingsUtils.SyncError;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarButtonVariant;
 import org.chromium.chrome.browser.toolbar.optional_button.ButtonData;
@@ -43,6 +43,7 @@ import org.chromium.chrome.browser.toolbar.optional_button.ButtonDataProvider;
 import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncConfig;
 import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncConfig.NoAccountSigninMode;
 import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncConfig.WithAccountSigninMode;
+import org.chromium.chrome.browser.ui.signin.SigninSurveyController;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetStrings;
 import org.chromium.chrome.browser.ui.signin.history_sync.HistorySyncConfig;
 import org.chromium.chrome.browser.user_education.IphCommandBuilder;
@@ -57,55 +58,49 @@ import org.chromium.components.signin.identitymanager.IdentityManager;
 import org.chromium.components.signin.identitymanager.PrimaryAccountChangeEvent;
 import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.sync.SyncService;
+import org.chromium.components.sync.UserActionableError;
 import org.chromium.components.user_prefs.UserPrefs;
 
 /**
  * Handles displaying IdentityDisc on toolbar depending on several conditions (user sign-in state,
  * whether NTP is shown)
  */
+@NullMarked
 public class IdentityDiscController
-        implements NativeInitObserver,
-                ProfileDataCache.Observer,
+        implements ProfileDataCache.Observer,
                 IdentityManager.Observer,
                 SyncService.SyncStateChangedListener,
                 ButtonDataProvider {
     // Context is used for fetching resources and launching preferences page.
     private final Context mContext;
-    private ActivityLifecycleDispatcher mActivityLifecycleDispatcher;
-    private final ObservableSupplier<Profile> mProfileSupplier;
+    private final MonotonicObservableSupplier<Profile> mProfileSupplier;
     private final Callback<Profile> mProfileSupplierObserver = this::setProfile;
-    private Profile mProfile;
+    private @Nullable Profile mProfile;
 
     // We observe IdentityManager to receive primary account state change notifications.
-    private IdentityManager mIdentityManager;
+    private @Nullable IdentityManager mIdentityManager;
 
     // SyncService is observed to update mIdentityError.
-    private SyncService mSyncService;
+    private @Nullable SyncService mSyncService;
 
     // ProfileDataCache facilitates retrieving profile picture.
-    private ProfileDataCache mProfileDataCache;
+    private @Nullable ProfileDataCache mProfileDataCache;
 
     private final ButtonDataImpl mButtonData;
     private final ObserverList<ButtonDataObserver> mObservers = new ObserverList<>();
-    private boolean mNativeIsInitialized;
 
     private boolean mIsTabNtp;
 
-    private @SyncError int mIdentityError = SyncError.NO_ERROR;
+    private @UserActionableError int mIdentityError = UserActionableError.NONE;
 
     /**
      * @param context The Context for retrieving resources, launching preference activity, etc.
-     * @param activityLifecycleDispatcher Dispatcher for activity lifecycle events, e.g. native
-     *     initialization completing.
      */
     public IdentityDiscController(
-            Context context,
-            ActivityLifecycleDispatcher activityLifecycleDispatcher,
-            ObservableSupplier<Profile> profileSupplier) {
+            Context context, MonotonicObservableSupplier<Profile> profileSupplier) {
         mContext = context;
-        mActivityLifecycleDispatcher = activityLifecycleDispatcher;
         mProfileSupplier = profileSupplier;
-        mActivityLifecycleDispatcher.register(this);
+        mProfileSupplier.addObserver(mProfileSupplierObserver);
 
         mButtonData =
                 new ButtonDataImpl(
@@ -124,16 +119,6 @@ public class IdentityDiscController
                         /* tooltipTextResId= */ Resources.ID_NULL);
     }
 
-    /** Registers itself to observe sign-in and sync status events. */
-    @Override
-    public void onFinishNativeInitialization() {
-        mActivityLifecycleDispatcher.unregister(this);
-        mActivityLifecycleDispatcher = null;
-        mNativeIsInitialized = true;
-
-        mProfileSupplier.addObserver(mProfileSupplierObserver);
-    }
-
     @Override
     public void addObserver(ButtonDataObserver obs) {
         mObservers.addObserver(obs);
@@ -145,7 +130,7 @@ public class IdentityDiscController
     }
 
     @Override
-    public ButtonData get(Tab tab) {
+    public ButtonData get(@Nullable Tab tab) {
         mIsTabNtp = tab != null && tab.getNativePage() instanceof NewTabPage;
         if (!mIsTabNtp) {
             mButtonData.setCanShow(false);
@@ -157,13 +142,13 @@ public class IdentityDiscController
     }
 
     private void calculateButtonData() {
-        if (!mNativeIsInitialized) {
+        if (mProfile == null) {
             assert !mButtonData.canShow();
             return;
         }
 
         String email = CoreAccountInfo.getEmailFrom(getSignedInAccountInfo());
-        ensureProfileDataCache();
+        ensureProfileDataCache(mProfile);
 
         mButtonData.setButtonSpec(
                 buttonSpecWithDrawableAndDescription(mButtonData.getButtonSpec(), email));
@@ -191,18 +176,23 @@ public class IdentityDiscController
                 AdaptiveToolbarButtonVariant.UNKNOWN,
                 buttonSpec.getActionChipLabelResId(),
                 buttonSpec.getHoverTooltipTextId(),
-                /* hasErrorBadge= */ mIdentityError != SyncError.NO_ERROR);
+                /* hasErrorBadge= */ mIdentityError != UserActionableError.NONE);
     }
 
     /**
      * Creates and initializes ProfileDataCache if it wasn't created previously. Subscribes
      * IdentityDiscController for profile data updates.
      */
-    private void ensureProfileDataCache() {
+    @EnsuresNonNull("mProfileDataCache")
+    private void ensureProfileDataCache(Profile profile) {
         if (mProfileDataCache != null) return;
 
+        IdentityManager identityManager =
+                IdentityServicesProvider.get().getIdentityManager(profile);
+        assert identityManager != null;
         mProfileDataCache =
-                ProfileDataCache.createWithoutBadge(mContext, R.dimen.toolbar_identity_disc_size);
+                ProfileDataCache.createWithoutBadge(
+                        mContext, identityManager, R.dimen.toolbar_identity_disc_size);
         mProfileDataCache.addObserver(this);
     }
 
@@ -210,6 +200,7 @@ public class IdentityDiscController
      * Returns Profile picture Drawable. The size of the image corresponds to current visual state.
      */
     private Drawable getProfileImage(@Nullable String email) {
+        assumeNonNull(mProfileDataCache);
         return email == null
                 ? AppCompatResources.getDrawable(mContext, R.drawable.account_circle)
                 : mProfileDataCache.getProfileDataOrDefault(email).getImage();
@@ -270,10 +261,6 @@ public class IdentityDiscController
     /** Call to tear down dependencies. */
     @Override
     public void destroy() {
-        if (mActivityLifecycleDispatcher != null) {
-            mActivityLifecycleDispatcher.unregister(this);
-            mActivityLifecycleDispatcher = null;
-        }
 
         if (mProfileDataCache != null) {
             mProfileDataCache.removeObserver(this);
@@ -290,10 +277,8 @@ public class IdentityDiscController
             mSyncService = null;
         }
 
-        if (mNativeIsInitialized) {
-            mProfileSupplier.removeObserver(mProfileSupplierObserver);
-            mProfile = null;
-        }
+        mProfileSupplier.removeObserver(mProfileSupplierObserver);
+        mProfile = null;
     }
 
     /** {@link SyncService.SyncStateChangedListener} implementation. */
@@ -303,7 +288,7 @@ public class IdentityDiscController
     }
 
     @VisibleForTesting
-    public @SyncError int getIdentityError() {
+    public @UserActionableError int getIdentityError() {
         return mIdentityError;
     }
 
@@ -312,7 +297,7 @@ public class IdentityDiscController
             return;
         }
 
-        @SyncError int error = SyncSettingsUtils.getSyncError(mProfile);
+        @UserActionableError int error = SyncSettingsUtils.getSyncError(mProfile);
         if (error == mIdentityError
                 || !ChromeFeatureList.isEnabled(ChromeFeatureList.UNO_PHASE_2_FOLLOW_UP)) {
             // Nothing changed.
@@ -322,10 +307,10 @@ public class IdentityDiscController
 
         CoreAccountInfo coreAccountInfo = getSignedInAccountInfo();
         if (coreAccountInfo != null) {
-            ensureProfileDataCache();
+            ensureProfileDataCache(mProfile);
             mProfileDataCache.setBadge(
                     coreAccountInfo.getEmail(),
-                    mIdentityError == SyncError.NO_ERROR
+                    mIdentityError == UserActionableError.NONE
                             ? null
                             : ProfileDataCache.createToolbarIdentityDiscBadgeConfig(
                                     mContext, R.drawable.ic_error_badge_16dp));
@@ -340,18 +325,19 @@ public class IdentityDiscController
     private void recordIdentityDiscUsed() {
         BrowserUiUtils.recordIdentityDiscClicked(mIsTabNtp);
 
-        assert isProfileInitialized();
-        Tracker tracker = TrackerFactory.getTrackerForProfile(mProfileSupplier.get());
+        assert mProfile != null;
+        Tracker tracker = TrackerFactory.getTrackerForProfile(mProfile);
         tracker.notifyEvent(EventConstants.IDENTITY_DISC_USED);
         RecordUserAction.record("MobileToolbarIdentityDiscTap");
     }
 
     /**
-     * Returns the account info of mIdentityManager if current profile is regular, and
-     * null for off-the-record ones.
+     * Returns the account info of mIdentityManager if current profile is regular, and null for
+     * off-the-record ones.
+     *
      * @return account info for the current profile. Returns null for OTR profile.
      */
-    private CoreAccountInfo getSignedInAccountInfo() {
+    private @Nullable CoreAccountInfo getSignedInAccountInfo() {
         return mIdentityManager != null
                 ? mIdentityManager.getPrimaryAccountInfo(ConsentLevel.SIGNIN)
                 : null;
@@ -377,7 +363,9 @@ public class IdentityDiscController
             mSyncService = null;
         } else {
             mIdentityManager = IdentityServicesProvider.get().getIdentityManager(profile);
+            assumeNonNull(mIdentityManager);
             mIdentityManager.addObserver(this);
+            calculateButtonData();
 
             mSyncService = SyncServiceFactory.getForProfile(profile);
             if (mSyncService != null) {
@@ -394,11 +382,12 @@ public class IdentityDiscController
             return mContext.getString(R.string.accessibility_toolbar_btn_signed_out_identity_disc);
         }
 
+        assumeNonNull(mProfileDataCache);
         DisplayableProfileData profileData = mProfileDataCache.getProfileDataOrDefault(email);
         String userName = profileData.getFullName();
         if (profileData.hasDisplayableEmailAddress()) {
             return mContext.getString(
-                    mIdentityError == SyncError.NO_ERROR
+                    mIdentityError == UserActionableError.NONE
                             ? R.string.accessibility_toolbar_btn_identity_disc_with_name_and_email
                             : R.string
                                     .accessibility_toolbar_btn_identity_disc_error_with_name_and_email,
@@ -407,41 +396,42 @@ public class IdentityDiscController
         }
 
         return mContext.getString(
-                mIdentityError == SyncError.NO_ERROR
+                mIdentityError == UserActionableError.NONE
                         ? R.string.accessibility_toolbar_btn_identity_disc_with_name
                         : R.string.accessibility_toolbar_btn_identity_disc_error_with_name,
                 userName);
     }
 
-    private boolean isProfileInitialized() {
-        return mProfileSupplier != null && mProfileSupplier.hasValue();
-    }
-
     @VisibleForTesting
     void onClick() {
-        if (!isProfileInitialized()) {
+        if (mProfile == null) {
             return;
         }
         recordIdentityDiscUsed();
 
-        Profile originalProfile = mProfileSupplier.get().getOriginalProfile();
+        Profile originalProfile = mProfile.getOriginalProfile();
         if (getSignedInAccountInfo() == null
                 && UserPrefs.get(originalProfile).getBoolean(Pref.SIGNIN_ALLOWED)) {
             AccountPickerBottomSheetStrings bottomSheetStrings =
                     new AccountPickerBottomSheetStrings.Builder(
-                                    R.string.signin_account_picker_bottom_sheet_title)
-                            .setSubtitleStringId(
-                                    R.string.signin_account_picker_bottom_sheet_benefits_subtitle)
+                                    mContext.getString(
+                                            R.string.signin_account_picker_bottom_sheet_title))
+                            .setSubtitleString(
+                                    mContext.getString(
+                                            R.string
+                                                    .signin_account_picker_bottom_sheet_benefits_subtitle))
                             .build();
             BottomSheetSigninAndHistorySyncConfig config =
                     new BottomSheetSigninAndHistorySyncConfig.Builder(
                                     bottomSheetStrings,
                                     NoAccountSigninMode.BOTTOM_SHEET,
                                     WithAccountSigninMode.DEFAULT_ACCOUNT_BOTTOM_SHEET,
-                                    HistorySyncConfig.OptInMode.OPTIONAL)
+                                    HistorySyncConfig.OptInMode.OPTIONAL,
+                                    mContext.getString(R.string.history_sync_title),
+                                    mContext.getString(R.string.history_sync_subtitle))
+                            .signinSurveyType(SigninSurveyController.SigninSurveyType.NTP_AVATAR)
                             .build();
-            @Nullable
-            Intent intent =
+            @Nullable Intent intent =
                     SigninAndHistorySyncActivityLauncherImpl.get()
                             .createBottomSheetSigninIntentOrShowError(
                                     mContext,
@@ -454,7 +444,7 @@ public class IdentityDiscController
         } else {
             SettingsNavigation settingsNavigation =
                     SettingsNavigationFactory.createSettingsNavigation();
-            settingsNavigation.startSettings(mContext, MainSettings.class);
+            settingsNavigation.startSettings(mContext);
         }
     }
 

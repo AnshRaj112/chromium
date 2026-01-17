@@ -6,6 +6,7 @@
 
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/files/file.h"
 #include "base/files/file_util.h"
 #include "base/logging.h"
@@ -33,6 +34,10 @@
 #if BUILDFLAG(IS_ANDROID)
 #include "content/browser/android/tracing_controller_android.h"
 #endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_IOS)
+#include "base/apple/foundation_util.h"
+#endif  // BUILDFLAG(IS_IOS)
 
 namespace content {
 
@@ -202,12 +207,16 @@ class StartupTracingController::BackgroundTracer {
  private:
   void WriteData(const char* data, size_t size) {
     // Last chunk can be empty.
-    if (size == 0)
+    if (size == 0) {
       return;
+    }
+
+    base::span<const uint8_t> data_span =
+        UNSAFE_TODO(base::as_bytes(base::span(data, size)));
 
     // Proto files should be written directly to the file.
     if (output_format_ == tracing::TraceStartupConfig::OutputFormat::kProto) {
-      UNSAFE_TODO(file_.WriteAtCurrentPos(data, size));
+      file_.WriteAtCurrentPosAndCheck(data_span);
       return;
     }
 
@@ -217,12 +226,12 @@ class StartupTracingController::BackgroundTracer {
           std::make_unique<tracing::TracePacketTokenizer>();
     }
 
-    std::vector<perfetto::TracePacket> packets = trace_packet_tokenizer_->Parse(
-        reinterpret_cast<const uint8_t*>(data), size);
+    std::vector<perfetto::TracePacket> packets =
+        trace_packet_tokenizer_->Parse(data_span);
     for (const auto& packet : packets) {
       for (const auto& slice : packet.slices()) {
-        UNSAFE_TODO(file_.WriteAtCurrentPos(
-            reinterpret_cast<const char*>(slice.start), slice.size));
+        file_.WriteAtCurrentPosAndCheck(UNSAFE_TODO(base::span(
+            reinterpret_cast<const uint8_t*>(slice.start), slice.size)));
       }
     }
   }
@@ -325,6 +334,9 @@ namespace {
 base::FilePath BasenameToPath(std::string basename) {
 #if BUILDFLAG(IS_ANDROID)
   return TracingControllerAndroid::GenerateTracingFilePath(basename);
+#elif BUILDFLAG(IS_IOS)
+  // On iOS blink, write to the documents directory associated with the app.
+  return base::apple::GetUserDocumentPath().AppendASCII(basename);
 #else
   // Default to saving the startup trace into the current dir.
   return base::FilePath().AppendASCII(basename);

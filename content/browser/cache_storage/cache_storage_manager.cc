@@ -125,8 +125,8 @@ base::FilePath ConstructOriginPath(const base::FilePath& profile_path,
   if (owner != storage::mojom::CacheStorageOwner::kCacheAPI) {
     identifier += "-" + base::NumberToString(static_cast<int>(owner));
   }
-  const std::string origin_hash_hex = base::ToLowerASCII(
-      base::HexEncode(base::SHA1Hash(base::as_byte_span(identifier))));
+  const std::string origin_hash_hex =
+      base::HexEncodeLower(base::SHA1Hash(base::as_byte_span(identifier)));
   return first_party_default_root_path.AppendASCII(origin_hash_hex);
 }
 
@@ -401,15 +401,6 @@ CacheStorageHandle CacheStorageManager::OpenCacheStorage(
     const storage::BucketLocator& bucket_locator,
     storage::mojom::CacheStorageOwner owner) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-
-  // Wait to create the MemoryPressureListener until the first CacheStorage
-  // object is needed.  This ensures we create the listener on the correct
-  // thread.
-  if (!memory_pressure_listener_) {
-    memory_pressure_listener_ = std::make_unique<base::MemoryPressureListener>(
-        FROM_HERE, base::BindRepeating(&CacheStorageManager::OnMemoryPressure,
-                                       base::Unretained(this)));
-  }
 
   CacheStorageMap::const_iterator it =
       cache_storage_map_.find({bucket_locator, owner});
@@ -808,18 +799,6 @@ bool CacheStorageManager::IsValidQuotaStorageKey(
   // Disallow opaque storage keys at the quota boundary because we DCHECK that
   // we don't get an opaque key in lower code layers.
   return !storage_key.origin().opaque();
-}
-
-void CacheStorageManager::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel level) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (level != base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL) {
-    return;
-  }
-
-  for (auto& entry : cache_storage_map_) {
-    entry.second->ReleaseUnreferencedCaches();
-  }
 }
 
 // static

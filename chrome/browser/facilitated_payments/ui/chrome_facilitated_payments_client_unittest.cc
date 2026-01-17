@@ -36,7 +36,8 @@ class MockFacilitatedPaymentsController : public FacilitatedPaymentsController {
       (base::span<const autofill::Ewallet> ewallet_suggestions,
        std::unique_ptr<payments::facilitated::FacilitatedPaymentsAppInfoList>
            app_suggestions,
-       base::OnceCallback<void(int64_t)> on_payment_account_selected),
+       base::OnceCallback<void(payments::facilitated::SelectedFopData)>
+           on_fop_selected),
       (override));
   MOCK_METHOD(void, ShowProgressScreen, (), (override));
   MOCK_METHOD(void, ShowErrorScreen, (), (override));
@@ -60,6 +61,7 @@ class MockPixAccountLinkingManager
               MaybeShowPixAccountLinkingPrompt,
               (const url::Origin& pix_payment_page_origin),
               (override));
+  MOCK_METHOD(void, DismissPrompt, (), (override));
 };
 
 class ChromeFacilitatedPaymentsClientTest
@@ -188,6 +190,17 @@ TEST_F(ChromeFacilitatedPaymentsClientTest,
 
   base_client().ShowPixPaymentPrompt({}, base::DoNothing());
   base_client().ShowProgressScreen();
+}
+
+// Test that DismissPrompt is called when the client is destroyed.
+TEST_F(ChromeFacilitatedPaymentsClientTest,
+       Destructor_DismissesPixAccountLinkingPrompt) {
+  base_client().InitPixAccountLinkingFlow(
+      url::Origin::Create(GURL("https://example.com")));
+
+  EXPECT_CALL(pix_account_linking_manager(), DismissPrompt());
+
+  client_.reset();
 }
 
 // Test the client forwards call for closing the bottom sheet to the

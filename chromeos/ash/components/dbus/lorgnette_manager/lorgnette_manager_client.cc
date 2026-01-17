@@ -9,12 +9,10 @@
 #include <string>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/files/scoped_file.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/logging.h"
@@ -646,7 +644,7 @@ class LorgnetteManagerClientImpl : public LorgnetteManagerClient {
                            bool more_pages,
                            std::optional<std::string> data) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    if (!base::Contains(scan_job_state_, uuid)) {
+    if (!scan_job_state_.contains(uuid)) {
       LOG(ERROR) << "Received ScanDataCompleted for unrecognized scan job: "
                  << uuid;
       return;
@@ -902,7 +900,7 @@ class LorgnetteManagerClientImpl : public LorgnetteManagerClient {
 
     // This will have been created already by OnStartScannerDiscoveryResponse,
     // so no need to search for it first.
-    DCHECK(base::Contains(discovery_sessions_, response->session_id()));
+    DCHECK(discovery_sessions_.contains(response->session_id()));
     discovery_sessions_[response->session_id()].session_end_callback =
         std::move(callback);
   }
@@ -942,7 +940,7 @@ class LorgnetteManagerClientImpl : public LorgnetteManagerClient {
       return;
     }
 
-    if (!base::Contains(scan_job_state_, signal_proto.scan_uuid())) {
+    if (!scan_job_state_.contains(signal_proto.scan_uuid())) {
       LOG(ERROR) << "Received signal for unrecognized scan job: "
                  << signal_proto.scan_uuid();
       return;
@@ -988,7 +986,7 @@ class LorgnetteManagerClientImpl : public LorgnetteManagerClient {
       return;
     }
 
-    if (!base::Contains(discovery_sessions_, signal.session_id())) {
+    if (!discovery_sessions_.contains(signal.session_id())) {
       LOG(ERROR) << "Received signal for unrecognized discovery session: "
                  << signal.session_id();
       return;
@@ -1006,7 +1004,7 @@ class LorgnetteManagerClientImpl : public LorgnetteManagerClient {
   void ListScannersDiscoveryScannersUpdated(
       lorgnette::ScannerListChangedSignal signal) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-    DCHECK(base::Contains(discovery_sessions_, signal.session_id()));
+    DCHECK(discovery_sessions_.contains(signal.session_id()));
     DiscoverySessionState& session = discovery_sessions_[signal.session_id()];
     base::TimeDelta event_interval =
         base::TimeTicks::Now() - session.last_event;
@@ -1045,8 +1043,6 @@ class LorgnetteManagerClientImpl : public LorgnetteManagerClient {
             "Scanning.DiscoverySession.Result", session.response.result(),
             static_cast<lorgnette::OperationResult>(
                 lorgnette::OperationResult_ARRAYSIZE));
-        base::UmaHistogramMediumTimes("Scanning.DiscoverySession.MaxInterval",
-                                      session.max_event_interval);
         DCHECK(session.session_end_callback);
         std::move(*session.session_end_callback)
             .Run(std::move(session.response));

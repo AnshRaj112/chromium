@@ -11,7 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
@@ -25,16 +24,16 @@
 #include "device/fido/authenticator_get_assertion_response.h"
 #include "device/fido/ctap_get_assertion_request.h"
 #include "device/fido/discoverable_credential_metadata.h"
-#include "device/fido/features.h"
 #include "device/fido/fido_authenticator.h"
-#include "device/fido/fido_constants.h"
 #include "device/fido/fido_discovery_factory.h"
-#include "device/fido/fido_transport_protocol.h"
-#include "device/fido/fido_types.h"
 #include "device/fido/filter.h"
 #include "device/fido/pin.h"
-#include "device/fido/public_key_credential_descriptor.h"
-#include "device/fido/public_key_credential_user_entity.h"
+#include "device/fido/public/features.h"
+#include "device/fido/public/fido_constants.h"
+#include "device/fido/public/fido_transport_protocol.h"
+#include "device/fido/public/fido_types.h"
+#include "device/fido/public/public_key_credential_descriptor.h"
+#include "device/fido/public/public_key_credential_user_entity.h"
 
 #if BUILDFLAG(IS_MAC)
 #include "device/fido/mac/authenticator.h"
@@ -262,28 +261,12 @@ CtapGetAssertionOptions SpecializeOptionsForAuthenticator(
   return specialized_options;
 }
 
-bool IsOnlyHybridOrInternal(const PublicKeyCredentialDescriptor& credential) {
-  if (credential.transports.empty()) {
-    return false;
-  }
-  return std::ranges::all_of(credential.transports, [](const auto& transport) {
-    return transport == FidoTransportProtocol::kHybrid ||
-           transport == FidoTransportProtocol::kInternal;
-  });
-}
-
-bool AllowListOnlyHybridOrInternal(const CtapGetAssertionRequest& request) {
-  return !request.allow_list.empty() &&
-         std::ranges::all_of(request.allow_list, &IsOnlyHybridOrInternal);
-}
-
 bool AllowListIncludedTransport(const CtapGetAssertionRequest& request,
                                 FidoTransportProtocol transport) {
   return std::ranges::any_of(
       request.allow_list,
       [transport](const PublicKeyCredentialDescriptor& cred) {
-        return cred.transports.empty() ||
-               base::Contains(cred.transports, transport);
+        return cred.transports.empty() || cred.transports.contains(transport);
       });
 }
 
@@ -309,10 +292,6 @@ GetAssertionRequestHandler::GetAssertionRequestHandler(
       request_.user_verification;
   transport_availability_info().has_empty_allow_list =
       request_.allow_list.empty();
-  transport_availability_info().is_only_hybrid_or_internal =
-      AllowListOnlyHybridOrInternal(request_);
-  transport_availability_info().is_off_the_record_context =
-      options_.is_off_the_record_context;
   transport_availability_info().transport_list_did_include_internal =
       AllowListIncludedTransport(request_, FidoTransportProtocol::kInternal);
   transport_availability_info().transport_list_did_include_hybrid =
@@ -349,8 +328,8 @@ void GetAssertionRequestHandler::PreselectAccount(
     DiscoverableCredentialMetadata credential) {
   DCHECK(!preselected_credential_);
   DCHECK(request_.allow_list.empty() ||
-         base::Contains(request_.allow_list, credential.cred_id,
-                        &PublicKeyCredentialDescriptor::id));
+         std::ranges::contains(request_.allow_list, credential.cred_id,
+                               &PublicKeyCredentialDescriptor::id));
   preselected_credential_ = std::move(credential);
 }
 

@@ -26,20 +26,20 @@ namespace content::indexed_db {
 // 3 - Adds metadata needed for blob support.
 // 4 - Adds size & last_modified to 'file' blob_info encodings.
 // 5 - One time verification that blob files exist on disk.
-const constexpr int64_t kLatestKnownSchemaVersion = 5;
+inline constexpr int64_t kLatestKnownSchemaVersion = 5;
 // Migration from version 2 to 3 occurred in 2014, and migration to version 4
 // began in early 2020, so we currently continue to support schema that are as
 // old as 2014.
-const constexpr int64_t kEarliestSupportedSchemaVersion = 3;
+inline constexpr int64_t kEarliestSupportedSchemaVersion = 3;
 
-CONTENT_EXPORT extern const unsigned char kMinimumIndexId;
+inline constexpr unsigned char kMinimumIndexId = 30;
 
 CONTENT_EXPORT std::string MaxIDBKey();
 CONTENT_EXPORT std::string MinIDBKey();
 
 // DatabaseId, BlobNumber
-typedef std::pair<int64_t, int64_t> BlobJournalEntryType;
-typedef std::vector<BlobJournalEntryType> BlobJournalType;
+using BlobJournalEntryType = std::pair<int64_t, int64_t>;
+using BlobJournalType = std::vector<BlobJournalEntryType>;
 
 CONTENT_EXPORT void EncodeByte(unsigned char value, std::string* into);
 CONTENT_EXPORT void EncodeBool(bool value, std::string* into);
@@ -185,7 +185,7 @@ class KeyPrefix {
 
   static bool Decode(std::string_view* slice, KeyPrefix* result);
   std::string Encode() const;
-  static std::string EncodeEmpty();
+  CONTENT_EXPORT static std::string EncodeEmpty();
   int Compare(const KeyPrefix& other) const;
 
   CONTENT_EXPORT static bool IsValidDatabaseId(int64_t database_id);
@@ -211,15 +211,17 @@ class KeyPrefix {
   int64_t index_id_;
 
  private:
+  FRIEND_TEST_ALL_PREFIXES(IndexedDBLevelDBCodingTest, Empty);
+
   // Special constructor for CreateWithSpecialIndex()
   KeyPrefix(enum Type,
             int64_t database_id,
             int64_t object_store_id,
             int64_t index_id);
 
-  static std::string EncodeInternal(int64_t database_id,
-                                    int64_t object_store_id,
-                                    int64_t index_id);
+  CONTENT_EXPORT static std::string EncodeInternal(int64_t database_id,
+                                                   int64_t object_store_id,
+                                                   int64_t index_id);
 };
 
 class SchemaVersionKey {

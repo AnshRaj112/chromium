@@ -4,6 +4,7 @@
 
 #include "components/network_session_configurator/browser/network_session_configurator.h"
 
+#include <algorithm>
 #include <limits>
 #include <map>
 #include <string_view>
@@ -12,7 +13,6 @@
 #include <vector>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/field_trial_params.h"
@@ -22,11 +22,9 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "build/build_config.h"
-#include "components/network_session_configurator/common/network_features.h"
 #include "components/network_session_configurator/common/network_switches.h"
 #include "components/variations/variations_switches.h"
 #include "net/base/features.h"
-#include "net/base/host_mapping_rules.h"
 #include "net/disk_cache/backend_experiment.h"
 #include "net/disk_cache/buildflags.h"
 #include "net/http/http_network_session.h"
@@ -39,6 +37,7 @@
 #include "net/third_party/quiche/src/quiche/http2/core/spdy_protocol.h"
 #include "net/third_party/quiche/src/quiche/quic/core/quic_packets.h"
 #include "net/third_party/quiche/src/quiche/quic/core/quic_tag.h"
+#include "url/scheme_host_port.h"
 
 #if BUILDFLAG(IS_MAC)
 #include "base/mac/mac_util.h"
@@ -392,6 +391,14 @@ int GetQuicRetransmittableOnWireTimeoutMilliseconds(
   return 0;
 }
 
+bool ShouldQuicAllowDebuggingSniInTransportParam(
+    const VariationParameters& quic_trial_params) {
+  return base::EqualsCaseInsensitiveASCII(
+      GetVariationParam(quic_trial_params,
+                        "enable_debugging_sni_in_transport_param"),
+      "true");
+}
+
 int GetQuicIdleSessionMigrationPeriodSeconds(
     const VariationParameters& quic_trial_params) {
   int value;
@@ -466,6 +473,9 @@ int GetInitialDelayForBrokenAlternativeServiceSeconds(
 
 bool DelayMainJobWithAvailableSpdySession(
     const VariationParameters& quic_trial_params) {
+  if (base::FeatureList::IsEnabled(net::features::kAdditionalDelayMainJob)) {
+    return net::features::kDelayMainJobWithAvailableSpdySession.Get();
+  }
   return base::EqualsCaseInsensitiveASCII(
       GetVariationParam(quic_trial_params,
                         "delay_main_job_with_available_spdy_session"),
@@ -510,6 +520,9 @@ void SetQuicFlags(const VariationParameters& quic_trial_params) {
 }
 
 size_t GetQuicMaxPacketLength(const VariationParameters& quic_trial_params) {
+  if (base::FeatureList::IsEnabled(net::features::kLowerQuicMaxPacketSize)) {
+    return net::features::kQuicMaxPacketSize.Get();
+  }
   unsigned value;
   if (base::StringToUint(
           GetVariationParam(quic_trial_params, "max_packet_length"), &value)) {
@@ -528,7 +541,7 @@ quic::ParsedQuicVersionVector GetQuicVersions(
   quic::ParsedQuicVersionVector obsolete_versions = net::ObsoleteQuicVersions();
   bool found_obsolete_version = false;
   for (const quic::ParsedQuicVersion& version : trial_versions) {
-    if (!base::Contains(obsolete_versions, version)) {
+    if (!std::ranges::contains(obsolete_versions, version)) {
       filtered_versions.push_back(version);
     } else {
       found_obsolete_version = true;
@@ -664,6 +677,10 @@ void ConfigureQuicParams(const base::CommandLine& command_line,
       quic_params->retransmittable_on_wire_timeout =
           base::Milliseconds(retransmittable_on_wire_timeout_milliseconds);
     }
+
+    quic_params->enable_debugging_sni_in_transport_param =
+        ShouldQuicAllowDebuggingSniInTransportParam(quic_trial_params);
+
     quic_params->migrate_idle_sessions =
         ShouldQuicMigrateIdleSessions(quic_trial_params);
     int idle_session_migration_period_seconds =
@@ -796,11 +813,13 @@ void ParseCommandLineAndFieldTrials(const base::CommandLine& command_line,
       for (const std::string& host_port : base::SplitString(
                origins, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL)) {
         if (host_port == "*")
-          quic_params->origins_to_force_quic_on.insert(net::HostPortPair());
-        net::HostPortPair quic_origin =
+          quic_params->force_quic_everywhere = true;
+        net::HostPortPair quic_host_port =
             net::HostPortPair::FromString(host_port);
-        if (!quic_origin.IsEmpty())
-          quic_params->origins_to_force_quic_on.insert(quic_origin);
+        if (!quic_host_port.IsEmpty()) {
+          quic_params->origins_to_force_quic_on.insert(url::SchemeHostPort(
+              "https", quic_host_port.host(), quic_host_port.port()));
+        }
       }
     }
 
@@ -823,11 +842,6 @@ void ParseCommandLineAndFieldTrials(const base::CommandLine& command_line,
   if (command_line.HasSwitch(switches::kTestingFixedHttpsPort)) {
     params->testing_fixed_https_port =
         GetSwitchValueAsInt(command_line, switches::kTestingFixedHttpsPort);
-  }
-
-  if (command_line.HasSwitch(switches::kHostRules)) {
-    params->host_mapping_rules.SetRulesFromString(
-        command_line.GetSwitchValueASCII(switches::kHostRules));
   }
 }
 

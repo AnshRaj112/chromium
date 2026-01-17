@@ -21,6 +21,7 @@ import static org.mockito.Mockito.when;
 
 import androidx.fragment.app.FragmentManager;
 import androidx.test.filters.MediumTest;
+import androidx.test.filters.SmallTest;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -351,6 +352,63 @@ public class SignOutCoordinatorTest {
         onView(withText(R.string.sign_out_unsaved_data_title))
                 .inRoot(isDialog())
                 .check(matches(isDisplayed()));
+    }
+
+    @Test
+    @SmallTest
+    public void testUndoSignInWithSnackbarThrowsOnUnsyncedData() {
+        setUpMocks();
+        mUnsyncedDataTypes.add(DataType.BOOKMARKS);
+
+        assertUndoSignInWithSnackbarThrows(
+                IllegalStateException.class,
+                SignoutReason.USER_TAPPED_UNDO_RIGHT_AFTER_SIGN_IN_FROM_BOOKMARKS);
+    }
+
+    @Test
+    @SmallTest
+    public void testUndoSignInWithSnackbarThrowsForUnsupportedReasons() {
+        for (@SignoutReason int reason = 0; reason <= SignoutReason.MAX_VALUE; reason++) {
+            switch (reason) {
+                case SignoutReason.USER_TAPPED_UNDO_RIGHT_AFTER_SIGN_IN_FROM_BOOKMARKS:
+                case SignoutReason.USER_TAPPED_UNDO_RIGHT_AFTER_SIGN_IN_FROM_NTP:
+                case SignoutReason.USER_TAPPED_UNDO_RIGHT_AFTER_SIGN_IN_FROM_RECENT_TABS:
+                    continue;
+            }
+            // All other reasons should throw.
+            assertUndoSignInWithSnackbarThrows(IllegalArgumentException.class, reason);
+        }
+    }
+
+    @Test
+    @SmallTest
+    public void testUndoSigninWithSnackbarThrowsNotSignedIn() {
+        IdentityServicesProvider.setInstanceForTests(mIdentityServicesProviderMock);
+        doReturn(mIdentityManagerMock)
+                .when(mIdentityServicesProviderMock)
+                .getIdentityManager(mProfile);
+        doReturn(false).when(mIdentityManagerMock).hasPrimaryAccount(ConsentLevel.SIGNIN);
+
+        assertUndoSignInWithSnackbarThrows(
+                IllegalStateException.class,
+                SignoutReason.USER_TAPPED_UNDO_RIGHT_AFTER_SIGN_IN_FROM_BOOKMARKS);
+    }
+
+    private <T extends Throwable> void assertUndoSignInWithSnackbarThrows(
+            Class<T> expectedThrowable, @SignoutReason int reason) {
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    Assert.assertThrows(
+                            expectedThrowable,
+                            () ->
+                                    SignOutCoordinator.undoSignInWithSnackbar(
+                                            mActivityTestRule.getActivity(),
+                                            mProfile,
+                                            mSnackbarManager,
+                                            reason,
+                                            mOnSignOut));
+                });
+        verify(mOnSignOut, never()).run();
     }
 
     private void setUpMocks() {

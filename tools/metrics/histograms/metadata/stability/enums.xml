@@ -491,10 +491,13 @@ Called by update_bad_message_reasons.py.-->
   <int value="323" label="MDDH_SET_PREFERRED_SINK_ID_WITHOUT_FEATURE"/>
   <int value="324" label="MH_MULTIPLE_MIDI_SESSIONS"/>
   <int value="325" label="RFHI_INVALID_NET_ERROR_CODE"/>
-  <int value="326" label="MSDH_DISABLED_FEATURE_IS_SET"/>
+  <int value="326" label="MSDH_RESTRICT_OWN_AUDIO_IS_SET_WHEN_UNSUPPORTED"/>
   <int value="327" label="RFH_SAME_DOC_INSECURE_REQUEST_POLICY_CHANGE"/>
   <int value="328" label="RFH_SAME_DOC_INSECURE_NAV_SET_CHANGE"/>
   <int value="329" label="RFH_ORIGIN_TO_COMMIT_MISMATCH"/>
+  <int value="330" label="RFH_CRASH_REPORT_STORAGE_SIZE_TOO_LARGE"/>
+  <int value="331" label="RFH_CRASH_REPORT_STORAGE_ALREADY_INITIALIZED"/>
+  <int value="332" label="RFH_INVALID_DOCUMENT_SEQUENCE_NUMBER"/>
 </enum>
 
 <enum name="BadMessageReasonExtensions">
@@ -687,19 +690,6 @@ Called by update_debug_scenarios.py.-->
   <int value="2" label="Don't restore tabs, show crash infobar and NTP"/>
   <int value="3" label="Restore tabs with return to previous tab NTP"/>
   <int value="4" label="Show safe mode"/>
-</enum>
-
-<enum name="IOSStabilityUserVisibleTerminationType">
-  <summary>
-    One of several separate stability metrics. The values are non-contiguous as
-    they are a subset of values matching fields of the Stability proto (from the
-    SystemProfile).
-  </summary>
-  <int value="0"
-      label="Termination caused by system signal (f.e. EXC_BAD_ACCESS)"/>
-  <int value="1"
-      label="Termination caused by Hang / UI Thread freeze (ui thread was
-             locked for 9+ seconds and the app was quit by OS or the user)."/>
 </enum>
 
 <enum name="MobileSessionShutdownType">

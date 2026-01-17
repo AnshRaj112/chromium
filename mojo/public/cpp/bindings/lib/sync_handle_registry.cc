@@ -8,7 +8,6 @@
 
 #include "base/auto_reset.h"
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/synchronization/waitable_event.h"
@@ -59,12 +58,14 @@ bool SyncHandleRegistry::RegisterHandle(const Handle& handle,
                                         HandleCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  if (base::Contains(handles_, handle))
+  if (handles_.contains(handle)) {
     return false;
+  }
 
   MojoResult result = wait_set_.AddHandle(handle, handle_signals);
-  if (result != MOJO_RESULT_OK)
+  if (result != MOJO_RESULT_OK) {
     return false;
+  }
 
   handles_[handle] = std::move(callback);
   return true;
@@ -72,8 +73,9 @@ bool SyncHandleRegistry::RegisterHandle(const Handle& handle,
 
 void SyncHandleRegistry::UnregisterHandle(const Handle& handle) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!base::Contains(handles_, handle))
+  if (!handles_.contains(handle)) {
     return;
+  }
 
   MojoResult result = wait_set_.RemoveHandle(handle);
   DCHECK_EQ(MOJO_RESULT_OK, result);
@@ -119,12 +121,7 @@ SyncHandleRegistry::EventCallbackSubscription SyncHandleRegistry::RegisterEvent(
       it->second.get(), std::move(callback));
 }
 
-bool SyncHandleRegistry::Wait(base::span<const bool*> should_stop,
-                              size_t spanification_suspected_redundant_count) {
-  // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-  // redundant in M143.
-  CHECK(spanification_suspected_redundant_count == should_stop.size(),
-        base::NotFatalUntil::M143);
+bool SyncHandleRegistry::Wait(base::span<const bool*> should_stop) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   size_t num_ready_handles;
@@ -133,9 +130,10 @@ bool SyncHandleRegistry::Wait(base::span<const bool*> should_stop,
 
   scoped_refptr<SyncHandleRegistry> preserver(this);
   while (true) {
-    for (size_t i = 0; i < spanification_suspected_redundant_count; ++i) {
-      if (*should_stop[i])
+    for (const bool* flag : should_stop) {
+      if (*flag) {
         return true;
+      }
     }
 
     // TODO(yzshen): Theoretically it can reduce sync call re-entrancy if we

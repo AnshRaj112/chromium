@@ -22,6 +22,9 @@ ci.defaults.set(
     build_numbers = True,
     contact_team_email = "chrome-build-team@google.com",
     execution_timeout = 10 * time.hour,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     priority = ci_constants.DEFAULT_FYI_PRIORITY,
     service_account = ci_constants.DEFAULT_SERVICE_ACCOUNT,
     shadow_service_account = ci_constants.DEFAULT_SHADOW_SERVICE_ACCOUNT,
@@ -65,7 +68,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = "ci/Mac Builder",
     targets = targets.bundle(
@@ -98,7 +100,7 @@ ci.thin_tester(
 This builder is intended to shadow {}.<br/>\
 But, the tests are built by {}.\
 """.format(
-        linkify_builder("ci", "mac14-tests"),
+        linkify_builder("ci", "Mac13 Tests"),
         linkify_builder("build", "Mac Builder Siso FYI"),
     ),
     parent = "build/Mac Builder Siso FYI",
@@ -116,7 +118,6 @@ But, the tests are built by {}.\
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -124,7 +125,7 @@ But, the tests are built by {}.\
             "chromium_mac_rel_isolated_scripts_once",
         ],
         mixins = [
-            "mac_default_x64",
+            "mac_13_x64",
             "isolate_profile_data",
         ],
         per_test_modifications = {
@@ -168,6 +169,9 @@ But, the tests are built by {}.\
                 swarming = targets.swarming(
                     shards = 4,
                 ),
+            ),
+            "telemetry_perf_unittests": targets.mixin(
+                ci_only = True,
             ),
             "unit_tests": targets.mixin(
                 swarming = targets.swarming(

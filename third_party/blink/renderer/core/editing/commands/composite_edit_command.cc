@@ -29,6 +29,7 @@
 
 #include "third_party/blink/renderer/core/accessibility/blink_ax_event_intent.h"
 #include "third_party/blink/renderer/core/accessibility/scoped_blink_ax_event_intent.h"
+#include "third_party/blink/renderer/core/clipboard/data_transfer.h"
 #include "third_party/blink/renderer/core/dom/document.h"
 #include "third_party/blink/renderer/core/dom/document_fragment.h"
 #include "third_party/blink/renderer/core/dom/element_traversal.h"
@@ -72,6 +73,7 @@
 #include "third_party/blink/renderer/core/editing/visible_position.h"
 #include "third_party/blink/renderer/core/editing/visible_selection.h"
 #include "third_party/blink/renderer/core/editing/visible_units.h"
+#include "third_party/blink/renderer/core/events/input_event.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/html/forms/html_input_element.h"
 #include "third_party/blink/renderer/core/html/html_br_element.h"
@@ -92,6 +94,7 @@
 #include "third_party/blink/renderer/platform/heap/collection_support/clear_collection_scope.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/instrumentation/resource_coordinator/document_resource_coordinator.h"
+#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 
 namespace blink {
 
@@ -111,8 +114,9 @@ bool IsWhitespaceForRebalance(const Text& text_node, UChar character) {
 
 }  // namespace
 
-CompositeEditCommand::CompositeEditCommand(Document& document)
-    : EditCommand(document) {
+CompositeEditCommand::CompositeEditCommand(Document& document,
+                                           DataTransfer* data_transfer)
+    : EditCommand(document), data_transfer_(data_transfer) {
   const VisibleSelection& visible_selection =
       document.GetFrame()
           ->Selection()
@@ -594,14 +598,17 @@ void CompositeEditCommand::SplitTextNodeContainingElement(Text* text,
       ASSERT_NO_EDITING_ABORT);
 }
 
-void CompositeEditCommand::InsertTextIntoNode(Text* node,
-                                              unsigned offset,
-                                              const String& text) {
+void CompositeEditCommand::InsertTextIntoNode(
+    Text* node,
+    unsigned offset,
+    const String& text,
+    PasswordEchoBehavior password_echo_behavior) {
   // InsertIntoTextNodeCommand is never aborted.
-  if (!text.empty())
-    ApplyCommandToComposite(
-        MakeGarbageCollected<InsertIntoTextNodeCommand>(node, offset, text),
-        ASSERT_NO_EDITING_ABORT);
+  if (!text.empty()) {
+    ApplyCommandToComposite(MakeGarbageCollected<InsertIntoTextNodeCommand>(
+                                node, offset, text, password_echo_behavior),
+                            ASSERT_NO_EDITING_ABORT);
+  }
 }
 
 void CompositeEditCommand::DeleteTextFromNode(Text* node,
@@ -613,17 +620,22 @@ void CompositeEditCommand::DeleteTextFromNode(Text* node,
       ASSERT_NO_EDITING_ABORT);
 }
 
-void CompositeEditCommand::ReplaceTextInNode(Text* node,
-                                             unsigned offset,
-                                             unsigned count,
-                                             const String& replacement_text) {
+void CompositeEditCommand::ReplaceTextInNode(
+    Text* node,
+    unsigned offset,
+    unsigned count,
+    const String& replacement_text,
+    PasswordEchoBehavior password_echo_behavior) {
   // SetCharacterDataCommand is never aborted.
-  ApplyCommandToComposite(MakeGarbageCollected<SetCharacterDataCommand>(
-                              node, offset, count, replacement_text),
-                          ASSERT_NO_EDITING_ABORT);
+  ApplyCommandToComposite(
+      MakeGarbageCollected<SetCharacterDataCommand>(
+          node, offset, count, replacement_text, password_echo_behavior),
+      ASSERT_NO_EDITING_ABORT);
 }
 
-Position CompositeEditCommand::ReplaceSelectedTextInNode(const String& text) {
+Position CompositeEditCommand::ReplaceSelectedTextInNode(
+    const String& text,
+    PasswordEchoBehavior password_echo_behavior) {
   const Position& start = EndingSelection().Start();
   const Position& end = EndingSelection().End();
   auto* text_node = DynamicTo<Text>(start.ComputeContainerNode());
@@ -633,7 +645,7 @@ Position CompositeEditCommand::ReplaceSelectedTextInNode(const String& text) {
 
   ReplaceTextInNode(text_node, start.OffsetInContainerNode(),
                     end.OffsetInContainerNode() - start.OffsetInContainerNode(),
-                    text);
+                    text, password_echo_behavior);
 
   return Position(text_node, start.OffsetInContainerNode() + text.length());
 }
@@ -822,8 +834,10 @@ void CompositeEditCommand::RebalanceWhitespaceOnTextSubstring(Text* text_node,
       string, IsStartOfParagraph(visible_upstream_pos) || !upstream,
       should_emit_nbs_pbefore_end);
 
-  if (string != rebalanced_string)
-    ReplaceTextInNode(text_node, upstream, length, rebalanced_string);
+  if (string != rebalanced_string) {
+    ReplaceTextInNode(text_node, upstream, length, rebalanced_string,
+                      EditCommand::PasswordEchoBehavior::kDoNotEcho);
+  }
 }
 
 void CompositeEditCommand::PrepareWhitespaceAtPositionForSplit(
@@ -870,7 +884,8 @@ void CompositeEditCommand::
   if (!container_text_node)
     return;
   ReplaceTextInNode(container_text_node, pos.OffsetInContainerNode(), 1,
-                    NonBreakingSpaceString());
+                    NonBreakingSpaceString(),
+                    EditCommand::PasswordEchoBehavior::kDoNotEcho);
 }
 
 void CompositeEditCommand::RebalanceWhitespace() {
@@ -921,7 +936,8 @@ void CompositeEditCommand::DeleteInsignificantText(Text* text_node,
     return DeleteTextFromNode(text_node, start, end - start);
   }
   // Replace the text between start and end with collapsed version.
-  return ReplaceTextInNode(text_node, start, end - start, string);
+  return ReplaceTextInNode(text_node, start, end - start, string,
+                           EditCommand::PasswordEchoBehavior::kDoNotEcho);
 }
 
 void CompositeEditCommand::DeleteInsignificantText(const Position& start,
@@ -1021,7 +1037,7 @@ HTMLBRElement* CompositeEditCommand::AddBlockPlaceholderIfNeeded(
 
   // append the placeholder to make sure it follows
   // any unrendered blocks
-  if (block->Size().height == 0 || IsEmptyListItem(*block)) {
+  if (block->StitchedSize().height == 0 || IsEmptyListItem(*block)) {
     return AppendBlockPlaceholder(container, editing_state);
   }
 
@@ -1481,34 +1497,44 @@ void CompositeEditCommand::MoveParagraphs(
     VisiblePosition visible_start = EndingVisibleSelection().VisibleStart();
     VisiblePosition visible_end = EndingVisibleSelection().VisibleEnd();
 
-    bool start_after_paragraph =
-        ComparePositions(visible_start, end_of_paragraph_to_move) > 0;
-    bool end_before_paragraph =
-        ComparePositions(visible_end, start_of_paragraph_to_move) < 0;
+    if (RuntimeEnabledFeatures::
+            HandleDisconnectedSelectionDuringDOMChangesEnabled() &&
+        (visible_start.IsNull() || visible_end.IsNull())) {
+      // Skip preserving the selection if the selection endpoints
+      // visible_start and visible_end are invalid.
+      // It can happen due to a callback of a synchronous event
+      // dispatched by a prior DOM mutation.
+    } else {
+      bool start_after_paragraph =
+          ComparePositions(visible_start, end_of_paragraph_to_move) > 0;
+      bool end_before_paragraph =
+          ComparePositions(visible_end, start_of_paragraph_to_move) < 0;
 
-    if (!start_after_paragraph && !end_before_paragraph) {
-      bool start_in_paragraph =
-          ComparePositions(visible_start, start_of_paragraph_to_move) >= 0;
-      bool end_in_paragraph =
-          ComparePositions(visible_end, end_of_paragraph_to_move) <= 0;
-      const TextIteratorBehavior behavior =
-          RuntimeEnabledFeatures::EnterInOpenShadowRootsEnabled()
-              ? TextIteratorBehavior::
-                    AllVisiblePositionsIncludingShadowRootRangeLengthBehavior()
-              : TextIteratorBehavior::AllVisiblePositionsRangeLengthBehavior();
+      if (!start_after_paragraph && !end_before_paragraph) {
+        bool start_in_paragraph =
+            ComparePositions(visible_start, start_of_paragraph_to_move) >= 0;
+        bool end_in_paragraph =
+            ComparePositions(visible_end, end_of_paragraph_to_move) <= 0;
+        const TextIteratorBehavior behavior =
+            RuntimeEnabledFeatures::EnterInOpenShadowRootsEnabled()
+                ? TextIteratorBehavior::
+                      AllVisiblePositionsIncludingShadowRootRangeLengthBehavior()
+                : TextIteratorBehavior::
+                      AllVisiblePositionsRangeLengthBehavior();
 
-      start_index = 0;
-      if (start_in_paragraph) {
-        start_index = TextIterator::RangeLength(
-            start_of_paragraph_to_move.ToParentAnchoredPosition(),
-            visible_start.ToParentAnchoredPosition(), behavior);
-      }
+        start_index = 0;
+        if (start_in_paragraph) {
+          start_index = TextIterator::RangeLength(
+              start_of_paragraph_to_move.ToParentAnchoredPosition(),
+              visible_start.ToParentAnchoredPosition(), behavior);
+        }
 
-      end_index = 0;
-      if (end_in_paragraph) {
-        end_index = TextIterator::RangeLength(
-            start_of_paragraph_to_move.ToParentAnchoredPosition(),
-            visible_end.ToParentAnchoredPosition(), behavior);
+        end_index = 0;
+        if (end_in_paragraph) {
+          end_index = TextIterator::RangeLength(
+              start_of_paragraph_to_move.ToParentAnchoredPosition(),
+              visible_end.ToParentAnchoredPosition(), behavior);
+        }
       }
     }
   }
@@ -1670,7 +1696,8 @@ void CompositeEditCommand::MoveParagraphs(
   if (should_preserve_style == kDoNotPreserveStyle)
     options |= ReplaceSelectionCommand::kMatchStyle;
   ApplyCommandToComposite(MakeGarbageCollected<ReplaceSelectionCommand>(
-                              GetDocument(), fragment, options),
+                              GetDocument(), fragment, options,
+                              EditCommand::PasswordEchoBehavior::kDoNotEcho),
                           editing_state);
   if (editing_state->IsAborted())
     return;
@@ -2124,6 +2151,7 @@ void CompositeEditCommand::Trace(Visitor* visitor) const {
   visitor->Trace(starting_selection_);
   visitor->Trace(ending_selection_);
   visitor->Trace(undo_step_);
+  visitor->Trace(data_transfer_);
   EditCommand::Trace(visitor);
 }
 
@@ -2140,7 +2168,8 @@ void CompositeEditCommand::AppliedEditing() {
   DispatchInputEventEditableContentChanged(
       undo_step.StartingRootEditableElement(),
       undo_step.EndingRootEditableElement(), GetInputType(),
-      TextDataForInputEvent(), IsComposingFromCommand(this));
+      TextDataForInputEvent(), IsComposingFromCommand(this),
+      data_transfer_.Get());
 
   const SelectionInDOMTree& new_selection =
       CorrectedSelectionAfterCommand(EndingSelection(), &GetDocument());

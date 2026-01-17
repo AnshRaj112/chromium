@@ -14,7 +14,6 @@
 #import "base/strings/string_number_conversions.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
-#import "base/types/cxx23_to_underlying.h"
 #import "base/values.h"
 #import "components/autofill/core/browser/autofill_field.h"
 #import "components/autofill/core/common/autocomplete_parsing_util.h"
@@ -89,7 +88,8 @@ bool IsContextSecureForWebState(web::WebState* web_state) {
 
 std::unique_ptr<base::Value> ParseJson(NSString* json_string) {
   std::optional<base::Value> json_value =
-      base::JSONReader::Read(base::SysNSStringToUTF8(json_string));
+      base::JSONReader::Read(base::SysNSStringToUTF8(json_string),
+                             base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!json_value) {
     return nullptr;
   }

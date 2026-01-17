@@ -9,6 +9,8 @@
 #include "third_party/blink/renderer/core/animation/animation.h"
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/dom/element.h"
+#include "third_party/blink/renderer/core/dom/trigger_scoped_name.h"
+#include "third_party/blink/renderer/core/style/style_trigger_attachment.h"
 
 namespace blink {
 
@@ -90,11 +92,19 @@ class CORE_EXPORT CSSAnimation : public Animation {
   // depends on computed values.
   void FlushPendingUpdates() const override { FlushStyles(); }
 
-  const std::optional<Vector<AtomicString>>& GetTriggerNames() {
-    return trigger_names_;
+  const Member<const StyleTriggerAttachmentVector>& GetTriggerAttachments() {
+    return trigger_attachments_;
   }
-  void SetTriggerNames(const std::optional<Vector<AtomicString>>& names) {
-    trigger_names_ = names;
+  void SetTriggerAttachments(
+      const Member<const StyleTriggerAttachmentVector>& attachments) {
+    trigger_attachments_ = attachments;
+  }
+
+  void SetNamedTriggerAttachment(Member<const TriggerScopedName> scope,
+                                 AnimationTrigger* trigger);
+  HeapHashMap<Member<const TriggerScopedName>, Member<AnimationTrigger>>&
+  NamedTriggerAttachments() {
+    return named_trigger_attachments_;
   }
 
  protected:
@@ -138,7 +148,14 @@ class CORE_EXPORT CSSAnimation : public Animation {
   Member<Element> owning_element_;
 
   // Names of Triggers corresponding to the animation-trigger property.
-  std::optional<Vector<AtomicString>> trigger_names_;
+  Member<const StyleTriggerAttachmentVector> trigger_attachments_;
+
+  // This maps the trigger names to the AnimationTriggers that were attached as
+  // a result of the animation-trigger declaration. We need to keep track of
+  // this so that when style changes happen, in addition to attaching the
+  // (potentially new) correct trigger but we also remove the obsolete trigger.
+  HeapHashMap<Member<const TriggerScopedName>, Member<AnimationTrigger>>
+      named_trigger_attachments_;
 };
 
 template <>

@@ -6,6 +6,7 @@
 
 #include "base/containers/span.h"
 #include "base/functional/bind.h"
+#include "base/strings/string_view_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -43,7 +44,7 @@ class ResponseHandlerBase {
 
   std::unique_ptr<net::test_server::HttpResponse> ServeResponse(
       const net::test_server::HttpRequest& request) {
-    if (request.GetURL().path() != expected_path_) {
+    if (request.GetURL().GetPath() != expected_path_) {
       return nullptr;
     }
 
@@ -120,7 +121,7 @@ std::unique_ptr<net::test_server::HttpResponse> ServeRedirectWithQwacHeader(
     const std::string& redirect_url,
     const std::string& qwac_link_url,
     const net::test_server::HttpRequest& request) {
-  if (request.GetURL().path() != expected_path) {
+  if (request.GetURL().GetPath() != expected_path) {
     return nullptr;
   }
 
@@ -137,7 +138,7 @@ std::unique_ptr<net::test_server::HttpResponse> ServeRedirectWithQwacHeader(
 std::unique_ptr<net::test_server::HttpResponse> FailTestIfPathRequested(
     const std::string& expected_path,
     const net::test_server::HttpRequest& request) {
-  if (request.GetURL().path() != expected_path) {
+  if (request.GetURL().GetPath() != expected_path) {
     return nullptr;
   }
 
@@ -886,8 +887,8 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest, TestInvalidBinding) {
                             k2QwacVerificationFailed);
 }
 
-// TODO(crbug.com/392931069): Test that qwac is not fetched after clicking
+// TODO(crbug.com/436274241): Test that qwac is not fetched after clicking
 // through HTTPS error.
-// TODO(crbug.com/392931069): Test that qwac requests shows up in netlog?
+// TODO(crbug.com/436300891): Test that qwac requests shows up in netlog?
 
 }  // namespace

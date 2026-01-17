@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
@@ -35,6 +35,7 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/content_browser_test.h"
+#include "content/public/test/content_browser_test_content_browser_client.h"
 #include "content/public/test/content_browser_test_utils.h"
 #include "content/public/test/test_utils.h"
 #include "content/shell/browser/shell.h"
@@ -151,7 +152,8 @@ class TestInputEventObserver : public RenderWidgetHost::InputEventObserver {
   ~TestInputEventObserver() override {}
 
   void OnInputEvent(const RenderWidgetHost& widget,
-                    const blink::WebInputEvent& event) override {
+                    const blink::WebInputEvent& event,
+                    InputEventSource source) override {
     dispatched_events_.push_back(event.GetType());
   }
 
@@ -293,8 +295,8 @@ IN_PROC_BROWSER_TEST_F(RenderWidgetHostTouchEmulatorBrowserTest,
     // that we generated a GestureScrollEnd and routed it without crashing.
     TestInputEventObserver::EventTypeVector dispatched_events =
         observer.GetAndResetDispatchedEventTypes();
-    EXPECT_TRUE(base::Contains(dispatched_events,
-                               blink::WebInputEvent::Type::kGestureScrollEnd));
+    EXPECT_TRUE(std::ranges::contains(
+        dispatched_events, blink::WebInputEvent::Type::kGestureScrollEnd));
   } while (!touch_emulator->suppress_next_fling_cancel_for_testing());
 }
 #endif  // !BUILDFLAG(IS_ANDROID)
@@ -401,7 +403,10 @@ IN_PROC_BROWSER_TEST_F(RenderWidgetHostTouchEmulatorBrowserTest,
 
   SimulateRoutedMouseEvent(blink::WebInputEvent::Type::kMouseUp, 10, 60, 0,
                            true);
-  WaitForAckWith(blink::WebInputEvent::Type::kTouchEnd);
+  if (observer.acked_touch_event_type() !=
+      blink::WebInputEvent::Type::kTouchEnd) {
+    WaitForAckWith(blink::WebInputEvent::Type::kTouchEnd);
+  }
   EXPECT_EQ(blink::WebInputEvent::Type::kTouchEnd,
             observer.acked_touch_event_type());
   dispatched_events = observer.GetAndResetDispatchedEventTypes();
@@ -1190,6 +1195,7 @@ IN_PROC_BROWSER_TEST_F(RenderWidgetHostDelegatedInkMetadataTest,
                    .delegated_ink_metadata.has_value());
 }
 
+#if BUILDFLAG(IS_ANDROID)
 namespace {
 
 class LocalSurfaceIdChangedObserver
@@ -1265,37 +1271,20 @@ class RenderWidgetHostSameDocNavUpdatesLocalSurfaceIdTest
     : public RenderWidgetHostBrowserTest,
       public ::testing::WithParamInterface<bool> {
  public:
-  RenderWidgetHostSameDocNavUpdatesLocalSurfaceIdTest() {
-    bool increment_local_surface_id = GetParam();
-    if (increment_local_surface_id) {
-      scoped_feature_list_.InitWithFeaturesAndParameters(
-          /*enabled_features=*/
-          {{blink::features::
-                kIncrementLocalSurfaceIdForMainframeSameDocNavigation,
-            {}}},
-          /*disabled_features=*/{});
-    } else {
-      scoped_feature_list_.InitWithFeaturesAndParameters(
-          /*enabled_features=*/
-          {},
-          /*disabled_features=*/{
-              blink::features::
-                  kIncrementLocalSurfaceIdForMainframeSameDocNavigation});
-    }
-  }
+  RenderWidgetHostSameDocNavUpdatesLocalSurfaceIdTest() = default;
 
   void SetUpOnMainThread() override {
     host_resolver()->AddRule("*", "127.0.0.1");
     ASSERT_TRUE(embedded_test_server()->Start());
+    auto preferences = web_contents()->GetOrCreateWebPreferences();
+    preferences.should_screenshot_on_mainframe_same_doc_navigation = GetParam();
+    web_contents()->SetWebPreferences(preferences);
   }
 
   void SetUpCommandLine(base::CommandLine* command_line) override {
     RenderWidgetHostBrowserTest::SetUpCommandLine(command_line);
     command_line->AppendSwitch(switches::kForcePrefersNoReducedMotion);
   }
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 // Assert that with `IncrementLocalSurfaceIdForMainframeSameDocNavigation`
@@ -1303,10 +1292,6 @@ class RenderWidgetHostSameDocNavUpdatesLocalSurfaceIdTest
 IN_PROC_BROWSER_TEST_P(RenderWidgetHostSameDocNavUpdatesLocalSurfaceIdTest,
                        SameDocNavigationUpdatesLocalSurfaceId) {
   bool increment_local_surface_id = GetParam();
-  ASSERT_EQ(increment_local_surface_id,
-            base::FeatureList::IsEnabled(
-                blink::features::
-                    kIncrementLocalSurfaceIdForMainframeSameDocNavigation));
   ASSERT_TRUE(NavigateToURL(shell(), embedded_test_server()->GetURL(
                                          "/session_history/fragment.html")));
   // Changes the background color when navigate to "fragment.html#a".
@@ -1341,6 +1326,8 @@ IN_PROC_BROWSER_TEST_P(RenderWidgetHostSameDocNavUpdatesLocalSurfaceIdTest,
 INSTANTIATE_TEST_SUITE_P(All,
                          RenderWidgetHostSameDocNavUpdatesLocalSurfaceIdTest,
                          ::testing::Bool());
+
+#endif  // BUILDFLAG(IS_ANDROID)
 
 namespace {
 

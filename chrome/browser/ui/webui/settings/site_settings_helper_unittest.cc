@@ -4,6 +4,8 @@
 
 #include "chrome/browser/ui/webui/settings/site_settings_helper.h"
 
+#include <algorithm>
+
 #include "base/check_deref.h"
 #include "base/containers/to_vector.h"
 #include "base/functional/callback_helpers.h"
@@ -94,7 +96,12 @@ constexpr ContentSettingsType kContentTypeNotifications =
 class SiteSettingsHelperTest : public testing::Test {
  public:
   void SetUp() override {
-    TestingBrowserProcess::GetGlobal()->CreateGlobalFeaturesForTesting();
+    TestingBrowserProcess::GetGlobal()->SetUpGlobalFeaturesForTesting(
+        /*profile_manager=*/false);
+  }
+
+  void TearDown() override {
+    TestingBrowserProcess::GetGlobal()->TearDownGlobalFeaturesForTesting();
   }
 
   void VerifySetting(const base::Value::List& exceptions,
@@ -277,8 +284,7 @@ TEST_F(SiteSettingsHelperTest, ExceptionListFiltersIncognitoPolicyExceptions) {
   policy_provider->SetWebsiteSetting(
       ContentSettingsPattern::FromString(test_url),
       ContentSettingsPattern::Wildcard(), kContentTypeCookies,
-      base::Value(CONTENT_SETTING_ALLOW), /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      base::Value(CONTENT_SETTING_ALLOW), /*constraints=*/{});
   policy_provider->set_read_only(true);
   content_settings::TestUtils::OverrideProvider(map, std::move(policy_provider),
                                                 ProviderType::kPolicyProvider);
@@ -300,8 +306,7 @@ TEST_F(SiteSettingsHelperTest, ExceptionListFiltersIncognitoPolicyExceptions) {
   incognito_policy_provider->SetWebsiteSetting(
       ContentSettingsPattern::FromString(test_url),
       ContentSettingsPattern::Wildcard(), kContentTypeCookies,
-      base::Value(CONTENT_SETTING_ALLOW), /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      base::Value(CONTENT_SETTING_ALLOW), /*constraints=*/{});
   incognito_policy_provider->set_read_only(true);
   content_settings::TestUtils::OverrideProvider(
       incognito_map, std::move(incognito_policy_provider),
@@ -500,8 +505,7 @@ TEST_F(SiteSettingsHelperTest, CheckExceptionOrder) {
   policy_provider->SetWebsiteSetting(
       ContentSettingsPattern::FromString(star_google_com),
       ContentSettingsPattern::Wildcard(), kContentType,
-      base::Value(CONTENT_SETTING_BLOCK), /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      base::Value(CONTENT_SETTING_BLOCK), /*constraints=*/{});
   policy_provider->set_read_only(true);
   content_settings::TestUtils::OverrideProvider(map, std::move(policy_provider),
                                                 ProviderType::kPolicyProvider);
@@ -519,8 +523,7 @@ TEST_F(SiteSettingsHelperTest, CheckExceptionOrder) {
   extension_provider->SetWebsiteSetting(
       ContentSettingsPattern::FromString(drive_google_com),
       ContentSettingsPattern::Wildcard(), kContentType,
-      base::Value(CONTENT_SETTING_ASK), /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      base::Value(CONTENT_SETTING_ASK), /*constraints=*/{});
   extension_provider->set_read_only(true);
   content_settings::TestUtils::OverrideProvider(
       map, std::move(extension_provider),
@@ -597,8 +600,7 @@ TEST_F(SiteSettingsHelperTest, ContentSettingSource) {
   extension_provider->SetWebsiteSetting(
       ContentSettingsPattern::FromURL(origin),
       ContentSettingsPattern::FromURL(origin), kContentType,
-      base::Value(CONTENT_SETTING_BLOCK), /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      base::Value(CONTENT_SETTING_BLOCK), /*constraints=*/{});
   extension_provider->set_read_only(true);
   content_settings::TestUtils::OverrideProvider(
       map, std::move(extension_provider),
@@ -613,8 +615,7 @@ TEST_F(SiteSettingsHelperTest, ContentSettingSource) {
   policy_provider->SetWebsiteSetting(
       ContentSettingsPattern::FromURL(origin),
       ContentSettingsPattern::FromURL(origin), kContentType,
-      base::Value(CONTENT_SETTING_ALLOW), /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      base::Value(CONTENT_SETTING_ALLOW), /*constraints=*/{});
   policy_provider->set_read_only(true);
   content_settings::TestUtils::OverrideProvider(map, std::move(policy_provider),
                                                 ProviderType::kPolicyProvider);
@@ -988,13 +989,11 @@ TEST_F(SiteSettingsHelperTest, AutomaticFullscreenVisibility) {
   TestingProfile profile;
   profile.SetPermissionControllerDelegate(
       permissions::GetPermissionControllerDelegate(&profile));
-  base::test::ScopedFeatureList feature_list{
-      features::kAutomaticFullscreenContentSetting};
   const ContentSettingsType type = ContentSettingsType::AUTOMATIC_FULLSCREEN;
 
   // Automatic Fullscreen is visible for non-origin-specific lists.
   auto types = GetVisiblePermissionCategories();
-  EXPECT_TRUE(base::Contains(types, type));
+  EXPECT_TRUE(std::ranges::contains(types, type));
 
   constexpr char kDefault[] = "https://www.default.com:443";
   constexpr char kAllowed[] = "https://www.allowed.com:443";
@@ -1007,15 +1006,14 @@ TEST_F(SiteSettingsHelperTest, AutomaticFullscreenVisibility) {
   EXPECT_EQ(SiteSettingSource::kDefault, source);
   EXPECT_EQ(CONTENT_SETTING_BLOCK, content_setting);
   types = GetVisiblePermissionCategories(kDefault, &profile);
-  EXPECT_FALSE(base::Contains(types, type));
+  EXPECT_FALSE(std::ranges::contains(types, type));
 
   // Simulate allowing Automatic Fullscreen through enterprise policy.
   auto policy_provider = std::make_unique<content_settings::MockProvider>();
   policy_provider->SetWebsiteSetting(
       ContentSettingsPattern::FromString(kAllowed),
       ContentSettingsPattern::FromString(kAllowed), type,
-      base::Value(CONTENT_SETTING_ALLOW), /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      base::Value(CONTENT_SETTING_ALLOW), /*constraints=*/{});
   policy_provider->set_read_only(true);
   content_settings::TestUtils::OverrideProvider(map, std::move(policy_provider),
                                                 ProviderType::kPolicyProvider);
@@ -1026,7 +1024,7 @@ TEST_F(SiteSettingsHelperTest, AutomaticFullscreenVisibility) {
   EXPECT_EQ(SiteSettingSource::kPolicy, source);
   EXPECT_EQ(CONTENT_SETTING_ALLOW, content_setting);
   types = GetVisiblePermissionCategories(kAllowed, &profile);
-  EXPECT_TRUE(base::Contains(types, type));
+  EXPECT_TRUE(std::ranges::contains(types, type));
 }
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1038,7 +1036,7 @@ TEST_F(SiteSettingsHelperTest, WebPrintingVisibility) {
   const ContentSettingsType type = ContentSettingsType::WEB_PRINTING;
 
   // Web Printing is visible for non-origin-specific lists.
-  EXPECT_TRUE(base::Contains(GetVisiblePermissionCategories(), type));
+  EXPECT_TRUE(std::ranges::contains(GetVisiblePermissionCategories(), type));
 
   constexpr char kDefault[] = "https://www.default.com:443";
   constexpr char kAllowed[] = "https://www.allowed.com:443";
@@ -1046,27 +1044,26 @@ TEST_F(SiteSettingsHelperTest, WebPrintingVisibility) {
       "isolated-app://aerugqztij5biqquuk3mfwpsaibuegaqcitgfchwuosuofdjabzqaaic";
 
   // Web Printing is not visible for sites with the default source.
-  EXPECT_FALSE(
-      base::Contains(GetVisiblePermissionCategories(kDefault, &profile), type));
+  EXPECT_FALSE(std::ranges::contains(
+      GetVisiblePermissionCategories(kDefault, &profile), type));
 
   // Web Printing is always visible for IWA origins.
-  EXPECT_TRUE(
-      base::Contains(GetVisiblePermissionCategories(kIwa, &profile), type));
+  EXPECT_TRUE(std::ranges::contains(
+      GetVisiblePermissionCategories(kIwa, &profile), type));
 
   // Simulate allowing Web Printing through enterprise policy.
   auto policy_provider = std::make_unique<content_settings::MockProvider>();
   policy_provider->SetWebsiteSetting(
       ContentSettingsPattern::FromString(kAllowed),
       ContentSettingsPattern::FromString(kAllowed), type,
-      base::Value(CONTENT_SETTING_ALLOW), /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      base::Value(CONTENT_SETTING_ALLOW), /*constraints=*/{});
   content_settings::TestUtils::OverrideProvider(
       HostContentSettingsMapFactory::GetForProfile(&profile),
       std::move(policy_provider), ProviderType::kPolicyProvider);
 
   // Web Printing is visible for origins with non-default sources.
-  EXPECT_TRUE(
-      base::Contains(GetVisiblePermissionCategories(kAllowed, &profile), type));
+  EXPECT_TRUE(std::ranges::contains(
+      GetVisiblePermissionCategories(kAllowed, &profile), type));
 }
 #endif
 
@@ -1117,11 +1114,16 @@ class SiteSettingsHelperChooserExceptionTest : public testing::Test {
   Profile* profile() { return &profile_; }
 
   void SetUp() override {
-    TestingBrowserProcess::GetGlobal()->CreateGlobalFeaturesForTesting();
+    TestingBrowserProcess::GetGlobal()->SetUpGlobalFeaturesForTesting(
+        /*profile_manager=*/false);
     SetUpUsbChooserContext();
 #if BUILDFLAG(IS_CHROMEOS)
     SetUpSmartCardPermissionContext();
 #endif  // BUILDFLAG(IS_CHROMEOS)
+  }
+
+  void TearDown() override {
+    TestingBrowserProcess::GetGlobal()->TearDownGlobalFeaturesForTesting();
   }
 
   // Sets up the UsbChooserContext with two devices and permissions for these
@@ -1158,7 +1160,8 @@ class SiteSettingsHelperChooserExceptionTest : public testing::Test {
                                            *ephemeral_device_info);
 
     // Add the policy granted permissions for testing.
-    auto policy_value = base::JSONReader::Read(kUsbPolicySetting);
+    auto policy_value = base::JSONReader::Read(
+        kUsbPolicySetting, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
     DCHECK(policy_value);
     profile()->GetPrefs()->Set(prefs::kManagedWebUsbAllowDevicesForUrls,
                                std::move(*policy_value));
@@ -1419,10 +1422,16 @@ class SiteSettingsHelperExtensionTest
             std::make_unique<content::BrowserTaskEnvironment>()) {}
 
   void SetUp() override {
-    TestingBrowserProcess::GetGlobal()->CreateGlobalFeaturesForTesting();
+    TestingBrowserProcess::GetGlobal()->SetUpGlobalFeaturesForTesting(
+        /*profile_manager=*/false);
     extensions::ExtensionServiceTestBase::SetUp();
     // The test profile is initialized in InitializeEmptyExtensionService().
     InitializeEmptyExtensionService();
+  }
+
+  void TearDown() override {
+    extensions::ExtensionServiceTestBase::TearDown();
+    TestingBrowserProcess::GetGlobal()->TearDownGlobalFeaturesForTesting();
   }
 
   scoped_refptr<const extensions::Extension> LoadExtension(
@@ -1541,8 +1550,13 @@ TEST_F(SiteSettingsHelperExtensionTest,
 class SiteSettingsHelperIsolatedWebAppTest : public testing::Test {
  protected:
   void SetUp() override {
-    TestingBrowserProcess::GetGlobal()->CreateGlobalFeaturesForTesting();
+    TestingBrowserProcess::GetGlobal()->SetUpGlobalFeaturesForTesting(
+        /*profile_manager=*/false);
     web_app::test::AwaitStartWebAppProviderAndSubsystems(&testing_profile_);
+  }
+
+  void TearDown() override {
+    TestingBrowserProcess::GetGlobal()->TearDownGlobalFeaturesForTesting();
   }
 
   web_app::IsolatedWebAppUrlInfo InstallIsolatedWebApp(
@@ -1604,8 +1618,6 @@ TEST_F(SiteSettingsHelperIsolatedWebAppTest,
 }
 
 TEST_F(SiteSettingsHelperIsolatedWebAppTest, AutomaticFullscreenVisibility) {
-  base::test::ScopedFeatureList feature_list{
-      features::kAutomaticFullscreenContentSetting};
   const ContentSettingsType type = ContentSettingsType::AUTOMATIC_FULLSCREEN;
   web_app::IsolatedWebAppUrlInfo app_url_info = InstallIsolatedWebApp(kAppName);
 

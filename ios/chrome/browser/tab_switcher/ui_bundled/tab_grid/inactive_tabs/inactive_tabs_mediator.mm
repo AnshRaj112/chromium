@@ -429,6 +429,10 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
   NOTREACHED();
 }
 
+- (void)closeTabsExceptID:(web::WebStateID)itemID {
+  NOTREACHED();
+}
+
 - (void)deleteTabGroup:(base::WeakPtr<const TabGroup>)group
             sourceView:(UIView*)sourceView {
   NOTREACHED();
@@ -496,6 +500,24 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
 - (void)closeItemWithIdentifier:(GridItemIdentifier*)identifier {
   CHECK(identifier.type == GridItemType::kTab);
   [self closeItemWithID:identifier.tabSwitcherItem.identifier];
+}
+
+- (void)createTabGroupWithTitle:(NSString*)title
+                     sourceItem:(GridItemIdentifier*)sourceItem
+                     droppedTab:(TabInfo*)droppedTab
+                destinationItem:(GridItemIdentifier*)destinationItem {
+  // No-op
+}
+
+- (void)addDroppedTab:(TabInfo*)droppedTab
+           sourceItem:(GridItemIdentifier*)sourceItem
+              toGroup:(const TabGroup*)group {
+  // No-op
+}
+
+- (void)mergeGroup:(TabGroupInfo*)droppedGroup
+    intoDestinationItem:(GridItemIdentifier*)destinationItem {
+  // No-op
 }
 
 @end

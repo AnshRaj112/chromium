@@ -60,10 +60,15 @@
 #include "third_party/blink/renderer/platform/network/http_names.h"
 #include "third_party/blink/renderer/platform/network/mime/mime_type_registry.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
+#include "third_party/blink/renderer/platform/wtf/text/atomic_string.h"
 #include "third_party/skia/include/core/SkSurface.h"
 #include "ui/base/clipboard/clipboard_constants.h"
 #include "ui/base/dragdrop/mojom/drag_drop_types.mojom-blink.h"
 #include "ui/gfx/geometry/rect_conversions.h"
+
+#if BUILDFLAG(IS_WIN)
+#include "third_party/blink/renderer/platform/wtf/text/line_ending.h"
+#endif
 
 namespace blink {
 
@@ -196,6 +201,37 @@ std::optional<DragOperationsMask> ConvertEffectAllowedToDragOperationsMask(
   return std::nullopt;
 }
 
+AtomicString ConvertEffectAllowedToDropEffect(
+    const AtomicString& effect_allowed) {
+  auto mask = ConvertEffectAllowedToDragOperationsMask(effect_allowed);
+  if (!mask.has_value()) {
+    return keywords::kNone;
+  }
+  // The spec [1] doesn't define a specific order drop effects should be
+  // prioritized in, and leaves it up to user agents to adapt to their
+  // platform's convention.
+  // [1] https://html.spec.whatwg.org/multipage/dnd.html#the-dragevent-interface
+  // For example, if `effectAllowed` is "all", the entry in the spec table
+  // mentions that `dropEffect` should be:
+  // > "copy", or, if appropriate, either "link" or "move"
+  // In desktop platforms, the usual expectation is that when you drag something
+  // within the file system it will be moved (if it's on the same disk).
+  // This ordering matches `DragController::DefaultOperationForDrag`.
+  if (mask == kDragOperationEvery) {
+    return AtomicString("copy");
+  }
+  if (mask.value() & kDragOperationMove) {
+    return AtomicString("move");
+  }
+  if ((mask.value() & kDragOperationCopy)) {
+    return AtomicString("copy");
+  }
+  if (mask.value() & kDragOperationLink) {
+    return AtomicString("link");
+  }
+  return keywords::kNone;
+}
+
 AtomicString ConvertDragOperationsMaskToEffectAllowed(DragOperationsMask op) {
   if (((op & kDragOperationMove) && (op & kDragOperationCopy) &&
        (op & kDragOperationLink)) ||
@@ -256,6 +292,10 @@ DataTransfer* DataTransfer::Create(DataTransferType type,
 }
 
 DataTransfer::~DataTransfer() = default;
+
+void DataTransfer::resetDropEffect() {
+  drop_effect_ = AtomicString();
+}
 
 void DataTransfer::setDropEffect(const AtomicString& effect) {
   if (!IsForDragAndDrop())
@@ -546,7 +586,7 @@ void DataTransfer::WriteSelection(const FrameSelection& selection) {
 
   String str = selection.SelectedTextForClipboard();
 #if BUILDFLAG(IS_WIN)
-  ReplaceNewlinesWithWindowsStyleNewlines(str);
+  str = NormalizeLineEndingsToCRLF(str);
 #endif
   ReplaceNBSPWithSpace(str);
   data_object_->SetData(ui::kMimeTypePlainText, str);
@@ -596,9 +636,13 @@ void DataTransfer::SetSourceOperation(DragOperationsMask op) {
   effect_allowed_ = ConvertDragOperationsMaskToEffectAllowed(op);
 }
 
+void DataTransfer::SetDestinationOperationFromEffectAllowed() {
+  setDropEffect(ConvertEffectAllowedToDropEffect(effect_allowed_));
+}
+
 void DataTransfer::SetDestinationOperation(ui::mojom::blink::DragOperation op) {
-  drop_effect_ = ConvertDragOperationsMaskToEffectAllowed(
-      static_cast<DragOperationsMask>(op));
+  setDropEffect(ConvertDragOperationsMaskToEffectAllowed(
+      static_cast<DragOperationsMask>(op)));
 }
 
 DataTransferItemList* DataTransfer::items() {

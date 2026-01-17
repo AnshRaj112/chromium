@@ -20,14 +20,14 @@
 #include "third_party/blink/renderer/core/layout/early_break.h"
 #include "third_party/blink/renderer/core/layout/floats_utils.h"
 #include "third_party/blink/renderer/core/layout/fragmentation_utils.h"
+#include "third_party/blink/renderer/core/layout/inline/fit_text_scale.h"
+#include "third_party/blink/renderer/core/layout/inline/fit_text_utils.h"
 #include "third_party/blink/renderer/core/layout/inline/inline_cursor.h"
 #include "third_party/blink/renderer/core/layout/inline/inline_node.h"
 #include "third_party/blink/renderer/core/layout/inline/physical_line_box_fragment.h"
 #include "third_party/blink/renderer/core/layout/inline/ruby_utils.h"
-#include "third_party/blink/renderer/core/layout/layout_multi_column_flow_thread.h"
 #include "third_party/blink/renderer/core/layout/layout_object.h"
 #include "third_party/blink/renderer/core/layout/layout_result.h"
-#include "third_party/blink/renderer/core/layout/legacy_layout_tree_walking.h"
 #include "third_party/blink/renderer/core/layout/length_utils.h"
 #include "third_party/blink/renderer/core/layout/list/unpositioned_list_marker.h"
 #include "third_party/blink/renderer/core/layout/logical_box_fragment.h"
@@ -56,24 +56,20 @@ bool HasLineEvenIfEmpty(LayoutBox* box) {
   // Note: |block_flow->NeedsCollectInline()| is true after removing all
   // children from block[1].
   // [1] editing/inserting/insert_after_delete.html
-  if (!GetLayoutObjectForFirstChildNode(block_flow)) {
+  if (!block_flow->FirstChild()) {
     // Note: |block_flow->ChildrenInline()| can be both true or false:
     //  - true: just after construction, <div></div>
     //  - true: one of child is inline them remove all, <div>abc</div>
     //  - false: all children are block then remove all, <div><p></p></div>
     return block_flow->HasLineIfEmpty();
   }
-  if (AreNGBlockFlowChildrenInline(block_flow)) {
+  if (block_flow->ChildrenInline()) {
     return block_flow->HasLineIfEmpty() &&
            InlineNode(block_flow).IsBlockLevel();
   }
   const LayoutBlockFlow* fragmentation_context_root = nullptr;
-  if (RuntimeEnabledFeatures::FlowThreadLessEnabled()) {
-    if (block_flow->IsMulticolContainer()) {
-      fragmentation_context_root = block_flow;
-    }
-  } else {
-    fragmentation_context_root = block_flow->MultiColumnFlowThread();
+  if (block_flow->IsMulticolContainer()) {
+    fragmentation_context_root = block_flow;
   }
   if (fragmentation_context_root) {
     DCHECK(!fragmentation_context_root->ChildrenInline());
@@ -655,36 +651,80 @@ BlockLayoutAlgorithm::HandleNonsuccessfulLayoutResult(
   }
 }
 
-NOINLINE const LayoutResult* BlockLayoutAlgorithm::LayoutInlineChild(
+const LayoutResult* BlockLayoutAlgorithm::LayoutInlineChild(
     const InlineNode& node) {
+  ParagraphScale paragraph_scale;
+  if (RuntimeEnabledFeatures::CssFitWidthTextEnabled()) {
+    const bool grow_consistent =
+        Style().TextGrow().Target() == FitTextTarget::kConsistent;
+    const bool shrink_consistent =
+        Style().TextShrink().Target() == FitTextTarget::kConsistent;
+    if (grow_consistent || shrink_consistent) {
+      // Compute the paragraph scaling factor with a cloned
+      // BlockLayoutAlgorithm.
+      // TODO(crbug.com/417306102): This approach is an inefficient because it
+      // handles all layout processes, and is a temporary hack until we can
+      // implement a production-ready solution. Ideally we should introduce a
+      // new phase separate from minmax and layout to skip unnecessary
+      // processing.
+      // Additionally, this feature is not currently intended to be used with
+      // multi-column layouts.
+      LayoutAlgorithmParams cloned_param(
+          Node(), container_builder_.InitialFragmentGeometry(),
+          GetConstraintSpace(), GetBreakToken(), early_break_,
+          additional_early_breaks_);
+      cloned_param.column_spanner_path = column_spanner_path_;
+      cloned_param.previous_result = previous_result_;
+      BlockLayoutAlgorithm cloned_algorithm(cloned_param);
+      const LayoutResult* result =
+          cloned_algorithm.LayoutInlineChild(node, nullptr);
+      paragraph_scale = MeasurePerBlockScale(
+          InlineNode(To<LayoutBlockFlow>(Node().GetLayoutBox())),
+          result->GetPhysicalFragment(), ChildAvailableSize().inline_size);
+      if ((paragraph_scale.scale < 1.0f && !shrink_consistent) ||
+          (paragraph_scale.scale > 1.0f && !grow_consistent)) {
+        paragraph_scale = ParagraphScale();
+      }
+    }
+  }
+  return LayoutInlineChild(node, &paragraph_scale);
+}
+
+NOINLINE const LayoutResult* BlockLayoutAlgorithm::LayoutInlineChild(
+    const InlineNode& node,
+    const ParagraphScale* paragraph_scale) {
   const TextWrapStyle wrap = node.Style().GetTextWrapStyle();
   if (wrap == TextWrapStyle::kPretty) [[unlikely]] {
     UseCounter::Count(node.GetDocument(), WebFeature::kTextWrapPretty);
     if (!node.IsScoreLineBreakDisabled()) {
       return LayoutWithOptimalInlineChildLayoutContext<kMaxLinesForOptimal>(
-          node);
+          node, paragraph_scale);
     }
   } else if (wrap == TextWrapStyle::kBalance) [[unlikely]] {
     UseCounter::Count(node.GetDocument(), WebFeature::kTextWrapBalance);
     if (!node.IsScoreLineBreakDisabled()) {
       return LayoutWithOptimalInlineChildLayoutContext<kMaxLinesForBalance>(
-          node);
+          node, paragraph_scale);
     }
   } else {
     DCHECK(ShouldWrapLineGreedy(wrap));
   }
 
-  SimpleInlineChildLayoutContext context(node, &container_builder_);
+  // For performance avoid stack initialization on this large object.
+  STACK_UNINITIALIZED SimpleInlineChildLayoutContext context(
+      node, &container_builder_);
+  context.EnableMeasuringModeIfNecessary(paragraph_scale);
   return Layout(&context);
 }
 
 template <wtf_size_t capacity>
 NOINLINE const LayoutResult*
 BlockLayoutAlgorithm::LayoutWithOptimalInlineChildLayoutContext(
-    const InlineNode& child) {
+    const InlineNode& child,
+    const ParagraphScale* paragraph_scale) {
   OptimalInlineChildLayoutContext<capacity> context(child, &container_builder_);
-  const LayoutResult* result = Layout(&context);
-  return result;
+  context.EnableMeasuringModeIfNecessary(paragraph_scale);
+  return Layout(&context);
 }
 
 NOINLINE const LayoutResult* BlockLayoutAlgorithm::RelayoutIgnoringLineClamp() {
@@ -766,6 +806,20 @@ inline const LayoutResult* BlockLayoutAlgorithm::Layout(
             (BorderScrollbarPadding().block_start + clamp_bfc_offset)
                 .ClampNegativeToZero();
       }
+
+      if (clamp_bfc_offset != kIndefiniteSize) {
+        WebFeature use_counter_feature;
+        if (Style().WebkitLineClamp() != 0 ||
+            Style().Continue() == EContinue::kWebkitLegacy) {
+          use_counter_feature = WebFeature::kWebkitLineClampWithHeight;
+        } else if (Style().LineClamp() == 0) {
+          use_counter_feature = WebFeature::kLineClampAuto;
+        } else {
+          use_counter_feature = WebFeature::kLineClampByLinesAndHeight;
+        }
+        UseCounter::Count(Node().GetDocument(), use_counter_feature);
+      }
+
       line_clamp_data_.UpdateFromStyle(Style().LineClamp(), clamp_bfc_offset);
     }
   } else {
@@ -921,14 +975,8 @@ inline const LayoutResult* BlockLayoutAlgorithm::Layout(
     const BreakToken* child_break_token = entry.token;
 
     if (child.IsOutOfFlowPositioned()) {
-      // Out-of-flow fragmentation is a special step that takes place after
-      // regular layout, so we should never resume anything here. However, we
-      // may have break-before tokens, when a column spanner is directly
-      // followed by an OOF.
-      DCHECK(!child_break_token ||
-             (child_break_token->IsBlockType() &&
-              To<BlockBreakToken>(child_break_token)->IsBreakBefore()));
-      HandleOutOfFlowPositioned(previous_inflow_position, To<BlockNode>(child));
+      HandleOutOfFlowPositioned(previous_inflow_position, To<BlockNode>(child),
+                                To<BlockBreakToken>(child_break_token));
     } else if (child.IsFloating()) {
       HandleFloat(previous_inflow_position, To<BlockNode>(child),
                   To<BlockBreakToken>(child_break_token));
@@ -1064,9 +1112,13 @@ inline const LayoutResult* BlockLayoutAlgorithm::Layout(
 #endif
 
   if (placeholder_child) {
+    PlaceholderLayoutResult offset_and_status = HandleTextControlPlaceholder(
+        placeholder_child, previous_inflow_position);
+    if (offset_and_status.status != LayoutResult::kSuccess) {
+      return container_builder_.Abort(offset_and_status.status);
+    }
     previous_inflow_position.logical_block_offset =
-        HandleTextControlPlaceholder(placeholder_child,
-                                     previous_inflow_position);
+        offset_and_status.logical_block_offset;
   }
 
   if (!child_iterator.NextChild(previous_inline_break_token).node) {
@@ -1498,7 +1550,18 @@ bool BlockLayoutAlgorithm::TryReuseFragmentsFromCache(
 
 void BlockLayoutAlgorithm::HandleOutOfFlowPositioned(
     const PreviousInflowPosition& previous_inflow_position,
-    BlockNode child) {
+    const BlockNode& child,
+    const BlockBreakToken* child_break_token) {
+#if DCHECK_IS_ON()
+  if (!RuntimeEnabledFeatures::FragmentedOofInCbEnabled()) {
+    // Unless the above feature is enabled, out-of-flow fragmentation is a
+    // special step that takes place after regular layout, so we should never
+    // resume anything here. However, we may have break-before tokens, when a
+    // column spanner is directly followed by an OOF.
+    DCHECK(!child_break_token || child_break_token->IsBreakBefore());
+  }
+#endif
+
   if (GetConstraintSpace().HasBlockFragmentation()) {
     // Forced breaks cannot be specified directly on out-of-flow positioned
     // elements, but if the preceding block has a forced break after, we need to
@@ -1513,14 +1576,27 @@ void BlockLayoutAlgorithm::HandleOutOfFlowPositioned(
     }
   }
 
+  if (child_break_token && !child_break_token->IsForcedBreak() &&
+      RuntimeEnabledFeatures::FragmentedOofInCbEnabled()) {
+    // This OOF is either being resumed (after a break inside), or has been
+    // attempted placed earlier, and therefore has the correct offsets stored on
+    // the break token (and running through the offset calculation code below
+    // would give incorrect results).
+    container_builder_.AddOutOfFlowChildCandidate(child, *child_break_token);
+    return;
+  }
+
   DCHECK(child.IsOutOfFlowPositioned());
-  LogicalOffset static_offset = {BorderScrollbarPadding().inline_start,
-                                 previous_inflow_position.logical_block_offset};
+  LogicalStaticPosition static_pos(
+      LogicalOffset(BorderScrollbarPadding().inline_start,
+                    previous_inflow_position.logical_block_offset));
 
   // We only include the margin strut in the OOF static-position if we know we
   // aren't going to be a zero-block-size fragment.
-  if (container_builder_.BfcBlockOffset())
-    static_offset.block_offset += previous_inflow_position.margin_strut.Sum();
+  if (container_builder_.BfcBlockOffset()) {
+    static_pos.offset.block_offset +=
+        previous_inflow_position.margin_strut.Sum();
+  }
 
   if (child.Style().IsOriginalDisplayInlineType()) {
     // The static-position of inline-level OOF-positioned nodes depends on
@@ -1536,26 +1612,25 @@ void BlockLayoutAlgorithm::HandleOutOfFlowPositioned(
     LayoutUnit origin_bfc_block_offset =
         container_builder_.BfcBlockOffset().value_or(
             GetConstraintSpace().ExpectedBfcBlockOffset()) +
-        static_offset.block_offset;
+        static_pos.offset.block_offset;
 
     BfcOffset origin_bfc_offset = {
         GetConstraintSpace().GetBfcOffset().line_offset +
             BorderScrollbarPadding().LineLeft(Style().Direction()),
         origin_bfc_block_offset};
 
-    static_offset.inline_offset += CalculateOutOfFlowStaticInlineLevelOffset(
-        Style(), origin_bfc_offset, GetExclusionSpace(),
-        ChildAvailableSize().inline_size);
-
-    container_builder_.AddOutOfFlowChildCandidate(child, static_offset);
+    static_pos.offset.inline_offset +=
+        CalculateOutOfFlowStaticInlineLevelOffset(
+            Style(), origin_bfc_offset, GetExclusionSpace(),
+            ChildAvailableSize().inline_size);
   } else {
     WritingDirectionMode parent_writing_direction =
         GetConstraintSpace().GetWritingDirection();
-    auto inline_axis_edge = InlineStaticPositionEdge(
+    static_pos.inline_edge = InlineStaticPositionEdge(
         child, /*justify_items_style=*/&Style(), parent_writing_direction);
     // 'align-items' doesn't apply in block layout, so don't apply it to OOF
     // items.
-    auto block_axis_edge = BlockStaticPositionEdge(
+    static_pos.block_edge = BlockStaticPositionEdge(
         child, /*align_items_style=*/nullptr, parent_writing_direction);
 
     // The alignment container for block OOF elements is a zero-thickness line
@@ -1566,21 +1641,20 @@ void BlockLayoutAlgorithm::HandleOutOfFlowPositioned(
     //
     // https://drafts.csswg.org/css-position-3/#staticpos-rect
     LayoutUnit available_inline_size = ChildAvailableSize().inline_size;
-    switch (inline_axis_edge) {
+    switch (static_pos.inline_edge) {
       case LogicalStaticPosition::InlineEdge::kInlineCenter:
-        static_offset.inline_offset += available_inline_size / 2;
+        static_pos.offset.inline_offset += available_inline_size / 2;
         break;
       case LogicalStaticPosition::InlineEdge::kInlineEnd:
-        static_offset.inline_offset += available_inline_size;
+        static_pos.offset.inline_offset += available_inline_size;
         break;
       case LogicalStaticPosition::InlineEdge::kInlineStart:
         // The static position is already correct in this case.
         break;
     }
-
-    container_builder_.AddOutOfFlowChildCandidate(
-        child, static_offset, inline_axis_edge, block_axis_edge);
   }
+
+  container_builder_.AddOutOfFlowChildCandidate(child, static_pos);
 }
 
 void BlockLayoutAlgorithm::HandleFloat(
@@ -1898,8 +1972,7 @@ LayoutResult::EStatus BlockLayoutAlgorithm::HandleNewFormattingContext(
 
   // Update line-clamp data, and abort if needed
   if (!line_clamp_data_.UpdateAfterLayout(
-          layout_result, *container_builder_.BfcBlockOffset(),
-          *previous_inflow_position, Padding().block_end)) {
+          layout_result, *previous_inflow_position, container_builder_)) {
     container_builder_.SetLinesUntilClamp(
         line_clamp_data_.LinesUntilClamp(/*show_measured_lines*/ true));
     container_builder_.SetLineClampAfterLayoutObject(
@@ -2054,7 +2127,8 @@ const LayoutResult* BlockLayoutAlgorithm::LayoutNewFormattingContext(
       // Because the marker is laid out as a normal block child, its inline
       // size is extended to fill up the space. Compute the regular marker size
       // from the first child.
-      const auto& marker_fragment = layout_result->GetPhysicalFragment();
+      const auto& marker_fragment =
+          To<PhysicalBoxFragment>(layout_result->GetPhysicalFragment());
       LayoutUnit marker_inline_size;
       if (!marker_fragment.Children().empty()) {
         marker_inline_size =
@@ -2410,7 +2484,7 @@ LayoutResult::EStatus BlockLayoutAlgorithm::FinishInflow(
     // already be past the relevant floats.
     child_data->is_pushed_by_floats = layout_result->IsPushedByFloats();
 
-    ConstraintSpace new_child_space = CreateConstraintSpaceForChild(
+    const ConstraintSpace new_child_space = CreateConstraintSpaceForChild(
         child, child_break_token, *child_data, ChildAvailableSize(),
         /* is_new_fc */ false, child_bfc_block_offset);
     layout_result =
@@ -2431,10 +2505,10 @@ LayoutResult::EStatus BlockLayoutAlgorithm::FinishInflow(
       DCHECK(child_data->is_pushed_by_floats ||
              !layout_result->IsPushedByFloats());
 
-      new_child_space = CreateConstraintSpaceForChild(
+      const ConstraintSpace final_child_space = CreateConstraintSpaceForChild(
           child, child_break_token, *child_data, ChildAvailableSize(),
           /* is_new_fc */ false, child_bfc_block_offset);
-      layout_result = LayoutInflow(new_child_space, child_break_token,
+      layout_result = LayoutInflow(final_child_space, child_break_token,
                                    early_break_, column_spanner_path_, &child,
                                    inline_child_layout_context);
     }
@@ -2526,9 +2600,9 @@ LayoutResult::EStatus BlockLayoutAlgorithm::FinishInflow(
     }
 
     if (inline_child_layout_context) {
-      for (auto token :
+      for (const auto& token :
            inline_child_layout_context->ParallelFlowBreakTokens()) {
-        container_builder_.AddBreakToken(std::move(token),
+        container_builder_.AddBreakToken(token.Get(),
                                          /* is_in_parallel_flow */ true);
       }
     }
@@ -2613,18 +2687,13 @@ LayoutResult::EStatus BlockLayoutAlgorithm::FinishInflow(
   *previous_inline_break_token = outgoing_inline_break_token;
 
   // Update |line_clamp_data_| from the LayoutResult, and abort if needed.
-  // If the BFC block offset hasn't been resolved, the child we just laid out
-  // must be empty (no lines and zero block size), so we can skip the update.
-  if (auto bfc_block_offset = container_builder_.BfcBlockOffset()) {
-    if (!line_clamp_data_.UpdateAfterLayout(layout_result, *bfc_block_offset,
-                                            *previous_inflow_position,
-                                            Padding().block_end)) {
-      container_builder_.SetLinesUntilClamp(
-          line_clamp_data_.LinesUntilClamp(/*show_measured_lines*/ true));
-      container_builder_.SetLineClampAfterLayoutObject(
-          line_clamp_data_.last_layout_object);
-      return LayoutResult::kNeedsLineClampRelayout;
-    }
+  if (!line_clamp_data_.UpdateAfterLayout(
+          layout_result, *previous_inflow_position, container_builder_)) {
+    container_builder_.SetLinesUntilClamp(
+        line_clamp_data_.LinesUntilClamp(/*show_measured_lines*/ true));
+    container_builder_.SetLineClampAfterLayoutObject(
+        line_clamp_data_.last_layout_object);
+    return LayoutResult::kNeedsLineClampRelayout;
   }
 
   if (container_builder_.ShouldTextBoxTrim()) [[unlikely]] {
@@ -3407,7 +3476,6 @@ ConstraintSpace BlockLayoutAlgorithm::CreateConstraintSpaceForChild(
     }
     builder.SetLineClampData(line_clamp_data_.data);
     builder.SetLineClampEndMarginStrut(line_clamp_data_.end_margin_strut);
-    builder.SetLineClampEndPadding(Padding().block_end);
     builder.SetShouldTextBoxTrimInsideWhenLineClamp(
         line_clamp_data_.data.IsLineClampContext() &&
         (constraint_space.ShouldTextBoxTrimInsideWhenLineClamp() ||
@@ -3762,7 +3830,8 @@ bool BlockLayoutAlgorithm::PositionListMarkerWithoutLineBoxes(
   return true;
 }
 
-LayoutUnit BlockLayoutAlgorithm::HandleTextControlPlaceholder(
+BlockLayoutAlgorithm::PlaceholderLayoutResult
+BlockLayoutAlgorithm::HandleTextControlPlaceholder(
     BlockNode placeholder,
     const PreviousInflowPosition& previous_inflow_position) {
   DCHECK(Node().IsTextControl()) << Node().GetLayoutBox();
@@ -3776,7 +3845,8 @@ LayoutUnit BlockLayoutAlgorithm::HandleTextControlPlaceholder(
     const PhysicalFragment& child =
         *container_builder_.Children()[kTextBlockIndex].fragment;
     if (child.IsTextControlContainer()) {
-      const auto& grand_children = child.PostLayoutChildren();
+      const auto& grand_children =
+          To<PhysicalBoxFragment>(child).PostLayoutChildren();
       const auto begin = grand_children.begin();
       if (begin != grand_children.end()) {
         LogicalFragment grand_child_fragment(
@@ -3795,16 +3865,23 @@ LayoutUnit BlockLayoutAlgorithm::HandleTextControlPlaceholder(
       is_new_fc);
 
   const LayoutResult* result = placeholder.Layout(space);
+  // crbug.com/439682405 and crbug.com/440833172: The placeholder layout may
+  // fail.
+  if (result->Status() != LayoutResult::kSuccess) {
+    return {previous_inflow_position.logical_block_offset, result->Status()};
+  }
   LogicalOffset offset = BorderScrollbarPadding().StartOffset();
   if (Node().IsTextArea()) {
-    return FinishTextControlPlaceholder(result, offset, apply_fixed_size,
-                                        previous_inflow_position);
+    return {FinishTextControlPlaceholder(result, offset, apply_fixed_size,
+                                         previous_inflow_position),
+            result->Status()};
   }
   // Usually another child provides the baseline. However it doesn't if
   // another child is out-of-flow.
   if (!container_builder_.FirstBaseline()) {
-    return FinishTextControlPlaceholder(result, offset, apply_fixed_size,
-                                        previous_inflow_position);
+    return {FinishTextControlPlaceholder(result, offset, apply_fixed_size,
+                                         previous_inflow_position),
+            result->Status()};
   }
   LogicalBoxFragment fragment(
       GetConstraintSpace().GetWritingDirection(),
@@ -3834,8 +3911,9 @@ LayoutUnit BlockLayoutAlgorithm::HandleTextControlPlaceholder(
       offset.block_offset = border_padding_block_start;
     }
   }
-  return FinishTextControlPlaceholder(result, offset, apply_fixed_size,
-                                      previous_inflow_position);
+  return {FinishTextControlPlaceholder(result, offset, apply_fixed_size,
+                                       previous_inflow_position),
+          result->Status()};
 }
 
 LayoutUnit BlockLayoutAlgorithm::FinishTextControlPlaceholder(
@@ -3896,9 +3974,8 @@ void BlockLineClampData::UpdateFromStyle(int lines_until_clamp,
 
 bool BlockLineClampData::UpdateAfterLayout(
     const LayoutResult* layout_result,
-    LayoutUnit bfc_block_offset,
     const PreviousInflowPosition& previous_inflow_position,
-    LayoutUnit block_end_padding) {
+    const BoxFragmentBuilder& container_builder) {
   const PhysicalFragment& fragment = layout_result->GetPhysicalFragment();
 
   int old_lines_until_clamp = 0;
@@ -3907,10 +3984,30 @@ bool BlockLineClampData::UpdateAfterLayout(
     if (!fragment.IsFormattingContextRoot() && !ignore_further_lines) {
       data.lines_until_clamp = layout_result->LinesUntilClamp();
     }
+
+    // If data.lines_until_clamp is 0 (rather than negative) after clamping at
+    // the end of the line-clamp container, we relayout without clamping.
+    // However, if we have only lineless boxes and IFCs, we shouldn't relayout
+    // (since there *is* content after clamp), but data.lines_until_clamp would
+    // still be zero. Therefore, if there's a lineless block immediately after
+    // the clamp point, we explicitly decrease data.lines_until_clamp.
+    if (data.IsClampByLines() && !fragment.IsLineBox() &&
+        !ignore_further_lines && old_lines_until_clamp == 0 &&
+        data.lines_until_clamp == 0) {
+      data.lines_until_clamp = -1;
+    }
   }
 
   if (data.IsMeasureUntilBfcOffset() &&
       !previous_inflow_position_when_clamped.has_value()) {
+    // If the BFC block offset hasn't been resolved, the child we just laid out
+    // must be empty (no lines and zero block size), so we can skip the update.
+    if (!container_builder.BfcBlockOffset().has_value()) {
+      DCHECK_EQ(old_lines_until_clamp, data.lines_until_clamp);
+      DCHECK(fragment.Size().IsEmpty());
+      return true;
+    }
+
     // We compute the margin strut we'd have after this block if we were to
     // clamp here.
     MarginStrut collapsed_strut = previous_inflow_position.margin_strut;
@@ -3930,17 +4027,23 @@ bool BlockLineClampData::UpdateAfterLayout(
     if (previous_inflow_position.block_end_annotation_space < LayoutUnit()) {
       padding_annotation_overflow =
           std::max(previous_inflow_position.block_end_annotation_space,
-                   -block_end_padding);
+                   -container_builder.Padding().block_end);
     }
 
-    LayoutUnit bfc_offset = bfc_block_offset +
+    LayoutUnit bfc_offset = *container_builder.BfcBlockOffset() +
                             previous_inflow_position.logical_block_offset +
                             padding_annotation_overflow +
                             (collapsed_strut.Sum() - end_margin_strut.Sum());
 
     if (bfc_offset > data.clamp_bfc_offset) {
-      data.lines_until_clamp = old_lines_until_clamp;
-      return false;
+      if (data.IsClampByLines()) {
+        UseCounter::Count(container_builder.Node().GetDocument(),
+                          WebFeature::kLineClampByLinesOverflows);
+      }
+      if (RuntimeEnabledFeatures::CSSLineClampEnabled()) {
+        data.lines_until_clamp = old_lines_until_clamp;
+        return false;
+      }
     }
 
     if (old_lines_until_clamp == data.lines_until_clamp ||

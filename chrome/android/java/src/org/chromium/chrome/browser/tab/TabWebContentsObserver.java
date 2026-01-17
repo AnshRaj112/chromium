@@ -37,7 +37,6 @@ import org.chromium.chrome.browser.pdf.PdfUtils;
 import org.chromium.chrome.browser.policy.PolicyAuditor;
 import org.chromium.chrome.browser.policy.PolicyAuditor.AuditEvent;
 import org.chromium.chrome.browser.serial.SerialNotificationManager;
-import org.chromium.chrome.browser.tab.Tab.MediaState;
 import org.chromium.chrome.browser.ui.native_page.NativePage;
 import org.chromium.chrome.browser.usb.UsbNotificationManager;
 import org.chromium.content_public.browser.GlobalRenderFrameHostId;
@@ -130,6 +129,10 @@ public class TabWebContentsObserver extends TabWebContentsUserData {
         }
     }
 
+    public @Nullable WebContentsObserver getWebContentsObserverForTesting() {
+        return mObserver;
+    }
+
     private void showSadTab(SadTab sadTab) {
         sadTab.show(
                 mTab.getThemedApplicationContext(),
@@ -163,6 +166,10 @@ public class TabWebContentsObserver extends TabWebContentsUserData {
 
         @Override
         public void primaryMainFrameRenderProcessGone(@TerminationStatus int terminationStatus) {
+            // If the renderer process was destroyed due to the tab being destroyed, don't try to
+            // handle this or treat it as a tab crash.
+            if (mTab.isDestroyed()) return;
+
             Log.i(
                     TAG,
                     "primaryMainFrameRenderProcessGone() for tab id: "
@@ -414,17 +421,6 @@ public class TabWebContentsObserver extends TabWebContentsUserData {
                     null,
                     mLastUrl,
                     mTab.isIncognito());
-        }
-
-        @Override
-        public void mediaStartedPlaying() {
-            // TODO(crbug.com/430072416): Identify when audio is muted.
-            mTab.setMediaState(MediaState.AUDIBLE);
-        }
-
-        @Override
-        public void mediaStoppedPlaying() {
-            mTab.setMediaState(MediaState.NONE);
         }
     }
 }

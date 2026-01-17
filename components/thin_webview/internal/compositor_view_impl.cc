@@ -17,7 +17,6 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "components/thin_webview/internal/jni_headers/CompositorViewImpl_jni.h"
 
-using base::android::JavaParamRef;
 using base::android::JavaRef;
 
 namespace thin_webview {
@@ -26,10 +25,11 @@ namespace {
 const int kPixelFormatUnknown = 0;
 }  // namespace
 
-jlong JNI_CompositorViewImpl_Init(JNIEnv* env,
-                                  const JavaParamRef<jobject>& obj,
-                                  const JavaParamRef<jobject>& jwindow_android,
-                                  jint java_background_color) {
+static jlong JNI_CompositorViewImpl_Init(
+    JNIEnv* env,
+    const JavaRef<jobject>& obj,
+    const JavaRef<jobject>& jwindow_android,
+    int32_t java_background_color) {
   ui::WindowAndroid* window_android =
       ui::WindowAndroid::FromJavaWindowAndroid(jwindow_android);
   auto compositor_view = std::make_unique<CompositorViewImpl>(
@@ -88,11 +88,11 @@ void CompositorViewImpl::SurfaceDestroyed(JNIEnv* env) {
 }
 
 void CompositorViewImpl::SurfaceChanged(JNIEnv* env,
-                                        jint format,
-                                        jint width,
-                                        jint height,
+                                        int32_t format,
+                                        int32_t width,
+                                        int32_t height,
                                         bool can_be_used_with_surface_control,
-                                        const JavaParamRef<jobject>& surface) {
+                                        const JavaRef<jobject>& surface) {
   DCHECK(surface);
   if (current_surface_format_ != format) {
     current_surface_format_ = format;
@@ -131,3 +131,5 @@ void CompositorViewImpl::UpdateLayerTreeHost() {
 
 }  // namespace android
 }  // namespace thin_webview
+
+DEFINE_JNI(CompositorViewImpl)

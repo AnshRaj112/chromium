@@ -23,7 +23,6 @@
 #include "gpu/command_buffer/client/gles2_interface.h"
 #include "gpu/command_buffer/client/shared_image_interface.h"
 #include "gpu/command_buffer/common/mailbox.h"
-#include "gpu/command_buffer/common/mailbox_holder.h"
 #include "gpu/ipc/client/gpu_channel_host.h"
 #include "gpu/ipc/common/gpu_surface_tracker.h"
 #include "services/viz/public/cpp/gpu/context_provider_command_buffer.h"
@@ -105,7 +104,6 @@ void MailboxToSurfaceBridgeImpl::CreateAndBindContextProvider(
       FROM_HERE, base::BindOnce(
                      [](content::Compositor::ContextProviderCallback callback) {
                        content::Compositor::CreateContextProvider(
-                           gpu::SharedMemoryLimits::ForMailboxContext(),
                            std::move(callback));
                      },
                      std::move(callback)));
@@ -147,7 +145,7 @@ void MailboxToSurfaceBridgeImpl::CreateGpuFence(
 scoped_refptr<gpu::ClientSharedImage>
 MailboxToSurfaceBridgeImpl::CreateSharedImage(
     gfx::GpuMemoryBufferHandle buffer_handle,
-    gfx::BufferFormat buffer_format,
+    viz::SharedImageFormat format,
     const gfx::Size& size,
     const gfx::ColorSpace& color_space,
     gpu::SharedImageUsageSet usage,
@@ -158,10 +156,9 @@ MailboxToSurfaceBridgeImpl::CreateSharedImage(
   auto* sii = context_provider_->SharedImageInterface();
   DCHECK(sii);
 
-  CHECK_EQ(buffer_format, gfx::BufferFormat::RGBA_8888);
+  CHECK_EQ(format, viz::SinglePlaneFormat::kRGBA_8888);
   auto client_shared_image = sii->CreateSharedImage(
-      {viz::SinglePlaneFormat::kRGBA_8888, size, color_space, usage,
-       "WebXrMailboxToSurfaceBridge"},
+      {format, size, color_space, usage, "WebXrMailboxToSurfaceBridge"},
       std::move(buffer_handle));
   CHECK(client_shared_image);
   sync_token = sii->GenVerifiedSyncToken();
@@ -176,9 +173,7 @@ void MailboxToSurfaceBridgeImpl::DestroySharedImage(
   DCHECK(IsConnected());
   DCHECK(shared_image);
 
-  auto* sii = context_provider_->SharedImageInterface();
-  DCHECK(sii);
-  sii->DestroySharedImage(sync_token, std::move(shared_image));
+  shared_image->UpdateDestructionSyncToken(sync_token);
 }
 
 std::unique_ptr<device::MailboxToSurfaceBridge>

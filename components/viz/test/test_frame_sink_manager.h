@@ -38,11 +38,16 @@ class TestFrameSinkManagerImpl : public mojom::FrameSinkManager {
   // mojom::FrameSinkManager:
   void RegisterFrameSinkId(const FrameSinkId& frame_sink_id,
                            bool report_activation) override {}
-  void InvalidateFrameSinkId(const FrameSinkId& frame_sink_id) override {}
+  void InvalidateFrameSinkId(const FrameSinkId& frame_sink_id,
+                             InvalidateFrameSinkIdCallback callback) override;
   void SetFrameSinkDebugLabel(const FrameSinkId& frame_sink_id,
                               const std::string& debug_label) override {}
   void CreateRootCompositorFrameSink(
       mojom::RootCompositorFrameSinkParamsPtr params) override {}
+#if BUILDFLAG(IS_MAC)
+  void CreateCompositorDisplayLink(
+      mojom::CompositorDisplayLinkParamsPtr params) override {}
+#endif
   void CreateFrameSinkBundle(
       const FrameSinkBundleId& bundle_id,
       mojo::PendingReceiver<mojom::FrameSinkBundle> receiver,
@@ -66,11 +71,13 @@ class TestFrameSinkManagerImpl : public mojom::FrameSinkManager {
   void AddVideoDetectorObserver(
       mojo::PendingRemote<mojom::VideoDetectorObserver> observer) override {}
   void CreateVideoCapturer(
-      mojo::PendingReceiver<mojom::FrameSinkVideoCapturer> receiver) override {}
+      mojo::PendingReceiver<mojom::FrameSinkVideoCapturer> receiver,
+      uint32_t capture_version_source) override {}
   void EvictSurfaces(const std::vector<SurfaceId>& surface_ids) override {}
   void RequestCopyOfOutput(const SurfaceId& surface_id,
                            std::unique_ptr<CopyOutputRequest> request,
-                           bool capture_exact_surface_id) override {}
+                           bool capture_exact_surface_id,
+                           base::TimeDelta timeout) override {}
 #if BUILDFLAG(IS_ANDROID)
   void CacheBackBuffer(uint32_t cache_id,
                        const FrameSinkId& root_frame_sink_id) override {}

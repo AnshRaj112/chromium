@@ -56,21 +56,30 @@ content::WebContents* SessionRestore::RestoreForeignSessionTab(
 
   TabAndroid* current_tab = TabAndroid::FromWebContents(web_contents);
   DCHECK(current_tab);
-  // If swapped, return the current tab's most up-to-date web contents.
+  // Fake replacing the current tab's WebContents with a new one by creating and
+  // selecting a new tab then closing the old one. Using the current tab as the
+  // parent will ensure group state, position, etc. should be kept.
   if (disposition == WindowOpenDisposition::CURRENT_TAB) {
-    current_tab->SwapWebContents(std::move(new_web_contents), false, false);
-    return current_tab->web_contents();
+    // This will never be a bulk session restore so we can select the tab here.
+    tab_model->CreateTab(current_tab, std::move(new_web_contents),
+                         TabModel::kInvalidIndex,
+                         TabModel::TabLaunchType::FROM_RECENT_TABS_FOREGROUND,
+                         /*should_pin=*/false);
+    tab_model->CloseTab(current_tab->GetHandle());
+    return raw_new_web_contents;
   }
   DCHECK(disposition == WindowOpenDisposition::NEW_FOREGROUND_TAB ||
          disposition == WindowOpenDisposition::NEW_BACKGROUND_TAB);
   // Do not select a tab here it will interrupt bulk session restores.
-  tab_model->CreateTab(current_tab, new_web_contents.release(),
-                       /*select=*/false);
+  tab_model->CreateTab(
+      current_tab, std::move(new_web_contents), TabModel::kInvalidIndex,
+      TabModel::TabLaunchType::FROM_RECENT_TABS, /*should_pin=*/false);
   return raw_new_web_contents;
 }
 
 // static
-std::vector<Browser*> SessionRestore::RestoreForeignSessionWindows(
+std::vector<BrowserWindowInterface*>
+SessionRestore::RestoreForeignSessionWindows(
     Profile* profile,
     std::vector<const sessions::SessionWindow*>::const_iterator begin,
     std::vector<const sessions::SessionWindow*>::const_iterator end) {

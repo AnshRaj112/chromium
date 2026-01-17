@@ -27,9 +27,11 @@ import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
 import org.junit.runners.model.Statement;
 
+import org.chromium.base.ContextUtils;
 import org.chromium.base.Log;
 import org.chromium.base.ResettersForTesting;
 import org.chromium.base.ResettersForTesting.State;
+import org.chromium.base.ThreadUtils;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.lifetime.LifetimeAssert;
 import org.chromium.base.metrics.UmaRecorderHolder;
@@ -48,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.ServiceLoader;
 
 /**
  * A custom runner for JUnit4 tests that checks requirements to conditionally ignore tests.
@@ -79,7 +82,7 @@ public class BaseJUnit4ClassRunner extends AndroidJUnit4ClassRunner {
         /**
          * @param targetContext the instrumentation context that will be used during the test.
          */
-        public void run(Context targetContext, Class<?> testClass);
+        void run(Context targetContext, Class<?> testClass);
     }
 
     /**
@@ -95,7 +98,15 @@ public class BaseJUnit4ClassRunner extends AndroidJUnit4ClassRunner {
          * @param targetContext the instrumentation context that will be used during the test.
          * @param testMethod the test method to be run.
          */
-        public void run(Context targetContext, FrameworkMethod testMethod);
+        void run(Context targetContext, FrameworkMethod testMethod);
+    }
+
+    /** An interface for classes that want to do checks after all other tear down is complete. */
+    public interface AfterCleanupCheck {
+        /**
+         * @param clazz The class that was just run.
+         */
+        void onAfterTestClass(Class<?> clazz);
     }
 
     /** Makes it more obvious that all tests are being marked as failed. */
@@ -127,26 +138,12 @@ public class BaseJUnit4ClassRunner extends AndroidJUnit4ClassRunner {
      * failure.
      */
     public static class CascadingFailureException extends RuntimeException {
-        private CascadingFailureException(String message) {
-            super(message);
-        }
-
-        @Override
-        public String toString() {
-            // Shorten full name to just simple name.
-            return getClass().getSimpleName() + ": " + getLocalizedMessage();
-        }
-
-        /**
-         * Returns a new CascadingFailureException with the originalException marked as suppressed.
-         *
-         * @param message Error message for the CascadingFailureException
-         * @param originalException The original throwable being suppressed.
-         */
-        public static CascadingFailureException wrap(String message, Throwable originalException) {
-            CascadingFailureException exception = new CascadingFailureException(message);
-            exception.addSuppressed(originalException);
-            return exception;
+        private CascadingFailureException(String failedTestName, Throwable orig) {
+            super(
+                    "A previous batched test ("
+                            + failedTestName
+                            + ") failed and may be the cause of this failure (see \"Caused By\").",
+                    orig);
         }
     }
 
@@ -154,6 +151,7 @@ public class BaseJUnit4ClassRunner extends AndroidJUnit4ClassRunner {
     private long mTestStartTimeMs;
     private String mFailedBatchTestName;
     private JniTestInstancesSnapshot mJniZeroSnapshot;
+    private boolean mAnyTestFailed;
 
     /**
      * Create a BaseJUnit4ClassRunner to run {@code klass} and initialize values.
@@ -317,6 +315,7 @@ public class BaseJUnit4ClassRunner extends AndroidJUnit4ClassRunner {
 
                     @Override
                     public void testFailure(Failure failure) {
+                        mAnyTestFailed = true;
                         mPendingFailure = failure;
                     }
 
@@ -446,12 +445,7 @@ public class BaseJUnit4ClassRunner extends AndroidJUnit4ClassRunner {
 
     private Throwable wrapExceptionIfCascadingFailure(Throwable originalFailure) {
         if (mFailedBatchTestName == null) return originalFailure;
-        return CascadingFailureException.wrap(
-                "A previous batched test ("
-                        + mFailedBatchTestName
-                        + ") failed and may be the cause of the current failure. See suppressed"
-                        + " failure below.",
-                originalFailure);
+        return new CascadingFailureException(mFailedBatchTestName, originalFailure);
     }
 
     private void onBeforeTestMethod(FrameworkMethod method) {
@@ -461,17 +455,10 @@ public class BaseJUnit4ClassRunner extends AndroidJUnit4ClassRunner {
         boolean firstTestMethod = ResettersForTesting.getState() != State.BETWEEN_METHODS;
         ResettersForTesting.beforeHooksWillExecute();
         if (firstTestMethod) {
-            BaseChromiumAndroidJUnitRunner.sInMemorySharedPreferencesContext
-                    .createSharedPreferencesSnapshot();
             mJniZeroSnapshot = JniTestInstancesSnapshot.snapshotOverridesForTesting();
         } else {
-            BaseChromiumAndroidJUnitRunner.sInMemorySharedPreferencesContext
-                    .restoreSharedPreferencesSnapshot();
             JniTestInstancesSnapshot.restoreSnapshotForTesting(mJniZeroSnapshot);
         }
-
-        // TODO: Might be slow to do this before every test.
-        SharedPreferencesTestUtil.deleteOnDiskSharedPreferences(getApplication());
 
         Class<?> testClass = getTestClass().getJavaClass();
         CommandLineFlags.reset(testClass.getAnnotations(), method.getAnnotations());
@@ -489,15 +476,26 @@ public class BaseJUnit4ClassRunner extends AndroidJUnit4ClassRunner {
     protected void onBeforeTestClass() {
         Class<?> testClass = getTestClass().getJavaClass();
         ResettersForTesting.beforeClassHooksWillExecute();
-        BaseChromiumAndroidJUnitRunner.sInMemorySharedPreferencesContext.resetSharedPreferences();
-        JniTestInstancesSnapshot.clearAllForTesting();
 
+        // Reset SharedPreferences only between test classes (not methods) since some tests rely
+        // on state persisting between methods (e.g. when an Activity remains open).
+        // Clear between classes to ensure that one test class cannot impact another.
+        BaseChromiumAndroidJUnitRunner.sInMemorySharedPreferencesContext.resetSharedPreferences();
+        SharedPreferencesTestUtil.deleteOnDiskSharedPreferences(getApplication());
+
+        JniTestInstancesSnapshot.clearAllForTesting();
         CommandLineFlags.reset(testClass.getAnnotations(), null);
         TestAnimations.reset(testClass, null);
 
         Context targetContext = InstrumentationRegistry.getTargetContext();
         for (ClassHook hook : getPreClassHooks()) {
             hook.run(targetContext, testClass);
+        }
+
+        // Allows test classes to set the command-line before feature list is initialized.
+        if (ContextUtils.sDoFeatureListInitHookForTesting != null) {
+            ThreadUtils.runOnUiThreadBlocking(ContextUtils.sDoFeatureListInitHookForTesting);
+            ContextUtils.sDoFeatureListInitHookForTesting = null;
         }
     }
 
@@ -552,6 +550,14 @@ public class BaseJUnit4ClassRunner extends AndroidJUnit4ClassRunner {
         boolean finishSuccess = ActivityFinisher.finishAll();
         if (afterClassPassed && finishSuccess) {
             LifetimeAssert.assertAllInstancesDestroyedForTesting();
+            if (!mAnyTestFailed) {
+                for (AfterCleanupCheck check :
+                        ServiceLoader.load(
+                                AfterCleanupCheck.class,
+                                AfterCleanupCheck.class.getClassLoader())) {
+                    check.onAfterTestClass(getTestClass().getJavaClass());
+                }
+            }
         } else {
             LifetimeAssert.resetForTesting();
         }

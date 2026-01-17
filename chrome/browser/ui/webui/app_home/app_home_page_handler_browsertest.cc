@@ -12,12 +12,16 @@
 #include "base/test/test_future.h"
 #include "chrome/browser/extensions/test_extension_system.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_dialogs.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/create_application_shortcut_view_test_support.h"
+#include "chrome/browser/ui/web_applications/test/web_app_browsertest_util.h"
 #include "chrome/browser/ui/web_applications/web_app_browsertest_base.h"
+#include "chrome/browser/ui/web_applications/web_app_menu_model.h"
 #include "chrome/browser/ui/webui/app_home/app_home.mojom.h"
 #include "chrome/browser/ui/webui/app_home/mock_app_home_page.h"
 #include "chrome/browser/web_applications/os_integration/web_app_shortcut.h"
+#include "chrome/browser/web_applications/proto/web_app_install_state.pb.h"
 #include "chrome/browser/web_applications/test/os_integration_test_override_impl.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/browser/web_applications/test/web_app_test_observers.h"
@@ -25,12 +29,16 @@
 #include "chrome/browser/web_applications/web_app_constants.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
+#include "chrome/browser/web_applications/web_app_registry_update.h"
+#include "chrome/browser/web_applications/web_app_sync_bridge.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/test/base/in_process_browser_test.h"
+#include "chrome/test/base/ui_test_utils.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "content/public/common/content_features.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/test_web_ui.h"
@@ -142,6 +150,11 @@ class TestAppHomePageHandler : public AppHomePageHandler {
                                                         run_on_os_login_mode);
   }
 
+  void OnWebAppManifestUpdated(const webapps::AppId& app_id) override {
+    run_loop_->Quit();
+    AppHomePageHandler::OnWebAppManifestUpdated(app_id);
+  }
+
   std::unique_ptr<base::RunLoop> run_loop_;
   base::OnceClosure run_on_os_login_mode_changed_handle_;
 };
@@ -221,7 +234,7 @@ class AppHomePageHandlerTest : public InProcessBrowserTest {
         extensions::manifest_keys::kPlatformAppBackgroundPage,
         "background.html");
 
-    std::string error;
+    std::u16string error;
     scoped_refptr<extensions::Extension> extension =
         extensions::Extension::Create(
             base::FilePath(), extensions::mojom::ManifestLocation::kUnpacked,
@@ -238,7 +251,7 @@ class AppHomePageHandlerTest : public InProcessBrowserTest {
                                      .Set(keys::kVersion, "1.0")
                                      .Set(keys::kManifestVersion, 2);
 
-    std::string error;
+    std::u16string error;
     scoped_refptr<extensions::Extension> extension =
         extensions::Extension::Create(
             base::FilePath(), extensions::mojom::ManifestLocation::kUnpacked,
@@ -326,6 +339,28 @@ IN_PROC_BROWSER_TEST_F(AppHomePageHandlerTest, OnWebAppInstalled) {
       .Times(testing::AtLeast(1));
   webapps::AppId installed_app_id = InstallTestWebApp();
   page_handler->Wait();
+}
+
+IN_PROC_BROWSER_TEST_F(AppHomePageHandlerTest, SkipAppsToBeMigrated) {
+  std::unique_ptr<TestAppHomePageHandler> page_handler =
+      GetAppHomePageHandler();
+  EXPECT_CALL(page_, AddApp(MatchAppName(kTestAppName)))
+      .Times(testing::AtLeast(1));
+  webapps::AppId installed_app_id = InstallTestWebApp();
+  {
+    web_app::ScopedRegistryUpdate update =
+        web_app::WebAppProvider::GetForTest(profile())
+            ->sync_bridge_unsafe()
+            .BeginUpdate();
+    web_app::WebApp* mutable_web_app = update->UpdateApp(installed_app_id);
+    ASSERT_NE(nullptr, mutable_web_app);
+    mutable_web_app->SetInstallState(web_app::proto::SUGGESTED_FROM_MIGRATION);
+  }
+
+  base::test::TestFuture<std::vector<app_home::mojom::AppInfoPtr>> future;
+  page_handler->GetApps(future.GetCallback());
+  auto app_infos = future.Take();
+  EXPECT_TRUE(app_infos.empty());
 }
 
 IN_PROC_BROWSER_TEST_F(AppHomePageHandlerTest, OnExtensionLoaded_App) {
@@ -538,6 +573,67 @@ IN_PROC_BROWSER_TEST_F(AppHomePageHandlerTest, HandleLaunchDeprecatedApp) {
   page_handler->LaunchApp(extension->id(), nullptr);
   // Launch deprecated app will show deprecated apps dialog view.
   EXPECT_NE(waiter.WaitIfNeededAndGet(), nullptr);
+}
+
+class AppHomePageHandlerUpdateTest : public AppHomePageHandlerTest {
+ public:
+  AppHomePageHandlerUpdateTest() {
+    feature_list_.InitAndEnableFeature(features::kWebAppPredictableAppUpdating);
+  }
+
+  void SetUpOnMainThread() override {
+    AppHomePageHandlerTest::SetUpOnMainThread();
+    EXPECT_TRUE(embedded_https_test_server().Start());
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(AppHomePageHandlerUpdateTest, HandlePageCalls) {
+  std::unique_ptr<TestAppHomePageHandler> page_handler =
+      GetAppHomePageHandler();
+  web_app::WebAppProvider* provider =
+      web_app::WebAppProvider::GetForTest(browser()->profile());
+
+  EXPECT_CALL(page_, AddApp(MatchAppName("Web app for updating")))
+      .Times(testing::AtLeast(1));
+
+  const GURL app_url =
+      embedded_https_test_server().GetURL("/web_apps/updating/index.html");
+  ui_test_utils::BrowserCreatedObserver browser_created_observer;
+  const webapps::AppId app_id =
+      web_app::InstallWebAppFromPage(browser(), app_url);
+  Browser* app_browser = browser_created_observer.Wait();
+  page_handler->Wait();
+
+  // Ensure that the `UpdateApp()` call happens twice, once after the start url
+  // is updated, and once when the actual update is accepted. This tests both
+  // silent and user accepted updates.
+  EXPECT_CALL(page_, UpdateApp(MatchAppId(app_id))).Times(testing::AtLeast(2));
+  const GURL update_url = embedded_https_test_server().GetURL(
+      "/web_apps/updating/new_icon_page_masking.html");
+
+  // Trigger a silent update, store pending info on the web app.
+  {
+    web_app::UpdateAwaiter awaiter(provider->install_manager());
+    EXPECT_TRUE(ui_test_utils::NavigateToURL(app_browser, update_url));
+    awaiter.AwaitUpdate();
+    provider->command_manager().AwaitAllCommandsCompleteForTesting();
+  }
+
+  // Trigger the dialog and accept the pending update.
+  {
+    views::NamedWidgetShownWaiter update_dialog_waiter(
+        views::test::AnyWidgetTestPasskey(), "WebAppUpdateReviewDialog");
+    WebAppMenuModel model(/*provider=*/nullptr, app_browser);
+    model.Init();
+    model.ExecuteCommand(IDC_WEB_APP_UPGRADE_DIALOG, /*event_flags=*/0);
+    views::Widget* dialog_widget = update_dialog_waiter.WaitIfNeededAndGet();
+    ASSERT_NE(nullptr, dialog_widget);
+    views::test::AcceptDialog(dialog_widget);
+    provider->command_manager().AwaitAllCommandsCompleteForTesting();
+  }
 }
 
 }  // namespace webapps

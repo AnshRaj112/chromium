@@ -15,7 +15,6 @@
 #import "base/feature_list.h"
 #import "base/files/file_enumerator.h"
 #import "base/files/file_path.h"
-#import "base/files/file_util.h"
 #import "base/functional/bind.h"
 #import "base/ios/ios_util.h"
 #import "base/location.h"
@@ -50,9 +49,7 @@ namespace {
 // will mark any pending reports as skipped. By disabling UserEnabledUploading
 // safe mode crashes will be ignored. This also disables the main thread freeze
 // detector.
-BASE_FEATURE(kIOSCrashUploadKillSwitch,
-             "IOSCrashUploadKillSwitch",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kIOSCrashUploadKillSwitch, base::FEATURE_DISABLED_BY_DEFAULT);
 
 const char kUptimeAtRestoreInMs[] = "uptime_at_restore_in_ms";
 const char kUploadedInRecoveryMode[] = "uploaded_in_recovery_mode";

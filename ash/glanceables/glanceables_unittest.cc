@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <utility>
+
 #include "ash/glanceables/classroom/fake_glanceables_classroom_client.h"
 #include "ash/glanceables/classroom/glanceables_classroom_student_view.h"
 #include "ash/glanceables/common/glanceables_contents_scroll_view.h"
@@ -22,17 +24,17 @@
 #include "ash/test/ash_test_base.h"
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/time/time.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "components/account_id/account_id.h"
 #include "google_apis/gaia/gaia_id.h"
 #include "testing/gtest/include/gtest/gtest.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/compositor/test/test_utils.h"
 #include "ui/gfx/geometry/vector2d.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/test/widget_animation_waiter.h"
 #include "ui/views/view_utils.h"
@@ -239,13 +241,13 @@ class GlanceablesTasksAndClassroomTest : public GlanceablesBaseTest {
 
   CounterExpandButton* GetTasksExpandButtonView() const {
     return views::AsViewClass<CounterExpandButton>(
-        GetTasksView()->GetViewByID(base::to_underlying(
+        GetTasksView()->GetViewByID(std::to_underlying(
             GlanceablesViewId::kTimeManagementBubbleExpandButton)));
   }
 
   views::ScrollView* GetTasksScrollView() const {
     return views::AsViewClass<views::ScrollView>(GetTasksView()->GetViewByID(
-        base::to_underlying(GlanceablesViewId::kContentsScrollView)));
+        std::to_underlying(GlanceablesViewId::kContentsScrollView)));
   }
 
   GlanceablesClassroomStudentView* GetClassroomView() const {
@@ -255,14 +257,14 @@ class GlanceablesTasksAndClassroomTest : public GlanceablesBaseTest {
 
   CounterExpandButton* GetClassroomExpandButtonView() const {
     return views::AsViewClass<CounterExpandButton>(
-        GetClassroomView()->GetViewByID(base::to_underlying(
+        GetClassroomView()->GetViewByID(std::to_underlying(
             GlanceablesViewId::kTimeManagementBubbleExpandButton)));
   }
 
   views::ScrollView* GetClassroomScrollView() const {
     return views::AsViewClass<views::ScrollView>(
         GetClassroomView()->GetViewByID(
-            base::to_underlying(GlanceablesViewId::kContentsScrollView)));
+            std::to_underlying(GlanceablesViewId::kContentsScrollView)));
   }
 
   GlanceableTrayBubbleView* view() const { return view_; }
@@ -761,8 +763,8 @@ TEST_F(GlanceablesTasksAndClassroomTest,
 TEST_F(GlanceablesTasksAndClassroomTest,
        ExpandCollapseAnimationSmoothnessHistogram) {
   // Enable animations.
-  ui::ScopedAnimationDurationScaleMode duration(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode duration(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   base::HistogramTester resize_animation_histograms;
 

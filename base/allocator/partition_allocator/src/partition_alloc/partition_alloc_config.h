@@ -160,6 +160,18 @@ constexpr bool kUseLazyCommit = true;
 constexpr bool kUseLazyCommit = false;
 #endif
 
+// See the comment in PartitionBucket::SlotSpanCommittedSize(). This should not
+// be enabled on Windows (because it increases committed memory, which is a
+// limited system-wide resource on this platform). It has been evaluated on
+// macOS, where it yielded no beenefit (nor any real downside).
+constexpr bool kUseFewerMemoryRegions =
+#if PA_BUILDFLAG(IS_LINUX) || PA_BUILDFLAG(IS_ANDROID) || \
+    PA_BUILDFLAG(IS_CHROMEOS)
+    true;
+#else
+    false;
+#endif
+
 // On these platforms, lock all the partitions before fork(), and unlock after.
 // This may be required on more platforms in the future.
 #define PA_CONFIG_HAS_ATFORK_HANDLER()                 \
@@ -248,14 +260,7 @@ constexpr bool kUseLazyCommit = false;
 #define PA_CONFIG_IS_NONCLANG_MSVC() 0
 #endif
 
-// Set GN build override 'assert_cpp_20' to false to disable assertion.
-#if PA_BUILDFLAG(ASSERT_CPP_20)
 static_assert(__cplusplus >= 202002L,
               "PartitionAlloc targets C++20 or higher.");
-#endif  // PA_BUILDFLAG(ASSERT_CPP_20)
-
-// Named pass-through that determines whether or not PA should generally
-// enforce that `SlotStart` instances are in fact slot starts.
-#define PA_CONFIG_ENFORCE_SLOT_STARTS() PA_BUILDFLAG(DCHECKS_ARE_ON)
 
 #endif  // PARTITION_ALLOC_PARTITION_ALLOC_CONFIG_H_

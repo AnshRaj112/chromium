@@ -36,17 +36,17 @@ MotionEventAndroidJava::MotionEventAndroidJava(
     base::TimeTicks oldest_event_time,
     base::TimeTicks latest_event_time,
     base::TimeTicks down_time_ms,
-    jint android_action,
-    jint pointer_count,
-    jint history_size,
-    jint action_index,
-    jint android_action_button,
-    jint android_gesture_classification,
-    jint android_button_state,
-    jint meta_state,
+    int32_t android_action,
+    int32_t pointer_count,
+    int32_t history_size,
+    int32_t action_index,
+    int32_t android_action_button,
+    int32_t android_gesture_classification,
+    int32_t android_button_state,
+    int32_t meta_state,
     jfloat raw_offset_x_pixels,
     jfloat raw_offset_y_pixels,
-    jboolean for_touch_handle,
+    bool for_touch_handle,
     const Pointer* const pointer0,
     const Pointer* const pointer1,
     std::unique_ptr<MotionEventAndroidSource> source)
@@ -85,30 +85,6 @@ MotionEventAndroidJava::~MotionEventAndroidJava() = default;
 
 ScopedJavaLocalRef<jobject> MotionEventAndroidJava::GetJavaObject() const {
   return source()->GetJavaObject();
-}
-
-float MotionEventAndroidJava::GetXPix(size_t pointer_index) const {
-  DCHECK_LT(pointer_index, GetPointerCount());
-  if (IsPointerCacheable(pointer_index)) {
-    return GetCachedPointerPosition(pointer_index).x() / pix_to_dip();
-  }
-  return source()->GetXPix(pointer_index);
-}
-
-float MotionEventAndroidJava::GetYPix(size_t pointer_index) const {
-  DCHECK_LT(pointer_index, GetPointerCount());
-  if (IsPointerCacheable(pointer_index)) {
-    return GetCachedPointerPosition(pointer_index).y() / pix_to_dip();
-  }
-  return source()->GetYPix(pointer_index);
-}
-
-float MotionEventAndroidJava::GetPressure(size_t pointer_index) const {
-  DCHECK_LT(pointer_index, GetPointerCount());
-  if (IsPointerCacheable(pointer_index)) {
-    return GetCachedPointerPressure(pointer_index);
-  }
-  return source()->GetPressure(pointer_index);
 }
 
 bool MotionEventAndroidJava::IsLatestEventTimeResampled() const {

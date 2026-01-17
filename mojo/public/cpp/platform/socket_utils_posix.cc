@@ -56,8 +56,9 @@ bool GetPeerEuid(base::PlatformFile fd, uid_t* peer_euid) {
 
 bool IsPeerAuthorized(base::PlatformFile fd) {
   uid_t peer_euid;
-  if (!GetPeerEuid(fd, &peer_euid))
+  if (!GetPeerEuid(fd, &peer_euid)) {
     return false;
+  }
   if (peer_euid != geteuid()) {
     DLOG(ERROR) << "Client euid is not authorized";
     return false;
@@ -71,15 +72,6 @@ ssize_t SocketWrite(base::PlatformFile socket,
                     const void* bytes,
                     size_t num_bytes) {
   return send(socket, bytes, num_bytes, MSG_NOSIGNAL);
-}
-
-ssize_t SocketWritev(base::PlatformFile socket,
-                     struct iovec* iov,
-                     size_t num_iov) {
-  struct msghdr msg = {};
-  msg.msg_iov = iov;
-  msg.msg_iovlen = num_iov;
-  return HANDLE_EINTR(sendmsg(socket, &msg, MSG_NOSIGNAL));
 }
 
 ssize_t SendmsgWithHandles(base::PlatformFile socket,
@@ -122,11 +114,13 @@ ssize_t SocketRecvmsg(base::PlatformFile socket,
   msg.msg_controllen = sizeof(cmsg_buf);
   ssize_t result =
       HANDLE_EINTR(recvmsg(socket, &msg, block ? 0 : MSG_DONTWAIT));
-  if (result < 0)
+  if (result < 0) {
     return result;
+  }
 
-  if (msg.msg_controllen == 0)
+  if (msg.msg_controllen == 0) {
     return result;
+  }
 
   DCHECK(!(msg.msg_flags & MSG_CTRUNC));
 
@@ -155,10 +149,12 @@ bool AcceptSocketConnection(base::PlatformFile server_fd,
   DCHECK_GE(server_fd, 0);
   connection_fd->reset();
   base::ScopedFD accepted_handle(HANDLE_EINTR(accept(server_fd, nullptr, 0)));
-  if (!accepted_handle.is_valid())
+  if (!accepted_handle.is_valid()) {
     return IsRecoverableError();
-  if (check_peer_user && !IsPeerAuthorized(accepted_handle.get()))
+  }
+  if (check_peer_user && !IsPeerAuthorized(accepted_handle.get())) {
     return true;
+  }
   if (!base::SetNonBlocking(accepted_handle.get())) {
     PLOG(ERROR) << "base::SetNonBlocking() failed " << accepted_handle.get();
     return true;

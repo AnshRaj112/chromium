@@ -41,7 +41,7 @@
 #include "ui/accessibility/platform/ax_platform_tree_manager_delegate.h"
 #include "ui/accessibility/platform/browser_accessibility.h"
 #include "ui/base/buildflags.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 
 namespace ui {
 class AXNodeIdDelegate;
@@ -153,9 +153,9 @@ class COMPONENT_EXPORT(AX_PLATFORM) BrowserAccessibilityManager
   virtual bool TreeHasExtraAnnouncementNodes() const;
   virtual size_t TreeExtraAnnouncementNodesCount() const;
 
-  virtual void FireBlinkEvent(ax::mojom::Event event_type,
-                              BrowserAccessibility* node,
-                              int action_request_id) {}
+  virtual void FireSourceEvent(ax::mojom::Event event_type,
+                               BrowserAccessibility* node,
+                               int action_request_id) {}
 
   // AXPlatformTreeManager overrides.
   void FireGeneratedEvent(AXEventGenerator::Event event_type,
@@ -253,6 +253,7 @@ class COMPONENT_EXPORT(AX_PLATFORM) BrowserAccessibilityManager
   void ScrollToPoint(const BrowserAccessibility& node, gfx::Point point);
   void SetAccessibilityFocus(const BrowserAccessibility& node);
   void Blur(const BrowserAccessibility& node);
+  void RequestLayoutBasedAction(const BrowserAccessibility& node);
   void SetFocus(const BrowserAccessibility& node);
   void SetSequentialFocusNavigationStartingPoint(
       const BrowserAccessibility& node);

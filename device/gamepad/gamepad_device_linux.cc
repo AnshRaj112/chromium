@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "device/gamepad/gamepad_device_linux.h"
 
 #include <fcntl.h>
@@ -20,8 +15,10 @@
 #include <array>
 #include <string_view>
 
+#include "base/compiler_specific.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/functional/callback_helpers.h"
+#include "base/logging.h"
 #include "base/posix/eintr_wrapper.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
@@ -69,7 +66,7 @@ const size_t kSpecialKeysLen = std::size(kSpecialKeys);
 #define BITS_TO_LONGS(x) (((x) + LONG_BITS - 1) / LONG_BITS)
 
 static inline bool test_bit(int bit, const unsigned long* data) {
-  return data[bit / LONG_BITS] & (1UL << (bit % LONG_BITS));
+  return UNSAFE_TODO(data[bit / LONG_BITS]) & (1UL << (bit % LONG_BITS));
 }
 
 GamepadBusType GetEvdevBusType(const base::ScopedFD& fd) {
@@ -173,7 +170,7 @@ int StoreRumbleEffect(const base::ScopedFD& fd,
                       uint16_t strong_magnitude,
                       uint16_t weak_magnitude) {
   struct ff_effect effect;
-  memset(&effect, 0, sizeof(effect));
+  UNSAFE_TODO(memset(&effect, 0, sizeof(effect)));
   effect.type = FF_RUMBLE;
   effect.id = effect_id;
   effect.replay.length = duration;
@@ -192,7 +189,7 @@ void DestroyEffect(const base::ScopedFD& fd, int effect_id) {
 
 bool StartOrStopEffect(const base::ScopedFD& fd, int effect_id, bool do_start) {
   struct input_event start_stop;
-  memset(&start_stop, 0, sizeof(start_stop));
+  UNSAFE_TODO(memset(&start_stop, 0, sizeof(start_stop)));
   start_stop.type = EV_FF;
   start_stop.code = effect_id;
   start_stop.value = do_start ? 1 : 0;
@@ -610,8 +607,12 @@ void GamepadDeviceLinux::OnOpenHidrawNodeComplete(
     OpenDeviceNodeCallback callback,
     base::ScopedFD fd) {
   DCHECK(polling_runner_->RunsTasksInCurrentSequence());
-  if (fd.is_valid())
+  if (fd.is_valid()) {
+    VLOG(1) << "Successfully opened hidraw node.";
     InitializeHidraw(std::move(fd));
+  } else {
+    VLOG(1) << "Failed to open hidraw node.";
+  }
   std::move(callback).Run(this);
 }
 

@@ -10,10 +10,10 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
 #include "base/command_line.h"
-#include "base/functional/callback_forward.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "components/regional_capabilities/regional_capabilities_switches.h"
+#include "components/search_engines/search_engine_choice/search_engine_choice_utils.h"
 #include "components/search_engines/search_engines_pref_names.h"
 #include "components/search_engines/search_terms_data.h"
 #include "components/search_engines/template_url_prepopulate_data.h"
@@ -28,8 +28,8 @@ class TemplateUrlServiceAndroidUnitTest
     : public LoadedTemplateURLServiceUnitTestBase {
  public:
   void SetUp() override {
-    // Chosen due to being an EEA country, see
-    // `regional_capabilities::IsEeaCountry()`.
+    // Chosen due to being associated to
+    // `regional_capabilities::ProgramSettings::kWaffle`.
     const char kBelgiumCountryId[] = "BE";
     base::CommandLine::ForCurrentProcess()->AppendSwitchASCII(
         switches::kSearchEngineChoiceCountry, kBelgiumCountryId);

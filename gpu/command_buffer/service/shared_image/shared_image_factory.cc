@@ -8,7 +8,6 @@
 
 #include <memory>
 
-#include "base/containers/contains.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/metrics/histogram_functions.h"
@@ -23,20 +22,22 @@
 #include "gpu/command_buffer/service/service_utils.h"
 #include "gpu/command_buffer/service/shared_context_state.h"
 #include "gpu/command_buffer/service/shared_image/compound_image_backing.h"
+#include "gpu/command_buffer/service/shared_image/cpu_readback_upload_copy_strategy.h"
 #include "gpu/command_buffer/service/shared_image/egl_image_backing_factory.h"
 #include "gpu/command_buffer/service/shared_image/gl_texture_image_backing_factory.h"
 #include "gpu/command_buffer/service/shared_image/raw_draw_image_backing_factory.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_backing.h"
+#include "gpu/command_buffer/service/shared_image/shared_image_copy_manager.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_format_service_utils.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_manager.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_representation.h"
+#include "gpu/command_buffer/service/shared_image/shared_memory_copy_strategy.h"
 #include "gpu/command_buffer/service/shared_image/shared_memory_image_backing_factory.h"
 #include "gpu/command_buffer/service/shared_image/wrapped_sk_image_backing_factory.h"
 #include "gpu/config/gpu_finch_features.h"
 #include "gpu/config/gpu_preferences.h"
 #include "ui/base/ozone_buildflags.h"
 #include "ui/base/ui_base_features.h"
-#include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/gpu_memory_buffer_handle.h"
 #include "ui/gl/gl_display.h"
 #include "ui/gl/gl_implementation.h"
@@ -86,13 +87,21 @@
 #endif  // BUILDFLAG(IS_FUCHSIA)
 
 #if BUILDFLAG(IS_ANDROID)
-#include "base/android/android_hardware_buffer_compat.h"
 #include "gpu/command_buffer/service/shared_image/ahardwarebuffer_image_backing_factory.h"
 #endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(USE_DAWN)
+#include "gpu/command_buffer/service/shared_image/dawn_image_backing_factory.h"
+#endif  // BUILDFLAG(USE_DAWN)
+
+#include "base/feature_list.h"
 
 namespace gpu {
 
 namespace {
+
+BASE_FEATURE(kUseCompoundImageBackingAsDefault,
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 const char* GmbTypeToString(gfx::GpuMemoryBufferType type) {
   switch (type) {
@@ -134,20 +143,6 @@ gfx::GpuMemoryBufferType GetNativeBufferType() {
 #endif
 }
 
-bool WillGetGmbConfigFromGpu() {
-#if BUILDFLAG(IS_OZONE)
-  // Ozone/X11 requires gpu initialization to be done before it can determine
-  // what formats gmb can use. This limitation comes from the requirement to
-  // have GLX bindings initialized. The buffer formats will be passed through
-  // gpu extra info.
-  return ui::OzonePlatform::GetInstance()
-      ->GetPlatformProperties()
-      .fetch_buffer_formats_for_gmb_on_gpu;
-#else
-  return false;
-#endif
-}
-
 }  // namespace
 
 SharedImageFactory::SharedImageFactory(
@@ -170,6 +165,10 @@ SharedImageFactory::SharedImageFactory(
       texture_target_for_io_surfaces_(GetTextureTargetForIOSurfaces()),
 #endif
       workarounds_(workarounds) {
+  copy_manager_ = base::MakeRefCounted<SharedImageCopyManager>();
+  copy_manager_->AddStrategy(std::make_unique<SharedMemoryCopyStrategy>());
+  copy_manager_->AddStrategy(std::make_unique<CPUReadbackUploadCopyStrategy>());
+
   auto shared_memory_backing_factory =
       std::make_unique<SharedMemoryImageBackingFactory>();
   factories_.push_back(std::move(shared_memory_backing_factory));
@@ -222,11 +221,20 @@ SharedImageFactory::SharedImageFactory(
     factories_.push_back(
         std::make_unique<DCompImageBackingFactory>(context_state_));
   }
-  if (IsD3DSharedImageSupported()) {
+  // WebNN requires use of shared images for WebGPUInterop.
+  const bool is_webnn_feature_enabled =
+      (gpu_feature_info.status_values[GPU_FEATURE_TYPE_WEBNN] ==
+       kGpuFeatureStatusEnabled);
+
+  const bool enable_webnn_only_d3d_factory =
+      is_webnn_feature_enabled && !IsD3DSharedImageSupported();
+
+  if (IsD3DSharedImageSupported() || enable_webnn_only_d3d_factory) {
     auto d3d_factory = std::make_unique<D3DImageBackingFactory>(
         context_state_->GetD3D11Device(),
         shared_image_manager_->dxgi_shared_handle_manager(),
-        context_state_->GetGLFormatCaps(), workarounds_);
+        context_state_->GetGLFormatCaps(), workarounds_,
+        enable_webnn_only_d3d_factory);
     d3d_backing_factory_ = d3d_factory.get();
     factories_.push_back(std::move(d3d_factory));
   }
@@ -253,7 +261,9 @@ SharedImageFactory::SharedImageFactory(
 #if BUILDFLAG(IS_WIN)
   if (gr_context_type_ == GrContextType::kVulkan) {
     auto external_vk_image_factory =
-        std::make_unique<ExternalVkImageBackingFactory>(context_state_);
+        std::make_unique<ExternalVkImageBackingFactory>(
+            context_state_,
+            gpu_preferences_.enable_webgpu_on_vk_via_gl_interop);
     factories_.push_back(std::move(external_vk_image_factory));
   }
 #endif  // BUILDFLAG(IS_WIN)
@@ -286,6 +296,7 @@ SharedImageFactory::SharedImageFactory(
     auto ahb_factory = std::make_unique<AHardwareBufferImageBackingFactory>(
         feature_info.get(), gpu_preferences_,
         context_state_->vk_context_provider());
+    ahb_factory_ = ahb_factory.get();
     factories_.push_back(std::move(ahb_factory));
   }
 #elif BUILDFLAG(IS_OZONE)
@@ -297,10 +308,18 @@ SharedImageFactory::SharedImageFactory(
         context_state_, workarounds_);
     factories_.push_back(std::move(ozone_factory));
   }
+
 #if BUILDFLAG(ENABLE_VULKAN) && (BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_FUCHSIA))
-  if (gr_context_type_ == GrContextType::kVulkan) {
+  if (gr_context_type_ == GrContextType::kVulkan
+#if BUILDFLAG(USE_WEBGPU_ON_VULKAN_VIA_GL_INTEROP)
+      /* We support GL context for WebGPU gl-vulkan interop (on linux).*/
+      || gpu_preferences_.enable_webgpu_on_vk_via_gl_interop
+#endif
+  ) {
     auto external_vk_image_factory =
-        std::make_unique<ExternalVkImageBackingFactory>(context_state_);
+        std::make_unique<ExternalVkImageBackingFactory>(
+            context_state_,
+            gpu_preferences_.enable_webgpu_on_vk_via_gl_interop);
     factories_.push_back(std::move(external_vk_image_factory));
   }
 #endif  // BUILDFLAG(ENABLE_VULKAN) && (BUILDFLAG(IS_LINUX) ||
@@ -322,6 +341,17 @@ SharedImageFactory::SharedImageFactory(
     factories_.push_back(std::move(iosurface_backing_factory));
   }
 #endif
+
+#if BUILDFLAG(USE_DAWN)
+  // This factory will only be used with skia graphite dawn as of now. It is
+  // currently not in use at all and will be soon enabled to be used with
+  // CompoundSharedImage. It will be used when there is no other backing
+  // which can support dawn representation. Hence it is added here at the end
+  // in the list.
+  if (gr_context_type_ == GrContextType::kGraphiteDawn) {
+    factories_.push_back(std::make_unique<DawnImageBackingFactory>());
+  }
+#endif  // BUILDFLAG(USE_DAWN)
 }
 
 SharedImageFactory::~SharedImageFactory() {
@@ -346,40 +376,106 @@ bool SharedImageFactory::CreateSharedImage(
     return false;
   }
 
-  auto backing = factory->CreateSharedImage(
+  auto temp_backing = factory->CreateSharedImage(
       mailbox, format, surface_handle, size, color_space, surface_origin,
       alpha_type, SharedImageUsageSet(usage), std::move(debug_label),
       IsSharedBetweenThreads(usage));
+
+  std::unique_ptr<SharedImageBacking> backing =
+      base::FeatureList::IsEnabled(kUseCompoundImageBackingAsDefault)
+          ? CompoundImageBacking::WrapExternalBacking(this, copy_manager(),
+                                                      std::move(temp_backing))
+          : std::move(temp_backing);
 
   DVLOG_IF(1, !!backing) << "CreateSharedImage[" << backing->GetName()
                          << "] size=" << size.ToString()
                          << " usage=" << CreateLabelForSharedImageUsage(usage)
                          << " format=" << format.ToString();
-
   return RegisterBacking(std::move(backing), std::move(pool_id));
 }
 
-bool SharedImageFactory::IsNativeBufferSupported(gfx::BufferFormat format,
-                                                 gfx::BufferUsage usage) {
-  // Note that we are initializing the |supported_gmb_configurations_| here to
-  // make sure gpu service have already initialized and required metadata like
-  // supported buffer configurations have already been sent from browser
-  // process to GPU process for wayland.
-  if (!supported_gmb_configurations_inited_) {
-    supported_gmb_configurations_inited_ = true;
-    if (WillGetGmbConfigFromGpu()) {
-#if BUILDFLAG(IS_OZONE_X11)
-      for (const auto& config : gpu_extra_info_.gpu_memory_buffer_support_x11) {
-        supported_gmb_configurations_.emplace(config);
-      }
-#endif  // BUILDFLAG(IS_OZONE_X11)
-    } else {
-      supported_gmb_configurations_ =
-          gpu::GpuMemoryBufferSupport::GetNativeGpuMemoryBufferConfigurations();
-    }
+// static
+bool SharedImageFactory::IsNativeBufferSupported(
+    viz::SharedImageFormat format,
+    gfx::BufferUsage usage,
+    const gfx::GpuExtraInfo& gpu_extra_info) {
+#if BUILDFLAG(IS_APPLE)
+  switch (usage) {
+    case gfx::BufferUsage::GPU_READ:
+    case gfx::BufferUsage::SCANOUT:
+    case gfx::BufferUsage::SCANOUT_CPU_READ_WRITE:
+    case gfx::BufferUsage::GPU_READ_CPU_READ_WRITE:
+    case gfx::BufferUsage::SCANOUT_FRONT_RENDERING:
+    case gfx::BufferUsage::SCANOUT_VEA_CPU_READ:
+      return format == viz::SinglePlaneFormat::kBGRA_8888 ||
+             format == viz::SinglePlaneFormat::kRGBA_8888 ||
+             format == viz::SinglePlaneFormat::kBGRX_8888 ||
+             format == viz::SinglePlaneFormat::kRGBX_8888 ||
+             format == viz::SinglePlaneFormat::kR_8 ||
+             format == viz::SinglePlaneFormat::kRG_88 ||
+             format == viz::SinglePlaneFormat::kR_16 ||
+             format == viz::SinglePlaneFormat::kRG_1616 ||
+             format == viz::SinglePlaneFormat::kRGBA_F16 ||
+             format == viz::SinglePlaneFormat::kBGRA_1010102 ||
+             format == viz::MultiPlaneFormat::kNV12 ||
+             format == viz::MultiPlaneFormat::kNV12A ||
+             format == viz::MultiPlaneFormat::kP010;
+    case gfx::BufferUsage::SCANOUT_VDA_WRITE:
+    case gfx::BufferUsage::PROTECTED_SCANOUT:
+    case gfx::BufferUsage::PROTECTED_SCANOUT_VDA_WRITE:
+    case gfx::BufferUsage::SCANOUT_CAMERA_READ_WRITE:
+    case gfx::BufferUsage::CAMERA_AND_CPU_READ_WRITE:
+    case gfx::BufferUsage::VEA_READ_CAMERA_AND_CPU_READ_WRITE:
+      return false;
   }
-  return base::Contains(supported_gmb_configurations_,
-                        gfx::BufferUsageAndFormat(usage, format));
+  NOTREACHED();
+#elif BUILDFLAG(IS_ANDROID)
+  switch (usage) {
+    case gfx::BufferUsage::GPU_READ:
+    case gfx::BufferUsage::SCANOUT:
+      return format == viz::SinglePlaneFormat::kRGBA_8888 ||
+             format == viz::SinglePlaneFormat::kRGBX_8888 ||
+             format == viz::SinglePlaneFormat::kBGR_565;
+    case gfx::BufferUsage::SCANOUT_CPU_READ_WRITE:
+    case gfx::BufferUsage::GPU_READ_CPU_READ_WRITE:
+    case gfx::BufferUsage::SCANOUT_VDA_WRITE:
+    case gfx::BufferUsage::PROTECTED_SCANOUT:
+    case gfx::BufferUsage::PROTECTED_SCANOUT_VDA_WRITE:
+    case gfx::BufferUsage::SCANOUT_CAMERA_READ_WRITE:
+    case gfx::BufferUsage::CAMERA_AND_CPU_READ_WRITE:
+    case gfx::BufferUsage::SCANOUT_VEA_CPU_READ:
+    case gfx::BufferUsage::VEA_READ_CAMERA_AND_CPU_READ_WRITE:
+    case gfx::BufferUsage::SCANOUT_FRONT_RENDERING:
+      return false;
+  }
+  NOTREACHED();
+#elif BUILDFLAG(IS_OZONE)
+  return ui::OzonePlatform::GetInstance()->IsNativePixmapConfigSupported(format,
+                                                                         usage);
+#elif BUILDFLAG(IS_WIN)
+  switch (usage) {
+    case gfx::BufferUsage::GPU_READ:
+    case gfx::BufferUsage::SCANOUT:
+      return format == viz::SinglePlaneFormat::kRGBA_8888 ||
+             format == viz::SinglePlaneFormat::kRGBX_8888 ||
+             format == viz::SinglePlaneFormat::kBGRA_8888 ||
+             format == viz::SinglePlaneFormat::kBGRX_8888;
+    case gfx::BufferUsage::SCANOUT_CPU_READ_WRITE:
+    case gfx::BufferUsage::GPU_READ_CPU_READ_WRITE:
+    case gfx::BufferUsage::SCANOUT_VDA_WRITE:
+    case gfx::BufferUsage::PROTECTED_SCANOUT:
+    case gfx::BufferUsage::PROTECTED_SCANOUT_VDA_WRITE:
+    case gfx::BufferUsage::SCANOUT_CAMERA_READ_WRITE:
+    case gfx::BufferUsage::CAMERA_AND_CPU_READ_WRITE:
+    case gfx::BufferUsage::SCANOUT_VEA_CPU_READ:
+    case gfx::BufferUsage::VEA_READ_CAMERA_AND_CPU_READ_WRITE:
+    case gfx::BufferUsage::SCANOUT_FRONT_RENDERING:
+      return false;
+  }
+  NOTREACHED();
+#else
+  return false;
+#endif
 }
 
 bool SharedImageFactory::CreateSharedImage(const Mailbox& mailbox,
@@ -399,11 +495,12 @@ bool SharedImageFactory::CreateSharedImage(const Mailbox& mailbox,
     return false;
   }
 
-  auto buffer_format = ToBufferFormat(format);
   auto native_buffer_supported =
-      IsNativeBufferSupported(buffer_format, buffer_usage);
-
+      IsNativeBufferSupported(format, buffer_usage, gpu_extra_info_);
   std::unique_ptr<SharedImageBacking> backing;
+  const bool force_compound_backing =
+      base::FeatureList::IsEnabled(kUseCompoundImageBackingAsDefault);
+
   if (native_buffer_supported) {
     auto* factory = GetFactoryByUsage(usage, format, size,
                                       /*pixel_data=*/{}, GetNativeBufferType());
@@ -413,17 +510,20 @@ bool SharedImageFactory::CreateSharedImage(const Mailbox& mailbox,
       return false;
     }
 
-    backing = factory->CreateSharedImage(
+    auto temp_backing = factory->CreateSharedImage(
         mailbox, format, surface_handle, size, color_space, surface_origin,
         alpha_type, SharedImageUsageSet(usage), debug_label,
         IsSharedBetweenThreads(usage), buffer_usage);
 
-    if (backing) {
-      DVLOG(1) << "CreateSharedImageBackedByBuffer[" << backing->GetName()
-               << "] size=" << size.ToString()
-               << " usage=" << CreateLabelForSharedImageUsage(usage)
-               << " format=" << format.ToString();
-    }
+    backing = force_compound_backing
+                  ? CompoundImageBacking::WrapExternalBacking(
+                        this, copy_manager(), std::move(temp_backing))
+                  : std::move(temp_backing);
+
+    DVLOG_IF(1, !!backing) << "CreateSharedImageBackedByBuffer["
+                           << backing->GetName() << "] size=" << size.ToString()
+                           << " usage=" << CreateLabelForSharedImageUsage(usage)
+                           << " format=" << format.ToString();
   } else {
     // If native buffers are not supported, try to create shared memory based
     // backings.
@@ -440,41 +540,36 @@ bool SharedImageFactory::CreateSharedImage(const Mailbox& mailbox,
 
       bool use_compound = false;
       if (!factory && !IsSharedBetweenThreads(usage)) {
-        // Check if CompoundImageBacking can hold shared memory buffer plus
-        // another GPU backing type to satisfy requirements.
-        if (CompoundImageBacking::IsValidSharedMemoryBufferFormat(size,
-                                                                  format)) {
-          factory =
-              GetFactoryByUsage(CompoundImageBacking::GetGpuSharedImageUsage(
-                                    SharedImageUsageSet(usage)),
-                                format, size,
-                                /*pixel_data=*/{}, gfx::EMPTY_BUFFER);
-          use_compound = factory != nullptr;
+        // Check if CompoundImageBacking can be created. CompoundImageBacking
+        // holds
+        // a shared memory buffer plus another GPU backing type to satisfy the
+        // requirements.
+        backing = CompoundImageBacking::Create(
+            this, copy_manager(), mailbox, format, size, color_space,
+            surface_origin, alpha_type, usage, debug_label, buffer_usage);
+        use_compound = backing != nullptr;
+      }
+
+      if (!use_compound) {
+        if (factory) {
+          auto temp_backing = factory->CreateSharedImage(
+              mailbox, format, surface_handle, size, color_space,
+              surface_origin, alpha_type, SharedImageUsageSet(usage),
+              debug_label, IsSharedBetweenThreads(usage), buffer_usage);
+          backing = force_compound_backing
+                        ? CompoundImageBacking::WrapExternalBacking(
+                              this, copy_manager(), std::move(temp_backing))
+                        : std::move(temp_backing);
+          DVLOG_IF(1, !!backing)
+              << "CreateSharedImageBackedByBuffer[" << backing->GetName()
+              << "] size=" << size.ToString()
+              << " usage=" << CreateLabelForSharedImageUsage(usage)
+              << " format=" << format.ToString();
+        } else {
+          LogGetFactoryFailed(usage, format, gfx::SHARED_MEMORY_BUFFER, size,
+                              debug_label);
+          return false;
         }
-      }
-
-      if (!factory) {
-        LogGetFactoryFailed(usage, format, gfx::SHARED_MEMORY_BUFFER, size,
-                            debug_label);
-        return false;
-      }
-
-      if (use_compound) {
-        backing = CompoundImageBacking::CreateSharedMemory(
-            factory, mailbox, format, size, color_space, surface_origin,
-            alpha_type, usage, debug_label, buffer_usage);
-      } else {
-        backing = factory->CreateSharedImage(
-            mailbox, format, surface_handle, size, color_space, surface_origin,
-            alpha_type, SharedImageUsageSet(usage), debug_label,
-            IsSharedBetweenThreads(usage), buffer_usage);
-      }
-
-      if (backing) {
-        DVLOG(1) << "CreateSharedImageBackedByBuffer[" << backing->GetName()
-                 << "] size=" << size.ToString()
-                 << " usage=" << CreateLabelForSharedImageUsage(usage)
-                 << " format=" << format.ToString();
       }
     }
   }
@@ -503,16 +598,22 @@ bool SharedImageFactory::CreateSharedImage(const Mailbox& mailbox,
     return false;
   }
 
-  auto backing = factory->CreateSharedImage(
+  auto temp_backing = factory->CreateSharedImage(
       mailbox, format, size, color_space, surface_origin, alpha_type,
       SharedImageUsageSet(usage), std::move(debug_label),
       IsSharedBetweenThreads(usage), data);
-  if (backing) {
-    DVLOG(1) << "CreateSharedImagePixels[" << backing->GetName()
-             << "] with pixels size=" << size.ToString()
-             << " usage=" << CreateLabelForSharedImageUsage(usage)
-             << " format=" << format.ToString();
-  }
+
+  std::unique_ptr<SharedImageBacking> backing =
+      base::FeatureList::IsEnabled(kUseCompoundImageBackingAsDefault)
+          ? CompoundImageBacking::WrapExternalBacking(this, copy_manager(),
+                                                      std::move(temp_backing))
+          : std::move(temp_backing);
+
+  DVLOG_IF(1, !!backing) << "CreateSharedImagePixels[" << backing->GetName()
+                         << "] with pixels size=" << size.ToString()
+                         << " usage=" << CreateLabelForSharedImageUsage(usage)
+                         << " format=" << format.ToString();
+
   return RegisterBacking(std::move(backing));
 }
 
@@ -530,46 +631,51 @@ bool SharedImageFactory::CreateSharedImage(
   gfx::GpuMemoryBufferType gmb_type = buffer_handle.type;
 
   bool use_compound = false;
-  SharedImageBackingFactory* factory =
-      GetFactoryByUsage(usage, format, size, {}, gmb_type);
-
+  std::unique_ptr<SharedImageBacking> backing;
+  SharedImageBackingFactory* factory = nullptr;
+#if BUILDFLAG(IS_ANDROID)
+  if (ahb_factory_ &&
+      ahb_factory_->IsSupportedForMappableBuffer(usage, format, gmb_type)) {
+    factory = ahb_factory_;
+  }
+#endif  // BUILDFLAG(IS_ANDROID)
+  if (!factory) {
+    factory = GetFactoryByUsage(usage, format, size, {}, gmb_type);
+  }
   if (!factory && gmb_type == gfx::SHARED_MEMORY_BUFFER &&
       !IsSharedBetweenThreads(usage)) {
-    // Check if CompoundImageBacking can hold shared memory buffer plus
-    // another GPU backing type to satisfy requirements.
-    if (CompoundImageBacking::IsValidSharedMemoryBufferFormat(size, format)) {
-      factory =
-          GetFactoryByUsage(CompoundImageBacking::GetGpuSharedImageUsage(
-                                SharedImageUsageSet(usage)),
-                            format, size, /*pixel_data=*/{}, gfx::EMPTY_BUFFER);
-      use_compound = factory != nullptr;
-    }
+    // Check if CompoundImageBacking can be created. CompoundImageBacking holds
+    // a shared memory buffer plus another GPU backing type to satisfy the
+    // requirements.
+    backing = CompoundImageBacking::Create(
+        this, copy_manager(), mailbox, buffer_handle.Clone(), format, size,
+        color_space, surface_origin, alpha_type, usage, debug_label);
+    use_compound = backing != nullptr;
   }
 
-  if (!factory) {
+  if (!use_compound && !factory) {
     LogGetFactoryFailed(usage, format, gmb_type, size, debug_label);
     return false;
   }
 
-  std::unique_ptr<SharedImageBacking> backing;
-  if (use_compound) {
-    backing = CompoundImageBacking::CreateSharedMemory(
-        factory, mailbox, std::move(buffer_handle), format, size, color_space,
-        surface_origin, alpha_type, usage, std::move(debug_label));
-  } else {
-    backing = factory->CreateSharedImage(
+  if (!use_compound) {
+    auto temp_backing = factory->CreateSharedImage(
         mailbox, format, size, color_space, surface_origin, alpha_type, usage,
         std::move(debug_label), IsSharedBetweenThreads(usage),
         std::move(buffer_handle));
+
+    backing = base::FeatureList::IsEnabled(kUseCompoundImageBackingAsDefault)
+                  ? CompoundImageBacking::WrapExternalBacking(
+                        this, copy_manager(), std::move(temp_backing))
+                  : std::move(temp_backing);
   }
 
-  if (backing) {
-    DVLOG(1) << "CreateSharedImageWithBuffer[" << backing->GetName()
-             << "] size=" << size.ToString()
-             << " usage=" << CreateLabelForSharedImageUsage(usage)
-             << " format=" << format.ToString()
-             << " gmb_type=" << GmbTypeToString(gmb_type);
-  }
+  DVLOG_IF(1, !!backing) << "CreateSharedImageWithBuffer[" << backing->GetName()
+                         << "] size=" << size.ToString()
+                         << " usage=" << CreateLabelForSharedImageUsage(usage)
+                         << " format=" << format.ToString()
+                         << " gmb_type=" << GmbTypeToString(gmb_type);
+
   return RegisterBacking(std::move(backing), std::move(pool_id));
 }
 
@@ -629,40 +735,6 @@ bool SharedImageFactory::IsD3DSharedImageSupported() const {
   return D3DImageBackingFactory::IsD3DSharedImageSupported(
       context_state_->GetD3D11Device().Get(), gpu_preferences_);
 }
-
-bool SharedImageFactory::CreateSwapChain(const Mailbox& front_buffer_mailbox,
-                                         const Mailbox& back_buffer_mailbox,
-                                         viz::SharedImageFormat format,
-                                         const gfx::Size& size,
-                                         const gfx::ColorSpace& color_space,
-                                         GrSurfaceOrigin surface_origin,
-                                         SkAlphaType alpha_type,
-                                         gpu::SharedImageUsageSet usage) {
-  if (!D3DImageBackingFactory::IsSwapChainSupported(
-          gpu_preferences_, context_state_->dawn_context_provider())) {
-    return false;
-  }
-
-  auto backings = d3d_backing_factory_->CreateSwapChain(
-      front_buffer_mailbox, back_buffer_mailbox, format, size, color_space,
-      surface_origin, alpha_type, usage);
-  return RegisterBacking(std::move(backings.front_buffer)) &&
-         RegisterBacking(std::move(backings.back_buffer));
-}
-
-bool SharedImageFactory::PresentSwapChain(const Mailbox& mailbox) {
-  if (!D3DImageBackingFactory::IsSwapChainSupported(
-          gpu_preferences_, context_state_->dawn_context_provider())) {
-    return false;
-  }
-  auto* shared_image = GetFactoryRef(mailbox);
-  if (!shared_image) {
-    DLOG(ERROR) << "PresentSwapChain: Could not find shared image mailbox";
-    return false;
-  }
-  shared_image->PresentSwapChain();
-  return true;
-}
 #endif  // BUILDFLAG(IS_WIN)
 
 #if BUILDFLAG(IS_FUCHSIA)
@@ -676,11 +748,10 @@ void SharedImageFactory::RegisterSysmemBufferCollection(
   VkDevice device =
       vulkan_context_provider->GetDeviceQueue()->GetVulkanDevice();
   DCHECK(device != VK_NULL_HANDLE);
-  auto buffer_format = ToBufferFormat(format);
   vulkan_context_provider->GetVulkanImplementation()
       ->RegisterSysmemBufferCollection(
-          device, std::move(service_handle), std::move(sysmem_token),
-          buffer_format, usage, gfx::Size(), 0, register_with_image_pipe);
+          device, std::move(service_handle), std::move(sysmem_token), format,
+          usage, gfx::Size(), 0, register_with_image_pipe);
 }
 #endif  // BUILDFLAG(IS_FUCHSIA)
 
@@ -691,6 +762,40 @@ bool SharedImageFactory::CopyToGpuMemoryBuffer(const Mailbox& mailbox) {
     return false;
   }
   return shared_image->CopyToGpuMemoryBuffer();
+}
+
+#if !BUILDFLAG(IS_ANDROID)
+gfx::GpuMemoryBufferHandle
+SharedImageFactory::CreateNativeGpuMemoryBufferHandle(
+    const gfx::Size& size,
+    viz::SharedImageFormat format,
+    gfx::BufferUsage usage) {
+#if BUILDFLAG(IS_APPLE)
+  return IOSurfaceImageBackingFactory::CreateGpuMemoryBufferHandle(size,
+                                                                   format);
+#elif BUILDFLAG(IS_OZONE)
+  return OzoneImageBackingFactory::CreateGpuMemoryBufferHandle(
+      shared_image_manager_->vulkan_context_provider(), size, format, usage);
+#else
+  return D3DImageBackingFactory::CreateGpuMemoryBufferHandle(
+      shared_image_manager_->io_runner(), size, format, usage);
+#endif
+}
+#endif
+
+bool SharedImageFactory::CopyNativeBufferToSharedMemoryAsync(
+    gfx::GpuMemoryBufferHandle buffer_handle,
+    base::UnsafeSharedMemoryRegion shared_memory) {
+#if BUILDFLAG(IS_WIN)
+  return D3DImageBackingFactory::CopyNativeBufferToSharedMemoryAsync(
+      std::move(buffer_handle), std::move(shared_memory));
+#elif BUILDFLAG(IS_ANDROID)
+  return AHardwareBufferImageBackingFactory::
+      CopyNativeBufferToSharedMemoryAsync(std::move(buffer_handle),
+                                          std::move(shared_memory));
+#else
+  return false;
+#endif
 }
 
 #if BUILDFLAG(IS_WIN)
@@ -769,8 +874,9 @@ gpu::SharedImageCapabilities SharedImageFactory::MakeCapabilities() {
   shared_image_caps.supports_r16_shared_images =
       is_angle_metal || is_skia_graphite;
   shared_image_caps.supports_native_nv12_mappable_shared_images =
-      IsNativeBufferSupported(gfx::BufferFormat::YUV_420_BIPLANAR,
-                              gfx::BufferUsage::GPU_READ_CPU_READ_WRITE);
+      IsNativeBufferSupported(viz::MultiPlaneFormat::kNV12,
+                              gfx::BufferUsage::GPU_READ_CPU_READ_WRITE,
+                              gpu_extra_info_);
   shared_image_caps.disable_r8_shared_images =
       workarounds_.r8_egl_images_broken;
   shared_image_caps.disable_webgpu_shared_images =
@@ -826,6 +932,10 @@ bool SharedImageFactory::HasSharedImage(const Mailbox& mailbox) const {
   return shared_images_.contains(mailbox);
 }
 
+base::WeakPtr<SharedImageFactory> SharedImageFactory::GetWeakPtr() {
+  return weak_ptr_factory_.GetWeakPtr();
+}
+
 void SharedImageFactory::SetGpuExtraInfo(
     const gfx::GpuExtraInfo& gpu_extra_info) {
   gpu_extra_info_ = gpu_extra_info;
@@ -839,6 +949,12 @@ bool SharedImageFactory::IsSharedBetweenThreads(
   // Raw Draw backings will be write accessed on the GPU main thread, and
   // be read accessed on the compositor thread.
   if (usage.Has(SHARED_IMAGE_USAGE_RAW_DRAW)) {
+    return true;
+  }
+
+  // WebNN shared tensors will be accessed on both the GPU main thread and the
+  // sequence owning the WebNN tensor. Synchronization is done via SyncTokens.
+  if (usage.Has(SHARED_IMAGE_USAGE_WEBNN_SHARED_TENSOR)) {
     return true;
   }
 
@@ -908,20 +1024,20 @@ void SharedImageFactory::LogGetFactoryFailed(gpu::SharedImageUsageSet usage,
   // TODO(crbug.com/423037052): Handle offscreen canvas case for WebView where
   // we fail to find a shared image factory.
   // Suppress crashes due to this client for now.
-  if (new_debug_label == "CanvasResourceRasterGmb") {
+  if (new_debug_label.find("CanvasResourceRasterGmb") != std::string::npos) {
     return;
   }
 #endif
-  SCOPED_CRASH_KEY_STRING32("SIFactory", "DebugLabel", new_debug_label);
+  SCOPED_CRASH_KEY_STRING64("SIFactory", "DebugLabel", new_debug_label);
   SCOPED_CRASH_KEY_STRING64("SIFactory", "Format", format.ToString());
-  SCOPED_CRASH_KEY_NUMBER("SIFactory", "Usage", usage);
+  SCOPED_CRASH_KEY_NUMBER("SIFactory", "Usage", static_cast<uint32_t>(usage));
   SCOPED_CRASH_KEY_STRING64("SIFactory", "GMBType", GmbTypeToString(gmb_type));
   SCOPED_CRASH_KEY_STRING64("SIFactory", "Size", size.ToString());
   SCOPED_CRASH_KEY_BOOL("SIFactory", "SharedBwThreads",
                         IsSharedBetweenThreads(usage));
   // DumpWithoutCrashing to get crash reports for failure to find a shared image
   // backing factory.
-  // base::debug::DumpWithoutCrashing();
+  base::debug::DumpWithoutCrashing();
 }
 
 bool SharedImageFactory::RegisterBacking(
@@ -941,7 +1057,6 @@ bool SharedImageFactory::RegisterBacking(
     return false;
   }
 
-  shared_image->RegisterImageFactory(this);
   if (pool_id) {
     shared_image->SetSharedImagePoolId(pool_id.value());
   }
@@ -979,6 +1094,11 @@ SharedImageRepresentationFactoryRef* SharedImageFactory::GetFactoryRef(
     const gpu::Mailbox& mailbox) const {
   auto it = shared_images_.find(mailbox);
   return it != shared_images_.end() ? it->second.get() : nullptr;
+}
+
+const scoped_refptr<SharedImageCopyManager>&
+SharedImageFactory::copy_manager() {
+  return copy_manager_;
 }
 
 SharedImageRepresentationFactory::SharedImageRepresentationFactory(
@@ -1028,9 +1148,10 @@ std::unique_ptr<DawnBufferRepresentation>
 SharedImageRepresentationFactory::ProduceDawnBuffer(
     const Mailbox& mailbox,
     const wgpu::Device& device,
-    wgpu::BackendType backend_type) {
+    wgpu::BackendType backend_type,
+    scoped_refptr<SharedContextState> context_state) {
   return manager_->ProduceDawnBuffer(mailbox, memory_type_tracker_.get(),
-                                     device, backend_type);
+                                     device, backend_type, context_state);
 }
 
 std::unique_ptr<WebNNTensorRepresentation>

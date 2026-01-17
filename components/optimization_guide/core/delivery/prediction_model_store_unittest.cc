@@ -6,6 +6,7 @@
 
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/functional/callback_helpers.h"
 #include "base/rand_util.h"
 #include "base/task/thread_pool.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -48,24 +49,11 @@ struct ModelDetail {
 
 }  // namespace
 
-class TestPredictionModelStore : public PredictionModelStore {
- public:
-  explicit TestPredictionModelStore(PrefService* local_state)
-      : local_state_(local_state) {}
-
-  // PredictionModelStore:
-  PrefService* GetLocalState() const override { return local_state_; }
-
- private:
-  raw_ptr<PrefService> local_state_;
-};
-
 class PredictionModelStoreTest : public testing::Test {
  public:
   void SetUp() override {
     ASSERT_TRUE(temp_models_dir_.CreateUniqueTempDir());
-    local_state_prefs_ = std::make_unique<TestingPrefServiceSimple>();
-    prefs::RegisterLocalStatePrefs(local_state_prefs_->registry());
+    prefs::RegisterLocalStatePrefs(local_state_.registry());
     CreateAndInitializePredictionModelStore();
     RunUntilIdle();
   }
@@ -86,12 +74,12 @@ class PredictionModelStoreTest : public testing::Test {
   // Creates model files and returns model details.
   ModelDetail CreateTestModelFiles(
       proto::OptimizationTarget optimization_target,
-      const proto::ModelCacheKey& model_cache_key,
+      std::string locale,
       const std::vector<const base::FilePath::CharType*>
           additional_file_names) {
     auto base_model_dir =
         prediction_model_store_->GetBaseModelDirForModelCacheKey(
-            optimization_target, model_cache_key);
+            optimization_target, ClientCacheKey::FromLocale(locale));
     base::CreateDirectory(base_model_dir);
     base::WriteFile(base_model_dir.Append(GetBaseFileNameForModels()), "");
     proto::ModelInfo model_info;
@@ -102,7 +90,7 @@ class PredictionModelStoreTest : public testing::Test {
       model_info.add_additional_files()->set_file_path(
           FilePathToString(base::FilePath(additional_file_name)));
     }
-    *model_info.mutable_model_cache_key() = model_cache_key;
+    *model_info.mutable_model_cache_key() = CreateModelCacheKey(locale);
     std::string model_info_pb;
     model_info.SerializeToString(&model_info_pb);
     base::WriteFile(base_model_dir.Append(GetBaseFileNameForModelInfo()),
@@ -112,15 +100,17 @@ class PredictionModelStoreTest : public testing::Test {
 
   void CreateAndInitializePredictionModelStore() {
     prediction_model_store_ =
-        std::make_unique<TestPredictionModelStore>(local_state_prefs_.get());
+        std::make_unique<PredictionModelStore>(local_state_);
     prediction_model_store_->Initialize(temp_models_dir_.GetPath());
   }
 
   void WaitForModeLoad(proto::OptimizationTarget optimization_target,
-                       const proto::ModelCacheKey& model_cache_key) {
+                       const ClientCacheKey& model_cache_key) {
     std::unique_ptr<base::RunLoop> run_loop = std::make_unique<base::RunLoop>();
     prediction_model_store_->LoadModel(
         optimization_target, model_cache_key,
+        base::ThreadPool::CreateSequencedTaskRunner(
+            {base::MayBlock(), base::TaskPriority::BEST_EFFORT}),
         base::BindOnce(&PredictionModelStoreTest::OnPredictionModelLoaded,
                        base::Unretained(this), run_loop.get()));
     run_loop->Run();
@@ -131,13 +121,14 @@ class PredictionModelStoreTest : public testing::Test {
   base::test::TaskEnvironment task_environment_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   base::ScopedTempDir temp_models_dir_;
-  std::unique_ptr<TestingPrefServiceSimple> local_state_prefs_;
+  TestingPrefServiceSimple local_state_;
+  ModelStoreLedger ledger_{local_state_};
   std::unique_ptr<proto::PredictionModel> last_loaded_prediction_model_;
-  std::unique_ptr<TestPredictionModelStore> prediction_model_store_;
+  std::unique_ptr<PredictionModelStore> prediction_model_store_;
 };
 
 TEST_F(PredictionModelStoreTest, BaseModelDirs) {
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
   auto base_model_dir =
       prediction_model_store_->GetBaseModelDirForModelCacheKey(
           kTestOptimizationTargetFoo, model_cache_key);
@@ -146,12 +137,12 @@ TEST_F(PredictionModelStoreTest, BaseModelDirs) {
 }
 
 TEST_F(PredictionModelStoreTest, ModelUpdateAndLoad) {
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
 
   EXPECT_FALSE(prediction_model_store_->HasModel(kTestOptimizationTargetFoo,
                                                  model_cache_key));
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
@@ -175,8 +166,8 @@ TEST_F(PredictionModelStoreTest, ModelUpdateAndLoad) {
             model_detail.base_model_dir.Append(GetBaseFileNameForModels()));
   EXPECT_EQ(0, loaded_model->model_info().additional_files_size());
 
-  auto metadata_entry = ModelStoreMetadataEntry::GetModelMetadataEntryIfExists(
-      local_state_prefs_.get(), kTestOptimizationTargetFoo, model_cache_key);
+  auto metadata_entry =
+      ledger_.GetEntryIfExists(kTestOptimizationTargetFoo, model_cache_key);
   EXPECT_EQ(
       model_detail.base_model_dir,
       temp_models_dir_.GetPath().Append(*metadata_entry->GetModelBaseDir()));
@@ -187,9 +178,9 @@ TEST_F(PredictionModelStoreTest, ModelUpdateAndLoad) {
 
 // Tests model with an additional file.
 TEST_F(PredictionModelStoreTest, ModelWithAdditionalFile) {
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key,
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo,
                            {FILE_PATH_LITERAL("valid_additional_file.txt")});
 
   prediction_model_store_->UpdateModel(
@@ -213,9 +204,9 @@ TEST_F(PredictionModelStoreTest, ModelWithAdditionalFile) {
 
 // Tests model with invalid additional file.
 TEST_F(PredictionModelStoreTest, InvalidModelAdditionalFile) {
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key,
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo,
                            {FILE_PATH_LITERAL("valid_additional_file.txt"),
                             FILE_PATH_LITERAL("invalid_additional_file.txt")});
   base::DeleteFile(
@@ -233,12 +224,13 @@ TEST_F(PredictionModelStoreTest, InvalidModelAdditionalFile) {
 }
 
 TEST_F(PredictionModelStoreTest, ModelsSharedBasedOnServerModelCacheKey) {
-  auto model_cache_key_foo = CreateModelCacheKey(kTestLocaleFoo);
-  auto model_cache_key_bar = CreateModelCacheKey(kTestLocaleBar);
+  auto model_cache_key_foo = ClientCacheKey::FromLocale(kTestLocaleFoo);
+  auto model_cache_key_bar = ClientCacheKey::FromLocale(kTestLocaleBar);
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key_foo, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModelCacheKeyMapping(
-      kTestOptimizationTargetFoo, model_cache_key_foo, model_cache_key_foo);
+      kTestOptimizationTargetFoo, model_cache_key_foo,
+      CreateModelCacheKey(kTestLocaleFoo));
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key_foo, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
@@ -248,7 +240,8 @@ TEST_F(PredictionModelStoreTest, ModelsSharedBasedOnServerModelCacheKey) {
 
   // Allow the model to be shared for different cache key.
   prediction_model_store_->UpdateModelCacheKeyMapping(
-      kTestOptimizationTargetFoo, model_cache_key_bar, model_cache_key_foo);
+      kTestOptimizationTargetFoo, model_cache_key_bar,
+      CreateModelCacheKey(kTestLocaleFoo));
   EXPECT_TRUE(prediction_model_store_->HasModel(kTestOptimizationTargetFoo,
                                                 model_cache_key_bar));
 
@@ -270,9 +263,9 @@ TEST_F(PredictionModelStoreTest, ModelsSharedBasedOnServerModelCacheKey) {
 }
 
 TEST_F(PredictionModelStoreTest, UpdateMetadataForExistingModel) {
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
@@ -296,8 +289,8 @@ TEST_F(PredictionModelStoreTest, UpdateMetadataForExistingModel) {
   prediction_model_store_->UpdateMetadataForExistingModel(
       kTestOptimizationTargetFoo, model_cache_key, model_info);
   RunUntilIdle();
-  auto metadata_entry = ModelStoreMetadataEntry::GetModelMetadataEntryIfExists(
-      local_state_prefs_.get(), kTestOptimizationTargetFoo, model_cache_key);
+  auto metadata_entry =
+      ledger_.GetEntryIfExists(kTestOptimizationTargetFoo, model_cache_key);
   EXPECT_LE(base::Minutes(99),
             metadata_entry->GetExpiryTime() - base::Time::Now());
   EXPECT_EQ(
@@ -311,16 +304,16 @@ TEST_F(PredictionModelStoreTest, ModelStorageMetrics) {
 
   base::HistogramTester histogram_tester;
 
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
   RunUntilIdle();
 
   model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetBar, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetBar, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetBar, model_cache_key, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
@@ -357,9 +350,9 @@ TEST_F(PredictionModelStoreTest, ModelStorageMetrics) {
 TEST_F(PredictionModelStoreTest, ExpiredModelRemoved) {
   base::HistogramTester histogram_tester;
 
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
@@ -384,17 +377,15 @@ TEST_F(PredictionModelStoreTest, ExpiredModelRemoved) {
   EXPECT_FALSE(base::DirectoryExists(model_detail.base_model_dir));
   EXPECT_FALSE(base::PathExists(
       model_detail.base_model_dir.Append(GetBaseFileNameForModels())));
-  EXPECT_TRUE(
-      local_state_prefs_->GetDict(prefs::localstate::kStoreFilePathsToDelete)
-          .empty());
+  EXPECT_TRUE(ledger_.GetPathsToDelete().empty());
 }
 
 TEST_F(PredictionModelStoreTest, ExpiredModelRemovedOnLoadModel) {
   base::HistogramTester histogram_tester;
 
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
@@ -417,13 +408,10 @@ TEST_F(PredictionModelStoreTest, ExpiredModelRemovedOnLoadModel) {
   EXPECT_TRUE(base::DirectoryExists(model_detail.base_model_dir));
   EXPECT_TRUE(base::PathExists(
       model_detail.base_model_dir.Append(GetBaseFileNameForModels())));
-  EXPECT_EQ(1U, local_state_prefs_
-                    ->GetDict(prefs::localstate::kStoreFilePathsToDelete)
-                    .size());
-  EXPECT_TRUE(
-      local_state_prefs_->GetDict(prefs::localstate::kStoreFilePathsToDelete)
-          .FindBool(FilePathToString(ConvertToRelativePath(
-              temp_models_dir_.GetPath(), model_detail.base_model_dir))));
+  EXPECT_EQ(1U, ledger_.GetPathsToDelete().size());
+  EXPECT_TRUE(ledger_.GetPathsToDelete().FindBool(
+      FilePathToString(ConvertToRelativePath(temp_models_dir_.GetPath(),
+                                             model_detail.base_model_dir))));
 
   // Recreate the store and it will remove the model slated for deletion
   // earlier.
@@ -432,17 +420,15 @@ TEST_F(PredictionModelStoreTest, ExpiredModelRemovedOnLoadModel) {
   EXPECT_FALSE(base::DirectoryExists(model_detail.base_model_dir));
   EXPECT_FALSE(base::PathExists(
       model_detail.base_model_dir.Append(GetBaseFileNameForModels())));
-  EXPECT_TRUE(
-      local_state_prefs_->GetDict(prefs::localstate::kStoreFilePathsToDelete)
-          .empty());
+  EXPECT_TRUE(ledger_.GetPathsToDelete().empty());
 }
 
 TEST_F(PredictionModelStoreTest, OldModelRemovedOnNewModelUpdate) {
   base::HistogramTester histogram_tester;
 
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
@@ -452,7 +438,7 @@ TEST_F(PredictionModelStoreTest, OldModelRemovedOnNewModelUpdate) {
 
   // Update the model.
   auto new_model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key, new_model_detail.model_info,
       new_model_detail.base_model_dir, base::DoNothing());
@@ -467,30 +453,25 @@ TEST_F(PredictionModelStoreTest, OldModelRemovedOnNewModelUpdate) {
       PredictionModelStoreModelRemovalReason::kNewModelUpdate, 1);
   EXPECT_TRUE(base::PathExists(
       model_detail.base_model_dir.Append(GetBaseFileNameForModels())));
-  EXPECT_EQ(1U, local_state_prefs_
-                    ->GetDict(prefs::localstate::kStoreFilePathsToDelete)
-                    .size());
-  EXPECT_TRUE(
-      local_state_prefs_->GetDict(prefs::localstate::kStoreFilePathsToDelete)
-          .FindBool(FilePathToString(ConvertToRelativePath(
-              temp_models_dir_.GetPath(), model_detail.base_model_dir))));
+  EXPECT_EQ(1U, ledger_.GetPathsToDelete().size());
+  EXPECT_TRUE(ledger_.GetPathsToDelete().FindBool(
+      FilePathToString(ConvertToRelativePath(temp_models_dir_.GetPath(),
+                                             model_detail.base_model_dir))));
 
   // Recreate the store and it will remove the old model slated for deletion.
   CreateAndInitializePredictionModelStore();
   RunUntilIdle();
   EXPECT_TRUE(prediction_model_store_->HasModel(kTestOptimizationTargetFoo,
                                                 model_cache_key));
-  EXPECT_TRUE(
-      local_state_prefs_->GetDict(prefs::localstate::kStoreFilePathsToDelete)
-          .empty());
+  EXPECT_TRUE(ledger_.GetPathsToDelete().empty());
 }
 
 TEST_F(PredictionModelStoreTest, InvalidModelDirModelRemoved) {
   base::HistogramTester histogram_tester;
 
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
@@ -512,9 +493,9 @@ TEST_F(PredictionModelStoreTest, InvalidModelDirModelRemoved) {
 TEST_F(PredictionModelStoreTest, InvalidModelDirModelUpdate) {
   base::HistogramTester histogram_tester;
 
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   // Delete the model file to make it invalid.
   base::DeleteFile(
       model_detail.base_model_dir.Append(GetBaseFileNameForModels()));
@@ -533,12 +514,12 @@ TEST_F(PredictionModelStoreTest, InvalidModelDirModelUpdate) {
 
 TEST_F(PredictionModelStoreTest, InconsistentModelDirsRemoved) {
   base::HistogramTester histogram_tester;
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
 
   EXPECT_FALSE(prediction_model_store_->HasModel(kTestOptimizationTargetFoo,
                                                  model_cache_key));
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
@@ -549,9 +530,9 @@ TEST_F(PredictionModelStoreTest, InconsistentModelDirsRemoved) {
   // Create some inconsistent model dirs that exist in the store, but not in the
   // local state.
   auto model_detail_inconsistent_foo =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   auto model_detail_inconsistent_bar =
-      CreateTestModelFiles(kTestOptimizationTargetBar, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetBar, kTestLocaleFoo, {});
   EXPECT_TRUE(base::DirectoryExists(model_detail.base_model_dir));
   EXPECT_TRUE(
       base::DirectoryExists(model_detail_inconsistent_foo.base_model_dir));
@@ -583,12 +564,12 @@ TEST_F(PredictionModelStoreTest, InconsistentModelDirsRemoved) {
 
 TEST_F(PredictionModelStoreTest, InconsistentOptTargetDirsRemoved) {
   base::HistogramTester histogram_tester;
-  auto model_cache_key = CreateModelCacheKey(kTestLocaleFoo);
+  auto model_cache_key = ClientCacheKey::FromLocale(kTestLocaleFoo);
 
   EXPECT_FALSE(prediction_model_store_->HasModel(kTestOptimizationTargetFoo,
                                                  model_cache_key));
   auto model_detail =
-      CreateTestModelFiles(kTestOptimizationTargetFoo, model_cache_key, {});
+      CreateTestModelFiles(kTestOptimizationTargetFoo, kTestLocaleFoo, {});
   prediction_model_store_->UpdateModel(
       kTestOptimizationTargetFoo, model_cache_key, model_detail.model_info,
       model_detail.base_model_dir, base::DoNothing());
@@ -599,7 +580,7 @@ TEST_F(PredictionModelStoreTest, InconsistentOptTargetDirsRemoved) {
 
   // Create some invalid models and dirs within the model store dir.
   auto model_detail_unknown = CreateTestModelFiles(
-      proto::OPTIMIZATION_TARGET_UNKNOWN, model_cache_key, {});
+      proto::OPTIMIZATION_TARGET_UNKNOWN, kTestLocaleFoo, {});
   EXPECT_TRUE(base::DirectoryExists(model_detail_unknown.base_model_dir));
   auto invalid_dir = temp_models_dir_.GetPath().AppendASCII("baz");
   base::CreateDirectory(invalid_dir);

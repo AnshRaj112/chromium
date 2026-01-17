@@ -51,7 +51,6 @@
 #include "base/auto_reset.h"
 #include "base/check.h"
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/functional/bind.h"
@@ -64,6 +63,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
+#include "chromeos/components/kiosk/kiosk_utils.h"
 #include "chromeos/ui/base/app_types.h"
 #include "chromeos/ui/base/window_properties.h"
 #include "chromeos/utils/haptics_util.h"
@@ -155,7 +155,7 @@ void AppendWindowsToOverview(
   overview_session->set_auto_add_windows_enabled(false);
   for (aura::Window* window :
        Shell::Get()->mru_window_tracker()->BuildMruWindowList(kActiveDesk)) {
-    if (!base::Contains(windows, window) ||
+    if (!std::ranges::contains(windows, window) ||
         window_util::ShouldExcludeForOverview(window)) {
       continue;
     }
@@ -242,7 +242,7 @@ bool IsParentSwitchableContainer(const aura::Window* window) {
 
 bool IsApplistActiveInTabletMode(const aura::Window* active_window) {
   DCHECK(active_window);
-  if (!display::Screen::GetScreen()->InTabletMode()) {
+  if (!display::Screen::Get()->InTabletMode()) {
     return false;
   }
 
@@ -438,7 +438,7 @@ DesksController* DesksController::Get() {
   // |DesksController::NotifyDeskNameChanged())| could be called
   // during the construction of |DesksController|, and at this point
   // |Shell::desks_controller_| has not been assigned yet.
-  return static_cast<DesksController*>(chromeos::DesksHelper::Get(nullptr));
+  return static_cast<DesksController*>(chromeos::DesksHelper::Get());
 }
 
 // static
@@ -525,6 +525,11 @@ bool DesksController::AreDesksBeingModified() const {
 }
 
 bool DesksController::CanCreateDesks() const {
+  // No new desk should be created during Kiosk Session.
+  if (chromeos::IsKioskSession()) {
+    return false;
+  }
+
   return desks_.size() < desks_util::GetMaxNumberOfDesks();
 }
 
@@ -638,7 +643,6 @@ void DesksController::NewDesk(DesksCreationRemovalSource source,
     SetDeviceUsesDesksPref(prefs, true);
     desks_restore_util::UpdatePrimaryUserDeskGuidsPrefs();
     desks_restore_util::UpdatePrimaryUserDeskNamesPrefs();
-    desks_restore_util::UpdatePrimaryUserDeskLacrosProfileIdPrefs();
     desks_restore_util::UpdatePrimaryUserDeskMetricsPrefs();
     UMA_HISTOGRAM_ENUMERATION(kNewDeskHistogramName, source);
     ReportDesksCountHistogram();
@@ -646,7 +650,7 @@ void DesksController::NewDesk(DesksCreationRemovalSource source,
 }
 
 bool DesksController::HasDesk(const Desk* desk) const {
-  return base::Contains(desks_, desk, &std::unique_ptr<Desk>::get);
+  return std::ranges::contains(desks_, desk, &std::unique_ptr<Desk>::get);
 }
 
 Desk* DesksController::GetDeskAtIndex(size_t index) const {
@@ -713,7 +717,6 @@ void DesksController::ReorderDesk(int old_index, int new_index) {
   // right order.
   desks_restore_util::UpdatePrimaryUserDeskNamesPrefs();
   desks_restore_util::UpdatePrimaryUserDeskGuidsPrefs();
-  desks_restore_util::UpdatePrimaryUserDeskLacrosProfileIdPrefs();
   desks_restore_util::UpdatePrimaryUserDeskMetricsPrefs();
 
   // 2. For multi-profile switching, update all affected active desk index in
@@ -1429,7 +1432,7 @@ bool DesksController::OnSingleInstanceAppLaunchingFromSavedDesk(
           case chromeos::WindowStateType::kInactive:
           case chromeos::WindowStateType::kFullscreen:
           case chromeos::WindowStateType::kPinned:
-          case chromeos::WindowStateType::kTrustedPinned:
+          case chromeos::WindowStateType::kLockedFullscreen:
           case chromeos::WindowStateType::kPip:
             NOTREACHED();
         }
@@ -1645,7 +1648,7 @@ void DesksController::OnAnimationFinished(DeskAnimationBase* animation) {
 }
 
 bool DesksController::HasDeskWithName(const std::u16string& desk_name) const {
-  return base::Contains(desks_, desk_name, &Desk::name);
+  return std::ranges::contains(desks_, desk_name, &Desk::name);
 }
 
 void DesksController::ActivateDeskInternal(const Desk* desk,
@@ -1966,7 +1969,6 @@ void DesksController::RemoveDeskInternal(const Desk* desk,
 
   desks_restore_util::UpdatePrimaryUserDeskNamesPrefs();
   desks_restore_util::UpdatePrimaryUserDeskGuidsPrefs();
-  desks_restore_util::UpdatePrimaryUserDeskLacrosProfileIdPrefs();
   desks_restore_util::UpdatePrimaryUserDeskMetricsPrefs();
 
   DCHECK_LE(available_container_ids_.size(), desks_util::GetMaxNumberOfDesks());
@@ -2255,7 +2257,7 @@ const Desk* DesksController::FindDeskOfWindow(aura::Window* window) const {
   }
 
   for (const auto& desk : desks_) {
-    if (base::Contains(desk->windows(), window))
+    if (std::ranges::contains(desk->windows(), window))
       return desk.get();
   }
 
@@ -2347,7 +2349,7 @@ bool DesksController::MoveWindowFromSourceDeskTo(
   // the active desk, and cannot be removed. Except floated window, which is
   // handled by `FloatController::OnMovingFloatedWindowToDesk`.
   const bool is_floated = WindowState::Get(window)->IsFloated();
-  if (!base::Contains(source_desk->windows(), window) && !is_floated) {
+  if (!std::ranges::contains(source_desk->windows(), window) && !is_floated) {
     return false;
   }
 

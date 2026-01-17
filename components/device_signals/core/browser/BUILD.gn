@@ -57,29 +57,28 @@ static_library("browser") {
     sources += [ "browser_utils.cc" ]
 
     deps += [
-      "//components/policy/content",
+      "//components/policy/core/browser",
       "//content/public/browser",
     ]
-  }
-
-  if (is_win || is_mac || is_linux || is_android) {
   }
 
   if (is_android) {
     public += [ "android/android_os_signals_collector.h" ]
     sources += [ "android/android_os_signals_collector.cc" ]
+    deps += [
+      "//components/safe_browsing/android:safe_browsing_api_handler",
+      "//components/safe_browsing/android:safe_browsing_api_handler_util",
+    ]
   } else if (is_win || is_mac || is_linux) {
     public += [
       "agent_signals_collector.h",
       "crowdstrike_client.h",
       "desktop/desktop_os_signals_collector.h",
-      "detected_agent_client.h",
     ]
     sources += [
       "agent_signals_collector.cc",
       "crowdstrike_client.cc",
       "desktop/desktop_os_signals_collector.cc",
-      "detected_agent_client.cc",
     ]
     deps += [ "//services/data_decoder/public/cpp" ]
   }
@@ -100,6 +99,10 @@ static_library("browser") {
 
   if (is_chromeos) {
     sources += [ "chromeos/browser_utils_chromeos.cc" ]
+  }
+
+  if (is_android) {
+    sources += [ "android/browser_utils_android.cc" ]
   }
 }
 
@@ -125,6 +128,7 @@ static_library("test_support") {
     "//base",
     "//components/device_signals/core/common/mojom",
     "//components/signin/public/identity_manager",
+    "//services/network/public/cpp",
     "//testing/gmock",
   ]
 }
@@ -153,14 +157,25 @@ source_set("unit_tests") {
     "//testing/gtest",
   ]
 
+  if (is_android) {
+    sources += [ "android/android_os_signals_collector_unittest.cc" ]
+    deps += [
+      "//components/safe_browsing/android:safe_browsing_api_handler",
+      "//components/safe_browsing/android:safe_browsing_api_handler_util",
+      "//content/test:test_support",
+    ]
+  }
+
   if (is_win || is_mac || is_linux) {
     sources += [
       "agent_signals_collector_unittest.cc",
       "crowdstrike_client_unittest.cc",
       "desktop/desktop_os_signals_collector_unittest.cc",
-      "detected_agent_client_unittest.cc",
     ]
-    deps += [ "//services/data_decoder/public/cpp:test_support" ]
+    deps += [
+      "//components/device_signals/core/common:test_support",
+      "//services/data_decoder/public/cpp:test_support",
+    ]
   }
 
   if (is_win) {

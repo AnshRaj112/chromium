@@ -35,7 +35,8 @@
 #include "chrome/browser/sync/sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/browser_list.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/common/pref_names.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
@@ -148,14 +149,15 @@ void DeleteProfileHelper::MaybeScheduleProfileForDeletion(
     // Close all browser windows before deleting the profile. If the user
     // cancels the closing of any tab in an OnBeforeUnload event, profile
     // deletion is also cancelled. (crbug.com/289390)
-    BrowserList::CloseAllBrowsersWithProfile(
+    chrome::CloseAllBrowsersWithProfile(
         profile,
+        /*skip_beforeunload=*/false,
         base::BindRepeating(
             &DeleteProfileHelper::EnsureActiveProfileExistsBeforeDeletion,
             base::Unretained(this), base::Passed(std::move(keep_alive)),
             base::Passed(std::move(profile_keep_alive)),
             base::Passed(std::move(callback))),
-        base::BindRepeating(&CancelProfileDeletion), false);
+        base::BindRepeating(&CancelProfileDeletion));
   } else {
     EnsureActiveProfileExistsBeforeDeletion(std::move(keep_alive),
                                             /*profile_keep_alive=*/nullptr,
@@ -295,16 +297,23 @@ void DeleteProfileHelper::EnsureActiveProfileExistsBeforeDeletion(
   }
 
   // Search for an active browser and use its profile as active if possible.
-  for (Browser* browser : *BrowserList::GetInstance()) {
-    Profile* profile = browser->profile();
-    base::FilePath cur_path = profile->GetPath();
-    if (cur_path != profile_dir && cur_path != guest_profile_path &&
-        !IsProfileDirectoryMarkedForDeletion(cur_path)) {
-      OnNewActiveProfileInitialized(profile_dir, cur_path, std::move(callback),
-                                    std::move(keep_alive),
-                                    std::move(profile_keep_alive), profile);
-      return;
-    }
+  bool found = false;
+  ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+      [this, &profile_dir, &guest_profile_path, &callback, &keep_alive,
+       &profile_keep_alive, &found](BrowserWindowInterface* browser) {
+        Profile* const profile = browser->GetProfile();
+        const base::FilePath cur_path = profile->GetPath();
+        if (cur_path != profile_dir && cur_path != guest_profile_path &&
+            !IsProfileDirectoryMarkedForDeletion(cur_path)) {
+          OnNewActiveProfileInitialized(
+              profile_dir, cur_path, std::move(callback), std::move(keep_alive),
+              std::move(profile_keep_alive), profile);
+          found = true;
+        }
+        return !found;
+      });
+  if (found) {
+    return;
   }
 
   // There no valid browsers to fallback, search for any existing valid profile.

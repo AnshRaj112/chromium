@@ -4,19 +4,40 @@
 
 #import "ios/chrome/browser/policy/model/reporting/profile_report_generator_ios.h"
 
+#import "base/feature_list.h"
 #import "base/strings/sys_string_conversions.h"
+#import "components/enterprise/browser/identifiers/profile_id_service.h"
 #import "components/policy/core/browser/policy_conversions.h"
+#import "components/policy/core/common/cloud/affiliation.h"
 #import "components/policy/core/common/cloud/machine_level_user_cloud_policy_manager.h"
+#import "components/policy/core/common/cloud/user_cloud_policy_manager.h"
+#import "components/policy/proto/device_management_backend.pb.h"
 #import "components/signin/public/identity_manager/account_info.h"
 #import "components/signin/public/identity_manager/identity_manager.h"
+#import "ios/chrome/browser/enterprise/identifiers/profile_id_service_factory_ios.h"
 #import "ios/chrome/browser/policy/model/browser_policy_connector_ios.h"
 #import "ios/chrome/browser/policy/model/policy_conversions_client_ios.h"
+#import "ios/chrome/browser/policy/model/reporting/features.h"
+#import "ios/chrome/browser/policy/model/reporting/reporting_util.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/profile/profile_manager_ios.h"
 #import "ios/chrome/browser/signin/model/identity_manager_factory.h"
 
 namespace enterprise_reporting {
+
+namespace {
+
+std::optional<CoreAccountInfo> GetAccountInfo(ProfileIOS* profile) {
+  signin::IdentityManager* identity_manager =
+      IdentityManagerFactory::GetForProfile(profile);
+  return identity_manager->HasPrimaryAccount(signin::ConsentLevel::kSignin)
+             ? std::make_optional(identity_manager->GetPrimaryAccountInfo(
+                   signin::ConsentLevel::kSignin))
+             : std::nullopt;
+}
+
+}  // namespace
 
 ProfileReportGeneratorIOS::ProfileReportGeneratorIOS() = default;
 
@@ -28,33 +49,36 @@ bool ProfileReportGeneratorIOS::Init(const base::FilePath& path) {
   const std::string name = path.BaseName().AsUTF8Unsafe();
   profile_ =
       GetApplicationContext()->GetProfileManager()->GetProfileWithName(name);
-
-  if (!profile_) {
-    return false;
-  }
-
-  return true;
+  return profile_ != nullptr;
 }
 
 void ProfileReportGeneratorIOS::GetSigninUserInfo(
     enterprise_management::ChromeUserProfileInfo* report) {
-  signin::IdentityManager* identity_manager =
-      IdentityManagerFactory::GetForProfile(profile_);
-
-  if (!identity_manager->HasPrimaryAccount(signin::ConsentLevel::kSignin)) {
+  std::optional<CoreAccountInfo> account_info = GetAccountInfo(profile_);
+  if (!account_info.has_value()) {
     return;
   }
-
-  CoreAccountInfo account_info =
-      identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSignin);
   auto* signed_in_user_info = report->mutable_chrome_signed_in_user();
-  signed_in_user_info->set_email(account_info.email);
-  signed_in_user_info->set_obfuscated_gaia_id(account_info.gaia.ToString());
+  signed_in_user_info->set_email(account_info->email);
+  signed_in_user_info->set_obfuscated_gaia_id(account_info->gaia.ToString());
 }
 
 void ProfileReportGeneratorIOS::GetAffiliationInfo(
     enterprise_management::ChromeUserProfileInfo* report) {
-  // Affiliation information is currently not supported on iOS.
+  if (!base::FeatureList::IsEnabled(
+          enterprise_reporting::kCloudProfileReporting)) {
+    // Affiliation information is currently not supported on iOS.
+    return;
+  }
+
+  auto* affiliation_state = report->mutable_affiliation();
+  if (IsProfileAffiliated(profile_)) {
+    affiliation_state->set_is_affiliated(true);
+    return;
+  }
+
+  affiliation_state->set_is_affiliated(false);
+  affiliation_state->set_unaffiliation_reason(GetUnaffiliatedReason(profile_));
 }
 
 void ProfileReportGeneratorIOS::GetExtensionInfo(
@@ -69,28 +93,67 @@ void ProfileReportGeneratorIOS::GetExtensionRequest(
 
 void ProfileReportGeneratorIOS::GetProfileId(
     enterprise_management::ChromeUserProfileInfo* report) {
-  // TODO(crbug.com/389974117): Profile ID is currently unavailable on iOS.
+  if (base::FeatureList::IsEnabled(
+          enterprise_reporting::kCloudProfileReporting)) {
+    std::optional<std::string> profile_id =
+        enterprise::ProfileIdServiceFactoryIOS::GetForProfile(profile_)
+            ->GetProfileId();
+    if (profile_id.has_value()) {
+      report->set_profile_id(profile_id.value());
+    }
+  }
 }
 
 void ProfileReportGeneratorIOS::GetProfileName(
     enterprise_management::ChromeUserProfileInfo* report) {
-  report->set_name(profile_->GetProfileName());
+  if (base::FeatureList::IsEnabled(
+          enterprise_reporting::kUseEmailAsProfileName)) {
+    // Unlike other platforms, iOS doesn't have a meaningful profile name: it's
+    // just a randomly-generated UUID.
+    //
+    // Use the name from the GAIA account, since that's more meaningful.
+    std::optional<CoreAccountInfo> account_info = GetAccountInfo(profile_);
+    if (account_info.has_value()) {
+      signin::IdentityManager* identity_manager =
+          IdentityManagerFactory::GetForProfile(profile_);
+      AccountInfo extended_account_info =
+          identity_manager->FindExtendedAccountInfo(*account_info);
+      if (!extended_account_info.full_name.empty()) {
+        report->set_name(extended_account_info.full_name);
+      } else {
+        report->set_name(account_info->email);
+      }
+    }
+  } else {
+    report->set_name(profile_->GetProfileName());
+  }
 }
 
 std::unique_ptr<policy::PolicyConversionsClient>
 ProfileReportGeneratorIOS::MakePolicyConversionsClient(bool is_machine_scope) {
-  // Note that profile reporting is not supported on iOS yet, hence we igore
-  // `is_machine_scope` value.
-  return std::make_unique<PolicyConversionsClientIOS>(profile_);
+  auto client = std::make_unique<PolicyConversionsClientIOS>(profile_);
+  if (base::FeatureList::IsEnabled(
+          enterprise_reporting::kCloudProfileReporting)) {
+    // For profile reporting, if user is not affiliated, we need to hide machine
+    // policy value.
+    client->EnableShowMachineValues(is_machine_scope ||
+                                    IsProfileAffiliated(profile_));
+  }
+  return client;
 }
 
 policy::CloudPolicyManager* ProfileReportGeneratorIOS::GetCloudPolicyManager(
     bool is_machine_scope) {
-  // Note that profile reporting is not supported on iOS yet, hence we igore
-  // `is_machine_scope` value.
-  return GetApplicationContext()
-      ->GetBrowserPolicyConnector()
-      ->machine_level_user_cloud_policy_manager();
+  if (is_machine_scope) {
+    // CBCM report will include CBCM policy fetch information.
+    return GetApplicationContext()
+        ->GetBrowserPolicyConnector()
+        ->machine_level_user_cloud_policy_manager();
+  }
+  DCHECK(base::FeatureList::IsEnabled(
+      enterprise_reporting::kCloudProfileReporting));
+  // Profile report will include user cloud policy information by default.
+  return profile_->GetUserCloudPolicyManager();
 }
 
 }  // namespace enterprise_reporting

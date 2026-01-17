@@ -30,7 +30,6 @@
 #include "ash/wm/wm_event.h"
 #include "ash/wm/workspace/backdrop_controller.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/window_tracker.h"
@@ -228,7 +227,7 @@ void WorkspaceLayoutManager::OnWindowHierarchyChanged(
   // If the window is already tracked by the workspace this update would be
   // redundant as the fullscreen and shelf state would have been handled in
   // OnWindowAddedToLayout.
-  if (base::Contains(windows_, params.target)) {
+  if (windows_.contains(params.target)) {
     return;
   }
 
@@ -289,7 +288,7 @@ void WorkspaceLayoutManager::OnWindowDestroying(aura::Window* window) {
 void WorkspaceLayoutManager::OnWindowActivating(ActivationReason reason,
                                                 aura::Window* gaining_active,
                                                 aura::Window* losing_active) {
-  if (!base::Contains(windows_, gaining_active)) {
+  if (!windows_.contains(gaining_active)) {
     return;
   }
 
@@ -306,8 +305,8 @@ void WorkspaceLayoutManager::OnWindowActivated(ActivationReason reason,
                                                aura::Window* lost_active) {
   // This callback may be called multiple times with one activation change
   // because we have one instance of this class for each desk.
-  if ((!gained_active || !base::Contains(windows_, gained_active)) &&
-      (!lost_active || !base::Contains(windows_, lost_active))) {
+  if ((!gained_active || !windows_.contains(gained_active)) &&
+      (!lost_active || !windows_.contains(lost_active))) {
     return;
   }
 
@@ -399,7 +398,7 @@ void WorkspaceLayoutManager::OnPostWindowStateTypeChange(
 void WorkspaceLayoutManager::OnDisplayMetricsChanged(
     const display::Display& display,
     uint32_t changed_metrics) {
-  if (display::Screen::GetScreen()->GetDisplayNearestWindow(window_).id() !=
+  if (display::Screen::Get()->GetDisplayNearestWindow(window_).id() !=
       display.id()) {
     return;
   }
@@ -495,11 +494,11 @@ void WorkspaceLayoutManager::OnHotseatStateChanged(HotseatState old_state,
 
 void WorkspaceLayoutManager::OnAppListVisibilityChanged(bool shown,
                                                         int64_t display_id) {
-  if (display::Screen::GetScreen()->GetDisplayNearestWindow(window_).id() !=
+  if (display::Screen::Get()->GetDisplayNearestWindow(window_).id() !=
       display_id) {
     return;
   }
-  if (!Shell::Get()->IsInTabletMode()) {
+  if (!display::Screen::Get()->InTabletMode()) {
     MaybeUpdateA11yFloatingPanelOrPipBounds();
   }
 }

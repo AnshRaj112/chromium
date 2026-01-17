@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "storage/browser/file_system/obfuscated_file_util.h"
 
 #include <stddef.h>
@@ -21,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+#include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/files/file.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -517,7 +514,8 @@ class ObfuscatedFileUtilTest : public testing::Test,
               base::MakeRefCounted<net::StringIOBuffer>(data).get(), length));
     } else {
       ASSERT_TRUE(file.IsValid());
-      ASSERT_EQ(length, file.Write(0, data, length));
+      ASSERT_TRUE(file.WriteAndCheck(
+          0, base::as_byte_span(data).first(static_cast<size_t>(length))));
       file.Close();
     }
 

@@ -9,7 +9,6 @@
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
@@ -63,11 +62,12 @@ std::unique_ptr<WebAccessibleResourcesInfo> ParseResourceStringList(
     return nullptr;
   }
 
+  CHECK(manifest_keys.web_accessible_resources.has_value());
   auto info = std::make_unique<WebAccessibleResourcesInfo>();
   URLPatternSet resource_set;
 
   for (std::string& web_accessible_resource :
-       manifest_keys.web_accessible_resources) {
+       *manifest_keys.web_accessible_resources) {
     resource_set.AddPattern(
         GetPattern(std::move(web_accessible_resource), extension));
   }
@@ -100,8 +100,10 @@ std::unique_ptr<WebAccessibleResourcesInfo> ParseEntryList(
     return nullptr;
   }
 
+  CHECK(manifest_keys.web_accessible_resources.has_value());
   size_t i = 0;
-  for (auto& web_accessible_resource : manifest_keys.web_accessible_resources) {
+  for (auto& web_accessible_resource :
+       *manifest_keys.web_accessible_resources) {
     bool use_dynamic_url_bool = web_accessible_resource.use_dynamic_url &&
                                 *web_accessible_resource.use_dynamic_url;
 
@@ -191,7 +193,7 @@ bool IsResourceWebAccessibleImpl(
   }
 
   GURL initiator_url = GetInitiatorUrl(initiator_origin);
-  std::string relative_path = target_url.path();
+  std::string relative_path = target_url.GetPath();
 
   // Look for the first match in the array of web accessible resources.
   for (const auto& entry : info->web_accessible_resources) {
@@ -210,12 +212,12 @@ bool IsResourceWebAccessibleImpl(
       // `upstream_url` or the `target_url` because the goal of this feature is
       // to ensure that the dynamic url was used for fetching the resource.
       if (entry.use_dynamic_url) {
-        bool is_guid_target_url = extension.guid() == target_url.host_piece();
+        bool is_guid_target_url = extension.guid() == target_url.host();
         if (upstream_url.is_empty()) {
           result = is_guid_target_url;
         } else {
-          result = extension.guid() == upstream_url.host_piece() ||
-                   is_guid_target_url;
+          result =
+              extension.guid() == upstream_url.host() || is_guid_target_url;
         }
         if (!result) {
           continue;
@@ -238,8 +240,8 @@ bool IsResourceWebAccessibleImpl(
       // extension, or if the initiator host matches an entry extension id.
       if (initiator_url.SchemeIs(extensions::kExtensionScheme) &&
           (entry.allow_all_extensions ||
-           extension.id() == initiator_url.host() ||
-           base::Contains(entry.extension_ids, initiator_url.host()))) {
+           extension.id() == initiator_url.GetHost() ||
+           entry.extension_ids.contains(initiator_url.GetHost()))) {
         return result;
       }
     }

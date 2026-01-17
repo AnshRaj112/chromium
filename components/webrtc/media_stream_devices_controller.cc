@@ -69,15 +69,8 @@ void MediaStreamDevicesController::RequestPermissions(
     return;
   }
 
-  if (rfh->GetLastCommittedOrigin().GetURL().is_empty()) {
-    std::move(callback).Run(
-        blink::mojom::StreamDevicesSet(),
-        blink::mojom::MediaStreamRequestResult::PERMISSION_DENIED, false, {},
-        {});
-    return;
-  }
-
-  if (rfh->GetLastCommittedOrigin().GetURL() != request.security_origin) {
+  const GURL url = rfh->GetLastCommittedOrigin().GetURL();
+  if (url.is_empty() || url != request.security_origin) {
     std::move(callback).Run(
         blink::mojom::StreamDevicesSet(),
         blink::mojom::MediaStreamRequestResult::INVALID_SECURITY_ORIGIN, false,
@@ -100,42 +93,42 @@ void MediaStreamDevicesController::RequestPermissions(
   std::vector<std::string> requested_video_capture_device_ids;
 
   if (controller->ShouldRequestAudio()) {
-    auto audo_descriptor = content::PermissionDescriptorUtil::
+    auto audio_descriptor = content::PermissionDescriptorUtil::
         CreatePermissionDescriptorForPermissionType(
             blink::PermissionType::AUDIO_CAPTURE);
-    content::PermissionResult permission_status =
+    content::PermissionResult permission_result =
         permission_controller->GetPermissionResultForCurrentDocument(
-            audo_descriptor, rfh);
-    if (permission_status.status == blink::mojom::PermissionStatus::DENIED) {
-      controller->denial_reason_ =
-          blink::mojom::MediaStreamRequestResult::PERMISSION_DENIED;
+            audio_descriptor, rfh);
+    if (permission_result.status == blink::mojom::PermissionStatus::DENIED) {
+      controller->denial_reason_ = blink::mojom::MediaStreamRequestResult::
+          PERMISSION_DENIED_BY_CONTROLLER;
       // If `rfh` is a fenced frame, it will have no permission policy as well.
       controller->RunCallback(
-          permission_status.source ==
+          permission_result.source ==
               content::PermissionStatusSource::FEATURE_POLICY ||
-          permission_status.source ==
+          permission_result.source ==
               content::PermissionStatusSource::FENCED_FRAME);
       return;
     }
 
-    permission_types.push_back(std::move(audo_descriptor));
+    permission_types.push_back(std::move(audio_descriptor));
     requested_audio_capture_device_ids = request.requested_audio_device_ids;
   }
   if (controller->ShouldRequestVideo()) {
     auto video_descriptor = content::PermissionDescriptorUtil::
         CreatePermissionDescriptorForPermissionType(
             blink::PermissionType::VIDEO_CAPTURE);
-    content::PermissionResult permission_status =
+    content::PermissionResult permission_result =
         permission_controller->GetPermissionResultForCurrentDocument(
             video_descriptor, rfh);
-    if (permission_status.status == blink::mojom::PermissionStatus::DENIED) {
-      controller->denial_reason_ =
-          blink::mojom::MediaStreamRequestResult::PERMISSION_DENIED;
+    if (permission_result.status == blink::mojom::PermissionStatus::DENIED) {
+      controller->denial_reason_ = blink::mojom::MediaStreamRequestResult::
+          PERMISSION_DENIED_BY_CONTROLLER;
       // If `rfh` is a fenced frame, it will have no permission policy as well.
       controller->RunCallback(
-          permission_status.source ==
+          permission_result.source ==
               content::PermissionStatusSource::FEATURE_POLICY ||
-          permission_status.source ==
+          permission_result.source ==
               content::PermissionStatusSource::FENCED_FRAME);
       return;
     }
@@ -154,12 +147,12 @@ void MediaStreamDevicesController::RequestPermissions(
       auto ptz_descriptor = content::PermissionDescriptorUtil::
           CreatePermissionDescriptorForPermissionType(
               blink::PermissionType::CAMERA_PAN_TILT_ZOOM);
-      permission_status =
+      permission_result =
           permission_controller->GetPermissionResultForCurrentDocument(
               ptz_descriptor, rfh);
-      if (permission_status.status == blink::mojom::PermissionStatus::DENIED) {
-        controller->denial_reason_ =
-            blink::mojom::MediaStreamRequestResult::PERMISSION_DENIED;
+      if (permission_result.status == blink::mojom::PermissionStatus::DENIED) {
+        controller->denial_reason_ = blink::mojom::MediaStreamRequestResult::
+            PERMISSION_DENIED_BY_CONTROLLER;
         controller->RunCallback(/*blocked_by_permissions_policy=*/false);
         return;
       }
@@ -372,10 +365,13 @@ ContentSetting MediaStreamDevicesController::GetContentSetting(
     return CONTENT_SETTING_BLOCK;
   }
 
-  if (!IsUserAcceptAllowed(permission)) {
-    *denial_reason = blink::mojom::MediaStreamRequestResult::PERMISSION_DENIED;
+#if BUILDFLAG(IS_ANDROID)
+  if (!IsUserAcceptAllowedOnAndroid(permission)) {
+    *denial_reason =
+        blink::mojom::MediaStreamRequestResult::ANDROID_CANT_REQUEST_PERMISSION;
     return CONTENT_SETTING_BLOCK;
   }
+#endif
 
   // Don't request if the kill switch is on.
   if (PermissionIsBlockedForReason(
@@ -387,9 +383,9 @@ ContentSetting MediaStreamDevicesController::GetContentSetting(
   return CONTENT_SETTING_ASK;
 }
 
-bool MediaStreamDevicesController::IsUserAcceptAllowed(
-    blink::PermissionType permission) const {
 #if BUILDFLAG(IS_ANDROID)
+bool MediaStreamDevicesController::IsUserAcceptAllowedOnAndroid(
+    blink::PermissionType permission) const {
   ui::WindowAndroid* window_android =
       web_contents_->GetNativeView()->GetWindowAndroid();
   if (!window_android)
@@ -422,10 +418,8 @@ bool MediaStreamDevicesController::IsUserAcceptAllowed(
   // TODO(qinmin): Add a test for this. http://crbug.com/396869.
   // TODO(raymes): Shouldn't this apply to all permissions not just audio/video?
   return web_contents_->GetRenderWidgetHostView()->IsShowing();
-#else
-  return true;
-#endif
 }
+#endif
 
 bool MediaStreamDevicesController::PermissionIsBlockedForReason(
     blink::PermissionType permission,
@@ -453,7 +447,7 @@ bool MediaStreamDevicesController::PermissionIsBlockedForReason(
 }
 
 void MediaStreamDevicesController::PromptAnsweredGroupedRequest(
-    const std::vector<blink::mojom::PermissionStatus>& permissions_status) {
+    const std::vector<content::PermissionResult>& permission_result) {
   if (content::RenderFrameHost::FromID(request_.render_process_id,
                                        request_.render_frame_id) == nullptr) {
     // The frame requesting media devices was removed while we were waiting for
@@ -463,8 +457,12 @@ void MediaStreamDevicesController::PromptAnsweredGroupedRequest(
 
   std::vector<ContentSetting> responses;
   std::ranges::transform(
-      permissions_status, back_inserter(responses),
-      permissions::PermissionUtil::PermissionStatusToContentSetting);
+      permission_result, back_inserter(responses),
+
+      [](content::PermissionResult result) {
+        return permissions::PermissionUtil::PermissionStatusToContentSetting(
+            result.status);
+      });
 
   bool need_audio = ShouldRequestAudio();
   bool need_video = ShouldRequestVideo();
@@ -491,8 +489,8 @@ void MediaStreamDevicesController::PromptAnsweredGroupedRequest(
 
   for (ContentSetting response : responses) {
     if (response == CONTENT_SETTING_BLOCK)
-      denial_reason_ =
-          blink::mojom::MediaStreamRequestResult::PERMISSION_DENIED;
+      denial_reason_ = blink::mojom::MediaStreamRequestResult::
+          PERMISSION_DENIED_BY_CONTROLLER;
     else if (response == CONTENT_SETTING_ASK)
       denial_reason_ =
           blink::mojom::MediaStreamRequestResult::PERMISSION_DISMISSED;

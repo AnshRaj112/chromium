@@ -10,7 +10,6 @@
 
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
-#include "base/memory/memory_pressure_listener.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/task/sequenced_task_runner.h"
@@ -73,7 +72,7 @@ class SharedStorageManager {
   SharedStorageManager(const SharedStorageManager&) = delete;
   SharedStorageManager& operator=(const SharedStorageManager&) = delete;
 
-  virtual ~SharedStorageManager();
+  ~SharedStorageManager();
 
   AsyncSharedStorageDatabase* database() { return database_.get(); }
 
@@ -94,11 +93,6 @@ class SharedStorageManager {
   base::WeakPtr<SharedStorageManager> GetWeakPtr() {
     return weak_ptr_factory_.GetWeakPtr();
   }
-
-  // Called when the system is under memory pressure.
-  void OnMemoryPressure(
-      base::OnceCallback<void()> callback,
-      base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level);
 
   // Tallies database errors, watching for consecutive ones. If the threshold
   // `max_allowed_consecutive_operation_errors_` is exceeded, then the database
@@ -363,9 +357,6 @@ class SharedStorageManager {
 
   // Counts operation errors due to SQL database errors.
   int operation_sql_error_count_ = 0;
-
-  // Listens for the system being under memory pressure.
-  std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
 
   // Callback to be run at the end of `OnDatabaseDestroyed()`.
   base::OnceCallback<void(bool)> on_db_destroyed_callback_for_testing_;

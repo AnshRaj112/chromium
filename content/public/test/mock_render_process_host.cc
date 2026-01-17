@@ -9,7 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/lazy_instance.h"
@@ -193,6 +192,12 @@ bool MockRenderProcessHost::GetIntersectsViewport() {
   return true;
 }
 
+#if !BUILDFLAG(IS_ANDROID)
+bool MockRenderProcessHost::IsForInitialWebUI() const {
+  return false;
+}
+#endif  // !BUILDFLAG(IS_ANDROID)
+
 bool MockRenderProcessHost::IsForGuestsOnly() {
   return is_for_guests_only_;
 }
@@ -266,8 +271,6 @@ bool MockRenderProcessHost::FastShutdownStarted() {
 }
 
 const base::Process& MockRenderProcessHost::GetProcess() {
-  // Return the current-process handle for the IPC::GetPlatformFileForTransit
-  // function.
   if (process.IsValid())
     return process;
 
@@ -277,11 +280,6 @@ const base::Process& MockRenderProcessHost::GetProcess() {
 
 bool MockRenderProcessHost::IsReady() {
   return is_ready_;
-}
-
-bool MockRenderProcessHost::Send(IPC::Message* msg) {
-  delete msg;
-  return true;
 }
 
 ChildProcessId MockRenderProcessHost::GetID() const {
@@ -322,6 +320,10 @@ void MockRenderProcessHost::Cleanup() {
     return;
   }
   delayed_cleanup_ = false;
+
+  if (pending_reuse_ref_count_ > 0) {
+    return;
+  }
 
   if (listeners_.IsEmpty() && !deletion_callback_called_ &&
       !pending_view_count_) {
@@ -375,9 +377,14 @@ bool MockRenderProcessHost::HasPriorityOverride() {
 void MockRenderProcessHost::ClearPriorityOverride() {}
 #endif  // !BUILDFLAG(IS_ANDROID)
 
-void MockRenderProcessHost::SetHasSpareRendererPriority(bool) {}
-
 #if BUILDFLAG(IS_ANDROID)
+void MockRenderProcessHost::GraduateSpareToNormalRendererPriority() {}
+
+bool MockRenderProcessHost::
+    ShouldThrottleNavigationForSpareRendererGraduation() {
+  return false;
+}
+
 ChildProcessImportance MockRenderProcessHost::GetEffectiveImportance() {
   NOTIMPLEMENTED();
   return ChildProcessImportance::NORMAL;
@@ -393,10 +400,6 @@ void MockRenderProcessHost::DumpProcessStack() {}
 #endif
 
 void MockRenderProcessHost::SetSuddenTerminationAllowed(bool allowed) {}
-
-bool MockRenderProcessHost::SuddenTerminationAllowed() {
-  return true;
-}
 
 BrowserContext* MockRenderProcessHost::GetBrowserContext() {
   return browser_context_;
@@ -556,15 +559,15 @@ bool MockRenderProcessHost::HostHasNotBeenUsed() {
 }
 
 bool MockRenderProcessHost::IsSpare() const {
-  return base::Contains(SpareRenderProcessHostManagerImpl::Get().GetSpares(),
-                        this);
+  return std::ranges::contains(
+      SpareRenderProcessHostManagerImpl::Get().GetSpares(), this);
 }
 
 void MockRenderProcessHost::SetProcessLock(
     const IsolationContext& isolation_context,
     const ProcessLock& process_lock) {
   ChildProcessSecurityPolicyImpl::GetInstance()->LockProcess(
-      isolation_context, GetDeprecatedID(), !IsUnused(), process_lock);
+      isolation_context, GetID(), !IsUnused(), process_lock);
   if (process_lock.IsASiteOrOrigin())
     is_renderer_locked_to_site_ = true;
 }
@@ -575,7 +578,7 @@ ProcessLock MockRenderProcessHost::GetProcessLock() const {
 }
 
 bool MockRenderProcessHost::IsProcessLockedToSiteForTesting() {
-  return GetProcessLock().is_locked_to_site();
+  return GetProcessLock().IsLockedToSite();
 }
 
 void MockRenderProcessHost::BindCacheStorage(
@@ -643,13 +646,6 @@ MockRenderProcessHost::StartRtpDump(bool incoming,
   return base::NullCallback();
 }
 
-bool MockRenderProcessHost::OnMessageReceived(const IPC::Message& msg) {
-  IPC::Listener* listener = listeners_.Lookup(msg.routing_id());
-  if (listener)
-    return listener->OnMessageReceived(msg);
-  return false;
-}
-
 void MockRenderProcessHost::OnChannelConnected(int32_t peer_pid) {}
 
 void MockRenderProcessHost::OverrideBinderForTesting(
@@ -671,13 +667,7 @@ MockRenderProcessHostFactory::~MockRenderProcessHostFactory() = default;
 RenderProcessHost* MockRenderProcessHostFactory::CreateRenderProcessHost(
     BrowserContext* browser_context,
     SiteInstance* site_instance) {
-  const bool is_for_guests_only = site_instance && site_instance->IsGuest();
-  StoragePartitionConfig storage_partition_config =
-      GetOrCreateStoragePartitionConfig(browser_context, site_instance);
-  std::unique_ptr<MockRenderProcessHost> host =
-      std::make_unique<MockRenderProcessHost>(
-          browser_context, storage_partition_config, is_for_guests_only);
-  processes_.push_back(std::move(host));
+  processes_.push_back(BuildRenderProcessHost(browser_context, site_instance));
   return processes_.back().get();
 }
 
@@ -688,6 +678,30 @@ void MockRenderProcessHostFactory::Remove(MockRenderProcessHost* host) const {
       break;
     }
   }
+}
+
+std::unique_ptr<MockRenderProcessHost>
+MockRenderProcessHostFactory::BuildRenderProcessHost(
+    BrowserContext* browser_context,
+    SiteInstance* site_instance) {
+  const bool is_for_guests_only = site_instance && site_instance->IsGuest();
+  StoragePartitionConfig storage_partition_config =
+      GetOrCreateStoragePartitionConfig(browser_context, site_instance);
+  return std::make_unique<MockRenderProcessHost>(
+      browser_context, storage_partition_config, is_for_guests_only);
+}
+
+base::ScopedClosureRunner MockRenderProcessHost::DelayProcessShutdown(
+    const base::TimeDelta& subframe_shutdown_timeout,
+    const base::TimeDelta& unload_handler_timeout,
+    const SiteInfo& site_info) {
+  return base::ScopedClosureRunner();
+}
+
+void MockRenderProcessHost::StopTrackingProcessForShutdownDelay() {}
+
+bool MockRenderProcessHost::IsOnlyHostingPrerenderedFramesOrEmpty() {
+  return false;
 }
 
 }  // namespace content

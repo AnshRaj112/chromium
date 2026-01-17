@@ -4,6 +4,9 @@
 
 package org.chromium.chrome.browser.gesturenav;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeHistoryUrl;
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
+
 import android.graphics.Bitmap;
 import android.view.KeyEvent;
 import android.widget.ListView;
@@ -38,7 +41,6 @@ import org.chromium.chrome.test.transit.ChromeTransitTestRules;
 import org.chromium.chrome.test.transit.FreshCtaTransitTestRule;
 import org.chromium.chrome.test.transit.page.WebPageStation;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
-import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.content_public.browser.NavigationController;
 import org.chromium.content_public.browser.NavigationEntry;
 import org.chromium.content_public.browser.NavigationHistory;
@@ -128,7 +130,7 @@ public class NavigationSheetTest {
             mHistory.addEntry(
                     new TestNavigationEntry(
                             NAVIGATION_INDEX_3,
-                            new GURL(UrlConstants.NTP_URL),
+                            new GURL(getOriginalNativeNtpUrl()),
                             GURL.emptyGURL(),
                             GURL.emptyGURL(),
                             null,
@@ -166,7 +168,7 @@ public class NavigationSheetTest {
                 history.addEntry(
                         new NavigationEntry(
                                 FULL_HISTORY_ENTRY_INDEX,
-                                new GURL(UrlConstants.HISTORY_URL),
+                                new GURL(getOriginalNativeHistoryUrl()),
                                 GURL.emptyGURL(),
                                 GURL.emptyGURL(),
                                 mActivityTestRule
@@ -333,7 +335,7 @@ public class NavigationSheetTest {
         CriteriaHelper.pollUiThread(
                 () -> {
                     boolean doesNewTabItemPresent = false;
-                    boolean doesShowFullHisotryItemPresent = false;
+                    boolean doesShowFullHistoryItemPresent = false;
                     for (int i = 0; i < controller.mHistory.getEntryCount(); i++) {
                         ListItem item = (ListItem) listview.getAdapter().getItem(i);
                         String label = item.model.get(ItemProperties.LABEL);
@@ -350,11 +352,11 @@ public class NavigationSheetTest {
                         if (label.equals(regularNtpText)) {
                             doesNewTabItemPresent = true;
                         } else if (label.equals(fullHistoryText)) {
-                            doesShowFullHisotryItemPresent = true;
+                            doesShowFullHistoryItemPresent = true;
                         }
                     }
                     Assert.assertTrue(doesNewTabItemPresent);
-                    Assert.assertTrue(doesShowFullHisotryItemPresent);
+                    Assert.assertTrue(doesShowFullHistoryItemPresent);
                 });
     }
 

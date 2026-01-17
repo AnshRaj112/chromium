@@ -6,7 +6,6 @@
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/notreached.h"
 #include "base/task/task_traits.h"
@@ -38,9 +37,16 @@ EarlyPrefsExportService::EarlyPrefsExportService(const base::FilePath& root_dir,
   // we can restart session with correct flags before loading
   // profile.
   StoreAndTrackPref(flags_ui::prefs::kAboutFlagsEntries);
+
   // Some policies need to be enforced early in the login flow
   // to limit lifetime of authenticated authsession.
   StoreAndTrackPref(ash::prefs::kRecoveryFactorBehavior);
+
+  // Used for determining the complexity of local auth factors.
+  StoreAndTrackPref(ash::prefs::kLocalAuthFactorsComplexity);
+
+  // Used for determining which local auth factors have been enabled.
+  StoreAndTrackPref(prefs::kLocalAuthFactors);
 }
 
 EarlyPrefsExportService::~EarlyPrefsExportService() = default;

@@ -8,7 +8,6 @@
 #include <optional>
 #include <set>
 
-#include "base/functional/callback_forward.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/time/time.h"
 #include "net/base/connection_endpoint_metadata.h"
@@ -81,7 +80,8 @@ class SessionRequester {
         QuicSessionKey(destination_.host(), destination_.port(), privacy_mode_,
                        proxy_chain_, session_usage_, socket_tag_,
                        network_anonymization_key_, secure_dns_policy_,
-                       require_dns_https_alpn_));
+                       require_dns_https_alpn_,
+                       disable_cert_verification_network_fetches_));
     request_ = manager_->CreateRequest(key);
     int rv = request_->RequestSession(
         endpoint_, cert_verify_flags_, dns_resolution_start_time_,
@@ -156,6 +156,7 @@ class SessionRequester {
   NetworkAnonymizationKey network_anonymization_key_;
   SecureDnsPolicy secure_dns_policy_ = SecureDnsPolicy::kAllow;
   bool require_dns_https_alpn_ = false;
+  bool disable_cert_verification_network_fetches_ = false;
 
   // For calling RequestSession().
   QuicEndpoint endpoint_{quic_version_,
@@ -419,7 +420,7 @@ TEST_P(QuicSessionAttemptManagerTest, JobCompletesWhenAllRequestsCancelled) {
   InitializeWithDefaultProofVerifyDetails();
 
   MockQuicData socket_data(version_);
-  socket_data.AddConnect(ASYNC, ERR_IO_PENDING);
+  socket_data.AddConnect(SYNCHRONOUS, ERR_IO_PENDING);
   socket_data.AddSocketDataToFactory(socket_factory_.get());
 
   // Create multiple pending requests.
@@ -506,7 +507,7 @@ TEST_P(QuicSessionAttemptManagerTest, OnOriginFrame) {
 
   // 1. Make a request for `kDefaultServerHostName` that will be pending.
   MockQuicData socket_data1(version_);
-  socket_data1.AddConnect(ASYNC, ERR_IO_PENDING);
+  socket_data1.AddConnect(SYNCHRONOUS, ERR_IO_PENDING);
   socket_data1.AddSocketDataToFactory(socket_factory_.get());
 
   SessionRequester requester1 = CreateRequester();

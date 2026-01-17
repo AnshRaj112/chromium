@@ -281,7 +281,7 @@ int TransportConnectJob::DoResolveHostComplete(int result) {
 
   if (result != OK) {
     // If hostname resolution failed, record an empty endpoint and the result.
-    connection_attempts_.push_back(ConnectionAttempt(IPEndPoint(), result));
+    connection_attempts_.emplace_back(IPEndPoint(), result);
     return result;
   }
 
@@ -344,26 +344,8 @@ int TransportConnectJob::DoResolveHostCallbackComplete() {
     return ERR_NAME_NOT_RESOLVED;
   }
 
-  Error result = OK;
-  // If DNS aliases are resolved, have the delegate process the aliases to
-  // determine if further action is needed.
-  // Only invoke `HandleDnsAliasesResolved` if aliases contains at least one
-  // element that is not the destination hostname.
-  const std::string& endpoint_hostname =
-      std::holds_alternative<url::SchemeHostPort>(params_->destination())
-          ? std::get<url::SchemeHostPort>(params_->destination()).host()
-          : std::get<HostPortPair>(params_->destination()).host();
-  if (dns_aliases_.size() > 1 ||
-      (dns_aliases_.size() == 1 && !dns_aliases_.contains(endpoint_hostname))) {
-    result = HandleDnsAliasesResolved(dns_aliases_);
-    CHECK_NE(result, ERR_IO_PENDING);
-  }
-
-  if (result == OK) {
-    next_state_ = STATE_TRANSPORT_CONNECT;
-  }
-
-  return result;
+  next_state_ = STATE_TRANSPORT_CONNECT;
+  return OK;
 }
 
 int TransportConnectJob::DoTransportConnect() {

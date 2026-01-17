@@ -23,6 +23,7 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/button/image_button_factory.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/layout/fill_layout.h"
 
@@ -63,9 +64,10 @@ class DismissButton : public views::ImageButton {
 
     SetTooltipText(
         l10n_util::GetStringUTF16(IDS_ASH_LOCK_SCREEN_MEDIA_CONTROLS_CLOSE));
-    views::SetImageFromVectorIconWithColorId(
-        this, vector_icons::kCloseRoundedIcon, foreground_color_id,
-        foreground_disabled_color_id, kDismissButtonIconSize);
+    views::SetImageFromVectorIconWithColor(
+        this, vector_icons::kCloseRoundedIcon,
+        {foreground_color_id, foreground_disabled_color_id},
+        kDismissButtonIconSize);
   }
 };
 

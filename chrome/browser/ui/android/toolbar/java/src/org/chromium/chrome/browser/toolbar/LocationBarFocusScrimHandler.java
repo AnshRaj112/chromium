@@ -8,8 +8,11 @@ import android.content.Context;
 import android.view.View;
 
 import org.chromium.base.Callback;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.NonNullObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
+import org.chromium.chrome.browser.browser_controls.BottomControlsStacker;
+import org.chromium.chrome.browser.browser_controls.BottomControlsStacker.LayerType;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.omnibox.LocationBarDataProvider;
 import org.chromium.chrome.browser.omnibox.UrlFocusChangeListener;
 import org.chromium.components.browser_ui.widget.scrim.ScrimManager;
@@ -33,10 +36,10 @@ public class LocationBarFocusScrimHandler implements UrlFocusChangeListener {
     private final int mLightScrimColor;
 
     private final LocationBarDataProvider mLocationBarDataProvider;
-    private final Runnable mClickDelegate;
     private final Context mContext;
-    private final ObservableSupplier<Integer> mTabStripHeightSupplier;
+    private final NonNullObservableSupplier<Integer> mTabStripHeightSupplier;
     private final Callback<Integer> mTabStripHeightChangeCallback;
+    private final BottomControlsStacker mBottomControlsStacker;
 
     /**
      * @param scrimManager Coordinator responsible for showing and hiding the scrim view.
@@ -55,20 +58,21 @@ public class LocationBarFocusScrimHandler implements UrlFocusChangeListener {
             LocationBarDataProvider locationBarDataProvider,
             Runnable clickDelegate,
             View scrimTarget,
-            ObservableSupplier<Integer> tabStripHeightSupplier) {
+            NonNullObservableSupplier<Integer> tabStripHeightSupplier,
+            BottomControlsStacker bottomControlsStacker) {
         mScrimManager = scrimManager;
         mLocationBarDataProvider = locationBarDataProvider;
-        mClickDelegate = clickDelegate;
+        mBottomControlsStacker = bottomControlsStacker;
         mContext = context;
 
-        int topMargin = tabStripHeightSupplier.get() == null ? 0 : tabStripHeightSupplier.get();
+        int topMargin = tabStripHeightSupplier.get();
         mLightScrimColor = context.getColor(R.color.omnibox_focused_fading_background_color_light);
         mScrimModel =
                 new PropertyModel.Builder(ScrimProperties.ALL_KEYS)
                         .with(ScrimProperties.ANCHOR_VIEW, scrimTarget)
                         .with(ScrimProperties.SHOW_IN_FRONT_OF_ANCHOR_VIEW, true)
                         .with(ScrimProperties.TOP_MARGIN, topMargin)
-                        .with(ScrimProperties.CLICK_DELEGATE, mClickDelegate)
+                        .with(ScrimProperties.CLICK_DELEGATE, clickDelegate)
                         .with(ScrimProperties.VISIBILITY_CALLBACK, visibilityChangeCallback)
                         .build();
 
@@ -80,6 +84,13 @@ public class LocationBarFocusScrimHandler implements UrlFocusChangeListener {
 
     @Override
     public void onUrlFocusChange(boolean hasFocus) {
+        if (ChromeFeatureList.sOmniboxAutofocusOnIncognitoNtp.isEnabled()
+                && mLocationBarDataProvider
+                        .getNewTabPageDelegate()
+                        .isIncognitoNewTabPageCurrentlyVisible()) {
+            return;
+        }
+
         boolean isTablet = DeviceFormFactor.isNonMultiDisplayContextOnTablet(mContext);
         boolean useLightColor =
                 !isTablet
@@ -88,6 +99,9 @@ public class LocationBarFocusScrimHandler implements UrlFocusChangeListener {
         mScrimModel.set(
                 ScrimProperties.BACKGROUND_COLOR,
                 useLightColor ? mLightScrimColor : ScrimProperties.INVALID_COLOR);
+        mScrimModel.set(
+                ScrimProperties.BOTTOM_MARGIN,
+                mBottomControlsStacker.getHeightFromLayerToBottom(LayerType.BOTTOM_CHIN));
 
         if (hasFocus && !showScrimAfterAnimationCompletes()) {
             mScrimManager.showScrim(mScrimModel);

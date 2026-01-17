@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
+#include "chrome/browser/extensions/api/gcm/extension_gcm_app_handler.h"
 #include "chrome/browser/extensions/api/gcm/gcm_api.h"
 #include "chrome/browser/extensions/extension_apitest.h"
-#include "chrome/browser/extensions/extension_gcm_app_handler.h"
 #include "chrome/browser/gcm/gcm_profile_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/chrome_switches.h"
@@ -15,7 +16,10 @@
 #include "components/sync/base/command_line_switches.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/test/result_catcher.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 using extensions::ResultCatcher;
 
@@ -106,8 +110,8 @@ const Extension* GcmApiTest::LoadTestExtension(
   if (extension) {
     const GURL extension_url = extension->GetResourceURL(page_name);
     EXPECT_TRUE(extension_url.is_valid());
-    EXPECT_TRUE(NavigateToURL(extension_url));
-    EXPECT_TRUE(content::WaitForLoadStop(GetActiveWebContents()));
+    auto* web_contents = GetActiveWebContents();
+    EXPECT_TRUE(NavigateToURL(web_contents, extension_url));
   }
   return extension;
 }
@@ -125,8 +129,8 @@ IN_PROC_BROWSER_TEST_F(GcmApiTest, Register) {
 
   const std::vector<std::string>& sender_ids =
       service()->last_registered_sender_ids();
-  EXPECT_TRUE(base::Contains(sender_ids, "Sender1"));
-  EXPECT_TRUE(base::Contains(sender_ids, "Sender2"));
+  EXPECT_TRUE(std::ranges::contains(sender_ids, "Sender1"));
+  EXPECT_TRUE(std::ranges::contains(sender_ids, "Sender2"));
 }
 
 IN_PROC_BROWSER_TEST_F(GcmApiTest, Unregister) {

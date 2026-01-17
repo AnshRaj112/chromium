@@ -11,7 +11,6 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_array.h"
 #include "base/android/jni_string.h"
-#include "base/containers/contains.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/metrics/histogram_macros.h"
@@ -23,7 +22,7 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "components/omnibox/browser/jni_headers/AutocompleteResult_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 using base::android::ToJavaBooleanArray;
 using base::android::ToJavaByteArray;
@@ -149,9 +148,9 @@ ScopedJavaLocalRef<jobjectArray> AutocompleteResult::BuildJavaMatches(
 
 bool AutocompleteResult::VerifyCoherency(
     JNIEnv* env,
-    const JavaParamRef<jlongArray>& j_matches_array,
-    jint match_index,
-    jint verification_point) {
+    const JavaRef<jlongArray>& j_matches_array,
+    int32_t match_index,
+    int32_t verification_point) {
   DCHECK(j_matches_array);
 
   std::vector<jlong> j_matches;
@@ -209,3 +208,5 @@ bool AutocompleteResult::VerifyCoherency(
                             MatchVerificationResult::COUNT);
   return true;
 }
+
+DEFINE_JNI(AutocompleteResult)

@@ -12,3 +12,18 @@ features:
 - name: has-slotted
   files:
   - parse-has-slotted.tentative.html
+- name: not
+  files:
+  - parse-not.html
+- name: shadow-parts
+  files:
+  - parse-part.html
+- name: heading-selectors
+  files:
+  - parse-heading.html
+- name: is
+  files:
+  - parse-is.html
+- name: where
+  files:
+  - parse-where.html

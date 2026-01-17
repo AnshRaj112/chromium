@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 #include "third_party/blink/renderer/core/paint/timing/paint_timing_detector.h"
 
+#include "base/check_deref.h"
 #include "base/metrics/histogram_functions.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
@@ -29,7 +30,9 @@
 #include "third_party/blink/renderer/core/style/style_fetched_image.h"
 #include "third_party/blink/renderer/core/svg/graphics/svg_image.h"
 #include "third_party/blink/renderer/core/timing/dom_window_performance.h"
+#include "third_party/blink/renderer/core/timing/navigation_id_generator.h"
 #include "third_party/blink/renderer/core/timing/soft_navigation_heuristics.h"
+#include "third_party/blink/renderer/core/timing/window_performance.h"
 #include "third_party/blink/renderer/platform/graphics/bitmap_image.h"
 #include "third_party/blink/renderer/platform/graphics/graphics_context.h"
 #include "third_party/blink/renderer/platform/graphics/image.h"
@@ -128,6 +131,23 @@ void ReportImagePixelInaccuracy(HTMLImageElement* image_element) {
   }
 }
 
+const char* ScrollTypeToString(mojom::blink::ScrollType scroll_type) {
+  switch (scroll_type) {
+    case mojom::blink::ScrollType::kUser:
+      return "user";
+    case mojom::blink::ScrollType::kProgrammatic:
+      return "programmatic";
+    case mojom::blink::ScrollType::kClamping:
+      return "clamping";
+    case mojom::blink::ScrollType::kCompositor:
+      return "compositor";
+    case mojom::blink::ScrollType::kAnchoring:
+      return "anchoring";
+    case mojom::blink::ScrollType::kScrollStart:
+      return "scrollstart";
+  }
+}
+
 }  // namespace
 
 PaintTimingDetector::PaintTimingDetector(LocalFrameView* frame_view)
@@ -137,22 +157,21 @@ PaintTimingDetector::PaintTimingDetector(LocalFrameView* frame_view)
       image_paint_timing_detector_(
           MakeGarbageCollected<ImagePaintTimingDetector>(frame_view)) {
   if (PaintTimingVisualizer::IsTracingEnabled()) {
-    visualizer_.emplace();
+    visualizer_ = std::make_unique<PaintTimingVisualizer>();
   }
 }
 
 void PaintTimingDetector::NotifyPaintFinished() {
   if (PaintTimingVisualizer::IsTracingEnabled()) {
     if (!visualizer_) {
-      visualizer_.emplace();
+      visualizer_ = std::make_unique<PaintTimingVisualizer>();
     }
     visualizer_->RecordMainFrameViewport(*frame_view_);
   } else {
     visualizer_.reset();
   }
 
-  LocalDOMWindow* window = frame_view_->GetFrame().DomWindow();
-  if (window) {
+  if (LocalDOMWindow* window = DomWindow()) {
     DOMWindowPerformance::performance(*window)->OnPaintFinished();
 
     if (auto* heuristics = window->GetSoftNavigationHeuristics()) {
@@ -281,7 +300,7 @@ void PaintTimingDetector::NotifyImageRemoved(
 }
 
 void PaintTimingDetector::OnInputOrScroll() {
-  if (LocalDOMWindow* window = frame_view_->GetFrame().DomWindow()) {
+  if (LocalDOMWindow* window = DomWindow()) {
     if (auto* heuristics = window->GetSoftNavigationHeuristics()) {
       heuristics->OnInputOrScroll();
     }
@@ -320,6 +339,10 @@ void PaintTimingDetector::NotifyInputEvent(WebInputEvent::Type type) {
 }
 
 void PaintTimingDetector::NotifyScroll(mojom::blink::ScrollType scroll_type) {
+  // TODO(crbug.com/330709851): Remove once we're sure scroll restoration is
+  // handled properly for soft navs.
+  TRACE_EVENT("loading", "PaintTimingDetector::NotifyScroll", "type",
+              ScrollTypeToString(scroll_type));
   if (scroll_type != mojom::blink::ScrollType::kUser &&
       scroll_type != mojom::blink::ScrollType::kCompositor) {
     return;
@@ -337,18 +360,18 @@ PaintTimingDetector::GetLargestContentfulPaintCalculator() {
     return largest_contentful_paint_calculator_.Get();
   }
 
-  auto* dom_window = frame_view_->GetFrame().DomWindow();
+  auto* dom_window = DomWindow();
   if (!dom_window) {
     return nullptr;
   }
 
   largest_contentful_paint_calculator_ =
       MakeGarbageCollected<LargestContentfulPaintCalculator>(
-          DOMWindowPerformance::performance(*dom_window));
+          DOMWindowPerformance::performance(*dom_window), this);
   return largest_contentful_paint_calculator_.Get();
 }
 
-void PaintTimingDetector::UpdateMetricsLcp() {
+void PaintTimingDetector::OnLcpMetricsForReportingChanged() {
   // The DidChangePerformanceTiming method which triggers the reporting of
   // metrics LCP would not be called when we are not recording metrics LCP.
   if (!first_input_or_scroll_notified_timestamp_.is_null()) {
@@ -427,40 +450,33 @@ void PaintTimingDetector::UpdateLcpCandidate() {
   if (!lcp_calculator) {
     return;
   }
-
   CHECK_EQ(first_input_or_scroll_notified_timestamp_.is_null(),
            image_paint_timing_detector_->IsRecordingLargestImagePaint());
   CHECK_EQ(first_input_or_scroll_notified_timestamp_.is_null(),
            text_paint_timing_detector_->IsRecordingLargestTextPaint());
-
-  // * nullptr means there is no new candidate update, which could be caused by
-  // user input or no content show up on the page.
-  // * Record.paint_time == 0 means there is an image but the image is still
-  // loading. The perf API should wait until the paint-time is available.
-  std::pair<TextRecord*, bool> text_update_result =
-      text_paint_timing_detector_->UpdateMetricsCandidate();
-  std::pair<ImageRecord*, bool> image_update_result =
-      image_paint_timing_detector_->UpdateMetricsCandidate();
-
-  if (image_update_result.second || text_update_result.second) {
-    UpdateMetricsLcp();
-  }
-
-  lcp_calculator->UpdateWebExposedLargestContentfulPaintIfNeeded(
-      text_update_result.first, image_update_result.first,
-      /*is_triggered_by_soft_navigation=*/false);
+  lcp_calculator->MaybeFlushCandidates();
 }
 
 void PaintTimingDetector::ReportIgnoredContent() {
   text_paint_timing_detector_->ReportLargestIgnoredText();
-  if (image_paint_timing_detector_->IsRecordingLargestImagePaint()) {
-    image_paint_timing_detector_->ReportLargestIgnoredImage();
-  }
+  image_paint_timing_detector_->ReportLargestIgnoredImage();
 }
 
 const LargestContentfulPaintDetails&
 PaintTimingDetector::LatestLcpDetailsForTest() {
   return GetLargestContentfulPaintCalculator()->LatestLcpDetails();
+}
+
+void PaintTimingDetector::EmitLcpPerformanceEntry(
+    const DOMPaintTimingInfo& paint_timing_info,
+    uint64_t paint_size,
+    base::TimeTicks load_time,
+    const AtomicString& id,
+    const String& url,
+    Element* element) {
+  DOMWindowPerformance::performance(CHECK_DEREF(DomWindow()))
+      ->OnLargestContentfulPaintUpdated(paint_timing_info, paint_size,
+                                        load_time, id, url, element);
 }
 
 ScopedPaintTimingDetectorBlockPaintHook*
@@ -520,6 +536,10 @@ void PaintTimingDetector::Trace(Visitor* visitor) const {
   visitor->Trace(image_paint_timing_detector_);
   visitor->Trace(frame_view_);
   visitor->Trace(largest_contentful_paint_calculator_);
+}
+
+LocalDOMWindow* PaintTimingDetector::DomWindow() const {
+  return frame_view_->GetFrame().DomWindow();
 }
 
 }  // namespace blink

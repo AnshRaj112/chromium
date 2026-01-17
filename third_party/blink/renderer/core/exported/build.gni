@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 blink_core_sources_exported = [
+  "web_agent_cluster_key.cc",
   "web_array_buffer.cc",
   "web_array_buffer_converter.cc",
   "web_blob.cc",
@@ -33,6 +34,7 @@ blink_core_sources_exported = [
   "web_input_element.cc",
   "web_input_method_controller_impl.cc",
   "web_input_method_controller_impl.h",
+  "web_interaction_effects_monitor.cc",
   "web_isolated_world_info.cc",
   "web_label_element.cc",
   "web_language_detection_details.cc",
@@ -94,5 +96,6 @@ blink_core_tests_exported = [
   "web_scoped_window_focus_allowed_indicator_test.cc",
   "web_searchable_form_data_test.cc",
   "web_selector_test.cc",
+  "web_view_impl_test.cc",
   "web_view_test.cc",
 ]

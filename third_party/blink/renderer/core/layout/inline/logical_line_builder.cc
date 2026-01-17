@@ -25,6 +25,72 @@
 
 namespace blink {
 
+namespace {
+
+bool CanUseItemForNeedsPaint(const InlineItem& item) {
+  switch (item.Type()) {
+    case InlineItem::kBlockInInline:
+    case InlineItem::kCloseTag:
+    case InlineItem::kFloating:
+    case InlineItem::kOutOfFlowPositioned:
+    case InlineItem::kListMarker:
+    case InlineItem::kBidiControl:
+    case InlineItem::kOpenRubyColumn:
+    case InlineItem::kCloseRubyColumn:
+    case InlineItem::kRubyLinePlaceholder:
+      return false;
+
+    case InlineItem::kControl:
+    case InlineItem::kText:
+      if (!item.Length()) {
+        return false;
+      }
+      break;
+
+    case InlineItem::kAtomicInline:
+    case InlineItem::kOpenTag:
+    case InlineItem::kInitialLetterBox:
+      break;
+  }
+  return item.TextType() == TextItemType::kNormal && item.GetLayoutObject();
+}
+
+const LayoutObject& LayoutObjectForLineClampEllipsis(
+    const InlineNode& node,
+    const InlineItemResults& line_items,
+    const InlineItemTextIndex& line_start) {
+  for (const auto& item_result : base::Reversed(line_items)) {
+    const auto& item = *item_result.item;
+    if (!CanUseItemForNeedsPaint(item)) {
+      continue;
+    }
+    if ((item.Type() == InlineItem::kText ||
+         item.Type() == InlineItem::kControl) &&
+        !item_result.Length()) {
+      continue;
+    }
+    return *item.GetLayoutObject();
+  }
+
+  // If we haven't found any useful layout object in the line's previous
+  // results (for example, because the ellipsis displaced this entire line),
+  // we try to find layout objects in previous lines. This is needed so, if
+  // the height of previous lines change, the ellipsis gets repainted.
+  auto items_prefix =
+      base::span<const Member<InlineItem>>(node.ItemsData(false).items)
+          .first(line_start.item_index);
+  for (const auto& item : base::Reversed(items_prefix)) {
+    if (CanUseItemForNeedsPaint(*item)) {
+      return *item->GetLayoutObject();
+    }
+  }
+
+  // If we weren't able to find anything, we fallback to the inline root.
+  return *node.GetLayoutBlockFlow();
+}
+
+}  // namespace
+
 LogicalLineBuilder::LogicalLineBuilder(InlineNode node,
                                        const ConstraintSpace& constraint_space,
                                        const InlineBreakToken* break_token,
@@ -88,8 +154,11 @@ void LogicalLineBuilder::CreateLine(LineInfo* line_info,
       const ShapeResultView* shape_result_view =
           ShapeResultView::Create(ellipsis_data->shape_result);
       FontHeight text_metrics = ellipsis_data->text_metrics;
+      const LayoutObject& corresponding_layout_object =
+          LayoutObjectForLineClampEllipsis(node_, *line_items,
+                                           line_info->Start());
 
-      line_box->AddChild(*node_.GetLayoutBlockFlow(),
+      line_box->AddChild(corresponding_layout_object,
                          StyleVariant::kStandardEllipsis, shape_result_view,
                          ellipsis_data->text,
                          LogicalRect(LayoutUnit(), -text_metrics.ascent,
@@ -515,7 +584,8 @@ InlineBoxState* LogicalLineBuilder::PlaceRubyColumn(
     }
   }
   std::pair<LayoutUnit, LayoutUnit> base_insets =
-      ApplyRubyAlign(line_available_size.value_or(item_result.inline_size),
+      ApplyRubyAlign(line_available_size.value_or(item_result.inline_size -
+                                                  item_result.spacing_before),
                      on_start_edge, on_end_edge, ruby_column.base_line);
 
   // Set up LogicalRubyColumns. This should be done before consuming the base
@@ -558,6 +628,7 @@ InlineBoxState* LogicalLineBuilder::PlaceRubyColumn(
     }
     if (i == 0) {
       logical_column.base_insets = base_insets;
+      logical_column.base_insets.first += item_result.spacing_before;
     }
     logical_column.size = column_base_size;
     PlaceRubyAnnotation(item_result, line_available_size, i,
@@ -576,7 +647,8 @@ void LogicalLineBuilder::PlaceRubyAnnotation(
   std::pair<LayoutUnit, LayoutUnit> insets =
       ApplyRubyAlign(line_available_size.value_or(
                          item_result.inline_size -
-                         item_result.ruby_column->last_base_glyph_spacing),
+                         item_result.ruby_column->last_base_glyph_spacing -
+                         item_result.spacing_before),
                      /* on_start_edge */ false,
                      /* on_end_edge */ false, annotation_line);
 
@@ -600,7 +672,8 @@ void LogicalLineBuilder::PlaceRubyAnnotation(
                              base::span(*line_items));
 
   logical_column.state_stack.ComputeInlinePositions(
-      line_items, LayoutUnit(), /* ignore_box_margin_border_padding */ false);
+      line_items, item_result.spacing_before,
+      /* ignore_box_margin_border_padding */ false);
 
   logical_column.annotation_items = line_items;
 }

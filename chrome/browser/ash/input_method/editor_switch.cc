@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-
 #include "chrome/browser/ash/input_method/editor_switch.h"
+
+#include <utility>
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
@@ -41,7 +42,7 @@
 namespace ash::input_method {
 namespace {
 
-const char* kWorkspaceDomainsWithPathDenylist[][2] = {
+constexpr const char* kWorkspaceDomainsWithPathDenylist[][2] = {
     {"calendar.google", ""}, {"docs.google", ""},      {"drive.google", ""},
     {"keep.google", ""},     {"mail.google", "/chat"}, {"mail.google", "/mail"},
     {"meet.google", ""},     {"script.google", ""},    {"sites.google", ""},
@@ -198,6 +199,7 @@ bool IsAppAllowed(std::string_view app_id) {
           extension_misc::kGoogleSlidesDemoAppId,
           ash::kGmailAppId,
           ash::kGoogleChatAppId,
+          ash::kOldGoogleChatAppId,
           ash::kGoogleMeetAppId,
           ash::kGoogleDocsAppId,
           ash::kGoogleSlidesAppId,
@@ -220,7 +222,8 @@ std::vector<std::string> GetAllowedInputMethodEngines() {
 
   // Loads allowed imes from field trials
   if (auto parsed = base::JSONReader::Read(
-          base::GetFieldTrialParamValue(kExperimentName, kImeAllowlistLabel));
+          base::GetFieldTrialParamValue(kExperimentName, kImeAllowlistLabel),
+          base::JSON_PARSE_CHROMIUM_EXTENSIONS);
       parsed.has_value() && parsed->is_list()) {
     for (const auto& item : parsed->GetList()) {
       if (item.is_string()) {
@@ -309,8 +312,8 @@ bool EditorSwitch::IsFeedbackEnabled() const {
 
   // If managed, check the enablement value.
   return profile_->GetPrefs()->GetInteger(prefs::kHmwManagedSettings) ==
-         base::to_underlying(chromeos::editor_menu::EditorEnterprisePolicy::
-                                 kAllowedWithModelImprovement);
+         std::to_underlying(chromeos::editor_menu::EditorEnterprisePolicy::
+                                kAllowedWithModelImprovement);
 }
 
 bool EditorSwitch::CanShowNoticeBanner() const {
@@ -440,7 +443,7 @@ bool EditorSwitch::CanBeTriggered() const {
          !net::NetworkChangeNotifier::IsOffline() &&
          !context_->InTabletMode() &&
          profile_->GetPrefs()->GetInteger(prefs::kHmwManagedSettings) !=
-             base::to_underlying(
+             std::to_underlying(
                  chromeos::editor_menu::EditorEnterprisePolicy::kDisallowed) &&
          // user pref value
          profile_->GetPrefs()->GetBoolean(prefs::kOrcaEnabled) &&

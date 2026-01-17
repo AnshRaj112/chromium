@@ -28,8 +28,6 @@
   return self;
 }
 
-#pragma mark - TabToGridTransitionAnimation
-
 - (void)animateWithCompletion:(ProceduralBlock)completion {
   UIView* animatedView = _animationParameters.animatedView;
   CGRect destinationFrame = _animationParameters.destinationFrame;
@@ -39,8 +37,11 @@
   UIView* topToolbarSnapshotView = _animationParameters.topToolbarSnapshotView;
   UIView* bottomToolbarSnapshotView =
       _animationParameters.bottomToolbarSnapshotView;
-  BOOL isIncognito = _animationParameters.isIncognito;
+  BOOL isIncognito = _animationParameters.incognito;
   UIView* activeGridView = _animationParameters.activeGrid.view;
+  UIView* pinnedTabsView = _animationParameters.pinnedTabs.view;
+  BOOL isActiveCellPinned = _animationParameters.activeCellPinned;
+  BOOL isTopToolbarHidden = _animationParameters.topToolbarHidden;
 
   // Ratio of destination frame width over the current frame width.
   CGFloat destinationOverCurrentFrameRatio =
@@ -66,13 +67,6 @@
   CGRect imageViewOriginFrame = CGRectMake(
       0, topToolbarHeight, originFrame.size.width, contentSnapshot.size.height);
   contentImageView.frame = imageViewOriginFrame;
-
-  // Create the content snapshot's destination frame.
-  CGFloat destinationFrameAspectRatio =
-      destinationFrame.size.width / destinationFrame.size.height;
-  CGRect imageViewDestinationFrame =
-      CGRectMake(0, topToolbarHeight, originFrame.size.width,
-                 originFrame.size.width / destinationFrameAspectRatio);
 
   // Needed so that the contentImageView's innerImageView frame is not
   // CGRectZero when the animation starts.
@@ -108,9 +102,10 @@
   CABasicAnimation* animation = [CABasicAnimation animationWithKeyPath:@"path"];
   animation.fromValue = (id)(noCropPath.CGPath);
   animation.toValue = (id)(croppedToolbarPath.CGPath);
-  animation.duration = kTabToGridAnimationDuration * 0.7;
-  animation.timingFunction =
-      [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseIn];
+  animation.duration =
+      kTabToGridAnimationDuration * (isActiveCellPinned ? 0.6 : 0.7);
+  animation.timingFunction = [CAMediaTimingFunction
+      functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
   [animatedView.layer.mask addAnimation:animation forKey:@"maskAnimation"];
 
   // Active tab grid blur animation setup.
@@ -121,16 +116,22 @@
                            belowSubview:animatedView];
   AddSameConstraints(activeGridBlurView.superview, activeGridBlurView);
 
+  [animatedView.superview setNeedsLayout];
+  [animatedView.superview layoutIfNeeded];
+
   // Active grid zoom animation setup.
   [activeGridView setNeedsLayout];
   [activeGridView layoutIfNeeded];
 
   // Find the center of the destination frame in the grid view's coordinate
   // system. This is needed because of the grid view's scroll view.
-  SetActiveGridAnchorPointToFrameCenter(activeGridView, destinationFrame);
+  SetAnchorPointToFrameCenter(activeGridView, destinationFrame);
+  SetAnchorPointToFrameCenter(pinnedTabsView, destinationFrame);
 
   // Scale the grid view before the animation.
   activeGridView.transform = CGAffineTransformMakeScale(kTabGridAnimationScale,
+                                                        kTabGridAnimationScale);
+  pinnedTabsView.transform = CGAffineTransformMakeScale(kTabGridAnimationScale,
                                                         kTabGridAnimationScale);
 
   // The main tab grid transition animation.
@@ -138,12 +139,7 @@
     // Animate the removal of the blur and zooming of the grid view.
     activeGridBlurView.effect = nil;
     activeGridView.transform = CGAffineTransformIdentity;
-
-    // Needed so that the contentImageView's innerImageView frame is
-    // animated.
-    contentImageView.frame = imageViewDestinationFrame;
-    [contentImageView setNeedsLayout];
-    [contentImageView layoutIfNeeded];
+    pinnedTabsView.transform = CGAffineTransformIdentity;
 
     // Scale animated view to destination frame.
     animatedView.transform = CGAffineTransformMakeScale(
@@ -164,6 +160,11 @@
     activeGridView.layer.anchorPoint = CGPointMake(0.5, 0.5);
     activeGridView.frame = oldAnimationFrame;
 
+    // Reset the pinned tabs view.
+    CGRect oldPinnedTabsFrame = pinnedTabsView.frame;
+    pinnedTabsView.layer.anchorPoint = CGPointMake(0.5, 0.5);
+    pinnedTabsView.frame = oldPinnedTabsFrame;
+
     // Cleanup.
     animatedView.transform = CGAffineTransformIdentity;
     animatedView.layer.mask = nil;
@@ -179,8 +180,18 @@
 
   // Toolbars animation.
   void (^toolbarsAnimation)() = ^{
-    topToolbarSnapshotView.alpha = 0;
+    if (!isTopToolbarHidden) {
+      // If the top toolbar is hidden, the snapshot should not be fade out as
+      // the toolbar background behind it should not appear.
+      topToolbarSnapshotView.alpha = 0;
+    }
     bottomToolbarSnapshotView.alpha = 0;
+  };
+
+  // Fade out the animated view towards the end of the animation, only
+  // applicable to a pinned tab.
+  void (^fadeOutPinnedTabCellAnimation)() = ^{
+    animatedView.alpha = 0;
   };
 
   // Animate the toolbars with a relative duration.
@@ -190,6 +201,16 @@
                                 kTabToGridToolbarsAnimationRelativeStartTime
                                   animations:toolbarsAnimation];
   };
+
+  if (isActiveCellPinned) {
+    [UIView animateWithDuration:kTabToGridAnimationDuration / 2
+                          delay:kTabToGridAnimationDuration / 2
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:fadeOutPinnedTabCellAnimation
+                     completion:^(BOOL) {
+                       animatedView.alpha = 1.0;
+                     }];
+  }
 
   // Perform the toolbars animation.
   [UIView animateKeyframesWithDuration:kTabToGridAnimationDuration

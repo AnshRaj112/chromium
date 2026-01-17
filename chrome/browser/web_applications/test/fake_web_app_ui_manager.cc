@@ -7,7 +7,6 @@
 #include <optional>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
@@ -208,6 +207,7 @@ void FakeWebAppUiManager::TriggerInstallDialogForBackgroundInstall(
     std::unique_ptr<webapps::MlInstallOperationTracker> tracker,
     const GURL& install_url,
     const std::optional<GURL>& manifest_id,
+    const GURL& last_committed_url,
     InstallCallback callback) {
   NOTIMPLEMENTED();
 }

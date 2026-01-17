@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "ui/shell_dialogs/select_file_dialog_win.h"
 
 #include <stddef.h>
@@ -225,10 +220,8 @@ TEST_F(SelectFileDialogWinTest, CancelAllDialogs) {
           ui::SelectFileDialog::SELECT_OPEN_MULTI_FILE, kSelectFileDefaultTitle,
       }};
 
-  for (size_t i = 0; i < std::size(kTestCases); ++i) {
-    SCOPED_TRACE(base::StringPrintf("i=%zu", i));
-
-    const auto& test_case = kTestCases[i];
+  for (size_t i = 0; const auto& test_case : kTestCases) {
+    SCOPED_TRACE(base::StringPrintf("i=%zu", i++));
 
     scoped_refptr<ui::SelectFileDialog> dialog =
         ui::SelectFileDialog::Create(this, nullptr);

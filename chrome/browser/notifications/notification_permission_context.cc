@@ -4,6 +4,8 @@
 
 #include "chrome/browser/notifications/notification_permission_context.h"
 
+#include <variant>
+
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
@@ -19,16 +21,18 @@
 #include "components/content_settings/core/common/content_settings_pattern.h"
 #include "components/content_settings/core/common/content_settings_types.h"
 #include "components/permissions/permission_decision.h"
+#include "components/permissions/permission_prompt_decision.h"
 #include "components/permissions/permission_request_id.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/permission_descriptor_util.h"
 #include "content/public/browser/permission_request_description.h"
+#include "content/public/browser/permission_result.h"
 #include "services/network/public/mojom/permissions_policy/permissions_policy_feature.mojom.h"
 #include "third_party/blink/public/common/permissions/permission_utils.h"
 #include "url/gurl.h"
 
 #if BUILDFLAG(IS_ANDROID)
-#include "base/android/build_info.h"
+#include "base/android/android_info.h"
 #include "chrome/browser/android/flags/chrome_cached_flags.h"
 #include "chrome/browser/android/shortcut_helper.h"
 #include "chrome/browser/flags/android/chrome_feature_list.h"
@@ -70,7 +74,13 @@ NotificationPermissionContext::NotificationPermissionContext(
     : ContentSettingPermissionContextBase(
           browser_context,
           ContentSettingsType::NOTIFICATIONS,
-          network::mojom::PermissionsPolicyFeature::kNotFound) {}
+          network::mojom::PermissionsPolicyFeature::kNotFound) {
+#if BUILDFLAG(IS_ANDROID)
+  if (Profile::FromBrowserContext(browser_context)->AsTestingProfile()) {
+    enabled_app_level_notification_permission_for_testing_ = true;
+  }
+#endif  // BUILDFLAG(IS_ANDROID)
+}
 
 NotificationPermissionContext::~NotificationPermissionContext() = default;
 
@@ -111,7 +121,7 @@ ContentSetting NotificationPermissionContext::GetPermissionStatusForExtension(
       extensions::ExtensionRegistry::Get(
           Profile::FromBrowserContext(browser_context()))
           ->enabled_extensions()
-          .GetByID(origin.host());
+          .GetByID(origin.GetHost());
 
   if (!extension || !extension->permissions_data()->HasAPIPermission(
                         extensions::mojom::APIPermissionID::kNotifications)) {
@@ -144,7 +154,9 @@ void NotificationPermissionContext::DecidePermission(
   // around the restriction by posting a message to their Service Worker, where
   // showing a notification is allowed.
   if (request_data->requesting_origin != request_data->embedding_origin) {
-    std::move(callback).Run(blink::mojom::PermissionStatus::DENIED);
+    std::move(callback).Run(content::PermissionResult(
+        blink::mojom::PermissionStatus::DENIED,
+        content::PermissionStatusSource::UNSPECIFIED));
     return;
   }
 
@@ -176,8 +188,11 @@ void NotificationPermissionContext::DecidePermission(
                   if (context) {
                     context->NotifyPermissionSet(
                         *request_data, std::move(callback),
-                        /*persist=*/true, PermissionDecision::kDeny,
-                        /*is_final_decision=*/true);
+                        /*persist=*/true,
+                        permissions::PermissionPromptDecision{
+                            .overall_decision = PermissionDecision::kDeny,
+                            .prompt_options = std::monostate(),
+                            .is_final = true});
                   }
                 },
                 weak_factory_ui_thread_.GetWeakPtr(), std::move(request_data),
@@ -193,8 +208,8 @@ void NotificationPermissionContext::DecidePermission(
       ShortcutHelper::DoesOriginContainAnyInstalledTrustedWebActivity(
           request_data->requesting_origin);
   bool contains_installed_webapp = contains_twa || contains_webapk;
-  if (base::android::BuildInfo::GetInstance()->sdk_int() >=
-          base::android::SDK_VERSION_T &&
+  if (base::android::android_info::sdk_int() >=
+          base::android::android_info::SDK_VERSION_T &&
       contains_installed_webapp) {
     // WebAPKs match URLs using a scope URL which may contain a path. An origin
     // has no path and would not fall within such a scope. So to find a matching
@@ -223,12 +238,11 @@ void NotificationPermissionContext::DecidePermission(
 }
 
 void NotificationPermissionContext::UpdateTabContext(
-    const permissions::PermissionRequestID& id,
-    const GURL& requesting_frame,
+    const permissions::PermissionRequestData& request_data,
     bool allowed) {
   auto* content_settings =
       content_settings::PageSpecificContentSettings::GetForFrame(
-          id.global_render_frame_host_id());
+          request_data.id.global_render_frame_host_id());
   if (!content_settings) {
     return;
   }

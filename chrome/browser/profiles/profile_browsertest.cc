@@ -6,11 +6,13 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <memory>
+#include <optional>
+#include <string>
 
 #include "base/check.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
@@ -18,6 +20,7 @@
 #include "base/json/json_reader.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
 #include "base/path_service.h"
@@ -45,7 +48,7 @@
 #include "chrome/browser/profiles/profile_observer.h"
 #include "chrome/browser/profiles/profile_test_util.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/browser_list.h"
+#include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/test/test_browser_closed_waiter.h"
 #include "chrome/common/chrome_constants.h"
@@ -70,6 +73,7 @@
 #include "net/base/load_flags.h"
 #include "net/base/net_errors.h"
 #include "net/dns/mock_host_resolver.h"
+#include "net/http/http_response_headers.h"
 #include "net/net_buildflags.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/url_request/url_request_failed_job.h"
@@ -127,7 +131,7 @@ class SimpleURLLoaderHelper {
     loader_ = network::SimpleURLLoader::Create(std::move(request),
                                                TRAFFIC_ANNOTATION_FOR_TESTS);
 
-    loader_->DownloadToStringOfUnboundedSizeUntilCrashAndDie(
+    loader_->DownloadHeadersOnly(
         factory, base::BindOnce(&SimpleURLLoaderHelper::OnSimpleLoaderComplete,
                                 base::Unretained(this)));
   }
@@ -135,7 +139,7 @@ class SimpleURLLoaderHelper {
   SimpleURLLoaderHelper(const SimpleURLLoaderHelper&) = delete;
   SimpleURLLoaderHelper& operator=(const SimpleURLLoaderHelper&) = delete;
 
-  void OnSimpleLoaderComplete(std::unique_ptr<std::string> response_body) {
+  void OnSimpleLoaderComplete(scoped_refptr<net::HttpResponseHeaders> headers) {
     EXPECT_EQ(expected_error_code_, loader_->NetError());
     is_complete_ = true;
     run_loop_.Quit();
@@ -400,7 +404,9 @@ IN_PROC_BROWSER_TEST_F(ProfileBrowserTest, MAYBE_CreateNewProfileAsynchronous) {
 
 // TODO(crbug.com/40812649): Flaky on ChromeOS-Ash.
 // TODO(crbug.com/40771709): Flaky on Mac.
-#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
+// TODO(crbug.com/456184496): Flaky on Linux MSan.
+#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) || \
+    (BUILDFLAG(IS_LINUX) && defined(MEMORY_SANITIZER))
 #define MAYBE_CreateOldProfileAsynchronous DISABLED_CreateOldProfileAsynchronous
 #else
 #define MAYBE_CreateOldProfileAsynchronous CreateOldProfileAsynchronous
@@ -478,7 +484,8 @@ std::string GetExitTypePreferenceFromDisk(Profile* profile) {
   if (!base::ReadFileToString(prefs_path, &prefs))
     return std::string();
 
-  std::optional<base::Value> value = base::JSONReader::Read(prefs);
+  std::optional<base::Value> value =
+      base::JSONReader::Read(prefs, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!value)
     return std::string();
 
@@ -854,8 +861,10 @@ IN_PROC_BROWSER_TEST_F(ProfileBrowserTest, DestroyOnOTRProfileAmongMany) {
 class ProfileBrowserTestWithDestroyProfile : public ProfileBrowserTest {
  public:
   ProfileBrowserTestWithDestroyProfile() {
+    // Pin the browser process to ensure it remains alive after all Browsers are
+    // destroyed for testing.
     keep_alive_ = std::make_unique<ScopedKeepAlive>(
-        KeepAliveOrigin::BROWSER, KeepAliveRestartOption::DISABLED);
+        KeepAliveOrigin::PROFILE_MANAGER, KeepAliveRestartOption::DISABLED);
 
     scoped_feature_list_.InitAndEnableFeature(
         features::kDestroyProfileOnBrowserClose);
@@ -926,9 +935,9 @@ IN_PROC_BROWSER_TEST_F(ProfileBrowserTest, TestGetAllOffTheRecordProfiles) {
       regular_profile->GetAllOffTheRecordProfiles();
 
   EXPECT_EQ(3u, all_otrs.size());
-  EXPECT_TRUE(base::Contains(all_otrs, otr_profile1));
-  EXPECT_TRUE(base::Contains(all_otrs, otr_profile2));
-  EXPECT_TRUE(base::Contains(all_otrs, incognito_profile));
+  EXPECT_TRUE(std::ranges::contains(all_otrs, otr_profile1));
+  EXPECT_TRUE(std::ranges::contains(all_otrs, otr_profile2));
+  EXPECT_TRUE(std::ranges::contains(all_otrs, incognito_profile));
 }
 
 // Tests Profile::IsSameOrParent
@@ -986,10 +995,6 @@ IN_PROC_BROWSER_TEST_F(ProfileBrowserTest, TestProfileTypes) {
 
   EXPECT_EQ(profile_metrics::BrowserProfileType::kGuest,
             profile_metrics::GetBrowserProfileType(guest_browser->profile()));
-
-  // Verify that both a parent and a child profile creation are recorded
-  EXPECT_THAT(tester.GetAllSamples("Profile.Guest.TypeCreated"),
-              ::testing::ElementsAre(base::Bucket(0, 1), base::Bucket(1, 1)));
 #endif
 }
 
@@ -1000,7 +1005,7 @@ IN_PROC_BROWSER_TEST_F(ProfileBrowserTest, UnderOneMinute) {
   Browser* browser = CreateGuestBrowser();
   TestBrowserClosedWaiter close_waiter(browser);
 
-  BrowserList::CloseAllBrowsersWithProfile(browser->profile());
+  chrome::CloseAllBrowsersWithProfile(browser->profile());
   ASSERT_TRUE(close_waiter.WaitUntilClosed());
   tester.ExpectUniqueSample("Profile.Guest.OTR.Lifetime", 0, 1);
 }
@@ -1012,7 +1017,7 @@ IN_PROC_BROWSER_TEST_F(ProfileBrowserTest, OneHour) {
 
   browser->profile()->SetCreationTimeForTesting(base::Time::Now() -
                                                 base::Seconds(60) * 60);
-  BrowserList::CloseAllBrowsersWithProfile(browser->profile());
+  chrome::CloseAllBrowsersWithProfile(browser->profile());
   ASSERT_TRUE(close_waiter.WaitUntilClosed());
   tester.ExpectUniqueSample("Profile.Guest.OTR.Lifetime", 60, 1);
 }

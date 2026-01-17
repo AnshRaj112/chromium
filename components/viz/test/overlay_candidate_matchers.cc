@@ -44,12 +44,6 @@ void PrintTo(const OverlayCandidate& candidate, std::ostream* os) {
 
 namespace test {
 
-bool PlaneZOrderAscendingComparator::operator()(
-    const OverlayCandidate& a,
-    const OverlayCandidate& b) const {
-  return a.plane_z_order < b.plane_z_order;
-}
-
 testing::Matcher<const OverlayCandidate&> IsRenderPassOverlay(
     AggregatedRenderPassId id) {
   return testing::AllOf(
@@ -101,7 +95,7 @@ testing::Matcher<const OverlayCandidate&> OverlayIsFullScreen() {
 
 MATCHER_P(ApproximatelyEquals, expected, "") {
   constexpr float threshold = 0.001f;
-  return expected.ApproximatelyEqual(expected, threshold, threshold);
+  return arg.ApproximatelyEqual(expected, threshold, threshold);
 }
 
 testing::Matcher<const OverlayCandidate&> OverlayTargetRectIs(
@@ -109,6 +103,13 @@ testing::Matcher<const OverlayCandidate&> OverlayTargetRectIs(
   return testing::ResultOf("display rect in target space",
                            &OverlayCandidate::DisplayRectInTargetSpace,
                            ApproximatelyEquals(expected));
+}
+
+size_t NumOverlaysExcludingPrimaryPlane(
+    const OverlayCandidateList& candidate_list) {
+  return std::ranges::count_if(candidate_list, [](const auto& overlay) {
+    return !overlay.is_root_render_pass;
+  });
 }
 
 }  // namespace test

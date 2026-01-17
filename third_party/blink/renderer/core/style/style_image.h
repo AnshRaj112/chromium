@@ -59,7 +59,6 @@ class CORE_EXPORT StyleImage : public GarbageCollected<StyleImage> {
   virtual ~StyleImage() = default;
 
   bool operator==(const StyleImage& other) const { return IsEqual(other); }
-  bool operator!=(const StyleImage& other) const { return !(*this == other); }
 
   // Returns a CSSValue representing the origin <image> value. May not be the
   // actual CSSValue from which this StyleImage was originally created if the
@@ -89,7 +88,7 @@ class CORE_EXPORT StyleImage : public GarbageCollected<StyleImage> {
 
   // Is the <image> considered same-origin? `failing_url` is set to the
   // (potentially formatted) URL of the first non-same-origin <image>.
-  virtual bool IsAccessAllowed(WTF::String& failing_url) const = 0;
+  virtual bool IsAccessAllowed(String& failing_url) const = 0;
 
   // Determine the natural dimensions (width, height, aspect ratio) of this
   // <image>, scaled by `multiplier`.
@@ -182,13 +181,7 @@ class CORE_EXPORT StyleImage : public GarbageCollected<StyleImage> {
   ALWAYS_INLINE bool IsPaintImage() const { return is_paint_image_; }
   ALWAYS_INLINE bool IsCrossfadeImage() const { return is_crossfade_; }
 
-  bool IsLazyloadPossiblyDeferred() const {
-    return is_lazyload_possibly_deferred_;
-  }
-
   virtual bool IsLoadedAfterMouseover() const { return false; }
-
-  virtual bool IsFromOriginCleanStyleSheet() const { return true; }
 
   virtual void Trace(Visitor* visitor) const {}
 
@@ -200,8 +193,7 @@ class CORE_EXPORT StyleImage : public GarbageCollected<StyleImage> {
         is_image_resource_set_(false),
         is_crossfade_(false),
         is_mask_source_(false),
-        is_paint_image_(false),
-        is_lazyload_possibly_deferred_(false) {}
+        is_paint_image_(false) {}
   bool is_image_resource_ : 1;
   bool is_pending_image_ : 1;
   bool is_generated_image_ : 1;
@@ -209,7 +201,6 @@ class CORE_EXPORT StyleImage : public GarbageCollected<StyleImage> {
   bool is_crossfade_ : 1;
   bool is_mask_source_ : 1;
   bool is_paint_image_ : 1;
-  bool is_lazyload_possibly_deferred_ : 1;
 
   virtual bool IsEqual(const StyleImage&) const = 0;
 

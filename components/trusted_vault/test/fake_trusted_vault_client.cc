@@ -4,13 +4,13 @@
 
 #include "components/trusted_vault/test/fake_trusted_vault_client.h"
 
+#include <algorithm>
 #include <list>
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/location.h"
@@ -43,14 +43,16 @@ void FakeTrustedVaultClient::FakeServer::StoreKeysOnServer(
 
 void FakeTrustedVaultClient::FakeServer::MimicKeyRetrievalByUser(
     const GaiaId& gaia_id,
-    TrustedVaultClient* client) {
+    FakeTrustedVaultClient* client,
+    std::optional<trusted_vault::TrustedVaultUserActionTriggerForUMA> trigger) {
   DCHECK(client);
   DCHECK_NE(0U, gaia_id_to_keys_.count(gaia_id))
       << "StoreKeysOnServer() should have been called for " << gaia_id;
 
   client->StoreKeys(gaia_id, gaia_id_to_keys_[gaia_id],
                     /*last_key_version=*/
-                    static_cast<int>(gaia_id_to_keys_[gaia_id].size()) - 1);
+                    static_cast<int>(gaia_id_to_keys_[gaia_id].size()) - 1,
+                    trigger);
 }
 
 std::vector<std::vector<uint8_t>>
@@ -63,7 +65,7 @@ FakeTrustedVaultClient::FakeServer::RequestRotatedKeysFromServer(
   }
 
   const std::vector<std::vector<uint8_t>>& latest_keys = it->second;
-  if (!base::Contains(latest_keys, key_known_by_client)) {
+  if (!std::ranges::contains(latest_keys, key_known_by_client)) {
     // |key_known_by_client| is invalid or too old: cannot be used to follow
     // key rotation.
     return {};
@@ -181,12 +183,13 @@ void FakeTrustedVaultClient::FetchKeys(
 void FakeTrustedVaultClient::StoreKeys(
     const GaiaId& gaia_id,
     const std::vector<std::vector<uint8_t>>& keys,
-    int last_key_version) {
+    int last_key_version,
+    std::optional<trusted_vault::TrustedVaultUserActionTriggerForUMA> trigger) {
   CachedKeysPerUser& cached_keys = gaia_id_to_cached_keys_[gaia_id];
   cached_keys.keys = keys;
   cached_keys.marked_as_stale = false;
   for (Observer& observer : observer_list_) {
-    observer.OnTrustedVaultKeysChanged();
+    observer.OnTrustedVaultKeysChanged(trigger);
   }
 }
 

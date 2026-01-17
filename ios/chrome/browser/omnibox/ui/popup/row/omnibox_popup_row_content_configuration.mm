@@ -33,8 +33,6 @@ const NSInteger kWrappingSuggestNumberOfLines = 2;
 }  // namespace
 
 NSString* const OmniboxPopupRowCellReuseIdentifier = @"OmniboxPopupRowCell";
-NSString* const OmniboxPopupAIModeRowCellReuseIdentifier =
-    @"OmniboxPopupAIModeRowCell";
 const CGFloat kOmniboxPopupCellMinimumHeight = 58;
 
 /// Redefines "Content View interface" as readwrite.
@@ -115,12 +113,6 @@ const CGFloat kOmniboxPopupCellMinimumHeight = 58;
     self.trailingIconType = TrailingIconType::kOpenExistingTab;
     trailingButtonActionName =
         l10n_util::GetNSString(IDS_IOS_OMNIBOX_POPUP_SWITCH_TO_OPEN_TAB);
-  } else if (_suggestion.isSearchWithAim &&
-             base::FeatureList::IsEnabled(
-                 omnibox::kOmniboxAimShortcutTypedState)) {
-    self.trailingIconType = TrailingIconType::kSearchWithAim;
-    trailingButtonActionName =
-        l10n_util::GetNSString(IDS_IOS_OMNIBOX_POPUP_SEARCH_WITH_AIM);
   } else if (_suggestion.isAppendable) {
     self.trailingIconType = TrailingIconType::kRefineQuery;
     trailingButtonActionName =
@@ -150,6 +142,8 @@ const CGFloat kOmniboxPopupCellMinimumHeight = 58;
   configuration.semanticContentAttribute = self.semanticContentAttribute;
   configuration.faviconRetriever = self.faviconRetriever;
   configuration.imageRetriever = self.imageRetriever;
+  configuration.refineQueryArrowDirectionDown =
+      self.refineQueryArrowDirectionDown;
 
   // Setting `suggestion` already sets some properties in "Content View
   // interface". Update the properties that can change with
@@ -161,6 +155,7 @@ const CGFloat kOmniboxPopupCellMinimumHeight = 58;
   configuration.directionalLayoutMargin = self.directionalLayoutMargin;
   configuration.isPopoutOmnibox = self.isPopoutOmnibox;
   configuration.trailingIconType = self.trailingIconType;
+  configuration.presentationContext = _presentationContext;
   return configuration;
 }
 

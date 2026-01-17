@@ -21,6 +21,10 @@ ci.defaults.set(
     builder_group = "chromium.chromiumos",
     builder_config_settings = builder_config.ci_settings(
         retry_failed_shards = True,
+        # TODO(crbug.com/451296512): VM has become unstable after kernel update,
+        # leading to frequent invalid shards. Retry them while the VM image is
+        # improved.
+        retry_invalid_shards = True,
     ),
     pool = ci_constants.DEFAULT_POOL,
     cores = 8,
@@ -29,6 +33,9 @@ ci.defaults.set(
     tree_closing = True,
     tree_closing_notifiers = ci_constants.DEFAULT_TREE_CLOSING_NOTIFIERS,
     execution_timeout = ci_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     health_spec = health_spec.modified_default({
         "Unhealthy": struct(
             build_time = struct(
@@ -80,7 +87,6 @@ ci.builder(
                 "amd64-generic",
             ],
         ),
-        build_gs_bucket = "chromium-chromiumos-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -130,7 +136,6 @@ ci.builder(
                 "amd64-generic",
             ],
         ),
-        build_gs_bucket = "chromium-chromiumos-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -189,7 +194,6 @@ ci.builder(
                 "amd64-generic",
             ],
         ),
-        build_gs_bucket = "chromium-chromiumos-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -246,7 +250,6 @@ ci.builder(
             ],
             cros_boards_with_qemu_images = "amd64-generic-vm",
         ),
-        build_gs_bucket = "chromium-chromiumos-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -298,7 +301,6 @@ ci.thin_tester(
             ],
             cros_boards_with_qemu_images = "amd64-generic-vm",
         ),
-        build_gs_bucket = "chromium-chromiumos-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -308,6 +310,7 @@ ci.thin_tester(
         ],
         mixins = [
             "chromeos-generic-vm",
+            "retry_only_failed_tests",
         ],
     ),
     targets_settings = targets.settings(
@@ -351,7 +354,6 @@ ci.thin_tester(
             ],
             cros_boards_with_qemu_images = "amd64-generic-vm",
         ),
-        build_gs_bucket = "chromium-chromiumos-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -406,7 +408,6 @@ ci.builder(
                 "arm-generic",
             ],
         ),
-        build_gs_bucket = "chromium-chromiumos-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -709,7 +710,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.CHROMEOS,
         ),
-        build_gs_bucket = "chromium-chromiumos-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -730,9 +730,14 @@ ci.builder(
             "linux-jammy",
         ],
         per_test_modifications = {
+            "angle_unittests": targets.mixin(
+                args = [
+                    "--gtest_filter=-TestSuiteTest.RunFlakyTests:TestSuiteTest.RunMockTests",
+                ],
+            ),
             "browser_tests": targets.mixin(
                 swarming = targets.swarming(
-                    shards = 140,
+                    shards = 160,
                 ),
             ),
             "content_browsertests": targets.mixin(
@@ -742,7 +747,7 @@ ci.builder(
             ),
             "interactive_ui_tests": targets.mixin(
                 swarming = targets.swarming(
-                    shards = 12,
+                    shards = 24,
                 ),
             ),
             "net_unittests": targets.mixin(
@@ -805,7 +810,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.CHROMEOS,
         ),
-        build_gs_bucket = "chromium-chromiumos-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -830,8 +834,14 @@ ci.builder(
             "x86-64",
             "isolate_profile_data",
             "linux-jammy",
+            "retry_only_failed_tests",
         ],
         per_test_modifications = {
+            "absl_hardening_tests": targets.mixin(
+                args = [
+                    "--fail-fast",
+                ],
+            ),
             "angle_unittests": targets.mixin(
                 # crbug.com/41493162: angle_unittests has a high failure rate.
                 # Re-enable cq when the issue is fixed.
@@ -916,7 +926,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.CHROMEOS,
         ),
-        build_gs_bucket = "chromium-chromiumos-archive",
     ),
     gn_args = gn_args.config(
         configs = [

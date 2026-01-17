@@ -65,14 +65,16 @@ void FieldClassificationModelExecutorPerfTest::RunTestInternal(
       /*model_inference_timeout=*/std::nullopt,
       optimization_guide::proto::
           OPTIMIZATION_TARGET_AUTOFILL_FIELD_CLASSIFICATION,
-      runner, base::SequencedTaskRunner::GetCurrentDefault());
+      /*model_loading_task_runner=*/runner,
+      /*execution_task_runner=*/runner,
+      base::SequencedTaskRunner::GetCurrentDefault());
   runner->PostTask(
     FROM_HERE,
     base::BindOnce(&ModelExecutor::UpdateModelFile,
                     executor->GetWeakPtrForExecutionThread(), model_path));
   {
     base::ElapsedTimer inference_timer;
-    for (size_t i = 0; i < num_inferences; i++) {
+    for (size_t i = 0; i < num_inferences; ++i) {
       // Execute the test in exactly the same way as model_executor_unittest.
       FieldClassificationModelEncoder::ModelInput input = {{
                                                                TokenId(14),

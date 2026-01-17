@@ -77,6 +77,7 @@
 #import "ios/web/public/js_messaging/web_frame.h"
 #import "ios/web/public/navigation/navigation_context.h"
 #import "ios/web/public/web_state.h"
+#import "ios/web/public/web_state_id.h"
 #import "services/network/public/cpp/shared_url_loader_factory.h"
 #import "ui/base/device_form_factor.h"
 #import "ui/base/l10n/l10n_util_mac.h"
@@ -335,7 +336,7 @@ constexpr int kNotifyAutoSigninDuration = 3;  // seconds
           URLLoaderFactory:_webState->GetBrowserState()
                                ->GetSharedURLLoaderFactory()];
   if (![_delegate displaySignInNotification:self.notifyAutoSigninViewController
-                                  fromTabId:_webState->GetStableIdentifier()]) {
+                                  fromTabId:_webState->GetUniqueIdentifier()]) {
     // The notification was not shown. Store the password form in
     // `_pendingAutoSigninPasswordForm` to show the notification later.
     _pendingAutoSigninPasswordForm = std::move(formSignedIn);
@@ -462,7 +463,7 @@ constexpr int kNotifyAutoSigninDuration = 3;  // seconds
       auto delegate = std::make_unique<IOSChromeSavePasswordInfoBarDelegate>(
           accountToStorePassword,
           /*password_update=*/false, accountStorageUserState, std::move(form),
-          self.dispatcher);
+          self.dispatcher, self.ukmSourceId);
       std::unique_ptr<InfoBarIOS> infobar = std::make_unique<InfoBarIOS>(
           InfobarType::kInfobarTypePasswordSave, std::move(delegate),
           /*skip_banner=*/manual);
@@ -483,7 +484,7 @@ constexpr int kNotifyAutoSigninDuration = 3;  // seconds
               ? accountToStorePassword
               : std::nullopt,
           /*password_update=*/true, accountStorageUserState, std::move(form),
-          self.dispatcher);
+          self.dispatcher, self.ukmSourceId);
       std::unique_ptr<InfoBarIOS> infobar = std::make_unique<InfoBarIOS>(
           InfobarType::kInfobarTypePasswordUpdate, std::move(delegate),
           /*skip_banner=*/manual);

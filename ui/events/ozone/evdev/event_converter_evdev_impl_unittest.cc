@@ -1010,9 +1010,9 @@ TEST_F(DeferDeviceSetUpEventConverterEvdevImplTest, KeyboardHasKeys) {
   const std::vector<uint64_t> key_bits = dev->GetKeyboardKeyBits();
 
   // KEY_A should be supported.
-  EXPECT_TRUE(ui::EvdevBitUint64IsSet(key_bits.data(), 30));
+  EXPECT_TRUE(ui::EvdevBitUint64IsSet(key_bits, 30));
   // BTN_A shouldn't be supported.
-  EXPECT_FALSE(ui::EvdevBitUint64IsSet(key_bits.data(), 305));
+  EXPECT_FALSE(ui::EvdevBitUint64IsSet(key_bits, 305));
 }
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1227,13 +1227,13 @@ TEST_F(EventConverterEvdevImplLogTest, ChangeKeyboardType) {
 
   std::array<unsigned long, EVDEV_BITS_TO_LONGS(EV_CNT)> ev_bits = {};
   std::array<unsigned long, EVDEV_BITS_TO_LONGS(KEY_CNT)> key_bits = {};
-  ui::EvdevSetBit(ev_bits.data(), EV_KEY);
+  ui::EvdevSetBit(ev_bits, EV_KEY);
   for (int key = KEY_ESC; key <= KEY_D; key++) {
-    ui::EvdevSetBit(key_bits.data(), key);
+    ui::EvdevSetBit(key_bits, key);
   }
 
-  devinfo.SetEventTypes(ev_bits.data(), ev_bits.size());
-  devinfo.SetKeyEvents(key_bits.data(), key_bits.size());
+  devinfo.SetEventTypes(ev_bits);
+  devinfo.SetKeyEvents(key_bits);
 
   std::string log = LogSubst(kDefaultDeviceLogDescription, "keyboard_type",
                              "ui::KeyboardType::VALID_KEYBOARD");
@@ -1245,11 +1245,11 @@ TEST_F(EventConverterEvdevImplLogTest, ChangeCapslockLED) {
 
   std::array<unsigned long, EVDEV_BITS_TO_LONGS(EV_CNT)> ev_bits = {};
   std::array<unsigned long, EVDEV_BITS_TO_LONGS(LED_CNT)> led_bits = {};
-  ui::EvdevSetBit(ev_bits.data(), EV_LED);
-  ui::EvdevSetBit(led_bits.data(), LED_CAPSL);
+  ui::EvdevSetBit(ev_bits, EV_LED);
+  ui::EvdevSetBit(led_bits, LED_CAPSL);
 
-  devinfo.SetEventTypes(ev_bits.data(), ev_bits.size());
-  devinfo.SetLedEvents(led_bits.data(), led_bits.size());
+  devinfo.SetEventTypes(ev_bits);
+  devinfo.SetLedEvents(led_bits);
 
   std::string log =
       LogSubst(kDefaultDeviceLogDescription, "has_caps_lock_led", "1");

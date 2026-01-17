@@ -10,7 +10,6 @@
 #include <tuple>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/scoped_feature_list.h"
@@ -1056,7 +1055,7 @@ TEST_F(DrawPropertiesTest, VisibleLayerRectForReferenceFilterUnderClip) {
   clip_node.pixel_moving_filter_id = filter_node.id;
 
   UpdateActiveTreeDrawProperties();
-  EXPECT_EQ(gfx::Rect(100, 100, 150, 150), child->visible_layer_rect());
+  EXPECT_EQ(gfx::Rect(50, 50, 200, 200), child->visible_layer_rect());
 }
 
 TEST_F(DrawPropertiesTest, RenderSurfaceForBlendMode) {
@@ -7086,10 +7085,6 @@ TEST_F(DrawPropertiesTest, LayerSkippingInSubtreeOfSingularTransform) {
 }
 
 TEST_F(DrawPropertiesTest, RenderSurfacePixelAlignment) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(
-      features::kRenderSurfacePixelAlignment);
-
   LayerImpl* root = root_layer();
   LayerImpl* parent = AddLayerInActiveTree<LayerImpl>();
   LayerImpl* child = AddLayerInActiveTree<LayerImpl>();
@@ -7978,7 +7973,8 @@ TEST_F(DrawPropertiesTest, LargeTransformTest) {
   EXPECT_TRUE(is_inf_or_nan);
 
   // The root layer should be in the RenderSurfaceList.
-  EXPECT_TRUE(base::Contains(GetRenderSurfaceList(), GetRenderSurface(root)));
+  EXPECT_TRUE(
+      std::ranges::contains(GetRenderSurfaceList(), GetRenderSurface(root)));
 }
 
 #if DCHECK_IS_ON()

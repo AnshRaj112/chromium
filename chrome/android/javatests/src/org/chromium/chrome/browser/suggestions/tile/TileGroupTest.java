@@ -7,6 +7,8 @@ package org.chromium.chrome.browser.suggestions.tile;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
+
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.filters.MediumTest;
 
@@ -25,18 +27,19 @@ import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.transit.AutoResetCtaTransitTestRule;
 import org.chromium.chrome.test.transit.ChromeTransitTestRules;
 import org.chromium.chrome.test.transit.ntp.MvtRemovedSnackbarFacility;
+import org.chromium.chrome.test.transit.ntp.MvtUnpinnedSnackbarFacility;
 import org.chromium.chrome.test.transit.ntp.MvtsFacility;
 import org.chromium.chrome.test.transit.ntp.MvtsTileFacility;
 import org.chromium.chrome.test.transit.ntp.RegularNewTabPageStation;
 import org.chromium.chrome.test.transit.page.WebPageStation;
 import org.chromium.chrome.test.util.browser.suggestions.SuggestionsDependenciesRule;
 import org.chromium.chrome.test.util.browser.suggestions.mostvisited.FakeMostVisitedSites;
-import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.net.test.EmbeddedTestServer;
 import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.url.GURL;
 
 import java.util.List;
+import java.util.Set;
 
 /** Instrumentation tests for {@link TileGroup} on the New Tab Page. */
 @RunWith(ChromeJUnit4ClassRunner.class)
@@ -55,6 +58,7 @@ public class TileGroupTest {
                 "/chrome/test/data/android/navigate/two.html",
                 "/chrome/test/data/android/navigate/three.html"
             };
+    private static final GURL FAKE_CUSTOM_LINK_URL = new GURL("https://www.google.com/");
 
     private String[] mSiteSuggestionUrls;
     private FakeMostVisitedSites mMostVisitedSites;
@@ -97,18 +101,18 @@ public class TileGroupTest {
     private MvtRemovedSnackbarFacility doTestDismissTileWithContextMenuImpl() {
         RegularNewTabPageStation ntp =
                 mInitialPage.loadPageProgrammatically(
-                        UrlConstants.NTP_URL, RegularNewTabPageStation.newBuilder());
+                        getOriginalNativeNtpUrl(), RegularNewTabPageStation.newBuilder());
         MvtsFacility mvts = ntp.focusOnMvts(mSiteSuggestions);
-        final MvtsTileFacility tile = mvts.ensureTileIsDisplayedAndGet(0);
+        MvtsTileFacility tile = mvts.ensureTileIsDisplayedAndGet(0);
 
         // Dismiss the tile using the context menu.
-        List<SiteSuggestion> siteSuggestionsAfterRemoval =
+        List<SiteSuggestion> siteSuggestionsAfterRemove =
                 mSiteSuggestions.subList(1, mSiteSuggestions.size());
-        var pair =
-                tile.openContextMenu().selectRemove(siteSuggestionsAfterRemoval, mMostVisitedSites);
+        var snackbar =
+                tile.openContextMenu().selectRemove(siteSuggestionsAfterRemove, mMostVisitedSites);
         assertTrue(mMostVisitedSites.isUrlBlocklisted(new GURL(mSiteSuggestionUrls[0])));
 
-        return pair.second;
+        return snackbar;
     }
 
     @Test
@@ -133,5 +137,63 @@ public class TileGroupTest {
         // Undo removal with the snackbar.
         snackbar.undo(mMostVisitedSites);
         assertFalse(mMostVisitedSites.isUrlBlocklisted(new GURL(mSiteSuggestionUrls[0])));
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"NewTabPage"})
+    @Restriction({DeviceFormFactor.PHONE})
+    public void testUnpinCustomTile_Phones() {
+        doTestUnpinCustomTileImpl();
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"NewTabPage"})
+    @Restriction({DeviceFormFactor.TABLET_OR_DESKTOP})
+    public void testUnpinCustomTile_Tablets() {
+        doTestUnpinCustomTileImpl();
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"NewTabPage"})
+    @Restriction({DeviceFormFactor.PHONE})
+    public void testUnpinCustomTile_undo_Phones() {
+        var snackbar = doTestUnpinCustomTileImpl();
+
+        // Undo the unpin.
+        snackbar.undo(mMostVisitedSites);
+        assertTrue(mMostVisitedSites.hasCustomLink(FAKE_CUSTOM_LINK_URL));
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"NewTabPage"})
+    @Restriction({DeviceFormFactor.TABLET_OR_DESKTOP})
+    public void testUnpinCustomTile_undo_Tablets() {
+        var snackbar = doTestUnpinCustomTileImpl();
+
+        // Undo the unpin.
+        snackbar.undo(mMostVisitedSites);
+        assertTrue(mMostVisitedSites.hasCustomLink(FAKE_CUSTOM_LINK_URL));
+    }
+
+    private MvtUnpinnedSnackbarFacility doTestUnpinCustomTileImpl() {
+        mMostVisitedSites.addCustomLink("Custom Link", FAKE_CUSTOM_LINK_URL, 0);
+
+        RegularNewTabPageStation ntp =
+                mInitialPage.loadPageProgrammatically(
+                        getOriginalNativeNtpUrl(), RegularNewTabPageStation.newBuilder());
+        MvtsFacility mvts =
+                ntp.focusOnMvts(
+                        mMostVisitedSites.getCombinedSuggestions(),
+                        /* separatorIndices= */ Set.of(1));
+        MvtsTileFacility tile = mvts.ensureTileIsDisplayedAndGet(0);
+
+        // Unpin the tile using the context menu.
+        var snackbar = tile.openContextMenu().selectUnpin(mSiteSuggestions, mMostVisitedSites);
+        assertFalse(mMostVisitedSites.hasCustomLink(FAKE_CUSTOM_LINK_URL));
+        return snackbar;
     }
 }

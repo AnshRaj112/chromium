@@ -11,6 +11,7 @@
 
 #include "base/containers/enum_set.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/advanced_memory_safety_checks.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
 #include "components/browsing_data/content/browsing_data_quota_helper.h"
@@ -22,10 +23,9 @@
 #include "content/public/browser/private_aggregation_data_model.h"
 #include "content/public/browser/session_storage_usage_info.h"
 #include "net/cookies/canonical_cookie.h"
+#include "net/device_bound_sessions/session_key.h"
 #include "net/shared_dictionary/shared_dictionary_isolation_key.h"
-#include "services/network/public/mojom/device_bound_sessions.mojom.h"
 #include "third_party/blink/public/common/storage_key/storage_key.h"
-#include "third_party/blink/public/mojom/quota/quota_types.mojom.h"
 #include "url/origin.h"
 
 namespace content {
@@ -38,6 +38,9 @@ class StoragePartition;
 // "data owners", which denote which entity the data should be closely
 // associated with in UI surfaces.
 class BrowsingDataModel {
+  // TODO(crbug.com/467904023): Remove this macro once the bug gets fixed.
+  ADVANCED_MEMORY_SAFETY_CHECKS();
+
  public:
   // The entity that logically owns a set of data. All browsing data will be
   // grouped by its owner.

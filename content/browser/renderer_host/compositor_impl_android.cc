@@ -17,7 +17,6 @@
 #include "base/android/scoped_java_ref.h"
 #include "base/auto_reset.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
@@ -45,6 +44,7 @@
 #include "components/input/utils.h"
 #include "components/viz/common/features.h"
 #include "components/viz/common/gpu/context_provider.h"
+#include "components/viz/common/gpu/raster_context_provider.h"
 #include "components/viz/common/quads/compositor_frame.h"
 #include "components/viz/common/surfaces/local_surface_id.h"
 #include "components/viz/common/surfaces/surface_range.h"
@@ -57,6 +57,7 @@
 #include "content/browser/gpu/gpu_process_host.h"
 #include "content/browser/renderer_host/compositor_dependencies_android.h"
 #include "content/browser/renderer_host/render_widget_host_impl.h"
+#include "content/common/features.h"
 #include "content/public/browser/android/compositor.h"
 #include "content/public/browser/android/compositor_client.h"
 #include "content/public/browser/browser_task_traits.h"
@@ -97,23 +98,12 @@ NOINLINE void FatalSurfaceFailure() {
 
 gpu::SharedMemoryLimits GetCompositorContextSharedMemoryLimits(
     gfx::NativeWindow window) {
-  const gfx::Size screen_size = display::Screen::GetScreen()
-                                    ->GetDisplayNearestWindow(window)
-                                    .GetSizeInPixel();
+  const gfx::Size screen_size =
+      display::Screen::Get()->GetDisplayNearestWindow(window).GetSizeInPixel();
   return gpu::SharedMemoryLimits::ForDisplayCompositor(screen_size);
 }
 
-gpu::ContextCreationAttribs GetCompositorContextAttributes() {
-  gpu::ContextCreationAttribs attributes;
-  attributes.enable_raster_interface = true;
-  attributes.enable_gles2_interface = false;
-  attributes.enable_grcontext = false;
-
-  return attributes;
-}
-
 void CreateContextProviderAfterGpuChannelEstablished(
-    gpu::SharedMemoryLimits shared_memory_limits,
     Compositor::ContextProviderCallback callback,
     scoped_refptr<gpu::GpuChannelHost> gpu_channel_host) {
   if (!gpu_channel_host) {
@@ -124,18 +114,10 @@ void CreateContextProviderAfterGpuChannelEstablished(
   int32_t stream_id = kGpuStreamIdDefault;
   gpu::SchedulingPriority stream_priority = kGpuStreamPriorityUI;
 
-  constexpr bool automatic_flushes = false;
-  constexpr bool support_locking = false;
-
-  gpu::ContextCreationAttribs attributes;
-  attributes.enable_gles2_interface = true;
-
-  auto context_provider =
-      base::MakeRefCounted<viz::ContextProviderCommandBuffer>(
-          std::move(gpu_channel_host), stream_id, stream_priority,
-          GURL(std::string("chrome://gpu/Compositor::CreateContextProvider")),
-          automatic_flushes, support_locking, shared_memory_limits, attributes,
-          viz::command_buffer_metrics::ContextType::UNKNOWN);
+  auto context_provider = viz::ContextProviderCommandBuffer::CreateForGL(
+      std::move(gpu_channel_host), stream_id, stream_priority,
+      GURL(std::string("chrome://gpu/Compositor::CreateContextProvider")),
+      viz::command_buffer_metrics::ContextType::UNKNOWN);
   std::move(callback).Run(std::move(context_provider));
 }
 
@@ -202,12 +184,10 @@ void Compositor::Initialize() {
 
 // static
 void Compositor::CreateContextProvider(
-    gpu::SharedMemoryLimits shared_memory_limits,
     ContextProviderCallback callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  BrowserGpuChannelHostFactory::instance()->EstablishGpuChannel(
-      base::BindOnce(&CreateContextProviderAfterGpuChannelEstablished,
-                     shared_memory_limits, std::move(callback)));
+  BrowserGpuChannelHostFactory::instance()->EstablishGpuChannel(base::BindOnce(
+      &CreateContextProviderAfterGpuChannelEstablished, std::move(callback)));
 }
 
 // static
@@ -359,6 +339,7 @@ void CompositorImpl::SetVisible(bool visible) {
     // Hide the LayerTreeHost and release its frame sink.
     host_->SetVisible(false);
     host_->ReleaseLayerTreeFrameSink();
+    raster_context_provider_.reset();
     pending_frames_ = 0;
 
     // Notify CompositorDependenciesAndroid of visibility changes last, to
@@ -394,7 +375,7 @@ void CompositorImpl::TearDownDisplayAndUnregisterRootFrameSink() {
   // sync IPC. This guards against reentrant code using |display_private_|
   // before it can be reset.
   display_private_.reset();
-  GetHostFrameSinkManager()->InvalidateFrameSinkId(frame_sink_id_, this);
+  GetHostFrameSinkManager()->InvalidateFrameSinkId(frame_sink_id_, this, {});
   if (display_client_) {
     display_client_->SetPreferredRefreshRate(0);
   }
@@ -524,19 +505,20 @@ void CompositorImpl::OnGpuChannelEstablished(
 
   constexpr bool support_locking = false;
   constexpr bool automatic_flushes = false;
-  display_color_spaces_ = display::Screen::GetScreen()
+  display_color_spaces_ = display::Screen::Get()
                               ->GetDisplayNearestWindow(root_window_)
                               .GetColorSpaces();
 
-  auto context_provider =
-      base::MakeRefCounted<viz::ContextProviderCommandBuffer>(
-          std::move(gpu_channel_host), stream_id, stream_priority,
-          GURL(std::string("chrome://gpu/CompositorImpl::") +
-               std::string("CompositorContextProvider")),
-          automatic_flushes, support_locking,
-          GetCompositorContextSharedMemoryLimits(root_window_),
-          GetCompositorContextAttributes(),
-          viz::command_buffer_metrics::ContextType::BROWSER_COMPOSITOR);
+  auto context_provider = viz::ContextProviderCommandBuffer::CreateForRaster(
+      std::move(gpu_channel_host), stream_id, stream_priority,
+      GURL(std::string("chrome://gpu/CompositorImpl::") +
+           std::string("CompositorContextProvider")),
+      automatic_flushes, support_locking,
+      GetCompositorContextSharedMemoryLimits(root_window_),
+      viz::command_buffer_metrics::ContextType::BROWSER_COMPOSITOR,
+      /*lose_context_when_out_of_memory=*/false
+
+  );
   auto result = context_provider->BindToCurrentSequence();
 
   if (result == gpu::ContextResult::kFatalFailure) {
@@ -548,6 +530,7 @@ void CompositorImpl::OnGpuChannelEstablished(
     return;
   }
 
+  raster_context_provider_ = context_provider;
   InitializeVizLayerTreeFrameSink(std::move(context_provider));
 }
 
@@ -607,6 +590,7 @@ void CompositorImpl::DidReceiveCompositorFrameAck() {
 
 void CompositorImpl::DidLoseLayerTreeFrameSink() {
   TRACE_EVENT0("compositor", "CompositorImpl::DidLoseLayerTreeFrameSink");
+  raster_context_provider_.reset();
   client_->DidSwapFrame(0);
 }
 
@@ -671,9 +655,8 @@ void CompositorImpl::RemoveChildFrameSink(
 
 void CompositorImpl::OnDisplayMetricsChanged(const display::Display& display,
                                              uint32_t changed_metrics) {
-  if (display.id() != display::Screen::GetScreen()
-                          ->GetDisplayNearestWindow(root_window_)
-                          .id()) {
+  if (display.id() !=
+      display::Screen::Get()->GetDisplayNearestWindow(root_window_).id()) {
     return;
   }
 
@@ -721,12 +704,17 @@ void CompositorImpl::OnAdaptiveRefreshRateInfoChanged() {
   if (root_window_ && display_private_) {
     ui::WindowAndroid::AdaptiveRefreshRateInfo arr_info =
         root_window_->adaptive_refresh_rate_info();
-    display_private_->SetAdaptiveRefreshRateInfo(
-        arr_info.supports_adaptive_refresh_rate,
-        arr_info.suggested_frame_rate_high,
-        display::Screen::GetScreen()
-            ->GetDisplayNearestWindow(root_window_)
-            .device_scale_factor());
+    auto info = viz::mojom::AdaptiveRefreshRateInfo::New();
+    info->has_support = arr_info.supports_adaptive_refresh_rate;
+    info->suggested_high = arr_info.suggested_frame_rate_high;
+    info->device_scale_factor = display::Screen::Get()
+                                    ->GetDisplayNearestWindow(root_window_)
+                                    .device_scale_factor();
+    for (const auto& point : arr_info.velocity_mapping) {
+      info->velocity_mapping.push_back(viz::mojom::FrameRateVelocityPoint::New(
+          point.frame_per_second, point.dp_per_second));
+    }
+    display_private_->SetAdaptiveRefreshRateInfo(std::move(info));
   }
 }
 
@@ -770,13 +758,16 @@ void CompositorImpl::InitializeVizLayerTreeFrameSink(
   root_params->display_client = display_client_->GetBoundRemote(task_runner);
 
   const auto& display_props =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(root_window_);
+      display::Screen::Get()->GetDisplayNearestWindow(root_window_);
 
   viz::RendererSettings renderer_settings;
   renderer_settings.partial_swap_enabled = true;
   renderer_settings.allow_antialiasing = false;
   renderer_settings.highp_threshold_min = 2048;
   renderer_settings.requires_alpha_channel = requires_alpha_channel_;
+  if (base::FeatureList::IsEnabled(features::kDisableAutoResizeOutputSurface)) {
+    renderer_settings.auto_resize_output_surface = false;
+  }
 
   root_params->frame_sink_id = frame_sink_id_;
   root_params->widget = surface_handle_;
@@ -937,6 +928,11 @@ void CompositorImpl::AddFrameSubmissionObserver(
 void CompositorImpl::RemoveFrameSubmissionObserver(
     FrameSubmissionObserver* observer) {
   frame_submission_observers_.RemoveObserver(observer);
+}
+
+scoped_refptr<viz::RasterContextProvider>
+CompositorImpl::GetRasterContextProvider() {
+  return raster_context_provider_;
 }
 
 }  // namespace content

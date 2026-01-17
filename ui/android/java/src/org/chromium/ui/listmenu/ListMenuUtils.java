@@ -6,22 +6,32 @@ package org.chromium.ui.listmenu;
 
 import static org.chromium.ui.listmenu.ListMenuItemProperties.CLICK_LISTENER;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.ENABLED;
+import static org.chromium.ui.listmenu.ListMenuItemProperties.HOVER_LISTENER;
+import static org.chromium.ui.listmenu.ListMenuItemProperties.IS_HIGHLIGHTED;
+import static org.chromium.ui.listmenu.ListMenuItemProperties.KEY_LISTENER;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.TITLE;
+import static org.chromium.ui.listmenu.ListMenuItemProperties.TITLE_ID;
 import static org.chromium.ui.listmenu.ListMenuSubmenuItemProperties.SUBMENU_ITEMS;
 
+import android.content.Context;
+import android.graphics.Rect;
 import android.view.View;
 import android.widget.ListView;
-
-import androidx.annotation.NonNull;
 
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.ui.R;
+import org.chromium.ui.hierarchicalmenu.HierarchicalMenuController;
+import org.chromium.ui.hierarchicalmenu.HierarchicalMenuController.SubmenuHeaderFactory;
+import org.chromium.ui.hierarchicalmenu.HierarchicalMenuKeyProvider;
 import org.chromium.ui.modelutil.LayoutViewBuilder;
 import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
 import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
 import org.chromium.ui.modelutil.ModelListAdapter;
 import org.chromium.ui.modelutil.PropertyModel;
+import org.chromium.ui.modelutil.PropertyModel.WritableBooleanPropertyKey;
+import org.chromium.ui.modelutil.PropertyModel.WritableIntPropertyKey;
+import org.chromium.ui.modelutil.PropertyModel.WritableObjectPropertyKey;
 
 import java.util.Collection;
 import java.util.List;
@@ -39,7 +49,6 @@ public class ListMenuUtils {
      * @param listItems The {@link ModelList} containing the items to be displayed in the menu.
      * @return A configured {@link ModelListAdapter} ready to be set on the {@link ListView}.
      */
-    @NonNull
     public static ModelListAdapter createAdapter(ModelList listItems) {
         return createAdapter(listItems, Set.of(), /* delegate= */ null);
     }
@@ -57,12 +66,11 @@ public class ListMenuUtils {
      *     the item's CLICK_LISTENER or listMenu's onMenuItemSelected method will be used.
      * @return A configured {@link ModelListAdapter} ready to be set on the {@link ListView}.
      */
-    @NonNull
-    public static ModelListAdapter createAdapter(
+    public static ListMenuItemAdapter createAdapter(
             ModelList listItems,
             Collection<Integer> disabledTypes,
             ListMenu.@Nullable Delegate delegate) {
-        ModelListAdapter adapter = new ListMenuItemAdapter(listItems, disabledTypes, delegate);
+        ListMenuItemAdapter adapter = new ListMenuItemAdapter(listItems, disabledTypes, delegate);
 
         adapter.registerType(
                 ListItemType.DIVIDER,
@@ -92,58 +100,6 @@ public class ListMenuUtils {
         return adapter;
     }
 
-    /**
-     * Callback to use when a menu item of type MENU_ITEM_WITH_SUBMENU is clicked.
-     *
-     * @param headerModelList {@link ModelList} for unscrollable top header; null if headers scroll.
-     * @param contentModelList {@link ModelList} for the scrollable content of the menu.
-     * @param item The menu item which was clicked.
-     */
-    private static void onItemWithSubmenuClicked(
-            @Nullable ModelList headerModelList, ModelList contentModelList, ListItem item) {
-        @Nullable ModelList parentHeaderModelList =
-                headerModelList == null ? null : shallowCopy(headerModelList);
-        ModelList parentModelList = shallowCopy(contentModelList);
-        contentModelList.clear();
-        if (headerModelList != null) headerModelList.clear();
-        // Add the clicked item as a header to the submenu.
-        final PropertyModel model =
-                new PropertyModel.Builder(ListMenuSubmenuHeaderItemProperties.ALL_KEYS)
-                        .with(TITLE, item.model.get(TITLE))
-                        .with(ENABLED, true)
-                        .with(
-                                CLICK_LISTENER,
-                                (unusedView) -> {
-                                    if (headerModelList != null && parentHeaderModelList != null) {
-                                        setModelListContent(headerModelList, parentHeaderModelList);
-                                    }
-                                    setModelListContent(contentModelList, parentModelList);
-                                })
-                        .build();
-        (headerModelList == null ? contentModelList : headerModelList)
-                .add(new ListItem(ListItemType.SUBMENU_HEADER, model));
-
-        for (ListItem listItem : item.model.get(SUBMENU_ITEMS)) {
-            contentModelList.add(listItem);
-        }
-    }
-
-    private static void setModelListContent(ModelList modelList, ModelList target) {
-        modelList.clear();
-        for (ListItem item : target) {
-            modelList.add(item);
-        }
-    }
-
-    /** Returns a shallow copy of {@param modelList}. */
-    private static ModelList shallowCopy(ModelList modelList) {
-        ModelList result = new ModelList();
-        for (ListItem item : modelList) {
-            result.add(item);
-        }
-        return result;
-    }
-
     /** Returns whether {@param item} has a click listener. */
     public static boolean hasClickListener(ListItem item) {
         return item.model != null
@@ -152,80 +108,101 @@ public class ListMenuUtils {
     }
 
     /**
-     * Makes {@param dismissDialog} run at the end of the callback of {@param item}. If the item
-     * doesn't already have a click callback in its model, no click callback is added.
+     * Constructs a {@link ModelList} containing the submenu items of a given parent item.
      *
-     * @param item The item to which we would add {@param runnable}.
-     * @param dismissDialog The {@link Runnable} to run to dismiss the dialog.
+     * @param item The parent {@link ListItem} that contains the submenu.
+     * @return A new {@link ModelList} populated with the children of the given item.
      */
-    private static void addRunnableToCallback(ListItem item, Runnable dismissDialog) {
-        if (hasClickListener(item)) {
-            View.OnClickListener oldListener = item.model.get(CLICK_LISTENER);
-            item.model.set(
-                    CLICK_LISTENER,
-                    (view) -> {
-                        oldListener.onClick(view);
-                        dismissDialog.run();
-                    });
+    public static ModelList getModelListSubtree(ListItem item) {
+        ModelList modelList = new ModelList();
+        for (ListItem listItem : item.model.get(SUBMENU_ITEMS)) {
+            modelList.add(listItem);
         }
+        return modelList;
     }
 
     /**
-     * Runs {@param dismissDialog} at the end of each callback, recursively (through submenu items).
-     * If the item doesn't already have a click callback in its model, no click callback is added.
+     * Calculates the Rect of a given View in the coordinate space of a root View. This is useful
+     * when you need to position a UI element (like a popup) relative to a specific view, but need
+     * the coordinates to be based on the root view's visible area, which accounts for when the
+     * window is not placed in the origin of the screen.
      *
-     * @param headerModelList {@link ModelList} for unscrollable top header; null if headers scroll.
-     * @param contentModelList {@link ModelList} for the scrollable content of the menu.
-     * @param item The item to start with.
-     * @param dismissDialog The {@link Runnable} to run.
+     * @param view The View whose position and size are to be calculated.
+     * @return A new {@link Rect} containing the coordinates and dimensions of the {@code view}
+     *     relative to the visible frame of the {@code rootView}.
      */
-    private static void setupCallbacksRecursivelyForItem(
-            @Nullable ModelList headerModelList,
-            ModelList contentModelList,
-            ListItem item,
-            Runnable dismissDialog) {
-        if (item.model == null) return;
-        if (item.model.containsKey(SUBMENU_ITEMS)) {
-            item.model.set(
-                    CLICK_LISTENER,
-                    (unusedView) ->
-                            onItemWithSubmenuClicked(headerModelList, contentModelList, item));
-            for (ListItem submenuItem :
-                    PropertyModel.getFromModelOrDefault(item.model, SUBMENU_ITEMS, List.of())) {
-                setupCallbacksRecursivelyForItem(
-                        headerModelList, contentModelList, submenuItem, dismissDialog);
-            }
-        } else {
-            // Note: SUBMENU_HEADER items should be (and are) excluded by this, because
-            // SUBMENU_HEADER items aren't in the model's SUBMENU_ITEMS.
-            // MENU_ITEM_WITH_SUBMENU items should also not be included.
-            // The rationale for excluding these is that we don't want to dismiss the dialog when we
-            // are navigating through submenus.
-            addRunnableToCallback(item, dismissDialog);
-        }
+    public static Rect getViewRectRelativeToItsRootView(View view) {
+        Rect rootViewRect = new Rect();
+        view.getRootView().getWindowVisibleDisplayFrame(rootViewRect);
+        int[] viewCoordinates = new int[2];
+        view.getLocationOnScreen(viewCoordinates);
+
+        int left = viewCoordinates[0] - rootViewRect.left;
+        int top = viewCoordinates[1] - rootViewRect.top;
+
+        return new Rect(left, top, left + view.getWidth(), top + view.getHeight());
     }
 
     /**
-     * Runs {@param dismissDialog} at the end of each callback, recursively (through submenu items).
-     * If an item doesn't already have a click callback in its model, no click callback is added.
+     * Creates an instance of {@link HierarchicalMenuController} for {@link ListMenu}.
      *
-     * @param headerModelList {@link ModelList} for unscrollable top header; null if headers scroll.
-     * @param contentModelList {@link ModelList} for the scrollable content of the menu.
-     * @param dismissDialog The {@link Runnable} to run.
+     * @param context The {@link Context} for the controller to use.
      */
-    public static void setupCallbacksRecursively(
-            @Nullable ModelList headerModelList,
-            ModelList contentModelList,
-            Runnable dismissDialog) {
-        if (headerModelList != null) {
-            for (ListItem listItem : headerModelList) {
-                setupCallbacksRecursivelyForItem(
-                        headerModelList, contentModelList, listItem, dismissDialog);
-            }
+    public static HierarchicalMenuController createHierarchicalMenuController(Context context) {
+        HierarchicalMenuKeyProvider keyProvider = new ListMenuUtils.ListMenuKeyProvider();
+        SubmenuHeaderFactory headerFactory =
+                (clickedItem, backRunnable) -> {
+                    PropertyModel.Builder builder =
+                            new PropertyModel.Builder(ListMenuSubmenuItemProperties.ALL_KEYS);
+                    HierarchicalMenuController.populateDefaultHeaderProperties(
+                            builder,
+                            keyProvider,
+                            clickedItem.model.get(ListMenuItemProperties.TITLE),
+                            backRunnable);
+                    return new ListItem(ListItemType.SUBMENU_HEADER, builder.build());
+                };
+        return new HierarchicalMenuController(context, keyProvider, headerFactory);
+    }
+
+    public static class ListMenuKeyProvider implements HierarchicalMenuKeyProvider {
+        @Override
+        public WritableObjectPropertyKey<View.@Nullable OnClickListener> getClickListenerKey() {
+            return CLICK_LISTENER;
         }
-        for (ListItem listItem : contentModelList) {
-            setupCallbacksRecursivelyForItem(
-                    headerModelList, contentModelList, listItem, dismissDialog);
+
+        @Override
+        public WritableBooleanPropertyKey getEnabledKey() {
+            return ENABLED;
+        }
+
+        @Override
+        public WritableObjectPropertyKey<View.@Nullable OnHoverListener> getHoverListenerKey() {
+            return HOVER_LISTENER;
+        }
+
+        @Override
+        public WritableObjectPropertyKey<CharSequence> getTitleKey() {
+            return TITLE;
+        }
+
+        @Override
+        public WritableIntPropertyKey getTitleIdKey() {
+            return TITLE_ID;
+        }
+
+        @Override
+        public WritableObjectPropertyKey<View.OnKeyListener> getKeyListenerKey() {
+            return KEY_LISTENER;
+        }
+
+        @Override
+        public WritableObjectPropertyKey<List<ListItem>> getSubmenuItemsKey() {
+            return SUBMENU_ITEMS;
+        }
+
+        @Override
+        public WritableBooleanPropertyKey getIsHighlightedKey() {
+            return IS_HIGHLIGHTED;
         }
     }
 }

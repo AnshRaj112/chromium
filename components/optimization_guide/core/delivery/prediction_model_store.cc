@@ -6,12 +6,14 @@
 
 #include "base/command_line.h"
 #include "base/files/file_enumerator.h"
+#include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/memory/ptr_util.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/rand_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/task/thread_pool.h"
+#include "base/trace_event/trace_event.h"
 #include "base/uuid.h"
 #include "components/optimization_guide/core/delivery/model_store_metadata_entry.h"
 #include "components/optimization_guide/core/delivery/model_util.h"
@@ -152,8 +154,9 @@ void RecordModelStorageMetrics(const base::FilePath& base_store_dir) {
 
 }  // namespace
 
-PredictionModelStore::PredictionModelStore()
-    : background_task_runner_(base::ThreadPool::CreateSequencedTaskRunner(
+PredictionModelStore::PredictionModelStore(PrefService& local_state)
+    : ledger_(local_state),
+      background_task_runner_(base::ThreadPool::CreateSequencedTaskRunner(
           {base::MayBlock(), base::TaskPriority::BEST_EFFORT})) {}
 
 PredictionModelStore::~PredictionModelStore() = default;
@@ -187,8 +190,7 @@ void PredictionModelStore::Initialize(const base::FilePath& base_store_dir) {
           switches::kModelOverride)) {
     background_task_runner_->PostTask(
         FROM_HERE, base::BindOnce(&RemoveInvalidModelDirs, base_store_dir_,
-                                  ModelStoreMetadataEntry::GetValidModelDirs(
-                                      GetLocalState())));
+                                  ledger_.GetValidModelDirs()));
   }
   background_task_runner_->PostTask(
       FROM_HERE, base::BindOnce(&RecordModelStorageMetrics, base_store_dir_));
@@ -196,10 +198,10 @@ void PredictionModelStore::Initialize(const base::FilePath& base_store_dir) {
 
 bool PredictionModelStore::HasModel(
     proto::OptimizationTarget optimization_target,
-    const proto::ModelCacheKey& model_cache_key) const {
+    const ClientCacheKey& model_cache_key) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  auto metadata = ModelStoreMetadataEntry::GetModelMetadataEntryIfExists(
-      GetLocalState(), optimization_target, model_cache_key);
+  auto metadata =
+      ledger_.GetEntryIfExists(optimization_target, model_cache_key);
   if (!metadata) {
     return false;
   }
@@ -210,11 +212,11 @@ bool PredictionModelStore::HasModel(
 
 bool PredictionModelStore::HasModelWithVersion(
     proto::OptimizationTarget optimization_target,
-    const proto::ModelCacheKey& model_cache_key,
+    const ClientCacheKey& model_cache_key,
     int64_t version) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  auto metadata = ModelStoreMetadataEntry::GetModelMetadataEntryIfExists(
-      GetLocalState(), optimization_target, model_cache_key);
+  auto metadata =
+      ledger_.GetEntryIfExists(optimization_target, model_cache_key);
   if (!metadata) {
     return false;
   }
@@ -234,12 +236,16 @@ bool PredictionModelStore::HasModelWithVersion(
 
 void PredictionModelStore::LoadModel(
     proto::OptimizationTarget optimization_target,
-    const proto::ModelCacheKey& model_cache_key,
+    const ClientCacheKey& model_cache_key,
+    scoped_refptr<base::SequencedTaskRunner> model_task_runner,
     PredictionModelLoadedCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  auto metadata = ModelStoreMetadataEntry::GetModelMetadataEntryIfExists(
-      GetLocalState(), optimization_target, model_cache_key);
+  TRACE_EVENT("optimization_guide", "PredictionModelStore::LoadModel", "target",
+              GetStringNameForOptimizationTarget(optimization_target));
+
+  auto metadata =
+      ledger_.GetEntryIfExists(optimization_target, model_cache_key);
   if (!metadata) {
     std::move(callback).Run(nullptr);
     return;
@@ -260,11 +266,11 @@ void PredictionModelStore::LoadModel(
     return;
   }
 
-  background_task_runner_->PostTaskAndReplyWithResult(
+  model_task_runner->PostTaskAndReplyWithResult(
       FROM_HERE,
-      base::BindOnce(
-          &PredictionModelStore::LoadAndVerifyModelInBackgroundThread,
-          optimization_target, base_store_dir_.Append(*base_model_dir)),
+      base::BindOnce(&PredictionModelStore::LoadAndVerifyModelOffThread,
+                     optimization_target,
+                     base_store_dir_.Append(*base_model_dir)),
       base::BindOnce(&PredictionModelStore::OnModelLoaded,
                      weak_ptr_factory_.GetWeakPtr(), optimization_target,
                      model_cache_key, std::move(callback)));
@@ -272,9 +278,13 @@ void PredictionModelStore::LoadModel(
 
 // static
 std::unique_ptr<proto::PredictionModel>
-PredictionModelStore::LoadAndVerifyModelInBackgroundThread(
+PredictionModelStore::LoadAndVerifyModelOffThread(
     proto::OptimizationTarget optimization_target,
     const base::FilePath& base_model_dir) {
+  TRACE_EVENT("optimization_guide",
+              "PredictionModelStore::LoadAndVerifyModelOffThread", "target",
+              GetStringNameForOptimizationTarget(optimization_target));
+
   auto model_info = ParseModelInfoFromFile(
       base_model_dir.Append(GetBaseFileNameForModelInfo()));
   if (!model_info) {
@@ -308,10 +318,15 @@ PredictionModelStore::LoadAndVerifyModelInBackgroundThread(
 
 void PredictionModelStore::OnModelLoaded(
     proto::OptimizationTarget optimization_target,
-    const proto::ModelCacheKey& model_cache_key,
+    const ClientCacheKey& model_cache_key,
     PredictionModelLoadedCallback callback,
     std::unique_ptr<proto::PredictionModel> model) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  TRACE_EVENT("optimization_guide", "PredictionModelStore::OnModelLoaded",
+              "target",
+              GetStringNameForOptimizationTarget(optimization_target));
+
   if (!model) {
     RemoveModel(optimization_target, model_cache_key,
                 PredictionModelStoreModelRemovalReason::kModelLoadFailed);
@@ -323,7 +338,7 @@ void PredictionModelStore::OnModelLoaded(
 
 void PredictionModelStore::UpdateMetadataForExistingModel(
     proto::OptimizationTarget optimization_target,
-    const proto::ModelCacheKey& model_cache_key,
+    const ClientCacheKey& model_cache_key,
     const proto::ModelInfo& model_info) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(model_info.has_version());
@@ -333,9 +348,9 @@ void PredictionModelStore::UpdateMetadataForExistingModel(
     return;
   }
 
-  ModelStoreMetadataEntryUpdater metadata(GetLocalState(), optimization_target,
-                                          model_cache_key);
-  DCHECK(!metadata.GetModelBaseDir()->IsAbsolute());
+  ModelStoreMetadataEntryUpdater metadata =
+      ledger_.UpdateEntry(optimization_target, model_cache_key);
+  DCHECK(!metadata.entry().GetModelBaseDir()->IsAbsolute());
   metadata.SetVersion(model_info.version());
   if (model_info.has_valid_duration()) {
     metadata.SetExpiryTime(
@@ -347,7 +362,7 @@ void PredictionModelStore::UpdateMetadataForExistingModel(
 
 void PredictionModelStore::UpdateModel(
     proto::OptimizationTarget optimization_target,
-    const proto::ModelCacheKey& model_cache_key,
+    const ClientCacheKey& model_cache_key,
     const proto::ModelInfo& model_info,
     const base::FilePath& base_model_dir,
     base::OnceClosure callback) {
@@ -356,8 +371,8 @@ void PredictionModelStore::UpdateModel(
   DCHECK_EQ(optimization_target, model_info.optimization_target());
   DCHECK(base_store_dir_.IsParent(base_model_dir));
 
-  ModelStoreMetadataEntryUpdater metadata(GetLocalState(), optimization_target,
-                                          model_cache_key);
+  ModelStoreMetadataEntryUpdater metadata =
+      ledger_.UpdateEntry(optimization_target, model_cache_key);
   metadata.SetVersion(model_info.version());
   metadata.SetExpiryTime(
       base::Time::Now() +
@@ -366,7 +381,7 @@ void PredictionModelStore::UpdateModel(
            : ModelStoreMetadataEntry::kDefaultStoredModelValidDuration));
   metadata.SetKeepBeyondValidDuration(model_info.keep_beyond_valid_duration());
 
-  auto old_model_dir = metadata.GetModelBaseDir();
+  auto old_model_dir = metadata.entry().GetModelBaseDir();
   if (old_model_dir) {
     RecordPredictionModelStoreModelRemovalVersionHistogram(
         optimization_target,
@@ -387,7 +402,7 @@ void PredictionModelStore::UpdateModel(
 
 void PredictionModelStore::OnModelUpdateVerified(
     proto::OptimizationTarget optimization_target,
-    const proto::ModelCacheKey& model_cache_key,
+    const ClientCacheKey& model_cache_key,
     base::OnceClosure callback,
     bool model_paths_exist) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -401,42 +416,38 @@ void PredictionModelStore::OnModelUpdateVerified(
 
 base::FilePath PredictionModelStore::GetBaseModelDirForModelCacheKey(
     proto::OptimizationTarget optimization_target,
-    const proto::ModelCacheKey& model_cache_key) {
+    const ClientCacheKey& model_cache_key) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   DCHECK(!base_store_dir_.empty());
   auto base_model_dir = base_store_dir_
                             .AppendASCII(base::NumberToString(
                                 static_cast<int>(optimization_target)))
-                            .AppendASCII(GetModelCacheKeyHash(model_cache_key));
+                            .AppendASCII(model_cache_key.hexhash);
   return base_model_dir.AppendASCII(
       base::HexEncode(base::RandBytesAsVector(8)));
 }
 
 void PredictionModelStore::UpdateModelCacheKeyMapping(
     proto::OptimizationTarget optimization_target,
-    const proto::ModelCacheKey& client_model_cache_key,
+    const ClientCacheKey& client_model_cache_key,
     const proto::ModelCacheKey& server_model_cache_key) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  ModelStoreMetadataEntryUpdater::UpdateModelCacheKeyMapping(
-      GetLocalState(), optimization_target, client_model_cache_key,
-      server_model_cache_key);
+  ledger_.UpdateModelCacheKeyMapping(
+      optimization_target, client_model_cache_key, server_model_cache_key);
 }
 
 void PredictionModelStore::RemoveModel(
     proto::OptimizationTarget optimization_target,
-    const proto::ModelCacheKey& model_cache_key,
+    const ClientCacheKey& model_cache_key,
     PredictionModelStoreModelRemovalReason model_remove_reason) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!GetLocalState()) {
-    return;
-  }
 
   RecordPredictionModelStoreModelRemovalVersionHistogram(optimization_target,
                                                          model_remove_reason);
-  ModelStoreMetadataEntryUpdater metadata(GetLocalState(), optimization_target,
-                                          model_cache_key);
-  auto base_model_dir = metadata.GetModelBaseDir();
+  ModelStoreMetadataEntryUpdater metadata =
+      ledger_.UpdateEntry(optimization_target, model_cache_key);
+  auto base_model_dir = metadata.entry().GetModelBaseDir();
   if (base_model_dir) {
     ScheduleModelDirRemoval(*base_model_dir);
   }
@@ -457,17 +468,12 @@ void PredictionModelStore::ScheduleModelDirRemoval(
       base_model_dir.IsAbsolute()
           ? ConvertToRelativePath(base_store_dir_, base_model_dir)
           : base_model_dir;
-  ScopedDictPrefUpdate pref_update(GetLocalState(),
-                                   prefs::localstate::kStoreFilePathsToDelete);
-  pref_update->Set(FilePathToString(relative_model_dir), true);
+  ledger_.AddPathToDelete(relative_model_dir);
 }
 
 void PredictionModelStore::PurgeInactiveModels() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(GetLocalState());
-  for (const auto& expired_model_dir :
-       ModelStoreMetadataEntryUpdater::PurgeAllInactiveMetadata(
-           GetLocalState())) {
+  for (const auto& expired_model_dir : ledger_.PurgeAllInactiveMetadata()) {
     // Backward compatibility: Model dirs were absolute in the earlier versions,
     // and it was only in experiment. The latest versions use relative paths.
     DCHECK(!expired_model_dir.IsAbsolute() ||
@@ -485,9 +491,7 @@ void PredictionModelStore::PurgeInactiveModels() {
 
 void PredictionModelStore::CleanUpOldModelFiles() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(GetLocalState());
-  for (const auto entry :
-       GetLocalState()->GetDict(prefs::localstate::kStoreFilePathsToDelete)) {
+  for (const auto entry : ledger_.GetPathsToDelete()) {
     // Backward compatibility: Model dirs were absolute in the earlier versions.
     // The latest versions use relative paths.
     auto path_to_delete = StringToFilePath(entry.first);
@@ -501,34 +505,24 @@ void PredictionModelStore::CleanUpOldModelFiles() {
         FROM_HERE,
         base::BindOnce(&base::DeletePathRecursively, absolute_path_to_delete),
         base::BindOnce(&PredictionModelStore::OnFilePathDeleted,
-                       weak_ptr_factory_.GetWeakPtr(), entry.first));
+                       weak_ptr_factory_.GetWeakPtr(), *path_to_delete));
   }
 }
 
-void PredictionModelStore::OnFilePathDeleted(const std::string& path_to_delete,
-                                             bool success) {
+void PredictionModelStore::OnFilePathDeleted(
+    const base::FilePath& path_to_delete,
+    bool success) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(GetLocalState());
   if (!success) {
     // Try to delete again later.
     return;
   }
-
-  ScopedDictPrefUpdate pref_update(GetLocalState(),
-                                   prefs::localstate::kStoreFilePathsToDelete);
-  pref_update->Remove(path_to_delete);
+  ledger_.RemovePathToDelete(path_to_delete);
 }
 
 base::FilePath PredictionModelStore::GetBaseStoreDirForTesting() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return base_store_dir_;
-}
-
-void PredictionModelStore::ResetForTesting() {
-  DETACH_FROM_SEQUENCE(sequence_checker_);
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  base_store_dir_ = base::FilePath();
-  background_task_runner_.reset();
 }
 
 }  // namespace optimization_guide

@@ -6,14 +6,18 @@ package org.chromium.chrome.browser.ui.signin;
 
 import static org.chromium.build.NullUtil.assumeNonNull;
 
-import android.view.View;
+import android.accounts.AccountManager;
+import android.app.Activity;
+import android.content.Intent;
 
-import androidx.annotation.IntDef;
-
+import org.chromium.base.IntentUtils;
 import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.signin.services.SigninManager;
+import org.chromium.chrome.browser.signin.services.SigninMetricsUtils;
+import org.chromium.chrome.browser.signin.services.SigninMetricsUtils.State;
 import org.chromium.chrome.browser.ui.signin.history_sync.HistorySyncConfig;
 import org.chromium.chrome.browser.ui.signin.history_sync.HistorySyncHelper;
 import org.chromium.components.browser_ui.widget.gesture.BackPressHandler.BackPressResult;
@@ -22,58 +26,90 @@ import org.chromium.components.signin.SigninFeatures;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
 import org.chromium.components.signin.identitymanager.IdentityManager;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-
 /**
  * Interface for coordinators responsible of showing the correct sub-component of the sign-in and
  * history opt-in flow.
  */
 @NullMarked
-public interface SigninAndHistorySyncCoordinator {
+public abstract class SigninAndHistorySyncCoordinator {
 
     /** Indicates the sign-in flow completion status. */
-    @IntDef({
-        Result.COMPLETED,
-        Result.INTERRUPTED,
-    })
-    @Retention(RetentionPolicy.SOURCE)
-    @interface Result {
-        /** Indicates the sign-in flow completed successfully. */
-        int COMPLETED = 0;
+    public static class Result {
+        /**
+         * Whether the sign-in operation occurred during this specific execution of the flow. Should
+         * be False if the user was already signed in before the flow started. Note, if the user
+         * explicitly accepts the sign-in CTA and the history sync consent is required, then
+         * declining history sync invalidates the entire sign-in.
+         */
+        public final boolean hasSignedIn;
 
         /**
-         * Indicates the sign-in flow was not completed due to error. The conditions depend on the
-         * configuration of the sign-in flow: e.g. if history opt-in is shown, declining history
-         * opt-in will set the INTERRUPTED state, and same for the sign-in step.
+         * The user successfully completed the history sync enablement step during the flow. Note,
+         * it possible for an already signed-in user to not be shown the sign-in CTA and only the
+         * history sync consent dialog.
          */
-        int INTERRUPTED = 1;
+        public final boolean hasOptedInHistorySync;
+
+        public Result(boolean hasSignedIn, boolean hasOptedInHistorySync) {
+            this.hasSignedIn = hasSignedIn;
+            this.hasOptedInHistorySync = hasOptedInHistorySync;
+        }
+
+        /** Default non-completion state, user canceled the sign-in flow, or an error occurred. */
+        public static Result aborted() {
+            return new Result(false, false);
+        }
     }
 
     /** Cleans up the coordinator after it is finished being used. */
-    void destroy();
-
-    /**
-     * Called when an Google Play Services "add account" flow started at the activity level has
-     * finished without being completed.
-     */
-    void onAddAccountCanceled();
-
-    /**
-     * Called when an account is added via Google Play Services "add account" flow started at the
-     * activity level.
-     */
-    void onAccountAdded(String accountEmail);
-
-    /** Provides the root view of the sign-in and history opt-in flow. */
-    View getView();
+    public abstract void destroy();
 
     /** Called when the configuration of the embedder activity changes. */
-    void onConfigurationChange();
+    public abstract void onConfigurationChange();
 
     /** Called when a backpress occurs in the embedder activity. */
     @BackPressResult
-    int handleBackPress();
+    public abstract int handleBackPress();
+
+    /**
+     * Called when an Google Play Services "add account" flow started at the activity level has
+     * finished with a result.
+     */
+    public final void onAddAccountResult(int resultCode, @Nullable Intent data) {
+        final String accountEmail =
+                data == null
+                        ? null
+                        : IntentUtils.safeGetStringExtra(data, AccountManager.KEY_ACCOUNT_NAME);
+
+        if (resultCode != Activity.RESULT_OK || accountEmail == null) {
+            // Record NULL_ACCOUNT_NAME if the add account activity successfully returns but
+            // contains a null account name.
+            if (resultCode == Activity.RESULT_OK && accountEmail == null) {
+                SigninMetricsUtils.logAddAccountStateHistogram(State.NULL_ACCOUNT_NAME);
+            } else {
+                SigninMetricsUtils.logAddAccountStateHistogram(State.CANCELLED);
+            }
+            onAddAccountCanceled();
+            return;
+        }
+
+        SigninMetricsUtils.logAddAccountStateHistogram(State.SUCCEEDED);
+        onAccountAdded(accountEmail);
+    }
+
+    /**
+     * Called by {@link onAddAccountResult} when an Google Play Services "add account" flow started
+     * at the activity level has finished without being completed.
+     */
+    protected abstract void onAddAccountCanceled();
+
+    /**
+     * Called by {@link onAddAccountResult} when an Google Play Services "add account" flow started
+     * at the activity level has finished after being completed.
+     *
+     * @param accountEmail the email of the added account.
+     */
+    protected abstract void onAccountAdded(String accountEmail);
 
     /**
      * Whether the sign-in ui will show in the sign-in flow if the latter is launched.
@@ -111,20 +147,21 @@ public interface SigninAndHistorySyncCoordinator {
         return shouldShowHistorySync(profile, historyOptInMode);
     }
 
-    static boolean shouldShowHistorySync(
+    public static boolean shouldShowHistorySync(
             Profile profile, @HistorySyncConfig.OptInMode int historyOptInMode) {
         HistorySyncHelper historySyncHelper = HistorySyncHelper.getForProfile(profile);
         boolean forceHistoryOptInScreen =
                 SigninFeatureMap.isEnabled(SigninFeatures.FORCE_HISTORY_OPT_IN_SCREEN);
         return switch (historyOptInMode) {
             case HistorySyncConfig.OptInMode.NONE -> false;
-            case HistorySyncConfig.OptInMode.OPTIONAL -> !historySyncHelper
-                            .shouldSuppressHistorySync()
-                    && (forceHistoryOptInScreen || !historySyncHelper.isDeclinedOften());
-            case HistorySyncConfig.OptInMode.REQUIRED -> !historySyncHelper
-                    .shouldSuppressHistorySync();
-            default -> throw new IllegalArgumentException(
-                    "Unexpected value for historyOptInMode :" + historyOptInMode);
+            case HistorySyncConfig.OptInMode.OPTIONAL ->
+                    historySyncHelper.shouldDisplayHistorySync()
+                            && (forceHistoryOptInScreen || !historySyncHelper.isDeclinedOften());
+            case HistorySyncConfig.OptInMode.REQUIRED ->
+                    historySyncHelper.shouldDisplayHistorySync();
+            default ->
+                    throw new IllegalArgumentException(
+                            "Unexpected value for historyOptInMode :" + historyOptInMode);
         };
     }
 }

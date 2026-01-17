@@ -12,10 +12,10 @@ import android.widget.ScrollView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.chromium.base.Callback;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.components.browser_ui.edge_to_edge.EdgeToEdgePadAdjuster;
+import org.chromium.ui.edge_to_edge.EdgeToEdgePadAdjuster;
 
 /**
  * A simple implementation of {@link EdgeToEdgePadAdjuster} which can add a padding when e2e is on
@@ -27,7 +27,8 @@ public class SimpleEdgeToEdgePadAdjuster implements EdgeToEdgePadAdjuster {
     private final View mViewToPad;
     private final int mDefaultBottomPadding;
     private final boolean mEnableClipToPadding;
-    private final @Nullable ObservableSupplier<EdgeToEdgeController> mEdgeToEdgeControllerSupplier;
+    private final @Nullable MonotonicObservableSupplier<EdgeToEdgeController>
+            mEdgeToEdgeControllerSupplier;
     private @Nullable EdgeToEdgeController mEdgeToEdgeController;
     private final Callback<EdgeToEdgeController> mControllerChangedCallback =
             this::updateEdgeToEdgeController;
@@ -61,7 +62,8 @@ public class SimpleEdgeToEdgePadAdjuster implements EdgeToEdgePadAdjuster {
      */
     public SimpleEdgeToEdgePadAdjuster(
             View view,
-            @Nullable ObservableSupplier<EdgeToEdgeController> edgeToEdgeControllerSupplier,
+            @Nullable MonotonicObservableSupplier<EdgeToEdgeController>
+                    edgeToEdgeControllerSupplier,
             boolean enableClipToPadding) {
         mViewToPad = view;
         mEnableClipToPadding = enableClipToPadding;

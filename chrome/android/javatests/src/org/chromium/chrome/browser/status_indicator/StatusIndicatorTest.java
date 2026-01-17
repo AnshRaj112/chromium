@@ -12,6 +12,8 @@ import static androidx.test.espresso.matcher.ViewMatchers.Visibility.VISIBLE;
 import static androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
+
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.view.View;
@@ -217,8 +219,8 @@ public class StatusIndicatorTest {
     @Test
     @MediumTest
     public void testShowAndHideOnNtp() {
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
-        Tab tab = mActivityTestRule.getActivity().getActivityTab();
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
+        Tab tab = mActivityTestRule.getActivityTab();
         NewTabPageTestUtils.waitForNtpLoaded(tab);
         final int viewId = View.generateViewId();
         final View view = tab.getNativePage().getView();
@@ -301,7 +303,7 @@ public class StatusIndicatorTest {
     @MediumTest
     public void testShowAndHideOnRecentTabsPage() {
         mActivityTestRule.loadUrl(UrlConstants.RECENT_TABS_URL);
-        final Tab tab = mActivityTestRule.getActivity().getActivityTab();
+        final Tab tab = mActivityTestRule.getActivityTab();
         RecentTabsPageTestUtils.waitForRecentTabsPageLoaded(tab);
 
         // R.id.status_indicator won't be in the View tree until the indicator is shown for the

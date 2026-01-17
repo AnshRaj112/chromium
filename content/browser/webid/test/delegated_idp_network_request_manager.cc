@@ -23,11 +23,10 @@ void DelegatedIdpNetworkRequestManager::FetchWellKnown(
 
 void DelegatedIdpNetworkRequestManager::FetchConfig(
     const GURL& provider,
-    blink::mojom::RpMode rp_mode,
     int idp_brand_icon_ideal_size,
     int idp_brand_icon_minimum_size,
     FetchConfigCallback callback) {
-  delegate_->FetchConfig(provider, rp_mode, idp_brand_icon_ideal_size,
+  delegate_->FetchConfig(provider, idp_brand_icon_ideal_size,
                          idp_brand_icon_minimum_size, std::move(callback));
 }
 
@@ -42,13 +41,13 @@ void DelegatedIdpNetworkRequestManager::FetchClientMetadata(
                                  std::move(callback));
 }
 
-void DelegatedIdpNetworkRequestManager::SendAccountsRequest(
+bool DelegatedIdpNetworkRequestManager::SendAccountsRequest(
     const url::Origin& idp_origin,
     const GURL& accounts_url,
     const std::string& client_id,
     AccountsRequestCallback callback) {
-  delegate_->SendAccountsRequest(idp_origin, accounts_url, client_id,
-                                 std::move(callback));
+  return delegate_->SendAccountsRequest(idp_origin, accounts_url, client_id,
+                                        std::move(callback));
 }
 
 void DelegatedIdpNetworkRequestManager::SendTokenRequest(
@@ -58,10 +57,11 @@ void DelegatedIdpNetworkRequestManager::SendTokenRequest(
     bool idp_blindness,
     TokenRequestCallback callback,
     ContinueOnCallback continue_on,
+    RedirectToCallback redirect_to,
     RecordErrorMetricsCallback record_error_metrics_callback) {
   delegate_->SendTokenRequest(token_url, account, url_encoded_post_data,
                               idp_blindness, std::move(callback),
-                              std::move(continue_on),
+                              std::move(continue_on), std::move(redirect_to),
                               std::move(record_error_metrics_callback));
 }
 
@@ -80,7 +80,7 @@ void DelegatedIdpNetworkRequestManager::SendSuccessfulTokenRequestMetrics(
 void DelegatedIdpNetworkRequestManager::SendFailedTokenRequestMetrics(
     const GURL& metrics_endpoint_url,
     bool did_show_ui,
-    MetricsEndpointErrorCode error_code) {
+    webid::MetricsEndpointErrorCode error_code) {
   delegate_->SendFailedTokenRequestMetrics(metrics_endpoint_url, did_show_ui,
                                            error_code);
 }

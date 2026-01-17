@@ -12,7 +12,6 @@
 #include <utility>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/location.h"
@@ -71,8 +70,9 @@ void PlatformAuthProviderManager::SetEnabled(bool enabled,
   on_enable_complete_.Reset();
 
   // Drop origins if previously enabled.
-  if (!enabled && !origins_.empty())
+  if (!enabled && !origins_.empty()) {
     origins_.clear();
+  }
 
   enabled_ = enabled;
 
@@ -99,7 +99,7 @@ bool PlatformAuthProviderManager::IsEnabledFor(const GURL& url) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   return !supports_origin_filtering_ ||
-         base::Contains(origins_, url::Origin::Create(url));
+         origins_.contains(url::Origin::Create(url));
 }
 
 void PlatformAuthProviderManager::GetData(const GURL& url,
@@ -107,11 +107,9 @@ void PlatformAuthProviderManager::GetData(const GURL& url,
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(url.is_valid());
 
-  // In general, callers should only request data for requests that are headed
-  // toward one of the origins stored in `origins_`. Given the async nature of
-  // changes to the set of origins, it's possible that a request could come in
-  // after the manager had been disabled or after a change to the set of
-  // origins.
+  // Note: given the async nature of changes to the set of origins, it's
+  // possible that a request could come in after the manager had been disabled
+  // or after a change to the set of origins.
   if (!IsEnabledFor(url)) {
     std::move(callback).Run(net::HttpRequestHeaders());
   } else {
@@ -158,11 +156,13 @@ void PlatformAuthProviderManager::OnOrigins(
     new_origins = base::flat_set<url::Origin>(std::move(*origins));
   }
 
-  if (origins_ != new_origins)
+  if (origins_ != new_origins) {
     origins_ = std::move(new_origins);
+  }
 
-  if (on_enable_complete_)
+  if (on_enable_complete_) {
     std::move(on_enable_complete_).Run();
+  }
 }
 
 std::unique_ptr<PlatformAuthProvider>

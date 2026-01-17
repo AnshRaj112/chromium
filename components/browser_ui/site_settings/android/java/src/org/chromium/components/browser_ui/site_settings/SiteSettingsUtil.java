@@ -27,6 +27,7 @@ public class SiteSettingsUtil {
     public static final int[] SETTINGS_ORDER = {
         ContentSettingsType.COOKIES,
         ContentSettingsType.GEOLOCATION,
+        ContentSettingsType.GEOLOCATION_WITH_OPTIONS,
         ContentSettingsType.MEDIASTREAM_CAMERA,
         ContentSettingsType.MEDIASTREAM_MIC,
         ContentSettingsType.NOTIFICATIONS,
@@ -48,11 +49,14 @@ public class SiteSettingsUtil {
         ContentSettingsType.HAND_TRACKING,
         ContentSettingsType.IDLE_DETECTION,
         ContentSettingsType.FEDERATED_IDENTITY_API,
+        ContentSettingsType.AUTO_PICTURE_IN_PICTURE,
         ContentSettingsType.SENSORS,
         ContentSettingsType.AUTO_DARK_WEB_CONTENT,
         ContentSettingsType.REQUEST_DESKTOP_SITE,
         ContentSettingsType.JAVASCRIPT_OPTIMIZER,
         ContentSettingsType.LOCAL_NETWORK_ACCESS,
+        ContentSettingsType.LOCAL_NETWORK,
+        ContentSettingsType.LOOPBACK_NETWORK,
     };
 
     static final int[] CHOOSER_PERMISSIONS = {

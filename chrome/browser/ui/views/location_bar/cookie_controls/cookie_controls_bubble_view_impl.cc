@@ -29,10 +29,10 @@ constexpr int kMaxBubbleWidth = 1000;
 }  // namespace
 
 CookieControlsBubbleViewImpl::CookieControlsBubbleViewImpl(
-    views::View* anchor_view,
+    views::BubbleAnchor anchor,
     content::WebContents* web_contents,
     OnCloseBubbleCallback callback)
-    : LocationBarBubbleDelegateView(anchor_view, web_contents, true),
+    : LocationBarBubbleDelegateView(anchor, web_contents, true),
       callback_(std::move(callback)) {
   SetShowCloseButton(true);
   SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
@@ -142,8 +142,7 @@ bool CookieControlsBubbleViewImpl::OnCloseRequested(
 
   // Ignore focus loss while the reloading view is visible. The reloading view
   // will automatically close when the page has loaded.
-  if (GetReloadingView()->GetVisible() ||
-      GetContentView()->GetTrackingProtectionsButton()->GetSpinnerVisible()) {
+  if (GetReloadingView()->GetVisible()) {
     // Always close the bubble if a JS dialog is being shown.
     if (auto* app_modal_queue =
             javascript_dialogs::AppModalDialogQueue::GetInstance();

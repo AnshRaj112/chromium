@@ -30,7 +30,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.chrome.browser.autofill.AutofillImageFetcher;
@@ -50,8 +50,6 @@ import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.url.GURL;
 
-import java.util.Optional;
-
 /** Unit test for {@link AutofillVcnEnrollBottomSheetCoordinator}. */
 @RunWith(BaseRobolectricTestRunner.class)
 @SmallTest
@@ -61,7 +59,7 @@ public final class AutofillVcnEnrollBottomSheetCoordinatorTest {
 
     @Mock private ManagedBottomSheetController mBottomSheetController;
     @Mock private LayoutStateProvider mLayoutStateProvider;
-    @Mock private ObservableSupplier<TabModelSelector> mTabModelSelectorSupplier;
+    @Mock private MonotonicObservableSupplier<TabModelSelector> mTabModelSelectorSupplier;
     @Mock private Profile mProfile;
     @Mock private AutofillImageFetcher mImageFetcher;
 
@@ -111,9 +109,9 @@ public final class AutofillVcnEnrollBottomSheetCoordinatorTest {
                                 mWindow.getContext().get(),
                                 ImageType.CREDIT_CARD_ART_IMAGE,
                                 ImageSize.SMALL)))
-                .thenReturn(Optional.of(bitmap));
+                .thenReturn(bitmap);
         when(mImageFetcher.getImageIfAvailable(/* url= */ any(), /* iconSpecs= */ any()))
-                .thenReturn(Optional.empty());
+                .thenReturn(null);
     }
 
     @After

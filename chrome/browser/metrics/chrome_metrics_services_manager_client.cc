@@ -24,7 +24,6 @@
 #include "chrome/browser/metrics/chrome_metrics_service_accessor.h"
 #include "chrome/browser/metrics/chrome_metrics_service_client.h"
 #include "chrome/browser/metrics/variations/chrome_variations_service_client.h"
-#include "chrome/browser/metrics/variations/ui_string_overrider_factory.h"
 #include "chrome/browser/net/system_network_context_manager.h"
 #include "chrome/browser/ui/browser_otr_state.h"
 #include "chrome/common/chrome_paths.h"
@@ -47,8 +46,6 @@
 #include "chrome/browser/android/metrics/uma_session_stats.h"
 #include "chrome/browser/ui/android/tab_model/tab_model.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_list.h"
-#else
-#include "chrome/browser/ui/browser_list.h"
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_WIN)
@@ -293,7 +290,6 @@ ChromeMetricsServicesManagerClient::CreateVariationsService() {
   return variations::VariationsService::Create(
       std::make_unique<ChromeVariationsServiceClient>(), local_state_,
       GetMetricsStateManager(), switches::kDisableBackgroundNetworking,
-      chrome_variations::CreateUIStringOverrider(),
       base::BindOnce(&content::GetNetworkConnectionTracker));
 }
 
@@ -356,8 +352,6 @@ bool ChromeMetricsServicesManagerClient::IsOffTheRecordSessionActive() {
   // before tabs get added to the TabModel. This means it may be more
   // conservative in case unused TabModels are not cleaned up, but it seems to
   // work correctly.
-  // TODO(crbug.com/40529753): Check if TabModelList's version can be updated
-  // safely.
   // TODO(crbug.com/40107157): This function should return true for Incognito
   // CCTs.
   for (const TabModel* model : TabModelList::models()) {
@@ -367,9 +361,7 @@ bool ChromeMetricsServicesManagerClient::IsOffTheRecordSessionActive() {
 
   return false;
 #else
-  // Depending directly on BrowserList, since that is the implementation
-  // that we get correct notifications for.
-  return BrowserList::IsOffTheRecordBrowserActive();
+  return ::IsOffTheRecordSessionActive();
 #endif
 }
 

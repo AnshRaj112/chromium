@@ -7,7 +7,6 @@ package org.chromium.chrome.browser.toolbar.top;
 import org.jni_zero.JNINamespace;
 import org.jni_zero.NativeMethods;
 
-import org.chromium.base.supplier.Supplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.cc.input.OffsetTag;
@@ -17,6 +16,8 @@ import org.chromium.components.browser_ui.widget.ClipDrawableProgressBar.Drawing
 import org.chromium.ui.modelutil.PropertyKey;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.ui.resources.ResourceManager;
+
+import java.util.function.Supplier;
 
 /** A SceneLayer to render the top toolbar. This is the "view" piece of the top toolbar overlay. */
 @JNINamespace("android")
@@ -53,7 +54,8 @@ class TopToolbarSceneLayer extends SceneOverlayLayer {
                         model.get(TopToolbarOverlayProperties.URL_BAR_RESOURCE_ID),
                         model.get(TopToolbarOverlayProperties.URL_BAR_COLOR),
                         model.get(TopToolbarOverlayProperties.X_OFFSET),
-                        model.get(TopToolbarOverlayProperties.CONTENT_OFFSET),
+                        model.get(TopToolbarOverlayProperties.Y_OFFSET),
+                        model.get(TopToolbarOverlayProperties.LEGACY_CONTENT_OFFSET),
                         model.get(TopToolbarOverlayProperties.SHOW_SHADOW),
                         model.get(TopToolbarOverlayProperties.VISIBLE),
                         model.get(TopToolbarOverlayProperties.ANONYMIZE),
@@ -79,7 +81,8 @@ class TopToolbarSceneLayer extends SceneOverlayLayer {
                         progressInfo.progressBarStaticBackgroundRect.width(),
                         progressInfo.progressBarStaticBackgroundColor,
                         progressInfo.cornerRadius,
-                        progressInfo.progressBarVisualUpdateAvailable);
+                        progressInfo.progressBarVisualUpdateAvailable,
+                        progressInfo.visible);
     }
 
     @Override
@@ -115,7 +118,8 @@ class TopToolbarSceneLayer extends SceneOverlayLayer {
                 int urlBarResourceId,
                 int urlBarColor,
                 float xOffset,
-                float contentOffset,
+                float yOffset,
+                float legacyContentOffset,
                 boolean showShadow,
                 boolean visible,
                 boolean anonymize,
@@ -137,6 +141,7 @@ class TopToolbarSceneLayer extends SceneOverlayLayer {
                 int progressBarStaticBackgroundWidth,
                 int progressBarStaticBackgroundColor,
                 float cornerRadius,
-                boolean progressBarVisualUpdateAvailable);
+                boolean progressBarVisualUpdateAvailable,
+                boolean visible);
     }
 }

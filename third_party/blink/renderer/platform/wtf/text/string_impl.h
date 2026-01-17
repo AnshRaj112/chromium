@@ -30,6 +30,7 @@
 #include <array>
 #include <atomic>
 #include <functional>
+#include <new>
 
 #include "base/check_op.h"
 #include "base/compiler_specific.h"
@@ -93,7 +94,7 @@ class WTF_EXPORT StringImpl {
   // StringImpls are allocated out of the WTF buffer partition.
   void* operator new(size_t);
   void* operator new(size_t, void* ptr) { return ptr; }
-  void operator delete(void*);
+  void operator delete(StringImpl* impl, std::destroying_delete_t);
 
   // Used to construct static strings, which have a special ref_count_ that can
   // never hit zero. This means that the static string will never be destroyed.
@@ -216,16 +217,14 @@ class WTF_EXPORT StringImpl {
   // The character content is always copied.
   std::u16string ToU16String() const;
 
-  // Use Span instead.
-  template <typename CharType>
-  UNSAFE_BUFFER_USAGE ALWAYS_INLINE const CharType* GetCharacters() const;
-
   template <typename CharType>
   ALWAYS_INLINE base::span<CharType> Span() const;
 
   size_t CharactersSizeInBytes() const {
     return length() * (Is8Bit() ? sizeof(LChar) : sizeof(UChar));
   }
+
+  ALWAYS_INLINE size_t GetAllocatedSize() const;
 
   bool IsAtomic() const {
     return hash_and_flags_.load(std::memory_order_acquire) & kIsAtomic;
@@ -312,7 +311,7 @@ class WTF_EXPORT StringImpl {
   //    Table Add and Removal operations (including the fetch_sub to 0) are
   //    done under a lock.
 
-  ALWAYS_INLINE void Release() const {
+  ALWAYS_INLINE void Release() {
     if (!IsStatic()) {
       // This can be a relaxed load as long as the subtraction is performed
       // with acq_rel order. Any modification to `ref_count_` reordered after
@@ -620,7 +619,7 @@ class WTF_EXPORT StringImpl {
       StripBehavior);
   NOINLINE wtf_size_t HashSlowCase() const;
 
-  void DestroyIfNeeded() const;
+  void DestroyIfNeeded();
 
   // Calculates the kContainsOnlyAscii and kIsLowerAscii flags. Returns
   // a bitfield with those 2 values.
@@ -649,16 +648,6 @@ class WTF_EXPORT StringImpl {
   const unsigned length_;
   mutable std::atomic<uint32_t> hash_and_flags_;
 };
-
-template <>
-ALWAYS_INLINE const LChar* StringImpl::GetCharacters<LChar>() const {
-  return Characters8();
-}
-
-template <>
-ALWAYS_INLINE const UChar* StringImpl::GetCharacters<UChar>() const {
-  return Characters16();
-}
 
 template <>
 ALWAYS_INLINE base::span<LChar> StringImpl::Span<LChar>() const {
@@ -698,6 +687,13 @@ ALWAYS_INLINE bool StringImpl::ContainsOnlyASCIIOrEmpty() const {
   if (flags & kAsciiPropertyCheckDone)
     return flags & kContainsOnlyAscii;
   return ComputeASCIIFlags() & kContainsOnlyAscii;
+}
+
+ALWAYS_INLINE size_t StringImpl::GetAllocatedSize() const {
+  const size_t size = CharactersSizeInBytes() + sizeof(StringImpl);
+  DCHECK(Is8Bit() ? size == AllocationSize<LChar>(length())
+                  : size == AllocationSize<UChar>(length()));
+  return size;
 }
 
 ALWAYS_INLINE bool StringImpl::IsLowerASCII() const {
@@ -746,6 +742,12 @@ WTF_EXPORT int CodeUnitCompareIgnoringASCIICase(const StringImpl*,
                                                 const StringImpl*);
 WTF_EXPORT int CodeUnitCompareIgnoringASCIICase(const StringImpl*,
                                                 const LChar*);
+
+template <typename CharacterType1, typename CharacterType2>
+int CodeUnitCompareIgnoringAsciiCase(base::span<const CharacterType1> c1,
+                                     base::span<const CharacterType2> c2) {
+  return CodeUnitCompare(c1, c2, [](auto c) { return ToASCIILower(c); });
+}
 
 template <typename CharType>
 inline wtf_size_t Find(base::span<const CharType> characters,
@@ -862,18 +864,6 @@ UNSAFE_BUFFER_USAGE inline wtf_size_t LengthOfNullTerminatedString(
     ++length;
   }
   return base::checked_cast<wtf_size_t>(length);
-}
-
-template <wtf_size_t inlineCapacity>
-bool EqualIgnoringNullity(const Vector<UChar, inlineCapacity>& a,
-                          StringImpl* b) {
-  if (!b)
-    return !a.size();
-  if (a.size() != b->length())
-    return false;
-  if (b->Is8Bit())
-    return Equal(a.data(), b->Characters8(), b->length());
-  return Equal(a.data(), b->Characters16(), b->length());
 }
 
 template <typename CharacterType1,

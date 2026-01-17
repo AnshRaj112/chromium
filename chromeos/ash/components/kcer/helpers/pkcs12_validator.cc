@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "chromeos/ash/components/kcer/helpers/pkcs12_validator.h"
 
 #include <cert.h>
@@ -17,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
 #include "base/containers/span.h"
 #include "base/logging.h"
 #include "base/strings/string_number_conversions.h"
@@ -63,7 +58,7 @@ Pkcs12ReaderStatusCode MakeNicknameUnique(
   std::string temp_nickname;
   while (unique_counter < kMaxAttemptUniqueNicknameCreation) {
     temp_nickname = AddUniqueIndex(nickname, unique_counter);
-    if (!base::Contains(existing_nicknames, temp_nickname)) {
+    if (!existing_nicknames.contains(temp_nickname)) {
       unique_nickname = temp_nickname;
       return Pkcs12ReaderStatusCode::kSuccess;
     }
@@ -234,8 +229,8 @@ Pkcs12ReaderStatusCode ValidateAndPrepareCertData(
       LOG(ERROR) << MakePkcs12CertImportErrorMessage(get_cert_der_result);
       return get_cert_der_result;
     }
-    CertDer cert_der_typed(
-        std::vector<uint8_t>(cert_der.get(), cert_der.get() + cert_der_size));
+    CertDer cert_der_typed(std::vector<uint8_t>(
+        cert_der.get(), UNSAFE_TODO(cert_der.get() + cert_der_size)));
 
     if (cert_cache.FindCert(cert_der_typed.value())) {
       LOG(WARNING) << "Cert is already installed, skipping";

@@ -5,7 +5,6 @@
 #ifndef COMPONENTS_PAYMENTS_CONTENT_ANDROID_PAYMENT_APP_SERVICE_BRIDGE_H_
 #define COMPONENTS_PAYMENTS_CONTENT_ANDROID_PAYMENT_APP_SERVICE_BRIDGE_H_
 
-#include <map>
 #include <memory>
 #include <vector>
 
@@ -79,6 +78,7 @@ class PaymentAppServiceBridge : public PaymentAppFactory::Delegate {
   scoped_refptr<WebPaymentsWebDataService> GetWebPaymentsWebDataService()
       const override;
   bool IsOffTheRecord() const override;
+  bool PrefsCanMakePayment() const override;
   base::WeakPtr<ContentPaymentRequestDelegate> GetPaymentRequestDelegate()
       const override;
   void ShowProcessingSpinner() override;

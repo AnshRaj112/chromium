@@ -30,7 +30,6 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.robolectric.RuntimeEnvironment;
 
-import org.chromium.base.supplier.Supplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Batch;
 import org.chromium.chrome.browser.magic_stack.ModuleDelegate;
@@ -46,6 +45,8 @@ import org.chromium.components.prefs.PrefChangeRegistrar.PrefObserver;
 import org.chromium.components.prefs.PrefService;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modelutil.PropertyModel;
+
+import java.util.function.Supplier;
 
 /** Tests for the Safety Hub Magic Stack mediator. */
 @RunWith(BaseRobolectricTestRunner.class)
@@ -63,7 +64,6 @@ public class SafetyHubMagicStackMediatorTest {
     @Mock private PrefChangeRegistrar mPrefChangeRegistrar;
     @Mock private Supplier<ModalDialogManager> mModalDialogManagerSupplier;
     @Mock private View mView;
-    @Mock private SafetyHubHatsHelper mSafetyHubHatsHelper;
 
     private Context mContext;
     private Profile mProfile;
@@ -91,8 +91,7 @@ public class SafetyHubMagicStackMediatorTest {
                         mTabModelSelector,
                         mModuleDelegate,
                         mPrefChangeRegistrar,
-                        mModalDialogManagerSupplier,
-                        mSafetyHubHatsHelper);
+                        mModalDialogManagerSupplier);
         SettingsNavigationFactory.setInstanceForTesting(mSettingsNavigation);
 
         mModalDialogManager =
@@ -137,9 +136,6 @@ public class SafetyHubMagicStackMediatorTest {
                 shadowOf(mModel.get(SafetyHubMagicStackViewProperties.ICON_DRAWABLE))
                         .getCreatedFromResId(),
                 R.drawable.secured_by_brand_shield_24);
-        verify(mSafetyHubHatsHelper, times(1))
-                .triggerProactiveHatsSurveyWhenCardShown(
-                        mTabModelSelector, MagicStackEntry.ModuleType.SAFE_BROWSING);
 
         OnClickListener onClickListener =
                 mModel.get(SafetyHubMagicStackViewProperties.BUTTON_ON_CLICK_LISTENER);
@@ -148,9 +144,6 @@ public class SafetyHubMagicStackMediatorTest {
                 .startSettings(eq(mContext), eq(SafeBrowsingSettingsFragment.class));
         verify(mModuleDelegate, times(1)).removeModule(ModuleType.SAFETY_HUB);
         verify(mMagicStackBridge, times(1)).dismissSafeBrowsingModule();
-        verify(mSafetyHubHatsHelper, times(1))
-                .triggerProactiveHatsSurveyWhenCardTapped(
-                        mTabModelSelector, MagicStackEntry.ModuleType.SAFE_BROWSING);
     }
 
     @Test
@@ -177,17 +170,11 @@ public class SafetyHubMagicStackMediatorTest {
                 shadowOf(mModel.get(SafetyHubMagicStackViewProperties.ICON_DRAWABLE))
                         .getCreatedFromResId(),
                 R.drawable.ic_check_circle_filled_green_24dp);
-        verify(mSafetyHubHatsHelper, times(1))
-                .triggerProactiveHatsSurveyWhenCardShown(
-                        mTabModelSelector, MagicStackEntry.ModuleType.REVOKED_PERMISSIONS);
 
         OnClickListener onClickListener =
                 mModel.get(SafetyHubMagicStackViewProperties.BUTTON_ON_CLICK_LISTENER);
         onClickListener.onClick(mView);
         verify(mSettingsNavigation).startSettings(eq(mContext), eq(SafetyHubFragment.class));
-        verify(mSafetyHubHatsHelper, times(1))
-                .triggerProactiveHatsSurveyWhenCardTapped(
-                        mTabModelSelector, MagicStackEntry.ModuleType.REVOKED_PERMISSIONS);
     }
 
     @Test
@@ -217,17 +204,11 @@ public class SafetyHubMagicStackMediatorTest {
                 shadowOf(mModel.get(SafetyHubMagicStackViewProperties.ICON_DRAWABLE))
                         .getCreatedFromResId(),
                 R.drawable.safety_hub_notifications_icon);
-        verify(mSafetyHubHatsHelper, times(1))
-                .triggerProactiveHatsSurveyWhenCardShown(
-                        mTabModelSelector, MagicStackEntry.ModuleType.NOTIFICATION_PERMISSIONS);
 
         OnClickListener onClickListener =
                 mModel.get(SafetyHubMagicStackViewProperties.BUTTON_ON_CLICK_LISTENER);
         onClickListener.onClick(mView);
         verify(mSettingsNavigation).startSettings(eq(mContext), eq(SafetyHubFragment.class));
-        verify(mSafetyHubHatsHelper, times(1))
-                .triggerProactiveHatsSurveyWhenCardTapped(
-                        mTabModelSelector, MagicStackEntry.ModuleType.NOTIFICATION_PERMISSIONS);
     }
 
     @Test
@@ -256,9 +237,6 @@ public class SafetyHubMagicStackMediatorTest {
                 shadowOf(mModel.get(SafetyHubMagicStackViewProperties.ICON_DRAWABLE))
                         .getCreatedFromResId(),
                 R.drawable.ic_password_manager_key);
-        verify(mSafetyHubHatsHelper, times(1))
-                .triggerProactiveHatsSurveyWhenCardShown(
-                        mTabModelSelector, MagicStackEntry.ModuleType.PASSWORDS);
 
         OnClickListener onClickListener =
                 mModel.get(SafetyHubMagicStackViewProperties.BUTTON_ON_CLICK_LISTENER);
@@ -266,9 +244,6 @@ public class SafetyHubMagicStackMediatorTest {
         verify(mPasswordCheckIntentForAccountCheckup, times(1)).send();
         verify(mModuleDelegate, times(1)).removeModule(ModuleType.SAFETY_HUB);
         verify(mMagicStackBridge, times(1)).dismissCompromisedPasswordsModule();
-        verify(mSafetyHubHatsHelper, times(1))
-                .triggerProactiveHatsSurveyWhenCardTapped(
-                        mTabModelSelector, MagicStackEntry.ModuleType.PASSWORDS);
     }
 
     @Test

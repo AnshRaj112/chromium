@@ -12,7 +12,6 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
-#include "base/timer/elapsed_timer.h"
 #include "base/trace_event/trace_event.h"
 #include "ui/gfx/linux/gbm_wrapper.h"
 #include "ui/ozone/platform/drm/gpu/drm_device.h"
@@ -72,8 +71,8 @@ std::unique_ptr<DrmWindowProxy> DrmThreadProxy::CreateDrmWindowProxy(
 void DrmThreadProxy::CreateBuffer(gfx::AcceleratedWidget widget,
                                   const gfx::Size& size,
                                   const gfx::Size& framebuffer_size,
-                                  gfx::BufferFormat format,
-                                  gfx::BufferUsage usage,
+                                  viz::SharedImageFormat format,
+                                  NativePixmapUsageSet usage,
                                   uint32_t flags,
                                   std::unique_ptr<GbmBuffer>* buffer,
                                   scoped_refptr<DrmFramebuffer>* framebuffer) {
@@ -92,7 +91,7 @@ void DrmThreadProxy::CreateBuffer(gfx::AcceleratedWidget widget,
 void DrmThreadProxy::CreateBufferFromHandle(
     gfx::AcceleratedWidget widget,
     const gfx::Size& size,
-    gfx::BufferFormat format,
+    viz::SharedImageFormat format,
     gfx::NativePixmapHandle handle,
     std::unique_ptr<GbmBuffer>* buffer,
     scoped_refptr<DrmFramebuffer>* framebuffer) {
@@ -143,20 +142,9 @@ std::vector<OverlayStatus> DrmThreadProxy::CheckOverlayCapabilitiesSync(
       &DrmThread::CheckOverlayCapabilitiesSync, base::Unretained(&drm_thread_),
       widget, candidates, &result);
 
-  base::ElapsedTimer timer;
   PostSyncTask(drm_thread_.task_runner(),
                base::BindOnce(&DrmThread::RunTaskAfterDeviceReady,
                               base::Unretained(&drm_thread_), std::move(task)));
-  base::TimeDelta time = timer.Elapsed();
-
-  static constexpr base::TimeDelta kMinTime = base::Microseconds(1);
-  static constexpr base::TimeDelta kMaxTime = base::Milliseconds(10);
-  static constexpr int kTimeBuckets = 50;
-  UMA_HISTOGRAM_CUSTOM_MICROSECONDS_TIMES(
-      "Compositing.Display.DrmThreaedProxy."
-      "CheckOverlayCapabilitiesSyncOnDrmThreadUs",
-      time, kMinTime, kMaxTime, kTimeBuckets);
-
   return result;
 }
 

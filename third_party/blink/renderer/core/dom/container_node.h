@@ -32,6 +32,7 @@
 #include "third_party/blink/renderer/core/dom/node.h"
 #include "third_party/blink/renderer/core/dom/static_node_list.h"
 #include "third_party/blink/renderer/core/html/collection_type.h"
+#include "third_party/blink/renderer/platform/heap/heap_traits.h"
 #include "third_party/blink/renderer/platform/wtf/casting.h"
 #include "third_party/blink/renderer/platform/wtf/vector.h"
 
@@ -101,7 +102,9 @@ class CORE_EXPORT ContainerNode : public Node {
                                       ExceptionState&);
 
   Node* firstChild() const { return first_child_.Get(); }
-  Node* lastChild() const { return last_child_.Get(); }
+  Node* lastChild() const {
+    return first_child_ ? first_child_->PreviousSiblingCircular() : nullptr;
+  }
   bool hasChildren() const { return static_cast<bool>(first_child_); }
   bool HasChildren() const { return static_cast<bool>(first_child_); }
 
@@ -178,11 +181,14 @@ class CORE_EXPORT ContainerNode : public Node {
   void ParserFinishedBuildingDocumentFragment(ShouldNotifyInsertedNodes);
   void ParserRemoveChild(Node&);
   void ParserInsertBefore(Node* new_child, Node& ref_child);
+  void ParserReplaceChild(Node& new_child, Node& old_child);
   void ParserTakeAllChildrenFrom(ContainerNode&);
 
   void RemoveChildren();
 
-  void CloneChildNodesFrom(const ContainerNode&, NodeCloningData&);
+  void CloneChildNodesFrom(const ContainerNode&,
+                           NodeCloningData&,
+                           CustomElementRegistry*);
 
   using Node::DetachLayoutTree;
   void AttachLayoutTree(AttachContext&) override;
@@ -472,8 +478,8 @@ class CORE_EXPORT ContainerNode : public Node {
   // only.
   String getHTML(const GetHTMLOptions*, ExceptionState&) const;
 
-  WritableStream* patchSelf(ScriptState*);
-  WritableStream* patchAll(ScriptState*);
+  WritableStream* streamAppendHTMLUnsafe(ScriptState*, ExceptionState&);
+  WritableStream* streamHTMLUnsafe(ScriptState*, ExceptionState&);
 
   // DocumentOrElementEventHandlers:
   // These event listeners are only actually web-exposed on interfaces that
@@ -495,8 +501,20 @@ class CORE_EXPORT ContainerNode : public Node {
                                            Element* attribute_owner_element,
                                            const ChildrenChange*);
 
-  void SetFirstChild(Node* child) { first_child_ = child; }
-  void SetLastChild(Node* child) { last_child_ = child; }
+  void SetFirstChild(Node* child) {
+    if (child) {
+      child->SetPreviousSibling(lastChild());
+    }
+    first_child_ = child;
+  }
+  void SetLastChild(Node* child) {
+    if (first_child_) {
+      first_child_->SetPreviousSibling(child);
+    } else if (child) {
+      // This is soon going to be the first and only child.
+      child->SetPreviousSibling(child);
+    }
+  }
 
   // Utility functions for NodeListsNodeData API.
   template <typename Collection>
@@ -578,7 +596,8 @@ class CORE_EXPORT ContainerNode : public Node {
                                                      ExceptionState&) const;
 
   Member<Node> first_child_;
-  Member<Node> last_child_;
+  // We do not store lastChild() explicitly; it is stored in
+  // first_child_->previous_.
 };
 
 template <>
@@ -597,7 +616,7 @@ inline bool ContainerNode::HasChildCount(unsigned count) const {
 
 inline ContainerNode::ContainerNode(TreeScope* tree_scope,
                                     ConstructionType type)
-    : Node(tree_scope, type), first_child_(nullptr), last_child_(nullptr) {}
+    : Node(tree_scope, type), first_child_(nullptr) {}
 
 inline bool ContainerNode::NeedsAdjacentStyleRecalc() const {
   if (!ChildrenAffectedByDirectAdjacentRules() &&

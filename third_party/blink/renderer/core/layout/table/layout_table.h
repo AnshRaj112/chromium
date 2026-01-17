@@ -101,7 +101,6 @@ class CORE_EXPORT LayoutTable : public LayoutBlock {
 
   void Trace(Visitor*) const override;
 
-  static bool ShouldCreateInlineAnonymous(const LayoutObject& parent);
   static LayoutTable* CreateAnonymousWithParent(const LayoutObject&);
 
   bool IsFirstCell(const LayoutTableCell&) const;
@@ -150,7 +149,8 @@ class CORE_EXPORT LayoutTable : public LayoutBlock {
   void RemoveChild(LayoutObject*) override;
 
   void StyleDidChange(StyleDifference diff,
-                      const ComputedStyle* old_style) override;
+                      const ComputedStyle* old_style,
+                      const StyleChangeContext&) override;
 
   LayoutBox* CreateAnonymousBoxWithSameTypeAs(
       const LayoutObject* parent) const override;
@@ -201,10 +201,15 @@ class CORE_EXPORT LayoutTable : public LayoutBlock {
 
   unsigned EffectiveColumnCount() const;
 
- protected:
+ private:
   bool IsTable() const final {
     NOT_DESTROYED();
     return true;
+  }
+
+  bool CanMergeWith(const LayoutBoxModelObject& other) const override {
+    NOT_DESTROYED();
+    return other.IsTable();
   }
 
   // Table paints background specially.
@@ -213,7 +218,6 @@ class CORE_EXPORT LayoutTable : public LayoutBlock {
     return false;
   }
 
- private:
   void InvalidateCachedTableBorders();
 
   // Table borders are cached because computing collapsed borders is expensive.

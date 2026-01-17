@@ -5,12 +5,15 @@
 package org.chromium.components.browser_ui.bottomsheet;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.view.View;
 
+import androidx.annotation.ColorInt;
 import androidx.annotation.IntDef;
 import androidx.annotation.StringRes;
 
-import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.NonNullObservableSupplier;
+import org.chromium.base.supplier.ObservableSuppliers;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 
@@ -137,6 +140,19 @@ public interface BottomSheetContent {
     }
 
     /**
+     * Whether the sheet uses a custom background color. If color is not overridden (default to
+     * {@link Color.TRANSPARENT}), the BottomSheetController will set a default background color for
+     * the sheet.
+     *
+     * <p>Note: This color only used if {@link #hasSolidBackgroundColor()} returns true.
+     *
+     * @return The custom background color of the sheet.
+     */
+    default @ColorInt int getSheetBackgroundColorOverride() {
+        return Color.TRANSPARENT;
+    }
+
+    /**
      * The height of bottom sheet in PEEK mode. The sheet content that wants to show content as PEEK
      * can override this method and provide a non-negative height. This interface by default
      * supplies {@link HeightMode#DISABLED}.
@@ -194,13 +210,11 @@ public interface BottomSheetContent {
 
     /**
      * @return An observable supplier that will hold true if the content will intercept and handle a
-     *         back press event, false otherwise. If left {@code false}, the sheet will collapse to
-     *         its minimum state on back press or do nothing if in the minimum / peeking state.
+     *     back press event, false otherwise. If left {@code false}, the sheet will collapse to its
+     *     minimum state on back press or do nothing if in the minimum / peeking state.
      */
-    default ObservableSupplierImpl<Boolean> getBackPressStateChangedSupplier() {
-        ObservableSupplierImpl<Boolean> supplier = new ObservableSupplierImpl<>();
-        supplier.set(false);
-        return supplier;
+    default NonNullObservableSupplier<Boolean> getBackPressStateChangedSupplier() {
+        return ObservableSuppliers.alwaysFalse();
     }
 
     /**

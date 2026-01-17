@@ -14,6 +14,7 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/memory/raw_ptr.h"
+#include "base/memory/raw_ref.h"
 #include "base/run_loop.h"
 #include "base/scoped_observation.h"
 #include "chrome/browser/ash/app_list/arc/arc_app_list_prefs.h"
@@ -160,8 +161,7 @@ bool ShouldEnableArcVm() {
   std::string use_flags;
   CHECK(base::ReadFileToString(
       base::FilePath("/usr/local/etc/tast_use_flags.txt"), &use_flags));
-  return base::Contains(use_flags, "arcvm") &&
-         !base::Contains(use_flags, "arcpp");
+  return use_flags.contains("arcvm") && !use_flags.contains("arcpp");
 }
 
 // Gets the active user's browser context.
@@ -180,7 +180,7 @@ void WaitForAppRegister(const std::string& app_id) {
 ChromeOSIntegrationArcMixin::ChromeOSIntegrationArcMixin(
     InProcessBrowserTestMixinHost* host,
     const ChromeOSIntegrationLoginMixin& login_mixin)
-    : InProcessBrowserTestMixin(host), login_mixin_(login_mixin) {}
+    : InProcessBrowserTestMixin(host), login_mixin_(raw_ref(login_mixin)) {}
 
 ChromeOSIntegrationArcMixin::~ChromeOSIntegrationArcMixin() = default;
 
@@ -242,7 +242,7 @@ void ChromeOSIntegrationArcMixin::SetUpCommandLine(
     return;
   }
 
-  CHECK(login_mixin_.mode() != ChromeOSIntegrationLoginMixin::Mode::kStubLogin)
+  CHECK(login_mixin_->mode() != ChromeOSIntegrationLoginMixin::Mode::kStubLogin)
       << "ARC does not work with stub login.";
 
   // User data dir needs to be "/home/chronos". Otherwise,

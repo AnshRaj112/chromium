@@ -345,7 +345,7 @@ void FakeSessionManagerClient::LoginScreenStorageRetrieve(
     LoginScreenStorageRetrieveCallback callback) {
   // Default value which is checked in tests.
   std::string data = "Test";
-  if (base::Contains(login_screen_storage_, key)) {
+  if (login_screen_storage_.contains(key)) {
     data = login_screen_storage_[key];
   }
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
@@ -456,21 +456,6 @@ void FakeSessionManagerClient::NotifyLockScreenShown() {
 void FakeSessionManagerClient::NotifyLockScreenDismissed() {
   notify_lock_screen_dismissed_call_count_++;
   screen_is_locked_ = false;
-}
-
-bool FakeSessionManagerClient::BlockingRequestBrowserDataMigration(
-    const cryptohome::AccountIdentifier& cryptohome_id,
-    const std::string& mode) {
-  request_browser_data_migration_called_ = true;
-  request_browser_data_migration_mode_called_ = true;
-  request_browser_data_migration_mode_value_ = mode;
-  return true;
-}
-
-bool FakeSessionManagerClient::BlockingRequestBrowserDataBackwardMigration(
-    const cryptohome::AccountIdentifier& cryptohome_id) {
-  request_browser_data_backward_migration_called_ = true;
-  return true;
 }
 
 void FakeSessionManagerClient::RetrieveActiveSessions(
@@ -776,8 +761,7 @@ bool FakeSessionManagerClient::GetFlagsForUser(
     feature_flag_list.Append(feature_flag);
   }
   if (!feature_flag_list.empty()) {
-    std::string encoded;
-    base::JSONWriter::Write(feature_flag_list, &encoded);
+    std::string encoded = base::WriteJson(feature_flag_list).value_or("");
     out_flags_for_user->push_back(base::StringPrintf(
         "--%s=%s", chromeos::switches::kFeatureFlags, encoded.c_str()));
   }
@@ -788,8 +772,7 @@ bool FakeSessionManagerClient::GetFlagsForUser(
     origin_list_dict.Set(entry.first, entry.second);
   }
   if (!origin_list_dict.empty()) {
-    std::string encoded;
-    base::JSONWriter::Write(origin_list_dict, &encoded);
+    std::string encoded = base::WriteJson(origin_list_dict).value_or("");
     out_flags_for_user->push_back(base::StringPrintf(
         "--%s=%s", chromeos::switches::kFeatureFlagsOriginList,
         encoded.c_str()));

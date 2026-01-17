@@ -4,6 +4,7 @@
 
 #import "ios/chrome/test/ios_chrome_unit_test_suite.h"
 
+#import "base/memory/memory_pressure_listener_registry.h"
 #import "base/metrics/user_metrics.h"
 #import "base/path_service.h"
 #import "base/test/test_simple_task_runner.h"
@@ -39,8 +40,11 @@ class IOSChromeUnitTestSuiteInitializer
   void OnTestStart(const testing::TestInfo& test_info) override {
     ios::provider::Initialize();
 
+    memory_pressure_registry_ =
+        std::make_unique<base::MemoryPressureListenerRegistry>();
+
     DCHECK(!GetApplicationContext());
-    application_context_.reset(new TestingApplicationContext);
+    application_context_ = std::make_unique<TestingApplicationContext>();
   }
 
   void OnTestEnd(const testing::TestInfo& test_info) override {
@@ -48,10 +52,14 @@ class IOSChromeUnitTestSuiteInitializer
     application_context_.reset();
 
     breadcrumbs::BreadcrumbManager::GetInstance().ResetForTesting();
+
+    memory_pressure_registry_.reset();
   }
 
  private:
   std::unique_ptr<ApplicationContext> application_context_;
+  std::unique_ptr<base::MemoryPressureListenerRegistry>
+      memory_pressure_registry_;
 };
 
 }  // namespace
@@ -64,6 +72,17 @@ IOSChromeUnitTestSuite::~IOSChromeUnitTestSuite() {}
 
 void IOSChromeUnitTestSuite::Initialize() {
   url::AddStandardScheme(kChromeUIScheme, url::SCHEME_WITH_HOST);
+
+  // Force unittests to run using en-US so if testing string output will work
+  // regardless of the system language.
+  ui::ResourceBundle::InitSharedInstanceWithLocale(
+      "en-US", nullptr, ui::ResourceBundle::LOAD_COMMON_RESOURCES);
+  base::FilePath resources_pack_path;
+  base::PathService::Get(base::DIR_ASSETS, &resources_pack_path);
+  resources_pack_path =
+      resources_pack_path.Append(FILE_PATH_LITERAL("resources.pak"));
+  ui::ResourceBundle::GetSharedInstance().AddDataPackFromPath(
+      resources_pack_path, ui::kScaleFactorNone);
 
   // Add an additional listener to do the extra initialization for unit tests.
   // It will be started before the base class listeners and ended after the

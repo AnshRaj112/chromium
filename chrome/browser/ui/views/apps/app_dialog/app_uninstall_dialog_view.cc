@@ -5,6 +5,7 @@
 #include "chrome/browser/ui/views/apps/app_dialog/app_uninstall_dialog_view.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/barrier_callback.h"
@@ -15,7 +16,6 @@
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "base/values.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
@@ -32,13 +32,13 @@
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/extensions/manifest_handlers/app_launch_info.h"
-#include "chrome/common/url_constants.h"
 #include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/constrained_window/constrained_window_views.h"
 #include "components/google/core/common/google_util.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/url_formatter/elide_url.h"
+#include "components/webapps/isolated_web_apps/scheme.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/manifest_url_handlers.h"
@@ -425,7 +425,7 @@ void AppUninstallDialogView::InitializeSubAppList(
     auto* sub_app_label =
         box->AddChildView(std::make_unique<views::Label>(sub_app.app_name));
 
-    sub_app_label->SetGroup(base::to_underlying(DialogViewID::SUB_APP_LABEL));
+    sub_app_label->SetGroup(std::to_underlying(DialogViewID::SUB_APP_LABEL));
 
     sub_app_label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
     sub_app_label->SetMultiLine(true);
@@ -434,7 +434,7 @@ void AppUninstallDialogView::InitializeSubAppList(
         box->AddChildView(std::make_unique<views::ImageView>());
     sub_app_icon->SetImage(
         ui::ImageModel::FromImageSkia(sub_app.icon->uncompressed));
-    sub_app_icon->SetGroup(base::to_underlying(DialogViewID::SUB_APP_ICON));
+    sub_app_icon->SetGroup(std::to_underlying(DialogViewID::SUB_APP_ICON));
 
     box->SetBetweenChildSpacing(
         provider->GetDistanceMetric(views::DISTANCE_RELATED_LABEL_HORIZONTAL));
@@ -521,17 +521,17 @@ void AppUninstallDialogView::InitializeViewForWebApp(
   DCHECK(app_start_url.is_valid());
 
   // Sub apps are currently only supported for Isolated Web Apps.
-  if (app_start_url.SchemeIs(chrome::kIsolatedAppScheme)) {
+  if (app_start_url.SchemeIs(webapps::kIsolatedAppScheme)) {
     sub_apps_description_ = AddChildView(std::make_unique<views::Label>());
     sub_apps_scroll_view_ = AddChildView(std::make_unique<views::ScrollView>());
     sub_apps_description_->SetVisible(false);
     sub_apps_scroll_view_->SetVisible(false);
     LoadSubAppIds(app_name, app_id);
-  } else {
-    // Isolated Web Apps will always have their data cleared as part of
-    // uninstallation.
-    InitializeCheckbox(app_start_url);
+    return;
   }
+  // Isolated Web Apps will always have their data cleared as part of
+  // uninstallation.
+  InitializeCheckbox(app_start_url);
 }
 
 #if BUILDFLAG(IS_CHROMEOS)

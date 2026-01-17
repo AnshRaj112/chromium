@@ -4,11 +4,11 @@
 
 #import "ios/chrome/browser/reading_list/model/url_downloader.h"
 
+#import <algorithm>
 #import <string>
 #import <vector>
 
 #import "base/base64.h"
-#import "base/containers/contains.h"
 #import "base/files/file_path.h"
 #import "base/files/file_util.h"
 #import "base/functional/bind.h"
@@ -149,7 +149,7 @@ std::string ReplaceImagesInHTML(
     std::string image_data;
     base::Value value(images[i].url.spec());
 
-    base::JSONWriter::Write(value, &image_url);
+    image_url = base::WriteJson(value).value_or("");
     image_data = base::Base64Encode(images[i].data);
 
     std::string src_with_data =
@@ -270,7 +270,7 @@ void URLDownloader::RemoveOfflineURL(const GURL& url) {
 }
 
 void URLDownloader::DownloadOfflineURL(const GURL& url) {
-  if (!base::Contains(tasks_, std::make_pair(DOWNLOAD, url))) {
+  if (!std::ranges::contains(tasks_, std::make_pair(DOWNLOAD, url))) {
     tasks_.push_back(std::make_pair(DOWNLOAD, url));
     HandleNextTask();
   }

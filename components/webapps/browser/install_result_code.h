@@ -105,7 +105,14 @@ enum class InstallResultCode {
   // doesn't match. For web install API.
   kManifestIdMismatch = 34,
 
-  kMaxValue = kManifestIdMismatch,
+  // For sync installs, install using the fallback WebAppInstallInfo once the
+  // trusted icon architecture is enabled.
+  kFallbackInstallUsingTrustedIcons = 35,
+
+  // No valid migration source was found for an app that requires one.
+  kNoValidMigrationSource = 36,
+
+  kMaxValue = kNoValidMigrationSource,
 };
 // LINT.ThenChange(//tools/metrics/histograms/enums.xml:WebAppInstallResultCode)
 

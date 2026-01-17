@@ -11,7 +11,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/user_metrics.h"
 #include "base/metrics/user_metrics_action.h"
-#include "base/observer_list_internal.h"
+#include "base/observer_list.h"
 #include "base/strings/string_util.h"
 #include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/ui/actions/chrome_action_id.h"
@@ -131,6 +131,8 @@ bool IsWidgetCurrentSizeSmallerThanPreferredSize(views::Widget* widget) {
 
 DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(WebAppInstallDialogDelegate,
                                       kDiyAppsDialogOkButtonId);
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(WebAppInstallDialogDelegate,
+                                      kDiyAppsDialogInputTextId);
 DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(WebAppInstallDialogDelegate,
                                       kPwaInstallDialogInstallButton);
 DEFINE_CLASS_CUSTOM_ELEMENT_EVENT_TYPE(WebAppInstallDialogDelegate,

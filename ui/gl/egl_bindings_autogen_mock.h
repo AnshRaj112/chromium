@@ -8,6 +8,11 @@
 //    clang-format -i -style=chromium filename
 // DO NOT EDIT!
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 // Silence presubmit and Tricium warnings about include guards
 // no-include-guard-because-multiply-included
 // NOLINT(build/header_guard)
@@ -220,6 +225,10 @@ static EGLBoolean GL_BINDING_CALL Mock_eglPostSubBufferNV(EGLDisplay dpy,
                                                           EGLint y,
                                                           EGLint width,
                                                           EGLint height);
+static EGLBoolean GL_BINDING_CALL
+Mock_eglPresentationTimeANDROID(EGLDisplay dpy,
+                                EGLSurface surface,
+                                EGLnsecsANDROID time);
 static EGLenum GL_BINDING_CALL Mock_eglQueryAPI(void);
 static EGLBoolean GL_BINDING_CALL Mock_eglQueryContext(EGLDisplay dpy,
                                                        EGLContext ctx,

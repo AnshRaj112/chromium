@@ -7,10 +7,12 @@
 #include <variant>
 
 #include "base/check.h"
+#include "base/command_line.h"
 #include "base/notreached.h"
 #include "build/build_config.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/common/content_client.h"
+#include "content/public/common/content_switches.h"
 #include "content/public/gpu/content_gpu_client.h"
 #include "content/public/renderer/content_renderer_client.h"
 #include "content/public/utility/content_utility_client.h"
@@ -92,6 +94,31 @@ ContentRendererClient* ContentMainDelegate::CreateContentRendererClient() {
 
 ContentUtilityClient* ContentMainDelegate::CreateContentUtilityClient() {
   return new ContentUtilityClient();
+}
+
+bool ContentMainDelegate::ShouldInitializePerfetto(InvokedIn invoked_in) {
+  return true;
+}
+
+bool ContentMainDelegate::IsInitFeatureListEarly() {
+  return false;
+}
+
+bool ContentMainDelegate::ShouldReconfigurePartitionAlloc() {
+  return true;
+}
+
+bool ContentMainDelegate::ShouldLoadV8Snapshot(
+    const std::string& process_type) {
+  // The gpu does not need v8, and the browser only needs v8 when in single
+  // process mode.
+  if (process_type == switches::kGpuProcess ||
+      (process_type.empty() &&
+       !base::CommandLine::ForCurrentProcess()->HasSwitch(
+           switches::kSingleProcess))) {
+    return false;
+  }
+  return true;
 }
 
 }  // namespace content

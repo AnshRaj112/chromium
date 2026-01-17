@@ -6,7 +6,6 @@
 
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/task/single_thread_task_runner.h"
@@ -14,6 +13,7 @@
 #include "cc/test/test_client_shared_image_interface.h"
 #include "cc/tiles/image_decode_cache_utils.h"
 #include "cc/trees/layer_tree_frame_sink_client.h"
+#include "components/viz/common/features.h"
 #include "components/viz/common/frame_sinks/begin_frame_source.h"
 #include "components/viz/common/frame_sinks/delay_based_time_source.h"
 #include "components/viz/common/resources/returned_resource.h"
@@ -96,7 +96,9 @@ std::unique_ptr<LayerContext> FakeLayerTreeFrameSink::CreateLayerContext(
 }
 
 void FakeLayerTreeFrameSink::DidReceiveCompositorFrameAck() {
-  client_->DidReceiveCompositorFrameAck();
+  if (!base::FeatureList::IsEnabled(features::kNoCompositorFrameAcks)) {
+    client_->DidReceiveCompositorFrameAck();
+  }
 }
 
 void FakeLayerTreeFrameSink::ReturnResourcesHeldByParent() {

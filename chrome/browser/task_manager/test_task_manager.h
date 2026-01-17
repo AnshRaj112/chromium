@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "base/byte_count.h"
 #include "base/time/time.h"
 #include "chrome/browser/task_manager/task_manager_interface.h"
 
@@ -29,10 +30,13 @@ class TestTaskManager : public TaskManagerInterface {
   double GetPlatformIndependentCPUUsage(TaskId task_id) const override;
   base::Time GetStartTime(TaskId task_id) const override;
   base::TimeDelta GetCpuTime(TaskId task_id) const override;
-  int64_t GetMemoryFootprintUsage(TaskId task_id) const override;
-  int64_t GetSwappedMemoryUsage(TaskId task_id) const override;
-  int64_t GetGpuMemoryUsage(TaskId task_id,
-                            bool* has_duplicates) const override;
+  std::optional<base::ByteSize> GetMemoryFootprintUsage(
+      TaskId task_id) const override;
+  std::optional<base::ByteSize> GetSwappedMemoryUsage(
+      TaskId task_id) const override;
+  std::optional<base::ByteSize> GetGpuMemoryUsage(
+      TaskId task_id,
+      bool* has_duplicates) const override;
   int GetIdleWakeupsPerSecond(TaskId task_id) const override;
   int GetHardFaultsPerSecond(TaskId task_id) const override;
   void GetGDIHandles(TaskId task_id,
@@ -56,14 +60,15 @@ class TestTaskManager : public TaskManagerInterface {
   void GetTerminationStatus(TaskId task_id,
                             base::TerminationStatus* out_status,
                             int* out_error_code) const override;
-  int64_t GetNetworkUsage(TaskId task_id) const override;
-  int64_t GetProcessTotalNetworkUsage(TaskId task_id) const override;
-  int64_t GetCumulativeNetworkUsage(TaskId task_id) const override;
-  int64_t GetCumulativeProcessTotalNetworkUsage(TaskId task_id) const override;
-  int64_t GetSqliteMemoryUsed(TaskId task_id) const override;
+  base::ByteSize GetNetworkUsage(TaskId task_id) const override;
+  std::optional<base::ByteSize> GetProcessTotalNetworkUsage(
+      TaskId task_id) const override;
+  base::ByteSize GetCumulativeNetworkUsage(TaskId task_id) const override;
+  std::optional<base::ByteSize> GetSqliteMemoryUsed(
+      TaskId task_id) const override;
   bool GetV8Memory(TaskId task_id,
-                   int64_t* allocated,
-                   int64_t* used) const override;
+                   base::ByteSize* allocated,
+                   base::ByteSize* used) const override;
   bool GetWebCacheStats(TaskId task_id,
                         blink::WebCacheResourceTypeStats* stats) const override;
   int GetKeepaliveCount(TaskId task_id) const override;

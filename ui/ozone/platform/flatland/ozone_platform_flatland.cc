@@ -25,7 +25,7 @@
 #include "ui/events/ozone/layout/keyboard_layout_engine_manager.h"
 #include "ui/events/ozone/layout/stub/stub_keyboard_layout_engine.h"
 #include "ui/events/platform/platform_event_source.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/ozone/common/bitmap_cursor_factory.h"
 #include "ui/ozone/common/stub_overlay_manager.h"
 #include "ui/ozone/platform/flatland/flatland_gpu_host.h"
@@ -212,7 +212,7 @@ class OzonePlatformFlatland : public OzonePlatform,
         base::SingleThreadTaskRunner::GetCurrentDefault());
   }
 
-  bool IsNativePixmapConfigSupported(gfx::BufferFormat format,
+  bool IsNativePixmapConfigSupported(viz::SharedImageFormat format,
                                      gfx::BufferUsage usage) const override {
     return FlatlandSysmemBufferCollection::IsNativePixmapConfigSupported(format,
                                                                          usage);

@@ -24,8 +24,8 @@ std::string ErrorToString(GoogleServiceAuthError::State error_state) {
   switch (error_state) {
     case GoogleServiceAuthError::INVALID_GAIA_CREDENTIALS:
       return "InvalidGaiaCredentials";
-    case GoogleServiceAuthError::USER_NOT_SIGNED_UP:
-      return "UserNotSignedUp";
+    case GoogleServiceAuthError::ACCOUNT_NOT_FOUND:
+      return "AccountNotFound";
     case GoogleServiceAuthError::CONNECTION_FAILED:
       return "ConnectionFailed";
     case GoogleServiceAuthError::SERVICE_UNAVAILABLE:
@@ -51,29 +51,24 @@ std::string ErrorToString(GoogleServiceAuthError::State error_state) {
 namespace signin {
 
 BASE_FEATURE(kRestrictSignoutAccessTokenFetch,
-             "RestrictSignoutAccessTokenFetch",
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
              base::FEATURE_ENABLED_BY_DEFAULT);
-#else
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
 AccessTokenFetcher::AccessTokenFetcher(
     const CoreAccountId& account_id,
-    const std::string& oauth_consumer_name,
+    OAuthConsumerId oauth_consumer_id,
+    const OAuthConsumer& oauth_consumer,
     ProfileOAuth2TokenService* token_service,
     PrimaryAccountManager* primary_account_manager,
-    const ScopeSet& scopes,
     TokenCallback callback,
     Mode mode,
     bool require_sync_consent_for_scope_verification,
     Source token_source)
     : AccessTokenFetcher(account_id,
-                         oauth_consumer_name,
+                         oauth_consumer_id,
+                         oauth_consumer,
                          token_service,
                          primary_account_manager,
                          /*url_loader_factory=*/nullptr,
-                         scopes,
                          std::move(callback),
                          mode,
                          require_sync_consent_for_scope_verification,
@@ -81,26 +76,27 @@ AccessTokenFetcher::AccessTokenFetcher(
 
 AccessTokenFetcher::AccessTokenFetcher(
     const CoreAccountId& account_id,
-    const std::string& oauth_consumer_name,
+    OAuthConsumerId oauth_consumer_id,
+    const OAuthConsumer& oauth_consumer,
     ProfileOAuth2TokenService* token_service,
     PrimaryAccountManager* primary_account_manager,
     scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
-    const ScopeSet& scopes,
     TokenCallback callback,
     Mode mode,
     bool require_sync_consent_for_scope_verification,
     Source token_source)
-    : OAuth2AccessTokenManager::Consumer(oauth_consumer_name),
+    : OAuth2AccessTokenManager::Consumer(oauth_consumer.GetName()),
       account_id_(account_id),
       token_service_(token_service),
       primary_account_manager_(primary_account_manager),
       url_loader_factory_(std::move(url_loader_factory)),
-      scopes_(scopes),
+      scopes_(oauth_consumer.GetScopes()),
       callback_(std::move(callback)),
       mode_(mode),
       token_source_(token_source),
       require_sync_consent_for_scope_verification_(
-          require_sync_consent_for_scope_verification) {
+          require_sync_consent_for_scope_verification),
+      oauth_consumer_id_(oauth_consumer_id) {
   if (mode_ == Mode::kImmediate || IsRefreshTokenAvailable()) {
     StartAccessTokenRequest();
     return;
@@ -112,68 +108,6 @@ AccessTokenFetcher::AccessTokenFetcher(
   token_service_observation_.Observe(token_service_.get());
 }
 
-AccessTokenFetcher::AccessTokenFetcher(
-    const CoreAccountId& account_id,
-    OAuthConsumerId oauth_consumer_id,
-    ProfileOAuth2TokenService* token_service,
-    PrimaryAccountManager* primary_account_manager,
-    TokenCallback callback,
-    Mode mode,
-    bool require_sync_consent_for_scope_verification,
-    Source token_source)
-    : AccessTokenFetcher(account_id,
-                         oauth_consumer_id,
-                         token_service,
-                         primary_account_manager,
-                         /*url_loader_factory=*/nullptr,
-                         std::move(callback),
-                         mode,
-                         require_sync_consent_for_scope_verification,
-                         token_source) {}
-
-AccessTokenFetcher::AccessTokenFetcher(
-    const CoreAccountId& account_id,
-    OAuthConsumerId oauth_consumer_id,
-    ProfileOAuth2TokenService* token_service,
-    PrimaryAccountManager* primary_account_manager,
-    scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
-    TokenCallback callback,
-    Mode mode,
-    bool require_sync_consent_for_scope_verification,
-    Source token_source)
-    : AccessTokenFetcher(account_id,
-                         GetOAuthConsumerFromId(oauth_consumer_id),
-                         token_service,
-                         primary_account_manager,
-                         url_loader_factory,
-                         std::move(callback),
-                         mode,
-                         require_sync_consent_for_scope_verification,
-                         token_source) {
-  oauth_consumer_id_ = oauth_consumer_id;
-}
-
-AccessTokenFetcher::AccessTokenFetcher(
-    const CoreAccountId& account_id,
-    const OAuthConsumer& oauth_consumer,
-    ProfileOAuth2TokenService* token_service,
-    PrimaryAccountManager* primary_account_manager,
-    scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
-    TokenCallback callback,
-    Mode mode,
-    bool require_sync_consent_for_scope_verification,
-    Source token_source)
-    : AccessTokenFetcher(account_id,
-                         oauth_consumer.GetName(),
-                         token_service,
-                         primary_account_manager,
-                         url_loader_factory,
-                         oauth_consumer.GetScopes(),
-                         std::move(callback),
-                         mode,
-                         require_sync_consent_for_scope_verification,
-                         token_source) {}
-
 AccessTokenFetcher::~AccessTokenFetcher() = default;
 
 void AccessTokenFetcher::VerifyScopeAccess() {
@@ -184,7 +118,7 @@ void AccessTokenFetcher::VerifyScopeAccess() {
   }
 
   // The consumer has privileged access to all scopes, return early.
-  if (IsPrivilegedOAuth2Consumer(/*consumer_name=*/id())) {
+  if (IsPrivilegedOAuth2Consumer(oauth_consumer_id_)) {
     VLOG(1) << id() << " has access rights to scopes: "
             << base::JoinString(
                    std::vector<std::string>(scopes_.begin(), scopes_.end()),
@@ -313,10 +247,8 @@ void AccessTokenFetcher::OnGetTokenSuccess(
   std::unique_ptr<OAuth2AccessTokenManager::Request> request_deleter(
       std::move(access_token_request_));
 
-  if (oauth_consumer_id_.has_value()) {
-    base::UmaHistogramEnumeration("Signin.AccessTokenFetch.Success",
-                                  oauth_consumer_id_.value());
-  }
+  base::UmaHistogramEnumeration("Signin.AccessTokenFetch.Success",
+                                oauth_consumer_id_);
   RunCallbackAndMaybeDie(
       GoogleServiceAuthError::AuthErrorNone(),
       AccessTokenInfo(token_response.access_token,
@@ -332,13 +264,10 @@ void AccessTokenFetcher::OnGetTokenFailure(
   std::unique_ptr<OAuth2AccessTokenManager::Request> request_deleter(
       std::move(access_token_request_));
 
-  if (oauth_consumer_id_.has_value()) {
-    CHECK(error.state() != GoogleServiceAuthError::NONE);
-    std::string error_str = ErrorToString(error.state());
-    base::UmaHistogramEnumeration(
-        "Signin.AccessTokenFetch.Failure." + error_str,
-        oauth_consumer_id_.value());
-  }
+  CHECK(error.state() != GoogleServiceAuthError::NONE);
+  std::string error_str = ErrorToString(error.state());
+  base::UmaHistogramEnumeration("Signin.AccessTokenFetch.Failure." + error_str,
+                                oauth_consumer_id_);
   RunCallbackAndMaybeDie(error, AccessTokenInfo());
 
   // Potentially dead after the above invocation; nothing to do except return.

@@ -10,7 +10,6 @@
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -52,9 +51,7 @@ namespace chromeos {
 // default because this is a bug fix. Only putting it behind a feature flag for
 // kill switch in case of emergency.
 // TODO(b/339059662): remove feature flag once retries are in stable channel.
-BASE_FEATURE(kEnableRetryEnqueueRecord,
-             "EnableRetryEnqueueRecord",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kEnableRetryEnqueueRecord, base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Number of seconds we'll retry to enqueue a record if Missive is unavailable.
 // If `kEnableRetryEnqueueRecord` is not enabled, the parameter is not set, or
@@ -93,7 +90,7 @@ bool IsApiKeyAccepted(std::string_view api_key) {
   }
   const std::string lowercase_api_key = base::ToLowerASCII(api_key);
   for (auto key : kBlockListedKeys) {
-    if (base::Contains(lowercase_api_key, key)) {
+    if (lowercase_api_key.contains(key)) {
       LOG(ERROR) << "API Key is block-listed: " << api_key;
       return false;
     }

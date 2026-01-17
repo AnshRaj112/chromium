@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "ui/accessibility/platform/ax_platform_node_auralinux.h"
 
 #include <stdint.h>
@@ -2754,9 +2749,14 @@ AtkRole AXPlatformNodeAuraLinux::GetAtkRole() const {
     case ax::mojom::Role::kEmbeddedObject:
       return ATK_ROLE_EMBEDDED;
     case ax::mojom::Role::kForm:
-      // TODO(accessibility) Forms which lack an accessible name are no longer
-      // exposed as forms. http://crbug.com/874384. Forms which have accessible
-      // names should be exposed as ATK_ROLE_LANDMARK according to Core AAM.
+      // Per Core AAM, named forms should be exposed as landmarks.
+      // TODO(crbug.com/468317749): Blink currently maps unnamed <form> to
+      // kSection instead of kForm. Once fixed, platforms will handle the
+      // mapping. For now, explicit role="form" without a name still reaches
+      // here and should remain ATK_ROLE_FORM.
+      if (HasStringAttribute(ax::mojom::StringAttribute::kName)) {
+        return ATK_ROLE_LANDMARK;
+      }
       return ATK_ROLE_FORM;
     case ax::mojom::Role::kFigure:
     case ax::mojom::Role::kFeed:
@@ -2893,6 +2893,8 @@ AtkRole AXPlatformNodeAuraLinux::GetAtkRole() const {
       return ATK_ROLE_CHECK_MENU_ITEM;
     case ax::mojom::Role::kMenuItemRadio:
       return ATK_ROLE_RADIO_MENU_ITEM;
+    case ax::mojom::Role::kMenuItemSeparator:
+      return ATK_ROLE_SEPARATOR;
     case ax::mojom::Role::kMenuListPopup:
       return ATK_ROLE_MENU;
     case ax::mojom::Role::kMenuListOption:
@@ -4638,7 +4640,7 @@ void AXPlatformNodeAuraLinux::GetFloatAttributeInGValue(
     GValue* value) {
   float float_val;
   if (GetFloatAttribute(attr, &float_val)) {
-    memset(value, 0, sizeof(*value));
+    *value = {};
     g_value_init(value, G_TYPE_FLOAT);
     g_value_set_float(value, float_val);
   }

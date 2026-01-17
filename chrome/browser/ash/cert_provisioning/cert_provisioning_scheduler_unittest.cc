@@ -4,7 +4,6 @@
 
 #include "chrome/browser/ash/cert_provisioning/cert_provisioning_scheduler.h"
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/test/values_test_util.h"
@@ -32,7 +31,6 @@ using testing::_;
 using testing::AtLeast;
 using testing::ByMove;
 using testing::Exactly;
-using testing::Invoke;
 using testing::Mock;
 using testing::Return;
 using testing::ReturnRef;
@@ -316,8 +314,7 @@ TEST_F(CertProvisioningSchedulerTest, WorkerFailed) {
   // Failed worker should be deleted, failed profile ID is saved, no new
   // workers should be created.
   EXPECT_EQ(scheduler.GetWorkers().size(), 0U);
-  EXPECT_TRUE(
-      base::Contains(scheduler.GetFailedCertProfileIds(), kCertProfileId));
+  EXPECT_TRUE(scheduler.GetFailedCertProfileIds().contains(kCertProfileId));
 
   certificate_helper_->AddCert(kCertScope, kCertProfileId);
 
@@ -362,8 +359,7 @@ TEST_F(CertProvisioningSchedulerTest, InitialAndDailyUpdates) {
                               CertProvisioningWorkerState::kFailed);
 
   ASSERT_EQ(scheduler.GetWorkers().size(), 0U);
-  EXPECT_TRUE(
-      base::Contains(scheduler.GetFailedCertProfileIds(), kCertProfileId));
+  EXPECT_TRUE(scheduler.GetFailedCertProfileIds().contains(kCertProfileId));
 
   // No workers should be created yet.
   FastForwardBy(base::Hours(20));
@@ -479,8 +475,7 @@ TEST_F(CertProvisioningSchedulerTest, MultipleWorkers) {
                               CertProvisioningWorkerState::kFailed);
 
   EXPECT_EQ(scheduler.GetWorkers().size(), 1U);
-  EXPECT_TRUE(
-      base::Contains(scheduler.GetFailedCertProfileIds(), kCertProfileId2));
+  EXPECT_TRUE(scheduler.GetFailedCertProfileIds().contains(kCertProfileId2));
 
   certificate_helper_->AddCert(kCertScope, kCertProfileId0);
 
@@ -488,8 +483,7 @@ TEST_F(CertProvisioningSchedulerTest, MultipleWorkers) {
   scheduler.UpdateAllWorkers();
 
   EXPECT_EQ(scheduler.GetWorkers().size(), 1U);
-  EXPECT_TRUE(
-      base::Contains(scheduler.GetFailedCertProfileIds(), kCertProfileId2));
+  EXPECT_TRUE(scheduler.GetFailedCertProfileIds().contains(kCertProfileId2));
 
   // Check one more time that scheduler doesn't create new workers for failed
   // certificate profiles (the factory will fail on an attempt to do so).
@@ -1187,8 +1181,7 @@ TEST_F(CertProvisioningSchedulerTest, StateChangeNotifications) {
   observer.WaitForOneCall();
 
   EXPECT_EQ(scheduler.GetWorkers().size(), 0U);
-  EXPECT_TRUE(
-      base::Contains(scheduler.GetFailedCertProfileIds(), kCertProfileId1));
+  EXPECT_TRUE(scheduler.GetFailedCertProfileIds().contains(kCertProfileId1));
 }
 
 TEST_F(CertProvisioningSchedulerTest, HoldBackNotifications) {
@@ -1358,8 +1351,7 @@ TEST_F(CertProvisioningSchedulerTest, PolicyChangeClearsFailedWorkers) {
                               CertProvisioningWorkerState::kFailed);
 
   ASSERT_EQ(scheduler.GetWorkers().size(), 0U);
-  ASSERT_TRUE(
-      base::Contains(scheduler.GetFailedCertProfileIds(), kCertProfileId));
+  ASSERT_TRUE(scheduler.GetFailedCertProfileIds().contains(kCertProfileId));
   ASSERT_EQ(observer.ReadAndResetCallCount(), 1U);
 
   // Change the policy to the empty one, the failed worker should be cleared.
@@ -1412,8 +1404,7 @@ TEST_F(CertProvisioningSchedulerTest, PolicyUpdateRestartsFailedWorkers) {
                               CertProvisioningWorkerState::kFailed);
 
   ASSERT_EQ(scheduler.GetWorkers().size(), 0U);
-  ASSERT_TRUE(
-      base::Contains(scheduler.GetFailedCertProfileIds(), kCertProfileId));
+  ASSERT_TRUE(scheduler.GetFailedCertProfileIds().contains(kCertProfileId));
   ASSERT_EQ(observer.ReadAndResetCallCount(), 1U);
 
   CertProfile updated_cert_profile(
@@ -1437,7 +1428,7 @@ TEST_F(CertProvisioningSchedulerTest, PolicyUpdateRestartsFailedWorkers) {
   pref_service_.Set(GetPrefNameForCertProfiles(kCertScope), updated_config);
   FastForwardBy(base::Seconds(1));
 
-  ASSERT_TRUE(base::Contains(scheduler.GetWorkers(), kCertProfileId));
+  ASSERT_TRUE(scheduler.GetWorkers().contains(kCertProfileId));
   ASSERT_EQ(scheduler.GetFailedCertProfileIds().size(), 0U);
   ASSERT_GE(observer.ReadAndResetCallCount(), 1U);
 }

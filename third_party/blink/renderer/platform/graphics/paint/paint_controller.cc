@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/platform/graphics/paint/paint_controller.h"
 
+#include <cstdint>
 #include <memory>
 
 #include "base/logging.h"
@@ -183,6 +184,21 @@ void PaintController::RecordRegionCaptureData(
   if (paint_chunker_.AddRegionCaptureDataToCurrentChunk(id, client, crop_id,
                                                         rect))
     CheckNewChunk();
+}
+
+void PaintController::RecordTrackedElementData(
+    const DisplayItemClient& client,
+    const TrackedElementId& highlight_id,
+    const gfx::Rect& rect) {
+  DCHECK(!highlight_id->is_zero());
+  PaintChunk::Id id(client.Id(), DisplayItem::kTrackedElement,
+                    current_fragment_);
+  CheckNewChunkId(id);
+  ValidateNewChunkClient(client);
+  if (paint_chunker_.AddTrackedElementDataToCurrentChunk(id, client,
+                                                         highlight_id, rect)) {
+    CheckNewChunk();
+  }
 }
 
 void PaintController::RecordScrollHitTestData(
@@ -886,7 +902,7 @@ void PaintController::BeginFrame(const void* frame) {
 
 FrameFirstPaint PaintController::EndFrame(const void* frame) {
   FrameFirstPaint result = frame_first_paints_.back();
-  DCHECK(result.frame == frame);
+  DCHECK(result.frame == reinterpret_cast<uintptr_t>(frame));
   frame_first_paints_.pop_back();
   return result;
 }

@@ -10,6 +10,7 @@
 #include "chrome/browser/visibility_timer_tab_helper.h"
 #include "components/content_settings/browser/page_specific_content_settings.h"
 #include "components/permissions/permission_decision.h"
+#include "components/permissions/permission_prompt_decision.h"
 #include "components/permissions/permission_request_id.h"
 #include "content/public/browser/browser_context.h"
 #include "services/network/public/mojom/permissions_policy/permissions_policy_feature.mojom.h"
@@ -25,12 +26,11 @@ IdleDetectionPermissionContext::IdleDetectionPermissionContext(
 IdleDetectionPermissionContext::~IdleDetectionPermissionContext() = default;
 
 void IdleDetectionPermissionContext::UpdateTabContext(
-    const permissions::PermissionRequestID& id,
-    const GURL& requesting_frame,
+    const permissions::PermissionRequestData& request_data,
     bool allowed) {
   content_settings::PageSpecificContentSettings* content_settings =
       content_settings::PageSpecificContentSettings::GetForFrame(
-          id.global_render_frame_host_id());
+          request_data.id.global_render_frame_host_id());
   if (!content_settings)
     return;
 
@@ -71,8 +71,11 @@ void IdleDetectionPermissionContext::DecidePermission(
                   if (context) {
                     context->NotifyPermissionSet(
                         *request_data, std::move(callback),
-                        /*persist=*/true, PermissionDecision::kDeny,
-                        /*is_final_decision=*/true);
+                        /*persist=*/true,
+                        permissions::PermissionPromptDecision{
+                            .overall_decision = PermissionDecision::kDeny,
+                            .prompt_options = std::monostate(),
+                            .is_final = true});
                   }
                 },
                 weak_factory_.GetWeakPtr(), std::move(request_data),

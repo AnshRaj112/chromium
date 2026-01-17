@@ -43,7 +43,8 @@ class CORE_EXPORT LayoutTableSection : public LayoutBlock {
   void WillBeRemovedFromTree() override;
 
   void StyleDidChange(StyleDifference diff,
-                      const ComputedStyle* old_style) override;
+                      const ComputedStyle* old_style,
+                      const StyleChangeContext&) override;
 
   LayoutBox* CreateAnonymousBoxWithSameTypeAs(
       const LayoutObject* parent) const override;
@@ -76,10 +77,15 @@ class CORE_EXPORT LayoutTableSection : public LayoutBlock {
 
   unsigned NumRows() const;
 
- protected:
+ private:
   bool IsTableSection() const final {
     NOT_DESTROYED();
     return true;
+  }
+
+  bool CanMergeWith(const LayoutBoxModelObject& other) const override {
+    NOT_DESTROYED();
+    return other.IsTableSection();
   }
 
   // Table section paints background specially.

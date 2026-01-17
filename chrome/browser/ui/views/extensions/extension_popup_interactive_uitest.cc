@@ -8,7 +8,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/extensions/extension_action_test_helper.h"
 #include "chrome/browser/ui/views/extensions/extension_popup.h"
-#include "chrome/browser/ui/views/extensions/extensions_toolbar_container.h"
+#include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
 #include "chrome/browser/ui/views/extensions/security_dialog_tracker.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
@@ -30,7 +30,7 @@
 #include "net/test/embedded_test_server/controllable_http_response.h"
 #include "ui/base/mojom/ui_base_types.mojom-shared.h"
 #include "ui/events/base_event_utils.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/test/widget_activation_waiter.h"
 #include "ui/views/test/widget_test.h"
@@ -197,7 +197,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionPopupInteractiveUiTest,
   // Navigate to an https site.
   const GURL secure_url =
       embedded_test_server()->GetURL("example.com", "/simple.html");
-  EXPECT_EQ("https", secure_url.scheme());
+  EXPECT_EQ("https", secure_url.GetScheme());
 
   content::RenderFrameHost* frame =
       ui_test_utils::NavigateToURL(browser(), secure_url);
@@ -597,10 +597,10 @@ IN_PROC_BROWSER_TEST_F(ExtensionPopupInteractiveUiTest,
                                                    extension->id());
   popup_waiter.RestrictToType(extensions::mojom::ViewType::kExtensionPopup);
   BrowserView& browser_view = browser()->GetBrowserView();
-  ExtensionsToolbarContainer* extensions_container =
+  ExtensionsToolbarDesktop* extensions_container =
       browser_view.toolbar()->extensions_container();
-  extensions_container->ShowToolbarActionPopupForAPICall(extension->id(),
-                                                         ShowPopupCallback());
+  extensions_container->GetToolbarViewModel()->ShowToolbarActionPopupForAPICall(
+      extension->id(), ShowPopupCallback());
 
   // The extension should load the image.
   slow_img_response.WaitForRequest();

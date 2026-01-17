@@ -8,9 +8,6 @@ import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-
 import android.view.View;
 
 import androidx.test.filters.LargeTest;
@@ -21,17 +18,16 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Feature;
+import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.HistogramWatcher;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
-import org.chromium.chrome.browser.password_manager.PasswordManagerUtilBridge;
-import org.chromium.chrome.browser.password_manager.PasswordManagerUtilBridgeJni;
 import org.chromium.chrome.browser.settings.SettingsActivityTestRule;
 import org.chromium.chrome.browser.sync.FakeSyncServiceImpl;
 import org.chromium.chrome.browser.sync.SyncServiceFactory;
@@ -49,6 +45,7 @@ import org.chromium.ui.test.util.ViewUtils;
 /** Test suite for IdentityErrorCardPreference */
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
+@DisableFeatures(ChromeFeatureList.SETTINGS_MULTI_COLUMN)
 public class IdentityErrorCardPreferenceTest {
     public final SettingsActivityTestRule<ManageSyncSettings> mSettingsActivityTestRule =
             new SettingsActivityTestRule<>(ManageSyncSettings.class);
@@ -67,7 +64,7 @@ public class IdentityErrorCardPreferenceTest {
     @Rule public final SigninTestRule mSigninTestRule = new SigninTestRule();
 
     private static final String RENDER_TEST_DESCRIPTION = "Identity error card.";
-    private static final int RENDER_TEST_REVISION = 1;
+    private static final int RENDER_TEST_REVISION = 2;
 
     @Rule
     public final ChromeRenderTestRule mRenderTestRule =
@@ -77,15 +74,11 @@ public class IdentityErrorCardPreferenceTest {
                     .setBugComponent(ChromeRenderTestRule.Component.SERVICES_SYNC)
                     .build();
 
-    @Mock private PasswordManagerUtilBridge.Natives mPasswordManagerUtilBridgeJniMock;
-
     private FakeSyncServiceImpl mFakeSyncServiceImpl;
     private WebPageStation mPage;
 
     @Before
     public void setUp() {
-        PasswordManagerUtilBridgeJni.setInstanceForTesting(mPasswordManagerUtilBridgeJniMock);
-
         mPage = mActivityTestRule.startOnBlankPage();
 
         ThreadUtils.runOnUiThreadBlocking(
@@ -235,7 +228,7 @@ public class IdentityErrorCardPreferenceTest {
     @LargeTest
     @Feature("RenderTest")
     public void testIdentityErrorCardForUpmBackendOutdated() throws Exception {
-        when(mPasswordManagerUtilBridgeJniMock.isGmsCoreUpdateRequired(any())).thenReturn(true);
+        mFakeSyncServiceImpl.setRequiresUpmBackendUpgrade(true);
 
         mSigninTestRule.addTestAccountThenSignin();
 
@@ -247,6 +240,23 @@ public class IdentityErrorCardPreferenceTest {
         }
         mRenderTestRule.render(
                 getIdentityErrorCardView(), "identity_error_card_upm_backend_outdated");
+    }
+
+    @Test
+    @LargeTest
+    @Feature("RenderTest")
+    public void testIdentityErrorCardForBookmarksLimitExceeded() throws Exception {
+        mFakeSyncServiceImpl.setBookmarksLimitExceeded(true);
+        mSigninTestRule.addTestAccountThenSignin();
+
+        try (HistogramWatcher watchIdentityErrorCardShownHistogram =
+                HistogramWatcher.newSingleRecordWatcher(
+                        "Sync.IdentityErrorCard.BookmarkLimitReached",
+                        SyncSettingsUtils.ErrorUiAction.SHOWN)) {
+            mSettingsActivityTestRule.startSettingsActivity();
+        }
+        mRenderTestRule.render(
+                getIdentityErrorCardView(), "identity_error_card_bookmark_limit_reached");
     }
 
     @Test

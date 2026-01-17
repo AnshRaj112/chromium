@@ -21,7 +21,6 @@
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/accounts_mutator.h"
 #include "components/signin/public/identity_manager/primary_account_access_token_fetcher.h"
-#include "components/signin/public/identity_manager/scope_set.h"
 #include "components/signin/public/identity_manager/tribool.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
@@ -228,12 +227,10 @@ void AdvancedProtectionStatusManagerDesktop::RefreshAdvancedProtectionStatus() {
   // can be determined from the "service flags" contained in the response.
   // Note that the (quite powerful) `kOAuth1LoginScope` is required for the
   // server to return the service flags.
-  signin::ScopeSet scopes;
-  scopes.insert(GaiaConstants::kOAuth1LoginScope);
-
   access_token_fetcher_ = std::make_unique<
       signin::PrimaryAccountAccessTokenFetcher>(
-      "advanced_protection_status_manager", identity_manager_, scopes,
+      signin::OAuthConsumerId::kAdvancedProtectionStatusManager,
+      identity_manager_,
       base::BindOnce(
           &AdvancedProtectionStatusManagerDesktop::OnAccessTokenFetchComplete,
           base::Unretained(this), unconsented_primary_account_id),

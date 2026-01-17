@@ -44,7 +44,7 @@ namespace partition_alloc::internal {
 #pragma optimize("", off)
 #endif
 PA_ALWAYS_INLINE void SecureMemset(void* ptr, uint8_t value, size_t size) {
-  memset(ptr, value, size);
+  PA_UNSAFE_TODO(memset(ptr, value, size));
 
 #if !PA_CONFIG(IS_NONCLANG_MSVC)
   // As best as we can tell, this is sufficient to break any optimisations that
@@ -69,24 +69,12 @@ PA_ALWAYS_INLINE void DebugMemset(void* ptr, int value, size_t size) {
   LiftThreadIsolationScope lift_thread_isolation_restrictions;
 #endif
   size_t size_to_memset = std::min(size, size_t{1} << 19);
-  memset(ptr, value, size_to_memset);
+  PA_UNSAFE_TODO(memset(ptr, value, size_to_memset));
 }
 #endif  // PA_BUILDFLAG(EXPENSIVE_DCHECKS_ARE_ON)
 
 PA_ALWAYS_INLINE uintptr_t ObjectInnerPtr2Addr(const void* ptr) {
   return UntagPtr(ptr);
-}
-PA_ALWAYS_INLINE uintptr_t ObjectPtr2Addr(const void* object) {
-  // TODO(bartekn): Check that |object| is indeed an object start.
-  return ObjectInnerPtr2Addr(object);
-}
-PA_ALWAYS_INLINE void* SlotStartAddr2Ptr(uintptr_t slot_start) {
-  // TODO(bartekn): Check that |slot_start| is indeed a slot start.
-  return TagAddr(slot_start);
-}
-PA_ALWAYS_INLINE uintptr_t SlotStartPtr2Addr(const void* slot_start) {
-  // TODO(bartekn): Check that |slot_start| is indeed a slot start.
-  return UntagPtr(slot_start);
 }
 
 // In order to resolve circular dependencies, define template method:

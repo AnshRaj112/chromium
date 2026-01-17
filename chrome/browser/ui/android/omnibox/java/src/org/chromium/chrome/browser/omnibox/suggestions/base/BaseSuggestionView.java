@@ -4,30 +4,30 @@
 
 package org.chromium.chrome.browser.omnibox.suggestions.base;
 
+import static org.chromium.build.NullUtil.assumeNonNull;
+
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityEvent;
 import android.widget.ImageView;
 
 import androidx.annotation.LayoutRes;
 import androidx.annotation.VisibleForTesting;
-import androidx.appcompat.content.res.AppCompatResources;
-import androidx.appcompat.widget.AppCompatImageView;
 
 import org.chromium.build.annotations.CheckDiscard;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.chrome.browser.omnibox.R;
 import org.chromium.chrome.browser.omnibox.suggestions.SimpleSelectionController;
-import org.chromium.chrome.browser.util.KeyNavigationUtil;
 import org.chromium.components.browser_ui.widget.RoundedCornerOutlineProvider;
+import org.chromium.ui.base.KeyNavigationUtil;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.OptionalInt;
 
 /**
  * Base layout for common suggestion types. Includes support for a configurable suggestion content
@@ -41,9 +41,16 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
     public final T contentView;
     public final ActionChipsView actionChipsView;
     public final RoundedCornerOutlineProvider decorationIconOutline;
-    private final List<ImageView> mActionButtons;
+    private final List<ActionButtonView> mActionButtons;
     private final SimpleSelectionController mActionButtonsHighlighter;
-    private Optional<Runnable> mOnFocusViaSelectionListener = Optional.empty();
+    private final View.OnTouchListener mActionButtonTouchListener;
+    private @Nullable Runnable mOnFocusViaSelectionListener;
+    // Tracks whether the suggestion view is currently hovered during motion. This value diffs
+    // from isHovered(), which stays active if the action button is hovered even when the suggestion
+    // view itself is not hovered.
+    private boolean mSelfMotionHovered;
+    private boolean mAnyActionButtonHovered;
+    private boolean mAnyActionButtonPressed;
 
     /**
      * Constructs a new suggestion view and inflates supplied layout as the contents view.
@@ -91,6 +98,24 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
                         this::highlightActionButton,
                         0,
                         SimpleSelectionController.Mode.SATURATING_WITH_SENTINEL);
+
+        mActionButtonTouchListener =
+                new View.OnTouchListener() {
+                    @SuppressLint("ClickableViewAccessibility")
+                    @Override
+                    public boolean onTouch(View v, MotionEvent event) {
+                        switch (event.getAction()) {
+                            case MotionEvent.ACTION_DOWN:
+                                mAnyActionButtonPressed = true;
+                                break;
+                            case MotionEvent.ACTION_UP:
+                            case MotionEvent.ACTION_CANCEL:
+                                mAnyActionButtonPressed = false;
+                                break;
+                        }
+                        return false;
+                    }
+                };
     }
 
     /**
@@ -113,7 +138,7 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
     /**
      * @return List of Action views.
      */
-    public List<ImageView> getActionButtons() {
+    public List<ActionButtonView> getActionButtons() {
         return mActionButtons;
     }
 
@@ -123,14 +148,12 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
      * @param buttonIndex the index of an action button
      * @param isSelected whether to apply hairline
      */
-    private void highlightActionButton(int buttonIndex, boolean isHighlighted) {
-        mActionButtons
-                .get(buttonIndex)
-                .setForeground(
-                        isHighlighted
-                                ? AppCompatResources.getDrawable(
-                                        getContext(), R.drawable.hairline_circle)
-                                : null);
+    private void highlightActionButton(int buttonIndex, boolean isSelected) {
+        ActionButtonView actionButtonView = mActionButtons.get(buttonIndex);
+        actionButtonView.setSelected(isSelected);
+        if (isSelected) {
+            actionButtonView.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);
+        }
     }
 
     /**
@@ -138,18 +161,59 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
      *
      * @param desiredViewCount Desired number of action buttons.
      */
+    @SuppressLint("ClickableViewAccessibility")
     private void increaseActionButtonsCount(int desiredViewCount) {
         for (int index = mActionButtons.size(); index < desiredViewCount; index++) {
-            ImageView actionView = new AppCompatImageView(getContext());
-            actionView.setClickable(true);
-            actionView.setFocusable(true);
-            actionView.setScaleType(ImageView.ScaleType.CENTER);
+            ActionButtonView actionView = new ActionButtonView(getContext());
+            actionView.setOnHoverListener(
+                    (v, event) -> {
+                        int action = event.getActionMasked();
+                        if (action == MotionEvent.ACTION_HOVER_ENTER
+                                || action == MotionEvent.ACTION_HOVER_EXIT) {
+                            // When the action button is pressed, HOVER_EXIT is emitted before the
+                            // touch event. We need to detect and set pressed state in advance in
+                            // order to avoid the premature hiding of the action button.
+                            boolean pressed =
+                                    (event.getButtonState() & MotionEvent.BUTTON_PRIMARY) != 0;
+                            if (pressed) {
+                                actionView.setPressed(true);
+                            }
+
+                            boolean hovered = action == MotionEvent.ACTION_HOVER_ENTER;
+                            actionView.setHovered(hovered);
+                            mAnyActionButtonHovered = hovered;
+
+                            // When the action button is hovered, the suggestion view is also
+                            // rendered as hovered. After that, when the mouse moves away from the
+                            // action button, the mouse may:
+                            //
+                            // * Enter the suggestion view. The suggestion view will receive and
+                            //   process the hover enter event and keep the hover state drawing.
+                            //
+                            // * Move away from the suggestion view. The suggestion view will
+                            //   not have a chance to clear its hover state drawing. To deal with
+                            //   this, we force to clear its hover state.
+                            if (!mAnyActionButtonHovered && !mSelfMotionHovered && !pressed) {
+                                setHovered(false);
+                            }
+                        }
+                        return false;
+                    });
+            actionView.setOnTouchListener(mActionButtonTouchListener);
 
             actionView.setLayoutParams(
                     LayoutParams.forViewType(LayoutParams.SuggestionViewType.ACTION_BUTTON));
             mActionButtons.add(actionView);
             addView(actionView);
         }
+    }
+
+    @Override
+    public void setHovered(boolean hovered) {
+        // The suggestion view should remain in hovered drawing state when the action buttion is
+        // hovered or pressed.
+        hovered |= mAnyActionButtonHovered || mAnyActionButtonPressed;
+        super.setHovered(hovered);
     }
 
     /**
@@ -165,14 +229,19 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
     }
 
     @Override
+    public void dispatchSetSelected(boolean selected) {
+        // Do nothing. Do not assign the selected state to children.
+    }
+
+    @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         // Pass event to ActionChips first in case this key event is appropriate for ActionChip
         // navigation.
         if (actionChipsView.onKeyDown(keyCode, event)) return true;
         if (KeyNavigationUtil.isEnter(event)) {
             if (!mActionButtonsHighlighter.isParkedAtSentinel()) {
-                OptionalInt selection = mActionButtonsHighlighter.getPosition();
-                return mActionButtons.get(selection.getAsInt()).performClick();
+                int selection = assumeNonNull(mActionButtonsHighlighter.getPosition());
+                return mActionButtons.get(selection).performClick();
             }
             return performClick();
         }
@@ -200,10 +269,31 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
     }
 
     @Override
+    public boolean onHoverEvent(MotionEvent event) {
+        boolean result = super.onHoverEvent(event);
+
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_HOVER_ENTER || action == MotionEvent.ACTION_HOVER_EXIT) {
+            mSelfMotionHovered = action == MotionEvent.ACTION_HOVER_ENTER;
+            for (ActionButtonView v : mActionButtons) {
+                v.onParentViewHoverChanged(mSelfMotionHovered);
+            }
+        }
+
+        return result;
+    }
+
+    @Override
     public void setSelected(boolean selected) {
         super.setSelected(selected);
         if (mActionButtonsHighlighter != null) mActionButtonsHighlighter.reset();
-        if (selected) mOnFocusViaSelectionListener.ifPresent(Runnable::run);
+        for (ActionButtonView v : mActionButtons) {
+            v.onParentViewSelected(selected);
+        }
+
+        if (selected && mOnFocusViaSelectionListener != null) {
+            mOnFocusViaSelectionListener.run();
+        }
     }
 
     /**
@@ -212,7 +302,7 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
      * @param listener The listener to be notified about selection.
      */
     void setOnFocusViaSelectionListener(@Nullable Runnable listener) {
-        mOnFocusViaSelectionListener = Optional.ofNullable(listener);
+        mOnFocusViaSelectionListener = listener;
     }
 
     /** Set the lead-in spacing for the action chip carousel. */

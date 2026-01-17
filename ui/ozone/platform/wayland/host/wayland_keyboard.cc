@@ -12,6 +12,7 @@
 #include <cstring>
 #include <utility>
 
+#include "base/files/scoped_file.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted_memory.h"
@@ -241,6 +242,7 @@ void WaylandKeyboard::OnKeymap(void* data,
                                uint32_t format,
                                int32_t fd,
                                uint32_t size) {
+  base::ScopedFD scoped_fd(fd);
   auto* self = static_cast<WaylandKeyboard*>(data);
   DCHECK(self);
 
@@ -251,7 +253,7 @@ void WaylandKeyboard::OnKeymap(void* data,
   // mapped with MAP_PRIVATE by the recipient, as MAP_SHARED may fail."
   int map_flags =
       wl_keyboard_get_version(keyboard) >= 7 ? MAP_PRIVATE : MAP_SHARED;
-  void* keymap = mmap(nullptr, size, PROT_READ, map_flags, fd, 0);
+  void* keymap = mmap(nullptr, size, PROT_READ, map_flags, scoped_fd.get(), 0);
   if (keymap == MAP_FAILED) {
     DPLOG(ERROR) << "Failed to map XKB keymap.";
     return;
@@ -396,7 +398,15 @@ void WaylandKeyboard::ProcessKey(uint32_t serial,
                                  uint32_t key,
                                  uint32_t state,
                                  KeyEventKind kind) {
-  bool down = state == WL_KEYBOARD_KEY_STATE_PRESSED;
+  // If we receive a Repeat event while repeat info != 0,
+  // we shouldn't dispatch it.
+  if (state == WL_KEYBOARD_KEY_STATE_REPEATED &&
+      auto_repeat_handler_.IsAutoRepeatEnabled()) {
+    LOG(WARNING) << "Received key repeat event while repeat rate is non-zero";
+    return;
+  }
+
+  bool down = state != WL_KEYBOARD_KEY_STATE_RELEASED;
   if (down) {
     connection_->serial_tracker().UpdateSerial(wl::SerialType::kKeyPress,
                                                serial);
@@ -418,9 +428,11 @@ void WaylandKeyboard::ProcessKey(uint32_t serial,
     return;
   }
 
-  DispatchKey(
-      key, 0 /*scan_code*/, down, false /*repeat*/, std::make_optional(serial),
-      wl::EventMillisecondsToTimeTicks(time), device_id(), EF_NONE, kind);
+  DispatchKey(key, 0 /*scan_code*/, down,
+              state == WL_KEYBOARD_KEY_STATE_REPEATED /*repeat*/,
+              std::make_optional(serial),
+              wl::EventMillisecondsToTimeTicks(time), device_id(), EF_NONE,
+              kind);
 }
 
 void WaylandKeyboard::DispatchKey(unsigned int key,

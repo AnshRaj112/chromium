@@ -172,15 +172,11 @@ TEST_F(ControlledFramePermissionsTest, Verify) {
       case ContentSettingsType::
           FEDERATED_IDENTITY_IDENTITY_PROVIDER_REGISTRATION:
       case ContentSettingsType::ANTI_ABUSE:
-      case ContentSettingsType::THIRD_PARTY_STORAGE_PARTITIONING:
       case ContentSettingsType::HTTPS_ENFORCED:
       case ContentSettingsType::ALL_SCREEN_CAPTURE:
       case ContentSettingsType::COOKIE_CONTROLS_METADATA:
       case ContentSettingsType::TPCD_HEURISTICS_GRANTS:
       case ContentSettingsType::TPCD_METADATA_GRANTS:
-      case ContentSettingsType::TPCD_TRIAL:
-      case ContentSettingsType::TOP_LEVEL_TPCD_TRIAL:
-      case ContentSettingsType::TOP_LEVEL_TPCD_ORIGIN_TRIAL:
       case ContentSettingsType::AUTO_PICTURE_IN_PICTURE:
       case ContentSettingsType::FILE_SYSTEM_ACCESS_EXTENDED_PERMISSION:
       case ContentSettingsType::FILE_SYSTEM_ACCESS_RESTORE_PERMISSION:
@@ -198,11 +194,15 @@ TEST_F(ControlledFramePermissionsTest, Verify) {
       case ContentSettingsType::CONTROLLED_FRAME:
       case ContentSettingsType::REVOKED_DISRUPTIVE_NOTIFICATION_PERMISSIONS:
       case ContentSettingsType::LOCAL_NETWORK_ACCESS:
+      case ContentSettingsType::LOCAL_NETWORK:
+      case ContentSettingsType::LOOPBACK_NETWORK:
       case ContentSettingsType::
           ON_DEVICE_SPEECH_RECOGNITION_LANGUAGES_DOWNLOADED:
       case ContentSettingsType::INITIALIZED_TRANSLATIONS:
       case ContentSettingsType::SUSPICIOUS_NOTIFICATION_IDS:
       case ContentSettingsType::DEVICE_ATTRIBUTES:
+      case ContentSettingsType::PERMISSION_ACTIONS_HISTORY:
+      case ContentSettingsType::SUSPICIOUS_NOTIFICATION_SHOW_ORIGINAL:
         break;
 
       default:
@@ -227,6 +227,7 @@ TEST_F(ControlledFramePermissionsTest, Verify) {
       case blink::PermissionType::MIDI_SYSEX:
       case blink::PermissionType::NOTIFICATIONS:
       case blink::PermissionType::GEOLOCATION:
+      case blink::PermissionType::GEOLOCATION_APPROXIMATE:
       case blink::PermissionType::PROTECTED_MEDIA_IDENTIFIER:
       case blink::PermissionType::MIDI:
       case blink::PermissionType::DURABLE_STORAGE:
@@ -261,6 +262,8 @@ TEST_F(ControlledFramePermissionsTest, Verify) {
       case blink::PermissionType::HAND_TRACKING:
       case blink::PermissionType::WEB_APP_INSTALLATION:
       case blink::PermissionType::LOCAL_NETWORK_ACCESS:
+      case blink::PermissionType::LOCAL_NETWORK:
+      case blink::PermissionType::LOOPBACK_NETWORK:
         break;
 
       default:

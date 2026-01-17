@@ -272,8 +272,8 @@ class FullRestoreReadAndSaveTest : public testing::Test {
       int32_t index,
       chromeos::AppType app_type = chromeos::AppType::BROWSER,
       base::Uuid desk_guid = base::Uuid()) {
-    std::unique_ptr<aura::Window> window(
-        aura::test::CreateTestWindowWithId(id, nullptr));
+    std::unique_ptr<aura::Window> window =
+        aura::test::CreateTestWindow({.bounds = {100, 100}, .window_id = id});
     window->SetProperty(chromeos::kAppTypeKey, app_type);
     window->SetProperty(app_restore::kWindowIdKey, id);
     app_restore::WindowInfo window_info;
@@ -286,8 +286,8 @@ class FullRestoreReadAndSaveTest : public testing::Test {
 
   std::unique_ptr<app_restore::WindowInfo> GetArcWindowInfo(
       int32_t restore_window_id) {
-    std::unique_ptr<aura::Window> window(
-        aura::test::CreateTestWindowWithId(restore_window_id, nullptr));
+    std::unique_ptr<aura::Window> window = aura::test::CreateTestWindow(
+        {.bounds = {100, 100}, .window_id = restore_window_id});
     window->SetProperty(chromeos::kAppTypeKey, chromeos::AppType::ARC_APP);
     window->SetProperty(app_restore::kRestoreWindowIdKey, restore_window_id);
     return FullRestoreReadHandler::GetInstance()->GetWindowInfo(window.get());
@@ -501,7 +501,7 @@ TEST_F(FullRestoreReadAndSaveTest, SaveAndReadRestoreData) {
               testing::Optional(kActivationIndex1));
 
   // Verify the restore data for |kId2| doesn't exist.
-  EXPECT_FALSE(base::Contains(launch_list_it->second, kId2));
+  EXPECT_FALSE(launch_list_it->second.contains(kId2));
 
   // Verify the restore data for |kId2| is moved to |kId3|.
   const auto app_restore_data_it3 = launch_list_it->second.find(kId3);

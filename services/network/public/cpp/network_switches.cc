@@ -16,6 +16,10 @@ const char kForcePermissionPolicyUnloadDefaultEnabled[] =
 
 // These mappings only apply to the host resolver.
 const char kHostResolverRules[] = "host-resolver-rules";
+// Deprecated alias for backwards compatibility, now does the same thing as
+// --host-resolver-rules which should be used instead.
+// TODO(crbug.com/40070729): consider removing in some future release.
+const char kHostRules[] = "host-rules";
 
 // A set of public key hashes for which to ignore certificate-related errors.
 //
@@ -107,16 +111,19 @@ const char kUseRelatedWebsiteSet[] = "use-related-website-set";
 // This allows running local tests against "public" and "local" IP addresses.
 //
 // This switch is specified as a comma-separated list of overrides. Each
-// override is given as a colon-separated "<endpoint>:<address space>" pair.
+// override is an equals-separated "<endpoint|ip-range>=<address space>" pair.
+//
 // Grammar, in pseudo-BNF format:
 //
 //   switch := override-list
 //   override-list := override “,” override-list | <nil>
-//   override := ip-endpoint “=” address-space
+//   override := (ip-endpoint | ip_range) “=” address-space
 //   address-space := “public” | “private” | “local” | "loopback"
 //   ip-endpoint := ip-address ":" port
 //   ip-address := see `net::ParseURLHostnameToAddress()` for details
 //   port := integer in the [0-65535] range
+//   ip-range := ip-address "/" bitmask
+//   bitmask := integer in the [0-128] range
 //
 // Any invalid entries in the comma-separated list are ignored. If the port
 // specified is 0, all ports for the given ip-address will be overridden.
@@ -139,10 +146,5 @@ const char kDisableSharedDictionaryStorageCleanupForTesting[] =
 
 // The switch to ignore bad mojo message reports. Only for testing.
 const char kIgnoreBadMessageForTesting[] = "ignore-bad-message-for-testing";
-
-// The switch to enable storing probabilistic reveal tokens to disk. This should
-// only be enabled for testing and debugging.
-const char kStoreProbabilisticRevealTokens[] =
-    "store-probabilistic-reveal-tokens";
 
 }  // namespace network::switches

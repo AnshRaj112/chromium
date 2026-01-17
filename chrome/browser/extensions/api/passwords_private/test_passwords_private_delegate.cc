@@ -8,11 +8,11 @@
 #include <optional>
 #include <string>
 
-#include "base/containers/contains.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/extensions/api/passwords_private/passwords_private_event_router.h"
 #include "chrome/browser/extensions/api/passwords_private/passwords_private_event_router_factory.h"
+#include "components/password_manager/core/browser/ui/saved_passwords_presenter.h"
 #include "ui/base/l10n/time_format.h"
 #include "url/gurl.h"
 
@@ -63,6 +63,11 @@ TestPasswordsPrivateDelegate::TestPasswordsPrivateDelegate()
   current_entries_.push_back(std::move(passkey));
 }
 TestPasswordsPrivateDelegate::~TestPasswordsPrivateDelegate() = default;
+
+password_manager::SavedPasswordsPresenter*
+TestPasswordsPrivateDelegate::GetSavedPasswordsPresenter() {
+  return saved_passwords_presenter_.get();
+}
 
 void TestPasswordsPrivateDelegate::GetSavedPasswordsList(
     UiEntriesCallback callback) {
@@ -400,10 +405,20 @@ void TestPasswordsPrivateDelegate::SetAccountStorageEnabled(bool enabled) {
   is_account_storage_enabled_ = enabled;
 }
 
+void TestPasswordsPrivateDelegate::SetShouldShowAccountStorageSettingToggle(
+    bool enabled) {
+  should_show_account_storage_setting_toggle_ = enabled;
+}
+
 void TestPasswordsPrivateDelegate::AddCompromisedCredential(int id) {
   api::passwords_private::PasswordUiEntry cred;
   cred.id = id;
   insecure_credentials_.push_back(std::move(cred));
+}
+
+void TestPasswordsPrivateDelegate::SetSavedPasswordsPresenter(
+    std::unique_ptr<password_manager::SavedPasswordsPresenter> presenter) {
+  saved_passwords_presenter_ = std::move(presenter);
 }
 
 void TestPasswordsPrivateDelegate::SendSavedPasswordsList() {
@@ -422,8 +437,8 @@ void TestPasswordsPrivateDelegate::SendPasswordExceptionsList() {
 
 bool TestPasswordsPrivateDelegate::IsCredentialPresentInInsecureCredentialsList(
     const api::passwords_private::PasswordUiEntry& credential) {
-  return base::Contains(insecure_credentials_, credential.id,
-                        &api::passwords_private::PasswordUiEntry::id);
+  return std::ranges::contains(insecure_credentials_, credential.id,
+                               &api::passwords_private::PasswordUiEntry::id);
 }
 
 void TestPasswordsPrivateDelegate::SwitchBiometricAuthBeforeFillingState(

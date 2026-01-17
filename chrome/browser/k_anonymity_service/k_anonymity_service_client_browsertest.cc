@@ -91,7 +91,7 @@ class TestKAnonymityServiceMixin : public InProcessBrowserTestMixin {
   std::unique_ptr<HttpResponse> HandleGenerateShortIdentifierRequest(
       const HttpRequest& request) {
     auto http_response = std::make_unique<BasicHttpResponse>();
-    if (!base::Contains(request.headers, "Authorization")) {
+    if (!request.headers.contains("Authorization")) {
       http_response->set_code(net::HTTP_UNAUTHORIZED);
       ADD_FAILURE() << "Missing authorization in Short Identifier request.";
       return http_response;
@@ -148,10 +148,9 @@ class TestKAnonymityServiceMixin : public InProcessBrowserTestMixin {
   }
 
   std::unique_ptr<HttpResponse> HandleIssueRequest(const HttpRequest& request) {
-    if (!base::Contains(request.headers, "Authorization") ||
-        !base::Contains(request.headers, "Sec-Private-State-Token") ||
-        !base::Contains(request.headers,
-                        "Sec-Private-State-Token-Crypto-Version")) {
+    if (!request.headers.contains("Authorization") ||
+        !request.headers.contains("Sec-Private-State-Token") ||
+        !request.headers.contains("Sec-Private-State-Token-Crypto-Version")) {
       ADD_FAILURE()
           << "Trust token issue request missing required headers. Got: "
           << request.all_headers;
@@ -258,7 +257,7 @@ class TestKAnonymityServiceMixin : public InProcessBrowserTestMixin {
   std::unique_ptr<HttpResponse> HandleRequest(const HttpRequest& request) {
     // Handle all of the URLs in k_anonymity_service_urls.h
     GURL absolute_url = https_server_->GetURL(request.relative_url);
-    std::string path = absolute_url.path();
+    std::string path = absolute_url.GetPath();
     if (path == "/v1/generateShortIdentifier") {
       return HandleGenerateShortIdentifierRequest(request);
     } else if (path.starts_with("/v1/1/fetchKeys")) {

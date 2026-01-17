@@ -101,6 +101,10 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
     return last_activated_surface_id_.local_surface_id();
   }
 
+  const SurfaceId& last_created_surface_id() const {
+    return last_created_surface_id_;
+  }
+
   bool is_root() const { return is_root_; }
 
   FrameSinkManagerImpl* frame_sink_manager() { return frame_sink_manager_; }
@@ -155,13 +159,13 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
   void OnSurfaceWillDraw(Surface* surface) override;
   void RefResources(
       const std::vector<TransferableResource>& resources) override;
-  void UnrefResources(std::vector<ReturnedResource> resources) override;
+  void UnrefResources(std::vector<ReturnedResourceViz> resources) override;
   void ReturnResources(std::vector<ReturnedResource> resources) override;
   void ReceiveFromChild(
       const std::vector<TransferableResource>& resources) override;
   // Takes the CopyOutputRequests that were requested for a surface with at
   // most |local_surface_id|.
-  std::vector<PendingCopyOutputRequest> TakeCopyOutputRequests(
+  std::vector<std::unique_ptr<PendingCopyOutputRequest>> TakeCopyOutputRequests(
       const LocalSurfaceId& local_surface_id) override;
   void OnFrameTokenChanged(uint32_t frame_token) override;
   void SendCompositorFrameAck() override;
@@ -182,8 +186,9 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
   void SetNeedsBeginFrame(bool needs_begin_frame);
   void SetWantsAnimateOnlyBeginFrames();
   void SetAutoNeedsBeginFrame();
+  void SetNoCompositorFrameAcks();
   void DidNotProduceFrame(const BeginFrameAck& ack);
-  virtual void SubmitCompositorFrame(
+  void SubmitCompositorFrame(
       const LocalSurfaceId& local_surface_id,
       CompositorFrame frame,
       std::optional<HitTestRegionList> hit_test_region_list,
@@ -213,7 +218,7 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
   // This is called by SubmitCompositorFrame(), which DCHECK-fails on a
   // non-accepted result. Prefer calling SubmitCompositorFrame() instead of this
   // method unless the result value affects what the caller will do next.
-  SubmitResult MaybeSubmitCompositorFrame(
+  virtual SubmitResult MaybeSubmitCompositorFrame(
       const LocalSurfaceId& local_surface_id,
       CompositorFrame frame,
       std::optional<HitTestRegionList> hit_test_region_list,
@@ -228,8 +233,8 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
       const VideoCaptureSubTarget& sub_target) const override;
   void OnClientCaptureStarted() override;
   void OnClientCaptureStopped() override;
-  void RequestCopyOfOutput(
-      PendingCopyOutputRequest pending_copy_output_request) override;
+  void RequestCopyOfOutput(std::unique_ptr<PendingCopyOutputRequest>
+                               pending_copy_output_request) override;
   const CompositorFrameMetadata* GetLastActivatedFrameMetadata() override;
 
   HitTestAggregator* GetHitTestAggregator();
@@ -246,7 +251,7 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
   // string.
   static const char* GetSubmitResultAsString(SubmitResult result);
 
-  const std::vector<PendingCopyOutputRequest>&
+  const std::vector<std::unique_ptr<PendingCopyOutputRequest>>&
   copy_output_requests_for_testing() const {
     return copy_output_requests_;
   }
@@ -305,7 +310,6 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
   const BeginFrameArgs& LastUsedBeginFrameArgs() const override;
   void OnBeginFrameSourcePausedChanged(bool paused) override;
   bool WantsAnimateOnlyBeginFrames() const override;
-  bool IsRoot() const override;
 
   void UpdateNeedsBeginFramesInternal();
   void StartObservingBeginFrameSource();
@@ -364,7 +368,7 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
 
   // Keeps track of CompositorFrames that have been submitted and have not
   // yet received an ACK from their Surface.
-  uint32_t pending_frames_ = 0u;
+  int pending_frames_ = 0;
 
   std::vector<ReturnedResource> surface_returned_resources_;
 
@@ -387,6 +391,7 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
 
   bool wants_animate_only_begin_frames_ = false;
   bool auto_needs_begin_frame_ = false;
+  bool no_compositor_frame_acks_ = false;
 
   // Indicates the FrameSinkBundle to which this sink belongs, if any.
   std::optional<FrameSinkBundleId> bundle_id_;
@@ -408,7 +413,7 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
   // Used for tests only.
   AggregatedDamageCallback aggregated_damage_callback_;
 
-  uint64_t last_frame_index_ = kFrameIndexStart - 1;
+  uint32_t last_frame_index_ = kFrameIndexStart - 1;
 
   // The video capture clients hooking into this instance to observe frame
   // begins and damage, and then make CopyOutputRequests on the appropriate
@@ -425,7 +430,7 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
   // PendingCopyOutputRequest::local_surface_id will not. Note that if the
   // PendingCopyOutputRequest::local_surface_id is default initialized, then the
   // next surface will take it regardless of its LocalSurfaceId.
-  std::vector<PendingCopyOutputRequest> copy_output_requests_;
+  std::vector<std::unique_ptr<PendingCopyOutputRequest>> copy_output_requests_;
 
   bool callback_received_begin_frame_ = true;
   bool callback_received_receive_ack_ = true;
@@ -438,6 +443,7 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
   class PendingFrameDetails : SurfaceObserver {
    public:
     PendingFrameDetails(base::TimeTicks frame_submit_timestamp,
+                        TreesInVizTiming frame_timing_details,
                         SurfaceManager* surface_manager);
     ~PendingFrameDetails() override;
 
@@ -449,6 +455,18 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
 
     base::TimeTicks frame_submit_timestamp() const {
       return frame_submit_timestamp_;
+    }
+    base::TimeTicks start_update_display_tree() const {
+      return trees_in_viz_timing_details_.start_update_display_tree;
+    }
+    base::TimeTicks start_prepare_to_draw() const {
+      return trees_in_viz_timing_details_.start_prepare_to_draw;
+    }
+    base::TimeTicks start_draw_layers() const {
+      return trees_in_viz_timing_details_.start_draw_layers;
+    }
+    base::TimeTicks submit_compositor_frame() const {
+      return trees_in_viz_timing_details_.submit_compositor_frame;
     }
     base::TimeTicks frame_embed_timestamp() const {
       return frame_embed_timestamp_;
@@ -466,6 +484,9 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
     void SetOrObserveFrameEmbedTimeStamp();
 
     const base::TimeTicks frame_submit_timestamp_;
+
+    // TreesInViz related timestamps.
+    const TreesInVizTiming trees_in_viz_timing_details_;
     base::TimeTicks frame_embed_timestamp_;
     // The surface ID that is associated with the frame.
     SurfaceId surface_id_;
@@ -492,7 +513,7 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
   // has been drawn.
   static_assert(kFrameIndexStart > 1,
                 "|last_drawn_frame_index| relies on kFrameIndexStart > 1");
-  uint64_t last_drawn_frame_index_ = kFrameIndexStart - 1;
+  uint32_t last_drawn_frame_index_ = kFrameIndexStart - 1;
 
   // This value represents throttling on sending a BeginFrame. If non-zero, it
   // represents the duration of time in between sending two consecutive frames.

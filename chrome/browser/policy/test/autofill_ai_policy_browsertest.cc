@@ -4,8 +4,9 @@
 
 #include <string>
 #include <unordered_map>
+#include <utility>
 
-#include "base/types/cxx23_to_underlying.h"
+#include "base/strings/strcat.h"
 #include "base/values.h"
 #include "chrome/browser/policy/policy_test_utils.h"
 #include "chrome/browser/profiles/profile.h"
@@ -37,23 +38,40 @@ using enum ModelExecutionEnterprisePolicyValue;
 
 // The policy's value are 0, 1, 2 and Autofill expects that the enum
 // ModelExecutionEnterprisePolicyValue matches those values.
-static_assert(base::to_underlying(kAllow) == 0);
-static_assert(base::to_underlying(kAllowWithoutLogging) == 1);
-static_assert(base::to_underlying(kDisable) == 2);
+static_assert(std::to_underlying(kAllow) == 0);
+static_assert(std::to_underlying(kAllowWithoutLogging) == 1);
+static_assert(std::to_underlying(kDisable) == 2);
 
+// This test has two parameters:
+//  * Policy value.
+//  * kYourSavedInfoSettingsPage feature flag value. When this flag is on, the
+//  `/autofill` page is replaced with the '/identityDocs' and '/travel' pages.
 class AutofillAiPolicyTest
     : public PolicyTest,
-      public testing::WithParamInterface<ModelExecutionEnterprisePolicyValue> {
+      public testing::WithParamInterface<
+          std::tuple<ModelExecutionEnterprisePolicyValue, bool>> {
  public:
   AutofillAiPolicyTest() {
-    scoped_feature_list_.InitWithFeatures(
-        {autofill::features::kAutofillAiWithDataSchema,
-         autofill::features::kAutofillAiIgnoreGeoIp},
-        {});
+    std::vector<base::test::FeatureRef> enabled_features{
+        autofill::features::kAutofillAiWithDataSchema,
+        autofill::features::kAutofillAiIgnoreGeoIp};
+    std::vector<base::test::FeatureRef> disabled_features;
+
+    if (is_your_saved_info_settings_page_enabled()) {
+      enabled_features.push_back(
+          autofill::features::kYourSavedInfoSettingsPage);
+    } else {
+      disabled_features.push_back(
+          autofill::features::kYourSavedInfoSettingsPage);
+    }
+    scoped_feature_list_.InitWithFeatures(enabled_features, disabled_features);
   }
 
   ModelExecutionEnterprisePolicyValue policy_value() const {
-    return GetParam();
+    return std::get<0>(GetParam());
+  }
+  bool is_your_saved_info_settings_page_enabled() const {
+    return std::get<1>(GetParam());
   }
   bool disabled_by_policy() const { return policy_value() == kDisable; }
 
@@ -68,7 +86,7 @@ class AutofillAiPolicyTest
 
     PolicyMap policies;
     SetPolicy(&policies, key::kAutofillPredictionSettings,
-              base::Value(base::to_underlying(policy_value())));
+              base::Value(std::to_underlying(policy_value())));
     UpdateProviderPolicy(policies);
 
     // The base test fixture creates a tab before we set the policy. We create a
@@ -89,6 +107,14 @@ class AutofillAiPolicyTest
             ->RegisterCreateServicesCallbackForTesting(base::BindRepeating(
                 &AutofillAiPolicyTest::OnWillCreateBrowserContextServices,
                 base::Unretained(this)));
+  }
+
+  void VerifySettingsUrlIsReachable(std::string_view sub_page) {
+    ASSERT_TRUE(ui_test_utils::NavigateToURL(
+        browser(), GURL(base::StrCat({"chrome://settings/", sub_page}))));
+    EXPECT_TRUE(content::WaitForLoadStop(GetWebContents()));
+    EXPECT_EQ(GetWebContents()->GetURL().GetPath(),
+              base::StrCat({"/", sub_page}));
   }
 
  private:
@@ -118,21 +144,21 @@ class AutofillAiPolicyTest
   base::CallbackListSubscription create_services_subscription_;
 };
 
-INSTANTIATE_TEST_SUITE_P(,
-                         AutofillAiPolicyTest,
-                         testing::Values(kAllow,
-                                         kAllowWithoutLogging,
-                                         kDisable));
+INSTANTIATE_TEST_SUITE_P(
+    ,
+    AutofillAiPolicyTest,
+    testing::Combine(testing::Values(kAllow, kAllowWithoutLogging, kDisable),
+                     testing::Bool()));
 
 // Tests that the chrome://settings entry for Autofill AI is always reachable
 // even if the policy is disabled.
 IN_PROC_BROWSER_TEST_P(AutofillAiPolicyTest, SettingsNotDisabledByPolicy) {
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(
-      browser(),
-      GURL(base::StrCat({"chrome://settings/", chrome::kAutofillAiSubPage}))));
-  EXPECT_TRUE(content::WaitForLoadStop(GetWebContents()));
-  EXPECT_EQ(GetWebContents()->GetURL().path(),
-            base::StrCat({"/", chrome::kAutofillAiSubPage}));
+  if (is_your_saved_info_settings_page_enabled()) {
+    VerifySettingsUrlIsReachable(chrome::kIdentityDocsSubPage);
+    VerifySettingsUrlIsReachable(chrome::kTravelSubPage);
+  } else {
+    VerifySettingsUrlIsReachable(chrome::kAutofillAiSubPage);
+  }
 }
 
 }  // namespace

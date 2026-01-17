@@ -8,6 +8,7 @@ import {MetricsBrowserProxyImpl, ReadAloudSettingsChange, ReadAnythingLogger, Re
 import {assertEquals, assertGT, assertLE} from 'chrome-untrusted://webui-test/chai_assert.js';
 
 import {createSpeechSynthesisVoice} from './common.js';
+import {FakeReadingMode} from './fake_reading_mode.js';
 import {TestMetricsBrowserProxy} from './test_metrics_browser_proxy.js';
 
 suite('Logger', () => {
@@ -24,6 +25,8 @@ suite('Logger', () => {
   }
 
   setup(() => {
+    const readingMode = new FakeReadingMode();
+    chrome.readingMode = readingMode as unknown as typeof chrome.readingMode;
     metrics = new TestMetricsBrowserProxy();
     MetricsBrowserProxyImpl.setInstance(metrics);
 
@@ -57,22 +60,6 @@ suite('Logger', () => {
 
     assertEquals(2, metrics.getCallCount('recordNewPage'));
     assertEquals(0, metrics.getCallCount('recordNewPageWithSpeech'));
-  });
-
-  test('highlight on', () => {
-    logger.logHighlightState(true);
-    logger.logHighlightState(true);
-
-    assertEquals(2, metrics.getCallCount('recordHighlightOn'));
-    assertEquals(0, metrics.getCallCount('recordHighlightOff'));
-  });
-
-  test('highlight off', () => {
-    logger.logHighlightState(false);
-    logger.logHighlightState(false);
-
-    assertEquals(0, metrics.getCallCount('recordHighlightOn'));
-    assertEquals(2, metrics.getCallCount('recordHighlightOff'));
   });
 
   test('highlight granularity change', () => {
@@ -117,6 +104,23 @@ suite('Logger', () => {
     const source = 123;
     logger.logSpeechStopSource(source);
     assertEquals(source, await metrics.whenCalled('recordSpeechStopSource'));
+  });
+
+  test('empty state', () => {
+    logger.logEmptyState();
+    assertEquals(1, metrics.getCallCount('recordEmptyState'));
+  });
+
+  test('line focus session with flag enabled', () => {
+    chrome.readingMode.isLineFocusEnabled = true;
+    logger.logLineFocusSession();
+    assertEquals(1, metrics.getCallCount('recordLineFocusSession'));
+  });
+
+  test('line focus session with flag disabled', () => {
+    chrome.readingMode.isLineFocusEnabled = false;
+    logger.logLineFocusSession();
+    assertEquals(0, metrics.getCallCount('recordLineFocusSession'));
   });
 
   test('logVoiceSpeed', () => {

@@ -92,6 +92,7 @@
 #include "ui/events/event_observer.h"
 #include "ui/events/event_utils.h"
 #include "ui/events/gesture_detection/gesture_configuration.h"
+#include "ui/events/gestures/gesture_provider_aura.h"
 #include "ui/events/gestures/gesture_recognizer.h"
 #include "ui/events/keycodes/dom/dom_code.h"
 #include "ui/gfx/canvas.h"
@@ -107,10 +108,15 @@
 #include "ui/wm/public/tooltip_client.h"
 
 #if BUILDFLAG(IS_WIN)
+#include <windows.h>
+
+#include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "components/stylus_handwriting/win/features.h"
 #include "content/browser/renderer_host/input/stylus_handwriting_controller_win.h"
 #include "content/browser/renderer_host/legacy_render_widget_host_win.h"
+#include "content/common/features.h"
 #include "ui/accessibility/platform/ax_fragment_root_win.h"
 #include "ui/accessibility/platform/browser_accessibility_manager_win.h"
 #include "ui/accessibility/platform/browser_accessibility_win.h"
@@ -119,7 +125,8 @@
 #include "ui/base/ime/win/tsf_input_scope.h"
 #include "ui/base/win/hidden_window.h"
 #include "ui/display/win/screen_win.h"
-#include "ui/gfx/gdi_util.h"
+#include "ui/events/win/system_event_state_lookup.h"
+#include "ui/gfx/win/gdi_util.h"
 #endif  // BUILDFLAG(IS_WIN)
 
 #if BUILDFLAG(IS_LINUX)
@@ -155,10 +162,65 @@ namespace {
 // `RenderWidgetHost` is hidden.
 // TODO(crbug.com/330301468): Remove this once we determine the cause of failure
 // to reallocate an LSI for the UI compositor.
-BASE_FEATURE(kRenderWidgetHostHiddenCheck,
-             "RenderWidgetHostHiddenCheck",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kRenderWidgetHostHiddenCheck, base::FEATURE_ENABLED_BY_DEFAULT);
+
+#if BUILDFLAG(IS_WIN)
+// Arabic (101) HKL: 00000401
+const std::wstring_view kArabic101KeyboardLayoutName = L"00000401";
+
+// This state helps relieve unnecessary calls to GetKeyboardLayoutName() and
+// IsEnabled(features::kArabicIndicDigitInput) for the purposes of
+// Arabic-Indic digit input. Declared static because keyboard layout state is
+// per-thread and RWHVA is only allocated on the UI thread.
+struct ArabicIndicDigitInputState {
+  HKL curr_hkl = nullptr;
+  bool is_arabic_101_kl = false;
+  bool feature_enabled = false;
+  bool feature_initialized = false;
+};
+ArabicIndicDigitInputState arabic_indic_digit_input_state;
+
+void UpdateArabicIndicDigitInputStateIfNecessary() {
+  if (!arabic_indic_digit_input_state.feature_initialized) {
+    arabic_indic_digit_input_state.feature_enabled =
+        base::FeatureList::IsEnabled(features::kArabicIndicDigitInput);
+    arabic_indic_digit_input_state.feature_initialized = true;
+  }
+
+  HKL curr_hkl = ::GetKeyboardLayout(0 /* thread id */);
+  if (curr_hkl != arabic_indic_digit_input_state.curr_hkl) {
+    arabic_indic_digit_input_state.curr_hkl = curr_hkl;
+    wchar_t kl_name[KL_NAMELENGTH];
+    arabic_indic_digit_input_state.is_arabic_101_kl =
+        ::GetKeyboardLayoutName(kl_name) &&
+        kl_name == kArabic101KeyboardLayoutName;
+  }
+}
+
+// Windows Arabic keyboard layouts do not provide native Arabic-Indic digit
+// input. To support this for web input, we intercept ASCII digit key events and
+// forward equivalent Arabic-Indic digits to the renderer. We do this when
+// Ctrl+Alt or Right Alt (AltGr) is held and a top-row digit key is pressed,
+// simulating AltGr-based input behavior. This is only done for Arabic 101.
+// Arabic 102 and Arabic 102 AZERTY already have defined AltGr behavior in the
+// top-row digit keys and AZERTY is primarily used in locales that do not often
+// use Arabic-Indic digits.
+bool ShouldInputArabicIndicDigits(const ui::KeyEvent& event) {
+  return arabic_indic_digit_input_state.is_arabic_101_kl &&
+         arabic_indic_digit_input_state.feature_enabled &&
+         event.type() == ui::EventType::kKeyPressed &&
+         // Check for VKEY_0 to VKEY_9 because we should not perform
+         // arabic-indic input for numpad digits.
+         event.key_code() >= ui::VKEY_0 && event.key_code() <= ui::VKEY_9;
+}
+#endif  // BUILDFLAG(IS_WIN)
 }  // namespace
+
+#if BUILDFLAG(IS_WIN)
+void ResetArabicIndicDigitInputStateForTesting() {
+  arabic_indic_digit_input_state = {nullptr, false, false, false};
+}
+#endif  // BUILDFLAG(IS_WIN)
 
 // We need to watch for mouse events outside a Web Popup or its parent
 // and dismiss the popup for certain events.
@@ -278,8 +340,8 @@ RenderWidgetHostViewAura::RenderWidgetHostViewAura(
       device_scale_factor_(0.0f),
       event_handler_(new RenderWidgetHostViewEventHandler(host(), this, this)),
       frame_sink_id_(host()->GetFrameSinkId()),
-      visibility_(host()->is_hidden() ? Visibility::HIDDEN
-                                      : Visibility::VISIBLE) {
+      visibility_(host()->IsHidden() ? Visibility::HIDDEN
+                                     : Visibility::VISIBLE) {
   // CreateDelegatedFrameHostClient() and CreateAuraWindow() assume that the
   // FrameSinkId is valid. RenderWidgetHostImpl::GetFrameSinkId() always returns
   // a valid FrameSinkId.
@@ -308,6 +370,10 @@ RenderWidgetHostViewAura::RenderWidgetHostViewAura(
         owner_delegate->GetWebkitPreferencesForWidget()
             .double_tap_to_zoom_enabled;
   }
+
+#if BUILDFLAG(IS_WIN)
+  UpdateArabicIndicDigitInputStateIfNecessary();
+#endif  // BUILDFLAG(IS_WIN)
 
   host()->render_frame_metadata_provider()->AddObserver(this);
 }
@@ -580,7 +646,7 @@ void RenderWidgetHostViewAura::ShowImpl(PageVisibilityState page_visibility) {
   // OnShowWithPageVisibility will not call NotifyHostAndDelegateOnWasShown,
   // which updates `visibility_`, unless the host is hidden. Make sure no update
   // is needed.
-  CHECK(host_->is_hidden() || visibility_ == Visibility::VISIBLE);
+  CHECK(host_->IsHidden() || visibility_ == Visibility::VISIBLE);
   OnShowWithPageVisibility(page_visibility);
 }
 
@@ -591,14 +657,14 @@ void RenderWidgetHostViewAura::EnsurePlatformVisibility(
   auto* wth = window()->GetHost();
   if (wth && !wth->window()->GetLocalSurfaceId().is_valid() &&
       base::FeatureList::IsEnabled(kRenderWidgetHostHiddenCheck)) {
-    CHECK(host()->is_hidden());
+    CHECK(host()->IsHidden());
   }
 }
 
 void RenderWidgetHostViewAura::NotifyHostAndDelegateOnWasShown(
     blink::mojom::RecordContentToVisibleTimeRequestPtr tab_switch_start_state) {
   CHECK(delegated_frame_host_) << "Cannot be invoked during destruction.";
-  CHECK(host_->is_hidden());
+  CHECK(host_->IsHidden());
   CHECK_NE(visibility_, Visibility::VISIBLE);
 
   visibility_ = Visibility::VISIBLE;
@@ -644,7 +710,7 @@ void RenderWidgetHostViewAura::HideImpl() {
   CHECK(visibility_ == Visibility::HIDDEN ||
         visibility_ == Visibility::OCCLUDED);
 
-  if (!host()->is_hidden()) {
+  if (!host()->IsHidden()) {
     host()->WasHidden();
     aura::WindowTreeHost* host = window_->GetHost();
       aura::Window* parent = window_->parent();
@@ -688,7 +754,7 @@ void RenderWidgetHostViewAura::
         blink::mojom::RecordContentToVisibleTimeRequestPtr
             visible_time_request) {
   CHECK(delegated_frame_host_) << "Cannot be invoked during destruction.";
-  CHECK(!host_->is_hidden());
+  CHECK(!host_->IsHidden());
   CHECK_EQ(visibility_, Visibility::VISIBLE);
   CHECK(visible_time_request);
 
@@ -711,7 +777,7 @@ void RenderWidgetHostViewAura::
 void RenderWidgetHostViewAura::
     CancelSuccessfulPresentationTimeRequestForHostAndDelegate() {
   CHECK(delegated_frame_host_) << "Cannot be invoked during destruction.";
-  CHECK(!host_->is_hidden());
+  CHECK(!host_->IsHidden());
   CHECK_EQ(visibility_, Visibility::VISIBLE);
 
   host()->CancelSuccessfulPresentationTimeRequest();
@@ -726,7 +792,7 @@ viz::SurfaceId RenderWidgetHostViewAura::GetFallbackSurfaceIdForTesting()
 bool RenderWidgetHostViewAura::ShouldSkipCursorUpdate() const {
   aura::Window* root_window = window_->GetRootWindow();
   CHECK(root_window);
-  display::Screen* screen = display::Screen::GetScreen();
+  display::Screen* screen = display::Screen::Get();
   CHECK(screen);
 
   // Ignore cursor update messages if the window under the cursor is not us.
@@ -808,7 +874,7 @@ void RenderWidgetHostViewAura::ComputeDisplayFeature() {
   }
 
   const display::Display display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(window_);
+      display::Screen::Get()->GetDisplayNearestWindow(window_);
   // Set the display feature only if the browser window is maximized or
   // fullscreen.
   if (window_->GetRootWindow()->GetBoundsInScreen() != display.work_area() &&
@@ -1031,7 +1097,8 @@ uint32_t RenderWidgetHostViewAura::GetCaptureSequenceNumber() const {
 void RenderWidgetHostViewAura::CopyFromSurface(
     const gfx::Rect& src_subrect,
     const gfx::Size& dst_size,
-    base::OnceCallback<void(const SkBitmap&)> callback) {
+    base::TimeDelta timeout,
+    base::OnceCallback<void(const content::CopyFromSurfaceResult&)> callback) {
   base::WeakPtr<RenderWidgetHostImpl> popup_host;
   base::WeakPtr<DelegatedFrameHost> popup_frame_host;
   if (popup_child_host_view_) {
@@ -1041,14 +1108,22 @@ void RenderWidgetHostViewAura::CopyFromSurface(
   }
   RenderWidgetHostViewBase::CopyMainAndPopupFromSurface(
       host()->GetWeakPtr(), delegated_frame_host_->GetWeakPtr(), popup_host,
-      popup_frame_host, src_subrect, dst_size, device_scale_factor_,
+      popup_frame_host, src_subrect, dst_size, device_scale_factor_, timeout,
       std::move(callback));
+}
+
+ui::FilteredGestureProvider*
+RenderWidgetHostViewAura::GetFilteredGestureProviderForTesting() {
+  if (!window_ || !window_->provider()) {
+    return nullptr;
+  }
+  return &(window_->provider()->filtered_gesture_provider());
 }
 
 #if BUILDFLAG(IS_WIN)
 void RenderWidgetHostViewAura::UpdateMouseLockRegion() {
   RECT window_rect =
-      display::Screen::GetScreen()
+      display::Screen::Get()
           ->DIPToScreenRectInWindow(window_, window_->GetBoundsInScreen())
           .ToRECT();
   ::ClipCursor(&window_rect);
@@ -1087,6 +1162,13 @@ void RenderWidgetHostViewAura::ResetFallbackToFirstNavigationSurface() {
   delegated_frame_host_->ResetFallbackToFirstNavigationSurface();
 }
 
+void RenderWidgetHostViewAura::OnUnconfirmedTapConvertedToTap() {
+  if (!window_ || !window_->provider()) {
+    return;
+  }
+  window_->provider()->OnUnconfirmedTapConvertedToTap();
+}
+
 bool RenderWidgetHostViewAura::RequestRepaintOnNewSurface() {
   return SynchronizeVisualProperties(cc::DeadlinePolicy::UseDefaultDeadline(),
                                      std::nullopt);
@@ -1118,10 +1200,13 @@ gfx::Rect RenderWidgetHostViewAura::GetBoundsInRootWindow() {
 
     // If this is a headless window return the headless window bounds stored in
     // Aura window properties instead of the actual platform window bounds which
-    // may be different.
+    // may be different. Note that headless window bounds are in screen
+    // coordinates, so they need to be converted back to DIPs just like the
+    // regular ones below.
     if (gfx::Rect* headless_bounds =
             host->window()->GetProperty(aura::client::kHeadlessBoundsKey)) {
-      return *headless_bounds;
+      return display::Screen::Get()->ScreenToDIPRectInWindow(top_level,
+                                                             *headless_bounds);
     }
 
     RECT window_rect = {0};
@@ -1141,8 +1226,7 @@ gfx::Rect RenderWidgetHostViewAura::GetBoundsInRootWindow() {
 
     // Pixels come back from GetWindowHost, so we need to convert those back to
     // DIPs here.
-    bounds = display::Screen::GetScreen()->ScreenToDIPRectInWindow(top_level,
-                                                                   bounds);
+    bounds = display::Screen::Get()->ScreenToDIPRectInWindow(top_level, bounds);
   }
 
 #endif
@@ -1444,10 +1528,17 @@ void RenderWidgetHostViewAura::InsertChar(const ui::KeyEvent& event) {
   // Ignore character messages for VKEY_RETURN sent on CTRL+M. crbug.com/315547
   if (event_handler_->accept_return_character() ||
       event.GetCharacter() != ui::VKEY_RETURN) {
-    // Send a blink::WebInputEvent::Char event to |host_|.
-    ForwardKeyboardEventWithLatencyInfo(
-        input::NativeWebKeyboardEvent(event, event.GetCharacter()),
-        *event.latency(), nullptr);
+#if BUILDFLAG(IS_WIN)
+    if (ShouldInputArabicIndicDigits(event) && ui::win::IsAltRightPressed()) {
+      ForwardArabicIndicCharEventWithLatencyInfo(event, event.GetCharacter());
+    } else
+#endif  // BUILDFLAG(IS_WIN)
+    {
+      // Send a blink::WebInputEvent::Char event to |host_|.
+      ForwardKeyboardEventWithLatencyInfo(
+          input::NativeWebKeyboardEvent(event, event.GetCharacter()),
+          *event.latency(), nullptr);
+    }
   }
 }
 
@@ -1801,6 +1892,10 @@ bool RenderWidgetHostViewAura::GetTextFromRange(const gfx::Range& range,
 void RenderWidgetHostViewAura::OnInputMethodChanged() {
   // TODO(suzhe): implement the newly added "locale" property of HTML DOM
   // TextEvent.
+
+#if BUILDFLAG(IS_WIN)
+  UpdateArabicIndicDigitInputStateIfNecessary();
+#endif  // BUILDFLAG(IS_WIN)
 }
 
 bool RenderWidgetHostViewAura::ChangeTextDirectionAndLayoutAlignment(
@@ -2107,7 +2202,7 @@ void RenderWidgetHostViewAura::OnDisplayMetricsChanged(
     return;
   }
 #endif  // BUILDFLAG(IS_OZONE)
-  display::Screen* screen = display::Screen::GetScreen();
+  display::Screen* screen = display::Screen::Get();
   if (display.id() != screen->GetDisplayNearestWindow(window_).id())
     return;
 
@@ -2198,27 +2293,30 @@ void RenderWidgetHostViewAura::OnDeviceScaleFactorChanged(
 }
 
 void RenderWidgetHostViewAura::OnWindowDestroying(aura::Window* window) {
+  // Make sure that the input method no longer references to this object before
+  // this object is removed from the root window (i.e. this object loses access
+  // to the input method).
+  DetachFromInputMethod(true);
+
+  if (overscroll_controller_) {
+    overscroll_controller_->Reset();
+  }
+
 #if BUILDFLAG(IS_WIN)
   // The LegacyRenderWidgetHostHWND instance is destroyed when its window is
-  // destroyed. Normally we control when that happens via the Destroy call
-  // in the dtor. However there may be cases where the window is destroyed
-  // by Windows, i.e. the parent window is destroyed before the
-  // RenderWidgetHostViewAura instance goes away etc. To avoid that we
-  // destroy the LegacyRenderWidgetHostHWND instance here.
+  // destroyed. Normally we control when that happens via the Destroy call in
+  // the dtor. However there may be cases where the window is destroyed by
+  // Windows, i.e. the parent window is destroyed before the
+  // RenderWidgetHostViewAura instance goes away etc. To avoid that we destroy
+  // the LegacyRenderWidgetHostHWND instance here. Do this last, as the call to
+  // DestroyWindow in here may pump window messages, and consequently delete
+  // this.
   if (legacy_render_widget_host_HWND_) {
     // The Destroy call below will delete the LegacyRenderWidgetHostHWND
     // instance.
     legacy_render_widget_host_HWND_.ExtractAsDangling()->Destroy();
   }
 #endif
-
-  // Make sure that the input method no longer references to this object before
-  // this object is removed from the root window (i.e. this object loses access
-  // to the input method).
-  DetachFromInputMethod(true);
-
-  if (overscroll_controller_)
-    overscroll_controller_->Reset();
 }
 
 void RenderWidgetHostViewAura::OnWindowDestroyed(aura::Window* window) {
@@ -2251,6 +2349,20 @@ bool RenderWidgetHostViewAura::RequiresDoubleTapGestureEvents() const {
 void RenderWidgetHostViewAura::OnKeyEvent(ui::KeyEvent* event) {
   last_pointer_type_ = ui::EventPointerType::kUnknown;
   event_handler_->OnKeyEvent(event);
+
+#if BUILDFLAG(IS_WIN)
+  // When inputting Ctrl+Alt+Top Row Digit, Windows does not generate a WM_CHAR
+  // or WM_SYSCHAR. So we synthesize an Arabic-Indic char event here and
+  // forward it to the renderer. When inputting RightAlt+Top Row Digit, Windows
+  // generates a WM_SYSCHAR so that is handled in InsertChar.
+  constexpr ui::EventFlags kCtrlAndAltPressed =
+      ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN;
+  if (ShouldInputArabicIndicDigits(*event) &&
+      ((event->flags() & kCtrlAndAltPressed) == kCtrlAndAltPressed)) {
+    const char16_t ascii_digit_char = event->key_code() - ui::VKEY_0 + u'0';
+    ForwardArabicIndicCharEventWithLatencyInfo(*event, ascii_digit_char);
+  }
+#endif  // BUILDFLAG(IS_WIN)
 }
 
 void RenderWidgetHostViewAura::OnMouseEvent(ui::MouseEvent* event) {
@@ -2378,7 +2490,7 @@ void RenderWidgetHostViewAura::OnStartStylusWriting() {
   handwriting_controller->OnStartStylusWriting(
       base::BindRepeating(&RenderWidgetHostViewAura::OnFocusHandwritingTarget,
                           weak_ptr_factory_.GetWeakPtr()),
-      last_stylus_handwriting_properties_.value(), *this);
+      last_stylus_handwriting_properties_.value());
   last_stylus_handwriting_properties_.reset();
 }
 
@@ -2420,11 +2532,9 @@ void RenderWidgetHostViewAura::OnEditElementFocusedForStylusWriting(
   UpdateProximateCharacterBounds(
       focus_result ? std::move(focus_result->proximate_bounds) : nullptr);
 
-  if (focus_result) {
-    handwriting_controller->OnFocusHandled(*this);
-  } else {
-    handwriting_controller->OnFocusFailed(*this);
-  }
+  UMA_HISTOGRAM_BOOLEAN("Stylus.Handwriting.TSFFocus", !!focus_result);
+  focus_result ? handwriting_controller->OnFocusHandled()
+               : handwriting_controller->OnFocusFailed();
 }
 
 void RenderWidgetHostViewAura::OnFocusHandwritingTarget(
@@ -2463,6 +2573,18 @@ void RenderWidgetHostViewAura::OnTouchEvent(ui::TouchEvent* event) {
         last_stylus_handwriting_properties_.has_value()
             ? last_stylus_handwriting_properties_->handwriting_stroke_id
             : 0);
+    // If initialization was successful, get the "handwriting tolerance" (i.e a
+    // value in DIPs that surrounds an editable region where handwriting should
+    // still be possible) and notify the renderer about it.
+    if (StylusHandwritingControllerWin::GetInstance()) {
+      const int handwriting_radius =
+          StylusHandwritingControllerWin::GetInstance()
+              ->GetStylusHandwritingToleranceInDips(*window_->GetRootWindow());
+      if (handwriting_radius_ != handwriting_radius) {
+        handwriting_radius_ = handwriting_radius;
+        UpdateScreenInfo();
+      }
+    }
     // TODO(crbug.com/355578906): Add telemetry.
   }
 #endif  // BUILDFLAG(IS_WIN)
@@ -2529,6 +2651,13 @@ void RenderWidgetHostViewAura::OnWindowFocused(aura::Window* gained_focus,
         host()->GetRootBrowserAccessibilityManager();
     if (manager)
       manager->OnWindowFocused();
+
+#if BUILDFLAG(IS_WIN)
+    // When keyboard layout is updated while a window from a different thread
+    // has focus, Windows will not call TSFTextStore::OnLanguageChanged. So we
+    // need to check if the keyboard layout changed whenever we regain focus.
+    UpdateArabicIndicDigitInputStateIfNecessary();
+#endif  // BUILDFLAG(IS_WIN)
     return;
   }
 
@@ -2705,7 +2834,7 @@ void RenderWidgetHostViewAura::UpdateCursorIfOverSelf() {
   if (ShouldSkipCursorUpdate())
     return;
 
-  display::Screen* screen = display::Screen::GetScreen();
+  display::Screen* screen = display::Screen::Get();
   CHECK(screen);
   gfx::Point root_window_point = screen->GetCursorScreenPoint();
   aura::client::ScreenPositionClient* screen_position_client =
@@ -2757,7 +2886,7 @@ void RenderWidgetHostViewAura::OnDidUpdateVisualPropertiesComplete(
         host(), metadata.top_controls_shown_ratio);
   }
 
-  if (host()->is_hidden()) {
+  if (host()->IsHidden()) {
     // When an embedded child responds, we want to accept its changes to the
     // viz::LocalSurfaceId. However we do not want to embed surfaces while
     // hidden. Nor do we want to embed invalid ids when we are evicted. Becoming
@@ -2884,10 +3013,11 @@ void RenderWidgetHostViewAura::SetTooltipsEnabled(bool enable) {
 
 void RenderWidgetHostViewAura::NotifyRendererOfCursorVisibilityState(
     bool is_visible) {
-  if (host()->is_hidden() ||
+  if (host()->IsHidden() ||
       (cursor_visibility_state_in_renderer_ == VISIBLE && is_visible) ||
-      (cursor_visibility_state_in_renderer_ == NOT_VISIBLE && !is_visible))
+      (cursor_visibility_state_in_renderer_ == NOT_VISIBLE && !is_visible)) {
     return;
+  }
 
   cursor_visibility_state_in_renderer_ = is_visible ? VISIBLE : NOT_VISIBLE;
   host()->OnCursorVisibilityStateChanged(is_visible);
@@ -2963,8 +3093,9 @@ void RenderWidgetHostViewAura::UpdateLegacyWin() {
     // the associated RenderWidget is also visible before the
     // LegacyRenderWidgetHostHWND instace is created. Ensure that it is shown
     // here.
-    if (!host()->is_hidden())
+    if (!host()->IsHidden()) {
       legacy_render_widget_host_HWND_->Show();
+    }
   }
 }
 #endif
@@ -3090,6 +3221,7 @@ void RenderWidgetHostViewAura::OnOldViewDidNavigatePreCommit() {
   // Invalidate the surface so that we don't attempt to evict it multiple times.
   window_->InvalidateLocalSurfaceId();
   delegated_frame_host_->DidNavigateMainFramePreCommit();
+  CancelActiveTouches();
 }
 
 void RenderWidgetHostViewAura::OnNewViewDidNavigatePostCommit() {
@@ -3114,6 +3246,7 @@ void RenderWidgetHostViewAura::DidEnterBackForwardCache() {
   //
   // Called after to prevent prematurely evict the BFCached surface.
   host()->ForceFirstFrameAfterNavigationTimeout();
+  GetMouseWheelPhaseHandler()->DidEnterBackForwardCache();
 }
 
 void RenderWidgetHostViewAura::ActivatedOrEvictedFromBackForwardCache() {
@@ -3371,5 +3504,22 @@ ui::Compositor* RenderWidgetHostViewAura::GetCompositor() {
 
   return window_->GetHost()->compositor();
 }
+
+#if BUILDFLAG(IS_WIN)
+void RenderWidgetHostViewAura::ForwardArabicIndicCharEventWithLatencyInfo(
+    const ui::KeyEvent& event,
+    char16_t ascii_char) {
+  const char16_t arabic_indic_digit_char = ascii_char - u'0' + kArabicIndicZero;
+  const int sys_stripped_flags =
+      event.flags() & (~ui::EF_ALT_DOWN & ~ui::EF_CONTROL_DOWN);
+  ui::KeyEvent arabic_indic_digit_event = ui::KeyEvent::FromCharacter(
+      arabic_indic_digit_char, event.key_code(), ui::DomCode::NONE,
+      sys_stripped_flags, event.time_stamp());
+  ForwardKeyboardEventWithLatencyInfo(
+      input::NativeWebKeyboardEvent(arabic_indic_digit_event,
+                                    arabic_indic_digit_char),
+      *event.latency(), nullptr);
+}
+#endif  // BUILDFLAG(IS_WIN)
 
 }  // namespace content

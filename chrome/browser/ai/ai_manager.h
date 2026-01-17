@@ -12,13 +12,13 @@
 #include "base/supports_user_data.h"
 #include "base/types/pass_key.h"
 #include "chrome/browser/ai/ai_context_bound_object_set.h"
-#include "chrome/browser/ai/ai_create_on_device_session_task.h"
 #include "chrome/browser/ai/ai_language_model.h"
 #include "chrome/browser/ai/ai_model_download_progress_manager.h"
 #include "chrome/browser/ai/ai_proofreader.h"
 #include "chrome/browser/ai/ai_summarizer.h"
 #include "chrome/browser/ai/ai_utils.h"
 #include "components/component_updater/component_updater_service.h"
+#include "components/optimization_guide/public/mojom/model_broker.mojom-forward.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/render_widget_host.h"
 #include "content/public/browser/render_widget_host_observer.h"
@@ -26,11 +26,11 @@
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/receiver_set.h"
 #include "mojo/public/cpp/bindings/remote_set.h"
-#include "third_party/blink/public/mojom/ai/ai_common.mojom.h"
+#include "third_party/blink/public/mojom/ai/ai_common.mojom-forward.h"
 #include "third_party/blink/public/mojom/ai/ai_language_model.mojom-forward.h"
 #include "third_party/blink/public/mojom/ai/ai_manager.mojom.h"
 #include "third_party/blink/public/mojom/ai/model_download_progress_observer.mojom-forward.h"
-#include "third_party/blink/public/mojom/devtools/console_message.mojom-data-view.h"
+#include "third_party/blink/public/mojom/devtools/console_message.mojom-forward.h"
 
 namespace base {
 class SupportsUserData;
@@ -62,25 +62,13 @@ class AIManager : public base::SupportsUserData::Data,
   void AddReceiver(mojo::PendingReceiver<blink::mojom::AIManager> receiver);
 
   size_t GetContextBoundObjectSetSizeForTesting() {
-    return context_bound_object_set_.GetSizeForTesting();
+    return context_bound_object_set_.GetSize();
   }
 
   size_t GetDownloadProgressObserversSizeForTesting() {
     return model_download_progress_manager_.GetNumberOfReporters();
   }
 
-  // Returns if all of the language codes in `languages` are supported.
-  static bool IsLanguagesSupported(
-      const std::vector<AILanguageCodePtr>& languages,
-      const base::flat_set<std::string_view>& allowed_languages);
-
-  // Returns if `output` and all of the language codes in `input` and `context`
-  // are supported.
-  static bool IsLanguagesSupported(
-      const std::vector<AILanguageCodePtr>& input,
-      const std::vector<AILanguageCodePtr>& context,
-      const AILanguageCodePtr& output,
-      const base::flat_set<std::string_view>& allowed_languages);
   // Return the default and max sampling params for the LanguageModel API.
   blink::mojom::AILanguageModelParamsPtr GetLanguageModelParams();
 
@@ -120,11 +108,18 @@ class AIManager : public base::SupportsUserData::Data,
 
   // Check whether optimization guide supports the feature matching `capability`
   // and modalities specified by `capabilities`; yields a result to `callback`.
-  void CanCreateSession(optimization_guide::ModelBasedCapabilityKey capability,
+  void CanCreateSession(optimization_guide::mojom::OnDeviceFeature capability,
                         on_device_model::Capabilities capabilities,
                         CanCreateLanguageModelCallback callback);
 
   bool IsBuiltInAIAPIsEnabledByPolicy();
+
+  // Returns true if `options` uses only `supported` languages, false otherwise.
+  // Logs errors and warnings and initializes empty output languages as needed.
+  template <typename OptionsPtrType>
+  bool CheckAndFixLanguages(OptionsPtrType& options,
+                            std::string_view api_name,
+                            const base::flat_set<std::string_view>& supported);
 
  private:
   void OnModelPathValidationComplete(const base::FilePath& model_path,
@@ -145,14 +140,35 @@ class AIManager : public base::SupportsUserData::Data,
       content::RenderWidgetHost* widget_host) override;
 
   void FinishCanCreateSession(
-      optimization_guide::ModelBasedCapabilityKey capability,
+      optimization_guide::mojom::OnDeviceFeature capability,
       on_device_model::Capabilities capabilities,
       CanCreateLanguageModelCallback callback,
       optimization_guide::OnDeviceModelEligibilityReason eligibility);
 
-  void AddMessageToConsoleForUnexpectedLanguage(
-      blink::mojom::ConsoleMessageLevel level,
-      std::string message);
+  template <typename ContextBoundObjectType,
+            typename ContextBoundObjectReceiverInterface,
+            typename ClientRemoteInterface,
+            typename CreateOptionsPtrType>
+  void OnSessionCreated(
+      AIContextBoundObjectSet& context_bound_object_set,
+      CreateOptionsPtrType options,
+      std::optional<optimization_guide::MultimodalMessage> initial_request,
+      mojo::PendingRemote<ClientRemoteInterface> client,
+      std::unique_ptr<optimization_guide::OnDeviceSession> session);
+
+  // Eagerly initializes a broad set of features.
+  void MaybeTryEagerInit();
+  // Eagerly initialize a feature depending on its eligibility.
+  void MaybeTryEagerInitWithEligibility(
+      optimization_guide::mojom::OnDeviceFeature feature,
+      optimization_guide::OnDeviceModelEligibilityReason eligibility);
+
+  void MaybeLogMissingOutputLanguageWarning(
+      const std::string_view api_name,
+      const base::flat_set<std::string_view>& supported_languages);
+  void MaybeLogUnsupportedLanguageError(
+      const std::string_view api_name,
+      const base::flat_set<std::string_view>& supported_languages);
 
   mojo::ReceiverSet<blink::mojom::AIManager> receivers_;
 
@@ -170,8 +186,11 @@ class AIManager : public base::SupportsUserData::Data,
 
   content::WeakDocumentPtr rfh_;
 
-  bool did_add_warning_console_message_for_unexpected_language_ = false;
-  bool did_add_error_console_message_for_unexpected_language_ = false;
+  bool did_log_missing_output_language_warning_ = false;
+  bool did_log_unsupported_language_error_ = false;
+
+  // Features that have attempted initialization in this session.
+  base::flat_set<optimization_guide::mojom::OnDeviceFeature> tried_init_;
 
   base::WeakPtrFactory<AIManager> weak_factory_{this};
 };

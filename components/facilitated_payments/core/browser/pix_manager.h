@@ -7,6 +7,8 @@
 
 #include <cstring>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 #include "base/functional/callback_forward.h"
@@ -22,6 +24,7 @@
 #include "components/facilitated_payments/core/browser/network_api/facilitated_payments_initiate_payment_request_details.h"
 #include "components/facilitated_payments/core/browser/network_api/facilitated_payments_initiate_payment_response_details.h"
 #include "components/facilitated_payments/core/metrics/facilitated_payments_metrics.h"
+#include "components/facilitated_payments/core/mojom/pix_code_validator.mojom.h"
 #include "components/facilitated_payments/core/utils/facilitated_payments_ui_utils.h"
 #include "components/facilitated_payments/core/utils/facilitated_payments_utils.h"
 #include "components/optimization_guide/core/hints/optimization_guide_decider.h"
@@ -50,14 +53,18 @@ class PixManager {
   // Resets `this` to initial state. Cancels any alive async callbacks.
   void Reset();
 
-  // Checks whether the `render_frame_host_url` is allowlisted and validates the
-  // `pix_code` before trigger the Pix payments flow. Note: If the Pix payment
-  // flow has already been triggered by the other code detection methods like
-  // DOM search then this method is a no-op.
+  // Checks whether the `render_frame_host_url` is allowlisted and validates
+  // the `pix_code` before triggering the Pix payments flow. Note: If the Pix
+  // payment flow has already been triggered by the other code detection
+  // methods like DOM search then this method is a no-op.
+  //
+  // If Rust Pix code validation is enabled, `rust_validation_result` will
+  // always have a value.
   virtual void OnPixCodeCopiedToClipboard(
       const GURL& render_frame_host_url,
       const url::Origin& render_frame_host_origin,
-      const std::string& pix_code,
+      std::optional<PixCodeRustValidationResult> rust_validation_result,
+      std::string pix_code,
       ukm::SourceId ukm_source_id);
 
  private:
@@ -96,6 +103,12 @@ class PixManager {
       CopyTrigger_UrlNotInAllowlist_PayflowExitedHistogramLogged);
   FRIEND_TEST_ALL_PREFIXES(PixManagerTestWithAccountLinkingEnabled,
                            DismissPrompt);
+  FRIEND_TEST_ALL_PREFIXES(
+      PixManagerTestWithAccountLinkingEnabled,
+      ChromeCustomTabWithGboardAsDefaultIme_PixFlowNotTriggered);
+  FRIEND_TEST_ALL_PREFIXES(
+      PixManagerTestWithAccountLinkingEnabled,
+      ChromeCustomTabWithGboardNotAsDefaultIme_PixFlowTriggered);
   FRIEND_TEST_ALL_PREFIXES(
       PixManagerTestWithAccountLinkingEnabled,
       ErrorScreenNotAutoDismissedAfterInvokingPurchaseAction);
@@ -145,6 +158,12 @@ class PixManager {
                            PayflowExitedReason_InvalidCode);
   FRIEND_TEST_ALL_PREFIXES(PixManagerTestWithAccountLinkingEnabled,
                            PayflowExitedReason_NoLinkedAccount);
+  FRIEND_TEST_ALL_PREFIXES(
+      PixManagerTestWithAccountLinkingEnabled,
+      PayflowExitedReason_StaticCode_FeatureDisabled_PixFlowsAbandoned);
+  FRIEND_TEST_ALL_PREFIXES(
+      PixManagerTestWithAccountLinkingEnabled,
+      PayflowExitedReason_StaticCode_ApiClientAvailabilityChecked);
   FRIEND_TEST_ALL_PREFIXES(
       PixManagerTestWithAccountLinkingEnabled,
       NoLinkedAccount_AccountLinkingFlagDisabled_AccountLinkingFlowNotTriggered);
@@ -205,12 +224,20 @@ class PixManager {
 
   // Called by the utility process after validation of the `pix_code`. If the
   // utility processes has disconnected (e.g., due to a crash in the validation
-  // code), then `is_pix_code_valid` contains an error string instead of the
-  // boolean validation result. The call to validate the PIX code was made at
+  // code), then `pix_qr_code_type` contains an error string instead of the
+  // PixQrCodeType result. The call to validate the Pix code was made at
   // `start_time`.
-  void OnPixCodeValidated(std::string pix_code,
-                          base::TimeTicks start_time,
-                          base::expected<bool, std::string> is_pix_code_valid);
+  void OnPixCodeValidated(
+      std::optional<PixCodeRustValidationResult> rust_validation_result,
+      std::string pix_code,
+      base::TimeTicks start_time,
+      base::expected<mojom::PixQrCodeType, std::string> pix_qr_code_type);
+
+  // Processes a fully-validated Pix code. Exposed separately from
+  // `OnPixCodeValidated()` since the Rust validator does not need to go to the
+  // utility process at all.
+  void OnValidPixCode(std::string pix_code,
+                      mojom::PixQrCodeType pix_qr_code_type);
 
   // Lazily initializes an API client and returns a pointer to it. Returns a
   // pointer to the existing API client, if one is already initialized. The
@@ -259,9 +286,8 @@ class PixManager {
   void OnPurchaseActionResult(base::TimeTicks start_time,
                               PurchaseActionResult result);
 
-  // TODO(crbug.com/420735186): Rename to OnUiScreenEvent.
   // Called by the view to communicate UI events.
-  void OnUiEvent(UiEvent ui_event_type);
+  void OnUiScreenEvent(UiEvent ui_event_type);
 
   // Sets the internal state and triggers dismissal.
   void DismissPrompt();
@@ -317,7 +343,7 @@ class PixManager {
   // double-click.
   bool has_payflow_started_ = false;
 
-  // Utility process validator for PIX code strings.
+  // Utility process validator for Pix code strings.
   data_decoder::DataDecoder utility_process_validator_;
 
   // Represents the current state of the UI or the UI state that is intended. In

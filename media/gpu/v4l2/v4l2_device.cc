@@ -24,7 +24,6 @@
 #include <algorithm>
 #include <set>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/not_fatal_until.h"
@@ -428,8 +427,8 @@ bool V4L2Device::CanCreateEGLImageFrom(const Fourcc fourcc) const {
 #endif
   };
 
-  return base::Contains(kEGLImageDrmFmtsSupported,
-                        V4L2PixFmtToDrmFormat(fourcc.ToV4L2PixFmt()));
+  return std::ranges::contains(kEGLImageDrmFmtsSupported,
+                               V4L2PixFmtToDrmFormat(fourcc.ToV4L2PixFmt()));
 }
 
 std::vector<uint32_t> V4L2Device::PreferredInputFormat(Type type) const {
@@ -570,7 +569,7 @@ V4L2Device::EnumerateSupportedDecodeProfiles(
                                 V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE);
 
   for (uint32_t pixelformat : v4l2_codecs_as_pix_fmts) {
-    if (!base::Contains(pixelformats, pixelformat)) {
+    if (!std::ranges::contains(pixelformats, pixelformat)) {
       continue;
     }
 
@@ -728,7 +727,6 @@ V4L2RequestsQueue* V4L2Device::GetRequestsQueue() {
     struct media_device_info media_info;
     if (HANDLE_EINTR(ioctl(candidate_media_fd.get(), MEDIA_IOC_DEVICE_INFO,
                            &media_info)) < 0) {
-      RecordMediaIoctlUMA(MediaIoctlRequests::kMediaIocDeviceInfo);
       VPLOGF(2) << "Failed to Query media device info.";
       continue;
     }
@@ -804,7 +802,6 @@ bool V4L2Device::SetExtCtrls(uint32_t ctrl_class,
 
   const int result = Ioctl(VIDIOC_S_EXT_CTRLS, &ext_ctrls);
   if (result < 0) {
-    RecordVidiocIoctlErrorUMA(VidiocIoctlRequests::kVidiocSExtCtrls);
     if (ext_ctrls.error_idx == ext_ctrls.count)
       VPLOGF(1) << "VIDIOC_S_EXT_CTRLS: validation failed while trying to set "
                    "controls";
@@ -1041,7 +1038,7 @@ std::string V4L2Device::GetDevicePathFor(Type type, uint32_t pixfmt) {
   const Devices& devices = GetDevicesForType(type);
 
   for (const auto& device : devices) {
-    if (base::Contains(device.second, pixfmt)) {
+    if (std::ranges::contains(device.second, pixfmt)) {
       return device.first;
     }
   }

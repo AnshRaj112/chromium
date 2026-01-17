@@ -29,7 +29,6 @@
 #include "content/public/common/content_features.h"
 #include "media/audio/application_loopback_device_helper.h"
 #include "media/audio/audio_device_description.h"
-#include "media/audio/audio_features.h"
 #include "media/mojo/mojom/capture_handle.mojom.h"
 #include "media/mojo/mojom/display_media_information.mojom.h"
 #include "third_party/blink/public/common/features_generated.h"
@@ -41,6 +40,10 @@
 #if BUILDFLAG(IS_WIN)
 #include "chrome/browser/media/webrtc/desktop_capture_devices_util_win.h"
 #endif  // BUILDFLAG(IS_WIN)
+
+#if BUILDFLAG(IS_MAC)
+#include "third_party/webrtc/modules/desktop_capture/mac/window_list_utils.h"
+#endif  // BUILDFLAG(IS_MAC)
 
 namespace {
 
@@ -249,20 +252,22 @@ std::string DeviceName(content::WebContents* web_contents,
   }
 }
 
-blink::MediaStreamDevice DesktopMediaIDToAudioMediaStreamDevice(
-    std::string device_id,
-    content::DesktopMediaID::Type desktop_media_id_type,
-    blink::mojom::MediaStreamType media_stream_type) {
-  if (desktop_media_id_type == content::DesktopMediaID::TYPE_WEB_CONTENTS) {
-    return blink::MediaStreamDevice(media_stream_type, device_id, "Tab audio");
-  } else if (desktop_media_id_type == content::DesktopMediaID::TYPE_WINDOW &&
-             media::IsApplicationAudioCaptureSupported()) {
-    return blink::MediaStreamDevice(media_stream_type, device_id,
-                                    "Application Audio");
-  } else {
-    return blink::MediaStreamDevice(media_stream_type, device_id,
-                                    "System Audio");
+std::string GetAudioMediaStreamDeviceName(
+    const content::DesktopMediaID& desktop_media_id) {
+  switch (desktop_media_id.type) {
+    case content::DesktopMediaID::TYPE_WEB_CONTENTS:
+      return "Tab audio";
+    case content::DesktopMediaID::TYPE_WINDOW:
+      return (desktop_media_id.window_audio_type ==
+              content::DesktopMediaID::AudioType::kApplication)
+                 ? "Application Audio"
+                 : "System Audio";
+    case content::DesktopMediaID::TYPE_SCREEN:
+      return "System Audio";
+    case content::DesktopMediaID::TYPE_NONE:
+      NOTREACHED();
   }
+  NOTREACHED();
 }
 
 void CreateMediaStreamCaptureIndicatorUI(
@@ -278,16 +283,9 @@ void CreateMediaStreamCaptureIndicatorUI(
                             std::unique_ptr<content::MediaStreamUI>)>
         on_media_stream_capture_indicator_ui_created_callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-#if BUILDFLAG(IS_ANDROID)
-  std::unique_ptr<content::MediaStreamUI> capture_indicator_ui =
-      MediaCaptureDevicesDispatcher::GetInstance()
-          ->GetMediaStreamCaptureIndicator()
-          ->RegisterMediaStream(web_contents, devices);
-  std::move(on_media_stream_capture_indicator_ui_created_callback)
-      .Run(std::move(devices), std::move(capture_indicator_ui));
-#else  // !BUILDFLAG(IS_ANDROID)
-  // If required, register to display the notification for stream capture.
   std::unique_ptr<MediaStreamUI> notification_ui;
+#if !BUILDFLAG(IS_ANDROID)
+  // If required, register to display the notification for stream capture.
   if (display_notification) {
     if (media_id.type == content::DesktopMediaID::TYPE_WEB_CONTENTS) {
       content::GlobalRenderFrameHostId capturer_id;
@@ -308,15 +306,16 @@ void CreateMediaStreamCaptureIndicatorUI(
           web_contents);
     }
   }
+#endif
 
   std::unique_ptr<content::MediaStreamUI> capture_indicator_ui =
       MediaCaptureDevicesDispatcher::GetInstance()
           ->GetMediaStreamCaptureIndicator()
           ->RegisterMediaStream(web_contents, devices,
-                                std::move(notification_ui), application_title);
+                                std::move(notification_ui), application_title,
+                                media_id);
   std::move(on_media_stream_capture_indicator_ui_created_callback)
       .Run(std::move(devices), std::move(capture_indicator_ui));
-#endif
 }
 
 void OnAudioDeviceIdObtained(
@@ -343,9 +342,9 @@ void OnAudioDeviceIdObtained(
   }
 
   if (audio_device_id.has_value()) {
-    blink::MediaStreamDevice audio_device =
-        DesktopMediaIDToAudioMediaStreamDevice(audio_device_id.value(),
-                                               media_id.type, audio_type);
+    blink::MediaStreamDevice audio_device(
+        audio_type, audio_device_id.value(),
+        GetAudioMediaStreamDeviceName(media_id));
     devices.audio_device = audio_device;
     devices.audio_device->display_media_info =
         DesktopMediaIDToDisplayMediaInformation(
@@ -358,14 +357,30 @@ void OnAudioDeviceIdObtained(
       std::move(on_media_stream_capture_indicator_ui_created_callback));
 }
 
-std::optional<std::string> GetApplicationId(intptr_t window_id) {
-#if BUILDFLAG(IS_WIN)
-  base::ProcessId process_id = GetAppMainProcessId(window_id);
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+namespace {
+std::optional<std::string> ProcessIdToApplicationLoopbackDeviceId(
+    base::ProcessId process_id,
+    bool restrict_own_audio) {
   if (process_id == base::kNullProcessId) {
     return std::nullopt;
   }
-
+  if (restrict_own_audio && base::GetCurrentProcId() == process_id) {
+    return media::CreateRestrictOwnAudioBrowserLoopbackDeviceId();
+  }
   return media::CreateApplicationLoopbackDeviceId(process_id);
+}
+}  // namespace
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+
+std::optional<std::string> GetApplicationId(intptr_t window_id,
+                                            bool restrict_own_audio) {
+#if BUILDFLAG(IS_WIN)
+  return ProcessIdToApplicationLoopbackDeviceId(GetAppMainProcessId(window_id),
+                                                restrict_own_audio);
+#elif BUILDFLAG(IS_MAC)
+  return ProcessIdToApplicationLoopbackDeviceId(
+      webrtc::GetWindowOwnerPid(window_id), restrict_own_audio);
 #else
   return std::nullopt;
 #endif  // BUILDFLAG(IS_WIN)
@@ -389,13 +404,15 @@ void GetAudioDeviceId(content::DesktopMediaID desktop_media_id,
     web_id.disable_local_echo =
         disable_local_echo || suppress_local_audio_playback;
     device_id = web_id.ToString();
-  } else if (desktop_media_id.type == content::DesktopMediaID::TYPE_WINDOW) {
-    if (media::IsApplicationAudioCaptureSupported()) {
-      base::ThreadPool::PostTaskAndReplyWithResult(
-          FROM_HERE, base::BindOnce(&GetApplicationId, desktop_media_id.id),
-          std::move(audio_device_id_obtained_callback));
-      return;
-    }
+  } else if (desktop_media_id.type == content::DesktopMediaID::TYPE_WINDOW &&
+             desktop_media_id.window_audio_type ==
+                 content::DesktopMediaID::AudioType::kApplication) {
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE,
+        base::BindOnce(&GetApplicationId, desktop_media_id.id,
+                       restrict_own_audio),
+        std::move(audio_device_id_obtained_callback));
+    return;
   } else {
     // Use the special loopback device ID for system audio capture.
     if (restrict_own_audio) {

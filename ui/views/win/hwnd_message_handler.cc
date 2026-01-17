@@ -30,6 +30,7 @@
 #include "base/strings/string_util_win.h"
 #include "base/strings/stringprintf.h"
 #include "base/task/current_thread.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
@@ -40,6 +41,7 @@
 #include "services/tracing/public/cpp/perfetto/macros.h"
 #include "third_party/perfetto/protos/perfetto/trace/track_event/chrome_window_handle_event_info.pbzero.h"
 #include "third_party/skia/include/core/SkPath.h"
+#include "ui/accessibility/accessibility_features.h"
 #include "ui/accessibility/platform/ax_fragment_root_win.h"
 #include "ui/accessibility/platform/ax_platform.h"
 #include "ui/accessibility/platform/ax_platform_node_win.h"
@@ -69,9 +71,10 @@
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/resize_utils.h"
-#include "ui/gfx/icon_util.h"
+#include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/path_win.h"
 #include "ui/gfx/win/hwnd_util.h"
+#include "ui/gfx/win/icon_util.h"
 #include "ui/gfx/win/rendering_window_manager.h"
 #include "ui/latency/latency_info.h"
 #include "ui/native_theme/native_theme_win.h"
@@ -421,7 +424,7 @@ std::unique_ptr<HWNDMessageHandler> HWNDMessageHandler::Create(
     HWNDMessageHandlerDelegate* delegate,
     const std::string& debugging_id) {
   HWNDMessageHandler* message_handler =
-      display::Screen::GetScreen()->IsHeadless()
+      display::Screen::Get()->IsHeadless()
           ? new HWNDMessageHandlerHeadless(delegate, debugging_id)
           : new HWNDMessageHandler(delegate, debugging_id);
   return base::WrapUnique(message_handler);
@@ -451,7 +454,6 @@ HWNDMessageHandler::HWNDMessageHandler(HWNDMessageHandlerDelegate* delegate,
       last_mouse_hwheel_time_(0),
       dwm_transition_desired_(false),
       sent_window_size_changing_(false),
-      did_return_uia_object_(false),
       left_button_down_on_caption_(false),
       background_fullscreen_hack_(false) {}
 
@@ -810,6 +812,9 @@ void HWNDMessageHandler::Hide() {
 }
 
 void HWNDMessageHandler::Maximize() {
+  if (IsFullscreen()) {
+    SetFullscreen(false, display::kInvalidDisplayId);
+  }
   ExecuteSystemMenuCommand(SC_MAXIMIZE);
 }
 
@@ -819,7 +824,11 @@ void HWNDMessageHandler::Minimize() {
 }
 
 void HWNDMessageHandler::Restore() {
-  ExecuteSystemMenuCommand(SC_RESTORE);
+  if (IsFullscreen()) {
+    SetFullscreen(false, display::kInvalidDisplayId);
+  } else {
+    ExecuteSystemMenuCommand(SC_RESTORE);
+  }
 }
 
 void HWNDMessageHandler::Activate() {
@@ -1006,13 +1015,17 @@ void HWNDMessageHandler::SetWindowIcons(const gfx::ImageSkia& window_icon,
                                         const gfx::ImageSkia& app_icon) {
   if (!window_icon.isNull()) {
     base::win::ScopedGDIObject<HICON> previous_icon = std::move(window_icon_);
-    window_icon_ = IconUtil::CreateHICONFromSkBitmap(*window_icon.bitmap());
+    window_icon_ = IconUtil::CreateHICONFromSkBitmapSizedTo(
+        *window_icon.bitmap(), GetSystemMetrics(SM_CXSMICON),
+        GetSystemMetrics(SM_CYSMICON));
     SendMessage(hwnd(), WM_SETICON, ICON_SMALL,
                 reinterpret_cast<LPARAM>(window_icon_.get()));
   }
   if (!app_icon.isNull()) {
     base::win::ScopedGDIObject<HICON> previous_icon = std::move(app_icon_);
-    app_icon_ = IconUtil::CreateHICONFromSkBitmap(*app_icon.bitmap());
+    app_icon_ = IconUtil::CreateHICONFromSkBitmapSizedTo(
+        *app_icon.bitmap(), GetSystemMetrics(SM_CXICON),
+        GetSystemMetrics(SM_CYICON));
     SendMessage(hwnd(), WM_SETICON, ICON_BIG,
                 reinterpret_cast<LPARAM>(app_icon_.get()));
   }
@@ -1053,10 +1066,7 @@ void HWNDMessageHandler::SetAspectRatio(float aspect_ratio,
   DCHECK_GT(aspect_ratio, 0.0f);
 
   aspect_ratio_ = aspect_ratio;
-
-  // Convert to pixels.
-  excluded_margin_ =
-      display::win::GetScreenWin()->DIPToScreenSize(hwnd(), excluded_margin);
+  excluded_margin_dip_ = excluded_margin;
 
   // When the aspect ratio is set, size the window to adhere to it. This keeps
   // the same origin point as the original window.
@@ -1417,7 +1427,10 @@ gfx::NativeViewAccessible HWNDMessageHandler::GetChildOfAXFragmentRoot() {
 }
 
 gfx::NativeViewAccessible HWNDMessageHandler::GetParentOfAXFragmentRoot() {
-  return nullptr;
+  if (!features::IsAccessibilityWinAXFragmentRootParentEnabled()) {
+    return nullptr;
+  }
+  return delegate_->GetParentNativeViewAccessible();
 }
 
 bool HWNDMessageHandler::IsAXFragmentRootAControlElement() {
@@ -1880,11 +1893,30 @@ LRESULT HWNDMessageHandler::OnCreate(CREATESTRUCT* create_struct) {
     dpi_ = display::win::GetScreenWin()->GetDPIForHWND(hwnd());
   }
 
+  // The window may begin responding to WM_GETOBJECT messages from this point
+  // until WM_DESTROY is received; see
+  // https://learn.microsoft.com/windows/win32/winauto/wm-getobject#remarks.
+  may_service_accessibility_requests_ = true;
+
   // TODO(beng): move more of NWW::OnCreate here.
   return 0;
 }
 
+namespace {
+
+void UiaDisconnectProviderInTask(
+    Microsoft::WRL::ComPtr<IRawElementProviderSimple> provider) {
+  ::UiaDisconnectProvider(provider.Get());
+}
+
+}  // namespace
+
 void HWNDMessageHandler::OnDestroy() {
+  // The window will no longer service WM_GETOBJECT messages from this point
+  // onward; see
+  // https://learn.microsoft.com/windows/win32/winauto/wm-getobject#remarks.
+  may_service_accessibility_requests_ = false;
+
   ::RemoveProp(hwnd(), ui::kWindowTranslucent);
   session_change_observer_.reset();
   delegate_->HandleDestroying();
@@ -1897,11 +1929,26 @@ void HWNDMessageHandler::OnDestroy() {
     map.erase(i);
   }
 
-  // If we have ever returned a UIA object via WM_GETOBJECT, signal that all
-  // objects associated with this HWND can be discarded. See:
-  // https://docs.microsoft.com/en-us/windows/win32/api/uiautomationcoreapi/nf-uiautomationcoreapi-uiareturnrawelementprovider#remarks
-  if (did_return_uia_object_) {
-    UiaReturnRawElementProvider(hwnd(), 0, 0, nullptr);
+  if (auto& ax_platform = ui::AXPlatform::GetInstance();
+      ax_platform.HasServicedUiaClients()) {
+    // Clean up UIA resources associated with this window's fragment root if all
+    // providers have not previously been disconnected; see
+    // https://learn.microsoft.com/en-us/windows/win32/api/uiautomationcoreapi/nf-uiautomationcoreapi-uiadisconnectprovider.
+    if (ax_platform.IsUiaProviderEnabled() &&
+        base::FeatureList::IsEnabled(features::kUiaDisconnectRootProviders)) {
+      // Post a task to disconnect the provider to avoid a potential re-entrancy
+      // issue -- UiaDisconnectProvider may make COM calls, which could result
+      // in a call to PeekMessage.
+      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE,
+          base::BindOnce(&UiaDisconnectProviderInTask,
+                         Microsoft::WRL::ComPtr<IRawElementProviderSimple>(
+                             ax_fragment_root_->GetProvider())));
+    }
+
+    // Disassociate this window from MSAA clients that are observing events; see
+    // https://docs.microsoft.com/en-us/windows/win32/api/uiautomationcoreapi/nf-uiautomationcoreapi-uiareturnrawelementprovider#remarks
+    ::UiaReturnRawElementProvider(hwnd(), 0, 0, nullptr);
   }
 }
 
@@ -2064,52 +2111,53 @@ void HWNDMessageHandler::OnGetMinMaxInfo(MINMAXINFO* minmax_info) {
 LRESULT HWNDMessageHandler::OnGetObject(UINT message,
                                         WPARAM w_param,
                                         LPARAM l_param) {
-  LRESULT reference_result = static_cast<LRESULT>(0L);
-
-  // Only the lower 32 bits of l_param are valid when checking the object id
-  // because it sometimes gets sign-extended incorrectly (but not always).
-  DWORD obj_id = static_cast<DWORD>(static_cast<DWORD_PTR>(l_param));
-
-  const bool is_uia_request = static_cast<DWORD>(UiaRootObjectId) == obj_id;
-  const bool is_uia_active =
-      is_uia_request && ::ui::AXPlatform::GetInstance().IsUiaProviderEnabled();
-  const bool is_msaa_request = static_cast<DWORD>(OBJID_CLIENT) == obj_id;
-
-  if (is_uia_request) {
-    ::ui::AXPlatform::GetInstance().OnUiaProviderRequested(is_uia_active);
+  // The window will only service accessibility requests after processing a
+  // WM_CREATE message and before processing a WM_DESTROY message; see
+  // https://learn.microsoft.com/windows/win32/winauto/wm-getobject#remarks.
+  if (!may_service_accessibility_requests_) {
+    return 0;
   }
 
-  if ((is_uia_request || is_msaa_request) &&
-      delegate_->GetNativeViewAccessible()) {
-    // Expose either the UIA or the MSAA implementation, but not both, depending
-    // on the state of the feature flag.
-    if (is_uia_active) {
-      // Retrieve UIA object for the root view.
-      Microsoft::WRL::ComPtr<IRawElementProviderSimple> root;
-      ax_fragment_root_->GetNativeViewAccessible()->QueryInterface(
-          IID_PPV_ARGS(&root));
+  // Casting the signed pointer-sized LPARAM to a signed LONG is well-defined:
+  // only the low-order 32-bits are preserved.
+  switch (static_cast<LONG>(l_param)) {
+    case UiaRootObjectId:
+      if (ui::AXPlatform::GetInstance().IsUiaProviderEnabled()) {
+        // Return the IRawElementProviderSimple for the window's client area to
+        // a UI Automation client.
+        Microsoft::WRL::ComPtr<IRawElementProviderSimple> root;
+        ax_fragment_root_->GetNativeViewAccessible()->QueryInterface(
+            IID_PPV_ARGS(&root));
 
-      // Return the UIA object via UiaReturnRawElementProvider(). See:
-      // https://docs.microsoft.com/en-us/windows/win32/winauto/wm-getobject
-      did_return_uia_object_ = true;
-      reference_result =
-          UiaReturnRawElementProvider(hwnd(), w_param, l_param, root.Get());
-    } else if (is_msaa_request) {
-      // Retrieve MSAA dispatch object for the root view.
-      Microsoft::WRL::ComPtr<IAccessible> root(
-          delegate_->GetNativeViewAccessible());
-      reference_result =
-          LresultFromObject(IID_IAccessible, w_param, root.Get());
-    }
-  } else if (::GetFocus() == hwnd() && ax_system_caret_ &&
-             static_cast<DWORD>(OBJID_CARET) == obj_id) {
-    Microsoft::WRL::ComPtr<IAccessible> ax_system_caret_accessible =
-        ax_system_caret_->GetCaret();
-    reference_result = LresultFromObject(IID_IAccessible, w_param,
-                                         ax_system_caret_accessible.Get());
+        ui::AXPlatform::GetInstance().SetUiaClientServiced(true);
+        return ::UiaReturnRawElementProvider(hwnd(), w_param, l_param,
+                                             root.Get());
+      }
+
+      // The UIA Provider is not enabled. The client will most likely try again
+      // for OBJID_CLIENT.
+      break;
+
+    case OBJID_CLIENT:
+      // Return the IAccessible for the window's client area to an MSAA client.
+      if (auto root_accessible = delegate_->GetNativeViewAccessible()) {
+        return ::LresultFromObject(IID_IAccessible, w_param, root_accessible);
+      }
+      break;
+
+    case OBJID_CARET:
+      // Return the IAccessible for the window's caret to an MSAA client.
+      if (ax_system_caret_ && ::GetFocus() == hwnd()) {
+        return ::LresultFromObject(IID_IAccessible, w_param,
+                                   ax_system_caret_->GetCaret());
+      }
+      break;
+
+    default:
+      break;
   }
 
-  return reference_result;
+  return 0;
 }
 
 LRESULT HWNDMessageHandler::OnImeMessages(UINT message,
@@ -2393,7 +2441,7 @@ LRESULT HWNDMessageHandler::OnNCActivate(UINT message,
 LRESULT HWNDMessageHandler::OnNCCalcSize(BOOL mode, LPARAM l_param) {
   // We only override the default handling if we need to specify a custom
   // non-client edge width. Note that in most cases "no insets" means no
-  // custom width, but in fullscreen mode or when the NonClientFrameView
+  // custom width, but in fullscreen mode or when the FrameView
   // requests it, we want a custom width of 0.
 
   // Let User32 handle the first nccalcsize for captioned windows
@@ -2662,7 +2710,10 @@ void HWNDMessageHandler::OnPaint(HDC dc) {
 
   if (!IsRectEmpty(&ps.rcPaint)) {
     HBRUSH brush = delegate_->GetBackgroundPaintBrush();
-    if (!brush) {
+    // Translucent windows on Win10 + ANGLE D3D11 have a blending issue with
+    // non-black brush. Fallback to black brush to work around the issue. See
+    // crbug.com/445485657.
+    if (!brush || is_translucent_) {
       brush = reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
     }
 
@@ -3648,22 +3699,6 @@ void HWNDMessageHandler::UpdateDwmFrame() {
   }
 }
 
-void HWNDMessageHandler::GenerateTouchEvent(ui::EventType event_type,
-                                            const gfx::Point& point,
-                                            ui::PointerId id,
-                                            base::TimeTicks time_stamp,
-                                            TouchEvents* touch_events) {
-  ui::TouchEvent event(event_type, point, time_stamp,
-                       ui::PointerDetails(ui::EventPointerType::kTouch, id));
-
-  event.SetFlags(ui::GetModifiersFromKeyState());
-
-  event.latency()->AddLatencyNumberWithTimestamp(
-      ui::INPUT_EVENT_LATENCY_ORIGINAL_COMPONENT, time_stamp);
-
-  touch_events->push_back(event);
-}
-
 bool HWNDMessageHandler::HandleMouseInputForCaption(unsigned int message,
                                                     WPARAM w_param,
                                                     LPARAM l_param) {
@@ -3827,9 +3862,11 @@ void HWNDMessageHandler::SizeWindowToAspectRatio(UINT param,
     max_size_param = max_window_size;
   }
 
+  gfx::Size excluded_margin = delegate_->DIPToScreenSize(excluded_margin_dip_);
+
   gfx::SizeRectToAspectRatioWithExcludedMargin(
       GetWindowResizeEdge(param), aspect_ratio_.value(), min_window_size,
-      max_size_param, excluded_margin_, *window_rect);
+      max_size_param, excluded_margin, *window_rect);
 }
 
 POINT HWNDMessageHandler::GetCursorPos() const {

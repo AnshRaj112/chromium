@@ -61,9 +61,11 @@ enum class RegexFeature : uint8_t {
   kAutofillSupportPhoneticNameForJP = 2,
   kAutofillSupportLastNamePrefix = 3,
   kAutofillEnableLoyaltyCardsFilling = 4,
-  kAutofillImproveCityFieldClassification = 5,
-  kAutofillSupportSplitZipCode = 6,
-  kMaxValue = kAutofillSupportSplitZipCode,
+  kAutofillSupportSplitZipCode = 5,
+  kAutofillDisallowMoreHyphenLikeLabels = 6,
+  kAutofillFixStateCountryMisclassification = 7,
+  kAutofillFixCivilStateMisclassificationForESPT = 8,
+  kMaxValue = kAutofillFixCivilStateMisclassificationForESPT,
 };
 
 // Returns a `DenseSet` containing all `RegexFeature`s whose corresponding

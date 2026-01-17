@@ -98,8 +98,14 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 // Returns whether the current layout is showing the bottom omnibox.
 - (BOOL)isCurrentLayoutBottomOmnibox;
 
-// Returns whether the Enhanced Safe Browsing Infobar Promo feature is enabled.
-- (BOOL)isEnhancedSafeBrowsingInfobarEnabled;
+// Returns whether the Ask Gemini Chip feature is enabled.
+- (BOOL)isAskGeminiChipEnabled;
+
+// Returns whether the ComposeboxIOS feature is enabled.
+- (BOOL)isComposeboxIOSEnabled;
+
+// Returns the interface orientation of the scene.
+- (UIInterfaceOrientation)interfaceOrientation;
 
 #pragma mark - Profile Utilities (EG2)
 
@@ -225,9 +231,6 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 // Waits for there to be `count` number of incognito tabs within a timeout, or a
 // GREYAssert is induced.
 - (void)waitForIncognitoTabCount:(NSUInteger)count;
-
-// Loads `URL` as if it was opened from an external application.
-- (void)openURLFromExternalApp:(const GURL&)URL;
 
 // Programmatically dismisses settings screen.
 - (void)dismissSettings;
@@ -550,6 +553,12 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 - (void)waitForIncognitoTabCount:(NSUInteger)count
               inWindowWithNumber:(int)windowNumber;
 
+// Opens the settings menu directly (not via the UI) in the window with the
+// given number. EarlGrey + Multiwindow + SwiftUI (the tools menu) do not
+// play well together, so EG often fails to interact with the tools menu in
+// secondary windows.
+- (void)openSettingsInWindowWithNumber:(int)windowNumber;
+
 #pragma mark - SignIn Utilities (EG2)
 
 // Signs the user out, clears the known accounts & browsing data, and wait for
@@ -644,6 +653,9 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 // Returns the current web state's last committed URL.
 - (GURL)webStateLastCommittedURL;
 
+// Waits for the current web state's visible URL to be `URL`.
+- (void)waitForWebStateVisibleURL:(const GURL&)URL;
+
 // Purges cached web view pages, so the next time back navigation will not use
 // a cached page. Browsers don't have to use a fresh version for back/forward
 // navigation for HTTP pages and may serve a version from the cache even if the
@@ -731,9 +743,6 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 // Returns YES if UKM feature is enabled.
 - (BOOL)isUKMEnabled [[nodiscard]];
 
-// Returns YES if DWA feature is enabled.
-- (BOOL)isDWAEnabled [[nodiscard]];
-
 // Returns YES if kTestFeature is enabled.
 - (BOOL)isTestFeatureEnabled;
 
@@ -754,9 +763,6 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 // Returns whether the app is configured to, and running in an environment which
 // can, open multiple windows.
 - (BOOL)areMultipleWindowsSupported;
-
-// Returns whether the NewOverflowMenu feature is enabled.
-- (BOOL)isNewOverflowMenuEnabled;
 
 // Returns whether the UseLensToSearchForImage feature is enabled;
 - (BOOL)isUseLensToSearchForImageEnabled;
@@ -811,6 +817,14 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 
 // Returns the object for `key` in NSUserDefault.
 - (id)userDefaultsObjectForKey:(NSString*)key;
+
+// Creates a `AppGroupCommand` based on the provided text and writes it the
+// shared NSUserDefaults.
+- (void)setAppGroupCommandToSearchText:(NSString*)text;
+
+// Creates an incognito `AppGroupCommand` based on the provided text and writes
+// it the shared NSUserDefaults.
+- (void)setAppGroupCommandToIncognitoSearchText:(NSString*)text;
 
 #pragma mark - Pref Utilities (EG2)
 
@@ -909,16 +923,16 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 - (void)verifyCopyLinkActionWithText:(NSString*)text;
 
 // Taps on the Open in New Tab context menu action and waits for the `URL` to be
-// present in the omnibox.
-- (void)verifyOpenInNewTabActionWithURL:(const std::string&)URL;
+// present the URL of the current tab.
+- (void)verifyOpenInNewTabActionWithURL:(const GURL&)URL;
 
 // Taps on the Open in New Window context menu action and waits for the
 // `content` to be present in webview.
 - (void)verifyOpenInNewWindowActionWithContent:(const std::string&)content;
 
 // Taps on the Open in Incognito context menu action and waits for the `URL` to
-// be present in the omnibox.
-- (void)verifyOpenInIncognitoActionWithURL:(const std::string&)URL;
+// be present the URL of the current tab.
+- (void)verifyOpenInIncognitoActionWithURL:(const GURL&)URL;
 
 // Taps on the Share context menu action and validates that the ActivityView
 // was brought up with the correct title in its header. The title starts as the
@@ -979,6 +993,11 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 // is induced on failure.
 - (void)tapButtonInActivitySheetWithID:(NSString*)buttonText;
 
+// Taps the `more` button in the activity sheet that allows users to expand the
+// sheet to see all available actions on iOS 26+. Example:
+// https://screenshot.googleplex.com/8QGvXx4q2LNYoVJ
+- (void)tapMoreOptionButtonInActivitySheet;
+
 #pragma mark - First Run Utilities
 
 // Writes the First Run Sentinel file, used to record that First Run has
@@ -1004,6 +1023,15 @@ id<GREYAction> grey_longPressWithDuration(base::TimeDelta duration);
 
 // Waits for the MessagingBackendService to be initialized.
 - (NSError*)waitForMessagingBackendServiceInitialized;
+
+#pragma mark - Reader mode Utilities
+
+// Shows Reader mode in the current tab and wait for the Reader mode WebState to
+// be ready.
+- (BOOL)showReaderModeAndWaitUntilReaderModeWebStateIsReady;
+
+// Hides Reader mode in the current tab.
+- (void)hideReaderMode;
 
 @end
 

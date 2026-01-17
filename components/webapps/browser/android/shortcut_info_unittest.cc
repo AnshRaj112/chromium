@@ -20,6 +20,7 @@
 namespace webapps {
 
 using blink::mojom::DisplayMode;
+using DisplayOverride = blink::Manifest::DisplayOverride;
 using Purpose = blink::mojom::ManifestImageResource_Purpose;
 
 blink::Manifest::ImageResource CreateImage(const std::string& url,
@@ -312,8 +313,8 @@ TEST_F(ShortcutInfoTest, ShortcutItemsPopulated) {
   info_.UpdateFromManifest(manifest_);
 
   ASSERT_EQ(info_.best_shortcut_icon_urls.size(), 3u);
-  EXPECT_EQ(info_.best_shortcut_icon_urls[0].path(), "/i1_3");
-  EXPECT_EQ(info_.best_shortcut_icon_urls[1].path(), "/i2_2");
+  EXPECT_EQ(info_.best_shortcut_icon_urls[0].GetPath(), "/i1_3");
+  EXPECT_EQ(info_.best_shortcut_icon_urls[1].GetPath(), "/i2_2");
   EXPECT_FALSE(info_.best_shortcut_icon_urls[2].is_valid());
 }
 
@@ -340,8 +341,8 @@ TEST_F(ShortcutInfoTest, FindMaskableSplashIcon) {
 
   info_.UpdateBestSplashIcon(manifest_);
 
-    EXPECT_EQ(info_.splash_image_url.path(), "/icon_144.png");
-    EXPECT_TRUE(info_.is_splash_image_maskable);
+  EXPECT_EQ(info_.splash_image_url.GetPath(), "/icon_144.png");
+  EXPECT_TRUE(info_.is_splash_image_maskable);
 }
 
 TEST_F(ShortcutInfoTest, SplashIconFallbackToAny) {
@@ -354,30 +355,33 @@ TEST_F(ShortcutInfoTest, SplashIconFallbackToAny) {
 
   info_.UpdateBestSplashIcon(manifest_);
 
-  EXPECT_EQ(info_.splash_image_url.path(), "/icon_144.png");
+  EXPECT_EQ(info_.splash_image_url.GetPath(), "/icon_144.png");
   EXPECT_FALSE(info_.is_splash_image_maskable);
 }
 
 TEST_F(ShortcutInfoTest, DisplayOverride) {
-  manifest_.display = blink::mojom::DisplayMode::kBrowser;
-  manifest_.display_override = {blink::mojom::DisplayMode::kMinimalUi};
+  manifest_.display = DisplayMode::kBrowser;
+  manifest_.display_override = {
+      DisplayOverride::Create(DisplayMode::kMinimalUi)};
   info_.UpdateFromManifest(manifest_);
-  EXPECT_EQ(info_.display, blink::mojom::DisplayMode::kMinimalUi);
+  EXPECT_EQ(info_.display, DisplayMode::kMinimalUi);
 
-  manifest_.display = blink::mojom::DisplayMode::kFullscreen;
-  manifest_.display_override = {blink::mojom::DisplayMode::kBrowser};
+  manifest_.display = DisplayMode::kFullscreen;
+  manifest_.display_override = {DisplayOverride::Create(DisplayMode::kBrowser)};
   info_.UpdateFromManifest(manifest_);
-  EXPECT_EQ(info_.display, blink::mojom::DisplayMode::kBrowser);
+  EXPECT_EQ(info_.display, DisplayMode::kBrowser);
 
-  manifest_.display = blink::mojom::DisplayMode::kStandalone;
-  manifest_.display_override = {blink::mojom::DisplayMode::kFullscreen};
+  manifest_.display = DisplayMode::kStandalone;
+  manifest_.display_override = {
+      DisplayOverride::Create(DisplayMode::kFullscreen)};
   info_.UpdateFromManifest(manifest_);
-  EXPECT_EQ(info_.display, blink::mojom::DisplayMode::kFullscreen);
+  EXPECT_EQ(info_.display, DisplayMode::kFullscreen);
 
-  manifest_.display = blink::mojom::DisplayMode::kMinimalUi;
-  manifest_.display_override = {blink::mojom::DisplayMode::kStandalone};
+  manifest_.display = DisplayMode::kMinimalUi;
+  manifest_.display_override = {
+      DisplayOverride::Create(DisplayMode::kStandalone)};
   info_.UpdateFromManifest(manifest_);
-  EXPECT_EQ(info_.display, blink::mojom::DisplayMode::kStandalone);
+  EXPECT_EQ(info_.display, DisplayMode::kStandalone);
 }
 
 TEST_F(ShortcutInfoTest, ManifestIdGenerated) {

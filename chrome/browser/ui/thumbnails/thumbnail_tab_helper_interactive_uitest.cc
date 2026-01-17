@@ -4,18 +4,21 @@
 
 #include <optional>
 
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/test/scoped_feature_list.h"
-#include "build/build_config.h"
+#include "chrome/browser/performance_manager/public/background_tab_loading_policy.h"
 #include "chrome/browser/performance_manager/test_support/page_discarding_utils.h"
-#include "chrome/browser/sessions/tab_loader_tester.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/interaction/browser_elements.h"
 #include "chrome/browser/ui/performance_controls/test_support/memory_saver_interactive_test_mixin.h"
 #include "chrome/browser/ui/thumbnails/thumbnail_image.h"
 #include "chrome/browser/ui/thumbnails/thumbnail_tab_helper.h"
@@ -28,10 +31,6 @@
 #include "content/public/test/browser_test.h"
 #include "ui/base/interaction/state_observer.h"
 #include "url/gurl.h"
-
-#if BUILDFLAG(ENABLE_SESSION_SERVICE)
-#include "chrome/browser/sessions/tab_loader.h"
-#endif  // BUILDFLAG(ENABLE_SESSION_SERVICE)
 
 namespace {
 class ThumbnailObserver : public ui::test::StateObserver<bool> {
@@ -93,15 +92,6 @@ using ::performance_manager::testing::ScopedSetAllPagesDiscardableForTesting;
 
 class ThumbnailTabHelperUpdatedInteractiveTest
     : public MemorySaverInteractiveTestMixin<InteractiveBrowserTest> {
- public:
-#if BUILDFLAG(ENABLE_SESSION_SERVICE)
-  void ConfigureTabLoader(TabLoader* tab_loader) {
-    TabLoaderTester tester(tab_loader);
-    tester.SetMaxSimultaneousLoadsForTesting(1);
-    tester.SetMaxLoadedTabCountForTesting(1);
-  }
-#endif
-
  protected:
   void SetUp() override {
     // This flag causes the thumbnail tab helper system to engage. Otherwise
@@ -112,6 +102,7 @@ class ThumbnailTabHelperUpdatedInteractiveTest
   }
 
   void SetUpOnMainThread() override {
+    target_browser_ = browser();
     MemorySaverInteractiveTestMixin<
         InteractiveBrowserTest>::SetUpOnMainThread();
     unconditionally_discard_pages_ =
@@ -122,19 +113,17 @@ class ThumbnailTabHelperUpdatedInteractiveTest
     unconditionally_discard_pages_.reset();
     MemorySaverInteractiveTestMixin<
         InteractiveBrowserTest>::TearDownOnMainThread();
+    target_browser_ = nullptr;
   }
 
-  int GetTabCount() { return browser()->tab_strip_model()->count(); }
-
-  Browser* GetBrowser(int browser_index) {
-    return BrowserList::GetInstance()->get(browser_index);
-  }
+  int GetTabCount() { return target_browser_->GetTabStripModel()->count(); }
 
   auto CheckTabHasThumbnailData(int tab_index, bool has_data) {
     return CheckResult(
         [=, this]() {
           return ThumbnailTabHelper::FromWebContents(
-                     browser()->tab_strip_model()->GetWebContentsAt(tab_index))
+                     target_browser_->GetTabStripModel()->GetWebContentsAt(
+                         tab_index))
               ->thumbnail()
               ->has_data();
         },
@@ -143,24 +132,20 @@ class ThumbnailTabHelperUpdatedInteractiveTest
                       (has_data ? " has" : " doesn't have"), " data"}));
   }
 
-  auto WaitForAndVerifyThumbnail(int tab_index, int browser_index = 0) {
-    return Steps(
-        ObserveState(
-            kThumbnailCreatedState,
-            [tab_index, browser_index]() {
-              auto* browser = BrowserList::GetInstance()->get(browser_index);
-              return browser->tab_strip_model()->GetWebContentsAt(tab_index);
-            }),
-        WaitForState(kThumbnailCreatedState, true));
+  auto WaitForAndVerifyThumbnail(int tab_index) {
+    return Steps(ObserveState(kThumbnailCreatedState,
+                              [tab_index, this]() {
+                                return target_browser_->GetTabStripModel()
+                                    ->GetWebContentsAt(tab_index);
+                              }),
+                 WaitForState(kThumbnailCreatedState, true));
   }
 
-  auto VerifyTabIsNotLoadedAndNeedsReloading(int tab_index, int browser_index) {
+  auto VerifyTabIsNotLoadedAndNeedsReloading(int tab_index) {
     return Check(
-        [tab_index, browser_index]() {
-          auto* contents = BrowserList::GetInstance()
-                               ->get(browser_index)
-                               ->tab_strip_model()
-                               ->GetWebContentsAt(tab_index);
+        [tab_index, this]() {
+          auto* contents =
+              target_browser_->GetTabStripModel()->GetWebContentsAt(tab_index);
           return !contents->IsLoading() &&
                  contents->GetController().NeedsReload();
         },
@@ -168,27 +153,33 @@ class ThumbnailTabHelperUpdatedInteractiveTest
                       " is not loaded and needs reloading"}));
   }
 
-  auto CheckTabCountInBrowserIndex(int browser_index, int count) {
+  auto CheckTabCountInBrowser(int count) {
     return CheckResult(
-        [this, browser_index]() {
-          return GetBrowser(browser_index)->tab_strip_model()->count();
-        },
+        [this]() { return target_browser_->GetTabStripModel()->count(); },
         count,
         base::StrCat({"Checking that there are ", base::NumberToString(count),
                       " tabs"}));
   }
 
-  auto CheckActiveTabInBrowserIndex(int browser_index, int active_index) {
+  auto CheckActiveTabInBrowser(int active_index) {
     return CheckResult(
-        [this, browser_index]() {
-          return GetBrowser(browser_index)->tab_strip_model()->active_index();
+        [this]() {
+          return target_browser_->GetTabStripModel()->active_index();
         },
         active_index,
         base::StrCat({"Checking that the active tab is in index ",
                       base::NumberToString(active_index)}));
   }
 
+  void set_target_browser(BrowserWindowInterface* target_browser) {
+    target_browser_ = target_browser;
+  }
+  BrowserWindowInterface* target_browser() { return target_browser_; }
+
  private:
+  // The browser target for thumbnail tab helper tests.
+  raw_ptr<BrowserWindowInterface> target_browser_;
+
   base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<ScopedSetAllPagesDiscardableForTesting>
       unconditionally_discard_pages_;
@@ -215,55 +206,56 @@ IN_PROC_BROWSER_TEST_F(ThumbnailTabHelperUpdatedInteractiveTest,
       CheckTabIsDiscarded(0, true), CheckTabHasThumbnailData(0, true));
 }
 
-// TabLoader (used here) is available only when browser is built
-// with ENABLE_SESSION_SERVICE.
-#if BUILDFLAG(ENABLE_SESSION_SERVICE)
-
 // On browser restore, some tabs may not be loaded. Requesting a
 // thumbnail for one of these tabs should trigger load and capture.
 IN_PROC_BROWSER_TEST_F(ThumbnailTabHelperUpdatedInteractiveTest,
                        CapturesRestoredTabWhenRequested) {
+  // Target a new browser to allow testing the browser-restore codepath without
+  // triggering shutdown.
+  ui_test_utils::BrowserCreatedObserver browser_created_observer;
   ui_test_utils::NavigateToURLWithDisposition(
       browser(), GURL(chrome::kChromeUINewTabURL),
       WindowOpenDisposition::NEW_WINDOW,
       ui_test_utils::BROWSER_TEST_WAIT_FOR_BROWSER);
+  set_target_browser(browser_created_observer.Wait());
+
   RunTestSequence(
       InContext(
-          GetBrowser(1)->window()->GetElementContext(),
+          BrowserElements::From(target_browser())->GetContext(),
           AddInstrumentedTab(kFirstTab, GURL(chrome::kChromeUINewTabURL), 1),
           WaitForWebContentsReady(kFirstTab),
           AddInstrumentedTab(kSecondTab, GURL(chrome::kChromeUINewTabURL), 2),
           WaitForWebContentsReady(kSecondTab),
           AddInstrumentedTab(kThirdTab, GURL(chrome::kChromeUINewTabURL), 3),
           WaitForWebContentsReady(kThirdTab)),
-      CheckTabCountInBrowserIndex(1, 4), CheckActiveTabInBrowserIndex(1, 3),
-      ObserveState(kBrowserRemovedState, [this]() { return GetBrowser(1); }),
+      CheckTabCountInBrowser(4), CheckActiveTabInBrowser(3),
+      ObserveState(
+          kBrowserRemovedState,
+          [this]() { return target_browser()->GetBrowserForMigrationOnly(); }),
       // Can't close browser when WebContents is notifying observers.
       Do([this]() {
         // Override manual value set in MemorySaverInteractiveTestMixin to
         // prepare for tab strip being destroyed along with the browser.
         resource_coordinator::GetTabLifecycleUnitSource()
             ->SetFocusedTabStripModelForTesting(nullptr);
-        GetBrowser(1)->window()->Close();
+        target_browser()->GetWindow()->Close();
+        set_target_browser(nullptr);
       }),
       WaitForState(kBrowserRemovedState, true), Do([this]() {
         // Set up the tab loader to ensure tabs are left unloaded.
-        base::RepeatingCallback<void(TabLoader*)> callback =
-            base::BindRepeating(
-                &ThumbnailTabHelperUpdatedInteractiveTest::ConfigureTabLoader,
-                base::Unretained(this));
-        TabLoaderTester::SetConstructionCallbackForTesting(&callback);
+        ASSERT_TRUE(
+            performance_manager::policies::CanScheduleLoadForRestoredTabs());
+        performance_manager::policies::
+            SetMaxSimultaneousBackgroundTabLoadsForTesting(1);
+        performance_manager::policies::SetMaxLoadedBackgroundTabCountForTesting(
+            1);
 
         // Restore recently closed window.
+        ui_test_utils::BrowserCreatedObserver browser_created_observer;
         chrome::OpenWindowWithRestoredTabs(browser()->profile());
+        set_target_browser(browser_created_observer.Wait());
       }),
-      CheckTabCountInBrowserIndex(1, 4), CheckActiveTabInBrowserIndex(1, 3),
-      VerifyTabIsNotLoadedAndNeedsReloading(1, 1),
-      VerifyTabIsNotLoadedAndNeedsReloading(2, 1),
-      WaitForAndVerifyThumbnail(1, 1));
-
-  // Clean up the callback.
-  TabLoaderTester::SetConstructionCallbackForTesting(nullptr);
+      CheckTabCountInBrowser(4), CheckActiveTabInBrowser(3),
+      VerifyTabIsNotLoadedAndNeedsReloading(1),
+      VerifyTabIsNotLoadedAndNeedsReloading(2), WaitForAndVerifyThumbnail(1));
 }
-
-#endif  // BUILDFLAG(ENABLE_SESSION_SERVICE)

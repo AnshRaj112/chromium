@@ -33,6 +33,7 @@
 
 #include <vector>
 
+#include "base/types/expected.h"
 #include "net/cookies/site_for_cookies.h"
 #include "net/storage_access_api/status.h"
 #include "net/url_request/referrer_policy.h"
@@ -48,6 +49,10 @@
 #include "third_party/blink/public/web/web_node.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/accessibility/ax_error_types.h"
+
+namespace base {
+class UnguessableToken;
+}
 
 namespace ui {
 struct AXTreeUpdate;
@@ -78,7 +83,9 @@ enum class BackForwardCacheAware { kAllow, kPossiblyDisallow };
 // Provides readonly access to some properties of a DOM document.
 class BLINK_EXPORT WebDocument : public WebNode {
  public:
-  WebDocument() = default;
+  explicit WebDocument(
+      cppgc::SourceLocation loc = BLINK_WEB_NODE_LOCATION_FROM_HERE)
+      : WebNode(loc) {}
   WebDocument(const WebDocument& e) = default;
 
   WebDocument& operator=(const WebDocument& e) {
@@ -207,6 +214,32 @@ class BLINK_EXPORT WebDocument : public WebNode {
   // Returns the number of active resource requests that are being loaded by the
   // document's ResourceFetcher.
   size_t ActiveResourceRequestCount() const;
+
+  // Executes a script tool with the given `name` and `input_arguments`.
+  //
+  // The associated callback is invoked once the async execution of the tool is
+  // finished along with the result of the execution. A null response indicates
+  // a failure in tool execution.
+  enum class ScriptToolError {
+    kInvalidToolName,
+    kInvalidInputArguments,
+    kToolInvocationFailed
+  };
+  using ScriptToolExecutedCallback =
+      base::OnceCallback<void(base::expected<WebString, ScriptToolError>)>;
+  void ExecuteScriptTool(const WebString& name,
+                         const WebString& input_arguments,
+                         ScriptToolExecutedCallback tool_executed_cb);
+
+  // Dispatches an autofill event on the document with the given field data.
+  // This is called by the autofill agent before filling form fields.
+  // The `fill_id` is passed so that refill requests can be associated with
+  // the original fill operation. If `supports_refill` is false, the event's
+  // refill() method will be null.
+  void DispatchAutofillEvent(
+      std::vector<std::pair<WebFormControlElement, WebString>> autofill_values,
+      const base::UnguessableToken& fill_id,
+      bool supports_refill);
 
 #if INSIDE_BLINK
   WebDocument(Document*);

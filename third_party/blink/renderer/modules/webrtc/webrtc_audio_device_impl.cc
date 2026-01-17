@@ -4,7 +4,8 @@
 
 #include "third_party/blink/renderer/modules/webrtc/webrtc_audio_device_impl.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/logging.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/stringprintf.h"
@@ -68,8 +69,12 @@ void WebRtcAudioDeviceImpl::RenderData(
     // samples, so we add the delay multiplied by the number of samples. See
     // https://w3c.github.io/webrtc-stats/#dom-rtcaudioplayoutstats-totalplayoutdelay
     total_playout_delay_ += audio_delay * audio_bus->frames();
-    total_samples_duration_ += media::AudioTimestampHelper::FramesToTime(
-        audio_bus->frames(), sample_rate);
+    // |total_samples_duration_| is the total duration (in seconds) of all audio
+    // samples that have been played out. Includes both synthesized and
+    // non-synthesized samples.
+    total_samples_duration_ += (media::AudioTimestampHelper::FramesToTime(
+                                    audio_bus->frames(), sample_rate) +
+                                glitch_info.duration);
 #if DCHECK_IS_ON()
     DCHECK(!renderer_ || renderer_->CurrentThreadIsRenderingThread());
     if (!audio_renderer_thread_checker_.CalledOnValidThread()) {
@@ -373,7 +378,7 @@ void WebRtcAudioDeviceImpl::AddAudioCapturer(
   DCHECK(!capturer->device().id.empty());
 
   base::AutoLock auto_lock(lock_);
-  DCHECK(!base::Contains(capturers_, capturer));
+  DCHECK(!std::ranges::contains(capturers_, capturer));
   capturers_.push_back(capturer);
   capturer->SetOutputDeviceForAec(output_device_id_for_aec_.Utf8());
 }
@@ -393,7 +398,7 @@ void WebRtcAudioDeviceImpl::AddPlayoutSink(
   DVLOG(1) << "WebRtcAudioDeviceImpl::AddPlayoutSink()";
   DCHECK(sink);
   base::AutoLock auto_lock(lock_);
-  DCHECK(!base::Contains(playout_sinks_, sink));
+  DCHECK(!std::ranges::contains(playout_sinks_, sink));
   playout_sinks_.push_back(sink);
 }
 

@@ -37,6 +37,7 @@
 #include "third_party/blink/public/mojom/timing/resource_timing.mojom-blink-forward.h"
 #include "third_party/blink/renderer/core/accessibility/ax_object_cache.h"
 #include "third_party/blink/renderer/core/css/style_change_reason.h"
+#include "third_party/blink/renderer/core/css/style_engine.h"
 #include "third_party/blink/renderer/core/dom/events/event.h"
 #include "third_party/blink/renderer/core/events/current_input_event.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
@@ -58,11 +59,13 @@
 #include "third_party/blink/renderer/core/loader/document_loader.h"
 #include "third_party/blink/renderer/core/loader/frame_load_request.h"
 #include "third_party/blink/renderer/core/loader/frame_loader.h"
+#include "third_party/blink/renderer/core/loader/resource_initiator_helper.h"
 #include "third_party/blink/renderer/core/loader/url_matcher.h"
 #include "third_party/blink/renderer/core/page/page.h"
 #include "third_party/blink/renderer/core/page/scrolling/root_scroller_controller.h"
 #include "third_party/blink/renderer/core/paint/paint_layer.h"
 #include "third_party/blink/renderer/core/timing/dom_window_performance.h"
+#include "third_party/blink/renderer/core/timing/resource_timing_context.h"
 #include "third_party/blink/renderer/core/timing/window_performance.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
@@ -72,7 +75,10 @@
 #include "third_party/blink/renderer/platform/loader/fetch/resource_timing_utils.h"
 #include "third_party/blink/renderer/platform/network/network_state_notifier.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
+#include "third_party/blink/renderer/platform/scheduler/public/task_attribution_info.h"
+#include "third_party/blink/renderer/platform/scheduler/public/task_attribution_tracker.h"
 #include "third_party/blink/renderer/platform/scheduler/public/thread_scheduler.h"
+#include "third_party/blink/renderer/platform/weborigin/kurl.h"
 #include "third_party/blink/renderer/platform/weborigin/security_origin.h"
 
 namespace blink {
@@ -201,6 +207,11 @@ Node::InsertionNotificationRequest HTMLFrameOwnerElement::InsertedInto(
     ContainerNode& insertion_point) {
   InsertionNotificationRequest result =
       HTMLElement::InsertedInto(insertion_point);
+
+  if (display_ad_element_monitor_) {
+    display_ad_element_monitor_->EnsureStarted();
+  }
+
   // If a state-preserving atomic move is in progress, then we have to manually
   // perform some bookkeeping that ordinarily would only be done deeper in the
   // frame setup logic that gets triggered in the *NON* state-preserving atomic
@@ -222,6 +233,10 @@ Node::InsertionNotificationRequest HTMLFrameOwnerElement::InsertedInto(
 }
 
 void HTMLFrameOwnerElement::RemovedFrom(ContainerNode& insertion_point) {
+  if (display_ad_element_monitor_) {
+    display_ad_element_monitor_->OnElementRemovedOrUntagged();
+  }
+
   // See documentation in `InsertedInto()` above. In the state-preserving atomic
   // move case, we don't invoke `ClearContentFrame()`, which would normally do
   // at least two things:
@@ -426,12 +441,14 @@ void HTMLFrameOwnerElement::UpdateRequiredPolicy() {
   }
 }
 
-void HTMLFrameOwnerElement::UpdateDeferredFetchPolicy(const KURL& to_url) {
+void HTMLFrameOwnerElement::UpdateDeferredFetchPolicy(
+    scoped_refptr<const SecurityOrigin> to_origin) {
   if (!IsFetchLaterUseDeferredFetchPolicyEnabled()) {
     return;
   }
   frame_policy_.deferred_fetch_policy =
-      FetchLaterUtil::GetContainerDeferredFetchPolicyOnNavigation(this, to_url);
+      FetchLaterUtil::GetContainerDeferredFetchPolicyOnNavigation(this,
+                                                                  to_origin);
   DidChangeContainerPolicy();
 }
 
@@ -465,7 +482,7 @@ void HTMLFrameOwnerElement::FrameOwnerPropertiesChanged() {
   mojom::blink::FrameOwnerPropertiesPtr properties =
       mojom::blink::FrameOwnerProperties::New();
   properties->name = BrowsingContextContainerName().IsNull()
-                         ? WTF::g_empty_string
+                         ? g_empty_string
                          : BrowsingContextContainerName(),
   properties->scrollbar_mode = ScrollbarMode();
   properties->margin_width = MarginWidth();
@@ -503,6 +520,8 @@ void HTMLFrameOwnerElement::AddResourceTiming(
     return;
   }
 
+  info->initiator_url = fallback_timing_info_->initiator_url;
+
   DOMWindowPerformance::performance(*GetDocument().domWindow())
       ->AddResourceTiming(std::move(info), localName());
   DidReportResourceTiming();
@@ -534,13 +553,13 @@ void HTMLFrameOwnerElement::ReportFallbackResourceTimingIfNeeded() {
 void HTMLFrameOwnerElement::DispatchLoad() {
   ReportFallbackResourceTimingIfNeeded();
   DispatchScopedEvent(*Event::Create(event_type_names::kLoad));
-  if (RuntimeEnabledFeatures::PotentialPermissionsPolicyReportingEnabled()) {
+  if (RuntimeEnabledFeatures::PotentialPermissionsPolicyReportingEnabled() &&
+      GetExecutionContext()) {
     CheckPotentialPermissionsPolicyViolation();
   }
 }
 
-Document* HTMLFrameOwnerElement::getSVGDocument(
-    ExceptionState& exception_state) const {
+Document* HTMLFrameOwnerElement::getSVGDocument() const {
   Document* doc = contentDocument();
   if (doc && doc->IsSVGDocument())
     return doc;
@@ -678,6 +697,14 @@ bool HTMLFrameOwnerElement::LoadOrRedirectSubframe(
     fallback_timing_info_ =
         CreateResourceTimingInfo(base::TimeTicks::Now(), url,
                                  /*response=*/nullptr);
+
+    if (RuntimeEnabledFeatures::ResourceTimingInitiatorEnabled()) {
+      v8::Isolate* isolate =
+          ResourceInitiatorHelper::GetIsolateIfRunningScriptOnMainThread();
+      fallback_timing_info_->initiator_url =
+          isolate ? ResourceInitiatorHelper::GetScriptInitiatorUrl(*isolate)
+                  : GetDocument().Url();
+    }
   }
 
   // Update the |should_lazy_load_children_| value according to the "loading"
@@ -818,11 +845,31 @@ void HTMLFrameOwnerElement::ParseAttribute(
   }
 }
 
+void HTMLFrameOwnerElement::DidSetAdStatus() {
+  if (display_ad_element_monitor_) {
+    if (!IsAdRelated()) {
+      display_ad_element_monitor_->OnElementRemovedOrUntagged();
+      display_ad_element_monitor_.Clear();
+    }
+    return;
+  }
+
+  if (IsAdRelated()) {
+    display_ad_element_monitor_ =
+        MakeGarbageCollected<DisplayAdElementMonitor>(this);
+  }
+}
+
 bool HTMLFrameOwnerElement::IsAdRelated() const {
   if (!content_frame_)
     return false;
 
   return content_frame_->IsAdFrame();
+}
+
+bool HTMLFrameOwnerElement::ShouldHighlightAd() const {
+  return display_ad_element_monitor_ &&
+         display_ad_element_monitor_->ShouldHighlight();
 }
 
 mojom::blink::ColorScheme HTMLFrameOwnerElement::GetColorScheme() const {
@@ -866,6 +913,7 @@ void HTMLFrameOwnerElement::Trace(Visitor* visitor) const {
   visitor->Trace(content_frame_);
   visitor->Trace(embedded_content_view_);
   visitor->Trace(lazy_load_frame_observer_);
+  visitor->Trace(display_ad_element_monitor_);
   HTMLElement::Trace(visitor);
   FrameOwner::Trace(visitor);
 }

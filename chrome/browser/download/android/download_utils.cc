@@ -26,29 +26,28 @@
 // offline_items_collection::FailState.
 #include "chrome/android/chrome_jni_headers/DownloadUtils_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 
 namespace {
 // If received bytes is more than the size limit and resumption will restart
 // from the beginning, throttle it.
-int kDefaultAutoResumptionSizeLimit = 10 * 1024 * 1024;  // 10 MB
+constexpr int kDefaultAutoResumptionSizeLimit = 10 * 1024 * 1024;  // 10 MB
 }  // namespace
 
-static jint JNI_DownloadUtils_GetResumeMode(
+static int32_t JNI_DownloadUtils_GetResumeMode(
     JNIEnv* env,
     std::string& url,
     offline_items_collection::FailState failState) {
   auto reason =
       OfflineItemUtils::ConvertFailStateToDownloadInterruptReason(failState);
-  return static_cast<jint>(download::GetDownloadResumeMode(
+  return static_cast<int32_t>(download::GetDownloadResumeMode(
       GURL(std::move(url)), reason, false /* restart_required */,
       true /* user_action_required */));
 }
 
-static jboolean JNI_DownloadUtils_IsDownloadRestrictedByPolicy(
-    JNIEnv* env,
-    Profile* profile) {
+static bool JNI_DownloadUtils_IsDownloadRestrictedByPolicy(JNIEnv* env,
+                                                           Profile* profile) {
   content::DownloadManager* manager = profile->GetDownloadManager();
   if (manager) {
     return manager->GetDelegate()->IsDownloadRestrictedByPolicy();
@@ -88,7 +87,9 @@ void DownloadUtils::OpenDownload(download::DownloadItem* item,
   Java_DownloadUtils_openDownload(
       env, item->GetTargetFilePath().value(), item->GetMimeType(),
       item->GetGuid(), otr_profile_id, original_url,
-      item->GetReferrerUrl().spec(), static_cast<jint>(open_source));
+      item->GetReferrerUrl().spec(), static_cast<int32_t>(open_source),
+      base::android::ConvertUTF8ToJavaString(
+          env, item->GetFileNameToReportUser().value()));
 }
 
 // static
@@ -104,7 +105,7 @@ std::string DownloadUtils::RemapGenericMimeType(const std::string& mime_type,
 bool DownloadUtils::ShouldAutoOpenDownload(download::DownloadItem* item) {
   JNIEnv* env = base::android::AttachCurrentThread();
   return Java_MimeUtils_canAutoOpenMimeType(env, item->GetMimeType()) &&
-         IsDownloadUserInitiated(item);
+         IsDownloadUserInitiated(item) && item->AllowAutoOpenAfterCompletion();
 }
 
 // static
@@ -126,3 +127,6 @@ bool DownloadUtils::IsDownloadUserInitiated(download::DownloadItem* download) {
                                   ui::PAGE_TRANSITION_RELOAD) ||
          PageTransitionCoreTypeIs(page_transition, ui::PAGE_TRANSITION_KEYWORD);
 }
+
+DEFINE_JNI(MimeUtils)
+DEFINE_JNI(DownloadUtils)

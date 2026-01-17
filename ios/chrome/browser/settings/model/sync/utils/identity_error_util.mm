@@ -98,6 +98,20 @@ GetUIInfoForTrustedVaultRecoverabilityDegradedErrorForEverything() {
   return errorInfo;
 }
 
+// Gets the AccountErrorUIInfo data representing the kBookmarksLimitExceeded
+// error.
+AccountErrorUIInfo* GetUIInfoForBookmarksLimitExceededError() {
+  AccountErrorUIInfo* error_info = [[AccountErrorUIInfo alloc]
+       initWithErrorType:syncer::SyncService::UserActionableError::
+                             kBookmarksLimitExceeded
+      userActionableType:AccountErrorUserActionableType::
+                             kAcknowledgeBookmarkError
+               messageID:IDS_IOS_SYNC_ERROR_BOOKMARKS_LIMIT_EXCEEDED_MESSAGE
+           buttonLabelID:IDS_IOS_SYNC_ERROR_BOOKMARKS_LIMIT_EXCEEDED_BUTTON];
+
+  return error_info;
+}
+
 }  // namespace
 
 AccountErrorUIInfo* GetAccountErrorUIInfo(syncer::SyncService* sync_service) {
@@ -105,10 +119,7 @@ AccountErrorUIInfo* GetAccountErrorUIInfo(syncer::SyncService* sync_service) {
 
   switch (sync_service->GetUserActionableError()) {
     case syncer::SyncService::UserActionableError::kSignInNeedsUpdate:
-      if (base::FeatureList::IsEnabled(switches::kEnableIdentityInAuthError)) {
-        return GetUIInfoForAuthenticationError();
-      }
-      break;
+      return GetUIInfoForAuthenticationError();
     case syncer::SyncService::UserActionableError::kNeedsPassphrase:
       return GetUIInfoForPassphraseError();
     case syncer::SyncService::UserActionableError::
@@ -123,7 +134,13 @@ AccountErrorUIInfo* GetAccountErrorUIInfo(syncer::SyncService* sync_service) {
     case syncer::SyncService::UserActionableError::
         kTrustedVaultRecoverabilityDegradedForEverything:
       return GetUIInfoForTrustedVaultRecoverabilityDegradedErrorForEverything();
+    case syncer::SyncService::UserActionableError::kBookmarksLimitExceeded:
+      return GetUIInfoForBookmarksLimitExceededError();
     case syncer::SyncService::UserActionableError::kNone:
+      break;
+
+    case syncer::SyncService::UserActionableError::kNeedsClientUpgrade:
+      // TODO(crbug.com/370026230): Implement UI support for this case.
       break;
   }
 

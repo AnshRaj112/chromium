@@ -5,12 +5,11 @@
 import 'chrome://history/history.js';
 
 import type {HistoryAppElement} from 'chrome://history/history.js';
-import {BrowserServiceImpl, ensureLazyLoaded, HistoryEmbeddingsBrowserProxyImpl, HistoryEmbeddingsPageHandlerRemote} from 'chrome://history/history.js';
+import {BrowserServiceImpl, HistoryEmbeddingsBrowserProxyImpl, HistoryEmbeddingsPageHandlerRemote} from 'chrome://history/history.js';
 import type {HistoryEntry, QueryResult} from 'chrome://resources/cr_components/history/history.mojom-webui.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {PromiseResolver} from 'chrome://resources/js/promise_resolver.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
-import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 import {TestMock} from 'chrome://webui-test/test_mock.js';
 import {microtasksFinished} from 'chrome://webui-test/test_util.js';
 
@@ -31,7 +30,7 @@ suite('history-toolbar', function() {
     return toolbar;
   }
 
-  setup(function() {
+  setup(async function() {
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
     testService = new TestBrowserService();
     BrowserServiceImpl.setInstance(testService);
@@ -43,12 +42,8 @@ suite('history-toolbar', function() {
 
     app = document.createElement('history-app');
     document.body.appendChild(app);
-    return Promise
-        .all([
-          ensureLazyLoaded(),
-          testService.handler.whenCalled('queryHistory'),
-        ])
-        .then(flushTasks);
+    await testService.handler.whenCalled('queryHistory');
+    return microtasksFinished();
   });
 
   test('selecting checkbox causes toolbar to change', async function() {
@@ -73,7 +68,7 @@ suite('history-toolbar', function() {
 
     item.$.checkbox.click();
     await item.$.checkbox.updateComplete;
-    await flushTasks();
+    await microtasksFinished();
 
     // Ensure that when an item is deselected the count held by the
     // toolbar decreases.
@@ -104,6 +99,7 @@ suite('history-toolbar', function() {
     toolbar.$.mainToolbar.dispatchEvent(new CustomEvent(
         'search-changed', {bubbles: true, composed: true, detail: 'Test2'}));
     await testService.handler.whenCalled('queryHistory');
+    await microtasksFinished();
 
     assertTrue(toolbar.spinnerActive);
     delayedQuery.resolve({

@@ -4,7 +4,6 @@
 
 package org.chromium.chrome.browser.tasks.tab_management;
 
-import static org.chromium.chrome.browser.tasks.tab_management.ArchivedTabsCardViewProperties.ARCHIVE_TIME_DELTA_DAYS;
 import static org.chromium.chrome.browser.tasks.tab_management.ArchivedTabsCardViewProperties.CLICK_HANDLER;
 import static org.chromium.chrome.browser.tasks.tab_management.ArchivedTabsCardViewProperties.ICON_HIGHLIGHTED;
 import static org.chromium.chrome.browser.tasks.tab_management.ArchivedTabsCardViewProperties.NUMBER_OF_ARCHIVED_TABS;
@@ -12,11 +11,11 @@ import static org.chromium.chrome.browser.tasks.tab_management.ArchivedTabsCardV
 import static org.chromium.chrome.browser.tasks.tab_management.MessageCardViewProperties.MESSAGE_CARD_VISIBILITY_CONTROL_IN_REGULAR_AND_INCOGNITO_MODE;
 import static org.chromium.chrome.browser.tasks.tab_management.MessageCardViewProperties.MESSAGE_TYPE;
 import static org.chromium.chrome.browser.tasks.tab_management.MessageCardViewProperties.MessageCardScope.REGULAR;
-import static org.chromium.chrome.browser.tasks.tab_management.MessageService.MessageType.ARCHIVED_TABS_MESSAGE;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.CARD_ALPHA;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.CARD_ANIMATION_STATUS;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.CARD_TYPE;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.ModelType.MESSAGE;
+import static org.chromium.chrome.browser.tasks.tab_management.TabSwitcherMessageManager.MessageType.ARCHIVED_TABS_MESSAGE;
 
 import android.view.View;
 
@@ -41,8 +40,6 @@ public class ArchivedTabsCardViewBinder {
             cardView.setNumberOfArchivedTabs(model.get(NUMBER_OF_ARCHIVED_TABS));
         } else if (key == ICON_HIGHLIGHTED) {
             cardView.setIconHighlight(model.get(ICON_HIGHLIGHTED));
-        } else if (key == ARCHIVE_TIME_DELTA_DAYS) {
-            cardView.setArchiveTimeDeltaDays(model.get(ARCHIVE_TIME_DELTA_DAYS));
         } else if (key == CLICK_HANDLER) {
             cardView.setClickHandler(model.get(CLICK_HANDLER));
         } else if (key == WIDTH) {
@@ -58,7 +55,6 @@ public class ArchivedTabsCardViewBinder {
         return new PropertyModel.Builder(ArchivedTabsCardViewProperties.ALL_KEYS)
                 .with(CLICK_HANDLER, data.onClickRunnable)
                 .with(ICON_HIGHLIGHTED, false)
-                .with(ARCHIVE_TIME_DELTA_DAYS, 0)
                 .with(MESSAGE_CARD_VISIBILITY_CONTROL_IN_REGULAR_AND_INCOGNITO_MODE, REGULAR)
                 .with(CARD_ALPHA, 1f)
                 .with(MESSAGE_TYPE, ARCHIVED_TABS_MESSAGE)

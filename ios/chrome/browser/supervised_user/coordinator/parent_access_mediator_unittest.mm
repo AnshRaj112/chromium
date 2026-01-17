@@ -31,7 +31,7 @@ namespace {
 
 std::unique_ptr<net::test_server::HttpResponse> HandleRequest(
     const net::test_server::HttpRequest& request) {
-  if (request.GetURL().path() == "/parentaccess") {
+  if (request.GetURL().GetPath() == "/parentaccess") {
     auto result = std::make_unique<net::test_server::BasicHttpResponse>();
     result->set_content_type("text/html");
     result->set_content("<html><head></head><body>Content</body></html>");
@@ -110,7 +110,13 @@ class ParentAccessMediatorTest : public PlatformTest {
     server_.RegisterDefaultHandler(base::BindRepeating(&HandleRequest));
   }
 
-  ~ParentAccessMediatorTest() override { [mediator_ disconnect]; }
+  ~ParentAccessMediatorTest() override = default;
+
+  void TearDown() override {
+    delegate_ = nil;
+    [mediator_ disconnect];
+    PlatformTest::TearDown();
+  }
 
   // Initializes the ParentAccessMediator with a WebState and its dependencies.
   // Returns a pointer to the WebState owned by the mediator.

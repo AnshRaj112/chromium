@@ -10,8 +10,9 @@
 #import "base/strings/utf_string_conversions.h"
 #import "base/test/ios/wait_util.h"
 #import "components/signin/internal/identity_manager/account_capabilities_constants.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey_ui_test_util.h"
+#import "components/translate/core/browser/translate_pref_names.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey_ui_test_util.h"
 #import "ios/chrome/browser/badges/ui_bundled/badge_constants.h"
 #import "ios/chrome/browser/infobars/ui_bundled/banners/infobar_banner_constants.h"
 #import "ios/chrome/browser/infobars/ui_bundled/infobar_earl_grey_ui_test_util.h"
@@ -19,6 +20,7 @@
 #import "ios/chrome/browser/overlays/model/public/web_content_area/alert_constants.h"
 #import "ios/chrome/browser/permissions/ui_bundled/permissions_app_interface.h"
 #import "ios/chrome/browser/permissions/ui_bundled/permissions_constants.h"
+#import "ios/chrome/browser/reader_mode/model/features.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/earl_grey/chrome_actions.h"
@@ -27,9 +29,11 @@
 #import "ios/chrome/test/earl_grey/chrome_matchers.h"
 #import "ios/chrome/test/earl_grey/chrome_test_case.h"
 #import "ios/chrome/test/scoped_eg_synchronization_disabler.h"
+#import "ios/testing/earl_grey/app_launch_configuration.h"
 #import "ios/testing/earl_grey/disabled_test_macros.h"
 #import "ios/testing/earl_grey/earl_grey_test.h"
 #import "ios/web/public/permissions/permissions.h"
+#import "net/test/embedded_test_server/default_handlers.h"
 #import "net/test/embedded_test_server/embedded_test_server.h"
 #import "ui/base/l10n/l10n_util.h"
 
@@ -116,6 +120,28 @@ void TapDoneButtonOnInfobarModal() {
 
 @implementation PermissionsTestCase
 
+- (AppLaunchConfiguration)appConfigurationForTestCase {
+  AppLaunchConfiguration config = [super appConfigurationForTestCase];
+  if ([self isRunningTest:@selector(DISABLED_testPermissionsWithReaderMode)]) {
+    config.features_enabled.push_back(kEnableReaderModeInUS);
+  }
+  return config;
+}
+
+- (void)setUp {
+  [super setUp];
+  // Disable translate to avoid the translate badge showing automatically.
+  [ChromeEarlGrey setBoolValue:NO
+                   forUserPref:translate::prefs::kOfferTranslateEnabled];
+}
+
+- (void)tearDownHelper {
+  // Reactivate translation.
+  [ChromeEarlGrey setBoolValue:YES
+                   forUserPref:translate::prefs::kOfferTranslateEnabled];
+  [super tearDownHelper];
+}
+
 #pragma mark - Helper functions
 
 // Checks that if the alert for site permissions pops up with
@@ -147,7 +173,7 @@ void TapDoneButtonOnInfobarModal() {
              @"Permissions dialog was not shown.");
   NSString* alertText = l10n_util::GetNSStringF(
       IDS_IOS_PERMISSIONS_ALERT_DIALOG_MESSAGE,
-      base::UTF8ToUTF16(self.testServer->base_url().host()),
+      base::UTF8ToUTF16(self.testServer->base_url().GetHost()),
       base::SysNSStringToUTF16(permissionsString));
   id<GREYMatcher> textMatcher = grey_allOf(
       grey_ancestor(dialogMatcher), grey_accessibilityLabel(alertText), nil);
@@ -237,7 +263,8 @@ void TapDoneButtonOnInfobarModal() {
 // Tests that when microphone permission is granted, the user could see a banner
 // notification and then toggle microphone permission through the infobar modal
 // through the location bar badge.
-- (void)testAllowAndBlockMicrophonePermission {
+// TODO(crbug.com/460744137): Test is flaky.
+- (void)FLAKY_testAllowAndBlockMicrophonePermission {
   GREYAssertTrue(self.testServer->Start(), @"Test server failed to start.");
   [ChromeEarlGrey
       loadURL:self.testServer->GetURL("/permissions/microphone_only.html")];
@@ -448,12 +475,8 @@ void TapDoneButtonOnInfobarModal() {
 }
 
 // Tests that permissions are reset after user navigation.
-- (void)testPermissionsAfterNavigation {
-  // TODO(crbug.com/40921852): Failing on iOS17.
-  if (@available(iOS 17.0, *)) {
-    XCTSkip(@"Failing on iOS17");
-  }
-
+// TODO(crbug.com/40921852): Re-enable the test.
+- (void)DISABLED_testPermissionsAfterNavigation {
   GREYAssertTrue(self.testServer->Start(), @"Test server failed to start.");
   [ChromeEarlGrey
       loadURL:self.testServer->GetURL("/permissions/microphone_only.html")];
@@ -676,6 +699,64 @@ void TapDoneButtonOnInfobarModal() {
     @(web::PermissionCamera) : @(web::PermissionStateNotAccessible),
     @(web::PermissionMicrophone) : @(web::PermissionStateNotAccessible)
   }];
+}
+
+// Tests that by enabling permissions, then triggering Reader mode, then
+// disabling Reader mode, the permission badges are still visible at the end.
+// TODO(crbug.com/470346971): Enable this test failing on ios-fieldtrial-rel.
+- (void)DISABLED_testPermissionsWithReaderMode {
+  GREYAssertTrue(self.testServer->Start(), @"Test server failed to start.");
+  [ChromeEarlGrey
+      loadURL:self.testServer->GetURL("/permissions/camera_only.html")];
+
+  {
+    // It is suspected that the video element in the test page performs some
+    // fast repetitive animations that, combined with the EarlGrey
+    // synchronization, delays the invocation of the infobar appearance
+    // animation completion block. As a workaround, we disables EarlGrey
+    // synchronization whenever the test is showing the video element.
+    ScopedSynchronizationDisabler disabler;
+    [self checkAndTapAlertContainingPermissions:
+              l10n_util::GetNSString(
+                  IDS_IOS_PERMISSIONS_ALERT_DIALOG_PERMISSION_CAMERA)
+                                    shouldAllow:YES];
+
+    // Verify Camera Badge is visible (accepted state).
+    [InfobarEarlGreyUI waitUntilInfobarBannerVisibleOrTimeout:YES];
+    [[EarlGrey selectElementWithMatcher:InfobarBannerCameraOnly()]
+        performAction:grey_swipeFastInDirection(kGREYDirectionUp)];
+    [[EarlGrey selectElementWithMatcher:CameraBadge(/*accepted=*/YES)]
+        assertWithMatcher:grey_sufficientlyVisible()];
+
+    // Inject a lot of text to make the page distillable (eligible for Reader
+    // Mode).
+    NSString* loremIpsum =
+        @"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do "
+         "eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim "
+         "ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut "
+         "aliquip ex ea commodo consequat. Duis aute irure dolor in "
+         "reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla "
+         "pariatur. Excepteur sint occaecat cupidatat non proident, sunt in "
+         "culpa qui officia deserunt mollit anim id est laborum.";
+    NSString* script = [NSString
+        stringWithFormat:
+            @"(function() { for (var i = 0; i < 20; i++) { var p = "
+            @"document.createElement('p'); "
+            @"p.innerText = '%@'; document.body.appendChild(p); } })();",
+            loremIpsum];
+    [ChromeEarlGrey evaluateJavaScriptForSideEffect:script];
+
+    // Enable Reader Mode.
+    [ChromeEarlGrey showReaderModeAndWaitUntilReaderModeWebStateIsReady];
+
+    // Disable Reader Mode.
+    [ChromeEarlGrey hideReaderMode];
+
+    // Verify Camera Badge is visible (accepted state) at the end.
+    [ChromeEarlGrey
+        waitForSufficientlyVisibleElementWithMatcher:CameraBadge(
+                                                         /*accepted=*/YES)];
+  }
 }
 
 @end

@@ -63,13 +63,13 @@ class PowerStatusTest : public AshTestBase {
   void TearDown() override {
     power_status_->RemoveObserver(test_observer_.get());
     test_observer_.reset();
+    power_status_ = nullptr;
     AshTestBase::TearDown();
     chromeos::PowerManagerClient::Shutdown();
   }
 
  protected:
-  raw_ptr<PowerStatus, DanglingUntriaged> power_status_ =
-      nullptr;  // Not owned.
+  raw_ptr<PowerStatus> power_status_ = nullptr;  // Not owned.
   std::unique_ptr<TestObserver> test_observer_;
 };
 
@@ -312,8 +312,14 @@ TEST_F(PowerStatusTest, PreferredMinimumExternalPower) {
   EXPECT_EQ(23.45, power_status_->GetPreferredMinimumPower());
 }
 
+// Verifies that PowerStatus::BatteryImageInfo::ResolveColors correctly
+// determines the final colors for the battery icon. This test checks that:
+// 1. Explicitly provided foreground and badge colors are honored.
+// 2. The badge color correctly defaults to the foreground color when charging.
+// 3. The alert color is resolved from the ColorProvider's system-defined alert
+// color.
 TEST_F(PowerStatusTest, BatteryImageColorResolution) {
-  // Set up Color Resolution Testing
+  // Set up Color Resolution Testing.
   PowerSupplyProperties prop;
   prop.set_external_power(PowerSupplyProperties::DISCONNECTED);
   prop.set_battery_state(PowerSupplyProperties::DISCHARGING);
@@ -331,7 +337,7 @@ TEST_F(PowerStatusTest, BatteryImageColorResolution) {
   EXPECT_EQ(resolved_colors.foreground_color, SK_ColorRED);
   EXPECT_EQ(resolved_colors.badge_color, SK_ColorBLUE);
 
-  // Test Badge Color Resolution
+  // Test Badge Color Resolution.
   prop.set_external_power(PowerSupplyProperties::AC);
   prop.set_battery_state(PowerSupplyProperties::CHARGING);
   prop.set_battery_percent(51);

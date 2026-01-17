@@ -4,6 +4,8 @@
 
 #include "ash/wm/gestures/back_gesture/back_gesture_event_handler.h"
 
+#include <utility>
+
 #include "ash/app_list/app_list_controller_impl.h"
 #include "ash/constants/ash_features.h"
 #include "ash/controls/contextual_tooltip.h"
@@ -29,11 +31,9 @@
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_util.h"
 #include "ash/wm/wm_event.h"
-#include "base/containers/contains.h"
 #include "base/debug/crash_logging.h"
 #include "base/i18n/rtl.h"
 #include "base/metrics/user_metrics.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "chromeos/ui/base/app_types.h"
 #include "chromeos/ui/base/window_pin_type.h"
 #include "chromeos/ui/base/window_properties.h"
@@ -206,8 +206,7 @@ void BackGestureEventHandler::OnDisplayMetricsChanged(
 
 void BackGestureEventHandler::OnGestureEvent(ui::GestureEvent* event) {
   // Do not handle gesture events that are not generated from |first_touch_id_|.
-  if (base::Contains(other_touch_event_ids_list_,
-                     event->unique_touch_event_id())) {
+  if (other_touch_event_ids_list_.contains(event->unique_touch_event_id())) {
     return;
   }
 
@@ -341,9 +340,6 @@ bool BackGestureEventHandler::MaybeHandleBackGesture(
       back_start_location_ = screen_location;
 
       base::RecordAction(base::UserMetricsAction("Ash_Tablet_BackGesture"));
-      back_gesture_start_scenario_type_ = GetStartScenarioType(
-          dragged_from_splitview_divider_, back_start_location_);
-      RecordStartScenarioType(back_gesture_start_scenario_type_);
       break;
     case ui::EventType::kGestureScrollUpdate:
       if (!going_back_started_)
@@ -367,7 +363,7 @@ bool BackGestureEventHandler::MaybeHandleBackGesture(
       SCOPED_CRASH_KEY_BOOL("286590216", "going_back_started_1",
                             going_back_started_);
       SCOPED_CRASH_KEY_NUMBER("286590216", "event.type",
-                              base::to_underlying(event->type()));
+                              std::to_underlying(event->type()));
       if (back_gesture_affordance_->IsActivated() ||
           (event->type() == ui::EventType::kScrollFlingStart &&
            event->details().velocity_x() >= kFlingVelocityForGoingBack)) {
@@ -400,33 +396,20 @@ bool BackGestureEventHandler::MaybeHandleBackGesture(
                   Shelf::ForWindow(top_window_state->window())
                       ->shelf_layout_manager()
                       ->UpdateVisibilityStateForBackGesture();
-                  RecordEndScenarioType(
-                      BackGestureEndScenarioType::kShowShelfAndHotseat);
                 }
               } else {
                 // Complete as exiting the fullscreen mode of the underneath
                 // window.
                 const WMEvent wm_event(WM_EVENT_TOGGLE_FULLSCREEN);
                 top_window_state->OnWMEvent(&wm_event);
-                RecordEndScenarioType(
-                    BackGestureEndScenarioType::kExitFullscreen);
               }
             } else if (window_util::ShouldMinimizeTopWindowOnBack()) {
               // Complete as minimizing the underneath window.
               top_window_state->Minimize();
-              RecordEndScenarioType(
-                  GetEndScenarioType(back_gesture_start_scenario_type_,
-                                     BackGestureEndType::kMinimize));
             } else {
               // Complete as going back to the previous page of the underneath
               // window.
               SendBackEvent(screen_location);
-            }
-            // |top_window| could be nullptr while in overview mode since back
-            // gesture is allowed in overview mode even no window opens.
-            if (top_window) {
-              RecordUnderneathWindowType(
-                  GetUnderneathWindowType(back_gesture_start_scenario_type_));
             }
           }
         }
@@ -442,8 +425,6 @@ bool BackGestureEventHandler::MaybeHandleBackGesture(
         }
       } else {
         back_gesture_affordance_->Abort();
-        RecordEndScenarioType(GetEndScenarioType(
-            back_gesture_start_scenario_type_, BackGestureEndType::kAbort));
       }
       going_back_started_ = false;
       dragged_from_splitview_divider_ = false;
@@ -465,7 +446,7 @@ bool BackGestureEventHandler::CanStartGoingBack(
   if (shell->session_controller()->IsRunningInAppMode())
     return false;
 
-  if (!display::Screen::GetScreen()->InTabletMode()) {
+  if (!display::Screen::Get()->InTabletMode()) {
     return false;
   }
 
@@ -482,7 +463,7 @@ bool BackGestureEventHandler::CanStartGoingBack(
       shell->screen_pinning_controller();
   if (screen_pinning_controller->IsPinned() &&
       GetWindowPinType(screen_pinning_controller->pinned_window()) ==
-          chromeos::WindowPinType::kTrustedPinned) {
+          chromeos::WindowPinType::kLockedFullscreen) {
     return false;
   }
 
@@ -503,7 +484,7 @@ bool BackGestureEventHandler::CanStartGoingBack(
   }
 
   gfx::Rect hit_bounds_in_screen(
-      display::Screen::GetScreen()
+      display::Screen::Get()
           ->GetDisplayNearestWindow(
               window_util::GetRootWindowAt(screen_location))
           .work_area());
@@ -566,8 +547,6 @@ bool BackGestureEventHandler::CanStartGoingBack(
 
 void BackGestureEventHandler::SendBackEvent(const gfx::Point& screen_location) {
   window_util::SendBackKeyEvent(window_util::GetRootWindowAt(screen_location));
-  RecordEndScenarioType(GetEndScenarioType(back_gesture_start_scenario_type_,
-                                           BackGestureEndType::kBack));
 }
 
 bool BackGestureEventHandler::ShouldWaitForTouchPressAck(

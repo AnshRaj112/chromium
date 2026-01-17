@@ -9,7 +9,6 @@
 #include <functional>
 #include <limits>
 
-#include "base/containers/contains.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
@@ -32,6 +31,18 @@ ParseStatus::Or<base::TimeDelta> TimeDelta::Parse(ResolvedSourceString str) {
         return duration;
       });
 }
+
+ByteRangeExpression::ByteRangeExpression(
+    types::DecimalInteger length,
+    std::optional<types::DecimalInteger> offset)
+    : length(std::move(length)), offset(std::move(offset)) {}
+ByteRangeExpression::ByteRangeExpression(const ByteRangeExpression& other) =
+    default;
+ByteRangeExpression::ByteRangeExpression(ByteRangeExpression&& other) = default;
+ByteRangeExpression& ByteRangeExpression::operator=(
+    const ByteRangeExpression& other) = default;
+ByteRangeExpression& ByteRangeExpression::operator=(
+    ByteRangeExpression&& other) = default;
 
 // static
 ParseStatus::Or<ByteRangeExpression> ByteRangeExpression::Parse(
@@ -59,8 +70,7 @@ ParseStatus::Or<ByteRangeExpression> ByteRangeExpression::Parse(
     offset = std::move(offset_result).value();
   }
 
-  return ByteRangeExpression{.length = std::move(length).value(),
-                             .offset = offset};
+  return ByteRangeExpression(std::move(length).value(), offset);
 }
 
 // static
@@ -69,7 +79,7 @@ ParseStatus::Or<base::Time> ISO8601Date::Parse(ResolvedSourceString str) {
   if (base::Time::FromString(str.Str().data(), &time)) {
     return time;
   }
-  return ParseStatusCode::kMalformedTag;
+  return ParseStatusCode::kMalformedDate;
 }
 
 // static
@@ -103,7 +113,7 @@ DecimalResolution::Parse(ResolvedSourceString str) {
 
 namespace {
 bool IsOneOf(char c, std::string_view set) {
-  return base::Contains(set, c);
+  return set.contains(c);
 }
 
 // Returns the substring matching a valid AttributeName, advancing `source_str`

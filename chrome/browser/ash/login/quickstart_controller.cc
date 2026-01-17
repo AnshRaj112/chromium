@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ash/login/quickstart_controller.h"
 
+#include <algorithm>
 #include <memory>
 #include <variant>
 
@@ -330,7 +331,7 @@ void QuickStartController::AbortFlow(AbortFlowReason reason) {
   constexpr AbortFlowReason kUnsupportedUserTypes[] = {
       AbortFlowReason::ENTERPRISE_ENROLLMENT, AbortFlowReason::SIGNIN_SCHOOL,
       AbortFlowReason::ADD_CHILD};
-  if (base::Contains(kUnsupportedUserTypes, reason)) {
+  if (std::ranges::contains(kUnsupportedUserTypes, reason)) {
     QS_LOG(INFO) << "Aborting flow due to unsupported user type: " << reason;
     bootstrap_controller_->OnSetupComplete();
     return;
@@ -479,7 +480,11 @@ void QuickStartController::OnStatusChanged(
       bootstrap_controller_->AttemptGoogleAccountTransfer();
       return;
     case Step::TRANSFERRING_GOOGLE_ACCOUNT_DETAILS:
-      CHECK(did_request_account_transfer_) << "Unrequested account transfer!";
+      if (!did_request_account_transfer_) {
+        QS_LOG(ERROR)
+            << "Unrequested account transfer! Flow probably was aborted.";
+        return;
+      }
       // Intermediate state. Nothing to do.
       if (controller_state_ != ControllerState::CONNECTED) {
         QS_LOG(ERROR) << "Expected controller_state_ to be CONNECTED. Actual "
@@ -489,7 +494,11 @@ void QuickStartController::OnStatusChanged(
       }
       return;
     case Step::TRANSFERRED_GOOGLE_ACCOUNT_DETAILS:
-      CHECK(did_request_account_transfer_) << "Unrequested account transfer!";
+      if (!did_request_account_transfer_) {
+        QS_LOG(ERROR)
+            << "Unrequested account transfer! Flow probably was aborted.";
+        return;
+      }
       if (controller_state_ != ControllerState::CONNECTED) {
         QS_LOG(ERROR) << "Expected controller_state_ to be CONNECTED. Actual "
                          "controller_state_: "

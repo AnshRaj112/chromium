@@ -7,19 +7,12 @@
 #import "base/functional/bind.h"
 #import "base/functional/callback.h"
 #import "components/signin/internal/identity_manager/account_capabilities_constants.h"
+#import "google_apis/gaia/gaia_id.h"
 
 namespace {
 
 using CapabilityResult = SystemIdentityManager::CapabilityResult;
 using DismissViewCallback = SystemIdentityManager::DismissViewCallback;
-
-// Helper function used to extract the capability from `capabilities` map in
-// `IsSubjectToParentalControls`.
-CapabilityResult FetchCapabilityCompleted(
-    std::map<std::string, CapabilityResult> capabilities) {
-  DCHECK_EQ(capabilities.size(), 1u);
-  return capabilities.begin()->second;
-}
 
 }  // anonymous namespace
 
@@ -41,15 +34,6 @@ SystemIdentityManager::SystemIdentityManager() = default;
 
 SystemIdentityManager::~SystemIdentityManager() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-}
-
-void SystemIdentityManager::IsSubjectToParentalControls(
-    id<SystemIdentity> identity,
-    FetchCapabilityCallback callback) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  FetchCapabilities(
-      identity, {kIsSubjectToParentalControlsCapabilityName},
-      base::BindOnce(&FetchCapabilityCompleted).Then(std::move(callback)));
 }
 
 void SystemIdentityManager::AddObserver(
@@ -136,4 +120,9 @@ void SystemIdentityManager::FireIdentityAccessTokenRefreshFailed(
   for (auto& observer : observers_) {
     observer.OnIdentityAccessTokenRefreshFailed(identity, error, scopes);
   }
+}
+
+bool SystemIdentityManager::IsScopeLimitedError(
+    id<RefreshAccessTokenError> error) {
+  return false;
 }

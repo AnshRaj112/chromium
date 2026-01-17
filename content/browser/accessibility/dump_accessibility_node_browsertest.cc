@@ -647,6 +647,10 @@ IN_PROC_BROWSER_TEST_P(DumpAccessibilityAccNameTest, NameFromContentDfn) {
   RunAccNameTest(FILE_PATH_LITERAL("name-from-content-dfn.html"));
 }
 
+IN_PROC_BROWSER_TEST_P(DumpAccessibilityAccNameTest, NameFromContentOfAddress) {
+  RunAccNameTest(FILE_PATH_LITERAL("name-from-content-of-address.html"));
+}
+
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityAccNameTest, NameFromContentOfLabel) {
   RunAccNameTest(FILE_PATH_LITERAL("name-from-content-of-label.html"));
 }
@@ -761,6 +765,10 @@ IN_PROC_BROWSER_TEST_P(DumpAccessibilityAccNameTest,
 
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityAccNameTest, NameImageTitle) {
   RunAccNameTest(FILE_PATH_LITERAL("name-image-title.html"));
+}
+
+IN_PROC_BROWSER_TEST_P(DumpAccessibilityAccNameTest, NameImgEmptyAltTitle) {
+  RunAccNameTest(FILE_PATH_LITERAL("name-img-empty-alt-title.html"));
 }
 
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityAccNameTest, NameImgLabelAltTitle) {

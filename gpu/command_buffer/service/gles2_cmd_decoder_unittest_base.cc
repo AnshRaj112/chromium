@@ -19,7 +19,6 @@
 #include <vector>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/heap_array.h"
 #include "base/containers/span.h"
 #include "base/strings/string_number_conversions.h"
@@ -74,7 +73,7 @@ void NormalizeInitState(gpu::gles2::GLES2DecoderTestBase::InitState* init) {
   };
   bool contains_vao_extension = false;
   for (const char* extension : kVAOExtensions) {
-    if (base::Contains(init->extensions, extension)) {
+    if (init->extensions.contains(extension)) {
       contains_vao_extension = true;
       break;
     }
@@ -145,8 +144,7 @@ GLES2DecoderTestBase::GLES2DecoderTestBase()
       cached_stencil_front_mask_(static_cast<GLuint>(-1)),
       cached_stencil_back_mask_(static_cast<GLuint>(-1)),
       shader_language_version_(100),
-      shader_translator_cache_(gpu_preferences_),
-      discardable_manager_(gpu_preferences_) {
+      shader_translator_cache_(gpu_preferences_) {
   memset(immediate_buffer_, 0xEE, sizeof(immediate_buffer_));
 }
 
@@ -211,12 +209,10 @@ ContextResult GLES2DecoderTestBase::MaybeInitDecoderWithWorkarounds(
   scoped_refptr<FeatureInfo> feature_info =
       new FeatureInfo(workarounds, gpu_feature_info);
 
-  const bool bind_generates_resource = false;
-  group_ = scoped_refptr<ContextGroup>(new ContextGroup(
+  group_ = MakeRefCounted<ContextGroup>(
       gpu_preferences_, memory_tracker_, &shader_translator_cache_,
-      &framebuffer_completeness_cache_, feature_info, bind_generates_resource,
-      /*progress_reporter=*/nullptr, gpu_feature_info, &discardable_manager_,
-      nullptr, &shared_image_manager_));
+      &framebuffer_completeness_cache_, feature_info,
+      /*progress_reporter=*/nullptr, gpu_feature_info, &shared_image_manager_);
 
   InSequence sequence;
 
@@ -233,9 +229,8 @@ ContextResult GLES2DecoderTestBase::MaybeInitDecoderWithWorkarounds(
   context_->GLContextStub::MakeCurrentImpl(surface_.get());
 
   TestHelper::SetupContextGroupInitExpectations(
-      gl_.get(), DisallowedFeatures(), normalized_init.extensions.c_str(),
-      normalized_init.gl_version.c_str(), init.context_type,
-      bind_generates_resource);
+      gl_.get(), normalized_init.extensions.c_str(),
+      normalized_init.gl_version.c_str(), init.context_type);
 
   // We initialize the ContextGroup with a MockGLES2Decoder so that
   // we can use the ContextGroup to figure out how the real GLES2Decoder
@@ -244,8 +239,7 @@ ContextResult GLES2DecoderTestBase::MaybeInitDecoderWithWorkarounds(
   mock_decoder_ = std::make_unique<MockGLES2Decoder>(
       this, command_buffer_service_.get(), &outputter_);
 
-  EXPECT_EQ(group_->Initialize(mock_decoder_.get(), init.context_type,
-                               DisallowedFeatures()),
+  EXPECT_EQ(group_->Initialize(mock_decoder_.get(), init.context_type),
             gpu::ContextResult::kSuccess);
 
   // GPUTracer
@@ -448,13 +442,8 @@ ContextResult GLES2DecoderTestBase::MaybeInitDecoderWithWorkarounds(
   shared_memory_base_ = buffer->memory();
   ClearSharedMemory();
 
-  ContextCreationAttribs attribs;
-  attribs.lose_context_when_out_of_memory =
-      normalized_init.lose_context_when_out_of_memory;
-  attribs.context_type = init.context_type;
-
-  decoder_.reset(GLES2Decoder::Create(this, command_buffer_service_.get(),
-                                      &outputter_, group_.get()));
+  decoder_ = GLES2Decoder::Create(this, command_buffer_service_.get(),
+                                  &outputter_, group_.get());
   decoder_->SetIgnoreCachedStateForTest(ignore_cached_state_for_test_);
   decoder_->GetLogger()->set_log_synthesized_gl_errors(false);
 
@@ -466,7 +455,8 @@ ContextResult GLES2DecoderTestBase::MaybeInitDecoderWithWorkarounds(
     decoder_->SetCopyTexImageBlitterForTest(copy_tex_image_blitter_);
   }
   gpu::ContextResult result = decoder_->Initialize(
-      surface_, context_, false, DisallowedFeatures(), attribs);
+      surface_, context_, /*offscreen=*/false, init.context_type,
+      normalized_init.lose_context_when_out_of_memory);
   if (result != gpu::ContextResult::kSuccess) {
     // GLES2CmdDecoder::Destroy should be handled by Initialize in all failure
     // cases.
@@ -2047,7 +2037,6 @@ void GLES2DecoderTestBase::SetupShader(
   base::span<TestHelper::ProgramOutputInfo> program_outputs =
       shader_language_version_ == 100 ? kProgramOutputsESSL1
                                       : kProgramOutputsESSL3;
-  const size_t kNumProgramOutputs = 1;
   const int kNumUniformBlocks = 2;
   const auto kUniformBlockBinding = std::to_array<int>({0, 1});
   const auto kUniformBlockDataSize = std::to_array<int>({32, 16});
@@ -2066,8 +2055,7 @@ void GLES2DecoderTestBase::SetupShader(
 
     TestHelper::SetupShaderExpectationsWithVaryings(
         gl_.get(), group_->feature_info(), attribs, num_attribs, uniforms,
-        num_uniforms, nullptr, 0, program_outputs, kNumProgramOutputs,
-        program_service_id);
+        num_uniforms, nullptr, 0, program_outputs, program_service_id);
   }
 
   DoCreateShader(
@@ -2276,30 +2264,6 @@ void GLES2DecoderWithShaderTestBase::SetUp() {
   SetupDefaultProgram();
 }
 
-void GLES2DecoderTestBase::DoInitializeDiscardableTextureCHROMIUM(
-    GLuint texture_id) {
-  scoped_refptr<gpu::Buffer> buffer =
-      command_buffer_service_->GetTransferBuffer(shared_memory_id_);
-  ClientDiscardableHandle handle(buffer, 0, shared_memory_id_);
-
-  cmds::InitializeDiscardableTextureCHROMIUM cmd;
-  cmd.Init(texture_id, shared_memory_id_, 0);
-  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
-}
-
-void GLES2DecoderTestBase::DoUnlockDiscardableTextureCHROMIUM(
-    GLuint texture_id) {
-  cmds::UnlockDiscardableTextureCHROMIUM cmd;
-  cmd.Init(texture_id);
-  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
-}
-
-void GLES2DecoderTestBase::DoLockDiscardableTextureCHROMIUM(GLuint texture_id) {
-  cmds::LockDiscardableTextureCHROMIUM cmd;
-  cmd.Init(texture_id);
-  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
-}
-
 namespace {
 
 GpuPreferences GenerateGpuPreferencesForPassthroughTests() {
@@ -2311,12 +2275,9 @@ GpuPreferences GenerateGpuPreferencesForPassthroughTests() {
 
 GLES2DecoderPassthroughTestBase::GLES2DecoderPassthroughTestBase(
     ContextType context_type)
-    : gpu_preferences_(GenerateGpuPreferencesForPassthroughTests()),
-      shader_translator_cache_(gpu_preferences_),
-      discardable_manager_(gpu_preferences_),
-      passthrough_discardable_manager_(gpu_preferences_) {
-  context_creation_attribs_.context_type = context_type;
-}
+    : context_type_(context_type),
+      gpu_preferences_(GenerateGpuPreferencesForPassthroughTests()),
+      shader_translator_cache_(gpu_preferences_) {}
 
 GLES2DecoderPassthroughTestBase::~GLES2DecoderPassthroughTestBase() = default;
 
@@ -2358,18 +2319,16 @@ void GLES2DecoderPassthroughTestBase::SetUp() {
   ASSERT_EQ(gl::GetANGLEImplementation(), gl::ANGLEImplementation::kNull);
 
   scoped_refptr<gles2::FeatureInfo> feature_info = new gles2::FeatureInfo();
-  group_ = new gles2::ContextGroup(
+  group_ = MakeRefCounted<gles2::ContextGroup>(
       gpu_preferences_, /*memory_tracker=*/nullptr, &shader_translator_cache_,
       &framebuffer_completeness_cache_, feature_info,
-      /*bind_generates_resource=*/false,
-      /*progress_reporter=*/nullptr, GpuFeatureInfo(), &discardable_manager_,
-      &passthrough_discardable_manager_, &shared_image_manager_);
+      /*progress_reporter=*/nullptr, GpuFeatureInfo(), &shared_image_manager_);
 
   surface_ = gl::init::CreateOffscreenGLSurface(display_, gfx::Size(4, 4));
-  context_ =
-      gl::init::CreateGLContext(nullptr, surface_.get(),
-                                GenerateGLContextAttribsForDecoder(
-                                    context_creation_attribs_, group_.get()));
+  context_ = gl::init::CreateGLContext(
+      nullptr, surface_.get(),
+      GenerateGLContextAttribsForDecoder(
+          context_type_, gl::GpuPreference::kLowPower, group_.get()));
   context_->MakeCurrent(surface_.get());
 
   command_buffer_service_ = std::make_unique<FakeCommandBufferServiceBase>();
@@ -2381,18 +2340,15 @@ void GLES2DecoderPassthroughTestBase::SetUp() {
   // request what they need.
   decoder_->SetOptionalExtensionsRequestedForTesting(false);
 
-  ASSERT_EQ(
-      group_->Initialize(decoder_.get(), context_creation_attribs_.context_type,
-                         DisallowedFeatures()),
-      gpu::ContextResult::kSuccess);
+  ASSERT_EQ(group_->Initialize(decoder_.get(), context_type_),
+            gpu::ContextResult::kSuccess);
 
   // We need command buffer to emulate default framebuffer is the GLSurface is
   // surfaceless.
   const bool offscreen = surface_->IsSurfaceless();
-  ASSERT_EQ(
-      decoder_->Initialize(surface_, context_, offscreen, DisallowedFeatures(),
-                           context_creation_attribs_),
-      gpu::ContextResult::kSuccess);
+  ASSERT_EQ(decoder_->Initialize(surface_, context_, offscreen, context_type_,
+                                 /*lose_context_when_out_of_memory=*/false),
+            gpu::ContextResult::kSuccess);
 
   scoped_refptr<gpu::Buffer> buffer =
       command_buffer_service_->CreateTransferBufferHelper(kSharedBufferSize,
@@ -2581,33 +2537,6 @@ void GLES2DecoderPassthroughTestBase::DoGetIntegerv(GLenum pname,
       GetSharedMemoryAs<cmds::GetIntegerv::Result*>();
   DCHECK(static_cast<size_t>(cmd_result->GetNumResults()) >= num_results);
   std::copy(cmd_result->GetData(), cmd_result->GetData() + num_results, result);
-}
-
-void GLES2DecoderPassthroughTestBase::DoInitializeDiscardableTextureCHROMIUM(
-    GLuint client_id) {
-  int32_t shmem_id = 0;
-  scoped_refptr<gpu::Buffer> buffer =
-      command_buffer_service_->CreateTransferBufferHelper(sizeof(uint32_t),
-                                                          &shmem_id);
-  ClientDiscardableHandle handle(buffer, 0, shmem_id);
-
-  cmds::InitializeDiscardableTextureCHROMIUM cmd;
-  cmd.Init(client_id, shmem_id, 0);
-  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
-}
-
-void GLES2DecoderPassthroughTestBase::DoUnlockDiscardableTextureCHROMIUM(
-    GLuint client_id) {
-  cmds::UnlockDiscardableTextureCHROMIUM cmd;
-  cmd.Init(client_id);
-  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
-}
-
-void GLES2DecoderPassthroughTestBase::DoLockDiscardableTextureCHROMIUM(
-    GLuint client_id) {
-  cmds::LockDiscardableTextureCHROMIUM cmd;
-  cmd.Init(client_id);
-  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
 }
 
 // GCC requires these declarations, but MSVC requires they not be present

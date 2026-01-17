@@ -17,11 +17,13 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/test_shortcut_win.h"
 #include "base/win/scoped_com_initializer.h"
+#include "build/branding_buildflags.h"
 #include "chrome/browser/shell_integration.h"
 #include "chrome/browser/shortcuts/platform_util_win.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths_internal.h"
+#include "chrome/install_static/install_details.h"
 #include "chrome/install_static/install_util.h"
 #include "chrome/installer/util/install_util.h"
 #include "chrome/installer/util/shell_util.h"
@@ -392,4 +394,23 @@ TEST(ShellIntegrationWinTest, GetAppModelIdForProfileTest) {
 }
 
 }  // namespace win
+
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+TEST(ShellIntegrationWinTest, GetDirectLaunchUrlScheme) {
+  std::string scheme = GetDirectLaunchUrlScheme();
+  // For branded builds, the scheme should either be "google-chrome"
+  // (primary install mode) or empty (secondary/side-by-side install modes)
+  // for security reasons.
+  if (install_static::InstallDetails::Get().is_primary_mode()) {
+    EXPECT_EQ(scheme, "google-chrome");
+  } else {
+    EXPECT_EQ(scheme, std::string());
+  }
+}
+#else  // !BUILDFLAG(GOOGLE_CHROME_BRANDING)
+TEST(ShellIntegrationWinTest, GetDirectLaunchUrlSchemeUnbranded) {
+  EXPECT_EQ("chromium", GetDirectLaunchUrlScheme());
+}
+#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+
 }  // namespace shell_integration

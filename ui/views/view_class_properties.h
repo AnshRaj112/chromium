@@ -7,13 +7,14 @@
 
 #include "ui/base/class_property.h"
 #include "ui/base/interaction/element_identifier.h"
-#include "ui/gfx/geometry/size.h"
 #include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/layout/layout_types.h"
 #include "ui/views/views_export.h"
 
 namespace gfx {
 class Insets;
+class Rect;
+class Size;
 }  // namespace gfx
 
 namespace views {
@@ -21,6 +22,7 @@ namespace views {
 class BoxLayoutFlexSpecification;
 class DialogDelegate;
 class FlexSpecification;
+class FocusManager;
 class HighlightPathGenerator;
 class Widget;
 
@@ -99,6 +101,11 @@ VIEWS_EXPORT extern const ui::ClassProperty<bool>* const
 VIEWS_EXPORT extern const ui::ClassProperty<ui::ElementIdentifier>* const
     kElementIdentifierKey;
 
+// A property to store a FocusManager* that should be used for a view that is
+// not (yet) attached to a widget. This makes View::GetFocusManager() work.
+VIEWS_EXPORT extern const ui::ClassProperty<FocusManager*>* const
+    kDetachedViewFocusManagerKey;
+
 }  // namespace views
 
 // Declare template specializations introduced by Views here to make sure that
@@ -119,6 +126,7 @@ DECLARE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT, views::Widget*)
 
 #if !defined(USE_AURA)
 // aura_constants.h declares this.
+DECLARE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT, gfx::Rect*)
 DECLARE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT, gfx::Size*)
 #endif
 

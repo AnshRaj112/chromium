@@ -14,13 +14,13 @@
 #include "base/check.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
+#include "base/containers/to_vector.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/environment.h"
 #include "base/feature_list.h"
 #include "base/files/file.h"
 #include "base/files/file_path.h"
-#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
@@ -30,6 +30,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/task/bind_post_task.h"
 #include "base/task/sequenced_task_runner.h"
@@ -40,15 +41,11 @@
 #include "base/values.h"
 #include "build/build_config.h"
 #include "build/chromecast_buildflags.h"
-#include "components/ip_protection/common/ip_protection_telemetry.h"
-#include "components/ip_protection/common/masked_domain_list_manager.h"
-#include "components/ip_protection/common/probabilistic_reveal_token_registry.h"
-#include "components/network_session_configurator/common/network_features.h"
 #include "components/os_crypt/sync/os_crypt.h"
-#include "components/privacy_sandbox/masked_domain_list/masked_domain_list.pb.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/scoped_message_error_crash_key.h"
+#include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "mojo/public/cpp/bindings/shared_remote.h"
 #include "mojo/public/cpp/system/functions.h"
 #include "net/base/address_list.h"
@@ -83,7 +80,7 @@
 #include "net/url_request/url_request_context.h"
 #include "services/network/dns_config_change_manager.h"
 #include "services/network/first_party_sets/first_party_sets_manager.h"
-#include "services/network/http_auth_cache_copier.h"
+#include "services/network/http_auth_cache_proxy_copier.h"
 #include "services/network/net_log_exporter.h"
 #include "services/network/net_log_proxy_sink.h"
 #include "services/network/network_context.h"
@@ -483,7 +480,7 @@ void NetworkService::Initialize(mojom::NetworkServiceParamsPtr params,
       net::NetworkChangeNotifier::GetSystemDnsConfigNotifier(), net_log_);
   host_resolver_factory_ = std::make_unique<net::HostResolver::Factory>();
 
-  http_auth_cache_copier_ = std::make_unique<HttpAuthCacheCopier>();
+  http_auth_cache_proxy_copier_ = std::make_unique<HttpAuthCacheProxyCopier>();
 
   doh_probe_activator_ = std::make_unique<DelayedDohProbeActivator>(this);
 
@@ -498,13 +495,6 @@ void NetworkService::Initialize(mojom::NetworkServiceParamsPtr params,
       std::make_unique<FirstPartySetsManager>(params->first_party_sets_enabled);
 
   tpcd_metadata_manager_ = std::make_unique<network::tpcd::metadata::Manager>();
-
-  masked_domain_list_manager_ =
-      std::make_unique<ip_protection::MaskedDomainListManager>(
-          params->ip_protection_proxy_bypass_policy);
-
-  probabilistic_reveal_token_registry_ =
-      std::make_unique<ip_protection::ProbabilisticRevealTokenRegistry>();
 
 #if BUILDFLAG(IS_CT_SUPPORTED)
   constexpr size_t kMaxSCTAuditingCacheEntries = 1024;
@@ -729,7 +719,8 @@ void NetworkService::ConfigureStubHostResolver(
     bool happy_eyeballs_v3_enabled,
     net::SecureDnsMode secure_dns_mode,
     const net::DnsOverHttpsConfig& dns_over_https_config,
-    bool additional_dns_types_enabled) {
+    bool additional_dns_types_enabled,
+    const std::vector<net::IPEndPoint>& fallback_doh_nameservers) {
   // Enable or disable the insecure part of DnsClient. "DnsClient" is the class
   // that implements the stub resolver.
   host_resolver_manager_->SetInsecureDnsClientEnabled(
@@ -745,7 +736,7 @@ void NetworkService::ConfigureStubHostResolver(
   overrides.secure_dns_mode = secure_dns_mode;
   overrides.allow_dns_over_https_upgrade =
       base::FeatureList::IsEnabled(features::kDnsOverHttpsUpgrade);
-
+  overrides.fallback_doh_nameservers = fallback_doh_nameservers;
   host_resolver_manager_->SetDnsConfigOverrides(overrides);
 
   const bool happy_eyeballs_v3_changed =
@@ -802,17 +793,13 @@ void NetworkService::SetRawHeadersAccess(
   }
 }
 
-void NetworkService::SetMaxConnectionsPerProxyChain(int32_t max_connections) {
-  int new_limit = max_connections;
-  if (new_limit < 0) {
-    new_limit = net::kDefaultMaxSocketsPerProxyChain;
-  }
-
+void NetworkService::SetMaxConnectionsPerProxyChain(uint32_t max_connections) {
   // Clamp the value between min_limit and max_limit.
-  int max_limit = 99;
-  int min_limit = net::ClientSocketPoolManager::max_sockets_per_group(
+  size_t max_limit = 99;
+  size_t min_limit = net::ClientSocketPoolManager::max_sockets_per_group(
       net::HttpNetworkSession::NORMAL_SOCKET_POOL);
-  new_limit = std::clamp(new_limit, min_limit, max_limit);
+  size_t new_limit = std::clamp(base::saturated_cast<size_t>(max_connections),
+                                min_limit, max_limit);
 
   // Assign the global limit.
   net::ClientSocketPoolManager::set_max_sockets_per_proxy_chain(
@@ -874,11 +861,6 @@ void NetworkService::OnClientCertStoreChanged() {
 
 void NetworkService::SetEncryptionKey(const std::string& encryption_key) {
   OSCrypt::SetRawEncryptionKey(encryption_key);
-}
-
-void NetworkService::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level) {
-  base::MemoryPressureListener::NotifyMemoryPressure(memory_pressure_level);
 }
 
 void NetworkService::OnPeerToPeerConnectionsCountChange(uint32_t count) {
@@ -989,21 +971,6 @@ void NetworkService::UpdateKeyPinsList(mojom::PinListPtr pin_list,
       state->UpdatePinList(pinsets_, host_pins_, pins_list_update_time_);
     }
   }
-}
-
-void NetworkService::UpdateMaskedDomainList(
-    base::File default_file,
-    uint64_t default_file_size,
-    base::File regular_browsing_file,
-    uint64_t regular_browsing_file_size) {
-  masked_domain_list_manager_->UpdateMaskedDomainList(
-      std::move(default_file), default_file_size,
-      std::move(regular_browsing_file), regular_browsing_file_size);
-}
-
-void NetworkService::UpdateProbabilisticRevealTokenRegistry(
-    base::Value::Dict registry) {
-  probabilistic_reveal_token_registry_->UpdateRegistry(std::move(registry));
 }
 
 #if BUILDFLAG(IS_ANDROID)
@@ -1231,4 +1198,44 @@ void NetworkService::SetTpcdMetadataGrants(
     const std::vector<ContentSettingPatternSource>& settings) {
   tpcd_metadata_manager_->SetGrants(settings);
 }
+
+void NetworkService::AddDurableMessageCollector(
+    mojo::PendingReceiver<network::mojom::DurableMessageCollector> receiver) {
+  if (!durable_message_collector_manager_) {
+    durable_message_collector_manager_ =
+        std::make_unique<DevtoolsDurableMessageCollectorManager>();
+  }
+  durable_message_collector_manager_->AddCollector(std::move(receiver));
+}
+
+std::unique_ptr<DevtoolsDurableMessageWriter>
+NetworkService::MaybeCreateDurableMessageWriter(
+    const base::UnguessableToken& throttling_profile_id,
+    const std::string& devtools_request_id) {
+  if (!throttling_profile_id || devtools_request_id.empty()) {
+    return nullptr;
+  }
+
+  if (!durable_message_collector_manager_) {
+    return nullptr;
+  }
+
+  std::vector<DevtoolsDurableMessageCollector*> collectors =
+      durable_message_collector_manager_->GetCollectorsEnabledForProfile(
+          throttling_profile_id);
+  if (collectors.empty()) {
+    return nullptr;
+  }
+
+  std::vector<base::WeakPtr<DevtoolsDurableMessage>> messages;
+  for (auto* collector : collectors) {
+    if (!collector) {
+      continue;
+    }
+    messages.push_back(collector->CreateDurableMessage(devtools_request_id));
+  }
+  return std::make_unique<MultipleDurableMessageWriterImpl>(
+      std::move(messages));
+}
+
 }  // namespace network

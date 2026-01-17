@@ -11,6 +11,7 @@ import androidx.annotation.ColorInt;
 import org.chromium.base.Callback;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
+import org.chromium.chrome.browser.toolbar.optional_button.OptionalButtonProperties.OnBeforeWidthTransitionCallback;
 import org.chromium.ui.modelutil.PropertyModel;
 
 @NullMarked
@@ -36,6 +37,10 @@ class OptionalButtonMediator {
         mModel.set(OptionalButtonProperties.ICON_TINT_LIST, colorStateList);
     }
 
+    void setOnBeforeWidthTransitionCallback(OnBeforeWidthTransitionCallback callback) {
+        mModel.set(OptionalButtonProperties.ON_BEFORE_WIDTH_TRANSITION_CALLBACK, callback);
+    }
+
     void setBackgroundColorFilter(@ColorInt int backgroundColor) {
         mModel.set(OptionalButtonProperties.ICON_BACKGROUND_COLOR, backgroundColor);
     }
@@ -56,6 +61,18 @@ class OptionalButtonMediator {
         mModel.set(
                 OptionalButtonProperties.ON_BEFORE_HIDE_TRANSITION_CALLBACK,
                 onBeforeHideTransitionCallback);
+    }
+
+    public void setOnBeforeShowTransitionCallback(Runnable onBeforeShowTransitionCallback) {
+        mModel.set(
+                OptionalButtonProperties.ON_BEFORE_SHOW_TRANSITION_CALLBACK,
+                onBeforeShowTransitionCallback);
+    }
+
+    public void setOnBeforeDelayedTransitionCallback(Runnable onBeforeDelayedTransitionCallback) {
+        mModel.set(
+                OptionalButtonProperties.ON_BEFORE_DELAYED_TRANSITION_CALLBACK,
+                onBeforeDelayedTransitionCallback);
     }
 
     public void setPaddingStart(int paddingStart) {

@@ -16,8 +16,11 @@
 #include <utility>
 #include <vector>
 
+#include "base/check.h"
+#include "base/check_op.h"
 #include "base/containers/flat_set.h"
 #include "base/containers/stack.h"
+#include "base/debug/crash_logging.h"
 #include "base/feature_list.h"
 #include "base/i18n/case_conversion.h"
 #include "base/memory/raw_ptr.h"
@@ -39,6 +42,7 @@
 #include "components/omnibox/browser/tailored_word_break_iterator.h"
 #include "components/omnibox/common/omnibox_features.h"
 #include "components/omnibox/common/string_cleaning.h"
+#include "third_party/abseil-cpp/absl/container/flat_hash_set.h"
 #include "components/search_engines/template_url_service.h"
 #include "third_party/metrics_proto/omnibox_event.pb.h"
 
@@ -105,7 +109,8 @@ bool UpdateRecentVisitsFromHistoryDBTask::RunOnDBThread(
     history::HistoryBackend* backend,
     history::HistoryDatabase* db) {
   succeeded_ = db->GetMostRecentVisitsForURL(
-      url_id_, URLIndexPrivateData::kMaxVisitsToStoreInCache, &recent_visits_);
+      url_id_, URLIndexPrivateData::kMaxVisitsToStoreInCache,
+      history::VisitQuery404sPolicy::kExclude404s, &recent_visits_);
   if (!succeeded_)
     recent_visits_.clear();
   return true;  // Always claim to be done; do not retry failures.
@@ -164,7 +169,8 @@ ScoredHistoryMatches URLIndexPrivateData::HistoryItemsForTerms(
   bool history_ids_were_trimmed = false;
   // A set containing the list of words extracted from each search string,
   // used to prevent running duplicate searches.
-  std::set<String16Vector> seen_search_words;
+  absl::flat_hash_set<String16Vector> seen_search_words;
+  seen_search_words.reserve(search_strings.size());
   for (const std::u16string& search_string : search_strings) {
     // The search string we receive may contain escaped characters. For reducing
     // the index we need individual, lower-cased words, ignoring escapings. For
@@ -188,9 +194,9 @@ ScoredHistoryMatches URLIndexPrivateData::HistoryItemsForTerms(
     if (lower_words.empty())
       continue;
     // If we've already searched for this list of words, don't do it again.
-    if (seen_search_words.find(lower_words) != seen_search_words.end())
+    if (!seen_search_words.insert(lower_words).second) {
       continue;
-    seen_search_words.insert(lower_words);
+    }
 
     HistoryIDVector history_ids = HistoryIDsFromWords(lower_words);
     history_ids_were_trimmed |= TrimHistoryIdsPool(&history_ids);
@@ -222,11 +228,11 @@ ScoredHistoryMatches URLIndexPrivateData::HistoryItemsForTerms(
     // Filter unique matches to maximize the use of the `max_matches` capacity.
     // It's possible this'll still end up with duplicates as having unique
     // URL IDs does not guarantee having unique `stripped_destination_url`.
-    std::set<HistoryID> seen_history_ids;
+    absl::flat_hash_set<HistoryID> seen_history_ids;
+    seen_history_ids.reserve(scored_items.size());
     std::erase_if(scored_items, [&](const auto& scored_item) {
       HistoryID scored_item_id = scored_item.url_info.id();
-      bool duplicate = seen_history_ids.count(scored_item_id);
-      seen_history_ids.insert(scored_item_id);
+      bool duplicate = !seen_history_ids.insert(scored_item_id).second;
       return duplicate;
     });
     if (!skip_resize && scored_items.size() > max_matches) {
@@ -662,11 +668,12 @@ void URLIndexPrivateData::HistoryIdsToScoredMatches(
   // problematic when there are multiple duplicate matches. Try counting the
   // unique hosts in the matches instead.
   size_t num_unique_hosts;
-  std::set<std::string> unique_hosts = {};
+  absl::flat_hash_set<std::string> unique_hosts;
+  unique_hosts.reserve(history_ids.size());
   for (const auto& history_id : history_ids) {
     DCHECK(history_info_map_.count(history_id));
     unique_hosts.insert(
-        history_info_map_.find(history_id)->second.url_row.url().host());
+        history_info_map_.find(history_id)->second.url_row.url().GetHost());
     // `ScoredHistoryMatch` assigns the same specificity to suggestions for
     // counts 4 or larger.
     // TODO(manukh) Should share `kMaxUniqueHosts` with `ScoredHistoryMatch`,
@@ -760,9 +767,11 @@ bool URLIndexPrivateData::IndexRow(
     // However, unittest code actually calls this on the UI thread.
     // So we don't do any thread checks.
     history::VisitVector recent_visits;
-    if (history_db->GetMostRecentVisitsForURL(row_id, kMaxVisitsToStoreInCache,
-                                              &recent_visits))
+    if (history_db->GetMostRecentVisitsForURL(
+            row_id, kMaxVisitsToStoreInCache,
+            history::VisitQuery404sPolicy::kExclude404s, &recent_visits)) {
       UpdateRecentVisits(row_id, recent_visits);
+    }
   } else if (history_service) {
     DCHECK(tracker);
     ScheduleUpdateRecentVisits(history_service, row_id, tracker);
@@ -776,18 +785,24 @@ void URLIndexPrivateData::AddRowWordsToIndex(const history::URLRow& row,
   HistoryID history_id = static_cast<HistoryID>(row.id());
   // Split URL into individual, unique words then add in the title words.
   const GURL& gurl(row.url());
-  DCHECK(gurl.is_valid());
-  const std::u16string& url =
-      string_cleaning::CleanUpUrlForMatching(gurl, nullptr);
+  CHECK(gurl.is_valid());
+  const std::u16string& url = omnibox::CleanUpUrlForMatching(gurl, nullptr);
   String16Set url_words = String16SetFromString16(
       url, word_starts ? &word_starts->url_word_starts_ : nullptr);
-  const std::u16string& title =
-      string_cleaning::CleanUpTitleForMatching(row.title());
+  const std::u16string& title = omnibox::CleanUpTitleForMatching(row.title());
   String16Set title_words = String16SetFromString16(
       title, word_starts ? &word_starts->title_word_starts_ : nullptr);
   for (const auto& word :
-       base::STLSetUnion<String16Set>(url_words, title_words))
+       base::STLSetUnion<String16Set>(url_words, title_words)) {
+    CHECK(!word.empty());
+    // Confirm no corruption after `CleanUpTitleForMatching()` above, which
+    // limits to `kCleanedUpTitleMaxLength` (1024).
+    CHECK_LT(word.length(), 1024u);
+    // Some crash keys if the fix doesn't work.
+    SCOPED_CRASH_KEY_STRING256("Bug348617573", "url", gurl.spec());
+    SCOPED_CRASH_KEY_STRING32("Bug348617573", "word", base::UTF16ToUTF8(word));
     AddWordToIndex(word, history_id);
+  }
 
   search_term_cache_.clear();  // Invalidate the term cache.
 }
@@ -872,7 +887,7 @@ void URLIndexPrivateData::ResetSearchTermCache() {
 bool URLIndexPrivateData::URLSchemeIsAllowlisted(
     const GURL& gurl,
     const std::set<std::string>& allowlist) {
-  return allowlist.find(gurl.scheme()) != allowlist.end();
+  return allowlist.find(gurl.GetScheme()) != allowlist.end();
 }
 
 bool URLIndexPrivateData::ShouldExclude(
@@ -966,4 +981,3 @@ bool URLIndexPrivateData::HistoryItemFactorGreater::operator()(
     return (r1.visit_count() > r2.visit_count());
   return (r1.last_visit() > r2.last_visit());
 }
-

@@ -15,9 +15,9 @@
 #import "components/send_tab_to_self/features.h"
 #import "components/sync_device_info/device_info_sync_service.h"
 #import "ios/chrome/browser/content_notification/model/content_notification_util.h"
-#import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_collection_utils.h"
+#import "ios/chrome/browser/content_suggestions/ui/content_suggestions_collection_utils.h"
+#import "ios/chrome/browser/push_notification/coordinator/notifications_opt_in_alert_coordinator.h"
 #import "ios/chrome/browser/push_notification/model/push_notification_client_id.h"
-#import "ios/chrome/browser/push_notification/ui_bundled/notifications_opt_in_alert_coordinator.h"
 #import "ios/chrome/browser/settings/ui_bundled/notifications/content_notifications/content_notifications_coordinator.h"
 #import "ios/chrome/browser/settings/ui_bundled/notifications/notifications_banner_view_controller.h"
 #import "ios/chrome/browser/settings/ui_bundled/notifications/notifications_mediator.h"
@@ -83,7 +83,6 @@
       AuthenticationServiceFactory::GetForProfile(self.profile);
   id<SystemIdentity> identity =
       authService->GetPrimaryIdentity(signin::ConsentLevel::kSignin);
-  const GaiaId gaiaID(identity.gaiaID);
   PrefService* prefService = self.profile->GetPrefs();
   syncer::DeviceInfoSyncService* deviceInfoSyncService =
       DeviceInfoSyncServiceFactory::GetForProfile(self.profile);
@@ -93,7 +92,7 @@
 
   self.mediator =
       [[NotificationsMediator alloc] initWithPrefService:prefService
-                                                  gaiaID:gaiaID
+                                                  gaiaID:identity.gaiaId
                                    deviceInfoSyncService:deviceInfoSyncService];
   self.mediator.handler = self;
   self.mediator.presenter = self;
@@ -140,6 +139,9 @@
     case PushNotificationClientId::kSendTab:
     case PushNotificationClientId::kReminders:
       return ItemIdentifierSendTab;
+    case PushNotificationClientId::kCrossPlatformPromos:
+      // TODO:(crbug.com/445662240): Add toggle for this feature.
+      NOTREACHED();
   }
 }
 

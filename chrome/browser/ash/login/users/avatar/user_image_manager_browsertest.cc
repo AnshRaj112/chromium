@@ -72,7 +72,6 @@
 #include "components/user_manager/user_manager.h"
 #include "components/user_manager/user_type.h"
 #include "content/public/test/browser_test.h"
-#include "crypto/rsa_private_key.h"
 #include "google_apis/gaia/gaia_id.h"
 #include "google_apis/gaia/gaia_urls.h"
 #include "net/test/embedded_test_server/controllable_http_response.h"
@@ -232,18 +231,14 @@ class UserImageManagerTestBase : public LoginManagerTest,
         identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSignin);
     signin::SetRefreshTokenForAccount(identity_manager, core_info.account_id,
                                       kRandomTokenStrForTesting);
-    AccountInfo account_info;
-    account_info.email = core_info.email;
-    account_info.gaia = core_info.gaia;
-    account_info.account_id = core_info.account_id;
-    account_info.is_under_advanced_protection =
-        core_info.is_under_advanced_protection;
-    account_info.full_name = account_info.email;
-    account_info.given_name = account_info.email;
-    account_info.hosted_domain = kNoHostedDomainFound;
-    account_info.locale = account_info.email;
-    account_info.picture_url =
-        embedded_test_server()->GetURL("/avatar.jpg").spec();
+    AccountInfo account_info =
+        AccountInfo::Builder(core_info)
+            .SetFullName(core_info.email)
+            .SetGivenName(core_info.email)
+            .SetHostedDomain(std::string())
+            .SetLocale(core_info.email)
+            .SetAvatarUrl(embedded_test_server()->GetURL("/avatar.jpg").spec())
+            .Build();
     signin::UpdateAccountInfoForAccount(identity_manager, account_info);
   }
 
@@ -626,14 +621,11 @@ class UserImageManagerPolicyTest : public UserImageManagerTestBase,
                                 &image_data)) {
       ADD_FAILURE();
     }
-    std::string policy;
-    base::JSONWriter::Write(policy::test::ConstructExternalDataReference(
-                                embedded_test_server()
-                                    ->GetURL(std::string("/") + relative_path)
-                                    .spec(),
-                                image_data),
-                            &policy);
-    return policy;
+    std::string path = std::string("/") + relative_path;
+    std::string url = embedded_test_server()->GetURL(path).spec();
+    return base::WriteJson(
+               policy::test::ConstructExternalDataReference(url, image_data))
+        .value_or("");
   }
 
   DeviceStateMixin device_state_{

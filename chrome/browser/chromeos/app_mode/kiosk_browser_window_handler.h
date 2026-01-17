@@ -11,11 +11,15 @@
 #include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/scoped_observation.h"
 #include "base/timer/timer.h"
 #include "chrome/browser/chromeos/app_mode/kiosk_policies.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/browser_list_observer.h"
+#include "chrome/browser/ui/browser_window/public/browser_collection_observer.h"
+#include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+
+class BrowserWindowInterface;
 
 namespace chromeos {
 
@@ -49,7 +53,7 @@ enum class KioskBrowserWindowType {
 // If the last browser window gets closed, the session gets ended.
 //
 // It also manages showing required settings pages in a consistent browser.
-class KioskBrowserWindowHandler : public BrowserListObserver {
+class KioskBrowserWindowHandler : public BrowserCollectionObserver {
  public:
   KioskBrowserWindowHandler(
       Profile* profile,
@@ -66,17 +70,37 @@ class KioskBrowserWindowHandler : public BrowserListObserver {
 
  private:
   void OnCompleteBrowserAdded(Browser* browser);
-  bool TriageNewBrowserWindow(Browser* browser);
+
+  // Signals the end of the navigation monitoring phase.
+  // Invoked in one of the two scenarios:
+  // 1. The browser navigation has successfully started.
+  // 2. An unexpected event changed the window visibility (e.g. new tab being
+  // opened).
+  void OnBrowserNavigationWatchEnded(Browser* browser);
+  // Returns true if the browser window is allowed to be opened in kiosk mode
+  // independent of the navigation URL with no need to wait for navigation to
+  // happen.
+  bool PreTriageNewBrowserWindowWithoutUrl(Browser* browser);
+  // Returns true if it's a valid settings window and closes the browser window
+  // otherwise.
+  // Once the navigation has started or is considered not necessary to wait for,
+  // triage the settings browser window, since all other cases have been triaged
+  // in scope of `PreTriageNewBrowserWindowWithoutUrl`.
+  bool TriageNewSettingsBrowserWindow(Browser* browser);
   void HandleNewSettingsWindow(Browser* browser, const std::string& url_string);
 
-  void CloseBrowserWindowsIf(base::FunctionRef<bool(const Browser&)> filter);
-  void CloseBrowserAndSetTimer(Browser* browser);
+  void CloseBrowserWindowsIf(
+      base::FunctionRef<bool(const BrowserWindowInterface&)> filter);
+  void CloseBrowserAndSetTimer(
+      BrowserWindowInterface* browser_window_interface);
   void OnCloseBrowserTimeout();
   void CloseAllUnexpectedBrowserWindows();
 
-  // BrowserListObserver
-  void OnBrowserAdded(Browser* browser) override;
-  void OnBrowserRemoved(Browser* browser) override;
+  // BrowserCollectionObserver
+  void OnBrowserCreated(
+      BrowserWindowInterface* browser_window_interface) override;
+  void OnBrowserClosed(
+      BrowserWindowInterface* browser_window_interface) override;
 
   // Returns true if open by web application and allowed by policy.
   bool IsNewBrowserWindowAllowed(Browser* browser) const;
@@ -120,9 +144,12 @@ class KioskBrowserWindowHandler : public BrowserListObserver {
   // confirmed to be closed via `OnBrowserRemoved`. If they did not get closed
   // before the timer fires, we will crash as we consider the kiosk session
   // compromised.
-  std::map<Browser*, base::OneShotTimer> closing_browsers_;
+  std::map<BrowserWindowInterface*, base::OneShotTimer> closing_browsers_;
 
   std::map<Browser*, std::unique_ptr<NavigationWaiter>> url_waiters_;
+
+  base::ScopedObservation<GlobalBrowserCollection, BrowserCollectionObserver>
+      browser_collection_observation_{this};
 
   base::WeakPtrFactory<KioskBrowserWindowHandler> weak_ptr_factory_{this};
 };

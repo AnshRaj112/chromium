@@ -4,15 +4,19 @@
 
 #include "chrome/browser/ui/views/tabs/tab_strip_control_button.h"
 
+#include <optional>
 #include <utility>
 
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/ui_features.h"
-#include "chrome/browser/ui/views/frame/browser_non_client_frame_view.h"
+#include "chrome/browser/ui/views/frame/browser_frame_view.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/tab_strip.h"
 #include "chrome/browser/ui/views/tabs/tab_strip_controller.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h"
 #include "chrome/common/chrome_features.h"
 #include "third_party/skia/include/core/SkPath.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/gfx/geometry/skia_conversions.h"
@@ -21,6 +25,7 @@
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_highlight.h"
 #include "ui/views/animation/ink_drop_state.h"
+#include "ui/views/background.h"
 #include "ui/views/controls/highlight_path_generator.h"
 
 using std::make_unique;
@@ -38,16 +43,17 @@ class ControlButtonHighlightPathGenerator
     gfx::Rect rect(view->GetContentsBounds());
 
     SkPath path;
-    const int corner_radius = control_button_->GetCornerRadius();
-    const SkScalar left_radius =
-        control_button_->GetScaledCornerRadius(corner_radius, Edge::kLeft);
-    const SkScalar right_radius =
-        control_button_->GetScaledCornerRadius(corner_radius, Edge::kRight);
-    const SkScalar radii[8] = {left_radius,  left_radius,  right_radius,
-                               right_radius, right_radius, right_radius,
-                               left_radius,  left_radius};
-    path.addRoundRect(gfx::RectToSkRect(rect), radii);
-    return path;
+    const SkScalar left_radius = control_button_->GetScaledCornerRadius(
+        control_button_->GetLeftCornerRadius(), Edge::kLeft);
+    const SkScalar right_radius = control_button_->GetScaledCornerRadius(
+        control_button_->GetRightCornerRadius(), Edge::kRight);
+    const SkVector radii[4] = {{left_radius,  left_radius},
+                               {right_radius, right_radius},
+                               {right_radius, right_radius},
+                               {left_radius,  left_radius}};
+
+    return SkPath::RRect(
+        SkRRect::MakeRectRadii(gfx::RectToSkRect(rect), radii));
   }
 
  private:
@@ -59,12 +65,12 @@ const int TabStripControlButton::kIconSize = 16;
 const gfx::Size TabStripControlButton::kButtonSize{28, 28};
 
 TabStripControlButton::TabStripControlButton(
-    TabStripController* tab_strip_controller,
+    BrowserWindowInterface* browser_window_interface,
     PressedCallback callback,
     const gfx::VectorIcon& icon,
     Edge fixed_flat_edge,
     Edge animated_flat_edge)
-    : TabStripControlButton(tab_strip_controller,
+    : TabStripControlButton(browser_window_interface,
                             std::move(callback),
                             icon,
                             std::u16string(),
@@ -72,12 +78,12 @@ TabStripControlButton::TabStripControlButton(
                             animated_flat_edge) {}
 
 TabStripControlButton::TabStripControlButton(
-    TabStripController* tab_strip_controller,
+    BrowserWindowInterface* browser_window_interface,
     PressedCallback callback,
     const std::u16string& text,
     Edge fixed_flat_edge,
     Edge animated_flat_edge)
-    : TabStripControlButton(tab_strip_controller,
+    : TabStripControlButton(browser_window_interface,
                             std::move(callback),
                             gfx::VectorIcon::EmptyIcon(),
                             text,
@@ -85,7 +91,7 @@ TabStripControlButton::TabStripControlButton(
                             animated_flat_edge) {}
 
 TabStripControlButton::TabStripControlButton(
-    TabStripController* tab_strip_controller,
+    BrowserWindowInterface* browser_window_interface,
     PressedCallback callback,
     const gfx::VectorIcon& icon,
     const std::u16string& text,
@@ -95,7 +101,7 @@ TabStripControlButton::TabStripControlButton(
       icon_(icon),
       fixed_flat_edge_(fixed_flat_edge),
       animated_flat_edge_(animated_flat_edge),
-      tab_strip_controller_(tab_strip_controller) {
+      browser_window_interface_(browser_window_interface) {
   SetImageCentered(true);
   SetEventTargeter(std::make_unique<views::ViewTargeter>(this));
 
@@ -105,6 +111,9 @@ TabStripControlButton::TabStripControlButton(
   background_frame_active_color_id_ = kColorNewTabButtonBackgroundFrameActive;
   background_frame_inactive_color_id_ =
       kColorNewTabButtonBackgroundFrameInactive;
+
+  inkdrop_hover_color_id_ = kColorTabStripControlButtonInkDrop;
+  inkdrop_ripple_color_id_ = kColorTabStripControlButtonInkDropRipple;
 
   UpdateIcon();
   SetHorizontalAlignment(gfx::ALIGN_CENTER);
@@ -144,6 +153,24 @@ void TabStripControlButton::SetBackgroundFrameInactiveColorId(
     ui::ColorId new_color_id) {
   background_frame_inactive_color_id_ = new_color_id;
   UpdateColors();
+}
+
+void TabStripControlButton::SetInkdropHoverColorId(
+    const ChromeColorIds new_color_id) {
+  if (inkdrop_hover_color_id_ == new_color_id) {
+    return;
+  }
+  inkdrop_hover_color_id_ = new_color_id;
+  UpdateInkDrop();
+}
+
+void TabStripControlButton::SetInkdropRippleColorId(
+    const ChromeColorIds new_color_id) {
+  if (inkdrop_ripple_color_id_ == new_color_id) {
+    return;
+  }
+  inkdrop_ripple_color_id_ = new_color_id;
+  UpdateInkDrop();
 }
 
 void TabStripControlButton::SetVectorIcon(const gfx::VectorIcon& icon) {
@@ -188,18 +215,17 @@ void TabStripControlButton::UpdateIcon() {
 
 void TabStripControlButton::UpdateInkDrop() {
   const auto* const color_provider = GetColorProvider();
-
-  if (!color_provider) {
+  if (!color_provider || !IsWidgetAlive()) {
     return;
   }
 
-  CreateToolbarInkdropCallbacks(this, kColorTabStripControlButtonInkDrop,
-                                kColorTabStripControlButtonInkDropRipple);
+  CreateToolbarInkdropCallbacks(this, inkdrop_hover_color_id_,
+                                inkdrop_ripple_color_id_);
 }
 
 void TabStripControlButton::UpdateColors() {
   const auto* const color_provider = GetColorProvider();
-  if (!color_provider) {
+  if (!color_provider || !IsWidgetAlive()) {
     return;
   }
 
@@ -212,22 +238,24 @@ void TabStripControlButton::UpdateColors() {
 
 void TabStripControlButton::UpdateBackground() {
   const auto* const color_provider = GetColorProvider();
-
-  if (!color_provider) {
+  if (!color_provider || !IsWidgetAlive()) {
     return;
   }
 
-  const std::optional<int> bg_id = tab_strip_controller_->GetCustomBackgroundId(
-      BrowserFrameActiveState::kUseCurrent);
+  BrowserFrameView* const browser_frame_view = GetBrowserFrameView();
+  const std::optional<int> bg_id =
+      browser_frame_view ? browser_frame_view->GetCustomBackgroundId(
+                               BrowserFrameActiveState::kUseCurrent)
+                         : std::nullopt;
 
   // Paint the background as transparent for image based themes.
   if (bg_id.has_value() && paint_transparent_for_custom_image_theme_) {
     SetBackground(views::CreateSolidBackground(SK_ColorTRANSPARENT));
   } else {
     const float right_corner_radius =
-        GetScaledCornerRadius(GetCornerRadius(), Edge::kRight);
+        GetScaledCornerRadius(GetRightCornerRadius(), Edge::kRight);
     const float left_corner_radius =
-        GetScaledCornerRadius(GetCornerRadius(), Edge::kLeft);
+        GetScaledCornerRadius(GetLeftCornerRadius(), Edge::kLeft);
     SetBackground(views::CreateBackgroundFromPainter(
         views::Painter::CreateSolidRoundRectPainterWithVariableRadius(
             color_provider->GetColor(GetBackgroundColor()),
@@ -275,29 +303,33 @@ void TabStripControlButton::OnThemeChanged() {
 }
 
 bool TabStripControlButton::GetHitTestMask(SkPath* mask) const {
-  const bool extend_to_top = tab_strip_controller_->IsFrameCondensed();
+  const bool extend_to_top = IsFrameCondensed();
 
-  const SkScalar bottom_radius = GetCornerRadius();
-  const SkScalar top_radius = extend_to_top ? 0.0f : bottom_radius;
-  const SkScalar bottom_left_radius =
-      GetScaledCornerRadius(bottom_radius, Edge::kLeft);
-  const SkScalar bottom_right_radius =
-      GetScaledCornerRadius(bottom_radius, Edge::kRight);
-  const SkScalar top_left_radius =
-      GetScaledCornerRadius(top_radius, Edge::kLeft);
-  const SkScalar top_right_radius =
-      GetScaledCornerRadius(top_radius, Edge::kRight);
-  const SkScalar radii[8] = {top_left_radius,     top_left_radius,
-                             top_right_radius,    top_right_radius,
-                             bottom_right_radius, bottom_right_radius,
-                             bottom_left_radius,  bottom_left_radius};
+  const SkScalar bottom_left_radius = GetLeftCornerRadius();
+  const SkScalar bottom_right_radius = GetRightCornerRadius();
+  const SkScalar top_left_radius = extend_to_top ? 0.0f : bottom_left_radius;
+  const SkScalar top_right_radius = extend_to_top ? 0.0f : bottom_right_radius;
+
+  const SkScalar scaled_bottom_left_radius =
+      GetScaledCornerRadius(bottom_left_radius, Edge::kLeft);
+  const SkScalar scaled_bottom_right_radius =
+      GetScaledCornerRadius(bottom_right_radius, Edge::kRight);
+  const SkScalar scaled_top_left_radius =
+      GetScaledCornerRadius(top_left_radius, Edge::kLeft);
+  const SkScalar scaled_top_right_radius =
+      GetScaledCornerRadius(top_right_radius, Edge::kRight);
+  const SkVector radii[4] = {
+      {scaled_top_left_radius, scaled_top_left_radius},
+      {scaled_top_right_radius, scaled_top_right_radius},
+      {scaled_bottom_right_radius, scaled_bottom_right_radius},
+      {scaled_bottom_left_radius, scaled_bottom_left_radius}};
 
   gfx::Rect rect = GetContentsBounds();
   if (extend_to_top) {
     rect.SetVerticalBounds(0, rect.bottom());
   }
 
-  mask->addRoundRect(gfx::RectToSkRect(rect), radii);
+  *mask = SkPath::RRect(SkRRect::MakeRectRadii(gfx::RectToSkRect(rect), radii));
 
   return true;
 }
@@ -316,6 +348,11 @@ void TabStripControlButton::NotifyClick(const ui::Event& event) {
       views::InkDropState::ACTION_TRIGGERED);
 }
 
+bool TabStripControlButton::IsFrameCondensed() const {
+  BrowserFrameView* const browser_frame_view = GetBrowserFrameView();
+  return browser_frame_view ? browser_frame_view->IsFrameCondensed() : false;
+}
+
 void TabStripControlButton::SetFlatEdgeFactor(float factor) {
   flat_edge_factor_ = factor;
   UpdateBackground();
@@ -329,6 +366,29 @@ void TabStripControlButton::SetFlatEdgeFactor(float factor) {
 void TabStripControlButton::AnimateToStateForTesting(
     views::InkDropState state) {
   views::InkDrop::Get(this)->GetInkDrop()->AnimateToState(state);
+}
+
+bool TabStripControlButton::IsWidgetAlive() const {
+  const views::Widget* widget = GetWidget();
+  return widget && !widget->IsClosed();
+}
+
+BrowserFrameView* TabStripControlButton::GetBrowserFrameView() const {
+  BrowserView* const browser_view =
+      BrowserView::GetBrowserViewForBrowser(browser_window_interface_);
+  // 'browser_view' can be null during startup before the BrowserView is added
+  // to a widget and is associated to `browser_window_interface_`
+  if (!browser_view) {
+    return nullptr;
+  }
+
+  return browser_view->browser_widget()->GetFrameView();
+}
+
+void TabStripControlButton::SetLeftRightCornerRadii(int left, int right) {
+  left_corner_radius_ = left;
+  right_corner_radius_ = right;
+  UpdateBackground();
 }
 
 BEGIN_METADATA(TabStripControlButton)

@@ -4,7 +4,6 @@
 
 #include "third_party/blink/renderer/core/speculation_rules/speculation_rules_header.h"
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "net/http/structured_headers.h"
 #include "services/network/public/mojom/fetch_api.mojom-blink-forward.h"
@@ -45,6 +44,12 @@ void SpeculationRulesHeader::ProcessHeadersForDocumentResponse(
 
   window.CountUse(WebFeature::kSpeculationRulesHeader);
 
+  // Only process speculation rules for main frame documents, since speculation
+  // rules only work for top-level navigations.
+  if (!window.GetFrame() || !window.GetFrame()->IsMainFrame()) {
+    return;
+  }
+
   SpeculationRulesHeader self;
   self.ParseSpeculationRulesHeader(header_value, window.BaseURL());
   self.ReportErrors(window);
@@ -58,10 +63,10 @@ void SpeculationRulesHeader::ParseSpeculationRulesHeader(
   if (!parsed_header.has_value()) {
     String message = "Cannot parse Speculation-Rules header value.";
     if (KURL(base_url, header_value.StripWhiteSpace()).IsValid()) {
-      message = message + " However, " +
-                header_value.StripWhiteSpace().EncodeForDebugging() +
-                " appears to be a valid URL. "
-                "You may need to enclose it in quotation marks.";
+      message = StrCat({message, " However, ",
+                        header_value.StripWhiteSpace().EncodeForDebugging(),
+                        " appears to be a valid URL. You may need to enclose "
+                        "it in quotation marks."});
     }
     errors_.push_back(std::pair(
         SpeculationRulesLoadOutcome::kUnparseableSpeculationRulesHeader,
@@ -87,9 +92,9 @@ void SpeculationRulesHeader::ParseSpeculationRulesHeader(
           parsed_item.member[0].item.is_token()) {
         String token = String::FromUTF8(parsed_item.member[0].item.GetString());
         if (KURL(base_url, token).IsValid()) {
-          message = message + " However, " + token.EncodeForDebugging() +
-                    " appears to be a valid URL. "
-                    "You may need to enclose it in quotation marks.";
+          message = StrCat({message, " However, ", token.EncodeForDebugging(),
+                            " appears to be a valid URL. You may need to "
+                            "enclose it in quotation marks."});
         }
       }
       errors_.push_back(std::pair(
@@ -102,8 +107,8 @@ void SpeculationRulesHeader::ParseSpeculationRulesHeader(
     if (url_str.empty() || !speculation_rule_url.IsValid()) {
       errors_.push_back(std::pair(
           SpeculationRulesLoadOutcome::kInvalidSpeculationRulesHeaderItem,
-          String("URL \"" + url_str +
-                 "\" found in Speculation-Rules header is invalid.")));
+          StrCat({"URL \"", url_str,
+                  "\" found in Speculation-Rules header is invalid."})));
       continue;
     }
     urls_.push_back(std::move(speculation_rule_url));

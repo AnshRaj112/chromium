@@ -8,7 +8,6 @@
 #include <memory>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "base/scoped_multi_source_observation.h"
@@ -19,7 +18,7 @@
 #include "ui/accessibility/platform/ax_platform_node_delegate.h"
 #include "ui/accessibility/platform/ax_unique_id.h"
 #include "ui/aura/window.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/views/accessibility/views_utilities_aura.h"
 #include "ui/views/view.h"
 #include "ui/views/views_delegate.h"
@@ -93,7 +92,7 @@ class AuraLinuxApplication : public ui::AXPlatformNodeDelegate,
 
     widget = GetToplevelWidgetIncludingTransientWindows(widget);
     if (!widget || !widget->native_widget() ||
-        base::Contains(widgets_, widget)) {
+        std::ranges::contains(widgets_, widget)) {
       return;
     }
 

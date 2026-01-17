@@ -6,14 +6,12 @@
 
 #include "base/check_op.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "content/browser/child_process_security_policy_impl.h"
 #include "content/browser/origin_agent_cluster_isolation_state.h"
 #include "content/browser/site_info.h"
 #include "content/browser/site_instance_group.h"
 #include "content/browser/site_instance_impl.h"
 #include "content/public/browser/browser_context.h"
-#include "content/public/browser/browser_or_resource_context.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/site_isolation_policy.h"
 #include "content/public/common/content_features.h"
@@ -34,7 +32,7 @@ BrowsingInstance::BrowsingInstance(
     bool is_fixed_storage_partition)
     : isolation_context_(
           BrowsingInstanceId::FromUnsafeValue(next_browsing_instance_id_++),
-          BrowserOrResourceContext(browser_context),
+          browser_context,
           is_guest,
           is_fenced,
           OriginAgentClusterIsolationState::CreateForDefaultIsolation(
@@ -50,12 +48,8 @@ BrowsingInstance::BrowsingInstance(
   }
 }
 
-BrowserContext* BrowsingInstance::GetBrowserContext() const {
-  return isolation_context_.browser_or_resource_context().ToBrowserContext();
-}
-
 bool BrowsingInstance::HasSiteInstance(const SiteInfo& site_info) {
-  return base::Contains(site_instance_map_, site_info);
+  return site_instance_map_.contains(site_info);
 }
 
 scoped_refptr<SiteInstanceImpl> BrowsingInstance::GetSiteInstanceForURL(
@@ -308,7 +302,7 @@ int BrowsingInstance::EstimateOriginAgentClusterOverhead() {
   // it is difficult in practice to account for, so we don't try to.
   for (auto& entry : site_instance_map_) {
     const SiteInfo& site_info = entry.first;
-    GURL process_lock_url = site_info.process_lock_url();
+    GURL process_lock_url = site_info.GetProcessLockURL();
     if (!process_lock_url.SchemeIs(url::kHttpsScheme)) {
       continue;
     }

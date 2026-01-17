@@ -63,6 +63,9 @@ defaults.set(
     build_numbers = True,
     contact_team_email = "webrtc-infra@google.com",
     execution_timeout = 3 * time.hour,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     properties = {
         "perf_dashboard_machine_group": "ChromiumWebRTC",
     },
@@ -100,7 +103,6 @@ builder(
             target_platform = builder_config.target_platform.ANDROID,
         ),
         android_config = builder_config.android_config(config = "base_config"),
-        build_gs_bucket = "chromium-webrtc",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -137,7 +139,6 @@ builder(
             target_platform = builder_config.target_platform.ANDROID,
         ),
         android_config = builder_config.android_config(config = "base_config"),
-        build_gs_bucket = "chromium-webrtc",
     ),
     targets = targets.bundle(
         targets = [
@@ -170,7 +171,6 @@ builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-webrtc",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -205,7 +205,6 @@ builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-webrtc",
     ),
     targets = targets.bundle(
         targets = [
@@ -235,7 +234,6 @@ builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-webrtc",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -271,7 +269,6 @@ builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-webrtc",
     ),
     targets = targets.bundle(
         targets = [
@@ -301,7 +298,6 @@ builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-webrtc",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -323,7 +319,7 @@ builder(
 )
 
 builder(
-    name = "WebRTC Chromium Win10 Tester",
+    name = "WebRTC Chromium Win Tester",
     description_html = "Testing WebRTC inside Chromium",
     parent = "WebRTC Chromium Win Builder",
     builder_spec = builder_config.builder_spec(
@@ -339,7 +335,6 @@ builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-webrtc",
     ),
     targets = targets.bundle(
         targets = [
@@ -349,7 +344,7 @@ builder(
             targets.mixin(
                 swarming = targets.swarming(
                     dimensions = {
-                        "os": "Windows-10",
+                        "os": "Windows-11",
                     },
                 ),
             ),

@@ -21,6 +21,7 @@
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/property_effects.h"
 #include "ui/views/view_utils.h"
 
 namespace {
@@ -122,7 +123,7 @@ void DesktopMediaSourceView::SetSelected(bool selected) {
                                                    gfx::Font::Weight::NORMAL));
   }
 
-  OnPropertyChanged(&selected_, views::kPropertyEffectsPaint);
+  OnPropertyChanged(&selected_, views::PropertyEffects::kPaint);
 }
 
 void DesktopMediaSourceView::SetStyle(DesktopMediaSourceViewStyle style) {

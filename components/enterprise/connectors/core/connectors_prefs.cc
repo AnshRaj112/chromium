@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "build/build_config.h"
-#include "components/enterprise/buildflags/buildflags.h"
 #include "components/enterprise/connectors/core/common.h"
 #include "components/enterprise/connectors/core/service_provider_config.h"
 #include "components/enterprise/device_trust/prefs.h"
@@ -22,6 +21,12 @@
 namespace enterprise_connectors {
 
 // Profile Prefs
+#if BUILDFLAG(ENTERPRISE_CACHE_ENCRYPTION)
+const char kCacheEncryptionEnabledPref[] =
+    "enterprise_connectors.cache_encryption_enabled";
+const char kEncryptedCacheMasterKey[] = "enterprise.encrypted_cache_master_key";
+#endif
+
 const char kOnFileAttachedPref[] = "enterprise_connectors.on_file_attached";
 
 const char kOnFileDownloadedPref[] = "enterprise_connectors.on_file_downloaded";
@@ -81,15 +86,21 @@ void RegisterProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterIntegerPref(kOnFileDownloadedScopePref, 0);
   registry->RegisterIntegerPref(kOnBulkDataEntryScopePref, 0);
   registry->RegisterIntegerPref(kOnPrintScopePref, 0);
+
 #if BUILDFLAG(IS_CHROMEOS)
   registry->RegisterIntegerPref(kOnFileTransferScopePref, 0);
 #endif
   RegisterDeviceTrustConnectorProfilePrefs(registry);
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
 #if BUILDFLAG(ENTERPRISE_CLIENT_CERTIFICATES)
   client_certificates::RegisterProfilePrefs(registry);
 #endif  // BUILDFLAG(ENTERPRISE_CLIENT_CERTIFICATES)
-#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+
+#if BUILDFLAG(ENTERPRISE_CACHE_ENCRYPTION)
+  registry->RegisterBooleanPref(kCacheEncryptionEnabledPref, false);
+  registry->RegisterStringPref(kEncryptedCacheMasterKey, "");
+#endif
 }
 
 void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {

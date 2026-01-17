@@ -661,7 +661,7 @@ void ServiceWorkerContextCore::DidGetRegistrationsForDeleteForStorageKey(
   ContentBrowserClient* browser_client = GetContentClient()->browser();
   BrowserContext* browser_context = wrapper_->browser_context();
   DCHECK(browser_context);
-  for (auto registration : registrations) {
+  for (const auto& registration : registrations) {
     if (browser_client->MayDeleteServiceWorkerRegistration(
             registration->scope(), browser_context)) {
       filtered_registrations.push_back(std::move(registration));
@@ -949,11 +949,7 @@ void ServiceWorkerContextCore::RemoveLiveVersion(int64_t id) {
     observer_list_->Notify(FROM_HERE,
                            &ServiceWorkerContextCoreObserver::OnStopped, id);
     for (auto& observer : sync_observer_list_->observers) {
-      const std::optional<ServiceWorkerRunningInfo> running_info =
-          wrapper_->GetRunningServiceWorkerInfo(id);
-      if (running_info.has_value()) {
-        observer.OnStoppedSync(id, version->scope());
-      }
+      observer.OnStoppedSync(id, version->scope());
     }
   }
 
@@ -1021,10 +1017,9 @@ void ServiceWorkerContextCore::DeleteAndStartOver(StatusCallback callback) {
       FROM_HERE, &ServiceWorkerContextCoreObserver::OnDeleteAndStartOver);
   for (const auto& live_version_itr : live_versions_) {
     ServiceWorkerVersion* live_version = live_version_itr.second;
-    for (auto& observer : sync_observer_list_->observers) {
-      const std::optional<ServiceWorkerRunningInfo> running_info =
-          wrapper_->GetRunningServiceWorkerInfo(live_version->version_id());
-      if (running_info.has_value()) {
+    if (live_version->running_status() !=
+        blink::EmbeddedWorkerStatus::kStopped) {
+      for (auto& observer : sync_observer_list_->observers) {
         observer.OnStoppedSync(live_version->version_id(),
                                live_version->scope());
       }
@@ -1179,6 +1174,14 @@ void ServiceWorkerContextCore::OnClientNavigated(const GURL& script_url,
                          script_url, url);
 }
 
+void ServiceWorkerContextCore::OnPushEventFinished(
+    const GURL& script_url,
+    const std::optional<std::vector<GURL>>& requested_urls) {
+  observer_list_->Notify(FROM_HERE,
+                         &ServiceWorkerContextCoreObserver::OnPushEventFinished,
+                         script_url, requested_urls);
+}
+
 void ServiceWorkerContextCore::OnControlleeAdded(
     ServiceWorkerVersion* version,
     const std::string& client_uuid,
@@ -1245,11 +1248,7 @@ void ServiceWorkerContextCore::OnRunningStateChanged(
                              &ServiceWorkerContextCoreObserver::OnStopped,
                              version->version_id());
       for (auto& observer : sync_observer_list_->observers) {
-        const std::optional<ServiceWorkerRunningInfo> running_info =
-            wrapper_->GetRunningServiceWorkerInfo(version->version_id());
-        if (running_info.has_value()) {
-          observer.OnStoppedSync(version->version_id(), version->scope());
-        }
+        observer.OnStoppedSync(version->version_id(), version->scope());
       }
       break;
     case blink::EmbeddedWorkerStatus::kStarting:
@@ -1269,11 +1268,7 @@ void ServiceWorkerContextCore::OnRunningStateChanged(
                              &ServiceWorkerContextCoreObserver::OnStopping,
                              version->version_id());
       for (auto& observer : sync_observer_list_->observers) {
-        const std::optional<ServiceWorkerRunningInfo> running_info =
-            wrapper_->GetRunningServiceWorkerInfo(version->version_id());
-        if (running_info.has_value()) {
-          observer.OnStoppingSync(version->version_id(), version->scope());
-        }
+        observer.OnStoppingSync(version->version_id(), version->scope());
       }
       break;
   }
@@ -1349,8 +1344,10 @@ void ServiceWorkerContextCore::OnReportConsoleMessage(
       version->version_id(), version->scope(), version->key(), console_message);
 
   for (auto& observer : sync_observer_list_->observers) {
-    observer.OnReportConsoleMessageSync(version->version_id(), version->scope(),
-                                        console_message);
+    observer.OnReportConsoleMessageSync(
+        version->embedded_worker() ? version->embedded_worker()->process_id()
+                                   : ChildProcessHost::kInvalidUniqueID,
+        version->version_id(), version->scope(), console_message);
   }
 }
 

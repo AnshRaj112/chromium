@@ -132,6 +132,8 @@ class EmbeddedTestServerHandle {
 //
 class EmbeddedTestServer {
  public:
+  // Below line is for //net/android:net_java_test_support_enums_srcjar
+  // GENERATED_JAVA_ENUM_PACKAGE: org.chromium.net.test
   enum Type {
     TYPE_HTTP,
     TYPE_HTTPS,
@@ -210,6 +212,9 @@ class EmbeddedTestServer {
 
   struct OCSPConfig {
     // Enumerates the types of OCSP response that the testserver can produce.
+    //
+    // Below line is for //net/android:net_java_test_support_enums_srcjar
+    // GENERATED_JAVA_ENUM_PACKAGE: org.chromium.net.test
     enum class ResponseType {
       // OCSP will not be enabled for the corresponding config.
       kOff,
@@ -291,6 +296,26 @@ class EmbeddedTestServer {
     std::vector<SingleResponse> single_responses;
   };
 
+  struct CertAndKey {
+    CertAndKey(bssl::UniquePtr<CRYPTO_BUFFER> cert,
+               bssl::UniquePtr<EVP_PKEY> pkey);
+    CertAndKey(std::vector<bssl::UniquePtr<CRYPTO_BUFFER>> cert_chain,
+               bssl::UniquePtr<EVP_PKEY> pkey);
+    ~CertAndKey();
+
+    CertAndKey(const CertAndKey&);
+    CertAndKey(CertAndKey&&);
+    CertAndKey& operator=(const CertAndKey&);
+    CertAndKey& operator=(CertAndKey&&);
+
+    // Certificate chain for this credential. The first entry must be the leaf
+    // cert.
+    std::vector<bssl::UniquePtr<CRYPTO_BUFFER>> cert_chain;
+
+    // Private key used by this credential.
+    bssl::UniquePtr<EVP_PKEY> pkey;
+  };
+
   // Configuration for generated server certificate.
   struct ServerCertificateConfig {
     ServerCertificateConfig();
@@ -355,12 +380,37 @@ class EmbeddedTestServer {
     // Generate embedded SCTList in the certificate for the specified logs.
     std::vector<CertBuilder::SctConfig> embedded_scts;
 
+    // If non-empty, the serialized SignedCertificateTimestampList to send in
+    // the handshake. (This isn't particularly useful, but is only used by one
+    // low-level test. If we wanted to test the TLS SCT support that can
+    // actually verify successfully, we could use SctConfigs here too?)
+    std::vector<uint8_t> tls_signed_cert_timestamp_list;
+
     // If non-empty, raw bytes to use as the leaf subject. If empty, a random
     // valid subject will be generated.
     // (This can be used for testing behavior with invalid or weird encodings,
     // if we need tests to set specific subjects for more normal cases, we
     // should consider adding a more ergonomic API for that.)
     std::vector<uint8_t> subject_tlv;
+
+    // Use a certificate and private key supplied by the caller instead of
+    // generating one. When this is specified, all of the above parameters are
+    // ignored.
+    // TODO(crbug.com/469624806): refactor so that when configuring with a cert
+    // and key directly, it uses a different config struct that only has the
+    // relevant members (possibly something involving std::variant so that you
+    // can configure the server with a mix of configs that some generate a cert
+    // and some specify the cert and key?)
+    std::optional<CertAndKey> cert_and_key;
+
+    // If non-empty, the TLS Trust Anchor Identifier of this credential. If
+    // specified, this credential will only be used if the client requested
+    // a matching id.
+    std::vector<uint8_t> trust_anchor_id;
+
+    // If set, causes the server to only support the specified signature
+    // algorithm for this credential in TLS 1.2 and below.
+    std::optional<uint16_t> signature_algorithm_for_testing;
   };
 
   using UpgradeResultOrHttpResponse =
@@ -501,6 +551,8 @@ class EmbeddedTestServer {
   void SetSSLConfig(const ServerCertificateConfig& cert_config,
                     const SSLServerConfig& ssl_config);
   void SetSSLConfig(const ServerCertificateConfig& cert_config);
+  void SetSSLConfig(base::span<const ServerCertificateConfig> cert_configs,
+                    const SSLServerConfig& ssl_config);
 
   // TODO(mattm): make this [[nodiscard]]
   bool ResetSSLConfig(ServerCertificate cert,
@@ -515,19 +567,21 @@ class EmbeddedTestServer {
   /// up a full config using SetSSLConfig().
   void SetCertHostnames(std::vector<std::string> hostnames);
 
-  // Returns the certificate that the server is using.
+  // Returns the certificate that the server is using. Includes intermediates
+  // that are served in the handshake, if any.
   // If using a generated ServerCertificate type, this must not be called before
   // InitializeAndListen() has been called.
-  scoped_refptr<X509Certificate> GetCertificate();
+  scoped_refptr<X509Certificate> GetCertificate(size_t credential_num = 0);
 
   // Returns any generated intermediates that the server may be using. May
   // return null if no intermediate is generated.  Must not be called before
   // InitializeAndListen().
-  scoped_refptr<X509Certificate> GetGeneratedIntermediate();
+  scoped_refptr<X509Certificate> GetGeneratedIntermediate(
+      size_t credential_num = 0);
 
   // Returns the root certificate that issued the certificate the server is
   // using.  Must not be called before InitializeAndListen().
-  scoped_refptr<X509Certificate> GetRoot();
+  scoped_refptr<X509Certificate> GetRoot(size_t credential_num = 0);
 
   // Registers request handler which serves files from |directory|.
   // For instance, a request to "/foo.html" is served by "foo.html" under
@@ -631,6 +685,25 @@ class EmbeddedTestServer {
       base::OnceClosure closure);
 
  private:
+  struct Credential {
+    Credential();
+    Credential(Credential&& other);
+    Credential& operator=(Credential&& other);
+    ~Credential();
+
+    // The certificate chain that will be served for this credential. Includes
+    // the leaf, and the intermediate if there is an intermediate being served
+    // in the handshake.
+    // May be null if the generated leaf certificate cannot be parsed as an
+    // X509Certificate.
+    scoped_refptr<X509Certificate> x509_cert;
+
+    // May be null if no intermediate is generated.
+    scoped_refptr<X509Certificate> intermediate;
+
+    scoped_refptr<X509Certificate> root;
+  };
+
   // Returns the file name of the certificate the server is using. The test
   // certificates can be found in net/data/ssl/certificates/.
   std::string GetCertificateName() const;
@@ -639,10 +712,11 @@ class EmbeddedTestServer {
   void ShutdownOnIOThread();
 
   // Sets the SSL configuration for the server. It is invalid for |cert_config|
-  // to be non-null if |cert| is not CERT_AUTO.
-  void SetSSLConfigInternal(ServerCertificate cert,
-                            const ServerCertificateConfig* cert_config,
-                            const SSLServerConfig& ssl_config);
+  // to be non-empty if |cert| is not CERT_AUTO.
+  void SetSSLConfigInternal(
+      ServerCertificate cert,
+      base::span<const ServerCertificateConfig> cert_configs,
+      const SSLServerConfig& ssl_config);
 
   // Resets the SSLServerConfig on the IO thread.
   bool ResetSSLConfigOnIOThread(ServerCertificate cert,
@@ -679,12 +753,28 @@ class EmbeddedTestServer {
   bool UsingStaticCert() const;
 
   // Reads server certificate and private key from file. May only be called if
-  // |cert_| refers to a file-based cert & key.
-  [[nodiscard]] bool InitializeCertAndKeyFromFile();
+  // |cert_| refers to a file-based cert & key. Returns empty vector on error.
+  [[nodiscard]]
+  std::vector<SSLServerCredential> InitializeCertAndKeyFromFile();
 
-  // Generate server certificate and private key. May only be called if |cert_|
-  // refers to a generated cert & key.
-  [[nodiscard]] bool GenerateCertAndKey();
+  // Generate all server certificates and private keys. May only be called if
+  // |cert_| refers to a generated cert & key. Returns empty vector on error.
+  [[nodiscard]]
+  std::vector<SSLServerCredential> GenerateCertAndKeys();
+
+  // Generate and return a single credential for the given certificate config.
+  struct CredentialPair {
+    Credential credential;
+    SSLServerCredential ssl_credential;
+  };
+  std::optional<CredentialPair> GenerateCertAndKey(
+      const ServerCertificateConfig& cert_config) const;
+
+  // Returns a CredentialPair for the config, either using the `CertAndKey`
+  // supplied in the config or generating the credential based on the config
+  // options.
+  std::optional<CredentialPair> ConfigToCredentialPair(
+      const ServerCertificateConfig& cert_config) const;
 
   // Initializes the SSLServerContext so that SSLServerSocket connections may
   // share the same cache
@@ -735,14 +825,8 @@ class EmbeddedTestServer {
   ScopedTestRoot scoped_test_root_;
   net::SSLServerConfig ssl_config_;
   ServerCertificate cert_ = CERT_OK;
-  ServerCertificateConfig cert_config_;
-  // If non-empty, will be used instead of `x509_cert_`.
-  std::vector<bssl::UniquePtr<CRYPTO_BUFFER>> cert_chain_;
-  scoped_refptr<X509Certificate> x509_cert_;
-  // May be null if no intermediate is generated.
-  scoped_refptr<X509Certificate> intermediate_;
-  scoped_refptr<X509Certificate> root_;
-  bssl::UniquePtr<EVP_PKEY> private_key_;
+  std::vector<ServerCertificateConfig> cert_configs_;
+  std::vector<Credential> credentials_;
   base::flat_map<std::string, std::string> alps_accept_ch_;
   std::unique_ptr<SSLServerContext> context_;
 

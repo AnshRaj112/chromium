@@ -1523,6 +1523,28 @@ TEST_F(TemplateURLTest, SuggestClient) {
 #endif
 }
 
+TEST_F(TemplateURLTest, ComposeboxSuggestClient) {
+  base::test::ScopedFeatureList features;
+  const std::string base_url_str("http://google.com/?");
+  const std::string query_params_str("client={google:suggestClient}");
+  const std::string full_url_str = base_url_str + query_params_str;
+  search_terms_data_.set_google_base_url(base_url_str);
+
+  TemplateURLData data;
+  data.SetURL(full_url_str);
+  TemplateURL url(data);
+  EXPECT_TRUE(url.url_ref().IsValid(search_terms_data_));
+  ASSERT_FALSE(url.url_ref().SupportsReplacement(search_terms_data_));
+  TemplateURLRef::SearchTermsArgs search_terms_args;
+
+  search_terms_args.request_source = RequestSource::NTP_COMPOSEBOX;
+  // Check that the URL is correct for `RequestSource::NTP_COMPOSEBOX`.
+  features.InitAndEnableFeature(omnibox::kComposeboxUsesChromeComposeClient);
+  GURL result(
+      url.url_ref().ReplaceSearchTerms(search_terms_args, search_terms_data_));
+  EXPECT_EQ("http://google.com/?client=chrome-compose", result.spec());
+}
+
 TEST_F(TemplateURLTest, SuggestRequestIdentifier) {
   const std::string base_url_str("http://google.com/?");
   const std::string query_params_str("gs_ri={google:suggestRid}");
@@ -1549,6 +1571,13 @@ TEST_F(TemplateURLTest, SuggestRequestIdentifier) {
 #else
   EXPECT_EQ("http://google.com/?gs_ri=chrome-ext-ansg", result.spec());
 #endif
+
+  search_terms_args.request_source = RequestSource::NTP_COMPOSEBOX;
+  // Check that the URL is correct for `RequestSource::NTP_COMPOSEBOX`.
+  result = GURL(
+      url.url_ref().ReplaceSearchTerms(search_terms_args, search_terms_data_));
+  ASSERT_TRUE(result.is_valid());
+  EXPECT_EQ("http://google.com/?gs_ri=", result.spec());
 }
 
 TEST_F(TemplateURLTest, ZeroSuggestCacheDuration) {
@@ -3054,6 +3083,70 @@ TEST_F(TemplateURLTest, GetBuiltinImageResourceId_FromCustomEngine) {
   TemplateURL t_url(data);
 
   EXPECT_EQ(t_url.GetBuiltinImageResourceId(), "IDR_DEFAULT_FAVICON");
+}
+
+#if !BUILDFLAG(IS_ANDROID)
+TEST_F(TemplateURLTest, GetMarketingSnippet_Custom) {
+  std::u16string engine_name = u"My Custom Engine";
+  TemplateURLData custom_data;
+  custom_data.SetShortName(engine_name);
+  custom_data.SetKeyword(u"custom.com");
+  TemplateURL custom_url(custom_data);
+  EXPECT_NE(custom_url.GetMarketingSnippet().find(engine_name),
+            std::u16string::npos);
+}
+#endif
+
+TEST_F(TemplateURLTest, GetBuiltinImageResourceId_YahooJpBranded) {
+  // Test relevant for this special case of prepopulated search engines data. If
+  // these preconditions turn out false, consider removing the test, and maybe
+  // the associated logic too.
+  ASSERT_EQ(TemplateURLPrepopulateData::yahoo_jp.id,
+            TemplateURLPrepopulateData::yahoo_fr.id);
+  ASSERT_NE(TemplateURLPrepopulateData::yahoo_jp.keyword,
+            TemplateURLPrepopulateData::yahoo_fr.keyword);
+  ASSERT_NE(TemplateURLPrepopulateData::yahoo_jp.base_builtin_resource_id,
+            TemplateURLPrepopulateData::yahoo_fr.base_builtin_resource_id);
+
+  TemplateURLData data;
+  data.prepopulate_id = TemplateURLPrepopulateData::yahoo_jp.id;
+  data.SetKeyword(TemplateURLPrepopulateData::yahoo_jp.keyword);
+  TemplateURL t_url(data);
+
+  if constexpr (kEnableBuiltinSearchProviderAssets) {
+    EXPECT_NE(
+        t_url.GetBuiltinImageResourceId().find(
+            TemplateURLPrepopulateData::yahoo_jp.base_builtin_resource_id),
+        std::u16string::npos);
+  } else {
+    EXPECT_EQ(t_url.GetBuiltinImageResourceId(), "IDR_DEFAULT_FAVICON");
+  }
+}
+
+TEST_F(TemplateURLTest, GetBuiltinImageResourceId_YahooFrBranded) {
+  // Test relevant for this special case of prepopulated search engines data. If
+  // these preconditions turn out false, consider removing the test, and maybe
+  // the associated logic too.
+  ASSERT_EQ(TemplateURLPrepopulateData::yahoo_jp.id,
+            TemplateURLPrepopulateData::yahoo_fr.id);
+  ASSERT_NE(TemplateURLPrepopulateData::yahoo_jp.keyword,
+            TemplateURLPrepopulateData::yahoo_fr.keyword);
+  ASSERT_NE(TemplateURLPrepopulateData::yahoo_jp.base_builtin_resource_id,
+            TemplateURLPrepopulateData::yahoo_fr.base_builtin_resource_id);
+
+  TemplateURLData data;
+  data.prepopulate_id = TemplateURLPrepopulateData::yahoo_fr.id;
+  data.SetKeyword(TemplateURLPrepopulateData::yahoo_fr.keyword);
+  TemplateURL t_url(data);
+
+  if constexpr (kEnableBuiltinSearchProviderAssets) {
+    EXPECT_NE(
+        t_url.GetBuiltinImageResourceId().find(
+            TemplateURLPrepopulateData::yahoo_fr.base_builtin_resource_id),
+        std::u16string::npos);
+  } else {
+    EXPECT_EQ(t_url.GetBuiltinImageResourceId(), "IDR_DEFAULT_FAVICON");
+  }
 }
 
 struct IsBetterThanEngineTestEngine {

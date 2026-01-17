@@ -12,9 +12,9 @@
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/signin/model/chrome_account_manager_service.h"
 #import "ios/chrome/browser/signin/model/chrome_account_manager_service_factory.h"
 #import "ios/chrome/browser/signin/model/identity_manager_factory.h"
@@ -75,12 +75,12 @@
 
 - (void)accountPickerListTableViewController:
             (AccountPickerSelectionScreenTableViewController*)viewController
-                 didSelectIdentityWithGaiaID:(NSString*)gaiaID {
+                 didSelectIdentityWithGaiaID:(const GaiaId&)gaiaID {
   ChromeAccountManagerService* accountManagerService =
       ChromeAccountManagerServiceFactory::GetForProfile(self.profile);
 
   id<SystemIdentity> identity =
-      accountManagerService->GetIdentityOnDeviceWithGaiaID(GaiaId(gaiaID));
+      accountManagerService->GetIdentityOnDeviceWithGaiaID(gaiaID);
   DCHECK(identity);
   _mediator.selectedIdentity = identity;
   [self.delegate accountPickerSelectionScreenCoordinatorIdentitySelected:self];
@@ -94,8 +94,8 @@
 - (void)showManagementHelpPage {
   OpenNewTabCommand* command = [OpenNewTabCommand
       commandWithURLFromChrome:GURL(kManagementLearnMoreURL)];
-  id<ApplicationCommands> handler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> handler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
   [handler closePresentedViewsAndOpenURL:command];
 }
 

@@ -54,6 +54,10 @@ LINK_RESOURCE_ID(IDR_AUTOFILL_CC_VERVE, R.drawable.verve_card)
 LINK_RESOURCE_ID(IDR_AUTOFILL_CC_VISA_OLD, R.drawable.visa_card)
 LINK_RESOURCE_ID(IDR_AUTOFILL_CC_VISA, R.drawable.visa_card)
 LINK_RESOURCE_ID(IDR_AUTOFILL_GOOGLE_PAY, R.drawable.google_pay)
+LINK_RESOURCE_ID(IDR_AUTOFILL_METADATA_BNPL_GENERIC,
+                 R.drawable.bnpl_icon_generic)
+LINK_RESOURCE_ID(IDR_AUTOFILL_METADATA_BNPL_GENERIC_OLD,
+                 R.drawable.bnpl_icon_generic)
 LINK_RESOURCE_ID(IDR_AUTOFILL_METADATA_CC_AMEX_OLD,
                  R.drawable.amex_metadata_card)
 LINK_RESOURCE_ID(IDR_AUTOFILL_METADATA_CC_AMEX, R.drawable.amex_metadata_card)
@@ -100,10 +104,6 @@ LINK_RESOURCE_ID(IDR_AUTOFILL_IBAN, R.drawable.iban_icon)
 // Use DECLARE_RESOURCE_ID here as these resources are used for android only.
 DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_CC_SCAN_NEW,
                     R.drawable.ic_photo_camera_black)
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_HTTP_WARNING,
-                    R.drawable.ic_info_outline_grey_16dp)
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_HTTPS_INVALID_WARNING,
-                    R.drawable.ic_warning_red_16dp)
 DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_OFFER_TAG_GREEN,
                     R.drawable.ic_offer_tag)
 DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_ANDROID_MESSAGES,
@@ -114,11 +114,20 @@ DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_ANDROID_MESSAGES,
 DECLARE_RESOURCE_ID(IDR_AUTOFILL_PLUS_ADDRESS,
                     R.drawable.ic_plus_addresses_logo_16dp)
 
-// We display settings and edit icon for keyboard accessory using Android's
-// |VectorDrawableCompat|. We do not display these icons for autofill popup.
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_SETTINGS, R.drawable.ic_settings_black)
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_CREATE, R.drawable.ic_edit_24dp)
-
 // Home and work icons.
-DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_HOME, R.drawable.home_logo)
+DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_HOME, R.drawable.ic_home_24dp)
 DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_WORK, R.drawable.work_logo)
+
+// APC password recovery icon
+DECLARE_RESOURCE_ID(IDR_ANDROID_PASSWORD_HISTORY, R.drawable.ic_history_24dp)
+
+// Autofill AI icons.
+DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_PASSPORT, R.drawable.passport)
+DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_ID_CARD, R.drawable.id_card)
+DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_FLIGHT, R.drawable.flight)
+DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_TRAVEL_LUGGAGE_AND_BAGS,
+                    R.drawable.travel_luggage_and_bags)
+DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_PERSON_CHECK, R.drawable.person_check)
+DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_VEHICLE, R.drawable.directions_car)
+// Autofill AI icons.
+DECLARE_RESOURCE_ID(IDR_ANDROID_AUTOFILL_WALLET, R.drawable.wallet)

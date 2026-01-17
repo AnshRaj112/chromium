@@ -4,6 +4,7 @@
 
 #include "chrome/browser/memory/oom_memory_details.h"
 
+#include "base/byte_count.h"
 #include "base/logging.h"
 #include "base/process/process_metrics.h"
 #include "base/strings/utf_string_conversions.h"
@@ -37,7 +38,8 @@ void OomMemoryDetails::OnDetailsAvailable() {
   if (base::GetGraphicsMemoryInfo(&gpu_meminfo)) {
     log_string +=
         "Graphics " +
-        base::UTF16ToASCII(ui::FormatBytes(gpu_meminfo.gpu_memory_size));
+        base::UTF16ToASCII(ui::FormatBytes(base::ByteSize(
+            base::checked_cast<uint64_t>((gpu_meminfo.gpu_memory_size)))));
   }
 #endif
   LOG(WARNING) << title_ << " (" << delta.InMilliseconds() << " ms):\n"

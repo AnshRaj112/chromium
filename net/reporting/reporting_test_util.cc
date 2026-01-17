@@ -59,7 +59,7 @@ class PendingUploadImpl : public TestReportingUploader::PendingUpload {
   const GURL& url() const override { return url_; }
   const std::string& json() const override { return json_; }
   std::optional<base::Value> GetValue() const override {
-    return base::JSONReader::Read(json_);
+    return base::JSONReader::Read(json_, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   }
 
   void Complete(ReportingUploader::Outcome outcome) override {
@@ -172,16 +172,14 @@ TestReportingContext::TestReportingContext(
     base::Clock* clock,
     const base::TickClock* tick_clock,
     const ReportingPolicy& policy,
-    ReportingCache::PersistentReportingStore* store,
-    const base::flat_map<std::string, GURL>& enterprise_reporting_endpoints)
+    ReportingCache::PersistentReportingStore* store)
     : ReportingContext(policy,
                        clock,
                        tick_clock,
                        TestReportingRandIntCallback(),
                        std::make_unique<TestReportingUploader>(),
                        std::make_unique<TestReportingDelegate>(),
-                       store,
-                       enterprise_reporting_endpoints) {
+                       store) {
   auto delivery_timer = std::make_unique<base::MockOneShotTimer>();
   delivery_timer_ = delivery_timer.get();
   auto garbage_collection_timer = std::make_unique<base::MockOneShotTimer>();

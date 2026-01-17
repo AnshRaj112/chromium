@@ -8,7 +8,6 @@
 #include <limits>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/memory/scoped_refptr.h"
@@ -34,20 +33,6 @@ void SendLogMessage(const std::string& message) {
 }  // namespace
 
 namespace blink {
-
-template <>
-struct CrossThreadCopier<scoped_refptr<webrtc::AudioProcessorInterface>>
-    : public CrossThreadCopierByValuePassThrough<
-          scoped_refptr<webrtc::AudioProcessorInterface>> {
-  STATIC_ONLY(CrossThreadCopier);
-};
-
-template <>
-struct CrossThreadCopier<scoped_refptr<WebRtcAudioSink::Adapter>>
-    : public CrossThreadCopierPassThrough<
-          scoped_refptr<WebRtcAudioSink::Adapter>> {
-  STATIC_ONLY(CrossThreadCopier);
-};
 
 WebRtcAudioSink::WebRtcAudioSink(
     const std::string& label,
@@ -262,7 +247,7 @@ void WebRtcAudioSink::Adapter::AddSink(webrtc::AudioTrackSinkInterface* sink) {
   SendLogMessage(
       base::StringPrintf("Adapter::AddSink({label=%s})", label_.c_str()));
   base::AutoLock auto_lock(lock_);
-  DCHECK(!base::Contains(sinks_, sink));
+  DCHECK(!std::ranges::contains(sinks_, sink));
   sinks_.push_back(sink);
 }
 

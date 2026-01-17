@@ -58,6 +58,15 @@ gfx::Rect ToPixelSnappedLogicalRect(const LogicalRect& rect) {
       SnapSizeToPixel(rect.size.block_size, rect.offset.block_offset));
 }
 
+PhysicalToLogicalGetter<LayoutUnit, LayoutBox> LogicalMargin(
+    const LayoutBox& layout_box,
+    const ComputedStyle& container_style) {
+  return PhysicalToLogicalGetter<LayoutUnit, LayoutBox>(
+      container_style.GetWritingDirection(), layout_box, &LayoutBox::MarginTop,
+      &LayoutBox::MarginRight, &LayoutBox::MarginBottom,
+      &LayoutBox::MarginLeft);
+}
+
 // Unlike LayoutBoxModelObject::PhysicalBorderToLogical(), this function
 // applies container's WritingDirectionMode.
 PhysicalToLogicalGetter<LayoutUnit, LayoutBox> LogicalBorder(
@@ -179,7 +188,7 @@ static bool CheckShapeImageOrigin(Document& document,
   document.AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
       mojom::ConsoleMessageSource::kSecurity,
       mojom::ConsoleMessageLevel::kError,
-      "Unsafe attempt to load URL " + url_string + "."));
+      StrCat({"Unsafe attempt to load URL ", url_string, "."})));
   return false;
 }
 
@@ -259,17 +268,9 @@ const Shape& ShapeOutsideInfo::ComputedShape() const {
   const ComputedStyle& containing_block_style = containing_block.StyleRef();
 
   WritingMode writing_mode = containing_block_style.GetWritingMode();
-  // Make sure contentWidth is not negative. This can happen when containing
-  // block has a vertical scrollbar and its content is smaller than the
-  // scrollbar width.
-  LayoutUnit percentage_resolution_inline_size =
-      containing_block.IsLayoutNGObject()
-          ? percentage_resolution_inline_size_
-          : std::max(LayoutUnit(), containing_block.ContentWidth());
-
   float margin =
       FloatValueForLength(layout_box_->StyleRef().ShapeMargin(),
-                          percentage_resolution_inline_size.ToFloat());
+                          percentage_resolution_inline_size_.ToFloat());
 
   float shape_image_threshold = style.ShapeImageThreshold();
   DCHECK(style.ShapeOutside());
@@ -308,7 +309,7 @@ LayoutUnit ShapeOutsideInfo::BlockStartOffset() const {
       layout_box_->ContainingBlock()->StyleRef();
   switch (ReferenceBox(*layout_box_->StyleRef().ShapeOutside())) {
     case CSSBoxType::kMargin:
-      return -layout_box_->MarginBlockStart(&container_style);
+      return -LogicalMargin(*layout_box_, container_style).BlockStart();
     case CSSBoxType::kBorder:
       return LayoutUnit();
     case CSSBoxType::kPadding:
@@ -328,7 +329,7 @@ LayoutUnit ShapeOutsideInfo::InlineStartOffset() const {
       layout_box_->ContainingBlock()->StyleRef();
   switch (ReferenceBox(*layout_box_->StyleRef().ShapeOutside())) {
     case CSSBoxType::kMargin:
-      return -layout_box_->MarginInlineStart(&container_style);
+      return -LogicalMargin(*layout_box_, container_style).InlineStart();
     case CSSBoxType::kBorder:
       return LayoutUnit();
     case CSSBoxType::kPadding:

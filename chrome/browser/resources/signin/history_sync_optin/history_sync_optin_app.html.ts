@@ -30,12 +30,12 @@ export function getHtml(this: HistorySyncOptinAppElement) {
       ` : ''}
     </div>
     <div id="buttonRow">
-      <cr-button id="rejectButton" class="tonal-button"
-          @click="${this.onReject_}">
+      <cr-button id="rejectButton" class="${this.getRejectButtonClass_()}"
+          @click="${this.onReject_}" ?disabled="${this.buttonsDisabled_}">
         $i18n{historySyncOptInRejectButtonLabel}
       </cr-button>
-      <cr-button id="acceptButton" class="action-button"
-          @click="${this.onAccept_}">
+      <cr-button id="acceptButton" class="${this.getAcceptButtonClass_()}"
+          @click="${this.onAccept_}" ?disabled="${this.buttonsDisabled_}">
         $i18n{historySyncOptInAcceptButtonLabel}
       </cr-button>
     </div>

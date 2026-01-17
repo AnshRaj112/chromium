@@ -11,7 +11,6 @@
 #include "base/atomic_sequence_num.h"
 #include "base/check_op.h"
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/notreached.h"
 #include "base/power_monitor/power_monitor.h"
@@ -85,12 +84,8 @@ spdy::SettingsMap AddDefaultHttp2Settings(spdy::SettingsMap http2_settings) {
 
 bool OriginToForceQuicOnInternal(const QuicParams& quic_params,
                                  const url::SchemeHostPort& destination) {
-  // TODO(crbug.com/40181080): Consider converting `origins_to_force_quic_on` to
-  // use url::SchemeHostPort.
-  return (
-      base::Contains(quic_params.origins_to_force_quic_on, HostPortPair()) ||
-      base::Contains(quic_params.origins_to_force_quic_on,
-                     HostPortPair::FromSchemeHostPort(destination)));
+  return (quic_params.force_quic_everywhere ||
+          quic_params.origins_to_force_quic_on.contains(destination));
 }
 
 }  // unnamed namespace
@@ -229,12 +224,6 @@ HttpNetworkSession::HttpNetworkSession(const HttpNetworkSessionParams& params,
           ->initial_delay_for_broken_alternative_service,
       context.quic_context->params()->exponential_backoff_on_initial_delay);
 
-  if (!params_.disable_idle_sockets_close_on_memory_pressure) {
-    memory_pressure_listener_ = std::make_unique<base::MemoryPressureListener>(
-        FROM_HERE, base::BindRepeating(&HttpNetworkSession::OnMemoryPressure,
-                                       base::Unretained(this)));
-  }
-
   http_stream_pool_ = std::make_unique<HttpStreamPool>(
       this,
       /*cleanup_on_ip_address_change=*/!params.ignore_ip_address_changes);
@@ -259,7 +248,7 @@ HttpNetworkSession::~HttpNetworkSession() {
 
 void HttpNetworkSession::StartResponseDrainer(
     std::unique_ptr<HttpResponseBodyDrainer> drainer) {
-  DCHECK(!base::Contains(response_drainers_, drainer.get()));
+  DCHECK(!response_drainers_.contains(drainer.get()));
   HttpResponseBodyDrainer* drainer_ptr = drainer.get();
   response_drainers_.insert(std::move(drainer));
   drainer_ptr->Start(this);
@@ -267,7 +256,7 @@ void HttpNetworkSession::StartResponseDrainer(
 
 void HttpNetworkSession::RemoveResponseDrainer(
     HttpResponseBodyDrainer* drainer) {
-  DCHECK(base::Contains(response_drainers_, drainer));
+  DCHECK(response_drainers_.contains(drainer));
 
   response_drainers_.erase(response_drainers_.find(drainer));
 }
@@ -283,8 +272,7 @@ base::Value HttpNetworkSession::SocketPoolInfoToValue() const {
   return normal_socket_pool_manager_->SocketPoolInfoToValue();
 }
 
-std::unique_ptr<base::Value> HttpNetworkSession::SpdySessionPoolInfoToValue()
-    const {
+base::Value HttpNetworkSession::SpdySessionPoolInfoToValue() const {
   return spdy_session_pool_.SpdySessionPoolInfoToValue();
 }
 
@@ -308,8 +296,12 @@ base::Value HttpNetworkSession::QuicInfoToValue() const {
   dict.Set("supported_versions", std::move(supported_versions));
 
   base::Value::List origins_to_force_quic_on;
-  for (const auto& origin : quic_params->origins_to_force_quic_on) {
-    origins_to_force_quic_on.Append(origin.ToString());
+  if (quic_params->force_quic_everywhere) {
+    origins_to_force_quic_on.Append("<everywhere>");
+  } else {
+    for (const auto& origin : quic_params->origins_to_force_quic_on) {
+      origins_to_force_quic_on.Append(origin.Serialize());
+    }
   }
   dict.Set("origins_to_force_quic_on", std::move(origins_to_force_quic_on));
 
@@ -457,21 +449,6 @@ ClientSocketPoolManager* HttpNetworkSession::GetSocketPoolManager(
       return websocket_socket_pool_manager_.get();
     default:
       NOTREACHED();
-  }
-}
-
-void HttpNetworkSession::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level) {
-  DCHECK(!params_.disable_idle_sockets_close_on_memory_pressure);
-
-  switch (memory_pressure_level) {
-    case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE:
-      break;
-
-    case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_MODERATE:
-    case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL:
-      CloseIdleConnections("Low memory");
-      break;
   }
 }
 

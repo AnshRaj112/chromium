@@ -105,7 +105,13 @@ class GESTURE_DETECTION_EXPORT GestureProvider {
     return current_down_event_.get();
   }
 
-  const ui::MotionEvent* last_event() const { return last_event_.get(); }
+  const ui::MotionEvent* last_event_without_history() const {
+    return last_event_without_history_.get();
+  }
+
+  void OnUnconfirmedTapConvertedToTap();
+
+  GestureDetector* GetGestureDetectorForTesting();
 
  private:
   bool CanHandle(const MotionEvent& event) const;
@@ -117,7 +123,7 @@ class GESTURE_DETECTION_EXPORT GestureProvider {
   std::unique_ptr<GestureListenerImpl> gesture_listener_;
 
   std::unique_ptr<MotionEvent> current_down_event_;
-  std::unique_ptr<MotionEvent> last_event_;
+  std::unique_ptr<MotionEvent> last_event_without_history_;
 
   // Logs information on touch and gesture events.
   GestureTouchUMAHistogram uma_histogram_;

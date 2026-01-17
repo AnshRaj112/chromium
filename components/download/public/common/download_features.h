@@ -6,7 +6,6 @@
 #define COMPONENTS_DOWNLOAD_PUBLIC_COMMON_DOWNLOAD_FEATURES_H_
 
 #include "base/feature_list.h"
-#include "base/metrics/field_trial_params.h"
 #include "build/build_config.h"
 #include "components/download/public/common/download_export.h"
 
@@ -22,18 +21,16 @@ COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kBackoffInDownloading);
 COMPONENTS_DOWNLOAD_EXPORT bool IsBackoffInDownloadingEnabled();
 
 #if BUILDFLAG(IS_ANDROID)
-// Whether download expiration date will be refreshed on resumption.
-COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kRefreshExpirationDate);
-
 // Whether to enable smart suggestion for large downloads
 COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(
     kSmartSuggestionForLargeDownloads);
-#endif
 
-// On downloads-related UI surfaces, attribute the download to the initiator
-// origin of the download request in UI displays, rather than the URL of the
-// download itself.
-COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kDisplayInitiatorOrigin);
+// Whether to show blocked sensitive downloads on download home.
+COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kShowBlockedSensitiveDownload);
+
+// Whether to show the download scanning state on download home.
+COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kShowDownloadScanningState);
+#endif
 
 // Whether download notification service uses new unified API based on offline
 // item and native persistence of notification IDs.
@@ -55,9 +52,6 @@ COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kUseParallelRequestsForHTTP2);
 // Whether parallel download is used for QUIC connections.
 COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kUseParallelRequestsForQUIC);
 
-// Whether to delete expired download.
-COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kDeleteExpiredDownloads);
-
 // Whether to delete downloads that are overwritten by others.
 COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kDeleteOverwrittenDownloads);
 
@@ -66,9 +60,6 @@ COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kAllowFileBufferSizeControl);
 
 // Whether mixed-content PDF links can be downloaded if opening inline.
 COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kAllowedMixedContentInlinePdf);
-
-// Whether to write filename to the clipboard when copying image downloads.
-COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(kCopyImageFilenameToClipboard);
 
 // Whether to enable async notification manager for downloads.
 COMPONENTS_DOWNLOAD_EXPORT BASE_DECLARE_FEATURE(

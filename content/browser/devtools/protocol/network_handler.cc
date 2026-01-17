@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <algorithm>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -15,7 +16,6 @@
 #include "base/barrier_closure.h"
 #include "base/base64.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/queue.h"
 #include "base/containers/span.h"
 #include "base/feature_list.h"
@@ -24,11 +24,13 @@
 #include "base/i18n/icu_string_conversions.h"
 #include "base/memory/raw_ptr.h"
 #include "base/process/process_handle.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_view_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
+#include "base/unguessable_token.h"
 #include "content/browser/background_sync/background_sync_manager.h"
 #include "content/browser/devtools/devtools_agent_host_impl.h"
 #include "content/browser/devtools/devtools_io_context.h"
@@ -64,7 +66,6 @@
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/network_service_instance.h"
 #include "content/public/browser/render_process_host.h"
-#include "content/public/browser/resource_context.h"
 #include "content/public/browser/service_worker_context.h"
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/storage_partition.h"
@@ -73,7 +74,6 @@
 #include "content/public/common/content_features.h"
 #include "ipc/constants.mojom.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
-#include "net/base/features.h"
 #include "net/base/host_port_pair.h"
 #include "net/base/ip_endpoint.h"
 #include "net/base/net_errors.h"
@@ -104,8 +104,11 @@
 #include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "services/network/public/mojom/devtools_observer.mojom.h"
 #include "services/network/public/mojom/http_raw_headers.mojom.h"
+#include "services/network/public/mojom/network_context.mojom-forward.h"
 #include "services/network/public/mojom/service_worker_router_info.mojom.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
+#include "third_party/abseil-cpp/absl/container/flat_hash_map.h"
+#include "third_party/abseil-cpp/absl/functional/overload.h"
 #include "third_party/blink/public/common/loader/referrer_utils.h"
 #include "third_party/blink/public/mojom/navigation/navigation_params.mojom.h"
 #include "third_party/blink/public/platform/resource_request_blocked_reason.h"
@@ -194,6 +197,7 @@ std::unique_ptr<Network::CookiePartitionKey> BuildCookiePartitionKey(
 
 std::unique_ptr<Network::Cookie> BuildCookie(
     const net::CanonicalCookie& cookie) {
+  DCHECK(cookie.ExpiryDate().is_null() || !cookie.ExpiryDate().is_inf());
   std::unique_ptr<Network::Cookie> devtools_cookie =
       Network::Cookie::Create()
           .SetName(cookie.Name())
@@ -208,7 +212,6 @@ std::unique_ptr<Network::Cookie> BuildCookie(
           .SetSecure(cookie.SecureAttribute())
           .SetSession(!cookie.IsPersistent())
           .SetPriority(BuildCookiePriority(cookie.Priority()))
-          .SetSameParty(false)
           .SetSourceScheme(BuildCookieSourceScheme(cookie.SourceScheme()))
           .SetSourcePort(cookie.SourcePort())
           .Build();
@@ -303,7 +306,7 @@ class CookieRetrieverNetworkService
   }
 
   std::unique_ptr<GetCookiesCallback> callback_;
-  std::unordered_map<std::string, net::CanonicalCookie> all_cookies_;
+  absl::flat_hash_map<std::string, net::CanonicalCookie> all_cookies_;
 };
 
 namespace {
@@ -428,7 +431,7 @@ MakeCookieFromProtocolValues(
 
     secure = secure || source_url.SchemeIsCryptographic();
     if (normalized_domain.empty())
-      normalized_domain = source_url.host();
+      normalized_domain = source_url.GetHost();
   }
 
   std::string url_host = normalized_domain;
@@ -751,7 +754,7 @@ String GetProtocol(const GURL& url,
           protocol = "http/1.1";
       }
     } else {
-      protocol = url.scheme();
+      protocol = url.GetScheme();
     }
   }
   return protocol;
@@ -1207,6 +1210,8 @@ NetworkHandler::NetworkHandler(
     const std::string& host_id,
     const base::UnguessableToken& devtools_token,
     DevToolsIOContext* io_context,
+    DevToolsSession* session,
+    StoragePartition* maybe_storage_partition,
     base::RepeatingClosure update_loader_factories_callback,
     DevToolsAgentHostClient* client,
     base::OnceClosure cleanup_after_modifications_callback)
@@ -1216,18 +1221,22 @@ NetworkHandler::NetworkHandler(
       io_context_(io_context),
       client_(client),
       browser_context_(nullptr),
-      storage_partition_(nullptr),
+      storage_partition_(maybe_storage_partition),
       host_(nullptr),
       enabled_(false),
 #if BUILDFLAG(ENABLE_REPORTING)
       reporting_receiver_(this),
 #endif  // BUILDFLAG(ENABLE_REPORTING)
+#if BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
+      device_bound_session_receiver_(this),
+#endif  // BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
       bypass_service_worker_(false),
       cache_disabled_(false),
       update_loader_factories_callback_(
           std::move(update_loader_factories_callback)),
       cleanup_after_modifications_callback_(
-          std::move(cleanup_after_modifications_callback)) {
+          std::move(cleanup_after_modifications_callback)),
+      root_session_(*session->GetRootSession()) {
   DCHECK(io_context_);
   static bool have_configured_service_worker_context = false;
   if (have_configured_service_worker_context)
@@ -1352,14 +1361,23 @@ bool NetworkHandler::AddInterceptedResourceType(
     intercepted_resource_types->insert(blink::mojom::ResourceType::kScript);
     return true;
   }
-  if (resource_type == protocol::Network::ResourceTypeEnum::XHR) {
+
+  // Map several fetch-like CDP resource types to the underlying `kXhr` Blink
+  // resource type. This is necessary because Blink's loader subsystem, where
+  // interception occurs, does not differentiate between these types at a
+  // protocol level. This mapping provides a functional interception mechanism
+  // and resolves the issue where filtering for 'Fetch' or 'EventSource' would
+  // silently fail. See https://crbug.com/40256663#comment10 for context.
+  if (resource_type == protocol::Network::ResourceTypeEnum::XHR ||
+      resource_type == protocol::Network::ResourceTypeEnum::Fetch ||
+      resource_type == protocol::Network::ResourceTypeEnum::EventSource) {
     intercepted_resource_types->insert(blink::mojom::ResourceType::kXhr);
+    if (resource_type == protocol::Network::ResourceTypeEnum::Fetch) {
+      intercepted_resource_types->insert(blink::mojom::ResourceType::kPrefetch);
+    }
     return true;
   }
-  if (resource_type == protocol::Network::ResourceTypeEnum::Fetch) {
-    intercepted_resource_types->insert(blink::mojom::ResourceType::kPrefetch);
-    return true;
-  }
+
   if (resource_type ==
       protocol::Network::ResourceTypeEnum::CSPViolationReport) {
     intercepted_resource_types->insert(blink::mojom::ResourceType::kCspReport);
@@ -1453,6 +1471,7 @@ void NetworkHandler::SetRenderer(int render_process_host_id,
     storage_partition_ = nullptr;
     browser_context_ = nullptr;
   }
+  MaybeEnableDurableMessages(base::DoNothing());
   host_ = frame_host;
   if (background_sync_restorer_)
     background_sync_restorer_->SetStoragePartition(storage_partition_);
@@ -1462,20 +1481,46 @@ Response NetworkHandler::Enable(
     std::optional<int> max_total_size,
     std::optional<int> max_resource_size,
     std::optional<int> max_post_data_size,
-    std::optional<bool> report_direct_socket_traffic) {
+    std::optional<bool> report_direct_socket_traffic,
+    std::optional<bool> enable_durable_messages) {
+  // Durable Messages require a maxTotalBufferSize to be set, for enabling
+  // collection.
+  durable_message_max_total_size_ = max_total_size.value_or(0);
+  if (enable_durable_messages.value_or(false) &&
+      !durable_message_max_total_size_) {
+    return Response::InvalidParams(
+        "maxTotalBufferSize is required with enableDurableMessages");
+  }
+  enable_durable_messages_ = enable_durable_messages.value_or(false);
   enabled_ = true;
+  if (enable_durable_messages_) {
+    // MaybeEnableDurableMessages will asynchronously enable durable messages
+    // collection if possible, if used with enable(). This will be deprecated,
+    // in favor of enableDurableMessages in the future.
+    MaybeEnableDurableMessages(base::DoNothing());
+  }
+  if (enable_durable_messages.has_value() &&
+      enable_durable_messages.value() == false) {
+    // If an explicit `false` is passed, any active collector should be
+    // disabled for this profile.
+    DisableDurableMessages();
+  }
   return Response::FallThrough();
 }
 
-Response NetworkHandler::Disable() {
+DispatchResponse NetworkHandler::Disable() {
   enabled_ = false;
   url_loader_interceptor_.reset();
-  SetNetworkConditions(nullptr);
+  SetNetworkConditions({}, /*offline=*/false);
   extra_headers_.clear();
   ClearAcceptedEncodingsOverride();
   enable_third_party_cookie_restriction_ = false;
   disable_third_party_cookie_metadata_ = false;
   disable_third_party_cookie_heuristics_ = false;
+#if BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
+  device_bound_session_receiver_.reset();
+#endif  // BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
+  DisableDurableMessages();
   return Response::FallThrough();
 }
 
@@ -1518,7 +1563,7 @@ NetworkHandler::BuildProtocolReport(const net::ReportingReport& report) {
     return nullptr;
   }
   std::vector<GURL> reporting_filter_urls = ComputeReportingURLs(host_);
-  if (base::Contains(reporting_filter_urls, report.url)) {
+  if (std::ranges::contains(reporting_filter_urls, report.url)) {
     return protocol::Network::ReportingApiReport::Create()
         .SetId(report.id.ToString())
         .SetInitiatorUrl(report.url.spec())
@@ -1612,6 +1657,574 @@ Response NetworkHandler::EnableReportingApi(const bool enable) {
 }
 #endif  // BUILDFLAG(ENABLE_REPORTING)
 
+#if BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
+
+namespace {
+std::unique_ptr<protocol::Network::DeviceBoundSessionKey>
+BuildProtocolDeviceBoundSessionKey(
+    const net::device_bound_sessions::SessionKey& key) {
+  return protocol::Network::DeviceBoundSessionKey::Create()
+      .SetSite(key.site.Serialize())
+      .SetId(key.id.value())
+      .Build();
+}
+
+String BuildProtocolDeviceBoundSessionUrlRuleType(
+    net::device_bound_sessions::InclusionResult rule_type) {
+  switch (rule_type) {
+    case net::device_bound_sessions::InclusionResult::kExclude:
+      return protocol::Network::DeviceBoundSessionUrlRule::RuleTypeEnum::
+          Exclude;
+    case net::device_bound_sessions::InclusionResult::kInclude:
+      return protocol::Network::DeviceBoundSessionUrlRule::RuleTypeEnum::
+          Include;
+  }
+}
+
+std::unique_ptr<protocol::Network::DeviceBoundSessionUrlRule>
+BuildProtocolDeviceBoundSessionUrlRule(
+    const net::device_bound_sessions::UrlRuleDisplay& rule) {
+  return protocol::Network::DeviceBoundSessionUrlRule::Create()
+      .SetRuleType(BuildProtocolDeviceBoundSessionUrlRuleType(rule.rule_type))
+      .SetHostPattern(rule.host_pattern)
+      .SetPathPrefix(rule.path_prefix)
+      .Build();
+}
+
+std::unique_ptr<protocol::Network::DeviceBoundSessionInclusionRules>
+BuildProtocolDeviceBoundDeviceBoundSessionInclusionRules(
+    const net::device_bound_sessions::SessionInclusionRulesDisplay& rules) {
+  auto protocol_rules = std::make_unique<
+      protocol::Array<protocol::Network::DeviceBoundSessionUrlRule>>();
+  protocol_rules->reserve(rules.url_rules.size());
+  for (const auto& rule : rules.url_rules) {
+    protocol_rules->emplace_back(BuildProtocolDeviceBoundSessionUrlRule(rule));
+  }
+  return protocol::Network::DeviceBoundSessionInclusionRules::Create()
+      .SetOrigin(rules.origin)
+      .SetIncludeSite(rules.include_site)
+      .SetUrlRules(std::move(protocol_rules))
+      .Build();
+}
+
+std::unique_ptr<protocol::Network::DeviceBoundSessionCookieCraving>
+BuildProtocolDeviceBoundDeviceBoundSessionCookieCraving(
+    const net::device_bound_sessions::CookieCravingDisplay& craving) {
+  auto protocol_craving =
+      protocol::Network::DeviceBoundSessionCookieCraving::Create()
+          .SetName(craving.name)
+          .SetDomain(craving.domain)
+          .SetPath(craving.path)
+          .SetSecure(craving.secure)
+          .SetHttpOnly(craving.http_only)
+          .Build();
+  std::optional<Network::CookieSameSite> same_site =
+      BuildCookieSameSite(craving.same_site);
+  if (same_site.has_value()) {
+    protocol_craving->SetSameSite(same_site.value());
+  }
+  return protocol_craving;
+}
+
+std::unique_ptr<protocol::Network::DeviceBoundSession>
+BuildProtocolDeviceBoundSession(
+    const net::device_bound_sessions::SessionDisplay& session) {
+  auto protocol_cravings = std::make_unique<
+      protocol::Array<protocol::Network::DeviceBoundSessionCookieCraving>>();
+  protocol_cravings->reserve(session.cookie_cravings.size());
+  for (const auto& craving : session.cookie_cravings) {
+    protocol_cravings->emplace_back(
+        BuildProtocolDeviceBoundDeviceBoundSessionCookieCraving(craving));
+  }
+  auto protocol_initiators = std::make_unique<protocol::Array<std::string>>();
+  protocol_initiators->reserve(session.allowed_refresh_initiators.size());
+  for (const auto& initiator : session.allowed_refresh_initiators) {
+    protocol_initiators->emplace_back(initiator);
+  }
+
+  auto protocol_session =
+      protocol::Network::DeviceBoundSession::Create()
+          .SetKey(BuildProtocolDeviceBoundSessionKey(session.key))
+          .SetRefreshUrl(session.refresh_url.spec())
+          .SetInclusionRules(
+              BuildProtocolDeviceBoundDeviceBoundSessionInclusionRules(
+                  session.inclusion_rules))
+          .SetCookieCravings(std::move(protocol_cravings))
+          .SetExpiryDate(session.expiry_date.InSecondsFSinceUnixEpoch())
+          .SetAllowedRefreshInitiators(std::move(protocol_initiators))
+          .Build();
+  if (session.cached_challenge) {
+    protocol_session->SetCachedChallenge(session.cached_challenge.value());
+  }
+  return protocol_session;
+}
+
+String BuildProtocolDeviceBoundSessionFetchResult(
+    net::device_bound_sessions::SessionError::ErrorType type) {
+  switch (type) {
+    case net::device_bound_sessions::SessionError::ErrorType::kSuccess:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::Success;
+    case net::device_bound_sessions::SessionError::ErrorType::kKeyError:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::KeyError;
+    case net::device_bound_sessions::SessionError::ErrorType::kSigningError:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::SigningError;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kServerRequestedTermination:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          ServerRequestedTermination;
+    case net::device_bound_sessions::SessionError::ErrorType::kInvalidSessionId:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidSessionId;
+    case net::device_bound_sessions::SessionError::ErrorType::kInvalidChallenge:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidChallenge;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kTooManyChallenges:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          TooManyChallenges;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidFetcherUrl:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidFetcherUrl;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidRefreshUrl:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidRefreshUrl;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kTransientHttpError:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          TransientHttpError;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kScopeOriginSameSiteMismatch:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          ScopeOriginSameSiteMismatch;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kRefreshUrlSameSiteMismatch:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          RefreshUrlSameSiteMismatch;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kMismatchedSessionId:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          MismatchedSessionId;
+    case net::device_bound_sessions::SessionError::ErrorType::kMissingScope:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::MissingScope;
+    case net::device_bound_sessions::SessionError::ErrorType::kNoCredentials:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          NoCredentials;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kSubdomainRegistrationWellKnownUnavailable:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          SubdomainRegistrationWellKnownUnavailable;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kSubdomainRegistrationUnauthorized:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          SubdomainRegistrationUnauthorized;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kSubdomainRegistrationWellKnownMalformed:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          SubdomainRegistrationWellKnownMalformed;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kSessionProviderWellKnownUnavailable:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          SessionProviderWellKnownUnavailable;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kFederatedKeyThumbprintMismatch:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          FederatedKeyThumbprintMismatch;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidFederatedSessionUrl:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidFederatedSessionUrl;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidFederatedKey:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidFederatedKey;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kTooManyRelyingOriginLabels:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          TooManyRelyingOriginLabels;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kBoundCookieSetForbidden:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          BoundCookieSetForbidden;
+    case net::device_bound_sessions::SessionError::ErrorType::kNetError:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::NetError;
+    case net::device_bound_sessions::SessionError::ErrorType::kProxyError:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::ProxyError;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidConfigJson:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidConfigJson;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kEmptySessionConfig:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          EmptySessionConfig;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidCredentialsConfig:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidCredentialsConfig;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidCredentialsType:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidCredentialsType;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidCredentialsEmptyName:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidCredentialsEmptyName;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidCredentialsCookie:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidCredentialsCookie;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kPersistentHttpError:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          PersistentHttpError;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kRegistrationAttemptedChallenge:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          RegistrationAttemptedChallenge;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidScopeOrigin:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidScopeOrigin;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kScopeOriginContainsPath:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          ScopeOriginContainsPath;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kRefreshInitiatorNotString:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          RefreshInitiatorNotString;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kRefreshInitiatorInvalidHostPattern:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          RefreshInitiatorInvalidHostPattern;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidScopeSpecification:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidScopeSpecification;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kMissingScopeSpecificationType:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          MissingScopeSpecificationType;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kEmptyScopeSpecificationDomain:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          EmptyScopeSpecificationDomain;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kEmptyScopeSpecificationPath:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          EmptyScopeSpecificationPath;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidScopeSpecificationType:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidScopeSpecificationType;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidScopeIncludeSite:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidScopeIncludeSite;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kMissingScopeIncludeSite:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          MissingScopeIncludeSite;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kFederatedNotAuthorizedByProvider:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          FederatedNotAuthorizedByProvider;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kFederatedNotAuthorizedByRelyingParty:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          FederatedNotAuthorizedByRelyingParty;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kSessionProviderWellKnownMalformed:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          SessionProviderWellKnownMalformed;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kSessionProviderWellKnownHasProviderOrigin:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          SessionProviderWellKnownHasProviderOrigin;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kRelyingPartyWellKnownMalformed:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          RelyingPartyWellKnownMalformed;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kRelyingPartyWellKnownHasRelyingOrigins:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          RelyingPartyWellKnownHasRelyingOrigins;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidFederatedSessionProviderSessionMissing:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidFederatedSessionProviderSessionMissing;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidFederatedSessionWrongProviderOrigin:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidFederatedSessionWrongProviderOrigin;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidCredentialsCookieCreationTime:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidCredentialsCookieCreationTime;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidCredentialsCookieName:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidCredentialsCookieName;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidCredentialsCookieParsing:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidCredentialsCookieParsing;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidCredentialsCookieUnpermittedAttribute:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidCredentialsCookieUnpermittedAttribute;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidCredentialsCookieInvalidDomain:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidCredentialsCookieInvalidDomain;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidCredentialsCookiePrefix:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidCredentialsCookiePrefix;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidScopeRulePath:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidScopeRulePath;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidScopeRuleHostPattern:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidScopeRuleHostPattern;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kScopeRuleOriginScopedHostPatternMismatch:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          ScopeRuleOriginScopedHostPatternMismatch;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kScopeRuleSiteScopedHostPatternMismatch:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          ScopeRuleSiteScopedHostPatternMismatch;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kSigningQuotaExceeded:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          SigningQuotaExceeded;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kRelyingPartyWellKnownUnavailable:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          RelyingPartyWellKnownUnavailable;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kInvalidFederatedSessionProviderFailedToRestoreKey:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          InvalidFederatedSessionProviderFailedToRestoreKey;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kFailedToUnwrapKey:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          FailedToUnwrapKey;
+    case net::device_bound_sessions::SessionError::ErrorType::
+        kSessionDeletedDuringRefresh:
+      return protocol::Network::DeviceBoundSessionFetchResultEnum::
+          SessionDeletedDuringRefresh;
+  }
+}
+
+String BuildProtocolDeviceBoundSessionRefreshResult(
+    net::device_bound_sessions::RefreshResult result) {
+  switch (result) {
+    case net::device_bound_sessions::RefreshResult::kRefreshed:
+      return protocol::Network::RefreshEventDetails::RefreshResultEnum::
+          Refreshed;
+    case net::device_bound_sessions::RefreshResult::kInitializedService:
+      return protocol::Network::RefreshEventDetails::RefreshResultEnum::
+          InitializedService;
+    case net::device_bound_sessions::RefreshResult::kUnreachable:
+      return protocol::Network::RefreshEventDetails::RefreshResultEnum::
+          Unreachable;
+    case net::device_bound_sessions::RefreshResult::kServerError:
+      return protocol::Network::RefreshEventDetails::RefreshResultEnum::
+          ServerError;
+    case net::device_bound_sessions::RefreshResult::kRefreshQuotaExceeded:
+      return protocol::Network::RefreshEventDetails::RefreshResultEnum::
+          RefreshQuotaExceeded;
+    case net::device_bound_sessions::RefreshResult::kFatalError:
+      return protocol::Network::RefreshEventDetails::RefreshResultEnum::
+          FatalError;
+    case net::device_bound_sessions::RefreshResult::kSigningQuotaExceeded:
+      return protocol::Network::RefreshEventDetails::RefreshResultEnum::
+          SigningQuotaExceeded;
+  }
+}
+
+String BuildProtocolDeviceBoundSessionChallengeResult(
+    net::device_bound_sessions::ChallengeResult result) {
+  switch (result) {
+    case net::device_bound_sessions::ChallengeResult::kSuccess:
+      return protocol::Network::ChallengeEventDetails::ChallengeResultEnum::
+          Success;
+    case net::device_bound_sessions::ChallengeResult::kNoSessionId:
+      return protocol::Network::ChallengeEventDetails::ChallengeResultEnum::
+          NoSessionId;
+    case net::device_bound_sessions::ChallengeResult::kNoSessionMatch:
+      return protocol::Network::ChallengeEventDetails::ChallengeResultEnum::
+          NoSessionMatch;
+    case net::device_bound_sessions::ChallengeResult::kCantSetBoundCookie:
+      return protocol::Network::ChallengeEventDetails::ChallengeResultEnum::
+          CantSetBoundCookie;
+  }
+}
+
+String BuildProtocolDeviceBoundSessionDeletionReason(
+    net::device_bound_sessions::DeletionReason reason) {
+  switch (reason) {
+    case net::device_bound_sessions::DeletionReason::kExpired:
+      return protocol::Network::TerminationEventDetails::DeletionReasonEnum::
+          Expired;
+    case net::device_bound_sessions::DeletionReason::kFailedToRestoreKey:
+      return protocol::Network::TerminationEventDetails::DeletionReasonEnum::
+          FailedToRestoreKey;
+    case net::device_bound_sessions::DeletionReason::kFailedToUnwrapKey:
+      return protocol::Network::TerminationEventDetails::DeletionReasonEnum::
+          FailedToUnwrapKey;
+    case net::device_bound_sessions::DeletionReason::kStoragePartitionCleared:
+      return protocol::Network::TerminationEventDetails::DeletionReasonEnum::
+          StoragePartitionCleared;
+    case net::device_bound_sessions::DeletionReason::kClearBrowsingData:
+      return protocol::Network::TerminationEventDetails::DeletionReasonEnum::
+          ClearBrowsingData;
+    case net::device_bound_sessions::DeletionReason::kServerRequested:
+      return protocol::Network::TerminationEventDetails::DeletionReasonEnum::
+          ServerRequested;
+    case net::device_bound_sessions::DeletionReason::kInvalidSessionParams:
+      return protocol::Network::TerminationEventDetails::DeletionReasonEnum::
+          InvalidSessionParams;
+    case net::device_bound_sessions::DeletionReason::kRefreshFatalError:
+      return protocol::Network::TerminationEventDetails::DeletionReasonEnum::
+          RefreshFatalError;
+  }
+}
+
+}  // namespace
+
+void NetworkHandler::AddDeviceBoundSessionDisplays(
+    const std::vector<::net::device_bound_sessions::SessionDisplay>& sessions) {
+  auto protocol_sessions = std::make_unique<
+      protocol::Array<protocol::Network::DeviceBoundSession>>();
+  protocol_sessions->reserve(sessions.size());
+  for (const auto& session : sessions) {
+    protocol_sessions->emplace_back(BuildProtocolDeviceBoundSession(session));
+  }
+  frontend_->DeviceBoundSessionsAdded(std::move(protocol_sessions));
+}
+
+void NetworkHandler::OnDeviceBoundSessionEventReceived(
+    const net::device_bound_sessions::SessionEvent& event) {
+  std::unique_ptr<protocol::Network::CreationEventDetails> creationEventDetails;
+  std::unique_ptr<protocol::Network::RefreshEventDetails> refreshEventDetails;
+  std::unique_ptr<protocol::Network::TerminationEventDetails>
+      terminationEventDetails;
+  std::unique_ptr<protocol::Network::ChallengeEventDetails>
+      challengeEventDetails;
+  std::visit(
+      absl::Overload{
+          [&creationEventDetails](
+              const net::device_bound_sessions::CreationEventDetails& details) {
+            creationEventDetails =
+                protocol::Network::CreationEventDetails::Create()
+                    .SetFetchResult(BuildProtocolDeviceBoundSessionFetchResult(
+                        details.fetch_error))
+                    .Build();
+            if (details.new_session_display.has_value()) {
+              creationEventDetails->SetNewSession(
+                  BuildProtocolDeviceBoundSession(
+                      details.new_session_display.value()));
+            }
+          },
+          [&refreshEventDetails](
+              const net::device_bound_sessions::RefreshEventDetails& details) {
+            refreshEventDetails =
+                protocol::Network::RefreshEventDetails::Create()
+                    .SetRefreshResult(
+                        BuildProtocolDeviceBoundSessionRefreshResult(
+                            details.refresh_result))
+                    .SetWasFullyProactiveRefresh(
+                        details.was_fully_proactive_refresh)
+                    .Build();
+            if (details.fetch_error.has_value()) {
+              refreshEventDetails->SetFetchResult(
+                  BuildProtocolDeviceBoundSessionFetchResult(
+                      details.fetch_error.value()));
+            }
+            if (details.new_session_display.has_value()) {
+              refreshEventDetails->SetNewSession(
+                  BuildProtocolDeviceBoundSession(
+                      details.new_session_display.value()));
+            }
+          },
+          [&terminationEventDetails](
+              const net::device_bound_sessions::TerminationEventDetails&
+                  details) {
+            terminationEventDetails =
+                protocol::Network::TerminationEventDetails::Create()
+                    .SetDeletionReason(
+                        BuildProtocolDeviceBoundSessionDeletionReason(
+                            details.deletion_reason))
+                    .Build();
+          },
+          [&challengeEventDetails](
+              const net::device_bound_sessions::ChallengeEventDetails&
+                  details) {
+            challengeEventDetails =
+                protocol::Network::ChallengeEventDetails::Create()
+                    .SetChallengeResult(
+                        BuildProtocolDeviceBoundSessionChallengeResult(
+                            details.challenge_result))
+                    .SetChallenge(details.challenge)
+                    .Build();
+          }},
+      event.event_type_details);
+
+  frontend_->DeviceBoundSessionEventOccurred(
+      event.event_id.ToString(), event.site.Serialize(), event.succeeded,
+      event.session_id, std::move(creationEventDetails),
+      std::move(refreshEventDetails), std::move(terminationEventDetails),
+      std::move(challengeEventDetails));
+}
+
+Response NetworkHandler::EnableDeviceBoundSessions(bool enable) {
+  if (!storage_partition_ || !host_ ||
+      !base::FeatureList::IsEnabled(features::kDeviceBoundSessionsDevTools)) {
+    return Response::InternalError();
+  }
+
+  if (enable) {
+    if (!device_bound_session_receiver_.is_bound()) {
+      mojo::Remote<network::mojom::DeviceBoundSessionManager> manager;
+      storage_partition_->GetNetworkContext()->GetDeviceBoundSessionManager(
+          manager.BindNewPipeAndPassReceiver());
+      mojo::PendingRemote<network::mojom::DeviceBoundSessionEventObserver>
+          observer;
+      device_bound_session_receiver_.Bind(
+          observer.InitWithNewPipeAndPassReceiver());
+      manager->AddEventObserver(std::move(observer));
+    }
+  } else {
+    device_bound_session_receiver_.reset();
+  }
+
+  return Response::Success();
+}
+
+Response NetworkHandler::FetchSchemefulSite(const std::string& origin,
+                                            std::string* schemeful_site) {
+  *schemeful_site = net::SchemefulSite(GURL(origin)).Serialize();
+  return Response::Success();
+}
+#else
+Response NetworkHandler::EnableDeviceBoundSessions(bool enable) {
+  return Response::MethodNotFound("not implemented");
+}
+
+Response NetworkHandler::FetchSchemefulSite(const std::string& origin,
+                                            std::string* schemeful_site) {
+  return Response::MethodNotFound("not implemented");
+}
+
+#endif  // BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
+
 Response NetworkHandler::SetCacheDisabled(bool cache_disabled) {
   cache_disabled_ = cache_disabled;
   return Response::FallThrough();
@@ -1696,11 +2309,9 @@ void NetworkHandler::GetCookies(std::unique_ptr<Array<String>> protocol_urls,
   std::vector<GURL> urls = ComputeCookieURLs(host_, protocol_urls);
   bool is_webui = host_ && host_->web_ui();
 
-  urls.erase(std::remove_if(urls.begin(), urls.end(),
-                            [=, this](const GURL& url) {
-                              return !client_->MayAttachToURL(url, is_webui);
-                            }),
-             urls.end());
+  std::erase_if(urls, [=, this](const GURL& url) {
+    return !client_->MayAttachToURL(url, is_webui);
+  });
 
   CookieRetrieverNetworkService::Retrieve(
       storage_partition_->GetCookieManagerForBrowserProcess(), urls,
@@ -1750,7 +2361,6 @@ void NetworkHandler::SetCookie(
     std::optional<std::string> same_site,
     std::optional<double> expires,
     std::optional<std::string> priority,
-    std::optional<bool> same_party,
     std::optional<std::string> source_scheme,
     std::optional<int> source_port,
     std::unique_ptr<Network::CookiePartitionKey> partition_key,
@@ -1899,7 +2509,7 @@ void NetworkHandler::DeleteCookies(
           "An http or https url URL must be specified"));
       return;
     }
-    normalized_domain = url.host();
+    normalized_domain = url.GetHost();
   }
 
   auto* cookie_manager =
@@ -1942,21 +2552,63 @@ Response NetworkHandler::EmulateNetworkConditions(
     std::optional<double> packet_loss,
     std::optional<int> packet_queue_length,
     std::optional<bool> packet_reordering) {
-  network::mojom::NetworkConditionsPtr network_conditions;
+  std::vector<network::mojom::MatchedNetworkConditionsPtr> network_conditions;
   bool throttling_enabled = offline || latency > 0 || download_throughput > 0 ||
                             upload_throughput > 0;
   if (throttling_enabled) {
-    network_conditions = network::mojom::NetworkConditions::New();
-    network_conditions->offline = offline;
-    network_conditions->latency = base::Milliseconds(latency);
-    network_conditions->download_throughput = download_throughput;
-    network_conditions->upload_throughput = upload_throughput;
-    network_conditions->packet_loss = packet_loss.value_or(0.);
-    network_conditions->packet_queue_length = packet_queue_length.value_or(0);
-    network_conditions->packet_reordering = packet_reordering.value_or(false);
+    network_conditions.push_back(
+        network::mojom::MatchedNetworkConditions::New());
+    network_conditions.back()->conditions =
+        network::mojom::NetworkConditions::New();
+    network_conditions.back()->conditions->offline = offline;
+    network_conditions.back()->conditions->latency =
+        base::Milliseconds(latency);
+    network_conditions.back()->conditions->download_throughput =
+        download_throughput;
+    network_conditions.back()->conditions->upload_throughput =
+        upload_throughput;
+    network_conditions.back()->conditions->packet_loss =
+        packet_loss.value_or(0.);
+    network_conditions.back()->conditions->packet_queue_length =
+        packet_queue_length.value_or(0);
+    network_conditions.back()->conditions->packet_reordering =
+        packet_reordering.value_or(false);
   }
-  SetNetworkConditions(std::move(network_conditions));
+  SetNetworkConditions(std::move(network_conditions), offline);
   return Response::FallThrough();
+}
+
+Response NetworkHandler::EmulateNetworkConditionsByRule(
+    bool offline,
+    std::unique_ptr<protocol::Array<protocol::Network::NetworkConditions>>
+        matched_network_conditions,
+    std::unique_ptr<protocol::Array<String>>* rule_ids_result) {
+  std::vector<network::mojom::MatchedNetworkConditionsPtr> matched_conditions;
+  *rule_ids_result = std::make_unique<protocol::Array<String>>();
+  for (auto& matched_condition : *matched_network_conditions) {
+    auto rule_id = base::UnguessableToken::Create();
+    network::mojom::MatchedNetworkConditionsPtr conditions =
+        network::mojom::MatchedNetworkConditions::New();
+    conditions->pattern = matched_condition->GetUrlPattern();
+    conditions->conditions = network::mojom::NetworkConditions::New();
+    conditions->conditions->offline = offline;
+    conditions->conditions->latency =
+        base::Milliseconds(matched_condition->GetLatency());
+    conditions->conditions->download_throughput =
+        matched_condition->GetDownloadThroughput();
+    conditions->conditions->upload_throughput =
+        matched_condition->GetUploadThroughput();
+    conditions->conditions->packet_loss = matched_condition->GetPacketLoss(0.);
+    conditions->conditions->packet_queue_length =
+        matched_condition->GetPacketQueueLength(0);
+    conditions->conditions->packet_reordering =
+        matched_condition->GetPacketReordering(false);
+    conditions->conditions->rule_id = rule_id;
+    rule_ids_result->get()->push_back(rule_id.ToString());
+    matched_conditions.emplace_back(std::move(conditions));
+  }
+  SetNetworkConditions(std::move(matched_conditions), offline);
+  return Response::Success();
 }
 
 Response NetworkHandler::SetBypassServiceWorker(bool bypass) {
@@ -2238,13 +2890,6 @@ std::unique_ptr<Network::Response> BuildResponse(
   if (info.ssl_info.has_value())
     response->SetSecurityDetails(BuildSecurityDetails(*info.ssl_info));
 
-  // Sets `is_ip_protection_used` within the response. This is currently set
-  // only if kIpPrivacyEnableIppInDevTools is enabled.
-  // TODO(crbug.com/432716000): Remove this guard once IPP is fully launched.
-  if (net::features::kIpPrivacyEnableIppInDevTools.Get()) {
-    response->SetIsIpProtectionUsed(info.is_for_ip_protection && !was_cached);
-  }
-
   return response;
 }
 
@@ -2440,6 +3085,10 @@ void NetworkHandler::PrefetchRequestWillBeSent(
           .SetReferrerPolicy(referrerPolicy(request.referrer_policy))
           .Build();
 
+  if (request.is_ad_tagged) {
+    request_info->SetIsAdRelated(true);
+  }
+
   frontend_->RequestWillBeSent(
       request_id, request_id, url, std::move(request_info), current_ticks,
       current_wall_time, std::move(initiator), redirect_emitted_extra_info,
@@ -2483,6 +3132,7 @@ void NetworkHandler::NavigationRequestWillBeSent(
           .SetInitialPriority(resourcePriority(net::HIGHEST))
           .SetReferrerPolicy(referrerPolicy(common_params.referrer->policy))
           .Build();
+
   if (!url_fragment.empty())
     request->SetUrlFragment(url_fragment);
 
@@ -2534,6 +3184,11 @@ void NetworkHandler::NavigationRequestWillBeSent(
           host_->ComputeSiteForCookies().IsFirstParty(common_params.url));
     }
   }
+
+  if (nav_request.is_ad_tagged()) {
+    request->SetIsAdRelated(true);
+  }
+
   frontend_->RequestWillBeSent(
       id, id, url_without_fragment, std::move(request), current_ticks,
       current_wall_time, std::move(initiator), redirect_emitted_extra_info,
@@ -2571,6 +3226,10 @@ void NetworkHandler::FencedFrameReportRequestSent(
   if (!event_data.empty()) {
     request_info->SetHasPostData(true);
     request_info->SetPostData(event_data);
+  }
+
+  if (request.is_ad_tagged) {
+    request_info->SetIsAdRelated(true);
   }
 
   frontend_->RequestWillBeSent(
@@ -2615,6 +3274,10 @@ void NetworkHandler::RequestSent(
   if (request_info.trust_token_params) {
     request_object->SetTrustTokenParams(
         BuildTrustTokenParams(*request_info.trust_token_params));
+  }
+
+  if (request_info.is_ad_related) {
+    request_object->SetIsAdRelated(true);
   }
 
   std::string resource_type = Network::ResourceTypeEnum::Other;
@@ -2699,14 +3362,6 @@ String BuildCorsError(network::mojom::CorsError cors_error) {
     case network::mojom::CorsError::kPreflightInvalidAllowCredentials:
       return protocol::Network::CorsErrorEnum::PreflightInvalidAllowCredentials;
 
-    case network::mojom::CorsError::kPreflightMissingAllowPrivateNetwork:
-      return protocol::Network::CorsErrorEnum::
-          PreflightMissingAllowPrivateNetwork;
-
-    case network::mojom::CorsError::kPreflightInvalidAllowPrivateNetwork:
-      return protocol::Network::CorsErrorEnum::
-          PreflightInvalidAllowPrivateNetwork;
-
     case network::mojom::CorsError::kInvalidAllowMethodsPreflightResponse:
       return protocol::Network::CorsErrorEnum::
           InvalidAllowMethodsPreflightResponse;
@@ -2731,25 +3386,6 @@ String BuildCorsError(network::mojom::CorsError cors_error) {
 
     case network::mojom::CorsError::kInvalidPrivateNetworkAccess:
       return protocol::Network::CorsErrorEnum::InvalidPrivateNetworkAccess;
-
-    case network::mojom::CorsError::kUnexpectedPrivateNetworkAccess:
-      return protocol::Network::CorsErrorEnum::UnexpectedPrivateNetworkAccess;
-
-    case network::mojom::CorsError::kPreflightMissingPrivateNetworkAccessId:
-      return protocol::Network::CorsErrorEnum::
-          PreflightMissingPrivateNetworkAccessId;
-
-    case network::mojom::CorsError::kPreflightMissingPrivateNetworkAccessName:
-      return protocol::Network::CorsErrorEnum::
-          PreflightMissingPrivateNetworkAccessName;
-
-    case network::mojom::CorsError::kPrivateNetworkAccessPermissionUnavailable:
-      return protocol::Network::CorsErrorEnum::
-          PrivateNetworkAccessPermissionUnavailable;
-
-    case network::mojom::CorsError::kPrivateNetworkAccessPermissionDenied:
-      return protocol::Network::CorsErrorEnum::
-          PrivateNetworkAccessPermissionDenied;
 
     case network::mojom::CorsError::kLocalNetworkAccessPermissionDenied:
       return protocol::Network::CorsErrorEnum::
@@ -2855,6 +3491,10 @@ void NetworkHandler::FetchKeepAliveRequestWillBeSent(
     }
   }
 
+  if (request.is_ad_tagged) {
+    request_info->SetIsAdRelated(true);
+  }
+
   frontend_->RequestWillBeSent(
       request_id, request_id, url, std::move(request_info), current_ticks,
       current_wall_time, std::move(initiator), redirect_emitted_extra_info,
@@ -2905,10 +3545,7 @@ void NetworkHandler::OnSignedExchangeReceived(
     }
     if (certificate) {
       auto encoded_certificates = std::make_unique<protocol::Array<String>>();
-      encoded_certificates->emplace_back(
-          base::Base64Encode(net::x509_util::CryptoBufferAsStringPiece(
-              certificate->cert_buffer())));
-      for (const auto& cert : certificate->intermediate_buffers()) {
+      for (const auto& cert : certificate->cert_buffers()) {
         encoded_certificates->emplace_back(base::Base64Encode(
             net::x509_util::CryptoBufferAsStringPiece(cert.get())));
       }
@@ -3104,15 +3741,90 @@ void NetworkHandler::BodyDataReceived(const String& request_id,
   received_body_data_[request_id] = {body, is_base64_encoded};
 }
 
-void NetworkHandler::GetResponseBody(
+void NetworkHandler::FedCmRequestWillBeSent(
+    const std::string& request_id,
+    const std::string& loader_id,
+    const network::ResourceRequest& request,
+    const std::optional<std::string>& request_body,
+    const GURL& initiator_url,
+    const std::optional<base::UnguessableToken>& frame_token,
+    base::TimeTicks timestamp) {
+  if (!enabled_) {
+    return;
+  }
+
+  double current_wall_time = base::Time::Now().InSecondsFSinceUnixEpoch();
+  double current_ticks = timestamp.since_origin().InSecondsF();
+
+  std::vector<base::expected<std::vector<uint8_t>, std::string>>
+      request_body_bytes;
+  if (request_body.has_value() && !request_body->empty()) {
+    request_body_bytes.emplace_back(
+        std::vector<uint8_t>(request_body->begin(), request_body->end()));
+  }
+
+  std::unique_ptr<protocol::Network::Request> request_info =
+      CreateRequestFromResourceRequest(request, "",
+                                       std::move(request_body_bytes));
+
+  auto initiator = protocol::Network::Initiator::Create()
+                       .SetType(protocol::Network::Initiator::TypeEnum::FedCM)
+                       .Build();
+  if (!initiator_url.is_empty()) {
+    initiator->SetUrl(initiator_url.spec());
+  }
+
+  std::string frame_token_str =
+      frame_token.has_value() ? frame_token.value().ToString() : "";
+
+  frontend_->RequestWillBeSent(
+      request_id, loader_id, request.url.spec(), std::move(request_info),
+      current_ticks, current_wall_time, std::move(initiator),
+      /*redirectHasExtraInfo=*/false, /*redirectResponse=*/nullptr,
+      std::string(Network::ResourceTypeEnum::FedCM), frame_token_str,
+      /*hasUserGesture=*/false);
+}
+
+void NetworkHandler::ProcessDurableMessageOrGetLocalData(
     const String& request_id,
-    std::unique_ptr<GetResponseBodyCallback> callback) {
+    std::unique_ptr<GetResponseBodyCallback> callback,
+    std::optional<mojo_base::BigBuffer> durable_message) {
+  if (durable_message.has_value()) {
+    std::string_view data_view =
+        base::as_string_view(base::span(*durable_message));
+    if (base::IsStringUTF8(data_view)) {
+      callback->sendSuccess(std::string(data_view), false);
+    } else {
+      callback->sendSuccess(base::Base64Encode(data_view), true);
+    }
+    return;
+  }
+
   auto it = received_body_data_.find(request_id);
   if (it != received_body_data_.end()) {
     callback->sendSuccess(it->second.first, it->second.second);
   } else {
     callback->fallThrough();
   }
+}
+
+void NetworkHandler::GetResponseBody(
+    const String& request_id,
+    std::unique_ptr<GetResponseBodyCallback> callback) {
+  CHECK(storage_partition_);
+  CHECK(devtools_token_);
+  network::mojom::DurableMessageCollector* collector =
+      root_session_->MaybeGetDurableMessageCollector();
+  if (collector) {
+    collector->Retrieve(
+        request_id,
+        base::BindOnce(&NetworkHandler::ProcessDurableMessageOrGetLocalData,
+                       weak_factory_.GetWeakPtr(), request_id,
+                       std::move(callback)));
+    return;
+  }
+  ProcessDurableMessageOrGetLocalData(request_id, std::move(callback),
+                                      std::nullopt);
 }
 
 void NetworkHandler::TakeResponseBodyForInterceptionAsStream(
@@ -3153,7 +3865,7 @@ std::string NetworkHandler::ExtractFragment(const GURL& url,
     *fragment = std::string();
     return url.spec();
   }
-  *fragment = "#" + url.ref();
+  *fragment = "#" + url.GetRef();
   GURL::Replacements replacements;
   replacements.ClearRef();
   return url.ReplaceComponents(replacements).spec();
@@ -3203,6 +3915,9 @@ NetworkHandler::CreateRequestFromResourceRequest(
     request_object->SetPostDataEntries(std::move(data_entries));
     request_object->SetHasPostData(true);
   }
+  if (request.is_ad_tagged) {
+    request_object->SetIsAdRelated(true);
+  }
   return request_object;
 }
 
@@ -3212,24 +3927,39 @@ bool NetworkHandler::MaybeCreateProxyForInterception(
     const base::UnguessableToken& frame_token,
     bool is_navigation,
     bool is_download,
-    network::mojom::URLLoaderFactoryOverride* intercepting_factory) {
+    network::mojom::URLLoaderFactoryOverride* intercepting_factory,
+    mojo::PendingRemote<network::mojom::TrustedURLLoaderHeaderClient>*
+        header_client) {
   return url_loader_interceptor_ &&
          url_loader_interceptor_->CreateProxyForInterception(
              process_id, storage_partition, frame_token, is_navigation,
-             is_download, intercepting_factory);
+             is_download, intercepting_factory, header_client);
 }
 
 void NetworkHandler::ApplyOverrides(
     net::HttpRequestHeaders* headers,
     bool* skip_service_worker,
     bool* disable_cache,
-    std::optional<std::vector<net::SourceStreamType>>* accepted_stream_types) {
-  for (auto& entry : extra_headers_)
+    std::optional<std::vector<net::SourceStreamType>>* accepted_stream_types,
+    GURL* referrer_override) {
+  for (auto& entry : extra_headers_) {
+    if (referrer_override &&
+        base::EqualsCaseInsensitiveASCII(entry.first,
+                                         net::HttpRequestHeaders::kReferer)) {
+      GURL referrer_override_(entry.second);
+      if (referrer_override_.is_valid()) {
+        // If extra header `Referer` is set and is a valid URL, use it as the
+        // referrer.
+        *referrer_override = referrer_override_;
+      }
+    }
     headers->SetHeader(entry.first, entry.second);
+  }
   *skip_service_worker |= bypass_service_worker_;
   *disable_cache |= cache_disabled_;
-  if (!accepted_stream_types_)
+  if (!accepted_stream_types_) {
     return;
+  }
   if (!*accepted_stream_types)
     *accepted_stream_types = std::vector<net::SourceStreamType>();
   (*accepted_stream_types)
@@ -3290,18 +4020,22 @@ void NetworkHandler::RequestIntercepted(
 }
 
 void NetworkHandler::SetNetworkConditions(
-    network::mojom::NetworkConditionsPtr conditions) {
-  if (!storage_partition_)
+    std::vector<network::mojom::MatchedNetworkConditionsPtr> matched_conditions,
+    bool offline) {
+  if (!storage_partition_) {
     return;
+  }
   network::mojom::NetworkContext* context =
       storage_partition_->GetNetworkContext();
-  bool offline = conditions ? conditions->offline : false;
 
-  if (!devtools_token_.is_empty())
-    context->SetNetworkConditions(devtools_token_, std::move(conditions));
+  if (!devtools_token_.is_empty()) {
+    context->SetNetworkConditions(devtools_token_,
+                                  std::move(matched_conditions));
+  }
 
-  if (offline == !!background_sync_restorer_)
+  if (offline == !!background_sync_restorer_) {
     return;
+  }
   background_sync_restorer_.reset(
       offline ? new BackgroundSyncRestorer(host_id_, storage_partition_)
               : nullptr);
@@ -3434,9 +4168,11 @@ void NetworkHandler::OnRequestWillBeSentExtraInfo(
     const std::vector<network::mojom::HttpRawHeaderPairPtr>& request_headers,
     const base::TimeTicks timestamp,
     const network::mojom::ClientSecurityStatePtr& security_state,
-    const network::mojom::OtherPartitionInfoPtr& other_partition_info) {
-  if (!enabled_)
+    const network::mojom::OtherPartitionInfoPtr& other_partition_info,
+    std::optional<base::UnguessableToken> applied_network_conditions_id) {
+  if (!enabled_) {
     return;
+  }
 
   frontend_->RequestWillBeSentExtraInfo(
       devtools_request_id, BuildProtocolAssociatedCookies(request_cookie_list),
@@ -3445,6 +4181,9 @@ void NetworkHandler::OnRequestWillBeSentExtraInfo(
       other_partition_info
           ? std::optional<bool>(
                 other_partition_info->site_has_cookie_in_other_partition)
+          : std::nullopt,
+      applied_network_conditions_id.has_value()
+          ? std::optional<String>(applied_network_conditions_id->ToString())
           : std::nullopt);
 }
 
@@ -3639,7 +4378,7 @@ void NetworkHandler::LoadNetworkResource(
         network::mojom::CSPDirectiveName::ConnectSrc, gurl, gurl,
         /*has_followed_redirect=*/false, /*source_location=*/nullptr,
         network::CSPContext::CHECK_ENFORCED_CSP,
-        /*is_form_submission=*/false);
+        /*is_opaque_fenced_frame=*/false);
     if (!result.IsAllowed()) {
       callback->sendFailure(Response::ServerError("CSP violation"));
       return;
@@ -3654,10 +4393,11 @@ void NetworkHandler::LoadNetworkResource(
         network::mojom::TrustTokenOperationPolicyVerdict::kForbid,
         network::mojom::TrustTokenOperationPolicyVerdict::kForbid,
         frame->GetCookieSettingOverrides(),
+        /*network_restrictions_id=*/std::nullopt,
         "NetworkHandler::LoadNetworkResource");
 
     auto factory = CreateNetworkFactoryForDevTools(
-        gurl.scheme(), frame->GetProcess(), frame->GetRoutingID(),
+        gurl.GetScheme(), frame->GetProcess(), frame->GetRoutingID(),
         frame->GetLastCommittedOrigin(), std::move(params));
     if (!factory.is_valid()) {
       callback->sendFailure(Response::InvalidParams("Unsupported URL scheme"));
@@ -3679,7 +4419,7 @@ void NetworkHandler::LoadNetworkResource(
     // TODO(mkwst): Check CSP for non-frame targets.
     auto info = host->CreateNetworkFactoryParamsForDevTools();
     auto factory = CreateNetworkFactoryForDevTools(
-        gurl.scheme(), host->GetProcessHost(), IPC::mojom::kRoutingIdNone,
+        gurl.GetScheme(), host->GetProcessHost(), IPC::mojom::kRoutingIdNone,
         info.origin, std::move(info.factory_params));
     if (factory.is_valid()) {
       url_loader_factory.Bind(std::move(factory));
@@ -3778,54 +4518,6 @@ void NetworkHandler::OnTrustTokenOperationDone(
       result.issued_token_count);
 }
 
-void NetworkHandler::OnSubresourceWebBundleMetadata(
-    const std::string& devtools_request_id,
-    const std::vector<GURL>& urls) {
-  if (!enabled_)
-    return;
-
-  auto new_urls = std::make_unique<protocol::Array<protocol::String>>();
-  for (const auto& url : urls) {
-    new_urls->push_back(url.spec());
-  }
-  frontend()->SubresourceWebBundleMetadataReceived(devtools_request_id,
-                                                   std::move(new_urls));
-}
-
-void NetworkHandler::OnSubresourceWebBundleMetadataError(
-    const std::string& devtools_request_id,
-    const std::string& error_message) {
-  if (!enabled_)
-    return;
-
-  frontend()->SubresourceWebBundleMetadataError(devtools_request_id,
-                                                error_message);
-}
-
-void NetworkHandler::OnSubresourceWebBundleInnerResponse(
-    const std::string& inner_request_devtools_id,
-    const GURL& url,
-    const std::optional<std::string>& bundle_request_devtools_id) {
-  if (!enabled_)
-    return;
-
-  frontend()->SubresourceWebBundleInnerResponseParsed(
-      inner_request_devtools_id, url.spec(), bundle_request_devtools_id);
-}
-
-void NetworkHandler::OnSubresourceWebBundleInnerResponseError(
-    const std::string& inner_request_devtools_id,
-    const GURL& url,
-    const std::string& error_message,
-    const std::optional<std::string>& bundle_request_devtools_id) {
-  if (!enabled_)
-    return;
-
-  frontend()->SubresourceWebBundleInnerResponseError(
-      inner_request_devtools_id, url.spec(), error_message,
-      bundle_request_devtools_id);
-}
-
 void NetworkHandler::OnPolicyContainerHostUpdated() {
   if (!enabled_) {
     return;
@@ -3846,10 +4538,6 @@ String NetworkHandler::BuildPrivateNetworkRequestPolicy(
       // TODO(crbug.com/40154414): Fix this.
       return protocol::Network::PrivateNetworkRequestPolicyEnum::
           WarnFromInsecureToMorePrivate;
-    case network::mojom::PrivateNetworkRequestPolicy::kPreflightBlock:
-      return protocol::Network::PrivateNetworkRequestPolicyEnum::PreflightBlock;
-    case network::mojom::PrivateNetworkRequestPolicy::kPreflightWarn:
-      return protocol::Network::PrivateNetworkRequestPolicyEnum::PreflightWarn;
     case network::mojom::PrivateNetworkRequestPolicy::kPermissionBlock:
       return protocol::Network::PrivateNetworkRequestPolicyEnum::
           PermissionBlock;
@@ -3892,6 +4580,40 @@ NetworkHandler::BuildCorsErrorStatus(const network::CorsErrorStatus& status) {
       .SetCorsError(BuildCorsError(status.cors_error))
       .SetFailedParameter(status.failed_parameter)
       .Build();
+}
+
+void NetworkHandler::MaybeEnableDurableMessages(base::OnceClosure callback) {
+  if (!enable_durable_messages_ || devtools_token_.is_empty()) {
+    std::move(callback).Run();
+    return;
+  }
+  network::mojom::NetworkDurableMessageConfigPtr durable_messages_config;
+  durable_messages_config = network::mojom::NetworkDurableMessageConfig::New();
+  durable_messages_config->http_storage_max_size =
+      durable_message_max_total_size_;
+  root_session_->EnableDurableMessageCollector(
+      devtools_token_, std::move(durable_messages_config), std::move(callback));
+}
+
+void NetworkHandler::DisableDurableMessages(base::OnceClosure callback) {
+  enable_durable_messages_ = false;
+  root_session_->DisableDurableMessageCollectorForProfile(devtools_token_,
+                                                          std::move(callback));
+}
+
+void NetworkHandler::ConfigureDurableMessages(
+    std::optional<int> max_total_size,
+    std::optional<int> max_resource_size,
+    std::unique_ptr<ConfigureDurableMessagesCallback> callback) {
+  if (!max_total_size.has_value() || max_total_size.value() == 0) {
+    DisableDurableMessages(base::BindOnce(
+        &ConfigureDurableMessagesCallback::sendSuccess, std::move(callback)));
+    return;
+  }
+  durable_message_max_total_size_ = max_total_size.value();
+  enable_durable_messages_ = true;
+  MaybeEnableDurableMessages(base::BindOnce(
+      &ConfigureDurableMessagesCallback::sendSuccess, std::move(callback)));
 }
 
 }  // namespace protocol

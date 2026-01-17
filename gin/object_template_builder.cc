@@ -8,6 +8,7 @@
 
 #include <string_view>
 
+#include "base/strings/strcat.h"
 #include "gin/interceptor.h"
 #include "gin/per_isolate_data.h"
 #include "gin/public/wrappable_pointer_tags.h"
@@ -141,7 +142,7 @@ ObjectTemplateBuilder::ObjectTemplateBuilder(v8::Isolate* isolate,
                   : "Objects of this type cannot be created using the "
                     "constructor"))),
       template_(constructor_template_->InstanceTemplate()) {
-  template_->SetInternalFieldCount(0);
+  template_->SetInternalFieldCount(kNumberOfInternalFields);
 }
 
 ObjectTemplateBuilder::ObjectTemplateBuilder(

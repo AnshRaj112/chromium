@@ -13,11 +13,13 @@
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_renderer_data.h"
+#include "chrome/browser/ui/views/tabs/alert_indicator_button.h"
 #include "chrome/browser/ui/views/tabs/tab_slot_view.h"
 #include "chrome/browser/ui/views/tabs/tab_style_views.h"
 #include "chrome/common/buildflags.h"
 #include "components/performance_manager/public/freezing/freezing.h"
 #include "components/tab_groups/tab_group_id.h"
+#include "components/tabs/public/tab_interface.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/gfx/animation/animation_delegate.h"
 #include "ui/gfx/animation/linear_animation.h"
@@ -29,7 +31,6 @@
 #include "ui/views/masked_targeter_delegate.h"
 #include "ui/views/view_observer.h"
 
-class AlertIndicatorButton;
 class TabCloseButton;
 class TabSlotController;
 class TabIcon;
@@ -50,7 +51,7 @@ enum class TabAlert;
 
 #if BUILDFLAG(ENABLE_GLIC)
 namespace glic {
-class GlicTabUnderlineView;
+class TabUnderlineView;
 }  // namespace glic
 #endif
 
@@ -62,7 +63,8 @@ class GlicTabUnderlineView;
 class Tab : public gfx::AnimationDelegate,
             public views::MaskedTargeterDelegate,
             public views::ViewObserver,
-            public TabSlotView {
+            public TabSlotView,
+            public AlertIndicatorButton::Delegate {
   METADATA_HEADER(Tab, TabSlotView)
 
  public:
@@ -76,7 +78,7 @@ class Tab : public gfx::AnimationDelegate,
   // tests to prevent them from interfering with unrelated tests.
   static void SetShowHoverCardOnMouseHoverForTesting(bool value);
 
-  explicit Tab(TabSlotController* controller);
+  explicit Tab(tabs::TabHandle handle, TabSlotController* controller);
   Tab(const Tab&) = delete;
   Tab& operator=(const Tab&) = delete;
   ~Tab() override;
@@ -112,6 +114,7 @@ class Tab : public gfx::AnimationDelegate,
   TabSlotView::ViewType GetTabSlotViewType() const override;
   TabSizeInfo GetTabSizeInfo() const override;
   void SetGroup(std::optional<tab_groups::TabGroupId> group) override;
+  void SetSplit(std::optional<split_tabs::SplitTabId> split) override;
   void UpdateAccessibleName();
 
   void OnAXNameChanged(ax::mojom::StringAttribute attribute,
@@ -126,9 +129,6 @@ class Tab : public gfx::AnimationDelegate,
   // Returns the color for the tab's group, if any.
   std::optional<SkColor> GetGroupColor() const;
 
-  // Returns the color used for the alert indicator icon.
-  ui::ColorId GetAlertIndicatorColor(tabs::TabAlert state) const;
-
   // Returns true if this tab is the active tab.
   bool IsActive() const;
 
@@ -136,8 +136,11 @@ class Tab : public gfx::AnimationDelegate,
   // changed.
   void ActiveStateChanged();
 
-  // Called when the alert indicator has changed states.
-  void AlertStateChanged();
+  // AlertIndicatorButton::Delegate
+  bool ShouldEnableMuteToggle(int required_width) override;
+  void ToggleTabAudioMute() override;
+  bool IsApparentlyActive() const override;
+  void AlertStateChanged() override;
 
   // Called when the selected state changes.
   void SelectedStateChanged();
@@ -161,17 +164,9 @@ class Tab : public gfx::AnimationDelegate,
   // throbbers in sync.
   void StepLoadingAnimation(const base::TimeDelta& elapsed_time);
 
-  // Sets the visibility of the indicator shown when the tab needs to indicate
-  // to the user that it needs their attention.
-  void SetTabNeedsAttention(bool attention);
-
   void CreateFreezingVote(content::WebContents* contents);
   void ReleaseFreezingVote();
   bool HasFreezingVote() const { return freezing_vote_.has_value(); }
-
-  // Returns the width of the largest part of the tab that is available for the
-  // user to click to select/activate the tab.
-  int GetWidthOfLargestSelectableRegion() const;
 
   bool mouse_hovered() const { return mouse_hovered_; }
 
@@ -192,13 +187,13 @@ class Tab : public gfx::AnimationDelegate,
       const std::u16string& title,
       std::optional<tabs::TabAlert> alert_state);
 
-  // Returns an alert state to be shown among given alert states.
-  static std::optional<tabs::TabAlert> GetAlertStateToShow(
-      const std::vector<tabs::TabAlert>& alert_states);
-
   bool showing_close_button_for_testing() const {
     return showing_close_button_;
   }
+
+  bool showing_icon() const { return showing_icon_; }
+  bool showing_alert_indicator() const { return showing_alert_indicator_; }
+  bool showing_close_button() const { return showing_close_button_; }
 
   raw_ptr<TabCloseButton> close_button() { return close_button_; }
 
@@ -208,12 +203,10 @@ class Tab : public gfx::AnimationDelegate,
     return alert_indicator_button_;
   }
 
-  void SetShouldShowDiscardIndicator(bool enabled);
-
   void UpdateInsets();
 
 #if BUILDFLAG(ENABLE_GLIC)
-  glic::GlicTabUnderlineView* glic_underline() const {
+  glic::TabUnderlineView* glic_underline() const {
     return glic_tab_underline_view_;
   }
 #endif
@@ -250,9 +243,13 @@ class Tab : public gfx::AnimationDelegate,
   // pinned tab.
   bool ShouldRenderAsNormalTab() const;
 
-  // Updates the blocked attention state of the `icon_`. This only updates
-  // state; it is the responsibility of the caller to request a paint.
-  void UpdateTabIconNeedsAttentionBlocked();
+  // Updates the attention state of the `icon_`. This only updates state; it is
+  // the responsibility of the caller to request a paint.
+  void UpdateTabIconAttention();
+
+  // Returns the width of the largest part of the tab that is available for the
+  // user to click to select/activate the tab.
+  int GetWidthOfLargestSelectableRegion() const;
 
   // Selects, generates, and applies colors for various foreground elements to
   // ensure proper contrast. Elements affected include title text, close button
@@ -266,6 +263,9 @@ class Tab : public gfx::AnimationDelegate,
 
   void CloseButtonPressed(const ui::Event& event);
 
+  // The tab handle associated with the view.
+  const tabs::TabHandle tab_handle_;
+
   // The controller, never nullptr.
   const raw_ptr<TabSlotController> controller_;
 
@@ -277,7 +277,7 @@ class Tab : public gfx::AnimationDelegate,
   bool closing_ = false;
 
 #if BUILDFLAG(ENABLE_GLIC)
-  raw_ptr<glic::GlicTabUnderlineView> glic_tab_underline_view_ = nullptr;
+  raw_ptr<glic::TabUnderlineView> glic_tab_underline_view_ = nullptr;
 #endif
 
   raw_ptr<TabIcon> icon_ = nullptr;

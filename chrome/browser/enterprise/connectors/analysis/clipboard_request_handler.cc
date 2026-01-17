@@ -5,10 +5,10 @@
 #include "chrome/browser/enterprise/connectors/analysis/clipboard_request_handler.h"
 
 #include "chrome/browser/enterprise/connectors/analysis/content_analysis_info.h"
-#include "chrome/browser/enterprise/data_controls/reporting_service.h"
 #include "chrome/browser/safe_browsing/cloud_content_scanning/deep_scanning_utils.h"
 #include "components/enterprise/connectors/core/common.h"
 #include "components/enterprise/connectors/core/reporting_constants.h"
+#include "components/enterprise/connectors/core/reporting_event_router.h"
 
 namespace enterprise_connectors {
 
@@ -24,7 +24,7 @@ ClipboardRequestHandler::TestFactory* TestFactoryStorage() {
 // static
 std::unique_ptr<ClipboardRequestHandler> ClipboardRequestHandler::Create(
     ContentAnalysisInfo* content_analysis_info,
-    safe_browsing::BinaryUploadService* upload_service,
+    BinaryUploadService* upload_service,
     Profile* profile,
     GURL url,
     Type type,
@@ -63,7 +63,7 @@ ClipboardRequestHandler::~ClipboardRequestHandler() = default;
 
 ClipboardRequestHandler::ClipboardRequestHandler(
     ContentAnalysisInfo* content_analysis_info,
-    safe_browsing::BinaryUploadService* upload_service,
+    BinaryUploadService* upload_service,
     Profile* profile,
     GURL url,
     Type type,
@@ -91,8 +91,7 @@ void ClipboardRequestHandler::ReportWarningBypass(
   ReportAnalysisConnectorWarningBypass(
       profile_, *content_analysis_info_,
       /*source*/
-      data_controls::ReportingService::GetClipboardSourceString(
-          clipboard_source_),
+      ReportingEventRouter::GetClipboardSourceString(clipboard_source_),
       /*destination*/ url_.spec(),
       type_ == Type::kText ? "Text data" : "Image data",
       /*download_digest_sha256*/ "", type_ == Type::kText ? "text/plain" : "",
@@ -118,11 +117,13 @@ bool ClipboardRequestHandler::UploadDataImpl() {
 
   content_analysis_info_->InitializeRequest(request.get());
   request->set_analysis_connector(BULK_DATA_ENTRY);
+  if (type_ == Type::kImage) {
+    request->set_image_paste(true);
+  }
   if (type_ == Type::kText) {
     request->set_destination(url_.spec());
     std::string source_string =
-        data_controls::ReportingService::GetClipboardSourceString(
-            clipboard_source_);
+        ReportingEventRouter::GetClipboardSourceString(clipboard_source_);
     if (!source_string.empty()) {
       request->set_source(source_string);
     }
@@ -142,17 +143,17 @@ bool ClipboardRequestHandler::UploadDataImpl() {
 }
 
 void ClipboardRequestHandler::OnContentAnalysisResponse(
-    safe_browsing::BinaryUploadService::Result result,
+    ScanRequestUploadResult result,
     ContentAnalysisResponse response) {
   response_ = std::move(response);
   request_tokens_to_ack_final_actions_[response_.request_token()] =
       GetAckFinalAction(response_);
 
-  RecordDeepScanMetrics(content_analysis_info_->settings()
-                            .cloud_or_local_settings.is_cloud_analysis(),
-                        access_point_,
-                        base::TimeTicks::Now() - upload_start_time_,
-                        content_size_, result, response_);
+  safe_browsing::RecordDeepScanMetrics(
+      content_analysis_info_->settings()
+          .cloud_or_local_settings.is_cloud_analysis(),
+      access_point_, base::TimeTicks::Now() - upload_start_time_, content_size_,
+      result, response_);
 
   auto request_handler_result = CalculateRequestHandlerResult(
       content_analysis_info_->settings(), result, response_);
@@ -166,8 +167,7 @@ void ClipboardRequestHandler::OnContentAnalysisResponse(
   MaybeReportDeepScanningVerdict(
       profile_, content_analysis_info_.get(),
       /*source*/
-      data_controls::ReportingService::GetClipboardSourceString(
-          clipboard_source_),
+      ReportingEventRouter::GetClipboardSourceString(clipboard_source_),
       /*destination*/ url_.spec(),
       type_ == Type::kText ? "Text data" : "Image data",
       /*download_digest_sha256*/ "", type_ == Type::kText ? "text/plain" : "",

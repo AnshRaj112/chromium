@@ -6,6 +6,7 @@
  * @fileoverview
  * 'settings-people-page' is the settings page containing sign-in settings.
  */
+import 'chrome://resources/cr_elements/cr_icon/cr_icon.js';
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_icon_button/cr_icon_button.js';
 import 'chrome://resources/cr_elements/cr_link_row/cr_link_row.js';
@@ -25,13 +26,13 @@ import '../settings_shared.css.js';
 import type {ProfileInfo} from '/shared/settings/people_page/profile_info_browser_proxy.js';
 import {ProfileInfoBrowserProxyImpl} from '/shared/settings/people_page/profile_info_browser_proxy.js';
 import type {StoredAccount, SyncBrowserProxy, SyncStatus} from '/shared/settings/people_page/sync_browser_proxy.js';
-import {SignedInState, SyncBrowserProxyImpl} from '/shared/settings/people_page/sync_browser_proxy.js';
+import {ChromeSigninAccessPoint, SignedInState, StatusAction, SyncBrowserProxyImpl} from '/shared/settings/people_page/sync_browser_proxy.js';
 // <if expr="is_chromeos">
 import {convertImageSequenceToPng} from 'chrome://resources/ash/common/cr_picture/png.js';
 // </if>
 import type {CrToastElement} from 'chrome://resources/cr_elements/cr_toast/cr_toast.js';
 import {WebUiListenerMixin} from 'chrome://resources/cr_elements/web_ui_listener_mixin.js';
-import {assert} from 'chrome://resources/js/assert.js';
+import {assert, assertNotReached} from 'chrome://resources/js/assert.js';
 import {focusWithoutInk} from 'chrome://resources/js/focus_without_ink.js';
 import {getImage} from 'chrome://resources/js/icon.js';
 import {OpenWindowProxyImpl} from 'chrome://resources/js/open_window_proxy.js';
@@ -41,11 +42,9 @@ import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bu
 import {loadTimeData} from '../i18n_setup.js';
 import {routes} from '../route.js';
 import type {Route} from '../router.js';
-import {Router} from '../router.js';
+import {RouteObserverMixin, Router} from '../router.js';
 import {SettingsViewMixin} from '../settings_page/settings_view_mixin.js';
 
-// <if expr="not is_chromeos">
-import {RouteObserverMixin} from '../router.js';
 // </if>
 
 // <if expr="is_chromeos">
@@ -189,6 +188,12 @@ export class SettingsPeoplePageElement extends SettingsPeoplePageElementBase {
       primaryAccountEmail_: String,
       primaryAccountIconUrl_: String,
       // </if>
+
+      // Exposes ChromeSigninAccessPoint enum to HTML bindings.
+      accessPointEnum_: {
+        type: Object,
+        value: ChromeSigninAccessPoint,
+      },
     };
   }
 
@@ -318,8 +323,11 @@ export class SettingsPeoplePageElement extends SettingsPeoplePageElementBase {
     // Sign-in impressions should be recorded only if the sign-in promo is
     // shown. They should be recorder only once, the first time
     // |this.syncStatus| is set.
+    // With `ReplaceSyncPromosWithSignInPromos`, this is not a sign in promo, so
+    // we should not record.
     const shouldRecordSigninImpression = !this.syncStatus && syncStatus &&
-        this.signinAllowed_ && !this.isSyncing_();
+        this.signinAllowed_ && !this.isSyncing_() &&
+        !this.replaceSyncPromosWithSignInPromos_;
 
     this.syncStatus = syncStatus;
 
@@ -336,8 +344,16 @@ export class SettingsPeoplePageElement extends SettingsPeoplePageElementBase {
       return false;
     }
 
-    return (this.storedAccounts!.length > 0 || this.isSyncing_()) &&
-        !this.syncStatus!.hasError;
+    if (this.syncStatus!.hasError &&
+        this.syncStatus!.statusAction !== StatusAction.UPGRADE_CLIENT &&
+        this.syncStatus!.statusAction !==
+            StatusAction.SHOW_BOOKMARKS_LIMIT_HELP_ARTICLE) {
+      return false;
+    }
+
+    return (!this.replaceSyncPromosWithSignInPromos_ &&
+            this.storedAccounts!.length > 0) ||
+        this.isSyncing_();
   }
   // </if>
 
@@ -392,6 +408,11 @@ export class SettingsPeoplePageElement extends SettingsPeoplePageElementBase {
         this.syncStatus.signedInState === SignedInState.SIGNED_IN;
   }
 
+  private shouldLinkToProfileRow_(): boolean {
+    return !this.shouldShowSyncAccountControl_() &&
+        !this.shouldLinkToAccountSettingsPage_();
+  }
+
   private shouldShowSyncAccountControl_(): boolean {
     if (this.syncStatus === undefined) {
       return false;
@@ -427,7 +448,10 @@ export class SettingsPeoplePageElement extends SettingsPeoplePageElementBase {
   /**
    * @return A CSS image-set for multiple scale factors.
    */
-  private getIconImageSet_(iconUrl: string): string {
+  private getIconImageSet_(iconUrl?: string): string {
+    if (!iconUrl) {
+      return '';
+    }
     return getImage(iconUrl);
   }
 
@@ -441,6 +465,22 @@ export class SettingsPeoplePageElement extends SettingsPeoplePageElementBase {
     return this.replaceSyncPromosWithSignInPromos_ &&
         (!this.syncStatus ||
          this.syncStatus.signedInState !== SignedInState.SYNCING);
+  }
+
+  private getAccountRowSubtitle_(): string {
+    if (this.syncStatus && this.syncStatus.statusText) {
+      if (this.syncStatus.statusAction === StatusAction.ENTER_PASSPHRASE) {
+        return loadTimeData.substituteString(
+            this.syncStatus.statusText, this.primaryAccountEmail_);
+      }
+
+      if (this.syncStatus.statusAction ===
+          StatusAction.SHOW_BOOKMARKS_LIMIT_HELP_ARTICLE) {
+        return this.syncStatus.statusText;
+      }
+    }
+
+    return this.primaryAccountEmail_;
   }
   // </if>
 
@@ -490,17 +530,15 @@ export class SettingsPeoplePageElement extends SettingsPeoplePageElementBase {
         break;
       case 'account':
         assert(loadTimeData.getBoolean('replaceSyncPromosWithSignInPromos'));
-        // TODO(crbug.com/429139804): Replace with actual entry point once
-        // implemented.
-        triggerId = 'sync-setup';
+        triggerId = 'account-subpage-row';
         break;
       case 'googleServices':
         assert(loadTimeData.getBoolean('replaceSyncPromosWithSignInPromos'));
-        // TODO(crbug.com/429139804): Replace with actual entry point once
-        // implemented.
-        triggerId = 'sync-setup';
+        triggerId = 'google-services';
         break;
         // </if>
+      default:
+        assertNotReached();
     }
 
     assert(triggerId);

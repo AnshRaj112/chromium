@@ -345,9 +345,12 @@ FakeRenderFrameMetadataObserver::FakeRenderFrameMetadataObserver(
 // MockInputEventObserver -------------------------------------------------
 class MockInputEventObserver : public RenderWidgetHost::InputEventObserver {
  public:
-  MOCK_METHOD2(OnInputEvent,
-               void(const RenderWidgetHost& widget,
-                    const blink::WebInputEvent&));
+  MOCK_METHOD(void,
+              OnInputEvent,
+              (const RenderWidgetHost& widget,
+               const blink::WebInputEvent&,
+               InputEventSource),
+              (override));
 #if BUILDFLAG(IS_ANDROID)
   MOCK_METHOD1(OnImeTextCommittedEvent, void(const std::u16string& text_str));
   MOCK_METHOD1(OnImeSetComposingTextEvent,
@@ -384,20 +387,12 @@ class MockRenderWidgetHostDelegate : public RenderWidgetHostDelegate {
     return unhandled_keyboard_event_type_;
   }
 
-  bool prehandle_mouse_event_called() const {
-    return prehandle_mouse_event_called_;
-  }
-
   bool prehandle_keyboard_event_called() const {
     return prehandle_keyboard_event_called_;
   }
 
   WebInputEvent::Type prehandle_keyboard_event_type() const {
     return prehandle_keyboard_event_type_;
-  }
-
-  void set_prehandle_mouse_event(bool handle) {
-    prehandle_mouse_event_ = handle;
   }
 
   void set_prehandle_keyboard_event(bool handle) {
@@ -467,14 +462,6 @@ class MockRenderWidgetHostDelegate : public RenderWidgetHostDelegate {
               (override));
 
  protected:
-  bool PreHandleMouseEvent(const blink::WebMouseEvent& event) override {
-    prehandle_mouse_event_called_ = true;
-    if (prehandle_mouse_event_) {
-      return true;
-    }
-    return false;
-  }
-
   KeyboardEventProcessingResult PreHandleKeyboardEvent(
       const input::NativeWebKeyboardEvent& event) override {
     prehandle_keyboard_event_type_ = event.GetType();
@@ -526,8 +513,6 @@ class MockRenderWidgetHostDelegate : public RenderWidgetHostDelegate {
   }
 
  private:
-  bool prehandle_mouse_event_ = false;
-  bool prehandle_mouse_event_called_ = false;
   bool prehandle_keyboard_event_;
   bool prehandle_keyboard_event_is_shortcut_;
   bool prehandle_keyboard_event_called_;
@@ -846,13 +831,10 @@ class RenderWidgetHostTest : public testing::Test {
     touch_event_.ReleasePoint(index);
   }
 
-  const WebInputEvent* GetInputEventFromMessage(const IPC::Message& message) {
-    base::PickleIterator iter(message);
-    const char* data;
-    size_t data_length;
-    if (!iter.ReadData(&data, &data_length))
-      return nullptr;
-    return reinterpret_cast<const WebInputEvent*>(data);
+  void WaitForHang() {
+    task_environment_.FastForwardBy(input::kHungRendererDelay +
+                                    input::kHungRendererPingTimeout +
+                                    base::Milliseconds(10));
   }
 
   BrowserTaskEnvironment task_environment_{
@@ -1607,37 +1589,6 @@ TEST_F(RenderWidgetHostTest, SendEditCommandsBeforeKeyEvent) {
       blink::mojom::InputEventResultState::kConsumed);
 }
 
-TEST_F(RenderWidgetHostTest, PreHandleMouseEvent) {
-  // Simulate the situation that the browser handled the mouse event during
-  // pre-handle phrase.
-  delegate_->set_prehandle_mouse_event(true);
-
-  // Simulate a mouse event.
-  SimulateMouseEvent(WebMouseEvent::Type::kMouseDown);
-
-  EXPECT_TRUE(delegate_->prehandle_mouse_event_called());
-
-  // Make sure the mouse event is not sent to the renderer.
-  MockWidgetInputHandler::MessageVector dispatched_events =
-      host_->mock_render_input_router()->GetAndResetDispatchedMessages();
-  EXPECT_EQ(0u, dispatched_events.size());
-
-  // Simulate the situation that the browser didn't handle the mouse event
-  // during pre-handle phrase.
-  delegate_->set_prehandle_mouse_event(false);
-
-  // Simulate a mouse event.
-  SimulateMouseEvent(WebMouseEvent::Type::kMouseUp);
-
-  // Make sure the mouse event is sent to the renderer.
-  dispatched_events =
-      host_->mock_render_input_router()->GetAndResetDispatchedMessages();
-  ASSERT_EQ(1u, dispatched_events.size());
-  ASSERT_TRUE(dispatched_events[0]->ToEvent());
-  EXPECT_EQ(WebMouseEvent::Type::kMouseUp,
-            dispatched_events[0]->ToEvent()->Event()->Event().GetType());
-}
-
 TEST_F(RenderWidgetHostTest, PreHandleRawKeyDownEvent) {
   // Simulate the situation that the browser handled the key down event during
   // pre-handle phrase.
@@ -1863,7 +1814,8 @@ TEST_F(RenderWidgetHostTest, UnhandledGestureEvent) {
 // Test that the hang monitor timer expires properly if a new timer is started
 // while one is in progress (see crbug.com/11007).
 TEST_F(RenderWidgetHostTest, DontPostponeInputEventAckTimeout) {
-  base::TimeDelta delay = input::kHungRendererDelay;
+  base::TimeDelta delay =
+      input::kHungRendererDelay + input::kHungRendererPingTimeout;
 
   // Start a timeout.
   host_->GetRenderInputRouter()->StartInputEventAckTimeoutForTesting();
@@ -1891,8 +1843,7 @@ TEST_F(RenderWidgetHostTest, StopAndStartInputEventAckTimeout) {
   host_->GetRenderInputRouter()->StartInputEventAckTimeoutForTesting();
 
   // Wait long enough for first timeout and see if it fired.
-  task_environment_.FastForwardBy(input::kHungRendererDelay +
-                                  base::Milliseconds(10));
+  WaitForHang();
   EXPECT_TRUE(delegate_->unresponsive_timer_fired());
 }
 
@@ -1906,21 +1857,18 @@ TEST_F(RenderWidgetHostTest, InputEventAckTimeoutDisabledForInputWhenHidden) {
 
   // The timeout should not fire.
   EXPECT_FALSE(delegate_->unresponsive_timer_fired());
-  task_environment_.FastForwardBy(input::kHungRendererDelay +
-                                  base::Milliseconds(10));
+  WaitForHang();
   EXPECT_FALSE(delegate_->unresponsive_timer_fired());
 
   // The timeout should never reactivate while hidden.
   SimulateMouseEvent(WebInputEvent::Type::kMouseMove, 10, 10, 0, false);
-  task_environment_.FastForwardBy(input::kHungRendererDelay +
-                                  base::Milliseconds(10));
+  WaitForHang();
   EXPECT_FALSE(delegate_->unresponsive_timer_fired());
 
   // Showing the widget should restore the timeout, as the events have
   // not yet been ack'ed.
   host_->WasShown({} /* record_tab_switch_time_request */);
-  task_environment_.FastForwardBy(input::kHungRendererDelay +
-                                  base::Milliseconds(10));
+  WaitForHang();
   EXPECT_TRUE(delegate_->unresponsive_timer_fired());
 }
 
@@ -1943,8 +1891,7 @@ TEST_F(RenderWidgetHostTest, MultipleInputEvents) {
       blink::mojom::InputEventResultState::kConsumed);
 
   // Wait long enough for second timeout and see if it fired.
-  task_environment_.FastForwardBy(input::kHungRendererDelay +
-                                  base::Milliseconds(10));
+  WaitForHang();
   EXPECT_TRUE(delegate_->unresponsive_timer_fired());
 }
 
@@ -2296,9 +2243,9 @@ TEST_F(RenderWidgetHostTest, RendererExitedResetsIsHidden) {
   host_->SetView(new TestView(host_.get()));
   host_->WasShown({} /* record_tab_switch_time_request */);
 
-  ASSERT_FALSE(host_->is_hidden());
+  ASSERT_FALSE(host_->IsHidden());
   host_->RendererExited();
-  ASSERT_TRUE(host_->is_hidden());
+  ASSERT_TRUE(host_->IsHidden());
 
   // Make sure the input router is in a fresh state.
   ASSERT_FALSE(host_->input_router()->HasPendingEvents());
@@ -2325,7 +2272,7 @@ TEST_F(RenderWidgetHostTest, RendererExitedNoDrag) {
 
   GURL http_url = GURL("http://www.domain.com/index.html");
   DropData drop_data;
-  drop_data.url = http_url;
+  drop_data.url_infos = {ui::ClipboardUrlInfo{http_url, u""}};
   drop_data.html_base_url = http_url;
   FileSystemAccessManagerImpl* file_system_manager =
       static_cast<StoragePartitionImpl*>(process_->GetStoragePartition())
@@ -2528,7 +2475,7 @@ TEST_F(RenderWidgetHostTest, AddAndRemoveInputEventObserver) {
   // Confirm OnInputEvent is triggered.
   input::NativeWebKeyboardEvent native_event =
       CreateNativeWebKeyboardEvent(WebInputEvent::Type::kChar);
-  EXPECT_CALL(observer, OnInputEvent(_, _)).Times(1);
+  EXPECT_CALL(observer, OnInputEvent(_, _, _)).Times(1);
   std::move(host_->GetRenderInputRouter()->GetDispatchToRendererCallback())
       .Run(native_event, input::DispatchToRendererResult::kNotDispatched);
 
@@ -2536,7 +2483,7 @@ TEST_F(RenderWidgetHostTest, AddAndRemoveInputEventObserver) {
   host_->RemoveInputEventObserver(&observer);
 
   // Confirm InputEventObserver is removed.
-  EXPECT_CALL(observer, OnInputEvent(_, _)).Times(0);
+  EXPECT_CALL(observer, OnInputEvent(_, _, _)).Times(0);
   std::move(host_->GetRenderInputRouter()->GetDispatchToRendererCallback())
       .Run(native_event, input::DispatchToRendererResult::kNotDispatched);
 }
@@ -2555,7 +2502,7 @@ TEST_F(RenderWidgetHostTest, ScopedObservationWithInputEventObserver) {
   // Confirm OnInputEvent is triggered.
   input::NativeWebKeyboardEvent native_event =
       CreateNativeWebKeyboardEvent(WebInputEvent::Type::kChar);
-  EXPECT_CALL(observer, OnInputEvent(_, _)).Times(1);
+  EXPECT_CALL(observer, OnInputEvent(_, _, _)).Times(1);
   std::move(host_->GetRenderInputRouter()->GetDispatchToRendererCallback())
       .Run(native_event, input::DispatchToRendererResult::kNotDispatched);
 
@@ -2563,7 +2510,7 @@ TEST_F(RenderWidgetHostTest, ScopedObservationWithInputEventObserver) {
   scoped_observation.Reset();
 
   // Confirm InputEventObserver is removed.
-  EXPECT_CALL(observer, OnInputEvent(_, _)).Times(0);
+  EXPECT_CALL(observer, OnInputEvent(_, _, _)).Times(0);
   std::move(host_->GetRenderInputRouter()->GetDispatchToRendererCallback())
       .Run(native_event, input::DispatchToRendererResult::kNotDispatched);
 }
@@ -2593,7 +2540,7 @@ TEST_F(RenderWidgetHostTest, OnVerticalScrollDirectionChanged) {
   const auto NotifyVerticalScrollDirectionChanged =
       [this](viz::VerticalScrollDirection scroll_direction) {
         static uint32_t frame_token = 1u;
-        host_->frame_token_message_queue_->DidProcessFrame(
+        host_->render_frame_metadata_provider_.DidProcessFrame(
             frame_token, base::TimeTicks::Now());
 
         cc::RenderFrameMetadata metadata;

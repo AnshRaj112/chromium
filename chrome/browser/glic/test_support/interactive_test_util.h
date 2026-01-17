@@ -37,7 +37,7 @@ namespace internal {
 class GlicFreShowingDialogObserver
     : public ui::test::PollingStateObserver<bool> {
  public:
-  explicit GlicFreShowingDialogObserver(GlicFreController* controller);
+  explicit GlicFreShowingDialogObserver(const GlicFreController& controller);
   ~GlicFreShowingDialogObserver() override;
 };
 
@@ -45,11 +45,15 @@ DECLARE_STATE_IDENTIFIER_VALUE(GlicFreShowingDialogObserver,
                                kGlicFreShowingDialogState);
 
 // Observes `controller` for changes to state().
+// When `tab` is not null, it will return a GlicWindowController::State inferred
+// by the IsShowing() method of the instance for the given tab. Otherwise, it
+// will return the state() from the controller.
 class GlicWindowControllerStateObserver
     : public ui::test::PollingStateObserver<GlicWindowController::State> {
  public:
   explicit GlicWindowControllerStateObserver(
-      const GlicWindowController& controller);
+      const GlicWindowController& controller,
+      tabs::TabInterface* tab = nullptr);
   ~GlicWindowControllerStateObserver() override;
 };
 
@@ -83,8 +87,8 @@ DECLARE_STATE_IDENTIFIER_VALUE(GlicAppStateObserver, kGlicAppState);
 // True when the timer is not running. Use `Start()` to start the timer.
 class WaitingStateObserver : public ui::test::StateObserver<bool> {
  public:
-  WaitingStateObserver() { OnStateObserverStateChanged(true); }
-  ~WaitingStateObserver() override = default;
+  WaitingStateObserver();
+  ~WaitingStateObserver() override;
 
   void Start(base::TimeDelta timeout) {
     OnStateObserverStateChanged(false);

@@ -10,6 +10,7 @@
 #include "content/browser/child_process_security_policy_impl.h"
 #include "content/browser/process_lock.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/render_process_host.h"
 
 namespace content {
@@ -54,9 +55,10 @@ void RecentlyDestroyedHosts::RecordMetricIfReusableHostRecentlyDestroyed(
             reusable_host_lookup_time - iter->second;
         base::UmaHistogramCustomTimes(
             "SiteIsolation.ReusePendingOrCommittedSite."
-            "TimeSinceReusableProcessDestroyed.MainFrame",
+            "TimeSinceReusableProcessDestroyed.MainFrame2",
             reuse_interval, base::Milliseconds(1), kMainFrameStorageTimeout,
             50);
+        instance->recently_destroyed_hosts_for_main_frame_reuse_.erase(iter);
       }
       break;
     }
@@ -76,8 +78,9 @@ void RecentlyDestroyedHosts::RecordMetricIfReusableHostRecentlyDestroyed(
             reusable_host_lookup_time - iter->second;
         base::UmaHistogramCustomTimes(
             "SiteIsolation.ReusePendingOrCommittedSite."
-            "TimeSinceReusableProcessDestroyed.Subframe",
+            "TimeSinceReusableProcessDestroyed.Subframe2",
             reuse_interval, base::Milliseconds(1), kSubframeStorageTimeout, 50);
+        instance->recently_destroyed_hosts_for_subframe_reuse_.erase(iter);
       }
       break;
     }
@@ -101,8 +104,9 @@ void RecentlyDestroyedHosts::Add(
   // Don't record sites with an empty process lock. This includes sites on
   // Android that are not isolated. These sites would not be affected by
   // increased process reuse, so are irrelevant for the metric being recorded.
-  if (!process_lock.is_locked_to_site())
+  if (!process_lock.IsLockedToSite()) {
     return;
+  }
 
   // Record the time before |time_spent_running_unload_handlers| to exclude time
   // spent in delayed-shutdown state from the metric. This makes it consistent

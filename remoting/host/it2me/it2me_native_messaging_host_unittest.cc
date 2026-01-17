@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "remoting/host/it2me/it2me_native_messaging_host.h"
 
 #include <cstdint>
@@ -21,6 +16,7 @@
 #include "base/json/json_writer.h"
 #include "base/location.h"
 #include "base/logging.h"
+#include "base/memory/memory_pressure_listener_registry.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/numerics/safe_conversions.h"
@@ -312,6 +308,10 @@ class It2MeNativeMessagingHostTest : public testing::Test {
   base::File input_write_file_;
   base::File output_read_file_;
 
+  // Without a MemoryPressureListenerRegistry, a debug logging message is
+  // emitted, which affects this test suite.
+  base::MemoryPressureListenerRegistry memory_pressure_listener_registry_;
+
   std::unique_ptr<base::test::TaskEnvironment> task_environment_;
   std::unique_ptr<base::RunLoop> test_run_loop_;
 
@@ -403,24 +403,24 @@ std::optional<base::Value::Dict>
 It2MeNativeMessagingHostTest::ReadMessageFromOutputPipe() {
   while (true) {
     uint32_t length;
-    int read_result = output_read_file_.ReadAtCurrentPos(
-        reinterpret_cast<char*>(&length), sizeof(length));
+    int read_result = UNSAFE_TODO(output_read_file_.ReadAtCurrentPos(
+        reinterpret_cast<char*>(&length), sizeof(length)));
     if (read_result != sizeof(length)) {
       // The output pipe has been closed, return an empty message.
       return std::nullopt;
     }
 
     std::string message_json(length, '\0');
-    read_result =
-        output_read_file_.ReadAtCurrentPos(std::data(message_json), length);
+    read_result = UNSAFE_TODO(
+        output_read_file_.ReadAtCurrentPos(std::data(message_json), length));
     if (read_result != static_cast<int>(length)) {
       LOG(ERROR) << "Message size (" << read_result
                  << ") doesn't match the header (" << length << ").";
       return std::nullopt;
     }
 
-    std::optional<base::Value::Dict> message =
-        base::JSONReader::ReadDict(message_json);
+    std::optional<base::Value::Dict> message = base::JSONReader::ReadDict(
+        message_json, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
     if (!message) {
       LOG(ERROR) << "Malformed message:" << message_json;
       return std::nullopt;
@@ -436,8 +436,7 @@ It2MeNativeMessagingHostTest::ReadMessageFromOutputPipe() {
 
 void It2MeNativeMessagingHostTest::WriteMessageToInputPipe(
     const base::Value::Dict& message) {
-  std::string message_json;
-  base::JSONWriter::Write(message, &message_json);
+  std::string message_json = base::WriteJson(message).value_or("");
 
   uint32_t length = base::checked_cast<uint32_t>(message_json.length());
   input_write_file_.WriteAtCurrentPos(base::byte_span_from_ref(length));
@@ -714,6 +713,7 @@ TEST_F(It2MeNativeMessagingHostTest,
   params.allow_clipboard_sync = false;
   params.connection_auto_accept_timeout = base::Hours(8);
   params.request_origin = ChromeOsEnterpriseRequestOrigin::kEnterpriseAdmin;
+  params.audio_playback = ChromeOsEnterpriseAudioPlayback::kLocalOnly;
   connect_message.Merge(params.ToDict());
   WriteMessageToInputPipe(connect_message);
   VerifyConnectResponses(next_id);
@@ -729,6 +729,8 @@ TEST_F(It2MeNativeMessagingHostTest,
             base::Hours(8));
   ASSERT_EQ(get_chrome_os_enterprise_params()->request_origin,
             ChromeOsEnterpriseRequestOrigin::kEnterpriseAdmin);
+  ASSERT_EQ(get_chrome_os_enterprise_params()->audio_playback,
+            ChromeOsEnterpriseAudioPlayback::kLocalOnly);
 #else
   ASSERT_FALSE(get_chrome_os_enterprise_params().has_value());
 #endif

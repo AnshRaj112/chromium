@@ -4,9 +4,10 @@
 
 #include "google_apis/gcm/engine/unregistration_request.h"
 
+#include <optional>
+#include <string>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/strings/escape.h"
@@ -18,6 +19,7 @@
 #include "google_apis/gcm/monitoring/gcm_stats_recorder.h"
 #include "net/base/load_flags.h"
 #include "net/http/http_request_headers.h"
+#include "net/http/http_response_headers.h"
 #include "net/http/http_status_code.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "services/network/public/cpp/resource_request.h"
@@ -47,13 +49,13 @@ const char kDeviceRegistrationError[] = "PHONE_REGISTRATION_ERROR";
 
 // Gets correct status from the error message.
 UnregistrationRequest::Status GetStatusFromError(const std::string& error) {
-  if (base::Contains(error, kInvalidParameters)) {
+  if (error.contains(kInvalidParameters)) {
     return UnregistrationRequest::INVALID_PARAMETERS;
   }
-  if (base::Contains(error, kInternalServerError)) {
+  if (error.contains(kInternalServerError)) {
     return UnregistrationRequest::INTERNAL_SERVER_ERROR;
   }
-  if (base::Contains(error, kDeviceRegistrationError)) {
+  if (error.contains(kDeviceRegistrationError)) {
     return UnregistrationRequest::DEVICE_REGISTRATION_ERROR;
   }
   // Should not be reached, unless the server adds new error types.
@@ -210,13 +212,13 @@ void UnregistrationRequest::BuildRequestBody(std::string* body) {
 
 UnregistrationRequest::Status UnregistrationRequest::ParseResponse(
     const network::SimpleURLLoader* source,
-    std::unique_ptr<std::string> body) {
+    std::optional<std::string> body) {
   if (!body) {
     DVLOG(1) << "Unregistration URL fetching failed.";
     return URL_FETCHING_FAILED;
   }
 
-  std::string response = std::move(*body);
+  std::string response = std::move(body).value();
 
   // If we are able to parse a meaningful known error, let's do so. Note that
   // some errors will have HTTP_OK response code!
@@ -271,7 +273,7 @@ void UnregistrationRequest::RetryWithBackoff() {
 
 void UnregistrationRequest::OnURLLoadComplete(
     const network::SimpleURLLoader* source,
-    std::unique_ptr<std::string> body) {
+    std::optional<std::string> body) {
   UnregistrationRequest::Status status = ParseResponse(source, std::move(body));
 
   DVLOG(1) << "UnregistrationRequestStatus: " << status;

@@ -10,7 +10,6 @@
 #include "base/test/bind.h"
 #include "chrome/browser/ash/growth/install_web_app_action_performer.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
-#include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/web_applications/test/fake_os_integration_manager.h"
 #include "chrome/browser/web_applications/test/fake_web_app_provider.h"
@@ -135,7 +134,8 @@ class InstallWebAppActionPerformerTest : public testing::Test {
 TEST_F(InstallWebAppActionPerformerTest, TestValidInstallation) {
   const auto validInstallDictString =
       base::StringPrintf(kAppInstallTemplate, kValidURLKey, kValidURL);
-  auto value = base::JSONReader::Read(validInstallDictString);
+  auto value = base::JSONReader::Read(validInstallDictString,
+                                      base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ASSERT_TRUE(value.has_value());
   action().Run(/*campaign_id=*/1, /*group_id=*/std::nullopt, &value->GetDict(),
                base::BindOnce(&InstallWebAppActionPerformerTest::
@@ -147,7 +147,8 @@ TEST_F(InstallWebAppActionPerformerTest, TestValidInstallation) {
 TEST_F(InstallWebAppActionPerformerTest, TestInvalidInstallationInvalidURL) {
   const auto invalidInstallDictString =
       base::StringPrintf(kAppInstallTemplate, kValidURLKey, kInvalidURL);
-  auto value = base::JSONReader::Read(invalidInstallDictString);
+  auto value = base::JSONReader::Read(invalidInstallDictString,
+                                      base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ASSERT_TRUE(value.has_value());
 
   action().Run(/*campaign_id=*/1, /*group_id=*/std::nullopt, &value->GetDict(),
@@ -160,7 +161,8 @@ TEST_F(InstallWebAppActionPerformerTest, TestInvalidInstallationInvalidURL) {
 TEST_F(InstallWebAppActionPerformerTest, TestInvalidUrlKey) {
   const auto invalidInstallDictString =
       base::StringPrintf(kAppInstallTemplate, kInvalidURLKey, kValidURL);
-  auto value = base::JSONReader::Read(invalidInstallDictString);
+  auto value = base::JSONReader::Read(invalidInstallDictString,
+                                      base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ASSERT_TRUE(value.has_value());
 
   action().Run(/*campaign_id=*/1, /*group_id=*/std::nullopt, &value->GetDict(),
@@ -176,7 +178,8 @@ TEST_F(InstallWebAppActionPerformerTest, InvalidRequest) {
         "param" : "param"
       }
     })";
-  auto value = base::JSONReader::Read(kInvalidParams);
+  auto value = base::JSONReader::Read(kInvalidParams,
+                                      base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ASSERT_TRUE(value.has_value());
   action().Run(/*campaign_id=*/1, /*group_id=*/std::nullopt, &value->GetDict(),
                base::BindOnce(&InstallWebAppActionPerformerTest::

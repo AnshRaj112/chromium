@@ -140,7 +140,8 @@ void Supervisor::RequestTraceWithHeapDump(TraceFinishedCallback callback,
   }
 
   auto finished_dump_callback = base::BindOnce(
-      [](TraceFinishedCallback callback, bool anonymize, bool success,
+      [](TraceFinishedCallback callback, bool anonymize,
+         memory_instrumentation::mojom::RequestOutcome outcome,
          uint64_t dump_guid) {
         // Once the trace has stopped, run |callback| on the UI thread.
         auto finish_sink_callback = base::BindOnce(
@@ -163,8 +164,9 @@ void Supervisor::RequestTraceWithHeapDump(TraceFinishedCallback callback,
       std::move(callback), anonymize);
 
   auto trigger_memory_dump_callback = base::BindOnce(
-      [](base::OnceCallback<void(bool success, uint64_t dump_guid)>
-             finished_dump_callback) {
+      [](base::OnceCallback<void(
+             memory_instrumentation::mojom::RequestOutcome outcome,
+             uint64_t dump_guid)> finished_dump_callback) {
         memory_instrumentation::MemoryInstrumentation::GetInstance()
             ->RequestGlobalDumpAndAppendToTrace(
                 base::trace_event::MemoryDumpType::kExplicitlyTriggered,

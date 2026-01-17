@@ -15,11 +15,11 @@
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/field_trial.h"
 #include "base/observer_list.h"
+#include "base/sequence_checker.h"
 #include "base/time/time.h"
 #include "components/variations/client_filterable_state.h"
 #include "components/variations/entropy_provider.h"
 #include "components/variations/service/safe_seed_manager.h"
-#include "components/variations/service/ui_string_overrider.h"
 #include "components/variations/service/variations_field_trial_creator.h"
 #include "components/variations/service/variations_service_client.h"
 #include "components/variations/variations_request_scheduler.h"
@@ -191,7 +191,6 @@ class VariationsService
   // |state_manager| provides access to metrics state info. Must not be null.
   // |disable_network_switch| is a command-line switch that can be used to
   // disable network communication.
-  // |ui_string_overrider| provides overrides for UI strings.
   // |network_connection_tracker_getter| allows the VariationsService to
   // observe network state changes.
   static std::unique_ptr<VariationsService> Create(
@@ -199,7 +198,6 @@ class VariationsService
       PrefService* local_state,
       metrics::MetricsStateManager* state_manager,
       const char* disable_network_switch,
-      const UIStringOverrider& ui_string_overrider,
       web_resource::ResourceRequestAllowedNotifier::
           NetworkConnectionTrackerGetter network_connection_tracker_getter);
 
@@ -233,15 +231,13 @@ class VariationsService
       std::unique_ptr<base::FeatureList> feature_list,
       PlatformFieldTrials* platform_field_trials);
 
-  // Returns the names of studies and their groups which could possibly be
-  // forced.
-  std::vector<StudyGroupNames> GetStudiesAvailableToForce();
+  // Calls to the callback with the studies and their groups which could
+  // possibly be forced.
+  void GetStudiesAvailableToForce(
+      base::OnceCallback<void(std::vector<StudyGroupNames>)> done_callback);
 
   // The seed type used.
   SeedType GetSeedType() const;
-
-  // Overrides cached UI strings on the resource bundle once it is initialized.
-  void OverrideCachedUIStrings();
 
   int request_count() const { return request_count_; }
 
@@ -263,6 +259,12 @@ class VariationsService
   // Returns the fetch time of the latest seed. Returns base::Time() if there is
   // no seed.
   base::Time GetLatestSeedFetchTime();
+
+  // Calls `done_callback` with the stored seed info for debugging. Reads either
+  // the latest or the safe seed, according to the specified `seed_type`.
+  void GetStoredSeedInfoForDebugging(
+      base::OnceCallback<void(StoredSeedInfo)> done_callback,
+      VariationsSeedStore::SeedType seed_type);
 
  protected:
   // Gets the serial number of the most recent Finch seed. Virtual for testing.
@@ -298,8 +300,7 @@ class VariationsService
       std::unique_ptr<VariationsServiceClient> client,
       std::unique_ptr<web_resource::ResourceRequestAllowedNotifier> notifier,
       PrefService* local_state,
-      metrics::MetricsStateManager* state_manager,
-      const UIStringOverrider& ui_string_overrider);
+      metrics::MetricsStateManager* state_manager);
 
   // Sets the URL for querying the variations server. Used for testing.
   void set_variations_server_url(const GURL& url) {
@@ -369,7 +370,7 @@ class VariationsService
   void NotifyObservers(const SeedSimulationResult& result);
 
   // Called by SimpleURLLoader when |pending_seed_request_| load completes.
-  void OnSimpleLoaderComplete(std::unique_ptr<std::string> response_body);
+  void OnSimpleLoaderComplete(std::optional<std::string> response_body);
 
   // Retry the fetch over HTTP, called by OnSimpleLoaderComplete when a request
   // fails. Returns true is the fetch was successfully started, this does not
@@ -389,6 +390,13 @@ class VariationsService
   // |encrypted|. Returns true on success, false on failure. The encryption can
   // be done in-place.
   bool EncryptString(const std::string& plaintext, std::string* encrypted);
+
+  // Calls `done_callback` with the studies and their groups which could
+  // possibly be forced from the given `seed`.
+  void GetStudiesAvailableToForceFromSeed(
+      base::OnceCallback<void(std::vector<StudyGroupNames>)> done_callback,
+      bool success,
+      VariationsSeed seed);
 
   std::unique_ptr<VariationsServiceClient> client_;
 

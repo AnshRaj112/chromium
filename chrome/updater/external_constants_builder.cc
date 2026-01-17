@@ -4,12 +4,14 @@
 
 #include "chrome/updater/external_constants_builder.h"
 
+#include <cstdint>
 #include <iterator>
 #include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "base/base64.h"
 #include "base/files/file_util.h"
 #include "base/json/json_file_value_serializer.h"
 #include "base/logging.h"
@@ -183,16 +185,27 @@ ExternalConstantsBuilder& ExternalConstantsBuilder::ClearCrxVerifierFormat() {
   return *this;
 }
 
+ExternalConstantsBuilder& ExternalConstantsBuilder::SetCrxPublicKeyHash(
+    std::optional<std::vector<uint8_t>> crx_public_key_hash) {
+  overrides_.Set(
+      kDevOverrideKeyCrxPublicKeyHash,
+      crx_public_key_hash ? base::Base64Encode(*crx_public_key_hash) : "");
+  return *this;
+}
+
+ExternalConstantsBuilder& ExternalConstantsBuilder::ClearCrxPublicKeyHash() {
+  overrides_.Remove(kDevOverrideKeyCrxPublicKeyHash);
+  return *this;
+}
+
 ExternalConstantsBuilder& ExternalConstantsBuilder::SetDictPolicies(
     const base::Value::Dict& dict_policies) {
   overrides_.Set(kDevOverrideKeyDictPolicies, dict_policies.Clone());
-  overrides_.Set(kDevOverrideKeyGroupPolicies, dict_policies.Clone());
   return *this;
 }
 
 ExternalConstantsBuilder& ExternalConstantsBuilder::ClearDictPolicies() {
   overrides_.Remove(kDevOverrideKeyDictPolicies);
-  overrides_.Remove(kDevOverrideKeyGroupPolicies);
   return *this;
 }
 
@@ -292,6 +305,9 @@ bool ExternalConstantsBuilder::Modify() {
   }
   if (!overrides_.contains(kDevOverrideKeyCrxVerifierFormat)) {
     SetCrxVerifierFormat(verifier->CrxVerifierFormat());
+  }
+  if (!overrides_.contains(kDevOverrideKeyCrxPublicKeyHash)) {
+    SetCrxPublicKeyHash(verifier->CrxPublicKeyHash());
   }
   if (!overrides_.contains(kDevOverrideKeyDictPolicies)) {
     SetDictPolicies(verifier->DictPolicies());

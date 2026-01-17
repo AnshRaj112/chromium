@@ -7,20 +7,22 @@
 
 // A class that reports basic safebrowsing statistics to Google's SafeBrowsing
 // servers.
+
 #include <memory>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "base/containers/unique_ptr_adapters.h"
-#include "base/files/file_util.h"
+#include "base/files/file_path.h"
 #include "base/functional/callback_forward.h"
 #include "base/gtest_prod_util.h"
-#include "base/memory/ref_counted.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/threading/sequence_bound.h"
 #include "components/keyed_service/core/keyed_service.h"
-#include "components/safe_browsing/core/browser/db/hit_report.h"
 #include "components/safe_browsing/core/browser/db/util.h"
+#include "components/safe_browsing/core/browser/db/v4_protocol_config.h"
 #include "components/safe_browsing/core/browser/safe_browsing_hats_delegate.h"
 #include "components/safe_browsing/core/browser/safe_browsing_token_fetcher.h"
 #include "components/safe_browsing/core/common/proto/csd.pb.h"
@@ -30,6 +32,10 @@
 namespace network {
 class SimpleURLLoader;
 }  // namespace network
+
+namespace net {
+class HttpResponseHeaders;
+}
 
 namespace safe_browsing {
 
@@ -68,9 +74,6 @@ class PingManager : public KeyedService {
     // Track a client safe browsing report being sent.
     virtual void AddToCSBRRsSent(
         std::unique_ptr<ClientSafeBrowsingReportRequest> csbrr) = 0;
-
-    // Track a hit report being sent.
-    virtual void AddToHitReportsSent(std::unique_ptr<HitReport> hit_report) = 0;
   };
 
   // Helper class to read/write a report on disk.
@@ -139,23 +142,6 @@ class PingManager : public KeyedService {
       const base::FilePath& persister_root_path,
       base::RepeatingCallback<bool()> get_should_send_persisted_report);
 
-  void OnURLLoaderComplete(network::SimpleURLLoader* source,
-                           std::unique_ptr<std::string> response_body);
-  void OnSafeBrowsingHitURLLoaderComplete(
-      network::SimpleURLLoader* source,
-      std::unique_ptr<std::string> response_body);
-  void OnThreatDetailsReportURLLoaderComplete(
-      network::SimpleURLLoader* source,
-      bool has_access_token,
-      std::unique_ptr<std::string> response_body);
-
-  // Report to Google when a SafeBrowsing warning is shown to the user.
-  // |hit_report.threat_type| should be one of the types known by
-  // SafeBrowsingtHitUrl. This method will also sanitize the URLs in the report
-  // before sending it.
-  void ReportSafeBrowsingHit(
-      std::unique_ptr<safe_browsing::HitReport> hit_report);
-
   // Sends a detailed threat report after performing validation, sanitizing
   // contained URLs, and adding extra details to the report. The returned object
   // provides details on whether the report was successful.
@@ -185,11 +171,8 @@ class PingManager : public KeyedService {
   friend class PingManagerTest;
 
  private:
-  FRIEND_TEST_ALL_PREFIXES(PingManagerTest, TestSafeBrowsingHitUrl);
   FRIEND_TEST_ALL_PREFIXES(PingManagerTest, TestThreatDetailsUrl);
   FRIEND_TEST_ALL_PREFIXES(PingManagerTest, TestReportThreatDetails);
-  FRIEND_TEST_ALL_PREFIXES(PingManagerTest, TestReportSafeBrowsingHit);
-  FRIEND_TEST_ALL_PREFIXES(PingManagerTest, TestSanitizeHitReport);
   FRIEND_TEST_ALL_PREFIXES(PingManagerTest, TestSanitizeThreatDetailsReport);
 
   const V4ProtocolConfig config_;
@@ -197,18 +180,12 @@ class PingManager : public KeyedService {
   using Reports = std::set<std::unique_ptr<network::SimpleURLLoader>,
                            base::UniquePtrComparator>;
 
-  // Generates URL for reporting safe browsing hits.
-  GURL SafeBrowsingHitUrl(safe_browsing::HitReport* hit_report) const;
-
   // Generates URL for reporting threat details for users who opt-in.
   GURL ThreatDetailsUrl() const;
 
   // Sanitizes the URLs in the client safe browsing report.
   void SanitizeThreatDetailsReport(
       safe_browsing::ClientSafeBrowsingReportRequest* report);
-
-  // Sanitizes the URLs in the hit report.
-  void SanitizeHitReport(HitReport* hit_report);
 
   // Finalizes the report with additional data, and then serializes it to
   // |out_serialized_report|. On success, this returns SUCCESS. On failure, it
@@ -218,9 +195,12 @@ class PingManager : public KeyedService {
       std::string* out_serialized_report);
 
   // Once the user's access_token has been fetched by ReportThreatDetails (or
-  // intentionally not fetched), attaches the token and sends the report.
-  void ReportThreatDetailsOnGotAccessToken(const std::string& serialized_report,
-                                           const std::string& access_token);
+  // intentionally not fetched), attaches the token and sends the report. The
+  // `report_type` is included for logging purposes.
+  void ReportThreatDetailsOnGotAccessToken(
+      const std::string& serialized_report,
+      ClientSafeBrowsingReportRequest::ReportType report_type,
+      const std::string& access_token);
 
   // Reads persisted reports from disk.
   void ReadPersistedReports();
@@ -228,8 +208,17 @@ class PingManager : public KeyedService {
   // Sends `serialized_reports` to Safe Browsing.
   void OnReadPersistedReportsDone(std::vector<std::string> serialized_reports);
 
+  void OnURLLoaderComplete(network::SimpleURLLoader* source,
+                           scoped_refptr<net::HttpResponseHeaders> headers);
+
+  void OnThreatDetailsReportURLLoaderComplete(
+      network::SimpleURLLoader* source,
+      bool has_access_token,
+      ClientSafeBrowsingReportRequest::ReportType report_type,
+      scoped_refptr<net::HttpResponseHeaders> headers);
+
   // Track outstanding SafeBrowsing report fetchers for clean up.
-  // We add both "hit" and "detail" fetchers in this set.
+  // We add "detail" fetchers in this set.
   Reports safebrowsing_reports_;
 
   // Used to issue network requests.
@@ -242,9 +231,9 @@ class PingManager : public KeyedService {
   // based on whether they're a signed-in ESB user.
   base::RepeatingCallback<bool()> get_should_fetch_access_token_;
 
-  // WebUIInfoSingleton extends PingManager::WebUIDelegate to enable the
-  // workaround of calling methods in WebUIInfoSingleton without /core having a
-  // dependency on /content.
+  // WebUIContentInfoSingleton extends PingManager::WebUIDelegate to enable the
+  // workaround of calling methods in WebUIContentInfoSingleton without /core
+  // having a dependency on /content.
   raw_ptr<WebUIDelegate> webui_delegate_;
 
   // The task runner for the UI thread.

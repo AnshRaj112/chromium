@@ -11,8 +11,10 @@
 #include <vector>
 
 #include "base/time/time.h"
+#include "base/values.h"
 #include "build/build_config.h"
 #include "chrome/installer/util/initial_preferences.h"
+#include "extensions/buildflags/buildflags.h"
 
 class GURL;
 class Profile;
@@ -63,8 +65,16 @@ struct MasterPrefs {
   std::vector<GURL> bookmarks;
   std::string import_bookmarks_path;
   std::string suppress_default_browser_prompt_for_version;
+  base::Value::Dict import_bookmarks_dict;
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  std::string initial_extensions_provider_name;
+  base::Value::List initial_extensions;
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 #if BUILDFLAG(IS_MAC)
   bool confirm_to_quit;
+#endif
+#if BUILDFLAG(IS_LINUX)
+  bool eula_required = false;
 #endif
 };
 
@@ -134,6 +144,13 @@ ProcessInitialPreferencesResult ProcessInitialPreferences(
     const base::FilePath& user_data_dir,
     std::unique_ptr<installer::InitialPreferences> initial_prefs,
     MasterPrefs* out_prefs);
+
+#if BUILDFLAG(IS_LINUX)
+// Shows the EULA dialog if required. Returns true if the EULA is accepted
+// or not required. Returns false if the EULA has not been accepted. If the EULA
+// has not been accepted, the caller should exit promptly.
+bool ShowEulaDialog();
+#endif
 
 }  // namespace first_run
 

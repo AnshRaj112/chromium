@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config/features.gni")
 import("//testing/test.gni")
+import("//third_party/protobuf/proto_library.gni")
 
 group("sync") {
   public_deps = [
@@ -12,6 +12,12 @@ group("sync") {
     "//components/sync/nigori",
     "//components/sync/service",
   ]
+}
+
+proto_library("test_support_proto") {
+  testonly = true
+
+  sources = [ "test/unknown_fields.proto" ]
 }
 
 static_library("test_support") {
@@ -42,6 +48,8 @@ static_library("test_support") {
     "test/fake_data_type_processor.h",
     "test/fake_data_type_sync_bridge.cc",
     "test/fake_data_type_sync_bridge.h",
+    "test/fake_device_statistics_request.cc",
+    "test/fake_device_statistics_request.h",
     "test/fake_server.cc",
     "test/fake_server.h",
     "test/fake_server_http_post_provider.cc",
@@ -110,6 +118,8 @@ static_library("test_support") {
     "test/sync_change_processor_wrapper_for_test.h",
     "test/sync_client_mock.cc",
     "test/sync_client_mock.h",
+    "test/sync_service_crypto_test_utils.cc",
+    "test/sync_service_crypto_test_utils.h",
     "test/sync_service_impl_bundle.cc",
     "test/sync_service_impl_bundle.h",
     "test/sync_user_settings_mock.cc",
@@ -125,6 +135,8 @@ static_library("test_support") {
     "test/test_sync_user_settings.h",
     "test/trackable_mock_invalidation.cc",
     "test/trackable_mock_invalidation.h",
+    "test/unknown_field_util.cc",
+    "test/unknown_field_util.h",
   ]
 
   public_deps = [
@@ -140,9 +152,11 @@ static_library("test_support") {
   ]
 
   deps = [
+    ":test_support_proto",
     "//base",
     "//base/test:test_support",
     "//components/bookmarks/browser",
+    "//components/os_crypt/async/browser:test_support",
     "//components/pref_registry",
     "//components/prefs:test_support",
     "//components/signin/public/base",
@@ -235,6 +249,8 @@ source_set("unit_tests") {
     "service/backend_migrator_unittest.cc",
     "service/data_type_controller_unittest.cc",
     "service/data_type_manager_impl_unittest.cc",
+    "service/device_statistics_request_impl_unittest.cc",
+    "service/device_statistics_tracker_unittest.cc",
     "service/glue/sync_engine_impl_unittest.cc",
     "service/glue/sync_transport_data_prefs_unittest.cc",
     "service/history_sync_session_durations_metrics_recorder_unittest.cc",
@@ -271,6 +287,7 @@ source_set("unit_tests") {
     "//base",
     "//base/test:test_support",
     "//components/gcm_driver:test_support",
+    "//components/os_crypt/async/browser:test_support",
     "//components/os_crypt/sync",
     "//components/os_crypt/sync:test_support",
     "//components/prefs:test_support",
@@ -312,10 +329,6 @@ source_set("unit_tests") {
       "//components/policy/core/browser",
     ]
   }
-
-  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
-  # enable the diagnostic by removing this line.
-  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 if (!is_android && !is_ios && !is_fuchsia) {

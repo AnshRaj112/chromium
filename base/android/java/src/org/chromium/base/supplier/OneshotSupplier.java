@@ -8,6 +8,8 @@ import org.chromium.base.Callback;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 
+import java.util.function.Supplier;
+
 /**
  * OneshotSupplier wraps an asynchronously provided, non-null object {@code T}, notifying observers
  * a single time when the dependency becomes available. Note that null is the un-set value; a
@@ -16,7 +18,7 @@ import org.chromium.build.annotations.Nullable;
  * <p>This allows classes dependent on {@code T} to be provided with a OneshotSupplier during
  * construction and register a {@code Callback<T>} to be notified when the needed dependency is
  * available, but without the need to un-register that Callback upon destruction. Contrast to {@link
- * ObservableSupplier}, which requires un-registration to prevent post-destruction callback
+ * MonotonicObservableSupplier}, which requires un-registration to prevent post-destruction callback
  * invocation because the object can change an arbitrary number of times.
  *
  * <p>This class must only be accessed from a single thread. Unless a particular thread designation
@@ -58,8 +60,9 @@ public interface OneshotSupplier<T> extends Supplier<@Nullable T> {
      * @param callback The callback to be called (either async or sync).
      */
     default void runSyncOrOnAvailable(Callback<T> callback) {
-        if (hasValue()) {
-            callback.onResult(get());
+        T value = get();
+        if (value != null) {
+            callback.onResult(value);
         } else {
             onAvailable(callback);
         }

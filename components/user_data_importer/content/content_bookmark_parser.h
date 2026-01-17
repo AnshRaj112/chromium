@@ -5,6 +5,7 @@
 #ifndef COMPONENTS_USER_DATA_IMPORTER_CONTENT_CONTENT_BOOKMARK_PARSER_H_
 #define COMPONENTS_USER_DATA_IMPORTER_CONTENT_CONTENT_BOOKMARK_PARSER_H_
 
+#include "base/sequence_checker.h"
 #include "components/user_data_importer/common/importer_data_types.h"
 #include "components/user_data_importer/mojom/bookmark_html_parser.mojom.h"
 #include "components/user_data_importer/utility/bookmark_parser.h"
@@ -23,10 +24,13 @@ class BookmarkHtmlParser;
 // Content implementation of the BookmarkParser interface. This class reads the
 // bookmarks HTML file contents and then launches, on the utility process, the
 // actual parsing of the file contents, which are from an untrusted data source.
-// TODO(crbug.com/434664541): Add test coverage for ContentBookmarkParser.
+//
+// Can be created on any sequence (e.g. on a UI thread), but there after, must
+// be used and destroyed on the same background sequence.
 class ContentBookmarkParser : public BookmarkParser {
  public:
   ContentBookmarkParser();
+  ~ContentBookmarkParser() override;
 
   // BookmarkParser:
   // Reads the file contents and then launches the actual parsing on the utility
@@ -42,12 +46,8 @@ class ContentBookmarkParser : public BookmarkParser {
           parser);
 
  private:
-  friend class base::RefCountedThreadSafe<ContentBookmarkParser>;
-
-  ~ContentBookmarkParser() override;
-
-  void ParseOnUIThread(std::string raw_html,
-                       BookmarkParser::BookmarkParsingCallback callback);
+  void ParseImpl(std::string raw_html,
+                 BookmarkParser::BookmarkParsingCallback callback);
 
   void OnParseFinished(
       BookmarkParser::BookmarkParsingCallback callback,
@@ -55,6 +55,14 @@ class ContentBookmarkParser : public BookmarkParser {
 
   // The utility process host used to run the parser.
   mojo::Remote<mojom::BookmarkHtmlParser> html_parser_remote_;
+
+  // HTML parser to use for testing. If set, `html_parser_remote_` will be bound
+  // to this instead of being launched in a utility process.
+  mojo::PendingRemote<mojom::BookmarkHtmlParser> html_parser_for_testing_;
+
+  SEQUENCE_CHECKER(sequence_checker_);
+
+  base::WeakPtrFactory<ContentBookmarkParser> weak_ptr_factory_{this};
 };
 
 }  // namespace user_data_importer

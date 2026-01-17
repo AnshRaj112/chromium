@@ -8,6 +8,7 @@
 #include "base/containers/fixed_flat_map.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/containers/map_util.h"
+#include "base/functional/callback_helpers.h"
 #include "chrome/browser/printing/local_printer_utils_chromeos.h"
 
 namespace printing {
@@ -100,7 +101,7 @@ void InProgressJobsStorageChromeOS::OnPrintJobUpdate(
     }
     observer.OnWebPrintJobUpdate(std::move(out_update));
   }
-  if (state && base::Contains(kTerminalJobStates, *state)) {
+  if (state && kTerminalJobStates.contains(*state)) {
     state_observers_.Remove(observer_id);
     controllers_.Remove(controller_id);
     job_id_to_observer_controller_id_pair_.erase(id_pair_itr);

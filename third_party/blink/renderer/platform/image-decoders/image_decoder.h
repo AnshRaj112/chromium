@@ -52,13 +52,10 @@
 #include "third_party/blink/renderer/platform/wtf/vector.h"
 #include "third_party/skia/include/core/SkImageInfo.h"
 #include "third_party/skia/modules/skcms/skcms.h"
+#include "ui/gfx/hdr_metadata.h"
 
 class SkColorSpace;
 class SkData;
-
-namespace gfx {
-struct HDRMetadata;
-}  // namespace gfx
 
 namespace blink {
 
@@ -85,23 +82,36 @@ class PLATFORM_EXPORT ImagePlanes final {
   // |color_type| is kGray_8_SkColorType if GetYUVBitDepth() == 8 and either
   // kA16_float_SkColorType or kA16_unorm_SkColorType if GetYUVBitDepth() > 8.
   //
+  // If `hbd_output_type` is `kUnscaled`, the decoder will output unscaled
+  // high-bit-depth YUV values into the kA16_unorm_SkColorType planes. E.g.,
+  // 10-bit content will result in 10-bit range values in each 16-bit field.
+  // Otherwise values will be scaled to 16-bit extents.
+  //
   // TODO(crbug/910276): To support YUVA, ImagePlanes needs to support a
   // variable number of planes.
+  enum class HighBitDepthOutputType { kScaledTo16Bits, kUnscaled };
   ImagePlanes(base::span<void*, cc::kNumYUVPlanes> planes,
               base::span<const wtf_size_t, cc::kNumYUVPlanes> row_bytes,
-              SkColorType color_type);
+              SkColorType color_type,
+              HighBitDepthOutputType hbd_output_type =
+                  HighBitDepthOutputType::kScaledTo16Bits);
 
   void* Plane(cc::YUVIndex);
   wtf_size_t RowBytes(cc::YUVIndex) const;
   SkColorType color_type() const { return color_type_; }
   void SetHasCompleteScan() { has_complete_scan_ = true; }
   bool HasCompleteScan() const { return has_complete_scan_; }
+  bool SupportsUnscaledOutput() const {
+    return hbd_output_type_ == HighBitDepthOutputType::kUnscaled;
+  }
 
  private:
   std::array<void*, cc::kNumYUVPlanes> planes_;
   std::array<wtf_size_t, cc::kNumYUVPlanes> row_bytes_;
   SkColorType color_type_ = kUnknown_SkColorType;
   bool has_complete_scan_ = false;
+  HighBitDepthOutputType hbd_output_type_ =
+      HighBitDepthOutputType::kScaledTo16Bits;
 };
 
 class PLATFORM_EXPORT ColorProfile final {
@@ -318,9 +328,6 @@ class PLATFORM_EXPORT ImageDecoder {
   // kA16_unorm_SkColorType and kA16_float_SkColorType ImagePlanes.
   virtual uint8_t GetYUVBitDepth() const;
 
-  // Image decoders that support HDR metadata can override this.
-  virtual std::optional<gfx::HDRMetadata> GetHDRMetadata() const;
-
   // Image decoders that support C2PA manifest embedding can override this.
   virtual bool HasC2PAManifest() const;
 
@@ -400,6 +407,9 @@ class PLATFORM_EXPORT ImageDecoder {
   // color profile. This is independent of whether or not that profile's
   // transform has been baked into the pixel values.
   bool HasEmbeddedColorProfile() const { return embedded_color_profile_.get(); }
+
+  // Return the HDR metadata from the image and its color profile.
+  const gfx::HDRMetadata& GetHDRMetadata() const { return hdr_metadata_; }
 
   void SetEmbeddedColorProfile(std::unique_ptr<ColorProfile> profile);
 
@@ -549,6 +559,9 @@ class PLATFORM_EXPORT ImageDecoder {
   const cc::AuxImage aux_image_;
   ImageOrientationEnum orientation_ = ImageOrientationEnum::kDefault;
   gfx::Size density_corrected_size_;
+
+  // The HDR metadata that was read from the codec.
+  gfx::HDRMetadata hdr_metadata_;
 
   // The maximum amount of memory a decoded image should require. Ideally,
   // image decoders should downsample large images to fit under this limit

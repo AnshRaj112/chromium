@@ -14,11 +14,9 @@ import androidx.lifecycle.LifecycleObserver;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.Observer;
 
-import org.chromium.base.supplier.Supplier;
 import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.autofill.R;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.components.autofill.AutofillFeatures;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modaldialog.ModalDialogProperties;
 import org.chromium.ui.modelutil.PropertyModel;
@@ -26,11 +24,12 @@ import org.chromium.ui.modelutil.PropertyModelChangeProcessor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.function.Supplier;
 
 /**
- * Coordinator for the autofill options settings screen. Connects the settings fragment with ...
- *   ... a model keeping track of the settings state, and
- *   ... a mediator to ensure the settings UI is consistent with prefs.
+ * Coordinator for the autofill options settings screen. Connects the settings fragment with a model
+ * keeping track of the settings state, and a mediator to ensure the settings UI is consistent with
+ * prefs.
  */
 @NullMarked
 public class AutofillOptionsCoordinator {
@@ -59,7 +58,7 @@ public class AutofillOptionsCoordinator {
      */
     public static void createFor(
             AutofillOptionsFragment fragment,
-            Supplier<ModalDialogManager> modalDialogManagerSupplier,
+            Supplier<@Nullable ModalDialogManager> modalDialogManagerSupplier,
             Runnable restartRunnable) {
         new AutofillOptionsCoordinator(fragment, modalDialogManagerSupplier, restartRunnable)
                 .initializeOnViewCreated();
@@ -68,10 +67,9 @@ public class AutofillOptionsCoordinator {
     @VisibleForTesting
     AutofillOptionsCoordinator(
             AutofillOptionsFragment fragment,
-            Supplier<ModalDialogManager> modalDialogManagerSupplier,
+            Supplier<@Nullable ModalDialogManager> modalDialogManagerSupplier,
             Runnable restartRunnable) {
-        assert ChromeFeatureList.isEnabled(
-                AutofillFeatures.AUTOFILL_VIRTUAL_VIEW_STRUCTURE_ANDROID);
+
         mFragment = fragment;
         mMediator =
                 new AutofillOptionsMediator(
@@ -138,29 +136,19 @@ public class AutofillOptionsCoordinator {
                                 getString(R.string.autofill_options_undo_toggle_change))
                         .with(ModalDialogProperties.CANCEL_ON_TOUCH_OUTSIDE, true)
                         .with(ModalDialogProperties.CONTROLLER, mMediator);
-        if (ChromeFeatureList.isEnabled(
-                ChromeFeatureList.THIRD_PARTY_DISABLE_CHROME_AUTOFILL_SETTINGS_SCREEN)) {
-            builder.with(
-                            ModalDialogProperties.TITLE,
-                            getString(R.string.autofill_options_change_autofill_service_title))
-                    .with(
-                            ModalDialogProperties.MESSAGE_PARAGRAPHS,
-                            new ArrayList<>(
-                                    Arrays.asList(
-                                            getString(
-                                                    R.string
-                                                            .autofill_options_restart_prompt_paragraph_1_text),
-                                            getString(
-                                                    R.string
-                                                            .autofill_options_restart_prompt_paragraph_2_text))));
-        } else {
-            builder.with(
-                            ModalDialogProperties.TITLE,
-                            getString(R.string.autofill_options_restart_prompt_title))
-                    .with(
-                            ModalDialogProperties.MESSAGE_PARAGRAPH_1,
-                            getString(R.string.autofill_options_restart_prompt_text));
-        }
+        builder.with(
+                        ModalDialogProperties.TITLE,
+                        getString(R.string.autofill_options_change_autofill_service_title))
+                .with(
+                        ModalDialogProperties.MESSAGE_PARAGRAPHS,
+                        new ArrayList<>(
+                                Arrays.asList(
+                                        getString(
+                                                R.string
+                                                        .autofill_options_restart_prompt_paragraph_1_text),
+                                        getString(
+                                                R.string
+                                                        .autofill_options_restart_prompt_paragraph_2_text))));
         return builder.build();
     }
 

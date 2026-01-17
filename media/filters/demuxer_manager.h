@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "base/functional/callback.h"
-#include "base/memory/memory_pressure_listener.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/task/sequenced_task_runner.h"
@@ -32,8 +31,8 @@
 
 namespace media {
 
-// This class manages both an implementation of media::Demuxer and of
-// media::DataSource. DataSource, in particular may be null, since MSE playback
+// This class manages both an implementation of Demuxer and of
+// DataSource. DataSource, in particular may be null, since MSE playback
 // does not make use of it. In the case that DataSource is present, these
 // objects should have a similar lifetime, and both must be destroyed on the
 // media thread, so owning them together makes sense. Additionally, the demuxer
@@ -43,7 +42,7 @@ namespace media {
 // to managing playback state.
 class MEDIA_EXPORT DemuxerManager {
  public:
-  class Client {
+  class Client : public TrackManager {
    public:
     virtual void OnEncryptedMediaInitData(
         EmeInitDataType init_data_type,
@@ -56,16 +55,11 @@ class MEDIA_EXPORT DemuxerManager {
     // Can be called quite often.
     virtual void OnProgress() = 0;
 
-    virtual void OnError(media::PipelineStatus status) = 0;
+    virtual void OnError(PipelineStatus status) = 0;
 
     // Used for controlling the client when a demuxer swap happens.
     virtual void StopForDemuxerReset() = 0;
     virtual void RestartForHls() = 0;
-
-#if BUILDFLAG(ENABLE_FFMPEG) || BUILDFLAG(ENABLE_HLS_DEMUXER)
-    virtual void AddMediaTrack(const media::MediaTrack&) = 0;
-    virtual void RemoveMediaTrack(const media::MediaTrack&) = 0;
-#endif  // BUILDFLAG(ENABLE_FFMPEG) || BUILDFLAG(ENABLE_HLS_DEMUXER)
 
 #if BUILDFLAG(ENABLE_HLS_DEMUXER)
     virtual base::SequenceBound<HlsDataSourceProvider>
@@ -77,7 +71,7 @@ class MEDIA_EXPORT DemuxerManager {
 
     // Given a demuxer, the client should construct an implementation of
     // base::trace_event::MemoryDumpProvider for debugging purposes.
-    virtual void MakeDemuxerThreadDumper(media::Demuxer* demuxer) = 0;
+    virtual void MakeDemuxerThreadDumper(Demuxer* demuxer) = 0;
 
     virtual double CurrentTime() const = 0;
 
@@ -99,7 +93,6 @@ class MEDIA_EXPORT DemuxerManager {
   DemuxerManager(Client* client,
                  scoped_refptr<base::SequencedTaskRunner> media_task_runner,
                  MediaLog* log,
-                 bool enable_instant_source_buffer_gc,
                  std::unique_ptr<Demuxer> demuxer_override);
   ~DemuxerManager();
   void InvalidateWeakPtrs();
@@ -148,32 +141,27 @@ class MEDIA_EXPORT DemuxerManager {
   std::optional<GURL> GetDataSourceUrlAfterRedirects() const;
   bool DataSourceFullyBuffered() const;
   bool IsStreaming() const;
-  bool PassedDataSourceTimingAllowOriginCheck() const;
   bool IsLiveContent() const;
 
  private:
   // Demuxer creation and helper methods
-  std::unique_ptr<media::Demuxer> CreateChunkDemuxer();
+  std::unique_ptr<Demuxer> CreateChunkDemuxer();
 
 #if BUILDFLAG(ENABLE_FFMPEG)
-  std::unique_ptr<media::Demuxer> CreateFFmpegDemuxer();
+  std::unique_ptr<Demuxer> CreateFFmpegDemuxer();
+  void OnFFmpegMediaTracksUpdated(std::unique_ptr<MediaTracks> tracks);
 #endif  // BUILDFLAG(ENABLE_FFMPEG)
 
 #if BUILDFLAG(ENABLE_HLS_DEMUXER)
   std::tuple<raw_ptr<DataSourceInfo>, std::unique_ptr<Demuxer>>
   CreateHlsDemuxer();
-#endif
 
-#if BUILDFLAG(ENABLE_FFMPEG) || BUILDFLAG(ENABLE_HLS_DEMUXER)
-  void AddMediaTrack(const media::MediaTrack&);
-  void RemoveMediaTrack(const media::MediaTrack&);
-#endif  // BUILDFLAG(ENABLE_FFMPEG) || BUILDFLAG(ENABLE_HLS_DEMUXER)
+  void AddTrack(const MediaTrack&);
+  void RemoveTrack(const MediaTrack&);
+  void SetTrackState(const MediaTrack&, MediaTrack::State);
+#endif  // BUILDFLAG(ENABLE_HLS_DEMUXER)
 
   void SetDemuxer(std::unique_ptr<Demuxer> demuxer);
-
-  // Memory pressure listener specifically for when using ChunkDemuxer.
-  void OnMemoryPressure(
-      base::MemoryPressureListener::MemoryPressureLevel level);
 
   // Trampoline methods for binding with |weak_this_| that call into |client_|.;
   void OnEncryptedMediaInitData(EmeInitDataType init_data_type,
@@ -183,10 +171,6 @@ class MEDIA_EXPORT DemuxerManager {
   void RestartClientForHLS();
   void FreeResourcesAfterMediaThreadWait(base::OnceClosure cb);
 
-#if BUILDFLAG(ENABLE_FFMPEG)
-  void OnFFmpegMediaTracksUpdated(std::unique_ptr<MediaTracks> tracks);
-#endif  // BUILDFLAG(ENABLE_FFMPEG)
-
   void DemuxerRequestsSeek(base::TimeDelta time);
 
   // This is usually just the WebMediaPlayerImpl.
@@ -195,12 +179,6 @@ class MEDIA_EXPORT DemuxerManager {
   // The demuxers need access the the media task runner and media log.
   const scoped_refptr<base::SequencedTaskRunner> media_task_runner_;
   std::unique_ptr<MediaLog> media_log_;
-
-  // When MSE memory pressure based garbage collection is enabled, the
-  // |enable_instant_source_buffer_gc| controls whether the GC is done
-  // immediately on memory pressure notification or during the next
-  // SourceBuffer append (slower, but MSE spec compliant).
-  bool enable_instant_source_buffer_gc_ = false;
 
   // Used for FFmpegDemuxer in most cases and for creating MemoryDataSource
   // objects.
@@ -225,10 +203,9 @@ class MEDIA_EXPORT DemuxerManager {
   // which becomes the default demuxer to use.
   std::unique_ptr<Demuxer> demuxer_override_;
 
-  // RAII member for notifying demuxers of memory pressure.
-  std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
-
+#if BUILDFLAG(ENABLE_HLS_DEMUXER)
   bool hls_fallback_ = false;
+#endif  // BUILDFLAG(ENABLE_HLS_DEMUXER)
 
   // Are we allowed to switch demuxer mid-stream when fallback error codes
   // are encountered

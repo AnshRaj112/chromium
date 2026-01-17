@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "ui/ozone/platform/wayland/test/wayland_test.h"
 
 #include <memory>
 
+#include "base/compiler_specific.h"
 #include "base/run_loop.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/events/devices/device_data_manager.h"
@@ -41,7 +37,9 @@ namespace ui {
 WaylandTestBase::WaylandTestBase(wl::ServerConfig config)
     : task_environment_(base::test::TaskEnvironment::MainThreadType::UI,
                         base::test::TaskEnvironment::TimeSource::MOCK_TIME),
-      server_(config) {
+      server_(config),
+      connection_(std::make_unique<WaylandConnection>()),
+      delegate_(connection_.get()) {
 #if BUILDFLAG(USE_XKBCOMMON)
   auto keyboard_layout_engine =
       std::make_unique<XkbKeyboardLayoutEngine>(xkb_evdev_code_converter_);
@@ -50,7 +48,6 @@ WaylandTestBase::WaylandTestBase(wl::ServerConfig config)
 #endif
   scoped_keyboard_layout_engine_ = std::make_unique<ScopedKeyboardLayoutEngine>(
       std::move(keyboard_layout_engine));
-  connection_ = std::make_unique<WaylandConnection>();
   buffer_manager_gpu_ = std::make_unique<WaylandBufferManagerGpu>();
   surface_factory_ = std::make_unique<WaylandSurfaceFactory>(
       connection_.get(), buffer_manager_gpu_.get());
@@ -91,6 +88,14 @@ void WaylandTestBase::SetUp() {
 
   // The surface must be activated before buffers are attached.
   ActivateSurface(window_->root_surface()->get_surface_id());
+
+  // Activating the surface creates a token request with a 500ms timeout. See
+  // XdgActivation::TokenRequest::InitiateRequest() / kMaxTokenRequestDelay.
+  // This callback can mess with test expectatins if it returns during the test
+  // (either by calling methods a test is expecting, or even simply by advancing
+  // the event timestamps), which sometimes happens. Mock a 2x timeout delay so
+  // we can be sure that the callback has completed by the time the test starts.
+  task_environment_.FastForwardBy(base::Milliseconds(1000));
 
   EXPECT_EQ(0u,
             DeviceDataManager::GetInstance()->GetTouchscreenDevices().size());
@@ -216,7 +221,8 @@ void WaylandTestBase::MaybeSetUpXkb() {
             std::move(shared_keymap_region));
     ASSERT_TRUE(shared_keymap.IsValid());
 
-    memcpy(shared_keymap.memory(), keymap_string.get(), keymap_size);
+    UNSAFE_TODO(
+        memcpy(shared_keymap.memory(), keymap_string.get(), keymap_size));
 
     auto* const keyboard = server->seat()->keyboard()->resource();
     ASSERT_TRUE(keyboard);
@@ -252,7 +258,8 @@ std::unique_ptr<WaylandWindow> WaylandTestBase::CreateWaylandWindowWithParams(
     PlatformWindowType type,
     const gfx::Rect bounds,
     MockWaylandPlatformWindowDelegate* delegate,
-    gfx::AcceleratedWidget parent_widget) {
+    gfx::AcceleratedWidget parent_widget,
+    bool inactive) {
   PlatformWindowInitProperties properties;
   properties.bounds = bounds;
   properties.type = type;
@@ -261,7 +268,7 @@ std::unique_ptr<WaylandWindow> WaylandTestBase::CreateWaylandWindowWithParams(
   auto window =
       delegate->CreateWaylandWindow(connection_.get(), std::move(properties));
   if (window)
-    window->Show(false);
+    window->Show(inactive);
   return window;
 }
 

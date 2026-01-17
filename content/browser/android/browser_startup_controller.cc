@@ -12,15 +12,21 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "content/public/android/content_main_dex_jni/BrowserStartupControllerImpl_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 namespace content {
 
-void BrowserStartupComplete(int result,
-                            base::TimeDelta longest_blocking_duration) {
+void BrowserStartupComplete(
+    int result,
+    base::TimeDelta longest_duration_of_posted_startup_tasks,
+    base::TimeDelta total_duration_of_posted_startup_tasks) {
   JNIEnv* env = base::android::AttachCurrentThread();
   Java_BrowserStartupControllerImpl_browserStartupComplete(
-      env, result, longest_blocking_duration.InMilliseconds());
+      env, result,
+      /*longestDurationOfPostedStartupTasksMs=*/
+      longest_duration_of_posted_startup_tasks.InMilliseconds(),
+      /*totalDurationOfPostedStartupTasksMs=*/
+      total_duration_of_posted_startup_tasks.InMilliseconds());
 }
 
 void MinimalBrowserStartupComplete() {
@@ -36,12 +42,16 @@ bool ShouldStartGpuProcessOnBrowserStartup() {
 
 static void JNI_BrowserStartupControllerImpl_SetCommandLineFlags(
     JNIEnv* env,
-    jboolean single_process) {
-  SetContentCommandLineFlags(static_cast<bool>(single_process));
+    bool single_process) {
+  SetContentCommandLineFlags(single_process);
 }
 
-static void JNI_BrowserStartupControllerImpl_FlushStartupTasks(JNIEnv* env) {
-  BrowserMainLoop::GetInstance()->SynchronouslyFlushStartupTasks();
+static void JNI_BrowserStartupControllerImpl_FlushStartupTasks(
+    JNIEnv* env,
+    bool was_posted) {
+  BrowserMainLoop::GetInstance()->SynchronouslyFlushStartupTasks(was_posted);
 }
 
 }  // namespace content
+
+DEFINE_JNI(BrowserStartupControllerImpl)

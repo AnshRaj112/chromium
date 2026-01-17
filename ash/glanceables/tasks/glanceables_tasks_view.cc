@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "ash/api/tasks/tasks_client.h"
 #include "ash/api/tasks/tasks_types.h"
@@ -34,15 +35,14 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/time_format.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/compositor/layer.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/animation_builder.h"
 #include "ui/views/border.h"
@@ -134,7 +134,7 @@ class AddNewTaskButton : public views::LabelButton {
             std::move(callback),
             l10n_util::GetStringUTF16(
                 IDS_GLANCEABLES_TASKS_ADD_NEW_TASK_BUTTON_LABEL)) {
-    SetID(base::to_underlying(GlanceablesViewId::kTasksBubbleAddNewButton));
+    SetID(std::to_underlying(GlanceablesViewId::kTasksBubbleAddNewButton));
     SetImageModel(
         views::Button::ButtonState::STATE_NORMAL,
         ui::ImageModel::FromVectorIcon(kGlanceablesTasksAddNewTaskIcon,
@@ -323,7 +323,7 @@ void GlanceablesTasksView::AnimateResize(ResizeAnimation::Type resize_type) {
   resize_animation_.reset();
   running_resize_animation_.reset();
 
-  if (!ui::ScopedAnimationDurationScaleMode::duration_multiplier()) {
+  if (!gfx::ScopedAnimationDurationScaleMode::duration_multiplier()) {
     PreferredSizeChanged();
     return;
   }
@@ -373,7 +373,6 @@ void GlanceablesTasksView::AnimateResize(ResizeAnimation::Type resize_type) {
 }
 
 void GlanceablesTasksView::AddNewTaskButtonPressed() {
-  // TODO(b/301253574): make sure there is only one view is in `kEdit` state.
   items_container_view()->SetVisible(true);
   auto* const pending_new_task = items_container_view()->AddChildViewAt(
       CreateTaskView(GetActiveTaskList()->id, /*task=*/nullptr),

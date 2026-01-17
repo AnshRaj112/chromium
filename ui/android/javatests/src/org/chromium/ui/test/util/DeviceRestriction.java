@@ -4,7 +4,7 @@
 
 package org.chromium.ui.test.util;
 
-import org.chromium.base.BuildInfo;
+import org.chromium.base.DeviceInfo;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.base.test.util.RestrictionSkipCheck;
@@ -22,17 +22,38 @@ public final class DeviceRestriction {
     /** Specifies the test is only valid on non-automotive form factors. */
     public static final String RESTRICTION_TYPE_NON_AUTO = "Non Auto";
 
+    /** Specifies the test is only valid on non-foldable form factors. */
+    public static final String RESTRICTION_TYPE_NON_FOLDABLE = "Non Foldable";
+
     private static Boolean sIsAuto;
+
+    private static Boolean sIsFoldable;
 
     private static boolean isAuto() {
         if (sIsAuto == null) {
-            sIsAuto = ThreadUtils.runOnUiThreadBlocking(() -> BuildInfo.getInstance().isAutomotive);
+            sIsAuto =
+                    ThreadUtils.runOnUiThreadBlocking(
+                            () -> {
+                                return DeviceInfo.isAutomotive();
+                            });
         }
         return sIsAuto;
+    }
+
+    private static boolean isFoldable() {
+        if (sIsFoldable == null) {
+            sIsFoldable =
+                    ThreadUtils.runOnUiThreadBlocking(
+                            () -> {
+                                return DeviceInfo.isFoldable();
+                            });
+        }
+        return sIsFoldable;
     }
 
     public static void registerChecks(RestrictionSkipCheck check) {
         check.addHandler(RESTRICTION_TYPE_AUTO, () -> !isAuto());
         check.addHandler(RESTRICTION_TYPE_NON_AUTO, () -> isAuto());
+        check.addHandler(RESTRICTION_TYPE_NON_FOLDABLE, () -> isFoldable());
     }
 }

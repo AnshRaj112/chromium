@@ -21,7 +21,6 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_CSS_CSS_IMAGE_VALUE_H_
 #define THIRD_PARTY_BLINK_RENDERER_CORE_CSS_CSS_IMAGE_VALUE_H_
 
-#include "base/memory/scoped_refptr.h"
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/css/css_url_data.h"
 #include "third_party/blink/renderer/core/css/css_value.h"
@@ -46,11 +45,9 @@ class CORE_EXPORT CSSImageValue : public CSSValue {
     return cached_image_.Get();
   }
   FetchParameters PrepareFetch(const Document&,
-                               FetchParameters::ImageRequestBehavior,
                                CrossOriginAttributeValue) const;
   StyleImage* CacheImage(
       const Document&,
-      FetchParameters::ImageRequestBehavior,
       CrossOriginAttributeValue = kCrossOriginAttributeNotSet,
       const float override_image_resolution = 0.0f);
 

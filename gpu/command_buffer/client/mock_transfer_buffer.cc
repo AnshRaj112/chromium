@@ -6,6 +6,7 @@
 
 #include "base/bits.h"
 #include "base/compiler_specific.h"
+#include "base/notreached.h"
 #include "gpu/command_buffer/common/command_buffer.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -22,7 +23,6 @@ MockTransferBuffer::MockTransferBuffer(CommandBuffer* command_buffer,
       alignment_(alignment),
       actual_buffer_index_(0),
       expected_buffer_index_(0),
-      last_alloc_(nullptr),
       expected_offset_(result_size),
       actual_offset_(result_size),
       initialize_fail_(initialize_fail) {
@@ -79,10 +79,8 @@ bool MockTransferBuffer::HaveBuffer() const {
   return true;
 }
 
-void* MockTransferBuffer::AllocUpTo(unsigned int size,
-                                    unsigned int* size_allocated) {
-  EXPECT_TRUE(size_allocated != nullptr);
-  EXPECT_TRUE(last_alloc_ == nullptr);
+base::span<uint8_t> MockTransferBuffer::AllocUpTo(unsigned int size) {
+  EXPECT_TRUE(last_alloc_.empty());
 
   // Toggle which buffer we get each time to simulate the buffer being
   // reallocated.
@@ -94,20 +92,18 @@ void* MockTransferBuffer::AllocUpTo(unsigned int size,
   }
   uint32_t offset = actual_offset_;
   actual_offset_ += RoundToAlignment(size);
-  *size_allocated = size;
 
   // Make sure each buffer has a different offset.
   last_alloc_ =
-      UNSAFE_TODO(actual_buffer() + offset + actual_buffer_index_ * alignment_);
+      actual_span().subspan(offset + actual_buffer_index_ * alignment_, size);
   return last_alloc_;
 }
 
-void* MockTransferBuffer::Alloc(unsigned int size) {
+base::span<uint8_t> MockTransferBuffer::Alloc(unsigned int size) {
   EXPECT_LE(size, MaxTransferBufferSize());
-  unsigned int temp = 0;
-  void* p = AllocUpTo(size, &temp);
-  EXPECT_EQ(temp, size);
-  return p;
+  base::span<uint8_t> span = AllocUpTo(size);
+  EXPECT_EQ(span.size(), size);
+  return span;
 }
 
 RingBuffer::Offset MockTransferBuffer::GetOffset(void* pointer) const {
@@ -116,13 +112,13 @@ RingBuffer::Offset MockTransferBuffer::GetOffset(void* pointer) const {
 }
 
 void MockTransferBuffer::DiscardBlock(void* p) {
-  EXPECT_EQ(last_alloc_, p);
-  last_alloc_ = nullptr;
+  EXPECT_EQ(last_alloc_.data(), static_cast<uint8_t*>(p));
+  last_alloc_ = {};
 }
 
 void MockTransferBuffer::FreePendingToken(void* p, unsigned int /* token */) {
-  EXPECT_EQ(last_alloc_, p);
-  last_alloc_ = nullptr;
+  EXPECT_EQ(last_alloc_.data(), static_cast<uint8_t*>(p));
+  last_alloc_ = {};
 }
 
 unsigned int MockTransferBuffer::GetSize() const {
@@ -163,6 +159,7 @@ MockTransferBuffer::ExpectedMemoryInfo MockTransferBuffer::GetExpectedMemory(
   mem.id = GetExpectedTransferBufferId();
   mem.ptr = static_cast<uint8_t*>(
       GetExpectedTransferAddressFromOffset(mem.offset, size));
+  mem.span = expected_span().subspan(mem.offset);
   return mem;
 }
 
@@ -173,6 +170,7 @@ MockTransferBuffer::GetExpectedResultMemory(uint32_t size) {
   mem.id = GetExpectedResultBufferId();
   mem.ptr = static_cast<uint8_t*>(
       GetExpectedTransferAddressFromOffset(mem.offset, size));
+  mem.span = expected_span().subspan(mem.offset);
   return mem;
 }
 

@@ -28,7 +28,7 @@
 #include "chrome/browser/ui/webauthn/sheet_models.h"
 #include "chrome/browser/ui/webauthn/transport_hover_list_model.h"
 #include "chrome/browser/webauthn/authenticator_request_dialog_model.h"
-#include "device/fido/fido_constants.h"
+#include "device/fido/public/fido_constants.h"
 #include "ui/gfx/text_constants.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/layout/box_layout.h"
@@ -85,17 +85,17 @@ class AuthenticatorMechanismSelectorSheetView
   }
 };
 
-class AuthenticatorCreatePasskeySheetView
+class AuthenticatorChromeProfileCreatePasskeySheetView
     : public AuthenticatorRequestSheetView {
  public:
-  explicit AuthenticatorCreatePasskeySheetView(
-      std::unique_ptr<AuthenticatorCreatePasskeySheetModel> model)
+  explicit AuthenticatorChromeProfileCreatePasskeySheetView(
+      std::unique_ptr<AuthenticatorChromeProfileCreatePasskeySheetModel> model)
       : AuthenticatorRequestSheetView(std::move(model)) {}
 
-  AuthenticatorCreatePasskeySheetView(
-      const AuthenticatorCreatePasskeySheetView&) = delete;
-  AuthenticatorCreatePasskeySheetView& operator=(
-      const AuthenticatorCreatePasskeySheetView&) = delete;
+  AuthenticatorChromeProfileCreatePasskeySheetView(
+      const AuthenticatorChromeProfileCreatePasskeySheetView&) = delete;
+  AuthenticatorChromeProfileCreatePasskeySheetView& operator=(
+      const AuthenticatorChromeProfileCreatePasskeySheetView&) = delete;
 
  private:
   // AuthenticatorRequestSheetView:
@@ -108,11 +108,11 @@ class AuthenticatorCreatePasskeySheetView
         views::BoxLayout::CrossAxisAlignment::kStretch);
     container->SetBetweenChildSpacing(12);
     container->AddChildView(std::make_unique<PasskeyDetailView>(
-        static_cast<AuthenticatorCreatePasskeySheetModel*>(model())
+        static_cast<AuthenticatorChromeProfileCreatePasskeySheetModel*>(model())
             ->dialog_model()
             ->user_entity));
     auto* label = container->AddChildView(std::make_unique<views::Label>(
-        static_cast<AuthenticatorCreatePasskeySheetModel*>(model())
+        static_cast<AuthenticatorChromeProfileCreatePasskeySheetModel*>(model())
             ->passkey_storage_description(),
         views::style::CONTEXT_DIALOG_BODY_TEXT));
     label->SetMultiLine(true);
@@ -310,9 +310,11 @@ std::unique_ptr<AuthenticatorRequestSheetView> CreateSheetViewForCurrentStepOf(
           std::make_unique<AuthenticatorPriorityMechanismSheetModel>(
               dialog_model));
       break;
-    case Step::kCreatePasskey:
-      sheet_view = std::make_unique<AuthenticatorCreatePasskeySheetView>(
-          std::make_unique<AuthenticatorCreatePasskeySheetModel>(dialog_model));
+    case Step::kChromeProfileCreatePasskey:
+      sheet_view = std::make_unique<
+          AuthenticatorChromeProfileCreatePasskeySheetView>(
+          std::make_unique<AuthenticatorChromeProfileCreatePasskeySheetModel>(
+              dialog_model));
       break;
     case Step::kGPMError:
       sheet_view = std::make_unique<AuthenticatorRequestSheetView>(
@@ -348,12 +350,12 @@ std::unique_ptr<AuthenticatorRequestSheetView> CreateSheetViewForCurrentStepOf(
               dialog_model,
               AuthenticatorGpmPinSheetModelBase::Mode::kPinEntry));
       break;
-    case Step::kTrustThisComputerAssertion:
+    case Step::kGPMTrustThisComputerAssertion:
       sheet_view = std::make_unique<AuthenticatorRequestSheetView>(
           std::make_unique<AuthenticatorTrustThisComputerAssertionSheetModel>(
               dialog_model));
       break;
-    case Step::kTrustThisComputerCreation:
+    case Step::kGPMTrustThisComputerCreation:
       sheet_view = std::make_unique<AuthenticatorCreateUserSheetView>(
           std::make_unique<AuthenticatorTrustThisComputerCreationSheetModel>(
               dialog_model));
@@ -390,9 +392,10 @@ std::unique_ptr<AuthenticatorRequestSheetView> CreateSheetViewForCurrentStepOf(
     case Step::kPasskeyAutofill:
     case Step::kPasskeyUpgrade:
     case Step::kClosed:
-    case Step::kRecoverSecurityDomain:
+    case Step::kGPMRecoverSecurityDomain:
     case Step::kGPMReauthForPinReset:
     case Step::kPasswordOsAuth:
+    case Step::kPlatformAuthenticator:
       sheet_view = std::make_unique<AuthenticatorRequestSheetView>(
           std::make_unique<PlaceholderSheetModel>(dialog_model));
       break;

@@ -4,7 +4,6 @@
 
 #include "extensions/renderer/bindings/api_bindings_system_unittest.h"
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/strings/stringprintf.h"
@@ -120,10 +119,6 @@ bool AllowAllAPIs(v8::Local<v8::Context> context, const std::string& name) {
   return true;
 }
 
-bool AllowPromises(v8::Local<v8::Context> context) {
-  return true;
-}
-
 }  // namespace
 
 APIBindingsSystemTest::APIBindingsSystemTest() = default;
@@ -146,7 +141,7 @@ void APIBindingsSystemTest::SetUp() {
   bindings_system_ = std::make_unique<APIBindingsSystem>(
       base::BindRepeating(&APIBindingsSystemTest::GetAPISchema,
                           base::Unretained(this)),
-      base::BindRepeating(&AllowAllAPIs), base::BindRepeating(&AllowPromises),
+      base::BindRepeating(&AllowAllAPIs),
       base::BindRepeating(&APIBindingsSystemTest::OnAPIRequest,
                           base::Unretained(this)),
       std::make_unique<TestInteractionProvider>(),
@@ -193,7 +188,7 @@ void APIBindingsSystemTest::AddConsoleError(v8::Local<v8::Context> context,
 
 const base::Value::Dict& APIBindingsSystemTest::GetAPISchema(
     const std::string& api_name) {
-  EXPECT_TRUE(base::Contains(api_schemas_, api_name));
+  EXPECT_TRUE(api_schemas_.contains(api_name));
   return api_schemas_[api_name];
 }
 

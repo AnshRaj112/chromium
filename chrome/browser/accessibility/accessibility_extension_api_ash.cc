@@ -6,6 +6,7 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <memory>
 #include <set>
 #include <vector>
@@ -16,7 +17,6 @@
 #include "ash/public/cpp/event_rewriter_controller.h"
 #include "ash/public/cpp/window_tree_host_lookup.h"
 #include "ash/webui/settings/public/constants/routes_util.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
 #include "base/notreached.h"
@@ -239,7 +239,7 @@ AccessibilityPrivateSetCursorPositionFunction::Run() {
   EXTENSION_FUNCTION_VALIDATE(params);
   gfx::Point location_in_screen(params->point.x, params->point.y);
   const display::Display display =
-      display::Screen::GetScreen()->GetDisplayNearestPoint(location_in_screen);
+      display::Screen::Get()->GetDisplayNearestPoint(location_in_screen);
   auto* host = ash::GetWindowTreeHostForDisplay(display.id());
   if (!host) {
     return RespondNow(Error("Unable to find a window tree host"));
@@ -258,7 +258,7 @@ AccessibilityPrivateSetCursorPositionFunction::Run() {
 ExtensionFunction::ResponseAction
 AccessibilityPrivateGetDisplayBoundsFunction::Run() {
   const std::vector<display::Display>& displays =
-      display::Screen::GetScreen()->GetAllDisplays();
+      display::Screen::Get()->GetAllDisplays();
   base::Value::List result;
   for (auto& display : displays) {
     const gfx::Rect& bounds = display.bounds();
@@ -395,6 +395,19 @@ AccessibilityPrivateGetLocalizedDomKeyStringForKeyCodeFunction::Run() {
 }
 
 ExtensionFunction::ResponseAction
+AccessibilityPrivateProcessPendingSpokenFeedbackEventFunction::Run() {
+  CHECK_EQ(extension_misc::kChromeVoxExtensionId, extension_id());
+  std::optional<
+      accessibility_private::ProcessPendingSpokenFeedbackEvent::Params>
+      params = accessibility_private::ProcessPendingSpokenFeedbackEvent::
+          Params::Create(args());
+  EXTENSION_FUNCTION_VALIDATE(params);
+  ash::EventRewriterController::Get()->ProcessPendingSpokenFeedbackEvent(
+      params->id, params->propagate);
+  return RespondNow(NoArguments());
+}
+
+ExtensionFunction::ResponseAction
 AccessibilityPrivateHandleScrollableBoundsForPointFoundFunction::Run() {
   std::optional<
       accessibility_private::HandleScrollableBoundsForPointFound::Params>
@@ -486,9 +499,6 @@ AccessibilityPrivateIsFeatureEnabledFunction::Run() {
     case accessibility_private::AccessibilityFeature::kDictationContextChecking:
       enabled = ::features::
           IsExperimentalAccessibilityDictationContextCheckingEnabled();
-      break;
-    case accessibility_private::AccessibilityFeature::kFaceGaze:
-      enabled = ::features::IsAccessibilityFaceGazeEnabled();
       break;
     case accessibility_private::AccessibilityFeature::kCaptionsOnBrailleDisplay:
       enabled = ::features::IsAccessibilityCaptionsOnBrailleDisplayEnabled();
@@ -599,7 +609,7 @@ AccessibilityPrivateSendSyntheticKeyEventFunction::Run() {
       keyboard_code, ui::UsLayoutKeyboardCodeToDomCode(keyboard_code), flags);
 
   auto* host = ash::GetWindowTreeHostForDisplay(
-      display::Screen::GetScreen()->GetPrimaryDisplay().id());
+      display::Screen::Get()->GetPrimaryDisplay().id());
   DCHECK(host);
 
   bool dictation_enabled = AccessibilityManager::Get()->IsDictationEnabled();
@@ -1048,6 +1058,14 @@ AccessibilityPrivateSetSelectToSpeakStateFunction::Run() {
 }
 
 ExtensionFunction::ResponseAction
+AccessibilityPrivateEnableSpokenFeedbackMv3KeyHandlingFunction::Run() {
+  CHECK_EQ(extension_misc::kChromeVoxExtensionId, extension_id());
+  ash::EventRewriterController::Get()->SetSpokenFeedbackMv3KeyHandlingEnabled(
+      true);
+  return RespondNow(NoArguments());
+}
+
+ExtensionFunction::ResponseAction
 AccessibilityPrivateSetVirtualKeyboardVisibleFunction::Run() {
   std::optional<accessibility_private::SetVirtualKeyboardVisible::Params>
       params = accessibility_private::SetVirtualKeyboardVisible::Params::Create(
@@ -1255,7 +1273,7 @@ AccessibilityPrivateUpdateSwitchAccessBubbleFunction::Run() {
        *(params->actions)) {
     std::string action = accessibility_private::ToString(extension_action);
     // Check that this action is not already in our actions list.
-    if (base::Contains(actions_to_show, action)) {
+    if (std::ranges::contains(actions_to_show, action)) {
       continue;
     }
     actions_to_show.push_back(action);

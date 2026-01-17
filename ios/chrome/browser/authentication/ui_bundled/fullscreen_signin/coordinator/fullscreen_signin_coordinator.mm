@@ -8,13 +8,13 @@
 
 #import "base/notreached.h"
 #import "components/signin/public/identity_manager/identity_manager.h"
+#import "ios/chrome/browser/authentication/fullscreen_signin_screen/coordinator/fullscreen_signin_screen_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/fullscreen_signin/coordinator/fullscreen_signin_coordinator_delegate.h"
-#import "ios/chrome/browser/authentication/ui_bundled/fullscreen_signin_screen/coordinator/fullscreen_signin_screen_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator+protected.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_in_progress.h"
-#import "ios/chrome/browser/first_run/ui_bundled/first_run_screen_delegate.h"
-#import "ios/chrome/browser/first_run/ui_bundled/first_run_util.h"
+#import "ios/chrome/browser/first_run/public/first_run_screen_delegate.h"
+#import "ios/chrome/browser/first_run/public/first_run_util.h"
 #import "ios/chrome/browser/screen/ui_bundled/screen_provider.h"
 #import "ios/chrome/browser/screen/ui_bundled/screen_type.h"
 #import "ios/chrome/browser/shared/coordinator/chrome_coordinator/animated_coordinator.h"
@@ -50,9 +50,11 @@
                           accessPoint:(signin_metrics::AccessPoint)accessPoint
     changeProfileContinuationProvider:(const ChangeProfileContinuationProvider&)
                                           changeProfileContinuationProvider {
-  DCHECK(!browser->GetProfile()->IsOffTheRecord());
+  DCHECK_EQ(browser->type(), Browser::Type::kRegular);
   self = [super initWithBaseViewController:viewController browser:browser];
   if (self) {
+    CHECK_EQ(browser->type(), Browser::Type::kRegular,
+             base::NotFatalUntil::M145);
     CHECK(changeProfileContinuationProvider);
     _screenProvider = screenProvider;
     _changeProfileContinuationProvider = changeProfileContinuationProvider;
@@ -168,6 +170,7 @@
     case kBestFeatures:
     case kLensInteractivePromo:
     case kLensAnimatedPromo:
+    case kSyncedSetUp:
     case kGuidedTour:
     case kSafariImport:
     case kStepsCompleted:

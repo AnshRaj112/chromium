@@ -10,7 +10,6 @@
 #include <string>
 #include <string_view>
 
-#include "base/containers/contains.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
@@ -84,7 +83,7 @@ const DatabaseIdentifier DatabaseIdentifier::UniqueFileIdentifier() {
 // static
 DatabaseIdentifier DatabaseIdentifier::CreateFromOrigin(const GURL& origin) {
   if (!origin.is_valid() || origin.is_empty() || !origin.IsStandard() ||
-      SchemeIsUnique(origin.scheme())) {
+      SchemeIsUnique(origin.GetScheme())) {
     return DatabaseIdentifier();
   }
 
@@ -100,18 +99,15 @@ DatabaseIdentifier DatabaseIdentifier::CreateFromOrigin(const GURL& origin) {
   if (port == url::PORT_UNSPECIFIED)
     port = 0;
 
-  return DatabaseIdentifier(origin.scheme(),
-                            origin.host(),
-                            port,
-                            false /* unique */,
-                            false /* file */);
+  return DatabaseIdentifier(origin.GetScheme(), origin.GetHost(), port,
+                            false /* unique */, false /* file */);
 }
 
 // static
 DatabaseIdentifier DatabaseIdentifier::Parse(std::string_view identifier) {
   if (!base::IsStringASCII(identifier))
     return DatabaseIdentifier();
-  if (base::Contains(identifier, "..")) {
+  if (identifier.contains("..")) {
     return DatabaseIdentifier();
   }
   static const char kForbidden[] = {'\\', '/', ':', '\0'};
@@ -151,7 +147,8 @@ DatabaseIdentifier DatabaseIdentifier::Parse(std::string_view identifier) {
   GURL url(base::StrCat({scheme, "://", hostname, "/"}));
 
   // If a url doesn't parse cleanly or doesn't round trip, reject it.
-  if (!url.is_valid() || url.scheme() != scheme || url.host() != hostname) {
+  if (!url.is_valid() || url.GetScheme() != scheme ||
+      url.GetHost() != hostname) {
     return DatabaseIdentifier();
   }
   // Clear hostname for a non-special URL. This behavior existed before

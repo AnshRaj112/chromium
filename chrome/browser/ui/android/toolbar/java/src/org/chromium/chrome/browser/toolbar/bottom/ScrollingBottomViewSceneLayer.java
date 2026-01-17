@@ -5,7 +5,6 @@
 package org.chromium.chrome.browser.toolbar.bottom;
 
 import android.graphics.RectF;
-import android.view.View;
 
 import org.jni_zero.JNINamespace;
 import org.jni_zero.NativeMethods;
@@ -13,16 +12,11 @@ import org.jni_zero.NativeMethods;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.cc.input.OffsetTag;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.chrome.browser.layouts.EventFilter;
 import org.chromium.chrome.browser.layouts.SceneOverlay;
-import org.chromium.chrome.browser.layouts.components.VirtualView;
 import org.chromium.chrome.browser.layouts.scene_layer.SceneLayer;
 import org.chromium.chrome.browser.layouts.scene_layer.SceneOverlayLayer;
 import org.chromium.components.browser_ui.widget.ViewResourceFrameLayout;
 import org.chromium.ui.resources.ResourceManager;
-
-import java.util.List;
 
 /**
  * A composited view that sits at the bottom of the screen and listens to changes in the browser
@@ -123,15 +117,7 @@ public class ScrollingBottomViewSceneLayer extends SceneOverlayLayer implements 
 
     @Override
     public SceneOverlayLayer getUpdatedSceneOverlayTree(
-            RectF viewport, RectF visibleViewport, ResourceManager resourceManager, float yOffset) {
-        boolean isShadowVisible;
-        if (ChromeFeatureList.sBcivBottomControls.isEnabled()) {
-            isShadowVisible = true;
-        } else {
-            // The composited shadow should be visible if the Android toolbar's isn't.
-            isShadowVisible = mBottomView.getVisibility() != View.VISIBLE;
-        }
-
+            RectF viewport, RectF visibleViewport, ResourceManager resourceManager) {
         ScrollingBottomViewSceneLayerJni.get()
                 .updateScrollingBottomViewLayer(
                         mNativePtr,
@@ -140,7 +126,7 @@ public class ScrollingBottomViewSceneLayer extends SceneOverlayLayer implements 
                         mTopShadowHeightPx,
                         mCurrentXOffsetPx,
                         viewport.height() + mCurrentYOffsetPx,
-                        isShadowVisible,
+                        true,
                         mOffsetTag);
 
         return this;
@@ -153,36 +139,8 @@ public class ScrollingBottomViewSceneLayer extends SceneOverlayLayer implements 
     }
 
     @Override
-    public @Nullable EventFilter getEventFilter() {
-        return null;
-    }
-
-    @Override
-    public boolean shouldHideAndroidBrowserControls() {
-        return false;
-    }
-
-    @Override
-    public boolean updateOverlay(long time, long dt) {
-        return false;
-    }
-
-    @Override
-    public boolean onBackPressed() {
-        return false;
-    }
-
-    @Override
-    public boolean handlesTabCreating() {
-        return false;
-    }
-
-    @Override
     public void onSizeChanged(
             float width, float height, float visibleViewportOffsetY, int orientation) {}
-
-    @Override
-    public void getVirtualViews(List<VirtualView> views) {}
 
     @NativeMethods
     interface Natives {

@@ -9,7 +9,7 @@
 #import "components/autofill/core/browser/test_utils/autofill_test_utils.h"
 #import "components/autofill/core/common/autofill_payments_features.h"
 #import "components/strings/grit/components_strings.h"
-#import "ios/chrome/browser/autofill/ui_bundled/authentication/authentication_egtest_util.h"
+#import "ios/chrome/browser/autofill/authentication/test/authentication_egtest_util.h"
 #import "ios/chrome/browser/autofill/ui_bundled/autofill_app_interface.h"
 #import "ios/chrome/browser/autofill/ui_bundled/autofill_ui_constants.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
@@ -30,15 +30,6 @@
 @end
 
 @implementation AutofillProgressDialogDismissEGTest
-
-- (AppLaunchConfiguration)appConfigurationForTestCase {
-  AppLaunchConfiguration config;
-
-  config.features_enabled.push_back(
-      autofill::features::kAutofillEnableFpanRiskBasedAuthentication);
-
-  return config;
-}
 
 - (void)setUp {
   [super setUp];
@@ -92,7 +83,8 @@
                           IDS_AUTOFILL_CARD_UNMASK_PROGRESS_DIALOG_TITLE)];
 }
 
-- (void)testDismissWithConfirmation_DisappearsAfterDelay {
+// TODO(crbug.com/444040307): Test is flaky.
+- (void)DISABLED_testDismissWithConfirmation_DisappearsAfterDelay {
   // Simulate flow to show dialog.
   [self simulateUserFlowToShowDialogLoadingState];
 

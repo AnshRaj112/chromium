@@ -7,7 +7,6 @@
 #include <memory>
 
 #include "ash/webui/graduation/graduation_state_tracker.h"
-#include "ash/webui/graduation/mojom/graduation_ui.mojom-shared.h"
 #include "ash/webui/graduation/mojom/graduation_ui.mojom.h"
 #include "ash/webui/graduation/webview_auth_handler.h"
 #include "base/functional/bind.h"
@@ -96,8 +95,7 @@ TEST_F(GraduationUiHandlerTest, AuthenticateWebviewSuccess) {
   MockWebviewAuthHandler* mock_auth_handler =
       static_cast<MockWebviewAuthHandler*>(test_api.GetWebviewAuthHandler());
   EXPECT_CALL(*mock_auth_handler, AuthenticateWebview(testing::_))
-      .WillOnce(
-          testing::Invoke(base::test::RunOnceCallback<0>(/*is_success=*/true)));
+      .WillOnce(base::test::RunOnceCallback<0>(/*is_success=*/true));
   base::RunLoop run_loop;
   handler()->AuthenticateWebview(base::BindLambdaForTesting(
       [&](graduation_ui::mojom::AuthResult result) -> void {
@@ -113,8 +111,7 @@ TEST_F(GraduationUiHandlerTest, AuthenticateWebviewFailure) {
   MockWebviewAuthHandler* mock_auth_handler =
       static_cast<MockWebviewAuthHandler*>(test_api.GetWebviewAuthHandler());
   EXPECT_CALL(*mock_auth_handler, AuthenticateWebview(testing::_))
-      .WillOnce(testing::Invoke(
-          base::test::RunOnceCallback<0>(/*is_success=*/false)));
+      .WillOnce(base::test::RunOnceCallback<0>(/*is_success=*/false));
   base::RunLoop run_loop;
   handler()->AuthenticateWebview(base::BindLambdaForTesting(
       [&](graduation_ui::mojom::AuthResult result) -> void {

@@ -21,6 +21,9 @@ ci.defaults.set(
     os = os.LINUX_DEFAULT,
     contact_team_email = "clank-engprod@google.com",
     execution_timeout = ci_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     health_spec = health_spec.default(),
     priority = ci_constants.DEFAULT_FYI_PRIORITY,
     service_account = ci_constants.DEFAULT_SERVICE_ACCOUNT,
@@ -58,7 +61,6 @@ ci.builder(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-android-desktop-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -75,7 +77,7 @@ ci.builder(
         ],
     ),
     targets = targets.bundle(
-        targets = "android_desktop_fyi_tests",
+        targets = "android_desktop_fyi_gtests",
         mixins = [
             "15-desktop-x64-emulator",
             "emulator-8-cores",
@@ -89,6 +91,7 @@ ci.builder(
             "chrome_public_test_apk": targets.mixin(
                 args = [
                     "--test-launcher-filter-file=../../testing/buildbot/filters/android.desktop.emulator_15.chrome_public_test_apk.filter",
+                    "--skia-gold-consider-unsupported",
                 ],
                 ci_only = True,
             ),

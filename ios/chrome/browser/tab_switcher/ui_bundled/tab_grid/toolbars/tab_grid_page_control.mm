@@ -267,17 +267,13 @@ UIImageView* ImageViewForSymbol(NSString* symbol_name,
 
   _scrolledToEdge = scrolledToEdge;
 
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   if (@available(iOS 26, *)) {
   } else {
-#endif
     CGFloat backgroundAlpha =
         scrolledToEdge ? kScrolledToTopBackgroundAlpha : kBackgroundAlpha;
     self.background.backgroundColor = [UIColor colorWithWhite:1
                                                         alpha:backgroundAlpha];
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   }
-#endif
 }
 
 #pragma mark - Public Properties
@@ -622,15 +618,12 @@ UIImageView* ImageViewForSymbol(NSString* symbol_name,
     }
   }
 
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   if (@available(iOS 26, *)) {
     iconNotSelected.tintColor = UIColor.whiteColor;
   } else {
-#endif
     iconNotSelected.tintColor = [UIColor colorNamed:kStaticGrey300Color];
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   }
-#endif
+
   iconSelected.tintColor = UIColor.blackColor;
 
   [self.contentView insertSubview:iconNotSelected belowSubview:self.sliderView];
@@ -642,7 +635,6 @@ UIImageView* ImageViewForSymbol(NSString* symbol_name,
 - (void)setupViews {
   self.scrolledToEdge = YES;
 
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   if (@available(iOS 26, *)) {
     UIGlassEffect* glassEffect =
         [UIGlassEffect effectWithStyle:UIGlassEffectStyleRegular];
@@ -654,10 +646,11 @@ UIImageView* ImageViewForSymbol(NSString* symbol_name,
     [self addSubview:backgroundView];
     backgroundView.center =
         CGPointMake(kOverallWidth / 2.0, kOverallHeight / 2.0);
+    backgroundView.layer.cornerRadius = kSegmentHeight / 2;
+    backgroundView.layer.masksToBounds = YES;
     self.background = backgroundView;
     self.contentView = backgroundView.contentView;
   } else {
-#endif
     UIView* backgroundView = [[UIView alloc]
         initWithFrame:CGRectMake(0, 0, kOverallWidth, kSegmentHeight)];
     backgroundView.backgroundColor =
@@ -670,9 +663,7 @@ UIImageView* ImageViewForSymbol(NSString* symbol_name,
         CGPointMake(kOverallWidth / 2.0, kOverallHeight / 2.0);
     self.background = backgroundView;
     self.contentView = backgroundView;
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   }
-#endif
 
   // Set up the layout guides for the segments.
   UILayoutGuide* incognitoGuide = [[UILayoutGuide alloc] init];
@@ -725,15 +716,13 @@ UIImageView* ImageViewForSymbol(NSString* symbol_name,
   CGRect sliderFrame =
       CGRectMake(0, verticalMargin, kSliderWidth, kSliderHeight);
   UIView* slider = [[UIView alloc] initWithFrame:sliderFrame];
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+
   if (@available(iOS 26, *)) {
     slider.layer.cornerRadius = kSliderHeight / 2.0;
   } else {
-#endif
     slider.layer.cornerRadius = kSliderCornerRadius;
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   }
-#endif
+
   slider.layer.masksToBounds = YES;
   slider.backgroundColor = UIColor.whiteColor;
   if (ios::provider::IsRaccoonEnabled()) {
@@ -827,9 +816,8 @@ UIImageView* ImageViewForSymbol(NSString* symbol_name,
   } else if (CGRectContainsPoint(self.tabGroupsGuide.layoutFrame, point)) {
     page = TabGridPageTabGroups;
   } else {
-    // bug: taps in the left- or rightmost `kSliderOverhang` points of the
-    // control will fall through to this case.
-    // TODO(crbug.com/41366258): Fix this.
+    // TODO(crbug.com/451554492): taps in the left- or rightmost
+    // `kSliderOverhang` points of the control will fall through to this case.
     page = TabGridPageRegularTabs;
   }
   if (page != self.selectedPage) {

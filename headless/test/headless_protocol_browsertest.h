@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "base/command_line.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/values.h"
 #include "components/headless/test/test_meta_info.h"
 #include "content/public/browser/devtools_agent_host.h"
@@ -55,7 +56,6 @@ class HeadlessProtocolBrowserTest : public HeadlessDevTooledBrowserTest {
   void OnceSetUp(base::Value::Dict params);
   void OnLoadEventFired(const base::Value::Dict& params);
   void OnEvaluateResult(base::Value::Dict params);
-  void OnConsoleAPICalled(const base::Value::Dict& params);
 
   void ProcessTestResult(const std::string& test_result);
   void FinishTest();
@@ -64,6 +64,7 @@ class HeadlessProtocolBrowserTest : public HeadlessDevTooledBrowserTest {
   void LoadTestMetaInfo();
 
   TestMetaInfo test_meta_info_;
+  std::unique_ptr<base::test::ScopedFeatureList> feature_list_;
   bool test_finished_ = false;
 };
 

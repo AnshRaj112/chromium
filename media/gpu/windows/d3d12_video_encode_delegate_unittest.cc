@@ -15,7 +15,6 @@
 #include "third_party/microsoft_dxheaders/src/include/directx/d3dx12_core.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
@@ -27,18 +26,19 @@ namespace {
 class MockD3D12VideoEncodeDelegate : public D3D12VideoEncodeDelegate {
  public:
   explicit MockD3D12VideoEncodeDelegate(
-      Microsoft::WRL::ComPtr<ID3D12VideoDevice3> video_device)
-      : D3D12VideoEncodeDelegate(std::move(video_device)) {}
+      Microsoft::WRL::ComPtr<ID3D12VideoDevice3> video_device,
+      const gpu::GpuDriverBugWorkarounds& gpu_workarounds)
+      : D3D12VideoEncodeDelegate(std::move(video_device), gpu_workarounds) {}
   ~MockD3D12VideoEncodeDelegate() override = default;
 
   size_t GetMaxNumOfRefFrames() const override { return 8; }
+  size_t GetMaxNumOfManualRefBuffers() const override { return 4; }
   bool SupportsRateControlReconfiguration() const override { return false; }
-  EncoderStatus::Or<BitstreamBufferMetadata> EncodeImpl(
-      ID3D12Resource*,
-      UINT,
-      const VideoEncoder::EncodeOptions&,
-      const gfx::ColorSpace&) override {
-    return BitstreamBufferMetadata();
+  EncoderStatus EncodeImpl(ID3D12Resource*,
+                           UINT,
+                           const VideoEncoder::EncodeOptions&,
+                           const gfx::ColorSpace&) override {
+    return EncoderStatus::Codes::kOk;
   }
 
  private:
@@ -131,7 +131,7 @@ D3D12VideoEncodeDelegateTestBase::GetEncoderOutputMetadataResourceMap(
       D3D12ResourceMock*, std::unique_ptr<D3D12_VIDEO_ENCODER_OUTPUT_METADATA>>>
       mapped_metadata;
   ON_CALL(*resource.Get(), Map(0, _, _))
-      .WillByDefault(Invoke([&](UINT, const D3D12_RANGE*, void** data) {
+      .WillByDefault([&](UINT, const D3D12_RANGE*, void** data) {
         D3D12_VIDEO_ENCODER_OUTPUT_METADATA* metadata =
             new D3D12_VIDEO_ENCODER_OUTPUT_METADATA{
                 .EncodedBitstreamWrittenBytesCount = bitstream_size,
@@ -140,17 +140,17 @@ D3D12VideoEncodeDelegateTestBase::GetEncoderOutputMetadataResourceMap(
         (*mapped_metadata)[resource.Get()].reset(metadata);
         *data = metadata;
         return S_OK;
-      }));
+      });
   ScopedD3D12ResourceMap metadata_buffer;
   EXPECT_TRUE(metadata_buffer.Map(resource.Get(), 0, nullptr));
   ON_CALL(*resource.Get(), Unmap(0, _))
-      .WillByDefault(Invoke(
+      .WillByDefault(
           [resource = std::move(resource)](UINT, const D3D12_RANGE*) mutable {
             mapped_metadata->erase(resource.Get());
             // gtest complains that the mock isn't freed if we don't drop the
             // reference to it here.
             resource.Reset();
-          }));
+          });
   return metadata_buffer;
 }
 
@@ -168,6 +168,18 @@ D3D12VideoEncodeDelegateTestBase::CreateResource(
   return input_frame;
 }
 
+void D3D12VideoEncodeDelegateTestBase::EnableFeature(
+    const base::Feature& feature) {
+  scoped_feature_list_.emplace();
+  scoped_feature_list_->InitAndEnableFeature(feature);
+}
+
+void D3D12VideoEncodeDelegateTestBase::DisableFeature(
+    const base::Feature& feature) {
+  scoped_feature_list_.emplace();
+  scoped_feature_list_->InitAndDisableFeature(feature);
+}
+
 class D3D12VideoEncodeDelegateTest : public D3D12VideoEncodeDelegateTestBase {
  protected:
   void SetUp() override {
@@ -177,8 +189,9 @@ class D3D12VideoEncodeDelegateTest : public D3D12VideoEncodeDelegateTestBase {
         .WillByDefault(SetComPointeeAndReturnOk<1>(device_.Get()));
     ON_CALL(*video_device3_.Get(), QueryInterface(IID_ID3D12VideoDevice1, _))
         .WillByDefault(SetComPointeeAndReturnOk<1>(video_device3_.Get()));
-    encoder_delegate_ =
-        std::make_unique<MockD3D12VideoEncodeDelegate>(video_device3_);
+    gpu::GpuDriverBugWorkarounds gpu_workarounds{};
+    encoder_delegate_ = std::make_unique<MockD3D12VideoEncodeDelegate>(
+        video_device3_, gpu_workarounds);
     encoder_delegate_->SetFactoriesForTesting(
         base::BindRepeating(&CreateVideoEncoderWrapper),
         base::BindRepeating(&CreateVideoProcessorWrapper));
@@ -276,6 +289,33 @@ TEST_F(D3D12VideoEncodeDelegateTestWithProcessFrame, EncodeFrameWithVP) {
       gfx::ColorSpace::MatrixID::BT709, gfx::ColorSpace::RangeID::FULL);
   EXPECT_EQ(metadata.encoded_color_space, output_color_space);
   EXPECT_EQ(metadata.payload_size_bytes, kPayloadSize);
+}
+
+TEST_F(D3D12VideoEncodeDelegateTest, EncodeWithTooManyReferenceBuffersFails) {
+  VideoEncodeAccelerator::Config config = GetDefaultH264Config();
+  ASSERT_TRUE(encoder_delegate_->Initialize(config).is_ok());
+
+  gfx::Size input_size = config.input_visible_size;
+  auto input_frame = CreateResource(input_size, config.input_format);
+  gfx::ColorSpace color_space = gfx::ColorSpace::CreateREC709();
+  constexpr size_t kPayloadSize = 1024;
+  auto shared_memory = base::UnsafeSharedMemoryRegion::Create(kPayloadSize);
+  BitstreamBuffer bitstream_buffer(base::RandInt(0, H264DPB::kDPBMaxSize - 1),
+                                   shared_memory.Duplicate(), kPayloadSize);
+
+  VideoEncoder::EncodeOptions options;
+  // Fill reference_buffers with one more than supported to trigger failure.
+  const size_t too_many = encoder_delegate_->GetMaxNumOfManualRefBuffers() + 1;
+  for (size_t i = 0; i < too_many; ++i) {
+    options.reference_buffers.push_back(static_cast<uint8_t>(i));
+  }
+
+  auto result_or_error = encoder_delegate_->Encode(input_frame, 0u, color_space,
+                                                   bitstream_buffer, options);
+
+  // Expect an error indicating too many reference buffers.
+  EXPECT_FALSE(result_or_error.has_value());
+  EXPECT_EQ(result_or_error.code(), EncoderStatus::Codes::kBadReferenceBuffer);
 }
 
 }  // namespace media

@@ -19,7 +19,6 @@
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/browsing_data/core/browsing_data_utils.h"
 #include "components/content_settings/core/browser/cookie_settings.h"
-#include "components/content_settings/core/common/features.h"
 #include "components/content_settings/core/common/pref_names.h"
 #include "components/infobars/content/content_infobar_manager.h"
 #include "components/page_info/core/features.h"
@@ -47,10 +46,7 @@ const char kDeleteBrowsingDataActionName[] =
     "Privacy.DeleteBrowsingData.Action";
 
 void ClickButton(views::Button* button) {
-  views::test::ButtonTestApi test_api(button);
-  ui::MouseEvent e(ui::EventType::kMousePressed, gfx::Point(), gfx::Point(),
-                   ui::EventTimeForNow(), 0, 0);
-  test_api.NotifyClick(e);
+  views::test::ButtonTestApi(button).NotifyDefaultMouseClick();
 }
 
 }  // namespace
@@ -384,19 +380,7 @@ IN_PROC_BROWSER_TEST_F(PageSpecificSiteDataDialogBrowserTest,
   EXPECT_EQ(1u, infobar_count());
 }
 
-class PageSpecificSiteDataDialogPre3pcdBrowserTest
-    : public PageSpecificSiteDataDialogBrowserTest {
- public:
-  PageSpecificSiteDataDialogPre3pcdBrowserTest() {
-    feature_list_.InitAndDisableFeature(
-        content_settings::features::kTrackingProtection3pcd);
-  }
-
- private:
-  base::test::ScopedFeatureList feature_list_;
-};
-
-IN_PROC_BROWSER_TEST_F(PageSpecificSiteDataDialogPre3pcdBrowserTest,
+IN_PROC_BROWSER_TEST_F(PageSpecificSiteDataDialogBrowserTest,
                        PartitionedCookiesAndAllowedThirdParty) {
   // Allow third-party cookies.
   browser()->profile()->GetPrefs()->SetInteger(

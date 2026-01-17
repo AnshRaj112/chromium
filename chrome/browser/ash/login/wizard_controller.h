@@ -5,7 +5,6 @@
 #ifndef CHROME_BROWSER_ASH_LOGIN_WIZARD_CONTROLLER_H_
 #define CHROME_BROWSER_ASH_LOGIN_WIZARD_CONTROLLER_H_
 
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -20,6 +19,7 @@
 #include "chrome/browser/ash/login/demo_mode/demo_session.h"
 #include "chrome/browser/ash/login/enrollment/auto_enrollment_check_screen.h"
 #include "chrome/browser/ash/login/enrollment/enrollment_screen.h"
+#include "chrome/browser/ash/login/fjord_oobe/proto/fjord_oobe_state.pb.h"
 #include "chrome/browser/ash/login/oobe_metrics_helper.h"
 #include "chrome/browser/ash/login/oobe_screen.h"
 #include "chrome/browser/ash/login/quickstart_controller.h"
@@ -27,7 +27,6 @@
 #include "chrome/browser/ash/login/screens/account_selection_screen.h"
 #include "chrome/browser/ash/login/screens/add_child_screen.h"
 #include "chrome/browser/ash/login/screens/ai_intro_screen.h"
-#include "chrome/browser/ash/login/screens/assistant_optin_flow_screen.h"
 #include "chrome/browser/ash/login/screens/categories_selection_screen.h"
 #include "chrome/browser/ash/login/screens/choobe_screen.h"
 #include "chrome/browser/ash/login/screens/consolidated_consent_screen.h"
@@ -106,7 +105,7 @@ class DemoSetupController;
 class ErrorScreen;
 struct Geoposition;
 class KioskApp;
-class SimpleGeolocationProvider;
+class SystemLocationProvider;
 class TimeZoneProvider;
 struct TimeZoneResponseData;
 enum class KioskAppType;
@@ -225,7 +224,7 @@ class WizardController : public OobeUI::Observer {
   BaseScreen* current_screen() const { return current_screen_; }
 
   // Returns true if a given screen exists.
-  bool HasScreen(OobeScreenId screen_id);
+  bool HasScreen(OobeScreenId screen_id) const;
 
   // Returns a given screen. Creates it lazily.
   BaseScreen* GetScreen(OobeScreenId screen_id);
@@ -260,6 +259,9 @@ class WizardController : public OobeUI::Observer {
 
   // Show Cryptohome recovery screen.
   void ShowCryptohomeRecoveryScreen(std::unique_ptr<UserContext> user_context);
+
+  // Exits Fjord touch controller screen if it's showing.
+  bool ExitFjordTouchControllerScreen();
 
   // Set pref value for first run.
   void PrepareFirstRunPrefs();
@@ -321,7 +323,6 @@ class WizardController : public OobeUI::Observer {
   void ShowEncryptionMigrationScreen();
   void ShowManagementTransitionScreen();
   void ShowUpdateRequiredScreen();
-  void ShowAssistantOptInFlowScreen();
   void ShowMultiDeviceSetupScreen();
   void ShowGestureNavigationScreen();
   void ShowPinSetupScreenAsSecondaryFactor();
@@ -360,6 +361,8 @@ class WizardController : public OobeUI::Observer {
   void ShowAccountSelectionScreen();
   void ShowAppLaunchSplashScreen();
   void ShowFjordTouchControllerScreen();
+  void ShowFjordStationSetupScreen();
+  void ShowFjordFwUpdateScreen();
 
   // Shows images login screen.
   void ShowLoginScreen();
@@ -426,13 +429,16 @@ class WizardController : public OobeUI::Observer {
   void AttemptLocalAuthenticationWithContext(
       std::unique_ptr<UserContext> user_context);
   void FinishAuthFactorsSetup();
+  void ObtainContextAndFinalizeAuth();
+  void FinalizeAuthWithContext(std::unique_ptr<UserContext> user_context);
+  void CompleteLogin();
   // End of Local authentication setup sub-group
   void OnRecommendAppsScreenExit(RecommendAppsScreen::Result result);
   void OnRemoteActivityNotificationScreenExit();
   void OnAppDownloadingScreenExit();
   void OnAiIntroScreenExit(AiIntroScreen::Result result);
   void OnGeminiIntroScreenExit(GeminiIntroScreen::Result result);
-  void OnAssistantOptInFlowScreenExit(AssistantOptInFlowScreen::Result result);
+
   void OnMultiDeviceSetupScreenExit(MultiDeviceSetupScreen::Result result);
   void OnGestureNavigationScreenExit(GestureNavigationScreen::Result result);
   void OnMarketingOptInScreenExit(MarketingOptInScreen::Result result);
@@ -477,6 +483,7 @@ class WizardController : public OobeUI::Observer {
       PersonalizedRecommendAppsScreen::Result result);
   void OnPerksDiscoveryScreenExit(PerksDiscoveryScreen::Result result);
   void OnAppLaunchSplashScreenExit();
+  void OnFjordStationSetupScreenExit();
 
   // Callback invoked once it has been determined whether the device is disabled
   // or not.
@@ -541,7 +548,7 @@ class WizardController : public OobeUI::Observer {
   void OnTimezoneResolved(std::unique_ptr<TimeZoneResponseData> timezone,
                           bool server_error);
 
-  // Called from SimpleGeolocationProvider when location is resolved.
+  // Called from SystemLocationProvider when location is resolved.
   void OnLocationResolved(const Geoposition& position,
                           bool server_error,
                           const base::TimeDelta elapsed);
@@ -580,6 +587,11 @@ class WizardController : public OobeUI::Observer {
 
   // Tries to enable pre-consent metrics.
   void MaybeEnablePreConsentMetrics();
+
+  // Notifies the FjordOobeStateManager of an OOBE state change. This is a no-op
+  // for devices that do not implement the Fjord variant of OOBE.
+  void MaybeNotifyFjordOobeStateManager(
+      fjord_oobe_state::proto::FjordOobeStateInfo::FjordOobeState state);
 
   std::unique_ptr<policy::AutoEnrollmentController> auto_enrollment_controller_;
   std::unique_ptr<ChoobeFlowController> choobe_flow_controller_;

@@ -6,34 +6,34 @@
 
 #include <memory>
 #include <string_view>
-#include <unordered_map>
 
+#include "base/check_op.h"
+#include "base/feature_list.h"
 #include "base/i18n/case_conversion.h"
+#include "base/memory/ptr_util.h"
 #include "base/no_destructor.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/autofill/core/browser/geo/grit/autofill_address_rewriter_resources_map.h"
-#include "third_party/re2/src/re2/re2.h"
+#include "components/autofill/core/common/autofill_features.h"
+#include "components/autofill/core/common/autofill_regexes.h"
+#include "third_party/icu/source/common/unicode/utypes.h"
+#include "third_party/icu/source/i18n/unicode/regex.h"
 #include "third_party/zlib/google/compression_utils.h"
 #include "ui/base/resource/resource_bundle.h"
 
 namespace autofill {
 namespace {
 
-// Aliases for the types used by the compiled rules cache.
-using CompiledRule = std::pair<std::unique_ptr<re2::RE2>, std::string>;
-using CompiledRuleVector = std::vector<CompiledRule>;
-using CompiledRuleCache = std::unordered_map<std::string, CompiledRuleVector>;
-
 // Helper function to convert region to mapping key string.
 std::string GetMapKey(const std::string& region) {
   return base::StrCat({"IDR_ADDRESS_REWRITER_", region, "_RULES"});
 }
 
-// Helper function to extract region rules data.
-std::string ExtractRegionRulesData(const std::string& region) {
-  std::string resource_key = GetMapKey(region);
+// Helper function to retrieve resource data.
+std::string GetResourceData(const std::string& resource_key) {
   for (const webui::ResourcePath& resource :
        kAutofillAddressRewriterResources) {
     if (resource.path == resource_key) {
@@ -45,36 +45,49 @@ std::string ExtractRegionRulesData(const std::string& region) {
       return data;
     }
   }
-
   return std::string();
 }
 
-// Helper function to populate |compiled_rules| by parsing |data_string|.
-void CompileRulesFromData(const std::string& data_string,
-                          CompiledRuleVector* compiled_rules) {
-  std::string_view data = data_string;
-  re2::RE2::Options options;
-  options.set_encoding(RE2::Options::EncodingUTF8);
-  options.set_word_boundary(true);
+// Helper function to extract region rules data.
+std::string ExtractRegionRulesData(const std::string& region) {
+  std::string resource_key = GetMapKey(region);
 
-  size_t token_end = 0;
-  while (!data.empty()) {
-    token_end = data.find('\t');
-    auto pattern =
-        std::make_unique<re2::RE2>(data.substr(0, token_end), options);
-    data.remove_prefix(token_end + 1);
+  if (base::FeatureList::IsEnabled(features::kAutofillFixRewriterRules)) {
+    std::string resource_data =
+        GetResourceData(base::StrCat({resource_key, "_UPDATED"}));
+    if (!resource_data.empty()) {
+      return resource_data;
+    }
+  }
 
-    token_end = data.find('\n');
-    std::string rewrite_string(data.substr(0, token_end));
-    compiled_rules->emplace_back(std::move(pattern), std::move(rewrite_string));
-    data.remove_prefix(token_end + 1);
+  return GetResourceData(resource_key);
+}
+
+}  // namespace
+
+// Helper function to populate `compiled_rules` by parsing `data_string`.
+// static
+void AddressRewriter::CompileRulesFromData(std::string_view data_string,
+                                           CompiledRuleVector* compiled_rules) {
+  std::vector<std::string_view> lines = base::SplitStringPiece(
+      data_string, "\n", base::KEEP_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
+
+  for (std::string_view line : lines) {
+    // `base::SPLIT_WANT_ALL` is needed to ensure that rules rewriting to an
+    // empty string work.
+    std::vector<std::string_view> parts = base::SplitStringPiece(
+        line, "\t", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
+    DCHECK_EQ(parts.size(), 2U);
+    std::unique_ptr<const icu::RegexPattern> pattern = CompileRegex(
+        base::UTF8ToUTF16(parts[0]), UREGEX_UWORD | UREGEX_CASE_INSENSITIVE);
+    compiled_rules->emplace_back(std::move(pattern), std::string(parts[1]));
   }
 }
 
 // The cache of compiled string replacement rules, keyed by region. This class
 // is a singleton that compiles the rules for a given region the first time
 // they are requested.
-class Cache {
+class AddressRewriter::Cache {
  public:
   // Return the singleton instance of the cache.
   static Cache* GetInstance() {
@@ -139,7 +152,8 @@ class Cache {
   friend class base::NoDestructor<Cache>;
 };
 
-}  // namespace
+AddressRewriter::AddressRewriter(const CompiledRuleVector* compiled_rules)
+    : compiled_rules_(compiled_rules) {}
 
 // static
 std::u16string AddressRewriter::RewriteForCountryCode(
@@ -155,9 +169,7 @@ AddressRewriter AddressRewriter::ForCountryCode(
   const std::string region = base::ToUpperASCII(country_code.value());
   const CompiledRuleVector* rules =
       Cache::GetInstance()->GetRulesForRegion(region);
-  AddressRewriter rewriter;
-  rewriter.impl_ = rules;
-  return rewriter;
+  return AddressRewriter(rules);
 }
 
 // static
@@ -165,26 +177,23 @@ AddressRewriter AddressRewriter::ForCustomRules(
     const std::string& custom_rules) {
   const CompiledRuleVector* rules =
       Cache::GetInstance()->CreateRulesForData(custom_rules);
-  AddressRewriter rewriter;
-  rewriter.impl_ = rules;
-  return rewriter;
+  return AddressRewriter(rules);
 }
 
 std::u16string AddressRewriter::Rewrite(const std::u16string& text) const {
-  if (impl_ == nullptr) {
+  if (compiled_rules_ == nullptr || compiled_rules_->empty()) {
     return base::CollapseWhitespace(text, true);
   }
 
   // Apply all of the string replacement rules. We don't have to worry about
   // whitespace during these passes because the patterns are all whitespace
   // tolerant regular expressions.
-  std::string utf8_text = base::UTF16ToUTF8(text);
-  for (const auto& rule : *static_cast<const CompiledRuleVector*>(impl_)) {
-    RE2::GlobalReplace(&utf8_text, *rule.first, rule.second);
+  std::u16string result = text;
+  for (const CompiledRule& rule : *compiled_rules_) {
+    result = MatchAndReplace(result, *rule.first, rule.second);
   }
 
-  // Collapse whitespace before returning the final value.
-  return base::UTF8ToUTF16(base::CollapseWhitespaceASCII(utf8_text, true));
+  return base::CollapseWhitespace(result, true);
 }
 
 }  // namespace autofill

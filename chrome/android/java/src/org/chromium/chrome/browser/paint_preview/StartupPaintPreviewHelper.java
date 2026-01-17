@@ -12,8 +12,7 @@ import android.os.SystemClock;
 import org.chromium.base.Callback;
 import org.chromium.base.ObserverList;
 import org.chromium.base.lifetime.Destroyable;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.fullscreen.BrowserControlsManager;
@@ -29,6 +28,8 @@ import org.chromium.chrome.browser.tabmodel.TabModelSelectorObserver;
 import org.chromium.chrome.browser.toolbar.load_progress.LoadProgressCoordinator;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.ui.base.WindowAndroid;
+
+import java.util.function.Supplier;
 
 /** Glue code for the Paint Preview show-on-startup feature. */
 @NullMarked
@@ -125,7 +126,7 @@ public class StartupPaintPreviewHelper implements Destroyable {
     public static void showPaintPreviewOnRestore(Tab tab) {
         WindowAndroid windowAndroid = tab.getWindowAndroid();
         assumeNonNull(windowAndroid);
-        ObservableSupplier<StartupPaintPreviewHelper> paintPreviewSupplier =
+        MonotonicObservableSupplier<StartupPaintPreviewHelper> paintPreviewSupplier =
                 StartupPaintPreviewHelperSupplier.from(windowAndroid);
         if (paintPreviewSupplier == null) return;
 

@@ -43,6 +43,7 @@
 #include "ui/base/webui/web_ui_util.h"
 #include "ui/display/display_features.h"
 #include "ui/display/display_switches.h"
+#include "ui/display/manager/display_manager.h"
 #include "ui/display/manager/touch_device_manager.h"
 #include "ui/events/ash/keyboard_capability.h"
 #include "ui/events/ash/keyboard_layout_util.h"
@@ -501,11 +502,8 @@ bool IsTouchCalibrationAvailable() {
 
 bool IsTouchscreenRemappingExperienceAvailable() {
   return features::IsTouchscreenMappingExperienceEnabled() &&
+         Shell::Get()->display_manager()->GetNumExternalDisplays() >= 2 &&
          display::HasExternalTouchscreenDevice();
-}
-
-bool IsListAllDisplayModesEnabled() {
-  return display::features::IsListAllDisplayModesEnabled();
 }
 
 bool IsExcludeDisplayInMirrorModeEnabled() {
@@ -1304,7 +1302,7 @@ void DeviceSection::OnGetDisplayLayoutInfo(
   }
 
   // Refresh Rate dropdown.
-  if (has_external_display && IsListAllDisplayModesEnabled()) {
+  if (has_external_display) {
     updater.AddSearchTags(GetDisplayExternalWithRefreshSearchConcepts());
   } else {
     updater.RemoveSearchTags(GetDisplayExternalWithRefreshSearchConcepts());
@@ -1649,9 +1647,6 @@ void DeviceSection::AddDeviceDisplayStrings(
 
   html_source->AddBoolean("unifiedDesktopAvailable",
                           IsUnifiedDesktopAvailable());
-
-  html_source->AddBoolean("listAllDisplayModes",
-                          IsListAllDisplayModesEnabled());
 
   html_source->AddBoolean("deviceSupportsAmbientColor",
                           DoesDeviceSupportAmbientColor());

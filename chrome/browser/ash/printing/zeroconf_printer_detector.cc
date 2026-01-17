@@ -11,7 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
@@ -155,8 +154,7 @@ std::string ZeroconfPrinterId(const ServiceDescription& service,
   md5.Update(metadata.usb_MDL);
   md5.Update(metadata.ty);
   md5.Update(metadata.rp);
-  return base::StringPrintf("zeroconf-%s",
-                            base::ToLowerASCII(base::HexEncode(md5.Finish())));
+  return base::StringPrintf("zeroconf-%s", base::HexEncodeLower(md5.Finish()));
 }
 
 // Attempt to fill |detected_printer| using the information in
@@ -394,7 +392,7 @@ class ZeroconfPrinterDetectorImpl : public ZeroconfPrinterDetector {
         this, discovery_client_.get(), service_type);
     lister->Start();
     lister->DiscoverNewDevices();
-    DCHECK(!base::Contains(device_listers_, service_type));
+    DCHECK(!device_listers_.contains(service_type));
     device_listers_[service_type] = std::move(lister);
   }
 
@@ -402,14 +400,14 @@ class ZeroconfPrinterDetectorImpl : public ZeroconfPrinterDetector {
   // Requires that printers_lock_ be held.
   std::vector<DetectedPrinter> GetPrintersLocked() {
     printers_lock_.AssertAcquired();
-    std::map<std::string, DetectedPrinter> unified;
+    std::map<std::string_view, DetectedPrinter> unified;
     // The order in which we look through these maps defines priority -- earlier
     // service types in this list will be used preferentially over later ones.
     // This depends on the fact that map::insert will fail if the entry already
     // exists.
     for (const char* service_type : kServiceNames) {
       for (const auto& entry : printers_[service_type]) {
-        unified.insert({entry.first, entry.second});
+        unified.emplace(entry.first, entry.second);
       }
     }
     std::vector<DetectedPrinter> ret;
@@ -432,7 +430,7 @@ class ZeroconfPrinterDetectorImpl : public ZeroconfPrinterDetector {
   bool IsPrintersEmpty() const {
     printers_lock_.AssertAcquired();
     for (const char* service_type : kServiceNames) {
-      DCHECK(base::Contains(printers_, service_type));
+      DCHECK(printers_.contains(service_type));
       if (!printers_.at(service_type).empty()) {
         return false;
       }

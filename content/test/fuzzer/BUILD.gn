@@ -152,6 +152,7 @@ if (enable_mojom_fuzzer) {
       "//base/test:test_support",
       "//content/browser:for_content_tests",
       "//content/test:test_support",
+      "//mojo/public/tools/fuzzers:test_support",
       "//services/network:test_support",
       "//storage/browser:test_support",
       "//third_party/icu:icudata",
@@ -208,6 +209,33 @@ content_mojolpm_fuzzer_test("code_cache_host_mojolpm_fuzzer") {
   seed_corpus_sources = [
     "//content/test/data/fuzzer_corpus/code_cache_host_mojolpm_fuzzer/did_generate_cacheable_metadata_origin_a.textproto",
     "//content/test/data/fuzzer_corpus/code_cache_host_mojolpm_fuzzer/did_generate_cacheable_metadata_origin_b.textproto",
+  ]
+}
+
+content_mojolpm_fuzzer_test("idb_factory_mojolpm_fuzzer") {
+  sources = [ "idb_factory_mojolpm_fuzzer.cc" ]
+
+  proto_source = "idb_factory_mojolpm_fuzzer.proto"
+  testcase_proto_kind = "content.fuzzing.idb_factory.proto.Testcase"
+
+  deps = [
+    ":mojolpm_fuzzer_support",
+    "//content/browser:for_content_tests",
+    "//content/browser/indexed_db",
+    "//content/browser/indexed_db:unit_tests",
+    "//content/public/browser:browser_sources",
+    "//third_party/blink/public/mojom:mojom_modules_mojolpm",
+  ]
+
+  proto_deps = [ "//third_party/blink/public/mojom:mojom_modules_mojolpm" ]
+
+  seed_corpus_sources = [
+    "//content/test/data/fuzzer_corpus/idb_factory_mojolpm_fuzzer/basic_blob.textproto",
+    "//content/test/data/fuzzer_corpus/idb_factory_mojolpm_fuzzer/basic_index_operations.textproto",
+    "//content/test/data/fuzzer_corpus/idb_factory_mojolpm_fuzzer/basic_put_get.textproto",
+    "//content/test/data/fuzzer_corpus/idb_factory_mojolpm_fuzzer/idb_factory.textproto",
+    "//content/test/data/fuzzer_corpus/idb_factory_mojolpm_fuzzer/index_cursor.textproto",
+    "//content/test/data/fuzzer_corpus/idb_factory_mojolpm_fuzzer/object_store_cursor.textproto",
   ]
 }
 
@@ -277,8 +305,10 @@ fuzzer_test("browser_accessibility_fuzzer") {
 source_set("indexed_db_fuzzer_support") {
   public_deps = [
     "//base",
+    "//components/services/storage",
     "//content/browser/indexed_db",
     "//content/public/browser:browser_sources",
+    "//content/test:test_support",
     "//third_party/blink/public/common:headers",
   ]
   testonly = true
@@ -320,6 +350,7 @@ if (use_fuzzing_engine) {
       "//base/test:test_support",
       "//content/browser",
       "//content/public/browser:browser_sources",
+      "//content/test:test_support",
       "//net",
       "//net:net_fuzzer_test_support",
     ]
@@ -523,23 +554,6 @@ if (enable_mojom_fuzzer) {
 
     import_dirs = [ root_gen_dir ]
     testonly = true
-  }
-}
-
-if (use_fuzzing_engine) {
-  test("cookie_readiness_list_parser_fuzzer") {
-    sources = [ "../../browser/cookie_insight_list/cookie_readiness_list/cookie_readiness_list_parser_fuzztest.cc" ]
-
-    fuzztests = [ "CookieReadinessListParserFuzzTest.ParseReadinessListSuccessfullyParsesAnyString" ]
-
-    testonly = true
-    deps = [
-      "//base",
-      "//base:i18n",
-      "//content/browser",
-      "//content/public/browser:browser_sources",
-      "//third_party/fuzztest:fuzztest_gtest_main",
-    ]
   }
 }
 

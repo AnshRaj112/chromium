@@ -4,8 +4,9 @@
 
 #include "gpu/command_buffer/service/drm_modifiers_filter_dawn.h"
 
+#include <algorithm>
+
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/containers/flat_map.h"
 #include "components/viz/common/resources/shared_image_format_utils.h"
@@ -31,16 +32,14 @@ constexpr auto kModifierBlocklist = base::MakeFixedFlatSet<uint64_t>({
     I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC,
 });
 
-base::flat_map<gfx::BufferFormat, std::vector<uint64_t>> GetDawnModifierMap(
-    wgpu::Adapter adapter) {
-  base::flat_map<gfx::BufferFormat, std::vector<uint64_t>> modifier_map;
+base::flat_map<viz::SharedImageFormat, std::vector<uint64_t>>
+GetDawnModifierMap(wgpu::Adapter adapter) {
+  base::flat_map<viz::SharedImageFormat, std::vector<uint64_t>> modifier_map;
 
-  for (int i = 0; i <= static_cast<int>(gfx::BufferFormat::LAST); i++) {
-    gfx::BufferFormat buffer_format = static_cast<gfx::BufferFormat>(i);
-    auto si_format = viz::GetSharedImageFormat(buffer_format);
+  for (auto si_format : ui::kDrmSharedImageFormats) {
     auto wgpu_format = ToDawnFormat(si_format);
     if (wgpu_format == wgpu::TextureFormat::Undefined) {
-      modifier_map.emplace(buffer_format, std::vector<uint64_t>());
+      modifier_map.emplace(si_format, std::vector<uint64_t>());
       continue;
     }
 
@@ -50,19 +49,19 @@ base::flat_map<gfx::BufferFormat, std::vector<uint64_t>> GetDawnModifierMap(
     adapter.GetFormatCapabilities(wgpu_format, &formatCapabilities);
 
     if (!drmCapabilities.properties || !drmCapabilities.propertiesCount) {
-      modifier_map.emplace(buffer_format, std::vector<uint64_t>());
+      modifier_map.emplace(si_format, std::vector<uint64_t>());
       continue;
     }
 
     std::vector<uint64_t> modifiers;
     modifiers.reserve(drmCapabilities.propertiesCount);
     for (size_t j = 0; j < drmCapabilities.propertiesCount; j++) {
-      if (!base::Contains(kModifierBlocklist,
-                          drmCapabilities.properties[j].modifier)) {
+      if (!std::ranges::contains(kModifierBlocklist,
+                                 drmCapabilities.properties[j].modifier)) {
         modifiers.push_back(drmCapabilities.properties[j].modifier);
       }
     }
-    modifier_map.emplace(buffer_format, std::move(modifiers));
+    modifier_map.emplace(si_format, std::move(modifiers));
   }
 
   return modifier_map;
@@ -75,7 +74,7 @@ void PopulateDawnDrmFormatsAndModifiers(
     base::flat_map<uint32_t, std::vector<uint64_t>>& fourcc_modifier_map) {
   auto buffer_format_map = GetDawnModifierMap(adapter);
   for (auto& entry : buffer_format_map) {
-    int fourcc_format = ui::GetFourCCFormatFromBufferFormat(entry.first);
+    int fourcc_format = ui::GetFourCCFormatFromSharedImageFormat(entry.first);
     if (fourcc_format == DRM_FORMAT_INVALID) {
       continue;
     }
@@ -90,13 +89,14 @@ DrmModifiersFilterDawn::DrmModifiersFilterDawn(wgpu::Adapter adapter) {
 DrmModifiersFilterDawn::~DrmModifiersFilterDawn() = default;
 
 std::vector<uint64_t> DrmModifiersFilterDawn::Filter(
-    gfx::BufferFormat format,
+    viz::SharedImageFormat format,
     const std::vector<uint64_t>& modifiers) {
+  CHECK(viz::HasEquivalentBufferFormat(format));
   const auto& modifier_set = modifier_map_.at(format);
 
   std::vector<uint64_t> intersection;
   for (const auto& modifier : modifiers) {
-    if (base::Contains(modifier_set, modifier)) {
+    if (std::ranges::contains(modifier_set, modifier)) {
       intersection.push_back(modifier);
     }
   }

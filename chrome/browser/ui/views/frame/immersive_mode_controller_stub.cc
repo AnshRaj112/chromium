@@ -5,6 +5,11 @@
 #include "chrome/browser/ui/views/frame/immersive_mode_controller_stub.h"
 
 #include "base/notreached.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+
+ImmersiveModeControllerStub::ImmersiveModeControllerStub(
+    BrowserWindowInterface* browser)
+    : ImmersiveModeController(browser) {}
 
 void ImmersiveModeControllerStub::Init(BrowserView* browser_view) {}
 
@@ -13,10 +18,6 @@ void ImmersiveModeControllerStub::SetEnabled(bool enabled) {
 }
 
 bool ImmersiveModeControllerStub::IsEnabled() const {
-  return false;
-}
-
-bool ImmersiveModeControllerStub::ShouldHideTopViews() const {
   return false;
 }
 
@@ -40,10 +41,6 @@ void ImmersiveModeControllerStub::OnFindBarVisibleBoundsChanged(
 bool ImmersiveModeControllerStub::ShouldStayImmersiveAfterExitingFullscreen() {
   return false;
 }
-
-void ImmersiveModeControllerStub::OnWidgetActivationChanged(
-    views::Widget* widget,
-    bool active) {}
 
 int ImmersiveModeControllerStub::GetMinimumContentOffset() const {
   return 0;

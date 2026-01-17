@@ -10,7 +10,6 @@
 #include <string_view>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
@@ -20,6 +19,7 @@
 #include "sql/database.h"
 #include "sql/test/scoped_error_expecter.h"
 #include "sql/test/test_helpers.h"
+#include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/sqlite/sqlite3.h"
 
@@ -256,9 +256,7 @@ TEST_F(StatementTest, BindBlob) {
   Statement select(db_.GetUniqueStatement("SELECT b FROM blobs ORDER BY id"));
   for (const std::vector<uint8_t>& value : values) {
     ASSERT_TRUE(select.Step());
-    std::vector<uint8_t> column_value;
-    EXPECT_TRUE(select.ColumnBlobAsVector(0, &column_value));
-    EXPECT_EQ(value, column_value);
+    EXPECT_EQ(value, select.ColumnBlobAsVector(0));
   }
   EXPECT_FALSE(select.Step());
 }
@@ -289,9 +287,7 @@ TEST_F(StatementTest, BindBlob_String16Overload) {
   Statement select(db_.GetUniqueStatement("SELECT b FROM blobs ORDER BY id"));
   for (const std::u16string& value : values) {
     ASSERT_TRUE(select.Step());
-    std::u16string column_value;
-    EXPECT_TRUE(select.ColumnBlobAsString16(0, &column_value));
-    EXPECT_EQ(value, column_value);
+    EXPECT_THAT(select.ColumnBlobAsString16(0), testing::Optional(value));
   }
   EXPECT_FALSE(select.Step());
 }
@@ -333,11 +329,8 @@ TEST_F(StatementTest, BlobStressTest) {
   {
     Statement select(db_.GetUniqueStatement("SELECT * FROM blobs"));
     ASSERT_TRUE(select.Step());
-    std::string output50, output51;
-    EXPECT_TRUE(select.ColumnBlobAsString(50, &output50));
-    EXPECT_EQ("overwrite", output50);
-    EXPECT_TRUE(select.ColumnBlobAsString(51, &output51));
-    EXPECT_EQ(std::string(100, 'y'), output51);
+    EXPECT_EQ("overwrite", select.ColumnBlobAsString(50));
+    EXPECT_EQ(std::string(100, 'y'), select.ColumnBlobAsString(51));
   }
 
   // Make sure the underlying statement is reset i.e. the old bindings don't
@@ -421,9 +414,9 @@ TEST_F(StatementTest, GetSQLStatementExcludesBoundValues) {
 
   // Verify that GetSQLStatement doesn't leak any bound values that may be PII.
   std::string sql_statement = insert.GetSQLStatement();
-  EXPECT_TRUE(base::Contains(sql_statement, "INSERT INTO texts(t) VALUES(?)"));
-  EXPECT_TRUE(base::Contains(sql_statement, "VALUES"));
-  EXPECT_FALSE(base::Contains(sql_statement, "Doe"));
+  EXPECT_TRUE(sql_statement.contains("INSERT INTO texts(t) VALUES(?)"));
+  EXPECT_TRUE(sql_statement.contains("VALUES"));
+  EXPECT_FALSE(sql_statement.contains("Doe"));
 
   // Sanity check that the name was actually committed.
   Statement select(db_.GetUniqueStatement("SELECT t FROM texts ORDER BY id"));

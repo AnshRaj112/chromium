@@ -18,11 +18,10 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.robolectric.annotation.Config;
 
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.content_public.browser.SelectAroundCaretResult;
 import org.chromium.content_public.browser.SelectionClient;
@@ -35,24 +34,18 @@ import org.chromium.url.JUnitTestGURLs;
 /** Unit tests for {@link TapToSeekSelectionManager} */
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
-@EnableFeatures({
-    ChromeFeatureList.READALOUD,
-    ChromeFeatureList.READALOUD_PLAYBACK,
-    ChromeFeatureList.READALOUD_TAP_TO_SEEK
-})
+@EnableFeatures({ChromeFeatureList.READALOUD, ChromeFeatureList.READALOUD_PLAYBACK})
 public class TapToSeekSelectionManagerUnitTest {
     @Rule public final MockitoRule mMockitoRule = MockitoJUnit.rule();
 
     @Mock private ReadAloudController mReadAloudController;
 
-    @Mock private Profile mProfile;
     private static final GURL sTestGURL = JUnitTestGURLs.EXAMPLE_URL;
-    @Mock private ObservableSupplier<Tab> mMockTabProvider;
+    @Mock private MonotonicObservableSupplier<Tab> mMockTabProvider;
     @Mock private Tab mTab;
     @Mock private Tab mTab2;
     @Mock private WebContents mWebContents;
     @Mock private WebContents mWebContents2;
-    @Mock private SelectionClient mSelectionClient;
     @Mock private SelectionPopupController mSelectionPopupController;
     @Mock private SelectionClient mSmartSelectionClient;
     @Mock private SelectionClient mSmartSelectionClient2;
@@ -61,7 +54,6 @@ public class TapToSeekSelectionManagerUnitTest {
 
     @Before
     public void setUp() {
-        doReturn(false).when(mProfile).isOffTheRecord();
         doReturn(mWebContents).when(mTab).getWebContents();
         doReturn(mWebContents2).when(mTab2).getWebContents();
         doReturn(mTab).when(mMockTabProvider).get();

@@ -5,7 +5,6 @@
 #ifndef CHROME_BROWSER_UI_WEB_APPLICATIONS_WEB_APP_DIALOGS_H_
 #define CHROME_BROWSER_UI_WEB_APPLICATIONS_WEB_APP_DIALOGS_H_
 
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -16,12 +15,14 @@
 #include "build/build_config.h"
 #include "chrome/browser/web_applications/ui_manager/update_dialog_types.h"
 #include "chrome/browser/web_applications/web_app_callback_app_identity.h"
+#include "chrome/browser/web_applications/web_app_icon_manager.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
 #include "chrome/browser/web_applications/web_app_uninstall_dialog_user_options.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
+#include "components/webapps/common/web_app_id.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/interaction/element_identifier.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 
 static_assert(BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
               BUILDFLAG(IS_CHROMEOS));
@@ -32,7 +33,8 @@ class Browser;
 
 namespace base {
 class FilePath;
-}
+class TimeTicks;
+}  // namespace base
 
 namespace content {
 class WebContents;
@@ -44,6 +46,13 @@ enum class WebappUninstallSource;
 }  // namespace webapps
 
 namespace web_app {
+
+enum class NotSupportedReason {
+  kGuestMode = 0,
+  kOffTheRecord = 1,
+  kPolicyDisabled = 2,
+  kMaxValue = kPolicyDisabled
+};
 
 class IsolatedWebAppInstallerCoordinator;
 class WebAppScreenshotFetcher;
@@ -92,6 +101,7 @@ void ShowWebAppIdentityUpdateDialog(const std::string& app_id,
 void ShowWebAppReviewUpdateDialog(const webapps::AppId& app_id,
                                   const WebAppIdentityUpdate& update,
                                   Browser* browser,
+                                  base::TimeTicks start_time,
                                   UpdateReviewDialogCallback callback);
 
 // Shows the web app uninstallation dialog on a page whenever user has decided
@@ -101,7 +111,7 @@ void ShowWebAppUninstallDialog(
     const webapps::AppId& app_id,
     webapps::WebappUninstallSource uninstall_source,
     gfx::NativeWindow parent,
-    std::map<SquareSizePx, SkBitmap> icon_bitmaps,
+    IconMetadataFromDisk icon_metadata,
     UninstallDialogCallback uninstall_dialog_result_callback);
 
 // Callback used to indicate whether a user has accepted the launch of a
@@ -182,9 +192,24 @@ void ShowWebAppDetailedInstallDialog(
     base::WeakPtr<WebAppScreenshotFetcher> screenshot_fetcher,
     PwaInProductHelpState iph_state = PwaInProductHelpState::kNotShown);
 
+// Creates and shows a dialog that requests the consent from the user to
+// install the requested apps as sub apps to the named parent app. This is
+// triggered by an app calling the Multi App API add() function. The dialog is
+// modal to the browser window containing the app calling the API.
+void ShowSubAppsInstallDialog(
+    content::WebContents* web_contents,
+    const std::vector<std::unique_ptr<WebAppInstallInfo>>& sub_apps,
+    const std::string& parent_app_name,
+    const webapps::AppId& parent_app_id,
+    base::OnceCallback<void(bool)> callback);
+
 // Sets whether |ShowSimpleInstallDialogForWebApps| should accept immediately
 // without any user interaction.
 base::AutoReset<bool> SetAutoAcceptPWAInstallConfirmationForTesting();
+
+// Sets whether |ShowSimpleInstallDialogForWebApps| should decline immediately
+// without any user interaction.
+base::AutoReset<bool> SetAutoDeclinePWAInstallConfirmationForTesting();
 
 // Sets whether |ShowDiyInstallDialogForWebApps| should accept immediately
 // without any user interaction.
@@ -230,6 +255,15 @@ void ShowWebInstallAppLaunchDialog(
 
 // Sets whether |ShowWebInstallAppLaunchDialog| should accept immediately.
 base::AutoReset<bool> SetAutoAcceptWebInstallLaunchDialogForTesting();
+
+// Shows the install not supported dialog for web apps. This dialog is
+// displayed when the user tries to install a web app in an unsupported
+// environment, such as Incognito or Guest mode. The |callback| is called
+// when the dialog is closed.
+void ShowInstallNotSupportedDialog(content::WebContents* web_contents,
+                                   Profile* profile,
+                                   NotSupportedReason reason,
+                                   base::OnceClosure callback);
 
 }  // namespace web_app
 

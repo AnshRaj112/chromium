@@ -87,10 +87,14 @@ impl Parse for CppPrefixArgs {
 /// test will fail when run. If the return type is a `Result`, then an `Err` is
 /// treated as a test failure.
 ///
+/// The `gtest` macro will hide the test function in an ad-hoc `mod`, so the
+/// original function name doesn't matter.  By convention, the function is
+/// just named `fn test`.
+///
 /// # Examples
 /// ```
 /// #[gtest(MathTest, Addition)]
-/// fn my_test() {
+/// fn test() {
 ///   expect_eq!(1 + 1, 2);
 /// }
 /// ```
@@ -105,7 +109,7 @@ impl Parse for CppPrefixArgs {
 /// fail if the test returns an `Err`, and print the resulting error string:
 /// ```
 /// #[gtest(ResultTest, CheckThingWithResult)]
-/// fn my_test() -> std::result::Result<(), String> {
+/// fn test() -> std::result::Result<(), String> {
 ///   call_thing_with_result()?;
 /// }
 /// ```
@@ -258,6 +262,20 @@ pub fn gtest(
             "#[gtest(...)] can only be used in targets where the GN \
             variable `is_gtest_unittests` is set to `true`.");
 
+        // TODO(crbug.com/462501862): gtest interop doesn't currently work on
+        // at least some mac ASAN builds. Just disable the tests on those
+        // configurations until we figure out why and how to fix it.
+        #[cfg(all(IS_ASAN, any(target_os = "macos", target_os = "ios")))]
+        const _ : () = {
+            // We need to keep the function's definition so that anything inside
+            // it is marked as used. We put each one in an anonymous namespace
+            // to prevent collisions, since gtest allows functions to have the
+            // same name.
+            #[allow(dead_code)]
+            #input_fn
+        };
+
+        #[cfg(not(all(IS_ASAN, any(target_os = "macos", target_os = "ios"))))]
         mod #test_mod {
             use super::*;
 
@@ -284,7 +302,7 @@ pub fn gtest(
             // of `run_test_fn`. We can not use `pub` to resolve this unfortunately. When `#[used]`
             // is fixed in https://github.com/rust-lang/rust/issues/47384, this may also be
             // resolved as well.
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             extern "C" fn #run_test_fn(
                 suite: std::pin::Pin<&mut ::rust_gtest_interop::OpaqueTestingTest>
             ) {

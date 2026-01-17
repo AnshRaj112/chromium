@@ -6,7 +6,6 @@
 
 #include <algorithm>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/numerics/safe_conversions.h"
 #include "services/network/public/mojom/permissions_policy/permissions_policy_feature.mojom-blink.h"
@@ -94,7 +93,7 @@ ScriptPromise<IDLSequence<FontMetadata>> FontAccess::QueryLocalFontsImpl(
         remote_.BindNewPipeAndPassReceiver(
             context->GetTaskRunner(TaskType::kFontLoading)));
     remote_.set_disconnect_handler(
-        WTF::BindOnce(&FontAccess::OnDisconnect, WrapWeakPersistent(this)));
+        BindOnce(&FontAccess::OnDisconnect, WrapWeakPersistent(this)));
   }
   DCHECK(remote_.is_bound());
 
@@ -103,8 +102,8 @@ ScriptPromise<IDLSequence<FontMetadata>> FontAccess::QueryLocalFontsImpl(
           script_state, exception_state.GetContext());
   auto promise = resolver->Promise();
   remote_->EnumerateLocalFonts(resolver->WrapCallbackInScriptScope(
-      WTF::BindOnce(&FontAccess::DidGetEnumerationResponse,
-                    WrapWeakPersistent(this), WrapPersistent(options))));
+      blink::BindOnce(&FontAccess::DidGetEnumerationResponse,
+                      WrapWeakPersistent(this), WrapPersistent(options))));
 
   return promise;
 }
@@ -158,7 +157,7 @@ void FontAccess::DidGetEnumerationResponse(
     // If the optional postscript name filter is set in QueryOptions,
     // only allow items that match.
     if (hasPostscriptNameFilter &&
-        !base::Contains(selection_utf8, element.postscript_name().c_str())) {
+        !selection_utf8.contains(element.postscript_name().c_str())) {
       continue;
     }
 

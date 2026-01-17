@@ -4,11 +4,9 @@
 
 #include "components/page_load_metrics/browser/observers/prerender_page_load_metrics_observer.h"
 
-#include "base/containers/contains.h"
 #include "base/time/time.h"
 #include "chrome/browser/page_load_metrics/integration_tests/metric_integration_test.h"
 #include "chrome/browser/preloading/prerender/prerender_utils.h"
-#include "chrome/common/chrome_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/page_load_metrics/browser/observers/core/uma_page_load_metrics_observer.h"
 #include "components/page_load_metrics/browser/page_load_metrics_test_waiter.h"
@@ -129,7 +127,7 @@ class PrerenderPageLoadMetricsObserverBrowserTest
         internal::kHistogramLargestContentfulPaint, 0);
   }
 
-  void CheckResponsivenessMetrics(const GURL& url, bool is_incognito = false) {
+  void CheckResponsivenessMetrics(const GURL& url) {
     std::vector<std::string> ukm_list = {
         "InteractiveTiming.WorstUserInteractionLatency.MaxEventDuration",
         "InteractiveTiming.UserInteractionLatency.HighPercentile2."
@@ -165,11 +163,6 @@ class PrerenderPageLoadMetricsObserverBrowserTest
     for (auto& uma : uma_list) {
       histogram_tester().ExpectTotalCount(uma, 1);
     }
-
-    histogram_tester().ExpectTotalCount(
-        internal::
-            kHistogramPrerenderUserInteractionLatencyHighPercentile2MaxEventDurationIncognito,
-        is_incognito ? 1 : 0);
   }
 
   content::test::PrerenderTestHelper prerender_helper_;
@@ -372,7 +365,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
 
   // Wait until the completion of prerendering navigation.
   prerender_helper_.WaitForPrerenderLoadCompletion(prerender_url);
-  content::FrameTreeNodeId host_id =
+  content::PrerenderHostId host_id =
       prerender_helper_.GetHostForUrl(prerender_url);
   EXPECT_TRUE(host_id);
 
@@ -470,7 +463,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
 
   // Start a prerender.
   GURL prerender_url = embedded_test_server()->GetURL("/title2.html");
-  const content::FrameTreeNodeId host_id =
+  const content::PrerenderHostId host_id =
       prerender_helper_.AddPrerender(prerender_url);
 
   content::test::PrerenderHostObserver observer(*web_contents(), host_id);
@@ -488,7 +481,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
                     .size());
 
   auto entries = GetMergedUkmEntries(PrerenderPageLoad::kEntryName);
-  EXPECT_FALSE(base::Contains(entries, prerender_url));
+  EXPECT_FALSE(entries.contains(prerender_url));
 }
 
 IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
@@ -525,7 +518,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
 
   // Verify that UKM records the URL after the redirection, not the initial URL.
   auto entries = GetMergedUkmEntries(PrerenderPageLoad::kEntryName);
-  ASSERT_FALSE(base::Contains(entries, prerender_url));
+  ASSERT_FALSE(entries.contains(prerender_url));
   const ukm::mojom::UkmEntry* prerendered_page_entry =
       entries[redirected_url].get();
   ASSERT_TRUE(prerendered_page_entry);
@@ -570,7 +563,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
     registry_observer.WaitForTrigger(kPrerenderingUrl);
   }
 
-  content::FrameTreeNodeId host_id =
+  content::PrerenderHostId host_id =
       prerender_helper_.GetHostForUrl(kPrerenderingUrl);
   content::test::PrerenderHostObserver prerender_observer(*web_contents(),
                                                           host_id);
@@ -777,8 +770,16 @@ IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
             shifting_duration.InMilliseconds());
 }
 
+// TODO(crbug.com/438364202): Re-enable this test
+#if BUILDFLAG(IS_LINUX) && defined(ADDRESS_SANITIZER)
+#define MAYBE_ResponseBodyReceivedAfterActivation \
+  DISABLED_ResponseBodyReceivedAfterActivation
+#else
+#define MAYBE_ResponseBodyReceivedAfterActivation \
+  ResponseBodyReceivedAfterActivation
+#endif
 IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
-                       ResponseBodyReceivedAfterActivation) {
+                       MAYBE_ResponseBodyReceivedAfterActivation) {
   net::test_server::ControllableHttpResponse response(embedded_test_server(),
                                                       "/title2.html");
   ASSERT_TRUE(embedded_test_server()->Start());
@@ -836,7 +837,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
   // Start a prerender and a main frame navigation in the prerendered page.
   GURL prerender_url = embedded_test_server()->GetURL("/title2.html");
   GURL navigation_url = embedded_test_server()->GetURL("/title3.html");
-  content::FrameTreeNodeId host_id =
+  content::PrerenderHostId host_id =
       prerender_helper_.AddPrerender(prerender_url);
   prerender_helper_.WaitForPrerenderLoadCompletion(host_id);
   prerender_helper_.NavigatePrerenderedPage(host_id, navigation_url);
@@ -908,7 +909,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
   // not the initial URL.
   auto entries = GetMergedUkmEntries(PrerenderPageLoad::kEntryName);
   EXPECT_EQ(2u, entries.size());
-  ASSERT_FALSE(base::Contains(entries, prerender_url));
+  ASSERT_FALSE(entries.contains(prerender_url));
   const ukm::mojom::UkmEntry* prerendered_page_entry =
       entries[navigation_url].get();
   ASSERT_TRUE(prerendered_page_entry);
@@ -957,51 +958,4 @@ IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverBrowserTest,
       PrerenderPageLoad::kTiming_ActivationToLargestContentfulPaintName));
 
   CheckResponsivenessMetrics(navigation_url);
-}
-
-class PrerenderPageLoadMetricsObserverIncognitoBrowserTest
-    : public PrerenderPageLoadMetricsObserverBrowserTest {
-  void SetUpCommandLine(base::CommandLine* command_line) override {
-    command_line->AppendSwitch(switches::kIncognito);
-  }
-};
-
-IN_PROC_BROWSER_TEST_F(PrerenderPageLoadMetricsObserverIncognitoBrowserTest,
-                       MainFrameNavigationIncognito) {
-  ASSERT_TRUE(embedded_test_server()->Start());
-
-  // Navigate to an initial page.
-  auto initial_url = embedded_test_server()->GetURL("/empty.html");
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), initial_url));
-
-  // Start a prerender and a main frame navigation in the prerendered page.
-  GURL prerender_url = embedded_test_server()->GetURL("/title2.html");
-  GURL navigation_url = embedded_test_server()->GetURL("/title3.html");
-  content::FrameTreeNodeId host_id =
-      prerender_helper_.AddPrerender(prerender_url);
-  prerender_helper_.WaitForPrerenderLoadCompletion(host_id);
-  prerender_helper_.NavigatePrerenderedPage(host_id, navigation_url);
-  prerender_helper_.WaitForPrerenderLoadCompletion(host_id);
-
-  // Activate and wait for FCP.
-  auto waiter = std::make_unique<page_load_metrics::PageLoadMetricsTestWaiter>(
-      web_contents());
-  waiter->AddPageExpectation(page_load_metrics::PageLoadMetricsTestWaiter::
-                                 TimingField::kFirstContentfulPaint);
-  prerender_helper_.NavigatePrimaryPage(prerender_url);
-  waiter->Wait();
-
-  // Simulate mouse click and wait for FirstInputDelay.
-  content::SimulateMouseClick(web_contents(), 0,
-                              blink::WebPointerProperties::Button::kLeft);
-  waiter->AddPageExpectation(page_load_metrics::PageLoadMetricsTestWaiter::
-                                 TimingField::kFirstInputDelay);
-  waiter->Wait();
-
-  // Force navigation to another page, which should force logging of histograms
-  // persisted at the end of the page load lifetime.
-  ASSERT_TRUE(
-      ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL)));
-
-  CheckResponsivenessMetrics(navigation_url, true);
 }

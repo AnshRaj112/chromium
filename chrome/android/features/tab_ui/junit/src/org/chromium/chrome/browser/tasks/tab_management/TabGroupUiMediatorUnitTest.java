@@ -24,7 +24,6 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -84,7 +83,6 @@ import org.chromium.chrome.browser.tabmodel.TabCreator;
 import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilterObserver;
-import org.chromium.chrome.browser.tabmodel.TabGroupModelFilterProvider;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorImpl;
@@ -107,6 +105,7 @@ import org.chromium.ui.modelutil.PropertyModel;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /** Tests for {@link TabGroupUiMediator}. */
@@ -146,7 +145,6 @@ public class TabGroupUiMediatorUnitTest {
     @Mock private LayoutStateProvider mLayoutManager;
     @Spy private TabModel mTabModel;
     @Mock private View mView;
-    @Mock private TabGroupModelFilterProvider mTabGroupModelFilterProvider;
     @Mock private TabGroupModelFilter mTabGroupModelFilter;
     @Mock private TabGridDialogMediator.DialogController mTabGridDialogController;
     @Mock private SharedImageTilesCoordinator mSharedImageTilesCoordinator;
@@ -204,10 +202,6 @@ public class TabGroupUiMediatorUnitTest {
         Tab newTab = prepareTab(TAB4_ID, TAB4_ID);
         List<Tab> tabs = new ArrayList<>(Arrays.asList(newTab));
         doReturn(tabs).when(mTabGroupModelFilter).getRelatedTabList(TAB4_ID);
-        TabModel incognitoTabModel = spy(TabModel.class);
-        doReturn(newTab).when(incognitoTabModel).getTabAt(POSITION1);
-        doReturn(true).when(incognitoTabModel).isIncognito();
-        doReturn(1).when(incognitoTabModel).getCount();
     }
 
     private void verifyNeverReset() {
@@ -227,6 +221,7 @@ public class TabGroupUiMediatorUnitTest {
                 .setBottomControlsVisible(isVisible);
     }
 
+    @SuppressWarnings("DirectInvocationOnMock")
     private void initAndAssertProperties(@Nullable Tab currentTab) {
         doReturn(true).when(mTabModelSelector).isTabStateInitialized();
         if (currentTab == null) {
@@ -234,6 +229,7 @@ public class TabGroupUiMediatorUnitTest {
             doReturn(0).when(mTabModel).getCount();
             doReturn(0).when(mTabGroupModelFilter).getIndividualTabAndGroupCount();
             doReturn(null).when(mTabModelSelector).getCurrentTab();
+            when(mTabModel.iterator()).thenAnswer(inv -> Collections.emptyList().iterator());
         } else {
             doReturn(mTabModel.indexOf(currentTab)).when(mTabModel).index();
             doReturn(currentTab).when(mTabModelSelector).getCurrentTab();
@@ -323,6 +319,7 @@ public class TabGroupUiMediatorUnitTest {
         doReturn(false).when(mTabModel).isIncognito();
         doReturn(mTabModel).when(mTabModelSelector).getModel(false);
         doReturn(3).when(mTabModel).getCount();
+        when(mTabModel.iterator()).thenAnswer(inv -> List.of(mTab1, mTab2, mTab3).iterator());
         doReturn(0).when(mTabModel).index();
         doReturn(mTab1).when(mTabModel).getTabAt(0);
         doReturn(mTab2).when(mTabModel).getTabAt(1);
@@ -347,20 +344,14 @@ public class TabGroupUiMediatorUnitTest {
         doReturn(true).when(mTabGroupModelFilter).isTabInTabGroup(mTab2);
         doReturn(true).when(mTabGroupModelFilter).isTabInTabGroup(mTab3);
 
-        doReturn(mTabGroupModelFilter)
-                .when(mTabGroupModelFilterProvider)
-                .getCurrentTabGroupModelFilter();
-        doReturn(mTabGroupModelFilter)
-                .when(mTabGroupModelFilterProvider)
-                .getTabGroupModelFilter(true);
-        doReturn(mTabGroupModelFilter)
-                .when(mTabGroupModelFilterProvider)
-                .getTabGroupModelFilter(false);
+        doReturn(mTabGroupModelFilter).when(mTabModelSelector).getCurrentTabGroupModelFilter();
+        doReturn(mTabGroupModelFilter).when(mTabModelSelector).getTabGroupModelFilter(true);
+        doReturn(mTabGroupModelFilter).when(mTabModelSelector).getTabGroupModelFilter(false);
         doNothing()
                 .when(mTabGroupModelFilter)
                 .addTabGroupObserver(mTabGroupModelFilterObserverArgumentCaptor.capture());
 
-        // Set up TabModelSelector and TabGroupModelFilterProvider.
+        // Set up TabModelSelector.
         List<TabModel> tabModelList = new ArrayList<>();
         tabModelList.add(mTabModel);
         doReturn(mTabModel).when(mTabModelSelector).getCurrentModel();
@@ -369,11 +360,8 @@ public class TabGroupUiMediatorUnitTest {
         doReturn(tabModelList).when(mTabModelSelector).getModels();
         when(mTabModelSelector.getCurrentTabModelSupplier()).thenReturn(mTabModelSupplier);
 
-        doReturn(mTabGroupModelFilterProvider)
-                .when(mTabModelSelector)
-                .getTabGroupModelFilterProvider();
         doNothing()
-                .when(mTabGroupModelFilterProvider)
+                .when(mTabModelSelector)
                 .addTabGroupModelFilterObserver(mTabModelObserverArgumentCaptor.capture());
 
         // Set up OverviewModeBehavior.
@@ -503,6 +491,7 @@ public class TabGroupUiMediatorUnitTest {
     }
 
     @Test
+    @SuppressWarnings("DirectInvocationOnMock")
     public void tabSelection_NotSameGroup_SingleTabToGroup() {
         initAndAssertProperties(mTab1);
 
@@ -552,6 +541,7 @@ public class TabGroupUiMediatorUnitTest {
     }
 
     @Test
+    @SuppressWarnings("DirectInvocationOnMock")
     public void tabSelection_ScrollToSelectedIndex() {
         initAndAssertProperties(mTab1);
         assertThat(mModel.get(TabGroupUiProperties.INITIAL_SCROLL_INDEX), equalTo(null));
@@ -713,6 +703,7 @@ public class TabGroupUiMediatorUnitTest {
     }
 
     @Test
+    @SuppressWarnings("DirectInvocationOnMock")
     public void tabAddition_TabGroup_ScrollToTheLast() {
         initAndAssertProperties(mTab2);
         assertThat(mModel.get(TabGroupUiProperties.INITIAL_SCROLL_INDEX), equalTo(0));
@@ -921,7 +912,7 @@ public class TabGroupUiMediatorUnitTest {
 
         mTabGroupUiMediator.destroy();
 
-        verify(mTabGroupModelFilterProvider)
+        verify(mTabModelSelector)
                 .removeTabGroupModelFilterObserver(mTabModelObserverArgumentCaptor.capture());
         verify(mLayoutManager).removeObserver(mLayoutStateObserverCaptor.capture());
         verify(mTabModelSupplier).removeObserver(mTabModelSupplierObserverCaptor.capture());

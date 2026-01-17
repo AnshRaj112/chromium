@@ -8,7 +8,6 @@
 
 #include <algorithm>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/metrics/histogram_functions.h"
@@ -46,6 +45,7 @@
 #include "ui/base/window_open_disposition_utils.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/text_elider.h"
 #include "ui/menus/simple_menu_model.h"
 
@@ -301,7 +301,7 @@ bool BackForwardMenuModel::IsSeparator(size_t index) const {
 void BackForwardMenuModel::FetchFavicon(NavigationEntry* entry) {
   // If the favicon has already been requested for this menu, don't do
   // anything.
-  if (base::Contains(requested_favicons_, entry->GetUniqueID())) {
+  if (requested_favicons_.contains(entry->GetUniqueID())) {
     return;
   }
 

@@ -8,12 +8,12 @@
 #include <map>
 #include <set>
 
-#include "base/containers/contains.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/test/scoped_feature_list.h"
 #include "content/browser/renderer_host/back_forward_cache_impl.h"
 #include "content/common/features.h"
 #include "content/public/browser/global_routing_id.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_features.h"
 
@@ -62,7 +62,7 @@ std::vector<base::test::FeatureRefAndParams> Merge(
   // Go over the additional features/params - if they match a default feature,
   // make a new featureparam with the combined features, otherwise just add the
   // additional feature as is.
-  for (auto feature_and_params : additional_features_and_params) {
+  for (const auto& feature_and_params : additional_features_and_params) {
     auto default_feature_and_param = std::ranges::find(
         default_features_and_params, feature_and_params.feature->name,
         [](const base::test::FeatureRefAndParams default_feature) {
@@ -81,8 +81,8 @@ std::vector<base::test::FeatureRefAndParams> Merge(
     }
   }
   // Add any default features we didn't have additional params for.
-  for (auto feature_and_params : default_features_and_params) {
-    if (!base::Contains(
+  for (const auto& feature_and_params : default_features_and_params) {
+    if (!std::ranges::contains(
             final_features_and_params, feature_and_params.feature->name,
             [](const base::test::FeatureRefAndParams default_feature) {
               return default_feature.feature->name;
@@ -202,10 +202,11 @@ GetDefaultDisabledBackForwardCacheFeaturesForTesting(
       features::kBackForwardCacheMemoryControls};
 
   for (auto additional_feature : additional_features) {
-    if (!base::Contains(final_features, additional_feature->name,
-                        [](const base::test::FeatureRef default_feature) {
-                          return default_feature->name;
-                        })) {
+    if (!std::ranges::contains(
+            final_features, additional_feature->name,
+            [](const base::test::FeatureRef default_feature) {
+              return default_feature->name;
+            })) {
       final_features.emplace_back(additional_feature);
     }
   }

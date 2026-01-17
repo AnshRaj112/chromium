@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <memory>
+#include <utility>
+#include <variant>
 
 #include "base/base64.h"
 #include "base/check.h"
@@ -29,7 +31,7 @@
 #include "content/public/browser/web_contents.h"
 #include "services/metrics/public/cpp/ukm_builders.h"
 #include "services/metrics/public/cpp/ukm_recorder.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "url/gurl.h"
 #include "url/origin.h"
 
@@ -37,11 +39,14 @@ namespace {
 
 using password_manager::UiCredential;
 
-// Returns whether there is at least one credential with a non-empty username.
-bool ContainsNonEmptyUsername(
-    const base::span<const UiCredential>& credentials) {
-  return std::ranges::any_of(credentials, [](const UiCredential& credential) {
-    return !credential.username().empty();
+using Credential = TouchToFillView::Credential;
+
+// Returns whether there is at least one password credential with a non-empty
+// username.
+bool ContainsNonEmptyUsername(const base::span<const Credential>& credentials) {
+  return std::ranges::any_of(credentials, [](const Credential& credential) {
+    const UiCredential* ui_credential = std::get_if<UiCredential>(&credential);
+    return ui_credential && !ui_credential->username().empty();
   });
 }
 
@@ -102,8 +107,7 @@ TouchToFillControllerAutofillDelegate::
 }
 
 void TouchToFillControllerAutofillDelegate::OnShow(
-    base::span<const password_manager::UiCredential> credentials,
-    base::span<password_manager::PasskeyCredential> passkey_credentials) {
+    base::span<const Credential> credentials) {
   CHECK(filler_);
 
   filler_->UpdateTriggerSubmission(ShouldTriggerSubmission() &&
@@ -267,6 +271,12 @@ bool TouchToFillControllerAutofillDelegate::
   return false;
 }
 
+std::optional<std::vector<Credential>>
+TouchToFillControllerAutofillDelegate::SortCredentials(
+    base::span<const Credential> credentials) {
+  return std::nullopt;
+}
+
 gfx::NativeView TouchToFillControllerAutofillDelegate::GetNativeView() {
   return web_contents_->GetNativeView();
 }
@@ -297,6 +307,11 @@ void TouchToFillControllerAutofillDelegate::FillCredential(
       base::BindOnce(
           &TouchToFillControllerAutofillDelegate::OnFillingCredentialComplete,
           base::Unretained(this), credential.username()));
+  if (credential.is_backup_credential()) {
+    password_manager::metrics_util::LogPasswordDropdownItemSelected(
+        password_manager::metrics_util::PasswordDropdownSelectedOption::
+            kBackupPassword);
+  }
 }
 
 void TouchToFillControllerAutofillDelegate::OnFillingCredentialComplete(

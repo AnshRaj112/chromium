@@ -4,6 +4,7 @@
 
 #include "chrome/browser/web_applications/jobs/get_progressive_web_app_size_job.h"
 
+#include "base/strings/to_string.h"
 #include "chrome/browser/browsing_data/chrome_browsing_data_model_delegate.h"
 #include "chrome/browser/web_applications/commands/computed_app_size.h"
 #include "chrome/browser/web_applications/locks/all_apps_lock.h"
@@ -64,7 +65,8 @@ void GetProgressiveWebAppSizeJob::OnQuotaModelInfoLoaded(
         quota_storage_info_list) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
-  if (!lock_with_app_resources_->registrar().IsInRegistrar(app_id_)) {
+  if (!lock_with_app_resources_->registrar().AppMatches(
+          app_id_, WebAppFilter::IsAppSurfaceableToUser())) {
     // (crbug.com/1480755): This crash is not expected as the app is checked for
     // validity when the command is evoked in StartWithLock. We are also still
     // holding the lock so a change to the status of the app throughout is not

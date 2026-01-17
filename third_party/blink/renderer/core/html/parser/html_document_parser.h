@@ -29,7 +29,6 @@
 #include <memory>
 
 #include "base/memory/scoped_refptr.h"
-#include "base/memory/weak_ptr.h"
 #include "base/rand_util.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
@@ -95,7 +94,8 @@ class CORE_EXPORT HTMLDocumentParser : public ScriptableDocumentParser,
   HTMLDocumentParser(ContainerNode* fragment_target,
                      Element* context_element,
                      ParserContentPolicy,
-                     ParserPrefetchPolicy prefetch_policy = kAllowPrefetching);
+                     ParserPrefetchPolicy prefetch_policy,
+                     CustomElementRegistry* registry);
   ~HTMLDocumentParser() override;
   void Trace(Visitor*) const override;
 
@@ -103,6 +103,7 @@ class CORE_EXPORT HTMLDocumentParser : public ScriptableDocumentParser,
       const String&,
       DocumentFragment*,
       Element* context_element,
+      CustomElementRegistry*,
       ParserContentPolicy = kAllowScriptingContent);
 
   // Exposed for testing.
@@ -136,6 +137,10 @@ class CORE_EXPORT HTMLDocumentParser : public ScriptableDocumentParser,
   // Start pausing the parser while waiting for the performance.mark() call.
   void NotifyParserPauseByUserTiming() override;
   void NotifyParserResumeByUserTiming() override;
+
+  // The execution context, i.e., the document, no longer blocks script
+  // execution.
+  void ExecuteScriptsWaitingForPrerenderActivation() override;
 
   void SetPatchScope(ContainerNode* scope);
 
@@ -286,7 +291,7 @@ class CORE_EXPORT HTMLDocumentParser : public ScriptableDocumentParser,
   SequenceBound<BackgroundHTMLScanner> background_script_scanner_;
   HTMLPreloadScanner::BackgroundPtr background_scanner_;
   using BackgroundScanFn =
-      WTF::CrossThreadRepeatingFunction<void(const KURL&, const String&)>;
+      CrossThreadRepeatingFunction<void(const KURL&, const String&)>;
   BackgroundScanFn background_scan_fn_;
 
   scoped_refptr<base::SingleThreadTaskRunner> loading_task_runner_;

@@ -9,7 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
@@ -33,6 +32,7 @@
 #include "components/payments/core/error_strings.h"
 #include "components/payments/core/features.h"
 #include "components/payments/core/method_strings.h"
+#include "components/payments/core/payment_prefs.h"
 #include "components/payments/core/payment_request_data_util.h"
 #include "components/payments/core/payments_experimental_features.h"
 #include "components/webauthn/core/browser/internal_authenticator.h"
@@ -163,6 +163,11 @@ PaymentRequestState::GetWebPaymentsWebDataService() const {
 
 bool PaymentRequestState::IsOffTheRecord() const {
   return GetPaymentRequestDelegate()->IsOffTheRecord();
+}
+
+bool PaymentRequestState::PrefsCanMakePayment() const {
+  return GetPaymentRequestDelegate()->GetPrefService()->GetBoolean(
+      kCanMakePaymentEnabled);
 }
 
 void PaymentRequestState::OnPaymentAppCreated(std::unique_ptr<PaymentApp> app) {
@@ -345,8 +350,8 @@ void PaymentRequestState::CheckRequestedMethodsSupported(
 
   if (!are_requested_methods_supported_ &&
       get_all_payment_apps_error_.empty() &&
-      base::Contains(spec_->payment_method_identifiers_set(),
-                     methods::kGooglePlayBilling) &&
+      spec_->payment_method_identifiers_set().contains(
+          methods::kGooglePlayBilling) &&
       !IsInTwa()) {
     get_all_payment_apps_error_ = errors::kAppStoreMethodOnlySupportedInTwa;
   }

@@ -34,7 +34,6 @@ import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.flags.ActivityType;
 import org.chromium.chrome.browser.profiles.Profile;
-import org.chromium.chrome.browser.profiles.ProfileProvider;
 import org.chromium.chrome.browser.tab.MockTab;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabCreationState;
@@ -62,15 +61,8 @@ public class ArchivedTabModelSelectorImplTest {
     @Mock private TabDelegateFactory mTabDelegateFactory;
     @Mock private NextTabPolicySupplier mNextTabPolicySupplier;
 
-    @Mock
-    private IncognitoTabModelObserver.IncognitoReauthDialogDelegate
-            mIncognitoReauthDialogDelegateMock;
-
-    @Mock private Callback<TabModel> mTabModelSupplierObserverMock;
     @Mock private Callback<Tab> mTabSupplierObserverMock;
     @Mock private Callback<Integer> mTabCountSupplierObserverMock;
-    @Mock private TabModelSelectorObserver mTabModelSelectorObserverMock;
-    @Mock private ProfileProvider mProfileProvider;
     @Mock private Profile mProfile;
     @Mock private Profile mIncognitoProfile;
     @Mock private Context mContext;
@@ -94,24 +86,15 @@ public class ArchivedTabModelSelectorImplTest {
                         realAsyncTabParamsManager);
         assertTrue(currentTabModelSupplierHasObservers());
         assertNull(mTabModelSelector.getCurrentTabModelSupplier().get());
-        assertNull(
-                mTabModelSelector.getTabGroupModelFilterProvider().getCurrentTabGroupModelFilter());
+        assertNull(mTabModelSelector.getCurrentTabGroupModelFilter());
 
         mTabCreatorManager.initialize(mTabModelSelector);
         TabRemover regularTabRemover =
-                new PassthroughTabRemover(
-                        () ->
-                                mTabModelSelector
-                                        .getTabGroupModelFilterProvider()
-                                        .getTabGroupModelFilter(false));
+                new PassthroughTabRemover(() -> mTabModelSelector.getTabGroupModelFilter(false));
         MockTabModel regularTabModel = new MockTabModel(mProfile, null);
         regularTabModel.setTabRemoverForTesting(regularTabRemover);
         TabRemover incognitoTabRemover =
-                new PassthroughTabRemover(
-                        () ->
-                                mTabModelSelector
-                                        .getTabGroupModelFilterProvider()
-                                        .getTabGroupModelFilter(true));
+                new PassthroughTabRemover(() -> mTabModelSelector.getTabGroupModelFilter(true));
         MockTabModel incognitoTabModel = new MockTabModel(mIncognitoProfile, null);
         incognitoTabModel.setTabRemoverForTesting(incognitoTabRemover);
         mTabModelSelector.onNativeLibraryReadyInternal(
@@ -127,10 +110,7 @@ public class ArchivedTabModelSelectorImplTest {
                 mTabModelSelector.getCurrentTabModelSupplier().get());
         assertEquals(
                 mTabModelSelector.getCurrentModel(),
-                mTabModelSelector
-                        .getTabGroupModelFilterProvider()
-                        .getCurrentTabGroupModelFilter()
-                        .getTabModel());
+                mTabModelSelector.getCurrentTabGroupModelFilter().getTabModel());
     }
 
     @After
@@ -157,10 +137,7 @@ public class ArchivedTabModelSelectorImplTest {
         assertEquals(normalTab, mTabModelSelector.getCurrentTabSupplier().get());
         assertEquals(
                 mTabModelSelector.getModel(false),
-                mTabModelSelector
-                        .getTabGroupModelFilterProvider()
-                        .getCurrentTabGroupModelFilter()
-                        .getTabModel());
+                mTabModelSelector.getCurrentTabGroupModelFilter().getTabModel());
         ShadowLooper.runUiThreadTasks();
         verify(mTabSupplierObserverMock).onResult(eq(normalTab));
         mTabModelSelector.getCurrentTabSupplier().removeObserver(mTabSupplierObserverMock);

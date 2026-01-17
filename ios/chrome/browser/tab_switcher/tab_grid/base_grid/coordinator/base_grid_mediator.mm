@@ -48,14 +48,15 @@
 #import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
 #import "ios/chrome/browser/shared/model/url/url_util.h"
 #import "ios/chrome/browser/shared/model/web_state_list/browser_util.h"
+#import "ios/chrome/browser/shared/model/web_state_list/removing_indexes.h"
 #import "ios/chrome/browser/shared/model/web_state_list/tab_group.h"
 #import "ios/chrome/browser/shared/model/web_state_list/tab_group_utils.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_opener.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/bookmarks_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/reading_list_add_command.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/shared_tab_group_last_tab_closed_alert_command.h"
 #import "ios/chrome/browser/shared/public/commands/tab_grid_commands.h"
 #import "ios/chrome/browser/shared/public/commands/tab_grid_toolbar_commands.h"
@@ -105,14 +106,16 @@ void LogPriceDropMetrics(web::WebState* web_state) {
   if (!shopping_helper) {
     return;
   }
-  const ShoppingPersistedDataTabHelper::PriceDrop* price_drop =
-      shopping_helper->GetPriceDrop();
-  BOOL has_price_drop =
-      price_drop && price_drop->current_price && price_drop->previous_price;
-  base::RecordAction(base::UserMetricsAction(
-      base::StringPrintf("Commerce.TabGridSwitched.%s",
-                         has_price_drop ? "HasPriceDrop" : "NoPriceDrop")
-          .c_str()));
+  shopping_helper->GetPriceDrop(base::BindOnce(
+      [](std::optional<ShoppingPersistedDataTabHelper::PriceDrop> price_drop) {
+        BOOL has_price_drop = price_drop.has_value() &&
+                              price_drop->current_price &&
+                              price_drop->previous_price;
+        base::RecordAction(base::UserMetricsAction(
+            base::StringPrintf("Commerce.TabGridSwitched.%s",
+                               has_price_drop ? "HasPriceDrop" : "NoPriceDrop")
+                .c_str()));
+      }));
 }
 
 // Returns the pinned WebState with the given SnapshotID (if it exists) or null.
@@ -161,6 +164,9 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
 
   // Helper class to configure tab item images.
   std::unique_ptr<TabSnapshotAndFaviconConfigurator> _tabImagesConfigurator;
+
+  // The item for the grid cell that will be replaced by a new group.
+  GridItemIdentifier* _destinationItemForGroupCreation;
 }
 
 - (instancetype)initWithModeHolder:(TabGridModeHolder*)modeHolder {
@@ -245,6 +251,10 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
 
 - (TabGridModeHolder*)modeHolder {
   return _modeHolder;
+}
+
+- (SelectedGridItems*)selectedEditingItems {
+  return _selectedEditingItems;
 }
 
 - (void)disconnect {
@@ -752,10 +762,17 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
       GridItemIdentifier* groupItemIdentifier =
           [GridItemIdentifier groupIdentifier:currentGroup];
       CHECK(groupItemIdentifier.tabGroupItem.tabGroup);
-      [self insertItem:groupItemIdentifier
-          beforeWebStateIndex:groupItemIdentifier.tabGroupItem.tabGroup->range()
-                                  .range_end() +
-                              1];
+      if (IsTabGridDragAndDropEnabled() && _destinationItemForGroupCreation) {
+        [self.consumer replaceItem:_destinationItemForGroupCreation
+               withReplacementItem:groupItemIdentifier];
+        _destinationItemForGroupCreation = nil;
+      } else {
+        [self insertItem:groupItemIdentifier
+            beforeWebStateIndex:groupItemIdentifier.tabGroupItem.tabGroup
+                                    ->range()
+                                    .range_end() +
+                                1];
+      }
       break;
     }
     case WebStateListChange::Type::kGroupVisualDataUpdate: {
@@ -988,6 +1005,36 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
   }
 }
 
+- (void)closeTabsExceptID:(web::WebStateID)itemID {
+  CHECK(IsCloseOtherTabsEnabled());
+  if (!self.webStateList) {
+    return;
+  }
+
+  int index = GetWebStateIndex(self.webStateList,
+                               WebStateSearchCriteria{.identifier = itemID});
+  if (index == WebStateList::kInvalidIndex) {
+    return;
+  }
+
+  const TabGroup* group = self.webStateList->GetGroupOfWebStateAt(index);
+  if (!group) {
+    CloseOtherWebStates(*(self.webStateList), index,
+                        WebStateList::ClosingReason::kUserAction);
+    return;
+  }
+
+  std::vector<int> indicesToRemove;
+  for (int i : group->range()) {
+    if (i != index) {
+      indicesToRemove.push_back(i);
+    }
+  }
+  self.webStateList->CloseWebStatesAtIndices(
+      WebStateList::ClosingReason::kUserAction,
+      RemovingIndexes(indicesToRemove));
+}
+
 - (void)selectTabGroup:(const TabGroup*)tabGroup {
   WebStateList* webStateList = self.webStateList;
 
@@ -1030,11 +1077,11 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
     return;
   }
 
-  id<ApplicationCommands> applicationHandler =
-      HandlerForProtocol(browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> sceneHandler =
+      HandlerForProtocol(browser->GetCommandDispatcher(), SceneCommands);
   TabGridOpeningMode openingMode =
       incognito ? TabGridOpeningMode::kIncognito : TabGridOpeningMode::kRegular;
-  [applicationHandler displayTabGridInMode:openingMode];
+  [sceneHandler displayTabGridInMode:openingMode];
 
   id<TabGroupsCommands> tabGroupsHandler =
       HandlerForProtocol(browser->GetCommandDispatcher(), TabGroupsCommands);
@@ -1501,6 +1548,12 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
   [itemProvider loadObjectOfClass:[NSURL class] completionHandler:loadHandler];
 }
 
+- (BOOL)isGroupShared:(TabGroupInfo*)group {
+  return tab_groups::utils::IsTabGroupShared(
+      group.tabGroup, tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+                          self.browser->GetProfile()));
+}
+
 #pragma mark - Private
 
 // Returns a id<SnapshotStorage> for the current browser.
@@ -1742,9 +1795,99 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
   NOTREACHED() << "Should be implemented in a subclass.";
 }
 
+- (void)createTabGroupWithTitle:(NSString*)title
+                     sourceItem:(GridItemIdentifier*)sourceItem
+                     droppedTab:(TabInfo*)droppedTab
+                destinationItem:(GridItemIdentifier*)destinationItem {
+  tab_groups::TabGroupVisualData visualData = tab_groups::TabGroupVisualData(
+      base::SysNSStringToUTF16(title),
+      TabGroup::DefaultColorForNewTabGroup(self.webStateList));
+
+  web::WebStateID droppedTabID =
+      sourceItem ? sourceItem.tabSwitcherItem.identifier : droppedTab.tabID;
+  std::set<web::WebStateID> identifiers = {
+      droppedTabID, destinationItem.tabSwitcherItem.identifier};
+  std::set<int> tabIndexes;
+  for (web::WebStateID identifier : identifiers) {
+    int index = GetWebStateIndex(_webStateList, WebStateSearchCriteria{
+                                                    .identifier = identifier,
+                                                });
+    if (index == WebStateList::kInvalidIndex) {
+      index = _webStateList->count();
+      MoveTabToBrowser(droppedTabID, self.browser, index);
+    }
+    tabIndexes.insert(index);
+  }
+  _destinationItemForGroupCreation = destinationItem;
+  if (!tabIndexes.empty()) {
+    _webStateList->CreateGroup(tabIndexes, visualData,
+                               tab_groups::TabGroupId::GenerateNew());
+  }
+}
+
+- (void)addDroppedTab:(TabInfo*)droppedTab
+           sourceItem:(GridItemIdentifier*)sourceItem
+              toGroup:(const TabGroup*)group {
+  web::WebStateID droppedTabID =
+      sourceItem ? sourceItem.tabSwitcherItem.identifier : droppedTab.tabID;
+  MoveTabToGroup(droppedTabID, group, _profile);
+}
+
+- (void)mergeGroup:(TabGroupInfo*)droppedGroup
+    intoDestinationItem:(GridItemIdentifier*)destinationItem {
+  if (destinationItem.tabGroupItem) {
+    // If `destinationItem` is a group, then move tabs in `droppedGroup` to it.
+    std::set<int> tabIndexes;
+    for (int i : droppedGroup.tabGroup->range()) {
+      web::WebStateID tab_id =
+          _webStateList->GetWebStateAt(i)->GetUniqueIdentifier();
+      int index = GetWebStateIndex(_webStateList, WebStateSearchCriteria{
+                                                      .identifier = tab_id,
+                                                  });
+      if (index == WebStateList::kInvalidIndex) {
+        index = _webStateList->count();
+        MoveTabToBrowser(tab_id, self.browser, index);
+      }
+      tabIndexes.insert(index);
+    }
+    _webStateList->MoveToGroup(tabIndexes,
+                               destinationItem.tabGroupItem.tabGroup);
+  } else {
+    //  If `destinationItem` is a tab, create a new group with `droppedGroup`'s
+    //  title. Cannot just add tab to `droppedGroup` since that would mean the
+    //  animation is not centered around `destinationItem`.
+    std::set<int> tabIndexes = {GetWebStateIndex(
+        _webStateList,
+        WebStateSearchCriteria{
+            .identifier = destinationItem.tabSwitcherItem.identifier,
+        })};
+    for (int i : droppedGroup.tabGroup->range()) {
+      web::WebStateID tab_id =
+          _webStateList->GetWebStateAt(i)->GetUniqueIdentifier();
+      int index = GetWebStateIndex(_webStateList, WebStateSearchCriteria{
+                                                      .identifier = tab_id,
+                                                  });
+      if (index == WebStateList::kInvalidIndex) {
+        index = _webStateList->count();
+        MoveTabToBrowser(tab_id, self.browser, index);
+      }
+      tabIndexes.insert(index);
+    }
+    tab_groups::TabGroupVisualData visualData = tab_groups::TabGroupVisualData(
+        droppedGroup.tabGroup->visual_data().title(),
+        droppedGroup.tabGroup->visual_data().color());
+    _webStateList->CreateGroup(tabIndexes, visualData,
+                               tab_groups::TabGroupId::GenerateNew());
+  }
+}
+
 #pragma mark - TabGridToolbarsGridDelegate
 
 - (void)closeAllButtonTapped:(id)sender {
+  NOTREACHED() << "Should be implemented in a subclass.";
+}
+
+- (void)closeOtherTabsButtonTapped:(id)sender {
   NOTREACHED() << "Should be implemented in a subclass.";
 }
 
@@ -1796,6 +1939,10 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
 - (void)cancelSearchButtonTapped:(id)sender {
   base::RecordAction(base::UserMetricsAction("MobileTabGridCancelSearchTabs"));
   _modeHolder.mode = TabGridMode::kNormal;
+}
+
+- (void)pageActionMenuEntrypointTapped:(id)sender {
+  NOTREACHED() << "Should be implemented in a subclass.";
 }
 
 - (void)closeSelectedTabs:(id)sender {
@@ -1851,6 +1998,14 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
 - (void)selectTabsButtonTapped:(id)sender {
   base::RecordAction(base::UserMetricsAction("MobileTabGridSelectTabs"));
   _modeHolder.mode = TabGridMode::kSelection;
+}
+
+- (void)createNewTabGroupButtonTapped:(id)sender {
+  [self.tabGroupsHandler showTabGroupCreationWithoutTabs];
+}
+
+- (void)deleteBrowsingDataButtonTapped:(id)sender {
+  NOTREACHED() << "Should be implemented in a subclass.";
 }
 
 #pragma mark - GridViewControllerMutator

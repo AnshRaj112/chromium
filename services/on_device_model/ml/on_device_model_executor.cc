@@ -24,8 +24,10 @@
 #include "base/numerics/safe_conversions.h"
 #include "base/task/thread_pool.h"
 #include "base/timer/elapsed_timer.h"
+#include "base/trace_event/trace_event.h"
 #include "components/optimization_guide/core/optimization_guide_features.h"
 #include "services/on_device_model/ml/chrome_ml.h"
+#include "services/on_device_model/ml/chrome_ml_api.h"
 #include "services/on_device_model/ml/gpu_blocklist.h"
 #include "services/on_device_model/ml/performance_class.h"
 #include "services/on_device_model/ml/session_accessor.h"
@@ -42,10 +44,11 @@
 #include "third_party/rust/chromium_crates_io/vendor/llguidance-v1/llguidance.h"
 #endif
 
-using on_device_model::mojom::LoadModelResult;
-
 namespace ml {
 namespace {
+
+namespace odmm = ::on_device_model::mojom;
+using odmm::LoadModelResult;
 
 constexpr uint32_t kReserveTokensForSafety = 2;
 
@@ -153,6 +156,13 @@ class Responder final {
         case ChromeMLExecutionStatus::kComplete:
           DCHECK(!output->text);
           break;
+        case ChromeMLExecutionStatus::kInvalidConstraint:
+          DCHECK(!output->text);
+          // TODO(crbug.com/391919456): Propagate error.
+          if (weak_ptr) {
+            weak_ptr->Cancel();
+          }
+          return;
       }
 
       task_runner->PostTask(
@@ -223,6 +233,48 @@ class Responder final {
   base::WeakPtrFactory<Responder> weak_ptr_factory_{this};
 };
 
+// Handles sending and cancelling ASR streams.
+class AsrStreamResponder final {
+ public:
+  explicit AsrStreamResponder(
+      mojo::PendingRemote<odmm::AsrStreamResponder> responder,
+      SessionAccessor::Ptr session)
+      : responder_(std::move(responder)), session_(std::move(session)) {
+    responder_.set_disconnect_handler(
+        base::BindOnce(&AsrStreamResponder::Cancel, base::Unretained(this)));
+  }
+  ~AsrStreamResponder() { Cancel(); }
+  SessionAccessor* session() { return session_.get(); }
+  ChromeMLASRStreamOutputFn CreateOutputFn() {
+    return [weak_ptr = weak_ptr_factory_.GetWeakPtr(),
+            task_runner = base::SequencedTaskRunner::GetCurrentDefault()](
+               const ChromeMLASRStreamOutput& output) {
+      std::vector<odmm::SpeechRecognitionResultPtr> result;
+      result.reserve(output.size());
+      for (const auto& t : output) {
+        result.push_back(
+            odmm::SpeechRecognitionResult::New(t.transcript, t.is_final));
+      }
+      task_runner->PostTask(
+          FROM_HERE, base::BindOnce(&AsrStreamResponder::OnOutput, weak_ptr,
+                                    std::move(result)));
+    };
+  }
+
+  base::WeakPtr<AsrStreamResponder> AsWeakPtr() {
+    return weak_ptr_factory_.GetWeakPtr();
+  }
+
+ private:
+  void Cancel() { session_ = nullptr; }
+  void OnOutput(std::vector<odmm::SpeechRecognitionResultPtr> output) {
+    responder_->OnResponse(std::move(output));
+  }
+  mojo::Remote<odmm::AsrStreamResponder> responder_;
+  SessionAccessor::Ptr session_;
+  base::WeakPtrFactory<AsrStreamResponder> weak_ptr_factory_{this};
+};
+
 // Handles calling the ContextClient on completion and canceling the context
 // request.
 class ContextHolder final {
@@ -260,6 +312,7 @@ class ContextHolder final {
 
  private:
   void OnComplete(int tokens_processed) {
+    TRACE_EVENT("optimization_guide", "ContextHolder::OnComplete");
     if (tokens_processed > 0) {
       base::UmaHistogramCounts10000("OnDeviceModel.TokenCount.Context",
                                     tokens_processed);
@@ -277,6 +330,7 @@ class ContextHolder final {
   }
 
   void OnDisconnect() {
+    TRACE_EVENT("optimization_guide", "ContextHolder::OnDisconnect");
     if (on_disconnect_) {
       std::move(on_disconnect_).Run(this);
     }
@@ -294,16 +348,16 @@ class ContextHolder final {
 BackendImpl::BackendImpl(const ml::ChromeML* chrome_ml)
     : chrome_ml_(chrome_ml), ts_holder_(ml::TsHolder::Create(*chrome_ml_)) {}
 
-BackendImpl::~BackendImpl() = default;
-
 base::expected<void, on_device_model::ServiceDisconnectReason>
 BackendImpl::CanCreate() {
   if (!chrome_ml_) {
     return base::unexpected(
         on_device_model::ServiceDisconnectReason::kFailedToLoadLibrary);
   }
+  ml::DeviceInfo device_info =
+      ml::QueryDeviceInfo(chrome_ml_->api(), /*log_histogram=*/false);
   if (!on_device_model::IsCpuCapable() &&
-      ml::IsGpuBlocked(chrome_ml_->api(), /*log_histogram=*/false)) {
+      device_info.gpu_blocked_reason != GpuBlockedReason::kNotBlocked) {
     return base::unexpected(
         on_device_model::ServiceDisconnectReason::kGpuBlocked);
   }
@@ -313,6 +367,7 @@ BackendImpl::CanCreate() {
 DISABLE_CFI_DLSYM
 on_device_model::Capabilities BackendImpl::GetCapabilities(
     on_device_model::ModelFile model_file) {
+  TRACE_EVENT("optimization_guide", "BackendImpl::GetCapabilities");
   on_device_model::Capabilities result;
   if (!chrome_ml_->api().GetCapabilities) {
     return result;
@@ -349,22 +404,24 @@ BackendImpl::CreateWithResult(on_device_model::mojom::LoadModelParamsPtr params,
 void BackendImpl::LoadTextSafetyModel(
     on_device_model::mojom::TextSafetyModelParamsPtr params,
     mojo::PendingReceiver<on_device_model::mojom::TextSafetyModel> model) {
+  TRACE_EVENT("optimization_guide", "BackendImpl::LoadTextSafetyModel");
   ts_holder_.AsyncCall(&ml::TsHolder::Reset)
       .WithArgs(std::move(params), std::move(model));
 }
 
-on_device_model::mojom::DevicePerformanceInfoPtr
-BackendImpl::GetDevicePerformanceInfo() {
-  return ml::GetDevicePerformanceInfo(*chrome_ml_);
+std::pair<on_device_model::mojom::DevicePerformanceInfoPtr,
+          on_device_model::mojom::DeviceInfoPtr>
+BackendImpl::GetDeviceAndPerformanceInfo() {
+  return ml::GetDeviceAndPerformanceInfo(*chrome_ml_);
 }
 
-SessionImpl::SessionImpl(const ChromeML& chrome_ml,
-                         OnDeviceModelExecutor& executor,
+BackendImpl::~BackendImpl() = default;
+
+SessionImpl::SessionImpl(OnDeviceModelExecutor& executor,
                          SessionAccessor::Ptr session,
                          uint32_t max_tokens,
                          std::optional<uint32_t> adaptation_id)
-    : chrome_ml_(chrome_ml),
-      executor_(executor),
+    : executor_(executor),
       session_(std::move(session)),
       max_tokens_(max_tokens),
       adaptation_id_(adaptation_id) {}
@@ -375,6 +432,7 @@ void SessionImpl::Append(
     on_device_model::mojom::AppendOptionsPtr options,
     mojo::PendingRemote<on_device_model::mojom::ContextClient> client,
     base::OnceClosure on_complete) {
+  TRACE_EVENT("optimization_guide", "SessionImpl::Append");
   model_response_prefix_ = GetModelResponsePrefix(options->input->pieces);
   auto context_holder = std::make_unique<ContextHolder>(
       std::move(client),
@@ -395,28 +453,21 @@ void SessionImpl::Generate(
     on_device_model::mojom::GenerateOptionsPtr options,
     mojo::PendingRemote<on_device_model::mojom::StreamingResponder> response,
     base::OnceClosure on_complete) {
+  TRACE_EVENT("optimization_guide", "SessionImpl::Generate");
   auto cloned = session_->Clone();
   auto cloned_raw = cloned.get();  // For Generate after std::move
   responder_ = std::make_unique<Responder>(
       std::move(response), std::move(on_complete), std::move(cloned));
   ChromeMLExecutionOutputFn output_fn = responder_->CreateOutputFn();
-  ChromeMLConstraint constraint = 0;
-  if (options->constraint) {
-    constraint = executor_->CreateConstraint(*options->constraint,
-                                             model_response_prefix_);
-    if (!constraint) {
-      // TODO(crbug.com/391919456): Propagate error.
-      responder_.reset();
-      return;
-    }
-  }
-  *responder_->GetCancelFn() =
-      cloned_raw->Generate(std::move(options), constraint, output_fn);
+  *responder_->GetCancelFn() = cloned_raw->Generate(
+      std::move(options), executor_->GetConstraintFactory(),
+      model_response_prefix_, output_fn);
 }
 
 DISABLE_CFI_DLSYM
 void SessionImpl::SizeInTokens(on_device_model::mojom::InputPtr input,
                                base::OnceCallback<void(uint32_t)> callback) {
+  TRACE_EVENT("optimization_guide", "SessionImpl::SizeInTokens");
   session_->SizeInTokens(std::move(input),
                          ConvertCallbackToFn(std::move(callback)));
 }
@@ -424,6 +475,7 @@ void SessionImpl::SizeInTokens(on_device_model::mojom::InputPtr input,
 DISABLE_CFI_DLSYM
 void SessionImpl::Score(const std::string& text,
                         base::OnceCallback<void(float)> callback) {
+  TRACE_EVENT("optimization_guide", "SessionImpl::Score");
   session_->Score(text, ConvertCallbackToFn(std::move(callback)));
 }
 
@@ -431,22 +483,48 @@ DISABLE_CFI_DLSYM
 void SessionImpl::GetProbabilitiesBlocking(
     const std::string& input,
     base::OnceCallback<void(const std::vector<float>&)> callback) {
+  TRACE_EVENT("optimization_guide", "SessionImpl::GetProbabilitiesBlocking");
   session_->GetProbabilitiesBlocking(input,
                                      ConvertCallbackToFn(std::move(callback)));
 }
 
+DISABLE_CFI_DLSYM
+void SessionImpl::AsrStream(
+    odmm::AsrStreamOptionsPtr options,
+    mojo::PendingRemote<odmm::AsrStreamResponder> responder) {
+  TRACE_EVENT("optimization_guide", "SessionImpl::AsrStream");
+  DCHECK_EQ(asr_responder_, nullptr);
+  auto cloned = session_->Clone();
+  auto cloned_raw = cloned.get();  // For CreateAsrStream after std::move
+  asr_responder_ = std::make_unique<AsrStreamResponder>(std::move(responder),
+                                                        std::move(cloned));
+  ChromeMLASRStreamOutputFn output_fn = asr_responder_->CreateOutputFn();
+  cloned_raw->CreateAsrStream(std::move(options), output_fn);
+}
+
+DISABLE_CFI_DLSYM
+void SessionImpl::AsrAddAudioChunk(odmm::AudioDataPtr data) {
+  TRACE_EVENT("optimization_guide.debug", "SessionImpl::AsrAddAudioChunk");
+  if (!asr_responder_) {
+    return;
+  }
+  asr_responder_->session()->AsrAddAudioChunk(std::move(data));
+}
+
 std::unique_ptr<on_device_model::BackendSession> SessionImpl::Clone() {
-  return std::make_unique<SessionImpl>(chrome_ml_.get(), *executor_,
-                                       session_->Clone(), max_tokens_,
-                                       adaptation_id_);
+  TRACE_EVENT("optimization_guide", "SessionImpl::Clone");
+  return std::make_unique<SessionImpl>(*executor_, session_->Clone(),
+                                       max_tokens_, adaptation_id_);
 }
 
 void SessionImpl::RemoveContext(ContextHolder* context) {
+  TRACE_EVENT("optimization_guide", "SessionImpl::RemoveContext");
   std::erase_if(context_holders_, base::MatchesUniquePtr(context));
 }
 
 DISABLE_CFI_DLSYM
 void DestroyModel(const ChromeML* chrome_ml, ChromeMLModel model) {
+  TRACE_EVENT("optimization_guide", "DestroyModel");
   chrome_ml->api().DestroyModel(model);
 }
 
@@ -455,14 +533,13 @@ OnDeviceModelExecutor::OnDeviceModelExecutor(
     const ChromeML& chrome_ml)
     : chrome_ml_(chrome_ml),
       model_task_runner_(
-          base::ThreadPool::CreateSequencedTaskRunner({base::MayBlock()})) {}
+          base::ThreadPool::CreateSequencedTaskRunner({base::MayBlock()})),
+      constraint_factory_(
+          ConstraintFactory::Create(*chrome_ml_, model_task_runner_)) {}
 
 OnDeviceModelExecutor::~OnDeviceModelExecutor() {
-#if defined(ENABLE_ON_DEVICE_CONSTRAINTS)
-  if (tokenizer_ != nullptr) {
-    llg_free_tokenizer(tokenizer_);
-  }
-#endif
+  TRACE_EVENT("optimization_guide",
+              "OnDeviceModelExecutor::~OnDeviceModelExecutor");
   if (model_ != 0) {
     model_task_runner_->PostTask(
         FROM_HERE, base::BindOnce(&DestroyModel, &chrome_ml_.get(), model_));
@@ -475,6 +552,7 @@ OnDeviceModelExecutor::CreateWithResult(
     const ChromeML& chrome_ml,
     on_device_model::mojom::LoadModelParamsPtr params,
     base::OnceClosure on_complete) {
+  TRACE_EVENT("optimization_guide", "OnDeviceModelExecutor::CreateWithResult");
   auto executor = std::make_unique<OnDeviceModelExecutor>(
       base::PassKey<OnDeviceModelExecutor>(), chrome_ml);
   auto load_model_result =
@@ -490,6 +568,7 @@ std::unique_ptr<on_device_model::BackendSession>
 OnDeviceModelExecutor::CreateSession(
     const ScopedAdaptation* adaptation,
     on_device_model::mojom::SessionParamsPtr params) {
+  TRACE_EVENT("optimization_guide", "OnDeviceModelExecutor::CreateSession");
   std::optional<uint32_t> adaptation_id;
   on_device_model::mojom::LoadAdaptationParamsPtr adaptation_params;
   if (adaptation) {
@@ -501,7 +580,7 @@ OnDeviceModelExecutor::CreateSession(
   auto session = SessionAccessor::Create(
       *chrome_ml_, model_task_runner_, model_, std::move(params),
       std::move(adaptation_params), adaptation_id);
-  return std::make_unique<SessionImpl>(*chrome_ml_, *this, std::move(session),
+  return std::make_unique<SessionImpl>(*this, std::move(session),
                                        max_tokens_ - kReserveTokensForSafety,
                                        adaptation_id);
 }
@@ -509,110 +588,26 @@ OnDeviceModelExecutor::CreateSession(
 std::unique_ptr<OnDeviceModelExecutor::ScopedAdaptation>
 OnDeviceModelExecutor::LoadAdaptation(
     on_device_model::mojom::LoadAdaptationParamsPtr params) {
+  TRACE_EVENT("optimization_guide", "OnDeviceModelExecutor::LoadAdaptation");
   adaptation_params_.insert({next_adaptation_id_, std::move(params)});
   return std::make_unique<ScopedAdaptation>(weak_ptr_factory_.GetWeakPtr(),
                                             next_adaptation_id_++);
 }
 
 void OnDeviceModelExecutor::UnloadAdaptation(uint32_t adaptation_id) {
+  TRACE_EVENT("optimization_guide", "OnDeviceModelExecutor::UnloadAdaptation");
   adaptation_params_.erase(adaptation_id);
-}
-
-DISABLE_CFI_DLSYM
-ChromeMLConstraint OnDeviceModelExecutor::CreateConstraint(
-    const on_device_model::mojom::ResponseConstraint& response_constraint,
-    const std::optional<std::string>& prefix) {
-#if defined(ENABLE_ON_DEVICE_CONSTRAINTS)
-  if (!tokenizer_) {
-    CHECK(chrome_ml_->api().GetTokenizerParams(
-        model_, [&](const ChromeMLTokenizerParams& params) {
-          LlgTokenizerInit tokenizer_init{
-              .vocab_size = params.vocab_size,
-              .tok_eos = params.eos_token_id,
-              .token_lens = params.token_lens,
-              .token_bytes = params.token_bytes,
-              .tokenizer_json = params.tokenizer_json_file_content,
-              .tokenize_fn = params.tokenize_fn,
-              .tokenize_user_data = params.tokenize_user_data,
-          };
-
-          std::string error;
-          error.resize(256);
-          tokenizer_ =
-              llg_new_tokenizer(&tokenizer_init, error.data(), error.size());
-          if (!tokenizer_) {
-            LOG(ERROR) << "Error creating tokenizer: " << error;
-          }
-        }));
-  }
-
-  if (!tokenizer_) {
-    return 0;
-  }
-
-  LlgConstraintInit init;
-  llg_constraint_init_set_defaults(&init, tokenizer_);
-  LlgConstraint* constraint = nullptr;
-  switch (response_constraint.which()) {
-    case on_device_model::mojom::ResponseConstraint::Tag::kJsonSchema:
-      constraint = llg_new_constraint_json(
-          &init, response_constraint.get_json_schema().c_str());
-      break;
-    case on_device_model::mojom::ResponseConstraint::Tag::kRegex:
-      constraint = llg_new_constraint_regex(
-          &init, response_constraint.get_regex().c_str());
-      break;
-    case on_device_model::mojom::ResponseConstraint::Tag::kUnknownType:
-      LOG(ERROR) << "Unknown constraint type.";
-      return 0;
-  }
-  const char* error = llg_get_error(constraint);
-  if (error) {
-    LOG(ERROR) << "Error creating constraint: " << error;
-    llg_free_constraint(constraint);
-    return 0;
-  }
-  // Now apply any model prefix to the constraint so the generated model
-  // response continues with the correct constraint state.
-  if (prefix) {
-    std::vector<uint32_t> tokens;
-    // First get the total number of tokens needed.
-    size_t token_size = llg_tokenize_bytes(
-        tokenizer_, reinterpret_cast<const uint8_t*>(prefix->data()),
-        prefix->size(), tokens.data(), 0);
-    tokens.resize(token_size);
-    // Then tokenize into `tokens`.
-    llg_tokenize_bytes(tokenizer_,
-                       reinterpret_cast<const uint8_t*>(prefix->data()),
-                       prefix->size(), tokens.data(), tokens.size());
-    // Apply each token to the constraint.
-    for (uint32_t token : tokens) {
-      LlgMaskResult mask_res;
-      if (llg_compute_mask(constraint, &mask_res) < 0) {
-        LOG(ERROR) << "Error computing mask for prompt prefix.";
-        llg_free_constraint(constraint);
-        return 0;
-      }
-      LlgCommitResult res;
-      if (llg_commit_token(constraint, token, &res) < 0) {
-        LOG(ERROR) << "Error matching prompt prefix.";
-        llg_free_constraint(constraint);
-        return 0;
-      }
-    }
-  }
-  return reinterpret_cast<ChromeMLConstraint>(constraint);
-#else
-  return 0;
-#endif
 }
 
 DISABLE_CFI_DLSYM
 LoadModelResult OnDeviceModelExecutor::Init(
     on_device_model::mojom::LoadModelParamsPtr params,
     base::OnceClosure on_complete) {
+  TRACE_EVENT("optimization_guide", "OnDeviceModelExecutor::Init");
+  ml::DeviceInfo device_info =
+      ml::QueryDeviceInfo(chrome_ml_->api(), /*log_histogram=*/false);
   if (params->backend_type == ml::ModelBackendType::kGpuBackend &&
-      ml::IsGpuBlocked(chrome_ml_->api(), /*log_histogram=*/false)) {
+      device_info.gpu_blocked_reason != GpuBlockedReason::kNotBlocked) {
     return LoadModelResult::kGpuBlocked;
   }
   on_device_model::ModelAssets assets = std::move(params->assets);
@@ -635,6 +630,12 @@ LoadModelResult OnDeviceModelExecutor::Init(
                             assets.cache.IsValid()
                         ? assets.cache.TakePlatformFile()
                         : base::kInvalidPlatformFile;
+  if (assets.encoder_cache.IsValid()) {
+    data.encoder_cache_file = assets.encoder_cache.TakePlatformFile();
+  }
+  if (assets.adapter_cache.IsValid()) {
+    data.adapter_cache_file = assets.adapter_cache.TakePlatformFile();
+  }
   ChromeMLModelDescriptor descriptor = {
       .backend_type = params->backend_type,
       .model_data = &data,
@@ -660,6 +661,7 @@ LoadModelResult OnDeviceModelExecutor::Init(
 // static
 void OnDeviceModelExecutor::Schedule(uintptr_t context,
                                      std::function<void()>* fn) {
+  TRACE_EVENT("optimization_guide", "OnDeviceModelExecutor::Schedule");
   base::ThreadPool::PostTask(
       FROM_HERE, {base::TaskPriority::USER_BLOCKING, base::MayBlock()},
       base::BindOnce([](std::function<void()> fn) { fn(); }, std::move(*fn)));

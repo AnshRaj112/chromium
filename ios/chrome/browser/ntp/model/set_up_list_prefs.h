@@ -17,8 +17,9 @@ namespace set_up_list_prefs {
 // Prefs to store the state of each item in the list.
 extern const char kDefaultBrowserItemState[];
 extern const char kAutofillItemState[];
-extern const char kFollowItemState[];
 extern const char kNotificationsItemState[];
+extern const char kSafariImportItemState[];
+extern const char kBackgroundCustomizationItemState[];
 extern const char kAllItemsComplete[];
 extern const char kDisabled[];
 
@@ -61,9 +62,6 @@ bool AllItemsComplete(PrefService* prefs);
 
 // Returns `true` if the Set Up List has been disabled.
 bool IsSetUpListDisabled(PrefService* prefs);
-
-// Disables the SetUpList.
-void DisableSetUpList(PrefService* prefs);
 
 // Stores the current time as the "last interaction" time for SetUpList.
 void RecordInteraction(PrefService* prefs);

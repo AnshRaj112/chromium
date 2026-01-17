@@ -7,7 +7,7 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
 #import "components/url_formatter/elide_url.h"
-#import "ios/chrome/browser/browser_container/ui_bundled/edit_menu_app_interface.h"
+#import "ios/chrome/browser/browser_content/ui_bundled/edit_menu_app_interface.h"
 #import "ios/chrome/browser/settings/ui_bundled/settings_root_table_constants.h"
 #import "ios/chrome/test/earl_grey/chrome_matchers_app_interface.h"
 #import "ios/testing/earl_grey/earl_grey_test.h"
@@ -52,8 +52,20 @@ id<GREYMatcher> ButtonWithForegroundColor(NSString* colorName) {
   return [ChromeMatchersAppInterface buttonWithForegroundColor:colorName];
 }
 
+id<GREYMatcher> ButtonWithPrimaryColor() {
+  return [ChromeMatchersAppInterface buttonWithPrimaryColor];
+}
+
+id<GREYMatcher> ButtonWithSecondaryColor() {
+  return [ChromeMatchersAppInterface buttonWithSecondaryColor];
+}
+
+id<GREYMatcher> ButtonWithEqualWeightColor() {
+  return [ChromeMatchersAppInterface buttonWithEqualWeightColor];
+}
+
 id<GREYMatcher> ButtonWithBackgroundColor(NSString* colorName) {
-  return [ChromeMatchersAppInterface buttonWithBackgroundColor:colorName];
+  return [ChromeMatchersAppInterface buttonWithBackgroundColorNamed:colorName];
 }
 
 id<GREYMatcher> ContextMenuItemWithAccessibilityLabel(NSString* label) {
@@ -247,6 +259,10 @@ id<GREYMatcher> LocationViewContainingText(const std::string& text) {
       locationViewContainingText:base::SysUTF8ToNSString(text)];
 }
 
+id<GREYMatcher> LocationViewEmpty() {
+  return [ChromeMatchersAppInterface locationViewEmpty];
+}
+
 id<GREYMatcher> ToolsMenuButton() {
   return [ChromeMatchersAppInterface toolsMenuButton];
 }
@@ -319,6 +335,10 @@ id<GREYMatcher> OpenLinkInIncognitoButton() {
 
 id<GREYMatcher> OpenLinkInNewWindowButton() {
   return [ChromeMatchersAppInterface openLinkInNewWindowButton];
+}
+
+id<GREYMatcher> NavigationBarCloseButton() {
+  return [ChromeMatchersAppInterface navigationBarCloseButton];
 }
 
 id<GREYMatcher> NavigationBarDoneButton() {
@@ -643,6 +663,10 @@ id<GREYMatcher> FakeOmnibox() {
   return [ChromeMatchersAppInterface fakeOmnibox];
 }
 
+id<GREYMatcher> SnackbarViewMatcher() {
+  return [ChromeMatchersAppInterface snackbarViewMatcher];
+}
+
 id<GREYMatcher> DiscoverHeaderLabel() {
   return [ChromeMatchersAppInterface discoverHeaderLabel];
 }
@@ -740,6 +764,10 @@ id<GREYMatcher> TabGroupActivityLabelOnGridCellAtIndex(unsigned int index) {
 
 id<GREYMatcher> TabGridDoneButton() {
   return [ChromeMatchersAppInterface tabGridDoneButton];
+}
+
+id<GREYMatcher> TabGridOverflowMenuButton() {
+  return [ChromeMatchersAppInterface tabGridOverflowMenuButton];
 }
 
 id<GREYMatcher> TabGridUndoCloseAllButton() {
@@ -856,9 +884,11 @@ id<GREYMatcher> ContentViewSmallerThanScrollView() {
 }
 
 id<GREYMatcher> HistoryEntry(const std::string& url, const std::string& title) {
-  return [ChromeMatchersAppInterface
-      historyEntryForURL:base::SysUTF8ToNSString(url)
-                   title:base::SysUTF8ToNSString(title)];
+  return grey_allOf(
+      grey_accessibilityLabel(
+          [NSString stringWithFormat:@"%@, %@", base::SysUTF8ToNSString(title),
+                                     base::SysUTF8ToNSString(url)]),
+      grey_sufficientlyVisible(), nil);
 }
 
 id<GREYMatcher> HistoryEntry(const GURL& url, const std::string& title) {
@@ -963,16 +993,6 @@ id<GREYMatcher> WhatsNewDestinationButton() {
 
 id<GREYMatcher> SettingsActionButton() {
   return [ChromeMatchersAppInterface settingsActionButton];
-}
-
-#pragma mark - Promo style view controller
-
-id<GREYMatcher> PromoScreenPrimaryButtonMatcher() {
-  return [ChromeMatchersAppInterface promoScreenPrimaryButtonMatcher];
-}
-
-id<GREYMatcher> PromoScreenSecondaryButtonMatcher() {
-  return [ChromeMatchersAppInterface promoScreenSecondaryButtonMatcher];
 }
 
 #pragma mark - Incognito Interstitial
@@ -1177,6 +1197,24 @@ id<GREYMatcher> FakeJoinFlowView() {
 
 id<GREYMatcher> TabGroupsPanel() {
   return [ChromeMatchersAppInterface tabGroupsPanel];
+}
+
+#pragma mark - Button Stack
+
+id<GREYMatcher> ButtonStackPrimaryButton() {
+  return [ChromeMatchersAppInterface buttonStackPrimaryButton];
+}
+
+id<GREYMatcher> ButtonStackSecondaryButton() {
+  return [ChromeMatchersAppInterface buttonStackSecondaryButton];
+}
+
+id<GREYMatcher> ButtonStackTertiaryButton() {
+  return [ChromeMatchersAppInterface buttonStackTertiaryButton];
+}
+
+id<GREYMatcher> ButtonStackCheckmarkSymbol() {
+  return [ChromeMatchersAppInterface buttonStackCheckmarkSymbol];
 }
 
 }  // namespace chrome_test_util

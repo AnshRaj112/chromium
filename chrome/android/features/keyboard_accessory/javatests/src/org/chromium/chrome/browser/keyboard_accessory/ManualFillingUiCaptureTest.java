@@ -40,9 +40,10 @@ import java.util.concurrent.TimeoutException;
  * like shadows, padding and RTL differences. Logic integration tests involving all filling
  * components belong into {@link ManualFillingIntegrationTest}.
  */
+// TODO(crbug.com/447076444): Enable Keyboard Accessory revamp flag
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
-@Features.DisableFeatures({ChromeFeatureList.EDGE_TO_EDGE_BOTTOM_CHIN})
+@Features.DisableFeatures({ChromeFeatureList.AUTOFILL_ANDROID_DESKTOP_KEYBOARD_ACCESSORY_REVAMP})
 public class ManualFillingUiCaptureTest {
     @Rule
     public final FreshCtaTransitTestRule mActivityTestRule =
@@ -84,7 +85,8 @@ public class ManualFillingUiCaptureTest {
         waitForUnrelatedChromeUi();
         mScreenShooter.shoot("AccessorySheetPasswords");
 
-        whenDisplayed(withId(R.id.passwords_sheet)).perform(scrollToLastElement());
+        whenDisplayed(withId(R.id.passwords_sheet), /* atLeast= */ 51)
+                .perform(scrollToLastElement());
         waitForUnrelatedChromeUi();
         mScreenShooter.shoot("AccessorySheetPasswordsScrolled");
     }
@@ -116,7 +118,8 @@ public class ManualFillingUiCaptureTest {
         waitForUnrelatedChromeUi();
         mScreenShooter.shoot("AccessorySheetPasswordsRTL");
 
-        whenDisplayed(withId(R.id.passwords_sheet)).perform(scrollToLastElement());
+        whenDisplayed(withId(R.id.passwords_sheet), /* atLeast= */ 51)
+                .perform(scrollToLastElement());
         waitForUnrelatedChromeUi();
         mScreenShooter.shoot("AccessorySheetPasswordsScrolledRTL");
     }
@@ -131,7 +134,7 @@ public class ManualFillingUiCaptureTest {
     }
 
     private void waitForSuggestionsInSheet() {
-        whenDisplayed(withId(R.id.keyboard_accessory_sheet_frame));
+        whenDisplayed(withId(R.id.keyboard_accessory_sheet_frame), /* atLeast= */ 51);
         RecyclerViewTestUtils.waitForStableRecyclerView(
                 mActivityTestRule.getActivity().findViewById(R.id.passwords_sheet));
     }

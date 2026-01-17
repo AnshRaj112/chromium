@@ -7,15 +7,13 @@
 #include <algorithm>
 #include <numeric>
 
-#include "base/containers/contains.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/rand_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
+#include "chrome/browser/media/router/discovery/access_code/access_code_cast_sink_service.h"
 #include "chrome/browser/media/router/discovery/access_code/access_code_cast_sink_service_factory.h"
 #include "chrome/browser/media/router/discovery/access_code/access_code_media_sink_util.h"
-#include "chrome/browser/signin/identity_manager_factory.h"
-#include "chrome/browser/sync/sync_service_factory.h"
 #include "components/access_code_cast/common/access_code_cast_metrics.h"
 #include "components/media_router/browser/media_router.h"
 #include "components/media_router/browser/media_router_factory.h"
@@ -134,11 +132,8 @@ AccessCodeCastHandler::AccessCodeCastHandler(
     DCHECK(access_code_sink_service_)
         << "AccessCodeSinkService was not properly created!";
 
-    identity_manager_ = IdentityManagerFactory::GetForProfile(
-        media_route_starter_->GetProfile()->GetOriginalProfile());
+    identity_manager_ = access_code_sink_service_->GetIdentityManager();
 
-    sync_service_ = SyncServiceFactory::GetForProfile(
-        media_route_starter_->GetProfile()->GetOriginalProfile());
     Init();
   }
 }
@@ -190,12 +185,11 @@ void AccessCodeCastHandler::AddSink(
     return;
   }
 
-  if (!IsAccountSyncEnabled()) {
+  if (!IsPrimaryAccountSignedIn()) {
     GetMediaRouter()->GetLogger()->LogError(
         mojom::LogCategory::kDiscovery, kLoggerComponent,
-        "Sync is either pasused or diabled for this account. It must be "
-        "enabled fully for the access code casting flow to communicate with "
-        "the server.",
+        "The primary account is not signed in. It must be signed for the "
+        "access code casting flow to communicate with the server.",
         "", "", "");
     std::move(add_sink_callback_).Run(AddSinkResultCode::PROFILE_SYNC_ERROR);
     return;
@@ -207,7 +201,7 @@ void AccessCodeCastHandler::AddSink(
 }
 
 bool AccessCodeCastHandler::IsCastModeAvailable(MediaCastMode mode) const {
-  return base::Contains(cast_mode_set_, mode);
+  return cast_mode_set_.contains(mode);
 }
 
 // Discovery is not complete until the sink is in QRM. This is because any
@@ -388,8 +382,8 @@ void AccessCodeCastHandler::OnRouteResponse(MediaCastMode cast_mode,
 
 bool AccessCodeCastHandler::HasActiveRoute(const MediaSink::Id& sink_id) {
   return GetMediaRouter() &&
-         base::Contains(GetMediaRouter()->GetCurrentRoutes(), sink_id,
-                        &MediaRoute::media_sink_id);
+         std::ranges::contains(GetMediaRouter()->GetCurrentRoutes(), sink_id,
+                               &MediaRoute::media_sink_id);
 }
 
 void AccessCodeCastHandler::SetIdentityManagerForTesting(
@@ -397,17 +391,18 @@ void AccessCodeCastHandler::SetIdentityManagerForTesting(
   identity_manager_ = identity_manager;
 }
 
-void AccessCodeCastHandler::SetSyncServiceForTesting(
-    syncer::SyncService* sync_service) {
-  sync_service_ = sync_service;
-}
-
-bool AccessCodeCastHandler::IsAccountSyncEnabled() {
-  if (!identity_manager_ || !sync_service_) {
+bool AccessCodeCastHandler::IsPrimaryAccountSignedIn() {
+  if (!identity_manager_) {
     return false;
   }
-  return identity_manager_->HasPrimaryAccount(signin::ConsentLevel::kSync) &&
-         sync_service_->IsSyncFeatureActive();
+  const CoreAccountId account_id =
+      identity_manager_->GetPrimaryAccountId(signin::ConsentLevel::kSignin);
+  if (account_id.empty()) {
+    return false;
+  }
+
+  return !identity_manager_->HasAccountWithRefreshTokenInPersistentErrorState(
+      account_id);
 }
 
 }  // namespace media_router

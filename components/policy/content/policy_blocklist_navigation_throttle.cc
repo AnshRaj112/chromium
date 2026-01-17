@@ -7,10 +7,10 @@
 #include "base/check_op.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
-#include "components/policy/content/policy_blocklist_service.h"
 #include "components/policy/content/safe_sites_navigation_throttle.h"
-#include "components/policy/core/browser/url_blocklist_manager.h"
-#include "components/policy/core/browser/url_blocklist_policy_handler.h"
+#include "components/policy/core/browser/url_list/policy_blocklist_service.h"
+#include "components/policy/core/browser/url_list/url_blocklist_manager.h"
+#include "components/policy/core/browser/url_list/url_blocklist_policy_handler.h"
 #include "components/policy/core/common/features.h"
 #include "components/policy/core/common/policy_pref_names.h"
 #include "components/prefs/pref_service.h"
@@ -21,6 +21,7 @@
 #include "url/gurl.h"
 
 using URLBlocklistState = policy::URLBlocklist::URLBlocklistState;
+using PolicyBlocklistState = PolicyBlocklistService::PolicyBlocklistState;
 using SafeSitesFilterBehavior = policy::SafeSitesFilterBehavior;
 
 // Passing an Unretained pointer for the safe_sites_navigation_throttle_
@@ -28,13 +29,16 @@ using SafeSitesFilterBehavior = policy::SafeSitesFilterBehavior;
 // which runs the callback from within the object.
 PolicyBlocklistNavigationThrottle::PolicyBlocklistNavigationThrottle(
     content::NavigationThrottleRegistry& registry,
-    content::BrowserContext* context)
+    PrefService* prefs,
+    PolicyBlocklistService* blocklist_service,
+    SafeSearchService* safe_search_service)
     : content::NavigationThrottle(registry),
-      blocklist_service_(PolicyBlocklistFactory::GetForBrowserContext(context)),
-      prefs_(user_prefs::UserPrefs::Get(context)) {
+      blocklist_service_(blocklist_service),
+      prefs_(prefs) {
   DCHECK(prefs_);
   auto safe_sites_navigation_throttle =
-      std::make_unique<SafeSitesNavigationThrottle>(registry, context);
+      std::make_unique<SafeSitesNavigationThrottle>(registry,
+                                                    safe_search_service);
   if (base::FeatureList::IsEnabled(
           policy::features::kPolicyBlocklistProceedUntilResponse)) {
     safe_sites_navigation_throttle_ =
@@ -55,18 +59,20 @@ PolicyBlocklistNavigationThrottle::PolicyBlocklistNavigationThrottle(
 PolicyBlocklistNavigationThrottle::~PolicyBlocklistNavigationThrottle() =
     default;
 
-bool PolicyBlocklistNavigationThrottle::IsBlockedViewSourceNavigation() {
+bool PolicyBlocklistNavigationThrottle::IsViewSourceNavigation() {
   content::NavigationEntry* nav_entry =
       navigation_handle()->GetNavigationEntry();
-  if (!nav_entry || !nav_entry->IsViewSourceMode()) {
-    return false;
-  }
+  return nav_entry && nav_entry->IsViewSourceMode();
+}
 
+PolicyBlocklistState
+PolicyBlocklistNavigationThrottle::GetViewSourceNavigationBlocklistState() {
+  CHECK(IsViewSourceNavigation());
   GURL view_source_url =
       GURL(std::string("view-source:") + navigation_handle()->GetURL().spec());
 
-  return (blocklist_service_->GetURLBlocklistState(view_source_url) ==
-          URLBlocklistState::URL_IN_BLOCKLIST);
+  return blocklist_service_->GetURLBlocklistStateWithPolicySource(
+      view_source_url);
 }
 
 content::NavigationThrottle::ThrottleCheckResult
@@ -79,15 +85,35 @@ PolicyBlocklistNavigationThrottle::WillStartOrRedirectRequest(
     return PROCEED;
   }
 
-  URLBlocklistState blocklist_state =
-      blocklist_service_->GetURLBlocklistState(url);
-  if (blocklist_state == URLBlocklistState::URL_IN_BLOCKLIST ||
-      IsBlockedViewSourceNavigation()) {
-    return ThrottleCheckResult(BLOCK_REQUEST,
-                               net::ERR_BLOCKED_BY_ADMINISTRATOR);
+  PolicyBlocklistState blocklist_state =
+      blocklist_service_->GetURLBlocklistStateWithPolicySource(url);
+
+  if (blocklist_state.url_blocklist_state ==
+      URLBlocklistState::URL_IN_BLOCKLIST) {
+    return ThrottleCheckResult(
+        BLOCK_REQUEST,
+        blocklist_state.policy_source == PolicyBlocklistState::INCOGNITO_POLICY
+            ? net::ERR_BLOCKED_IN_INCOGNITO_BY_ADMINISTRATOR
+            : net::ERR_BLOCKED_BY_ADMINISTRATOR);
   }
 
-  if (blocklist_state == URLBlocklistState::URL_IN_ALLOWLIST) {
+  // If the navigation is to view-source, check if the view-source:url should
+  // be blocked.
+  if (IsViewSourceNavigation()) {
+    PolicyBlocklistState view_source_blocklist_state =
+        GetViewSourceNavigationBlocklistState();
+    if (view_source_blocklist_state.url_blocklist_state ==
+        URLBlocklistState::URL_IN_BLOCKLIST) {
+      return ThrottleCheckResult(
+          BLOCK_REQUEST, view_source_blocklist_state.policy_source ==
+                                 PolicyBlocklistState::INCOGNITO_POLICY
+                             ? net::ERR_BLOCKED_IN_INCOGNITO_BY_ADMINISTRATOR
+                             : net::ERR_BLOCKED_BY_ADMINISTRATOR);
+    }
+  }
+
+  if (blocklist_state.url_blocklist_state ==
+      URLBlocklistState::URL_IN_ALLOWLIST) {
     return PROCEED;
   }
 

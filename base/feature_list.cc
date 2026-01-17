@@ -2,27 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "base/location.h"
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40284755): Remove this and spanify to fix the errors.
-#pragma allow_unsafe_buffers
-#endif
+#include "base/feature_list.h"
 
 #include <stddef.h>
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <tuple>
 
 #include "base/base_switches.h"
 #include "base/check_is_test.h"
-#include "base/containers/contains.h"
+#include "base/command_line.h"
+#include "base/compiler_specific.h"
 #include "base/containers/span.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
-#include "base/feature_list.h"
 #include "base/feature_visitor.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
@@ -163,17 +161,19 @@ struct FeatureEntry {
   uint64_t pickle_size;
 
   // Return a pointer to the pickled data area immediately following the entry.
-  uint8_t* GetPickledDataPtr() { return reinterpret_cast<uint8_t*>(this + 1); }
+  uint8_t* GetPickledDataPtr() {
+    return reinterpret_cast<uint8_t*>(UNSAFE_TODO(this + 1));
+  }
   const uint8_t* GetPickledDataPtr() const {
-    return reinterpret_cast<const uint8_t*>(this + 1);
+    return reinterpret_cast<const uint8_t*>(UNSAFE_TODO(this + 1));
   }
 
   // Reads the feature and trial name from the pickle. Calling this is only
   // valid on an initialized entry that's in shared memory.
   bool GetFeatureAndTrialName(std::string_view* feature_name,
                               std::string_view* trial_name) const {
-    Pickle pickle = Pickle::WithUnownedBuffer(
-        span(GetPickledDataPtr(), checked_cast<size_t>(pickle_size)));
+    Pickle pickle = Pickle::WithUnownedBuffer(UNSAFE_TODO(
+        span(GetPickledDataPtr(), checked_cast<size_t>(pickle_size))));
     PickleIterator pickle_iter(pickle);
     if (!pickle_iter.ReadStringPiece(feature_name)) {
       return false;
@@ -196,12 +196,18 @@ bool SplitIntoTwo(std::string_view text,
                   std::string* second) {
   std::vector<std::string_view> parts =
       SplitStringPiece(text, separator, TRIM_WHITESPACE, SPLIT_WANT_ALL);
-  if (parts.size() == 2) {
-    *second = std::string(parts[1]);
-  } else if (parts.size() > 2) {
+  if (parts.empty()) {
+    DLOG(ERROR) << "Using '" << separator << "' to split '" << text
+                << "' failed.";
+    return false;
+  }
+  if (parts.size() > 2) {
     DLOG(ERROR) << "Only one '" << separator
                 << "' is allowed but got: " << text;
     return false;
+  }
+  if (parts.size() == 2) {
+    *second = std::string(parts[1]);
   }
   *first = parts[0];
   return true;
@@ -439,7 +445,8 @@ void FeatureList::AddFeaturesToAllocator(PersistentMemoryAllocator* allocator) {
 
     entry->override_state = override.second.overridden_state;
     entry->pickle_size = pickle.size();
-    memcpy(entry->GetPickledDataPtr(), pickle.data(), pickle.size());
+    UNSAFE_TODO(
+        memcpy(entry->GetPickledDataPtr(), pickle.data(), pickle.size()));
 
     allocator->MakeIterable(entry);
   }
@@ -583,7 +590,7 @@ bool FeatureList::InitInstance(
     instance_existed_before = true;
   }
 
-  std::unique_ptr<FeatureList> feature_list(new FeatureList);
+  auto feature_list = std::make_unique<FeatureList>();
   feature_list->InitFromCommandLine(enable_features, disable_features);
   feature_list->RegisterExtraFeatureOverrides(extra_overrides);
   FeatureList::SetInstance(std::move(feature_list));
@@ -1020,7 +1027,7 @@ bool FeatureList::AllowFeatureAccess(const Feature& feature) const {
   if (!IsEarlyAccessInstance()) {
     return true;
   }
-  return base::Contains(allowed_feature_names_, feature.name);
+  return allowed_feature_names_.contains(feature.name);
 }
 
 FeatureList::OverrideEntry::OverrideEntry(OverrideState overridden_state,

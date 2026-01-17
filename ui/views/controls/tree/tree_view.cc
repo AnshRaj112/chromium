@@ -67,6 +67,16 @@ static constexpr int kAuxiliaryTextLineEndPadding = 5;
 // How much children are indented from their parent.
 static constexpr int kIndent = 20;
 
+// The horizontal padding (10 pixels) of the Textfield is retrieved via
+// DISTANCE_TEXTFIELD_HORIZONTAL_TEXT_PADDING. This value is excessively large
+// when used in the tree view, resulting in layout overlap between the icon and
+// the Textfield. To resolve this overlap issue while ensuring the text inside
+// the Textfield remains fully aligned with the line text before editing, we
+// reduce the horizontal padding of the Textfield by 5 pixels and shift the
+// entire Textfield 5 pixels to the right.
+// See https://crbug.com/360815370
+static constexpr int kEditorHorizontalExtraInsets = -5;
+
 namespace {
 
 void PaintRowIcon(gfx::Canvas* canvas,
@@ -202,6 +212,7 @@ void TreeView::StartEditing(TreeModelNode* node) {
     editor_->SetFontList(font_list_);
     empty_editor_size_ = editor_->GetPreferredSize({});
     editor_->set_controller(this);
+    editor_->SetExtraInsets(gfx::Insets::VH(0, kEditorHorizontalExtraInsets));
   }
   editor_->SetText(selected_node_->model_node()->GetTitle());
   // TODO(crbug.com/40853810): Investigate whether accessible name should stay
@@ -879,14 +890,6 @@ void TreeView::UpdateSelection(TreeModelNode* model_node,
     active_node_ = node;
   }
 
-  if (selection_changed) {
-    SchedulePaintForNode(selected_node_);
-    SetAccessibleSelectionForNode(selected_node_, false);
-    selected_node_ = node;
-    SetAccessibleSelectionForNode(selected_node_, true);
-    SchedulePaintForNode(selected_node_);
-  }
-
   if (active_changed && node) {
     // GetForegroundBoundsForNode() returns RTL-flipped coordinates for paint.
     // Un-flip before passing to ScrollRectToVisible(), which uses layout
@@ -910,11 +913,14 @@ void TreeView::UpdateSelection(TreeModelNode* model_node,
   }
 
   if (selection_changed) {
+    SchedulePaintForNode(selected_node_);
+    SetAccessibleSelectionForNode(selected_node_, false);
+    selected_node_ = node;
+    SetAccessibleSelectionForNode(selected_node_, true);
+    SchedulePaintForNode(selected_node_);
     AXVirtualView* ax_selected_view =
         node ? node->accessibility_view() : nullptr;
-    if (ax_selected_view) {
-      ax_selected_view->NotifyEvent(ax::mojom::Event::kSelection, true);
-    } else {
+    if (!ax_selected_view) {
       NotifyAccessibilityEventDeprecated(ax::mojom::Event::kSelection, true);
     }
   }
@@ -1118,7 +1124,8 @@ void TreeView::LayoutEditor() {
   // flip it for the following calculations and ScrollRectToVisible().
   row_bounds.set_x(
       GetMirroredXWithWidthInView(row_bounds.x(), row_bounds.width()));
-  row_bounds.set_x(row_bounds.x() + text_offset_);
+  row_bounds.set_x(row_bounds.x() + text_offset_ +
+                   (-kEditorHorizontalExtraInsets));
   row_bounds.set_width(row_bounds.width() - text_offset_);
   row_bounds.Inset(
       gfx::Insets::VH(kTextVerticalPadding, kTextHorizontalPadding));

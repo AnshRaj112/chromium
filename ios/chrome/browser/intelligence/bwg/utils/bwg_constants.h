@@ -7,7 +7,7 @@
 
 #import <Foundation/Foundation.h>
 
-namespace bwg {
+namespace gemini {
 
 // The different entrypoints from which Gemini was opened.
 // Logged as IOSGeminiEntryPoint enum for the IOS.Gemini.EntryPoint histogram.
@@ -23,13 +23,17 @@ enum class EntryPoint {
   OmniboxChip = 3,
   // Gemini was opened via re opening a tab that had Gemini open.
   TabReopen = 4,
-  // Gemini was opened from the Diamond prototype.
-  Diamond = 5,
-  kMaxValue = Diamond,
+  // Gemini was opened from the AppBar.
+  AppBar = 5,
+  // Gemini was opened via the image long-press context menu.
+  ImageContextMenu = 6,
+  // Gemini was opened via tapping the image remix in-product help.
+  ImageRemixIPH = 7,
+  kMaxValue = ImageRemixIPH,
 };
 // LINT.ThenChange(/tools/metrics/histograms/metadata/ios/enums.xml:IOSGeminiEntryPoint)
 
-}  // namespace bwg
+}  // namespace gemini
 
 // BWG UI sheet detent identifier.
 extern NSString* const kBWGPromoConsentFullDetentIdentifier;
@@ -43,6 +47,15 @@ extern const char kLastInteractionTimestampDictKey[];
 // Session map dictionary key for the server ID.
 extern const char kServerIDDictKey[];
 
+// The accessibility ID of the bwg consent FootNote textView.
+extern NSString* const kBwgFootNoteTextViewAccessibilityIdentifier;
+
+// The accessibility ID the bwg consent primary button.
+extern NSString* const kBwgPrimaryButtonAccessibilityIdentifier;
+
+// The accessibility ID the bwg consent secondary button.
+extern NSString* const kBwgSecondaryButtonAccessibilityIdentifier;
+
 // Session map dictionary key for the visible URL during the last BWG
 // interaction.
 extern const char kURLOnLastInteractionDictKey[];
@@ -54,5 +67,18 @@ extern const char kFootnoteLinkURLManagedAccount[];
 extern const char kSecondBoxLinkURLManagedAccount[];
 extern const char kSecondBoxLink1URLNonManagedAccount[];
 extern const char kSecondBoxLink2URLNonManagedAccount[];
+
+// Action identifier on a tap on links in the footnote.
+extern NSString* const kBwgFirstFootnoteLinkAction;
+extern NSString* const kBwgSecondFootnoteLinkAction;
+extern NSString* const kBwgFootnoteLinkActionManagedAccount;
+extern NSString* const kBwgSecondBoxLinkActionManagedAccount;
+extern NSString* const kBwgSecondBoxLink1ActionNonManagedAccount;
+extern NSString* const kBwgSecondBoxLink2ActionNonManagedAccount;
+
+// The sliding window for displaying a Gemini contextual cue chip. Chips are
+// shown within this time range (in hours) relative to the last chip that was
+// displayed.
+extern const int kGeminiContextualCueChipSlidingWindow;
 
 #endif  // IOS_CHROME_BROWSER_INTELLIGENCE_BWG_UTILS_BWG_CONSTANTS_H_

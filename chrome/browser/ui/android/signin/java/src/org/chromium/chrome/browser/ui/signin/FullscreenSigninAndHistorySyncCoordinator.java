@@ -44,7 +44,6 @@ import org.chromium.components.signin.identitymanager.IdentityManager;
 import org.chromium.components.signin.metrics.AccountConsistencyPromoAction;
 import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.signin.metrics.SignoutReason;
-import org.chromium.components.signin.metrics.SyncButtonClicked;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 
@@ -53,9 +52,8 @@ import java.lang.annotation.RetentionPolicy;
 
 /** Parent coordinator for the re-FRE promo */
 @NullMarked
-public final class FullscreenSigninAndHistorySyncCoordinator
-        implements SigninAndHistorySyncCoordinator,
-                HistorySyncCoordinator.HistorySyncDelegate,
+public final class FullscreenSigninAndHistorySyncCoordinator extends SigninAndHistorySyncCoordinator
+        implements HistorySyncCoordinator.HistorySyncDelegate,
                 FullscreenSigninCoordinator.Delegate {
     public interface Delegate {
         /** Notifies when the user clicked the "add account" button. */
@@ -77,7 +75,7 @@ public final class FullscreenSigninAndHistorySyncCoordinator
          */
         Promise<@Nullable Void> getNativeInitializationPromise();
 
-        void onFlowComplete(@SigninAndHistorySyncCoordinator.Result int result);
+        void onFlowComplete(SigninAndHistorySyncCoordinator.Result result);
     }
 
     /**
@@ -161,6 +159,10 @@ public final class FullscreenSigninAndHistorySyncCoordinator
         }
     }
 
+    public View getView() {
+        return mViewHolder;
+    }
+
     /** Implements {@link SigninAndHistorySyncCoordinator}. */
     @Override
     public void destroy() {
@@ -187,12 +189,6 @@ public final class FullscreenSigninAndHistorySyncCoordinator
         mSigninCoordinator.onAccountAdded(accountName);
     }
 
-    /** Implements {@link SigninAndHistorySyncCoordinator}. */
-    @Override
-    public View getView() {
-        return mViewHolder;
-    }
-
     /**
      * Implements {@link SigninAndHistorySyncCoordinator}. Removes existing views from the view
      * switcher and re-inflates them with the correct layout after a configuration change.
@@ -210,17 +206,17 @@ public final class FullscreenSigninAndHistorySyncCoordinator
         switch (mCurrentView) {
             case ChildView.SIGNIN:
                 if (isSignedIn()) {
+                    Profile profile = assumeNonNull(mProfileSupplier.get()).getOriginalProfile();
                     SigninManager signinManager =
-                            IdentityServicesProvider.get()
-                                    .getSigninManager(mProfileSupplier.get().getOriginalProfile());
+                            IdentityServicesProvider.get().getSigninManager(profile);
                     assumeNonNull(signinManager);
                     signinManager.signOut(SignoutReason.ABORT_SIGNIN);
                 }
-                mDelegate.onFlowComplete(SigninAndHistorySyncCoordinator.Result.INTERRUPTED);
+                mDelegate.onFlowComplete(SigninAndHistorySyncCoordinator.Result.aborted());
                 break;
             case ChildView.HISTORY_SYNC:
                 if (!mDidShowSignin) {
-                    mDelegate.onFlowComplete(SigninAndHistorySyncCoordinator.Result.INTERRUPTED);
+                    mDelegate.onFlowComplete(SigninAndHistorySyncCoordinator.Result.aborted());
                     return BackPressResult.SUCCESS;
                 }
                 showChildView(ChildView.SIGNIN);
@@ -240,16 +236,17 @@ public final class FullscreenSigninAndHistorySyncCoordinator
     @Override
     public void advanceToNextPage() {
         if (!isSignedIn() || mCurrentView == ChildView.HISTORY_SYNC) {
-            mDelegate.onFlowComplete(SigninAndHistorySyncCoordinator.Result.INTERRUPTED);
+            mDelegate.onFlowComplete(SigninAndHistorySyncCoordinator.Result.aborted());
             return;
         }
-        Profile profile = mProfileSupplier.get().getOriginalProfile();
+        Profile profile = assumeNonNull(mProfileSupplier.get()).getOriginalProfile();
         if (!SigninAndHistorySyncCoordinator.shouldShowHistorySync(
                 profile, mConfig.historyOptInMode)) {
             HistorySyncHelper historySyncHelper = HistorySyncHelper.getForProfile(profile);
             historySyncHelper.recordHistorySyncNotShown(mSigninAccessPoint);
             // TODO(crbug.com/376469696): Differentiate the failure & completion case here.
-            mDelegate.onFlowComplete(SigninAndHistorySyncCoordinator.Result.COMPLETED);
+            mDelegate.onFlowComplete(
+                    new SigninAndHistorySyncCoordinator.Result(mDidShowSignin, false));
             return;
         }
         showChildView(ChildView.HISTORY_SYNC);
@@ -333,37 +330,26 @@ public final class FullscreenSigninAndHistorySyncCoordinator
 
     /** Implements {@link HistorySyncCoordinator.HistorySyncDelegate} */
     @Override
-    public void dismissHistorySync(boolean isHistorySyncAccepted) {
+    public void dismissHistorySync(boolean didSignOut, boolean isHistorySyncAccepted) {
         mViewHolder.removeAllViews();
         if (mHistorySyncCoordinator != null) {
             mHistorySyncCoordinator.destroy();
             mHistorySyncCoordinator = null;
         }
-        @SigninAndHistorySyncCoordinator.Result
-        int flowResult =
-                isHistorySyncAccepted
-                        ? SigninAndHistorySyncCoordinator.Result.COMPLETED
-                        : SigninAndHistorySyncCoordinator.Result.INTERRUPTED;
+        SigninAndHistorySyncCoordinator.Result flowResult =
+                new SigninAndHistorySyncCoordinator.Result(
+                        mDidShowSignin && !didSignOut, isHistorySyncAccepted);
         mDelegate.onFlowComplete(flowResult);
     }
 
     /** Implements {@link HistorySyncDelegate} */
     @Override
     public void recordHistorySyncOptIn(
-            @SigninAccessPoint int accessPoint, @SyncButtonClicked int syncButtonClicked) {
-        switch (syncButtonClicked) {
-            case SyncButtonClicked.HISTORY_SYNC_OPT_IN_EQUAL_WEIGHTED:
-            case SyncButtonClicked.HISTORY_SYNC_OPT_IN_NOT_EQUAL_WEIGHTED:
-                SigninMetricsUtils.logHistorySyncAcceptButtonClicked(
-                        accessPoint, syncButtonClicked);
-                break;
-            case SyncButtonClicked.HISTORY_SYNC_CANCEL_EQUAL_WEIGHTED:
-            case SyncButtonClicked.HISTORY_SYNC_CANCEL_NOT_EQUAL_WEIGHTED:
-                SigninMetricsUtils.logHistorySyncDeclineButtonClicked(
-                        accessPoint, syncButtonClicked);
-                break;
-            default:
-                throw new IllegalStateException("Unrecognized sync button type");
+            @SigninAccessPoint int accessPoint, boolean isHistorySyncAccepted) {
+        if (isHistorySyncAccepted) {
+            SigninMetricsUtils.logHistorySyncAcceptButtonClicked(accessPoint);
+        } else {
+            SigninMetricsUtils.logHistorySyncDeclineButtonClicked(accessPoint);
         }
     }
 
@@ -388,9 +374,9 @@ public final class FullscreenSigninAndHistorySyncCoordinator
     }
 
     private boolean isSignedIn() {
+        Profile profile = assumeNonNull(mProfileSupplier.get()).getOriginalProfile();
         IdentityManager identityManager =
-                IdentityServicesProvider.get()
-                        .getIdentityManager(mProfileSupplier.get().getOriginalProfile());
+                IdentityServicesProvider.get().getIdentityManager(profile);
         assumeNonNull(identityManager);
         return identityManager.hasPrimaryAccount(ConsentLevel.SIGNIN);
     }
@@ -445,11 +431,12 @@ public final class FullscreenSigninAndHistorySyncCoordinator
 
         boolean shouldSignOutOnDecline =
                 mDidShowSignin && mConfig.historyOptInMode == HistorySyncConfig.OptInMode.REQUIRED;
+        Profile profile = assumeNonNull(mProfileSupplier.get()).getOriginalProfile();
         mHistorySyncCoordinator =
                 new HistorySyncCoordinator(
                         mActivity,
                         this,
-                        mProfileSupplier.get().getOriginalProfile(),
+                        profile,
                         mConfig.historySyncConfig,
                         mSigninAccessPoint,
                         /* showEmailInFooter= */ !mDidShowSignin,

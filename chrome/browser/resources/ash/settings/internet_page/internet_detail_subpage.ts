@@ -257,17 +257,7 @@ export class SettingsInternetDetailPageElement extends
         value() {
           return loadTimeData.valueExists('showTechnologyBadge') &&
               loadTimeData.getBoolean('showTechnologyBadge');
-        },
-      },
 
-      /**
-       * Whether to show the Hidden toggle on configured wifi networks (flag).
-       */
-      showHiddenToggle_: {
-        type: Boolean,
-        value() {
-          return loadTimeData.valueExists('showHiddenToggle') &&
-              loadTimeData.getBoolean('showHiddenToggle');
         },
       },
 
@@ -417,7 +407,6 @@ export class SettingsInternetDetailPageElement extends
   private proxyExpanded_: boolean;
   private shouldShowConfigureWhenNetworkLoaded_: boolean;
   private showConfigurableSections_: boolean;
-  private showHiddenToggle_: boolean;
   private showMeteredToggle_: boolean;
   private showTechnologyBadge_: string;
   private trafficCountersAdapter_: TrafficCountersAdapter;
@@ -498,8 +487,9 @@ export class SettingsInternetDetailPageElement extends
       this.afterRenderShowDeepLink_(
           settingId,
           () =>
-              this.shadowRoot!.querySelector('cellular-roaming-toggle-button')!
-                  .getCellularRoamingToggle());
+              this.shadowRoot!.querySelector('cellular-roaming-toggle-button')
+                  ?.getCellularRoamingToggle() ||
+              null);
       // Stop deep link attempt since we completed it manually.
       return false;
     }
@@ -508,8 +498,9 @@ export class SettingsInternetDetailPageElement extends
       this.networkExpanded_ = true;
       this.afterRenderShowDeepLink_(
           settingId,
-          () => this.shadowRoot!.querySelector(
-                                    'network-apnlist')!.getApnSelect());
+          () => this.shadowRoot!.querySelector('network-apnlist')
+                    ?.getApnSelect() ||
+              null);
       return false;
     }
 
@@ -519,8 +510,9 @@ export class SettingsInternetDetailPageElement extends
       this.networkExpanded_ = true;
       this.afterRenderShowDeepLink_(
           settingId,
-          () => this.shadowRoot!.querySelector('network-ip-config')!
-                    .getAutoConfigIpToggle());
+          () => this.shadowRoot!.querySelector('network-ip-config')
+                    ?.getAutoConfigIpToggle() ||
+              null);
       return false;
     }
 
@@ -529,8 +521,9 @@ export class SettingsInternetDetailPageElement extends
       this.networkExpanded_ = true;
       this.afterRenderShowDeepLink_(
           settingId,
-          () => this.shadowRoot!.querySelector('network-nameservers')!
-                    .getNameserverRadioButtons());
+          () => this.shadowRoot!.querySelector('network-nameservers')
+                    ?.getNameserverRadioButtons() ||
+              null);
       return false;
     }
 
@@ -540,8 +533,9 @@ export class SettingsInternetDetailPageElement extends
       this.proxyExpanded_ = true;
       this.afterRenderShowDeepLink_(
           settingId,
-          () => this.shadowRoot!.querySelector('network-proxy-section')!
-                    .getAllowSharedToggle());
+          () => this.shadowRoot!.querySelector('network-proxy-section')
+                    ?.getAllowSharedToggle() ||
+              null);
       return false;
     }
 
@@ -945,8 +939,7 @@ export class SettingsInternetDetailPageElement extends
         !this.managedProperties_!.typeProperties.cellular!.allowTextMessages) {
       return;
     }
-    const config =
-        OncMojo.getDefaultConfigProperties(this.managedProperties_!.type);
+    const config = this.getDefaultConfigProperties_();
     config.typeConfig.cellular = {
       textMessageAllowState: {
         allowTextMessages: e.detail.value,
@@ -1100,6 +1093,8 @@ export class SettingsInternetDetailPageElement extends
         managedProperties.typeProperties.wifi!.signalStrength =
             networkState.typeState.wifi!.signalStrength;
         break;
+      default:
+        break;
     }
     this.updateManagedProperties_(managedProperties);
     this.propertiesReceived_ = true;
@@ -1114,7 +1109,7 @@ export class SettingsInternetDetailPageElement extends
   }
 
   private getDefaultConfigProperties_(): ConfigProperties {
-    return OncMojo.getDefaultConfigProperties(this.managedProperties_!.type);
+    return OncMojo.getBaselineConfigProperties(this.managedProperties_);
   }
 
   private async setMojoNetworkProperties_(config: ConfigProperties):
@@ -1963,10 +1958,6 @@ export class SettingsInternetDetailPageElement extends
   }
 
   private showHiddenNetworkToggle_(): boolean {
-    if (!this.showHiddenToggle_) {
-      return false;
-    }
-
     if (!this.managedProperties_) {
       return false;
     }
@@ -2097,9 +2088,13 @@ export class SettingsInternetDetailPageElement extends
           case VpnType.kL2TPIPsec:
             fields.push('vpn.type', 'vpn.host', 'vpn.l2tp.username');
             break;
+          default:
+            break;
         }
         break;
       case NetworkType.kWiFi:
+        break;
+      default:
         break;
     }
     if (OncMojo.isRestrictedConnectivity(this.managedProperties_.portalState)) {
@@ -2165,7 +2160,11 @@ export class SettingsInternetDetailPageElement extends
                   'vpn.openVpn.tlsAuthContents', 'vpn.openVpn.keyDirection');
             }
             break;
+          default:
+            break;
         }
+        break;
+      default:
         break;
     }
     return fields;

@@ -8,6 +8,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/views/controls/button/image_button_factory.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
 
 namespace global_media_controls {
@@ -59,8 +60,8 @@ void MediaActionButton::Update(int button_id,
   }
   foreground_color_id_ = foreground_color_id;
   SetTooltipText(l10n_util::GetStringUTF16(tooltip_text_id));
-  views::SetImageFromVectorIconWithColorId(
-      this, vector_icon, foreground_color_id_, foreground_disabled_color_id_,
+  views::SetImageFromVectorIconWithColor(
+      this, vector_icon, {foreground_color_id_, foreground_disabled_color_id_},
       icon_size_);
 }
 
@@ -69,8 +70,8 @@ void MediaActionButton::UpdateText(int tooltip_text_id) {
 }
 
 void MediaActionButton::UpdateIcon(const gfx::VectorIcon& vector_icon) {
-  views::SetImageFromVectorIconWithColorId(
-      this, vector_icon, foreground_color_id_, foreground_disabled_color_id_,
+  views::SetImageFromVectorIconWithColor(
+      this, vector_icon, {foreground_color_id_, foreground_disabled_color_id_},
       icon_size_);
 }
 

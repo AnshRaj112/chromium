@@ -10,6 +10,7 @@
 #include <optional>
 
 #include "base/cancelable_callback.h"
+#include "base/cfi_buildflags.h"
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
 #include "base/files/file_path.h"
@@ -134,8 +135,10 @@
 #if !BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/lifetime/application_lifetime_desktop.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/browser_list.h"
+#include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_ui.h"
@@ -151,7 +154,6 @@
 #include "chrome/browser/extensions/extension_management_constants.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/scoped_test_mv2_enabler.h"
-#include "chrome/browser/extensions/unpacked_installer.h"
 #include "chrome/browser/ui/views/side_panel/extensions/extension_side_panel_manager.h"
 #include "extensions/browser/api_test_utils.h"
 #include "extensions/browser/extension_host_test_helper.h"
@@ -162,6 +164,7 @@
 #include "extensions/browser/offscreen_document_host.h"
 #include "extensions/browser/service_worker/service_worker_test_utils.h"
 #include "extensions/browser/test_extension_registry_observer.h"
+#include "extensions/browser/unpacked_installer.h"
 #include "extensions/common/manifest.h"
 #include "extensions/common/mojom/view_type.mojom.h"
 #include "extensions/common/switches.h"
@@ -513,9 +516,10 @@ class DevToolsBeforeUnloadTest : public DevToolsTest {
     ASSERT_TRUE(content::ExecJs(
         DevToolsWindowTesting::Get(devtools_window)->main_web_contents(),
         "window.open(\"\", \"\", \"location=0\");"));
-    Browser* popup_browser = BrowserList::GetInstance()->GetLastActive();
-    WebContents* popup_contents =
-        popup_browser->tab_strip_model()->GetActiveWebContents();
+    WebContents* const popup_contents =
+        GetLastActiveBrowserWindowInterfaceWithAnyProfile()
+            ->GetTabStripModel()
+            ->GetActiveWebContents();
     content::WaitForLoadStop(popup_contents);
   }
 
@@ -779,7 +783,7 @@ class DevToolsServiceWorkerExtensionTest : public InProcessBrowserTest {
   scoped_refptr<DevToolsAgentHost> FindExtensionHost(const std::string& id) {
     for (auto& host : DevToolsAgentHost::GetOrCreateAll()) {
       if (host->GetType() == DevToolsAgentHost::kTypeServiceWorker &&
-          host->GetURL().host() == id) {
+          host->GetURL().GetHost() == id) {
         return host;
       }
     }
@@ -855,7 +859,7 @@ class WorkerDevToolsTest : public InProcessBrowserTest {
 
     void DevToolsAgentHostCreated(DevToolsAgentHost* host) override {
       if (host->GetType() == DevToolsAgentHost::kTypeSharedWorker &&
-          host->GetURL().path().rfind(path_) != std::string::npos) {
+          host->GetURL().GetPath().rfind(path_) != std::string::npos) {
         *out_host_ = host;
         content::GetUIThreadTaskRunner({})->PostTask(FROM_HERE,
                                                      std::move(quit_));
@@ -872,7 +876,7 @@ class WorkerDevToolsTest : public InProcessBrowserTest {
       const char* path) {
     for (auto& host : DevToolsAgentHost::GetOrCreateAll()) {
       if (host->GetType() == DevToolsAgentHost::kTypeSharedWorker &&
-          host->GetURL().path().rfind(path) != std::string::npos) {
+          host->GetURL().GetPath().rfind(path) != std::string::npos) {
         return host;
       }
     }
@@ -1043,11 +1047,12 @@ IN_PROC_BROWSER_TEST_F(DevToolsBeforeUnloadTest,
   }
   // Try to close browser window.
   {
+    EXPECT_EQ(1u, chrome::GetTotalBrowserCount());
     chrome::CloseWindow(browser());
     AcceptModalDialog();
     CancelModalDialog();
     base::RunLoop().RunUntilIdle();
-    EXPECT_EQ(browser(), BrowserList::GetInstance()->get(0));
+    EXPECT_EQ(1u, chrome::GetTotalBrowserCount());
   }
   // Try to exit application.
   {
@@ -1259,8 +1264,8 @@ IN_PROC_BROWSER_TEST_F(DevToolsExtensionTest,
   EXPECT_EQ(extensions_instance->GetProcess(),
             data_frame_rfh->GetSiteInstance()->GetProcess());
 
-  EXPECT_EQ(web_url.host(),
-            web_frame_rfh->GetSiteInstance()->GetSiteURL().host());
+  EXPECT_EQ(web_url.GetHost(),
+            web_frame_rfh->GetSiteInstance()->GetSiteURL().GetHost());
   EXPECT_NE(devtools_instance, web_frame_rfh->GetSiteInstance());
   EXPECT_NE(extensions_instance, web_frame_rfh->GetSiteInstance());
 
@@ -1278,8 +1283,8 @@ IN_PROC_BROWSER_TEST_F(DevToolsExtensionTest,
   web_frame_rfh = ChildFrameAt(panel_frame_rfh, 2);
 
   EXPECT_EQ(about_blank_url, web_frame_rfh->GetLastCommittedURL());
-  EXPECT_EQ(web_url.host(),
-            web_frame_rfh->GetSiteInstance()->GetSiteURL().host());
+  EXPECT_EQ(web_url.GetHost(),
+            web_frame_rfh->GetSiteInstance()->GetSiteURL().GetHost());
   EXPECT_NE(devtools_instance, web_frame_rfh->GetSiteInstance());
   EXPECT_NE(extensions_instance, web_frame_rfh->GetSiteInstance());
 
@@ -1376,8 +1381,8 @@ IN_PROC_BROWSER_TEST_F(DevToolsExtensionTest,
             devtools_extension_devtools_page_rfh->GetSiteInstance());
   EXPECT_EQ(extensions_instance,
             devtools_sidebar_pane_extension_rfh->GetSiteInstance());
-  EXPECT_EQ(web_url.host(),
-            http_iframe_rfh->GetSiteInstance()->GetSiteURL().host());
+  EXPECT_EQ(web_url.GetHost(),
+            http_iframe_rfh->GetSiteInstance()->GetSiteURL().GetHost());
   EXPECT_NE(devtools_instance, http_iframe_rfh->GetSiteInstance());
   EXPECT_NE(extensions_instance, http_iframe_rfh->GetSiteInstance());
 }
@@ -1451,8 +1456,8 @@ IN_PROC_BROWSER_TEST_F(DevToolsExtensionTest,
   EXPECT_TRUE(
       devtools_instance->GetSiteURL().SchemeIs(content::kChromeDevToolsScheme));
   EXPECT_NE(devtools_instance, extensions_instance);
-  EXPECT_EQ(web_url.host(),
-            http_iframe_rfh->GetSiteInstance()->GetSiteURL().host());
+  EXPECT_EQ(web_url.GetHost(),
+            http_iframe_rfh->GetSiteInstance()->GetSiteURL().GetHost());
   EXPECT_NE(devtools_instance, http_iframe_rfh->GetSiteInstance());
   EXPECT_NE(extensions_instance, http_iframe_rfh->GetSiteInstance());
 }
@@ -1889,20 +1894,6 @@ IN_PROC_BROWSER_TEST_F(DevToolsExtensionTest, MAYBE_CantInspectChromeScheme) {
           base::StrCat({kArbitraryPage, "#chrome://version/"}));
 }
 
-// TODO(crbug.com/417938496): Flaky on Linux ASAN, MSAN and debug builds.
-#if BUILDFLAG(IS_LINUX)
-#define MAYBE_CantInspectDevtoolsScheme DISABLED_CantInspectDevtoolsScheme
-#else
-#define MAYBE_CantInspectDevtoolsScheme CantInspectDevtoolsScheme
-#endif
-IN_PROC_BROWSER_TEST_F(DevToolsExtensionTest, MAYBE_CantInspectDevtoolsScheme) {
-  LoadExtension("can_inspect_url");
-  RunTest(
-      "waitForTestResultsAsMessage",
-      base::StrCat({kArbitraryPage,
-                    "#devtools://devtools/bundled/devtools_compatibility.js"}));
-}
-
 // TODO(crbug.com/369074885): Flaky on Linux and slow builders like MSAN/debug.
 #if BUILDFLAG(IS_LINUX) || defined(MEMORY_SANITIZER) || !defined(NDEBUG)
 #define MAYBE_CantInspectViewSourceDevtoolsScheme \
@@ -2053,8 +2044,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsExtensionTest,
   GURL offscreen_url = extension->GetResourceURL("offscreen.html");
   std::unique_ptr<extensions::OffscreenDocumentHost> offscreen_document =
       std::make_unique<extensions::OffscreenDocumentHost>(
-          *extension,
-          browser()->profile(), offscreen_url);
+          *extension, browser()->profile(), offscreen_url);
   {
     extensions::ExtensionHostTestHelper offscreen_waiter(browser()->profile(),
                                                          extension->id());
@@ -2136,13 +2126,40 @@ class DevToolsExtensionFileAccessTest : public DevToolsExtensionTest {
           get: function() { return "http:"; }
         });
 
-        chrome.devtools.inspectedWindow.getResources((resources) => {
-          const hasFile = !!resources.find(r => r.url.startsWith('file:'));
-          setInterval(() => {
-            top.postMessage(
-                {testOutput: (hasFile == %d) ? 'PASS' : 'FAIL'}, '*');
-          }, 10);
-        });)",
+        const testDone = (result) => {
+          if (window.testDone) {
+            return;
+          }
+          window.testDone = true;
+          clearTimeout(window.timeout);
+          chrome.devtools.inspectedWindow.onResourceAdded.removeListener(
+              onResourceAdded);
+          top.postMessage({testOutput: result}, '*');
+        };
+
+        const allowFileAccess = !!%d;
+
+        function onResourceAdded(resource) {
+          if (resource.url.startsWith('file:')) {
+            testDone(allowFileAccess ? 'PASS' : 'FAIL');
+          }
+        }
+
+        chrome.devtools.inspectedWindow.onResourceAdded.addListener(
+            onResourceAdded);
+
+        chrome.devtools.inspectedWindow.getResources(resources => {
+          for (const resource of resources) {
+            onResourceAdded(resource);
+          }
+        });
+
+        if (allowFileAccess) {
+          window.timeout = setTimeout(() => testDone('FAIL'), 8000);
+        } else {
+          window.timeout = setTimeout(() => testDone('PASS'), 5000);
+        }
+)",
                                      allow_file_access));
 
     std::string file_url =
@@ -2166,23 +2183,65 @@ class DevToolsExtensionFileAccessTest : public DevToolsExtensionTest {
   }
 };
 
+// This test is flaky on Linux MSAN.
+// TODO(https://crbug.com/463490299): Enable the test.
+#if defined(MEMORY_SANITIZER) || defined(ADDRESS_SANITIZER) ||         \
+    BUILDFLAG(CFI_CAST_CHECK) || BUILDFLAG(CFI_ICALL_CHECK) ||         \
+    BUILDFLAG(CFI_ENFORCEMENT_TRAP) ||                                 \
+    BUILDFLAG(CFI_ENFORCEMENT_DIAGNOSTIC) || BUILDFLAG(IS_CHROMEOS) || \
+    BUILDFLAG(IS_LINUX)
+#define MAYBE_CanGetFileResourceWithFileAccess \
+  DISABLED_CanGetFileResourceWithFileAccess
+#else
+#define MAYBE_CanGetFileResourceWithFileAccess CanGetFileResourceWithFileAccess
+#endif
 IN_PROC_BROWSER_TEST_F(DevToolsExtensionFileAccessTest,
-                       CanGetFileResourceWithFileAccess) {
+                       MAYBE_CanGetFileResourceWithFileAccess) {
   Run(true, "file:///");
 }
 
+// TODO(crbug.com/463490299): Tests time out on sanitizer bots.
+#if defined(MEMORY_SANITIZER) || defined(ADDRESS_SANITIZER) || \
+    BUILDFLAG(CFI_CAST_CHECK) || BUILDFLAG(CFI_ICALL_CHECK) || \
+    BUILDFLAG(CFI_ENFORCEMENT_TRAP) || BUILDFLAG(CFI_ENFORCEMENT_DIAGNOSTIC)
+#define MAYBE_CantGetFileResourceWithoutFileAccess \
+  DISABLED_CantGetFileResourceWithoutFileAccess
+#else
+#define MAYBE_CantGetFileResourceWithoutFileAccess \
+  CantGetFileResourceWithoutFileAccess
+#endif
 IN_PROC_BROWSER_TEST_F(DevToolsExtensionFileAccessTest,
-                       CantGetFileResourceWithoutFileAccess) {
+                       MAYBE_CantGetFileResourceWithoutFileAccess) {
   Run(false, "file:///");
 }
 
+// TODO(crbug.com/463490299): Tests time out on sanitizer bots.
+#if defined(MEMORY_SANITIZER) || defined(ADDRESS_SANITIZER) || \
+    BUILDFLAG(CFI_CAST_CHECK) || BUILDFLAG(CFI_ICALL_CHECK) || \
+    BUILDFLAG(CFI_ENFORCEMENT_TRAP) || BUILDFLAG(CFI_ENFORCEMENT_DIAGNOSTIC)
+#define MAYBE_CantGetFileResourceWithoutFileAccessNoSlashes \
+  DISABLED_CantGetFileResourceWithoutFileAccessNoSlashes
+#else
+#define MAYBE_CantGetFileResourceWithoutFileAccessNoSlashes \
+  CantGetFileResourceWithoutFileAccessNoSlashes
+#endif
 IN_PROC_BROWSER_TEST_F(DevToolsExtensionFileAccessTest,
-                       CantGetFileResourceWithoutFileAccessNoSlashes) {
+                       MAYBE_CantGetFileResourceWithoutFileAccessNoSlashes) {
   Run(false, "file:");
 }
 
+// TODO(crbug.com/463490299): Tests time out on sanitizer bots.
+#if defined(MEMORY_SANITIZER) || defined(ADDRESS_SANITIZER) || \
+    BUILDFLAG(CFI_CAST_CHECK) || BUILDFLAG(CFI_ICALL_CHECK) || \
+    BUILDFLAG(CFI_ENFORCEMENT_TRAP) || BUILDFLAG(CFI_ENFORCEMENT_DIAGNOSTIC)
+#define MAYBE_CantGetFileResourceWithoutFileAccessMixedCase \
+  DISABLED_CantGetFileResourceWithoutFileAccessMixedCase
+#else
+#define MAYBE_CantGetFileResourceWithoutFileAccessMixedCase \
+  CantGetFileResourceWithoutFileAccessMixedCase
+#endif
 IN_PROC_BROWSER_TEST_F(DevToolsExtensionFileAccessTest,
-                       CantGetFileResourceWithoutFileAccessMixedCase) {
+                       MAYBE_CantGetFileResourceWithoutFileAccessMixedCase) {
   Run(false, "fILe:");
 }
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
@@ -2247,7 +2306,7 @@ namespace {
 
 bool InterceptURLLoad(content::URLLoaderInterceptor::RequestParams* params) {
   const GURL& url = params->url_request.url;
-  if (!base::EndsWith(url.path(), kPushTestResource,
+  if (!base::EndsWith(url.GetPath(), kPushTestResource,
                       base::CompareCase::SENSITIVE)) {
     return false;
   }
@@ -2269,7 +2328,7 @@ bool InterceptURLLoad(content::URLLoaderInterceptor::RequestParams* params) {
   load_timing.send_end = base::TimeTicks::Now();
   load_timing.receive_headers_end = base::TimeTicks::Now();
   load_timing.push_start = start_time - base::Milliseconds(100);
-  if (url.query() != kPushUseNullEndTime) {
+  if (url.GetQuery() != kPushUseNullEndTime) {
     load_timing.push_end = base::TimeTicks::Now();
   }
 
@@ -3020,9 +3079,15 @@ class MockWebUIProvider
 
   std::unique_ptr<content::WebUIController> NewWebUI(content::WebUI* web_ui,
                                                      const GURL& url) override {
-    content::URLDataSource::Add(
-        Profile::FromWebUI(web_ui),
-        std::make_unique<StaticURLDataSource>(source_, content_));
+    auto* profile = Profile::FromWebUI(web_ui);
+    // Use the initial value of |source_| as a flag to ensure the data source is
+    // only added once.
+    if (source_ == "dummyurl") {
+      content::URLDataSource::Add(profile,
+                                  std::make_unique<StaticURLDataSource>(
+                                      std::string(url.host()), content_));
+      source_ = "added";  // Update state to prevent re-addition.
+    }
     return std::make_unique<content::WebUIController>(web_ui);
   }
 
@@ -3034,9 +3099,7 @@ class MockWebUIProvider
 // This tests checks that window is correctly initialized when DevTools is
 // opened while navigation through history with forward and back actions.
 // (crbug.com/627407)
-// TODO(crbug.com/40267320): Deflake and re-enable this test.
-IN_PROC_BROWSER_TEST_F(DevToolsTest,
-                       DISABLED_TestWindowInitializedOnNavigateBack) {
+IN_PROC_BROWSER_TEST_F(DevToolsTest, TestWindowInitializedOnNavigateBack) {
   TestChromeWebUIControllerFactory test_factory;
   content::ScopedWebUIControllerFactoryRegistration factory_registration(
       &test_factory);
@@ -3045,7 +3108,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsTest,
                                   "  window.abc = 239;\n"
                                   "  console.log(abc);\n"
                                   "</script>");
-  test_factory.AddFactoryOverride(GURL("chrome://foo/dummyurl").host(),
+  test_factory.AddFactoryOverride(GURL("chrome://foo/dummyurl").GetHost(),
                                   &mock_provider);
 
   ASSERT_TRUE(
@@ -3055,7 +3118,9 @@ IN_PROC_BROWSER_TEST_F(DevToolsTest,
   chrome::DuplicateTab(browser());
   chrome::SelectPreviousTab(browser());
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("about:blank")));
+  content::TestNavigationObserver back_navigation_observer(GetInspectedTab());
   chrome::GoBack(browser(), WindowOpenDisposition::CURRENT_TAB);
+  back_navigation_observer.Wait();
   RunTestFunction(window, "testWindowInitializedOnNavigateBack");
 
   DevToolsWindowTesting::CloseDevToolsWindowSync(window);
@@ -3076,7 +3141,7 @@ IN_PROC_BROWSER_TEST_F(DevToolsTest, TestRawHeadersWithRedirectAndHSTS) {
       browser()->profile()->GetDefaultStoragePartition();
   base::RunLoop run_loop;
   partition->GetNetworkContext()->AddHSTS(
-      https_url.host(), expiry, include_subdomains, run_loop.QuitClosure());
+      https_url.GetHost(), expiry, include_subdomains, run_loop.QuitClosure());
   run_loop.Run();
 
   OpenDevToolsWindow(kArbitraryPage, false);
@@ -3196,16 +3261,6 @@ IN_PROC_BROWSER_TEST_F(DevToolsTest, DISABLED_DisposeEmptyBrowserContext) {
   window_ = DevToolsWindowTesting::OpenDiscoveryDevToolsWindowSync(
       browser()->profile());
   RunTestMethod("testDisposeEmptyBrowserContext");
-  CloseDevToolsWindow();
-}
-
-// TODO(crbug.com/40689291): Find a better strategy for testing protocol methods
-// against non-headless Chrome.
-IN_PROC_BROWSER_TEST_F(DevToolsTest, NewWindowFromBrowserContext) {
-  window_ = DevToolsWindowTesting::OpenDiscoveryDevToolsWindowSync(
-      browser()->profile());
-  LoadLegacyFilesInFrontend(window_);
-  RunTestMethod("testNewWindowFromBrowserContext");
   CloseDevToolsWindow();
 }
 
@@ -3355,12 +3410,13 @@ class KeepAliveDevToolsTest : public InProcessBrowserTest {
 
 IN_PROC_BROWSER_TEST_F(KeepAliveDevToolsTest, KeepsAliveUntilBrowserClose) {
   EXPECT_FALSE(browser_shutdown::IsTryingToQuit());
-  EXPECT_TRUE(BrowserList::GetInstance()->empty());
+  const auto* global_colection = GlobalBrowserCollection::GetInstance();
+  EXPECT_TRUE(global_colection->IsEmpty());
   EXPECT_TRUE(KeepAliveRegistry::GetInstance()->IsKeepingAlive());
   EXPECT_TRUE(KeepAliveRegistry::GetInstance()->IsOriginRegistered(
       KeepAliveOrigin::REMOTE_DEBUGGING));
   chrome::NewEmptyWindow(ProfileManager::GetLastUsedProfile());
-  EXPECT_FALSE(BrowserList::GetInstance()->empty());
+  EXPECT_FALSE(global_colection->IsEmpty());
   BrowserHandler handler(nullptr, std::string());
   handler.Close();
   ui_test_utils::WaitForBrowserToClose();
@@ -3382,6 +3438,7 @@ class DevToolsPolicyTest : public InProcessBrowserTest {
     policy::BrowserPolicyConnector::SetPolicyProviderForTesting(&provider_);
   }
   testing::NiceMock<policy::MockConfigurationPolicyProvider> provider_;
+
  private:
   // TODO(https://crbug.com/423465927): Explore a better approach to make the
   // existing tests run with the prewarm feature enabled.
@@ -4085,7 +4142,7 @@ class DevToolsConsoleInsightsTest : public DevToolsTest {
     auto* identity_manager =
         IdentityManagerFactory::GetForProfile(browser()->profile());
     auto account_info = signin::MakePrimaryAccountAvailable(
-        identity_manager, "test@example.com", signin::ConsentLevel::kSync);
+        identity_manager, "test@example.com", signin::ConsentLevel::kSignin);
     AccountCapabilitiesTestMutator mutator(&account_info.capabilities);
     mutator.set_can_use_devtools_generative_ai_features(!is_minor);
     signin::UpdateAccountInfoForAccount(identity_manager, account_info);
@@ -4102,7 +4159,7 @@ class DevToolsConsoleInsightsTest : public DevToolsTest {
 
 bool hasQueryParam(WebContents* wc, std::string query_param) {
   return std::string::npos !=
-         wc->GetLastCommittedURL().query().find(query_param);
+         wc->GetLastCommittedURL().GetQuery().find(query_param);
 }
 
 IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest, NotBeBlockedByFeatureFlag) {
@@ -4352,6 +4409,69 @@ IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
 #endif
 
   CloseDevToolsWindow();
+}
+
+class DevToolsGdpProfilesTest : public DevToolsTest {
+ public:
+  DevToolsGdpProfilesTest() {
+    policy_provider_.SetDefaultReturns(
+        /*is_initialization_complete_return=*/true,
+        /*is_first_policy_load_complete_return=*/true);
+    policy::BrowserPolicyConnector::SetPolicyProviderForTesting(
+        &policy_provider_);
+  }
+
+  ~DevToolsGdpProfilesTest() override = default;
+
+ protected:
+  testing::NiceMock<policy::MockConfigurationPolicyProvider> policy_provider_;
+
+  const base::DictValue getGdpProfilesAvailability() {
+    OpenDevToolsWindow(kDebuggerTestPage, false);
+    LoadLegacyFilesInFrontend(window_);
+    WebContents* wc = DevToolsWindowTesting::Get(window_)->main_web_contents();
+    const auto result = content::EvalJs(wc, content::JsReplace(R"(
+      (async function() {
+        return new Promise(resolve => {
+          Host.InspectorFrontendHost.getHostConfig(resolve);
+        });
+      })();
+    )"))
+                            .TakeValue()
+                            .TakeDict();
+    CloseDevToolsWindow();
+    return result.FindDict("devToolsGdpProfilesAvailability")->Clone();
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(DevToolsGdpProfilesTest,
+                       ReflectsEnterprisePolicyInHostConfig) {
+  const base::DictValue configGdpAvailability1 =
+      this->getGdpProfilesAvailability();
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+  EXPECT_TRUE(configGdpAvailability1.FindBool("enabled").value());
+#else
+  EXPECT_FALSE(configGdpAvailability1.FindBool("enabled").value());
+#endif
+  EXPECT_EQ(configGdpAvailability1.FindInt("enterprisePolicyValue").value(), 0);
+
+  // Disable via enterprise policy.
+  policy::PolicyMap policies;
+  policies.Set(policy::key::kDevToolsGoogleDeveloperProgramProfileAvailability,
+               policy::POLICY_LEVEL_MANDATORY, policy::POLICY_SCOPE_USER,
+               policy::POLICY_SOURCE_CLOUD, base::Value(/* disabled */ 2),
+               nullptr);
+  policy_provider_.UpdateChromePolicy(policies);
+  base::RunLoop().RunUntilIdle();
+
+  const base::DictValue configGdpAvailability2 =
+      this->getGdpProfilesAvailability();
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+  EXPECT_TRUE(configGdpAvailability2.FindBool("enabled").value());
+#else
+  EXPECT_FALSE(configGdpAvailability2.FindBool("enabled").value());
+#endif
+  EXPECT_EQ(configGdpAvailability2.FindInt("enterprisePolicyValue").value(), 2);
 }
 
 class DevToolsSelfXssTest : public DevToolsTest {

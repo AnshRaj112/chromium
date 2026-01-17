@@ -11,13 +11,13 @@
 #include "base/files/file_path.h"
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/download/download_test_file_activity_observer.h"
-#include "chrome/browser/extensions/install_verifier.h"
 #include "chrome/browser/web_applications/test/os_integration_test_override_impl.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "content/public/test/download_test_observer.h"
 #include "content/public/test/slow_download_http_response.h"
 #include "content/public/test/test_download_http_response.h"
 #include "content/public/test/test_file_error_injector.h"
+#include "extensions/browser/install_verifier.h"
 #include "extensions/browser/scoped_ignore_content_verifier_for_test.h"
 #include "ui/base/window_open_disposition.h"
 
@@ -105,8 +105,6 @@ class DownloadTestBase : public InProcessBrowserTest {
   static constexpr char kDangerousMockFilePath[] =
       "/downloads/dangerous/dangerous.exe";
 #elif BUILDFLAG(IS_POSIX)
-  // TODO(crbug.com/40800578): Find an actually "dangerous" extension for
-  // Fuchsia.
   static constexpr char kDangerousMockFilePath[] =
       "/downloads/dangerous/dangerous.sh";
 #endif
@@ -242,13 +240,11 @@ class DownloadTestBase : public InProcessBrowserTest {
   // |download_info| array.  |count| is the number of files.
   // If a Select File dialog appears, it will choose the default and return
   // immediately.
-  void DownloadFilesCheckErrors(size_t spanification_suspected_redundant_count,
-                                base::span<DownloadInfo> download_info);
+  void DownloadFilesCheckErrors(base::span<DownloadInfo> download_info);
   void DownloadFilesCheckErrorsLoopBody(const DownloadInfo& download_info,
                                         size_t i);
 
   void DownloadInsertFilesErrorCheckErrors(
-      size_t spanification_suspected_redundant_count,
       base::span<FileErrorInjectInfo> info);
   void DownloadInsertFilesErrorCheckErrorsLoopBody(
       scoped_refptr<content::TestFileErrorInjector> injector,
@@ -257,9 +253,7 @@ class DownloadTestBase : public InProcessBrowserTest {
 
   // Attempts to download a file to a read-only folder, based on information
   // in |download_info|.
-  void DownloadFilesToReadonlyFolder(
-      size_t spanification_suspected_redundant_count,
-      base::span<DownloadInfo> download_info);
+  void DownloadFilesToReadonlyFolder(base::span<DownloadInfo> download_info);
 
   // This method:
   // * Starts a mock download by navigating to embedded test server URL.

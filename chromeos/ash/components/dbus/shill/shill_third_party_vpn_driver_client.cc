@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "chromeos/ash/components/dbus/shill/shill_third_party_vpn_driver_client.h"
 
 #include <stddef.h>
@@ -15,7 +10,8 @@
 #include <map>
 #include <set>
 
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
+#include "base/containers/to_vector.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
@@ -32,7 +28,7 @@ namespace ash {
 
 namespace {
 
-const char* kSetParametersKeyList[] = {
+constexpr const char* kSetParametersKeyList[] = {
     shill::kAddressParameterThirdPartyVpn,
     shill::kBroadcastAddressParameterThirdPartyVpn,
     shill::kExclusionListParameterThirdPartyVpn,
@@ -143,7 +139,7 @@ ShillThirdPartyVpnDriverClientImpl::ShillThirdPartyVpnDriverClientImpl(
     dbus::Bus* bus)
     : bus_(bus) {
   for (uint32_t i = 0; i < std::size(kSetParametersKeyList); ++i) {
-    valid_keys_.insert(kSetParametersKeyList[i]);
+    valid_keys_.insert(UNSAFE_TODO(kSetParametersKeyList[i]));
   }
 }
 
@@ -224,7 +220,7 @@ void ShillThirdPartyVpnDriverClientImpl::SetParameters(
   dbus::MessageWriter array_writer(nullptr);
   writer.OpenArray("{ss}", &array_writer);
   for (auto it : parameters) {
-    if (!base::Contains(valid_keys_, it.first)) {
+    if (!valid_keys_.contains(it.first)) {
       LOG(WARNING) << "Unknown key " << it.first;
       continue;
     }
@@ -282,11 +278,10 @@ void ShillThirdPartyVpnDriverClientImpl::OnPacketReceived(
     return;
 
   dbus::MessageReader reader(signal);
-  const uint8_t* data = nullptr;
-  size_t length = 0;
-  if (reader.PopArrayOfBytes(&data, &length)) {
+  base::span<const uint8_t> data;
+  if (reader.PopArrayOfBytes(&data)) {
     helper_info->observer()->OnPacketReceived(
-        std::vector<char>(data, data + length));
+        base::ToVector(data, [](uint8_t byte) -> char { return byte; }));
   }
 }
 

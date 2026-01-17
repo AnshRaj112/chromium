@@ -15,6 +15,7 @@
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/metrics/field_trial.h"
+#include "base/strings/strcat.h"
 #include "chrome/browser/ash/bruschetta/bruschetta_util.h"
 #include "chrome/browser/ash/crostini/crostini_features.h"
 #include "chrome/browser/ash/crostini/crostini_pref_names.h"
@@ -197,12 +198,11 @@ void ChromeFeaturesServiceProvider::IsFeatureEnabled(
     dbus::ExportedObject::ResponseSender response_sender) {
   static const base::Feature constexpr* kFeatureLookup[] = {
       &arc::kBootCompletedBroadcastFeature,
-      &arc::kCustomTabsExperimentFeature,
       &arc::kNativeBridgeToggleFeature,
       &features::kSessionManagerLongKillTimeout,
       &features::kSessionManagerLivenessCheck,
       &features::kBorealisProvision,
-      &features::kDeferConciergeStartup,
+
   };
 
   dbus::MessageReader reader(method_call);

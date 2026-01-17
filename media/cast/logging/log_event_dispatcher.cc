@@ -7,9 +7,7 @@
 #include <algorithm>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/memory/scoped_refptr.h"
@@ -136,7 +134,7 @@ void LogEventDispatcher::Impl::DispatchBatchOfEvents(
 }
 
 void LogEventDispatcher::Impl::Subscribe(RawEventSubscriber* subscriber) {
-  CHECK(!base::Contains(subscribers_, subscriber));
+  CHECK(!std::ranges::contains(subscribers_, subscriber));
   subscribers_.push_back(subscriber);
 }
 

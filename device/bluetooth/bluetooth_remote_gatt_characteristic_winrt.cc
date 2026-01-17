@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "device/bluetooth/bluetooth_remote_gatt_characteristic_winrt.h"
 
 #include <utility>
 
+#include "base/compiler_specific.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
@@ -238,7 +234,7 @@ void BluetoothRemoteGattCharacteristicWinrt::WriteRemoteCharacteristic(
   }
 
   ComPtr<IBuffer> buffer;
-  hr = base::win::CreateIBufferFromData(value.data(), value.size(), &buffer);
+  hr = base::win::CreateIBufferFromData(value, &buffer);
   if (FAILED(hr)) {
     BLUETOOTH_LOG(DEBUG) << "base::win::CreateIBufferFromData failed: "
                          << logging::SystemErrorCodeToString(hr);
@@ -532,9 +528,8 @@ void BluetoothRemoteGattCharacteristicWinrt::OnReadValue(
     return;
   }
 
-  uint8_t* data = nullptr;
-  uint32_t length = 0;
-  hr = base::win::GetPointerToBufferData(value.Get(), &data, &length);
+  base::span<uint8_t> data_span;
+  hr = base::win::GetPointerToBufferData(value.Get(), data_span);
   if (FAILED(hr)) {
     BLUETOOTH_LOG(DEBUG) << "Getting Pointer To Buffer Data failed: "
                          << logging::SystemErrorCodeToString(hr);
@@ -544,7 +539,7 @@ void BluetoothRemoteGattCharacteristicWinrt::OnReadValue(
     return;
   }
 
-  value_.assign(data, data + length);
+  value_.assign(data_span.begin(), data_span.end());
   std::move(pending_read_callback).Run(/*error_code=*/std::nullopt, value_);
 }
 
@@ -601,16 +596,15 @@ void BluetoothRemoteGattCharacteristicWinrt::OnValueChanged(
     return;
   }
 
-  uint8_t* data = nullptr;
-  uint32_t length = 0;
-  hr = base::win::GetPointerToBufferData(value.Get(), &data, &length);
+  base::span<uint8_t> data_span;
+  hr = base::win::GetPointerToBufferData(value.Get(), data_span);
   if (FAILED(hr)) {
     BLUETOOTH_LOG(DEBUG) << "Getting Pointer To Buffer Data failed: "
                          << logging::SystemErrorCodeToString(hr);
     return;
   }
 
-  value_.assign(data, data + length);
+  value_.assign(data_span.begin(), data_span.end());
   service_->GetDevice()->GetAdapter()->NotifyGattCharacteristicValueChanged(
       this, value_);
 }

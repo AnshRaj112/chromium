@@ -32,10 +32,7 @@
 #include "chrome/browser/enterprise/connectors/test/deep_scanning_test_utils.h"
 #include "chrome/browser/enterprise/connectors/test/fake_content_analysis_delegate.h"
 #include "chrome/browser/enterprise/connectors/test/fake_files_request_handler.h"
-#include "chrome/browser/extensions/api/safe_browsing_private/safe_browsing_private_event_router.h"
-#include "chrome/browser/extensions/api/safe_browsing_private/safe_browsing_private_event_router_factory.h"
 #include "chrome/browser/policy/dm_token_utils.h"
-#include "chrome/browser/safe_browsing/cloud_content_scanning/binary_upload_service.h"
 #include "chrome/browser/safe_browsing/cloud_content_scanning/deep_scanning_utils.h"
 #include "chrome/browser/safe_browsing/test_extension_event_observer.h"
 #include "chrome/common/chrome_paths.h"
@@ -43,6 +40,7 @@
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/test/base/testing_profile_manager.h"
 #include "components/enterprise/common/proto/connectors.pb.h"
+#include "components/enterprise/connectors/core/cloud_content_scanning/common.h"
 #include "components/enterprise/connectors/core/reporting_constants.h"
 #include "components/policy/core/common/cloud/mock_cloud_policy_client.h"
 #include "components/prefs/testing_pref_service.h"
@@ -720,10 +718,6 @@ class FileTransferAnalysisDelegateAuditOnlyTest : public BaseTest {
                                       /*machine_scope*/ false);
     cloud_policy_client_ = std::make_unique<policy::MockCloudPolicyClient>();
     cloud_policy_client_->SetDMToken(kDmToken);
-    extensions::SafeBrowsingPrivateEventRouterFactory::GetInstance()
-        ->SetTestingFactory(
-            profile_, base::BindRepeating(
-                          &safe_browsing::BuildSafeBrowsingPrivateEventRouter));
     RealtimeReportingClientFactory::GetInstance()->SetTestingFactory(
         profile_,
         base::BindRepeating(&safe_browsing::BuildRealtimeReportingClient));
@@ -732,7 +726,7 @@ class FileTransferAnalysisDelegateAuditOnlyTest : public BaseTest {
     identity_test_environment_ =
         std::make_unique<signin::IdentityTestEnvironment>();
     identity_test_environment_->MakePrimaryAccountAvailable(
-        kUserName, signin::ConsentLevel::kSync);
+        kUserName, signin::ConsentLevel::kSignin);
     RealtimeReportingClientFactory::GetForProfile(profile())
         ->SetIdentityManagerForTesting(
             identity_test_environment_->identity_manager());
@@ -801,9 +795,9 @@ class FileTransferAnalysisDelegateAuditOnlyTest : public BaseTest {
   }
 
   void FakeFileUploadCallback(
-      safe_browsing::BinaryUploadService::Result result,
+      ScanRequestUploadResult result,
       const base::FilePath& path,
-      std::unique_ptr<safe_browsing::BinaryUploadService::Request> request,
+      std::unique_ptr<BinaryUploadRequest> request,
       test::FakeFilesRequestHandler::FakeFileRequestCallback callback) {
     EXPECT_FALSE(path.empty());
     EXPECT_EQ(request->device_token(), kDmToken);
@@ -817,7 +811,7 @@ class FileTransferAnalysisDelegateAuditOnlyTest : public BaseTest {
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
         FROM_HERE,
         base::BindOnce(std::move(callback), path,
-                       safe_browsing::BinaryUploadService::Result::SUCCESS,
+                       ScanRequestUploadResult::kSuccess,
                        ConnectorStatusCallback(path)),
         kResponseDelay);
   }

@@ -35,9 +35,9 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_features.h"
 #include "crypto/sha2.h"
-#include "device/fido/fido_transport_protocol.h"
-#include "device/fido/fido_types.h"
-#include "device/fido/public_key_credential_descriptor.h"
+#include "device/fido/public/fido_transport_protocol.h"
+#include "device/fido/public/fido_types.h"
+#include "device/fido/public/public_key_credential_descriptor.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/mojom/webauthn/authenticator.mojom.h"
 #include "url/url_constants.h"
@@ -55,14 +55,12 @@ void RecordSystemPromptResult(
       result);
 }
 
-#if BUILDFLAG(IS_ANDROID)
 const device::PublicKeyCredentialParams::CredentialInfo
     kDefaultBrowserBoundKeyCredentialParameters[] = {
         {device::CredentialType::kPublicKey,
          base::strict_cast<int32_t>(device::CoseAlgorithmIdentifier::kEs256)},
         {device::CredentialType::kPublicKey,
          base::strict_cast<int32_t>(device::CoseAlgorithmIdentifier::kRs256)}};
-#endif  // BUILDFLAG(IS_ANDROID)
 
 }  // namespace
 
@@ -79,7 +77,8 @@ SecurePaymentConfirmationApp::SecurePaymentConfirmationApp(
     base::WeakPtr<PaymentRequestSpec> spec,
     mojom::SecurePaymentConfirmationRequestPtr request,
     std::unique_ptr<webauthn::InternalAuthenticator> authenticator,
-    std::vector<PaymentApp::PaymentEntityLogo> payment_entities_logos)
+    std::vector<PaymentApp::PaymentEntityLogo> payment_entities_logos,
+    bool is_error_dialog)
     : PaymentApp(/*icon_resource_id=*/0, PaymentApp::Type::INTERNAL),
       content::WebContentsObserver(web_contents_to_observe),
       authenticator_frame_routing_id_(
@@ -97,7 +96,8 @@ SecurePaymentConfirmationApp::SecurePaymentConfirmationApp(
       passkey_browser_binder_(std::move(passkey_browser_binder)),
       device_supports_browser_bound_keys_in_hardware_(
           device_supports_browser_bound_keys_in_hardware),
-      payment_entities_logos_(std::move(payment_entities_logos)) {
+      payment_entities_logos_(std::move(payment_entities_logos)),
+      is_error_dialog_(is_error_dialog) {
   app_method_names_.insert(methods::kSecurePaymentConfirmation);
 }
 
@@ -141,7 +141,14 @@ void SecurePaymentConfirmationApp::InvokePaymentApp(
 
   options->challenge = request_->challenge;
   std::optional<std::vector<uint8_t>> browser_bound_public_key = std::nullopt;
-#if BUILDFLAG(IS_ANDROID)
+
+  // Last used time is needed on platforms where the credentials cannot be
+  // listed by platform APIs.
+  std::optional<base::Time> last_used;
+#if BUILDFLAG(IS_WIN)
+  last_used = base::Time::NowFromSystemTime();
+#endif
+
   if (passkey_browser_binder_) {
     std::vector<device::PublicKeyCredentialParams::CredentialInfo>
         credential_parameters = request_->browser_bound_pub_key_cred_params;
@@ -158,7 +165,7 @@ void SecurePaymentConfirmationApp::InvokePaymentApp(
     } else {
       passkey_browser_binder_->GetOrCreateBoundKeyForPasskey(
           credential_id_, effective_relying_party_identity_,
-          credential_parameters,
+          credential_parameters, std::move(last_used),
           base::BindOnce(&SecurePaymentConfirmationApp::OnGetBrowserBoundKey,
                          weak_ptr_factory_.GetWeakPtr(), delegate,
                          std::move(options)));
@@ -167,10 +174,6 @@ void SecurePaymentConfirmationApp::InvokePaymentApp(
     OnGetBrowserBoundKey(delegate, std::move(options),
                          /*is_new=*/false, /*browser_bound_key=*/nullptr);
   }
-#else   // BUILDFLAG(IS_ANDROID))
-  OnGetBrowserBoundKey(delegate, std::move(options),
-                       /*is_new=*/false, /*browser_bound_key=*/nullptr);
-#endif  // BUILDFLAG(IS_ANDROID))
 }
 
 bool SecurePaymentConfirmationApp::IsCompleteForPayment() const {
@@ -298,7 +301,6 @@ SecurePaymentConfirmationApp::SetAppSpecificResponseFields(
           response_->info.Clone(), response_->authenticator_attachment,
           response_->signature, response_->user_handle,
           response_->extensions.Clone());
-#if BUILDFLAG(IS_ANDROID)
   if (base::FeatureList::IsEnabled(
           blink::features::kSecurePaymentConfirmationBrowserBoundKeys) &&
       assertion_response->extensions->payment.is_null()) {
@@ -309,7 +311,6 @@ SecurePaymentConfirmationApp::SetAppSpecificResponseFields(
     assertion_response->extensions->payment->browser_bound_signature =
         browser_bound_key_->Sign(response_->info->client_data_json);
   }
-#endif  // BUILDFLAG(IS_ANDROID)
   response->get_assertion_authenticator_response =
       std::move(assertion_response);
   return response;
@@ -338,11 +339,22 @@ void SecurePaymentConfirmationApp::OnGetBrowserBoundKey(
   std::optional<std::vector<uint8_t>> browser_bound_public_key = std::nullopt;
   if (browser_bound_key_) {
     browser_bound_public_key = browser_bound_key_->GetPublicKeyAsCoseKey();
-    RecordBrowserBoundKeyInclusion(
-        is_new ? SecurePaymentConfirmationBrowserBoundKeyInclusionResult::
-                     kIncludedNew
-               : SecurePaymentConfirmationBrowserBoundKeyInclusionResult::
-                     kIncludedExisting);
+    if (is_new) {
+      RecordBrowserBoundKeyInclusion(
+          SecurePaymentConfirmationBrowserBoundKeyInclusionResult::
+              kIncludedNew);
+    } else {
+      RecordBrowserBoundKeyInclusion(
+          SecurePaymentConfirmationBrowserBoundKeyInclusionResult::
+              kIncludedExisting);
+
+      // Update last used on platforms where the credentials cannot be listed by
+      // platform APIs.
+#if BUILDFLAG(IS_WIN)
+      passkey_browser_binder_->UpdateKeyLastUsedToNow(
+          credential_id_, effective_relying_party_identity_);
+#endif
+    }
   } else if (passkey_browser_binder_) {
     RecordBrowserBoundKeyInclusion(
         device_supports_browser_bound_keys_in_hardware_
@@ -389,6 +401,10 @@ void SecurePaymentConfirmationApp::OnGetBrowserBoundKey(
       std::move(options),
       base::BindOnce(&SecurePaymentConfirmationApp::OnGetAssertion,
                      weak_ptr_factory_.GetWeakPtr(), delegate));
+
+  if (wait_for_get_bbk_for_tests_) {
+    std::move(wait_for_get_bbk_for_tests_).Run();
+  }
 }
 
 void SecurePaymentConfirmationApp::OnGetAssertion(

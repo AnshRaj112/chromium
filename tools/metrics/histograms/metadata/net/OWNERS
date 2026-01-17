@@ -8,5 +8,8 @@ nidhijaju@chromium.org
 toyoshim@chromium.org
 
 # For DeviceBoundSessions
-drubery@chromium.org
-thefrog@chromium.org
+drubery@chromium.org #{LAST_RESORT_SUGGESTION}
+thefrog@chromium.org #{LAST_RESORT_SUGGESTION}
+
+# For Crypto.UnexportableKeys
+alexilin@chromium.org #{LAST_RESORT_SUGGESTION}

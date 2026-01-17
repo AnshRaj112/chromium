@@ -34,11 +34,11 @@ import org.junit.runner.RunWith;
 
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
+import org.chromium.base.test.util.DisableIf;
 import org.chromium.base.test.util.DisabledTest;
-import org.chromium.base.test.util.Features;
+import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.ChromeWindow;
 import org.chromium.chrome.browser.autofill.AutofillTestHelper;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.keyboard_accessory.FakeKeyboard;
 import org.chromium.chrome.browser.keyboard_accessory.ManualFillingTestHelper;
@@ -50,13 +50,16 @@ import org.chromium.chrome.test.transit.FreshCtaTransitTestRule;
 import org.chromium.chrome.test.transit.page.WebPageStation;
 import org.chromium.components.autofill.AutofillProfile;
 import org.chromium.content_public.browser.test.util.DOMUtils;
+import org.chromium.ui.base.DeviceFormFactor;
+import org.chromium.ui.test.util.DeviceRestriction;
 
 import java.util.concurrent.TimeoutException;
 
 /** Integration tests for address accessory views. */
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
-@Features.DisableFeatures({ChromeFeatureList.EDGE_TO_EDGE_BOTTOM_CHIN})
+@DisableIf.Device(DeviceFormFactor.TABLET_OR_DESKTOP) // crbug.com/463649037
+@Restriction(DeviceRestriction.RESTRICTION_TYPE_NON_AUTO) // crbug.com/463649037
 public class AddressAccessoryIntegrationTest {
     @Rule
     public final FreshCtaTransitTestRule mActivityTestRule =
@@ -124,7 +127,7 @@ public class AddressAccessoryIntegrationTest {
                                 not(isAssignableFrom(TextView.class))))
                 .perform(click());
         mHelper.waitForKeyboardToDisappear();
-        whenDisplayed(withId(R.id.addresses_sheet));
+        whenDisplayed(withId(R.id.addresses_sheet), /* atLeast= */ 51);
         onView(withText(containsString("No saved addresses"))).check(matches(isDisplayed()));
     }
 

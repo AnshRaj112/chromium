@@ -226,7 +226,6 @@ bool ShouldShowCastButton(HTMLMediaElement& media_element) {
 
 bool ShouldShowCastOverlayButton(HTMLMediaElement& media_element) {
   return !media_element.ShouldShowControls() &&
-         RuntimeEnabledFeatures::MediaCastOverlayButtonEnabled() &&
          ShouldShowCastButton(media_element);
 }
 
@@ -807,9 +806,9 @@ void MediaControlsImpl::UpdateCSSClassFromState() {
 
   for (int i = 0; i < 8; i++) {
     if (i == state)
-      toAdd.push_back(UNSAFE_TODO(kStateCSSClasses[i]));
+      toAdd.push_back(kStateCSSClasses[i]);
     else
-      toRemove.push_back(UNSAFE_TODO(kStateCSSClasses[i]));
+      toRemove.push_back(kStateCSSClasses[i]);
   }
 
   if (MediaElement().ShouldShowControls() && ShouldShowVideoControls() &&

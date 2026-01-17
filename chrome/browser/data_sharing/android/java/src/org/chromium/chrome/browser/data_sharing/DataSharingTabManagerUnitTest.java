@@ -35,10 +35,9 @@ import org.mockito.junit.MockitoRule;
 
 import org.chromium.base.Callback;
 import org.chromium.base.Token;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneshotSupplierImpl;
-import org.chromium.base.supplier.Supplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.collaboration.CollaborationControllerDelegateFactory;
 import org.chromium.chrome.browser.collaboration.CollaborationServiceFactory;
@@ -47,7 +46,6 @@ import org.chromium.chrome.browser.share.ShareDelegate;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
-import org.chromium.chrome.browser.tabmodel.TabGroupModelFilterProvider;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.ui.favicon.FaviconHelper;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
@@ -83,6 +81,7 @@ import org.chromium.url.JUnitTestGURLs;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 /** Unit test for {@link DataSharingTabManager} */
 @RunWith(BaseRobolectricTestRunner.class)
@@ -119,7 +118,6 @@ public class DataSharingTabManagerUnitTest {
     @Mock private Callback<Boolean> mCreateGroupFinishedCallback;
     @Mock private ModalDialogManager mModalDialogManager;
     @Mock private TabGroupModelFilter mTabGroupModelFilter;
-    @Mock private TabGroupModelFilterProvider mTabGroupModelFilterProvider;
     @Mock private TabGroupUiActionHandler mTabGroupUiActionHandler;
     @Mock private FaviconHelper mFaviconHelper;
     @Mock private Tab mTab;
@@ -129,7 +127,7 @@ public class DataSharingTabManagerUnitTest {
     private Activity mActivity;
     private ObservableSupplierImpl<TabModelSelector> mTabModelSelectorSupplier;
     private Supplier<BottomSheetController> mBottomSheetControllerSupplier;
-    private ObservableSupplier<ShareDelegate> mShareDelegateSupplier;
+    private MonotonicObservableSupplier<ShareDelegate> mShareDelegateSupplier;
     private SyncedGroupTestHelper mSyncedGroupTestHelper;
 
     @Before
@@ -218,7 +216,7 @@ public class DataSharingTabManagerUnitTest {
     @Test
     public void testManageSharing() {
         mDataSharingTabManager.showManageSharing(
-                mActivity, COLLABORATION_ID1, /* outcomeCallback= */ null);
+                mActivity, COLLABORATION_ID1, /* manageCallback= */ null);
     }
 
     @Test
@@ -253,12 +251,7 @@ public class DataSharingTabManagerUnitTest {
         doReturn(mProfile).when(mProfile).getOriginalProfile();
 
         mTabModelSelectorSupplier.set(mTabModelSelector);
-        doReturn(mTabGroupModelFilterProvider)
-                .when(mTabModelSelector)
-                .getTabGroupModelFilterProvider();
-        doReturn(mTabGroupModelFilter)
-                .when(mTabGroupModelFilterProvider)
-                .getTabGroupModelFilter(anyBoolean());
+        doReturn(mTabGroupModelFilter).when(mTabModelSelector).getTabGroupModelFilter(anyBoolean());
         when(mTab.getTabGroupId()).thenReturn(null).thenReturn(LOCAL_ID.tabGroupId);
 
         mSavedTabGroup.collaborationId = null;
@@ -283,12 +276,7 @@ public class DataSharingTabManagerUnitTest {
         doReturn(mProfile).when(mProfile).getOriginalProfile();
 
         mTabModelSelectorSupplier.set(mTabModelSelector);
-        doReturn(mTabGroupModelFilterProvider)
-                .when(mTabModelSelector)
-                .getTabGroupModelFilterProvider();
-        doReturn(mTabGroupModelFilter)
-                .when(mTabGroupModelFilterProvider)
-                .getTabGroupModelFilter(anyBoolean());
+        doReturn(mTabGroupModelFilter).when(mTabModelSelector).getTabGroupModelFilter(anyBoolean());
         doReturn(LOCAL_ID.tabGroupId).when(mTab).getTabGroupId();
 
         mSavedTabGroup.collaborationId = null;
@@ -316,9 +304,7 @@ public class DataSharingTabManagerUnitTest {
     @Test
     public void testDisplayTabGroupAnywhere_local() {
         when(mProfile.getOriginalProfile()).thenReturn(mProfile);
-        when(mTabModelSelector.getTabGroupModelFilterProvider())
-                .thenReturn(mTabGroupModelFilterProvider);
-        when(mTabGroupModelFilterProvider.getTabGroupModelFilter(anyBoolean()))
+        when(mTabModelSelector.getTabGroupModelFilter(anyBoolean()))
                 .thenReturn(mTabGroupModelFilter);
         when(mTabGroupSyncService.getGroup(SYNC_GROUP_ID1)).thenReturn(mSavedTabGroup);
         when(mTabGroupModelFilter.getGroupLastShownTabId(GROUP_ID)).thenReturn(TAB_GROUP_ROOT_ID);
@@ -333,9 +319,7 @@ public class DataSharingTabManagerUnitTest {
     @Test
     public void testDisplayTabGroupAnywhere_hidden() {
         when(mProfile.getOriginalProfile()).thenReturn(mProfile);
-        when(mTabModelSelector.getTabGroupModelFilterProvider())
-                .thenReturn(mTabGroupModelFilterProvider);
-        when(mTabGroupModelFilterProvider.getTabGroupModelFilter(anyBoolean()))
+        when(mTabModelSelector.getTabGroupModelFilter(anyBoolean()))
                 .thenReturn(mTabGroupModelFilter);
         mSavedTabGroup.localId = null;
         when(mTabGroupSyncService.getGroup(SYNC_GROUP_ID1)).thenReturn(mSavedTabGroup);
@@ -357,9 +341,7 @@ public class DataSharingTabManagerUnitTest {
     @Test
     public void testDisplayTabGroupAnywhere_otherWindow() {
         when(mProfile.getOriginalProfile()).thenReturn(mProfile);
-        when(mTabModelSelector.getTabGroupModelFilterProvider())
-                .thenReturn(mTabGroupModelFilterProvider);
-        when(mTabGroupModelFilterProvider.getTabGroupModelFilter(anyBoolean()))
+        when(mTabModelSelector.getTabGroupModelFilter(anyBoolean()))
                 .thenReturn(mTabGroupModelFilter);
         mSavedTabGroup.localId = LOCAL_ID;
         when(mTabGroupSyncService.getGroup(SYNC_GROUP_ID1)).thenReturn(mSavedTabGroup);

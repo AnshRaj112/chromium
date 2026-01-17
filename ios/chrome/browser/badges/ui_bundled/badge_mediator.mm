@@ -7,11 +7,15 @@
 #import <map>
 
 #import "base/apple/foundation_util.h"
+#import "base/feature_list.h"
 #import "base/metrics/user_metrics.h"
+#import "ios/chrome/browser/badges/model/features.h"
 #import "ios/chrome/browser/badges/ui_bundled/badge_button.h"
+#import "ios/chrome/browser/badges/ui_bundled/badge_button_factory.h"
 #import "ios/chrome/browser/badges/ui_bundled/badge_consumer.h"
 #import "ios/chrome/browser/badges/ui_bundled/badge_item.h"
 #import "ios/chrome/browser/badges/ui_bundled/badge_tappable_item.h"
+#import "ios/chrome/browser/badges/ui_bundled/badge_type.h"
 #import "ios/chrome/browser/badges/ui_bundled/badge_type_util.h"
 #import "ios/chrome/browser/infobars/model/badge_state.h"
 #import "ios/chrome/browser/infobars/model/infobar_badge_tab_helper.h"
@@ -23,14 +27,23 @@
 #import "ios/chrome/browser/infobars/model/overlays/default_infobar_overlay_request_factory.h"
 #import "ios/chrome/browser/infobars/model/overlays/infobar_overlay_request_inserter.h"
 #import "ios/chrome/browser/infobars/model/overlays/infobar_overlay_util.h"
+#import "ios/chrome/browser/intelligence/features/features.h"
+#import "ios/chrome/browser/location_bar/badge/model/badge_type.h"
+#import "ios/chrome/browser/location_bar/badge/model/location_bar_badge_configuration.h"
 #import "ios/chrome/browser/overlays/model/public/overlay_presenter.h"
 #import "ios/chrome/browser/overlays/model/public/overlay_presenter_observer_bridge.h"
 #import "ios/chrome/browser/overlays/model/public/overlay_request_queue.h"
+#import "ios/chrome/browser/reader_mode/model/features.h"
+#import "ios/chrome/browser/reader_mode/model/reader_mode_tab_helper.h"
+#import "ios/chrome/browser/reader_mode/model/reader_mode_tab_helper_observer_bridge.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list_observer_bridge.h"
 #import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
+#import "ios/chrome/browser/shared/public/commands/location_bar_badge_commands.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/list_model/list_model.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
+#import "ios/web/public/browser_state.h"
 #import "ios/web/public/permissions/permissions.h"
 #import "ios/web/public/web_state_observer_bridge.h"
 
@@ -42,13 +55,71 @@ const char kInfobarOverflowBadgeTappedUserAction[] =
 const char kInfobarOverflowBadgeShownUserAction[] =
     "MobileMessagesOverflowBadgeShown";
 
+// Helper method to determine if the `infobarType` is supported in Reader
+// Mode.
+bool IsInfobarTypeSupportedInReaderMode(InfobarType infobarType,
+                                        bool is_incognito) {
+  switch (infobarType) {
+    case InfobarType::kInfobarTypePermissions:
+      return true;
+    case InfobarType::kInfobarTypeReaderMode:
+      return IsProactiveSuggestionsFrameworkEnabled() && !is_incognito;
+    case InfobarType::kInfobarTypeConfirm:
+    case InfobarType::kInfobarTypePasswordSave:
+    case InfobarType::kInfobarTypePasswordUpdate:
+    case InfobarType::kInfobarTypeSaveCard:
+    case InfobarType::kInfobarTypeTranslate:
+    case InfobarType::kInfobarTypeSaveAutofillAddressProfile:
+    case InfobarType::kInfobarTypeTailoredSecurityService:
+    case InfobarType::kInfobarTypeSyncError:
+    case InfobarType::kInfobarTypeEnhancedSafeBrowsing:
+    case InfobarType::kInfobarTypeSignin:
+    case InfobarType::kInfobarTypeCollaborationGroup:
+    case InfobarType::kInfobarTypeCollaborationOutOfDate:
+    case InfobarType::kInfobarTypeSaveCvc:
+      return IsProactiveSuggestionsFrameworkEnabled();
+  }
+}
+
+// TODO(crbug.com/458142962): Migrate to LocationBarBadgeType.
+// Helper method to convert a `BadgeType` to a `LocationBarBadgeType. Serves as
+// a strict switch case to ensure that there's parity between both types.
+LocationBarBadgeType LocationBarBadgeTypeFromBadgeType(BadgeType badgeType) {
+  switch (badgeType) {
+    case BadgeType::kBadgeTypePasswordSave:
+      return LocationBarBadgeType::kPasswordSave;
+    case BadgeType::kBadgeTypePasswordUpdate:
+      return LocationBarBadgeType::kPasswordUpdate;
+    case BadgeType::kBadgeTypeTranslate:
+      return LocationBarBadgeType::kTranslate;
+    case BadgeType::kBadgeTypeSaveCard:
+      return LocationBarBadgeType::kSaveCard;
+    case BadgeType::kBadgeTypePermissionsCamera:
+      return LocationBarBadgeType::kPermissionsCamera;
+    case BadgeType::kBadgeTypePermissionsMicrophone:
+      return LocationBarBadgeType::kPermissionsMicrophone;
+    case BadgeType::kBadgeTypeSaveAddressProfile:
+      return LocationBarBadgeType::kSaveAddressProfile;
+    case BadgeType::kBadgeTypeOverflow:
+      return LocationBarBadgeType::kOverflow;
+    case BadgeType::kBadgeTypeReaderMode:
+      return LocationBarBadgeType::kReaderMode;
+    // Incognito badge is handled separately.
+    case BadgeType::kBadgeTypeIncognito:
+    case BadgeType::kBadgeTypeNone:
+      return LocationBarBadgeType::kNone;
+  }
+}
+
 }  // namespace
 
 @interface BadgeMediator () <CRWWebStateObserver,
                              InfobarBadgeTabHelperDelegate,
                              OverlayPresenterObserving,
+                             ReaderModeTabHelperObserving,
                              WebStateListObserving> {
   std::unique_ptr<OverlayPresenterObserver> _overlayPresenterObserver;
+  std::unique_ptr<ReaderModeTabHelperObserverBridge> _readerModeObserver;
   std::unique_ptr<WebStateListObserver> _webStateListObserver;
   std::unique_ptr<web::WebStateObserverBridge> _webStateObserver;
 }
@@ -74,7 +145,11 @@ const char kInfobarOverflowBadgeShownUserAction[] =
 
 @end
 
-@implementation BadgeMediator
+@implementation BadgeMediator {
+  // Factory for badge buttons. Used to send badge updates to Location Bar
+  // Badge.
+  BadgeButtonFactory* _badgeButtonFactory;
+}
 
 - (instancetype)initWithWebStateList:(WebStateList*)webStateList
                     overlayPresenter:(OverlayPresenter*)overlayPresenter {
@@ -89,6 +164,8 @@ const char kInfobarOverflowBadgeShownUserAction[] =
     _webStateList = webStateList;
     _webState = _webStateList->GetActiveWebState();
 
+    _readerModeObserver =
+        std::make_unique<ReaderModeTabHelperObserverBridge>(self);
     _webStateListObserver = std::make_unique<WebStateListObserverBridge>(self);
     _webStateList->AddObserver(_webStateListObserver.get());
     _webStateObserver = std::make_unique<web::WebStateObserverBridge>(self);
@@ -96,7 +173,16 @@ const char kInfobarOverflowBadgeShownUserAction[] =
     if (_webState) {
       InfobarBadgeTabHelper::GetOrCreateForWebState(_webState)->SetDelegate(
           self);
+      if (ReaderModeTabHelper* readerModeTabHelper =
+              ReaderModeTabHelper::FromWebState(_webState)) {
+        readerModeTabHelper->AddObserver(_readerModeObserver.get());
+      }
       _webState->AddObserver(_webStateObserver.get());
+    }
+    _badgeButtonFactory = [[BadgeButtonFactory alloc] init];
+    if (_webState) {
+      _badgeButtonFactory.incognito =
+          _webState->GetBrowserState()->IsOffTheRecord();
     }
   }
   return self;
@@ -118,6 +204,10 @@ const char kInfobarOverflowBadgeShownUserAction[] =
 
 - (void)disconnectWebState {
   if (self.webState) {
+    if (ReaderModeTabHelper* readerModeTabHelper =
+            ReaderModeTabHelper::FromWebState(self.webState)) {
+      readerModeTabHelper->RemoveObserver(_readerModeObserver.get());
+    }
     self.webState = nullptr;
     _webStateObserver = nullptr;
   }
@@ -147,17 +237,80 @@ const char kInfobarOverflowBadgeShownUserAction[] =
   }
 
   NSMutableArray<id<BadgeItem>>* badges = [NSMutableArray array];
+
+  // If Reader Mode is active, only show camera and microphone permissions
+  // badges.
+  BOOL isReaderModeActive = NO;
+  if (self.webState) {
+    ReaderModeTabHelper* readerModeTabHelper =
+        ReaderModeTabHelper::FromWebState(self.webState);
+    if (readerModeTabHelper && readerModeTabHelper->IsActive()) {
+      isReaderModeActive = YES;
+    }
+  }
+
   std::map<InfobarType, BadgeState> badgeStatesForInfobarType =
       self.badgeTabHelper->GetInfobarBadgeStates();
+  const bool is_incognito =
+      self.webState && self.webState->GetBrowserState()->IsOffTheRecord();
   for (auto& infobarTypeBadgeStatePair : badgeStatesForInfobarType) {
+    if (isReaderModeActive &&
+        !IsInfobarTypeSupportedInReaderMode(infobarTypeBadgeStatePair.first,
+                                            is_incognito)) {
+      continue;
+    }
     BadgeType badgeType =
         BadgeTypeForInfobarType(infobarTypeBadgeStatePair.first);
+    // TODO(crbug.com/448422022): Remove this translate badge filtering logic
+    // when migrating to LocationBarBadgeViewController.
+    if (IsProactiveSuggestionsFrameworkEnabled()) {
+      BadgeState badgeState = infobarTypeBadgeStatePair.second;
+      if (badgeType == kBadgeTypeTranslate &&
+          !(badgeState & BadgeStateAccepted)) {
+        continue;
+      }
+    }
     // Update BadgeType for permissions to align with current permission states
     // of the web state.
     if (infobarTypeBadgeStatePair.first ==
         InfobarType::kInfobarTypePermissions) {
-      badgeType = self.permissionsBadgeType;
+      // TODO(crbug.com/458307626): Migrate to LocationBarBadge.
+      if (IsProactiveSuggestionsFrameworkEnabled() && self.webState &&
+          !self.webState->GetBrowserState()->IsOffTheRecord()) {
+        // Check camera permission.
+        if (self.webState->GetStateForPermission(web::PermissionCamera) ==
+            web::PermissionStateAllowed) {
+          BadgeTappableItem* cameraItem = [[BadgeTappableItem alloc]
+              initWithBadgeType:kBadgeTypePermissionsCamera];
+          cameraItem.badgeState = infobarTypeBadgeStatePair.second;
+          [badges addObject:cameraItem];
+        }
+
+        // Check microphone permission.
+        if (self.webState->GetStateForPermission(web::PermissionMicrophone) ==
+            web::PermissionStateAllowed) {
+          BadgeTappableItem* microphoneItem = [[BadgeTappableItem alloc]
+              initWithBadgeType:kBadgeTypePermissionsMicrophone];
+          microphoneItem.badgeState = infobarTypeBadgeStatePair.second;
+          [badges addObject:microphoneItem];
+        }
+
+        continue;
+      } else {
+        // Fallback to original behavior when framework is disabled.
+        badgeType = self.permissionsBadgeType;
+      }
     }
+
+    // Add badge at the front of the list if it is the Reader mode badge.
+    if (badgeType == kBadgeTypeReaderMode) {
+      BadgeTappableItem* readerModeItem =
+          [[BadgeTappableItem alloc] initWithBadgeType:kBadgeTypeReaderMode];
+      readerModeItem.badgeState = infobarTypeBadgeStatePair.second;
+      [badges insertObject:readerModeItem atIndex:0];
+      continue;
+    }
+
     BadgeTappableItem* item =
         [[BadgeTappableItem alloc] initWithBadgeType:badgeType];
     item.badgeState = infobarTypeBadgeStatePair.second;
@@ -180,12 +333,22 @@ const char kInfobarOverflowBadgeShownUserAction[] =
   }
   if (_webState) {
     InfobarBadgeTabHelper::GetOrCreateForWebState(_webState)->SetDelegate(nil);
+    if (ReaderModeTabHelper* readerModeTabHelper =
+            ReaderModeTabHelper::FromWebState(_webState)) {
+      readerModeTabHelper->RemoveObserver(_readerModeObserver.get());
+    }
     _webState->RemoveObserver(_webStateObserver.get());
   }
   _webState = webState;
   if (_webState) {
     InfobarBadgeTabHelper::GetOrCreateForWebState(_webState)->SetDelegate(self);
+    if (ReaderModeTabHelper* readerModeTabHelper =
+            ReaderModeTabHelper::FromWebState(_webState)) {
+      readerModeTabHelper->AddObserver(_readerModeObserver.get());
+    }
     _webState->AddObserver(_webStateObserver.get());
+    _badgeButtonFactory.incognito =
+        _webState->GetBrowserState()->IsOffTheRecord();
   }
   [self updateConsumer];
 }
@@ -223,8 +386,21 @@ const char kInfobarOverflowBadgeShownUserAction[] =
   } else {
     displayedBadge = [badges firstObject];
   }
-  // Update the consumer with the new badge items.
-  [self.consumer setupWithDisplayedBadge:displayedBadge];
+
+  if (IsLocationBarBadgeMigrationEnabled()) {
+    // Update Location Bar Badge with a new badge update.
+    if (displayedBadge) {
+      LocationBarBadgeConfiguration* badgeConfig = [self
+          configureLocationBarBadgeConfigurationFromBadgeItem:displayedBadge
+                                                      infoBar:nil];
+      [self.dispatcher updateBadgeConfig:badgeConfig];
+    } else {
+      [self.dispatcher updateBadgeConfig:nil];
+    }
+  } else {
+    // Update the consumer with the new badge items.
+    [self.consumer setupWithDisplayedBadge:displayedBadge];
+  }
 }
 
 #pragma mark - BadgeDelegate
@@ -238,6 +414,7 @@ const char kInfobarOverflowBadgeShownUserAction[] =
 }
 
 - (void)passwordsBadgeButtonTapped:(id)sender {
+  CHECK(!base::FeatureList::IsEnabled(kAutofillBadgeRemoval));
   BadgeButton* badgeButton = base::apple::ObjCCastStrict<BadgeButton>(sender);
   DCHECK(badgeButton.badgeType == kBadgeTypePasswordSave ||
          badgeButton.badgeType == kBadgeTypePasswordUpdate);
@@ -246,6 +423,7 @@ const char kInfobarOverflowBadgeShownUserAction[] =
 }
 
 - (void)saveAddressProfileBadgeButtonTapped:(id)sender {
+  CHECK(!base::FeatureList::IsEnabled(kAutofillBadgeRemoval));
   BadgeButton* badgeButton = base::apple::ObjCCastStrict<BadgeButton>(sender);
   DCHECK_EQ(badgeButton.badgeType, kBadgeTypeSaveAddressProfile);
 
@@ -253,6 +431,7 @@ const char kInfobarOverflowBadgeShownUserAction[] =
 }
 
 - (void)saveCardBadgeButtonTapped:(id)sender {
+  CHECK(!base::FeatureList::IsEnabled(kAutofillBadgeRemoval));
   BadgeButton* badgeButton = base::apple::ObjCCastStrict<BadgeButton>(sender);
   DCHECK_EQ(badgeButton.badgeType, kBadgeTypeSaveCard);
 
@@ -288,7 +467,36 @@ const char kInfobarOverflowBadgeShownUserAction[] =
 #pragma mark - InfobarBadgeTabHelperDelegate
 
 - (BOOL)badgeSupportedForInfobarType:(InfobarType)infobarType {
-  return BadgeTypeForInfobarType(infobarType) != kBadgeTypeNone;
+  if (base::FeatureList::IsEnabled(kAutofillBadgeRemoval)) {
+    // TODO(crbug.com/440366193): Remove this ad hoc logic once we can fully
+    // cleanup the autofill and password badges code once we are done
+    // experimenting.
+    switch (infobarType) {
+      case InfobarType::kInfobarTypePasswordSave:
+      case InfobarType::kInfobarTypePasswordUpdate:
+      case InfobarType::kInfobarTypeSaveCard:
+      case InfobarType::kInfobarTypeSaveAutofillAddressProfile:
+        // Special case where we dynamically want to exclude the badge for
+        // certain infobars while still keeping a badge type for the infobar
+        // in BadgeTypeForInfobarType(). This ad hoc logic is temporary the
+        // time we sunset these badges.
+        return false;
+      case InfobarType::kInfobarTypeConfirm:
+      case InfobarType::kInfobarTypeTranslate:
+      case InfobarType::kInfobarTypePermissions:
+      case InfobarType::kInfobarTypeTailoredSecurityService:
+      case InfobarType::kInfobarTypeSyncError:
+      case InfobarType::kInfobarTypeEnhancedSafeBrowsing:
+      case InfobarType::kInfobarTypeSignin:
+      case InfobarType::kInfobarTypeCollaborationGroup:
+      case InfobarType::kInfobarTypeCollaborationOutOfDate:
+      case InfobarType::kInfobarTypeSaveCvc:
+      case InfobarType::kInfobarTypeReaderMode:
+        return BadgeTypeForInfobarType(infobarType) != kBadgeTypeNone;
+    }
+  } else {
+    return BadgeTypeForInfobarType(infobarType) != kBadgeTypeNone;
+  }
 }
 
 - (void)updateBadgesShownForWebState:(web::WebState*)webState {
@@ -297,16 +505,41 @@ const char kInfobarOverflowBadgeShownUserAction[] =
     // currently active WebState.
     return;
   }
+
   NSArray<id<BadgeItem>>* badges = self.badges;
 
-  // The badge to be displayed alongside the fullscreen badge. Logic below
-  // currently assigns it to the last non-fullscreen badge in the list, since it
-  // works if there is only one non-fullscreen badge. Otherwise, where there are
-  // multiple non-fullscreen badges, additional logic below determines what
-  // badge will be shown.
+  if (IsProactiveSuggestionsFrameworkEnabled() && self.webState &&
+      !self.webState->GetBrowserState()->IsOffTheRecord()) {
+    [self handleMultiBadgeDisplay:badges];
+  } else {
+    [self handleSingleBadgeDisplay:badges];
+  }
+
+  [self updateConsumerReadStatus];
+}
+
+// Handles the multi badge state for proactive suggestions framework.
+- (void)handleMultiBadgeDisplay:(NSArray<id<BadgeItem>>*)badges {
+  NSMutableArray<id<BadgeItem>>* badgesToDisplay =
+      [[NSMutableArray alloc] init];
+
+  if ([badges count] > 2) {
+    // Show first badge + overflow badge.
+    [badgesToDisplay addObject:badges[0]];
+    id<BadgeItem> overflowBadge =
+        [[BadgeTappableItem alloc] initWithBadgeType:kBadgeTypeOverflow];
+    [badgesToDisplay addObject:overflowBadge];
+    base::RecordAction(
+        base::UserMetricsAction(kInfobarOverflowBadgeShownUserAction));
+  } else {
+    [badgesToDisplay addObjectsFromArray:badges];
+  }
+  [self.consumer updateDisplayedBadges:badgesToDisplay];
+}
+
+// Handles original single-badge logic.
+- (void)handleSingleBadgeDisplay:(NSArray<id<BadgeItem>>*)badges {
   id<BadgeItem> displayedBadge;
-  // The badge that is current displaying its banner. This will be set as the
-  // displayedBadge if there are multiple badges.
   id<BadgeItem> presentingBadge;
 
   for (id<BadgeItem> item in badges) {
@@ -316,19 +549,13 @@ const char kInfobarOverflowBadgeShownUserAction[] =
     displayedBadge = item;
   }
 
-  // Figure out what displayedBadge should be showing if there are multiple
-  // non-Fullscreen badges.
   NSInteger count = [badges count];
   if (count > 1) {
-    // If a badge's banner is being presented, then show that badge as the
-    // displayed badge. Otherwise, show the overflow badge.
     displayedBadge =
         presentingBadge
             ? presentingBadge
             : [[BadgeTappableItem alloc] initWithBadgeType:kBadgeTypeOverflow];
   } else if (count == 1) {
-    // Since there is only one non-fullscreen badge, it will be fixed as the
-    // displayed badge, so mark it as read.
     [self onBadgeItemRead:displayedBadge];
   }
 
@@ -338,15 +565,13 @@ const char kInfobarOverflowBadgeShownUserAction[] =
         base::UserMetricsAction(kInfobarOverflowBadgeShownUserAction));
   }
 
-  InfoBarIOS* infoBar = nullptr;
+  InfoBarIOS* infoBar = nil;
   if (displayedBadge.badgeType == kBadgeTypeSaveAddressProfile) {
     infoBar = [self
         infobarWithType:InfobarTypeForBadgeType(displayedBadge.badgeType)];
   }
 
-  [self.consumer updateDisplayedBadge:displayedBadge
-                              infoBar:infoBar];
-  [self updateConsumerReadStatus];
+  [self.consumer updateDisplayedBadge:displayedBadge infoBar:infoBar];
 }
 
 #pragma mark - OverlayPresenterObserving
@@ -400,6 +625,20 @@ const char kInfobarOverflowBadgeShownUserAction[] =
   [self disconnectWebState];
 }
 
+#pragma mark - ReaderModeTabHelperObserving
+
+- (void)readerModeWebStateDidLoadContent:(ReaderModeTabHelper*)tabHelper
+                                webState:(web::WebState*)webState {
+  [self updateConsumer];
+}
+
+- (void)readerModeWebStateWillBecomeUnavailable:(ReaderModeTabHelper*)tabHelper
+                                       webState:(web::WebState*)webState
+                                         reason:(ReaderModeDeactivationReason)
+                                                    reason {
+  [self updateConsumer];
+}
+
 #pragma mark - Private
 
 // Mark the `item`'s infobar type's read status to YES.
@@ -416,11 +655,20 @@ const char kInfobarOverflowBadgeShownUserAction[] =
 - (void)updateConsumerReadStatus {
   for (id<BadgeItem> item in self.badges) {
     if (!(item.badgeState & BadgeStateRead)) {
-      [self.consumer markDisplayedBadgeAsRead:NO];
+      if (IsLocationBarBadgeMigrationEnabled()) {
+        [self.dispatcher markDisplayedBadgeAsUnread:YES];
+      } else {
+        [self.consumer markDisplayedBadgeAsRead:NO];
+      }
       return;
     }
   }
-  [self.consumer markDisplayedBadgeAsRead:YES];
+
+  if (IsLocationBarBadgeMigrationEnabled()) {
+    [self.dispatcher markDisplayedBadgeAsUnread:NO];
+  } else {
+    [self.consumer markDisplayedBadgeAsRead:YES];
+  }
 }
 
 // Shows the modal UI when `button` is tapped.
@@ -482,6 +730,29 @@ const char kInfobarOverflowBadgeShownUserAction[] =
           base::UserMetricsAction("MobileMessagesBadgeNonAcceptedTapped"));
       break;
   }
+}
+
+// Helper method to configure a LocationBarBadgeConfiguration from a BadgeItem.
+- (LocationBarBadgeConfiguration*)
+    configureLocationBarBadgeConfigurationFromBadgeItem:
+        (id<BadgeItem>)displayedBadge
+                                                infoBar:(InfoBarIOS*)infoBar {
+  BadgeButton* button =
+      [_badgeButtonFactory badgeButtonForBadgeType:displayedBadge.badgeType
+                                      usingInfoBar:infoBar];
+  [button setAccepted:displayedBadge.badgeState & BadgeStateAccepted
+             animated:NO];
+
+  LocationBarBadgeType badgeType =
+      LocationBarBadgeTypeFromBadgeType(button.badgeType);
+
+  LocationBarBadgeConfiguration* buttonConfig =
+      [[LocationBarBadgeConfiguration alloc]
+           initWithBadgeType:badgeType
+          accessibilityLabel:button.accessibilityLabel
+                  badgeImage:button.image];
+  buttonConfig.active = button.accepted;
+  return buttonConfig;
 }
 
 @end

@@ -143,6 +143,11 @@ def add_common_args(parser):
       'will change the batching of test cases which may expose failures '
       'caused by test cases that implicitly depend on running in the same '
       'batch as others.')
+  parser.add_argument(
+      '--omit-default-test-args',
+      action='store_true',
+      help="Removes all test args normally set for the builder's tests. Often "
+      'used in tandem with additional_test_args to override various args.')
 
 
 def add_compile_args(parser):
@@ -157,6 +162,13 @@ def add_compile_args(parser):
       help='Skips instrumenting code-coverage, even if the builder is '
       'configured to instrument. Instrumentation can inflate both build sizes '
       "and runtimes. But some failures may only occur when it's enabled.")
+  parser.add_argument(
+      '--use-autoninja',
+      action='store_true',
+      help="Uses autoninja if it's detected on PATH. By default, UTR will "
+      'compile using direct siso invocations, exactly as the given builder '
+      'behaves. But this may lead to slower compiles than expected. Use this '
+      'option to instead use autoninja, which will use its own siso settings.')
 
 
 def add_test_args(parser):
@@ -298,6 +310,8 @@ def _main_impl():
         skip_coverage=not skip_compile and args.no_coverage_instrumentation,
         no_rbe=not skip_compile and args.no_rbe,
         no_siso=args.no_siso,
+        use_autoninja=not skip_compile and args.use_autoninja,
+        omit_default_test_args=args.omit_default_test_args,
     )
     exit_code, error_msg = recipe_runner.run_recipe(
         filter_stdout=args.verbosity < 2)

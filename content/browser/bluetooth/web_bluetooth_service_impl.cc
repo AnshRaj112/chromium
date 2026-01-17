@@ -15,7 +15,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/containers/queue.h"
 #include "base/containers/to_vector.h"
 #include "base/functional/bind.h"
@@ -564,7 +563,7 @@ void WebBluetoothServiceImpl::OnPermissionRevoked(const url::Origin& origin) {
 
   std::erase_if(watch_advertisements_clients_,
                 [&](const std::unique_ptr<WatchAdvertisementsClient>& client) {
-                  return !base::Contains(permitted_ids, client->device_id());
+                  return !permitted_ids.contains(client->device_id());
                 });
 
   MaybeStopDiscovery();
@@ -722,8 +721,8 @@ void WebBluetoothServiceImpl::GattCharacteristicValueChanged(
     BluetoothRemoteGattCharacteristic* characteristic,
     const std::vector<uint8_t>& value) {
   // Don't notify of characteristics that we haven't returned.
-  if (!base::Contains(characteristic_id_to_service_id_,
-                      characteristic->GetIdentifier())) {
+  if (!characteristic_id_to_service_id_.contains(
+          characteristic->GetIdentifier())) {
     return;
   }
 
@@ -907,6 +906,10 @@ void WebBluetoothServiceImpl::RemoteServerConnect(
   mojo::AssociatedRemote<blink::mojom::WebBluetoothServerClient>
       web_bluetooth_server_client(std::move(client));
 
+  if (base::FeatureList::IsEnabled(
+          blink::features::kWebBluetoothCancelConnect)) {
+    pending_connection_device_ids_.insert(device_id);
+  }
   query_result.device->CreateGattConnection(base::BindOnce(
       &WebBluetoothServiceImpl::OnCreateGATTConnection,
       weak_ptr_factory_.GetWeakPtr(), device_id,
@@ -917,6 +920,20 @@ void WebBluetoothServiceImpl::RemoteServerDisconnect(
     const blink::WebBluetoothDeviceId& device_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   CHECK(back_forward_cache_feature_handle_.IsValid());
+
+  if (base::FeatureList::IsEnabled(
+          blink::features::kWebBluetoothCancelConnect)) {
+    auto connecting_iter = pending_connection_device_ids_.find(device_id);
+    if (connecting_iter != pending_connection_device_ids_.end()) {
+      pending_connection_device_ids_.erase(connecting_iter);
+      const CacheQueryResult query_result = QueryCacheForDevice(device_id);
+      if (query_result.outcome != CacheQueryOutcome::kSuccess) {
+        return;
+      }
+      query_result.device->DisconnectGatt();
+      return;
+    }
+  }
 
   if (connected_devices_->IsConnectedToDeviceWithId(device_id)) {
     DVLOG(1) << "Disconnecting device: " << device_id.str();
@@ -1919,6 +1936,11 @@ void WebBluetoothServiceImpl::OnCreateGATTConnection(
     std::unique_ptr<BluetoothGattConnection> connection,
     std::optional<BluetoothDevice::ConnectErrorCode> error_code) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
+
+  if (base::FeatureList::IsEnabled(
+          blink::features::kWebBluetoothCancelConnect)) {
+    pending_connection_device_ids_.erase(device_id);
+  }
   if (error_code.has_value()) {
     std::move(callback).Run(TranslateConnectErrorAndRecord(error_code.value()));
     return;
@@ -2285,7 +2307,7 @@ void WebBluetoothServiceImpl::RunPendingPrimaryServicesRequests(
   }
 
   // Sending get-service responses unexpectedly queued another request.
-  DCHECK(!base::Contains(pending_primary_services_requests_, device_address));
+  DCHECK(!pending_primary_services_requests_.contains(device_address));
 }
 
 RenderProcessHost* WebBluetoothServiceImpl::GetRenderProcessHost() {

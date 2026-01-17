@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/platform/bindings/wrapper_type_info.h"
 
+#include "base/notreached.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/bindings/v8_object_constructor.h"
 #include "third_party/blink/renderer/platform/bindings/v8_per_isolate_data.h"
@@ -11,7 +12,7 @@
 namespace blink {
 
 static_assert(offsetof(struct WrapperTypeInfo, type_id) ==
-                  offsetof(struct gin::WrapperInfo, type_id),
+                  offsetof(struct gin::DeprecatedWrapperInfo, embedder),
               "offset of WrapperTypeInfo.ginEmbedder must be the same as "
               "gin::DeprecatedWrapperInfo.embedder");
 

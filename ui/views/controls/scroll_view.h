@@ -10,13 +10,13 @@
 #include <utility>
 
 #include "base/callback_list.h"
-#include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "ui/color/color_variant.h"
 #include "ui/compositor/layer_type.h"
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/scrollbar/scroll_bar.h"
 #include "ui/views/controls/separator.h"
+#include "ui/views/metadata/view_factory.h"
 
 namespace cc {
 struct ElementId;
@@ -175,6 +175,15 @@ class VIEWS_EXPORT ScrollView : public View, public ScrollBarController {
                                    int thickness,
                                    bool fills_opaquely);
 
+  // Direction of linear opacity gradient applied when overflow content exists.
+  enum class GradientDirection { kNone = 0, kHorizontal = 1, kVertical = 2 };
+
+  // Sets which direction a opacity gradient should be shown when content
+  // overflows. Gradient can only be applied to one direction at a time, so in
+  // cases where both horizontal and vertical scroll overflows, only one can
+  // have a opacity gradient.
+  void SetOverflowGradientMask(GradientDirection direction);
+
   // Turns this scroll view into a bounded scroll view, with a fixed height.
   // By default, a ScrollView will stretch to fill its outer container.
   void ClipHeightTo(int min_height, int max_height);
@@ -255,6 +264,10 @@ class VIEWS_EXPORT ScrollView : public View, public ScrollBarController {
     return horiz_sb_->is_scrolling() || vert_sb_->is_scrolling();
   }
 
+  void SetUseContentsPreferredSize(bool use_contents_preferred_size) {
+    use_contents_preferred_size_ = use_contents_preferred_size;
+  }
+
  private:
   friend class test::ScrollViewTestApi;
 
@@ -330,6 +343,10 @@ class VIEWS_EXPORT ScrollView : public View, public ScrollBarController {
 
   View* GetContentsViewportForTest() const;
 
+  // Update gradient mask for a single direction - horizontal or vertical.
+  // Only one gradient at a time is allowed.
+  void UpdateGradientMask();
+
   // The current contents and its viewport. |contents_| is contained in
   // |contents_viewport_|.
   // Can dangle in practice during out-of-order view tree destruction.
@@ -400,6 +417,11 @@ class VIEWS_EXPORT ScrollView : public View, public ScrollBarController {
   // Whether the left/right/up/down arrow keys attempt to scroll the view.
   bool allow_keyboard_scrolling_ = true;
 
+  // Uses the contents' preferred size when laying out if one exists. This
+  // should eventually be true for all cases but using this bool in the interim
+  // to prevent breaking any existing ScrollView uses.
+  bool use_contents_preferred_size_ = false;
+
   // The layer type used for content view when scroll by layers is enabled.
   ui::LayerType layer_type_ = ui::LAYER_TEXTURED;
 
@@ -411,6 +433,14 @@ class VIEWS_EXPORT ScrollView : public View, public ScrollBarController {
 
   // Post-layout callback.
   base::RepeatingCallback<void(ScrollView*)> post_layout_callback_;
+
+  GradientDirection gradient_direction_ = GradientDirection::kNone;
+
+  // Track if the leading gradient is shown
+  bool is_leading_gradient_visible_ = false;
+
+  // Track if the trailing gradient is shown
+  bool is_trailing_gradient_visible_ = false;
 };
 
 // When building with GCC this ensures that an instantiation of the

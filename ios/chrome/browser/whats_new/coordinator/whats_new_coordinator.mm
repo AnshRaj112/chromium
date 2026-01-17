@@ -12,25 +12,19 @@
 #import "components/feature_engagement/public/event_constants.h"
 #import "components/feature_engagement/public/tracker.h"
 #import "ios/chrome/browser/feature_engagement/model/tracker_factory.h"
-#import "ios/chrome/browser/promos_manager/ui_bundled/promos_manager_ui_handler.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
+#import "ios/chrome/browser/promos_manager/coordinator/promos_manager_ui_handler.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/lens_commands.h"
 #import "ios/chrome/browser/shared/public/commands/promos_manager_commands.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/shared/public/commands/whats_new_commands.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller.h"
 #import "ios/chrome/browser/url_loading/model/url_loading_browser_agent.h"
 #import "ios/chrome/browser/whats_new/coordinator/whats_new_detail_coordinator.h"
 #import "ios/chrome/browser/whats_new/coordinator/whats_new_mediator.h"
+#import "ios/chrome/browser/whats_new/public/constants.h"
 #import "ios/chrome/browser/whats_new/ui/whats_new_table_view_controller.h"
-
-namespace {
-
-NSString* const kTableViewNavigationDismissButtonId =
-    @"kWhatsNewTableViewNavigationDismissButtonId";
-
-}  // namespace
 
 @interface WhatsNewCoordinator () <UINavigationControllerDelegate,
                                    UIAdaptivePresentationControllerDelegate>
@@ -46,8 +40,8 @@ NSString* const kTableViewNavigationDismissButtonId =
     WhatsNewDetailCoordinator* whatsNewDetailCoordinator;
 // The starting time of What's New.
 @property(nonatomic, assign) base::TimeTicks whatsNewStartTime;
-// Application command handler.
-@property(nonatomic, readonly) id<ApplicationCommands> applicationHandler;
+// Scene commands handler.
+@property(nonatomic, readonly) id<SceneCommands> sceneHandler;
 // Dispatcher for handling Lens promo actions.
 @property(nonatomic, readonly) id<LensCommands> lensHandler;
 // Whats New commands handler.
@@ -81,7 +75,7 @@ NSString* const kTableViewNavigationDismissButtonId =
   self.tableViewController.delegate = self;
   self.tableViewController.actionHandler = self.mediator;
   self.mediator.consumer = self.tableViewController;
-  self.mediator.applicationHandler = self.applicationHandler;
+  self.mediator.sceneHandler = self.sceneHandler;
   self.mediator.whatsNewHandler = self.whatsNewHandler;
   self.mediator.lensHandler = self.lensHandler;
   self.mediator.settingsHandler = self.settingsHandler;
@@ -174,9 +168,9 @@ NSString* const kTableViewNavigationDismissButtonId =
 
 #pragma mark Private
 
-- (id<ApplicationCommands>)applicationHandler {
-  id<ApplicationCommands> handler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+- (id<SceneCommands>)sceneHandler {
+  id<SceneCommands> handler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
   DCHECK(handler);
 
   return handler;
@@ -208,10 +202,11 @@ NSString* const kTableViewNavigationDismissButtonId =
 
 - (UIBarButtonItem*)dismissButton {
   UIBarButtonItem* button = [[UIBarButtonItem alloc]
-      initWithBarButtonSystemItem:UIBarButtonSystemItemDone
+      initWithBarButtonSystemItem:UIBarButtonSystemItemClose
                            target:self
                            action:@selector(dismiss)];
-  [button setAccessibilityIdentifier:kTableViewNavigationDismissButtonId];
+  [button
+      setAccessibilityIdentifier:kWhatsNewTableViewNavigationDismissButtonId];
   return button;
 }
 

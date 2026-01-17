@@ -17,7 +17,8 @@ class StructTest: XCTestCase {
     badFoo.value = false
     badFoo.description = Foolean.GetDescriptionForValue(true)
 
-    // Test passing object defined in C++ and initialized in Swift to top level C++ functions.
+    // Test passing object defined in C++ and initialized in Swift to top level
+    // C++ functions.
     XCTAssertTrue(IsFooleanValid(goodFoo))
     XCTAssertFalse(IsFooleanValid(badFoo))
   }

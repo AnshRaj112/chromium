@@ -10,6 +10,7 @@
 #include <compare>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "base/check.h"
 #include "base/component_export.h"
@@ -96,7 +97,7 @@ class COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT) SharedImageFormat final {
   // Returns whether this format needs to be externally sampled. Note that
   // external sampling is supported only on Ozone.
   bool PrefersExternalSampler() const {
-#if BUILDFLAG(IS_OZONE)
+#if BUILDFLAG(IS_OZONE) || BUILDFLAG(IS_ANDROID)
     return is_multi_plane()
                ? format_.multiplanar_format.prefers_external_sampler
                : false;
@@ -105,7 +106,7 @@ class COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT) SharedImageFormat final {
 #endif
   }
 
-#if BUILDFLAG(IS_OZONE)
+#if BUILDFLAG(IS_OZONE) || BUILDFLAG(IS_ANDROID)
   // Sets this format (which must be multiplanar) as needing external sampling.
   void SetPrefersExternalSampler() {
     CHECK(is_multi_plane());
@@ -123,7 +124,7 @@ class COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT) SharedImageFormat final {
   // using this method in case it is determined that the it's backed by shared
   // memory. https://issues.chromium.org/339546249.
   void ClearPrefersExternalSampler() {
-#if BUILDFLAG(IS_OZONE)
+#if BUILDFLAG(IS_OZONE) || BUILDFLAG(IS_ANDROID)
     CHECK(is_multi_plane() &&
           format_.multiplanar_format.prefers_external_sampler);
     format_.multiplanar_format.prefers_external_sampler = false;
@@ -135,6 +136,9 @@ class COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT) SharedImageFormat final {
 
   // Returns true is `plane_index` is valid.
   bool IsValidPlaneIndex(int plane_index) const;
+
+  // Returns the subsampling width and height scale for the format.
+  std::pair<int, int> GetSubsamplingScale() const;
 
   // Returns the size for a plane given `plane_index`.
   gfx::Size GetPlaneSize(int plane_index, const gfx::Size& size) const;
@@ -163,6 +167,10 @@ class COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT) SharedImageFormat final {
   // Returns the bit depth for multiplanar format based on the channel format.
   int MultiplanarBitDepth() const;
 
+  // Returns the number of bytes per channel for multiplanar format based on the
+  // channel format.
+  uint64_t MultiplanarStorageBytesPerChannel() const;
+
   // Returns a std::string for the format.
   std::string ToString() const;
 
@@ -175,8 +183,9 @@ class COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT) SharedImageFormat final {
   // Returns true if the format is ETC1 compressed.
   bool IsCompressed() const;
 
-  // NOTE: Supported only for true single-plane formats.
-  int BitsPerPixel() const;
+  // NOTE: Supported only for true single-plane formats that have a fixed number
+  // of bytes per pixel, eg. not ETC1.
+  int BytesPerPixel() const;
 
   // Returns a SharedImageFormat that matches Skia's kN32_SkColorType.  Use this
   // function to get optimal 8 bit format for the Skia CPU backend.
@@ -199,7 +208,7 @@ class COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT) SharedImageFormat final {
       PlaneConfig plane_config;
       Subsampling subsampling;
       ChannelFormat channel_format;
-#if BUILDFLAG(IS_OZONE)
+#if BUILDFLAG(IS_OZONE) || BUILDFLAG(IS_ANDROID)
       // NOTE: This field is intentionally not used as part of defining equality
       // between two MultiplanarFormat instances as clients should not generally
       // need to care. Clients who need to distinguish for a particular

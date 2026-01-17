@@ -11,7 +11,6 @@
 
 #include "base/base_switches.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/dcheck_is_on.h"
 #include "base/feature_list.h"
@@ -245,9 +244,7 @@ bool IsSimilarToIntABNF(const std::string& header_value) {
   return true;
 }
 
-// User agent minor version matches "0.X.0" which depends on reduced UA
-// through kReduceUserAgentMinorVersion experiment, currently the reduced minor
-// version is "0.0.0".
+// Checks that the user agent minor version matches "0.0.0"
 void CheckUserAgentMinorVersion(const std::string& user_agent_value,
                                 const bool expected_ua_reduced) {
   // A regular expression that matches Chrome/{major_version}.{minor_version}
@@ -256,19 +253,13 @@ void CheckUserAgentMinorVersion(const std::string& user_agent_value,
       "Chrome/[0-9]+\\.([0-9]+\\.[0-9]+\\.[0-9]+)";
   // The minor version in the reduced UA string is always "0.0.0".
   static constexpr char kReducedMinorVersion[] = "0.0.0";
-  // The minor version in the ReduceUserAgentMinorVersion experiment is always
-  // "0.X.0", where X is the frozen build version.
-  const std::string kReduceUserAgentMinorVersion =
-      "0." +
-      std::string(blink::features::kUserAgentFrozenBuildVersion.Get().data()) +
-      ".0";
 
   std::string minor_version;
   EXPECT_TRUE(re2::RE2::PartialMatch(user_agent_value, kChromeVersionRegex,
                                      &minor_version));
 
   if (expected_ua_reduced) {
-    EXPECT_EQ(minor_version, kReduceUserAgentMinorVersion);
+    EXPECT_EQ(minor_version, kReducedMinorVersion);
   } else {
     EXPECT_NE(minor_version, kReducedMinorVersion);
   }
@@ -1205,7 +1196,7 @@ class ClientHintsBrowserTest : public policy::PolicyTest {
 
     for (const auto& elem : network::GetClientHintToNameMap()) {
       const auto& header = elem.second;
-      if (base::Contains(request.headers, header)) {
+      if (request.headers.contains(header)) {
         base::AutoLock lock(count_headers_lock_);
         // The user agent hint is special:
         if (header == "sec-ch-ua") {
@@ -1241,23 +1232,7 @@ class ClientHintsBrowserTest : public policy::PolicyTest {
         continue;
       }
 
-      // Skip over the `Sec-CH-UA-Reduced` client hint because it is only added
-      // in the presence of a valid "UserAgentReduction" Origin Trial token.
-      // `Sec-CH-UA-Reduced` is tested via UaReducedOriginTrialBrowserTest
-      // below.
-      if (header == "sec-ch-ua-reduced") {
-        continue;
-      }
-
-      // TODO(crbug.com/40211003): Skip over the `Sec-CH-UA-Full` client hint
-      // because it is only added in the presence of a valid
-      // "UserAgentDeprecation" Origin Trial token. Need to add `Sec-CH-UA-Full`
-      // corresponding tests.
-      if (header == "sec-ch-ua-full") {
-        continue;
-      }
-
-      EXPECT_EQ(expect_client_hints, base::Contains(request.headers, header));
+      EXPECT_EQ(expect_client_hints, request.headers.contains(header));
     }
   }
 
@@ -1843,9 +1818,10 @@ IN_PROC_BROWSER_TEST_F(ClientHintsBrowserTest, RestartBrowser) {
             expected_full_version_list);
 
   // Restart the browser, create a new browser to mock the restart process.
-  Browser* new_browser = CreateBrowser(browser()->profile());
+  BrowserWindowInterface* const new_browser =
+      CreateBrowser(browser()->profile());
   CloseBrowserSynchronously(browser());
-  SelectFirstBrowser();
+  SetBrowser(new_browser);
   ASSERT_EQ(browser(), new_browser);
 
   // First request with new browser should expect the high-entropy client hints
@@ -2322,7 +2298,7 @@ IN_PROC_BROWSER_TEST_F(ClientHintsBrowserTest,
                        DisregardPersistenceRequestIframe_CrossOrigin) {
   const GURL gurl = accept_ch_with_iframe_url();
 
-  intercept_iframe_resource_ = gurl.path();
+  intercept_iframe_resource_ = gurl.GetPath();
 
   base::HistogramTester histogram_tester;
   ContentSettingsForOneType host_settings =
@@ -2360,7 +2336,7 @@ IN_PROC_BROWSER_TEST_P(ClientHintsBrowserTestForMetaTagTypes,
       intercept_to_meta_delegate_iframe_ = true;
       break;
   }
-  intercept_iframe_resource_ = gurl.path();
+  intercept_iframe_resource_ = gurl.GetPath();
 
   base::HistogramTester histogram_tester;
   ContentSettingsForOneType host_settings =
@@ -4067,16 +4043,15 @@ class ClientHintsBrowserTestWithEmulatedMedia
   ~ClientHintsBrowserTestWithEmulatedMedia() override = default;
 
   void MonitorResourceRequest(const net::test_server::HttpRequest& request) {
-    if (base::Contains(request.headers, "sec-ch-prefers-color-scheme")) {
+    if (request.headers.contains("sec-ch-prefers-color-scheme")) {
       prefers_color_scheme_observed_ =
           request.headers.at("sec-ch-prefers-color-scheme");
     }
-    if (base::Contains(request.headers, "sec-ch-prefers-reduced-motion")) {
+    if (request.headers.contains("sec-ch-prefers-reduced-motion")) {
       prefers_reduced_motion_observed_ =
           request.headers.at("sec-ch-prefers-reduced-motion");
     }
-    if (base::Contains(request.headers,
-                       "sec-ch-prefers-reduced-transparency")) {
+    if (request.headers.contains("sec-ch-prefers-reduced-transparency")) {
       prefers_reduced_transparency_observed_ =
           request.headers.at("sec-ch-prefers-reduced-transparency");
     }
@@ -4497,9 +4472,9 @@ class SameOriginUaReductionBrowserTest : public UaReductionBrowserTest {
       return false;
 
     std::string path = "chrome/test/data/client_hints";
-    path.append(static_cast<std::string>(params->url_request.url.path_piece()));
+    path.append(static_cast<std::string>(params->url_request.url.path()));
 
-    if (params->url_request.url.path() == "/basic.html") {
+    if (params->url_request.url.GetPath() == "/basic.html") {
       URLLoaderInterceptor::WriteResponse(path, params->client.get());
       return true;
     }
@@ -4556,7 +4531,7 @@ IN_PROC_BROWSER_TEST_F(SameOriginUaReductionBrowserTest,
   CheckSecClientHintUaCount();
 
   // Make sure the last intercepted URL was the request for the embedded iframe.
-  EXPECT_EQ(last_request_url().path(), "/simple.html");
+  EXPECT_EQ(last_request_url().GetPath(), "/simple.html");
 }
 
 IN_PROC_BROWSER_TEST_F(SameOriginUaReductionBrowserTest, SubresourceRequest) {
@@ -4569,7 +4544,7 @@ IN_PROC_BROWSER_TEST_F(SameOriginUaReductionBrowserTest, SubresourceRequest) {
 
   // Make sure the last intercepted URL was the subresource request for the
   // embedded stylesheet.
-  EXPECT_EQ(last_request_url().path(), "/style.css");
+  EXPECT_EQ(last_request_url().GetPath(), "/style.css");
 }
 
 IN_PROC_BROWSER_TEST_F(SameOriginUaReductionBrowserTest, UserAgentOverride) {
@@ -4691,9 +4666,9 @@ class ThirdPartyUaReductionBrowserTest : public UaReductionBrowserTest {
         GURL(kFirstPartyOriginUrl)) {
       return false;
     }
-    if (params->url_request.url.path() !=
+    if (params->url_request.url.GetPath() !=
             base::StrCat({"/accept_ch_ua_cross_origin_iframe_request.html"}) &&
-        params->url_request.url.path() !=
+        params->url_request.url.GetPath() !=
             base::StrCat(
                 {"/accept_ch_ua_cross_origin_subresource_request.html"})) {
       return false;
@@ -4703,12 +4678,12 @@ class ThirdPartyUaReductionBrowserTest : public UaReductionBrowserTest {
     std::string headers =
         "HTTP/1.1 200 OK\nContent-Type: text/html; charset=utf-8\n";
     std::string body = "<html><head>";
-    if (params->url_request.url.path() ==
+    if (params->url_request.url.GetPath() ==
         base::StrCat({"/accept_ch_ua_cross_origin_subresource_request.html"})) {
       base::StrAppend(&body, {BuildSubresourceHTML()});
     }
     base::StrAppend(&body, {"</head><body>"});
-    if (params->url_request.url.path() ==
+    if (params->url_request.url.GetPath() ==
         base::StrCat({"/accept_ch_ua_cross_origin_iframe_request.html"})) {
       base::StrAppend(&body, {BuildIframeHTML()});
     }
@@ -4772,7 +4747,7 @@ IN_PROC_BROWSER_TEST_F(ThirdPartyUaReductionBrowserTest,
 
   // Make sure the last intercepted URL was the request for the embedded
   // iframe.
-  EXPECT_EQ(GetLastRequestedURL()->path(), "/simple.html");
+  EXPECT_EQ(GetLastRequestedURL()->GetPath(), "/simple.html");
 }
 
 // Tests that headers are not sent to a third-party iframe after script is
@@ -4797,7 +4772,7 @@ IN_PROC_BROWSER_TEST_F(ThirdPartyUaReductionBrowserTest, ScriptDisabled) {
 
   // Make sure the last intercepted URL was the request for the embedded
   // iframe.
-  EXPECT_EQ(GetLastRequestedURL()->path(), "/simple.html");
+  EXPECT_EQ(GetLastRequestedURL()->GetPath(), "/simple.html");
 }
 
 IN_PROC_BROWSER_TEST_F(ThirdPartyUaReductionBrowserTest,
@@ -4810,7 +4785,7 @@ IN_PROC_BROWSER_TEST_F(ThirdPartyUaReductionBrowserTest,
 
   // Make sure the last intercepted URL was the request for the embedded
   // iframe.
-  EXPECT_EQ(GetLastRequestedURL()->path(), "/style.css");
+  EXPECT_EQ(GetLastRequestedURL()->GetPath(), "/style.css");
 }
 
 IN_PROC_BROWSER_TEST_F(ThirdPartyUaReductionBrowserTest,
@@ -4825,7 +4800,7 @@ IN_PROC_BROWSER_TEST_F(ThirdPartyUaReductionBrowserTest,
 
   // Make sure the last intercepted URL was the request for the embedded
   // iframe.
-  EXPECT_EQ(GetLastRequestedURL()->path(), "/simple.html");
+  EXPECT_EQ(GetLastRequestedURL()->GetPath(), "/simple.html");
 }
 
 IN_PROC_BROWSER_TEST_F(ThirdPartyUaReductionBrowserTest,
@@ -4840,7 +4815,7 @@ IN_PROC_BROWSER_TEST_F(ThirdPartyUaReductionBrowserTest,
 
   // Make sure the last intercepted URL was the request for the embedded
   // iframe.
-  EXPECT_EQ(GetLastRequestedURL()->path(), "/style.css");
+  EXPECT_EQ(GetLastRequestedURL()->GetPath(), "/style.css");
 }
 
 // CrOS multi-profiles implementation is too different for these tests.
@@ -5008,7 +4983,7 @@ class RedirectUaReductionBrowserTest : public InProcessBrowserTest {
 
     std::string resource_path = "chrome/test/data/client_hints";
     resource_path.append(
-        static_cast<std::string>(params->url_request.url.path_piece()));
+        static_cast<std::string>(params->url_request.url.path()));
     URLLoaderInterceptor::WriteResponse(resource_path, params->client.get());
     return true;
   }

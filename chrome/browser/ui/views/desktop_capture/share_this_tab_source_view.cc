@@ -9,6 +9,7 @@
 #include "base/task/thread_pool.h"
 #include "chrome/browser/favicon/favicon_utils.h"
 #include "chrome/browser/media/webrtc/desktop_media_picker_utils.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_widget_host_view.h"
@@ -52,9 +53,11 @@ void HandleCapturedBitmap(
         reply,
     std::optional<uint32_t> last_hash,
     gfx::Size thumbnail_size,
-    const SkBitmap& bitmap) {
+    const content::CopyFromSurfaceResult& result) {
   CHECK(!thumbnail_size.IsEmpty());
 
+  // TODO(crbug.com/466199824): Update callsite to handle error case.
+  const SkBitmap& bitmap = result.has_value() ? result->bitmap : SkBitmap();
   std::optional<gfx::ImageSkia> image;
 
   // Only scale and update if the frame appears to be new.
@@ -153,6 +156,10 @@ void ShareThisTabSourceView::Refresh() {
     return;  // No further refreshes scheduled.
   }
 
+  if (!web_contents_) {
+    return;
+  }
+
   content::RenderFrameHost* const host = web_contents_->GetPrimaryMainFrame();
   if (!host) {
     return;
@@ -167,7 +174,7 @@ void ShareThisTabSourceView::Refresh() {
                               weak_factory_.GetWeakPtr());
 
   view->CopyFromSurface(
-      gfx::Rect(), gfx::Size(),
+      gfx::Rect(), gfx::Size(), base::TimeDelta(),
       base::BindPostTask(thumbnail_task_runner_,
                          base::BindOnce(&HandleCapturedBitmap, std::move(reply),
                                         last_hash_, kPreviewRect.size())));

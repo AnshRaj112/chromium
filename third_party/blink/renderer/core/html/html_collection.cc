@@ -37,6 +37,7 @@
 #include "third_party/blink/renderer/core/html/forms/html_option_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_options_collection.h"
 #include "third_party/blink/renderer/core/html/html_element.h"
+#include "third_party/blink/renderer/core/html/html_menu_item_element.h"
 #include "third_party/blink/renderer/core/html/html_object_element.h"
 #include "third_party/blink/renderer/core/html/html_tag_collection.h"
 #include "third_party/blink/renderer/core/html/window_name_collection.h"
@@ -239,8 +240,10 @@ static inline bool IsMatchingHTMLElement(const HTMLCollection& html_collection,
     case kSelectOptions:
       return To<HTMLOptionsCollection>(html_collection).ElementMatches(element);
     case kSelectedOptions: {
-      auto* option_element = DynamicTo<HTMLOptionElement>(element);
-      return option_element && option_element->Selected();
+      if (auto* option = DynamicTo<HTMLOptionElement>(element)) {
+        return option->Selected() && option->OwnerSelectElement() == html_collection.ownerNode();
+      }
+      return false;
     }
     case kDataListOptions:
       return To<HTMLDataListOptionsCollection>(html_collection)
@@ -274,7 +277,11 @@ static inline bool IsMatchingHTMLElement(const HTMLCollection& html_collection,
     case kCommandInvokers:
       if (auto* invoker =
               DynamicTo<HTMLButtonElement>(const_cast<HTMLElement&>(element))) {
-        return invoker->commandForElement() != nullptr;
+        return invoker->commandForElement();
+      }
+      if (auto* invoker = DynamicTo<HTMLMenuItemElement>(
+              const_cast<HTMLElement&>(element))) {
+        return invoker->commandForElement();
       }
       return false;
     case kClassCollectionType:

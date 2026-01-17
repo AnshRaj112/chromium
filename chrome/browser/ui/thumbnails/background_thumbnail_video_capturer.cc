@@ -17,6 +17,8 @@
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "media/capture/mojom/video_capture_buffer.mojom.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
+#include "third_party/perfetto/include/perfetto/tracing/track_event_args.h"
 #include "third_party/skia/include/core/SkColorSpace.h"
 #include "ui/gfx/geometry/skia_conversions.h"
 
@@ -59,8 +61,8 @@ void BackgroundThumbnailVideoCapturer::Start(
     // safe since this is only invoked from the UI thread.
     static uint64_t capture_num GUARDED_BY_CONTEXT(sequence_checker_) = 0;
     cur_capture_num_ = ++capture_num;
-    TRACE_EVENT_NESTABLE_ASYNC_BEGIN0("ui", "Tab.Preview.VideoCapture",
-                                      TRACE_ID_LOCAL(cur_capture_num_));
+    TRACE_EVENT_BEGIN("ui", "Tab.Preview.VideoCapture",
+                      perfetto::Track(cur_capture_num_));
   }
 
   start_time_ = base::TimeTicks::Now();
@@ -87,8 +89,7 @@ void BackgroundThumbnailVideoCapturer::Stop() {
   video_capturer_->Stop();
   video_capturer_.reset();
 
-  TRACE_EVENT_NESTABLE_ASYNC_END0("ui", "Tab.Preview.VideoCapture",
-                                  TRACE_ID_LOCAL(cur_capture_num_));
+  TRACE_EVENT_END("ui", perfetto::Track(cur_capture_num_));
   start_time_ = base::TimeTicks();
   cur_capture_num_ = 0;
 }
@@ -135,8 +136,8 @@ void BackgroundThumbnailVideoCapturer::OnFrameCaptured(
   ++num_received_frames_;
 
   uint64_t frame_id = base::trace_event::GetNextGlobalTraceId();
-  TRACE_EVENT_WITH_FLOW0("ui", "Tab.Preview.ProcessVideoCaptureFrame", frame_id,
-                         TRACE_EVENT_FLAG_FLOW_OUT);
+  TRACE_EVENT("ui", "Tab.Preview.ProcessVideoCaptureFrame",
+              perfetto::Flow::ProcessScoped(frame_id));
 
   // The SkBitmap's pixels will be marked as immutable, but the installPixels()
   // API requires a non-const pointer. So, cast away the const.
@@ -190,8 +191,8 @@ void BackgroundThumbnailVideoCapturer::OnFrameCaptured(
   got_frame_callback_.Run(cropped_frame, frame_id);
 }
 
-void BackgroundThumbnailVideoCapturer::OnNewSubCaptureTargetVersion(
-    uint32_t sub_capture_target_version) {}
+void BackgroundThumbnailVideoCapturer::OnNewCaptureVersion(
+    const media::CaptureVersion& capture_version) {}
 
 void BackgroundThumbnailVideoCapturer::OnFrameWithEmptyRegionCapture() {}
 

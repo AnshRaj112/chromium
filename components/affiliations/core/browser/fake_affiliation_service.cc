@@ -50,7 +50,7 @@ void FakeAffiliationService::GetGroupingInfo(std::vector<FacetURI> facet_uris,
   std::move(callback).Run(std::move(result));
 }
 void FakeAffiliationService::GetPSLExtensions(
-    base::OnceCallback<void(std::vector<std::string>)> callback) const {
+    base::OnceCallback<void(std::vector<std::string>)> callback) {
   std::move(callback).Run({});
 }
 void FakeAffiliationService::UpdateAffiliationsAndBranding(
@@ -60,5 +60,9 @@ void FakeAffiliationService::UpdateAffiliationsAndBranding(
 }
 void FakeAffiliationService::RegisterSource(
     std::unique_ptr<AffiliationSource> source) {}
+
+base::WeakPtr<AffiliationService> FakeAffiliationService::AsWeakPtr() {
+  return weak_ptr_factory_.GetWeakPtr();
+}
 
 }  // namespace affiliations

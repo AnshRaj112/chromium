@@ -9,7 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/i18n/number_formatting.h"
 #include "base/notimplemented.h"
@@ -100,7 +99,7 @@ void WiredDisplayMediaRouteProvider::CreateRoute(
     int32_t frame_tree_node_id,
     base::TimeDelta timeout,
     CreateRouteCallback callback) {
-  DCHECK(!base::Contains(presentations_, presentation_id));
+  DCHECK(!presentations_.contains(presentation_id));
   std::optional<Display> display = GetDisplayBySinkId(sink_id);
   if (!display) {
     std::move(callback).Run(std::nullopt, nullptr,
@@ -258,11 +257,11 @@ void WiredDisplayMediaRouteProvider::OnDisplayMetricsChanged(
 }
 
 std::vector<Display> WiredDisplayMediaRouteProvider::GetAllDisplays() const {
-  return display::Screen::GetScreen()->GetAllDisplays();
+  return display::Screen::Get()->GetAllDisplays();
 }
 
 Display WiredDisplayMediaRouteProvider::GetPrimaryDisplay() const {
-  return display::Screen::GetScreen()->GetPrimaryDisplay();
+  return display::Screen::Get()->GetPrimaryDisplay();
 }
 
 WiredDisplayMediaRouteProvider::Presentation::Presentation(

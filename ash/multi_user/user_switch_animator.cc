@@ -7,15 +7,14 @@
 #include <algorithm>
 #include <memory>
 
-#include "ash/multi_user/multi_user_window_manager_impl.h"
-#include "ash/public/cpp/multi_user_window_manager_observer.h"
+#include "ash/multi_user/multi_user_window_manager.h"
+#include "ash/multi_user/multi_user_window_manager_observer.h"
 #include "ash/shell.h"
 #include "ash/wallpaper/wallpaper_controller_impl.h"
 #include "ash/wm/desks/desks_controller.h"
 #include "ash/wm/mru_window_tracker.h"
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/window_positioner.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "ui/aura/client/aura_constants.h"
@@ -90,7 +89,7 @@ void PutMruWindowLast(
 
 }  // namespace
 
-UserSwitchAnimator::UserSwitchAnimator(MultiUserWindowManagerImpl* owner,
+UserSwitchAnimator::UserSwitchAnimator(MultiUserWindowManager* owner,
                                        const AccountId& new_account_id,
                                        base::TimeDelta animation_speed)
     : owner_(owner),
@@ -129,7 +128,7 @@ bool UserSwitchAnimator::CoversScreen(aura::Window* window) {
   }
   gfx::Rect bounds = window->GetBoundsInScreen();
   gfx::Rect work_area =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(window).work_area();
+      display::Screen::Get()->GetDisplayNearestWindow(window).work_area();
   bounds.Intersect(work_area);
   return work_area == bounds;
 }
@@ -237,7 +236,7 @@ void UserSwitchAnimator::TransitionWindows(AnimationStep animation_step) {
           // different than that of the for_show_account_id) should return to
           // their
           // original owners' desktops.
-          MultiUserWindowManagerImpl::WindowToEntryMap::const_iterator itr =
+          MultiUserWindowManager::WindowToEntryMap::const_iterator itr =
               owner_->window_to_entry().find(window);
           DCHECK(itr != owner_->window_to_entry().end());
           if (show_for_account_id != itr->second->owner() &&
@@ -367,7 +366,7 @@ void UserSwitchAnimator::BuildUserToWindowsListMap() {
   auto& window_to_entry_map = owner_->window_to_entry();
   for (auto& window_entry_pair : window_to_entry_map) {
     aura::Window* parent_window = window_entry_pair.first->parent();
-    if (!base::Contains(parent_windows, parent_window)) {
+    if (!parent_windows.contains(parent_window)) {
       parent_windows.insert(parent_window);
       for (aura::Window* child_window : parent_window->children()) {
         auto itr = window_to_entry_map.find(child_window);

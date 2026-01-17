@@ -2,18 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "extensions/browser/api/storage/storage_frontend.h"
 
 #include <memory>
 #include <utility>
 
 #include "base/barrier_closure.h"
-#include "base/containers/contains.h"
 #include "base/debug/alias.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
@@ -526,7 +520,7 @@ ValueStoreCache* StorageFrontend::GetValueStoreCache(
 
 bool StorageFrontend::IsStorageEnabled(
     settings_namespace::Namespace settings_namespace) const {
-  return base::Contains(caches_, settings_namespace);
+  return caches_.contains(settings_namespace);
 }
 
 void StorageFrontend::RunWithStorage(

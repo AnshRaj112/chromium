@@ -13,7 +13,7 @@
 #include "base/strings/cstring_view.h"
 #include "base/time/time.h"
 #include "content/common/content_export.h"
-#include "content/public/browser/btm_redirect_info.h"
+#include "content/public/browser/btm_redirect.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/page.h"
 #include "content/public/browser/render_frame_host.h"
@@ -122,9 +122,7 @@ std::ostream& operator<<(std::ostream& os, TimestampRange type);
 
 // Values for a site in the `bounces` table.
 struct StateValue {
-  TimestampRange site_storage_times;
   TimestampRange user_activation_times;
-  TimestampRange stateful_bounce_times;
   TimestampRange bounce_times;
   TimestampRange web_authn_assertion_times;
 };
@@ -137,18 +135,10 @@ struct PopupsStateValue {
   bool is_authentication_interaction;
 };
 
-struct PopupWithTime {
-  std::string opener_site;
-  std::string popup_site;
-  base::Time last_popup_time;
-};
-
 inline bool operator==(const StateValue& lhs, const StateValue& rhs) {
-  return std::tie(lhs.site_storage_times, lhs.user_activation_times,
-                  lhs.stateful_bounce_times, lhs.bounce_times,
+  return std::tie(lhs.user_activation_times, lhs.bounce_times,
                   lhs.web_authn_assertion_times) ==
-         std::tie(rhs.site_storage_times, rhs.user_activation_times,
-                  rhs.stateful_bounce_times, rhs.bounce_times,
+         std::tie(rhs.user_activation_times, rhs.bounce_times,
                   rhs.web_authn_assertion_times);
 }
 
@@ -233,7 +223,6 @@ enum class BtmInteractionType {
 };
 
 enum class BtmRecordedEvent {
-  kStorage,
   kUserActivation,
   kWebAuthnAssertion,
 };

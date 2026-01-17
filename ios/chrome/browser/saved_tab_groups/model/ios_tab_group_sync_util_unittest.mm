@@ -12,6 +12,8 @@
 #import "ios/chrome/browser/data_sharing/model/data_sharing_service_factory.h"
 #import "ios/chrome/browser/saved_tab_groups/model/tab_group_local_update_observer.h"
 #import "ios/chrome/browser/saved_tab_groups/model/tab_group_sync_service_factory.h"
+#import "ios/chrome/browser/sessions/model/session_restoration_service_factory.h"
+#import "ios/chrome/browser/sessions/model/test_session_restoration_service.h"
 #import "ios/chrome/browser/share_kit/model/test_share_kit_service.h"
 #import "ios/chrome/browser/shared/model/browser/browser_list.h"
 #import "ios/chrome/browser/shared/model/browser/browser_list_factory.h"
@@ -22,6 +24,7 @@
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_opener.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/snapshots/model/snapshot_browser_agent.h"
+#import "ios/chrome/browser/snapshots/model/snapshot_source_tab_helper.h"
 #import "ios/chrome/browser/snapshots/model/snapshot_tab_helper.h"
 #import "ios/web/public/navigation/navigation_item.h"
 #import "ios/web/public/test/fakes/fake_navigation_context.h"
@@ -40,8 +43,7 @@ namespace utils {
 namespace {
 
 // Creates a MockTabGroupSyncService.
-std::unique_ptr<KeyedService> CreateMockSyncService(
-    web::BrowserState* context) {
+std::unique_ptr<KeyedService> CreateMockSyncService(ProfileIOS* profile) {
   return std::make_unique<::testing::NiceMock<MockTabGroupSyncService>>();
 }
 
@@ -60,6 +62,9 @@ class TabGroupSyncUtilTest : public PlatformTest {
     test_profile_builder.AddTestingFactory(
         TabGroupSyncServiceFactory::GetInstance(),
         base::BindRepeating(&CreateMockSyncService));
+    test_profile_builder.AddTestingFactory(
+        SessionRestorationServiceFactory::GetInstance(),
+        TestSessionRestorationService::GetTestingFactory());
     profile_ = std::move(test_profile_builder).Build();
 
     mock_service_ = static_cast<MockTabGroupSyncService*>(
@@ -70,7 +75,8 @@ class TabGroupSyncUtilTest : public PlatformTest {
 
     browser_list_ = BrowserListFactory::GetForProfile(profile_.get());
     local_observer_ = std::make_unique<TabGroupLocalUpdateObserver>(
-        browser_list_.get(), mock_service_);
+        browser_list_.get(), mock_service_,
+        SessionRestorationServiceFactory::GetForProfile(profile_.get()));
 
     browser_list_->AddBrowser(browser_.get());
     browser_list_->AddBrowser(other_browser_.get());
@@ -92,6 +98,7 @@ class TabGroupSyncUtilTest : public PlatformTest {
     auto fake_web_state = std::make_unique<web::FakeWebState>();
     web::FakeWebState* inserted_web_state = fake_web_state.get();
     SnapshotTabHelper::CreateForWebState(inserted_web_state);
+    SnapshotSourceTabHelper::CreateForWebState(inserted_web_state);
     browser->GetWebStateList()->InsertWebState(
         std::move(fake_web_state),
         WebStateList::InsertionParams::Automatic().Activate());
@@ -484,7 +491,7 @@ TEST_F(TabGroupSyncUtilTest, IsTabGroupSharedWithShared) {
 
   SavedTabGroup saved_group(u"title", tab_groups::TabGroupColorId::kGrey,
                             /*urls=*/{}, /*position=*/std::nullopt);
-  saved_group.SetCollaborationId(CollaborationId("collaboration"));
+  saved_group.SetCollaborationId(syncer::CollaborationId("collaboration"));
 
   EXPECT_CALL(*mock_service_, GetGroup(tab_group_id))
       .WillOnce(testing::Return(saved_group));
@@ -519,7 +526,7 @@ TEST_F(TabGroupSyncUtilTest, GetTabGroupCollabIDWithShared) {
 
   SavedTabGroup saved_group(u"title", tab_groups::TabGroupColorId::kGrey,
                             /*urls=*/{}, /*position=*/std::nullopt);
-  saved_group.SetCollaborationId(CollaborationId("collaboration"));
+  saved_group.SetCollaborationId(syncer::CollaborationId("collaboration"));
 
   tab_groups::EitherGroupID either_id = tab_group_id;
   EXPECT_CALL(*mock_service_, GetGroup(either_id))
@@ -562,7 +569,7 @@ TEST_F(TabGroupSyncUtilTest, GetUserRoleForGroupShared) {
 
   SavedTabGroup saved_group(u"title", tab_groups::TabGroupColorId::kGrey,
                             /*urls=*/{}, /*position=*/std::nullopt);
-  saved_group.SetCollaborationId(CollaborationId("collaboration"));
+  saved_group.SetCollaborationId(syncer::CollaborationId("collaboration"));
 
   tab_groups::EitherGroupID either_id = tab_group_id;
   EXPECT_CALL(*mock_service_, GetGroup(either_id))

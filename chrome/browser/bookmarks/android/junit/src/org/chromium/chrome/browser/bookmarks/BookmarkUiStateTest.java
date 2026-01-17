@@ -11,6 +11,8 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeBookmarksUrl;
+
 import android.net.Uri;
 
 import org.junit.Before;
@@ -33,11 +35,13 @@ public class BookmarkUiStateTest {
 
     @Mock public BookmarkModel mBookmarkModel;
 
+    private BookmarkId mRoot;
+
     @Before
     public void before() {
         doReturn(true).when(mBookmarkModel).doesBookmarkExist(any());
-        BookmarkId root = new BookmarkId(0, BookmarkType.NORMAL);
-        doReturn(root).when(mBookmarkModel).getDefaultFolderViewLocation();
+        mRoot = new BookmarkId(0, BookmarkType.NORMAL);
+        doReturn(mRoot).when(mBookmarkModel).getDefaultFolderViewLocation();
     }
 
     @Test
@@ -62,13 +66,8 @@ public class BookmarkUiStateTest {
 
     @Test
     public void testCreateFolderState() {
-        BookmarkUiState rootFolderState =
-                BookmarkUiState.createFolderState(
-                        mBookmarkModel.getDefaultFolderViewLocation(), mBookmarkModel);
-        assertEquals(
-                rootFolderState,
-                BookmarkUiState.createFolderState(
-                        mBookmarkModel.getDefaultFolderViewLocation(), mBookmarkModel));
+        BookmarkUiState rootFolderState = BookmarkUiState.createFolderState(mRoot, mBookmarkModel);
+        assertEquals(rootFolderState, BookmarkUiState.createFolderState(mRoot, mBookmarkModel));
 
         BookmarkId validFolderId = new BookmarkId(1, BookmarkType.NORMAL);
         BookmarkUiState validFolderState =
@@ -81,18 +80,12 @@ public class BookmarkUiStateTest {
     @Test
     public void testCreateStateFromUrl() {
         BookmarkUiState rootFolderState =
-                BookmarkUiState.createStateFromUrl(UrlConstants.BOOKMARKS_URL, mBookmarkModel);
-        assertEquals(
-                rootFolderState,
-                BookmarkUiState.createFolderState(
-                        mBookmarkModel.getDefaultFolderViewLocation(), mBookmarkModel));
+                BookmarkUiState.createStateFromUrl(getOriginalNativeBookmarksUrl(), mBookmarkModel);
+        assertEquals(rootFolderState, BookmarkUiState.createFolderState(mRoot, mBookmarkModel));
 
         BookmarkUiState invalidFolderState =
                 BookmarkUiState.createStateFromUrl("foo", mBookmarkModel);
-        assertEquals(
-                invalidFolderState,
-                BookmarkUiState.createFolderState(
-                        mBookmarkModel.getDefaultFolderViewLocation(), mBookmarkModel));
+        assertEquals(invalidFolderState, BookmarkUiState.createFolderState(mRoot, mBookmarkModel));
 
         BookmarkId validFolderId = new BookmarkId(5, BookmarkType.NORMAL);
         Uri validFolderUri = BookmarkUiState.createFolderUrl(validFolderId);
@@ -104,8 +97,7 @@ public class BookmarkUiStateTest {
 
     @Test
     public void testCreateFolderUrl() {
-        Uri rootFolderUri =
-                BookmarkUiState.createFolderUrl(mBookmarkModel.getDefaultFolderViewLocation());
+        Uri rootFolderUri = BookmarkUiState.createFolderUrl(mRoot);
         assertTrue(rootFolderUri.toString().startsWith(UrlConstants.BOOKMARKS_FOLDER_URL));
         assertEquals("0", rootFolderUri.getLastPathSegment());
 
@@ -134,9 +126,7 @@ public class BookmarkUiStateTest {
         BookmarkUiState searchState = BookmarkUiState.createSearchState("");
         assertTrue(searchState.isValid(mBookmarkModel));
 
-        BookmarkUiState folderState =
-                BookmarkUiState.createFolderState(
-                        mBookmarkModel.getDefaultFolderViewLocation(), mBookmarkModel);
+        BookmarkUiState folderState = BookmarkUiState.createFolderState(mRoot, mBookmarkModel);
         assertTrue(folderState.isValid(mBookmarkModel));
         doReturn(false).when(mBookmarkModel).doesBookmarkExist(any());
         assertFalse(folderState.isValid(mBookmarkModel));

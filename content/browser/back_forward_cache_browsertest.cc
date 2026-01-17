@@ -4,13 +4,13 @@
 
 #include "content/browser/back_forward_cache_browsertest.h"
 
+#include <algorithm>
 #include <climits>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/memory/raw_ptr.h"
@@ -317,8 +317,8 @@ std::string BackForwardCacheBrowserTest::DepictFrameTree(FrameTreeNode* node) {
 bool BackForwardCacheBrowserTest::HistogramContainsIntValue(
     base::HistogramBase::Sample32 sample,
     std::vector<base::Bucket> histogram_values) {
-  return base::Contains(histogram_values, static_cast<int>(sample),
-                        &base::Bucket::min);
+  return std::ranges::contains(histogram_values, static_cast<int>(sample),
+                               &base::Bucket::min);
 }
 
 void BackForwardCacheBrowserTest::EvictByJavaScript(RenderFrameHostImpl* rfh) {
@@ -1297,8 +1297,8 @@ class BackForwardCacheBrowserTestForLowMemoryDevices
 
     // Set the value of memory threshold more than the physical memory and check
     // if back-forward cache is disabled or not.
-    std::string memory_threshold =
-        base::NumberToString(base::SysInfo::AmountOfPhysicalMemoryMB() + 1);
+    std::string memory_threshold = base::NumberToString(
+        base::SysInfo::AmountOfPhysicalMemory().InMiB() + 1);
     scoped_feature_list_.InitWithFeaturesAndParameters(
         {{features::kBackForwardCacheMemoryControls,
           {{"memory_threshold_for_back_forward_cache_in_mb",
@@ -1442,8 +1442,8 @@ class BackForwardCacheBrowserTestForHighMemoryDevices
 
     // Set the value of memory threshold less than the physical memory and check
     // if back-forward cache is enabled or not.
-    std::string memory_threshold =
-        base::NumberToString(base::SysInfo::AmountOfPhysicalMemoryMB() - 1);
+    std::string memory_threshold = base::NumberToString(
+        base::SysInfo::AmountOfPhysicalMemory().InMiB() - 1);
     scoped_feature_list_.InitWithFeaturesAndParameters(
         {{features::kBackForwardCacheMemoryControls,
           {{"memory_threshold_for_back_forward_cache_in_mb",
@@ -1566,8 +1566,8 @@ class BackForwardCacheBrowserTestForHighMemoryDevicesWithBFCacheDisabled
 
     // Set the value of memory threshold less than the physical memory and check
     // if back-forward cache is enabled or not.
-    std::string memory_threshold =
-        base::NumberToString(base::SysInfo::AmountOfPhysicalMemoryMB() - 1);
+    std::string memory_threshold = base::NumberToString(
+        base::SysInfo::AmountOfPhysicalMemory().InMiB() - 1);
     scoped_feature_list_.InitWithFeaturesAndParameters(
         /*enabled_features=*/
         {{features::kBackForwardCacheMemoryControls,

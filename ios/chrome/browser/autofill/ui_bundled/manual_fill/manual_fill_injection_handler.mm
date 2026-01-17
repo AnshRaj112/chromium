@@ -27,16 +27,15 @@
 #import "components/password_manager/ios/account_select_fill_data.h"
 #import "components/password_manager/ios/ios_password_manager_driver_factory.h"
 #import "components/password_manager/ios/shared_password_controller.h"
+#import "ios/chrome/browser/autofill/form_input_accessory/public/scoped_form_input_accessory_reauth_module_override.h"
 #import "ios/chrome/browser/autofill/model/features.h"
 #import "ios/chrome/browser/autofill/model/form_input_accessory_view_handler.h"
 #import "ios/chrome/browser/autofill/model/form_suggestion_client.h"
-#import "ios/chrome/browser/autofill/ui_bundled/form_input_accessory/scoped_form_input_accessory_reauth_module_override.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/form_observer_helper.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_credential.h"
 #import "ios/chrome/browser/passwords/model/password_tab_helper.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/public/commands/security_alert_commands.h"
-#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/common/ui/reauthentication/reauthentication_event.h"
 #import "ios/chrome/common/ui/reauthentication/reauthentication_module.h"
 #import "ios/chrome/grit/ios_strings.h"
@@ -228,7 +227,7 @@ bool IsSupportedSuggestion(FormSuggestion* suggestion) {
     // It is really odd to not have params here as getting a suggestion for the
     // manual fallback should correlate with a form activity. Only
     // crash when stateless is enabled so we don't perturbate the current flow.
-    CHECK(_lastFocusedElementParams, base::NotFatalUntil::M137);
+    CHECK(_lastFocusedElementParams);
 
     // Do not pass the params yet as the client will wrap its own params around
     // the suggestion. This is to keep the status quo of how params are handled

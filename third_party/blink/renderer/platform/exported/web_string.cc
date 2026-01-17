@@ -30,7 +30,6 @@
 
 #include "third_party/blink/public/platform/web_string.h"
 
-#include "base/strings/latin1_string_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/string_view_util.h"
 #include "third_party/blink/renderer/platform/wtf/assertions.h"
@@ -154,17 +153,17 @@ size_t WebString::Find(std::string_view characters) const {
 }
 
 bool WebString::operator<(const WebString& other) const {
-  return WTF::CodeUnitCompare(impl_.get(), other.impl_.get()) < 0;
+  return CodeUnitCompare(impl_.get(), other.impl_.get()) < 0;
 }
 
-WebString::WebString(const WTF::String& s) : impl_(s.Impl()) {}
+WebString::WebString(const String& s) : impl_(s.Impl()) {}
 
-WebString& WebString::operator=(const WTF::String& s) {
+WebString& WebString::operator=(const String& s) {
   impl_ = s.Impl();
   return *this;
 }
 
-WebString::operator WTF::String() const {
+WebString::operator String() const {
   return impl_.get();
 }
 

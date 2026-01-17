@@ -311,8 +311,7 @@ google_apis::RequestSender* YouTubeMusicClient::GetRequestSender() {
   if (!request_sender_) {
     CHECK(create_request_sender_callback_);
     request_sender_ =
-        std::move(create_request_sender_callback_)
-            .Run({GaiaConstants::kYouTubeMusicOAuth2Scope}, kTrafficAnnotation);
+        std::move(create_request_sender_callback_).Run(kTrafficAnnotation);
     create_request_sender_callback_ = base::NullCallback();
     CHECK(request_sender_);
   }
@@ -349,14 +348,13 @@ void YouTubeMusicClient::OnGetPlaylistRequestDone(
     const base::Time& request_start_time,
     base::expected<std::unique_ptr<google_apis::youtube_music::Playlist>,
                    google_apis::youtube_music::ApiError> result) {
-  if (playlist_callback_map_.find(playlist_id) ==
-      playlist_callback_map_.end()) {
+  auto it = playlist_callback_map_.find(playlist_id);
+  if (it == playlist_callback_map_.end()) {
     return;
   }
 
-  GetPlaylistCallback playlist_callback =
-      std::move(playlist_callback_map_[playlist_id]);
-  playlist_callback_map_.erase(playlist_id);
+  GetPlaylistCallback playlist_callback = std::move(it->second);
+  playlist_callback_map_.erase(it);
 
   if (!playlist_callback) {
     return;

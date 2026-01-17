@@ -94,21 +94,21 @@ IN_PROC_BROWSER_TEST_F(RenderDocumentHostBrowserTest, BasicSubframe) {
   // 2) Navigate the subframe same-process. (non local root case).
   NavigateIframeToURL(web_contents(), "test_iframe", url_subframe_2);
   RenderFrameHostImpl* child_rfh_2 = subframe->current_frame_host();
-  EXPECT_TRUE(delete_child_rfh_1.deleted());
+  EXPECT_TRUE(delete_child_rfh_1.WaitUntilDeleted());
   EXPECT_NE(child_rfh_1, child_rfh_2);
   RenderFrameDeletedObserver delete_child_rfh_2(child_rfh_2);
 
   // 3) Navigate the subframe cross-process.
   NavigateIframeToURL(web_contents(), "test_iframe", url_subframe_3);
   RenderFrameHostImpl* child_rfh_3 = subframe->current_frame_host();
-  EXPECT_TRUE(delete_child_rfh_1.deleted());
+  EXPECT_TRUE(delete_child_rfh_2.WaitUntilDeleted());
   EXPECT_NE(child_rfh_2, child_rfh_3);
   RenderFrameDeletedObserver delete_child_rfh_3(child_rfh_3);
 
   // 4) Navigate the subframe same-process. (local root case).
   NavigateIframeToURL(web_contents(), "test_iframe", url_subframe_4);
   RenderFrameHostImpl* child_rfh_4 = subframe->current_frame_host();
-  EXPECT_TRUE(delete_child_rfh_3.deleted());
+  EXPECT_TRUE(delete_child_rfh_3.WaitUntilDeleted());
   EXPECT_NE(child_rfh_3, child_rfh_4);
 }
 
@@ -167,10 +167,16 @@ IN_PROC_BROWSER_TEST_F(RenderDocumentHostBrowserTest, PopupScriptableNavigate) {
   EXPECT_EQ("bar_2", EvalJs(new_contents, "window.foo;"));
 }
 
+// TODO(crbug.com/458460875): Test has flaked regularly since 2025-11-04.
+#if BUILDFLAG(IS_ANDROID)
+#define MAYBE_SubframeScriptableNavigate DISABLED_SubframeScriptableNavigate
+#else
+#define MAYBE_SubframeScriptableNavigate SubframeScriptableNavigate
+#endif
 // Two frames are scriptable with each other. Test it works appropriately after
 // one of them doing a same-origin navigation.
 IN_PROC_BROWSER_TEST_F(RenderDocumentHostBrowserTest,
-                       SubframeScriptableNavigate) {
+                       MAYBE_SubframeScriptableNavigate) {
   GURL url_1(embedded_test_server()->GetURL("/page_with_iframe.html"));
   GURL url_2(embedded_test_server()->GetURL("/title2.html"));
   GURL url_3(embedded_test_server()->GetURL("/title3.html"));

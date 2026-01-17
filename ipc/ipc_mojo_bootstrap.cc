@@ -17,7 +17,6 @@
 
 #include "base/check_op.h"
 #include "base/containers/circular_deque.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -43,7 +42,6 @@
 #include "mojo/public/cpp/bindings/associated_group.h"
 #include "mojo/public/cpp/bindings/associated_group_controller.h"
 #include "mojo/public/cpp/bindings/connector.h"
-#include "mojo/public/cpp/bindings/features.h"
 #include "mojo/public/cpp/bindings/interface_endpoint_client.h"
 #include "mojo/public/cpp/bindings/interface_endpoint_controller.h"
 #include "mojo/public/cpp/bindings/interface_id.h"
@@ -66,7 +64,6 @@ namespace {
 constinit thread_local bool off_sequence_binding_allowed = false;
 
 BASE_FEATURE(kMojoChannelAssociatedSendUsesRunOrPostTask,
-             "MojoChannelAssociatedSendUsesRunOrPostTask",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Used to track some internal Channel state in pursuit of message leaks.
@@ -337,7 +334,7 @@ class ChannelAssociatedGroupController
         id = next_interface_id_++;
         if (set_interface_id_namespace_bit_)
           id |= mojo::kInterfaceIdNamespaceMask;
-      } while (base::Contains(endpoints_, id));
+      } while (endpoints_.contains(id));
 
       Endpoint* endpoint = new Endpoint(this, id);
       if (encountered_error_)
@@ -399,7 +396,7 @@ class ChannelAssociatedGroupController
       return;
     {
       base::AutoLock locker(lock_);
-      DCHECK(base::Contains(endpoints_, id));
+      DCHECK(endpoints_.contains(id));
       Endpoint* endpoint = endpoints_[id].get();
       DCHECK(!endpoint->client());
       DCHECK(!endpoint->closed());
@@ -431,7 +428,7 @@ class ChannelAssociatedGroupController
     DCHECK(client);
 
     base::AutoLock locker(lock_);
-    DCHECK(base::Contains(endpoints_, id));
+    DCHECK(endpoints_.contains(id));
 
     Endpoint* endpoint = endpoints_[id].get();
     endpoint->AttachClient(client, std::move(runner));
@@ -449,7 +446,7 @@ class ChannelAssociatedGroupController
     DCHECK(mojo::IsValidInterfaceId(id));
 
     base::AutoLock locker(lock_);
-    DCHECK(base::Contains(endpoints_, id));
+    DCHECK(endpoints_.contains(id));
 
     Endpoint* endpoint = endpoints_[id].get();
     endpoint->DetachClient();

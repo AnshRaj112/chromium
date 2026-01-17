@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "ui/base/interaction/element_identifier.h"
 
-#include <cstring>
+#include <string_view>
 
-#include "base/containers/contains.h"
+#include "base/check.h"
+#include "base/compiler_specific.h"
 #include "base/no_destructor.h"
 
 namespace ui {
@@ -36,15 +32,16 @@ ElementIdentifier ElementIdentifier::FromRawValue(intptr_t value) {
     return ElementIdentifier();
   const auto* impl =
       reinterpret_cast<const internal::ElementIdentifierImpl*>(value);
-  CHECK(base::Contains(GetKnownIdentifiers(), impl));
+  CHECK(GetKnownIdentifiers().contains(impl));
   return ElementIdentifier(impl);
 }
 
 // static
 ElementIdentifier ElementIdentifier::FromName(const char* name) {
   for (const auto* impl : GetKnownIdentifiers()) {
-    if (!strcmp(impl->name, name))
+    if (std::string_view(impl->name) == name) {
       return ElementIdentifier(impl);
+    }
   }
   return ElementIdentifier();
 }
@@ -70,22 +67,25 @@ ElementIdentifier::KnownIdentifiers& ElementIdentifier::GetKnownIdentifiers() {
   return *known_identifiers.get();
 }
 
+COMPONENT_EXPORT(UI_BASE_INTERACTION)
 void PrintTo(ElementIdentifier element_identifier, std::ostream* os) {
   *os << "ElementIdentifier " << element_identifier.GetName();
 }
 
+COMPONENT_EXPORT(UI_BASE_INTERACTION)
 void PrintTo(ElementContext element_context, std::ostream* os) {
   *os << "ElementContext " << static_cast<const void*>(element_context);
 }
 
-extern std::ostream& operator<<(std::ostream& os,
-                                ElementIdentifier element_identifier) {
+COMPONENT_EXPORT(UI_BASE_INTERACTION)
+std::ostream& operator<<(std::ostream& os,
+                         ElementIdentifier element_identifier) {
   PrintTo(element_identifier, &os);
   return os;
 }
 
-extern std::ostream& operator<<(std::ostream& os,
-                                ElementContext element_context) {
+COMPONENT_EXPORT(UI_BASE_INTERACTION)
+std::ostream& operator<<(std::ostream& os, ElementContext element_context) {
   PrintTo(element_context, &os);
   return os;
 }

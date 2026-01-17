@@ -44,7 +44,7 @@
     <message name="IDS_PRINT_PREVIEW_SAVING" desc="Text shown after the user clicks on the save button and before the print preview tab is closed to let the user know that saving is in progress.">
       Saving...
     </message>
-    <message name="IDS_PRINT_PREVIEW_OPTION_ALL_PAGES" desc="Option to print all pages.">
+    <message name="IDS_PRINT_PREVIEW_OPTION_ALL_PAGES" desc="Option to print all pages." meaning="All pages in a document.">
       All
     </message>
     <message name="IDS_PRINT_PREVIEW_OPTION_ODD_PAGES" desc="Option to print odd numbered pages only.">
@@ -150,6 +150,9 @@
     </message>
     <message name="IDS_PRINT_PREVIEW_OPTION_FIT_TO_PAPER" desc="Dropdown option shown in print preview page to auto fit the PDF page to the paper size.">
       Fit to paper
+    </message>
+    <message name="IDS_PRINT_PREVIEW_OPTION_ACTUAL_SIZE" desc="Dropdown option shown in print preview page to unscale the PDF page.">
+      Actual size
     </message>
     <message name="IDS_PRINT_PREVIEW_OPTION_BACKGROUND_COLORS_AND_IMAGES" desc="Checkbox label shown in print preview page to print webpage backgrounds.">
       Background graphics

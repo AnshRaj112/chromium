@@ -5,6 +5,7 @@
 #include "chrome/common/chrome_switches.h"
 
 #include "build/build_config.h"
+#include "build/buildflag.h"
 #include "extensions/buildflags/buildflags.h"
 #include "printing/buildflags/buildflags.h"
 
@@ -24,6 +25,15 @@ namespace switches {
 // navigator.language DOM property. language[-country] where language is the 2
 // letter code from ISO-639.
 const char kAcceptLang[] = "accept-lang";
+
+#if BUILDFLAG(IS_MAC)
+// Only if we're running in an unsigned build, passing this flag will allow
+// app shims whose code signature does not match what chrome is expecting to
+// still connect to chrome. This is used by some tests to allow the test to
+// pretend to be a valid app shim.
+const char kAllowAppShimSignatureMismatchForTests[] =
+    "allow-appshim-signature-mismatch-for-tests";
+#endif
 
 // Allows third-party content included on a page to prompt for a HTTP basic
 // auth username/password pair.
@@ -63,6 +73,10 @@ const char kAppModeOAuth2Token[] = "app-mode-oauth-token";
 // This is used along with kAppId to indicate an app was launched during
 // OS login, and which mode the app was launched in.
 const char kAppRunOnOsLoginMode[] = "app-run-on-os-login-mode";
+
+// A process type (switches::kProcessType) that is used by App Shim processes.
+// See chrome/app_shim/app_shim_main_delegate.mm.
+const char kAppShim[] = "app-shim";
 
 // Overrides the URL that the webstore APIs download extensions from.
 // Note: the URL must contain one '%s' for the extension ID.
@@ -188,6 +202,9 @@ const char kDiagnosticsRecovery[] = "diagnostics-recovery";
 const char kDisableAutoMaximizeForTests[] = "disable-auto-maximize-for-tests";
 #endif
 
+// Disable auto-reload of pages on top-level error.
+const char kDisableAutoReload[] = "disable-auto-reload";
+
 // Disable several subsystems which run network requests in the background.
 // This is for use when doing network performance testing to avoid noise in the
 // measurements.
@@ -242,6 +259,11 @@ const char kDiskCacheDir[] = "disk-cache-dir";
 // Forces the maximum disk space to be used by the disk cache, in bytes.
 const char kDiskCacheSize[] = "disk-cache-size";
 
+#if BUILDFLAG(IS_MAC)
+// Skips initializing the shares NSApplication instance in ChromeTestSuite.
+const char kDoNotCreateNSAppForTests[] = "do-not-create-nsapp-for-tests";
+#endif
+
 // Do not de-elevate the browser on launch. Used after de-elevating to prevent
 // infinite loops.
 const char kDoNotDeElevateOnLaunch[] = "do-not-de-elevate";
@@ -254,6 +276,9 @@ const char kDumpBrowserHistograms[] = "dump-browser-histograms";
 const char kEnableAudioDebugRecordingsFromExtension[] =
     "enable-audio-debug-recordings-from-extension";
 
+// Enable auto-reload of pages on top-level error.
+const char kEnableAutoReload[] = "enable-auto-reload";
+
 // Enables the multi-level undo system for bookmarks.
 const char kEnableBookmarkUndo[] = "enable-bookmark-undo";
 
@@ -261,8 +286,17 @@ const char kEnableBookmarkUndo[] = "enable-bookmark-undo";
 // Proxy component within the service process.
 const char kEnableCloudPrintProxy[] = "enable-cloud-print-proxy";
 
+#if BUILDFLAG(IS_CHROMEOS)
+// If enabled, DevTools will allow creating pwa_handler, to enable executing
+// CDP methods (i.e. PWA.install) on browsers connected remotely
+const char kEnableDevToolsPwaHandler[] = "enable-devtools-pwa-handler";
+#endif
+
 // Enables Domain Reliability Monitoring.
 const char kEnableDomainReliability[] = "enable-domain-reliability";
+
+// Enables the experimental GreenDev UI in DevTools.
+const char kEnableDevToolsGreenDevUi[] = "devtools-greendev-ui";
 
 // Enables logging for extension activity.
 const char kEnableExtensionActivityLogging[] =
@@ -311,14 +345,6 @@ const char kExtensionContentVerificationEnforceStrict[] = "enforce_strict";
 
 // Name of the command line flag to allow the experimental actor API.
 const char kExtensionExperimentalActor[] = "enable-extension-actor-api";
-
-// Turns on extension install verification if it would not otherwise have been
-// turned on.
-const char kExtensionsInstallVerification[] = "extensions-install-verification";
-
-// Specifies a comma-separated list of extension ids that should be forced to
-// be treated as not from the webstore when doing install verification.
-const char kExtensionsNotWebstore[] = "extensions-not-webstore";
 
 // Specifies the variation of Zero State extensions toolbar recommendation to
 // show.
@@ -369,6 +395,11 @@ const char kHideCrashRestoreBubble[] = "hide-crash-restore-bubble";
 // http://google.com.
 const char kHomePage[] = "homepage";
 
+#if !BUILDFLAG(IS_ANDROID)
+// Triggers the import of passwords on startup.
+const char kImportPasswords[] = "import-passwords";
+#endif
+
 // Causes the initial browser opened to be in incognito mode. Further browsers
 // may or may not be in incognito mode; see `IncognitoModePrefs`.
 const char kIncognito[] = "incognito";
@@ -381,6 +412,13 @@ const char kInitIsolateAsForeground[] = "init-isolate-as-foreground";
 // Installs an autogenerated theme based on the given RGB value.
 // The format is "r,g,b", where r, g, b are a numeric values from 0 to 255.
 const char kInstallAutogeneratedTheme[] = "install-autogenerated-theme";
+
+// Forces immediate platform policy refresh (not cloud policy) when Chrome is
+// already running. The switch prevents a new browser window from opening and
+// only triggers the policy refresh. Useful for testing and automation to avoid
+// waiting for the next scheduled refresh interval. No-op if Chrome is not
+// already running.
+const char kRefreshPlatformPolicy[] = "refresh-platform-policy";
 
 // Causes Chrome to initiate an installation flow for the given app.
 const char kInstallChromeApp[] = "install-chrome-app";
@@ -481,6 +519,15 @@ const char kOnTheFlyMhtmlHashComputation[] =
 // Launches URL in new browser window.
 const char kOpenInNewWindow[] = "new-window";
 
+// Activates an existing tab or app window by URL or app id before creating
+// anything new. Syntax: comma-ordered selectors. Bare URLs are exact.
+// Add a trailing * for prefix. app:<app-id> targets PWAs.
+// Example: --focus=https://meet.google.com/*,app:abc123
+const char kFocus[] = "focus";
+
+// Specifies a file path to write JSON focus result information.
+const char kFocusResultFile[] = "focus-result-file";
+
 // Packages an extension to a .crx installable file from a given directory.
 const char kPackExtension[] = "pack-extension";
 
@@ -534,7 +581,8 @@ const char kProxyAutoDetect[] = "proxy-auto-detect";
 // Specifies a list of hosts for whom we bypass proxy settings and use direct
 // connections. Ignored if --proxy-auto-detect or --no-proxy-server are also
 // specified. This is a comma-separated list of bypass rules. See:
-// "net/proxy_resolution/proxy_bypass_rules.h" for the format of these rules.
+// "net/proxy_resolution/proxy_host_matching_rules.h" for the format of these
+// rules.
 const char kProxyBypassList[] = "proxy-bypass-list";
 
 // Uses the pac script at the given URL
@@ -918,7 +966,7 @@ const char kGuest[] = "guest";
 const char kForceNtpMobilePromo[] = "force-ntp-mobile-promo";
 #endif
 
-#if BUILDFLAG(ENABLE_GLIC)
+#if BUILDFLAG(ENABLE_GLIC) || BUILDFLAG(ENABLE_GLIC_ANDROID)
 // Overrides the glic guest URL.
 const char kGlicGuestURL[] = "glic-guest-url";
 const char kGlicAlwaysOpenFre[] = "glic-always-open-fre";
@@ -933,14 +981,34 @@ const char kGlicAllowedOrigins[] = "glic-webui-allowed-origins";
 const char kGlicAutomation[] = "glic-automation";
 // Dev mode for glic only exposed via command line flag.
 const char kGlicDev[] = "glic-dev";
+// If this flag is set, then the page navigating will not trigger a reload.
+const char kGlicSkipReloadAfterNavigation[] =
+    "glic-skip-reload-after-navigation";
 // Whether additional logging is enabled in the glic api host.
 const char kGlicHostLogging[] = "glic-host-logging";
+// Whether to show web actuation toggle in the Chrome AI settings page.
+const char kGlicAlwaysShowWebActuationToggle[] =
+    "glic-always-show-web-actuation-toggle";
+
+// List of URL patterns in the glic webview to redirect to an admin blocked
+// panel, as a space-separated list.
+const char kGlicAdminRedirectPatterns[] = "glic-admin-redirect-patterns";
+
+// Reset local state pref kGlicMultiInstanceEnabledBySubscriptionTier to false.
+// Intended for manual testing only.
+const char kGlicResetMultiInstanceEnabledByTier[] =
+    "glic-reset-mi-enabled-by-tier";
+
+// Override actual AI subscription tier by forcing G1 status, specifically for
+// multi-instance enablement. Intended for manual testing only.
+const char kGlicForceG1StatusForMultiInstance[] = "glic-force-g1-for-mi";
 #endif
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 // Writes open and installed web apps for each profile to the specified file
-// without launching a new browser window or tab. Pass a absolute file path to
-// specify where to output the information. Can be used together with optional
+// without launching a new browser window or tab. Pass a absolute file path
+// to specify where to output the information. Can be used together with
+// optional
 // --profile-base-name switch to only write information for a given profile.
 const char kListApps[] = "list-apps";
 

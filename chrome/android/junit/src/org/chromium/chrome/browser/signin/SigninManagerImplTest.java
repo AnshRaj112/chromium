@@ -18,13 +18,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.robolectric.Shadows.shadowOf;
-
-import android.app.Application;
-import android.content.Context;
-import android.os.UserManager;
-
-import androidx.test.core.app.ApplicationProvider;
 
 import org.junit.After;
 import org.junit.Before;
@@ -34,29 +27,22 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
 import org.robolectric.annotation.LooperMode;
-import org.robolectric.shadows.ShadowApplication;
 import org.robolectric.shadows.ShadowLooper;
 
-import org.chromium.base.Callback;
-import org.chromium.base.CallbackUtils;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.chrome.browser.bookmarks.BookmarkModel;
 import org.chromium.chrome.browser.bookmarks.FakeBookmarkModel;
 import org.chromium.chrome.browser.browsing_data.BrowsingDataBridge;
 import org.chromium.chrome.browser.browsing_data.BrowsingDataBridgeJni;
-import org.chromium.chrome.browser.browsing_data.BrowsingDataType;
-import org.chromium.chrome.browser.browsing_data.TimePeriod;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
 import org.chromium.chrome.browser.preferences.Pref;
-import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.SigninManager;
 import org.chromium.chrome.browser.signin.services.SigninPreferencesManager;
 import org.chromium.chrome.test.util.browser.signin.AccountManagerTestRule;
@@ -75,8 +61,6 @@ import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.signin.metrics.SignoutReason;
 import org.chromium.components.signin.test.util.FakeIdentityManager;
 import org.chromium.components.signin.test.util.TestAccounts;
-import org.chromium.components.user_prefs.UserPrefs;
-import org.chromium.components.user_prefs.UserPrefsJni;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -86,7 +70,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @LooperMode(LooperMode.Mode.LEGACY)
 @EnableFeatures({
     SigninFeatures.SKIP_CHECK_FOR_ACCOUNT_MANAGEMENT_ON_SIGNIN,
-    SigninFeatures.MAKE_ACCOUNTS_AVAILABLE_IN_IDENTITY_MANAGER,
 })
 public class SigninManagerImplTest {
     private static final long NATIVE_SIGNIN_MANAGER = 10001L;
@@ -99,12 +82,10 @@ public class SigninManagerImplTest {
 
     @Mock private SigninManagerImpl.Natives mNativeMock;
     @Mock private BrowsingDataBridge.Natives mBrowsingDataBridgeNativeMock;
-    @Mock private UserPrefs.Natives mUserPrefsNativeMock;
     @Mock private PrefChangeRegistrar.Natives mPrefChangeRegistrarNativeMock;
     @Mock private PrefService mPrefService;
     @Mock private IdentityMutator mIdentityMutator;
     @Mock private ExternalAuthUtils mExternalAuthUtils;
-    @Mock private Profile mProfile;
     @Mock private SigninManager.SignInStateObserver mSignInStateObserver;
 
     private final FakeIdentityManager mIdentityManager = new FakeIdentityManager();
@@ -114,10 +95,8 @@ public class SigninManagerImplTest {
     public void setUp() {
         SigninManagerImplJni.setInstanceForTesting(mNativeMock);
         BrowsingDataBridgeJni.setInstanceForTesting(mBrowsingDataBridgeNativeMock);
-        UserPrefsJni.setInstanceForTesting(mUserPrefsNativeMock);
         PrefChangeRegistrarJni.setInstanceForTesting(mPrefChangeRegistrarNativeMock);
 
-        when(mUserPrefsNativeMock.get(mProfile)).thenReturn(mPrefService);
         ExternalAuthUtils.setInstanceForTesting(mExternalAuthUtils);
         BookmarkModel.setInstanceForTesting(FakeBookmarkModel.createModel());
 
@@ -190,14 +169,6 @@ public class SigninManagerImplTest {
 
         doAnswer(
                         (args) -> {
-                            ((Callback<Boolean>) args.getArgument(2)).onResult(true);
-                            return null;
-                        })
-                .when(mNativeMock)
-                .isAccountManaged(anyLong(), any(), any());
-
-        doAnswer(
-                        (args) -> {
                             ((Runnable) args.getArgument(2)).run();
                             return null;
                         })
@@ -238,7 +209,7 @@ public class SigninManagerImplTest {
         // The primary account should be cleared *before* clearing any account data.
         // For more information see crbug.com/589028.
         InOrder inOrder = inOrder(mNativeMock, mIdentityMutator);
-        inOrder.verify(mIdentityMutator).clearPrimaryAccount(eq(SignoutReason.TEST));
+        inOrder.verify(mIdentityMutator).removePrimaryAccountButKeepTokens(eq(SignoutReason.TEST));
         verify(mIdentityMutator)
                 .seedAccountsThenReloadAllAccountsWithPrimaryAccount(List.of(), null);
 
@@ -255,7 +226,7 @@ public class SigninManagerImplTest {
         // The primary account should be cleared *before* clearing any account data.
         // For more information see crbug.com/589028.
         InOrder inOrder = inOrder(mNativeMock, mIdentityMutator);
-        inOrder.verify(mIdentityMutator).clearPrimaryAccount(eq(SignoutReason.TEST));
+        inOrder.verify(mIdentityMutator).removePrimaryAccountButKeepTokens(eq(SignoutReason.TEST));
         verify(mIdentityMutator)
                 .seedAccountsThenReloadAllAccountsWithPrimaryAccount(List.of(), null);
 
@@ -276,7 +247,7 @@ public class SigninManagerImplTest {
         // The primary account should be cleared *before* clearing any account data.
         // For more information see crbug.com/589028.
         InOrder inOrder = inOrder(mNativeMock, mIdentityMutator);
-        inOrder.verify(mIdentityMutator).clearPrimaryAccount(eq(SignoutReason.TEST));
+        inOrder.verify(mIdentityMutator).removePrimaryAccountButKeepTokens(eq(SignoutReason.TEST));
         verify(mIdentityMutator)
                 .seedAccountsThenReloadAllAccountsWithPrimaryAccount(List.of(), null);
 
@@ -323,7 +294,7 @@ public class SigninManagerImplTest {
         // The primary account should be cleared *before* clearing any account data.
         // For more information see crbug.com/589028.
         InOrder inOrder = inOrder(mNativeMock, mIdentityMutator);
-        inOrder.verify(mIdentityMutator).clearPrimaryAccount(eq(SignoutReason.TEST));
+        inOrder.verify(mIdentityMutator).removePrimaryAccountButKeepTokens(eq(SignoutReason.TEST));
 
         // Sign-out should only clear the profile when the user is syncing and has decided to
         // wipe data.
@@ -364,52 +335,7 @@ public class SigninManagerImplTest {
                 mock(SigninManager.SignOutCallback.class),
                 /* forceWipeUserData= */ true);
 
-        // Passwords should not be among the cleared types.
-        int[] expectedClearedTypes =
-                new int[] {
-                    BrowsingDataType.HISTORY,
-                    BrowsingDataType.CACHE,
-                    BrowsingDataType.SITE_DATA,
-                    BrowsingDataType.FORM_DATA,
-                };
-        verify(mBrowsingDataBridgeNativeMock)
-                .clearBrowsingData(
-                        any(),
-                        any(),
-                        eq(expectedClearedTypes),
-                        eq(TimePeriod.ALL_TIME),
-                        any(),
-                        any(),
-                        any(),
-                        any());
-    }
-
-    @Test
-    public void wipeSyncDataOnly() {
-        createSigninManager();
-        mIdentityManager.setPrimaryAccount(TestAccounts.ACCOUNT1);
-
-        mSigninManager.wipeSyncUserData(
-                CallbackUtils.emptyRunnable(), SigninManager.DataWipeOption.WIPE_SYNC_DATA);
-
-        // Passwords should not be among the cleared types.
-        int[] expectedClearedTypes =
-                new int[] {
-                    BrowsingDataType.HISTORY,
-                    BrowsingDataType.CACHE,
-                    BrowsingDataType.SITE_DATA,
-                    BrowsingDataType.FORM_DATA,
-                };
-        verify(mBrowsingDataBridgeNativeMock)
-                .clearBrowsingData(
-                        any(),
-                        any(),
-                        eq(expectedClearedTypes),
-                        eq(TimePeriod.ALL_TIME),
-                        any(),
-                        any(),
-                        any(),
-                        any());
+        verify(mNativeMock).wipeSyncUserData(anyLong(), any());
     }
 
     @Test
@@ -432,7 +358,7 @@ public class SigninManagerImplTest {
                             return null;
                         })
                 .when(mIdentityMutator)
-                .clearPrimaryAccount(anyInt());
+                .removePrimaryAccountButKeepTokens(anyInt());
 
         mSigninManager.signOut(SignoutReason.TEST);
         AtomicInteger callCount = new AtomicInteger(0);
@@ -542,13 +468,6 @@ public class SigninManagerImplTest {
         createSigninManager();
         when(mExternalAuthUtils.canUseGooglePlayServices()).thenReturn(true);
 
-        // Make sure that the user is not a demo user.
-        ShadowApplication shadowApplication =
-                shadowOf((Application) ApplicationProvider.getApplicationContext());
-        UserManager userManager = Mockito.mock(UserManager.class);
-        Mockito.when(userManager.isDemoUser()).thenReturn(false);
-        shadowApplication.setSystemService(Context.USER_SERVICE, userManager);
-
         assertTrue(mSigninManager.isSigninSupported(/* requireUpdatedPlayServices= */ true));
         assertTrue(mSigninManager.isSigninSupported(/* requireUpdatedPlayServices= */ false));
     }
@@ -558,13 +477,6 @@ public class SigninManagerImplTest {
         createSigninManager();
         when(mExternalAuthUtils.canUseGooglePlayServices()).thenReturn(false);
 
-        // Make sure that the user is not a demo user.
-        ShadowApplication shadowApplication =
-                shadowOf((Application) ApplicationProvider.getApplicationContext());
-        UserManager userManager = Mockito.mock(UserManager.class);
-        Mockito.when(userManager.isDemoUser()).thenReturn(false);
-        shadowApplication.setSystemService(Context.USER_SERVICE, userManager);
-
         assertFalse(mSigninManager.isSigninSupported(/* requireUpdatedPlayServices= */ true));
     }
 
@@ -573,7 +485,7 @@ public class SigninManagerImplTest {
                 (SigninManagerImpl)
                         SigninManagerImpl.create(
                                 NATIVE_SIGNIN_MANAGER,
-                                mProfile,
+                                mPrefService,
                                 mIdentityManager,
                                 mIdentityMutator);
         mSigninManager.addSignInStateObserver(mSignInStateObserver);

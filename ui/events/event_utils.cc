@@ -7,6 +7,7 @@
 #include <limits>
 #include <map>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "base/check.h"
@@ -15,7 +16,6 @@
 #include "base/time/time.h"
 #include "base/trace_event/trace_id_helper.h"
 #include "base/trace_event/typed_macros.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "build/build_config.h"
 #include "third_party/perfetto/include/perfetto/tracing/string_helpers.h"
 #include "third_party/perfetto/include/perfetto/tracing/track.h"
@@ -34,7 +34,7 @@ namespace ui {
 
 namespace {
 
-int g_custom_event_types = base::to_underlying(EventType::kLast);
+int g_custom_event_types = std::to_underlying(EventType::kLast);
 
 #define UMA_HISTOGRAM_EVENT_LATENCY_TIMES(name, sample)           \
   UMA_HISTOGRAM_CUSTOM_TIMES(name, sample, base::Milliseconds(1), \
@@ -112,7 +112,7 @@ bool ShouldDefaultToNaturalScroll() {
 }
 
 display::Display::TouchSupport GetInternalDisplayTouchSupport() {
-  display::Screen* screen = display::Screen::GetScreen();
+  display::Screen* screen = display::Screen::Get();
   // No screen in some unit tests.
   if (!screen)
     return display::Display::TouchSupport::UNKNOWN;
@@ -161,36 +161,37 @@ void ComputeEventLatencyOS(EventType type,
     case EventType::kMousewheel:
       UMA_HISTOGRAM_EVENT_LATENCY_TIMES(kMouseWheelEventName, delta);
       // Do not record traces for wheel events to avoid spam.
-      return;
+      break;
     case EventType::kTouchMoved:
       UMA_HISTOGRAM_EVENT_LATENCY_TIMES(kTouchMovedEventName, delta);
       // Do not record traces for move events to avoid spam.
-      return;
+      break;
     case EventType::kTouchPressed:
       UMA_HISTOGRAM_EVENT_LATENCY_TIMES(kTouchPressedEventName, delta);
       RecordEventLatencyTrace(kTouchPressedEventName, time_stamp, current_time);
-      return;
+      break;
     case EventType::kTouchReleased:
       UMA_HISTOGRAM_EVENT_LATENCY_TIMES(kTouchReleasedEventName, delta);
       RecordEventLatencyTrace(kTouchReleasedEventName, time_stamp,
                               current_time);
-      return;
+      break;
     case EventType::kTouchCancelled:
       UMA_HISTOGRAM_EVENT_LATENCY_TIMES(kTouchCancelledEventName, delta);
       RecordEventLatencyTrace(kTouchCancelledEventName, time_stamp,
                               current_time);
-      return;
+      break;
     case EventType::kKeyPressed:
       UMA_HISTOGRAM_EVENT_LATENCY_TIMES(kKeyPressedEventName, delta);
       RecordEventLatencyTrace(kKeyPressedEventName, time_stamp, current_time);
-      return;
+      break;
     case EventType::kMousePressed:
       UMA_HISTOGRAM_EVENT_LATENCY_TIMES(kMousePressedEventName, delta);
       RecordEventLatencyTrace(kMousePressedEventName, time_stamp, current_time);
-      return;
+      break;
     default:
       return;
   }
+  UMA_HISTOGRAM_EVENT_LATENCY_TIMES("Event.Latency.OS2", delta);
 }
 
 #if BUILDFLAG(IS_WIN)

@@ -19,7 +19,7 @@ network::mojom::blink::CSPSourcePtr ConvertSource(const WebCSPSource& source) {
 network::mojom::blink::CSPSourceListPtr ConvertSourceList(
     const WebCSPSourceList& source_list) {
   return network::mojom::blink::CSPSourceList::New(
-      WTF::ToVector(source_list.sources, ConvertSource),
+      ToVector(source_list.sources, ConvertSource),
       Vector<String>(source_list.nonces),
       Vector<network::IntegrityMetadata>(source_list.hashes),
       Vector<network::IntegrityMetadata>(source_list.url_hashes),
@@ -29,7 +29,7 @@ network::mojom::blink::CSPSourceListPtr ConvertSourceList(
       source_list.allow_wasm_eval, source_list.allow_wasm_unsafe_eval,
       source_list.allow_dynamic, source_list.allow_dynamic_url,
       source_list.allow_unsafe_hashes, source_list.report_sample,
-      source_list.report_hash_algorithm);
+      source_list.allow_trusted_types_eval, source_list.report_hash_algorithm);
 }
 
 }  // namespace

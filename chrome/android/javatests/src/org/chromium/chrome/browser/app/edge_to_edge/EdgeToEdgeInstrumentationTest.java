@@ -33,7 +33,6 @@ import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.Feature;
-import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.base.test.util.MinAndroidSdkLevel;
@@ -54,6 +53,7 @@ import org.chromium.chrome.test.transit.ChromeTransitTestRules;
 import org.chromium.chrome.test.util.ActivityTestUtils;
 import org.chromium.content_public.browser.test.util.UiUtils;
 import org.chromium.net.test.EmbeddedTestServer;
+import org.chromium.ui.UiSwitches;
 import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.test.util.DeviceRestriction;
 import org.chromium.ui.test.util.RenderTestRule;
@@ -69,10 +69,7 @@ import java.io.IOException;
 })
 @Restriction({DeviceFormFactor.PHONE, DeviceRestriction.RESTRICTION_TYPE_NON_AUTO})
 @MinAndroidSdkLevel(Build.VERSION_CODES.R)
-@EnableFeatures({
-    ChromeFeatureList.DRAW_CUTOUT_EDGE_TO_EDGE,
-    ChromeFeatureList.EDGE_TO_EDGE_BOTTOM_CHIN
-})
+@EnableFeatures(ChromeFeatureList.DRAW_CUTOUT_EDGE_TO_EDGE)
 public class EdgeToEdgeInstrumentationTest {
     @Rule
     public final AutoResetCtaTransitTestRule mActivityTestRule =
@@ -107,6 +104,7 @@ public class EdgeToEdgeInstrumentationTest {
 
     @Before
     public void setUp() {
+        mActivityTestRule.getEmbeddedTestServerRule().setServerPort(12345);
         mTestServer = mActivityTestRule.getTestServer();
         mActivity = mActivityTestRule.getActivity();
         assertNotNull(mActivity);
@@ -253,58 +251,10 @@ public class EdgeToEdgeInstrumentationTest {
 
     @Test
     @MediumTest
-    @DisableFeatures(ChromeFeatureList.FLOATING_SNACKBAR)
-    public void testSnackbar() throws InterruptedException {
-        activateFeatureToEdge();
-        optOutOfToEdge();
-        var snackbarManager = mActivity.getSnackbarManager();
-        snackbarManager.setEdgeToEdgeSupplier(mEdgeToEdgeController);
-        ThreadUtils.runOnUiThreadBlocking(
-                () -> {
-                    snackbarManager.showSnackbar(
-                            Snackbar.make(
-                                    "Test",
-                                    new SnackbarManager.SnackbarController() {},
-                                    Snackbar.TYPE_PERSISTENT,
-                                    Snackbar.UMA_TEST_SNACKBAR));
-                });
-
-        UiUtils.settleDownUI(InstrumentationRegistry.getInstrumentation());
-
-        var adjuster =
-                snackbarManager
-                        .getCurrentSnackbarViewForTesting()
-                        .getEdgeToEdgePadAdjusterForTesting();
-        Assert.assertNotNull("Pad Adjuster should be created", adjuster);
-
-        int heightOnAuto =
-                snackbarManager.getCurrentSnackbarViewForTesting().getViewForTesting().getHeight();
-
-        goToEdge();
-        int heightOnCover =
-                snackbarManager.getCurrentSnackbarViewForTesting().getViewForTesting().getHeight();
-        Assert.assertEquals(
-                "New padding has been added to adjusters when viewport-fit=cover.",
-                mEdgeToEdgeController.getBottomInsetPx(),
-                heightOnCover - heightOnAuto);
-
-        optOutOfToEdge();
-        heightOnAuto =
-                snackbarManager.getCurrentSnackbarViewForTesting().getViewForTesting().getHeight();
-        Assert.assertEquals(
-                "Padding to adjusters has been removed when viewport-fit=auto.",
-                mEdgeToEdgeController.getBottomInsetPx(),
-                heightOnCover - heightOnAuto);
-    }
-
-    @Test
-    @MediumTest
-    @EnableFeatures(ChromeFeatureList.FLOATING_SNACKBAR)
     public void testFloatingSnackbar() throws InterruptedException {
         activateFeatureToEdge();
         optOutOfToEdge();
         var snackbarManager = mActivity.getSnackbarManager();
-        snackbarManager.setEdgeToEdgeSupplier(mEdgeToEdgeController);
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     snackbarManager.showSnackbar(
@@ -316,13 +266,6 @@ public class EdgeToEdgeInstrumentationTest {
                 });
 
         UiUtils.settleDownUI(InstrumentationRegistry.getInstrumentation());
-
-        var adjuster =
-                snackbarManager
-                        .getCurrentSnackbarViewForTesting()
-                        .getEdgeToEdgePadAdjusterForTesting();
-        Assert.assertNull(
-                "Pad Adjuster is not used in the floating snackbar and should be null.", adjuster);
     }
 
     @Test
@@ -377,7 +320,7 @@ public class EdgeToEdgeInstrumentationTest {
                         + "opted in.",
                 Color.TRANSPARENT,
                 mActivity.getWindow().getNavigationBarColor());
-        assertNavigationBarColor(mActivity.getActivityTab().getBackgroundColor());
+        assertNavigationBarColor(mActivityTestRule.getActivityTab().getBackgroundColor());
 
         TabUiTestHelper.enterTabSwitcher(mActivity);
         assertEquals(
@@ -390,7 +333,7 @@ public class EdgeToEdgeInstrumentationTest {
                 "Should stay toEdge upon leaving the Tab Switcher.",
                 Color.TRANSPARENT,
                 mActivity.getWindow().getNavigationBarColor());
-        assertNavigationBarColor(mActivity.getActivityTab().getBackgroundColor());
+        assertNavigationBarColor(mActivityTestRule.getActivityTab().getBackgroundColor());
     }
 
     @Test
@@ -413,7 +356,8 @@ public class EdgeToEdgeInstrumentationTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
-    @EnableFeatures(ChromeFeatureList.EDGE_TO_EDGE_EVERYWHERE + ":e2e_everywhere_debug/true")
+    @EnableFeatures(ChromeFeatureList.EDGE_TO_EDGE_EVERYWHERE)
+    @CommandLineFlags.Add(UiSwitches.ENABLE_EDGE_TO_EDGE_DEBUG_LAYERS)
     public void testPadWithEdgeToEdgeLayout() throws IOException {
         goToEdge();
         assertDrawingToEdge();

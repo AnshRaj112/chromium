@@ -37,12 +37,16 @@ class WebFrame : public base::SupportsUserData {
   virtual bool IsMainFrame() const = 0;
   // The security origin associated with this frame.
   virtual url::Origin GetSecurityOrigin() const = 0;
+  // The URL associated with this frame. Important: for security-relevant
+  // decisions, do not use this function. Instead, use `GetSecurityOrigin()`. A
+  // `GURL` and an `Origin` are not interchangeable.
+  virtual GURL GetUrl() const = 0;
 
   // Returns the BrowserState associated with this WebFrame.
   virtual BrowserState* GetBrowserState() = 0;
 
   // Calls the JavaScript function `name` in the frame context. For example, to
-  // call __gCrWeb.formHandlers.trackFormMutations(delay), pass
+  // call trackFormMutations(delay) function from formHandlers API, pass
   // 'form.trackFormMutations' as `name` and the value for the delay parameter
   // to `parameters`. `name` must point to a function in the __gCrWeb object.
   // `parameters` is a vector of values that will be passed to the function.

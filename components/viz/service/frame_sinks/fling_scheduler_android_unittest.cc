@@ -91,9 +91,9 @@ class FlingSchedulerTest : public testing::Test,
     // Cleanup hierarchy.
     frame_sink_manager_->UnregisterFrameSinkHierarchy(kFrameSinkIdRoot,
                                                       kFrameSinkIdA);
-    frame_sink_manager_->InvalidateFrameSinkId(kFrameSinkIdRoot);
+    frame_sink_manager_->InvalidateFrameSinkId(kFrameSinkIdRoot, {});
     // Invalidating should destroy the CompositorFrameSinkImpl's.
-    frame_sink_manager_->InvalidateFrameSinkId(kFrameSinkIdA);
+    frame_sink_manager_->InvalidateFrameSinkId(kFrameSinkIdA, {});
 
     fling_controller_.reset();
     // Make sure that all FrameSinkSourceMappings have been deleted.
@@ -165,7 +165,7 @@ class FlingSchedulerTest : public testing::Test,
   }
 
   void InvalidateRootFrameSinkId() {
-    frame_sink_manager_->InvalidateFrameSinkId(kFrameSinkIdRoot);
+    frame_sink_manager_->InvalidateFrameSinkId(kFrameSinkIdRoot, {});
   }
 
  private:
@@ -181,8 +181,8 @@ class FlingSchedulerTest : public testing::Test,
 
   // Checks if a [Root]CompositorFrameSinkImpl exists for |frame_sink_id|.
   bool CompositorFrameSinkExists(const FrameSinkId& frame_sink_id) {
-    return base::Contains(frame_sink_manager_->sink_map_, frame_sink_id) ||
-           base::Contains(frame_sink_manager_->root_sink_map_, frame_sink_id);
+    return frame_sink_manager_->sink_map_.contains(frame_sink_id) ||
+           frame_sink_manager_->root_sink_map_.contains(frame_sink_id);
   }
 
   // Creates a CompositorFrameSinkImpl.

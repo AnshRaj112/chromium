@@ -5,7 +5,6 @@
 #ifndef COMPONENTS_PAYMENTS_CONTENT_SECURE_PAYMENT_CONFIRMATION_APP_FACTORY_H_
 #define COMPONENTS_PAYMENTS_CONTENT_SECURE_PAYMENT_CONFIRMATION_APP_FACTORY_H_
 
-#include <map>
 #include <memory>
 
 #include "base/memory/scoped_refptr.h"
@@ -15,9 +14,7 @@
 
 namespace payments {
 
-#if BUILDFLAG(IS_ANDROID)
 class BrowserBoundKeyStore;
-#endif  // BUILDFLAG(IS_ANDROID)
 struct SecurePaymentConfirmationCredential;
 
 class SecurePaymentConfirmationAppFactory : public PaymentAppFactory {
@@ -33,10 +30,8 @@ class SecurePaymentConfirmationAppFactory : public PaymentAppFactory {
   // PaymentAppFactory:
   void Create(base::WeakPtr<Delegate> delegate) override;
 
-#if BUILDFLAG(IS_ANDROID)
   void SetBrowserBoundKeyStoreForTesting(
       scoped_refptr<BrowserBoundKeyStore> key_store);
-#endif  // BUILDFLAG(IS_ANDROID)
 
   void SetCredentialFinderForTesting(
       std::unique_ptr<SecurePaymentConfirmationCredentialFinder>
@@ -63,9 +58,7 @@ class SecurePaymentConfirmationAppFactory : public PaymentAppFactory {
   // been set into the Request.
   void DidDownloadAllIcons(std::unique_ptr<Request> request);
 
-#if BUILDFLAG(IS_ANDROID)
   scoped_refptr<BrowserBoundKeyStore> browser_bound_key_store_for_testing_;
-#endif  // BUILDFLAG(IS_ANDROID)
 
   std::unique_ptr<SecurePaymentConfirmationCredentialFinder> credential_finder_;
 

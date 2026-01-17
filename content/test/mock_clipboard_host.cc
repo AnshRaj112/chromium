@@ -4,10 +4,11 @@
 
 #include "content/test/mock_clipboard_host.h"
 
+#include <algorithm>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/notreached.h"
+#include "base/numerics/byte_conversions.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
 #include "build/build_config.h"
@@ -41,7 +42,10 @@ void MockClipboardHost::Reset() {
 
 void MockClipboardHost::GetSequenceNumber(ui::ClipboardBuffer clipboard_buffer,
                                           GetSequenceNumberCallback callback) {
-  std::move(callback).Run(sequence_number_);
+  auto bytes = sequence_number_.value().AsBytes();
+  std::move(callback).Run(
+      absl::MakeUint128(base::U64FromLittleEndian(bytes.first<8>()),
+                        base::U64FromLittleEndian(bytes.last<8>())));
 }
 
 std::vector<std::u16string> MockClipboardHost::ReadStandardFormatNames() {
@@ -59,7 +63,7 @@ std::vector<std::u16string> MockClipboardHost::ReadStandardFormatNames() {
     types.push_back(ui::kMimeTypePng16);
   }
   for (auto& it : custom_data_) {
-    CHECK(!base::Contains(types, it.first));
+    CHECK(!std::ranges::contains(types, it.first));
     types.push_back(it.first);
   }
   return types;
@@ -225,7 +229,12 @@ void MockClipboardHost::RegisterClipboardListener(
 
 void MockClipboardHost::OnClipboardDataChanged() {
   if (clipboard_listener_) {
-    clipboard_listener_->OnClipboardDataChanged();
+    auto sequence_number_bytes = sequence_number_.value().AsBytes();
+    clipboard_listener_->OnClipboardDataChanged(
+        ReadStandardFormatNames(),
+        absl::MakeUint128(
+            base::U64FromLittleEndian(sequence_number_bytes.first<8>()),
+            base::U64FromLittleEndian(sequence_number_bytes.last<8>())));
   }
 }
 

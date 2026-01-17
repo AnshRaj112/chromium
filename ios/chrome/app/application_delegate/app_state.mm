@@ -9,7 +9,6 @@
 #import "base/apple/foundation_util.h"
 #import "base/ios/crb_protocol_observers.h"
 #import "base/strings/sys_string_conversions.h"
-#import "base/types/cxx23_to_underlying.h"
 #import "ios/chrome/app/application_delegate/app_state+Testing.h"
 #import "ios/chrome/app/application_delegate/app_state_observer.h"
 #import "ios/chrome/app/application_delegate/startup_information.h"
@@ -21,10 +20,10 @@
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/browser/browser_provider.h"
 #import "ios/chrome/browser/shared/model/browser/browser_provider_interface.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/help_commands.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 
 namespace {
 
@@ -164,8 +163,8 @@ BOOL ApplicationIsInBackground() {
   if (newInitStage == AppInitStage::kStart) {
     DCHECK_EQ(_initStage, AppInitStage::kStart);
   } else {
-    DCHECK_EQ(base::to_underlying(newInitStage),
-              base::to_underlying(_initStage) + 1);
+    DCHECK_EQ(std::to_underlying(newInitStage),
+              std::to_underlying(_initStage) + 1);
   }
 
   AppInitStage previousInitStage = _initStage;
@@ -197,7 +196,7 @@ BOOL ApplicationIsInBackground() {
                                        didTransitionFromInitStage:)] &&
       _initStage > AppInitStage::kStart) {
     AppInitStage previousInitStage =
-        static_cast<AppInitStage>(base::to_underlying(_initStage) - 1);
+        static_cast<AppInitStage>(std::to_underlying(_initStage) - 1);
     // Trigger an update on the newly added agent.
     [observer appState:self didTransitionFromInitStage:previousInitStage];
   }
@@ -232,7 +231,7 @@ BOOL ApplicationIsInBackground() {
 - (void)queueTransitionToNextInitStage {
   DCHECK_LT(_initStage, AppInitStage::kFinal);
   AppInitStage nextInitStage =
-      static_cast<AppInitStage>(base::to_underlying(_initStage) + 1);
+      static_cast<AppInitStage>(std::to_underlying(_initStage) + 1);
   [self queueTransitionToInitStage:nextInitStage];
 }
 
@@ -314,7 +313,12 @@ BOOL ApplicationIsInBackground() {
   // application state know so it can enable the clean exit beacon while work
   // is underway.
   if (ApplicationIsInBackground()) {
-    GetApplicationContext()->OnAppStartedBackgroundProcessing();
+    // Background refresh events can be triggered at odd times in the startup/
+    // shutdown cycle, so always ensure that the app context exists.
+    ApplicationContext* applicationContext = GetApplicationContext();
+    if (applicationContext) {
+      applicationContext->OnAppStartedBackgroundProcessing();
+    }
   }
 }
 
@@ -324,7 +328,12 @@ BOOL ApplicationIsInBackground() {
   // kills the app in the background at this point it should not be a crash for
   // the purposes of metrics or experiments.
   if (ApplicationIsInBackground()) {
-    GetApplicationContext()->OnAppFinishedBackgroundProcessing();
+    // Background refresh events can be triggered at odd times in the startup/
+    // shutdown cycle, so always ensure that the app context exists.
+    ApplicationContext* applicationContext = GetApplicationContext();
+    if (applicationContext) {
+      applicationContext->OnAppFinishedBackgroundProcessing();
+    }
   }
 }
 

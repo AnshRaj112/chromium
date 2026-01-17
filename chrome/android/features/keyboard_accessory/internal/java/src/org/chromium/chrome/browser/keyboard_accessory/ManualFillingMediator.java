@@ -4,6 +4,7 @@
 
 package org.chromium.chrome.browser.keyboard_accessory;
 
+import static org.chromium.chrome.browser.keyboard_accessory.ManualFillingProperties.FIELD_BOUNDS;
 import static org.chromium.chrome.browser.keyboard_accessory.ManualFillingProperties.IS_CREDENTIAL_FIELD_OR_HAS_AUTOFILL_SUGGESTIONS;
 import static org.chromium.chrome.browser.keyboard_accessory.ManualFillingProperties.IS_FULLSCREEN;
 import static org.chromium.chrome.browser.keyboard_accessory.ManualFillingProperties.KEYBOARD_EXTENSION_STATE;
@@ -18,33 +19,40 @@ import static org.chromium.chrome.browser.keyboard_accessory.ManualFillingProper
 import static org.chromium.chrome.browser.keyboard_accessory.ManualFillingProperties.SHOW_WHEN_VISIBLE;
 import static org.chromium.chrome.browser.keyboard_accessory.ManualFillingProperties.SUPPRESSED_BY_BOTTOM_SHEET;
 
+import android.content.res.Resources;
+import android.graphics.RectF;
 import android.util.SparseArray;
 import android.view.Surface;
 import android.view.View;
 import android.view.ViewGroup;
 
-import androidx.annotation.Nullable;
 import androidx.annotation.Px;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.view.WindowInsetsCompat;
 
 import org.chromium.base.Callback;
 import org.chromium.base.TraceEvent;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.NonNullObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.ObservableSuppliers;
+import org.chromium.base.supplier.SettableNonNullObservableSupplier;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.back_press.BackPressManager;
 import org.chromium.chrome.browser.compositor.CompositorViewHolder;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
+import org.chromium.chrome.browser.fullscreen.BrowserControlsManager;
 import org.chromium.chrome.browser.fullscreen.FullscreenManager;
 import org.chromium.chrome.browser.fullscreen.FullscreenOptions;
 import org.chromium.chrome.browser.keyboard_accessory.ManualFillingProperties.KeyboardExtensionState;
 import org.chromium.chrome.browser.keyboard_accessory.ManualFillingProperties.StateProperty;
 import org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryCoordinator;
+import org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryStyle;
+import org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryStyle.NotchPosition;
 import org.chromium.chrome.browser.keyboard_accessory.data.KeyboardAccessoryData;
 import org.chromium.chrome.browser.keyboard_accessory.data.KeyboardAccessoryData.Action;
-import org.chromium.chrome.browser.keyboard_accessory.data.PropertyProvider;
+import org.chromium.chrome.browser.keyboard_accessory.data.Provider;
 import org.chromium.chrome.browser.keyboard_accessory.sheet_component.AccessorySheetCoordinator;
 import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.AccessorySheetTabCoordinator;
 import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.AddressAccessorySheetCoordinator;
@@ -72,12 +80,11 @@ import org.chromium.components.browser_ui.widget.gesture.BackPressHandler;
 import org.chromium.content_public.browser.NavigationHandle;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsAccessibility;
-import org.chromium.ui.DropdownPopupWindow;
-import org.chromium.ui.base.ApplicationViewportInsetSupplier;
 import org.chromium.ui.base.DeviceInput;
 import org.chromium.ui.base.ViewUtils;
 import org.chromium.ui.base.ViewportInsets;
 import org.chromium.ui.base.WindowAndroid;
+import org.chromium.ui.display.DisplayUtil;
 import org.chromium.ui.modelutil.PropertyKey;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.ui.modelutil.PropertyObservable;
@@ -86,6 +93,7 @@ import org.chromium.ui.mojom.VirtualKeyboardMode;
 import java.util.HashSet;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * This part of the manual filling component manages the state of the manual filling flow depending
@@ -101,11 +109,12 @@ class ManualFillingMediator
     private static final int MIN_WINDOW_HEIGHT_FOR_UNDOCKED_BAR_DP = 480;
     private static final int MIN_WINDOW_WIDTH_FOR_UNDOCKED_BAR_DP = 600;
     private static final int EXPANDED_WINDOW_WIDTH_FOR_UNDOCKED_BAR_DP = 840;
+    private static final float MAXIMUM_BAR_WIDTH_PERCENTAGE = 0.7f;
 
     private final SparseArray<AccessorySheetTabCoordinator> mSheets = new SparseArray<>();
     private final PropertyModel mModel = ManualFillingProperties.createFillingModel();
     private WindowAndroid mWindowAndroid;
-    private ApplicationViewportInsetSupplier mApplicationViewportInsetSupplier;
+    private NonNullObservableSupplier<ViewportInsets> mApplicationViewportInsetTracker;
     private final ObservableSupplierImpl<Integer> mBottomInsetSupplier =
             new ObservableSupplierImpl<>();
     private final ManualFillingStateCache mStateCache = new ManualFillingStateCache();
@@ -114,7 +123,6 @@ class ManualFillingMediator
     private AccessorySheetCoordinator mAccessorySheet;
     private ChromeActivity mActivity; // Used to control the keyboard.
     private TabModelSelectorTabModelObserver mTabModelObserver;
-    private DropdownPopupWindow mPopup;
     private BottomSheetController mBottomSheetController;
     private ManualFillingComponent.SoftKeyboardDelegate mSoftKeyboardDelegate;
     private ConfirmationDialogHelper mConfirmationHelper;
@@ -122,12 +130,14 @@ class ManualFillingMediator
     private Supplier<EdgeToEdgeController> mEdgeToEdgeControllerSupplier = () -> null;
     private BooleanSupplier mIsContextualSearchOpened;
     private final Callback<ViewportInsets> mViewportInsetsObserver = this::onViewportInsetChanged;
-    private final ObservableSupplierImpl<Boolean> mBackPressChangedSupplier =
-            new ObservableSupplierImpl<>();
+    private final SettableNonNullObservableSupplier<Boolean> mBackPressChangedSupplier =
+            ObservableSuppliers.createNonNull(false);
+
     private final ObservableSupplierImpl<KeyboardAccessoryVisualStateProvider>
             mKeyboardAccessoryVisualStateSupplier = new ObservableSupplierImpl<>();
     private final ObservableSupplierImpl<AccessorySheetVisualStateProvider>
             mAccessorySheetVisualStateSupplier = new ObservableSupplierImpl<>();
+    private @Nullable BrowserControlsManager mControlsManager;
 
     private final TabObserver mTabObserver =
             new EmptyTabObserver() {
@@ -156,6 +166,13 @@ class ManualFillingMediator
                         Tab tab, NavigationHandle navigation) {
                     if (isInitialized() && !mKeyboardAccessory.empty()) {
                         updateExtensionStateAndKeyboard(isSoftKeyboardShowing(getContentView()));
+                    }
+                }
+
+                @Override
+                public void onContentViewScrollingStateChanged(boolean scrolling) {
+                    if (scrolling && shouldHideOnScroll()) {
+                        hide();
                     }
                 }
             };
@@ -196,7 +213,8 @@ class ManualFillingMediator
             BackPressManager backPressManager,
             Supplier<EdgeToEdgeController> edgeToEdgeControllerSupplier,
             ManualFillingComponent.SoftKeyboardDelegate keyboardDelegate,
-            ConfirmationDialogHelper confirmationHelper) {
+            ConfirmationDialogHelper confirmationHelper,
+            @Nullable BrowserControlsManager controlsManager) {
         mActivity = (ChromeActivity) windowAndroid.getActivity().get();
         assert mActivity != null;
         mWindowAndroid = windowAndroid;
@@ -210,15 +228,20 @@ class ManualFillingMediator
         mAccessorySheet = accessorySheet;
         mKeyboardAccessoryVisualStateSupplier.set(mKeyboardAccessory);
         mAccessorySheetVisualStateSupplier.set(mAccessorySheet);
+        if (controlsManager != null) {
+            mAccessorySheet.setContentOffsetSupplier(controlsManager::getContentOffset);
+        }
         mAccessorySheet.setOnPageChangeListener(mKeyboardAccessory.getOnPageChangeListener());
         mAccessorySheet.setHeight(getIdealSheetHeight());
-        mApplicationViewportInsetSupplier = mWindowAndroid.getApplicationBottomInsetSupplier();
-        mApplicationViewportInsetSupplier.addObserver(mViewportInsetsObserver);
+        mApplicationViewportInsetTracker =
+                mWindowAndroid.getApplicationBottomInsetTracker().getSupplier();
+        mApplicationViewportInsetTracker.addObserver(mViewportInsetsObserver);
         mActivity.findViewById(android.R.id.content).addOnLayoutChangeListener(this);
         mBackPressManager = backPressManager;
         mBackPressChangedSupplier.set(shouldHideOnBackPress());
         mBackPressManager.addHandler(this, Type.MANUAL_FILLING);
         mEdgeToEdgeControllerSupplier = edgeToEdgeControllerSupplier;
+        mControlsManager = controlsManager;
 
         mTabModelObserver =
                 new TabModelSelectorTabModelObserver(mActivity.getTabModelSelector()) {
@@ -256,7 +279,7 @@ class ManualFillingMediator
                                 || is(FLOATING_SHEET)));
     }
 
-    ObservableSupplier<Integer> getBottomInsetSupplier() {
+    MonotonicObservableSupplier<Integer> getBottomInsetSupplier() {
         return mBottomInsetSupplier;
     }
 
@@ -322,7 +345,7 @@ class ManualFillingMediator
     void registerSheetDataProvider(
             WebContents webContents,
             @AccessoryTabType int tabType,
-            PropertyProvider<KeyboardAccessoryData.AccessorySheetData> dataProvider) {
+            Provider<KeyboardAccessoryData.AccessorySheetData> dataProvider) {
         if (!isInitialized()) return;
         ManualFillingState state = mStateCache.getStateFor(webContents);
 
@@ -336,16 +359,17 @@ class ManualFillingMediator
         refreshTabs();
     }
 
-    void registerAutofillProvider(
-            PropertyProvider<List<AutofillSuggestion>> autofillProvider,
-            AutofillDelegate delegate) {
+    void setSuggestions(List<AutofillSuggestion> suggestions, AutofillDelegate delegate) {
         if (!isInitialized()) return;
         if (mKeyboardAccessory == null) return;
-        mKeyboardAccessory.registerAutofillProvider(autofillProvider, delegate);
+        mKeyboardAccessory.setSuggestions(suggestions, delegate);
     }
 
-    void registerActionProvider(
-            WebContents webContents, PropertyProvider<Action[]> actionProvider) {
+    void setFieldBounds(RectF bounds) {
+        mModel.set(FIELD_BOUNDS, bounds);
+    }
+
+    void registerActionProvider(WebContents webContents, Provider<Action[]> actionProvider) {
         if (!isInitialized()) return;
         ManualFillingState state = mStateCache.getStateFor(webContents);
 
@@ -362,7 +386,7 @@ class ManualFillingMediator
         for (Tab tab : mObservedTabs) tab.removeObserver(mTabObserver);
         mObservedTabs.clear();
         mActivity.getFullscreenManager().removeObserver(mFullscreenObserver);
-        mApplicationViewportInsetSupplier.removeObserver(mViewportInsetsObserver);
+        mApplicationViewportInsetTracker.removeObserver(mViewportInsetsObserver);
         mBottomSheetController.removeObserver(mBottomSheetObserver);
         mBackPressChangedSupplier.set(false);
         mBackPressManager.removeHandler(this);
@@ -385,7 +409,7 @@ class ManualFillingMediator
     }
 
     @Override
-    public ObservableSupplier<Boolean> getHandleBackPressChangedSupplier() {
+    public NonNullObservableSupplier<Boolean> getHandleBackPressChangedSupplier() {
         return mBackPressChangedSupplier;
     }
 
@@ -393,10 +417,6 @@ class ManualFillingMediator
         if (!isInitialized()) return;
         pause();
         hideSoftKeyboard();
-    }
-
-    void notifyPopupOpened(DropdownPopupWindow popup) {
-        mPopup = popup;
     }
 
     void show(boolean waitForKeyboard, boolean isCredentialFieldOrHasAutofillSuggestions) {
@@ -458,6 +478,9 @@ class ManualFillingMediator
         // TODO(bokan): Once mApplicationViewportInsetSupplier includes browser controls, we can use
         // CompositorViewHolder instead of WebContents and simply apply the viewVisibleHeightInset
         // to it, rather than awkwardly undoing the webContentsHeightInset.
+        // TODO(crbug.com/458644290): Confirm if space checks work correctly when dynamic
+        // positioning is used.
+
         WebContents webContents = mActivity.getCurrentWebContents();
         if (webContents == null || webContents.isDestroyed()) return false;
         float height = webContents.getHeight(); // In dip. Already insetted by top/bottom controls.
@@ -470,7 +493,7 @@ class ManualFillingMediator
         // bigger than an open keyboard — so if an open sheet affects the inset, we can safely
         // ignore it, too.
         height +=
-                mApplicationViewportInsetSupplier.get().webContentsHeightInset
+                mApplicationViewportInsetTracker.get().webContentsHeightInset
                         / mWindowAndroid.getDisplay().getDipScale();
 
         return height >= MINIMAL_AVAILABLE_VERTICAL_SPACE // Allows for a bar if not shown yet.
@@ -485,7 +508,7 @@ class ManualFillingMediator
         } else if (property == IS_FULLSCREEN) {
             if (isInitialized() && !mKeyboardAccessory.empty()) {
                 updateExtensionStateAndKeyboard(isSoftKeyboardShowing(getContentView()));
-                changeBottomControlSpaceForState(mModel.get(KEYBOARD_EXTENSION_STATE));
+                updateStyleAndControlSpaceForState(mModel.get(KEYBOARD_EXTENSION_STATE));
             }
             return;
         } else if (property == PORTRAIT_ORIENTATION) {
@@ -512,6 +535,9 @@ class ManualFillingMediator
             // Do nothing. IS_CREDENTIAL_FIELD_OR_HAS_AUTOFILL_SUGGESTIONS is used with
             // KEYBOARD_EXTENSION_STATE.
             return;
+        } else if (property == FIELD_BOUNDS) {
+            // Do nothing. FIELD_BOUNDS is used when keyboard accessory style is modified.
+            return;
         }
         throw new IllegalArgumentException("Unhandled property: " + property);
     }
@@ -523,7 +549,7 @@ class ManualFillingMediator
     private void transitionIntoState(@KeyboardExtensionState int extensionState) {
         if (!meetsStatePreconditions(extensionState)) return;
         TraceEvent.begin("ManualFillingMediator#transitionIntoState");
-        changeBottomControlSpaceForState(extensionState);
+        updateStyleAndControlSpaceForState(extensionState);
         enforceStateProperties(extensionState); // Triggers a relayout. Call after changing insets.
         updateKeyboard(extensionState);
         TraceEvent.end("ManualFillingMediator#transitionIntoState");
@@ -588,7 +614,37 @@ class ManualFillingMediator
                 && !mModel.get(IS_CREDENTIAL_FIELD_OR_HAS_AUTOFILL_SUGGESTIONS);
     }
 
-    private boolean isLargeFormFactor() {
+    /**
+     * @return Whether the last item in the Keyboard Accessory Bar should be sticky (aligned to the
+     *     end of the bar). The last item should not be sticky on large form factor devices as the
+     *     UI for these devices is different.
+     */
+    private boolean shouldHaveStickyLastItem() {
+        return !(isLargeFormFactor()
+                && ChromeFeatureList.isEnabled(
+                        ChromeFeatureList.AUTOFILL_ANDROID_DESKTOP_KEYBOARD_ACCESSORY_REVAMP));
+    }
+
+    /**
+     * @return Whether suggestions should animate from the top instead of horizontally. This
+     *     vertical animation is specific to the revamped UI on large form factor devices.
+     */
+    private boolean shouldAnimateSuggestionsFromTop() {
+        return isLargeFormFactor()
+                && ChromeFeatureList.isEnabled(
+                        ChromeFeatureList.AUTOFILL_ANDROID_DESKTOP_KEYBOARD_ACCESSORY_REVAMP);
+    }
+
+    /**
+     * @return Whether Keyboard Accessory should hide on page scroll.
+     */
+    private boolean shouldHideOnScroll() {
+        return isLargeFormFactor()
+                && ChromeFeatureList.isEnabled(
+                        ChromeFeatureList.AUTOFILL_ANDROID_KEYBOARD_ACCESSORY_DYNAMIC_POSITIONING);
+    }
+
+    public boolean isLargeFormFactor() {
         int windowWidthDp = mActivity.getResources().getConfiguration().screenWidthDp;
         int windowHeightDp = mActivity.getResources().getConfiguration().screenHeightDp;
         boolean isPhysicalKeyboardConnected =
@@ -608,6 +664,8 @@ class ManualFillingMediator
     private void enforceStateProperties(@KeyboardExtensionState int extensionState) {
         TraceEvent.begin("ManualFillingMediator#enforceStateProperties");
         if (requiresVisibleBar(extensionState)) {
+            mKeyboardAccessory.setHasStickyLastItem(shouldHaveStickyLastItem());
+            mKeyboardAccessory.setAnimateSuggestionsFromTop(shouldAnimateSuggestionsFromTop());
             mKeyboardAccessory.show();
         } else {
             mKeyboardAccessory.dismiss();
@@ -623,12 +681,12 @@ class ManualFillingMediator
             // to trigger events that rely on the relayout (like toggling the overview button):
             Supplier<CompositorViewHolder> compositorViewHolderSupplier =
                     mActivity.getCompositorViewHolderSupplier();
-            if (compositorViewHolderSupplier.hasValue()) {
+            var compositorViewHolder = compositorViewHolderSupplier.get();
+            if (compositorViewHolder != null) {
                 // The CompositorViewHolder is null when the activity is in the process of being
                 // destroyed which also renders relayouting pointless.
                 ViewUtils.requestLayout(
-                        compositorViewHolderSupplier.get(),
-                        "ManualFillingMediator.enforceStateProperties");
+                        compositorViewHolder, "ManualFillingMediator.enforceStateProperties");
             }
             trySetA11yFocusOnWebContents();
         }
@@ -683,7 +741,6 @@ class ManualFillingMediator
     public void onChangeAccessorySheet(int tabIndex) {
         if (!isInitialized()) return;
         mAccessorySheet.setActiveTab(tabIndex);
-        if (mPopup != null && mPopup.isShowing()) mPopup.dismiss();
         if (is(EXTENDING_KEYBOARD)) {
             mModel.set(KEYBOARD_EXTENSION_STATE, REPLACING_KEYBOARD);
         } else if (is(FLOATING_BAR)) {
@@ -733,10 +790,113 @@ class ManualFillingMediator
                 title, message, confirmButtonText, confirmedCallback, declinedCallback);
     }
 
-    private void changeBottomControlSpaceForState(int extensionState) {
+    /**
+     * Gets the keyboard accessory's top offset. Since these are viewport coordinates, the browser
+     * controls height must be added to position it correctly relative to the web content.
+     */
+    private @Px int getTopOffset() {
+        if (mControlsManager == null) {
+            return 0;
+        }
+        @Px int contentOffset = mControlsManager.getContentOffset();
+
+        if (ChromeFeatureList.isEnabled(
+                ChromeFeatureList.AUTOFILL_ANDROID_KEYBOARD_ACCESSORY_DYNAMIC_POSITIONING)) {
+            return getTopOffsetForDynamicPositioning() + contentOffset;
+        }
+
+        int topInsetOverlap =
+                mActivity
+                        .getResources()
+                        .getDimensionPixelOffset(R.dimen.keyboard_accessory_top_inset_overlap);
+        return Math.max(0, contentOffset - topInsetOverlap);
+    }
+
+    private @Px int getFocusedFieldBottomPx() {
+        return Math.round(
+                mModel.get(FIELD_BOUNDS).bottom * mWindowAndroid.getDisplay().getDipScale());
+    }
+
+    private @Px int getFocusedFieldTopPx() {
+        return Math.round(mModel.get(FIELD_BOUNDS).top * mWindowAndroid.getDisplay().getDipScale());
+    }
+
+    private @Px int getBarWithNotchHeightPx() {
+        Resources resources = mActivity.getResources();
+        return resources.getDimensionPixelSize(R.dimen.keyboard_accessory_height_redesign)
+                + resources.getDimensionPixelSize(R.dimen.keyboard_accessory_notch_height);
+    }
+
+    private @Px int getTopOffsetForDynamicPositioning() {
+        return getNotchPositionForDynamicPositioning() == NotchPosition.TOP
+                ? getFocusedFieldBottomPx()
+                : getFocusedFieldTopPx() - getBarWithNotchHeightPx();
+    }
+
+    private @NotchPosition int getNotchPositionForDynamicPositioning() {
+        CompositorViewHolder compositorViewHolder =
+                mActivity.getCompositorViewHolderSupplier().get();
+        RectF viewport = new RectF();
+        compositorViewHolder.getVisibleViewport(viewport);
+
+        @Px int viewportHeight = Math.round(viewport.height());
+
+        // Display the notch below the bar.
+        if (viewportHeight - getFocusedFieldBottomPx() > getBarWithNotchHeightPx()) {
+            return NotchPosition.TOP;
+        }
+        // Display the notch above the bar.
+        return NotchPosition.BOTTOM;
+    }
+
+    /**
+     * For dynamically positioned keyboard accessory, the horizontal offset is provided as the left
+     * boundary of the focused field, ensuring the bar is displayed near the field.
+     */
+    private @Px int getHorizontalOffset() {
+        if (ChromeFeatureList.isEnabled(
+                ChromeFeatureList.AUTOFILL_ANDROID_KEYBOARD_ACCESSORY_DYNAMIC_POSITIONING)) {
+            return Math.round(
+                    mModel.get(FIELD_BOUNDS).left * mWindowAndroid.getDisplay().getDipScale());
+        }
+        return 0;
+    }
+
+    private @Px int getMaxWidth() {
+        int screenWidthDp = mActivity.getResources().getConfiguration().screenWidthDp;
+        @Px int screenWidth = DisplayUtil.dpToPx(mWindowAndroid.getDisplay(), screenWidthDp);
+        return (int) (MAXIMUM_BAR_WIDTH_PERCENTAGE * screenWidth);
+    }
+
+    // TODO(crbug.com/469956054): Make this method more readable.
+    private void updateStyleAndControlSpaceForState(int extensionState) {
         if (extensionState == WAITING_TO_REPLACE) return; // Don't change yet.
-        int newControlsHeight = 0;
+
         int newControlsOffset = 0;
+        if (isLargeFormFactor()
+                && ChromeFeatureList.isEnabled(
+                        ChromeFeatureList.AUTOFILL_ANDROID_DESKTOP_KEYBOARD_ACCESSORY_REVAMP)) {
+            if (requiresVisibleBar(extensionState)) {
+                mKeyboardAccessory.setStyle(
+                        KeyboardAccessoryStyle.createUndockedKeyboardAccessoryStyle(
+                                getHorizontalOffset(),
+                                getTopOffset(),
+                                getMaxWidth(),
+                                getNotchPositionForDynamicPositioning()));
+                mBottomInsetSupplier.set(0);
+                return;
+            }
+            if (requiresVisibleSheet(extensionState)
+                    && ChromeFeatureList.isEnabled(
+                            ChromeFeatureList
+                                    .AUTOFILL_ANDROID_KEYBOARD_ACCESSORY_DYNAMIC_POSITIONING)) {
+                mAccessorySheet.setStyle(/* isDocked= */ false);
+                mBottomInsetSupplier.set(0);
+                return;
+            }
+        }
+
+        int newControlsHeight = 0;
         if (requiresVisibleBar(extensionState)) {
             boolean isEdgeToEdgeActive = mEdgeToEdgeControllerSupplier.get() != null;
             // TODO(crbug.com/41483806): Treat VirtualKeyboardMode.OVERLAYS_CONTENT like fullscreen?
@@ -759,8 +919,12 @@ class ManualFillingMediator
                                     .getResources()
                                     .getDimensionPixelSize(R.dimen.toolbar_shadow_height);
             newControlsOffset += mAccessorySheet.getHeight();
+            mAccessorySheet.setStyle(/* isDocked= */ true);
         }
-        mKeyboardAccessory.setBottomOffset(newControlsOffset);
+        if (requiresVisibleBar(extensionState)) {
+            mKeyboardAccessory.setStyle(
+                    KeyboardAccessoryStyle.createDockedKeyboardAccessoryStyle(newControlsOffset));
+        }
         mBottomInsetSupplier.set(newControlsHeight);
     }
 
@@ -821,15 +985,23 @@ class ManualFillingMediator
     }
 
     private boolean isSoftKeyboardShowing(@Nullable View view) {
-        return view != null && mSoftKeyboardDelegate.isSoftKeyboardShowing(mActivity, view);
+        return view != null && mSoftKeyboardDelegate.isSoftKeyboardShowing(view);
     }
 
     /**
      * Uses the keyboard (if available) to determine the height of the accessory sheet.
      *
-     * @return The estimated keyboard height or enough space to display at least three suggestions.
+     * @return The estimated keyboard height or enough space to display at least three suggestions
+     *     (in Px). If dynamic positioning is used it returns WRAP_CONTENT.
      */
-    private @Px int calculateAccessorySheetHeight() {
+    private int calculateAccessorySheetHeight() {
+        // When the dynamic positioning the height is adjusted based on the content.
+        if (isLargeFormFactor()
+                && ChromeFeatureList.isEnabled(
+                        ChromeFeatureList
+                                .AUTOFILL_ANDROID_KEYBOARD_ACCESSORY_DYNAMIC_POSITIONING)) {
+            return ViewGroup.LayoutParams.WRAP_CONTENT;
+        }
         int minimalSheetHeight = getIdealSheetHeight();
         int newSheetHeight = getKeyboardAndNavigationHeight() + getHeaderHeight();
         return Math.max(newSheetHeight, minimalSheetHeight);
@@ -870,7 +1042,7 @@ class ManualFillingMediator
         // viewport height (minus browser controls). This will correctly account for the virtual
         // keyboard mode which is baked into webContents' height. The CompositorViewHolder is
         // resized by the soft keyboard.
-        visibleViewportHeightPx += mApplicationViewportInsetSupplier.get().webContentsHeightInset;
+        visibleViewportHeightPx += mApplicationViewportInsetTracker.get().webContentsHeightInset;
 
         // Now remove the insets coming from this class. This will already include the sheet height.
         visibleViewportHeightPx -= mBottomInsetSupplier.get();
@@ -887,9 +1059,17 @@ class ManualFillingMediator
 
         // Adjust the height such that the new visible height will be exactly
         // MINIMAL_AVAILABLE_VERTICAL_SPACE.
-        mAccessorySheet.setHeight(
-                visibleViewportHeightPx + mAccessorySheet.getHeight() - minimumVerticalSpacePx);
-        changeBottomControlSpaceForState(mModel.get(KEYBOARD_EXTENSION_STATE));
+        // When the dynamic positioning the height is adjusted based on the content.
+        if (isLargeFormFactor()
+                && ChromeFeatureList.isEnabled(
+                        ChromeFeatureList
+                                .AUTOFILL_ANDROID_KEYBOARD_ACCESSORY_DYNAMIC_POSITIONING)) {
+            mAccessorySheet.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+        } else {
+            mAccessorySheet.setHeight(
+                    visibleViewportHeightPx + mAccessorySheet.getHeight() - minimumVerticalSpacePx);
+        }
+        updateStyleAndControlSpaceForState(mModel.get(KEYBOARD_EXTENSION_STATE));
     }
 
     private void refreshTabs() {
@@ -1011,12 +1191,22 @@ class ManualFillingMediator
     }
 
     private @Px int getBarHeightWithoutShadow() {
-        return mActivity
-                .getResources()
-                .getDimensionPixelSize(R.dimen.keyboard_accessory_suggestion_height);
+        if (ChromeFeatureList.isEnabled(
+                ChromeFeatureList.AUTOFILL_ENABLE_KEYBOARD_ACCESSORY_CHIP_REDESIGN)) {
+            return mActivity
+                    .getResources()
+                    .getDimensionPixelSize(R.dimen.keyboard_accessory_height_redesign);
+        }
+        return mActivity.getResources().getDimensionPixelSize(R.dimen.keyboard_accessory_height);
     }
 
     private @Px int getHeaderHeight() {
+        if (ChromeFeatureList.isEnabled(
+                ChromeFeatureList.AUTOFILL_ENABLE_KEYBOARD_ACCESSORY_CHIP_REDESIGN)) {
+            return mActivity
+                    .getResources()
+                    .getDimensionPixelSize(R.dimen.keyboard_accessory_height_with_shadow_redesign);
+        }
         return mActivity
                 .getResources()
                 .getDimensionPixelSize(R.dimen.keyboard_accessory_height_with_shadow);
@@ -1036,7 +1226,7 @@ class ManualFillingMediator
      * Returns the supplier for a {@link KeyboardAccessoryVisualStateProvider} that can be observed
      * to be notified of changes to the visual state of the keyboard accessory.
      */
-    ObservableSupplier<KeyboardAccessoryVisualStateProvider>
+    MonotonicObservableSupplier<KeyboardAccessoryVisualStateProvider>
             getKeyboardAccessoryVisualStateProvider() {
         return mKeyboardAccessoryVisualStateSupplier;
     }
@@ -1045,7 +1235,8 @@ class ManualFillingMediator
      * Returns a supplier for {@link AccessorySheetVisualStateProvider} that can be observed to be
      * notified of changes to the visual state of the accessory sheet.
      */
-    ObservableSupplier<AccessorySheetVisualStateProvider> getAccessorySheetVisualStateProvider() {
+    MonotonicObservableSupplier<AccessorySheetVisualStateProvider>
+            getAccessorySheetVisualStateProvider() {
         return mAccessorySheetVisualStateSupplier;
     }
 

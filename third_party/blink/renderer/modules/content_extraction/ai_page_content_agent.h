@@ -1,11 +1,11 @@
-// Copyright 2024 The Chromium Authors
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_CONTENT_EXTRACTION_AI_PAGE_CONTENT_AGENT_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_CONTENT_EXTRACTION_AI_PAGE_CONTENT_AGENT_H_
 
-#include "base/functional/callback_forward.h"
+#include "base/functional/callback.h"
 #include "base/memory/stack_allocated.h"
 #include "base/types/pass_key.h"
 #include "mojo/public/cpp/bindings/lib/validation_context.h"
@@ -19,12 +19,17 @@
 #include "third_party/blink/renderer/platform/mojo/heap_mojo_receiver_set.h"
 #include "third_party/blink/renderer/platform/mojo/heap_mojo_wrapper_mode.h"
 #include "third_party/blink/renderer/platform/supplementable.h"
+#include "third_party/blink/renderer/platform/wtf/hash_map.h"
+#include "third_party/blink/renderer/platform/wtf/hash_traits.h"
 
 namespace blink {
 class Document;
 class LayoutIFrame;
 class LayoutObject;
 class LocalFrame;
+#if DCHECK_IS_ON()
+class AutoBuildHelper;
+#endif
 
 // AIPageContent is responsible for handling requests for inner-text. It calls
 // to InnerTextBuilder to handle building of the text.
@@ -41,6 +46,11 @@ class MODULES_EXPORT AIPageContentAgent final
       mojo::PendingReceiver<mojom::blink::AIPageContentAgent> receiver);
 
   static AIPageContentAgent* GetOrCreateForTesting(Document&);
+#if DCHECK_IS_ON()
+  // If enabled, the ContentNode tree will be automatically built on page load.
+  static void EnableAutomaticActionableExtractionOnPageLoadForTesting(
+      LocalFrame&);
+#endif
 
   AIPageContentAgent(base::PassKey<AIPageContentAgent>, LocalFrame&);
   AIPageContentAgent(const AIPageContentAgent&) = delete;
@@ -58,6 +68,16 @@ class MODULES_EXPORT AIPageContentAgent final
       const mojom::blink::AIPageContentOptions& options) const;
   // LocalFrameView::LifecycleNotificationObserver overrides.
   void DidFinishPostLifecycleSteps(const LocalFrameView&) override;
+
+  String DumpContentNodeTreeForTest();
+  String DumpContentNodeForTest(Node* node);
+
+#if DCHECK_IS_ON()
+  // Called by the DOMContentLoaded listener to kick off auto-build; this is
+  // only used by tests to ensure we run cleanly without triggering crashes or
+  // checks/dchecks.
+  void RunAutoBuildAfterDOMContentLoadedForTesting();
+#endif
 
  private:
   void GetAIPageContentSync(mojom::blink::AIPageContentOptionsPtr options,
@@ -109,6 +129,8 @@ class MODULES_EXPORT AIPageContentAgent final
         const LocalFrame& frame,
         mojom::blink::AIPageContentFrameInteractionInfo&
             frame_interaction_info);
+    void MaybeAddPopupData(LocalFrame& frame,
+                           mojom::blink::AIPageContentFrameData& frame_data);
     void AddAriaRole(const LayoutObject& object,
                      mojom::blink::AIPageContentAttributes& attributes);
     void AddNodeInteractionInfo(
@@ -120,10 +142,9 @@ class MODULES_EXPORT AIPageContentAgent final
         mojom::blink::AIPageContentNodeInteractionInfo& interaction_info) const;
     void AddMetaData(
         const LocalFrame& frame,
-        WTF::Vector<mojom::blink::AIPageContentMetaPtr>& meta_data) const;
-    void AddNodeGeometry(
-        const LayoutObject& object,
-        mojom::blink::AIPageContentAttributes& attributes) const;
+        Vector<mojom::blink::AIPageContentMetaPtr>& meta_data) const;
+    void AddNodeGeometry(const LayoutObject& object,
+                         mojom::blink::AIPageContentAttributes& attributes);
     void AddAnnotatedRoles(const LayoutObject& object,
                            Vector<mojom::blink::AIPageContentAnnotatedRole>&
                                annotated_roles) const;
@@ -141,9 +162,16 @@ class MODULES_EXPORT AIPageContentAgent final
         const mojom::blink::AIPageContentAttributes& attributes) const;
 
     void AddInteractiveNode(DOMNodeId dom_node_id);
-    void ComputeHitTestableNodesInViewport(
-        const LocalFrame& frame,
-        mojom::blink::AIPageContentFrameData& frame_data);
+    void ComputeHitTestableNodesInViewport(const LocalFrame& frame);
+
+    void UpdateLifecycle(Document& document);
+
+    void TrackPasswordRedactionIfNeeded(
+        const LayoutObject& object,
+        mojom::blink::AIPageContentAttributes& attributes,
+        std::optional<gfx::Rect> visible_bounding_box = std::nullopt);
+
+    Vector<gfx::Rect> visible_bounding_box_for_passwords_;
 
     // The set of nodes which are involved in a user interaction and must
     // produce a ContentNode.
@@ -155,7 +183,8 @@ class MODULES_EXPORT AIPageContentAgent final
 
     const raw_ref<const mojom::blink::AIPageContentOptions> options_;
 
-    base::flat_map<DOMNodeId, int32_t> dom_node_to_z_order_;
+    HashMap<DOMNodeId, int32_t, IntWithZeroKeyHashTraits<DOMNodeId>>
+        dom_node_to_z_order_;
 
     // Whether the stack depth has exceeded the max tree depth.
     bool stack_depth_exceeded_ = false;
@@ -165,13 +194,21 @@ class MODULES_EXPORT AIPageContentAgent final
   };
 
   void Bind(mojo::PendingReceiver<mojom::blink::AIPageContentAgent> receiver);
+  void EnsureLifecycleObserverRegistered();
 
   HeapMojoReceiverSet<mojom::blink::AIPageContentAgent, AIPageContentAgent>
       receiver_set_;
   // Already registered for lifetime notifications.
-  bool is_registered_ = false;
+  bool is_lifecycle_observer_registered_ = false;
   // Tasks to run when post lifecycle.
-  WTF::Vector<base::OnceClosure> async_extraction_tasks_;
+  Vector<base::OnceClosure> async_extraction_tasks_;
+
+#if DCHECK_IS_ON()
+  void ListenForDOMContentLoadedForAutoBuild();
+  AutoBuildHelper* GetOrCreateAutoBuildHelper();
+  Member<AutoBuildHelper> auto_build_helper_;
+  friend class AutoBuildHelper;
+#endif
 };
 
 }  // namespace blink

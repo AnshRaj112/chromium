@@ -6,7 +6,7 @@
 
 #import "base/strings/string_util.h"
 #import "base/strings/sys_string_conversions.h"
-#import "ios/chrome/browser/intelligence/bwg/metrics/bwg_metrics.h"
+#import "ios/chrome/browser/intelligence/bwg/metrics/gemini_metrics.h"
 #import "ios/chrome/browser/intelligence/bwg/ui/bwg_consent_mutator.h"
 #import "ios/chrome/browser/intelligence/bwg/ui/bwg_ui_utils.h"
 #import "ios/chrome/browser/intelligence/bwg/utils/bwg_constants.h"
@@ -14,6 +14,7 @@
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/common/string_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
+#import "ios/chrome/common/ui/util/chrome_button.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util.h"
@@ -38,20 +39,10 @@ const CGFloat kBoxesStackViewCornerRadius = 16.0;
 const CGFloat kInnerStackViewSpacing = 6.0;
 const CGFloat kInnerStackViewPadding = 12.0;
 
-// Spacing between primary and secondary buttons.
-const CGFloat kSpacingPrimarySecondaryButtons = 0.0;
+// Spacing for primary and secondary buttons.
+const CGFloat kSpacingPrimarySecondaryButtonsIOS26 = 4.0;
+const CGFloat kSpacingPrimarySecondaryButtonsIOS18 = 0;
 
-// Action identifier on a tap on links in the footnote.
-NSString* const kFirstFootnoteLinkAction = @"firstFootnoteLinkAction";
-NSString* const kSecondFootnoteLinkAction = @"secondFootnoteLinkAction";
-NSString* const kFootnoteLinkActionManagedAccount =
-    @"footnoteLinkActionManagedAccount";
-NSString* const kSecondBoxLinkActionManagedAccount =
-    @"secondBoxLinkActionManagedAccount";
-NSString* const kSecondBoxLink1ActionNonManagedAccount =
-    @"secondBoxLink1ActionNonManagedAccount";
-NSString* const kSecondBoxLink2ActionNonManagedAccount =
-    @"secondBoxLink2ActionNonManagedAccount";
 
 }  // namespace
 
@@ -158,11 +149,12 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
 
     NSRange linkRange = [fullText rangeOfString:linkText];
 
-    return [self createAttributedString:fullText
-                        withLinkActions:@[ kFootnoteLinkActionManagedAccount ]
-                               inRanges:@[ [NSValue valueWithRange:linkRange] ]
-                         textAttributes:textAttributes
-                              fontStyle:fontStyle];
+    return
+        [self createAttributedString:fullText
+                     withLinkActions:@[ kBwgFootnoteLinkActionManagedAccount ]
+                            inRanges:@[ [NSValue valueWithRange:linkRange] ]
+                      textAttributes:textAttributes
+                           fontStyle:fontStyle];
   }
 
   NSString* link1NSString =
@@ -184,7 +176,7 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
   NSRange link2Range = [fullText rangeOfString:link2NSString];
 
   NSArray<NSString*>* linkActions =
-      @[ kFirstFootnoteLinkAction, kSecondFootnoteLinkAction ];
+      @[ kBwgFirstFootnoteLinkAction, kBwgSecondFootnoteLinkAction ];
   NSArray<NSValue*>* linkRanges = @[
     [NSValue valueWithRange:link1Range], [NSValue valueWithRange:link2Range]
   ];
@@ -219,11 +211,12 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
 
     NSRange linkRange = [fullText rangeOfString:linkText];
 
-    return [self createAttributedString:fullText
-                        withLinkActions:@[ kSecondBoxLinkActionManagedAccount ]
-                               inRanges:@[ [NSValue valueWithRange:linkRange] ]
-                         textAttributes:textAttributes
-                              fontStyle:fontStyle];
+    return
+        [self createAttributedString:fullText
+                     withLinkActions:@[ kBwgSecondBoxLinkActionManagedAccount ]
+                            inRanges:@[ [NSValue valueWithRange:linkRange] ]
+                      textAttributes:textAttributes
+                           fontStyle:fontStyle];
   }
 
   NSString* link1NSString = l10n_util::GetNSString(
@@ -246,8 +239,8 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
   NSRange link2Range = [fullText rangeOfString:link2NSString];
 
   NSArray<NSString*>* linkActions = @[
-    kSecondBoxLink1ActionNonManagedAccount,
-    kSecondBoxLink2ActionNonManagedAccount
+    kBwgSecondBoxLink1ActionNonManagedAccount,
+    kBwgSecondBoxLink2ActionNonManagedAccount
   ];
   NSArray<NSValue*>* linkRanges = @[
     [NSValue valueWithRange:link1Range], [NSValue valueWithRange:link2Range]
@@ -271,7 +264,7 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
 
   [self.view addSubview:_mainStackView];
   AddSameConstraintsWithInsets(
-      _mainStackView, self.view.safeAreaLayoutGuide,
+      _mainStackView, self.view,
       NSDirectionalEdgeInsetsMake(0, kMainStackHorizontalInset, 0,
                                   kMainStackHorizontalInset));
   [_mainStackView addArrangedSubview:[self createBoxesStackView]];
@@ -283,8 +276,13 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
 - (void)configureButtons {
   UIView* primaryButtonView = [self createPrimaryButton];
   [_mainStackView addArrangedSubview:primaryButtonView];
-  [_mainStackView setCustomSpacing:kSpacingPrimarySecondaryButtons
-                         afterView:primaryButtonView];
+  if (@available(iOS 26, *)) {
+    [_mainStackView setCustomSpacing:kSpacingPrimarySecondaryButtonsIOS26
+                           afterView:primaryButtonView];
+  } else {
+    [_mainStackView setCustomSpacing:kSpacingPrimarySecondaryButtonsIOS18
+                           afterView:primaryButtonView];
+  }
   [_mainStackView addArrangedSubview:[self createSecondaryButton]];
 }
 
@@ -409,6 +407,7 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
   titleLabel.text = titleText;
   titleLabel.font =
       PreferredFontForTextStyle(UIFontTextStyleHeadline, UIFontWeightSemibold);
+  titleLabel.accessibilityTraits |= UIAccessibilityTraitHeader;
 
   titleLabel.numberOfLines = 0;
   [innerStackView addArrangedSubview:titleLabel];
@@ -447,6 +446,7 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
   titleLabel.text = titleText;
   titleLabel.font =
       PreferredFontForTextStyle(UIFontTextStyleHeadline, UIFontWeightSemibold);
+  titleLabel.accessibilityTraits |= UIAccessibilityTraitHeader;
 
   titleLabel.numberOfLines = 0;
   [innerStackView addArrangedSubview:titleLabel];
@@ -479,46 +479,54 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
   footNoteTextView.linkTextAttributes =
       @{NSForegroundColorAttributeName : [UIColor colorNamed:kBlue600Color]};
   footNoteTextView.attributedText = [self createFootnoteAttributedText];
+  footNoteTextView.accessibilityIdentifier =
+      kBwgFootNoteTextViewAccessibilityIdentifier;
 
   return footNoteTextView;
 }
 
 // Creates the primary button.
 - (UIButton*)createPrimaryButton {
-  UIButton* primaryButton = [BWGUIUtils
-      createPrimaryButtonWithTitle:l10n_util::GetNSString(
-                                       IDS_IOS_BWG_CONSENT_PRIMARY_BUTTON)];
+  ChromeButton* primaryButton =
+      [[ChromeButton alloc] initWithStyle:ChromeButtonStylePrimary];
+  primaryButton.title =
+      l10n_util::GetNSString(IDS_IOS_BWG_CONSENT_PRIMARY_BUTTON);
   [primaryButton addTarget:self
                     action:@selector(didTapPrimaryButton:)
           forControlEvents:UIControlEventTouchUpInside];
   primaryButton.accessibilityLabel =
       l10n_util::GetNSString(IDS_IOS_BWG_CONSENT_PRIMARY_BUTTON);
+  primaryButton.accessibilityIdentifier =
+      kBwgPrimaryButtonAccessibilityIdentifier;
   return primaryButton;
 }
 
 // Creates the secondary button.
 - (UIButton*)createSecondaryButton {
-  UIButton* secondaryButton = [BWGUIUtils
-      createSecondaryButtonWithTitle:l10n_util::GetNSString(
-                                         IDS_IOS_BWG_CONSENT_SECONDARY_BUTTON)];
+  ChromeButton* secondaryButton =
+      [[ChromeButton alloc] initWithStyle:ChromeButtonStyleSecondary];
+  secondaryButton.title =
+      l10n_util::GetNSString(IDS_IOS_BWG_CONSENT_SECONDARY_BUTTON);
   [secondaryButton addTarget:self
                       action:@selector(didTapSecondaryButton:)
             forControlEvents:UIControlEventTouchUpInside];
   secondaryButton.accessibilityLabel =
       l10n_util::GetNSString(IDS_IOS_BWG_CONSENT_SECONDARY_BUTTON);
+  secondaryButton.accessibilityIdentifier =
+      kBwgSecondaryButtonAccessibilityIdentifier;
   return secondaryButton;
 }
 
 // Did tap the primary button.
 - (void)didTapPrimaryButton:(UIButton*)sender {
   RecordFREConsentAction(IOSGeminiFREAction::kAccept);
-  [self.mutator didConsentBWG];
+  [self.mutator didConsentGemini];
 }
 
 // Did tap the secondary button.
 - (void)didTapSecondaryButton:(UIButton*)sender {
   RecordFREConsentAction(IOSGeminiFREAction::kDismiss);
-  [self.mutator didRefuseBWGConsent];
+  [self.mutator didRefuseGeminiConsent];
 }
 
 #pragma mark - UITextViewDelegate
@@ -530,28 +538,31 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
   if (!textItem.link) {
     return nil;
   }
-  if ([textItem.link.absoluteString isEqualToString:kFirstFootnoteLinkAction]) {
+
+  RecordFREConsentAction(IOSGeminiFREAction::kLinkClick);
+  if ([textItem.link.absoluteString
+          isEqualToString:kBwgFirstFootnoteLinkAction]) {
     __weak __typeof(self) weakSelf = self;
     return [UIAction actionWithHandler:^(UIAction* action) {
       [weakSelf.mutator openNewTabWithURL:GURL(kFirstFootnoteLinkURL)];
     }];
   }
   if ([textItem.link.absoluteString
-          isEqualToString:kSecondFootnoteLinkAction]) {
+          isEqualToString:kBwgSecondFootnoteLinkAction]) {
     __weak __typeof(self) weakSelf = self;
     return [UIAction actionWithHandler:^(UIAction* action) {
       [weakSelf.mutator openNewTabWithURL:GURL(kSecondFootnoteLinkURL)];
     }];
   }
   if ([textItem.link.absoluteString
-          isEqualToString:kFootnoteLinkActionManagedAccount]) {
+          isEqualToString:kBwgFootnoteLinkActionManagedAccount]) {
     __weak __typeof(self) weakSelf = self;
     return [UIAction actionWithHandler:^(UIAction* action) {
       [weakSelf.mutator openNewTabWithURL:GURL(kFootnoteLinkURLManagedAccount)];
     }];
   }
   if ([textItem.link.absoluteString
-          isEqualToString:kSecondBoxLinkActionManagedAccount]) {
+          isEqualToString:kBwgSecondBoxLinkActionManagedAccount]) {
     __weak __typeof(self) weakSelf = self;
     return [UIAction actionWithHandler:^(UIAction* action) {
       [weakSelf.mutator
@@ -559,7 +570,7 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
     }];
   }
   if ([textItem.link.absoluteString
-          isEqualToString:kSecondBoxLink1ActionNonManagedAccount]) {
+          isEqualToString:kBwgSecondBoxLink1ActionNonManagedAccount]) {
     __weak __typeof(self) weakSelf = self;
     return [UIAction actionWithHandler:^(UIAction* action) {
       [weakSelf.mutator
@@ -567,7 +578,7 @@ NSString* const kSecondBoxLink2ActionNonManagedAccount =
     }];
   }
   if ([textItem.link.absoluteString
-          isEqualToString:kSecondBoxLink2ActionNonManagedAccount]) {
+          isEqualToString:kBwgSecondBoxLink2ActionNonManagedAccount]) {
     __weak __typeof(self) weakSelf = self;
     return [UIAction actionWithHandler:^(UIAction* action) {
       [weakSelf.mutator

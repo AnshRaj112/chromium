@@ -9,9 +9,11 @@
 
 #include "base/check_op.h"
 #include "base/containers/flat_set.h"
+#include "base/features.h"
 #include "base/memory/raw_span.h"
 #include "base/memory/safety_checks.h"
 #include "base/strings/escape.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "components/affiliations/core/browser/affiliation_service.h"
 #include "components/affiliations/core/browser/affiliation_utils.h"
@@ -28,8 +30,8 @@ namespace {
 // out-of-bounds writes. Behind a flag in case it finds too many issues and is
 // a stability risk, or there's an unexpected performance impact.
 BASE_FEATURE(kPasswordsGrouperHeapIntegrityKillSwitch,
-             "PasswordsGrouperHeapIntegrityKillSwitch",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             "PasswordsGrouperHeapIntegrityKillSwitchv2",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 using affiliations::FacetBrandingInfo;
 using affiliations::FacetURI;
@@ -145,9 +147,9 @@ PasswordsGrouper::Credentials::Credentials() = default;
 PasswordsGrouper::Credentials::~Credentials() = default;
 
 PasswordsGrouper::PasswordsGrouper(
-    affiliations::AffiliationService* affiliation_service)
-    : affiliation_service_(affiliation_service) {
-  DCHECK(affiliation_service_);
+    affiliations::AffiliationService* affiliation_service) {
+  DCHECK(affiliation_service);
+  affiliation_service_ = affiliation_service->AsWeakPtr();
   affiliation_service_->GetPSLExtensions(
       base::BindOnce(&PasswordsGrouper::InitializePSLExtensionList,
                      weak_ptr_factory_.GetWeakPtr()));
@@ -157,6 +159,10 @@ PasswordsGrouper::~PasswordsGrouper() = default;
 void PasswordsGrouper::GroupCredentials(std::vector<PasswordForm> forms,
                                         std::vector<PasskeyCredential> passkeys,
                                         base::OnceClosure callback) {
+  if (!affiliation_service_) {
+    return;
+  }
+
   // Convert forms to Facets.
   std::vector<FacetURI> facets;
   facets.reserve(forms.size());

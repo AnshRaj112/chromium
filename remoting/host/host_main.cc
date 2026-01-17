@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 // This file implements the common entry point shared by all Chromoting Host
 // processes.
 
@@ -16,6 +11,7 @@
 
 #include "base/at_exit.h"
 #include "base/command_line.h"
+#include "base/compiler_specific.h"
 #include "base/files/file_path.h"
 #include "base/i18n/icu_util.h"
 #include "base/logging.h"
@@ -49,7 +45,8 @@
 namespace remoting {
 
 // Known entry points.
-int HostProcessMain();
+int SingleProcessHostProcessMain();
+int NetworkProcessMain();
 #if BUILDFLAG(IS_WIN)
 int DaemonProcessMain();
 int DesktopProcessMain();
@@ -65,34 +62,33 @@ namespace {
 
 typedef int (*MainRoutineFn)();
 
-const char kUsageMessage[] =
-    "Usage: %s [options]\n"
-    "\n"
-    "Options:\n"
+void Usage(const base::FilePath& program_name) {
+  printf(
+      "Usage: %s [options]\n"
+      "\n"
+      "Options:\n"
 
 #if BUILDFLAG(IS_LINUX)
-    "  --audio-pipe-name=<pipe> - Sets the pipe name to capture audio on "
-    "Linux.\n"
+      "  --audio-pipe-name=<pipe> - Sets the pipe name to capture audio on "
+      "Linux.\n"
 #endif  // BUILDFLAG(IS_LINUX)
 
 #if BUILDFLAG(IS_APPLE)
-    "  --list-audio-devices     - List all audio devices and their device "
-    "UID.\n"
+      "  --list-audio-devices     - List all audio devices and their device "
+      "UID.\n"
 #endif  // BUILDFLAG(IS_APPLE)
 
-    "  --console                - Runs the daemon interactively.\n"
-    "  --elevate=<binary>       - Runs <binary> elevated.\n"
-    "  --host-config=<config>   - Specifies the host configuration.\n"
-    "  --help, -?               - Prints this message.\n"
-    "  --type                   - Specifies process type.\n"
-    "  --version                - Prints the host version and exits.\n"
-    "  --evaluate-type=<type>   - Evaluates the capability of the host.\n"
-    "  --enable-wtmpdb          - Enables recording to wtmpdb on Linux.\n"
-    "  --webrtc-trace-event-file=<path> - Enables logging webrtc trace events "
-    "to a file.\n";
-
-void Usage(const base::FilePath& program_name) {
-  printf(kUsageMessage, program_name.MaybeAsASCII().c_str());
+      "  --console                - Runs the daemon interactively.\n"
+      "  --elevate=<binary>       - Runs <binary> elevated.\n"
+      "  --host-config=<config>   - Specifies the host configuration.\n"
+      "  --help, -?               - Prints this message.\n"
+      "  --type                   - Specifies process type.\n"
+      "  --version                - Prints the host version and exits.\n"
+      "  --evaluate-type=<type>   - Evaluates the capability of the host.\n"
+      "  --enable-wtmpdb          - Enables recording to wtmpdb on Linux.\n"
+      "  --webrtc-trace-event-file=<path> - Enables logging webrtc trace events"
+      " to a file.\n",
+      program_name.MaybeAsASCII().c_str());
 }
 
 #if BUILDFLAG(IS_WIN)
@@ -126,8 +122,7 @@ int RunElevated() {
       command_line.GetCommandLineString();
 
   // Launch the child process requesting elevation.
-  SHELLEXECUTEINFO info;
-  memset(&info, 0, sizeof(info));
+  SHELLEXECUTEINFO info = {};
   info.cbSize = sizeof(info);
   info.lpVerb = L"runas";
   info.lpFile = binary.value().c_str();
@@ -149,8 +144,10 @@ int RunElevated() {
 MainRoutineFn SelectMainRoutine(const std::string& process_type) {
   MainRoutineFn main_routine = nullptr;
 
-  if (process_type == kProcessTypeHost) {
-    main_routine = &HostProcessMain;
+  if (process_type == kProcessTypeSingleProcessHost) {
+    main_routine = &SingleProcessHostProcessMain;
+  } else if (process_type == kProcessTypeNetwork) {
+    main_routine = &NetworkProcessMain;
 #if BUILDFLAG(IS_WIN)
   } else if (process_type == kProcessTypeDaemon) {
     main_routine = &DaemonProcessMain;
@@ -202,8 +199,8 @@ int HostMain(int argc, char** argv) {
   }
 #endif  // BUILDFLAG(IS_WIN)
 
-  // Assume the host process by default.
-  std::string process_type = kProcessTypeHost;
+  // Assume the single-process host process by default.
+  std::string process_type = kProcessTypeSingleProcessHost;
   if (command_line->HasSwitch(kProcessTypeSwitchName)) {
     process_type = command_line->GetSwitchValueASCII(kProcessTypeSwitchName);
   }
@@ -269,16 +266,19 @@ int HostMain(int argc, char** argv) {
 
   remoting::LoadResources("");
 
-  mojo::core::Init({
-#if BUILDFLAG(IS_WIN)
-      .is_broker_process = main_routine == &DaemonProcessMain
-#elif BUILDFLAG(IS_MAC)
-      // The broker process on Mac is the agent process broker.
-      .is_broker_process = false
-#else
-      .is_broker_process = main_routine == &HostProcessMain
+  bool is_broker_process = false;
+#if !BUILDFLAG(IS_MAC)
+  // The single-process host process should act as the mojo broker, except on
+  // Mac, where the broker process is the agent process broker.
+  is_broker_process |= main_routine == &SingleProcessHostProcessMain;
 #endif
-  });
+#if BUILDFLAG(IS_WIN)
+  // For multi-process Windows hosts, the daemon process should act as the
+  // broker.
+  is_broker_process |= main_routine == &DaemonProcessMain;
+#endif
+
+  mojo::core::Init({.is_broker_process = is_broker_process});
 
   // Invoke the entry point.
   int exit_code = main_routine();

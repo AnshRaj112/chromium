@@ -30,7 +30,7 @@ namespace {
 constexpr char kId[] = "id";
 constexpr char kName[] = "name";
 constexpr char kDescription[] = "description";
-constexpr char kUri[] = "ipp://192.168.1.5";
+constexpr char kUri[] = "ipp://192.168.1.5:631";
 constexpr int kRank = 2;
 
 constexpr int kCopies = 5;
@@ -262,6 +262,21 @@ constexpr char kCjtNoFitToPageAndMargins[] = R"(
       }
     })";
 
+chromeos::Printer PrinterFrom(const std::string& id,
+                              const std::string& name,
+                              const std::string& description,
+                              bool via_policy,
+                              std::string uri) {
+  chromeos::Printer printer(id);
+  printer.set_display_name(name);
+  printer.set_description(description);
+  if (via_policy) {
+    printer.set_source(chromeos::Printer::SRC_POLICY);
+  }
+  EXPECT_TRUE(printer.SetUri(uri));
+  return printer;
+}
+
 std::unique_ptr<printing::PrintSettings> ConstructPrintSettings() {
   auto settings = std::make_unique<printing::PrintSettings>();
   settings->set_color(printing::mojom::ColorModel::kColor);
@@ -340,8 +355,7 @@ TEST(PrintingApiUtilsTest, GetDefaultPrinterRules_EmptyPref) {
 }
 
 TEST(PrintingApiUtilsTest, PrinterToIdl) {
-  crosapi::mojom::LocalDestinationInfo printer(kId, kName, kDescription, true,
-                                               kUri);
+  chromeos::Printer printer = PrinterFrom(kId, kName, kDescription, true, kUri);
 
   std::optional<DefaultPrinterRules> default_printer_rules =
       DefaultPrinterRules();
@@ -478,9 +492,12 @@ TEST(PrintingApiUtilsTest, ParsePrintTicketInvalidVendorItem) {
 TEST(PrintingApiUtilsTest, ParsePrintTicketInvalidMarginsItem) {
   const std::string kInvalidMarginsCjt =
       base::StringPrintf(kTemplateMargingsItemCjt, -40, 20, -30, 40);
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
+      printing::features::kApiPrintingMarginsAndScale);
   EXPECT_TRUE(ParsePrintTicket(base::test::ParseJsonDict(kInvalidMarginsCjt)));
 
-  base::test::ScopedFeatureList feature_list;
+  feature_list.Reset();
   feature_list.InitAndEnableFeature(
       printing::features::kApiPrintingMarginsAndScale);
   EXPECT_FALSE(ParsePrintTicket(base::test::ParseJsonDict(kInvalidMarginsCjt)));
@@ -695,7 +712,10 @@ TEST(PrintingApiUtilsTest,
       printing::mojom::PrintScalingType::kNone,
   };
 
+  base::test::ScopedFeatureList feature_list;
   // Test with feature disabled - all types should pass as check is skipped.
+  feature_list.InitAndDisableFeature(
+      printing::features::kApiPrintingMarginsAndScale);
   for (const auto& scaling_type : kScalingTypes) {
     settings->set_print_scaling(scaling_type);
     EXPECT_TRUE(
@@ -703,7 +723,8 @@ TEST(PrintingApiUtilsTest,
   }
 
   // Re-enable feature for further tests.
-  base::test::ScopedFeatureList feature_list(
+  feature_list.Reset();
+  feature_list.InitAndEnableFeature(
       printing::features::kApiPrintingMarginsAndScale);
 
   capabilities.print_scaling_types.clear();

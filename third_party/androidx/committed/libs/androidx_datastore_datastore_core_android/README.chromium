@@ -1,7 +1,7 @@
 Name: DataStore Core
 Short Name: datastore-core-android
-URL: https://developer.android.com/jetpack/androidx/releases/datastore#1.2.0-SNAPSHOT
-Version: 1.2.0-SNAPSHOT
+URL: https://androidx.dev/snapshots/builds/14734851/artifacts/repository/androidx/datastore/datastore-core-android/1.3.0-SNAPSHOT/datastore-core-android-1.3.0-20260117.055223-1.aar
+Version: 1.3.0-SNAPSHOT
 Update Mechanism: Autoroll
 License: Apache-2.0
 License File: LICENSE
@@ -12,6 +12,9 @@ License Android Compatible: yes
 
 Description:
 Android DataStore Core - contains the underlying store used by each serialization method
+
+See also: https://developer.android.com/jetpack/androidx/releases/datastore#1.3.0-SNAPSHOT
+
 
 Local Modifications:
 No modifications.

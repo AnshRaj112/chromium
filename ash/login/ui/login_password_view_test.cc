@@ -15,9 +15,9 @@
 #include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "ui/base/ime/text_input_type.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/test/event_generator.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/widget/widget.h"
@@ -59,6 +59,12 @@ class LoginPasswordViewTest : public LoginTestBase {
     SetWidget(CreateWidgetWithContent(view_));
   }
 
+  void TearDown() override {
+    arrow_navigation_delegate_.reset();
+    view_ = nullptr;
+    LoginTestBase::TearDown();
+  }
+
   void OnPasswordSubmit(std::u16string_view password) {
     password_ = std::u16string_view(password);
   }
@@ -66,7 +72,7 @@ class LoginPasswordViewTest : public LoginTestBase {
     is_password_field_empty_ = is_empty;
   }
 
-  raw_ptr<LoginPasswordView, DanglingUntriaged> view_ = nullptr;
+  raw_ptr<LoginPasswordView> view_ = nullptr;
   std::optional<std::u16string> password_;
   bool is_password_field_empty_ = true;
   std::unique_ptr<LoginScreenArrowNavigationDelegate>

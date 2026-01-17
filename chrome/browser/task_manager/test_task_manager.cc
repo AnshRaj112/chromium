@@ -4,6 +4,8 @@
 
 #include "chrome/browser/task_manager/test_task_manager.h"
 
+#include <optional>
+
 #include "base/timer/mock_timer.h"
 
 namespace task_manager {
@@ -39,17 +41,20 @@ base::TimeDelta TestTaskManager::GetCpuTime(TaskId task_id) const {
   return base::TimeDelta();
 }
 
-int64_t TestTaskManager::GetMemoryFootprintUsage(TaskId task_id) const {
-  return -1;
+std::optional<base::ByteSize> TestTaskManager::GetMemoryFootprintUsage(
+    TaskId task_id) const {
+  return std::nullopt;
 }
 
-int64_t TestTaskManager::GetSwappedMemoryUsage(TaskId task_id) const {
-  return -1;
+std::optional<base::ByteSize> TestTaskManager::GetSwappedMemoryUsage(
+    TaskId task_id) const {
+  return std::nullopt;
 }
 
-int64_t TestTaskManager::GetGpuMemoryUsage(TaskId task_id,
-                                           bool* has_duplicates) const {
-  return -1;
+std::optional<base::ByteSize> TestTaskManager::GetGpuMemoryUsage(
+    TaskId task_id,
+    bool* has_duplicates) const {
+  return std::nullopt;
 }
 
 int TestTaskManager::GetIdleWakeupsPerSecond(TaskId task_id) const {
@@ -127,30 +132,28 @@ void TestTaskManager::GetTerminationStatus(TaskId task_id,
   *out_error_code = 0;
 }
 
-int64_t TestTaskManager::GetNetworkUsage(TaskId task_id) const {
-  return 0;
+base::ByteSize TestTaskManager::GetNetworkUsage(TaskId task_id) const {
+  return base::ByteSize(0);
 }
 
-int64_t TestTaskManager::GetProcessTotalNetworkUsage(TaskId task_id) const {
-  return -1;
-}
-
-int64_t TestTaskManager::GetCumulativeNetworkUsage(TaskId task_id) const {
-  return 0;
-}
-
-int64_t TestTaskManager::GetCumulativeProcessTotalNetworkUsage(
+std::optional<base::ByteSize> TestTaskManager::GetProcessTotalNetworkUsage(
     TaskId task_id) const {
-  return 0;
+  return std::nullopt;
 }
 
-int64_t TestTaskManager::GetSqliteMemoryUsed(TaskId task_id) const {
-  return -1;
+base::ByteSize TestTaskManager::GetCumulativeNetworkUsage(
+    TaskId task_id) const {
+  return base::ByteSize(0);
+}
+
+std::optional<base::ByteSize> TestTaskManager::GetSqliteMemoryUsed(
+    TaskId task_id) const {
+  return std::nullopt;
 }
 
 bool TestTaskManager::GetV8Memory(TaskId task_id,
-                                  int64_t* allocated,
-                                  int64_t* used) const {
+                                  base::ByteSize* allocated,
+                                  base::ByteSize* used) const {
   return false;
 }
 

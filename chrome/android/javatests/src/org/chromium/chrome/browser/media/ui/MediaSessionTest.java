@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.media.ui;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
+
 import android.content.Intent;
 import android.media.AudioManager;
 
@@ -30,7 +32,6 @@ import org.chromium.chrome.test.util.NewTabPageTestUtils;
 import org.chromium.chrome.test.util.browser.TabLoadObserver;
 import org.chromium.components.browser_ui.media.MediaNotificationController;
 import org.chromium.components.browser_ui.media.MediaNotificationManager;
-import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.components.url_formatter.SchemeDisplay;
 import org.chromium.components.url_formatter.UrlFormatter;
 import org.chromium.content_public.browser.test.util.DOMUtils;
@@ -62,7 +63,7 @@ public class MediaSessionTest {
     @LargeTest
     public void testPauseOnHeadsetUnplug() throws IllegalArgumentException, TimeoutException {
         mActivityTestRule.startOnTestServerUrl(TEST_PATH);
-        Tab tab = mActivityTestRule.getActivity().getActivityTab();
+        Tab tab = mActivityTestRule.getActivityTab();
 
         Assert.assertTrue(DOMUtils.isMediaPaused(tab.getWebContents(), VIDEO_ID));
         DOMUtils.playMedia(tab.getWebContents(), VIDEO_ID);
@@ -84,8 +85,8 @@ public class MediaSessionTest {
     public void mediaSessionUrlUpdatedAfterNativePageNavigation() throws Exception {
         mActivityTestRule.startOnBlankPage();
 
-        Tab tab = mActivityTestRule.getActivity().getActivityTab();
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
+        Tab tab = mActivityTestRule.getActivityTab();
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
         NewTabPageTestUtils.waitForNtpLoaded(tab);
 
         Assert.assertTrue(tab.getNativePage() instanceof NewTabPage);

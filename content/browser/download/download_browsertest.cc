@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 // This file contains download browser tests that are known to be runnable
 // in a pure content context.  Over time tests should be migrated here.
 
@@ -20,7 +15,6 @@
 #include <vector>
 
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -106,9 +100,6 @@
 #include "content/browser/plugin_service_impl.h"
 #endif
 
-#if BUILDFLAG(IS_ANDROID)
-#include "base/android/build_info.h"
-#endif
 
 using ::testing::_;
 using ::testing::AllOf;
@@ -977,7 +968,7 @@ class DownloadContentTest : public ContentBrowserTest {
  public:
   DownloadContentTest() {
     feature_list_.InitWithFeatures(
-        {},
+        {blink::features::kSvgAnchorElementDownloadAttribute},
         {
             download::features::kAllowDownloadResumptionWithoutStrongValidators,
             // Link Preview hides alt+click. Disables it not to do so.
@@ -1160,8 +1151,10 @@ class DownloadContentTest : public ContentBrowserTest {
 
     // Check the contents.
     EXPECT_EQ(value, file_contents);
-    if (memcmp(file_contents.c_str(), value.c_str(), expected_size) != 0)
+    if (UNSAFE_TODO(
+            memcmp(file_contents.c_str(), value.c_str(), expected_size)) != 0) {
       return false;
+    }
 
     return true;
   }
@@ -1205,7 +1198,8 @@ class DownloadContentTest : public ContentBrowserTest {
 
       pattern =
           TestDownloadHttpResponse::GetPatternBytes(seed, offset, bytes_read);
-      ASSERT_EQ(0, memcmp(pattern.data(), &data.front(), bytes_read))
+      UNSAFE_TODO(
+          ASSERT_EQ(0, memcmp(pattern.data(), &data.front(), bytes_read)))
           << "Comparing block at offset " << offset << " and length "
           << bytes_read;
       offset += bytes_read;
@@ -1256,7 +1250,8 @@ class DownloadContentTestWithoutStrongValidators : public DownloadContentTest {
       bool fail_content_validation) {
     SetupErrorInjectionDownloads();
     GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-    GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+    GURL server_url =
+        embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
     TestDownloadHttpResponse::Parameters parameters =
         TestDownloadHttpResponse::Parameters::WithSingleInterruption(
             inject_error_callback());
@@ -1296,19 +1291,19 @@ class DownloadContentTestWithoutStrongValidators : public DownloadContentTest {
 
     // The second request is a range request.
     std::string value;
-    ASSERT_FALSE(base::Contains(requests[1]->http_request.headers,
-                                net::HttpRequestHeaders::kIfRange));
+    ASSERT_FALSE(requests[1]->http_request.headers.contains(
+        net::HttpRequestHeaders::kIfRange));
 
-    ASSERT_TRUE(base::Contains(requests[1]->http_request.headers,
-                               net::HttpRequestHeaders::kRange));
+    ASSERT_TRUE(requests[1]->http_request.headers.contains(
+        net::HttpRequestHeaders::kRange));
     EXPECT_EQ(
         base::StringPrintf("bytes=%" PRId64 "-",
                            interruption_offset - kValidationLength),
         requests[1]->http_request.headers.at(net::HttpRequestHeaders::kRange));
     if (fail_content_validation) {
       // The third request is a restart request.
-      ASSERT_FALSE(base::Contains(requests[2]->http_request.headers,
-                                  net::HttpRequestHeaders::kRange));
+      ASSERT_FALSE(requests[2]->http_request.headers.contains(
+          net::HttpRequestHeaders::kRange));
       EXPECT_EQ(parameters.size, requests[2]->transferred_byte_count);
     }
   }
@@ -1418,7 +1413,8 @@ class ParallelDownloadTest : public DownloadContentTest {
     EXPECT_TRUE(
         base::FeatureList::IsEnabled(download::features::kParallelDownloading));
     GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-    GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+    GURL server_url =
+        embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
     TestDownloadHttpResponse::StartServing(parameters, server_url);
 
     base::FilePath intermediate_file_path =
@@ -1457,7 +1453,8 @@ class ParallelDownloadTest : public DownloadContentTest {
         base::FeatureList::IsEnabled(download::features::kParallelDownloading));
 
     GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-    GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+    GURL server_url =
+        embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
 
     // Only parallel download needs to specify the connection type to http 1.1,
     // other tests will automatically fall back to non-parallel download even if
@@ -1845,7 +1842,7 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, DownloadOctetStream) {
   plugin_info.mime_types.push_back(
       WebPluginMimeType(kTestMimeType, kTestFileType, ""));
   plugin_info.type = WebPluginInfo::PLUGIN_TYPE_BROWSER_INTERNAL_PLUGIN;
-  PluginServiceImpl::GetInstance()->RegisterInternalPlugin(plugin_info, false);
+  PluginServiceImpl::GetInstance()->RegisterInternalPlugin(plugin_info);
 
   // The following is served with a Content-Type of application/octet-stream.
   NavigateToURLAndWaitForDownload(
@@ -1872,7 +1869,7 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest,
   plugin_info.mime_types.push_back(
       WebPluginMimeType(kTestMimeType, kTestFileType, ""));
   plugin_info.type = WebPluginInfo::PLUGIN_TYPE_BROWSER_INTERNAL_PLUGIN;
-  PluginServiceImpl::GetInstance()->RegisterInternalPlugin(plugin_info, false);
+  PluginServiceImpl::GetInstance()->RegisterInternalPlugin(plugin_info);
 
   // The following is served with a Content-Type of application/octet-stream.
   NavigateToURLAndWaitForDownload(
@@ -1898,7 +1895,7 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest,
   plugin_info.mime_types.push_back(
       WebPluginMimeType(kTestMimeType, kTestFileType, ""));
   plugin_info.type = WebPluginInfo::PLUGIN_TYPE_BROWSER_INTERNAL_PLUGIN;
-  PluginServiceImpl::GetInstance()->RegisterInternalPlugin(plugin_info, false);
+  PluginServiceImpl::GetInstance()->RegisterInternalPlugin(plugin_info);
 
   // The following is served with a Content-Type of application/octet-stream.
   NavigateToURLAndWaitForDownload(
@@ -1925,7 +1922,7 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest,
   plugin_info.mime_types.push_back(
       WebPluginMimeType(kTestMimeType, kTestFileType, ""));
   plugin_info.type = WebPluginInfo::PLUGIN_TYPE_BROWSER_INTERNAL_PLUGIN;
-  PluginServiceImpl::GetInstance()->RegisterInternalPlugin(plugin_info, false);
+  PluginServiceImpl::GetInstance()->RegisterInternalPlugin(plugin_info);
 
   // The following is served with a Content-Type of application/octet-stream.
   NavigateToURLAndWaitForDownload(
@@ -2134,7 +2131,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, ShutdownAtRelease) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeWithStrongValidators) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -2178,13 +2176,13 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeWithStrongValidators) {
             requests[1]->transferred_byte_count);
 
   std::string value;
-  ASSERT_TRUE(base::Contains(requests[1]->http_request.headers,
-                             net::HttpRequestHeaders::kIfRange));
+  ASSERT_TRUE(requests[1]->http_request.headers.contains(
+      net::HttpRequestHeaders::kIfRange));
   EXPECT_EQ(parameters.etag, requests[1]->http_request.headers.at(
                                  net::HttpRequestHeaders::kIfRange));
 
-  ASSERT_TRUE(base::Contains(requests[1]->http_request.headers,
-                             net::HttpRequestHeaders::kRange));
+  ASSERT_TRUE(requests[1]->http_request.headers.contains(
+      net::HttpRequestHeaders::kRange));
   EXPECT_EQ(
       base::StringPrintf("bytes=%" PRId64 "-", interruption_offset),
       requests[1]->http_request.headers.at(net::HttpRequestHeaders::kRange));
@@ -2466,7 +2464,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, NoDownloadManagerDelegateDownload) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, BadRangeHeader) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -2497,7 +2496,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, BadRangeHeader) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, InvalidRangeHeader) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -2566,7 +2566,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, InvalidRangeHeader) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, BadEncoding) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -2605,7 +2606,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RestartIfNotPartialResponse) {
   const int kNewPatternGeneratorSeed = 2;
 
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -2651,13 +2653,13 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RestartIfNotPartialResponse) {
   // The second request transfers the entire response.
   EXPECT_EQ(parameters.size, requests[1]->transferred_byte_count);
 
-  ASSERT_TRUE(base::Contains(requests[1]->http_request.headers,
-                             net::HttpRequestHeaders::kIfRange));
+  ASSERT_TRUE(requests[1]->http_request.headers.contains(
+      net::HttpRequestHeaders::kIfRange));
   EXPECT_EQ(parameters.etag, requests[1]->http_request.headers.at(
                                  net::HttpRequestHeaders::kIfRange));
 
-  ASSERT_TRUE(base::Contains(requests[1]->http_request.headers,
-                             net::HttpRequestHeaders::kRange));
+  ASSERT_TRUE(requests[1]->http_request.headers.contains(
+      net::HttpRequestHeaders::kRange));
   EXPECT_EQ(
       base::StringPrintf("bytes=%" PRId64 "-", interruption_offset),
       requests[1]->http_request.headers.at(net::HttpRequestHeaders::kRange));
@@ -2670,7 +2672,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RestartIfNoETag) {
   const int kNewPatternGeneratorSeed = 2;
 
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -2701,10 +2704,10 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RestartIfNoETag) {
 
   // Neither If-Range nor Range headers should be present in the second request.
   ASSERT_EQ(2u, requests.size());
-  EXPECT_FALSE(base::Contains(requests[1]->http_request.headers,
-                              net::HttpRequestHeaders::kIfRange));
-  EXPECT_FALSE(base::Contains(requests[1]->http_request.headers,
-                              net::HttpRequestHeaders::kRange));
+  EXPECT_FALSE(requests[1]->http_request.headers.contains(
+      net::HttpRequestHeaders::kIfRange));
+  EXPECT_FALSE(requests[1]->http_request.headers.contains(
+      net::HttpRequestHeaders::kRange));
 }
 
 // Partial file goes missing before the download is resumed. The download should
@@ -2712,7 +2715,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RestartIfNoETag) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, RestartIfNoPartialFile) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -2746,7 +2750,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RestartIfNoPartialFile) {
 
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, RecoverFromInitFileError) {
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(TestDownloadHttpResponse::Parameters(),
                                          server_url);
 
@@ -2788,7 +2793,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RecoverFromInitFileError) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest,
                        RecoverFromIntermediateFileRenameError) {
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(TestDownloadHttpResponse::Parameters(),
                                          server_url);
 
@@ -2830,7 +2836,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest,
 
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, RecoverFromFinalRenameError) {
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(TestDownloadHttpResponse::Parameters(),
                                          server_url);
 
@@ -2877,7 +2884,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, Resume_Hash) {
 
   // As a control, let's try GetHash() on an uninterrupted download.
   GURL url1 = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url1 = embedded_test_server()->GetURL(url1.host(), url1.path());
+  GURL server_url1 =
+      embedded_test_server()->GetURL(url1.GetHost(), url1.GetPath());
   TestDownloadHttpResponse::StartServing(parameters, server_url1);
   download::DownloadItem* uninterrupted_download(
       StartDownloadAndReturnItem(shell(), server_url1));
@@ -2887,7 +2895,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, Resume_Hash) {
   SetupErrorInjectionDownloads();
   // Now with interruptions.
   GURL url2 = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url2 = embedded_test_server()->GetURL(url2.host(), url2.path());
+  GURL server_url2 =
+      embedded_test_server()->GetURL(url2.GetHost(), url2.GetPath());
   parameters.inject_error_cb = inject_error_callback();
   parameters.injected_errors.push(100);
   parameters.injected_errors.push(211);
@@ -2934,7 +2943,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, Resume_Hash) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, CancelInterruptedDownload) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback()),
@@ -2959,7 +2969,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, CancelInterruptedDownload) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, RemoveInterruptedDownload) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback()),
@@ -2984,7 +2995,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RemoveCompletedDownload) {
   // A completed download shouldn't delete the downloaded file when it is
   // removed.
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(TestDownloadHttpResponse::Parameters(),
                                          server_url);
 
@@ -3007,7 +3019,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RemoveCompletedDownload) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, RemoveResumingDownload) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -3058,7 +3071,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RemoveResumingDownload) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, CancelResumingDownload) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -3116,7 +3130,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, RemoveResumedDownload) {
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(parameters, server_url);
 
   download::DownloadItem* download =
@@ -3163,7 +3178,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, MAYBE_CancelResumedDownload) {
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(parameters, server_url);
 
   download::DownloadItem* download =
@@ -3199,7 +3215,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, MAYBE_CancelResumedDownload) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeRestoredDownload_NoFile) {
   TestDownloadHttpResponse::Parameters parameters;
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(parameters, server_url);
 
   base::FilePath intermediate_file_path =
@@ -3260,7 +3277,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeRestoredDownload_NoFile) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeRestoredDownload_NoHash) {
   TestDownloadHttpResponse::Parameters parameters;
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(parameters, server_url);
 
   base::FilePath intermediate_file_path =
@@ -3315,7 +3333,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest,
                        ResumeRestoredDownload_EtagMismatch) {
   TestDownloadHttpResponse::Parameters parameters;
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(parameters, server_url);
 
   base::FilePath intermediate_file_path =
@@ -3371,7 +3390,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest,
                        ResumeRestoredDownload_CorrectHash) {
   TestDownloadHttpResponse::Parameters parameters;
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(parameters, server_url);
 
   base::FilePath intermediate_file_path =
@@ -3439,7 +3459,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest,
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeRestoredDownload_WrongHash) {
   TestDownloadHttpResponse::Parameters parameters;
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(parameters, server_url);
 
   base::FilePath intermediate_file_path =
@@ -3521,7 +3542,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeRestoredDownload_WrongHash) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeRestoredDownload_ShortFile) {
   TestDownloadHttpResponse::Parameters parameters;
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(parameters, server_url);
 
   base::FilePath intermediate_file_path =
@@ -3596,7 +3618,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeRestoredDownload_LongFile) {
   TestDownloadHttpResponse::Parameters parameters;
   parameters.size = kFileSize;
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::StartServing(parameters, server_url);
 
   base::FilePath intermediate_file_path =
@@ -3657,7 +3680,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, ResumeRestoredDownload_LongFile) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, ReferrerForPartialResumption) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -3688,8 +3712,7 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, ReferrerForPartialResumption) {
 
   ASSERT_GE(2u, requests.size());
   net::test_server::HttpRequest last_request = requests.back()->http_request;
-  ASSERT_TRUE(
-      base::Contains(last_request.headers, net::HttpRequestHeaders::kReferer));
+  ASSERT_TRUE(last_request.headers.contains(net::HttpRequestHeaders::kReferer));
   EXPECT_EQ(last_request.headers.at(net::HttpRequestHeaders::kReferer),
             document_url.DeprecatedGetOriginAsURL().spec());
 }
@@ -4213,7 +4236,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, DownloadAttributeNetworkError) {
   SetupErrorInjectionDownloads();
   WebContents* content = shell()->web_contents();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   GURL document_url = embedded_test_server()->GetURL(
       std::string("/download/download-attribute.html?target=") +
       server_url.spec());
@@ -4824,7 +4848,8 @@ IN_PROC_BROWSER_TEST_F(ParallelDownloadTest, MiddleSliceDelayedError) {
                                         true /* delay_response */);
 
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestRequestPauseHandler request_pause_handler;
   parameters.on_pause_handler = request_pause_handler.GetOnPauseHandler();
   // Send some data for the first request and pause it so download won't
@@ -4975,7 +5000,8 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest, UploadBytes) {
 IN_PROC_BROWSER_TEST_F(DownloadContentTest, FetchErrorResponseBodyResumption) {
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());
@@ -5379,7 +5405,7 @@ IN_PROC_BROWSER_TEST_F(DownloadPrerenderTest, DiscardNonNavigationDownload) {
   EXPECT_TRUE(NavigateToURL(shell(), kInitialUrl));
 
   // Create a prerendered page.
-  FrameTreeNodeId host_id = prerender_helper()->AddPrerender(kPrerenderingUrl);
+  PrerenderHostId host_id = prerender_helper()->AddPrerender(kPrerenderingUrl);
   auto* render_frame_host =
       prerender_helper()->GetPrerenderedMainFrameHost(host_id);
   auto* web_contents = shell()->web_contents();
@@ -5563,6 +5589,31 @@ IN_PROC_BROWSER_TEST_F(DownloadContentTest,
   ASSERT_TRUE(server.ShutdownAndWaitUntilComplete());
 }
 
+IN_PROC_BROWSER_TEST_F(DownloadContentTest, SVGAnchorDownloadAttribute) {
+  GURL svg_url =
+      embedded_test_server()->GetURL("/download/svg_download_test.html");
+  EXPECT_TRUE(NavigateToURL(shell(), svg_url));
+
+  std::unique_ptr<DownloadTestObserver> observer(CreateWaiter(shell(), 1));
+
+  SimulateEndOfPaintHoldingOnPrimaryMainFrame(shell()->web_contents());
+  auto click_result =
+      EvalJs(shell()->web_contents(), "clickSVGDownloadLink();");
+  EXPECT_EQ("SVG download link clicked", click_result.ExtractString());
+  observer->WaitForFinished();
+
+  std::vector<raw_ptr<download::DownloadItem, VectorExperimental>> downloads;
+  DownloadManagerForShell(shell())->GetAllDownloads(&downloads);
+  ASSERT_EQ(1u, downloads.size());
+  EXPECT_EQ(download::DownloadItem::COMPLETE, downloads[0]->GetState());
+
+  EXPECT_EQ(FILE_PATH_LITERAL("svg-suggested-filename.txt"),
+            downloads[0]->GetTargetFilePath().BaseName().value());
+  VerifyFile(downloads[0]->GetFullPath(), "SVG download test content", 25);
+
+  DownloadManagerForShell(shell())->Shutdown();
+}
+
 using DownloadRangeTestParams =
     std::tuple<int64_t /*starting byte in range request*/,
                int64_t /*ending byte in range request*/,
@@ -5638,7 +5689,8 @@ IN_PROC_BROWSER_TEST_F(DownloadRangeResumptionTest,
   // Make range download interrupted at certain position.
   SetupErrorInjectionDownloads();
   GURL url = TestDownloadHttpResponse::GetNextURLForDownload();
-  GURL server_url = embedded_test_server()->GetURL(url.host(), url.path());
+  GURL server_url =
+      embedded_test_server()->GetURL(url.GetHost(), url.GetPath());
   TestDownloadHttpResponse::Parameters parameters =
       TestDownloadHttpResponse::Parameters::WithSingleInterruption(
           inject_error_callback());

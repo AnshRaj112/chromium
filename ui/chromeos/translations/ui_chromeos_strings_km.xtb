@@ -35,6 +35,7 @@
 <translation id="1249250836236328755">ប្រភេទ</translation>
 <translation id="1254593899333212300">ការភ្ជាប់អ៊ីនធឺណិតផ្ទាល់</translation>
 <translation id="1272293450992660632">តម្លៃ PIN មិនត្រូវគ្នាទេ។</translation>
+<translation id="1279040297980392566">កំពុង​រង់ចាំ​ឱ្យស្កេន​ចប់ សូម​ព្យាយាម​ម្ដងទៀត​នៅពេល​ក្រោយ</translation>
 <translation id="1280820357415527819">កំពុង​ស្វែងរក​បណ្ដាញ​ទូរសព្ទ​ចល័ត</translation>
 <translation id="1293556467332435079">ឯកសារ</translation>
 <translation id="1297922636971898492">Google Drive មិនមានទេឥឡូវនេះ។ ការទាញឡើងនឹងចាប់ផ្តើមឡើងវិញដោយស្វ័យប្រវត្តិនៅពេល Google Drive ត្រលប់មកវិញ។</translation>
@@ -109,7 +110,6 @@
 <translation id="1813278315230285598">សេវាកម្ម</translation>
 <translation id="181434555916624618">ឥឡូវនេះ លទ្ធផល​ដែលមាន​មនុស្ស​នឹងមិន​បង្ហាញទេ។ សូមសាកល្បងប្រើសារតម្រុយផ្សេង។</translation>
 <translation id="1829129547161959350">ភីនខ្វីន</translation>
-<translation id="183183971458492120">កំពុង​ផ្ទុក​ព័ត៌មាន...</translation>
 <translation id="1832073788765803750">កាតាកាណា​ពាក់កណ្ដាល​ទទឹង</translation>
 <translation id="1834290891154666894">ការបញ្ចូល​ភាពត្រូវគ្នា​នៃឈ្មោះជំនួស​នៃប្រធានបទ​មិនត្រឹមត្រូវ</translation>
 <translation id="1838709767668011582">គេហទំព័រ Google</translation>
@@ -146,13 +146,13 @@
 <translation id="2142680004883808240">ភាសារុស្ស៊ី​ដែលប្រើ​ក្ដារចុចតាម​សូរសព្ទ YaZHert</translation>
 <translation id="2143778271340628265">ការតំឡើងប្រូកស៊ីដោយខ្លូនឯង</translation>
 <translation id="2148716181193084225">ថ្ងៃនេះ</translation>
+<translation id="2161573825856688200">គម្រោង Google</translation>
 <translation id="2163152940313951844">តួអក្សរ​មិនត្រឹមត្រូវ៖ <ph name="CHARACTER_NAME" /></translation>
 <translation id="2178056538281447670">Microsoft 365</translation>
 <translation id="2184934335987813305">ភាសាព័រទុយហ្កាល់​ដែលប្រើ​ក្ដារចុច​កុំព្យូទ័រ​អាមេរិកអន្តរជាតិ</translation>
 <translation id="2193661397560634290">បានប្រើអស់ <ph name="SPACE_USED" /></translation>
 <translation id="2198315389084035571">ភាសាចិនសាមញ្ញ</translation>
 <translation id="22085916256174561">ភាសាកូរ៉េ</translation>
-<translation id="2208919847696382164">ដំឡើង​តាមរយៈ Linux</translation>
 <translation id="2215692307449050019">ថ្មសល់តិច។ ការធ្វើ​សមកាលកម្ម​ឯកសារ​នឹងបន្ត នៅពេល​អ្នកភ្ជាប់ទៅ​ថាមពល។</translation>
 <translation id="2225536596944493418">តើអ្នកប្រាកដថា​ចង់លុបធាតុ <ph name="NUMBER_OF_ITEMS" /> ដែរទេ?</translation>
 <translation id="2230062665678605299">មិនអាចបង្កើតថតឯកសារ "<ph name="FOLDER_NAME" />". <ph name="ERROR_MESSAGE" /></translation>
@@ -213,7 +213,6 @@
 <translation id="2653059201992392941">អ្នកអាចព្យាយាមបាន <ph name="RETRIES" /> ដងទៀត។</translation>
 <translation id="2663066752008346276">ភាសា​ភូមា/មីយ៉ាន់ម៉ា​ដែលប្រើ​ក្ដារចុច​មីយ៉ានសាន</translation>
 <translation id="2664412712123763093">ទីតាំង​ឯកសារ</translation>
-<translation id="2718540689505416944">ដំឡើង​កម្មវិធី​តាមរយៈ Linux</translation>
 <translation id="2719020180254996569">បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, ព័ត៌មាន​លម្អិត</translation>
 <translation id="2724954091494693138">ភាសាតួកគី​ដែលប្រើ​ក្ដារចុច F</translation>
 <translation id="2732288874651063549">គ្រប់គ្រង​ការចែករំលែក​ជាមួយ <ph name="VM_NAME" /></translation>
@@ -222,7 +221,6 @@
 <translation id="2764206540577097904">អ្នកបានប្រើទំហំផ្ទុក Google Workspace បុគ្គលរបស់អ្នកអស់ហើយ។</translation>
 <translation id="2771816809568414714">ឈីស</translation>
 <translation id="2781645665747935084">ភាសាប៊ែលស៊ិក</translation>
-<translation id="2782104745158847185">មានបញ្ហាក្នុង​ការដំឡើង​កម្មវិធី Linux</translation>
 <translation id="2802583107108007218">ស្វែងយល់បន្ថែម​អំពី​ការរឹតបន្តឹងទាំងនេះ</translation>
 <translation id="2803375539583399270">បញ្ចូលកូដ PIN</translation>
 <translation id="2819519502129272135">បានបិទ​ការធ្វើសម​កាលកម្ម​ឯកសារ</translation>
@@ -345,7 +343,6 @@
 <translation id="3786301125658655746">អ្នកនៅក្រៅបណ្តាញ។</translation>
 <translation id="3789841737615482174">តំឡើង</translation>
 <translation id="3793469551756281394">នៅសល់ប្រហែល <ph name="REMAINING_TIME_HOUR" /> <ph name="REMAINING_TIME_MINUTE" /> ទៀត</translation>
-<translation id="3798449238516105146">កំណែ</translation>
 <translation id="3801082500826908679">ហ្វារូស</translation>
 <translation id="3809272675881623365">ទន្សាយ</translation>
 <translation id="3810973564298564668">គ្រប់គ្រង</translation>
@@ -353,19 +350,17 @@
 <translation id="3811494700605067549">ឯកសារ 1 ត្រូវបានជ្រើស</translation>
 <translation id="3817579325494460411">មិនបានផ្ដល់</translation>
 <translation id="3819448694985509187">កូដ PIN មិនត្រឹមត្រូវទេ។ អ្នកអាចព្យាយាមបាន 1 ដងទៀត។</translation>
-<translation id="3822559385185038546">ប្រូកស៊ី​នេះ​ត្រូវបាន​អនុវត្ត​ដោយ​អ្នកគ្រប់គ្រង​របស់​អ្នក</translation>
 <translation id="3830674330436234648">គ្មានការចាក់ដែលអាចប្រើបានទេ</translation>
 <translation id="383652340667548381">ភាសាស៊ែប</translation>
 <translation id="3839045880592694915">ម៉ូដឹមរបស់អ្នកមិនត្រូវបានអនុញ្ញាតឱ្យភ្ជាប់ដោយក្រុមហ៊ុន​សេវាទូរសព្ទរបស់អ្នកទេ។ សូមទាក់ទងទៅក្រុមហ៊ុន​សេវាទូរសព្ទរបស់អ្នក ដើម្បីទទួលបានព័ត៌មានលម្អិតបន្ថែម។</translation>
 <translation id="385051799172605136">ថយក្រោយ</translation>
 <translation id="3855472144336161447">German Neo 2</translation>
 <translation id="3858860766373142691">ឈ្មោះ</translation>
-<translation id="3866249974567520381">ការពិពណ៌នា</translation>
 <translation id="3899991606604168269">ភាសាបារាំង (កាណាដា) ដែលប្រើ​ក្ដារចុចច្រើនភាសា</translation>
 <translation id="3901991538546252627">កំពុងភ្ជាប់ទៅ <ph name="NAME" /></translation>
 <translation id="3906232975181435906">កំពុងដំឡើង​កម្រងព័ត៌មាន​ឧបករណ៍ចល័ត បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" /></translation>
 <translation id="3924145049010392604">Meta</translation>
-<translation id="3943857333388298514">បិទភ្ជាប់</translation>
+<translation id="3943857333388298514">ដាក់ចូល</translation>
 <translation id="3950820424414687140">ចូល</translation>
 <translation id="3952872973865944257">សូរសព្ទ​ជាភាសា​តេលូហ្គូ</translation>
 <translation id="3958548648197196644">គីវី</translation>
@@ -438,7 +433,6 @@
 <translation id="4477219268485577442">សូរសព្ទប៊ុលហ្គារី</translation>
 <translation id="4508265954913339219">ការធ្វើសកម្មភាពបានបរាជ័យ</translation>
 <translation id="4509667233588080747">ភាសា​អង់គ្លេស (សហរដ្ឋអាមេរិក) ដែលប្រើ​ក្ដារចុចអន្តរជាតិ Workman</translation>
-<translation id="4522570452068850558">ព័ត៌មានលំអិត</translation>
 <translation id="4527800702232535228">ថតនេះត្រូវបាន​ចែករំលែកជាមួយ Parallels Desktop</translation>
 <translation id="4552678318981539154">ទិន្នន័យចន្លោះផ្ទុ</translation>
 <translation id="4552759165874948005">បណ្ដាញ <ph name="NETWORK_TYPE" />, កម្លាំង​រលកសញ្ញា <ph name="SIGNAL_STRENGTH" />%</translation>
@@ -596,13 +590,13 @@
 <translation id="5596627076506792578">ជម្រើសច្រើនទៀត</translation>
 <translation id="5602622065581044566">ភាសាប៊ុលហ្ការី​ដែលប្រើ​ក្ដារចុច​តាម​សូរសព្ទ</translation>
 <translation id="5605830556594064952">US Dvorak</translation>
+<translation id="560739212255190568">អ្នកគ្រប់គ្រង​របស់អ្នក​បានកំណត់​វិធាន​លុបពីលើ​ប្រូកស៊ី​បន្ថែមពីលើ​ការអនុវត្ត​គោលការណ៍​ប្រូកស៊ី​ខាងក្រោម</translation>
 <translation id="5618330573454123917">ឯកសារនេះ​ត្រូវបានរចនាឡើង​សម្រាប់កុំព្យូទ័រដែលប្រើ​កម្មវិធី Macintosh។ ឯកសារនេះ​មិនត្រូវគ្នា​ជាមួយ​ឧបករណ៍​របស់អ្នក​ដែលដំណើរការ ChromeOS ទេ។ <ph name="BEGIN_LINK_HELP" />ស្វែងយល់បន្ថែម<ph name="END_LINK_HELP" />អំពី​ការបើកឯកសារ​នៅលើ ChromeOS។</translation>
 <translation id="5625294776298156701">ភាសាតាមិល​ដែលប្រើ​ក្ដារចុច Tamil99</translation>
 <translation id="5633226425545095130">ការផ្លាស់ទីធាតុនេះនឹងចែករំលែកវាជាមួយអ្នកគ្រប់គ្នាដែលអាចមើលឃើញថតរួម '<ph name="DESTINATION_NAME" />'។</translation>
 <translation id="5649768706273821470">ស្តាប់</translation>
 <translation id="5650895901941743674">ពិនិត្យមើលការកំណត់រចនាសម្ព័ន្ធ APN របស់អ្នក</translation>
 <translation id="5669691691057771421">បញ្ចូលកូដ PIN ថ្មី</translation>
-<translation id="5678784840044122290">កម្មវិធី Linux នឹង​មាននៅក្នុង​ស្ថានីយ​​របស់អ្នក​ ហើយវា​ក៏​អាច​បង្ហាញរូបតំណាង​នៅក្នុង​កម្មវិធី​ចាប់ផ្ដើម​របស់អ្នក​ផងដែរ។</translation>
 <translation id="5686799162999241776"><ph name="BEGIN_BOLD" />មិនអាច​ផ្ដាច់ចេញ​ពីបណ្ណសារ ឬ​ថាស​និម្មិត​បានទេ<ph name="END_BOLD" />
    <ph name="LINE_BREAKS" />
    បិទ​ឯកសារ​ទាំងអស់​នៅលើ​បណ្ណសារ ឬ​ថាស​និមិ្មត រួច​ព្យាយាម​ម្ដងទៀត។</translation>
@@ -637,7 +631,6 @@
 <translation id="5861477046012235702">អ្នកលេង​ហ្គេម</translation>
 <translation id="5864471791310927901">DHCP lookup បានបរាជ័យ</translation>
 <translation id="5896749729057314184">បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, បានបិទដំណើរការ, កម្លាំងរលកសញ្ញា <ph name="SIGNAL_STRENGTH" />%, ព័ត៌មានលម្អិត</translation>
-<translation id="5911887972742538906">មានបញ្ហា​កើតឡើង អំឡុង​ពេលដំឡើង​កម្មវិធី Linux របស់អ្នក។</translation>
 <translation id="5912396950572065471">ទម្រង់</translation>
 <translation id="5918480239180455431">មាន​មុខងារ​ស្វែងរក​ថ្មីៗ</translation>
 <translation id="5926082595146149752">ភាសាហូឡង់ (ហូឡង់) ដែលប្រើ​ក្ដារចុចកុំព្យូទ័រ​អាមេរិកអន្តរជាតិ</translation>
@@ -806,7 +799,6 @@
 <translation id="7238097264433196391">ឈ្មោះ​ឧបករណ៍ USB</translation>
 <translation id="7238643356913091553"><ph name="NETWORK_NAME" />, ព័ត៌មាន​លម្អិត</translation>
 <translation id="7246947237293279874">ប្រូកស៊ី FTP</translation>
-<translation id="7248671827512403053">កម្មវិធី</translation>
 <translation id="7256405249507348194">កំហុសឆ្គងដែលមិនបានសម្គាល់៖ <ph name="DESC" /></translation>
 <translation id="7268659760406822741">មានសេវាកម្ម</translation>
 <translation id="7291818353625820805">ចង់ឱ្យ​គ្រាប់ចុច​ចុច​ឡើងវិញ​ឬ? សូមបិទ​សញ្ញា​សម្គាល់​សំឡេង​នៅក្នុងការកំណត់​ក្ដារចុច</translation>
@@ -933,7 +925,6 @@
 <translation id="8151638057146502721">តំឡើង</translation>
 <translation id="8154666764013920974">{NUM_ERROR,plural, =1{បញ្ហា 1។}other{បញ្ហា #។}}</translation>
 <translation id="8154842056504218462">បានជ្រើសរើសធាតុទាំងអស់។</translation>
-<translation id="8157684860301034423">មិន​អាច​ទាញយកព័ត៌មាន​កម្មវិធី​បានទេ។</translation>
 <translation id="8175731104491895765">ភាសា​បារាំង (បែលហ្ស៊ិក)</translation>
 <translation id="8175799081768705361">កំពុង​ធ្វើសម​កាលកម្ម​ឯកសារ​ថាស <ph name="NUMBER_OF_FILES_SYNCING" /></translation>
 <translation id="8179976553408161302">បញ្ចូល</translation>
@@ -995,6 +986,7 @@
 <translation id="8540608333167683902">បណ្ដាញ <ph name="NETWORK_INDEX" /> នៃ <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, កម្លាំងរលកសញ្ញា <ph name="SIGNAL_STRENGTH" />%, ព័ត៌មានលម្អិត</translation>
 <translation id="8545476925160229291">ភាសា​អង់គ្លេស (សហរដ្ឋអាមេរិក)</translation>
 <translation id="854655314928502177">URL ស្វែងរកប្រូកស៊ីគេហទំព័រដោយស្វ័យប្រវត្តិ៖</translation>
+<translation id="8547747809824590510">អ្នកគ្រប់គ្រង​របស់អ្នក​បានកំណត់​វិធាន​លុបពីលើ​ប្រូកស៊ី</translation>
 <translation id="8549186985808798022">ភាសា​អ៊ីតាលី</translation>
 <translation id="8551494947769799688">ភាសាឡាត់វៀ</translation>
 <translation id="8560515948038859357">ភាសាចិនកាតាំង</translation>
@@ -1055,6 +1047,7 @@
 <translation id="9038620279323455325">ឯកសារដែល​ដាក់ឈ្មោះ "<ph name="FILE_NAME" />" មានរួចហើយ។ សូមជ្រើសរើស​ឈ្មោះផ្សេង។</translation>
 <translation id="9046895021617826162">ការភ្ជាប់បានបរាជ័យ</translation>
 <translation id="9065512565307033593">ប្រសិនបើអ្នក​មិនអាចផ្ទៀងផ្ទាត់​បានទេ សិទ្ធិចូលប្រើ​បណ្ដាញ​របស់អ្នក​នឹងត្រូវបានបិទ។</translation>
+<translation id="9079844694307518094">អ្នកគ្រប់គ្រង​របស់អ្នក​កំពុង​អនុវត្ត​គោលការណ៍​ប្រូកស៊ី​ខាងក្រោម</translation>
 <translation id="908378762078012445">ភាសារុស្ស៊ី​ដែលប្រើ​ក្ដារចុចតាម​សូរសព្ទ AATSEEL</translation>
 <translation id="9086302186042011942">កំពុងធ្វើសមកម្ម</translation>
 <translation id="9099674669267916096">ចំនួន​ទំព័រ</translation>
@@ -1075,9 +1068,9 @@
 <translation id="9183302530794969518">Google ឯកសារ</translation>
 <translation id="9189836632794948435">ភាសា​កាហ្សាក់</translation>
 <translation id="9200427192836333033">បានស្រង់ធាតុ <ph name="NUMBER_OF_ITEMS" />។</translation>
-<translation id="9213073329713032541">បានចាប់ផ្ដើម​ការដំឡើង​ដោយជោគជ័យហើយ។</translation>
 <translation id="9219103736887031265">រូបភាព</translation>
 <translation id="9219908252191632183">ទេសភាព​ភព​ព្រះចន្ទ</translation>
+<translation id="931652069802536959">បណ្ដាញ​ត្រូវបាន​ទប់ស្កាត់​ដោយ​គោលការណ៍</translation>
 <translation id="938470336146445890">សូមតំឡើងវិញ្ញាបនប័ត្រអ្នកប្រើ។</translation>
 <translation id="939736085109172342">ថតឯកសារថ្មី</translation>
 <translation id="943972244133411984">កែសម្រួល​ដោយ</translation>

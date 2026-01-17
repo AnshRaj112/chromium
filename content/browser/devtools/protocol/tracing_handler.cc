@@ -26,7 +26,7 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "base/trace_event/memory_dump_manager.h"
-#include "base/trace_event/trace_event_impl.h"
+#include "base/trace_event/trace_event.h"
 #include "base/trace_event/traced_value.h"
 #include "base/trace_event/tracing_agent.h"
 #include "base/values.h"
@@ -49,6 +49,7 @@
 #include "content/public/browser/tracing_service.h"
 #include "content/public/browser/web_contents.h"
 #include "services/resource_coordinator/public/cpp/memory_instrumentation/memory_instrumentation.h"
+#include "services/resource_coordinator/public/mojom/memory_instrumentation/memory_instrumentation.mojom-shared.h"
 #include "services/tracing/public/cpp/perfetto/perfetto_config.h"
 #include "services/tracing/public/cpp/perfetto/perfetto_session.h"
 #include "services/tracing/public/cpp/perfetto/trace_packet_tokenizer.h"
@@ -938,6 +939,12 @@ void TracingHandler::GetCategories(
                      weak_factory_.GetWeakPtr(), std::move(callback)));
 }
 
+Response TracingHandler::GetTrackEventDescriptor(Binary* out_descriptor) {
+  *out_descriptor = Binary::fromVector(
+      TracingController::GetInstance()->GetTrackEventDescriptor());
+  return Response::Success();
+}
+
 void TracingHandler::OnRecordingEnabled(std::unique_ptr<StartCallback> callback,
                                         const std::string& error_msg) {
   if (!error_msg.empty()) {
@@ -1030,9 +1037,11 @@ void TracingHandler::RequestMemoryDump(
 
 void TracingHandler::OnMemoryDumpFinished(
     std::unique_ptr<RequestMemoryDumpCallback> callback,
-    bool success,
+    memory_instrumentation::mojom::RequestOutcome outcome,
     uint64_t dump_id) {
-  callback->sendSuccess(base::StringPrintf("0x%" PRIx64, dump_id), success);
+  callback->sendSuccess(
+      base::StringPrintf("0x%" PRIx64, dump_id),
+      outcome == memory_instrumentation::mojom::RequestOutcome::kSuccess);
 }
 
 void TracingHandler::OnFrameFromVideoConsumer(

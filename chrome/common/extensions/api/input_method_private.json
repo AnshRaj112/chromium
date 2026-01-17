@@ -116,9 +116,51 @@
         }
       },
       {
+        "id": "JapaneseInputMode",
+        "type": "string",
+        "description": "Japanese IME: input mode. Enum values MUST match CrOS Settings @ https://crsrc.org/c/chrome/browser/resources/ash/settings/os_languages_page/input_method_prefs_consts.ts",
+        "enum": ["Kana", "Romaji"]
+      },
+      {
+        "id": "JapanesePunctuationStyle",
+        "type": "string",
+        "description": "Japanese IME: punctuation style. Enum values MUST match CrOS Settings @ https://crsrc.org/c/chrome/browser/resources/ash/settings/os_languages_page/input_method_prefs_consts.ts",
+        "enum": ["KutenTouten", "CommaPeriod", "KutenPeriod", "CommaTouten"]
+      },
+      {
+        "id": "JapaneseSymbolStyle",
+        "type": "string",
+        "description": "Japanese IME: symbol style. Enum values MUST match CrOS Settings @ https://crsrc.org/c/chrome/browser/resources/ash/settings/os_languages_page/input_method_prefs_consts.ts",
+        "enum": ["CornerBracketMiddleDot", "SquareBracketSlash", "CornerBracketSlash", "SquareBracketMiddleDot"]
+      },
+      {
+        "id": "JapaneseSpaceInputStyle",
+        "type": "string",
+        "description": "Japanese IME: space input style. Enum values MUST match CrOS Settings @ https://crsrc.org/c/chrome/browser/resources/ash/settings/os_languages_page/input_method_prefs_consts.ts",
+        "enum": ["InputMode", "Fullwidth", "Halfwidth"]
+      },
+      {
+        "id": "JapaneseSelectionShortcut",
+        "type": "string",
+        "description": "Japanese IME: selection shortcut. Enum values MUST match CrOS Settings @ https://crsrc.org/c/chrome/browser/resources/ash/settings/os_languages_page/input_method_prefs_consts.ts",
+        "enum": ["NoShortcut", "Digits123456789", "ASDFGHJKL"]
+      },
+      {
+        "id": "JapaneseKeymapStyle",
+        "type": "string",
+        "description": "Japanese IME: keymap style. Enum values MUST match CrOS Settings @ https://crsrc.org/c/chrome/browser/resources/ash/settings/os_languages_page/input_method_prefs_consts.ts",
+        "enum": ["Atok", "MsIme", "Kotoeri", "ChromeOs"]
+      },
+      {
+        "id": "ShiftKeyModeStyle",
+        "type": "string",
+        "description": "Japanese IME: shift key mode switch. Enum values MUST match CrOS Settings @ https://crsrc.org/c/chrome/browser/resources/ash/settings/os_languages_page/input_method_prefs_consts.ts",
+        "enum": ["Off", "Alphanumeric", "Katakana"]
+      },
+      {
         "id": "InputMethodSettings",
         "type": "object",
-        "description": "User preference settings for a specific input method. Japanese input methods are not included because they are managed separately by Mozc module.",
+        "description": "User preference settings for a specific input method. Entry names MUST match CrOS Settings @ https://crsrc.org/c/chrome/browser/resources/ash/settings/os_languages_page/input_method_prefs_consts.ts",
         "properties": {
           "enableCompletion": { "type": "boolean", "optional": true, "description": "Whether to enable auto completion."},
           "enableDoubleSpacePeriod": { "type": "boolean", "optional": true, "description": "Whether to auto transform double spaces to type period."},
@@ -133,6 +175,66 @@
           "virtualKeyboardAutoCorrectionLevel": { "type": "integer", "optional": true, "description": "The level of auto correction for virtual keyboard (0: Off, 1: Modest, 2: Aggressive)."},
           "virtualKeyboardEnableCapitalization": { "type": "boolean", "optional": true, "description": "Whether enable auto capitalization for virtual keyboard."},
           "xkbLayout": { "type": "string", "optional": true, "description": "The xkb keyboard (system provided keyboard) layout."},
+          "JapaneseInputMode": {
+            "$ref": "JapaneseInputMode",
+            "optional": true,
+            "description": "Japanese IME: input mode."
+          },
+          "JapanesePunctuationStyle": {
+            "$ref": "JapanesePunctuationStyle",
+            "optional": true,
+            "description": "Japanese IME: punctuation style."
+          },
+          "JapaneseSymbolStyle": {
+            "$ref": "JapaneseSymbolStyle",
+            "optional": true,
+            "description": "Japanese IME: symbol style."
+          },
+          "JapaneseSpaceInputStyle": {
+            "$ref": "JapaneseSpaceInputStyle",
+            "optional": true,
+            "description": "Japanese IME: space input style."
+          },
+          "JapaneseSectionShortcut": {
+            "$ref": "JapaneseSelectionShortcut",
+            "optional": true,
+            "description": "Japanese IME: selection shortcut (NOTE: 'Section' in property name is a persisted typo)."
+          },
+          "JapaneseKeymapStyle": {
+            "$ref": "JapaneseKeymapStyle",
+            "optional": true,
+            "description": "Japanese IME: keymap style."
+          },
+          "AutomaticallySwitchToHalfwidth": {
+            "type": "boolean",
+            "optional": true,
+            "description": "Japanese IME: Whether to switch to halfwidth automatically."
+          },
+          "ShiftKeyModeStyle": {
+            "$ref": "ShiftKeyModeStyle",
+            "optional": true,
+            "description": "Japanese IME: shift key mode switch."
+          },
+          "UseInputHistory": {
+            "type": "boolean",
+            "optional": true,
+            "description": "Japanese IME: Whether to use input history for suggestions."
+          },
+          "UseSystemDictionary": {
+            "type": "boolean",
+            "optional": true,
+            "description": "Japanese IME: Whether to use system dictionary for suggestions."
+          },
+          "numberOfSuggestions" : {
+            "type": "integer",
+            "optional": true,
+            "description": "Japanese IME: Number of suggestions."
+          },
+          "JapaneseDisableSuggestions": {
+            "type": "boolean",
+            "optional": true,
+            "description": "Japanese IME: Whether to disable personalized conversions, suggestions, and user dictionary."
+          },
           "koreanEnableSyllableInput": { "type": "boolean", "optional": true, "description": "Whether input one syllable at a time in korean input method."},
           "koreanKeyboardLayout": { "type": "string", "optional": true, "description": "The layout of korean keyboard."},
           "koreanShowHangulCandidate": { "type": "boolean", "optional": true, "description": "Whether to show hangul candidates in korean input method."},
@@ -142,29 +244,9 @@
             "optional": true,
             "description": "User can use shortcuts to switch between Chinese and English quickly when using pinyin, this flag indicates whether the default language is Chinese."
           },
-          "pinyinEnableFuzzy": { "type": "boolean", "optional": true, "description": "Whether to enable fuzzy pinyin."},
           "pinyinEnableLowerPaging": { "type": "boolean", "optional": true, "description": "Whether to enable using ','/'.' to page up/down the candidates in pinyin."},
           "pinyinEnableUpperPaging": { "type": "boolean", "optional": true, "description": "Whether to enable using '-'/'=' to page up/down the candidates in pinyin."},
           "pinyinFullWidthCharacter": { "type": "boolean", "optional": true, "description": "Whether to output full width letters and digits in pinyin."},
-          "pinyinFuzzyConfig": {
-            "type": "object",
-            "optional": true,
-            "description": "The configuration of which fuzzy pairs are enable.",
-            "properties": {
-              "an_ang": {"type": "boolean", "optional": true, "description": "Whether to enable an_ang fuzzy"},
-              "c_ch": {"type": "boolean", "optional": true, "description": "Whether to enable c_ch fuzzy"},
-              "en_eng": {"type": "boolean", "optional": true, "description": "Whether to enable en_eng fuzzy"},
-              "f_h": {"type": "boolean", "optional": true, "description": "Whether to enable f_h fuzzy"},
-              "ian_iang": {"type": "boolean", "optional": true, "description": "Whether to enable ian_iang fuzzy"},
-              "in_ing": {"type": "boolean", "optional": true, "description": "Whether to enable in_ing fuzzy"},
-              "k_g": {"type": "boolean", "optional": true, "description": "Whether to enable k_g fuzzy"},
-              "l_n": {"type": "boolean", "optional": true, "description": "Whether to enable l_n fuzzy"},
-              "r_l": {"type": "boolean", "optional": true, "description": "Whether to enable r_l fuzzy"},
-              "s_sh": {"type": "boolean", "optional": true, "description": "Whether to enable s_sh fuzzy"},
-              "uan_uang": {"type": "boolean", "optional": true, "description": "Whether to enable uan_uang fuzzy"},
-              "z_zh": {"type": "boolean", "optional": true, "description": "Whether to enable z_zh fuzzy"}
-            }
-          },
           "zhuyinKeyboardLayout": { "type": "string", "optional": true, "description": "The layout of zhuyin keyboard."},
           "zhuyinPageSize": { "type": "integer", "optional": true, "description": "The page size of zhuyin candidate page."},
           "zhuyinSelectKeys": { "type": "string", "optional": true, "description": "The keys used to select candidates in zhuyin."},
@@ -188,7 +270,7 @@
         "parameters": [],
         "returns_async": {
           "name": "callback",
-          "description": "Callback which is called with the config object.",
+          "description": "Resolves with the config object.",
           "parameters": [
             {
               "name": "config",
@@ -208,7 +290,7 @@
         "parameters": [],
         "returns_async": {
           "name": "callback",
-          "description": "Callback which is called with the input method objects.",
+          "description": "Resolves with the input method objects.",
           "parameters": [
             {
               "name": "inputMethods",
@@ -232,7 +314,7 @@
         "parameters": [],
         "returns_async": {
           "name": "callback",
-          "description": "Callback which is called with the current input method.",
+          "description": "Resolves with the current input method.",
           "parameters": [
             {
               "name": "inputMethodId",
@@ -255,7 +337,7 @@
         "returns_async": {
           "name": "callback",
           "optional": true,
-          "description": "Callback which is called once the current input method is set. If unsuccessful $(ref:runtime.lastError) is set.",
+          "description": "Resolves once the current input method is set. If unsuccessful, the promise is rejected.",
           "parameters": []
         }
       }, {
@@ -266,7 +348,7 @@
           "returns_async": {
             "name": "callback",
             "optional": true,
-            "description": "Callback which is called once the input method is swapped (if applicable). If unsuccessful $(ref:runtime.lastError) is set.",
+            "description": "Resolves once the input method is swapped (if applicable). If unsuccessful, the promise is rejected.",
             "parameters": []
           }
       }, {
@@ -276,7 +358,7 @@
         "parameters": [],
         "returns_async": {
           "name": "callback",
-          "description": "Callback which is called once the list of dictionary words are ready.",
+          "description": "Resolves once the list of dictionary words are ready.",
           "parameters": [
             {
               "name": "words",
@@ -302,7 +384,7 @@
         "returns_async": {
           "name": "callback",
           "optional": true,
-          "description": "Callback which is called once the word is added. If unsuccessful $(ref:runtime.lastError) is set.",
+          "description": "Resolves once the word is added. If unsuccessful, the promise is rejected.",
           "parameters": []
         }
       }, {
@@ -319,7 +401,7 @@
         "returns_async": {
           "name": "callback",
           "optional": true,
-          "description": "Callback which is called when the layout is set.",
+          "description": "Resolves when the layout is set.",
           "parameters": []
         }
       }, {
@@ -341,7 +423,7 @@
         "returns_async": {
           "name": "callback",
           "optional": true,
-          "description": "Called when the operation completes.",
+          "description": "Resolves when the operation completes.",
           "parameters": []
         }
       }, {
@@ -352,7 +434,7 @@
         "returns_async": {
           "name": "callback",
           "optional": true,
-          "description": "Called when the operation completes.",
+          "description": "Resolves when the operation completes.",
           "parameters": []
         }
       }, {
@@ -363,7 +445,7 @@
         "returns_async": {
           "name": "callback",
           "optional": true,
-          "description": "Called when the operation completes.",
+          "description": "Resolves when the operation completes.",
           "parameters": []
         }
       }, {
@@ -395,7 +477,7 @@
         ],
         "returns_async": {
           "name": "callback",
-          "description": "Callback which is called to provide the result",
+          "description": "Resolves to provide the result",
           "parameters": [
             {
               "name": "surroundingInfo",
@@ -422,7 +504,7 @@
         ],
         "returns_async": {
           "name": "callback",
-          "description": "Callback to receive the settings",
+          "description": "Resolves with the settings",
           "parameters": [
             {
               "name": "settings",
@@ -451,7 +533,7 @@
         "returns_async": {
           "name": "callback",
           "optional": true,
-          "description": "Callback to notify that the new value has been set",
+          "description": "Resolves to notify that the new value has been set",
           "parameters": []
         }
       }, {
@@ -503,7 +585,7 @@
         "returns_async": {
           "name": "callback",
           "optional": true,
-          "description": "Called when the operation completes with a boolean indicating if the text was accepted or not. On failure, $(ref:runtime.lastError) is set.",
+          "description": "Resolves when the operation completes with a boolean indicating if the text was accepted or not. On failure, the promise will be rejected.",
           "parameters": [
             {
               "name": "success",
@@ -564,7 +646,7 @@
       ],
       "returns_async": {
         "name": "callback",
-        "description": "Called with a LanguagePackStatus when the operation completes.",
+        "description": "Resolves with a LanguagePackStatus when the operation completes.",
         "parameters": [
           {
             "name": "status",
@@ -675,22 +757,6 @@
             "$ref": "InputContext",
             "name": "context",
             "description": "Describes the text field that has acquired focus."
-          }
-        ]
-      }, {
-        "name": "onSettingsChanged",
-        "type": "function",
-        "description": "This event is sent when the settings for any input method changed. It is sent to all extensions that are listening to this event, and enabled by the user.",
-        "parameters": [
-          {
-            "name": "engineID",
-            "type": "string",
-            "description": "ID of the engine that changed"
-          },
-          {
-            "name": "settings",
-            "$ref": "InputMethodSettings",
-            "description": "The new settings"
           }
         ]
       }, {

@@ -65,11 +65,22 @@ class CORE_EXPORT StylePropertySerializer {
                            String separator = " ") const;
   String GetShorthandValueForRule(const StylePropertyShorthand&,
                                   const StylePropertyShorthand&) const;
+  String GetShorthandValueForBidirectionalGapRuleInset(
+      const StylePropertyShorthand&) const;
+  String GetShorthandValueForBidirectionalGapRuleEdgeInteriorInset(
+      const StylePropertyShorthand&) const;
   String GetShorthandValueForBidirectionalGapRules(
       const StylePropertyShorthand&) const;
   String GetShorthandValueForGapDecorationsRule(
       const StylePropertyShorthand&,
       CSSGapDecorationPropertyDirection direction) const;
+  String GetShorthandValueForGapDecorationsRuleInset(
+      const StylePropertyShorthand&,
+      CSSGapDecorationPropertyDirection direction) const;
+  String GetShorthandValueForGapDecorationsRuleEdgeInteriorInset(
+      const StylePropertyShorthand&,
+      CSSGapDecorationPropertyDirection direction,
+      bool is_edge) const;
   String GetShorthandValueForColumnRule(const StylePropertyShorthand&) const;
   String GetShorthandValueForColumns(const StylePropertyShorthand&) const;
   // foo || bar || ... || baz
@@ -80,12 +91,14 @@ class CORE_EXPORT StylePropertySerializer {
   String GetShorthandValueForGridArea(const StylePropertyShorthand&) const;
   String GetShorthandValueForGridLine(const StylePropertyShorthand&) const;
   String GetShorthandValueForGridTemplate(const StylePropertyShorthand&) const;
-  String GetShorthandValueForMasonry(const StylePropertyShorthand&) const;
+  String GetShorthandValueForGridLanes(const StylePropertyShorthand&) const;
   String ContainerValue() const;
   String TimelineValue(const StylePropertyShorthand&) const;
   String ScrollTimelineValue() const;
   String ViewTimelineValue() const;
   String AnimationRangeShorthandValue() const;
+  String TimelineTriggerRangeShorthandValue() const;
+  String TimelineTriggerExitRangeShorthandValue() const;
   String FontValue() const;
   String FontSynthesisValue() const;
   String FontVariantValue() const;
@@ -98,7 +111,6 @@ class CORE_EXPORT StylePropertySerializer {
   String TextWrapValue() const;
   String ContainIntrinsicSizeValue() const;
   String WhiteSpaceValue() const;
-  String ScrollStartValue() const;
   String LineClampValue(bool is_webkit_line_clamp) const;
   String PositionTryValue(const StylePropertyShorthand&) const;
   String GetPropertyText(const CSSPropertyName&,

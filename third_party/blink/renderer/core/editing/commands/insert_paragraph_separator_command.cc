@@ -280,15 +280,13 @@ void InsertParagraphSeparatorCommand::DoApply(EditingState* editing_state) {
   if (!start_block || !start_block->NonShadowBoundaryParentNode() ||
       (RuntimeEnabledFeatures::InsertLineBreakIfPhrasingContentEnabled() &&
        IsEditableRootPhrasingContent(insertion_position)) ||
-      (RuntimeEnabledFeatures::InsertLineBreakIfInlineListItemEnabled() &&
-       IsDisplayInlineType(list_child)) ||
-      IsTableCell(start_block) ||
-      IsA<HTMLFormElement>(*start_block)
+      IsDisplayInlineType(list_child) || IsTableCell(start_block) ||
+      IsA<HTMLFormElement>(*start_block) ||
       // FIXME: If the node is hidden, we don't have a canonical position so we
       // will do the wrong thing for tables and <hr>.
       // https://bugs.webkit.org/show_bug.cgi?id=40342
-      || (!canonical_pos.IsNull() &&
-          IsDisplayInsideTable(canonical_pos.AnchorNode())) ||
+      (!canonical_pos.IsNull() &&
+       IsDisplayInsideTable(canonical_pos.AnchorNode())) ||
       (!canonical_pos.IsNull() &&
        IsA<HTMLHRElement>(*canonical_pos.AnchorNode()))) {
     ApplyCommandToComposite(
@@ -559,7 +557,8 @@ void InsertParagraphSeparatorCommand::DoApply(EditingState* editing_state) {
           << text_node;
       ReplaceTextInNode(text_node,
                         leading_whitespace.ComputeOffsetInContainerNode(), 1,
-                        NonBreakingSpaceString());
+                        NonBreakingSpaceString(),
+                        EditCommand::PasswordEchoBehavior::kDoNotEcho);
       GetDocument().UpdateStyleAndLayout(DocumentUpdateReason::kEditing);
     }
   }
@@ -664,7 +663,7 @@ void InsertParagraphSeparatorCommand::DoApply(EditingState* editing_state) {
       if (position_after_split.AnchorNode()->IsTextNode()) {
         InsertTextIntoNode(
             To<Text>(position_after_split.ComputeContainerNode()), 0,
-            NonBreakingSpaceString());
+            NonBreakingSpaceString(), PasswordEchoBehavior::kDoNotEcho);
       }
     }
   }

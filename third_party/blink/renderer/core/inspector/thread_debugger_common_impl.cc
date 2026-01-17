@@ -8,6 +8,7 @@
 
 #include "base/check.h"
 #include "base/rand_util.h"
+#include "gin/public/gin_embedders.h"
 #include "third_party/blink/public/mojom/frame/user_activation_notification_type.mojom-blink.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_evaluation_result.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_binding_for_core.h"
@@ -752,8 +753,9 @@ void ThreadDebuggerCommonImpl::CreateFunctionProperty(
     v8::SideEffectType side_effect_type) {
   CreateFunctionPropertyWithData(
       context, object, name, callback,
-      v8::External::New(v8::Isolate::GetCurrent(), this), description,
-      side_effect_type);
+      v8::External::New(v8::Isolate::GetCurrent(), this,
+                        gin::kThreadDebuggerCommonImplTag),
+      description, side_effect_type);
 }
 
 void ThreadDebuggerCommonImpl::installAdditionalCommandLineAPI(
@@ -944,7 +946,8 @@ void ThreadDebuggerCommonImpl::GetEventListenersCallback(
     return;
 
   ThreadDebuggerCommonImpl* debugger = static_cast<ThreadDebuggerCommonImpl*>(
-      v8::Local<v8::External>::Cast(callback_info.Data())->Value());
+      v8::Local<v8::External>::Cast(callback_info.Data())
+          ->Value(gin::kThreadDebuggerCommonImplTag));
   DCHECK(debugger);
   v8::Isolate* isolate = callback_info.GetIsolate();
   v8::Local<v8::Context> context = isolate->GetCurrentContext();
@@ -1003,18 +1006,17 @@ static uint64_t GetTraceId(ThreadDebuggerCommonImpl* this_thread_debugger,
 
 void ThreadDebuggerCommonImpl::consoleTime(v8::Isolate* isolate,
                                            v8::Local<v8::String> label) {
-  TRACE_EVENT_COPY_NESTABLE_ASYNC_BEGIN0(
-      "blink.console", ToCoreString(isolate, label).Utf8().c_str(),
-      TRACE_ID_WITH_SCOPE("console.time",
-                          TRACE_ID_LOCAL(GetTraceId(this, label))));
+  TRACE_EVENT_BEGIN(
+      "blink.console",
+      perfetto::DynamicString(ToCoreString(isolate, label).Utf8()),
+      perfetto::NamedTrack("console.time", GetTraceId(this, label)));
 }
 
 void ThreadDebuggerCommonImpl::consoleTimeEnd(v8::Isolate* isolate,
                                               v8::Local<v8::String> label) {
-  TRACE_EVENT_COPY_NESTABLE_ASYNC_END0(
-      "blink.console", ToCoreString(isolate, label).Utf8().c_str(),
-      TRACE_ID_WITH_SCOPE("console.time",
-                          TRACE_ID_LOCAL(GetTraceId(this, label))));
+  TRACE_EVENT_END(
+      "blink.console",
+      perfetto::NamedTrack("console.time", GetTraceId(this, label)));
 }
 
 void ThreadDebuggerCommonImpl::consoleTimeStamp(v8::Isolate* isolate,

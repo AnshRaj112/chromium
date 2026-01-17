@@ -138,8 +138,8 @@ void VP9Decoder::SetStream(int32_t id,
     secure_handle_ = 0;
   }
 
-  parser_.SetStream(decoder_buffer_->data(), decoder_buffer_->size(),
-                    frame_sizes,
+  parser_.SetStream(base::span(*decoder_buffer_).data(),
+                    decoder_buffer_->size(), frame_sizes,
                     decrypt_config ? decrypt_config->Clone() : nullptr);
 }
 
@@ -430,9 +430,9 @@ VideoColorSpace VP9Decoder::GetVideoColorSpace() const {
   return picture_color_space_;
 }
 
-std::optional<gfx::HDRMetadata> VP9Decoder::GetHDRMetadata() const {
+gfx::HDRMetadata VP9Decoder::GetHDRMetadata() const {
   // VP9 only allow HDR metadata exists in the container.
-  return std::nullopt;
+  return gfx::HDRMetadata();
 }
 
 size_t VP9Decoder::GetRequiredNumOfPictures() const {

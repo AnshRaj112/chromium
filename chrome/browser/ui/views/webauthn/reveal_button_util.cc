@@ -15,6 +15,7 @@
 #include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/button/image_button_factory.h"
+#include "ui/views/metadata/view_factory.h"
 
 namespace {
 constexpr int kEyeIconSize = 20;
@@ -33,12 +34,12 @@ std::unique_ptr<views::ToggleImageButton> CreateRevealButton(
           .SetToggledTooltipText(
               l10n_util::GetStringUTF16(IDS_WEBAUTHN_HIDE_PIN))
           .Build();
-  SetImageFromVectorIconWithColorId(button.get(), vector_icons::kVisibilityIcon,
-                                    ui::kColorIcon, ui::kColorIconDisabled,
-                                    kEyeIconSize);
-  SetToggledImageFromVectorIconWithColorId(
-      button.get(), vector_icons::kVisibilityOffIcon, ui::kColorIcon,
-      ui::kColorIconDisabled, kEyeIconSize);
+  SetImageFromVectorIconWithColor(button.get(), vector_icons::kVisibilityIcon,
+                                  {ui::kColorIcon, ui::kColorIconDisabled},
+                                  kEyeIconSize);
+  SetToggledImageFromVectorIconWithColor(
+      button.get(), vector_icons::kVisibilityOffIcon,
+      {ui::kColorIcon, ui::kColorIconDisabled}, kEyeIconSize);
   views::InkDrop::Get(button.get())
       ->SetMode(views::InkDropHost::InkDropMode::ON);
   button->SetHasInkDropActionOnClick(true);

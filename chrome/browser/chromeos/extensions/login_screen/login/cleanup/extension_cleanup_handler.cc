@@ -4,6 +4,8 @@
 
 #include "chrome/browser/chromeos/extensions/login_screen/login/cleanup/extension_cleanup_handler.h"
 
+#include <algorithm>
+
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/browser_process.h"
@@ -67,12 +69,14 @@ void ExtensionCleanupHandler::UninstallExtensions() {
     // Skip the apps/extensions not meant to be uninstalled and reinstalled. The
     // browsing history will be removed by BrowsingDataCleanupHandler and open
     // windows will be closed by OpenWindowsCleanupHandler.
-    if (base::Contains(kExemptExtensions, extension_id))
+    if (std::ranges::contains(kExemptExtensions, extension_id)) {
       continue;
+    }
 
     // Skip extensions exempt by policy.
-    if (base::Contains(policy_exempt_extensions, extension_id))
+    if (policy_exempt_extensions.contains(extension_id)) {
       continue;
+    }
 
     extensions_to_be_uninstalled_.insert(extension_id);
   }

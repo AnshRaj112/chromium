@@ -36,10 +36,15 @@ import org.robolectric.ParameterizedRobolectricTestRunner.Parameter;
 import org.robolectric.ParameterizedRobolectricTestRunner.Parameters;
 import org.robolectric.shadows.ShadowLooper;
 
+import org.chromium.base.DeviceInfo;
 import org.chromium.base.supplier.LazyOneshotSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.ObservableSuppliers;
 import org.chromium.base.supplier.OneshotSupplierImpl;
+import org.chromium.base.supplier.SettableNonNullObservableSupplier;
+import org.chromium.base.supplier.SettableNullableObservableSupplier;
 import org.chromium.base.test.BaseRobolectricTestRule;
+import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.profiles.ProfileProvider;
@@ -50,7 +55,6 @@ import org.chromium.chrome.browser.ui.searchactivityutils.SearchActivityClient;
 import org.chromium.components.browser_ui.widget.gesture.BackPressHandler.BackPressResult;
 import org.chromium.components.feature_engagement.Tracker;
 import org.chromium.ui.base.TestActivity;
-import org.chromium.ui.util.XrUtils;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -81,7 +85,6 @@ public class HubCoordinatorUnitTest {
     @Rule public BaseRobolectricTestRule mBaseRule = new BaseRobolectricTestRule();
 
     @Mock private Tab mTab;
-    @Mock private Tab mIncognitoTab;
     @Mock private HubLayoutController mHubLayoutController;
     @Mock private Pane mTabSwitcherPane;
     @Mock private Pane mIncognitoTabSwitcherPane;
@@ -92,21 +95,22 @@ public class HubCoordinatorUnitTest {
     @Mock private Tracker mTracker;
     @Mock private SearchActivityClient mSearchActivityClient;
     @Mock private HubColorMixer mHubColorMixer;
-    private final ObservableSupplierImpl<Boolean> mHubVisibilitySupplier =
-            new ObservableSupplierImpl<>();
-    private final ObservableSupplierImpl<Boolean> mTabSwitcherBackPressSupplier =
-            new ObservableSupplierImpl<>();
-    private final ObservableSupplierImpl<Boolean> mIncognitoTabSwitcherBackPressSupplier =
-            new ObservableSupplierImpl<>();
-    private final ObservableSupplierImpl<Tab> mTabSupplier = new ObservableSupplierImpl<>();
+    private final SettableNonNullObservableSupplier<Boolean> mHubVisibilitySupplier =
+            ObservableSuppliers.createNonNull(false);
+    private final SettableNonNullObservableSupplier<Boolean> mTabSwitcherBackPressSupplier =
+            ObservableSuppliers.createNonNull(false);
+    private final SettableNonNullObservableSupplier<Boolean>
+            mIncognitoTabSwitcherBackPressSupplier = ObservableSuppliers.createNonNull(false);
+    private final SettableNullableObservableSupplier<Tab> mTabSupplier =
+            ObservableSuppliers.createNullable();
     private final ObservableSupplierImpl<Integer> mPreviousLayoutTypeSupplier =
             new ObservableSupplierImpl<>();
     private final ObservableSupplierImpl<DisplayButtonData> mReferenceButtonDataSupplier =
             new ObservableSupplierImpl<>();
-    private final ObservableSupplierImpl<Boolean> mRegularHubSearchEnabledStateSupplier =
-            new ObservableSupplierImpl<>();
-    private final ObservableSupplierImpl<Boolean> mIncognitoHubSearchEnabledStateSupplier =
-            new ObservableSupplierImpl<>();
+    private final SettableNonNullObservableSupplier<Boolean> mRegularHubSearchEnabledStateSupplier =
+            ObservableSuppliers.createNonNull(false);
+    private final SettableNonNullObservableSupplier<Boolean>
+            mIncognitoHubSearchEnabledStateSupplier = ObservableSuppliers.createNonNull(false);
     private final OneshotSupplierImpl<ProfileProvider> mProfileProviderSupplier =
             new OneshotSupplierImpl<>();
     private final ObservableSupplierImpl<EdgeToEdgeController> mEdgeToEdgeSupplier =
@@ -117,7 +121,7 @@ public class HubCoordinatorUnitTest {
 
     @Before
     public void setUp() {
-        XrUtils.setXrDeviceForTesting(mIsXrDevice);
+        DeviceInfo.setIsXrForTesting(mIsXrDevice);
 
         TrackerFactory.setTrackerForTests(mTracker);
         mReferenceButtonDataSupplier.set(mReferenceButtonData);
@@ -133,6 +137,8 @@ public class HubCoordinatorUnitTest {
                 .thenReturn(mReferenceButtonDataSupplier);
         when(mTabSwitcherPane.getHubSearchEnabledStateSupplier())
                 .thenReturn(mRegularHubSearchEnabledStateSupplier);
+        when(mTabSwitcherPane.getHubSearchBoxVisibilitySupplier())
+                .thenReturn(new ObservableSupplierImpl<>());
         when(mIncognitoTabSwitcherPane.getPaneId()).thenReturn(PaneId.INCOGNITO_TAB_SWITCHER);
         when(mIncognitoTabSwitcherPane.getColorScheme()).thenReturn(HubColorScheme.INCOGNITO);
         when(mIncognitoTabSwitcherPane.getHandleBackPressChangedSupplier())
@@ -143,10 +149,10 @@ public class HubCoordinatorUnitTest {
                 .thenReturn(mReferenceButtonDataSupplier);
         when(mIncognitoTabSwitcherPane.getHubSearchEnabledStateSupplier())
                 .thenReturn(mIncognitoHubSearchEnabledStateSupplier);
+        when(mIncognitoTabSwitcherPane.getHubSearchBoxVisibilitySupplier())
+                .thenReturn(new ObservableSupplierImpl<>());
         when(mTab.getId()).thenReturn(TAB_ID);
         when(mTab.isIncognito()).thenReturn(false);
-        when(mIncognitoTab.getId()).thenReturn(INCOGNITO_TAB_ID);
-        when(mIncognitoTab.isIncognito()).thenReturn(true);
         when(mHubLayoutController.getPreviousLayoutTypeSupplier())
                 .thenReturn(mPreviousLayoutTypeSupplier);
         when(mHubLayoutController.getIsAnimatingSupplier())
@@ -160,7 +166,12 @@ public class HubCoordinatorUnitTest {
                         .registerPane(
                                 PaneId.INCOGNITO_TAB_SWITCHER,
                                 LazyOneshotSupplier.fromValue(mIncognitoTabSwitcherPane));
-        mPaneManager = spy(new PaneManagerImpl(builder, mHubVisibilitySupplier));
+        mPaneManager =
+                spy(
+                        new PaneManagerImpl(
+                                builder,
+                                mHubVisibilitySupplier,
+                                /* defaultPaneId= */ PaneId.TAB_SWITCHER));
 
         assertTrue(mPaneManager.focusPane(PaneId.TAB_SWITCHER));
         assertEquals(mTabSwitcherPane, mPaneManager.getFocusedPaneSupplier().get());
@@ -183,7 +194,8 @@ public class HubCoordinatorUnitTest {
                         mSearchActivityClient,
                         mEdgeToEdgeSupplier,
                         mHubColorMixer,
-                        /* xrSpaceModeObservableSupplier= */ null);
+                        /* xrSpaceModeObservableSupplier= */ null,
+                        /* defaultPaneId= */ PaneId.TAB_SWITCHER);
         ShadowLooper.runUiThreadTasks();
         mRootView.getChildCount();
         assertNotEquals(0, mRootView.getChildCount());
@@ -377,7 +389,8 @@ public class HubCoordinatorUnitTest {
                                             mSearchActivityClient,
                                             mEdgeToEdgeSupplier,
                                             mHubColorMixer,
-                                            null);
+                                            null,
+                                            /* defaultPaneId= */ PaneId.TAB_SWITCHER);
 
                             // EmptyDelegate.isBottomToolbarEnabled() returns false,
                             // so no bottom toolbar coordinator should be created
@@ -419,11 +432,52 @@ public class HubCoordinatorUnitTest {
                                             mSearchActivityClient,
                                             mEdgeToEdgeSupplier,
                                             mHubColorMixer,
-                                            null);
+                                            null,
+                                            /* defaultPaneId= */ PaneId.TAB_SWITCHER);
 
                             assertNotNull(coordinator.getHubBottomToolbarCoordinatorForTesting());
 
                             coordinator.destroy();
                         });
+    }
+
+    @Test
+    public void onPaneSwipe_recordsHistograms() {
+        var leftSwipeWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecord("Android.Hub.PaneSwiped.Left", PaneId.TAB_SWITCHER)
+                        .expectNoRecords("Android.Hub.PaneSwiped.Right")
+                        .build();
+        mHubCoordinator.onPaneSwipe(true);
+        leftSwipeWatcher.assertExpected("Expected a left swipe to be recorded.");
+
+        var rightSwipeWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecord(
+                                "Android.Hub.PaneSwiped.Right", PaneId.INCOGNITO_TAB_SWITCHER)
+                        .expectNoRecords("Android.Hub.PaneSwiped.Left")
+                        .build();
+        mHubCoordinator.onPaneSwipe(false);
+        rightSwipeWatcher.assertExpected("Expected a right swipe to be recorded.");
+    }
+
+    @Test
+    public void onPaneSwipe_cyclesToNextPane() {
+        mHubCoordinator.onPaneSwipe(true);
+        verify(mPaneManager).focusPane(PaneId.INCOGNITO_TAB_SWITCHER);
+    }
+
+    @Test
+    public void onPaneSwipe_cyclesToPreviousPane() {
+        mHubCoordinator.onPaneSwipe(false);
+        verify(mPaneManager).focusPane(PaneId.INCOGNITO_TAB_SWITCHER);
+    }
+
+    @Test
+    public void onPaneSwipe_wrapsAroundFromLastPane() {
+        reset(mPaneManager);
+        assertTrue(mPaneManager.focusPane(PaneId.INCOGNITO_TAB_SWITCHER));
+        mHubCoordinator.onPaneSwipe(true);
+        verify(mPaneManager).focusPane(PaneId.TAB_SWITCHER);
     }
 }

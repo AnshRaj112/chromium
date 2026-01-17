@@ -220,14 +220,6 @@ sync_pb::ContactInfoSpecifics ContactInfoSpecificsFromAutofillProfile(
   specifics.set_use_date_unix_epoch_seconds(
       (profile.usage_history().use_date() - base::Time::UnixEpoch())
           .InSeconds());
-  if (auto use_date2 = profile.usage_history().use_date(2)) {
-    specifics.set_use_date2_unix_epoch_seconds(
-        (*use_date2 - base::Time::UnixEpoch()).InSeconds());
-  }
-  if (auto use_date3 = profile.usage_history().use_date(3)) {
-    specifics.set_use_date3_unix_epoch_seconds(
-        (*use_date3 - base::Time::UnixEpoch()).InSeconds());
-  }
   specifics.set_date_modified_unix_epoch_seconds(
       (profile.usage_history().modification_date() - base::Time::UnixEpoch())
           .InSeconds());
@@ -235,7 +227,6 @@ sync_pb::ContactInfoSpecifics ContactInfoSpecificsFromAutofillProfile(
   specifics.set_profile_label(profile.profile_label());
 
   specifics.set_initial_creator_id(profile.initial_creator_id());
-  specifics.set_last_modifier_id(profile.last_modifier_id());
 
   ContactInfoEntryDataSetter s(profile);
   // Set name-related values and statuses.
@@ -361,25 +352,12 @@ AutofillProfile CreateAutofillProfileFromContactInfoSpecifics(
   profile.usage_history().set_use_date(
       base::Time::UnixEpoch() +
       base::Seconds(specifics.use_date_unix_epoch_seconds()));
-  if (specifics.has_use_date2_unix_epoch_seconds()) {
-    profile.usage_history().set_use_date(
-        base::Time::UnixEpoch() +
-            base::Seconds(specifics.use_date2_unix_epoch_seconds()),
-        2);
-  }
-  if (specifics.has_use_date3_unix_epoch_seconds()) {
-    profile.usage_history().set_use_date(
-        base::Time::UnixEpoch() +
-            base::Seconds(specifics.use_date3_unix_epoch_seconds()),
-        3);
-  }
   profile.usage_history().set_modification_date(
       base::Time::UnixEpoch() +
       base::Seconds(specifics.date_modified_unix_epoch_seconds()));
   profile.set_language_code(specifics.language_code());
   profile.set_profile_label(specifics.profile_label());
   profile.set_initial_creator_id(specifics.initial_creator_id());
-  profile.set_last_modifier_id(specifics.last_modifier_id());
 
   ContactInfoProfileSetter s(profile);
   // Set name-related values and statuses.
@@ -454,6 +432,7 @@ bool AreContactInfoSpecificsValid(
   return base::Uuid::ParseLowercase(specifics.guid()).is_valid();
 }
 
+// LINT.IfChange(TrimContactInfoSpecificsData)
 sync_pb::ContactInfoSpecifics TrimContactInfoSpecificsDataForCaching(
     const sync_pb::ContactInfoSpecifics& contact_info_specifics) {
   sync_pb::ContactInfoSpecifics trimmed_specifics =
@@ -463,12 +442,13 @@ sync_pb::ContactInfoSpecifics TrimContactInfoSpecificsDataForCaching(
   trimmed_specifics.clear_address_type();
   trimmed_specifics.clear_use_count();
   trimmed_specifics.clear_use_date_unix_epoch_seconds();
-  trimmed_specifics.clear_use_date2_unix_epoch_seconds();
-  trimmed_specifics.clear_use_date3_unix_epoch_seconds();
   trimmed_specifics.clear_date_modified_unix_epoch_seconds();
   trimmed_specifics.clear_language_code();
   trimmed_specifics.clear_profile_label();
   trimmed_specifics.clear_initial_creator_id();
+  // This field is no longer used. Leaving it here as it should still be treated
+  // as supported for the purpose of trimming to ensure it is properly handled
+  // for older clients.
   trimmed_specifics.clear_last_modifier_id();
 
   EntryTokenDeleter d;
@@ -617,5 +597,6 @@ sync_pb::ContactInfoSpecifics TrimContactInfoSpecificsDataForCaching(
 
   return trimmed_specifics;
 }
+// LINT.ThenChange(//components/sync/protocol/contact_info_specifics.proto:ContactInfoSpecifics)
 
 }  // namespace autofill

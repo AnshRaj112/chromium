@@ -4,7 +4,8 @@
 
 #include "chrome/browser/ash/extensions/gfx_utils.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "chrome/browser/ash/app_list/arc/arc_app_test.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_service_test_base.h"
@@ -37,20 +38,20 @@ class DualBadgeMapTest : public ExtensionServiceTestBase {
   DualBadgeMapTest(const DualBadgeMapTest&) = delete;
   DualBadgeMapTest& operator=(const DualBadgeMapTest&) = delete;
 
-  ~DualBadgeMapTest() override { profile_.reset(); }
+  ~DualBadgeMapTest() override = default;
 
   void SetUp() override {
     extensions::ExtensionServiceTestBase::SetUp();
+    arc_app_test_.PreProfileSetUp();
     InitializeEmptyExtensionService();
-    arc_test_.SetUp(profile_.get());
+    arc_app_test_.PostProfileSetUp(profile());
   }
 
   void TearDown() override {
-    arc_test_.TearDown();
+    arc_app_test_.PreProfileTearDown();
     extensions::ExtensionServiceTestBase::TearDown();
+    arc_app_test_.PostProfileTearDown();
   }
-
-  Profile* profile() { return profile_.get(); }
 
  protected:
   arc::mojom::ArcPackageInfoPtr CreateArcPackage(
@@ -61,11 +62,11 @@ class DualBadgeMapTest : public ExtensionServiceTestBase {
   }
 
   void AddArcPackage(arc::mojom::ArcPackageInfoPtr package) {
-    arc_test_.app_instance()->SendPackageAdded(std::move(package));
+    arc_app_test_.app_instance()->SendPackageAdded(std::move(package));
   }
 
   void RemoveArcPackage(const std::string& package_name) {
-    arc_test_.app_instance()->SendPackageUninstalled(package_name);
+    arc_app_test_.app_instance()->SendPackageUninstalled(package_name);
   }
 
   arc::mojom::AppInfoPtr CreateArcApp(const std::string& name,
@@ -76,7 +77,7 @@ class DualBadgeMapTest : public ExtensionServiceTestBase {
   }
 
   void AddArcApp(arc::mojom::AppInfoPtr app) {
-    arc_test_.app_instance()->SendAppAdded(*app);
+    arc_app_test_.app_instance()->SendAppAdded(*app);
   }
 
   scoped_refptr<const Extension> CreateExtension(const std::string& id) {
@@ -93,7 +94,7 @@ class DualBadgeMapTest : public ExtensionServiceTestBase {
   }
 
  private:
-  ArcAppTest arc_test_;
+  ArcAppTest arc_app_test_;
 };
 
 TEST_F(DualBadgeMapTest, ExtensionToArcAppMapTest) {
@@ -150,7 +151,7 @@ TEST_F(DualBadgeMapTest, ArcAppToExtensionMapTest) {
   extension_ids = extensions::util::GetEquivalentInstalledExtensions(
       profile(), kGmailArcPackage);
   EXPECT_TRUE(1 == extension_ids.size());
-  EXPECT_TRUE(base::Contains(extension_ids, kGmailExtensionId1));
+  EXPECT_TRUE(std::ranges::contains(extension_ids, kGmailExtensionId1));
 
   // Install another Gmail extension app.
   scoped_refptr<const Extension> extension2 =
@@ -159,15 +160,15 @@ TEST_F(DualBadgeMapTest, ArcAppToExtensionMapTest) {
   extension_ids = extensions::util::GetEquivalentInstalledExtensions(
       profile(), kGmailArcPackage);
   EXPECT_TRUE(2 == extension_ids.size());
-  EXPECT_TRUE(base::Contains(extension_ids, kGmailExtensionId1));
-  EXPECT_TRUE(base::Contains(extension_ids, kGmailExtensionId2));
+  EXPECT_TRUE(std::ranges::contains(extension_ids, kGmailExtensionId1));
+  EXPECT_TRUE(std::ranges::contains(extension_ids, kGmailExtensionId2));
 
   RemoveExtension(extension1.get());
   extension_ids = extensions::util::GetEquivalentInstalledExtensions(
       profile(), kGmailArcPackage);
   EXPECT_TRUE(1 == extension_ids.size());
-  EXPECT_FALSE(base::Contains(extension_ids, kGmailExtensionId1));
-  EXPECT_TRUE(base::Contains(extension_ids, kGmailExtensionId2));
+  EXPECT_FALSE(std::ranges::contains(extension_ids, kGmailExtensionId1));
+  EXPECT_TRUE(std::ranges::contains(extension_ids, kGmailExtensionId2));
 
   RemoveExtension(extension2.get());
   extension_ids = extensions::util::GetEquivalentInstalledExtensions(

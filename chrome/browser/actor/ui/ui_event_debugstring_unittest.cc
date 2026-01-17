@@ -13,15 +13,6 @@ namespace actor::ui {
 namespace {
 using testing::Return;
 
-constexpr PageTarget PointTarget() {
-  return gfx::Point(10, 20);
-}
-
-constexpr PageTarget DomNodeTarget() {
-  return DomNode{.node_id = 30,
-                 .document_identifier = "some_document_identifier"};
-}
-
 class UiEventDebugStringTest : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -39,13 +30,21 @@ TEST_F(UiEventDebugStringTest, StartTask) {
   EXPECT_EQ(DebugString(UiEvent(StartTask(TaskId(123)))), "StartTask[id=123]");
 }
 
+TEST_F(UiEventDebugStringTest, StopTask) {
+  EXPECT_EQ(
+      DebugString(SyncUiEvent(StopTask(
+          TaskId(123), ActorTask::State::kCancelled, /*title=*/"", Handle()))),
+      "StopTask[id=123, final_state=Cancelled, title="
+      ", last_acted_on_tab=5555]");
+}
+
 TEST_F(UiEventDebugStringTest, TaskStateChanged) {
   EXPECT_EQ(DebugString(SyncUiEvent(
                 TaskStateChanged(TaskId(123), ActorTask::State::kActing))),
             "TaskStateChanged[task_id=123, state=Acting]");
   EXPECT_EQ(DebugString(UiEvent(TaskStateChanged(
-                TaskId(8675), ActorTask::State::kPausedByClient))),
-            "TaskStateChanged[task_id=8675, state=PausedByClient]");
+                TaskId(8675), ActorTask::State::kPausedByActor))),
+            "TaskStateChanged[task_id=8675, state=PausedByActor]");
 }
 
 TEST_F(UiEventDebugStringTest, StartingToActOnTab) {
@@ -59,19 +58,25 @@ TEST_F(UiEventDebugStringTest, StoppedActingOnTab) {
 }
 
 TEST_F(UiEventDebugStringTest, MouseMove) {
-  EXPECT_EQ(DebugString(UiEvent(MouseMove(Handle(), PointTarget()))),
-            "MouseMove[target=10,20]");
-  EXPECT_EQ(DebugString(AsyncUiEvent(MouseMove(Handle(), DomNodeTarget()))),
-            "MouseMove[target=DomNode[id=30 doc_id=some_document_identifier]]");
+  EXPECT_EQ(DebugString(UiEvent(MouseMove(Handle(), gfx::Point(10, 20),
+                                          TargetSource::kToolRequest))),
+            "MouseMove[target=10,20 target_source=ToolRequest]");
+  EXPECT_EQ(DebugString(AsyncUiEvent(MouseMove(
+                Handle(), std::nullopt, TargetSource::kUnresolvableInApc))),
+            "MouseMove[target=null target_source=UnresolvableInApc]");
+  EXPECT_EQ(DebugString(UiEvent(MouseMove(Handle(), gfx::Point(999, 888),
+                                          TargetSource::kDerivedFromApc))),
+            "MouseMove[target=999,888 target_source=DerivedFromApc]");
 }
 
 TEST_F(UiEventDebugStringTest, MouseClick) {
-  EXPECT_EQ(DebugString(UiEvent(MouseClick(Handle(), MouseClickType::kLeft,
-                                           MouseClickCount::kSingle))),
+  EXPECT_EQ(DebugString(UiEvent(MouseClick(Handle(), mojom::ClickType::kLeft,
+                                           mojom::ClickCount::kSingle))),
             "MouseClick[type=kLeft, count=kSingle]");
-  EXPECT_EQ(DebugString(AsyncUiEvent(MouseClick(
-                Handle(), MouseClickType::kRight, MouseClickCount::kDouble))),
-            "MouseClick[type=kRight, count=kDouble]");
+  EXPECT_EQ(
+      DebugString(AsyncUiEvent(MouseClick(Handle(), mojom::ClickType::kRight,
+                                          mojom::ClickCount::kDouble))),
+      "MouseClick[type=kRight, count=kDouble]");
 }
 
 }  // namespace

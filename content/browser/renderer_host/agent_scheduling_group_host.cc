@@ -5,7 +5,6 @@
 
 #include <memory>
 
-#include "base/containers/contains.h"
 #include "base/containers/unique_ptr_adapters.h"
 #include "base/feature_list.h"
 #include "base/memory/raw_ptr.h"
@@ -21,9 +20,9 @@
 #include "content/common/agent_scheduling_group.mojom.h"
 #include "content/common/renderer.mojom.h"
 #include "content/public/browser/render_process_host.h"
-#include "ipc/ipc_channel_mojo.h"
+#include "ipc/constants.mojom.h"
+#include "ipc/ipc_channel_factory.h"
 #include "ipc/ipc_channel_proxy.h"
-#include "ipc/ipc_message.h"
 #include "third_party/blink/public/mojom/shared_storage/shared_storage_worklet_service.mojom.h"
 #include "third_party/blink/public/mojom/worker/worklet_global_scope_creation_params.mojom.h"
 
@@ -31,7 +30,7 @@ namespace content {
 
 namespace {
 
-using ::IPC::ChannelMojo;
+using ::IPC::ChannelFactory;
 using ::IPC::ChannelProxy;
 using ::IPC::Listener;
 using ::mojo::AssociatedReceiver;
@@ -131,7 +130,7 @@ AgentSchedulingGroupHost* AgentSchedulingGroupHost::GetOrCreate(
   // RenderProcessHosts throughout its lifetime, but it should only ever see a
   // single AgentSchedulingGroupHost for a given RenderProcessHost.
 #if DCHECK_IS_ON()
-  DCHECK(!base::Contains(data->site_instance_groups, &site_instance_group));
+  DCHECK(!data->site_instance_groups.contains(&site_instance_group));
   data->site_instance_groups.insert(&site_instance_group);
 #endif
 
@@ -145,7 +144,7 @@ int32_t AgentSchedulingGroupHost::GetNextID() {
 }
 
 AgentSchedulingGroupHost::AgentSchedulingGroupHost(RenderProcessHost& process)
-    : process_(process.GetSafeRef()), receiver_(this) {
+    : process_(process), receiver_(this) {
   process_->AddObserver(this);
 
   // The RenderProcessHost's channel and other mojo interfaces are bound by the
@@ -206,25 +205,10 @@ void AgentSchedulingGroupHost::RenderProcessHostDestroyed(
   SetState(LifecycleState::kRenderProcessHostDestroyed);
 }
 
-bool AgentSchedulingGroupHost::OnMessageReceived(const IPC::Message& message) {
-  if (message.routing_id() == MSG_ROUTING_CONTROL) {
-    bad_message::ReceivedBadMessage(&*process_,
-                                    bad_message::ASGH_RECEIVED_CONTROL_MESSAGE);
-    return false;
-  }
-
-  auto* listener = GetListener(message.routing_id());
-  if (!listener)
-    return false;
-
-  return listener->OnMessageReceived(message);
-}
-
-void AgentSchedulingGroupHost::OnBadMessageReceived(
-    const IPC::Message& message) {
+void AgentSchedulingGroupHost::OnBadMessageReceived() {
   // If a bad message is received, it should be treated the same as a bad
   // message on the renderer-wide channel (i.e., kill the renderer).
-  return process_->OnBadMessageReceived(message);
+  return process_->OnBadMessageReceived();
 }
 
 void AgentSchedulingGroupHost::OnAssociatedInterfaceRequest(
@@ -399,7 +383,7 @@ void AgentSchedulingGroupHost::SetUpIPC() {
     process_->GetRendererInterface()->CreateAgentSchedulingGroup(
         bootstrap.InitWithNewPipeAndPassReceiver());
 
-    auto channel_factory = ChannelMojo::CreateServerFactory(
+    auto channel_factory = ChannelFactory::CreateServerFactory(
         bootstrap.PassPipe(), /*ipc_task_runner=*/io_task_runner,
         /*proxy_task_runner=*/
         base::SingleThreadTaskRunner::GetCurrentDefault());
@@ -468,7 +452,7 @@ std::ostream& operator<<(std::ostream& os,
 }
 
 Listener* AgentSchedulingGroupHost::GetListener(int32_t routing_id) {
-  DCHECK_NE(routing_id, MSG_ROUTING_CONTROL);
+  DCHECK_NE(routing_id, IPC::mojom::kRoutingIdControl);
 
   return listener_map_.Lookup(routing_id);
 }

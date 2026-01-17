@@ -24,11 +24,12 @@ IN_PROC_BROWSER_TEST_F(ExtensionViewHostFactoryTest, CreateExtensionHosts) {
                         .AppendASCII("none"));
   ASSERT_TRUE(extension.get());
 
-  content::BrowserContext* browser_context = browser()->profile();
+  content::BrowserContext* browser_context = profile();
 
   // Popup hosts are created with the correct type and profile.
   std::unique_ptr<ExtensionViewHost> host =
-      ExtensionViewHostFactory::CreatePopupHost(extension->url(), browser());
+      ExtensionViewHostFactory::CreatePopupHost(*extension, extension->url(),
+                                                browser());
   EXPECT_EQ(extension.get(), host->extension());
   EXPECT_EQ(browser_context, host->browser_context());
   EXPECT_EQ(mojom::ViewType::kExtensionPopup, host->extension_host_type());
@@ -45,7 +46,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionViewHostFactoryTest,
                         .AppendASCII("simple_default"));
   ASSERT_TRUE(extension.get());
 
-  content::BrowserContext* browser_context = browser()->profile();
+  content::BrowserContext* browser_context = profile();
 
   {
     // Create a side panel host with a browser passed in.

@@ -32,7 +32,6 @@ using base::android::ConvertJavaStringToUTF8;
 using base::android::JavaArrayOfByteArrayToBytesVector;
 using base::android::JavaByteArrayToString;
 using base::android::JavaIntArrayToIntVector;
-using base::android::JavaParamRef;
 using base::android::JavaRef;
 using base::android::ScopedJavaGlobalRef;
 using base::android::ScopedJavaLocalRef;
@@ -70,7 +69,7 @@ void OnOptimizationGuideDecision(
 
 base::flat_set<proto::OptimizationType> JavaIntArrayToOptTypesSet(
     JNIEnv* env,
-    const JavaParamRef<jintArray>& joptimization_types) {
+    const JavaRef<jintArray>& joptimization_types) {
   std::vector<int> joptimization_types_vector;
   JavaIntArrayToIntVector(env, joptimization_types,
                           &joptimization_types_vector);
@@ -213,7 +212,7 @@ ScopedJavaLocalRef<jobject> OptimizationGuideBridge::GetJavaObject() {
 
 void OptimizationGuideBridge::RegisterOptimizationTypes(
     JNIEnv* env,
-    const JavaParamRef<jintArray>& joptimization_types) {
+    const JavaRef<jintArray>& joptimization_types) {
   base::flat_set<proto::OptimizationType> opt_types_set =
       JavaIntArrayToOptTypesSet(env, joptimization_types);
   optimization_guide_keyed_service_->RegisterOptimizationTypes(
@@ -223,8 +222,8 @@ void OptimizationGuideBridge::RegisterOptimizationTypes(
 void OptimizationGuideBridge::CanApplyOptimization(
     JNIEnv* env,
     GURL& url,
-    jint optimization_type,
-    const JavaParamRef<jobject>& java_callback) {
+    int32_t optimization_type,
+    const JavaRef<jobject>& java_callback) {
   optimization_guide_keyed_service_->CanApplyOptimization(
       url,
       static_cast<optimization_guide::proto::OptimizationType>(
@@ -236,7 +235,7 @@ void OptimizationGuideBridge::CanApplyOptimization(
 base::android::ScopedJavaLocalRef<jobject>
 OptimizationGuideBridge::CanApplyOptimizationSync(JNIEnv* env,
                                                   GURL& url,
-                                                  jint optimization_type) {
+                                                  int32_t optimization_type) {
   optimization_guide::OptimizationMetadata metadata;
 
   auto decision = optimization_guide_keyed_service_->CanApplyOptimization(
@@ -253,9 +252,9 @@ OptimizationGuideBridge::CanApplyOptimizationSync(JNIEnv* env,
 void OptimizationGuideBridge::CanApplyOptimizationOnDemand(
     JNIEnv* env,
     std::vector<GURL>& urls,
-    const JavaParamRef<jintArray>& optimization_types,
-    jint request_context,
-    const JavaParamRef<jobject>& java_callback,
+    const JavaRef<jintArray>& optimization_types,
+    int32_t request_context,
+    const JavaRef<jobject>& java_callback,
     jni_zero::ByteArrayView& request_context_metadata_serialized) {
   proto::RequestContextMetadata request_context_metadata_deserialized;
   request_context_metadata_deserialized.ParseFromArray(
@@ -302,3 +301,5 @@ void OptimizationGuideBridge::OnNewPushNotification(
 
 }  // namespace android
 }  // namespace optimization_guide
+
+DEFINE_JNI(OptimizationGuideBridge)

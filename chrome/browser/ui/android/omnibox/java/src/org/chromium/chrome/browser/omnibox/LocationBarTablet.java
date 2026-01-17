@@ -39,6 +39,8 @@ class LocationBarTablet extends LocationBarLayout implements OnLongClickListener
     private float mLayoutLeft;
     private float mLayoutRight;
     private int mToolbarStartPaddingDifference;
+
+    @SuppressWarnings("HidingField")
     private UrlBar mUrlBar;
 
     /** Constructor used to inflate from XML. */
@@ -155,11 +157,7 @@ class LocationBarTablet extends LocationBarLayout implements OnLongClickListener
      * hiding buttons.
      */
     /* package */ void resetValuesAfterAnimation() {
-        mMicButton.setTranslationX(0);
-        mLensButton.setTranslationX(0);
-        mDeleteButton.setTranslationX(0);
-        mBookmarkButton.setTranslationX(0);
-        mLocationBarIcon.setTranslationX(0);
+        setLocationBarButtonTranslationForNtpAnimation(0.f);
         mUrlBar.setTranslationX(0);
 
         mMicButton.setAlpha(1.f);
@@ -244,6 +242,8 @@ class LocationBarTablet extends LocationBarLayout implements OnLongClickListener
     }
 
     /* package */ void setBookmarkButtonVisibility(boolean showBookmarkButton) {
+        // The button may be null if this method is called before initialization is finished.
+        if (mBookmarkButton == null) return;
         mBookmarkButton.setVisibility(showBookmarkButton ? View.VISIBLE : View.GONE);
     }
 
@@ -314,5 +314,11 @@ class LocationBarTablet extends LocationBarLayout implements OnLongClickListener
             description = resources.getString(R.string.menu_bookmark);
         }
         return Toast.showAnchoredToast(context, v, description);
+    }
+
+    @Override
+    /* package */ void setLocationBarButtonTranslationForNtpAnimation(float translationX) {
+        super.setLocationBarButtonTranslationForNtpAnimation(translationX);
+        mBookmarkButton.setTranslationX(translationX);
     }
 }

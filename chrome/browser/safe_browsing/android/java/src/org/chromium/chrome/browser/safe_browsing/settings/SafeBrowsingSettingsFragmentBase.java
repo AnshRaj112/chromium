@@ -9,7 +9,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.build.annotations.Initializer;
 import org.chromium.build.annotations.NullMarked;
@@ -37,7 +37,7 @@ public abstract class SafeBrowsingSettingsFragmentBase extends ChromeBaseSetting
     }
 
     @Override
-    public ObservableSupplier<String> getPageTitle() {
+    public MonotonicObservableSupplier<String> getPageTitle() {
         return mPageTitle;
     }
 
@@ -63,7 +63,7 @@ public abstract class SafeBrowsingSettingsFragmentBase extends ChromeBaseSetting
                 menu.add(Menu.NONE, R.id.menu_id_targeted_help, Menu.NONE, R.string.menu_help);
         help.setIcon(
                 TraceEventVectorDrawableCompat.create(
-                        getResources(), R.drawable.ic_help_and_feedback, getActivity().getTheme()));
+                        getResources(), R.drawable.ic_help_24dp, getActivity().getTheme()));
     }
 
     @Override

@@ -15,9 +15,11 @@
 #include "base/memory/weak_ptr.h"
 #include "base/test/test_future.h"
 #include "net/base/completion_once_callback.h"
+#include "net/base/load_timing_internal_info.h"
 #include "net/base/net_errors.h"
 #include "net/base/request_priority.h"
 #include "net/dns/host_resolver.h"
+#include "net/http/alternative_service.h"
 #include "net/http/http_stream_key.h"
 #include "net/http/http_stream_pool.h"
 #include "net/http/http_stream_pool_job.h"
@@ -149,6 +151,18 @@ class FakeServiceEndpointResolver : public HostResolver {
   // existed.
   FakeServiceEndpointResolution& ConfigureDefaultResolution();
 
+  // Makes any attempt to create a request that did not match a call to
+  // AddFakeRequest() CHECK. For tests that use test fixtures that call
+  // ConfigureDefaultResolution(), that want more fine grained call over
+  // resolutions.
+  void ClearDefaultResolution() { default_resolution_.reset(); }
+
+  // When called, causes the destructor call to expect all requests added by
+  // AddFakeRequest() to be consumed.
+  void set_expect_all_fake_requests_consumed() {
+    expect_all_fake_requests_consumed_ = true;
+  }
+
   // HostResolver methods:
   void OnShutdown() override;
   std::unique_ptr<ResolveHostRequest> CreateRequest(
@@ -169,6 +183,7 @@ class FakeServiceEndpointResolver : public HostResolver {
   bool IsHappyEyeballsV3Enabled() const override;
 
  private:
+  bool expect_all_fake_requests_consumed_ = false;
   std::list<std::unique_ptr<FakeServiceEndpointRequest>> requests_;
   std::optional<FakeServiceEndpointResolution> default_resolution_;
 };
@@ -253,13 +268,12 @@ class FakeStreamSocket : public MockClientSocket {
 // A helper to create an HttpStreamKey.
 class StreamKeyBuilder {
  public:
-  explicit StreamKeyBuilder(std::string_view destination = "http://a.test")
-      : destination_(url::SchemeHostPort(GURL(destination))) {}
+  explicit StreamKeyBuilder(std::string_view destination = "http://a.test");
 
   StreamKeyBuilder(const StreamKeyBuilder&) = delete;
   StreamKeyBuilder& operator=(const StreamKeyBuilder&) = delete;
 
-  ~StreamKeyBuilder() = default;
+  ~StreamKeyBuilder();
 
   StreamKeyBuilder& from_key(const HttpStreamKey& key);
 
@@ -280,6 +294,12 @@ class StreamKeyBuilder {
     return *this;
   }
 
+  StreamKeyBuilder& set_alt_service(
+      std::optional<AlternativeService> alt_service) {
+    alt_service_ = std::move(alt_service);
+    return *this;
+  }
+
   HttpStreamKey Build() const;
 
  private:
@@ -287,6 +307,7 @@ class StreamKeyBuilder {
   PrivacyMode privacy_mode_ = PRIVACY_MODE_DISABLED;
   SecureDnsPolicy secure_dns_policy_ = SecureDnsPolicy::kAllow;
   bool disable_cert_network_fetches_ = true;
+  std::optional<AlternativeService> alt_service_;
 };
 
 // An HttpStreamPool::Job::Delegate implementation for tests.
@@ -322,16 +343,18 @@ class TestJobDelegate : public HttpStreamPool::Job::Delegate {
   // HttpStreamPool::Job::Delegate implementations:
   void OnStreamReady(HttpStreamPool::Job* job,
                      std::unique_ptr<HttpStream> stream,
-                     NextProto negotiated_protocol) override;
+                     NextProto negotiated_protocol,
+                     std::optional<SessionSource> session_source) override;
   RequestPriority priority() const override;
   HttpStreamPool::RespectLimits respect_limits() const override;
   const std::vector<SSLConfig::CertAndStatus>& allowed_bad_certs()
       const override;
-  bool enable_ip_based_pooling() const override;
+  bool enable_ip_based_pooling_for_h2() const override;
   bool enable_alternative_services() const override;
   NextProtoSet allowed_alpns() const override;
   const ProxyInfo& proxy_info() const override;
   const NetLogWithSource& net_log() const override;
+  const perfetto::Flow& flow() const override;
   void OnStreamFailed(HttpStreamPool::Job* job,
                       int status,
                       const NetErrorDetails& net_error_details,
@@ -358,6 +381,7 @@ class TestJobDelegate : public HttpStreamPool::Job::Delegate {
   std::vector<SSLConfig::CertAndStatus> allowed_bad_certs_;
   ProxyInfo proxy_info_ = ProxyInfo::Direct();
   NetLogWithSource net_log_;
+  perfetto::Flow flow_;
 
   std::unique_ptr<HttpStreamPool::Job> job_;
 

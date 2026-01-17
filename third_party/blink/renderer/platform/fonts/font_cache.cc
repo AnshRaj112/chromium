@@ -80,8 +80,6 @@ const char kMonoEmojiLocale[] = "und-Zsym";
 extern const char kNotoColorEmojiCompat[] = "Noto Color Emoji Compat";
 #endif
 
-SkFontMgr* FontCache::static_font_manager_ = nullptr;
-
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 float FontCache::device_scale_factor_ = 1.0;
 #endif
@@ -89,41 +87,19 @@ float FontCache::device_scale_factor_ = 1.0;
 #if BUILDFLAG(IS_WIN)
 bool FontCache::antialiased_text_enabled_ = false;
 bool FontCache::lcd_text_enabled_ = false;
-static bool should_use_test_font_mgr = false;
 #endif  // BUILDFLAG(IS_WIN)
 
 FontCache& FontCache::Get() {
   return FontGlobalContext::GetFontCache();
 }
 
-FontCache::FontCache() : font_manager_(sk_ref_sp(static_font_manager_)) {
-#if BUILDFLAG(IS_WIN)
-  if (!font_manager_ || should_use_test_font_mgr) {
-    // This code path is only for unit tests. This SkFontMgr does not work in
-    // sandboxed environments, but injecting this initialization code to all
-    // unit tests isn't easy.
-    font_manager_ = SkFontMgr_New_DirectWrite();
-    // Set |is_test_font_mgr_| to capture if this is not happening in the
-    // production code. crbug.com/561873
-    is_test_font_mgr_ = true;
-
-    // Tests[1][2] construct |FontCache| without |static_font_manager|, but
-    // these tests install font manager with dwrite proxy even if they don't
-    // have remote end in browser.
-    // [1] HtmlBasedUsernameDetectorTest.UserGroupAttributes
-    // [2] RenderViewImplTest.OnDeleteSurroundingTextInCodePoints
-    should_use_test_font_mgr = true;
-  }
-  DCHECK(font_manager_.get());
-#endif
-}
+FontCache::FontCache() = default;
 
 FontCache::~FontCache() = default;
 
 void FontCache::Trace(Visitor* visitor) const {
   visitor->Trace(font_cache_clients_);
   visitor->Trace(font_platform_data_cache_);
-  visitor->Trace(fallback_list_shaper_cache_);
   visitor->Trace(font_data_cache_);
   visitor->Trace(font_fallback_map_);
 #if BUILDFLAG(IS_MAC)
@@ -169,22 +145,8 @@ const FontPlatformData* FontCache::GetFontPlatformData(
       this, font_description, creation_params, alternate_font_name);
 }
 
-ShapeCache* FontCache::GetShapeCache(const FallbackListCompositeKey& key) {
-  auto result = fallback_list_shaper_cache_.insert(key, nullptr);
-  if (result.is_new_entry) {
-    result.stored_value->value = MakeGarbageCollected<ShapeCache>();
-  }
-  return result.stored_value->value.Get();
-}
-
-void FontCache::SetFontManager(sk_sp<SkFontMgr> font_manager) {
-  DCHECK(!static_font_manager_);
-  static_font_manager_ = font_manager.release();
-}
-
 void FontCache::AcceptLanguagesChanged(const String& accept_languages) {
   LayoutLocale::AcceptLanguagesChanged(accept_languages);
-  Get().InvalidateShapeCache();
 }
 
 const SimpleFontData* FontCache::GetFontData(
@@ -263,92 +225,32 @@ const SimpleFontData* FontCache::FallbackFontForCharacter(
   return result;
 }
 
-void FontCache::PurgeFallbackListShaperCache() {
-  TRACE_EVENT0("fonts,ui", "FontCache::PurgeFallbackListShaperCache");
-  for (auto& shape_cache : fallback_list_shaper_cache_.Values()) {
-    shape_cache->Clear();
-  }
-}
-
-void FontCache::InvalidateShapeCache() {
-  PurgeFallbackListShaperCache();
-}
-
-void FontCache::Purge() {
-  // Ideally we should never be forcing the purge while the
-  // FontCachePurgePreventer is in scope, but we call purge() at any timing
-  // via MemoryPressureListenerRegistry.
-  if (purge_prevent_count_)
-    return;
-
-  PurgeFallbackListShaperCache();
-}
-
 void FontCache::AddClient(FontCacheClient* client) {
   CHECK(client);
   DCHECK(!font_cache_clients_.Contains(client));
   font_cache_clients_.insert(client);
 }
 
-uint16_t FontCache::Generation() {
-  return generation_;
-}
-
 void FontCache::Invalidate() {
   TRACE_EVENT0("fonts,ui", "FontCache::Invalidate");
   font_platform_data_cache_.Clear();
   font_data_cache_.Clear();
-  generation_++;
 
   for (const auto& client : font_cache_clients_) {
     client->FontCacheInvalidated();
   }
-
-  Purge();
 }
 
 void FontCache::CrashWithFontInfo(const FontDescription* font_description) {
-  SkFontMgr* font_mgr = nullptr;
   int num_families = std::numeric_limits<int>::min();
-  bool is_test_font_mgr = false;
-  if (FontGlobalContext::TryGet()) {
-    FontCache& font_cache = FontGlobalContext::GetFontCache();
-#if BUILDFLAG(IS_WIN)
-    is_test_font_mgr = font_cache.is_test_font_mgr_;
-#endif
-    font_mgr = font_cache.font_manager_.get();
-    if (font_mgr)
-      num_families = font_mgr->countFamilies();
-  }
 
-  // In production, these 3 font managers must match.
-  // They don't match in unit tests or in single process mode.
-  SkFontMgr* static_font_mgr = static_font_manager_;
-  SkFontMgr* skia_default_font_mgr = skia::DefaultFontMgr().get();
-  base::debug::Alias(&font_mgr);
-  base::debug::Alias(&static_font_mgr);
-  base::debug::Alias(&skia_default_font_mgr);
+  num_families = skia::DefaultFontMgr()->countFamilies();
 
   FontDescription font_description_copy = *font_description;
   base::debug::Alias(&font_description_copy);
-  base::debug::Alias(&is_test_font_mgr);
   base::debug::Alias(&num_families);
 
   NOTREACHED();
-}
-
-void FontCache::DumpShapeResultCache(
-    base::trace_event::ProcessMemoryDump* memory_dump) {
-  DCHECK(IsMainThread());
-  base::trace_event::MemoryAllocatorDump* dump =
-      memory_dump->CreateAllocatorDump("font_caches/shape_caches");
-  size_t shape_result_cache_size = 0;
-  for (const auto& shape_cache : fallback_list_shaper_cache_.Values()) {
-    shape_result_cache_size += shape_cache->ByteSize();
-  }
-  dump->AddScalar("size", "bytes", shape_result_cache_size);
-  memory_dump->AddSuballocation(dump->guid(),
-                                Partitions::kAllocatedObjectPoolName);
 }
 
 sk_sp<SkTypeface> FontCache::CreateTypefaceFromUniqueName(
@@ -412,10 +314,8 @@ void FontCache::MaybePreloadSystemFonts() {
     return;
   }
 
-  const int kPhysicalMemoryGB =
-      base::SysInfo::AmountOfPhysicalMemoryMB() / 1024;
-
-  if (kPhysicalMemoryGB < features::kPreloadSystemFontsRequiredMemoryGB.Get()) {
+  if (base::SysInfo::AmountOfPhysicalMemory().InGiB() <
+      features::kPreloadSystemFontsRequiredMemoryGB.Get()) {
     return;
   }
 

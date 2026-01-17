@@ -14,6 +14,7 @@
 
 #include "base/containers/to_vector.h"
 #include "base/logging.h"
+#include "base/memory/memory_pressure_listener_registry.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/mock_log.h"
 #include "base/test/scoped_command_line.h"
@@ -34,6 +35,7 @@
 #include "services/network/public/mojom/fetch_api.mojom.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/navigation/preloading_headers.h"
 #include "url/gurl.h"
 
@@ -52,6 +54,7 @@ using ::testing::AnyOf;
 using ::testing::ExplainMatchResult;
 using ::testing::HasSubstr;
 using ::testing::IsSupersetOf;
+using ::testing::Not;
 using ::testing::Pair;
 using ::testing::StartsWith;
 using ::testing::StrCaseEq;
@@ -61,19 +64,31 @@ constexpr std::string_view kPagePath = "/page";
 constexpr std::string_view kResourcePath = "/nocontent";
 constexpr std::string_view kHostname = "a.test";
 
-class PerformNetworkContextPrefetchRecorderTest : public ::testing::Test {
+class PerformNetworkContextPrefetchRecorderTest
+    : public ::testing::TestWithParam<bool> {
  public:
   PerformNetworkContextPrefetchRecorderTest() {
-    features_.InitWithFeatures(
-        /*enabled_features=*/
-        {
-            network::features::kNetworkContextPrefetch,
-            features::kLoadingPredictorPrefetch,
-            features::kPrefetchManagerUseNetworkContextPrefetch,
-        },
-        /*disabled_features=*/{});
+    std::vector<base::test::FeatureRef> enabled_features = {
+        network::features::kNetworkContextPrefetch,
+        features::kLoadingPredictorPrefetch,
+        features::kPrefetchManagerUseNetworkContextPrefetch,
+    };
+    std::vector<base::test::FeatureRef> disabled_features;
+
+    // Parameter determines whether kRemovePurposeHeaderForPrefetch is enabled
+    if (GetParam()) {
+      enabled_features.push_back(
+          blink::features::kRemovePurposeHeaderForPrefetch);
+    } else {
+      disabled_features.push_back(
+          blink::features::kRemovePurposeHeaderForPrefetch);
+    }
+
+    features_.InitWithFeatures(enabled_features, disabled_features);
     profile_ = std::make_unique<TestingProfile>();
   }
+
+  bool IsRemovePurposeHeaderEnabled() const { return GetParam(); }
 
   void SetUp() override {
     host_resolver_.host_resolver()->AddRule("*", "127.0.0.1");
@@ -147,7 +162,10 @@ class PerformNetworkContextPrefetchRecorderTest : public ::testing::Test {
   // IO_MAINLOOP is needed for the EmbeddedTestServer.
   content::BrowserTaskEnvironment task_environment_{
       content::BrowserTaskEnvironment::IO_MAINLOOP};
-  variations::ScopedVariationsIdsProvider scoped_variations_ids_provider_{
+  // Silences warnings about a missing registry, which impedes tests using
+  // MockLog.
+  base::MemoryPressureListenerRegistry memory_pressure_listener_registry_;
+  variations::test::ScopedVariationsIdsProvider scoped_variations_ids_provider_{
       variations::VariationsIdsProvider::Mode::kUseSignedInState};
   std::unique_ptr<TestingProfile> profile_;
   base::test::TestFuture<const HttpRequest&> request_future_;
@@ -164,7 +182,7 @@ auto HasHeader(std::string_view name, ValueMatcher value_matcher) {
   return Contains(Pair(StrCaseEq(name), value_matcher));
 }
 
-TEST_F(PerformNetworkContextPrefetchRecorderTest, Script) {
+TEST_P(PerformNetworkContextPrefetchRecorderTest, Script) {
   DoPrefetch(RequestDestination::kScript);
   const auto request = GetRequest();
   EXPECT_EQ(request.relative_url, "/nocontent");
@@ -175,8 +193,23 @@ TEST_F(PerformNetworkContextPrefetchRecorderTest, Script) {
   // changes there shouldn't require changing this test.
   EXPECT_THAT(request.headers, HasHeader("Accept", "*/*"));
   EXPECT_THAT(request.headers, HasHeader("Accept-Language", "en"));
+
+  // Test Purpose headers based on feature flag state
+  if (IsRemovePurposeHeaderEnabled()) {
+    // When feature is enabled, legacy Purpose header should be removed
+    EXPECT_THAT(request.headers,
+                Not(HasHeader(blink::kPurposeHeaderName,
+                              blink::kSecPurposePrefetchHeaderValue)));
+  } else {
+    // When feature is disabled, ensure legacy Purpose header is working
+    EXPECT_THAT(request.headers,
+                HasHeader(blink::kPurposeHeaderName,
+                          blink::kSecPurposePrefetchHeaderValue));
+  }
+
+  // Sec-Purpose header should always be present regardless of feature flag
   EXPECT_THAT(request.headers,
-              HasHeader(blink::kPurposeHeaderName,
+              HasHeader(blink::kSecPurposeHeaderName,
                         blink::kSecPurposePrefetchHeaderValue));
   EXPECT_THAT(request.headers, HasHeader("Referer", PageURL().spec()));
   EXPECT_THAT(request.headers, HasHeader("sec-ch-ua", HasSubstr("v=")));
@@ -188,15 +221,12 @@ TEST_F(PerformNetworkContextPrefetchRecorderTest, Script) {
   EXPECT_THAT(request.headers, HasHeader("Sec-Fetch-Mode", "no-cors"));
   EXPECT_THAT(request.headers, HasHeader("Sec-Fetch-Site", "same-origin"));
   EXPECT_THAT(request.headers,
-              HasHeader(blink::kSecPurposeHeaderName,
-                        blink::kSecPurposePrefetchHeaderValue));
-  EXPECT_THAT(request.headers,
               HasHeader("User-Agent", StartsWith("Mozilla/5.0 ")));
 
   EXPECT_TRUE(request.content.empty());
 }
 
-TEST_F(PerformNetworkContextPrefetchRecorderTest, Style) {
+TEST_P(PerformNetworkContextPrefetchRecorderTest, Style) {
   DoPrefetch(RequestDestination::kStyle);
   const auto request = GetRequest();
 
@@ -224,7 +254,7 @@ class InsecureTestServer final {
 
 constexpr auto kERROR = ::logging::LOGGING_ERROR;
 
-TEST_F(PerformNetworkContextPrefetchRecorderTest, NonSSLPage) {
+TEST_P(PerformNetworkContextPrefetchRecorderTest, NonSSLPage) {
   InsecureTestServer insecure(GetFutureCallback());
   {
     StrictMock<base::test::MockLog> log;
@@ -239,7 +269,7 @@ TEST_F(PerformNetworkContextPrefetchRecorderTest, NonSSLPage) {
   ExpectNoRequest();
 }
 
-TEST_F(PerformNetworkContextPrefetchRecorderTest, NonSSLResource) {
+TEST_P(PerformNetworkContextPrefetchRecorderTest, NonSSLResource) {
   InsecureTestServer insecure(GetFutureCallback());
   {
     StrictMock<base::test::MockLog> log;
@@ -260,14 +290,14 @@ TEST_F(PerformNetworkContextPrefetchRecorderTest, NonSSLResource) {
   EXPECT_EQ(request.relative_url, kResourcePath);
 }
 
-TEST_F(PerformNetworkContextPrefetchRecorderTest, ReferrerSameOrigin) {
+TEST_P(PerformNetworkContextPrefetchRecorderTest, ReferrerSameOrigin) {
   DoPrefetch(RequestDestination::kStyle);
   const auto request = GetRequest();
 
   EXPECT_THAT(request.headers, HasHeader("Referer", PageURL().spec()));
 }
 
-TEST_F(PerformNetworkContextPrefetchRecorderTest, ReferrerCrossOrigin) {
+TEST_P(PerformNetworkContextPrefetchRecorderTest, ReferrerCrossOrigin) {
   // These are both included in CERT_TEST_NAMES
   constexpr char kPageHostname[] = "a.test";
   constexpr char kResourceHostname[] = "b.test";
@@ -283,6 +313,10 @@ TEST_F(PerformNetworkContextPrefetchRecorderTest, ReferrerCrossOrigin) {
   EXPECT_THAT(request.headers, HasHeader("Referer", expected_referrer));
   EXPECT_THAT(request.headers, HasHeader("Sec-Fetch-Site", "cross-site"));
 }
+
+INSTANTIATE_TEST_SUITE_P(RemovePurposeHeaderVariations,
+                         PerformNetworkContextPrefetchRecorderTest,
+                         ::testing::Bool());
 
 }  // namespace
 

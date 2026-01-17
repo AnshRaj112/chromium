@@ -119,7 +119,7 @@ TEST(CookieManagerTraitsTest, Roundtrips_CookieAccessResult) {
             copied.is_allowed_to_access_secure_cookies);
 }
 
-TEST(CookieManagerTraitsTest, Rountrips_CookieWithAccessResult) {
+TEST(CookieManagerTraitsTest, Roundtrips_CookieWithAccessResult) {
   auto original_cookie = net::CanonicalCookie::CreateUnsafeCookieForTesting(
       "A", "B", "x.y", "/path", base::Time(), base::Time(), base::Time(),
       base::Time(),
@@ -255,7 +255,8 @@ TEST(CookieManagerTraitsTest, Roundtrips_CookieChangeCause) {
         net::CookieChangeCause::OVERWRITE, net::CookieChangeCause::EXPIRED,
         net::CookieChangeCause::EVICTED,
         net::CookieChangeCause::EXPIRED_OVERWRITE,
-        net::CookieChangeCause::INSERTED_NO_CHANGE_OVERWRITE}) {
+        net::CookieChangeCause::INSERTED_NO_CHANGE_OVERWRITE,
+        net::CookieChangeCause::INSERTED_NO_VALUE_CHANGE_OVERWRITE}) {
     net::CookieChangeCause roundtrip;
     ASSERT_TRUE(mojo::test::SerializeAndDeserialize<mojom::CookieChangeCause>(
         change_cause, roundtrip));

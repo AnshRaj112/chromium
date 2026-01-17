@@ -17,6 +17,7 @@ DEFINE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT,
                                        views::BoxLayoutFlexSpecification*)
 DEFINE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT, views::DialogDelegate*)
 DEFINE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT, views::FlexSpecification*)
+DEFINE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT, views::FocusManager*)
 DEFINE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT,
                                        views::HighlightPathGenerator*)
 DEFINE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT, views::LayoutAlignment*)
@@ -25,6 +26,7 @@ DEFINE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT, views::Widget*)
 
 #if !defined(USE_AURA)
 // aura_constants.cc defines this.
+DEFINE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT, gfx::Rect*)
 DEFINE_EXPORTED_UI_CLASS_PROPERTY_TYPE(VIEWS_EXPORT, gfx::Size*)
 #endif
 
@@ -50,5 +52,8 @@ DEFINE_UI_CLASS_PROPERTY_KEY(bool, kViewIgnoredByLayoutKey, false)
 DEFINE_UI_CLASS_PROPERTY_KEY(ui::ElementIdentifier,
                              kElementIdentifierKey,
                              ui::ElementIdentifier())
+DEFINE_UI_CLASS_PROPERTY_KEY(FocusManager*,
+                             kDetachedViewFocusManagerKey,
+                             nullptr)
 
 }  // namespace views

@@ -182,6 +182,8 @@ class WTF_EXPORT StringView {
 
   bool IsLowerASCII() const;
   bool ContainsOnlyASCIIOrEmpty() const;
+  // Returns true if the string is empty or contains only Latin-1 characters.
+  bool ContainsOnlyLatin1OrEmpty() const;
 
   bool SubstringContainsOnlyWhitespaceOrEmpty(unsigned from, unsigned to) const;
 
@@ -196,18 +198,6 @@ class WTF_EXPORT StringView {
       }
       return static_cast<const UChar*>(bytes_)[i];
     })
-  }
-
-  // Use Span16() instead.
-  UNSAFE_BUFFER_USAGE const LChar* Characters8() const {
-    DCHECK(Is8Bit());
-    return static_cast<const LChar*>(bytes_);
-  }
-
-  // Use Span16() instead.
-  UNSAFE_BUFFER_USAGE const UChar* Characters16() const {
-    DCHECK(!Is8Bit());
-    return static_cast<const UChar*>(bytes_);
   }
 
   base::span<const LChar> Span8() const {
@@ -282,9 +272,14 @@ class WTF_EXPORT StringView {
   // appends double-quotes, and escapes characters other than ASCII printables.
   [[nodiscard]] String EncodeForDebugging() const;
 
+  // Find a character. Returns the index of the match, or `kNotFound`.
+  wtf_size_t find(UChar ch, wtf_size_t start = 0) const;
   // Find characters. Returns the index of the match, or `kNotFound`.
   wtf_size_t Find(CharacterMatchFunctionPtr match_function,
                   wtf_size_t start = 0) const;
+
+  // Returns `true` if this StringView contains the specified character.
+  bool contains(UChar ch) const;
 
   template <bool isSpecialCharacter(UChar)>
   bool IsAllSpecialCharacters() const;
@@ -303,6 +298,27 @@ class WTF_EXPORT StringView {
   //      ...
   CodePointIterator begin() const;
   CodePointIterator end() const;
+
+  // Returns a substring removing leading and trailing white spaces.
+  // This function removes spaces, \n, \t, \r, \f, \v, and unicode spaces such
+  // as U+2000 and U+3000.
+  [[nodiscard]] StringView StripWhiteSpace() const;
+  // Returns a substring removing leading and trailing matched characters.
+  [[nodiscard]] StringView StripWhiteSpace(
+      IsWhiteSpaceFunctionPtr predicate) const;
+
+  // Returns a list of substrings of `this`, separated by `separator`.
+  //
+  // `StringView("a,,b").Split(',')` produces ["a", "", "b"], and
+  // `StringView("").Split(',')` produces [""].
+  Vector<StringView> Split(UChar separator) const;
+
+  // Returns a list of substrings of `this`, separated by `separator`.
+  // This doesn't produce empty substrings.
+  //
+  // `StringView(" a  b").Split(' ')` produces ["a", "b"], and
+  // `StringView("").Split(',')` produces an empty list.
+  Vector<StringView> SplitSkippingEmpty(UChar separator) const;
 
  private:
   void Set(const StringImpl&, unsigned offset, unsigned length);
@@ -328,9 +344,9 @@ inline StringView::StringView(const StringView& view,
   // SAFETY: Invariants are checked last two line.
   UNSAFE_BUFFERS({
     if (Is8Bit()) {
-      bytes_ = view.Characters8() + offset;
+      bytes_ = view.Span8().data() + offset;
     } else {
-      bytes_ = view.Characters16() + offset;
+      bytes_ = view.Span16().data() + offset;
     }
   });
 }
@@ -410,17 +426,19 @@ inline bool EqualIgnoringASCIICase(const StringView& a,
                     : EqualIgnoringASCIICase(a.Span16(), span);
 }
 
-// TODO(esprehn): Can't make this an overload of WTF::equal since that makes
-// calls to equal() that pass literal strings ambiguous. Figure out if we can
-// replace all the callers with equalStringView and then rename it to equal().
+WTF_EXPORT int CodeUnitCompareIgnoringAsciiCase(StringView a, StringView b);
+inline bool CodeUnitCompareIgnoringAsciiCaseLessThan(StringView a,
+                                                     StringView b) {
+  return CodeUnitCompareIgnoringAsciiCase(a, b) < 0;
+}
+
+// TODO(esprehn): Can't make this an overload of blink::Equal since that makes
+// calls to Equal() that pass literal strings ambiguous. Figure out if we can
+// replace all the callers with EqualStringView and then rename it to Equal().
 WTF_EXPORT bool EqualStringView(const StringView&, const StringView&);
 
 inline bool operator==(const StringView& a, const StringView& b) {
   return EqualStringView(a, b);
-}
-
-inline bool operator!=(const StringView& a, const StringView& b) {
-  return !(a == b);
 }
 
 inline wtf_size_t StringView::Find(CharacterMatchFunctionPtr match_function,

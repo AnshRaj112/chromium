@@ -3,27 +3,26 @@
 // found in the LICENSE file.
 
 #include "base/android/scoped_java_ref.h"
-#include "chrome/browser/privacy_sandbox/tracking_protection_settings_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "components/prefs/pref_service.h"
 #include "components/privacy_sandbox/tracking_protection_settings.h"
 
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/browser/privacy_sandbox/android/jni_headers/TrackingProtectionSettingsBridge_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 namespace {
-privacy_sandbox::TrackingProtectionSettings* GetTrackingProtectionSettings(
-    const base::android::JavaRef<jobject>& j_profile) {
-  return TrackingProtectionSettingsFactory::GetForProfile(
-      Profile::FromJavaObject(j_profile));
+
+PrefService* GetPrefService(const base::android::JavaRef<jobject>& j_profile) {
+  return Profile::FromJavaObject(j_profile)->GetPrefs();
 }
 }  // namespace
 
-jboolean
-JNI_TrackingProtectionSettingsBridge_IsIpProtectionDisabledForEnterprise(
+static void JNI_TrackingProtectionSettingsBridge_MaybeSetRollbackPrefsModeB(
     JNIEnv* env,
-    const JavaParamRef<jobject>& j_profile) {
-  return GetTrackingProtectionSettings(j_profile)
-      ->IsIpProtectionDisabledForEnterprise();
+    const JavaRef<jobject>& j_profile) {
+  privacy_sandbox::MaybeSetRollbackPrefsModeB(GetPrefService(j_profile));
 }
+
+DEFINE_JNI(TrackingProtectionSettingsBridge)

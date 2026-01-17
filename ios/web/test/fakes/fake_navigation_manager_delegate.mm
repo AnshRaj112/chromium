@@ -29,7 +29,8 @@ FakeNavigationManagerDelegate::GetWebViewNavigationProxy() const {
 void FakeNavigationManagerDelegate::GoToBackForwardListItem(
     WKBackForwardListItem* wk_item,
     NavigationItem* item,
-    NavigationInitiationType type,
+    BackForwardNavigationType navigation_type,
+    NavigationInitiationType initiation_type,
     bool has_user_gesture) {}
 void FakeNavigationManagerDelegate::RemoveWebView() {}
 
@@ -40,6 +41,8 @@ NavigationItemImpl* FakeNavigationManagerDelegate::GetPendingItem() {
 GURL FakeNavigationManagerDelegate::GetCurrentURL() const {
   return GURL();
 }
+
+void FakeNavigationManagerDelegate::UpdateSSLStatusForCurrentNavigationItem() {}
 
 void FakeNavigationManagerDelegate::SetWebViewNavigationProxy(id web_view) {
   test_web_view_ = web_view;

@@ -86,7 +86,9 @@ class CORE_EXPORT EventHandler final : public GarbageCollected<EventHandler> {
 
   void NodeChildrenWillBeRemoved(ContainerNode& container) {
     mouse_event_manager_->NodeChildrenWillBeRemoved(container);
+    pointer_event_manager_->NodeChildrenWillBeRemoved(container);
   }
+
   void NodeWillBeRemoved(Node& node) {
     mouse_event_manager_->NodeWillBeRemoved(node);
     pointer_event_manager_->NodeWillBeRemoved(node);
@@ -212,6 +214,9 @@ class CORE_EXPORT EventHandler final : public GarbageCollected<EventHandler> {
       Element* override_target_element = nullptr,
       WebMenuSourceType = kMenuSourceNone);
 
+  // See PointerEventManager::AppendTouchIdForCanceledPointerDown().
+  void AppendTouchIdForCanceledPointerDown(uint32_t unique_touch_event_id);
+
   // Returns whether pointerId is active or not
   bool IsPointerEventActive(PointerId);
 
@@ -252,6 +257,7 @@ class CORE_EXPORT EventHandler final : public GarbageCollected<EventHandler> {
   // Clears drag target and related states. It is called when drag is done or
   // canceled.
   void ClearDragState();
+  void ReportDragEnd();
 
   EventHandlerRegistry& GetEventHandlerRegistry() const {
     return *event_handler_registry_;
@@ -293,6 +299,10 @@ class CORE_EXPORT EventHandler final : public GarbageCollected<EventHandler> {
   TaskHandle& GetDelayedNavigationTaskHandle();
 
   base::debug::CrashKeyString* CrashKeyForBug1519197() const;
+
+  // Testing helper: Returns the LocalFrame from a target node for drag/drop.
+  // This exposes the logic of LocalFrameFromTargetNode for testing purposes.
+  static LocalFrame* LocalFrameFromTargetNodeForTesting(Node* target);
 
  private:
   WebInputEventResult HandleMouseMoveOrLeaveEvent(

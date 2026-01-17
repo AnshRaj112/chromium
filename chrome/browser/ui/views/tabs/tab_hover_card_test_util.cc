@@ -24,8 +24,9 @@ TabHoverCardTestUtil::~TabHoverCardTestUtil() {
 }
 
 // static
-TabStrip* TabHoverCardTestUtil::GetTabStrip(Browser* browser) {
-  return BrowserView::GetBrowserViewForBrowser(browser)->tabstrip();
+TabStrip* TabHoverCardTestUtil::GetTabStrip(BrowserWindowInterface* browser) {
+  return BrowserView::GetBrowserViewForBrowser(browser)
+      ->horizontal_tab_strip_for_testing();
 }
 
 // static
@@ -59,8 +60,9 @@ int TabHoverCardTestUtil::GetHoverCardsSeenCount(Browser* browser) {
 }
 
 // static
-TabHoverCardBubbleView* TabHoverCardTestUtil::SimulateHoverTab(Browser* browser,
-                                                               int tab_index) {
+TabHoverCardBubbleView* TabHoverCardTestUtil::SimulateHoverTab(
+    BrowserWindowInterface* browser,
+    int tab_index) {
   auto* const tab_strip = GetTabStrip(browser);
 
   // We don't use Tab::OnMouseEntered here to invoke the hover card because

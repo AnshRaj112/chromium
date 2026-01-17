@@ -12,12 +12,13 @@ import android.view.ViewGroup;
 import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.supplier.LazyOneshotSupplier;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.NonNullObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.hub.HubColorMixer.OverviewModeAlphaObserver;
 import org.chromium.components.browser_ui.widget.scrim.ScrimManager;
+
+import java.util.function.Supplier;
 
 /**
  * Holds dependencies for initialization of {@link HubLayout}. These dependencies come from the
@@ -52,7 +53,7 @@ public class HubLayoutDependencyHolder {
             LazyOneshotSupplier<ViewGroup> hubRootViewGroupSupplier,
             ScrimManager scrimManager,
             Supplier<View> scrimAnchorViewSupplier,
-            ObservableSupplier<Boolean> isIncognitoSupplier,
+            NonNullObservableSupplier<Boolean> isIncognitoSupplier,
             OverviewModeAlphaObserver onOverviewAlphaChange,
             @Nullable Supplier<Boolean> xrFullSpaceModeSupplier) {
         this(

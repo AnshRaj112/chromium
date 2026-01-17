@@ -9,7 +9,7 @@
 #include "components/payments/core/features.h"
 #include "components/payments/core/secure_payment_confirmation_credential.h"
 #include "components/webauthn/core/browser/internal_authenticator.h"
-#include "content/public/browser/webauthn_security_utils.h"
+#include "components/webauthn/core/browser/webauthn_security_utils.h"
 #include "url/origin.h"
 
 namespace payments {
@@ -20,8 +20,8 @@ namespace {
 // RP ID).
 bool RequiresThirdPartyPaymentBit(const url::Origin& caller_origin,
                                   const std::string& relying_party_id) {
-  return !content::OriginIsAllowedToClaimRelyingPartyId(relying_party_id,
-                                                        caller_origin);
+  return !webauthn::OriginIsAllowedToClaimRelyingPartyId(relying_party_id,
+                                                         caller_origin);
 }
 }  // namespace
 
@@ -30,8 +30,8 @@ SecurePaymentConfirmationCredentialFinder::
 SecurePaymentConfirmationCredentialFinder::
     ~SecurePaymentConfirmationCredentialFinder() {
   std::ranges::for_each(requests_, [&](const auto& pair) {
-    if (pair.second.second) {
-      pair.second.second->CancelRequest(pair.first);
+    if (pair.second) {
+      pair.second->CancelRequest(pair.first);
     }
   });
 }
@@ -74,22 +74,25 @@ void SecurePaymentConfirmationCredentialFinder::GetMatchingCredentials(
   } else {
     WebDataServiceBase::Handle handle =
         web_data_service->GetSecurePaymentConfirmationCredentials(
-            std::move(credential_ids), std::move(relying_party_id), this);
-    requests_[handle] =
-        std::make_pair(std::move(result_callback), web_data_service);
+            std::move(credential_ids), relying_party_id,
+            base::BindOnce(&SecurePaymentConfirmationCredentialFinder::
+                               OnGetMatchingCredentialsFromWebDataService,
+                           weak_ptr_factory_.GetWeakPtr(),
+                           std::move(result_callback)));
+    requests_[handle] = web_data_service;
   }
 }
 
-void SecurePaymentConfirmationCredentialFinder::OnWebDataServiceRequestDone(
-    WebDataServiceBase::Handle handle,
-    std::unique_ptr<WDTypedResult> result) {
+void SecurePaymentConfirmationCredentialFinder::
+    OnGetMatchingCredentialsFromWebDataService(
+        SecurePaymentConfirmationCredentialFinderCallback callback,
+        WebDataServiceBase::Handle handle,
+        std::unique_ptr<WDTypedResult> result) {
   auto iterator = requests_.find(handle);
   if (iterator == requests_.end()) {
     return;
   }
 
-  SecurePaymentConfirmationCredentialFinderCallback callback =
-      std::move(iterator->second.first);
   requests_.erase(iterator);
 
   if (result && result->GetType() == SECURE_PAYMENT_CONFIRMATION) {

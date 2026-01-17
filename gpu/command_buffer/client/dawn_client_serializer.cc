@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "gpu/command_buffer/client/dawn_client_serializer.h"
 
+#include "base/compiler_specific.h"
 #include "base/numerics/checked_math.h"
 #include "base/trace_event/trace_event.h"
 #include "gpu/command_buffer/client/dawn_client_memory_transfer_service.h"
 #include "gpu/command_buffer/client/shared_memory_limits.h"
 #include "gpu/command_buffer/client/webgpu_cmd_helper.h"
 #include "gpu/command_buffer/client/webgpu_implementation.h"
+#include "third_party/perfetto/include/perfetto/tracing/track_event_args.h"
 
 namespace gpu {
 namespace webgpu {
@@ -61,7 +58,7 @@ void* DawnClientSerializer::GetCmdSpace(size_t size) {
     // If the buffer is valid and has sufficient space, return the
     // pointer and increment the offset.
     uint8_t* ptr = static_cast<uint8_t*>(buffer_.address());
-    ptr += put_offset_;
+    UNSAFE_TODO(ptr += put_offset_);
 
     put_offset_ += static_cast<uint32_t>(size);
     return ptr;
@@ -103,9 +100,8 @@ void DawnClientSerializer::Commit() {
     uint64_t trace_id;
     if (is_tracing) {
       trace_id = base::RandUint64();
-      TRACE_EVENT_WITH_FLOW0(TRACE_DISABLED_BY_DEFAULT("gpu.dawn"),
-                             "DawnCommands", trace_id,
-                             TRACE_EVENT_FLAG_FLOW_OUT);
+      TRACE_EVENT(TRACE_DISABLED_BY_DEFAULT("gpu.dawn"), "DawnCommands",
+                  perfetto::Flow::Global(trace_id));
     } else {
       trace_id = 0;
     }

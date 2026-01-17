@@ -23,8 +23,6 @@ namespace sandbox {
 // BrokerServicesDelegate common implementation.
 class TestBrokerServicesDelegateBase : public BrokerServicesDelegate {
  public:
-  bool ParallelLaunchEnabled() override { return true; }
-
   void ParallelLaunchPostTaskAndReplyWithResult(
       const base::Location& from_here,
       base::OnceCallback<CreateTargetResult()> task,
@@ -106,7 +104,7 @@ TEST_F(ParallelLaunchTest, SingleLaunch) {
   base::RunLoop run_loop;
   int launches_remaining_count = 1;
   broker->SpawnTargetAsync(
-      prog_name, arguments.c_str(), std::move(policy),
+      prog_name, arguments, std::move(policy),
       base::BindOnce(&FinishSpawnTargetAsync, base::Unretained(&spawn_result),
                      base::Unretained(&run_loop),
                      base::Unretained(&launches_remaining_count)));
@@ -192,7 +190,7 @@ TEST_F(ParallelLaunchTest, ParallelLaunch) {
                                                               USER_LOCKDOWN));
 
     broker->SpawnTargetAsync(
-        prog_name, arguments.c_str(), std::move(policy),
+        prog_name, arguments, std::move(policy),
         base::BindOnce(&FinishSpawnTargetAsync,
                        base::Unretained(&first_spawn_result),
                        base::Unretained(&run_loop),
@@ -210,7 +208,7 @@ TEST_F(ParallelLaunchTest, ParallelLaunch) {
                                                               USER_LOCKDOWN));
 
     broker->SpawnTargetAsync(
-        prog_name, arguments.c_str(), std::move(policy),
+        prog_name, arguments, std::move(policy),
         base::BindOnce(&FinishSpawnTargetAsync,
                        base::Unretained(&second_spawn_result),
                        base::Unretained(&run_loop),

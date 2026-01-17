@@ -12,7 +12,7 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "content/public/android/content_jni_headers/BackgroundSyncNetworkObserver_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 namespace content {
 
@@ -45,8 +45,7 @@ BackgroundSyncNetworkObserverAndroid::Observer::~Observer() {
 }
 
 void BackgroundSyncNetworkObserverAndroid::Observer::
-    NotifyConnectionTypeChanged(JNIEnv* env,
-                                jint new_connection_type) {
+    NotifyConnectionTypeChanged(JNIEnv* env, int32_t new_connection_type) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   callback_.Run(
       static_cast<network::mojom::ConnectionType>(new_connection_type));
@@ -80,3 +79,5 @@ void BackgroundSyncNetworkObserverAndroid::RegisterWithNetworkConnectionTracker(
     network::NetworkConnectionTracker* network_connection_tracker) {}
 
 }  // namespace content
+
+DEFINE_JNI(BackgroundSyncNetworkObserver)

@@ -4,12 +4,14 @@
 
 #include "services/viz/public/cpp/compositing/compositor_frame_metadata_mojom_traits.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "build/build_config.h"
 #include "services/viz/public/cpp/compositing/begin_frame_args_mojom_traits.h"
 #include "services/viz/public/cpp/compositing/compositor_frame_transition_directive_mojom_traits.h"
 #include "services/viz/public/cpp/compositing/selection_mojom_traits.h"
 #include "services/viz/public/cpp/compositing/surface_id_mojom_traits.h"
+#include "services/viz/public/cpp/compositing/trees_in_viz_timing_mojom_traits.h"
 #include "services/viz/public/cpp/crash_keys.h"
 #include "skia/public/mojom/skcolor4f_mojom_traits.h"
 #include "third_party/blink/public/common/tokens/tokens_mojom_traits.h"
@@ -80,13 +82,14 @@ bool StructTraits<viz::mojom::CompositorFrameMetadataDataView,
         data.ReadCaptureBounds(&out->capture_bounds) &&
         data.ReadOffsetTagDefinitions(&out->offset_tag_definitions) &&
         data.ReadOffsetTagValues(&out->offset_tag_values) &&
-        data.ReadFrameIntervalInputs(&out->frame_interval_inputs))) {
+        data.ReadFrameIntervalInputs(&out->frame_interval_inputs) &&
+        data.ReadTreesInVizTiming(&out->trees_in_viz_timing_details))) {
     return false;
   }
 
   // Verify that OffsetTagDefinition providers are referenced surfaces.
   for (auto& tag_def : out->offset_tag_definitions) {
-    if (!base::Contains(out->referenced_surfaces, tag_def.provider)) {
+    if (!std::ranges::contains(out->referenced_surfaces, tag_def.provider)) {
       return false;
     }
   }

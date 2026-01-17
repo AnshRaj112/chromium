@@ -7,7 +7,7 @@
 #include <map>
 #include <memory>
 
-#include "base/containers/contains.h"
+#include "base/check.h"
 #include "base/logging.h"
 #include "base/no_destructor.h"
 #include "ui/base/interaction/element_identifier.h"

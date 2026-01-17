@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include <memory>
 #include <tuple>
 
 #include "base/command_line.h"
+#include "base/compiler_specific.h"
 #include "base/containers/span.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
@@ -95,14 +91,10 @@ SharedQuadState* CreateSharedQuadState(AggregatedRenderPass* render_pass,
 }
 
 void DeleteSharedImage(
-    scoped_refptr<RasterContextProvider> context_provider,
     scoped_refptr<gpu::ClientSharedImage> client_shared_image,
     const gpu::SyncToken& sync_token,
     bool is_lost) {
-  DCHECK(context_provider);
-  gpu::SharedImageInterface* sii = context_provider->SharedImageInterface();
-  DCHECK(sii);
-  sii->DestroySharedImage(sync_token, std::move(client_shared_image));
+  client_shared_image->UpdateDestructionSyncToken(sync_token);
 }
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -258,8 +250,9 @@ void ReadbackResultRGBA(TestGpuServiceHolder* gpu_service_holder,
                               ->shared_image_manager()
                               ->ProduceMemory(mailbox, memory_tracker.get());
     auto access = representation->BeginScopedReadAccess();
-    memcpy(out_plane.pixmap().writable_addr(), access->pixmap().addr(),
-           out_plane.pixmap().computeByteSize());
+    UNSAFE_TODO(memcpy(out_plane.pixmap().writable_addr(),
+                       access->pixmap().addr(),
+                       out_plane.pixmap().computeByteSize()));
     return;
   }
 
@@ -445,8 +438,8 @@ class ReadbackPixelTest : public VizPixelTest {
           {format, size, color_space, gpu::SHARED_IMAGE_USAGE_CPU_WRITE_ONLY,
            "TestLabels"});
       auto scoped_mapping = shared_image->Map();
-      memcpy(scoped_mapping->GetMemoryForPlane(0).data(), pixels.data(),
-             pixels.size());
+      UNSAFE_TODO(memcpy(scoped_mapping->GetMemoryForPlane(0).data(),
+                         pixels.data(), pixels.size()));
       return shared_image;
     } else {
       return sii->CreateSharedImage(
@@ -472,7 +465,8 @@ class ReadbackPixelTest : public VizPixelTest {
     std::unordered_map<ResourceId, ResourceId, ResourceIdHasher> resource_map =
         cc::SendResourceAndGetChildToParentMap(
             {resource_id}, resource_provider_.get(),
-            child_resource_provider_.get(), child_context_provider_.get());
+            child_resource_provider_.get(),
+            child_context_provider_->SharedImageInterface());
     ResourceId mapped_resource_id = resource_map[resource_id];
 
     const gfx::Rect output_rect(source_size);
@@ -503,8 +497,7 @@ class ReadbackPixelTest : public VizPixelTest {
         client_shared_image->creation_sync_token());
 
     auto release_callback =
-        base::BindOnce(&DeleteSharedImage, child_context_provider_,
-                       std::move(client_shared_image));
+        base::BindOnce(&DeleteSharedImage, std::move(client_shared_image));
     return child_resource_provider_->ImportResource(
         resource, std::move(release_callback));
   }
@@ -631,7 +624,7 @@ class ReadbackPixelTestRGBAWithBlit
       : ReadbackPixelTest(std::get<0>(GetParam())),
         should_scale_by_half_(std::get<1>(GetParam())),
         letterboxing_behavior_(std::get<2>(GetParam())),
-        populates_gpu_memory_buffer_(std::get<3>(GetParam())) {}
+        populates_mappable_shared_image_(std::get<3>(GetParam())) {}
 
   CopyOutputResult::Destination RequestDestination() const {
     return CopyOutputResult::Destination::kSharedImage;
@@ -650,16 +643,16 @@ class ReadbackPixelTestRGBAWithBlit
   }
 
   // Test parameter that will return `true` if we'll claim that the textures we
-  // create come from GpuMemoryBuffer, `false` otherwise. This exercises a
-  // different code path in SkiaRenderer.
-  bool populates_gpu_memory_buffer() const {
-    return populates_gpu_memory_buffer_;
+  // create come from a mappable SharedImage, `false` otherwise. This exercises
+  // a different code path in SkiaRenderer.
+  bool populates_mappable_shared_image() const {
+    return populates_mappable_shared_image_;
   }
 
  private:
   bool should_scale_by_half_ = false;
   LetterboxingBehavior letterboxing_behavior_;
-  bool populates_gpu_memory_buffer_ = false;
+  bool populates_mappable_shared_image_ = false;
 };
 
 // Test that RGBA readback works correctly using existing textures.
@@ -703,10 +696,10 @@ TEST_P(ReadbackPixelTestRGBAWithBlit, ExecutesCopyRequestWithBlit) {
 
             request.set_result_selection(result_selection);
 
-            request.set_blit_request(
-                BlitRequest(destination_subregion.origin(),
-                            GetLetterboxingBehavior(), std::move(shared_image),
-                            gpu::SyncToken(), populates_gpu_memory_buffer()));
+            request.set_blit_request(BlitRequest(
+                destination_subregion.origin(), GetLetterboxingBehavior(),
+                std::move(shared_image), gpu::SyncToken(),
+                populates_mappable_shared_image()));
           }));
 
   // Check that a result was produced and is of the expected rect/size.
@@ -901,7 +894,7 @@ class ReadbackPixelTestNV12WithBlit
       : ReadbackPixelTest(std::get<0>(GetParam())),
         should_scale_by_half_(std::get<1>(GetParam())),
         letterboxing_behavior_(std::get<2>(GetParam())),
-        populates_gpu_memory_buffer_(std::get<3>(GetParam())) {}
+        populates_mappable_shared_image_(std::get<3>(GetParam())) {}
 
   CopyOutputResult::Destination RequestDestination() const {
     return CopyOutputResult::Destination::kSharedImage;
@@ -922,14 +915,14 @@ class ReadbackPixelTestNV12WithBlit
   // Test parameter that will return `true` if we'll claim that the textures we
   // create come from GpuMemoryBuffer, `false` otherwise. This exercises a
   // different code path in SkiaRenderer.
-  bool populates_gpu_memory_buffer() const {
-    return populates_gpu_memory_buffer_;
+  bool populates_mappable_shared_image() const {
+    return populates_mappable_shared_image_;
   }
 
  private:
   bool should_scale_by_half_ = false;
   LetterboxingBehavior letterboxing_behavior_;
-  bool populates_gpu_memory_buffer_ = false;
+  bool populates_mappable_shared_image_ = false;
 };
 
 // Test that NV12 readback works correctly using existing textures.
@@ -1038,7 +1031,7 @@ TEST_P(ReadbackPixelTestNV12WithBlit, ExecutesCopyRequestWithBlit) {
 
         request.set_blit_request(BlitRequest(
             destination_subregion.origin(), GetLetterboxingBehavior(),
-            shared_image, sync_token, populates_gpu_memory_buffer()));
+            shared_image, sync_token, populates_mappable_shared_image()));
       }));
 
   // Check that a result was produced and is of the expected rect/size.

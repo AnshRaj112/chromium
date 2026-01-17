@@ -110,6 +110,13 @@ NSString* const kYoutubeBundleID = @"com.google.ios.youtube";
 NSString* const kPrimaryAccount = @"ios.primary_account";
 
 NSString* const kChromeLikelyDefaultBrowser = @"ChromeLikelyDefaultBrowser";
+NSString* const kChromeLikelyDefaultBrowserUpdateTimestamp =
+    @"ChromeLikelyDefaultBrowserUpdateTimestamp";
+
+NSString* const kGMOSKOInstallAttribution = @"iGAStartedChromeInstall";
+
+NSString* const kAppPreviewInstallAttribution =
+    @"ChromeAppPreview_InstallAttribution";
 
 NSString* ApplicationGroup() {
   return [AppGroupHelper applicationGroup];

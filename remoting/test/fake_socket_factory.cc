@@ -12,7 +12,6 @@
 #include <string>
 
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/location.h"
@@ -132,7 +131,7 @@ int FakeUdpSocket::SendTo(const void* data,
   webrtc::ApplyPacketOptions(
       webrtc::ArrayView<uint8_t>(buffer->bytes(), data_size),
       options.packet_time_params, (now - base::TimeTicks()).InMicroseconds());
-  SignalSentPacket(
+  NotifySentPacket(
       this, webrtc::SentPacketInfo(options.packet_id, webrtc::TimeMillis()));
   dispatcher_->DeliverPacket(local_address_, address, buffer, data_size);
   return data_size;
@@ -217,7 +216,9 @@ void FakePacketSocketFactory::SetLatency(base::TimeDelta average,
   latency_stddev_ = stddev;
 }
 
-webrtc::AsyncPacketSocket* FakePacketSocketFactory::CreateUdpSocket(
+std::unique_ptr<webrtc::AsyncPacketSocket>
+FakePacketSocketFactory::CreateUdpSocket(
+    const webrtc::Environment& /*env*/,
     const webrtc::SocketAddress& local_address,
     uint16_t min_port,
     uint16_t max_port) {
@@ -226,7 +227,7 @@ webrtc::AsyncPacketSocket* FakePacketSocketFactory::CreateUdpSocket(
   int port = -1;
   if (min_port > 0 && max_port > 0) {
     for (uint16_t i = min_port; i <= max_port; ++i) {
-      if (!base::Contains(udp_sockets_, i)) {
+      if (!udp_sockets_.contains(i)) {
         port = i;
         break;
       }
@@ -239,21 +240,23 @@ webrtc::AsyncPacketSocket* FakePacketSocketFactory::CreateUdpSocket(
       port = next_port_;
       next_port_ =
           (next_port_ >= kPortRangeEnd) ? kPortRangeStart : (next_port_ + 1);
-    } while (base::Contains(udp_sockets_, port));
+    } while (udp_sockets_.contains(port));
   }
 
   CHECK(local_address.ipaddr() == address_);
 
-  FakeUdpSocket* result = new FakeUdpSocket(
+  auto result = std::make_unique<FakeUdpSocket>(
       this, dispatcher_, webrtc::SocketAddress(local_address.ipaddr(), port));
 
   udp_sockets_[port] = base::BindRepeating(&FakeUdpSocket::ReceivePacket,
-                                           base::Unretained(result));
+                                           base::Unretained(result.get()));
 
   return result;
 }
 
-webrtc::AsyncListenSocket* FakePacketSocketFactory::CreateServerTcpSocket(
+std::unique_ptr<webrtc::AsyncListenSocket>
+FakePacketSocketFactory::CreateServerTcpSocket(
+    const webrtc::Environment& env,
     const webrtc::SocketAddress& local_address,
     uint16_t min_port,
     uint16_t max_port,
@@ -261,7 +264,9 @@ webrtc::AsyncListenSocket* FakePacketSocketFactory::CreateServerTcpSocket(
   return nullptr;
 }
 
-webrtc::AsyncPacketSocket* FakePacketSocketFactory::CreateClientTcpSocket(
+std::unique_ptr<webrtc::AsyncPacketSocket>
+FakePacketSocketFactory::CreateClientTcpSocket(
+    const webrtc::Environment& env,
     const webrtc::SocketAddress& local_address,
     const webrtc::SocketAddress& remote_address,
     const webrtc::PacketSocketTcpOptions& opts) {

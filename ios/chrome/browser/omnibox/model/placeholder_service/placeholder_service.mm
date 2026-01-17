@@ -182,7 +182,7 @@ UIImage* PlaceholderService::GetBundledIconForTemplateURL(
   // Google bundled icon.
   if (template_url->GetEngineType(template_url_service_->search_terms_data()) ==
       SEARCH_ENGINE_GOOGLE) {
-#if BUILDFLAG(IOS_USE_BRANDED_SYMBOLS)
+#if BUILDFLAG(IOS_USE_BRANDED_ASSETS)
     return MakeSymbolMulticolor(
         CustomSymbolWithPointSize(kGoogleIconSymbol, icon_point_size));
 #endif
@@ -235,8 +235,8 @@ void PlaceholderService::PerformIconFetch(const TemplateURL* template_url,
   auto favicon_completion = base::CallbackToBlock(base::BindRepeating(
       [](base::WeakPtr<PlaceholderService> weak_self,
          TemplateURLID template_url_id, CGFloat icon_point_size,
-         FaviconAttributes* favicon_result) {
-        if (!favicon_result.faviconImage || favicon_result.usesDefaultImage) {
+         FaviconAttributes* favicon_result, bool cached) {
+        if (!favicon_result.faviconImage) {
           return;
         }
         UIImage* favicon = favicon_result.faviconImage;

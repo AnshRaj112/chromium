@@ -6,12 +6,12 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <memory>
 #include <set>
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
@@ -55,10 +55,10 @@ static bool LayerHasValidPropertyTreeIndices(const LayerImpl* layer) {
 
 static bool LayerWillPushProperties(const LayerTreeImpl* tree,
                                     const LayerImpl* layer) {
-  return base::Contains(tree->LayersThatShouldPushProperties(), layer) ||
+  return tree->LayersThatShouldPushProperties().contains(layer) ||
          // TODO(crbug.com/40335690): Stop always pushing PictureLayerImpl
          // properties.
-         base::Contains(tree->picture_layers(), layer);
+         std::ranges::contains(tree->picture_layers(), layer);
 }
 #endif
 
@@ -196,20 +196,10 @@ static void PushLayerPropertiesInternal(Iterator source_layers_begin,
 void TreeSynchronizer::PushLayerProperties(LayerTreeImpl* pending_tree,
                                            LayerTreeImpl* active_tree) {
   const auto& layers = pending_tree->LayersThatShouldPushProperties();
-  const auto& picture_layers = pending_tree->picture_layers();
-  const size_t push_count =
-      layers.size() + (pending_tree->always_push_properties_on_picture_layers()
-                           ? picture_layers.size()
-                           : 0);
+  const size_t push_count = layers.size();
   TRACE_EVENT1("cc", "TreeSynchronizer::PushLayerPropertiesTo.Impl",
                "layer_count", push_count);
   PushLayerPropertiesInternal(layers.begin(), layers.end(), active_tree);
-  if (pending_tree->always_push_properties_on_picture_layers()) {
-    // TODO(crbug.com/40335690): Stop always pushing PictureLayerImpl
-    // properties.
-    PushLayerPropertiesInternal(picture_layers.begin(), picture_layers.end(),
-                                active_tree);
-  }
   pending_tree->ClearLayersThatShouldPushProperties();
 }
 

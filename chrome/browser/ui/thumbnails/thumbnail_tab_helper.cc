@@ -21,7 +21,9 @@
 #include "chrome/browser/ui/thumbnails/thumbnail_readiness_tracker.h"
 #include "chrome/browser/ui/thumbnails/thumbnail_scheduler.h"
 #include "chrome/browser/ui/thumbnails/thumbnail_scheduler_impl.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/render_widget_host.h"
@@ -263,7 +265,7 @@ void ThumbnailTabHelper::CaptureThumbnailOnTabBackgrounded() {
       source_size, scale_factor, /* include_scrollbars_in_capture */ false);
 
   source_view->CopyFromSurface(
-      copy_info.copy_rect, copy_info.target_size,
+      copy_info.copy_rect, copy_info.target_size, base::TimeDelta(),
       base::BindOnce(&ThumbnailTabHelper::StoreThumbnailForTabSwitch,
                      weak_factory_for_thumbnail_on_tab_hidden_.GetWeakPtr(),
                      time_of_call));
@@ -294,12 +296,17 @@ ThumbnailScheduler& ThumbnailTabHelper::GetScheduler() {
   return *instance.get();
 }
 
-void ThumbnailTabHelper::StoreThumbnailForTabSwitch(base::TimeTicks start_time,
-                                                    const SkBitmap& bitmap) {
+void ThumbnailTabHelper::StoreThumbnailForTabSwitch(
+    base::TimeTicks start_time,
+    const content::CopyFromSurfaceResult& result) {
   UMA_HISTOGRAM_CUSTOM_TIMES("Tab.Preview.TimeToStoreAfterTabSwitch",
                              base::TimeTicks::Now() - start_time,
                              base::Milliseconds(1), base::Seconds(1), 50);
-  StoreThumbnail(CaptureType::kCopyFromView, bitmap, std::nullopt);
+  if (!result.has_value()) {
+    return;
+  }
+
+  StoreThumbnail(CaptureType::kCopyFromView, result->bitmap, std::nullopt);
 }
 
 void ThumbnailTabHelper::StoreThumbnailForBackgroundCapture(

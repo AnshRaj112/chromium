@@ -13,10 +13,10 @@ import android.util.AttributeSet;
 import android.view.View;
 
 import org.chromium.base.metrics.RecordHistogram;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.NullableObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
+import org.chromium.cc.input.BrowserControlsState;
 import org.chromium.chrome.browser.toolbar.ConstraintsChecker;
 import org.chromium.chrome.browser.toolbar.R;
 import org.chromium.chrome.browser.toolbar.ToolbarCaptureType;
@@ -86,9 +86,7 @@ public class ScrollingBottomViewResourceFrameLayout extends ViewResourceFrameLay
                 // with BCIV, so we change the default state to only show the composited shadow.
                 // Since the shadow is a UIResourceLayer, we need to make the android shadow
                 // visible for the capture so that the layer gets the correct resource.
-                if (ChromeFeatureList.sBcivBottomControls.isEnabled()) {
-                    mShadow.setVisibility(View.VISIBLE);
-                }
+                mShadow.setVisibility(View.VISIBLE);
 
                 RecordHistogram.recordEnumeratedHistogram(
                         "Android.Toolbar.BitmapCapture",
@@ -115,9 +113,7 @@ public class ScrollingBottomViewResourceFrameLayout extends ViewResourceFrameLay
 
             @Override
             public void onCaptureEnd() {
-                if (ChromeFeatureList.sBcivBottomControls.isEnabled()) {
-                    mShadow.setVisibility(View.INVISIBLE);
-                }
+                mShadow.setVisibility(View.INVISIBLE);
             }
         };
     }
@@ -143,7 +139,8 @@ public class ScrollingBottomViewResourceFrameLayout extends ViewResourceFrameLay
     /**
      * @param constraintsSupplier Used to access current constraints of the browser controls.
      */
-    public void setConstraintsSupplier(ObservableSupplier<Integer> constraintsSupplier) {
+    public void setConstraintsSupplier(
+            NullableObservableSupplier<@BrowserControlsState Integer> constraintsSupplier) {
         assert mConstraintsChecker == null;
         mConstraintsChecker =
                 new ConstraintsChecker(

@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.tasks.tab_management;
 
+import static org.chromium.chrome.test.util.ChromeTabUtils.getTabCountOnUiThread;
+
 import android.view.ViewGroup;
 
 import androidx.test.espresso.Espresso;
@@ -81,9 +83,7 @@ public class ClosableTabListEditorTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     var currentTabGroupModelFilterSupplier =
-                            mTabModelSelector
-                                    .getTabGroupModelFilterProvider()
-                                    .getCurrentTabGroupModelFilterSupplier();
+                            mTabModelSelector.getCurrentTabGroupModelFilterSupplier();
                     mEdgeToEdgeSupplier = new ObservableSupplierImpl<>();
                     mTabListEditorCoordinator =
                             new TabListEditorCoordinator(
@@ -107,7 +107,9 @@ public class ClosableTabListEditorTest {
                                     mEdgeToEdgeSupplier,
                                     CreationMode.FULL_SCREEN,
                                     /* undoBarExplicitTrigger= */ null,
-                                    /* componentName= */ null);
+                                    /* componentName= */ null,
+                                    TabListEditorCoordinator.UNLIMITED_SELECTION,
+                                    false);
 
                     mTabListEditorController = mTabListEditorCoordinator.getController();
                     mTabListEditorLayout =
@@ -220,8 +222,9 @@ public class ClosableTabListEditorTest {
         List<Tab> tabs = new ArrayList<>();
 
         TabModel currentTabModel = mTabModelSelector.getCurrentModel();
-        for (int i = 0; i < currentTabModel.getCount(); i++) {
-            tabs.add(currentTabModel.getTabAt(i));
+        for (int i = 0; i < getTabCountOnUiThread(currentTabModel); i++) {
+            int j = i;
+            tabs.add(ThreadUtils.runOnUiThreadBlocking(() -> currentTabModel.getTabAt(j)));
         }
 
         return tabs;

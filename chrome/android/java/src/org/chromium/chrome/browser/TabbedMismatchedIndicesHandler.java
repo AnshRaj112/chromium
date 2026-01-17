@@ -6,9 +6,7 @@ package org.chromium.chrome.browser;
 
 import android.app.Activity;
 
-import androidx.annotation.VisibleForTesting;
-
-import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.build.annotations.NullMarked;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.tabmodel.MismatchedIndicesHandler;
@@ -16,11 +14,8 @@ import org.chromium.chrome.browser.tabmodel.MismatchedIndicesHandler;
 import java.util.function.LongSupplier;
 
 /** Implementation of MismatchedIndicesHandler used by {@link ChromeTabbedActivity}. */
+@NullMarked
 public class TabbedMismatchedIndicesHandler implements MismatchedIndicesHandler {
-    @VisibleForTesting
-    public static final String HISTOGRAM_MISMATCHED_INDICES_ACTIVITY_CREATION_TIME_DELTA =
-            "Android.MultiWindowMode.MismatchedIndices.ActivityCreationTimeDelta";
-
     private final LongSupplier mOnCreateTimestampMsSupplier;
     private final boolean mSkipIndexReassignment;
 
@@ -57,8 +52,6 @@ public class TabbedMismatchedIndicesHandler implements MismatchedIndicesHandler 
         long onCreateTimeDeltaMs =
                 mOnCreateTimestampMsSupplier.getAsLong()
                         - tabbedActivityAtRequestedIndex.getOnCreateTimestampMs();
-        RecordHistogram.recordTimesHistogram(
-                HISTOGRAM_MISMATCHED_INDICES_ACTIVITY_CREATION_TIME_DELTA, onCreateTimeDeltaMs);
         boolean shouldSaveState =
                 tabbedActivityAtRequestedIndex.getLifecycleDispatcher().getCurrentActivityState()
                         < ActivityLifecycleDispatcher.ActivityState.STOPPED_WITH_NATIVE;

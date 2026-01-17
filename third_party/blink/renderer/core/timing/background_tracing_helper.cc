@@ -6,16 +6,15 @@
 
 #include <string_view>
 
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/feature_list.h"
-#include "base/hash/md5.h"
 #include "base/numerics/byte_conversions.h"
 #include "base/rand_util.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_split.h"
 #include "base/trace_event/named_trigger.h"
 #include "base/trace_event/typed_macros.h"
+#include "crypto/obsolete/md5.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/scheme_registry.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
@@ -25,11 +24,15 @@
 #include "third_party/blink/renderer/platform/weborigin/security_origin.h"
 #include "third_party/blink/renderer/platform/wtf/text/ascii_ctype.h"
 #include "third_party/blink/renderer/platform/wtf/text/number_parsing_options.h"
-#include "third_party/blink/renderer/platform/wtf/text/string_operators.h"
 #include "third_party/blink/renderer/platform/wtf/text/string_to_number.h"
 #include "url/url_constants.h"
 
 namespace blink {
+
+uint32_t MD5Hash32ForBackgroundTracingHelper(std::string_view string) {
+  auto digest = crypto::obsolete::Md5::Hash(string);
+  return base::U32FromBigEndian(base::span(digest).first<4u>());
+}
 
 namespace {
 
@@ -105,7 +108,7 @@ BackgroundTracingHelper::BackgroundTracingHelper(ExecutionContext* context) {
   uint32_t this_site_hash = MD5Hash32(this_site_ascii);
 
   // We only need the site information if it's allowed by the allow list.
-  if (base::Contains(GetSiteHashSet(), this_site_hash)) {
+  if (GetSiteHashSet().Contains(this_site_hash)) {
     site_ = this_site_ascii;
     site_hash_ = this_site_hash;
   }
@@ -228,9 +231,7 @@ BackgroundTracingHelper::SplitMarkNameAndId(StringView mark_name) {
 
 // static
 uint32_t BackgroundTracingHelper::MD5Hash32(std::string_view string) {
-  base::MD5Digest digest;
-  base::MD5Sum(base::as_byte_span(string), &digest);
-  return base::U32FromBigEndian(base::span(digest.a).first<4u>());
+  return MD5Hash32ForBackgroundTracingHelper(string);
 }
 
 // static

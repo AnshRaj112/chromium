@@ -6,7 +6,9 @@
 
 #include "base/strings/pattern.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "base/test/run_until.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/test/test_future.h"
 #include "base/test/values_test_util.h"
 #include "base/test/with_feature_override.h"
 #include "build/build_config.h"
@@ -46,12 +48,12 @@ class MockContentBrowserClient : public ContentBrowserTestContentBrowserClient {
 
   MOCK_METHOD(void,
               LogWebFeatureForCurrentPage,
-              (content::RenderFrameHost*, blink::mojom::WebFeature),
+              (RenderFrameHost*, blink::mojom::WebFeature),
               (override));
 
   bool IsFullCookieAccessAllowed(
-      content::BrowserContext* browser_context,
-      content::WebContents* web_contents,
+      BrowserContext* browser_context,
+      WebContents* web_contents,
       const GURL& url,
       const blink::StorageKey& storage_key,
       net::CookieSettingOverrides overrides) override {
@@ -70,18 +72,24 @@ class BlobUrlBrowserTest : public ContentBrowserTest {
   BlobUrlBrowserTest& operator=(const BlobUrlBrowserTest&) = delete;
 
   void SetUpOnMainThread() override {
+    ContentBrowserTest::SetUpOnMainThread();
     host_resolver()->AddRule("*", "127.0.0.1");
     SetupCrossSiteRedirector(embedded_test_server());
     ASSERT_TRUE(embedded_test_server()->Start());
     client_ = std::make_unique<MockContentBrowserClient>();
+
+    SetupCrossSiteRedirector(&embedded_https_test_server());
+    ASSERT_TRUE(embedded_https_test_server().Start());
   }
 
   MockContentBrowserClient& GetMockClient() { return *client_; }
 
-  void TearDownOnMainThread() override { client_.reset(); }
+  void TearDownOnMainThread() override {
+    client_.reset();
+    ContentBrowserTest::TearDownOnMainThread();
+  }
 
  private:
-  base::test::ScopedFeatureList feature_list_;
   std::unique_ptr<MockContentBrowserClient> client_;
 };
 
@@ -223,7 +231,6 @@ IN_PROC_BROWSER_TEST_F(BlobUrlBrowserTest, ReplaceStateToAddAuthorityToBlob) {
 
 IN_PROC_BROWSER_TEST_F(BlobUrlBrowserTest,
                        TestUseCounterForCrossPartitionSameOriginBlobURLFetch) {
-  GetMockClient().allow_cookie_access_ = true;
   GURL main_url = embedded_test_server()->GetURL(
       "c.com", "/cross_site_iframe_factory.html?c(b(c))");
   EXPECT_TRUE(NavigateToURL(shell(), main_url));
@@ -245,24 +252,31 @@ IN_PROC_BROWSER_TEST_F(BlobUrlBrowserTest,
   EXPECT_CALL(
       GetMockClient(),
       LogWebFeatureForCurrentPage(
-          testing::_,
+          rfh_c,
+          blink::mojom::WebFeature::kCrossPartitionSameOriginBlobURLFetch))
+      .Times(0);
+
+  EXPECT_CALL(
+      GetMockClient(),
+      LogWebFeatureForCurrentPage(
+          rfh_b,
+          blink::mojom::WebFeature::kCrossPartitionSameOriginBlobURLFetch))
+      .Times(0);
+
+  EXPECT_CALL(
+      GetMockClient(),
+      LogWebFeatureForCurrentPage(
+          rfh_c_2,
           blink::mojom::WebFeature::kCrossPartitionSameOriginBlobURLFetch))
       .Times(1);
 
-  std::string fetch_blob_url_js = JsReplace(
-      "async function test() {"
-      " const blob = await fetch($1).then(response => response.blob());"
-      " await blob.text();}"
-      "test();",
-      blob_url);
+  std::string fetch_blob_url_js = JsReplace("fetch($1)", blob_url);
 
+  EXPECT_TRUE(ExecJs(rfh_c, fetch_blob_url_js));
   EXPECT_FALSE(ExecJs(rfh_b, fetch_blob_url_js));
-
-  EXPECT_TRUE(ExecJs(rfh_c_2, fetch_blob_url_js));
+  EXPECT_FALSE(ExecJs(rfh_c_2, fetch_blob_url_js));
 
   EXPECT_TRUE(ExecJs(rfh_c, JsReplace("URL.revokeObjectURL($1)", blob_url)));
-
-  EXPECT_FALSE(ExecJs(rfh_c_2, fetch_blob_url_js));
 }
 
 IN_PROC_BROWSER_TEST_F(BlobUrlBrowserTest, TestBlobFetchRequestError) {
@@ -370,6 +384,67 @@ IN_PROC_BROWSER_TEST_F(BlobUrlBrowserTest,
   EXPECT_EQ(ready_state, 4);
 }
 
+// Regression test for the issue described in
+// https://crbug.com/399308041#comment7 where blob URL partitioning was bypassed
+// for all contexts when third-party cookies were enabled.
+IN_PROC_BROWSER_TEST_F(
+    BlobUrlBrowserTest,
+    BlobUrlPartitioningNotAlwaysBypassedWithThirdPartyCookieEnabled) {
+  GetMockClient().allow_cookie_access_ = true;
+  GURL main_url = embedded_https_test_server().GetURL(
+      "c.com", "/cross_site_iframe_factory.html?c(b(c))");
+  EXPECT_TRUE(NavigateToURL(shell(), main_url));
+
+  RenderFrameHost* rfh_c = shell()->web_contents()->GetPrimaryMainFrame();
+
+  std::string blob_url_string =
+      EvalJs(
+          rfh_c,
+          "const blob_url = URL.createObjectURL(new "
+          "Blob(['<!doctype html><body>potato</body>'], {type: 'text/html'}));"
+          "blob_url;")
+          .ExtractString();
+  GURL blob_url(blob_url_string);
+
+  RenderFrameHost* rfh_b = ChildFrameAt(rfh_c, 0);
+  RenderFrameHost* rfh_c_2 = ChildFrameAt(rfh_b, 0);
+
+  std::string fetch_blob_url_js = JsReplace("fetch($1)", blob_url);
+
+  EXPECT_TRUE(ExecJs(rfh_c, fetch_blob_url_js));
+
+  // This access shouldn't succeed even though third-party cookies are enabled.
+  EXPECT_FALSE(ExecJs(rfh_c_2, fetch_blob_url_js));
+
+  // Note: the SAA spec carves out an auto-resolve case when the requesting and
+  // embedding origins are same-site: step 16.7 of
+  // https://privacycg.github.io/storage-access/#dom-document-requeststorageaccess.
+  // However, Chrome implements that in //chrome
+  // (`StorageAccessGrantPermissionContext::DecidePermission`), so //content
+  // can't rely on it. Thus, we must manually grant the permission here.
+  base::test::TestFuture<PermissionControllerImpl::OverrideStatus> future;
+  static_cast<PermissionControllerImpl*>(
+      rfh_c_2->GetBrowserContext()->GetPermissionController())
+      ->SetPermissionOverride(
+          /*requesting_origin=*/url::Origin::Create(main_url),
+          /*embedding_origin=*/url::Origin::Create(main_url),
+          blink::PermissionType::STORAGE_ACCESS_GRANT,
+          blink::mojom::PermissionStatus::GRANTED, future.GetCallback());
+  ASSERT_EQ(future.Get(),
+            PermissionControllerImpl::OverrideStatus::kOverrideSet);
+
+  EXPECT_TRUE(ExecJs(rfh_c_2, "document.requestStorageAccess()"));
+
+  // After requesting storage access, this third-party context should now be
+  // able to access the first-party blob URL.
+  EXPECT_TRUE(ExecJs(rfh_c_2, fetch_blob_url_js));
+
+  EXPECT_TRUE(ExecJs(rfh_c, JsReplace("URL.revokeObjectURL($1)", blob_url)));
+
+  EXPECT_FALSE(ExecJs(rfh_c, fetch_blob_url_js));
+  EXPECT_FALSE(ExecJs(rfh_c_2, fetch_blob_url_js));
+}
+
 class BlobUrlDevToolsIssueTest : public ContentBrowserTest {
  protected:
   BlobUrlDevToolsIssueTest() {
@@ -387,7 +462,10 @@ class BlobUrlDevToolsIssueTest : public ContentBrowserTest {
     client_ = std::make_unique<MockContentBrowserClient>();
   }
 
-  void TearDownOnMainThread() override { client_.reset(); }
+  void TearDownOnMainThread() override {
+    client_.reset();
+    ContentBrowserTest::TearDownOnMainThread();
+  }
 
   void WaitForIssueAndCheckUrl(const std::string& url,
                                TestDevToolsProtocolClient* client,
@@ -401,9 +479,8 @@ class BlobUrlDevToolsIssueTest : public ContentBrowserTest {
           return issue_code && *issue_code == "PartitioningBlobURLIssue";
         }));
 
-    EXPECT_THAT(params, base::test::IsSupersetOfValue(
-                            base::test::ParseJson(content::JsReplace(
-                                R"({
+    EXPECT_THAT(params, base::test::IsSupersetOfValue(JsReplace(
+                            R"({
                   "issue": {
                     "code": "PartitioningBlobURLIssue",
                     "details": {
@@ -414,7 +491,7 @@ class BlobUrlDevToolsIssueTest : public ContentBrowserTest {
                     }
                   }
                 })",
-                                url, expected_info_enum))));
+                            url, expected_info_enum)));
 
     // Clear existing notifications so subsequent calls don't fail by checking
     // `url` against old notifications.
@@ -423,8 +500,6 @@ class BlobUrlDevToolsIssueTest : public ContentBrowserTest {
 
  private:
   base::test::ScopedFeatureList feature_list_;
-
- private:
   std::unique_ptr<MockContentBrowserClient> client_;
 };
 
@@ -449,14 +524,19 @@ IN_PROC_BROWSER_TEST_F(BlobUrlDevToolsIssueTest, PartitioningBlobUrlIssue) {
   RenderFrameHost* rfh_b = ChildFrameAt(rfh_c, 0);
   RenderFrameHost* rfh_c_2 = ChildFrameAt(rfh_b, 0);
 
+  base::test::TestFuture<PermissionControllerImpl::OverrideStatus> future;
   static_cast<PermissionControllerImpl*>(
       rfh_c_2->GetBrowserContext()->GetPermissionController())
-      ->SetPermissionOverride(/*origin=*/std::nullopt,
-                              blink::PermissionType::STORAGE_ACCESS_GRANT,
-                              blink::mojom::PermissionStatus::DENIED);
+      ->SetPermissionOverride(
+          /*requesting_origin=*/std::nullopt,
+          /*embedding_origin=*/std::nullopt,
+          blink::PermissionType::STORAGE_ACCESS_GRANT,
+          blink::mojom::PermissionStatus::DENIED, future.GetCallback());
+  ASSERT_EQ(future.Get(),
+            PermissionControllerImpl::OverrideStatus::kOverrideSet);
 
-  std::unique_ptr<content::TestDevToolsProtocolClient> client =
-      std::make_unique<content::TestDevToolsProtocolClient>();
+  std::unique_ptr<TestDevToolsProtocolClient> client =
+      std::make_unique<TestDevToolsProtocolClient>();
   client->AttachToFrameTreeHost(rfh_c_2);
   client->SendCommandSync("Audits.enable");
   client->ClearNotifications();
@@ -502,8 +582,7 @@ IN_PROC_BROWSER_TEST_F(BlobUrlDevToolsIssueTest,
 
   // 3b. Open new tab from b.com context.
   ShellAddedObserver new_shell_observer;
-  EXPECT_TRUE(
-      content::ExecJs(rfh_c, content::JsReplace("window.open($1)", b_url)));
+  EXPECT_TRUE(ExecJs(rfh_c, JsReplace("window.open($1)", b_url)));
 
   Shell* new_shell = new_shell_observer.GetShell();
   WebContents* new_contents = new_shell->web_contents();

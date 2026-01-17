@@ -20,7 +20,6 @@
 #include "base/time/time.h"
 #include "base/trace_event/trace_config.h"
 #include "chrome/browser/extensions/extension_service.h"
-#include "chrome/browser/extensions/unpacked_installer.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/common/chrome_paths.h"
@@ -31,6 +30,7 @@
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/test_extension_registry_observer.h"
+#include "extensions/browser/unpacked_installer.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/switches.h"
 #include "net/dns/mock_host_resolver.h"
@@ -99,11 +99,10 @@ void TabCapturePerformanceTestBase::LoadExtension(
 
   LOG(INFO) << "Loading extension...";
   auto* const extension_registry =
-      extensions::ExtensionRegistry::Get(browser()->profile());
+      extensions::ExtensionRegistry::Get(GetProfile());
   extensions::TestExtensionRegistryObserver registry_observer(
       extension_registry);
-  extensions::UnpackedInstaller::Create(browser()->profile())
-      ->Load(unpacked_dir);
+  extensions::UnpackedInstaller::Create(GetProfile())->Load(unpacked_dir);
   extension_ = registry_observer.WaitForExtensionReady().get();
   CHECK(extension_);
   CHECK_EQ(kExtensionId, extension_->id());
@@ -261,7 +260,7 @@ TabCapturePerformanceTestBase::HandleRequest(
   auto response = std::make_unique<net::test_server::BasicHttpResponse>();
   response->set_content_type("text/html");
   const GURL& url = request.GetURL();
-  if (url.path() == kTestWebPagePath) {
+  if (url.GetPath() == kTestWebPagePath) {
     response->set_content(test_page_to_serve_);
   } else {
     response->set_code(net::HTTP_NOT_FOUND);

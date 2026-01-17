@@ -32,6 +32,7 @@
 #include "media/audio/fake_audio_manager.h"
 #include "media/audio/mock_audio_debug_recording_manager.h"
 #include "media/audio/test_audio_thread.h"
+#include "media/base/audio_bus.h"
 #include "media/base/limits.h"
 #include "media/base/media_switches.h"
 #include "media/media_buildflags.h"
@@ -367,10 +368,10 @@ TEST_F(AudioManagerTest, EnumerateInputDevicesAlsaWithInputDeviceSwitch) {
   AudioDeviceDescriptions device_descriptions;
   device_info_accessor_->GetAudioInputDeviceDescriptions(&device_descriptions);
   CheckDeviceDescriptions(device_descriptions);
-  EXPECT_TRUE(base::Contains(device_descriptions, "switch-input-device",
-                             [](const auto& device_description) {
-                               return device_description.unique_id;
-                             }));
+  EXPECT_TRUE(std::ranges::contains(device_descriptions, "switch-input-device",
+                                    [](const auto& device_description) {
+                                      return device_description.unique_id;
+                                    }));
 }
 
 TEST_F(AudioManagerTest, EnumerateOutputDevicesAlsa) {
@@ -392,10 +393,10 @@ TEST_F(AudioManagerTest, EnumerateOutputDevicesAlsaWithOutputDeviceSwitch) {
   AudioDeviceDescriptions device_descriptions;
   device_info_accessor_->GetAudioOutputDeviceDescriptions(&device_descriptions);
   CheckDeviceDescriptions(device_descriptions);
-  EXPECT_TRUE(base::Contains(device_descriptions, "switch-output-device",
-                             [](const auto& device_description) {
-                               return device_description.unique_id;
-                             }));
+  EXPECT_TRUE(std::ranges::contains(device_descriptions, "switch-output-device",
+                                    [](const auto& device_description) {
+                                      return device_description.unique_id;
+                                    }));
 }
 #endif  // defined(USE_ALSA)
 

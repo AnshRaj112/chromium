@@ -7,7 +7,6 @@
 #include <memory>
 
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
@@ -20,10 +19,12 @@
 #include "base/task/task_runner.h"
 #include "base/types/pass_key.h"
 #include "base/values.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/web_applications/locks/all_apps_lock.h"
 #include "chrome/browser/web_applications/locks/app_lock.h"
 #include "chrome/browser/web_applications/locks/lock.h"
 #include "chrome/browser/web_applications/locks/noop_lock.h"
+#include "chrome/browser/web_applications/locks/partitioned_lock_holder.h"
 #include "chrome/browser/web_applications/locks/partitioned_lock_id.h"
 #include "chrome/browser/web_applications/locks/partitioned_lock_manager.h"
 #include "chrome/browser/web_applications/locks/shared_web_contents_lock.h"
@@ -97,13 +98,16 @@ const char* KeysOnStaticPartitionToString(KeysOnStaticPartition key) {
   }
 }
 
+PartitionedLockId GetAllAppsLockId() {
+  return PartitionedLockId(
+      {static_cast<int>(LockPartition::kStatic),
+       base::NumberToString(KeysOnStaticPartition::kAllApps)});
+}
+
 PartitionedLockManager::PartitionedLockRequest GetAllAppsLock(
     PartitionedLockManager::LockType type) {
-  return PartitionedLockManager::PartitionedLockRequest(
-      PartitionedLockId(
-          {static_cast<int>(LockPartition::kStatic),
-           base::NumberToString(KeysOnStaticPartition::kAllApps)}),
-      type);
+  return PartitionedLockManager::PartitionedLockRequest(GetAllAppsLockId(),
+                                                        type);
 }
 
 PartitionedLockManager::PartitionedLockRequest GetSharedWebContentsLock() {
@@ -171,38 +175,68 @@ void LogLockRequest(
 }  // namespace
 
 template <class LockType>
-void WebAppLockManager::GrantLock(base::WeakPtr<LockType> lock) {
+void WebAppLockManager::GrantLockWithCallback(
+    base::WeakPtr<LockType> lock,
+    base::OnceClosure on_lock_acquired) {
   // This callback is never called if the lock holder is destroyed, see
   // invariant on PartitionedLockManager::AcquireLocks
   CHECK(lock);
   lock->GrantLock(*this);
+  std::move(on_lock_acquired).Run();
 }
 
-template void WebAppLockManager::GrantLock<NoopLock>(
-    base::WeakPtr<NoopLock> lock);
-template void WebAppLockManager::GrantLock<AppLock>(
-    base::WeakPtr<AppLock> lock);
-
-template void WebAppLockManager::GrantLock<AllAppsLock>(
-    base::WeakPtr<AllAppsLock> lock);
+template void WebAppLockManager::GrantLockWithCallback<NoopLock>(
+    base::WeakPtr<NoopLock> lock,
+    base::OnceClosure on_lock_acquired);
+template void WebAppLockManager::GrantLockWithCallback<AppLock>(
+    base::WeakPtr<AppLock> lock,
+    base::OnceClosure on_lock_acquired);
+template void WebAppLockManager::GrantLockWithCallback<AllAppsLock>(
+    base::WeakPtr<AllAppsLock> lock,
+    base::OnceClosure on_lock_acquired);
 
 template <>
-void WebAppLockManager::GrantLock(base::WeakPtr<SharedWebContentsLock> lock) {
-  // This callback is never called if the lock holder is destroyed, see
-  // invariant on PartitionedLockManager::AcquireLocks
+void WebAppLockManager::GrantLockWithCallback(
+    base::WeakPtr<SharedWebContentsLock> lock,
+    base::OnceClosure on_lock_acquired) {
   CHECK(lock);
+
+  // Don't grant lock during profile shutdown to prevent WebContents creation.
+  // This prevents the race condition where a lock is granted after
+  // BrowserContext shutdown has started, which would cause a CHECK failure
+  // in RenderProcessHostImpl constructor.
+  if (provider_->profile()->ShutdownStarted()) {
+    // CRITICAL: Don't call on_lock_acquired callback during shutdown.
+    // Lock is granted by PartitionedLockManager but resources not allocated.
+    LOG(WARNING) << "Lock acquisition during shutdown - callback not called";
+    return;
+  }
+
   lock->GrantLock(
       *this, *provider_->command_manager().EnsureWebContentsCreated(PassKey()));
+  std::move(on_lock_acquired).Run();
 }
 
 template <>
-void WebAppLockManager::GrantLock(
-    base::WeakPtr<SharedWebContentsWithAppLock> lock) {
-  // This callback is never called if the lock holder is destroyed, see
-  // invariant on PartitionedLockManager::AcquireLocks
+void WebAppLockManager::GrantLockWithCallback(
+    base::WeakPtr<SharedWebContentsWithAppLock> lock,
+    base::OnceClosure on_lock_acquired) {
   CHECK(lock);
+
+  // Don't grant lock during profile shutdown to prevent WebContents creation.
+  // This prevents the race condition where a lock is granted after
+  // BrowserContext shutdown has started, which would cause a CHECK failure
+  // in RenderProcessHostImpl constructor.
+  if (provider_->profile()->ShutdownStarted()) {
+    // CRITICAL: Don't call on_lock_acquired callback during shutdown.
+    // Lock is granted by PartitionedLockManager but resources not allocated.
+    LOG(WARNING) << "Lock acquisition during shutdown - callback not called";
+    return;
+  }
+
   lock->GrantLock(
       *this, *provider_->command_manager().EnsureWebContentsCreated(PassKey()));
+  std::move(on_lock_acquired).Run();
 }
 
 WebAppLockManager::WebAppLockManager() = default;
@@ -225,11 +259,14 @@ void WebAppLockManager::AcquireLock(
     base::OnceClosure on_lock_acquired,
     const base::Location& location) {
   CHECK(!lock.IsGranted());
-  AcquireLockImpl(lock.GetLockHolder(PassKey()), lock_description,
-                  base::BindOnce(&WebAppLockManager::GrantLock<LockType>,
-                                 GetWeakPtr(), lock.AsWeakPtr())
-                      .Then(std::move(on_lock_acquired)),
-                  location);
+  PartitionedLockHolder& holder =
+      lock.InitializeLockHolderForAcquire(PassKey());
+  AcquireLockImpl(
+      holder, lock_description,
+      base::BindOnce(&WebAppLockManager::GrantLockWithCallback<LockType>,
+                     GetWeakPtr(), lock.AsWeakPtr(),
+                     std::move(on_lock_acquired)),
+      location);
 }
 
 template void WebAppLockManager::AcquireLock<NoopLock>(
@@ -270,22 +307,19 @@ WebAppLockManager::UpgradeAndAcquireLock(
       result_lock_description =
           std::make_unique<SharedWebContentsWithAppLockDescription>(app_ids);
 
-  // Upgrading requires the new lock to still hold all of the old locks.
-  std::swap(new_lock.GetLockHolder(PassKey()).locks,
-            old_lock->GetLockHolder(PassKey()).locks);
-
   // Note that the description given to `AcquireLock` is the
   // `AppLockDescription` and not the `SharedWebContentsWithAppLock`. This is
   // because `SharedWebContentsLock` already has the web contents lock granted,
   // and we only need the extra app locks.
+  PartitionedLockHolder& holder =
+      new_lock.InitializeLockHolderForUpgrade(std::move(old_lock), PassKey());
+  AcquireLockImpl(holder, AppLockDescription(app_ids),
+                  base::BindOnce(&WebAppLockManager::GrantLockWithCallback<
+                                     SharedWebContentsWithAppLock>,
+                                 GetWeakPtr(), new_lock.AsWeakPtr(),
+                                 std::move(on_lock_acquired)),
+                  location);
 
-  AcquireLockImpl(
-      new_lock.GetLockHolder(PassKey()), AppLockDescription(app_ids),
-      base::BindOnce(
-          &WebAppLockManager::GrantLock<SharedWebContentsWithAppLock>,
-          GetWeakPtr(), new_lock.AsWeakPtr())
-          .Then(std::move(on_lock_acquired)),
-      location);
   return result_lock_description;
 }
 
@@ -299,15 +333,38 @@ std::unique_ptr<AppLockDescription> WebAppLockManager::UpgradeAndAcquireLock(
   std::unique_ptr<AppLockDescription> result_lock_description =
       std::make_unique<AppLockDescription>(app_ids);
 
-  // Upgrading requires the new lock to still hold all of the old locks.
-  std::swap(new_lock.GetLockHolder(PassKey()).locks,
-            old_lock->GetLockHolder(PassKey()).locks);
+  PartitionedLockHolder& holder =
+      new_lock.InitializeLockHolderForUpgrade(std::move(old_lock), PassKey());
+  AcquireLockImpl(
+      holder, *result_lock_description,
+      base::BindOnce(&WebAppLockManager::GrantLockWithCallback<AppLock>,
+                     GetWeakPtr(), new_lock.AsWeakPtr(),
+                     std::move(on_lock_acquired)),
+      location);
+  return result_lock_description;
+}
 
-  AcquireLockImpl(new_lock.GetLockHolder(PassKey()), *result_lock_description,
-                  base::BindOnce(&WebAppLockManager::GrantLock<AppLock>,
-                                 GetWeakPtr(), new_lock.AsWeakPtr())
-                      .Then(std::move(on_lock_acquired)),
-                  location);
+std::unique_ptr<AllAppsLockDescription>
+WebAppLockManager::UpgradeAndAcquireLock(
+    std::unique_ptr<SharedWebContentsWithAppLock> old_lock,
+    AllAppsLock& new_lock,
+    base::OnceClosure on_lock_acquired,
+    const base::Location& location) {
+  CHECK(!new_lock.IsGranted());
+  std::unique_ptr<AllAppsLockDescription> result_lock_description =
+      std::make_unique<AllAppsLockDescription>();
+
+  // Upgrading requires the new lock to still hold all of the old locks.
+  PartitionedLockHolder& holder =
+      new_lock.InitializeLockHolderForUpgrade(std::move(old_lock), PassKey());
+
+  // Upgrade to exclusive.
+  lock_manager_.UpgradeToExclusive(
+      holder, GetAllAppsLockId(),
+      base::BindOnce(&WebAppLockManager::GrantLockWithCallback<AllAppsLock>,
+                     GetWeakPtr(), new_lock.AsWeakPtr(),
+                     std::move(on_lock_acquired)),
+      location);
   return result_lock_description;
 }
 

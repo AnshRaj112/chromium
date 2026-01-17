@@ -11,12 +11,12 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "cc/slim/layer.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/android/event_forwarder.h"
+#include "ui/android/ui_android_features.h"
 #include "ui/android/window_android.h"
 #include "ui/base/cursor/cursor.h"
 #include "ui/base/cursor/mojom/cursor_type.mojom-shared.h"
@@ -130,7 +130,7 @@ ScopedJavaLocalRef<jobject> ViewAndroid::GetEventForwarder() {
 
 void ViewAndroid::AddChild(ViewAndroid* child) {
   DCHECK(child);
-  DCHECK(!base::Contains(children_, child));
+  DCHECK(!std::ranges::contains(children_, child));
   DCHECK(!RootPathHasEventForwarder(this) || !SubtreeHasEventForwarder(child))
       << "Some view tree path will have more than one event forwarder "
          "if the child is added.";
@@ -335,6 +335,10 @@ void ViewAndroid::SetCopyOutputCallback(CopyViewCallback callback) {
   copy_view_callback_ = std::move(callback);
 }
 
+void ViewAndroid::SetHitTestCallback(HitTestCallback callback) {
+  hit_test_callback_ = std::move(callback);
+}
+
 // If view does not support copy request, return back the request.
 std::unique_ptr<viz::CopyOutputRequest> ViewAndroid::MaybeRequestCopyOfView(
     std::unique_ptr<viz::CopyOutputRequest> request) {
@@ -398,10 +402,10 @@ void ViewAndroid::RequestFocus() {
 
 bool ViewAndroid::StartDragAndDrop(const JavaRef<jobject>& jshadow_image,
                                    const JavaRef<jobject>& jdrop_data,
-                                   jint cursor_offset_x,
-                                   jint cursor_offset_y,
-                                   jint drag_obj_rect_width,
-                                   jint drag_obj_rect_height) {
+                                   int32_t cursor_offset_x,
+                                   int32_t cursor_offset_y,
+                                   int32_t drag_obj_rect_width,
+                                   int32_t drag_obj_rect_height) {
   ScopedJavaLocalRef<jobject> delegate(GetViewAndroidDelegate());
   if (delegate.is_null())
     return false;
@@ -565,6 +569,16 @@ void ViewAndroid::OnControlsResizeViewChanged(bool controls_resize_view) {
   }
 }
 
+void ViewAndroid::DispatchWindowPositionChange() {
+  if (event_handler_) {
+    event_handler_->OnWindowPositionChanged();
+  }
+
+  for (ViewAndroid* child : children_) {
+    child->DispatchWindowPositionChange();
+  }
+}
+
 gfx::Size ViewAndroid::GetPhysicalBackingSize() const {
   return physical_size_;
 }
@@ -712,6 +726,10 @@ template <typename E>
 bool ViewAndroid::HitTest(EventHandlerCallback<E> handler_callback,
                           const E& event,
                           const gfx::PointF& point) {
+  if (!IsCheckHitEligible()) {
+    return false;
+  }
+
   if (event_handler_) {
     if (bounds_dips_.origin().IsOrigin()) {  // (x, y) == (0, 0)
       if (handler_callback.Run(event_handler_.get(), event))
@@ -733,8 +751,9 @@ bool ViewAndroid::HitTest(EventHandlerCallback<E> handler_callback,
       bool matched = child->match_parent();
       if (!matched)
         matched = child->bounds_dips_.Contains(int_point);
-      if (matched && child->HitTest(handler_callback, event, offset_point))
+      if (matched && child->HitTest(handler_callback, event, offset_point)) {
         return true;
+      }
     }
   }
   return false;
@@ -761,4 +780,11 @@ void ViewAndroid::OnPointerLockRelease() {
   }
 }
 
+bool ViewAndroid::IsCheckHitEligible() const {
+  return !base::FeatureList::IsEnabled(kCheckHitEligibility) ||
+         hit_test_callback_.is_null() || hit_test_callback_.Run();
+}
+
 }  // namespace ui
+
+DEFINE_JNI(ViewAndroidDelegate)

@@ -97,11 +97,12 @@ std::unique_ptr<FrameNodeImpl> PerformanceManagerImpl::CreateFrameNode(
     const blink::LocalFrameToken& frame_token,
     content::BrowsingInstanceId browsing_instance_id,
     content::SiteInstanceGroupId site_instance_group_id,
-    bool is_current) {
+    bool is_current,
+    bool is_active) {
   return CreateNodeImpl<FrameNodeImpl>(
       process_node, page_node, parent_frame_node,
       outer_document_for_fenced_frame, render_frame_id, frame_token,
-      browsing_instance_id, site_instance_group_id, is_current);
+      browsing_instance_id, site_instance_group_id, is_current, is_active);
 }
 
 // static
@@ -125,7 +126,7 @@ std::unique_ptr<ProcessNodeImpl> PerformanceManagerImpl::CreateProcessNode(
 // static
 std::unique_ptr<ProcessNodeImpl> PerformanceManagerImpl::CreateProcessNode(
     RenderProcessHostProxy render_process_host_proxy,
-    base::TaskPriority priority) {
+    base::Process::Priority priority) {
   return CreateNodeImpl<ProcessNodeImpl>(std::move(render_process_host_proxy),
                                          priority);
 }

@@ -30,7 +30,8 @@ extern const char kVersionSwitchName[];
 extern const char kProcessTypeController[];
 extern const char kProcessTypeDaemon[];
 extern const char kProcessTypeDesktop[];
-extern const char kProcessTypeHost[];
+extern const char kProcessTypeNetwork[];
+extern const char kProcessTypeSingleProcessHost[];
 extern const char kProcessTypeRdpDesktopSession[];
 extern const char kProcessTypeEvaluateCapability[];
 extern const char kProcessTypeFileChooser[];
@@ -45,6 +46,9 @@ extern const char kEvaluateCapabilitySwitchName[];
 // Used to record client sessions to wtmpd.
 extern const char kEnableWtmpdb[];
 #endif
+
+// Indicates whether Corp Messaging should be enabled for signaling.
+extern const char kEnableCorpMessaging[];
 
 // Values for kEvaluateCapabilitySwitchName.
 #if BUILDFLAG(IS_WIN)

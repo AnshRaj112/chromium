@@ -8,6 +8,7 @@ import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.Espresso.pressBack;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.longClick;
+import static androidx.test.espresso.action.ViewActions.replaceText;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
@@ -18,6 +19,8 @@ import static org.mockito.Mockito.doReturn;
 
 import static org.chromium.base.ThreadUtils.runOnUiThreadBlocking;
 import static org.chromium.base.test.util.Restriction.RESTRICTION_TYPE_NON_LOW_END_DEVICE;
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeBookmarksUrl;
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNonNativeNtpUrl;
 
 import android.view.MenuItem;
 import android.view.View;
@@ -38,6 +41,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
@@ -49,6 +53,7 @@ import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.DoNotBatch;
+import org.chromium.base.test.util.ImportantFormFactors;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.bookmarks.BookmarkDelegate;
@@ -63,6 +68,7 @@ import org.chromium.chrome.browser.bookmarks.BookmarkToolbar;
 import org.chromium.chrome.browser.bookmarks.BookmarkUiPrefs.BookmarkRowDisplayPref;
 import org.chromium.chrome.browser.bookmarks.BookmarkUiState.BookmarkUiMode;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
+import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.ui.signin.signin_promo.SigninPromoCoordinator;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
@@ -76,7 +82,6 @@ import org.chromium.components.bookmarks.BookmarkId;
 import org.chromium.components.bookmarks.BookmarkType;
 import org.chromium.components.browser_ui.widget.RecyclerViewTestUtils;
 import org.chromium.components.browser_ui.widget.selectable_list.SelectableListToolbar;
-import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.content_public.browser.test.util.TouchCommon;
 import org.chromium.ui.accessibility.AccessibilityState;
 import org.chromium.ui.base.DeviceFormFactor;
@@ -88,6 +93,7 @@ import java.util.concurrent.ExecutionException;
 /** Tests for the reading list in the bookmark manager. */
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
+@ImportantFormFactors(DeviceFormFactor.ONLY_TABLET)
 @DoNotBatch(reason = "BookmarkTest has behaviours and thus can't be batched.")
 public class ReadingListTest {
     @Rule
@@ -107,6 +113,7 @@ public class ReadingListTest {
     // trigger native load / CommandLineFlag setup.
     private GURL mTestUrlA;
     private @Nullable BookmarkActivity mBookmarkActivity;
+    private @Mock Profile mProfile;
 
     @Before
     public void setUp() {
@@ -133,18 +140,14 @@ public class ReadingListTest {
         BookmarkTestUtil.waitForBookmarkModelLoaded();
 
         if (mActivityTestRule.getActivity().isTablet()) {
-            mActivityTestRule.loadUrl(UrlConstants.BOOKMARKS_URL);
+            mActivityTestRule.loadUrl(getOriginalNativeBookmarksUrl());
             mItemsContainer =
                     mActivityTestRule
                             .getActivity()
                             .findViewById(R.id.selectable_list_recycler_view);
             mItemsContainer.setItemAnimator(null); // Disable animation to reduce flakiness.
             mBookmarkManagerCoordinator =
-                    ((BookmarkPage)
-                                    mActivityTestRule
-                                            .getActivity()
-                                            .getActivityTab()
-                                            .getNativePage())
+                    ((BookmarkPage) mActivityTestRule.getActivityTab().getNativePage())
                             .getManagerForTesting();
         } else {
             // phone
@@ -212,7 +215,8 @@ public class ReadingListTest {
         // We should default to the root bookmark.
         Assert.assertEquals(BookmarkUiMode.FOLDER, delegate.getCurrentUiMode());
         Assert.assertEquals(
-                "chrome-native://bookmarks/folder/0", mBookmarkManagerOpener.getLastUsedUrl());
+                "chrome-native://bookmarks/folder/0",
+                mBookmarkManagerOpener.getLastUsedUrl(mProfile));
         Assert.assertEquals("Bookmarks", toolbar.getTitle());
 
         // When opening "Mobile bookmarks", we should come back to it when within the same session.
@@ -232,7 +236,8 @@ public class ReadingListTest {
         // Reopen and make sure we're back in "Mobile bookmarks".
         Assert.assertEquals(BookmarkUiMode.FOLDER, delegate.getCurrentUiMode());
         Assert.assertEquals(
-                "chrome-native://bookmarks/folder/3", mBookmarkManagerOpener.getLastUsedUrl());
+                "chrome-native://bookmarks/folder/3",
+                mBookmarkManagerOpener.getLastUsedUrl(mProfile));
     }
 
     @Test
@@ -305,18 +310,24 @@ public class ReadingListTest {
         openRootFolder();
         openReadingList();
 
-        // Enter search UI, but don't enter any search key word.
-        ThreadUtils.runOnUiThreadBlocking(getBookmarkDelegate()::openSearchUi);
-        Assert.assertEquals(
-                "Wrong state, should be searching",
-                BookmarkUiMode.SEARCHING,
-                getBookmarkDelegate().getCurrentUiMode());
+        // On tablets, the search UI is always visible. On phones, we have to open it.
+        if (DeviceFormFactor.isNonMultiDisplayContextOnTablet(mActivityTestRule.getActivity())) {
+            BookmarkTestUtil.getSearchBoxViewInteraction()
+                    .perform(replaceText(TEST_PAGE_TITLE_GOOGLE));
+        } else {
+            // Enter search UI, but don't enter any search key word.
+            ThreadUtils.runOnUiThreadBlocking(getBookmarkDelegate()::openSearchUi);
+            Assert.assertEquals(
+                    "Wrong state, should be searching",
+                    BookmarkUiMode.SEARCHING,
+                    getBookmarkDelegate().getCurrentUiMode());
 
-        runOnUiThreadBlocking(
-                () ->
-                        mBookmarkManagerCoordinator
-                                .getTestingDelegate()
-                                .searchForTesting(TEST_PAGE_TITLE_GOOGLE));
+            runOnUiThreadBlocking(
+                    () ->
+                            mBookmarkManagerCoordinator
+                                    .getTestingDelegate()
+                                    .searchForTesting(TEST_PAGE_TITLE_GOOGLE));
+        }
 
         // Blocking wait to go from 4 items to post-search 2 items (search row and 1 item result).
         // Just waitForStableRecyclerView has not been sufficient, see https://crbug.com/369092966.
@@ -400,7 +411,7 @@ public class ReadingListTest {
         BookmarkPromoHeader.forcePromoVisibilityForTesting(false);
         addReadingListBookmark(TEST_PAGE_TITLE_GOOGLE, mTestUrlA);
 
-        mActivityTestRule.loadUrlInNewTab(UrlConstants.NTP_NON_NATIVE_URL, /* incognito= */ true);
+        mActivityTestRule.loadUrlInNewTab(getOriginalNonNativeNtpUrl(), /* incognito= */ true);
 
         openBookmarkManager();
         openRootFolder();

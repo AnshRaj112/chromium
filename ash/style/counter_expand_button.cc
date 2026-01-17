@@ -24,6 +24,8 @@
 #include "ui/gfx/paint_vector_icon.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/animation_builder.h"
+#include "ui/views/background.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
@@ -40,6 +42,8 @@ constexpr auto kLabelInsets = gfx::Insets::TLBR(0, 8, 0, 0);
 constexpr int kCornerRadius = 12;
 constexpr int kJellyChevronIconSize = 20;
 constexpr int kLabelFontSize = 12;
+
+std::optional<bool> g_tooltip_enabled_for_testing;
 
 }  // namespace
 
@@ -75,12 +79,21 @@ CounterExpandButton::CounterExpandButton() {
   views::FocusRing::Get(this)->SetColorId(ui::kColorAshFocusRing);
   views::FocusRing::Get(this)->SetOutsetFocusRingDisabled(true);
 
-  SetPaintToLayer(ui::LAYER_SOLID_COLOR);
-  layer()->SetRoundedCornerRadius(gfx::RoundedCornersF{kTrayItemCornerRadius});
-  layer()->SetIsFastRoundedCorner(true);
+  SetBackground(views::CreateLayerBasedRoundedBackground(
+      cros_tokens::kCrosSysSystemOnBase1,
+      gfx::RoundedCornersF{kTrayItemCornerRadius}));
 }
 
 CounterExpandButton::~CounterExpandButton() = default;
+
+// static
+base::AutoReset<std::optional<bool>>
+CounterExpandButton::SetTooltipEnabledForTesting(bool value) {
+  CHECK(!g_tooltip_enabled_for_testing.has_value());
+  base::AutoReset<std::optional<bool>> result(&g_tooltip_enabled_for_testing,
+                                              value);
+  return result;
+}
 
 void CounterExpandButton::SetExpanded(bool expanded) {
   if (expanded_ == expanded) {
@@ -128,7 +141,9 @@ void CounterExpandButton::UpdateIcons() {
 void CounterExpandButton::UpdateTooltip() {
   std::u16string tooltip_text = expanded_ ? GetExpandedStateTooltipText()
                                           : GetCollapsedStateTooltipText();
-  SetTooltipText(tooltip_text);
+  if (g_tooltip_enabled_for_testing.value_or(true)) {
+    SetTooltipText(tooltip_text);
+  }
   GetViewAccessibility().SetName(
       tooltip_text, tooltip_text.empty()
                         ? ax::mojom::NameFrom::kAttributeExplicitlyEmpty
@@ -201,7 +216,6 @@ void CounterExpandButton::OnThemeChanged() {
   views::Button::OnThemeChanged();
 
   UpdateIcons();
-  UpdateBackgroundColor();
 }
 
 gfx::Size CounterExpandButton::CalculatePreferredSize(
@@ -266,11 +280,6 @@ std::u16string CounterExpandButton::GetExpandedStateTooltipText() const {
 
 std::u16string CounterExpandButton::GetCollapsedStateTooltipText() const {
   return u"";
-}
-
-void CounterExpandButton::UpdateBackgroundColor() {
-  layer()->SetColor(
-      GetColorProvider()->GetColor(cros_tokens::kCrosSysSystemOnBase1));
 }
 
 BEGIN_METADATA(CounterExpandButton)

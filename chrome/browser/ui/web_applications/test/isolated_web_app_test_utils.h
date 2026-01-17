@@ -15,7 +15,7 @@
 #include "base/threading/thread_restrictions.h"
 #include "base/version.h"
 #include "chrome/browser/ui/web_applications/web_app_browsertest_base.h"
-#include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_update_manager.h"
+#include "chrome/browser/web_applications/isolated_web_apps/update/isolated_web_app_update_manager.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "components/version_info/channel.h"
@@ -58,6 +58,7 @@ class IsolatedWebAppBrowserTestHarness : public WebAppBrowserTestBase {
  protected:
   std::unique_ptr<net::EmbeddedTestServer> CreateAndStartServer(
       base::FilePath::StringViewType chrome_test_data_relative_root);
+
   IsolatedWebAppUrlInfo InstallDevModeProxyIsolatedWebApp(
       const url::Origin& origin);
   content::RenderFrameHost* OpenApp(
@@ -106,8 +107,8 @@ class UpdateDiscoveryTaskResultWaiter
 
 class UpdateApplyTaskResultWaiter
     : public IsolatedWebAppUpdateManager::Observer {
-  using TaskResultCallback = base::OnceCallback<void(
-      IsolatedWebAppUpdateApplyTask::CompletionStatus status)>;
+  using TaskResultCallback =
+      base::OnceCallback<void(IsolatedWebAppApplyUpdateCommandResult status)>;
 
  public:
   UpdateApplyTaskResultWaiter(WebAppProvider& provider,
@@ -118,7 +119,7 @@ class UpdateApplyTaskResultWaiter
   // IsolatedWebAppUpdateManager::Observer:
   void OnUpdateApplyTaskCompleted(
       const webapps::AppId& app_id,
-      IsolatedWebAppUpdateApplyTask::CompletionStatus status) override;
+      IsolatedWebAppApplyUpdateCommandResult status) override;
 
  private:
   const webapps::AppId expected_app_id_;

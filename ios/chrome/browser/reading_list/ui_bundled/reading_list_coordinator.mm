@@ -27,6 +27,7 @@
 #import "ios/chrome/browser/authentication/ui_bundled/change_profile/change_profile_reading_list_continuation.h"
 #import "ios/chrome/browser/authentication/ui_bundled/enterprise/enterprise_utils.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/signin_utils.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin_presenter.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin_promo_view_mediator.h"
 #import "ios/chrome/browser/favicon/model/ios_chrome_favicon_loader_factory.h"
@@ -50,12 +51,15 @@
 #import "ios/chrome/browser/reading_list/ui_bundled/reading_list_menu_provider.h"
 #import "ios/chrome/browser/reading_list/ui_bundled/reading_list_table_view_controller.h"
 #import "ios/chrome/browser/reminder_notifications/coordinator/reminder_notifications_coordinator.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser/browser_provider.h"
+#import "ios/chrome/browser/shared/model/browser/browser_provider_interface.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/table_view/table_view_navigation_controller.h"
@@ -117,7 +121,7 @@
   // The mediator that updates the sign-in promo view.
   SigninPromoViewMediator* _signinPromoViewMediator;
   // Handler for sign-in commands.
-  id<ApplicationCommands> _applicationCommandsHandler;
+  id<SceneCommands> _sceneHandler;
   // Authentication Service to retrieve the user's signed-in state.
   raw_ptr<AuthenticationService> _authService;
   // Observer for auth service status changes.
@@ -158,8 +162,8 @@
                                                faviconLoader:faviconLoader
                                              listItemFactory:itemFactory];
   // Initialize services.
-  _applicationCommandsHandler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  _sceneHandler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
   _authService = AuthenticationServiceFactory::GetForProfile(profile);
   _authServiceObserverBridge =
       std::make_unique<AuthenticationServiceObserverBridge>(_authService, self);
@@ -178,15 +182,6 @@
   self.tableViewController.menuProvider = self;
 
   itemFactory.accessibilityDelegate = self.tableViewController;
-
-  // Add the "Done" button and hook it up to `stop`.
-  UIBarButtonItem* dismissButton = [[UIBarButtonItem alloc]
-      initWithBarButtonSystemItem:UIBarButtonSystemItemDone
-                           target:self
-                           action:@selector(dismissButtonTapped)];
-  [dismissButton
-      setAccessibilityIdentifier:kTableViewNavigationDismissButtonId];
-  self.tableViewController.navigationItem.rightBarButtonItem = dismissButton;
 
   // Present RecentTabsNavigationController.
   self.navigationController = [[TableViewNavigationController alloc]
@@ -240,11 +235,6 @@
   self.started = YES;
 }
 
-- (void)dismissButtonTapped {
-  base::RecordAction(base::UserMetricsAction("MobileReadingListClose"));
-  [_delegate closeReadingList];
-}
-
 - (void)stop {
   if (!self.started) {
     return;
@@ -283,13 +273,15 @@
   _identityManager = nullptr;
   _syncService = nullptr;
   _identityManagerObserverBridge.reset();
+  _authServiceObserverBridge.reset();
 
   [super stop];
   self.started = NO;
 }
 
 - (void)dealloc {
-  DCHECK(!self.mediator);
+  CHECK(!_authServiceObserverBridge, base::NotFatalUntil::M145);
+  CHECK(!self.mediator, base::NotFatalUntil::M145);
 }
 
 #pragma mark - ReadingListListViewControllerAudience
@@ -298,7 +290,7 @@
   self.navigationController.toolbarHidden = !hasItems;
 }
 
-#pragma mark - ReadingListTableViewControllerDelegate
+#pragma mark - ReadingListListViewControllerDelegate
 
 - (void)dismissReadingListListViewController:(UIViewController*)viewController {
   CHECK_EQ(self.tableViewController, viewController);
@@ -378,7 +370,9 @@
 }
 
 - (BOOL)canDismiss {
-  return !_signinPromoViewMediator.signinInProgress;
+  // In case we don’t know, allow the view to be dismissed in order not to block
+  // the user on a frozen view if sign-in is acciddentally stopped.
+  return _signinPromoViewMediator.signinInProgress != signin::Tribool::kTrue;
 }
 
 #pragma mark - URL Loading Helpers
@@ -587,21 +581,28 @@
 - (void)showSignin:(SigninPromoViewMediator*)mediator
            command:(ShowSigninCommand*)command {
   CHECK_EQ(mediator, _signinPromoViewMediator);
+  if (_signinCoordinator.viewWillPersist) {
+    return;
+  }
+  [_signinCoordinator stop];
   __weak __typeof(self) weakSelf = self;
-  [command addSigninCompletion:^(SigninCoordinatorResult result,
+  [command addSigninCompletion:^(SigninCoordinator* coordinator,
+                                 SigninCoordinatorResult result,
                                  id<SystemIdentity>) {
-    [weakSelf signinDidCompleteWithResult:result];
+    [weakSelf signinDidCompleteWithCoordinator:coordinator result:result];
   }];
   _signinCoordinator = [SigninCoordinator
       signinCoordinatorWithCommand:command
-                           browser:self.browser
+                           browser:signin::GetRegularBrowser(self.browser)
                 baseViewController:self.navigationController];
   [_signinCoordinator start];
 }
 
 #pragma mark - SigninPromoViewMediatorDelegate Helper
 
-- (void)signinDidCompleteWithResult:(SigninCoordinatorResult)result {
+- (void)signinDidCompleteWithCoordinator:(SigninCoordinator*)coordinator
+                                  result:(SigninCoordinatorResult)result {
+  CHECK_EQ(_signinCoordinator, coordinator, base::NotFatalUntil::M151);
   [_signinPromoViewMediator signinDidCompleteWithResult:result];
   [self updateSignInPromoVisibility];
   [self stopSigninCoordinator];

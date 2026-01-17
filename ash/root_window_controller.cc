@@ -79,6 +79,7 @@
 #include "ash/wm/workspace/workspace_layout_manager.h"
 #include "ash/wm/workspace_controller.h"
 #include "base/command_line.h"
+#include "base/debug/dump_without_crashing.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_macros.h"
@@ -369,8 +370,18 @@ class RootWindowTargeter : public aura::WindowTargeter {
       // adjust the location.
       bool bounded_click = ShouldConstrainMouseClick(event, has_capture_target);
       if (!has_capture_target || bounded_click) {
+        // TODO(crbug.com/462446075) : Remove this once the empty target window
+        // is identified.
+        if (window->bounds().IsEmpty()) {
+          LOG(ERROR) << " Window with empty bounds is target:"
+                     << window->GetName();
+          base::debug::DumpWithoutCrashing();
+        }
+        const gfx::Rect& window_bounds = window->bounds();
         gfx::Point new_location =
-            FitPointToBounds(event->location(), window->bounds());
+            window_bounds.IsEmpty()
+                ? event->location()
+                : FitPointToBounds(event->location(), window->bounds());
         // Do not change |location_f|. It's used to compute pixel position and
         // such client should know what they're doing.
         event->set_location(new_location);
@@ -381,7 +392,7 @@ class RootWindowTargeter : public aura::WindowTargeter {
   }
 
   // Stop-gap workaround for telemetry tests that send events far outside of the
-  // display (e.g. 512, -4711). Fix the test and remove this (crbgu.com/904623).
+  // display (e.g. 512, -4711). Fix the test and remove this (crbug.com/904623).
   bool IsEventInsideDisplayForTelemetryHack(aura::Window* window,
                                             ui::LocatedEvent* event) {
     constexpr int ExtraMarginForTelemetryTest = -10;
@@ -500,6 +511,17 @@ class FillLayoutManager : public aura::LayoutManager {
 
   raw_ptr<aura::Window> container_;
 };
+
+void SetOcclusionOverrideToTrackedWindow(
+    aura::Window* subtree,
+    std::optional<aura::Window::OcclusionState> state) {
+  if (subtree->GetOcclusionState() != aura::Window::OcclusionState::UNKNOWN) {
+    subtree->SetOcclusionStateOverride(state);
+  }
+  for (auto child : subtree->children()) {
+    SetOcclusionOverrideToTrackedWindow(child, state);
+  }
+}
 
 }  // namespace
 
@@ -920,7 +942,7 @@ void RootWindowController::StartSplitViewOverviewSession(
     return;
   }
 
-  if (Shell::Get()->IsInTabletMode()) {
+  if (display::Screen::Get()->InTabletMode()) {
     OverviewController::Get()->StartOverview(
         action.value_or(OverviewStartAction::kSplitView),
         type.value_or(OverviewEnterExitType::kNormal));
@@ -940,6 +962,13 @@ void RootWindowController::EndSplitViewOverviewSession(
         ->RecordSplitViewOverviewSessionExitPointMetrics(exit_point);
   }
   split_view_overview_session_.reset();
+}
+
+void RootWindowController::ForceOccludeWindowsInAlwaysOnTop(bool occlude) {
+  SetOcclusionOverrideToTrackedWindow(
+      GetContainer(kShellWindowId_AlwaysOnTopContainer),
+      occlude ? std::optional(aura::Window::OcclusionState::OCCLUDED)
+              : std::nullopt);
 }
 
 void RootWindowController::SetScreenRotationAnimatorForTest(
@@ -1199,6 +1228,8 @@ void RootWindowController::CreateContainers() {
                       "AlwaysOnTopContainer", shutdown_screenshot_container);
   ::wm::SetChildWindowVisibilityChangesAnimated(always_on_top_container);
   always_on_top_container->SetProperty(::wm::kUsesScreenCoordinatesKey, true);
+  window_util::SetChildrenUseExtendedHitRegionForWindow(
+      always_on_top_container);
 
   aura::Window* float_container =
       CreateContainer(kShellWindowId_FloatContainer, "FloatContainer",
@@ -1414,16 +1445,15 @@ RootWindowController::BuildBirchMenuModelAdapter(
       wallpaper_widget_controller()->GetWidget(), source_type,
       base::BindOnce(&RootWindowController::OnMenuClosed,
                      base::Unretained(this)),
-      display::Screen::GetScreen()->InTabletMode(), /*for_chip_menu=*/false);
+      display::Screen::Get()->InTabletMode(), /*for_chip_menu=*/false);
 }
 
 std::unique_ptr<AppMenuModelAdapter>
 RootWindowController::BuildShelfMenuModelAdapter(
     ui::mojom::MenuSourceType source_type) {
-  const bool tablet_mode = display::Screen::GetScreen()->InTabletMode();
-  const int64_t display_id = display::Screen::GetScreen()
-                                 ->GetDisplayNearestWindow(GetRootWindow())
-                                 .id();
+  const bool tablet_mode = display::Screen::Get()->InTabletMode();
+  const int64_t display_id =
+      display::Screen::Get()->GetDisplayNearestWindow(GetRootWindow()).id();
   auto shelf_menu_model_adapter = std::make_unique<ShelfMenuModelAdapter>(
       std::make_unique<ShelfContextMenuModel>(nullptr, display_id,
                                               /*menu_in_shelf=*/false),

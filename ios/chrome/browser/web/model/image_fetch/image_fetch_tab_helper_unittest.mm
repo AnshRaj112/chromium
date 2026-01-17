@@ -19,7 +19,6 @@
 #import "ios/web/public/test/scoped_testing_web_client.h"
 #import "ios/web/public/test/web_state_test_util.h"
 #import "ios/web/public/test/web_task_environment.h"
-#import "ios/web/test/js_test_util_internal.h"
 #import "ios/web/web_state/ui/crw_web_controller.h"
 #import "net/http/http_util.h"
 #import "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
@@ -117,11 +116,13 @@ TEST_F(ImageFetchTabHelperTest, GetImageDataWithJsSucceedFromCanvas) {
       web_state(),
       [NSString
           stringWithFormat:
-              @"__gCrWeb.imageFetch = {}; __gCrWeb.imageFetch.getImageData = "
-               "function(id, url) { "
-               "  window.webkit.messageHandlers['ImageFetchMessageHandler']."
-               "  postMessage({'id': id, 'data': btoa('%s'), 'from':'canvas'});"
-               "}; true;",
+              @"const imageFetchApi = "
+              @"__gCrWeb.getRegisteredApi('imageFetch');"
+              @"function getImageData(id, url) { "
+               "window.webkit.messageHandlers['ImageFetchMessageHandler']."
+               " postMessage({'id': id, 'data': btoa('%s'), 'from':'canvas'});"
+               "};"
+               "imageFetchApi.addFunction('getImageData', getImageData); true;",
               kImageData],
       ImageFetchJavaScriptFeature::GetInstance());
   ASSERT_NSEQ(@YES, script_result);
@@ -151,15 +152,16 @@ TEST_F(ImageFetchTabHelperTest, GetImageDataWithJsSucceedFromXmlHttpRequest) {
       web_state(),
       [NSString
           stringWithFormat:
-              @"__gCrWeb.imageFetch = {}; __gCrWeb.imageFetch.getImageData = "
-               "function(id, url) { "
-               "  window.webkit.messageHandlers['ImageFetchMessageHandler']."
-               "  postMessage({'id': id, 'data': btoa('%s'), 'from':'xhr'});"
-               "}; true;",
+              @"const imageFetchApi = "
+              @"__gCrWeb.getRegisteredApi('imageFetch');"
+               "function getImageData(id, url) { "
+               "window.webkit.messageHandlers['ImageFetchMessageHandler']."
+               "postMessage({'id': id, 'data': btoa('%s'), 'from':'xhr'});"
+               "}; imageFetchApi.addFunction('getImageData', getImageData); "
+               "true;",
               kImageData],
       ImageFetchJavaScriptFeature::GetInstance());
   ASSERT_NSEQ(@YES, script_result);
-
   __block bool callback_invoked = false;
   image_fetch_tab_helper()->GetImageData(GURL(kImageUrl), web::Referrer(),
                                          ^(NSData* data) {
@@ -182,10 +184,13 @@ TEST_F(ImageFetchTabHelperTest, GetImageDataWithJsSucceedFromXmlHttpRequest) {
 TEST_F(ImageFetchTabHelperTest, GetImageDataWithJsFail) {
   id script_result = web::test::ExecuteJavaScriptForFeatureAndReturnResult(
       web_state(),
-      @"__gCrWeb.imageFetch = {}; __gCrWeb.imageFetch.getImageData = "
-       "function(id, url) { "
-       "  window.webkit.messageHandlers['ImageFetchMessageHandler']."
-       "  postMessage({'id': id}); }; true;",
+      @"const imageFetchApi = "
+      @"__gCrWeb.getRegisteredApi('imageFetch');"
+       "function getImageData(id, url) { "
+       "  "
+       "window.webkit.messageHandlers['ImageFetchMessageHandler'].postMessage({"
+       "'id': id}); }; "
+       "imageFetchApi.addFunction('getImageData', getImageData); true;",
       ImageFetchJavaScriptFeature::GetInstance());
   ASSERT_NSEQ(@YES, script_result);
 
@@ -211,8 +216,10 @@ TEST_F(ImageFetchTabHelperTest, GetImageDataWithJsTimeout) {
   // Inject fake `__gCrWeb.imageFetch.getImageData` that does not do anything.
   id script_result = web::test::ExecuteJavaScriptForFeatureAndReturnResult(
       web_state(),
-      @"__gCrWeb.imageFetch = {}; __gCrWeb.imageFetch.getImageData = "
-      @"function(id, url) {}; true;",
+      @"const imageFetchApi = "
+      @"__gCrWeb.getRegisteredApi('imageFetch');"
+      @"function getImageData(id, url) {};"
+      @"imageFetchApi.addFunction('getImageData', getImageData); true;",
       ImageFetchJavaScriptFeature::GetInstance());
   ASSERT_NSEQ(@YES, script_result);
 
@@ -239,8 +246,10 @@ TEST_F(ImageFetchTabHelperTest, GetImageDataWithWebStateDestroy) {
   // Inject fake `__gCrWeb.imageFetch.getImageData` that does not do anything.
   id script_result = web::test::ExecuteJavaScriptForFeatureAndReturnResult(
       web_state(),
-      @"__gCrWeb.imageFetch = {}; __gCrWeb.imageFetch.getImageData = "
-      @"function(id, url) {}; true;",
+      @"const imageFetchApi = "
+      @"__gCrWeb.getRegisteredApi('imageFetch');"
+      @"function getImageData(id, url) {};"
+      @"imageFetchApi.addFunction('getImageData', getImageData); true;",
       ImageFetchJavaScriptFeature::GetInstance());
   ASSERT_NSEQ(@YES, script_result);
 
@@ -267,8 +276,10 @@ TEST_F(ImageFetchTabHelperTest, GetImageDataWithWebStateNavigate) {
   // Inject fake `__gCrWeb.imageFetch.getImageData` that does not do anything.
   id script_result = web::test::ExecuteJavaScriptForFeatureAndReturnResult(
       web_state(),
-      @"__gCrWeb.imageFetch = {}; __gCrWeb.imageFetch.getImageData = "
-      @"function(id, url) {}; true;",
+      @"const imageFetchApi = "
+      @"__gCrWeb.getRegisteredApi('imageFetch');"
+      @"function getImageData(id, url) {};"
+      @"imageFetchApi.addFunction('getImageData', getImageData);true;",
       ImageFetchJavaScriptFeature::GetInstance());
   ASSERT_NSEQ(@YES, script_result);
 

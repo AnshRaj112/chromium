@@ -8,9 +8,9 @@
 
 #include "base/check_op.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/user_metrics.h"
+#include "base/notreached.h"
 #include "base/time/time.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/signin/signin_util.h"
@@ -19,6 +19,9 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/signin/signin_view_controller.h"
+#include "chrome/browser/ui/webui/signin/history_sync_optin_helper.h"
+#include "chrome/browser/ui/webui/signin/history_sync_optin_service.h"
+#include "chrome/browser/ui/webui/signin/history_sync_optin_service_factory.h"
 #include "chrome/browser/ui/webui/signin/login_ui_service.h"
 #include "chrome/browser/ui/webui/signin/login_ui_service_factory.h"
 #include "chrome/browser/ui/webui/signin/turn_sync_on_helper.h"
@@ -26,6 +29,7 @@
 #include "components/signin/public/base/signin_switches.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
+#include "components/sync/base/features.h"
 #include "components/sync/base/user_selectable_type.h"
 #include "components/sync/service/sync_user_settings.h"
 #include "content/public/browser/navigation_controller.h"
@@ -38,6 +42,12 @@ constexpr char kDiceSyncHeaderTimeoutHistogramNameHistogramName[] =
     "Signin.SigninManager.SyncHeaderTimeout";
 constexpr char kDiceSyncHeaderArrivalTimeWindowHistogramName[] =
     "Signin.SigninManager.SyncHeaderArrivalTimeWindowAfterLst";
+
+void RecordDiceSyncHeaderTimeout(bool timeout) {
+  base::UmaHistogramBoolean(kDiceSyncHeaderTimeoutHistogramNameHistogramName,
+                            timeout);
+}
+
 }  // namespace
 
 // static
@@ -62,7 +72,8 @@ DiceTabHelper::GetEnableSyncCallbackForBrowser() {
     bool is_sync_promo =
         access_point ==
             signin_metrics::AccessPoint::kAvatarBubbleSignInWithSyncPromo ||
-        access_point == signin_metrics::AccessPoint::kSettings;
+        access_point == signin_metrics::AccessPoint::kSettings ||
+        access_point == signin_metrics::AccessPoint::kSettingsYourSavedInfo;
     TurnSyncOnHelper::SigninAbortedMode abort_mode =
         is_sync_promo ? TurnSyncOnHelper::SigninAbortedMode::KEEP_ACCOUNT
                       : TurnSyncOnHelper::SigninAbortedMode::REMOVE_ACCOUNT;
@@ -79,26 +90,37 @@ DiceTabHelper::EnableHistorySyncOptinCallback
 DiceTabHelper::GetHistorySyncOptinCallbackForBrowser() {
   return base::BindRepeating([](Profile* profile,
                                 content::WebContents* web_contents,
-                                const CoreAccountInfo& account_info) {
-    CHECK(base::FeatureList::IsEnabled(switches::kEnableHistorySyncOptin));
+                                const CoreAccountInfo& account_info,
+                                signin_metrics::AccessPoint access_point) {
     CHECK(base::FeatureList::IsEnabled(
-        switches::kEnableHistorySyncOptinFromTabHelper));
+        syncer::kReplaceSyncPromosWithSignInPromos));
     CHECK(profile);
 
     Browser* browser = web_contents ? chrome::FindBrowserWithTab(web_contents)
                                     : chrome::FindBrowserWithProfile(profile);
-    if (!browser || !signin_util::ShouldShowHistorySyncOptinScreen(*profile)) {
+    if (!browser) {
       return;
     }
 
-    const signin::IdentityManager* identity_manager =
+    HistorySyncOptinService* history_sync_optin_service =
+        HistorySyncOptinServiceFactory::GetForProfile(profile);
+    CHECK(history_sync_optin_service);
+
+    signin::IdentityManager* identity_manager =
         IdentityManagerFactory::GetForProfile(profile);
     CHECK(identity_manager);
+    AccountInfo extended_account_info =
+        identity_manager->FindExtendedAccountInfoByAccountId(
+            account_info.account_id);
+    if (extended_account_info.IsEmpty()) {
+      return;
+    }
     CHECK(identity_manager->GetPrimaryAccountInfo(signin::ConsentLevel::kSignin)
               .account_id == account_info.account_id);
-    browser->GetFeatures()
-        .signin_view_controller()
-        ->ShowModalHistorySyncOptInDialog();
+    history_sync_optin_service->StartHistorySyncOptinFlow(
+        extended_account_info,
+        std::make_unique<HistorySyncOptinServiceDefaultDelegate>(),
+        access_point);
   });
 }
 
@@ -220,6 +242,11 @@ void DiceTabHelper::UpdateSyncCallback(
   state_->enable_sync_callback = std::move(enable_sync_callback);
 }
 
+void DiceTabHelper::UpdateHistorySyncOptinCallback(
+    EnableHistorySyncOptinCallback history_sync_optin_callback) {
+  state_->history_sync_optin_callback = std::move(history_sync_optin_callback);
+}
+
 void DiceTabHelper::UpdateSigninErrorCallback(
     ShowSigninErrorCallback show_signin_error_callback) {
   state_->show_signin_error_callback = std::move(show_signin_error_callback);
@@ -259,17 +286,9 @@ DiceTabHelper::SetScopedInterceptionBubbleTimerForTesting(
 // stopped and recorded in the histogram `SyncHeaderArrivalTimeWindow`.
 void DiceTabHelper::StartInterceptionBubbleTimer(
     base::OnceClosure retry_interception_bubble_callback) {
-  base::OnceClosure record_timeout_callback = base::BindOnce([] {
-    base::UmaHistogramBoolean(kDiceSyncHeaderTimeoutHistogramNameHistogramName,
-                              true);
-  });
   base::OnceClosure timer_callback =
-      base::FeatureList::IsEnabled(
-          switches::kBrowserSigninInSyncHeaderOnGaiaIntegration)
-          ? std::move(record_timeout_callback)
-                .Then(std::move(retry_interception_bubble_callback))
-          : std::move(record_timeout_callback);
-
+      std::move(base::BindOnce(&RecordDiceSyncHeaderTimeout, true))
+          .Then(std::move(retry_interception_bubble_callback));
   state_->elapsed_time_since_lst_arrival_timer =
       std::make_unique<base::ElapsedTimer>();
   state_->retry_interception_bubble_timer.Start(
@@ -282,8 +301,7 @@ void DiceTabHelper::StopInterceptionBubbleTimer() {
       // Unexpected, edge case where a token exchange hasn't been requested yet
       // by the time Chrome processes the Sync header.
       || !IsTokenExchangeDone()) {
-    base::UmaHistogramBoolean(kDiceSyncHeaderTimeoutHistogramNameHistogramName,
-                              false);
+    RecordDiceSyncHeaderTimeout(false);
   }
   state_->retry_interception_bubble_timer.Stop();
 

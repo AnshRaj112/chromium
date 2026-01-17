@@ -4,6 +4,9 @@
 
 package org.chromium.chrome.browser.tabmodel;
 
+import android.app.Activity;
+
+import org.chromium.base.Token;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.tab.Tab;
@@ -35,6 +38,17 @@ public interface TabModelDelegate {
      */
     default void openMostRecentlyClosedEntry(TabModel model) {}
 
+    /**
+     * Gets the timestamp of the most recent tab closure event stored by the native
+     * TabRestoreService. If a valid, non-zero timestamp is not available, this should return {@link
+     * TabModel#INVALID_TIMESTAMP}.
+     *
+     * @return The closure timestamp, in millis.
+     */
+    default long getMostRecentClosureTime() {
+        return TabModel.INVALID_TIMESTAMP;
+    }
+
     // TODO(aurimas): clean these methods up.
     TabModel getCurrentModel();
 
@@ -51,4 +65,24 @@ public interface TabModelDelegate {
     boolean isTabModelRestored();
 
     void selectModel(boolean incognito);
+
+    /**
+     * Moves a tab to a new window.
+     *
+     * @param tab The tab to move.
+     * @param activity The activity to move the tab to.
+     * @param newIndex The index to move the tab to.
+     */
+    default void moveTabToWindow(Tab tab, Activity activity, int newIndex) {}
+
+    /**
+     * Moves a tab group to a new window.
+     *
+     * @param tabGroupId The tab group to move.
+     * @param activity The activity to move the tab group to.
+     * @param newIndex The index to move the tab group to.
+     * @param isIncognito Whether the tab group is in the incognito model.
+     */
+    default void moveTabGroupToWindow(
+            Token tabGroupId, Activity activity, int newIndex, boolean isIncognito) {}
 }

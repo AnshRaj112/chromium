@@ -4,7 +4,8 @@
 
 #include "net/cookies/cookie_base.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/feature_list.h"
 #include "base/logging.h"
 #include "base/strings/strcat.h"
@@ -16,6 +17,7 @@
 #include "net/cookies/cookie_util.h"
 #include "net/cookies/ref_unique_cookie_key.h"
 #include "net/cookies/unique_cookie_key.h"
+#include "url/gurl.h"
 
 namespace net {
 
@@ -420,7 +422,7 @@ CookieAccessResult CookieBase::IsSetPermittedInContext(
     access_result = *cookie_access_result;
   }
 
-  if (!base::Contains(cookieable_schemes, source_url.scheme())) {
+  if (!std::ranges::contains(cookieable_schemes, source_url.scheme())) {
     access_result.status.AddExclusionReason(
         CookieInclusionStatus::ExclusionReason::EXCLUDE_NONCOOKIEABLE_SCHEME);
   }
@@ -543,11 +545,11 @@ CookieAccessResult CookieBase::IsSetPermittedInContext(
   return access_result;
 }
 
-bool CookieBase::IsOnPath(const std::string& url_path) const {
+bool CookieBase::IsOnPath(const std::string_view url_path) const {
   return cookie_util::IsOnPath(path_, url_path);
 }
 
-bool CookieBase::IsDomainMatch(const std::string& host) const {
+bool CookieBase::IsDomainMatch(const std::string_view host) const {
   return cookie_util::IsDomainMatch(domain_, host);
 }
 

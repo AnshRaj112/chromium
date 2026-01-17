@@ -11,8 +11,8 @@
 #include "base/no_destructor.h"
 #include "base/notreached.h"
 #include "build/build_config.h"
-#include "components/permissions/features.h"
 #include "components/permissions/permission_decision.h"
+#include "components/permissions/permission_prompt_decision.h"
 #include "components/permissions/permission_util.h"
 #include "components/permissions/request_type.h"
 #include "components/strings/grit/components_strings.h"
@@ -54,7 +54,7 @@ base::WeakPtr<PermissionRequest> PermissionRequest::GetWeakPtr() {
   return weak_factory_.GetWeakPtr();
 }
 
-#if BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
 PermissionRequest::AnnotatedMessageText::AnnotatedMessageText(
     std::u16string text,
     std::vector<std::pair<size_t, size_t>> bolded_ranges)
@@ -101,6 +101,12 @@ PermissionRequest::GetDialogAnnotatedMessageText(
     case RequestType::kLocalNetworkAccess:
       message_id = IDS_LOCAL_NETWORK_ACCESS_INFOBAR_TEXT;
       break;
+    case RequestType::kLocalNetwork:
+      message_id = IDS_LOCAL_NETWORK_INFOBAR_TEXT;
+      break;
+    case RequestType::kLoopbackNetwork:
+      message_id = IDS_LOOPBACK_NETWORK_INFOBAR_TEXT;
+      break;
     case RequestType::kMicStream:
       message_id = IDS_MEDIA_CAPTURE_AUDIO_ONLY_INFOBAR_TEXT;
       break;
@@ -116,10 +122,12 @@ PermissionRequest::GetDialogAnnotatedMessageText(
     case RequestType::kNotifications:
       message_id = IDS_NOTIFICATIONS_INFOBAR_TEXT;
       break;
+#if BUILDFLAG(IS_ANDROID)
     case RequestType::kProtectedMediaIdentifier:
       message_id =
           IDS_PROTECTED_MEDIA_IDENTIFIER_PER_ORIGIN_PROVISIONING_INFOBAR_TEXT;
       break;
+#endif  // BUILDFLAG(IS_ANDROID)
     case RequestType::kStorageAccess:
       // The SA prompt does not currently bold any part of its message.
       return AnnotatedMessageText(
@@ -176,17 +184,25 @@ PermissionRequest::GetDialogAnnotatedMessageText(
 
   return AnnotatedMessageText(text, bolded_ranges);
 }
-#endif
+#endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
 
 bool PermissionRequest::IsEmbeddedPermissionElementInitiated() const {
-  return data_->embedded_permission_element_initiated;
+  return data_->IsEmbeddedPermissionElementInitiated();
+}
+
+bool PermissionRequest::IsGeolocationElementInitiated() const {
+  return data_->IsGeolocationElementInitiated();
+}
+
+bool PermissionRequest::IsEligibleForHeuristicAutoGrant() const {
+  return data_->IsEligibleForHeuristicAutoGrant();
 }
 
 std::optional<gfx::Rect> PermissionRequest::GetAnchorElementPosition() const {
-  return data_->anchor_element_position;
+  return data_->GetAnchorElementPosition();
 }
 
-#if !BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
 bool PermissionRequest::IsConfirmationChipSupported() {
   return permissions::IsConfirmationChipSupported(request_type());
@@ -357,6 +373,12 @@ std::u16string PermissionRequest::GetMessageTextFragment() const {
     case RequestType::kLocalNetworkAccess:
       message_id = IDS_LOCAL_NETWORK_ACCESS_PERMISSION_FRAGMENT;
       break;
+    case RequestType::kLocalNetwork:
+      message_id = IDS_LOCAL_NETWORK_PERMISSION_FRAGMENT;
+      break;
+    case RequestType::kLoopbackNetwork:
+      message_id = IDS_LOOPBACK_NETWORK_PERMISSION_FRAGMENT;
+      break;
     case RequestType::kMicStream:
       message_id = IDS_MEDIA_CAPTURE_AUDIO_ONLY_PERMISSION_FRAGMENT;
       break;
@@ -410,7 +432,7 @@ std::u16string PermissionRequest::GetMessageTextFragment() const {
   DCHECK_NE(0, message_id);
   return l10n_util::GetStringUTF16(message_id);
 }
-#endif
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
 std::optional<std::u16string> PermissionRequest::GetAllowAlwaysText() const {
   return std::nullopt;
@@ -426,22 +448,31 @@ bool PermissionRequest::ShouldUseTwoOriginPrompt() const {
 
 void PermissionRequest::PermissionGranted(bool is_one_time) {
   std::move(permission_decided_callback_)
-      .Run(is_one_time ? PermissionDecision::kAllowThisTime
-                       : PermissionDecision::kAllow,
-           /*is_final_decision=*/true, /*request_data=*/*data_);
+      .Run(PermissionPromptDecision{.overall_decision =
+                                        is_one_time
+                                            ? PermissionDecision::kAllowThisTime
+                                            : PermissionDecision::kAllow,
+                                    .prompt_options = prompt_options(),
+                                    .is_final = true},
+           /*request_data=*/*data_);
 }
 
 void PermissionRequest::PermissionDenied() {
   std::move(permission_decided_callback_)
-      .Run(PermissionDecision::kDeny,
-           /*is_final_decision=*/true, /*request_data=*/*data_);
+      .Run(PermissionPromptDecision{.overall_decision =
+                                        PermissionDecision::kDeny,
+                                    .prompt_options = prompt_options(),
+                                    .is_final = true},
+           /*request_data=*/*data_);
 }
 
 void PermissionRequest::Cancelled(bool is_final_decision) {
   if (permission_decided_callback_) {
-    permission_decided_callback_.Run(PermissionDecision::kNone,
-                                     is_final_decision,
-                                     /*request_data=*/*data_);
+    permission_decided_callback_.Run(
+        PermissionPromptDecision{.overall_decision = PermissionDecision::kNone,
+                                 .prompt_options = prompt_options(),
+                                 .is_final = is_final_decision},
+        /*request_data=*/*data_);
   }
 }
 
@@ -490,20 +521,12 @@ std::u16string PermissionRequest::GetPermissionNameTextFragment() const {
   return l10n_util::GetStringUTF16(message_id);
 }
 
-std::optional<PermissionHatsTriggerHelper::PreviewParametersForHats>
-PermissionRequest::get_preview_parameters() const {
-  return preview_parameters_;
-}
-
-void PermissionRequest::set_preview_parameters(
-    PermissionHatsTriggerHelper::PreviewParametersForHats preview_parmeters) {
-  preview_parameters_ = std::move(preview_parmeters);
-}
-
 void PermissionRequest::SetEmbeddedPermissionElementInitiatedForTesting(
     bool embedded_permission_element_initiated) {
-  data_->embedded_permission_element_initiated =
-      embedded_permission_element_initiated;
+  if (embedded_permission_element_initiated) {
+    data_->embedded_permission_request_descriptor =
+        blink::mojom::EmbeddedPermissionRequestDescriptor::New();
+  }
 }
 
 bool PermissionRequest::IsSourceSubscribedToPermissionChangeEvent(

@@ -80,7 +80,7 @@ namespace {
 ui::ImageModel GetDefaultIcon() {
   return ui::ImageModel::FromVectorIcon(
       vector_icons::kInsertDriveFileOutlineIcon, ui::kColorIcon,
-      GetLayoutConstant(DOWNLOAD_ICON_SIZE));
+      GetLayoutConstant(LayoutConstant::kDownloadIconSize));
 }
 
 gfx::Image GetDefaultIconImage(const ui::ColorProvider* color_provider) {
@@ -156,7 +156,7 @@ void DownloadBubbleRowView::UpdateRow(bool initial_setup) {
 
 void DownloadBubbleRowView::AddedToWidget() {
   current_scale_ =
-      display::Screen::GetScreen()
+      display::Screen::Get()
           ->GetPreferredScaleFactorForView(GetWidget()->GetNativeView())
           .value_or(1.0);
   SetIcon();
@@ -165,6 +165,7 @@ void DownloadBubbleRowView::AddedToWidget() {
     focus_manager->AddFocusChangeListener(this);
     RegisterAccelerators(focus_manager);
   }
+  pip_occlusion_observation_.Observe(GetWidget());
 }
 
 void DownloadBubbleRowView::RemovedFromWidget() {
@@ -227,7 +228,7 @@ bool DownloadBubbleRowView::StartLoadFileIcon() {
 }
 
 void DownloadBubbleRowView::OnFileIconLoaded(gfx::Image icon) {
-  const int icon_size = GetLayoutConstant(DOWNLOAD_ICON_SIZE);
+  const int icon_size = GetLayoutConstant(LayoutConstant::kDownloadIconSize);
   file_icon_ = ResizedImage(
       icon.IsEmpty() ? GetDefaultIconImage(GetColorProvider()) : icon,
       {icon_size, icon_size});
@@ -262,7 +263,7 @@ void DownloadBubbleRowView::SetIcon() {
     has_default_icon_ = false;
     SetIconFromImageModel(ui::ImageModel::FromVectorIcon(
         *info_->icon_override(), info_->secondary_color(),
-        GetLayoutConstant(DOWNLOAD_ICON_SIZE)));
+        GetLayoutConstant(LayoutConstant::kDownloadIconSize)));
     return;
   }
 
@@ -275,7 +276,8 @@ void DownloadBubbleRowView::SetIcon() {
     last_overridden_icon_ = &kIncognitoIcon;
     has_default_icon_ = false;
     SetIconFromImageModel(ui::ImageModel::FromVectorIcon(
-        kIncognitoIcon, ui::kColorIcon, GetLayoutConstant(DOWNLOAD_ICON_SIZE)));
+        kIncognitoIcon, ui::kColorIcon,
+        GetLayoutConstant(LayoutConstant::kDownloadIconSize)));
     return;
   }
 
@@ -287,8 +289,8 @@ void DownloadBubbleRowView::SetIcon() {
     }
     last_overridden_icon_ = &kUserAccountAvatarIcon;
     has_default_icon_ = false;
-    SetIconFromImageModel(
-        profiles::GetGuestAvatar(GetLayoutConstant(DOWNLOAD_ICON_SIZE)));
+    SetIconFromImageModel(profiles::GetGuestAvatar(
+        GetLayoutConstant(LayoutConstant::kDownloadIconSize)));
     return;
   }
 
@@ -344,7 +346,7 @@ DownloadBubbleRowView::DownloadBubbleRowView(
   views::InkDrop::UseInkDropForFloodFillRipple(views::InkDrop::Get(this),
                                                /*highlight_on_hover=*/true,
                                                /*highlight_on_focus=*/true);
-  views::InkDrop::Get(this)->SetBaseColorId(kColorDownloadBubbleRowHover);
+  views::InkDrop::Get(this)->SetBaseColor(kColorDownloadBubbleRowHover);
   views::InkDrop::Get(this)->SetHighlightOpacity(1.0f);
 
   const int icon_label_spacing = ChromeLayoutProvider::Get()->GetDistanceMetric(
@@ -391,7 +393,7 @@ DownloadBubbleRowView::DownloadBubbleRowView(
   icon_->SetPaintToLayer();
   icon_->layer()->SetFillsBoundsOpaquely(false);
   icon_->SetProperty(views::kTableColAndRowSpanKey, gfx::Size(1, 2));
-  const int icon_size = GetLayoutConstant(DOWNLOAD_ICON_SIZE);
+  const int icon_size = GetLayoutConstant(LayoutConstant::kDownloadIconSize);
   icon_->SetImageSize({icon_size, icon_size});
 
   primary_label_ = AddChildView(std::make_unique<views::Label>(
@@ -452,7 +454,7 @@ DownloadBubbleRowView::DownloadBubbleRowView(
   subpage_icon_->SetVisible(false);
   subpage_icon_->SetImage(ui::ImageModel::FromVectorIcon(
       kChevronRightChromeRefreshIcon, ui::kColorIcon,
-      GetLayoutConstant(DOWNLOAD_ICON_SIZE)));
+      GetLayoutConstant(LayoutConstant::kDownloadIconSize)));
 
   // The content of the label will be populated in the `UpdateRow` function.
   secondary_label_ = AddChildView(std::make_unique<views::Label>(
@@ -638,7 +640,7 @@ void DownloadBubbleRowView::OnMainButtonPressed(const ui::Event& event) {
     return;
   }
   if (input_protector_->IsPossiblyUnintendedInteraction(
-          event, /*allow_key_events=*/true)) {
+          event, /*allow_key_events=*/false)) {
     return;
   }
   if (info_->has_subpage()) {
@@ -657,7 +659,7 @@ void DownloadBubbleRowView::OnActionButtonPressed(
     const ui::Event& event) {
   if (!bubble_controller_ || !info_->model() ||
       input_protector_->IsPossiblyUnintendedInteraction(
-          event, /*allow_key_events=*/true)) {
+          event, /*allow_key_events=*/false)) {
     return;
   }
   bubble_controller_->ProcessDownloadButtonPress(info_->model()->GetWeakPtr(),
@@ -679,8 +681,9 @@ void DownloadBubbleRowView::UpdateButtons() {
     views::ImageButton* action_button = quick_actions_[action.command];
     action_button->SetImageModel(
         views::Button::STATE_NORMAL,
-        ui::ImageModel::FromVectorIcon(*(action.icon), ui::kColorIcon,
-                                       GetLayoutConstant(DOWNLOAD_ICON_SIZE)));
+        ui::ImageModel::FromVectorIcon(
+            *(action.icon), ui::kColorIcon,
+            GetLayoutConstant(LayoutConstant::kDownloadIconSize)));
     action_button->GetViewAccessibility().SetName(
         GetAccessibleNameForQuickAction(action.command));
     action_button->SetTooltipText(action.hover_text);
@@ -801,7 +804,7 @@ void DownloadBubbleRowView::AddQuickAction(DownloadCommands::Command command) {
   quick_action->SetProperty(views::kMarginsKey, kRowInterElementPadding);
   quick_action->SetVisible(false);
   views::InkDrop::Get(quick_action)
-      ->SetBaseColorId(views::TypographyProvider::Get().GetColorId(
+      ->SetBaseColor(views::TypographyProvider::Get().GetColorId(
           views::style::CONTEXT_BUTTON, views::style::STYLE_SECONDARY));
   quick_actions_[command] = quick_action;
 }
@@ -934,6 +937,13 @@ bool DownloadBubbleRowView::AcceleratorPressed(
 bool DownloadBubbleRowView::CanHandleAccelerators() const {
   bool focused = Contains(GetFocusManager()->GetFocusedView());
   return focused;
+}
+
+void DownloadBubbleRowView::OnOcclusionStateChanged(bool occluded) {
+  transparent_button_->SetEnabled(!occluded);
+  for (auto& [command, action_button] : quick_actions_) {
+    action_button->SetEnabled(!occluded);
+  }
 }
 
 std::u16string_view DownloadBubbleRowView::GetSecondaryLabelTextForTesting() {

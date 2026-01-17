@@ -13,7 +13,6 @@
 #include "ash/public/cpp/login_screen_model.h"
 #include "base/check_deref.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/lazy_instance.h"
@@ -27,6 +26,9 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
+#include "chrome/browser/ash/certificate_provider/certificate_provider_service.h"
+#include "chrome/browser/ash/certificate_provider/certificate_provider_service_factory.h"
+#include "chrome/browser/ash/certificate_provider/pin_dialog_manager.h"
 #include "chrome/browser/ash/login/helper.h"
 #include "chrome/browser/ash/login/lock/views_screen_locker.h"
 #include "chrome/browser/ash/login/login_auth_recorder.h"
@@ -39,9 +41,6 @@
 #include "chrome/browser/ash/login/quick_unlock/quick_unlock_utils.h"
 #include "chrome/browser/ash/login/session/user_session_manager.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
-#include "chrome/browser/certificate_provider/certificate_provider_service.h"
-#include "chrome/browser/certificate_provider/certificate_provider_service_factory.h"
-#include "chrome/browser/certificate_provider/pin_dialog_manager.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/ash/login/login_screen_client_impl.h"
@@ -656,7 +655,7 @@ void ScreenLocker::ScheduleDeletion() {
 
 bool ScreenLocker::IsAuthTemporarilyDisabledForUser(
     const AccountId& account_id) {
-  return base::Contains(users_with_temporarily_disabled_auth_, account_id);
+  return users_with_temporarily_disabled_auth_.contains(account_id);
 }
 
 void ScreenLocker::SetAuthenticatorsForTesting(
@@ -846,7 +845,7 @@ void ScreenLocker::OnAuthScanDone(
   }
 
   UserContext user_context(*primary_user);
-  if (!base::Contains(matches, primary_user->username_hash())) {
+  if (!matches.contains(primary_user->username_hash())) {
     LOG(ERROR) << "Fingerprint unlock failed because it does not match primary"
                << " user's record";
     OnFingerprintAuthFailure(*primary_user);

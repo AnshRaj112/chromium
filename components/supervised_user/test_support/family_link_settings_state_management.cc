@@ -8,7 +8,6 @@
 #include <optional>
 #include <ostream>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/notreached.h"
 #include "base/strings/strcat.h"
@@ -104,8 +103,8 @@ constexpr FetcherConfig kDefineChromeTestStateConfig{
     .access_token_config =
         AccessTokenConfig{
             .mode = signin::PrimaryAccountAccessTokenFetcher::Mode::kImmediate,
-            // TODO(b/284523446): Refer to GaiaConstants rather than literal.
-            .oauth2_scope = "https://www.googleapis.com/auth/kid.permission",
+            .oauth_consumer_id =
+                signin::OAuthConsumerId::kSupervisedUserClassifyUrl,
         },
     .request_priority = net::IDLE,
 };
@@ -118,9 +117,8 @@ constexpr FetcherConfig kResetChromeTestStateConfig{
     .access_token_config =
         AccessTokenConfig{
             .mode = signin::PrimaryAccountAccessTokenFetcher::Mode::kImmediate,
-            // TODO(b/284523446): Refer to GaiaConstants rather than
-            // literal.
-            .oauth2_scope = "https://www.googleapis.com/auth/kid.permission",
+            .oauth_consumer_id =
+                signin::OAuthConsumerId::kSupervisedUserClassifyUrl,
         },
     .request_priority = net::IDLE,
 };
@@ -135,7 +133,7 @@ inline void AddWebsiteException(
       request.mutable_url_filtering_settings()->add_exceptions();
   // DefineChromeTestStateRequest requires patterns rather than fully-qualified
   // urls. Host part works well in this case.
-  exception->set_pattern(url.host());
+  exception->set_pattern(url.GetHost());
   exception->set_exception_type(exception_type);
 }
 

@@ -7,6 +7,9 @@
 
 #import "base/feature_list.h"
 
+// Enables a new blur method for the autofill bottom sheet.
+BASE_DECLARE_FEATURE(kAutofillBottomSheetNewBlur);
+
 // Enables the stateless form suggestion controller.
 BASE_DECLARE_FEATURE(kStatelessFormSuggestionController);
 
@@ -22,5 +25,9 @@ BASE_DECLARE_FEATURE(kThrottleFormInputAccessorySuggestionRefresh);
 // Enables skipping reloading input views in the form input keyboard accessory
 // when the app is in the background.
 BASE_DECLARE_FEATURE(kFormInputAccessorySkipInputViewReloadInBackground);
+
+// Feature flag to apply a limit on the number of suggestions to show in the
+// Keyboard Accessory view.
+BASE_DECLARE_FEATURE(kIOSKeyboardAccessorySuggestionsCutOffLimit);
 
 #endif  // IOS_CHROME_BROWSER_AUTOFILL_MODEL_FEATURES_H_

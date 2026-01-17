@@ -4,10 +4,12 @@
 
 package org.chromium.chrome.browser.ui.appmenu;
 
+import android.view.View;
+
 import androidx.annotation.IntDef;
-import androidx.annotation.Nullable;
 
 import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -23,10 +25,12 @@ public interface AppMenuHandler {
         AppMenuItemType.STANDARD,
         AppMenuItemType.TITLE_BUTTON,
         AppMenuItemType.BUTTON_ROW,
+        AppMenuItemType.MENU_ITEM_WITH_SUBMENU,
+        AppMenuItemType.SUBMENU_HEADER,
         AppMenuItemType.DIVIDER
     })
     @Retention(RetentionPolicy.SOURCE)
-    public @interface AppMenuItemType {
+    @interface AppMenuItemType {
         /** Regular Android menu item that contains a title and an icon if icon is specified. */
         int STANDARD = 0;
 
@@ -42,14 +46,20 @@ public interface AppMenuHandler {
          */
         int BUTTON_ROW = 2;
 
+        /** Menu item that when contains submenus. */
+        int MENU_ITEM_WITH_SUBMENU = 3;
+
+        /** The header for submenus when submenus are displayed in drilldown. */
+        int SUBMENU_HEADER = 4;
+
         /** A divider item to distinguish between menu item groupings. */
-        int DIVIDER = 3;
+        int DIVIDER = 5;
 
         /**
          * The number of menu item types specified above. If you add a menu item type you MUST
          * increment this.
          */
-        int NUM_ENTRIES = 4;
+        int NUM_ENTRIES = 6;
     }
 
     /**
@@ -94,6 +104,15 @@ public interface AppMenuHandler {
 
     /** Requests to hide the App Menu. */
     void hideAppMenu();
+
+    /**
+     * Show the app menu.
+     *
+     * @param anchorView Anchor view used for the popup
+     * @param startDragging Whether dragging is started
+     * @return True, if the menu is shown, false, if menu is not shown.
+     */
+    boolean showAppMenu(@Nullable View anchorView, boolean startDragging);
 
     /**
      * @return A new {@link AppMenuButtonHelper} to hook up to a view containing a menu button.

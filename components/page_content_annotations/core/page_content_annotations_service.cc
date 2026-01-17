@@ -10,7 +10,7 @@
 
 #include "base/barrier_closure.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
+#include "base/functional/callback_helpers.h"
 #include "base/i18n/case_conversion.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros_local.h"
@@ -230,22 +230,15 @@ PageContentAnnotationsService::PageContentAnnotationsService(
   }
 #endif
 
-  is_remote_page_metadata_fetching_enabled_ =
-      features::RemotePageMetadataEnabled(application_locale, country_code);
-  is_salient_image_metadata_fetching_enabled_ =
-      features::ShouldPersistSalientImageMetadata(application_locale,
-                                                  country_code);
-  std::vector<optimization_guide::proto::OptimizationType> optimization_types;
-  if (is_remote_page_metadata_fetching_enabled_) {
+  if (features::RemotePageMetadataEnabled(application_locale, country_code)) {
+    std::vector<optimization_guide::proto::OptimizationType> optimization_types;
     optimization_types.emplace_back(optimization_guide::proto::PAGE_ENTITIES);
-  }
-  if (is_salient_image_metadata_fetching_enabled_) {
     optimization_types.emplace_back(optimization_guide::proto::SALIENT_IMAGE);
+    if (optimization_guide_decider_) {
+      optimization_guide_decider_->RegisterOptimizationTypes(
+          optimization_types);
+    }
   }
-  if (optimization_guide_decider_ && !optimization_types.empty()) {
-    optimization_guide_decider_->RegisterOptimizationTypes(optimization_types);
-  }
-
   validator_ =
       PageContentAnnotationsValidator::MaybeCreateAndStartTimer(annotator_);
 }
@@ -519,7 +512,7 @@ void PageContentAnnotationsService::OnPageContentAnnotated(
 
   MaybeRecordVisibilityUKM(visit, content_annotations);
   NotifyPageContentAnnotatedObservers(
-      AnnotationType::kContentVisibility, visit.url,
+      AnnotationType::kContentVisibility, visit,
       PageContentAnnotationsResult::CreateContentVisibilityScoreResult(
           content_annotations->visibility_score));
 
@@ -562,8 +555,8 @@ void PageContentAnnotationsService::OnZeroSuggestResponseUpdated(
   std::vector<std::string> related_searches;
   for (const auto& result : suggest_results) {
     // Suggestions with HIVEMIND subtype are considered "related searches".
-    if (base::Contains(result.subtypes,
-                       omnibox::SuggestSubtype::SUBTYPE_HIVEMIND)) {
+    if (std::ranges::contains(result.subtypes,
+                              omnibox::SuggestSubtype::SUBTYPE_HIVEMIND)) {
       related_searches.push_back(
           base::UTF16ToUTF8(base::CollapseWhitespace(result.suggestion, true)));
     }
@@ -650,8 +643,8 @@ void PageContentAnnotationsService::QueryURL(
     const HistoryVisit& visit,
     PersistAnnotationsCallback callback,
     PageContentAnnotationsType annotation_type) {
-  history_service_->QueryURL(
-      visit.url, /*want_visits=*/true,
+  history_service_->QueryURLAndVisits(
+      visit.url, history::VisitQuery404sPolicy::kExclude404s,
       base::BindOnce(&PageContentAnnotationsService::OnURLQueried,
                      weak_ptr_factory_.GetWeakPtr(), visit, std::move(callback),
                      annotation_type),
@@ -662,7 +655,7 @@ void PageContentAnnotationsService::OnURLQueried(
     const HistoryVisit& visit,
     PersistAnnotationsCallback callback,
     PageContentAnnotationsType annotation_type,
-    history::QueryURLResult url_result) {
+    history::QueryURLAndVisitsResult url_result) {
   if (!url_result.success || url_result.visits.empty()) {
     LogPageContentAnnotationsStorageStatus(
         PageContentAnnotationsStorageStatus::kNoVisitsForUrl, annotation_type);
@@ -708,12 +701,17 @@ void PageContentAnnotationsService::OnURLsModified(
 
 void PageContentAnnotationsService::OnURLVisitedWithNavigationId(
     history::HistoryService* history_service,
-    const history::URLRow& url_row,
-    const history::VisitRow& visit_row,
-    std::optional<int64_t> local_navigation_id) {
+    const history::VisitedURLInfo& visited_url_info) {
   DCHECK_EQ(history_service, history_service_);
 
+  const history::URLRow& url_row = visited_url_info.url_row;
+  const history::VisitRow& visit_row = visited_url_info.visit_row;
   if (!url_row.url().SchemeIsHTTPOrHTTPS()) {
+    return;
+  }
+
+  if (visited_url_info.response_code_category ==
+      history::VisitResponseCodeCategory::k404) {
     return;
   }
 
@@ -722,8 +720,8 @@ void PageContentAnnotationsService::OnURLVisitedWithNavigationId(
   history_visit.nav_entry_timestamp = visit_row.visit_time;
   history_visit.text_to_annotate = base::UTF16ToUTF8(url_row.title());
   history_visit.url = url_row.url();
-  if (local_navigation_id) {
-    history_visit.navigation_id = local_navigation_id.value();
+  if (visited_url_info.local_navigation_id) {
+    history_visit.navigation_id = visited_url_info.local_navigation_id.value();
   }
 
   if (template_url_service_) {
@@ -779,17 +777,13 @@ void PageContentAnnotationsService::OnURLVisitedWithNavigationId(
     return;
   }
 
-  if (is_remote_page_metadata_fetching_enabled_ &&
-      optimization_guide_decider_) {
+  if (optimization_guide_decider_) {
     optimization_guide_decider_->CanApplyOptimization(
         url_row.url(), optimization_guide::proto::PAGE_ENTITIES,
         base::BindOnce(
             &PageContentAnnotationsService::OnOptimizationGuideResponseReceived,
             weak_ptr_factory_.GetWeakPtr(), history_visit,
             optimization_guide::proto::PAGE_ENTITIES));
-  }
-  if (is_salient_image_metadata_fetching_enabled_ &&
-      optimization_guide_decider_) {
     optimization_guide_decider_->CanApplyOptimization(
         url_row.url(), optimization_guide::proto::SALIENT_IMAGE,
         base::BindOnce(
@@ -887,14 +881,14 @@ void PageContentAnnotationsService::PersistSalientImageMetadata(
 
 void PageContentAnnotationsService::NotifyPageContentAnnotatedObservers(
     AnnotationType annotation_type,
-    const GURL& url,
+    const HistoryVisit& visit,
     const PageContentAnnotationsResult& page_content_annotations_result) {
   if (page_content_annotations_observers_.find(annotation_type) ==
       page_content_annotations_observers_.end()) {
     return;
   }
   for (auto& observer : page_content_annotations_observers_[annotation_type]) {
-    observer.OnPageContentAnnotated(url, page_content_annotations_result);
+    observer.OnPageContentAnnotated(visit, page_content_annotations_result);
   }
 }
 

@@ -4,6 +4,7 @@
 
 #include "ash/ambient/metrics/ambient_metrics.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -15,7 +16,6 @@
 #include "ash/public/cpp/ash_web_view.h"
 #include "ash/webui/personalization_app/mojom/personalization_app.mojom-shared.h"
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/logging.h"
@@ -26,7 +26,6 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "net/base/url_util.h"
-#include "services/data_decoder/public/cpp/data_decoder.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "url/gurl.h"
@@ -84,26 +83,6 @@ void RecordEngagementTime(const std::string& histogram_name,
       /*buckets=*/kAmbientModeElapsedTimeHistogramBuckets);
 }
 
-// After the JSON in the URL fragment has been decoded in `result`:
-void OnAmbientVideoPlaybackMetricsParsed(
-    base::OnceCallback<void(base::Value::Dict)> completion_cb,
-    data_decoder::DataDecoder::ValueOrError result) {
-  CHECK(completion_cb);
-  // These errors really shouldn't ever happen, but they're not significant
-  // enough to crash the whole process over.
-  if (!result.has_value()) {
-    LOG(ERROR) << "JSON parsing failed with error: " << result.error();
-    std::move(completion_cb).Run(base::Value::Dict());
-    return;
-  }
-  if (!result->is_dict()) {
-    LOG(ERROR) << "Expected JSON dictionary for metrics";
-    std::move(completion_cb).Run(base::Value::Dict());
-    return;
-  }
-  std::move(completion_cb).Run(std::move(*result).TakeDict());
-}
-
 // Retrieves the the JSON dictionary in the `web_view`'s URL fragment.
 void GetAmbientVideoPlaybackMetrics(
     AshWebView* web_view,
@@ -114,7 +93,7 @@ void GetAmbientVideoPlaybackMetrics(
   // metrics data without using any elaborate frameworks or permissions
   // (ex: a WebUI).
   std::string serialized_playback_metrics =
-      net::UnescapePercentEncodedUrl(web_view->GetVisibleURL().ref());
+      net::UnescapePercentEncodedUrl(web_view->GetVisibleURL().GetRef());
   if (serialized_playback_metrics.empty()) {
     // This can legitimately happen if the ambient video is still being loaded
     // and it's still unclear whether playback has started successfully or
@@ -123,10 +102,21 @@ void GetAmbientVideoPlaybackMetrics(
     std::move(completion_cb).Run(base::Value::Dict());
     return;
   }
-  data_decoder::DataDecoder::ParseJsonIsolated(
-      serialized_playback_metrics,
-      base::BindOnce(&OnAmbientVideoPlaybackMetricsParsed,
-                     std::move(completion_cb)));
+  std::optional<base::Value> result = base::JSONReader::Read(
+      serialized_playback_metrics, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
+  // These errors really shouldn't ever happen, but they're not significant
+  // enough to crash the whole process over.
+  if (!result.has_value()) {
+    LOG(ERROR) << "JSON parsing failed";
+    std::move(completion_cb).Run(base::Value::Dict());
+    return;
+  }
+  if (!result->is_dict()) {
+    LOG(ERROR) << "Expected JSON dictionary for metrics";
+    std::move(completion_cb).Run(base::Value::Dict());
+    return;
+  }
+  std::move(completion_cb).Run(std::move(*result).TakeDict());
 }
 
 AmbientVideoSessionStatus ParseAmbientVideoSessionStatus(
@@ -213,7 +203,7 @@ AmbientModePhotoSource AmbientSettingsToPhotoSource(
     return AmbientModePhotoSource::kGooglePhotosEmpty;
   }
 
-  bool has_recent_highlights = base::Contains(
+  bool has_recent_highlights = std::ranges::contains(
       settings.selected_album_ids, ash::kAmbientModeRecentHighlightsAlbumId);
 
   if (has_recent_highlights && settings.selected_album_ids.size() == 1) {

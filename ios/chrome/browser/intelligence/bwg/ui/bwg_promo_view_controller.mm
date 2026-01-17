@@ -4,14 +4,16 @@
 
 #import "ios/chrome/browser/intelligence/bwg/ui/bwg_promo_view_controller.h"
 
-#import "ios/chrome/browser/intelligence/bwg/metrics/bwg_metrics.h"
+#import "ios/chrome/browser/intelligence/bwg/metrics/gemini_metrics.h"
 #import "ios/chrome/browser/intelligence/bwg/ui/bwg_consent_mutator.h"
 #import "ios/chrome/browser/intelligence/bwg/ui/bwg_promo_view_controller_delegate.h"
 #import "ios/chrome/browser/intelligence/bwg/ui/bwg_ui_utils.h"
 #import "ios/chrome/browser/intelligence/bwg/utils/bwg_constants.h"
+#import "ios/chrome/browser/intelligence/features/features.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
+#import "ios/chrome/common/ui/util/chrome_button.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/public/provider/chrome/browser/font/font_api.h"
@@ -46,11 +48,23 @@ const CGFloat kOuterBoxSize = 64.0;
 // Height of the separator line.
 const CGFloat kSeparatorHeight = 1.0;
 
-// Spacing between the scrollView and the buttons.
-const CGFloat kSpacingPrimarySecondaryButtons = 0.0;
+// Spacing for primary and secondary buttons.
+const CGFloat kSpacingPrimarySecondaryButtonsIOS26 = 4.0;
+const CGFloat kSpacingPrimarySecondaryButtonsIOS18 = 0;
 
-// Spacing between primary and secondary buttons.
+// Spacing between the scrollView and the buttons.
 const CGFloat kSpacingScrollViewAndButtons = 24.0;
+
+// Spacing between the main title and summary.
+const CGFloat kSpacingTitleAndSummary = 10.0;
+
+// Constants for gradient Gemini logo.
+#if BUILDFLAG(IOS_USE_BRANDED_ASSETS)
+const CGFloat kGeminiLogoFontScale = 2.0;
+#endif
+const CGFloat kFontCapHeightMultiplier = 1.1;
+const CGFloat kImageWidthAdjustment = 10.0;
+const CGFloat kBaselineAdjustment = 10.0;
 
 }  // namespace
 
@@ -75,7 +89,6 @@ const CGFloat kSpacingScrollViewAndButtons = 24.0;
 
 - (void)viewDidDisappear:(BOOL)animated {
   [super viewDidDisappear:animated];
-  [self.BWGPromoDelegate promoViewControllerWasDismissed];
 }
 
 #pragma mark - BWGFREViewControllerProtocol
@@ -112,6 +125,22 @@ const CGFloat kSpacingScrollViewAndButtons = 24.0;
   return wrapperContainer;
 }
 
+// Creates a feature row with an icon and localized title/body IDs.
+- (UIView*)createFeatureRowWithIcon:(UIImage*)icon
+                            titleID:(int)titleID
+                             bodyID:(int)bodyID {
+  NSString* title = l10n_util::GetNSString(titleID);
+  NSString* body = l10n_util::GetNSString(bodyID);
+
+  UIImageView* iconImageView = [[UIImageView alloc] initWithImage:icon];
+  UIView* iconContainer = [self createIconContainerView:iconImageView];
+  UIStackView* titleBodyStackView =
+      [self createContentDescriptionWithTitle:title body:body];
+  return [self
+      createContentHorizontalStackViewWithIconContainer:iconContainer
+                                         titleBodyStack:titleBodyStackView];
+}
+
 // Configures the main stack view and contains all the content including the
 // buttons.
 - (void)configureMainStackView {
@@ -132,50 +161,40 @@ const CGFloat kSpacingScrollViewAndButtons = 24.0;
   ]];
 
   [_mainStackView addArrangedSubview:[self createMainTitle]];
-  [_mainStackView setCustomSpacing:10 afterView:_titleContainerView];
+  [_mainStackView setCustomSpacing:kSpacingTitleAndSummary
+                         afterView:_titleContainerView];
 
   UIImageSymbolConfiguration* config = [UIImageSymbolConfiguration
       configurationWithPointSize:kIconSize
                           weight:UIImageSymbolWeightMedium];
 
-  UIImageView* firstIconImageView = [[UIImageView alloc]
-      initWithImage:CustomSymbolWithConfiguration(kTextSearchSymbol, config)];
+  UIView* askRow =
+      [self createFeatureRowWithIcon:CustomSymbolWithConfiguration(
+                                         kTextSearchSymbol, config)
+                             titleID:IDS_IOS_BWG_PROMO_FIRST_BOX_TITLE
+                              bodyID:IDS_IOS_BWG_PROMO_FIRST_BOX_BODY];
+  [_mainStackView addArrangedSubview:askRow];
+  [_mainStackView addArrangedSubview:[self createSeparatorView]];
 
-  UIView* firstIconContainer =
-      [self createIconContainerView:firstIconImageView];
-  UIStackView* firstTitleBodyStackView = [self
-      createContentDescriptionWithTitle:l10n_util::GetNSString(
-                                            IDS_IOS_BWG_PROMO_FIRST_BOX_TITLE)
+  if (IsGeminiImageRemixToolShowFRERowEnabled()) {
+    UIView* remixRow = [self
+        createFeatureRowWithIcon:DefaultSymbolWithConfiguration(
+                                     kPhotoOnRectangleAngled, config)
+                         titleID:IDS_IOS_GEMINI_PROMO_REMIX_IMAGE_BOX_TITLE
+                          bodyID:IDS_IOS_GEMINI_PROMO_REMIX_IMAGE_BOX_BODY];
+    [_mainStackView addArrangedSubview:remixRow];
+    [_mainStackView addArrangedSubview:[self createSeparatorView]];
+  }
 
-                                   body:l10n_util::GetNSString(
-                                            IDS_IOS_BWG_PROMO_FIRST_BOX_BODY)];
-  UIStackView* firstContentHorizontalStackView =
-      [self createContentHorizontalStackViewWithIconContainer:firstIconContainer
-                                               titleBodyStack:
-                                                   firstTitleBodyStackView];
-  [_mainStackView addArrangedSubview:firstContentHorizontalStackView];
+  UIView* summarizeRow =
+      [self createFeatureRowWithIcon:DefaultSymbolWithConfiguration(
+                                         kListBulletSymbol, config)
+                             titleID:IDS_IOS_BWG_PROMO_SECOND_BOX_TITLE
+                              bodyID:IDS_IOS_BWG_PROMO_SECOND_BOX_BODY];
+  [_mainStackView addArrangedSubview:summarizeRow];
 
-  UIView* separatorView = [self createSeparatorView];
-  [_mainStackView addArrangedSubview:separatorView];
-
-  UIImageView* secondIconImageView = [[UIImageView alloc]
-      initWithImage:DefaultSymbolWithConfiguration(kListBulletSymbol, config)];
-
-  UIView* secondIconContainer =
-      [self createIconContainerView:secondIconImageView];
-  UIStackView* secondTitleBodyStackView = [self
-      createContentDescriptionWithTitle:l10n_util::GetNSString(
-                                            IDS_IOS_BWG_PROMO_SECOND_BOX_TITLE)
-
-                                   body:l10n_util::GetNSString(
-                                            IDS_IOS_BWG_PROMO_SECOND_BOX_BODY)];
-  UIStackView* secondContentHorizontalStackView = [self
-      createContentHorizontalStackViewWithIconContainer:secondIconContainer
-                                         titleBodyStack:
-                                             secondTitleBodyStackView];
-  [_mainStackView addArrangedSubview:secondContentHorizontalStackView];
   [_mainStackView setCustomSpacing:kSpacingScrollViewAndButtons
-                         afterView:secondContentHorizontalStackView];
+                         afterView:summarizeRow];
   [self configureButtons];
 }
 
@@ -188,7 +207,6 @@ const CGFloat kSpacingScrollViewAndButtons = 24.0;
   [_titleContainerView addSubview:mainTitleLabel];
 
   AddSameConstraints(mainTitleLabel, _titleContainerView);
-  [_mainStackView setCustomSpacing:20 afterView:_titleContainerView];
   return _titleContainerView;
 }
 
@@ -201,50 +219,102 @@ const CGFloat kSpacingScrollViewAndButtons = 24.0;
   UIFont* labelFont =
       PreferredFontForTextStyle(UIFontTextStyleTitle1, UIFontWeightSemibold);
   mainTitleLabel.font = labelFont;
-
   NSString* mainTitleString =
       l10n_util::GetNSString(IDS_IOS_BWG_PROMO_MAIN_TITLE);
+
+#if BUILDFLAG(IOS_USE_BRANDED_ASSETS)
   NSString* gradientSubstring =
       l10n_util::GetNSString(IDS_IOS_BWG_PROMO_GRADIENT_TEXT);
+  UIImage* geminiIcon = CustomSymbolWithPointSize(
+      kGeminiFullSymbol, labelFont.pointSize + kGeminiLogoFontScale);
+  UIImage* gradientImage = [self createGradientImageFromSymbol:geminiIcon];
+
+  NSAttributedString* gradientGeminiString =
+      [self attributedStringWithText:mainTitleString
+                  replacingSubstring:gradientSubstring
+                           withImage:gradientImage
+                                font:labelFont];
+
+  mainTitleLabel.attributedText = gradientGeminiString;
+#else
   NSMutableAttributedString* attributedString =
       [[NSMutableAttributedString alloc] initWithString:mainTitleString];
+  mainTitleLabel.attributedText = attributedString;
+#endif
 
-  CGSize mainTitleTextSize = [attributedString size];
+  mainTitleLabel.accessibilityLabel = mainTitleString;
+  mainTitleLabel.accessibilityTraits |= UIAccessibilityTraitHeader;
+  return mainTitleLabel;
+}
+
+// Creates a gradient image from a symbol image.
+- (UIImage*)createGradientImageFromSymbol:(UIImage*)symbolImage {
+  CGSize iconSize = symbolImage.size;
+
   CAGradientLayer* gradientLayer = [CAGradientLayer layer];
   gradientLayer.colors = [self createGradientColorsArray];
-  gradientLayer.startPoint = CGPointMake(0, 0.5);
-  gradientLayer.endPoint = CGPointMake(0.8, 0.5);
-  gradientLayer.frame =
-      CGRectMake(0, 0, mainTitleTextSize.width, labelFont.pointSize);
+  gradientLayer.startPoint = CGPointMake(0.0, 0.5);
+  gradientLayer.endPoint = CGPointMake(1.0, 0.5);
+  gradientLayer.frame = CGRectMake(0, 0, iconSize.width, iconSize.height);
 
   UIGraphicsImageRenderer* renderer =
-      [[UIGraphicsImageRenderer alloc] initWithSize:mainTitleTextSize];
-  UIImage* textImage = [renderer
+      [[UIGraphicsImageRenderer alloc] initWithSize:iconSize];
+  UIImage* gradientImage = [renderer
       imageWithActions:^(UIGraphicsImageRendererContext* rendererContext) {
+        // CG layers have inversed coordinates of symbol images. Therefore, we
+        // vertically flip the rendered image.
+        CGContextTranslateCTM(rendererContext.CGContext, 0, iconSize.height);
+        CGContextScaleCTM(rendererContext.CGContext, 1.0, -1.0);
+        CGContextClipToMask(rendererContext.CGContext,
+                            CGRectMake(0, 0, iconSize.width, iconSize.height),
+                            symbolImage.CGImage);
         [gradientLayer renderInContext:rendererContext.CGContext];
       }];
+  return gradientImage;
+}
 
-  UIColor* gradientColor = [UIColor colorWithPatternImage:textImage];
-  NSRange gradientRange = [mainTitleString rangeOfString:gradientSubstring];
-  [attributedString addAttribute:NSForegroundColorAttributeName
-                           value:gradientColor
-                           range:gradientRange];
+// Creates an attributed string and replaces a substring with an image.
+- (NSAttributedString*)attributedStringWithText:(NSString*)text
+                             replacingSubstring:(NSString*)substring
+                                      withImage:(UIImage*)image
+                                           font:(UIFont*)font {
+  NSMutableAttributedString* attributedString =
+      [[NSMutableAttributedString alloc]
+          initWithString:text
+              attributes:@{NSFontAttributeName : font}];
 
-  UIFont* gradientStringFont =
-      ios::provider::GetBrandedProductMediumFont(labelFont.pointSize);
-  [attributedString addAttribute:NSFontAttributeName
-                           value:gradientStringFont
-                           range:gradientRange];
+  NSRange range = [attributedString.string rangeOfString:substring];
+  NSTextAttachment* textAttachment = [[NSTextAttachment alloc] init];
+  textAttachment.image = image;
 
-  mainTitleLabel.attributedText = attributedString;
-  return mainTitleLabel;
+  // Adjust bounds so image aligns with the string.
+  CGFloat imageHeight = font.capHeight * kFontCapHeightMultiplier;
+  CGFloat imageAspectRatio = image.size.width / image.size.height;
+  CGFloat imageWidth = imageHeight * imageAspectRatio + kImageWidthAdjustment;
+  CGFloat yOrigin = font.descender / kBaselineAdjustment;
+
+  textAttachment.bounds = CGRectMake(0, yOrigin, imageWidth, imageHeight);
+
+  NSAttributedString* attachmentString =
+      [NSAttributedString attributedStringWithAttachment:textAttachment];
+
+  [attributedString replaceCharactersInRange:range
+                        withAttributedString:attachmentString];
+
+  return attributedString;
 }
 
 // Create an array of colors representing a gradient color palette.
 - (NSArray*)createGradientColorsArray {
+  UITraitCollection* lightTraitCollection = [UITraitCollection
+      traitCollectionWithUserInterfaceStyle:UIUserInterfaceStyleLight];
   NSArray<UIColor*>* colors = @[
-    [UIColor colorNamed:kBlue400Color], [UIColor colorNamed:kBlue700Color],
-    [UIColor colorNamed:kBlue300Color]
+    [[UIColor colorNamed:kBlue500Color]
+        resolvedColorWithTraitCollection:lightTraitCollection],
+    [[UIColor colorNamed:kBlue700Color]
+        resolvedColorWithTraitCollection:lightTraitCollection],
+    [[UIColor colorNamed:kBlue300Color]
+        resolvedColorWithTraitCollection:lightTraitCollection]
   ];
 
   NSMutableArray<id>* gradientColorArray = [[NSMutableArray alloc] init];
@@ -312,6 +382,7 @@ const CGFloat kSpacingScrollViewAndButtons = 24.0;
   titleLabel.textColor = [UIColor colorNamed:kTextPrimaryColor];
   titleLabel.numberOfLines = 0;
   titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+  titleLabel.accessibilityTraits |= UIAccessibilityTraitHeader;
 
   UILabel* bodyLabel = [[UILabel alloc] init];
   bodyLabel.text = bodyText;
@@ -344,23 +415,26 @@ const CGFloat kSpacingScrollViewAndButtons = 24.0;
   return contentHorizontalStackView;
 }
 
-// Creates the primary button.
+// Creates the Primary Button.
 - (UIButton*)createPrimaryButton {
-  UIButton* primaryButton = [BWGUIUtils
-      createPrimaryButtonWithTitle:l10n_util::GetNSString(
-                                       IDS_IOS_BWG_PROMO_PRIMARY_BUTTON)];
+  ChromeButton* primaryButton =
+      [[ChromeButton alloc] initWithStyle:ChromeButtonStylePrimary];
+  primaryButton.title =
+      l10n_util::GetNSString(IDS_IOS_BWG_PROMO_PRIMARY_BUTTON);
   [primaryButton addTarget:self
                     action:@selector(didTapPrimaryButton:)
           forControlEvents:UIControlEventTouchUpInside];
-  // TODO(crbug.com/420643840): Add a11y labels.
+  primaryButton.accessibilityLabel =
+      l10n_util::GetNSString(IDS_IOS_BWG_PROMO_PRIMARY_BUTTON);
   return primaryButton;
 }
 
-// Creates the secondary button.
+// Creates the Secondary Button.
 - (UIButton*)createSecondaryButton {
-  UIButton* secondaryButton = [BWGUIUtils
-      createSecondaryButtonWithTitle:l10n_util::GetNSString(
-                                         IDS_IOS_BWG_PROMO_SECONDARY_BUTTON)];
+  ChromeButton* secondaryButton =
+      [[ChromeButton alloc] initWithStyle:ChromeButtonStyleSecondary];
+  secondaryButton.title =
+      l10n_util::GetNSString(IDS_IOS_BWG_PROMO_SECONDARY_BUTTON);
   [secondaryButton addTarget:self
                       action:@selector(didTapSecondaryButton:)
             forControlEvents:UIControlEventTouchUpInside];
@@ -369,12 +443,17 @@ const CGFloat kSpacingScrollViewAndButtons = 24.0;
   return secondaryButton;
 }
 
-// Configures primary and secondary buttons.
+// Configures Primary and Secondary Buttons.
 - (void)configureButtons {
   UIView* primaryButtonView = [self createPrimaryButton];
   [_mainStackView addArrangedSubview:primaryButtonView];
-  [_mainStackView setCustomSpacing:kSpacingPrimarySecondaryButtons
-                         afterView:primaryButtonView];
+  if (@available(iOS 26, *)) {
+    [_mainStackView setCustomSpacing:kSpacingPrimarySecondaryButtonsIOS26
+                           afterView:primaryButtonView];
+  } else {
+    [_mainStackView setCustomSpacing:kSpacingPrimarySecondaryButtonsIOS18
+                           afterView:primaryButtonView];
+  }
   [_mainStackView addArrangedSubview:[self createSecondaryButton]];
 }
 
@@ -387,7 +466,7 @@ const CGFloat kSpacingScrollViewAndButtons = 24.0;
 // Did tap Secondary Button.
 - (void)didTapSecondaryButton:(UIButton*)sender {
   RecordFREPromoAction(IOSGeminiFREAction::kDismiss);
-  [self.mutator didCloseBWGPromo];
+  [self.mutator didCloseGeminiPromo];
 }
 
 @end

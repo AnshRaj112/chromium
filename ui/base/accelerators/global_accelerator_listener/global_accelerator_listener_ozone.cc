@@ -4,7 +4,6 @@
 
 #include "ui/base/accelerators/global_accelerator_listener/global_accelerator_listener_ozone.h"
 
-#include "base/containers/contains.h"
 #include "base/memory/ptr_util.h"
 #include "base/no_destructor.h"
 #include "build/config/linux/dbus/buildflags.h"
@@ -15,6 +14,8 @@
 #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
 #include "base/environment.h"
 #include "base/feature_list.h"
+#include "base/nix/xdg_util.h"
+#include "base/version_info/nix/version_extra_utils.h"
 #include "build/branding_buildflags.h"
 #include "ui/base/accelerators/global_accelerator_listener/global_accelerator_listener_linux.h"
 #endif
@@ -23,42 +24,15 @@ using content::BrowserThread;
 
 namespace {
 #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
-BASE_FEATURE(kGlobalShortcutsPortal,
-             "GlobalShortcutsPortal",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-constexpr char kChannelEnvVar[] = "CHROME_VERSION_EXTRA";
-
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-constexpr char kSessionPrefix[] = "chrome";
-#else
-constexpr char kSessionPrefix[] = "chromium";
-#endif
+BASE_FEATURE(kGlobalShortcutsPortal, base::FEATURE_ENABLED_BY_DEFAULT);
 
 constexpr char kSessionSuffix[] = "_global_shortcuts";
-
-std::string GetSessionPrefixChannel() {
-  auto env = base::Environment::Create();
-  auto channel = env->GetVar(kChannelEnvVar);
-  if (channel == "beta") {
-    return "_beta";
-  }
-  if (channel == "unstable") {
-    return "_unstable";
-  }
-  if (channel == "canary") {
-    return "_canary";
-  }
-  // No suffix for stable. Also if the channel is unknown, the most likely
-  // scenario is the user is running the binary directly and not getting the
-  // environment variable set, so assume stable to minimize potential risk of
-  // settings or data loss.
-  return "";
-}
 
 std::string GetSessionName() {
   // The session name must not ever change, otherwise user registered
   // shortcuts will be lost.
-  return kSessionPrefix + GetSessionPrefixChannel() + kSessionSuffix;
+  auto env = base::Environment::Create();
+  return version_info::nix::GetSessionNamePrefix(*env) + kSessionSuffix;
 }
 #endif  // BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
 }  // namespace
@@ -75,7 +49,14 @@ GlobalAcceleratorListener* GlobalAcceleratorListener::GetInstance() {
   }
 
 #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_DBUS)
-  if (base::FeatureList::IsEnabled(kGlobalShortcutsPortal)) {
+  // ListShortcuts on GNOME will return an empty list when the session is
+  // created, making this class incorrectly believe it must rebind all
+  // shortcuts, leading to a dialog shown on every browser start.
+  // https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/issues/185
+  auto env = base::Environment::Create();
+  if (base::nix::GetDesktopEnvironment(env.get()) !=
+          base::nix::DESKTOP_ENVIRONMENT_GNOME &&
+      base::FeatureList::IsEnabled(kGlobalShortcutsPortal)) {
     static GlobalAcceleratorListenerLinux* const linux_instance =
         new GlobalAcceleratorListenerLinux(nullptr, GetSessionName());
     return linux_instance;
@@ -138,7 +119,7 @@ void GlobalAcceleratorListenerOzone::StopListening() {
 
 bool GlobalAcceleratorListenerOzone::StartListeningForAccelerator(
     const ui::Accelerator& accelerator) {
-  DCHECK(!base::Contains(registered_hot_keys_, accelerator));
+  DCHECK(!registered_hot_keys_.contains(accelerator));
 
   if (!platform_global_shortcut_listener_) {
     return false;
@@ -156,7 +137,7 @@ bool GlobalAcceleratorListenerOzone::StartListeningForAccelerator(
 
 void GlobalAcceleratorListenerOzone::StopListeningForAccelerator(
     const ui::Accelerator& accelerator) {
-  DCHECK(base::Contains(registered_hot_keys_, accelerator));
+  DCHECK(registered_hot_keys_.contains(accelerator));
   // Otherwise how could the accelerator be registered?
   DCHECK(platform_global_shortcut_listener_);
 

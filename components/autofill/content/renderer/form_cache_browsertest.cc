@@ -485,7 +485,7 @@ TEST_F(FormCacheBrowserTest, FormCacheSizeUpperBound) {
   // Create a HTML page that contains `kMaxExtractableFields + 1` non-empty
   // forms.
   std::string html;
-  for (unsigned int i = 0; i < kMaxExtractableFields + 1; i++) {
+  for (unsigned int i = 0; i < kMaxExtractableFields + 1; ++i) {
     html += "<form><input></form>";
   }
   LoadHTML(html.c_str());
@@ -503,7 +503,7 @@ TEST_F(FormCacheBrowserTest, FormCacheSizeUpperBound) {
 // skipping any additional forms.
 TEST_F(FormCacheBrowserTest, FieldLimit) {
   std::string html;
-  for (unsigned int i = 0; i < kMaxExtractableFields + 1; i++) {
+  for (unsigned int i = 0; i < kMaxExtractableFields + 1; ++i) {
     html += "<form><input></form>";
   }
   LoadHTML(html.c_str());
@@ -520,7 +520,7 @@ TEST_F(FormCacheBrowserTest, FieldLimit) {
 // clearing their frames and skipping the then-empty forms.
 TEST_F(FormCacheBrowserTest, FrameLimit) {
   std::string html;
-  for (unsigned int i = 0; i < kMaxExtractableChildFrames + 1; i++) {
+  for (unsigned int i = 0; i < kMaxExtractableChildFrames + 1; ++i) {
     html += "<form><iframe></iframe></form>";
   }
   LoadHTML(html.c_str());
@@ -551,10 +551,10 @@ TEST_F(FormCacheBrowserTest, FieldAndFrameLimit) {
       kMaxExtractableFields + 1 - kNumFormsWithFrame;
 
   std::string html;
-  for (size_t i = 0; i < kNumFormsWithFrame; i++) {
+  for (size_t i = 0; i < kNumFormsWithFrame; ++i) {
     html += "<form><input><iframe></iframe></form>";
   }
-  for (size_t i = 0; i < kNumFormsWithoutFrame; i++) {
+  for (size_t i = 0; i < kNumFormsWithoutFrame; ++i) {
     html += "<form><input></form>";
   }
   LoadHTML(html.c_str());
@@ -596,14 +596,8 @@ TEST_F(FormCacheBrowserTest, UpdateFormCacheMeasuresTotalTime) {
   // / On pageload `AutofillAgent::DidDispatchDomContentLoadedEvent()` and
   // `PasswordAutofillAgent::DidFinishLoad()` are called, each triggering form
   //  extraction.
-  histogram_tester.ExpectTotalCount(
-      "Autofill.TimingPrecise.ExtractFormData",
-      // When `AutofillOptimizeFormExtraction` is disabled, the
-      // signal from AutofillAgent also notifies PasswordAutofillAgent, which
-      // extracts a third but redundant time.
-      base::FeatureList::IsEnabled(features::kAutofillOptimizeFormExtraction)
-          ? 2
-          : 3);
+  histogram_tester.ExpectTotalCount("Autofill.TimingPrecise.ExtractFormData",
+                                    2);
   histogram_tester.ExpectTotalCount(
       "Autofill.TimingPrecise.ExtractFormData.UpdateFormCache", 1);
 }

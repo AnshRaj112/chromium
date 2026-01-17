@@ -31,7 +31,7 @@
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/ui/extensions/extensions_dialogs.h"
-#include "chrome/browser/ui/views/extensions/extensions_toolbar_container.h"
+#include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
 #include "extensions/browser/app_window/app_window_registry.h"
@@ -103,7 +103,7 @@ ChooserBubbleUiViewDelegate::ChooserBubbleUiViewDelegate(
     content::WebContents* contents,
     std::unique_ptr<permissions::ChooserController> chooser_controller)
     : LocationBarBubbleDelegateView(
-          GetChooserAnchorConfiguration(browser).anchor_view,
+          GetChooserAnchorConfiguration(browser).anchor,
           contents) {
   // ------------------------------------
   // | Chooser bubble title             |
@@ -168,9 +168,9 @@ void ChooserBubbleUiViewDelegate::OnSelectionChanged() {
 
 void ChooserBubbleUiViewDelegate::UpdateAnchor(Browser* browser) {
   AnchorConfiguration configuration = GetChooserAnchorConfiguration(browser);
-  SetAnchorView(configuration.anchor_view);
+  SetAnchor(configuration.anchor);
   SetHighlightedButton(configuration.highlighted_button);
-  if (!configuration.anchor_view) {
+  if (std::holds_alternative<std::nullptr_t>(configuration.anchor)) {
     SetAnchorRect(GetChooserAnchorRect(browser));
   }
   SetArrow(configuration.bubble_arrow);
@@ -213,20 +213,19 @@ base::OnceClosure ShowDeviceChooserDialogForExtension(
     return base::DoNothing();
   }
 
-  // `GetExtensionsToolbarContainer` may return `nullptr`, for instance in
+  // `GetExtensionsToolbarDesktop` may return `nullptr`, for instance in
   // extension popup windows.
-  auto* extensions_toolbar_container =
-      BrowserView::GetBrowserViewForBrowser(browser)
-          ->toolbar_button_provider()
-          ->GetExtensionsToolbarContainer();
-  if (!extensions_toolbar_container) {
+  auto* extensions_toolbar = BrowserView::GetBrowserViewForBrowser(browser)
+                                 ->toolbar_button_provider()
+                                 ->GetExtensionsToolbarDesktop();
+  if (!extensions_toolbar) {
     return base::DoNothing();
   }
 
   auto bubble = std::make_unique<ChooserBubbleUiViewDelegate>(
       browser, contents, std::move(controller));
   base::OnceClosure close_closure = bubble->MakeCloseClosure();
-  extensions_toolbar_container->ShowWidgetForExtension(
+  extensions_toolbar->ShowWidgetForExtension(
       views::BubbleDialogDelegateView::CreateBubble(std::move(bubble)),
       extension->id());
   return close_closure;

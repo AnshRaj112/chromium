@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 import '/strings.m.js';
+import './margin_control_container.js';
 
 import {I18nMixinLit} from 'chrome://resources/cr_elements/i18n_mixin_lit.js';
 import {WebUiListenerMixinLit} from 'chrome://resources/cr_elements/web_ui_listener_mixin_lit.js';
 import {assert} from 'chrome://resources/js/assert.js';
+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {hasKeyModifiers} from 'chrome://resources/js/util.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 import type {PropertyValues} from 'chrome://resources/lit/v3_0/lit.rollup.js';
@@ -627,10 +629,30 @@ export class PrintPreviewPreviewAreaElement extends
         100;
   }
 
+  private isScalingPdf_(): boolean {
+    return this.getSetting('scalingTypePdf').available;
+  }
+
   /** @return Appropriate key for the scaling type setting. */
   private getScalingSettingKey_(): keyof Settings {
-    return this.getSetting('scalingTypePdf').available ? 'scalingTypePdf' :
-                                                         'scalingType';
+    return this.isScalingPdf_() ? 'scalingTypePdf' : 'scalingType';
+  }
+
+  /**
+   * @return true if the scaling type has just changed between
+   * `ScalingType.CUSTOM` and another scaling type that is functionally
+   * equivalent. In other words, this detects switch back
+   * and forth between the `CUSTOM` scaling type and
+   * a different scaling type that behaves the same as `CUSTOM`.
+   */
+  private scalingTypeAlteredAroundCustom_(
+      otherScalingTypeSameToCustom: ScalingType,
+      currentScalingType: ScalingType, lastScalingType: ScalingType): boolean {
+    const otherToCustom = currentScalingType === ScalingType.CUSTOM &&
+        lastScalingType === otherScalingTypeSameToCustom;
+    const customToOther = currentScalingType === otherScalingTypeSameToCustom &&
+        lastScalingType === ScalingType.CUSTOM;
+    return customToOther || otherToCustom;
   }
 
   /**
@@ -650,15 +672,25 @@ export class PrintPreviewPreviewAreaElement extends
       return false;
     }
 
+    // When 'alignPdfDefaultPrintSettingsWithHTML' is enabled,
+    // PDF documents use a different default scaling behavior:
+    //
+    // - OLD behavior: PDF default scaling = CUSTOM with a scale factor of 100
+    // - NEW behavior: PDF default scaling = kCenterShrinkToFitPaper
+    //
+    // The behavior of the new option "actual size" is the same as custom
+    // scaling with a scale factor of 100.
+    if (this.isScalingPdf_() &&
+        loadTimeData.getBoolean('alignPdfDefaultPrintSettingsWithHTML')) {
+      return !this.scalingTypeAlteredAroundCustom_(
+          ScalingType.ACTUAL_SIZE, scalingType, lastTicket.scalingType);
+    }
+
     // Scaling doesn't always change because of a scalingType change. Changing
     // between custom scaling with a scale factor of 100 and default scaling
     // makes no difference.
-    const defaultToCustom = scalingType === ScalingType.DEFAULT &&
-        lastTicket.scalingType === ScalingType.CUSTOM;
-    const customToDefault = scalingType === ScalingType.CUSTOM &&
-        lastTicket.scalingType === ScalingType.DEFAULT;
-
-    return !defaultToCustom && !customToDefault;
+    return !this.scalingTypeAlteredAroundCustom_(
+        ScalingType.DEFAULT, scalingType, lastTicket.scalingType);
   }
 
   /**

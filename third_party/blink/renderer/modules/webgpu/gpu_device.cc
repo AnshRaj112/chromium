@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/webgpu/gpu_device.h"
 
+#include "base/task/bind_post_task.h"
 #include "gpu/command_buffer/client/webgpu_interface.h"
 #include "third_party/blink/public/platform/platform.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
@@ -46,6 +47,8 @@
 #include "third_party/blink/renderer/modules/webgpu/gpu_validation_error.h"
 #include "third_party/blink/renderer/modules/webgpu/string_utils.h"
 #include "third_party/blink/renderer/platform/heap/thread_state.h"
+#include "third_party/blink/renderer/platform/wtf/cross_thread_functional.h"
+#include "third_party/blink/renderer/platform/wtf/text/strcat.h"
 
 namespace blink {
 
@@ -118,12 +121,10 @@ std::optional<V8GPUFeatureName::Enum> RequiredFeatureForTextureFormat(
     case V8GPUTextureFormat::Enum::kR16Unorm:
     case V8GPUTextureFormat::Enum::kRg16Unorm:
     case V8GPUTextureFormat::Enum::kRgba16Unorm:
-      return V8GPUFeatureName::Enum::kChromiumExperimentalUnorm16TextureFormats;
-
     case V8GPUTextureFormat::Enum::kR16Snorm:
     case V8GPUTextureFormat::Enum::kRg16Snorm:
     case V8GPUTextureFormat::Enum::kRgba16Snorm:
-      return V8GPUFeatureName::Enum::kChromiumExperimentalSnorm16TextureFormats;
+      return V8GPUFeatureName::Enum::kTextureFormatsTier1;
 
     default:
       return std::nullopt;
@@ -152,9 +153,37 @@ GPUDevice::GPUDevice(ExecutionContext* execution_context,
     : ExecutionContextClient(execution_context),
       DawnObject(dawn_control_client, label),
       adapter_(adapter),
-      lost_property_(MakeGarbageCollected<LostProperty>(execution_context)),
-      logging_callback_(BindWGPURepeatingCallback(&GPUDevice::OnLogging,
-                                                  WrapWeakPersistent(this))) {}
+      lost_property_(MakeGarbageCollected<LostProperty>(execution_context)) {
+  if (IsWebGPUMultithreadedWorker(execution_context)) {
+    // When the IO thread processes GPU process responses, the logging callback
+    // is called on the IO thread. This initialization, however, happens on the
+    // main thread, hence the need for the initial CrossThread wrapping. The
+    // internal call to the *Impl function, however, is proxied back to the main
+    // thread, so we need to create it here on the main thread via BindRepeating
+    // and pass it in.
+    logging_callback_.reset(MakeWGPURepeatingCallback(
+        ConvertToBaseRepeatingCallback(CrossThreadBindRepeating(
+            [](scoped_refptr<base::SingleThreadTaskRunner> main_runner,
+               base::RepeatingCallback<void(wgpu::LoggingType, const String&)>
+                   cb,
+               wgpu::LoggingType loggingType, wgpu::StringView message) {
+              String messageStr = StringFromASCIIAndUTF8(message);
+              main_runner->PostTask(
+                  FROM_HERE, ConvertToBaseOnceCallback(CrossThreadBindOnce(
+                                 cb, loggingType, std::move(messageStr))));
+            },
+            execution_context->GetTaskRunner(TaskType::kWebGPU),
+            BindRepeating(&GPUDevice::OnLoggingImpl,
+                          WrapWeakPersistent(this))))));
+  } else {
+    logging_callback_.reset(MakeWGPURepeatingCallback(blink::BindRepeating(
+        [](GPUDevice* self, wgpu::LoggingType loggingType,
+           wgpu::StringView message) {
+          self->OnLoggingImpl(loggingType, StringFromASCIIAndUTF8(message));
+        },
+        WrapWeakPersistent(this))));
+  }
+}
 
 void GPUDevice::Initialize(wgpu::Device handle,
                            const GPUDeviceDescriptor* descriptor,
@@ -247,11 +276,12 @@ void GPUDevice::AddSingletonWarning(GPUSingletonWarning type) {
     String message;
     switch (type) {
       case GPUSingletonWarning::kNonPreferredFormat:
-        message =
-            "WebGPU canvas configured with a different format than is "
-            "preferred by this device (\"" +
-            FromDawnEnum(GPU::GetPreferredCanvasFormat()).AsString() +
-            "\"). This requires an extra copy, which may impact performance.";
+        message = StrCat(
+            {"WebGPU canvas configured with a different format than is "
+             "preferred by this device (\"",
+             FromDawnEnum(GPU::GetPreferredCanvasFormat()).AsStringView(),
+             "\"). This requires an extra copy, which may impact "
+             "performance."});
         break;
       case GPUSingletonWarning::kDepthKey:
         message =
@@ -293,10 +323,10 @@ bool GPUDevice::ValidateTextureFormatUsage(V8GPUTextureFormat format,
 
   V8GPUFeatureName requiredFeature = V8GPUFeatureName(requiredFeatureEnum);
 
-  exception_state.ThrowTypeError(String::Format(
+  exception_state.ThrowTypeError(UNSAFE_TODO(String::Format(
       "Use of the '%s' texture format requires the '%s' feature "
       "to be enabled on %s.",
-      format.AsCStr(), requiredFeature.AsCStr(), GetFormattedLabel().c_str()));
+      format.AsCStr(), requiredFeature.AsCStr(), GetFormattedLabel().c_str())));
   return false;
 }
 
@@ -320,35 +350,31 @@ bool GPUDevice::ValidateBlendFactor(V8GPUBlendFactor blend_factor,
 
   V8GPUFeatureName requiredFeature = V8GPUFeatureName(requiredFeatureEnum);
 
-  exception_state.ThrowTypeError(
+  exception_state.ThrowTypeError(UNSAFE_TODO(
       String::Format("Use of the '%s' blend factor requires the '%s' feature "
                      "to be enabled on %s.",
                      blend_factor.AsCStr(), requiredFeature.AsCStr(),
-                     GetFormattedLabel().c_str()));
+                     GetFormattedLabel().c_str())));
   return false;
 }
 
-void GPUDevice::OnUncapturedError(const wgpu::Device& device,
-                                  wgpu::ErrorType errorType,
-                                  wgpu::StringView message) {
+void GPUDevice::OnUncapturedErrorImpl(wgpu::ErrorType errorType,
+                                      const String& message) {
   // Suppress errors once the device is lost.
   if (lost_property_->GetState() == LostProperty::kResolved) {
     return;
   }
 
   DCHECK_NE(errorType, wgpu::ErrorType::NoError);
-  LOG(ERROR) << "GPUDevice: " << std::string_view(message);
+  LOG(ERROR) << "GPUDevice: " << message;
 
   GPUUncapturedErrorEventInit* init = GPUUncapturedErrorEventInit::Create();
   if (errorType == wgpu::ErrorType::Validation) {
-    init->setError(MakeGarbageCollected<GPUValidationError>(
-        StringFromASCIIAndUTF8(message)));
+    init->setError(MakeGarbageCollected<GPUValidationError>(message));
   } else if (errorType == wgpu::ErrorType::OutOfMemory) {
-    init->setError(MakeGarbageCollected<GPUOutOfMemoryError>(
-        StringFromASCIIAndUTF8(message)));
+    init->setError(MakeGarbageCollected<GPUOutOfMemoryError>(message));
   } else if (errorType == wgpu::ErrorType::Internal) {
-    init->setError(MakeGarbageCollected<GPUInternalError>(
-        StringFromASCIIAndUTF8(message)));
+    init->setError(MakeGarbageCollected<GPUInternalError>(message));
   } else {
     return;
   }
@@ -361,9 +387,8 @@ void GPUDevice::OnUncapturedError(const wgpu::Device& device,
   }
 }
 
-void GPUDevice::OnLogging(wgpu::LoggingType loggingType,
-                          wgpu::StringView message) {
-  std::string_view messageView = {message.data, message.length};
+void GPUDevice::OnLoggingImpl(wgpu::LoggingType loggingType,
+                              const String& message) {
   // Callback function for WebGPU logging return command
   mojom::blink::ConsoleMessageLevel level;
   switch (loggingType) {
@@ -391,8 +416,7 @@ void GPUDevice::OnLogging(wgpu::LoggingType loggingType,
   ExecutionContext* execution_context = GetExecutionContext();
   if (execution_context) {
     auto* console_message = MakeGarbageCollected<ConsoleMessage>(
-        mojom::blink::ConsoleMessageSource::kRendering, level,
-        StringFromASCIIAndUTF8(messageView));
+        mojom::blink::ConsoleMessageSource::kRendering, level, message);
     execution_context->AddConsoleMessage(console_message);
   }
 }
@@ -583,11 +607,10 @@ ScriptPromise<GPURenderPipeline> GPUDevice::createRenderPipelineAsync(
           script_state, exception_state.GetContext());
   auto promise = resolver->Promise();
   auto* callback = MakeWGPUOnceCallback(resolver->WrapCallbackInScriptScope(
-      WTF::BindOnce(&GPUDevice::OnCreateRenderPipelineAsyncCallback,
-                    WrapPersistent(this), descriptor->label())));
-
+      BindOnce(&GPUDevice::OnCreateRenderPipelineAsyncCallback,
+               WrapPersistent(this), descriptor->label())));
   GetHandle().CreateRenderPipelineAsync(
-      &dawn_desc_info.dawn_desc, wgpu::CallbackMode::AllowSpontaneous,
+      &dawn_desc_info.dawn_desc, wgpu::CallbackMode::AllowProcessEvents,
       callback->UnboundCallback(), callback->AsUserdata());
 
   // WebGPU guarantees that promises are resolved in finite time so we need to
@@ -599,23 +622,22 @@ ScriptPromise<GPURenderPipeline> GPUDevice::createRenderPipelineAsync(
 ScriptPromise<GPUComputePipeline> GPUDevice::createComputePipelineAsync(
     ScriptState* script_state,
     const GPUComputePipelineDescriptor* descriptor) {
-  auto* resolver =
-      MakeGarbageCollected<ScriptPromiseResolver<GPUComputePipeline>>(
-          script_state);
-  auto promise = resolver->Promise();
-
   std::string desc_label;
   OwnedProgrammableStage computeStage;
   wgpu::ComputePipelineDescriptor dawn_desc =
       AsDawnType(this, descriptor, &desc_label, &computeStage);
 
+  auto* resolver =
+      MakeGarbageCollected<ScriptPromiseResolver<GPUComputePipeline>>(
+          script_state);
+  auto promise = resolver->Promise();
   auto* callback = MakeWGPUOnceCallback(resolver->WrapCallbackInScriptScope(
-      WTF::BindOnce(&GPUDevice::OnCreateComputePipelineAsyncCallback,
-                    WrapPersistent(this), descriptor->label())));
-
+      BindOnce(&GPUDevice::OnCreateComputePipelineAsyncCallback,
+               WrapPersistent(this), descriptor->label())));
   GetHandle().CreateComputePipelineAsync(
-      &dawn_desc, wgpu::CallbackMode::AllowSpontaneous,
+      &dawn_desc, wgpu::CallbackMode::AllowProcessEvents,
       callback->UnboundCallback(), callback->AsUserdata());
+
   // WebGPU guarantees that promises are resolved in finite time so we need to
   // ensure commands are flushed.
   EnsureFlush(ToEventLoop(script_state));
@@ -642,12 +664,12 @@ GPUQuerySet* GPUDevice::createQuerySet(const GPUQuerySetDescriptor* descriptor,
   if (descriptor->type() == V8GPUQueryType::Enum::kTimestamp &&
       !features_->Has(kTimestampQuery) &&
       !features_->Has(kTimestampQueryInsidePasses)) {
-    exception_state.ThrowTypeError(
+    exception_state.ThrowTypeError(UNSAFE_TODO(
         String::Format("Use of timestamp queries requires the '%s' or '%s' "
                        "feature to be enabled on %s.",
                        V8GPUFeatureName(kTimestampQuery).AsCStr(),
                        V8GPUFeatureName(kTimestampQueryInsidePasses).AsCStr(),
-                       GetFormattedLabel().c_str()));
+                       GetFormattedLabel().c_str())));
     return nullptr;
   }
   return GPUQuerySet::Create(this, descriptor);
@@ -664,11 +686,9 @@ ScriptPromise<IDLNullable<GPUError>> GPUDevice::popErrorScope(
           script_state);
   auto promise = resolver->Promise();
 
-  auto* callback =
-      MakeWGPUOnceCallback(resolver->WrapCallbackInScriptScope(WTF::BindOnce(
-          &GPUDevice::OnPopErrorScopeCallback, WrapPersistent(this))));
-
-  GetHandle().PopErrorScope(wgpu::CallbackMode::AllowSpontaneous,
+  auto* callback = MakeWGPUOnceCallback(resolver->WrapCallbackInScriptScope(
+      BindOnce(&GPUDevice::OnPopErrorScopeCallback, WrapPersistent(this))));
+  GetHandle().PopErrorScope(wgpu::CallbackMode::AllowProcessEvents,
                             callback->UnboundCallback(),
                             callback->AsUserdata());
 
@@ -735,6 +755,7 @@ void GPUDevice::Trace(Visitor* visitor) const {
   visitor->Trace(lost_property_);
   visitor->Trace(external_texture_cache_);
   visitor->Trace(textures_with_mailbox_);
+  visitor->Trace(buffers_with_mailbox_);
   visitor->Trace(mappable_buffers_);
   ExecutionContextClient::Trace(visitor);
   EventTarget::Trace(visitor);
@@ -753,6 +774,11 @@ void GPUDevice::DissociateMailboxes() {
     texture->DissociateMailbox();
   }
   textures_with_mailbox_.clear();
+
+  for (auto& buffer : buffers_with_mailbox_) {
+    buffer->DissociateMailbox();
+  }
+  buffers_with_mailbox_.clear();
 }
 
 void GPUDevice::UnmapAllMappableBuffers(v8::Isolate* isolate) {
@@ -779,19 +805,60 @@ void GPUDevice::UntrackTextureWithMailbox(GPUTexture* texture) {
   textures_with_mailbox_.erase(texture);
 }
 
+void GPUDevice::TrackBufferWithMailbox(GPUBuffer* buffer) {
+  DCHECK(buffer);
+  buffers_with_mailbox_.insert(buffer);
+}
+
+void GPUDevice::UntrackBufferWithMailbox(GPUBuffer* buffer) {
+  DCHECK(buffer);
+  buffers_with_mailbox_.erase(buffer);
+}
+
 void GPUDevice::SetDescriptorCallbacks(wgpu::DeviceDescriptor& dawn_desc) {
-  // Set the uncaptured error callback first because it's ownership will be
+  ExecutionContext* execution_context = GetExecutionContext();
+
+  // Set the uncaptured error callback first because its ownership will be
   // passed to the device lost callback immediately after.
   std::unique_ptr<WGPURepeatingCallback<wgpu::UncapturedErrorCallback<void>>>
-      error_callback(BindWGPURepeatingCallback(&GPUDevice::OnUncapturedError,
-                                               WrapWeakPersistent(this)));
+      error_callback;
+  if (IsWebGPUMultithreadedWorker(execution_context)) {
+    // When the IO thread processes GPU process responses, the uncaptured error
+    // callback is called on the IO thread. This initialization, however,
+    // happens on the main thread, hence the need for the initial CrossThread
+    // wrapping. The internal call to the *Impl function, however, is proxied
+    // back to the main thread, so we need to create it here on the main thread
+    // via BindRepeating and pass it in.
+    error_callback.reset(MakeWGPURepeatingCallback(
+        ConvertToBaseRepeatingCallback(CrossThreadBindRepeating(
+            [](scoped_refptr<base::SingleThreadTaskRunner> main_runner,
+               base::RepeatingCallback<void(wgpu::ErrorType, const String&)> cb,
+               const wgpu::Device& device, wgpu::ErrorType errorType,
+               wgpu::StringView message) {
+              String messageStr = StringFromASCIIAndUTF8(message);
+              main_runner->PostTask(
+                  FROM_HERE, ConvertToBaseOnceCallback(CrossThreadBindOnce(
+                                 cb, errorType, std::move(messageStr))));
+            },
+            execution_context->GetTaskRunner(TaskType::kWebGPU),
+            BindRepeating(&GPUDevice::OnUncapturedErrorImpl,
+                          WrapWeakPersistent(this))))));
+  } else {
+    error_callback.reset(MakeWGPURepeatingCallback(blink::BindRepeating(
+        [](GPUDevice* self, const wgpu::Device&, wgpu::ErrorType errorType,
+           wgpu::StringView message) {
+          self->OnUncapturedErrorImpl(errorType,
+                                      StringFromASCIIAndUTF8(message));
+        },
+        WrapWeakPersistent(this))));
+  }
   dawn_desc.SetUncapturedErrorCallback(error_callback->UnboundCallback(),
                                        error_callback->AsUserdata());
 
   auto* lost_callback = MakeWGPUOnceCallback(
-      WTF::BindOnce(&GPUDevice::OnDeviceLost, WrapWeakPersistent(this),
-                    std::move(error_callback)));
-  dawn_desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous,
+      BindOnce(&GPUDevice::OnDeviceLost, WrapWeakPersistent(this),
+               std::move(error_callback)));
+  dawn_desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowProcessEvents,
                                   lost_callback->UnboundCallback(),
                                   lost_callback->AsUserdata());
 }

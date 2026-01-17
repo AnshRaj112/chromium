@@ -4,8 +4,12 @@
 
 #include "chrome/browser/actor/tools/click_tool_request.h"
 
+#include <optional>
+
 #include "chrome/browser/actor/tools/tool_request_visitor_functor.h"
-#include "chrome/common/actor.mojom.h"
+#include "chrome/common/actor.mojom-shared.h"
+#include "content/public/browser/render_widget_host.h"
+#include "third_party/blink/public/common/input/web_mouse_event.h"
 
 namespace actor {
 
@@ -13,8 +17,8 @@ using ::tabs::TabHandle;
 
 ClickToolRequest::ClickToolRequest(TabHandle tab_handle,
                                    const PageTarget& target,
-                                   MouseClickType type,
-                                   MouseClickCount count)
+                                   mojom::ClickType type,
+                                   mojom::ClickCount count)
     : PageToolRequest(tab_handle, target),
       click_type_(type),
       click_count_(count) {}
@@ -25,11 +29,12 @@ void ClickToolRequest::Apply(ToolRequestVisitorFunctor& f) const {
   f.Apply(*this);
 }
 
-std::string ClickToolRequest::JournalEvent() const {
-  return "Click";
+std::string_view ClickToolRequest::Name() const {
+  return kName;
 }
 
-mojom::ToolActionPtr ClickToolRequest::ToMojoToolAction() const {
+mojom::ToolActionPtr ClickToolRequest::ToMojoToolAction(
+    content::RenderFrameHost& frame) const {
   auto click = mojom::ClickAction::New();
   click->type = click_type_;
   click->count = click_count_;
@@ -38,6 +43,22 @@ mojom::ToolActionPtr ClickToolRequest::ToMojoToolAction() const {
 
 std::unique_ptr<PageToolRequest> ClickToolRequest::Clone() const {
   return std::make_unique<ClickToolRequest>(*this);
+}
+
+ObservationDelayController::PageStabilityConfig
+ClickToolRequest::GetObservationPageStabilityConfig() const {
+  return ObservationDelayController::PageStabilityConfig{
+      .supports_paint_stability = true,
+  };
+}
+
+void ClickToolRequest::WillSendToRenderer(
+    content::RenderWidgetHost* render_widget_host) {
+  blink::WebMouseEvent event = blink::WebMouseEvent();
+  event.SetType(blink::WebInputEvent::Type::kMouseDown);
+
+  // Trigger user interaction notification.
+  render_widget_host->SimulateUserInteraction(event);
 }
 
 }  // namespace actor

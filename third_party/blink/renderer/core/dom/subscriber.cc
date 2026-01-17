@@ -4,8 +4,9 @@
 
 #include "third_party/blink/renderer/core/dom/subscriber.h"
 
+#include <algorithm>
+
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom-blink.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_observer.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_observer_callback.h"
@@ -145,7 +146,6 @@ void Subscriber::error(ScriptState* script_state, ScriptValue error_value) {
     // have if we're in a detached context. See observable-constructor.window.js
     // for tests.
     if (!script_state->ContextIsValid()) {
-      CHECK(!GetExecutionContext());
       return;
     }
     ScriptState::Scope scope(script_state);
@@ -195,12 +195,12 @@ void Subscriber::ConsumerUnsubscribe(
   // Now that the abort algorithm has run, clear the
   // `AbortSignal::AlgorithmHandle` associated with `associated_observer` that's
   // keeping it alive.
-  DCHECK(base::Contains(consumer_abort_algorithms_, associated_observer));
+  DCHECK(consumer_abort_algorithms_.Contains(associated_observer));
   consumer_abort_algorithms_.erase(associated_observer);
 
   // Also remove `associated_observer` from `internal_observers_`, since it no
   // longer cares about values `this` produces.
-  DCHECK(base::Contains(internal_observers_, associated_observer));
+  DCHECK(std::ranges::contains(internal_observers_, associated_observer));
   internal_observers_.erase(
       std::ranges::find(internal_observers_, associated_observer));
 
@@ -252,7 +252,7 @@ void Subscriber::CloseSubscription(ScriptState* script_state,
   // cannot be modified anymore. If any of these callbacks below invoke
   // `addTeardown()` with a *new* callback, it will be invoked synchronously
   // instead of added to this vector.
-  for (Member<V8VoidFunction> teardown : base::Reversed(teardown_callbacks_)) {
+  for (Member<V8VoidFunction>& teardown : base::Reversed(teardown_callbacks_)) {
     teardown->InvokeAndReportException(nullptr);
   }
   teardown_callbacks_.clear();

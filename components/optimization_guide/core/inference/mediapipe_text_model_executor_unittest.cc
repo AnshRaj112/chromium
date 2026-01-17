@@ -22,6 +22,7 @@ class MediapipeTextModelExecutorTest : public testing::Test {
         /*model_inference_timeout=*/std::nullopt,
         proto::OptimizationTarget::OPTIMIZATION_TARGET_PAINFUL_PAGE_LOAD,
         task_environment_.GetMainThreadTaskRunner(),
+        task_environment_.GetMainThreadTaskRunner(),
         task_environment_.GetMainThreadTaskRunner());
 
     base::FilePath source_root_dir;
@@ -36,11 +37,14 @@ class MediapipeTextModelExecutorTest : public testing::Test {
     executor_->UpdateModelFile(model_file_path);
   }
 
+  void TearDown() override {
+    // Model file is deleted on task runner. Run all tasks to avoid memory leak.
+    task_environment_.RunUntilIdle();
+  }
+
   base::test::TaskEnvironment* task_environment() { return &task_environment_; }
 
   MediapipeTextModelExecutor* executor() { return executor_.get(); }
-
-  void RunUntilIdle() { task_environment_.RunUntilIdle(); }
 
  private:
   base::test::TaskEnvironment task_environment_;

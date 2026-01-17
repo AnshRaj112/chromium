@@ -19,7 +19,6 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/browser/ui/android/toolbar/jni_headers/LocationBarModel_jni.h"
 
-using base::android::JavaParamRef;
 using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 
@@ -53,8 +52,8 @@ LocationBarModelAndroid::GetUrlOfVisibleNavigationEntry(JNIEnv* env) {
   return url::GURLAndroid::FromNativeGURL(env, location_bar_model_->GetURL());
 }
 
-jint LocationBarModelAndroid::GetPageClassification(JNIEnv* env,
-                                                    bool is_prefetch) const {
+int32_t LocationBarModelAndroid::GetPageClassification(JNIEnv* env,
+                                                       bool is_prefetch) const {
   return location_bar_model_->GetPageClassification(is_prefetch);
 }
 
@@ -73,7 +72,7 @@ bool LocationBarModelAndroid::IsNewTabPage() const {
 
   // Android Chrome has its own Instant NTP page implementation.
   if (url.SchemeIs(chrome::kChromeNativeScheme) &&
-      url.host_piece() == chrome::kChromeUINewTabHost) {
+      url.host() == chrome::kChromeUINewTabHost) {
     return true;
   }
 
@@ -81,6 +80,9 @@ bool LocationBarModelAndroid::IsNewTabPage() const {
 }
 
 // static
-jlong JNI_LocationBarModel_Init(JNIEnv* env, const JavaParamRef<jobject>& obj) {
+static jlong JNI_LocationBarModel_Init(JNIEnv* env,
+                                       const JavaRef<jobject>& obj) {
   return reinterpret_cast<intptr_t>(new LocationBarModelAndroid(env, obj));
 }
+
+DEFINE_JNI(LocationBarModel)

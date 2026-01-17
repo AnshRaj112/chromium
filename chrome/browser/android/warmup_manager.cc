@@ -15,7 +15,7 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/android/chrome_jni_headers/WarmupManager_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 static void JNI_WarmupManager_StartPreconnectPredictorInitialization(
     JNIEnv* env,
@@ -46,8 +46,10 @@ static void JNI_WarmupManager_StartPrefetchFromCct(
     JNIEnv* env,
     content::WebContents* web_contents,
     GURL& url,
-    jboolean juse_prefetch_proxy,
+    bool juse_prefetch_proxy,
     std::optional<url::Origin>& trusted_source_origin) {
   ChromePrefetchManager::GetOrCreateForWebContents(web_contents)
       ->StartPrefetchFromCCT(url, juse_prefetch_proxy, trusted_source_origin);
 }
+
+DEFINE_JNI(WarmupManager)

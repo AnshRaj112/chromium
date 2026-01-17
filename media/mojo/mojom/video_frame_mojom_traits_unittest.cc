@@ -20,7 +20,6 @@
 #include "build/build_config.h"
 #include "gpu/command_buffer/client/test_shared_image_interface.h"
 #include "gpu/command_buffer/common/mailbox.h"
-#include "gpu/command_buffer/common/mailbox_holder.h"
 #include "gpu/command_buffer/common/sync_token.h"
 #include "media/base/color_plane_layout.h"
 #include "media/base/video_frame.h"
@@ -123,7 +122,10 @@ TEST_F(VideoFrameStructTraitsTest, MappableVideoFrame) {
       VideoFrame::STORAGE_OWNED_MEMORY,
       VideoFrame::STORAGE_UNOWNED_MEMORY,
   };
-  constexpr VideoPixelFormat formats[] = {PIXEL_FORMAT_I420, PIXEL_FORMAT_NV12};
+  constexpr VideoPixelFormat formats[] = {
+      PIXEL_FORMAT_I420, PIXEL_FORMAT_NV12, PIXEL_FORMAT_XRGB,
+      PIXEL_FORMAT_ARGB, PIXEL_FORMAT_XBGR, PIXEL_FORMAT_ABGR,
+  };
   constexpr gfx::Size kCodedSize(100, 100);
   constexpr gfx::Rect kVisibleRect(kCodedSize);
   constexpr gfx::Size kNaturalSize = kCodedSize;
@@ -161,10 +163,15 @@ TEST_F(VideoFrameStructTraitsTest, MappableVideoFrame) {
           frame = media::VideoFrame::WrapExternalYuvData(
               format, kCodedSize, kVisibleRect, kNaturalSize, strides[0],
               strides[1], strides[2], data[0], data[1], data[2], kTimestamp);
-        } else {
+        } else if (format == PIXEL_FORMAT_NV12) {
           frame = media::VideoFrame::WrapExternalYuvData(
               format, kCodedSize, kVisibleRect, kNaturalSize, strides[0],
               strides[1], data[0], data[1], kTimestamp);
+        } else {
+          ASSERT_TRUE(media::IsRGB(format));
+          frame = media::VideoFrame::WrapExternalData(
+              format, kCodedSize, kVisibleRect, kNaturalSize, data[0],
+              kTimestamp);
         }
         if (storage_type == VideoFrame::STORAGE_SHMEM)
           frame->BackWithSharedMemory(&region.region);
@@ -645,7 +652,6 @@ TEST_F(VideoFrameStructTraitsTest, DmabufsVideoFrameTooSmall) {
 
 TEST_F(VideoFrameStructTraitsTest, MappableSharedImageVideoFrame) {
   auto test_sii = base::MakeRefCounted<gpu::TestSharedImageInterface>();
-  test_sii->UseTestGMBInSharedImageCreationWithBufferUsage();
   gfx::Size coded_size = gfx::Size(256, 256);
   gfx::Rect visible_rect(coded_size);
   auto timestamp = base::Milliseconds(1);
@@ -663,8 +669,8 @@ TEST_F(VideoFrameStructTraitsTest, MappableSharedImageVideoFrame) {
   ASSERT_TRUE(frame);
   ASSERT_TRUE(RoundTrip(&frame));
   ASSERT_TRUE(frame);
-  ASSERT_EQ(frame->storage_type(), VideoFrame::STORAGE_GPU_MEMORY_BUFFER);
-  EXPECT_TRUE(frame->HasMappableGpuBuffer());
+  ASSERT_EQ(frame->storage_type(), VideoFrame::STORAGE_MAPPABLE_SHARED_IMAGE);
+  EXPECT_TRUE(frame->HasMappableSharedImage());
   EXPECT_FALSE(frame->metadata().end_of_stream);
   EXPECT_EQ(frame->format(), PIXEL_FORMAT_ABGR);
   EXPECT_EQ(frame->coded_size(), coded_size);

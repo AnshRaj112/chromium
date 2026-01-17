@@ -18,7 +18,11 @@ try_.defaults.set(
     cores = 8,
     os = os.LINUX_DEFAULT,
     execution_timeout = try_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     service_account = try_constants.DEFAULT_SERVICE_ACCOUNT,
+    siso_keep_going = siso.KEEP_GOING,
     siso_project = siso.project.DEFAULT_UNTRUSTED,
     siso_remote_jobs = siso.remote_jobs.HIGH_JOBS_FOR_CQ,
 )
@@ -31,6 +35,15 @@ def _builder(mirror_of = None, **kwargs):
     try_.builder(
         mirrors = [mirror_of],
         gn_args = mirror_of,
+        **kwargs
+    )
+
+def _mirror_builder(name = None, **kwargs):
+    """Defines a builder that mirrors the CI builder of the same name."""
+    _builder(
+        name = name,
+        mirror_of = "ci/" + name,
+        contact_team_email = "chrome-fuzzing-core@google.com",
         **kwargs
     )
 
@@ -104,6 +117,10 @@ _builder(
     name = "linux-ubsan-vptr-rel",
     mirror_of = "ci/UBSan vptr Release",
 )
+
+_mirror_builder(name = "android-desktop-x64-libfuzzer-asan", executable = "recipe:chromium/fuzz")
+
+_mirror_builder(name = "android-arm64-libfuzzer-hwasan", executable = "recipe:chromium/fuzz")
 
 _builder(
     name = "mac-asan-rel",
@@ -179,3 +196,41 @@ try_.builder(
     ),
     contact_team_email = "chrome-fuzzing-core@google.com",
 )
+
+# Libfuzzer test bots.
+
+# All test bots should run on the CQ for any changes to fuzztest.
+# See crbug.com/466122130.
+def _test_builder(**kwargs):
+    _mirror_builder(
+        cq_settings = try_.cq_settings(
+            location_filters = ["third_party/fuzztest"],
+        ),
+        **kwargs
+    )
+
+_test_builder(name = "chromeos-x64-libfuzzer-asan-rel-tests")
+
+_test_builder(name = "linux-x64-libfuzzer-asan-dbg-tests")
+
+_test_builder(name = "linux-x64-libfuzzer-asan-rel-tests")
+
+_test_builder(name = "linux-x64-libfuzzer-msan-rel-tests")
+
+_test_builder(name = "linux-x64-libfuzzer-ubsan-rel-tests")
+
+_test_builder(name = "linux-x86-libfuzzer-asan-rel-tests")
+
+_test_builder(
+    name = "mac-arm64-libfuzzer-asan-rel-tests",
+    cores = None,
+    os = os.MAC_DEFAULT,
+    cpu = cpu.ARM64,
+)
+
+_test_builder(
+    name = "win-x64-libfuzzer-asan-rel-tests",
+    os = os.WINDOWS_DEFAULT,
+)
+
+_test_builder(name = "linux-x64-centipede-asan-rel-tests")

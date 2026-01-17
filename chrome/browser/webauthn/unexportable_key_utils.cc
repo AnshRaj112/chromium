@@ -11,14 +11,23 @@
 #include "crypto/unexportable_key.h"
 #include "crypto/user_verifying_key.h"
 #include "device/fido/enclave/constants.h"
-#include "device/fido/features.h"
+#include "device/fido/public/features.h"
 
 #if BUILDFLAG(IS_MAC)
 #include "chrome/browser/webauthn/enclave_manager.h"
 #endif  // BUILDFLAG(IS_MAC)
 
+namespace {
+std::unique_ptr<crypto::UnexportableKeyProvider> (*g_mock_provider)() = nullptr;
+}  // namespace
+
 std::unique_ptr<crypto::UnexportableKeyProvider>
 GetWebAuthnUnexportableKeyProvider() {
+  // The WebAuthn test override takes preference.
+  if (g_mock_provider) {
+    return g_mock_provider();
+  }
+
   // On Linux, access to the TPM is complex compared to Windows and macOS.
   // There are libraries that _should_ work with a TPM 2.0, but Linux often
   // runs on non-PCs, where TPMs will probably never exist. Thus gating enclave
@@ -51,10 +60,8 @@ GetWebAuthnUnexportableKeyProvider() {
 #endif  // BUILDFLAG(IS_MAC)
   std::unique_ptr<crypto::UnexportableKeyProvider> provider =
       crypto::GetUnexportableKeyProvider(std::move(config));
-  if ((!provider || provider->SelectAlgorithm(
-                        device::enclave::kSigningAlgorithms) == std::nullopt) &&
-      base::FeatureList::IsEnabled(
-          device::kWebAuthnMicrosoftSoftwareUnexportableKeyProvider)) {
+  if (!provider || provider->SelectAlgorithm(
+                       device::enclave::kSigningAlgorithms) == std::nullopt) {
     // On Windows, if there is no TPM support, use the Microsoft Software Key
     // Storage Provider instead.
     provider = crypto::GetMicrosoftSoftwareUnexportableKeyProvider();
@@ -66,4 +73,15 @@ std::unique_ptr<crypto::UserVerifyingKeyProvider>
 GetWebAuthnUserVerifyingKeyProvider(
     crypto::UserVerifyingKeyProvider::Config config) {
   return crypto::GetUserVerifyingKeyProvider(std::move(config));
+}
+
+void SetWebAuthnUnexportableKeyProviderForTesting(
+    std::unique_ptr<crypto::UnexportableKeyProvider> (*func)()) {
+  if (g_mock_provider) {
+    // Nesting scoped providers is not supported.
+    CHECK(!func);
+    g_mock_provider = nullptr;
+  } else {
+    g_mock_provider = func;
+  }
 }

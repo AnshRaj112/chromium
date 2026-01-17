@@ -9,7 +9,7 @@
 #import "ios/chrome/browser/broadcaster/ui_bundled/chrome_broadcaster.h"
 #import "ios/chrome/browser/fullscreen/ui_bundled/fullscreen_system_notification_observer.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
-#import "ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbars_size.h"
+#import "ios/chrome/browser/toolbar/legacy/ui_bundled/fullscreen/toolbars_size.h"
 #import "ios/web/common/features.h"
 
 // static
@@ -24,13 +24,13 @@ FullscreenControllerImpl::FullscreenControllerImpl(Browser* browser)
       model_(std::make_unique<FullscreenModel>()),
       mediator_(this, model_.get()),
       web_state_list_observer_(this, model_.get(), &mediator_),
-      fullscreen_browser_observer_(&web_state_list_observer_, browser),
       bridge_(
           [[ChromeBroadcastOberverBridge alloc] initWithObserver:model_.get()]),
       notification_observer_([[FullscreenSystemNotificationObserver alloc]
           initWithController:this
                     mediator:&mediator_]) {
   DCHECK(broadcaster_);
+  web_state_list_observer_.SetWebStateList(browser->GetWebStateList());
   [broadcaster_ addObserver:bridge_
                 forSelector:@selector(broadcastScrollViewContentSize:)];
   if (base::FeatureList::IsEnabled(web::features::kSmoothScrollingDefault)) {

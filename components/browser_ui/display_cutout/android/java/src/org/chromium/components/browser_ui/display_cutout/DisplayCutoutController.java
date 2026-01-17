@@ -19,7 +19,7 @@ import org.chromium.base.Callback;
 import org.chromium.base.Log;
 import org.chromium.base.UserData;
 import org.chromium.base.UserDataHost;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.blink.mojom.ViewportFit;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -60,7 +60,7 @@ public class DisplayCutoutController implements InsetObserver.WindowInsetObserve
      * Provides the activity-specific (vs tab-specific) cutout mode. The activity-specific
      * cutout mode takes precedence over the tab-specific cutout mode.
      */
-    private @Nullable ObservableSupplier<Integer> mBrowserCutoutModeSupplier;
+    private @Nullable MonotonicObservableSupplier<Integer> mBrowserCutoutModeSupplier;
 
     /** Observes {@link mBrowserCutoutModeSupplier}. */
     private @Nullable Callback<Integer> mBrowserCutoutModeObserver;
@@ -141,7 +141,7 @@ public class DisplayCutoutController implements InsetObserver.WindowInsetObserve
          * Returns the activity-specific (vs tab-specific) cutout mode. The activity-specific cutout
          * mode takes precedence over the tab-specific cutout mode.
          */
-        @Nullable ObservableSupplier<Integer> getBrowserDisplayCutoutModeSupplier();
+        @Nullable MonotonicObservableSupplier<Integer> getBrowserDisplayCutoutModeSupplier();
 
         /** Whether the activity is in browser (not-HTML) fullscreen. */
         boolean isInBrowserFullscreen();
@@ -170,6 +170,7 @@ public class DisplayCutoutController implements InsetObserver.WindowInsetObserve
      * {@code null} is returned.
      */
     private static @Nullable DisplayCutoutController from(Tab tab) {
+        if (tab.isDestroyed()) return null;
         UserDataHost host = tab.getUserDataHost();
         return host.getUserData(USER_DATA_KEY);
     }
@@ -246,7 +247,8 @@ public class DisplayCutoutController implements InsetObserver.WindowInsetObserve
         }
     }
 
-    private void updateBrowserCutoutObserver(@Nullable ObservableSupplier<Integer> supplier) {
+    private void updateBrowserCutoutObserver(
+            @Nullable MonotonicObservableSupplier<Integer> supplier) {
         if (mBrowserCutoutModeSupplier == supplier) return;
 
         if (mBrowserCutoutModeObserver != null && mBrowserCutoutModeSupplier != null) {
@@ -390,10 +392,13 @@ public class DisplayCutoutController implements InsetObserver.WindowInsetObserve
             return LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
         }
 
-        if (mBrowserCutoutModeSupplier != null && mBrowserCutoutModeSupplier.hasValue()) {
-            int browserCutoutMode = mBrowserCutoutModeSupplier.get();
-            if (browserCutoutMode != LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT) {
-                return browserCutoutMode;
+        if (mBrowserCutoutModeSupplier != null) {
+            Integer mode = mBrowserCutoutModeSupplier.get();
+            if (mode != null) {
+                int browserCutoutMode = mode;
+                if (browserCutoutMode != LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT) {
+                    return browserCutoutMode;
+                }
             }
         }
 

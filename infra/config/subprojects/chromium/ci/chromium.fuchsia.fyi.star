@@ -23,6 +23,9 @@ ci.defaults.set(
     os = os.LINUX_DEFAULT,
     gardener_rotations = gardener_rotations.FUCHSIA,
     execution_timeout = 10 * time.hour,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     health_spec = health_spec.default(),
     notifies = ["cr-fuchsia"],
     service_account = ci_constants.DEFAULT_SERVICE_ACCOUNT,
@@ -60,7 +63,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.FUCHSIA,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -80,7 +82,7 @@ ci.builder(
         mixins = [
             "arm64",
             "docker",
-            "linux-jammy-or-focal",
+            "linux-jammy",
         ],
         per_test_modifications = {
             "blink_web_tests": targets.remove(
@@ -97,6 +99,7 @@ ci.builder(
             "chrome_wpt_tests": targets.remove(
                 reason = "Wptrunner does not work on Fuchsia",
             ),
+            "content_browsertests": targets.mixin(swarming = targets.swarming(shards = 28)),
             "headless_shell_wpt_tests": targets.remove(
                 reason = "Wptrunner does not work on Fuchsia",
             ),
@@ -175,7 +178,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.FUCHSIA,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
         # This builder is slow naturally, running everything in serial to avoid
         # using too much resource.
         run_tests_serially = True,
@@ -258,6 +260,7 @@ ci.builder(
         ),
     ],
     contact_team_email = "chrome-fuchsia-engprod@google.com",
+    execution_timeout = 24 * time.hour,
 )
 
 ci.builder(
@@ -278,7 +281,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.FUCHSIA,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -295,7 +297,7 @@ ci.builder(
         ],
         mixins = [
             "fuchsia-persistent-emulator",
-            "linux-focal",
+            "linux-jammy",
             targets.mixin(
                 swarming = targets.swarming(
                     dimensions = {
@@ -338,7 +340,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.FUCHSIA,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -430,7 +431,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.FUCHSIA,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -439,9 +439,7 @@ ci.builder(
             "fuchsia",
             "cast_receiver_perf_optimized",
             "x64",
-            # TODO(crbug.com/420718775): Enable "dcheck_always_on", now there
-            # are multiple test failures needing extra investigation.
-            # See https://ci.chromium.org/ui/p/chromium/builders/try/fuchsia-x64-perf-cast-receiver-rel/170/overview
+            "dcheck_always_on",
         ],
     ),
     # Do not forget to update

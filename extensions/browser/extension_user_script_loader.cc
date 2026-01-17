@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "extensions/browser/extension_user_script_loader.h"
 
 #include <stddef.h>
@@ -20,7 +15,6 @@
 #include <string>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -128,10 +122,12 @@ void VerifyContent(ContentVerifier* verifier,
                    const ExtensionId& extension_id,
                    const base::FilePath& extension_root,
                    const base::FilePath& relative_path,
+                   const base::Version& extension_version,
                    const std::optional<std::string>& content) {
   DCHECK(verifier);
   scoped_refptr<ContentVerifyJob> job(ContentVerifier::CreateAndStartJobFor(
-      extension_id, extension_root, relative_path, verifier));
+      extension_id, extension_root, extension_version, relative_path,
+      verifier));
   CHECK(job);
   if (content) {
     job->BytesRead(*content, MOJO_RESULT_OK);
@@ -188,6 +184,7 @@ void LoadScriptContent(const mojom::HostID& host_id,
                        const std::optional<int>& script_resource_id,
                        const SubstitutionMap* localization_messages,
                        const scoped_refptr<ContentVerifier>& verifier,
+                       const base::Version& extension_version,
                        size_t& remaining_length) {
   DCHECK(script_file);
   auto [content, source] =
@@ -198,7 +195,7 @@ void LoadScriptContent(const mojom::HostID& host_id,
     // Note: |content| is nullopt here for missing / unreadable file. We still
     // pass it through ContentVerifier to report content verification error.
     VerifyContent(verifier.get(), host_id.id, script_file->extension_root(),
-                  script_file->relative_path(), content);
+                  script_file->relative_path(), extension_version, content);
   }
 
   if (!content) {
@@ -296,7 +293,7 @@ void LoadUserScripts(
       if (script_file->GetContent().empty()) {
         LoadScriptContent(script->host_id(), script_file.get(),
                           script_resource_ids[script_file.get()], nullptr,
-                          verifier, remaining_length);
+                          verifier, host_info.version, remaining_length);
       }
 
       script_files_length += script_file->GetContent().length();
@@ -313,7 +310,7 @@ void LoadUserScripts(
           LoadScriptContent(script->host_id(), script_file.get(),
                             script_resource_ids[script_file.get()],
                             localization_messages.get(), verifier,
-                            remaining_length);
+                            host_info.version, remaining_length);
         }
 
         script_files_length += script_file->GetContent().length();
@@ -527,6 +524,21 @@ std::unique_ptr<UserScript> CopyDynamicScriptInfo(const UserScript& script) {
 
 }  // namespace
 
+ExtensionUserScriptLoader::PathAndLocaleInfo::PathAndLocaleInfo(
+    base::FilePath file_path,
+    base::Version version,
+    std::string default_locale,
+    extension_l10n_util::GzippedMessagesPermission gzip_permission)
+    : file_path(std::move(file_path)),
+      version(std::move(version)),
+      default_locale(std::move(default_locale)),
+      gzip_permission(gzip_permission) {}
+
+ExtensionUserScriptLoader::PathAndLocaleInfo::PathAndLocaleInfo(
+    const PathAndLocaleInfo& other) = default;
+
+ExtensionUserScriptLoader::PathAndLocaleInfo::~PathAndLocaleInfo() = default;
+
 ExtensionUserScriptLoader::ExtensionUserScriptLoader(
     BrowserContext* browser_context,
     const Extension& extension,
@@ -545,7 +557,8 @@ ExtensionUserScriptLoader::ExtensionUserScriptLoader(
     : UserScriptLoader(
           browser_context,
           mojom::HostID(mojom::HostID::HostType::kExtensions, extension.id())),
-      host_info_({extension.path(), LocaleInfo::GetDefaultLocale(&extension),
+      host_info_({extension.path(), extension.version(),
+                  LocaleInfo::GetDefaultLocale(&extension),
                   extension_l10n_util::GetGzippedMessagesPermissionForExtension(
                       &extension)}),
       helper_(browser_context, extension.id(), state_store),
@@ -611,7 +624,7 @@ void ExtensionUserScriptLoader::AddDynamicScripts(
   // are quickly unregistered.
   std::erase_if(scripts, [&pending_ids = pending_dynamic_script_ids_](
                              const std::unique_ptr<UserScript>& script) {
-    return !base::Contains(pending_ids, script->id());
+    return !pending_ids.contains(script->id());
   });
 
   if (scripts.empty()) {
@@ -623,7 +636,7 @@ void ExtensionUserScriptLoader::AddDynamicScripts(
   for (const auto& script : scripts) {
     // Additionally, only add scripts to the set of active scripts in renderers
     // (through `AddScripts()`) if the `source` for that script is enabled.
-    if (!base::Contains(disabled_sources_, script->GetSource())) {
+    if (!disabled_sources_.contains(script->GetSource())) {
       // TODO(crbug.com/40938420): This results in an additional copy being
       // stored in the browser for each of these scripts. Optimize the usage of
       // inline code.
@@ -820,7 +833,7 @@ void ExtensionUserScriptLoader::DynamicScriptsStorageHelper::SetDynamicScripts(
   base::Value::List scripts_value;
   URLPatternSet persistent_patterns;
   for (const std::unique_ptr<UserScript>& script : scripts) {
-    if (!base::Contains(persistent_dynamic_script_ids, script->id())) {
+    if (!persistent_dynamic_script_ids.contains(script->id())) {
       continue;
     }
 
@@ -873,7 +886,7 @@ void ExtensionUserScriptLoader::LoadScripts(
 
   ScriptResourceIds script_resource_ids;
   for (const std::unique_ptr<UserScript>& script : user_scripts) {
-    if (!base::Contains(added_script_ids, script->id())) {
+    if (!added_script_ids.contains(script->id())) {
       continue;
     }
     FillScriptFileResourceIds(script->js_scripts(), script_resource_ids);
@@ -899,7 +912,7 @@ void ExtensionUserScriptLoader::OnInitialDynamicScriptsReadFromStateStore(
   for (const std::unique_ptr<UserScript>& script : initial_dynamic_scripts) {
     // Only add the script to the `UserScriptLoader`'s set (thus sending it to
     // renderers) if the script source type is enabled.
-    if (!base::Contains(disabled_sources_, script->GetSource())) {
+    if (!disabled_sources_.contains(script->GetSource())) {
       scripts_to_add.push_back(CopyDynamicScriptInfo(*script));
       pending_dynamic_script_ids_.insert(script->id());
     }
@@ -977,12 +990,12 @@ void ExtensionUserScriptLoader::OnDynamicScriptsRemoved(
     std::erase_if(
         loaded_dynamic_scripts_,
         [&removed_script_ids](const std::unique_ptr<UserScript>& script) {
-          return base::Contains(removed_script_ids, script->id());
+          return removed_script_ids.contains(script->id());
         });
 
     std::erase_if(persistent_dynamic_script_ids_,
                   [&removed_script_ids](const auto& id) {
-                    return base::Contains(removed_script_ids, id);
+                    return removed_script_ids.contains(id);
                   });
 
     helper_.SetDynamicScripts(loaded_dynamic_scripts_,

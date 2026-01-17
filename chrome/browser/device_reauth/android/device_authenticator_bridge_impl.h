@@ -8,13 +8,13 @@
 #include "base/android/scoped_java_ref.h"
 #include "base/functional/callback_forward.h"
 #include "chrome/browser/device_reauth/android/device_authenticator_android.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 
 class DeviceAuthenticatorBridgeImpl : public DeviceAuthenticatorBridge {
  public:
   explicit DeviceAuthenticatorBridgeImpl(const gfx::NativeWindow window);
   explicit DeviceAuthenticatorBridgeImpl(
-      const base::android::JavaParamRef<jobject>& activity);
+      const base::android::JavaRef<jobject>& activity);
   ~DeviceAuthenticatorBridgeImpl() override;
 
   DeviceAuthenticatorBridgeImpl(const DeviceAuthenticatorBridgeImpl&) = delete;
@@ -35,7 +35,7 @@ class DeviceAuthenticatorBridgeImpl : public DeviceAuthenticatorBridge {
   void Cancel() override;
 
   // Called by Java when the authentication completes with the `result`.
-  void OnAuthenticationCompleted(JNIEnv* env, jint result);
+  void OnAuthenticationCompleted(JNIEnv* env, int32_t result);
 
  private:
   // Called when the authentication completes.

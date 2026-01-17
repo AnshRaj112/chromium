@@ -14,6 +14,7 @@
 #include "components/permissions/resolvers/permission_resolver.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/blink/public/mojom/permissions/permission.mojom.h"
 #include "third_party/blink/public/mojom/permissions/permission_status.mojom.h"
 
 namespace permissions {
@@ -24,12 +25,14 @@ class GeolocationPermissionResolverTest
  protected:
   static std::unique_ptr<PermissionResolver> approximate_request_resolver() {
     return std::make_unique<GeolocationPermissionResolver>(
-        /*requested_precise=*/false);
+        *blink::mojom::PermissionDescriptor::New(
+            blink::mojom::PermissionName::GEOLOCATION_APPROXIMATE, nullptr));
   }
 
   static std::unique_ptr<PermissionResolver> precise_request_resolver() {
     return std::make_unique<GeolocationPermissionResolver>(
-        /*requested_precise=*/true);
+        *blink::mojom::PermissionDescriptor::New(
+            blink::mojom::PermissionName::GEOLOCATION, nullptr));
   }
 };
 
@@ -62,6 +65,7 @@ TEST_F(GeolocationPermissionResolverTest,
   EXPECT_EQ(precise_request_resolver()->DeterminePermissionStatus(setting),
             blink::mojom::PermissionStatus::GRANTED);
 }
+
 TEST_F(GeolocationPermissionResolverTest,
        TestDeterminePermissionStatusAllowBlock) {
   auto setting =
@@ -70,7 +74,7 @@ TEST_F(GeolocationPermissionResolverTest,
   EXPECT_EQ(approximate_request_resolver()->DeterminePermissionStatus(setting),
             blink::mojom::PermissionStatus::GRANTED);
   EXPECT_EQ(precise_request_resolver()->DeterminePermissionStatus(setting),
-            blink::mojom::PermissionStatus::DENIED);
+            blink::mojom::PermissionStatus::GRANTED);
 }
 
 TEST_F(GeolocationPermissionResolverTest,
@@ -108,38 +112,45 @@ TEST_F(GeolocationPermissionResolverTest,
               previous_setting, PermissionDecision::kDeny, std::monostate())),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 
-  EXPECT_EQ(std::get<GeolocationSetting>(
-                precise_request_resolver()->ComputePermissionDecisionResult(
-                    previous_setting, PermissionDecision::kAllow,
-                    GeolocationPromptOptions{/*selected_precise=*/false})),
-            GeolocationSetting(PermissionOption::kAllowed,
-                               PermissionOption::kDenied));
+  EXPECT_EQ(
+      std::get<GeolocationSetting>(
+          precise_request_resolver()->ComputePermissionDecisionResult(
+              previous_setting, PermissionDecision::kAllow,
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
+      GeolocationSetting(PermissionOption::kAllowed,
+                         PermissionOption::kDenied));
 
-  EXPECT_EQ(std::get<GeolocationSetting>(
-                precise_request_resolver()->ComputePermissionDecisionResult(
-                    previous_setting, PermissionDecision::kAllowThisTime,
-                    GeolocationPromptOptions{/*selected_precise=*/false})),
-            GeolocationSetting(PermissionOption::kAllowed,
-                               PermissionOption::kDenied));
+  EXPECT_EQ(
+      std::get<GeolocationSetting>(
+          precise_request_resolver()->ComputePermissionDecisionResult(
+              previous_setting, PermissionDecision::kAllowThisTime,
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
+      GeolocationSetting(PermissionOption::kAllowed,
+                         PermissionOption::kDenied));
 
   EXPECT_EQ(
       std::get<GeolocationSetting>(
           precise_request_resolver()->ComputePermissionDecisionResult(
               previous_setting, PermissionDecision::kDeny,
-              GeolocationPromptOptions{/*selected_precise=*/false})),
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 
   EXPECT_EQ(std::get<GeolocationSetting>(
                 precise_request_resolver()->ComputePermissionDecisionResult(
                     previous_setting, PermissionDecision::kAllow,
-                    GeolocationPromptOptions{/*selected_precise=*/true})),
+                    GeolocationPromptOptions{
+                        /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
             GeolocationSetting(PermissionOption::kAllowed,
                                PermissionOption::kAllowed));
 
   EXPECT_EQ(std::get<GeolocationSetting>(
                 precise_request_resolver()->ComputePermissionDecisionResult(
                     previous_setting, PermissionDecision::kAllowThisTime,
-                    GeolocationPromptOptions{/*selected_precise=*/true})),
+                    GeolocationPromptOptions{
+                        /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
             GeolocationSetting(PermissionOption::kAllowed,
                                PermissionOption::kAllowed));
 
@@ -147,7 +158,8 @@ TEST_F(GeolocationPermissionResolverTest,
       std::get<GeolocationSetting>(
           precise_request_resolver()->ComputePermissionDecisionResult(
               previous_setting, PermissionDecision::kDeny,
-              GeolocationPromptOptions{/*selected_precise=*/true})),
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 }
 
@@ -175,38 +187,45 @@ TEST_F(GeolocationPermissionResolverTest,
               previous_setting, PermissionDecision::kDeny, std::monostate())),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 
-  EXPECT_EQ(std::get<GeolocationSetting>(
-                precise_request_resolver()->ComputePermissionDecisionResult(
-                    previous_setting, PermissionDecision::kAllow,
-                    GeolocationPromptOptions{/*selected_precise=*/false})),
-            GeolocationSetting(PermissionOption::kAllowed,
-                               PermissionOption::kDenied));
+  EXPECT_EQ(
+      std::get<GeolocationSetting>(
+          precise_request_resolver()->ComputePermissionDecisionResult(
+              previous_setting, PermissionDecision::kAllow,
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
+      GeolocationSetting(PermissionOption::kAllowed,
+                         PermissionOption::kDenied));
 
-  EXPECT_EQ(std::get<GeolocationSetting>(
-                precise_request_resolver()->ComputePermissionDecisionResult(
-                    previous_setting, PermissionDecision::kAllowThisTime,
-                    GeolocationPromptOptions{/*selected_precise=*/false})),
-            GeolocationSetting(PermissionOption::kAllowed,
-                               PermissionOption::kDenied));
+  EXPECT_EQ(
+      std::get<GeolocationSetting>(
+          precise_request_resolver()->ComputePermissionDecisionResult(
+              previous_setting, PermissionDecision::kAllowThisTime,
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
+      GeolocationSetting(PermissionOption::kAllowed,
+                         PermissionOption::kDenied));
 
   EXPECT_EQ(
       std::get<GeolocationSetting>(
           precise_request_resolver()->ComputePermissionDecisionResult(
               previous_setting, PermissionDecision::kDeny,
-              GeolocationPromptOptions{/*selected_precise=*/false})),
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 
   EXPECT_EQ(std::get<GeolocationSetting>(
                 precise_request_resolver()->ComputePermissionDecisionResult(
                     previous_setting, PermissionDecision::kAllow,
-                    GeolocationPromptOptions{/*selected_precise=*/true})),
+                    GeolocationPromptOptions{
+                        /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
             GeolocationSetting(PermissionOption::kAllowed,
                                PermissionOption::kAllowed));
 
   EXPECT_EQ(std::get<GeolocationSetting>(
                 precise_request_resolver()->ComputePermissionDecisionResult(
                     previous_setting, PermissionDecision::kAllowThisTime,
-                    GeolocationPromptOptions{/*selected_precise=*/true})),
+                    GeolocationPromptOptions{
+                        /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
             GeolocationSetting(PermissionOption::kAllowed,
                                PermissionOption::kAllowed));
 
@@ -214,7 +233,8 @@ TEST_F(GeolocationPermissionResolverTest,
       std::get<GeolocationSetting>(
           precise_request_resolver()->ComputePermissionDecisionResult(
               previous_setting, PermissionDecision::kDeny,
-              GeolocationPromptOptions{/*selected_precise=*/true})),
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 }
 
@@ -243,38 +263,52 @@ TEST_F(GeolocationPermissionResolverTest,
               previous_setting, PermissionDecision::kDeny, std::monostate())),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 
-  EXPECT_EQ(std::get<GeolocationSetting>(
-                precise_request_resolver()->ComputePermissionDecisionResult(
-                    previous_setting, PermissionDecision::kAllow,
-                    GeolocationPromptOptions{/*selected_precise=*/false})),
-            GeolocationSetting(PermissionOption::kAllowed,
-                               PermissionOption::kDenied));
+  EXPECT_EQ(
+      std::get<GeolocationSetting>(
+          precise_request_resolver()->ComputePermissionDecisionResult(
+              previous_setting, PermissionDecision::kAllow, std::monostate())),
+      GeolocationSetting(PermissionOption::kAllowed,
+                         PermissionOption::kDenied));
 
-  EXPECT_EQ(std::get<GeolocationSetting>(
-                precise_request_resolver()->ComputePermissionDecisionResult(
-                    previous_setting, PermissionDecision::kAllowThisTime,
-                    GeolocationPromptOptions{/*selected_precise=*/false})),
-            GeolocationSetting(PermissionOption::kAllowed,
-                               PermissionOption::kDenied));
+  EXPECT_EQ(
+      std::get<GeolocationSetting>(
+          precise_request_resolver()->ComputePermissionDecisionResult(
+              previous_setting, PermissionDecision::kAllow,
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
+      GeolocationSetting(PermissionOption::kAllowed,
+                         PermissionOption::kDenied));
+
+  EXPECT_EQ(
+      std::get<GeolocationSetting>(
+          precise_request_resolver()->ComputePermissionDecisionResult(
+              previous_setting, PermissionDecision::kAllowThisTime,
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
+      GeolocationSetting(PermissionOption::kAllowed,
+                         PermissionOption::kDenied));
 
   EXPECT_EQ(
       std::get<GeolocationSetting>(
           precise_request_resolver()->ComputePermissionDecisionResult(
               previous_setting, PermissionDecision::kDeny,
-              GeolocationPromptOptions{/*selected_precise=*/false})),
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 
   EXPECT_EQ(std::get<GeolocationSetting>(
                 precise_request_resolver()->ComputePermissionDecisionResult(
                     previous_setting, PermissionDecision::kAllow,
-                    GeolocationPromptOptions{/*selected_precise=*/true})),
+                    GeolocationPromptOptions{
+                        /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
             GeolocationSetting(PermissionOption::kAllowed,
                                PermissionOption::kAllowed));
 
   EXPECT_EQ(std::get<GeolocationSetting>(
                 precise_request_resolver()->ComputePermissionDecisionResult(
                     previous_setting, PermissionDecision::kAllowThisTime,
-                    GeolocationPromptOptions{/*selected_precise=*/true})),
+                    GeolocationPromptOptions{
+                        /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
             GeolocationSetting(PermissionOption::kAllowed,
                                PermissionOption::kAllowed));
 
@@ -282,7 +316,8 @@ TEST_F(GeolocationPermissionResolverTest,
       std::get<GeolocationSetting>(
           precise_request_resolver()->ComputePermissionDecisionResult(
               previous_setting, PermissionDecision::kDeny,
-              GeolocationPromptOptions{/*selected_precise=*/true})),
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 }
 
@@ -311,38 +346,45 @@ TEST_F(GeolocationPermissionResolverTest,
               previous_setting, PermissionDecision::kDeny, std::monostate())),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 
-  EXPECT_EQ(std::get<GeolocationSetting>(
-                precise_request_resolver()->ComputePermissionDecisionResult(
-                    previous_setting, PermissionDecision::kAllow,
-                    GeolocationPromptOptions{/*selected_precise=*/false})),
-            GeolocationSetting(PermissionOption::kAllowed,
-                               PermissionOption::kDenied));
+  EXPECT_EQ(
+      std::get<GeolocationSetting>(
+          precise_request_resolver()->ComputePermissionDecisionResult(
+              previous_setting, PermissionDecision::kAllow,
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
+      GeolocationSetting(PermissionOption::kAllowed,
+                         PermissionOption::kDenied));
 
-  EXPECT_EQ(std::get<GeolocationSetting>(
-                precise_request_resolver()->ComputePermissionDecisionResult(
-                    previous_setting, PermissionDecision::kAllowThisTime,
-                    GeolocationPromptOptions{/*selected_precise=*/false})),
-            GeolocationSetting(PermissionOption::kAllowed,
-                               PermissionOption::kDenied));
+  EXPECT_EQ(
+      std::get<GeolocationSetting>(
+          precise_request_resolver()->ComputePermissionDecisionResult(
+              previous_setting, PermissionDecision::kAllowThisTime,
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
+      GeolocationSetting(PermissionOption::kAllowed,
+                         PermissionOption::kDenied));
 
   EXPECT_EQ(
       std::get<GeolocationSetting>(
           precise_request_resolver()->ComputePermissionDecisionResult(
               previous_setting, PermissionDecision::kDeny,
-              GeolocationPromptOptions{/*selected_precise=*/false})),
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kApproximate})),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 
   EXPECT_EQ(std::get<GeolocationSetting>(
                 precise_request_resolver()->ComputePermissionDecisionResult(
                     previous_setting, PermissionDecision::kAllow,
-                    GeolocationPromptOptions{/*selected_precise=*/true})),
+                    GeolocationPromptOptions{
+                        /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
             GeolocationSetting(PermissionOption::kAllowed,
                                PermissionOption::kAllowed));
 
   EXPECT_EQ(std::get<GeolocationSetting>(
                 precise_request_resolver()->ComputePermissionDecisionResult(
                     previous_setting, PermissionDecision::kAllowThisTime,
-                    GeolocationPromptOptions{/*selected_precise=*/true})),
+                    GeolocationPromptOptions{
+                        /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
             GeolocationSetting(PermissionOption::kAllowed,
                                PermissionOption::kAllowed));
 
@@ -350,7 +392,8 @@ TEST_F(GeolocationPermissionResolverTest,
       std::get<GeolocationSetting>(
           precise_request_resolver()->ComputePermissionDecisionResult(
               previous_setting, PermissionDecision::kDeny,
-              GeolocationPromptOptions{/*selected_precise=*/true})),
+              GeolocationPromptOptions{
+                  /*selected_accuracy=*/GeolocationAccuracy::kPrecise})),
       GeolocationSetting(PermissionOption::kDenied, PermissionOption::kDenied));
 }
 

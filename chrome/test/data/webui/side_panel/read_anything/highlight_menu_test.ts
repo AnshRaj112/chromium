@@ -1,99 +1,151 @@
 // Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 import 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 
-import {BrowserProxy} from '//resources/cr_components/color_change_listener/browser_proxy.js';
-import type {CrIconButtonElement} from '//resources/cr_elements/cr_icon_button/cr_icon_button.js';
-import type {AppElement, ReadAnythingToolbarElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
-import {assertEquals, assertStringContains, assertTrue} from 'chrome-untrusted://webui-test/chai_assert.js';
+import {DEFAULT_SETTINGS, ReadAloudSettingsChange, ToolbarEvent} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import type {HighlightMenuElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import {assertEquals, assertFalse, assertNotEquals, assertTrue} from 'chrome-untrusted://webui-test/chai_assert.js';
 import {microtasksFinished} from 'chrome-untrusted://webui-test/test_util.js';
 
-import {createApp, stubAnimationFrame} from './common.js';
+import {assertCheckMarksForDropdown, assertHeadersForDropdown, assertTestSettingsAreNotDefaultSettings, mockMetrics, stubAnimationFrame, TEST_RANDOM_VALUE_SETTINGS} from './common.js';
 import {FakeReadingMode} from './fake_reading_mode.js';
-import {TestColorUpdaterBrowserProxy} from './test_color_updater_browser_proxy.js';
+import type {TestMetricsBrowserProxy} from './test_metrics_browser_proxy.js';
 
 suite('HighlightMenuElement', () => {
-  let app: AppElement;
-  let toolbar: ReadAnythingToolbarElement;
-  let highlightButton: CrIconButtonElement;
+  let highlightMenu: HighlightMenuElement;
+  let metrics: TestMetricsBrowserProxy;
 
-  setup(async () => {
+  function createHighlightMenu() {
+    highlightMenu = document.createElement('highlight-menu');
+    document.body.appendChild(highlightMenu);
+  }
+
+  suiteSetup(() => {
+    assertTestSettingsAreNotDefaultSettings();
+  });
+
+  setup(() => {
     // Clearing the DOM should always be done first.
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
-    BrowserProxy.setInstance(new TestColorUpdaterBrowserProxy());
     const readingMode = new FakeReadingMode();
     chrome.readingMode = readingMode as unknown as typeof chrome.readingMode;
-    chrome.readingMode.isReadAloudEnabled = true;
-
-    app = await createApp();
-
-    toolbar = app.$.toolbar;
-    highlightButton =
-        toolbar.$.toolbarContainer.querySelector<CrIconButtonElement>(
-            '#highlight')!;
+    metrics = mockMetrics();
   });
 
-  test('highlighting is on by default', () => {
-    assertEquals('read-anything:highlight-on', highlightButton.ironIcon);
-    assertStringContains(highlightButton.title, 'Voice');
-    assertEquals(0, chrome.readingMode.highlightGranularity);
-    assertTrue(chrome.readingMode.isHighlightOn());
+  test('has checkmarks', () => {
+    createHighlightMenu();
+    assertCheckMarksForDropdown(highlightMenu);
   });
 
-  test('preference restore maintains menu highlight state', () => {
-    chrome.readingMode.restoreSettingsFromPrefs();
-    assertEquals('read-anything:highlight-on', highlightButton.ironIcon);
-    assertStringContains(highlightButton.title, 'Voice');
-    assertEquals(0, chrome.readingMode.highlightGranularity);
-    assertTrue(chrome.readingMode.isHighlightOn());
+  test('does not have headers', () => {
+    assertHeadersForDropdown(
+        highlightMenu.$.menu, /*shouldHaveHeaders=*/ false);
   });
 
+  test('highlight change is propagated', async () => {
+    createHighlightMenu();
+    const numberOfOptions = 3;
+    let closeAllMenusCount = 0;
+    document.addEventListener(
+        ToolbarEvent.CLOSE_ALL_MENUS, () => closeAllMenusCount += 1);
 
-  test('click opens menu', async () => {
-    stubAnimationFrame();
-    highlightButton.click();
+    const highlight1 = chrome.readingMode.noHighlighting;
+    highlightMenu.$.menu.dispatchEvent(new CustomEvent(
+        ToolbarEvent.HIGHLIGHT_CHANGE, {detail: {data: highlight1}}));
+    assertEquals(highlight1, chrome.readingMode.highlightGranularity);
+
+    const highlight2 = chrome.readingMode.autoHighlighting;
+    highlightMenu.$.menu.dispatchEvent(new CustomEvent(
+        ToolbarEvent.HIGHLIGHT_CHANGE, {detail: {data: highlight2}}));
+    assertEquals(highlight2, chrome.readingMode.highlightGranularity);
+
+    const highlight3 = chrome.readingMode.sentenceHighlighting;
+    highlightMenu.$.menu.dispatchEvent(new CustomEvent(
+        ToolbarEvent.HIGHLIGHT_CHANGE, {detail: {data: highlight3}}));
+    assertEquals(highlight3, chrome.readingMode.highlightGranularity);
+
+    assertEquals(
+        ReadAloudSettingsChange.HIGHLIGHT_CHANGE,
+        await metrics.whenCalled('recordSpeechSettingsChange'));
+    assertEquals(
+        numberOfOptions, metrics.getCallCount('recordSpeechSettingsChange'));
+    assertEquals(numberOfOptions, closeAllMenusCount);
+  });
+
+  test('highlight change logs new granularity', async () => {
+    createHighlightMenu();
+
+    const highlight = chrome.readingMode.noHighlighting;
+    highlightMenu.$.menu.dispatchEvent(new CustomEvent(
+        ToolbarEvent.HIGHLIGHT_CHANGE, {detail: {data: highlight}}));
+
+    assertEquals(
+        highlight, await metrics.whenCalled('recordHighlightGranularity'));
+  });
+
+  test('has phrase highlighting option if flag enabled', () => {
+    chrome.readingMode.isPhraseHighlightingEnabled = true;
+
+    createHighlightMenu();
+
+    const menu = highlightMenu.$.menu.$.lazyMenu.get();
+    const options =
+        Array.from(menu.querySelectorAll<HTMLButtonElement>('.dropdown-item'));
+    const titles = options.map(button => button.textContent?.trim());
+    assertEquals(5, titles.length);
+    assertTrue(titles.includes('Phrase'));
+  });
+
+  test('does not have phrase highlighting option if flag disabled', () => {
+    chrome.readingMode.isPhraseHighlightingEnabled = false;
+
+    createHighlightMenu();
+
+    const menu = highlightMenu.$.menu.$.lazyMenu.get();
+    const options =
+        Array.from(menu.querySelectorAll<HTMLButtonElement>('.dropdown-item'));
+    const titles = options.map(button => button.textContent?.trim());
+    assertEquals(4, titles.length);
+    assertFalse(titles.includes('Phrase'));
+  });
+
+  test('restores saved highlight option', async () => {
+    createHighlightMenu();
+    const granularity = chrome.readingMode.wordHighlighting;
+    const startingIndex = highlightMenu.$.menu.currentSelectedIndex;
+    assertNotEquals(granularity, startingIndex);
+
+    highlightMenu.settingsPrefs = {
+      ...DEFAULT_SETTINGS,
+      highlightGranularity: granularity,
+    };
     await microtasksFinished();
 
-    const menu = toolbar.$.highlightMenu.$.menu.$.lazyMenu.get();
-    assertTrue(menu.open);
+    assertNotEquals(startingIndex, highlightMenu.$.menu.currentSelectedIndex);
   });
 
-  suite('dropdown menu', () => {
-    let options: HTMLButtonElement[];
+  test('does nothing if saved highlight is the same', async () => {
+    createHighlightMenu();
+    const startingIndex = highlightMenu.$.menu.currentSelectedIndex;
 
-    setup(async () => {
-      stubAnimationFrame();
-      highlightButton.click();
-      await microtasksFinished();
-      const menu = toolbar.$.highlightMenu.$.menu.$.lazyMenu.get();
-      assertTrue(menu.open);
-      options = Array.from(
-          menu.querySelectorAll<HTMLButtonElement>('.dropdown-item'));
-    });
+    highlightMenu.settingsPrefs = {
+      ...TEST_RANDOM_VALUE_SETTINGS,
+      highlightGranularity: 0,
+    };
+    await microtasksFinished();
 
-    test('has 4 items', () => {
-      assertEquals(options.length, 4);
-    });
+    assertEquals(startingIndex, highlightMenu.$.menu.currentSelectedIndex);
+  });
 
-    test('selects highlight granularity', async () => {
-      let index = 0;
-      for (const option of options) {
-        option.click();
-        await microtasksFinished();
-        // Skip phrase highlighting, since it's not shown in this menu.
-        if (index === chrome.readingMode.phraseHighlighting) {
-          index += 1;
-        }
-        assertEquals(chrome.readingMode.highlightGranularity, index);
-        index++;
-      }
-    });
-
-    test('highlight off changes icon', async () => {
-      options[3]!.click();
-      await microtasksFinished();
-      assertEquals('read-anything:highlight-off', highlightButton.ironIcon);
-    });
+  test('can be closed programatically', () => {
+    createHighlightMenu();
+    stubAnimationFrame();
+    highlightMenu.open(document.body);
+    const innerMenu = highlightMenu.$.menu.$.lazyMenu.get();
+    assertTrue(innerMenu.open);
+    highlightMenu.close();
+    assertFalse(innerMenu.open);
   });
 });

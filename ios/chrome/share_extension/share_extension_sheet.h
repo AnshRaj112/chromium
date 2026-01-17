@@ -7,13 +7,13 @@
 
 #import <UIKit/UIKit.h>
 
-#import "ios/chrome/common/ui/confirmation_alert/confirmation_alert_action_handler.h"
-#import "ios/chrome/common/ui/confirmation_alert/confirmation_alert_view_controller.h"
-#import "ios/chrome/share_extension/account_info.h"
+#import "ios/chrome/common/ui/button_stack/button_stack_action_delegate.h"
+#import "ios/chrome/common/ui/button_stack/button_stack_view_controller.h"
+#import "ios/chrome/share_extension/share_extension_account_info.h"
 
 @protocol ShareExtensionDelegate;
 @interface ShareExtensionSheet
-    : ConfirmationAlertViewController <ConfirmationAlertActionHandler>
+    : ButtonStackViewController <ButtonStackActionDelegate>
 
 // The image to share.
 @property(nonatomic, strong) UIImage* sharedImage;
@@ -22,7 +22,7 @@
 @property(nonatomic, strong) NSURL* sharedURL;
 @property(nonatomic, copy) NSString* sharedTitle;
 @property(nonatomic, strong) UIImage* sharedURLPreview;
-@property(nonatomic, strong) AccountInfo* selectedAccountInfo;
+@property(nonatomic, strong) ShareExtensionAccountInfo* selectedAccountInfo;
 
 // The text to share.
 @property(nonatomic, copy) NSString* sharedText;
@@ -37,14 +37,7 @@
 // The delegate for interactions in `ShareExtensionSheet`.
 @property(nonatomic, weak) id<ShareExtensionDelegate> delegate;
 
-- (instancetype)init NS_DESIGNATED_INITIALIZER;
-
-- (instancetype)initWithStyle:(UITableViewStyle)style NS_UNAVAILABLE;
-- (instancetype)initWithCoder:(NSCoder*)coder NS_UNAVAILABLE;
-- (instancetype)initWithNibName:(NSString*)nibNameOrNil
-                         bundle:(NSBundle*)nibBundleOrNil NS_UNAVAILABLE;
-
-- (void)setAccounts:(NSArray<AccountInfo*>*)accounts;
+- (void)setAccounts:(NSArray<ShareExtensionAccountInfo*>*)accounts;
 
 @end
 

@@ -7,7 +7,6 @@ load("@chromium-luci//args.star", "args")
 load("@chromium-luci//branches.star", "branches")
 load("@chromium-luci//builder_config.star", "builder_config")
 load("@chromium-luci//builder_health_indicators.star", "health_spec")
-load("@chromium-luci//builders.star", "cpu")
 load("@chromium-luci//ci.star", "ci")
 load("@chromium-luci//consoles.star", "consoles")
 load("@chromium-luci//gn_args.star", "gn_args")
@@ -26,6 +25,9 @@ ci.defaults.set(
     tree_closing_notifiers = gpu.ci.TREE_CLOSING_NOTIFIERS,
     contact_team_email = "chrome-gpu-infra@google.com",
     execution_timeout = ci_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     health_spec = health_spec.default(),
     service_account = ci_constants.DEFAULT_SERVICE_ACCOUNT,
     shadow_service_account = ci_constants.DEFAULT_SHADOW_SERVICE_ACCOUNT,
@@ -86,7 +88,6 @@ gpu.ci.linux_builder(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -144,7 +145,6 @@ gpu.ci.linux_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -179,7 +179,6 @@ gpu.ci.linux_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -223,7 +222,6 @@ gpu.ci.mac_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -236,8 +234,6 @@ gpu.ci.mac_builder(
         ],
     ),
     targets = targets.bundle(),
-    cores = None,
-    cpu = cpu.ARM64,
     console_view_entry = consoles.console_view_entry(
         category = "Mac",
     ),
@@ -260,7 +256,6 @@ gpu.ci.mac_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -272,8 +267,6 @@ gpu.ci.mac_builder(
         ],
     ),
     targets = targets.bundle(),
-    cores = None,
-    cpu = cpu.ARM64,
     tree_closing = False,
     console_view_entry = consoles.console_view_entry(
         category = "Mac",
@@ -304,7 +297,6 @@ gpu.ci.windows_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -339,7 +331,6 @@ gpu.ci.windows_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -377,7 +368,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -428,7 +418,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -474,7 +463,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -486,6 +474,11 @@ ci.thin_tester(
             "puppet_production",
         ],
         per_test_modifications = {
+            "pixel_skia_gold_metal_passthrough_graphite_test": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 2,
+                ),
+            ),
             "tab_capture_end2end_tests": targets.remove(
                 reason = "Run these only on Release bots.",
             ),
@@ -521,7 +514,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -561,7 +553,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -614,7 +605,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -654,7 +644,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -679,6 +668,12 @@ ci.thin_tester(
                         # now since we are manually applying the number of jobs above.
                         targets.magic_args.GPU_PARALLEL_JOBS: None,
                     },
+                ),
+            ),
+            "trace_test": targets.mixin(
+                # TODO(crbug.com/453961754): fix slowdown in trace_test and remove this sharding
+                swarming = targets.swarming(
+                    shards = 2,
                 ),
             ),
         },
@@ -715,7 +710,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-gpu-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -725,6 +719,7 @@ ci.thin_tester(
         mixins = [
             "win10_nvidia_gtx_1660_stable",
             "puppet_production",
+            "retry_only_failed_tests",
         ],
         per_test_modifications = {
             "pixel_skia_gold_passthrough_test": targets.per_test_modification(

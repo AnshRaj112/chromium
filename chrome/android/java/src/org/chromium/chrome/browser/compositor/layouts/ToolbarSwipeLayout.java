@@ -19,8 +19,9 @@ import org.chromium.base.CallbackUtils;
 import org.chromium.base.MathUtils;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.ObservableSuppliers;
+import org.chromium.base.supplier.SettableNullableObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.R;
@@ -82,8 +83,10 @@ public class ToolbarSwipeLayout extends Layout {
     private @Nullable TopToolbarOverlayCoordinator mLeftToolbarOverlay;
     private @Nullable TopToolbarOverlayCoordinator mRightToolbarOverlay;
 
-    private final ObservableSupplierImpl<@Nullable Tab> mLeftTabSupplier;
-    private final ObservableSupplierImpl<@Nullable Tab> mRightTabSupplier;
+    private final SettableNullableObservableSupplier<Tab> mLeftTabSupplier =
+            ObservableSuppliers.createNullable();
+    private final SettableNullableObservableSupplier<Tab> mRightTabSupplier =
+            ObservableSuppliers.createNullable();
 
     private final ViewGroup mContentContainer;
 
@@ -127,7 +130,7 @@ public class ToolbarSwipeLayout extends Layout {
             BrowserControlsStateProvider browserControlsStateProvider,
             LayoutManager layoutManager,
             TopUiThemeColorProvider topUiColorProvider,
-            ObservableSupplier<Integer> bottomControlsOffsetSupplier,
+            MonotonicObservableSupplier<Integer> bottomControlsOffsetSupplier,
             ViewGroup contentContainer) {
         super(context, updateHost, renderHost);
         mBlackHoleEventFilter = new BlackHoleEventFilter(context);
@@ -140,10 +143,9 @@ public class ToolbarSwipeLayout extends Layout {
 
         mMoveToolbar = !DeviceFormFactor.isNonMultiDisplayContextOnTablet(context);
 
-        mLeftTabSupplier = new ObservableSupplierImpl<>();
-        mRightTabSupplier = new ObservableSupplierImpl<>();
         // No new captures should be taken mid swipe, so this shouldn't matter.
-        ObservableSupplier<Long> captureResourceIdSupplier = new ObservableSupplierImpl<>();
+        MonotonicObservableSupplier<Long> captureResourceIdSupplier =
+                ObservableSuppliers.alwaysNull();
 
         if (mMoveToolbar) {
             mLeftToolbarOverlay =
@@ -156,10 +158,11 @@ public class ToolbarSwipeLayout extends Layout {
                             () -> mRenderHost.getResourceManager(),
                             topUiColorProvider,
                             bottomControlsOffsetSupplier,
-                            new ObservableSupplierImpl<>(false),
+                            ObservableSuppliers.alwaysFalse(),
                             LayoutType.TOOLBAR_SWIPE,
                             /* isVisibilityManuallyControlled= */ true,
-                            captureResourceIdSupplier);
+                            captureResourceIdSupplier,
+                            null);
             mLeftToolbarOverlay.setManualVisibility(true);
             layoutManager.addSceneOverlay(mLeftToolbarOverlay);
 
@@ -173,10 +176,11 @@ public class ToolbarSwipeLayout extends Layout {
                             () -> mRenderHost.getResourceManager(),
                             topUiColorProvider,
                             bottomControlsOffsetSupplier,
-                            new ObservableSupplierImpl<>(false),
+                            ObservableSuppliers.alwaysFalse(),
                             LayoutType.TOOLBAR_SWIPE,
                             /* isVisibilityManuallyControlled= */ true,
-                            captureResourceIdSupplier);
+                            captureResourceIdSupplier,
+                            null);
             mRightToolbarOverlay.setManualVisibility(true);
             layoutManager.addSceneOverlay(mRightToolbarOverlay);
         }
@@ -596,10 +600,10 @@ public class ToolbarSwipeLayout extends Layout {
                 viewport, contentViewport, tabContentManager, resourceManager, browserControls);
 
         if (mSceneLayer != null) {
-            int background_color = getBackgroundColor();
+            int backgroundColor = getBackgroundColor();
 
-            mSceneLayer.update(mLeftTab, true, background_color);
-            mSceneLayer.update(mRightTab, false, background_color);
+            mSceneLayer.update(mLeftTab, true, backgroundColor);
+            mSceneLayer.update(mRightTab, false, backgroundColor);
         }
     }
 

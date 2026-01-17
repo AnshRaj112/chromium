@@ -41,11 +41,12 @@
 #include "components/password_manager/core/browser/features/password_features.h"
 #include "components/password_manager/core/browser/leak_detection_dialog_utils.h"
 #include "components/password_manager/core/common/password_manager_constants.h"
+#include "components/password_manager/core/common/password_manager_features.h"
 #include "components/strings/grit/components_strings.h"
 #include "content/public/browser/url_data_source.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui_data_source.h"
-#include "device/fido/features.h"
+#include "device/fido/public/features.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -115,6 +116,16 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
        IDS_PASSWORD_MANAGER_DESTINATION_DROPDOWN_ACCESSIBLE_NAME},
       {"addPasswordTitle", IDS_PASSWORD_MANAGER_UI_ADD_PASSWORD},
       {"addShortcut", IDS_PASSWORD_MANAGER_UI_ADD_SHORTCUT_TITLE},
+      {"actorLoginPermissionsTitle",
+       IDS_PASSWORD_MANAGER_UI_ALLOWED_ACTOR_LOGIN_SITES_TITLE},
+      {"actorLoginPermissionsDescription",
+       IDS_PASSWORD_MANAGER_UI_ALLOWED_ACTOR_LOGIN_SITES_DESCRIPTION},
+      {"removeActorLoginDialogTitle",
+       IDS_PASSWORD_MANAGER_UI_REMOVE_ACTOR_LOGIN_PERMISSION_DIALOG_TITLE},
+      {"removeActorLoginDialogDescription",
+       IDS_PASSWORD_MANAGER_UI_REMOVE_ACTOR_LOGIN_PERMISSION_DIALOG_DESCRIPTION},
+      {"removeActorLoginDialogConfirmation",
+       IDS_PASSWORD_MANAGER_UI_REMOVE_ACTOR_LOGIN_PERMISSION_DIALOG_CONFIRMATION},
       {"alreadyChangedPasswordLink",
        IDS_PASSWORD_MANAGER_UI_ALREADY_CHANGED_PASSWORD},
       {"appsLabel", IDS_PASSWORD_MANAGER_UI_APPS_LABEL},
@@ -128,6 +139,10 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
        IDS_PASSWORD_MANAGER_UI_BACK_TO_CHECKUP_ARIA_DESCRIPTION},
       {"backToPasswords",
        IDS_PASSWORD_MANAGER_UI_BACK_TO_PASSWORDS_ARIA_DESCRIPTION},
+      {"backToSettings",
+       IDS_PASSWORD_MANAGER_UI_BACK_TO_PASSWORD_SETTINGS_ARIA_DESCRIPTION},
+      {"backupPasswordDetailsCardAriaLabel",
+       IDS_PASSWORD_MANAGER_UI_BACKUP_PASSWORD_DETAILS_CARD_ARIA_LABEL},
       {"blockedSitesDescription",
        IDS_PASSWORD_MANAGER_UI_BLOCKED_SITES_DESCRIPTION},
       {"blockedSitesTitle", IDS_PASSWORD_MANAGER_UI_BLOCKED_SITES_TITLE},
@@ -339,6 +354,8 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
        IDS_PASSWORD_MANAGER_UI_PASSKEY_DETAILS_CARD_DELETE_BUTTON_ARIA_LABEL},
       {"passkeyDetailsCardDeleteButtonNoUsernameAriaLabel",
        IDS_PASSWORD_MANAGER_UI_PASSKEY_DETAILS_CARD_DELETE_BUTTON_NO_USERNAME_ARIA_LABEL},
+      {"passkeyHiddenInfoLabel",
+       IDS_PASSWORD_MANAGER_UI_PASSKEY_HIDDEN_INFO_LABEL},
       {"passkeyManagementInfoLabel",
        IDS_PASSWORD_MANAGER_UI_PASSKEY_MANAGEMENT_INFO_LABEL},
       {"passkeyUpgradeSettingsToggleLabel",
@@ -346,7 +363,6 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
       {"passkeyUpgradeSettingsToggleSubLabel",
        IDS_PASSWORD_MANAGER_UI_PASSKEY_UPGRADE_TOGGLE_SUBLABEL},
       {"passwordChangeSettingLabel", IDS_SETTINGS_PASSWORD_CHANGE_LABEL},
-      {"passwordChangeSettingSubLabel", IDS_SETTINGS_PASSWORD_CHANGE_SUBLABEL},
       {"passwordChangeSettingDataBreach",
        IDS_SETTINGS_PASSWORD_CHANGE_DATA_BREACH},
       {"passwordChangeSettingWhereSaved",
@@ -513,6 +529,11 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
           IDS_PASSWORD_MANAGER_UI_SHARE_PASSWORD_NO_OTHER_FAMILY_MEMBERS,
           chrome::kFamilyGroupViewURL));
 
+  source->AddString("passwordChangeSettingSubLabel",
+                    l10n_util::GetStringFUTF16(
+                        IDS_SETTINGS_PASSWORD_CHANGE_SUBLABEL_WITH_LEARN_MORE,
+                        chrome::kPasswordChangeLearnMoreURL));
+
   source->AddString("familyGroupViewURL", chrome::kFamilyGroupViewURL);
 
   source->AddString(
@@ -635,9 +656,13 @@ content::WebUIDataSource* CreateAndAddPasswordsUIHTMLSource(
       "passkeyUpgradeSettingsToggleVisible",
       base::FeatureList::IsEnabled(device::kWebAuthnPasskeyUpgrade));
 
+  source->AddBoolean(
+      "enableActorLoginPermissions",
+      base::FeatureList::IsEnabled(password_manager::features::kActorLogin));
+
   source->AddBoolean("passwordChangeAvailable",
                      PasswordChangeServiceFactory::GetForProfile(profile)
-                         ->ShouldShowEntryInSettings());
+                         ->UserIsActivePasswordChangeUser());
 
   source->AddBoolean(
       "enablePasswordManagerMojoApi",

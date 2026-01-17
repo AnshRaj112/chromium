@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-
 #include "components/device_signals/core/common/platform_utils.h"
 
 #include <windows.h>
@@ -90,7 +89,7 @@ std::optional<std::string> GetHexStringRegValue(
     if (res == ERROR_SUCCESS) {
       // Converting the values to lowercase specifically for CrowdStrike as
       // some of their APIs only accept the lowercase version.
-      return base::ToLowerASCII(base::HexEncode(raw_bytes));
+      return base::HexEncodeLower(raw_bytes);
     }
   }
 
@@ -262,18 +261,6 @@ base::FilePath GetCrowdStrikeZtaFilePath() {
     return app_data_dir;
   }
   return app_data_dir.Append(kZtaFilePathSuffix);
-}
-
-base::FilePath GetCrowdStrikeAgentInstallPath() {
-  static constexpr base::FilePath::CharType kCrowdstrikeAgentPathSuffix[] =
-      FILE_PATH_LITERAL("CrowdStrike\\FalconService.exe");
-
-  base::FilePath app_path;
-  if (!base::PathService::Get(base::DIR_PROGRAM_FILES, &app_path)) {
-    // Returning the empty path when failing.
-    return app_path;
-  }
-  return app_path.Append(kCrowdstrikeAgentPathSuffix);
 }
 
 std::string GetDeviceModel() {

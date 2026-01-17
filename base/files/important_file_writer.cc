@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40284755): Remove this and spanify to fix the errors.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "base/files/important_file_writer.h"
 
 #include <stddef.h>
@@ -20,6 +15,7 @@
 #include <variant>
 
 #include "base/check_op.h"
+#include "base/compiler_specific.h"
 #include "base/critical_closure.h"
 #include "base/debug/alias.h"
 #include "base/files/file.h"
@@ -261,11 +257,12 @@ bool ImportantFileWriter::WriteFileAtomicallyImpl(
   // for details).
   constexpr ptrdiff_t kMaxWriteAmount = 8 * 1024 * 1024;
   int bytes_written = 0;
-  for (const char *scan = data.data(), *const end = scan + data.length();
-       scan < end; scan += bytes_written) {
+  for (const char *scan = data.data(), *const end =
+                                           UNSAFE_TODO(scan + data.length());
+       scan < end; UNSAFE_TODO(scan += bytes_written)) {
     const int write_amount =
         static_cast<int>(std::min(kMaxWriteAmount, end - scan));
-    bytes_written = tmp_file.WriteAtCurrentPos(scan, write_amount);
+    bytes_written = UNSAFE_TODO(tmp_file.WriteAtCurrentPos(scan, write_amount));
     if (bytes_written != write_amount) {
       DPLOG(WARNING) << "Failed to write " << write_amount << " bytes to temp "
                      << "file to update " << path
@@ -399,16 +396,14 @@ void ImportantFileWriter::WriteNowWithBackgroundDataProducer(
     BackgroundDataProducerCallback background_data_producer) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  auto split_task =
-      SplitOnceCallback(BindOnce(&ProduceAndWriteStringToFileAtomically, path_,
-                                 std::move(background_data_producer),
-                                 std::move(before_next_write_callback_),
-                                 std::move(after_next_write_callback_),
-                                 replace_file_callback_, histogram_suffix_));
-
+  OnceClosure write_task = BindOnce(&ProduceAndWriteStringToFileAtomically,
+                                    path_, std::move(background_data_producer),
+                                    std::move(before_next_write_callback_),
+                                    std::move(after_next_write_callback_),
+                                    replace_file_callback_, histogram_suffix_);
   if (!task_runner_->PostTask(
           FROM_HERE, MakeCriticalClosure("ImportantFileWriter::WriteNow",
-                                         std::move(split_task.first),
+                                         std::move(write_task),
                                          /*is_immediate=*/true))) {
     // Posting the task to background message loop is not expected
     // to fail.

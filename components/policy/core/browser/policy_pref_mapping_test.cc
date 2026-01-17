@@ -4,6 +4,7 @@
 
 #include "components/policy/core/browser/policy_pref_mapping_test.h"
 
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <optional>
@@ -12,7 +13,6 @@
 #include <vector>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
@@ -443,15 +443,15 @@ class PolicyTestCase {
 #else
 #error "Unknown platform"
 #endif
-    return base::Contains(supported_os_, os);
+    return std::ranges::contains(supported_os_, os);
   }
 
   bool IsOsCovered() const {
 #if BUILDFLAG(IS_ANDROID)
     // Android policies that apply to desktop Android are covered as part of the
     // desktop Android build because they may invoke desktop-only code.
-    return base::Contains(supported_os_, "android") ||
-           base::Contains(supported_os_, "desktop_android");
+    return std::ranges::contains(supported_os_, "android") ||
+           std::ranges::contains(supported_os_, "desktop_android");
 #else
     return IsOsSupported();
 #endif
@@ -510,7 +510,8 @@ class PolicyTestCases {
         ADD_FAILURE() << "Error reading: " << path;
         return;
       }
-      auto parsed_json = base::JSONReader::ReadAndReturnValueWithError(json);
+      auto parsed_json = base::JSONReader::ReadAndReturnValueWithError(
+          json, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
       if (!parsed_json.has_value()) {
         ADD_FAILURE() << "Error parsing " << path << " : "
                       << parsed_json.error().message;
@@ -699,8 +700,7 @@ void VerifyPolicyToPrefMappings(const base::FilePath& test_case_dir,
       }
     }
 
-    if (test_filter.has_value() &&
-        !base::Contains(test_filter.value(), policy_name)) {
+    if (test_filter.has_value() && !test_filter.value().contains(policy_name)) {
       // Skip policy based on the filter.
       continue;
     }
@@ -712,15 +712,15 @@ void VerifyPolicyToPrefMappings(const base::FilePath& test_case_dir,
                        : ::testing::Message()
                              << "Policy name: " << policy_name << " - " << idx);
 
-      if (!chrome_schema.GetKnownProperty(policy_name).valid() &&
-          test_case->IsSupported()) {
-        // Print warning message if a deprecated policy is still supported by
-        // the test file.
-        LOG(WARNING) << "Policy " << policy_name << " is marked as supported "
-                     << "on this OS but does not exist in the Chrome policy "
-                     << "schema.";
-        continue;
-      }
+      ASSERT_TRUE(chrome_schema.GetKnownProperty(policy_name).valid() ||
+                  !test_case->IsSupported())
+          << "Test case for " << policy_name << " is marked as supported on "
+          << "this OS, but the policy does not exist on this OS (anymore?). "
+          << "If you remove support for a policy, please also remove the "
+          << "corresponding test cases in "
+          << "components/policy/test/data/pref_mapping/" << policy_name
+          << ".json or remove the file altogether if the policy is no longer "
+          << "supported on any platform.";
 
       if (!test_case->IsSupported() ||
           test_case->has_reason_for_missing_test()) {

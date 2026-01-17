@@ -2,13 +2,11 @@
   "android-cronet-x64-dbg": {
     "additional_compile_targets": [
       "cronet_package",
-      "cronet_perf_test_apk",
       "cronet_sample_test_apk",
       "cronet_smoketests_apk",
       "cronet_smoketests_missing_native_library_instrumentation_apk",
       "cronet_smoketests_platform_only_instrumentation_apk",
       "cronet_test_instrumentation_apk",
-      "cronet_tests_android",
       "cronet_unittests_android",
       "net_unittests"
     ],
@@ -21,6 +19,8 @@
           ],
           "script": "//tools/perf/process_perf_results.py"
         },
+        "module_name": "//components/cronet/android:cronet_sizes",
+        "module_scheme": "single",
         "name": "cronet_sizes",
         "resultdb": {
           "enable": true,
@@ -57,6 +57,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_sample_test_apk",
+        "module_scheme": "junit",
         "name": "cronet_sample_test_apk",
         "resultdb": {
           "enable": true,
@@ -103,6 +105,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_apk",
         "resultdb": {
           "enable": true,
@@ -149,6 +153,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_missing_native_library_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_missing_native_library_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -195,6 +201,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_platform_only_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_platform_only_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -242,6 +250,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_test_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_test_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -286,56 +296,12 @@
             "--bucket",
             "chromium-result-details",
             "--test-name",
-            "cronet_tests_android"
-          ],
-          "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
-        },
-        "name": "cronet_tests_android",
-        "resultdb": {
-          "enable": true,
-          "has_native_resultdb_integration": true
-        },
-        "swarming": {
-          "dimensions": {
-            "cores": "8",
-            "cpu": "x86-64",
-            "device_os": null,
-            "device_type": null,
-            "os": "Ubuntu-22.04",
-            "pool": "chromium.tests.avd"
-          },
-          "named_caches": [
-            {
-              "name": "android_31_google_apis_x64",
-              "path": ".android_emulator/android_31_google_apis_x64"
-            }
-          ],
-          "optional_dimensions": {
-            "60": {
-              "caches": "android_31_google_apis_x64"
-            }
-          },
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "cronet_tests_android",
-        "test_id_prefix": "ninja://components/cronet/android:cronet_tests_android/"
-      },
-      {
-        "args": [
-          "--avd-config=../../tools/android/avd/proto/android_31_google_apis_x64.textpb",
-          "--gs-results-bucket=chromium-result-details",
-          "--recover-devices"
-        ],
-        "description": "Run with android_31_google_apis_x64",
-        "merge": {
-          "args": [
-            "--bucket",
-            "chromium-result-details",
-            "--test-name",
             "cronet_unittests_android"
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_unittests_android",
+        "module_scheme": "gtest",
         "name": "cronet_unittests_android",
         "resultdb": {
           "enable": true,
@@ -382,6 +348,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//net:net_unittests",
+        "module_scheme": "gtest",
         "name": "net_unittests",
         "resultdb": {
           "enable": true,
@@ -433,6 +401,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_sample_test_apk",
+        "module_scheme": "junit",
         "name": "cronet_sample_test_apk",
         "resultdb": {
           "enable": true,
@@ -479,6 +449,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_apk",
         "resultdb": {
           "enable": true,
@@ -525,6 +497,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_missing_native_library_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_missing_native_library_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -571,6 +545,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_platform_only_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_platform_only_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -618,6 +594,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_test_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_test_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -662,56 +640,12 @@
             "--bucket",
             "chromium-result-details",
             "--test-name",
-            "cronet_tests_android"
-          ],
-          "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
-        },
-        "name": "cronet_tests_android",
-        "resultdb": {
-          "enable": true,
-          "has_native_resultdb_integration": true
-        },
-        "swarming": {
-          "dimensions": {
-            "cores": "8",
-            "cpu": "x86-64",
-            "device_os": null,
-            "device_type": null,
-            "os": "Ubuntu-22.04",
-            "pool": "chromium.tests.avd"
-          },
-          "named_caches": [
-            {
-              "name": "android_33_google_apis_x64",
-              "path": ".android_emulator/android_33_google_apis_x64"
-            }
-          ],
-          "optional_dimensions": {
-            "60": {
-              "caches": "android_33_google_apis_x64"
-            }
-          },
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "cronet_tests_android",
-        "test_id_prefix": "ninja://components/cronet/android:cronet_tests_android/"
-      },
-      {
-        "args": [
-          "--avd-config=../../tools/android/avd/proto/android_33_google_apis_x64.textpb",
-          "--gs-results-bucket=chromium-result-details",
-          "--recover-devices"
-        ],
-        "description": "Run with android_33_google_apis_x64",
-        "merge": {
-          "args": [
-            "--bucket",
-            "chromium-result-details",
-            "--test-name",
             "cronet_unittests_android"
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_unittests_android",
+        "module_scheme": "gtest",
         "name": "cronet_unittests_android",
         "resultdb": {
           "enable": true,
@@ -758,6 +692,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//net:net_unittests",
+        "module_scheme": "gtest",
         "name": "net_unittests",
         "resultdb": {
           "enable": true,
@@ -810,6 +746,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_sample_test_apk",
+        "module_scheme": "junit",
         "name": "cronet_sample_test_apk",
         "resultdb": {
           "enable": true,
@@ -857,6 +795,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_apk",
         "resultdb": {
           "enable": true,
@@ -904,6 +844,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_missing_native_library_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_missing_native_library_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -951,6 +893,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_platform_only_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_platform_only_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -999,6 +943,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_test_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_test_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -1044,57 +990,12 @@
             "--bucket",
             "chromium-result-details",
             "--test-name",
-            "cronet_tests_android"
-          ],
-          "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
-        },
-        "name": "cronet_tests_android",
-        "resultdb": {
-          "enable": true,
-          "has_native_resultdb_integration": true
-        },
-        "swarming": {
-          "dimensions": {
-            "cores": "8",
-            "cpu": "x86-64",
-            "device_os": null,
-            "device_type": null,
-            "os": "Ubuntu-22.04",
-            "pool": "chromium.tests.avd"
-          },
-          "named_caches": [
-            {
-              "name": "android_34_google_apis_x64",
-              "path": ".android_emulator/android_34_google_apis_x64"
-            }
-          ],
-          "optional_dimensions": {
-            "60": {
-              "caches": "android_34_google_apis_x64"
-            }
-          },
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "cronet_tests_android",
-        "test_id_prefix": "ninja://components/cronet/android:cronet_tests_android/"
-      },
-      {
-        "args": [
-          "--avd-config=../../tools/android/avd/proto/android_34_google_apis_x64.textpb",
-          "--gs-results-bucket=chromium-result-details",
-          "--recover-devices"
-        ],
-        "description": "Run with android_34_google_apis_x64",
-        "isolate_profile_data": true,
-        "merge": {
-          "args": [
-            "--bucket",
-            "chromium-result-details",
-            "--test-name",
             "cronet_unittests_android"
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_unittests_android",
+        "module_scheme": "gtest",
         "name": "cronet_unittests_android",
         "resultdb": {
           "enable": true,
@@ -1142,6 +1043,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//net:net_unittests",
+        "module_scheme": "gtest",
         "name": "net_unittests",
         "resultdb": {
           "enable": true,
@@ -1194,6 +1097,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_sample_test_apk",
+        "module_scheme": "junit",
         "name": "cronet_sample_test_apk",
         "resultdb": {
           "enable": true,
@@ -1241,6 +1146,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_apk",
         "resultdb": {
           "enable": true,
@@ -1288,6 +1195,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_missing_native_library_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_missing_native_library_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -1335,6 +1244,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_platform_only_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_platform_only_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -1383,6 +1294,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_test_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_test_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -1428,57 +1341,12 @@
             "--bucket",
             "chromium-result-details",
             "--test-name",
-            "cronet_tests_android"
-          ],
-          "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
-        },
-        "name": "cronet_tests_android",
-        "resultdb": {
-          "enable": true,
-          "has_native_resultdb_integration": true
-        },
-        "swarming": {
-          "dimensions": {
-            "cores": "8",
-            "cpu": "x86-64",
-            "device_os": null,
-            "device_type": null,
-            "os": "Ubuntu-22.04",
-            "pool": "chromium.tests.avd"
-          },
-          "named_caches": [
-            {
-              "name": "android_35_google_apis_x64",
-              "path": ".android_emulator/android_35_google_apis_x64"
-            }
-          ],
-          "optional_dimensions": {
-            "60": {
-              "caches": "android_35_google_apis_x64"
-            }
-          },
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "cronet_tests_android",
-        "test_id_prefix": "ninja://components/cronet/android:cronet_tests_android/"
-      },
-      {
-        "args": [
-          "--avd-config=../../tools/android/avd/proto/android_35_google_apis_x64.textpb",
-          "--gs-results-bucket=chromium-result-details",
-          "--recover-devices"
-        ],
-        "description": "Run with android_35_google_apis_x64",
-        "isolate_profile_data": true,
-        "merge": {
-          "args": [
-            "--bucket",
-            "chromium-result-details",
-            "--test-name",
             "cronet_unittests_android"
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_unittests_android",
+        "module_scheme": "gtest",
         "name": "cronet_unittests_android",
         "resultdb": {
           "enable": true,
@@ -1526,6 +1394,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//net:net_unittests",
+        "module_scheme": "gtest",
         "name": "net_unittests",
         "resultdb": {
           "enable": true,
@@ -1578,6 +1448,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_sample_test_apk",
+        "module_scheme": "junit",
         "name": "cronet_sample_test_apk",
         "resultdb": {
           "enable": true,
@@ -1625,6 +1497,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_apk",
         "resultdb": {
           "enable": true,
@@ -1672,6 +1546,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_missing_native_library_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_missing_native_library_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -1719,6 +1595,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_smoketests_platform_only_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_smoketests_platform_only_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -1767,6 +1645,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_test_instrumentation_apk",
+        "module_scheme": "junit",
         "name": "cronet_test_instrumentation_apk",
         "resultdb": {
           "enable": true,
@@ -1812,57 +1692,12 @@
             "--bucket",
             "chromium-result-details",
             "--test-name",
-            "cronet_tests_android"
-          ],
-          "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
-        },
-        "name": "cronet_tests_android",
-        "resultdb": {
-          "enable": true,
-          "has_native_resultdb_integration": true
-        },
-        "swarming": {
-          "dimensions": {
-            "cores": "8",
-            "cpu": "x86-64",
-            "device_os": null,
-            "device_type": null,
-            "os": "Ubuntu-22.04",
-            "pool": "chromium.tests.avd"
-          },
-          "named_caches": [
-            {
-              "name": "android_36_google_apis_x64",
-              "path": ".android_emulator/android_36_google_apis_x64"
-            }
-          ],
-          "optional_dimensions": {
-            "60": {
-              "caches": "android_36_google_apis_x64"
-            }
-          },
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "cronet_tests_android",
-        "test_id_prefix": "ninja://components/cronet/android:cronet_tests_android/"
-      },
-      {
-        "args": [
-          "--avd-config=../../tools/android/avd/proto/android_36_google_apis_x64.textpb",
-          "--gs-results-bucket=chromium-result-details",
-          "--recover-devices"
-        ],
-        "description": "Run with android_36_google_apis_x64",
-        "isolate_profile_data": true,
-        "merge": {
-          "args": [
-            "--bucket",
-            "chromium-result-details",
-            "--test-name",
             "cronet_unittests_android"
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//components/cronet/android:cronet_unittests_android",
+        "module_scheme": "gtest",
         "name": "cronet_unittests_android",
         "resultdb": {
           "enable": true,
@@ -1910,6 +1745,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//net:net_unittests",
+        "module_scheme": "gtest",
         "name": "net_unittests",
         "resultdb": {
           "enable": true,

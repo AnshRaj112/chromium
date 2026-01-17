@@ -31,8 +31,6 @@ source_set("navigation") {
     "//ios/web/public/download",
     "//ios/web/public/js_messaging",
     "//ios/web/public/security",
-    "//ios/web/public/session",
-    "//ios/web/public/session/proto",
     "//ios/web/security",
     "//ios/web/session",
     "//ios/web/util",
@@ -58,8 +56,6 @@ source_set("navigation") {
     "crw_wk_navigation_handler.mm",
     "crw_wk_navigation_states.h",
     "crw_wk_navigation_states.mm",
-    "serializable_user_data_manager_impl.h",
-    "serializable_user_data_manager_impl.mm",
     "url_schemes.mm",
     "web_kit_constants.cc",
     "web_kit_constants.h",
@@ -77,6 +73,7 @@ source_set("core") {
     ":proto_util",
     "//base",
     "//components/url_formatter",
+    "//ios/public/provider/web:navigation",
     "//ios/web/common:features",
     "//ios/web/common:user_agent",
     "//ios/web/navigation:wk_navigation_util",
@@ -89,6 +86,7 @@ source_set("core") {
   ]
 
   sources = [
+    "back_forward_navigation_type.h",
     "crw_navigation_item_holder.h",
     "crw_navigation_item_holder.mm",
     "navigation_context_impl.h",

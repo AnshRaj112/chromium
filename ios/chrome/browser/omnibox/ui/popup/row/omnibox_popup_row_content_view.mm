@@ -33,7 +33,7 @@ const CGFloat kMultilineTextTopMargin = 12.0;
 const CGFloat kTextTrailingMargin = 0.0;
 const CGFloat kMultilineTextTrailingMargin = 4.0;
 const CGFloat kMultilineLineSpacing = 2.0;
-const CGFloat kTrailingButtonTrailingMargin = 7.0;
+const CGFloat kTrailingButtonTrailingMargin = 14;
 /// Trailing button trailing margin with popout omnibox.
 const CGFloat kTrailingButtonTrailingMarginPopout = 26.0;
 const CGFloat kTextSpacing = 2.0f;
@@ -137,6 +137,8 @@ const CGFloat kTopGradientColorOpacity = 0.85;
         [[OmniboxPopupRowTrailingButton alloc] initWithFrame:CGRectZero];
     _trailingButton.translatesAutoresizingMaskIntoConstraints = NO;
     _trailingButton.isAccessibilityElement = NO;
+    _trailingButton.refineQueryArrowDirectionDown =
+        configuration.refineQueryArrowDirectionDown;
     [_trailingButton
         setContentCompressionResistancePriority:UILayoutPriorityRequired
                                         forAxis:
@@ -227,12 +229,10 @@ const CGFloat kTopGradientColorOpacity = 0.85;
     self.configuration = configuration;
 
     [self adjustIconDimensionsForContentSize];
-    if (@available(iOS 17, *)) {
-      [self
-          registerForTraitChanges:@[ UITraitPreferredContentSizeCategory.self ]
-                       withAction:@selector
-                       (adjustIconDimensionsForContentSize)];
-    }
+
+    [self
+        registerForTraitChanges:@[ UITraitPreferredContentSizeCategory.self ]
+                     withAction:@selector(adjustIconDimensionsForContentSize)];
   }
   return self;
 }
@@ -245,20 +245,6 @@ const CGFloat kTopGradientColorOpacity = 0.85;
         kLeadingIconViewSize * multiplier;
   }
 }
-
-#if !defined(__IPHONE_17_0) || __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_17_0
-- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
-  [super traitCollectionDidChange:previousTraitCollection];
-  if (@available(iOS 17, *)) {
-    return;
-  }
-
-  if (self.traitCollection.preferredContentSizeCategory !=
-      previousTraitCollection.preferredContentSizeCategory) {
-    [self setNeedsLayout];
-  }
-}
-#endif
 
 - (void)didMoveToWindow {
   if (self.window) {
@@ -364,8 +350,13 @@ const CGFloat kTopGradientColorOpacity = 0.85;
   }
 
   // Trailing Button.
+  // Set the presentation context before the trailing icon type as it need the
+  // presentation context to correctly set up the trailing icon.
+  _trailingButton.presentationContext = configuration.presentationContext;
   _trailingButton.trailingIconType = configuration.trailingIconType;
   _trailingButton.isHighlighted = configuration.isBackgroundHighlighted;
+  _trailingButton.refineQueryArrowDirectionDown =
+      configuration.refineQueryArrowDirectionDown;
   _textTrailingToButtonConstraint.active = !_trailingButton.hidden;
 
   // Separator.
@@ -411,8 +402,7 @@ const CGFloat kTopGradientColorOpacity = 0.85;
 
 /// Handles tap on trailing button.
 - (void)trailingButtonTapped {
-  if (_configuration.trailingIconType == TrailingIconType::kSearchWithAim ||
-      _configuration.trailingIconType == TrailingIconType::kOpenExistingTab) {
+  if (_configuration.trailingIconType == TrailingIconType::kOpenExistingTab) {
     TriggerHapticFeedbackForSelectionChange();
   }
 

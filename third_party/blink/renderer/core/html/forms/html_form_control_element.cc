@@ -352,7 +352,7 @@ bool HTMLFormControlElement::IsSuccessfulSubmitButton() const {
 }
 
 // static
-bool HTMLFormControlElement::IsValidPopoverElement(const HTMLElement& element) {
+bool HTMLFormControlElement::IsValidPopoverTrigger(const HTMLElement& element) {
   if (!element.IsInTreeScope() ||
       element.SupportsPopoverTriggering() == PopoverTriggerSupport::kNone ||
       element.IsDisabledFormControl()) {
@@ -375,7 +375,7 @@ HTMLFormControlElement::PopoverTargetElement
 HTMLFormControlElement::popoverTargetElement(HTMLElement& element) {
   const PopoverTargetElement no_element{.popover = nullptr,
                                         .action = PopoverTriggerAction::kNone};
-  if (!IsValidPopoverElement(element)) {
+  if (!IsValidPopoverTrigger(element)) {
     return no_element;
   }
 
@@ -407,37 +407,23 @@ HTMLFormControlElement::popoverTargetElement() {
   return HTMLFormControlElement::popoverTargetElement(*this);
 }
 
-Element* HTMLFormControlElement::InterestForElement() const {
-  if (!RuntimeEnabledFeatures::HTMLInterestForAttributeEnabled(
-          GetDocument().GetExecutionContext())) {
-    return nullptr;
-  }
-  if (!IsInTreeScope() || IsDisabledFormControl()) {
-    return nullptr;
-  }
-
-  return GetElementAttributeResolvingReferenceTarget(
-      html_names::kInterestforAttr);
+bool HTMLFormControlElement::IsValidInterestInvoker(Element& target) const {
+  DCHECK(RuntimeEnabledFeatures::HTMLInterestForAttributeEnabled());
+  // Buttons need to be enabled in order to support interest invokers.
+  return !IsDisabledFormControl();
 }
 
 // static
 void HTMLFormControlElement::HandlePopoverActivation(Event& event,
                                                      HTMLElement& element) {
   if (event.type() != event_type_names::kDOMActivate ||
-      !IsValidPopoverElement(element)) {
+      !IsValidPopoverTrigger(element)) {
     return;
   }
-  // CommandFor should have been handled in
-  // HTMLButtonElement::DefaultEventHandler
-  DCHECK((RuntimeEnabledFeatures::ElementInternalsDotTypeEnabled() &&
-          element.IsCustomButton()) ||
-         !IsA<HTMLButtonElement>(element) ||
-         !DynamicTo<HTMLButtonElement>(element)->commandForElement());
-
   auto popover = popoverTargetElement(element);
   if (popover.popover) {
     bool event_target_was_nested_popover = false;
-    if (auto* target_node = event.target()->ToNode()) {
+    if (auto* target_node = event.RawTarget()->ToNode()) {
       bool button_is_ancestor_of_popover =
           element.IsShadowIncludingAncestorOf(*popover.popover);
       event_target_was_nested_popover =
@@ -484,10 +470,13 @@ void HTMLFormControlElement::HandlePopoverActivation(Event& event,
 }
 
 void HTMLFormControlElement::DefaultEventHandler(Event& event) {
+  HTMLElement::DefaultEventHandler(event);
+  if (event.DefaultHandled()) {
+    return;
+  }
   // Buttons that aren't form participants might be Invoker buttons or Popover
   // buttons.
   HTMLFormControlElement::HandlePopoverActivation(event, *this);
-  HTMLElement::DefaultEventHandler(event);
 }
 
 // static

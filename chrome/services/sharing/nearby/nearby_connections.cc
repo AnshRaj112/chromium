@@ -8,7 +8,6 @@
 #include <string_view>
 
 #include "base/feature_list.h"
-#include "base/files/file_util.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
@@ -578,7 +577,7 @@ void NearbyConnections::RequestConnectionV3(
           [service_id];
   const std::string& endpoint_id = remote_device->endpoint_id;
 
-  if (base::Contains(endpoint_id_to_presence_device_map, endpoint_id)) {
+  if (endpoint_id_to_presence_device_map.contains(endpoint_id)) {
     CD_LOG(INFO, Feature::NEARBY_INFRA)
         << __func__ << "PresenceDevice already exists in map.";
   } else {

@@ -17,15 +17,17 @@
 #include "base/power_monitor/power_monitor.h"
 #include "base/power_monitor/power_monitor_device_source.h"
 #include "base/run_loop.h"
+#include "base/task/sequence_manager/sequence_manager.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/threading/thread_checker.h"
 #include "build/build_config.h"
 #include "content/child/child_process.h"
-#include "content/common/process_visibility_tracker.h"
+#include "content/common/process_priority_tracker.h"
 #include "content/gpu/browser_exposed_gpu_interfaces.h"
 #include "content/gpu/gpu_service_factory.h"
 #include "content/public/common/content_client.h"
+#include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/gpu/content_gpu_client.h"
 #include "gpu/command_buffer/common/shm_count.h"
@@ -140,7 +142,9 @@ GpuChildThread::GpuChildThread(base::RepeatingClosure quit_closure,
 
 GpuChildThread::~GpuChildThread() = default;
 
-void GpuChildThread::Init(const base::TimeTicks& process_start_time) {
+void GpuChildThread::Init(
+    const base::TimeTicks& process_start_time,
+    base::sequence_manager::SequenceManager* sequence_manager) {
   if (!in_process_gpu())
     mojo::SetDefaultProcessErrorHandler(base::BindRepeating(&HandleBadMessage));
 
@@ -168,9 +172,11 @@ void GpuChildThread::Init(const base::TimeTicks& process_start_time) {
   }
 #endif
 
-  memory_pressure_listener_ = std::make_unique<base::MemoryPressureListener>(
-      FROM_HERE, base::BindRepeating(&GpuChildThread::OnMemoryPressure,
-                                     base::Unretained(this)));
+  if (sequence_manager &&
+      base::FeatureList::IsEnabled(
+          features::kBoostThreadsPriorityDuringInputScenario)) {
+    sequence_manager->AddTaskObserver(this);
+  }
 }
 
 bool GpuChildThread::in_process_gpu() const {
@@ -192,10 +198,10 @@ void GpuChildThread::OnGpuServiceConnection(viz::GpuServiceImpl* gpu_service) {
 #endif
 
   if (!IsInBrowserProcess()) {
-    gpu_service->SetVisibilityChangedCallback(
-        base::BindRepeating([](bool visible) {
-          ProcessVisibilityTracker::GetInstance()->OnProcessVisibilityChanged(
-              visible);
+    gpu_service->SetPriorityChangedCallback(
+        base::BindRepeating([](base::Process::Priority priority) {
+          ProcessPriorityTracker::GetInstance()->OnProcessPriorityChanged(
+              priority);
         }));
   }
 
@@ -237,14 +243,20 @@ void GpuChildThread::QuitMainMessageLoop() {
   quit_closure_.Run();
 }
 
-void GpuChildThread::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel level) {
-  if (level != base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL)
-    return;
+void GpuChildThread::WillProcessTask(const base::PendingTask& pending_task,
+                                     bool was_blocked_or_low_priority) {
+  performance_scenarios::InputScenario input_scenario =
+      performance_scenarios::GetInputScenario(
+          performance_scenarios::ScenarioScope::kGlobal)
+          ->load(std::memory_order_relaxed);
 
-  if (viz_main_.discardable_shared_memory_manager())
-    viz_main_.discardable_shared_memory_manager()->ReleaseFreeMemory();
-  SkGraphics::PurgeAllCaches();
+  // Post a task to the IO thread if the input scenario has changed. This is
+  // used to make sure the IO thread checks the scenarios in time.
+  if (input_scenario != last_input_scenario_) {
+    last_input_scenario_ = input_scenario;
+    ChildProcess::current()->io_task_runner()->PostTask(FROM_HERE,
+                                                        base::DoNothing());
+  }
 }
 
 void GpuChildThread::QuitSafelyHelper(

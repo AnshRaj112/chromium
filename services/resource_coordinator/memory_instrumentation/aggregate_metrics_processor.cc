@@ -7,11 +7,10 @@
 #include <string>
 #include <vector>
 
-#include "base/android/library_loader/anchor_functions.h"
 #include "base/android/library_loader/anchor_functions_buildflags.h"
 #include "base/bits.h"
 #include "base/command_line.h"
-#include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/files/file.h"
 #include "base/format_macros.h"
 #include "base/logging.h"
@@ -19,6 +18,10 @@
 #include "base/strings/stringprintf.h"
 #include "base/trace_event/trace_event.h"
 #include "services/resource_coordinator/public/cpp/memory_instrumentation/global_memory_dump.h"
+
+#if BUILDFLAG(IS_ANDROID)
+#include "base/android/library_loader/anchor_functions.h"
+#endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(SUPPORTS_CODE_ORDERING)
 
@@ -38,10 +41,8 @@ void LogNativeCodeResidentPages(base::span<size_t> accessed_pages_set) {
   }
 
   for (size_t page : accessed_pages_set) {
-    std::string page_str = base::StringPrintf("%" PRIuS "\n", page);
-
-    if (UNSAFE_TODO(file.WriteAtCurrentPos(
-            page_str.c_str(), static_cast<int>(page_str.size()))) < 0) {
+    if (!file.WriteAtCurrentPos(
+            base::as_byte_span(base::StringPrintf("%" PRIuS "\n", page)))) {
       DLOG(WARNING) << "Error while dumping Resident pages";
       return;
     }

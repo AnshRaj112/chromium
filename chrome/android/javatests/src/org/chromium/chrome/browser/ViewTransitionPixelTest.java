@@ -30,7 +30,7 @@ import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
-import org.chromium.base.test.util.Features.EnableFeatures;
+import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.MinAndroidSdkLevel;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -125,7 +125,6 @@ public class ViewTransitionPixelTest {
                             mActivityTestRule
                                     .getKeyboardDelegate()
                                     .isKeyboardShowing(
-                                            mActivityTestRule.getActivity(),
                                             mActivityTestRule.getActivity().getTabsView());
                     Criteria.checkThat(isKeyboardShowing, Matchers.is(show));
                 },
@@ -134,7 +133,7 @@ public class ViewTransitionPixelTest {
     }
 
     private WebContents getWebContents() {
-        return mActivityTestRule.getActivity().getActivityTab().getWebContents();
+        return mActivityTestRule.getActivityTab().getWebContents();
     }
 
     private void showAndWaitForKeyboard() throws Throwable {
@@ -187,7 +186,7 @@ public class ViewTransitionPixelTest {
 
     private void setLocationAndWaitForLoad(String url) {
         ChromeTabUtils.waitForTabPageLoaded(
-                mActivityTestRule.getActivity().getActivityTab(),
+                mActivityTestRule.getActivityTab(),
                 url,
                 () -> {
                     try {
@@ -267,8 +266,7 @@ public class ViewTransitionPixelTest {
     }
 
     private String getCurrentUrl() {
-        return ChromeTabUtils.getUrlStringOnUiThread(
-                mActivityTestRule.getActivity().getActivityTab());
+        return ChromeTabUtils.getUrlStringOnUiThread(mActivityTestRule.getActivityTab());
     }
 
     /**
@@ -281,6 +279,7 @@ public class ViewTransitionPixelTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
+    @DisabledTest(message = "crbug.com/435692206")
     public void testVirtualKeyboardResizesVisual() throws Throwable {
         startKeyboardTest(VirtualKeyboardMode.RESIZES_VISUAL);
 
@@ -323,22 +322,23 @@ public class ViewTransitionPixelTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
+    @DisabledTest(message = "crbug.com/435692206")
     public void testVirtualKeyboardResizesContent() throws Throwable {
         doTestVirtualKeyboardResizesContent();
     }
 
     /**
-     * Same as {@code #testVirtualKeyboardResizesContent()}, but with TabStripLayoutOptimization
-     * enabled. This tablet feature uses caption bar insets to draw custom app headers and is known
-     * to have caused regressions in bottom Chrome UI placement when OSK is visible.
+     * Same as {@code #testVirtualKeyboardResizesContent()}, but assuming the presence of caption
+     * bar insets to draw custom app headers. This is known to have caused regressions in bottom
+     * Chrome UI placement when OSK is visible.
      */
     @Test
     @MediumTest
     @Feature({"RenderTest"})
     @MinAndroidSdkLevel(VERSION_CODES.R)
-    @EnableFeatures(ChromeFeatureList.TAB_STRIP_LAYOUT_OPTIMIZATION)
     @Restriction(DeviceFormFactor.TABLET_OR_DESKTOP)
-    public void testVirtualKeyboardResizesContent_TSLOEnabled() throws Throwable {
+    @DisabledTest(message = "crbug.com/435692206")
+    public void testVirtualKeyboardResizesContent_ValidCaptionBarFrame() throws Throwable {
         // Simulate fullscreen window behavior in an environment that supports Android V custom app
         // header APIs.
         WindowInsetsUtils.setFrameForTesting(new Size(2560, 1600));
@@ -454,6 +454,8 @@ public class ViewTransitionPixelTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
+    // TODO(crbug.com/473893732): Update the test for lock top control or use restriction.
+    @DisableFeatures(ChromeFeatureList.LOCK_TOP_CONTROLS_ON_LARGE_TABLETS_V2)
     public void testBrowserControlsRootSnapshotControlsOverlay() throws Throwable {
         String url = "/chrome/test/data/android/view_transition_browser_controls.html";
         mActivityTestRule.startOnTestServerUrl(url);
@@ -502,6 +504,8 @@ public class ViewTransitionPixelTest {
     @MediumTest
     @Feature({"RenderTest"})
     @DisabledTest(message = "crbug.com/387372707")
+    // TODO(crbug.com/473893732): Update the test for lock top control or use restriction.
+    @DisableFeatures(ChromeFeatureList.LOCK_TOP_CONTROLS_ON_LARGE_TABLETS_V2)
     public void testBrowserControlsRootSnapshotControlsPush() throws Throwable {
         String url = "/chrome/test/data/android/view_transition_browser_controls.html";
         mActivityTestRule.startOnTestServerUrl(url);
@@ -541,6 +545,8 @@ public class ViewTransitionPixelTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
+    // TODO(crbug.com/473893732): Update the test for lock top control or use restriction.
+    @DisableFeatures(ChromeFeatureList.LOCK_TOP_CONTROLS_ON_LARGE_TABLETS_V2)
     public void testBrowserControlsChildSnapshotControlsOverlay() throws Throwable {
         String url = "/chrome/test/data/android/view_transition_browser_controls_child.html";
         mActivityTestRule.startOnTestServerUrl(url);

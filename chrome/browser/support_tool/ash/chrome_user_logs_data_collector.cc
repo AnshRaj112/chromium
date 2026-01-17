@@ -20,7 +20,6 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/location.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/strings/string_util.h"
@@ -42,6 +41,8 @@ namespace {
 constexpr char kChromeLogsDir[] = "log";
 // The pattern for name of Chrome logs file.
 constexpr char kChromeLogsPattern[] = "chrome*";
+// A reasonable limit for log collection to prevent OOM.
+constexpr size_t kMaxLogFileSize = 50 * 1024 * 1024;  // 50 MB
 
 // Paths of other (non-Chrome) user logs.
 constexpr std::array<const char*, 3> kOtherLogsPaths = {
@@ -90,8 +91,10 @@ std::pair<base::FilePath, std::string> ReadUserLogAndCopyContents(
     return {base::FilePath(), std::string()};
 
   std::string file_contents;
-  if (!base::ReadFileToString(log_path, &file_contents))
+  if (!base::ReadFileToStringWithMaxSize(log_path, &file_contents,
+                                         kMaxLogFileSize)) {
     return {copy_target, std::string()};
+  }
 
   return {copy_target, file_contents};
 }
@@ -125,8 +128,9 @@ bool CopyTemporaryLogFileToTarget(base::FilePath log_file,
 
 std::optional<std::string> ReadLogFromFile(base::FilePath log_file) {
   std::string log;
-  if (!base::ReadFileToString(log_file, &log))
+  if (!base::ReadFileToStringWithMaxSize(log_file, &log, kMaxLogFileSize)) {
     return std::nullopt;
+  }
   return log;
 }
 

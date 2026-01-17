@@ -10,7 +10,6 @@
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/containers/to_value_list.h"
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
@@ -22,10 +21,10 @@
 #include "chrome/browser/extensions/extension_menu_icon_loader.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/extensions/menu_manager_factory.h"
-#include "chrome/browser/extensions/permissions/active_tab_permission_granter.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/extensions/api/context_menus.h"
 #include "components/guest_view/buildflags/buildflags.h"
+#include "extensions/browser/permissions/active_tab_permission_granter.h"
 // Intentionally outside if BUILDFLAG(ENABLE_GUEST_VIEW) so we can use
 // kInstanceIDNone constant.
 #include "components/guest_view/common/guest_view_constants.h"
@@ -35,6 +34,7 @@
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_api_frame_id_map.h"
 #include "extensions/browser/state_store.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/manifest_handlers/background_info.h"
 #include "extensions/common/mojom/event_dispatcher.mojom.h"
@@ -48,6 +48,8 @@
 #include "components/guest_view/browser/guest_view_base.h"
 #include "extensions/browser/guest_view/web_view/web_view_guest.h"
 #endif  // BUILDFLAG(ENABLE_GUEST_VIEW)
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 using content::ChildProcessHost;
 using content::WebContents;
@@ -428,13 +430,14 @@ bool MenuManager::AddContextItem(const Extension* extension,
   const MenuItem::ExtensionKey& key = item->id().extension_key;
 
   // The item must have a non-empty key, and not have already been added.
-  if (key.empty() || base::Contains(items_by_id_, item->id()))
+  if (key.empty() || items_by_id_.contains(item->id())) {
     return false;
+  }
 
   const std::string& extension_id = extension ? extension->id() : "";
   DCHECK_EQ(extension_id, key.extension_id);
 
-  bool first_item = !base::Contains(context_items_, key);
+  bool first_item = !context_items_.contains(key);
   context_items_[key].push_back(std::move(item));
   items_by_id_[item_ptr->id()] = item_ptr;
 
@@ -459,8 +462,9 @@ bool MenuManager::AddChildItem(const MenuItem::Id& parent_id,
   if (!parent || parent->type() != MenuItem::NORMAL ||
       parent->incognito() != child->incognito() ||
       parent->extension_id() != child->extension_id() ||
-      base::Contains(items_by_id_, child->id()))
+      items_by_id_.contains(child->id())) {
     return false;
+  }
   MenuItem* child_ptr = child.get();
   parent->AddChild(std::move(child));
   items_by_id_[child_ptr->id()] = child_ptr;
@@ -541,8 +545,9 @@ bool MenuManager::ChangeParent(const MenuItem::Id& child_id,
 }
 
 bool MenuManager::RemoveContextMenuItem(const MenuItem::Id& id) {
-  if (!base::Contains(items_by_id_, id))
+  if (!items_by_id_.contains(id)) {
     return false;
+  }
 
   MenuItem* menu_item = GetItemById(id);
   DCHECK(menu_item);
@@ -863,8 +868,9 @@ void MenuManager::SanitizeRadioListsInMenu(
 }
 
 bool MenuManager::ItemUpdated(const MenuItem::Id& id) {
-  if (!base::Contains(items_by_id_, id))
+  if (!items_by_id_.contains(id)) {
     return false;
+  }
 
   MenuItem* menu_item = GetItemById(id);
   DCHECK(menu_item);
@@ -976,7 +982,7 @@ void MenuManager::OnExtensionUnloaded(content::BrowserContext* browser_context,
                                       const Extension* extension,
                                       UnloadedExtensionReason reason) {
   MenuItem::ExtensionKey extension_key(extension->id());
-  if (base::Contains(context_items_, extension_key)) {
+  if (context_items_.contains(extension_key)) {
     RemoveAllContextItems(extension_key);
   }
 }
@@ -1022,10 +1028,10 @@ void MenuManager::SetMenuIconLoader(
 
 MenuIconLoader* MenuManager::GetMenuIconLoader(
     MenuItem::ExtensionKey extension_key) {
-  if (!base::Contains(webview_menu_icon_loaders_, extension_key)) {
+  if (!webview_menu_icon_loaders_.contains(extension_key)) {
     return extension_menu_icon_loader_.get();
   }
-  DCHECK(base::Contains(webview_menu_icon_loaders_, extension_key));
+  DCHECK(webview_menu_icon_loaders_.contains(extension_key));
   return webview_menu_icon_loaders_[extension_key].get();
 }
 

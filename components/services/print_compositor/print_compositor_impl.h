@@ -5,7 +5,6 @@
 #ifndef COMPONENTS_SERVICES_PRINT_COMPOSITOR_PRINT_COMPOSITOR_IMPL_H_
 #define COMPONENTS_SERVICES_PRINT_COMPOSITOR_PRINT_COMPOSITOR_IMPL_H_
 
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -29,7 +28,11 @@
 #include "third_party/skia/include/core/SkRefCnt.h"
 #include "third_party/skia/include/core/SkStream.h"
 #include "third_party/skia/include/core/SkTypeface.h"
-#include "ui/accessibility/ax_tree_update.h"
+
+namespace ui {
+class AXTree;
+struct AXTreeUpdate;
+}  // namespace ui
 
 #if BUILDFLAG(ENTERPRISE_WATERMARK)
 #include "components/enterprise/watermarking/mojom/watermark.mojom-forward.h"  // nogncheck
@@ -298,7 +301,7 @@ class PrintCompositorImpl : public mojom::PrintCompositor {
 
   // If present, the accessibility tree for the document needed to
   // export a tagged (accessible) PDF.
-  ui::AXTreeUpdate accessibility_tree_;
+  std::unique_ptr<ui::AXTree> accessibility_tree_;
 
   // How (or if) to generate a document outline.
   mojom::GenerateDocumentOutline generate_document_outline_ =
@@ -318,13 +321,6 @@ class PrintCompositorImpl : public mojom::PrintCompositor {
 // Draw the watermark specified by `watermark_block` using the provided canvas
 // and its size. Exposed for testing.
 void DrawEnterpriseWatermark(
-    SkCanvas* canvas,
-    SkSize size,
-    const watermark::mojom::WatermarkBlockPtr& watermark_block);
-
-// Helper function to draw the watermark block without checking for feature
-// flags. Exposed for testing.
-void DrawWatermarkBlockForTesting(
     SkCanvas* canvas,
     SkSize size,
     const watermark::mojom::WatermarkBlockPtr& watermark_block);

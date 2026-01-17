@@ -42,6 +42,7 @@ pub extern crate small_ctor;
 /// #[extern_test_suite("cpp::type::wrapped::by::Foo")
 /// unsafe impl TestSuite for Foo {}
 /// ```
+#[allow(clippy::missing_safety_doc)] // TODO(https://crbug.com/472355480)
 pub unsafe trait TestSuite {
     /// Gives the Gtest factory function on the C++ side which constructs the
     /// C++ class for which the implementing Rust type is an FFI wrapper.
@@ -117,7 +118,7 @@ pub mod __private {
         let null_term_file = std::ffi::CString::new(make_canonical_file_path(file)).unwrap();
         let null_term_message = std::ffi::CString::new(message).unwrap();
 
-        extern "C" {
+        unsafe extern "C" {
             fn rust_gtest_add_failure_at(
                 file: *const std::ffi::c_char,
                 line: i32,
@@ -178,16 +179,14 @@ pub mod __private {
             .to_string()
     }
 
-    extern "C" {
+    unsafe extern "C" {
         /// extern for C++'s rust_gtest_default_factory().
         /// TODO(danakj): We do this by hand because cxx doesn't support passing
         /// raw function pointers: https://github.com/dtolnay/cxx/issues/1011.
         pub fn rust_gtest_default_factory(
             f: extern "C" fn(Pin<&mut OpaqueTestingTest>),
         ) -> Pin<&'static mut OpaqueTestingTest>;
-    }
 
-    extern "C" {
         /// extern for C++'s rust_gtest_add_test().
         ///
         /// Note that the `factory` parameter is actually a C++ function

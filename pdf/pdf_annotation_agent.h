@@ -6,11 +6,11 @@
 #define PDF_PDF_ANNOTATION_AGENT_H_
 
 #include <ostream>
+#include <utility>
 
 #include "base/containers/span.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "third_party/blink/public/mojom/annotation/annotation.mojom.h"
@@ -20,7 +20,7 @@ namespace chrome_pdf {
 // Represents a single instance of text fragment annotation in a PDF. It's
 // uniquely owned by the `PdfViewWebPlugin`. For each annotation, a new instance
 // is created to replace the previous instance.
-class PDFAnnotationAgent : public blink::mojom::AnnotationAgent {
+class PdfAnnotationAgent : public blink::mojom::AnnotationAgent {
  public:
   // The name "Container" is to respect the mojom naming convention: an
   // AnnotationAgentContainer uniquely owns one or more AnnotationAgent.
@@ -41,13 +41,13 @@ class PDFAnnotationAgent : public blink::mojom::AnnotationAgent {
     ~Container() = default;
   };
 
-  PDFAnnotationAgent(
+  PdfAnnotationAgent(
       Container* container,
       blink::mojom::AnnotationType type,
       blink::mojom::SelectorPtr selector,
       mojo::PendingRemote<blink::mojom::AnnotationAgentHost> host_remote,
       mojo::PendingReceiver<blink::mojom::AnnotationAgent> agent_receiver);
-  ~PDFAnnotationAgent() override;
+  ~PdfAnnotationAgent() override;
 
   // `blink::mojom::AnnotationAgent`:
   void ScrollIntoView(bool applies_focus) override;
@@ -75,7 +75,7 @@ class PDFAnnotationAgent : public blink::mojom::AnnotationAgent {
   };
 
   friend std::ostream& operator<<(std::ostream& o, State state) {
-    o << base::to_underlying(state);
+    o << std::to_underlying(state);
     return o;
   }
 
@@ -89,7 +89,7 @@ class PDFAnnotationAgent : public blink::mojom::AnnotationAgent {
   mojo::Remote<blink::mojom::AnnotationAgentHost> agent_host_;
   mojo::Receiver<blink::mojom::AnnotationAgent> receiver_{this};
 
-  base::WeakPtrFactory<PDFAnnotationAgent> weak_factory_{this};
+  base::WeakPtrFactory<PdfAnnotationAgent> weak_factory_{this};
 };
 
 }  // namespace chrome_pdf

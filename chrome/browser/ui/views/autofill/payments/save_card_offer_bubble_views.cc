@@ -64,7 +64,7 @@
 namespace autofill {
 
 SaveCardOfferBubbleViews::SaveCardOfferBubbleViews(
-    views::View* anchor_view,
+    views::BubbleAnchor anchor_view,
     content::WebContents* web_contents,
     SaveCardBubbleController* controller)
     : SaveCardBubbleViews(anchor_view, web_contents, controller) {
@@ -83,11 +83,13 @@ SaveCardOfferBubbleViews::SaveCardOfferBubbleViews(
 void SaveCardOfferBubbleViews::Init() {
   SaveCardBubbleViews::Init();
 
-  if (controller() &&
-      (controller()->GetBubbleType() == BubbleType::UPLOAD_SAVE ||
-       controller()->GetBubbleType() == BubbleType::UPLOAD_IN_PROGRESS)) {
+  if (controller() && (controller()->GetPaymentsBubbleType() ==
+                           PaymentsBubbleType::kUploadSave ||
+                       controller()->GetPaymentsBubbleType() ==
+                           PaymentsBubbleType::kUploadInProgress)) {
     loading_row_ = AddChildView(CreateLoadingRow());
-    if (controller()->GetBubbleType() == BubbleType::UPLOAD_IN_PROGRESS) {
+    if (controller()->GetPaymentsBubbleType() ==
+        PaymentsBubbleType::kUploadInProgress) {
       ShowThrobber();
     }
   }
@@ -96,26 +98,29 @@ void SaveCardOfferBubbleViews::Init() {
 }
 
 bool SaveCardOfferBubbleViews::Accept() {
-  bool show_throbber =
-      controller() && controller()->GetBubbleType() == BubbleType::UPLOAD_SAVE;
+  bool show_throbber = controller() && controller()->GetPaymentsBubbleType() ==
+                                           PaymentsBubbleType::kUploadSave;
 
   if (show_throbber) {
     ShowThrobber();
   }
 
   if (controller()) {
-    controller()->OnSaveButton(
-        {cardholder_name_textfield_
-             ? std::u16string(cardholder_name_textfield_->GetText())
-             : std::u16string(),
-         month_input_dropdown_
-             ? month_input_dropdown_->GetModel()->GetItemAt(
-                   month_input_dropdown_->GetSelectedIndex().value())
-             : std::u16string(),
-         year_input_dropdown_
-             ? year_input_dropdown_->GetModel()->GetItemAt(
-                   year_input_dropdown_->GetSelectedIndex().value())
-             : std::u16string()});
+    payments::PaymentsAutofillClient::UserProvidedCardDetails details;
+    if (cardholder_name_textfield_) {
+      details.cardholder_name = cardholder_name_textfield_->GetText();
+    }
+    if (month_input_dropdown_) {
+      details.expiration_date_month =
+          month_input_dropdown_->GetModel()->GetItemAt(
+              month_input_dropdown_->GetSelectedIndex().value());
+    }
+    if (year_input_dropdown_) {
+      details.expiration_date_year =
+          year_input_dropdown_->GetModel()->GetItemAt(
+              year_input_dropdown_->GetSelectedIndex().value());
+    }
+    controller()->OnSaveButton(details);
   }
 
   // If a throbber is shown, don't automatically close the bubble view upon
@@ -166,10 +171,25 @@ bool SaveCardOfferBubbleViews::IsDialogButtonEnabled(
 
 void SaveCardOfferBubbleViews::AddedToWidget() {
   SaveCardBubbleViews::AddedToWidget();
+  int lottie_resource_id;
+  switch (controller()->GetPaymentsBubbleType()) {
+    case PaymentsBubbleType::kUploadSave:
+    case PaymentsBubbleType::kUploadInProgress:
+    case PaymentsBubbleType::kUploadComplete:
+      lottie_resource_id = IDR_AUTOFILL_SAVE_CARD_SECURE_LOTTIE;
+      break;
+    case PaymentsBubbleType::kLocalCvcSave:
+    case PaymentsBubbleType::kUploadCvcSave:
+      lottie_resource_id = IDR_AUTOFILL_SAVE_SECURITY_CODE_LOTTIE;
+      break;
+    default:
+      lottie_resource_id = IDR_AUTOFILL_SAVE_CARD_LOCAL_LOTTIE;
+  }
+
   // Set the header image.
   ui::ResourceBundle& bundle = ui::ResourceBundle::GetSharedInstance();
   auto image_view = std::make_unique<views::ImageView>(
-      bundle.GetThemedLottieImageNamed(IDR_AUTOFILL_SAVE_CARD_LOTTIE));
+      bundle.GetThemedLottieImageNamed(lottie_resource_id));
   image_view->GetViewAccessibility().SetIsInvisible(true);
   GetBubbleFrameView()->SetHeaderView(std::move(image_view));
 }
@@ -402,6 +422,12 @@ void SaveCardOfferBubbleViews::LinkClicked(const GURL& url) {
 void SaveCardOfferBubbleViews::ShowThrobber() {
   if (loading_row_ == nullptr) {
     return;
+  }
+
+  // Disable the cardholder name field (if present) to avoid the user modifying
+  // it (to no effect) while the dialog is in the loading state.
+  if (cardholder_name_textfield_) {
+    cardholder_name_textfield_->SetEnabled(false);
   }
 
   SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));

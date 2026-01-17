@@ -10,7 +10,6 @@
 #include <tuple>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/i18n/rtl.h"
 #include "base/strings/string_util.h"
@@ -94,8 +93,11 @@ std::string OrderByManagedAndAlphabetically::GetShortNameSortKey(
 }  // namespace internal
 
 TemplateURLTableModel::TemplateURLTableModel(
-    TemplateURLService* template_url_service)
-    : observer_(nullptr), template_url_service_(template_url_service) {
+    TemplateURLService* template_url_service,
+    bool ai_mode_enabled)
+    : observer_(nullptr),
+      template_url_service_(template_url_service),
+      ai_mode_enabled_(ai_mode_enabled) {
   DCHECK(template_url_service);
   template_url_service_->AddObserver(this);
   template_url_service_->Load();
@@ -114,14 +116,22 @@ void TemplateURLTableModel::Reload() {
       extension_entries;
   // Keywords that can be made the default first.
   for (TemplateURL* template_url : urls) {
-    // Don't include the expanded set of starter pack keywords if the expansion
-    // feature flag is not enabled.
-    if ((template_url->starter_pack_id() ==
-             template_url_starter_pack_data::kGemini &&
-         !OmniboxFieldTrial::IsStarterPackExpansionEnabled()) ||
-        (template_url->starter_pack_id() ==
-             template_url_starter_pack_data::kPage &&
-         !omnibox_feature_configs::ContextualSearch::Get().starter_pack_page)) {
+    // Skip @gemini if feature disabled.
+    if (template_url->starter_pack_id() ==
+            template_url_starter_pack_data::kGemini &&
+        !OmniboxFieldTrial::IsStarterPackExpansionEnabled()) {
+      continue;
+    }
+    // Skip @page if feature disabled.
+    if (template_url->starter_pack_id() ==
+            template_url_starter_pack_data::kPage &&
+        !omnibox_feature_configs::ContextualSearch::Get().starter_pack_page) {
+      continue;
+    }
+    // Skip @aimode if feature disabled.
+    if (template_url->starter_pack_id() ==
+            template_url_starter_pack_data::kAiMode &&
+        !ai_mode_enabled_) {
       continue;
     }
 
@@ -229,8 +239,8 @@ void TemplateURLTableModel::ModifyTemplateURL(size_t index,
 TemplateURL* TemplateURLTableModel::GetTemplateURL(size_t index) {
   // Sanity checks for https://crbug.com/781703.
   CHECK_LT(index, entries_.size());
-  CHECK(
-      base::Contains(template_url_service_->GetTemplateURLs(), entries_[index]))
+  CHECK(std::ranges::contains(template_url_service_->GetTemplateURLs(),
+                              entries_[index]))
       << "TemplateURLTableModel is returning a pointer to a TemplateURL "
          "that has already been freed by TemplateURLService.";
 

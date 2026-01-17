@@ -14,7 +14,7 @@
 #import "components/autofill/core/browser/data_manager/personal_data_manager.h"
 #import "components/autofill/core/browser/data_manager/personal_data_manager_observer.h"
 #import "components/autofill/core/browser/foundations/autofill_manager.h"
-#import "components/autofill/core/browser/suggestions/payments/payments_suggestion_generator.h"
+#import "components/autofill/core/browser/suggestions/payments/payments_suggestion_generator_util.h"
 #import "components/autofill/core/common/autofill_payments_features.h"
 #import "components/autofill/ios/browser/autofill_driver_ios.h"
 #import "components/autofill/ios/browser/credit_card_util.h"
@@ -85,13 +85,6 @@ bool IsV3() {
   std::unique_ptr<autofill::PersonalDataManagerObserverBridge>
       _personalDataManagerObserver;
 
-  // Scoped observer used to track registration of the
-  // PersonalDataManagerObserverBridge.
-  std::unique_ptr<
-      base::ScopedObservation<autofill::PersonalDataManager,
-                              autofill::PersonalDataManagerObserver>>
-      _scopedPersonalDataManagerObservation;
-
   // Information regarding the triggering form for this bottom sheet.
   autofill::FormActivityParams _params;
 
@@ -125,13 +118,9 @@ bool IsV3() {
 
     if (personalDataManager) {
       _personalDataManager = personalDataManager;
-      _personalDataManagerObserver.reset(
-          new autofill::PersonalDataManagerObserverBridge(self));
-      _scopedPersonalDataManagerObservation = std::make_unique<
-          base::ScopedObservation<autofill::PersonalDataManager,
-                                  autofill::PersonalDataManagerObserver>>(
-          _personalDataManagerObserver.get());
-      _scopedPersonalDataManagerObservation->Observe(_personalDataManager);
+      _personalDataManagerObserver =
+          std::make_unique<autofill::PersonalDataManagerObserverBridge>(
+              _personalDataManager, self);
     }
 
     // Create and register the observers.
@@ -157,12 +146,8 @@ bool IsV3() {
 }
 
 - (void)disconnect {
-  if (_personalDataManager && _personalDataManagerObserver.get()) {
-    _personalDataManager->RemoveObserver(_personalDataManagerObserver.get());
-    _personalDataManagerObserver.reset();
-  }
-
-  _scopedPersonalDataManagerObservation.reset();
+  _personalDataManagerObserver = nullptr;
+  _personalDataManager = nullptr;
 
   _webStateListObservation.reset();
   _webStateListObserver.reset();
@@ -264,11 +249,11 @@ bool IsV3() {
 
   FormSuggestionTabHelper* formSuggestionTabHelper =
       FormSuggestionTabHelper::FromWebState(activeWebState);
-  CHECK(formSuggestionTabHelper, base::NotFatalUntil::M137);
+  CHECK(formSuggestionTabHelper);
 
   id<FormInputSuggestionsProvider> crossProvider =
       formSuggestionTabHelper->GetAccessoryViewProvider();
-  CHECK(crossProvider, base::NotFatalUntil::M137);
+  CHECK(crossProvider);
 
   if (crossProvider.type != SuggestionProviderTypeAutofill && !IsV3()) {
     // Last resort safety exit: On the unlikely event that the provider was

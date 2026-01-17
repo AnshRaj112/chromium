@@ -7,7 +7,6 @@
 #include <algorithm>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/callback_helpers.h"
 #include "content/browser/webid/flags.h"
@@ -52,9 +51,6 @@ void InMemoryFederatedPermissionContext::RemoveEmbargoAndResetCounts(
   embargoed_origins_.erase(relying_party_embedder);
 }
 
-void InMemoryFederatedPermissionContext::RecordIgnoreAndEmbargo(
-    const url::Origin& relying_party_embedder) {}
-
 bool InMemoryFederatedPermissionContext::ShouldCompleteRequestImmediately()
     const {
   const base::CommandLine* current_command_line =
@@ -96,6 +92,11 @@ bool InMemoryFederatedPermissionContext::IsAutoReauthnSettingEnabled() {
 
 bool InMemoryFederatedPermissionContext::IsAutoReauthnEmbargoed(
     const url::Origin& relying_party_embedder) {
+  return false;
+}
+
+bool InMemoryFederatedPermissionContext::IsAutoReauthnDisabledByEmbedder(
+    content::WebContents* web_contents) {
   return false;
 }
 
@@ -293,7 +294,7 @@ void InMemoryFederatedPermissionContext::SetIdpSigninStatus(
     observer.OnIdpSigninStatusReceived(idp_origin, idp_signin_status);
   }
 
-  if (options && IsFedCmLightweightModeEnabled()) {
+  if (options && webid::IsLightweightModeEnabled()) {
     if (idp_signin_status) {
       idp_login_status_options_[idp_origin.Serialize()] = options.value();
     } else {

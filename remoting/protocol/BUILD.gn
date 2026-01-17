@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config/features.gni")
 import("//media/media_options.gni")
 import("//remoting/remoting_options.gni")
 
@@ -70,6 +69,10 @@ static_library("protocol") {
     "connection_to_host.h",
     "content_description.cc",
     "content_description.h",
+    "coordinate_conversion.cc",
+    "coordinate_conversion.h",
+    "coordinate_converter.cc",
+    "coordinate_converter.h",
     "credentials_type.h",
     "data_channel_manager.cc",
     "data_channel_manager.h",
@@ -138,6 +141,7 @@ static_library("protocol") {
     "message_serialization.h",
     "monitored_video_stub.cc",
     "monitored_video_stub.h",
+    "mouse_cursor_monitor.h",
     "mouse_input_filter.cc",
     "mouse_input_filter.h",
     "named_message_pipe_handler.cc",
@@ -400,6 +404,8 @@ source_set("unit_tests") {
     "connection_tester.cc",
     "connection_tester.h",
     "content_description_unittest.cc",
+    "coordinate_conversion_test.cc",
+    "coordinate_converter_unittest.cc",
     "data_channel_manager_unittest.cc",
     "fractional_input_filter_unittest.cc",
     "frame_stats_unittest.cc",

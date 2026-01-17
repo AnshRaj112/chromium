@@ -46,7 +46,6 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notimplemented.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "chromeos/ui/base/chromeos_ui_constants.h"
 #include "chromeos/ui/base/window_properties.h"
@@ -136,7 +135,7 @@ bool CanRestoreState(WindowStateType current_state,
 }
 
 bool IsTabletModeEnabled() {
-  return display::Screen::GetScreen()->InTabletMode();
+  return display::Screen::Get()->InTabletMode();
 }
 
 bool IsToplevelContainer(aura::Window* window) {
@@ -226,7 +225,7 @@ WMEventType WMEventTypeFromShowState(
 // before committing the snap event if needed.
 float GetTargetSnapRatio(aura::Window* window,
                          const WindowSnapWMEvent* snap_event) {
-  if (Shell::Get()->IsInTabletMode()) {
+  if (display::Screen::Get()->InTabletMode()) {
     return snap_event->snap_ratio();
   }
 
@@ -274,8 +273,7 @@ void MoveAllTransientChildrenToNewRoot(aura::Window* window) {
     wm::ConvertRectToScreen(dst_root, &child_bounds);
     container->AddChild(transient_child);
     transient_child->SetBoundsInScreen(
-        child_bounds,
-        display::Screen::GetScreen()->GetDisplayNearestWindow(window));
+        child_bounds, display::Screen::Get()->GetDisplayNearestWindow(window));
 
     // Transient children may have transient children.
     MoveAllTransientChildrenToNewRoot(transient_child);
@@ -441,12 +439,13 @@ bool WindowState::IsSnapped() const {
 }
 
 bool WindowState::IsPinned() const {
+  // Locked fullscreen is considered a pinned state.
   return GetStateType() == WindowStateType::kPinned ||
-         GetStateType() == WindowStateType::kTrustedPinned;
+         GetStateType() == WindowStateType::kLockedFullscreen;
 }
 
-bool WindowState::IsTrustedPinned() const {
-  return GetStateType() == WindowStateType::kTrustedPinned;
+bool WindowState::IsLockedFullscreen() const {
+  return GetStateType() == WindowStateType::kLockedFullscreen;
 }
 
 bool WindowState::IsPip() const {
@@ -841,7 +840,7 @@ void WindowState::OnActivationLost() {
 }
 
 display::Display WindowState::GetDisplay() const {
-  return display::Screen::GetScreen()->GetDisplayNearestWindow(window_);
+  return display::Screen::Get()->GetDisplayNearestWindow(window_);
 }
 
 WindowStateType WindowState::GetRestoreWindowState() const {
@@ -963,15 +962,14 @@ void WindowState::AdjustSnappedBoundsForDisplayWorkspaceChange(
   // might end up calling this function during work area changes, so we avoid
   // unnecessary task in that case when it will be overwritten by tablet mode
   // work.
-  if (is_dragged() || !IsSnapped() ||
-      display::Screen::GetScreen()->InTabletMode()) {
+  if (is_dragged() || !IsSnapped() || display::Screen::Get()->InTabletMode()) {
     return;
   }
   gfx::Rect maximized_bounds =
       screen_util::GetMaximizedWindowBoundsInParent(window_);
 
   const display::Display display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(window_);
+      display::Screen::Get()->GetDisplayNearestWindow(window_);
 
   // For snapped window, `GetSnappedWindowBounds` computes bounds position
   // from snap type and size from |snap_ratio|.
@@ -1079,7 +1077,7 @@ void WindowState::SetBoundsDirect(const gfx::Rect& bounds_in_parent) {
             ? window_->delegate()->GetMaximumSize().value_or(gfx::Size())
             : gfx::Size();
     const display::Display display =
-        display::Screen::GetScreen()->GetDisplayNearestWindow(window_);
+        display::Screen::Get()->GetDisplayNearestWindow(window_);
     min_size.SetToMin(display.work_area().size());
 
     actual_new_bounds.set_width(
@@ -1180,7 +1178,7 @@ void WindowState::SetBoundsDirectCrossFade(const gfx::Rect& bounds_in_parent,
   }
 
   SCOPED_CRASH_KEY_NUMBER("333095196", "state_type",
-                          base::to_underlying(GetStateType()));
+                          std::to_underlying(GetStateType()));
 
   CrossFadeAnimation(window_, std::move(old_layer_owner));
 }

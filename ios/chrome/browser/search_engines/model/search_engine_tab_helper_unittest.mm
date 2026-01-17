@@ -4,7 +4,8 @@
 
 #import "ios/chrome/browser/search_engines/model/search_engine_tab_helper.h"
 
-#import "base/containers/contains.h"
+#import <algorithm>
+
 #import "base/functional/bind.h"
 #import "base/strings/utf_string_conversions.h"
 #import "base/test/bind.h"
@@ -60,7 +61,7 @@ class SearchEngineTabHelperTest : public PlatformTest {
     builder.AddTestingFactory(
         ios::TemplateURLServiceFactory::GetInstance(),
         base::BindLambdaForTesting(
-            [this](web::BrowserState*) -> std::unique_ptr<KeyedService> {
+            [this](ProfileIOS* profile) -> std::unique_ptr<KeyedService> {
               std::unique_ptr<TemplateURLService> model =
                   search_engines_test_environment_.ReleaseTemplateURLService();
               return model;
@@ -89,10 +90,10 @@ class SearchEngineTabHelperTest : public PlatformTest {
   web::WebState* web_state() { return web_state_.get(); }
 
   IOSChromeScopedTestingLocalState scoped_testing_local_state_;
-  search_engines::SearchEnginesTestEnvironment search_engines_test_environment_;
-  web::ScopedTestingWebClient web_client_;
   web::WebTaskEnvironment task_environment_{
       web::WebTaskEnvironment::MainThreadType::IO};
+  search_engines::SearchEnginesTestEnvironment search_engines_test_environment_;
+  web::ScopedTestingWebClient web_client_;
   data_decoder::test::InProcessDataDecoder in_process_data_decoder_;
   std::unique_ptr<TestProfileIOS> profile_;
   std::unique_ptr<web::WebState> web_state_;
@@ -127,7 +128,7 @@ TEST_F(SearchEngineTabHelperTest, AddTemplateURLByOpenSearch) {
   // added and others remain untouched.
   TemplateURL* new_url = nullptr;
   for (TemplateURL* url : template_url_service()->GetTemplateURLs()) {
-    if (!base::Contains(old_urls, url)) {
+    if (!std::ranges::contains(old_urls, url)) {
       ASSERT_FALSE(new_url);
       new_url = url;
     }
@@ -177,7 +178,7 @@ TEST_F(SearchEngineTabHelperTest, AddTemplateURLBySearchableURL) {
   // added and others remain untouched.
   TemplateURL* new_url = nullptr;
   for (TemplateURL* url : template_url_service()->GetTemplateURLs()) {
-    if (!base::Contains(old_urls, url)) {
+    if (!std::ranges::contains(old_urls, url)) {
       ASSERT_FALSE(new_url);
       new_url = url;
     }

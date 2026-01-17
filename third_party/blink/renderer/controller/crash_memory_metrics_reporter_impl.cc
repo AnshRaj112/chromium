@@ -7,6 +7,8 @@
 #include <utility>
 
 #include "base/atomicops.h"
+#include "base/byte_count.h"
+#include "base/byte_size.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/process/memory.h"
 #include "base/process/process_metrics.h"
@@ -67,11 +69,11 @@ void CrashMemoryMetricsReporterImpl::WriteIntoSharedMemory() {
 }
 
 void CrashMemoryMetricsReporterImpl::SampleMemoryState(TimerBase*) {
-  base::SystemMemoryInfoKB meminfo;
+  base::SystemMemoryInfo meminfo;
   base::GetSystemMemoryInfo(&meminfo);
   OomInterventionMetrics metrics;
-  metrics.current_available_memory_kb = meminfo.available;
-  metrics.current_swap_free_kb = meminfo.swap_free;
+  metrics.current_available_memory = meminfo.available;
+  metrics.current_swap_free = meminfo.swap_free;
   last_reported_metrics_ = metrics;
   WriteIntoSharedMemory();
 }

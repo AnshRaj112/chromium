@@ -14,6 +14,7 @@
 
 #include "base/android/jni_weak_ref.h"
 #include "base/android/scoped_java_ref.h"
+#include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
@@ -157,15 +158,13 @@ class TabAndroid : public tabs::TabInterface,
 
   void SetWindowSessionID(SessionID window_id);
 
-  std::unique_ptr<content::WebContents> SwapWebContents(
-      std::unique_ptr<content::WebContents> new_contents,
-      bool did_start_load,
-      bool did_finish_load);
-
   bool IsCustomTab() const;
   bool IsHidden() const;
 
   bool IsTrustedWebActivity() const;
+
+  // Set the media state of the tab. This is called by MediaStateObserver.
+  void SetMediaState(int media_state);
 
   // Observers -----------------------------------------------------------------
 
@@ -175,37 +174,41 @@ class TabAndroid : public tabs::TabInterface,
 
   // Methods called from Java via JNI -----------------------------------------
 
-  void Destroy(JNIEnv* env);
+  void Destroy();
+  bool HasParentCollection();
   void InitWebContents(
       JNIEnv* env,
-      jboolean incognito,
-      jboolean is_background_tab,
-      const base::android::JavaParamRef<jobject>& jweb_contents,
-      const base::android::JavaParamRef<jobject>& jweb_contents_delegate,
-      const base::android::JavaParamRef<jobject>&
-          jcontext_menu_populator_factory);
-  void InitializeAutofillIfNecessary(JNIEnv* env);
+      bool incognito,
+      bool is_background_tab,
+      const base::android::JavaRef<jobject>& jweb_contents,
+      const base::android::JavaRef<jobject>& jweb_contents_delegate,
+      const base::android::JavaRef<jobject>& jcontext_menu_populator_factory);
+  void InitializeAutofillIfNecessary();
   void UpdateDelegates(
       JNIEnv* env,
-      const base::android::JavaParamRef<jobject>& jweb_contents_delegate,
-      const base::android::JavaParamRef<jobject>&
-          jcontext_menu_populator_factory);
-  void DestroyWebContents(JNIEnv* env);
-  void ReleaseWebContents(JNIEnv* env);
+      const base::android::JavaRef<jobject>& jweb_contents_delegate,
+      const base::android::JavaRef<jobject>& jcontext_menu_populator_factory);
+  void SendDidActivateUpdate(JNIEnv* env);
+  void SendWillDeactivateUpdate(JNIEnv* env);
+  void SendDidInsertUpdate(JNIEnv* env);
+  void DestroyWebContents();
+  void ReleaseWebContents();
   bool IsPhysicalBackingSizeEmpty(
-      JNIEnv* env,
-      const base::android::JavaParamRef<jobject>& jweb_contents);
+      const base::android::JavaRef<jobject>& jweb_contents);
   void OnPhysicalBackingSizeChanged(
-      JNIEnv* env,
-      const base::android::JavaParamRef<jobject>& jweb_contents,
-      jint width,
-      jint height);
-  void SetActiveNavigationEntryTitleForUrl(JNIEnv* env,
-                                           std::string& jurl,
+      const base::android::JavaRef<jobject>& jweb_contents,
+      int32_t width,
+      int32_t height);
+  void SetActiveNavigationEntryTitleForUrl(std::string& jurl,
                                            std::u16string& jtitle);
-
-  void LoadOriginalImage(JNIEnv* env);
-  void OnShow(JNIEnv* env);
+  void LoadOriginalImage();
+  void OnShow();
+  void NotifyPinnedStateChanged(bool is_pinned);
+  void NotifyTabGroupChanged(std::optional<base::Token> tab_group_id);
+  bool IsDragging() const;
+  void OnDraggingStateChanged(bool is_dragging);
+  base::CallbackListSubscription RegisterDraggingChanged(
+      base::RepeatingCallback<void(TabInterface*, bool)> callback);
 
   scoped_refptr<content::DevToolsAgentHost> GetDevToolsAgentHost();
 
@@ -248,9 +251,12 @@ class TabAndroid : public tabs::TabInterface,
   base::CallbackListSubscription RegisterModalUIChanged(
       TabInterfaceCallback callback) override;
   bool IsInNormalWindow() const override;
+  BrowserWindowInterface* GetBrowserWindowInterface() override;
+  const BrowserWindowInterface* GetBrowserWindowInterface() const override;
   tabs::TabFeatures* GetTabFeatures() override;
   const tabs::TabFeatures* GetTabFeatures() const override;
   bool IsPinned() const override;
+  bool IsBlocked() const override;
   bool IsSplit() const override;
   std::optional<tab_groups::TabGroupId> GetGroup() const override;
   std::optional<split_tabs::SplitTabId> GetSplit() const override;
@@ -272,6 +278,7 @@ class TabAndroid : public tabs::TabInterface,
 
   void UpdateProperties();
   void SetIsPinned(bool pinned);
+  void SetIsDragging(bool dragging);
   void SetTabGroupId(std::optional<tab_groups::TabGroupId> tab_group_id);
 
   int tab_id_;
@@ -293,6 +300,21 @@ class TabAndroid : public tabs::TabInterface,
   raw_ptr<tabs::TabCollection> parent_collection_ = nullptr;
 
   base::ObserverList<Observer> observers_;
+
+  base::RepeatingCallbackList<void(TabInterface*, bool)>
+      pinned_state_changed_callback_list_;
+
+  base::RepeatingCallbackList<void(TabInterface*,
+                                   std::optional<tab_groups::TabGroupId>)>
+      group_changed_callback_list_;
+
+  base::RepeatingCallbackList<void(TabInterface*, bool)>
+      dragging_changed_callback_list_;
+
+  base::RepeatingCallbackList<void(TabInterface*)> did_activate_callback_list_;
+  base::RepeatingCallbackList<void(TabInterface*)>
+      will_deactivate_callback_list_;
+  base::RepeatingCallbackList<void(TabInterface*)> did_insert_callback_list_;
 
   const base::WeakPtr<Profile> profile_;
   ui::UnownedUserDataHost unowned_user_data_host_;

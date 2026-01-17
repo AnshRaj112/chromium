@@ -14,6 +14,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "base/byte_count.h"
 #include "base/check.h"
 #include "base/functional/callback.h"
 #include "base/memory/ref_counted.h"
@@ -32,7 +33,7 @@ class Pickle;
 class PickleIterator;
 class Time;
 class TimeDelta;
-}
+}  // namespace base
 
 namespace net {
 
@@ -79,7 +80,7 @@ class NET_EXPORT HttpResponseHeaders
     Builder& AddHeader(std::string_view name, std::string_view value) {
       DCHECK(HttpUtil::IsValidHeaderName(name));
       DCHECK(HttpUtil::IsValidHeaderValue(value));
-      headers_.push_back({name, value});
+      headers_.emplace_back(name, value);
       return *this;
     }
 
@@ -99,7 +100,7 @@ class NET_EXPORT HttpResponseHeaders
   // Persist options.
   typedef int PersistOptions;
   static const PersistOptions PERSIST_RAW = -1;  // Raw, unparsed headers.
-  static const PersistOptions PERSIST_ALL = 0;  // Parsed headers.
+  static const PersistOptions PERSIST_ALL = 0;   // Parsed headers.
   static const PersistOptions PERSIST_SANS_COOKIES = 1 << 0;
   static const PersistOptions PERSIST_SANS_CHALLENGES = 1 << 1;
   static const PersistOptions PERSIST_SANS_HOP_BY_HOP = 1 << 2;
@@ -115,17 +116,16 @@ class NET_EXPORT HttpResponseHeaders
     base::TimeDelta staleness;
   };
 
-  static const char kContentRange[];
-  static const char kLastModified[];
-  static const char kVary[];
+  static constexpr char kContentRange[] = "Content-Range";
+  static constexpr char kLastModified[] = "Last-Modified";
+  static constexpr char kVary[] = "Vary";
 
-  static constexpr std::string_view kCacheControl = "cache-control";
-  static constexpr std::string_view kNoStore = "no-store";
-  static constexpr std::string_view kNoCache = "no-cache";
-  static constexpr std::string_view kMustRevalidate = "must-revalidate";
-  static constexpr std::string_view kMaxAge = "max-age=";
-  static constexpr std::string_view kStaleWhileRevalidate =
-      "stale-while-revalidate=";
+  static constexpr char kCacheControl[] = "cache-control";
+  static constexpr char kNoStore[] = "no-store";
+  static constexpr char kNoCache[] = "no-cache";
+  static constexpr char kMustRevalidate[] = "must-revalidate";
+  static constexpr char kMaxAge[] = "max-age=";
+  static constexpr char kStaleWhileRevalidate[] = "stale-while-revalidate=";
 
   HttpResponseHeaders() = delete;
 
@@ -238,9 +238,7 @@ class NET_EXPORT HttpResponseHeaders
   std::string GetStatusLine() const;
 
   // Get the HTTP version of the normalized status line.
-  HttpVersion GetHttpVersion() const {
-    return http_version_;
-  }
+  HttpVersion GetHttpVersion() const { return http_version_; }
 
   // Get the HTTP status text of the normalized status line.
   std::string GetStatusText() const;
@@ -398,13 +396,13 @@ class NET_EXPORT HttpResponseHeaders
   // RFC 2616.
   bool HasValidators() const;
 
-  // Extracts the value of the Content-Length header or returns -1 if there is
-  // no such header in the response.
-  int64_t GetContentLength() const;
-
-  // Extracts the value of the specified header or returns -1 if there is no
+  // Returns the value of the Content-Length header or nullopt if there is no
   // such header in the response.
-  int64_t GetInt64HeaderValue(const std::string& header) const;
+  std::optional<base::ByteCount> GetContentLength() const;
+
+  // Returns the value of the specified header or nullopt if there is no such
+  // header in the response.
+  std::optional<int64_t> GetInt64HeaderValue(std::string_view header) const;
 
   // Extracts the values in a Content-Range header and returns true if all three
   // values are present and valid for a 206 response; otherwise returns false.
@@ -446,7 +444,7 @@ class NET_EXPORT HttpResponseHeaders
  private:
   friend class base::RefCountedThreadSafe<HttpResponseHeaders>;
 
-  using HeaderSet = std::unordered_set<std::string>;
+  class HeaderSet;
 
   // The members of this structure point into raw_headers_.
   struct ParsedHeader;

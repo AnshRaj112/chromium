@@ -8,7 +8,6 @@
 
 #include "base/memory/ptr_util.h"
 #include "ui/events/android/motion_event_android_java.h"
-#include "ui/events/android/motion_event_android_native.h"
 #include "ui/events/android/motion_event_android_source_java.h"
 #include "ui/events/android/motion_event_android_source_native.h"
 
@@ -23,16 +22,16 @@ std::unique_ptr<MotionEventAndroid> MotionEventAndroidFactory::CreateFromJava(
     jfloat ticks_y,
     jfloat tick_multiplier,
     base::TimeTicks oldest_event_time,
-    jint android_action,
-    jint pointer_count,
-    jint history_size,
-    jint action_index,
-    jint android_action_button,
-    jint android_gesture_classification,
-    jint android_button_state,
+    int32_t android_action,
+    int32_t pointer_count,
+    int32_t history_size,
+    int32_t action_index,
+    int32_t android_action_button,
+    int32_t android_gesture_classification,
+    int32_t android_button_state,
     jfloat raw_offset_x_pixels,
     jfloat raw_offset_y_pixels,
-    jboolean for_touch_handle,
+    bool for_touch_handle,
     const MotionEventAndroid::Pointer* const pointer0,
     const MotionEventAndroid::Pointer* const pointer1) {
   return CreateFromJava(
@@ -56,16 +55,16 @@ std::unique_ptr<MotionEventAndroid> MotionEventAndroidFactory::CreateFromJava(
     base::TimeTicks oldest_event_time,
     base::TimeTicks latest_event_time,
     base::TimeTicks down_time_ms,
-    jint android_action,
-    jint pointer_count,
-    jint history_size,
-    jint action_index,
-    jint android_action_button,
-    jint android_gesture_classification,
-    jint android_button_state,
+    int32_t android_action,
+    int32_t pointer_count,
+    int32_t history_size,
+    int32_t action_index,
+    int32_t android_action_button,
+    int32_t android_gesture_classification,
+    int32_t android_button_state,
     jfloat raw_offset_x_pixels,
     jfloat raw_offset_y_pixels,
-    jboolean for_touch_handle,
+    bool for_touch_handle,
     const MotionEventAndroid::Pointer* const pointer0,
     const MotionEventAndroid::Pointer* const pointer1,
     bool is_latest_event_time_resampled) {
@@ -161,7 +160,7 @@ std::unique_ptr<MotionEventAndroid> MotionEventAndroidFactory::CreateFromNative(
   auto source = std::make_unique<MotionEventAndroidSourceNative>(
       std::move(input_event), y_offset_pix);
 
-  return base::WrapUnique<MotionEventAndroid>(new MotionEventAndroidNative(
+  return base::WrapUnique<MotionEventAndroid>(new MotionEventAndroid(
       pix_to_dip,
       /*ticks_x=*/0.f,
       /*ticks_y=*/0.f,

@@ -8,7 +8,6 @@
 #include <memory>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
@@ -471,6 +470,25 @@ bool HatsServiceDesktop::CanShowSurvey(const std::string& trigger) const {
     return false;
   }
 
+  // Check the profile age requirements for this survey. Some surveys (e.g.
+  // those for the First Run Experience) need to run on brand new profiles.
+  switch (config.profile_age_requirement) {
+    case hats::SurveyConfig::ProfileAgeRequirement::kOneMonthOrOlder: {
+      // If the profile is too new, measured as the age of the profile
+      // directory, the user is ineligible.
+      base::Time now = base::Time::Now();
+      auto creation_time = profile()->GetOriginalProfile()->GetCreationTime();
+      if ((now - creation_time) < kMinimumProfileAge) {
+        UMA_HISTOGRAM_ENUMERATION(kHatsShouldShowSurveyReasonHistogram,
+                                  ShouldShowSurveyReasons::kNoProfileTooNew);
+        return false;
+      }
+      break;
+    }
+    case hats::SurveyConfig::ProfileAgeRequirement::kAnyAge:
+      break;
+  }
+
   if (DoesCooldownApply(profile(), GetPrefsForHatsMetadata(), config)) {
     UMA_HISTOGRAM_ENUMERATION(
         kHatsShouldShowSurveyReasonHistogram,
@@ -566,16 +584,6 @@ bool HatsServiceDesktop::CanShowAnySurvey(bool user_prompted) const {
   // whether a user is eligible is thus lower for these types of surveys.
   if (user_prompted) {
     return true;
-  }
-
-  // If the profile is too new, measured as the age of the profile
-  // directory, the user is ineligible.
-  base::Time now = base::Time::Now();
-  auto creation_time = profile()->GetOriginalProfile()->GetCreationTime();
-  if ((now - creation_time) < kMinimumProfileAge) {
-    UMA_HISTOGRAM_ENUMERATION(kHatsShouldShowSurveyReasonHistogram,
-                              ShouldShowSurveyReasons::kNoProfileTooNew);
-    return false;
   }
 
   return true;
@@ -736,8 +744,8 @@ void HatsServiceDesktop::CheckSurveyStatusAndMaybeShow(
   CHECK_EQ(product_specific_bits_data.size(),
            survey_config.product_specific_bits_data_fields.size());
   for (const auto& field_value : product_specific_bits_data) {
-    CHECK(base::Contains(survey_config.product_specific_bits_data_fields,
-                         field_value.first));
+    CHECK(std::ranges::contains(survey_config.product_specific_bits_data_fields,
+                                field_value.first));
   }
 
   // Check that the |product_specific_string_data| matches the fields for this
@@ -745,8 +753,8 @@ void HatsServiceDesktop::CheckSurveyStatusAndMaybeShow(
   CHECK_EQ(product_specific_string_data.size(),
            survey_config.product_specific_string_data_fields.size());
   for (const auto& field_value : product_specific_string_data) {
-    CHECK(base::Contains(survey_config.product_specific_string_data_fields,
-                         field_value.first));
+    CHECK(std::ranges::contains(
+        survey_config.product_specific_string_data_fields, field_value.first));
   }
 
   // As soon as the HaTS Next dialog is created it will attempt to contact

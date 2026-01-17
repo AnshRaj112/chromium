@@ -88,8 +88,12 @@ const CGFloat kSelectionViewOpacityAnimationDuration = 0.4f;
   [self.delegate lensOverlayContainerPresenterWillBeginPresentation:self];
 
   [_baseViewController.view endEditing:YES];
-  [_baseViewController.view addSubview:_containerViewController.view];
+
+  [_containerViewController willMoveToParentViewController:_baseViewController];
   [_baseViewController addChildViewController:_containerViewController];
+  [_baseViewController.view addSubview:_containerViewController.view];
+  [_containerViewController didMoveToParentViewController:_baseViewController];
+
   _containerViewController.view.translatesAutoresizingMaskIntoConstraints = NO;
   NSDirectionalEdgeInsets insets =
       [self.delegate lensOverlayContainerPresenterInsetsForPresentation:self];
@@ -102,7 +106,6 @@ const CGFloat kSelectionViewOpacityAnimationDuration = 0.4f;
                      constant:insets.top];
   [NSLayoutConstraint activateConstraints:@[ _topConstraint ]];
 
-  [_containerViewController didMoveToParentViewController:_baseViewController];
   _containerViewController.selectionViewController.view.alpha = 1;
 
   if (!animated) {

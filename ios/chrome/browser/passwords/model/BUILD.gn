@@ -6,8 +6,8 @@ import("//components/optimization_guide/features.gni")
 
 source_set("model") {
   sources = [
-    "ios_chrome_bulk_leak_check_service_factory.cc",
     "ios_chrome_bulk_leak_check_service_factory.h",
+    "ios_chrome_bulk_leak_check_service_factory.mm",
     "ios_chrome_password_check_manager.h",
     "ios_chrome_password_check_manager.mm",
     "ios_chrome_password_check_manager_factory.h",
@@ -53,6 +53,7 @@ source_set("model") {
     "//base",
     "//base:i18n",
     "//components/autofill/core/browser",
+    "//components/autofill/core/browser/integrators/password_manager",
     "//components/autofill/core/common",
     "//components/autofill/ios/browser",
     "//components/autofill/ios/browser:util",
@@ -79,6 +80,8 @@ source_set("model") {
     "//components/translate/core/browser",
     "//components/ukm",
     "//components/ukm/ios:ukm_url_recorder",
+    "//components/webauthn/ios",
+    "//components/webauthn/ios:features",
     "//google_apis",
     "//ios/chrome/app:tests_hook",
     "//ios/chrome/app/strings",
@@ -89,7 +92,6 @@ source_set("model") {
     "//ios/chrome/browser/infobars/model",
     "//ios/chrome/browser/infobars/model:public",
     "//ios/chrome/browser/infobars/ui_bundled/coordinators",
-    "//ios/chrome/browser/ntp/ui_bundled:logo",
     "//ios/chrome/browser/passwords/ui_bundled:password_suggestion_utils",
     "//ios/chrome/browser/safe_browsing/model",
     "//ios/chrome/browser/shared/model/application_context",
@@ -101,6 +103,7 @@ source_set("model") {
     "//ios/chrome/browser/shared/public/features",
     "//ios/chrome/browser/shared/public/features:system_flags",
     "//ios/chrome/browser/shared/ui/elements",
+    "//ios/chrome/browser/shared/ui/symbols",
     "//ios/chrome/browser/shared/ui/util",
     "//ios/chrome/browser/signin/model",
     "//ios/chrome/browser/ssl/model",
@@ -111,11 +114,9 @@ source_set("model") {
     "//ios/chrome/browser/webauthn/model",
     "//ios/chrome/browser/webdata_services/model",
     "//ios/chrome/common/ui/util",
-    "//ios/third_party/material_components_ios",
     "//ios/web/common",
     "//ios/web/public/js_messaging",
     "//net",
-    "//third_party/material_design_icons:ic_account_circle",
     "//ui/base",
     "//url",
   ]
@@ -130,14 +131,6 @@ source_set("model") {
 
 source_set("password_controller_delegate") {
   sources = [ "password_controller_delegate.h" ]
-}
-
-source_set("save_passwords_consumer") {
-  sources = [
-    "save_passwords_consumer.h",
-    "save_passwords_consumer.mm",
-  ]
-  deps = [ "//components/password_manager/core/browser" ]
 }
 
 source_set("store_factory") {
@@ -159,6 +152,7 @@ source_set("store_factory") {
     "//base",
     "//components/password_manager/core/browser",
     "//components/password_manager/core/browser/affiliation:affiliation_fetching",
+    "//components/password_manager/core/browser/affiliation:affiliation_match_helper",
     "//components/password_manager/core/browser/features:password_features",
     "//components/password_manager/core/common:features",
     "//components/signin/public/identity_manager",
@@ -191,6 +185,7 @@ source_set("infobar_delegates") {
     "//ios/chrome/app/strings",
     "//ios/chrome/app/theme",
     "//ios/chrome/browser/shared/public/commands",
+    "//services/metrics/public/cpp:metrics_cpp",
     "//ui/base",
   ]
 }
@@ -281,7 +276,6 @@ source_set("unit_tests") {
     "//components/autofill/ios/browser:util",
     "//components/autofill/ios/common",
     "//components/autofill/ios/form_util",
-    "//components/autofill/ios/form_util:form_util_feature",
     "//components/enterprise/connectors/core",
     "//components/infobars/core",
     "//components/password_manager/core/browser",
@@ -296,14 +290,15 @@ source_set("unit_tests") {
     "//components/safe_browsing/core/browser/password_protection:test_support",
     "//components/safe_browsing/core/common:safe_browsing_prefs",
     "//components/sync_preferences:test_support",
-    "//components/ukm:test_support",
+    "//components/test/ios",
     "//components/ukm:test_support",
     "//ios/chrome/app/strings",
     "//ios/chrome/browser/affiliations/model",
+    "//ios/chrome/browser/autofill/form_input_accessory/coordinator",
     "//ios/chrome/browser/autofill/model",
+    "//ios/chrome/browser/autofill/model:features",
     "//ios/chrome/browser/autofill/model/bottom_sheet",
     "//ios/chrome/browser/autofill/ui_bundled:coordinator",
-    "//ios/chrome/browser/autofill/ui_bundled/form_input_accessory",
     "//ios/chrome/browser/enterprise/connectors/reporting",
     "//ios/chrome/browser/infobars/model",
     "//ios/chrome/browser/passwords/model:store_factory",
@@ -320,6 +315,7 @@ source_set("unit_tests") {
     "//ios/web/js_messaging:web_view_js_utils",
     "//ios/web/public/js_messaging",
     "//ios/web/public/test",
+    "//ios/web/public/test:javascript_test",
     "//ios/web/public/test/fakes",
     "//net:test_support",
     "//services/metrics/public/cpp:metrics_cpp",
@@ -343,14 +339,16 @@ source_set("eg2_tests") {
     "//components/enterprise/connectors/core:test_support",
     "//components/password_manager/core/browser/features:password_features",
     "//components/password_manager/core/common",
-    "//components/plus_addresses:features",
+    "//components/plus_addresses/core/common:features",
     "//components/policy/core/common:common_constants",
     "//components/strings",
     "//components/sync/base",
     "//components/sync/service",
     "//ios/chrome/app/strings",
-    "//ios/chrome/browser/authentication/ui_bundled:eg_test_support+eg2",
+    "//ios/chrome/browser/authentication/test:eg_test_support+eg2",
     "//ios/chrome/browser/autofill/ui_bundled:eg_test_support+eg2",
+    "//ios/chrome/browser/badges/model:features",
+    "//ios/chrome/browser/badges/ui_bundled:public",
     "//ios/chrome/browser/infobars/ui_bundled/banners:public",
     "//ios/chrome/browser/metrics/model:eg_test_support+eg2",
     "//ios/chrome/browser/passwords/ui_bundled:constants",

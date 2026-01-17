@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 // For information about interceptions as a whole see
 // http://dev.chromium.org/developers/design-documents/sandbox .
 
@@ -20,6 +15,7 @@
 
 #include "base/bits.h"
 #include "base/check_op.h"
+#include "base/compiler_specific.h"
 #include "base/containers/heap_array.h"
 #include "base/notreached.h"
 #include "base/rand_util.h"
@@ -85,7 +81,7 @@ InterceptionManager::InterceptionData::InterceptionData(
 InterceptionManager::InterceptionData::~InterceptionData() {}
 
 InterceptionManager::InterceptionManager(TargetProcess& child_process)
-    : child_(child_process), names_used_(false) {}
+    : child_(child_process) {}
 InterceptionManager::~InterceptionManager() {}
 
 bool InterceptionManager::AddToPatchedFunctions(
@@ -102,25 +98,6 @@ bool InterceptionManager::AddToPatchedFunctions(
   function.interceptor_address = replacement_code_address;
 
   interceptions_.push_back(function);
-  return true;
-}
-
-bool InterceptionManager::AddToPatchedFunctions(
-    const wchar_t* dll_name,
-    const char* function_name,
-    InterceptionType interception_type,
-    const char* replacement_function_name,
-    InterceptorId id) {
-  InterceptionData function;
-  function.type = interception_type;
-  function.id = id;
-  function.dll = dll_name;
-  function.function = function_name;
-  function.interceptor = replacement_function_name;
-  function.interceptor_address = nullptr;
-
-  interceptions_.push_back(function);
-  names_used_ = true;
   return true;
 }
 
@@ -157,8 +134,8 @@ ResultCode InterceptionManager::InitializeInterceptions() {
   if (rc != SBOX_ALL_OK)
     return rc;
 
-  rc = child_->TransferVariable("g_interceptions", &remote_buffer,
-                                &g_interceptions, sizeof(g_interceptions));
+  rc = child_->TransferVariable(&remote_buffer, &g_interceptions,
+                                sizeof(g_interceptions));
   return rc;
 }
 
@@ -182,8 +159,7 @@ size_t InterceptionManager::GetBufferSize() const {
     }
 
     // we have to NULL terminate the strings on the structure
-    size_t strings_chars =
-        interception.function.size() + interception.interceptor.size() + 2;
+    size_t strings_chars = interception.function.size() + 1;
 
     // a new FunctionInfo is required per function
     size_t record_bytes = offsetof(FunctionInfo, function) + strings_chars;
@@ -210,9 +186,6 @@ bool InterceptionManager::SetupConfigBuffer(void* buffer, size_t buffer_bytes) {
   SharedMemory* shared_memory = reinterpret_cast<SharedMemory*>(buffer);
   DllPatchInfo* dll_info = shared_memory->dll_list;
   size_t num_dlls = 0;
-
-  shared_memory->interceptor_base =
-      names_used_ ? child_->MainModule() : nullptr;
 
   buffer_bytes -= offsetof(SharedMemory, dll_list);
   buffer = dll_info;
@@ -271,7 +244,7 @@ bool InterceptionManager::SetupDllInfo(const InterceptionData& data,
     return false;
 
   *buffer_bytes -= required;
-  *buffer = reinterpret_cast<char*>(*buffer) + required;
+  *buffer = UNSAFE_TODO(reinterpret_cast<char*>(*buffer) + required);
 
   // set up the dll info to be what we know about it at this time
   dll_info->unload_module = (data.type == INTERCEPTION_UNLOAD_MODULE);
@@ -279,7 +252,7 @@ bool InterceptionManager::SetupDllInfo(const InterceptionData& data,
   dll_info->offset_to_functions = required;
   dll_info->num_functions = 0;
   data.dll.copy(dll_info->dll_name, data.dll.size());
-  dll_info->dll_name[data.dll.size()] = L'\0';
+  UNSAFE_TODO(dll_info->dll_name[data.dll.size()]) = L'\0';
 
   return true;
 }
@@ -300,33 +273,26 @@ bool InterceptionManager::SetupInterceptionInfo(const InterceptionData& data,
   FunctionInfo* function = reinterpret_cast<FunctionInfo*>(*buffer);
 
   size_t name_bytes = data.function.size();
-  size_t interceptor_bytes = data.interceptor.size();
 
   // the strings at the end of the structure are zero terminated
-  size_t required =
-      offsetof(FunctionInfo, function) + name_bytes + interceptor_bytes + 2;
+  size_t required = offsetof(FunctionInfo, function) + name_bytes + 1;
   required = RoundUpToMultiple(required, sizeof(size_t));
   if (*buffer_bytes < required)
     return false;
 
   // update the caller's values
   *buffer_bytes -= required;
-  *buffer = reinterpret_cast<char*>(*buffer) + required;
+  *buffer = UNSAFE_TODO(reinterpret_cast<char*>(*buffer) + required);
 
   function->record_bytes = required;
   function->type = data.type;
   function->id = data.id;
   function->interceptor_address = data.interceptor_address;
-  char* names = function->function;
+  char* name = function->function;
 
-  data.function.copy(names, name_bytes);
-  names += name_bytes;
-  *names++ = '\0';
-
-  // interceptor follows the function_name
-  data.interceptor.copy(names, interceptor_bytes);
-  names += interceptor_bytes;
-  *names++ = '\0';
+  data.function.copy(name, name_bytes);
+  UNSAFE_TODO(name += name_bytes);
+  UNSAFE_TODO(*name++ = '\0');
 
   // update the dll table
   dll_info->num_functions++;
@@ -375,7 +341,7 @@ ResultCode InterceptionManager::PatchNtdll(bool hot_patch_needed) {
   size_t thunk_offset = internal::GetGranularAlignedRandomOffset(thunk_bytes);
 
   // Split the base and offset along page boundaries.
-  thunk_base += thunk_offset & ~(kPageSize - 1);
+  UNSAFE_TODO(thunk_base += thunk_offset & ~(kPageSize - 1));
   thunk_offset &= kPageSize - 1;
 
   // Make an aligned, padded allocation, and move the pointer to our chunk.
@@ -384,8 +350,8 @@ ResultCode InterceptionManager::PatchNtdll(bool hot_patch_needed) {
       ::VirtualAllocEx(child, thunk_base, thunk_bytes_padded, MEM_COMMIT,
                        PAGE_EXECUTE_READWRITE));
   CHECK(thunk_base);  // If this fails we'd crash anyway on an invalid access.
-  DllInterceptionData* thunks =
-      reinterpret_cast<DllInterceptionData*>(thunk_base + thunk_offset);
+  DllInterceptionData* thunks = reinterpret_cast<DllInterceptionData*>(
+      UNSAFE_TODO(thunk_base + thunk_offset));
 
   // this should write all the individual thunks to the child's memory
   base::expected<PatchClientResultData, ResultCode> patch =
@@ -409,9 +375,8 @@ ResultCode InterceptionManager::PatchNtdll(bool hot_patch_needed) {
   ::VirtualProtectEx(child, thunks, thunk_bytes, PAGE_EXECUTE_READ,
                      &old_protection);
 
-  ResultCode ret =
-      child_->TransferVariable("g_originals", &patch.value().originals,
-                               &g_originals, sizeof(g_originals));
+  ResultCode ret = child_->TransferVariable(&patch.value().originals,
+                                            &g_originals, sizeof(g_originals));
   return ret;
 }
 
@@ -440,19 +405,19 @@ InterceptionManager::PatchClientFunctions(DllInterceptionData* thunks,
     if (INTERCEPTION_SERVICE_CALL != interception.type)
       return base::unexpected(SBOX_ERROR_BAD_PARAMS);
 
-    NTSTATUS ret = thunk.Setup(
-        ntdll_base, nullptr, interception.function.c_str(),
-        interception.interceptor.c_str(), interception.interceptor_address,
-        &thunks->thunks[patch.dll_data.num_thunks],
-        thunk_bytes - patch.dll_data.used_bytes, nullptr);
+    NTSTATUS ret =
+        thunk.Setup(ntdll_base, interception.function.c_str(),
+                    interception.interceptor_address,
+                    &UNSAFE_TODO(thunks->thunks[patch.dll_data.num_thunks]),
+                    thunk_bytes - patch.dll_data.used_bytes, nullptr);
     if (!NT_SUCCESS(ret)) {
       ::SetLastError(GetLastErrorFromNtStatus(ret));
       return base::unexpected(SBOX_ERROR_CANNOT_SETUP_INTERCEPTION_THUNK);
     }
 
-    DCHECK(!patch.originals.functions[interception.id]);
-    patch.originals.functions[interception.id] =
-        &thunks->thunks[patch.dll_data.num_thunks];
+    DCHECK(!UNSAFE_TODO(patch.originals.functions[interception.id]));
+    UNSAFE_TODO(patch.originals.functions[interception.id]) =
+        &UNSAFE_TODO(thunks->thunks[patch.dll_data.num_thunks]);
 
     patch.dll_data.num_thunks++;
     patch.dll_data.used_bytes += sizeof(ThunkData);

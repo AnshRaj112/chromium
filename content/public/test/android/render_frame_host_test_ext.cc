@@ -21,7 +21,7 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "content/public/test/android/content_test_jni/RenderFrameHostTestExt_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 namespace content {
 
@@ -39,8 +39,9 @@ void OnExecuteJavaScriptResult(const base::android::JavaRef<jobject>& jcallback,
 
 }  // namespace
 
-jlong JNI_RenderFrameHostTestExt_Init(JNIEnv* env,
-                                      jlong render_frame_host_android_ptr) {
+static jlong JNI_RenderFrameHostTestExt_Init(
+    JNIEnv* env,
+    jlong render_frame_host_android_ptr) {
   RenderFrameHostAndroid* rfha =
       reinterpret_cast<RenderFrameHostAndroid*>(render_frame_host_android_ptr);
   auto* host = new RenderFrameHostTestExt(
@@ -56,9 +57,9 @@ RenderFrameHostTestExt::RenderFrameHostTestExt(RenderFrameHostImpl* rfhi)
 
 void RenderFrameHostTestExt::ExecuteJavaScript(
     JNIEnv* env,
-    const JavaParamRef<jstring>& jscript,
-    const JavaParamRef<jobject>& jcallback,
-    jboolean with_user_gesture) {
+    const JavaRef<jstring>& jscript,
+    const JavaRef<jobject>& jcallback,
+    bool with_user_gesture) {
   std::u16string script(base::android::ConvertJavaStringToUTF16(env, jscript));
   auto callback = base::BindOnce(
       &OnExecuteJavaScriptResult,
@@ -74,7 +75,7 @@ void RenderFrameHostTestExt::ExecuteJavaScript(
 
 void RenderFrameHostTestExt::UpdateVisualState(
     JNIEnv* env,
-    const JavaParamRef<jobject>& jcallback) {
+    const JavaRef<jobject>& jcallback) {
   auto result_callback = base::BindOnce(
       &base::android::RunBooleanCallbackAndroid,
       base::android::ScopedJavaGlobalRef<jobject>(env, jcallback));
@@ -82,10 +83,10 @@ void RenderFrameHostTestExt::UpdateVisualState(
 }
 
 void RenderFrameHostTestExt::NotifyVirtualKeyboardOverlayRect(JNIEnv* env,
-                                                              jint x,
-                                                              jint y,
-                                                              jint width,
-                                                              jint height) {
+                                                              int32_t x,
+                                                              int32_t y,
+                                                              int32_t width,
+                                                              int32_t height) {
   gfx::Size size(width, height);
   gfx::Point origin(x, y);
   render_frame_host_->GetPage().NotifyVirtualKeyboardOverlayRect(
@@ -93,3 +94,5 @@ void RenderFrameHostTestExt::NotifyVirtualKeyboardOverlayRect(JNIEnv* env,
 }
 
 }  // namespace content
+
+DEFINE_JNI(RenderFrameHostTestExt)

@@ -4,13 +4,30 @@
 
 #include "chrome/browser/glic/test_support/non_interactive_glic_test.h"
 
+#include "chrome/browser/glic/host/context/glic_focused_browser_manager_impl.h"
+
+#if BUILDFLAG(IS_CHROMEOS)
+#include "chromeos/constants/chromeos_features.h"
+#endif  // BUILDFLAG(IS_CHROMEOS)
+
 namespace glic {
 
-NonInteractiveGlicTest::NonInteractiveGlicTest() = default;
+NonInteractiveGlicTest::NonInteractiveGlicTest() {
+#if BUILDFLAG(IS_CHROMEOS)
+  features_.InitAndEnableFeature(chromeos::features::kFeatureManagementGlic);
+#endif  // BUILDFLAG(IS_CHROMEOS)
+
+  GlicFocusedBrowserManagerImpl::SetTestingModeForTesting(true);
+}
 
 NonInteractiveGlicTest::NonInteractiveGlicTest(
     const base::FieldTrialParams& glic_params,
     const GlicTestEnvironmentConfig& glic_config)
-    : test::InteractiveGlicTestT<InteractiveBrowserTest>(glic_params,
-                                                         glic_config) {}
+    : test::InteractiveGlicTestMixin<InteractiveBrowserTest>(glic_params,
+                                                             glic_config) {
+  GlicFocusedBrowserManagerImpl::SetTestingModeForTesting(true);
 }
+
+NonInteractiveGlicTest::~NonInteractiveGlicTest() = default;
+
+}  // namespace glic

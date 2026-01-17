@@ -8,6 +8,11 @@
 //    clang-format -i -style=chromium filename
 // DO NOT EDIT!
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #ifndef UI_GL_GL_BINDINGS_AUTOGEN_GL_H_
 #define UI_GL_GL_BINDINGS_AUTOGEN_GL_H_
 
@@ -1960,6 +1965,7 @@ struct ExtensionsGL {
   bool b_GL_KHR_parallel_shader_compile;
   bool b_GL_KHR_robustness;
   bool b_GL_MESA_framebuffer_flip_y;
+  bool b_GL_MESA_sampler_objects;
   bool b_GL_NV_blend_equation_advanced;
   bool b_GL_NV_fence;
   bool b_GL_NV_framebuffer_blit;

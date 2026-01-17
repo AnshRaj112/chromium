@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/payments/payment_manager.h"
 
+#include "base/task/single_thread_task_runner.h"
 #include "third_party/blink/public/platform/browser_interface_broker_proxy.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
@@ -67,8 +68,8 @@ ScriptPromise<IDLBoolean> PaymentManager::enableDelegations(
 
   manager_->EnableDelegations(
       std::move(mojo_delegations),
-      WTF::BindOnce(&PaymentManager::OnEnableDelegationsResponse,
-                    WrapPersistent(this)));
+      BindOnce(&PaymentManager::OnEnableDelegationsResponse,
+               WrapPersistent(this)));
   enable_delegations_resolver_ =
       MakeGarbageCollected<ScriptPromiseResolver<IDLBoolean>>(
           script_state, exception_state.GetContext());
@@ -93,7 +94,7 @@ PaymentManager::PaymentManager(ServiceWorkerRegistration* registration)
             context->GetTaskRunner(TaskType::kUserInteraction)));
   }
 
-  manager_.set_disconnect_handler(WTF::BindOnce(
+  manager_.set_disconnect_handler(BindOnce(
       &PaymentManager::OnServiceConnectionError, WrapWeakPersistent(this)));
   manager_->Init(registration_->GetExecutionContext()->Url(),
                  registration_->scope());

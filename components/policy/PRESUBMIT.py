@@ -9,12 +9,17 @@ PRESUBMIT_VERSION = '2.0.0'
 
 import glob
 import os
+import re
 import sys
 from xml.dom import minidom
 from xml.parsers import expat
 
 sys.path.append(os.path.abspath('./resources'))
-from policy_templates import GetPolicyTemplates
+from policy_templates import (
+  GetPolicyTemplates,
+  SENSITIVE_POLICY_NOTICES,
+  SENSITIVE_POLICIES_WITH_MANUAL_NOTICE_PATTERN
+)
 
 sys.path.append(os.path.join('..', '..', 'third_party'))
 import pyyaml
@@ -31,6 +36,8 @@ _PRESUBMIT_PATH = os.path.join(_COMPONENTS_POLICY_PATH, 'PRESUBMIT.py')
 _TOOLS_PATH = os.path.join(_COMPONENTS_POLICY_PATH, 'tools')
 _SYNTAX_CHECK_SCRIPT_PATH = os.path.join(_TOOLS_PATH,
       'syntax_check_policy_template_json.py')
+_POLICY_TEMPLATES_SCRIPT_PATH = os.path.join(_COMPONENTS_POLICY_PATH,
+      'resources', 'policy_templates.py')
 _TEMPLATES_PATH = os.path.join(_COMPONENTS_POLICY_PATH, 'resources',
       'templates')
 _MESSAGES_PATH = os.path.join(_TEMPLATES_PATH, 'messages.yaml')
@@ -53,6 +60,24 @@ _LEGACY_DEVICE_POLICY_PROTO_MAP_PATH = os.path.join(
 # device policy, but be aware that too heavy policies could result in user
 # profiles not having enough space on the device.
 TOTAL_DEVICE_POLICY_EXTERNAL_DATA_MAX_SIZE = 1024 * 1024 * 100
+
+
+# Policies that are allowed to already include
+# the sensitive policy notices in their description.
+#
+# The build will skip these policies to allow a stepwise migration.
+# Sensitive policies not on this list and
+# already containing notices will result in an error.
+#
+# DO NOT ADD new policies to this list.
+# Instead, let the build automatically add the appropriate notices
+# when you mark a policy with sensitive: True
+SENSITIVE_POLICIES_WITH_MANUAL_NOTICE = [
+    "RestoreOnStartupURLs",
+    "FirstPartySetsOverrides",
+    "AutoOpenFileTypes",
+    "MetricsReportingEnabled",
+]
 
 
 def _SafeListDir(directory):
@@ -552,6 +577,10 @@ def CheckPolicyChangeVersionPlatformCompatibility(input_api, output_api):
   if skip_compatibility_check:
     return results
 
+  bypass_errors_check_message = ('If this is intentional, add '
+            'BYPASS_POLICY_COMPATIBILITY_CHECK=<reason> to your CL '
+            'description.\n')
+
   policy_changelist = _GetPolicyChangeList(input_api)
   current_version = _GetCurrentVersion(input_api)
   for policy_changes in policy_changelist:
@@ -568,7 +597,7 @@ def CheckPolicyChangeVersionPlatformCompatibility(input_api, output_api):
           results.append(output_api.PresubmitError(
             f"In policy {policy_name}: Policy has been removed on {platform}. "
             "A released policy cannot be removed. Mark it as deprecated and "
-            "update the supported versions."))
+            f"update the supported versions. {bypass_errors_check_message}"))
 
       if original_range['from'] >= current_version:
         if platform not in new_policy_platforms:
@@ -581,7 +610,8 @@ def CheckPolicyChangeVersionPlatformCompatibility(input_api, output_api):
           platform not in original_policy_platforms):
         results.append(output_api.PresubmitError(
           f"In policy {policy_name}: Support can't be added on platform "
-          f"{platform} because version {new_from_version} is already released.")
+          f"{platform} because version {new_from_version} is already released."
+          f" {bypass_errors_check_message}")
         )
 
       if (new_from_version == current_version - 1 and
@@ -847,4 +877,56 @@ def CheckDevicePolicies(input_api, output_api):
       'Total sum of device policy external data maximum size limits should not '
       f'exceed {TOTAL_DEVICE_POLICY_EXTERNAL_DATA_MAX_SIZE} bytes, current sum '
       f'is {total_device_policy_external_data_max_size} bytes.'))
+  return results
+
+
+def CheckSensitivePoliciesWithManualNotices(input_api, output_api):
+  results = []
+
+  if _SkipPresubmitChecks(input_api, [
+        _POLICIES_DEFINITIONS_PATH,
+        _POLICY_TEMPLATES_SCRIPT_PATH,
+        _PRESUBMIT_PATH
+      ]):
+    return results
+
+  # Check that the regex we use for detecting manually added notices
+  # still match (are up-to-date with) the notices we automatically append.
+  for platform, pattern in (
+    SENSITIVE_POLICIES_WITH_MANUAL_NOTICE_PATTERN.items()
+  ):
+    if not re.search(pattern, SENSITIVE_POLICY_NOTICES[platform], re.MULTILINE):
+      results.append(output_api.PresubmitError(
+          f"Regex for platform '{platform}' no longer matches its notice. "
+          "Please update the regex."))
+
+  # Skip remaining checks since they might not be relevant
+  # when problems are already found with the notice detection logic.
+  if results:
+    return results
+
+  policies_with_manual_notice = \
+    GetPolicyTemplates()['sensitive_policies_with_manual_notices']
+
+  not_allowed = [
+    policy for policy in policies_with_manual_notice
+    if policy not in SENSITIVE_POLICIES_WITH_MANUAL_NOTICE
+  ]
+
+  if not_allowed:
+    error_message = (
+      "The following sensitive policies contain manually added sensitive "
+      "policy notices in their YAML descriptions:\n\n"
+    )
+
+    for name in not_allowed:
+      error_message += f"{name}\n"
+
+    error_message += (
+      "\nPlease remove the manual notices from the YAML files. "
+      "Standard notices are added automatically by the build process."
+    )
+
+    results.append(output_api.PresubmitError(error_message))
+
   return results

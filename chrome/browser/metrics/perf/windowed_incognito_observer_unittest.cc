@@ -29,15 +29,15 @@ class TestWindowedIncognitoMonitor : public WindowedIncognitoMonitor {
   using WindowedIncognitoMonitor::num_incognito_window_opened;
 
  private:
-  // BrowserListObserver implementation.
-  void OnBrowserAdded(Browser* browser) override {
+  // BrowserCollectionObserver implementation.
+  void OnBrowserCreated(BrowserWindowInterface* browser) override {
     num_on_browser_added_++;
-    WindowedIncognitoMonitor::OnBrowserAdded(browser);
+    WindowedIncognitoMonitor::OnBrowserCreated(browser);
   }
 
-  void OnBrowserRemoved(Browser* browser) override {
+  void OnBrowserClosed(BrowserWindowInterface* browser) override {
     num_on_browser_removed_++;
-    WindowedIncognitoMonitor::OnBrowserRemoved(browser);
+    WindowedIncognitoMonitor::OnBrowserClosed(browser);
   }
 
   int num_on_browser_added_ = 0;
@@ -73,12 +73,11 @@ class WindowedIncognitoMonitorTest : public testing::Test {
                   : profile_.get();
     Browser::CreateParams params(browser_profile, true);
     params.type = Browser::TYPE_NORMAL;
-    params.window = browser_window.get();
+    params.window = browser_window.release();
     auto browser = Browser::DeprecatedCreateOwnedForTesting(params);
 
     size_t handle = next_browser_id++;
-    open_browsers_[handle] =
-        std::make_pair(std::move(browser_window), std::move(browser));
+    open_browsers_[handle] = std::move(browser);
     return handle;
   }
 
@@ -95,11 +94,8 @@ class WindowedIncognitoMonitorTest : public testing::Test {
   // The associated testing browser profile.
   std::unique_ptr<TestingProfile> profile_;
 
-  // Keep track of the open browsers and accompanying windows.
-  std::unordered_map<
-      size_t,
-      std::pair<std::unique_ptr<TestBrowserWindow>, std::unique_ptr<Browser>>>
-      open_browsers_;
+  // Keep track of the open browsers.
+  std::unordered_map<size_t, std::unique_ptr<Browser>> open_browsers_;
   static size_t next_browser_id;
 
   std::unique_ptr<TestWindowedIncognitoMonitor> incognito_monitor_;
@@ -107,7 +103,7 @@ class WindowedIncognitoMonitorTest : public testing::Test {
 
 size_t WindowedIncognitoMonitorTest::next_browser_id = 1;
 
-// Test that BrowserListObserver callbacks work as expected.
+// Test that BrowserCollectionObserver callbacks work as expected.
 TEST_F(WindowedIncognitoMonitorTest, CheckSetup) {
   // Open a normal window.
   size_t window1 = OpenBrowserWindow(false);

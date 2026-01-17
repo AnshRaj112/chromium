@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/location.h"
@@ -140,6 +139,8 @@ void UpdateClientImpl::CheckForUpdate(
 
 void UpdateClientImpl::RunTask(scoped_refptr<Task> task) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  VLOG(2) << __func__;
+
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(&Task::Run, task));
   tasks_.insert(task);
@@ -164,6 +165,9 @@ void UpdateClientImpl::OnTaskComplete(Callback callback,
       FROM_HERE, base::BindOnce(std::move(callback), error));
 
   tasks_.erase(task);
+  VLOG(2) << __func__ << ": tasks_.empty(): " << tasks_.empty()
+          << ", task_queue_.empty(): " << task_queue_.empty()
+          << ", error: " << static_cast<int>(error);
 
   if (is_stopped_) {
     return;
@@ -205,14 +209,14 @@ bool UpdateClientImpl::IsUpdating(const std::string& id) const {
 
   for (const auto& task : tasks_) {
     const auto ids = task->GetIds();
-    if (base::Contains(ids, id)) {
+    if (std::ranges::contains(ids, id)) {
       return true;
     }
   }
 
   for (const auto& task : task_queue_) {
     const auto ids = task->GetIds();
-    if (base::Contains(ids, id)) {
+    if (std::ranges::contains(ids, id)) {
       return true;
     }
   }
@@ -249,6 +253,7 @@ void UpdateClientImpl::SendPing(const CrxComponent& crx_component,
                                 PingParams ping_params,
                                 Callback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  VLOG(2) << __func__;
 
   RunTask(base::MakeRefCounted<TaskSendPing>(
       update_engine_.get(), crx_component, ping_params,

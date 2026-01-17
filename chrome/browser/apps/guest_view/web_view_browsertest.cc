@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <algorithm>
 #include <memory>
 #include <set>
 #include <string>
@@ -10,7 +11,6 @@
 #include <vector>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -130,6 +130,8 @@
 #include "extensions/browser/api/declarative/rules_registry.h"
 #include "extensions/browser/api/declarative/rules_registry_service.h"
 #include "extensions/browser/api/declarative/test_rules_registry.h"
+#include "extensions/browser/api/declarative_net_request/action_tracker.h"
+#include "extensions/browser/api/declarative_net_request/rules_monitor_service.h"
 #include "extensions/browser/api/declarative_webrequest/webrequest_constants.h"
 #include "extensions/browser/api/extensions_api_client.h"
 #include "extensions/browser/app_window/native_app_window.h"
@@ -2428,13 +2430,13 @@ IN_PROC_BROWSER_TEST_P(WebViewSSLErrorTest, MAYBE_InterstitialPageRouteEvents) {
       content::GetInputEventRouterRenderWidgetHostViews(
           GetFirstAppWindowWebContents());
 
-  ASSERT_TRUE(base::Contains(
+  ASSERT_TRUE(std::ranges::contains(
       hosts, GetFirstAppWindowWebContents()->GetPrimaryMainFrame()->GetView()));
 
   auto* guest_main_frame =
       GetGuestViewManager()->GetLastGuestRenderFrameHostCreated();
   ASSERT_TRUE(guest_main_frame);
-  ASSERT_TRUE(base::Contains(hosts, guest_main_frame->GetView()));
+  ASSERT_TRUE(std::ranges::contains(hosts, guest_main_frame->GetView()));
 }
 
 // Test makes sure that the browser does not crash when a `<webview>` navigates
@@ -3216,24 +3218,11 @@ IN_PROC_BROWSER_TEST_P(WebViewTest, TestContextMenu) {
   auto* guest_main_frame =
       GetGuestViewManager()->WaitForSingleGuestRenderFrameHostCreated();
   ASSERT_TRUE(guest_main_frame);
-
-  auto close_menu_and_stop_run_loop = [](base::OnceClosure closure,
-                                         RenderViewContextMenu* context_menu) {
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE, base::BindOnce(&RenderViewContextMenuBase::Cancel,
-                                  base::Unretained(context_menu)));
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE, std::move(closure));
-  };
-
-  base::RunLoop run_loop;
-  RenderViewContextMenu::RegisterMenuShownCallbackForTesting(
-      base::BindOnce(close_menu_and_stop_run_loop, run_loop.QuitClosure()));
-
+  ContextMenuShownObserver context_menu_shown_observer =
+      ContextMenuShownObserver();
   OpenContextMenu(guest_main_frame);
-
-  // Wait for the context menu to be visible.
-  run_loop.Run();
+  context_menu_shown_observer.Wait();
+  EXPECT_EQ(true, context_menu_shown_observer.shown());
 }
 
 IN_PROC_BROWSER_TEST_P(WebViewTest, MediaAccessAPIAllow_TestAllow) {
@@ -3431,13 +3420,12 @@ class MockHidDelegate : public ChromeHidDelegate {
     chooser_controller_->set_view(mock_chooser_view_.get());
 
     EXPECT_CALL(*mock_chooser_view_.get(), OnOptionsInitialized)
-        .WillOnce(
-            testing::Invoke([this] { chooser_controller_->Select({0}); }));
+        .WillOnce([this] { chooser_controller_->Select({0}); });
   }
 
  private:
-  std::unique_ptr<HidChooserController> chooser_controller_;
   std::unique_ptr<permissions::MockChooserControllerView> mock_chooser_view_;
+  std::unique_ptr<HidChooserController> chooser_controller_;
 };
 
 class WebHidWebViewTest : public WebViewTest {
@@ -3836,7 +3824,7 @@ std::unique_ptr<net::test_server::HttpResponse> HandleDownloadRequestWithCookie(
     return nullptr;
   }
 
-  std::string cookie_to_expect = request.GetURL().query();
+  std::string cookie_to_expect = request.GetURL().GetQuery();
   const auto cookie_header_it = request.headers.find("cookie");
   std::unique_ptr<net::test_server::BasicHttpResponse> response;
 
@@ -3972,7 +3960,7 @@ IN_PROC_BROWSER_TEST_P(WebViewTest, DownloadCookieIsolation) {
     ASSERT_TRUE(
         base::ReadFileToString(download->GetTargetFilePath(), &content));
     // Note that the contents of the file is the value of the cookie.
-    EXPECT_EQ(content, download->GetURL().query());
+    EXPECT_EQ(content, download->GetURL().GetQuery());
     cookies.insert(content);
   }
 
@@ -5078,7 +5066,7 @@ IN_PROC_BROWSER_TEST_P(WebViewTest, NavigateGuestToWebviewAccessibleResource) {
   extensions::ExtensionRegistry* registry =
       extensions::ExtensionRegistry::Get(browser()->profile());
   const extensions::Extension* extension =
-      registry->enabled_extensions().GetByID(guest_url.host());
+      registry->enabled_extensions().GetByID(guest_url.GetHost());
   EXPECT_EQ(extensions::mojom::ContextType::kUnprivilegedExtension,
             process_map->GetMostLikelyContextType(
                 extension, guest_process->GetDeprecatedID(), &guest_url));
@@ -5162,9 +5150,6 @@ IN_PROC_BROWSER_TEST_P(WebViewTest,
   // - It is a "regular" extension API function that goes through the request /
   //   response flow in ExtensionFunctionDispatcher, unlike extension message
   //   APIs.
-  // *TODO(crbug.com/40263329): The exact set of APIs and type of
-  // context this is is a bit fuzzy. In practice, it's basically the same set
-  // as is exposed to content scripts.
   static constexpr char kGetAcceptLanguages[] =
       R"(new Promise(resolve => {
            chrome.i18n.getAcceptLanguages((languages) => {
@@ -5781,6 +5766,8 @@ IN_PROC_BROWSER_TEST_P(WebViewGuestScrollTouchTest,
   }
 }
 
+#if BUILDFLAG(IS_WIN)
+
 // This runs the chrome://chrome-signin page which includes an OOPIF-<webview>
 // of accounts.google.com.
 class ChromeSignInWebViewTest : public WebViewTest {
@@ -5816,13 +5803,46 @@ INSTANTIATE_TEST_SUITE_P(/* no prefix */,
                          testing::Bool(),
                          ChromeSignInWebViewTest::DescribeParams);
 
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+// Check that rules from the DeclarativeNetRequest API are not matched for
+// requests originating from WebViews.
+IN_PROC_BROWSER_TEST_P(ChromeSignInWebViewTest,
+                       DeclarativeNetRequestRulesNotMatched) {
+  SKIP_FOR_MPARCH();  // TODO(crbug.com/40202416): Enable test for MPArch.
+
+  // Load an extension that blocks all main frame requests into
+  // accounts.google.com which is loaded inside the WebView in
+  // chrome://chrome-signin.
+  const auto* extension = LoadExtension(test_data_dir_.AppendASCII(
+      "api_test/declarative_net_request/block_chrome_signin"));
+
+  // Navigate to a WebUI page that contains a WebView which loads
+  // accounts.google.com.
+  const GURL signin_url{"chrome://chrome-signin/?reason=6"};
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), signin_url));
+  WaitForWebViewInDom();
+
+  // Check that no rules were matched from the extension. Note that the test
+  // would not complete if the accounts.google.com request from the WebView is
+  // blocked.
+  extensions::declarative_net_request::RulesMonitorService*
+      rules_monitor_service =
+          extensions::declarative_net_request::RulesMonitorService::Get(
+              browser()->profile());
+  ASSERT_TRUE(rules_monitor_service);
+  extensions::declarative_net_request::ActionTracker& action_tracker =
+      rules_monitor_service->action_tracker();
+
+  EXPECT_TRUE(action_tracker
+                  .GetMatchedRules(*extension, std::nullopt, base::Time::Min())
+                  .empty());
+}
+
 // This verifies the fix for http://crbug.com/667708.
 IN_PROC_BROWSER_TEST_P(ChromeSignInWebViewTest,
                        ClosingChromeSignInShouldNotCrash) {
   SKIP_FOR_MPARCH();  // TODO(crbug.com/40202416): Enable test for MPArch.
 
-  GURL signin_url{"chrome://chrome-signin/?reason=5"};
+  GURL signin_url{"chrome://chrome-signin/?reason=6"};
 
   ASSERT_TRUE(AddTabAtIndex(0, signin_url, ui::PAGE_TRANSITION_TYPED));
   ASSERT_TRUE(AddTabAtIndex(1, signin_url, ui::PAGE_TRANSITION_TYPED));
@@ -5830,7 +5850,6 @@ IN_PROC_BROWSER_TEST_P(ChromeSignInWebViewTest,
 
   chrome::CloseTab(browser());
 }
-#endif
 
 // This test verifies that unattached guests are not included as the inner
 // WebContents. The test verifies this by triggering a find-in-page request on a
@@ -5841,7 +5860,7 @@ IN_PROC_BROWSER_TEST_P(ChromeSignInWebViewTest,
                        NoFindInPageForUnattachedGuest) {
   SKIP_FOR_MPARCH();  // TODO(crbug.com/40202416): Enable test for MPArch.
 
-  GURL signin_url{"chrome://chrome-signin/?reason=5"};
+  GURL signin_url{"chrome://chrome-signin/?reason=6"};
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), signin_url));
 
   // Navigate a tab to a page with a <webview>.
@@ -5899,7 +5918,7 @@ IN_PROC_BROWSER_TEST_P(ChromeSignInWebViewTest,
 
   // Load a WebUI with a webview. For testing convenience, we use the existing
   // chrome signin page.
-  const GURL signin_url{"chrome://chrome-signin/?reason=5"};
+  const GURL signin_url{"chrome://chrome-signin/?reason=6"};
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), signin_url));
   WaitForWebViewInDom();
   content::WebContents* tab_contents =
@@ -5925,6 +5944,8 @@ IN_PROC_BROWSER_TEST_P(ChromeSignInWebViewTest,
   // The WebUI should not see the events for the app's webview.
   EXPECT_EQ(false, content::EvalJs(tab_contents, "window.sawRequest;"));
 }
+
+#endif  // BUILDFLAG(IS_WIN)
 
 // This test class makes "isolated.com" an isolated origin, to be used in
 // testing isolated origins inside of a WebView.

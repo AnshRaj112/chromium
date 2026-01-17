@@ -7,13 +7,13 @@
 
 #include <stdint.h>
 
-#include <string>
-
 #include "base/component_export.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ref.h"
 #include "components/variations/entropy_provider.h"
 #include "components/variations/proto/study.pb.h"
 #include "components/variations/proto/variations_seed.pb.h"
+#include "components/variations/sticky_activation_manager.h"
 
 namespace base {
 class FeatureList;
@@ -45,10 +45,9 @@ class VariationsLayers;
 // Helper class to instantiate field trials from a variations seed.
 class COMPONENT_EXPORT(VARIATIONS) VariationsSeedProcessor {
  public:
-  using UIStringOverrideCallback =
-      base::RepeatingCallback<void(uint32_t, const std::u16string&)>;
-
-  VariationsSeedProcessor();
+  // Note: The `sticky_activation_manager` must outlive this class.
+  explicit VariationsSeedProcessor(
+      StickyActivationManager& sticky_activation_manager);
 
   VariationsSeedProcessor(const VariationsSeedProcessor&) = delete;
   VariationsSeedProcessor& operator=(const VariationsSeedProcessor&) = delete;
@@ -63,7 +62,6 @@ class COMPONENT_EXPORT(VARIATIONS) VariationsSeedProcessor {
   // according to the client's |client_state|.
   void CreateTrialsFromSeed(const VariationsSeed& seed,
                             const ClientFilterableState& client_state,
-                            const UIStringOverrideCallback& override_callback,
                             const EntropyProviders& entropy_providers,
                             const VariationsLayers& layers,
                             base::FeatureList* feature_list);
@@ -78,10 +76,13 @@ class COMPONENT_EXPORT(VARIATIONS) VariationsSeedProcessor {
 
   // Creates and registers a field trial from the |processed_study| data.
   void CreateTrialFromStudy(const ProcessedStudy& processed_study,
-                            const UIStringOverrideCallback& override_callback,
                             const EntropyProviders& entropy_providers,
                             const VariationsLayers& layers,
                             base::FeatureList* feature_list);
+
+  // Used to manage studies that use sticky activation, to determine which ones
+  // should be activated on startup per their prior state.
+  raw_ref<StickyActivationManager> sticky_activation_manager_;
 };
 
 }  // namespace variations

@@ -6,7 +6,6 @@
 
 #include <memory>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/logging.h"
@@ -23,7 +22,6 @@
 #include "chromeos/ash/components/network/network_util.h"
 #include "chromeos/ash/components/network/onc/network_onc_utils.h"
 #include "chromeos/ash/components/network/onc/onc_translator.h"
-#include "chromeos/ash/components/network/portal_detector/network_portal_detector.h"
 #include "chromeos/ash/components/network/technology_state_controller.h"
 #include "components/onc/onc_constants.h"
 #include "content/public/browser/browser_context.h"
@@ -720,7 +718,7 @@ void NetworkingPrivateChromeOS::GetDeviceStateList(
                                     ::onc::network_type::kWiFi,
                                     ::onc::network_type::kCellular};
   for (const char* technology : technology_types) {
-    if (base::Contains(technologies_found, technology)) {
+    if (technologies_found.contains(technology)) {
       continue;
     }
     AppendDeviceState(technology, nullptr /* device */, device_state_list);

@@ -307,7 +307,7 @@ std::optional<double> CSSToLengthConversionData::ContainerSizes::FindNamedSize(
 
 CSSToLengthConversionData::AnchorData::AnchorData(
     AnchorEvaluator* evaluator,
-    const ScopedCSSName* position_anchor,
+    const StylePositionAnchor& position_anchor,
     const std::optional<PositionAreaOffsets>& position_area_offsets)
     : evaluator_(evaluator),
       position_anchor_(position_anchor),
@@ -577,6 +577,10 @@ void CSSToLengthConversionData::ReferenceAnchor() const {
 
 void CSSToLengthConversionData::ReferenceSibling() const {
   SetFlag(Flag::kSiblingRelative);
+}
+
+void CSSToLengthConversionData::ReferenceElementDependentRandom() const {
+  SetFlag(Flag::kElementDependentRandom);
 }
 
 }  // namespace blink

@@ -4,14 +4,15 @@
 
 #include "chrome/renderer/accessibility/read_anything/read_anything_app_model.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <utility>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/stringprintf.h"
+#include "base/time/time.h"
 #include "chrome/common/read_anything/read_anything_util.h"
 #include "chrome/renderer/accessibility/read_anything/read_aloud_traversal_utils.h"
 #include "chrome/renderer/accessibility/read_anything/read_anything_node_utils.h"
@@ -51,8 +52,7 @@ const ui::AXNode* GetUnignoredParentForSelection(const ui::AXNode* node) {
       // displayed as siblings, to avoid misnumbering.
       const std::string_view display =
           node->GetStringAttribute(ax::mojom::StringAttribute::kDisplay);
-      return base::Contains(display, "inline") ||
-             base::Contains(display, "list-item");
+      return display.contains("inline") || display.contains("list-item");
     };
     if (!should_skip(ancestor)) {
       return ancestor;
@@ -124,7 +124,8 @@ void ReadAnythingAppModel::OnSettingsRestoredFromPrefs(
     double font_size,
     bool links_enabled,
     bool images_enabled,
-    read_anything::mojom::Colors color) {
+    read_anything::mojom::Colors color,
+    read_anything::mojom::LineFocus line_focus) {
   line_spacing_ = line_spacing;
   letter_spacing_ = letter_spacing;
   font_name_ = std::move(font_name);
@@ -132,6 +133,7 @@ void ReadAnythingAppModel::OnSettingsRestoredFromPrefs(
   links_enabled_ = links_enabled;
   images_enabled_ = images_enabled;
   color_theme_ = color;
+  line_focus_ = line_focus;
 }
 
 void ReadAnythingAppModel::Reset(std::vector<ui::AXNodeID> content_node_ids) {
@@ -147,6 +149,14 @@ void ReadAnythingAppModel::ResetSelection() {
   selection_node_ids_.clear();
   start_ = SelectionEndpoint();
   end_ = SelectionEndpoint();
+}
+
+void ReadAnythingAppModel::ResetLineFocusSession() {
+  line_focus_session_start_time_ = std::optional<base::TimeTicks>();
+  line_focus_mouse_distance_ = 0;
+  line_focus_scroll_distance_ = 0;
+  line_focus_keyboard_lines_ = 0;
+  line_focus_speech_lines_ = 0;
 }
 
 bool ReadAnythingAppModel::PostProcessSelection() {
@@ -342,7 +352,7 @@ void ReadAnythingAppModel::ComputeDisplayNodeIdsForDistilledTree() {
         content_node->GetAncestorsCrossingTreeBoundaryAsQueue();
     while (!ancestors.empty()) {
       ui::AXNodeID ancestor_id = ancestors.front()->id();
-      if (base::Contains(display_node_ids_, ancestor_id)) {
+      if (display_node_ids_.contains(ancestor_id)) {
         break;
       }
       ancestors.pop();
@@ -388,7 +398,7 @@ ui::AXSerializableTree* ReadAnythingAppModel::GetTreeFromId(
 }
 
 bool ReadAnythingAppModel::ContainsTree(const ui::AXTreeID& tree_id) const {
-  return base::Contains(tree_infos_, tree_id);
+  return tree_infos_.contains(tree_id);
 }
 
 bool ReadAnythingAppModel::ContainsActiveTree() const {
@@ -437,7 +447,7 @@ void ReadAnythingAppModel::SetTreeInfoUrlInformation(
   tree_info.is_docs = url.SchemeIsHTTPOrHTTPS() &&
                       (url.DomainIs("docs.google.com") ||
                        url.DomainIs("docs.sandbox.google.com")) &&
-                      url.path().starts_with("/document") &&
+                      url.GetPath().starts_with("/document") &&
                       !url.ExtractFileName().empty();
 
   tree_info.is_url_information_set = true;
@@ -582,6 +592,7 @@ void ReadAnythingAppModel::AccessibilityEventReceived(
       // If read aloud is searching for a child tree to distill and this tree id
       // matches one of the possible child ids, set the active tree to this tree
       // so that it can be distilled.
+      VLOG(1) << "Using child to set active tree id to " << tree_id;
       SetActiveTreeId(tree_id);
 
       // Ensure that requires_distillation_ is set to true whenever there's a
@@ -659,7 +670,7 @@ void ReadAnythingAppModel::OnAXTreeDestroyed(const ui::AXTreeID& tree_id) {
 }
 
 ukm::SourceId ReadAnythingAppModel::GetUkmSourceId() const {
-  if (base::Contains(tree_infos_, active_tree_id_)) {
+  if (tree_infos_.contains(active_tree_id_)) {
     ReadAnythingAppModel::AXTreeInfo* tree_info =
         tree_infos_.at(active_tree_id_).get();
     if (tree_info) {
@@ -676,7 +687,7 @@ void ReadAnythingAppModel::SetUkmSourceIdForTree(const ui::AXTreeID& tree,
   // tree_infos_. When this happens, we should keep track of the ukm_source_id,
   // and later, if the tree is added to tree_infos_ while it's still active,
   // we can try again to set the ukm source.
-  if (!base::Contains(tree_infos_, active_tree_id_)) {
+  if (!tree_infos_.contains(active_tree_id_)) {
     pending_ukm_sources_[tree] = ukm_source_id;
     return;
   }
@@ -685,7 +696,7 @@ void ReadAnythingAppModel::SetUkmSourceIdForTree(const ui::AXTreeID& tree,
 }
 
 void ReadAnythingAppModel::SetUkmSourceId(ukm::SourceId ukm_source_id) {
-  if (!base::Contains(tree_infos_, active_tree_id_)) {
+  if (!tree_infos_.contains(active_tree_id_)) {
     return;
   }
   ReadAnythingAppModel::AXTreeInfo* tree_info =
@@ -701,7 +712,7 @@ void ReadAnythingAppModel::SetUkmSourceId(ukm::SourceId ukm_source_id) {
 }
 
 int ReadAnythingAppModel::GetNumSelections() const {
-  if (base::Contains(tree_infos_, active_tree_id_)) {
+  if (tree_infos_.contains(active_tree_id_)) {
     ReadAnythingAppModel::AXTreeInfo* tree_info =
         tree_infos_.at(active_tree_id_).get();
     if (tree_info) {
@@ -712,7 +723,7 @@ int ReadAnythingAppModel::GetNumSelections() const {
 }
 
 void ReadAnythingAppModel::SetNumSelections(int num_selections) {
-  if (!base::Contains(tree_infos_, active_tree_id_)) {
+  if (!tree_infos_.contains(active_tree_id_)) {
     return;
   }
   ReadAnythingAppModel::AXTreeInfo* tree_info =
@@ -733,7 +744,7 @@ ui::AXNode* ReadAnythingAppModel::GetAXNode(
 }
 
 bool ReadAnythingAppModel::NodeIsContentNode(ui::AXNodeID ax_node_id) const {
-  return base::Contains(content_node_ids_, ax_node_id);
+  return std::ranges::contains(content_node_ids_, ax_node_id);
 }
 
 void ReadAnythingAppModel::AdjustTextSize(int increment) {
@@ -828,6 +839,9 @@ void ReadAnythingAppModel::ProcessNonGeneratedEvents(
   // generated. The consumer should not process the same event here and for
   // generated events.
   for (auto& event : events) {
+#if BUILDFLAG(IS_MAC)
+    VLOG(2) << "Non-generated event type: " << event.event_type;
+#endif
     switch (event.event_type) {
       case ax::mojom::Event::kLoadComplete:
         requires_distillation_ = true;
@@ -907,11 +921,26 @@ void ReadAnythingAppModel::ProcessNonGeneratedEvents(
       case ax::mojom::Event::kTreeChanged:
           break;
       case ax::mojom::Event::kValueChanged:
+#if BUILDFLAG(IS_MAC)
+        // VLOG to assess if this is a reliable location to detect text field
+        // changes on Mac to avoid introducing unnecessary redraws.
+        if (ui::AXNode* node = GetAXNode(event.id);
+            node && ui::IsTextField(node->GetRole())) {
+          VLOG(1) << "kValueChanged on a text field";
+        }
+#endif
         // After the user finishes typing something we wait for a timer and
         // redraw to capture the input.
         if (event.event_from == ax::mojom::EventFrom::kUser &&
             event.event_intents.size() > 0) {
           reset_draw_timer_ = true;
+#if BUILDFLAG(IS_MAC)
+          VLOG(1) << "kValueChanged on a user event triggering redraw timer";
+#endif
+        } else {
+#if BUILDFLAG(IS_MAC)
+          VLOG(1) << "kValueChanged without a redraw timer trigger";
+#endif
         }
         break;
       case ax::mojom::Event::kAriaAttributeChangedDeprecated:
@@ -944,6 +973,9 @@ void ReadAnythingAppModel::ProcessGeneratedEvents(
   // Note that this list of events may overlap with non-generated events in the
   // It's up to the consumer to pick but its generally good to prefer generated.
   for (const auto& event : event_generator) {
+#if BUILDFLAG(IS_MAC)
+    VLOG(2) << "Generated event type: " << event.event_params->event;
+#endif
     switch (event.event_params->event) {
       case ui::AXEventGenerator::Event::DOCUMENT_SELECTION_CHANGED:
         requires_post_process_selection_ = true;
@@ -987,7 +1019,7 @@ void ReadAnythingAppModel::ProcessGeneratedEvents(
         break;
       case ui::AXEventGenerator::Event::EXPANDED:
         if (features::IsReadAnythingReadAloudEnabled()) {
-          if (base::Contains(content_node_ids_, event.node_id)) {
+          if (std::ranges::contains(content_node_ids_, event.node_id)) {
             redraw_required_ = true;
           } else {
             requires_distillation_ = true;
@@ -1011,6 +1043,7 @@ void ReadAnythingAppModel::ProcessGeneratedEvents(
       case ui::AXEventGenerator::Event::CHECKED_STATE_DESCRIPTION_CHANGED:
       case ui::AXEventGenerator::Event::CHILDREN_CHANGED:
       case ui::AXEventGenerator::Event::CONTROLS_CHANGED:
+      case ui::AXEventGenerator::Event::DEFAULT_ACTION_VERB_CHANGED:
       case ui::AXEventGenerator::Event::DETAILS_CHANGED:
       case ui::AXEventGenerator::Event::DESCRIBED_BY_CHANGED:
       case ui::AXEventGenerator::Event::DESCRIPTION_CHANGED:
@@ -1157,12 +1190,18 @@ void ReadAnythingAppModel::AllowChildTreeForActiveTree(bool use_child_tree) {
 
   ui::AXSerializableTree* active_tree = GetTreeFromId(active_tree_id_);
   if (!active_tree) {
+    VLOG(1) << "Not allowing child tree for active tree because active tree is "
+               "null";
     return;
   }
   std::set<ui::AXTreeID> child_ids = active_tree->GetAllChildTreeIds();
   if (!child_ids.size()) {
+    VLOG(1) << "Not allowing child tree for active tree because active tree "
+               "has no child trees";
     return;
   }
+
+  VLOG(1) << "Allow child tree for active tree";
 
   // Store all the possible child tree ids that could be used as the active
   // tree if they have distillable content.

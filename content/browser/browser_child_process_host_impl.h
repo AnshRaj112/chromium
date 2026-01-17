@@ -9,7 +9,9 @@
 
 #include <list>
 #include <memory>
+#include <optional>
 
+#include "base/memory/memory_pressure_listener.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/unsafe_shared_memory_region.h"
@@ -64,7 +66,8 @@ class BrowserChildProcessHostImpl
       public base::win::ObjectWatcher::Delegate,
 #endif
       public ChildProcessLauncher::Client,
-      public memory_instrumentation::mojom::CoordinatorConnector {
+      public memory_instrumentation::mojom::CoordinatorConnector,
+      public base::MemoryPressureListener {
  public:
   // Constructs a process host with |ipc_mode| determining how IPC is done.
   BrowserChildProcessHostImpl(content::ProcessType process_type,
@@ -78,8 +81,7 @@ class BrowserChildProcessHostImpl
 
   // BrowserChildProcessHost implementation:
   void Launch(std::unique_ptr<SandboxedProcessLauncherDelegate> delegate,
-              std::unique_ptr<base::CommandLine> cmd_line,
-              bool terminate_on_shutdown) override;
+              std::unique_ptr<base::CommandLine> cmd_line) override;
   const ChildProcessData& GetData() override;
   ChildProcessHost* GetHost() override;
   ChildProcessTerminationInfo GetTerminationInfo(bool known_dead) override;
@@ -87,7 +89,6 @@ class BrowserChildProcessHostImpl
       override;
   void SetName(const std::u16string& name) override;
   void SetMetricsName(const std::string& metrics_name) override;
-  void SetProcess(base::Process process) override;
 
   // ChildProcessHostDelegate implementation:
   void OnChannelInitialized(IPC::Channel* channel) override;
@@ -95,7 +96,7 @@ class BrowserChildProcessHostImpl
   const base::Process& GetProcess() override;
   void BindHostReceiver(mojo::GenericPendingReceiver receiver) override;
   void OnChannelConnected(int32_t peer_pid) override;
-  void OnBadMessageReceived(const IPC::Message& message) override;
+  void OnBadMessageReceived() override;
 
   // HistogramChildProcess implementation:
   void BindChildHistogramFetcherFactory(
@@ -114,8 +115,7 @@ class BrowserChildProcessHostImpl
   void LaunchWithFileData(
       std::unique_ptr<SandboxedProcessLauncherDelegate> delegate,
       std::unique_ptr<base::CommandLine> cmd_line,
-      std::unique_ptr<ChildProcessLauncherFileData> file_data,
-      bool terminate_on_shutdown);
+      std::unique_ptr<ChildProcessLauncherFileData> file_data);
 
   // Unlike Launch(), AppendExtraCommandLineSwitches will not be called
   // in this function. If AppendExtraCommandLineSwitches has been called before
@@ -124,8 +124,7 @@ class BrowserChildProcessHostImpl
   void LaunchWithoutExtraCommandLineSwitches(
       std::unique_ptr<SandboxedProcessLauncherDelegate> delegate,
       std::unique_ptr<base::CommandLine> cmd_line,
-      std::unique_ptr<ChildProcessLauncherFileData> file_data,
-      bool terminate_on_shutdown);
+      std::unique_ptr<ChildProcessLauncherFileData> file_data);
 
 #if !BUILDFLAG(IS_ANDROID)
   void SetProcessPriority(base::Process::Priority priority);
@@ -183,6 +182,9 @@ class BrowserChildProcessHostImpl
           receiver,
       mojo::PendingRemote<memory_instrumentation::mojom::ClientProcess>
           client_process) override;
+
+  void OnMemoryPressure(
+      base::MemoryPressureLevel memory_pressure_level) override;
 
   // Returns true if the process has successfully launched. Must only be called
   // on the IO thread.
@@ -280,6 +282,9 @@ class BrowserChildProcessHostImpl
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
   ChildThreadTypeSwitcher child_thread_type_switcher_;
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+
+  std::optional<base::MemoryPressureListenerRegistration>
+      memory_pressure_listener_registration_;
 
   base::WeakPtrFactory<BrowserChildProcessHostImpl> weak_factory_{this};
 };

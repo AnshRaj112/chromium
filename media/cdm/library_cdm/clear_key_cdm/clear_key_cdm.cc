@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "media/cdm/library_cdm/clear_key_cdm/clear_key_cdm.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <utility>
 
 #include "base/compiler_specific.h"
 #include "base/containers/span.h"
+#include "base/containers/to_vector.h"
 #include "base/files/file.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
@@ -67,22 +65,47 @@ const char kDummyIndividualizationRequest[] = "dummy individualization request";
 
 static bool g_is_cdm_module_initialized = false;
 
-// Copies |input_buffer| into a DecoderBuffer. If the |input_buffer| is
-// empty, an empty (end-of-stream) DecoderBuffer is returned.
-static scoped_refptr<media::DecoderBuffer> CopyDecoderBufferFrom(
+namespace {
+
+class CdmInputBufferExternalMemory
+    : public media::DecoderBuffer::ExternalMemory {
+ public:
+  explicit CdmInputBufferExternalMemory(base::span<const uint8_t> data)
+      : data_(data) {}
+  CdmInputBufferExternalMemory() = delete;
+  CdmInputBufferExternalMemory(const CdmInputBufferExternalMemory&) = delete;
+  CdmInputBufferExternalMemory& operator=(const CdmInputBufferExternalMemory&) =
+      delete;
+
+  const base::span<const uint8_t> Span() const override { return data_; }
+
+ private:
+  base::raw_span<const uint8_t> data_;
+};
+
+}  // namespace
+
+// Creates a DecoderBuffer from |input_buffer|. If the |input_buffer| is empty,
+// an empty (end-of-stream) DecoderBuffer is returned.
+static scoped_refptr<media::DecoderBuffer> DecoderBufferFrom(
     const cdm::InputBuffer_2& input_buffer) {
   if (!input_buffer.data) {
-    DCHECK(!input_buffer.data_size);
+    CHECK(!input_buffer.data_size);
     return media::DecoderBuffer::CreateEOSBuffer();
   }
+  // SAFETY: `input_buffer` is defined in the cdm interface submodule:
+  // https://chromium.googlesource.com/chromium/cdm
+  auto input_buffer_span =
+      UNSAFE_BUFFERS(base::span(input_buffer.data, input_buffer.data_size));
 
-  // TODO(xhwang): Get rid of this copy.
+  // Take |input_buffer|'s underlying memory and store it into |output_buffer|.
+  // This is safe because this method is only used in Decrypt(). Decrypt() is
+  // called synchronously and |input_buffer| and |output_buffer| will get
+  // destroyed when Decrypt() goes out of scope.
+  auto external_memory =
+      std::make_unique<CdmInputBufferExternalMemory>(input_buffer_span);
   scoped_refptr<media::DecoderBuffer> output_buffer =
-      media::DecoderBuffer::CopyFrom(
-          // SAFETY: `data` and `data_size` from `input_buffer` must be
-          // consistent.
-          UNSAFE_BUFFERS(
-              base::span(input_buffer.data, input_buffer.data_size)));
+      media::DecoderBuffer::FromExternalMemory(std::move(external_memory));
   output_buffer->set_timestamp(base::Microseconds(input_buffer.timestamp));
 
   if (input_buffer.encryption_scheme == cdm::EncryptionScheme::kUnencrypted)
@@ -90,11 +113,13 @@ static scoped_refptr<media::DecoderBuffer> CopyDecoderBufferFrom(
 
   DCHECK_GT(input_buffer.iv_size, 0u);
   DCHECK_GT(input_buffer.key_id_size, 0u);
+  // SAFETY: `input_buffer` is defined in the cdm interface submodule:
+  // https://chromium.googlesource.com/chromium/cdm
+  auto subsample_span = UNSAFE_BUFFERS(
+      base::span(input_buffer.subsamples, input_buffer.num_subsamples));
   std::vector<media::SubsampleEntry> subsamples;
-  for (uint32_t i = 0; i < input_buffer.num_subsamples; ++i) {
-    subsamples.push_back(
-        media::SubsampleEntry(input_buffer.subsamples[i].clear_bytes,
-                              input_buffer.subsamples[i].cipher_bytes));
+  for (const cdm::SubsampleEntry& subsample : subsample_span) {
+    subsamples.emplace_back(subsample.clear_bytes, subsample.cipher_bytes);
   }
 
   const std::string key_id_string(
@@ -234,6 +259,9 @@ static bool g_verify_host_files_result = false;
 // writable.
 bool VerifyCdmHost_0(const cdm::HostFile* host_files, uint32_t num_files) {
   LOG(WARNING) << __func__ << ": " << num_files;
+  // SAFETY: This is a C API, can't have spans:
+  // https://source.chromium.org/chromium/chromium/src/+/main:media/cdm/api/content_decryption_module_ext.h;l=56;drc=33685ef0a89c1eb9c61f1819dc0029594a53cefb.
+  auto host_files_span = UNSAFE_BUFFERS(base::span(host_files, num_files));
 
   // We should always have the CDM and at least one common file.
   // The common CDM host file (e.g. chrome) might not exist since we are running
@@ -250,19 +278,18 @@ bool VerifyCdmHost_0(const cdm::HostFile* host_files, uint32_t num_files) {
   }
 
   int num_opened_files = 0;
-  for (uint32_t i = 0; i < num_files; ++i) {
-    const int kBytesToRead = 10;
-    std::vector<char> buffer(kBytesToRead);
-
-    base::File file(static_cast<base::PlatformFile>(host_files[i].file));
-    if (!file.IsValid())
+  for (const cdm::HostFile& host_file : host_files_span) {
+    base::File file(static_cast<base::PlatformFile>(host_file.file));
+    if (!file.IsValid()) {
       continue;
+    }
 
     num_opened_files++;
-
-    int bytes_read = file.Read(0, buffer.data(), buffer.size());
-    if (bytes_read != kBytesToRead) {
-      LOG(ERROR) << "File bytes read: " << bytes_read;
+    constexpr int kBytesToRead = 10;
+    std::array<uint8_t, kBytesToRead> buffer;
+    const std::optional<size_t> bytes_read = file.Read(0, buffer);
+    if (!bytes_read.has_value() || (*bytes_read != kBytesToRead)) {
+      LOG(ERROR) << "File bytes read: " << bytes_read.value_or(0);
       g_verify_host_files_result = false;
       return true;
     }
@@ -348,7 +375,7 @@ ClearKeyCdm::ClearKeyCdm(HostInterface* host, const std::string& key_system)
           base::BindRepeating(&ClearKeyCdm::OnSessionExpirationUpdate,
                               base::Unretained(this)))),
       key_system_(key_system) {
-  DCHECK(g_is_cdm_module_initialized);
+  CHECK(g_is_cdm_module_initialized);
 }
 
 ClearKeyCdm::~ClearKeyCdm() = default;
@@ -391,7 +418,10 @@ void ClearKeyCdm::CreateSessionAndGenerateRequest(
                     "Persistent state not allowed.");
     return;
   }
-
+  // SAFETY: These are defined from a vector here:
+  // https://source.chromium.org/chromium/chromium/src/+/main:media/cdm/cdm_adapter.cc;l=384;drc=8bd3d24cc3bdbffe564eeeca112a6744e6766b17
+  auto init_data_vector = UNSAFE_BUFFERS(
+      std::vector<uint8_t>(init_data, init_data + init_data_size));
   auto promise = std::make_unique<CdmCallbackPromise<std::string>>(
       base::BindOnce(&ClearKeyCdm::OnSessionCreated, base::Unretained(this),
                      promise_id),
@@ -400,8 +430,7 @@ void ClearKeyCdm::CreateSessionAndGenerateRequest(
   cdm_host_proxy_->ReportMetrics(cdm::kSdkVersion, 12345);
   cdm_->CreateSessionAndGenerateRequest(
       ToMediaSessionType(session_type), ToEmeInitDataType(init_data_type),
-      std::vector<uint8_t>(init_data, init_data + init_data_size),
-      std::move(promise));
+      std::move(init_data_vector), std::move(promise));
 
   // Run unit tests if applicable. Unit test results are reported in the form of
   // a session message. Therefore it can only be called after session creation.
@@ -416,6 +445,11 @@ void ClearKeyCdm::CreateSessionAndGenerateRequest(
     ReportVerifyCdmHostTestResult();
   } else if (key_system_ == kExternalClearKeyStorageIdTestKeySystem) {
     StartStorageIdTest();
+  } else if (key_system_ == kExternalClearKeyKeySystem) {
+    // Normally, we would report cdm::kDecoderCheck1SuccessCount after
+    // decoding, but for clear key tests, we only want to verify plumbing of
+    // metrics.
+    cdm_host_proxy_->ReportMetrics(cdm::kDecoderCheck1SuccessCount, 1);
   }
 }
 
@@ -425,7 +459,7 @@ void ClearKeyCdm::LoadSession(uint32_t promise_id,
                               uint32_t session_id_length) {
   DVLOG(1) << __func__;
   DCHECK_EQ(session_type, cdm::kPersistentLicense);
-  DCHECK(allow_persistent_state_);
+  CHECK(allow_persistent_state_);
   std::string web_session_str(session_id, session_id_length);
 
   auto promise = std::make_unique<CdmCallbackPromise<std::string>>(
@@ -444,15 +478,16 @@ void ClearKeyCdm::UpdateSession(uint32_t promise_id,
                                 uint32_t response_size) {
   DVLOG(1) << __func__;
   std::string web_session_str(session_id, session_id_length);
-  std::vector<uint8_t> response_vector(response, response + response_size);
-
+  // SAFETY: `response` and `response_size` must be in conformance.
+  auto response_copy =
+      UNSAFE_BUFFERS(std::vector<uint8_t>(response, response + response_size));
   auto promise = std::make_unique<CdmCallbackPromise<>>(
       base::BindOnce(&ClearKeyCdm::OnUpdateSuccess, base::Unretained(this),
                      promise_id, web_session_str),
       base::BindOnce(&ClearKeyCdm::OnPromiseFailed, base::Unretained(this),
                      promise_id));
 
-  cdm_->UpdateSession(session_id, response_vector, std::move(promise));
+  cdm_->UpdateSession(session_id, std::move(response_copy), std::move(promise));
 }
 
 void ClearKeyCdm::OnUpdateSuccess(uint32_t promise_id,
@@ -532,16 +567,18 @@ void ClearKeyCdm::SetServerCertificate(uint32_t promise_id,
                      promise_id),
       base::BindOnce(&ClearKeyCdm::OnPromiseFailed, base::Unretained(this),
                      promise_id));
+  // SAFETY: `server_certificate_data` must be in conformance with
+  // `server_certificate_data_size`.
   cdm_->SetServerCertificate(
-      std::vector<uint8_t>(
+      UNSAFE_BUFFERS(std::vector<uint8_t>(
           server_certificate_data,
-          server_certificate_data + server_certificate_data_size),
+          server_certificate_data + server_certificate_data_size)),
       std::move(promise));
 }
 
 void ClearKeyCdm::TimerExpired(void* context) {
   DVLOG(1) << __func__;
-  DCHECK(has_set_timer_);
+  CHECK(has_set_timer_);
   std::string renewal_message;
 
   if (key_system_ == kExternalClearKeyMessageTypeTestKeySystem) {
@@ -575,7 +612,7 @@ static void CopyDecryptResults(Decryptor::Status* status_copy,
 cdm::Status ClearKeyCdm::Decrypt(const cdm::InputBuffer_2& encrypted_buffer,
                                  cdm::DecryptedBlock* decrypted_block) {
   DVLOG(1) << __func__;
-  DCHECK(encrypted_buffer.data);
+  CHECK(encrypted_buffer.data);
 
   scoped_refptr<DecoderBuffer> buffer;
   cdm::Status status = DecryptToMediaDecoderBuffer(encrypted_buffer, &buffer);
@@ -585,12 +622,16 @@ cdm::Status ClearKeyCdm::Decrypt(const cdm::InputBuffer_2& encrypted_buffer,
   }
 
   auto buffer_span = base::span(*buffer);
-  DCHECK(!buffer_span.empty());
+  CHECK(!buffer_span.empty());
   decrypted_block->SetDecryptedBuffer(
       cdm_host_proxy_->Allocate(buffer_span.size()));
-  memcpy(reinterpret_cast<void*>(decrypted_block->DecryptedBuffer()->Data()),
-         buffer_span.data(), buffer_span.size());
   decrypted_block->DecryptedBuffer()->SetSize(buffer_span.size());
+  // SAFETY: decrypted_block is allocated in the above line with
+  // `buffer_span.size()` capacity.
+  base::span<uint8_t> decrypted_buffer_span =
+      UNSAFE_BUFFERS(base::span(decrypted_block->DecryptedBuffer()->Data(),
+                                decrypted_block->DecryptedBuffer()->Size()));
+  decrypted_buffer_span.copy_from_nonoverlapping(buffer_span);
   decrypted_block->SetTimestamp(buffer->timestamp().InMicroseconds());
 
   return cdm::kSuccess;
@@ -758,9 +799,9 @@ void ClearKeyCdm::ScheduleNextTimer() {
 cdm::Status ClearKeyCdm::DecryptToMediaDecoderBuffer(
     const cdm::InputBuffer_2& encrypted_buffer,
     scoped_refptr<DecoderBuffer>* decrypted_buffer) {
-  DCHECK(decrypted_buffer);
+  CHECK(decrypted_buffer);
 
-  scoped_refptr<DecoderBuffer> buffer = CopyDecoderBufferFrom(encrypted_buffer);
+  scoped_refptr<DecoderBuffer> buffer = DecoderBufferFrom(encrypted_buffer);
 
   // EOS and unencrypted streams can be returned as-is.
   if (buffer->end_of_stream() || !buffer->decrypt_config()) {

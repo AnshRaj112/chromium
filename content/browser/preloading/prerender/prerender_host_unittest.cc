@@ -112,9 +112,7 @@ TEST(IsActivationHeaderMatchTest, CalculateMismatchedHeaders) {
     PrerenderCancellationReason reason = PrerenderCancellationReason(
         PrerenderFinalStatus::kActivationNavigationParameterMismatch);
     net::HttpRequestHeaders prerender_headers;
-    prerender_headers.AddHeadersFromString("");
     net::HttpRequestHeaders potential_headers;
-    potential_headers.AddHeadersFromString("");
     EXPECT_TRUE(PrerenderHost::IsActivationHeaderMatch(
         potential_headers, prerender_headers, reason));
     EXPECT_FALSE(reason.GetPrerenderMismatchedHeaders());
@@ -194,7 +192,6 @@ TEST(IsActivationHeaderMatchTest, CalculateMismatchedHeaders) {
     PrerenderCancellationReason reason = PrerenderCancellationReason(
         PrerenderFinalStatus::kActivationNavigationParameterMismatch);
     net::HttpRequestHeaders prerender_headers;
-    prerender_headers.AddHeadersFromString("");
     net::HttpRequestHeaders potential_headers;
     potential_headers.SetHeader("name1", "value1");
     potential_headers.SetHeader("name2", "value2");
@@ -219,7 +216,6 @@ TEST(IsActivationHeaderMatchTest, CalculateMismatchedHeaders) {
     prerender_headers.SetHeader("name2", "value2");
     prerender_headers.SetHeader("name3", "value3");
     net::HttpRequestHeaders potential_headers;
-    potential_headers.AddHeadersFromString("");
     EXPECT_FALSE(PrerenderHost::IsActivationHeaderMatch(
         potential_headers, prerender_headers, reason));
     std::vector<PrerenderMismatchedHeaders> mismatched_headers_expected;
@@ -297,12 +293,13 @@ class PrerenderHostTest : public RenderViewHostImplTestHarness {
         ui::PAGE_TRANSITION_LINK,
         /*should_warm_up_compositor=*/false,
         /*should_prepare_paint_tree=*/false,
-        /*should_pause_javascript_execution=*/false,
+        blink::mojom::SpeculationAction::kPrerender,
         std::move(url_match_predicate),
         /*prerender_navigation_handle_callback=*/{},
         PreloadPipelineInfoImpl::Create(
             /*planned_max_preloading_type=*/PreloadingType::kPrerender),
-        /*allow_reuse=*/false);
+        /*allow_reuse=*/false,
+        /*form_submission=*/false);
   }
 
   void ExpectFinalStatus(PrerenderFinalStatus status) {
@@ -344,10 +341,10 @@ class PrerenderHostTest : public RenderViewHostImplTestHarness {
 TEST_F(PrerenderHostTest, IsNoVarySearchHeaderSet) {
   // Start prerendering a page.
   const GURL kPrerenderingUrl("https://example.com/next");
-  FrameTreeNodeId prerender_frame_tree_node_id =
+  PrerenderHostId prerender_host_id =
       contents()->AddPrerender(kPrerenderingUrl);
   PrerenderHost* prerender_host =
-      registry().FindNonReservedHostById(prerender_frame_tree_node_id);
+      registry().FindNonReservedHostById(prerender_host_id);
   CommitPrerenderNavigation(
       *prerender_host, ExpectedReadyForActivationState(true),
       net::HttpResponseHeaders::Builder(net::HttpVersion(1, 1), "200 OK")
@@ -359,10 +356,10 @@ TEST_F(PrerenderHostTest, IsNoVarySearchHeaderSet) {
 TEST_F(PrerenderHostTest, Activate) {
   // Start prerendering a page.
   const GURL kPrerenderingUrl("https://example.com/next");
-  FrameTreeNodeId prerender_frame_tree_node_id =
+  PrerenderHostId prerender_host_id =
       contents()->AddPrerender(kPrerenderingUrl);
   PrerenderHost* prerender_host =
-      registry().FindNonReservedHostById(prerender_frame_tree_node_id);
+      registry().FindNonReservedHostById(prerender_host_id);
   CommitPrerenderNavigation(*prerender_host);
 
   // Perform a navigation in the primary frame tree which activates the
@@ -374,10 +371,9 @@ TEST_F(PrerenderHostTest, Activate) {
 TEST_F(PrerenderHostTest, DontActivate) {
   // Start the prerendering navigation, but don't activate it.
   const GURL kPrerenderingUrl("https://example.com/next");
-  const FrameTreeNodeId prerender_frame_tree_node_id =
+  const PrerenderHostId prerender_host_id =
       contents()->AddPrerender(kPrerenderingUrl);
-  registry().CancelHost(prerender_frame_tree_node_id,
-                        PrerenderFinalStatus::kDestroyed);
+  registry().CancelHost(prerender_host_id, PrerenderFinalStatus::kDestroyed);
   ExpectFinalStatus(PrerenderFinalStatus::kDestroyed);
 }
 
@@ -453,16 +449,17 @@ TEST_F(PrerenderHostTest, MainFrameNavigationForReservedHost) {
 TEST_F(PrerenderHostTest, ActivationAfterPageStateUpdate) {
   // Start prerendering a page.
   const GURL kPrerenderingUrl("https://example.com/next");
-  const FrameTreeNodeId prerender_frame_tree_node_id =
-      registry().CreateAndStartHost(
-          GeneratePrerenderAttributes(kPrerenderingUrl));
+  const PrerenderHostId prerender_host_id = registry().CreateAndStartHost(
+      GeneratePrerenderAttributes(kPrerenderingUrl));
+  ASSERT_TRUE(prerender_host_id);
   PrerenderHost* prerender_host =
-      registry().FindNonReservedHostById(prerender_frame_tree_node_id);
+      registry().FindNonReservedHostById(prerender_host_id);
   CommitPrerenderNavigation(*prerender_host);
 
   auto* prerender_root_ftn =
-      FrameTreeNode::GloballyFindByID(prerender_frame_tree_node_id);
-  RenderFrameHostImpl* prerender_rfh = prerender_root_ftn->current_frame_host();
+      FrameTreeNode::GloballyFindByID(prerender_host->frame_tree_node_id());
+  RenderFrameHostImpl* prerender_rfh =
+      prerender_host->GetPrerenderedMainFrameHost();
   NavigationEntryImpl* prerender_nav_entry =
       prerender_root_ftn->frame_tree().controller().GetLastCommittedEntry();
   FrameNavigationEntry* prerender_root_fne =
@@ -552,11 +549,11 @@ TEST_F(PrerenderHostTest, LoadProgressChangedInvokedOnActivation) {
 
 TEST_F(PrerenderHostTest, DontCancelPrerenderWhenTriggerGetsHidden) {
   const GURL kPrerenderingUrl = GURL("https://example.com/empty.html");
-  const FrameTreeNodeId prerender_frame_tree_node_id =
-      registry().CreateAndStartHost(
-          GeneratePrerenderAttributes(kPrerenderingUrl));
+  const PrerenderHostId prerender_host_id = registry().CreateAndStartHost(
+      GeneratePrerenderAttributes(kPrerenderingUrl));
+  ASSERT_TRUE(prerender_host_id);
   PrerenderHost* prerender_host =
-      registry().FindNonReservedHostById(prerender_frame_tree_node_id);
+      registry().FindNonReservedHostById(prerender_host_id);
   ASSERT_NE(prerender_host, nullptr);
   CommitPrerenderNavigation(*prerender_host);
 
@@ -571,11 +568,11 @@ TEST_F(PrerenderHostTest, DontCancelPrerenderWhenTriggerGetsHidden) {
 
 TEST_F(PrerenderHostTest, CancelActivationFromHiddenPage) {
   const GURL kPrerenderingUrl = GURL("https://example.com/empty.html");
-  const FrameTreeNodeId prerender_frame_tree_node_id =
-      registry().CreateAndStartHost(
-          GeneratePrerenderAttributes(kPrerenderingUrl));
+  const PrerenderHostId prerender_host_id = registry().CreateAndStartHost(
+      GeneratePrerenderAttributes(kPrerenderingUrl));
+  ASSERT_TRUE(prerender_host_id);
   PrerenderHost* prerender_host =
-      registry().FindNonReservedHostById(prerender_frame_tree_node_id);
+      registry().FindNonReservedHostById(prerender_host_id);
   ASSERT_NE(prerender_host, nullptr);
   CommitPrerenderNavigation(*prerender_host);
 
@@ -583,8 +580,8 @@ TEST_F(PrerenderHostTest, CancelActivationFromHiddenPage) {
   contents()->WasHidden();
 
   // Activation from the background page should fail.
-  test::PrerenderHostObserver prerender_host_observer(
-      *contents(), prerender_frame_tree_node_id);
+  test::PrerenderHostObserver prerender_host_observer(*contents(),
+                                                      prerender_host_id);
   std::unique_ptr<NavigationSimulatorImpl> navigation =
       NavigationSimulatorImpl::CreateRendererInitiated(
           kPrerenderingUrl, contents()->GetPrimaryMainFrame());
@@ -600,11 +597,11 @@ TEST_F(PrerenderHostTest, CancelActivationFromHiddenPage) {
 
 TEST_F(PrerenderHostTest, DontCancelPrerenderWhenTriggerGetsVisible) {
   const GURL kPrerenderingUrl = GURL("https://example.com/empty.html");
-  const FrameTreeNodeId prerender_frame_tree_node_id =
-      registry().CreateAndStartHost(
-          GeneratePrerenderAttributes(kPrerenderingUrl));
+  const PrerenderHostId prerender_host_id = registry().CreateAndStartHost(
+      GeneratePrerenderAttributes(kPrerenderingUrl));
+  ASSERT_TRUE(prerender_host_id);
   PrerenderHost* prerender_host =
-      registry().FindNonReservedHostById(prerender_frame_tree_node_id);
+      registry().FindNonReservedHostById(prerender_host_id);
   ASSERT_NE(prerender_host, nullptr);
   CommitPrerenderNavigation(*prerender_host);
 
@@ -618,11 +615,11 @@ TEST_F(PrerenderHostTest, DontCancelPrerenderWhenTriggerGetsVisible) {
 #if !BUILDFLAG(IS_ANDROID)
 TEST_F(PrerenderHostTest, DontCancelPrerenderWhenTriggerGetsOcculded) {
   const GURL kPrerenderingUrl = GURL("https://example.com/empty.html");
-  const FrameTreeNodeId prerender_frame_tree_node_id =
-      registry().CreateAndStartHost(
-          GeneratePrerenderAttributes(kPrerenderingUrl));
+  const PrerenderHostId prerender_host_id = registry().CreateAndStartHost(
+      GeneratePrerenderAttributes(kPrerenderingUrl));
+  ASSERT_TRUE(prerender_host_id);
   PrerenderHost* prerender_host =
-      registry().FindNonReservedHostById(prerender_frame_tree_node_id);
+      registry().FindNonReservedHostById(prerender_host_id);
   ASSERT_NE(prerender_host, nullptr);
   CommitPrerenderNavigation(*prerender_host);
 
@@ -639,11 +636,11 @@ TEST_F(PrerenderHostTest, UrlMatchPredicate) {
       [](const GURL&, const std::optional<content::UrlMatchType>&) {
         return true;
       });
-  const FrameTreeNodeId prerender_frame_tree_node_id =
-      registry().CreateAndStartHost(
-          GeneratePrerenderAttributesWithPredicate(kPrerenderingUrl, callback));
+  const PrerenderHostId prerender_host_id = registry().CreateAndStartHost(
+      GeneratePrerenderAttributesWithPredicate(kPrerenderingUrl, callback));
+  ASSERT_TRUE(prerender_host_id);
   PrerenderHost* prerender_host =
-      registry().FindNonReservedHostById(prerender_frame_tree_node_id);
+      registry().FindNonReservedHostById(prerender_host_id);
   ASSERT_NE(prerender_host, nullptr);
   const GURL kActivatedUrl = GURL("https://example.com/empty.html?activate");
   ASSERT_NE(kActivatedUrl, kPrerenderingUrl);
@@ -670,18 +667,18 @@ TEST_F(PrerenderHostTest, CanceledPrerenderCannotBeReadyForActivation) {
       PreloadingType::kPrerender, std::move(same_url_matcher),
       contents()->GetPrimaryMainFrame()->GetPageUkmSourceId());
 
-  const FrameTreeNodeId prerender_frame_tree_node_id =
-      registry().CreateAndStartHost(
-          GeneratePrerenderAttributes(kPrerenderingUrl), preloading_attempt);
+  const PrerenderHostId prerender_host_id = registry().CreateAndStartHost(
+      GeneratePrerenderAttributes(kPrerenderingUrl), preloading_attempt);
+  ASSERT_TRUE(prerender_host_id);
   PrerenderHost* prerender_host =
-      registry().FindNonReservedHostById(prerender_frame_tree_node_id);
+      registry().FindNonReservedHostById(prerender_host_id);
   ASSERT_NE(prerender_host, nullptr);
 
   // Registry keeps alive through this test, so it is safe to capture the
   // reference to `registry`.
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(base::BindLambdaForTesting([&]() {
-        registry().CancelHost(prerender_frame_tree_node_id,
+        registry().CancelHost(prerender_host_id,
                               PrerenderFinalStatus::kTriggerDestroyed);
       })));
 

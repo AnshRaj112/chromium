@@ -4,7 +4,6 @@
 
 #include "components/history_clusters/core/features.h"
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/strings/string_split.h"
@@ -26,22 +25,16 @@ constexpr auto enabled_by_default_desktop_only =
 
 namespace internal {
 
-BASE_FEATURE(kJourneys, "Journeys", enabled_by_default_desktop_only);
+BASE_FEATURE(kJourneys, enabled_by_default_desktop_only);
 
-BASE_FEATURE(kJourneysImages,
-             "JourneysImages",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kJourneysImages, base::FEATURE_ENABLED_BY_DEFAULT);
 
 const base::FeatureParam<bool> kJourneysImagesCover{
     &kJourneysImages, "JourneysImagesCover", true};
 
-BASE_FEATURE(kOmniboxAction,
-             "JourneysOmniboxAction",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kOmniboxHistoryClusterProvider,
              "JourneysOmniboxHistoryClusterProvider",
-             enabled_by_default_desktop_only);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kNonUserVisibleDebug,
              "JourneysNonUserVisibleDebug",
@@ -51,20 +44,11 @@ BASE_FEATURE(kUserVisibleDebug,
              "JourneysUserVisibleDebug",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kHistoryClustersInternalsPage,
-             "HistoryClustersInternalsPage",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kHistoryClustersInternalsPage, base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kHistoryClustersKeywordFiltering,
-             "HistoryClustersKeywordFiltering",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kHistoryClustersVisitDeduping,
-             "HistoryClustersVisitDeduping",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kHistoryClustersVisitDeduping, base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kHistoryClustersNavigationContextClustering,
-             "HistoryClustersNavigationContextClustering",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 }  // namespace internal

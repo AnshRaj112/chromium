@@ -57,12 +57,6 @@ std::string GetSerialNumber() {
   return ReadFile("/sys/class/dmi/id/product_serial");
 }
 
-base::FilePath GetCrowdStrikeAgentInstallPath() {
-  static constexpr base::FilePath::CharType kCrowdstrikeAgentPath[] =
-      FILE_PATH_LITERAL("/opt/CrowdStrike/");
-  return base::FilePath(kCrowdstrikeAgentPath);
-}
-
 base::FilePath GetCrowdStrikeZtaFilePath() {
   // ZTA files currently are not stored locally on linux platforms.
   return base::FilePath();
@@ -163,6 +157,28 @@ std::vector<std::string> internal::GetMacAddressesImpl() {
     result.push_back(address);
   }
   return result;
+}
+
+std::optional<std::string> GetDistributionVersion() {
+  base::FilePath os_release_file("/etc/os-release");
+  std::string release_info;
+  base::StringPairs values;
+  if (base::PathExists(os_release_file) &&
+      base::ReadFileToStringWithMaxSize(os_release_file, &release_info, 8192) &&
+      base::SplitStringIntoKeyValuePairs(release_info, '=', '\n', &values)) {
+    auto version_id = std::ranges::find(
+        values, "VERSION_ID", &std::pair<std::string, std::string>::first);
+    if (version_id != values.end()) {
+      return std::string(
+          base::TrimString(version_id->second, "\"", base::TRIM_ALL));
+    }
+  }
+
+  return std::nullopt;
+}
+
+std::optional<CrowdStrikeSignals> GetCrowdStrikeSignals() {
+  return std::nullopt;
 }
 
 }  // namespace device_signals

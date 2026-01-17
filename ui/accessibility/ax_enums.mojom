@@ -118,8 +118,8 @@ enum Event {
 //
 // LINT.IfChange(Role)
 //
-// Next version: 8
-// Next value: 213
+// Next version: 9
+// Next value: 214
 [Extensible, Stable, Uuid="d258eb73-e0cc-490c-b881-80ee11d3fec2"]
 enum Role {
   [Default]kUnknown = 181, // The role has not been set.
@@ -296,6 +296,7 @@ enum Role {
   kMenuItem = 124,
   kMenuItemCheckBox = 125,
   kMenuItemRadio = 126,
+  [MinVersion=8] kMenuItemSeparator = 213,
   kMenuListOption = 127,
   kMenuListPopup = 128,
   kMeter = 129,
@@ -399,8 +400,8 @@ enum State {
 // An action to be taken on an accessibility node.
 // In contrast to |AXDefaultActionVerb|, these describe what happens to the
 // object, e.g. "FOCUS".
-// Next version: 5
-// Next value: 41
+// Next version: 6
+// Next value: 42
 [Extensible, Stable, Uuid="ed8e4466-0522-4f98-ac28-59a523b70232"]
 enum Action {
   [Default]kNone = 0,
@@ -463,7 +464,7 @@ enum Action {
   // Delete any selected text in the control's text value and
   // insert |AXActionData::value| in its place, like when typing or pasting.
   kReplaceSelectedText = 17,
-
+  [MinVersion=5] kRequestLayoutBasedAction = 41,
   [MinVersion=1] kResumeMedia = 34,
 
   // Scrolls by approximately one screen in a specific direction. Should be
@@ -571,6 +572,12 @@ enum DefaultActionVerb {
   // as it bubbles up.
   kClickAncestor,
 
+  // A click on this node will result in event dispatch to this node.
+  kClickInHitTest,
+
+  // A click on this node will not result in event dispatch to this node.
+  kClickNotInHitTest,
+
   kJump,
   kOpen,
   kPress,
@@ -652,8 +659,8 @@ enum StringAttribute {
   kVirtualContent = 30,
 };
 
-// Next version: 6
-// Next value: 68
+// Next version: 8
+// Next value: 70
 [Extensible, Stable, Uuid="c350e50f-5177-405d-b155-79868449ba7b"]
 enum IntAttribute {
   [Default]kNone = 0,
@@ -810,6 +817,14 @@ enum IntAttribute {
 
   // The maximum length of a textfield.
   [MinVersion=5] kMaxLength = 67,
+
+  // Paint order, indicates when this node is painted relative to
+  // other nodes, larger is later.
+  [MinVersion=6] kPaintOrder = 68,
+
+  // This used for adjusting the text changed event attribute
+  // (e.g. fromIndex, addedCount) when IME committing text.
+  [MinVersion=7] kCommittedTextLength = 69,
 };
 
 // Next version: 2
@@ -848,8 +863,8 @@ enum FloatAttribute {
 //
 // Finally, note that different tree sources can use all three states for a
 // given attribute, while another tree source only uses two.
-// Next value: 23
-// Next Version: 3
+// Next value: 25
+// Next Version: 4
 [Extensible, Stable, Uuid="ed1f1b8c-c89c-483f-9840-ca3b10042e81"]
 enum BoolAttribute {
   [Default]kNone = 0,
@@ -929,6 +944,11 @@ enum BoolAttribute {
   // Android does not provide nodes that are not on screen.
   // We need to distinguish containers that are like this.
   [MinVersion=2] kHasHiddenOffscreenNodes = 22,
+
+  // This used for determining text change types when
+  // sending text changed accessibility events to android.
+  [MinVersion=3] kHasComposition = 23,
+  [MinVersion=3] kTextSuggestionSelectedByIME = 24,
 };
 
 // Next version: 8

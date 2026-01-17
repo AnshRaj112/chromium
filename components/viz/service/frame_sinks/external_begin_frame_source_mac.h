@@ -8,7 +8,6 @@
 #include <memory>
 #include <vector>
 
-#include "base/feature_list.h"
 #include "base/memory/raw_ptr.h"
 #include "components/viz/common/display/update_vsync_parameters_callback.h"
 #include "components/viz/common/frame_sinks/begin_frame_source.h"
@@ -39,7 +38,8 @@ class VIZ_COMMON_EXPORT ExternalBeginFrameSourceMac
   ~ExternalBeginFrameSourceMac() override;
 
   // BeginFrameSource implementation.
-  void SetVSyncDisplayID(int64_t display_id) override;
+  void SetVSyncDisplayID(int64_t display_id, bool force_update) override;
+  void UpdateVSyncDisplay() override;
 
   // ExternalBeginFrameSourceClient implementation.
   void OnNeedsBeginFrames(bool needs_begin_frames) override;

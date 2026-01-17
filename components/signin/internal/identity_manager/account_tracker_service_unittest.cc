@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "base/auto_reset.h"
+#include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/stringprintf.h"
@@ -202,7 +203,7 @@ class AccountTrackerServiceTest : public testing::Test {
 #if BUILDFLAG(IS_ANDROID)
     // Mock AccountManagerFacade in java code for tests that require its
     // initialization.
-    signin::SetUpMockAccountManagerFacade();
+    signin::SetUpFakeAccountManagerFacade();
 #endif
 
     AccountTrackerService::RegisterPrefs(pref_service_.registry());
@@ -255,13 +256,13 @@ class AccountTrackerServiceTest : public testing::Test {
   }
 
   void CheckAccountDetails(AccountKey account_key, const AccountInfo& info) {
-    EXPECT_EQ(AccountKeyToAccountId(account_key), info.account_id);
-    EXPECT_EQ(AccountKeyToGaiaId(account_key), info.gaia);
-    EXPECT_EQ(AccountKeyToEmail(account_key), info.email);
-    EXPECT_EQ(kNoHostedDomainFound, info.hosted_domain);
-    EXPECT_EQ(AccountKeyToFullName(account_key), info.full_name);
-    EXPECT_EQ(AccountKeyToGivenName(account_key), info.given_name);
-    EXPECT_EQ(AccountKeyToLocale(account_key), info.locale);
+    EXPECT_EQ(info.GetAccountId(), AccountKeyToAccountId(account_key));
+    EXPECT_EQ(info.GetGaiaId(), AccountKeyToGaiaId(account_key));
+    EXPECT_EQ(info.GetEmail(), AccountKeyToEmail(account_key));
+    EXPECT_EQ(info.GetHostedDomain(), std::string());
+    EXPECT_EQ(info.GetFullName(), AccountKeyToFullName(account_key));
+    EXPECT_EQ(info.GetGivenName(), AccountKeyToGivenName(account_key));
+    EXPECT_EQ(info.GetLocale(), AccountKeyToLocale(account_key));
   }
 
   void CheckAccountCapabilities(AccountKey account_key,
@@ -516,7 +517,7 @@ void AccountTrackerServiceTest::
   SimulateTokenAvailable(kAccountKeyChild);
   AccountInfo account_info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyChild));
-  EXPECT_EQ(account_info.is_child_account, signin::Tribool::kUnknown);
+  EXPECT_EQ(account_info.IsChildAccount(), signin::Tribool::kUnknown);
 
   // AccountUpdated notification requires account's gaia to be known.
   // Set account's user info first to receive an UPDATED event when capabilities
@@ -529,7 +530,7 @@ void AccountTrackerServiceTest::
   account_info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyChild));
 
-  EXPECT_EQ(account_info.is_child_account, expected_is_child_account);
+  EXPECT_EQ(account_info.IsChildAccount(), expected_is_child_account);
 }
 #endif  // !BUILDFLAG(IS_CHROMEOS)
 
@@ -571,7 +572,7 @@ TEST_F(AccountTrackerServiceTest, TokenAvailable_UserInfo_ImageSuccess) {
   AccountInfo account_info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyAlpha));
   EXPECT_TRUE(account_info.account_image.IsEmpty());
-  EXPECT_TRUE(account_info.last_downloaded_image_url_with_size.empty());
+  EXPECT_FALSE(account_info.GetLastDownloadedAvatarUrlWithSize().has_value());
   ReturnAccountImageFetchSuccess(kAccountKeyAlpha);
   EXPECT_TRUE(CheckAccountTrackerEvents({
       TrackingEvent(UPDATED, AccountKeyToAccountId(kAccountKeyAlpha),
@@ -581,7 +582,7 @@ TEST_F(AccountTrackerServiceTest, TokenAvailable_UserInfo_ImageSuccess) {
   account_info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyAlpha));
   EXPECT_FALSE(account_info.account_image.IsEmpty());
-  EXPECT_EQ(account_info.last_downloaded_image_url_with_size,
+  EXPECT_EQ(account_info.GetLastDownloadedAvatarUrlWithSize(),
             AccountKeyToPictureURLWithSize(kAccountKeyAlpha));
   histogram_tester.ExpectTotalCount(
       "Signin.AccountFetcher.AccountUserInfoFetchTime", 1);
@@ -603,12 +604,12 @@ TEST_F(AccountTrackerServiceTest, TokenAvailable_UserInfo_ImageFailure) {
   AccountInfo account_info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyAlpha));
   EXPECT_TRUE(account_info.account_image.IsEmpty());
-  EXPECT_TRUE(account_info.last_downloaded_image_url_with_size.empty());
+  EXPECT_FALSE(account_info.GetLastDownloadedAvatarUrlWithSize().has_value());
   ReturnAccountImageFetchFailure(kAccountKeyAlpha);
   account_info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyAlpha));
   EXPECT_TRUE(account_info.account_image.IsEmpty());
-  EXPECT_TRUE(account_info.last_downloaded_image_url_with_size.empty());
+  EXPECT_FALSE(account_info.GetLastDownloadedAvatarUrlWithSize().has_value());
   histogram_tester.ExpectTotalCount(
       "Signin.AccountFetcher.AccountUserInfoFetchTime", 1);
   histogram_tester.ExpectTotalCount(
@@ -824,7 +825,7 @@ TEST_F(AccountTrackerServiceTest, RefreshAccount_FetchImageSuccess) {
   AccountInfo account_info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyAlpha));
   EXPECT_FALSE(account_info.account_image.IsEmpty());
-  EXPECT_EQ(account_info.last_downloaded_image_url_with_size,
+  EXPECT_EQ(account_info.GetLastDownloadedAvatarUrlWithSize(),
             AccountKeyToPictureURLWithSize(kAccountKeyAlpha));
 }
 
@@ -994,7 +995,7 @@ TEST_F(AccountTrackerServiceTest, Persistence) {
   ASSERT_EQ(1u, infos.size());
   CheckAccountDetails(kAccountKeyBeta, infos[0]);
   CheckAccountCapabilities(kAccountKeyBeta, infos[0]);
-  EXPECT_EQ(signin::Tribool::kTrue, infos[0].is_child_account);
+  EXPECT_EQ(infos[0].IsChildAccount(), signin::Tribool::kTrue);
 #if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   EXPECT_TRUE(infos[0].is_under_advanced_protection);
 #else
@@ -1039,6 +1040,47 @@ TEST_F(AccountTrackerServiceTest, Persistence_DeleteEmpty) {
   ASSERT_TRUE(scoped_user_data_dir.Delete());
 }
 
+TEST_F(AccountTrackerServiceTest, Persistence_LoadAccountImagesFromDiskFails) {
+  // Define a user data directory for the account image storage.
+  base::ScopedTempDir scoped_user_data_dir;
+  ASSERT_TRUE(scoped_user_data_dir.CreateUniqueTempDir());
+
+  // Create a tracker and save to prefs a valid account and an image.
+  ResetAccountTrackerWithPersistence(scoped_user_data_dir.GetPath());
+  SimulateTokenAvailable(kAccountKeyAlpha);
+  ReturnAccountInfoFetchSuccess(kAccountKeyAlpha);
+  ReturnAccountImageFetchSuccess(kAccountKeyAlpha);
+
+  AccountInfo info = account_tracker()->GetAccountInfo(
+      AccountKeyToAccountId(kAccountKeyAlpha));
+  EXPECT_EQ(info.GetAccountId(), AccountKeyToAccountId(kAccountKeyAlpha));
+  EXPECT_TRUE(info.GetAvatarImage().has_value());
+  EXPECT_TRUE(info.GetLastDownloadedAvatarUrlWithSize().has_value());
+
+  // Wait until the account image is saved.
+  task_environment_.RunUntilIdle();
+
+  // Delete an avatar image to simulate a read problem for the next tracker.
+  ASSERT_TRUE(base::DeleteFile(
+      scoped_user_data_dir.GetPath()
+          .AppendASCII("Accounts")
+          .AppendASCII("Avatar Images")
+          .AppendASCII(AccountKeyToAccountId(kAccountKeyAlpha).ToString())));
+
+  // Create a new tracker and make sure it loads the accounts.
+  ResetAccountTrackerWithPersistence(scoped_user_data_dir.GetPath());
+
+  // Wait until the account image is loaded.
+  task_environment_.RunUntilIdle();
+
+  // Verify that the image is empty and the URL has been cleared.
+  info = account_tracker()->GetAccountInfo(
+      AccountKeyToAccountId(kAccountKeyAlpha));
+  EXPECT_EQ(info.GetAccountId(), AccountKeyToAccountId(kAccountKeyAlpha));
+  EXPECT_FALSE(info.GetAvatarImage().has_value());
+  EXPECT_FALSE(info.GetLastDownloadedAvatarUrlWithSize().has_value());
+}
+
 TEST_F(AccountTrackerServiceTest, SeedAccountInfo) {
   EXPECT_TRUE(account_tracker()->GetAccounts().empty());
 
@@ -1074,11 +1116,12 @@ TEST_F(AccountTrackerServiceTest, SeedAccountInfo) {
 }
 
 TEST_F(AccountTrackerServiceTest, SeedAccountInfoFull) {
-  AccountInfo info;
-  info.gaia = AccountKeyToGaiaId(kAccountKeyAlpha);
-  info.email = AccountKeyToEmail(kAccountKeyAlpha);
-  info.full_name = AccountKeyToFullName(kAccountKeyAlpha);
-  info.account_id = account_tracker()->SeedAccountInfo(info);
+  AccountInfo info = AccountInfo::Builder(AccountKeyToGaiaId(kAccountKeyAlpha),
+                                          AccountKeyToEmail(kAccountKeyAlpha))
+                         .SetFullName(AccountKeyToFullName(kAccountKeyAlpha))
+                         .Build();
+  CoreAccountId account_id = account_tracker()->SeedAccountInfo(info);
+  info = AccountInfo::Builder(info).SetAccountId(account_id).Build();
 
   // Validate that seeding an unexisting account works and sends a
   // notification.
@@ -1092,10 +1135,12 @@ TEST_F(AccountTrackerServiceTest, SeedAccountInfoFull) {
 
   // Validate that seeding new full informations to an existing account works
   // and sends a notification.
-  info.given_name = AccountKeyToGivenName(kAccountKeyAlpha);
-  info.hosted_domain = kNoHostedDomainFound;
-  info.locale = AccountKeyToLocale(kAccountKeyAlpha);
-  info.picture_url = AccountKeyToPictureURL(kAccountKeyAlpha);
+  info = AccountInfo::Builder(info)
+             .SetGivenName(AccountKeyToGivenName(kAccountKeyAlpha))
+             .SetHostedDomain(kNoHostedDomainFound)
+             .SetLocale(AccountKeyToLocale(kAccountKeyAlpha))
+             .SetAvatarUrl(AccountKeyToPictureURL(kAccountKeyAlpha))
+             .Build();
   account_tracker()->SeedAccountInfo(info);
   stored_info = account_tracker()->GetAccountInfo(info.account_id);
   EXPECT_EQ(info.gaia, stored_info.gaia);
@@ -1376,7 +1421,7 @@ TEST_F(AccountTrackerServiceTest, ChildAccountBasic) {
   EXPECT_TRUE(CheckAccountTrackerEvents({}));
   AccountInfo info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyChild));
-  EXPECT_EQ(signin::Tribool::kTrue, info.is_child_account);
+  EXPECT_EQ(info.IsChildAccount(), signin::Tribool::kTrue);
   SimulateTokenRevoked(kAccountKeyChild);
 }
 
@@ -1392,10 +1437,10 @@ TEST_F(AccountTrackerServiceTest, ChildAccountWithSecondaryEdu) {
   EXPECT_TRUE(CheckAccountTrackerEvents({}));
   AccountInfo info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyChild));
-  EXPECT_EQ(signin::Tribool::kTrue, info.is_child_account);
+  EXPECT_EQ(info.IsChildAccount(), signin::Tribool::kTrue);
   info =
       account_tracker()->GetAccountInfo(AccountKeyToAccountId(kAccountKeyEdu));
-  EXPECT_NE(signin::Tribool::kTrue, info.is_child_account);
+  EXPECT_NE(info.IsChildAccount(), signin::Tribool::kTrue);
   SimulateTokenRevoked(kAccountKeyChild);
   SimulateTokenRevoked(kAccountKeyEdu);
 }
@@ -1414,7 +1459,7 @@ TEST_F(AccountTrackerServiceTest, UnsupervisedAccountUpdatedAndRevoked) {
   }));
   AccountInfo info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyChild));
-  EXPECT_EQ(signin::Tribool::kFalse, info.is_child_account);
+  EXPECT_EQ(info.IsChildAccount(), signin::Tribool::kFalse);
   SimulateTokenRevoked(kAccountKeyChild);
   EXPECT_TRUE(CheckAccountTrackerEvents({
       TrackingEvent(REMOVED, AccountKeyToAccountId(kAccountKeyChild),
@@ -1437,7 +1482,7 @@ TEST_F(AccountTrackerServiceTest, ChildAccountUpdatedAndRevoked) {
   }));
   AccountInfo info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyChild));
-  EXPECT_EQ(signin::Tribool::kTrue, info.is_child_account);
+  EXPECT_EQ(info.IsChildAccount(), signin::Tribool::kTrue);
   SimulateTokenRevoked(kAccountKeyChild);
   EXPECT_TRUE(CheckAccountTrackerEvents({
       TrackingEvent(REMOVED, AccountKeyToAccountId(kAccountKeyChild),
@@ -1478,7 +1523,7 @@ TEST_F(AccountTrackerServiceTest, ChildAccountGraduation) {
 
   AccountInfo info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyChild));
-  EXPECT_EQ(signin::Tribool::kTrue, info.is_child_account);
+  EXPECT_EQ(info.IsChildAccount(), signin::Tribool::kTrue);
   ReturnFetchResults(GaiaUrls::GetInstance()->oauth_user_info_url(),
                      net::HTTP_OK,
                      GenerateValidTokenInfoResponse(kAccountKeyChild));
@@ -1495,7 +1540,7 @@ TEST_F(AccountTrackerServiceTest, ChildAccountGraduation) {
 
   info = account_tracker()->GetAccountInfo(
       AccountKeyToAccountId(kAccountKeyChild));
-  EXPECT_EQ(signin::Tribool::kFalse, info.is_child_account);
+  EXPECT_EQ(info.IsChildAccount(), signin::Tribool::kFalse);
   EXPECT_TRUE(CheckAccountTrackerEvents({
       TrackingEvent(UPDATED, AccountKeyToAccountId(kAccountKeyChild),
                     AccountKeyToGaiaId(kAccountKeyChild),
@@ -1660,61 +1705,3 @@ TEST_F(AccountTrackerServiceTest,
       testing::ElementsAre(base::Bucket(1, 1)));
 }
 #endif
-
-TEST_F(AccountTrackerServiceTest, CapabilityPrefNameMigration) {
-  base::ScopedTempDir scoped_user_data_dir;
-  ASSERT_TRUE(scoped_user_data_dir.CreateUniqueTempDir());
-
-  // Create a tracker and add an account. This should cause the account to be
-  // saved to persistence.
-  ResetAccountTrackerWithPersistence(scoped_user_data_dir.GetPath());
-  SimulateTokenAvailable(kAccountKeyAlpha);
-  ReturnAccountInfoFetchSuccess(kAccountKeyAlpha);
-
-  // The capability is unknown, and none of the capability-related keys should
-  // be set.
-  EXPECT_EQ(
-      signin::Tribool::kUnknown,
-      account_tracker()
-          ->GetAccountInfo(AccountKeyToAccountId(kAccountKeyAlpha))
-          .capabilities
-          .can_show_history_sync_opt_ins_without_minor_mode_restrictions());
-  ScopedListPrefUpdate update(prefs(), prefs::kAccountInfo);
-  ASSERT_FALSE(update->empty());
-  base::Value::Dict* dict = (*update)[0].GetIfDict();
-  ASSERT_TRUE(dict);
-  const char kDeprecatedCapabilityKey[] =
-      "accountcapabilities.can_offer_extended_chrome_sync_promos";
-  const char kNewCapabilityKey[] =
-      "accountcapabilities.accountcapabilities/gi2tklldmfya";
-  // The deprecated key is not set.
-  EXPECT_FALSE(dict->FindIntByDottedPath(kDeprecatedCapabilityKey));
-  EXPECT_TRUE(dict->FindIntByDottedPath(kNewCapabilityKey));
-
-  // Set the capability using the deprecated key, and reload the account.
-  dict->SetByDottedPath(kDeprecatedCapabilityKey, 1);
-  dict->RemoveByDottedPath(kNewCapabilityKey);
-  ClearAccountTrackerEvents();
-  ResetAccountTrackerWithPersistence(scoped_user_data_dir.GetPath());
-  EXPECT_TRUE(CheckAccountTrackerEvents(
-      {TrackingEvent(UPDATED, AccountKeyToAccountId(kAccountKeyAlpha),
-                     AccountKeyToGaiaId(kAccountKeyAlpha),
-                     AccountKeyToEmail(kAccountKeyAlpha))}));
-
-  // Check that the migration happened.
-  std::vector<AccountInfo> infos = account_tracker()->GetAccounts();
-  ASSERT_EQ(1u, infos.size());
-  CheckAccountDetails(kAccountKeyAlpha, infos[0]);
-  // The deprecated key has been read.
-  EXPECT_EQ(
-      signin::Tribool::kTrue,
-      infos[0]
-          .capabilities
-          .can_show_history_sync_opt_ins_without_minor_mode_restrictions());
-  // The deprecated key has been removed.
-  EXPECT_FALSE(dict->FindIntByDottedPath(kDeprecatedCapabilityKey));
-  // The new key has been written.
-  std::optional<int> new_key = dict->FindIntByDottedPath(kNewCapabilityKey);
-  ASSERT_TRUE(new_key.has_value());
-  EXPECT_EQ(static_cast<int>(signin::Tribool::kTrue), new_key.value());
-}

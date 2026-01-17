@@ -36,7 +36,7 @@ import {assert, assertNotReached} from '//resources/js/assert.js';
 import {focusWithoutInk} from '//resources/js/focus_without_ink.js';
 import {PolymerElement} from '//resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 import type {SyncBrowserProxy, SyncPrefs, SyncStatus} from '/shared/settings/people_page/sync_browser_proxy.js';
-import {PageStatus, SignedInState, StatusAction, SyncBrowserProxyImpl} from '/shared/settings/people_page/sync_browser_proxy.js';
+import {ChromeSigninAccessPoint, shouldShowSyncTogglesForStatusAction, PageStatus, SignedInState, SyncBrowserProxyImpl} from '/shared/settings/people_page/sync_browser_proxy.js';
 import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
 import {OpenWindowProxyImpl} from 'chrome://resources/js/open_window_proxy.js';
 
@@ -195,14 +195,6 @@ export class SettingsSyncPageElement extends SettingsSyncPageElementBase {
             'syncPrefs.explicitPassphraseTime)',
       },
 
-      // TODO(crbug.com/324091979): Remove once crbug.com/324091979 launched.
-      enableLinkedServicesSetting_: {
-        type: Boolean,
-        value() {
-          return loadTimeData.getBoolean('enableLinkedServicesSetting');
-        },
-      },
-
       isEeaChoiceCountry_: {
         type: Boolean,
         value() {
@@ -213,6 +205,12 @@ export class SettingsSyncPageElement extends SettingsSyncPageElementBase {
       personalizationCollapseExpanded_: {
         type: Boolean,
         value: false,
+      },
+
+      // Exposes ChromeSigninAccessPoint enum to HTML bindings.
+      accessPointEnum_: {
+        type: Object,
+        value: ChromeSigninAccessPoint,
       },
     };
   }
@@ -236,7 +234,6 @@ export class SettingsSyncPageElement extends SettingsSyncPageElementBase {
   declare private signedIn_: boolean;
   declare private syncDisabledByAdmin_: boolean;
   declare private syncSectionDisabled_: boolean;
-  declare private enableLinkedServicesSetting_: boolean;
   declare private isEeaChoiceCountry_: boolean;
   declare private personalizationCollapseExpanded_: boolean;
 
@@ -359,9 +356,8 @@ export class SettingsSyncPageElement extends SettingsSyncPageElementBase {
         (this.syncStatus_.signedInState !== SignedInState.SYNCING ||
          !!this.syncStatus_.disabled ||
          (!!this.syncStatus_.hasError &&
-          this.syncStatus_.statusAction !== StatusAction.ENTER_PASSPHRASE &&
-          this.syncStatus_.statusAction !==
-              StatusAction.RETRIEVE_TRUSTED_VAULT_KEYS));
+          !shouldShowSyncTogglesForStatusAction(
+              this.syncStatus_.statusAction)));
   }
 
   private computeSyncDisabledByAdmin_(): boolean {

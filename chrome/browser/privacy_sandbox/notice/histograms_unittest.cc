@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "base/containers/contains.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -10,6 +9,8 @@
 #include "chrome/browser/privacy_sandbox/notice/notice.mojom.h"
 #include "chrome/browser/privacy_sandbox/notice/notice_catalog.h"
 #include "chrome/browser/privacy_sandbox/notice/notice_storage.h"
+#include "chrome/test/base/testing_profile.h"
+#include "content/public/test/browser_task_environment.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -19,19 +20,29 @@ namespace {
 using Event = notice::mojom::PrivacySandboxNoticeEvent;
 using enum Event;
 
-TEST(PrivacySandboxNoticeHistogramsTest, CheckPSNoticeHistograms) {
+class PrivacySandboxNoticeHistogramsTest : public testing::Test {
+ public:
+  PrivacySandboxNoticeHistogramsTest()
+      : profile_(std::make_unique<TestingProfile>()) {}
+
+ protected:
+  content::BrowserTaskEnvironment task_environment_;
+  std::unique_ptr<TestingProfile> profile_;
+};
+
+TEST_F(PrivacySandboxNoticeHistogramsTest, CheckPSNoticeHistograms) {
   std::optional<base::HistogramVariantsEntryMap> notices;
   std::vector<std::string> missing_notices;
   {
     notices = base::ReadVariantsFromHistogramsXml("PSNotice", "privacy");
     ASSERT_TRUE(notices.has_value());
   }
-  NoticeCatalogImpl catalog;
+  NoticeCatalogImpl catalog(profile_.get());
   EXPECT_EQ(catalog.GetNotices().size(), notices->size());
   for (const Notice* notice : catalog.GetNotices()) {
     // TODO(crbug.com/333406690): Implement something to clean up notices that
     // don't exist.
-    if (!base::Contains(*notices, notice->GetStorageName())) {
+    if (!notices->contains(notice->GetStorageName())) {
       missing_notices.emplace_back(notice->GetStorageName());
     }
   }
@@ -43,7 +54,7 @@ TEST(PrivacySandboxNoticeHistogramsTest, CheckPSNoticeHistograms) {
          "//tools/metrics/histograms/metadata/privacy/histograms.xml";
 }
 
-TEST(PrivacySandboxNoticeHistogramsTest, CheckPSNoticeActionHistograms) {
+TEST_F(PrivacySandboxNoticeHistogramsTest, CheckPSNoticeActionHistograms) {
   std::optional<base::HistogramVariantsEntryMap> actions;
   std::vector<std::string> missing_actions;
   {
@@ -58,7 +69,7 @@ TEST(PrivacySandboxNoticeHistogramsTest, CheckPSNoticeActionHistograms) {
       continue;
     }
     if (std::string notice_name = GetNoticeActionStringFromEvent(event);
-        !base::Contains(*actions, notice_name)) {
+        !actions->contains(notice_name)) {
       missing_actions.emplace_back(notice_name);
     }
   }

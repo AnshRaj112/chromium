@@ -22,6 +22,7 @@
 #include "components/download/public/common/download_create_info.h"
 #include "components/download/public/common/download_features.h"
 #include "components/download/public/common/download_interrupt_reasons_utils.h"
+#include "components/download/public/common/download_item_impl.h"
 #include "components/download/public/common/download_save_info.h"
 #include "components/download/public/common/download_stats.h"
 #include "components/download/public/common/download_task_runner.h"
@@ -34,6 +35,7 @@
 #include "net/http/http_status_code.h"
 #include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/resource_request.h"
+#include "services/network/public/mojom/url_response_head.mojom.h"
 #include "url/origin.h"
 
 #if BUILDFLAG(IS_ANDROID)
@@ -676,6 +678,7 @@ ResumeMode GetDownloadResumeMode(const GURL& url,
     case DOWNLOAD_INTERRUPT_REASON_SERVER_FORBIDDEN:
     case DOWNLOAD_INTERRUPT_REASON_SERVER_CROSS_ORIGIN_REDIRECT:
     case DOWNLOAD_INTERRUPT_REASON_FILE_SAME_AS_SOURCE:
+    case DOWNLOAD_INTERRUPT_REASON_LOCAL_DOWNLOAD_BLOCKED:
       return ResumeMode::INVALID;
   }
   if (user_action_required && restart_required)
@@ -759,10 +762,7 @@ int64_t GetDownloadValidationLengthConfig() {
 }
 
 base::TimeDelta GetExpiredDownloadDeleteTime() {
-  int expired_days = base::GetFieldTrialParamByFeatureAsInt(
-      features::kDeleteExpiredDownloads, kExpiredDownloadDeleteTimeFinchKey,
-      kDefaultDownloadExpiredTimeInDays);
-  return base::Days(expired_days);
+  return base::Days(kDefaultDownloadExpiredTimeInDays);
 }
 
 base::TimeDelta GetOverwrittenDownloadDeleteTime() {

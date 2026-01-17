@@ -8,7 +8,6 @@
 #include <optional>
 
 #include "gpu/command_buffer/client/client_shared_image.h"
-#include "gpu/command_buffer/common/mailbox_holder.h"
 #include "gpu/command_buffer/common/sync_token.h"
 #include "gpu/ipc/common/exported_shared_image.mojom-shared.h"
 #include "gpu/ipc/common/gpu_ipc_common_export.h"
@@ -19,6 +18,24 @@
 #include "ui/gfx/mojom/buffer_types_mojom_traits.h"
 
 namespace mojo {
+
+template <>
+struct GPU_IPC_COMMON_EXPORT StructTraits<
+    gpu::mojom::SharedImageExportResultDataView,
+    gpu::SharedImageExportResult> {
+  static const gpu::SyncToken& sync_token(
+      const gpu::SharedImageExportResult& shared_image_exported_result) {
+    return shared_image_exported_result.sync_token_;
+  }
+
+  static bool Read(gpu::mojom::SharedImageExportResultDataView data,
+                   gpu::SharedImageExportResult* out) {
+    if (!data.ReadSyncToken(&out->sync_token_)) {
+      return false;
+    }
+    return true;
+  }
+};
 
 template <>
 struct GPU_IPC_COMMON_EXPORT StructTraits<
@@ -46,6 +63,10 @@ struct GPU_IPC_COMMON_EXPORT StructTraits<
     return shared_image.texture_target_;
   }
 
+  static bool is_software(const gpu::ExportedSharedImage& shared_image) {
+    return shared_image.is_software_;
+  }
+
   static std::optional<gfx::GpuMemoryBufferHandle>& buffer_handle(
       gpu::ExportedSharedImage& shared_image) {
     return shared_image.buffer_handle_;
@@ -71,6 +92,7 @@ struct GPU_IPC_COMMON_EXPORT StructTraits<
       return false;
     }
     out->texture_target_ = data.texture_target();
+    out->is_software_ = data.is_software();
     return true;
   }
 };

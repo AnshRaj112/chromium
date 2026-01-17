@@ -13,7 +13,6 @@
 #include "base/test/simple_test_tick_clock.h"
 #include "base/time/time.h"
 #include "chrome/browser/resource_coordinator/tab_helper.h"
-#include "chrome/browser/resource_coordinator/tab_manager_features.h"
 #include "chrome/browser/sessions/session_restore_test_utils.h"
 #include "chrome/browser/sessions/tab_loader_tester.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
@@ -177,7 +176,7 @@ class TabLoaderTest : public BrowserWithTestWindowTest {
         SimulatePrimaryPageChanged(tab.contents());
     }
 
-    TabLoader::RestoreTabs(restored_tabs_, clock_.NowTicks());
+    TabLoader::DeprecatedRestoreTabs(restored_tabs_, clock_.NowTicks());
     EXPECT_TRUE(tab_loader_.IsSharedTabLoader());
     EXPECT_FALSE(tab_loader_.IsLoadingEnabled());
     tab_loader_.WaitForTabLoadingEnabled();
@@ -309,8 +308,7 @@ TEST_F(TabLoaderTest, OnMemoryPressure) {
 
   // Simulate memory pressure and expect the tab loader to disable loading.
   EXPECT_TRUE(tab_loader_.IsLoadingEnabled());
-  tab_loader_.OnMemoryPressure(
-      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_MODERATE);
+  tab_loader_.OnMemoryPressure(base::MEMORY_PRESSURE_LEVEL_MODERATE);
   EXPECT_FALSE(tab_loader_.IsLoadingEnabled());
 
   // Finish loading the tab and expect the tab loader to disconnect.

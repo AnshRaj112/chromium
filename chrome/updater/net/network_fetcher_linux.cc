@@ -113,7 +113,8 @@ class LibcurlNetworkFetcherImpl {
       const base::flat_map<std::string, std::string>& response_headers,
       const std::string& header) {
     const std::string lower = base::ToLowerASCII(header);
-    return response_headers.contains(lower) ? response_headers.at(lower) : "";
+    auto it = response_headers.find(lower);
+    return it != response_headers.end() ? it->second : "";
   }
 
   CurlUniquePtr curl_;
@@ -482,7 +483,8 @@ std::unique_ptr<update_client::NetworkFetcher> NetworkFetcherFactory::Create()
     VLOG(1) << "Failed to initialize a curl handle.";
     return nullptr;
   }
-  return std::make_unique<LibcurlNetworkFetcher>(std::move(curl));
+  return std::make_unique<LoggingNetworkFetcher>(
+      std::make_unique<LibcurlNetworkFetcher>(std::move(curl)));
 }
 
 }  // namespace updater

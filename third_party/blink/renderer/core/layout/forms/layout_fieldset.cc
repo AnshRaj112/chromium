@@ -31,7 +31,8 @@ LayoutBlock* LayoutFieldset::FindAnonymousFieldsetContentBox() const {
 
 void LayoutFieldset::AddChild(LayoutObject* new_child,
                               LayoutObject* before_child) {
-  if (!new_child->IsText() && !new_child->IsAnonymous()) {
+  if (!RuntimeEnabledFeatures::LayoutReinsertOnInFlowStateChangeEnabled() &&
+      !new_child->IsText() && !new_child->IsAnonymous()) {
     // Adding a child LayoutObject always causes reattach of <fieldset>. So
     // |before_child| is always nullptr.
     // See HTMLFieldSetElement::DidRecalcStyle().
@@ -88,9 +89,9 @@ void LayoutFieldset::InsertedIntoTree() {
     case EDisplay::kInlineGrid:
       display = EDisplay::kGrid;
       break;
-    case EDisplay::kMasonry:
-    case EDisplay::kInlineMasonry:
-      display = EDisplay::kMasonry;
+    case EDisplay::kGridLanes:
+    case EDisplay::kInlineGridLanes:
+      display = EDisplay::kGridLanes;
       break;
     default:
       break;
@@ -183,10 +184,6 @@ void LayoutFieldset::UpdateAnonymousChildStyle(
   child_style_builder.SetOverflowX(StyleRef().OverflowX());
   child_style_builder.SetOverflowY(StyleRef().OverflowY());
   child_style_builder.SetUnicodeBidi(StyleRef().GetUnicodeBidi());
-
-  // scroll-start
-  child_style_builder.SetScrollStartX(StyleRef().ScrollStartX());
-  child_style_builder.SetScrollStartY(StyleRef().ScrollStartY());
 }
 
 void LayoutFieldset::InvalidatePaint(

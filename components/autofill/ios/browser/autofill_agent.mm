@@ -32,7 +32,6 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
 #import "base/time/time.h"
-#import "base/types/cxx23_to_underlying.h"
 #import "base/types/zip.h"
 #import "base/uuid.h"
 #import "base/values.h"
@@ -46,6 +45,7 @@
 #import "components/autofill/core/browser/suggestions/suggestion.h"
 #import "components/autofill/core/browser/suggestions/suggestion_type.h"
 #import "components/autofill/core/common/autofill_constants.h"
+#import "components/autofill/core/common/autofill_debug_features.h"
 #import "components/autofill/core/common/autofill_features.h"
 #import "components/autofill/core/common/autofill_payments_features.h"
 #import "components/autofill/core/common/autofill_prefs.h"
@@ -54,6 +54,7 @@
 #import "components/autofill/core/common/form_data.h"
 #import "components/autofill/core/common/form_data_predictions.h"
 #import "components/autofill/core/common/form_field_data.h"
+#import "components/autofill/core/common/mojom/autofill_types.mojom-shared.h"
 #import "components/autofill/core/common/unique_ids.h"
 #import "components/autofill/ios/browser/autofill_driver_ios.h"
 #import "components/autofill/ios/browser/autofill_driver_ios_bridge.h"
@@ -69,11 +70,10 @@
 #import "components/autofill/ios/form_util/form_activity_observer_bridge.h"
 #import "components/autofill/ios/form_util/form_activity_params.h"
 #import "components/autofill/ios/form_util/form_handlers_java_script_feature.h"
-#import "components/autofill/ios/form_util/form_util_java_script_feature.h"
 #import "components/feature_engagement/public/feature_constants.h"
 #import "components/grit/components_resources.h"
-#import "components/plus_addresses/features.h"
-#import "components/plus_addresses/grit/plus_addresses_strings.h"
+#import "components/plus_addresses/core/browser/grit/plus_addresses_strings.h"
+#import "components/plus_addresses/core/common/features.h"
 #import "components/prefs/ios/pref_observer_bridge.h"
 #import "components/prefs/pref_change_registrar.h"
 #import "components/prefs/pref_service.h"
@@ -125,6 +125,7 @@ struct AutofillData {
   std::string frameID;
   base::Value::Dict payload;
   FieldToFormLookupMap fieldToFormLookupMap;
+  autofill::mojom::FormActionType actionType;
 };
 
 // Delay for setting an utterance to be queued, it is required to ensure that
@@ -236,14 +237,11 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
     _prefObserverBridge->ObserveChangesForPreference(
         autofill::prefs::kAutofillProfileEnabled, &_prefChangeRegistrar);
 
-    // Inject feature flags in the page content world when running in the
-    // isolated world. Feature flags are needed for the form submission hook
-    // that is injected in that the page world.
-    if (base::FeatureList::IsEnabled(kAutofillIsolatedWorldForJavascriptIos)) {
-      _page_world_features_injector =
-          std::make_unique<AutofillFormFeaturesInjector>(
-              webState, web::ContentWorld::kPageContentWorld);
-    }
+    // Inject feature flags in the page content world. Feature flags are needed
+    // for the form submission hook that is injected in that the page world.
+    _page_world_features_injector =
+        std::make_unique<AutofillFormFeaturesInjector>(
+            webState, web::ContentWorld::kPageContentWorld);
   }
   return self;
 }
@@ -371,7 +369,6 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
 
   if (suggestion.type == autofill::SuggestionType::kAddressEntry ||
       suggestion.type == autofill::SuggestionType::kCreditCardEntry ||
-      suggestion.type == autofill::SuggestionType::kCreateNewPlusAddress ||
       suggestion.type == autofill::SuggestionType::kVirtualCreditCardEntry ||
       suggestion.type ==
           autofill::SuggestionType::kAddressFieldByFieldFilling) {
@@ -467,8 +464,9 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
 #pragma mark - AutofillDriverIOSBridge
 
 - (void)fillData:(const std::vector<autofill::FormFieldData::FillData>&)fields
-         section:(const Section&)section
-         inFrame:(web::WebFrame*)frame {
+           section:(const Section&)section
+           inFrame:(web::WebFrame*)frame
+    withActionType:(autofill::mojom::FormActionType)actionType {
   base::Value::Dict fieldsData;
   FieldToFormLookupMap fieldToFormLookupMap;
 
@@ -490,7 +488,8 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
   AutofillData autofillData = {
       .frameID = frame ? frame->GetFrameId() : "",
       .payload = std::move(payload),
-      .fieldToFormLookupMap = std::move(fieldToFormLookupMap)};
+      .fieldToFormLookupMap = std::move(fieldToFormLookupMap),
+      .actionType = actionType};
 
   // Store the form data when WebState is not visible, to send it as soon as it
   // becomes visible again, e.g., when the CVC unmask prompt is showing.
@@ -537,8 +536,7 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
 }
 
 - (void)handleParsedForms:
-            (const std::vector<
-                raw_ptr<autofill::FormStructure, VectorExperimental>>&)forms
+            (const std::vector<raw_ref<const autofill::FormStructure>>&)forms
                   inFrame:(web::WebFrame*)frame {
 }
 
@@ -546,7 +544,7 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
             (const std::vector<autofill::FormDataPredictions>&)forms
                         inFrame:(web::WebFrame*)frame {
   CHECK(base::FeatureList::IsEnabled(
-      autofill::features::test::kAutofillShowTypePredictions));
+      autofill::features::debug::kAutofillShowTypePredictions));
 
   base::Value::Dict predictionData;
   for (const auto& form : forms) {
@@ -632,14 +630,11 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
       // changes
       value = SysUTF16ToNSString(popup_suggestion.main_text.value);
     } else if (popup_suggestion.type ==
-                   autofill::SuggestionType::kFillExistingPlusAddress ||
-               popup_suggestion.type ==
-                   autofill::SuggestionType::kCreateNewPlusAddress) {
+               autofill::SuggestionType::kFillExistingPlusAddress) {
       // Show any plus_address suggestions.
       value = SysUTF16ToNSString(popup_suggestion.main_text.value);
       if (!popup_suggestion.labels.empty() &&
-          !popup_suggestion.labels.front().empty() &&
-          _delegate.isKeyboardAccessoryUpgradeEnabled) {
+          !popup_suggestion.labels.front().empty()) {
         displayDescription =
             SysUTF16ToNSString(popup_suggestion.labels[0][0].value);
       }
@@ -669,16 +664,17 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
               ? SuggestionIconType::kAccountWork
               : SuggestionIconType::kNone;
     }
-    FormSuggestion* suggestion =
-        [FormSuggestion suggestionWithValue:value
-                                 minorValue:minorValue
-                         displayDescription:displayDescription
-                                       icon:icon
-                                       type:popup_suggestion.type
-                                    payload:popup_suggestion.payload
-                fieldByFieldFillingTypeUsed:fieldByFieldFillingTypeUsed
-                             requiresReauth:NO
-                 acceptanceA11yAnnouncement:acceptanceA11yAnnouncement];
+    FormSuggestion* suggestion = [FormSuggestion
+                suggestionWithValue:value
+                         minorValue:minorValue
+                 displayDescription:displayDescription
+                               icon:icon
+              hasCustomCardArtImage:popup_suggestion.has_custom_card_art_image
+                               type:popup_suggestion.type
+                            payload:popup_suggestion.payload
+        fieldByFieldFillingTypeUsed:fieldByFieldFillingTypeUsed
+                     requiresReauth:NO
+         acceptanceA11yAnnouncement:acceptanceA11yAnnouncement];
 
     suggestion.featureForIPH = SuggestionFeatureForIPH::kUnknown;
     suggestion.suggestionIconType = suggestionIconType;
@@ -695,6 +691,11 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
                    kIPHAutofillHomeWorkProfileSuggestionFeature) {
       suggestion.featureForIPH =
           SuggestionFeatureForIPH::kHomeAndWorkAddressSuggestion;
+    } else if (popup_suggestion.iph_metadata.feature ==
+               &feature_engagement::
+                   kIPHAutofillAccountNameEmailSuggestionFeature) {
+      suggestion.featureForIPH =
+          SuggestionFeatureForIPH::kAccountNameEmailSuggestion;
     }
 
     // Put "clear form" entry at the front of the suggestions.
@@ -874,7 +875,8 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
 - (void)webState:(web::WebState*)webState
     didSubmitDocumentWithFormData:(const FormData&)formData
                    hasUserGesture:(BOOL)hasUserGesture
-                          inFrame:(web::WebFrame*)frame {
+                          inFrame:(web::WebFrame*)frame
+                   perfectFilling:(BOOL)perfectFilling {
   if (![self isAutofillEnabled] || !frame) {
     return;
   }
@@ -995,7 +997,8 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
 // JSON string.
 - (void)onDidFillWithResults:(NSString*)resultsAsJsonStr
                      inFrame:(web::WebFrame*)frame
-        fieldToFormLookupMap:(const FieldToFormLookupMap&)fieldToFormLookupMap {
+        fieldToFormLookupMap:(const FieldToFormLookupMap&)fieldToFormLookupMap
+              withActionType:(autofill::mojom::FormActionType)actionType {
   std::map<uint32_t, std::u16string> fillingResults;
   if (autofill::ExtractFillingResults(resultsAsJsonStr, &fillingResults)) {
     [self updateFieldManagerWithFillingResults:fillingResults inFrame:frame];
@@ -1014,7 +1017,9 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
     }
   }
 
-  [self recordFormFillingSuccessMetrics:!fillingResults.empty()];
+  if (actionType == autofill::mojom::FormActionType::kFill) {
+    [self recordFormFillingSuccessMetrics:!fillingResults.empty()];
+  }
 }
 
 // Called when did clear fields.
@@ -1120,11 +1125,13 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
   const auto callback =
       [](__weak AutofillAgent* agent, base::WeakPtr<web::WebFrame> frame,
          SuggestionHandledCompletion completion,
-         const FieldToFormLookupMap& map, NSString* jsonString) {
+         const FieldToFormLookupMap& map,
+         autofill::mojom::FormActionType actionType, NSString* jsonString) {
         if (frame) {
           [agent onDidFillWithResults:jsonString
                               inFrame:frame.get()
-                 fieldToFormLookupMap:map];
+                 fieldToFormLookupMap:map
+                       withActionType:actionType];
         }
 
         // Only run the completion if set as it isn't impossible that the
@@ -1137,7 +1144,7 @@ bool ContainsFocusableField(const FormData& form, FieldRendererId field_id) {
       frame, std::move(data.payload), _pendingAutocompleteFieldID,
       base::BindOnce(callback, weakSelf, frame->AsWeakPtr(),
                      std::exchange(_suggestionHandledCompletion, nil),
-                     std::move(data.fieldToFormLookupMap)));
+                     std::move(data.fieldToFormLookupMap), data.actionType));
 }
 
 // Helper method used to implement the aynchronous completion block of

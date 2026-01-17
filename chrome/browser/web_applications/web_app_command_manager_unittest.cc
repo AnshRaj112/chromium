@@ -11,7 +11,7 @@
 #include "base/barrier_callback.h"
 #include "base/barrier_closure.h"
 #include "base/containers/flat_set.h"
-#include "base/functional/callback_forward.h"
+#include "base/containers/to_vector.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/memory/weak_ptr.h"
@@ -20,6 +20,7 @@
 #include "base/test/bind.h"
 #include "base/test/gmock_callback_support.h"
 #include "base/test/mock_callback.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
 #include "base/values.h"
 #include "chrome/browser/web_applications/commands/internal/callback_command.h"
@@ -29,8 +30,10 @@
 #include "chrome/browser/web_applications/locks/shared_web_contents_lock.h"
 #include "chrome/browser/web_applications/locks/shared_web_contents_with_app_lock.h"
 #include "chrome/browser/web_applications/test/fake_web_app_provider.h"
+#include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/browser/web_applications/test/web_app_test.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
+#include "chrome/common/chrome_features.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/test_utils.h"
 #include "content/public/test/web_contents_observer_test_utils.h"
@@ -99,8 +102,7 @@ class WebAppCommandManagerTest : public WebAppTest {
 
   void SetUp() override {
     WebAppTest::SetUp();
-    FakeWebAppProvider* provider = FakeWebAppProvider::Get(profile());
-    provider->StartWithSubsystems();
+    test::AwaitStartWebAppProviderAndSubsystems(profile());
   }
 
   void TearDown() override {
@@ -506,6 +508,8 @@ TEST_F(WebAppCommandManagerTest, AppWithSharedWebContents) {
 }
 
 TEST_F(WebAppCommandManagerTest, ToDebugValue) {
+  base::test::ScopedFeatureList features{features::kRecordWebAppDebugInfo};
+
   base::test::TestFuture<void> on_command_complete;
   manager().ScheduleCommand(
       std::make_unique<internal::CallbackCommand<AppLock>>(
@@ -527,14 +531,8 @@ TEST_F(WebAppCommandManagerTest, ToDebugValue) {
 
   auto get_metadata_field_names =
       [](const base::Value::Dict& command_dict) -> std::vector<std::string> {
-    std::vector<std::string> names;
-    const base::Value::Dict* metadata = command_dict.FindDict("!metadata");
-    std::transform(
-        metadata->cbegin(), metadata->cend(), std::back_inserter(names),
-        [](base::Value::Dict::const_iterator::reference pair) -> std::string {
-          return pair.first;
-        });
-    return names;
+    return base::ToVector(*command_dict.FindDict("!metadata"),
+                          [](const auto& kv) { return kv.first; });
   };
 
   base::Value::List* log = command_manager_debug_value.FindList("command_log");
@@ -544,16 +542,56 @@ TEST_F(WebAppCommandManagerTest, ToDebugValue) {
       get_metadata_field_names(log->front().GetDict()),
       ::testing::UnorderedElementsAre(
           "command_result", "completion_location", "id", "initial_lock_request",
-          "name", "result", "started", "scheduled_location"));
+          "!name", "started", "scheduled_location", "scheduled_at",
+          "completed_at", "started_at"));
 
   base::Value::List* queue =
       command_manager_debug_value.FindList("command_queue");
   ASSERT_TRUE(queue);
   ASSERT_GT(queue->size(), 0ul);
+  EXPECT_THAT(get_metadata_field_names(queue->front().GetDict()),
+              ::testing::UnorderedElementsAre(
+                  "id", "initial_lock_request", "!name", "started",
+                  "scheduled_location", "scheduled_at"));
+}
+
+TEST_F(WebAppCommandManagerTest, ToDebugValueWithResult) {
+  base::test::ScopedFeatureList features{features::kRecordWebAppDebugInfo};
+
+  base::test::TestFuture<webapps::AppId> on_command_complete;
+  base::OnceCallback<std::string(AppLock&, base::Value::Dict&)> callback =
+      base::BindOnce([](webapps::AppId app_id, AppLock&,
+                        base::Value::Dict&) { return app_id; },
+                     kTestAppId);
+  manager().ScheduleCommand(
+      std::make_unique<
+          internal::CallbackCommandWithResult<AppLock, webapps::AppId>>(
+          "", AppLockDescription(kTestAppId), std::move(callback),
+          on_command_complete.GetCallback(), "shutdown"));
+  EXPECT_TRUE(on_command_complete.Wait());
+  EXPECT_EQ(on_command_complete.Get(), kTestAppId);
+
+  // Generally we should not test the output of the debug value, as this seems
+  // fragile & can duplicate testing of the real functionality. However for the
+  // common metadata it seems fine.
+  base::Value::Dict command_manager_debug_value =
+      manager().ToDebugValue().TakeDict();
+
+  auto get_metadata_field_names =
+      [](const base::Value::Dict& command_dict) -> std::vector<std::string> {
+    return base::ToVector(*command_dict.FindDict("!metadata"),
+                          [](const auto& kv) { return kv.first; });
+  };
+
+  base::Value::List* log = command_manager_debug_value.FindList("command_log");
+  ASSERT_TRUE(log);
+  ASSERT_GT(log->size(), 0ul);
   EXPECT_THAT(
-      get_metadata_field_names(queue->front().GetDict()),
-      ::testing::UnorderedElementsAre("id", "initial_lock_request", "name",
-                                      "started", "scheduled_location"));
+      get_metadata_field_names(log->front().GetDict()),
+      ::testing::UnorderedElementsAre(
+          "command_result", "completion_location", "id", "initial_lock_request",
+          "!name", "!result", "started", "scheduled_location", "scheduled_at",
+          "completed_at", "started_at"));
 }
 
 TEST_F(WebAppCommandManagerTest, DestroySharedWebContentsOnPostTask) {

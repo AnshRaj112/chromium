@@ -22,11 +22,11 @@ import org.robolectric.Robolectric;
 import org.robolectric.android.util.concurrent.RoboExecutorService;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
-import org.robolectric.shadows.ShadowLog;
 import org.robolectric.util.Scheduler;
 
 import org.chromium.base.Log;
 import org.chromium.base.task.AsyncTask.Status;
+import org.chromium.base.test.BaseRobolectricTestRule;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 
 import java.util.concurrent.CancellationException;
@@ -96,12 +96,11 @@ public class AsyncTaskThreadTest {
 
     @Rule public ExpectedException thrown = ExpectedException.none();
 
-    public AsyncTaskThreadTest() {
-        if (DEBUG) ShadowLog.stream = System.out;
-    }
+    public AsyncTaskThreadTest() {}
 
     @Before
     public void setUp() {
+        BaseRobolectricTestRule.uninstallPausedExecutorService();
         mBackgroundScheduler.pause();
         assertEquals(Status.PENDING, mTask.getStatus());
     }

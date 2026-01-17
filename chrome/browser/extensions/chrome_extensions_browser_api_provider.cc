@@ -7,7 +7,8 @@
 #include "chrome/browser/extensions/api/generated_api_registration.h"
 #include "extensions/browser/extension_function_registry.h"
 #include "extensions/buildflags/buildflags.h"
-#include "chrome/browser/extensions/api/commands/commands.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -18,9 +19,6 @@ ChromeExtensionsBrowserAPIProvider::~ChromeExtensionsBrowserAPIProvider() =
 
 void ChromeExtensionsBrowserAPIProvider::RegisterExtensionFunctions(
     ExtensionFunctionRegistry* registry) {
-  // Commands
-  registry->RegisterFunction<GetAllCommandsFunction>();
-
   // Generated APIs from Chrome.
   api::ChromeGeneratedFunctionRegistry::RegisterAll(registry);
 }

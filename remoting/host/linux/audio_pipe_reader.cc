@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "remoting/host/linux/audio_pipe_reader.h"
 
 #include <fcntl.h>
@@ -15,8 +10,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <optional>
 #include <utility>
 
+#include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/posix/eintr_wrapper.h"
@@ -161,12 +159,12 @@ void AudioPipeReader::DoCapture() {
   data.resize(pos + bytes_to_read);
 
   while (pos < data.size()) {
-    int read_result =
-        pipe_.ReadAtCurrentPos(std::data(data) + pos, data.size() - pos);
-    if (read_result > 0) {
-      pos += read_result;
+    const std::optional<size_t> read_bytes =
+        pipe_.ReadAtCurrentPos(base::as_writable_byte_span(data).subspan(pos));
+    if (read_bytes.value_or(0) > 0) {
+      pos += *read_bytes;
     } else {
-      if (read_result < 0 && errno != EWOULDBLOCK && errno != EAGAIN) {
+      if (!read_bytes && errno != EWOULDBLOCK && errno != EAGAIN) {
         PLOG(ERROR) << "read";
       }
       break;

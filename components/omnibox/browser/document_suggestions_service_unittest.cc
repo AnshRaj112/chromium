@@ -39,9 +39,6 @@ void OnDocumentSuggestionsLoaderAvailable(
     std::unique_ptr<network::SimpleURLLoader> loader,
     const std::string& request_body) {}
 
-void OnURLLoadComplete(const network::SimpleURLLoader* source,
-                       std::unique_ptr<std::string> response_body) {}
-
 class DocumentSuggestionsServiceTest : public testing::Test {
  protected:
   DocumentSuggestionsServiceTest()
@@ -54,7 +51,7 @@ class DocumentSuggestionsServiceTest : public testing::Test {
             identity_test_env_.identity_manager(),
             shared_url_loader_factory_)) {
     // Set up a variation.
-    variations::AssociateGoogleVariationID(
+    variations::AssociateGoogleVariationIDForTesting(
         variations::GOOGLE_WEB_PROPERTIES_ANY_CONTEXT, "trial name",
         "group name", kVariationID);
     base::FieldTrialList::CreateFieldTrial("trial name", "group name")
@@ -74,7 +71,7 @@ class DocumentSuggestionsServiceTest : public testing::Test {
   }
 
   base::test::TaskEnvironment task_environment_;
-  variations::ScopedVariationsIdsProvider scoped_variations_ids_provider_{
+  variations::test::ScopedVariationsIdsProvider scoped_variations_ids_provider_{
       variations::VariationsIdsProvider::Mode::kUseSignedInState};
   network::TestURLLoaderFactory test_url_loader_factory_;
   scoped_refptr<network::SharedURLLoaderFactory> shared_url_loader_factory_;
@@ -95,7 +92,7 @@ TEST_F(DocumentSuggestionsServiceTest, EnsureVariationHeaders) {
   document_suggestions_service_->CreateDocumentSuggestionsRequest(
       u"", false, base::BindOnce(OnDocumentSuggestionsRequestAvailable),
       base::BindOnce(OnDocumentSuggestionsLoaderAvailable),
-      base::BindOnce(OnURLLoadComplete));
+      /*completion_callback=*/base::DoNothing());
 
   base::RunLoop().RunUntilIdle();
 
@@ -117,7 +114,7 @@ TEST_F(DocumentSuggestionsServiceTest, EnsureCookies) {
   document_suggestions_service_->CreateDocumentSuggestionsRequest(
       u"", false, base::BindOnce(OnDocumentSuggestionsRequestAvailable),
       base::BindOnce(OnDocumentSuggestionsLoaderAvailable),
-      base::BindOnce(OnURLLoadComplete));
+      /*completion_callback=*/base::DoNothing());
 
   base::RunLoop().RunUntilIdle();
 

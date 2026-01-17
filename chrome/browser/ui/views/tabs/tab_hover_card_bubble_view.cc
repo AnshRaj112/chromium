@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 
+#include "base/byte_size.h"
 #include "base/containers/lru_cache.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/field_trial_params.h"
@@ -21,6 +22,8 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/performance_controls/tab_resource_usage_tab_helper.h"
+#include "chrome/browser/ui/tabs/alert/tab_alert_controller.h"
+#include "chrome/browser/ui/tabs/public/tab_features.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/collaboration_messaging_tab_data.h"
 #include "chrome/browser/ui/tabs/tab_renderer_data.h"
 #include "chrome/browser/ui/tabs/tab_style.h"
@@ -447,9 +450,16 @@ TabHoverCardBubbleView::TabHoverCardBubbleView(Tab* tab,
             .WithOrder(1));
   }
 
-  // Set up widget.
+  SetProperty(views::kElementIdentifierKey, kHoverCardBubbleElementId);
 
+  // Create the widget from the view. Additional setup happens in
+  // `AddedToWidget()`.
   views::BubbleDialogDelegateView::CreateBubble(this);
+}
+
+TabHoverCardBubbleView::~TabHoverCardBubbleView() = default;
+
+void TabHoverCardBubbleView::AddedToWidget() {
   set_adjust_if_offscreen(true);
   GetBubbleFrameView()->SetPreferredArrowAdjustment(
       views::BubbleFrameView::PreferredArrowAdjustment::kOffset);
@@ -464,18 +474,16 @@ TabHoverCardBubbleView::TabHoverCardBubbleView(Tab* tab,
   // Note that this code has to go after CreateBubble() above, since setting up
   // the placeholder image and background color require a ColorProvider, which
   // is only available once this View has been added to its widget.
+  Tab* tab = static_cast<Tab*>(GetAnchorView());
   if (thumbnail_view_ && !tab->HasThumbnail() && !tab->IsActive()) {
     thumbnail_view_->SetPlaceholderImage();
   }
 
   // Start in the fully "faded-in" position so that whatever text we initially
-  // display is visible.
+  // display is visible. For TBD reasons, this needs to be done after the
+  // CreateBubble() call, or the crossfades have an incorrect background color.
   SetTextFade(1.0);
-
-  SetProperty(views::kElementIdentifierKey, kHoverCardBubbleElementId);
 }
-
-TabHoverCardBubbleView::~TabHoverCardBubbleView() = default;
 
 CollaborationMessagingRowData
 TabHoverCardBubbleView::GetCollaborationMessagingData(
@@ -528,14 +536,15 @@ void TabHoverCardBubbleView::UpdateCardContent(const Tab* tab) {
   // can be blank for some web pages.
   if (!tab_data.last_committed_url.is_valid()) {
     domain_url = tab_data.visible_url;
-    title = tab_data.IsCrashed()
+    title = tab_data.is_crashed
                 ? l10n_util::GetStringUTF16(IDS_HOVER_CARD_CRASHED_TITLE)
                 : l10n_util::GetStringUTF16(IDS_TAB_LOADING_TITLE);
     alert_state_ = std::nullopt;
   } else {
     domain_url = tab_data.last_committed_url;
     title = tab_data.title;
-    alert_state_ = Tab::GetAlertStateToShow(tab_data.alert_state);
+    alert_state_ =
+        tabs::TabAlertController::GetAlertStateToShow(tab_data.alert_state);
   }
 
   std::u16string domain;
@@ -543,31 +552,31 @@ void TabHoverCardBubbleView::UpdateCardContent(const Tab* tab) {
   if (domain_url.SchemeIsFile()) {
     is_filename = true;
     domain = l10n_util::GetStringUTF16(IDS_HOVER_CARD_FILE_URL_SOURCE);
+  } else if (domain_url.SchemeIsBlob()) {
+    domain = l10n_util::GetStringUTF16(IDS_HOVER_CARD_BLOB_URL_SOURCE);
+  } else if (domain_url.SchemeIs(url::kViewSourceScheme)) {
+    domain = l10n_util::GetStringUTF16(IDS_HOVER_CARD_VIEW_SOURCE_URL_SOURCE);
   } else {
-    if (domain_url.SchemeIsBlob()) {
-      domain = l10n_util::GetStringUTF16(IDS_HOVER_CARD_BLOB_URL_SOURCE);
-    } else {
-      if (tab_data.should_display_url) {
-        // Hide the domain when necessary. This leaves an empty space in the
-        // card, but this scenario is very rare. Also, shrinking the card to
-        // remove the space would result in visual noise, so we keep it simple.
-        domain = url_formatter::FormatUrl(
-            domain_url,
-            url_formatter::kFormatUrlOmitDefaults |
-                url_formatter::kFormatUrlOmitHTTPS |
-                url_formatter::kFormatUrlOmitTrivialSubdomains |
-                url_formatter::kFormatUrlTrimAfterHost,
-            base::UnescapeRule::NORMAL, nullptr, nullptr, nullptr);
-      }
+    if (tab_data.should_display_url) {
+      // Hide the domain when necessary. This leaves an empty space in the
+      // card, but this scenario is very rare. Also, shrinking the card to
+      // remove the space would result in visual noise, so we keep it simple.
+      domain = url_formatter::FormatUrl(
+          domain_url,
+          url_formatter::kFormatUrlOmitDefaults |
+              url_formatter::kFormatUrlOmitHTTPS |
+              url_formatter::kFormatUrlOmitTrivialSubdomains |
+              url_formatter::kFormatUrlTrimAfterHost,
+          base::UnescapeRule::NORMAL, nullptr, nullptr, nullptr);
+    }
 
-      // Most of the time we want our standard (tail-elided) formatting for web
-      // pages, but when viewing an image in the browser, many users want to
-      // view the image dimensions (see crbug.com/1222984) so for titles that
-      // "look" like images (i.e. that end with a dimension) we instead switch
-      // to middle-elide.
-      if (FilenameElider::FindImageDimensions(title) != std::u16string::npos) {
-        is_filename = true;
-      }
+    // Most of the time we want our standard (tail-elided) formatting for web
+    // pages, but when viewing an image in the browser, many users want to
+    // view the image dimensions (see crbug.com/1222984) so for titles that
+    // "look" like images (i.e. that end with a dimension) we instead switch
+    // to middle-elide.
+    if (FilenameElider::FindImageDimensions(title) != std::u16string::npos) {
+      is_filename = true;
     }
   }
 
@@ -583,10 +592,9 @@ void TabHoverCardBubbleView::UpdateCardContent(const Tab* tab) {
   // tabs.
   const bool show_discard_status =
       !show_collaboration_messaging && tab_data.should_show_discard_status;
-  const int64_t tab_memory_usage_in_bytes =
-      tab_data.tab_resource_usage
-          ? tab_data.tab_resource_usage->memory_usage_in_bytes()
-          : 0;
+  const base::ByteSize tab_memory_usage =
+      tab_data.tab_resource_usage ? tab_data.tab_resource_usage->memory_usage()
+                                  : base::ByteSize(0);
   const bool is_high_memory_usage =
       tab_data.tab_resource_usage
           ? tab_data.tab_resource_usage->is_high_memory_usage()
@@ -597,16 +605,16 @@ void TabHoverCardBubbleView::UpdateCardContent(const Tab* tab) {
   // shared tabs.
   const bool show_memory_usage =
       !show_collaboration_messaging && !show_discard_status &&
-      ((bubble_params_.show_memory_usage && tab_memory_usage_in_bytes > 0) ||
+      ((bubble_params_.show_memory_usage && tab_memory_usage.is_positive()) ||
        is_high_memory_usage);
   const bool show_footer = alert_state_.has_value() || show_discard_status ||
                            show_memory_usage || show_collaboration_messaging;
 
-  footer_view_->SetAlertData({alert_state_, show_discard_status,
-                              tab_data.discarded_memory_savings_in_bytes});
+  footer_view_->SetAlertData(
+      {alert_state_, show_discard_status, tab_data.discarded_memory_savings});
 
   footer_view_->SetPerformanceData(
-      {show_memory_usage, is_high_memory_usage, tab_memory_usage_in_bytes});
+      {show_memory_usage, is_high_memory_usage, tab_memory_usage});
 
   footer_view_->SetCollaborationMessagingData(collaboration_messaging_data);
 

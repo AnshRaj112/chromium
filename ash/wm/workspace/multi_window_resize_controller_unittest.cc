@@ -4,6 +4,8 @@
 
 #include "ash/wm/workspace/multi_window_resize_controller.h"
 
+#include <algorithm>
+
 #include "ash/public/cpp/shelf_config.h"
 #include "ash/public/cpp/test/shell_test_api.h"
 #include "ash/shell.h"
@@ -11,14 +13,13 @@
 #include "ash/test/test_window_builder.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller.h"
 #include "ash/wm/test/fake_window_state.h"
-#include "ash/wm/test/test_non_client_frame_view_ash.h"
+#include "ash/wm/test/test_frame_view_ash.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_state_delegate.h"
 #include "ash/wm/wm_event.h"
 #include "ash/wm/wm_metrics.h"
 #include "ash/wm/workspace_controller.h"
 #include "ash/wm/workspace_controller_test_api.h"
-#include "base/containers/contains.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -69,7 +70,8 @@ class MultiWindowResizeControllerTest : public AshTestBase {
         resize_controller_->windows_.window2 == window) {
       return true;
     }
-    return base::Contains(resize_controller_->windows_.other_windows, window);
+    return std::ranges::contains(resize_controller_->windows_.other_windows,
+                                 window);
   }
 
   bool IsOverWindows(const gfx::Point& loc) {
@@ -98,12 +100,12 @@ class MultiWindowResizeControllerTest : public AshTestBase {
 // Assertions around moving mouse over 2 windows.
 TEST_F(MultiWindowResizeControllerTest, BasicTests) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTRIGHT);
   ui::test::EventGenerator* generator = GetEventGenerator();
   generator->MoveMouseTo(w1->bounds().CenterPoint());
@@ -199,12 +201,12 @@ TEST_F(MultiWindowResizeControllerTest, IsOverWindows) {
 // Makes sure deleting a window hides.
 TEST_F(MultiWindowResizeControllerTest, DeleteWindow) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTRIGHT);
   ui::test::EventGenerator* generator = GetEventGenerator();
   generator->MoveMouseTo(w1->bounds().CenterPoint());
@@ -238,12 +240,12 @@ TEST_F(MultiWindowResizeControllerTest, DeleteWindow) {
 // Tests resizing.
 TEST_F(MultiWindowResizeControllerTest, Drag) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTRIGHT);
   ui::test::EventGenerator* generator = GetEventGenerator();
   generator->MoveMouseTo(w1->bounds().CenterPoint());
@@ -288,16 +290,16 @@ TEST_F(MultiWindowResizeControllerTest, Drag) {
 // Makes sure three windows are picked up.
 TEST_F(MultiWindowResizeControllerTest, Three) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate3;
-  std::unique_ptr<aura::Window> w3(CreateTestWindowInShellWithDelegate(
-      &delegate3, -3, gfx::Rect(200, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w3(CreateTestWindowInShell(
+      {.delegate = &delegate3, .bounds = {200, 0, 100, 100}, .window_id = -3}));
   delegate3.set_window_component(HTRIGHT);
 
   ui::test::EventGenerator* generator = GetEventGenerator();
@@ -352,12 +354,12 @@ TEST_F(MultiWindowResizeControllerTest, Three) {
 // Tests that clicking outside of the resize handle dismisses it.
 TEST_F(MultiWindowResizeControllerTest, ClickOutside) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTLEFT);
 
   ui::test::EventGenerator* generator = GetEventGenerator();
@@ -388,12 +390,12 @@ TEST_F(MultiWindowResizeControllerTest, ClickOutside) {
 // resizer widget should be dismissed.
 TEST_F(MultiWindowResizeControllerTest, WindowStateChange) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTLEFT);
 
   ui::test::EventGenerator* generator = GetEventGenerator();
@@ -445,14 +447,14 @@ TEST_F(MultiWindowResizeControllerTest, WindowStateChange) {
 // resize widget should be dismissed.
 TEST_F(MultiWindowResizeControllerTest, HideWindowTest) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   auto child_of_w1 = ChildTestWindowBuilder(w1.get()).Build();
 
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTLEFT);
 
   ui::test::EventGenerator* generator = GetEventGenerator();
@@ -474,17 +476,17 @@ TEST_F(MultiWindowResizeControllerTest, HideWindowTest) {
 // non-resizeable window.
 TEST_F(MultiWindowResizeControllerTest, NonResizeableWindowTestA) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 100}, .window_id = -2}));
   w2->SetProperty(aura::client::kResizeBehaviorKey, 0);
   delegate2.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate3;
-  std::unique_ptr<aura::Window> w3(CreateTestWindowInShellWithDelegate(
-      &delegate3, -3, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w3(CreateTestWindowInShell(
+      {.delegate = &delegate3, .bounds = {100, 0, 100, 100}, .window_id = -3}));
   delegate3.set_window_component(HTRIGHT);
   ui::test::EventGenerator* generator = GetEventGenerator();
   generator->MoveMouseTo(w1->bounds().CenterPoint());
@@ -496,16 +498,16 @@ TEST_F(MultiWindowResizeControllerTest, NonResizeableWindowTestA) {
 // other.
 TEST_F(MultiWindowResizeControllerTest, NonResizeableWindowTestB) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate3;
-  std::unique_ptr<aura::Window> w3(CreateTestWindowInShellWithDelegate(
-      &delegate3, -3, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w3(CreateTestWindowInShell(
+      {.delegate = &delegate3, .bounds = {100, 0, 100, 100}, .window_id = -3}));
   w3->SetProperty(aura::client::kResizeBehaviorKey, 0);
   delegate3.set_window_component(HTRIGHT);
   ui::test::EventGenerator* generator = GetEventGenerator();
@@ -517,17 +519,17 @@ TEST_F(MultiWindowResizeControllerTest, NonResizeableWindowTestB) {
 // two other windows, one of which is non-resizeable but obscured by the other.
 TEST_F(MultiWindowResizeControllerTest, NonResizeableWindowTestC) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   w2->SetProperty(aura::client::kResizeBehaviorKey, 0);
   delegate2.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate3;
-  std::unique_ptr<aura::Window> w3(CreateTestWindowInShellWithDelegate(
-      &delegate3, -3, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w3(CreateTestWindowInShell(
+      {.delegate = &delegate3, .bounds = {100, 0, 100, 100}, .window_id = -3}));
   delegate3.set_window_component(HTRIGHT);
   ui::test::EventGenerator* generator = GetEventGenerator();
   generator->MoveMouseTo(w1->bounds().CenterPoint());
@@ -539,12 +541,12 @@ TEST_F(MultiWindowResizeControllerTest, NonResizeableWindowTestC) {
 // non-resizeable.
 TEST_F(MultiWindowResizeControllerTest, MakeWindowNonResizeable) {
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTLEFT);
 
   ui::test::EventGenerator* generator = GetEventGenerator();
@@ -564,16 +566,18 @@ TEST_F(MultiWindowResizeControllerTest, TwoSnappedWindows) {
   const int bottom_inset = 300 - ShelfConfig::Get()->shelf_size();
   // Create two snapped windows, one left snapped, one right snapped.
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(100, 100, 100, 100)));
+  std::unique_ptr<aura::Window> w1(CreateTestWindowInShell(
+      {.delegate = &delegate1, .bounds = {100, 100, 100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   WindowState* w1_state = WindowState::Get(w1.get());
   const WindowSnapWMEvent snap_left(WM_EVENT_SNAP_PRIMARY);
   w1_state->OnWMEvent(&snap_left);
   EXPECT_EQ(WindowStateType::kPrimarySnapped, w1_state->GetStateType());
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 100, 100, 100)));
+  std::unique_ptr<aura::Window> w2(
+      CreateTestWindowInShell({.delegate = &delegate2,
+                               .bounds = {100, 100, 100, 100},
+                               .window_id = -2}));
   delegate2.set_window_component(HTRIGHT);
   WindowState* w2_state = WindowState::Get(w2.get());
   const WindowSnapWMEvent snap_right(WM_EVENT_SNAP_SECONDARY);
@@ -651,12 +655,12 @@ TEST_F(MultiWindowResizeControllerTest, MultiWindowResizeUserActionMetrics) {
   // Create two windows with shared edge. Hover the mouse over the edge and only
   // `kMultiWindowResizerShow` will be recorded.
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTRIGHT);
 
   // Verify the initial state of the metrics.
@@ -767,12 +771,12 @@ TEST_F(MultiWindowResizeControllerTest, MultiWindowResizeHistogramTest) {
 
   // Create two windows with shared edge.
   aura::test::TestWindowDelegate delegate1;
-  std::unique_ptr<aura::Window> w1(CreateTestWindowInShellWithDelegate(
-      &delegate1, -1, gfx::Rect(0, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w1(
+      CreateTestWindowInShell({.delegate = &delegate1, .bounds = {100, 100}}));
   delegate1.set_window_component(HTRIGHT);
   aura::test::TestWindowDelegate delegate2;
-  std::unique_ptr<aura::Window> w2(CreateTestWindowInShellWithDelegate(
-      &delegate2, -2, gfx::Rect(100, 0, 100, 100)));
+  std::unique_ptr<aura::Window> w2(CreateTestWindowInShell(
+      {.delegate = &delegate2, .bounds = {100, 0, 100, 100}, .window_id = -2}));
   delegate2.set_window_component(HTRIGHT);
 
   base::HistogramTester histogram_tester;

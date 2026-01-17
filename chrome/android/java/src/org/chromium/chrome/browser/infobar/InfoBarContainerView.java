@@ -16,7 +16,7 @@ import android.widget.FrameLayout;
 
 import androidx.annotation.VisibleForTesting;
 
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
@@ -24,13 +24,13 @@ import org.chromium.chrome.browser.browser_controls.BrowserControlsUtils;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeController;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeControllerFactory;
 import org.chromium.components.browser_ui.banners.SwipableOverlayView;
-import org.chromium.components.browser_ui.edge_to_edge.EdgeToEdgePadAdjuster;
 import org.chromium.components.infobars.InfoBar;
 import org.chromium.components.infobars.InfoBarAnimationListener;
 import org.chromium.components.infobars.InfoBarContainerLayout;
 import org.chromium.components.infobars.InfoBarUiItem;
 import org.chromium.ui.display.DisplayAndroid;
 import org.chromium.ui.display.DisplayUtil;
+import org.chromium.ui.edge_to_edge.EdgeToEdgePadAdjuster;
 import org.chromium.ui.insets.InsetObserver;
 
 /** The {@link View} for the {@link InfoBarContainer}. */
@@ -74,7 +74,7 @@ public class InfoBarContainerView extends SwipableOverlayView
     /** Tracks the previous event's scroll offset to determine if a scroll is up or down. */
     private int mLastScrollOffsetY;
 
-    private final @Nullable ObservableSupplier<EdgeToEdgeController> mEdgeToEdgeSupplier;
+    private final @Nullable MonotonicObservableSupplier<EdgeToEdgeController> mEdgeToEdgeSupplier;
     private @Nullable EdgeToEdgePadAdjuster mEdgeToEdgePadAdjuster;
 
     /**
@@ -109,7 +109,7 @@ public class InfoBarContainerView extends SwipableOverlayView
             Context context,
             ContainerViewObserver containerViewObserver,
             @Nullable BrowserControlsStateProvider browserControlsStateProvider,
-            @Nullable ObservableSupplier<EdgeToEdgeController> edgeToEdgeSupplier,
+            @Nullable MonotonicObservableSupplier<EdgeToEdgeController> edgeToEdgeSupplier,
             boolean isTablet) {
         super(context, null, false);
         mContainerViewObserver = containerViewObserver;

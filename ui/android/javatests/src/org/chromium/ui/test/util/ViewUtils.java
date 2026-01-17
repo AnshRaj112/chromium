@@ -4,10 +4,6 @@
 
 package org.chromium.ui.test.util;
 
-import static androidx.test.espresso.Espresso.onView;
-import static androidx.test.espresso.matcher.RootMatchers.isDialog;
-import static androidx.test.espresso.matcher.ViewMatchers.isRoot;
-
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.instanceOf;
@@ -39,6 +35,9 @@ import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.junit.Assert;
 
+import org.chromium.base.test.transit.ViewElement;
+import org.chromium.base.test.transit.ViewFinder;
+import org.chromium.base.test.transit.ViewPresence;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 
@@ -145,44 +144,14 @@ public class ViewUtils {
     }
 
     /**
-     * Waits until a view in a dialog root view that matches the given matcher and any of the given
-     * {@link ExpectedViewState}s. waitForViewCheckingState is flaky with dialogs after api 29.
-     * Fails if the matcher applies to multiple views. Times out after {@link
-     * CriteriaHelper#DEFAULT_MAX_TIME_TO_POLL} milliseconds.
-     *
-     * @param viewMatcher The matcher matching the view that should be waited for.
-     * @param viewState State that the matching view should be in. If multiple states are passed,
-     *     the waiting will stop if at least one applies.
-     */
-    public static void waitForDialogViewCheckingState(
-            Matcher<View> viewMatcher, @ExpectedViewState int viewState) {
-        onView(isRoot())
-                .inRoot(isDialog())
-                .check(withEventualExpectedViewState(viewMatcher, viewState));
-    }
-
-    /**
-     * Waits until a view matches the given matcher and any of the given {@link ExpectedViewState}s.
-     * Fails if the matcher applies to multiple views. Times out after
-     * {@link CriteriaHelper#DEFAULT_MAX_TIME_TO_POLL} milliseconds.
-     *
-     * @param viewMatcher The matcher matching the view that should be waited for.
-     * @param viewState State that the matching view should be in. If multiple states are passed,
-     *                  the waiting will stop if at least one applies.
-     */
-    public static void waitForViewCheckingState(
-            Matcher<View> viewMatcher, @ExpectedViewState int viewState) {
-        onView(isRoot()).check(withEventualExpectedViewState(viewMatcher, viewState));
-    }
-
-    /**
      * Waits until a visible view matches the given matcher. Fails if the matcher applies to
      * multiple views. Times out after {@link CriteriaHelper#DEFAULT_MAX_TIME_TO_POLL} milliseconds.
      *
      * @param viewMatcher The matcher matching the view that should be waited for.
      */
     public static void waitForVisibleView(Matcher<View> viewMatcher) {
-        waitForViewCheckingState(viewMatcher, VIEW_VISIBLE);
+        ViewFinder.waitForView(
+                viewMatcher, ViewElement.newOptions().allowDisabled().displayingAtLeast(1).build());
     }
 
     /**
@@ -244,6 +213,20 @@ public class ViewUtils {
      * Waits until a visible view matching the given matcher Fails if the matcher applies to
      * multiple views. Times out after {@link CriteriaHelper#DEFAULT_MAX_TIME_TO_POLL} milliseconds.
      *
+     * @param viewMatcher The matcher matching the view that should be waited for.
+     * @param options The options to override expectations for the View (e.g. displayed %).
+     * @return An interaction on the matching view.
+     */
+    public static ViewInteraction onViewWaiting(
+            Matcher<View> viewMatcher, ViewElement.Options options) {
+        ViewPresence<View> viewPresence = ViewFinder.waitForView(viewMatcher, options);
+        return viewPresence.onView();
+    }
+
+    /**
+     * Waits until a visible view matching the given matcher Fails if the matcher applies to
+     * multiple views. Times out after {@link CriteriaHelper#DEFAULT_MAX_TIME_TO_POLL} milliseconds.
+     *
      * <p>Android API 30+ tests are flakey with espresso 3.2 without the inRoot(isDialog()) check.
      *
      * @param viewMatcher The matcher matching the view that should be waited for.
@@ -251,37 +234,13 @@ public class ViewUtils {
      */
     public static ViewInteraction onViewWaiting(
             Matcher<View> viewMatcher, boolean checkRootDialog) {
-        Runnable r =
-                () -> {
-                    onView(isRoot())
-                            .check(
-                                    (View view, NoMatchingViewException noMatchException) -> {
-                                        if (noMatchException != null) throw noMatchException;
-                                        new ExpectedViewCriteria(
-                                                        viewMatcher, VIEW_VISIBLE, (ViewGroup) view)
-                                                .run();
-                                    });
-                };
-        // Needed to prevent flakiness with espresso 3.2 after API 29.
+        ViewElement.Options.Builder optionsBuilder = ViewElement.newOptions().allowDisabled();
         if (checkRootDialog) {
-            r =
-                    () -> {
-                        onView(isRoot())
-                                .inRoot(isDialog())
-                                .check(
-                                        (View view, NoMatchingViewException noMatchException) -> {
-                                            if (noMatchException != null) throw noMatchException;
-                                            new ExpectedViewCriteria(
-                                                            viewMatcher,
-                                                            VIEW_VISIBLE,
-                                                            (ViewGroup) view)
-                                                    .run();
-                                        });
-                    };
+            optionsBuilder = optionsBuilder.inDialog();
         }
-
-        CriteriaHelper.pollInstrumentationThread(r);
-        return onView(viewMatcher);
+        ViewPresence<View> viewPresence =
+                ViewFinder.waitForView(viewMatcher, optionsBuilder.build());
+        return viewPresence.onView();
     }
 
     /**
@@ -293,7 +252,9 @@ public class ViewUtils {
      * @return An interaction on the matching view.
      */
     public static ViewInteraction onViewWaiting(Matcher<View> viewMatcher) {
-        return onViewWaiting(viewMatcher, false);
+        ViewPresence<View> viewPresence =
+                ViewFinder.waitForView(viewMatcher, ViewElement.allowDisabledOption());
+        return viewPresence.onView();
     }
 
     /**

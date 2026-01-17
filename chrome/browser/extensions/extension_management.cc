@@ -2,19 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "chrome/browser/extensions/extension_management.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
@@ -35,6 +30,7 @@
 #include "chrome/browser/extensions/extension_management_internal.h"
 #include "chrome/browser/extensions/external_policy_loader.h"
 #include "chrome/browser/extensions/external_provider_impl.h"
+#include "chrome/browser/extensions/forced_extensions/install_stage_tracker.h"
 #include "chrome/browser/extensions/forced_extensions/install_stage_tracker_factory.h"
 #include "chrome/browser/extensions/managed_installation_mode.h"
 #include "chrome/browser/extensions/managed_toolbar_pin_mode.h"
@@ -50,8 +46,10 @@
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/common/content_switches.h"
+#include "extensions/browser/blocklist_extension_prefs.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/pref_names.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_features.h"
 #include "extensions/common/extension_urls.h"
@@ -81,12 +79,18 @@
 #include "chrome/browser/extensions/management/management_util.h"
 #endif
 
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
+
 namespace extensions {
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
 // Disables off-store force-installed extensions in low trust environments.
 BASE_FEATURE(kDisableOffstoreForceInstalledExtensionsInLowTrustEnviroment,
-             "DisableOffstoreForceInstalledExtensionsInLowTrustEnviroment",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Disables force-installed extensions in low trust environments when
+// greylisted.
+BASE_FEATURE(kDisableForceInstalledExtensionsInLowTrustEnviromentWhenGreylisted,
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
@@ -121,6 +125,7 @@ ExtensionManagement::ExtensionManagement(Profile* profile)
                              pref_change_callback);
   pref_change_registrar_.Add(pref_names::kExtensionUnpublishedAvailability,
                              pref_change_callback);
+
   // Note that both |global_settings_| and |default_settings_| will be null
   // before first call to Refresh(), so in order to resolve this, Refresh() must
   // be called in the initialization of ExtensionManagement.
@@ -173,16 +178,19 @@ ManagedInstallationMode ExtensionManagement::GetInstallationMode(
 
 #if BUILDFLAG(ENABLE_DESKTOP_ANDROID_EXTENSIONS)
 bool ExtensionManagement::ExtensionsEnabledForDesktopAndroid() const {
-  if (enterprise_util::IsBrowserManaged(profile_)) {
-    // Disable extensions only for specific managed accounts.
-    // This check keeps many tests from failing.
-    std::string user_name = profile_->GetProfileUserName();
-    // Crude check to avoid passing invalid strings to `ExtractDomainName`.
-    if (base::Contains(user_name, "@")) {
-      std::string domain = gaia::ExtractDomainName(user_name);
-      if (domain == "google.com" || domain == "managedchrome.com") {
-        return false;
-      }
+  // If Finch has enabled extensions for corp, allow them.
+  if (base::FeatureList::IsEnabled(
+          extensions_features::kEnableExtensionsForCorpDesktopAndroid)) {
+    return true;
+  }
+  // Disable extensions only for specific domains.
+  // This check keeps many tests from failing.
+  std::string user_name = profile_->GetProfileUserName();
+  // Crude check to avoid passing invalid strings to `ExtractDomainName`.
+  if (user_name.contains("@")) {
+    std::string domain = gaia::ExtractDomainName(user_name);
+    if (domain == "google.com" || domain == "managedchrome.com") {
+      return false;
     }
   }
   return true;
@@ -241,16 +249,22 @@ bool ExtensionManagement::HasAllowlistedExtension() {
   }
 
   // If there are deferred extensions try loading them.
+  if (deferred_ids_.empty()) {
+    return false;
+  }
+
   while (!deferred_ids_.empty()) {
     auto extension_id = *deferred_ids_.begin();
     // This will remove the entry from |deferred_ids_|.
     LoadDeferredExtensionSetting(extension_id);
-    DCHECK(!base::Contains(deferred_ids_, extension_id));
+    DCHECK(!deferred_ids_.contains(extension_id));
     if (AccessById(extension_id)->installation_mode ==
         ManagedInstallationMode::kAllowed) {
+      NotifyExtensionManagementPrefChanged();
       return true;
     }
   }
+  NotifyExtensionManagementPrefChanged();
 
   return false;
 }
@@ -294,8 +308,10 @@ bool ExtensionManagement::IsInstallationExplicitlyAllowed(
     const ExtensionId& id) {
   auto* setting = GetSettingsForId(id);
   // No settings explicitly specified for |id|.
-  if (setting == nullptr)
+  if (setting == nullptr) {
     return false;
+  }
+
   // Checks if the extension is on the automatically installed list or
   // install allow-list.
   ManagedInstallationMode mode = setting->installation_mode;
@@ -348,7 +364,7 @@ bool ExtensionManagement::IsAllowedManifestType(
     return true;
   const std::vector<Manifest::Type>& allowed_types =
       *global_settings_->allowed_types;
-  return base::Contains(allowed_types, manifest_type);
+  return std::ranges::contains(allowed_types, manifest_type);
 }
 
 bool ExtensionManagement::IsAllowedManifestVersion(
@@ -473,6 +489,32 @@ bool ExtensionManagement::IsAllowedByUnpackedDeveloperModePolicy(
   bool in_developer_mode =
       profile_->GetPrefs()->GetBoolean(prefs::kExtensionsUIDeveloperMode);
   return in_developer_mode;
+}
+
+bool ExtensionManagement::IsGreylistedForceInstalledInLowTrustEnvironment(
+    const ExtensionId& extension_id) {
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+  if (!base::FeatureList::IsEnabled(
+          kDisableForceInstalledExtensionsInLowTrustEnviromentWhenGreylisted)) {
+    return false;
+  }
+
+  if (!blocklist_prefs::IsExtensionGreylisted(extension_id,
+                                              ExtensionPrefs::Get(profile_))) {
+    return false;
+  }
+
+  auto* setting = GetSettingsForId(extension_id);
+  if (setting == nullptr ||
+      setting->installation_mode != ManagedInstallationMode::kForced) {
+    return false;
+  }
+
+  return GetHigherManagementAuthorityTrustworthiness(profile_) <
+         policy::ManagementAuthorityTrustworthiness::TRUSTED;
+#else
+  return false;
+#endif
 }
 
 bool ExtensionManagement::IsForceInstalledInLowTrustEnvironment(
@@ -634,6 +676,15 @@ bool ExtensionManagement::IsFileUrlNavigationAllowed(const ExtensionId& id) {
   return setting && setting->file_url_navigation_allowed;
 }
 
+extensions::ManagedToolbarPinMode ExtensionManagement::GetToolbarPinMode(
+    const ExtensionId& extension_id) {
+  auto* setting = GetSettingsForId(extension_id);
+  if (setting) {
+    return setting->toolbar_pin;
+  }
+  return extensions::ManagedToolbarPinMode::kDefaultUnpinned;
+}
+
 bool ExtensionManagement::CheckMinimumVersion(const Extension* extension,
                                               std::string* required_version) {
   auto* setting = GetSettingsForId(extension->id());
@@ -683,8 +734,7 @@ void ExtensionManagement::Refresh() {
   default_settings_ = std::make_unique<internal::IndividualSettings>();
 
   // Parse default settings.
-  const base::Value wildcard("*");
-  if ((denied_list_pref && base::Contains(*denied_list_pref, wildcard)) ||
+  if ((denied_list_pref && denied_list_pref->contains("*")) ||
       (extension_request_pref && extension_request_pref->GetBool())) {
     default_settings_->installation_mode = ManagedInstallationMode::kBlocked;
   }
@@ -822,8 +872,8 @@ void ExtensionManagement::Refresh() {
             // entry. This ensures that the entry in these settings matches
             // the entry in the forcelist. Also don't defer if the extension
             // is installed.
-            if (base::Contains(*settings_by_id, extension_id) ||
-                base::Contains(installed_extensions, extension_id)) {
+            if (settings_by_id->contains(extension_id) ||
+                installed_extensions.contains(extension_id)) {
               return false;
             }
             auto* install_mode =
@@ -879,8 +929,10 @@ bool ExtensionManagement::ParseById(const std::string& extension_id,
 
 internal::IndividualSettings* ExtensionManagement::GetSettingsForId(
     const std::string& extension_id) {
-  if (base::Contains(deferred_ids_, extension_id))
+  if (deferred_ids_.contains(extension_id)) {
     LoadDeferredExtensionSetting(extension_id);
+    NotifyExtensionManagementPrefChanged();
+  }
 
   auto iter_id = settings_by_id_.find(extension_id);
   if (iter_id == settings_by_id_.end())
@@ -891,7 +943,7 @@ internal::IndividualSettings* ExtensionManagement::GetSettingsForId(
 
 void ExtensionManagement::LoadDeferredExtensionSetting(
     const std::string& extension_id) {
-  DCHECK(base::Contains(deferred_ids_, extension_id));
+  DCHECK(deferred_ids_.contains(extension_id));
 
   // No need to check again later.
   deferred_ids_.erase(extension_id);
@@ -911,7 +963,7 @@ void ExtensionManagement::LoadDeferredExtensionSetting(
 
     auto extension_ids = base::SplitStringPiece(
         iter.first, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
-    if (base::Contains(extension_ids, extension_id)) {
+    if (std::ranges::contains(extension_ids, extension_id)) {
       // Found our settings. After parsing, continue looking for more entries.
       ParseById(extension_id, *subdict);
       found = true;

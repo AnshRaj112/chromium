@@ -9,12 +9,10 @@
 
 #include <list>
 #include <map>
-#include <memory>
 #include <optional>
 #include <utility>
 
 #include "base/gtest_prod_util.h"
-#include "base/memory/memory_pressure_listener.h"
 #include "base/memory/post_delayed_memory_reduction_task.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/singleton.h"
@@ -75,11 +73,6 @@ class VIZ_CLIENT_EXPORT FrameEvictionManager
     max_number_of_saved_frames_ = max_number_of_saved_frames;
   }
 
-  // React on memory pressure events to adjust the number of cached frames.
-  // Please make this private when crbug.com/443824 has been fixed.
-  void OnMemoryPressure(
-      base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level);
-
   // Purges all unlocked frames, allowing us to reclaim resources.
   void PurgeAllUnlockedFrames();
 
@@ -104,8 +97,6 @@ class VIZ_CLIENT_EXPORT FrameEvictionManager
   void CullOldUnlockedFrames();
 #endif
 
-  void PurgeMemory(int percentage);
-
   // Pauses/unpauses frame eviction.
   void Pause();
   void Unpause();
@@ -119,10 +110,6 @@ class VIZ_CLIENT_EXPORT FrameEvictionManager
 
   bool OnMemoryDump(const base::trace_event::MemoryDumpArgs& args,
                     base::trace_event::ProcessMemoryDump* pmd) override;
-
-  // Listens for system under pressure notifications and adjusts number of
-  // cached frames accordingly.
-  std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
 
   std::map<FrameEvictionManagerClient*, size_t> locked_frames_;
   // {FrameEvictionManagerClient, Last Unlock() time}, ordered with the most

@@ -4,7 +4,6 @@
 
 #include <memory>
 
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/task_environment.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -76,6 +75,7 @@ class SimulatedToolbarElement : public View {
         .SetAnimationDuration(kDefaultAnimationDuration);
     animating_layout->SetTargetLayoutManager(std::make_unique<FlexLayout>())
         ->SetOrientation(LayoutOrientation::kHorizontal);
+    animating_layout->disable_widget_check_for_testing();
   }
 
   void SetAnimationDuration(base::TimeDelta animation_duration) {
@@ -271,7 +271,7 @@ class SimulatedExtensionsContainer : public SimulatedToolbarElement {
       int x = 0;
       for (int i = 0; i < static_cast<int>(children().size()) - 1; ++i) {
         const View* const child = children()[i];
-        if (base::Contains(visible_views_, child)) {
+        if (visible_views_.contains(child)) {
           if (num_visible > 0) {
             --num_visible;
             EXPECT_TRUE(child->GetVisible()) << " icon " << i;

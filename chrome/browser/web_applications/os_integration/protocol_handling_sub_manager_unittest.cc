@@ -6,7 +6,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/files/file_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/test_future.h"
@@ -506,7 +505,8 @@ TEST_F(ProtocolHandlingExecuteTest, ForceUnregisterAppNotInRegistry) {
             std::make_tuple(app_id, std::vector({protocol_handler.protocol})),
             std::make_tuple(app_id, std::vector<std::string>())));
   }
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(app_id));
+  EXPECT_FALSE(
+      provider().registrar_unsafe().GetInstallState(app_id).has_value());
 
   // This should have no affect.
   SynchronizeOsOptions options;

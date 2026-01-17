@@ -10,14 +10,16 @@ import androidx.annotation.IntDef;
 import androidx.annotation.VisibleForTesting;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
-import androidx.preference.PreferenceFragmentCompat;
 
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+import org.chromium.chrome.browser.settings.ChromeBaseSettingsFragment;
+import org.chromium.chrome.browser.settings.search.ChromeBaseSearchIndexProvider;
 import org.chromium.chrome.browser.tracing.TracingController;
 import org.chromium.chrome.browser.tracing.TracingNotificationManager;
 import org.chromium.components.browser_ui.settings.EmbeddableSettingsPage;
@@ -31,7 +33,8 @@ import java.util.Map;
 import java.util.Set;
 
 /** Settings fragment that shows options for recording a performance trace. */
-public class TracingSettings extends PreferenceFragmentCompat
+@NullMarked
+public class TracingSettings extends ChromeBaseSettingsFragment
         implements EmbeddableSettingsPage, TracingController.Observer {
     static final String NON_DEFAULT_CATEGORY_PREFIX = "disabled-by-default-";
 
@@ -61,7 +64,7 @@ public class TracingSettings extends PreferenceFragmentCompat
     private static final String MSG_MODE_RECORD_CONTINUOUSLY = "Record continuously";
     private static final String MSG_SHARE_TRACE = "Share trace";
 
-    private final ObservableSupplier<String> mPageTitle =
+    private final MonotonicObservableSupplier<String> mPageTitle =
             new ObservableSupplierImpl<>(MSG_TRACING_TITLE);
 
     @VisibleForTesting
@@ -228,7 +231,7 @@ public class TracingSettings extends PreferenceFragmentCompat
     }
 
     @Override
-    public ObservableSupplier<String> getPageTitle() {
+    public MonotonicObservableSupplier<String> getPageTitle() {
         return mPageTitle;
     }
 
@@ -313,4 +316,9 @@ public class TracingSettings extends PreferenceFragmentCompat
     public @AnimationType int getAnimationType() {
         return AnimationType.PROPERTY;
     }
+
+    // TODO(crbug.com/444470792): Determine what pieces of logic are dynamic and need handling.
+    public static final ChromeBaseSearchIndexProvider SEARCH_INDEX_DATA_PROVIDER =
+            new ChromeBaseSearchIndexProvider(
+                    TracingSettings.class.getName(), R.xml.tracing_preferences);
 }

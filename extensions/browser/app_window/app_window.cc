@@ -866,7 +866,7 @@ void AppWindow::SetNativeWindowFullscreen() {
 
 bool AppWindow::IntersectsWithTaskbar() const {
 #if BUILDFLAG(IS_WIN)
-  display::Screen* screen = display::Screen::GetScreen();
+  display::Screen* screen = display::Screen::Get();
   gfx::Rect window_bounds = native_app_window_->GetRestoredBounds();
   std::vector<display::Display> displays = screen->GetAllDisplays();
 
@@ -979,12 +979,8 @@ blink::mojom::DisplayMode AppWindow::GetDisplayMode(
                         : blink::mojom::DisplayMode::kStandalone;
 }
 
-WindowController* AppWindow::GetExtensionWindowController() const {
+WindowController* AppWindow::GetExtensionWindowController() {
   return app_window_contents_->GetWindowController();
-}
-
-content::WebContents* AppWindow::GetAssociatedWebContents() const {
-  return web_contents();
 }
 
 void AppWindow::OnExtensionUnloaded(BrowserContext* browser_context,
@@ -1003,7 +999,8 @@ bool AppWindow::IsWebContentsVisible(content::WebContents* web_contents) {
   return app_delegate_->IsWebContentsVisible(web_contents);
 }
 
-WebContentsModalDialogHost* AppWindow::GetWebContentsModalDialogHost() {
+WebContentsModalDialogHost* AppWindow::GetWebContentsModalDialogHost(
+    content::WebContents* web_contents) {
   return native_app_window_.get();
 }
 
@@ -1017,7 +1014,7 @@ void AppWindow::SaveWindowPosition() {
 
   gfx::Rect bounds = native_app_window_->GetRestoredBounds();
   gfx::Rect screen_bounds =
-      display::Screen::GetScreen()->GetDisplayMatching(bounds).work_area();
+      display::Screen::Get()->GetDisplayMatching(bounds).work_area();
   ui::mojom::WindowShowState window_state =
       native_app_window_->GetRestoredState();
   cache->SaveGeometry(extension_id(), window_key_, bounds, screen_bounds,
@@ -1080,7 +1077,7 @@ AppWindow::CreateParams AppWindow::LoadDefaults(CreateParams params) const {
                            &cached_screen_bounds, &cached_state)) {
       // App window has cached screen bounds, make sure it fits on screen in
       // case the screen resolution changed.
-      display::Screen* screen = display::Screen::GetScreen();
+      display::Screen* screen = display::Screen::Get();
       display::Display display = screen->GetDisplayMatching(cached_bounds);
       gfx::Rect current_screen_bounds = display.work_area();
       SizeConstraints constraints(

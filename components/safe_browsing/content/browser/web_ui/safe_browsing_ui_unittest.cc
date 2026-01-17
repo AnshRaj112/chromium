@@ -3,7 +3,12 @@
 // found in the LICENSE file.
 
 #include "components/safe_browsing/content/browser/web_ui/safe_browsing_ui.h"
+
 #include "base/test/values_test_util.h"
+#include "components/os_crypt/async/browser/os_crypt_async.h"
+#include "components/os_crypt/async/browser/test_utils.h"
+#include "components/safe_browsing/content/browser/web_ui/safe_browsing_content_ui_handler.h"
+#include "components/safe_browsing/core/browser/web_ui/web_ui_info_singleton_event_observer.h"
 #include "components/safe_browsing/core/common/proto/safebrowsingv5.pb.h"
 #include "content/public/test/browser_task_environment.h"
 #include "content/public/test/test_browser_context.h"
@@ -16,35 +21,41 @@ class SafeBrowsingUITest : public testing::Test {
  public:
   SafeBrowsingUITest() = default;
 
-  void SetUp() override {}
+  void SetUp() override {
+    os_crypt_async_ = os_crypt_async::GetTestOSCryptAsyncForTesting(
+        /*is_sync_for_unittests=*/true);
+  }
 
   int SetMemberInt(int member_int) {
     member_int_ = member_int;
     return member_int_;
   }
 
-  SafeBrowsingUIHandler* RegisterNewHandler() {
-    auto handler_unique =
-        std::make_unique<SafeBrowsingUIHandler>(&browser_context_, nullptr);
+  SafeBrowsingContentUIHandler* RegisterNewHandler() {
+    auto handler_unique = std::make_unique<SafeBrowsingContentUIHandler>(
+        &browser_context_, nullptr, os_crypt_async_.get());
 
-    SafeBrowsingUIHandler* handler = handler_unique.get();
+    SafeBrowsingContentUIHandler* handler = handler_unique.get();
     handler->SetWebUIForTesting(&web_ui_);
     // Calling AllowJavascript will register the handler as a web UI instance
-    // for WebUIInfoSingleton::GetInstance(). We do this instead of registering
-    // the instance directly because otherwise, the first SafeBrowsingUIHandler
-    // call to AllowJavascript will re-register the instance.
+    // for WebUIContentInfoSingleton::GetInstance(). We do this instead of
+    // registering the instance directly because otherwise, the first
+    // SafeBrowsingContentUIHandler call to AllowJavascript will re-register the
+    // instance.
     handler->AllowJavascriptForTesting();
 
     web_ui_.AddMessageHandler(std::move(handler_unique));
     return handler;
   }
 
-  void UnregisterHandler(SafeBrowsingUIHandler* handler) {
-    WebUIInfoSingleton::GetInstance()->UnregisterWebUIInstance(handler);
+  void UnregisterHandler(SafeBrowsingContentUIHandler* handler) {
+    WebUIContentInfoSingleton::GetInstance()->UnregisterWebUIInstance(
+        handler->event_observer());
   }
 
  protected:
   int member_int_;
+  std::unique_ptr<os_crypt_async::OSCryptAsync> os_crypt_async_;
   content::TestWebUI web_ui_;
   content::BrowserTaskEnvironment task_environment_;
   content::TestBrowserContext browser_context_;
@@ -58,7 +69,7 @@ TEST_F(SafeBrowsingUITest, CRSBLOGDoesNotEvaluateWhenNoListeners) {
   EXPECT_EQ(member_int_, 0);
 
   // Register a listener, so SetMemberInt() will be evaluated.
-  SafeBrowsingUIHandler* handler = RegisterNewHandler();
+  SafeBrowsingContentUIHandler* handler = RegisterNewHandler();
 
   CRSBLOG << SetMemberInt(1);
   EXPECT_EQ(member_int_, 1);
@@ -67,7 +78,7 @@ TEST_F(SafeBrowsingUITest, CRSBLOGDoesNotEvaluateWhenNoListeners) {
 }
 
 TEST_F(SafeBrowsingUITest, TestHPRTLookups) {
-  SafeBrowsingUIHandler* handler = RegisterNewHandler();
+  SafeBrowsingContentUIHandler* handler = RegisterNewHandler();
   ASSERT_EQ(0u, web_ui_.call_data().size());
 
   // Create request.
@@ -79,7 +90,7 @@ TEST_F(SafeBrowsingUITest, TestHPRTLookups) {
   std::string ohttp_key = "testing_ohttp_key";
   // Add request to pings.
   std::optional<int> token =
-      WebUIInfoSingleton::GetInstance()->AddToHPRTLookupPings(
+      WebUIContentInfoSingleton::GetInstance()->AddToHPRTLookupPings(
           inner_request.get(), relay_url_spec, ohttp_key);
   // Validate request call_data.
   ASSERT_TRUE(token.has_value());
@@ -125,8 +136,8 @@ TEST_F(SafeBrowsingUITest, TestHPRTLookups) {
   full_hash_detail_3->add_attributes(
       ::safe_browsing::V5::ThreatAttribute::FRAME_ONLY);
   // Add response to pings.
-  WebUIInfoSingleton::GetInstance()->AddToHPRTLookupResponses(token.value(),
-                                                              response.get());
+  WebUIContentInfoSingleton::GetInstance()->AddToHPRTLookupResponses(
+      token.value(), response.get());
   // Validate response call_data.
   ASSERT_EQ(2u, web_ui_.call_data().size());
   EXPECT_EQ(web_ui_.call_data()[1]->arg1()->GetString(),

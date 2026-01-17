@@ -19,7 +19,6 @@
 #include "ash/system/diagnostics/routine_log.h"
 #include "ash/system/diagnostics/telemetry_log.h"
 #include "ash/test/ash_test_base.h"
-#include "ash/webui/diagnostics_ui/mojom/network_health_provider.mojom-forward.h"
 #include "ash/webui/diagnostics_ui/mojom/network_health_provider.mojom-shared.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -55,8 +54,6 @@ class DiagnosticsLogControllerTest : public NoSessionAshTestBase {
   DiagnosticsLogControllerTest& operator=(DiagnosticsLogControllerTest&) =
       delete;
   ~DiagnosticsLogControllerTest() override = default;
-
-  void SetUp() override { NoSessionAshTestBase::SetUp(); }
 
  protected:
   base::FilePath GetSessionLogPath() {
@@ -273,7 +270,6 @@ TEST_F(DiagnosticsLogControllerTest,
   InitializeWithFakeDelegate();
 
   // Simulate sign-in user.
-  ClearLogin();
   DiagnosticsLogController::Get()->ResetAndInitializeLogWriters();
   EXPECT_EQ(expected_path_not_regular_user, log_base_path());
 
@@ -281,10 +277,12 @@ TEST_F(DiagnosticsLogControllerTest,
   DiagnosticsLogController::Get()->ResetAndInitializeLogWriters();
   EXPECT_EQ(expected_path_not_regular_user, log_base_path());
 
+  ClearLogin();
   SimulateKioskMode(user_manager::UserType::kKioskChromeApp);
   DiagnosticsLogController::Get()->ResetAndInitializeLogWriters();
   EXPECT_EQ(expected_path_not_regular_user, log_base_path());
 
+  ClearLogin();
   SimulateKioskMode(user_manager::UserType::kKioskWebApp);
   DiagnosticsLogController::Get()->ResetAndInitializeLogWriters();
   EXPECT_EQ(expected_path_not_regular_user, log_base_path());
@@ -320,18 +318,20 @@ TEST_F(DiagnosticsLogControllerTest,
   InitializeWithFakeDelegate();
 
   // Simulate sign-in user.
-  ClearLogin();
   EXPECT_EQ(expected_path_not_regular_user, log_base_path());
 
   SimulateGuestLogin();
   EXPECT_EQ(expected_path_not_regular_user, log_base_path());
 
+  ClearLogin();
   SimulateKioskMode(user_manager::UserType::kKioskChromeApp);
   EXPECT_EQ(expected_path_not_regular_user, log_base_path());
 
+  ClearLogin();
   SimulateKioskMode(user_manager::UserType::kKioskWebApp);
   EXPECT_EQ(expected_path_not_regular_user, log_base_path());
 
+  ClearLogin();
   SimulateUserLogin({kTestUserEmail});
   const base::FilePath expected_path_regular_user =
       base::FilePath(kDefaultUserDir).Append(kDiangosticsDirName);

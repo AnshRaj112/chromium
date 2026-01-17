@@ -15,10 +15,12 @@
 #include <string>
 #include <vector>
 
+#include "base/sequence_checker.h"
 #include "components/password_manager/core/browser/hash_password_manager.h"
 #include "components/password_manager/core/browser/password_form.h"
 #include "components/password_manager/core/browser/password_reuse_detector.h"
 #include "components/password_manager/core/browser/password_store/password_store_change.h"
+#include "third_party/abseil-cpp/absl/container/flat_hash_map.h"
 
 namespace password_manager {
 
@@ -92,13 +94,17 @@ class PasswordReuseDetectorImpl : public PasswordReuseDetector {
   struct PasswordLengthAndMatchingCredentials {
     PasswordLengthAndMatchingCredentials();
     ~PasswordLengthAndMatchingCredentials();
+    PasswordLengthAndMatchingCredentials(
+        const PasswordLengthAndMatchingCredentials&);
+    PasswordLengthAndMatchingCredentials& operator=(
+        const PasswordLengthAndMatchingCredentials&);
 
     int password_length = 0;
     std::set<MatchingReusedCredential> matching_credentials;
   };
 
   using PasswordsReusedCredentialsHashMap =
-      std::unordered_map<uint64_t, PasswordLengthAndMatchingCredentials>;
+      absl::flat_hash_map<uint64_t, PasswordLengthAndMatchingCredentials>;
 
   using passwords_iterator = PasswordsReusedCredentialsMap::const_iterator;
 
@@ -129,10 +135,6 @@ class PasswordReuseDetectorImpl : public PasswordReuseDetector {
   // If saved-password reuse is found, fills in the MatchingReusedCredentials
   // with any reused password, and returns password hash and length of longest
   // reused password.
-  std::pair<uint64_t, size_t> CheckSavedPasswordReuse(
-      const std::u16string& input,
-      const std::string& domain,
-      std::vector<MatchingReusedCredential>* matching_reused_credentials_out);
   std::pair<uint64_t, size_t> CheckSavedPasswordReuseBasedOnHash(
       const std::u16string& input,
       const std::string& domain,

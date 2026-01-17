@@ -139,7 +139,7 @@ void AddFiles(PlatformClipboard::Data data, OSExchangeDataProvider* provider) {
 
     url::RawCanonOutputT<char16_t> unescaped;
     url::DecodeURLEscapeSequences(
-        url.path_piece(), url::DecodeURLMode::kUTF8OrIsomorphic, &unescaped);
+        url.path(), url::DecodeURLMode::kUTF8OrIsomorphic, &unescaped);
 
     const base::FilePath path(base::UTF16ToUTF8(unescaped.view()));
     filenames.emplace_back(path, path.BaseName());
@@ -191,7 +191,8 @@ void AddUrl(PlatformClipboard::Data data, OSExchangeDataProvider* provider) {
     return;
   }
 
-  provider->SetURL(url, lines[1]);
+  ClipboardUrlInfo url_info(url, lines[1]);
+  provider->SetURLs(base::span_from_ref(url_info));
 }
 
 }  // namespace
@@ -276,10 +277,26 @@ bool WaylandExchangeDataProvider::ExtractData(const std::string& mime_type,
                                               std::string* out_content) const {
   DCHECK(out_content);
   DCHECK(IsMimeTypeSupported(mime_type));
-  if (std::optional<ui::OSExchangeData::UrlInfo> url_info;
-      mime_type == ui::kMimeTypeMozillaUrl &&
-      (url_info = GetURLAndTitle(kFilenameToURLPolicy)).has_value()) {
-    out_content->append(url_info->url.spec());
+
+  if (mime_type == ui::kMimeTypeMozillaUrl ||
+      mime_type == ui::kMimeTypeUriList) {
+    const std::vector<ClipboardUrlInfo> url_infos =
+        GetURLsAndTitles(kFilenameToURLPolicy);
+    if (url_infos.empty()) {
+      return false;
+    }
+    // Mozilla format: URL\nTitle\n for each entry
+    for (const auto& url_info : url_infos) {
+      if (!out_content->empty()) {
+        out_content->append("\n");
+      }
+      out_content->append(url_info.url.spec());
+      if (url_info.title.empty()) {
+        continue;
+      }
+      out_content->append("\n");
+      out_content->append(base::UTF16ToUTF8(url_info.title));
+    }
     return true;
   }
   if ((mime_type == ui::kMimeTypeHtml || mime_type == ui::kMimeTypeUtf8Html) &&

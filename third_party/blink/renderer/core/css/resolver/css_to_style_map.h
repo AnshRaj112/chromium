@@ -120,27 +120,30 @@ class CSSToStyleMap {
   static EAnimationTriggerBehavior MapAnimationTriggerBehavior(
       StyleResolverState&,
       const CSSValue&);
-  static Persistent<const ScopedCSSName> MapAnimationTimelineTriggerName(
+  static const ScopedCSSName* MapAnimationTimelineTriggerName(
       StyleResolverState&,
       const CSSValue&);
   static EAnimationTriggerBehavior MapAnimationTimelineTriggerBehavior(
       StyleResolverState&,
       const CSSValue&);
-  static std::optional<TimelineOffset> MapAnimationTimelineTriggerRangeStart(
+  static std::optional<TimelineOffset>
+  MapAnimationTimelineTriggerEntryRangeStart(StyleResolverState&,
+                                             const CSSValue&);
+  static std::optional<TimelineOffset> MapAnimationTimelineTriggerEntryRangeEnd(
       StyleResolverState&,
       const CSSValue&);
-  static std::optional<TimelineOffset> MapAnimationTimelineTriggerRangeEnd(
+  static TimelineOffsetOrAuto MapAnimationTimelineTriggerActiveRangeStart(
       StyleResolverState&,
       const CSSValue&);
-  static TimelineOffsetOrAuto MapAnimationTimelineTriggerExitRangeStart(
+  static TimelineOffsetOrAuto MapAnimationTimelineTriggerActiveRangeEnd(
       StyleResolverState&,
       const CSSValue&);
-  static TimelineOffsetOrAuto MapAnimationTimelineTriggerExitRangeEnd(
-      StyleResolverState&,
-      const CSSValue&);
-  static StyleTimeline MapAnimationTimelineTriggerTimeline(StyleResolverState&,
-                                                           const CSSValue&);
+  static StyleTimeline MapAnimationTimelineTriggerSource(StyleResolverState&,
+                                                         const CSSValue&);
   static std::optional<Vector<AtomicString>> MapAnimationTriggerNames(
+      StyleResolverState&,
+      const CSSValue&);
+  static Member<StyleTriggerAttachmentVector> MapAnimationTriggerAttachments(
       StyleResolverState&,
       const CSSValue&);
 };

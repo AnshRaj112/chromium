@@ -16,11 +16,12 @@
 
 namespace ui {
 
-PointerProperties::PointerProperties()
-    : PointerProperties(0, 0, 0) {
-}
+PointerProperties::PointerProperties() : PointerProperties(0, 0, 0) {}
 
-PointerProperties::PointerProperties(float x, float y, float touch_major)
+PointerProperties::PointerProperties(float x,
+                                     float y,
+                                     float touch_major,
+                                     bool has_native_touch_major)
     : id(0),
       tool_type(MotionEvent::ToolType::UNKNOWN),
       x(x),
@@ -35,7 +36,8 @@ PointerProperties::PointerProperties(float x, float y, float touch_major)
       tilt_y(0),
       twist(0),
       tangential_pressure(0),
-      source_device_id(0) {}
+      source_device_id(0),
+      has_native_touch_major(has_native_touch_major) {}
 
 PointerProperties::PointerProperties(const MotionEvent& event,
                                      size_t pointer_index)
@@ -53,7 +55,8 @@ PointerProperties::PointerProperties(const MotionEvent& event,
       tilt_y(event.GetTiltY(pointer_index)),
       twist(event.GetTwist(pointer_index)),
       tangential_pressure(event.GetTangentialPressure(pointer_index)),
-      source_device_id(0) {}
+      source_device_id(0),
+      has_native_touch_major(event.HasNativeTouchMajor(pointer_index)) {}
 
 PointerProperties::PointerProperties(const PointerProperties& other) = default;
 
@@ -174,6 +177,11 @@ float MotionEventGeneric::GetTouchMinor(size_t pointer_index) const {
   return pointers_[pointer_index].touch_minor;
 }
 
+bool MotionEventGeneric::HasNativeTouchMajor(size_t pointer_index) const {
+  DCHECK_LT(pointer_index, pointers_.size());
+  return pointers_[pointer_index].has_native_touch_major;
+}
+
 float MotionEventGeneric::GetOrientation(size_t pointer_index) const {
   DCHECK_LT(pointer_index, pointers_.size());
   return pointers_[pointer_index].orientation;
@@ -239,6 +247,14 @@ float MotionEventGeneric::GetHistoricalTouchMajor(
   return historical_events_[historical_index]->GetTouchMajor(pointer_index);
 }
 
+bool MotionEventGeneric::GetHistoricalHasNativeTouchMajor(
+    size_t pointer_index,
+    size_t historical_index) const {
+  DCHECK_LT(historical_index, historical_events_.size());
+  return historical_events_[historical_index]->HasNativeTouchMajor(
+      pointer_index);
+}
+
 float MotionEventGeneric::GetHistoricalX(size_t pointer_index,
                                          size_t historical_index) const {
   DCHECK_LT(historical_index, historical_events_.size());
@@ -258,8 +274,8 @@ int32_t MotionEventGeneric::GetSourceDeviceId(size_t pointer_index) const {
 
 // static
 std::unique_ptr<MotionEventGeneric> MotionEventGeneric::CloneEvent(
-    const MotionEvent& event) {
-  bool with_history = true;
+    const MotionEvent& event,
+    bool with_history) {
   return base::WrapUnique(new MotionEventGeneric(event, with_history));
 }
 
@@ -286,8 +302,9 @@ size_t MotionEventGeneric::PushPointer(const PointerProperties& pointer) {
 }
 
 void MotionEventGeneric::RemovePointerAt(size_t index) {
-  DCHECK_LT(index, pointers_.size());
-  pointers_.erase(UNSAFE_TODO(pointers_.begin() + index));
+  CHECK_LT(index, pointers_.size());
+  // SAFETY: Already checked bounds.
+  UNSAFE_BUFFERS(pointers_.erase(pointers_.begin() + index));
 }
 
 void MotionEventGeneric::PushHistoricalEvent(
@@ -331,10 +348,10 @@ MotionEventGeneric::MotionEventGeneric(const MotionEvent& event,
     historical_event->set_action(Action::MOVE);
     historical_event->set_event_time(event.GetHistoricalEventTime(h));
     for (size_t i = 0; i < pointer_count; ++i) {
-      historical_event->PushPointer(
-          PointerProperties(event.GetHistoricalX(i, h),
-                            event.GetHistoricalY(i, h),
-                            event.GetHistoricalTouchMajor(i, h)));
+      historical_event->PushPointer(PointerProperties(
+          event.GetHistoricalX(i, h), event.GetHistoricalY(i, h),
+          event.GetHistoricalTouchMajor(i, h),
+          event.GetHistoricalHasNativeTouchMajor(i, h)));
     }
     PushHistoricalEvent(std::move(historical_event));
   }

@@ -39,7 +39,7 @@
 #include "ui/base/ui_base_features.h"
 #include "ui/color/color_id.h"
 #include "ui/gfx/color_palette.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
@@ -306,7 +306,7 @@ void ShareThisTabDialogView::SetupAudioToggle() {
       std::make_unique<views::ImageView>());
   audio_icon_view->SetImage(ui::ImageModel::FromVectorIcon(
       vector_icons::kVolumeUpIcon, ui::kColorIcon,
-      GetLayoutConstant(PAGE_INFO_ICON_SIZE)));
+      GetLayoutConstant(LayoutConstant::kPageInfoIconSize)));
 
   views::Label* audio_toggle_label =
       audio_toggle_container->AddChildView(std::make_unique<views::Label>());

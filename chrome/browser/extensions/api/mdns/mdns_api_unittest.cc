@@ -223,7 +223,7 @@ class MDnsAPITest : public extensions::ExtensionServiceTestBase {
           "background.html");
     }
 
-    std::string error;
+    std::u16string error;
     return extensions::Extension::Create(
         bogus_file_pathname(name),
         extensions::mojom::ManifestLocation::kInvalidLocation, manifest,
@@ -257,6 +257,11 @@ class MDnsAPIDiscoveryTest : public MDnsAPITest {
     MDnsAPITest::SetUp();
     mdns_api_ = static_cast<MockedMDnsAPI*>(MDnsAPI::Get(browser_context()));
     EXPECT_CALL(*mdns_api_, IsMDnsAllowed(_)).WillRepeatedly(Return(true));
+  }
+
+  void TearDown() override {
+    mdns_api_ = nullptr;
+    MDnsAPITest::TearDown();
   }
 
  protected:

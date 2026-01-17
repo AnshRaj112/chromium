@@ -15,7 +15,7 @@
 #import "ios/chrome/browser/fullscreen/ui_bundled/fullscreen_metrics.h"
 #import "ios/chrome/browser/fullscreen/ui_bundled/fullscreen_model_observer.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
-#import "ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbars_size.h"
+#import "ios/chrome/browser/toolbar/legacy/ui_bundled/fullscreen/toolbars_size.h"
 #import "ios/chrome/common/ui/util/ui_util.h"
 #import "ios/web/common/features.h"
 
@@ -349,7 +349,12 @@ FullscreenModel::ScrollAction FullscreenModel::ActionForScrollFromOffset(
   bool scrolling_past_top = y_content_offset_ <= -top_inset_;
   bool content_fits = content_height_ <= scroll_view_height_ - top_inset_;
   bool scrolling_past_bottom =
-      y_content_offset_ + scroll_view_height_ + top_inset_ >= content_height_;
+      y_content_offset_ + scroll_view_height_ + top_inset_ +
+          toolbars_size_.expandedTopToolbarHeight +
+          toolbars_size_.expandedBottomToolbarHeight -
+          (toolbars_size_.collapsedTopToolbarHeight -
+           toolbars_size_.collapsedBottomToolbarHeight) >=
+      content_height_;
   if (ignoring_current_scroll_ ||
       (scrolling_past_top && !scrolling_content_down) ||
       (content_fits && !scrolling_content_down) ||
@@ -402,10 +407,12 @@ void FullscreenModel::UpdateProgress() {
   if (base::FeatureList::IsEnabled(web::features::kSmoothScrollingDefault)) {
     SetProgress(1.0 + delta / toolbar_height_delta);
     return;
-  }
-  if (IsFullscreenTransitionSpeedSet()) {
-    SetProgress(1.0 + (delta * speed_) / toolbar_height_delta);
-    return;
+  } else {
+    if (IsFullscreenTransitionSpeedSet()) {
+      SetProgress(1.0 + (delta * speed_) / toolbar_height_delta);
+      return;
+    }
+    SetProgress(1.0 + delta / toolbar_height_delta);
   }
 }
 

@@ -14,6 +14,11 @@
 namespace features {
 
 COMPONENT_EXPORT(UI_BASE_FEATURES)
+BASE_DECLARE_FEATURE(kSendEmptyGestureScrollUpdate);
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+BASE_DECLARE_FEATURE_PARAM(bool,
+                           kSendEmptyGestureScrollUpdateFilterOutEmptyUpdates);
+COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_DECLARE_FEATURE(kExperimentalFlingAnimation);
 COMPONENT_EXPORT(UI_BASE_FEATURES) BASE_DECLARE_FEATURE(kFocusFollowsCursor);
 COMPONENT_EXPORT(UI_BASE_FEATURES)
@@ -82,6 +87,9 @@ COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_DECLARE_FEATURE(kSystemCursorSizeSupported);
 COMPONENT_EXPORT(UI_BASE_FEATURES) bool IsSystemCursorSizeSupported();
 
+BASE_DECLARE_FEATURE(kUseCursorEventHook);
+COMPONENT_EXPORT(UI_BASE_FEATURES) bool ShouldUseCursorEventHook();
+
 // Used to enable keyboard accessible tooltips in in-page content
 // (i.e., inside Blink). See
 // ::views::features::kKeyboardAccessibleTooltipInViews for
@@ -112,8 +120,6 @@ COMPONENT_EXPORT(UI_BASE_FEATURES) bool AreF11AndF12ShortcutsEnabled();
 COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_DECLARE_FEATURE(kOzoneBubblesUsePlatformWidgets);
 
-COMPONENT_EXPORT(UI_BASE_FEATURES)
-BASE_DECLARE_FEATURE(kWaylandLinuxDrmSyncobj);
 
 COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_DECLARE_FEATURE(kWaylandPerSurfaceScale);
@@ -122,16 +128,8 @@ COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_DECLARE_FEATURE(kWaylandTextInputV3);
 
 COMPONENT_EXPORT(UI_BASE_FEATURES)
-BASE_DECLARE_FEATURE(kWaylandUiScale);
-
-COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_DECLARE_FEATURE(kWaylandSessionManagement);
 #endif  // BUILDFLAG(IS_OZONE)
-
-#if BUILDFLAG(IS_LINUX)
-COMPONENT_EXPORT(UI_BASE_FEATURES)
-BASE_DECLARE_FEATURE(kOverrideDefaultOzonePlatformHintToAuto);
-#endif  // BUILDFLAG(IS_LINUX)
 
 // Indicates whether DrmOverlayManager should used the synchronous API to
 // perform pageflip tests.
@@ -158,6 +156,22 @@ COMPONENT_EXPORT(UI_BASE_FEATURES) extern const char kPredictorNameEmpty[];
 // instead of the original -5ms.
 COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_DECLARE_FEATURE(kResamplingScrollEventsExperimentalPrediction);
+
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+extern const char kResampleLatencyModeFixedMs[];
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+extern const char kResampleLatencyModeFractional[];
+
+// Enables experimental configuration of the resample latency for scroll events.
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+BASE_DECLARE_FEATURE(kResampleScrollEventsLatency);
+
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+extern const base::FeatureParam<std::string> kResampleLatencyModeParam;
+
+// Param for the value used in the chosen mode.
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+extern const base::FeatureParam<double> kResampleLatencyValueParam;
 
 // Uses a ratio of the vsync refresh rate. The timing/ratio can be changed on
 // the command line through a `latency` param.
@@ -246,6 +260,19 @@ BASE_DECLARE_FEATURE(kHandleIMESpanChangesOnUpdateComposition);
 
 COMPONENT_EXPORT(UI_BASE_FEATURES)
 bool IsHandleIMESpanChangesOnUpdateCompositionEnabled();
+
+// Controls whether the default system accent colors should be used.
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+BASE_DECLARE_FEATURE(kUseSystemDefaultAccentColors);
+
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+BASE_DECLARE_FEATURE(kStringWidthCache);
+
+// Fix for ZIP Shell Folder virtual file detection. When enabled,
+// HasVirtualFilenames() checks if CF_HDROP actually returns data
+// (not just advertises it) before treating files as real.
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+BASE_DECLARE_FEATURE(kUseClipboardStrictVirtualFileCheck);
 
 }  // namespace features
 

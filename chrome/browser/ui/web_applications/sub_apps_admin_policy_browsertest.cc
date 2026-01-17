@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/policy/policy_util.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/web_applications/sub_apps_install_dialog_controller.h"
+#include "chrome/browser/ui/views/web_apps/sub_apps_install_dialog_controller.h"
 #include "chrome/browser/ui/web_applications/sub_apps_service_impl.h"
 #include "chrome/browser/ui/web_applications/test/isolated_web_app_test_utils.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_url_info.h"
 #include "chrome/browser/web_applications/isolated_web_apps/test/isolated_web_app_builder.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/common/pref_names.h"
@@ -79,9 +81,10 @@ class SubAppsAdminPolicyTest : public IsolatedWebAppBrowserTestHarness {
     IsolatedWebAppUrlInfo parent_app = app->InstallChecked(profile());
     parent_app_id_ = parent_app.app_id();
 
-    EXPECT_EQ(provider().registrar_unsafe().GetInstallState(parent_app_id_),
-              proto::InstallState::INSTALLED_WITH_OS_INTEGRATION);
-    EXPECT_THAT(provider().registrar_unsafe().IsIsolated(parent_app_id_),
+    EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+        parent_app_id_, WebAppFilter::InstalledInOperatingSystemForTesting()));
+    EXPECT_THAT(provider().registrar_unsafe().AppMatches(
+                    parent_app_id_, WebAppFilter::IsIsolatedApp()),
                 IsTrue());
     EXPECT_THAT(GetAllSubAppIds(parent_app_id_), IsEmpty());
 

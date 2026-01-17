@@ -31,6 +31,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <mutex>
 #include <type_traits>
 
 #include "absl/base/attributes.h"
@@ -47,6 +48,7 @@ namespace tcmalloc {
 namespace tcmalloc_internal {
 
 class AllocationGuardSpinLockHolder;
+class Static;
 
 }  // namespace tcmalloc_internal
 }  // namespace tcmalloc
@@ -101,6 +103,7 @@ class ABSL_LOCKABLE ABSL_ATTRIBUTE_WARN_UNUSED SpinLock {
     ABSL_TSAN_MUTEX_POST_LOCK(this, 0, 0);
   }
 
+  ABSL_DEPRECATE_AND_INLINE()
   inline void Lock() ABSL_EXCLUSIVE_LOCK_FUNCTION() { return lock(); }
 
   // Try to acquire this SpinLock without blocking and return true if the
@@ -116,6 +119,7 @@ class ABSL_LOCKABLE ABSL_ATTRIBUTE_WARN_UNUSED SpinLock {
     return res;
   }
 
+  ABSL_DEPRECATE_AND_INLINE()
   [[nodiscard]] inline bool TryLock() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) {
     return try_lock();
   }
@@ -139,6 +143,7 @@ class ABSL_LOCKABLE ABSL_ATTRIBUTE_WARN_UNUSED SpinLock {
     ABSL_TSAN_MUTEX_POST_UNLOCK(this, 0);
   }
 
+  ABSL_DEPRECATE_AND_INLINE()
   inline void Unlock() ABSL_UNLOCK_FUNCTION() { unlock(); }
 
   // Determine if the lock is held.  When the lock is held by the invoking
@@ -170,6 +175,16 @@ class ABSL_LOCKABLE ABSL_ATTRIBUTE_WARN_UNUSED SpinLock {
   // Provide access to protected method above.  Use for testing only.
   friend struct SpinLockTest;
   friend class tcmalloc::tcmalloc_internal::AllocationGuardSpinLockHolder;
+  friend class tcmalloc::tcmalloc_internal::Static;
+
+  static int GetAdaptiveSpinCount() {
+    return adaptive_spin_count_.load(std::memory_order_relaxed);
+  }
+  static void SetAdaptiveSpinCount(int count) {
+    adaptive_spin_count_.store(count, std::memory_order_relaxed);
+  }
+
+  static std::atomic<int> adaptive_spin_count_;
 
  private:
   // lockword_ is used to store the following:
@@ -233,19 +248,18 @@ class ABSL_LOCKABLE ABSL_ATTRIBUTE_WARN_UNUSED SpinLock {
 
 // Corresponding locker object that arranges to acquire a spinlock for
 // the duration of a C++ scope.
-class ABSL_SCOPED_LOCKABLE [[nodiscard]] SpinLockHolder {
+class ABSL_SCOPED_LOCKABLE [[nodiscard]] SpinLockHolder
+    : public std::lock_guard<SpinLock> {
  public:
+  inline explicit SpinLockHolder(
+      SpinLock& l ABSL_INTERNAL_ATTRIBUTE_CAPTURED_BY(this))
+      ABSL_EXCLUSIVE_LOCK_FUNCTION(l)
+      : std::lock_guard<SpinLock>(l) {}
+  ABSL_DEPRECATE_AND_INLINE()
   inline explicit SpinLockHolder(SpinLock* l) ABSL_EXCLUSIVE_LOCK_FUNCTION(l)
-      : lock_(l) {
-    l->lock();
-  }
-  inline ~SpinLockHolder() ABSL_UNLOCK_FUNCTION() { lock_->unlock(); }
+      : SpinLockHolder(*l) {}
 
-  SpinLockHolder(const SpinLockHolder&) = delete;
-  SpinLockHolder& operator=(const SpinLockHolder&) = delete;
-
- private:
-  SpinLock* lock_;
+  inline ~SpinLockHolder() ABSL_UNLOCK_FUNCTION() = default;
 };
 
 // Register a hook for profiling support.

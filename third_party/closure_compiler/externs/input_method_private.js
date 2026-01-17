@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -136,8 +136,74 @@ chrome.inputMethodPrivate.LanguagePackStatusChange;
 chrome.inputMethodPrivate.InputContext;
 
 /**
- * User preference settings for a specific input method. Japanese input methods
- * are not included because they are managed separately by Mozc module.
+ * @enum {string}
+ */
+chrome.inputMethodPrivate.JapaneseInputMode = {
+  KANA: 'Kana',
+  ROMAJI: 'Romaji',
+};
+
+/**
+ * @enum {string}
+ */
+chrome.inputMethodPrivate.JapanesePunctuationStyle = {
+  KUTEN_TOUTEN: 'KutenTouten',
+  COMMA_PERIOD: 'CommaPeriod',
+  KUTEN_PERIOD: 'KutenPeriod',
+  COMMA_TOUTEN: 'CommaTouten',
+};
+
+/**
+ * @enum {string}
+ */
+chrome.inputMethodPrivate.JapaneseSymbolStyle = {
+  CORNER_BRACKET_MIDDLE_DOT: 'CornerBracketMiddleDot',
+  SQUARE_BRACKET_SLASH: 'SquareBracketSlash',
+  CORNER_BRACKET_SLASH: 'CornerBracketSlash',
+  SQUARE_BRACKET_MIDDLE_DOT: 'SquareBracketMiddleDot',
+};
+
+/**
+ * @enum {string}
+ */
+chrome.inputMethodPrivate.JapaneseSpaceInputStyle = {
+  INPUT_MODE: 'InputMode',
+  FULLWIDTH: 'Fullwidth',
+  HALFWIDTH: 'Halfwidth',
+};
+
+/**
+ * @enum {string}
+ */
+chrome.inputMethodPrivate.JapaneseSelectionShortcut = {
+  NO_SHORTCUT: 'NoShortcut',
+  DIGITS123456789: 'Digits123456789',
+  ASDFGHJKL: 'ASDFGHJKL',
+};
+
+/**
+ * @enum {string}
+ */
+chrome.inputMethodPrivate.JapaneseKeymapStyle = {
+  ATOK: 'Atok',
+  MS_IME: 'MsIme',
+  KOTOERI: 'Kotoeri',
+  CHROME_OS: 'ChromeOs',
+};
+
+/**
+ * @enum {string}
+ */
+chrome.inputMethodPrivate.ShiftKeyModeStyle = {
+  OFF: 'Off',
+  ALPHANUMERIC: 'Alphanumeric',
+  KATAKANA: 'Katakana',
+};
+
+/**
+ * User preference settings for a specific input method. Entry names MUST match
+ * CrOS Settings @
+ * https://crsrc.org/c/chrome/browser/resources/ash/settings/os_languages_page/input_method_prefs_consts.ts
  * @typedef {{
  *   enableCompletion: (boolean|undefined),
  *   enableDoubleSpacePeriod: (boolean|undefined),
@@ -152,29 +218,26 @@ chrome.inputMethodPrivate.InputContext;
  *   virtualKeyboardAutoCorrectionLevel: (number|undefined),
  *   virtualKeyboardEnableCapitalization: (boolean|undefined),
  *   xkbLayout: (string|undefined),
+ *   JapaneseInputMode: (!chrome.inputMethodPrivate.JapaneseInputMode|undefined),
+ *   JapanesePunctuationStyle: (!chrome.inputMethodPrivate.JapanesePunctuationStyle|undefined),
+ *   JapaneseSymbolStyle: (!chrome.inputMethodPrivate.JapaneseSymbolStyle|undefined),
+ *   JapaneseSpaceInputStyle: (!chrome.inputMethodPrivate.JapaneseSpaceInputStyle|undefined),
+ *   JapaneseSectionShortcut: (!chrome.inputMethodPrivate.JapaneseSelectionShortcut|undefined),
+ *   JapaneseKeymapStyle: (!chrome.inputMethodPrivate.JapaneseKeymapStyle|undefined),
+ *   AutomaticallySwitchToHalfwidth: (boolean|undefined),
+ *   ShiftKeyModeStyle: (!chrome.inputMethodPrivate.ShiftKeyModeStyle|undefined),
+ *   UseInputHistory: (boolean|undefined),
+ *   UseSystemDictionary: (boolean|undefined),
+ *   numberOfSuggestions: (number|undefined),
+ *   JapaneseDisableSuggestions: (boolean|undefined),
  *   koreanEnableSyllableInput: (boolean|undefined),
  *   koreanKeyboardLayout: (string|undefined),
  *   koreanShowHangulCandidate: (boolean|undefined),
  *   pinyinChinesePunctuation: (boolean|undefined),
  *   pinyinDefaultChinese: (boolean|undefined),
- *   pinyinEnableFuzzy: (boolean|undefined),
  *   pinyinEnableLowerPaging: (boolean|undefined),
  *   pinyinEnableUpperPaging: (boolean|undefined),
  *   pinyinFullWidthCharacter: (boolean|undefined),
- *   pinyinFuzzyConfig: ({
- *     an_ang: (boolean|undefined),
- *     c_ch: (boolean|undefined),
- *     en_eng: (boolean|undefined),
- *     f_h: (boolean|undefined),
- *     ian_iang: (boolean|undefined),
- *     in_ing: (boolean|undefined),
- *     k_g: (boolean|undefined),
- *     l_n: (boolean|undefined),
- *     r_l: (boolean|undefined),
- *     s_sh: (boolean|undefined),
- *     uan_uang: (boolean|undefined),
- *     z_zh: (boolean|undefined)
- *   }|undefined),
  *   zhuyinKeyboardLayout: (string|undefined),
  *   zhuyinPageSize: (number|undefined),
  *   zhuyinSelectKeys: (string|undefined),
@@ -196,7 +259,7 @@ chrome.inputMethodPrivate.InputMethodSettings;
  * @param {function({
  *   isPhysicalKeyboardAutocorrectEnabled: boolean,
  *   isImeMenuActivated: boolean
- * }): void} callback Callback which is called with the config object.
+ * }): void} callback Resolves with the config object.
  */
 chrome.inputMethodPrivate.getInputMethodConfig = function(callback) {};
 
@@ -208,14 +271,14 @@ chrome.inputMethodPrivate.getInputMethodConfig = function(callback) {};
  *   id: string,
  *   name: string,
  *   indicator: string
- * }>): void} callback Callback which is called with the input method objects.
+ * }>): void} callback Resolves with the input method objects.
  */
 chrome.inputMethodPrivate.getInputMethods = function(callback) {};
 
 /**
  * Gets the current input method.
- * @param {function(string): void} callback Callback which is called with the
- *     current input method.
+ * @param {function(string): void} callback Resolves with the current input
+ *     method.
  */
 chrome.inputMethodPrivate.getCurrentInputMethod = function(callback) {};
 
@@ -223,40 +286,38 @@ chrome.inputMethodPrivate.getCurrentInputMethod = function(callback) {};
  * Sets the current input method.
  * @param {string} inputMethodId The input method ID to be set as current input
  *     method.
- * @param {function(): void=} callback Callback which is called once the current
- *     input method is set. If unsuccessful $(ref:runtime.lastError) is set.
+ * @param {function(): void=} callback Resolves once the current input method is
+ *     set. If unsuccessful, the promise is rejected.
  */
 chrome.inputMethodPrivate.setCurrentInputMethod = function(inputMethodId, callback) {};
 
 /**
  * Switches to the last used input method. If no last used input method, this is
  * a no-op.
- * @param {function(): void=} callback Callback which is called once the input
- *     method is swapped (if applicable). If unsuccessful
- *     $(ref:runtime.lastError) is set.
+ * @param {function(): void=} callback Resolves once the input method is swapped
+ *     (if applicable). If unsuccessful, the promise is rejected.
  */
 chrome.inputMethodPrivate.switchToLastUsedInputMethod = function(callback) {};
 
 /**
  * Fetches a list of all the words currently in the dictionary.
- * @param {function(!Array<string>): void} callback Callback which is called
- *     once the list of dictionary words are ready.
+ * @param {function(!Array<string>): void} callback Resolves once the list of
+ *     dictionary words are ready.
  */
 chrome.inputMethodPrivate.fetchAllDictionaryWords = function(callback) {};
 
 /**
  * Adds a single word to be stored in the dictionary.
  * @param {string} word A new word to add to the dictionary.
- * @param {function(): void=} callback Callback which is called once the word is
- *     added. If unsuccessful $(ref:runtime.lastError) is set.
+ * @param {function(): void=} callback Resolves once the word is added. If
+ *     unsuccessful, the promise is rejected.
  */
 chrome.inputMethodPrivate.addWordToDictionary = function(word, callback) {};
 
 /**
  * Sets the XKB layout for the given input method.
  * @param {string} xkb_name The XKB layout name.
- * @param {function(): void=} callback Callback which is called when the layout
- *     is set.
+ * @param {function(): void=} callback Resolves when the layout is set.
  */
 chrome.inputMethodPrivate.setXkbLayout = function(xkb_name, callback) {};
 
@@ -266,21 +327,21 @@ chrome.inputMethodPrivate.setXkbLayout = function(xkb_name, callback) {};
  * @param {{
  *   contextID: number
  * }} parameters
- * @param {function(): void=} callback Called when the operation completes.
+ * @param {function(): void=} callback Resolves when the operation completes.
  */
 chrome.inputMethodPrivate.finishComposingText = function(parameters, callback) {};
 
 /**
  * Shows the input view window. If the input view window is already shown, this
  * function will do nothing.
- * @param {function(): void=} callback Called when the operation completes.
+ * @param {function(): void=} callback Resolves when the operation completes.
  */
 chrome.inputMethodPrivate.showInputView = function(callback) {};
 
 /**
  * Hides the input view window. If the input view window is already hidden, this
  * function will do nothing.
- * @param {function(): void=} callback Called when the operation completes.
+ * @param {function(): void=} callback Resolves when the operation completes.
  */
 chrome.inputMethodPrivate.hideInputView = function(callback) {};
 
@@ -303,7 +364,7 @@ chrome.inputMethodPrivate.openOptionsPage = function(inputMethodId) {};
  *   before: string,
  *   selected: string,
  *   after: string
- * }): void} callback Callback which is called to provide the result
+ * }): void} callback Resolves to provide the result
  */
 chrome.inputMethodPrivate.getSurroundingText = function(beforeLength, afterLength, callback) {};
 
@@ -312,7 +373,7 @@ chrome.inputMethodPrivate.getSurroundingText = function(beforeLength, afterLengt
  * @param {string} engineID The ID of the engine (e.g. 'zh-t-i0-pinyin',
  *     'xkb:us::eng')
  * @param {function((!chrome.inputMethodPrivate.InputMethodSettings|undefined)): void}
- *     callback Callback to receive the settings
+ *     callback Resolves with the settings
  */
 chrome.inputMethodPrivate.getSettings = function(engineID, callback) {};
 
@@ -322,7 +383,7 @@ chrome.inputMethodPrivate.getSettings = function(engineID, callback) {};
  *     'xkb:us::eng')
  * @param {!chrome.inputMethodPrivate.InputMethodSettings} settings The settings
  *     to set
- * @param {function(): void=} callback Callback to notify that the new value has
+ * @param {function(): void=} callback Resolves to notify that the new value has
  *     been set
  */
 chrome.inputMethodPrivate.setSettings = function(engineID, settings, callback) {};
@@ -340,9 +401,9 @@ chrome.inputMethodPrivate.setSettings = function(engineID, settings, callback) {
  *     style: !chrome.inputMethodPrivate.UnderlineStyle
  *   }>|undefined)
  * }} parameters
- * @param {function(boolean): void=} callback Called when the operation
+ * @param {function(boolean): void=} callback Resolves when the operation
  *     completes with a boolean indicating if the text was accepted or not. On
- *     failure, $(ref:runtime.lastError) is set.
+ *     failure, the promise will be rejected.
  */
 chrome.inputMethodPrivate.setCompositionRange = function(parameters, callback) {};
 
@@ -372,7 +433,7 @@ chrome.inputMethodPrivate.notifyInputMethodReadyForTesting = function() {};
  * Gets the aggregate status of all language packs for a given input method.
  * @param {string} inputMethodId Fully qualified ID of the input method
  * @param {function(!chrome.inputMethodPrivate.LanguagePackStatus): void}
- *     callback Called with a LanguagePackStatus when the operation completes.
+ *     callback Resolves with a LanguagePackStatus when the operation completes.
  */
 chrome.inputMethodPrivate.getLanguagePackStatus = function(inputMethodId, callback) {};
 
@@ -426,13 +487,6 @@ chrome.inputMethodPrivate.onImeMenuItemsChanged;
  * @type {!ChromeEvent}
  */
 chrome.inputMethodPrivate.onFocus;
-
-/**
- * This event is sent when the settings for any input method changed. It is sent
- * to all extensions that are listening to this event, and enabled by the user.
- * @type {!ChromeEvent}
- */
-chrome.inputMethodPrivate.onSettingsChanged;
 
 /**
  * This event is sent when the screen is being mirrored or the desktop is being

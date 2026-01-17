@@ -20,10 +20,11 @@ import android.os.Handler;
 import android.view.KeyEvent;
 
 import org.jni_zero.CalledByNative;
+import org.jni_zero.JniType;
 import org.jni_zero.NativeMethods;
 
+import org.chromium.base.AndroidInfo;
 import org.chromium.base.ApiCompatibilityUtils;
-import org.chromium.base.BuildInfo;
 import org.chromium.base.Callback;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.ObserverList.RewindableIterator;
@@ -45,16 +46,21 @@ import org.chromium.chrome.browser.policy.PolicyAuditor;
 import org.chromium.chrome.browser.policy.PolicyAuditorJni;
 import org.chromium.chrome.browser.serial.SerialNotificationManager;
 import org.chromium.chrome.browser.usb.UsbNotificationManager;
+import org.chromium.chrome.browser.util.PictureInPictureWindowOptions;
 import org.chromium.chrome.browser.util.WindowFeatures;
 import org.chromium.components.browser_ui.styles.ChromeColors;
 import org.chromium.components.browser_ui.styles.SemanticColorUtils;
 import org.chromium.components.find_in_page.FindMatchRectsDetails;
 import org.chromium.components.find_in_page.FindNotificationDetails;
 import org.chromium.content_public.browser.InvalidateTypes;
+import org.chromium.content_public.browser.RenderFrameHost;
 import org.chromium.content_public.browser.WebContents;
+import org.chromium.content_public.browser.navigation_controller.UserAgentOverrideOption;
 import org.chromium.content_public.common.ResourceRequestBody;
+import org.chromium.ui.resources.dynamics.CaptureResult;
 import org.chromium.url.GURL;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** Implementation class of {@link TabWebContentsDelegateAndroid}. */
@@ -89,15 +95,14 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
         while (observers.hasNext()) observers.next().onFindMatchRectsAvailable(result);
     }
 
-    // Helper functions used to create types that are part of the public interface
     @CalledByNative
-    private static Rect createRect(int x, int y, int right, int bottom) {
-        return new Rect(x, y, right, bottom);
+    public List<Rect> createRectList() {
+        return new ArrayList<Rect>();
     }
 
     @CalledByNative
-    private static RectF createRectF(float x, float y, float right, float bottom) {
-        return new RectF(x, y, right, bottom);
+    public void createRectAndAddToList(List<Rect> list, int x, int y, int right, int bottom) {
+        list.add(new Rect(x, y, right, bottom));
     }
 
     @CalledByNative
@@ -118,9 +123,15 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
     }
 
     @CalledByNative
+    private static PictureInPictureWindowOptions createPictureInPictureWindowOptions(
+            @JniType("gfx::Rect") Rect windowBounds, boolean disallowReturnToOpener) {
+        return new PictureInPictureWindowOptions(windowBounds, disallowReturnToOpener);
+    }
+
+    @CalledByNative
     private static FindNotificationDetails createFindNotificationDetails(
             int numberOfMatches,
-            Rect rendererSelectionRect,
+            @JniType("gfx::Rect") Rect rendererSelectionRect,
             int activeMatchOrdinal,
             boolean finalUpdate) {
         return new FindNotificationDetails(
@@ -129,13 +140,15 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
 
     @CalledByNative
     private static FindMatchRectsDetails createFindMatchRectsDetails(
-            int version, int numRects, RectF activeRect) {
+            int version, int numRects, @JniType("gfx::RectF") RectF activeRect) {
         return new FindMatchRectsDetails(version, numRects, activeRect);
     }
 
     @CalledByNative
     private static void setMatchRectByIndex(
-            FindMatchRectsDetails findMatchRectsDetails, int index, RectF rect) {
+            FindMatchRectsDetails findMatchRectsDetails,
+            int index,
+            @JniType("gfx::RectF") RectF rect) {
         findMatchRectsDetails.rects[index] = rect;
     }
 
@@ -155,16 +168,23 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
     protected boolean addNewContents(
             WebContents sourceWebContents,
             WebContents webContents,
+            GURL targetUrl,
             int disposition,
             WindowFeatures windowFeatures,
-            boolean userGesture) {
+            boolean userGesture,
+            @Nullable PictureInPictureWindowOptions pictureInPictureWindowOptions) {
         return mDelegate.addNewContents(
-                sourceWebContents, webContents, disposition, windowFeatures, userGesture);
+                sourceWebContents,
+                webContents,
+                targetUrl,
+                disposition,
+                windowFeatures,
+                userGesture,
+                pictureInPictureWindowOptions);
     }
 
-    @CalledByNative
     @Override
-    protected void setContentsBounds(WebContents source, Rect bounds) {
+    public void setContentsBounds(WebContents source, Rect bounds) {
         mDelegate.setContentsBounds(source, bounds);
     }
 
@@ -237,11 +257,16 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
     @Override
     public boolean addMessageToConsole(int level, String message, int lineNumber, String sourceId) {
         // Only output console.log messages on debug variants of Android OS. crbug/869804
-        return !BuildInfo.isDebugAndroid();
+        return !AndroidInfo.isDebugAndroid();
     }
 
     @Override
     public void loadingStateChanged(boolean shouldShowLoadingUi) {
+        // Destroying a tab destroys the WebContents, which can call this function. Due to
+        // circular dependencies and this function observing the WebContents, not the Tab, there's
+        // no correct destruction ordering, so check if the Tab is being destroyed, and if so, don't
+        // try to use it.
+        if (mTab.isDestroyed()) return;
         boolean isLoading = mTab.getWebContents() != null && mTab.getWebContents().isLoading();
         if (isLoading) {
             mTab.onLoadStarted(shouldShowLoadingUi);
@@ -252,10 +277,10 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
     }
 
     @Override
-    public void onUpdateUrl(GURL url) {
+    public void onUpdateTargetUrl(GURL url) {
         RewindableIterator<TabObserver> observers = mTab.getTabObservers();
-        while (observers.hasNext()) observers.next().onUpdateUrl(mTab, url);
-        mDelegate.onUpdateUrl(url);
+        while (observers.hasNext()) observers.next().onUpdateTargetUrl(mTab, url);
+        mDelegate.onUpdateTargetUrl(url);
     }
 
     @Override
@@ -263,8 +288,9 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
         return mDelegate.takeFocus(reverse);
     }
 
+    @CalledByNative
     @Override
-    public boolean preHandleKeyboardEvent(long nativeKeyEvent) {
+    protected boolean preHandleKeyboardEvent(long nativeKeyEvent) {
         return mDelegate.preHandleKeyboardEvent(nativeKeyEvent);
     }
 
@@ -275,15 +301,22 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
 
     @Override
     public void enterFullscreenModeForTab(
-            long requestingFrame, boolean prefersNavigationBar, boolean prefersStatusBar) {
+            RenderFrameHost renderFrameHost,
+            boolean prefersNavigationBar,
+            boolean prefersStatusBar,
+            long displayId) {
         mDelegate.enterFullscreenModeForTab(
-                requestingFrame, prefersNavigationBar, prefersStatusBar);
+                renderFrameHost, prefersNavigationBar, prefersStatusBar, displayId);
     }
 
     @Override
     public void fullscreenStateChangedForTab(
-            boolean prefersNavigationBar, boolean prefersStatusBar) {
-        mDelegate.fullscreenStateChangedForTab(prefersNavigationBar, prefersStatusBar);
+            RenderFrameHost renderFrameHost,
+            boolean prefersNavigationBar,
+            boolean prefersStatusBar,
+            long displayId) {
+        mDelegate.fullscreenStateChangedForTab(
+                renderFrameHost, prefersNavigationBar, prefersStatusBar, displayId);
     }
 
     @Override
@@ -294,6 +327,21 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
     @Override
     public boolean isFullscreenForTabOrPending() {
         return mDelegate.isFullscreenForTabOrPending();
+    }
+
+    @Override
+    public long getFullscreenTargetDisplay() {
+        return mDelegate.getFullscreenTargetDisplay();
+    }
+
+    @Override
+    public void requestKeyboardLock(boolean escKeyLocked) {
+        mDelegate.requestKeyboardLock(escKeyLocked);
+    }
+
+    @Override
+    public void cancelKeyboardLockRequest() {
+        mDelegate.cancelKeyboardLockRequest();
     }
 
     @Override
@@ -363,23 +411,6 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
     }
 
     @Override
-    public void webContentsCreated(
-            WebContents sourceWebContents,
-            long openerRenderProcessId,
-            long openerRenderFrameId,
-            String frameName,
-            GURL targetUrl,
-            WebContents newWebContents) {
-        mDelegate.webContentsCreated(
-                sourceWebContents,
-                openerRenderProcessId,
-                openerRenderFrameId,
-                frameName,
-                targetUrl,
-                newWebContents);
-    }
-
-    @Override
     public void showRepostFormWarningDialog() {
         mDelegate.showRepostFormWarningDialog();
     }
@@ -436,8 +467,8 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
     }
 
     /**
-     * @return Night mode enabled/disabled for this Tab. To be used to propagate
-     *         the preferred color scheme to the renderer.
+     * @return Night mode enabled/disabled for this Tab. To be used to propagate the preferred color
+     *     scheme to the renderer.
      */
     @CalledByNative
     @Override
@@ -456,6 +487,7 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
 
     /**
      * Return true if app banners are to be permitted in this tab. May need to be overridden.
+     *
      * @return true if app banners are permitted, and false otherwise.
      */
     @CalledByNative
@@ -476,6 +508,7 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
 
     /**
      * Checks if the associated tab is currently presented in the context of custom tabs.
+     *
      * @return true if this is currently a custom tab.
      */
     @CalledByNative
@@ -487,6 +520,7 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
     /**
      * Checks if the associated tab is running an activity for installed webapp (TWA only for now),
      * and whether the geolocation request should be delegated to the client app.
+     *
      * @return true if this is TWA and should delegate geolocation request.
      */
     @CalledByNative
@@ -497,6 +531,7 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
 
     /**
      * Checks if the associated tab uses modal context menu.
+     *
      * @return true if the current tab uses modal context menu.
      */
     @CalledByNative
@@ -509,6 +544,25 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
     @Override
     protected boolean isDynamicSafeAreaInsetsEnabled() {
         return mDelegate.isDynamicSafeAreaInsetsEnabled();
+    }
+
+    @CalledByNative
+    @Override
+    public void requestPointerLock(
+            WebContents webContents, boolean userGesture, boolean lastUnlockedByTarget) {
+        mDelegate.requestPointerLock(webContents, userGesture, lastUnlockedByTarget);
+    }
+
+    @CalledByNative
+    @Override
+    public void lostPointerLock() {
+        mDelegate.lostPointerLock();
+    }
+
+    @CalledByNative
+    @Override
+    public void nonDraggableRegionsChanged(List<Rect> regions) {
+        mDelegate.nonDraggableRegionsChanged(regions);
     }
 
     @Override
@@ -547,8 +601,10 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
     }
 
     @Override
-    public boolean maybeCopyContentAreaAsBitmap(Callback<@Nullable Bitmap> callback) {
-        return NativePageBitmapCapturer.maybeCaptureNativeView(mTab, callback);
+    public boolean maybeCopyContentArea(
+            Callback<@Nullable CaptureResult> callback,
+            @CaptureResult.Destination int destination) {
+        return NativePageBitmapCapturer.maybeCaptureNativeView(mTab, callback, destination);
     }
 
     @Override
@@ -602,6 +658,11 @@ final class TabWebContentsDelegateAndroidImpl extends TabWebContentsDelegateAndr
         } else {
             ZoomController.zoomOut(wc);
         }
+    }
+
+    @Override
+    public @UserAgentOverrideOption int shouldOverrideUserAgentForPreloading(GURL url) {
+        return mTab.calculateUserAgentOverrideOption(url);
     }
 
     @Override

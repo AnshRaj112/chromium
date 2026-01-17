@@ -8,7 +8,6 @@
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/logging.h"
 #include "base/strings/escape.h"
@@ -280,7 +279,7 @@ std::unique_ptr<CastMediaSource> CreateFromURLParams(
 
 std::unique_ptr<CastMediaSource> ParseCastUrl(const MediaSource::Id& source_id,
                                               const GURL& url) {
-  std::string app_id = url.path();
+  std::string app_id = url.GetPath();
   // App ID must be non-empty.
   if (app_id.empty()) {
     return nullptr;
@@ -306,7 +305,7 @@ std::unique_ptr<CastMediaSource> ParseLegacyCastUrl(
     const MediaSource::Id& source_id,
     const GURL& url) {
   base::StringPairs params;
-  base::SplitStringIntoKeyValuePairs(url.ref(), '=', '/', &params);
+  base::SplitStringIntoKeyValuePairs(url.GetRef(), '=', '/', &params);
   for (auto& pair : params) {
     pair.second = base::UnescapeURLComponent(
         pair.second,
@@ -519,7 +518,7 @@ bool CastMediaSource::ProvidesStreamingAudioCapture() const {
 void CastMediaSource::set_supported_app_types(
     const std::vector<ReceiverAppType>& types) {
   DCHECK(!types.empty());
-  DCHECK(base::Contains(types, ReceiverAppType::kWeb));
+  DCHECK(std::ranges::contains(types, ReceiverAppType::kWeb));
   supported_app_types_ = types;
 }
 

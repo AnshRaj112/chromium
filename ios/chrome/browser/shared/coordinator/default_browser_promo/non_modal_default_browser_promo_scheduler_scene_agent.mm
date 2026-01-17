@@ -11,8 +11,8 @@
 #import "components/feature_engagement/public/tracker.h"
 #import "ios/chrome/browser/default_browser/model/features.h"
 #import "ios/chrome/browser/default_browser/model/utils.h"
-#import "ios/chrome/browser/default_promo/ui_bundled/default_browser_promo_non_modal_commands.h"
-#import "ios/chrome/browser/default_promo/ui_bundled/default_browser_promo_non_modal_metrics_util.h"
+#import "ios/chrome/browser/default_browser/promo/non_modal/public/default_browser_promo_non_modal_commands.h"
+#import "ios/chrome/browser/default_browser/promo/non_modal/public/default_browser_promo_non_modal_metrics_util.h"
 #import "ios/chrome/browser/feature_engagement/model/tracker_factory.h"
 #import "ios/chrome/browser/overlays/model/public/overlay_presenter.h"
 #import "ios/chrome/browser/overlays/model/public/overlay_presenter_observer_bridge.h"
@@ -24,8 +24,8 @@
 #import "ios/chrome/browser/shared/model/web_state_list/active_web_state_observation_forwarder.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list_observer_bridge.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/web/public/web_state.h"
 #import "ios/web/public/web_state_observer_bridge.h"
@@ -88,7 +88,7 @@ NonModalPromoTriggerType MetricTypeForPromoReason(
 // Time when a promo was shown on screen, used for metrics only.
 @property(nonatomic) base::TimeTicks promoShownTime;
 
-// WebState that the triggering event occured in.
+// WebState that the triggering event occurred in.
 @property(nonatomic, assign) web::WebState* webStateToListenTo;
 
 // Whether or not the promo is currently showing.
@@ -146,7 +146,7 @@ NonModalPromoTriggerType MetricTypeForPromoReason(
   }
 
   // This assumes that the currently active webstate is the one that the paste
-  // occured in.
+  // occurred in.
   web::WebState* activeWebState = self.webStateList->GetActiveWebState();
   // There should always be an active web state when pasting in the omnibox.
   if (!activeWebState) {
@@ -275,10 +275,7 @@ NonModalPromoTriggerType MetricTypeForPromoReason(
   LogNonModalTimeOnScreen(promoShownTime);
   LogUserInteractionWithNonModalPromo(_userInteractionWithNonModalPromoCount);
 
-  NSURL* settingsURL = [NSURL URLWithString:UIApplicationOpenSettingsURLString];
-  [[UIApplication sharedApplication] openURL:settingsURL
-                                     options:@{}
-                           completionHandler:nil];
+  OpenIOSDefaultBrowserSettingsPage();
 }
 
 - (void)logPromoUserDismiss:

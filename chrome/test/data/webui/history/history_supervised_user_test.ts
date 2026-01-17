@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 import type {HistoryAppElement, HistoryEntry, HistoryListElement, HistoryToolbarElement} from 'chrome://history/history.js';
-import {BrowserServiceImpl, ensureLazyLoaded} from 'chrome://history/history.js';
+import {BrowserServiceImpl} from 'chrome://history/history.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
-import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
-import {eventToPromise} from 'chrome://webui-test/test_util.js';
+import {eventToPromise, microtasksFinished} from 'chrome://webui-test/test_util.js';
 
 import {TestBrowserService} from './test_browser_service.js';
 import {createHistoryEntry, createHistoryInfo} from './test_util.js';
@@ -36,14 +35,11 @@ suite('history-list supervised-user', function() {
 
     historyList = app.$.history;
     toolbar = app.$.toolbar;
-    return Promise.all([
-      testService.handler.whenCalled('queryHistory'),
-      ensureLazyLoaded(),
-    ]);
+    return testService.handler.whenCalled('queryHistory');
   });
 
   test('checkboxes disabled for supervised user', function() {
-    return flushTasks().then(function() {
+    return microtasksFinished().then(function() {
       const items = historyList.shadowRoot.querySelectorAll('history-item');
 
       items[0]!.$.checkbox.click();
@@ -53,7 +49,7 @@ suite('history-list supervised-user', function() {
   });
 
   test('deletion disabled for supervised user', function() {
-    return flushTasks()
+    return microtasksFinished()
         .then(function() {
           const whenChecked =
               eventToPromise('history-checkbox-select', historyList);

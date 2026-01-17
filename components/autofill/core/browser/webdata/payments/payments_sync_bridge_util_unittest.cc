@@ -4,9 +4,11 @@
 
 #include "components/autofill/core/browser/webdata/payments/payments_sync_bridge_util.h"
 
+#include <utility>
 #include <variant>
 #include <vector>
 
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/protobuf_matchers.h"
@@ -27,12 +29,12 @@
 #include "components/autofill/core/browser/test_utils/autofill_test_utils.h"
 #include "components/autofill/core/browser/webdata/payments/payments_autofill_table.h"
 #include "components/autofill/core/browser/webdata/payments/payments_sync_bridge_test_util.h"
+#include "components/autofill/core/browser/webdata/payments/payments_sync_util.h"
 #include "components/autofill/core/browser/webdata/payments/server_cvc.h"
 #include "components/autofill/core/common/autofill_constants.h"
 #include "components/autofill/core/common/autofill_payments_features.h"
 #include "components/autofill/core/common/credit_card_network_identifiers.h"
 #include "components/sync/base/client_tag_hash.h"
-#include "components/sync/base/hash_util.h"
 #include "components/sync/protocol/autofill_offer_specifics.pb.h"
 #include "components/sync/protocol/autofill_specifics.pb.h"
 #include "components/sync/protocol/autofill_wallet_usage_specifics.pb.h"
@@ -119,9 +121,6 @@ class PaymentsSyncBridgeUtilTest : public testing::Test {
 
 // Tests that PopulateWalletTypesFromSyncData behaves as expected.
 TEST_F(PaymentsSyncBridgeUtilTest, PopulateWalletTypesFromSyncData) {
-  base::test::ScopedFeatureList feature;
-  feature.InitAndEnableFeature(features::kAutofillEnableCardBenefitsSourceSync);
-
   syncer::EntityChangeList entity_data;
   // Add two credit cards.
   std::string credit_card_id_1 = "credit_card_1";
@@ -501,16 +500,9 @@ INSTANTIATE_TEST_SUITE_P(
 // matching benefit source string.
 class PaymentsSyncBridgeUtilCardBenefitsSourceSyncTest
     : public testing::TestWithParam<
-          std::tuple<bool,
-                     sync_pb::WalletMaskedCreditCard::CardBenefitSource,
+          std::tuple<sync_pb::WalletMaskedCreditCard::CardBenefitSource,
                      std::string_view>> {
  public:
-  PaymentsSyncBridgeUtilCardBenefitsSourceSyncTest() {
-    feature_list_.InitWithFeatureState(
-        features::kAutofillEnableCardBenefitsSourceSync,
-        IsSyncingFlagEnabled());
-  }
-
   syncer::EntityChangeList PrepareSyncDataWithBenefitSource() {
     sync_pb::AutofillWalletSpecifics wallet_specifics_card =
         CreateAutofillWalletSpecificsForCard(
@@ -528,63 +520,40 @@ class PaymentsSyncBridgeUtilCardBenefitsSourceSyncTest
     return entity_data;
   }
 
-  bool IsSyncingFlagEnabled() { return std::get<0>(GetParam()); }
-
   sync_pb::WalletMaskedCreditCard::CardBenefitSource
   GetBenefitSourceForSpecifics() {
-    return std::get<1>(GetParam());
+    return std::get<0>(GetParam());
   }
 
-  std::string_view GetBenefitSourceString() { return std::get<2>(GetParam()); }
+  std::string_view GetBenefitSourceString() { return std::get<1>(GetParam()); }
 
  private:
   base::test::ScopedFeatureList feature_list_;
 };
 
-// Initializes the parameterized test suite with a boolean indicate whether the
-// feature flag is enabled,
+// Initializes the parameterized test suite with
 // `sync_pb::WalletMaskedCreditCard::CardBenefitSource` enum and the
 // corresponding benefit source string.
 INSTANTIATE_TEST_SUITE_P(
     /*no prefix*/,
     PaymentsSyncBridgeUtilCardBenefitsSourceSyncTest,
     testing::Values(
-        std::make_tuple(true,
-                        sync_pb::WalletMaskedCreditCard::SOURCE_UNKNOWN,
-                        ""),
-        std::make_tuple(true,
-                        sync_pb::WalletMaskedCreditCard::SOURCE_AMEX,
+        std::make_tuple(sync_pb::WalletMaskedCreditCard::SOURCE_UNKNOWN, ""),
+        std::make_tuple(sync_pb::WalletMaskedCreditCard::SOURCE_AMEX,
                         kAmexCardBenefitSource),
-        std::make_tuple(true,
-                        sync_pb::WalletMaskedCreditCard::SOURCE_BMO,
+        std::make_tuple(sync_pb::WalletMaskedCreditCard::SOURCE_BMO,
                         kBmoCardBenefitSource),
-        std::make_tuple(true,
-                        sync_pb::WalletMaskedCreditCard::SOURCE_CURINOS,
-                        kCurinosCardBenefitSource),
-        std::make_tuple(false,
-                        sync_pb::WalletMaskedCreditCard::SOURCE_UNKNOWN,
-                        ""),
-        std::make_tuple(false,
-                        sync_pb::WalletMaskedCreditCard::SOURCE_AMEX,
-                        kAmexCardBenefitSource),
-        std::make_tuple(false,
-                        sync_pb::WalletMaskedCreditCard::SOURCE_BMO,
-                        kBmoCardBenefitSource),
-        std::make_tuple(false,
-                        sync_pb::WalletMaskedCreditCard::SOURCE_CURINOS,
+        std::make_tuple(sync_pb::WalletMaskedCreditCard::SOURCE_CURINOS,
                         kCurinosCardBenefitSource)),
     [](const testing::TestParamInfo<
         PaymentsSyncBridgeUtilCardBenefitsSourceSyncTest::ParamType>& info) {
-      return base::StrCat({std::get<0>(info.param) ? "BenefitSourceEnabled_"
-                                                   : "BenefitSourceDisabled_",
-                           std::get<2>(info.param).empty()
+      return base::StrCat({std::get<1>(info.param).empty()
                                ? "SourceUnknown"
-                               : std::get<2>(info.param)});
+                               : std::get<1>(info.param)});
     });
 
-// Tests that when `kAutofillEnableCardBenefitsSourceSync` is enabled, benefit
-// source will set based on the benefit source enum from the synced data.
-// When the flag is disabled, benefit source will not be set.
+// Tests that benefit source will set based on the benefit source enum from the
+// synced data.
 TEST_P(PaymentsSyncBridgeUtilCardBenefitsSourceSyncTest, BenefitSourceMapping) {
   // Add a card with benefit source to entity.
   syncer::EntityChangeList entity_data = PrepareSyncDataWithBenefitSource();
@@ -604,8 +573,7 @@ TEST_P(PaymentsSyncBridgeUtilCardBenefitsSourceSyncTest, BenefitSourceMapping) {
                                   payment_instrument_creation_options);
 
   ASSERT_EQ(1U, wallet_cards.size());
-  EXPECT_EQ(test_api(wallet_cards.front()).benefit_source(),
-            IsSyncingFlagEnabled() ? GetBenefitSourceString() : std::string());
+  EXPECT_EQ(wallet_cards.front().benefit_source(), GetBenefitSourceString());
 }
 
 // Verify that the billing address id from the card saved on disk is kept if it
@@ -743,7 +711,7 @@ TEST_F(PaymentsSyncBridgeUtilTest, OfferSpecificsFromOfferData) {
             (offer_data.GetExpiry() - base::Time::UnixEpoch()).InSeconds());
   EXPECT_EQ(offer_specifics.merchant_domain().size(),
             (int)offer_data.GetMerchantOrigins().size());
-  for (int i = 0; i < offer_specifics.merchant_domain().size(); i++) {
+  for (int i = 0; i < offer_specifics.merchant_domain().size(); ++i) {
     EXPECT_EQ(offer_specifics.merchant_domain(i),
               offer_data.GetMerchantOrigins()[i].spec());
   }
@@ -777,7 +745,7 @@ TEST_F(PaymentsSyncBridgeUtilTest, OfferSpecificsFromCardLinkedOfferData) {
             (int)offer_data.GetEligibleInstrumentIds().size());
   for (int i = 0;
        i < offer_specifics.card_linked_offer_data().instrument_id().size();
-       i++) {
+       ++i) {
     EXPECT_EQ(offer_specifics.card_linked_offer_data().instrument_id(i),
               offer_data.GetEligibleInstrumentIds()[i]);
   }
@@ -1025,9 +993,9 @@ TEST_F(PaymentsSyncBridgeUtilTest, SetAutofillWalletSpecificsFromCardBenefit) {
     } else if (benefit_specifics.has_category_benefit()) {
       // Check category benefit specific field is set correctly.
       EXPECT_EQ(
-          base::to_underlying(
+          std::to_underlying(
               benefit_specifics.category_benefit().category_benefit_type()),
-          base::to_underlying(category_benefit.benefit_category()));
+          std::to_underlying(category_benefit.benefit_category()));
 
       target_benefit = category_benefit;
     } else {
@@ -1184,8 +1152,6 @@ TEST_F(PaymentsSyncBridgeUtilTest,
 #if BUILDFLAG(IS_ANDROID)
 // Tests that PopulateWalletTypesFromSyncData populates BankAccounts.
 TEST_F(PaymentsSyncBridgeUtilTest, PopulateBankAccountFromSyncData) {
-  base::test::ScopedFeatureList scoped_feature_list(
-      features::kAutofillEnableSyncingOfPixBankAccounts);
   syncer::EntityChangeList entity_data;
   std::string bank_account_id = "payment_instrument:123545";
   sync_pb::AutofillWalletSpecifics payment_instrument_bank_account_specifics =
@@ -1221,44 +1187,6 @@ TEST_F(PaymentsSyncBridgeUtilTest, PopulateBankAccountFromSyncData) {
 
   ASSERT_EQ(1u, bank_accounts.size());
   EXPECT_EQ(expected_bank_account, bank_accounts.at(0));
-}
-
-// Tests that PopulateWalletTypesFromSyncData does not BankAccounts if Pix
-// experiment flag is disabled.
-TEST_F(PaymentsSyncBridgeUtilTest,
-       PopulateBankAccountFromSyncDataExperimentOff) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndDisableFeature(
-      features::kAutofillEnableSyncingOfPixBankAccounts);
-  syncer::EntityChangeList entity_data;
-  std::string bank_account_id = "payment_instrument:123545";
-  sync_pb::AutofillWalletSpecifics payment_instrument_bank_account_specifics =
-      CreateAutofillWalletSpecificsForBankAccount(
-          /*client_tag=*/bank_account_id, /*nickname=*/"Pix bank account",
-          /*display_icon_url=*/GURL("http://www.google.com"),
-          /*bank_name=*/"ABC Bank",
-          /*account_number_suffix=*/"1234",
-          sync_pb::BankAccountDetails_AccountType_CHECKING);
-  entity_data.push_back(EntityChange::CreateAdd(
-      bank_account_id,
-      SpecificsToEntity(payment_instrument_bank_account_specifics,
-                        /*client_tag=*/"bank_account")));
-
-  std::vector<CreditCard> wallet_cards;
-  std::vector<Iban> wallet_ibans;
-  std::vector<PaymentsCustomerData> customer_data;
-  std::vector<CreditCardCloudTokenData> cloud_token_data;
-  std::vector<BankAccount> bank_accounts;
-  std::vector<CreditCardBenefit> benefits;
-  std::vector<sync_pb::PaymentInstrument> payment_instruments;
-  std::vector<sync_pb::PaymentInstrumentCreationOption>
-      payment_instrument_creation_options;
-  PopulateWalletTypesFromSyncData(entity_data, wallet_cards, wallet_ibans,
-                                  customer_data, cloud_token_data,
-                                  bank_accounts, benefits, payment_instruments,
-                                  payment_instrument_creation_options);
-
-  EXPECT_EQ(0u, bank_accounts.size());
 }
 
 TEST_F(PaymentsSyncBridgeUtilTest, BankAccountFromWalletSpecifics) {
@@ -1412,9 +1340,8 @@ TEST_F(PaymentsSyncBridgeUtilTest,
           CreateAutofillWalletSpecificsForLinkedBnplIssuer(
               instrument_id, issuer_id, currency, price_lower_bound,
               price_upper_bound);
-  std::string client_tag =
-      syncer::GetUnhashedClientTagFromAutofillWalletSpecifics(
-          payment_instrument_linked_bnpl_issuer_specifics);
+  std::string client_tag = GetUnhashedClientTagFromAutofillWalletSpecifics(
+      payment_instrument_linked_bnpl_issuer_specifics);
   entity_data.push_back(EntityChange::CreateAdd(
       /*storage_key=*/client_tag,
       SpecificsToEntity(payment_instrument_linked_bnpl_issuer_specifics,
@@ -1475,9 +1402,8 @@ TEST_F(PaymentsSyncBridgeUtilTest,
       payment_instrument_linked_bnpl_issuer_specifics =
           CreateAutofillWalletSpecificsForLinkedBnplIssuer(123545, "affirm",
                                                            "USD", 0, 35);
-  std::string client_tag =
-      syncer::GetUnhashedClientTagFromAutofillWalletSpecifics(
-          payment_instrument_linked_bnpl_issuer_specifics);
+  std::string client_tag = GetUnhashedClientTagFromAutofillWalletSpecifics(
+      payment_instrument_linked_bnpl_issuer_specifics);
   entity_data.push_back(EntityChange::CreateAdd(
       client_tag,
       SpecificsToEntity(payment_instrument_linked_bnpl_issuer_specifics,

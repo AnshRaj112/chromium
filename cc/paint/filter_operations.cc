@@ -6,11 +6,11 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <cmath>
 #include <numeric>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/trace_event/traced_value.h"
 #include "base/values.h"
@@ -78,6 +78,13 @@ gfx::Rect FilterOperations::MapRectReverse(const gfx::Rect& rect,
   };
   return std::accumulate(operations_.rbegin(), operations_.rend(), rect,
                          accumulate_rect);
+}
+
+gfx::Rect FilterOperations::ExpandRect(const gfx::Rect& rect,
+                                       const SkMatrix& ctm) const {
+  gfx::Rect result = MapRect(rect, ctm);
+  result.Union(MapRectReverse(rect, ctm));
+  return result;
 }
 
 bool FilterOperations::HasFilterThatMovesPixels() const {
@@ -150,7 +157,7 @@ bool FilterOperations::HasReferenceFilter() const {
 }
 
 bool FilterOperations::HasFilterOfType(FilterOperation::FilterType type) const {
-  return base::Contains(operations_, type, &FilterOperation::type);
+  return std::ranges::contains(operations_, type, &FilterOperation::type);
 }
 
 FilterOperations FilterOperations::Blend(const FilterOperations& from,

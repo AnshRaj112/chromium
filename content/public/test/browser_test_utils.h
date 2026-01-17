@@ -224,7 +224,7 @@ void NavigateToURLBlockUntilNavigationsComplete(
 // To write a test where the renderer itself blocks or cancels the navigation,
 // use `ExecJs()` or `EvalJs()`, e.g.:
 //
-//   EXPECT_THAT(ExecJs("try { location = ''; } catch (e) { e.message; }")
+//   EXPECT_THAT(EvalJs("try { location = ''; } catch (e) { e.message; }")
 //                   .ExtractString(),
 //               HasSubStr("..."));
 //
@@ -793,7 +793,8 @@ base::Value ListValueOf(Args&&... args) {
 // Each |arg| can be any type explicitly convertible to base::Value
 // (including int/string/std::string_view/char*/double/bool), or any type that
 // JsLiteralHelper is specialized for -- like URL and url::Origin, which emit
-// string literals. |args| can be a mix of different types.
+// string literals. Note that base::Value::Type::BINARY is not supported.
+// |args| can be a mix of different types.
 //
 // Example 1:
 //
@@ -1180,6 +1181,11 @@ ui::AXNodeData GetFocusedAccessibilityNodeInfo(WebContents* web_contents);
 // the exact ordering of events received while getting there. Blocks
 // until any change happens to the accessibility tree.
 void WaitForAccessibilityTreeToChange(WebContents* web_contents);
+
+// Waits for any change to the accessibility tree, with a timeout.
+// Returns true if a change occurred, false if the timeout was reached.
+bool WaitForAccessibilityTreeToChange(WebContents* web_contents,
+                                      base::TimeDelta timeout);
 
 // Searches the accessibility tree to see if any node's accessible name
 // is equal to the given name. If not, repeatedly calls
@@ -1581,7 +1587,7 @@ class RenderFrameSubmissionObserver
   // OnRenderFrameMetadataChangedAfterActivation.
   bool break_on_any_frame_ = false;
 
-  const raw_ptr<RenderFrameMetadataProviderImpl>
+  const base::WeakPtr<RenderFrameMetadataProviderImpl>
       render_frame_metadata_provider_;
   base::OnceClosure quit_closure_;
   // If non-null, run when metadata changes.
@@ -1660,7 +1666,8 @@ class InputMsgWatcher : public RenderWidgetHost::InputEventObserver {
                        const blink::WebInputEvent&) override;
 
   void OnInputEvent(const RenderWidgetHost& widget,
-                    const blink::WebInputEvent&) override;
+                    const blink::WebInputEvent& event,
+                    InputEventSource source) override;
 
   raw_ptr<RenderWidgetHost> render_widget_host_;
   blink::WebInputEvent::Type last_sent_event_type_ =
@@ -1833,6 +1840,11 @@ class TestNavigationManager : public WebContentsObserver {
   // getting a response.
   [[nodiscard]] bool WaitForResponse();
 
+  // Waits until the navigation fails. This will wait until all
+  // NavigationThrottles have proceeded through WillFailRequest. Returns false
+  // if the request did not fail.
+  [[nodiscard]] bool WaitForRequestFailed();
+
   // Waits until the navigation has been finished. Will automatically resume
   // navigations paused before this point. Returns false if the waiting was
   // terminated before reaching DidStartNavigation (e.g. timeout).
@@ -1881,7 +1893,8 @@ class TestNavigationManager : public WebContentsObserver {
     LOADER_STARTED = 3,
     REDIRECTED = 4,
     RESPONSE = 5,
-    FINISHED = 6,
+    REQUEST_FAILED = 6,
+    FINISHED = 7,
   };
 
   // WebContentsObserver:
@@ -1902,6 +1915,10 @@ class TestNavigationManager : public WebContentsObserver {
   // Called when the NavigationThrottle pauses the navigation in
   // WillProcessResponse.
   void OnWillProcessResponse();
+
+  // Called when the NavigationThrottle pauses the navigation in
+  // WillFailRequest.
+  void OnWillFailRequest();
 
   // Waits for the desired state. Returns false if the desired state cannot be
   // reached (eg the navigation finishes before reaching this state).
@@ -2618,6 +2635,9 @@ std::optional<int> GetDOMNodeIdFromSubframe(
 // call.
 [[nodiscard]] bool WaitForDOMContentLoaded(RenderFrameHost* rfh);
 
+// Returns a list of the `RenderWidgetHost` for popups in the `web_contents`.
+std::vector<RenderWidgetHost*> GetPopupWidgets(WebContents* web_contents);
+
 // One-shot helper that listens for creation of a new popup widget.
 class CreateNewPopupWidgetInterceptor
     : public blink::mojom::LocalFrameHostInterceptorForTesting {
@@ -2716,6 +2736,24 @@ class ShowPopupWidgetWaiter
   int32_t routing_id_ = IPC::mojom::kRoutingIdNone;
   int32_t process_id_ = 0;
   const raw_ptr<RenderFrameHost> frame_host_;
+};
+
+// Intercepts `RequestClosePopup()` method. By default `RequestClosePopup()`
+// discards the message. Individual test should override `RequestClosePopup()`
+// to customize the behavior.
+class RequestCloseWidgetInterceptor
+    : public blink::mojom::PopupWidgetHostInterceptorForTesting {
+ public:
+  explicit RequestCloseWidgetInterceptor(RenderWidgetHost* render_widget_host);
+  ~RequestCloseWidgetInterceptor() override;
+
+  // `blink::mojom::PopupWidgetHostInterceptorForTesting`:
+  blink::mojom::PopupWidgetHost* GetForwardingInterface() override;
+  void RequestClosePopup() override;
+
+ private:
+  mojo::test::ScopedSwapImplForTesting<blink::mojom::PopupWidgetHost>
+      swapped_impl_;
 };
 
 }  // namespace content

@@ -19,7 +19,6 @@
 #include "ash/system/privacy_hub/privacy_hub_notification_controller.h"
 #include "ash/system/privacy_hub/sensor_disabled_notification_delegate.h"
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/containers/enum_set.h"
 #include "components/vector_icons/vector_icons.h"
 #include "privacy_hub_notification_controller.h"
@@ -319,17 +318,6 @@ std::vector<std::u16string> PrivacyHubNotification::GetAppsAccessingSensors(
       if (is_capture_mode_active) {
         app_names.push_back(
             l10n_util::GetStringUTF16(IDS_ASH_SCREEN_CAPTURE_DISPLAY_SOURCE));
-      }
-    }
-
-    // Consider assistant only if no other apps were added to the list of app
-    // names.
-    if (app_names.size() == 0) {
-      bool is_assist_enabled =
-          Shell::Get()->app_list_controller()->IsAssistantAllowedAndEnabled();
-      if (is_assist_enabled) {
-        app_names.push_back(
-            l10n_util::GetStringUTF16(IDS_ASH_ASSISTANT_WINDOW));
       }
     }
   }

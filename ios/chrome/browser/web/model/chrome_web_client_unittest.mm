@@ -70,8 +70,8 @@ NSError* CreateTestError() {
       errorWithDomain:NSURLErrorDomain
                  code:NSURLErrorNetworkConnectionLost
              userInfo:@{
-               NSURLErrorFailingURLStringErrorKey :
-                   base::SysUTF8ToNSString(kTestUrl)
+               NSURLErrorFailingURLErrorKey :
+                   [NSURL URLWithString:base::SysUTF8ToNSString(kTestUrl)]
              }]);
 }
 }  // namespace
@@ -268,7 +268,7 @@ TEST_F(ChromeWebClientTest, PrepareErrorPageWithSSLInfo) {
   // make an actual network request.
   network::TestURLLoaderFactory test_loader_factory;
   test_loader_factory.AddResponse(
-      captive_portal::CaptivePortalDetector::kDefaultURL, "",
+      captive_portal::CaptivePortalDetector::GetDefaultUrl(), "",
       net::HTTP_NO_CONTENT);
   profile_->SetSharedURLLoaderFactory(
       base::MakeRefCounted<network::WeakWrapperSharedURLLoaderFactory>(

@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "components/sessions/core/tab_restore_service_impl.h"
 
 #include <stddef.h>
@@ -23,7 +18,6 @@
 #include "base/compiler_specific.h"
 #include "base/containers/adapters.h"
 #include "base/files/file_path.h"
-#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
@@ -420,6 +414,7 @@ struct GroupCommandFields {
   int browser_id = 0;
   std::u16string title;
   uint32_t color = 0;
+  int64_t timestamp = 0;
   bool is_saved;
   std::string saved_id;
 };
@@ -454,6 +449,10 @@ std::unique_ptr<sessions::tab_restore::Group> CreateGroupEntryFromCommand(
     }
   }
 
+  if (!it.ReadInt64(&parsed_fields.timestamp)) {
+    return nullptr;
+  }
+
   // Copy the parsed data.
   GroupCommandFields fields = parsed_fields;
 
@@ -467,6 +466,8 @@ std::unique_ptr<sessions::tab_restore::Group> CreateGroupEntryFromCommand(
   }
 
   group->browser_id = fields.browser_id;
+  group->timestamp = base::Time::FromDeltaSinceWindowsEpoch(
+      base::Microseconds(fields.timestamp));
   group->visual_data =
       tab_groups::TabGroupVisualData(fields.title, fields.color);
   *session_id = SessionID::FromSerializedValue(fields.session_id);
@@ -559,7 +560,8 @@ class TabRestoreServiceImpl::PersistenceDelegate
       tab_groups::TabGroupId group_id,
       std::optional<base::Uuid> saved_group_id,
       SessionID::id_type browser_id,
-      tab_groups::TabGroupVisualData visual_data);
+      tab_groups::TabGroupVisualData visual_data,
+      base::Time timestamp);
 
   // Creates a tab close command.
   static std::unique_ptr<SessionCommand> CreateSelectedNavigationInTabCommand(
@@ -849,7 +851,7 @@ void TabRestoreServiceImpl::PersistenceDelegate::ScheduleCommandsForGroup(
 
   command_storage_manager_->ScheduleCommand(CreateGroupCommand(
       group.id, group.tabs.size(), group.group_id, group.saved_group_id,
-      group.browser_id, group.visual_data));
+      group.browser_id, group.visual_data, group.timestamp));
   ScheduleCommandsForTabs(group.tabs);
 }
 
@@ -888,9 +890,9 @@ void TabRestoreServiceImpl::PersistenceDelegate::ScheduleCommandsForTab(
 
   if (tab.pinned) {
     PinnedStatePayload payload = true;
-    std::unique_ptr<SessionCommand> command(
-        new SessionCommand(kCommandPinnedState, sizeof(payload)));
-    memcpy(command->contents(), &payload, sizeof(payload));
+    auto command =
+        std::make_unique<SessionCommand>(kCommandPinnedState, sizeof(payload));
+    command->contents().copy_from(base::byte_span_from_ref(payload));
     command_storage_manager_->ScheduleCommand(std::move(command));
   }
 
@@ -989,7 +991,8 @@ TabRestoreServiceImpl::PersistenceDelegate::CreateGroupCommand(
     tab_groups::TabGroupId tab_group_id,
     std::optional<base::Uuid> saved_group_id,
     SessionID::id_type browser_id,
-    tab_groups::TabGroupVisualData visual_data) {
+    tab_groups::TabGroupVisualData visual_data,
+    base::Time timestamp) {
   static_assert(sizeof(SessionID::id_type) == sizeof(int),
                 "SessionID::id_type has changed size.");
 
@@ -1007,8 +1010,10 @@ TabRestoreServiceImpl::PersistenceDelegate::CreateGroupCommand(
     pickle.WriteString(saved_group_id.value().AsLowercaseString());
   }
 
-  std::unique_ptr<SessionCommand> command(
-      new SessionCommand(kCommandCreateGroup, pickle));
+  pickle.WriteInt64(timestamp.ToDeltaSinceWindowsEpoch().InMicroseconds());
+
+  std::unique_ptr<SessionCommand> command =
+      std::make_unique<SessionCommand>(kCommandCreateGroup, pickle);
   return command;
 }
 
@@ -1021,9 +1026,9 @@ std::unique_ptr<SessionCommand> TabRestoreServiceImpl::PersistenceDelegate::
   payload.id = tab_id.id();
   payload.index = index;
   payload.timestamp = timestamp.ToDeltaSinceWindowsEpoch().InMicroseconds();
-  std::unique_ptr<SessionCommand> command(
-      new SessionCommand(kCommandSelectedNavigationInTab, sizeof(payload)));
-  memcpy(command->contents(), &payload, sizeof(payload));
+  auto command = std::make_unique<SessionCommand>(
+      kCommandSelectedNavigationInTab, sizeof(payload));
+  command->contents().copy_from(base::byte_span_from_ref(payload));
   return command;
 }
 
@@ -1032,9 +1037,9 @@ std::unique_ptr<SessionCommand>
 TabRestoreServiceImpl::PersistenceDelegate::CreateRestoredEntryCommand(
     SessionID entry_id) {
   RestoredEntryPayload payload = entry_id.id();
-  std::unique_ptr<SessionCommand> command(
-      new SessionCommand(kCommandRestoredEntry, sizeof(payload)));
-  memcpy(command->contents(), &payload, sizeof(payload));
+  auto command =
+      std::make_unique<SessionCommand>(kCommandRestoredEntry, sizeof(payload));
+  command->contents().copy_from(base::byte_span_from_ref(payload));
   return command;
 }
 

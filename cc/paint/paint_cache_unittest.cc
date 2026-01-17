@@ -14,9 +14,7 @@ namespace {
 constexpr size_t kDefaultBudget = 1024u;
 
 SkPath CreatePath() {
-  SkPath path;
-  path.addCircle(2, 2, 5);
-  return path;
+  return SkPath::Circle(2, 2, 5);
 }
 
 sk_sp<SkRuntimeEffect> GetEffect() {
@@ -52,7 +50,8 @@ TEST_P(PaintCacheTest, ClientPurgeForBudgeting) {
   ClientPaintCache::PurgedData purged_data;
   client_cache.Purge(&purged_data);
   EXPECT_EQ(client_cache.bytes_used(), kDefaultBudget);
-  const auto& ids = UNSAFE_TODO(purged_data[static_cast<uint32_t>(GetType())]);
+  auto purged_span = base::span(purged_data);
+  const auto& ids = purged_span[static_cast<uint32_t>(GetType())];
   ASSERT_EQ(ids.size(), 2u);
   EXPECT_EQ(ids[0], 1u);
   EXPECT_EQ(ids[1], 2u);

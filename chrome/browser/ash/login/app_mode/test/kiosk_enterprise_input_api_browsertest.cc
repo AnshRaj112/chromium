@@ -12,7 +12,7 @@
 #include "base/check_deref.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/strings/strcat.h"
-#include "chrome/browser/ash/app_mode/fake_cws.h"
+#include "chrome/browser/ash/app_mode/fake_cws_mixin.h"
 #include "chrome/browser/ash/app_mode/test/kiosk_mixin.h"
 #include "chrome/browser/ash/app_mode/test/kiosk_test_utils.h"
 #include "chrome/browser/ash/login/test/device_state_mixin.h"
@@ -25,7 +25,6 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
-#include "content/public/test/test_navigation_observer.h"
 #include "extensions/test/extension_test_message_listener.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -48,18 +47,20 @@ constexpr std::string_view kFrFraMethodId = "xkb:fr::fra";
 // This extension exercises the `chrome.enterprise.kioskInput` API.
 constexpr std::string_view kExtensionId = "elhlgakmbkdkoajdlnfkhjbpgmbpjdig";
 
-// Serves the input extension in `fake_cws` and configures `user_policy`` to
+// Serves the input extension in `private_cws` and configures `user_policy` to
 // force install it.
-void ConfigureInputExtension(FakeCWS& fake_cws,
+void ConfigureInputExtension(FakeCwsMixin& private_cws,
                              ScopedUserPolicyUpdate& user_policy) {
   constexpr std::string_view kVersion = "1.0.0";
   auto crx_file = base::StrCat({kExtensionId, "-", kVersion, ".crx"});
+  auto policy_entry =
+      base::StrCat({kExtensionId, ";", private_cws.UpdateUrl().spec()});
 
-  fake_cws.SetUpdateCrx(kExtensionId, crx_file, kVersion);
+  private_cws.fake_cws().SetUpdateCrx(kExtensionId, crx_file, kVersion);
   user_policy.policy_payload()
       ->mutable_extensioninstallforcelist()
       ->mutable_value()
-      ->add_entries(kExtensionId);
+      ->add_entries(policy_entry);
 }
 
 std::string CurrentInputMethod() {
@@ -141,7 +142,7 @@ class KioskEnterpriseInputApiBrowserTest
   void SetUpInProcessBrowserTestFixture() override {
     MixinBasedInProcessBrowserTest::SetUpInProcessBrowserTestFixture();
     ConfigureInputExtension(
-        kiosk_.fake_cws(),
+        private_cws_,
         *kiosk_.device_state_mixin().RequestDeviceLocalAccountPolicyUpdate(
             AppInConfig().account_id));
   }
@@ -150,21 +151,23 @@ class KioskEnterpriseInputApiBrowserTest
     MixinBasedInProcessBrowserTest::SetUpOnMainThread();
     ExtensionTestMessageListener extension_ready("ready");
     extension_ready.set_extension_id(std::string(kExtensionId));
+    ui_test_utils::BrowserCreatedObserver browser_created_observer;
     ASSERT_TRUE(kiosk::test::WaitKioskLaunched());
+    SetBrowser(browser_created_observer.Wait());
     // `chrome.runtime` only gets defined once the page finishes loading.
-    content::TestNavigationObserver(&GetAppWebContents())
-        .WaitForNavigationFinished();
+    ASSERT_TRUE(WaitForLoadStop(&GetAppWebContents()));
     ASSERT_TRUE(extension_ready.WaitUntilSatisfied());
   }
 
   content::WebContents& GetAppWebContents() {
-    SelectFirstBrowser();
     BrowserView* browser_view =
         BrowserView::GetBrowserViewForBrowser(browser());
     return CHECK_DEREF(browser_view->GetActiveWebContents());
   }
 
  private:
+  FakeCwsMixin private_cws_{&mixin_host_, FakeCwsMixin::kPrivate};
+
   KioskMixin kiosk_{&mixin_host_,
                     /*cached_configuration=*/
                     {/*name=*/{},

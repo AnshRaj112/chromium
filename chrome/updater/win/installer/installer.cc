@@ -18,6 +18,7 @@
 
 #include <optional>
 #include <string>
+#include <typeinfo>
 
 #include "base/check.h"
 #include "base/command_line.h"
@@ -32,6 +33,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/synchronization/waitable_event.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/threading/platform_thread.h"
@@ -623,9 +625,7 @@ int WMain(HMODULE module) {
                      ui::GetInstallerDisplayName(bundle_name, lang).c_str(),
                      MB_OK | MB_ICONERROR | MB_SETFOREGROUND, 0);
     }
-    if (usage_stats_enable) {
-      SendPing(result.exit_code, result.windows_error);
-    }
+    SendPing(result.exit_code, result.windows_error);
   }
   base::ThreadPoolInstance::Get()->Shutdown();
   return wmain_exit_code;

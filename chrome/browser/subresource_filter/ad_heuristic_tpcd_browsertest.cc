@@ -8,7 +8,6 @@
 
 #include "base/check.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/test/bind.h"
@@ -20,10 +19,6 @@
 #include "chrome/browser/content_settings/host_content_settings_map_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/subresource_filter/subresource_filter_browser_test_harness.h"
-#include "chrome/browser/tpcd/experiment/tpcd_experiment_features.h"
-#include "chrome/browser/tpcd/support/tpcd_support_service.h"
-#include "chrome/browser/tpcd/support/tpcd_support_service_factory.h"
-#include "chrome/browser/tpcd/support/validity_service.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/testing_browser_process.h"
@@ -34,11 +29,7 @@
 #include "components/content_settings/core/common/features.h"
 #include "components/content_settings/core/common/pref_names.h"
 #include "components/metrics/content/subprocess_metrics_provider.h"
-#include "components/network_session_configurator/common/network_switches.h"
 #include "components/prefs/pref_service.h"
-#include "components/privacy_sandbox/tpcd_pref_names.h"
-#include "components/privacy_sandbox/tpcd_utils.h"
-#include "components/privacy_sandbox/tracking_protection_prefs.h"
 #include "components/subresource_filter/core/common/test_ruleset_utils.h"
 #include "components/tpcd/metadata/browser/parser.h"
 #include "components/user_prefs/user_prefs.h"
@@ -98,14 +89,9 @@ class AdHeuristicTPCDBrowserTestBase
   void SetUpOnMainThread() override {
     host_resolver()->AddRule("*", "127.0.0.1");
     https_server()->AddDefaultHandlers(GetChromeTestDataDir());
+    https_server()->SetSSLConfig(net::EmbeddedTestServer::CERT_TEST_NAMES);
     SetRulesetWithRules(
         {subresource_filter::testing::CreateSuffixRule("isad=1")});
-  }
-
-  void SetUpCommandLine(base::CommandLine* command_line) override {
-    // HTTPS server only serves a valid cert for 127.0.0.1 or localhost, so this
-    // is needed to load pages from other hosts (b.com, c.com) without an error.
-    command_line->AppendSwitch(switches::kIgnoreCertificateErrors);
   }
 
   PrefService* GetPrefs() {
@@ -194,34 +180,6 @@ class AdHeuristicTPCDBrowserTestBase
         ContentSetting::CONTENT_SETTING_ALLOW);
   }
 
-  void SetTopLevelTrialGrant(const GURL& third_party_url,
-                             const GURL& first_party_url) {
-    // Only |first_party_url| is used when creating the top-level tpcd support
-    // setting, since the settings are only scoped to the top-level site
-    // involved in the cookie access and therefore only use their
-    // |primary_site_pattern| field.
-    HostContentSettingsMap* settings_map =
-        HostContentSettingsMapFactory::GetForProfile(browser()->profile());
-    settings_map->SetContentSettingDefaultScope(
-        first_party_url, GURL(), ContentSettingsType::TOP_LEVEL_TPCD_TRIAL,
-        CONTENT_SETTING_ALLOW);
-
-    browser()
-        ->profile()
-        ->GetDefaultStoragePartition()
-        ->GetCookieManagerForBrowserProcess()
-        ->SetContentSettings(ContentSettingsType::TOP_LEVEL_TPCD_TRIAL,
-                             settings_map->GetSettingsForOneType(
-                                 ContentSettingsType::TOP_LEVEL_TPCD_TRIAL),
-                             base::NullCallback());
-
-    EXPECT_EQ(
-        CookieSettingsFactory::GetForProfile(browser()->profile())
-            ->GetCookieSetting(third_party_url, net::SiteForCookies(),
-                               first_party_url, net::CookieSettingOverrides()),
-        ContentSetting::CONTENT_SETTING_ALLOW);
-  }
-
   void Verify3PCookieAccessAllowed(
       net::test_server::ControllableHttpResponse* register_response) {
     // 3p cookie read
@@ -233,8 +191,7 @@ class AdHeuristicTPCDBrowserTestBase
     register_response->WaitForRequest();
 
     // COOKIE SHOULD BE ALLOWED.
-    EXPECT_TRUE(
-        base::Contains(register_response->http_request()->headers, "Cookie"));
+    EXPECT_TRUE(register_response->http_request()->headers.contains("Cookie"));
 
     // Check JS access.
     NavigateFrameTo("b.test", "/empty.html?isad=1");
@@ -260,15 +217,13 @@ class AdHeuristicTPCDBrowserTestBase
     FetchCookies("b.test", "/empty.html");
     register_response2->WaitForRequest();
     // COOKIE SHOULD NOT BE BLOCKED.
-    EXPECT_TRUE(
-        base::Contains(register_response2->http_request()->headers, "Cookie"));
+    EXPECT_TRUE(register_response2->http_request()->headers.contains("Cookie"));
 
     FetchCookies("b.test", "/empty.html?isad=1");
     register_response->WaitForRequest();
     // COOKIE SHOULD BE BLOCKED.
-    EXPECT_EQ(
-        base::Contains(register_response->http_request()->headers, "Cookie"),
-        false);
+    EXPECT_EQ(register_response->http_request()->headers.contains("Cookie"),
+              false);
 
     metrics::SubprocessMetricsProvider::MergeHistogramDeltasForTesting();
     histogram_tester.ExpectBucketCount(kAdHeuristicOverrideHistogramName,
@@ -436,7 +391,7 @@ class AdHeuristicTPCDBrowserTestSkipHeuristicsGrant
   base::test::ScopedFeatureList feature_list_;
 };
 
-// TODO(crbug.com/41481346): Investigate flakiness on Lacros/ChromeOS flakiness.
+// TODO(crbug.com/41481346): Investigate flakiness on ChromeOS.
 #if BUILDFLAG(IS_CHROMEOS)
 #define MAYBE_CookieBlocked DISABLED_CookieBlockedProfile
 #else
@@ -463,187 +418,4 @@ IN_PROC_BROWSER_TEST_F(AdHeuristicTPCDBrowserTestSkipHeuristicsGrant,
                               /*metadata_count=*/0, /*heuristics_count=*/1,
                               /*support_count=*/0,
                               /*top_level_support_count=*/0);
-}
-
-class AdHeuristicTPCDBrowserTestTrialGrant
-    : public AdHeuristicTPCDBrowserTestBase {
- public:
-  AdHeuristicTPCDBrowserTestTrialGrant() {
-    // Experiment feature param requests 3PCs blocked.
-    feature_list_.InitWithFeaturesAndParameters(
-        {{net::features::kTpcdTrialSettings, {}},
-         {content_settings::features::kTrackingProtection3pcd, {}},
-         {network::features::kSkipTpcdMitigationsForAds,
-          {{"SkipTpcdMitigationsForAdsSupport", "false"},
-           {"SkipTpcdMitigationsForAdsTopLevelTrial", "true"},
-           {"SkipTpcdMitigationsForAdsMetadata", "true"},
-           {"SkipTpcdMitigationsForAdsHeuristics", "true"}}}},
-        {});
-
-    // Disable the validity service so it doesn't remove manually created
-    // trial settings.
-    tpcd::trial::ValidityService::DisableForTesting();
-  }
-
- private:
-  base::test::ScopedFeatureList feature_list_;
-};
-
-IN_PROC_BROWSER_TEST_F(AdHeuristicTPCDBrowserTestTrialGrant, CookieAllowed) {
-  auto register_response =
-      std::make_unique<net::test_server::ControllableHttpResponse>(
-          https_server(), "/empty.html?isad=1");
-
-  ASSERT_TRUE(https_server()->Start());
-
-  NavigateToPageWithFrame("a.test");
-
-  GURL third_party_url = https_server()->GetURL("b.test", "/");
-  GURL first_party_url = https_server()->GetURL("a.test", "/");
-  tpcd::trial::TpcdTrialServiceFactory::GetForProfile(browser()->profile())
-      ->Update3pcdTrialSettingsForTesting(OriginTrialStatusChangeDetails(
-          url::Origin::Create(third_party_url), first_party_url.spec(),
-          /*match_subdomains=*/false,
-          /*enabled=*/true, /*source_id=*/std::nullopt));
-
-  Verify3PCookieAccessAllowed(register_response.get());
-}
-
-class AdHeuristicTPCDBrowserTestSkipTrialGrant
-    : public AdHeuristicTPCDBrowserTestBase {
- public:
-  AdHeuristicTPCDBrowserTestSkipTrialGrant() {
-    // Experiment feature param requests 3PCs blocked.
-    feature_list_.InitWithFeaturesAndParameters(
-        {{net::features::kTpcdTrialSettings, {}},
-         {content_settings::features::kTrackingProtection3pcd, {}},
-         {network::features::kSkipTpcdMitigationsForAds,
-          {{"SkipTpcdMitigationsForAdsSupport", "true"},
-           {"SkipTpcdMitigationsForAdsTopLevelTrial", "false"},
-           {"SkipTpcdMitigationsForAdsMetadata", "false"},
-           {"SkipTpcdMitigationsForAdsHeuristics", "false"}}}},
-        {});
-
-    // Disable the validity service so it doesn't remove manually created
-    // trial settings.
-    tpcd::trial::ValidityService::DisableForTesting();
-  }
-
- private:
-  base::test::ScopedFeatureList feature_list_;
-};
-
-IN_PROC_BROWSER_TEST_F(AdHeuristicTPCDBrowserTestSkipTrialGrant,
-                       CookieBlocked) {
-  auto register_response =
-      std::make_unique<net::test_server::ControllableHttpResponse>(
-          https_server(), "/empty.html?isad=1");
-  auto register_response2 =
-      std::make_unique<net::test_server::ControllableHttpResponse>(
-          https_server(), "/empty.html");
-
-  ASSERT_TRUE(https_server()->Start());
-
-  NavigateToPageWithFrame("a.test");
-
-  GURL third_party_url = https_server()->GetURL("b.test", "/");
-  GURL first_party_url = https_server()->GetURL("a.test", "/");
-  tpcd::trial::TpcdTrialServiceFactory::GetForProfile(browser()->profile())
-      ->Update3pcdTrialSettingsForTesting(OriginTrialStatusChangeDetails(
-          url::Origin::Create(third_party_url), first_party_url.spec(),
-          /*match_subdomains=*/false,
-          /*enabled=*/true, /*source_id=*/std::nullopt));
-
-  VerifyAdCookieAccessBlocked(register_response.get(), register_response2.get(),
-                              /*metadata_count=*/0, /*heuristics_count=*/0,
-                              /*support_count=*/1,
-                              /*top_level_support_count=*/0);
-}
-
-class AdHeuristicTPCDBrowserTestTopLevelTrialGrant
-    : public AdHeuristicTPCDBrowserTestBase {
- public:
-  AdHeuristicTPCDBrowserTestTopLevelTrialGrant() {
-    // Experiment feature param requests 3PCs blocked.
-    feature_list_.InitWithFeaturesAndParameters(
-        {{net::features::kTopLevelTpcdTrialSettings, {}},
-         {content_settings::features::kTrackingProtection3pcd, {}},
-         {network::features::kSkipTpcdMitigationsForAds,
-          {{"SkipTpcdMitigationsForAdsTopLevelTrial", "false"},
-           {"SkipTpcdMitigationsForAdsSupport", "true"},
-           {"SkipTpcdMitigationsForAdsMetadata", "true"},
-           {"SkipTpcdMitigationsForAdsHeuristics", "true"}}}},
-        {});
-
-    // Disable the validity service so it doesn't remove manually created
-    // trial settings.
-    tpcd::trial::ValidityService::DisableForTesting();
-  }
-
- private:
-  base::test::ScopedFeatureList feature_list_;
-};
-
-IN_PROC_BROWSER_TEST_F(AdHeuristicTPCDBrowserTestTopLevelTrialGrant,
-                       CookieAllowed) {
-  auto register_response =
-      std::make_unique<net::test_server::ControllableHttpResponse>(
-          https_server(), "/empty.html?isad=1");
-
-  ASSERT_TRUE(https_server()->Start());
-
-  NavigateToPageWithFrame("a.test");
-
-  GURL third_party_url = https_server()->GetURL("b.test", "/");
-  GURL first_party_url = https_server()->GetURL("a.test", "/");
-  SetTopLevelTrialGrant(third_party_url, first_party_url);
-
-  Verify3PCookieAccessAllowed(register_response.get());
-}
-
-class AdHeuristicTPCDBrowserTestSkipTopLevelTrialGrant
-    : public AdHeuristicTPCDBrowserTestBase {
- public:
-  AdHeuristicTPCDBrowserTestSkipTopLevelTrialGrant() {
-    // Experiment feature param requests 3PCs blocked.
-    feature_list_.InitWithFeaturesAndParameters(
-        {{net::features::kTopLevelTpcdTrialSettings, {}},
-         {content_settings::features::kTrackingProtection3pcd, {}},
-         {network::features::kSkipTpcdMitigationsForAds,
-          {{"SkipTpcdMitigationsForAdsTopLevelTrial", "true"},
-           {"SkipTpcdMitigationsForAdsSupport", "false"},
-           {"SkipTpcdMitigationsForAdsMetadata", "false"},
-           {"SkipTpcdMitigationsForAdsHeuristics", "false"}}}},
-        {});
-
-    // Disable the validity service so it doesn't remove manually created
-    // trial settings.
-    tpcd::trial::ValidityService::DisableForTesting();
-  }
-
- private:
-  base::test::ScopedFeatureList feature_list_;
-};
-
-IN_PROC_BROWSER_TEST_F(AdHeuristicTPCDBrowserTestSkipTopLevelTrialGrant,
-                       CookieBlocked) {
-  auto register_response =
-      std::make_unique<net::test_server::ControllableHttpResponse>(
-          https_server(), "/empty.html?isad=1");
-  auto register_response2 =
-      std::make_unique<net::test_server::ControllableHttpResponse>(
-          https_server(), "/empty.html");
-
-  ASSERT_TRUE(https_server()->Start());
-
-  NavigateToPageWithFrame("a.test");
-
-  GURL third_party_url = https_server()->GetURL("b.test", "/");
-  GURL first_party_url = https_server()->GetURL("a.test", "/");
-  SetTopLevelTrialGrant(third_party_url, first_party_url);
-
-  VerifyAdCookieAccessBlocked(register_response.get(), register_response2.get(),
-                              /*metadata_count=*/0, /*heuristics_count=*/0,
-                              /*support_count=*/0,
-                              /*top_level_support_count=*/1);
 }

@@ -16,13 +16,12 @@
 
 #include "base/functional/bind.h"
 #include "base/logging.h"
-#include "base/metrics/histogram_macros.h"
 #include "base/trace_event/typed_macros.h"
+#include "components/viz/common/resources/shared_image_format_utils.h"
 #include "third_party/libdrm/src/include/drm/drm_fourcc.h"
 #include "third_party/perfetto/include/perfetto/tracing/traced_value.h"
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "third_party/skia/include/core/SkImage.h"
-#include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/gpu_fence_handle.h"
@@ -242,9 +241,6 @@ void HardwareDisplayController::SchedulePageFlip(
 
   PageFlipResult result =
       ScheduleOrTestPageFlip(plane_list, page_flip_request, &release_fence);
-  UMA_HISTOGRAM_ENUMERATION(
-      "Compositing.Display.HardwareDisplayController.SchedulePageFlipResult",
-      result);
 
   if (PageFlipResult::kFailedPlaneAssignment == result) {
     watchdog_.CrashOnFailedPlaneAssignment();
@@ -366,9 +362,9 @@ std::vector<uint64_t> HardwareDisplayController::GetFormatModifiers(
       crtc_controllers_[0]->GetFormatModifiers(fourcc_format);
 
   if (drm_modifiers_filter_) {
-    gfx::BufferFormat buffer_format =
-        GetBufferFormatFromFourCCFormat(fourcc_format);
-    modifiers = drm_modifiers_filter_->Filter(buffer_format, modifiers);
+    viz::SharedImageFormat si_format =
+        GetSharedImageFormatFromFourCCFormat(fourcc_format);
+    modifiers = drm_modifiers_filter_->Filter(si_format, modifiers);
   }
 
   for (size_t i = 1; i < crtc_controllers_.size(); ++i) {
@@ -414,13 +410,12 @@ HardwareDisplayController::GetFormatModifiersForTestModeset(
 }
 
 void HardwareDisplayController::UpdatePreferredModifierForFormat(
-    gfx::BufferFormat buffer_format,
+    viz::SharedImageFormat format,
     uint64_t modifier) {
-  uint32_t fourcc_format = GetFourCCFormatFromBufferFormat(buffer_format);
+  uint32_t fourcc_format = GetFourCCFormatFromSharedImageFormat(format);
   preferred_format_modifier_[fourcc_format] = modifier;
 
-  uint32_t opaque_fourcc_format =
-      GetFourCCFormatForOpaqueFramebuffer(buffer_format);
+  uint32_t opaque_fourcc_format = GetFourCCFormatForOpaqueFramebuffer(format);
   preferred_format_modifier_[opaque_fourcc_format] = modifier;
 }
 

@@ -4,11 +4,13 @@
 
 #include "content/browser/picture_in_picture/document_picture_in_picture_window_controller_impl.h"
 
+#include <optional>
 #include <set>
 #include <utility>
 
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
+#include "content/browser/media/capture/pip_screen_capture_coordinator.h"
 #include "content/browser/media/media_web_contents_observer.h"
 #include "content/browser/media/session/media_session_impl.h"
 #include "content/browser/picture_in_picture/picture_in_picture_session.h"
@@ -18,6 +20,7 @@
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/overlay_window.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/browser/web_contents_delegate.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/common/content_client.h"
 #include "media/base/media_switches.h"
@@ -51,6 +54,9 @@ void DocumentPictureInPictureWindowControllerImpl::SetChildWebContents(
       GetChildWebContents(),
       base::BindOnce(&DocumentPictureInPictureWindowControllerImpl::Close,
                      weak_factory_.GetWeakPtr(), /*should_pause_video=*/true),
+      base::BindOnce(&DocumentPictureInPictureWindowControllerImpl::
+                         OnChildContentsFirstVisible,
+                     weak_factory_.GetWeakPtr()),
       base::BindOnce(&DocumentPictureInPictureWindowControllerImpl::
                          OnChildContentsDestroyed,
                      weak_factory_.GetWeakPtr()));
@@ -123,10 +129,15 @@ void DocumentPictureInPictureWindowControllerImpl::WebContentsDestroyed() {
 }
 
 std::optional<gfx::Rect>
-DocumentPictureInPictureWindowControllerImpl::GetWindowBounds() {
+DocumentPictureInPictureWindowControllerImpl::GetWindowBoundsInScreen() {
   if (!child_contents_)
     return std::nullopt;
-  return child_contents_->GetContainerBounds();
+
+  if (auto* delegate = child_contents_->GetDelegate()) {
+    return delegate->GetWindowBoundsInScreen();
+  }
+
+  return std::nullopt;
 }
 
 void DocumentPictureInPictureWindowControllerImpl::PrimaryPageChanged(Page&) {
@@ -153,12 +164,19 @@ void DocumentPictureInPictureWindowControllerImpl::NotifyClosedAndStopObserving(
   child_contents_ = nullptr;
   child_contents_observer_.reset();
 
+  if (auto* coordinator = PipScreenCaptureCoordinator::GetInstance()) {
+    coordinator->OnPipClosed();
+  }
+
+  WebContentsImpl* web_contents_impl = GetWebContentsImpl();
+
   // If the opener is being destroyed, then don't dispatch anything to it.
-  if (!GetWebContentsImpl())
+  if (!web_contents_impl) {
     return;
+  }
 
   // Notify the opener, and stop observing it.
-  GetWebContentsImpl()->SetHasPictureInPictureDocument(false);
+  web_contents_impl->SetHasPictureInPictureDocument(false);
   // Signal to the media player that |this| is leaving Picture-in-Picture mode.
   // The should_pause_video argument signals the user's intent. If true, the
   // user explicitly closed the window and any active media should be paused.
@@ -166,8 +184,24 @@ void DocumentPictureInPictureWindowControllerImpl::NotifyClosedAndStopObserving(
   // that any active media will continue playing in the parent tab.
   // TODO(crbug.com/40877557): connect this to the requestPictureInPicture
   // API and/or onleavepictureinpicture event once that's implemented.
-  GetWebContentsImpl()->ExitPictureInPicture();
+  web_contents_impl->ExitPictureInPicture();
   Observe(/*web_contents=*/nullptr);
+}
+
+void DocumentPictureInPictureWindowControllerImpl::
+    OnChildContentsFirstVisible() {
+  WebContentsImpl* web_contents_impl = GetWebContentsImpl();
+  if (!web_contents_impl) {
+    return;
+  }
+
+  if (auto* coordinator = PipScreenCaptureCoordinator::GetInstance()) {
+    if (child_contents_) {
+      coordinator->OnPipShown(
+          *child_contents_,
+          web_contents_impl->GetPrimaryMainFrame()->GetGlobalId());
+    }
+  }
 }
 
 void DocumentPictureInPictureWindowControllerImpl::OnChildContentsDestroyed() {
@@ -186,9 +220,11 @@ WEB_CONTENTS_USER_DATA_KEY_IMPL(DocumentPictureInPictureWindowControllerImpl);
 DocumentPictureInPictureWindowControllerImpl::ChildContentsObserver::
     ChildContentsObserver(WebContents* web_contents,
                           base::OnceClosure force_close_cb,
+                          base::OnceClosure contents_visible_cb,
                           base::OnceClosure contents_destroyed_cb)
     : WebContentsObserver(web_contents),
       force_close_cb_(std::move(force_close_cb)),
+      contents_visible_cb_(std::move(contents_visible_cb)),
       contents_destroyed_cb_(std::move(contents_destroyed_cb)) {}
 
 DocumentPictureInPictureWindowControllerImpl::ChildContentsObserver::
@@ -231,6 +267,14 @@ void DocumentPictureInPictureWindowControllerImpl::ChildContentsObserver::
   // Don't run `force_close_cb` from within the observer, since closing
   // `web_contents` is not allowed during an observer callback.
   GetUIThreadTaskRunner({})->PostTask(FROM_HERE, std::move(force_close_cb_));
+}
+
+void DocumentPictureInPictureWindowControllerImpl::ChildContentsObserver::
+    OnVisibilityChanged(Visibility visibility) {
+  // Trigger the callback the first time the window becomes visible.
+  if (visibility == Visibility::VISIBLE && contents_visible_cb_) {
+    std::move(contents_visible_cb_).Run();
+  }
 }
 
 void DocumentPictureInPictureWindowControllerImpl::ChildContentsObserver::

@@ -6,6 +6,8 @@ package org.chromium.chrome.browser.toolbar;
 
 import static org.junit.Assert.assertEquals;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
+
 import android.graphics.Color;
 import android.view.View;
 
@@ -30,11 +32,11 @@ import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.transit.AutoResetCtaTransitTestRule;
 import org.chromium.chrome.test.transit.ChromeTransitTestRules;
+import org.chromium.chrome.test.transit.ntp.IncognitoNewTabPageStation;
 import org.chromium.chrome.test.transit.page.WebPageStation;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
 import org.chromium.chrome.test.util.NewTabPageTestUtils;
 import org.chromium.chrome.test.util.browser.ThemeTestUtils;
-import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.ui.test.util.RenderTestRule;
 
 /** Render tests for the {@link TabSwitcherDrawable} with notification feature. */
@@ -46,7 +48,7 @@ public class TabSwitcherDrawableRenderTest {
     public final ChromeRenderTestRule mRenderTestRule =
             ChromeRenderTestRule.Builder.withPublicCorpus()
                     .setBugComponent(RenderTestRule.Component.UI_BROWSER_MOBILE_TAB_GROUPS)
-                    .setRevision(4)
+                    .setRevision(5)
                     .build();
 
     @Rule
@@ -110,8 +112,8 @@ public class TabSwitcherDrawableRenderTest {
     public void testTabSwitcherDrawable_newTabPage() throws Exception {
         ChromeTabbedActivity activity = mActivityTestRule.getActivity();
 
-        mActivityTestRule.loadUrlInNewTab(UrlConstants.NTP_URL, /* incognito= */ false);
-        NewTabPageTestUtils.waitForNtpLoaded(activity.getActivityTab());
+        mActivityTestRule.loadUrlInNewTab(getOriginalNativeNtpUrl(), /* incognito= */ false);
+        NewTabPageTestUtils.waitForNtpLoaded(mActivityTestRule.getActivityTab());
 
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
@@ -127,14 +129,17 @@ public class TabSwitcherDrawableRenderTest {
     public void testTabSwitcherDrawable_newTabPageIncognito() throws Exception {
         ChromeTabbedActivity activity = mActivityTestRule.getActivity();
 
-        mActivityTestRule.loadUrlInNewTab(UrlConstants.NTP_URL, /* incognito= */ true);
-        NewTabPageTestUtils.waitForNtpLoaded(activity.getActivityTab());
+        IncognitoNewTabPageStation incognitoPage = mPage.openNewIncognitoTabOrWindowFast();
 
+        ToggleTabStackButton toggleTabStackButton =
+                incognitoPage.getActivity().findViewById(R.id.tab_switcher_button);
+        TabSwitcherDrawable tabSwitcherDrawable =
+                toggleTabStackButton.getTabSwitcherDrawableForTesting();
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
-                    mTabSwitcherDrawable.setNotificationIconStatus(/* shouldShow= */ true);
+                    tabSwitcherDrawable.setNotificationIconStatus(/* shouldShow= */ true);
                 });
-        View toolbarView = activity.findViewById(R.id.toolbar);
+        View toolbarView = incognitoPage.getActivity().findViewById(R.id.toolbar);
         mRenderTestRule.render(toolbarView, "tab_page_toolbar_view_incognito_no_show");
     }
 

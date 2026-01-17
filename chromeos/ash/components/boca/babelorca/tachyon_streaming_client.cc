@@ -22,7 +22,6 @@
 #include "chromeos/ash/components/boca/babelorca/tachyon_client.h"
 #include "chromeos/ash/components/boca/babelorca/tachyon_constants.h"
 #include "chromeos/ash/components/boca/babelorca/tachyon_response.h"
-#include "chromeos/ash/services/boca/babelorca/mojom/tachyon_parsing_service.mojom-shared.h"
 #include "chromeos/ash/services/boca/babelorca/mojom/tachyon_parsing_service.mojom.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "net/base/load_flags.h"
@@ -119,7 +118,7 @@ void TachyonStreamingClient::OnComplete(bool success) {
   base::UmaHistogramEnumeration(kStreamEndReasonUma,
                                 StreamEndReason::kConnectionClosedError);
   HandleResponse(std::move(url_loader_), std::move(request_data_),
-                 std::move(auth_failure_cb_), /*response_body=*/nullptr);
+                 std::move(auth_failure_cb_), /*response_body=*/std::nullopt);
 }
 
 void TachyonStreamingClient::OnRetry(base::OnceClosure start_retry) {

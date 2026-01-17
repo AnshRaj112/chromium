@@ -25,6 +25,8 @@
 #include "chrome/common/webui_url_constants.h"
 #include "components/feature_engagement/public/feature_constants.h"
 #include "components/grit/components_scaled_resources.h"
+#include "components/performance_manager/public/user_tuning/prefs.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/common/url_constants.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -46,6 +48,7 @@
 #include "ui/views/border.h"
 #include "ui/views/cascading_property.h"
 #include "ui/views/interaction/element_tracker_views.h"
+#include "ui/views/property_effects.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
@@ -111,6 +114,13 @@ TabIcon::TabIcon()
   DCHECK(!GetShowingLoadingAnimation());
 
   SetProperty(views::kElementIdentifierKey, kTabIconElementId);
+
+  local_state_registrar_.Init(g_browser_process->local_state());
+  local_state_registrar_.Add(
+      performance_manager::user_tuning::prefs::kDiscardRingTreatmentEnabled,
+      base::BindRepeating(&TabIcon::OnDiscardRingTreatmentEnabledChanged,
+                          base::Unretained(this)));
+  OnDiscardRingTreatmentEnabledChanged();
 }
 
 TabIcon::~TabIcon() = default;
@@ -122,7 +132,7 @@ void TabIcon::SetData(const TabRendererData& data) {
   is_monochrome_favicon_ = data.is_monochrome_favicon;
   SetIcon(data.favicon, data.should_themify_favicon);
   SetNetworkState(data.network_state);
-  SetCrashed(data.IsCrashed());
+  SetCrashed(data.is_crashed);
   SetDiscarded(data.should_show_discard_status);
   has_tab_renderer_data_ = true;
 
@@ -196,9 +206,13 @@ void TabIcon::EnlargeDiscardIndicatorRadius(int radius) {
   increased_discard_indicator_radius_ = radius;
 }
 
-void TabIcon::SetShouldShowDiscardIndicator(bool enabled) {
-  should_show_discard_indicator_ = enabled;
-  bool show_discard_indicator = is_discarded_ && should_show_discard_indicator_;
+void TabIcon::OnDiscardRingTreatmentEnabledChanged() {
+  discard_ring_treatment_enabled_ =
+      g_browser_process->local_state()->GetBoolean(
+          performance_manager::user_tuning::prefs::
+              kDiscardRingTreatmentEnabled);
+  bool show_discard_indicator =
+      is_discarded_ && discard_ring_treatment_enabled_;
   if (was_discard_indicator_shown_ != show_discard_indicator) {
     was_discard_indicator_shown_ = show_discard_indicator;
 
@@ -376,12 +390,10 @@ void TabIcon::MaybePaintFavicon(gfx::Canvas* canvas,
   }
 
   std::unique_ptr<gfx::ScopedCanvas> scoped_canvas;
-  bool use_scale_filter = false;
 
   if (GetShowingLoadingAnimation() || favicon_size_animation_.is_animating() ||
       was_discard_indicator_shown_) {
     scoped_canvas = std::make_unique<gfx::ScopedCanvas>(canvas);
-    use_scale_filter = true;
     // The favicon is initially inset with the width of the loading-animation
     // stroke + an additional dp to create some visual separation.
     const float kInitialFaviconInsetDp = 1 + kLoadingAnimationStrokeWidthDp;
@@ -402,9 +414,8 @@ void TabIcon::MaybePaintFavicon(gfx::Canvas* canvas,
                                      favicon_size_animation_.GetCurrentValue()),
           kInitialFaviconDiameterDp, kFinalFaviconDiameterDp);
     }
-    SkPath path;
     gfx::PointF center = gfx::RectF(bounds).CenterPoint();
-    path.addCircle(center.x(), center.y(), diameter / 2);
+    const SkPath path = SkPath::Circle(center.x(), center.y(), diameter / 2);
     canvas->ClipPath(path, true);
     // This scales and offsets painting so that the drawn favicon is downscaled
     // to fit in the cropping area.
@@ -425,7 +436,7 @@ void TabIcon::MaybePaintFavicon(gfx::Canvas* canvas,
 
   canvas->DrawImageInt(icon, 0, 0, bounds.width(), bounds.height(), bounds.x(),
                        bounds.y(), bounds.width(), bounds.height(),
-                       use_scale_filter);
+                       /*filter=*/true);
 
   // Emits a custom event when the favicon finishes shrinking and the discard
   // ring gets painted
@@ -456,7 +467,8 @@ void TabIcon::SetIcon(const ui::ImageModel& icon, bool should_themify_favicon) {
 
 void TabIcon::SetDiscarded(bool discarded) {
   is_discarded_ = discarded;
-  bool show_discard_indicator = is_discarded_ && should_show_discard_indicator_;
+  bool show_discard_indicator =
+      is_discarded_ && discard_ring_treatment_enabled_;
   if (was_discard_indicator_shown_ != show_discard_indicator) {
     was_discard_indicator_shown_ = show_discard_indicator;
     favicon_size_animation_.SetSlideDuration(
@@ -522,7 +534,7 @@ void TabIcon::SetCrashed(bool crashed) {
       }
     }
   }
-  OnPropertyChanged(&crashed_, views::kPropertyEffectsPaint);
+  OnPropertyChanged(&crashed_, views::PropertyEffects::kPaint);
 }
 
 bool TabIcon::GetCrashed() const {

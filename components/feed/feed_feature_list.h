@@ -9,7 +9,6 @@
 
 #include "base/component_export.h"
 #include "base/feature_list.h"
-#include "base/metrics/field_trial_params.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "components/signin/public/base/consent_level.h"
@@ -52,10 +51,6 @@ BASE_DECLARE_FEATURE(kFeedLoadingPlaceholder);
 COMPONENT_EXPORT(COMPONENTS_FEED_FEATURE_LIST)
 BASE_DECLARE_FEATURE(kFeedImageMemoryCacheSizePercentage);
 
-// Feature that enables StAMP cards in the feed.
-COMPONENT_EXPORT(COMPONENTS_FEED_FEATURE_LIST)
-BASE_DECLARE_FEATURE(kFeedStamp);
-
 // Feature that provides the user assistance in discovering the web feed.
 COMPONENT_EXPORT(COMPONENTS_FEED_FEATURE_LIST)
 BASE_DECLARE_FEATURE(kWebFeedAwareness);
@@ -82,10 +77,6 @@ signin::ConsentLevel GetConsentLevelNeededForPersonalizedFeed();
 // When enabled, no view cache is used.
 COMPONENT_EXPORT(COMPONENTS_FEED_FEATURE_LIST)
 BASE_DECLARE_FEATURE(kFeedNoViewCache);
-
-// When enabled, allow show sign in command to request a user signs in / syncs.
-COMPONENT_EXPORT(COMPONENTS_FEED_FEATURE_LIST)
-BASE_DECLARE_FEATURE(kFeedShowSignInCommand);
 
 // When enabled, depending on params selected, enable different
 // performance-oriented features in Feed.
@@ -132,6 +123,10 @@ BASE_DECLARE_FEATURE(kFeedHeaderRemoval);
 // Feature that enables feed audio overviews.
 COMPONENT_EXPORT(COMPONENTS_FEED_FEATURE_LIST)
 BASE_DECLARE_FEATURE(kFeedAudioOverviews);
+
+// Feature that enables opening Incognito windows.
+COMPONENT_EXPORT(COMPONENTS_FEED_FEATURE_LIST)
+BASE_DECLARE_FEATURE(kAndroidOpenIncognitoAsWindow);
 
 COMPONENT_EXPORT(COMPONENTS_FEED_FEATURE_LIST)
 bool IsWebFeedEnabledForLocale(const std::string& country);

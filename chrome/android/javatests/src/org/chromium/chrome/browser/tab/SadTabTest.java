@@ -25,8 +25,10 @@ import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Feature;
+import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.base.test.util.UrlUtils;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.fullscreen.FullscreenManagerTestUtils;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
@@ -86,7 +88,7 @@ public class SadTabTest {
     @SmallTest
     @Feature({"SadTab"})
     public void testSadTabShownWhenRendererProcessKilled() {
-        final Tab tab = mInitialPage.loadedTabElement.get();
+        final Tab tab = mInitialPage.loadedTabElement.value();
 
         Assert.assertFalse(isShowingSadTab(tab));
         simulateRendererKilled(tab, true);
@@ -101,7 +103,7 @@ public class SadTabTest {
     @SmallTest
     @Feature({"SadTab"})
     public void testSadTabNotShownWhenRendererProcessKilledInBackround() {
-        final Tab tab = mInitialPage.loadedTabElement.get();
+        final Tab tab = mInitialPage.loadedTabElement.value();
 
         Assert.assertFalse(isShowingSadTab(tab));
         simulateRendererKilled(tab, false);
@@ -113,7 +115,7 @@ public class SadTabTest {
     @SmallTest
     @Feature({"SadTab"})
     public void testSadTabReloadAfterKill() throws Throwable {
-        final Tab tab = mInitialPage.loadedTabElement.get();
+        final Tab tab = mInitialPage.loadedTabElement.value();
 
         TestWebServer webServer = TestWebServer.start();
         try {
@@ -132,7 +134,7 @@ public class SadTabTest {
     @SmallTest
     @Feature({"SadTab"})
     public void testSadTabNoReloadAfterLoad() throws Throwable {
-        final Tab tab = mInitialPage.loadedTabElement.get();
+        final Tab tab = mInitialPage.loadedTabElement.value();
 
         TestWebServer webServer = TestWebServer.start();
         try {
@@ -157,7 +159,7 @@ public class SadTabTest {
     @SmallTest
     @Feature({"SadTab"})
     public void testSadTabPageButtonText() throws IllegalArgumentException {
-        final Tab tab = mInitialPage.loadedTabElement.get();
+        final Tab tab = mInitialPage.loadedTabElement.value();
 
         Assert.assertFalse(isShowingSadTab(tab));
         simulateRendererKilled(tab, true);
@@ -194,6 +196,8 @@ public class SadTabTest {
     @MediumTest
     @Feature({"SadTab"})
     @Restriction(DeviceRestriction.RESTRICTION_TYPE_NON_AUTO) // Browser controls don't move in auto
+    // TODO(crbug.com/473893732): Update the test for lock top control or use restriction.
+    @DisableFeatures(ChromeFeatureList.LOCK_TOP_CONTROLS_ON_LARGE_TABLETS_V2)
     public void testSadTabBrowserControlsVisibility() {
         ThreadUtils.runOnUiThreadBlocking(
                 TabStateBrowserControlsVisibilityDelegate::disablePageLoadDelayForTests);
@@ -202,7 +206,7 @@ public class SadTabTest {
         FullscreenManagerTestUtils.waitForBrowserControlsToBeMoveable(
                 mActivityTestRule.getActivity());
         FullscreenManagerTestUtils.scrollBrowserControls(mActivityTestRule.getActivity(), false);
-        simulateRendererKilled(mActivityTestRule.getActivity().getActivityTab(), true);
+        simulateRendererKilled(mActivityTestRule.getActivityTab(), true);
         FullscreenManagerTestUtils.waitForBrowserControlsPosition(
                 mActivityTestRule.getActivity(), 0);
     }

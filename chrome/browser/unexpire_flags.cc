@@ -4,9 +4,11 @@
 
 #include "chrome/browser/unexpire_flags.h"
 
+#include "base/check.h"
+#include "base/check_op.h"
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
+#include "base/feature_list.h"
 #include "base/no_destructor.h"
 #include "chrome/browser/expired_flags_list.h"
 #include "chrome/browser/unexpire_flags_gen.h"
@@ -25,7 +27,7 @@ static FlagNameToExpirationMap* GetFlagExpirationOverrideMap() {
 }
 
 int ExpirationMilestoneForFlag(const char* flag) {
-  if (base::Contains(*GetFlagExpirationOverrideMap(), flag)) {
+  if (GetFlagExpirationOverrideMap()->contains(flag)) {
     return GetFlagExpirationOverrideMap()->at(flag);
   }
 
@@ -108,7 +110,7 @@ bool IsFlagExpired(const flags_ui::FlagsStorage* storage,
   // unexpiry happens during FeatureList initialization.
   // TODO(ellyjones): what might we do about that?
   std::set<int> unexpired_milestones = UnexpiredMilestonesFromStorage(storage);
-  if (base::Contains(unexpired_milestones, mstone)) {
+  if (unexpired_milestones.contains(mstone)) {
     return false;
   }
 

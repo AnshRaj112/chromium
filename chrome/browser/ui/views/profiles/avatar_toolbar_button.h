@@ -25,6 +25,7 @@ class Browser;
 class BrowserView;
 struct AccountInfo;
 class GaiaId;
+class StateProvider;
 
 // Enum used for testing. It allows overriding different delay values based on
 // their usage in the `AvatarToolbarButton` through helper testing functions.
@@ -93,22 +94,23 @@ class AvatarToolbarButton : public ToolbarButton,
   void SetButtonActionDisabled(bool disabled);
   bool IsButtonActionDisabled() const;
 
-  // Attempts showing the In-Produce-Help for profile Switching.
+  // Attempts showing the In-Product-Help for profile Switching.
   void MaybeShowProfileSwitchIPH();
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-  // Attempts showing the In-Produce-Help when a supervised user signs-in in a
+  // Attempts showing the In-Product-Help when a supervised user signs-in in a
   // profile.
   void MaybeShowSupervisedUserSignInIPH();
+
+  // Attempts showing the In-Product-Help listing benefits for signed-in users
+  // after the sync-to-signin migration.
+  void MaybeShowSignInBenefitsIPH();
 #endif
 
   // Attempts showing the In-Product-Help in a subsequent web sign-in when the
   // explicit browser sign-in preference was remembered.
   void MaybeShowExplicitBrowserSigninPreferenceRememberedIPH(
       const AccountInfo& account_info);
-
-  // Attempts showing the In-Produce-Help for web sign out.
-  void MaybeShowWebSignoutIPH(const GaiaId& gaia_id);
 
   // Returns true if a text is set and is visible.
   bool IsLabelPresentAndVisible() const;
@@ -159,6 +161,11 @@ class AvatarToolbarButton : public ToolbarButton,
   // `TriggerTimeoutForTesting()` not enough for testing.
   [[nodiscard]] static base::AutoReset<std::optional<base::TimeDelta>>
   CreateScopedZeroDelayOverrideSigninPendingTextForTesting();
+
+  // WARNING: Do not use this method to test the Promo flows. Only used when
+  // necessary to bypass resetting the profile - e.g. when attempting to reach
+  // the limit counts.
+  void ForceShowingPromoForTesting();
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
  private:
@@ -169,11 +176,6 @@ class AvatarToolbarButton : public ToolbarButton,
   void OnPrimaryAccountChanged(
       const signin::PrimaryAccountChangeEvent& event_details) override;
   void OnExtendedAccountInfoUpdated(const AccountInfo& info) override;
-  void OnErrorStateOfRefreshTokenUpdatedForAccount(
-      const CoreAccountInfo& account_info,
-      const GoogleServiceAuthError& error,
-      signin_metrics::SourceForRefreshTokenOperation token_operation_source)
-      override;
 
   // ui::PropertyHandler:
   void AfterPropertyChange(const void* key, int64_t old_value) override;
@@ -185,7 +187,18 @@ class AvatarToolbarButton : public ToolbarButton,
   // and whether the chip is expanded.
   void UpdateInkdrop();
 
+  // Animates hiding/shrinking the button according to the text changes.
+  void AnimateTextChange(StateProvider* state_provider,
+                         const ui::ColorProvider* color_provider);
   void UpdateAccessibilityLabel();
+
+  // LabelButton:
+  gfx::Size CalculatePreferredSize(
+      const views::SizeBounds& available_size) const override;
+
+  // gfx::AnimationDelegate:
+  void AnimationProgressed(const gfx::Animation* animation) override;
+  void AnimationEnded(const gfx::Animation* animation) override;
 
   // Lists of observers.
   base::ObserverList<Observer, true> observer_list_;
@@ -210,6 +223,8 @@ class AvatarToolbarButton : public ToolbarButton,
   // remembered following a web sign-in event but waiting for the available
   // account information to be fetched in order to show the sign in IPH.
   GaiaId gaia_id_for_signin_choice_remembered_;
+
+  gfx::SlideAnimation slide_animation_;
 
   base::ScopedObservation<signin::IdentityManager,
                           signin::IdentityManager::Observer>

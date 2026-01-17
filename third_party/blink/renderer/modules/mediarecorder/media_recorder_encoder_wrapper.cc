@@ -4,7 +4,8 @@
 
 #include "third_party/blink/renderer/modules/mediarecorder/media_recorder_encoder_wrapper.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/numerics/safe_conversions.h"
 #include "media/base/decoder_buffer.h"
 #include "media/base/video_encoder_metrics_provider.h"
@@ -60,7 +61,7 @@ MediaRecorderEncoderWrapper::MediaRecorderEncoderWrapper(
       media::VideoCodec::kHEVC,
 #endif
   };
-  CHECK(base::Contains(kSupportedCodecs, codec_));
+  CHECK(std::ranges::contains(kSupportedCodecs, codec_));
   options_.latency_mode = media::VideoEncoder::LatencyMode::Quality;
   options_.bitrate = media::Bitrate::VariableBitrate(
       bits_per_second, base::ClampMul(bits_per_second, 2u).RawValue());
@@ -117,8 +118,8 @@ void MediaRecorderEncoderWrapper::Reconfigure(const gfx::Size& frame_size,
   CHECK_NE(state_, State::kInError);
   state_ = State::kInitializing;
   encoder_->Flush(
-      WTF::BindOnce(&MediaRecorderEncoderWrapper::CreateAndInitialize,
-                    weak_factory_.GetWeakPtr(), frame_size, encode_alpha));
+      blink::BindOnce(&MediaRecorderEncoderWrapper::CreateAndInitialize,
+                      weak_factory_.GetWeakPtr(), frame_size, encode_alpha));
 }
 
 void MediaRecorderEncoderWrapper::CreateAndInitialize(
@@ -162,12 +163,12 @@ void MediaRecorderEncoderWrapper::CreateAndInitialize(
                                 is_hardware_encoder_);
   encoder_->Initialize(
       profile_, options_,
-      WTF::BindRepeating(&MediaRecorderEncoderWrapper::OnVideoEncoderInfo,
-                         weak_factory_.GetWeakPtr()),
-      WTF::BindRepeating(&MediaRecorderEncoderWrapper::OutputEncodeData,
-                         weak_factory_.GetWeakPtr()),
-      WTF::BindOnce(&MediaRecorderEncoderWrapper::InitializeDone,
-                    weak_factory_.GetWeakPtr()));
+      blink::BindRepeating(&MediaRecorderEncoderWrapper::OnVideoEncoderInfo,
+                           weak_factory_.GetWeakPtr()),
+      blink::BindRepeating(&MediaRecorderEncoderWrapper::OutputEncodeData,
+                           weak_factory_.GetWeakPtr()),
+      blink::BindOnce(&MediaRecorderEncoderWrapper::InitializeDone,
+                      weak_factory_.GetWeakPtr()));
 }
 
 void MediaRecorderEncoderWrapper::InitializeDone(media::EncoderStatus status) {
@@ -236,8 +237,8 @@ void MediaRecorderEncoderWrapper::EncodePendingTasks() {
     // |pending_encode_tasks_| must be changed before calling Encode().
     encoder_->Encode(std::move(frame),
                      media::VideoEncoder::EncodeOptions(request_keyframe),
-                     WTF::BindOnce(&MediaRecorderEncoderWrapper::EncodeDone,
-                                   weak_factory_.GetWeakPtr()));
+                     blink::BindOnce(&MediaRecorderEncoderWrapper::EncodeDone,
+                                     weak_factory_.GetWeakPtr()));
   }
 }
 

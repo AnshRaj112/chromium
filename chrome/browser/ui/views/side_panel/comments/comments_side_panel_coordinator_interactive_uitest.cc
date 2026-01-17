@@ -6,13 +6,13 @@
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_actions.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/tabs/public/tab_features.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/side_panel/comments/comments_side_panel_coordinator.h"
-#include "chrome/browser/ui/views/side_panel/side_panel_coordinator.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_registry.h"
 #include "chrome/browser/ui/views/tabs/tab_strip.h"
 #include "chrome/browser/ui/views/test/tab_strip_interactive_test_mixin.h"
@@ -25,6 +25,7 @@
 #include "components/feature_engagement/public/feature_constants.h"
 #include "components/saved_tab_groups/public/features.h"
 #include "components/saved_tab_groups/public/tab_group_sync_service.h"
+#include "components/saved_tab_groups/public/types.h"
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/identity_test_utils.h"
@@ -117,6 +118,12 @@ class CommentsSidePanelCoordinatorInteractiveUiTest
     return browser()->GetFeatures().comments_side_panel_coordinator();
   }
 
+  actions::ActionItem* GetActionItemForCommentsSidePanel() {
+    return actions::ActionManager::Get().FindAction(
+        kActionSidePanelShowComments,
+        browser()->GetActions()->root_action_item());
+  }
+
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
 };
@@ -125,10 +132,7 @@ IN_PROC_BROWSER_TEST_F(CommentsSidePanelCoordinatorInteractiveUiTest,
                        EntryIsRegistered) {
   // The comments entry should be registered in the window registry.
   EXPECT_EQ(
-      browser()
-          ->GetFeatures()
-          .side_panel_coordinator()
-          ->GetWindowRegistry()
+      SidePanelRegistry::From(browser())
           ->GetEntryForKey(SidePanelEntry::Key(SidePanelEntry::Id::kComments))
           ->key()
           .id(),
@@ -166,6 +170,81 @@ IN_PROC_BROWSER_TEST_F(CommentsSidePanelCoordinatorInteractiveUiTest,
       // Verify the comments action is visible when the tab is shared.
       HoverTabAt(shared_tab_index), ClickMouse(), FinishTabstripAnimations(),
       WaitForShow(kSharedTabGroupCommentsActionElementId));
+}
+
+// Verify the comments action is shown when a tab is added to a shared group.
+IN_PROC_BROWSER_TEST_F(CommentsSidePanelCoordinatorInteractiveUiTest,
+                       CommentActionIsVisible_AddingTabToGroup) {
+  tab_groups::TabGroupId group_id = CreateNewTabGroup();
+  ShareTabGroup(group_id, syncer::CollaborationId("fake_collaboration_id"),
+                data_sharing::MemberRole::kOwner, /*should_sign_in=*/false);
+
+  // Simplest way to add a tab to group is to add the tab at the beginning of
+  // the tab strip and drag it to group header to its right.
+  EXPECT_TRUE(
+      AddTabAtIndex(0, GURL(url::kAboutBlankURL), ui::PAGE_TRANSITION_TYPED));
+  const int ungrouped_tab_index = 0;
+
+  browser()->tab_strip_model()->ActivateTabAt(ungrouped_tab_index);
+
+  RunTestSequence(WaitForShow(kTabGroupHeaderElementId),
+                  EnsureNotPresent(kSharedTabGroupCommentsActionElementId),
+                  HoverTabAt(ungrouped_tab_index),
+                  DragMouseTo(kTabGroupHeaderElementId), Do([&]() {
+                    // Verify the tab was added to the group.
+                    TabGroupModel* tab_group_model =
+                        browser()->tab_strip_model()->group_model();
+                    EXPECT_EQ(
+                        tab_group_model->GetTabGroup(group_id)->tab_count(), 2);
+                  }),
+                  WaitForShow(kSharedTabGroupCommentsActionElementId));
+}
+
+// Verify the comments action is shown when a tab group becomes shared.
+IN_PROC_BROWSER_TEST_F(CommentsSidePanelCoordinatorInteractiveUiTest,
+                       CommentActionIsVisible_SharingGroup) {
+  tab_groups::TabGroupId group_id = CreateNewTabGroup();
+
+  const int non_shared_tab_index = 0;
+  browser()->tab_strip_model()->ActivateTabAt(non_shared_tab_index);
+
+  RunTestSequence(
+      WaitForShow(kTabGroupHeaderElementId),
+      EnsureNotPresent(kSharedTabGroupCommentsActionElementId),
+      // Share the group.
+      Do([&] {
+        ShareTabGroup(
+            group_id, syncer::CollaborationId("fake_collaboration_id"),
+            data_sharing::MemberRole::kOwner, /*should_sign_in=*/false);
+
+        // Trigger observers to fire by updating the group's visual data.
+        tab_group_sync_service()->UpdateVisualData(group_id,
+                                                   browser()
+                                                       ->GetTabStripModel()
+                                                       ->group_model()
+                                                       ->GetTabGroup(group_id)
+                                                       ->visual_data());
+      }),
+      WaitForShow(kSharedTabGroupCommentsActionElementId),
+      // Unshare the group.
+      Do([&] {
+        EXPECT_TRUE(tab_group_sync_service()
+                        ->GetGroup(group_id)
+                        ->is_shared_tab_group());
+        tab_group_sync_service()->MakeTabGroupUnsharedForTesting(group_id);
+        EXPECT_FALSE(tab_group_sync_service()
+                         ->GetGroup(group_id)
+                         ->is_shared_tab_group());
+
+        // Trigger observers to fire by updating the group's visual data.
+        tab_group_sync_service()->UpdateVisualData(group_id,
+                                                   browser()
+                                                       ->GetTabStripModel()
+                                                       ->group_model()
+                                                       ->GetTabGroup(group_id)
+                                                       ->visual_data());
+      }),
+      WaitForHide(kSharedTabGroupCommentsActionElementId));
 }
 
 // Verify the comments side panel will resume visilibity when switching to a
@@ -225,10 +304,7 @@ IN_PROC_BROWSER_TEST_F(CommentsSidePanelCoordinatorInteractiveUiTest,
   RunTestSequence(
       // Initially, the title should have no group name.
       Do([&]() {
-        SidePanelCoordinator* side_panel =
-            browser()->GetFeatures().side_panel_coordinator();
-        actions::ActionItem* action_item = side_panel->GetActionItem(
-            SidePanelEntry::Key(SidePanelEntry::Id::kComments));
+        actions::ActionItem* action_item = GetActionItemForCommentsSidePanel();
         EXPECT_EQ(u"Comments", action_item->GetText());
       }),
 
@@ -238,20 +314,14 @@ IN_PROC_BROWSER_TEST_F(CommentsSidePanelCoordinatorInteractiveUiTest,
       WaitForShow(kSharedTabGroupCommentsActionElementId),
       PressButton(kSharedTabGroupCommentsActionElementId),
       WaitForShow(kSidePanelElementId), FinishTabstripAnimations(), Do([&]() {
-        SidePanelCoordinator* side_panel =
-            browser()->GetFeatures().side_panel_coordinator();
-        actions::ActionItem* action_item = side_panel->GetActionItem(
-            SidePanelEntry::Key(SidePanelEntry::Id::kComments));
+        actions::ActionItem* action_item = GetActionItemForCommentsSidePanel();
         EXPECT_EQ(u"Comments - Group 1", action_item->GetText());
       }),
 
       // Activate another shared tab, verify the title is updated.
       SelectTab(kTabStripElementId, group2_tab_index, InputType::kMouse),
       WaitForActiveTabChange(group2_tab_index), Do([&]() {
-        SidePanelCoordinator* side_panel =
-            browser()->GetFeatures().side_panel_coordinator();
-        actions::ActionItem* action_item = side_panel->GetActionItem(
-            SidePanelEntry::Key(SidePanelEntry::Id::kComments));
+        actions::ActionItem* action_item = GetActionItemForCommentsSidePanel();
         EXPECT_EQ(u"Comments - Group 2", action_item->GetText());
       }));
 }

@@ -9,7 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/format_macros.h"
 #include "base/i18n/number_formatting.h"
 #include "base/memory/ref_counted_memory.h"
@@ -43,9 +42,9 @@ class AboutUIHTMLSource : public web::URLDataSourceIOS {
   // web::URLDataSourceIOS implementation.
   std::string GetSource() const override;
   void StartDataRequest(
-      const std::string& path,
+      std::string_view path,
       web::URLDataSourceIOS::GotDataCallback callback) override;
-  std::string GetMimeType(const std::string& path) const override;
+  std::string GetMimeType(std::string_view path) const override;
   bool ShouldDenyXFrameOptions() const override;
 
   // Send the response data.
@@ -72,10 +71,11 @@ std::string AboutUIHTMLSource::GetSource() const {
 }
 
 void AboutUIHTMLSource::StartDataRequest(
-    const std::string& path,
+    std::string_view path,
     web::URLDataSourceIOS::GotDataCallback callback) {
   std::string response;
   // Add your data source here, in alphabetical order.
+  // keep-sorted start block=yes
   if (source_name_ == kChromeUICreditsHost) {
     int idr = IDR_ABOUT_UI_CREDITS_HTML;
     if (path == kCreditsJsPath) {
@@ -92,7 +92,7 @@ void AboutUIHTMLSource::StartDataRequest(
     // chrome://histograms, this code could likely be moved to //ios/web.
     for (base::HistogramBase* histogram : base::StatisticsRecorder::Sort(
              base::StatisticsRecorder::GetHistograms())) {
-      if (!base::Contains(histogram->histogram_name(), path)) {
+      if (!histogram->histogram_name().contains(path)) {
         continue;
       }
       base::Value::Dict histogram_dict = histogram->ToGraphDict();
@@ -108,6 +108,7 @@ void AboutUIHTMLSource::StartDataRequest(
       response.append("<br><hr><br>");
     }
   }
+  // keep-sorted end
 
   FinishDataRequest(response, std::move(callback));
 }
@@ -118,7 +119,7 @@ void AboutUIHTMLSource::FinishDataRequest(
   std::move(callback).Run(base::MakeRefCounted<base::RefCountedString>(html));
 }
 
-std::string AboutUIHTMLSource::GetMimeType(const std::string& path) const {
+std::string AboutUIHTMLSource::GetMimeType(std::string_view path) const {
   if (path == kCreditsJsPath || path == kStringsJsPath) {
     return "application/javascript";
   }

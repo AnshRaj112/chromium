@@ -49,7 +49,6 @@
 #include "third_party/blink/renderer/platform/bindings/script_state.h"
 #include "third_party/blink/renderer/platform/bindings/v8_private_property.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
-#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 #include "third_party/blink/renderer/platform/scheduler/public/task_attribution_info.h"
 #include "third_party/blink/renderer/platform/scheduler/public/task_attribution_tracker.h"
 #include "third_party/blink/renderer/platform/weborigin/kurl.h"
@@ -61,17 +60,27 @@ namespace blink {
 
 namespace {
 
-void MaybeRecordHistoryAdvanceMethodUkm(LocalDOMWindow* window) {
+void MaybeRecordHistoryPushStateUkm(LocalDOMWindow* window) {
   if (!window || !window->GetFrame()) {
+    return;
+  }
+
+  AdTracker* ad_tracker = window->GetFrame()->GetAdTracker();
+  if (!ad_tracker) {
     return;
   }
 
   bool has_sticky_user_activation =
       window->GetFrame()->HasStickyUserActivation();
-  bool from_ad = window->GetFrame()->IsAdScriptInStack() ||
-                 window->GetFrame()->IsAdFrame();
 
-  ukm::builders::HistoryApi_AdvanceMethod(window->UkmSourceID())
+  bool from_ad = window->GetFrame()->IsAdFrame() ||
+                 ad_tracker->IsAdScriptInStack(
+                     AdTracker::StackType::kTopOnly,
+                     /*ignore_monkey_patch=*/
+                     AdTracker::MonkeyPatchableApi::kHistoryPushState,
+                     /*out_ad_script_ancestry=*/nullptr);
+
+  ukm::builders::HistoryApi_PushState(window->UkmSourceID())
       .SetHasStickyUserActivation(has_sticky_user_activation)
       .SetFromAd(from_ad)
       .Record(window->UkmRecorder());
@@ -214,9 +223,6 @@ void History::go(ScriptState* script_state,
                  int delta,
                  ExceptionState& exception_state) {
   base::TimeTicks actual_navigation_start = base::TimeTicks::Now();
-  if (delta > 0) {
-    MaybeRecordHistoryAdvanceMethodUkm(DomWindow());
-  }
 
   LocalDOMWindow* window = DomWindow();
   if (!window) {
@@ -270,7 +276,7 @@ void History::pushState(ScriptState* script_state,
                         const String& title,
                         const String& url,
                         ExceptionState& exception_state) {
-  MaybeRecordHistoryAdvanceMethodUkm(DomWindow());
+  MaybeRecordHistoryPushStateUkm(DomWindow());
 
   v8::Isolate* isolate = script_state->GetIsolate();
   WebFrameLoadType load_type = WebFrameLoadType::kStandard;
@@ -321,14 +327,9 @@ void History::replaceState(ScriptState* script_state,
 }
 
 KURL History::UrlForState(const String& url_string) {
-  if (url_string.IsNull() ||
-      (url_string.empty() &&
-       RuntimeEnabledFeatures::StandardHistoryStateEmptyUrlHandlingEnabled())) {
+  if (url_string.IsNull() || url_string.empty()) {
     return DomWindow()->Url();
   }
-  if (url_string.empty())
-    return DomWindow()->BaseURL();
-
   return KURL(DomWindow()->BaseURL(), url_string);
 }
 
@@ -373,13 +374,13 @@ void History::StateObjectAdded(scoped_refptr<SerializedScriptValue> data,
   }
 
   if (!window->GetFrame()->navigation_rate_limiter().CanProceed()) {
-    // TODO(769592): Get an API spec change so that we can throw an exception:
-    //
-    //  exception_state.ThrowDOMException(DOMExceptionCode::kQuotaExceededError,
-    //                                    "Throttling history state changes to "
-    //                                    "prevent the browser from hanging.");
-    //
-    // instead of merely warning.
+    if (RuntimeEnabledFeatures::
+            ThrottledHistoryAPIThrowsSecurityErrorEnabled()) {
+      exception_state.ThrowSecurityError(
+          "Throttling history state changes to "
+          "prevent the browser from hanging.");
+    }
+
     return;
   }
 

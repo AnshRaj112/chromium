@@ -14,6 +14,7 @@
 #include "ui/views/layout/flex_layout.h"
 #include "ui/views/layout/flex_layout_view.h"
 #include "ui/views/layout/layout_types.h"
+#include "ui/views/metadata/view_factory.h"
 #include "ui/views/style/typography.h"
 #include "ui/views/view.h"
 
@@ -38,6 +39,7 @@ std::unique_ptr<views::View> CreateAccountRow(const AccountInfo& account) {
                       .SetText(base::UTF8ToUTF16(account.full_name))
                       .SetTextContext(views::style::CONTEXT_DIALOG_BODY_TEXT)
                       .SetTextStyle(views::style::STYLE_BODY_3_MEDIUM)
+                      .SetEnabledColor(ui::kColorSysOnSurface)
                       .SetHorizontalAlignment(
                           gfx::HorizontalAlignment::ALIGN_LEFT),
                   // Email.
@@ -45,6 +47,7 @@ std::unique_ptr<views::View> CreateAccountRow(const AccountInfo& account) {
                       .SetText(base::UTF8ToUTF16(account.email))
                       .SetTextContext(views::style::CONTEXT_DIALOG_BODY_TEXT)
                       .SetTextStyle(views::style::STYLE_BODY_4)
+                      .SetEnabledColor(ui::kColorSysOnSurfaceSubtle)
                       .SetHorizontalAlignment(
                           gfx::HorizontalAlignment::ALIGN_LEFT)))
       .Build();

@@ -9,6 +9,7 @@
 
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
+#include "base/logging.h"
 #include "base/run_loop.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/updater/constants.h"
@@ -49,14 +50,14 @@ int App::RunTasks() {
 }
 
 void App::Shutdown(int exit_code) {
+  VLOG(1) << __func__ << ": " << exit_code;
+
   if (quit_.is_null()) {
     // It's possible for shutdown to be called twice, since the runloop exits
     // only when idle. The exit code of the first shutdown will be used.
     return;
   }
 
-  // TODO(crbug.com/40259598): for non-silent scenarios where UI is not
-  // otherwise shown, some UI is needed here if exit_code indicates a failure.
   std::move(quit_).Run(exit_code);
 }
 

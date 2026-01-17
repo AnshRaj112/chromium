@@ -10,16 +10,15 @@
 #include "base/functional/callback_helpers.h"
 #include "base/no_destructor.h"
 #include "chrome/browser/apps/app_service/app_launch_params.h"
-#include "chrome/browser/apps/app_service/app_service_proxy.h"
-#include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
-#include "chrome/browser/apps/app_service/browser_app_launcher.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/web_applications/web_app_dialogs.h"
+#include "chrome/browser/web_applications/extensions/launch.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_manager.h"
 #include "chrome/browser/web_applications/os_integration/web_app_file_handler_manager.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/browser/web_applications/web_app_utils.h"
@@ -58,11 +57,9 @@ void LaunchAppWithParams(
         GetBrowserAppLauncherForTesting().Run(params_copy);
         barrier_callback.Run();
       } else {
-        apps::AppServiceProxyFactory::GetForProfile(profile)
-            ->BrowserAppLauncher()
-            ->LaunchAppWithParams(
-                std::move(params_copy),
-                base::IgnoreArgs<content::WebContents*>(barrier_callback));
+        web_app::LaunchExtensionOrWebApp(
+            profile, std::move(params_copy),
+            base::IgnoreArgs<content::WebContents*>(barrier_callback));
       }
     }
     return;
@@ -72,11 +69,9 @@ void LaunchAppWithParams(
     GetBrowserAppLauncherForTesting().Run(params);
     std::move(launch_finished_callback).Run();
   } else {
-    apps::AppServiceProxyFactory::GetForProfile(profile)
-        ->BrowserAppLauncher()
-        ->LaunchAppWithParams(std::move(params),
-                              base::IgnoreArgs<content::WebContents*>(
-                                  std::move(launch_finished_callback)));
+    web_app::LaunchExtensionOrWebApp(profile, std::move(params),
+                                     base::IgnoreArgs<content::WebContents*>(
+                                         std::move(launch_finished_callback)));
   }
 }
 
@@ -126,7 +121,7 @@ void UserChoiceDialogCompleted(
         allowed ? ApiApprovalState::kAllowed : ApiApprovalState::kDisallowed;
     if (protocol_url) {
       provider->scheduler().UpdateProtocolHandlerUserApproval(
-          app_id, protocol_url->scheme(), approval_state,
+          app_id, protocol_url->GetScheme(), approval_state,
           std::move(persist_done));
     } else {
       DCHECK(is_file_launch);
@@ -182,11 +177,10 @@ bool WebAppShimManagerDelegate::AppIsInstalled(Profile* profile,
   }
   WebAppProvider* provider = WebAppProvider::GetForWebApps(profile);
   CHECK(provider);
-  return profile &&
-         provider->registrar_unsafe().IsInstallState(
-             app_id, {proto::InstallState::SUGGESTED_FROM_ANOTHER_DEVICE,
-                      proto::InstallState::INSTALLED_WITHOUT_OS_INTEGRATION,
-                      proto::InstallState::INSTALLED_WITH_OS_INTEGRATION});
+  return provider->registrar_unsafe().IsInstallState(
+      app_id, {proto::InstallState::SUGGESTED_FROM_ANOTHER_DEVICE,
+               proto::InstallState::INSTALLED_WITHOUT_OS_INTEGRATION,
+               proto::InstallState::INSTALLED_WITH_OS_INTEGRATION});
 }
 
 bool WebAppShimManagerDelegate::AppCanCreateHost(Profile* profile,
@@ -210,13 +204,8 @@ bool WebAppShimManagerDelegate::AppUsesRemoteCocoa(
   }
   WebAppProvider* provider = WebAppProvider::GetForWebApps(profile);
   CHECK(provider);
-  auto& registrar = provider->registrar_unsafe();
-  return registrar.IsInstallState(
-             app_id, {proto::InstallState::SUGGESTED_FROM_ANOTHER_DEVICE,
-                      proto::InstallState::INSTALLED_WITHOUT_OS_INTEGRATION,
-                      proto::InstallState::INSTALLED_WITH_OS_INTEGRATION}) &&
-         registrar.GetAppEffectiveDisplayMode(app_id) !=
-             web_app::DisplayMode::kBrowser;
+  return provider->registrar_unsafe().AppMatches(
+      app_id, WebAppFilter::OpensInDedicatedWindow());
 }
 
 bool WebAppShimManagerDelegate::AppIsMultiProfile(
@@ -311,7 +300,7 @@ void WebAppShimManagerDelegate::LaunchApp(
     // Validate that the scheme is something that could be registered by the PWA
     // via the manifest.
     if (!provider->registrar_unsafe().IsRegisteredLaunchProtocol(
-            app_id, url.scheme())) {
+            app_id, url.GetScheme())) {
       DLOG(ERROR) << "Protocol is not a valid custom handler scheme.";
       continue;
     }
@@ -339,12 +328,13 @@ void WebAppShimManagerDelegate::LaunchApp(
     // unless the user has granted or denied permission to this protocol scheme
     // previously.
     web_app::WebAppRegistrar& registrar = provider->registrar_unsafe();
-    if (registrar.IsDisallowedLaunchProtocol(app_id, protocol_url.scheme())) {
+    if (registrar.IsDisallowedLaunchProtocol(app_id,
+                                             protocol_url.GetScheme())) {
       CancelAppLaunch(profile, app_id);
       return;
     }
 
-    if (!registrar.IsAllowedLaunchProtocol(app_id, protocol_url.scheme())) {
+    if (!registrar.IsAllowedLaunchProtocol(app_id, protocol_url.GetScheme())) {
       ShowWebAppProtocolLaunchDialog(
           std::move(protocol_url), profile, app_id,
           base::BindOnce(&UserChoiceDialogCompleted, std::move(params),

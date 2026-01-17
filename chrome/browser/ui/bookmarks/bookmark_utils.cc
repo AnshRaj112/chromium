@@ -18,6 +18,7 @@
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search/search.h"
+#include "chrome/browser/ui/tabs/features.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
@@ -50,6 +51,7 @@
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/image/image_skia_rep.h"
 #include "ui/gfx/image/image_skia_source.h"
 #include "ui/gfx/paint_vector_icon.h"
@@ -112,11 +114,19 @@ bool IsValidBookmarkDropLocation(
     return true;
   }
 
-  // `dragged_node` is null if the node is from another profile or the user is
-  // dragging a url. In both cases, `dragged_from_same_profile` is expected to
-  // be false. For dragging a node within the same profile, the `dragged_node`
-  // must be not null.
-  CHECK(dragged_node);
+  // In general, `dragged_node` is null if the node is from another profile or
+  // the user is dragging a url. In both cases, `dragged_from_same_profile` is
+  // expected to be false. For dragging a node within the same profile, the
+  // `dragged_node` must be not null.
+  // However, there’s an edge case. `dragged_node` might get deleted and become
+  // null during the drag operation, and it only happens when using the
+  // `chrome.bookmarks` extension API. In this case, return false to cancel the
+  // current drag operation.
+  // See https://crbug.com/472376579
+  if (!dragged_node) {
+    return false;
+  }
+
   CHECK(!dragged_node->is_root());
   CHECK(!dragged_node->is_permanent_node());
   // Don't allow the drop if the user is attempting to drop on the node being
@@ -226,6 +236,9 @@ bool ShouldShowAppsShortcutInBookmarkBar(Profile* profile) {
 }
 
 bool ShouldShowTabGroupsInBookmarkBar(Profile* profile) {
+  if (tabs::IsProjectsPanelFeatureEnabled()) {
+    return false;
+  }
   return profile->GetPrefs()->GetBoolean(
       bookmarks::prefs::kShowTabGroupsInBookmarkBar);
 }
@@ -319,47 +332,15 @@ bool CanAllBeEditedByUser(
 
 #if defined(TOOLKIT_VIEWS)
 
-gfx::ImageSkia GetBookmarkFolderImageFromVectorIcon(
-    BookmarkFolderIconType icon_type,
-    ui::ColorVariant color,
-    const ui::ColorProvider* color_provider) {
-  const gfx::VectorIcon* id;
-  gfx::ImageSkia folder;
-  if (icon_type == BookmarkFolderIconType::kNormal) {
-    id = &vector_icons::kFolderChromeRefreshIcon;
-  } else {
-    id = &vector_icons::kFolderManagedRefreshIcon;
-  }
-
-  const ui::ThemedVectorIcon icon(id, color);
-  folder = icon.GetImageSkia(color_provider);
-  return folder;
-}
-
 ui::ImageModel GetBookmarkFolderIcon(BookmarkFolderIconType icon_type,
                                      ui::ColorVariant color) {
-  int default_id = IDR_FOLDER_CLOSED;
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
-  // This block must be #ifdefed because only these platforms actually have this
-  // resource ID.
-  if (icon_type == BookmarkFolderIconType::kManaged) {
-    default_id = IDR_BOOKMARK_BAR_FOLDER_MANAGED;
+  const gfx::VectorIcon* icon_id;
+  if (icon_type == BookmarkFolderIconType::kNormal) {
+    icon_id = &vector_icons::kFolderChromeRefreshIcon;
+  } else {
+    icon_id = &vector_icons::kFolderManagedRefreshIcon;
   }
-#endif
-  const auto generator = [](int default_id, BookmarkFolderIconType icon_type,
-                            ui::ColorVariant color,
-                            const ui::ColorProvider* color_provider) {
-    gfx::ImageSkia folder;
-    folder =
-        GetBookmarkFolderImageFromVectorIcon(icon_type, color, color_provider);
-    return gfx::ImageSkia(std::make_unique<RTLFlipSource>(folder),
-                          folder.size());
-  };
-  const gfx::Size size =
-      ui::ResourceBundle::GetSharedInstance().GetImageNamed(default_id).Size();
-  return ui::ImageModel::FromImageGenerator(
-      base::BindRepeating(generator, default_id, icon_type, std::move(color)),
-      size);
+  return ui::ImageModel::FromVectorIcon(*icon_id, color);
 }
 #endif
 

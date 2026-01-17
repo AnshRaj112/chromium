@@ -11,12 +11,12 @@
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
 #include "base/notreached.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/trace_event/memory_dump_manager.h"
@@ -363,10 +363,7 @@ bool TraceConfig::IsEquivalentTo(const TraceConfig& other) const {
 }
 
 std::string TraceConfig::ToString() const {
-  Value dict = ToValue();
-  std::string json;
-  JSONWriter::Write(dict, &json);
-  return json;
+  return WriteJson(ToValue()).value_or("");
 }
 
 std::unique_ptr<ConvertableToTraceFormat>
@@ -410,7 +407,7 @@ void TraceConfig::Merge(const TraceConfig& config) {
 void TraceConfig::Clear() {
   record_mode_ = RECORD_UNTIL_FULL;
   trace_buffer_size_in_events_ = 0;
-  trace_buffer_size_in_bytes_ = ByteCount(0);
+  trace_buffer_size_in_bytes_ = ByteSize(0);
   enable_systrace_ = false;
   enable_argument_filter_ = false;
   enable_event_package_name_filter_ = false;
@@ -425,7 +422,7 @@ void TraceConfig::Clear() {
 void TraceConfig::InitializeDefault() {
   record_mode_ = RECORD_UNTIL_FULL;
   trace_buffer_size_in_events_ = 0;
-  trace_buffer_size_in_bytes_ = ByteCount(0);
+  trace_buffer_size_in_bytes_ = ByteSize(0);
   enable_systrace_ = false;
   enable_argument_filter_ = false;
   enable_event_package_name_filter_ = false;
@@ -447,8 +444,12 @@ void TraceConfig::InitializeFromConfigDict(const Value::Dict& dict) {
   }
   trace_buffer_size_in_events_ = base::saturated_cast<size_t>(
       dict.FindInt(kTraceBufferSizeInEvents).value_or(0));
+
+  int trace_buffer_size_in_kb = dict.FindInt(kTraceBufferSizeInKb).value_or(0);
   trace_buffer_size_in_bytes_ =
-      KiB(dict.FindInt(kTraceBufferSizeInKb).value_or(0));
+      trace_buffer_size_in_kb > 0
+          ? KiBU(checked_cast<unsigned>(trace_buffer_size_in_kb))
+          : ByteSize(0);
 
   enable_systrace_ = dict.FindBool(kEnableSystraceParam).value_or(false);
   enable_argument_filter_ =
@@ -492,7 +493,8 @@ void TraceConfig::InitializeFromConfigDict(const Value::Dict& dict) {
 }
 
 void TraceConfig::InitializeFromConfigString(std::string_view config_string) {
-  std::optional<Value> dict = JSONReader::Read(config_string);
+  std::optional<Value> dict =
+      JSONReader::Read(config_string, JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (dict && dict->is_dict()) {
     InitializeFromConfigDict(dict->GetDict());
   } else {
@@ -508,7 +510,7 @@ void TraceConfig::InitializeFromStrings(std::string_view category_filter_string,
 
   record_mode_ = RECORD_UNTIL_FULL;
   trace_buffer_size_in_events_ = 0;
-  trace_buffer_size_in_bytes_ = ByteCount(0);
+  trace_buffer_size_in_bytes_ = ByteSize(0);
   enable_systrace_ = false;
   systrace_events_.clear();
   enable_argument_filter_ = false;
@@ -802,8 +804,8 @@ std::string TraceConfig::ToTraceOptionsString() const {
 std::string TraceConfig::ToPerfettoTrackEventConfigRaw(
     bool privacy_filtering_enabled) const {
   perfetto::protos::gen::TrackEventConfig te_cfg;
-  if (!base::Contains(category_filter_.excluded_categories(), "*") &&
-      !base::Contains(category_filter_.included_categories(), "*")) {
+  if (!std::ranges::contains(category_filter_.excluded_categories(), "*") &&
+      !std::ranges::contains(category_filter_.included_categories(), "*")) {
     // In the case when the default behavior is not specified, apply the
     // following rule: if no categories are explicitly enabled, enable the
     // default ones; otherwise only enable matching categories.

@@ -296,6 +296,10 @@ class GestureProvider::GestureListenerImpl : public ScaleGestureListener,
              /*should_update=*/false);
   }
 
+  void OnUnconfirmedTapConvertedToTap() {
+    gesture_detector_.OnUnconfirmedTapConvertedToTap();
+  }
+
   // ScaleGestureListener implementation.
   bool OnScaleBegin(const ScaleGestureDetector& detector,
                     const MotionEvent& e) override {
@@ -719,6 +723,8 @@ class GestureProvider::GestureListenerImpl : public ScaleGestureListener,
 
   bool IsPinchInProgress() const { return pinch_event_sent_; }
 
+  GestureDetector* GetGestureDetectorForTesting() { return &gesture_detector_; }
+
  private:
   bool OnSingleTapImpl(const MotionEvent& e, int tap_count) {
     // Long taps in the edges of the screen have their events delayed by
@@ -929,6 +935,18 @@ void GestureProvider::SendSynthesizedEndEvents() {
   gesture_listener_->SendSynthesizedEndEvents();
 }
 
+void GestureProvider::OnUnconfirmedTapConvertedToTap() {
+  gesture_listener_->OnUnconfirmedTapConvertedToTap();
+}
+
+GestureDetector* GestureProvider::GetGestureDetectorForTesting() {
+  if (!gesture_listener_) {
+    return nullptr;
+  }
+  return static_cast<GestureListenerImpl*>(gesture_listener_.get())
+      ->GetGestureDetectorForTesting();  // IN-TEST
+}
+
 bool GestureProvider::CanHandle(const MotionEvent& event) const {
   // Aura requires one cancel event per touch point, whereas Android requires
   // one cancel event per touch sequence. Thus we need to allow extra cancel
@@ -939,7 +957,7 @@ bool GestureProvider::CanHandle(const MotionEvent& event) const {
 }
 
 void GestureProvider::OnTouchEventHandlingBegin(const MotionEvent& event) {
-  last_event_ = event.Clone();
+  last_event_without_history_ = event.Clone(/*with_history=*/false);
   switch (event.GetAction()) {
     case MotionEvent::Action::DOWN:
       current_down_event_ = event.Clone();

@@ -19,7 +19,6 @@
 #include "components/signin/public/identity_manager/account_capabilities.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/primary_account_access_token_fetcher.h"
-#include "components/signin/public/identity_manager/scope_set.h"
 #include "components/variations/net/variations_http_headers.h"
 #include "google_apis/gaia/gaia_constants.h"
 #include "net/base/load_flags.h"
@@ -66,9 +65,7 @@ std::string BuildDocumentSuggestionRequest(const std::u16string& query) {
                       base::Value(base::i18n::GetConfiguredLocale()));
   root.Set("requestOptions", std::move(request_options));
 
-  std::string result;
-  base::JSONWriter::Write(root, &result);
-  return result;
+  return base::WriteJson(root).value_or("");
 }
 
 }  // namespace
@@ -120,7 +117,7 @@ void DocumentSuggestionsService::CreateDocumentSuggestionsRequest(
         semantics {
           sender: "Omnibox"
           description:
-            "Request for Google Drive document suggestions from the omnibox."
+            "Request for Google Drive document suggestions from the omnibox. "
             "User must be signed in and have default search provider set to "
             "Google."
           trigger: "Signed-in user enters text in the omnibox."
@@ -130,8 +127,7 @@ void DocumentSuggestionsService::CreateDocumentSuggestionsRequest(
         policy {
           cookies_allowed: YES
           cookies_store: "user"
-          setting:
-            "Coupled to Google default search plus signed-in"
+          setting: "Coupled to Google default search plus signed-in."
           chrome_policy {
             SearchSuggestEnabled {
                 policy_options {mode: MANDATORY}
@@ -157,11 +153,8 @@ void DocumentSuggestionsService::CreateDocumentSuggestionsRequest(
 
   std::move(creation_callback).Run(request.get());
 
-  // Create and fetch an OAuth2 token.
-  signin::ScopeSet scopes;
-  scopes.insert(GaiaConstants::kCloudSearchQueryOAuth2Scope);
   token_fetcher_ = std::make_unique<signin::PrimaryAccountAccessTokenFetcher>(
-      "document_suggestions_service", identity_manager_, scopes,
+      signin::OAuthConsumerId::kDocumentSuggestionsService, identity_manager_,
       base::BindOnce(&DocumentSuggestionsService::AccessTokenAvailable,
                      base::Unretained(this), std::move(request),
                      std::move(request_body), traffic_annotation,

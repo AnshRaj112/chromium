@@ -5,7 +5,6 @@
 #include "ui/events/ozone/evdev/keyboard_evdev.h"
 
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/logging.h"
 #include "base/memory/weak_ptr.h"
 #include "base/task/single_thread_task_runner.h"
@@ -147,7 +146,7 @@ void KeyboardEvdev::SetSlowKeysDelay(base::TimeDelta delay) {
 
 void KeyboardEvdev::SetCurrentLayoutByName(
     const std::string& layout_name,
-    base::OnceCallback<void(bool)> callback) {
+    base::OnceCallback<void(bool success)> callback) {
   keyboard_layout_engine_->SetCurrentLayoutByName(layout_name,
                                                   std::move(callback));
   RefreshModifiers();

@@ -19,14 +19,8 @@ id<GREYMatcher> FormSuggestionViewMatcher();
 // Returns a matcher for the keyboard icon in the keyboard accessory bar.
 id<GREYMatcher> KeyboardIconMatcher();
 
-// Returns a matcher for the password icon in the keyboard accessory bar.
-id<GREYMatcher> PasswordIconMatcher();
-
 // Returns a matcher for the password table view in manual fallback.
 id<GREYMatcher> PasswordTableViewMatcher();
-
-// Returns a matcher for the password search bar in manual fallback.
-id<GREYMatcher> PasswordSearchBarMatcher();
 
 // Returns a matcher for the button to open Password Manager in manual
 // fallback.
@@ -45,9 +39,6 @@ id<GREYMatcher> OtherPasswordsDismissMatcher();
 // Returns a matcher for the a password in the manual fallback list.
 id<GREYMatcher> PasswordButtonMatcher();
 
-// Returns a matcher for the profiles icon in the keyboard accessory bar.
-id<GREYMatcher> ProfilesIconMatcher();
-
 // Returns a matcher for the profiles table view in manual fallback.
 id<GREYMatcher> ProfilesTableViewMatcher();
 
@@ -57,9 +48,6 @@ id<GREYMatcher> ManageProfilesMatcher();
 
 // Returns a matcher for the ProfileTableView window.
 id<GREYMatcher> ProfileTableViewWindowMatcher();
-
-// Returns a matcher for the credit card icon in the keyboard accessory bar.
-id<GREYMatcher> CreditCardIconMatcher();
 
 // Returns a matcher for the credit card table view in manual fallback.
 id<GREYMatcher> CreditCardTableViewMatcher();

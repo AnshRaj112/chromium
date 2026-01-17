@@ -11,8 +11,6 @@ import static org.hamcrest.CoreMatchers.instanceOf;
 
 import static org.chromium.base.test.transit.ViewSpec.viewSpec;
 
-import android.view.View;
-
 import org.chromium.base.test.transit.MoreViewConditions.ViewHasChildrenCountCondition;
 import org.chromium.base.test.transit.ScrollableFacility;
 import org.chromium.base.test.transit.ViewElement;
@@ -83,17 +81,17 @@ public class MvtsFacility extends ScrollableFacility<RegularNewTabPageStation> {
             }
 
             mSiteSuggestionsByTileIndex.add(mSiteSuggestions.get(i));
-            ViewSpec<? extends View> onScreenViewSpec = createTileSpec(parentIndex);
-            /* offScreenDataMatcher= */ Item item = items.declareItem(onScreenViewSpec, null);
+            ViewSpec<SuggestionsTileView> onScreenViewSpec = createTileSpec(parentIndex);
+            Item item = items.declareItem(onScreenViewSpec, /* offScreenDataMatcher= */ null);
             newTileItems.add(item);
             ++parentIndex;
         }
 
         if (mAddNewButtonIndex != null) {
             mSiteSuggestionsByTileIndex.add(null);
-            ViewSpec<? extends View> onScreenViewSpec = createTileSpec(mAddNewButtonIndex);
-            /* offScreenDataMatcher= */ addNewButtonItem =
-                    items.declareItem(onScreenViewSpec, null);
+            ViewSpec<SuggestionsTileView> onScreenViewSpec = createTileSpec(mAddNewButtonIndex);
+            addNewButtonItem =
+                    items.declareItem(onScreenViewSpec, /* offScreenDataMatcher= */ null);
             newTileItems.add(addNewButtonItem);
         }
         tileItems = Collections.unmodifiableList(newTileItems);
@@ -115,6 +113,14 @@ public class MvtsFacility extends ScrollableFacility<RegularNewTabPageStation> {
 
     List<SiteSuggestion> getSiteSuggestions() {
         return mSiteSuggestions;
+    }
+
+    Set<Integer> getSeparatorIndices() {
+        Set<Integer> separators = new HashSet<>(mNonTileIndices);
+        if (mAddNewButtonIndex != null) {
+            separators.remove(mAddNewButtonIndex);
+        }
+        return separators;
     }
 
     /** Ensure tile with index |i| is visible, maybe scrolling to it. */

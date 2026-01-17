@@ -8,19 +8,16 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <array>
 #include <memory>
-#include <set>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "base/auto_reset.h"
-#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "cc/base/protected_sequence_synchronizer.h"
 #include "cc/base/region.h"
-#include "cc/benchmarks/micro_benchmark.h"
 #include "cc/cc_export.h"
 #include "cc/input/hit_test_opaqueness.h"
 #include "cc/input/scroll_snap_data.h"
@@ -30,11 +27,7 @@
 #include "cc/paint/element_id.h"
 #include "cc/paint/filter_operations.h"
 #include "cc/paint/node_id.h"
-#include "cc/paint/paint_record.h"
-#include "cc/trees/effect_node.h"
-#include "cc/trees/property_tree.h"
-#include "cc/trees/property_tree_layer_tree_delegate.h"
-#include "cc/trees/target_property.h"
+#include "cc/trees/tracked_element_bounds.h"
 #include "components/viz/common/surfaces/region_capture_bounds.h"
 #include "components/viz/common/surfaces/subtree_capture_id.h"
 #include "components/viz/common/view_transition_element_resource_id.h"
@@ -45,6 +38,7 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/gfx/geometry/rrect_f.h"
+#include "ui/gfx/geometry/transform.h"
 
 namespace viz {
 class CopyOutputRequest;
@@ -56,10 +50,15 @@ class LayerImpl;
 class LayerTreeHost;
 class LayerTreeHostCommon;
 class LayerTreeImpl;
+class MicroBenchmark;
 class PictureLayer;
+class PropertyTrees;
 
 struct CommitState;
 struct ThreadUnsafeCommitState;
+
+enum class ElementListType;
+enum class RenderSurfaceReason : uint8_t;
 
 // For tracing and debugging. The info will be attached to this layer's tracing
 // output.
@@ -527,6 +526,16 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
     return viz::RegionCaptureBounds::Empty();
   }
 
+  // Set or get data for tracked elements on this layer. The geometry provided
+  // is in layer space.
+  void SetTrackedElementBounds(TrackedElementBounds bounds);
+  const TrackedElementBounds& tracked_element_bounds() const {
+    if (const auto& rare_inputs = inputs_.Read(*this).rare_inputs) {
+      return rare_inputs->tracked_element_bounds;
+    }
+    return TrackedElementBoundsEmpty();
+  }
+
   // Set or get the set of blocking wheel rects of this layer. The
   // |wheel_event_region| is the set of rects for which there is a non-passive
   // wheel event listener that paints into this layer. Mouse wheel messages
@@ -538,6 +547,16 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
       return rare_inputs->wheel_event_region;
     return Region::Empty();
   }
+
+#if BUILDFLAG(IS_ANDROID)
+  void SetXrHitTestOrder(std::vector<ElementId> xr_hit_test_order);
+  const std::vector<ElementId>* xr_hit_test_order() const {
+    if (const auto& rare_inputs = inputs_.Read(*this).rare_inputs) {
+      return &rare_inputs->xr_hit_test_order;
+    }
+    return nullptr;
+  }
+#endif
 
   // For layer tree mode only.
   // In layer list mode, use ScrollTree::SetScrollCallbacks() instead.
@@ -1011,9 +1030,14 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
     ~RareInputs();
 
     viz::RegionCaptureBounds capture_bounds;
+    TrackedElementBounds tracked_element_bounds;
     Region main_thread_scroll_hit_test_region;
     std::vector<ScrollHitTestRect> non_composited_scroll_hit_test_rects;
     Region wheel_event_region;
+#if BUILDFLAG(IS_ANDROID)
+    // Rare because only used on Android XR platform
+    std::vector<ElementId> xr_hit_test_order;
+#endif
     PaintFlags::FilterQuality filter_quality = PaintFlags::FilterQuality::kLow;
     PaintFlags::DynamicRangeLimitMixture dynamic_range_limit{
         PaintFlags::DynamicRangeLimit::kHigh};

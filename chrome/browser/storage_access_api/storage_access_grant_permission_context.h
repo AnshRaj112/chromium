@@ -14,6 +14,10 @@
 
 class GURL;
 
+namespace permissions {
+struct PermissionPromptDecision;
+}  // namespace permissions
+
 // These values are persisted to logs. Entries should not be renumbered and
 // numeric values should never be reused.
 // Update StorageAccessAPIRequestOutcome in enums.xml when you add entries.
@@ -102,8 +106,7 @@ class StorageAccessGrantPermissionContext
       const permissions::PermissionRequestData& request_data,
       permissions::BrowserPermissionCallback callback,
       bool persist,
-      PermissionDecision decision,
-      bool is_final_decision) override;
+      const permissions::PermissionPromptDecision& decision) override;
 
   // ContentSettingPermissionContextBase
   ContentSetting GetContentSettingStatusInternal(
@@ -114,11 +117,6 @@ class StorageAccessGrantPermissionContext
       const permissions::PermissionRequestData& request_data,
       ContentSetting content_setting,
       bool is_one_time) override;
-
-  // If the request is from a context partitioned as a popin we need to set
-  // the embedding origin to the popin opener's origin.
-  // See https://explainers-by-googlers.github.io/partitioned-popins/
-  GURL GetEffectiveEmbedderOrigin(content::RenderFrameHost* rfh) const override;
 
   // Internal implementation for NotifyPermissionSet.
   void NotifyPermissionSetInternal(
@@ -143,6 +141,8 @@ class StorageAccessGrantPermissionContext
       std::unique_ptr<permissions::PermissionRequestData> request_data,
       permissions::BrowserPermissionCallback callback,
       bool had_top_level_user_interaction);
+
+  void ReportRelatedWebsiteSetsDeprecation(content::RenderFrameHost* rfh);
 
   base::WeakPtrFactory<StorageAccessGrantPermissionContext> weak_factory_{this};
 };

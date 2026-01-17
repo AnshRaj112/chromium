@@ -7,7 +7,6 @@
 #include <memory>
 
 #include "base/containers/flat_set.h"
-#include "base/files/file_util.h"
 #include "base/strings/string_util.h"
 #include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
@@ -19,12 +18,14 @@
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
 #include "chrome/browser/web_applications/web_app_command_manager.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/browser/web_applications/web_app_icon_manager.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
 #include "chrome/browser/web_applications/web_app_install_params.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
+#include "chrome/common/chrome_features.h"
 #include "components/webapps/browser/install_result_code.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
 #include "components/webapps/common/web_app_id.h"
@@ -286,9 +287,15 @@ IN_PROC_BROWSER_TEST_F(InstallAppFromVerifiedManifestCommandTest,
 
   EXPECT_TRUE(webapps::IsSuccess(result_code));
 
+  // Post trusted icons launch, all icons use the same color (chosen from the
+  // one of the largest size).
+  SkColor expected_color =
+      base::FeatureList::IsEnabled(features::kWebAppUsePrimaryIcon)
+          ? SK_ColorGREEN
+          : SK_ColorRED;
   SkColor small_icon_color =
       IconManagerReadAppIconPixel(provider().icon_manager(), result_id, 96);
-  EXPECT_EQ(small_icon_color, SK_ColorRED);
+  EXPECT_EQ(small_icon_color, expected_color);
 
   SkColor large_icon_color =
       IconManagerReadAppIconPixel(provider().icon_manager(), result_id, 192);
@@ -519,9 +526,15 @@ IN_PROC_BROWSER_TEST_F(InstallAppFromVerifiedManifestCommandTest,
 
   EXPECT_TRUE(webapps::IsSuccess(result_code));
 
+  // Post trusted icons launch, all icons use the same color (chosen from the
+  // one of the largest size).
+  SkColor expected_color =
+      base::FeatureList::IsEnabled(features::kWebAppUsePrimaryIcon)
+          ? SK_ColorGREEN
+          : SK_ColorRED;
   SkColor small_icon_color =
       IconManagerReadAppIconPixel(provider().icon_manager(), result_id, 96);
-  EXPECT_EQ(small_icon_color, SK_ColorRED);
+  EXPECT_EQ(small_icon_color, expected_color);
 
   SkColor large_icon_color =
       IconManagerReadAppIconPixel(provider().icon_manager(), result_id, 192);
@@ -632,8 +645,8 @@ IN_PROC_BROWSER_TEST_F(InstallAppFromVerifiedManifestCommandTest,
   EXPECT_EQ(
       provider().registrar_unsafe().GetAppById(result_id)->user_display_mode(),
       mojom::UserDisplayMode::kBrowser);
-  EXPECT_EQ(provider().registrar_unsafe().GetAppEffectiveDisplayMode(result_id),
-            DisplayMode::kBrowser);
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      result_id, WebAppFilter::OpensInBrowserTab()));
 }
 
 IN_PROC_BROWSER_TEST_F(InstallAppFromVerifiedManifestCommandTest,
@@ -671,7 +684,8 @@ IN_PROC_BROWSER_TEST_F(InstallAppFromVerifiedManifestCommandTest,
       kDocumentUrl, kManifestUrl, manifest, expected_id,
       webapps::WebappInstallSource::OMNIBOX_INSTALL_ICON, /*is_diy_app=*/true);
 
-  EXPECT_TRUE(provider().registrar_unsafe().IsDiyApp(result_id));
+  EXPECT_FALSE(provider().registrar_unsafe().AppMatches(
+      result_id, WebAppFilter::IsCraftedApp()));
 }
 
 }  // namespace web_app

@@ -13,28 +13,34 @@ import android.os.SystemClock;
 import android.view.View;
 import android.widget.ImageButton;
 
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.test.transit.OptionalViewElement;
 import org.chromium.base.test.transit.TripBuilder;
 import org.chromium.base.test.transit.ViewElement;
 import org.chromium.base.test.transit.ViewSpec;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
+import org.chromium.chrome.browser.incognito.IncognitoUtils;
 import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.omnibox.UrlBar;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
-import org.chromium.chrome.browser.toolbar.home_button.HomeButton;
 import org.chromium.chrome.browser.toolbar.top.ToggleTabStackButton;
 import org.chromium.chrome.browser.toolbar.top.ToolbarControlContainer;
 import org.chromium.chrome.test.transit.ChromeTriggers;
+import org.chromium.chrome.test.transit.SoftKeyboardFacility;
 import org.chromium.chrome.test.transit.hub.IncognitoTabSwitcherStation;
 import org.chromium.chrome.test.transit.hub.RegularTabSwitcherStation;
 import org.chromium.chrome.test.transit.layouts.LayoutTypeVisibleCondition;
 import org.chromium.chrome.test.transit.ntp.IncognitoNewTabPageStation;
 import org.chromium.chrome.test.transit.ntp.RegularNewTabPageStation;
+import org.chromium.chrome.test.transit.omnibox.FakeOmniboxSuggestions;
+import org.chromium.chrome.test.transit.omnibox.OmniboxFacility;
 import org.chromium.content_public.browser.test.util.TouchCommon;
+
+import java.util.function.Supplier;
 
 /**
  * The screen that shows a web or native page with the toolbar within a tab.
@@ -44,9 +50,10 @@ import org.chromium.content_public.browser.test.util.TouchCommon;
  */
 public class CtaPageStation extends BasePageStation<ChromeTabbedActivity> {
     public static final ViewSpec<UrlBar> URL_BAR = viewSpec(UrlBar.class, withId(R.id.url_bar));
-    public ViewElement<ToolbarControlContainer> toolbarElement;
-    public ViewElement<ToggleTabStackButton> tabSwitcherButtonElement;
-    public ViewElement<ImageButton> menuButtonElement;
+    public final OptionalViewElement<View> homeButtonElement;
+    public final ViewElement<ToolbarControlContainer> toolbarElement;
+    public final ViewElement<ToggleTabStackButton> tabSwitcherButtonElement;
+    public final ViewElement<ImageButton> menuButtonElement;
 
     /** Prefer the CtaPageStation's subclass |newBuilder()|. */
     public static Builder<CtaPageStation> newGenericBuilder() {
@@ -69,7 +76,6 @@ public class CtaPageStation extends BasePageStation<ChromeTabbedActivity> {
                         ToolbarControlContainer.class,
                         withId(R.id.control_container),
                         ViewElement.unscopedOption());
-        declareView(HomeButton.class, withId(R.id.home_button), ViewElement.unscopedOption());
         tabSwitcherButtonElement =
                 declareView(
                         ToggleTabStackButton.class,
@@ -78,6 +84,10 @@ public class CtaPageStation extends BasePageStation<ChromeTabbedActivity> {
         menuButtonElement =
                 declareView(
                         ImageButton.class, withId(R.id.menu_button), ViewElement.unscopedOption());
+
+        // The home button may not appear in tablets if the available screen size is too small.
+        homeButtonElement =
+                declareOptionalView(withId(R.id.home_button), ViewElement.unscopedOption());
     }
 
     /** Long presses the tab switcher button to open the action menu. */
@@ -97,6 +107,8 @@ public class CtaPageStation extends BasePageStation<ChromeTabbedActivity> {
 
     /** Shortcut to open a new tab programmatically as if selecting "New Tab" from the app menu. */
     public RegularNewTabPageStation openNewTabFast() {
+        assert !mIsIncognito || !IncognitoUtils.shouldOpenIncognitoAsWindow()
+                : "Regular tabs can only be opened in regular (non-incognito) windows.";
         return ChromeTriggers.invokeCustomMenuActionTo(R.id.new_tab_menu_id, this)
                 .arriveAt(RegularNewTabPageStation.newBuilder().initOpeningNewTab().build());
     }
@@ -106,8 +118,54 @@ public class CtaPageStation extends BasePageStation<ChromeTabbedActivity> {
      * from the app menu.
      */
     public IncognitoNewTabPageStation openNewIncognitoTabFast() {
+        assert mIsIncognito || !IncognitoUtils.shouldOpenIncognitoAsWindow()
+                : "Incognito tabs can only be opened in incognito windows.";
         return ChromeTriggers.invokeCustomMenuActionTo(R.id.new_incognito_tab_menu_id, this)
                 .arriveAt(IncognitoNewTabPageStation.newBuilder().initOpeningNewTab().build());
+    }
+
+    /**
+     * Shortcut to open a new window programmatically as if selecting "New Window" from the app
+     * menu.
+     */
+    public RegularNewTabPageStation openNewWindowFast() {
+        return ChromeTriggers.invokeCustomMenuActionTo(R.id.new_window_menu_id, this)
+                .inNewTask()
+                .arriveAt(RegularNewTabPageStation.newBuilder().withEntryPoint().build());
+    }
+
+    /**
+     * Shortcut to open a new incognito window programmatically as if selecting "New Incognito
+     * Window" from the app menu.
+     */
+    public IncognitoNewTabPageStation openNewIncognitoWindowFast() {
+        return ChromeTriggers.invokeCustomMenuActionTo(R.id.new_incognito_window_menu_id, this)
+                .inNewTask()
+                .arriveAt(IncognitoNewTabPageStation.newBuilder().withEntryPoint().build());
+    }
+
+    /**
+     * Attempts to open a new tab programmatically as if selecting "New Tab" from the app menu if
+     * available. If not available, attempts to open a new window.
+     */
+    public RegularNewTabPageStation openNewTabOrWindowFast() {
+        if (IncognitoUtils.shouldOpenIncognitoAsWindow() && mIsIncognito) {
+            return openNewWindowFast();
+        } else {
+            return openNewTabFast();
+        }
+    }
+
+    /**
+     * Attempts to open a new incognito tab programmatically as if selecting "New Incognito Tab"
+     * from the app menu if available. If not available, attempts to open a new incognito window.
+     */
+    public IncognitoNewTabPageStation openNewIncognitoTabOrWindowFast() {
+        if (IncognitoUtils.shouldOpenIncognitoAsWindow() && !mIsIncognito) {
+            return openNewIncognitoWindowFast();
+        } else {
+            return openNewIncognitoTabFast();
+        }
     }
 
     /** Shortcut to select a different tab programmatically. */
@@ -186,40 +244,84 @@ public class CtaPageStation extends BasePageStation<ChromeTabbedActivity> {
         return openFakeLink(url, WebPageStation.newBuilder());
     }
 
+    /** Click the URL bar or Search Box to enter the Omnibox. */
+    public OmniboxFacility openOmnibox() {
+        return openOmnibox(/* fakeSuggestions= */ null);
+    }
+
+    /**
+     * Click the URL bar or Search Box to enter the Omnibox.
+     *
+     * @param fakeSuggestions If non-null, fake suggestions expected to be shown in the Omnibox.
+     */
+    public OmniboxFacility openOmnibox(@Nullable FakeOmniboxSuggestions fakeSuggestions) {
+        OmniboxFacility omniboxFacility =
+                new OmniboxFacility(/* incognito= */ mIsIncognito, fakeSuggestions);
+        SoftKeyboardFacility softKeyboard = new SoftKeyboardFacility();
+
+        // The Omnibox opens and so does the soft keyboard.
+        clickUrlBarOrSearchBarTo().enterFacilities(omniboxFacility, softKeyboard);
+
+        // Close the soft keyboard before returning since autocomplete doesn't work well with the
+        // GBoard displayed in the 12L AVD image (android_32_google_apis_x64_foldable_*.textpb).
+        softKeyboard.close();
+
+        return omniboxFacility;
+    }
+
+    /** Trigger to click the URL bar or Search Box to enter the Omnibox. */
+    protected TripBuilder clickUrlBarOrSearchBarTo() {
+        throw new UnsupportedOperationException(
+                "Url bar / search box ViewElement not yet added to " + this.getClass());
+    }
+
     /** Move to next tab by swiping the toolbar left. */
-    public <T extends CtaPageStation> T swipeToolbarToNextTab(
-            CtaPageStation.Builder<T> destinationBuilder) {
-        return swipeToolbar(destinationBuilder, /* directionRight= */ false);
+    public TripBuilder swipeToolbarToNextTabTo() {
+        return swipeToolbarTo(/* directionRight= */ false);
     }
 
     /** Move to previous tab by swiping the toolbar right. */
-    public <T extends CtaPageStation> T swipeToolbarToPreviousTab(
-            CtaPageStation.Builder<T> destinationBuilder) {
-        return swipeToolbar(destinationBuilder, /* directionRight= */ true);
+    public TripBuilder swipeToolbarToPreviousTabTo() {
+        return swipeToolbarTo(/* directionRight= */ true);
     }
 
-    public <T extends CtaPageStation> T swipeToolbar(
-            CtaPageStation.Builder<T> destinationBuilder, boolean directionRight) {
-        ToolbarSwipeCoordinates coords =
-                new ToolbarSwipeCoordinates(toolbarElement.get(), directionRight);
+    /** Move to previous tab by swiping the toolbar right. */
+    public WebPageStation swipeToolbarToPreviousTab(WebPageStation pageStation) {
+        return pageStation
+                .swipeToolbarToPreviousTabTo()
+                .arriveAt(
+                        WebPageStation.newBuilder()
+                                .initFrom(pageStation)
+                                .initSelectingExistingTab()
+                                .build());
+    }
 
-        T destination = destinationBuilder.initFrom(this).initSelectingExistingTab().build();
+    /** Move to next tab by swiping the toolbar left. */
+    public WebPageStation swipeToolbarToNextTab(WebPageStation pageStation) {
+        return pageStation
+                .swipeToolbarToNextTabTo()
+                .arriveAt(
+                        WebPageStation.newBuilder()
+                                .initFrom(pageStation)
+                                .initSelectingExistingTab()
+                                .build());
+    }
+
+    public TripBuilder swipeToolbarTo(boolean directionRight) {
+        ToolbarSwipeCoordinates coords =
+                new ToolbarSwipeCoordinates(toolbarElement.value(), directionRight);
+
         return runTo(
                         () ->
                                 TouchCommon.performDrag(
-                                        toolbarElement.get(),
+                                        toolbarElement.value(),
                                         coords.mFromX,
                                         coords.mToX,
                                         coords.mY,
                                         coords.mY,
                                         ToolbarSwipeCoordinates.STEP_COUNT,
                                         500))
-                .arriveAt(destination);
-    }
-
-    /** Start moving to next tab by swiping the toolbar left, but do not finish the swipe. */
-    public SwipingToTabFacility swipeToolbarToNextTabPartial() {
-        return swipeToolbarPartial(/* directionRight= */ false);
+                .withPossiblyAlreadyFulfilled();
     }
 
     /** Start moving to previous tab by swiping the toolbar right, but do not finish the swipe. */
@@ -229,7 +331,7 @@ public class CtaPageStation extends BasePageStation<ChromeTabbedActivity> {
 
     private SwipingToTabFacility swipeToolbarPartial(boolean directionRight) {
         ToolbarSwipeCoordinates coords =
-                new ToolbarSwipeCoordinates(toolbarElement.get(), directionRight);
+                new ToolbarSwipeCoordinates(toolbarElement.value(), directionRight);
         long downTime = SystemClock.uptimeMillis();
         Activity activity = getActivity();
 

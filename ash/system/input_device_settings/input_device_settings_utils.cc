@@ -7,11 +7,9 @@
 #include <string_view>
 
 #include "ash/public/cpp/accelerators_util.h"
-#include "ash/public/mojom/input_device_settings.mojom-shared.h"
 #include "ash/public/mojom/input_device_settings.mojom.h"
 #include "ash/shell.h"
 #include "ash/system/input_device_settings/input_device_settings_pref_names.h"
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/containers/flat_set.h"
 #include "base/export_template.h"
@@ -47,7 +45,7 @@ std::string HexEncode(uint16_t v) {
   uint8_t bytes[sizeof(uint16_t)];
   bytes[1] = v & 0xFF;
   bytes[0] = v >> 8;
-  return base::ToLowerASCII(base::HexEncode(bytes));
+  return base::HexEncodeLower(bytes);
 }
 
 bool ExistingSettingsHasValue(std::string_view setting_key,

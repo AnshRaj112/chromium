@@ -25,6 +25,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.ViewHolder;
 
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.build.annotations.MonotonicNonNull;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -32,6 +34,8 @@ import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.language.R;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.settings.ProfileDependentSetting;
+import org.chromium.components.browser_ui.settings.EmbeddableSettingsPage;
+import org.chromium.components.browser_ui.settings.SearchViewProvider;
 import org.chromium.components.browser_ui.settings.SettingsFragment;
 import org.chromium.components.browser_ui.settings.SettingsUtils;
 
@@ -45,11 +49,16 @@ import java.util.Locale;
  */
 @NullMarked
 public class SelectLanguageFragment extends Fragment
-        implements ProfileDependentSetting, SettingsFragment {
+        implements ProfileDependentSetting,
+                SettingsFragment,
+                EmbeddableSettingsPage,
+                SearchViewProvider {
     // Intent key to pass selected language code from SelectLanguageFragment.
-    static final String INTENT_SELECTED_LANGUAGE = "SelectLanguageFragment.SelectedLanguage";
+    static final String KEY_SELECTED_LANGUAGE = "SelectLanguageFragment.SelectedLanguage";
     // Intent key to receive type of languages to populate fragment with.
-    static final String INTENT_POTENTIAL_LANGUAGES = "SelectLanguageFragment.PotentialLanguages";
+    static final String KEY_POTENTIAL_LANGUAGES = "SelectLanguageFragment.PotentialLanguages";
+
+    static final String FRAGMENT_RESULT_TAG = "SelectLanguageFragment";
 
     /** A host to launch SelectLanguageFragment and receive the result. */
     interface Launcher {
@@ -105,16 +114,24 @@ public class SelectLanguageFragment extends Fragment
     private @MonotonicNonNull List<LanguageItem> mFilteredLanguages;
     private LanguageListBaseAdapter.ItemClickListener mItemClickListener;
     private @MonotonicNonNull Profile mProfile;
+    private @MonotonicNonNull SearchViewProvider.Observer mSearchViewObserver;
+
+    private final ObservableSupplierImpl<String> mPageTitle = new ObservableSupplierImpl<>();
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (ChromeFeatureList.isEnabled(ChromeFeatureList.DETAILED_LANGUAGE_SETTINGS)) {
-            getActivity().setTitle(R.string.languages_select);
-        } else {
-            getActivity().setTitle(R.string.add_language);
-        }
+        int titleResource =
+                ChromeFeatureList.isEnabled(ChromeFeatureList.DETAILED_LANGUAGE_SETTINGS)
+                        ? R.string.languages_select
+                        : R.string.add_language;
+        mPageTitle.set(getString(titleResource));
         setHasOptionsMenu(true);
+    }
+
+    @Override
+    public MonotonicObservableSupplier<String> getPageTitle() {
+        return mPageTitle;
     }
 
     @Override
@@ -135,20 +152,28 @@ public class SelectLanguageFragment extends Fragment
 
         @LanguagesManager.LanguageListType
         int languageOption =
-                getActivity()
-                        .getIntent()
-                        .getIntExtra(
-                                INTENT_POTENTIAL_LANGUAGES,
-                                LanguagesManager.LanguageListType.ACCEPT_LANGUAGES);
+                getArguments()
+                        .getShort(
+                                KEY_POTENTIAL_LANGUAGES,
+                                (short) LanguagesManager.LanguageListType.ACCEPT_LANGUAGES);
         assumeNonNull(mProfile);
         mFilteredLanguages =
                 LanguagesManager.getForProfile(mProfile).getPotentialLanguages(languageOption);
         mItemClickListener =
                 item -> {
-                    Intent intent = new Intent();
-                    intent.putExtra(INTENT_SELECTED_LANGUAGE, item.getCode());
-                    activity.setResult(Activity.RESULT_OK, intent);
-                    activity.finish();
+                    if (ChromeFeatureList.sSettingsSingleActivity.isEnabled()) {
+                        Bundle result = new Bundle();
+                        result.putString(KEY_SELECTED_LANGUAGE, item.getCode());
+                        var fragmentManager = getFragmentManager();
+                        assumeNonNull(fragmentManager);
+                        fragmentManager.setFragmentResult(FRAGMENT_RESULT_TAG, result);
+                        fragmentManager.popBackStack();
+                    } else {
+                        Intent intent = new Intent();
+                        intent.putExtra(KEY_SELECTED_LANGUAGE, item.getCode());
+                        activity.setResult(Activity.RESULT_OK, intent);
+                        activity.finish();
+                    }
                 };
         mAdapter = new LanguageSearchListAdapter(activity, mProfile);
 
@@ -171,10 +196,15 @@ public class SelectLanguageFragment extends Fragment
         assumeNonNull(mSearchView);
         mSearchView.setImeOptions(EditorInfo.IME_FLAG_NO_FULLSCREEN);
 
+        mSearchView.setOnSearchClickListener(
+                view -> {
+                    if (mSearchViewObserver != null) mSearchViewObserver.onUpdated(true);
+                });
         mSearchView.setOnCloseListener(
                 () -> {
                     mSearch = "";
                     mAdapter.setDisplayedLanguages(assumeNonNull(mFilteredLanguages));
+                    if (mSearchViewObserver != null) mSearchViewObserver.onUpdated(false);
                     return false;
                 });
 
@@ -196,6 +226,17 @@ public class SelectLanguageFragment extends Fragment
                         return true;
                     }
                 });
+    }
+
+    @Override
+    public void setSearchViewObserver(SearchViewProvider.Observer observer) {
+        mSearchViewObserver = observer;
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (mSearchViewObserver != null) mSearchViewObserver.onUpdated(false);
     }
 
     @Override

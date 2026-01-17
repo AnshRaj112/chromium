@@ -18,14 +18,11 @@
 #include "base/containers/flat_set.h"
 #include "base/containers/unique_ptr_adapters.h"
 #include "base/functional/bind.h"
-#include "base/memory/memory_pressure_monitor.h"
 #include "base/memory/raw_ptr.h"
-#include "base/memory/weak_ptr.h"
 #include "base/power_monitor/power_observer.h"
 #include "base/threading/thread_checker.h"
 #include "base/values.h"
 #include "build/buildflag.h"
-#include "net/base/host_mapping_rules.h"
 #include "net/base/host_port_pair.h"
 #include "net/base/net_export.h"
 #include "net/http/http_auth_cache.h"
@@ -82,7 +79,6 @@ struct NET_EXPORT HttpNetworkSessionParams {
   HttpNetworkSessionParams(const HttpNetworkSessionParams& other);
   ~HttpNetworkSessionParams();
 
-  HostMappingRules host_mapping_rules;
   bool ignore_certificate_errors = false;
   uint16_t testing_fixed_http_port = 0;
   uint16_t testing_fixed_https_port = 0;
@@ -146,9 +142,6 @@ struct NET_EXPORT HttpNetworkSessionParams {
 
   // If non-empty, QUIC will only be spoken to hosts in this list.
   base::flat_set<std::string> quic_host_allowlist;
-
-  // If true, idle sockets won't be closed when memory pressure happens.
-  bool disable_idle_sockets_close_on_memory_pressure = false;
 
   bool key_auth_cache_server_entries_by_network_anonymization_key = false;
 
@@ -267,7 +260,7 @@ class NET_EXPORT HttpNetworkSession : public base::PowerSuspendObserver {
   base::Value SocketPoolInfoToValue() const;
 
   // Creates a Value summary of the state of the SPDY sessions.
-  std::unique_ptr<base::Value> SpdySessionPoolInfoToValue() const;
+  base::Value SpdySessionPoolInfoToValue() const;
 
   // Creates a Value summary of the state of the QUIC sessions and
   // configuration.
@@ -326,10 +319,6 @@ class NET_EXPORT HttpNetworkSession : public base::PowerSuspendObserver {
 
   ClientSocketPoolManager* GetSocketPoolManager(SocketPoolType pool_type);
 
-  // Flush sockets on low memory notifications callback.
-  void OnMemoryPressure(
-      base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level);
-
   const raw_ptr<NetLog> net_log_;
   const raw_ptr<HttpServerProperties> http_server_properties_;
   const raw_ptr<CertVerifier> cert_verifier_;
@@ -367,8 +356,6 @@ class NET_EXPORT HttpNetworkSession : public base::PowerSuspendObserver {
 
   HttpNetworkSessionParams params_;
   HttpNetworkSessionContext context_;
-
-  std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
 
   bool power_suspended_ = false;
 

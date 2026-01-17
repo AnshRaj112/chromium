@@ -8,9 +8,11 @@
 #include "ash/public/cpp/auth/active_session_auth_controller.h"
 #include "ash/public/cpp/in_session_auth_dialog_controller.h"
 #include "ash/public/cpp/session/session_controller.h"
+#include "base/functional/callback_helpers.h"
 #include "base/notreached.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chromeos/ash/components/osauth/impl/request/password_manager_auth_request.h"
+#include "chromeos/ash/components/osauth/impl/request/payments_autofill_auth_request.h"
 #include "chromeos/ash/components/osauth/impl/request/settings_auth_request.h"
 #include "chromeos/ash/components/osauth/impl/request/webauthn_auth_request.h"
 #include "chromeos/ash/components/osauth/public/auth_session_storage.h"
@@ -39,6 +41,9 @@ AuthReason ToAshReason(chromeos::auth::mojom::Reason reason) {
                                   kAccessAuthenticationSettings};
     case chromeos::auth::mojom::Reason::kAccessMultideviceSettings:
       return ash::InSessionAuthDialogController::kAccessMultideviceSettings;
+    case chromeos::auth::mojom::Reason::kAccessAutofillPayments:
+      // Payments autofill always uses the new controller.
+      return AuthReason{ash::AuthRequest::Reason::kPaymentsAutofill};
   }
 }
 
@@ -69,6 +74,11 @@ std::unique_ptr<ash::AuthRequest> InSessionAuth::AuthRequestFromReason(
       // WebAuthN authentication requests are not made using this
       // mojo method.
       NOTREACHED();
+    case ash::AuthRequest::Reason::kPaymentsAutofill:
+      return std::make_unique<ash::PaymentsAutofillAuthRequest>(
+          prompt,
+          base::BindOnce(&InSessionAuth::OnAuthComplete,
+                         weak_factory_.GetWeakPtr(), std::move(callback)));
   }
   NOTREACHED();
 }

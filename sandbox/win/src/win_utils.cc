@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "sandbox/win/src/win_utils.h"
 
 #include <windows.h>
@@ -23,6 +18,7 @@
 #include <vector>
 
 #include "base/check.h"
+#include "base/compiler_specific.h"
 #include "base/containers/span.h"
 #include "base/numerics/safe_math.h"
 #include "base/strings/string_util.h"
@@ -115,7 +111,7 @@ std::optional<std::wstring> GetPathFromHandle(HANDLE handle) {
   if (!buffer)
     return std::nullopt;
   OBJECT_NAME_INFORMATION* name =
-      reinterpret_cast<OBJECT_NAME_INFORMATION*>(buffer->data());
+      UNSAFE_TODO(reinterpret_cast<OBJECT_NAME_INFORMATION*>(buffer->data()));
   return std::wstring(
       name->ObjectName.Buffer,
       name->ObjectName.Length / sizeof(name->ObjectName.Buffer[0]));
@@ -128,7 +124,7 @@ std::optional<std::wstring> GetTypeNameFromHandle(HANDLE handle) {
   if (!buffer)
     return std::nullopt;
   OBJECT_TYPE_INFORMATION* name =
-      reinterpret_cast<OBJECT_TYPE_INFORMATION*>(buffer->data());
+      UNSAFE_TODO(reinterpret_cast<OBJECT_TYPE_INFORMATION*>(buffer->data()));
   return std::wstring(name->Name.Buffer,
                       name->Name.Length / sizeof(name->Name.Buffer[0]));
 }
@@ -165,38 +161,6 @@ DWORD GetLastErrorFromNtStatus(NTSTATUS status) {
   return GetNtExports()->RtlNtStatusToDosError(status);
 }
 
-// This function uses the undocumented PEB ImageBaseAddress field to extract
-// the base address of the new process.
-void* GetProcessBaseAddress(HANDLE process) {
-  PROCESS_BASIC_INFORMATION process_basic_info = {};
-  NTSTATUS status = GetNtExports()->QueryInformationProcess(
-      process, ProcessBasicInformation, &process_basic_info,
-      sizeof(process_basic_info), nullptr);
-  if (STATUS_SUCCESS != status)
-    return nullptr;
-
-  NT_PEB peb = {};
-  SIZE_T bytes_read = 0;
-  if (!::ReadProcessMemory(process, process_basic_info.PebBaseAddress, &peb,
-                           sizeof(peb), &bytes_read) ||
-      (sizeof(peb) != bytes_read)) {
-    return nullptr;
-  }
-
-  void* base_address = peb.ImageBaseAddress;
-  char magic[2] = {};
-  if (!::ReadProcessMemory(process, base_address, magic, sizeof(magic),
-                           &bytes_read) ||
-      (sizeof(magic) != bytes_read)) {
-    return nullptr;
-  }
-
-  if (magic[0] != 'M' || magic[1] != 'Z')
-    return nullptr;
-
-  return base_address;
-}
-
 bool ContainsNulCharacter(std::wstring_view str) {
   wchar_t nul = '\0';
   return str.find_first_of(nul) != std::wstring::npos;
@@ -209,6 +173,26 @@ void WarmupRandomnessInfrastructure() {
   BOOL success = process_prng_fn(data, sizeof(data));
   // ProcessPrng is documented to always return TRUE.
   CHECK(success);
+}
+
+std::wstring FilterEnvironment(
+    const wchar_t* env,
+    const base::span<const std::wstring_view> to_keep) {
+  std::wstring result;
+
+  std::wstring_view curr(env);
+  while (!curr.empty()) {
+    std::wstring_view key = curr.substr(0, curr.find(L'='));
+    if (std::find(to_keep.begin(), to_keep.end(), key) != to_keep.end()) {
+      result.append(curr).push_back('\0');
+    }
+    UNSAFE_BUFFERS(env += curr.size() + 1);
+    curr = env;
+  }
+
+  // Add the terminating NUL.
+  result.push_back('\0');
+  return result;
 }
 
 }  // namespace sandbox

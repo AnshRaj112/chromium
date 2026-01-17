@@ -107,7 +107,7 @@ class CORE_EXPORT HTMLFormControlElement : public HTMLElement,
   // Retrieves the popover target element and triggering behavior.
   PopoverTargetElement popoverTargetElement();
 
-  Element* InterestForElement() const override;
+  bool IsValidInterestInvoker(Element& target) const override;
 
   // Handles popover activation for the given event and element.
   static void HandlePopoverActivation(Event& event, HTMLElement& element);
@@ -129,6 +129,21 @@ class CORE_EXPORT HTMLFormControlElement : public HTMLElement,
     return autofill_state_ == WebAutofillState::kPreviewed;
   }
   void SetAutofillState(WebAutofillState = WebAutofillState::kAutofilled);
+
+  // Returns true if the pseudo classes :tool-form-active and
+  // :tool-submit-active (given by the for_submit parameter) should match for
+  // this element.
+  bool MatchesToolActive(bool for_submit) {
+    // TODO(masonf): Implement correct matching state.
+    //
+    // Additionally:
+    //
+    //   PseudoStateChanged(CSSSelector::kPseudoToolFormActive);
+    //   PseudoStateChanged(CSSSelector::kPseudoToolSubmitFormActive);
+    //
+    // must be invoked appropriately when the state changes.
+    return false;
+  }
 
   bool IsAutocompleteEmailUrlOrPassword() const;
 
@@ -182,7 +197,7 @@ class CORE_EXPORT HTMLFormControlElement : public HTMLElement,
                                PopoverTriggerAction action);
   // Checks if the element exists, is a valid Popover element, and (if it's a
   // form control) supports popover triggering.
-  static bool IsValidPopoverElement(const HTMLElement& element);
+  static bool IsValidPopoverTrigger(const HTMLElement& element);
 
   enum WebAutofillState autofill_state_;
 

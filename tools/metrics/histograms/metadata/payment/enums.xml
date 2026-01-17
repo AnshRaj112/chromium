@@ -34,6 +34,25 @@ uploading your change for review.  These are checked by presubmit scripts.
   <int value="5" label="Admin Policy"/>
 </enum>
 
+<enum name="InternalPaymentAppAvailability">
+<!-- Must be kept in sync with the enum of the same name in internal Chrome for Android code. -->
+
+  <int value="0" label="Unknown"/>
+  <int value="1" label="Not Applicable - non-internal method"/>
+  <int value="2" label="Available"/>
+  <int value="3" label="Unavailable - Payment Request being aborted"/>
+  <int value="4" label="Unavailable - Cannot get page context"/>
+  <int value="5" label="Unavailable - Cannot use first-party Play Services"/>
+  <int value="6" label="Unavailable - Play Services is too old"/>
+  <int value="7"
+      label="Unavailable - Used legacy https://android.com/pay method"/>
+  <int value="8" label="Unavailable - Connection to Play Services failed"/>
+  <int value="9"
+      label="Unavailable - Connection to Play Services was suspended"/>
+  <int value="10" label="Unavailable - IsReadyToPay task failed"/>
+  <int value="11" label="Unavailable - IsReadyToPay task returned false"/>
+</enum>
+
 <enum name="PaymentRequestAddressEditorMode">
   <int value="0" label="Add new address"/>
   <int value="1" label="Edit existing address"/>
@@ -45,12 +64,6 @@ uploading your change for review.  These are checked by presubmit scripts.
   <int value="2" label="Payment request triggered (shown + skipped show)"/>
   <int value="3" label="Payment handler invoked"/>
   <int value="4" label="Completed"/>
-</enum>
-
-<enum name="PaymentRequestPrePurchaseQuery">
-  <int value="0" label="Other type of query"/>
-  <int value="1" label="Service Worker event"/>
-  <int value="2" label="Android intent"/>
 </enum>
 
 <!-- LINT.IfChange(PaymentRequestTryShowOutcome) -->
@@ -95,7 +108,7 @@ uploading your change for review.  These are checked by presubmit scripts.
   <int value="4" label="User wants to opt out of future SPC authentications"/>
 </enum>
 
-<!-- LINT.ThenChange(//components/payments/content/android/spc/java/src/org/chromium/components/payments/secure_payment_confirmation/SecurePaymentConfirmationAuthnController.java:SecurePaymentRequestOutcome) -->
+<!-- LINT.ThenChange(//components/payments/content/android/spc/java/src/org/chromium/components/payments/secure_payment_confirmation/SecurePaymentConfirmationAuthnController.java:SecurePaymentRequestOutcome, //components/payments/content/secure_payment_confirmation_controller.h:SecurePaymentRequestOutcome) -->
 
 </enums>
 

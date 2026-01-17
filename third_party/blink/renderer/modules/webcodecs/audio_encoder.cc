@@ -4,11 +4,12 @@
 
 #include "third_party/blink/renderer/modules/webcodecs/audio_encoder.h"
 
+#include <algorithm>
 #include <cinttypes>
 #include <limits>
 
-#include "base/containers/contains.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/strings/to_string.h"
 #include "base/trace_event/common/trace_event_common.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
@@ -32,7 +33,6 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_opus_application.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_opus_encoder_config.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_opus_signal.h"
-#include "third_party/blink/renderer/modules/webaudio/audio_buffer.h"
 #include "third_party/blink/renderer/modules/webcodecs/array_buffer_util.h"
 #include "third_party/blink/renderer/modules/webcodecs/encoded_audio_chunk.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
@@ -55,21 +55,38 @@ constexpr uint32_t kDefaultOpusComplexity = 9;
 template <typename T>
 bool VerifyParameterValues(const T& value,
                            String error_message_base_base,
-                           WTF::Vector<T> supported_values,
+                           Vector<T> supported_values,
                            String* js_error_message) {
-  if (base::Contains(supported_values, value)) {
+  if (std::ranges::contains(supported_values, value)) {
     return true;
+  }
+
+  Vector<String> supported_values_str;
+  for (const T& val : supported_values) {
+    supported_values_str.push_back(base::ToString(val));
   }
 
   StringBuilder error_builder;
   error_builder.Append(error_message_base_base);
   error_builder.Append(" Supported values: ");
-  for (auto i = 0u; i < supported_values.size(); i++) {
-    if (i != 0) {
-      error_builder.Append(", ");
-    }
-    error_builder.AppendNumber(supported_values[i]);
+  error_builder.AppendRange(std::move(supported_values_str), ", ");
+  *js_error_message = error_builder.ReleaseString();
+  return false;
+}
+
+bool VerifyDurationValues(int64_t microseconds,
+                          String error_message_base_base,
+                          String* js_error_message) {
+  if (microseconds >= 2500 && microseconds <= 120000 &&
+      microseconds % 2500 == 0) {
+    return true;
   }
+
+  StringBuilder error_builder;
+  error_builder.Append(error_message_base_base);
+  error_builder.Append(
+      " Needs to be a multiple of 2500 and in the range of [2500, 120000] "
+      "microseconds.");
   *js_error_message = error_builder.ToString();
   return false;
 }
@@ -200,16 +217,17 @@ AudioEncoderTraits::ParsedConfig* ParseConfigStatic(
 
   auto* result = MakeGarbageCollected<AudioEncoderTraits::ParsedConfig>();
 
-  result->options.codec = media::AudioCodec::kUnknown;
-  bool is_codec_ambiguous = true;
-  bool parse_succeeded = ParseAudioCodecString(
-      "", config->codec().Utf8(), &is_codec_ambiguous, &result->options.codec);
-
-  if (!parse_succeeded || is_codec_ambiguous) {
+  std::optional<media::AudioType> audio_type =
+      media::ParseAudioCodecString("", config->codec().Utf8());
+  if (!audio_type) {
     result->options.codec = media::AudioCodec::kUnknown;
     return result;
   }
 
+  // AudioCodecProfile isn't supported by any of Chromium's encoders. It's not
+  // likely in the future either since the existing profiles are for multi-pass
+  // type encodings that this API is not designed for.
+  result->options.codec = audio_type->codec;
   result->options.channels = config->numberOfChannels();
   if (result->options.channels == 0) {
     exception_state.ThrowTypeError(String::Format(
@@ -282,12 +300,9 @@ bool VerifyCodecSupportStatic(AudioEncoderTraits::ParsedConfig* config,
 
   switch (config->options.codec) {
     case media::AudioCodec::kOpus: {
-      // TODO(crbug.com/1378399): Support all multiples of basic frame
-      // durations.
-      if (!VerifyParameterValues(
+      if (!VerifyDurationValues(
               config->options.opus->frame_duration.InMicroseconds(),
-              "Unsupported Opus frameDuration.",
-              {2500, 5000, 10000, 20000, 40000, 60000}, js_error_message)) {
+              "Unsupported Opus frameDuration.", js_error_message)) {
         return false;
       }
       if (config->options.channels > 2) {
@@ -508,6 +523,14 @@ void AudioEncoder::ProcessConfigure(Request* request) {
           MakeUnwrappingCrossThreadHandle(request))));
 }
 
+bool AudioEncoder::ReadyToProcessNextRequest() {
+  if (active_encodes_ >= kMaxActiveEncodes) {
+    return false;
+  }
+
+  return Base::ReadyToProcessNextRequest();
+}
+
 void AudioEncoder::ProcessEncode(Request* request) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK_EQ(state_, V8CodecState::Enum::kConfigured);
@@ -536,6 +559,7 @@ void AudioEncoder::ProcessEncode(Request* request) {
           self->MakeEncodingError("Encoding error.", std::move(status)));
     }
 
+    --self->active_encodes_;
     req->EndTracing();
     self->ProcessRequests();
   };
@@ -563,6 +587,8 @@ void AudioEncoder::ProcessEncode(Request* request) {
 
   --requested_encodes_;
   ScheduleDequeueEvent();
+  ++active_encodes_;
+
   media_encoder_->Encode(
       std::move(audio_bus), timestamp,
       ConvertToBaseOnceCallback(CrossThreadBindOnce(
@@ -593,6 +619,11 @@ bool AudioEncoder::CanReconfigure(ParsedConfig& original_config,
 bool AudioEncoder::VerifyCodecSupport(ParsedConfig* config,
                                       String* js_error_message) {
   return VerifyCodecSupportStatic(config, js_error_message);
+}
+
+void AudioEncoder::ResetInternal(DOMException* ex) {
+  Base::ResetInternal(ex);
+  active_encodes_ = 0;
 }
 
 void AudioEncoder::OnNewEncode(InputType* input,
@@ -666,6 +697,10 @@ ScriptPromise<AudioEncoderSupport> AudioEncoder::isConfigSupported(
 
 const AtomicString& AudioEncoder::InterfaceName() const {
   return event_target_names::kAudioEncoder;
+}
+
+bool AudioEncoder::HasPendingActivity() const {
+  return (active_encodes_ > 0) || Base::HasPendingActivity();
 }
 
 DOMException* AudioEncoder::MakeOperationError(std::string error_msg,

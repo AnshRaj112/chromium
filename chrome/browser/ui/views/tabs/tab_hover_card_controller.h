@@ -72,8 +72,6 @@ class TabHoverCardController : public views::ViewObserver,
                            DisableMemoryUsageForTab);
   FRIEND_TEST_ALL_PREFIXES(TabHoverCardControllerTest,
                            ShowPreviewsForDiscardedTabWithThumbnail);
-  FRIEND_TEST_ALL_PREFIXES(TabHoverCardControllerTest,
-                           DontCaptureUnderCriticalMemoryPressure);
   FRIEND_TEST_ALL_PREFIXES(TabHoverCardPreviewsEnabledPrefTest, DefaultState);
   class EventSniffer;
 
@@ -142,6 +140,15 @@ class TabHoverCardController : public views::ViewObserver,
     return thumbnail_wait_state_ != ThumbnailWaitState::kNotWaiting;
   }
 
+  views::Widget* GetCardWidget() const;
+
+  // Requests that the Widget close. Provides an abstraction for migration to
+  // the client-owned widget model.
+  void CloseCardWidget();
+
+  //  Resets controller state associated with a HoverCard widget.
+  void OnCardClosing();
+
   // Timestamp of the last time the hover card is hidden by the mouse leaving
   // the tab strip. This is used for reshowing the hover card without delay if
   // the mouse reenters within a given amount of time.
@@ -180,6 +187,12 @@ class TabHoverCardController : public views::ViewObserver,
   // Ensure that an instance of the TabResourceUsageCollector exists so
   // resources are up to date when we eventually show the hover card.
   raw_ptr<TabResourceUsageCollector> tab_resource_usage_collector_;
+
+  // Observation of `tab_resource_usage_collector_`, active when `hover_card_`
+  // exists.
+  base::ScopedObservation<TabResourceUsageCollector,
+                          TabResourceUsageCollector::Observer>
+      tab_resource_usage_collector_observation_{this};
 
   // Tracks changes to the hover card preferences
   PrefChangeRegistrar pref_change_registrar_;

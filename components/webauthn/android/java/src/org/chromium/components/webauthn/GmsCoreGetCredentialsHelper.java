@@ -8,16 +8,12 @@ import static org.chromium.components.webauthn.WebauthnLogger.log;
 
 import android.os.SystemClock;
 
-import androidx.annotation.VisibleForTesting;
-
 import com.google.android.gms.tasks.OnFailureListener;
 
 import org.chromium.base.ResettersForTesting;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.device.DeviceFeatureList;
-import org.chromium.device.DeviceFeatureMap;
 
 import java.util.List;
 
@@ -45,6 +41,18 @@ public class GmsCoreGetCredentialsHelper {
         int CACHE_FAILURE_FALLBACK_FAILURE = 2;
         int FIDO2_SUCCESS = 3;
         int FIDO2_FAILURE = 4;
+        int NUM_ENTRIES = 5;
+    }
+
+    // LINT.ThenChange(//tools/metrics/histograms/webauthn/enums.xml)
+
+    // LINT.IfChange
+    private @interface GmsCoreSkippedCacheReason {
+        int GOOGLE_RP = 0;
+        int PAYMENT_REQUEST = 1;
+        int MODAL_ALLOW_LIST_REQUEST = 2;
+        int FEATURE_DISABLED = 3;
+        int OLD_GMSCORE_VERSION = 4;
         int NUM_ENTRIES = 5;
     }
 
@@ -80,7 +88,6 @@ public class GmsCoreGetCredentialsHelper {
         return sInstance;
     }
 
-    @VisibleForTesting
     public static void overrideInstanceForTesting(GmsCoreGetCredentialsHelper helper) {
         sInstance = helper;
         ResettersForTesting.register(() -> sInstance = null);
@@ -105,8 +112,8 @@ public class GmsCoreGetCredentialsHelper {
         final long startTimeMs = SystemClock.elapsedRealtime();
         if (reason == Reason.GET_ASSERTION_NON_GOOGLE
                 && GmsCoreUtils.isPasskeyCacheSupported()
-                && DeviceFeatureMap.isEnabled(
-                        DeviceFeatureList.WEBAUTHN_ANDROID_PASSKEY_CACHE_MIGRATION)) {
+                && WebauthnFeatureMap.getInstance()
+                        .isEnabled(WebauthnFeatures.WEBAUTHN_ANDROID_PASSKEY_CACHE_MIGRATION)) {
             Fido2ApiCallHelper.getInstance()
                     .invokePasskeyCacheGetCredentials(
                             authenticationContextProvider,
@@ -136,6 +143,7 @@ public class GmsCoreGetCredentialsHelper {
                                         startTimeMs);
                             });
         } else {
+            recordNoCacheReason(reason);
             getCredentialsFromFido2Api(
                     authenticationContextProvider,
                     relyingPartyId,
@@ -215,5 +223,29 @@ public class GmsCoreGetCredentialsHelper {
                 return "";
         }
         return CREDENTIAL_FETCH_DURATION_HISTOGRAM + suffix;
+    }
+
+    private void recordNoCacheReason(Reason requestReason) {
+        @GmsCoreSkippedCacheReason int reason;
+        if (requestReason == Reason.GET_ASSERTION_GOOGLE_RP) {
+            reason = GmsCoreSkippedCacheReason.GOOGLE_RP;
+        } else if (requestReason == Reason.PAYMENT
+                || requestReason == Reason.GET_MATCHING_CREDENTIAL_IDS) {
+            reason = GmsCoreSkippedCacheReason.PAYMENT_REQUEST;
+        } else if (requestReason == Reason.CHECK_FOR_MATCHING_CREDENTIALS) {
+            reason = GmsCoreSkippedCacheReason.MODAL_ALLOW_LIST_REQUEST;
+        } else if (!GmsCoreUtils.isPasskeyCacheSupported()) {
+            reason = GmsCoreSkippedCacheReason.OLD_GMSCORE_VERSION;
+        } else if (!WebauthnFeatureMap.getInstance()
+                .isEnabled(WebauthnFeatures.WEBAUTHN_ANDROID_PASSKEY_CACHE_MIGRATION)) {
+            reason = GmsCoreSkippedCacheReason.FEATURE_DISABLED;
+        } else {
+            assert false : "Update metric to cover unknown reason to not use the cache";
+            return;
+        }
+        RecordHistogram.recordEnumeratedHistogram(
+                "WebAuthentication.Android.GmsCoreSkippedCacheReason",
+                reason,
+                GmsCoreSkippedCacheReason.NUM_ENTRIES);
     }
 }

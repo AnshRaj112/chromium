@@ -20,12 +20,10 @@ source_set("notice_definitions") {
 
 source_set("core") {
   sources = [
-    "notice_catalog.cc",
     "notice_model.cc",
     "notice_storage.cc",
   ]
   public = [
-    "notice_catalog.h",
     "notice_model.h",
     "notice_storage.h",
   ]
@@ -52,6 +50,18 @@ source_set("interfaces") {
   ]
 }
 
+source_set("catalog") {
+  sources = [ "notice_catalog.cc" ]
+  public = [ "notice_catalog.h" ]
+  deps = [
+    ":core",
+    ":notice_definitions",
+    ":notice_mojom",
+    "//base",
+    "//chrome/browser/privacy_sandbox:headers",
+  ]
+}
+
 source_set("factory") {
   public = [ "notice_service_factory.h" ]
   deps = [
@@ -72,6 +82,7 @@ source_set("notice") {
   ]
 
   public_deps = [
+    ":catalog",
     ":core",
     ":factory",
     ":interfaces",
@@ -95,12 +106,8 @@ if (!is_android) {
   }
 
   source_set("desktop_view_manager") {
-    sources = [
-      "desktop_entrypoint_handlers.cc",
-      "desktop_view_manager.cc",
-    ]
+    sources = [ "desktop_view_manager.cc" ]
     public = [
-      "desktop_entrypoint_handlers.h",
       "desktop_view_manager.h",
       "desktop_view_manager_test_peer.h",
     ]
@@ -153,6 +160,7 @@ source_set("test_support") {
     "mocks/mock_notice_storage.h",
   ]
   deps = [
+    ":catalog",
     ":core",
     ":interfaces",
     ":notice_mojom",
@@ -185,6 +193,7 @@ source_set("unit_tests") {
   ]
   data = [ "//tools/metrics/histograms/metadata/privacy/histograms.xml" ]
   deps = [
+    ":catalog",
     ":core",
     ":notice",
     ":test_support",
@@ -215,6 +224,7 @@ source_set("browser_tests") {
   sources = [ "notice_service_browsertest.cc" ]
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   deps = [
+    ":catalog",
     ":core",
     ":interfaces",
     ":notice",
@@ -232,10 +242,6 @@ source_set("browser_tests") {
   }
 
   if (!is_android) {
-    sources += [
-      "desktop_entrypoint_handlers_browsertest.cc",
-      "desktop_view_manager_browsertest.cc",
-    ]
     deps += [
       ":desktop_view_manager",
       "//chrome/browser/sync",
@@ -243,7 +249,6 @@ source_set("browser_tests") {
       "//chrome/browser/ui/privacy_sandbox",
       "//chrome/browser/ui/signin",
       "//chrome/test:test_support_ui",
-      "//components/privacy_sandbox:features",
     ]
   }
 }

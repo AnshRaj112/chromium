@@ -7,6 +7,7 @@
 #include <optional>
 #include <utility>
 
+#include "base/byte_size.h"
 #include "base/check.h"
 #include "base/command_line.h"
 #include "base/feature_list.h"
@@ -81,7 +82,7 @@ WEB_CONTENTS_USER_DATA_KEY_IMPL(
 
 UserPerformanceTuningManager::PreDiscardResourceUsage::PreDiscardResourceUsage(
     content::WebContents* contents,
-    uint64_t memory_footprint_estimate,
+    base::ByteSize memory_footprint_estimate,
     ::mojom::LifecycleUnitDiscardReason discard_reason)
     : content::WebContentsUserData<PreDiscardResourceUsage>(*contents),
       memory_footprint_estimate_(memory_footprint_estimate),
@@ -92,10 +93,10 @@ UserPerformanceTuningManager::PreDiscardResourceUsage::
     ~PreDiscardResourceUsage() = default;
 
 void UserPerformanceTuningManager::PreDiscardResourceUsage::UpdateDiscardInfo(
-    uint64_t memory_footprint_estimate_kb,
+    base::ByteSize memory_footprint_estimate,
     ::mojom::LifecycleUnitDiscardReason discard_reason,
     base::LiveTicks discard_live_ticks) {
-  memory_footprint_estimate_ = memory_footprint_estimate_kb;
+  memory_footprint_estimate_ = memory_footprint_estimate;
   discard_reason_ = discard_reason;
   discard_live_ticks_ = discard_live_ticks;
 }

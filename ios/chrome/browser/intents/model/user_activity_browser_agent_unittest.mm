@@ -7,6 +7,7 @@
 #import <CoreSpotlight/CoreSpotlight.h>
 
 #import <memory>
+#import <utility>
 
 #import "base/memory/ptr_util.h"
 #import "base/memory/raw_ptr.h"
@@ -14,7 +15,6 @@
 #import "base/test/scoped_command_line.h"
 #import "base/test/task_environment.h"
 #import "base/test/with_feature_override.h"
-#import "base/types/cxx23_to_underlying.h"
 #import "base/values.h"
 #import "components/handoff/handoff_utility.h"
 #import "components/policy/core/common/policy_pref_names.h"
@@ -194,16 +194,18 @@ class UserActivityBrowserAgentTest : public PlatformTest {
     EXPECT_TRUE(IsIncognitoModeDisabled(pref_service));
   }
 
-  raw_ptr<UserActivityBrowserAgent> user_activity_browser_agent_;
   ProfileState* profile_state_;
   FakeSceneState* scene_state_;
   FakeSceneController* scene_controller_;
   id<ConnectionInformation> connection_information_;
 
  private:
-  std::unique_ptr<TestBrowser> browser_;
   web::WebTaskEnvironment task_environment_;
   std::unique_ptr<TestProfileIOS> profile_;
+  std::unique_ptr<TestBrowser> browser_;
+
+ protected:
+  raw_ptr<UserActivityBrowserAgent> user_activity_browser_agent_;
 };
 
 #pragma mark - Tests.
@@ -451,6 +453,15 @@ TEST_F(UserActivityBrowserAgentTest, ContinueUserActivityBrowsingWeb) {
   NSURL* nsurl = [NSURL URLWithString:@"http://google.com/foo/bar"];
   [user_activity setWebpageURL:nsurl];
 
+  GURL startGurl("http://www.google.com");
+  AppStartupParameters* startup_params = [[AppStartupParameters alloc]
+       initWithExternalURL:startGurl
+               completeURL:startGurl
+           applicationMode:ApplicationModeForTabOpening::NORMAL
+      forceApplicationMode:NO];
+
+  [connection_information_ setStartupParameters:startup_params];
+
   BOOL result =
       user_activity_browser_agent_->ContinueUserActivity(user_activity, YES);
 
@@ -671,8 +682,11 @@ TEST_F(UserActivityBrowserAgentTest, HandleStartupParamsWithExternalFile) {
   EXPECT_EQ(complete_url, scene_controller_.urlLoadParams.web_params.url);
   EXPECT_EQ(external_url,
             scene_controller_.urlLoadParams.web_params.virtual_url);
-  EXPECT_EQ(ApplicationModeForTabOpening::INCOGNITO,
-            connection_information_.startupParameters.applicationMode);
+  [connection_information_.startupParameters
+      requestApplicationModeWithBlock:^(
+          ApplicationModeForTabOpening applicationMode) {
+        EXPECT_EQ(applicationMode, ApplicationModeForTabOpening::INCOGNITO);
+      }];
 }
 
 // Tests that performActionForShortcutItem set startupParameters accordingly
@@ -724,8 +738,12 @@ TEST_F(UserActivityBrowserAgentTest,
         [[parameters objectAtIndex:2] boolValue]
             ? ApplicationModeForTabOpening::INCOGNITO
             : ApplicationModeForTabOpening::NORMAL;
-    EXPECT_EQ(app_mode,
-              connection_information_.startupParameters.applicationMode);
+    [connection_information_.startupParameters
+        requestApplicationModeWithBlock:^(
+            ApplicationModeForTabOpening applicationMode) {
+          EXPECT_EQ(applicationMode, app_mode);
+        }];
+
     EXPECT_EQ([[parameters objectAtIndex:3] intValue],
               connection_information_.startupParameters.postOpeningAction);
   }
@@ -737,7 +755,7 @@ TEST_F(UserActivityBrowserAgentTest,
        PerformActionForShortcutItemWithFirstRunUI) {
   // Setup.
   InstallMockProfileState(static_cast<ProfileInitStage>(
-      base::to_underlying(ProfileInitStage::kFinal) - 1));
+      std::to_underlying(ProfileInitStage::kFinal) - 1));
   UIApplicationShortcutItem* shortcut =
       [[UIApplicationShortcutItem alloc] initWithType:kShortcutNewSearch
                                        localizedTitle:kShortcutNewSearch];
@@ -776,7 +794,7 @@ TEST_F(UserActivityBrowserAgentTest, ContinueUserActivityBookmarks) {
 TEST_F(UserActivityBrowserAgentTest,
        ContinueUserActivityBookmarksFailsFirstRun) {
   InstallMockProfileState(static_cast<ProfileInitStage>(
-      base::to_underlying(ProfileInitStage::kFinal) - 1));
+      std::to_underlying(ProfileInitStage::kFinal) - 1));
   NSUserActivity* user_activity = [[NSUserActivity alloc]
       initWithActivityType:kSiriShortcutAddBookmarkToChrome];
 
@@ -800,8 +818,12 @@ TEST_F(UserActivityBrowserAgentTest,
             connection_information_.startupParameters.completeURL);
   EXPECT_EQ(GURL(kChromeUINewTabURL),
             connection_information_.startupParameters.externalURL);
-  EXPECT_EQ(ApplicationModeForTabOpening::NORMAL,
-            connection_information_.startupParameters.applicationMode);
+
+  [connection_information_.startupParameters
+      requestApplicationModeWithBlock:^(
+          ApplicationModeForTabOpening applicationMode) {
+        EXPECT_EQ(applicationMode, ApplicationModeForTabOpening::NORMAL);
+      }];
 }
 
 // Tests that Chrome does not continue the activity if the intent URLs array is
@@ -865,7 +887,7 @@ TEST_F(UserActivityBrowserAgentTest, ContinueUserActivityAddToReadingList) {
 TEST_F(UserActivityBrowserAgentTest,
        ContinueUserActivityAddToReadingListFailsFirstRun) {
   InstallMockProfileState(static_cast<ProfileInitStage>(
-      base::to_underlying(ProfileInitStage::kFinal) - 1));
+      std::to_underlying(ProfileInitStage::kFinal) - 1));
   NSUserActivity* user_activity = [[NSUserActivity alloc]
       initWithActivityType:kSiriShortcutAddReadingListItemToChrome];
 
@@ -1068,8 +1090,11 @@ TEST_F(UserActivityBrowserAgentTest,
 
   user_activity_browser_agent_->ContinueUserActivity(mock_user_activity, YES);
 
-  EXPECT_EQ(ApplicationModeForTabOpening::INCOGNITO,
-            [connection_information_ startupParameters].applicationMode);
+  [connection_information_.startupParameters
+      requestApplicationModeWithBlock:^(
+          ApplicationModeForTabOpening applicationMode) {
+        EXPECT_EQ(applicationMode, ApplicationModeForTabOpening::INCOGNITO);
+      }];
   EXPECT_EQ(GURL(kChromeUINewTabURL),
             [connection_information_ startupParameters].completeURL);
   EXPECT_EQ(GURL(kChromeUINewTabURL),
@@ -1090,8 +1115,12 @@ TEST_F(UserActivityBrowserAgentTest, ContinueUserActivityIntentSearchInChrome) {
 
   user_activity_browser_agent_->ContinueUserActivity(mock_user_activity, YES);
 
-  EXPECT_EQ(ApplicationModeForTabOpening::NORMAL,
-            [connection_information_ startupParameters].applicationMode);
+  [connection_information_.startupParameters
+      requestApplicationModeWithBlock:^(
+          ApplicationModeForTabOpening applicationMode) {
+        EXPECT_EQ(applicationMode, ApplicationModeForTabOpening::NORMAL);
+      }];
+
   EXPECT_EQ(GURL(kChromeUINewTabURL),
             [connection_information_ startupParameters].completeURL);
   EXPECT_EQ(GURL(kChromeUINewTabURL),

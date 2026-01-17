@@ -11,7 +11,6 @@
 #include <optional>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/dcheck_is_on.h"
 #include "base/files/file.h"
@@ -36,7 +35,6 @@
 #include "media/base/video_util.h"
 #include "media/gpu/buffer_validation.h"
 #include "media/gpu/macros.h"
-#include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/buffer_types.h"
 #include "ui/gfx/gpu_memory_buffer_handle.h"
 #include "ui/gfx/linux/drm_util_linux.h"
@@ -53,10 +51,10 @@
 namespace media {
 
 namespace {
+
 struct DrmVersionDeleter {
   void operator()(drmVersion* version) const { drmFreeVersion(version); }
 };
-
 using ScopedDrmVersionPtr = std::unique_ptr<drmVersion, DrmVersionDeleter>;
 
 // Returns the gbm device using the |drm_node_file_prefix|.
@@ -72,7 +70,7 @@ static std::unique_ptr<ui::GbmDevice> CreateGbmDevice(
         base::StrCat({drm_node_file_prefix, base::NumberToString(i)})));
 
 #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_V4L2_CODEC)
-    const bool is_render_node = base::Contains(drm_node_file_prefix, "render");
+    const bool is_render_node = drm_node_file_prefix.contains("render");
 
     // TODO(b/313513760): don't guard base::File::FLAG_WRITE behind
     // BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_V4L2_CODEC) once the hardware video
@@ -144,7 +142,7 @@ class GbmDeviceWrapper {
   // Creates a native BO and returns it as a NativePixmapHandle. Returns
   // std::nullopt on failure.
   std::optional<gfx::NativePixmapHandle> CreateNativePixmapHandle(
-      gfx::BufferFormat format,
+      viz::SharedImageFormat format,
       const gfx::Size& size,
       gfx::BufferUsage buffer_usage) {
     base::AutoLock lock(lock_);
@@ -153,7 +151,7 @@ class GbmDeviceWrapper {
       return std::nullopt;
     }
 
-    const int fourcc_format = ui::GetFourCCFormatFromBufferFormat(format);
+    const int fourcc_format = ui::GetFourCCFormatFromSharedImageFormat(format);
     if (fourcc_format == DRM_FORMAT_INVALID)
       return std::nullopt;
 
@@ -169,22 +167,6 @@ class GbmDeviceWrapper {
     return native_pixmap_handle;
   }
 
-  std::unique_ptr<ui::GbmBuffer> ImportGpuMemoryBuffer(
-      gfx::BufferFormat format,
-      const gfx::Size& size,
-      gfx::NativePixmapHandle handle) {
-    CHECK_LE(handle.planes.size(), base::checked_cast<size_t>(GBM_MAX_PLANES));
-    base::AutoLock lock(lock_);
-    if (!IsInitialized()) {
-      return nullptr;
-    }
-    const int fourcc_format = ui::GetFourCCFormatFromBufferFormat(format);
-    if (fourcc_format == DRM_FORMAT_INVALID)
-      return nullptr;
-    return gbm_device_->CreateBufferFromHandle(fourcc_format, size,
-                                               std::move(handle));
-  }
-
  private:
   GbmDeviceWrapper() {
     if (base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -193,7 +175,7 @@ class GbmDeviceWrapper {
           base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
               switches::kRenderNodeOverride));
 #if BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_V4L2_CODEC)
-      const bool is_render_node = base::Contains(dev_path.value(), "render");
+      const bool is_render_node = dev_path.value().contains("render");
 
       // TODO(b/313513760): don't guard base::File::FLAG_WRITE behind
       // BUILDFLAG(IS_LINUX) && BUILDFLAG(USE_V4L2_CODEC) once the hardware
@@ -295,11 +277,12 @@ std::optional<gfx::NativePixmapHandle> AllocateNativePixmapHandle(
     VideoPixelFormat pixel_format,
     const gfx::Size& coded_size,
     gfx::BufferUsage buffer_usage) {
-  auto buffer_format = VideoPixelFormatToGfxBufferFormat(pixel_format);
-  if (!buffer_format)
+  auto si_format = VideoPixelFormatToSharedImageFormat(pixel_format);
+  if (!si_format) {
     return std::nullopt;
+  }
   return GbmDeviceWrapper::Get()->CreateNativePixmapHandle(
-      *buffer_format, coded_size, buffer_usage);
+      *si_format, coded_size, buffer_usage);
 }
 
 }  // namespace
@@ -501,7 +484,7 @@ gfx::GpuMemoryBufferHandle CreateGpuMemoryBufferHandle(
 
   gfx::GpuMemoryBufferHandle handle;
   switch (video_frame->storage_type()) {
-    case VideoFrame::STORAGE_GPU_MEMORY_BUFFER:
+    case VideoFrame::STORAGE_MAPPABLE_SHARED_IMAGE:
       handle = video_frame->GetGpuMemoryBufferHandle();
       // TODO(crbug.com/1097956): handle a failure gracefully.
       CHECK_EQ(handle.type, gfx::NATIVE_PIXMAP)
@@ -568,15 +551,15 @@ scoped_refptr<gfx::NativePixmapDmaBuf> CreateNativePixmapDmaBuf(
     return nullptr;
   }
 
-  auto buffer_format =
-      VideoPixelFormatToGfxBufferFormat(video_frame->layout().format());
-  if (!buffer_format) {
+  auto si_format =
+      VideoPixelFormatToSharedImageFormat(video_frame->layout().format());
+  if (!si_format) {
     VLOGF(1) << "Unexpected video frame format";
     return nullptr;
   }
 
   auto native_pixmap = base::MakeRefCounted<gfx::NativePixmapDmaBuf>(
-      video_frame->coded_size(), *buffer_format,
+      video_frame->coded_size(), *si_format,
       std::move(gpu_memory_buffer_handle).native_pixmap_handle());
 
   DCHECK(native_pixmap->AreDmaBufFdsValid());

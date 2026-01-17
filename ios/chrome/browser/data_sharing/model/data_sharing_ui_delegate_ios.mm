@@ -13,8 +13,8 @@
 #import "ios/chrome/browser/share_kit/model/share_kit_service.h"
 #import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios_share_url_interception_context.h"
 #import "url/gurl.h"
 
@@ -39,23 +39,29 @@ void DataSharingUIDelegateIOS::HandleShareURLIntercepted(
   }
   IOSShareURLInterceptionContext* ios_context =
       static_cast<IOSShareURLInterceptionContext*>(context.get());
-  Browser* browser = ios_context->browser;
+  Browser* browser = ios_context->weak_browser.get();
   if (!browser) {
     return;
   }
 
-  id<ApplicationCommands> applicationHandler =
-      HandlerForProtocol(browser->GetCommandDispatcher(), ApplicationCommands);
+  id<SceneCommands> sceneHandler =
+      HandlerForProtocol(browser->GetCommandDispatcher(), SceneCommands);
 
-  [applicationHandler
-      dismissModalDialogsWithCompletion:
-          base::CallbackToBlock(base::BindOnce(
-              &DataSharingUIDelegateIOS::OnJoinFlowReadyToBePresented,
-              weak_ptr_factory_.GetWeakPtr(), url, browser))];
+  [sceneHandler dismissModalDialogsWithCompletion:
+                    base::CallbackToBlock(base::BindOnce(
+                        &DataSharingUIDelegateIOS::OnJoinFlowReadyToBePresented,
+                        weak_ptr_factory_.GetWeakPtr(), url,
+                        std::move(ios_context->weak_browser)))];
 }
 
-void DataSharingUIDelegateIOS::OnJoinFlowReadyToBePresented(GURL url,
-                                                            Browser* browser) {
+void DataSharingUIDelegateIOS::OnJoinFlowReadyToBePresented(
+    GURL url,
+    base::WeakPtr<Browser> weak_browser) {
+  Browser* browser = weak_browser.get();
+  if (!browser) {
+    return;
+  }
+
   UIViewController* base_view_controller =
       browser->GetSceneState().window.rootViewController;
 

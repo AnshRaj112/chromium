@@ -16,9 +16,9 @@ import androidx.core.content.ContextCompat;
 
 import com.google.android.material.color.MaterialColors;
 
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.chrome.browser.theme.SurfaceColorUpdateUtils;
 import org.chromium.components.browser_ui.styles.SemanticColorUtils;
 import org.chromium.ui.util.ColorUtils;
 import org.chromium.ui.util.ValueUtils;
@@ -27,6 +27,7 @@ import org.chromium.ui.util.ValueUtils;
 @NullMarked
 public final class HubColors {
     private static final String TAG = "HubColors";
+    private static @Nullable MonotonicObservableSupplier<Boolean> sXrSpaceModeObservableSupplier;
     private static final int[][] SELECTED_AND_NORMAL_STATES =
             new int[][] {new int[] {android.R.attr.state_selected}, new int[] {}};
     private static final int[][] DISABLED_AND_NORMAL_STATES =
@@ -46,11 +47,9 @@ public final class HubColors {
             Context context, @HubColorScheme int colorScheme) {
         switch (colorScheme) {
             case HubColorScheme.DEFAULT:
-                return SurfaceColorUpdateUtils.getGridTabSwitcherBackgroundColor(
-                        context, /* isIncognito= */ false);
+                return SemanticColorUtils.getDefaultBgColor(context);
             case HubColorScheme.INCOGNITO:
-                return SurfaceColorUpdateUtils.getGridTabSwitcherBackgroundColor(
-                        context, /* isIncognito= */ true);
+                return ContextCompat.getColor(context, R.color.default_bg_color_dark);
             default:
                 assert false;
                 return Color.TRANSPARENT;
@@ -79,6 +78,7 @@ public final class HubColors {
 
     /** Returns the color most icons should use per the given color scheme. */
     public static @ColorInt int getIconColor(Context context, @HubColorScheme int colorScheme) {
+        if (isXrFullSpaceMode()) return SemanticColorUtils.getDefaultIconColor(context);
         switch (colorScheme) {
             case HubColorScheme.DEFAULT:
                 return SemanticColorUtils.getDefaultIconColor(context);
@@ -95,11 +95,14 @@ public final class HubColors {
             Context context, @HubColorScheme int colorScheme, boolean isGtsUpdateEnabled) {
         switch (colorScheme) {
             case HubColorScheme.DEFAULT:
-                return SurfaceColorUpdateUtils.getHubPaneSwitcherSelectedIconColor(
-                        context, /* isIncognito= */ false, isGtsUpdateEnabled);
+                return isGtsUpdateEnabled
+                        ? SemanticColorUtils.getDefaultIconColor(context)
+                        : SemanticColorUtils.getDefaultIconColorAccent1(context);
             case HubColorScheme.INCOGNITO:
-                return SurfaceColorUpdateUtils.getHubPaneSwitcherSelectedIconColor(
-                        context, /* isIncognito= */ true, isGtsUpdateEnabled);
+                return isGtsUpdateEnabled
+                        ? ContextCompat.getColor(context, R.color.default_icon_color_light)
+                        : ContextCompat.getColor(
+                                context, R.color.default_control_color_active_dark);
             default:
                 assert false;
                 return Color.TRANSPARENT;
@@ -111,11 +114,10 @@ public final class HubColors {
             Context context, @HubColorScheme int colorScheme) {
         switch (colorScheme) {
             case HubColorScheme.DEFAULT:
-                return SurfaceColorUpdateUtils.geTabItemSelectorColor(
-                        context, /* isIncognito= */ false);
+                return SemanticColorUtils.getColorSurfaceBright(context);
             case HubColorScheme.INCOGNITO:
-                return SurfaceColorUpdateUtils.geTabItemSelectorColor(
-                        context, /* isIncognito= */ true);
+                return ContextCompat.getColor(
+                        context, R.color.pane_switcher_selected_tab_incognito);
             default:
                 assert false;
                 return Color.TRANSPARENT;
@@ -133,9 +135,9 @@ public final class HubColors {
     public static @ColorInt int getHairlineColor(Context context, @HubColorScheme int colorScheme) {
         switch (colorScheme) {
             case HubColorScheme.DEFAULT:
-                return SemanticColorUtils.getDividerLineBgColor(context);
+                return SemanticColorUtils.getDividerColor(context);
             case HubColorScheme.INCOGNITO:
-                return ContextCompat.getColor(context, R.color.divider_line_bg_color_light);
+                return ContextCompat.getColor(context, R.color.divider_color_light);
             default:
                 assert false;
                 return Color.TRANSPARENT;
@@ -161,11 +163,10 @@ public final class HubColors {
             Context context, @HubColorScheme int colorScheme) {
         switch (colorScheme) {
             case HubColorScheme.DEFAULT:
-                return SurfaceColorUpdateUtils.getGtsSearchBoxBackgroundColor(
-                        context, /* isIncognito= */ false);
+                return ContextCompat.getColor(context, R.color.hub_search_box_bg_color);
             case HubColorScheme.INCOGNITO:
-                return SurfaceColorUpdateUtils.getGtsSearchBoxBackgroundColor(
-                        context, /* isIncognito= */ true);
+                return ContextCompat.getColor(
+                        context, R.color.incognito_hub_search_box_bg_color);
             default:
                 assert false;
                 return ContextCompat.getColor(context, Resources.ID_NULL);
@@ -191,11 +192,9 @@ public final class HubColors {
             Context context, @HubColorScheme int colorScheme) {
         switch (colorScheme) {
             case HubColorScheme.DEFAULT:
-                return SurfaceColorUpdateUtils.getPaneSwitcherBackgroundColor(
-                        context, /* isIncognito= */ false);
+                return SemanticColorUtils.getColorSurfaceContainer(context);
             case HubColorScheme.INCOGNITO:
-                return SurfaceColorUpdateUtils.getPaneSwitcherBackgroundColor(
-                        context, /* isIncognito= */ true);
+                return ContextCompat.getColor(context, R.color.pane_switcher_background_incognito);
             default:
                 assert false;
                 return Color.TRANSPARENT;
@@ -298,5 +297,20 @@ public final class HubColors {
         int alphaScaled = Math.round(alpha * 255);
 
         return ColorUtils.setAlphaComponent(color, alphaScaled);
+    }
+
+    /**
+     * Sets the {@link MonotonicObservableSupplier} for XR space mode.
+     * DISCLAIMER: This is possibly unsafe for multi-window mode. This should
+     * be used with caution for more complex use cases.
+     * @param supplier The {@link MonotonicObservableSupplier} for XR space mode.
+     */
+    public static void setXrSpaceModeObservableSupplier(
+            @Nullable MonotonicObservableSupplier<Boolean> supplier) {
+        sXrSpaceModeObservableSupplier = supplier;
+    }
+
+    private static boolean isXrFullSpaceMode() {
+        return sXrSpaceModeObservableSupplier != null && sXrSpaceModeObservableSupplier.get();
     }
 }

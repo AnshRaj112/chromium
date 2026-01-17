@@ -51,7 +51,6 @@ class PLATFORM_EXPORT TransformOperations {
   void Trace(Visitor* visitor) const { visitor->Trace(operations_); }
 
   bool operator==(const TransformOperations& o) const;
-  bool operator!=(const TransformOperations& o) const { return !(*this == o); }
 
   // Constructs a transformation matrix from the operations. The parameter
   // |border_box_size| is used when computing styles that are size-dependent.
@@ -178,9 +177,14 @@ class PLATFORM_EXPORT TransformOperations {
   TransformOperations Add(const TransformOperations& addend) const;
   TransformOperations Zoom(double factor) const;
 
+  bool CanSmoothlyBlendWith(const TransformOperations& other) const;
+
   // Perform accumulation of |to| onto |this|, as specified in
   // https://drafts.csswg.org/css-transforms-2/#combining-transform-lists
   TransformOperations Accumulate(const TransformOperations& to) const;
+
+  bool ContainsSingularMatrixTransform() const;
+  bool IsMergedTransformSingular(wtf_size_t offset) const;
 
  private:
   HeapVector<Member<TransformOperation>, 2> operations_;

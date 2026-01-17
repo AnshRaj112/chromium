@@ -39,7 +39,7 @@ class StorageSchemaManifestHandlerTest : public testing::Test {
   }
 
   scoped_refptr<Extension> CreateExtension(const std::string& schema) {
-    std::string error;
+    std::u16string error;
     scoped_refptr<Extension> extension = Extension::Create(
         temp_dir_.GetPath(), mojom::ManifestLocation::kUnpacked, manifest_,
         Extension::NO_FLAGS, "", &error);
@@ -60,7 +60,7 @@ class StorageSchemaManifestHandlerTest : public testing::Test {
     scoped_refptr<Extension> extension = CreateExtension(schema);
     if (!extension.get())
       return testing::AssertionFailure() << "Failed to create test extension";
-    std::string error;
+    std::u16string error;
     std::vector<InstallWarning> warnings;
     if (file_util::ValidateExtension(extension.get(), &error, &warnings))
       return testing::AssertionSuccess();

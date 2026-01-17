@@ -6,7 +6,6 @@
 
 #include <algorithm>
 
-#include "base/containers/contains.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/rand_util.h"
 #include "base/task/sequenced_task_runner.h"
@@ -326,7 +325,7 @@ void BrowsingTopicsCalculator::DeriveTopTopics(
       uint64_t padded_topic_index_decision = GenerateRandUint64();
       padded_topic = semantic_tree.GetRandomTopic(taxonomy_version,
                                                   padded_topic_index_decision);
-    } while (base::Contains(top_topics, padded_topic));
+    } while (std::ranges::contains(top_topics, padded_topic));
 
     top_topics.emplace_back(std::move(padded_topic));
   }
@@ -386,6 +385,7 @@ void BrowsingTopicsCalculator::OnGetRecentBrowsingTopicsApiUsagesCompleted(
   history::QueryOptions options;
   options.begin_time = api_usage_context_data_start_time_;
   options.end_time = calculation_time_;
+  options.policy_for_404_visits = history::VisitQuery404sPolicy::kExclude404s;
   options.duplicate_policy = history::QueryOptions::KEEP_ALL_DUPLICATES;
 
   progress_ = Progress::kHistoryRequested;
@@ -415,7 +415,7 @@ void BrowsingTopicsCalculator::OnGetRecentlyVisitedURLsCompleted(
       continue;
     }
 
-    std::string raw_host = url_result.url().host();
+    std::string raw_host = url_result.url().GetHost();
     raw_hosts.insert(raw_host);
 
     if (url_result.visit_time() >= history_data_start_time_) {

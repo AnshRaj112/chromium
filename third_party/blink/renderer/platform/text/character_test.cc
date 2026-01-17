@@ -8,10 +8,12 @@
 #include <unicode/uscript.h>
 #include <unicode/utypes.h>
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/renderer/platform/text/emoji_segmentation_category.h"
 #include "third_party/blink/renderer/platform/text/emoji_segmentation_category_inline_header.h"
+#include "third_party/blink/renderer/platform/text/justification_opportunity.h"
 #include "third_party/blink/renderer/platform/wtf/text/character_names.h"
 #include "third_party/blink/renderer/platform/wtf/text/string_builder.h"
 
@@ -373,6 +375,15 @@ TEST(CharacterTest, TestEmoji40Data) {
   EXPECT_TRUE(Character::IsEmojiModifierBase(0x1F933));
 }
 
+TEST(CharacterTest, EmojiReserved) {
+#if U_ICU_VERSION_MAJOR_NUM >= 78
+  EXPECT_TRUE(Character::IsEmoji(0x1FAEF));
+#else
+  EXPECT_TRUE(Character::IsEmojiReserved(0x1FAEF));
+#endif
+  EXPECT_TRUE(Character::IsEmojiReserved(0x1FFFD));
+}
+
 TEST(CharacterTest, LineBreakAndQuoteNotEmoji) {
   EXPECT_FALSE(Character::IsEmojiTextDefault('\n'));
   EXPECT_FALSE(Character::IsEmojiTextDefault('"'));
@@ -598,7 +609,7 @@ static std::vector<UScriptCode> east_asian_script_codes{
 
 // returns true if the script code is in the above list.
 bool IsEastAsianScript(const UScriptCode& script_code) {
-  return base::Contains(east_asian_script_codes, script_code);
+  return std::ranges::contains(east_asian_script_codes, script_code);
 }
 
 // returns true if any of script_extension is in the above list.
@@ -606,7 +617,8 @@ bool HasEastAsianScriptExtention(
     const std::vector<UScriptCode>& script_extension) {
   for (const UScriptCode& east_asian_script_extension_code :
        east_asian_script_codes) {
-    if (base::Contains(script_extension, east_asian_script_extension_code)) {
+    if (std::ranges::contains(script_extension,
+                              east_asian_script_extension_code)) {
       return true;
     }
   }
@@ -655,7 +667,7 @@ bool ShouldBeConditional(UChar32 test_char, UEastAsianWidth east_asian_width) {
   // DOUBLE DAGGER U+2026 HORIZONTAL ELLIPSIS
   static std::vector<UChar32> not_conditional{0x0022, 0x0027, 0x002A, 0x002F,
                                               0x00B7, 0x2020, 0x2021, 0x2026};
-  if (base::Contains(not_conditional, test_char)) {
+  if (std::ranges::contains(not_conditional, test_char)) {
     return false;
   }
   // Exclude if the East_Asian_Width property is “East Asian Fullwidth (F)”,
@@ -736,6 +748,85 @@ TEST(CharacterTest, TestEastAsianSpacingPropertyRule) {
         break;
     }
   }
+}
+
+TEST(CharacterTest, ExpansionOpportunityEmoji) {
+  JustificationContext context;
+  // a, an emoji ZWJ sequence, z
+  // We should count both side of the emoji sequence.
+  StringView source(u"a\U0001F635\u200d\U0001f4ABz");
+  EXPECT_EQ(2u, Character::ExpansionOpportunityCount(
+                    TextJustify::kAuto, source.Span16(), TextDirection::kLtr,
+                    context));
+  EXPECT_FALSE(context.is_after_opportunity);
+
+  context.is_after_opportunity = true;
+  EXPECT_EQ(2u, Character::ExpansionOpportunityCount(
+                    TextJustify::kAuto, source.Span16(), TextDirection::kRtl,
+                    context));
+  EXPECT_FALSE(context.is_after_opportunity);
+}
+
+static struct CanReceiveTextEmphasisTestData {
+  const UChar32 character;
+  bool expected;
+} can_receive_text_emphasis_test_data[] = {
+    {u'0', true},
+    {u'a', true},
+    {u'人', true},
+    {u'한', true},
+    // Additional word-separator characters.
+    {uchar::kEthiopicWordspace, false},
+    {uchar::kAegeanWordSeparatorLine, false},
+    {uchar::kAegeanWordSeparatorDot, false},
+    {uchar::kUgariticWordDivider, false},
+    {uchar::kTibetanMarkIntersyllabicTsheg, false},
+    {uchar::kTibetanMarkDelimiterTshegBstar, false},
+    // Punctuation.
+    {u'(', false},
+    {u']', false},
+    {u'!', false},
+    {u' ', false},
+    {u'，', false},
+    // A set of exceptions for punctuation.
+    {uchar::kNumberSign, true},
+    {uchar::kPercentSign, true},
+    {uchar::kAmpersand, true},
+    {uchar::kCommercialAt, true},
+    {uchar::kSectionSign, true},
+    {uchar::kPilcrowSign, true},
+    {uchar::kArabicIndicPerMilleSign, true},
+    {uchar::kArabicIndicPerTenThousandSign, true},
+    {uchar::kArabicPercentSign, true},
+    {uchar::kPerMilleSign, true},
+    {uchar::kPerTenThousandSign, true},
+    {uchar::kTironianSignEt, true},
+    {uchar::kReversedPilcrowSign, true},
+    {uchar::kSwungDash, true},
+    {uchar::kPartAlternationMark, true},
+    // Characters with NFKD equivalence to the above.
+    {uchar::kSmallNumberSign, true},
+    {uchar::kSmallAmpersand, true},
+    {uchar::kSmallPercentSign, true},
+    {uchar::kSmallCommercialAt, true},
+    {uchar::kFullwidthNumberSign, true},
+    {uchar::kFullwidthPercentSign, true},
+    {uchar::kFullwidthAmpersand, true},
+    {uchar::kFullwidthCommercialAt, true},
+};
+
+class CanReceiveTextEmphasisTest
+    : public testing::Test,
+      public testing::WithParamInterface<CanReceiveTextEmphasisTestData> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    CanReceiveTextEmphasisTest,
+    CanReceiveTextEmphasisTest,
+    testing::ValuesIn(can_receive_text_emphasis_test_data));
+
+TEST_P(CanReceiveTextEmphasisTest, ToLowerWithoutOffset) {
+  const auto data = GetParam();
+  EXPECT_EQ(Character::CanReceiveTextEmphasis(data.character), data.expected);
 }
 
 }  // namespace blink

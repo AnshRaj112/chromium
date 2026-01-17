@@ -558,6 +558,8 @@ void HTMLMetaElement::NameRemoved(const AtomicString& name_value) {
              EqualIgnoringASCIICase(name_value,
                                     keywords::kResponsiveEmbeddedSizing)) {
     GetDocument().ResponsiveEmbeddedSizingChanged();
+  } else if (EqualIgnoringASCIICase(name_value, "text-scale")) {
+    GetDocument().TextScaleMetaChanged();
   }
 }
 
@@ -674,7 +676,12 @@ void HTMLMetaElement::ProcessContent() {
 
   if (RuntimeEnabledFeatures::ResponsiveIframesEnabled() &&
       EqualIgnoringASCIICase(name_value, keywords::kResponsiveEmbeddedSizing)) {
-    GetDocument().ResponsiveEmbeddedSizingChanged();
+    GetDocument().SetResponsiveEmbeddedSizing();
+  }
+
+  if (EqualIgnoringASCIICase(name_value, "text-scale")) {
+    GetDocument().TextScaleMetaChanged();
+    return;
   }
 
   if (EqualIgnoringASCIICase(name_value, "theme-color") &&

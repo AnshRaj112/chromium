@@ -34,8 +34,8 @@
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/content_settings/core/common/pref_names.h"
 #include "components/metrics_services_manager/metrics_services_manager.h"
-#include "components/plus_addresses/features.h"
-#include "components/plus_addresses/plus_address_hats_utils.h"
+#include "components/plus_addresses/core/browser/plus_address_hats_utils.h"
+#include "components/plus_addresses/core/common/features.h"
 #include "components/policy/core/common/policy_pref_names.h"
 #include "components/policy/policy_constants.h"
 #include "components/prefs/pref_service.h"
@@ -139,6 +139,14 @@ class HatsServiceBrowserTestBase : public policy::PolicyTest {
           ->GetSurveyConfigsByTriggersForTesting()[kHatsSurveyTriggerSettings]
           .requested_browser_type = requested_browser_type;
     }
+    return kHatsSurveyTriggerSettings;
+  }
+
+  std::string MockSurveyWithProfileAgeRequirement(
+      hats::SurveyConfig::ProfileAgeRequirement profile_age_requirement) {
+    GetHatsService()
+        ->GetSurveyConfigsByTriggersForTesting()[kHatsSurveyTriggerSettings]
+        .profile_age_requirement = profile_age_requirement;
     return kHatsSurveyTriggerSettings;
   }
 
@@ -536,6 +544,17 @@ IN_PROC_BROWSER_TEST_F(HatsServiceProbabilityOne, ProfileOldEnoughToShow) {
 }
 
 IN_PROC_BROWSER_TEST_F(HatsServiceProbabilityOne,
+                       ProfileJustCreatedAnyAgeRequirementShow) {
+  SetMetricsConsent(true);
+  // Simulate a brand new profile.
+  browser()->profile()->SetCreationTimeForTesting(base::Time::Now());
+  // Launch the survey with kAnyAge requirement.
+  GetHatsService()->LaunchSurvey(MockSurveyWithProfileAgeRequirement(
+      hats::SurveyConfig::ProfileAgeRequirement::kAnyAge));
+  EXPECT_TRUE(HatsNextDialogCreated());
+}
+
+IN_PROC_BROWSER_TEST_F(HatsServiceProbabilityOne,
                        RegularSurveyInIncognitoNoShow) {
   SetMetricsConsent(true);
   base::HistogramTester histogram_tester;
@@ -863,4 +882,20 @@ IN_PROC_BROWSER_TEST_F(HatsServiceProbabilityOne,
   HatsServiceDesktop::SurveyMetadata metadata;
   GetHatsService()->GetSurveyMetadataForTesting(&metadata);
   EXPECT_TRUE(metadata.last_survey_check_time.has_value());
+}
+
+IN_PROC_BROWSER_TEST_F(HatsServiceProbabilityOne, DialogDoesNotOutliveBrowser) {
+  SetMetricsConsent(true);
+  ASSERT_TRUE(
+      g_browser_process->GetMetricsServicesManager()->IsMetricsConsentGiven());
+  raw_ptr<BrowserWindowInterface> hats_browser = CreateBrowser(GetProfile());
+
+  GetHatsService()->LaunchSurveyForWebContents(
+      kHatsSurveyTriggerSettings,
+      hats_browser->GetTabStripModel()->GetActiveWebContents(),
+      /*product_specific_bits_data=*/{}, /*product_specific_string_data=*/{});
+  EXPECT_TRUE(GetHatsService()->hats_next_dialog_exists_for_testing());
+
+  CloseBrowserSynchronously(hats_browser.ExtractAsDangling());
+  EXPECT_FALSE(GetHatsService()->hats_next_dialog_exists_for_testing());
 }

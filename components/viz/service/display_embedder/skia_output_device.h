@@ -135,9 +135,6 @@ class VIZ_SERVICE_EXPORT SkiaOutputDevice {
   };
   virtual bool Reshape(const ReshapeParams& params) = 0;
 
-  // For devices that supports viewporter.
-  virtual void SetViewportSize(const gfx::Size& viewport_size);
-
   // Submit the GrContext and run |callback| after. Note most but not all
   // implementations will run |callback| in this call stack.
   // If the |sync_cpu| flag is true this function will return once the gpu
@@ -182,6 +179,8 @@ class VIZ_SERVICE_EXPORT SkiaOutputDevice {
 
   void SetDependencyTimings(base::TimeTicks task_ready);
 
+  void SetOverlayStartTimings(base::TimeTicks gpu_start_overlay);
+
   // Copy and return the contents of the surface owned by this device. If this
   // output device is surfaceless, then reads back from the OS compositor tree,
   // including non-protected overlays.
@@ -195,7 +194,8 @@ class VIZ_SERVICE_EXPORT SkiaOutputDevice {
              BufferPresentedCallback feedback,
              base::TimeTicks viz_scheduled_draw,
              base::TimeTicks gpu_started_draw,
-             base::TimeTicks task_ready);
+             base::TimeTicks task_ready,
+             base::TimeTicks gpu_started_overlay);
     SwapInfo(SwapInfo&& other);
     ~SwapInfo();
     uint64_t SwapId();
@@ -260,6 +260,7 @@ class VIZ_SERVICE_EXPORT SkiaOutputDevice {
   base::TimeTicks viz_scheduled_draw_;
   base::TimeTicks gpu_started_draw_;
   base::TimeTicks gpu_task_ready_;
+  base::TimeTicks gpu_started_overlay_;
 
   // RGBX format is emulated with RGBA.
   bool is_emulated_rgbx_ = false;

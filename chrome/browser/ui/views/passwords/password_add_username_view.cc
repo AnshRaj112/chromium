@@ -54,10 +54,10 @@ std::unique_ptr<views::View> CreatePasswordLabelWithEyeIconView(
   eye_icon->SetToggledTooltipText(
       l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_HIDE_PASSWORD));
   eye_icon->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
-  views::SetImageFromVectorIconWithColorId(eye_icon, views::kEyeIcon,
-                                           ui::kColorIcon, ui::kColorIcon);
-  views::SetToggledImageFromVectorIconWithColorId(
-      eye_icon, views::kEyeCrossedIcon, ui::kColorIcon, ui::kColorIcon);
+  views::SetImageFromVectorIconWithColor(eye_icon, views::kEyeIcon,
+                                         {ui::kColorIcon, ui::kColorIcon});
+  views::SetToggledImageFromVectorIconWithColor(
+      eye_icon, views::kEyeCrossedIcon, {ui::kColorIcon, ui::kColorIcon});
   eye_icon->SetCallback(base::BindRepeating(
       [](views::ToggleImageButton* toggle_button,
          views::Label* password_label) {
@@ -87,7 +87,7 @@ void AddEmptyBorder(views::View* password_field) {
 
 PasswordAddUsernameView::PasswordAddUsernameView(
     content::WebContents* web_contents,
-    views::View* anchor_view,
+    views::BubbleAnchor anchor_view,
     DisplayReason reason)
     : PasswordBubbleViewBase(web_contents, anchor_view, true),
       controller_(PasswordsModelDelegateFromWebContents(web_contents),

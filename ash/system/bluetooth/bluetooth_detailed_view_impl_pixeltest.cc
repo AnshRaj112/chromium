@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include "ash/public/cpp/bluetooth_config_service.h"
 #include "ash/system/bluetooth/bluetooth_detailed_view_impl.h"
 #include "ash/system/tray/fake_detailed_view_delegate.h"
 #include "ash/system/tray/tray_detailed_view.h"
@@ -14,11 +15,14 @@
 #include "ash/test/ash_test_base.h"
 #include "ash/test/ash_test_helper.h"
 #include "ash/test/pixel/ash_pixel_differ.h"
+#include "ash/test/pixel/ash_pixel_test_helper.h"
 #include "ash/test/pixel/ash_pixel_test_init_params.h"
+#include "base/auto_reset.h"
+#include "base/memory/raw_ptr.h"
+#include "base/run_loop.h"
 #include "base/test/scoped_feature_list.h"
 #include "chromeos/ash/services/bluetooth_config/fake_adapter_state_controller.h"
 #include "chromeos/ash/services/bluetooth_config/fake_device_cache.h"
-#include "chromeos/ash/services/bluetooth_config/public/mojom/cros_bluetooth_config.mojom-shared.h"
 #include "chromeos/ash/services/bluetooth_config/public/mojom/cros_bluetooth_config.mojom.h"
 #include "chromeos/ash/services/bluetooth_config/scoped_bluetooth_config_test_helper.h"
 #include "chromeos/constants/chromeos_features.h"
@@ -45,17 +49,41 @@ PairedBluetoothDevicePropertiesPtr CreatePairedDevice(
   return paired_properties;
 }
 
-// Returns appropriate screenshot suffix based on whether the feature flag is
-// enabled.
-std::string GetScreenshotName(const std::string& test_name, bool enabled) {
-  return test_name + (enabled ? "_unavailable_state_enabled"
-                              : "_unavailable_state_disabled");
-}
+class SystemPropertiesUpdateWaiter
+    : public bluetooth_config::mojom::SystemPropertiesObserver {
+ public:
+  SystemPropertiesUpdateWaiter() = default;
+  ~SystemPropertiesUpdateWaiter() override = default;
+
+  mojo::PendingRemote<bluetooth_config::mojom::SystemPropertiesObserver>
+  GeneratePendingRemote() {
+    return receiver_.BindNewPipeAndPassRemote();
+  }
+
+  void Wait() {
+    base::RunLoop run_loop;
+    base::AutoReset resetter{&run_loop_, &run_loop};
+    run_loop.Run();
+  }
+
+ private:
+  // mojom::SystemPropertiesObserver:
+  void OnPropertiesUpdated(bluetooth_config::mojom::BluetoothSystemPropertiesPtr
+                               properties) override {
+    run_loop_->Quit();
+  }
+
+  raw_ptr<base::RunLoop> run_loop_ = nullptr;
+  mojo::Receiver<bluetooth_config::mojom::SystemPropertiesObserver> receiver_{
+      this};
+};
 
 // Pixel tests for the quick settings Bluetooth detailed view.
 class BluetoothDetailedViewImplPixelTest
     : public AshTestBase,
-      public testing::WithParamInterface<bool> {
+      public testing::WithParamInterface<
+          std::tuple</*IsBluetoothWifiQSPodRefreshEnabled()=*/bool,
+                     /*IsSystemBlurEnabled()=*/bool>> {
  public:
   BluetoothDetailedViewImplPixelTest() {
     scoped_feature_list_ = std::make_unique<base::test::ScopedFeatureList>();
@@ -64,12 +92,25 @@ class BluetoothDetailedViewImplPixelTest
         IsBluetoothWifiQSPodRefreshEnabled());
   }
 
-  bool IsBluetoothWifiQSPodRefreshEnabled() { return GetParam(); }
+  bool IsBluetoothWifiQSPodRefreshEnabled() const {
+    return std::get<0>(GetParam());
+  }
+  bool IsSystemBlurEnabled() const { return std::get<1>(GetParam()); }
 
   // AshTestBase:
   std::optional<pixel_test::InitParams> CreatePixelTestInitParams()
       const override {
-    return pixel_test::InitParams();
+    pixel_test::InitParams init_params;
+    init_params.system_blur_enabled = IsSystemBlurEnabled();
+    return init_params;
+  }
+
+  // AshTestBase:
+  std::string GenerateScreenshotName(const std::string& title) override {
+    return pixel_test_helper()->GenerateScreenshotName(
+        title + (IsBluetoothWifiQSPodRefreshEnabled()
+                     ? "_unavailable_state_enabled"
+                     : "_unavailable_state_disabled"));
   }
 
   // Sets the list of paired devices in the device cache.
@@ -96,7 +137,8 @@ class BluetoothDetailedViewImplPixelTest
 INSTANTIATE_TEST_SUITE_P(
     All,
     BluetoothDetailedViewImplPixelTest,
-    /*IsBluetoothWifiQSPodRefreshEnabled()=*/testing::Bool());
+    testing::Combine(/*IsBluetoothWifiQSPodRefreshEnabled()=*/testing::Bool(),
+                     /*IsSystemBlurEnabled()=*/testing::Bool()));
 
 TEST_P(BluetoothDetailedViewImplPixelTest, Basics) {
   // Create test devices.
@@ -122,10 +164,21 @@ TEST_P(BluetoothDetailedViewImplPixelTest, Basics) {
           ->GetDetailedViewForTest<TrayDetailedView>();
   ASSERT_TRUE(detailed_view);
 
+  // Wait for the device updates.
+  SystemPropertiesUpdateWaiter waiter;
+  mojo::Remote<bluetooth_config::mojom::CrosBluetoothConfig>
+      remote_cros_bluetooth_config;
+  GetBluetoothConfigService(
+      remote_cros_bluetooth_config.BindNewPipeAndPassReceiver());
+  remote_cros_bluetooth_config->ObserveSystemProperties(
+      waiter.GeneratePendingRemote());
+  waiter.Wait();
+
   // Compare pixels.
   EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
-      GetScreenshotName("check_view", IsBluetoothWifiQSPodRefreshEnabled()),
-      /*revision_number=*/11, detailed_view));
+      GenerateScreenshotName("check_view"),
+      /*revision_number=*/pixel_test_helper()->IsSystemBlurEnabled() ? 11 : 0,
+      detailed_view));
 }
 
 TEST_P(BluetoothDetailedViewImplPixelTest, BluetoothUnavailable) {
@@ -152,9 +205,9 @@ TEST_P(BluetoothDetailedViewImplPixelTest, BluetoothUnavailable) {
 
   // Compare pixels.
   EXPECT_TRUE(GetPixelDiffer()->CompareUiComponentsOnPrimaryScreen(
-      GetScreenshotName("bluetooth_unavailable_view",
-                        IsBluetoothWifiQSPodRefreshEnabled()),
-      /*revision_number=*/2, detailed_view));
+      GenerateScreenshotName("bluetooth_unavailable_view"),
+      /*revision_number=*/pixel_test_helper()->IsSystemBlurEnabled() ? 2 : 0,
+      detailed_view));
 }
 
 }  // namespace

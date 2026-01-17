@@ -4,32 +4,29 @@
 
 use crate::ffi;
 use crate::models::Metadata;
-use anyhow::{anyhow, Result};
-use serde::{de, de::Deserializer, de::Error as DeserializerError, Deserialize};
-use serde_json_lenient;
+use serde::{de, de::Deserializer, de::Error as DeserializerError};
 use std::fmt;
 use std::io::{BufReader, Read};
-use zip;
 
 pub const STREAM_BUFFER_SIZE: usize = 4096;
 
 // Returns the expected data type for the provided file type.
-fn expected_data_type(file_type: ffi::FileType) -> Result<&'static str> {
+fn expected_data_type(file_type: ffi::FileType) -> Result<&'static str, &'static str> {
     match file_type {
         ffi::FileType::SafariHistory => Ok("history"),
         ffi::FileType::StablePortabilityHistory => Ok("history_visits"),
         ffi::FileType::PaymentCards => Ok("payment_cards"),
-        _ => Err(anyhow!("No data type for this file type")),
+        _ => Err("No data type for this file type"),
     }
 }
 
 // Returns the expected array token for the provided file type.
-fn array_token_for_data_type(file_type: ffi::FileType) -> Result<&'static str> {
+fn array_token_for_data_type(file_type: ffi::FileType) -> Result<&'static str, &'static str> {
     match file_type {
         ffi::FileType::SafariHistory => Ok("history"),
         ffi::FileType::StablePortabilityHistory => Ok("history_visits"),
         ffi::FileType::PaymentCards => Ok("payment_cards"),
-        _ => Err(anyhow!("No array token for this file type")),
+        _ => Err("No array token for this file type"),
     }
 }
 
@@ -48,11 +45,11 @@ impl<'a, R: Read> ZipEntryBufReader<'a, R> {
 
 struct ArrayDeserializerSeed<'de, T>(Box<dyn FnMut(T) + 'de>)
 where
-    T: Deserialize<'de>;
+    T: de::DeserializeOwned;
 
-impl<'de, 'a, T> de::DeserializeSeed<'de> for ArrayDeserializerSeed<'de, T>
+impl<'de, T> de::DeserializeSeed<'de> for ArrayDeserializerSeed<'de, T>
 where
-    T: Deserialize<'de>,
+    T: de::DeserializeOwned,
 {
     // The return type of the `deserialize` method. This implementation
     // passes elements into `callback` but does not create any new data
@@ -67,7 +64,7 @@ where
 
         impl<'de, T> de::Visitor<'de> for SeqVisitor<'de, T>
         where
-            T: Deserialize<'de>,
+            T: de::DeserializeOwned,
         {
             type Value = ();
 
@@ -79,8 +76,10 @@ where
             where
                 S: de::SeqAccess<'de>,
             {
-                while let Some(t) = seq.next_element::<T>()? {
-                    self.0(t);
+                while let Some(value) = seq.next_element::<serde_json_lenient::Value>()? {
+                    if let Ok(t) = serde_json_lenient::from_value(value) {
+                        self.0(t);
+                    }
                 }
                 Ok(())
             }
@@ -95,16 +94,16 @@ pub fn deserialize_top_level<'de, T, R>(
     file_type: ffi::FileType,
     callback: impl FnMut(T) + 'de,
     metadata_only: bool,
-) -> Result<()>
+) -> Result<(), String>
 where
-    T: Deserialize<'de> + 'de,
+    T: de::DeserializeOwned + 'de,
     R: std::io::Read,
 {
-    const VALID_PARTIAL_DESERIALIZATION: &'static str = "Valid partial deserialization";
+    const VALID_PARTIAL_DESERIALIZATION: &str = "Valid partial deserialization";
 
     struct MapVisitor<'de, T>
     where
-        T: Deserialize<'de>,
+        T: de::DeserializeOwned,
     {
         file_type: ffi::FileType,
         callback: Box<dyn FnMut(T) + 'de>,
@@ -113,7 +112,7 @@ where
 
     impl<'de, T> de::Visitor<'de> for MapVisitor<'de, T>
     where
-        T: Deserialize<'de> + 'de,
+        T: de::DeserializeOwned + 'de,
     {
         type Value = ();
 
@@ -125,7 +124,7 @@ where
         where
             M: de::MapAccess<'de>,
         {
-            const METADATA_TOKEN: &'static str = "metadata";
+            const METADATA_TOKEN: &str = "metadata";
             let Ok(data_type) = expected_data_type(self.file_type) else {
                 return Err(DeserializerError::custom("File type has no associated data type"));
             };
@@ -183,7 +182,7 @@ where
             if e.to_string().starts_with(VALID_PARTIAL_DESERIALIZATION) {
                 return Ok(());
             }
-            return Err(anyhow!("JSON parsing error: {}", e));
+            Err(e.to_string())
         }
     }
 }

@@ -39,17 +39,26 @@ class BLINK_COMMON_EXPORT WebTouchEvent : public WebInputEvent {
   bool hovering = false;
 
   // Whether this touch event is a touchstart or a first touchmove event per
-  // scroll.
+  // scroll. (Note: There can be multiple first touchmove events per scroll. All
+  // touchmoves up until the first touchmove that moves beyond the slop region
+  // are considered first touchmove events).
   bool touch_start_or_first_touch_move = false;
 
   // A unique identifier for the touch event. Valid ids start at one and
   // increase monotonically. Zero means an unknown id.
   uint32_t unique_touch_event_id = 0;
 
-  WebTouchEvent() = default;
+  WebTouchEvent()
+      : WebInputEvent(Type::kUndefined,
+                      Type::kTouchTypeFirst,
+                      Type::kTouchTypeLast) {}
 
   WebTouchEvent(Type type, int modifiers, base::TimeTicks time_stamp)
-      : WebInputEvent(type, modifiers, time_stamp) {}
+      : WebInputEvent(type,
+                      Type::kTouchTypeFirst,
+                      Type::kTouchTypeLast,
+                      modifiers,
+                      time_stamp) {}
 
   std::unique_ptr<WebInputEvent> Clone() const override;
   bool CanCoalesce(const WebInputEvent& event) const override;

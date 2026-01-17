@@ -8,7 +8,6 @@
 #include <optional>
 #include <string>
 
-#include "base/containers/contains.h"
 #include "base/task/current_thread.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/uuid.h"
@@ -69,7 +68,7 @@ class SavedTabGroupBarUnitTest : public TestWithBrowserView {
 
   SavedTabGroupBar* saved_tab_group_bar() { return saved_tab_group_bar_.get(); }
   TabGroupSyncService* service() {
-    return tab_groups::SavedTabGroupUtils::GetServiceForProfile(
+    return tab_groups::TabGroupSyncServiceFactory::GetForProfile(
         browser()->profile());
   }
 
@@ -81,7 +80,7 @@ class SavedTabGroupBarUnitTest : public TestWithBrowserView {
         tab_groups::prefs::kAutoPinNewTabGroups, true);
 
     TabGroupSyncService* service =
-        tab_groups::SavedTabGroupUtils::GetServiceForProfile(
+        tab_groups::TabGroupSyncServiceFactory::GetForProfile(
             browser()->profile());
     service->SetIsInitializedForTesting(true);
     Wait();
@@ -265,7 +264,7 @@ TEST_F(SavedTabGroupBarUnitTest, BarsWithSameModelsHaveSameButtons) {
 
   SavedTabGroupBar another_tab_group_bar_on_same_model(
       browser(),
-      tab_groups::SavedTabGroupUtils::GetServiceForProfile(profile()), false);
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(profile()), false);
 
   EXPECT_EQ(saved_tab_group_bar()->children().size(),
             another_tab_group_bar_on_same_model.children().size());
@@ -394,7 +393,8 @@ TEST_F(SavedTabGroupBarUnitTest, AccessibleName) {
       data.GetString16Attribute(ax::mojom::StringAttribute::kName));
 
   SavedTabGroup saved_tab_group = *service()->GetGroup(tab_group_id);
-  saved_tab_group.SetCollaborationId(CollaborationId("collaboration_id"));
+  saved_tab_group.SetCollaborationId(
+      syncer::CollaborationId("collaboration_id"));
   saved_tab_group_button->UpdateButtonData(saved_tab_group);
   data = ui::AXNodeData();
   saved_tab_group_button->GetViewAccessibility().GetAccessibleNodeData(&data);

@@ -4,6 +4,7 @@
 
 #include "extensions/browser/api/runtime/runtime_api.h"
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -165,37 +166,39 @@ bool ExtensionContextMatchesFilter(
     const api::runtime::ExtensionContext& context,
     const api::runtime::ContextFilter& filter) {
   if (filter.context_types &&
-      !base::Contains(*filter.context_types, context.context_type)) {
+      !std::ranges::contains(*filter.context_types, context.context_type)) {
     return false;
   }
   if (filter.context_ids &&
-      !base::Contains(*filter.context_ids, context.context_id)) {
+      !std::ranges::contains(*filter.context_ids, context.context_id)) {
     return false;
   }
-  if (filter.tab_ids && !base::Contains(*filter.tab_ids, context.tab_id)) {
+  if (filter.tab_ids &&
+      !std::ranges::contains(*filter.tab_ids, context.tab_id)) {
     return false;
   }
   if (filter.window_ids &&
-      !base::Contains(*filter.window_ids, context.window_id)) {
+      !std::ranges::contains(*filter.window_ids, context.window_id)) {
     return false;
   }
   if (filter.document_ids &&
       (!context.document_id ||
-       !base::Contains(*filter.document_ids, *context.document_id))) {
+       !std::ranges::contains(*filter.document_ids, *context.document_id))) {
     return false;
   }
   if (filter.frame_ids &&
-      !base::Contains(*filter.frame_ids, context.frame_id)) {
+      !std::ranges::contains(*filter.frame_ids, context.frame_id)) {
     return false;
   }
   if (filter.document_urls &&
       (!context.document_url ||
-       !base::Contains(*filter.document_urls, *context.document_url))) {
+       !std::ranges::contains(*filter.document_urls, *context.document_url))) {
     return false;
   }
   if (filter.document_origins &&
       (!context.document_origin ||
-       !base::Contains(*filter.document_origins, *context.document_origin))) {
+       !std::ranges::contains(*filter.document_origins,
+                              *context.document_origin))) {
     return false;
   }
   if (filter.incognito && *filter.incognito != context.incognito) {
@@ -817,8 +820,8 @@ ExtensionFunction::ResponseAction RuntimeGetContextsFunction::Run() {
   // Minor optimization: only construct the context if there's a chance it will
   // match the filter.
   if (!filter.context_types ||
-      base::Contains(*filter.context_types,
-                     api::runtime::ContextType::kBackground)) {
+      std::ranges::contains(*filter.context_types,
+                            api::runtime::ContextType::kBackground)) {
     if (std::optional<api::runtime::ExtensionContext> worker =
             GetWorkerContext()) {
       result.push_back(std::move(*worker));
@@ -879,7 +882,7 @@ RuntimeGetContextsFunction::GetFrameContexts() {
       ProcessManager::Get(browser_context());
   CHECK(process_manager);
 
-  auto get_context_type = [](content::WebContents* web_contents) {
+  auto get_context_type = [this](content::WebContents* web_contents) {
     mojom::ViewType view_type = GetViewType(web_contents);
     switch (view_type) {
       // These should never be reached for extensions capable of calling this
@@ -889,7 +892,9 @@ RuntimeGetContextsFunction::GetFrameContexts() {
       case mojom::ViewType::kBackgroundContents:
       case mojom::ViewType::kComponent:
       case mojom::ViewType::kExtensionBackgroundPage:
-        DUMP_WILL_BE_NOTREACHED();
+        DUMP_WILL_BE_NOTREACHED()
+            << "Unexpected view type found: " << (static_cast<int>(view_type))
+            << ", Extension ID: " << extension_id();
         break;
 
       case mojom::ViewType::kExtensionPopup:

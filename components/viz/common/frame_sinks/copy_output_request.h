@@ -138,9 +138,10 @@ class VIZ_COMMON_EXPORT CopyOutputRequest {
   // called before blit request was set on the copy request.
   void set_result_selection(const gfx::Rect& selection) {
     DCHECK(result_format_ == ResultFormat::RGBA ||
+           result_format_ == ResultFormat::RGBAF16 ||
            (selection.width() % 2 == 0 && selection.height() % 2 == 0))
         << "CopyOutputRequest supports odd-sized result_selection() only for "
-           "RGBA!";
+           "RGBA and RGBAF16!";
     DCHECK(!has_blit_request());
     result_selection_ = selection;
   }
@@ -165,6 +166,9 @@ class VIZ_COMMON_EXPORT CopyOutputRequest {
   // Sends the result from executing this request. Called by the internal
   // implementation, usually a DirectRenderer.
   void SendResult(std::unique_ptr<CopyOutputResult> result);
+
+  // Sends the result with an error code from executing this request.
+  void SendError(CopyOutputResult::Error error);
 
   // Returns true if SendResult() will deliver the CopyOutputResult using the
   // same TaskRunner as that to which the current task was posted.

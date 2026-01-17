@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/metrics/histogram_functions.h"
@@ -87,6 +86,8 @@ DesktopMediaPickerController::Params MakeDesktopPickerParams(
   params.select_only_screen = true;
   params.request_audio = true;
   params.force_audio_checkboxes_to_default_checked = true;
+  params.includable_web_contents_filter =
+      base::BindRepeating([](content::WebContents* wc) { return true; });
 
   return params;
 }
@@ -203,7 +204,6 @@ void MediaRouterDesktop::CreateRoute(const MediaSource::Id& source_id,
     desktop_picker_->Show(
         MakeDesktopPickerParams(web_contents),
         {DesktopMediaList::Type::kScreen},
-        base::BindRepeating([](content::WebContents* wc) { return true; }),
         base::BindOnce(&MediaRouterDesktop::CreateRouteWithSelectedDesktop,
                        weak_factory_.GetWeakPtr(), provider_id, sink_id,
                        presentation_id, origin, web_contents, timeout,
@@ -426,8 +426,6 @@ bool MediaRouterDesktop::RegisterMediaSinksObserver(
   // If the query isn't new, then there is no need to call MRPs.
   if (is_new_query) {
     for (const auto& provider : media_route_providers_) {
-      // TODO(crbug.com/40133937): Don't allow MediaSource::ForAnyTab().id() to
-      // be passed here.
       provider.second->StartObservingMediaSinks(source.id());
     }
   }
@@ -453,8 +451,6 @@ void MediaRouterDesktop::UnregisterMediaSinksObserver(
   // here.
   if (!it->second->HasObservers() && !source.IsTabMirroringSource()) {
     for (const auto& provider : media_route_providers_) {
-      // TODO(crbug.com/40133937): Don't allow MediaSource::ForAnyTab().id() to
-      // be passed here.
       provider.second->StopObservingMediaSinks(source.id());
     }
     sinks_queries_.erase(source.id());
@@ -527,7 +523,7 @@ void MediaRouterDesktop::RegisterMediaRouteProvider(
     mojo::PendingRemote<mojom::MediaRouteProvider>
         media_route_provider_remote) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  DCHECK(!base::Contains(media_route_providers_, provider_id));
+  DCHECK(!media_route_providers_.contains(provider_id));
   mojo::Remote<mojom::MediaRouteProvider> bound_remote(
       std::move(media_route_provider_remote));
   bound_remote.set_disconnect_handler(
@@ -903,7 +899,8 @@ MediaRouterDesktop::GetProviderIdForPresentation(
     DCHECK_LE(std::ranges::count(routes, presentation_id,
                                  &MediaRoute::presentation_id),
               1);
-    if (base::Contains(routes, presentation_id, &MediaRoute::presentation_id)) {
+    if (std::ranges::contains(routes, presentation_id,
+                              &MediaRoute::presentation_id)) {
       return provider_id;
     }
   }
@@ -916,7 +913,7 @@ MediaRouterDesktop::GetProviderIdForRoute(const MediaRoute::Id& route_id) {
   for (const auto& provider_to_routes : routes_query_.providers_to_routes()) {
     const mojom::MediaRouteProviderId provider_id = provider_to_routes.first;
     const std::vector<MediaRoute>& routes = provider_to_routes.second;
-    if (base::Contains(routes, route_id, &MediaRoute::media_route_id)) {
+    if (std::ranges::contains(routes, route_id, &MediaRoute::media_route_id)) {
       return provider_id;
     }
   }
@@ -1088,8 +1085,8 @@ bool MediaRouterDesktop::MediaRoutesQuery::AddRouteForProvider(
     mojom::MediaRouteProviderId provider_id,
     const MediaRoute& route) {
   std::vector<MediaRoute>& routes = providers_to_routes_[provider_id];
-  if (!base::Contains(routes, route.media_route_id(),
-                      &MediaRoute::media_route_id)) {
+  if (!std::ranges::contains(routes, route.media_route_id(),
+                             &MediaRoute::media_route_id)) {
     routes.push_back(route);
     UpdateCachedRouteList();
     return true;

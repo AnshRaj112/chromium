@@ -64,21 +64,6 @@ cfg_if! {
     }
 }
 
-cfg_if! {
-    if #[cfg(not(target_os = "horizon"))] {
-        s! {
-            pub struct hostent {
-                pub h_name: *mut c_char,
-                pub h_aliases: *mut *mut c_char,
-                pub h_addrtype: c_int,
-                pub h_length: c_int,
-                pub h_addr_list: *mut *mut c_char,
-                pub h_addr: *mut c_char,
-            }
-        }
-    }
-}
-
 s! {
     // The order of the `ai_addr` field in this struct is crucial
     // for converting between the Rust and C types.
@@ -108,19 +93,8 @@ s! {
         pub imr_interface: in_addr,
     }
 
-    pub struct linger {
-        pub l_onoff: c_int,
-        pub l_linger: c_int,
-    }
-
     pub struct in_addr {
         pub s_addr: crate::in_addr_t,
-    }
-
-    pub struct pollfd {
-        pub fd: c_int,
-        pub events: c_int,
-        pub revents: c_int,
     }
 
     pub struct lconv {
@@ -176,6 +150,8 @@ s! {
         pub f_namemax: c_ulong,
     }
 
+    // FIXME(1.0): This should not implement `PartialEq`
+    #[allow(unpredictable_function_pointer_comparisons)]
     pub struct sigaction {
         pub sa_handler: extern "C" fn(arg1: c_int),
         pub sa_mask: sigset_t,
@@ -557,10 +533,6 @@ cfg_if! {
 
 pub const RTLD_LAZY: c_int = 0x1;
 
-pub const STDIN_FILENO: c_int = 0;
-pub const STDOUT_FILENO: c_int = 1;
-pub const STDERR_FILENO: c_int = 2;
-
 pub const SEEK_SET: c_int = 0;
 pub const SEEK_CUR: c_int = 1;
 pub const SEEK_END: c_int = 2;
@@ -837,20 +809,20 @@ pub const PRIO_USER: c_int = 2;
 
 f! {
     pub fn FD_CLR(fd: c_int, set: *mut fd_set) -> () {
-        let bits = mem::size_of_val(&(*set).fds_bits[0]) * 8;
+        let bits = size_of_val(&(*set).fds_bits[0]) * 8;
         let fd = fd as usize;
         (*set).fds_bits[fd / bits] &= !(1 << (fd % bits));
         return;
     }
 
     pub fn FD_ISSET(fd: c_int, set: *const fd_set) -> bool {
-        let bits = mem::size_of_val(&(*set).fds_bits[0]) * 8;
+        let bits = size_of_val(&(*set).fds_bits[0]) * 8;
         let fd = fd as usize;
         return ((*set).fds_bits[fd / bits] & (1 << (fd % bits))) != 0;
     }
 
     pub fn FD_SET(fd: c_int, set: *mut fd_set) -> () {
-        let bits = mem::size_of_val(&(*set).fds_bits[0]) * 8;
+        let bits = size_of_val(&(*set).fds_bits[0]) * 8;
         let fd = fd as usize;
         (*set).fds_bits[fd / bits] |= 1 << (fd % bits);
         return;

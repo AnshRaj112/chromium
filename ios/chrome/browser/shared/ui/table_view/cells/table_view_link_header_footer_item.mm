@@ -5,7 +5,6 @@
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_link_header_footer_item.h"
 
 #import "base/check_op.h"
-#import "base/containers/contains.h"
 #import "ios/chrome/browser/net/model/crurl.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
@@ -148,14 +147,23 @@ const CGFloat kHorizontalSpacingToAlignWithItems = 16.0;
 - (void)setText:(NSString*)text
         withColor:(UIColor*)color
     textAlignment:(NSTextAlignment)textAlignment {
+  [self setText:text
+          withColor:color
+      textAlignment:textAlignment
+               font:[UIFont preferredFontForTextStyle:UIFontTextStyleFootnote]];
+}
+
+- (void)setText:(NSString*)text
+        withColor:(UIColor*)color
+    textAlignment:(NSTextAlignment)textAlignment
+             font:(UIFont*)font {
   StringWithTags parsedString = ParseStringWithLinks(text);
   NSMutableParagraphStyle* paragraphStyle =
       [[NSMutableParagraphStyle alloc] init];
   paragraphStyle.alignment = textAlignment;
 
   NSDictionary* textAttributes = @{
-    NSFontAttributeName :
-        [UIFont preferredFontForTextStyle:UIFontTextStyleFootnote],
+    NSFontAttributeName : font,
     NSForegroundColorAttributeName : color,
     NSParagraphStyleAttributeName : paragraphStyle
   };
@@ -201,27 +209,6 @@ const CGFloat kHorizontalSpacingToAlignWithItems = 16.0;
         [UIColor colorNamed:enabled ? kBlueColor : kDisabledTintColor]
   };
 }
-
-#pragma mark - UITextViewDelegate
-
-#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_17_0
-- (BOOL)textView:(UITextView*)textView
-    shouldInteractWithURL:(NSURL*)URL
-                  inRange:(NSRange)characterRange
-              interaction:(UITextItemInteraction)interaction {
-  if (@available(iOS 17, *)) {
-    return NO;
-  }
-
-  DCHECK(self.textView == textView);
-  CrURL* crurl = [[CrURL alloc] initWithNSURL:URL];
-  DCHECK(crurl.gurl.is_valid());
-  // DCHECK(base::Contains(self.urls, gURL));
-  [self.delegate view:self didTapLinkURL:crurl];
-  // Returns NO as the app is handling the opening of the URL.
-  return NO;
-}
-#endif
 
 - (UIAction*)textView:(UITextView*)textView
     primaryActionForTextItem:(UITextItem*)textItem

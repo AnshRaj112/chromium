@@ -470,7 +470,13 @@ void ApplyStyleCommand::ApplyRelativeFontStyleChange(
       // style this text node. To make this possible, add a style span to
       // surround this text node.
       auto* span = MakeGarbageCollected<HTMLSpanElement>(GetDocument());
-      SurroundNodeRangeWithElement(node, node, span, editing_state);
+      // Prevent merging the span with adjacent siblings, to ensure the DOM
+      // structure and traversal order do not change.
+      SurroundNodeRangeWithElement(
+          node, node, span, editing_state,
+          RuntimeEnabledFeatures::AvoidMergingStyledSpanWithSiblingsEnabled()
+              ? kDoNotMergeSiblings
+              : kMergeSiblings);
       if (editing_state->IsAborted())
         return;
       element = span;
@@ -1559,11 +1565,30 @@ void ApplyStyleCommand::RemoveInlineStyle(EditingStyle* style,
       }
 
       if (style_to_push_down) {
+        EditingStyle* filtered_style_to_push_down = style_to_push_down;
+
+        if (RuntimeEnabledFeatures::
+                RemoveFormatFilterBackgroundColorEnabled()) {
+          // Filter out styles that should be removed - don't push down styles
+          // that conflict with the styles we're trying to remove
+          filtered_style_to_push_down = style_to_push_down->Copy();
+          if (style && style->Style() && filtered_style_to_push_down->Style()) {
+            // Remove any properties from style_to_push_down that are present in
+            // the style being removed
+            for (const CSSPropertyValue& property :
+                 style->Style()->Properties()) {
+              filtered_style_to_push_down->Style()->RemoveProperty(
+                  property.PropertyID());
+            }
+          }
+        }
+
         for (; child_node; child_node = child_node->nextSibling()) {
-          ApplyInlineStyleToPushDown(child_node, style_to_push_down,
+          ApplyInlineStyleToPushDown(child_node, filtered_style_to_push_down,
                                      editing_state);
-          if (editing_state->IsAborted())
+          if (editing_state->IsAborted()) {
             return;
+          }
         }
       }
     }
@@ -1787,7 +1812,8 @@ void ApplyStyleCommand::SurroundNodeRangeWithElement(
     Node* passed_start_node,
     Node* end_node,
     Element* element_to_insert,
-    EditingState* editing_state) {
+    EditingState* editing_state,
+    MergeSiblings merge_siblings) {
   DCHECK(passed_start_node);
   DCHECK(end_node);
   DCHECK(element_to_insert);
@@ -1812,6 +1838,10 @@ void ApplyStyleCommand::SurroundNodeRangeWithElement(
     if (node == end_node)
       break;
     node = next;
+  }
+
+  if (merge_siblings == kDoNotMergeSiblings) {
+    return;
   }
 
   Node* next_sibling = element->nextSibling();
@@ -2110,7 +2140,8 @@ void ApplyStyleCommand::JoinChildTextNodes(ContainerNode* node,
       new_end = Position(child_text,
                          child_text->length() + end.OffsetInContainerNode());
     String text_to_move = next_text->data();
-    InsertTextIntoNode(child_text, child_text->length(), text_to_move);
+    InsertTextIntoNode(child_text, child_text->length(), text_to_move,
+                       PasswordEchoBehavior::kDoNotEcho);
     // Removing a Text node doesn't dispatch synchronous events.
     RemoveNode(next, ASSERT_NO_EDITING_ABORT);
     // don't move child node pointer. it may want to merge with more text nodes.

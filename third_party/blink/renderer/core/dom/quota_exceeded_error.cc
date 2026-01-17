@@ -8,6 +8,7 @@
 #include "third_party/blink/renderer/bindings/core/v8/v8_throw_dom_exception.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/platform/bindings/exception_code.h"
+#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 
 namespace blink {
 
@@ -17,7 +18,19 @@ QuotaExceededError* QuotaExceededError::Create(
     const QuotaExceededErrorOptions* options) {
   // Not doing AttachStackProperty is consistent with `new DOMException()`
   // but should be updated to do so to match spec (crbug.com/40815519).
-  return MakeGarbageCollected<QuotaExceededError>(message, options);
+  return MakeGarbageCollected<QuotaExceededError>(
+      message,
+      options->hasQuota() ? std::make_optional(options->quota()) : std::nullopt,
+      options->hasRequested() ? std::make_optional(options->requested())
+                              : std::nullopt);
+}
+
+// static
+QuotaExceededError* QuotaExceededError::Create(
+    const String& message,
+    std::optional<double> quota,
+    std::optional<double> requested) {
+  return MakeGarbageCollected<QuotaExceededError>(message, quota, requested);
 }
 
 // static
@@ -26,14 +39,8 @@ v8::Local<v8::Value> QuotaExceededError::Create(
     const String& message,
     std::optional<double> quota,
     std::optional<double> requested) {
-  auto* options = QuotaExceededErrorOptions::Create(isolate);
-  if (quota) {
-    options->setQuota(quota.value());
-  }
-  if (requested) {
-    options->setRequested(requested.value());
-  }
-  auto* exception = MakeGarbageCollected<QuotaExceededError>(message, options);
+  auto* exception =
+      MakeGarbageCollected<QuotaExceededError>(message, quota, requested);
   return V8ThrowDOMException::AttachStackProperty(isolate, exception);
 }
 
@@ -71,15 +78,6 @@ void QuotaExceededError::Reject(ScriptPromiseResolverBase* resolver,
                                      message);
   }
 }
-
-QuotaExceededError::QuotaExceededError(const String& message,
-                                       const QuotaExceededErrorOptions* options)
-    : DOMException(DOMExceptionCode::kQuotaExceededError, message),
-      quota_(options->hasQuota() ? std::make_optional(options->quota())
-                                 : std::nullopt),
-      requested_(options->hasRequested()
-                     ? std::make_optional(options->requested())
-                     : std::nullopt) {}
 
 QuotaExceededError::QuotaExceededError(const String& message,
                                        std::optional<double> quota,

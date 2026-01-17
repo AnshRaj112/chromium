@@ -7,7 +7,6 @@ load("@chromium-luci//args.star", "args")
 load("@chromium-luci//branches.star", "branches")
 load("@chromium-luci//builder_config.star", "builder_config")
 load("@chromium-luci//builder_health_indicators.star", "health_spec")
-load("@chromium-luci//builders.star", "cpu")
 load("@chromium-luci//ci.star", "ci")
 load("@chromium-luci//consoles.star", "consoles")
 load("@chromium-luci//gn_args.star", "gn_args")
@@ -25,6 +24,9 @@ ci.defaults.set(
     gardener_rotations = gardener_rotations.DAWN,
     contact_team_email = "chrome-gpu-infra@google.com",
     execution_timeout = ci_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     health_spec = health_spec.default(),
     # This property is read by the the dawn_top_of_tree gclient config and must
     # be set for branched builders in order to check out the appropriate branch.
@@ -110,7 +112,10 @@ gpu.ci.linux_builder(
             "gpu_dawn_common_isolated_scripts",
         ],
         mixins = [
+            "gpu-swarming-pool",
             "linux-jammy",
+            "no_gpu",
+            "x86-64",
         ],
     ),
     targets_settings = targets.settings(
@@ -142,7 +147,6 @@ gpu.ci.linux_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     gn_args = gn_args.config(
@@ -182,7 +186,6 @@ gpu.ci.linux_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     gn_args = gn_args.config(
@@ -196,7 +199,11 @@ gpu.ci.linux_builder(
             "x64",
         ],
     ),
-    targets = targets.bundle(),
+    targets = targets.bundle(
+        targets = [
+            "dawn_standalone_tests_compile_only",
+        ],
+    ),
     console_view_entry = consoles.console_view_entry(
         category = "DEPS|Linux|Builder",
         short_name = "x64",
@@ -225,7 +232,6 @@ gpu.ci.linux_builder(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     gn_args = gn_args.config(
@@ -267,7 +273,6 @@ gpu.ci.linux_builder(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-dawn-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -310,7 +315,6 @@ ci.thin_tester(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -395,7 +399,6 @@ ci.thin_tester(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -473,14 +476,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_compat_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "linux_intel_uhd_630_stable",
@@ -544,14 +546,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_compat_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "linux_nvidia_gtx_1660_stable",
@@ -566,64 +567,6 @@ ci.thin_tester(
         short_name = "x64",
     ),
     cq_mirrors_console_view = "mirrors",
-)
-
-gpu.ci.linux_builder(
-    name = "Dawn Linux TSAN Release",
-    description_html = "Runs ToT Dawn tests on stable Linux/NVIDIA GTX 1660 configs with TSan enabled",
-    builder_spec = builder_config.builder_spec(
-        gclient_config = builder_config.gclient_config(
-            config = "chromium",
-            apply_configs = [
-                "dawn_top_of_tree",
-            ],
-        ),
-        chromium_config = builder_config.chromium_config(
-            config = "chromium",
-            apply_configs = [
-                "mb",
-            ],
-            build_config = builder_config.build_config.RELEASE,
-            target_bits = 64,
-            target_platform = builder_config.target_platform.LINUX,
-        ),
-        build_gs_bucket = "chromium-dawn-archive",
-        run_tests_serially = True,
-    ),
-    gn_args = gn_args.config(
-        configs = [
-            "dawn_enable_opengles",
-            "tsan",
-            "release_try_builder",
-            "minimal_symbols",
-            "remoteexec",
-            "gpu_tests",
-            "linux",
-            "x64",
-        ],
-    ),
-    targets = targets.bundle(
-        # This bot doesn't run any browser-based tests
-        targets = [
-            "gpu_dawn_tsan_gtests",
-        ],
-        mixins = [
-            "linux_nvidia_gtx_1660_stable",
-        ],
-    ),
-    targets_settings = targets.settings(
-        os_type = targets.os_type.LINUX,
-        # This bot doesn't run any Telemetry-based tests so doesn't
-        # need the browser_config parameter.
-    ),
-    console_view_entry = consoles.console_view_entry(
-        category = "ToT|Linux|TSAN",
-        short_name = "x64",
-    ),
-    # Serially executed tests + TSAN = more than the default timeout needed in
-    # order to prevent build timeouts.
-    execution_timeout = 6 * time.hour,
-    siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CI,
 )
 
 gpu.ci.linux_builder(
@@ -648,7 +591,6 @@ gpu.ci.linux_builder(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     gn_args = gn_args.config(
@@ -691,7 +633,6 @@ gpu.ci.linux_builder(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-dawn-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -735,7 +676,6 @@ ci.thin_tester(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -821,7 +761,6 @@ ci.thin_tester(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -904,7 +843,6 @@ ci.thin_tester(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -974,6 +912,52 @@ ci.thin_tester(
 )
 
 ci.thin_tester(
+    name = "Dawn Android arm64 Release (Pixel 10)",
+    description_html = "Runs ToT Dawn tests on stable Pixel 10 configs",
+    parent = "ci/Dawn Android arm64 Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+            apply_configs = [
+                "android",
+                "dawn_top_of_tree",
+            ],
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "main_builder",
+            apply_configs = ["mb"],
+            build_config = builder_config.build_config.RELEASE,
+            target_arch = builder_config.target_arch.ARM,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.ANDROID,
+        ),
+        android_config = builder_config.android_config(
+            config = "base_config",
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        targets = [
+            "gpu_noop_sleep_telemetry_test",
+        ],
+        mixins = [
+            "has_native_resultdb_integration",
+            "gpu_pixel_10_stable",
+        ],
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.ANDROID_CHROMIUM,
+        os_type = targets.os_type.ANDROID,
+    ),
+    gardener_rotations = args.ignore_default(None),
+    console_view_entry = consoles.console_view_entry(
+        category = "ToT|Android",
+        short_name = "p10",
+    ),
+)
+
+ci.thin_tester(
     name = "Dawn Android arm64 Release (Samsung S24)",
     description_html = "Runs ToT Dawn tests on stable Samsung S24 configs",
     parent = "ci/Dawn Android arm64 Builder",
@@ -997,7 +981,6 @@ ci.thin_tester(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -1028,82 +1011,6 @@ ci.thin_tester(
     ),
 )
 
-gpu.ci.linux_builder(
-    name = "Dawn ChromeOS Skylab Release (volteer)",
-    description_html = "Runs ToT Dawn tests on Skylab-hosted volteer devices",
-    builder_spec = builder_config.builder_spec(
-        gclient_config = builder_config.gclient_config(
-            config = "chromium",
-            apply_configs = [
-                "chromeos",
-            ],
-        ),
-        chromium_config = builder_config.chromium_config(
-            config = "chromium",
-            apply_configs = [
-                "mb",
-            ],
-            build_config = builder_config.build_config.RELEASE,
-            target_arch = builder_config.target_arch.INTEL,
-            target_bits = 64,
-            target_platform = builder_config.target_platform.CHROMEOS,
-            target_cros_boards = [
-                "volteer",
-            ],
-        ),
-        run_tests_serially = True,
-        skylab_upload_location = builder_config.skylab_upload_location(
-            gs_bucket = "chromium-ci-skylab",
-            gs_extra = "chromeos_gpu",
-        ),
-    ),
-    gn_args = gn_args.config(
-        configs = [
-            "dawn_enable_opengles",
-            "gpu_tests",
-            "chromeos_device",
-            "volteer",
-            "ozone_headless",
-            "release_builder",
-            "try_builder",
-            "remoteexec",
-            "dcheck_off",
-            "no_symbols",
-            "is_skylab",
-            "chromeos",
-            "x64",
-        ],
-    ),
-    targets = targets.bundle(
-        targets = [
-            targets.bundle(
-                targets = [
-                    "dawn_chromeos_release_tests_volteer_skylab",
-                    "dawn_chromeos_release_telemetry_tests_volteer_skylab",
-                ],
-            ),
-        ],
-        additional_compile_targets = [
-            "chromiumos_preflight",
-        ],
-    ),
-    targets_settings = targets.settings(
-        browser_config = targets.browser_config.CROS_CHROME,
-        os_type = targets.os_type.CROS,
-        use_android_merge_script_by_default = False,
-        use_swarming = False,
-    ),
-    # TODO(crbug.com/40942991): This config is experimental and currently
-    # is too difficult for gardeners to keep green.
-    gardener_rotations = args.ignore_default(None),
-    console_view_entry = consoles.console_view_entry(
-        category = "ChromeOS|Intel",
-        short_name = "vlt",
-    ),
-    execution_timeout = 6 * time.hour,
-    siso_remote_jobs = siso.remote_jobs.HIGH_JOBS_FOR_CI,
-)
-
 ci.thin_tester(
     name = "Dawn Linux x64 Experimental Release (Intel UHD 630)",
     description_html = "Runs ToT Dawn tests on experimental Linux/Intel UHD 630 configs",
@@ -1122,7 +1029,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -1201,14 +1107,15 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
+        # If the experimental configuration is the same as stable, this should
+        # only be running 'gpu_noop_sleep_telemetry_test'. Otherwise, this
+        # should be running the same tests as 'Dawn LKinux x64 Release (NVIDIA
+        # GTX 1660)'.
         targets = [
-            "gpu_dawn_compat_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
+            "gpu_noop_sleep_telemetry_test",
         ],
         mixins = [
             "linux_nvidia_gtx_1660_experimental",
@@ -1220,10 +1127,10 @@ ci.thin_tester(
         os_type = targets.os_type.LINUX,
     ),
     # Uncomment this entry when this experimental tester is actually in use.
-    console_view_entry = consoles.console_view_entry(
-        category = "ToT|Linux|Nvidia",
-        short_name = "exp",
-    ),
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "ToT|Linux|Nvidia",
+    #     short_name = "exp",
+    # ),
     list_view = "chromium.gpu.experimental",
 )
 
@@ -1245,14 +1152,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_compat_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "linux_intel_uhd_630_stable",
@@ -1314,14 +1220,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_compat_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "linux_intel_uhd_770_stable",
@@ -1365,14 +1270,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_compat_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "linux_nvidia_gtx_1660_stable",
@@ -1408,7 +1312,6 @@ gpu.ci.mac_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1421,6 +1324,7 @@ gpu.ci.mac_builder(
             "mac",
         ],
     ),
+    targets = targets.bundle(),
     console_view_entry = consoles.console_view_entry(
         category = "ToT|Mac|Builder",
         short_name = "arm64",
@@ -1445,7 +1349,6 @@ gpu.ci.mac_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1458,8 +1361,11 @@ gpu.ci.mac_builder(
             "mac",
         ],
     ),
-    cores = None,
-    cpu = cpu.ARM64,
+    targets = targets.bundle(
+        targets = [
+            "dawn_standalone_tests_compile_only",
+        ],
+    ),
     console_view_entry = consoles.console_view_entry(
         category = "DEPS|Mac|Builder",
         short_name = "arm64",
@@ -1486,14 +1392,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "mac_arm64_apple_m2_retina_gpu_stable",
@@ -1531,7 +1436,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -1580,14 +1484,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "mac_arm64_apple_m2_retina_gpu_stable",
@@ -1623,7 +1526,6 @@ gpu.ci.mac_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     gn_args = gn_args.config(
@@ -1662,7 +1564,6 @@ gpu.ci.mac_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     gn_args = gn_args.config(
@@ -1676,7 +1577,11 @@ gpu.ci.mac_builder(
             "mac",
         ],
     ),
-    targets = targets.bundle(),
+    targets = targets.bundle(
+        targets = [
+            "dawn_standalone_tests_compile_only",
+        ],
+    ),
     console_view_entry = consoles.console_view_entry(
         category = "DEPS|Mac|Builder",
         short_name = "x64",
@@ -1706,14 +1611,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "mac_retina_amd_gpu_stable",
@@ -1761,14 +1665,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "mac_mini_intel_gpu_stable",
@@ -1815,7 +1718,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -1823,35 +1725,33 @@ ci.thin_tester(
         # the gpu_noop_sleep_telemetry_test test should be used. Otherwise, this
         # should have the same test_suites as 'Dawn Mac x64 Release (AMD)'.
         targets = [
-            "gpu_dawn_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
+            "gpu_noop_sleep_telemetry_test",
         ],
         mixins = [
             "limited_capacity_bot",
             "mac_retina_amd_gpu_experimental",
         ],
-        per_test_modifications = {
-            "webgpu_cts_dedicated_worker_tests": targets.remove(
-                reason = "We only need coverage on one GPU per OS, so remove from lower capacity configs.",
-            ),
-            "webgpu_cts_service_worker_tests": targets.remove(
-                reason = "We only need coverage on one GPU per OS, so remove from lower capacity configs.",
-            ),
-            "webgpu_cts_shared_worker_tests": targets.remove(
-                reason = "We only need coverage on one GPU per OS, so remove from lower capacity configs.",
-            ),
-        },
+        # per_test_modifications = {
+        #     "webgpu_cts_dedicated_worker_tests": targets.remove(
+        #         reason = "We only need coverage on one GPU per OS, so remove from lower capacity configs.",
+        #     ),
+        #     "webgpu_cts_service_worker_tests": targets.remove(
+        #         reason = "We only need coverage on one GPU per OS, so remove from lower capacity configs.",
+        #     ),
+        #     "webgpu_cts_shared_worker_tests": targets.remove(
+        #         reason = "We only need coverage on one GPU per OS, so remove from lower capacity configs.",
+        #     ),
+        # },
     ),
     targets_settings = targets.settings(
         browser_config = targets.browser_config.RELEASE,
         os_type = targets.os_type.MAC,
     ),
     # Uncomment this entry when this experimental tester is actually in use.
-    console_view_entry = consoles.console_view_entry(
-        category = "ToT|Mac|AMD",
-        short_name = "exp",
-    ),
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "ToT|Mac|AMD",
+    #     short_name = "exp",
+    # ),
     list_view = "chromium.gpu.experimental",
 )
 
@@ -1874,7 +1774,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -1882,9 +1781,9 @@ ci.thin_tester(
         # the gpu_noop_sleep_telemetry_test test should be used. Otherwise, this
         # should have the same test_suites as 'Dawn Mac x64 Release (Intel)'.
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "limited_capacity_bot",
@@ -1915,6 +1814,59 @@ ci.thin_tester(
 )
 
 ci.thin_tester(
+    name = "Dawn Mac x64 Release (AMD Radeon Pro 555X)",
+    description_html = "Runs ToT Dawn tests on 15\" 2019 Macbook Pros w/ AMD Radeon Pro 555X GPUs",
+    parent = "Dawn Mac x64 Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_arch = builder_config.target_arch.INTEL,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.MAC,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
+            "gpu_dawn_telemetry_tests",
+        ],
+        mixins = [
+            "limited_capacity_bot",
+            "mac_retina_amd_555x_gpu_stable",
+        ],
+        per_test_modifications = {
+            "webgpu_cts_dedicated_worker_tests": targets.remove(
+                reason = "We only need coverage on one GPU per OS, so remove from lower capacity configs.",
+            ),
+            "webgpu_cts_service_worker_tests": targets.remove(
+                reason = "We only need coverage on one GPU per OS, so remove from lower capacity configs.",
+            ),
+            "webgpu_cts_shared_worker_tests": targets.remove(
+                reason = "We only need coverage on one GPU per OS, so remove from lower capacity configs.",
+            ),
+        },
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE,
+        os_type = targets.os_type.MAC,
+    ),
+    console_view_entry = consoles.console_view_entry(
+        category = "ToT|Mac|AMD",
+        short_name = "555x",
+    ),
+)
+
+ci.thin_tester(
     name = "Dawn Mac x64 Release (AMD)",
     description_html = "Runs ToT Dawn tests on stable Mac/AMD Macbook Pro configs",
     parent = "Dawn Mac x64 Builder",
@@ -1933,14 +1885,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "mac_retina_amd_gpu_stable",
@@ -1986,14 +1937,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "mac_mini_intel_gpu_stable",
@@ -2041,7 +1991,6 @@ gpu.ci.windows_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -2087,44 +2036,18 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_webgpu_cts_asan",
-            "gpu_dawn_integration_asan_gtests_passthrough",
-            "gpu_dawn_asan_isolated_scripts",
         ],
         mixins = [
             "win10_intel_uhd_630_stable",
         ],
         per_test_modifications = {
-            "dawn_end2end_implicit_device_sync_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-            "dawn_end2end_no_dxc_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-            "dawn_end2end_skip_validation_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-            "dawn_end2end_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-            "dawn_end2end_wire_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
             "webgpu_cts_dedicated_worker_tests": targets.remove(
                 reason = "We only need coverage on one GPU per OS, so remove from lower capacity configs.",
             ),
@@ -2185,45 +2108,17 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_webgpu_cts_asan",
-            "gpu_dawn_integration_asan_gtests_passthrough",
-            "gpu_dawn_asan_isolated_scripts",
         ],
         mixins = [
             "win10_nvidia_gtx_1660_stable",
         ],
-        per_test_modifications = {
-            "dawn_end2end_implicit_device_sync_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-            "dawn_end2end_no_dxc_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-            "dawn_end2end_skip_validation_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-            "dawn_end2end_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-            "dawn_end2end_wire_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-        },
     ),
     targets_settings = targets.settings(
         browser_config = targets.browser_config.RELEASE_X64,
@@ -2260,7 +2155,6 @@ gpu.ci.windows_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     gn_args = gn_args.config(
@@ -2300,7 +2194,6 @@ gpu.ci.windows_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     gn_args = gn_args.config(
@@ -2315,7 +2208,11 @@ gpu.ci.windows_builder(
             "x64",
         ],
     ),
-    targets = targets.bundle(),
+    targets = targets.bundle(
+        targets = [
+            "dawn_standalone_tests_compile_only",
+        ],
+    ),
     console_view_entry = consoles.console_view_entry(
         category = "DEPS|Windows|Builder",
         short_name = "x64",
@@ -2344,7 +2241,6 @@ gpu.ci.windows_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -2359,6 +2255,9 @@ gpu.ci.windows_builder(
         ],
     ),
     targets = targets.bundle(
+        # TODO(crbug.com/452840618): Change this to just dawn_standalone_tests_compile_only
+        # once tests are enabled on Snapdragon X Elite devices in both Dawn and
+        # Chromium.
         additional_compile_targets = [
             "dawn_end2end_tests",
             "dawn_perf_tests",
@@ -2393,7 +2292,6 @@ gpu.ci.windows_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -2408,6 +2306,9 @@ gpu.ci.windows_builder(
         ],
     ),
     targets = targets.bundle(
+        # TODO(crbug.com/452840618): Change this to just dawn_standalone_tests_compile_only
+        # once tests are enabled on Snapdragon X Elite devices in both Dawn and
+        # Chromium.
         additional_compile_targets = [
             "dawn_end2end_tests",
             "dawn_perf_tests",
@@ -2421,6 +2322,58 @@ gpu.ci.windows_builder(
     console_view_entry = consoles.console_view_entry(
         category = "DEPS|Windows|Builder",
         short_name = "arm64",
+    ),
+)
+
+ci.thin_tester(
+    name = "Dawn Win11 arm64 DEPS Release (Qualcomm Snapdragon X Elite)",
+    description_html = "Runs DEPS-ed in Dawn tests on stable Windows 11/Qualcomm Snapdragon X Elite configs (Dell Latitude 7455)",
+    parent = "ci/Dawn Win11 arm64 DEPS Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.WIN,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
+            "gpu_dawn_telemetry_win_x64_tests",
+        ],
+        mixins = [
+            "win11_qualcomm_snapdragon_x_elite_stable",
+        ],
+        per_test_modifications = {
+            "gl_tests_passthrough": targets.mixin(
+                args = [
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/win.qualcomm.snapdragon_x_elite.gl_tests_passthrough.filter",
+                ],
+            ),
+            "gl_unittests": targets.mixin(
+                args = [
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/win.qualcomm.snapdragon_x_elite.gl_unittests.filter",
+                ],
+            ),
+        },
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE,
+        os_type = targets.os_type.WINDOWS,
+    ),
+    console_view_entry = consoles.console_view_entry(
+        category = "DEPS|Windows|arm64|Qualcomm",
+        short_name = "sdx",
     ),
 )
 
@@ -2445,14 +2398,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_win_x64_tests",
-            "gpu_dawn_integration_gtests_passthrough_win_x64",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "win10_intel_uhd_630_stable",
@@ -2508,14 +2460,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_win_x64_tests",
-            "gpu_dawn_integration_gtests_passthrough_win_x64",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "win10_nvidia_gtx_1660_stable",
@@ -2552,7 +2503,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -2618,14 +2568,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_win_x64_tests",
-            "gpu_dawn_integration_gtests_passthrough_win_x64",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "win10_intel_uhd_630_stable",
@@ -2679,7 +2628,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -2690,12 +2638,27 @@ ci.thin_tester(
         ],
         mixins = [
             "win10_intel_uhd_770_stable",
+            # TODO(b/400462723): Remove the limited_capacity_bot mixin once the
+            # issue with machines going offline is resolved.
+            "limited_capacity_bot",
         ],
         per_test_modifications = {
             "gl_tests_passthrough": targets.mixin(
                 args = [
                     "--test-launcher-filter-file=../../testing/buildbot/filters/win.uhd_770.gl_tests_passthrough.filter",
                 ],
+            ),
+            # TODO(crbug.com/453705239): Extra shards are needed here because UHD 770 bots are
+            # unexpectedly slow compared to UHD 630. Fix this and remove these modifications.
+            "dawn_end2end_validation_layers_tests": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 8,
+                ),
+            ),
+            "dawn_end2end_no_dxc_validation_layers_tests": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 8,
+                ),
             ),
         },
     ),
@@ -2729,7 +2692,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -2738,9 +2700,9 @@ ci.thin_tester(
         # should be running the same test_suites as
         # 'Dawn Win10 x64 Release (NVIDIA)'
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_win_x64_tests",
-            "gpu_dawn_integration_gtests_passthrough_win_x64",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "limited_capacity_bot",
@@ -2785,14 +2747,13 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_win_x64_tests",
-            "gpu_dawn_integration_gtests_passthrough_win_x64",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "win10_nvidia_gtx_1660_stable",
@@ -2829,7 +2790,6 @@ gpu.ci.windows_builder(
             target_bits = 32,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     gn_args = gn_args.config(
@@ -2868,7 +2828,6 @@ gpu.ci.windows_builder(
             target_bits = 32,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     gn_args = gn_args.config(
@@ -2882,7 +2841,11 @@ gpu.ci.windows_builder(
             "win",
         ],
     ),
-    targets = targets.bundle(),
+    targets = targets.bundle(
+        targets = [
+            "dawn_standalone_tests_compile_only",
+        ],
+    ),
     console_view_entry = consoles.console_view_entry(
         category = "DEPS|Windows|Builder",
         short_name = "x86",
@@ -2912,14 +2875,13 @@ ci.thin_tester(
             target_bits = 32,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests_fxc",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "win10_intel_uhd_630_stable",
@@ -2966,14 +2928,13 @@ ci.thin_tester(
             target_bits = 32,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests_fxc",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "win10_nvidia_gtx_1660_stable",
@@ -3016,7 +2977,6 @@ ci.thin_tester(
             target_bits = 32,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -3082,7 +3042,6 @@ ci.thin_tester(
             target_bits = 32,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
@@ -3137,14 +3096,13 @@ ci.thin_tester(
             target_bits = 32,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests_fxc",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "win10_intel_uhd_630_stable",
@@ -3189,14 +3147,13 @@ ci.thin_tester(
             target_bits = 32,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-dawn-archive",
         run_tests_serially = True,
     ),
     targets = targets.bundle(
         targets = [
+            "dawn_chromium_isolated_scripts",
+            "gpu_common_gtests_passthrough",
             "gpu_dawn_telemetry_tests_fxc",
-            "gpu_dawn_integration_gtests_passthrough",
-            "gpu_dawn_isolated_scripts",
         ],
         mixins = [
             "win10_nvidia_gtx_1660_stable",

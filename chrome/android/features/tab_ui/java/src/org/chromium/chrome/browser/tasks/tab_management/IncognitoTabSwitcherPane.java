@@ -14,10 +14,9 @@ import androidx.annotation.IntDef;
 
 import org.chromium.base.Callback;
 import org.chromium.base.CallbackController;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.supplier.OneshotSupplier;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.SettableNullableObservableSupplier;
 import org.chromium.build.annotations.EnsuresNonNullIf;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -49,6 +48,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
 import java.util.function.DoubleConsumer;
+import java.util.function.Supplier;
 
 /** A {@link Pane} representing the incognito tab switcher. */
 @NullMarked
@@ -58,6 +58,7 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
         TabCloseMethod.SWIPE,
         TabCloseMethod.TAB_LIST_EDITOR,
         TabCloseMethod.TAB_GRID_DIALOG,
+        TabCloseMethod.CLOSED_WHILE_REAUTH_VISIBLE,
         TabCloseMethod.OTHER,
     })
     @Retention(RetentionPolicy.CLASS)
@@ -65,7 +66,8 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
         int SWIPE = 0;
         int TAB_LIST_EDITOR = 1;
         int TAB_GRID_DIALOG = 2;
-        int OTHER = 3;
+        int CLOSED_WHILE_REAUTH_VISIBLE = 3;
+        int OTHER = 4;
     }
 
     private final IncognitoTabModelObserver mIncognitoTabModelObserver =
@@ -126,8 +128,6 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
     private final ResourceButtonData mReferenceButtonData;
     private final FullButtonData mEnabledNewTabButtonData;
     private final FullButtonData mDisabledNewTabButtonData;
-    private final ObservableSupplierImpl<Boolean> mHubSearchEnabledStateSupplier =
-            new ObservableSupplierImpl<>();
 
     private boolean mIsNativeInitialized;
     private int mLastClosedTabId;
@@ -156,11 +156,12 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
             @Nullable OneshotSupplier<IncognitoReauthController> incognitoReauthControllerSupplier,
             DoubleConsumer onToolbarAlphaChange,
             UserEducationHelper userEducationHelper,
-            ObservableSupplier<EdgeToEdgeController> edgeToEdgeSupplier,
-            ObservableSupplier<CompositorViewHolder> compositorViewHolderSupplier,
+            MonotonicObservableSupplier<EdgeToEdgeController> edgeToEdgeSupplier,
+            MonotonicObservableSupplier<CompositorViewHolder> compositorViewHolderSupplier,
             TabGroupCreationUiDelegate tabGroupCreationUiDelegate,
-            @Nullable ObservableSupplier<Boolean> xrSpaceModeObservableSupplier) {
+            @Nullable MonotonicObservableSupplier<Boolean> xrSpaceModeObservableSupplier) {
         super(
+                PaneId.INCOGNITO_TAB_SWITCHER,
                 context,
                 factory,
                 /* isIncognito= */ true,
@@ -171,6 +172,7 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
                 tabGroupCreationUiDelegate,
                 xrSpaceModeObservableSupplier);
 
+        mColorScheme = HubColorScheme.INCOGNITO;
         mIncognitoTabGroupModelFilterSupplier = incognitoTabGroupModelFilterSupplier;
         mLastClosedTabId = Tab.INVALID_TAB_ID;
 
@@ -209,16 +211,6 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
         } else {
             setNewTabButtonEnabledState(/* enabled= */ true);
         }
-    }
-
-    @Override
-    public @PaneId int getPaneId() {
-        return PaneId.INCOGNITO_TAB_SWITCHER;
-    }
-
-    @Override
-    public @HubColorScheme int getColorScheme() {
-        return HubColorScheme.INCOGNITO;
     }
 
     @Override
@@ -287,9 +279,7 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
 
         boolean isNotVisibleOrSelected =
                 !getIsVisibleSupplier().get() || !filter.getTabModel().isActiveModel();
-        boolean incognitoReauthShowing =
-                mIncognitoReauthController != null
-                        && mIncognitoReauthController.isIncognitoReauthPending();
+        boolean incognitoReauthShowing = isIncognitoReauthPending();
 
         if (isNotVisibleOrSelected || incognitoReauthShowing) {
             coordinator.resetWithListOfTabs(null);
@@ -318,10 +308,7 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
 
     @Override
     protected void requestAccessibilityFocusOnCurrentTab() {
-        if (mIncognitoReauthController != null
-                && mIncognitoReauthController.isReauthPageShowing()) {
-            return;
-        }
+        if (isIncognitoReauthShowing()) return;
 
         super.requestAccessibilityFocusOnCurrentTab();
     }
@@ -364,7 +351,7 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
     private IncognitoTabSwitcherPaneCleaner initIncognitoTabSwitcherPaneCleaner(
             TabSwitcherPaneCoordinator paneCoordinator) {
         @TabCloseMethod int finalTabCloseMethod = getFinalTabCloseMethod(paneCoordinator);
-        ObservableSupplier<Boolean> isAnimatingSupplier =
+        MonotonicObservableSupplier<Boolean> isAnimatingSupplier =
                 paneCoordinator.getIsRecyclerViewAnimatorRunning();
 
         Runnable cleanUpRunnable =
@@ -398,7 +385,9 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
         boolean isTabGridDialogVisible =
                 dialogShowingOrAnimationSupplier != null && dialogShowingOrAnimationSupplier.get();
 
-        if (wasClosedViaSwipe) {
+        if (isIncognitoReauthShowing()) {
+            return TabCloseMethod.CLOSED_WHILE_REAUTH_VISIBLE;
+        } else if (wasClosedViaSwipe) {
             return TabCloseMethod.SWIPE;
         } else if (wasClosedViaTabListEditor) {
             return TabCloseMethod.TAB_LIST_EDITOR;
@@ -422,9 +411,9 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
      * have finished.
      */
     private static class IncognitoTabSwitcherPaneCleaner {
-        private final @Nullable ObservableSupplier<Boolean> mIsAnimatingSupplier;
+        private final @Nullable MonotonicObservableSupplier<Boolean> mIsAnimatingSupplier;
         private final Callback<Boolean> mOnAnimationStatusChange = this::onAnimationStatusChange;
-        private final ObservableSupplierImpl<@Nullable DisplayButtonData>
+        private final SettableNullableObservableSupplier<DisplayButtonData>
                 mReferenceButtonDataSupplier;
         private final Runnable mCleanUpRunnable;
         private final @Nullable PaneHubController mController;
@@ -442,8 +431,8 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
          * @param finalTabCloseMethod How the final tab was closed.
          */
         public IncognitoTabSwitcherPaneCleaner(
-                @Nullable ObservableSupplier<Boolean> isAnimatingSupplier,
-                ObservableSupplierImpl<@Nullable DisplayButtonData> referenceButtonDataSupplier,
+                @Nullable MonotonicObservableSupplier<Boolean> isAnimatingSupplier,
+                SettableNullableObservableSupplier<DisplayButtonData> referenceButtonDataSupplier,
                 Runnable cleanUpRunnable,
                 @Nullable PaneHubController controller,
                 boolean isFocused,
@@ -495,6 +484,7 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
          *   <li>The final tab was closed via the tab list editor.
          *   <li>The final tab was closed via a swipe.
          *   <li>The tab grid dialog is visible.
+         *   <li>The incognito reauth screen is visible.
          * </ul>
          */
         @EnsuresNonNullIf(
@@ -526,7 +516,7 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
          * @param cleanUpRunnable Runnable to run when cleanup should occur.
          */
         public static void cleanUp(
-                ObservableSupplierImpl<@Nullable DisplayButtonData> referenceButtonDataSupplier,
+                SettableNullableObservableSupplier<DisplayButtonData> referenceButtonDataSupplier,
                 boolean isFocused,
                 @Nullable PaneHubController controller,
                 @Nullable Runnable cleanUpRunnable) {
@@ -541,8 +531,15 @@ public class IncognitoTabSwitcherPane extends TabSwitcherPaneBase {
         }
     }
 
-    @Override
-    public ObservableSupplier<Boolean> getHubSearchEnabledStateSupplier() {
-        return mHubSearchEnabledStateSupplier;
+    /** Returns whether the incognito reauth screen is showing. */
+    private boolean isIncognitoReauthShowing() {
+        return mIncognitoReauthController != null
+                && mIncognitoReauthController.isReauthPageShowing();
+    }
+
+    /** Returns whether the incognito reauth is pending the reauth screen may not be visible. */
+    private boolean isIncognitoReauthPending() {
+        return mIncognitoReauthController != null
+                && mIncognitoReauthController.isIncognitoReauthPending();
     }
 }

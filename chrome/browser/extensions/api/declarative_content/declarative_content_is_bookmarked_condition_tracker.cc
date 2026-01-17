@@ -4,15 +4,17 @@
 
 #include "chrome/browser/extensions/api/declarative_content/declarative_content_is_bookmarked_condition_tracker.h"
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/values.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "content/public/browser/web_contents.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/api/declarative/declarative_constants.h"
 #include "extensions/common/permissions/permissions_data.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -106,7 +108,7 @@ BookmarkAddedForUrl(const GURL& url) {
 
 void DeclarativeContentIsBookmarkedConditionTracker::PerWebContentsTracker::
 BookmarkRemovedForUrls(const std::set<GURL>& urls) {
-  if (base::Contains(urls, web_contents()->GetVisibleURL())) {
+  if (urls.contains(web_contents()->GetVisibleURL())) {
     is_url_bookmarked_ = false;
     request_evaluation_.Run(web_contents());
   }
@@ -195,7 +197,7 @@ void DeclarativeContentIsBookmarkedConditionTracker::TrackForWebContents(
 void DeclarativeContentIsBookmarkedConditionTracker::OnWebContentsNavigation(
     content::WebContents* contents,
     content::NavigationHandle* navigation_handle) {
-  DCHECK(base::Contains(per_web_contents_tracker_, contents));
+  DCHECK(per_web_contents_tracker_.contains(contents));
   per_web_contents_tracker_[contents]->UpdateState(true);
 }
 
@@ -267,7 +269,7 @@ void DeclarativeContentIsBookmarkedConditionTracker::
 void
 DeclarativeContentIsBookmarkedConditionTracker::DeletePerWebContentsTracker(
     content::WebContents* contents) {
-  DCHECK(base::Contains(per_web_contents_tracker_, contents));
+  DCHECK(per_web_contents_tracker_.contains(contents));
   per_web_contents_tracker_.erase(contents);
 }
 

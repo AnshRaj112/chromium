@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 
 import type {HistoryAppElement, HistoryEntry, HistoryItemElement, HistoryListElement, HistoryToolbarElement} from 'chrome://history/history.js';
-import {BrowserServiceImpl, CrRouter, ensureLazyLoaded} from 'chrome://history/history.js';
+import {BrowserServiceImpl, CrRouter} from 'chrome://history/history.js';
 import {webUIListenerCallback} from 'chrome://resources/js/cr.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {isMac} from 'chrome://resources/js/platform.js';
 import {PromiseResolver} from 'chrome://resources/js/promise_resolver.js';
 import {assertDeepEquals, assertEquals, assertFalse, assertGT, assertNotEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {pressAndReleaseKeyOn} from 'chrome://webui-test/keyboard_mock_interactions.js';
-import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 import {eventToPromise, microtasksFinished} from 'chrome://webui-test/test_util.js';
 
 import {TestBrowserService} from './test_browser_service.js';
@@ -67,12 +66,11 @@ suite('HistoryListTest', function() {
 
     element = app.$.history;
     toolbar = app.$.toolbar;
-    const queryManager = app.shadowRoot!.querySelector('history-query-manager');
+    const queryManager = app.shadowRoot.querySelector('history-query-manager');
     assertTrue(!!queryManager);
     queryManager.queryState = {...queryManager.queryState, incremental: true};
     return Promise.all([
       testService.handler.whenCalled('queryHistory'),
-      ensureLazyLoaded(),
       microtasksFinished(),
       eventToPromise('viewport-filled', element.$.infiniteList),
     ]);
@@ -95,7 +93,7 @@ suite('HistoryListTest', function() {
     element.dispatchEvent(new CustomEvent(
         'query-history', {detail: true, bubbles: true, composed: true}));
     await testService.handler.whenCalled('queryHistoryContinuation');
-    await flushTasks();
+    await microtasksFinished();
 
     assertFalse(element.isEmpty);
   });
@@ -111,7 +109,7 @@ suite('HistoryListTest', function() {
     await microtasksFinished();
     assertDeepEquals([true], getHistoryData().map(i => i.selected));
     toolbar.deleteSelectedItems();
-    await flushTasks();
+    await microtasksFinished();
     const dialog = element.$.dialog.get();
     assertTrue(dialog.open);
     testService.handler.resetResolver('queryHistory');
@@ -211,8 +209,7 @@ suite('HistoryListTest', function() {
   // See http://crbug.com/845802.
   test('DisablingCtrlAOnSyncedTabsPage', async function() {
     await finishSetup(TEST_HISTORY_RESULTS);
-    app.shadowRoot!.querySelector('history-router')!.selectedPage =
-        'syncedTabs';
+    app.shadowRoot.querySelector('history-router')!.selectedPage = 'syncedTabs';
     await microtasksFinished();
     const field = toolbar.$.mainToolbar.getSearchField();
     field.blur();
@@ -291,7 +288,7 @@ suite('HistoryListTest', function() {
     assertTrue(item.isCardStart);
     const heading =
         item.shadowRoot.querySelector<HTMLElement>(
-                           '#date-accessed')!.textContent!;
+                           '#date-accessed')!.textContent;
     const title = item.$.link;
 
     // Check that the card title displays the search term somewhere.
@@ -307,7 +304,7 @@ suite('HistoryListTest', function() {
     await finishSetup([]);
     await microtasksFinished();
     assertFalse(element.$.noResults.hidden);
-    assertNotEquals('', element.$.noResults.textContent!.trim());
+    assertNotEquals('', element.$.noResults.textContent.trim());
     assertTrue(element.$.infiniteList.hidden);
 
     testService.handler.setResultFor('queryHistory', Promise.resolve({
@@ -316,7 +313,7 @@ suite('HistoryListTest', function() {
     element.dispatchEvent(new CustomEvent(
         'query-history', {bubbles: true, composed: true, detail: false}));
     await testService.handler.whenCalled('queryHistory');
-    await flushTasks();
+    await microtasksFinished();
     assertTrue(element.$.noResults.hidden);
     assertFalse(element.$.infiniteList.hidden);
   });
@@ -365,8 +362,8 @@ suite('HistoryListTest', function() {
     await microtasksFinished();
 
     assertEquals(1, toolbar.count);
-    app.shadowRoot!.querySelector(
-                       'history-query-manager')!.queryState.incremental = false;
+    app.shadowRoot.querySelector(
+                      'history-query-manager')!.queryState.incremental = false;
 
     testService.handler.resetResolver('queryHistory');
     testService.handler.setResultFor('queryHistory', Promise.resolve({
@@ -647,7 +644,7 @@ suite('HistoryListTest', function() {
 
     testService.handler.resetResolver('queryHistory');
     webUIListenerCallback('history-deleted');
-    await flushTasks();
+    await microtasksFinished();
     assertEquals(0, testService.handler.getCallCount('queryHistory'));
   });
 

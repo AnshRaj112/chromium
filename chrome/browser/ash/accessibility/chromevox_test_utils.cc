@@ -29,20 +29,25 @@ ChromeVoxTestUtils::ChromeVoxTestUtils() {
 
 ChromeVoxTestUtils::~ChromeVoxTestUtils() = default;
 
-void ChromeVoxTestUtils::EnableChromeVox(bool check_for_intro) {
+void ChromeVoxTestUtils::EnableChromeVox(bool check_for_speech) {
   // Enable ChromeVox, disable earcons and wait for key mappings to be fetched.
   ASSERT_FALSE(AccessibilityManager::Get()->IsSpokenFeedbackEnabled());
   Profile* profile = GetProfile();
   console_observer_ = std::make_unique<ExtensionConsoleErrorObserver>(
       profile, extension_misc::kChromeVoxExtensionId);
-
   AccessibilityManager::Get()->EnableSpokenFeedback(true);
+
   if (::features::IsAccessibilityManifestV3EnabledForChromeVox()) {
-    // Watch events from an MV3 extension which runs in a service worker.
-    extensions::ExtensionRegistryTestHelper observer(
-        extension_misc::kChromeVoxExtensionId, profile);
-    ASSERT_EQ(3, observer.WaitForManifestVersion());
-    observer.WaitForServiceWorkerStart();
+    if (!profile->IsOffTheRecord()) {
+      // Watch events from an MV3 extension which runs in a service worker.
+      // Note: this class doesn't work with off the record profiles. For off
+      // the record profiles, we use the SpeechMonitor to signal that ChromeVox
+      // has loaded by waiting for text to speech to play.
+      extensions::ExtensionRegistryTestHelper observer(
+          extension_misc::kChromeVoxExtensionId, profile);
+      ASSERT_EQ(3, observer.WaitForManifestVersion());
+      observer.WaitForServiceWorkerStart();
+    }
   } else {
     // Watch events from an MV2 extension which runs in a background page.
     extensions::ExtensionHostTestHelper host_helper(
@@ -50,11 +55,16 @@ void ChromeVoxTestUtils::EnableChromeVox(bool check_for_intro) {
     host_helper.WaitForHostCompletedFirstLoad();
   }
 
-  sm()->ExpectSpeechPattern(
-      check_for_intro ? "ChromeVox spoken feedback is ready" : "*");
-  sm()->Call([this]() { GlobalizeModule("ChromeVox"); });
-  sm()->Call([this]() { DisableEarcons(); });
-  sm()->Call([this]() { WaitForReady(); });
+  if (check_for_speech) {
+    sm()->ExpectSpeechPattern("ChromeVox spoken feedback is ready");
+    sm()->Call([this]() { WaitForReady(); });
+    sm()->Call([this]() { GlobalizeModule("ChromeVox"); });
+    sm()->Call([this]() { DisableEarcons(); });
+  } else {
+    WaitForReady();
+    GlobalizeModule("ChromeVox");
+    DisableEarcons();
+  }
 }
 
 void ChromeVoxTestUtils::GlobalizeModule(const std::string& name) {
@@ -114,6 +124,26 @@ void ChromeVoxTestUtils::WaitForValidRange() {
         chrome.test.sendScriptResult('done');
       })()
   )JS");
+
+  RunJS(script);
+}
+
+void ChromeVoxTestUtils::WaitForPunctuationEcho(int punctuationEcho) {
+  std::string script = base::StringPrintf(R"JS(
+      (async function() {
+        const imports = TestImportManager.getImports();
+        const TtsBackground = imports.TtsBackground;
+        const pollFunction = () => {
+          if (TtsBackground.primary.getPunctuationEcho() !== %d) {
+            setTimeout(pollFunction, 100);
+          } else {
+            chrome.test.sendScriptResult('done');
+          }
+        };
+        setTimeout(pollFunction, 0);
+      })()
+    )JS",
+                                          punctuationEcho);
 
   RunJS(script);
 }

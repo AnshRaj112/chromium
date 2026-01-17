@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "storage/browser/blob/blob_memory_controller.h"
 
 #include <algorithm>
 #include <memory>
 #include <numeric>
 
+#include "base/byte_count.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/small_map.h"
+#include "base/containers/span.h"
 #include "base/feature_list.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
@@ -81,11 +77,12 @@ BlobStorageLimits CalculateBlobStorageLimitsImpl(
     bool disk_enabled,
     std::optional<uint64_t> optional_memory_size_for_testing) {
   int64_t disk_size = 0ull;
-  uint64_t memory_size = optional_memory_size_for_testing
-                             ? optional_memory_size_for_testing.value()
-                             : base::SysInfo::AmountOfPhysicalMemory();
+  uint64_t memory_size =
+      optional_memory_size_for_testing
+          ? optional_memory_size_for_testing.value()
+          : base::SysInfo::AmountOfPhysicalMemory().InBytesUnsigned();
   if (disk_enabled && CreateBlobDirectory(storage_dir) == base::File::FILE_OK)
-    disk_size = base::SysInfo::AmountOfTotalDiskSpace(storage_dir);
+    disk_size = base::SysInfo::AmountOfTotalDiskSpace(storage_dir).value_or(-1);
 
   BlobStorageLimits limits;
 
@@ -93,8 +90,7 @@ BlobStorageLimits CalculateBlobStorageLimitsImpl(
   if (memory_size > 0) {
 #if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_ANDROID) && \
     defined(ARCH_CPU_64_BITS)
-    constexpr size_t kTwoGigabytes = 2ull * 1024 * 1024 * 1024;
-    limits.max_blob_in_memory_space = kTwoGigabytes;
+    limits.max_blob_in_memory_space = base::GiB(2).InBytesUnsigned();
 #elif BUILDFLAG(IS_ANDROID)
     limits.max_blob_in_memory_space = static_cast<size_t>(memory_size / 100);
 #else
@@ -168,7 +164,7 @@ EmptyFilesResult CreateEmptyFiles(
                             kUnknownDiskAvailability);
   }
 
-  int64_t free_disk_space = disk_space_function(blob_storage_dir);
+  int64_t free_disk_space = disk_space_function(blob_storage_dir).value_or(-1);
 
   std::vector<FileCreationInfo> result;
   for (const base::FilePath& file_path : file_paths) {
@@ -213,7 +209,7 @@ std::pair<FileCreationInfo, int64_t> CreateFileAndWriteItems(
   if (creation_info.error != File::FILE_OK)
     return std::make_pair(std::move(creation_info), kUnknownDiskAvailability);
 
-  int64_t free_disk_space = disk_space_function(blob_storage_dir);
+  int64_t free_disk_space = disk_space_function(blob_storage_dir).value_or(-1);
 
   // Fail early instead of creating the files if we fill the disk.
   if (free_disk_space != kUnknownDiskAvailability &&
@@ -240,21 +236,20 @@ std::pair<FileCreationInfo, int64_t> CreateFileAndWriteItems(
 
   // Write data.
   file.SetLength(total_size_bytes);
-  int bytes_written = 0;
   for (const auto& item : data) {
-    size_t length = item.size();
-    size_t bytes_left = length;
-    while (bytes_left > 0) {
-      bytes_written = file.WriteAtCurrentPos(
-          reinterpret_cast<const char*>(item.data() + (length - bytes_left)),
-          base::saturated_cast<int>(bytes_left));
-      if (bytes_written < 0)
+    base::span<const uint8_t> bytes_left = item;
+    while (!bytes_left.empty()) {
+      const std::optional<size_t> bytes_written =
+          file.WriteAtCurrentPos(bytes_left);
+      if (!bytes_written) {
         break;
-      DCHECK_LE(static_cast<size_t>(bytes_written), bytes_left);
-      bytes_left -= bytes_written;
+      }
+      bytes_left = bytes_left.subspan(*bytes_written);
     }
-    if (bytes_written < 0)
+    if (!bytes_left.empty()) {
+      creation_info.error = File::FILE_ERROR_FAILED;
       break;
+    }
   }
   if (!file.Flush()) {
     file.Close();
@@ -264,9 +259,9 @@ std::pair<FileCreationInfo, int64_t> CreateFileAndWriteItems(
   }
 
   File::Info info;
-  bool success = file.GetInfo(&info);
-  creation_info.error =
-      bytes_written < 0 || !success ? File::FILE_ERROR_FAILED : File::FILE_OK;
+  if (!file.GetInfo(&info)) {
+    creation_info.error = File::FILE_ERROR_FAILED;
+  }
   creation_info.last_modified = info.last_modified;
   return std::make_pair(std::move(creation_info), disk_availability);
 }
@@ -551,10 +546,10 @@ BlobMemoryController::BlobMemoryController(
       disk_space_function_(&base::SysInfo::AmountOfFreeDiskSpace),
       populated_memory_items_(
           base::LRUCache<uint64_t, ShareableBlobDataItem*>::NO_AUTO_EVICT),
-      memory_pressure_listener_(
+      memory_pressure_listener_registration_(
           FROM_HERE,
-          base::BindRepeating(&BlobMemoryController::OnMemoryPressure,
-                              base::Unretained(this))) {}
+          base::MemoryPressureListenerTag::kBlobMemoryController,
+          this) {}
 
 BlobMemoryController::~BlobMemoryController() = default;
 
@@ -660,8 +655,7 @@ base::WeakPtr<QuotaAllocationTask> BlobMemoryController::ReserveMemoryQuota(
   if (total_bytes_needed <= GetAvailableMemoryForBlobs()) {
     GrantMemoryAllocations(&unreserved_memory_items,
                            static_cast<size_t>(total_bytes_needed));
-    MaybeScheduleEvictionUntilSystemHealthy(
-        base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE);
+    MaybeScheduleEvictionUntilSystemHealthy(base::MEMORY_PRESSURE_LEVEL_NONE);
     std::move(done_callback).Run(true);
     return base::WeakPtr<QuotaAllocationTask>();
   }
@@ -673,8 +667,7 @@ base::WeakPtr<QuotaAllocationTask> BlobMemoryController::ReserveMemoryQuota(
   auto weak_ptr =
       AppendMemoryTask(total_bytes_needed, std::move(unreserved_memory_items),
                        std::move(done_callback));
-  MaybeScheduleEvictionUntilSystemHealthy(
-      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE);
+  MaybeScheduleEvictionUntilSystemHealthy(base::MEMORY_PRESSURE_LEVEL_NONE);
   return weak_ptr;
 }
 
@@ -735,7 +728,7 @@ void BlobMemoryController::NotifyMemoryItemsUsed(
       continue;
     }
     // We don't want to re-add the item if we're currently paging it to disk.
-    if (base::Contains(items_paging_to_file_, item->item_id())) {
+    if (items_paging_to_file_.contains(item->item_id())) {
       return;
     }
     auto iterator = populated_memory_items_.Get(item->item_id());
@@ -745,8 +738,7 @@ void BlobMemoryController::NotifyMemoryItemsUsed(
       populated_memory_items_.Put(item->item_id(), item.get());
     }
   }
-  MaybeScheduleEvictionUntilSystemHealthy(
-      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE);
+  MaybeScheduleEvictionUntilSystemHealthy(base::MEMORY_PRESSURE_LEVEL_NONE);
 }
 
 void BlobMemoryController::CallWhenStorageLimitsAreKnown(
@@ -867,7 +859,7 @@ size_t BlobMemoryController::CollectItemsForEviction(
 }
 
 void BlobMemoryController::MaybeScheduleEvictionUntilSystemHealthy(
-    base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level) {
+    base::MemoryPressureLevel memory_pressure_level) {
   // Don't do eviction when others are happening, as we don't change our
   // pending_memory_quota_total_size_ value until after the paging files have
   // been written.
@@ -880,8 +872,7 @@ void BlobMemoryController::MaybeScheduleEvictionUntilSystemHealthy(
 
   size_t in_memory_limit = limits_.memory_limit_before_paging();
   uint64_t min_page_file_size = limits_.min_page_file_size;
-  if (memory_pressure_level !=
-      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE) {
+  if (memory_pressure_level != base::MEMORY_PRESSURE_LEVEL_NONE) {
     in_memory_limit = 0;
     // Use lower page file size to reduce using more memory for writing under
     // pressure.
@@ -987,19 +978,22 @@ void BlobMemoryController::OnEvictionComplete(
 
   // If we still have more blobs waiting and we're not waiting on more paging
   // operations, schedule more.
-  MaybeScheduleEvictionUntilSystemHealthy(
-      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE);
+  MaybeScheduleEvictionUntilSystemHealthy(base::MEMORY_PRESSURE_LEVEL_NONE);
 }
 
 void BlobMemoryController::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level) {
+    base::MemoryPressureLevel memory_pressure_level) {
+  // Nothing to do if no pressure.
+  if (memory_pressure_level == base::MEMORY_PRESSURE_LEVEL_NONE) {
+    return;
+  }
+
   // Under critical memory pressure the system is probably already swapping out
   // memory and making heavy use of IO. Adding to that is not desirable.
   // Furthermore, scheduling a task to write files to disk risks paging-in
   // memory that was already committed to disk which compounds the problem. Do
   // not take any action on critical memory pressure.
-  if (memory_pressure_level ==
-      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL) {
+  if (memory_pressure_level == base::MEMORY_PRESSURE_LEVEL_CRITICAL) {
     return;
   }
 

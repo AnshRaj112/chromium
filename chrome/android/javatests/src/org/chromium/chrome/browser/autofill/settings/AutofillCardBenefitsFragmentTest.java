@@ -59,7 +59,8 @@ import java.util.concurrent.TimeoutException;
 @Batch(Batch.PER_CLASS)
 @EnableFeatures({
     ChromeFeatureList.AUTOFILL_ENABLE_CARD_BENEFITS_FOR_AMERICAN_EXPRESS,
-    ChromeFeatureList.AUTOFILL_ENABLE_CARD_BENEFITS_FOR_BMO
+    ChromeFeatureList.AUTOFILL_ENABLE_CARD_BENEFITS_FOR_BMO,
+    ChromeFeatureList.AUTOFILL_ENABLE_FLAT_RATE_CARD_BENEFITS_FROM_CURINOS
 })
 public class AutofillCardBenefitsFragmentTest {
     @Rule public final AutofillTestRule mRule = new AutofillTestRule();
@@ -140,6 +141,7 @@ public class AutofillCardBenefitsFragmentTest {
     // Test to verify that the Preference screen is displayed and its title is visible as expected.
     @Test
     @MediumTest
+    @DisableFeatures(ChromeFeatureList.SETTINGS_MULTI_COLUMN)
     public void testCardBenefitsPreferenceScreen_shownWithTitle() throws Exception {
         SettingsActivity activity = mSettingsActivityTestRule.startSettingsActivity();
 
@@ -153,7 +155,8 @@ public class AutofillCardBenefitsFragmentTest {
     // visible as expected when benefit is enabled.
     @Test
     @MediumTest
-    public void testCardBenefitsPreferenceScreen_ToggleShownAndEnabled() throws Exception {
+    @DisableFeatures({ChromeFeatureList.AUTOFILL_ENABLE_NEW_CARD_BENEFITS_TOGGLE_TEXT})
+    public void testCardBenefitsPreferenceScreen_ToggleShownAndEnabled_FlagOff() throws Exception {
         // Initial state, card benefits is enabled by default.
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
@@ -171,6 +174,35 @@ public class AutofillCardBenefitsFragmentTest {
         assertEquals(
                 benefitTogglePreference.getSummary(),
                 activity.getString(R.string.autofill_settings_page_card_benefits_toggle_summary));
+        assertTrue(benefitTogglePreference.isEnabled());
+        assertTrue(benefitTogglePreference.isChecked());
+    }
+
+    // Test to verify that the enable benefits toggle is displays the new text
+    // when the `AUTOFILL_ENABLE_NEW_CARD_BENEFITS_TOGGLE_TEXT` flag is enabled.
+    @Test
+    @MediumTest
+    @EnableFeatures({ChromeFeatureList.AUTOFILL_ENABLE_NEW_CARD_BENEFITS_TOGGLE_TEXT})
+    public void testCardBenefitsPreferenceScreen_ToggleShownAndEnabled() throws Exception {
+        // Initial state, card benefits is enabled by default.
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    getPrefService().setBoolean(Pref.AUTOFILL_PAYMENT_CARD_BENEFITS, true);
+                });
+
+        SettingsActivity activity = mSettingsActivityTestRule.startSettingsActivity();
+
+        ChromeSwitchPreference benefitTogglePreference =
+                (ChromeSwitchPreference)
+                        getPreferenceScreen(activity).findPreference(PREF_KEY_ENABLE_CARD_BENEFIT);
+        assertEquals(
+                benefitTogglePreference.getTitle(),
+                activity.getString(R.string.autofill_settings_page_card_benefits_label));
+        assertEquals(
+                benefitTogglePreference.getSummary(),
+                activity.getString(
+                        R.string
+                                .autofill_settings_page_card_benefits_toggle_summary_with_issuer_terms_apply_text));
         assertTrue(benefitTogglePreference.isEnabled());
         assertTrue(benefitTogglePreference.isChecked());
     }
@@ -258,6 +290,8 @@ public class AutofillCardBenefitsFragmentTest {
     // text for issuer terms, and card icon.
     @Test
     @MediumTest
+    // TODO(crbug.com/433576895): Re-enable containment feature once the test is fixed.
+    @DisableFeatures(ChromeFeatureList.ANDROID_SETTINGS_CONTAINMENT)
     public void testCardBenefitsPreferenceScreen_displayNetworkAndTerm() throws Exception {
         mAutofillTestHelper.addServerCreditCard(SAMPLE_CARD_AMERICAN_EXPRESS_WITH_BENEFIT);
 

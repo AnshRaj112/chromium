@@ -12,6 +12,7 @@
 #include "content/public/browser/web_contents.h"
 
 #if BUILDFLAG(ENABLE_GLIC)
+#include "chrome/browser/glic/public/glic_keyed_service.h"
 #include "chrome/browser/glic/public/glic_keyed_service_factory.h"
 #endif
 
@@ -30,6 +31,7 @@ GlicNudgeController::~GlicNudgeController() = default;
 void GlicNudgeController::UpdateNudgeLabel(
     content::WebContents* web_contents,
     const std::string& nudge_label,
+    std::optional<std::string> prompt_suggestion,
     std::optional<GlicNudgeActivity> activity,
     GlicNudgeActivityCallback callback) {
   auto* const tab_interface =
@@ -52,12 +54,27 @@ void GlicNudgeController::UpdateNudgeLabel(
     return;
   }
 
+  if (activity &&
+      (activity == tabs::GlicNudgeActivity::
+                       kNudgeIgnoredOpenedContextualTasksSidePanel ||
+       activity == tabs::GlicNudgeActivity::
+                       kNudgeIgnoredOmniboxContextMenuInteraction) &&
+      delegate_ && delegate_->GetIsShowingGlicNudge()) {
+    delegate_->OnHideGlicNudgeUI();
+    OnNudgeActivity(*activity);
+    return;
+  }
+
   nudge_activity_callback_ = callback;
   PrefService* const pref_service =
       browser_window_interface_->GetProfile()->GetPrefs();
   if (pref_service->GetBoolean(glic::prefs::kGlicPinnedToTabstrip)) {
     if (delegate_) {
-      delegate_->OnTriggerGlicNudgeUI(nudge_label);
+      if (nudge_label.empty() && delegate_->GetIsShowingGlicNudge()) {
+        delegate_->OnHideGlicNudgeUI();
+      } else {
+        delegate_->OnTriggerGlicNudgeUI(nudge_label);
+      }
     }
   }
 
@@ -67,6 +84,8 @@ void GlicNudgeController::UpdateNudgeLabel(
   } else {
     OnNudgeActivity(tabs::GlicNudgeActivity::kNudgeShown);
   }
+
+  prompt_suggestion_ = prompt_suggestion;
 }
 
 void GlicNudgeController::OnNudgeActivity(GlicNudgeActivity activity) {
@@ -84,7 +103,7 @@ void GlicNudgeController::OnNudgeActivity(GlicNudgeActivity activity) {
       auto* profile = browser_window_interface_->GetProfile();
       auto* glic_service =
           glic::GlicKeyedServiceFactory::GetGlicKeyedService(profile);
-      glic_service->TryPreloadFre();
+      glic_service->TryPreloadFre(glic::GlicPrewarmingFreSource::kNudge);
 #endif
       nudge_activity_callback_.Run(GlicNudgeActivity::kNudgeShown);
       scoped_window_call_to_action_ptr =
@@ -95,6 +114,8 @@ void GlicNudgeController::OnNudgeActivity(GlicNudgeActivity activity) {
     case GlicNudgeActivity::kNudgeDismissed:
     case GlicNudgeActivity::kNudgeIgnoredActiveTabChanged:
     case GlicNudgeActivity::kNudgeIgnoredNavigation:
+    case GlicNudgeActivity::kNudgeIgnoredOpenedContextualTasksSidePanel:
+    case GlicNudgeActivity::kNudgeIgnoredOmniboxContextMenuInteraction:
       nudge_activity_callback_.Run(activity);
       nudge_activity_callback_.Reset();
       scoped_window_call_to_action_ptr.reset();
@@ -115,7 +136,7 @@ void GlicNudgeController::SetNudgeActivityCallbackForTesting() {
 void GlicNudgeController::OnActiveTabChanged(
     BrowserWindowInterface* browser_interface) {
   if (delegate_ && delegate_->GetIsShowingGlicNudge()) {
-    delegate_->OnTriggerGlicNudgeUI(std::string());
+    delegate_->OnHideGlicNudgeUI();
     OnNudgeActivity(tabs::GlicNudgeActivity::kNudgeIgnoredActiveTabChanged);
   }
 }

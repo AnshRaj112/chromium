@@ -1,7 +1,7 @@
 Name: Transition
 Short Name: transition
-URL: https://developer.android.com/jetpack/androidx/releases/transition#1.7.0-SNAPSHOT
-Version: 1.7.0-SNAPSHOT
+URL: https://dl.google.com/dl/android/maven2/androidx/transition/transition/1.7.0/transition-1.7.0.aar
+Version: 1.7.0
 Update Mechanism: Autoroll
 License: Apache-2.0
 License File: LICENSE
@@ -12,6 +12,9 @@ License Android Compatible: yes
 
 Description:
 Android Transition Support Library
+
+See also: https://developer.android.com/jetpack/androidx/releases/transition#1.7.0
+
 
 Local Modifications:
 No modifications.

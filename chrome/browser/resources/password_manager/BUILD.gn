@@ -50,11 +50,11 @@ build_webui("build") {
     "checkup_details_section.ts",
     "checkup_list_item.ts",
     "checkup_section.ts",
+    "credential_details/backup_password_details_card.ts",
     "credential_details/credential_field.ts",
     "credential_details/credential_note.ts",
     "credential_details/passkey_details_card.ts",
     "credential_details/password_details_card.ts",
-    "credential_details/backup_password_details_card.ts",
     "dialogs/add_password_dialog.ts",
     "dialogs/auth_timed_out_dialog.ts",
     "dialogs/delete_passkey_dialog.ts",
@@ -66,6 +66,7 @@ build_webui("build") {
     "dialogs/move_single_password_dialog.ts",
     "dialogs/multi_store_delete_password_dialog.ts",
     "dialogs/password_preview_item.ts",
+    "dialogs/remove_actor_login_permission_dialog.ts",
     "full_data_reset.ts",
     "password_change_details.ts",
     "password_details_section.ts",
@@ -146,6 +147,7 @@ build_webui("build") {
             "$root_gen_dir/chrome/browser/resources/settings_shared/tsc/*",
             target_gen_dir) ]
 
+  eslint_enable_web_component_missing_deps = true
   webui_context_type = "trusted"
   optimize = optimize_webui
   if (optimize) {

@@ -8,20 +8,30 @@
 
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_dir.h"
-#include "base/strings/string_util_internal.h"
+#include "base/strings/string_util.h"
 #include "base/test/bind.h"
+#include "base/test/gmock_expected_support.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "base/test/test_future.h"
 #include "base/types/expected.h"
+#include "components/unexportable_keys/background_task_origin.h"
 #include "components/unexportable_keys/unexportable_key_service.h"
 #include "components/unexportable_keys/unexportable_key_service_impl.h"
 #include "components/unexportable_keys/unexportable_key_task_manager.h"
 #include "crypto/scoped_fake_unexportable_key_provider.h"
 #include "crypto/unexportable_key.h"
+#include "net/base/features.h"
 #include "net/base/schemeful_site.h"
 #include "net/device_bound_sessions/proto/storage.pb.h"
+#include "net/device_bound_sessions/session.h"
+#include "net/device_bound_sessions/session_params.h"
+#include "net/device_bound_sessions/session_store.h"
 #include "net/dns/public/secure_dns_mode.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "url/gurl.h"
+
+using base::test::ErrorIs;
 
 namespace net::device_bound_sessions {
 
@@ -31,6 +41,8 @@ constexpr crypto::SignatureVerifier::SignatureAlgorithm
     kAcceptableAlgorithms[] = {crypto::SignatureVerifier::ECDSA_SHA256};
 constexpr unexportable_keys::BackgroundTaskPriority kTaskPriority =
     unexportable_keys::BackgroundTaskPriority::kUserBlocking;
+constexpr unexportable_keys::BackgroundTaskOrigin kTaskOrigin =
+    unexportable_keys::BackgroundTaskOrigin::kDeviceBoundSessionCredentials;
 
 unexportable_keys::UnexportableKeyId GenerateNewKey(
     unexportable_keys::UnexportableKeyService& key_service) {
@@ -47,7 +59,7 @@ unexportable_keys::UnexportableKeyId GenerateNewKey(
 
 std::vector<uint8_t> GetWrappedKey(
     unexportable_keys::UnexportableKeyService& key_service,
-    const unexportable_keys::UnexportableKeyId& key_id) {
+    unexportable_keys::UnexportableKeyId key_id) {
   unexportable_keys::ServiceErrorOr<std::vector<uint8_t>> wrapped_key =
       key_service.GetWrappedKey(key_id);
   CHECK(wrapped_key.has_value());
@@ -70,7 +82,7 @@ std::unique_ptr<Session> CreateSessionHelper(
     const std::string& origin = "https://foo.test") {
   SessionParams::Scope scope;
   scope.origin = origin;
-  std::string cookie_attr = "Secure; Domain=" + GURL(url_string).host();
+  std::string cookie_attr = "Secure; Domain=" + GURL(url_string).GetHost();
   std::vector<SessionParams::Credential> cookie_credentials(
       {SessionParams::Credential{"test_cookie", cookie_attr}});
   SessionParams params{session_id,
@@ -126,10 +138,7 @@ SessionStore::SessionsMap CreateAndSaveSessions(
 
 class SessionStoreImplTest : public testing::Test {
  public:
-  SessionStoreImplTest()
-      : unexportable_key_service_(unexportable_key_task_manager_) {
-    EXPECT_TRUE(temp_dir_.CreateUniqueTempDir());
-  }
+  SessionStoreImplTest() { EXPECT_TRUE(temp_dir_.CreateUniqueTempDir()); }
 
   ~SessionStoreImplTest() override = default;
 
@@ -200,13 +209,17 @@ class SessionStoreImplTest : public testing::Test {
     run_loop.Run();
   }
 
+ protected:
+  base::test::ScopedFeatureList feature_list_;
+
  private:
   base::test::TaskEnvironment task_environment_;
   base::ScopedTempDir temp_dir_;
   crypto::ScopedFakeUnexportableKeyProvider scoped_key_provider_;
-  unexportable_keys::UnexportableKeyTaskManager unexportable_key_task_manager_{
+  unexportable_keys::UnexportableKeyTaskManager unexportable_key_task_manager_;
+  unexportable_keys::UnexportableKeyServiceImpl unexportable_key_service_{
+      unexportable_key_task_manager_, kTaskOrigin,
       crypto::UnexportableKeyProvider::Config()};
-  unexportable_keys::UnexportableKeyServiceImpl unexportable_key_service_;
   std::unique_ptr<SessionStoreImpl> store_;
 };
 
@@ -239,8 +252,8 @@ TEST_F(SessionStoreImplTest, RequireDBInit) {
 
   // Verify that restore session binding key call fails.
   RestoreSessionBindingKey(site, session.get());
-  EXPECT_TRUE(session->unexportable_key_id() ==
-              base::unexpected(unexportable_keys::ServiceError::kKeyNotFound));
+  EXPECT_THAT(session->unexportable_key_id(),
+              ErrorIs(unexportable_keys::ServiceError::kKeyNotFound));
 }
 
 TEST_F(SessionStoreImplTest, RequireValidBindingKeyForSave) {
@@ -322,8 +335,8 @@ TEST_F(SessionStoreImplTest, HandleNonexistingSite) {
   // an entry for the associated site.
   RestoreSessionBindingKey(site, session.get());
   EXPECT_EQ(store().GetAllSessions().size(), 0u);
-  EXPECT_TRUE(session->unexportable_key_id() ==
-              base::unexpected(unexportable_keys::ServiceError::kKeyNotFound));
+  EXPECT_THAT(session->unexportable_key_id(),
+              ErrorIs(unexportable_keys::ServiceError::kKeyNotFound));
 }
 
 TEST_F(SessionStoreImplTest, HandleNonexistingSession) {
@@ -347,8 +360,8 @@ TEST_F(SessionStoreImplTest, HandleNonexistingSession) {
   // Try to restore the unsaved session's binding key.
   RestoreSessionBindingKey(site, session2.get());
   EXPECT_EQ(store().GetAllSessions().size(), 1u);
-  EXPECT_TRUE(session2->unexportable_key_id() ==
-              base::unexpected(unexportable_keys::ServiceError::kKeyNotFound));
+  EXPECT_THAT(session2->unexportable_key_id(),
+              ErrorIs(unexportable_keys::ServiceError::kKeyNotFound));
 }
 
 TEST_F(SessionStoreImplTest, DeleteSessions) {
@@ -407,12 +420,61 @@ TEST_F(SessionStoreImplTest, LoadSavedSessions) {
   MimicRestart();
 
   SessionStore::SessionsMap loaded_sessions = LoadSessions();
+  EXPECT_FALSE(loaded_sessions.empty());
   // Restore the binding keys in the store session objects.
   for (auto& [key, session] : loaded_sessions) {
     RestoreSessionBindingKey(key.site, session.get());
   }
 
   EXPECT_TRUE(SessionMapsAreEqual(saved_sessions, loaded_sessions));
+}
+
+TEST_F(SessionStoreImplTest, DropLowerSchemaVersionSessions) {
+  feature_list_.InitAndEnableFeatureWithParameters(
+      features::kDeviceBoundSessions,
+      {{features::kDeviceBoundSessionsSchemaVersion.name, "1"}});
+  CreateStoreAndLoadSessions();
+  SessionCfgList cfgs = {
+      {"https://a.foo.test/index.html", "session0", "https://foo.test"},
+      {"https://b.foo.test/index.html", "session1", "https://foo.test"},
+      {"https://c.bar.test/index.html", "session2", "https://bar.test"},
+  };
+
+  SessionStore::SessionsMap saved_sessions =
+      CreateAndSaveSessions(cfgs, unexportable_key_service(), store());
+
+  feature_list_.Reset();
+  feature_list_.InitAndEnableFeatureWithParameters(
+      features::kDeviceBoundSessions,
+      {{features::kDeviceBoundSessionsSchemaVersion.name, "2"}});
+  MimicRestart();
+
+  SessionStore::SessionsMap loaded_sessions = LoadSessions();
+  EXPECT_TRUE(loaded_sessions.empty());
+}
+
+TEST_F(SessionStoreImplTest, DropHigherSchemaVersionSessions) {
+  feature_list_.InitAndEnableFeatureWithParameters(
+      features::kDeviceBoundSessions,
+      {{features::kDeviceBoundSessionsSchemaVersion.name, "2"}});
+  CreateStoreAndLoadSessions();
+  SessionCfgList cfgs = {
+      {"https://a.foo.test/index.html", "session0", "https://foo.test"},
+      {"https://b.foo.test/index.html", "session1", "https://foo.test"},
+      {"https://c.bar.test/index.html", "session2", "https://bar.test"},
+  };
+
+  SessionStore::SessionsMap saved_sessions =
+      CreateAndSaveSessions(cfgs, unexportable_key_service(), store());
+
+  feature_list_.Reset();
+  feature_list_.InitAndEnableFeatureWithParameters(
+      features::kDeviceBoundSessions,
+      {{features::kDeviceBoundSessionsSchemaVersion.name, "1"}});
+  MimicRestart();
+
+  SessionStore::SessionsMap loaded_sessions = LoadSessions();
+  EXPECT_TRUE(loaded_sessions.empty());
 }
 
 TEST_F(SessionStoreImplTest, PruneLoadedEntryWithInvalidSite) {

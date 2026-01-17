@@ -25,7 +25,6 @@
 #include "ash/wm/wm_metrics.h"
 #include "base/check_op.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/time/time.h"
@@ -109,7 +108,7 @@ int NumRootWindowsInSplitViewRecording() {
 }
 
 bool InTabletMode() {
-  return display::Screen::GetScreen()->InTabletMode();
+  return display::Screen::Get()->InTabletMode();
 }
 
 bool TopTwoVisibleWindowsBothSnapped(
@@ -202,7 +201,7 @@ SplitViewMetricsController::SplitViewMetricsController(
   aura::Env::GetInstance()->AddObserver(this);
 
   const display::Display display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(
+      display::Screen::Get()->GetDisplayNearestWindow(
           split_view_controller->root_window());
   orientation_ = GetDeviceOrientation(display);
   ResetTimeAndCounter();
@@ -299,7 +298,7 @@ void SplitViewMetricsController::OnWindowParentChanged(aura::Window* window,
   if (parent && desks_util::IsDeskContainer(parent)) {
     if (parent->GetId() != current_desk_->container_id()) {
       RemoveObservedWindow(window);
-    } else if (base::Contains(no_state_observed_windows_, window)) {
+    } else if (no_state_observed_windows_.contains(window)) {
       WindowState::Get(window)->AddObserver(this);
       no_state_observed_windows_.erase(window);
     }
@@ -425,7 +424,7 @@ void SplitViewMetricsController::OnWindowInitialized(aura::Window* window) {
   // Note: The display id saved in window_info has no value. Need to use the
   // restore bounds/
   if (!window_info->current_bounds.has_value() ||
-      !display::Screen::GetScreen()
+      !display::Screen::Get()
            ->GetDisplayNearestWindow(split_view_controller_->root_window())
            .work_area()
            .Contains(window_info->current_bounds.value())) {
@@ -525,7 +524,7 @@ void SplitViewMetricsController::StopRecordSplitViewMetrics() {
 }
 
 bool SplitViewMetricsController::IsObservingWindow(aura::Window* window) const {
-  return base::Contains(observed_windows_, window);
+  return std::ranges::contains(observed_windows_, window);
 }
 
 void SplitViewMetricsController::AddObservedWindow(aura::Window* window) {

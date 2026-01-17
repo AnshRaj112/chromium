@@ -38,6 +38,7 @@
 #include "gpu/ipc/service/gpu_watchdog_thread.h"
 #include "gpu/ipc/service/image_transport_surface.h"
 #include "ipc/ipc_mojo_bootstrap.h"
+#include "third_party/perfetto/include/perfetto/tracing/track_event_args.h"
 #include "ui/gl/gl_bindings.h"
 #include "ui/gl/gl_context.h"
 #include "ui/gl/gl_implementation.h"
@@ -83,9 +84,7 @@ class DevToolsChannelData : public base::trace_event::ConvertableToTraceFormat {
   ~DevToolsChannelData() override = default;
 
   void AppendAsTraceFormat(std::string* out) const override {
-    std::string tmp;
-    base::JSONWriter::Write(value_, &tmp);
-    *out += tmp;
+    *out += base::WriteJson(value_).value_or("");
   }
 
  private:
@@ -101,6 +100,18 @@ DevToolsChannelData::CreateForChannel(GpuChannel* channel) {
   return base::WrapUnique(new DevToolsChannelData(base::Value(std::move(res))));
 }
 
+bool IsStateful(const mojom::ContextCreationAttribs& attribs) {
+  switch (attribs.which()) {
+    case mojom::ContextCreationAttribs::Tag::kWebgpu:
+      return true;
+    case mojom::ContextCreationAttribs::Tag::kGles:
+      return attribs.get_gles()->context_type == CONTEXT_TYPE_WEBGL1 ||
+             attribs.get_gles()->context_type == CONTEXT_TYPE_WEBGL2;
+    case mojom::ContextCreationAttribs::Tag::kRaster:
+      return false;
+  }
+}
+
 }  // namespace
 
 CommandBufferStub::CommandBufferStub(
@@ -111,7 +122,6 @@ CommandBufferStub::CommandBufferStub(
     int32_t stream_id,
     int32_t route_id)
     : channel_(channel),
-      context_type_(init_params.attribs.context_type),
       active_url_(init_params.active_url),
       context_label_(init_params.label),
       initialized_(false),
@@ -125,7 +135,8 @@ CommandBufferStub::CommandBufferStub(
       route_id_(route_id),
       last_flush_id_(0),
       previous_processed_num_(0),
-      wait_set_get_buffer_count_(0) {
+      wait_set_get_buffer_count_(0),
+      has_stateful_context_(IsStateful(*init_params.attribs)) {
   process_delayed_work_timer_.SetTaskRunner(channel_->task_runner());
 }
 
@@ -475,10 +486,8 @@ void CommandBufferStub::OnAsyncFlush(
 
   const uint64_t global_flush_id =
       GlobalFlushTracingId(channel_->client_id(), flush_id);
-  TRACE_EVENT_WITH_FLOW0(
-      "gpu,toplevel.flow", "CommandBuffer::Flush",
-      TRACE_ID_WITH_SCOPE("CommandBuffer::Flush", global_flush_id),
-      TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT);
+  TRACE_EVENT("gpu,toplevel.flow", "CommandBuffer::Flush",
+              perfetto::Flow::Global(global_flush_id, "CommandBuffer::Flush"));
 
   TRACE_EVENT1("gpu", "CommandBufferStub::OnAsyncFlush", "put_offset",
                put_offset);
@@ -505,10 +514,9 @@ void CommandBufferStub::OnAsyncFlush(
 #endif
 
   if (!HasUnprocessedCommands()) {
-    TRACE_EVENT_WITH_FLOW0(
-        "gpu,toplevel.flow", "CommandBuffer::FlushComplete",
-        TRACE_ID_WITH_SCOPE("CommandBuffer::Flush", global_flush_id),
-        TRACE_EVENT_FLAG_FLOW_IN);
+    TRACE_EVENT("gpu,toplevel.flow", "CommandBuffer::FlushComplete",
+                perfetto::TerminatingFlow::Global(global_flush_id,
+                                                  "CommandBuffer::Flush"));
   }
 }
 

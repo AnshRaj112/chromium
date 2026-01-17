@@ -11,7 +11,6 @@
 #include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "base/time/time.h"
 #include "build/buildflag.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/profiles/profile_picker.h"
@@ -25,7 +24,7 @@
 #include "ui/views/view.h"
 #include "ui/views/widget/widget_delegate.h"
 
-class ProfilePickerDiceSignInToolbar;
+class ProfilePickerSignInToolbar;
 class Profile;
 class ScopedProfileKeepAlive;
 class ProfileManagementFlowController;
@@ -92,6 +91,7 @@ class ProfilePickerView : public views::WidgetDelegateView,
   void WindowClosing() override;
   views::ClientView* CreateClientView(views::Widget* widget) override;
   views::View* GetContentsView() override;
+  void Layout(PassKey) override;
   std::u16string GetAccessibleWindowTitle() const override;
   gfx::Size CalculatePreferredSize(
       const views::SizeBounds& available_size) const override;
@@ -187,8 +187,8 @@ class ProfilePickerView : public views::WidgetDelegateView,
 
   // Switches the layout to the sign-in screen (and creates a new profile or
   // load an existing one based on the `profile_info` content).
-  void SwitchToDiceSignIn(ProfilePicker::ProfileInfo profile_info,
-                          StepSwitchFinishedCallback switch_finished_callback);
+  void SwitchToSignIn(ProfilePicker::ProfileInfo profile_info,
+                      StepSwitchFinishedCallback switch_finished_callback);
 
   // Switches the profile picker layout to display the reauth page to the main
   // account of the given `profile` if needed. On success the `profile` is
@@ -262,13 +262,9 @@ class ProfilePickerView : public views::WidgetDelegateView,
 
   // Toolbar view displayed on top of the WebView for GAIA sign-in, owned by the
   // view hierarchy.
-  raw_ptr<ProfilePickerDiceSignInToolbar> toolbar_ = nullptr;
+  raw_ptr<ProfilePickerSignInToolbar> toolbar_ = nullptr;
 
   std::unique_ptr<ProfileManagementFlowController> flow_controller_;
-
-  // Creation time of the picker, to measure performance on startup. Only set
-  // when the picker is shown on startup.
-  base::TimeTicks creation_time_on_startup_;
 
   // Manages IPH promos displayed through the Profile Picker.
   std::unique_ptr<ProfilePickerFeaturePromoController> feature_promo_;

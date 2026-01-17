@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include <stddef.h>
 #include <stdint.h>
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <tuple>
 #include <vector>
 
+#include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/files/file.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -207,14 +205,14 @@ TEST_F(SQLiteFeaturesTest, Mmap) {
   {
     base::File f(db_path_, kFlags);
     ASSERT_TRUE(f.IsValid());
-    memset(buf, '0', sizeof(buf));
-    ASSERT_EQ(f.Write(0*sizeof(buf), buf, sizeof(buf)), (int)sizeof(buf));
+    std::ranges::fill(buf, '0');
+    ASSERT_TRUE(f.WriteAndCheck(0 * sizeof(buf), base::as_byte_span(buf)));
 
-    memset(buf, '1', sizeof(buf));
-    ASSERT_EQ(f.Write(1*sizeof(buf), buf, sizeof(buf)), (int)sizeof(buf));
+    std::ranges::fill(buf, '1');
+    ASSERT_TRUE(f.WriteAndCheck(1 * sizeof(buf), base::as_byte_span(buf)));
 
-    memset(buf, '2', sizeof(buf));
-    ASSERT_EQ(f.Write(2*sizeof(buf), buf, sizeof(buf)), (int)sizeof(buf));
+    std::ranges::fill(buf, '2');
+    ASSERT_TRUE(f.WriteAndCheck(2 * sizeof(buf), base::as_byte_span(buf)));
   }
 
   // mmap the file and verify that everything looks right.
@@ -222,35 +220,38 @@ TEST_F(SQLiteFeaturesTest, Mmap) {
     base::MemoryMappedFile m;
     ASSERT_TRUE(m.Initialize(db_path_));
 
-    memset(buf, '0', sizeof(buf));
-    ASSERT_EQ(0, memcmp(buf, m.data() + 0*sizeof(buf), sizeof(buf)));
+    UNSAFE_TODO(memset(buf, '0', sizeof(buf)));
+    UNSAFE_TODO(
+        ASSERT_EQ(0, memcmp(buf, m.data() + 0 * sizeof(buf), sizeof(buf))));
 
-    memset(buf, '1', sizeof(buf));
-    ASSERT_EQ(0, memcmp(buf, m.data() + 1*sizeof(buf), sizeof(buf)));
+    UNSAFE_TODO(memset(buf, '1', sizeof(buf)));
+    UNSAFE_TODO(
+        ASSERT_EQ(0, memcmp(buf, m.data() + 1 * sizeof(buf), sizeof(buf))));
 
-    memset(buf, '2', sizeof(buf));
-    ASSERT_EQ(0, memcmp(buf, m.data() + 2*sizeof(buf), sizeof(buf)));
+    UNSAFE_TODO(memset(buf, '2', sizeof(buf)));
+    UNSAFE_TODO(
+        ASSERT_EQ(0, memcmp(buf, m.data() + 2 * sizeof(buf), sizeof(buf))));
 
     // Scribble some '3' into the first page of the file, and verify that it
     // looks the same in the memory mapping.
     {
       base::File f(db_path_, kFlags);
       ASSERT_TRUE(f.IsValid());
-      memset(buf, '3', sizeof(buf));
-      ASSERT_EQ(f.Write(0*sizeof(buf), buf, sizeof(buf)), (int)sizeof(buf));
+      std::ranges::fill(buf, '3');
+      ASSERT_TRUE(f.WriteAndCheck(0 * sizeof(buf), base::as_byte_span(buf)));
     }
-    ASSERT_EQ(0, memcmp(buf, m.data() + 0*sizeof(buf), sizeof(buf)));
+    UNSAFE_TODO(
+        ASSERT_EQ(0, memcmp(buf, m.data() + 0 * sizeof(buf), sizeof(buf))));
 
     // Repeat with a single '4' in case page-sized blocks are different.
-    const size_t kOffset = 1*sizeof(buf) + 123;
-    ASSERT_NE('4', m.data()[kOffset]);
+    const size_t kOffset = 1 * sizeof(buf) + 123;
+    UNSAFE_TODO(ASSERT_NE('4', m.data()[kOffset]));
     {
       base::File f(db_path_, kFlags);
       ASSERT_TRUE(f.IsValid());
-      buf[0] = '4';
-      ASSERT_EQ(f.Write(kOffset, buf, 1), 1);
+      ASSERT_TRUE(f.WriteAndCheck(kOffset, base::byte_span_from_ref('4')));
     }
-    ASSERT_EQ('4', m.data()[kOffset]);
+    UNSAFE_TODO(ASSERT_EQ('4', m.data()[kOffset]));
   }
 }
 

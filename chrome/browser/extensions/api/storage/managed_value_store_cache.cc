@@ -31,6 +31,7 @@
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_registry_observer.h"
 #include "extensions/browser/extension_system.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_id.h"
 #include "extensions/common/extension_set.h"
@@ -39,7 +40,10 @@
 
 #if BUILDFLAG(IS_CHROMEOS)
 #include "chrome/browser/ash/profiles/profile_helper.h"
+#include "chromeos/constants/chromeos_features.h"
 #endif
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 using content::BrowserContext;
 using content::BrowserThread;
@@ -192,9 +196,14 @@ void ManagedValueStoreCache::ExtensionTracker::LoadSchemasOnFileTaskRunner(
     // and is valid. If the schema is invalid then proceed with an empty schema.
     // The extension will be listed in chrome://policy but won't be able to load
     // any policies.
-    (*components)[extension->id()] =
-        StorageSchemaManifestHandler::GetSchema(extension.get())
-            .value_or(policy::Schema());
+    base::expected<policy::Schema, std::string> schema =
+        StorageSchemaManifestHandler::GetSchema(extension.get());
+    if (!schema.has_value()) {
+      LOG(ERROR) << "Failed to parse schema for extension " << extension->id()
+                 << " with error: " << schema.error();
+      schema = policy::Schema();
+    }
+    (*components)[extension->id()] = std::move(schema.value());
   }
 
   content::GetUIThreadTaskRunner({})->PostTask(
@@ -351,9 +360,14 @@ void ManagedValueStoreCache::OnPolicyUpdated(const policy::PolicyNamespace& ns,
 policy::PolicyDomain ManagedValueStoreCache::GetPolicyDomain(
     const Profile& profile) {
 #if BUILDFLAG(IS_CHROMEOS)
-  return ash::ProfileHelper::IsSigninProfile(&profile)
-             ? policy::POLICY_DOMAIN_SIGNIN_EXTENSIONS
-             : policy::POLICY_DOMAIN_EXTENSIONS;
+  bool use_signin_extensions_domain =
+      ash::ProfileHelper::IsSigninProfile(&profile);
+  if (chromeos::features::IsLockScreenBadgeAuthEnabled()) {
+    use_signin_extensions_domain |=
+        ash::ProfileHelper::IsLockScreenProfile(&profile);
+  }
+  return use_signin_extensions_domain ? policy::POLICY_DOMAIN_SIGNIN_EXTENSIONS
+                                      : policy::POLICY_DOMAIN_EXTENSIONS;
 #else
   return policy::POLICY_DOMAIN_EXTENSIONS;
 #endif

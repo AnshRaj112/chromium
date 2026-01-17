@@ -61,9 +61,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Tests for {@link PartialCustomTabSideSheetStrategy}. */
 @RunWith(BaseRobolectricTestRunner.class)
-@Config(
-        manifest = Config.NONE,
-        shadows = {PartialCustomTabTestRule.ShadowSemanticColorUtils.class})
+@Config(manifest = Config.NONE)
 @LooperMode(Mode.PAUSED)
 public class PartialCustomTabSideSheetStrategyTest {
     private static final float MINIMAL_WIDTH_RATIO_EXPANDED = 0.33f;
@@ -122,6 +120,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         return pcct;
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void create_sideSheetStrategy_Q() {
         mPCCTTestRule.configLandscapeMode();
@@ -135,6 +135,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 "Side-sheet has wrong width", 2000, mPCCTTestRule.mAttributeResults.get(0).width);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void create_sideSheetStrategy() {
         mPCCTTestRule.configLandscapeMode();
@@ -148,6 +150,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 "Side-sheet has wrong width", 2000, mPCCTTestRule.mAttributeResults.get(0).width);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void create_largeWidthLandscape() {
         mPCCTTestRule.configLandscapeMode();
@@ -161,6 +165,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 mPCCTTestRule.mAttributeResults.get(0).width);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void create_smallWidthLandscape_Expanded() {
         mPCCTTestRule.configLandscapeMode();
@@ -174,6 +180,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 mPCCTTestRule.mAttributeResults.get(0).width);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void create_smallWidthLandscape_Medium() {
         mPCCTTestRule.configDeviceWidthMedium();
@@ -186,6 +194,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 mPCCTTestRule.mAttributeResults.get(0).width);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void create_deviceWidthLandscape() {
         mPCCTTestRule.configLandscapeMode();
@@ -199,6 +209,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 mPCCTTestRule.mAttributeResults.get(0).width);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void create_widthHalfWindowLandscape() {
         mPCCTTestRule.configLandscapeMode();
@@ -211,6 +223,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         assertEquals(DEVICE_WIDTH_LANDSCAPE / 2, mPCCTTestRule.mAttributeResults.get(0).width);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void onShowSoftInputRunsRunnable() {
         mPCCTTestRule.configLandscapeMode();
@@ -226,6 +240,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         assertTabIsAtFullLandscapeHeight();
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void dragHandlebarInvisible() {
         mPCCTTestRule.configLandscapeMode();
@@ -239,6 +255,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         verify(mPCCTTestRule.mDragHandlebar).setVisibility(View.GONE);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void noTopShadow() {
         doReturn(47)
@@ -258,6 +276,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 mPCCTTestRule.mLayoutParams.topMargin);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void leftShadowIsVisible() {
         doReturn(47)
@@ -281,6 +301,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 mPCCTTestRule.mLayoutParams.rightMargin);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void rightShadowIsVisible() {
         doReturn(47)
@@ -304,6 +326,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 mPCCTTestRule.mLayoutParams.leftMargin);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void roundTopLeftCorner() {
         doReturn(16)
@@ -328,6 +352,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 .setCornerRadii(eq(new float[] {5, 5, 0, 0, 0, 0, 0, 0}));
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void roundTopRightCorner() {
         doReturn(16)
@@ -349,6 +375,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 .setCornerRadii(eq(new float[] {0, 0, 5, 5, 0, 0, 0, 0}));
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void noRoundedCorner() {
         mPCCTTestRule.configLandscapeMode();
@@ -366,6 +394,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 .setCornerRadii(eq(new float[] {0, 0, 0, 0, 0, 0, 0, 0}));
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void noShadowsFullWidth() {
         doReturn(47)
@@ -396,6 +426,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 mPCCTTestRule.mLayoutParams.leftMargin);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void drawDividerLine() {
         doReturn(10)
@@ -459,6 +491,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 mPCCTTestRule.mLayoutParams.leftMargin);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void noDecoration() {
         doReturn(10)
@@ -489,6 +523,8 @@ public class PartialCustomTabSideSheetStrategyTest {
                 mPCCTTestRule.mLayoutParams.leftMargin);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void enterAndExitHtmlFullscreen() {
         doReturn(47)
@@ -559,6 +595,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         clearInvocations(mPCCTTestRule.mOnActivityLayoutCallback);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void enterAndExitHtmlFullscreen_useDivider() {
         doReturn(10)
@@ -629,6 +667,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         clearInvocations(mPCCTTestRule.mOnActivityLayoutCallback);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void enterAndExitMaximizeMode() {
         var strategy = createPcctSideSheetStrategy(700);
@@ -673,6 +713,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         clearInvocations(mPCCTTestRule.mOnActivityLayoutCallback);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void toggleMaximizeNoAnimation() {
         var strategy = createPcctSideSheetStrategy(700);
@@ -717,6 +759,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         clearInvocations(mPCCTTestRule.mOnActivityLayoutCallback);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void maximizeAndFullscreen() {
         doReturn(16)
@@ -794,6 +838,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         assertPosition(LEFT, LTR, ACTIVITY_SIDE_SHEET_POSITION_START);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void handleCloseAnimation() {
         var strategy = createPcctSideSheetStrategy(2000);
@@ -817,6 +863,8 @@ public class PartialCustomTabSideSheetStrategyTest {
         assertEquals(DEVICE_HEIGHT, mPCCTTestRule.getWindowAttributes().y);
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void maximizeMinimize() {
         mPCCTTestRule.configLandscapeMode();

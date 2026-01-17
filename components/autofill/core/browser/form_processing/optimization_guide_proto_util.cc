@@ -71,7 +71,7 @@ void PopulateExtensionAPISpecificFields(
   // Add additional field-level metadata.
   CHECK_EQ(form_data.fields().size(),
            static_cast<size_t>(form_proto.fields_size()));
-  for (size_t i = 0; i < form_data.fields().size(); i++) {
+  for (size_t i = 0; i < form_data.fields().size(); ++i) {
     const FormFieldData& field = form_data.fields()[i];
     *form_proto.mutable_fields(i)->mutable_global_id() =
         ToGlobalIdProto(field.global_id());
@@ -93,6 +93,9 @@ optimization_guide::proto::FormData ToFormDataProto(
     // Unconditionally assign html meta data to the field.
     field_proto->set_field_name(base::UTF16ToUTF8(field.name()));
     field_proto->set_field_label(base::UTF16ToUTF8(field.label()));
+    field_proto->set_aria_label(base::UTF16ToUTF8(field.aria_label()));
+    field_proto->set_aria_description(
+        base::UTF16ToUTF8(field.aria_description()));
     field_proto->set_is_focusable(field.is_focusable());
     field_proto->set_placeholder(base::UTF16ToUTF8(field.placeholder()));
     field_proto->set_form_control_type(

@@ -11,12 +11,18 @@
 #include "third_party/blink/renderer/platform/bindings/script_forbidden_scope.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 #include "third_party/blink/renderer/platform/scheduler/public/frame_or_worker_scheduler.h"
+#include "third_party/blink/renderer/platform/scheduler/public/task_attribution_tracker.h"
 #include "v8/include/v8.h"
 
 namespace blink {
 namespace scheduler {
 
-EventLoop::EventLoop(EventLoop::Delegate* delegate,
+EventLoop::PauseMicrotasksHandle::PauseMicrotasksHandle(
+    v8::Isolate* isolate,
+    v8::MicrotaskQueue* queue)
+    : scope_(isolate, queue) {}
+
+EventLoop::EventLoop(Delegate* delegate,
                      v8::Isolate* isolate,
                      std::unique_ptr<v8::MicrotaskQueue> microtask_queue)
     : delegate_(delegate),
@@ -95,12 +101,18 @@ bool EventLoop::IsSchedulerAttachedForTest(FrameOrWorkerScheduler* scheduler) {
   return schedulers_.Contains(scheduler);
 }
 
+std::unique_ptr<EventLoop::PauseMicrotasksHandle> EventLoop::PauseMicrotasks() {
+  return base::WrapUnique(
+      new PauseMicrotasksHandle(isolate_, microtask_queue_.get()));
+}
+
 // static
 void EventLoop::RunPendingMicrotask(void* data) {
   TRACE_EVENT0("renderer.scheduler", "RunPendingMicrotask");
   auto* self = static_cast<EventLoop*>(data);
   base::OnceClosure task = std::move(self->pending_microtasks_.front());
   self->pending_microtasks_.pop_front();
+  TaskAttributionTracker::MicrotaskTraceScope scope(self->isolate_);
   std::move(task).Run();
 }
 

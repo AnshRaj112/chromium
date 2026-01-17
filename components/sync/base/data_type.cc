@@ -16,11 +16,11 @@ namespace syncer {
 
 namespace {
 
-static_assert(56 == syncer::GetNumDataTypes(),
+static_assert(60 == syncer::GetNumDataTypes(),
               "When adding a new type, update enum SyncDataTypes in enums.xml "
               "and suffix SyncDataType in histograms.xml.");
 
-static_assert(56 == syncer::GetNumDataTypes(),
+static_assert(60 == syncer::GetNumDataTypes(),
               "When adding a new type, follow the integration checklist in "
               "https://www.chromium.org/developers/design-documents/sync/"
               "integration-checklist/");
@@ -88,7 +88,6 @@ constexpr kSpecificsFieldNumberToDataTypeMap specifics_field_number2data_type =
          PRINTERS_AUTHORIZATION_SERVERS},
         {sync_pb::EntitySpecifics::kContactInfoFieldNumber, CONTACT_INFO},
         {sync_pb::EntitySpecifics::kSavedTabGroupFieldNumber, SAVED_TAB_GROUP},
-        {sync_pb::EntitySpecifics::kPowerBookmarkFieldNumber, POWER_BOOKMARK},
         {sync_pb::EntitySpecifics::kWebauthnCredentialFieldNumber,
          WEBAUTHN_CREDENTIAL},
         {sync_pb::EntitySpecifics::
@@ -109,9 +108,15 @@ constexpr kSpecificsFieldNumberToDataTypeMap specifics_field_number2data_type =
          PLUS_ADDRESS_SETTING},
         {sync_pb::EntitySpecifics::kAutofillValuableFieldNumber,
          AUTOFILL_VALUABLE},
+        {sync_pb::EntitySpecifics::kAutofillValuableMetadataFieldNumber,
+         AUTOFILL_VALUABLE_METADATA},
         {sync_pb::EntitySpecifics::kSharedTabGroupAccountDataFieldNumber,
          SHARED_TAB_GROUP_ACCOUNT_DATA},
+        {sync_pb::EntitySpecifics::kAccountSettingFieldNumber, ACCOUNT_SETTING},
         {sync_pb::EntitySpecifics::kSharedCommentFieldNumber, SHARED_COMMENT},
+        {sync_pb::EntitySpecifics::kAiThreadFieldNumber, AI_THREAD},
+        {sync_pb::EntitySpecifics::kContextualTaskFieldNumber, CONTEXTUAL_TASK},
+        {sync_pb::EntitySpecifics::kSkillFieldNumber, SKILL},
         // ---- Control Types ----
         {sync_pb::EntitySpecifics::kNigoriFieldNumber, NIGORI},
     });
@@ -249,9 +254,6 @@ void AddDefaultFieldValue(DataType type, sync_pb::EntitySpecifics* specifics) {
     case SAVED_TAB_GROUP:
       specifics->mutable_saved_tab_group();
       break;
-    case POWER_BOOKMARK:
-      specifics->mutable_power_bookmark();
-      break;
     case WEBAUTHN_CREDENTIAL:
       specifics->mutable_webauthn_credential();
       break;
@@ -282,11 +284,26 @@ void AddDefaultFieldValue(DataType type, sync_pb::EntitySpecifics* specifics) {
     case AUTOFILL_VALUABLE:
       specifics->mutable_autofill_valuable();
       break;
+    case AUTOFILL_VALUABLE_METADATA:
+      specifics->mutable_autofill_valuable_metadata();
+      break;
+    case ACCOUNT_SETTING:
+      specifics->mutable_account_setting();
+      break;
     case SHARED_TAB_GROUP_ACCOUNT_DATA:
       specifics->mutable_shared_tab_group_account_data();
       break;
     case SHARED_COMMENT:
       specifics->mutable_shared_comment();
+      break;
+    case AI_THREAD:
+      specifics->mutable_ai_thread();
+      break;
+    case CONTEXTUAL_TASK:
+      specifics->mutable_contextual_task();
+      break;
+    case SKILL:
+      specifics->mutable_skill();
       break;
   }
 }
@@ -386,8 +403,6 @@ int GetSpecificsFieldNumberFromDataType(DataType data_type) {
       return sync_pb::EntitySpecifics::kContactInfoFieldNumber;
     case SAVED_TAB_GROUP:
       return sync_pb::EntitySpecifics::kSavedTabGroupFieldNumber;
-    case POWER_BOOKMARK:
-      return sync_pb::EntitySpecifics::kPowerBookmarkFieldNumber;
     case WEBAUTHN_CREDENTIAL:
       return sync_pb::EntitySpecifics::kWebauthnCredentialFieldNumber;
     case INCOMING_PASSWORD_SHARING_INVITATION:
@@ -410,12 +425,22 @@ int GetSpecificsFieldNumberFromDataType(DataType data_type) {
       return sync_pb::EntitySpecifics::kPlusAddressSettingFieldNumber;
     case AUTOFILL_VALUABLE:
       return sync_pb::EntitySpecifics::kAutofillValuableFieldNumber;
+    case AUTOFILL_VALUABLE_METADATA:
+      return sync_pb::EntitySpecifics::kAutofillValuableMetadataFieldNumber;
+    case ACCOUNT_SETTING:
+      return sync_pb::EntitySpecifics::kAccountSettingFieldNumber;
     case SHARED_TAB_GROUP_ACCOUNT_DATA:
       return sync_pb::EntitySpecifics::kSharedTabGroupAccountDataFieldNumber;
     case SHARED_COMMENT:
       return sync_pb::EntitySpecifics::kSharedCommentFieldNumber;
+    case AI_THREAD:
+      return sync_pb::EntitySpecifics::kAiThreadFieldNumber;
+    case CONTEXTUAL_TASK:
+      return sync_pb::EntitySpecifics::kContextualTaskFieldNumber;
     case NIGORI:
       return sync_pb::EntitySpecifics::kNigoriFieldNumber;
+    case SKILL:
+      return sync_pb::EntitySpecifics::kSkillFieldNumber;
   }
   NOTREACHED();
 }
@@ -432,186 +457,33 @@ void internal::GetDataTypeSetFromSpecificsFieldNumberListHelper(
 }
 
 DataType GetDataTypeFromSpecifics(const sync_pb::EntitySpecifics& specifics) {
-  static_assert(56 == syncer::GetNumDataTypes(),
-                "When adding new protocol types, the following type lookup "
-                "logic must be updated.");
-  if (specifics.has_bookmark()) {
-    return BOOKMARKS;
-  }
-  if (specifics.has_preference()) {
-    return PREFERENCES;
-  }
-  if (specifics.has_password()) {
-    return PASSWORDS;
-  }
-  if (specifics.has_autofill_profile()) {
-    return AUTOFILL_PROFILE;
-  }
-  if (specifics.has_autofill()) {
-    return AUTOFILL;
-  }
-  if (specifics.has_autofill_wallet()) {
-    return AUTOFILL_WALLET_DATA;
-  }
-  if (specifics.has_wallet_metadata()) {
-    return AUTOFILL_WALLET_METADATA;
-  }
-  if (specifics.has_theme()) {
-    return THEMES;
-  }
-  if (specifics.has_extension()) {
-    return EXTENSIONS;
-  }
-  if (specifics.has_search_engine()) {
-    return SEARCH_ENGINES;
-  }
-  if (specifics.has_session()) {
-    return SESSIONS;
-  }
-  if (specifics.has_app()) {
-    return APPS;
-  }
-  if (specifics.has_app_setting()) {
-    return APP_SETTINGS;
-  }
-  if (specifics.has_extension_setting()) {
-    return EXTENSION_SETTINGS;
-  }
-  if (specifics.has_history_delete_directive()) {
-    return HISTORY_DELETE_DIRECTIVES;
-  }
-  if (specifics.has_dictionary()) {
-    return DICTIONARY;
-  }
-  if (specifics.has_device_info()) {
-    return DEVICE_INFO;
-  }
-  if (specifics.has_priority_preference()) {
-    return PRIORITY_PREFERENCES;
-  }
-  if (specifics.has_managed_user_setting()) {
-    return SUPERVISED_USER_SETTINGS;
-  }
-  if (specifics.has_app_list()) {
-    return APP_LIST;
-  }
-  if (specifics.has_arc_package()) {
-    return ARC_PACKAGE;
-  }
-  if (specifics.has_printer()) {
-    return PRINTERS;
-  }
-  if (specifics.has_reading_list()) {
-    return READING_LIST;
-  }
-  if (specifics.has_user_event()) {
-    return USER_EVENTS;
-  }
-  if (specifics.has_user_consent()) {
-    return USER_CONSENTS;
-  }
-  if (specifics.has_nigori()) {
-    return NIGORI;
-  }
-  if (specifics.has_send_tab_to_self()) {
-    return SEND_TAB_TO_SELF;
-  }
-  if (specifics.has_security_event()) {
-    return SECURITY_EVENTS;
-  }
-  if (specifics.has_web_app()) {
-    return WEB_APPS;
-  }
-  if (specifics.has_web_apk()) {
-    return WEB_APKS;
-  }
-  if (specifics.has_wifi_configuration()) {
-    return WIFI_CONFIGURATIONS;
-  }
-  if (specifics.has_os_preference()) {
-    return OS_PREFERENCES;
-  }
-  if (specifics.has_os_priority_preference()) {
-    return OS_PRIORITY_PREFERENCES;
-  }
-  if (specifics.has_sharing_message()) {
-    return SHARING_MESSAGE;
-  }
-  if (specifics.has_autofill_offer()) {
-    return AUTOFILL_WALLET_OFFER;
-  }
-  if (specifics.has_workspace_desk()) {
-    return WORKSPACE_DESK;
-  }
-  if (specifics.has_history()) {
-    return HISTORY;
-  }
-  if (specifics.has_printers_authorization_server()) {
-    return PRINTERS_AUTHORIZATION_SERVERS;
-  }
-  if (specifics.has_contact_info()) {
-    return CONTACT_INFO;
-  }
-  if (specifics.has_autofill_wallet_usage()) {
-    return AUTOFILL_WALLET_USAGE;
-  }
-  if (specifics.has_saved_tab_group()) {
-    return SAVED_TAB_GROUP;
-  }
-  if (specifics.has_power_bookmark()) {
-    return POWER_BOOKMARK;
-  }
-  if (specifics.has_webauthn_credential()) {
-    return WEBAUTHN_CREDENTIAL;
-  }
-  if (specifics.has_incoming_password_sharing_invitation()) {
-    return INCOMING_PASSWORD_SHARING_INVITATION;
-  }
-  if (specifics.has_outgoing_password_sharing_invitation()) {
-    return OUTGOING_PASSWORD_SHARING_INVITATION;
-  }
-  if (specifics.has_autofill_wallet_credential()) {
-    return AUTOFILL_WALLET_CREDENTIAL;
-  }
-  if (specifics.has_shared_tab_group_data()) {
-    return SHARED_TAB_GROUP_DATA;
-  }
-  if (specifics.has_collaboration_group()) {
-    return COLLABORATION_GROUP;
-  }
-  if (specifics.has_plus_address()) {
-    return PLUS_ADDRESS;
-  }
-  if (specifics.has_product_comparison()) {
-    return PRODUCT_COMPARISON;
-  }
-  if (specifics.has_cookie()) {
-    return COOKIES;
-  }
-  if (specifics.has_plus_address_setting()) {
-    return PLUS_ADDRESS_SETTING;
-  }
-  if (specifics.has_autofill_valuable()) {
-    return AUTOFILL_VALUABLE;
-  }
-  if (specifics.has_shared_tab_group_account_data()) {
-    return SHARED_TAB_GROUP_ACCOUNT_DATA;
-  }
-  if (specifics.has_shared_comment()) {
-    return SHARED_COMMENT;
+  // SpecificsVariantCase is a generated enum that lists all possible
+  // variants of the `specifics` oneof and has values corresponding to the
+  // field numbers of the oneof.
+  if (specifics.specifics_variant_case() ==
+      sync_pb::EntitySpecifics::SPECIFICS_VARIANT_NOT_SET) {
+    // This client version doesn't understand `specifics`.
+    DVLOG(1) << "Unknown datatype in sync proto.";
+    return UNSPECIFIED;
   }
 
-  // This client version doesn't understand `specifics`.
-  DVLOG(1) << "Unknown datatype in sync proto.";
-  return UNSPECIFIED;
+  return GetDataTypeFromSpecificsFieldNumber(
+      specifics.specifics_variant_case());
 }
 
 DataTypeSet AlwaysPreferredUserTypes() {
-  DataTypeSet types = {DEVICE_INFO,          USER_CONSENTS,
-                       PLUS_ADDRESS,         PLUS_ADDRESS_SETTING,
-                       PRIORITY_PREFERENCES, SECURITY_EVENTS,
-                       SEND_TAB_TO_SELF,     SUPERVISED_USER_SETTINGS,
-                       SHARING_MESSAGE};
+  // TODO(crbug.com/471795213): add SKILL to a corresponding UserSelectableType.
+  DataTypeSet types = {ACCOUNT_SETTING,
+                       DEVICE_INFO,
+                       USER_CONSENTS,
+                       PLUS_ADDRESS,
+                       PLUS_ADDRESS_SETTING,
+                       PRIORITY_PREFERENCES,
+                       SECURITY_EVENTS,
+                       SEND_TAB_TO_SELF,
+                       SUPERVISED_USER_SETTINGS,
+                       SHARING_MESSAGE,
+                       SKILL};
   // TODO(crbug.com/412602018): Mark AlwaysPreferredUserTypes() method as
   // constexpr when removing the feature flag.
   if (!base::FeatureList::IsEnabled(
@@ -622,10 +494,17 @@ DataTypeSet AlwaysPreferredUserTypes() {
 }
 
 DataTypeSet EncryptableUserTypes() {
-  static_assert(56 == syncer::GetNumDataTypes(),
+  static_assert(60 == syncer::GetNumDataTypes(),
                 "If adding an unencryptable type, remove from "
                 "encryptable_user_types below.");
   DataTypeSet encryptable_user_types = UserTypes();
+  // Account settings are read-only and therefore never encrypted.
+  encryptable_user_types.Remove(ACCOUNT_SETTING);
+  if (base::FeatureList::IsEnabled(kSyncMakeAutofillValuableNonEncryptable)) {
+    // Valuables are never encrypted because they can be generated from outside
+    // of Chrome.
+    encryptable_user_types.Remove(AUTOFILL_VALUABLE);
+  }
   // Wallet data is not encrypted since it actually originates on the server.
   encryptable_user_types.Remove(AUTOFILL_WALLET_DATA);
   encryptable_user_types.Remove(AUTOFILL_WALLET_OFFER);
@@ -656,6 +535,8 @@ DataTypeSet EncryptableUserTypes() {
   // originate from outside Chrome.
   encryptable_user_types.Remove(PLUS_ADDRESS);
   encryptable_user_types.Remove(PLUS_ADDRESS_SETTING);
+  // Valuable metadata is accessed on the server.
+  encryptable_user_types.Remove(AUTOFILL_VALUABLE_METADATA);
 
   return encryptable_user_types;
 }
@@ -747,8 +628,6 @@ const char* DataTypeToDebugString(DataType data_type) {
       return "Contact Info";
     case SAVED_TAB_GROUP:
       return "Saved Tab Group";
-    case POWER_BOOKMARK:
-      return "Power Bookmark";
     case WEBAUTHN_CREDENTIAL:
       return "WebAuthn Credentials";
     case INCOMING_PASSWORD_SHARING_INVITATION:
@@ -769,12 +648,22 @@ const char* DataTypeToDebugString(DataType data_type) {
       return "Plus Address Setting";
     case AUTOFILL_VALUABLE:
       return "Autofill Valuable";
+    case AUTOFILL_VALUABLE_METADATA:
+      return "Autofill Valuable Metadata";
+    case ACCOUNT_SETTING:
+      return "Account Setting";
     case SHARED_TAB_GROUP_ACCOUNT_DATA:
       return "Shared Tab Group Account Data";
     case SHARED_COMMENT:
       return "SharedComment";
+    case AI_THREAD:
+      return "AI Thread";
+    case CONTEXTUAL_TASK:
+      return "Contextual Task";
     case NIGORI:
       return "Encryption Keys";
+    case SKILL:
+      return "Skill";
   }
   NOTREACHED();
 }
@@ -866,8 +755,6 @@ const char* DataTypeToHistogramSuffix(DataType data_type) {
       return "CONTACT_INFO";
     case SAVED_TAB_GROUP:
       return "SAVED_TAB_GROUP";
-    case POWER_BOOKMARK:
-      return "POWER_BOOKMARK";
     case WEBAUTHN_CREDENTIAL:
       return "WEBAUTHN_CREDENTIAL";
     case INCOMING_PASSWORD_SHARING_INVITATION:
@@ -888,12 +775,22 @@ const char* DataTypeToHistogramSuffix(DataType data_type) {
       return "PLUS_ADDRESS_SETTING";
     case AUTOFILL_VALUABLE:
       return "AUTOFILL_VALUABLE";
+    case AUTOFILL_VALUABLE_METADATA:
+      return "AUTOFILL_VALUABLE_METADATA";
     case SHARED_TAB_GROUP_ACCOUNT_DATA:
       return "SHARED_TAB_GROUP_ACCOUNT_DATA";
     case SHARED_COMMENT:
       return "SHARED_COMMENT";
+    case AI_THREAD:
+      return "AI_THREAD";
+    case CONTEXTUAL_TASK:
+      return "CONTEXTUAL_TASK";
     case NIGORI:
       return "NIGORI";
+    case ACCOUNT_SETTING:
+      return "ACCOUNT_SETTING";
+    case SKILL:
+      return "SKILL";
   }
   // LINT.ThenChange(/tools/metrics/histograms/metadata/sync/histograms.xml:DataTypeHistogramSuffix)
   NOTREACHED();
@@ -985,8 +882,6 @@ DataTypeForHistograms DataTypeHistogramValue(DataType data_type) {
       return DataTypeForHistograms::kContactInfo;
     case SAVED_TAB_GROUP:
       return DataTypeForHistograms::kSavedTabGroups;
-    case POWER_BOOKMARK:
-      return DataTypeForHistograms::kPowerBookmark;
     case WEBAUTHN_CREDENTIAL:
       return DataTypeForHistograms::kWebAuthnCredentials;
     case INCOMING_PASSWORD_SHARING_INVITATION:
@@ -1007,12 +902,22 @@ DataTypeForHistograms DataTypeHistogramValue(DataType data_type) {
       return DataTypeForHistograms::kPlusAddressSettings;
     case AUTOFILL_VALUABLE:
       return DataTypeForHistograms::kAutofillValuable;
+    case AUTOFILL_VALUABLE_METADATA:
+      return DataTypeForHistograms::kAutofillValuableMetadata;
+    case ACCOUNT_SETTING:
+      return DataTypeForHistograms::kAccountSetting;
     case SHARED_TAB_GROUP_ACCOUNT_DATA:
       return DataTypeForHistograms::kSharedTabGroupAccountData;
     case SHARED_COMMENT:
       return DataTypeForHistograms::kSharedComment;
+    case AI_THREAD:
+      return DataTypeForHistograms::kAIThread;
+    case CONTEXTUAL_TASK:
+      return DataTypeForHistograms::kContextualTask;
     case NIGORI:
       return DataTypeForHistograms::kNigori;
+    case SKILL:
+      return DataTypeForHistograms::kSkill;
   }
   NOTREACHED();
 }
@@ -1121,8 +1026,6 @@ const char* DataTypeToStableLowerCaseString(DataType data_type) {
       return "contact_info";
     case SAVED_TAB_GROUP:
       return "saved_tab_group";
-    case POWER_BOOKMARK:
-      return "power_bookmark";
     case WEBAUTHN_CREDENTIAL:
       return "webauthn_credential";
     case INCOMING_PASSWORD_SHARING_INVITATION:
@@ -1143,12 +1046,22 @@ const char* DataTypeToStableLowerCaseString(DataType data_type) {
       return "plus_address_setting";
     case AUTOFILL_VALUABLE:
       return "autofill_valuable";
+    case AUTOFILL_VALUABLE_METADATA:
+      return "autofill_valuable_metadata";
+    case ACCOUNT_SETTING:
+      return "account_setting";
     case SHARED_TAB_GROUP_ACCOUNT_DATA:
       return "shared_tab_group_account_data";
     case SHARED_COMMENT:
       return "shared_comment";
+    case AI_THREAD:
+      return "ai_thread";
+    case CONTEXTUAL_TASK:
+      return "contextual_task";
     case NIGORI:
       return "nigori";
+    case SKILL:
+      return "skill";
   }
   // WARNING: existing strings must not be changed without migration, they
   // are persisted!

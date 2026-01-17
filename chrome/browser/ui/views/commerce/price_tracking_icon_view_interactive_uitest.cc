@@ -18,6 +18,7 @@
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/commerce/commerce_ui_tab_helper.h"
 #include "chrome/browser/ui/commerce/mock_commerce_ui_tab_helper.h"
+#include "chrome/browser/ui/interaction/browser_elements.h"
 #include "chrome/browser/ui/tabs/public/tab_features.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/commerce/price_tracking_bubble_dialog_view.h"
@@ -48,13 +49,11 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "services/metrics/public/cpp/ukm_builders.h"
 #include "ui/base/interaction/element_identifier.h"
-#include "ui/base/interaction/element_tracker.h"
 #include "ui/base/interaction/interactive_test.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/gfx/image/image.h"
 #include "ui/gfx/image/image_skia.h"
 #include "ui/views/controls/styled_label.h"
-#include "ui/views/interaction/element_tracker_views.h"
 #include "ui/views/test/widget_test.h"
 #include "ui/views/widget/any_widget_observer.h"
 
@@ -133,6 +132,15 @@ class PriceTrackingIconViewInteractiveTest : public InteractiveBrowserTest {
 
     commerce::AddProductBookmark(bookmark_model, u"title", url, 0,
                                  is_price_tracked);
+  }
+
+  auto CheckBubbleType(PriceTrackingBubbleDialogView::Type type) {
+    return CheckView(
+        kPriceTrackingBubbleDialogId,
+        [](PriceTrackingBubbleDialogView* bubble) {
+          return bubble->GetTypeForTesting();
+        },
+        type);
   }
 
  protected:
@@ -214,14 +222,9 @@ IN_PROC_BROWSER_TEST_F(PriceTrackingIconViewInteractiveTest,
                           embedded_test_server()->GetURL(kShoppingURL)),
       WaitForShow(kPriceTrackingChipElementId),
       PressButton(kPriceTrackingChipElementId),
-      WaitForShow(kPriceTrackingBubbleDialogId));
-
-  auto* bubble = static_cast<PriceTrackingBubbleDialogView*>(
-      views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
-          kPriceTrackingBubbleDialogId,
-          browser()->window()->GetElementContext()));
-  EXPECT_EQ(bubble->GetTypeForTesting(),
-            PriceTrackingBubbleDialogView::Type::TYPE_FIRST_USE_EXPERIENCE);
+      WaitForShow(kPriceTrackingBubbleDialogId),
+      CheckBubbleType(
+          PriceTrackingBubbleDialogView::Type::TYPE_FIRST_USE_EXPERIENCE));
 }
 
 // TODO(crbug.com/41494779): Test is failing on Mac under ChromeRefresh2023
@@ -260,14 +263,8 @@ IN_PROC_BROWSER_TEST_F(
                          omnibox::kPriceTrackingEnabledRefreshIcon.name;
                 })),
       PressButton(kPriceTrackingChipElementId),
-      WaitForShow(kPriceTrackingBubbleDialogId));
-
-  auto* bubble = static_cast<PriceTrackingBubbleDialogView*>(
-      views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
-          kPriceTrackingBubbleDialogId,
-          browser()->window()->GetElementContext()));
-  EXPECT_EQ(bubble->GetTypeForTesting(),
-            PriceTrackingBubbleDialogView::Type::TYPE_NORMAL);
+      WaitForShow(kPriceTrackingBubbleDialogId),
+      CheckBubbleType(PriceTrackingBubbleDialogView::Type::TYPE_NORMAL));
 }
 
 // TODO(crbug.com/41494779): Test is failing on Mac under ChromeRefresh2023
@@ -295,14 +292,8 @@ IN_PROC_BROWSER_TEST_F(PriceTrackingIconViewInteractiveTest,
                           embedded_test_server()->GetURL(kShoppingURL)),
       WaitForShow(kPriceTrackingChipElementId),
       PressButton(kPriceTrackingChipElementId),
-      WaitForShow(kPriceTrackingBubbleDialogId));
-
-  auto* bubble = static_cast<PriceTrackingBubbleDialogView*>(
-      views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
-          kPriceTrackingBubbleDialogId,
-          browser()->window()->GetElementContext()));
-  EXPECT_EQ(bubble->GetTypeForTesting(),
-            PriceTrackingBubbleDialogView::Type::TYPE_NORMAL);
+      WaitForShow(kPriceTrackingBubbleDialogId),
+      CheckBubbleType(PriceTrackingBubbleDialogView::Type::TYPE_NORMAL));
 }
 
 // TODO(crbug.com/41494779): Test is failing on Mac under ChromeRefresh2023
@@ -332,7 +323,7 @@ IN_PROC_BROWSER_TEST_F(PriceTrackingIconViewInteractiveTest,
       static_cast<PriceTrackingBubbleDialogView*>(
           views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
               kPriceTrackingBubbleDialogId,
-              browser()->window()->GetElementContext()))
+              BrowserElements::From(browser())->GetContext()))
           ->GetWidget();
   views::test::WidgetDestroyedWaiter destroyed_waiter(widget);
   widget->CloseWithReason(views::Widget::ClosedReason::kEscKeyPressed);
@@ -751,7 +742,7 @@ IN_PROC_BROWSER_TEST_F(PriceTrackingBubbleInteractiveTest,
   static_cast<PriceTrackingBubbleDialogView*>(
       views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
           kPriceTrackingBubbleDialogId,
-          browser()->window()->GetElementContext()))
+          BrowserElements::From(browser())->GetContext()))
       ->Cancel();
 
   EXPECT_EQ(user_action_tester_.GetActionCount(
@@ -783,7 +774,7 @@ IN_PROC_BROWSER_TEST_F(PriceTrackingBubbleInteractiveTest,
   static_cast<PriceTrackingBubbleDialogView*>(
       views::ElementTrackerViews::GetInstance()->GetFirstMatchingView(
           kPriceTrackingBubbleDialogId,
-          browser()->window()->GetElementContext()))
+          BrowserElements::From(browser())->GetContext()))
       ->GetBodyLabelForTesting()
       ->ClickFirstLinkForTesting();
 

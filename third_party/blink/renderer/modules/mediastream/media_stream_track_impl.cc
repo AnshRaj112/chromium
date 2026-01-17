@@ -31,7 +31,9 @@
 #include "base/functional/callback_helpers.h"
 #include "base/strings/to_string.h"
 #include "build/build_config.h"
+#include "media/base/media_switches.h"
 #include "third_party/blink/public/common/features.h"
+#include "third_party/blink/public/common/mediastream/media_stream_request.h"
 #include "third_party/blink/public/platform/modules/mediastream/web_media_stream_track.h"
 #include "third_party/blink/public/platform/modules/webrtc/webrtc_logging.h"
 #include "third_party/blink/public/web/modules/mediastream/media_stream_video_source.h"
@@ -211,15 +213,14 @@ std::optional<media::mojom::DisplayCaptureSurfaceType> GetDisplayCaptureType(
   return settings.display_surface;
 }
 
-WebString GetDisplaySurfaceString(
-    media::mojom::DisplayCaptureSurfaceType value) {
+String GetDisplaySurfaceString(media::mojom::DisplayCaptureSurfaceType value) {
   switch (value) {
     case media::mojom::DisplayCaptureSurfaceType::MONITOR:
-      return WebString::FromUTF8("monitor");
+      return "monitor";
     case media::mojom::DisplayCaptureSurfaceType::WINDOW:
-      return WebString::FromUTF8("window");
+      return "window";
     case media::mojom::DisplayCaptureSurfaceType::BROWSER:
-      return WebString::FromUTF8("browser");
+      return "browser";
   }
   NOTREACHED();
 }
@@ -308,9 +309,8 @@ MediaStreamTrackImpl::MediaStreamTrackImpl(
 
   if (video_track && GetDisplayCaptureType(component_)) {
     video_track->RegisterCaptureSurfaceResolutionChangeCallback(
-        WTF::BindRepeating(
-            &MediaStreamTrackImpl::MaybeDispatchConfigurationChange,
-            WrapWeakPersistent(this)));
+        BindRepeating(&MediaStreamTrackImpl::MaybeDispatchConfigurationChange,
+                      WrapWeakPersistent(this)));
   }
 }
 
@@ -418,8 +418,8 @@ void MediaStreamTrackImpl::setReadyState(
   if (ready_state_ != MediaStreamSource::kReadyStateEnded &&
       ready_state_ != ready_state) {
     ready_state_ = ready_state;
-    SendLogMessage(String::Format("%s({ready_state=%s})", __func__,
-                                  readyState().AsCStr()));
+    SendLogMessage(UNSAFE_TODO(String::Format("%s({ready_state=%s})", __func__,
+                                              readyState().AsCStr())));
 
     // Observers may dispatch events which create and add new Observers;
     // take a snapshot so as to safely iterate.
@@ -696,7 +696,7 @@ MediaTrackSettings* MediaStreamTrackImpl::getSettings() const {
     settings->setLogicalSurface(*platform_settings.logical_surface);
   }
   if (platform_settings.cursor) {
-    WTF::String value;
+    String value;
     switch (*platform_settings.cursor) {
       case media::mojom::CursorCaptureType::NEVER:
         value = "never";
@@ -849,11 +849,16 @@ void MediaStreamTrackImpl::SetConstraintsInternal(
         constraints_.Basic().suppress_local_audio_playback.Ideal();
   }
 
-  CHECK(!restrict_own_audio_setting_.has_value());
-  if (!constraints_.IsNull() &&
-      constraints_.Basic().restrict_own_audio.HasIdeal()) {
-    restrict_own_audio_setting_ =
-        constraints_.Basic().restrict_own_audio.Ideal();
+  if (RuntimeEnabledFeatures::RestrictOwnAudioEnabled() &&
+      device().has_value() &&
+      device()->type == mojom::blink::MediaStreamType::DISPLAY_AUDIO_CAPTURE) {
+    restrict_own_audio_setting_ = false;
+    if (!constraints_.IsNull() &&
+        constraints_.Basic().restrict_own_audio.HasIdeal()) {
+      restrict_own_audio_setting_ =
+          constraints_.Basic().restrict_own_audio.Ideal() &&
+          media::IsRestrictOwnAudioSupported();
+    }
   }
 }
 
@@ -971,8 +976,8 @@ void MediaStreamTrackImpl::SourceChangedCaptureConfiguration() {
   // configurationchange event if they differ from the old ones.
   if (image_capture_) {
     image_capture_->UpdateAndCheckMediaTrackSettingsAndCapabilities(
-        WTF::BindOnce(&MediaStreamTrackImpl::MaybeDispatchConfigurationChange,
-                      WrapWeakPersistent(this)));
+        BindOnce(&MediaStreamTrackImpl::MaybeDispatchConfigurationChange,
+                 WrapWeakPersistent(this)));
   }
 }
 
@@ -1090,7 +1095,7 @@ void MediaStreamTrackImpl::BeingTransferred(
   if (user_media_client) {
     user_media_client->KeepDeviceAliveForTransfer(
         device()->serializable_session_id().value(), transfer_id,
-        WTF::BindOnce(
+        BindOnce(
             [](MediaStreamTrack* cloned_track,
                ExecutionContext* execution_context, bool device_found) {
               if (!device_found) {
@@ -1225,15 +1230,16 @@ void MediaStreamTrackImpl::AddObserver(MediaStreamTrack::Observer* observer) {
   observers_.insert(observer);
 }
 
-void MediaStreamTrackImpl::SendLogMessage(const WTF::String& message) {
+void MediaStreamTrackImpl::SendLogMessage(const String& message) {
   WebRtcLogMessage(
-      String::Format(
-          "MST::%s [kind: %s, id: %s, label: %s, enabled: %s, muted: %s, "
-          "readyState: %s, remote=%s]",
-          message.Utf8().c_str(), kind().Utf8().c_str(), id().Utf8().c_str(),
-          label().Utf8().c_str(), enabled() ? "true" : "false",
-          muted() ? "true" : "false", readyState().AsCStr(),
-          component_->Remote() ? "true" : "false")
+      UNSAFE_TODO(
+          String::Format(
+              "MST::%s [kind: %s, id: %s, label: %s, enabled: %s, muted: %s, "
+              "readyState: %s, remote=%s]",
+              message.Utf8().c_str(), kind().Utf8().c_str(),
+              id().Utf8().c_str(), label().Utf8().c_str(),
+              enabled() ? "true" : "false", muted() ? "true" : "false",
+              readyState().AsCStr(), component_->Remote() ? "true" : "false"))
           .Utf8());
 }
 

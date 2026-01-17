@@ -5,11 +5,11 @@
 package org.chromium.chrome.browser.keyboard_accessory;
 
 import android.app.Activity;
+import android.graphics.RectF;
 import android.net.Uri;
 import android.text.style.ClickableSpan;
 import android.view.View;
 
-import androidx.annotation.Nullable;
 import androidx.browser.customtabs.CustomTabsIntent;
 
 import org.jni_zero.CalledByNative;
@@ -18,8 +18,8 @@ import org.jni_zero.JniType;
 import org.jni_zero.NativeMethods;
 
 import org.chromium.base.Callback;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.chrome.browser.keyboard_accessory.data.PropertyProvider;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.components.autofill.AutofillDelegate;
 import org.chromium.components.autofill.AutofillSuggestion;
 import org.chromium.components.autofill.AutofillSuggestion.Payload;
@@ -37,10 +37,9 @@ import java.util.List;
 public class AutofillKeyboardAccessoryViewBridge implements AutofillDelegate {
     private long mNativeAutofillKeyboardAccessory;
     private WeakReference<Activity> mActivity;
-    private @Nullable ObservableSupplier<ManualFillingComponent> mManualFillingComponentSupplier;
+    private @Nullable MonotonicObservableSupplier<ManualFillingComponent>
+            mManualFillingComponentSupplier;
     private @Nullable ManualFillingComponent mManualFillingComponent;
-    private final PropertyProvider<List<AutofillSuggestion>> mChipProvider =
-            new PropertyProvider<>(AccessoryAction.AUTOFILL_SUGGESTION);
     private final Callback<ManualFillingComponent> mFillingComponentObserver =
             this::connectToFillingComponent;
 
@@ -129,7 +128,9 @@ public class AutofillKeyboardAccessoryViewBridge implements AutofillDelegate {
     @CalledByNative
     private void dismiss() {
         if (mManualFillingComponentSupplier != null) {
-            mChipProvider.notifyObservers(List.of());
+            if (mManualFillingComponent != null) {
+                mManualFillingComponent.setSuggestions(List.of(), this);
+            }
             mManualFillingComponentSupplier.removeObserver(mFillingComponentObserver);
         }
         dismissed();
@@ -139,10 +140,20 @@ public class AutofillKeyboardAccessoryViewBridge implements AutofillDelegate {
      * Shows an Autofill view with specified suggestions.
      *
      * @param suggestions Autofill suggestions to be displayed.
+     * @param bounds Bounds of the focused field given in device-independent pixels.
      */
     @CalledByNative
-    private void show(@JniType("std::vector") List<AutofillSuggestion> suggestions) {
-        mChipProvider.notifyObservers(suggestions);
+    private void show(@JniType("std::vector") List<AutofillSuggestion> suggestions, RectF bounds) {
+        if (mManualFillingComponent != null) {
+            mManualFillingComponent.setFieldBounds(bounds);
+            mManualFillingComponent.setSuggestions(suggestions, this);
+        }
+    }
+
+    /** Helper function used to create RectF object on the c++ side. */
+    @CalledByNative
+    private static RectF createFieldBounds(float left, float top, float right, float bottom) {
+        return new RectF(left, top, right, bottom);
     }
 
     /**
@@ -191,6 +202,7 @@ public class AutofillKeyboardAccessoryViewBridge implements AutofillDelegate {
      *
      * @param sublabel Hint for the suggested text. The text that's going to be filled in the
      *     unfocused fields of the form. If {@see label} is empty, then this must be empty too.
+     * @param voiceOver Voice over text read for the keyboard accessory suggestion.
      * @param iconId The resource ID for the icon associated with the suggestion, or 0 for no icon.
      * @param suggestionType Determines the type of the suggestion.
      * @param isDeletable Whether the item can be deleted by the user.
@@ -205,6 +217,7 @@ public class AutofillKeyboardAccessoryViewBridge implements AutofillDelegate {
     private static AutofillSuggestion createAutofillSuggestion(
             @JniType("std::u16string") String label,
             @JniType("std::u16string") String sublabel,
+            @JniType("std::u16string") String voiceOver,
             int iconId,
             @SuggestionType int suggestionType,
             boolean isDeletable,
@@ -217,6 +230,7 @@ public class AutofillKeyboardAccessoryViewBridge implements AutofillDelegate {
         return new AutofillSuggestion.Builder()
                 .setLabel(label)
                 .setSubLabel(sublabel)
+                .setVoiceOver(voiceOver)
                 .setIconId(drawableId)
                 .setSuggestionType(suggestionType)
                 .setIsDeletable(isDeletable)
@@ -237,8 +251,6 @@ public class AutofillKeyboardAccessoryViewBridge implements AutofillDelegate {
     private void connectToFillingComponent(@Nullable ManualFillingComponent fillingComponent) {
         if (mManualFillingComponent == fillingComponent) return;
         mManualFillingComponent = fillingComponent;
-        if (mManualFillingComponent == null) return;
-        mManualFillingComponent.registerAutofillProvider(mChipProvider, this);
     }
 
     @NativeMethods

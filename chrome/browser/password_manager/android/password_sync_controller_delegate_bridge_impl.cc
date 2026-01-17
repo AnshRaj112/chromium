@@ -6,7 +6,6 @@
 
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
-#include "chrome/browser/password_manager/android/password_manager_android_util.h"
 #include "components/password_manager/core/browser/password_store/android_backend_error.h"
 #include "components/password_manager/core/common/password_manager_features.h"
 
@@ -55,8 +54,10 @@ void PasswordSyncControllerDelegateBridgeImpl::OnCredentialManagerNotified(
 
 void PasswordSyncControllerDelegateBridgeImpl::OnCredentialManagerError(
     JNIEnv* env,
-    jint error_code,
-    jint api_error_code) {
+    int32_t error_code,
+    int32_t api_error_code) {
   AndroidBackendError error{static_cast<AndroidBackendErrorType>(error_code)};
   consumer_->OnCredentialManagerError(error, static_cast<int>(api_error_code));
 }
+
+DEFINE_JNI(PasswordSyncControllerDelegateBridgeImpl)

@@ -8,30 +8,34 @@ import static org.chromium.build.NullUtil.assumeNonNull;
 
 import org.chromium.base.Callback;
 import org.chromium.base.lifetime.Destroyable;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.NonNullObservableSupplier;
+import org.chromium.base.supplier.ObservableSuppliers;
+import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.profiles.Profile;
-import org.chromium.chrome.browser.tab.Tab;
 
 /**
- * {@link ObservableSupplier} for {@link Profile} that updates each time the profile of the current
+ * {@link MonotonicObservableSupplier} for {@link Profile} that updates each time the profile of the current
  * tab model changes, e.g. if the current tab model switches to/from incognito. Like {@link
- * org.chromium.base.supplier.ObservableSupplier}, this class must only be accessed from a single
+ * MonotonicObservableSupplier}, this class must only be accessed from a single
  * thread.
  */
 @NullMarked
-public class TabModelSelectorProfileSupplier extends ObservableSupplierImpl<Profile>
-        implements Destroyable {
+public class TabModelSelectorProfileSupplier
+        implements MonotonicObservableSupplier<Profile>, Destroyable {
     private final TabModelSelectorObserver mSelectorObserver;
-    private final ObservableSupplier<TabModelSelector> mSelectorSupplier;
+    private final MonotonicObservableSupplier<TabModelSelector> mSelectorSupplier;
     private final Callback<TabModelSelector> mSelectorSupplierCallback;
     private final Callback<TabModel> mCurrentTabModelObserver;
+    private final SettableMonotonicObservableSupplier<Profile> mSupplier =
+            ObservableSuppliers.createMonotonic();
 
     private @Nullable TabModelSelector mSelector;
 
-    public TabModelSelectorProfileSupplier(ObservableSupplier<TabModelSelector> selectorSupplier) {
+    public TabModelSelectorProfileSupplier(
+            MonotonicObservableSupplier<TabModelSelector> selectorSupplier) {
         mSelectorObserver =
                 new TabModelSelectorObserver() {
                     @Override
@@ -42,12 +46,6 @@ public class TabModelSelectorProfileSupplier extends ObservableSupplierImpl<Prof
                         if (profile == null) return;
                         set(profile);
                     }
-
-                    @Override
-                    public void onNewTabCreated(Tab tab, int creationState) {}
-
-                    @Override
-                    public void onTabHidden(Tab tab) {}
 
                     @Override
                     public void onTabStateInitialized() {
@@ -69,8 +67,9 @@ public class TabModelSelectorProfileSupplier extends ObservableSupplierImpl<Prof
         mSelectorSupplierCallback = this::setSelector;
         mSelectorSupplier.addObserver(mSelectorSupplierCallback);
 
-        if (mSelectorSupplier.hasValue()) {
-            setSelector(mSelectorSupplier.get());
+        var selector = mSelectorSupplier.get();
+        if (selector != null) {
+            setSelector(selector);
         }
     }
 
@@ -100,33 +99,39 @@ public class TabModelSelectorProfileSupplier extends ObservableSupplierImpl<Prof
         mSelectorSupplier.removeObserver(mSelectorSupplierCallback);
     }
 
-    @Override
-    public void set(Profile profile) {
-        if (profile == null) {
-            throw new IllegalStateException("Null is not a valid value to set for the profile.");
-        }
+    private void set(@Nullable Profile profile) {
+        assert profile != null : "Cannot set a null Profile";
         // TODO(365814339): Convert to checked exception once all callsites are fixed.
         assert !profile.shutdownStarted() : "Attempting to set an already destroyed Profile";
-        super.set(profile);
+        mSupplier.set(profile);
     }
 
     @Override
     public Profile get() {
-        Profile profile = super.get();
-        if (profile == null) {
-            // Prevent unintentional access to a null profile early during app initialization. If a
-            // client wants to read this when it could be null, use hasValue() and add an observer
-            // to be notified when the profile becomes available.
-            throw new IllegalStateException("Attempting to read a null profile from the supplier");
-        }
+        Profile profile = mSupplier.get();
         // TODO(365814339): Convert to checked exception once all callsites are fixed.
-        assert !profile.shutdownStarted() : "Attempting to access an already destroyed Profile";
+        assert profile == null || !profile.shutdownStarted()
+                : "Attempting to access an already destroyed Profile";
         return profile;
     }
 
     @Override
-    public boolean hasValue() {
-        // this.get() will throw on null, so go directly to super.
-        return super.get() != null;
+    public @Nullable Profile addObserver(Callback<Profile> obs, int behavior) {
+        return mSupplier.addObserver(obs, behavior);
+    }
+
+    @Override
+    public void removeObserver(Callback<Profile> obs) {
+        mSupplier.removeObserver(obs);
+    }
+
+    @Override
+    public int getObserverCount() {
+        return mSupplier.getObserverCount();
+    }
+
+    @Override
+    public NonNullObservableSupplier<Profile> asNonNull() {
+        return mSupplier.asNonNull();
     }
 }

@@ -24,10 +24,14 @@
 
 #include "third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom-blink.h"
 #include "third_party/blink/renderer/core/animation/css/css_animations.h"
+#include "third_party/blink/renderer/core/css/css_crossfade_value.h"
+#include "third_party/blink/renderer/core/css/css_gradient_value.h"
+#include "third_party/blink/renderer/core/css/css_image_set_value.h"
 #include "third_party/blink/renderer/core/css/css_light_dark_value_pair.h"
 #include "third_party/blink/renderer/core/css/css_property_value_set.h"
 #include "third_party/blink/renderer/core/css/css_uri_value.h"
 #include "third_party/blink/renderer/core/css/resolver/style_resolver.h"
+#include "third_party/blink/renderer/core/css/style_engine.h"
 #include "third_party/blink/renderer/core/dom/flat_tree_traversal.h"
 #include "third_party/blink/renderer/core/dom/node.h"
 #include "third_party/blink/renderer/core/dom/pseudo_element.h"
@@ -36,6 +40,28 @@
 namespace blink {
 
 namespace {
+
+bool MayReturnNullRenderingStyleForPseudoElement(
+    PseudoId pseudo_id,
+    const ComputedStyle* parent_style) {
+  switch (pseudo_id) {
+    // We always create styles for ::column pseduo-elements to collect
+    // pseudo-element styles even if there are no matched properties.
+    // E.g. if we only have ::column::scroll-marker {} rule, we need to create
+    // a style for ::column.
+    case kPseudoIdColumn: {
+      return false;
+    }
+    // We always create styles for ::scroll-marker-group pseudo-elements
+    // if there is 'scroll-marker-group' property specified on the parent.
+    case kPseudoIdScrollMarkerGroup: {
+      CHECK(parent_style);
+      return parent_style->ScrollMarkerGroupNone();
+    }
+    default:
+      return true;
+  }
+}
 
 Element* ComputeStyledElement(const StyleRequest& style_request,
                               Element& element) {
@@ -131,10 +157,21 @@ EInsideLink StyleResolverState::InsideLink() const {
 
 const ComputedStyle* StyleResolverState::TakeStyle() {
   if (had_no_matched_properties_ &&
+      MayReturnNullRenderingStyleForPseudoElement(
+          element_context_.GetElement().GetPseudoIdForStyling(),
+          parent_style_) &&
       pseudo_request_type_ == StyleRequest::kForRenderer) {
     return nullptr;
   }
   return style_builder_->TakeStyle();
+}
+
+const ComputedStyle* StyleResolverState::CloneStyle() const {
+  if (had_no_matched_properties_ &&
+      pseudo_request_type_ == StyleRequest::kForRenderer) {
+    return nullptr;
+  }
+  return style_builder_->CloneStyle();
 }
 
 void StyleResolverState::UpdateLengthConversionData() {
@@ -182,7 +219,7 @@ CSSToLengthConversionData StyleResolverState::UnzoomedLengthConversionData() {
 
 Element* StyleResolverState::ContainerUnitContext() const {
   // TODO(crbug.com/396016391): Always provide a StyleRecalcContext.
-  return style_recalc_context_ ? style_recalc_context_->container
+  return style_recalc_context_ ? style_recalc_context_->size_container
                                : FlatTreeTraversal::ParentElement(GetElement());
 }
 
@@ -315,7 +352,8 @@ void StyleResolverState::SetTextOrientation(ETextOrientation text_orientation) {
   }
 }
 
-void StyleResolverState::SetPositionAnchor(ScopedCSSName* position_anchor) {
+void StyleResolverState::SetPositionAnchor(
+    const StylePositionAnchor& position_anchor) {
   if (StyleBuilder().PositionAnchor() != position_anchor) {
     StyleBuilder().SetPositionAnchor(position_anchor);
     css_to_length_conversion_data_.SetAnchorData(
@@ -334,6 +372,16 @@ void StyleResolverState::SetPositionAreaOffsets(
                                               StyleBuilder().PositionAnchor(),
                                               position_area_offsets));
   }
+}
+
+WritingDirectionMode StyleResolverState::GetAnchoredContainerWritingDirection()
+    const {
+  AnchorEvaluator* anchor_evaluator = GetAnchorEvaluator();
+  CHECK(anchor_evaluator)
+      << "Should only be invoked for flips, which only happen from "
+         "UpdateStyleAndLayoutTreeForOutOfFlow() for which we always have a "
+         "non-null AnchorEvaluator";
+  return anchor_evaluator->GetContainerWritingDirection();
 }
 
 CSSParserMode StyleResolverState::GetParserMode() const {
@@ -358,6 +406,35 @@ const CSSValue& StyleResolverState::ResolveLightDarkPair(
       return pair->First();
     }
     return pair->Second();
+  }
+  return value;
+}
+
+const CSSValue& StyleResolverState::ResolveGradients(
+    const CSSValue& value) const {
+  if (const auto* gradient_value =
+          DynamicTo<cssvalue::CSSGradientValue>(value)) {
+    return gradient_value->ResolveValuesIfNeeded(*this);
+  }
+  if (const auto* image_set_value = DynamicTo<CSSImageSetValue>(value)) {
+    return image_set_value->ResolveValuesIfNeeded(*this);
+  }
+  if (const auto* cross_fade_value =
+          DynamicTo<cssvalue::CSSCrossfadeValue>(value)) {
+    return cross_fade_value->ResolveValuesIfNeeded(*this);
+  }
+  return value;
+}
+
+CSSValue& StyleResolverState::ResolveGradients(CSSValue& value) const {
+  if (auto* gradient_value = DynamicTo<cssvalue::CSSGradientValue>(value)) {
+    return gradient_value->ResolveValuesIfNeeded(*this);
+  }
+  if (auto* image_set_value = DynamicTo<CSSImageSetValue>(value)) {
+    return image_set_value->ResolveValuesIfNeeded(*this);
+  }
+  if (auto* cross_fade_value = DynamicTo<cssvalue::CSSCrossfadeValue>(value)) {
+    return cross_fade_value->ResolveValuesIfNeeded(*this);
   }
   return value;
 }
@@ -397,17 +474,11 @@ void StyleResolverState::SetComputedStyleFlagsFromAuthorFlags(
     StyleBuilder().SetHasAuthorBorderRadius();
   }
 
-  if (RuntimeEnabledFeatures::CSSDoNotHideVisitedColorEnabled()) {
-    if (author_flags & CSSProperty::kHighlightColors) {
-      StyleBuilder().SetHasAuthorHighlightColors();
-    }
-  } else {
-    if ((InsideLink() != EInsideLink::kInsideVisitedLink &&
-         (author_flags & CSSProperty::kHighlightColors)) ||
-        (InsideLink() == EInsideLink::kInsideVisitedLink &&
-         (author_flags & CSSProperty::kVisitedHighlightColors))) {
-      StyleBuilder().SetHasAuthorHighlightColors();
-    }
+  if ((InsideLink() != EInsideLink::kInsideVisitedLink &&
+       (author_flags & CSSProperty::kHighlightColors)) ||
+      (InsideLink() == EInsideLink::kInsideVisitedLink &&
+       (author_flags & CSSProperty::kVisitedHighlightColors))) {
+    StyleBuilder().SetHasAuthorHighlightColors();
   }
 }
 

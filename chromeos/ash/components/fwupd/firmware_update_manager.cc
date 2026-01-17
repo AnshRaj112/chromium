@@ -15,7 +15,6 @@
 #include "base/base_paths.h"
 #include "base/check_op.h"
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/files/file.h"
 #include "base/files/file_path.h"
@@ -23,8 +22,10 @@
 #include "base/files/scoped_file.h"
 #include "base/json/json_reader.h"
 #include "base/path_service.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/strings/string_view_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/system/sys_info.h"
 #include "base/task/task_traits.h"
@@ -75,7 +76,7 @@ static constexpr auto FwupdStatusStringMap =
          {FwupdStatus::kWaitingForUser, "Waiting for user action"}});
 
 const char* GetFwupdStatusString(FwupdStatus enum_val) {
-  DCHECK(base::Contains(FwupdStatusStringMap, enum_val));
+  DCHECK(FwupdStatusStringMap.contains(enum_val));
   return FwupdStatusStringMap.at(enum_val);
 }
 
@@ -161,21 +162,16 @@ base::File VerifyChecksum(base::File file, const std::string& checksum) {
   }
 
   // Safe to truncate down to <int>.
-  int file_length = raw_file_length;
+  const int file_length = raw_file_length;
 
   // Check checksum of the file.
-  std::vector<char> buf(file_length);
-  if (UNSAFE_TODO(file.Read(0, buf.data(), file_length)) != file_length) {
+  std::vector<uint8_t> buf(file_length);
+  if (file.Read(0, buf) != file_length) {
     return base::File();
   }
 
-  const std::string_view contents(buf.data(), file_length);
-
-  const std::string sha_contents = crypto::SHA256HashString(contents);
-
   const std::string encoded_sha =
-      base::ToLowerASCII(base::HexEncode(sha_contents));
-
+      base::HexEncodeLower(crypto::SHA256HashString(base::as_string_view(buf)));
   if (encoded_sha != checksum) {
     FIRMWARE_LOG(ERROR) << "Wrong checksum, expected: " << checksum
                         << ", got: " << encoded_sha;
@@ -324,7 +320,8 @@ std::string GetFirmwareFileNameFromJsonString(const std::string& json_content) {
   }
 
   base::JSONReader::Result value =
-      base::JSONReader::ReadAndReturnValueWithError(json_content);
+      base::JSONReader::ReadAndReturnValueWithError(
+          json_content, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!value.has_value()) {
     FIRMWARE_LOG(ERROR) << "Failed to deserialize json string with error: "
                         << value.error().ToString();
@@ -816,6 +813,12 @@ void FirmwareUpdateManager::OnGetFile(const std::string& device_id,
     }
   }
 
+  if (inflight_update_.is_null()) {
+    FIRMWARE_LOG(ERROR) << "Unknown device ID: " << device_id;
+    std::move(callback).Run(MethodResult::kUnknownDeviceId);
+    return;
+  }
+
   task_runner_->PostTaskAndReplyWithResult(
       FROM_HERE,
       base::BindOnce(&VerifyChecksum, std::move(file),
@@ -867,7 +870,7 @@ void FirmwareUpdateManager::OnDeviceListResponse(FwupdDeviceList* devices) {
 void FirmwareUpdateManager::ShowNotificationIfRequired() {
   for (const auto& update : updates_) {
     if (update->priority == firmware_update::mojom::UpdatePriority::kCritical &&
-        !base::Contains(devices_already_notified_, update->device_id)) {
+        !devices_already_notified_.contains(update->device_id)) {
       devices_already_notified_.insert(update->device_id);
       NotifyCriticalFirmwareUpdateReceived();
     }
@@ -877,7 +880,7 @@ void FirmwareUpdateManager::ShowNotificationIfRequired() {
 void FirmwareUpdateManager::OnUpdateListResponse(const std::string& device_id,
                                                  FwupdUpdateList* updates) {
   DCHECK(updates);
-  DCHECK(base::Contains(devices_pending_update_, device_id));
+  DCHECK(devices_pending_update_.contains(device_id));
 
   // If there are updates, then choose the first one.
   if (!updates->empty()) {

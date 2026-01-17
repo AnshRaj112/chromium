@@ -12,16 +12,18 @@ import static org.mockito.Mockito.when;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 import org.robolectric.annotation.Config;
 
 import org.chromium.base.Callback;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabObserver;
@@ -32,7 +34,8 @@ import org.chromium.url.GURL;
 @Config(manifest = Config.NONE)
 public class BoardingPassControllerTest {
 
-    @Mock private ObservableSupplier<Tab> mMockTabProvider;
+    @Rule public final MockitoRule mMockitoRule = MockitoJUnit.rule();
+    @Mock private MonotonicObservableSupplier<Tab> mMockTabProvider;
 
     @Mock private Tab mMockTab;
 
@@ -46,7 +49,6 @@ public class BoardingPassControllerTest {
 
     @Before
     public void setUp() {
-        MockitoAnnotations.initMocks(this);
         BoardingPassBridgeJni.setInstanceForTesting(mMockBoardingPassBridgeJni);
         createControllerAndVerify();
     }

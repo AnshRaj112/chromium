@@ -20,10 +20,7 @@ include_rules = [
   "+chrome/browser/ash/login/users",
   "+chrome/browser/ash/policy/core",
   "+chrome/browser/ash/profiles",
-  "+chrome/browser/browser_process.h",
-  "+chrome/browser/browser_process_platform_part.h",
   "+chrome/browser/lifetime",
-  "+chrome/browser/notifications",
   "+chrome/browser/policy",
   "+chrome/browser/profiles",
   "+chrome/browser/ui/ash/arc",
@@ -33,4 +30,5 @@ include_rules = [
   "+chrome/common/webui_url_constants.h",
   "+chrome/grit",
   "+chrome/test/base",
+  "+ui/message_center/message_center.h",
 ]

@@ -57,6 +57,9 @@ void SpellCheckClient::CheckSpelling(
 
 void SpellCheckClient::RequestCheckingOfText(
     const blink::WebString& text,
+    const std::vector<gfx::Range>& spelling_markers,
+    blink::WebTextCheckClient::ShouldForceRefreshTextCheckService
+        should_force_refresh,
     std::unique_ptr<blink::WebTextCheckingCompletion> completion) {
   if (!enabled_ || text.IsEmpty()) {
     if (completion) {
@@ -74,7 +77,9 @@ void SpellCheckClient::RequestCheckingOfText(
 
   last_requested_text_checking_completion_ = std::move(completion);
   last_requested_text_check_string_ = text;
-  if (spell_checker_.HasInCache(text)) {
+  if (should_force_refresh ==
+          blink::WebTextCheckClient::ShouldForceRefreshTextCheckService::kNo &&
+      spell_checker_.HasInCache(text)) {
     FinishLastTextCheck();
   } else {
     frame_->GetTaskRunner(blink::TaskType::kInternalTest)

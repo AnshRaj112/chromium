@@ -39,7 +39,8 @@ TouchSelectionControllerInputObserver::TouchSelectionControllerInputObserver(
 
 void TouchSelectionControllerInputObserver::OnInputEvent(
     const RenderWidgetHost& widget,
-    const blink::WebInputEvent& input_event) {
+    const blink::WebInputEvent& input_event,
+    InputEventSource source) {
   if (!blink::WebInputEvent::IsGestureEventType(input_event.GetType())) {
     return;
   }
@@ -87,6 +88,11 @@ void TouchSelectionControllerInputObserver::OnInputEventAck(
     const blink::WebInputEvent& input_event) {
   if (!input_event.IsGestureScroll()) {
     return;
+  }
+
+  if (input_event.GetType() ==
+      blink::WebInputEvent::Type::kGestureScrollBegin) {
+    has_seen_scroll_begin_ack_ = true;
   }
 
   const blink::WebGestureEvent& event =

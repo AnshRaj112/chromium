@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "content/services/auction_worklet/auction_v8_helper.h"
 
 #include <limits>
@@ -15,7 +10,6 @@
 #include <utility>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/functional/callback.h"
 #include "base/location.h"
 #include "base/memory/raw_ptr.h"
@@ -392,6 +386,9 @@ v8::Local<v8::Context> AuctionV8Helper::CreateContext(
   auto result =
       context->Global()->Delete(context, CreateStringFromLiteral("Date"));
   DCHECK(!result.IsNothing());
+  auto result2 =
+      context->Global()->Delete(context, CreateStringFromLiteral("Temporal"));
+  DCHECK(!result2.IsNothing());
   return context;
 }
 
@@ -766,7 +763,7 @@ int AuctionV8Helper::AllocContextGroupId() {
     int candidate = ++last_context_group_id_;
     DCHECK_GT(candidate, 0);
 
-    if (!base::Contains(resume_callbacks_, candidate)) {
+    if (!resume_callbacks_.contains(candidate)) {
       resume_callbacks_.emplace(candidate, base::OnceClosure());
       return candidate;
     }

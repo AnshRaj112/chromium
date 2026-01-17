@@ -54,7 +54,7 @@ namespace blink {
 LocalFrame& InsertCommands::TargetFrame(LocalFrame& frame, Event* event) {
   if (!event)
     return frame;
-  const Node* node = event->target()->ToNode();
+  const Node* node = event->RawTarget()->ToNode();
   if (!node)
     return frame;
   LocalFrame* local_frame = node->GetDocument().GetFrame();
@@ -68,6 +68,7 @@ bool InsertCommands::ExecuteInsertFragment(LocalFrame& frame,
   return MakeGarbageCollected<ReplaceSelectionCommand>(
              *frame.GetDocument(), fragment,
              ReplaceSelectionCommand::kPreventNesting,
+             EditCommand::PasswordEchoBehavior::kDoNotEcho,
              InputEvent::InputType::kNone)
       ->Apply();
 }
@@ -228,7 +229,8 @@ bool InsertCommands::ExecuteInsertText(LocalFrame& frame,
                                        EditorCommandSource,
                                        const String& value) {
   DCHECK(frame.GetDocument());
-  TypingCommand::InsertText(*frame.GetDocument(), value, 0);
+  TypingCommand::InsertText(*frame.GetDocument(), value, 0,
+                            EditCommand::PasswordEchoBehavior::kDoNotEcho);
   return true;
 }
 

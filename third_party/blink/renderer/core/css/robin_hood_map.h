@@ -16,7 +16,7 @@ namespace blink {
 // Since RuleMap is so performance-critical for us (a large part of style
 // is looking up rules in RuleMaps, especially since we have one RuleSet per
 // stylesheet and one RuleSet has many RuleMaps), we have implemented our own
-// hash table, which gives better lookup performance than WTF::HashMap,
+// hash table, which gives better lookup performance than blink::HashMap,
 // especially on cache-starved CPUs. We pay for this with some extra code
 // and slightly more expensive inserts (and we also don't support deletes,
 // although that could be added). The key features of our implementation are:
@@ -58,7 +58,7 @@ namespace blink {
 //  - Arbitrary keys (currently supports only AtomicString as key).
 //
 //  - Using a HeapVector instead of a regular array, allowing to store Oilpan
-//    objects as values without using Persistent<> (note that WTF::HashMap
+//    objects as values without using Persistent<> (note that blink::HashMap
 //    only supports Oilpan objects using Member<>, not directly).
 //
 //  - Full STL-like or WTF-like interface: Better iterators, removals, etc.
@@ -122,7 +122,7 @@ struct RobinHoodMap {
 
     Bucket* bucket = FindBucket(key);
     for (unsigned i = 0; i < kPossibleBucketsPerKey;
-         ++i, UNSAFE_TODO(++bucket)) {
+         ++i, UNSAFE_BUFFERS(++bucket)) {
       if (bucket->key == key) {
         return bucket;
       }
@@ -148,20 +148,19 @@ struct RobinHoodMap {
    public:
     iterator(Bucket* pos, const Bucket* end) : pos_(pos), end_(end) {
       while (pos_ != end_ && pos_->key.IsNull()) {
-        UNSAFE_TODO(++pos_);
+        UNSAFE_BUFFERS(++pos_);
       }
     }
     Bucket& operator*() const { return *pos_; }
     Bucket* operator->() const { return pos_; }
     iterator& operator++() {
-      UNSAFE_TODO(++pos_);
+      UNSAFE_BUFFERS(++pos_);
       while (pos_ != end_ && pos_->key.IsNull()) {
-        UNSAFE_TODO(++pos_);
+        UNSAFE_BUFFERS(++pos_);
       }
       return *this;
     }
     bool operator==(const iterator& other) const { return pos_ == other.pos_; }
-    bool operator!=(const iterator& other) const { return pos_ != other.pos_; }
 
    private:
     Bucket* pos_;
@@ -172,23 +171,20 @@ struct RobinHoodMap {
     const_iterator(const Bucket* pos, const Bucket* end)
         : pos_(pos), end_(end) {
       while (pos_ != end_ && pos_->key.IsNull()) {
-        UNSAFE_TODO(++pos_);
+        UNSAFE_BUFFERS(++pos_);
       }
     }
     const Bucket& operator*() const { return *pos_; }
     const Bucket* operator->() const { return pos_; }
     const_iterator& operator++() {
-      UNSAFE_TODO(++pos_);
+      UNSAFE_BUFFERS(++pos_);
       while (pos_ != end_ && pos_->key.IsNull()) {
-        UNSAFE_TODO(++pos_);
+        UNSAFE_BUFFERS(++pos_);
       }
       return *this;
     }
     bool operator==(const const_iterator& other) const {
       return pos_ == other.pos_;
-    }
-    bool operator!=(const const_iterator& other) const {
-      return pos_ != other.pos_;
     }
 
    private:
@@ -204,13 +200,13 @@ struct RobinHoodMap {
 
  private:
   Bucket* EndBucket() {
-    return buckets_.get() ? UNSAFE_TODO(buckets_.get() + num_buckets_ +
-                                        kPossibleBucketsPerKey)
+    return buckets_.get() ? UNSAFE_BUFFERS(buckets_.get() + num_buckets_ +
+                                           kPossibleBucketsPerKey)
                           : nullptr;
   }
   const Bucket* EndBucket() const {
-    return buckets_.get() ? UNSAFE_TODO(buckets_.get() + num_buckets_ +
-                                        kPossibleBucketsPerKey)
+    return buckets_.get() ? UNSAFE_BUFFERS(buckets_.get() + num_buckets_ +
+                                           kPossibleBucketsPerKey)
                           : nullptr;
   }
   unsigned FindBucketIndex(const Key& key) const {
@@ -229,10 +225,10 @@ struct RobinHoodMap {
   // to find the element. This can never overflow; see the definition
   // of buckets_ below.
   Bucket* FindBucket(const Key& key) {
-    return UNSAFE_TODO(buckets_.get() + FindBucketIndex(key));
+    return UNSAFE_BUFFERS(buckets_.get() + FindBucketIndex(key));
   }
   const Bucket* FindBucket(const Key& key) const {
-    return UNSAFE_TODO(buckets_.get() + FindBucketIndex(key));
+    return UNSAFE_BUFFERS(buckets_.get() + FindBucketIndex(key));
   }
 
   // Inserts the given key/value, possibly displacing other buckets in the

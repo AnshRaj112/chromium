@@ -20,17 +20,17 @@
 #include "chrome/browser/extensions/chrome_test_extension_loader.h"
 #include "chrome/browser/extensions/extension_action_test_util.h"
 #include "chrome/browser/extensions/extension_service.h"
-#include "chrome/browser/extensions/load_error_reporter.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/toolbar/toolbar_action_view_controller.h"
+#include "chrome/browser/ui/toolbar/toolbar_action_view_model.h"
 #include "chrome/browser/ui/views/extensions/extensions_menu_button.h"
 #include "chrome/browser/ui/views/extensions/extensions_menu_item_view.h"
 #include "chrome/browser/ui/views/extensions/extensions_toolbar_button.h"
-#include "chrome/browser/ui/views/extensions/extensions_toolbar_container.h"
+#include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
 #include "chrome/browser/ui/views/extensions/extensions_toolbar_unittest.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "content/public/test/test_utils.h"
+#include "extensions/browser/load_error_reporter.h"
 #include "extensions/browser/test_extension_registry_observer.h"
 #include "extensions/common/extension.h"
 #include "extensions/test/test_extension_dir.h"
@@ -89,8 +89,9 @@ class ExtensionsMenuViewUnitTest : public ExtensionsToolbarUnitTest {
 void ExtensionsMenuViewUnitTest::SetUp() {
   ExtensionsToolbarUnitTest::SetUp();
 
-  ExtensionsMenuView::ShowBubble(extensions_container()->GetExtensionsButton(),
-                                 browser(), extensions_container());
+  ExtensionsMenuView::ShowBubble(
+      extensions_container()->GetExtensionsButton(), browser(),
+      extensions_container()->GetToolbarViewModel(), extensions_container());
 }
 
 scoped_refptr<const extensions::Extension>
@@ -132,7 +133,7 @@ ExtensionsMenuViewUnitTest::GetPinnedExtensionViews() {
       // queries the underlying model and not GetVisible(), as that relies on an
       // animation running, which is not reliable in unit tests on Mac.
       const bool is_visible = extensions_container()->IsActionVisibleOnToolbar(
-          action->view_controller()->GetId());
+          action->view_model()->GetId());
 #else
       const bool is_visible = action->GetVisible();
 #endif
@@ -150,14 +151,14 @@ ExtensionMenuItemView* ExtensionsMenuViewUnitTest::GetExtensionMenuItemView(
       extensions_menu()->extensions_menu_items_for_testing();
   auto iter =
       std::ranges::find(menu_items, name, [](ExtensionMenuItemView* item) {
-        return base::UTF16ToUTF8(item->view_controller()->GetActionName());
+        return base::UTF16ToUTF8(item->view_model()->GetActionName());
       });
   return iter == menu_items.end() ? nullptr : *iter;
 }
 
 std::vector<std::string> ExtensionsMenuViewUnitTest::GetPinnedExtensionNames() {
   return base::ToVector(GetPinnedExtensionViews(), [](ToolbarActionView* view) {
-    return base::UTF16ToUTF8(view->view_controller()->GetActionName());
+    return base::UTF16ToUTF8(view->view_model()->GetActionName());
   });
 }
 
@@ -419,7 +420,7 @@ TEST_F(ExtensionsMenuViewUnitTest, WindowTitle) {
 }
 
 // TODO(crbug.com/40636292): When supported, add a test to verify the
-// ExtensionsToolbarContainer shrinks when the window is too small to show all
+// ExtensionsToolbarDesktop shrinks when the window is too small to show all
 // pinned extensions.
 // TODO(crbug.com/40636292): When supported, add a test to verify an extension
 // is shown when a bubble pops up and needs to draw attention to it.

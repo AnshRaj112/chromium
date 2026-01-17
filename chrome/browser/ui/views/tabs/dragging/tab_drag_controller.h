@@ -24,17 +24,19 @@
 #include "chrome/browser/ui/views/tabs/dragging/drag_session_data.h"
 #include "chrome/browser/ui/views/tabs/dragging/dragging_tabs_session.h"
 #include "chrome/browser/ui/views/tabs/dragging/tab_drag_context.h"
+#include "chrome/browser/ui/views/tabs/dragging/tab_drag_target.h"
 #include "chrome/browser/ui/views/tabs/tab_strip_types.h"
 #include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "components/tabs/public/split_tab_data.h"
 #include "components/webapps/common/web_app_id.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "ui/base/dragdrop/mojom/drag_drop_types.mojom-shared.h"
 #include "ui/base/models/list_selection_model.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/image/image_skia.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
 
@@ -65,68 +67,15 @@ class TabStripScrollSession;
 class WindowFinder;
 class TabStripScrollSession;
 struct DetachedTabCollection;
+struct DetachedTab;
 
-// `TabDragDelegate` is an interface that may be implemented to facilitate
-// custom behavior beyond the tabstrip.
-// TODO(crbug.com/394370034): The tabstrip currently has logic that is a
-// good candidate for being a `TabDragDelegate`, but is tightly coupled with
-// responsibilities related to `TabDragContext` lifetime management. We should
-// attempt to split out as much of this logic as possible into a new
-// `TabDragDelegate`.
-class TabDragDelegate {
- public:
-  // An interface exposed to TabDragDelegate, allowing interaction with the
-  // ongoing drag session.
-  class DragController {
-   public:
-    virtual ~DragController() = default;
-
-    // Detaches the tab corresponding to the index within the current
-    // `DragSessionData`. If this is the last tab in the browser, the browser
-    // will close.
-    // This can only be called once dragging stopped and the referenced
-    // tab data must not have been already destroyed.
-    virtual std::unique_ptr<tabs::TabModel> DetachTabAtForInsertion(
-        int drag_idx) = 0;
-    virtual const DragSessionData& GetSessionData() const = 0;
-  };
-
-  virtual ~TabDragDelegate() = default;
-
-  // Invoked when this becomes the delegate of the drag controller.
-  virtual void OnTabDragEntered() = 0;
-
-  // Invoked on each iteration of the drag loop where this is the delegate of
-  // the drag controller.
-  virtual void OnTabDragUpdated(TabDragDelegate::DragController& controller,
-                                const gfx::Point& point_in_screen) = 0;
-
-  // Invoked when this delegate is no longer targeted by the controller.
-  virtual void OnTabDragExited() = 0;
-
-  // Notification for the end of a drag, for any reason (e.g. drop, cancel,
-  // etc.).
-  virtual void OnTabDragEnded() = 0;
-
-  // Indicates whether this delegate should handle a dropped tab.
-  virtual bool CanDropTab() = 0;
-
-  // Handles a drop that occurred while this delegate is targeted.
-  // This is only invoked if `CanDropTab` returned `true`.
-  virtual void HandleTabDrop(DragController& controller) = 0;
-
-  // Registers a callback that gets invoked when this is being destroyed.
-  virtual base::CallbackListSubscription RegisterWillDestroyCallback(
-      base::OnceClosure callback) = 0;
-};
-
-// An interface for fetching a `TabDragDelegate` from a given browser and
+// An interface for fetching a `TabDragTarget` from a given browser and
 // point.
 class TabDragPointResolver {
  public:
   virtual ~TabDragPointResolver() = default;
-  virtual TabDragDelegate* GetDragTarget(BrowserView& browser_view,
-                                         const gfx::Point& point_in_screen) = 0;
+  virtual TabDragTarget* GetDragTarget(BrowserView& browser_view,
+                                       const gfx::Point& point_in_screen) = 0;
 };
 
 // TabDragController is responsible for managing the tab dragging session. When
@@ -141,7 +90,7 @@ class TabDragPointResolver {
 // and RunMoveLoop() is invoked on the Widget to drag the browser around. This
 // is the default on aura.
 class TabDragController : public views::WidgetObserver,
-                          public TabDragDelegate::DragController
+                          public TabDragTarget::DragController
 #if defined(USE_AURA)
     ,
                           public aura::client::DragDropClientObserver
@@ -171,17 +120,15 @@ class TabDragController : public views::WidgetObserver,
   // TODO(crbug.com/41482188): Return this from *all* methods which may end the
   // drag (but maybe skip the public notification methods, e.g. TabWasAdded).
   enum class Liveness {
-    ALIVE,
-    DELETED,
+    kAlive,
+    kDeleted,
   };
 
   // Initializes TabDragController to drag the views in `dragging_views`
   // originating from `source_context`. `source_view` is the view that
   // initiated the drag and is either a Tab or a TabGroupHeader contained in
-  // `dragging_views`. `mouse_offset` is the distance of the mouse pointer from
-  // the origin of the first view in `dragging_views` and `source_view_offset`
-  // the offset from `source_view`. `source_view_offset` is the horizontal
-  // offset of `mouse_offset` relative to `source_view`.
+  // `dragging_views`.
+  // `offset_from_source_view` the offset from `source_view`.
   // `initial_selection_model` is the selection model before the drag started
   // and is only non-empty if the original selection isn't the same as the
   // dragging set. Returns Liveness::DELETED if `this` was deleted during this
@@ -189,8 +136,7 @@ class TabDragController : public views::WidgetObserver,
   [[nodiscard]] Liveness Init(TabDragContext* source_context,
                               TabSlotView* source_view,
                               const std::vector<TabSlotView*>& dragging_views,
-                              const gfx::Point& mouse_offset,
-                              int source_view_offset,
+                              const gfx::Point& offset_from_source_view,
                               ui::ListSelectionModel initial_selection_model,
                               ui::mojom::DragEventSource event_source);
 
@@ -198,7 +144,7 @@ class TabDragController : public views::WidgetObserver,
   // `tab_strip`.
   // NOTE: this returns false if the TabDragController is in the process of
   // finishing the drag.
-  static bool IsAttachedTo(const TabDragContextBase* tab_strip);
+  static bool IsAttachedTo(const TabDragContext* context);
 
   // Returns true if there is a drag underway.
   static bool IsActive();
@@ -207,7 +153,8 @@ class TabDragController : public views::WidgetObserver,
   // instead of a move loop.
   static bool IsSystemDnDSessionRunning();
 
-  // Called by TabStrip / TabStripRegionView to inform TabDragController.
+  // Called by TabStrip / HorizontalTabStripRegionView to inform
+  // TabDragController.
   static void OnSystemDnDUpdated(const ui::DropTargetEvent& event);
   static void OnSystemDnDExited();
   static void OnSystemDnDEnded();
@@ -309,36 +256,37 @@ class TabDragController : public views::WidgetObserver,
   };
 
   // Enumeration of the ways a drag session can end.
-  enum EndDragType {
+  enum class EndDragType {
     // Drag session exited normally: the user released the mouse.
-    NORMAL,
+    kNormal,
 
     // The drag session was canceled (alt-tab during drag, escape ...)
-    CANCELED,
+    kCanceled,
 
     // The tab (NavigationController) was destroyed during the drag.
-    TAB_DESTROYED
+    kTabDestroyed
   };
 
   // Whether Detach() should release capture or not.
-  enum ReleaseCapture {
-    RELEASE_CAPTURE,
-    DONT_RELEASE_CAPTURE,
+  enum class ReleaseCapture {
+    kReleaseCapture,
+    kDontReleaseCapture,
   };
 
   // Specifies what should happen when a drag motion exits the tab strip region
   // in an attempt to detach a tab.
-  enum DetachBehavior { DETACHABLE, NOT_DETACHABLE };
+  enum class DetachBehavior { kDetachable, kNotDetachable };
 
   // Overridden from views::WidgetObserver:
   void OnWidgetBoundsChanged(views::Widget* widget,
                              const gfx::Rect& new_bounds) override;
   void OnWidgetDestroyed(views::Widget* widget) override;
 
-  // TabDragDelegate::DragController
+  // TabDragTarget::DragController
   std::unique_ptr<tabs::TabModel> DetachTabAtForInsertion(
       int drag_idx) override;
   const DragSessionData& GetSessionData() const override;
+  const TabDragContext* GetAttachedContext() const override;
 
   // Forget the source tabstrip. It doesn't exist any more, so it doesn't
   // make sense to insert dragged tabs back into it if the drag is reverted.
@@ -388,7 +336,8 @@ class TabDragController : public views::WidgetObserver,
   //
   // `window_scale` is the scale of the window that `thumbnail` was captured
   // from.
-  void OnTabThumbnailAvailable(float window_scale, const SkBitmap& thumbnail);
+  void OnTabThumbnailAvailable(float window_scale,
+                               const content::CopyFromSurfaceResult& result);
 
   // Starts a regular drag and drop session as a fallback if RunMoveLoop() is
   // not supported and no drag session is currently running. `context` is used
@@ -406,7 +355,7 @@ class TabDragController : public views::WidgetObserver,
   // (screen coordinates), or nullptr if there is none. May end the drag on
   // some platforms as a result of reentrancy during system calls, hence this
   // also returns a Liveness.
-  [[nodiscard]] std::tuple<Liveness, TabDragContext*, TabDragDelegate*>
+  [[nodiscard]] std::tuple<Liveness, TabDragContext*, TabDragTarget*>
   GetDragTargetForPoint(gfx::Point point_in_screen);
 
   // Returns true if `context` contains the specified point in screen
@@ -423,7 +372,7 @@ class TabDragController : public views::WidgetObserver,
   void AttachToNewContext(
       TabDragContext* attached_context,
       std::unique_ptr<TabDragController> controller,
-      std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
+      std::vector<std::variant<std::unique_ptr<DetachedTab>,
                                std::unique_ptr<DetachedTabCollection>>>
           owned_tabs_and_collections);
 
@@ -436,7 +385,7 @@ class TabDragController : public views::WidgetObserver,
   // `attached_context_` currently owns a controller. Otherwise returns
   // nullptr.
   std::tuple<std::unique_ptr<TabDragController>,
-             std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
+             std::vector<std::variant<std::unique_ptr<DetachedTab>,
                                       std::unique_ptr<DetachedTabCollection>>>>
   Detach(ReleaseCapture release_capture);
 
@@ -583,6 +532,11 @@ class TabDragController : public views::WidgetObserver,
   void UpdateSelectionModel(TabStripModel* tab_strip_model,
                             ui::ListSelectionModel selection_model);
 
+  void OnContextStartedDragging(const std::vector<TabSlotView*>& views);
+  void OnContextStoppedDragging();
+  void OnContextDraggedTabsDetached();
+  void UpdateBrowserViewsForDragEnd();
+
 #if defined(USE_AURA)
   // aura::client::DragDropClientObserver:
   void OnDragStarted() override;
@@ -590,7 +544,7 @@ class TabDragController : public views::WidgetObserver,
 #endif  // defined(USE_AURA)
 
   // Updates the current drag target, and fires relevant handler events.
-  void UpdateDragTarget(TabDragDelegate* new_target);
+  void UpdateDragTarget(TabDragTarget* new_target);
   void ResetDragTarget();
 
   static void SetTabDragPointResolver(TabDragPointResolver& resolver);
@@ -619,9 +573,10 @@ class TabDragController : public views::WidgetObserver,
   // DraggedTabView is constructed.
   gfx::Point start_point_in_screen_;
 
-  // Ratio of the x-coordinate of the `source_view_offset` to the width of the
-  // source view.
-  float offset_to_width_ratio_;
+  // Ratio of the x and y coordinates of the `source_view_offset` to the
+  // width and height of the source view.
+  float offset_to_width_ratio_ = 0;
+  float offset_to_height_ratio_ = 0;
 
   // Used to track the view that had focus in the window containing
   // `source_view_`. This is saved so that focus can be restored properly when
@@ -736,8 +691,8 @@ class TabDragController : public views::WidgetObserver,
   bool expect_stay_alive_ = false;
 
   // The current candidate that may handle a tab drop.
-  raw_ptr<TabDragDelegate> current_drag_delegate_;
-  base::CallbackListSubscription drag_delegate_destroyed_subscription_;
+  raw_ptr<TabDragTarget> current_drag_target_;
+  base::CallbackListSubscription drag_target_destroyed_subscription_;
 
   std::unique_ptr<ui::PresentationTimeRecorder> presentation_time_recorder_;
 

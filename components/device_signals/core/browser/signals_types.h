@@ -12,12 +12,15 @@
 #include "base/values.h"
 #include "build/build_config.h"
 #include "components/device_signals/core/common/common_types.h"
-#include "components/enterprise/connectors/core/reporting_constants.h"
 #include "components/safe_browsing/core/common/safe_browsing_prefs.h"
 
 #if BUILDFLAG(IS_WIN)
 #include "components/device_signals/core/common/win/win_types.h"
 #endif  // BUILDFLAG(IS_WIN)
+
+namespace enterprise_connectors {
+enum EnterpriseRealTimeUrlCheckMode : int;
+}  // namespace enterprise_connectors
 
 namespace device_signals {
 
@@ -215,19 +218,27 @@ struct OsSignalsResponse : BaseSignalResponse {
 
   ~OsSignalsResponse() override;
 
-  // Common to all platforms
-  std::optional<std::string> display_name = std::nullopt;
+  // Common to all platforms, not necessarily all being collected.
+
   std::string browser_version{};
   std::optional<std::string> device_enrollment_domain = std::nullopt;
   std::string device_manufacturer{};
   std::string device_model{};
   device_signals::SettingValue disk_encryption =
       device_signals::SettingValue::UNKNOWN;
+  // Display name of the device, e.g "John Doe's Devoce"
+  std::optional<std::string> display_name = std::nullopt;
   std::optional<std::string> hostname = std::nullopt;
   std::optional<std::vector<std::string>> mac_addresses = std::nullopt;
   std::string operating_system{};
   device_signals::SettingValue os_firewall =
       device_signals::SettingValue::UNKNOWN;
+
+  // Version of the OS
+  // - Win: <major>.<minor>.<build>.<patch>, e.g 10.0.22631.5909
+  // - Linux: utsname.release, e.g 6.12.35-1rodete1-amd64
+  // - Mac: <major>.<minor>.<bugfix>, e.g 15.7.0
+  // - Android: The major version number, e.g 13
   std::string os_version{};
   device_signals::SettingValue screen_lock_secured =
       device_signals::SettingValue::UNKNOWN;
@@ -239,6 +250,16 @@ struct OsSignalsResponse : BaseSignalResponse {
   std::optional<device_signals::SettingValue> secure_boot_mode = std::nullopt;
   std::optional<std::string> windows_machine_domain = std::nullopt;
   std::optional<std::string> windows_user_domain = std::nullopt;
+
+  // Linux specific
+  std::optional<std::string> distribution_version = std::nullopt;
+
+  // Android specific
+  bool has_potentially_harmful_apps;
+  bool verified_apps_enabled;
+  // The date when the device most recently applied a security patch, in ms
+  // since epoch.
+  std::optional<int64_t> security_patch_ms;
 };
 
 struct ProfileSignalsResponse : BaseSignalResponse {

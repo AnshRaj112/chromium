@@ -8,17 +8,6 @@
 #include "base/component_export.h"
 #include "components/viz/common/resources/shared_image_format.h"
 
-namespace gpu {
-class ClientSharedImage;
-class SharedImageFormatToBufferFormatRestrictedUtilsAccessor;
-class SharedImageFormatRestrictedUtilsAccessor;
-class TestSharedImageInterface;
-}  // namespace gpu
-
-namespace cc {
-class PerfContextProvider;
-}
-
 namespace gfx {
 enum class BufferFormat : uint8_t;
 }
@@ -27,9 +16,55 @@ enum SkColorType : int;
 
 namespace viz {
 
-class ContextProviderCommandBuffer;
-class TestContextProvider;
-class TestInProcessContextProvider;
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+// Used for logging values to GPU.SharedImage.SharedImageFormat UMA.
+enum class SharedImageFormatUMA {
+  kRGBA_8888 = 0,
+  kRGBA_4444 = 1,
+  kBGRA_8888 = 2,
+  kALPHA_8 = 3,
+  kLUMINANCE_8 = 4,
+  kRGB_565 = 5,
+  kBGR_565 = 6,
+  kETC1 = 7,
+  kR_8 = 8,
+  kRG_88 = 9,
+  kLUMINANCE_F16 = 10,
+  kRGBA_F16 = 11,
+  kR_16 = 12,
+  kRG_1616 = 13,
+  kRGBX_8888 = 14,
+  kBGRX_8888 = 15,
+  kRGBA_1010102 = 16,
+  kBGRA_1010102 = 17,
+  kR_F16 = 18,
+  kYV12 = 19,
+  kNV12 = 20,
+  kNV12A = 21,
+  kP010 = 22,
+  kNV16 = 23,
+  kNV24 = 24,
+  kP210 = 25,
+  kP410 = 26,
+  kI420 = 27,
+  kI420A = 28,
+  kI422 = 29,
+  kI444 = 30,
+  kYUV420P10 = 31,
+  kYUV422P10 = 32,
+  kYUV444P10 = 33,
+  kYUV420P16 = 34,
+  kYUV422P16 = 35,
+  kYUV444P16 = 36,
+  kOther = 37,
+  kMaxValue = kOther
+};
+
+// Returns the SharedImageFormatUMA type used for emitting in UMA for the given
+// `format`.
+COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
+SharedImageFormatUMA GetSharedImageFormatUMA(SharedImageFormat format);
 
 // Returns the closest SkColorType for a given single planar `format`.
 //
@@ -67,43 +102,56 @@ COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
 gfx::BufferFormat SinglePlaneSharedImageFormatToBufferFormat(
     SharedImageFormat format);
 
+// Returns the BufferFormat corresponding to `format`.
+COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
+gfx::BufferFormat SharedImageFormatToBufferFormat(SharedImageFormat format);
+
 // Returns the SharedImageFormat corresponding to `buffer_format`.
 COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
 SharedImageFormat GetSharedImageFormat(gfx::BufferFormat buffer_format);
 
-// Utilities that conceptually belong only on the service side, but are
-// currently used by some clients. Usage is restricted to friended clients.
-class COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
-    SharedImageFormatRestrictedSinglePlaneUtils {
- private:
-  friend class ContextProviderCommandBuffer;
-  friend class TestContextProvider;
-  friend class TestInProcessContextProvider;
-  friend class cc::PerfContextProvider;
-  friend class gpu::SharedImageFormatRestrictedUtilsAccessor;
+// Returns the shared memory offset for `plane_index` for a `format` of `size`.
+COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
+size_t SharedMemoryOffsetForSharedImageFormat(SharedImageFormat format,
+                                              int plane_index,
+                                              const gfx::Size& size);
 
-  // |use_angle_rgbx_format| should be true when the
-  // GL_ANGLE_rgbx_internal_format extension is available.
-  static unsigned int ToGLTextureStorageFormat(SharedImageFormat format,
-                                               bool use_angle_rgbx_format);
-};
+// Calculates the row size in bytes for a shared memory plane of a
+// SharedImageFormat. Returns size on success and std::nullopt if the row size
+// exceeds the maximum value of `size_t`.
+COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
+std::optional<size_t> SharedMemoryRowSizeForSharedImageFormat(
+    SharedImageFormat format,
+    int plane_index,
+    int width);
 
-// Utility function which conceptually belong only on the service side, but are
-// currently used by some clients. Usage is restricted to friended class.
-class COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
-    SharedImageFormatToBufferFormatRestrictedUtils {
- private:
-  friend class gpu::ClientSharedImage;
-  friend class gpu::SharedImageFormatToBufferFormatRestrictedUtilsAccessor;
-  friend class gpu::TestSharedImageInterface;
+// Calculates the plane size in bytes for a shared memory plane of a
+// SharedImageFormat. Returns true on success and false if the plane size
+// exceeds the maximum value of `size_t`.
+COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
+std::optional<size_t> SharedMemoryPlaneSizeForSharedImageFormat(
+    SharedImageFormat format,
+    int plane_index,
+    const gfx::Size& size);
 
-  // BufferFormat is being transitioned out of SharedImage code (to use
-  // SharedImageFormat instead). Refrain from using this function or preferably
-  // use with single planar SharedImageFormats. Returns BufferFormat for given
-  // `format`.
-  static gfx::BufferFormat ToBufferFormat(SharedImageFormat format);
-};
+// Calculates the image size in bytes for shared memory of a
+// SharedImageFormat. Returns true on success and false if the image size
+// exceeds the maximum value of `size_t`.
+COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
+std::optional<size_t> SharedMemorySizeForSharedImageFormat(
+    SharedImageFormat format,
+    const gfx::Size& size);
 
+// Multiplanar buffer formats (e.g, YUV_420_BIPLANAR, YVU_420, P010) can be
+// tricky when the size of the primary plane is odd, because the subsampled
+// planes will have a size that is not a divisor of the primary plane's size.
+// This returns whether odd size multiplanar formats are supported.
+COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
+bool IsOddSizeMultiPlanarBuffersAllowed();
+
+// Returns a span containing all mappable SharedImageFormats.
+COMPONENT_EXPORT(VIZ_SHARED_IMAGE_FORMAT)
+base::span<const SharedImageFormat> GetMappableSharedImageFormatForTesting();
 }  // namespace viz
 
 #endif  // COMPONENTS_VIZ_COMMON_RESOURCES_SHARED_IMAGE_FORMAT_UTILS_H_

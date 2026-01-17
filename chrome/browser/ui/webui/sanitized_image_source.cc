@@ -6,10 +6,10 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
-#include "base/containers/contains.h"
 #include "base/memory/ref_counted_memory.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
@@ -21,7 +21,6 @@
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/common/webui_url_constants.h"
 #include "components/signin/public/identity_manager/primary_account_access_token_fetcher.h"
-#include "components/signin/public/identity_manager/scope_set.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/storage_partition.h"
 #include "google_apis/gaia/gaia_constants.h"
@@ -77,7 +76,7 @@ bool IsGooglePhotosUrl(const GURL& url) {
   };
 
   for (const char* const suffix : kGooglePhotosHostSuffixes) {
-    if (base::EndsWith(url.host_piece(), suffix)) {
+    if (base::EndsWith(url.host(), suffix)) {
       return true;
     }
   }
@@ -132,7 +131,7 @@ void SanitizedImageSource::StartDataRequest(
     content::URLDataSource::GotDataCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  std::string image_url_or_params = url.query();
+  std::string image_url_or_params = url.GetQuery();
   if (url != GURL(base::StrCat(
                  {chrome::kChromeUIImageURL, "?", image_url_or_params}))) {
     std::move(callback).Run(nullptr);
@@ -283,7 +282,7 @@ void SanitizedImageSource::OnImageLoaded(
     std::unique_ptr<network::SimpleURLLoader> loader,
     RequestAttributes request_attributes,
     content::URLDataSource::GotDataCallback callback,
-    std::unique_ptr<std::string> body) {
+    std::optional<std::string> body) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   if (loader->NetError() != net::OK || !body) {

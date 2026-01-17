@@ -62,7 +62,7 @@ class FakeWebState : public WebState {
   void LoadSimulatedRequest(const GURL& url,
                             NSData* response_data,
                             NSString* mime_type) override;
-  void Stop() override {}
+  void Stop() override;
   const NavigationManager* GetNavigationManager() const override;
   NavigationManager* GetNavigationManager() override;
   WebFramesManager* GetPageWorldWebFramesManager() override;
@@ -70,10 +70,8 @@ class FakeWebState : public WebState {
   const SessionCertificatePolicyCache* GetSessionCertificatePolicyCache()
       const override;
   SessionCertificatePolicyCache* GetSessionCertificatePolicyCache() override;
-  CRWSessionStorage* BuildSessionStorage() const override;
   void LoadData(NSData* data, NSString* mime_type, const GURL& url) override;
   void ExecuteUserJavaScript(NSString* javaScript) override;
-  NSString* GetStableIdentifier() const override;
   WebStateID GetUniqueIdentifier() const override;
   const std::string& GetContentsMimeType() const override;
   bool ContentIsHTML() const override;
@@ -172,6 +170,8 @@ class FakeWebState : public WebState {
       WebStatePolicyDecider::PolicyDecisionCallback callback);
   NSData* GetLastLoadedData() const;
   bool IsClosed() const;
+  // Whether `Stop` was called at least once on this WebState.
+  bool was_stopped() const { return was_stopped_; }
 
   // Notifier for tests.
   void OnPageLoaded(PageLoadCompletionStatus load_completion_status);
@@ -184,7 +184,7 @@ class FakeWebState : public WebState {
   void OnDownloadFinished(NSError* error);
 
  private:
-  raw_ptr<BrowserState> browser_state_ = nullptr;
+  raw_ptr<BrowserState, DanglingUntriaged> browser_state_ = nullptr;
   NSString* stable_identifier_ = nil;
   const WebStateID unique_identifier_;
   bool web_usage_enabled_ = true;
@@ -193,6 +193,7 @@ class FakeWebState : public WebState {
   bool is_visible_ = false;
   bool is_crashed_ = false;
   bool is_evicted_ = false;
+  bool was_stopped_ = false;
   bool has_opener_ = false;
   bool can_take_snapshot_ = false;
   bool is_closed_ = false;

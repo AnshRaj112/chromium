@@ -57,6 +57,8 @@ class RendererStartupHelper : public KeyedService,
   // content::RenderProcessHostCreationObserver:
   void OnRenderProcessHostCreated(
       content::RenderProcessHost* process_host) override;
+  void OnRenderProcessLaunched(
+      content::RenderProcessHost* process_host) override;
 
   // content::RenderProcessHostObserver:
   void RenderProcessExited(
@@ -135,6 +137,10 @@ class RendererStartupHelper : public KeyedService,
  private:
   friend class RendererStartupHelperTest;
   friend class RendererStartupHelperInterceptor;
+
+  // Registers a render process for extension communication by creating a Mojo
+  // remote and adding this instance as an observer.
+  void RegisterProcess(content::RenderProcessHost* process);
 
   // Initializes the specified process, informing it of system state and loaded
   // extensions.

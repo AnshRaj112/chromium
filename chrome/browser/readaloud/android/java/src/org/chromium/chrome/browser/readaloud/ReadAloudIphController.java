@@ -11,8 +11,8 @@ import android.view.View;
 
 import androidx.annotation.VisibleForTesting;
 
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.NullableObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.profiles.Profile;
@@ -20,9 +20,8 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuHandler;
 import org.chromium.chrome.browser.user_education.IphCommandBuilder;
 import org.chromium.chrome.browser.user_education.UserEducationHelper;
-import org.chromium.components.feature_engagement.FeatureConstants;
-
 import org.chromium.chrome.modules.readaloud.PlaybackArgs.PlaybackMode;
+import org.chromium.components.feature_engagement.FeatureConstants;
 
 /**
  * Controller to manage when and how we show ReadAloud in-product-help messages to users in the app
@@ -33,8 +32,8 @@ public class ReadAloudIphController {
     private final UserEducationHelper mUserEducationHelper;
     private final AppMenuHandler mAppMenuHandler;
     private final View mToolbarMenuButton;
-    private final ObservableSupplier<ReadAloudController> mReadAloudControllerSupplier;
-    private final Supplier<Tab> mCurrentTabSupplier;
+    private final MonotonicObservableSupplier<ReadAloudController> mReadAloudControllerSupplier;
+    private final NullableObservableSupplier<Tab> mCurrentTabSupplier;
     private boolean mShowAppMenuTextBubble;
     private final Runnable mReadabilityUpdateListener = this::maybeShowReadAloudAppMenuIph;
 
@@ -55,8 +54,8 @@ public class ReadAloudIphController {
             Profile profile,
             View toolbarMenuButton,
             AppMenuHandler appMenuHandler,
-            ObservableSupplier<Tab> tabSupplier,
-            ObservableSupplier<ReadAloudController> readAloudControllerSupplier,
+            NullableObservableSupplier<Tab> tabSupplier,
+            MonotonicObservableSupplier<ReadAloudController> readAloudControllerSupplier,
             boolean showAppMenuTextBubble) {
         this(
                 activity,
@@ -73,8 +72,8 @@ public class ReadAloudIphController {
             View toolbarMenuButton,
             AppMenuHandler appMenuHandler,
             UserEducationHelper userEducationHelper,
-            ObservableSupplier<Tab> tabSupplier,
-            ObservableSupplier<ReadAloudController> readAloudControllerSupplier,
+            NullableObservableSupplier<Tab> tabSupplier,
+            MonotonicObservableSupplier<ReadAloudController> readAloudControllerSupplier,
             boolean showAppMenuTextBubble) {
         mToolbarMenuButton = toolbarMenuButton;
         mAppMenuHandler = appMenuHandler;

@@ -9,14 +9,13 @@
 #include <algorithm>
 
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
 #include "base/no_destructor.h"
 #include "base/run_loop.h"
 #include "base/strings/string_util.h"
+#include "base/strings/string_view_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/synchronization/lock.h"
 #include "base/task/single_thread_task_runner.h"
@@ -209,14 +208,14 @@ std::string TestDownloadHttpResponse::GetPatternBytes(int seed,
   std::string output;
   while (length > 0) {
     uint64_t data = XorShift64StarWithIndex(seed, seed_offset);
-    int length_to_copy =
-        std::min(length, static_cast<int>(sizeof(data) - first_byte_position));
-    char* start_pos =
-        UNSAFE_TODO(reinterpret_cast<char*>(&data) + first_byte_position);
-    std::string string_to_append(start_pos,
-                                 UNSAFE_TODO(start_pos + length_to_copy));
-    output.append(string_to_append);
-    length -= length_to_copy;
+    auto data_span = base::byte_span_from_ref(data);
+    auto sub_span = data_span.subspan(
+        static_cast<size_t>(first_byte_position),
+        std::min(
+            static_cast<size_t>(length),
+            data_span.size() - static_cast<size_t>(first_byte_position)));
+    output.append(base::as_string_view(sub_span));
+    length -= sub_span.size();
     ++seed_offset;
     first_byte_position = 0;
   }
@@ -336,12 +335,12 @@ std::string TestDownloadHttpResponse::GetDefaultResponseHeaders() {
   // Send partial response.
   if (parameters_.support_partial_response && parameters_.support_byte_ranges) {
     bool has_if_range =
-        base::Contains(request_.headers, net::HttpRequestHeaders::kIfRange);
+        request_.headers.contains(net::HttpRequestHeaders::kIfRange);
     if (((has_if_range &&
           request_.headers.at(net::HttpRequestHeaders::kIfRange) ==
               parameters_.etag) ||
          (!has_if_range &&
-          base::Contains(request_.headers, net::HttpRequestHeaders::kRange))) &&
+          request_.headers.contains(net::HttpRequestHeaders::kRange))) &&
         HandleRangeAssumingValidatorMatch(headers)) {
       return headers;
     }
@@ -349,7 +348,7 @@ std::string TestDownloadHttpResponse::GetDefaultResponseHeaders() {
 
   // Send precondition failed for "If-Match" request header.
   if (parameters_.support_partial_response && parameters_.support_byte_ranges &&
-      base::Contains(request_.headers, net::HttpRequestHeaders::kIfMatch)) {
+      request_.headers.contains(net::HttpRequestHeaders::kIfMatch)) {
     if (request_.headers.at(net::HttpRequestHeaders::kIfMatch) !=
             parameters_.etag ||
         !HandleRangeAssumingValidatorMatch(headers)) {

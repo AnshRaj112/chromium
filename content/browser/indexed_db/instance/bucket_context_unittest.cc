@@ -9,11 +9,9 @@
 
 #include "base/files/scoped_temp_dir.h"
 #include "base/run_loop.h"
-#include "base/task/updateable_sequenced_task_runner.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/task_environment.h"
 #include "base/test/test_future.h"
-#include "components/services/storage/privileged/mojom/indexed_db_internals_types.mojom-shared.h"
 #include "components/services/storage/privileged/mojom/indexed_db_internals_types.mojom.h"
 #include "content/browser/indexed_db/instance/fake_transaction.h"
 #include "storage/browser/test/mock_quota_manager_proxy.h"
@@ -53,7 +51,6 @@ class BucketContextTest : public testing::Test {
                 "https://example.com")));
     bucket_context_ = std::make_unique<BucketContext>(
         bucket_info, base::FilePath(), BucketContext::Delegate(),
-        scoped_refptr<base::UpdateableSequencedTaskRunner>(),
         quota_manager_proxy_,
         /*blob_storage_context=*/mojo::NullRemote(),
         /*file_system_access_context=*/mojo::NullRemote());
@@ -318,9 +315,7 @@ TEST_F(BucketContextTest, MetadataRecordingStateHistory) {
 TEST_F(BucketContextTest, OverrideShouldUseSqliteForTesting) {
   auto is_sqlite_used_by_new_bucket = [this]() {
     return BucketContext(storage::BucketInfo(), base::FilePath(),
-                         BucketContext::Delegate(),
-                         scoped_refptr<base::UpdateableSequencedTaskRunner>(),
-                         quota_manager_proxy_,
+                         BucketContext::Delegate(), quota_manager_proxy_,
                          /*blob_storage_context=*/mojo::NullRemote(),
                          /*file_system_access_context=*/mojo::NullRemote())
         .ShouldUseSqlite();

@@ -22,6 +22,7 @@
 #include "components/viz/common/resources/shared_image_format.h"
 #include "content/web_test/renderer/test_runner.h"
 #include "content/web_test/renderer/web_frame_test_proxy.h"
+#include "gin/handle.h"
 #include "gin/interceptor.h"
 #include "gin/object_template_builder.h"
 #include "gin/wrappable.h"
@@ -220,12 +221,13 @@ bool TestPlugin::Initialize(blink::WebPluginContainer* container) {
 
   container_ = container;
 
-  blink::Platform::ContextAttributes attrs;
   blink::WebURL url = container->GetDocument().Url();
-  blink::Platform::GraphicsInfo gl_info;
+  blink::Platform::WebGLContextInfo gl_info;
   std::unique_ptr<blink::WebGraphicsContext3DProvider> context_provider =
-      blink::Platform::Current()->CreateOffscreenGraphicsContext3DProvider(
-          attrs, url, &gl_info);
+      blink::Platform::Current()->CreateWebGLGraphicsContextProvider(
+          /*prefer_low_power_gpu=*/true,
+          /*fail_if_major_performance_caveat=*/false,
+          blink::Platform::kWebGL1ContextType, url, &gl_info);
   if (context_provider && !context_provider->BindToCurrentSequence()) {
     context_provider = nullptr;
   }
@@ -490,10 +492,14 @@ void TestPlugin::DrawSceneSoftware(void* memory) {
     SkColor foreground_color = SkColorSetARGB(
         static_cast<uint8_t>(scene_.opacity * 255), scene_.primitive_color[0],
         scene_.primitive_color[1], scene_.primitive_color[2]);
-    SkPath triangle_path;
-    triangle_path.moveTo(0.5f * rect_.width(), 0.9f * rect_.height());
-    triangle_path.lineTo(0.1f * rect_.width(), 0.1f * rect_.height());
-    triangle_path.lineTo(0.9f * rect_.width(), 0.1f * rect_.height());
+    const SkPath triangle_path = SkPath::Polygon(
+        {
+            {0.5f * rect_.width(), 0.9f * rect_.height()},
+            {0.1f * rect_.width(), 0.1f * rect_.height()},
+            {0.9f * rect_.width(), 0.1f * rect_.height()},
+        },
+        /*isClosed=*/false);
+
     SkPaint paint;
     paint.setColor(foreground_color);
     paint.setStyle(SkPaint::kFill_Style);

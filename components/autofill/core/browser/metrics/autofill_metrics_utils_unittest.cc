@@ -21,7 +21,7 @@ namespace {
 using ::testing::ContainerEq;
 
 std::unique_ptr<FormStructure> CreateFormStructure(
-    const DenseSet<FieldType>& field_types) {
+    const FieldTypeSet& field_types) {
   test::FormDescription form_description;
   for (FieldType field_type : field_types) {
     form_description.fields.emplace_back(
@@ -29,7 +29,7 @@ std::unique_ptr<FormStructure> CreateFormStructure(
   }
   auto form_structure =
       std::make_unique<FormStructure>(test::GetFormData(form_description));
-  for (size_t i = 0; i < form_structure->field_count(); i++) {
+  for (size_t i = 0; i < form_structure->field_count(); ++i) {
     form_structure->field(i)->SetTypeTo(
         AutofillType(form_description.fields[i].role),
         AutofillPredictionSource::kHeuristics);
@@ -42,7 +42,7 @@ class AutofillMetricsUtilsTest : public testing::Test {
   test::AutofillUnitTestEnvironment autofill_test_environment_;
 };
 
-using IsCertainFormTypeTestData = std::tuple<DenseSet<FieldType>, bool>;
+using IsCertainFormTypeTestData = std::tuple<FieldTypeSet, bool>;
 
 // Test fixture for testing `internal::IsEmailOnlyForm()`.
 class IsEmailOnlyFormTest
@@ -118,11 +118,11 @@ INSTANTIATE_TEST_SUITE_P(
                                    ADDRESS_HOME_CITY},
                                   true)));
 
-// Given a form consisting of fields of types `DenseSet<FieldType>`, expect
+// Given a form consisting of fields of types `FieldTypeSet`, expect
 // `DenseSet<FormTypeNameForLogging>` to be returned from `Get{Address,
 // CreditCard}FormTypesForLogging()`.
 using FormTypesForLoggingTestData =
-    std::tuple<DenseSet<FieldType>, DenseSet<FormTypeNameForLogging>>;
+    std::tuple<FieldTypeSet, DenseSet<FormTypeNameForLogging>>;
 
 // Test fixture for testing `GetAddressFormTypesForLogging()`.
 class AddressFormTypesForLoggingTest
@@ -135,7 +135,8 @@ class AddressFormTypesForLoggingTest
 TEST_P(AddressFormTypesForLoggingTest,
        GetAddressFormTypesForLoggingReturnsAddressFormTypes) {
   EXPECT_EQ(GetAddressFormTypesForLogging(
-                *CreateFormStructure(std::get<0>(GetParam()))),
+                *CreateFormStructure(std::get<0>(GetParam())),
+                /*suppress_if_ac_unrecognized=*/true),
             std::get<1>(GetParam()));
 }
 
@@ -174,7 +175,8 @@ class CreditCardFormTypesForLoggingTest
 TEST_P(CreditCardFormTypesForLoggingTest,
        GetCreditCardFormTypesForLoggingReturnsCreditCardFormTypes) {
   EXPECT_EQ(GetCreditCardFormTypesForLogging(
-                *CreateFormStructure(std::get<0>(GetParam()))),
+                *CreateFormStructure(std::get<0>(GetParam())),
+                /*suppress_if_ac_unrecognized=*/true),
             std::get<1>(GetParam()));
 }
 
@@ -219,7 +221,8 @@ class FormTypesForLoggingTest
 TEST_P(FormTypesForLoggingTest,
        GetFormTypesForLoggingReturnsAppropriateFormTypes) {
   EXPECT_EQ(
-      GetFormTypesForLogging(*CreateFormStructure(std::get<0>(GetParam()))),
+      GetFormTypesForLogging(*CreateFormStructure(std::get<0>(GetParam())),
+                             /*suppress_if_ac_unrecognized=*/true),
       std::get<1>(GetParam()));
 }
 

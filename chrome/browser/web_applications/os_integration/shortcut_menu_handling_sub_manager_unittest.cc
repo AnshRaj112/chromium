@@ -7,7 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/files/file_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
@@ -648,7 +647,8 @@ TEST_F(ShortcutMenuHandlingSubManagerExecuteTest,
   test::UninstallAllWebApps(profile());
   ASSERT_FALSE(
       OsIntegrationTestOverrideImpl::Get()->AreShortcutsMenuRegistered());
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(app_id));
+  EXPECT_FALSE(
+      provider().registrar_unsafe().GetInstallState(app_id).has_value());
 
   SynchronizeOsOptions options;
   options.force_unregister_os_integration = true;

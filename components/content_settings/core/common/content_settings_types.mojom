@@ -331,10 +331,6 @@ enum ContentSettingsType {
   // should be enabled.
   ANTI_ABUSE,
 
-  // Content setting used to indicate whether third-party storage partitioning
-  // should be enabled.
-  THIRD_PARTY_STORAGE_PARTITIONING,
-
   // Used to indicate whether HTTPS-First Mode is enabled on the hostname.
   HTTPS_ENFORCED,
 
@@ -353,22 +349,6 @@ enum ContentSettingsType {
   // component updater service. This type will only be used when
   // `net::features::kTpcdMetadataGrants` is enabled.
   TPCD_METADATA_GRANTS,
-
-  // Content Setting for 3PC accesses granted via 3PC deprecation trial.
-  TPCD_TRIAL,
-
-  // Content Setting for 3PC accesses granted via top-level 3PC deprecation
-  // trial. Similar to TPCD_TRIAL, but applicable at the page-level for the
-  // lifetime of the page that served the token, rather than being specific to a
-  // requesting-origin/top-level-site combination and persistent.
-  TOP_LEVEL_TPCD_TRIAL,
-
-  // Content Setting for a first-party origin trial that allows websites to
-  // enable third-party cookie deprecation.
-  // ALLOW (default): no effect (e.g. third-party cookies allowed, if not
-  //                  blocked otherwise).
-  // BLOCK: third-party cookies blocked, but 3PCD mitigations enabled.
-  TOP_LEVEL_TPCD_ORIGIN_TRIAL,
 
   // Content setting used to indicate whether entering picture-in-picture
   // automatically should be enabled.
@@ -478,9 +458,13 @@ enum ContentSettingsType {
   // store revoked notification permissions of disruptive sites.
   REVOKED_DISRUPTIVE_NOTIFICATION_PERMISSIONS,
 
-  // Content setting for whether the site is allowed to make local network
-  // requests.
+  // Content settings for whether the site is allowed to make local network
+  // requests. Migration from LOCAL_NETWORK_ACCESS to the split setting of
+  // LOCAL_NETWORK AND LOOPBACK_NETWORK is in progress. See crbug.com/465491626
+  // for details.
   LOCAL_NETWORK_ACCESS,
+  LOCAL_NETWORK,
+  LOOPBACK_NETWORK,
 
   // Stores information on-device language packs for which a site has
   // installed using the Web Speech API.
@@ -498,5 +482,15 @@ enum ContentSettingsType {
   // Setting for enabling the Device Attributes API. Spec link:
   // https://wicg.github.io/WebApiDevice/device_attributes/
   DEVICE_ATTRIBUTES,
+
+  // Stores per-origin state for permission heuristics. Currently used for
+  // auto-granting geolocation element permission request after repeated
+  // temporary grants.
+  PERMISSION_ACTIONS_HISTORY,
+
+  // Website setting to indicate whether the user has selected "show original"
+  // when suspicious warning is shown. If the user has selected this, the
+  // notification permission will not be revoked based on suspicious verdict.
+  SUSPICIOUS_NOTIFICATION_SHOW_ORIGINAL,
 };
 // LINT.ThenChange(//components/content_settings/core/browser/content_settings_uma_util.cc:kHistogramValue)

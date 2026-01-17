@@ -52,6 +52,7 @@ struct TextureQuadParams {
   bool secure_output_only = false;
   gfx::ProtectedVideoType protected_video_type =
       gfx::ProtectedVideoType::kClear;
+  std::optional<gfx::Size> resource_size_in_pixels;
 };
 
 namespace internal {
@@ -296,6 +297,8 @@ class CompositorFrameBuilder {
       const gfx::DelegatedInkMetadata& metadata);
   CompositorFrameBuilder& AddOffsetTagDefinition(
       const OffsetTagDefinition& definition);
+
+  CompositorFrameBuilder& SetValidTreesInVizTimestamps(base::TimeTicks now);
 
  private:
   CompositorFrame MakeInitCompositorFrame() const;

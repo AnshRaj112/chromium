@@ -11,9 +11,17 @@ source_set("notifications") {
   public_deps = [
     "//chrome/browser/notifications/proto",
     "//chrome/browser/notifications/scheduler",
+    "//chrome/browser/profiles:profile",
+    "//components/keyed_service/core",
+    "//url",
   ]
 
-  sources = []
+  sources = [
+    "notification_common.h",
+    "notification_display_service.h",
+    "notification_display_service_factory.h",
+    "notification_handler.h",
+  ]
 
   if (is_android) {
     deps = [
@@ -35,6 +43,22 @@ source_set("notifications") {
       "notification_channels_provider_android.h",
     ]
   }
+}
+
+source_set("system_notification_helper") {
+  sources = [ "system_notification_helper.h" ]
+
+  public_deps = [ "//ui/message_center/public/cpp" ]
+}
+
+source_set("system_notification_helper_impl") {
+  sources = [ "system_notification_helper.cc" ]
+
+  deps = [
+    ":system_notification_helper",
+    "//chrome/browser:browser_public_dependencies",
+    "//ui/message_center/public/cpp",
+  ]
 }
 
 group("unit_tests") {
@@ -147,8 +171,8 @@ if (is_android) {
       "//third_party/android_deps:espresso_java",
       "//third_party/androidx:androidx_annotation_annotation_java",
       "//third_party/androidx:androidx_test_core_java",
-      "//third_party/androidx:androidx_test_core_java",
       "//third_party/androidx:androidx_test_ext_junit_java",
+      "//third_party/google-truth:google_truth_java",
       "//third_party/hamcrest:hamcrest_core_java",
       "//third_party/hamcrest:hamcrest_library_java",
       "//third_party/jni_zero:jni_zero_java",

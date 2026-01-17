@@ -10,7 +10,7 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "media/midi/midi_jni_headers/MidiInputPortAndroid_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 namespace midi {
 
@@ -36,9 +36,9 @@ void MidiInputPortAndroid::Close() {
 }
 
 void MidiInputPortAndroid::OnData(JNIEnv* env,
-                                  const JavaParamRef<jbyteArray>& data,
-                                  jint offset,
-                                  jint size,
+                                  const JavaRef<jbyteArray>& data,
+                                  int32_t offset,
+                                  int32_t size,
                                   jlong timestamp) {
   std::vector<uint8_t> bytes;
   base::android::JavaByteArrayToByteVector(env, data, &bytes);
@@ -51,7 +51,13 @@ void MidiInputPortAndroid::OnData(JNIEnv* env,
   // nanoseconds. Both are monotonic.
   base::TimeTicks timestamp_to_pass = base::TimeTicks::FromInternalValue(
       timestamp / base::TimeTicks::kNanosecondsPerMicrosecond);
-  delegate_->OnReceivedData(this, &bytes[offset], size, timestamp_to_pass);
+  delegate_->OnReceivedData(
+      this,
+      base::span(bytes).subspan(base::checked_cast<size_t>(offset),
+                                base::checked_cast<size_t>(size)),
+      timestamp_to_pass);
 }
 
 }  // namespace midi
+
+DEFINE_JNI(MidiInputPortAndroid)

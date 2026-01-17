@@ -5,6 +5,7 @@
 #ifndef COMPONENTS_PASSWORD_MANAGER_CORE_BROWSER_UI_SAVED_PASSWORDS_PRESENTER_H_
 #define COMPONENTS_PASSWORD_MANAGER_CORE_BROWSER_UI_SAVED_PASSWORDS_PRESENTER_H_
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -15,6 +16,7 @@
 #include "base/scoped_observation.h"
 #include "components/password_manager/core/browser/password_store/password_store_consumer.h"
 #include "components/password_manager/core/browser/password_store/password_store_interface.h"
+#include "components/password_manager/core/browser/ui/actor_login_permission.h"
 #include "components/password_manager/core/browser/ui/affiliated_group.h"
 #include "components/password_manager/core/browser/ui/credential_ui_entry.h"
 #include "components/password_manager/core/browser/ui/passwords_provider.h"
@@ -181,13 +183,12 @@ class SavedPasswordsPresenter : public PasswordStoreInterface::Observer,
       const std::vector<CredentialUIEntry>& credentials,
       metrics_util::MoveToAccountStoreTrigger trigger);
 
-  // Returns a list of unique passwords which includes normal credentials,
-  // federated credentials, passkeys, and blocked forms. If a same form is
-  // present both on account and profile stores it will be represented as a
-  // single entity. Uniqueness is determined using site name, username,
-  // password. For Android credentials package name is also taken into account
-  // and for Federated credentials federation origin.
+  // PasswordsProvider:
   std::vector<CredentialUIEntry> GetSavedCredentials() const override;
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+  base::flat_set<ActorLoginPermission> GetActorLoginPermissions(
+      syncer::SyncService* sync_service) const override;
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
   // Returns a list of affiliated groups for the Password Manager.
   std::vector<AffiliatedGroup> GetAffiliatedGroups();
@@ -198,6 +199,13 @@ class SavedPasswordsPresenter : public PasswordStoreInterface::Observer,
 
   // Returns a list of sites blocked by users for the Password Manager.
   std::vector<CredentialUIEntry> GetBlockedSites();
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+  // Revokes actor login permission for all credentials matching the `username`
+  // `signon_realm` pair.
+  void RevokeActorLoginPermission(const std::u16string& username,
+                                  const std::string& signon_realm);
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
   // Returns PasswordForms corresponding to |credential|.
   std::vector<PasswordForm> GetCorrespondingPasswordForms(

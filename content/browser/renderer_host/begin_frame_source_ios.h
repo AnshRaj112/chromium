@@ -28,7 +28,6 @@ class BeginFrameSourceIOS
   const viz::BeginFrameArgs& LastUsedBeginFrameArgs() const override;
   void OnBeginFrameSourcePausedChanged(bool paused) override;
   bool WantsAnimateOnlyBeginFrames() const override;
-  bool IsRoot() const override;
 
   // ui::ExternalBeginFrameControllerClientFactory implementation.
   mojo::PendingAssociatedRemote<viz::mojom::ExternalBeginFrameControllerClient>
@@ -37,6 +36,8 @@ class BeginFrameSourceIOS
   // viz::mojom::ExternalBeginFrameControllerClient implementation.
   void SetNeedsBeginFrame(bool needs_begin_frames) override;
   void SetPreferredInterval(base::TimeDelta interval) override;
+  void NeedsBeginFrameWithId(int64_t display_id,
+                             bool needs_begin_frames) override;
 
  private:
   const raw_ptr<ui::Compositor> compositor_;

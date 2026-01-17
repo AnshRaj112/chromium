@@ -14,7 +14,7 @@
 #import "components/password_manager/core/browser/password_manager_test_utils.h"
 #import "components/password_manager/core/browser/password_store/test_password_store.h"
 #import "components/password_manager/core/common/password_manager_pref_names.h"
-#import "components/plus_addresses/features.h"
+#import "components/plus_addresses/core/common/features.h"
 #import "components/policy/core/common/policy_loader_ios_constants.h"
 #import "components/policy/policy_constants.h"
 #import "components/search_engines/template_url_service.h"
@@ -35,10 +35,10 @@
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_ios.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_manager_ios.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/browser_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/popup_menu_commands.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
@@ -78,8 +78,8 @@ class SettingsTableViewControllerTest
     TestProfileIOS::Builder builder;
     builder.AddTestingFactory(
         SyncServiceFactory::GetInstance(),
-        base::BindRepeating(
-            [](web::BrowserState*) -> std::unique_ptr<KeyedService> {
+        base::BindOnce(
+            [](ProfileIOS* profile) -> std::unique_ptr<KeyedService> {
               return std::make_unique<syncer::TestSyncService>();
             }));
     builder.AddTestingFactory(
@@ -93,9 +93,8 @@ class SettingsTableViewControllerTest
             std::make_unique<FakeAuthenticationServiceDelegate>()));
     builder.AddTestingFactory(
         IOSChromeProfilePasswordStoreFactory::GetInstance(),
-        base::BindRepeating(
-            &password_manager::BuildPasswordStore<
-                web::BrowserState, password_manager::TestPasswordStore>));
+        base::BindOnce(&password_manager::BuildPasswordStore<
+                       ProfileIOS, password_manager::TestPasswordStore>));
     profile_ = profile_manager_.AddProfileWithBuilder(std::move(builder));
 
     // Prepare mocks for PushNotificationClient dependency
@@ -141,15 +140,14 @@ class SettingsTableViewControllerTest
     // Create mock command handlers. These are just for initializing the view
     // controller; because the handlers are local to this methdd, they will not
     // exist during tests, so if the tests call any commands they will fail.
-    id mock_application_handler =
-        OCMProtocolMock(@protocol(ApplicationCommands));
+    id mock_application_handler = OCMProtocolMock(@protocol(SceneCommands));
     id mock_settings_handler = OCMProtocolMock(@protocol(SettingsCommands));
     id mock_snackbar_handler = OCMProtocolMock(@protocol(SnackbarCommands));
     mock_popup_menu_handler_ = OCMProtocolMock(@protocol(PopupMenuCommands));
 
     CommandDispatcher* dispatcher = browser_->GetCommandDispatcher();
     [dispatcher startDispatchingToTarget:mock_application_handler
-                             forProtocol:@protocol(ApplicationCommands)];
+                             forProtocol:@protocol(SceneCommands)];
     [dispatcher startDispatchingToTarget:mock_settings_handler
                              forProtocol:@protocol(SettingsCommands)];
     [dispatcher startDispatchingToTarget:mock_settings_handler
@@ -168,8 +166,7 @@ class SettingsTableViewControllerTest
         initWithRootViewController:controller
                            browser:browser_.get()
                           delegate:nil];
-    controller.applicationHandler =
-        HandlerForProtocol(dispatcher, ApplicationCommands);
+    controller.sceneHandler = HandlerForProtocol(dispatcher, SceneCommands);
     controller.settingsHandler =
         HandlerForProtocol(dispatcher, SettingsCommands);
     controller.snackbarHandler =
@@ -306,7 +303,8 @@ TEST_F(SettingsTableViewControllerTest, HoldAccountStorageErrorWhenEligible) {
   // Verify that the account item is in an error state.
   TableViewAccountItem* identityAccountItem =
       base::apple::ObjCCast<TableViewAccountItem>(account_items[0]);
-  EXPECT_TRUE(identityAccountItem.shouldDisplayError);
+  ASSERT_EQ(TableViewAccountDetailImage::kError,
+            identityAccountItem.detailImage);
 }
 
 // Verifies that the error is removed from the model when the Account Storage
@@ -329,7 +327,8 @@ TEST_F(SettingsTableViewControllerTest, ClearAccountStorageErrorWhenResolved) {
   // Verify that the account item is in an error state.
   TableViewAccountItem* identityAccountItem =
       base::apple::ObjCCast<TableViewAccountItem>(account_items[0]);
-  ASSERT_TRUE(identityAccountItem.shouldDisplayError);
+  ASSERT_EQ(TableViewAccountDetailImage::kError,
+            identityAccountItem.detailImage);
 
   // Resolve the account error.
   sync_service_->GetUserSettings()->SetDecryptionPassphrase(kSyncPassphrase);
@@ -344,7 +343,8 @@ TEST_F(SettingsTableViewControllerTest, ClearAccountStorageErrorWhenResolved) {
   identityAccountItem =
       base::apple::ObjCCast<TableViewAccountItem>(account_items[0]);
   ASSERT_TRUE(identityAccountItem != nil);
-  EXPECT_FALSE(identityAccountItem.shouldDisplayError);
+  ASSERT_EQ(TableViewAccountDetailImage::kNone,
+            identityAccountItem.detailImage);
 }
 
 // Verifies that when eligible the account item model doesn't have the Account
@@ -366,7 +366,8 @@ TEST_F(SettingsTableViewControllerTest, DontHoldAccountErrorWhenNoError) {
   TableViewAccountItem* identityAccountItem =
       base::apple::ObjCCast<TableViewAccountItem>(account_items[0]);
   ASSERT_TRUE(identityAccountItem != nil);
-  EXPECT_FALSE(identityAccountItem.shouldDisplayError);
+  ASSERT_EQ(TableViewAccountDetailImage::kNone,
+            identityAccountItem.detailImage);
 }
 
 // Verifies that if the Save to Photos flag is enabled and Save to Photos is

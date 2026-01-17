@@ -30,10 +30,6 @@
 
 namespace web_app {
 
-namespace {
-constexpr char kFakeChromeBundleId[] = "fake.cfbundleidentifier";
-}
-
 class ShortcutsVersioningMacTest : public WebAppTest {
  public:
   ShortcutsVersioningMacTest()
@@ -42,13 +38,10 @@ class ShortcutsVersioningMacTest : public WebAppTest {
   void SetUp() override {
     WebAppTest::SetUp();
 
-    base::apple::SetBaseBundleIDOverride(kFakeChromeBundleId);
     // Put shortcuts somewhere under the home dir, as otherwise LaunchServices
     // won't be able to find them.
     override_registration_ =
         OsIntegrationTestOverrideImpl::OverrideForTesting();
-
-    provider_ = FakeWebAppProvider::Get(profile());
 
     // These tests require a real OsIntegrationManager, rather than the
     // FakeOsIntegrationManager that is created by default.
@@ -56,9 +49,10 @@ class ShortcutsVersioningMacTest : public WebAppTest {
         std::make_unique<WebAppFileHandlerManager>(profile());
     auto protocol_handler_manager =
         std::make_unique<WebAppProtocolHandlerManager>(profile());
-    provider_->SetOsIntegrationManager(std::make_unique<OsIntegrationManager>(
-        profile(), std::move(file_handler_manager),
-        std::move(protocol_handler_manager)));
+    fake_provider().SetOsIntegrationManager(
+        std::make_unique<OsIntegrationManager>(
+            profile(), std::move(file_handler_manager),
+            std::move(protocol_handler_manager)));
 
     // Do not yet start WebAppProvider here in SetUp, as tests verify behavior
     // that happens during and is triggered by start. As such individual tests
@@ -93,8 +87,6 @@ class ShortcutsVersioningMacTest : public WebAppTest {
  private:
   std::unique_ptr<OsIntegrationTestOverrideImpl::BlockingRegistration>
       override_registration_;
-
-  raw_ptr<FakeWebAppProvider, DanglingUntriaged> provider_ = nullptr;
 };
 
 TEST_F(ShortcutsVersioningMacTest, InitialVersionIsStored) {

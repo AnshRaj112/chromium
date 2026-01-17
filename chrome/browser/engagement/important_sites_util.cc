@@ -12,7 +12,6 @@
 #include <unordered_set>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/values.h"
 #include "build/build_config.h"
@@ -181,7 +180,7 @@ std::unordered_set<std::string> GetSuppressedImportantDomains(
   for (ContentSettingPatternSource& site :
        map->GetSettingsForOneType(ContentSettingsType::IMPORTANT_SITE_INFO)) {
     GURL origin(site.primary_pattern.ToString());
-    if (!origin.is_valid() || base::Contains(ignoring_domains, origin.host())) {
+    if (!origin.is_valid() || ignoring_domains.contains(origin.GetHost())) {
       continue;
     }
 
@@ -189,7 +188,7 @@ std::unordered_set<std::string> GetSuppressedImportantDomains(
       continue;
 
     if (ShouldSuppressItem(site.setting_value.GetDict())) {
-      ignoring_domains.insert(origin.host());
+      ignoring_domains.insert(origin.GetHost());
     }
   }
   return ignoring_domains;
@@ -316,7 +315,7 @@ ImportantDomainInfo& ImportantDomainInfo::operator=(ImportantDomainInfo&&) =
     default;
 
 std::string ImportantSitesUtil::GetRegisterableDomainOrIP(const GURL& url) {
-  return GetRegisterableDomainOrIPFromHost(url.host_piece());
+  return GetRegisterableDomainOrIPFromHost(url.host());
 }
 
 std::string ImportantSitesUtil::GetRegisterableDomainOrIPFromHost(

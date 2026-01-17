@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "remoting/host/file_transfer/file_chooser.h"
 
 #include <windows.h>
@@ -19,6 +14,8 @@
 #include <vector>
 
 #include "base/command_line.h"
+#include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/path_service.h"
@@ -174,9 +171,8 @@ void FileChooserWindows::OnObjectSignaled(HANDLE object) {
     return;
   }
 
-  mojo::Message serialized_message(
-      base::span<uint8_t>(response_bytes.begin(), bytes_read),
-      base::span<mojo::ScopedHandle>());
+  mojo::Message serialized_message(base::span(response_bytes).first(bytes_read),
+                                   base::span<mojo::ScopedHandle>());
 
   FileChooser::Result result;
   if (!mojom::FileChooserResult::DeserializeFromMessage(

@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/trace_event/trace_event.h"
 #include "third_party/blink/public/platform/web_string.h"
 #include "third_party/blink/public/web/web_local_frame_client.h"
@@ -27,8 +26,10 @@
 #include "third_party/blink/renderer/core/frame/local_dom_window.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/frame/local_frame_client.h"
+#include "third_party/blink/renderer/core/frame/web_frame_widget_impl.h"
 #include "third_party/blink/renderer/core/geometry/dom_rect.h"
 #include "third_party/blink/renderer/core/html/html_element.h"
+#include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
 #include "third_party/blink/renderer/platform/text/text_boundaries.h"
 #include "third_party/blink/renderer/platform/wtf/decimal.h"
@@ -159,40 +160,49 @@ void EditContext::DispatchTextFormatEvent(
 
     String underline_thickness;
     String underline_style;
+    // Use values defined in spec [1] for `TextFormat::underlineStyle` &
+    // `TextFormat::underlineThickness`
+    // TODO(crbug.com/354497121): Remove this change and update the TextFormat
+    // attribute type as per the spec [1] when the feature is enabled by
+    // default.
+    // [1]: https://w3c.github.io/edit-context/#textformatupdateevent
+    bool use_spec_values = RuntimeEnabledFeatures::
+        UseSpecValuesInTextFormatUpdateEventStylesEnabled();
     switch (ime_text_span.thickness) {
       case ui::ImeTextSpan::Thickness::kNone:
-        underline_thickness = "None";
+        underline_thickness = use_spec_values ? "none" : "None";
         break;
       case ui::ImeTextSpan::Thickness::kThin:
-        underline_thickness = "Thin";
+        underline_thickness = use_spec_values ? "thin" : "Thin";
         break;
       case ui::ImeTextSpan::Thickness::kThick:
-        underline_thickness = "Thick";
+        underline_thickness = use_spec_values ? "thick" : "Thick";
         break;
     }
     switch (ime_text_span.underline_style) {
       case ui::ImeTextSpan::UnderlineStyle::kNone:
-        underline_style = "None";
+        underline_style = use_spec_values ? "none" : "None";
         break;
       case ui::ImeTextSpan::UnderlineStyle::kSolid:
-        underline_style = "Solid";
+        underline_style = use_spec_values ? "solid" : "Solid";
         break;
       case ui::ImeTextSpan::UnderlineStyle::kDot:
-        underline_style = "Dotted";
+        underline_style = use_spec_values ? "dotted" : "Dotted";
         break;
       case ui::ImeTextSpan::UnderlineStyle::kDash:
-        underline_style = "Dashed";
+        underline_style = use_spec_values ? "dashed" : "Dashed";
         break;
       case ui::ImeTextSpan::UnderlineStyle::kSquiggle:
-        underline_style = "Squiggle";
+        underline_style = use_spec_values ? "wavy" : "Squiggle";
         break;
     }
 
-    text_formats.push_back(TextFormat::Create(
-        range_start, range_end,
-        underline_style, underline_thickness));
+    text_formats.push_back(
+        TextFormat::Create(range_start, range_end, underline_style,
+                           underline_thickness, ASSERT_NO_EXCEPTION));
 
-    if (underline_style != "None" || underline_thickness != "None") {
+    String none_value = use_spec_values ? "none" : "None";
+    if (underline_style != none_value || underline_thickness != none_value) {
       is_text_format_underline_style_or_thickness_not_none = true;
     }
   }
@@ -250,6 +260,15 @@ void EditContext::updateSelection(uint32_t start,
     UseCounter::Count(
         GetExecutionContext(),
         WebFeature::kEditContextUpdateSelectionDuringActiveComposition);
+
+    if (RuntimeEnabledFeatures::
+            EditContextHandleTextOrSelectionUpdateDuringCompositionEnabled()) {
+      // Abort the composition.
+      CancelComposition();
+      // Re-adjust bounds after removing current composition text.
+      bound_start = std::min(start, text_.length());
+      bound_end = std::min(end, text_.length());
+    }
   }
 
   SetSelection(bound_start, bound_end);
@@ -325,6 +344,26 @@ void EditContext::updateText(uint32_t start,
         WebFeature::kEditContextUpdateTextRangePrecedesOrOverlapsSelection);
   }
 
+  uint32_t new_selection_start = selection_start_;
+  uint32_t new_selection_end = selection_end_;
+  uint32_t delta = new_text.length() - (end - start);
+
+  if (!has_composition_ &&
+      RuntimeEnabledFeatures::
+          EditContextHandleTextOrSelectionUpdateDuringCompositionEnabled()) {
+    if (selection_start_ >= end) {
+      new_selection_start += delta;
+    } else if (selection_start_ > start) {
+      new_selection_start = start + new_text.length();
+    }
+
+    if (selection_end_ >= end) {
+      new_selection_end += delta;
+    } else if (selection_end_ > start) {
+      new_selection_end = start + new_text.length();
+    }
+  }
+
   if (has_composition_ && composition_range_end_ > start) {
     if (composition_range_start_ >= end) {
       // Example:
@@ -332,16 +371,39 @@ void EditContext::updateText(uint32_t start,
       UseCounter::Count(
           GetExecutionContext(),
           WebFeature::kEditContextUpdateTextRangePrecedesCompositionRange);
+      if (RuntimeEnabledFeatures::
+              EditContextHandleTextOrSelectionUpdateDuringCompositionEnabled()) {
+        new_selection_start += delta;
+        new_selection_end += delta;
+        composition_range_start_ += delta;
+        composition_range_end_ += delta;
+      }
     } else {
       // Example:
       // Composition range: [3, 6], Update range: [4, 7]
       UseCounter::Count(
           GetExecutionContext(),
           WebFeature::kEditContextUpdateTextRangeOverlapsCompositionRange);
+      if (RuntimeEnabledFeatures::
+              EditContextHandleTextOrSelectionUpdateDuringCompositionEnabled()) {
+        // Abort the composition.
+        CancelComposition();
+        // Re-adjust offsets after removing current composition text.
+        end = std::min(end, text_.length());
+        start = std::min(start, end);
+
+        new_selection_start = start + new_text.length();
+        new_selection_end = new_selection_start;
+      }
     }
   }
 
-  text_ = text_.Substring(0, start) + new_text + text_.Substring(end);
+  text_ = StrCat({text_.Substring(0, start), new_text, text_.Substring(end)});
+
+  if (RuntimeEnabledFeatures::
+          EditContextHandleTextOrSelectionUpdateDuringCompositionEnabled()) {
+    SetSelection(new_selection_start, new_selection_end);
+  }
 }
 
 String EditContext::text() const {
@@ -377,11 +439,22 @@ const HeapVector<Member<DOMRect>> EditContext::characterBounds() {
 void EditContext::GetLayoutBounds(gfx::Rect* control_bounds,
                                   gfx::Rect* selection_bounds) {
   // EditContext's coordinates are in CSS pixels, which need to be converted to
-  // physical pixels before return.
-  *control_bounds = gfx::ScaleToEnclosingRect(
-      control_bounds_, DomWindow()->GetFrame()->DevicePixelRatio());
-  *selection_bounds = gfx::ScaleToEnclosingRect(
-      selection_bounds_, DomWindow()->GetFrame()->DevicePixelRatio());
+  // physical pixels before returning.
+  LocalFrame* frame = DomWindow()->GetFrame();
+  *control_bounds =
+      gfx::ScaleToEnclosingRect(control_bounds_, frame->DevicePixelRatio());
+  *selection_bounds =
+      gfx::ScaleToEnclosingRect(selection_bounds_, frame->DevicePixelRatio());
+
+  if (RuntimeEnabledFeatures::
+          EditContextConvertLocalFrameBoundsToRootFrameEnabled() &&
+      !frame->IsLocalRoot()) {
+    // The browser side only translates remote frame coordinates into main frame
+    // coordinates. For local frames, convert the coordinates into root frame
+    // coordinates.
+    *control_bounds = frame->View()->ConvertToRootFrame(*control_bounds);
+    *selection_bounds = frame->View()->ConvertToRootFrame(*selection_bounds);
+  }
 
   TRACE_EVENT2("ime", "EditContext::GetLayoutBounds", "control",
                control_bounds->ToString(), "selection",
@@ -393,7 +466,8 @@ bool EditContext::SetComposition(
     const std::vector<ui::ImeTextSpan>& ime_text_spans,
     const WebRange& replacement_range,
     int selection_start,
-    int selection_end) {
+    int selection_end,
+    mojom::blink::ImeState ime_state) {
   TRACE_EVENT2(
       "ime", "EditContext::SetComposition", "start, end",
       std::to_string(selection_start) + ", " + std::to_string(selection_end),
@@ -408,7 +482,7 @@ bool EditContext::SetComposition(
     if (has_composition_) {
       // Receiving an empty text string is a signal to delete any text in the
       // composition range and terminate the composition
-      CancelComposition();
+      OnCancelComposition();
     }
     return true;
   }
@@ -429,8 +503,9 @@ bool EditContext::SetComposition(
 
   // Update the selection and buffer if the composition range has changed.
   String update_text(text);
-  text_ = text_.Substring(0, actual_replacement_range.StartOffset()) +
-          update_text + text_.Substring(actual_replacement_range.EndOffset());
+  text_ = StrCat({text_.Substring(0, actual_replacement_range.StartOffset()),
+                  update_text,
+                  text_.Substring(actual_replacement_range.EndOffset())});
 
   // Fire textupdate and textformatupdate events to JS.
   // Note the EditContext's internal selection start is a global offset while
@@ -451,6 +526,17 @@ bool EditContext::SetComposition(
   return true;
 }
 
+bool EditContext::SetComposition(
+    const WebString& text,
+    const std::vector<ui::ImeTextSpan>& ime_text_spans,
+    const WebRange& replacement_range,
+    int selection_start,
+    int selection_end) {
+  return SetComposition(text, ime_text_spans, replacement_range,
+                        selection_start, selection_end,
+                        mojom::blink::ImeState::kNone);
+}
+
 void EditContext::ClearCompositionState() {
   has_composition_ = false;
   composition_range_start_ = 0;
@@ -463,6 +549,22 @@ uint32_t EditContext::OrderedSelectionStart() const {
 
 uint32_t EditContext::OrderedSelectionEnd() const {
   return std::max(selection_start_, selection_end_);
+}
+
+uint32_t EditContext::BoundedSelectionStart() const {
+  if (RuntimeEnabledFeatures::
+          UseBoundedSelectionOffsetsInEditContextDeleteOperationsEnabled()) {
+    return std::min(selection_start_, text_.length());
+  }
+  return selection_start_;
+}
+
+uint32_t EditContext::BoundedSelectionEnd() const {
+  if (RuntimeEnabledFeatures::
+          UseBoundedSelectionOffsetsInEditContextDeleteOperationsEnabled()) {
+    return std::min(selection_end_, text_.length());
+  }
+  return selection_end_;
 }
 
 bool EditContext::SetCompositionFromExistingText(
@@ -506,11 +608,25 @@ bool EditContext::SetCompositionFromExistingText(
 }
 
 void EditContext::CancelComposition() {
+  if (!has_composition_) {
+    return;
+  }
+
+  if (auto* web_frame = WebLocalFrameImpl::FromFrame(DomWindow()->GetFrame())) {
+    if (auto* widget = web_frame->LocalRootFrameWidget()) {
+      widget->CancelComposition();
+    }
+  }
+
+  OnCancelComposition();
+}
+
+void EditContext::OnCancelComposition() {
   DCHECK(has_composition_);
 
   // Delete the text in the composition range
-  text_ = text_.Substring(0, composition_range_start_) +
-          text_.Substring(composition_range_end_);
+  text_ = StrCat({text_.Substring(0, composition_range_start_),
+                  text_.Substring(composition_range_end_)});
 
   // Place the selection where the deleted composition had been
   SetSelection(composition_range_start_, composition_range_start_);
@@ -527,8 +643,8 @@ bool EditContext::InsertText(const WebString& text) {
   TRACE_EVENT1("ime", "EditContext::InsertText", "text", text.Utf8());
 
   String update_text(text);
-  text_ = text_.Substring(0, OrderedSelectionStart()) + update_text +
-          text_.Substring(OrderedSelectionEnd());
+  text_ = StrCat({text_.Substring(0, OrderedSelectionStart()), update_text,
+                  text_.Substring(OrderedSelectionEnd())});
   uint32_t update_range_start = OrderedSelectionStart();
   uint32_t update_range_end = OrderedSelectionEnd();
   SetSelection(OrderedSelectionStart() + update_text.length(),
@@ -562,8 +678,8 @@ void EditContext::DeleteBackward() {
   // delete whole selection.
   if (selection_start_ == selection_end_) {
     SetSelection(FindNextBoundaryOffset<BackwardGraphemeBoundaryStateMachine>(
-                     text_, selection_start_),
-                 selection_end_);
+                     text_, BoundedSelectionStart()),
+                 BoundedSelectionEnd(), /*sync_selection=*/false);
   }
 
   DeleteCurrentSelection();
@@ -571,9 +687,10 @@ void EditContext::DeleteBackward() {
 
 void EditContext::DeleteForward() {
   if (selection_start_ == selection_end_) {
-    SetSelection(selection_start_,
+    SetSelection(BoundedSelectionStart(),
                  FindNextBoundaryOffset<ForwardGraphemeBoundaryStateMachine>(
-                     text_, selection_start_));
+                     text_, BoundedSelectionStart()),
+                 /*sync_selection=*/false);
   }
 
   DeleteCurrentSelection();
@@ -584,8 +701,9 @@ void EditContext::DeleteWordBackward() {
     String text16bit(text_);
     text16bit.Ensure16Bit();
     // TODO(shihken): implement platform behaviors when the spec is finalized.
-    SetSelection(FindNextWordBackward(text16bit.Span16(), selection_end_),
-                 selection_end_);
+    SetSelection(
+        FindNextWordBackward(text16bit.Span16(), BoundedSelectionEnd()),
+        BoundedSelectionEnd(), /*sync_selection=*/false);
   }
 
   DeleteCurrentSelection();
@@ -596,8 +714,10 @@ void EditContext::DeleteWordForward() {
     String text16bit(text_);
     text16bit.Ensure16Bit();
     // TODO(shihken): implement platform behaviors when the spec is finalized.
-    SetSelection(selection_start_,
-                 FindNextWordForward(text16bit.Span16(), selection_start_));
+    SetSelection(
+        BoundedSelectionStart(),
+        FindNextWordForward(text16bit.Span16(), BoundedSelectionStart()),
+        /*sync_selection=*/false);
   }
 
   DeleteCurrentSelection();
@@ -631,8 +751,9 @@ bool EditContext::CommitText(const WebString& text,
     }
   }
 
-  text_ = text_.Substring(0, actual_replacement_range.StartOffset()) +
-          update_text + text_.Substring(actual_replacement_range.EndOffset());
+  text_ = StrCat({text_.Substring(0, actual_replacement_range.StartOffset()),
+                  update_text,
+                  text_.Substring(actual_replacement_range.EndOffset())});
   SetSelection(actual_replacement_range.StartOffset() + update_text.length(),
                actual_replacement_range.StartOffset() + update_text.length());
 
@@ -677,8 +798,8 @@ void EditContext::ExtendSelectionAndDelete(int before, int after) {
                std::to_string(before) + ", " + std::to_string(after));
   before = std::min(before, static_cast<int>(OrderedSelectionStart()));
   after = std::min(after, static_cast<int>(text_.length()));
-  text_ = text_.Substring(0, OrderedSelectionStart() - before) +
-          text_.Substring(OrderedSelectionEnd() + after);
+  text_ = StrCat({text_.Substring(0, OrderedSelectionStart() - before),
+                  text_.Substring(OrderedSelectionEnd() + after)});
   const uint32_t update_range_start = OrderedSelectionStart() - before;
   const uint32_t update_range_end = OrderedSelectionEnd() + after;
   SetSelection(OrderedSelectionStart() - before,
@@ -699,9 +820,10 @@ void EditContext::DeleteSurroundingText(int before, int after) {
       update_range_start,
       OrderedSelectionEnd() - (OrderedSelectionStart() - update_range_start));
   CHECK_GE(selection_end_, selection_start_);
-  text_ = text_.Substring(0, update_range_start) +
-          text_.Substring(selection_start_, selection_end_ - selection_start_) +
-          text_.Substring(update_range_end);
+  text_ = StrCat(
+      {text_.Substring(0, update_range_start),
+       text_.Substring(selection_start_, selection_end_ - selection_start_),
+       text_.Substring(update_range_end)});
   String update_event_text(
       text_.Substring(selection_start_, selection_end_ - selection_start_));
 
@@ -715,6 +837,7 @@ void EditContext::DeleteSurroundingText(int before, int after) {
 
 void EditContext::SetSelection(int start,
                                int end,
+                               bool sync_selection,
                                bool dispatch_text_update_event) {
   TRACE_EVENT1("ime", "EditContext::SetSelection", "start, end",
                std::to_string(start) + ", " + std::to_string(end));
@@ -727,7 +850,7 @@ void EditContext::SetSelection(int start,
   selection_start_ = start;
   selection_end_ = end;
 
-  if (DomWindow() && DomWindow()->GetFrame()) {
+  if (sync_selection && DomWindow() && DomWindow()->GetFrame()) {
     DomWindow()->GetFrame()->Client()->DidChangeSelection(
         /*is_selection_empty=*/selection_start_ == selection_end_,
         blink::SyncCondition::kNotForced);
@@ -741,8 +864,8 @@ void EditContext::SetSelection(int start,
 }
 
 void EditContext::AttachElement(HTMLElement* element_to_attach) {
-  if (base::Contains(attached_elements_, element_to_attach,
-                     &Member<HTMLElement>::Get)) {
+  if (std::ranges::contains(attached_elements_, element_to_attach,
+                            &Member<HTMLElement>::Get)) {
     return;
   }
 
@@ -887,7 +1010,6 @@ bool EditContext::FirstRectForCharacterRange(uint32_t location,
     rect_in_viewport = gfx::ScaleToEnclosingRect(
         rect_in_css_pixels, DomWindow()->GetFrame()->DevicePixelRatio());
   }
-
   return found_rect;
 }
 

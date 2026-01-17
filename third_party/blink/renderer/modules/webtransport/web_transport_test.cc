@@ -67,7 +67,6 @@ namespace {
 
 using ::testing::_;
 using ::testing::ElementsAre;
-using ::testing::Invoke;
 using ::testing::Mock;
 using ::testing::StrictMock;
 using ::testing::Truly;
@@ -80,7 +79,7 @@ class WebTransportConnector final : public mojom::blink::WebTransportConnector {
         const KURL& url,
         Vector<network::mojom::blink::WebTransportCertificateFingerprintPtr>
             fingerprints,
-        Vector<WTF::String> application_protocols,
+        Vector<String> application_protocols,
         mojo::PendingRemote<network::mojom::blink::WebTransportHandshakeClient>
             handshake_client)
         : url(url),
@@ -91,7 +90,7 @@ class WebTransportConnector final : public mojom::blink::WebTransportConnector {
     KURL url;
     Vector<network::mojom::blink::WebTransportCertificateFingerprintPtr>
         fingerprints;
-    Vector<WTF::String> application_protocols;
+    Vector<String> application_protocols;
     mojo::PendingRemote<network::mojom::blink::WebTransportHandshakeClient>
         handshake_client;
   };
@@ -100,7 +99,7 @@ class WebTransportConnector final : public mojom::blink::WebTransportConnector {
       const KURL& url,
       Vector<network::mojom::blink::WebTransportCertificateFingerprintPtr>
           fingerprints,
-      const Vector<WTF::String>& application_protocols,
+      const Vector<String>& application_protocols,
       mojo::PendingRemote<network::mojom::blink::WebTransportHandshakeClient>
           handshake_client) override {
     connect_args_.push_back(ConnectArgs(url, std::move(fingerprints),
@@ -182,8 +181,8 @@ class WebTransportTest : public ::testing::Test {
         &scope.GetExecutionContext()->GetBrowserInterfaceBroker();
     interface_broker_->SetBinderForTesting(
         mojom::blink::WebTransportConnector::Name_,
-        WTF::BindRepeating(&WebTransportTest::BindConnector,
-                  weak_ptr_factory_.GetWeakPtr()));
+        blink::BindRepeating(&WebTransportTest::BindConnector,
+                             weak_ptr_factory_.GetWeakPtr()));
   }
 
   static WebTransportOptions* EmptyOptions() {
@@ -257,7 +256,7 @@ class WebTransportTest : public ::testing::Test {
         std::move(web_transport_to_pass),
         client_remote.InitWithNewPipeAndPassReceiver(),
         network::mojom::blink::HttpResponseHeaders::New(),
-        /*selected_application_protocol=*/WTF::String(),
+        /*selected_application_protocol=*/String(),
         network::mojom::blink::WebTransportStats::New());
     client_remote_.Bind(std::move(client_remote));
   }
@@ -788,10 +787,10 @@ TEST_F(WebTransportTest, SendDatagram) {
       CreateAndConnectSuccessfully(scope, "https://example.com");
 
   EXPECT_CALL(*mock_web_transport_, SendDatagram(ElementsAre('A'), _))
-      .WillOnce(Invoke([](base::span<const uint8_t>,
-                          MockWebTransport::SendDatagramCallback callback) {
+      .WillOnce([](base::span<const uint8_t>,
+                   MockWebTransport::SendDatagramCallback callback) {
         std::move(callback).Run(true);
-      }));
+      });
 
   auto* writable = web_transport->datagrams()->writable();
   auto* script_state = scope.GetScriptState();
@@ -815,11 +814,10 @@ TEST_F(WebTransportTest, BackpressureForOutgoingDatagrams) {
 
   EXPECT_CALL(*mock_web_transport_, SendDatagram(_, _))
       .Times(4)
-      .WillRepeatedly(
-          Invoke([](base::span<const uint8_t>,
-                    MockWebTransport::SendDatagramCallback callback) {
-            std::move(callback).Run(true);
-          }));
+      .WillRepeatedly([](base::span<const uint8_t>,
+                         MockWebTransport::SendDatagramCallback callback) {
+        std::move(callback).Run(true);
+      });
 
   web_transport->datagrams()->setOutgoingHighWaterMark(3);
   auto* writable = web_transport->datagrams()->writable();
@@ -891,15 +889,15 @@ TEST_F(WebTransportTest, SendDatagramBeforeConnect) {
 
   testing::Sequence s;
   EXPECT_CALL(*mock_web_transport_, SendDatagram(ElementsAre('A'), _))
-      .WillOnce(Invoke([](base::span<const uint8_t>,
-                          MockWebTransport::SendDatagramCallback callback) {
+      .WillOnce([](base::span<const uint8_t>,
+                   MockWebTransport::SendDatagramCallback callback) {
         std::move(callback).Run(true);
-      }));
+      });
   EXPECT_CALL(*mock_web_transport_, SendDatagram(ElementsAre('N'), _))
-      .WillOnce(Invoke([](base::span<const uint8_t>,
-                          MockWebTransport::SendDatagramCallback callback) {
+      .WillOnce([](base::span<const uint8_t>,
+                   MockWebTransport::SendDatagramCallback callback) {
         std::move(callback).Run(true);
-      }));
+      });
 
   test::RunPendingTasks();
   *chunk->Data() = 'N';
@@ -1688,6 +1686,68 @@ TEST_F(WebTransportTest, ReceiveStreamGarbageCollectionCancel) {
   EXPECT_FALSE(receive_stream);
 }
 
+// Tests that when OnIncomingStreamClosed() arrives before the stream is
+// created (due to IPC timing), the notification is stored in
+// closed_potentially_pending_streams_ and consumed when the stream is
+// eventually created. Verifies the fix for crbug.com/358257243.
+TEST_F(WebTransportTest, PendingIncomingStreamCloseConsumedOnceStreamExists) {
+  V8TestingScope scope;
+
+  auto* web_transport =
+      CreateAndConnectSuccessfully(scope, "https://example.com");
+
+  constexpr uint32_t kStreamId = 0;
+  EXPECT_FALSE(web_transport->HasPendingClosedStreamForTesting(kStreamId));
+
+  web_transport->OnIncomingStreamClosed(kStreamId, /*fin_received=*/true);
+  EXPECT_TRUE(web_transport->HasPendingClosedStreamForTesting(kStreamId));
+
+  mojo::ScopedDataPipeProducerHandle producer = DoAcceptUnidirectionalStream();
+  ReceiveStream* receive_stream = ReadReceiveStream(scope, web_transport);
+  ASSERT_TRUE(receive_stream);
+
+  // Creating the ReceiveStream should consume the pending close entry.
+  EXPECT_FALSE(web_transport->HasPendingClosedStreamForTesting(kStreamId));
+
+  producer.reset();
+  test::RunPendingTasks();
+}
+
+// Tests that OnIncomingStreamClosed() notifications for a stream that was
+// locally aborted (canceled) before receiving a close notification are properly
+// ignored, preventing entries from accumulating in
+// closed_potentially_pending_streams_. Part of fix for crbug.com/358257243.
+TEST_F(WebTransportTest, CloseIgnoredAfterLocalAbort) {
+  V8TestingScope scope;
+  auto* script_state = scope.GetScriptState();
+
+  auto* web_transport =
+      CreateAndConnectSuccessfully(scope, "https://example.com");
+
+  constexpr uint32_t kStreamId = 0;
+  mojo::ScopedDataPipeProducerHandle producer = DoAcceptUnidirectionalStream();
+  ReceiveStream* receive_stream = ReadReceiveStream(scope, web_transport);
+  ASSERT_TRUE(receive_stream);
+
+  // Cancel the stream locally (without receiving OnIncomingStreamClosed first).
+  // This triggers ForgetIncomingStream with has_received_close=false,
+  // adding kStreamId to recently_forgotten_incoming_stream_ids_.
+  auto cancel_promise =
+      receive_stream->cancel(script_state, ASSERT_NO_EXCEPTION);
+  ScriptPromiseTester cancel_tester(script_state, cancel_promise);
+  test::RunPendingTasks();
+  cancel_tester.WaitUntilSettled();
+  EXPECT_TRUE(cancel_tester.IsFulfilled());
+
+  // Now simulate OnIncomingStreamClosed arriving after the local abort.
+  // This should be ignored because the stream_id is in the tracking set.
+  web_transport->OnIncomingStreamClosed(kStreamId, /*fin_received=*/true);
+
+  // The close should NOT be added to closed_potentially_pending_streams_
+  // because the stream was already forgotten and tracked.
+  EXPECT_FALSE(web_transport->HasPendingClosedStreamForTesting(kStreamId));
+}
+
 TEST_F(WebTransportTest, ReceiveStreamGarbageCollectionRemoteClose) {
   V8TestingScope scope;
 
@@ -1859,7 +1919,7 @@ TEST_F(WebTransportTest, CreateReceiveStreamThenClose) {
       scope.GetIsolate(), read_tester.Value().V8Value());
   ASSERT_TRUE(exception);
   EXPECT_EQ(exception->name(), "WebTransportError");
-  EXPECT_EQ(exception->source(), "session");
+  EXPECT_EQ(exception->source(), V8WebTransportErrorSource::Enum::kSession);
   EXPECT_EQ(exception->streamErrorCode(), std::nullopt);
 }
 
@@ -1887,7 +1947,7 @@ TEST_F(WebTransportTest, CreateReceiveStreamThenRemoteClose) {
       scope.GetIsolate(), read_tester.Value().V8Value());
   ASSERT_TRUE(exception);
   EXPECT_EQ(exception->name(), "WebTransportError");
-  EXPECT_EQ(exception->source(), "session");
+  EXPECT_EQ(exception->source(), V8WebTransportErrorSource::Enum::kSession);
   EXPECT_EQ(exception->streamErrorCode(), std::nullopt);
 }
 
@@ -2092,7 +2152,7 @@ TEST_F(WebTransportTest, ReceivedResetStream) {
   ASSERT_TRUE(error);
 
   EXPECT_EQ(error->streamErrorCode(), kCode);
-  EXPECT_EQ(error->source(), "stream");
+  EXPECT_EQ(error->source(), V8WebTransportErrorSource::Enum::kStream);
 
   EXPECT_TRUE(bidirectional_stream->writable()->IsWritable());
 }
@@ -2140,7 +2200,7 @@ TEST_F(WebTransportTest, ReceivedStopSending) {
   ASSERT_TRUE(error);
 
   EXPECT_EQ(error->streamErrorCode(), kCode);
-  EXPECT_EQ(error->source(), "stream");
+  EXPECT_EQ(error->source(), V8WebTransportErrorSource::Enum::kStream);
 
   EXPECT_TRUE(bidirectional_stream->readable()->IsReadable());
 }

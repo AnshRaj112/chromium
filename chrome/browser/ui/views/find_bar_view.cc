@@ -55,6 +55,7 @@
 #include "ui/views/controls/separator.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/layout/layout_provider.h"
+#include "ui/views/metadata/view_factory.h"
 #include "ui/views/painter.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/views_features.h"
@@ -270,15 +271,15 @@ FindBarView::FindBarView(FindBarHost* host) {
   main_container->SetFlexForView(find_text_, 1, true);
 
   // Theme-aware image models.
-  views::SetImageFromVectorIconWithColorId(
+  views::SetImageFromVectorIconWithColor(
       find_previous_button_, kKeyboardArrowUpChromeRefreshIcon,
-      kColorFindBarButtonIcon, kColorFindBarButtonIconDisabled);
-  views::SetImageFromVectorIconWithColorId(
+      {kColorFindBarButtonIcon, kColorFindBarButtonIconDisabled});
+  views::SetImageFromVectorIconWithColor(
       find_next_button_, kKeyboardArrowDownChromeRefreshIcon,
-      kColorFindBarButtonIcon, kColorFindBarButtonIconDisabled);
-  views::SetImageFromVectorIconWithColorId(
-      close_button_, kCloseChromeRefreshIcon, kColorFindBarButtonIcon,
-      kColorFindBarButtonIconDisabled);
+      {kColorFindBarButtonIcon, kColorFindBarButtonIconDisabled});
+  views::SetImageFromVectorIconWithColor(
+      close_button_, kCloseChromeRefreshIcon,
+      {kColorFindBarButtonIcon, kColorFindBarButtonIconDisabled});
 
   SetOrientation(views::BoxLayout::Orientation::kVertical);
   SetHost(host);
@@ -312,8 +313,8 @@ FindBarView::~FindBarView() = default;
 
 void FindBarView::SetHost(FindBarHost* host) {
   find_bar_host_ = host;
-  find_text_->SetShouldDoLearning(
-      host && !host->browser_view()->GetProfile()->IsOffTheRecord());
+  find_text_->SetShouldDoLearning(host &&
+                                  !host->find_bar_owner()->IsOffTheRecord());
 }
 
 void FindBarView::SetFindTextAndSelectedRange(

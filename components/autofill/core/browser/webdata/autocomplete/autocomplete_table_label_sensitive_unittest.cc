@@ -11,7 +11,6 @@
 #include <string>
 #include <utility>
 
-#include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
@@ -155,6 +154,22 @@ class AutocompleteTableLabelSensitiveTest : public testing::Test {
   // submission fails.
   [[nodiscard]] std::optional<FormFieldData> CreateAndSubmitDefaultField() {
     return CreateAndSubmitDefaultFieldWithValue(kDefaultValue);
+  }
+
+  [[nodiscard]] std::optional<std::u16string>
+  GetAutocompleteEntryLabelSensitiveLabelNormalized(const std::u16string& name,
+                                                    const std::u16string& label,
+                                                    const std::u16string& value) {
+    sql::Statement s(db().GetSQLConnection()->GetUniqueStatement(
+        "SELECT label_normalized FROM autocomplete WHERE name = ? AND label = "
+        "? AND value = ?"));
+    s.BindString16(0, name);
+    s.BindString16(1, label);
+    s.BindString16(2, value);
+    if (!s.Step()) {
+      return std::nullopt;
+    }
+    return s.ColumnString16(0);
   }
 
   [[nodiscard]] bool DoesAutocompleteEntryExist(const std::u16string& name,
@@ -403,6 +418,19 @@ TEST_F(AddFormFieldValuesTest, InsertsAtMost256Entries) {
   EXPECT_EQ(AutocompleteEntriesCount(), 256U);
 }
 
+// AddFormFieldValues should insert a new entry with the correct normalized
+// label.
+TEST_F(AddFormFieldValuesTest, InsertsWithCorrectNormalizedLabel) {
+  FormFieldData field =
+      CreateTestFormField(u" !!!YOuR NaME:!!! ", kDefaultName, kDefaultValue,
+                          FormControlType::kInputText);
+  ASSERT_TRUE(SubmitFormField(field));
+
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveLabelNormalized(
+                field.name(), field.label(), field.value()),
+            u"your name");
+}
+
 using GetFormValuesForElementNameAndLabelTest =
     AutocompleteTableLabelSensitiveTest;
 
@@ -504,6 +532,21 @@ TEST_F(GetFormValuesForElementNameAndLabelTest, PrefixNarrowsDownResults) {
                   EqualsSearchResult(optional_field2.value().value(), 1)));
   EXPECT_THAT(entries_narrowed_down, ElementsAre(EqualsSearchResult(
                                          optional_field1.value().value(), 1)));
+}
+
+// GetFormValuesForElementNameAndLabel normalizes the label before querying the
+// database.
+TEST_F(GetFormValuesForElementNameAndLabelTest, NormalizesLabelBeforeQuerying) {
+  FormFieldData field = CreateTestFormField(
+      u"test label", kDefaultName, kDefaultValue, FormControlType::kInputText);
+  ASSERT_TRUE(SubmitFormField(field));
+
+  std::vector<AutocompleteSearchResultLabelSensitive> entries;
+  ASSERT_TRUE(table().GetFormValuesForElementNameAndLabel(
+      kDefaultName, u"....Test LaBeL!!!!:   ", kDefaultValue, /*limit=*/10,
+      entries));
+
+  EXPECT_THAT(entries, ElementsAre(EqualsSearchResult(kDefaultValue, 1)));
 }
 
 using GetCountOfValuesContainedBetweenTest =
@@ -1006,6 +1049,24 @@ TEST_F(RemoveFormElementTest, DoesNothingIfEntryDoesNotExist) {
                   seconds_precision_now, seconds_precision_now)));
 }
 
+// RemoveFormElement should match entries to be removed by the normalized label.
+TEST_F(RemoveFormElementTest, NormalizesLabelBeforeRemoving) {
+  // All three fields have the same normalized label.
+  FormFieldData field1 = CreateTestFormField(
+      u"label", kDefaultName, kDefaultValue, FormControlType::kInputText);
+  FormFieldData field2 = CreateTestFormField(
+      u"   label  ", kDefaultName, kDefaultValue, FormControlType::kInputText);
+  FormFieldData field3 =
+      CreateTestFormField(u"!!!!!LaBeL!!!!!:", kDefaultName, kDefaultValue,
+                          FormControlType::kInputText);
+  ASSERT_TRUE(SubmitFormFields({field1, field2, field3}));
+
+  ASSERT_TRUE(
+      table().RemoveFormElement(kDefaultName, field1.label(), kDefaultValue));
+
+  EXPECT_EQ(AutocompleteEntriesCount(), 0U);
+}
+
 using RemoveExpiredFormElementsTest = AutocompleteTableLabelSensitiveTest;
 
 // Adds an entry and advances the clock to make it expired.
@@ -1164,6 +1225,37 @@ TEST_F(GetAutocompleteEntryLabelSensitiveTest,
                                                  kDefaultValue);
 
   EXPECT_FALSE(entry.has_value());
+}
+
+// Verify label normalization:
+//   * Remove leading and trailing non-alphanumeric characters.
+//   * Convert to lowercase.
+//   * Cap normalized string length at 50 characters.
+//   * Ensure ICU awareness for proper handling of emojis, Kanji, and other
+//   scripts.
+//   * Unicode NFKC normalization is applied.
+TEST_F(AutocompleteTableLabelSensitiveTest, CorrectlyNormalizesLabel) {
+  FormFieldData field = CreateTestFormField(
+      u" !!!Long and!Case SeNsItIvE❤️Label 你好世界日本語안녕하세요Γειά σου "
+      u"🌐✨:   ",
+      kDefaultName, kDefaultValue, FormControlType::kInputText);
+  ASSERT_TRUE(SubmitFormField(field));
+
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveLabelNormalized(
+                field.name(), field.label(), field.value())
+                .value(),
+            u"long and!case sensitive❤️label 你好世界日本語안녕하세요γειά σο");
+
+  // NFKC normalization should decompose compatibility characters like the 'ﬁ'
+  // ligature (U+FB03) into 'f' and 'i'.
+  field = CreateTestFormField(u"ﬁle", kDefaultName, kDefaultValue,
+                              FormControlType::kInputText);
+  ASSERT_TRUE(SubmitFormField(field));
+
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveLabelNormalized(
+                field.name(), field.label(), field.value())
+                .value(),
+            u"file");
 }
 
 // Poisons the database and checks that we don't crash when adding a value.

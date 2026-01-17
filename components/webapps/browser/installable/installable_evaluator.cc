@@ -4,7 +4,8 @@
 
 #include "components/webapps/browser/installable/installable_evaluator.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/feature_list.h"
 #include "base/strings/string_util.h"
 #include "components/security_state/core/security_state.h"
@@ -50,7 +51,7 @@ InstallableStatusCode HasManifestOrAtRootScope(
     case InstallableCriteria::kDoNotCheck:
       return InstallableStatusCode::NO_ERROR_DETECTED;
     case InstallableCriteria::kNoManifestAtRootScope:
-      if (site_url.GetWithoutFilename().path().length() <= 1) {
+      if (site_url.GetWithoutFilename().GetPath().length() <= 1) {
         return InstallableStatusCode::NO_ERROR_DETECTED;
       }
       break;
@@ -94,7 +95,7 @@ bool HasValidStartUrl(const blink::mojom::Manifest& manifest,
     case InstallableCriteria::kNoManifestAtRootScope:
       return manifest.start_url.is_valid() ||
              metadata.application_url.is_valid() ||
-             site_url.GetWithoutFilename().path().length() <= 1;
+             site_url.GetWithoutFilename().GetPath().length() <= 1;
   }
 }
 
@@ -153,7 +154,7 @@ bool DoesManifestContainRequiredIcon(const blink::mojom::Manifest& manifest) {
       continue;
     }
 
-    if (!base::Contains(icon.purpose, IconPurpose::ANY)) {
+    if (!std::ranges::contains(icon.purpose, IconPurpose::ANY)) {
       continue;
     }
 
@@ -226,7 +227,7 @@ InstallableStatusCode InstallableEvaluator::GetDisplayError(
   // If this array is not empty, the first value will "win", so validate
   // this value is installable.
   if (!manifest.display_override.empty()) {
-    display_mode_to_evaluate = manifest.display_override[0];
+    display_mode_to_evaluate = manifest.display_override[0].display();
     error_type_if_invalid =
         InstallableStatusCode::MANIFEST_DISPLAY_OVERRIDE_NOT_SUPPORTED;
   }
@@ -265,18 +266,17 @@ int InstallableEvaluator::GetMinimumIconSizeInPx() {
   return kMinimumPrimaryIconSizeInPx;
 }
 
-std::optional<std::vector<InstallableStatusCode>>
-InstallableEvaluator::CheckInstallability() const {
+std::vector<InstallableStatusCode> InstallableEvaluator::CheckInstallability()
+    const {
   CHECK(blink::IsEmptyManifest(page_data_->GetManifest()) ||
         (page_data_->GetManifest().start_url.is_valid() &&
          page_data_->GetManifest().scope.is_valid() &&
          page_data_->GetManifest().id.is_valid()));
 
-  if (criteria_ == InstallableCriteria::kDoNotCheck) {
-    return std::nullopt;
-  }
-
   std::vector<InstallableStatusCode> errors;
+  if (criteria_ == InstallableCriteria::kDoNotCheck) {
+    return errors;
+  }
 
   InstallableStatusCode error = HasManifestOrAtRootScope(
       criteria_, page_data_->GetManifest(), page_data_->manifest_url(),
@@ -316,6 +316,9 @@ std::vector<InstallableStatusCode> InstallableEvaluator::CheckEligibility(
     content::WebContents* web_contents) const {
   std::vector<InstallableStatusCode> errors;
   if (web_contents->GetBrowserContext()->IsOffTheRecord()) {
+    // TODO(http://crbug.com/452122299): Have this not fail if the we are in
+    // CrOS + guest mode (either by not adding this error, or filtering it out
+    // later).
     errors.push_back(InstallableStatusCode::IN_INCOGNITO);
   }
   if (!IsContentSecure(web_contents)) {
@@ -332,13 +335,13 @@ bool InstallableEvaluator::IsContentSecure(content::WebContents* web_contents) {
 
   // chrome:// URLs are considered secure.
   const GURL& url = web_contents->GetLastCommittedURL();
-  if (url.scheme() == content::kChromeUIScheme) {
+  if (url.GetScheme() == content::kChromeUIScheme) {
     return true;
   }
 
   // chrome-untrusted:// URLs are shipped with Chrome, so they are considered
   // secure in this context.
-  if (url.scheme() == content::kChromeUIUntrustedScheme) {
+  if (url.GetScheme() == content::kChromeUIUntrustedScheme) {
     return true;
   }
 

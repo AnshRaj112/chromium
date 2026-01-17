@@ -7,7 +7,6 @@
 #include <iterator>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/debug/alias.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
@@ -66,7 +65,6 @@
 #include "content/public/browser/global_routing_id.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
-#include "content/public/browser/resource_context.h"
 #include "content/public/browser/shared_cors_origin_access_list.h"
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/browser/web_ui_url_loader_factory.h"
@@ -235,7 +233,7 @@ CreatePendingSharedURLLoaderFactory(StoragePartitionImpl* storage_partition,
         static_cast<RenderFrameHostImpl*>(rfh))
         .Run(/*is_navigation=*/true,
              /*is_download=*/true, factory_builder,
-             nullptr /* factory_override */);
+             nullptr /* factory_override */, /*header_client=*/nullptr);
 
     // Also allow the Content embedder to inject itself if it wants to.
     GetContentClient()->browser()->WillCreateURLLoaderFactory(
@@ -327,7 +325,7 @@ download::DownloadItemImpl* DownloadManagerImpl::CreateActiveItem(
     const download::DownloadCreateInfo& info) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
-  if (base::Contains(downloads_by_guid_, info.guid))
+  if (downloads_by_guid_.contains(info.guid))
     return nullptr;
 
   download::DownloadItemImpl* download =
@@ -717,7 +715,7 @@ void DownloadManagerImpl::OnNewDownloadIdRetrieved(
     download::InProgressDownloadManager::StartDownloadItemCallback callback,
     uint32_t id) {
 #if BUILDFLAG(IS_ANDROID)
-  if (info->transient && !info->is_must_download &&
+  if (info->transient && info->allow_auto_open_after_completion &&
       delegate_->ShouldOpenPdfInline() &&
       base::EqualsCaseInsensitiveASCII(info->mime_type, kPdfMimeType)) {
     if (IsOffTheRecord()) {
@@ -735,7 +733,7 @@ void DownloadManagerImpl::OnNewDownloadIdRetrieved(
           continue;
         }
 
-        if (!item->IsTransient() || item->IsMustDownload()) {
+        if (!item->IsTransient() || !item->AllowAutoOpenAfterCompletion()) {
           continue;
         }
 
@@ -932,7 +930,7 @@ void DownloadManagerImpl::CreateSavePackageDownloadItemWithId(
     uint32_t id) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   DCHECK_NE(download::DownloadItem::kInvalidId, id);
-  DCHECK(!base::Contains(downloads_, id));
+  DCHECK(!downloads_.contains(id));
 
   download::DownloadItemImpl* download_item = item_factory_->CreateSavePageItem(
       this, id, main_file_path, main_file_display_name, page_url, mime_type,
@@ -1138,7 +1136,7 @@ download::DownloadItem* DownloadManagerImpl::CreateDownloadItem(
   auto in_progress_download = RetrieveInProgressDownload(id);
 
   // Return null to clear cancelled or non-resumable download.
-  if (base::Contains(cleared_download_guids_on_startup_, guid)) {
+  if (cleared_download_guids_on_startup_.contains(guid)) {
     return nullptr;
   }
 
@@ -1200,8 +1198,8 @@ download::DownloadItem* DownloadManagerImpl::CreateDownloadItem(
 
 void DownloadManagerImpl::OnDownloadCreated(
     std::unique_ptr<download::DownloadItemImpl> download) {
-  DCHECK(!base::Contains(downloads_, download->GetId()));
-  DCHECK(!base::Contains(downloads_by_guid_, download->GetGuid()));
+  DCHECK(!downloads_.contains(download->GetId()));
+  DCHECK(!downloads_by_guid_.contains(download->GetGuid()));
   download::DownloadItemImpl* item = download.get();
   downloads_[item->GetId()] = std::move(download);
   downloads_by_guid_[item->GetGuid()] = item;
@@ -1463,7 +1461,7 @@ void DownloadManagerImpl::BeginResourceDownloadOnChecksComplete(
   } else if (rfh && params->url().SchemeIs(content::kChromeUIScheme)) {
     pending_url_loader_factory =
         std::make_unique<network::WrapperPendingSharedURLLoaderFactory>(
-            CreateWebUIURLLoaderFactory(rfh, params->url().scheme(),
+            CreateWebUIURLLoaderFactory(rfh, params->url().GetScheme(),
                                         base::flat_set<std::string>()));
   } else if (rfh && params->url().SchemeIsFileSystem()) {
     StoragePartitionImpl* storage_partition = GetStoragePartitionForConfig(
@@ -1488,7 +1486,7 @@ void DownloadManagerImpl::BeginResourceDownloadOnChecksComplete(
             params->render_process_host_id(),
             params->render_frame_host_routing_id(), params->initiator(),
             &non_network_url_loader_factories);
-    auto it = non_network_url_loader_factories.find(params->url().scheme());
+    auto it = non_network_url_loader_factories.find(params->url().GetScheme());
     if (it != non_network_url_loader_factories.end()) {
       pending_url_loader_factory =
           std::make_unique<network::WrapperPendingSharedURLLoaderFactory>(
@@ -1599,11 +1597,6 @@ bool DownloadManagerImpl::ShouldClearDownloadFromDB(
     download::DownloadItem::DownloadState state,
     download::DownloadInterruptReason reason,
     const base::Time& start_time) {
-  if (!base::FeatureList::IsEnabled(
-          download::features::kDeleteExpiredDownloads)) {
-    return false;
-  }
-
   // Use system time to determine if the download is expired. Manually setting
   // the system time can affect this.
   bool expired = base::Time::Now() - start_time >=

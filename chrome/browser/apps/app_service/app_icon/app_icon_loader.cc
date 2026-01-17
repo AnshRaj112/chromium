@@ -4,11 +4,11 @@
 
 #include "chrome/browser/apps/app_service/app_icon/app_icon_loader.h"
 
+#include <algorithm>
 #include <memory>
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -523,16 +523,18 @@ void AppIconLoader::LoadWebAppIcon(const std::string& web_app_id,
                 size_hint_in_dip_,
                 ui::GetScaleForResourceScaleFactor(scale_factor)));
         DCHECK(size_and_purpose.has_value());
-        if (!base::Contains(icon_pixel_sizes, size_and_purpose->size_px)) {
+        if (!std::ranges::contains(icon_pixel_sizes,
+                                   size_and_purpose->size_px)) {
           icon_pixel_sizes.emplace_back(size_and_purpose->size_px);
         }
       }
       DCHECK(!icon_pixel_sizes.empty());
 
-      icon_manager.ReadIcons(web_app_id, *icon_purpose_to_read,
-                             icon_pixel_sizes,
-                             base::BindOnce(&AppIconLoader::OnReadWebAppIcon,
-                                            base::WrapRefCounted(this)));
+      icon_manager.ReadTrustedIconsWithFallbackToManifestIcons(
+          web_app_id, icon_pixel_sizes, *icon_purpose_to_read,
+          web_app::WebAppIconManager::BitmapsFromIconMetadataExtractor(
+              base::BindOnce(&AppIconLoader::OnReadWebAppIcon,
+                             base::WrapRefCounted(this))));
 
       return;
     }
@@ -754,11 +756,13 @@ void AppIconLoader::GetWebAppCompressedIconData(
 
   std::vector<int> icon_pixel_sizes;
   icon_pixel_sizes.emplace_back(size_and_purpose->size_px);
-  icon_manager.ReadIcons(
-      web_app_id, *icon_purpose_to_read, icon_pixel_sizes,
-      base::BindOnce(&AppIconLoader::OnReadWebAppForCompressedIconData,
-                     base::WrapRefCounted(this),
-                     *icon_purpose_to_read == web_app::IconPurpose::MASKABLE));
+  icon_manager.ReadTrustedIconsWithFallbackToManifestIcons(
+      web_app_id, icon_pixel_sizes, *icon_purpose_to_read,
+      web_app::WebAppIconManager::BitmapsFromIconMetadataExtractor(
+          base::BindOnce(
+              &AppIconLoader::OnReadWebAppForCompressedIconData,
+              base::WrapRefCounted(this),
+              *icon_purpose_to_read == web_app::IconPurpose::MASKABLE)));
 }
 
 void AppIconLoader::GetChromeAppCompressedIconData(

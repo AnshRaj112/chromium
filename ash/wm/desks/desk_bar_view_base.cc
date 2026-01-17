@@ -56,7 +56,6 @@
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/compositor/layer.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/display/screen.h"
 #include "ui/events/devices/device_data_manager.h"
 #include "ui/events/devices/haptic_touchpad_effects.h"
@@ -65,6 +64,7 @@
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/gfx/text_elider.h"
 #include "ui/views/background.h"
 #include "ui/views/event_monitor.h"
@@ -125,8 +125,7 @@ void MaybeSetupBackgroundView(DeskBarViewBase* bar_view) {
     return;
   }
 
-  if (features::IsBackgroundBlurEnabled() &&
-      chromeos::features::IsSystemBlurEnabled()) {
+  if (chromeos::features::IsSystemBlurEnabled()) {
     layer->SetBackgroundBlur(ColorProvider::kBackgroundBlurSigma);
     layer->SetBackdropFilterQuality(ColorProvider::kBackgroundBlurQuality);
   }
@@ -141,7 +140,7 @@ void MaybeSetupBackgroundView(DeskBarViewBase* bar_view) {
   const ui::ColorId background_color_id =
       chromeos::features::IsSystemBlurEnabled()
           ? static_cast<ui::ColorId>(kColorAshShieldAndBase80)
-          : cros_tokens::kCrosSysSystemBaseElevatedOpaque;
+          : cros_tokens::kCrosSysSystemOnBaseOpaque;
   view->SetBackground(views::CreateSolidBackground(background_color_id));
 }
 
@@ -559,7 +558,7 @@ class DeskBarViewBase::AddDeskAnimation
     // nature the layout operation.
     auto new_mini_view_it = new_mini_views_.begin();
     while (new_mini_view_it != new_mini_views_.end()) {
-      if (base::Contains(bar_view_->mini_views_, *new_mini_view_it)) {
+      if (std::ranges::contains(bar_view_->mini_views_, *new_mini_view_it)) {
         ++new_mini_view_it;
       } else {
         new_mini_view_it = new_mini_views_.erase(new_mini_view_it);
@@ -1029,7 +1028,7 @@ void DeskBarViewBase::ScrollToShowViewIfNecessary(const views::View* view) {
   if (!IsScrollingInitialized()) {
     return;
   }
-  CHECK(base::Contains(contents_view_->children(), view));
+  CHECK(std::ranges::contains(contents_view_->children(), view));
   const gfx::Rect visible_bounds = scroll_view_->GetVisibleRect();
   const gfx::Rect view_bounds = view->bounds();
   const bool beyond_left = view_bounds.x() < visible_bounds.x();
@@ -1089,8 +1088,7 @@ void DeskBarViewBase::NudgeDeskName(int desk_index) {
   if (type_ == Type::kOverview) {
     // If we're in tablet mode and there are no external keyboards, open up the
     // virtual keyboard.
-    if (display::Screen::GetScreen()->InTabletMode() &&
-        !HasExternalKeyboard()) {
+    if (display::Screen::Get()->InTabletMode() && !HasExternalKeyboard()) {
       keyboard::KeyboardUIController::Get()->ShowKeyboard(/*lock=*/false);
     }
   }
@@ -1221,7 +1219,7 @@ bool DeskBarViewBase::ShouldShowLibraryUi() {
   // Only update visibility when needed. This will save a lot of repeated work.
   if (library_ui_visibility_ == LibraryUiVisibility::kToBeChecked) {
     if (!saved_desk_util::ShouldShowSavedDesksOptions() ||
-        display::Screen::GetScreen()->InTabletMode()) {
+        display::Screen::Get()->InTabletMode()) {
       library_ui_visibility_ = LibraryUiVisibility::kHidden;
     } else {
       auto* desk_model = Shell::Get()->saved_desk_delegate()->GetDeskModel();
@@ -1353,10 +1351,10 @@ void DeskBarViewBase::OnActivateDeskTimer(const base::Uuid& uuid) {
 
 void DeskBarViewBase::HandleClickEvent(DeskMiniView* mini_view) {
   // A timer to delay closing the desk bar.
-  if (!ui::ScopedAnimationDurationScaleMode::is_zero()) {
+  if (!gfx::ScopedAnimationDurationScaleMode::is_zero()) {
     desk_activation_timer_.Start(
         FROM_HERE,
-        ui::ScopedAnimationDurationScaleMode::duration_multiplier() *
+        gfx::ScopedAnimationDurationScaleMode::duration_multiplier() *
             kAnimationDelayDuration,
         base::BindOnce(&DeskBarViewBase::OnActivateDeskTimer,
                        base::Unretained(this), mini_view->desk()->uuid()));

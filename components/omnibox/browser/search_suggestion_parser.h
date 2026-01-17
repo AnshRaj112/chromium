@@ -375,19 +375,21 @@ class SearchSuggestionParser {
 
     // The map of suggestion group IDs to suggestion group information.
     omnibox::GroupConfigMap suggestion_groups_map;
+
+    // The smart compose inline hint.
+    std::string smart_compose_inline_hint;
   };
 
   // Converts JSON loaded by a SimpleURLLoader into UTF-8 and returns the
   // result.
   //
-  // |source| must be the SimpleURLLoader that loaded the data; it is used to
+  // `source` must be the SimpleURLLoader that loaded the data; it is used to
   // lookup the body's encoding from response headers.
   // Note: It can be nullptr in tests.
   //
-  // |response_body| must be the body of the response; it may be null.
-  static std::string ExtractJsonData(
-      const network::SimpleURLLoader* source,
-      std::unique_ptr<std::string> response_body);
+  // `response_body` must be the body of the response; it may be empty.
+  static std::string ExtractJsonData(const network::SimpleURLLoader* source,
+                                     std::optional<std::string> response_body);
 
   // Parses JSON response received from the provider, stripping XSSI
   // protection if needed. Returns the parsed data if successful, NULL
@@ -395,10 +397,25 @@ class SearchSuggestionParser {
   static std::optional<base::Value::List> DeserializeJsonData(
       std::string_view json_data);
 
+  // The options struct for ParseSuggestResultsWithOptions
+  struct ParseSuggestResultsOptions {
+    bool allow_empty_suggestion = false;
+  };
+
   // Parses results from the suggest server and updates the appropriate suggest
   // and navigation result lists in |results|. |is_keyword_result| indicates
   // whether the response was received from the keyword provider.
   // Returns whether the appropriate result list members were updated.
+  static bool ParseSuggestResults(
+      const base::Value::List& root_list,
+      const AutocompleteInput& input,
+      const AutocompleteSchemeClassifier& scheme_classifier,
+      int default_result_relevance,
+      bool is_keyword_result,
+      const ParseSuggestResultsOptions& options,
+      Results* results);
+
+  // ParseSuggestResultsWithOptions with optional values set to their default
   static bool ParseSuggestResults(
       const base::Value::List& root_list,
       const AutocompleteInput& input,

@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 
+#include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_test_util.h"
@@ -15,7 +16,6 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/profiles/profile_picker.h"
 #include "chrome/browser/ui/profiles/profile_ui_test_utils.h"
@@ -89,7 +89,7 @@ IN_PROC_BROWSER_TEST_F(AvatarMenuBrowserTest, EditProfile_NoBrowser) {
   ScopedKeepAlive keep_alive(KeepAliveOrigin::BROWSER,
                              KeepAliveRestartOption::DISABLED);
   Profile* profile = browser()->profile();
-  BrowserList::CloseAllBrowsersWithProfile(profile);
+  chrome::CloseAllBrowsersWithProfile(profile);
   ui_test_utils::WaitForBrowserToClose(browser());
   EXPECT_EQ(chrome::GetBrowserCount(profile), 0U);
 
@@ -124,7 +124,7 @@ IN_PROC_BROWSER_TEST_F(AvatarMenuBrowserTest, EditProfile_SigninRequired) {
   // Keep the browser process running while browsers are closed.
   ScopedKeepAlive keep_alive(KeepAliveOrigin::BROWSER,
                              KeepAliveRestartOption::DISABLED);
-  BrowserList::CloseAllBrowsersWithProfile(profile);
+  chrome::CloseAllBrowsersWithProfile(profile);
   ui_test_utils::WaitForBrowserToClose(browser());
   EXPECT_EQ(chrome::GetBrowserCount(profile), 0U);
 
@@ -151,20 +151,24 @@ IN_PROC_BROWSER_TEST_F(AvatarMenuBrowserTest, PRE_EditProfile_NotLoaded) {
   ProfileManager* profile_manager = g_browser_process->profile_manager();
   Profile& secondary_profile = profiles::testing::CreateProfileSync(
       profile_manager, profile_manager->GenerateNextProfileDirectoryPath());
-  ui_test_utils::BrowserChangeObserver secondary_profile_browser_observer(
-      nullptr, ui_test_utils::BrowserChangeObserver::ChangeType::kAdded);
+  ui_test_utils::BrowserCreatedObserver browser_created_observer;
   chrome::NewEmptyWindow(&secondary_profile);
   // Wait for secondary profile browser window open and becomes the last active
   // one.
-  ui_test_utils::WaitForBrowserSetLastActive(
-      secondary_profile_browser_observer.Wait());
+  ui_test_utils::WaitForBrowserSetLastActive(browser_created_observer.Wait());
 
   // Close all browsers to avoid restoring profiles on the next startup.
   CloseAllBrowsers();
 }
 
+// TODO(crbug.com/432068316): Flaky on linux-msan-rel.
+#if BUILDFLAG(IS_LINUX) && defined(MEMORY_SANITIZER)
+#define MAYBE_EditProfile_NotLoaded DISABLED_EditProfile_NotLoaded
+#else
+#define MAYBE_EditProfile_NotLoaded EditProfile_NotLoaded
+#endif
 // "Edit" isn't enabled if no profiles are loaded.
-IN_PROC_BROWSER_TEST_F(AvatarMenuBrowserTest, EditProfile_NotLoaded) {
+IN_PROC_BROWSER_TEST_F(AvatarMenuBrowserTest, MAYBE_EditProfile_NotLoaded) {
   EXPECT_EQ(chrome::GetTotalBrowserCount(), 0U);
   EXPECT_FALSE(menu()->ShouldShowEditProfileLink());
   EXPECT_FALSE(menu()->GetActiveProfileIndex().has_value());

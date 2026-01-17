@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -30,8 +31,10 @@
 #include "chrome/browser/extensions/api/tabs/windows_util.h"
 #include "chrome/browser/extensions/bookmarks/bookmarks_error_constants.h"
 #include "chrome/browser/extensions/bookmarks/bookmarks_helpers.h"
+#include "chrome/browser/extensions/browser_window_util.h"
 #include "chrome/browser/extensions/chrome_extension_function_details.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
+#include "chrome/browser/extensions/open_tab_helper.h"
 #include "chrome/browser/importer/external_process_importer_host.h"
 #include "chrome/browser/importer/importer_uma.h"
 #include "chrome/browser/platform_util.h"
@@ -44,6 +47,7 @@
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/chrome_select_file_policy.h"
+#include "chrome/browser/ui/tabs/split_tab_metrics.h"
 #include "chrome/browser/ui/window_sizer/window_sizer.h"
 #include "chrome/browser/undo/bookmark_undo_service_factory.h"
 #include "chrome/common/chrome_paths.h"
@@ -676,18 +680,47 @@ BookmarkManagerPrivateOpenInNewTabFunction::RunOnReady() {
   if (!node->is_url())
     return Error("Cannot open a folder in a new tab.");
 
-  ExtensionTabUtil::OpenTabParams options;
-  options.url = node->url().spec();
-  if (params->params.has_value()) {
-    options.active = params->params.value().active;
-    options.split = params->params.value().split;
+  OpenTabHelper::Params options;
+  if (params->params) {
+    options.active = params->params->active;
   }
   options.bookmark_id = node->id();
 
-  auto result =
-      extensions::ExtensionTabUtil::OpenTab(this, options, user_gesture());
+  base::expected<GURL, std::string> maybe_url =
+      ExtensionTabUtil::PrepareURLForNavigation(node->url().spec(), extension(),
+                                                browser_context());
+  if (!maybe_url.has_value()) {
+    return Error(maybe_url.error());
+  }
+  GURL validated_url = std::move(maybe_url.value());
+
+  base::expected<BrowserWindowInterface*, std::string> maybe_browser =
+      OpenTabHelper::FindOrCreateBrowser(validated_url, *this,
+                                         /*create_if_needed=*/false);
+  if (!maybe_browser.has_value()) {
+    return Error(std::move(maybe_browser.error()));
+  }
+
+  base::expected<content::WebContents*, std::string> result =
+      OpenTabHelper::OpenTab(validated_url, *maybe_browser.value(), *this,
+                             options);
   if (!result.has_value())
     return Error(result.error());
+
+  content::WebContents* new_contents = result.value();
+
+  if (params->params && params->params->split) {
+    BrowserWindowInterface* browser =
+        browser_window_util::GetBrowserForTabContents(*new_contents);
+    if (browser) {
+      TabStripModel* tab_strip =
+          browser->GetBrowserForMigrationOnly()->tab_strip_model();
+      tab_strip->AddToNewSplit(
+          {tab_strip->GetIndexOfWebContents(new_contents)},
+          split_tabs::SplitTabVisualData(),
+          split_tabs::SplitTabCreatedSource::kExtensionsApi);
+    }
+  }
 
   return NoArguments();
 }
@@ -727,8 +760,9 @@ BookmarkManagerPrivateOpenInNewWindowFunction::RunOnReady() {
   std::vector<UrlAndId> url_and_ids;
   urls.reserve(nodes.size());
   for (const bookmarks::BookmarkNode* node : nodes) {
-    if (!base::Contains(urls, node->url()))
+    if (!std::ranges::contains(urls, node->url())) {
       continue;  // The URL was filtered out; ignore this node.
+    }
     UrlAndId url_and_id;
     url_and_id.url = node->url();
     url_and_id.id = node->id();
@@ -746,7 +780,7 @@ BookmarkManagerPrivateOpenInNewWindowFunction::RunOnReady() {
   for (auto& url_and_id : url_and_ids) {
     NavigateParams navigate_params(window_profile, url_and_id.url,
                                    ui::PAGE_TRANSITION_LINK);
-    navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
+    navigate_params.window_action = NavigateParams::WindowAction::kShowWindow;
     navigate_params.disposition =
         first_tab ? WindowOpenDisposition::NEW_WINDOW
                   : WindowOpenDisposition::NEW_FOREGROUND_TAB;
@@ -809,6 +843,10 @@ BookmarkManagerPrivateIOFunction::~BookmarkManagerPrivateIOFunction() {
     select_file_dialog_->ListenerDestroyed();
 }
 
+void BookmarkManagerPrivateIOFunction::FileSelectionCanceled() {
+  CleanupFileDialog();
+}
+
 void BookmarkManagerPrivateIOFunction::ShowSelectFileDialog(
     ui::SelectFileDialog::Type type,
     const base::FilePath& default_path) {
@@ -843,9 +881,12 @@ void BookmarkManagerPrivateIOFunction::ShowSelectFileDialog(
                                   base::FilePath::StringType(), owning_window);
 }
 
-void BookmarkManagerPrivateIOFunction::FileSelectionCanceled() {
+void BookmarkManagerPrivateIOFunction::CleanupFileDialog() {
+  if (select_file_dialog_) {
+    select_file_dialog_->ListenerDestroyed();
+  }
   select_file_dialog_.reset();
-  Release();  // Balanced in BookmarkManagerPrivateIOFunction::SelectFile()
+  Release();  // Balanced in ShowSelectFileDialog().
 }
 
 ExtensionFunction::ResponseValue
@@ -875,8 +916,7 @@ void BookmarkManagerPrivateImportFunction::FileSelected(
 
   importer::LogImporterUseToMetrics("BookmarksAPI",
                                     user_data_importer::TYPE_BOOKMARKS_FILE);
-  select_file_dialog_.reset();
-  Release();  // Balanced in BookmarkManagerPrivateIOFunction::SelectFile()
+  CleanupFileDialog();
 }
 
 ExtensionFunction::ResponseValue
@@ -904,8 +944,7 @@ void BookmarkManagerPrivateExportFunction::FileSelected(
     int index) {
   bookmark_html_writer::WriteBookmarks(GetProfile(), file.path(),
                                        base::DoNothing());
-  select_file_dialog_.reset();
-  Release();  // Balanced in BookmarkManagerPrivateIOFunction::SelectFile()
+  CleanupFileDialog();
 }
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(BookmarkManagerPrivateDragEventRouter);

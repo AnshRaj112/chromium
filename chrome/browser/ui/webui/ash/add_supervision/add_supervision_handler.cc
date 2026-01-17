@@ -23,7 +23,6 @@
 #include "components/signin/public/identity_manager/access_token_fetcher.h"
 #include "components/signin/public/identity_manager/access_token_info.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
-#include "components/signin/public/identity_manager/scope_set.h"
 #include "components/supervised_user/core/browser/supervised_user_service.h"
 #include "components/user_manager/user_manager.h"
 #include "content/public/browser/web_ui.h"
@@ -99,17 +98,11 @@ void AddSupervisionHandler::GetOAuthToken(GetOAuthTokenCallback callback) {
         add_supervision::mojom::OAuthTokenFetchStatus::ERROR, "");
     return;
   }
-  signin::ScopeSet scopes;
-  scopes.insert(GaiaConstants::kKidsSupervisionSetupChildOAuth2Scope);
-  scopes.insert(GaiaConstants::kPeopleApiReadOnlyOAuth2Scope);
-  scopes.insert(GaiaConstants::kAccountsReauthOAuth2Scope);
-  scopes.insert(GaiaConstants::kAuditRecordingOAuth2Scope);
-  scopes.insert(GaiaConstants::kClearCutOAuth2Scope);
 
   oauth2_access_token_fetcher_ =
       identity_manager_->CreateAccessTokenFetcherForAccount(
           identity_manager_->GetPrimaryAccountId(signin::ConsentLevel::kSync),
-          "add_supervision", scopes,
+          signin::OAuthConsumerId::kAddSupervision,
           base::BindOnce(&AddSupervisionHandler::OnAccessTokenFetchComplete,
                          weak_ptr_factory_.GetWeakPtr(), std::move(callback)),
           signin::AccessTokenFetcher::Mode::kImmediate);

@@ -9,7 +9,6 @@
 #include <utility>
 
 #include "third_party/blink/renderer/core/core_export.h"
-#include "third_party/blink/renderer/core/css/style_engine.h"
 #include "third_party/blink/renderer/core/css/style_recalc_change.h"
 #include "third_party/blink/renderer/core/dom/element_rare_data_field.h"
 #include "third_party/blink/renderer/core/frame/local_frame_view.h"
@@ -123,10 +122,10 @@ class CORE_EXPORT DisplayLockContext final
            (IsActivatable(DisplayLockActivationReason::kAny) &&
             ActivatableDisplayLocksForced()) ||
            (IsAuto() && HasScrollerWithScrollMarkerGroup()) ||
-           (document_->GetStyleEngine().SkippedContainerRecalc() &&
-            IsActivatable(DisplayLockActivationReason::kAccessibility) &&
-            IsScreenReaderActive());
+           ShouldActivateForScreenReader();
   }
+
+  bool ShouldActivateForScreenReader() const;
   void DidLayoutChildren();
   ALWAYS_INLINE bool ShouldPrePaintChildren() const {
     return !is_locked_ || forced_info_.is_forced(ForcedPhase::kPrePaint) ||
@@ -189,6 +188,10 @@ class CORE_EXPORT DisplayLockContext final
 
   void NotifyCompositingDescendantDependentFlagUpdateWasBlocked() {
     needs_compositing_dependent_flag_update_ = true;
+  }
+
+  void NotifyVisualOverflowRecalcWasBlocked() {
+    needs_visual_overflow_recalc_update_ = true;
   }
 
   // Notify this element will be disconnected.
@@ -337,6 +340,7 @@ class CORE_EXPORT DisplayLockContext final
   bool MarkNeedsRepaintAndPaintArtifactCompositorUpdate();
   bool MarkNeedsCullRectUpdate();
   bool MarkForCompositingUpdatesIfNeeded();
+  bool MarkForVisualOverflowRecalcIfNeeded();
 
   bool IsElementDirtyForStyleRecalc() const;
   bool IsElementDirtyForLayout() const;
@@ -503,6 +507,7 @@ class CORE_EXPORT DisplayLockContext final
   bool needs_soft_navigation_context_update_ = false;
   bool needs_prepaint_subtree_walk_ = false;
   bool needs_compositing_dependent_flag_update_ = false;
+  bool needs_visual_overflow_recalc_update_ = false;
 
   // Will be true if child traversal was blocked on a previous layout run on the
   // locked element. We need to keep track of this to ensure that on the next

@@ -40,49 +40,45 @@ class DEVICE_VR_EXPORT OpenXrGraphicsBindingOpenGLES
   bool Initialize(XrInstance instance, XrSystemId system) override;
   const void* GetSessionCreateInfo() const override;
   int64_t GetSwapchainFormat(XrSession session) const override;
-  XrResult EnumerateSwapchainImages(
-      const XrSwapchain& color_swapchain) override;
-  void ClearSwapchainImages() override;
-  base::span<OpenXrSwapchainInfo> GetSwapChainImages() override;
-  base::span<const OpenXrSwapchainInfo> GetSwapChainImages() const override;
+  XrResult EnumerateSwapchainImages(OpenXrCompositionLayer& layer) override;
   bool CanUseSharedImages() const override;
-  void CreateSharedImages(gpu::SharedImageInterface* sii) override;
-  const OpenXrSwapchainInfo& GetActiveSwapchainImage() override;
-  bool Render(
-      const scoped_refptr<viz::ContextProvider>& context_provider) override;
+  void OnSwapchainImageActivated(OpenXrCompositionLayer& layer,
+                                 gpu::SharedImageInterface* sii) override;
+  void ResizeSharedBuffer(OpenXrCompositionLayer& layer,
+                          OpenXrSwapchainInfo& swap_chain_info,
+                          gpu::SharedImageInterface* sii) override;
   void CleanupWithoutSubmit() override;
-  bool WaitOnFence(gfx::GpuFence& gpu_fence) override;
-  bool ShouldFlipSubmittedImage() const override;
-  void SetOverlayAndWebXrVisibility(bool overlay_visible,
-                                    bool webxr_visible) override;
   bool SetOverlayTexture(gfx::GpuMemoryBufferHandle texture,
                          const gpu::SyncToken& sync_token,
                          const gfx::RectF& left,
                          const gfx::RectF& right) override;
   gfx::Size GetMaxTextureSize() override;
 
- private:
-  void OnSwapchainImageActivated(gpu::SharedImageInterface* sii) override;
-  void ResizeSharedBuffer(OpenXrSwapchainInfo& swap_chain_info,
-                          gpu::SharedImageInterface* sii);
+ protected:
+  // OpenXrGraphicsBinding
+  bool RenderLayer(
+      OpenXrCompositionLayer& layer,
+      const scoped_refptr<viz::ContextProvider>& context_provider) override;
+  bool WaitOnFence(OpenXrCompositionLayer& layer,
+                   gfx::GpuFence& gpu_fence) override;
+  void CreateSharedImages(OpenXrCompositionLayer& layer,
+                          gpu::SharedImageInterface* sii) override;
+  bool ShouldFlipSubmittedImage(OpenXrCompositionLayer& layer) const override;
+  bool SupportsLayers() const override;
+  std::unique_ptr<OpenXrCompositionLayer::GraphicsBindingData>
+  CreateLayerGraphicsBindingData() const override;
 
   bool gl_initialized_ = false;
   bool initialized_ = false;
-  bool using_shared_images_ = false;
   XrGraphicsBindingOpenGLESAndroidKHR binding_{
       XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR, nullptr};
-  std::vector<OpenXrSwapchainInfo> color_swapchain_images_;
   gfx::GpuMemoryBufferHandle overlay_handle_;
-
-  bool webxr_visible_ = true;
-  bool overlay_visible_ = false;
 
   scoped_refptr<gl::GLSurface> surface_;
   scoped_refptr<gl::GLContext> context_;
   scoped_refptr<gl::GLContextEGL> egl_context_;
 
   std::unique_ptr<XrRenderer> renderer_;
-  GLuint back_buffer_fbo_ = 0;
   LocalTexture overlay_texture_;
 };
 

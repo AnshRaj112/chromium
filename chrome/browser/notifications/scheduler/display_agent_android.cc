@@ -19,7 +19,7 @@
 
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/android/chrome_jni_headers/DisplayAgent_jni.h"
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 
 namespace {
@@ -35,12 +35,12 @@ notifications::UserActionHandler* GetUserActionHandler() {
 }  // namespace
 
 // static
-void JNI_DisplayAgent_OnUserAction(JNIEnv* env,
-                                   jint j_client_type,
-                                   jint j_action_type,
-                                   std::string& guid,
-                                   jint j_button_type,
-                                   std::string& button_id) {
+static void JNI_DisplayAgent_OnUserAction(JNIEnv* env,
+                                          int32_t j_client_type,
+                                          int32_t j_action_type,
+                                          std::string& guid,
+                                          int32_t j_button_type,
+                                          std::string& button_id) {
   auto user_action_type =
       static_cast<notifications::UserActionType>(j_action_type);
   notifications::UserActionData action_data(
@@ -81,7 +81,7 @@ void DisplayAgentAndroid::ShowNotification(
   for (const auto& icon : notification_data->icons) {
     Java_DisplayAgent_addIcon(
         env, java_notification_data, static_cast<int>(icon.first /*IconType*/),
-        icon.second.bitmap, static_cast<jint>(icon.second.resource_id));
+        icon.second.bitmap, static_cast<int32_t>(icon.second.resource_id));
   }
 
   for (size_t i = 0; i < notification_data->buttons.size(); ++i) {
@@ -96,3 +96,5 @@ void DisplayAgentAndroid::ShowNotification(
   Java_DisplayAgent_showNotification(env, java_notification_data,
                                      java_system_data);
 }
+
+DEFINE_JNI(DisplayAgent)

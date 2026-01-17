@@ -13,12 +13,12 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/run_loop.h"
 #include "base/scoped_observation.h"
 #include "base/strings/to_string.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/test/gmock_callback_support.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
@@ -31,6 +31,7 @@
 #include "components/content_settings/core/common/content_settings_pattern.h"
 #include "components/prefs/pref_service.h"
 #include "components/signin/core/browser/mirror_account_reconcilor_delegate.h"
+#include "components/signin/core/browser/test_account_reconcilor_observer.h"
 #include "components/signin/public/base/account_consistency_method.h"
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/base/list_accounts_test_utils.h"
@@ -65,9 +66,10 @@
 #include "components/account_manager_core/mock_account_manager_facade.h"
 #endif
 
-using signin_metrics::AccountReconcilorState;
-using testing::_;
-using testing::InSequence;
+using ::base::test::RunOnceClosure;
+using ::signin_metrics::AccountReconcilorState;
+using ::testing::_;
+using ::testing::InSequence;
 
 namespace {
 
@@ -261,25 +263,6 @@ gaia::ListedAccount ListedAccountFromCookieParams(
   listed_account.verified = params.verified;
   return listed_account;
 }
-
-class TestAccountReconcilorObserver : public AccountReconcilor::Observer {
- public:
-  void OnStateChanged(AccountReconcilorState state) override {
-    if (state == AccountReconcilorState::kRunning) {
-      ++started_count_;
-    }
-    if (state == AccountReconcilorState::kError) {
-      ++error_count_;
-    }
-  }
-  void OnBlockReconcile() override { ++blocked_count_; }
-  void OnUnblockReconcile() override { ++unblocked_count_; }
-
-  int started_count_ = 0;
-  int blocked_count_ = 0;
-  int unblocked_count_ = 0;
-  int error_count_ = 0;
-};
 
 }  // namespace
 
@@ -691,7 +674,7 @@ class BaseAccountReconcilorTestTable : public AccountReconcilorTest {
       }
       cookies_after_reconcile = cookies_before_reconcile;
       for (Cookie& cookie : cookies_after_reconcile) {
-        if (base::Contains(gaia_ids, cookie.gaia_id)) {
+        if (std::ranges::contains(gaia_ids, cookie.gaia_id)) {
           cookie.is_valid = true;
           gaia_ids.erase(std::ranges::find(gaia_ids, cookie.gaia_id));
         } else {
@@ -1082,7 +1065,9 @@ class AccountReconcilorDiceTest : public AccountReconcilorTest {
 };
 
 TEST_F(AccountReconcilorDiceTest, ClearPrimaryAccountNotAllowed) {
-  EXPECT_CALL(*GetMockReconcilor(), PerformLogoutAllAccountsAction()).Times(1);
+  base::RunLoop run_loop;
+  EXPECT_CALL(*GetMockReconcilor(), PerformLogoutAllAccountsAction())
+      .WillOnce(RunOnceClosure(run_loop.QuitClosure()));
   EXPECT_CALL(*GetMockReconcilor(), PerformSetCookiesAction(testing::_))
       .Times(0);
 
@@ -1099,7 +1084,7 @@ TEST_F(AccountReconcilorDiceTest, ClearPrimaryAccountNotAllowed) {
   AccountReconcilor* reconcilor = GetMockReconcilor();
   reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
   ASSERT_TRUE(reconcilor->is_reconcile_started_);
-  base::RunLoop().RunUntilIdle();
+  run_loop.Run();
   ASSERT_TRUE(reconcilor->is_reconcile_started_);
   testing::Mock::VerifyAndClearExpectations(GetMockReconcilor());
 
@@ -1132,18 +1117,17 @@ TEST_F(AccountReconcilorDiceTest, DiceReconcileWithoutSignin) {
   // a refresh token) triggers listing cookies so we need to setup cookies
   // before that.
   signin::SetListAccountsResponseNoAccounts(&test_url_loader_factory_);
-  const CoreAccountId account_id =
-      identity_test_env()->MakeAccountAvailable(kFakeEmail).account_id;
 
-  std::vector<CoreAccountId> accounts_to_send = {account_id};
   // The reconcilor does not rebuild cookies while signed out.
   EXPECT_CALL(*GetMockReconcilor(), PerformSetCookiesAction(testing::_))
       .Times(0);
 
   AccountReconcilor* reconcilor = GetMockReconcilor();
+  TestAccountReconcilorObserver observer(
+      reconcilor, /*wait_state=*/AccountReconcilorState::kOk);
   reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
+  observer.WaitForStateChange();
 
-  base::RunLoop().RunUntilIdle();
   ASSERT_FALSE(reconcilor->is_reconcile_started_);
   ASSERT_EQ(AccountReconcilorState::kOk, reconcilor->GetState());
 }
@@ -1158,9 +1142,11 @@ TEST_F(AccountReconcilorDiceTest, DiceReconcileNoop) {
       .Times(0);
 
   AccountReconcilor* reconcilor = GetMockReconcilor();
+  TestAccountReconcilorObserver observer(
+      reconcilor, /*wait_state=*/AccountReconcilorState::kOk);
   reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
-  ASSERT_TRUE(reconcilor->is_reconcile_started_);
-  base::RunLoop().RunUntilIdle();
+  observer.WaitForStateChange();
+
   ASSERT_FALSE(reconcilor->is_reconcile_started_);
   ASSERT_EQ(AccountReconcilorState::kOk, reconcilor->GetState());
 }
@@ -1200,12 +1186,14 @@ TEST_F(AccountReconcilorDiceTest, DiceReconcileReuseGaiaFirstAccount) {
   const signin::MultiloginParameters params(
       gaia::MultiloginMode::MULTILOGIN_UPDATE_COOKIE_ACCOUNTS_ORDER,
       accounts_to_send);
-  EXPECT_CALL(*GetMockReconcilor(), PerformSetCookiesAction(params));
+  base::RunLoop run_loop;
+  EXPECT_CALL(*GetMockReconcilor(), PerformSetCookiesAction(params))
+      .WillOnce(RunOnceClosure(run_loop.QuitClosure()));
 
   AccountReconcilor* reconcilor = GetMockReconcilor();
   reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
   ASSERT_TRUE(reconcilor->is_reconcile_started_);
-  base::RunLoop().RunUntilIdle();
+  run_loop.Run();
   SimulateSetAccountsInCookieCompleted(
       reconcilor, accounts_to_send,
       signin::SetAccountsInCookieResult::kSuccess);
@@ -1254,9 +1242,10 @@ TEST_F(AccountReconcilorDiceTest, DiceLastKnownFirstAccount) {
         .Times(0);
 
     AccountReconcilor* reconcilor = GetMockReconcilor();
+    TestAccountReconcilorObserver observer(
+        reconcilor, /*wait_state=*/AccountReconcilorState::kOk);
     reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
-    ASSERT_TRUE(reconcilor->is_reconcile_started_);
-    base::RunLoop().RunUntilIdle();
+    observer.WaitForStateChange();
     ASSERT_FALSE(reconcilor->is_reconcile_started_);
     ASSERT_EQ(AccountReconcilorState::kOk, reconcilor->GetState());
   }
@@ -1271,12 +1260,14 @@ TEST_F(AccountReconcilorDiceTest, DiceLastKnownFirstAccount) {
   const signin::MultiloginParameters params(
       gaia::MultiloginMode::MULTILOGIN_PRESERVE_COOKIE_ACCOUNTS_ORDER,
       accounts_to_send);
-  EXPECT_CALL(*GetMockReconcilor(), PerformSetCookiesAction(params));
+  base::RunLoop run_loop;
+  EXPECT_CALL(*GetMockReconcilor(), PerformSetCookiesAction(params))
+      .WillOnce(RunOnceClosure(run_loop.QuitClosure()));
 
   AccountReconcilor* reconcilor = GetMockReconcilor();
   reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
   ASSERT_TRUE(reconcilor->is_reconcile_started_);
-  base::RunLoop().RunUntilIdle();
+  run_loop.Run();
   SimulateSetAccountsInCookieCompleted(
       reconcilor, accounts_to_send,
       signin::SetAccountsInCookieResult::kSuccess);
@@ -1298,9 +1289,10 @@ TEST_F(AccountReconcilorDiceTest, UnverifiedAccountNoop) {
       .Times(0);
 
   AccountReconcilor* reconcilor = GetMockReconcilor();
+  TestAccountReconcilorObserver observer(
+      reconcilor, /*wait_state=*/AccountReconcilorState::kOk);
   reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
-  ASSERT_TRUE(reconcilor->is_reconcile_started_);
-  base::RunLoop().RunUntilIdle();
+  observer.WaitForStateChange();
   ASSERT_FALSE(reconcilor->is_reconcile_started_);
   ASSERT_EQ(AccountReconcilorState::kOk, reconcilor->GetState());
 }
@@ -1330,12 +1322,14 @@ TEST_F(AccountReconcilorDiceTest, UnverifiedAccountMerge) {
   const signin::MultiloginParameters params(
       gaia::MultiloginMode::MULTILOGIN_PRESERVE_COOKIE_ACCOUNTS_ORDER,
       accounts_to_send);
-  EXPECT_CALL(*GetMockReconcilor(), PerformSetCookiesAction(params));
+  base::RunLoop run_loop;
+  EXPECT_CALL(*GetMockReconcilor(), PerformSetCookiesAction(params))
+      .WillOnce(RunOnceClosure(run_loop.QuitClosure()));
 
   AccountReconcilor* reconcilor = GetMockReconcilor();
   reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
   ASSERT_TRUE(reconcilor->is_reconcile_started_);
-  base::RunLoop().RunUntilIdle();
+  run_loop.Run();
   SimulateSetAccountsInCookieCompleted(
       reconcilor, accounts_to_send,
       signin::SetAccountsInCookieResult::kSuccess);
@@ -1623,6 +1617,162 @@ TEST_F(AccountReconcilorDiceTest, PendingStateThenClearPrimaryAccount) {
 
   run_loop.Run();
   ASSERT_EQ(identity_manager->GetAccountsWithRefreshTokens().size(), 0u);
+}
+
+TEST_F(AccountReconcilorDiceTest, SetAccountsInCookiePersistentError) {
+  // Make Chrome to try to rebuild the cookies (Chrome accounts and Gaia
+  // accounts mismatch).
+  signin::SetListAccountsResponseOneAccountWithParams(
+      {.email = kFakeEmail,
+       .gaia_id = kFakeGaiaId,
+       .valid = true,
+       .signed_out = false,
+       .verified = true},
+      &test_url_loader_factory_);
+
+  signin::IdentityManager* identity_manager =
+      identity_test_env()->identity_manager();
+
+  const AccountInfo account_info_1 = signin::MakeAccountAvailable(
+      identity_manager, signin::AccountAvailabilityOptionsBuilder()
+                            .WithGaiaId(kFakeGaiaId)
+                            .WithRefreshToken("refresh_token_1")
+                            .AsPrimary(signin::ConsentLevel::kSignin)
+                            .Build(kFakeEmail));
+  ASSERT_TRUE(identity_manager->HasPrimaryAccountWithRefreshToken(
+      signin::ConsentLevel::kSignin));
+
+  const AccountInfo account_info_2 = signin::MakeAccountAvailable(
+      identity_manager, signin::AccountAvailabilityOptionsBuilder()
+                            .WithRefreshToken("refresh_token_2")
+                            .Build(kFakeEmail2));
+  ASSERT_TRUE(
+      identity_manager->HasAccountWithRefreshToken(account_info_2.account_id));
+
+  MockAccountReconcilor* reconcilor = GetMockReconcilor();
+
+  const signin::MultiloginParameters params(
+      gaia::MultiloginMode::MULTILOGIN_PRESERVE_COOKIE_ACCOUNTS_ORDER,
+      /*accounts_to_send=*/{account_info_1.account_id,
+                            account_info_2.account_id});
+  base::RunLoop run_loop;
+  EXPECT_CALL(*reconcilor, PerformSetCookiesAction(params))
+      .WillOnce(RunOnceClosure(run_loop.QuitClosure()));
+
+  reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
+  ASSERT_TRUE(reconcilor->is_reconcile_started_);
+
+  run_loop.Run();
+
+  SimulateSetAccountsInCookieCompleted(
+      reconcilor, /*accounts_to_send=*/{},
+      signin::SetAccountsInCookieResult::kPersistentError);
+
+  ASSERT_FALSE(reconcilor->is_reconcile_started_);
+
+  // Given the persistent error received, the reoncilor is in the error state.
+  EXPECT_EQ(AccountReconcilorState::kError, reconcilor->GetState());
+
+  // Nothing changes to the accounts state.
+  EXPECT_TRUE(
+      identity_manager->HasPrimaryAccount(signin::ConsentLevel::kSignin));
+  EXPECT_FALSE(
+      identity_manager->HasAccountWithRefreshTokenInPersistentErrorState(
+          account_info_1.account_id));
+  EXPECT_TRUE(
+      identity_manager->HasAccountWithRefreshToken(account_info_2.account_id));
+}
+
+TEST_F(AccountReconcilorDiceTest,
+       SetAccountsInCookiePersistentErrorRefreshTokensBoundToDifferentKeys) {
+  // Make Chrome to try to rebuild the cookies (Chrome accounts and Gaia
+  // accounts mismatch).
+  signin::SetListAccountsResponseOneAccountWithParams(
+      {.email = kFakeEmail,
+       .gaia_id = kFakeGaiaId,
+       .valid = true,
+       .signed_out = false,
+       .verified = true},
+      &test_url_loader_factory_);
+
+  // Setup two accounts with refresh tokens bound to different keys.
+  const std::vector<uint8_t> fake_binding_key = {1, 2, 3};
+  const std::vector<uint8_t> fake_binding_key_other = {4, 5, 6};
+
+  signin::IdentityManager* identity_manager =
+      identity_test_env()->identity_manager();
+
+  const AccountInfo account_info_1 = signin::MakeAccountAvailable(
+      identity_manager, signin::AccountAvailabilityOptionsBuilder()
+                            .WithGaiaId(kFakeGaiaId)
+                            .WithRefreshToken("refresh_token_1")
+                            .WithRefreshTokenBindingKey(fake_binding_key)
+                            .AsPrimary(signin::ConsentLevel::kSignin)
+                            .Build(kFakeEmail));
+  ASSERT_TRUE(identity_manager->HasPrimaryAccountWithRefreshToken(
+      signin::ConsentLevel::kSignin));
+
+  const AccountInfo account_info_2 = signin::MakeAccountAvailable(
+      identity_manager, signin::AccountAvailabilityOptionsBuilder()
+                            .WithRefreshToken("refresh_token_2")
+                            .WithRefreshTokenBindingKey(fake_binding_key_other)
+                            .Build(kFakeEmail2));
+  ASSERT_TRUE(
+      identity_manager->HasAccountWithRefreshToken(account_info_2.account_id));
+
+  MockAccountReconcilor* reconcilor = GetMockReconcilor();
+
+  const signin::MultiloginParameters expected_params_1(
+      gaia::MultiloginMode::MULTILOGIN_PRESERVE_COOKIE_ACCOUNTS_ORDER,
+      /*accounts_to_send=*/{account_info_1.account_id,
+                            account_info_2.account_id});
+  base::RunLoop perform_set_cookies_run_loop;
+  EXPECT_CALL(*reconcilor, PerformSetCookiesAction(expected_params_1))
+      .WillOnce(RunOnceClosure(perform_set_cookies_run_loop.QuitClosure()));
+
+  reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
+  ASSERT_TRUE(reconcilor->is_reconcile_started_);
+
+  perform_set_cookies_run_loop.Run();
+
+  SimulateSetAccountsInCookieCompleted(
+      reconcilor, /*accounts_to_send=*/{},
+      signin::SetAccountsInCookieResult::kPersistentError);
+
+  ASSERT_FALSE(reconcilor->is_reconcile_started_);
+
+  // Change in accounts is detected due to the invalidated refresh tokens,
+  // putting the reconcilor in the scheduled state.
+  EXPECT_EQ(AccountReconcilorState::kScheduled, reconcilor->GetState());
+
+  // Refresh tokens for secondary accounts are revoked and the refresh token for
+  // the primary account is invalidated.
+  EXPECT_FALSE(
+      identity_manager->HasAccountWithRefreshToken(account_info_2.account_id));
+  ASSERT_TRUE(
+      identity_manager->HasPrimaryAccount(signin::ConsentLevel::kSignin));
+  EXPECT_TRUE(
+      identity_manager->HasAccountWithRefreshTokenInPersistentErrorState(
+          account_info_1.account_id));
+
+  base::RunLoop perform_logout_all_accounts_run_loop;
+  // In the next reconcile cycle, there is no valid Chrome account (i.e. no
+  // accounts to send), the reconcilor recovers and preserves the primary
+  // account in the error state.
+  EXPECT_CALL(*reconcilor, PerformLogoutAllAccountsAction())
+      .WillOnce(
+          RunOnceClosure(perform_logout_all_accounts_run_loop.QuitClosure()));
+
+  perform_logout_all_accounts_run_loop.Run();
+
+  SimulateLogOutFromCookieCompleted(reconcilor,
+                                    GoogleServiceAuthError::AuthErrorNone());
+
+  ASSERT_FALSE(reconcilor->is_reconcile_started_);
+  EXPECT_EQ(AccountReconcilorState::kOk, reconcilor->GetState());
+  // The primary account is not cleared.
+  EXPECT_TRUE(
+      identity_manager->HasPrimaryAccount(signin::ConsentLevel::kSignin));
 }
 
 const std::vector<AccountReconcilorTestTableParam>
@@ -2030,11 +2180,12 @@ TEST_F(AccountReconcilorMirrorTest,
 // This test is needed until chrome changes to use gaia obfuscated id.
 // The primary account manager and token service use the gaia "email" property,
 // which preserves dots in usernames and preserves case.
-// gaia::ParseListAccountsData() however uses gaia "displayEmail" which does not
-// preserve case, and then passes the string through gaia::CanonicalizeEmail()
-// which removes dots.  This tests makes sure that an email like
-// "Dot.S@hmail.com", as seen by the token service, will be considered the same
-// as "dots@gmail.com" as returned by gaia::ParseListAccountsData().
+// gaia::ParseBinaryListAccountsData() however uses gaia "displayEmail" which
+// does not preserve case, and then passes the string through
+// gaia::CanonicalizeEmail() which removes dots.  This tests makes sure that an
+// email like "Dot.S@hmail.com", as seen by the token service, will be
+// considered the same as "dots@gmail.com" as returned by
+// gaia::ParseBinaryListAccountsData().
 TEST_F(AccountReconcilorMirrorTest, StartReconcileNoopWithDots) {
   AccountInfo account_info = ConnectProfileToAccount("Dot.S@gmail.com");
   signin::SetListAccountsResponseOneAccount(
@@ -2237,8 +2388,7 @@ TEST_F(AccountReconcilorMirrorTest, StartReconcileRemoveFromCookie) {
   ASSERT_FALSE(reconcilor->is_reconcile_started_);
 }
 
-// Check that token error on primary account results in a logout to all accounts
-// on Lacros. For other mirror platforms, reconcile is aborted.
+// Check that token error on primary account results in aborted reconcile
 TEST_F(AccountReconcilorMirrorTest, TokenErrorOnPrimary) {
   AccountInfo account_info = ConnectProfileToAccount(kFakeEmail);
   signin::UpdatePersistentErrorOfRefreshTokenForAccount(
@@ -2367,10 +2517,7 @@ TEST_F(AccountReconcilorMirrorTest, Lock) {
   ASSERT_FALSE(reconcilor->is_reconcile_started_);
   EXPECT_EQ(0, reconcilor->account_reconcilor_lock_count_);
 
-  TestAccountReconcilorObserver observer;
-  base::ScopedObservation<AccountReconcilor, AccountReconcilor::Observer>
-      scoped_observation(&observer);
-  scoped_observation.Observe(reconcilor);
+  TestAccountReconcilorObserver observer(reconcilor);
 
   // Lock prevents reconcile from starting, as long as one instance is alive.
   std::unique_ptr<AccountReconcilor::Lock> lock_1 =
@@ -2387,17 +2534,17 @@ TEST_F(AccountReconcilorMirrorTest, Lock) {
     // lock_1 is no longer blocking, but lock_2 is still alive.
     EXPECT_EQ(1, reconcilor->account_reconcilor_lock_count_);
     EXPECT_FALSE(reconcilor->is_reconcile_started_);
-    EXPECT_EQ(0, observer.started_count_);
-    EXPECT_EQ(0, observer.unblocked_count_);
-    EXPECT_EQ(1, observer.blocked_count_);
+    EXPECT_EQ(0, observer.started_count());
+    EXPECT_EQ(0, observer.unblocked_count());
+    EXPECT_EQ(1, observer.blocked_count());
   }
 
   // All locks are deleted, reconcile starts.
   EXPECT_EQ(0, reconcilor->account_reconcilor_lock_count_);
   ASSERT_TRUE(reconcilor->is_reconcile_started_);
-  EXPECT_EQ(1, observer.started_count_);
-  EXPECT_EQ(1, observer.unblocked_count_);
-  EXPECT_EQ(1, observer.blocked_count_);
+  EXPECT_EQ(1, observer.started_count());
+  EXPECT_EQ(1, observer.unblocked_count());
+  EXPECT_EQ(1, observer.blocked_count());
   EXPECT_EQ(AccountReconcilor::Trigger::kUnblockReconcile,
             reconcilor->trigger_);
 
@@ -2409,9 +2556,9 @@ TEST_F(AccountReconcilorMirrorTest, Lock) {
   }
   EXPECT_EQ(0, reconcilor->account_reconcilor_lock_count_);
   EXPECT_TRUE(reconcilor->is_reconcile_started_);
-  EXPECT_EQ(2, observer.started_count_);
-  EXPECT_EQ(2, observer.unblocked_count_);
-  EXPECT_EQ(2, observer.blocked_count_);
+  EXPECT_EQ(2, observer.started_count());
+  EXPECT_EQ(2, observer.unblocked_count());
+  EXPECT_EQ(2, observer.blocked_count());
 
   // Reconcile can complete successfully after being restarted.
   base::RunLoop().RunUntilIdle();
@@ -2780,11 +2927,7 @@ TEST_F(AccountReconcilorMirrorTest,
   ASSERT_TRUE(reconcilor);
 
   // Set up observer.
-  TestAccountReconcilorObserver observer;
-  base::ScopedObservation<AccountReconcilor, AccountReconcilor::Observer>
-      scoped_observation(&observer);
-  scoped_observation.Observe(reconcilor);
-
+  TestAccountReconcilorObserver observer(reconcilor);
   // Everything set. Actually start the test.
   reconcilor->StartReconcile(AccountReconcilor::Trigger::kCookieChange);
   base::RunLoop().RunUntilIdle();
@@ -2811,7 +2954,7 @@ TEST_F(AccountReconcilorMirrorTest,
   ASSERT_FALSE(reconcilor->is_reconcile_started_);
   ASSERT_EQ(GoogleServiceAuthError::State::NONE,
             reconcilor->error_during_last_reconcile_.state());
-  ASSERT_EQ(0, observer.error_count_);
+  ASSERT_EQ(0, observer.error_count());
 }
 
 // Test that delegate timeout is called when the delegate offers a valid

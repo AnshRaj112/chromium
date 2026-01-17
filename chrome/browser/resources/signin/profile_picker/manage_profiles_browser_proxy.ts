@@ -70,6 +70,12 @@ export interface ManageProfilesBrowserProxy {
   /** Launches Guest profile. */
   launchGuestProfile(): void;
 
+  /** Opens all profiles. */
+  launchAllProfiles(profilesPathList: string[]): void;
+
+  /** Records that the Open All Profiles button was shown. */
+  recordOpenAllProfilesButtonShown(): void;
+
   /**
    * Inform native the user's choice on whether to show the profile picker
    * on startup or not.
@@ -134,9 +140,9 @@ export interface ManageProfilesBrowserProxy {
   recordSignInPromoImpression(): void;
 
   /**
-   * Gets a profile for which the profile switch screen is shown.
+   * Gets the `ProfileState` for a profile.
    */
-  getSwitchProfile(): Promise<ProfileState>;
+  getProfileState(profilePath: string): Promise<ProfileState>;
 
   /**
    * Switches to an already existing profile at `profile_path`.
@@ -183,6 +189,14 @@ export class ManageProfilesBrowserProxyImpl {
     chrome.send('launchGuestProfile');
   }
 
+  launchAllProfiles(profilesPathList: string[]) {
+    chrome.send('launchAllProfiles', profilesPathList);
+  }
+
+  recordOpenAllProfilesButtonShown() {
+    chrome.send('recordOpenAllProfilesButtonShown');
+  }
+
   askOnStartupChanged(shouldShow: boolean) {
     chrome.send('askOnStartupChanged', [shouldShow]);
   }
@@ -227,8 +241,8 @@ export class ManageProfilesBrowserProxyImpl {
     chrome.send('recordSignInPromoImpression');
   }
 
-  getSwitchProfile() {
-    return sendWithPromise('getSwitchProfile');
+  getProfileState(profileSwitchPath: string) {
+    return sendWithPromise('getProfileState', profileSwitchPath);
   }
 
   confirmProfileSwitch(profilePath: string) {

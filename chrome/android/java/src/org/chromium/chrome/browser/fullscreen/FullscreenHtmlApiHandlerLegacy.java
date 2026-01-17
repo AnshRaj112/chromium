@@ -15,9 +15,9 @@ import android.app.Activity;
 import android.view.View;
 import android.view.WindowManager;
 
-import org.chromium.base.BuildInfo;
+import org.chromium.base.DeviceInfo;
 import org.chromium.base.Log;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.multiwindow.MultiWindowModeStateDispatcher;
@@ -43,7 +43,7 @@ public class FullscreenHtmlApiHandlerLegacy extends FullscreenHtmlApiHandlerBase
      */
     public FullscreenHtmlApiHandlerLegacy(
             Activity activity,
-            ObservableSupplier<Boolean> areControlsHidden,
+            MonotonicObservableSupplier<Boolean> areControlsHidden,
             boolean exitFullscreenOnStop,
             MultiWindowModeStateDispatcher multiWindowDispatcher) {
         super(activity, areControlsHidden, exitFullscreenOnStop, multiWindowDispatcher);
@@ -183,7 +183,7 @@ public class FullscreenHtmlApiHandlerLegacy extends FullscreenHtmlApiHandlerBase
     }
 
     private void setSystemUiVisibility(View contentView, int systemUiVisibility) {
-        if (!BuildInfo.getInstance().isAutomotive) {
+        if (!DeviceInfo.isAutomotive()) {
             contentView.setSystemUiVisibility(systemUiVisibility);
         }
     }

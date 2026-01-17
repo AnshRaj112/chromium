@@ -81,31 +81,6 @@ class DeviceAuthenticatorAndroidTest : public testing::Test {
   raw_ptr<MockDeviceAuthenticatorBridge> bridge_ = nullptr;
 };
 
-TEST_F(DeviceAuthenticatorAndroidTest, CanAuthenticateCallsBridge) {
-  base::HistogramTester histogram_tester;
-
-  EXPECT_CALL(bridge(), CanAuthenticateWithBiometric)
-      .WillOnce(Return(BiometricsAvailability::kAvailable));
-  EXPECT_TRUE(authenticator()->CanAuthenticateWithBiometrics());
-
-  histogram_tester.ExpectUniqueSample(
-      "Android.DeviceAuthenticator.CanAuthenticateWithBiometrics",
-      BiometricsAvailability::kAvailable, 1);
-}
-
-TEST_F(
-    DeviceAuthenticatorAndroidTest,
-    CanAuthenticateDoesNotReecordHistogramForNonPasswordManagerForIncognito) {
-  base::HistogramTester histogram_tester;
-
-  EXPECT_CALL(bridge(), CanAuthenticateWithBiometricOrScreenLock)
-      .WillOnce(Return(true));
-  EXPECT_TRUE(authenticator()->CanAuthenticateWithBiometricOrScreenLock());
-
-  histogram_tester.ExpectTotalCount(
-      "Android.DeviceAuthenticator.CanAuthenticateWithBiometrics", 0);
-}
-
 TEST_F(DeviceAuthenticatorAndroidTest, AuthenticateRecordsSource) {
   base::HistogramTester histogram_tester;
 
@@ -184,21 +159,6 @@ TEST_F(DeviceAuthenticatorAndroidTest, TriggersAuthIfPreviousFailed) {
                              DeviceAuthFinalResult::kSuccessWithBiometrics),
                          1),
                   Bucket(static_cast<int>(DeviceAuthFinalResult::kFailed), 1)));
-}
-
-TEST_F(DeviceAuthenticatorAndroidTest, GetBiometricAvailabilityStatusRequired) {
-  EXPECT_CALL(bridge(), CanAuthenticateWithBiometric)
-      .WillOnce(Return(BiometricsAvailability::kRequired));
-  EXPECT_EQ(device_reauth::BiometricStatus::kRequired,
-            authenticator()->GetBiometricAvailabilityStatus());
-}
-
-TEST_F(DeviceAuthenticatorAndroidTest,
-       GetBiometricAvailabilityStatusRequiredButHasErrors) {
-  EXPECT_CALL(bridge(), CanAuthenticateWithBiometric)
-      .WillOnce(Return(BiometricsAvailability::kRequiredButHasError));
-  EXPECT_EQ(device_reauth::BiometricStatus::kRequired,
-            authenticator()->GetBiometricAvailabilityStatus());
 }
 
 TEST_F(DeviceAuthenticatorAndroidTest,

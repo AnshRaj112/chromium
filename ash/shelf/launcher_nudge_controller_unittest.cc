@@ -25,7 +25,7 @@
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "ui/compositor/layer.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 
 namespace ash {
 
@@ -119,6 +119,12 @@ class LauncherNudgeControllerTest : public AshTestBase {
         scrollable_shelf_view_->shelf_view());
   }
 
+  void TearDown() override {
+    scrollable_shelf_view_ = nullptr;
+    nudge_controller_ = nullptr;
+    AshTestBase::TearDown();
+  }
+
   // Advances the mock clock in the task environment and wait until it is idle.
   // Note that AdvanceClock is used here instead of FastForwardBy because
   // `delay` used in test cases are too long for FastForwardBy to process and
@@ -143,10 +149,9 @@ class LauncherNudgeControllerTest : public AshTestBase {
     test_api_->RunMessageLoopUntilAnimationsDone();
   }
 
-  raw_ptr<LauncherNudgeController, DanglingUntriaged> nudge_controller_;
+  raw_ptr<LauncherNudgeController> nudge_controller_;
   std::unique_ptr<TestNudgeAnimationObserver> observer_;
-  raw_ptr<ScrollableShelfView, DanglingUntriaged> scrollable_shelf_view_ =
-      nullptr;
+  raw_ptr<ScrollableShelfView> scrollable_shelf_view_ = nullptr;
   std::unique_ptr<ShelfViewTestAPI> test_api_;
 };
 
@@ -180,8 +185,8 @@ TEST_F(LauncherNudgeControllerTest, DisableNudgeForExistingUser) {
 TEST_F(LauncherNudgeControllerTest, BasicTest) {
   // Set the animation duration mode to non-zero for the launcher nudge
   // animation to actually run in the tests.
-  ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   SimulateNewUserFirstLogin("user@gmail.com");
   ASSERT_TRUE(Shell::Get()->session_controller()->IsUserFirstLogin());
   EXPECT_EQ(0, GetNudgeShownCount());
@@ -211,8 +216,8 @@ TEST_F(LauncherNudgeControllerTest, BasicTest) {
 TEST_F(LauncherNudgeControllerTest, StopShowingNudgeAfterLauncherIsOpened) {
   // Set the animation duration mode to non-zero for the launcher nudge
   // animation to actually run in the tests.
-  ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   SimulateNewUserFirstLogin("user@gmail.com");
   EXPECT_EQ(0, GetNudgeShownCount());
 
@@ -222,7 +227,7 @@ TEST_F(LauncherNudgeControllerTest, StopShowingNudgeAfterLauncherIsOpened) {
 
   // Toggle the app list to show.
   Shell::Get()->app_list_controller()->ToggleAppList(
-      display::Screen::GetScreen()->GetPrimaryDisplay().id(),
+      display::Screen::Get()->GetPrimaryDisplay().id(),
       AppListShowSource::kShelfButton, base::TimeTicks());
   ASSERT_TRUE(Shell::Get()->app_list_controller()->IsVisible());
   AdvanceClock(nudge_controller_->GetNudgeInterval(/*is_first_time=*/false));
@@ -236,8 +241,8 @@ TEST_F(LauncherNudgeControllerTest, StopShowingNudgeAfterLauncherIsOpened) {
 TEST_F(LauncherNudgeControllerTest, DoNotShowNudgeInTabletMode) {
   // Set the animation duration mode to non-zero for the launcher nudge
   // animation to actually run in the tests.
-  ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   SimulateNewUserFirstLogin("user@gmail.com");
   EXPECT_EQ(0, GetNudgeShownCount());
 
@@ -259,8 +264,8 @@ TEST_F(LauncherNudgeControllerTest, DoNotShowNudgeInTabletMode) {
 TEST_F(LauncherNudgeControllerTest, ShowNudgeOnDisplayWhereCursorIsOn) {
   // Set the animation duration mode to non-zero for the launcher nudge
   // animation to actually run in the tests.
-  ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   SimulateNewUserFirstLogin("user@gmail.com");
   EXPECT_EQ(0, GetNudgeShownCount());
 
@@ -305,8 +310,8 @@ TEST_F(LauncherNudgeControllerTest,
        WaitUntilHomeButtonStaysLongEnoughToShowNudge) {
   // Set the animation duration mode to non-zero for the launcher nudge
   // animation to actually run in the tests.
-  ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   // New user logs in.
   SimulateNewUserFirstLogin("user@gmail.com");
@@ -351,8 +356,8 @@ TEST_F(LauncherNudgeControllerTest,
 TEST_F(LauncherNudgeControllerTest, NudgeLabelVisibilityTest) {
   // Set the animation duration mode to non-zero for the launcher nudge
   // animation to actually run in the tests.
-  ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   SimulateNewUserFirstLogin("user@gmail.com");
   EXPECT_EQ(GetNudgeShownCount(), 0);
 
@@ -399,8 +404,8 @@ TEST_F(LauncherNudgeControllerTest, NudgeLabelVisibilityTest) {
 TEST_F(LauncherNudgeControllerTest, AnimationUsedDependsOnAvailableSpace) {
   // Set the animation duration mode to non-zero for the launcher nudge
   // animation to actually run in the tests.
-  ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   SimulateNewUserFirstLogin("user@gmail.com");
   EXPECT_EQ(GetNudgeShownCount(), 0);
 

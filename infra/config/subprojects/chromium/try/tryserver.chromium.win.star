@@ -5,7 +5,7 @@
 
 load("@chromium-luci//branches.star", "branches")
 load("@chromium-luci//builder_config.star", "builder_config")
-load("@chromium-luci//builders.star", "os")
+load("@chromium-luci//builders.star", "builders", "os")
 load("@chromium-luci//consoles.star", "consoles")
 load("@chromium-luci//gn_args.star", "gn_args")
 load("@chromium-luci//targets.star", "targets")
@@ -24,9 +24,13 @@ try_.defaults.set(
     os = os.WINDOWS_DEFAULT,
     compilator_cores = 16,
     execution_timeout = try_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     orchestrator_cores = 2,
     orchestrator_siso_remote_jobs = siso.remote_jobs.HIGH_JOBS_FOR_CQ,
     service_account = try_constants.DEFAULT_SERVICE_ACCOUNT,
+    siso_keep_going = siso.KEEP_GOING,
     # Downloading with "minimum" strategy doesn't work
     # well for the win builder because some steps are missing inputs.
     # e.g. mini_installer.exe
@@ -348,15 +352,12 @@ try_.builder(
             "ci/win-arm64-rel",
             "release_try_builder",
             "no_resource_allowlisting",
-            "use_clang_coverage",
-            "partial_code_coverage_instrumentation",
             "enable_dangling_raw_ptr_feature_flag",
         ],
     ),
     builderless = True,
     os = os.WINDOWS_10,
     contact_team_email = "chrome-desktop-engprod@google.com",
-    coverage_test_types = ["unit", "overall"],
     main_list_view = "try",
     # The size of the testing pool is limited.
     max_concurrent_builds = 4,
@@ -370,7 +371,6 @@ try_.builder(
             "sandbox/policy/win/.+",
         ],
     ),
-    use_clang_coverage = True,
 )
 
 try_.builder(
@@ -473,7 +473,6 @@ gpu.try_.optional_tests_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-gpu-fyi-archive",
     ),
     builder_config_settings = builder_config.try_settings(
         retry_failed_shards = False,
@@ -533,47 +532,24 @@ gpu.try_.optional_tests_builder(
         browser_config = targets.browser_config.RELEASE_X64,
         os_type = targets.os_type.WINDOWS,
     ),
+    pool = "luci.chromium.gpu.try",
+    builderless = True,
     os = os.WINDOWS_DEFAULT,
+    ssd = builders.with_expiration(True, expiration = 5 * time.minute),
+    free_space = None,
+    alerts_enabled = False,
     contact_team_email = "chrome-gpu-infra@google.com",
     # default is 6 in _gpu_optional_tests_builder()
     execution_timeout = 5 * time.hour,
     main_list_view = "try",
+    # This is higher than the default of 7 for optional GPU builders
+    # because Windows builds take longer than other platforms even
+    # when using SSDs. Increasing the max concurrent builds a bit
+    # allows us to avoid long pending times without risk of
+    # overloading the testing hardware.
+    max_concurrent_builds = 9,
     siso_remote_jobs = siso.remote_jobs.HIGH_JOBS_FOR_CQ,
     tryjob = try_.job(
-        location_filters = [
-            # Inclusion filters.
-            cq.location_filter(path_regexp = "chrome/browser/media/.+"),
-            cq.location_filter(path_regexp = "chrome/browser/vr/.+"),
-            cq.location_filter(path_regexp = "components/cdm/renderer/.+"),
-            cq.location_filter(path_regexp = "content/browser/xr/.+"),
-            cq.location_filter(path_regexp = "content/test/data/gpu/.+"),
-            cq.location_filter(path_regexp = "content/test/gpu/.+"),
-            cq.location_filter(path_regexp = "device/vr/.+"),
-            cq.location_filter(path_regexp = "gpu/.+"),
-            cq.location_filter(path_regexp = "media/audio/.+"),
-            cq.location_filter(path_regexp = "media/base/.+"),
-            cq.location_filter(path_regexp = "media/capture/.+"),
-            cq.location_filter(path_regexp = "media/cdm/.+"),
-            cq.location_filter(path_regexp = "media/filters/.+"),
-            cq.location_filter(path_regexp = "media/gpu/.+"),
-            cq.location_filter(path_regexp = "media/mojo/.+"),
-            cq.location_filter(path_regexp = "media/renderers/.+"),
-            cq.location_filter(path_regexp = "media/video/.+"),
-            cq.location_filter(path_regexp = "services/webnn/.+"),
-            cq.location_filter(path_regexp = "testing/buildbot/tryserver.chromium.win.json"),
-            cq.location_filter(path_regexp = "testing/trigger_scripts/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/modules/vr/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/modules/mediastream/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/modules/webcodecs/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/modules/webgl/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/modules/webgpu/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/modules/xr/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/platform/graphics/gpu/.+"),
-            cq.location_filter(path_regexp = "tools/clang/scripts/update.py"),
-            cq.location_filter(path_regexp = "ui/gl/.+"),
-
-            # Exclusion filters.
-            cq.location_filter(exclude = True, path_regexp = ".*\\.md"),
-        ],
+        location_filters = gpu.try_.optional_trybot_location_filters.WINDOWS,
     ),
 )

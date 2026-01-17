@@ -9,7 +9,6 @@
 #include "third_party/blink/renderer/core/layout/layout_object_inlines.h"
 #include "third_party/blink/renderer/core/layout/svg/layout_svg_inline_text.h"
 #include "third_party/blink/renderer/core/style/computed_style.h"
-#include "third_party/blink/renderer/platform/fonts/shaping/shape_result_buffer.h"
 #include "third_party/blink/renderer/platform/wtf/size_assertions.h"
 
 namespace blink {
@@ -210,8 +209,6 @@ unsigned InlineItem::SetBidiLevel(InlineItems& items,
                                   unsigned end_offset,
                                   UBiDiLevel level,
                                   wtf_size_t num_out_of_flow) {
-  DCHECK(!num_out_of_flow ||
-         RuntimeEnabledFeatures::LineBreakOofNoOrcEnabled());
   InlineItem* item;
   for (;; ++index) {
     item = items[index];
@@ -301,8 +298,9 @@ String InlineItem::ToString() const {
   } else if (GetLayoutObject()) {
     object_info = GetLayoutObject()->ToString();
   }
-  return String::Format("InlineItem %s. %s", InlineItemTypeToString(Type()),
-                        object_info.Ascii().c_str());
+  return UNSAFE_TODO(String::Format("InlineItem %s. %s",
+                                    InlineItemTypeToString(Type()),
+                                    object_info.Ascii().c_str()));
 }
 
 // Split |items[index]| to 2 items at |offset|.

@@ -6,7 +6,6 @@
 
 #import <set>
 
-#import "base/containers/contains.h"
 #import "base/memory/raw_ptr.h"
 #import "base/strings/string_number_conversions.h"
 #import "base/test/ios/wait_util.h"
@@ -79,22 +78,22 @@ class HttpsOnlyModeBlockingPageTest : public PlatformTest {
   FakeWebState web_state_;
   raw_ptr<web::FakeNavigationManager> navigation_manager_ = nullptr;
   GURL url_;
-  std::unique_ptr<IOSSecurityInterstitialPage> page_;
   base::HistogramTester histogram_tester_;
   std::unique_ptr<HttpsUpgradeService> service_;
+  std::unique_ptr<IOSSecurityInterstitialPage> page_;
 };
 
 // Tests that the blocking page handles the proceed command by updating the
 // allow list and reloading the page.
 TEST_F(HttpsOnlyModeBlockingPageTest, HandleProceedCommand) {
   page_ = CreateBlockingPage(&web_state_, url_, service());
-  ASSERT_FALSE(service()->IsHttpAllowedForHost(url_.host()));
+  ASSERT_FALSE(service()->IsHttpAllowedForHost(url_.GetHost()));
   ASSERT_FALSE(navigation_manager_->ReloadWasCalled());
 
   // Send the proceed command.
   SendCommand(security_interstitials::CMD_PROCEED);
 
-  EXPECT_TRUE(service()->IsHttpAllowedForHost(url_.host()));
+  EXPECT_TRUE(service()->IsHttpAllowedForHost(url_.GetHost()));
   EXPECT_TRUE(navigation_manager_->ReloadWasCalled());
 
   // Verify that metrics are recorded correctly.

@@ -25,14 +25,18 @@ void PlatformThreadId::WriteIntoTrace(perfetto::TracedValue&& context) const {
 }
 
 // static
-void PlatformThreadBase::SetCurrentThreadType(ThreadType thread_type) {
+void PlatformThreadBase::SetCurrentThreadType(ThreadType thread_type,
+                                              bool may_change_affinity) {
   MessagePumpType message_pump_type = MessagePumpType::DEFAULT;
   if (CurrentIOThread::IsSet()) {
     message_pump_type = MessagePumpType::IO;
   } else if (CurrentUIThread::IsSet()) {
     message_pump_type = MessagePumpType::UI;
   }
-  internal::SetCurrentThreadType(thread_type, message_pump_type);
+  CHECK_LE(thread_type, ThreadType::kMaxValue);
+  internal::SetCurrentThreadTypeImpl(thread_type, message_pump_type,
+                                     may_change_affinity);
+  current_thread_type = thread_type;
 }
 
 // static
@@ -58,16 +62,5 @@ std::optional<TimeDelta> PlatformThreadBase::GetThreadLeewayOverride() {
 void PlatformThreadBase::SetNameCommon(const std::string& name) {
   ThreadIdNameManager::GetInstance()->SetName(name);
 }
-
-namespace internal {
-
-void SetCurrentThreadType(ThreadType thread_type,
-                          MessagePumpType pump_type_hint) {
-  CHECK_LE(thread_type, ThreadType::kMaxValue);
-  SetCurrentThreadTypeImpl(thread_type, pump_type_hint);
-  current_thread_type = thread_type;
-}
-
-}  // namespace internal
 
 }  // namespace base

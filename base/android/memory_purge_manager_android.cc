@@ -4,7 +4,6 @@
 
 #include "base/android/memory_purge_manager_android.h"
 
-#include "base/android/build_info.h"
 #include "base/android/pre_freeze_background_memory_trimmer.h"
 #include "base/functional/bind.h"
 #include "third_party/jni_zero/jni_zero.h"
@@ -26,7 +25,8 @@ static void JNI_MemoryPurgeManager_PostDelayedPurgeTaskOnUiThread(JNIEnv* env,
       base::Milliseconds(static_cast<long>(delay)));
 }
 
-static jboolean JNI_MemoryPurgeManager_IsOnPreFreezeMemoryTrimEnabled(
-    JNIEnv* env) {
+static bool JNI_MemoryPurgeManager_IsOnPreFreezeMemoryTrimEnabled(JNIEnv* env) {
   return base::android::PreFreezeBackgroundMemoryTrimmer::ShouldUseModernTrim();
 }
+
+DEFINE_JNI(MemoryPurgeManager)

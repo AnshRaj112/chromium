@@ -9,13 +9,16 @@
 #include <string>
 #include <utility>
 
+#include "base/strings/strcat.h"
 #include "content/services/auction_worklet/auction_v8_helper.h"
 #include "content/services/auction_worklet/public/mojom/auction_shared_storage_host.mojom.h"
 #include "content/services/auction_worklet/webidl_compat.h"
 #include "gin/converter.h"
+#include "gin/handle.h"
 #include "gin/object_template_builder.h"
-#include "gin/public/wrapper_info.h"
+#include "gin/public/gin_embedders.h"
 #include "gin/public/wrappable_pointer_tags.h"
+#include "gin/public/wrapper_info.h"
 #include "gin/wrappable.h"
 #include "services/network/public/cpp/shared_storage_utils.h"
 #include "services/network/public/mojom/shared_storage.mojom.h"
@@ -345,8 +348,8 @@ SharedStorageBindings::SharedStorageBindings(
 SharedStorageBindings::~SharedStorageBindings() = default;
 
 void SharedStorageBindings::AttachToContext(v8::Local<v8::Context> context) {
-  v8::Local<v8::External> v8_this =
-      v8::External::New(v8_helper_->isolate(), this);
+  v8::Local<v8::External> v8_this = v8::External::New(
+      v8_helper_->isolate(), this, gin::kSharedStorageBindingsTag);
 
   v8::Local<v8::Object> shared_storage = v8::Object::New(v8_helper_->isolate());
 
@@ -409,6 +412,8 @@ void SharedStorageBindings::AttachToContext(v8::Local<v8::Context> context) {
         v8::FunctionTemplate::New(v8_helper_->isolate(),
                                   &SharedStorageBindings::SetMethodConstructor,
                                   v8_this);
+    set_method_ctor_template->InstanceTemplate()->SetInternalFieldCount(
+        gin::kNumberOfInternalFields);
     set_method_ctor_template->Inherit(base_modifier_method_template);
     set_method_ctor_template->SetClassName(
         v8_helper_->CreateStringFromLiteral(kSharedStorageSetMethodName));
@@ -424,6 +429,8 @@ void SharedStorageBindings::AttachToContext(v8::Local<v8::Context> context) {
         v8::FunctionTemplate::New(
             v8_helper_->isolate(),
             &SharedStorageBindings::AppendMethodConstructor, v8_this);
+    append_method_ctor_template->InstanceTemplate()->SetInternalFieldCount(
+        gin::kNumberOfInternalFields);
     append_method_ctor_template->Inherit(base_modifier_method_template);
     append_method_ctor_template->SetClassName(
         v8_helper_->CreateStringFromLiteral(kSharedStorageAppendMethodName));
@@ -440,6 +447,8 @@ void SharedStorageBindings::AttachToContext(v8::Local<v8::Context> context) {
         v8::FunctionTemplate::New(
             v8_helper_->isolate(),
             &SharedStorageBindings::DeleteMethodConstructor, v8_this);
+    delete_method_ctor_template->InstanceTemplate()->SetInternalFieldCount(
+        gin::kNumberOfInternalFields);
     delete_method_ctor_template->Inherit(base_modifier_method_template);
     delete_method_ctor_template->SetClassName(
         v8_helper_->CreateStringFromLiteral(kSharedStorageDeleteMethodName));
@@ -456,6 +465,8 @@ void SharedStorageBindings::AttachToContext(v8::Local<v8::Context> context) {
         v8::FunctionTemplate::New(
             v8_helper_->isolate(),
             &SharedStorageBindings::ClearMethodConstructor, v8_this);
+    clear_method_ctor_template->InstanceTemplate()->SetInternalFieldCount(
+        gin::kNumberOfInternalFields);
     clear_method_ctor_template->Inherit(base_modifier_method_template);
     clear_method_ctor_template->SetClassName(
         v8_helper_->CreateStringFromLiteral(kSharedStorageClearMethodName));
@@ -476,7 +487,7 @@ void SharedStorageBindings::Reset() {}
 void SharedStorageBindings::Set(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   SharedStorageBindings* bindings = static_cast<SharedStorageBindings*>(
-      v8::External::Cast(*args.Data())->Value());
+      v8::External::Cast(*args.Data())->Value(gin::kSharedStorageBindingsTag));
   AuctionV8Helper* v8_helper = bindings->v8_helper_;
 
   network::mojom::SharedStorageModifierMethodWithOptionsPtr mojom_method =
@@ -495,7 +506,7 @@ void SharedStorageBindings::Set(
 void SharedStorageBindings::Append(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   SharedStorageBindings* bindings = static_cast<SharedStorageBindings*>(
-      v8::External::Cast(*args.Data())->Value());
+      v8::External::Cast(*args.Data())->Value(gin::kSharedStorageBindingsTag));
   AuctionV8Helper* v8_helper = bindings->v8_helper_;
 
   network::mojom::SharedStorageModifierMethodWithOptionsPtr mojom_method =
@@ -514,7 +525,7 @@ void SharedStorageBindings::Append(
 void SharedStorageBindings::Delete(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   SharedStorageBindings* bindings = static_cast<SharedStorageBindings*>(
-      v8::External::Cast(*args.Data())->Value());
+      v8::External::Cast(*args.Data())->Value(gin::kSharedStorageBindingsTag));
   AuctionV8Helper* v8_helper = bindings->v8_helper_;
 
   network::mojom::SharedStorageModifierMethodWithOptionsPtr mojom_method =
@@ -533,7 +544,7 @@ void SharedStorageBindings::Delete(
 void SharedStorageBindings::Clear(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   SharedStorageBindings* bindings = static_cast<SharedStorageBindings*>(
-      v8::External::Cast(*args.Data())->Value());
+      v8::External::Cast(*args.Data())->Value(gin::kSharedStorageBindingsTag));
   AuctionV8Helper* v8_helper = bindings->v8_helper_;
 
   network::mojom::SharedStorageModifierMethodWithOptionsPtr mojom_method =
@@ -552,7 +563,7 @@ void SharedStorageBindings::Clear(
 void SharedStorageBindings::BatchUpdate(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   SharedStorageBindings* bindings = static_cast<SharedStorageBindings*>(
-      v8::External::Cast(*args.Data())->Value());
+      v8::External::Cast(*args.Data())->Value(gin::kSharedStorageBindingsTag));
   AuctionV8Helper* v8_helper = bindings->v8_helper_;
   v8::Isolate* isolate = v8_helper->isolate();
 
@@ -669,7 +680,7 @@ void SharedStorageBindings::BatchUpdate(
 void SharedStorageBindings::SetMethodConstructor(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   SharedStorageBindings* bindings = static_cast<SharedStorageBindings*>(
-      v8::External::Cast(*args.Data())->Value());
+      v8::External::Cast(*args.Data())->Value(gin::kSharedStorageBindingsTag));
   AuctionV8Helper* v8_helper = bindings->v8_helper_;
   v8::Isolate* isolate = v8_helper->isolate();
 
@@ -698,7 +709,7 @@ void SharedStorageBindings::SetMethodConstructor(
 void SharedStorageBindings::AppendMethodConstructor(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   SharedStorageBindings* bindings = static_cast<SharedStorageBindings*>(
-      v8::External::Cast(*args.Data())->Value());
+      v8::External::Cast(*args.Data())->Value(gin::kSharedStorageBindingsTag));
   AuctionV8Helper* v8_helper = bindings->v8_helper_;
   v8::Isolate* isolate = v8_helper->isolate();
 
@@ -727,7 +738,7 @@ void SharedStorageBindings::AppendMethodConstructor(
 void SharedStorageBindings::DeleteMethodConstructor(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   SharedStorageBindings* bindings = static_cast<SharedStorageBindings*>(
-      v8::External::Cast(*args.Data())->Value());
+      v8::External::Cast(*args.Data())->Value(gin::kSharedStorageBindingsTag));
   AuctionV8Helper* v8_helper = bindings->v8_helper_;
   v8::Isolate* isolate = v8_helper->isolate();
 
@@ -756,7 +767,7 @@ void SharedStorageBindings::DeleteMethodConstructor(
 void SharedStorageBindings::ClearMethodConstructor(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   SharedStorageBindings* bindings = static_cast<SharedStorageBindings*>(
-      v8::External::Cast(*args.Data())->Value());
+      v8::External::Cast(*args.Data())->Value(gin::kSharedStorageBindingsTag));
   AuctionV8Helper* v8_helper = bindings->v8_helper_;
   v8::Isolate* isolate = v8_helper->isolate();
 

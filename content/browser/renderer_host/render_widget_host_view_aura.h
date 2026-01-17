@@ -8,7 +8,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -95,6 +94,14 @@ class RenderFrameHostImpl;
 class RenderWidgetHostView;
 class TouchSelectionControllerClientAura;
 
+// For use in conditional Arabic-Indic digit input. See comment above
+// ShouldInputArabicIndicDigits.
+inline constexpr char16_t kArabicIndicZero = u'\u0660';
+
+#if BUILDFLAG(IS_WIN)
+CONTENT_EXPORT void ResetArabicIndicDigitInputStateForTesting();
+#endif  // BUILDFLAG(IS_WIN)
+
 // RenderWidgetHostView class hierarchy described in render_widget_host_view.h.
 class CONTENT_EXPORT RenderWidgetHostViewAura
     : public RenderWidgetHostViewBase,
@@ -161,7 +168,10 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   void CopyFromSurface(
       const gfx::Rect& src_rect,
       const gfx::Size& output_size,
-      base::OnceCallback<void(const SkBitmap&)> callback) override;
+      base::TimeDelta timeout,
+      base::OnceCallback<void(const content::CopyFromSurfaceResult&)> callback)
+      override;
+  ui::FilteredGestureProvider* GetFilteredGestureProviderForTesting() override;
   void EnsureSurfaceSynchronizedForWebTest() override;
   void TransformPointToRootSurface(gfx::PointF* point) override;
   gfx::Rect GetBoundsInRootWindow() override;
@@ -194,6 +204,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   void InvalidateLocalSurfaceIdAndAllocationGroup() override;
   void ClearFallbackSurfaceForCommitPending() override;
   void ResetFallbackToFirstNavigationSurface() override;
+  void OnUnconfirmedTapConvertedToTap() override;
   bool RequestRepaintOnNewSurface() override;
   void DidStopFlinging() override;
   void OnOldViewDidNavigatePreCommit() override;
@@ -727,6 +738,9 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   void OnFocusHandwritingTarget(
       const gfx::Rect& focus_screen_rect_in_dips,
       const gfx::Size& tolerance_screen_distance_in_dips);
+
+  void ForwardArabicIndicCharEventWithLatencyInfo(const ui::KeyEvent& event,
+                                                  char16_t ascii_char);
 #endif  // BUILDFLAG(IS_WIN)
 
   raw_ptr<aura::Window> window_;
@@ -848,7 +862,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   bool double_tap_to_zoom_enabled_ = false;
 
   // Current visibility state. Initialized based on
-  // RenderWidgetHostImpl::is_hidden().
+  // RenderWidgetHostImpl::IsHidden().
   Visibility visibility_;
 
   // Represents a feature of the physical display whose offset and mask_length

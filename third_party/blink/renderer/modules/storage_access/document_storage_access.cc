@@ -9,6 +9,7 @@
 #include "services/metrics/public/cpp/ukm_builders.h"
 #include "third_party/blink/public/mojom/permissions/permission.mojom-blink.h"
 #include "third_party/blink/public/mojom/permissions/permission_status.mojom-blink-forward.h"
+#include "third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom-blink-forward.h"
 #include "third_party/blink/renderer/bindings/core/v8/idl_types.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_function.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise.h"
@@ -191,7 +192,7 @@ ScriptPromise<IDLUndefined> DocumentStorageAccess::requestStorageAccess(
   return RequestStorageAccessImpl(
       script_state,
       /*request_unpartitioned_cookie_access=*/true,
-      WTF::BindOnce([](ScriptPromiseResolver<IDLUndefined>* resolver) {
+      BindOnce([](ScriptPromiseResolver<IDLUndefined>* resolver) {
         DCHECK(resolver);
         resolver->Resolve();
       }));
@@ -220,12 +221,12 @@ ScriptPromise<StorageAccessHandle> DocumentStorageAccess::requestStorageAccess(
       script_state,
       /*request_unpartitioned_cookie_access=*/storage_access_types->all() ||
           storage_access_types->cookies(),
-      WTF::BindOnce(
+      BindOnce(
           [](LocalDOMWindow* window,
              const StorageAccessTypes* storage_access_types,
              ScriptPromiseResolver<StorageAccessHandle>* resolver) {
             if (!window) {
-                return;
+              return;
             }
             DCHECK(storage_access_types);
             DCHECK(resolver);
@@ -284,11 +285,8 @@ ScriptPromise<T> DocumentStorageAccess::RequestStorageAccessImpl(
   }
 
   // If this is the outermost frame we no longer need to make a request and
-  // can resolve the promise unless we are in a partitioned popin. Partitioned
-  // popins can be partitioned even as a top-frame, so need to continue.
-  // See https://explainers-by-googlers.github.io/partitioned-popins/
-  if (GetSupplementable()->IsInOutermostMainFrame() &&
-      !GetSupplementable()->GetPage()->IsPartitionedPopin()) {
+  // can resolve the promise.
+  if (GetSupplementable()->IsInOutermostMainFrame()) {
     FireRequestStorageAccessHistogram(
         RequestStorageResult::APPROVED_PRIMARY_FRAME);
     resolver->Resolve();
@@ -367,7 +365,7 @@ ScriptPromise<T> DocumentStorageAccess::RequestStorageAccessImpl(
           std::move(descriptor),
           LocalFrame::HasTransientUserActivation(
               GetSupplementable()->GetFrame()),
-          WTF::BindOnce(
+          blink::BindOnce(
               &DocumentStorageAccess::ProcessStorageAccessPermissionState<T>,
               WrapPersistent(this), WrapPersistent(resolver),
               request_unpartitioned_cookie_access, std::move(on_resolve)));
@@ -540,9 +538,9 @@ ScriptPromise<IDLUndefined> DocumentStorageAccess::requestStorageAccessFor(
           std::move(descriptor),
           LocalFrame::HasTransientUserActivation(
               GetSupplementable()->GetFrame()),
-          WTF::BindOnce(&DocumentStorageAccess::
-                            ProcessTopLevelStorageAccessPermissionState,
-                        WrapPersistent(this), WrapPersistent(resolver)));
+          BindOnce(&DocumentStorageAccess::
+                       ProcessTopLevelStorageAccessPermissionState,
+                   WrapPersistent(this), WrapPersistent(resolver)));
 
   return promise;
 }
@@ -560,6 +558,11 @@ void DocumentStorageAccess::ProcessTopLevelStorageAccessPermissionState(
     FireRequestStorageAccessForMetrics(
         RequestStorageResult::APPROVED_NEW_OR_EXISTING_GRANT,
         ExecutionContext::From(script_state));
+
+    UseCounter::Count(
+        GetSupplementable(),
+        mojom::blink::WebFeature::
+            kStorageAccessAPI_requestStorageAccessFor_Method_AsyncSuccess);
     resolver->Resolve();
   } else {
     LocalFrame::ConsumeTransientUserActivation(GetSupplementable()->GetFrame());

@@ -4,11 +4,13 @@
 
 #include "chrome/browser/ui/webui/top_chrome/webui_contents_warmup_level_recorder.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "chrome/browser/ui/webui/top_chrome/webui_contents_preload_manager.h"
 #include "chrome/browser/ui/webui/top_chrome/webui_contents_warmup_level.h"
 #include "chrome/browser/ui/webui/top_chrome/webui_url_utils.h"
 #include "content/public/browser/render_process_host.h"
+#include "content/public/browser/site_instance.h"
 #include "content/public/browser/spare_render_process_host_manager.h"
 #include "content/public/browser/web_contents.h"
 
@@ -61,7 +63,7 @@ void WebUIContentsWarmupLevelRecorder::BeforeContentsCreation() {
     pre_condition_->preloaded_contents = preloaded_contents->GetWeakPtr();
     pre_condition_->preloaded_process =
         preloaded_contents->GetPrimaryMainFrame()->GetProcess();
-    pre_condition_->preloaded_host = preloaded_contents->GetURL().host();
+    pre_condition_->preloaded_host = preloaded_contents->GetURL().GetHost();
   }
 }
 
@@ -70,7 +72,7 @@ void WebUIContentsWarmupLevelRecorder::AfterContentsCreation(
   CHECK(pre_condition_) << "You must call BeforeContentsCreation()";
   CHECK(web_contents);
 
-  if (base::Contains(
+  if (std::ranges::contains(
           pre_condition_->spare_process_ids,
           web_contents->GetPrimaryMainFrame()->GetProcess()->GetID())) {
     level_ = WebUIContentsWarmupLevel::kSpareRenderer;
@@ -78,7 +80,7 @@ void WebUIContentsWarmupLevelRecorder::AfterContentsCreation(
   }
 
   if (pre_condition_->preloaded_contents.get() == web_contents) {
-    level_ = pre_condition_->preloaded_host == web_contents->GetURL().host()
+    level_ = pre_condition_->preloaded_host == web_contents->GetURL().GetHost()
                  ? WebUIContentsWarmupLevel::kPreloadedWebContents
                  : WebUIContentsWarmupLevel::kRedirectedWebContents;
     return;

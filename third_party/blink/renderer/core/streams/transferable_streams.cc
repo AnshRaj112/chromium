@@ -18,6 +18,7 @@
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/core/dom/events/native_event_listener.h"
 #include "third_party/blink/renderer/core/events/message_event.h"
+#include "third_party/blink/renderer/core/frame/web_feature.h"
 #include "third_party/blink/renderer/core/messaging/message_port.h"
 #include "third_party/blink/renderer/core/streams/miscellaneous_operations.h"
 #include "third_party/blink/renderer/core/streams/read_request.h"
@@ -36,6 +37,7 @@
 #include "third_party/blink/renderer/platform/bindings/v8_throw_exception.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/heap/visitor.h"
+#include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
 #include "v8/include/v8.h"
 
 // See the design doc at
@@ -374,16 +376,10 @@ class CrossRealmTransformWritable::WriteAlgorithm final
   // backpressure.
   ScriptPromise<IDLUndefined> Run(
       ScriptState* script_state,
-      int spanification_suspected_redundant_argc,
       base::span<v8::Local<v8::Value>> argv) override {
-    // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-    // redundant in M143.
-    CHECK(
-        spanification_suspected_redundant_argc == static_cast<int>(argv.size()),
-        base::NotFatalUntil::M143);
     // https://streams.spec.whatwg.org/#abstract-opdef-setupcrossrealmtransformwritable
     // 8. Let writeAlgorithm be the following steps, taking a chunk argument:
-    DCHECK_EQ(spanification_suspected_redundant_argc, 1);
+    DCHECK_EQ(argv.size(), 1u);
     auto chunk = argv[0];
 
     // 1. If backpressurePromise is undefined, set backpressurePromise to a
@@ -480,14 +476,8 @@ class CrossRealmTransformWritable::CloseAlgorithm final
   // Sends a close message to the readable side and closes the message port.
   ScriptPromise<IDLUndefined> Run(
       ScriptState* script_state,
-      int spanification_suspected_redundant_argc,
       base::span<v8::Local<v8::Value>> argv) override {
-    // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-    // redundant in M143.
-    CHECK(
-        spanification_suspected_redundant_argc == static_cast<int>(argv.size()),
-        base::NotFatalUntil::M143);
-    DCHECK_EQ(spanification_suspected_redundant_argc, 0);
+    DCHECK_EQ(argv.size(), 0u);
 
     // https://streams.spec.whatwg.org/#abstract-opdef-setupcrossrealmtransformwritable
     // 9. Let closeAlgorithm be the folowing steps:
@@ -529,16 +519,10 @@ class CrossRealmTransformWritable::AbortAlgorithm final
   // Sends an abort message to the readable side and closes the message port.
   ScriptPromise<IDLUndefined> Run(
       ScriptState* script_state,
-      int spanification_suspected_redundant_argc,
       base::span<v8::Local<v8::Value>> argv) override {
-    // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-    // redundant in M143.
-    CHECK(
-        spanification_suspected_redundant_argc == static_cast<int>(argv.size()),
-        base::NotFatalUntil::M143);
     // https://streams.spec.whatwg.org/#abstract-opdef-setupcrossrealmtransformwritable
     // 10. Let abortAlgorithm be the following steps, taking a reason argument:
-    DCHECK_EQ(spanification_suspected_redundant_argc, 1);
+    DCHECK_EQ(argv.size(), 1u);
     auto reason = argv[0];
 
     v8::Local<v8::Value> error;
@@ -705,14 +689,8 @@ class CrossRealmTransformReadable::PullAlgorithm final
   // to clear.
   ScriptPromise<IDLUndefined> Run(
       ScriptState* script_state,
-      int spanification_suspected_redundant_argc,
       base::span<v8::Local<v8::Value>> argv) override {
-    // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-    // redundant in M143.
-    CHECK(
-        spanification_suspected_redundant_argc == static_cast<int>(argv.size()),
-        base::NotFatalUntil::M143);
-    DCHECK_EQ(spanification_suspected_redundant_argc, 0);
+    DCHECK_EQ(argv.size(), 0u);
     auto* isolate = script_state->GetIsolate();
 
     // https://streams.spec.whatwg.org/#abstract-opdef-setupcrossrealmtransformreadable
@@ -756,16 +734,10 @@ class CrossRealmTransformReadable::CancelAlgorithm final
   // Sends a cancel message to the writable side and closes the message port.
   ScriptPromise<IDLUndefined> Run(
       ScriptState* script_state,
-      int spanification_suspected_redundant_argc,
       base::span<v8::Local<v8::Value>> argv) override {
-    // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-    // redundant in M143.
-    CHECK(
-        spanification_suspected_redundant_argc == static_cast<int>(argv.size()),
-        base::NotFatalUntil::M143);
     // https://streams.spec.whatwg.org/#abstract-opdef-setupcrossrealmtransformreadable
     // 8. Let cancelAlgorithm be the following steps, taking a reason argument:
-    DCHECK_EQ(spanification_suspected_redundant_argc, 1);
+    DCHECK_EQ(argv.size(), 1u);
     auto reason = argv[0];
 
     v8::Local<v8::Value> error;
@@ -1070,6 +1042,8 @@ CORE_EXPORT WritableStream* CreateCrossRealmTransformWritable(
     AllowPerChunkTransferring allow_per_chunk_transferring,
     std::unique_ptr<WritableStreamTransferringOptimizer> optimizer,
     ExceptionState& exception_state) {
+  UseCounter::CountWebDXFeature(ExecutionContext::From(script_state),
+                                WebDXFeature::kTransferableStreams);
   WritableStream* stream = MakeGarbageCollected<CrossRealmTransformWritable>(
                                script_state, port, allow_per_chunk_transferring)
                                ->CreateWritableStream(exception_state);
@@ -1098,6 +1072,8 @@ CORE_EXPORT ReadableStream* CreateCrossRealmTransformReadable(
     MessagePort* port,
     std::unique_ptr<ReadableStreamTransferringOptimizer> optimizer,
     ExceptionState& exception_state) {
+  UseCounter::CountWebDXFeature(ExecutionContext::From(script_state),
+                                WebDXFeature::kTransferableStreams);
   ReadableStream* stream =
       MakeGarbageCollected<CrossRealmTransformReadable>(script_state, port)
           ->CreateReadableStream(exception_state);

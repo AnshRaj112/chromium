@@ -20,7 +20,6 @@
 #include "content/public/browser/web_contents.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/public/common/mediastream/media_stream_request.h"
-#include "third_party/blink/public/mojom/mediastream/media_stream.mojom-shared.h"
 #include "third_party/blink/public/mojom/mediastream/media_stream.mojom.h"
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -164,7 +163,8 @@ TEST_F(TabCaptureAccessHandlerTest, DlpRestricted) {
   blink::mojom::StreamDevices devices;
   ProcessRequest(source, &result, &devices);
 
-  EXPECT_EQ(blink::mojom::MediaStreamRequestResult::PERMISSION_DENIED, result);
+  EXPECT_EQ(blink::mojom::MediaStreamRequestResult::DLP_PERMISSION_DENIED,
+            result);
   EXPECT_FALSE(devices.video_device.has_value());
   EXPECT_FALSE(devices.audio_device.has_value());
 }

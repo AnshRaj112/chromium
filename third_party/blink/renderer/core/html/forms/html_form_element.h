@@ -25,12 +25,15 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_HTML_FORMS_HTML_FORM_ELEMENT_H_
 #define THIRD_PARTY_BLINK_RENDERER_CORE_HTML_FORMS_HTML_FORM_ELEMENT_H_
 
+#include "base/functional/callback.h"
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/html/forms/html_form_control_element.h"
 #include "third_party/blink/renderer/core/html/forms/radio_button_group_scope.h"
 #include "third_party/blink/renderer/core/html/html_element.h"
 #include "third_party/blink/renderer/core/loader/form_submission.h"
+#include "third_party/blink/renderer/core/script_tools/model_context.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_map.h"
+#include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 
 namespace blink {
 
@@ -102,8 +105,6 @@ class CORE_EXPORT HTMLFormElement final : public HTMLElement {
 
   bool NoValidate() const;
 
-  const AtomicString& Action() const;
-
   String method() const;
   void setMethod(const AtomicString&);
   FormSubmission::SubmitMethod Method() const { return attributes_.Method(); }
@@ -165,6 +166,7 @@ class CORE_EXPORT HTMLFormElement final : public HTMLElement {
 
   void HandleLocalEvents(Event&) override;
 
+  void AttributeChanged(const AttributeModificationParams&) override;
   void ParseAttribute(const AttributeModificationParams&) override;
   bool IsURLAttribute(const Attribute&) const override;
   bool HasLegalLinkAttribute(const QualifiedName&) const override;
@@ -214,6 +216,11 @@ class CORE_EXPORT HTMLFormElement final : public HTMLElement {
   void RemoveFromPastNamesMap(HTMLElement&);
   bool PastNamesEmpty() const;
 
+  bool IsValidWebMcpForm() const;
+  void UpdateMcpDefinitionsIfNeeded();
+  void ExecuteDeclarativeWebMCPFunction(String input_arguments);
+  String UpdateDeclarativeWebMCPInputSchema();
+
   using PastNamesMap = GCedHeapHashMap<AtomicString, Member<Element>>;
 
   FormSubmission::Attributes attributes_;
@@ -230,6 +237,37 @@ class CORE_EXPORT HTMLFormElement final : public HTMLElement {
   HeapVector<Member<HTMLImageElement>> image_elements_;
 
   base::OnceClosure cancel_last_submission_;
+
+  class HTMLFormMcpTool final : public GarbageCollected<HTMLFormMcpTool>,
+                                public DeclarativeWebMCPTool {
+   public:
+    HTMLFormMcpTool() = delete;
+    HTMLFormMcpTool(const HTMLFormMcpTool&) = delete;
+    HTMLFormMcpTool& operator=(const HTMLFormMcpTool&) = delete;
+    HTMLFormMcpTool(HTMLFormElement* form,
+                    String tool_name,
+                    String tool_description)
+        : tool_name_(tool_name),
+          tool_description_(tool_description),
+          form_(form) {
+      CHECK(!tool_name.IsNull() && !tool_description.IsNull());
+    }
+    String ComputeInputSchema() override;
+    void ExecuteTool(String input_arguments,
+                     base::OnceCallback<void(String)> done_callback) override;
+    String ToolName() const { return tool_name_; }
+    String ToolDescription() const { return tool_description_; }
+    bool IsValidTool() const { return !tool_name_.IsNull(); }
+    void Trace(Visitor* visitor) const;
+
+   private:
+    String tool_name_;
+    String tool_description_;
+    Member<HTMLFormElement> form_;
+  };
+
+  // Used only for (experimental) declarative WebMCP.
+  Member<HTMLFormMcpTool> active_webmcp_tool_;
 
   bool is_submitting_ = false;
   bool in_user_js_submit_event_ = false;

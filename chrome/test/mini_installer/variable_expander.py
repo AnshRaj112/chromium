@@ -96,6 +96,7 @@ class VariableExpander:
         *   Chrome'.
         * $CHROME_LONG_NAME_SXS: 'Google Chrome SxS' if $BRAND is 'Google
         *   Chrome'.
+        * $CHROME_PDF_PROG_ID: 'ChromePDF' (or 'ChromiumPDF' or 'CfTPDF').
         * $CHROME_SHORT_NAME: 'Chrome' (or 'Chromium' or
           'Google Chrome for Testing').
         * $CHROME_SHORT_NAME_BETA: 'ChromeBeta' if $BRAND is 'Google Chrome'.
@@ -250,6 +251,14 @@ class VariableExpander:
                 'ChromeSSHTM',
                 'CHROME_LONG_NAME':
                 'Google Chrome',
+                'CHROME_PDF_PROG_ID':
+                'ChromePDF',
+                'CHROME_PDF_PROG_ID_BETA':
+                'ChromeBPDF',
+                'CHROME_PDF_PROG_ID_DEV':
+                'ChromeDPDF',
+                'CHROME_PDF_PROG_ID_SXS':
+                'ChromeSSPDF',
                 'CHROME_SHORT_NAME':
                 'Chrome',
                 'CHROME_UPDATE_REGISTRY_SUBKEY':
@@ -287,6 +296,8 @@ class VariableExpander:
                 'ChromeDev',
                 'CHROME_SHORT_NAME_SXS':
                 'ChromeCanary',
+                'CHROME_DIRECT_LAUNCH_SCHEME':
+                'google-chrome',
                 'CHROME_UPDATE_REGISTRY_SUBKEY_BETA':
                 ('Software\\Google\\Update\\Clients\\'
                  '{8237E44A-0054-442C-B6B6-EA0509993955}'),
@@ -314,13 +325,13 @@ class VariableExpander:
                 'CHROME_ELEVATOR_CLSID_SXS':
                 ('{704C2872-2049-435E-A469-0A534313C42B}'),
                 'CHROME_ELEVATOR_IID':
-                ('{463ABECF-410D-407F-8AF5-0DF35A005CC8}'),
+                ('{1BF5208B-295F-4992-B5F4-3A9BB6494838}'),
                 'CHROME_ELEVATOR_IID_BETA':
-                ('{A2721D66-376E-4D2F-9F0F-9070E9A42B5F}'),
+                ('{B96A14B8-D0B0-44D8-BA68-2385B2A03254}'),
                 'CHROME_ELEVATOR_IID_DEV':
-                ('{BB2AA26B-343A-4072-8B6F-80557B8CE571}'),
+                ('{3FEFA48E-C8BF-461F-AED6-63F658CC850A}'),
                 'CHROME_ELEVATOR_IID_SXS':
-                ('{4F7CE041-28E9-484F-9DD0-61A8CACEFEE4}'),
+                ('{FF672E9F-0994-4322-81E5-3A5A9746140A}'),
                 'CHROME_ELEVATION_SERVICE_NAME':
                 ('GoogleChromeElevationService'),
                 'CHROME_ELEVATION_SERVICE_NAME_BETA':
@@ -359,18 +370,22 @@ class VariableExpander:
                 'ChromiumHTM',
                 'CHROME_LONG_NAME':
                 'Chromium',
+                'CHROME_PDF_PROG_ID':
+                'ChromiumPDF',
                 'CHROME_SHORT_NAME':
                 'Chromium',
                 'CHROME_UPDATE_REGISTRY_SUBKEY':
                 'Software\\Chromium',
                 'CHROME_CLIENT_STATE_KEY':
                 'Software\\Chromium',
+                'CHROME_DIRECT_LAUNCH_SCHEME':
+                'chromium',
                 'CHROME_TOAST_ACTIVATOR_CLSID':
                 ('{635EFA6F-08D6-4EC9-BD14-8A0FDE975159}'),
                 'CHROME_ELEVATOR_CLSID':
                 ('{D133B120-6DB4-4D6B-8BFE-83BF8CA1B1B0}'),
                 'CHROME_ELEVATOR_IID':
-                ('{B88C45B9-8825-4629-B83E-77CC67D9CEED}'),
+                ('{BB19A0E5-00C6-4966-94B2-5AFEC6FED93A}'),
                 'CHROME_ELEVATION_SERVICE_NAME':
                 'ChromiumElevationService',
                 'CHROME_ELEVATION_SERVICE_DISPLAY_NAME':
@@ -393,6 +408,8 @@ class VariableExpander:
                 'CfTHTML',
                 'CHROME_LONG_NAME':
                 'Google Chrome for Testing',
+                'CHROME_PDF_PROG_ID':
+                'CfTPDF',
                 'CHROME_SHORT_NAME':
                 'Google Chrome for Testing',
                 'CHROME_UPDATE_REGISTRY_SUBKEY':

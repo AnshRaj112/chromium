@@ -34,7 +34,7 @@ public interface SettingsNavigation {
         SettingsFragment.NON_CARD_PAYMENT_METHODS
     })
     @Retention(RetentionPolicy.SOURCE)
-    public @interface SettingsFragment {
+    @interface SettingsFragment {
         /// Main settings page.
         int MAIN = 0;
         /// Browsing Data management.
@@ -75,6 +75,23 @@ public interface SettingsNavigation {
     void startSettings(Context context, @SettingsFragment int settingsFragment);
 
     /**
+     * Starts a specific settings fragment. This can be used by code that does not supply its own
+     * settings page, but instead needs to redirect the user to an appropriate page that is out of
+     * reach.
+     * This takes additional {@code addToBackStack} param to control fragment stack.
+     * Note: unlike {@code Class<?> fragment} variations, this does not support {@code
+     * fragmentArgs}, because it is (sometimes) automatically derived from {@code context} and
+     * {@code settingsFragment}
+     *
+     * @param context The current Activity, or an application context if no Activity is available.
+     * @param settingsFragment The {@link SettingsFragment} to run.
+     * @param addToBackStack If true, the fragment will be stack on the backstack of the fragment
+     *     manager.
+     */
+    void startSettings(
+            Context context, @SettingsFragment int settingsFragment, boolean addToBackStack);
+
+    /**
      * Starts settings with the specified fragment.
      *
      * @param context The current Activity, or an application context if no Activity is available.
@@ -95,6 +112,38 @@ public interface SettingsNavigation {
             @Nullable Bundle fragmentArgs);
 
     /**
+     * Starts settings with the specified fragment and arguments.
+     *
+     * @param context The current Activity, or an application context if no Activity is available.
+     * @param fragment The fragment to show, or null to show the default fragment.
+     * @param fragmentArgs A bundle of additional fragment arguments.
+     * @param addToBackStack If true, the fragment will be stack on the backstack of the fragment
+     *     manager.
+     */
+    void startSettings(
+            Context context,
+            @Nullable Class<? extends Fragment> fragment,
+            @Nullable Bundle fragmentArgs,
+            boolean addToBackStack);
+
+    /**
+     * Starts settings with the specified fragment and arguments.
+     *
+     * @param context The current Activity, or an application context if no Activity is available.
+     * @param fragment The fragment to show, or null to show the default fragment.
+     * @param fragmentArgs A bundle of additional fragment arguments.
+     * @param addToBackStack If true, the fragment will be stack on the backstack of the fragment
+     *     manager.
+     * @param tag A tag used to identify the fragment transaction.
+     */
+    void startSettings(
+            Context context,
+            @Nullable Class<? extends Fragment> fragment,
+            @Nullable Bundle fragmentArgs,
+            boolean addToBackStack,
+            @Nullable String tag);
+
+    /**
      * Creates an intent for starting settings with the specified fragment.
      *
      * @param context The current Activity, or an application context if no Activity is available.
@@ -113,6 +162,38 @@ public interface SettingsNavigation {
             Context context,
             @Nullable Class<? extends Fragment> fragment,
             @Nullable Bundle fragmentArgs);
+
+    /**
+     * Creates an intent for starting settings with the specified fragment and arguments.
+     *
+     * @param context The current Activity, or an application context if no Activity is available.
+     * @param fragment The class of the fragment to show, or null to show the default fragment.
+     * @param fragmentArgs A bundle of additional fragment arguments.
+     * @param addToBackStack If true, the fragment will be stack on the backstack of the fragment
+     *     manager.
+     */
+    Intent createSettingsIntent(
+            Context context,
+            @Nullable Class<? extends Fragment> fragment,
+            @Nullable Bundle fragmentArgs,
+            boolean addToBackStack);
+
+    /**
+     * Creates an intent for starting settings with the specified fragment and arguments.
+     *
+     * @param context The current Activity, or an application context if no Activity is available.
+     * @param fragment The class of the fragment to show, or null to show the default fragment.
+     * @param fragmentArgs A bundle of additional fragment arguments.
+     * @param addToBackStack If true, the fragment will be stack on the backstack of the fragment
+     *     manager.
+     * @param tag A tag used to identify the fragment transaction.
+     */
+    Intent createSettingsIntent(
+            Context context,
+            @Nullable Class<? extends Fragment> fragment,
+            @Nullable Bundle fragmentArgs,
+            boolean addToBackStack,
+            @Nullable String tag);
 
     /**
      * Creates an intent for starting settings with the specified fragment and arguments.

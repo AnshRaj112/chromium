@@ -190,7 +190,7 @@ void ConfigureWebApp(ScopedDevicePolicyUpdate& update,
   account->mutable_web_kiosk_app()->set_url(url.spec());
 }
 
-// Configures a Kiosk isolated web app in device policies.
+// Configures a Kiosk isolated web app and related device policies.
 void ConfigureIsolatedWebApp(ScopedDevicePolicyUpdate& update,
                              const KioskMixin::IsolatedWebAppOption& option) {
   DeviceLocalAccountInfoProto* account =

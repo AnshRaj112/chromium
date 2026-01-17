@@ -4,11 +4,14 @@
 
 #include "chrome/browser/ui/web_applications/sub_apps_service_impl.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "base/check.h"
+#include "base/check_deref.h"
+#include "base/containers/map_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/concurrent_callbacks.h"
 #include "base/i18n/message_formatter.h"
@@ -21,9 +24,10 @@
 #include "chrome/browser/permissions/permission_decision_auto_blocker_factory.h"
 #include "chrome/browser/policy/policy_util.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ui/web_applications/sub_apps_install_dialog_controller.h"
+#include "chrome/browser/ui/web_applications/web_app_dialogs.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/browser/web_applications/web_app_install_finalizer.h"
 #include "chrome/browser/web_applications/web_app_install_params.h"
@@ -42,6 +46,7 @@
 #include "content/public/browser/isolated_context_util.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
+#include "third_party/blink/public/mojom/subapps/sub_apps_service.mojom.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/message_center/public/cpp/notification.h"
 #include "url/gurl.h"
@@ -274,8 +279,11 @@ void SubAppsServiceImpl::Add(
       // Compromised renderer, bail immediately (this call deletes *this).
       &SubAppsServiceImpl::ReportBadMessageAndDeleteThis, this);
 
-  CHECK(AreWebAppsUserInstallable(
-      Profile::FromBrowserContext(render_frame_host().GetBrowserContext())));
+  if (!AreWebAppsUserInstallable(Profile::FromBrowserContext(
+          render_frame_host().GetBrowserContext()))) {
+    ReturnAllAddsAsFailed(sub_apps_to_add, std::move(result_callback));
+    return;
+  }
 
   // Assign id to this add call
   int add_call_id = next_add_call_id_++;
@@ -301,7 +309,7 @@ void SubAppsServiceImpl::CollectInstallData(
   for (const auto& [manifest_id, url_to_load] : requested_installs) {
     // Check if app is the parent app itself
     if (manifest_id == parent_manifest_id) {
-      add_call_info_.at(add_call_id)
+      CHECK_DEREF(base::FindOrNull(add_call_info_, add_call_id))
           .results.emplace_back(SubAppsServiceAddResult::New(
               ConvertUrlToPath(manifest_id),
               blink::mojom::SubAppsServiceResultCode::kFailure));
@@ -311,7 +319,7 @@ void SubAppsServiceImpl::CollectInstallData(
     // Check if app is already installed as a sub app
     if (provider->registrar_unsafe().WasInstalledBySubApp(
             GenerateAppIdFromManifestId(manifest_id, parent_manifest_id))) {
-      add_call_info_.at(add_call_id)
+      CHECK_DEREF(base::FindOrNull(add_call_info_, add_call_id))
           .results.emplace_back(SubAppsServiceAddResult::New(
               ConvertUrlToPath(manifest_id),
               blink::mojom::SubAppsServiceResultCode::kSuccess));
@@ -338,7 +346,8 @@ void SubAppsServiceImpl::ProcessInstallData(
     int add_call_id,
     std::vector<std::pair<webapps::ManifestId,
                           std::unique_ptr<WebAppInstallInfo>>> install_data) {
-  AddCallInfo& add_call_info = add_call_info_.at(add_call_id);
+  AddCallInfo& add_call_info =
+      CHECK_DEREF(base::FindOrNull(add_call_info_, add_call_id));
   const webapps::AppId* parent_app_id = GetAppId(render_frame_host());
 
   for (auto& [manifest_id, install_info] : install_data) {
@@ -365,7 +374,8 @@ void SubAppsServiceImpl::ProcessInstallData(
 }
 
 void SubAppsServiceImpl::FinishAddCallOrShowInstallDialog(int add_call_id) {
-  AddCallInfo& add_call_info = add_call_info_.at(add_call_id);
+  AddCallInfo& add_call_info =
+      CHECK_DEREF(base::FindOrNull(add_call_info_, add_call_id));
 
   if (add_call_info.install_infos.empty()) {
     FinishAddCall(add_call_id, {});
@@ -381,17 +391,13 @@ void SubAppsServiceImpl::FinishAddCallOrShowInstallDialog(int add_call_id) {
       GetWebAppProvider(render_frame_host())->registrar_unsafe();
   const webapps::AppId* parent_app_id = GetAppId(render_frame_host());
 
-  add_call_info.install_dialog =
-      std::make_unique<SubAppsInstallDialogController>();
-  add_call_info.install_dialog->Init(
-      base::BindOnce(&SubAppsServiceImpl::ProcessDialogResponse,
-                     weak_ptr_factory_.GetWeakPtr(), add_call_id),
+  ShowSubAppsInstallDialog(
+      content::WebContents::FromRenderFrameHost(&render_frame_host()),
       add_call_info.install_infos,
       /*parent_app_name=*/registrar.GetAppShortName(*parent_app_id),
-      *parent_app_id, GetProfile(render_frame_host()),
-      /*window=*/
-      content::WebContents::FromRenderFrameHost(&render_frame_host())
-          ->GetTopLevelNativeWindow());
+      *parent_app_id,
+      base::BindOnce(&SubAppsServiceImpl::ProcessDialogResponse,
+                     weak_ptr_factory_.GetWeakPtr(), add_call_id));
 }
 
 void SubAppsServiceImpl::ProcessDialogResponse(int add_call_id,
@@ -415,7 +421,8 @@ void SubAppsServiceImpl::ProcessDialogResponse(int add_call_id,
           ContentSettingsType::SUB_APP_INSTALLATION_PROMPTS,
           /*dismissed_prompt_was_quiet=*/false);
 
-  AddCallInfo& add_call_info = add_call_info_.at(add_call_id);
+  AddCallInfo& add_call_info =
+      CHECK_DEREF(base::FindOrNull(add_call_info_, add_call_id));
 
   for (const std::unique_ptr<web_app::WebAppInstallInfo>& install_info :
        add_call_info.install_infos) {
@@ -428,7 +435,8 @@ void SubAppsServiceImpl::ProcessDialogResponse(int add_call_id,
 }
 
 void SubAppsServiceImpl::ScheduleSubAppInstalls(int add_call_id) {
-  AddCallInfo& add_call_info = add_call_info_.at(add_call_id);
+  AddCallInfo& add_call_info =
+      CHECK_DEREF(base::FindOrNull(add_call_info_, add_call_id));
 
   // Schedule install for each install_info that was collected
   WebAppProvider* provider = GetWebAppProvider(render_frame_host());
@@ -455,7 +463,8 @@ void SubAppsServiceImpl::ScheduleSubAppInstalls(int add_call_id) {
 void SubAppsServiceImpl::FinishAddCall(
     int add_call_id,
     std::vector<SubAppInstallResult> install_results) {
-  AddCallInfo& add_call_info = add_call_info_.at(add_call_id);
+  AddCallInfo& add_call_info =
+      CHECK_DEREF(base::FindOrNull(add_call_info_, add_call_id));
 
   for (const auto& [manifest_id, app_id, result_code] : install_results) {
     add_call_info.results.emplace_back(SubAppsServiceAddResult::New(
@@ -567,7 +576,8 @@ void SubAppsServiceImpl::RemoveSubApp(
   // its parent_app is the one doing the current call.
   if (!app || !app->parent_app_id() ||
       *calling_app_id != *app->parent_app_id() ||
-      !provider->registrar_unsafe().IsInRegistrar(sub_app_id)) {
+      !provider->registrar_unsafe().AppMatches(
+          sub_app_id, WebAppFilter::IsAppSurfaceableToUser())) {
     return std::move(callback).Run(SubAppsServiceRemoveResult::New(
         manifest_id_path, SubAppsServiceResultCode::kFailure));
   }

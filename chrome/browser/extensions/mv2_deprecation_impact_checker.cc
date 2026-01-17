@@ -4,17 +4,20 @@
 
 #include "chrome/browser/extensions/mv2_deprecation_impact_checker.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_split.h"
 #include "chrome/browser/extensions/extension_management.h"
 #include "chrome/browser/extensions/mv2_experiment_stage.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_features.h"
 #include "extensions/common/manifest.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -36,10 +39,8 @@ const std::vector<std::string>& GetHashedExceptionList() {
 }  // namespace
 
 MV2DeprecationImpactChecker::MV2DeprecationImpactChecker(
-    MV2ExperimentStage experiment_stage,
     ExtensionManagement* extension_management)
-    : experiment_stage_(experiment_stage),
-      extension_management_(extension_management) {}
+    : extension_management_(extension_management) {}
 MV2DeprecationImpactChecker::~MV2DeprecationImpactChecker() = default;
 
 bool MV2DeprecationImpactChecker::IsExtensionAffected(
@@ -55,11 +56,6 @@ bool MV2DeprecationImpactChecker::IsExtensionAffected(
     Manifest::Type manifest_type,
     mojom::ManifestLocation manifest_location,
     const HashedExtensionId& hashed_id) {
-  // Only consider any extensions if the experiment is enabled.
-  if (experiment_stage_ == MV2ExperimentStage::kNone) {
-    return false;
-  }
-
   // Only extensions < MV3.
   if (manifest_version >= 3) {
     return false;
@@ -83,7 +79,7 @@ bool MV2DeprecationImpactChecker::IsExtensionAffected(
   }
 
   // Extensions with a temporary exception.
-  if (base::Contains(GetHashedExceptionList(), hashed_id.value())) {
+  if (std::ranges::contains(GetHashedExceptionList(), hashed_id.value())) {
     return false;
   }
 

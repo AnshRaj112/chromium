@@ -7,8 +7,10 @@
 #import "base/memory/raw_ptr.h"
 #import "base/test/metrics/histogram_tester.h"
 #import "base/test/scoped_feature_list.h"
+#import "components/signin/public/base/signin_pref_names.h"
 #import "components/signin/public/base/signin_switches.h"
 #import "components/sync/test/sync_user_settings_mock.h"
+#import "ios/chrome/browser/policy/model/policy_util.h"
 #import "ios/chrome/browser/post_restore_signin/ui_bundled/metrics.h"
 #import "ios/chrome/browser/promos_manager/model/constants.h"
 #import "ios/chrome/browser/promos_manager/model/promo_config.h"
@@ -36,6 +38,7 @@
 
 namespace {
 const char kFakePreRestoreAccountEmail[] = "person@example.org";
+const char kFakePreRestoreAccountGaiaId[] = "fake_gaia";
 const char kFakePreRestoreAccountGivenName[] = "Given";
 const char kFakePreRestoreAccountFullName[] = "Full Name";
 }  // namespace
@@ -60,18 +63,22 @@ class PostRestoreSignInProviderTest : public PlatformTest {
   }
 
   void SetFakePreRestoreAccountInfo() {
-    AccountInfo accountInfo;
-    accountInfo.email = std::string(kFakePreRestoreAccountEmail);
-    accountInfo.given_name = std::string(kFakePreRestoreAccountGivenName);
-    accountInfo.full_name = std::string(kFakePreRestoreAccountFullName);
-    StorePreRestoreIdentity(pref_service_, accountInfo,
+    AccountInfo account_info =
+        AccountInfo::Builder(GaiaId(kFakePreRestoreAccountGaiaId),
+                             kFakePreRestoreAccountEmail)
+            .SetGivenName(kFakePreRestoreAccountGivenName)
+            .SetFullName(kFakePreRestoreAccountFullName)
+            .Build();
+    StorePreRestoreIdentity(pref_service_, account_info,
                             /*history_sync_enabled=*/false);
   }
 
   void ClearUserName() {
-    AccountInfo accountInfo;
-    accountInfo.email = std::string(kFakePreRestoreAccountEmail);
-    StorePreRestoreIdentity(pref_service_, accountInfo,
+    AccountInfo account_info =
+        AccountInfo::Builder(GaiaId(kFakePreRestoreAccountGaiaId),
+                             kFakePreRestoreAccountEmail)
+            .Build();
+    StorePreRestoreIdentity(pref_service_, account_info,
                             /*history_sync_enabled=*/false);
     // Reinstantiate a provider so that it picks up the changes.
     provider_ =
@@ -96,7 +103,7 @@ class PostRestoreSignInProviderTest : public PlatformTest {
  protected:
   IOSChromeScopedTestingLocalState scoped_testing_local_state_;
   web::WebTaskEnvironment task_environment_;
-  raw_ptr<PrefService> pref_service_;
+  raw_ptr<PrefService, DanglingUntriaged> pref_service_;
   std::unique_ptr<TestProfileIOS> profile_;
   raw_ptr<AuthenticationService> auth_service_;
   base::test::ScopedFeatureList scoped_feature_list_;
@@ -207,6 +214,23 @@ TEST_F(PostRestoreSignInProviderTest, AlreadySignedIn) {
   });
 
   SignIn();
+  [provider_ standardPromoAlertDefaultAction];
+
+  EXPECT_FALSE(didCallShowSignIn);
+}
+
+// Tests that when tapping "continue" when signed-in does not attempt to
+// re-signin.
+TEST_F(PostRestoreSignInProviderTest, SigninDisabled) {
+  GetApplicationContext()->GetLocalState()->SetInteger(
+      prefs::kBrowserSigninPolicy,
+      static_cast<int>(BrowserSigninMode::kDisabled));
+  __block bool didCallShowSignIn = false;
+  SetupMockHandler();
+  OCMStub([mock_handler_ showSignin:[OCMArg any]]).andDo(^(NSInvocation* inv) {
+    didCallShowSignIn = true;
+  });
+
   [provider_ standardPromoAlertDefaultAction];
 
   EXPECT_FALSE(didCallShowSignIn);

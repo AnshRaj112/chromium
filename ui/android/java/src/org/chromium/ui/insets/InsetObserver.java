@@ -20,11 +20,13 @@ import androidx.core.view.WindowInsetsCompat;
 import org.chromium.base.ObserverList;
 import org.chromium.base.ResettersForTesting;
 import org.chromium.base.metrics.RecordHistogram;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.NonNullObservableSupplier;
+import org.chromium.base.supplier.ObservableSuppliers;
+import org.chromium.base.supplier.SettableNonNullObservableSupplier;
+import org.chromium.base.ui.KeyboardUtils;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.ui.KeyboardUtils;
 import org.chromium.ui.base.ImmutableWeakReference;
 import org.chromium.ui.insets.InsetObserver.WindowInsetsConsumer.InsetConsumerSource;
 
@@ -42,7 +44,8 @@ public class InsetObserver implements OnApplyWindowInsetsListener {
     private int mKeyboardInset;
     private final Rect mSystemGestureInsets;
     protected final ObserverList<WindowInsetObserver> mObservers;
-    private final KeyboardInsetObservableSupplier mKeyboardInsetSupplier;
+    private final SettableNonNullObservableSupplier<Integer> mKeyboardInsetSupplier =
+            ObservableSuppliers.createNonNull(0);
     private final WindowInsetsAnimationCompat.Callback mWindowInsetsAnimationProxyCallback;
     private final ObserverList<WindowInsetsAnimationListener> mWindowInsetsAnimationListeners =
             new ObserverList<>();
@@ -123,6 +126,7 @@ public class InsetObserver implements OnApplyWindowInsetsListener {
             InsetConsumerSource.TOP_INSET_COORDINATOR,
             InsetConsumerSource.EDGE_TO_EDGE_CONTROLLER_CREATOR,
             InsetConsumerSource.EDGE_TO_EDGE_CONTROLLER_IMPL,
+            InsetConsumerSource.UPLOAD_IMAGE_PREVIEW_DIALOG,
             InsetConsumerSource.EDGE_TO_EDGE_LAYOUT_COORDINATOR,
             InsetConsumerSource.APP_HEADER_COORDINATOR_BOTTOM,
             InsetConsumerSource.COUNT
@@ -149,11 +153,12 @@ public class InsetObserver implements OnApplyWindowInsetsListener {
             // inset consumer if it creates the EdgeToEdgeControllerImpl.
             int EDGE_TO_EDGE_CONTROLLER_CREATOR = 4;
             int EDGE_TO_EDGE_CONTROLLER_IMPL = 5;
-            int EDGE_TO_EDGE_LAYOUT_COORDINATOR = 6;
-            int APP_HEADER_COORDINATOR_BOTTOM = 7;
+            int UPLOAD_IMAGE_PREVIEW_DIALOG = 6;
+            int EDGE_TO_EDGE_LAYOUT_COORDINATOR = 7;
+            int APP_HEADER_COORDINATOR_BOTTOM = 8;
 
             // Update this whenever a consumer source is added or removed.
-            int COUNT = 8;
+            int COUNT = 9;
         }
     }
 
@@ -209,14 +214,6 @@ public class InsetObserver implements OnApplyWindowInsetsListener {
         void onEnd(WindowInsetsAnimationCompat animation);
     }
 
-    private static class KeyboardInsetObservableSupplier extends ObservableSupplierImpl<Integer>
-            implements WindowInsetObserver {
-        @Override
-        public void onKeyboardInsetChanged(int inset) {
-            this.set(inset);
-        }
-    }
-
     /**
      * Creates an instance of {@link InsetObserver}.
      *
@@ -234,8 +231,6 @@ public class InsetObserver implements OnApplyWindowInsetsListener {
         mKeyboardInset = 0;
         mSystemGestureInsets = new Rect();
         mObservers = new ObserverList<>();
-        mKeyboardInsetSupplier = new KeyboardInsetObservableSupplier();
-        addObserver(mKeyboardInsetSupplier);
         mWindowInsetsAnimationProxyCallback =
                 new WindowInsetsAnimationCompat.Callback(
                         WindowInsetsAnimationCompat.Callback.DISPATCH_MODE_STOP) {
@@ -295,9 +290,9 @@ public class InsetObserver implements OnApplyWindowInsetsListener {
 
     /**
      * Returns a supplier that observes this {@link InsetObserver} and provides changes to the
-     * keyboard inset using the {@link ObservableSupplier} interface.
+     * keyboard inset using the {@link MonotonicObservableSupplier} interface.
      */
-    public ObservableSupplier<Integer> getSupplierForKeyboardInset() {
+    public NonNullObservableSupplier<Integer> getSupplierForKeyboardInset() {
         return mKeyboardInsetSupplier;
     }
 
@@ -571,9 +566,9 @@ public class InsetObserver implements OnApplyWindowInsetsListener {
         }
 
         mKeyboardInset = keyboardInset;
-
+        mKeyboardInsetSupplier.set(keyboardInset);
         for (WindowInsetObserver mObserver : mObservers) {
-            mObserver.onKeyboardInsetChanged(mKeyboardInset);
+            mObserver.onKeyboardInsetChanged(keyboardInset);
         }
     }
 

@@ -16,6 +16,8 @@
 #include <string_view>
 
 #include "base/base_export.h"
+#include "base/byte_count.h"
+#include "base/byte_size.h"
 #include "base/functional/callback_forward.h"
 #include "base/gtest_prod_util.h"
 #include "base/metrics/field_trial_params.h"
@@ -50,7 +52,7 @@ class ScopedAmountOfPhysicalMemoryOverride;
 }
 
 class FilePath;
-struct SystemMemoryInfoKB;
+struct SystemMemoryInfo;
 
 class BASE_EXPORT SysInfo {
  public:
@@ -69,43 +71,60 @@ class BASE_EXPORT SysInfo {
   // LITTLE cores on ARM bit.LITTLE architecture.
   // Returns 0 on symmetric architecture or when it failed to recognize.
   // This function will cache the result value in its implementation.
+  //
+  // Note that due to caching, this is not expected to be accurate in case of
+  // CPU unplug, which can happen, in particular in VMs. More specifically, the
+  // returned value is only expected to be valid at the time where this was
+  // first called. Subsequent calls may return a stable value, which can be an
+  // under/overestimate in case of CPU hotplug.
   static int NumberOfEfficientProcessors();
+
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
+  // Returns the maximum frequency of all the processors in Hz, if
+  // available. The data may not be available in virtual machines for
+  // instance. In this case, the returned value is empty.
+  //
+  // Also note that due to caching, this is not expected to be accurate in case
+  // of CPU unplug, which can happen, in particular in VMs. More specifically,
+  // the returned value is only expected to be valid at the time where this was
+  // first called. Subsequent calls may return a stable value, which can be an
+  // under/overestimate in case of CPU hotplug.
+  static const std::vector<uint64_t>& MaxFrequencyPerProcessor();
+#endif
 
   // Return the number of bytes of physical memory on the current machine.
   // If low-end device mode is manually enabled via command line flag, this
   // will return the lesser of the actual physical memory, or 512MB.
-  static uint64_t AmountOfPhysicalMemory();
+  static ByteSize AmountOfTotalPhysicalMemory();
+
+  // Deprecated: Prefer AmountOfTotalPhysicalMemory(), which returns a ByteSize.
+  // ByteCount is deprecated.
+  // TODO(crbug.com/448661443): Migrate all callers and remove this.
+  static ByteCount AmountOfPhysicalMemory() {
+    return AmountOfTotalPhysicalMemory().AsDeprecatedByteCount();
+  }
 
   // Return the number of bytes of current available physical memory on the
   // machine.
   // (The amount of memory that can be allocated without any significant
   // impact on the system. It can lead to freeing inactive file-backed
   // and/or speculative file-backed memory).
-  static uint64_t AmountOfAvailablePhysicalMemory();
+  static ByteSize AmountOfAvailablePhysicalMemory();
 
   // Return the number of bytes of virtual memory of this process. A return
   // value of zero means that there is no limit on the available virtual
   // memory.
-  static uint64_t AmountOfVirtualMemory();
-
-  // Return the number of megabytes of physical memory on the current machine.
-  static int AmountOfPhysicalMemoryMB() {
-    return static_cast<int>(AmountOfPhysicalMemory() / 1024 / 1024);
-  }
-
-  // Return the number of megabytes of available virtual memory, or zero if it
-  // is unlimited.
-  static int AmountOfVirtualMemoryMB() {
-    return static_cast<int>(AmountOfVirtualMemory() / 1024 / 1024);
-  }
+  static ByteSize AmountOfVirtualMemory();
 
   // Return the available disk space in bytes on the volume containing |path|,
-  // or -1 on failure.
-  static int64_t AmountOfFreeDiskSpace(const FilePath& path);
+  // or nullopt on failure.
+  // TODO(crbug.com/429140103): Convert the return type to ByteSize.
+  static std::optional<int64_t> AmountOfFreeDiskSpace(const FilePath& path);
 
-  // Return the total disk space in bytes on the volume containing |path|, or -1
-  // on failure.
-  static int64_t AmountOfTotalDiskSpace(const FilePath& path);
+  // Return the total disk space in bytes on the volume containing |path|, or
+  // nullopt on failure.
+  // TODO(crbug.com/429140103): Convert the return type to ByteSize.
+  static std::optional<int64_t> AmountOfTotalDiskSpace(const FilePath& path);
 
 #if BUILDFLAG(IS_FUCHSIA)
   // Sets the total amount of disk space to report under the specified |path|.
@@ -236,7 +255,9 @@ class BASE_EXPORT SysInfo {
   static std::string CPUModelName();
 
   // Return the smallest amount of memory (in bytes) which the VM system will
-  // allocate.
+  // allocate. On some platforms, such as Windows, this may not match the page
+  // size (e.g. x86/x86-64 Windows use a 4KB page size but a 64KB allocation
+  // granularity).
   static size_t VMAllocationGranularity();
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -319,7 +340,7 @@ class BASE_EXPORT SysInfo {
 
   // Returns true for low-end devices that may require extreme tradeoffs,
   // including user-visible changes, for acceptable performance.
-  // For general memory optimizations, consider |AmountOfPhysicalMemoryMB|.
+  // For general memory optimizations, consider |AmountOfTotalPhysicalMemory|.
   //
   // On Android this returns true when memory <= 1GB on Android O and later.
   // This is not the same as "low-memory".
@@ -366,22 +387,22 @@ class BASE_EXPORT SysInfo {
   FRIEND_TEST_ALL_PREFIXES(debug::SystemMetricsTest, ParseMeminfo);
 
   static int NumberOfEfficientProcessorsImpl();
-  static uint64_t AmountOfPhysicalMemoryImpl();
-  static uint64_t AmountOfAvailablePhysicalMemoryImpl();
+  static ByteSize AmountOfTotalPhysicalMemoryImpl();
+  static ByteSize AmountOfAvailablePhysicalMemoryImpl();
   static bool IsLowEndDeviceImpl();
   static HardwareInfo GetHardwareInfoSync();
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID) || \
     BUILDFLAG(IS_AIX)
-  static uint64_t AmountOfAvailablePhysicalMemory(
-      const SystemMemoryInfoKB& meminfo);
+  static ByteSize AmountOfAvailablePhysicalMemory(
+      const SystemMemoryInfo& meminfo);
 #endif
 
-  // Sets the amount of physical memory in MB for testing, thus allowing tests
-  // to run irrespective of the host machine's configuration.
-  static std::optional<uint64_t> SetAmountOfPhysicalMemoryMbForTesting(
-      uint64_t amount_of_memory_mb);
-  static void ClearAmountOfPhysicalMemoryMbForTesting();
+  // Sets the amount of physical memory for testing, thus allowing tests to run
+  // irrespective of the host machine's configuration.
+  static std::optional<ByteSize> SetAmountOfPhysicalMemoryForTesting(
+      ByteSize amount_of_memory);
+  static void ClearAmountOfPhysicalMemoryForTesting();
 };
 
 #if BUILDFLAG(IS_POSIX)

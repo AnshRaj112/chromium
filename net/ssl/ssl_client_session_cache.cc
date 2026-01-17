@@ -47,9 +47,10 @@ SSLClientSessionCache::SSLClientSessionCache(const Config& config)
     : clock_(base::DefaultClock::GetInstance()),
       config_(config),
       cache_(config.max_entries) {
-  memory_pressure_listener_ = std::make_unique<base::MemoryPressureListener>(
-      FROM_HERE, base::BindRepeating(&SSLClientSessionCache::OnMemoryPressure,
-                                     base::Unretained(this)));
+  memory_pressure_listener_registration_ =
+      std::make_unique<base::AsyncMemoryPressureListenerRegistration>(
+          FROM_HERE, base::MemoryPressureListenerTag::kSSLClientSessionCache,
+          this);
 }
 
 SSLClientSessionCache::~SSLClientSessionCache() {
@@ -58,6 +59,10 @@ SSLClientSessionCache::~SSLClientSessionCache() {
 
 size_t SSLClientSessionCache::size() const {
   return cache_.size();
+}
+
+size_t SSLClientSessionCache::max_size() const {
+  return cache_.max_size();
 }
 
 bssl::UniquePtr<SSL_SESSION> SSLClientSessionCache::Lookup(
@@ -84,11 +89,22 @@ bssl::UniquePtr<SSL_SESSION> SSLClientSessionCache::Lookup(
   return session;
 }
 
-void SSLClientSessionCache::Insert(const Key& cache_key,
+void SSLClientSessionCache::Insert(uint64_t generation_number,
+                                   const Key& cache_key,
                                    bssl::UniquePtr<SSL_SESSION> session) {
+  if (generation_number != generation_number_) {
+    return;
+  }
   auto iter = cache_.Get(cache_key);
-  if (iter == cache_.end())
+  if (iter == cache_.end()) {
     iter = cache_.Put(cache_key, Entry());
+  }
+
+  // Insertion can fail if the max size was zero due to memory pressure.
+  if (iter == cache_.end()) {
+    CHECK_EQ(cache_.max_size(), 0U);
+    return;
+  }
   iter->second.Push(std::move(session));
 }
 
@@ -105,6 +121,15 @@ void SSLClientSessionCache::ClearEarlyData(const Key& cache_key) {
 
 void SSLClientSessionCache::FlushForServers(
     const base::flat_set<HostPortPair>& servers) {
+  // The generation number is incremented here, which affects all hosts, even
+  // though this flush only applies to those matching `servers`. Only the
+  // sessions related to `servers` are cleared, so any other already cached
+  // sessions will remain valid despite the generation number changing. It
+  // could prevent sessions unrelated to `servers` that are in-flight at the
+  // time of this flush from being cached. That is not optimal but is a
+  // trade-off for implementation simplicity.
+  ++generation_number_;
+
   auto iter = cache_.begin();
   while (iter != cache_.end()) {
     if (servers.contains(iter->first.server)) {
@@ -116,6 +141,7 @@ void SSLClientSessionCache::FlushForServers(
 }
 
 void SSLClientSessionCache::Flush() {
+  ++generation_number_;
   cache_.Clear();
 }
 
@@ -188,15 +214,16 @@ void SSLClientSessionCache::FlushExpiredSessions() {
 }
 
 void SSLClientSessionCache::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level) {
+    base::MemoryPressureLevel memory_pressure_level) {
   switch (memory_pressure_level) {
-    case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE:
+    case base::MEMORY_PRESSURE_LEVEL_NONE:
+      cache_.UpdateMaxSize(config_.max_entries);
       break;
-    case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_MODERATE:
-      FlushExpiredSessions();
+    case base::MEMORY_PRESSURE_LEVEL_MODERATE:
+      cache_.UpdateMaxSize(config_.max_entries / 2);
       break;
-    case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL:
-      Flush();
+    case base::MEMORY_PRESSURE_LEVEL_CRITICAL:
+      cache_.UpdateMaxSize(0);
       break;
   }
 }

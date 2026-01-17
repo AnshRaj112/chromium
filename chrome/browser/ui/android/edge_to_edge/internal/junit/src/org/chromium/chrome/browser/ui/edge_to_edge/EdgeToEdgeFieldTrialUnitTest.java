@@ -19,7 +19,6 @@ import org.chromium.chrome.browser.flags.ChromeFeatureList;
 
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(shadows = ShadowBuild.class)
-@EnableFeatures(ChromeFeatureList.EDGE_TO_EDGE_BOTTOM_CHIN)
 public class EdgeToEdgeFieldTrialUnitTest {
 
     @Before
@@ -179,6 +178,8 @@ public class EdgeToEdgeFieldTrialUnitTest {
                 everywhereOverrides.isEnabledForManufacturerVersion());
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void testInvalidInputs_unevenLength() {
         ChromeFeatureList.sEdgeToEdgeBottomChinOemList.setForTesting("foobar");
@@ -190,6 +191,8 @@ public class EdgeToEdgeFieldTrialUnitTest {
                         .isEnabledForManufacturerVersion());
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void testInvalidInputs_unevenLength_2() {
         ChromeFeatureList.sEdgeToEdgeBottomChinOemList.setForTesting("foo,bar");
@@ -201,6 +204,8 @@ public class EdgeToEdgeFieldTrialUnitTest {
                         .isEnabledForManufacturerVersion());
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void testInvalidInputs_versionInvalid() {
         ChromeFeatureList.sEdgeToEdgeBottomChinOemList.setForTesting("foo,bar");

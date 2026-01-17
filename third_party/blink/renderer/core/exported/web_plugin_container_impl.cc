@@ -186,6 +186,12 @@ void WebPluginContainerImpl::Paint(GraphicsContext& context,
         visual_rect);
   }
 
+  if (element_->GetTrackedElementRect()) {
+    context.GetPaintController().RecordTrackedElementData(
+        *GetLayoutEmbeddedContent(), element_->GetTrackedElementRect()->id,
+        visual_rect);
+  }
+
   if (layer_) {
     layer_->SetBounds(Size());
     layer_->SetIsDrawable(true);
@@ -380,8 +386,8 @@ bool WebPluginContainerImpl::IsMouseLocked() {
 bool WebPluginContainerImpl::LockMouse(bool request_unadjusted_movement) {
   if (Page* page = element_->GetDocument().GetPage()) {
     bool res = page->GetPointerLockController().RequestPointerLock(
-        element_, WTF::BindOnce(&WebPluginContainerImpl::HandleLockMouseResult,
-                                WrapWeakPersistent(this)));
+        element_, BindOnce(&WebPluginContainerImpl::HandleLockMouseResult,
+                           WrapWeakPersistent(this)));
     if (res) {
       mouse_lock_lost_listener_ =
           MakeGarbageCollected<MouseLockLostListener>(this);

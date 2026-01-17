@@ -12,6 +12,7 @@ import {ColorChangeUpdater} from 'chrome://resources/cr_components/color_change_
 import type {CrButtonElement} from 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import {assert} from 'chrome://resources/js/assert.js';
 import {EventTracker} from 'chrome://resources/js/event_tracker.js';
+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 import type {PropertyValues} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
@@ -27,6 +28,7 @@ const SAMPLE_DATA: SignoutConfirmationData = {
   dialogSubtitle: '',
   acceptButtonLabel: '',
   cancelButtonLabel: '',
+  verifyButtonLabel: '',
   accountExtensions: [],
   hasUnsyncedData: false,
 };
@@ -36,6 +38,7 @@ export interface SignoutConfirmationAppElement {
     signoutConfirmationDialog: HTMLElement,
     acceptButton: CrButtonElement,
     cancelButton: CrButtonElement,
+    verifyReauthButton: CrButtonElement,
   };
 }
 
@@ -55,10 +58,15 @@ export class SignoutConfirmationAppElement extends CrLitElement {
   static override get properties() {
     return {
       data_: {type: Object},
+
+      isUnoPhase2FollowUpEnabled_: {type: Boolean},
     };
   }
 
   protected accessor data_: SignoutConfirmationData = SAMPLE_DATA;
+
+  protected accessor isUnoPhase2FollowUpEnabled_: boolean =
+      loadTimeData.getBoolean('isUnoPhase2FollowUpEnabled');
 
   private eventTracker_: EventTracker = new EventTracker();
 
@@ -124,6 +132,10 @@ export class SignoutConfirmationAppElement extends CrLitElement {
     return this.showExtensionsSection_() && this.data_.hasUnsyncedData;
   }
 
+  protected showVerifyReauthButton_(): boolean {
+    return !!this.data_.verifyButtonLabel;
+  }
+
   protected onAcceptButtonClick_() {
     this.signoutConfirmationBrowserProxy_.handler.accept(
         this.uninstallExtensionsOnSignout_());
@@ -132,6 +144,10 @@ export class SignoutConfirmationAppElement extends CrLitElement {
   protected onCancelButtonClick_() {
     this.signoutConfirmationBrowserProxy_.handler.cancel(
         this.uninstallExtensionsOnSignout_());
+  }
+
+  protected onVerifyReauthButtonClick_() {
+    this.signoutConfirmationBrowserProxy_.handler.performReauth();
   }
 
   // Request the browser to update the native view to match the current height

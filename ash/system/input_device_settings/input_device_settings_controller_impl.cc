@@ -17,8 +17,6 @@
 #include "ash/login/login_screen_controller.h"
 #include "ash/public/cpp/accelerators_util.h"
 #include "ash/public/cpp/input_device_settings_controller.h"
-#include "ash/public/mojom/input_device_settings.mojom-forward.h"
-#include "ash/public/mojom/input_device_settings.mojom-shared.h"
 #include "ash/public/mojom/input_device_settings.mojom.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
@@ -40,12 +38,10 @@
 #include "ash/system/input_device_settings/pref_handlers/pointing_stick_pref_handler_impl.h"
 #include "ash/system/input_device_settings/pref_handlers/touchpad_pref_handler_impl.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_tree.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/hash/sha1.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/strcat.h"
@@ -69,6 +65,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/events/ash/keyboard_capability.h"
+#include "ui/events/ash/mojom/extended_fkeys_modifier.mojom.h"
 #include "ui/events/ash/top_row_action_keys.h"
 #include "ui/events/devices/input_device.h"
 #include "ui/events/devices/keyboard_device.h"
@@ -389,8 +386,8 @@ bool KeyboardSettingsAreValid(
     const mojom::Keyboard& keyboard,
     const mojom::KeyboardSettings& settings,
     const mojom::KeyboardPolicies& keyboard_policies) {
-  const bool containsFnKey =
-      base::Contains(keyboard.modifier_keys, ui::mojom::ModifierKey::kFunction);
+  const bool containsFnKey = std::ranges::contains(
+      keyboard.modifier_keys, ui::mojom::ModifierKey::kFunction);
 
   for (const auto& remapping : settings.modifier_remappings) {
     auto it = std::ranges::find(keyboard.modifier_keys, remapping.first);
@@ -825,8 +822,10 @@ void InputDeviceSettingsControllerImpl::
             GetBluetoothDevice(bluetooth_adapter_.get(), keyboard->device_key);
         device != nullptr) {
       auto updated_battery_info = GetBatteryInfo(*device);
-      if (keyboard->battery_info.is_null() ||
-          BatteryInfoChanged(*keyboard->battery_info, *updated_battery_info)) {
+      if (!updated_battery_info.is_null() &&
+          (keyboard->battery_info.is_null() ||
+           BatteryInfoChanged(*keyboard->battery_info,
+                              *updated_battery_info))) {
         keyboard->battery_info = std::move(updated_battery_info);
         DispatchKeyboardBatteryInfoChanged(id);
       }
@@ -838,8 +837,10 @@ void InputDeviceSettingsControllerImpl::
             GetBluetoothDevice(bluetooth_adapter_.get(), touchpad->device_key);
         device != nullptr) {
       auto updated_battery_info = GetBatteryInfo(*device);
-      if (touchpad->battery_info.is_null() ||
-          BatteryInfoChanged(*touchpad->battery_info, *updated_battery_info)) {
+      if (!updated_battery_info.is_null() &&
+          (touchpad->battery_info.is_null() ||
+           BatteryInfoChanged(*touchpad->battery_info,
+                              *updated_battery_info))) {
         touchpad->battery_info = std::move(updated_battery_info);
         DispatchTouchpadBatteryInfoChanged(id);
       }
@@ -851,8 +852,9 @@ void InputDeviceSettingsControllerImpl::
             GetBluetoothDevice(bluetooth_adapter_.get(), mouse->device_key);
         device != nullptr) {
       auto updated_battery_info = GetBatteryInfo(*device);
-      if (mouse->battery_info.is_null() ||
-          BatteryInfoChanged(*mouse->battery_info, *updated_battery_info)) {
+      if (!updated_battery_info.is_null() &&
+          (mouse->battery_info.is_null() ||
+           BatteryInfoChanged(*mouse->battery_info, *updated_battery_info))) {
         mouse->battery_info = std::move(updated_battery_info);
         DispatchMouseBatteryInfoChanged(id);
       }
@@ -864,9 +866,10 @@ void InputDeviceSettingsControllerImpl::
                                           graphics_tablet->device_key);
         device != nullptr) {
       auto updated_battery_info = GetBatteryInfo(*device);
-      if (graphics_tablet->battery_info.is_null() ||
-          BatteryInfoChanged(*graphics_tablet->battery_info,
-                             *updated_battery_info)) {
+      if (!updated_battery_info.is_null() &&
+          (graphics_tablet->battery_info.is_null() ||
+           BatteryInfoChanged(*graphics_tablet->battery_info,
+                              *updated_battery_info))) {
         graphics_tablet->battery_info = std::move(updated_battery_info);
         DispatchGraphicsTabletBatteryInfoChanged(id);
       }
@@ -1833,7 +1836,7 @@ void InputDeviceSettingsControllerImpl::RecordComboDeviceMetric(
 }
 
 void InputDeviceSettingsControllerImpl::DispatchKeyboardConnected(DeviceId id) {
-  DCHECK(base::Contains(keyboards_, id));
+  DCHECK(keyboards_.contains(id));
   const auto& keyboard = *keyboards_.at(id);
   for (auto& observer : observers_) {
     observer.OnKeyboardConnected(keyboard);
@@ -1843,7 +1846,7 @@ void InputDeviceSettingsControllerImpl::DispatchKeyboardConnected(DeviceId id) {
 
 void InputDeviceSettingsControllerImpl::
     DispatchKeyboardDisconnectedAndEraseFromList(DeviceId id) {
-  DCHECK(base::Contains(keyboards_, id));
+  DCHECK(keyboards_.contains(id));
   auto keyboard_iter = keyboards_.find(id);
   auto keyboard = std::move(keyboard_iter->second);
   keyboards_.erase(keyboard_iter);
@@ -1854,7 +1857,7 @@ void InputDeviceSettingsControllerImpl::
 
 void InputDeviceSettingsControllerImpl::DispatchKeyboardSettingsChanged(
     DeviceId id) {
-  DCHECK(base::Contains(keyboards_, id));
+  DCHECK(keyboards_.contains(id));
   const auto& keyboard = *keyboards_.at(id);
   for (auto& observer : observers_) {
     observer.OnKeyboardSettingsUpdated(keyboard);
@@ -1862,7 +1865,7 @@ void InputDeviceSettingsControllerImpl::DispatchKeyboardSettingsChanged(
 }
 
 void InputDeviceSettingsControllerImpl::DispatchTouchpadConnected(DeviceId id) {
-  DCHECK(base::Contains(touchpads_, id));
+  DCHECK(touchpads_.contains(id));
   const auto& touchpad = *touchpads_.at(id);
   for (auto& observer : observers_) {
     observer.OnTouchpadConnected(touchpad);
@@ -1871,7 +1874,7 @@ void InputDeviceSettingsControllerImpl::DispatchTouchpadConnected(DeviceId id) {
 
 void InputDeviceSettingsControllerImpl::
     DispatchTouchpadDisconnectedAndEraseFromList(DeviceId id) {
-  DCHECK(base::Contains(touchpads_, id));
+  DCHECK(touchpads_.contains(id));
   auto touchpad_iter = touchpads_.find(id);
   auto touchpad = std::move(touchpad_iter->second);
   touchpads_.erase(touchpad_iter);
@@ -1882,7 +1885,7 @@ void InputDeviceSettingsControllerImpl::
 
 void InputDeviceSettingsControllerImpl::DispatchTouchpadSettingsChanged(
     DeviceId id) {
-  DCHECK(base::Contains(touchpads_, id));
+  DCHECK(touchpads_.contains(id));
   const auto& touchpad = *touchpads_.at(id);
   for (auto& observer : observers_) {
     observer.OnTouchpadSettingsUpdated(touchpad);
@@ -1890,7 +1893,7 @@ void InputDeviceSettingsControllerImpl::DispatchTouchpadSettingsChanged(
 }
 
 void InputDeviceSettingsControllerImpl::DispatchMouseConnected(DeviceId id) {
-  DCHECK(base::Contains(mice_, id));
+  DCHECK(mice_.contains(id));
   const auto& mouse = *mice_.at(id);
   for (auto& observer : observers_) {
     observer.OnMouseConnected(mouse);
@@ -1900,7 +1903,7 @@ void InputDeviceSettingsControllerImpl::DispatchMouseConnected(DeviceId id) {
 
 void InputDeviceSettingsControllerImpl::
     DispatchMouseDisconnectedAndEraseFromList(DeviceId id) {
-  DCHECK(base::Contains(mice_, id));
+  DCHECK(mice_.contains(id));
   auto mouse_iter = mice_.find(id);
   auto mouse = std::move(mouse_iter->second);
   mice_.erase(mouse_iter);
@@ -1911,7 +1914,7 @@ void InputDeviceSettingsControllerImpl::
 
 void InputDeviceSettingsControllerImpl::DispatchMouseSettingsChanged(
     DeviceId id) {
-  DCHECK(base::Contains(mice_, id));
+  DCHECK(mice_.contains(id));
   const auto& mouse = *mice_.at(id);
   for (auto& observer : observers_) {
     observer.OnMouseSettingsUpdated(mouse);
@@ -1920,7 +1923,7 @@ void InputDeviceSettingsControllerImpl::DispatchMouseSettingsChanged(
 
 void InputDeviceSettingsControllerImpl::DispatchPointingStickConnected(
     DeviceId id) {
-  DCHECK(base::Contains(pointing_sticks_, id));
+  DCHECK(pointing_sticks_.contains(id));
   const auto& pointing_stick = *pointing_sticks_.at(id);
   for (auto& observer : observers_) {
     observer.OnPointingStickConnected(pointing_stick);
@@ -1929,7 +1932,7 @@ void InputDeviceSettingsControllerImpl::DispatchPointingStickConnected(
 
 void InputDeviceSettingsControllerImpl::
     DispatchPointingStickDisconnectedAndEraseFromList(DeviceId id) {
-  DCHECK(base::Contains(pointing_sticks_, id));
+  DCHECK(pointing_sticks_.contains(id));
   auto pointing_stick_iter = pointing_sticks_.find(id);
   auto pointing_stick = std::move(pointing_stick_iter->second);
   pointing_sticks_.erase(pointing_stick_iter);
@@ -1940,7 +1943,7 @@ void InputDeviceSettingsControllerImpl::
 
 void InputDeviceSettingsControllerImpl::DispatchPointingStickSettingsChanged(
     DeviceId id) {
-  DCHECK(base::Contains(pointing_sticks_, id));
+  DCHECK(pointing_sticks_.contains(id));
   const auto& pointing_stick = *pointing_sticks_.at(id);
   for (auto& observer : observers_) {
     observer.OnPointingStickSettingsUpdated(pointing_stick);
@@ -1949,7 +1952,7 @@ void InputDeviceSettingsControllerImpl::DispatchPointingStickSettingsChanged(
 
 void InputDeviceSettingsControllerImpl::DispatchGraphicsTabletConnected(
     DeviceId id) {
-  DCHECK(base::Contains(graphics_tablets_, id));
+  DCHECK(graphics_tablets_.contains(id));
   const auto& graphics_tablet = *graphics_tablets_.at(id);
   for (auto& observer : observers_) {
     observer.OnGraphicsTabletConnected(graphics_tablet);
@@ -1958,7 +1961,7 @@ void InputDeviceSettingsControllerImpl::DispatchGraphicsTabletConnected(
 
 void InputDeviceSettingsControllerImpl::
     DispatchGraphicsTabletDisconnectedAndEraseFromList(DeviceId id) {
-  DCHECK(base::Contains(graphics_tablets_, id));
+  DCHECK(graphics_tablets_.contains(id));
   auto graphics_tablet_iter = graphics_tablets_.find(id);
   auto graphics_tablet = std::move(graphics_tablet_iter->second);
   graphics_tablets_.erase(graphics_tablet_iter);
@@ -1969,7 +1972,7 @@ void InputDeviceSettingsControllerImpl::
 
 void InputDeviceSettingsControllerImpl::DispatchGraphicsTabletSettingsChanged(
     DeviceId id) {
-  DCHECK(base::Contains(graphics_tablets_, id));
+  DCHECK(graphics_tablets_.contains(id));
   const auto& graphics_tablet = *graphics_tablets_.at(id);
   for (auto& observer : observers_) {
     observer.OnGraphicsTabletSettingsUpdated(graphics_tablet);
@@ -2156,11 +2159,17 @@ void InputDeviceSettingsControllerImpl::OnGraphicsTabletListUpdated(
 
 void InputDeviceSettingsControllerImpl::RestoreDefaultKeyboardRemappings(
     DeviceId id) {
-  DCHECK(base::Contains(keyboards_, id));
+  DCHECK(keyboards_.contains(id));
   auto& keyboard = *keyboards_.at(id);
   mojom::KeyboardSettingsPtr new_settings = keyboard.settings->Clone();
   new_settings->modifier_remappings = {};
   new_settings->six_pack_key_remappings = mojom::SixPackKeyInfo::New();
+  if (new_settings->f11.has_value()) {
+    new_settings->f11 = ui::mojom::ExtendedFkeysModifier::kDisabled;
+  }
+  if (new_settings->f12.has_value()) {
+    new_settings->f12 = ui::mojom::ExtendedFkeysModifier::kDisabled;
+  }
   if (keyboard.meta_key == ui::mojom::MetaKey::kCommand) {
     new_settings->modifier_remappings[ui::mojom::ModifierKey::kControl] =
         ui::mojom::ModifierKey::kMeta;
@@ -2591,7 +2600,7 @@ void InputDeviceSettingsControllerImpl::DispatchCustomizablePenButtonPressed(
 
 void InputDeviceSettingsControllerImpl::DispatchKeyboardBatteryInfoChanged(
     DeviceId id) {
-  CHECK(base::Contains(keyboards_, id));
+  CHECK(keyboards_.contains(id));
   CHECK(features::IsWelcomeExperienceEnabled());
   const auto& keyboard = *keyboards_.at(id);
   for (auto& observer : observers_) {
@@ -2601,7 +2610,7 @@ void InputDeviceSettingsControllerImpl::DispatchKeyboardBatteryInfoChanged(
 
 void InputDeviceSettingsControllerImpl::
     DispatchGraphicsTabletBatteryInfoChanged(DeviceId id) {
-  CHECK(base::Contains(graphics_tablets_, id));
+  CHECK(graphics_tablets_.contains(id));
   CHECK(features::IsWelcomeExperienceEnabled());
   const auto& graphics_tablet = *graphics_tablets_.at(id);
   for (auto& observer : observers_) {
@@ -2611,7 +2620,7 @@ void InputDeviceSettingsControllerImpl::
 
 void InputDeviceSettingsControllerImpl::DispatchMouseBatteryInfoChanged(
     DeviceId id) {
-  CHECK(base::Contains(mice_, id));
+  CHECK(mice_.contains(id));
   CHECK(features::IsWelcomeExperienceEnabled());
   const auto& mouse = *mice_.at(id);
   for (auto& observer : observers_) {
@@ -2621,7 +2630,7 @@ void InputDeviceSettingsControllerImpl::DispatchMouseBatteryInfoChanged(
 
 void InputDeviceSettingsControllerImpl::DispatchTouchpadBatteryInfoChanged(
     DeviceId id) {
-  CHECK(base::Contains(touchpads_, id));
+  CHECK(touchpads_.contains(id));
   CHECK(features::IsWelcomeExperienceEnabled());
   const auto& touchpad = *touchpads_.at(id);
   for (auto& observer : observers_) {

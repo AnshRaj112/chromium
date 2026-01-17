@@ -4,6 +4,7 @@
 
 #include "ash/system/holding_space/holding_space_view_delegate.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "ash/constants/ash_features.h"
@@ -23,7 +24,6 @@
 #include "ash/system/holding_space/holding_space_tray.h"
 #include "ash/system/holding_space/holding_space_tray_bubble.h"
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
 #include "base/task/sequenced_task_runner.h"
@@ -33,6 +33,7 @@
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
 #include "ui/base/dragdrop/mojom/drag_drop_types.mojom.h"
+#include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/base/dragdrop/os_exchange_data_provider.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
@@ -153,7 +154,7 @@ HoldingSpaceViewDelegate::HoldingSpaceViewDelegate(
 
   // Multi-select is the only selection UI in tablet mode. Outside of tablet
   // mode, selection UI is based on the `selection_size_`.
-  selection_ui_ = display::Screen::GetScreen()->InTabletMode()
+  selection_ui_ = display::Screen::Get()->InTabletMode()
                       ? SelectionUi::kMultiSelect
                       : SelectionUi::kSingleSelect;
 }
@@ -519,7 +520,7 @@ void HoldingSpaceViewDelegate::ExecuteCommand(int command, int event_flags) {
           [](const std::vector<const HoldingSpaceItem*>& items,
              std::vector<base::FilePath>& suggested_file_paths,
              const HoldingSpaceItem* item) {
-            const bool remove = base::Contains(items, item);
+            const bool remove = std::ranges::contains(items, item);
             if (remove) {
               if (HoldingSpaceItem::IsSuggestionType(item->type())) {
                 suggested_file_paths.push_back(item->file().file_path);
@@ -751,7 +752,7 @@ void HoldingSpaceViewDelegate::SetSelection(
 
   if (bubble_) {  // May be `nullptr` in testing.
     for (HoldingSpaceItemView* view : bubble_->GetHoldingSpaceItemViews()) {
-      view->SetSelected(base::Contains(item_ids, view->item_id()));
+      view->SetSelected(std::ranges::contains(item_ids, view->item_id()));
       if (view->selected())
         selection.push_back(view);
     }
@@ -787,7 +788,7 @@ void HoldingSpaceViewDelegate::SetSelectedRange(HoldingSpaceItemView* start,
 
 void HoldingSpaceViewDelegate::UpdateSelectionUi() {
   const SelectionUi selection_ui =
-      display::Screen::GetScreen()->InTabletMode() || selection_size_ > 1u
+      display::Screen::Get()->InTabletMode() || selection_size_ > 1u
           ? SelectionUi::kMultiSelect
           : SelectionUi::kSingleSelect;
 

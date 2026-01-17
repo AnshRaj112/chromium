@@ -27,6 +27,7 @@ import android.widget.LinearLayout;
 
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.view.ViewCompat;
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
 
@@ -233,6 +234,8 @@ public class TabListEditorMenuTest {
                                     new TabListEditorMenuAdapter());
                     mPropertyListModel.addObserver(mChangeProcessor);
                 });
+
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
     }
 
     @After
@@ -534,7 +537,7 @@ public class TabListEditorMenuTest {
                                     ShowMode.IF_ROOM,
                                     ButtonType.ICON,
                                     IconPosition.END,
-                                    R.plurals.tab_selection_editor_group_tabs,
+                                    R.plurals.tab_selection_editor_pin_tabs,
                                     R.drawable.ic_widgets));
                     configureMenuWithActions(actions);
                 });
@@ -571,7 +574,7 @@ public class TabListEditorMenuTest {
                                     ShowMode.IF_ROOM,
                                     ButtonType.ICON,
                                     IconPosition.START,
-                                    R.plurals.tab_selection_editor_group_tabs,
+                                    R.plurals.tab_selection_editor_pin_tabs,
                                     R.drawable.ic_widgets));
                     configureMenuWithActions(actions);
                 });
@@ -623,7 +626,7 @@ public class TabListEditorMenuTest {
                                     ShowMode.IF_ROOM,
                                     ButtonType.ICON,
                                     IconPosition.START,
-                                    R.plurals.tab_selection_editor_group_tabs,
+                                    R.plurals.tab_selection_editor_pin_tabs,
                                     R.drawable.ic_widgets));
                     configureMenuWithActions(actions);
                     actions.get(0).setShouldEnableAction(false);
@@ -661,7 +664,7 @@ public class TabListEditorMenuTest {
                                     ShowMode.MENU_ONLY,
                                     ButtonType.ICON,
                                     IconPosition.START,
-                                    R.plurals.tab_selection_editor_group_tabs,
+                                    R.plurals.tab_selection_editor_pin_tabs,
                                     R.drawable.ic_widgets));
                     configureMenuWithActions(actions);
                 });
@@ -677,7 +680,7 @@ public class TabListEditorMenuTest {
         PopupListener listener = new PopupListener();
         openMenu(listener);
         assertMenuItem("Close tab", true);
-        assertMenuItem("Group tab", false);
+        assertMenuItem("Pin tab", false);
         forceFinishRollAnimation();
         mRenderTestRule.render(
                 mTabListEditorMenu.getContentView(), "twoMenuItemsPartlyDisabled_Menu");

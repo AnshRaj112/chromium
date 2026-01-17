@@ -39,6 +39,7 @@ export interface ServiceInterface extends ActivityLogDelegate,
   shouldIgnoreUpdate(
       extensionId: string,
       eventType: chrome.developerPrivate.EventType): boolean;
+  showSiteSettings(extensionId: string): void;
 }
 
 export class Service implements ServiceInterface {
@@ -74,7 +75,21 @@ export class Service implements ServiceInterface {
   }
 
   getExtensionSize(id: string) {
-    return chrome.developerPrivate.getExtensionSize(id);
+    return chrome.developerPrivate.getExtensionSize(id).catch(error => {
+      // The extension is no longer in the system so we should no longer
+      // remain on this page. It's safe to catch this error here because
+      // `ExtensionsManagerElement` should navigate back to the LIST page if
+      // an extension for an extension specific page (such as this one) is
+      // uninstalled.
+      // For this API call, check that this should be the only error message
+      // that could be returned.
+      if (error.message !==
+          `No such extension found for call to ` +
+              `'developerPrivate.getExtensionSize'.`) {
+        throw error;
+      }
+      return '';
+    });
   }
 
   addRuntimeHostPermission(id: string, host: string): Promise<void> {
@@ -270,6 +285,27 @@ export class Service implements ServiceInterface {
     });
   }
 
+  openDevToolsForError(error: chrome.developerPrivate.RuntimeError): void {
+    const devToolsProperties: chrome.developerPrivate.OpenDevToolsProperties = {
+      extensionId: error.extensionId,
+      renderProcessId: error.renderProcessId,
+      renderViewId: error.renderViewId,
+      incognito: error.fromIncognito,
+      isServiceWorker: error.isServiceWorker,
+    };
+
+    // Get stack trace information if available to open the correct file and
+    // line.
+    const stackFrame = error.stackTrace && error.stackTrace[0];
+    if (stackFrame) {
+      devToolsProperties.url = stackFrame.url;
+      devToolsProperties.lineNumber = stackFrame.lineNumber;
+      devToolsProperties.columnNumber = stackFrame.columnNumber;
+    }
+
+    chrome.developerPrivate.openDevTools(devToolsProperties);
+  }
+
   openUrl(url: string): void {
     window.open(url);
   }
@@ -358,14 +394,16 @@ export class Service implements ServiceInterface {
           chrome.metricsPrivate.recordUserAction('Options_UpdateExtensions');
           return new Promise<void>((resolve, reject) => {
             const loadLocalExtensions = async () => {
-              for (const extension of extensions) {
-                if (extension.location === 'UNPACKED') {
-                  try {
-                    await this.reloadItem(extension.id);
-                  } catch (loadError) {
-                    reject(loadError);
-                    break;
-                  }
+              const unpackedExtensions = extensions.filter(
+                  (ext) => ext.location ===
+                      chrome.developerPrivate.Location.UNPACKED);
+
+              for (const extension of unpackedExtensions) {
+                try {
+                  await this.reloadItem(extension.id);
+                } catch (loadError) {
+                  reject(loadError);
+                  break;
                 }
               }
               resolve();
@@ -546,6 +584,10 @@ export class Service implements ServiceInterface {
 
   uploadItemToAccount(id: string): Promise<boolean> {
     return chrome.developerPrivate.uploadExtensionToAccount(id);
+  }
+
+  showSiteSettings(extensionId: string) {
+    chrome.developerPrivate.showSiteSettings(extensionId);
   }
 
   static getInstance(): ServiceInterface {

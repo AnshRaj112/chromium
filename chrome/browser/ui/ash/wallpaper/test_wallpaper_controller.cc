@@ -28,7 +28,8 @@ namespace {
 inline constexpr uint64_t kTestTimeOfDayUnitId = 17;
 }  // namespace
 
-TestWallpaperController::TestWallpaperController() : id_cache_(0) {
+TestWallpaperController::TestWallpaperController()
+    : id_cache_(DailyGooglePhotosIdCache::NO_AUTO_EVICT) {
   ClearCounts();
 }
 
@@ -64,14 +65,6 @@ void TestWallpaperController::SetClient(
 void TestWallpaperController::SetDriveFsDelegate(
     std::unique_ptr<ash::WallpaperDriveFsDelegate> drivefs_delegate) {
   NOTIMPLEMENTED_LOG_ONCE();
-}
-
-void TestWallpaperController::Init(
-    const base::FilePath& user_data,
-    const base::FilePath& wallpapers,
-    const base::FilePath& custom_wallpapers,
-    const base::FilePath& device_policy_wallpaper) {
-  NOTIMPLEMENTED();
 }
 
 bool TestWallpaperController::CanSetUserWallpaper(

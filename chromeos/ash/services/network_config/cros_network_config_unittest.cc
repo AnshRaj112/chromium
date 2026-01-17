@@ -4,11 +4,11 @@
 
 #include "chromeos/ash/services/network_config/cros_network_config.h"
 
+#include <algorithm>
 #include <tuple>
 
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
@@ -55,7 +55,6 @@
 #include "chromeos/ash/services/network_config/test_network_configuration_observer.h"
 #include "chromeos/components/onc/onc_utils.h"
 #include "chromeos/constants/chromeos_features.h"
-#include "chromeos/services/network_config/public/mojom/cros_network_config.mojom-forward.h"
 #include "chromeos/services/network_config/public/mojom/cros_network_config.mojom-shared.h"
 #include "chromeos/services/network_config/public/mojom/network_types.mojom-shared.h"
 #include "components/captive_portal/core/captive_portal_detector.h"
@@ -1409,7 +1408,7 @@ TEST_F(CrosNetworkConfigTest, PortalState) {
   EXPECT_EQ(mojom::ConnectionStateType::kPortal, network->connection_state);
   EXPECT_EQ(mojom::PortalState::kPortalSuspected, network->portal_state);
   ASSERT_TRUE(network->portal_probe_url);
-  EXPECT_EQ(captive_portal::CaptivePortalDetector::kDefaultURL,
+  EXPECT_EQ(captive_portal::CaptivePortalDetector::GetDefaultUrl(),
             *network->portal_probe_url);
 
   helper()->ConfigureService(
@@ -1849,7 +1848,7 @@ TEST_F(CrosNetworkConfigTest, GetDeviceStateListNoVpnServices) {
       NetworkHandler::Get()
           ->prohibited_technologies_handler()
           ->GetCurrentlyProhibitedTechnologies();
-  ASSERT_FALSE(base::Contains(prohibited_technologies, shill::kTypeVPN));
+  ASSERT_FALSE(std::ranges::contains(prohibited_technologies, shill::kTypeVPN));
 
   EXPECT_FALSE(ContainsVpnDeviceState(GetDeviceStateList()));
 }
@@ -4167,12 +4166,13 @@ TEST_F(CrosNetworkConfigTest, SetCellularSimState) {
 
 TEST_F(CrosNetworkConfigTest, SelectCellularMobileNetwork) {
   // Create fake list of found networks.
-  std::optional<base::Value> found_networks_list =
-      base::JSONReader::Read(base::StringPrintf(
+  std::optional<base::Value> found_networks_list = base::JSONReader::Read(
+      base::StringPrintf(
           R"([{"network_id": "network1", "technology": "GSM",
                "status": "current"},
               {"network_id": "network2", "technology": "GSM",
-               "status": "available"}])"));
+               "status": "available"}])"),
+      base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   helper()->device_test()->SetDeviceProperty(
       kCellularDevicePath, shill::kFoundNetworksProperty, *found_networks_list,
       /*notify_changed=*/true);

@@ -298,7 +298,7 @@ TEST_F(SandboxWinTest, AppContainerCheckProfile) {
         kLpacIdentityServices, kLpacCryptoServices, kLpacChromeInstallFiles,
         kRegistryRead},
        {}},
-      {sandbox::mojom::Sandbox::kWindowsSystemProxyResolver,
+      {sandbox::mojom::Sandbox::kProxyResolver,
        L"S-1-15-2-1733900417-1595997880-1847635518-1308794714-877418578-"
        L"3685220290-3324296907",
        true,
@@ -448,61 +448,56 @@ TEST_F(SandboxWinTest, GeneratedPolicyTestNoSandbox) {
 }
 
 TEST_F(SandboxWinTest, GetJobMemoryLimit) {
-  constexpr uint64_t k8GB = 8192;
 #if defined(ARCH_CPU_64_BITS)
-  constexpr uint64_t kGB = 1024 * 1024 * 1024;
-  constexpr uint64_t k65GB = 66560;
-  constexpr uint64_t k33GB = 33792;
-  constexpr uint64_t k17GB = 17408;
-
   // Test GPU with physical memory > 64GB.
   {
-    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(k65GB);
+    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(
+        base::GiBU(65));
     std::optional<size_t> memory_limit =
         SandboxWin::GetJobMemoryLimit(sandbox::mojom::Sandbox::kGpu);
-    EXPECT_TRUE(memory_limit.has_value());
-    EXPECT_EQ(memory_limit, 64 * kGB);
+    EXPECT_THAT(memory_limit, ::testing::Optional(base::GiBU(64).InBytes()));
   }
 
   // Test GPU with physical memory > 32GB
   {
-    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(k33GB);
+    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(
+        base::GiBU(33));
     std::optional<size_t> memory_limit =
         SandboxWin::GetJobMemoryLimit(sandbox::mojom::Sandbox::kGpu);
-    EXPECT_TRUE(memory_limit.has_value());
-    EXPECT_EQ(memory_limit, 32 * kGB);
+    EXPECT_THAT(memory_limit, ::testing::Optional(base::GiBU(32).InBytes()));
   }
 
   // Test GPU with physical memory > 16GB
   {
-    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(k17GB);
+    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(
+        base::GiBU(17));
     std::optional<size_t> memory_limit =
         SandboxWin::GetJobMemoryLimit(sandbox::mojom::Sandbox::kGpu);
-    EXPECT_TRUE(memory_limit.has_value());
-    EXPECT_EQ(memory_limit, 16 * kGB);
+    EXPECT_THAT(memory_limit, ::testing::Optional(base::GiBU(16).InBytes()));
   }
 
   // Test GPU with physical memory < 16GB
   {
-    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(k8GB);
+    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(
+        base::GiBU(8));
     std::optional<size_t> memory_limit =
         SandboxWin::GetJobMemoryLimit(sandbox::mojom::Sandbox::kGpu);
-    EXPECT_TRUE(memory_limit.has_value());
-    EXPECT_EQ(memory_limit, 8 * kGB);
+    EXPECT_THAT(memory_limit, ::testing::Optional(base::GiBU(8).InBytes()));
   }
 
   // Test that Renderer has high (1TB) memory limit.
   {
-    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(k8GB);
+    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(
+        base::GiBU(8));
     std::optional<size_t> memory_limit =
         SandboxWin::GetJobMemoryLimit(sandbox::mojom::Sandbox::kRenderer);
-    EXPECT_TRUE(memory_limit.has_value());
-    EXPECT_EQ(memory_limit, 1024 * kGB);
+    EXPECT_THAT(memory_limit, ::testing::Optional(base::TiBU(1).InBytes()));
   }
 #else
   // Test 32-bit processes don't get a limit.
   {
-    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(k8GB);
+    base::test::ScopedAmountOfPhysicalMemoryOverride memory_override(
+        base::GiBU(8));
     std::optional<size_t> memory_limit =
         SandboxWin::GetJobMemoryLimit(sandbox::mojom::Sandbox::kRenderer);
     EXPECT_FALSE(memory_limit.has_value());

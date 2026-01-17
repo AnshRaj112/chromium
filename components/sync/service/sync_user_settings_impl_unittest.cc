@@ -9,6 +9,7 @@
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
+#include "components/os_crypt/async/common/encryptor.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/testing_pref_service.h"
 #include "components/saved_tab_groups/public/pref_names.h"
@@ -23,6 +24,7 @@
 #include "components/sync/service/glue/sync_transport_data_prefs.h"
 #include "components/sync/service/sync_prefs.h"
 #include "components/sync/service/sync_service_crypto.h"
+#include "components/sync/test/sync_service_crypto_test_utils.h"
 #include "components/trusted_vault/test/fake_trusted_vault_client.h"
 #include "google_apis/gaia/gaia_id.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -112,6 +114,11 @@ class SyncUserSettingsImplTest : public testing::Test {
 
     sync_service_crypto_ = std::make_unique<SyncServiceCrypto>(
         &sync_service_crypto_delegate_, &trusted_vault_client_);
+    if (base::FeatureList::IsEnabled(kSyncUseOsCryptAsync)) {
+      sync_service_crypto_->SetEncryptor(
+          std::make_unique<os_crypt_async::Encryptor>(
+              GetEncryptorForTest()));
+    }
 
     ON_CALL(delegate_, IsCustomPassphraseAllowed).WillByDefault(Return(true));
     ON_CALL(delegate_, GetSyncAccountStateForPrefs)
@@ -163,6 +170,13 @@ TEST_F(SyncUserSettingsImplTest, PreferredTypesSyncEverything) {
   UserSelectableTypeSet all_registered_types =
       sync_user_settings->GetRegisteredSelectableTypes();
 
+  // TODO(crbug.com/445841720): In CL #3, delete (AI_THREAD is now mapped to a
+  // selectable type.
+  expected_types.Remove(AI_THREAD);
+  // TODO(crbug.com/445840788): In CL #3, delete (CONTEXTUAL_TASK is now mapped
+  // to a selectable type.
+  expected_types.Remove(CONTEXTUAL_TASK);
+
 #if BUILDFLAG(IS_CHROMEOS)
   expected_types.RemoveAll({WEB_APKS});
 #endif  // BUILDFLAG(IS_CHROMEOS)
@@ -200,7 +214,6 @@ TEST_F(SyncUserSettingsImplTest,
                             kReadingListEnableSyncTransportModeUponSignIn,
                             kSeparateLocalAndAccountSearchEngines,
                             syncer::kSeparateLocalAndAccountThemes,
-                            switches::kEnableExtensionsExplicitBrowserSignin,
                             switches::kEnablePreferencesAccountStorage},
       /*disabled_features=*/{kReplaceSyncPromosWithSignInPromos});
 
@@ -243,7 +256,6 @@ TEST_F(SyncUserSettingsImplTest,
                             kSeparateLocalAndAccountSearchEngines,
                             syncer::kSeparateLocalAndAccountThemes,
 #endif
-                            switches::kEnableExtensionsExplicitBrowserSignin,
                             switches::kEnablePreferencesAccountStorage},
       /*disabled_features=*/{});
 
@@ -260,6 +272,11 @@ TEST_F(SyncUserSettingsImplTest,
   UserSelectableTypeSet expected_disabled_types = {
       UserSelectableType::kHistory, UserSelectableType::kTabs,
       UserSelectableType::kSavedTabGroups, UserSelectableType::kCookies};
+
+#if BUILDFLAG(IS_CHROMEOS)
+  // Extensions syncing in transport mode is not supported on ChromeOS.
+  expected_disabled_types.Put(UserSelectableType::kExtensions);
+#endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_IOS) || BUILDFLAG(IS_ANDROID)
   // Themes is not supported on mobile.
@@ -332,6 +349,12 @@ TEST_F(SyncUserSettingsImplTest, PreferredTypesSyncAllOsTypes) {
 
   DataTypeSet expected_types = GetUserTypes();
   expected_types.RemoveAll({WEB_APKS});
+  // TODO(crbug.com/397767033): In CL #3, delete (AI_THREAD is now mapped to a
+  // selectable type.
+  expected_types.Remove(AI_THREAD);
+  // TODO(crbug.com/397767033): In CL #3, delete (CONTEXTUAL_TASK is now mapped
+  // to a selectable type.
+  expected_types.Remove(CONTEXTUAL_TASK);
   EXPECT_TRUE(sync_user_settings->IsSyncAllOsTypesEnabled());
   EXPECT_THAT(GetPreferredUserTypes(*sync_user_settings),
               ContainerEq(expected_types));

@@ -154,13 +154,13 @@ TEST_P(DomLabelTest, DataDrivenLabels) {
   std::string expected_output_content;
   ASSERT_TRUE(base::ReadFileToString(test.expected_output_path,
                                      &expected_output_content));
-  std::optional<base::Value> expected_output_json =
-      base::JSONReader::Read(expected_output_content);
+  std::optional<base::Value> expected_output_json = base::JSONReader::Read(
+      expected_output_content, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ASSERT_TRUE(expected_output_json && expected_output_json->is_list());
   const base::Value::List& expected_field_infos =
       expected_output_json->GetList();
   ASSERT_EQ(field_infos.size(), expected_field_infos.size());
-  for (size_t i = 0; i < field_infos.size(); i++) {
+  for (size_t i = 0; i < field_infos.size(); ++i) {
     EXPECT_EQ(field_infos[i], expected_field_infos[i]);
   }
 }

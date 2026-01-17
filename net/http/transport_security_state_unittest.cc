@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "base/base64.h"
+#include "base/containers/span.h"
 #include "base/containers/to_vector.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback_helpers.h"
@@ -1446,23 +1447,17 @@ TEST_F(TransportSecurityStateStaticTest, PreloadedPins) {
   EXPECT_TRUE(OnlyPinningInStaticState("doubleclick.net"));
   EXPECT_TRUE(OnlyPinningInStaticState("googlegroups.com"));
 
-  // Facebook has pinning and hsts on facebook.com, but only pinning on
-  // subdomains.
-  EXPECT_TRUE(state.GetStaticPKPState("facebook.com", &pkp_state));
-  EXPECT_FALSE(pkp_state.spki_hashes.empty());
+  // Facebook is not pinned but has hsts only on facebook.com.
+  EXPECT_FALSE(state.GetStaticPKPState("facebook.com", &pkp_state));
   EXPECT_TRUE(StaticShouldRedirect("facebook.com"));
-
-  EXPECT_TRUE(state.GetStaticPKPState("foo.facebook.com", &pkp_state));
-  EXPECT_FALSE(pkp_state.spki_hashes.empty());
+  EXPECT_FALSE(state.GetStaticPKPState("foo.facebook.com", &pkp_state));
   EXPECT_FALSE(StaticShouldRedirect("foo.facebook.com"));
 
-  // www.facebook.com and subdomains have both pinning and hsts.
-  EXPECT_TRUE(state.GetStaticPKPState("www.facebook.com", &pkp_state));
-  EXPECT_FALSE(pkp_state.spki_hashes.empty());
+  // www.facebook.com and subdomains are not pinned, but do have hsts.
+  EXPECT_FALSE(state.GetStaticPKPState("www.facebook.com", &pkp_state));
   EXPECT_TRUE(StaticShouldRedirect("www.facebook.com"));
 
-  EXPECT_TRUE(state.GetStaticPKPState("foo.www.facebook.com", &pkp_state));
-  EXPECT_FALSE(pkp_state.spki_hashes.empty());
+  EXPECT_FALSE(state.GetStaticPKPState("foo.www.facebook.com", &pkp_state));
   EXPECT_TRUE(StaticShouldRedirect("foo.www.facebook.com"));
 }
 
@@ -1570,7 +1565,7 @@ TEST_F(TransportSecurityStateTest, WriteSizeDecodeSize) {
     size_t position = writer.position();
     writer.Flush();
     ASSERT_NE(writer.bytes().data(), nullptr);
-    extras::PreloadDecoder::BitReader reader(writer.bytes().data(), position);
+    extras::PreloadDecoder::BitReader reader(writer.bytes(), position);
     size_t decoded_size;
     EXPECT_TRUE(reader.DecodeSize(&decoded_size));
     EXPECT_EQ(i, decoded_size);
@@ -1588,7 +1583,7 @@ TEST_F(TransportSecurityStateTest, DecodeSizeFour) {
   // 4 is encoded as 0b010. Shifted right to fill one byte, it is 0x02, with 5
   // bits of padding.
   uint8_t encoded = 0x02;
-  extras::PreloadDecoder::BitReader reader(&encoded, 8);
+  extras::PreloadDecoder::BitReader reader(base::span_from_ref(encoded), 8);
   for (size_t i = 0; i < 5; ++i) {
     bool unused;
     ASSERT_TRUE(reader.Next(&unused));

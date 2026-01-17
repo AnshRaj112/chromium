@@ -7,20 +7,26 @@ package org.chromium.net.impl;
 import static org.chromium.net.impl.HttpEngineNativeProvider.EXT_API_LEVEL;
 import static org.chromium.net.impl.HttpEngineNativeProvider.EXT_VERSION;
 
+import android.content.Context;
 import android.net.http.HttpEngine;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresExtension;
 import androidx.annotation.VisibleForTesting;
 
 import org.chromium.net.CronetEngine;
+import org.chromium.net.AndroidProxyOptions;
 import org.chromium.net.ExperimentalCronetEngine;
 import org.chromium.net.ICronetEngineBuilder;
+import org.chromium.net.impl.CronetLogger.CronetSource;
 import org.chromium.net.telemetry.ExperimentalOptions;
 import org.chromium.net.telemetry.OptionalBoolean;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Set;
 
 @RequiresExtension(extension = EXT_API_LEVEL, version = EXT_VERSION)
@@ -29,21 +35,29 @@ class AndroidHttpEngineBuilderWrapper extends ICronetEngineBuilder {
 
     private static boolean sLibraryLoaderUnsupportedLogged;
     private static boolean sNQEUnsupportedLogged;
+    private boolean mHasCustomUserAgent;
 
+    private final Context mContext;
     private final HttpEngine.Builder mBackend;
 
-    public AndroidHttpEngineBuilderWrapper(HttpEngine.Builder backend) {
+    public AndroidHttpEngineBuilderWrapper(Context context, HttpEngine.Builder backend) {
+        this.mContext = context;
         this.mBackend = backend;
     }
 
     @Override
     public String getDefaultUserAgent() {
-        return mBackend.getDefaultUserAgent();
+        // This code cannot simply delegate to mBackend.getDefaultUserAgent(). This override is
+        // necessary to make sure that older versions of HttpEngine used through the wrapper use the
+        // correct UserAgent.
+        return UserAgent.from(
+                mContext, CronetSource.CRONET_SOURCE_PLATFORM, HttpEngine.getVersionString());
     }
 
     @Override
     public ICronetEngineBuilder setUserAgent(String userAgent) {
         mBackend.setUserAgent(userAgent);
+        mHasCustomUserAgent = userAgent != null;
         return this;
     }
 
@@ -144,6 +158,13 @@ class AndroidHttpEngineBuilderWrapper extends ICronetEngineBuilder {
         return this;
     }
 
+    @Override
+    public ICronetEngineBuilder setProxyOptions(
+            @Nullable org.chromium.net.ProxyOptions proxyOptions) {
+        AndroidProxyOptions.apply(mBackend, proxyOptions);
+        return this;
+    }
+
     /**
      * Build a {@link CronetEngine} using this builder's configuration.
      *
@@ -151,7 +172,21 @@ class AndroidHttpEngineBuilderWrapper extends ICronetEngineBuilder {
      */
     @Override
     public ExperimentalCronetEngine build() {
+        // Here developers are using CronetEngine APIs backed by HttpEngine. Their default
+        // user agent differs. To maintain consistent behavior we pick the default user agent based
+        // on the API layer/side used by the developers.
+        if (!mHasCustomUserAgent) {
+            setUserAgent(getDefaultUserAgent());
+        }
         return new AndroidHttpEngineWrapper(mBackend.build());
+    }
+
+    @Override
+    public Set<Integer> getSupportedConfigOptions() {
+        // Whether PROXY_OPTIONS are supported or not is handled within AndroidProxyOptions#apply.
+        Set<Integer> supportedConfigOptions = new HashSet<>();
+        supportedConfigOptions.add(PROXY_OPTIONS);
+        return Collections.unmodifiableSet(supportedConfigOptions);
     }
 
     @VisibleForTesting
@@ -257,15 +292,11 @@ class AndroidHttpEngineBuilderWrapper extends ICronetEngineBuilder {
      * DnsOptions and QuicOptions.
      */
     private static int optionalBooleanToMigrationOptionState(OptionalBoolean value) {
-        switch (value) {
-            case TRUE:
-                return android.net.http.ConnectionMigrationOptions.MIGRATION_OPTION_ENABLED;
-            case FALSE:
-                return android.net.http.ConnectionMigrationOptions.MIGRATION_OPTION_DISABLED;
-            case UNSET:
-                return android.net.http.ConnectionMigrationOptions.MIGRATION_OPTION_UNSPECIFIED;
-        }
-
-        throw new AssertionError("Invalid OptionalBoolean value: " + value);
+        return switch (value) {
+            case TRUE -> android.net.http.ConnectionMigrationOptions.MIGRATION_OPTION_ENABLED;
+            case FALSE -> android.net.http.ConnectionMigrationOptions.MIGRATION_OPTION_DISABLED;
+            case UNSET -> android.net.http.ConnectionMigrationOptions.MIGRATION_OPTION_UNSPECIFIED;
+            default -> throw new AssertionError("Invalid OptionalBoolean value: " + value);
+        };
     }
 }

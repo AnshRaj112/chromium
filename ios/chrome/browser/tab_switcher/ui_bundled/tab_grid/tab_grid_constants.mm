@@ -53,6 +53,8 @@ NSString* const kTabGridEditShareButtonIdentifier =
 NSString* const kTabGridSearchBarIdentifier = @"kTabGridSearchBarIdentifier";
 NSString* const kTabGridSearchTextFieldIdentifierPrefix = @"kSearchTextId_";
 NSString* const kTabGridScrimIdentifier = @"kTabGridScrimIdentifier";
+NSString* const kTabGridOverflowMenuButtonIdentifier =
+    @"kTabGridOverflowMenuButtonIdentifier";
 
 NSString* const kTabCellActivityLabelIdentifier =
     @"TabCellActivityLabelIdentifier";
@@ -82,6 +84,9 @@ const CGFloat kTabGridSearchBarWidthRatio = 0.9f;
 const CGFloat kTabGridSearchBarHeight = 44.0f;
 // The Search bar width ratio modifier for non-compact orientation.
 const CGFloat kTabGridSearchBarNonCompactWidthRatioModifier = 0.5f;
+
+NSString* const kTabGridSearchSuggestedHistoryItemId =
+    @"kTabGridSearchSuggestedHistoryItemId";
 
 // Intrinsic heights of the tab grid toolbars.
 const CGFloat kTabGridTopToolbarHeight = 52.0f;

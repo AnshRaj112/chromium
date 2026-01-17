@@ -15,11 +15,10 @@
 #include "chrome/browser/win/cloud_synced_folder_checker.h"
 #include "chrome/browser/win/installer_downloader/installer_downloader_pref_names.h"
 #include "chrome/browser/win/installer_downloader/system_info_provider.h"
-#include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "components/download/public/common/download_interrupt_reasons.h"
 #include "components/download/public/common/download_url_parameters.h"
-#include "components/prefs/testing_pref_service.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/test/browser_task_environment.h"
 #include "content/public/test/fake_download_item.h"
 #include "content/public/test/mock_download_manager.h"
@@ -50,7 +49,8 @@ class MockSystemInfoProvider : public SystemInfoProvider {
 
 class InstallerDownloaderModelTest : public testing::Test {
  protected:
-  InstallerDownloaderModelTest() {
+  InstallerDownloaderModelTest()
+      : task_environment_(base::test::TaskEnvironment::TimeSource::MOCK_TIME) {
     auto mock_system_info_provider_ptr =
         std::make_unique<StrictMock<MockSystemInfoProvider>>();
     mock_system_info_provider_ = mock_system_info_provider_ptr.get();
@@ -58,10 +58,11 @@ class InstallerDownloaderModelTest : public testing::Test {
         std::move(mock_system_info_provider_ptr));
   }
 
-  TestingPrefServiceSimple& GetLocalState() { return *local_state_.Get(); }
+  PrefService& GetLocalState() {
+    return *TestingBrowserProcess::GetGlobal()->local_state();
+  }
 
   content::BrowserTaskEnvironment task_environment_;
-  ScopedTestingLocalState local_state_{TestingBrowserProcess::GetGlobal()};
   std::unique_ptr<InstallerDownloaderModelImpl> model_;
   raw_ptr<MockSystemInfoProvider> mock_system_info_provider_;
   content::MockDownloadManager mock_download_manager_;
@@ -382,6 +383,30 @@ TEST_F(InstallerDownloaderModelTest, DestinationMatchMetricFalse) {
   histograms.ExpectUniqueSample(
       "Windows.InstallerDownloader.DestinationMatches",
       /*sample=*/false, /*expected_bucket_count=*/1);
+}
+
+TEST_F(InstallerDownloaderModelTest, IncrementShowCountUpdatesLastShownTime) {
+  EXPECT_TRUE(GetLocalState()
+                  .GetTime(prefs::kInstallerDownloaderInfobarLastShowTime)
+                  .is_null());
+
+  // First increment should record the current time.
+  model_->IncrementShowCount();
+  const base::Time time1 =
+      GetLocalState().GetTime(prefs::kInstallerDownloaderInfobarLastShowTime);
+  EXPECT_FALSE(time1.is_null());
+  EXPECT_EQ(time1, base::Time::Now());
+
+  task_environment_.FastForwardBy(base::Seconds(30));
+
+  // Second increment should record the new, later time.
+  model_->IncrementShowCount();
+  const base::Time time2 =
+      GetLocalState().GetTime(prefs::kInstallerDownloaderInfobarLastShowTime);
+  EXPECT_FALSE(time2.is_null());
+
+  EXPECT_GT(time2, time1);
+  EXPECT_EQ(time2, time1 + base::Seconds(30));
 }
 
 }  // namespace

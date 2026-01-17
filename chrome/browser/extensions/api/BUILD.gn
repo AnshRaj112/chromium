@@ -22,17 +22,24 @@ group("api") {
 }
 
 # The collection of API implementations.
+# TODO(crbug.com/40245282): Add API implementations here as we detangle them
+# so that they can be separate GN targets.
 group("api_implementations") {
   # APIs supported on Win/Mac/Linux and desktop Android go here.
   # TODO(https://crbug.com/356905053): Add more APIs here.
   public_deps = [
     "//chrome/browser/extensions/api/activity_log_private",
     "//chrome/browser/extensions/api/browsing_data",
+    "//chrome/browser/extensions/api/commands",
     "//chrome/browser/extensions/api/context_menus",
     "//chrome/browser/extensions/api/cookies",
+    "//chrome/browser/extensions/api/debugger",
+    "//chrome/browser/extensions/api/desktop_capture",
+    "//chrome/browser/extensions/api/downloads_internal",
     "//chrome/browser/extensions/api/enterprise_hardware_platform",
     "//chrome/browser/extensions/api/extension_action",
     "//chrome/browser/extensions/api/font_settings",
+    "//chrome/browser/extensions/api/gcm",
     "//chrome/browser/extensions/api/module",
     "//chrome/browser/extensions/api/notifications",
     "//chrome/browser/extensions/api/omnibox",
@@ -44,7 +51,11 @@ group("api_implementations") {
     "//chrome/browser/extensions/api/reading_list",
     "//chrome/browser/extensions/api/runtime",
     "//chrome/browser/extensions/api/scripting",
+    "//chrome/browser/extensions/api/search",
+    "//chrome/browser/extensions/api/tab_capture",
+    "//chrome/browser/extensions/api/tab_groups",
     "//chrome/browser/extensions/api/web_authentication_proxy",
+    "//chrome/browser/extensions/api/web_navigation",
     "//chrome/browser/extensions/api/webrtc_audio_private",
     "//chrome/browser/extensions/api/webrtc_logging_private",
   ]
@@ -55,27 +66,19 @@ group("api_implementations") {
 
   if (enable_extensions) {
     # APIs supported on Win/Mac/Linux but NOT desktop Android go here.
-    # TODO(crbug.com/40245282): Add more API implementations here.
     public_deps += [
       "//chrome/browser/extensions/api/autofill_private",
       "//chrome/browser/extensions/api/braille_display_private",
       "//chrome/browser/extensions/api/command_line_private",
       "//chrome/browser/extensions/api/content_settings",
-      "//chrome/browser/extensions/api/debugger",
-      "//chrome/browser/extensions/api/desktop_capture",
-      "//chrome/browser/extensions/api/downloads_internal",
       "//chrome/browser/extensions/api/experimental_actor",
       "//chrome/browser/extensions/api/experimental_ai_data",
       "//chrome/browser/extensions/api/idltest",
       "//chrome/browser/extensions/api/networking_private",
       "//chrome/browser/extensions/api/resources_private",
       "//chrome/browser/extensions/api/safe_browsing_private",
-      "//chrome/browser/extensions/api/search",
       "//chrome/browser/extensions/api/settings_overrides",
       "//chrome/browser/extensions/api/side_panel",
-      "//chrome/browser/extensions/api/tab_capture",
-      "//chrome/browser/extensions/api/tab_groups",
-      "//chrome/browser/extensions/api/web_navigation",
       "//chrome/browser/extensions/api/web_view",
       "//chrome/browser/extensions/api/webrtc_desktop_capture_private",
     ]

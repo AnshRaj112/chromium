@@ -301,12 +301,8 @@ IN_PROC_BROWSER_TEST_F(BrowserUserEducationServiceBrowserTest,
 
       // IPH that limit session rate in other ways. These should probably be
       // revisited in the future.
-      {&feature_engagement::kIPHDesktopCustomizeChromeFeature,
+      {&feature_engagement::kIPHDesktopCustomizeChromeExperimentFeature,
        IPHFailureReason::kWrongSessionRate, "crbug.com/1443063"},
-      {&feature_engagement::kIPHDesktopCustomizeChromeRefreshFeature,
-       IPHFailureReason::kWrongSessionRate, "crbug.com/1443063"},
-      {&feature_engagement::kIPHDesktopCustomizeChromeRefreshFeature,
-       IPHFailureReason::kWrongSessionImpact, "crbug.com/1443063"},
       {&feature_engagement::kIPHMemorySaverModeFeature,
        IPHFailureReason::kWrongSessionRate, "crbug.com/1443063"},
       {&feature_engagement::kIPHPriceTrackingInSidePanelFeature, std::nullopt,
@@ -357,7 +353,7 @@ IN_PROC_BROWSER_TEST_F(BrowserUserEducationServiceBrowserTest,
   for (const auto& [feature, spec] : registry.feature_data()) {
     // If the feature is not on the known features list, no configuration is
     // possible.
-    if (!base::Contains(known_features, feature)) {
+    if (!known_features.contains(feature)) {
       failures.emplace_back(feature, IPHFailureReason::kUnlisted, nullptr);
       continue;
     }
@@ -550,7 +546,7 @@ IN_PROC_BROWSER_TEST_F(BrowserUserEducationServiceBrowserTest,
           (step.step_type() == ui::InteractionSequence::StepType::kShown &&
            step.body_text_id());
       const bool is_always_visible =
-          base::Contains(kAlwaysPresentElementIds, step.element_id());
+          kAlwaysPresentElementIds.contains(step.element_id());
       if (is_show_bubble && was_show_bubble && is_always_visible &&
           !step.transition_only_on_event()) {
         failures.push_back(

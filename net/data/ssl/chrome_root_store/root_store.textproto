@@ -8,7 +8,7 @@
 
 # Version # should always be incremented up whenever this (or any pem file that
 # it references) is changed.
-version_major: 23
+version_major: 29
 
 # CN=Actalis Authentication Root CA, O=Actalis S.p.A./03358520967, L=Milan, C=IT
 # https://ssltest-a.actalis.it:8443
@@ -71,15 +71,23 @@ trust_anchors {
 }
 
 # CN=Buypass Class 2 Root CA, O=Buypass AS-983163327, C=NO
+# Constraint date and time (GMT): Friday, October 31, 2025 11:59:59 PM
 trust_anchors {
   sha256_hex: "9a114025197c5bb95d94e63d55cd43790847b646b23cdf11ada4a00eff15fb48"
+  constraints: {
+    sct_not_after_sec: 1761955199
+  }
 }
 
 # CN=Buypass Class 3 Root CA, O=Buypass AS-983163327, C=NO
 # https://valid.evident.ca23.ssl.buypass.no/
+# Constraint date and time (GMT): Friday, October 31, 2025 11:59:59 PM
 trust_anchors {
   sha256_hex: "edf7ebbca27a2a384d387b7d4010c666e2edb4843e4c29b4ae1d5b9332e6b24d"
   ev_policy_oids: "2.23.140.1.1"
+  constraints: {
+    sct_not_after_sec: 1761955199
+  }
 }
 
 # OU=certSIGN ROOT CA G2, O=CERTSIGN SA, C=RO
@@ -155,16 +163,19 @@ trust_anchors {
 trust_anchors {
   sha256_hex: "31ad6648f8104138c738f39ea4320133393e3a18cc02296ef97c2ac9ef6731d0"
   ev_policy_oids: "2.23.140.1.1"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x0a"  # 52580.200109.1.10
 }
 
 # CN=DigiCert Assured ID Root CA, OU=www.digicert.com, O=DigiCert Inc, C=US
 trust_anchors {
   sha256_hex: "3e9099b5015e8f486c00bcea9d111ee721faba355a89bcf1df69561e3dc6325c"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x03"  # 52580.200109.1.3
 }
 
 # CN=DigiCert Global Root CA, OU=www.digicert.com, O=DigiCert Inc, C=US
 trust_anchors {
   sha256_hex: "4348a0e9444c78cb265e058d5e8944b4d84f9662bd26db257f8934a443c70161"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x02"  # 52580.200109.1.2
 }
 
 # CN=DigiCert Trusted Root G4, OU=www.digicert.com, O=DigiCert Inc, C=US
@@ -172,6 +183,7 @@ trust_anchors {
 trust_anchors {
   sha256_hex: "552f7bdcf1a7af9e6ce672017f4f12abf77240c78e761ac203d1d9d20ac89988"
   ev_policy_oids: "2.23.140.1.1"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x0b"  # 52580.200109.1.11
 }
 
 # CN=DigiCert High Assurance EV Root CA, OU=www.digicert.com, O=DigiCert Inc, C=US
@@ -179,6 +191,7 @@ trust_anchors {
 trust_anchors {
   sha256_hex: "7431e5f4c3c1ce4690774f0b61e05440883ba9a01ed00ba6abd7806ed3b118cf"
   ev_policy_oids: "2.23.140.1.1"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x01"  # 52580.200109.1.1
 }
 
 # CN=DigiCert Assured ID Root G2, OU=www.digicert.com, O=DigiCert Inc, C=US
@@ -186,6 +199,7 @@ trust_anchors {
 trust_anchors {
   sha256_hex: "7d05ebb682339f8c9451ee094eebfefa7953a114edb2f44949452fab7d2fc185"
   ev_policy_oids: "2.23.140.1.1"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x0c"  # 52580.200109.1.12
 }
 
 # CN=DigiCert Assured ID Root G3, OU=www.digicert.com, O=DigiCert Inc, C=US
@@ -193,6 +207,7 @@ trust_anchors {
 trust_anchors {
   sha256_hex: "7e37cb8b4c47090cab36551ba6f45db840680fba166a952db100717f43053fc2"
   ev_policy_oids: "2.23.140.1.1"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x0d"  # 52580.200109.1.13
 }
 
 # CN=DigiCert Global Root G2, OU=www.digicert.com, O=DigiCert Inc, C=US
@@ -200,6 +215,7 @@ trust_anchors {
 trust_anchors {
   sha256_hex: "cb3ccbb76031e5e0138f8dd39a23f9de47ffc35e43c1144cea27d46a5ab1cb5f"
   ev_policy_oids: "2.23.140.1.1"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x09"  # 52580.200109.1.9
 }
 
 # CN=CA Disig Root R2, O=Disig a.s., L=Bratislava, C=SK
@@ -217,81 +233,6 @@ trust_anchors {
 # CN=emSign ECC Root CA - G3, O=eMudhra Technologies Limited, OU=emSign PKI, C=IN
 trust_anchors {
   sha256_hex: "86a1ecba089c4a8d3bbe2734c612ba341d813e043cf9e8a862cd5c57a36bbe6b"
-}
-
-# CN=Entrust Root Certification Authority - EC1, OU=(c) 2012 Entrust, Inc. - for authorized use only, OU=See www.entrust.net/legal-terms, O=Entrust, Inc., C=US
-# https://validec.entrust.net
-# Constraint date: Mon Nov 11, 2024 23:59:59 GMT+0000
-trust_anchors {
-  sha256_hex: "02ed0eb28c14da45165c566791700d6451d7fb56f0b2ab1d3b8eb070e56edff5"
-  ev_policy_oids: "2.23.140.1.1"
-  constraints: {
-    sct_not_after_sec: 1731369599
-    min_version: "131"
-  }
-  constraints: {
-    max_version_exclusive: "131"
-  }
-}
-
-# CN=AffirmTrust Commercial, O=AffirmTrust, C=US
-# https://commercial.affirmtrust.com/
-# Constraint date: Mon Nov 11, 2024 23:59:59 GMT+0000
-trust_anchors {
-  sha256_hex: "0376ab1d54c5f9803ce4b2e201a0ee7eef7b57b636e8a93c9b8d4860c96f5fa7"
-  ev_policy_oids: "2.23.140.1.1"
-  constraints: {
-    sct_not_after_sec: 1731369599
-    min_version: "131"
-  }
-  constraints: {
-    max_version_exclusive: "131"
-  }
-}
-
-# CN=Entrust Root Certification Authority - G2, OU=(c) 2009 Entrust, Inc. - for authorized use only, OU=See www.entrust.net/legal-terms, O=Entrust, Inc., C=US
-# https://validg2.entrust.net
-# Constraint date: Mon Nov 11, 2024 23:59:59 GMT+0000
-trust_anchors {
-  sha256_hex: "43df5774b03e7fef5fe40d931a7bedf1bb2e6b42738c4e6d3841103d3aa7f339"
-  ev_policy_oids: "2.23.140.1.1"
-  constraints: {
-    sct_not_after_sec: 1731369599
-    min_version: "131"
-  }
-  constraints: {
-    max_version_exclusive: "131"
-  }
-}
-
-# CN=Entrust Root Certification Authority, OU=(c) 2006 Entrust, Inc., OU=www.entrust.net/CPS is incorporated by reference, O=Entrust, Inc., C=US
-# https://www.entrust.net/
-# Constraint date: Mon Nov 11, 2024 23:59:59 GMT+0000
-trust_anchors {
-  sha256_hex: "73c176434f1bc6d5adf45b0e76e727287c8de57616c1e6e6141a2b2cbc7d8e4c"
-  ev_policy_oids: "2.23.140.1.1"
-  constraints: {
-    sct_not_after_sec: 1731369599
-    min_version: "131"
-  }
-  constraints: {
-    max_version_exclusive: "131"
-  }
-}
-
-# CN=Entrust Root Certification Authority - G4, OU=(c) 2015 Entrust, Inc. - for authorized use only, OU=See www.entrust.net/legal-terms, O=Entrust, Inc., C=US
-# https://validg4.entrust.net
-# Constraint date: Mon Nov 11, 2024 23:59:59 GMT+0000
-trust_anchors {
-  sha256_hex: "db3517d1f6732a2d5ab97c533ec70779ee3270a62fb4ac4238372460e6f01e88"
-  ev_policy_oids: "2.23.140.1.1"
-  constraints: {
-    sct_not_after_sec: 1731369599
-    min_version: "131"
-  }
-  constraints: {
-    max_version_exclusive: "131"
-  }
 }
 
 # CN=GDCA TrustAUTH R5 ROOT, O=GUANG DONG CERTIFICATE AUTHORITY CO.,LTD., C=CN
@@ -394,6 +335,7 @@ trust_anchors {
 # CN=ISRG Root X1, O=Internet Security Research Group, C=US
 trust_anchors {
   sha256_hex: "96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6"
+  trust_anchor_id: "\x82\xdf\x13\x02\x01"  # 44947.2.1
 }
 
 # CN=Izenpe.com, O=IZENPE S.A., C=ES
@@ -463,11 +405,13 @@ trust_anchors {
 trust_anchors {
   sha256_hex: "85a0dd7dd720adb7ff05f83d542b209dc7ff4528f7d677b18389fea5e5c49e86"
   ev_policy_oids: "2.23.140.1.1"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x04"  # 52580.200109.1.4
 }
 
 # CN=QuoVadis Root CA 3 G3, O=QuoVadis Limited, C=BM
 trust_anchors {
   sha256_hex: "88ef81de202eb018452e43f864725cea5fbd1fc2d9d205730709c5d8b8690f46"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x08"  # 52580.200109.1.8
 }
 
 # CN=QuoVadis Root CA 2 G3, O=QuoVadis Limited, C=BM
@@ -475,6 +419,7 @@ trust_anchors {
 trust_anchors {
   sha256_hex: "8fe4fb0af93a4d0d67db0bebb23e37c71bf325dcbcdd240ea04daf58b47e1840"
   ev_policy_oids: "2.23.140.1.1"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x07"  # 52580.200109.1.7
 }
 
 # OU=Security Communication RootCA2, O=SECOM Trust Systems CO.,LTD., C=JP
@@ -603,13 +548,17 @@ trust_anchors {
 }
 
 # CN=Certum EC-384 CA, OU=Certum Certification Authority, O=Asseco Data Systems S.A., C=PL
+# https://valid-cec384ca.certificates.certum.pl/
 trust_anchors {
   sha256_hex: "6b328085625318aa50d173c98d8bda09d57e27413d114cf787a0f5d06c030cf6"
+  ev_policy_oids: "2.23.140.1.1"
 }
 
 # CN=Certum Trusted Root CA, OU=Certum Certification Authority, O=Asseco Data Systems S.A., C=PL
+# https://valid-ctrca.certificates.certum.pl/
 trust_anchors {
   sha256_hex: "fe7696573855773e37a95e7ad4d9cc96c30157c15d31765ba9b15704e1ae78fd"
+  ev_policy_oids: "2.23.140.1.1"
 }
 
 # CN=D-TRUST BR Root CA 1 2020, O=D-Trust GmbH, C=DE
@@ -664,6 +613,7 @@ trust_anchors {
 # CN=ISRG Root X2, O=Internet Security Research Group, C=US
 trust_anchors {
   sha256_hex: "69729b8e15a86efc177a57afb7171dfc64add28c2fca8cf1507e34453ccb1470"
+  trust_anchor_id: "\x82\xdf\x13\x02\x06"  # 44947.2.6
 }
 
 # CN=NAVER Global Root Certification Authority, O=NAVER BUSINESS PLATFORM Corp., C=KR
@@ -679,11 +629,13 @@ trust_anchors {
 # CN=DigiCert TLS ECC P384 Root G5, O=DigiCert, Inc., C=US
 trust_anchors {
   sha256_hex: "018e13f0772532cf809bd1b17281867283fc48c6e13be9c69812854a490c1b05"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x13"  # 52580.200109.1.19
 }
 
 # CN=DigiCert TLS RSA4096 Root G5, O=DigiCert, Inc., C=US
 trust_anchors {
   sha256_hex: "371a00dc0533b3721a7eeb40e8419e70799d2b0a0f2c1d80693165f7cec4ad75"
+  trust_anchor_id: "\x83\x9a\x64\x8c\x9b\x2d\x01\x12"  # 52580.200109.1.18
 }
 
 # C = US, O = Certainly, CN = Certainly Root E1
@@ -786,6 +738,24 @@ trust_anchors {
 trust_anchors {
   sha256_hex: "06c08d7dafd876971eb1124fe67f847ec0c7a158d3ea53cbe940e2ea9791f4c3"
   ev_policy_oids: "2.23.140.1.1"
+}
+
+# CN=SwissSign RSA TLS Root CA 2022 - 1, O=SwissSign AG, C=CH
+# https://ev-rsa-tls-2022-1-valid-cert-demo.swisssign.com/
+# Constraint date: Mon Jun 14, 2027 23:59:59 GMT+0000
+trust_anchors {
+  sha256_hex: "193144f431e0fddb740717d4de926a571133884b4360d30e272913cbe660ce41"
+  ev_policy_oids: "2.23.140.1.1"
+  constraints: {
+    sct_not_after_sec: 1813017599
+  }
+}
+
+# Cloudflare MTC experiment log shard3.
+# See https://bootstrap-mtca.cloudflareresearch.com/logs/shard3/metadata
+mtc_anchors {
+  log_id: "\x82\xda\x4b\x30\x08"  # 44363.48.8
+  tls_trust_anchor: true
 }
 
 # BEGIN additional certs:
@@ -1448,4 +1418,157 @@ additional_certs {
 additional_certs {
   sha256_hex: "fe95a24e7f94978e58d99350ab7ab789774a987cd25187c128c191d207523bb1"
   eutl: true
+}
+
+# "CN=WR1, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "b10b6f00e609509e8700f6d34687a2bfce38ea05a8fdf1cdc40c3a2a0d0d0e45"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x05"  # 11129.9.5
+}
+
+# "CN=WR2, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "e6fe22bf45e4f0d3b85c59e02c0f495418e1eb8d3210f788d48cd5e1cb547cd4"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x06"  # 11129.9.6
+}
+
+# "CN=WR3, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "2fe357db13751ff9160e87354975b3407498f41c9bd16a48657866e6e5a9b4c7"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x07"  # 11129.9.7
+}
+
+# "CN=WR4, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "dc9416c2f855126d6de977677538f2f967ff4998e90dfa435a17219be077fc06"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x08"  # 11129.9.8
+}
+
+# "CN=WR5, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "ae0fc852280f1b87cedaf73cfb84cf106efec88e8294253af352ed4034460d7b"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x09"  # 11129.9.9
+}
+
+# "CN=WE1, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "1dfc1605fbad358d8bc844f76d15203fac9ca5c1a79fd4857ffaf2864fbebf96"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x0a"  # 11129.9.10
+}
+
+# "CN=WE2, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "9c3f2fd11c57d7c649ad5a0932c0f0d29756f6a0a1c74c43e1e89a62d64cd320"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x0b"  # 11129.9.11
+}
+
+# "CN=WE3, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "9f819a4c876e12dc84e6fe0e37c1a69b137094b453fa98449398f4b71f4d0092"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x0c"  # 11129.9.12
+}
+
+# "CN=WE4, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "d0c97e56c7b0ba812d944ad771f7799b5d4144a2327a4e416554f7ee2aa0aeae"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x0d"  # 11129.9.13
+}
+
+# "CN=WE5, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "847409e63526f162753ac49f75218efaafa7d5c94ade9095ce72e7f6b6e3ac99"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x0e"  # 11129.9.14
+}
+
+# "CN=AE1, O=Google Trust Services, C=US"
+additional_certs {
+  sha256_hex: "812c212e9e45dc5005c7f47411183f5fb2ff1baee184d3354b2e93d78c280164"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\xd6\x79\x09\x0f"  # 11129.9.15
+}
+
+# "CN=E7,O=Let's Encrypt,C=US"
+additional_certs {
+  sha256_hex: "54715420224c5b65beed018dc3940d7338c577e322d5488f633d8c6a8fed61b2"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\x82\xdf\x13\x02\x0d"  # 44947.2.13
+}
+
+# "CN=E8,O=Let's Encrypt,C=US"
+additional_certs {
+  sha256_hex: "ac1274542267f17b525535b5563bf731febb182533b46a82dc869cb64eb528c0"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\x82\xdf\x13\x02\x0e"  # 44947.2.14
+}
+
+# "CN=E9,O=Let's Encrypt,C=US"
+additional_certs {
+  sha256_hex: "4185df97806c2ba76f1d79823f112ffa639a49ccdc990908102067ab6412b886"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\x82\xdf\x13\x02\x0f"  # 44947.2.15
+}
+
+# "CN=R12,O=Let's Encrypt,C=US"
+additional_certs {
+  sha256_hex: "131fce7784016899a5a00203a9efc80f18ebbd75580717edc1553580930836ec"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\x82\xdf\x13\x02\x12"  # 44947.2.18
+}
+
+# "CN=R13,O=Let's Encrypt,C=US"
+additional_certs {
+  sha256_hex: "d3b128216a843f8ef1321501f5df52a5df52939ee2c19297712cd3de4d419354"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\x82\xdf\x13\x02\x13"  # 44947.2.19
+}
+
+# "CN=R14,O=Let's Encrypt,C=US"
+additional_certs {
+  sha256_hex: "24d45aa9b8d6053d281f3842c8cc0c6c1af7ccdfd42dd5c12f6a74fa9323f7a2"
+  enforce_anchor_constraints: true
+  enforce_anchor_expiry: true
+  tls_trust_anchor: true
+  trust_anchor_id: "\x82\xdf\x13\x02\x14"  # 44947.2.20
 }

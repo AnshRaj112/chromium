@@ -12,7 +12,6 @@
 #include <set>
 #include <string>
 
-#include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/strings/string_number_conversions.h"
 #include "chrome/browser/nearby_sharing/client/fake_nearby_share_client.h"
@@ -41,7 +40,7 @@ const char kTestContactEmailPrefix[] = "email_";
 const char kTestContactPhonePrefix[] = "phone_";
 const char kTestDefaultDeviceName[] = "Josh's Chromebook";
 const char kTestProfileUserName[] = "test@google.com";
-const char* kTestPersonNames[] = {"BBB BBB", "CCC CCC", "AAA AAA"};
+constexpr const char* kTestPersonNames[] = {"BBB BBB", "CCC CCC", "AAA AAA"};
 
 // From nearby_share_contact_manager_impl.cc.
 constexpr base::TimeDelta kContactUploadPeriod = base::Hours(24);
@@ -101,7 +100,7 @@ std::vector<nearby::sharing::proto::Contact> BuildContactListToUpload(
     const std::vector<nearby::sharing::proto::ContactRecord>& contact_records) {
   std::vector<nearby::sharing::proto::Contact> contacts;
   for (const auto& contact_record : contact_records) {
-    bool is_selected = base::Contains(allowed_contact_ids, contact_record.id());
+    bool is_selected = allowed_contact_ids.contains(contact_record.id());
     for (const auto& identifier : contact_record.identifiers()) {
       nearby::sharing::proto::Contact contact;
       contact.mutable_identifier()->CopyFrom(identifier);

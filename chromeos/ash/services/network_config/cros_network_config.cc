@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "ash/constants/ash_features.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/i18n/time_formatting.h"
 #include "base/metrics/histogram_functions.h"
@@ -53,7 +52,6 @@
 #include "chromeos/ash/components/system/statistics_provider.h"
 #include "chromeos/components/onc/onc_utils.h"
 #include "chromeos/services/network_config/public/cpp/cros_network_config_util.h"
-#include "chromeos/services/network_config/public/mojom/cros_network_config.mojom-shared.h"
 #include "chromeos/services/network_config/public/mojom/cros_network_config.mojom.h"
 #include "components/captive_portal/core/captive_portal_detector.h"
 #include "components/device_event_log/device_event_log.h"
@@ -359,7 +357,7 @@ std::optional<GURL> GetPortalProbeUrl(const NetworkState* network) {
       if (probe_url.is_valid())
         return probe_url;
       else
-        return GURL(captive_portal::CaptivePortalDetector::kDefaultURL);
+        return GURL(captive_portal::CaptivePortalDetector::GetDefaultUrl());
     }
     case NetworkState::PortalState::kNoInternet:
       return std::nullopt;
@@ -402,7 +400,8 @@ bool IsVpnProhibited() {
         NetworkHandler::Get()
             ->prohibited_technologies_handler()
             ->GetCurrentlyProhibitedTechnologies();
-    vpn_prohibited = base::Contains(prohibited_technologies, shill::kTypeVPN);
+    vpn_prohibited =
+        std::ranges::contains(prohibited_technologies, shill::kTypeVPN);
   }
   return vpn_prohibited;
 }
@@ -3279,7 +3278,8 @@ void CrosNetworkConfig::StartConnectFailure(int callback_id,
              error_name == NetworkConnectionHandler::kErrorCertLoadTimeout ||
              error_name == NetworkConnectionHandler::kErrorConfigureFailed) {
     result = mojom::StartConnectResult::kNotConfigured;
-  } else if (error_name == NetworkConnectionHandler::kErrorBlockedByPolicy) {
+  } else if (error_name == NetworkConnectionHandler::kErrorBlockedByPolicy ||
+             error_name == NetworkConnectionHandler::kErrorWaitingForScan) {
     result = mojom::StartConnectResult::kBlocked;
   } else {
     result = mojom::StartConnectResult::kUnknown;

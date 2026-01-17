@@ -17,6 +17,7 @@
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
+#include "services/viz/public/cpp/compositing/blit_request_mojom_traits.h"
 #include "services/viz/public/cpp/compositing/copy_output_result_mojom_traits.h"
 #include "services/viz/public/cpp/crash_keys.h"
 
@@ -44,10 +45,11 @@ class CopyOutputResultSenderImpl : public viz::mojom::CopyOutputResultSender {
   ~CopyOutputResultSenderImpl() override {
     if (result_callback_) {
       result_callback_task_runner_->PostTask(
-          FROM_HERE, base::BindOnce(std::move(result_callback_),
-                                    std::make_unique<viz::CopyOutputResult>(
-                                        result_format_, result_destination_,
-                                        gfx::Rect(), false)));
+          FROM_HERE,
+          base::BindOnce(std::move(result_callback_),
+                         std::make_unique<viz::CopyOutputResult>(
+                             result_format_, result_destination_,
+                             viz::CopyOutputResult::Error::kUnknown)));
     }
   }
 
@@ -162,6 +164,10 @@ bool StructTraits<viz::mojom::CopyOutputRequestDataView,
 
   if (!data.ReadSource(&request->source_) || !data.ReadArea(&request->area_) ||
       !data.ReadResultSelection(&request->result_selection_)) {
+    return false;
+  }
+
+  if (!data.ReadBlitRequest(&request->blit_request_)) {
     return false;
   }
 

@@ -8,12 +8,12 @@
 #include <cstddef>
 #include <memory>
 
-#include "base/memory/memory_pressure_listener.h"
 #include "base/memory/raw_ptr.h"
 #include "base/threading/thread.h"
 #include "components/viz/service/viz_service_export.h"
 #include "gpu/command_buffer/service/memory_tracking.h"
 #include "gpu/command_buffer/service/shared_context_state.h"
+#include "gpu/ipc/common/memory_stats.h"
 #include "gpu/ipc/service/gpu_watchdog_thread.h"
 
 namespace gl {
@@ -33,6 +33,9 @@ class VulkanContextProvider;
 
 class VIZ_SERVICE_EXPORT CompositorGpuThread : public base::Thread {
  public:
+  using GetVideoMemoryUsageStatsCallback =
+      base::OnceCallback<void(const ::gpu::VideoMemoryUsageStats&)>;
+
   struct CreateParams {
     raw_ptr<gpu::GpuChannelManager> gpu_channel_manager = nullptr;
     raw_ptr<gl::GLDisplay> display = nullptr;
@@ -75,6 +78,10 @@ class VIZ_SERVICE_EXPORT CompositorGpuThread : public base::Thread {
 
   void LoseContext();
 
+  void AddVideoMemoryUsageStatsOnCompositorGpu(
+      GetVideoMemoryUsageStatsCallback callback,
+      gpu::VideoMemoryUsageStats video_memory_usage_stats);
+
  private:
   CompositorGpuThread(
       gpu::GpuChannelManager* gpu_channel_manager,
@@ -83,8 +90,6 @@ class VIZ_SERVICE_EXPORT CompositorGpuThread : public base::Thread {
 
   bool Initialize();
 
-  void HandleMemoryPressure(
-      base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level);
   void OnBackgroundedOnCompositorGpuThread();
 
   raw_ptr<gpu::GpuChannelManager> gpu_channel_manager_;
@@ -107,14 +112,6 @@ class VIZ_SERVICE_EXPORT CompositorGpuThread : public base::Thread {
   // before it.
   std::unique_ptr<gpu::GpuWatchdogThread> watchdog_thread_;
   scoped_refptr<gpu::SharedContextState> shared_context_state_;
-
-  // To start listening memory pressure signals from the platform, we create a
-  // new instance of MemoryPressureListener, passing a callback to a
-  // function that takes a MemoryPressureLevel parameter.To stop listening,
-  // simply delete the listener object. The implementation guarantees
-  // that the callback will always be called on the thread that created
-  // the listener.
-  std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
 
   base::WeakPtrFactory<CompositorGpuThread> weak_ptr_factory_;
 };

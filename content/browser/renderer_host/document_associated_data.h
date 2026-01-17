@@ -141,6 +141,18 @@ class DocumentAssociatedData : public base::SupportsUserData {
     devtools_navigation_token_ = devtools_navigation_token;
   }
 
+  // Sets the network restrictions id. Should only be called when the document
+  // is being committed. For more details see
+  // NavigationRequest::network_restrictions_id_
+  void set_network_restrictions_id(
+      std::optional<base::UnguessableToken> network_restrictions_id) {
+    network_restrictions_id_ = network_restrictions_id;
+  }
+
+  const std::optional<base::UnguessableToken>& network_restrictions_id() const {
+    return network_restrictions_id_;
+  }
+
   blink::mojom::ConfidenceLevel navigation_confidence() const {
     return confidence_level_;
   }
@@ -195,6 +207,11 @@ class DocumentAssociatedData : public base::SupportsUserData {
   void RemoveCookieSettingOverride(
       net::CookieSettingOverride cookie_setting_override);
 
+  void SetCrashReportContextRegion(base::UnsafeSharedMemoryRegion region);
+  const base::UnsafeSharedMemoryRegion& crash_report_storage_region() const {
+    return crash_report_storage_region_;
+  }
+
  private:
   const blink::DocumentToken token_;
   std::unique_ptr<PageImpl> owned_page_;
@@ -206,6 +223,7 @@ class DocumentAssociatedData : public base::SupportsUserData {
       services_;
   scoped_refptr<NavigationOrDocumentHandle> navigation_or_document_handle_;
   std::optional<base::UnguessableToken> devtools_navigation_token_;
+  std::optional<base::UnguessableToken> network_restrictions_id_;
   blink::mojom::ConfidenceLevel confidence_level_ =
       blink::mojom::ConfidenceLevel::kHigh;
   base::WeakPtr<KeepAliveURLLoaderService::FactoryContext>
@@ -216,6 +234,11 @@ class DocumentAssociatedData : public base::SupportsUserData {
   // augmented/modified before being returned via
   // `RenderFrameHostImpl::GetCookieSettingOverrides`.
   net::CookieSettingOverrides cookie_setting_overrides_;
+  // Shared memory region for crash report storage. The renderer is the sole
+  // writer into the memory, and `this` reads from it in
+  // `RenderFrameHostImpl::MaybeGenerateCrashReport()`, after the renderer
+  // process has crashed.
+  base::UnsafeSharedMemoryRegion crash_report_storage_region_;
 
   base::WeakPtrFactory<RenderFrameHostImpl> weak_factory_;
 };

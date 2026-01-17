@@ -25,6 +25,7 @@
 #include "base/notreached.h"
 #include "base/sanitizer_buildflags.h"
 #include "base/threading/thread.h"
+#include "base/time/time.h"
 #include "build/build_config.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/abseil-cpp/absl/base/dynamic_annotations.h"
@@ -329,7 +330,7 @@ class AcquireLoadThread : public PlatformThread::Delegate {
   void ThreadMain() override {
     // Wait for the other thread to make Release_Store
     PlatformThread::Sleep(Milliseconds(100));
-    value_->load(std::memory_order_acquire);
+    std::ignore = value_->load(std::memory_order_acquire);
   }
 
  private:

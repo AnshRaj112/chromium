@@ -139,11 +139,11 @@ struct VideoCaptureImpl::BufferContext
     return gmb_resources_->gpu_memory_buffer_handle.Clone();
   }
 
-  static void MailboxHolderReleased(scoped_refptr<BufferContext> buffer_context,
-                                    const gpu::SyncToken& release_sync_token) {
+  static void SharedImageReleased(scoped_refptr<BufferContext> buffer_context,
+                                  const gpu::SyncToken& release_sync_token) {
     if (!buffer_context->media_task_runner_->RunsTasksInCurrentSequence()) {
       buffer_context->media_task_runner_->PostTask(
-          FROM_HERE, base::BindOnce(&BufferContext::MailboxHolderReleased,
+          FROM_HERE, base::BindOnce(&BufferContext::SharedImageReleased,
                                     buffer_context, release_sync_token));
       return;
     }
@@ -414,7 +414,7 @@ bool VideoCaptureImpl::ProcessBuffer(
 #endif
 
       // Premapping of |gmb_handle.region| occurs in |buffer_context| when there
-      // is no GPU connection and inside GpuMemoryBufferImplDXGI when there is a
+      // is no GPU connection and inside MappableBufferDXGI when there is a
       // GPU connection.
       // Reset premapping in |buffer_context| to prevent concurrent mappings
       // that can occur when the GPU connection is lost and re-established.
@@ -535,6 +535,10 @@ bool VideoCaptureImpl::BindVideoFrameOnMediaTaskRunner(
 
   auto size = gfx::Size(video_frame_init_data.ready_buffer->info->coded_size);
   auto color_space = video_frame_init_data.ready_buffer->info->color_space;
+  if (!color_space.IsValid()) {
+    color_space = gfx::ColorSpace::CreateREC601();
+  }
+
   auto& shared_image =
       video_frame_init_data.buffer_context->gmb_resources()->shared_image;
   // If there is size or color space mismatch, recreate shared image with new
@@ -559,7 +563,7 @@ bool VideoCaptureImpl::BindVideoFrameOnMediaTaskRunner(
 #if BUILDFLAG(IS_APPLE)
     usage |= gpu::SHARED_IMAGE_USAGE_MACOS_VIDEO_TOOLBOX;
 #endif
-#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
+#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
     // These SharedImages may be used for zero-copy of VideoFrames into WebGPU.
     usage |= gpu::SHARED_IMAGE_USAGE_WEBGPU_READ;
 #endif
@@ -588,7 +592,7 @@ bool VideoCaptureImpl::BindVideoFrameOnMediaTaskRunner(
 
   auto frame = media::VideoFrame::WrapMappableSharedImage(
       shared_image, sync_token,
-      base::BindOnce(&BufferContext::MailboxHolderReleased,
+      base::BindOnce(&BufferContext::SharedImageReleased,
                      video_frame_init_data.buffer_context),
       gfx::Rect(video_frame_init_data.ready_buffer->info->visible_rect),
       video_frame_init_data.ready_buffer->info->visible_rect.size(),
@@ -618,7 +622,7 @@ struct VideoCaptureImpl::ClientInfo {
   media::VideoCaptureParams params;
   VideoCaptureStateUpdateCB state_update_cb;
   VideoCaptureDeliverFrameCB deliver_frame_cb;
-  VideoCaptureSubCaptureTargetVersionCB sub_capture_target_version_cb;
+  VideoCaptureVersionCB capture_version_cb;
   VideoCaptureNotifyFrameDroppedCB frame_dropped_cb;
 };
 
@@ -694,8 +698,8 @@ void VideoCaptureImpl::StartCapture(
       std::move(video_capture_callbacks.state_update_cb);
   client_info.deliver_frame_cb =
       std::move(video_capture_callbacks.deliver_frame_cb);
-  client_info.sub_capture_target_version_cb =
-      std::move(video_capture_callbacks.sub_capture_target_version_cb);
+  client_info.capture_version_cb =
+      std::move(video_capture_callbacks.capture_version_cb);
   client_info.frame_dropped_cb =
       std::move(video_capture_callbacks.frame_dropped_cb);
 
@@ -1002,7 +1006,7 @@ void VideoCaptureImpl::OnBufferDestroyed(int32_t buffer_id) {
   const auto& cb_iter = client_buffers_.find(buffer_id);
   if (cb_iter != client_buffers_.end()) {
     // If the BufferContext is non-null, the GpuMemoryBufferHandle-backed frames
-    // can have more than one reference (held by MailboxHolderReleased).
+    // can have more than one reference (held by SharedImageReleased).
     // Otherwise, only one reference should be held.
     DCHECK(!cb_iter->second.get() ||
            cb_iter->second->buffer_type() ==
@@ -1021,12 +1025,12 @@ void VideoCaptureImpl::OnFrameDropped(
   }
 }
 
-void VideoCaptureImpl::OnNewSubCaptureTargetVersion(
-    uint32_t sub_capture_target_version) {
+void VideoCaptureImpl::OnNewCaptureVersion(
+    const media::CaptureVersion& capture_version) {
   DCHECK_CALLED_ON_VALID_THREAD(io_thread_checker_);
 
   for (const auto& client : clients_) {
-    client.second.sub_capture_target_version_cb.Run(sub_capture_target_version);
+    client.second.capture_version_cb.Run(capture_version);
   }
 }
 
@@ -1052,7 +1056,7 @@ void VideoCaptureImpl::OnAllClientsFinishedConsumingFrame(
   buffer_context = nullptr;
   // For non-GMB case, there should be only one reference, from
   // |client_buffers_|. This DCHECK is invalid for GpuMemoryBufferHandle-backed
-  // frames, because MailboxHolderReleased may hold on to a reference to
+  // frames, because SharedImageReleased may hold on to a reference to
   // |buffer_context|.
   if (buffer_raw_ptr->buffer_type() !=
       VideoFrameBufferHandleType::kGpuMemoryBufferHandle) {

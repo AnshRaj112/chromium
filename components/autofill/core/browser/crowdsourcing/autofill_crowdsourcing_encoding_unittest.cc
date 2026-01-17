@@ -18,15 +18,20 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/protobuf_matchers.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/test/task_environment.h"
 #include "components/autofill/core/browser/autofill_field.h"
 #include "components/autofill/core/browser/crowdsourcing/randomized_encoder.h"
 #include "components/autofill/core/browser/field_types.h"
+#include "components/autofill/core/browser/form_parsing/determine_regex_types.h"
 #include "components/autofill/core/browser/form_parsing/form_field_parser.h"
+#include "components/autofill/core/browser/foundations/with_test_autofill_client_driver_manager.h"
 #include "components/autofill/core/browser/metrics/log_event.h"
 #include "components/autofill/core/browser/proto/api_v1.pb.h"
+#include "components/autofill/core/browser/proto/server.pb.h"
 #include "components/autofill/core/browser/test_utils/autofill_form_test_utils.h"
 #include "components/autofill/core/browser/test_utils/autofill_test_utils.h"
 #include "components/autofill/core/browser/test_utils/field_prediction_test_matchers.h"
+#include "components/autofill/core/common/autofill_debug_features.h"
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/autofill/core/common/autofill_prefs.h"
 #include "components/autofill/core/common/autofill_test_utils.h"
@@ -65,6 +70,7 @@ using ::testing::Eq;
 using ::testing::IsEmpty;
 using ::testing::Matcher;
 using ::testing::Not;
+using ::testing::Optional;
 using ::testing::Pointee;
 using ::testing::Property;
 using ::testing::ResultOf;
@@ -189,6 +195,34 @@ Matcher<AutofillUploadContents> SerializesAndDeepEquals(
 #undef PROPERTY_EQ
 }
 
+Matcher<AutofillQueryResponse::FormSuggestion::FieldSuggestion>
+DeepEqualsFieldSuggestion(
+    const AutofillQueryResponse::FormSuggestion::FieldSuggestion& expected) {
+  auto field_prediction_matcher =
+      [](const FieldPrediction& expected_field_prediction) {
+        return AllOf(Property("type", &FieldPrediction::type,
+                              expected_field_prediction.type()),
+                     Property("override", &FieldPrediction::override,
+                              expected_field_prediction.override()),
+                     Property("source", &FieldPrediction::source,
+                              expected_field_prediction.source()));
+      };
+  return AllOf(
+      Property("field_signature",
+               &AutofillQueryResponse::FormSuggestion::FieldSuggestion::
+                   field_signature,
+               expected.field_signature()),
+      Property(
+          "predictions",
+          &AutofillQueryResponse::FormSuggestion::FieldSuggestion::predictions,
+          ElementsAreArray(base::ToVector(expected.predictions(),
+                                          field_prediction_matcher))),
+      // Other fields than field_signature and predictions are just compared
+      // in a binary way. They probably don't matter for these tests.
+      EqualsProto<AutofillQueryResponse::FormSuggestion::FieldSuggestion>(
+          expected));
+}
+
 std::string SerializeAndEncode(const AutofillQueryResponse& response) {
   std::string unencoded_response_string;
   if (!response.SerializeToString(&unencoded_response_string)) {
@@ -210,7 +244,7 @@ void AddFieldOverrideToForm(
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 // Creates the override specification passed as a parameter to
-// `features::test::kAutofillOverridePredictions`.
+// `features::debug::kAutofillOverridePredictions`.
 std::string CreateManualOverridePrediction(
     const std::vector<ManualOverride>& overrides) {
   std::vector<std::string> override_specs;
@@ -233,11 +267,36 @@ std::string CreateManualOverridePrediction(
 }
 #endif
 
-class AutofillCrowdsourcingEncoding : public testing::Test {
+void ParseRationalizeAndSection(FormStructure& form) {
+  const RegexPredictions regex_predictions = DetermineRegexTypes(
+      GeoIpCountryCode(""), LanguageCode(""), form.ToFormData(), nullptr,
+      /*ignore_small_forms=*/true);
+  regex_predictions.ApplyTo(form.fields());
+  form.RationalizeAndAssignSections(GeoIpCountryCode(""), LanguageCode(""),
+                                    /*log_manager=*/nullptr);
+}
+
+class AutofillCrowdsourcingEncoding
+    : public testing::Test,
+      public WithTestAutofillClientDriverManager<> {
  public:
-  AutofillCrowdsourcingEncoding() = default;
+  AutofillCrowdsourcingEncoding() {
+    InitAutofillClient();
+    CreateAutofillDriver();
+  }
+
+  FormStructure& SeeAndGetParsedForm(const FormData& form_data) {
+    test_api(autofill_manager())
+        .AddSeenFormStructure(std::make_unique<FormStructure>(form_data));
+    FormStructure& form =
+        *test_api(autofill_manager()).FindCachedFormById(form_data.global_id());
+    ParseRationalizeAndSection(form);
+    return form;
+  }
 
  private:
+  base::test::TaskEnvironment task_environment_{
+      base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   test::AutofillUnitTestEnvironment autofill_test_environment_;
 };
 
@@ -983,10 +1042,23 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeUploadRequest_WithSubForms) {
                                    SerializesAndDeepEquals(upload_cvc)));
 }
 
-TEST_F(AutofillCrowdsourcingEncoding,
+class AutofillCrowdsourcingEncodingUploadProto
+    : public AutofillCrowdsourcingEncoding,
+      public testing::WithParamInterface<bool> {
+ public:
+  AutofillCrowdsourcingEncodingUploadProto() = default;
+  void SetUp() override {
+    feature_list_.InitWithFeatureState(features::kAutofillServerUploadMoreData,
+                                       GetParam());
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+TEST_P(AutofillCrowdsourcingEncodingUploadProto,
        EncodeUploadRequest_ThreeBitHashedMetadata) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(features::kAutofillServerUploadMoreData);
+  const bool kUploadMoreDataEnabled = GetParam();
 
   FormData form;
   form.set_id_attribute(u"form-id");
@@ -1017,44 +1089,70 @@ TEST_F(AutofillCrowdsourcingEncoding,
   ASSERT_EQ(1u, uploads.size());
   const AutofillUploadContents& upload = uploads.front();
 
-  // Verify form metadata hashes.
-  ASSERT_TRUE(upload.has_three_bit_hashed_form_metadata());
-  const ThreeBitHashedFormMetadata& form_metadata =
-      upload.three_bit_hashed_form_metadata();
-  EXPECT_EQ(form_metadata.id(), StrToHash3Bit(form.id_attribute()));
-  EXPECT_EQ(form_metadata.name(), StrToHash3Bit(form.name_attribute()));
-  EXPECT_EQ(form_metadata.button_titles_concatenated(),
-            StrToHash3Bit(form.button_titles()[0].first));
+  if (kUploadMoreDataEnabled) {
+    // Verify form metadata hashes.
+    ASSERT_TRUE(upload.has_three_bit_hashed_form_metadata());
+    const ThreeBitHashedFormMetadata& form_metadata =
+        upload.three_bit_hashed_form_metadata();
+    EXPECT_EQ(form_metadata.id(), StrToHash3Bit(form.id_attribute()));
+    EXPECT_EQ(form_metadata.name(), StrToHash3Bit(form.name_attribute()));
+    EXPECT_EQ(form_metadata.button_titles_concatenated(),
+              StrToHash3Bit(form.button_titles()[0].first));
 
-  // Verify field metadata hashes.
-  ASSERT_EQ(upload.field_data_size(), 1);
+    // Verify field metadata hashes.
+    ASSERT_EQ(upload.field_data_size(), 1);
 
-  const ThreeBitHashedFieldMetadata& field_metadata =
-      upload.field_data(0).three_bit_hashed_field_metadata();
-  EXPECT_EQ(field_metadata.id(), StrToHash3Bit(field.id_attribute()));
-  EXPECT_EQ(field_metadata.name(), StrToHash3Bit(field.name_attribute()));
-  EXPECT_EQ(field_metadata.type(),
-            StrToHash3Bit(FormControlTypeToString(field.form_control_type())));
-  EXPECT_EQ(field_metadata.label(), StrToHash3Bit(field.label()));
-  EXPECT_EQ(field_metadata.aria_label(), StrToHash3Bit(field.aria_label()));
-  EXPECT_EQ(field_metadata.aria_description(),
-            StrToHash3Bit(field.aria_description()));
-  EXPECT_EQ(field_metadata.placeholder(), StrToHash3Bit(field.placeholder()));
-  EXPECT_EQ(field_metadata.initial_value(), StrToHash3Bit(field.value()));
-  EXPECT_EQ(field_metadata.autocomplete(),
-            StrToHash3Bit(field.autocomplete_attribute()));
-  EXPECT_EQ(field_metadata.pattern(), StrToHash3Bit(field.pattern()));
+    const ThreeBitHashedFieldMetadata& field_metadata =
+        upload.field_data(0).three_bit_hashed_field_metadata();
+    EXPECT_EQ(field_metadata.id(), StrToHash3Bit(field.id_attribute()));
+    EXPECT_EQ(field_metadata.name(), StrToHash3Bit(field.name_attribute()));
+    EXPECT_EQ(
+        field_metadata.type(),
+        StrToHash3Bit(FormControlTypeToString(field.form_control_type())));
+    EXPECT_EQ(field_metadata.label(), StrToHash3Bit(field.label()));
+    EXPECT_EQ(field_metadata.aria_label(), StrToHash3Bit(field.aria_label()));
+    EXPECT_EQ(field_metadata.aria_description(),
+              StrToHash3Bit(field.aria_description()));
+    EXPECT_EQ(field_metadata.placeholder(), StrToHash3Bit(field.placeholder()));
+    EXPECT_EQ(field_metadata.autocomplete(),
+              StrToHash3Bit(field.autocomplete_attribute()));
+    EXPECT_EQ(field_metadata.pattern(), StrToHash3Bit(field.pattern()));
+  } else {
+    // Verify form metadata hashes are NOT present.
+    EXPECT_FALSE(upload.has_three_bit_hashed_form_metadata());
+
+    // Verify field metadata hashes are NOT present.
+    ASSERT_EQ(upload.field_data_size(), 1);
+    EXPECT_FALSE(upload.field_data(0).has_three_bit_hashed_field_metadata());
+  }
 }
 
-TEST_F(AutofillCrowdsourcingEncoding,
-       EncodeUploadRequest_ThreeBitHashedMetadata_FlagDisabled) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(features::kAutofillServerUploadMoreData);
+INSTANTIATE_TEST_SUITE_P(All,
+                         AutofillCrowdsourcingEncodingUploadProto,
+                         testing::Bool());
+
+class AutofillCrowdsourcingEncodingQueryProto
+    : public AutofillCrowdsourcingEncoding,
+      public testing::WithParamInterface<bool> {
+ public:
+  AutofillCrowdsourcingEncodingQueryProto() = default;
+  void SetUp() override {
+    feature_list_.InitWithFeatureState(
+        features::kAutofillServerExperimentalSignatures, GetParam());
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+TEST_P(AutofillCrowdsourcingEncodingQueryProto,
+       EncodeAutofillPageQueryRequest_WithExperimentalSignatures) {
+  const bool kExperimentalSignaturesEnabled = GetParam();
 
   FormData form;
   form.set_id_attribute(u"form-id");
   form.set_name_attribute(u"form-name");
-  form.set_action(GURL("http://www.foo.com/submit"));
+  form.set_url(GURL("http://www.foo.com/"));
   form.set_button_titles({std::make_pair(
       u"Submit Button", mojom::ButtonTitleType::BUTTON_ELEMENT_SUBMIT_TYPE)});
 
@@ -1072,21 +1170,56 @@ TEST_F(AutofillCrowdsourcingEncoding,
   field.set_renderer_id(test::MakeFieldRendererId());
   test_api(form).Append(field);
 
-  FormStructure form_structure(form);
-  EncodeUploadRequestOptions options;
+  std::vector<FormData> forms = {form};
 
-  std::vector<AutofillUploadContents> uploads =
-      EncodeUploadRequest(form_structure, options);
-  ASSERT_EQ(1u, uploads.size());
-  const AutofillUploadContents& upload = uploads.front();
+  auto [encoded_query, encoded_signatures] =
+      EncodeAutofillPageQueryRequest(forms);
 
-  // Verify form metadata hashes are NOT present.
-  EXPECT_FALSE(upload.has_three_bit_hashed_form_metadata());
+  ASSERT_EQ(encoded_query.forms_size(), 1);
+  const auto& query_form = encoded_query.forms(0);
 
-  // Verify field metadata hashes are NOT present.
-  ASSERT_EQ(upload.field_data_size(), 1);
-  EXPECT_FALSE(upload.field_data(0).has_three_bit_hashed_field_metadata());
+  if (kExperimentalSignaturesEnabled) {
+    EXPECT_EQ(query_form.structural_signature(),
+              CalculateStructuralFormSignature(form).value());
+
+    // Verify form metadata hashes.
+    ASSERT_TRUE(query_form.has_three_bit_hashed_form_metadata());
+    const auto& form_metadata = query_form.three_bit_hashed_form_metadata();
+    EXPECT_EQ(form_metadata.id(), StrToHash3Bit(form.id_attribute()));
+    EXPECT_EQ(form_metadata.name(), StrToHash3Bit(form.name_attribute()));
+    EXPECT_EQ(form_metadata.button_titles_concatenated(),
+              StrToHash3Bit(form.button_titles()[0].first));
+
+    // Verify field metadata hashes.
+    ASSERT_EQ(query_form.fields_size(), 1);
+    const auto& query_field = query_form.fields(0);
+    ASSERT_TRUE(query_field.has_three_bit_hashed_field_metadata());
+    const auto& field_metadata = query_field.three_bit_hashed_field_metadata();
+    EXPECT_EQ(field_metadata.id(), StrToHash3Bit(field.id_attribute()));
+    EXPECT_EQ(field_metadata.name(), StrToHash3Bit(field.name_attribute()));
+    EXPECT_EQ(
+        field_metadata.type(),
+        StrToHash3Bit(FormControlTypeToString(field.form_control_type())));
+    EXPECT_EQ(field_metadata.label(), StrToHash3Bit(field.label()));
+    EXPECT_EQ(field_metadata.aria_label(), StrToHash3Bit(field.aria_label()));
+    EXPECT_EQ(field_metadata.aria_description(),
+              StrToHash3Bit(field.aria_description()));
+    EXPECT_EQ(field_metadata.placeholder(), StrToHash3Bit(field.placeholder()));
+    EXPECT_EQ(field_metadata.autocomplete(),
+              StrToHash3Bit(field.autocomplete_attribute()));
+    EXPECT_EQ(field_metadata.pattern(), StrToHash3Bit(field.pattern()));
+  } else {
+    EXPECT_FALSE(query_form.has_structural_signature());
+    EXPECT_FALSE(query_form.has_three_bit_hashed_form_metadata());
+    ASSERT_EQ(query_form.fields_size(), 1);
+    const auto& query_field = query_form.fields(0);
+    EXPECT_FALSE(query_field.has_three_bit_hashed_field_metadata());
+  }
 }
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         AutofillCrowdsourcingEncodingQueryProto,
+                         testing::Bool());
 
 // Check that we compute the "datapresent" string correctly for the given
 // |available_types|.
@@ -1904,21 +2037,13 @@ TEST_F(AutofillCrowdsourcingEncoding,
            // Field 4: Expect `initial_value_changed` not set because the field
            // type resolves to `UNKNOWN_TYPE`.
            {.role = USERNAME, .value = u"username"}}});
-  // Form structure preserving the state from page load.
-  FormStructure cached_form_structure(form);
-  // Form structure containing the state on submit.
   FormStructure form_structure(form);
-
-  cached_form_structure.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  ParseRationalizeAndSection(form_structure);
 
   // Simulate user changed non-pre-filled field value.
   form_structure.field(0)->set_value(u"John");
   // Simulate user changed pre-filled field value.
   form_structure.field(2)->set_value(u"changed@example.com");
-
-  form_structure.RetrieveFromCache(
-      cached_form_structure,
-      FormStructure::RetrieveFromCacheReason::kFormImport);
 
   EncodeUploadRequestOptions options;
   options.encoder = RandomizedEncoder(
@@ -1944,8 +2069,9 @@ TEST_F(AutofillCrowdsourcingEncoding,
   EXPECT_FALSE(upload.field_data(3).has_initial_value_changed());
 }
 
-// Tests that Autofill does not send votes for a field that was filled with
-// fallback.
+// Tests that Autofill does send votes for a field that was filled with
+// fallback. Chrome clients should upload all form fields, see
+// crbug.com/444147005 for more details.
 TEST_F(AutofillCrowdsourcingEncoding,
        EncodeUploadRequest_SkipFieldsFilledWithFallback) {
   FormData form = test::GetFormData({.fields = {{.role = NAME_FIRST}}});
@@ -1970,7 +2096,7 @@ TEST_F(AutofillCrowdsourcingEncoding,
   uploads = EncodeUploadRequest(form_structure, options);
   ASSERT_GE(uploads.size(), 1u);
   upload = uploads[0];
-  EXPECT_EQ(upload.field_data_size(), 0);
+  EXPECT_EQ(upload.field_data_size(), 1);
 }
 
 TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
@@ -2023,10 +2149,7 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
   checkable_field.set_host_form_signature(form_signature);
   test_api(form).Append(checkable_field);
 
-  FormStructure form_structure(form);
-
-  std::vector<raw_ptr<const FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
+  std::vector<FormData> forms = {form};
 
   std::vector<FormSignature> expected_signatures;
   expected_signatures.emplace_back(form_signature.value());
@@ -2040,7 +2163,7 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
     AutofillPageQueryRequest::Form* query_form = query.add_forms();
     query_form->set_signature(form_signature.value());
     query_form->set_alternative_signature(
-        form_structure.alternative_form_signature().value());
+        CalculateAlternativeFormSignature(form).value());
     query_form->add_fields()->set_signature(412125936U);
     query_form->add_fields()->set_signature(1917667676U);
     query_form->add_fields()->set_signature(2226358947U);
@@ -2050,7 +2173,7 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
     query_form = query.add_forms();
     query_form->set_signature(12345UL);
     query_form->set_alternative_signature(
-        form_structure.alternative_form_signature().value());
+        CalculateAlternativeFormSignature(form).value());
     query_form->add_fields()->set_signature(1917667676U);
     query_form->add_fields()->set_signature(747221617U);
     query_form->add_fields()->set_signature(4108155786U);
@@ -2058,7 +2181,7 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
     query_form = query.add_forms();
     query_form->set_signature(67890UL);
     query_form->set_alternative_signature(
-        form_structure.alternative_form_signature().value());
+        CalculateAlternativeFormSignature(form).value());
     query_form->add_fields()->set_signature(2226358947U);
   }
 
@@ -2069,8 +2192,7 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
 
   // Add the same form, only one will be encoded, so
   // EncodeAutofillPageQueryRequest() should return the same data.
-  FormStructure form_structure2(form);
-  forms.push_back(&form_structure2);
+  forms.push_back(form);
 
   std::vector<FormSignature> expected_signatures2 = expected_signatures;
   auto [encoded_query2, encoded_signatures2] =
@@ -2093,8 +2215,7 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
     test_api(form).Append(field);
   }
 
-  FormStructure form_structure3(form);
-  forms.push_back(&form_structure3);
+  forms.push_back(form);
 
   std::vector<FormSignature> expected_signatures3 = expected_signatures2;
   expected_signatures3.push_back(form_signature3);
@@ -2104,7 +2225,7 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
     AutofillPageQueryRequest::Form* query_form = query.add_forms();
     query_form->set_signature(2608858059775241169);
     query_form->set_alternative_signature(
-        form_structure3.alternative_form_signature().value());
+        CalculateAlternativeFormSignature(form).value());
     query_form->add_fields()->set_signature(412125936U);
     query_form->add_fields()->set_signature(1917667676U);
     query_form->add_fields()->set_signature(2226358947U);
@@ -2120,11 +2241,9 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
   EXPECT_EQ(encoded_signatures3, expected_signatures3);
   EXPECT_THAT(encoded_query3, SerializesAndDeepEquals(query));
 
-  // |form_structures4| will have the same signature as |form_structure3|.
+  // form4 will have the same signature as form3.
   test_api(form).field(-1).set_name(u"address123456789");
-
-  FormStructure form_structure4(form);
-  forms.push_back(&form_structure4);
+  forms.push_back(form);
 
   std::vector<FormSignature> expected_signatures4 = expected_signatures3;
 
@@ -2143,8 +2262,7 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
     test_api(malformed_form).Append(field);
   }
 
-  FormStructure malformed_form_structure(malformed_form);
-  forms.push_back(&malformed_form_structure);
+  forms.push_back(malformed_form);
 
   std::vector<FormSignature> expected_signatures5 = expected_signatures4;
 
@@ -2154,8 +2272,7 @@ TEST_F(AutofillCrowdsourcingEncoding, EncodeAutofillPageQueryRequest) {
   EXPECT_THAT(encoded_query5, SerializesAndDeepEquals(query));
 
   // Check that we fail if there are only bad form(s).
-  std::vector<raw_ptr<const FormStructure, VectorExperimental>> bad_forms;
-  bad_forms.push_back(&malformed_form_structure);
+  std::vector<FormData> bad_forms = {malformed_form};
   auto [encoded_query6, encoded_signatures6] =
       EncodeAutofillPageQueryRequest(bad_forms);
   EXPECT_TRUE(encoded_signatures6.empty());
@@ -2173,17 +2290,15 @@ TEST_F(AutofillCrowdsourcingEncoding, SkipFieldTest) {
       .action = "http://cool.com/login",
   });
 
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<const FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
+  std::vector<FormData> forms = {form};
 
   // Create the expected query and serialize it to a string.
   AutofillPageQueryRequest query;
   query.set_client_version(std::string(GetProductNameAndVersionForUserAgent()));
   AutofillPageQueryRequest::Form* query_form = query.add_forms();
-  query_form->set_signature(form_structure.form_signature().value());
+  query_form->set_signature(CalculateFormSignature(form).value());
   query_form->set_alternative_signature(
-      form_structure.alternative_form_signature().value());
+      CalculateAlternativeFormSignature(form).value());
 
   query_form->add_fields()->set_signature(239111655U);
   query_form->add_fields()->set_signature(420638584U);
@@ -2212,17 +2327,15 @@ TEST_F(AutofillCrowdsourcingEncoding,
       .action = "http://cool.com/login",
   });
 
-  std::vector<raw_ptr<const FormStructure, VectorExperimental>> forms;
-  FormStructure form_structure(form);
-  forms.push_back(&form_structure);
+  std::vector<FormData> forms = {form};
 
   // Create the expected query and serialize it to a string.
   AutofillPageQueryRequest query;
   query.set_client_version(std::string(GetProductNameAndVersionForUserAgent()));
   AutofillPageQueryRequest::Form* query_form = query.add_forms();
-  query_form->set_signature(form_structure.form_signature().value());
+  query_form->set_signature(CalculateFormSignature(form).value());
   query_form->set_alternative_signature(
-      form_structure.alternative_form_signature().value());
+      CalculateAlternativeFormSignature(form).value());
 
   query_form->add_fields()->set_signature(239111655U);
   query_form->add_fields()->set_signature(420638584U);
@@ -2257,17 +2370,15 @@ TEST_F(AutofillCrowdsourcingEncoding,
       .action = "http://cool.com/login",
   });
 
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<const FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
+  std::vector<FormData> forms = {form};
 
   // Create the expected query and serialize it to a string.
   AutofillPageQueryRequest query;
   query.set_client_version(std::string(GetProductNameAndVersionForUserAgent()));
   AutofillPageQueryRequest::Form* query_form = query.add_forms();
-  query_form->set_signature(form_structure.form_signature().value());
+  query_form->set_signature(CalculateFormSignature(form).value());
   query_form->set_alternative_signature(
-      form_structure.alternative_form_signature().value());
+      CalculateAlternativeFormSignature(form).value());
 
   query_form->add_fields()->set_signature(239111655U);
   query_form->add_fields()->set_signature(420638584U);
@@ -2294,21 +2405,20 @@ TEST_F(AutofillCrowdsourcingEncoding,
       .action = "http://cool.com/login",
   });
 
-  FormStructure form_structure(form);
-  for (auto& fs_field : form_structure) {
-    fs_field->set_host_form_signature(form_structure.form_signature());
+  FormSignature form_signature = CalculateFormSignature(form);
+  for (FormFieldData& fs_field : test_api(form).fields()) {
+    fs_field.set_host_form_signature(form_signature);
   }
 
-  std::vector<raw_ptr<const FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
+  std::vector<FormData> forms = {form};
 
   // Create the expected query and serialize it to a string.
   AutofillPageQueryRequest query;
   query.set_client_version(std::string(GetProductNameAndVersionForUserAgent()));
   AutofillPageQueryRequest::Form* query_form = query.add_forms();
-  query_form->set_signature(form_structure.form_signature().value());
+  query_form->set_signature(CalculateFormSignature(form).value());
   query_form->set_alternative_signature(
-      form_structure.alternative_form_signature().value());
+      CalculateAlternativeFormSignature(form).value());
 
   query_form->add_fields()->set_signature(239111655U);
   query_form->add_fields()->set_signature(1318412689U);
@@ -2331,10 +2441,7 @@ TEST_F(AutofillCrowdsourcingEncoding, AllowBigForms) {
     }));
   }
 
-  FormStructure form_structure(form);
-
-  std::vector<raw_ptr<const FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
+  std::vector<FormData> forms = {form};
   auto [encoded_query, encoded_signatures] =
       EncodeAutofillPageQueryRequest(forms);
   EXPECT_EQ(1u, encoded_signatures.size());
@@ -2352,6 +2459,7 @@ TEST_F(AutofillCrowdsourcingEncoding,
                   {.label = u"some other field",
                    .name = u"some_other_field",
                    .autocomplete_attribute = "name"}}});
+  FormStructure& form = SeeAndGetParsedForm(form_data);
 
   // Setup the query response with an override for the name field to be a first
   // name.
@@ -2360,14 +2468,10 @@ TEST_F(AutofillCrowdsourcingEncoding,
   AddFieldOverrideToForm(form_data.fields()[0], NAME_FIRST, form_suggestion);
   AddFieldPredictionToForm(form_data.fields()[1], NAME_LAST, form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-
-  // Parse the response and update the field type predictions.
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures({form}),
+                                 {form_data});
   ASSERT_EQ(form.field_count(), 2U);
 
   // Validate the type predictions.
@@ -2383,18 +2487,18 @@ TEST_F(AutofillCrowdsourcingEncoding,
   EXPECT_FALSE(form.field(1)->server_type_prediction_is_override());
 
   // Validate that the server prediction won for the first field.
-  EXPECT_EQ(form.field(0)->Type().GetStorableType(), NAME_FIRST);
-  EXPECT_EQ(form.field(1)->Type().GetStorableType(), NAME_FULL);
+  EXPECT_THAT(form.field(0)->Type().GetTypes(), ElementsAre(NAME_FIRST));
+  EXPECT_THAT(form.field(1)->Type().GetTypes(), ElementsAre(NAME_FULL));
 
   // Validate that the server override cannot be altered.
   form.field(0)->SetTypeTo(AutofillType(NAME_FULL),
                            AutofillPredictionSource::kHeuristics);
-  EXPECT_EQ(form.field(0)->Type().GetStorableType(), NAME_FIRST);
+  EXPECT_THAT(form.field(0)->Type().GetTypes(), ElementsAre(NAME_FIRST));
 
   // Validate that that the non-override can be altered.
   form.field(1)->SetTypeTo(AutofillType(NAME_FIRST),
                            AutofillPredictionSource::kHeuristics);
-  EXPECT_EQ(form.field(1)->Type().GetStorableType(), NAME_FIRST);
+  EXPECT_THAT(form.field(1)->Type().GetTypes(), ElementsAre(NAME_FIRST));
 }
 
 // Test the heuristic prediction for NAME_LAST_SECOND overrides server
@@ -2412,9 +2516,7 @@ TEST_F(AutofillCrowdsourcingEncoding,
             // Should be identified by local heuristics.
             {.label = u"Apellido Materno", .name = u"apellido materno"}},
        .url = "http://foo.com"});
-
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  FormStructure& form = SeeAndGetParsedForm(form_data);
 
   // Setup the query response.
   AutofillQueryResponse response;
@@ -2424,12 +2526,10 @@ TEST_F(AutofillCrowdsourcingEncoding,
   AddFieldPredictionToForm(form_data.fields()[1], NAME_LAST, form_suggestion);
   AddFieldPredictionToForm(form_data.fields()[2], NAME_LAST, form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-
-  // Parse the response and update the field type predictions.
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures({form}),
+                                 {form_data});
   ASSERT_EQ(form.field_count(), 3U);
 
   // Validate the heuristic and server predictions.
@@ -2439,9 +2539,9 @@ TEST_F(AutofillCrowdsourcingEncoding,
   EXPECT_EQ(NAME_LAST, form.field(2)->server_type());
 
   // Validate that the heuristic prediction wins for the two last name fields.
-  EXPECT_EQ(form.field(0)->Type().GetStorableType(), NAME_FIRST);
-  EXPECT_EQ(form.field(1)->Type().GetStorableType(), NAME_LAST_FIRST);
-  EXPECT_EQ(form.field(2)->Type().GetStorableType(), NAME_LAST_SECOND);
+  EXPECT_THAT(form.field(0)->Type().GetTypes(), ElementsAre(NAME_FIRST));
+  EXPECT_THAT(form.field(1)->Type().GetTypes(), ElementsAre(NAME_LAST_FIRST));
+  EXPECT_THAT(form.field(2)->Type().GetTypes(), ElementsAre(NAME_LAST_SECOND));
 }
 
 // Test the heuristic prediction for ADDRESS_HOME_STREET_NAME and
@@ -2459,9 +2559,7 @@ TEST_F(AutofillCrowdsourcingEncoding,
             // Field for the postal code.
             {.label = u"ZIP", .name = u"ZIP"}},
        .url = "http://foo.com"});
-
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  FormStructure& form = SeeAndGetParsedForm(form_data);
 
   // Setup the query response.
   AutofillQueryResponse response;
@@ -2473,12 +2571,10 @@ TEST_F(AutofillCrowdsourcingEncoding,
   AddFieldPredictionToForm(form_data.fields()[2], ADDRESS_HOME_LINE2,
                            form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-
-  // Parse the response and update the field type predictions.
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures({form}),
+                                 {form_data});
   ASSERT_EQ(form.field_count(), 4U);
 
   // Validate the heuristic and server predictions.
@@ -2489,8 +2585,10 @@ TEST_F(AutofillCrowdsourcingEncoding,
 
   // Validate that the heuristic prediction wins for the street name and house
   // number.
-  EXPECT_EQ(form.field(1)->Type().GetStorableType(), ADDRESS_HOME_STREET_NAME);
-  EXPECT_EQ(form.field(2)->Type().GetStorableType(), ADDRESS_HOME_HOUSE_NUMBER);
+  EXPECT_THAT(form.field(1)->Type().GetTypes(),
+              ElementsAre(ADDRESS_HOME_STREET_NAME));
+  EXPECT_THAT(form.field(2)->Type().GetTypes(),
+              ElementsAre(ADDRESS_HOME_HOUSE_NUMBER));
 }
 
 // Tests that a joined prediction for email or loyalty card fields is generated
@@ -2507,8 +2605,7 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_JoinedTypes) {
              .name = u"password",
              .form_control_type = FormControlType::kInputPassword}},
        .url = "http://foo.com"});
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  FormStructure& form = SeeAndGetParsedForm(form_data);
 
   // Setup the query response.
   AutofillQueryResponse response;
@@ -2519,21 +2616,24 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_JoinedTypes) {
                             form_suggestion);
   AddFieldPredictionToForm(form_data.fields()[1], PASSWORD, form_suggestion);
 
-  // Parse the response and update the field type predictions.
-  std::string response_string = SerializeAndEncode(response);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures({form}),
+                                 {form_data});
   ASSERT_EQ(form.field_count(), 2U);
 
   // Validate the heuristic and server predictions.
+#if BUILDFLAG(IS_IOS)
   EXPECT_EQ(form.field(0)->heuristic_type(), EMAIL_ADDRESS);
+#else
+  EXPECT_EQ(form.field(0)->heuristic_type(), EMAIL_OR_LOYALTY_MEMBERSHIP_ID);
+#endif
   EXPECT_EQ(form.field(0)->server_type(), EMAIL_OR_LOYALTY_MEMBERSHIP_ID);
 
   // Validate that the server prediction wins for email or loyalty cards.
-  EXPECT_EQ(EMAIL_OR_LOYALTY_MEMBERSHIP_ID,
-            form.field(0)->Type().GetStorableType());
-  EXPECT_EQ(PASSWORD, form.field(1)->Type().GetStorableType());
+  EXPECT_THAT(form.field(0)->Type().GetTypes(),
+              ElementsAre(EMAIL_OR_LOYALTY_MEMBERSHIP_ID));
+  EXPECT_THAT(form.field(1)->Type().GetTypes(), ElementsAre(PASSWORD));
 }
 
 // Tests that a server joined prediction is not generated for email or loyalty
@@ -2550,8 +2650,7 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_NoJoinedTypes) {
              .name = u"password",
              .form_control_type = FormControlType::kInputPassword}},
        .url = "http://foo.com"});
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  FormStructure& form = SeeAndGetParsedForm(form_data);
 
   // Setup the query response.
   AutofillQueryResponse response;
@@ -2562,20 +2661,24 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_NoJoinedTypes) {
                             form_suggestion);
   AddFieldPredictionToForm(form_data.fields()[1], PASSWORD, form_suggestion);
 
-  // Parse the response and update the field type predictions.
-  std::string response_string = SerializeAndEncode(response);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures({form}),
+                                 {form_data});
   ASSERT_EQ(form.field_count(), 2U);
 
   // Validate the heuristic and server predictions.
-  EXPECT_EQ(form.field(0)->heuristic_type(), EMAIL_ADDRESS);
+#if BUILDFLAG(IS_IOS)
+  FieldType heuristic_type = EMAIL_ADDRESS;
+#else
+  FieldType heuristic_type = EMAIL_OR_LOYALTY_MEMBERSHIP_ID;
+#endif
+  EXPECT_EQ(form.field(0)->heuristic_type(), heuristic_type);
   EXPECT_EQ(form.field(0)->server_type(), EMAIL_ADDRESS);
 
   // Validate that the server prediction wins for email or loyalty cards.
-  EXPECT_EQ(form.field(0)->Type().GetStorableType(), EMAIL_ADDRESS);
-  EXPECT_EQ(form.field(1)->Type().GetStorableType(), PASSWORD);
+  EXPECT_THAT(form.field(0)->Type().GetTypes(), ElementsAre(heuristic_type));
+  EXPECT_THAT(form.field(1)->Type().GetTypes(), ElementsAre(PASSWORD));
 }
 
 // Tests proper resolution heuristic, server and html field types when the
@@ -2590,8 +2693,7 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_TooManyTypes) {
                            FormControlType::kInputText),
        CreateTestFormField("email", "email", "", FormControlType::kInputText,
                            "address-level2")});
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  FormStructure& form = SeeAndGetParsedForm(form_data);
 
   // Setup the query response.
   AutofillQueryResponse response;
@@ -2607,37 +2709,36 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_TooManyTypes) {
 
   std::string response_string = SerializeAndEncode(response);
 
-  // Parse the response and update the field type predictions.
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures({form}),
+                                 {form_data});
   ASSERT_EQ(form.field_count(), 3U);
 
   // Validate field 0.
   EXPECT_EQ(NAME_FIRST, form.field(0)->heuristic_type());
   EXPECT_EQ(NAME_FIRST, form.field(0)->server_type());
   EXPECT_EQ(HtmlFieldType::kUnspecified, form.field(0)->html_type());
-  EXPECT_EQ(NAME_FIRST, form.field(0)->Type().GetStorableType());
+  EXPECT_THAT(form.field(0)->Type().GetTypes(), ElementsAre(NAME_FIRST));
 
   // Validate field 1.
   EXPECT_EQ(NAME_LAST, form.field(1)->heuristic_type());
   EXPECT_EQ(NAME_LAST, form.field(1)->server_type());
   EXPECT_EQ(HtmlFieldType::kUnspecified, form.field(1)->html_type());
-  EXPECT_EQ(NAME_LAST, form.field(1)->Type().GetStorableType());
+  EXPECT_THAT(form.field(1)->Type().GetTypes(), ElementsAre(NAME_LAST));
 
   // Validate field 2. Note: HtmlFieldType::kAddressLevel2 -> City
   EXPECT_EQ(EMAIL_ADDRESS, form.field(2)->heuristic_type());
   EXPECT_EQ(ADDRESS_HOME_LINE1, form.field(2)->server_type());
   EXPECT_EQ(HtmlFieldType::kAddressLevel2, form.field(2)->html_type());
-  EXPECT_EQ(ADDRESS_HOME_CITY, form.field(2)->Type().GetStorableType());
+  EXPECT_THAT(form.field(2)->Type().GetTypes(), ElementsAre(ADDRESS_HOME_CITY));
 
   // Also check the extreme case of an empty form.
-  FormStructure empty_form{FormData()};
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> empty_forms{
-      &empty_form};
-  ParseServerPredictionsQueryResponse(response_string, empty_forms,
-                                      test::GetEncodedSignatures(empty_forms),
-                                      nullptr);
+  FormStructure& empty_form = SeeAndGetParsedForm(FormData());
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures({empty_form}),
+                                 {FormData()});
   ASSERT_EQ(empty_form.field_count(), 0U);
 }
 
@@ -2653,8 +2754,7 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_UnknownType) {
                            FormControlType::kInputText),
        CreateTestFormField("email", "email", "", FormControlType::kInputText,
                            "address-level2")});
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  FormStructure& form = SeeAndGetParsedForm(form_data);
 
   // Setup the query response.
   AutofillQueryResponse response;
@@ -2666,31 +2766,29 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_UnknownType) {
   AddFieldPredictionToForm(form_data.fields()[2], ADDRESS_HOME_LINE1,
                            form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-
-  // Parse the response and update the field type predictions.
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures({form}),
+                                 {form_data});
   ASSERT_EQ(form.field_count(), 3U);
 
   // Validate field 0.
   EXPECT_EQ(form.field(0)->heuristic_type(), NAME_FIRST);
   EXPECT_EQ(form.field(0)->server_type(), UNKNOWN_TYPE);
   EXPECT_EQ(form.field(0)->html_type(), HtmlFieldType::kUnspecified);
-  EXPECT_EQ(form.field(0)->Type().GetStorableType(), UNKNOWN_TYPE);
+  EXPECT_THAT(form.field(0)->Type().GetTypes(), ElementsAre(UNKNOWN_TYPE));
 
   // Validate field 1.
   EXPECT_EQ(form.field(1)->heuristic_type(), NAME_LAST);
   EXPECT_EQ(form.field(1)->server_type(), NO_SERVER_DATA);
   EXPECT_EQ(form.field(1)->html_type(), HtmlFieldType::kUnspecified);
-  EXPECT_EQ(form.field(1)->Type().GetStorableType(), NAME_LAST);
+  EXPECT_THAT(form.field(1)->Type().GetTypes(), ElementsAre(NAME_LAST));
 
   // Validate field 2. Note: HtmlFieldType::kAddressLevel2 -> City
   EXPECT_EQ(form.field(2)->heuristic_type(), EMAIL_ADDRESS);
   EXPECT_EQ(form.field(2)->server_type(), ADDRESS_HOME_LINE1);
   EXPECT_EQ(form.field(2)->html_type(), HtmlFieldType::kAddressLevel2);
-  EXPECT_EQ(form.field(2)->Type().GetStorableType(), ADDRESS_HOME_CITY);
+  EXPECT_THAT(form.field(2)->Type().GetTypes(), ElementsAre(ADDRESS_HOME_CITY));
 }
 
 struct PredictionPrecedenceTestCase {
@@ -2701,7 +2799,8 @@ struct PredictionPrecedenceTestCase {
 };
 
 class AutofillCrowdsourcingEncodingPredictionPrecedenceTest
-    : public ::testing::TestWithParam<PredictionPrecedenceTestCase> {
+    : public AutofillCrowdsourcingEncoding,
+      public ::testing::WithParamInterface<PredictionPrecedenceTestCase> {
  public:
   AutofillCrowdsourcingEncodingPredictionPrecedenceTest() {
     if (GetParam().autofill_ai_feature_on) {
@@ -2713,7 +2812,6 @@ class AutofillCrowdsourcingEncodingPredictionPrecedenceTest
 
  private:
   base::test::ScopedFeatureList feature_list_;
-  test::AutofillUnitTestEnvironment autofill_test_environment_;
 };
 
 // Tests that precedence of server's query response is indeed: Main frame
@@ -2722,7 +2820,7 @@ class AutofillCrowdsourcingEncodingPredictionPrecedenceTest
 // AI predictions are treated on the same footing as crowdsourcing predictions -
 // otherwise, they receive the lowest priority.
 TEST_P(AutofillCrowdsourcingEncodingPredictionPrecedenceTest,
-       ParseServerPredictionsQueryResponse) {
+       ParseQueryResponse) {
   constexpr int host_form_signature = 12345;
 
   // Create an iframe form with a single field.
@@ -2738,14 +2836,12 @@ TEST_P(AutofillCrowdsourcingEncodingPredictionPrecedenceTest,
   FormData form;
   form.set_fields(fields);
   form.set_url(GURL("http://foo.com"));
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
 
   // Make serialized API response.
   AutofillQueryResponse api_response;
   std::vector<FormSignature> encoded_signatures =
-      test::GetEncodedSignatures(forms);
+      test::GetEncodedSignatures({form_structure});
 
   // Main frame response.
   auto* main_frame_form_suggestion = api_response.add_form_suggestions();
@@ -2758,14 +2854,12 @@ TEST_P(AutofillCrowdsourcingEncodingPredictionPrecedenceTest,
   AddFieldPredictionsToForm(field, {GetParam().iframe_prediction},
                             iframe_form_suggestion);
 
-  // Serialize API response.
-  std::string response_string;
-  ASSERT_TRUE(api_response.SerializeToString(&response_string));
-  ParseServerPredictionsQueryResponse(base::Base64Encode(response_string),
-                                      forms, encoded_signatures, nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(api_response),
+                                 encoded_signatures, {form});
 
-  ASSERT_EQ(forms.front()->field_count(), 1U);
-  EXPECT_EQ(forms.front()->field(0)->server_type(), GetParam().expected_type);
+  ASSERT_EQ(form_structure.field_count(), 1U);
+  EXPECT_EQ(form_structure.field(0)->server_type(), GetParam().expected_type);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -2828,13 +2922,11 @@ TEST_F(AutofillCrowdsourcingEncoding,
   FormData form_data = test::GetFormData(
       {.fields = {
            {.host_form_signature = FormSignature(12345), .name = u"name"}}});
-
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  FormStructure& form = SeeAndGetParsedForm(form_data);
 
   // Setup the query response.
   AutofillQueryResponse response;
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form)};
   std::vector<FormSignature> encoded_signatures =
       test::GetEncodedSignatures(forms);
   // Main frame response.
@@ -2847,11 +2939,9 @@ TEST_F(AutofillCrowdsourcingEncoding,
   AddFieldPredictionToForm(form_data.fields()[0], SINGLE_USERNAME,
                            iframe_form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-
-  // Parse the response and update the field type predictions.
-  ParseServerPredictionsQueryResponse(response_string, forms,
-                                      encoded_signatures, nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 encoded_signatures, {form_data});
   ASSERT_EQ(form.field_count(), 1U);
 
   // Validate field 0.
@@ -2864,7 +2954,7 @@ TEST_F(AutofillCrowdsourcingEncoding,
 // used as a fallback if the form's signature does not contain useful type
 // predictions.
 TEST_F(AutofillCrowdsourcingEncoding,
-       ParseServerPredictionsQueryResponse_FallbackToHostFormSignature) {
+       ParseQueryResponse_FallbackToHostFormSignature) {
   // Create a form whose fields have FormFieldData::host_form_signature either
   // 12345 or 67890. The first two fields have identical field signatures.
   FormData form = test::GetFormData(
@@ -2886,9 +2976,8 @@ TEST_F(AutofillCrowdsourcingEncoding,
   expected_types.push_back(CREDIT_CARD_VERIFICATION_CODE);
   expected_types.push_back(NO_SERVER_DATA);
 
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
 
   ASSERT_GE(form.fields().size(), 6u);
 
@@ -2934,12 +3023,9 @@ TEST_F(AutofillCrowdsourcingEncoding,
                              form_suggestion);
   }
 
-  // Serialize API response.
-  std::string response_string;
-  ASSERT_TRUE(api_response.SerializeToString(&response_string));
-
-  ParseServerPredictionsQueryResponse(base::Base64Encode(response_string),
-                                      forms, encoded_signatures, nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(api_response),
+                                 encoded_signatures, {form});
 
   // Check expected field types.
   ASSERT_GE(forms[0]->field_count(), 6U);
@@ -2954,7 +3040,7 @@ TEST_F(AutofillCrowdsourcingEncoding,
   EXPECT_EQ(forms.front()->field(6)->server_type(), expected_types[6]);
 }
 
-TEST_F(AutofillCrowdsourcingEncoding, ParseServerPredictionsQueryResponse) {
+TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse) {
   // Make form 1 data.
   FormData form = test::GetFormData(
       {.fields = {{.label = u"fullname", .name = u"fullname"},
@@ -2962,10 +3048,6 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseServerPredictionsQueryResponse) {
                   // Checkable fields should be ignored in parsing
                   {.label = u"radio_button",
                    .form_control_type = FormControlType::kInputRadio}}});
-
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
 
   // Make form 2 data.
   FormData form2 = test::GetFormData(
@@ -2976,8 +3058,10 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseServerPredictionsQueryResponse) {
             .form_control_type = FormControlType::kInputPassword},
        }});
 
-  FormStructure form_structure2(form2);
-  forms.push_back(&form_structure2);
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+  FormStructure& form_structure2 = SeeAndGetParsedForm(form2);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure),
+                                               raw_ref(form_structure2)};
 
   // Make serialized API response.
   AutofillQueryResponse api_response;
@@ -2985,7 +3069,7 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseServerPredictionsQueryResponse) {
   auto* form_suggestion = api_response.add_form_suggestions();
   AddFieldPredictionsToForm(form.fields()[0],
                             {CreateFieldPrediction(NAME_FULL),
-                             CreateFieldPrediction(PHONE_HOME_COUNTRY_CODE)},
+                             CreateFieldPrediction(CREDIT_CARD_NAME_FULL)},
                             form_suggestion);
   AddFieldPredictionToForm(form.fields()[1], ADDRESS_HOME_LINE1,
                            form_suggestion);
@@ -2993,13 +3077,10 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseServerPredictionsQueryResponse) {
   form_suggestion = api_response.add_form_suggestions();
   AddFieldPredictionToForm(form2.fields()[0], EMAIL_ADDRESS, form_suggestion);
   AddFieldPredictionToForm(form2.fields()[1], NO_SERVER_DATA, form_suggestion);
-  // Serialize API response.
-  std::string response_string;
-  ASSERT_TRUE(api_response.SerializeToString(&response_string));
-
-  ParseServerPredictionsQueryResponse(base::Base64Encode(response_string),
-                                      forms, test::GetEncodedSignatures(forms),
-                                      nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(api_response),
+                                 test::GetEncodedSignatures(forms),
+                                 {form, form2});
 
   // Verify that the form fields are properly filled with data retrieved from
   // the query.
@@ -3009,7 +3090,7 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseServerPredictionsQueryResponse) {
   EXPECT_EQ(forms[0]->field(0)->server_type(), NAME_FULL);
   EXPECT_THAT(forms[0]->field(0)->server_predictions(),
               ElementsAre(EqualsPrediction(NAME_FULL),
-                          EqualsPrediction(PHONE_HOME_COUNTRY_CODE)));
+                          EqualsPrediction(CREDIT_CARD_NAME_FULL)));
 
   EXPECT_EQ(forms[0]->field(1)->server_type(), ADDRESS_HOME_LINE1);
   EXPECT_THAT(forms[0]->field(1)->server_predictions(),
@@ -3027,8 +3108,7 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseServerPredictionsQueryResponse) {
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 // Tests that manually specified (i.e. passed as a feature parameter) field type
 // predictions override server predictions.
-TEST_F(AutofillCrowdsourcingEncoding,
-       ParseServerPredictionsQueryResponseWithManualOverrides) {
+TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_WithManualOverrides) {
   // Make form.
   FormFieldData field1 =
       CreateTestFormField("name", "name", "", FormControlType::kInputText);
@@ -3037,21 +3117,20 @@ TEST_F(AutofillCrowdsourcingEncoding,
   FormData form;
   form.set_fields({field1, field2});
   form.set_url(GURL("http://foo.com"));
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{
-      &form_structure};
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
 
   // The feature is only initialized here because the parameters contain the
   // form and field signatures.
   // Only the prediction for the first field is overridden.
   base::test::ScopedFeatureList features;
   base::FieldTrialParams feature_parameters{
-      {features::test::kAutofillOverridePredictionsSpecification.name,
+      {features::debug::kAutofillOverridePredictionsSpecification.name,
        CreateManualOverridePrediction({{CalculateFormSignature(form),
                                         CalculateFieldSignatureForField(field1),
                                         {USERNAME}}})}};
   features.InitAndEnableFeatureWithParameters(
-      features::test::kAutofillOverridePredictions, feature_parameters);
+      features::debug::kAutofillOverridePredictions, feature_parameters);
 
   // Make serialized API response.
   AutofillQueryResponse api_response;
@@ -3065,9 +3144,9 @@ TEST_F(AutofillCrowdsourcingEncoding,
       {CreateFieldPrediction(PASSWORD, FieldPrediction::SOURCE_OVERRIDE)},
       form_suggestion);
 
-  ParseServerPredictionsQueryResponse(SerializeAndEncode(api_response), forms,
-                                      test::GetEncodedSignatures(forms),
-                                      nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(api_response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_EQ(forms[0]->field_count(), 2u);
 
@@ -3084,9 +3163,8 @@ TEST_F(AutofillCrowdsourcingEncoding,
 
 // Tests that specifying manual field type prediction overrides also works in
 // the absence of any server predictions.
-TEST_F(
-    AutofillCrowdsourcingEncoding,
-    ParseServerPredictionsQueryResponseWithManualOverridesAndNoServerPredictions) {
+TEST_F(AutofillCrowdsourcingEncoding,
+       ParseQueryResponse_WithManualOverridesAndNoServerPredictions) {
   // Make form.
   FormFieldData field1 =
       CreateTestFormField("name", "name", "", FormControlType::kInputText);
@@ -3100,9 +3178,8 @@ TEST_F(
   FormData form;
   form.set_fields({field1, field2});
   form.set_url(GURL("http://foo.com"));
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{
-      &form_structure};
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
   const FormSignature kFormSignature = CalculateFormSignature(form);
 
   // The feature is only initialized here because the parameters contain the
@@ -3113,18 +3190,18 @@ TEST_F(
   // through".
   base::test::ScopedFeatureList features;
   base::FieldTrialParams feature_parameters{
-      {features::test::kAutofillOverridePredictionsSpecification.name,
+      {features::debug::kAutofillOverridePredictionsSpecification.name,
        CreateManualOverridePrediction(
            {{kFormSignature, kFieldSignature, {NAME_FIRST}},
             {kFormSignature, kFieldSignature, {}}})}};
   features.InitAndEnableFeatureWithParameters(
-      features::test::kAutofillOverridePredictions, feature_parameters);
+      features::debug::kAutofillOverridePredictions, feature_parameters);
 
   // Make serialized API response.
   AutofillQueryResponse api_response;
-  ParseServerPredictionsQueryResponse(SerializeAndEncode(api_response), forms,
-                                      test::GetEncodedSignatures(forms),
-                                      nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(api_response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_EQ(forms[0]->field_count(), 2u);
 
@@ -3144,9 +3221,8 @@ TEST_F(
 // form / field signature pair leads to defaulting back to server predictions
 // at that position and all other fields with the same form / field signature
 // pair that follow.
-TEST_F(
-    AutofillCrowdsourcingEncoding,
-    ParseServerPredictionsQueryResponseWithManualOverridesAndPassthroughInLastPosition) {
+TEST_F(AutofillCrowdsourcingEncoding,
+       ParseQueryResponse_WithManualOverridesAndPassthroughInLastPosition) {
   // Make form.
   FormFieldData field1 =
       CreateTestFormField("name", "name", "", FormControlType::kInputText);
@@ -3163,9 +3239,8 @@ TEST_F(
   FormData form;
   form.set_fields({field1, field2, field3});
   form.set_url(GURL("http://foo.com"));
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{
-      &form_structure};
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
   const FormSignature kFormSignature = CalculateFormSignature(form);
 
   // The feature is only initialized here because the parameters contain the
@@ -3176,12 +3251,12 @@ TEST_F(
   // through".
   base::test::ScopedFeatureList features;
   base::FieldTrialParams feature_parameters{
-      {features::test::kAutofillOverridePredictionsSpecification.name,
+      {features::debug::kAutofillOverridePredictionsSpecification.name,
        CreateManualOverridePrediction(
            {{kFormSignature, kFieldSignature, {NAME_FIRST}},
             {kFormSignature, kFieldSignature, {}}})}};
   features.InitAndEnableFeatureWithParameters(
-      features::test::kAutofillOverridePredictions, feature_parameters);
+      features::debug::kAutofillOverridePredictions, feature_parameters);
 
   // Make serialized API response.
   AutofillQueryResponse api_response;
@@ -3199,9 +3274,9 @@ TEST_F(
       {CreateFieldPrediction(COMPANY_NAME, FieldPrediction::SOURCE_OVERRIDE)},
       form_suggestion);
 
-  ParseServerPredictionsQueryResponse(SerializeAndEncode(api_response), forms,
-                                      test::GetEncodedSignatures(forms),
-                                      nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(api_response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_EQ(forms[0]->field_count(), 3u);
 
@@ -3222,9 +3297,8 @@ TEST_F(
 // pass-through (i.e. no prediction at all) in a middle override for that
 // form / field signature pair leads to defaulting back to server predictions
 // only for that middle field.
-TEST_F(
-    AutofillCrowdsourcingEncoding,
-    ParseServerPredictionsQueryResponseWithManualOverridesAndPassthroughInMiddlePosition) {
+TEST_F(AutofillCrowdsourcingEncoding,
+       ParseQueryResponse_WithManualOverridesAndPassthroughInMiddlePosition) {
   // Make form.
   FormFieldData field1 =
       CreateTestFormField("name", "name", "", FormControlType::kInputText);
@@ -3244,9 +3318,8 @@ TEST_F(
   FormData form;
   form.set_fields({field1, field2, field3, field4});
   form.set_url(GURL("http://foo.com"));
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{
-      &form_structure};
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
   const FormSignature kFormSignature = CalculateFormSignature(form);
 
   // The feature is only initialized here because the parameters contain the
@@ -3257,13 +3330,13 @@ TEST_F(
   // through".
   base::test::ScopedFeatureList features;
   base::FieldTrialParams feature_parameters{
-      {features::test::kAutofillOverridePredictionsSpecification.name,
+      {features::debug::kAutofillOverridePredictionsSpecification.name,
        CreateManualOverridePrediction(
            {{kFormSignature, kFieldSignature, {NAME_FIRST}},
             {kFormSignature, kFieldSignature, {}},
             {kFormSignature, kFieldSignature, {COMPANY_NAME}}})}};
   features.InitAndEnableFeatureWithParameters(
-      features::test::kAutofillOverridePredictions, feature_parameters);
+      features::debug::kAutofillOverridePredictions, feature_parameters);
 
   // Make serialized API response.
   AutofillQueryResponse api_response;
@@ -3273,9 +3346,9 @@ TEST_F(
       {CreateFieldPrediction(NAME_LAST, FieldPrediction::SOURCE_OVERRIDE)},
       form_suggestion);
 
-  ParseServerPredictionsQueryResponse(SerializeAndEncode(api_response), forms,
-                                      test::GetEncodedSignatures(forms),
-                                      nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(api_response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_EQ(forms[0]->field_count(), 4u);
 
@@ -3305,7 +3378,7 @@ TEST_F(
 // alternative_form_signature based field type predictions override
 // alternative_form_signature server predictions.
 TEST_F(AutofillCrowdsourcingEncoding,
-       ParseServerPredictionsQueryResponseOverridesAlternativeFormSignature) {
+       ParseQueryResponse_OverridesAlternativeFormSignature) {
   // Make form.
   FormFieldData field1 =
       CreateTestFormField("name", "name", "", FormControlType::kInputText);
@@ -3314,21 +3387,20 @@ TEST_F(AutofillCrowdsourcingEncoding,
   FormData form;
   form.set_fields({field1, field2});
   form.set_url(GURL("http://foo.com"));
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{
-      &form_structure};
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
 
   // The feature is only initialized here because the parameters contain the
   // form and field signatures.
   // Only the prediction for the first field is overridden.
   base::test::ScopedFeatureList features;
   base::FieldTrialParams feature_parameters{
-      {features::test::kAutofillOverridePredictionsSpecification.name,
+      {features::debug::kAutofillOverridePredictionsSpecification.name,
        CreateManualOverridePrediction({{CalculateAlternativeFormSignature(form),
                                         CalculateFieldSignatureForField(field1),
                                         {USERNAME}}})}};
   features.InitAndEnableFeatureWithParameters(
-      features::test::kAutofillOverridePredictions, feature_parameters);
+      features::debug::kAutofillOverridePredictions, feature_parameters);
 
   // Make serialized API response.
   AutofillQueryResponse api_response;
@@ -3342,9 +3414,9 @@ TEST_F(AutofillCrowdsourcingEncoding,
       {CreateFieldPrediction(PASSWORD, FieldPrediction::SOURCE_OVERRIDE)},
       form_suggestion);
 
-  ParseServerPredictionsQueryResponse(
-      SerializeAndEncode(api_response), forms,
-      test::GetEncodedAlternativeSignatures(forms), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(api_response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_EQ(forms[0]->field_count(), 2u);
 
@@ -3362,9 +3434,8 @@ TEST_F(AutofillCrowdsourcingEncoding,
 // Tests that manually specified (i.e. passed as a feature parameter)
 // alternative_form_signature based field type predictions override
 // form_signature server predictions.
-TEST_F(
-    AutofillCrowdsourcingEncoding,
-    ParseServerPredictionsQueryResponseServerOverridesAlternativeFormSignature) {
+TEST_F(AutofillCrowdsourcingEncoding,
+       ParseQueryResponse_ServerOverridesAlternativeFormSignature) {
   // Make form.
   FormFieldData field1 =
       CreateTestFormField("name", "name", "", FormControlType::kInputText);
@@ -3373,21 +3444,20 @@ TEST_F(
   FormData form;
   form.set_fields({field1, field2});
   form.set_url(GURL("http://foo.com"));
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{
-      &form_structure};
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
 
   // The feature is only initialized here because the parameters contain the
   // form and field signatures.
   // Only the prediction for the first field is overridden.
   base::test::ScopedFeatureList features;
   base::FieldTrialParams feature_parameters{
-      {features::test::kAutofillOverridePredictionsSpecification.name,
+      {features::debug::kAutofillOverridePredictionsSpecification.name,
        CreateManualOverridePrediction({{CalculateAlternativeFormSignature(form),
                                         CalculateFieldSignatureForField(field1),
                                         {USERNAME}}})}};
   features.InitAndEnableFeatureWithParameters(
-      features::test::kAutofillOverridePredictions, feature_parameters);
+      features::debug::kAutofillOverridePredictions, feature_parameters);
 
   // Make serialized API response.
   AutofillQueryResponse api_response;
@@ -3403,9 +3473,9 @@ TEST_F(
                              FieldPrediction::SOURCE_PASSWORDS_DEFAULT)},
       form_suggestion);
 
-  ParseServerPredictionsQueryResponse(SerializeAndEncode(api_response), forms,
-                                      test::GetEncodedSignatures(forms),
-                                      nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(api_response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_EQ(forms[0]->field_count(), 2u);
 
@@ -3419,9 +3489,8 @@ TEST_F(
 }
 
 // Tests that server overrides have lower priority than manual overrides.
-TEST_F(
-    AutofillCrowdsourcingEncoding,
-    ParseServerPredictionsQueryResponseReplaceServerOverrideWithManualOverride) {
+TEST_F(AutofillCrowdsourcingEncoding,
+       ParseQueryResponse_ReplaceServerOverrideWithManualOverride) {
   FormFieldData name_field =
       CreateTestFormField("name", "name", "", FormControlType::kInputText);
   FormFieldData password_field = CreateTestFormField(
@@ -3429,22 +3498,21 @@ TEST_F(
   FormData form;
   form.set_fields({name_field, password_field});
   form.set_url(GURL("http://foo.com"));
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{
-      &form_structure};
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
 
   // The feature is only initialized here because the parameters contain the
   // form and field signatures. Only the prediction for the first field is
   // overridden.
   base::test::ScopedFeatureList features;
   base::FieldTrialParams feature_parameters{
-      {features::test::kAutofillOverridePredictionsSpecification.name,
+      {features::debug::kAutofillOverridePredictionsSpecification.name,
        CreateManualOverridePrediction(
            {{CalculateAlternativeFormSignature(form),
              CalculateFieldSignatureForField(name_field),
              {USERNAME}}})}};
   features.InitAndEnableFeatureWithParameters(
-      features::test::kAutofillOverridePredictions, feature_parameters);
+      features::debug::kAutofillOverridePredictions, feature_parameters);
 
   // Make serialized API response.
   AutofillQueryResponse api_response;
@@ -3458,9 +3526,9 @@ TEST_F(
       {CreateFieldPrediction(PASSWORD, FieldPrediction::SOURCE_OVERRIDE)},
       form_suggestion);
 
-  ParseServerPredictionsQueryResponse(SerializeAndEncode(api_response), forms,
-                                      test::GetEncodedSignatures(forms),
-                                      nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(api_response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_EQ(forms[0]->field_count(), 2u);
 
@@ -3474,49 +3542,45 @@ TEST_F(
 }
 #endif
 
-// Tests ParseServerPredictionsQueryResponse when the payload cannot be parsed
+// Tests parsing the server predictions when the payload cannot be parsed
 // to an AutofillQueryResponse where we expect an early return of the function.
 TEST_F(AutofillCrowdsourcingEncoding,
-       ParseServerPredictionsQueryResponseWhenCannotParseProtoFromString) {
+       ParseQueryResponse_WhenCannotParseProtoFromString) {
   FormData form;
   form.set_url(GURL("http://foo.com"));
   form.set_fields({CreateTestFormField("emailaddress", "emailaddress", "",
                                        FormControlType::kInputEmail)});
 
   // Add form to the vector needed by the response parsing function.
-  FormStructure form_structure(form);
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
   form_structure.field(0)->set_server_predictions(
       {CreateFieldPrediction(NAME_FULL)});
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
 
   std::string response_string = "invalid string that cannot be parsed";
-  ParseServerPredictionsQueryResponse(std::move(response_string), forms,
-                                      test::GetEncodedSignatures(forms),
-                                      nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(std::move(response_string),
+                                 test::GetEncodedSignatures(forms), {form});
 
-  // Verify that the form fields remain intact because
-  // ParseServerPredictionsQueryResponse could not parse the server's response
-  // because it was badly serialized.
+  // Verify that the form fields remain intact because we could not parse the
+  // server's response because it was badly serialized.
   ASSERT_GE(forms[0]->field_count(), 1U);
   EXPECT_EQ(NAME_FULL, forms[0]->field(0)->server_type());
 }
 
-// Tests ParseServerPredictionsQueryResponse when the payload is not base64
-// where we expect an early return of the function.
-TEST_F(AutofillCrowdsourcingEncoding,
-       ParseServerPredictionsQueryResponseWhenPayloadNotBase64) {
+// Tests parsing the server response when the payload is not base64 where we
+// expect an early return of the function.
+TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_WhenPayloadNotBase64) {
   FormData form;
   form.set_url(GURL("http://foo.com"));
   form.set_fields({CreateTestFormField("emailaddress", "emailaddress", "",
                                        FormControlType::kInputEmail)});
 
   // Add form to the vector needed by the response parsing function.
-  FormStructure form_structure(form);
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
   form_structure.field(0)->set_server_predictions(
       {CreateFieldPrediction(NAME_FULL)});
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
 
   // Make a really simple serialized API response. We don't encode it in base64.
   AutofillQueryResponse api_response;
@@ -3532,14 +3596,55 @@ TEST_F(AutofillCrowdsourcingEncoding,
   std::string response_string;
   ASSERT_TRUE(api_response.SerializeToString(&response_string));
 
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(std::move(response_string),
+                                 test::GetEncodedSignatures(forms), {form});
 
-  // Verify that the form fields remain intact because
-  // ParseServerPredictionsQueryResponse could not parse the server's response
-  // that was badly encoded.
+  // Verify that the form fields remain intact because we could not parse the
+  // server's response that was badly encoded.
   ASSERT_GE(forms[0]->field_count(), 1U);
   EXPECT_EQ(NAME_FULL, forms[0]->field(0)->server_type());
+}
+
+// Tests that predictions from small address fields are not removed when
+// ignoring small forms is disabled.
+TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_DontIgnoreSmallForms) {
+  base::test::ScopedFeatureList features{
+      features::kAutofillMoveSmallFormLogicToClient};
+  autofill_client().set_is_tab_in_actor_mode(/*is_in_actor_mode=*/true);
+
+  FormData form;
+  form.set_url(GURL("http://foo.com"));
+  form.set_fields(
+      {CreateTestFormField("Address line 1", "address-line-1", "",
+                           FormControlType::kInputText, "address-line1"),
+       CreateTestFormField("Address line 2", "address-line-2", "",
+                           FormControlType::kInputPassword, "address-line2")});
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
+
+  AutofillQueryResponse response;
+  auto* form_suggestion = response.add_form_suggestions();
+  AddFieldPredictionToForm(form.fields()[0], ADDRESS_HOME_LINE1,
+                           form_suggestion);
+  AddFieldPredictionToForm(form.fields()[1], ADDRESS_HOME_LINE2,
+                           form_suggestion);
+
+  // The small forms are not ignored - the Autofill on tab is in actor mode.
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures(forms), {form});
+
+  // Verify that the form fields remain intact.
+  ASSERT_GE(forms[0]->field_count(), 2U);
+  // Server type is parsed from the response and is the end result type.
+  EXPECT_EQ(forms[0]->field(0)->server_type(), ADDRESS_HOME_LINE1);
+  EXPECT_THAT(forms[0]->field(0)->Type().GetTypes(),
+              ElementsAre(ADDRESS_HOME_LINE1));
+  EXPECT_EQ(forms[0]->field(1)->server_type(), ADDRESS_HOME_LINE2);
+  EXPECT_THAT(forms[0]->field(1)->Type().GetTypes(),
+              ElementsAre(ADDRESS_HOME_LINE2));
 }
 
 TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_AuthorDefinedTypes) {
@@ -3550,10 +3655,9 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_AuthorDefinedTypes) {
                            "email"),
        CreateTestFormField("password", "password", "",
                            FormControlType::kInputPassword, "new-password")});
-  FormStructure form_structure(form);
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
-  forms.front()->DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
 
   AutofillQueryResponse response;
   auto* form_suggestion = response.add_form_suggestions();
@@ -3561,17 +3665,18 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_AuthorDefinedTypes) {
   AddFieldPredictionToForm(form.fields()[1], ACCOUNT_CREATION_PASSWORD,
                            form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_GE(forms[0]->field_count(), 2U);
   // Server type is parsed from the response and is the end result type.
   EXPECT_EQ(forms[0]->field(0)->server_type(), EMAIL_ADDRESS);
-  EXPECT_EQ(forms[0]->field(0)->Type().GetStorableType(), EMAIL_ADDRESS);
+  EXPECT_THAT(forms[0]->field(0)->Type().GetTypes(),
+              ElementsAre(EMAIL_ADDRESS));
   EXPECT_EQ(forms[0]->field(1)->server_type(), ACCOUNT_CREATION_PASSWORD);
-  EXPECT_EQ(forms[0]->field(1)->Type().GetStorableType(),
-            ACCOUNT_CREATION_PASSWORD);
+  EXPECT_THAT(forms[0]->field(1)->Type().GetTypes(),
+              ElementsAre(ACCOUNT_CREATION_PASSWORD));
 }
 
 // Tests that, when the flag is off, we will not set the predicted type to
@@ -3592,6 +3697,7 @@ TEST_F(AutofillCrowdsourcingEncoding,
                   {.label = u"Address", .name = u"address"},
                   // Autocomplete On, without server data.
                   {.label = u"Country", .name = u"country"}}});
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
 
   AutofillQueryResponse response;
   auto* form_suggestion = response.add_form_suggestions();
@@ -3600,28 +3706,23 @@ TEST_F(AutofillCrowdsourcingEncoding,
   AddFieldPredictionToForm(form.fields()[2], NO_SERVER_DATA, form_suggestion);
   AddFieldPredictionToForm(form.fields()[3], NO_SERVER_DATA, form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-
-  FormStructure form_structure(form);
-  // Will identify the sections based on the heuristics types.
-  form_structure.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
-
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
-
   // Will call RationalizeFieldTypePredictions
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_EQ(1U, forms.size());
   ASSERT_EQ(4U, forms[0]->field_count());
 
   // Only NAME_LAST should be affected by the flag.
-  EXPECT_EQ(forms[0]->field(1)->Type().GetStorableType(), NAME_LAST);
+  EXPECT_THAT(forms[0]->field(1)->Type().GetTypes(), ElementsAre(NAME_LAST));
 
-  EXPECT_EQ(forms[0]->field(0)->Type().GetStorableType(), NAME_FIRST);
-  EXPECT_EQ(forms[0]->field(2)->Type().GetStorableType(), ADDRESS_HOME_LINE1);
-  EXPECT_EQ(forms[0]->field(3)->Type().GetStorableType(), ADDRESS_HOME_COUNTRY);
+  EXPECT_THAT(forms[0]->field(0)->Type().GetTypes(), ElementsAre(NAME_FIRST));
+  EXPECT_THAT(forms[0]->field(2)->Type().GetTypes(),
+              ElementsAre(ADDRESS_HOME_LINE1));
+  EXPECT_THAT(forms[0]->field(3)->Type().GetTypes(),
+              ElementsAre(ADDRESS_HOME_COUNTRY));
 }
 
 // Tests that we never overwrite the CVC heuristic-predicted type, even if there
@@ -3640,6 +3741,7 @@ TEST_F(AutofillCrowdsourcingEncoding, NoServerDataCCFields_CVC_NoOverwrite) {
             .name = u"exp-date",
             .should_autocomplete = false},
            {.label = u"CVC", .name = u"cvc", .should_autocomplete = false}}});
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
 
   AutofillQueryResponse response;
   auto* form_suggestion = response.add_form_suggestions();
@@ -3648,31 +3750,24 @@ TEST_F(AutofillCrowdsourcingEncoding, NoServerDataCCFields_CVC_NoOverwrite) {
   AddFieldPredictionToForm(form.fields()[2], NO_SERVER_DATA, form_suggestion);
   AddFieldPredictionToForm(form.fields()[3], NO_SERVER_DATA, form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-
-  FormStructure form_structure(form);
-
-  // Will identify the sections based on the heuristics types.
-  form_structure.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
-
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
-
   // Will call RationalizeFieldTypePredictions
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_EQ(1U, forms.size());
   ASSERT_EQ(4U, forms[0]->field_count());
-  EXPECT_EQ(forms[0]->field(0)->Type().GetStorableType(),
-            CREDIT_CARD_NAME_FULL);
-  EXPECT_EQ(forms[0]->field(1)->Type().GetStorableType(), CREDIT_CARD_NUMBER);
-  EXPECT_EQ(forms[0]->field(2)->Type().GetStorableType(),
-            CREDIT_CARD_EXP_DATE_4_DIGIT_YEAR);
+  EXPECT_THAT(forms[0]->field(0)->Type().GetTypes(),
+              ElementsAre(CREDIT_CARD_NAME_FULL));
+  EXPECT_THAT(forms[0]->field(1)->Type().GetTypes(),
+              ElementsAre(CREDIT_CARD_NUMBER));
+  EXPECT_THAT(forms[0]->field(2)->Type().GetTypes(),
+              ElementsAre(CREDIT_CARD_EXP_DATE_4_DIGIT_YEAR));
 
   // Regardless of the flag, the CVC field should not have been overwritten.
-  EXPECT_EQ(forms[0]->field(3)->Type().GetStorableType(),
-            CREDIT_CARD_VERIFICATION_CODE);
+  EXPECT_THAT(forms[0]->field(3)->Type().GetTypes(),
+              ElementsAre(CREDIT_CARD_VERIFICATION_CODE));
 }
 
 // Tests that we never overwrite the CVC heuristic-predicted type, even if there
@@ -3691,6 +3786,7 @@ TEST_F(AutofillCrowdsourcingEncoding, WithServerDataCCFields_CVC_NoOverwrite) {
             .name = u"exp-date",
             .should_autocomplete = false},
            {.label = u"CVC", .name = u"cvc", .should_autocomplete = false}}});
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
 
   AutofillQueryResponse response;
   auto* form_suggestion = response.add_form_suggestions();
@@ -3702,32 +3798,25 @@ TEST_F(AutofillCrowdsourcingEncoding, WithServerDataCCFields_CVC_NoOverwrite) {
                            form_suggestion);
   AddFieldPredictionToForm(form.fields()[3], NO_SERVER_DATA, form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-
-  FormStructure form_structure(form);
-
-  // Will identify the sections based on the heuristics types.
-  form_structure.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
-
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms;
-  forms.push_back(&form_structure);
-
   // Will call RationalizeFieldTypePredictions
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures(forms), {form});
 
   ASSERT_EQ(1U, forms.size());
   ASSERT_EQ(4U, forms[0]->field_count());
 
   // Regardless of the flag, the fields should not have been overwritten,
   // including the CVC field.
-  EXPECT_EQ(forms[0]->field(0)->Type().GetStorableType(),
-            CREDIT_CARD_NAME_FULL);
-  EXPECT_EQ(forms[0]->field(1)->Type().GetStorableType(), CREDIT_CARD_NUMBER);
-  EXPECT_EQ(forms[0]->field(2)->Type().GetStorableType(),
-            CREDIT_CARD_EXP_DATE_4_DIGIT_YEAR);
-  EXPECT_EQ(forms[0]->field(3)->Type().GetStorableType(),
-            CREDIT_CARD_VERIFICATION_CODE);
+  EXPECT_THAT(forms[0]->field(0)->Type().GetTypes(),
+              ElementsAre(CREDIT_CARD_NAME_FULL));
+  EXPECT_THAT(forms[0]->field(1)->Type().GetTypes(),
+              ElementsAre(CREDIT_CARD_NUMBER));
+  EXPECT_THAT(forms[0]->field(2)->Type().GetTypes(),
+              ElementsAre(CREDIT_CARD_EXP_DATE_4_DIGIT_YEAR));
+  EXPECT_THAT(forms[0]->field(3)->Type().GetTypes(),
+              ElementsAre(CREDIT_CARD_VERIFICATION_CODE));
 }
 
 // When two fields have the same signature and the server response has multiple
@@ -3748,8 +3837,7 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_RankEqualSignatures) {
   ASSERT_EQ(CalculateFieldSignatureForField(form_data.fields()[0]),
             CalculateFieldSignatureForField(form_data.fields()[1]));
 
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  FormStructure& form = SeeAndGetParsedForm(form_data);
 
   // Setup the query response.
   AutofillQueryResponse response;
@@ -3759,12 +3847,12 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseQueryResponse_RankEqualSignatures) {
   AddFieldPredictionToForm(form_data.fields()[2], EMAIL_ADDRESS,
                            form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-
   // Parse the response and update the field type predictions.
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form)};
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures(forms),
+                                 {form_data});
   ASSERT_EQ(form.field_count(), 3U);
 
   EXPECT_EQ(form.field(0)->server_type(), NAME_FIRST);
@@ -3789,8 +3877,7 @@ TEST_F(AutofillCrowdsourcingEncoding,
   ASSERT_EQ(CalculateFieldSignatureForField(form_data.fields()[0]),
             CalculateFieldSignatureForField(form_data.fields()[1]));
 
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
+  FormStructure& form = SeeAndGetParsedForm(form_data);
 
   // Setup the query response.
   AutofillQueryResponse response;
@@ -3799,12 +3886,12 @@ TEST_F(AutofillCrowdsourcingEncoding,
   AddFieldPredictionToForm(form_data.fields()[2], EMAIL_ADDRESS,
                            form_suggestion);
 
-  std::string response_string = SerializeAndEncode(response);
-
   // Parse the response and update the field type predictions.
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
-  ParseServerPredictionsQueryResponse(
-      response_string, forms, test::GetEncodedSignatures(forms), nullptr);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form)};
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures(forms),
+                                 {form_data});
   ASSERT_EQ(form.field_count(), 3U);
 
   EXPECT_EQ(form.field(0)->server_type(), NAME_FIRST);
@@ -3812,112 +3899,6 @@ TEST_F(AutofillCrowdsourcingEncoding,
   // the same signature.
   EXPECT_EQ(form.field(1)->server_type(), NAME_FIRST);
   EXPECT_EQ(form.field(2)->server_type(), EMAIL_ADDRESS);
-}
-
-// Test that experimental server predictions are not used.
-TEST_F(AutofillCrowdsourcingEncoding,
-       ExperimentalServerPredictionsAreSeparate) {
-  FormData form_data;
-  form_data.set_url(GURL("http://foo.com"));
-
-  // Add 6 fields.
-  for (int i = 0; i < 6; i++) {
-    FormFieldData field;
-    field.set_form_control_type(FormControlType::kInputText);
-    field.set_name(base::NumberToString16(i));
-    field.set_label((base::NumberToString16(i)));
-    field.set_renderer_id(test::MakeFieldRendererId());
-    test_api(form_data).Append(field);
-  }
-
-  FormStructure form(form_data);
-  form.DetermineHeuristicTypes(GeoIpCountryCode(""), nullptr);
-
-  const auto default_autofill_prediction = CreateFieldPrediction(
-      NAME_FIRST, FieldPrediction::SOURCE_AUTOFILL_DEFAULT);
-  const auto default_password_prediction = CreateFieldPrediction(
-      USERNAME, FieldPrediction::SOURCE_PASSWORDS_DEFAULT);
-  const auto experimental_prediction = CreateFieldPrediction(
-      EMAIL_ADDRESS, FieldPrediction::SOURCE_ALL_APPROVED_EXPERIMENTS);
-  const auto null_prediction = CreateFieldPrediction(
-      NO_SERVER_DATA, FieldPrediction::SOURCE_UNSPECIFIED);
-  const auto unknown_prediction_source = CreateFieldPrediction(
-      PHONE_HOME_NUMBER, FieldPrediction::SOURCE_UNSPECIFIED);
-
-  // Setup the query response. Default predictions must be returned by
-  // `server_type()` and `server_predictions()` as provided.
-  AutofillQueryResponse response;
-  auto* form_suggestion = response.add_form_suggestions();
-  // 2 default + 1 experimental predictions.
-  AddFieldPredictionsToForm(
-      form_data.fields()[0],
-      {default_autofill_prediction, default_password_prediction,
-       experimental_prediction},
-      form_suggestion);
-  // 1 default + 1 experimental predictions.
-  AddFieldPredictionsToForm(
-      form_data.fields()[1],
-      {default_autofill_prediction, experimental_prediction}, form_suggestion);
-  // 2 default predictions.
-  AddFieldPredictionsToForm(
-      form_data.fields()[2],
-      {default_autofill_prediction, default_password_prediction},
-      form_suggestion);
-  // 1 null + 1 experimental predictions.
-  AddFieldPredictionsToForm(form_data.fields()[3],
-                            {null_prediction, experimental_prediction},
-                            form_suggestion);
-  // 1 experimental prediction. The server doesn't do that, but we can defend
-  // against it anyway. The default prediction should be effectively
-  // `NO_SERVER_DATA`.
-  AddFieldPredictionsToForm(form_data.fields()[4], {experimental_prediction},
-                            form_suggestion);
-  // A prediction without the source specified.
-  AddFieldPredictionsToForm(form_data.fields()[5], {unknown_prediction_source},
-                            form_suggestion);
-
-  // Parse the response and update the field type predictions.
-  std::vector<raw_ptr<FormStructure, VectorExperimental>> forms{&form};
-  ParseServerPredictionsQueryResponse(SerializeAndEncode(response), forms,
-                                      test::GetEncodedSignatures(forms),
-                                      nullptr);
-
-  ASSERT_EQ(form.field_count(), 6U);
-  EXPECT_THAT(
-      form.fields(),
-      Each(Pointee(Property(&AutofillField::server_type,
-                            Not(AnyOf(experimental_prediction.type(),
-                                      unknown_prediction_source.type()))))))
-      << "server_type() must not return a type provided as an experiment.";
-
-  // `server_predictions` should only return default predictions.
-  EXPECT_THAT(form.field(0)->server_predictions(),
-              ElementsAre(EqualsPrediction(default_autofill_prediction),
-                          EqualsPrediction(default_password_prediction)));
-  EXPECT_THAT(form.field(1)->server_predictions(),
-              ElementsAre(EqualsPrediction(default_autofill_prediction)));
-  EXPECT_THAT(form.field(2)->server_predictions(),
-              ElementsAre(EqualsPrediction(default_autofill_prediction),
-                          EqualsPrediction(default_password_prediction)));
-  EXPECT_THAT(form.field(3)->server_predictions(),
-              ElementsAre(EqualsPrediction(null_prediction)));
-  EXPECT_THAT(form.field(4)->server_predictions(),
-              ElementsAre(EqualsPrediction(null_prediction)));
-  EXPECT_THAT(form.field(5)->server_predictions(),
-              ElementsAre(EqualsPrediction(null_prediction)));
-
-  // `experimental_server_predictions` should only return experimental
-  // predictions.
-  EXPECT_THAT(form.field(0)->experimental_server_predictions(),
-              ElementsAre(EqualsPrediction(experimental_prediction)));
-  EXPECT_THAT(form.field(1)->experimental_server_predictions(),
-              ElementsAre(EqualsPrediction(experimental_prediction)));
-  EXPECT_THAT(form.field(2)->experimental_server_predictions(), IsEmpty());
-  EXPECT_THAT(form.field(3)->experimental_server_predictions(),
-              ElementsAre(EqualsPrediction(experimental_prediction)));
-  EXPECT_THAT(form.field(4)->experimental_server_predictions(),
-              ElementsAre(EqualsPrediction(experimental_prediction)));
-  EXPECT_THAT(form.field(5)->experimental_server_predictions(), IsEmpty());
 }
 
 // Tests that the `run_autofill_ai_model` of the `AutofillQueryResponse` proto
@@ -3929,14 +3910,352 @@ TEST_F(AutofillCrowdsourcingEncoding, ParseRunAutofillAiModel) {
   AutofillQueryResponse response;
   auto* form_suggestion = response.add_form_suggestions();
   form_suggestion->set_run_autofill_ai_model(true);
-  std::string response_string = SerializeAndEncode(response);
 
-  FormStructure form_structure(form);
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
   EXPECT_FALSE(form_structure.may_run_autofill_ai_model());
-  ParseServerPredictionsQueryResponse(
-      response_string, {&form_structure},
-      test::GetEncodedSignatures({&form_structure}), nullptr);
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures({form_structure}),
+                                 {form});
   EXPECT_TRUE(form_structure.may_run_autofill_ai_model());
+}
+
+// Tests that valid format strings are accepted and invalid ones are ignored.
+TEST_F(AutofillCrowdsourcingEncoding, ParseFormatString) {
+  base::test::ScopedFeatureList features{features::kAutofillAiWithDataSchema};
+  FormData form_data;
+  form_data.set_url(GURL("https://foo.com"));
+  form_data.set_fields(
+      {CreateTestFormField("Name", "name", "", FormControlType::kInputText),
+       CreateTestFormField("Driver's license number", "dl_number", "",
+                           FormControlType::kInputText),
+       CreateTestFormField("Passport number", "passport_number", "",
+                           FormControlType::kInputText, "")});
+
+  FormStructure& form = SeeAndGetParsedForm(form_data);
+
+  auto add_autofill_ai_prediction =
+      [](const FormFieldData& field, FieldType field_type,
+         FormatString_Type format_string_type,
+         std::string_view format_string_value,
+         AutofillQueryResponse_FormSuggestion* form_suggestion) {
+        AutofillQueryResponse_FormSuggestion_FieldSuggestion* field_suggestion =
+            form_suggestion->add_field_suggestions();
+        field_suggestion->set_field_signature(
+            *CalculateFieldSignatureForField(field));
+        AutofillQueryResponse_FormSuggestion_FieldSuggestion_FieldPrediction*
+            prediction = field_suggestion->add_predictions();
+        prediction->set_type(field_type);
+        prediction->set_source(FieldPrediction::SOURCE_AUTOFILL_AI);
+        field_suggestion->mutable_format_string()->set_format_string(
+            format_string_value);
+        field_suggestion->mutable_format_string()->set_type(format_string_type);
+      };
+
+  // Setup the query response.
+  AutofillQueryResponse response;
+  auto* form_suggestion = response.add_form_suggestions();
+  add_autofill_ai_prediction(form_data.fields()[1], DRIVERS_LICENSE_NUMBER,
+                             FormatString_Type_AFFIX, "-4", form_suggestion);
+  add_autofill_ai_prediction(form_data.fields()[2], PASSPORT_NUMBER,
+                             FormatString_Type_AFFIX, "asd", form_suggestion);
+
+  // Parse the response.
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form)};
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures(forms),
+                                 {form_data});
+  ASSERT_EQ(form.field_count(), 3U);
+
+  EXPECT_THAT(form.field(1)->Type().GetTypes(),
+              ElementsAre(DRIVERS_LICENSE_NUMBER));
+  EXPECT_THAT(form.field(1)->format_string(),
+              Optional(AutofillFormatString(u"-4", FormatString_Type_AFFIX)));
+  EXPECT_THAT(form.field(2)->Type().GetTypes(), ElementsAre(PASSPORT_NUMBER));
+  EXPECT_EQ(form.field(2)->format_string(), std::nullopt);
+}
+
+// Tests removing predictions from small address forms when ignoring small forms
+// is enabled. This is an integration test with details of small forms handling
+// tested in `ClearSmallAddressFormPredictionsTest`.
+TEST_F(AutofillCrowdsourcingEncoding,
+       ParseQueryResponse_IgnoreSmallAddressForms) {
+  base::test::ScopedFeatureList features{
+      features::kAutofillMoveSmallFormLogicToClient};
+
+  FormData form;
+  form.set_url(GURL("http://foo.com"));
+  form.set_fields(
+      {CreateTestFormField("Address line 1", "address-line-1", "",
+                           FormControlType::kInputText, "address-line1"),
+       CreateTestFormField("Address line 2", "address-line-2", "",
+                           FormControlType::kInputText, "address-line2")});
+  FormStructure& form_structure = SeeAndGetParsedForm(form);
+  std::vector<raw_ref<FormStructure>> forms = {raw_ref(form_structure)};
+
+  AutofillQueryResponse response;
+  auto* form_suggestion = response.add_form_suggestions();
+  AddFieldPredictionToForm(form.fields()[0], ADDRESS_HOME_LINE1,
+                           form_suggestion);
+  AddFieldPredictionToForm(form.fields()[1], ADDRESS_HOME_LINE2,
+                           form_suggestion);
+
+  test_api(autofill_manager())
+      .OnLoadedServerPredictions(SerializeAndEncode(response),
+                                 test::GetEncodedSignatures(forms), {form});
+
+  // Verify that the form fields remain intact.
+  ASSERT_GE(forms[0]->field_count(), 2U);
+  // Server predictions are cleared, but other predictions stay (i.e. html
+  // attribute).
+  EXPECT_EQ(forms[0]->field(0)->server_type(), NO_SERVER_DATA);
+  EXPECT_EQ(forms[0]->field(0)->html_type(), HtmlFieldType::kAddressLine1);
+  EXPECT_THAT(forms[0]->field(0)->Type().GetTypes(),
+              ElementsAre(ADDRESS_HOME_LINE1));
+  EXPECT_EQ(forms[0]->field(1)->server_type(), NO_SERVER_DATA);
+  EXPECT_EQ(forms[0]->field(1)->html_type(), HtmlFieldType::kAddressLine2);
+  EXPECT_THAT(forms[0]->field(1)->Type().GetTypes(),
+              ElementsAre(ADDRESS_HOME_LINE2));
+}
+
+struct ClearSmallAddressFormPredictions_TestCase {
+  std::string test_name;
+  std::vector<std::vector<FieldPrediction>> received_predictions;
+  std::vector<std::vector<FieldPrediction>> expected_predictions;
+};
+
+const ClearSmallAddressFormPredictions_TestCase
+    kClearSmallAddressFormPredictionsTestCases[] = {
+        {
+            // Verifies that address fields of a small address form (form of 2
+            // fields that are classified as address fields) are not propagated
+            // as address fields. It's not clear if that's ideal behavior but
+            // reflects the status quo.
+            .test_name = "SmallFormWithAddressOnlyFieldsSuppressed",
+            .received_predictions =
+                {
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_STREET_ADDRESS,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_CITY,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                },
+            .expected_predictions =
+                {
+                    {CreateFieldPrediction(
+                        NO_SERVER_DATA,
+                        FieldPrediction::SOURCE_UNSPECIFIED)},
+                    {CreateFieldPrediction(
+                        NO_SERVER_DATA,
+                        FieldPrediction::SOURCE_UNSPECIFIED)},
+                },
+        },
+        {
+            // Verifies that address fields of a large address form (form of 3+
+            // fields that are classified as address fields) are kept
+            // as address fields.
+            .test_name = "LargeFormWithAddressOnlyFieldsIsKept",
+            .received_predictions =
+                {
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_STREET_ADDRESS,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_CITY,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                    {CreateFieldPrediction(
+                        NO_SERVER_DATA,
+                        FieldPrediction::SOURCE_UNSPECIFIED)},
+                },
+            .expected_predictions =
+                {
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_STREET_ADDRESS,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_CITY,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                    {CreateFieldPrediction(
+                        NO_SERVER_DATA,
+                        FieldPrediction::SOURCE_UNSPECIFIED)},
+                },
+        },
+        {
+            // Tests that small forms with non-address field are not suppressed.
+            .test_name = "SmallFormWithNonAddressFieldNotSuppressed",
+            .received_predictions =
+                {
+                    {CreateFieldPrediction(
+                        CREDIT_CARD_NUMBER,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                },
+            .expected_predictions =
+                {
+                    {CreateFieldPrediction(
+                        CREDIT_CARD_NUMBER,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                },
+        },
+        {
+            // Tests that small forms with mixed address and non-address fields
+            // are not suppressed.
+            .test_name = "SmallFormWithMixedFieldsNotSuppressed",
+            .received_predictions =
+                {
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_STREET_ADDRESS,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                    {CreateFieldPrediction(
+                        CREDIT_CARD_NUMBER,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                },
+            .expected_predictions =
+                {
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_STREET_ADDRESS,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                    {CreateFieldPrediction(
+                        CREDIT_CARD_NUMBER,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                },
+        },
+        {
+            // Tests that for small forms with a password field, an
+            // EMAIL_ADDRESS, which is an address type, does not get wiped.
+            .test_name = "PasswordClassificationsMakeEmailsStick",
+            .received_predictions =
+                {
+                    {
+                        CreateFieldPrediction(
+                            EMAIL_ADDRESS,
+                            FieldPrediction::SOURCE_AUTOFILL_DEFAULT),
+                        CreateFieldPrediction(
+                            USERNAME,
+                            FieldPrediction::SOURCE_PASSWORDS_DEFAULT),
+                    },
+                    {CreateFieldPrediction(
+                        PASSWORD,
+                        FieldPrediction::SOURCE_PASSWORDS_DEFAULT)},
+                },
+            .expected_predictions =
+                {
+                    {
+                        CreateFieldPrediction(
+                            EMAIL_ADDRESS,
+                            FieldPrediction::SOURCE_AUTOFILL_DEFAULT),
+                        CreateFieldPrediction(
+                            USERNAME,
+                            FieldPrediction::SOURCE_PASSWORDS_DEFAULT),
+                    },
+                    {CreateFieldPrediction(
+                        PASSWORD,
+                        FieldPrediction::SOURCE_PASSWORDS_DEFAULT)},
+                },
+        },
+        {
+            // Verifies that overrides are not wiped.
+            .test_name = "NoWipeOfManualOverrides",
+            .received_predictions =
+                {
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_STREET_ADDRESS,
+                        FieldPrediction::SOURCE_MANUAL_OVERRIDE)},
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_CITY,
+                        FieldPrediction::SOURCE_AUTOFILL_DEFAULT)},
+                },
+            .expected_predictions =
+                {
+                    {CreateFieldPrediction(
+                        ADDRESS_HOME_STREET_ADDRESS,
+                        FieldPrediction::SOURCE_MANUAL_OVERRIDE)},
+                    {CreateFieldPrediction(
+                        NO_SERVER_DATA,
+                        FieldPrediction::SOURCE_UNSPECIFIED)},
+                },
+        },
+        {
+            // Verifies that AutofillAI classifications are protected but
+            // address classifications of small forms are wiped. This is legacy
+            // behavior. It's unclear if it's ideal.
+            .test_name = "NoWipeOfFormsAIClassifications",
+            .received_predictions =
+                {
+                    {CreateFieldPrediction(
+                         EMAIL_ADDRESS,
+                         FieldPrediction::SOURCE_AUTOFILL_DEFAULT),
+                     CreateFieldPrediction(
+                         NATIONAL_ID_CARD_NUMBER,
+                         FieldPrediction::SOURCE_AUTOFILL_AI)},
+                },
+            .expected_predictions =
+                {
+                    {CreateFieldPrediction(
+                        NATIONAL_ID_CARD_NUMBER,
+                        FieldPrediction::SOURCE_AUTOFILL_AI)},
+                },
+        },
+};
+
+class ClearSmallAddressFormPredictionsTest
+    : public AutofillCrowdsourcingEncoding,
+      public ::testing::WithParamInterface<
+          ClearSmallAddressFormPredictions_TestCase> {
+ public:
+  static std::string ParamInfoToString(
+      ::testing::TestParamInfo<ClearSmallAddressFormPredictions_TestCase>
+          param_info) {
+    return param_info.param.test_name;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    ,
+    ClearSmallAddressFormPredictionsTest,
+    ::testing::ValuesIn(kClearSmallAddressFormPredictionsTestCases),
+    ClearSmallAddressFormPredictionsTest::ParamInfoToString);
+
+TEST_P(ClearSmallAddressFormPredictionsTest,
+       ProcessServerPredictionsQueryResponse) {
+  base::test::ScopedFeatureList features{
+      features::kAutofillMoveSmallFormLogicToClient};
+  const auto& test_case = GetParam();
+
+  ASSERT_EQ(test_case.received_predictions.size(),
+            test_case.expected_predictions.size());
+
+  auto to_form_suggestion =
+      [](const std::vector<std::vector<FieldPrediction>>& predictions) {
+        AutofillQueryResponse::FormSuggestion suggestion;
+        for (size_t i = 0; i < predictions.size(); ++i) {
+          auto* field_suggestions = suggestion.add_field_suggestions();
+          field_suggestions->set_field_signature(i);
+          field_suggestions->mutable_predictions()->Assign(
+              predictions[i].begin(), predictions[i].end());
+        }
+        return suggestion;
+      };
+
+  AutofillQueryResponse::FormSuggestion received_form_suggestion =
+      to_form_suggestion(test_case.received_predictions);
+
+  AutofillQueryResponse::FormSuggestion expected_form_suggestion =
+      to_form_suggestion(test_case.expected_predictions);
+
+  AutofillQueryResponse::FormSuggestion processed_form_suggestion;
+  processed_form_suggestion.CopyFrom(received_form_suggestion);
+  ClearSmallAddressFormPredictionsForTesting(processed_form_suggestion);
+
+  EXPECT_THAT(processed_form_suggestion,
+              EqualsProto<AutofillQueryResponse::FormSuggestion>(
+                  expected_form_suggestion));
+
+  EXPECT_THAT(processed_form_suggestion.field_suggestions(),
+              ElementsAreArray(
+                  base::ToVector(expected_form_suggestion.field_suggestions(),
+                                 DeepEqualsFieldSuggestion)));
 }
 
 }  // namespace

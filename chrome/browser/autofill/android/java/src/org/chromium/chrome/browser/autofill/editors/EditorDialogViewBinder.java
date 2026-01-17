@@ -8,6 +8,7 @@ import static org.chromium.chrome.browser.autofill.AutofillUiUtils.getInputTypeF
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.ALLOW_DELETE;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.CANCEL_RUNNABLE;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.CUSTOM_DONE_BUTTON_TEXT;
+import static org.chromium.chrome.browser.autofill.editors.EditorProperties.DELETE_CONFIRMATION_PRIMARY_BUTTON_TEXT;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.DELETE_CONFIRMATION_TEXT;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.DELETE_CONFIRMATION_TITLE;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.DELETE_RUNNABLE;
@@ -17,14 +18,17 @@ import static org.chromium.chrome.browser.autofill.editors.EditorProperties.Drop
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.DropdownFieldProperties.DROPDOWN_KEY_VALUE_LIST;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.EDITOR_FIELDS;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.EDITOR_TITLE;
-import static org.chromium.chrome.browser.autofill.editors.EditorProperties.FOOTER_MESSAGE;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.FieldProperties.ERROR_MESSAGE;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.FieldProperties.FOCUSED;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.FieldProperties.IS_REQUIRED;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.FieldProperties.LABEL;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.FieldProperties.VALIDATOR;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.FieldProperties.VALUE;
-import static org.chromium.chrome.browser.autofill.editors.EditorProperties.NonEditableTextProperties.TEXT;
+import static org.chromium.chrome.browser.autofill.editors.EditorProperties.NonEditableTextProperties.CLICK_RUNNABLE;
+import static org.chromium.chrome.browser.autofill.editors.EditorProperties.NonEditableTextProperties.CONTENT_DESCRIPTION;
+import static org.chromium.chrome.browser.autofill.editors.EditorProperties.NonEditableTextProperties.ICON;
+import static org.chromium.chrome.browser.autofill.editors.EditorProperties.NoticeProperties.IMPORTANT_FOR_ACCESSIBILITY;
+import static org.chromium.chrome.browser.autofill.editors.EditorProperties.NoticeProperties.NOTICE_TEXT;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.SHOW_BUTTONS;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.TextFieldProperties.TEXT_FIELD_TYPE;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.TextFieldProperties.TEXT_FORMATTER;
@@ -32,9 +36,12 @@ import static org.chromium.chrome.browser.autofill.editors.EditorProperties.Text
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.VALIDATE_ON_SHOW;
 import static org.chromium.chrome.browser.autofill.editors.EditorProperties.VISIBLE;
 
+import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import org.chromium.build.annotations.NullMarked;
+import org.chromium.chrome.browser.autofill.R;
 import org.chromium.components.autofill.DropdownKeyValue;
 import org.chromium.ui.modelutil.PropertyKey;
 import org.chromium.ui.modelutil.PropertyModel;
@@ -60,12 +67,13 @@ public class EditorDialogViewBinder {
             view.setEditorTitle(model.get(EDITOR_TITLE));
         } else if (propertyKey == CUSTOM_DONE_BUTTON_TEXT) {
             view.setCustomDoneButtonText(model.get(CUSTOM_DONE_BUTTON_TEXT));
-        } else if (propertyKey == FOOTER_MESSAGE) {
-            view.setFooterMessage(model.get(FOOTER_MESSAGE));
         } else if (propertyKey == DELETE_CONFIRMATION_TITLE) {
             view.setDeleteConfirmationTitle(model.get(DELETE_CONFIRMATION_TITLE));
         } else if (propertyKey == DELETE_CONFIRMATION_TEXT) {
             view.setDeleteConfirmationText(model.get(DELETE_CONFIRMATION_TEXT));
+        } else if (propertyKey == DELETE_CONFIRMATION_PRIMARY_BUTTON_TEXT) {
+            view.setDeleteConfirmationPrimaryButtonText(
+                    model.get(DELETE_CONFIRMATION_PRIMARY_BUTTON_TEXT));
         } else if (propertyKey == EDITOR_FIELDS) {
             view.setEditorFields(model.get(EDITOR_FIELDS));
         } else if (propertyKey == DONE_RUNNABLE) {
@@ -144,9 +152,41 @@ public class EditorDialogViewBinder {
         }
     }
 
-    static void bindNonEditableTextView(PropertyModel model, TextView view, PropertyKey key) {
-        if (key == TEXT) {
-            view.setText(model.get(TEXT));
+    static void bindNonEditableTextView(PropertyModel model, View view, PropertyKey key) {
+        if (key == EditorProperties.NonEditableTextProperties.PRIMARY_TEXT) {
+            TextView textView = view.findViewById(R.id.primary_text);
+            textView.setText(model.get(EditorProperties.NonEditableTextProperties.PRIMARY_TEXT));
+        } else if (key == EditorProperties.NonEditableTextProperties.SECONDARY_TEXT) {
+            TextView secondaryTextView = view.findViewById(R.id.secondary_text);
+            String secondaryText =
+                    model.get(EditorProperties.NonEditableTextProperties.SECONDARY_TEXT);
+            if (secondaryText != null && !secondaryText.isEmpty()) {
+                secondaryTextView.setText(secondaryText);
+                secondaryTextView.setVisibility(View.VISIBLE);
+            } else {
+                secondaryTextView.setVisibility(View.GONE);
+            }
+        } else if (key == ICON) {
+            ImageView iconView = view.findViewById(R.id.icon);
+            iconView.setImageResource(model.get(ICON));
+            iconView.setVisibility(View.VISIBLE);
+        } else if (key == CLICK_RUNNABLE) {
+            view.setOnClickListener(v -> model.get(CLICK_RUNNABLE).run());
+        } else if (key == CONTENT_DESCRIPTION) {
+            view.setContentDescription(model.get(CONTENT_DESCRIPTION));
+        } else {
+            assert false : "Unhandled update to property:" + key;
+        }
+    }
+
+    static void bindNoticeTextView(PropertyModel model, TextView view, PropertyKey key) {
+        if (key == NOTICE_TEXT) {
+            view.setText(model.get(NOTICE_TEXT));
+        } else if (key == IMPORTANT_FOR_ACCESSIBILITY) {
+            view.setImportantForAccessibility(
+                    model.get(IMPORTANT_FOR_ACCESSIBILITY)
+                            ? View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                            : View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         } else {
             assert false : "Unhandled update to property:" + key;
         }

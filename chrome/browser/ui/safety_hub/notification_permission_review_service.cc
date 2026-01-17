@@ -9,7 +9,6 @@
 #include <set>
 #include <string>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "chrome/browser/ui/safety_hub/safety_hub_result.h"
@@ -20,13 +19,16 @@
 #include "components/content_settings/core/common/content_settings_types.h"
 #include "components/content_settings/core/common/content_settings_utils.h"
 #include "components/permissions/notifications_engagement_service.h"
-#include "components/safe_browsing/core/common/features.h"
 #include "components/site_engagement/content/site_engagement_service.h"
 #include "ui/base/l10n/l10n_util.h"
 
 namespace {
 
 constexpr char kExcludedKey[] = "exempted";
+
+// Engagement limits notification permissions module.
+const int kMinEngagementNotificationLimit = 0;
+const int kLowEngagementNotificationLimit = 4;
 
 std::set<std::pair<ContentSettingsPattern, ContentSettingsPattern>>
 GetIgnoredPatternPairs(scoped_refptr<HostContentSettingsMap> hcsm) {
@@ -54,12 +56,6 @@ NotificationPermissionsReviewService::NotificationPermissionsReviewService(
     site_engagement::SiteEngagementService* engagement_service)
     : engagement_service_(engagement_service), hcsm_(hcsm) {
   content_settings_observation_.Observe(hcsm);
-
-#if BUILDFLAG(IS_ANDROID)
-  if (!base::FeatureList::IsEnabled(features::kSafetyHub)) {
-    return;
-  }
-#endif  // BUILDFLAG(IS_ANDROID)
 
   // Disruptive notification revocation overlaps with the notification review
   // module. Disable this module when the disruptive revocation is running.
@@ -161,7 +157,7 @@ NotificationPermissionsReviewService::UpdateOnUIThread(
     }
 
     // Blocklisted permissions should not be in the review list.
-    if (base::Contains(ignored_patterns_set, pair)) {
+    if (ignored_patterns_set.contains(pair)) {
       continue;
     }
 
@@ -261,18 +257,14 @@ bool NotificationPermissionsReviewService::
   // more than 3. Otherwise, the notification permission should not be added
   // to review list.
   double score = engagement_service_->GetScore(url);
-  int low_engagement_notification_limit =
-      features::kSafetyCheckNotificationPermissionsLowEnagementLimit.Get();
   bool is_low_engagement =
       !site_engagement::SiteEngagementService::IsEngagementAtLeast(
           score, blink::mojom::EngagementLevel::MEDIUM) &&
-      notification_count > low_engagement_notification_limit;
-  int min_engagement_notification_limit =
-      features::kSafetyCheckNotificationPermissionsMinEnagementLimit.Get();
+      notification_count > kLowEngagementNotificationLimit;
   bool is_minimal_engagement =
       !site_engagement::SiteEngagementService::IsEngagementAtLeast(
           score, blink::mojom::EngagementLevel::LOW) &&
-      notification_count > min_engagement_notification_limit;
+      notification_count > kMinEngagementNotificationLimit;
 
   return is_minimal_engagement || is_low_engagement;
 }

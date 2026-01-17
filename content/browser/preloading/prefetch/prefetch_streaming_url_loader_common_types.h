@@ -7,8 +7,8 @@
 
 #include <optional>
 
-#include "mojo/public/cpp/bindings/receiver.h"
-#include "mojo/public/cpp/bindings/remote.h"
+#include "mojo/public/cpp/bindings/pending_receiver.h"
+#include "mojo/public/cpp/bindings/pending_remote.h"
 #include "services/network/public/mojom/url_loader.mojom-forward.h"
 #include "services/network/public/mojom/url_response_head.mojom-forward.h"
 
@@ -27,6 +27,8 @@ namespace network {
 struct ResourceRequest;
 struct URLLoaderCompletionStatus;
 }  // namespace network
+
+namespace content {
 
 // These values are persisted to logs. Entries should not be renumbered and
 // numeric values should never be reused.
@@ -91,7 +93,25 @@ using OnPrefetchResponseStartedCallback =
     base::OnceCallback<std::optional<PrefetchErrorOnResponseReceived>(
         network::mojom::URLResponseHead* head)>;
 
+// TODO(https://crbug.com/400761083): Refactor
+// `OnPrefetchDeterminedHeadCallback` and `OnPrefetchResponseCompletedCallback`.
+// Perhaps we can merge them into a single `base::OnceClosure` to notify
+// `PrefetchContainer` of `PrefetchResponseReader::LoadState` changes and pass
+// necessary `PrefetchResponseReader::LoadState` and other states by accessing
+// the last `PrefetchResponseReader` once https://crbug.com/432518638 is fixed.
+
+// Called when `PrefetchResponseReader::LoadState` reaches:
+// - `kResponseReceived` (`is_successful_determined_head` is true) or
+// - `kFailedResponseReceived`, `kFailedRedirect` or `kFailed`
+//   (`is_successful_determined_head` is false).
+using OnPrefetchDeterminedHeadCallback =
+    base::OnceCallback<void(bool is_successful_determined_head)>;
+
+// Called when `PrefetchResponseReader::LoadState` reaches:
+// - `kCompleted` (`is_success` is true) or
+// - `kFailed` (`is_success` is false).
 using OnPrefetchResponseCompletedCallback = base::OnceCallback<void(
+    bool is_success,
     const network::URLLoaderCompletionStatus& completion_status)>;
 
 // This callback is used by the owner to determine if the redirect should be
@@ -176,5 +196,7 @@ enum class PrefetchServiceWorkerState {
 
 using OnServiceWorkerStateDeterminedCallback =
     base::OnceCallback<void(PrefetchServiceWorkerState)>;
+
+}  // namespace content
 
 #endif  // CONTENT_BROWSER_PRELOADING_PREFETCH_PREFETCH_STREAMING_URL_LOADER_COMMON_TYPES_H_

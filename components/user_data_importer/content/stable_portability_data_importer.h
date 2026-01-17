@@ -6,10 +6,13 @@
 #define COMPONENTS_USER_DATA_IMPORTER_CONTENT_STABLE_PORTABILITY_DATA_IMPORTER_H_
 
 #include "base/memory/raw_ptr.h"
+#include "base/sequence_checker.h"
 #include "base/threading/sequence_bound.h"
+#include "build/build_config.h"
 #include "components/user_data_importer/content/content_bookmark_parser.h"
 #include "components/user_data_importer/utility/bookmark_parser.h"
 #include "components/user_data_importer/utility/history_callback_from_rust.h"
+#include "components/user_data_importer/utility/importer_metrics_recorder.h"
 
 namespace base {
 class File;
@@ -36,8 +39,13 @@ struct StablePortabilityHistoryEntry;
 class StablePortabilityDataImporter {
  public:
   // A callback used by the caller to obtain the number of successfully imported
-  // bookmarks, reading list items, or urls (for history import).
+  // bookmarks, reading list items, or history entries. In case of an error, the
+  // reported count will be -1.
   using ImportCallback = base::OnceCallback<void(int)>;
+
+  // Default batch size when importing history. Different values can be passed
+  // to ImportHistory() for testing purposes.
+  static constexpr size_t kHistoryBatchSize = 1000;
 
   // `history_service`, `bookmark_model`, and `reading_list_model` may be null,
   // but if non-null must outlive this class. `bookmark_parser` must not be
@@ -46,7 +54,7 @@ class StablePortabilityDataImporter {
       history::HistoryService* history_service,
       bookmarks::BookmarkModel* bookmark_model,
       ReadingListModel* reading_list_model,
-      scoped_refptr<ContentBookmarkParser> bookmark_parser);
+      std::unique_ptr<ContentBookmarkParser> bookmark_parser);
   ~StablePortabilityDataImporter();
 
   // Attempts to import bookmarks from the given `file`. `bookmarks_callback` is
@@ -59,12 +67,14 @@ class StablePortabilityDataImporter {
   // number of items successfully imported.
   void ImportReadingList(base::File file, ImportCallback reading_list_callback);
 
-  // Attempts to import the `history_filename`. `history_callback` is called at
-  // the end of the import process to notify the caller with the number of
-  // successful items imported.
-  void ImportHistory(const base::FilePath& history_filename,
+#if BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
+  // Attempts to import history from the given `file`. `history_callback` is
+  // called at the end of the import process to notify the caller about the
+  // number of items successfully imported.
+  void ImportHistory(base::File file,
                      ImportCallback history_callback,
-                     const size_t import_batch_size);
+                     const size_t import_batch_size = kHistoryBatchSize);
+#endif  // BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
 
  private:
   // Object used to allow Rust History import pipeline to communicate results
@@ -90,20 +100,20 @@ class StablePortabilityDataImporter {
         bool completed) override;
 
     // Calls `done_callback_` with 0 to signal that parsing has failed.
-    void Fail();
+    void Fail() override;
 
    private:
     TransferHistoryCallback transfer_history_callback_;
     user_data_importer::StablePortabilityDataImporter::ImportCallback
         done_callback_;
-    size_t total_imported_count_ = 0;
+    size_t parsed_history_entries_count_ = 0;
   };
 
   // Encapsulates work which must occur in the background thread.
   class BackgroundWorker {
    public:
     explicit BackgroundWorker(
-        scoped_refptr<ContentBookmarkParser> bookmark_parser);
+        std::unique_ptr<ContentBookmarkParser> bookmark_parser);
     ~BackgroundWorker();
 
     void ParseBookmarks(
@@ -111,13 +121,15 @@ class StablePortabilityDataImporter {
         user_data_importer::BookmarkParser::BookmarkParsingCallback
             bookmarks_callback);
 
+#if BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
     void ParseHistory(
-        const std::string& history_filename,
+        base::File file,
         std::unique_ptr<RustHistoryCallbackForStablePortabilityFormat> callback,
         size_t import_batch_size);
+#endif  // BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
 
    private:
-    scoped_refptr<ContentBookmarkParser> bookmark_parser_;
+    std::unique_ptr<ContentBookmarkParser> bookmark_parser_;
   };
 
   friend class StablePortabilityDataImporterTest;
@@ -127,19 +139,39 @@ class StablePortabilityDataImporter {
   void TransferHistoryEntries(
       std::vector<StablePortabilityHistoryEntry> history_entries);
 
-  // Receives the result of parsing bookmarks, stores them for later use, and
-  // invokes `bookmarks_callback` with the number of parsed bookmarks.
+  // Logs metrics related to history importing and invokes `history_callback`
+  // with the number of history entries imported. A negative
+  // `parsed_history_entries_count` is interpreted as an error having occurred
+  // during the importing.
+  void OnHistoryImportCompleted(ImportCallback history_callback,
+                                int parsed_history_entries_count);
+
+  // Receives the result of parsing bookmarks, and invokes `bookmarks_callback`
+  // with the number of parsed bookmarks.
   void OnBookmarksParsed(ImportCallback bookmarks_callback,
                          BookmarkParser::BookmarkParsingResult result);
 
-  // Receives the result of parsing the reading list, stores them for later use,
-  // and invokes `callback` with the number of parsed reading list items.
+  // Logs an error and invokes `bookmarks_callback` with -1, indicating an
+  // error occurred.
+  void OnBookmarksParsingError(ImportCallback bookmarks_callback,
+                               BookmarkParser::BookmarkParsingError error);
+
+  // Receives the result of parsing the reading list, and invokes
+  // `reading_list_callback` with the number of parsed reading list items.
   void OnReadingListParsed(ImportCallback reading_list_callback,
                            BookmarkParser::BookmarkParsingResult result);
+
+  // Logs an error and invokes `reading_list_callback` with -1, indicating an
+  // error occurred.
+  void OnReadingListParsingError(ImportCallback reading_list_callback,
+                                 BookmarkParser::BookmarkParsingError error);
 
   // Posts a task on `origin_sequence_task_runner` to call the provided
   // callbacks in `StablePortabilityDataImporter::Import`
   void PostCallback(auto callback, auto results);
+
+  // Number of URLs imported during the history import process.
+  size_t imported_history_entries_count_ = 0;
 
   // Service used to import history URLs.
   const raw_ptr<history::HistoryService> history_service_;
@@ -150,12 +182,10 @@ class StablePortabilityDataImporter {
   // Service used to import reading list items.
   const raw_ptr<ReadingListModel> reading_list_model_;
 
-  SEQUENCE_CHECKER(sequence_checker_);
+  // Helper object which logs metrics about the import flow.
+  ImporterMetricsRecorder metrics_recorder_;
 
-  // History entries which have been parsed, but not yet committed to permanent
-  // storage.
-  std::vector<StablePortabilityHistoryEntry> pending_history_entries_
-      GUARDED_BY_CONTEXT(sequence_checker_);
+  SEQUENCE_CHECKER(sequence_checker_);
 
   // The task runner from which the import task was launched. The purpose of
   // this task runner is to post tasks on the thread where the importer lives,

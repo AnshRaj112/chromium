@@ -8,10 +8,12 @@
  * Autofill keyboard accessory.
  */
 
-// Requires functions from fill.ts, form.ts, autofill_form_features.ts and
-// child_frame_registration_lib.ts.
-
-import {gCrWeb, gCrWebLegacy} from '//ios/web/public/js_messaging/resources/gcrweb.js';
+import {processChildFrameMessage} from '//components/autofill/ios/form_util/resources/child_frame_registration_lib.js';
+import {isAutofillableElement} from '//components/autofill/ios/form_util/resources/fill_element_inference_util.js';
+import * as fillUtil from '//components/autofill/ios/form_util/resources/fill_util.js';
+import {formSubmitted, reportFormSubmissionError, wasEditedByUser} from '//components/autofill/ios/form_util/resources/fill_web_form.js';
+import {getFieldIdentifier, getFormIdentifier, reportDetectedFormSubmission} from '//components/autofill/ios/form_util/resources/form_utils.js';
+import {CrWebApi, gCrWeb} from '//ios/web/public/js_messaging/resources/gcrweb.js';
 import {sendWebKitMessage} from '//ios/web/public/js_messaging/resources/utils.js';
 
 /**
@@ -60,6 +62,13 @@ let numberOfPendingMessages: number = 0;
  * messages.
  */
 let formMsgBatchMetadata: FormMsgBatchMetadata = {dropCount: 0};
+
+/**
+ * Retrieves the registered 'autofill_form_features' CrWebApi
+ * instance for use in this file.
+ */
+const autofillFormFeaturesApi =
+  gCrWeb.getRegisteredApi('autofill_form_features');
 
 /**
  * Parses a string to a boolean.
@@ -147,9 +156,8 @@ function formActivity(evt: Event): void {
   if (evt.type !== 'blur') {
     lastFocusedElement = document.activeElement;
   }
-  if (['change', 'input'].includes(evt.type) &&
-      gCrWebLegacy.form.wasEditedByUser !== null) {
-    gCrWebLegacy.form.wasEditedByUser.set(target, evt.isTrusted);
+  if (['change', 'input'].includes(evt.type) && wasEditedByUser !== null) {
+    wasEditedByUser.set(target, evt.isTrusted);
   }
 
   if (evt.target !== lastFocusedElement) {
@@ -159,8 +167,8 @@ function formActivity(evt: Event): void {
       target.tagName === 'FORM' ? target : (target as HTMLFormElement)['form'];
   const field = target.tagName === 'FORM' ? null : target;
 
-  const formRendererID = gCrWebLegacy.fill.getUniqueID(form);
-  const fieldRendererID = gCrWebLegacy.fill.getUniqueID(field);
+  const formRendererID = fillUtil.getUniqueID(form);
+  const fieldRendererID = fillUtil.getUniqueID(field);
 
   const fieldType = 'type' in target ? target.type : '';
   const fieldValue = 'value' in target ? target.value : '';
@@ -168,9 +176,9 @@ function formActivity(evt: Event): void {
   const msg = {
     'command': 'form.activity',
     'frameID': gCrWeb.getFrameId(),
-    'formName': gCrWebLegacy.form.getFormIdentifier(form),
+    'formName': getFormIdentifier(form),
     'formRendererID': formRendererID,
-    'fieldIdentifier': gCrWebLegacy.form.getFieldIdentifier(field),
+    'fieldIdentifier': getFieldIdentifier(field),
     'fieldRendererID': fieldRendererID,
     'fieldType': fieldType,
     'type': evt.type,
@@ -187,9 +195,7 @@ function formActivity(evt: Event): void {
  * content.
  */
 function submitHandler(evt: Event): void {
-  const allowDefaultPrevented =
-      gCrWebLegacy.autofill_form_features
-          .isAutofillAllowDefaultPreventedSubmission();
+  const allowDefaultPrevented = autofillFormFeaturesApi.getFunction('isAutofillAllowDefaultPreventedSubmission')();
   // Ignore the submission if it was preventDefault()ed by the content AND
   // `defaultPrevented` isn't allowed as a feature by Autofill.
   if (evt['defaultPrevented'] && !allowDefaultPrevented) {
@@ -200,7 +206,7 @@ function submitHandler(evt: Event): void {
     return;
   }
 
-  gCrWebLegacy.form.formSubmitted(
+  formSubmitted(
       evt.target as HTMLFormElement,
       /* messageHandler= */ NATIVE_MESSAGE_HANDLER,
       /* programmaticSubmission= */ false);
@@ -208,17 +214,16 @@ function submitHandler(evt: Event): void {
 
 /**
  * A wrapper around `submitHandler()` that catches and reports errors that
- * happen before calling gCrWebLegacy.form.formSubmitted().
+ * happen before calling utility function formSubmitted().
  */
 function submitHandlerWithErrorWrapper(evt: Event): void {
-  gCrWebLegacy.form.reportDetectedFormSubmission(
+  reportDetectedFormSubmission(
       /*isProgrammatic=*/ false, /*handler=*/ NATIVE_MESSAGE_HANDLER);
   try {
     submitHandler(evt);
   } catch (error) {
-    if (gCrWebLegacy.autofill_form_features
-            .isAutofillReportFormSubmissionErrorsEnabled()) {
-      gCrWebLegacy.form.reportFormSubmissionError(
+    if (autofillFormFeaturesApi.getFunction('isAutofillReportFormSubmissionErrorsEnabled')()) {
+      reportFormSubmissionError(
           error, /*programmaticSubmission=*/ false,
           /*handler=*/ NATIVE_MESSAGE_HANDLER);
     } else {
@@ -277,8 +282,8 @@ function sendFormMutationMessagesAfterDelay(
  * the Child Frame Registration lib.
  */
 function processInboundMessage(event: MessageEvent<any>): void {
-  if (gCrWebLegacy.autofill_form_features.isAutofillAcrossIframesEnabled()) {
-    gCrWebLegacy.remoteFrameRegistration.processChildFrameMessage(event);
+  if (autofillFormFeaturesApi.getFunction('isAutofillAcrossIframesEnabled')()) {
+    processChildFrameMessage(event);
   }
 }
 
@@ -315,17 +320,16 @@ function attachListeners(): void {
   if (formSubmitOriginalFunction === null) {
     formSubmitOriginalFunction = HTMLFormElement.prototype.submit;
     HTMLFormElement.prototype.submit = function() {
-      gCrWebLegacy.form.reportDetectedFormSubmission(
+      reportDetectedFormSubmission(
           /*isProgrammatic=*/ true, /*handler=*/ NATIVE_MESSAGE_HANDLER);
-      if (!gCrWebLegacy.autofill_form_features
-               .isAutofillIsolatedContentWorldEnabled()) {
+      if (!autofillFormFeaturesApi.getFunction('isAutofillIsolatedContentWorldEnabled')()) {
         // If an error happens in formSubmitted, this will cancel the form
         // submission which can lead to usability issue for the user.
         // Put the formSubmitted in a try catch to ensure the original function
         // is always called.
 
         try {
-          gCrWebLegacy.form.formSubmitted(
+          formSubmitted(
               this,
               /* messageHandler= */ NATIVE_MESSAGE_HANDLER,
               /* programmaticSubmission= */ true);
@@ -373,9 +377,9 @@ function findAllFormElementsInNodes(nodeList: NodeList): Element[] {
 function findFormlessFieldsIds(elements: Element[]): string[] {
   return elements
       .filter(
-          e => gCrWebLegacy.fill.isAutofillableElement(e) &&
+          e => isAutofillableElement(e) &&
               !(e as HTMLInputElement).form)
-      .map(gCrWebLegacy.fill.getUniqueID);
+      .map(fillUtil.getUniqueID);
 }
 
 /**
@@ -451,12 +455,12 @@ function trackFormMutations(delay: number): void {
         } else {
           // Send the removed forms identifiers to the browser.
           const filteredFormIDs =
-              forms.map(form => gCrWebLegacy.fill.getUniqueID(form));
+              forms.map(form => fillUtil.getUniqueID(form));
           removedFormMessage = {
             'command': 'form.removal',
             'frameID': gCrWeb.getFrameId(),
-            'removedFormIDs': gCrWebLegacy.stringify(filteredFormIDs),
-            'removedFieldIDs': gCrWebLegacy.stringify(removedFormlessFieldsIds),
+            'removedFormIDs': fillUtil.stringify(filteredFormIDs),
+            'removedFieldIDs': fillUtil.stringify(removedFormlessFieldsIds),
           };
           continue;
         }
@@ -467,7 +471,7 @@ function trackFormMutations(delay: number): void {
         removedFormMessage = {
           'command': 'form.removal',
           'frameID': gCrWeb.getFrameId(),
-          'removedFieldIDs': gCrWebLegacy.stringify(removedFormlessFieldsIds),
+          'removedFieldIDs': fillUtil.stringify(removedFormlessFieldsIds),
         };
         continue;
       } else if (formlessFieldsWereRemoved) {
@@ -505,4 +509,8 @@ function trackFormMutations(delay: number): void {
   formMutationObserver.observe(document, {childList: true, subtree: true});
 }
 
-gCrWebLegacy.formHandlers = {trackFormMutations};
+const formHandlersApi = new CrWebApi();
+
+formHandlersApi.addFunction('trackFormMutations', trackFormMutations);
+
+gCrWeb.registerApi('formHandlers', formHandlersApi);

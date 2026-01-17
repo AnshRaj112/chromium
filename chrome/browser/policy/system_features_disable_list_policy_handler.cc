@@ -6,7 +6,6 @@
 
 #include "ash/constants/ash_pref_names.h"
 #include "ash/constants/web_app_id_constants.h"
-#include "base/containers/contains.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/values.h"
@@ -44,6 +43,7 @@ const char kYoutubeFeature[] = "youtube";
 const char kGoogleMapsFeature[] = "google_maps";
 const char kCalculatorFeature[] = "calculator";
 const char kTextEditorFeature[] = "text_editor";
+const char kVidsFeature[] = "vids";
 
 const char kSystemFeaturesDisableListHistogram[] =
     "Enterprise.SystemFeaturesDisableList";
@@ -73,8 +73,7 @@ bool SystemFeaturesDisableListPolicyHandler::IsSystemFeatureDisabled(
   const base::Value::List& disabled_system_features =
       pref_service->GetList(policy::policy_prefs::kSystemFeaturesDisableList);
 
-  return base::Contains(disabled_system_features,
-                        base::Value(static_cast<int>(feature)));
+  return disabled_system_features.contains(static_cast<int>(feature));
 }
 
 void SystemFeaturesDisableListPolicyHandler::ApplyList(
@@ -88,15 +87,14 @@ void SystemFeaturesDisableListPolicyHandler::ApplyList(
     SystemFeature feature = ConvertToEnum(element.GetString());
     enums_list.Append(static_cast<int>(feature));
 
-    if (!old_list || !base::Contains(old_list->GetList(),
-                                     base::Value(static_cast<int>(feature)))) {
+    if (!old_list || !old_list->GetList().contains(static_cast<int>(feature))) {
       base::UmaHistogramEnumeration(kSystemFeaturesDisableListHistogram,
                                     feature);
     }
   }
 
-  bool os_settings_disabled = base::Contains(
-      enums_list, base::Value(static_cast<int>(SystemFeature::kOsSettings)));
+  bool os_settings_disabled =
+      enums_list.contains(static_cast<int>(SystemFeature::kOsSettings));
   prefs->SetBoolean(ash::prefs::kOsSettingsEnabled, !os_settings_disabled);
   prefs->SetValue(policy_prefs::kSystemFeaturesDisableList,
                   base::Value(std::move(enums_list)));
@@ -178,6 +176,9 @@ SystemFeature SystemFeaturesDisableListPolicyHandler::ConvertToEnum(
   }
   if (system_feature == kTextEditorFeature) {
     return SystemFeature::kTextEditor;
+  }
+  if (system_feature == kVidsFeature) {
+    return SystemFeature::kVids;
   }
   LOG(ERROR) << "Unsupported system feature: " << system_feature;
   return SystemFeature::kUnknownSystemFeature;

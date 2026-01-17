@@ -8,6 +8,7 @@ import org.jni_zero.CalledByNative;
 import org.jni_zero.JNINamespace;
 import org.jni_zero.NativeMethods;
 
+import org.chromium.base.JniOnceCallback;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.url.GURL;
@@ -43,9 +44,9 @@ public class GroupSuggestionsServiceImpl implements GroupSuggestionsService {
     }
 
     @Override
-    public void didSelectTab(int tabId, GURL url, int tabSelectionType, int lastId) {
+    public void didSelectTab(int tabId, GURL url, int tabSelectionCause, int lastId) {
         GroupSuggestionsServiceImplJni.get()
-                .didSelectTab(mNativePtr, tabId, url, tabSelectionType, lastId);
+                .didSelectTab(mNativePtr, tabId, url, tabSelectionCause, lastId);
     }
 
     @Override
@@ -89,7 +90,7 @@ public class GroupSuggestionsServiceImpl implements GroupSuggestionsService {
     public @Nullable CachedSuggestions getCachedSuggestions(int windowId) {
         if (mNativePtr == 0) {
             // Return CachedSuggestions with an empty list if the native service isn't initialized.
-            return new CachedSuggestions(null, (res) -> {});
+            return new CachedSuggestions(null, emptyJniCallback());
         }
         return GroupSuggestionsServiceImplJni.get().getCachedSuggestions(mNativePtr, windowId);
     }
@@ -97,6 +98,21 @@ public class GroupSuggestionsServiceImpl implements GroupSuggestionsService {
     @CalledByNative
     private void clearNativePtr() {
         mNativePtr = 0;
+    }
+
+    private static JniOnceCallback<UserResponseMetadata> emptyJniCallback() {
+        return new JniOnceCallback<>() {
+            @Override
+            public void destroy() {}
+
+            @Override
+            public void onResult(UserResponseMetadata result) {}
+
+            @Override
+            public Runnable bind(UserResponseMetadata result) {
+                return () -> {};
+            }
+        };
     }
 
     @NativeMethods
@@ -107,7 +123,7 @@ public class GroupSuggestionsServiceImpl implements GroupSuggestionsService {
                 long nativeGroupSuggestionsServiceAndroid,
                 int tabId,
                 GURL url,
-                @TabSelectionType int tabSelectionType,
+                @TabSelectionCause int tabSelectionCause,
                 int lastId);
 
         void willCloseTab(long nativeGroupSuggestionsServiceAndroid, int tabId);

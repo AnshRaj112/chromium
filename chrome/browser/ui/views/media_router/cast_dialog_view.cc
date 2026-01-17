@@ -6,7 +6,6 @@
 
 #include <optional>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/notreached.h"
@@ -44,7 +43,6 @@
 #include "ui/base/mojom/dialog_button.mojom.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/gfx/geometry/rect.h"
-#include "ui/gfx/native_widget_types.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/controls/button/label_button.h"
@@ -432,15 +430,15 @@ std::optional<MediaCastMode> CastDialogView::GetCastModeToUse(
   // supported and selected.
   switch (selected_source_) {
     case SourceType::kTab:
-      if (base::Contains(sink.cast_modes, PRESENTATION)) {
+      if (sink.cast_modes.contains(PRESENTATION)) {
         return std::make_optional<MediaCastMode>(PRESENTATION);
       }
-      if (base::Contains(sink.cast_modes, TAB_MIRROR)) {
+      if (sink.cast_modes.contains(TAB_MIRROR)) {
         return std::make_optional<MediaCastMode>(TAB_MIRROR);
       }
       break;
     case SourceType::kDesktop:
-      if (base::Contains(sink.cast_modes, DESKTOP_MIRROR)) {
+      if (sink.cast_modes.contains(DESKTOP_MIRROR)) {
         return std::make_optional<MediaCastMode>(DESKTOP_MIRROR);
       }
       break;

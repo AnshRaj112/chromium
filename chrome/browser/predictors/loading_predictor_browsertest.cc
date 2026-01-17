@@ -13,7 +13,6 @@
 
 #include "base/base64.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
@@ -233,7 +232,7 @@ class TestPreconnectManagerObserver
       mojo::PendingRemote<network::mojom::ConnectionChangeObserverClient>&
           observer,
       bool success) override {
-    ResolveHostRequestInfo preconnect_info{url.host(),
+    ResolveHostRequestInfo preconnect_info{url.GetHost(),
                                            network_anonymization_key};
     if (success) {
       successful_dns_lookups_.insert(preconnect_info);
@@ -278,31 +277,29 @@ class TestPreconnectManagerObserver
 
   bool HasOriginAttemptedToPreconnect(const GURL& origin) {
     DCHECK_EQ(origin, origin.DeprecatedGetOriginAsURL());
-    return base::Contains(preconnect_url_attempts_, origin);
+    return preconnect_url_attempts_.contains(origin);
   }
 
   bool HasHostBeenLookedUp(
       const std::string& host,
       const net::NetworkAnonymizationKey& network_anonymization_key) {
     ResolveHostRequestInfo preconnect_info{host, network_anonymization_key};
-    return base::Contains(successful_dns_lookups_, preconnect_info) ||
-           base::Contains(unsuccessful_dns_lookups_, preconnect_info);
+    return successful_dns_lookups_.contains(preconnect_info) ||
+           unsuccessful_dns_lookups_.contains(preconnect_info);
   }
 
   bool HostFound(
       const std::string& host,
       const net::NetworkAnonymizationKey& network_anonymization_key) {
-    return base::Contains(
-        successful_dns_lookups_,
+    return successful_dns_lookups_.contains(
         ResolveHostRequestInfo{host, network_anonymization_key});
   }
 
   bool ProxyFound(
       const GURL& url,
       const net::NetworkAnonymizationKey& network_anonymization_key) {
-    return base::Contains(successful_proxy_lookups_,
-                          ResolveProxyRequestInfo{url::Origin::Create(url),
-                                                  network_anonymization_key});
+    return successful_proxy_lookups_.contains(ResolveProxyRequestInfo{
+        url::Origin::Create(url), network_anonymization_key});
   }
 
   const std::vector<GURL>& PreconnectUrlAttemptsHistory() const {
@@ -351,8 +348,8 @@ class TestPreconnectManagerObserver
   };
 
   bool HasProxyBeenLookedUp(const ResolveProxyRequestInfo& resolve_proxy_info) {
-    return base::Contains(successful_proxy_lookups_, resolve_proxy_info) ||
-           base::Contains(unsuccessful_proxy_lookups_, resolve_proxy_info);
+    return successful_proxy_lookups_.contains(resolve_proxy_info) ||
+           unsuccessful_proxy_lookups_.contains(resolve_proxy_info);
   }
 
   void Wait() {
@@ -613,8 +610,7 @@ class LoadingPredictorBrowserTest : public InProcessBrowserTest {
     }
 
     GURL request_url = request.GetURL();
-    std::string dest =
-        base::UnescapeBinaryURLComponent(request_url.query_piece());
+    std::string dest = base::UnescapeBinaryURLComponent(request_url.query());
 
     auto http_response =
         std::make_unique<net::test_server::BasicHttpResponse>();
@@ -731,7 +727,7 @@ IN_PROC_BROWSER_TEST_F(LoadingPredictorBrowserTest,
   // preconnect.
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(preconnect_manager_observer()->HasHostBeenLookedUp(
-      url.host(), network_anonymization_key));
+      url.GetHost(), network_anonymization_key));
   EXPECT_FALSE(preconnect_manager_observer()->HasHostBeenLookedUp(
       "", network_anonymization_key));
   EXPECT_FALSE(preconnect_manager_observer()->HasOriginAttemptedToPreconnect(
@@ -777,9 +773,9 @@ IN_PROC_BROWSER_TEST_F(LoadingPredictorBrowserTest,
   auto observer = NavigateToURLAsync(url);
   EXPECT_TRUE(observer->WaitForRequestStart());
   preconnect_manager_observer()->WaitUntilHostLookedUp(
-      url.host(), network_anonymization_key);
+      url.GetHost(), network_anonymization_key);
   EXPECT_TRUE(preconnect_manager_observer()->HostFound(
-      url.host(), network_anonymization_key));
+      url.GetHost(), network_anonymization_key));
   // We should preconnect only 2 sockets for the main frame host.
   const size_t expected_connections = 2;
   connection_tracker()->WaitForAcceptedConnections(expected_connections);
@@ -807,7 +803,7 @@ IN_PROC_BROWSER_TEST_F(LoadingPredictorBrowserTest, LearnFromNavigation) {
   auto prediction = GetPreconnectPrediction(url);
   ASSERT_TRUE(prediction);
   EXPECT_EQ(prediction->is_redirected, false);
-  EXPECT_EQ(prediction->host, url.host());
+  EXPECT_EQ(prediction->host, url.GetHost());
   EXPECT_THAT(prediction->requests,
               testing::UnorderedElementsAreArray(requests));
 }
@@ -850,7 +846,7 @@ IN_PROC_BROWSER_TEST_F(LoadingPredictorBrowserTestLearnAllResources,
   auto prediction = GetPreconnectPrediction(url);
   ASSERT_TRUE(prediction);
   EXPECT_EQ(prediction->is_redirected, false);
-  EXPECT_EQ(prediction->host, url.host());
+  EXPECT_EQ(prediction->host, url.GetHost());
   EXPECT_THAT(prediction->requests,
               testing::UnorderedElementsAreArray(requests));
 }
@@ -879,7 +875,7 @@ IN_PROC_BROWSER_TEST_F(LoadingPredictorBrowserTest,
   auto prediction = GetPreconnectPrediction(redirect_url);
   ASSERT_TRUE(prediction);
   EXPECT_EQ(prediction->is_redirected, false);
-  EXPECT_EQ(prediction->host, redirect_url.host());
+  EXPECT_EQ(prediction->host, redirect_url.GetHost());
   EXPECT_THAT(prediction->requests,
               testing::UnorderedElementsAreArray(expected_requests));
   // The predictor needs minimum two redirect hits to be confident in the
@@ -889,10 +885,10 @@ IN_PROC_BROWSER_TEST_F(LoadingPredictorBrowserTest,
   prediction = GetPreconnectPrediction(original_url);
   ASSERT_TRUE(prediction);
   EXPECT_FALSE(prediction->is_redirected);
-  EXPECT_EQ(prediction->host, original_url.host());
+  EXPECT_EQ(prediction->host, original_url.GetHost());
   std::vector<PreconnectRequest> expected_requests_1;
   url::Origin redirect_origin = url::Origin::Create(
-      embedded_test_server()->GetURL(redirect_url.host(), "/"));
+      embedded_test_server()->GetURL(redirect_url.GetHost(), "/"));
   expected_requests_1.emplace_back(
       redirect_origin, 1, net::NetworkAnonymizationKey::CreateSameSite(site));
   EXPECT_THAT(prediction->requests,
@@ -906,7 +902,7 @@ IN_PROC_BROWSER_TEST_F(LoadingPredictorBrowserTest,
       redirect_origin, 1, net::NetworkAnonymizationKey::CreateSameSite(site));
   ASSERT_TRUE(prediction);
   EXPECT_EQ(prediction->is_redirected, true);
-  EXPECT_EQ(prediction->host, redirect_url.host());
+  EXPECT_EQ(prediction->host, redirect_url.GetHost());
   EXPECT_THAT(prediction->requests,
               testing::UnorderedElementsAreArray(expected_requests));
 }
@@ -931,9 +927,9 @@ IN_PROC_BROWSER_TEST_F(LoadingPredictorBrowserTest,
   for (auto* const host : kHtmlSubresourcesHosts) {
     GURL host_url(base::StringPrintf("http://%s", host));
     preconnect_manager_observer()->WaitUntilHostLookedUp(
-        host_url.host(), network_anonymization_key);
+        host_url.GetHost(), network_anonymization_key);
     EXPECT_TRUE(preconnect_manager_observer()->HostFound(
-        host_url.host(), network_anonymization_key));
+        host_url.GetHost(), network_anonymization_key));
   }
   // 2 connections to the main frame host + 1 connection per host for others.
   const size_t expected_connections = std::size(kHtmlSubresourcesHosts) + 1;
@@ -952,9 +948,9 @@ IN_PROC_BROWSER_TEST_F(LoadingPredictorBrowserTest, DnsPrefetch) {
       net::NetworkAnonymizationKey::CreateSameSite(site);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
   preconnect_manager_observer()->WaitUntilHostLookedUp(
-      GURL(kChromiumUrl).host(), network_anonymization_key);
+      GURL(kChromiumUrl).GetHost(), network_anonymization_key);
   EXPECT_TRUE(preconnect_manager_observer()->HostFound(
-      GURL(kChromiumUrl).host(), network_anonymization_key));
+      GURL(kChromiumUrl).GetHost(), network_anonymization_key));
 }
 
 // Tests that preconnect warms up a socket connection to a test server.
@@ -1472,7 +1468,7 @@ class LCPPAutoPreconnectTest : public InProcessBrowserTest,
     std::vector<std::string> hosts;
     for (auto& url :
          preconnect_manager_observer_->PreconnectUrlAttemptsHistory()) {
-      hosts.push_back(url.host());
+      hosts.push_back(url.GetHost());
     }
     return hosts;
   }
@@ -1485,7 +1481,8 @@ class LCPPAutoPreconnectTest : public InProcessBrowserTest,
   std::unique_ptr<TestPreconnectManagerObserver> preconnect_manager_observer_;
 };
 
-IN_PROC_BROWSER_TEST_P(LCPPAutoPreconnectTest, EnabledAllOrigins) {
+// https://crbug.com/440185653: Test is flaky.
+IN_PROC_BROWSER_TEST_P(LCPPAutoPreconnectTest, DISABLED_EnabledAllOrigins) {
   const bool kEnabledAllOrigins = GetParam();
 
   const GURL kUrl = embedded_test_server()->GetURL(
@@ -1628,7 +1625,7 @@ class LoadingPredictorNetworkIsolationKeyBrowserTest
                                          TRAFFIC_ANNOTATION_FOR_TESTS);
     simple_loader->DownloadToStringOfUnboundedSizeUntilCrashAndDie(
         browser()->profile()->GetURLLoaderFactory().get(),
-        simple_loader_helper.GetCallbackDeprecated());
+        simple_loader_helper.GetCallback());
     simple_loader_helper.WaitForCallback();
     ASSERT_TRUE(simple_loader_helper.response_body());
     if (url.IntPort() == embedded_test_server()->port()) {
@@ -1706,8 +1703,15 @@ INSTANTIATE_TEST_SUITE_P(All,
 
 // Make sure that the right NetworkAnonymizationKey is used by the
 // LoadingPredictor, both when the predictor is populated and when it isn't.
+//
+// TODO(crbug.com/448862629): Disable flaky test on mac
+#if BUILDFLAG(IS_MAC)
+#define MAYBE_LoadingPredictorNoRedirects DISABLED_LoadingPredictorNoRedirects
+#else
+#define MAYBE_LoadingPredictorNoRedirects LoadingPredictorNoRedirects
+#endif
 IN_PROC_BROWSER_TEST_P(LoadingPredictorNetworkIsolationKeyBrowserTest,
-                       LoadingPredictorNoRedirects) {
+                       MAYBE_LoadingPredictorNoRedirects) {
   // Cache resources needed by navigations, so the only sockets created
   // during navigations should be for the two preconnects.
   CacheFavIcon();
@@ -1847,7 +1851,7 @@ IN_PROC_BROWSER_TEST_P(LoadingPredictorNetworkIsolationKeyBrowserTest,
                                          TRAFFIC_ANNOTATION_FOR_TESTS);
     simple_loader->DownloadToStringOfUnboundedSizeUntilCrashAndDie(
         browser()->profile()->GetURLLoaderFactory().get(),
-        simple_loader_helper.GetCallbackDeprecated());
+        simple_loader_helper.GetCallback());
     simple_loader_helper.WaitForCallback();
     ASSERT_TRUE(simple_loader_helper.response_body());
     EXPECT_EQ(2u, connection_tracker()->GetAcceptedSocketCount());
@@ -2243,7 +2247,7 @@ IN_PROC_BROWSER_TEST_P(LoadingPredictorBrowserTestWithOptimizationGuide,
   auto observer = NavigateToURLAsync(url);
   EXPECT_TRUE(observer->WaitForRequestStart());
   for (auto* const host : kHtmlSubresourcesHosts) {
-    if (!IsLocalPredictionEnabled() && host != url.host()) {
+    if (!IsLocalPredictionEnabled() && host != url.GetHost()) {
       // We don't expect local predictions to be preconnected to.
       continue;
     }
@@ -2292,9 +2296,9 @@ IN_PROC_BROWSER_TEST_P(LoadingPredictorBrowserTestWithOptimizationGuide,
 
   // The initial URL should be preconnected to.
   preconnect_manager_observer()->WaitUntilHostLookedUp(
-      url.host(), network_anonymization_key);
+      url.GetHost(), network_anonymization_key);
   EXPECT_TRUE(preconnect_manager_observer()->HostFound(
-      url.host(), network_anonymization_key));
+      url.GetHost(), network_anonymization_key));
   EXPECT_TRUE(preconnect_manager_observer()->HasOriginAttemptedToPreconnect(
       origin.GetURL()));
 
@@ -2345,9 +2349,9 @@ IN_PROC_BROWSER_TEST_P(LoadingPredictorBrowserTestWithOptimizationGuide,
 
   // The initial URL should be preconnected to.
   preconnect_manager_observer()->WaitUntilHostLookedUp(
-      url.host(), network_anonymization_key);
+      url.GetHost(), network_anonymization_key);
   EXPECT_TRUE(preconnect_manager_observer()->HostFound(
-      url.host(), network_anonymization_key));
+      url.GetHost(), network_anonymization_key));
   EXPECT_TRUE(preconnect_manager_observer()->HasOriginAttemptedToPreconnect(
       origin.GetURL()));
   for (auto* const host : {"subresource.com", "otherresource.com"}) {
@@ -2499,9 +2503,9 @@ IN_PROC_BROWSER_TEST_F(LoadingPredictorBrowserTestWithNoLocalPredictions,
   EXPECT_TRUE(observer->WaitForRequestStart());
   // The initial URL should be preconnected to.
   preconnect_manager_observer()->WaitUntilHostLookedUp(
-      url.host(), network_anonymization_key);
+      url.GetHost(), network_anonymization_key);
   EXPECT_TRUE(preconnect_manager_observer()->HostFound(
-      url.host(), network_anonymization_key));
+      url.GetHost(), network_anonymization_key));
   EXPECT_TRUE(preconnect_manager_observer()->HasOriginAttemptedToPreconnect(
       origin.GetURL()));
   // 2 connections to the main frame host.
@@ -2551,9 +2555,9 @@ class LoadingPredictorPrefetchBrowserTest
  private:
   void MonitorRequest(const net::test_server::HttpRequest& request) {
     // Monitor only prefetches.
-    if (request.headers.find(blink::kPurposeHeaderName) ==
+    if (request.headers.find(blink::kSecPurposeHeaderName) ==
             request.headers.end() ||
-        (request.headers.at(blink::kPurposeHeaderName) !=
+        (request.headers.at(blink::kSecPurposeHeaderName) !=
          blink::kSecPurposePrefetchHeaderValue)) {
       return;
     }
@@ -2752,7 +2756,6 @@ IN_PROC_BROWSER_TEST_P(
   EXPECT_THAT(status.cors_error_status,
               Optional(network::CorsErrorStatus(
                   network::mojom::CorsError::kInsecurePrivateNetwork,
-                  network::mojom::IPAddressSpace::kUnknown,
                   network::mojom::IPAddressSpace::kLoopback)));
 }
 
@@ -3053,11 +3056,11 @@ IN_PROC_BROWSER_TEST_F(FencedFrameLoadingPredictorBrowserTest, DnsPrefetch) {
 
   // The observer should observe a DNS prefetch which succeeds.
   preconnect_manager_observer()->WaitUntilHostLookedUp(
-      dns_prefetch_url.host(), network_anonymization_key);
+      dns_prefetch_url.GetHost(), network_anonymization_key);
   EXPECT_TRUE(preconnect_manager_observer()->HasHostBeenLookedUp(
-      dns_prefetch_url.host(), network_anonymization_key));
+      dns_prefetch_url.GetHost(), network_anonymization_key));
   EXPECT_TRUE(preconnect_manager_observer()->HostFound(
-      dns_prefetch_url.host(), network_anonymization_key));
+      dns_prefetch_url.GetHost(), network_anonymization_key));
 }
 
 // Verify DNS prefetch is disabled after fenced frame untrusted network cutoff.
@@ -3102,14 +3105,14 @@ IN_PROC_BROWSER_TEST_F(FencedFrameLoadingPredictorBrowserTest,
 
   // The observer should observe a DNS prefetch which is cancelled.
   preconnect_manager_observer()->WaitUntilHostLookedUp(
-      dns_prefetch_url.host(), network_anonymization_key);
+      dns_prefetch_url.GetHost(), network_anonymization_key);
 
   // The host is looked up, but the lookup is eventually cancelled because the
   // fenced frame untrusted network access has been disabled.
   EXPECT_TRUE(preconnect_manager_observer()->HasHostBeenLookedUp(
-      dns_prefetch_url.host(), network_anonymization_key));
+      dns_prefetch_url.GetHost(), network_anonymization_key));
   EXPECT_FALSE(preconnect_manager_observer()->HostFound(
-      dns_prefetch_url.host(), network_anonymization_key));
+      dns_prefetch_url.GetHost(), network_anonymization_key));
 }
 
 // Verify DNS prefetch triggered by link response header is working in fenced
@@ -3183,11 +3186,11 @@ IN_PROC_BROWSER_TEST_F(FencedFrameLoadingPredictorBrowserTest,
 
   // The observer should observe a DNS prefetch which succeeds.
   preconnect_manager_observer()->WaitUntilHostLookedUp(
-      dns_prefetch_url.host(), network_anonymization_key);
+      dns_prefetch_url.GetHost(), network_anonymization_key);
   EXPECT_TRUE(preconnect_manager_observer()->HasHostBeenLookedUp(
-      dns_prefetch_url.host(), network_anonymization_key));
+      dns_prefetch_url.GetHost(), network_anonymization_key));
   EXPECT_TRUE(preconnect_manager_observer()->HostFound(
-      dns_prefetch_url.host(), network_anonymization_key));
+      dns_prefetch_url.GetHost(), network_anonymization_key));
 }
 
 // Verify DNS prefetch triggered by link response header is disabled after
@@ -3269,7 +3272,7 @@ IN_PROC_BROWSER_TEST_F(FencedFrameLoadingPredictorBrowserTest,
   // IPC call. Then there is no dns prefetch request initiated at all.
   // `HasHostBeenLookedUp()` is not checked here to avoid flakiness.
   EXPECT_FALSE(preconnect_manager_observer()->HostFound(
-      dns_prefetch_url.host(), network_anonymization_key));
+      dns_prefetch_url.GetHost(), network_anonymization_key));
 }
 
 }  // namespace predictors

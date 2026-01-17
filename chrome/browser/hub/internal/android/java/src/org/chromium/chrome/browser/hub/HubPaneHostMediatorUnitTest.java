@@ -31,8 +31,6 @@ import org.robolectric.shadows.ShadowLooper;
 
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.test.BaseRobolectricTestRunner;
-import org.chromium.base.test.util.Features.EnableFeatures;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.ui.modelutil.PropertyKey;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.ui.modelutil.PropertyObservable;
@@ -46,8 +44,6 @@ public class HubPaneHostMediatorUnitTest {
 
     private @Mock Pane mPane;
     private @Mock Pane mIncognitoPane;
-    private @Mock PaneManager mPaneManager;
-    private @Mock FullButtonData mButtonData;
     private @Mock ViewGroup mRootView;
     private @Mock ViewGroup mSnackbarContainer;
     private @Mock HubColorMixer mColorMixer;
@@ -66,9 +62,6 @@ public class HubPaneHostMediatorUnitTest {
 
         when(mPane.getRootView()).thenReturn(mRootView);
 
-        when(mPaneManager.getPaneForId(PaneId.TAB_SWITCHER)).thenReturn(mPane);
-        when(mPaneManager.getPaneForId(PaneId.INCOGNITO_TAB_SWITCHER)).thenReturn(mIncognitoPane);
-
         when(mPane.getPaneId()).thenReturn(PaneId.TAB_SWITCHER);
         when(mPane.getColorScheme()).thenReturn(HubColorScheme.DEFAULT);
         when(mIncognitoPane.getPaneId()).thenReturn(PaneId.INCOGNITO_TAB_SWITCHER);
@@ -86,7 +79,11 @@ public class HubPaneHostMediatorUnitTest {
     public void testDestroy() {
         mPaneSupplier.set(mPane);
         HubPaneHostMediator mediator =
-                new HubPaneHostMediator(mModel, mPaneSupplier, mPaneOrderController);
+                new HubPaneHostMediator(
+                        mModel,
+                        mPaneSupplier,
+                        mPaneOrderController,
+                        /* defaultPaneId= */ PaneId.TAB_SWITCHER);
         ShadowLooper.idleMainLooper();
         assertNotNull(mModel.get(PANE_ROOT_VIEW));
         assertTrue(mPaneSupplier.hasObservers());
@@ -99,7 +96,11 @@ public class HubPaneHostMediatorUnitTest {
     @Test
     @SmallTest
     public void testRootView() {
-        new HubPaneHostMediator(mModel, mPaneSupplier, mPaneOrderController);
+        new HubPaneHostMediator(
+                mModel,
+                mPaneSupplier,
+                mPaneOrderController,
+                /* defaultPaneId= */ PaneId.TAB_SWITCHER);
         assertNull(mModel.get(PANE_ROOT_VIEW));
 
         mPaneSupplier.set(mPane);
@@ -111,10 +112,13 @@ public class HubPaneHostMediatorUnitTest {
 
     @Test
     @SmallTest
-    @EnableFeatures(ChromeFeatureList.HUB_SLIDE_ANIMATION)
     public void testSlideAnimationDirection_NewPaneToTheRight() {
         // ORDER: PaneId.TAB_SWITCHER, PaneId.INCOGNITO_TAB_SWITCHER
-        new HubPaneHostMediator(mModel, mPaneSupplier, mPaneOrderController);
+        new HubPaneHostMediator(
+                mModel,
+                mPaneSupplier,
+                mPaneOrderController,
+                /* defaultPaneId= */ PaneId.TAB_SWITCHER);
         ShadowLooper.idleMainLooper();
         mPaneSupplier.set(mPane);
 
@@ -126,10 +130,13 @@ public class HubPaneHostMediatorUnitTest {
 
     @Test
     @SmallTest
-    @EnableFeatures(ChromeFeatureList.HUB_SLIDE_ANIMATION)
     public void testSlideAnimationDirection_NewPaneToTheLeft() {
         // ORDER: PaneId.TAB_SWITCHER, PaneId.INCOGNITO_TAB_SWITCHER
-        new HubPaneHostMediator(mModel, mPaneSupplier, mPaneOrderController);
+        new HubPaneHostMediator(
+                mModel,
+                mPaneSupplier,
+                mPaneOrderController,
+                /* defaultPaneId= */ PaneId.TAB_SWITCHER);
         ShadowLooper.idleMainLooper();
         mPaneSupplier.set(mIncognitoPane);
 
@@ -141,10 +148,13 @@ public class HubPaneHostMediatorUnitTest {
 
     @Test
     @SmallTest
-    @EnableFeatures(ChromeFeatureList.HUB_SLIDE_ANIMATION)
     public void testSlideAnimationDirection_multiplePaneChanges() {
         // ORDER: PaneId.TAB_SWITCHER, PaneId.INCOGNITO_TAB_SWITCHER
-        new HubPaneHostMediator(mModel, mPaneSupplier, mPaneOrderController);
+        new HubPaneHostMediator(
+                mModel,
+                mPaneSupplier,
+                mPaneOrderController,
+                /* defaultPaneId= */ PaneId.TAB_SWITCHER);
         ShadowLooper.idleMainLooper();
         mPaneSupplier.set(mPane);
 
@@ -162,7 +172,11 @@ public class HubPaneHostMediatorUnitTest {
     public void testRootView_paneAlreadySet() {
         mPaneSupplier.set(mPane);
 
-        new HubPaneHostMediator(mModel, mPaneSupplier, mPaneOrderController);
+        new HubPaneHostMediator(
+                mModel,
+                mPaneSupplier,
+                mPaneOrderController,
+                /* defaultPaneId= */ PaneId.TAB_SWITCHER);
         ShadowLooper.idleMainLooper();
         assertEquals(mRootView, mModel.get(PANE_ROOT_VIEW));
     }

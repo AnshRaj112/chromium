@@ -20,7 +20,6 @@
 #include "ash/capture_mode/test_capture_mode_delegate.h"
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
-#include "ash/public/cpp/assistant/controller/assistant_ui_controller.h"
 #include "ash/public/cpp/capture_mode/capture_mode_api.h"
 #include "ash/public/cpp/tablet_mode.h"
 #include "ash/root_window_controller.h"
@@ -40,15 +39,11 @@
 #include "base/run_loop.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
-#include "chromeos/ash/services/assistant/public/cpp/assistant_enums.h"
-#include "chromeos/ash/services/assistant/public/cpp/assistant_prefs.h"
-#include "chromeos/ash/services/assistant/public/cpp/features.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/compositor/test/layer_animation_stopped_waiter.h"
 #include "ui/display/test/display_manager_test_api.h"
 #include "ui/events/event.h"
@@ -58,6 +53,7 @@
 #include "ui/events/types/event_type.h"
 #include "ui/gfx/image/image.h"
 #include "ui/gfx/image/image_unittest_util.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/bounds_animator.h"
 #include "ui/views/controls/button/image_button.h"
@@ -160,7 +156,7 @@ class HomeButtonAnimationTest : public HomeButtonTestBase {
     HomeButtonTestBase::SetUp();
 
     animation_duration_.emplace(
-        ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+        gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   }
 
   void TearDown() override {
@@ -169,37 +165,14 @@ class HomeButtonAnimationTest : public HomeButtonTestBase {
   }
 
  private:
-  std::optional<ui::ScopedAnimationDurationScaleMode> animation_duration_;
+  std::optional<gfx::ScopedAnimationDurationScaleMode> animation_duration_;
 
-  base::test::ScopedFeatureList scoped_feature_list_;
-};
-
-class HomeButtonWithTextTest : public HomeButtonTestBase {
- public:
-  HomeButtonWithTextTest() {
-    scoped_feature_list_.InitAndEnableFeature(features::kHomeButtonWithText);
-  }
-  ~HomeButtonWithTextTest() override = default;
-
-  bool IsLabelVisible() const {
-    if (!home_button())
-      return false;
-    auto* label_container = home_button()->expandable_container_for_test();
-    return label_container->GetVisible() &&
-           label_container->layer()->visible() &&
-           home_button()->nudge_label_for_test();
-  }
-
- private:
   base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 class HomeButtonWithQuickAppAccess : public HomeButtonTestBase {
  public:
-  HomeButtonWithQuickAppAccess() {
-    scoped_feature_list_.InitAndEnableFeature(
-        features::kHomeButtonQuickAppAccess);
-  }
+  HomeButtonWithQuickAppAccess() = default;
   ~HomeButtonWithQuickAppAccess() override = default;
 
   bool IsQuickAppVisible() const {
@@ -218,6 +191,11 @@ class HomeButtonWithQuickAppAccess : public HomeButtonTestBase {
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+class HomeButtonNoSessionTest : public HomeButtonTest {
+ public:
+  HomeButtonNoSessionTest() { set_start_session(false); }
 };
 
 // Test that setting an existing app item as the quick app shows a working
@@ -469,8 +447,8 @@ TEST_F(HomeButtonWithQuickAppAccess, EmptyAppId) {
 // Test that the quick app button animates when showing and hiding.
 TEST_F(HomeButtonWithQuickAppAccess, QuickAppButtonAnimation) {
   EXPECT_FALSE(IsQuickAppVisible());
-  ui::ScopedAnimationDurationScaleMode regular_animations(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode regular_animations(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   const std::string quick_app_id = "Quick App Item";
   GetAppListTestHelper()->model()->CreateAndAddItem(quick_app_id);
@@ -684,6 +662,7 @@ class HomeButtonVisibilityWithAccessibilityFeaturesTest
 // The parameter indicates whether the kHideShelfControlsInTabletMode feature
 // is enabled.
 INSTANTIATE_TEST_SUITE_P(All, HomeButtonTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(All, HomeButtonNoSessionTest, testing::Bool());
 
 // Tests that the shelf navigation widget clip rect is not clipping the intended
 // home button bounds.
@@ -1028,7 +1007,7 @@ TEST_F(HomeButtonAnimationTest, NonAnimatedLayoutDuringAnimation) {
 
 inline constexpr LoginInfo k2ndRegularUserLoginInfo = {"user1@tray"};
 
-TEST_P(HomeButtonTest, LongPressGestureSunfishScanner) {
+TEST_P(HomeButtonNoSessionTest, LongPressGestureSunfishScanner) {
   // Simulate two users with primary user as active.
   auto primary = SimulateUserLogin(kRegularUserLoginInfo);
   SimulateUserLogin(k2ndRegularUserLoginInfo);
@@ -1063,10 +1042,10 @@ TEST_P(HomeButtonTest, LongPressGestureSunfishScanner) {
             BehaviorType::kSunfish);
 }
 
-TEST_P(HomeButtonTest, LongPressGestureInTabletModeSunfishScanner) {
+TEST_P(HomeButtonNoSessionTest, LongPressGestureInTabletModeSunfishScanner) {
   // Simulate two users with primary user as active.
-  auto primary = SimulateUserLogin({kDefaultUserEmail});
-  SimulateUserLogin({kDefaultUserEmail});
+  auto primary = SimulateUserLogin(kRegularUserLoginInfo);
+  SimulateUserLogin(k2ndRegularUserLoginInfo);
   SwitchActiveUser(primary);
 
   // Sunfish / Scanner should already be enabled.
@@ -1162,7 +1141,7 @@ TEST_P(HomeButtonTest, ClickOnCornerPixel) {
   // that a click on the bottom-left corner (or bottom-right corner in RTL)
   // can trigger the home button.
   gfx::Point corner(
-      0, display::Screen::GetScreen()->GetPrimaryDisplay().bounds().height());
+      0, display::Screen::Get()->GetPrimaryDisplay().bounds().height());
 
   ShelfNavigationWidget::TestApi test_api(
       GetPrimaryShelf()->navigation_widget());
@@ -1259,33 +1238,6 @@ TEST_P(HomeButtonTest, GestureHomeButtonHitTest) {
     // Check that the event target is the home button.
     EXPECT_EQ(target, nav_widget->GetHomeButton());
   }
-}
-
-// Checks the basic behavior of the label beside the home button when the
-// HomeButtonWithText feature is enabled.
-TEST_F(HomeButtonWithTextTest, Basic) {
-  // Verify that the label is visible at the beginning.
-  EXPECT_TRUE(IsLabelVisible());
-
-  // Open the app list and check that the label still exists.
-  gfx::Point center = home_button()->GetBoundsInScreen().CenterPoint();
-  GetEventGenerator()->MoveMouseTo(center);
-  GetEventGenerator()->ClickLeftButton();
-  GetAppListTestHelper()->WaitUntilIdle();
-  GetAppListTestHelper()->CheckVisibility(true);
-  EXPECT_TRUE(IsLabelVisible());
-
-  // Change to tablet mode, where the label and home button shouldn't be
-  // visible.
-  ash::TabletModeControllerTestApi().EnterTabletMode();
-  ShelfNavigationWidget::TestApi test_api(
-      GetPrimaryShelf()->navigation_widget());
-  EXPECT_FALSE(test_api.IsHomeButtonVisible());
-  EXPECT_FALSE(IsLabelVisible());
-
-  // Change back to clamshell mode. The label should be visible again.
-  ash::TabletModeControllerTestApi().LeaveTabletMode();
-  EXPECT_TRUE(IsLabelVisible());
 }
 
 INSTANTIATE_TEST_SUITE_P(

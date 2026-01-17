@@ -31,13 +31,7 @@ void SyncEventWatcher::AllowWokenUpBySyncWatchOnSameThread() {
   IncrementRegisterCount();
 }
 
-bool SyncEventWatcher::SyncWatch(
-    base::span<const bool*> stop_flags,
-    size_t spanification_suspected_redundant_num_stop_flags) {
-  // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-  // redundant in M143.
-  CHECK(spanification_suspected_redundant_num_stop_flags == stop_flags.size(),
-        base::NotFatalUntil::M143);
+bool SyncEventWatcher::SyncWatch(base::span<const bool*> stop_flags) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   IncrementRegisterCount();
 
@@ -48,29 +42,30 @@ bool SyncEventWatcher::SyncWatch(
   constexpr size_t kFlagStackCapacity = 4;
   absl::InlinedVector<const bool*, kFlagStackCapacity> should_stop_array;
   should_stop_array.push_back(&destroyed->data);
-  std::copy(stop_flags.data(),
-            stop_flags.subspan(spanification_suspected_redundant_num_stop_flags)
-                .data(),
+  std::copy(stop_flags.begin(), stop_flags.end(),
             std::back_inserter(should_stop_array));
-  bool result = registry_->Wait(should_stop_array, should_stop_array.size());
+  bool result = registry_->Wait(should_stop_array);
 
   // This object has been destroyed.
-  if (destroyed->data)
+  if (destroyed->data) {
     return false;
+  }
 
   DecrementRegisterCount();
   return result;
 }
 
 void SyncEventWatcher::IncrementRegisterCount() {
-  if (register_request_count_++ == 0)
+  if (register_request_count_++ == 0) {
     subscription_ = registry_->RegisterEvent(event_, callback_);
+  }
 }
 
 void SyncEventWatcher::DecrementRegisterCount() {
   DCHECK_GT(register_request_count_, 0u);
-  if (--register_request_count_ == 0)
+  if (--register_request_count_ == 0) {
     subscription_.reset();
+  }
 }
 
 }  // namespace mojo

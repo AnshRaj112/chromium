@@ -65,6 +65,14 @@ COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kAcceptCHFrame);
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kOffloadAcceptCHFrameCheck);
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(bool, kAcceptCHFrameOffloadNotAllowedHints);
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(bool, kAlwaysGenerateNotAllowedClientHints);
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(bool, kAcceptCHOffloadWithRedirect);
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(bool, kAcceptCHOffloadForSubframe);
 
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kCorsNonWildcardRequestHeadersSupport);
@@ -78,9 +86,10 @@ COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kReduceAcceptLanguageHTTP);
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE_PARAM(base::TimeDelta, kReduceAcceptLanguageCacheDuration);
-
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
-BASE_DECLARE_FEATURE(kPrivateNetworkAccessPreflightShortTimeout);
+BASE_DECLARE_FEATURE(kReduceAcceptLanguageCount);
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(int, kMaxAcceptLanguage);
 
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kLocalNetworkAccessChecks);
@@ -89,6 +98,16 @@ BASE_DECLARE_FEATURE_PARAM(bool, kLocalNetworkAccessChecksWarn);
 
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kLocalNetworkAccessChecksWebRTC);
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(bool, kLocalNetworkAccessChecksWebRTCLoopbackOnly);
+
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE(kLocalNetworkAccessChecksWebSockets);
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE(kLocalNetworkAccessChecksWebTransport);
+
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE(kLocalNetworkAccessChecksSplitPermissions);
 
 // If enabled, then the network service will parse the Cookie-Indices header.
 // This does not currently control changing cache behavior according to the
@@ -97,26 +116,16 @@ COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kCookieIndicesHeader);
 
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
-BASE_DECLARE_FEATURE(kCompressionDictionaryTransportBackend);
-
-COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kCompressionDictionaryTransport);
-
-COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
-BASE_DECLARE_FEATURE(kSharedDictionaryRegisterNavigationRequests);
 
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kPreloadedDictionaryConditionalUse);
 
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
-BASE_DECLARE_FEATURE(kIntegrityPolicyScript);
+BASE_DECLARE_FEATURE(kCompressionDictionaryTTL);
 
-// Enables visibility aware network service resource scheduler. When enabled,
-// request may be prioritized or de-prioritized based on the visibility of
-// requestors.
-// TODO(crbug.com/40066382): Remove this feature.
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
-BASE_DECLARE_FEATURE(kVisibilityAwareResourceScheduler);
+BASE_DECLARE_FEATURE(kIntegrityPolicyScript);
 
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kReduceTransferSizeUpdatedIPC);
@@ -125,6 +134,8 @@ COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kRendererSideContentDecoding);
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE_PARAM(int, kRendererSideContentDecodingPipeSize);
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE_PARAM(bool, kRendererSideContentDecodingForNavigation);
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE_PARAM(
     bool,
@@ -147,6 +158,11 @@ BASE_DECLARE_FEATURE(kAvoidResourceRequestCopies);
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kDocumentIsolationPolicy);
 
+// Should connection allowlists be enforced?
+// https://github.com/mikewest/anti-exfil
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE(kConnectionAllowlists);
+
 // To actually use the prefetch results, it's also necessary to enable
 // kNetworkContextPrefetchUseCache, below.
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
@@ -156,15 +172,7 @@ COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kNetworkContextPrefetchUseMatches);
 
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
-BASE_DECLARE_FEATURE(kTreatNullIPAsPublicAddressSpace);
-
-COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kCloneDevToolsConnectionOnlyIfRequested);
-
-// Should SRI-compliant HTTP Message Signatures be enforced?
-// https://wicg.github.io/signature-based-sri/
-COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
-BASE_DECLARE_FEATURE(kSRIMessageSignatureEnforcement);
 
 // Should Sec-Ad-Auction-Event-Recording-Eligible be sent on requests made
 // with attributionsrc, and should Ad-Auction-Register-Event responses on
@@ -314,12 +322,6 @@ BASE_DECLARE_FEATURE(kProtectedAudienceCorsSafelistKVv2Signals);
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kStorageAccessHeadersRespectPermissionsPolicy);
 
-// When enabled, a shared remote Mojo interface of
-// DeviceBoundSessionAccessObserver is used to reduce Clone() IPC.
-// See https://crbug.com/407680127 for more details.
-COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
-BASE_DECLARE_FEATURE(kDeviceBoundSessionAccessObserverSharedRemote);
-
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kCSPScriptSrcV2);
 
@@ -333,6 +335,11 @@ BASE_DECLARE_FEATURE(kCSPScriptSrcHashesInV1);
 // See https://chromestatus.com/feature/5202380930678784
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE(kCacheSharingForPervasiveScripts);
+
+// When enabled, sends SameSite=Lax cookies for FedCM requests in addition to
+// SameSite=None.
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE(kSendSameSiteLaxForFedCM);
 
 // newline-delimited list of URL patterns for "pervasive" scripts.
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
@@ -361,6 +368,19 @@ COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE_PARAM(bool, kNetworkServiceTaskSchedulerResourceScheduler);
 COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
 BASE_DECLARE_FEATURE_PARAM(bool, kNetworkServiceTaskSchedulerURLLoader);
+
+// When enabled, Network Service Task Scheduler supports
+// per-net::RequestrPriority task queues for each RequestPriority variant.
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE(kNetworkServicePerPriorityTaskQueues);
+
+// When enabled the browser process will start an UnexportableKeyService proxy
+// service that can be used by other processes. It will also make the network
+// process start using the proxy. This is needed for example when implementing
+// DBSC for macOS, since access to the Secure Enclave requires higher privileges
+// than what the network process has.
+COMPONENT_EXPORT(NETWORK_CPP_FLAGS_AND_SWITCHES)
+BASE_DECLARE_FEATURE(kUseUnexportableKeyServiceInBrowserProcess);
 
 }  // namespace network::features
 

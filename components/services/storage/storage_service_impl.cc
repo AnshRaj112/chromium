@@ -4,9 +4,8 @@
 
 #include "components/services/storage/storage_service_impl.h"
 
-#include "base/debug/crash_logging.h"
-#include "base/debug/dump_without_crashing.h"
 #include "base/functional/bind.h"
+#include "base/not_fatal_until.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "build/build_config.h"
@@ -25,8 +24,6 @@
 namespace storage {
 
 namespace {
-
-const char kSessionStorageDirectory[] = "Session Storage";
 
 // We don't use out-of-process Storage Service on Android, so we can avoid
 // pulling all the related code (including Directory mojom) into the build.
@@ -52,50 +49,15 @@ std::unique_ptr<FilesystemProxy> CreateRestrictedFilesystemProxy(
 }
 #endif
 
-template <typename T>
-base::OnceClosure MakeDeferredDeleter(std::unique_ptr<T> object) {
-  return base::BindOnce(
-      [](scoped_refptr<base::SequencedTaskRunner> task_runner, T* object) {
-        task_runner->DeleteSoon(FROM_HERE, object);
-      },
-      base::SequencedTaskRunner::GetCurrentDefault(),
-      // NOTE: We release `object` immediately. In the case
-      // where this task never runs, we prefer to leak the
-      // object rather than potentially destroying it on the
-      // wrong sequence.
-      object.release());
-}
-
-template <typename T>
-void ShutDown(std::unique_ptr<T> object) {
-  if (T* ptr = object.get()) {
-    ptr->ShutDown(MakeDeferredDeleter(std::move(object)));
-  }
-}
-
 }  // namespace
 
 StorageServiceImpl::StorageServiceImpl(
     mojo::PendingReceiver<mojom::StorageService> receiver,
     scoped_refptr<base::SequencedTaskRunner> io_task_runner)
     : receiver_(this, std::move(receiver)),
-      io_task_runner_(std::move(io_task_runner)),
-      creation_time_(base::Time::Now()) {}
+      io_task_runner_(std::move(io_task_runner)) {}
 
-StorageServiceImpl::~StorageServiceImpl() {
-  // ShutDown storages before we destroy the service. We transfer ownership of
-  // the storages to the ShutDown function, which deletes them after ShutDown
-  // completes.
-  while (!local_storages_.empty()) {
-    auto node = local_storages_.extract(local_storages_.begin());
-    ShutDown(std::move(node.value()));
-  }
-
-  while (!session_storages_.empty()) {
-    auto node = session_storages_.extract(session_storages_.begin());
-    ShutDown(std::move(node.value()));
-  }
-}
+StorageServiceImpl::~StorageServiceImpl() = default;
 
 void StorageServiceImpl::EnableAggressiveDomStorageFlushing() {
   StorageAreaImpl::EnableAggressiveCommitDelay();
@@ -129,37 +91,23 @@ void StorageServiceImpl::SetDataDirectory(
 
 void StorageServiceImpl::BindLocalStorageControl(
     const std::optional<base::FilePath>& path,
-    mojom::StorageLifecycle lifecycle,
     mojo::PendingReceiver<mojom::LocalStorageControl> receiver) {
-  base::TimeDelta timedelta = base::Time::Now() - creation_time_;
-
   if (path.has_value()) {
     if (!path->IsAbsolute()) {
       // Refuse to bind LocalStorage for relative paths.
       return;
     }
 
+    // TODO(crbug.com/396030877): Remove this workaround to remove the
+    // pre-existing LocalStorage once the issue is resolved.
     auto iter = persistent_local_storage_map_.find(*path);
-    // The map shouldn't contain an entry for this path. We should only bind a
-    // LocalStorage mojom::Receiver once. If this doesn't occur, we collect
-    // a crash dump to help diagnose the issue and safely shut down the existing
-    // local storage instance.
-    // TODO(crbug.com/396030877): Remove this DWoC and workaround once the issue
-    // is resolved.
     if (iter != persistent_local_storage_map_.end()) {
-      SCOPED_CRASH_KEY_NUMBER("396030877", "local_storage_lifecycle",
-                              static_cast<int>(lifecycle));
-      SCOPED_CRASH_KEY_NUMBER("396030877", "local_storage_timedelta",
-                              timedelta.InMilliseconds());
-      base::debug::DumpWithoutCrashing();
-
       ShutDownAndRemoveLocalStorage(iter->second);
     }
   }
 
   auto new_local_storage = std::make_unique<LocalStorageImpl>(
       path.value_or(base::FilePath()),
-      base::SequencedTaskRunner::GetCurrentDefault(),
       base::BindOnce(&StorageServiceImpl::ShutDownAndRemoveLocalStorage,
                      weak_ptr_factory_.GetWeakPtr()),
       std::move(receiver));
@@ -171,40 +119,23 @@ void StorageServiceImpl::BindLocalStorageControl(
 
 void StorageServiceImpl::BindSessionStorageControl(
     const std::optional<base::FilePath>& path,
-    mojom::StorageLifecycle lifecycle,
     mojo::PendingReceiver<mojom::SessionStorageControl> receiver) {
-  base::TimeDelta timedelta = base::Time::Now() - creation_time_;
-
   if (path.has_value()) {
     if (!path->IsAbsolute()) {
       // Refuse to bind SessionStorage for relative paths.
       return;
     }
 
+    // TODO(crbug.com/396030877): Remove this workaround to remove the
+    // pre-existing SessionStorage once the issue is resolved.
     auto iter = persistent_session_storage_map_.find(*path);
-    // The map shouldn't contain an entry for this path. We should only bind a
-    // a SessionStorage mojom::Receiver once. If this doesn't occur, we collect
-    // a crash dump to help diagnose the issue and safely shut down the existing
-    // session storage instance.
-    // TODO(crbug.com/396030877): Remove this DWoC and workaround once the issue
-    // is resolved.
     if (iter != persistent_session_storage_map_.end()) {
-      SCOPED_CRASH_KEY_NUMBER("396030877", "session_storage_lifecycle",
-                              static_cast<int>(lifecycle));
-      SCOPED_CRASH_KEY_NUMBER("396030877", "session_storage_timedelta",
-                              timedelta.InMilliseconds());
-      base::debug::DumpWithoutCrashing();
-
       ShutDownAndRemoveSessionStorage(iter->second);
     }
   }
 
   auto new_session_storage = std::make_unique<SessionStorageImpl>(
       path.value_or(base::FilePath()),
-      base::ThreadPool::CreateSequencedTaskRunner(
-          {base::MayBlock(), base::WithBaseSyncPrimitives(),
-           base::TaskShutdownBehavior::BLOCK_SHUTDOWN}),
-      base::SequencedTaskRunner::GetCurrentDefault(),
 #if BUILDFLAG(IS_ANDROID)
       // On Android there is no support for session storage restoring, and since
       // the restoring code is responsible for database cleanup, we must
@@ -214,7 +145,6 @@ void StorageServiceImpl::BindSessionStorageControl(
       path.has_value() ? SessionStorageImpl::BackingMode::kRestoreDiskState
                        : SessionStorageImpl::BackingMode::kNoDisk,
 #endif
-      std::string(kSessionStorageDirectory),
       base::OnceCallback<void(SessionStorageImpl*)>(
           base::BindOnce(&StorageServiceImpl::ShutDownAndRemoveSessionStorage,
                          weak_ptr_factory_.GetWeakPtr())),
@@ -232,27 +162,27 @@ void StorageServiceImpl::BindTestApi(
 
 void StorageServiceImpl::ShutDownAndRemoveSessionStorage(
     SessionStorageImpl* storage) {
-  if (!storage->GetStoragePath().empty()) {
-    persistent_session_storage_map_.erase(storage->GetStoragePath());
+  if (!storage->GetStoragePartitionDirectory().empty()) {
+    persistent_session_storage_map_.erase(
+        storage->GetStoragePartitionDirectory());
   }
 
   auto it = session_storages_.find(storage);
   if (it != session_storages_.end()) {
-    auto node = session_storages_.extract(it);
-    ShutDown(std::move(node.value()));
+    session_storages_.erase(it);
   }
 }
 
 void StorageServiceImpl::ShutDownAndRemoveLocalStorage(
     LocalStorageImpl* storage) {
-  if (!storage->GetStoragePath().empty()) {
-    persistent_local_storage_map_.erase(storage->GetStoragePath());
+  if (!storage->GetStoragePartitionDirectory().empty()) {
+    persistent_local_storage_map_.erase(
+        storage->GetStoragePartitionDirectory());
   }
 
   auto it = local_storages_.find(storage);
   if (it != local_storages_.end()) {
-    auto node = local_storages_.extract(it);
-    ShutDown(std::move(node.value()));
+    local_storages_.erase(it);
   }
 }
 

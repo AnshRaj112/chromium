@@ -47,7 +47,6 @@
 #include "storage/browser/quota/quota_task.h"
 #include "storage/browser/quota/special_storage_policy.h"
 #include "third_party/blink/public/common/storage_key/storage_key.h"
-#include "third_party/blink/public/mojom/quota/quota_types.mojom-forward.h"
 #include "third_party/blink/public/mojom/quota/quota_types.mojom-shared.h"
 
 namespace base {
@@ -175,7 +174,8 @@ class COMPONENT_EXPORT(STORAGE_BROWSER) QuotaManagerImpl
                    const base::FilePath& profile_path,
                    scoped_refptr<base::SingleThreadTaskRunner> io_thread,
                    scoped_refptr<SpecialStoragePolicy> special_storage_policy,
-                   const GetQuotaSettingsFunc& get_settings_function);
+                   const GetQuotaSettingsFunc& get_settings_function,
+                   bool report_static_storage_quota = false);
   QuotaManagerImpl(const QuotaManagerImpl&) = delete;
   QuotaManagerImpl& operator=(const QuotaManagerImpl&) = delete;
 
@@ -860,6 +860,9 @@ class COMPONENT_EXPORT(STORAGE_BROWSER) QuotaManagerImpl
   // reported values. The default value points to
   // QuotaManagerImpl::GetVolumeInfo.
   GetVolumeInfoFn get_volume_info_fn_;
+
+  // Whether to report static values for storage quota estimate APIs.
+  const bool report_static_storage_quota_;
 
   std::unique_ptr<EvictionRoundInfoHelper> eviction_helper_;
   std::map<BucketSetDataDeleter*, std::unique_ptr<BucketSetDataDeleter>>

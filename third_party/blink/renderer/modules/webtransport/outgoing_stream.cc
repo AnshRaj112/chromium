@@ -205,14 +205,14 @@ void OutgoingStream::Init(ExceptionState& exception_state) {
 void OutgoingStream::InitWithExistingWritableStream(
     WritableStream* stream,
     ExceptionState& exception_state) {
-  write_watcher_.Watch(data_pipe_.get(), MOJO_HANDLE_SIGNAL_WRITABLE,
-                       MOJO_TRIGGER_CONDITION_SIGNALS_SATISFIED,
-                       WTF::BindRepeating(&OutgoingStream::OnHandleReady,
-                                          WrapWeakPersistent(this)));
-  close_watcher_.Watch(data_pipe_.get(), MOJO_HANDLE_SIGNAL_PEER_CLOSED,
-                       MOJO_TRIGGER_CONDITION_SIGNALS_SATISFIED,
-                       WTF::BindRepeating(&OutgoingStream::OnPeerClosed,
-                                          WrapWeakPersistent(this)));
+  write_watcher_.Watch(
+      data_pipe_.get(), MOJO_HANDLE_SIGNAL_WRITABLE,
+      MOJO_TRIGGER_CONDITION_SIGNALS_SATISFIED,
+      BindRepeating(&OutgoingStream::OnHandleReady, WrapWeakPersistent(this)));
+  close_watcher_.Watch(
+      data_pipe_.get(), MOJO_HANDLE_SIGNAL_PEER_CLOSED,
+      MOJO_TRIGGER_CONDITION_SIGNALS_SATISFIED,
+      BindRepeating(&OutgoingStream::OnPeerClosed, WrapWeakPersistent(this)));
 
   writable_ = stream;
   stream->InitWithCountQueueingStrategy(
@@ -462,9 +462,9 @@ ScriptValue OutgoingStream::CreateAbortException(IsLocalAbort is_local_abort) {
 
   DOMExceptionCode code = is_local_abort ? DOMExceptionCode::kAbortError
                                          : DOMExceptionCode::kNetworkError;
-  String message =
+  String message = UNSAFE_TODO(
       String::Format("The stream was aborted %s",
-                     is_local_abort ? "locally" : "by the remote server");
+                     is_local_abort ? "locally" : "by the remote server"));
 
   return ScriptValue(script_state_->GetIsolate(),
                      V8ThrowDOMException::CreateOrEmpty(

@@ -370,6 +370,16 @@ void URLLoaderFactory::CreateLoaderAndStartWithSyncClient(
             resource_request.trusted_params->accept_ch_frame_observer));
   }
 
+  std::unique_ptr<DevtoolsDurableMessageWriter> maybe_durable_message_writer;
+  if (context_->network_service() &&
+      resource_request.devtools_request_id.has_value() &&
+      resource_request.throttling_profile_id.has_value()) {
+    maybe_durable_message_writer =
+        context_->network_service()->MaybeCreateDurableMessageWriter(
+            resource_request.throttling_profile_id.value(),
+            resource_request.devtools_request_id.value());
+  }
+
   auto loader = std::make_unique<URLLoader>(
       *this,
       base::BindOnce(&cors::CorsURLLoaderFactory::DestroyURLLoader,
@@ -385,7 +395,8 @@ void URLLoaderFactory::CreateLoaderAndStartWithSyncClient(
       std::move(devtools_observer), std::move(device_bound_session_observer),
       std::move(accept_ch_frame_observer),
       resource_request.shared_storage_writable_eligible,
-      *context_->GetSharedResourceChecker());
+      *context_->GetSharedResourceChecker(),
+      std::move(maybe_durable_message_writer));
 
   cors_url_loader_factory_->OnURLLoaderCreated(std::move(loader));
 }

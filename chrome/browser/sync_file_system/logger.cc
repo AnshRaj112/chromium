@@ -4,7 +4,6 @@
 
 #include "chrome/browser/sync_file_system/logger.h"
 
-#include "base/files/file_util.h"
 #include "base/lazy_instance.h"
 #include "base/location.h"
 #include "base/notreached.h"
@@ -47,7 +46,7 @@ void Log(logging::LogSeverity severity,
 
   va_list args;
   va_start(args, format);
-  base::StringAppendV(&what, format, args);
+  UNSAFE_TODO(base::StringAppendV(&what, format, args));
   va_end(args);
 
   // Log to WebUI regardless of LogSeverity (e.g. ignores command line flags).

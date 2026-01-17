@@ -9,6 +9,7 @@
 
 #include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
+#include "base/strings/to_string.h"
 #include "base/values.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/web_applications/commands/web_app_command.h"
@@ -106,8 +107,7 @@ void NavigateAndTriggerInstallDialogCommand::StartWithLock(
 
 void NavigateAndTriggerInstallDialogCommand::OnUrlLoaded(
     webapps::WebAppUrlLoaderResult result) {
-  GetMutableDebugValue().Set("WebAppUrlLoader::Result",
-                             ConvertUrlLoaderResultToString(result));
+  GetMutableDebugValue().Set("WebAppUrlLoader::Result", base::ToString(result));
   if (IsWebContentsDestroyed()) {
     GetMutableDebugValue().Set("web_contents_destroyed", true);
     CompleteAndSelfDestruct(
@@ -169,12 +169,16 @@ void NavigateAndTriggerInstallDialogCommand::OnAppLockGranted() {
   }
   CHECK(!app_id_.empty());
 
+  std::optional<proto::InstallState> install_state =
+      app_lock_->registrar().GetInstallState(app_id_);
+
   bool is_installable;
-  if (!app_lock_->registrar().IsInRegistrar(app_id_)) {
+  if (!install_state) {
     is_installable = true;
   } else {
-    switch (app_lock_->registrar().GetInstallState(app_id_).value()) {
+    switch (*install_state) {
       case web_app::proto::SUGGESTED_FROM_ANOTHER_DEVICE:
+      case web_app::proto::SUGGESTED_FROM_MIGRATION:
         is_installable = true;
         break;
       case web_app::proto::INSTALLED_WITH_OS_INTEGRATION:

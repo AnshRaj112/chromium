@@ -8,6 +8,7 @@
 #include "components/bookmarks/browser/bookmark_uuids.h"
 #include "components/bookmarks/browser/titled_url_index.h"
 #include "components/bookmarks/browser/url_index.h"
+#include "components/bookmarks/common/bookmark_constants.h"
 #include "components/bookmarks/common/user_folder_load_stats.h"
 
 namespace bookmarks {
@@ -46,7 +47,7 @@ BookmarkLoadDetails::BookmarkLoadDetails()
   // thread, and `client_` is not thread safe, and/or may be destroyed before
   // this.
   root_node_ = std::make_unique<BookmarkNode>(
-      /*id=*/0, base::Uuid::ParseLowercase(kRootNodeUuid), GURL());
+      kRootNodeId, base::Uuid::ParseLowercase(kRootNodeUuid), GURL());
   // WARNING: order is important here, various places assume the order is
   // constant (but can vary between embedders with the initial visibility
   // of permanent nodes).
@@ -175,6 +176,13 @@ UserFolderLoadStats BookmarkLoadDetails::ComputeUserFolderStats() const {
     // Look for user-generated folders under permanent nodes.
     if (!root_child->is_permanent_node()) {
       continue;
+    }
+
+    // We want to track the number of bookmarks at the top level of the
+    // Bookmark Bar.
+    if (root_child->is_folder() &&
+        root_child->type() == BookmarkNode::BOOKMARK_BAR) {
+      stats.bookmark_bar_top_level_items = root_child->children().size();
     }
 
     for (const auto& child : root_child->children()) {

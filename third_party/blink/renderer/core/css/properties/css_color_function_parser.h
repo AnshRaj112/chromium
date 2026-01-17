@@ -11,6 +11,7 @@
 #include "third_party/blink/renderer/core/css/color_function.h"
 #include "third_party/blink/renderer/core/css/css_color_channel_map.h"
 #include "third_party/blink/renderer/core/css/parser/css_parser_context.h"
+#include "third_party/blink/renderer/core/css/parser/css_parser_local_context.h"
 #include "third_party/blink/renderer/core/css/parser/css_parser_token_stream.h"
 #include "third_party/blink/renderer/core/css/properties/css_parsing_utils.h"
 #include "third_party/blink/renderer/platform/graphics/color.h"
@@ -29,6 +30,7 @@ class CORE_EXPORT ColorFunctionParser {
   CSSValue* ConsumeFunctionalSyntaxColor(
       CSSParserTokenStream& stream,
       const CSSParserContext& context,
+      CSSParserLocalContext&,
       const css_parsing_utils::ColorParserContext& color_parser_context);
 
   // These are exposed so that StyleColor::UnresolvedRelativeColor
@@ -46,31 +48,19 @@ class CORE_EXPORT ColorFunctionParser {
       CSSParserTokenStream& stream,
       CSSValueID function_id,
       const CSSParserContext& context,
+      CSSParserLocalContext&,
       const css_parsing_utils::ColorParserContext& color_parser_context);
   bool ConsumeChannel(
       CSSParserTokenStream& stream,
       const CSSParserContext& context,
+      CSSParserLocalContext&,
       int index,
       const css_parsing_utils::ColorParserContext& color_parser_context);
   bool ConsumeAlpha(
       CSSParserTokenStream& stream,
       const CSSParserContext& context,
+      CSSParserLocalContext&,
       const css_parsing_utils::ColorParserContext& color_parser_context);
-  void MakePerColorSpaceAdjustments();
-
-  static double ResolveColorChannel(
-      const CSSValue* value,
-      ChannelType channel_type,
-      double percentage_base,
-      const CSSColorChannelMap& color_channel_map);
-  static double ResolveAlpha(const CSSValue* value,
-                             ChannelType channel_type,
-                             const CSSColorChannelMap& color_channel_map);
-  static double ResolveRelativeChannelValue(
-      const CSSValue* value,
-      ChannelType channel_type,
-      double percentage_base,
-      const CSSColorChannelMap& color_channel_map);
 
   bool IsRelativeColor() const;
   bool AllChannelsAreResolvable() const;
@@ -93,7 +83,6 @@ class CORE_EXPORT ColorFunctionParser {
 
   // For relative colors
   const CSSValue* unresolved_origin_color_ = nullptr;
-  std::optional<Color> origin_color_;
   CSSColorChannelMap color_channel_map_;
 };
 

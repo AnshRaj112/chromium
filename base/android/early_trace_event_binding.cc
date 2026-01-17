@@ -21,77 +21,52 @@ namespace android {
 static void JNI_EarlyTraceEvent_RecordEarlyBeginEvent(JNIEnv* env,
                                                       std::string& name,
                                                       jlong time_ns,
-                                                      jint thread_id,
+                                                      int32_t thread_id,
                                                       jlong thread_time_ms) {
-  static const unsigned char* category_group_enabled =
-      TRACE_EVENT_API_GET_CATEGORY_GROUP_ENABLED(internal::kJavaTraceCategory);
-  trace_event_internal::AddTraceEventWithThreadIdAndTimestamps(
-      TRACE_EVENT_PHASE_BEGIN, category_group_enabled, name.c_str(),
-      /*scope=*/nullptr, trace_event_internal::kNoId,
-      PlatformThreadId(thread_id), TimeTicks::FromJavaNanoTime(time_ns),
-      ThreadTicks() + Milliseconds(thread_time_ms),
-      TRACE_EVENT_FLAG_JAVA_STRING_LITERALS | TRACE_EVENT_FLAG_COPY);
+  auto t = perfetto::ThreadTrack::ForThread(thread_id);
+  TRACE_EVENT_BEGIN(internal::kJavaTraceCategory, perfetto::DynamicString{name},
+                    t, TimeTicks::FromJavaNanoTime(time_ns));
 }
 
 static void JNI_EarlyTraceEvent_RecordEarlyEndEvent(JNIEnv* env,
                                                     std::string& name,
                                                     jlong time_ns,
-                                                    jint thread_id,
+                                                    int32_t thread_id,
                                                     jlong thread_time_ms) {
-  static const unsigned char* category_group_enabled =
-      TRACE_EVENT_API_GET_CATEGORY_GROUP_ENABLED(internal::kJavaTraceCategory);
-  trace_event_internal::AddTraceEventWithThreadIdAndTimestamps(
-      TRACE_EVENT_PHASE_END, category_group_enabled, name.c_str(),
-      /*scope=*/nullptr, trace_event_internal::kNoId,
-      PlatformThreadId(thread_id), TimeTicks::FromJavaNanoTime(time_ns),
-      ThreadTicks() + Milliseconds(thread_time_ms),
-      TRACE_EVENT_FLAG_JAVA_STRING_LITERALS | TRACE_EVENT_FLAG_COPY);
+  auto t = perfetto::ThreadTrack::ForThread(thread_id);
+  TRACE_EVENT_END(internal::kJavaTraceCategory, t,
+                  TimeTicks::FromJavaNanoTime(time_ns));
 }
 
 static void JNI_EarlyTraceEvent_RecordEarlyToplevelBeginEvent(
     JNIEnv* env,
     std::string& name,
     jlong time_ns,
-    jint thread_id,
-    jlong thread_time_ms) {
-  static const unsigned char* category_group_enabled =
-      TRACE_EVENT_API_GET_CATEGORY_GROUP_ENABLED(
-          internal::kToplevelTraceCategory);
-  trace_event_internal::AddTraceEventWithThreadIdAndTimestamps(
-      TRACE_EVENT_PHASE_BEGIN, category_group_enabled, name.c_str(),
-      /*scope=*/nullptr, trace_event_internal::kNoId,
-      PlatformThreadId(thread_id), TimeTicks::FromJavaNanoTime(time_ns),
-      ThreadTicks() + Milliseconds(thread_time_ms),
-      TRACE_EVENT_FLAG_JAVA_STRING_LITERALS | TRACE_EVENT_FLAG_COPY);
+    int32_t thread_id) {
+  auto t = perfetto::ThreadTrack::ForThread(thread_id);
+  TRACE_EVENT_BEGIN(internal::kToplevelTraceCategory,
+                    perfetto::DynamicString{name}, t,
+                    TimeTicks::FromJavaNanoTime(time_ns));
 }
 
-static void JNI_EarlyTraceEvent_RecordEarlyToplevelEndEvent(
-    JNIEnv* env,
-    std::string& name,
-    jlong time_ns,
-    jint thread_id,
-    jlong thread_time_ms) {
-  static const unsigned char* category_group_enabled =
-      TRACE_EVENT_API_GET_CATEGORY_GROUP_ENABLED(
-          internal::kToplevelTraceCategory);
-  trace_event_internal::AddTraceEventWithThreadIdAndTimestamps(
-      TRACE_EVENT_PHASE_END, category_group_enabled, name.c_str(),
-      /*scope=*/nullptr, trace_event_internal::kNoId,
-      PlatformThreadId(thread_id), TimeTicks::FromJavaNanoTime(time_ns),
-      ThreadTicks() + Milliseconds(thread_time_ms),
-      TRACE_EVENT_FLAG_JAVA_STRING_LITERALS | TRACE_EVENT_FLAG_COPY);
+static void JNI_EarlyTraceEvent_RecordEarlyToplevelEndEvent(JNIEnv* env,
+                                                            std::string& name,
+                                                            jlong time_ns,
+                                                            int32_t thread_id) {
+  auto t = perfetto::ThreadTrack::ForThread(thread_id);
+  TRACE_EVENT_END(internal::kToplevelTraceCategory, t,
+                  TimeTicks::FromJavaNanoTime(time_ns));
 }
 
 static void JNI_EarlyTraceEvent_RecordEarlyAsyncBeginEvent(JNIEnv* env,
                                                            std::string& name,
                                                            jlong id,
                                                            jlong time_ns) {
-  TRACE_EVENT_BEGIN(internal::kJavaTraceCategory, nullptr,
-                    perfetto::Track(static_cast<uint64_t>(id)),
-                    TimeTicks::FromJavaNanoTime(time_ns),
-                    [&](::perfetto::EventContext& ctx) {
-                      ctx.event()->set_name(name.c_str());
-                    });
+  TRACE_EVENT_BEGIN(
+      internal::kJavaTraceCategory, nullptr,
+      perfetto::Track(static_cast<uint64_t>(id)),
+      TimeTicks::FromJavaNanoTime(time_ns),
+      [&](::perfetto::EventContext& ctx) { ctx.event()->set_name(name); });
 }
 
 static void JNI_EarlyTraceEvent_RecordEarlyAsyncEndEvent(JNIEnv* env,
@@ -115,3 +90,5 @@ void SetBackgroundStartupTracingFlag(bool enabled) {
 
 }  // namespace android
 }  // namespace base
+
+DEFINE_JNI(EarlyTraceEvent)

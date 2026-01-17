@@ -14,11 +14,11 @@
 #include "base/memory/raw_ptr.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/extensions/scoped_test_mv2_enabler.h"
 #include "chrome/browser/extensions/test_extension_system.h"
-#include "chrome/browser/extensions/unpacked_installer.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
@@ -37,6 +37,7 @@
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/scripting_utils.h"
 #include "extensions/browser/test_extension_registry_observer.h"
+#include "extensions/browser/unpacked_installer.h"
 #include "extensions/common/extension_features.h"
 #include "extensions/common/url_pattern_set.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -71,14 +72,17 @@ std::optional<base::Value::Dict> LoadManifestFile(const base::FilePath path,
 }
 
 scoped_refptr<Extension> LoadExtension(const std::string& filename,
-                                       std::string* error) {
+                                       std::u16string* error) {
   base::FilePath path;
   base::PathService::Get(chrome::DIR_TEST_DATA, &path);
   path = path.AppendASCII("extensions")
              .AppendASCII("manifest_tests")
              .AppendASCII(filename.c_str());
-  std::optional<base::Value::Dict> manifest = LoadManifestFile(path, error);
+  std::string utf8_error;
+  std::optional<base::Value::Dict> manifest =
+      LoadManifestFile(path, &utf8_error);
   if (!manifest) {
+    *error = base::UTF8ToUTF16(utf8_error);
     return nullptr;
   }
   return Extension::Create(path.DirName(), mojom::ManifestLocation::kUnpacked,
@@ -284,7 +288,7 @@ TEST_F(UserScriptListenerTest, MultiProfile) {
   TestingProfile* profile2 =
       profile_manager_->CreateTestingProfile("test-profile2");
   ASSERT_TRUE(profile2);
-  std::string error;
+  std::u16string error;
   scoped_refptr<Extension> extension =
       LoadExtension("content_script_yahoo.json", &error);
   ASSERT_TRUE(extension.get());

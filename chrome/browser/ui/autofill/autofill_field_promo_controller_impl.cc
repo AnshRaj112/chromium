@@ -6,6 +6,7 @@
 
 #include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
+#include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/ui/autofill/autofill_field_promo_view.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
@@ -83,7 +84,21 @@ void AutofillFieldPromoControllerImpl::Hide() {
   is_maybe_showing_ = false;
   promo_hide_helper_.reset();
   if (promo_view_) {
-    std::exchange(promo_view_, nullptr)->Close();
+    // First, make the promo view invisible. Then, post a task to close it
+    // (which effectively destroys it). This ensures that parent bounds are
+    // recalculated before the view is destroyed, preventing a nullptr
+    // dereference.
+    promo_view_->MakeInvisible();
+    base::WeakPtr<AutofillFieldPromoView> view_to_close =
+        std::exchange(promo_view_, nullptr);
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(
+                       [](base::WeakPtr<AutofillFieldPromoView> promo_view) {
+                         if (promo_view) {
+                           promo_view->Close();
+                         }
+                       },
+                       view_to_close->GetWeakPtr()));
   }
 }
 

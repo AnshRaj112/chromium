@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "chromeos/ash/components/growth/campaigns_model.h"
 
 #include <memory>
@@ -17,6 +12,7 @@
 #include "ash/webui/grit/ash_mall_cros_app_resources.h"
 #include "ash/webui/grit/ash_personalization_app_resources.h"
 #include "ash/webui/grit/ash_print_management_resources.h"
+#include "base/compiler_specific.h"
 #include "base/logging.h"
 #include "base/notreached.h"
 #include "base/strings/string_number_conversions.h"
@@ -29,7 +25,6 @@
 #include "chromeos/ash/components/growth/action_performer.h"
 #include "chromeos/ash/components/growth/campaigns_logger.h"
 #include "chromeos/ash/components/growth/growth_metrics.h"
-#include "chromeos/ash/components/scalable_iph/buildflags.h"
 #include "chromeos/ash/grit/ash_resources.h"
 #include "chromeos/ui/vector_icons/vector_icons.h"
 #include "ui/base/models/image_model.h"
@@ -231,7 +226,6 @@ std::optional<int> GetBuiltInImageResourceId(
       return IDR_GROWTH_FRAMEWORK_G1_NOTIFICATION_PNG;
     case BuiltInImage::kMall:
       return IDR_GROWTH_FRAMEWORK_MALL_PNG;
-#if BUILDFLAG(ENABLE_CROS_SCALABLE_IPH)
     case BuiltInImage::kPrintJobsIcon:
       return IDR_ASH_PRINT_MANAGEMENT_PRINT_MANAGEMENT_192_PNG;
     case BuiltInImage::kGoogleDocsIcon:
@@ -240,15 +234,6 @@ std::optional<int> GetBuiltInImageResourceId(
       return IDR_SCALABLE_IPH_YOUTUBE_ICON_120_PNG;
     case BuiltInImage::kPlayStoreIcon:
       return IDR_SCALABLE_IPH_GOOGLE_PLAY_ICON_120_PNG;
-#else
-    // Sclable Iph images are included only if ash-build and Chrome branded.
-    // Returns a fall-back image for the other case.
-    case BuiltInImage::kPrintJobsIcon:
-    case BuiltInImage::kGoogleDocsIcon:
-    case BuiltInImage::kYouTubeIcon:
-    case BuiltInImage::kPlayStoreIcon:
-      return IDR_PRODUCT_LOGO_128;
-#endif  // BUILDFLAG(ENABLE_CROS_SCALABLE_IPH)
     case BuiltInImage::kRNotification:
       return IDR_GROWTH_FRAMEWORK_R_NOTIFICATION_PNG;
     case growth::BuiltInImage::kMallAppIcon:
@@ -312,7 +297,7 @@ const base::Feature* SelectFeatureByIndex(const base::Feature* features[],
     return nullptr;
   }
 
-  return features[index];
+  return UNSAFE_TODO(features[index]);
 }
 
 }  // namespace

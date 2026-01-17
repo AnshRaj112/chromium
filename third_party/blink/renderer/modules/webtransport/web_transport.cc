@@ -58,6 +58,7 @@
 #include "third_party/blink/renderer/platform/loader/fetch/unique_identifier.h"
 #include "third_party/blink/renderer/platform/timer.h"
 #include "third_party/blink/renderer/platform/wtf/functional.h"
+#include "third_party/blink/renderer/platform/wtf/hash_set.h"
 #include "third_party/blink/renderer/platform/wtf/text/strcat.h"
 #include "third_party/blink/renderer/platform/wtf/text/string_builder.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
@@ -95,7 +96,51 @@ bool CreateStreamDataPipe(mojo::ScopedDataPipeProducerHandle* producer,
   return true;
 }
 
+// Validates the conditions outlined in
+// https://w3c.github.io/webtransport/#webtransport-constructor and returns an
+// error message, or null string if the name is valid.
+[[nodiscard]] String ValidateProtocolName(StringView protocol) {
+  if (protocol.empty()) {
+    return "Protocol name cannot be empty.";
+  }
+  if (!VisitCharacters(protocol, [](auto span) {
+        for (const auto c : span) {
+          // Protocol names are sf-strings, which are defined as sequences of
+          // printable ASCII characters.
+          // See <https://www.rfc-editor.org/rfc/rfc8941.html#name-strings>.
+          if (c < 32 || c >= 127) {
+            return false;
+          }
+        }
+        return true;
+      })) {
+    return "Protocol name contains invalid characters.";
+  }
+  if (protocol.length() >= 512) {
+    return "Protocol name is longer than 512 bytes.";
+  }
+  return String();
+}
+
 }  // namespace
+
+// RecentlyForgottenStreamIdSet implementation
+void WebTransport::RecentlyForgottenStreamIdSet::Insert(uint32_t stream_id) {
+  auto result = id_set_.insert(stream_id);
+  CHECK(result.is_new_entry);  // Should always be new given our call sites.
+  if (id_set_.size() > kMaxSize) {
+    id_set_.RemoveFirst();
+  }
+}
+
+bool WebTransport::RecentlyForgottenStreamIdSet::Contains(
+    uint32_t stream_id) const {
+  return id_set_.Contains(stream_id);
+}
+
+void WebTransport::RecentlyForgottenStreamIdSet::Erase(uint32_t stream_id) {
+  id_set_.erase(stream_id);
+}
 
 // Sends a datagram on write().
 class WebTransport::DatagramUnderlyingSink final : public UnderlyingSinkBase {
@@ -157,8 +202,8 @@ class WebTransport::DatagramUnderlyingSink final : public UnderlyingSinkBase {
     for (const auto& datagram : pending_datagrams_) {
       web_transport_->transport_remote_->SendDatagram(
           base::span(datagram),
-          WTF::BindOnce(&DatagramUnderlyingSink::OnDatagramProcessed,
-                        WrapWeakPersistent(this)));
+          BindOnce(&DatagramUnderlyingSink::OnDatagramProcessed,
+                   WrapWeakPersistent(this)));
     }
     pending_datagrams_.clear();
   }
@@ -185,8 +230,8 @@ class WebTransport::DatagramUnderlyingSink final : public UnderlyingSinkBase {
 
     if (web_transport_->transport_remote_.is_bound()) {
       web_transport_->transport_remote_->SendDatagram(
-          data, WTF::BindOnce(&DatagramUnderlyingSink::OnDatagramProcessed,
-                              WrapWeakPersistent(this)));
+          data, BindOnce(&DatagramUnderlyingSink::OnDatagramProcessed,
+                         WrapWeakPersistent(this)));
     } else {
       Vector<uint8_t> datagram;
       datagram.AppendSpan(data);
@@ -576,8 +621,8 @@ class WebTransport::StreamVendingUnderlyingSource final
       return ToResolvedUndefinedPromise(script_state);
     }
 
-    vendor_->RequestStream(WTF::BindOnce(
-        &StreamVendingUnderlyingSource::Enqueue, WrapWeakPersistent(this)));
+    vendor_->RequestStream(BindOnce(&StreamVendingUnderlyingSource::Enqueue,
+                                    WrapWeakPersistent(this)));
 
     return ToResolvedUndefinedPromise(script_state);
   }
@@ -626,9 +671,10 @@ class WebTransport::ReceiveStreamVendor final
       : script_state_(script_state), web_transport_(web_transport) {}
 
   void RequestStream(EnqueueCallback enqueue) override {
-    web_transport_->transport_remote_->AcceptUnidirectionalStream(WTF::BindOnce(
-        &ReceiveStreamVendor::OnAcceptUnidirectionalStreamResponse,
-        WrapWeakPersistent(this), std::move(enqueue)));
+    web_transport_->transport_remote_->AcceptUnidirectionalStream(
+        blink::BindOnce(
+            &ReceiveStreamVendor::OnAcceptUnidirectionalStreamResponse,
+            WrapWeakPersistent(this), std::move(enqueue)));
   }
 
   void Trace(Visitor* visitor) const override {
@@ -671,6 +717,9 @@ class WebTransport::ReceiveStreamVendor final
 
       // This can run JavaScript. This is safe because `receive_stream` hasn't
       // been exposed yet.
+      // Note: OnIncomingStreamClosed() will eventually trigger
+      // ForgetIncomingStream() via the on_abort_ callback, which handles
+      // removal from incoming_stream_map_.
       receive_stream->GetIncomingStream()->OnIncomingStreamClosed(fin_received);
     }
 
@@ -689,9 +738,10 @@ class WebTransport::BidirectionalStreamVendor final
       : script_state_(script_state), web_transport_(web_transport) {}
 
   void RequestStream(EnqueueCallback enqueue) override {
-    web_transport_->transport_remote_->AcceptBidirectionalStream(WTF::BindOnce(
-        &BidirectionalStreamVendor::OnAcceptBidirectionalStreamResponse,
-        WrapWeakPersistent(this), std::move(enqueue)));
+    web_transport_->transport_remote_->AcceptBidirectionalStream(
+        blink::BindOnce(
+            &BidirectionalStreamVendor::OnAcceptBidirectionalStreamResponse,
+            WrapWeakPersistent(this), std::move(enqueue)));
   }
 
   void Trace(Visitor* visitor) const override {
@@ -738,6 +788,9 @@ class WebTransport::BidirectionalStreamVendor final
 
       // This can run JavaScript. This is safe because `receive_stream` hasn't
       // been exposed yet.
+      // Note: OnIncomingStreamClosed() will eventually trigger
+      // ForgetIncomingStream() via the on_abort_ callback, which handles
+      // removal from incoming_stream_map_.
       bidirectional_stream->GetIncomingStream()->OnIncomingStreamClosed(
           fin_received);
     }
@@ -811,9 +864,9 @@ ScriptPromise<WritableStream> WebTransport::createUnidirectionalStream(
   create_stream_resolvers_.insert(resolver);
   transport_remote_->CreateStream(
       std::move(data_pipe_consumer), mojo::ScopedDataPipeProducerHandle(),
-      WTF::BindOnce(&WebTransport::OnCreateSendStreamResponse,
-                    WrapWeakPersistent(this), WrapWeakPersistent(resolver),
-                    std::move(data_pipe_producer)));
+      BindOnce(&WebTransport::OnCreateSendStreamResponse,
+               WrapWeakPersistent(this), WrapWeakPersistent(resolver),
+               std::move(data_pipe_producer)));
 
   return resolver->Promise();
 }
@@ -858,10 +911,9 @@ ScriptPromise<BidirectionalStream> WebTransport::createBidirectionalStream(
   create_stream_resolvers_.insert(resolver);
   transport_remote_->CreateStream(
       std::move(outgoing_consumer), std::move(incoming_producer),
-      WTF::BindOnce(&WebTransport::OnCreateBidirectionalStreamResponse,
-                    WrapWeakPersistent(this), WrapWeakPersistent(resolver),
-                    std::move(outgoing_producer),
-                    std::move(incoming_consumer)));
+      BindOnce(&WebTransport::OnCreateBidirectionalStreamResponse,
+               WrapWeakPersistent(this), WrapWeakPersistent(resolver),
+               std::move(outgoing_producer), std::move(incoming_consumer)));
 
   return resolver->Promise();
 }
@@ -961,8 +1013,8 @@ ScriptPromise<WebTransportConnectionStats> WebTransport::getStats(
   const bool request_already_sent = !pending_get_stats_resolvers_.empty();
   pending_get_stats_resolvers_.push_back(resolver);
   if (transport_remote_.is_bound() && !request_already_sent) {
-    transport_remote_->GetStats(WTF::BindOnce(&WebTransport::OnGetStatsResponse,
-                                              WrapWeakPersistent(this)));
+    transport_remote_->GetStats(
+        BindOnce(&WebTransport::OnGetStatsResponse, WrapWeakPersistent(this)));
   }
   return resolver->Promise();
 }
@@ -972,7 +1024,7 @@ void WebTransport::OnConnectionEstablished(
     mojo::PendingReceiver<network::mojom::blink::WebTransportClient>
         client_receiver,
     network::mojom::blink::HttpResponseHeadersPtr response_headers,
-    const String& /*selected_application_protocol*/,
+    const String& selected_application_protocol,
     network::mojom::blink::WebTransportStatsPtr initial_stats) {
   DVLOG(1) << "WebTransport::OnConnectionEstablished() this=" << this;
   connector_.reset();
@@ -985,8 +1037,8 @@ void WebTransport::OnConnectionEstablished(
       GetExecutionContext()->GetTaskRunner(TaskType::kNetworking);
 
   client_receiver_.Bind(std::move(client_receiver), task_runner);
-  client_receiver_.set_disconnect_handler(WTF::BindOnce(
-      &WebTransport::OnConnectionError, WrapWeakPersistent(this)));
+  client_receiver_.set_disconnect_handler(
+      BindOnce(&WebTransport::OnConnectionError, WrapWeakPersistent(this)));
 
   DCHECK(!transport_remote_.is_bound());
   transport_remote_.Bind(std::move(web_transport), task_runner);
@@ -996,6 +1048,9 @@ void WebTransport::OnConnectionEstablished(
         outgoing_datagram_expiration_duration_);
   }
 
+  if (!selected_application_protocol.IsNull()) {
+    selected_application_protocol_ = selected_application_protocol;
+  }
   latest_stats_ = ConvertStatsFromMojom(std::move(initial_stats));
 
   datagram_underlying_sink_->SendPendingDatagrams();
@@ -1043,6 +1098,18 @@ void WebTransport::OnIncomingStreamClosed(uint32_t stream_id,
                                           bool fin_received) {
   DVLOG(1) << "WebTransport::OnIncomingStreamClosed(" << stream_id << ", "
            << fin_received << ") this=" << this;
+  // 0xfffffffe and 0xffffffff are reserved values in stream_map_.
+  CHECK_LT(stream_id, 0xfffffffe);
+
+  if (recently_forgotten_incoming_stream_ids_.Contains(stream_id)) {
+    recently_forgotten_incoming_stream_ids_.Erase(stream_id);
+    DVLOG(1) << "WebTransport::OnIncomingStreamClosed() correctly ignoring "
+                "close on recently forgotten stream_id="
+             << stream_id;
+    DCHECK(incoming_stream_map_.find(stream_id) == incoming_stream_map_.end());
+    return;
+  }
+
   auto it = incoming_stream_map_.find(stream_id);
 
   if (it == incoming_stream_map_.end()) {
@@ -1060,7 +1127,15 @@ void WebTransport::OnIncomingStreamClosed(uint32_t stream_id,
   }
 
   IncomingStream* stream = it->value;
+  // Note: stream->OnIncomingStreamClosed() will eventually trigger
+  // ForgetIncomingStream() via the on_abort_ callback, which handles removal
+  // from incoming_stream_map_. We don't need to record this close because
+  // OnIncomingStreamClosed() won't be called again for the same stream_id.
   stream->OnIncomingStreamClosed(fin_received);
+}
+
+bool WebTransport::HasPendingClosedStreamForTesting(uint32_t stream_id) const {
+  return closed_potentially_pending_streams_.Contains(stream_id);
 }
 
 void WebTransport::OnReceivedResetStream(uint32_t stream_id,
@@ -1177,10 +1252,18 @@ void WebTransport::StopSending(uint32_t stream_id, uint32_t code) {
   transport_remote_->StopSending(stream_id, code);
 }
 
-void WebTransport::ForgetIncomingStream(uint32_t stream_id) {
+void WebTransport::ForgetIncomingStream(uint32_t stream_id,
+                                        bool has_received_close) {
   DVLOG(1) << "WebTransport::ForgetIncomingStream() this=" << this
-           << ", stream_id=" << stream_id;
+           << ", stream_id=" << stream_id
+           << ", has_received_close=" << has_received_close;
   incoming_stream_map_.erase(stream_id);
+  // Only record if we haven't received OnIncomingStreamClosed() for this
+  // stream. If we have, we know it won't be called again, so no need to track
+  // it.
+  if (!has_received_close) {
+    recently_forgotten_incoming_stream_ids_.Insert(stream_id);
+  }
 }
 
 void WebTransport::ForgetOutgoingStream(uint32_t stream_id) {
@@ -1304,6 +1387,26 @@ void WebTransport::Init(const String& url_for_diagnostics,
         WebFeature::kWebTransportServerCertificateHashes);
   }
 
+  if (options.hasProtocols()) {
+    HashSet<String> encountered_protocols;
+    for (const String& protocol : options.protocols()) {
+      String validation_error = ValidateProtocolName(protocol);
+      if (!validation_error.IsNull()) {
+        exception_state.ThrowDOMException(DOMExceptionCode::kSyntaxError,
+                                          validation_error);
+        return;
+      }
+      HashSet<String>::AddResult add_result =
+          encountered_protocols.insert(protocol);
+      if (!add_result.is_new_entry) {
+        exception_state.ThrowDOMException(
+            DOMExceptionCode::kSyntaxError,
+            "Duplicate protocols are not allowed.");
+        return;
+      }
+    }
+  }
+
   if (auto* scheduler = execution_context->GetScheduler()) {
     // Two features are registered with `DisableBackForwardCache` policy here:
     // - `kWebTransport`: a non-sticky feature that will disable BFCache for any
@@ -1339,12 +1442,13 @@ void WebTransport::Init(const String& url_for_diagnostics,
             execution_context->GetTaskRunner(TaskType::kNetworking)));
 
     connector_->Connect(
-        url_, std::move(fingerprints), /*application_protocols=*/{},
+        url_, std::move(fingerprints),
+        options.hasProtocols() ? options.protocols() : Vector<String>(),
         handshake_client_receiver_.BindNewPipeAndPassRemote(
             execution_context->GetTaskRunner(TaskType::kNetworking)));
 
-    handshake_client_receiver_.set_disconnect_handler(WTF::BindOnce(
-        &WebTransport::OnConnectionError, WrapWeakPersistent(this)));
+    handshake_client_receiver_.set_disconnect_handler(
+        BindOnce(&WebTransport::OnConnectionError, WrapWeakPersistent(this)));
   }
 
   probe::WebTransportCreated(execution_context, inspector_transport_id_, url_);
@@ -1402,6 +1506,10 @@ void WebTransport::Dispose() {
   probe::WebTransportClosed(GetExecutionContext(), inspector_transport_id_);
   incoming_stream_map_.clear();
   outgoing_stream_map_.clear();
+  // Note: recently_forgotten_incoming_stream_ids_ is not cleared explicitly;
+  // let the garbage collector free the memory.
+  // Clear pending close notifications.
+  closed_potentially_pending_streams_.clear();
   connector_.reset();
   transport_remote_.reset();
   handshake_client_receiver_.reset();
@@ -1625,6 +1733,10 @@ WebTransportConnectionStats* WebTransport::ConvertStatsFromMojom(
   }
   out->setDatagrams(datagram_stats);
   return out;
+}
+
+const String& WebTransport::protocol() {
+  return selected_application_protocol_;
 }
 
 }  // namespace blink

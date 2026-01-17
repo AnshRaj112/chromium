@@ -38,7 +38,6 @@ import org.chromium.base.Token;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.compositor.LayerTitleCache;
-import org.chromium.chrome.browser.compositor.layouts.LayoutRenderHost;
 import org.chromium.chrome.browser.compositor.layouts.LayoutUpdateHost;
 import org.chromium.chrome.browser.compositor.layouts.components.CompositorButton;
 import org.chromium.chrome.browser.compositor.layouts.components.CompositorButton.ButtonType;
@@ -51,6 +50,7 @@ import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutView.Str
 import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutView.StripLayoutViewOnKeyboardFocusHandler;
 import org.chromium.chrome.browser.compositor.overlays.strip.TabLoadTracker.TabLoadTrackerCallback;
 import org.chromium.chrome.browser.layouts.scene_layer.SceneLayer;
+import org.chromium.chrome.browser.tab.Tab.MediaState;
 import org.chromium.ui.resources.ResourceManager;
 
 /** Tests for {@link TabStripSceneLayer}. */
@@ -68,7 +68,6 @@ public class TabStripSceneLayerTest {
     @Mock private StripLayoutViewOnClickHandler mOnClickHandler;
     @Mock private StripLayoutViewOnKeyboardFocusHandler mKeyboardFocusHandler;
     @Mock private TabLoadTrackerCallback mTabLoadTrackerCallback;
-    @Mock private LayoutRenderHost mLayoutRenderHost;
     @Mock private LayoutUpdateHost mLayoutUpdateHost;
     @Mock private TintedCompositorButton mCloseButton;
     @Mock private StripLayoutGroupTitle mStripGroupTitle;
@@ -137,7 +136,9 @@ public class TabStripSceneLayerTest {
                                 mKeyboardFocusHandler,
                                 mTabLoadTrackerCallback,
                                 mLayoutUpdateHost,
-                                false));
+                                false,
+                                false,
+                                MediaState.NONE));
         mTabStripSceneLayer.initializeNativeForTesting();
         mStripLayoutTabs = new StripLayoutTab[] {mStripLayoutTab};
         mStripGroupTitles = new StripLayoutGroupTitle[] {mStripGroupTitle};
@@ -268,6 +269,10 @@ public class TabStripSceneLayerTest {
                         eq(false),
                         eq(false),
                         anyBoolean(),
+                        anyBoolean(),
+                        anyInt(),
+                        anyInt(),
+                        anyFloat(),
                         anyFloat(),
                         anyFloat(),
                         anyFloat(),
@@ -298,7 +303,8 @@ public class TabStripSceneLayerTest {
                                         .getDimensionPixelSize(R.dimen.tabstrip_strokewidth)),
                         eq(
                                 FOLIO_FOOT_LENGTH_DP
-                                        * mContext.getResources().getDisplayMetrics().density));
+                                        * mContext.getResources().getDisplayMetrics().density),
+                        anyBoolean());
     }
 
     @Test
@@ -330,6 +336,10 @@ public class TabStripSceneLayerTest {
                         eq(false),
                         eq(false),
                         anyBoolean(),
+                        anyBoolean(),
+                        anyInt(),
+                        anyInt(),
+                        anyFloat(),
                         anyFloat(),
                         anyFloat(),
                         anyFloat(),
@@ -358,7 +368,8 @@ public class TabStripSceneLayerTest {
                                         .getDimensionPixelSize(R.dimen.tabstrip_strokewidth)),
                         eq(
                                 FOLIO_FOOT_LENGTH_DP
-                                        * mContext.getResources().getDisplayMetrics().density));
+                                        * mContext.getResources().getDisplayMetrics().density),
+                        anyBoolean());
     }
 
     @Test
@@ -390,6 +401,10 @@ public class TabStripSceneLayerTest {
                         eq(true),
                         eq(false),
                         anyBoolean(),
+                        anyBoolean(),
+                        anyInt(),
+                        anyInt(),
+                        anyFloat(),
                         anyFloat(),
                         anyFloat(),
                         anyFloat(),
@@ -420,7 +435,8 @@ public class TabStripSceneLayerTest {
                                         .getDimensionPixelSize(R.dimen.tabstrip_strokewidth)),
                         eq(
                                 FOLIO_FOOT_LENGTH_DP
-                                        * mContext.getResources().getDisplayMetrics().density));
+                                        * mContext.getResources().getDisplayMetrics().density),
+                        anyBoolean());
     }
 
     @Test
@@ -451,6 +467,10 @@ public class TabStripSceneLayerTest {
                         eq(false),
                         eq(false),
                         anyBoolean(),
+                        anyBoolean(),
+                        anyInt(),
+                        anyInt(),
+                        anyFloat(),
                         anyFloat(),
                         anyFloat(),
                         anyFloat(),
@@ -481,7 +501,8 @@ public class TabStripSceneLayerTest {
                                         .getDimensionPixelSize(R.dimen.tabstrip_strokewidth)),
                         eq(
                                 FOLIO_FOOT_LENGTH_DP
-                                        * mContext.getResources().getDisplayMetrics().density));
+                                        * mContext.getResources().getDisplayMetrics().density),
+                        anyBoolean());
     }
 
     @Test

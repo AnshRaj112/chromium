@@ -11,7 +11,6 @@
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/hash/hash.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_macros.h"
@@ -462,6 +461,7 @@ bool VotesUploader::UploadPasswordVote(
 
   autofill::EncodeUploadRequestOptions options;
   options.encoder = RandomizedEncoder::Create(client_->GetPrefs());
+  options.current_page_language = client_->GetPageLanguage();
   options.submission_event = submitted_form.submission_event;
   options.login_form_signature = login_form_signature;
   options.observed_submission = true;
@@ -572,6 +572,7 @@ void VotesUploader::UploadFirstLoginVotes(
 
   autofill::EncodeUploadRequestOptions options;
   options.encoder = RandomizedEncoder::Create(client_->GetPrefs());
+  options.current_page_language = client_->GetPageLanguage();
   options.submission_event = form_to_upload.submission_event;
   options.observed_submission = true;
 
@@ -591,9 +592,6 @@ void VotesUploader::UploadFirstLoginVotes(
   LabelFields(field_types, field_name_collision, vote_types, form_structure,
               options);
   SetKnownValueFlag(pending_credentials, best_matches, &form_structure);
-
-  // Annotate the form with the source language of the page.
-  form_structure.set_current_page_language(client_->GetPageLanguage());
 
   SetInitialHashValueOfUsernameField(
       form_to_upload.username_element_renderer_id, form_structure, options);
@@ -905,9 +903,6 @@ VotesUploader::EncodeUploadRequest(
     const autofill::EncodeUploadRequestOptions& options,
     std::optional<PasswordAttributesMetadata> password_attributes,
     bool should_set_passwords_were_revealed) {
-  // Annotate the form with the source language of the page.
-  form.set_current_page_language(client_->GetPageLanguage());
-
   std::vector<AutofillUploadContents> upload_contents =
       autofill::EncodeUploadRequest(form, options);
   CHECK(!upload_contents.empty());
@@ -1080,6 +1075,7 @@ bool VotesUploader::MaybeSendSingleUsernameVote(
 
   autofill::EncodeUploadRequestOptions options;
   options.encoder = RandomizedEncoder::Create(client_->GetPrefs());
+  options.current_page_language = client_->GetPageLanguage();
   options.observed_submission = true;
 
   // Label the username field with a SINGLE_USERNAME or NOT_USERNAME vote.

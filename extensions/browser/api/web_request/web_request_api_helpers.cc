@@ -15,7 +15,6 @@
 #include <utility>
 
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/functional/bind.h"
@@ -41,6 +40,7 @@
 #include "extensions/browser/api/web_request/web_request_info.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/extensions_browser_client.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/api/declarative_net_request.h"
 #include "extensions/common/extension_id.h"
 #include "net/cookies/cookie_util.h"
@@ -50,6 +50,8 @@
 #include "net/log/net_log_event_type.h"
 #include "services/network/public/cpp/features.h"
 #include "url/url_constants.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 // TODO(battre): move all static functions into an anonymous namespace at the
 // top of this file.
@@ -575,8 +577,7 @@ IgnoredAction::IgnoredAction(extensions::ExtensionId extension_id,
 
 IgnoredAction::IgnoredAction(IgnoredAction&& rhs) = default;
 
-bool ExtraInfoSpec::InitFromValue(content::BrowserContext* browser_context,
-                                  const base::Value& value,
+bool ExtraInfoSpec::InitFromValue(const base::Value& value,
                                   int* extra_info_spec) {
   *extra_info_spec = 0;
   if (!value.is_list()) {
@@ -600,6 +601,11 @@ bool ExtraInfoSpec::InitFromValue(content::BrowserContext* browser_context,
       *extra_info_spec |= REQUEST_BODY;
     } else if (*str == "extraHeaders") {
       *extra_info_spec |= EXTRA_HEADERS;
+    } else if (*str == "securityInfo") {
+      *extra_info_spec |= SECURITY_INFO;
+    } else if (*str == "securityInfoRawDer") {
+      *extra_info_spec |= SECURITY_INFO_RAW_DER;
+      *extra_info_spec |= SECURITY_INFO;
     } else {
       return false;
     }
@@ -616,10 +622,6 @@ RequestCookie::RequestCookie(RequestCookie&& other) = default;
 RequestCookie& RequestCookie ::operator=(RequestCookie&& other) = default;
 RequestCookie::~RequestCookie() = default;
 
-bool RequestCookie::operator==(const RequestCookie& other) const {
-  return std::tie(name, value) == std::tie(other.name, other.value);
-}
-
 RequestCookie RequestCookie::Clone() const {
   RequestCookie clone;
   clone.name = name;
@@ -631,13 +633,6 @@ ResponseCookie::ResponseCookie() = default;
 ResponseCookie::ResponseCookie(ResponseCookie&& other) = default;
 ResponseCookie& ResponseCookie ::operator=(ResponseCookie&& other) = default;
 ResponseCookie::~ResponseCookie() = default;
-
-bool ResponseCookie::operator==(const ResponseCookie& other) const {
-  return std::tie(name, value, expires, max_age, domain, path, secure,
-                  http_only) ==
-         std::tie(other.name, other.value, other.expires, other.max_age,
-                  other.domain, other.path, other.secure, other.http_only);
-}
 
 ResponseCookie ResponseCookie::Clone() const {
   ResponseCookie clone;
@@ -658,14 +653,6 @@ FilterResponseCookie::FilterResponseCookie(FilterResponseCookie&& other) =
 FilterResponseCookie& FilterResponseCookie ::operator=(
     FilterResponseCookie&& other) = default;
 FilterResponseCookie::~FilterResponseCookie() = default;
-
-bool FilterResponseCookie::operator==(const FilterResponseCookie& other) const {
-  // This ignores all of the fields of the base class ResponseCookie. Why?
-  // https://crbug.com/916248
-  return std::tie(age_lower_bound, age_upper_bound, session_cookie) ==
-         std::tie(other.age_lower_bound, other.age_upper_bound,
-                  other.session_cookie);
-}
 
 FilterResponseCookie FilterResponseCookie::Clone() const {
   FilterResponseCookie clone;
@@ -1243,14 +1230,14 @@ void MergeOnBeforeSendHeadersResponses(
         }
 
         // We must not modify anything that has been deleted before.
-        if (base::Contains(*removed_headers, key)) {
+        if (removed_headers->contains(key)) {
           extension_conflicts = true;
           break;
         }
 
         // We must not modify anything that has been set to a *different*
         // value before.
-        if (base::Contains(*set_headers, key) &&
+        if (set_headers->contains(key) &&
             request_headers->GetHeader(key) != value) {
           extension_conflicts = true;
           break;
@@ -1262,7 +1249,7 @@ void MergeOnBeforeSendHeadersResponses(
     // modified before.
     {
       for (const std::string& key : delta.deleted_request_headers) {
-        if (base::Contains(*set_headers, base::ToLowerASCII(key))) {
+        if (set_headers->contains(base::ToLowerASCII(key))) {
           extension_conflicts = true;
           break;
         }
@@ -1279,7 +1266,7 @@ void MergeOnBeforeSendHeadersResponses(
         std::string key = base::ToLowerASCII(modification.name());
         if (!request_headers->HasHeader(key)) {
           web_request_added_headers.insert(key);
-        } else if (!base::Contains(web_request_added_headers, key)) {
+        } else if (!web_request_added_headers.contains(key)) {
           // Note: |key| will only be present in |added_headers| if this is an
           // identical edit.
           web_request_overridden_headers.insert(key);
@@ -1651,8 +1638,8 @@ void MergeOnHeadersReceivedResponses(
     bool extension_conflicts = false;
     for (const ResponseHeader& header : delta.deleted_response_headers) {
       ResponseHeader lowercase_header(ToLowerCase(header));
-      if (base::Contains(removed_headers, lowercase_header) ||
-          base::Contains(dnr_header_actions, lowercase_header.first)) {
+      if (removed_headers.contains(lowercase_header) ||
+          dnr_header_actions.contains(lowercase_header.first)) {
         extension_conflicts = true;
         break;
       }
@@ -1835,7 +1822,7 @@ bool ShouldHideRequestHeader(content::BrowserContext* browser_context,
                                                 "accept-language", "cookie",
                                                 "origin", "referer"});
   return !(extra_info_spec & ExtraInfoSpec::EXTRA_HEADERS) &&
-         base::Contains(kRequestHeaders, base::ToLowerASCII(name));
+         kRequestHeaders.contains(base::ToLowerASCII(name));
 }
 
 bool ShouldHideResponseHeader(int extra_info_spec, const std::string& name) {

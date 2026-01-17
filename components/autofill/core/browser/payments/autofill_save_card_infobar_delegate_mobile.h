@@ -63,6 +63,7 @@ class AutofillSaveCardInfoBarDelegateMobile : public ConfirmInfoBarDelegate {
   const std::u16string& expiration_date_year() const {
     return ui_info_.expiration_date_year;
   }
+  const std::u16string& card_cvc() const { return ui_info_.card_cvc; }
   const std::u16string& displayed_target_account_email() const {
     return ui_info_.displayed_target_account_email;
   }
@@ -76,9 +77,9 @@ class AutofillSaveCardInfoBarDelegateMobile : public ConfirmInfoBarDelegate {
   // Called when a link in the legal message text was clicked.
   virtual void OnLegalMessageLinkClicked(GURL url);
 
-  // Google Pay branding is enabled with a flag and only for cards upstreamed
+  // Google Chrome branding is enabled with a flag and only for cards upstreamed
   // to Google.
-  bool IsGooglePayBrandingEnabled() const;
+  bool IsChromeBrandingEnabled() const;
 
   // Description text to be shown above the card information in the infobar.
   std::u16string GetDescriptionText() const;

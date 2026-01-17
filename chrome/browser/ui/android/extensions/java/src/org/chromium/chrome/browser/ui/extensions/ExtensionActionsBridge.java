@@ -15,9 +15,12 @@ import org.jni_zero.JniType;
 import org.jni_zero.NativeMethods;
 
 import org.chromium.base.ObserverList;
+import org.chromium.base.lifetime.Destroyable;
+import org.chromium.base.lifetime.LifetimeAssert;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.ui.browser_window.ChromeAndroidTask;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.extensions.ShowAction;
 
@@ -26,19 +29,15 @@ import java.util.Objects;
 /** A JNI bridge to interact with extension actions for the toolbar. */
 @NullMarked
 @JNINamespace("extensions")
-public class ExtensionActionsBridge {
+public class ExtensionActionsBridge implements Destroyable {
+    private final @Nullable LifetimeAssert mLifetimeAssert = LifetimeAssert.create(this);
     private long mNativeExtensionActionsBridge;
     private final ObserverList<Observer> mObservers = new ObserverList<>();
 
-    @CalledByNative
-    @VisibleForTesting
-    public ExtensionActionsBridge(long nativeExtensionActionsBridge) {
-        mNativeExtensionActionsBridge = nativeExtensionActionsBridge;
-    }
-
-    /** Returns an instance for the given profile. */
-    public static ExtensionActionsBridge get(Profile profile) {
-        return ExtensionActionsBridgeJni.get().get(profile);
+    public ExtensionActionsBridge(ChromeAndroidTask task) {
+        mNativeExtensionActionsBridge =
+                ExtensionActionsBridgeJni.get()
+                        .init(this, task.getOrCreateNativeBrowserWindowPtr());
     }
 
     /** Represents the result of handling a key event. */
@@ -70,10 +69,12 @@ public class ExtensionActionsBridge {
         }
     }
 
-    @CalledByNative
-    private void destroy() {
+    @Override
+    public void destroy() {
         assert mNativeExtensionActionsBridge != 0;
+        ExtensionActionsBridgeJni.get().destroy(mNativeExtensionActionsBridge);
         mNativeExtensionActionsBridge = 0;
+        LifetimeAssert.destroy(mLifetimeAssert);
     }
 
     public void addObserver(Observer observer) {
@@ -111,9 +112,22 @@ public class ExtensionActionsBridge {
      * <p>While loading the icon, this method returns a transparent icon.
      */
     @Nullable
-    public Bitmap getActionIcon(String actionId, int tabId) {
+    public Bitmap getActionIcon(
+            String actionId,
+            int tabId,
+            @Nullable WebContents webContents,
+            int canvasWidthDp,
+            int canvasHeightDp,
+            float scaleFactor) {
         return ExtensionActionsBridgeJni.get()
-                .getActionIcon(mNativeExtensionActionsBridge, actionId, tabId);
+                .getActionIcon(
+                        mNativeExtensionActionsBridge,
+                        actionId,
+                        tabId,
+                        webContents,
+                        canvasWidthDp,
+                        canvasHeightDp,
+                        scaleFactor);
     }
 
     /**
@@ -138,8 +152,8 @@ public class ExtensionActionsBridge {
      * temporary for until extensions are ready for dogfooding. TODO(crbug.com/422307625): Remove
      * this check once extensions are ready for dogfooding.
      */
-    public boolean extensionsEnabled() {
-        return ExtensionActionsBridgeJni.get().extensionsEnabled(mNativeExtensionActionsBridge);
+    public static boolean extensionsEnabled(Profile profile) {
+        return ExtensionActionsBridgeJni.get().extensionsEnabled(profile);
     }
 
     /** Handles the key down event and returns the result. */
@@ -229,7 +243,11 @@ public class ExtensionActionsBridge {
 
     @NativeMethods
     public interface Natives {
-        ExtensionActionsBridge get(@JniType("Profile*") Profile profile);
+        boolean extensionsEnabled(@JniType("Profile*") Profile profile);
+
+        long init(ExtensionActionsBridge bridge, long browserWindowInterfacePtr);
+
+        void destroy(long nativeExtensionActionsBridge);
 
         boolean areActionsInitialized(long nativeExtensionActionsBridge);
 
@@ -244,7 +262,11 @@ public class ExtensionActionsBridge {
         @Nullable Bitmap getActionIcon(
                 long nativeExtensionActionsBridge,
                 @JniType("std::string") String actionId,
-                int tabId);
+                int tabId,
+                @Nullable @JniType("content::WebContents*") WebContents webContents,
+                int canvasWidthDp,
+                int canvasHeightDp,
+                float scaleFactor);
 
         @JniType("ExtensionAction::ShowAction")
         int runAction(
@@ -252,8 +274,6 @@ public class ExtensionActionsBridge {
                 @JniType("std::string") String actionId,
                 int tabId,
                 @JniType("content::WebContents*") WebContents webContents);
-
-        boolean extensionsEnabled(long nativeExtensionActionsBridge);
 
         HandleKeyEventResult handleKeyDownEvent(
                 long nativeExtensionActionsBridge,

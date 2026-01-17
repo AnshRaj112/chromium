@@ -4,6 +4,8 @@
 
 #include "content/browser/preloading/prerender/prerender_navigation_throttle.h"
 
+#include <algorithm>
+
 #include "base/memory/ptr_util.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_split.h"
@@ -89,9 +91,11 @@ PrerenderNavigationThrottle::WillRedirectRequest() {
 PrerenderNavigationThrottle::PrerenderNavigationThrottle(
     NavigationThrottleRegistry& registry)
     : NavigationThrottle(registry),
-      prerender_host_(&PrerenderHost::GetFromFrameTreeNode(
-          *NavigationRequest::From(&registry.GetNavigationHandle())
-               ->frame_tree_node())) {
+      prerender_host_(
+          PrerenderHost::GetFromFrameTreeNode(
+              *NavigationRequest::From(&registry.GetNavigationHandle())
+                   ->frame_tree_node())
+              .GetWeakPtr()) {
   CHECK(prerender_host_);
 
   // This throttle is responsible for setting the initial navigation id on the
@@ -109,6 +113,10 @@ PrerenderNavigationThrottle::PrerenderNavigationThrottle(
 
 NavigationThrottle::ThrottleCheckResult
 PrerenderNavigationThrottle::WillStartOrRedirectRequest(bool is_redirection) {
+  if (!prerender_host_) {
+    return CANCEL;
+  }
+
   GURL navigation_url = navigation_handle()->GetURL();
   url::Origin navigation_origin = url::Origin::Create(navigation_url);
   url::Origin initial_prerendering_origin =
@@ -229,6 +237,10 @@ PrerenderNavigationThrottle::WillStartOrRedirectRequest(bool is_redirection) {
 
 NavigationThrottle::ThrottleCheckResult
 PrerenderNavigationThrottle::WillProcessResponse() {
+  if (!prerender_host_) {
+    return CANCEL;
+  }
+
   auto* navigation_request = NavigationRequest::From(navigation_handle());
 
   // https://wicg.github.io/nav-speculation/prerendering.html#navigate-fetch-patch
@@ -241,7 +253,7 @@ PrerenderNavigationThrottle::WillProcessResponse() {
   bool is_credentialed_prerender =
       navigation_request->response() &&
       navigation_request->response()->parsed_headers &&
-      base::Contains(
+      std::ranges::contains(
           navigation_request->response()->parsed_headers->supports_loading_mode,
           network::mojom::LoadingMode::kCredentialedPrerender);
   // Cancel prerendering when this is same-site cross-origin navigation but the
@@ -288,12 +300,16 @@ PrerenderNavigationThrottle::WillProcessResponse() {
 }
 
 bool PrerenderNavigationThrottle::IsInitialNavigation() const {
-  return prerender_host_->IsInitialNavigation(
-      *NavigationRequest::From(navigation_handle()));
+  return prerender_host_ ? prerender_host_->IsInitialNavigation(
+                               *NavigationRequest::From(navigation_handle()))
+                         : false;
 }
 
 void PrerenderNavigationThrottle::CancelPrerendering(
     PrerenderFinalStatus final_status) {
+  if (!prerender_host_) {
+    return;
+  }
   auto* navigation_request = NavigationRequest::From(navigation_handle());
   FrameTreeNode* frame_tree_node = navigation_request->frame_tree_node();
   CHECK_EQ(frame_tree_node->GetFrameType(), FrameType::kPrerenderMainFrame);
@@ -301,7 +317,7 @@ void PrerenderNavigationThrottle::CancelPrerendering(
       frame_tree_node->current_frame_host()
           ->delegate()
           ->GetPrerenderHostRegistry();
-  prerender_host_registry->CancelHost(prerender_host_->frame_tree_node_id(),
+  prerender_host_registry->CancelHost(prerender_host_->prerender_host_id(),
                                       final_status);
 }
 

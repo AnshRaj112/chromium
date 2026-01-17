@@ -32,18 +32,18 @@ void SingleFieldFillRouter::OnWillSubmitForm(
   CHECK(!form_structure ||
         form.fields().size() == form_structure->field_count());
   std::vector<FormFieldData> autocomplete_fields;
-  for (size_t i = 0; i < form.fields().size(); i++) {
+  for (size_t i = 0; i < form.fields().size(); ++i) {
     // If |form_structure| is present, then the fields in |form_structure| and
     // the fields in |form| are 1:1. |form_structure| not being present
     // indicates we may have fields that were not able to be parsed, so we route
     // them to autocomplete functionality by default.
     bool skip_because_promo_code =
         merchant_promo_code_manager_ && form_structure &&
-        form_structure->field(i)->Type().GetStorableType() ==
-            MERCHANT_PROMO_CODE;
+        form_structure->field(i)->Type().GetTypes().contains(
+            MERCHANT_PROMO_CODE);
     bool skip_because_iban =
         iban_manager_ && form_structure &&
-        form_structure->field(i)->Type().GetStorableType() == IBAN_VALUE;
+        form_structure->field(i)->Type().GetTypes().contains(IBAN_VALUE);
     if (!skip_because_iban && !skip_because_promo_code) {
       autocomplete_fields.push_back(form.fields()[i]);
     }

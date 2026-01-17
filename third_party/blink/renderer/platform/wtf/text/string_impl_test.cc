@@ -110,9 +110,9 @@ TEST(StringImplTest, LowerASCII) {
   static const UChar kTestWithNonASCIICapitalized[2] = {0x0041,
                                                         0x00e1};  // A\xE1
 
-  // Make sure we support scoped_refptr<const StringImpl>.
-  scoped_refptr<const StringImpl> const_ref = test_string_impl->IsolatedCopy();
-  DCHECK(const_ref->HasOneRef());
+  // Make sure we support scoped_refptr<StringImpl>.
+  scoped_refptr<StringImpl> isolated_ref = test_string_impl->IsolatedCopy();
+  DCHECK(isolated_ref->HasOneRef());
   EXPECT_TRUE(Equal(
       StringImpl::Create(kTestWithNonASCII).get(),
       StringImpl::Create(kTestWithNonASCIICapitalized)->LowerASCII().get()));
@@ -184,14 +184,59 @@ TEST(StringImplTest, UpperASCII) {
   static const UChar kTestWithNonASCIICapitalized[2] = {0x0041,
                                                         0x00e1};  // A\xE1
 
-  // Make sure we support scoped_refptr<const StringImpl>.
-  scoped_refptr<const StringImpl> const_ref = test_string_impl->IsolatedCopy();
-  DCHECK(const_ref->HasOneRef());
+  // Make sure we support scoped_refptr<StringImpl>.
+  scoped_refptr<StringImpl> isolated_ref = test_string_impl->IsolatedCopy();
+  DCHECK(isolated_ref->HasOneRef());
   EXPECT_TRUE(Equal(StringImpl::Create(kTestWithNonASCIICapitalized).get(),
                     StringImpl::Create(kTestWithNonASCII)->UpperASCII().get()));
   EXPECT_FALSE(Equal(
       StringImpl::Create(kTestWithNonASCIICapitalized).get(),
       StringImpl::Create(kTestWithNonASCIIComparison)->UpperASCII().get()));
+}
+
+TEST(StringImplTest, CodeUnitCompareIgnoringAsciiCase) {
+  StringView lchar1("abC");
+  StringView lchar2("ABc");
+  StringView lchar3("xyz");
+  StringView lchar4("ab");
+  StringView uchar1(u"abC");
+  StringView uchar2(u"ABc");
+  StringView uchar3(u"xyz");
+  StringView uchar4(u"ab");
+  StringView empty_lchar("");
+  StringView empty_uchar(u"");
+  StringView lchar_ascii("abc");
+  StringView uchar_nonascii(u"ab\u00E1");
+  StringView lchar_nonascii("ab\xE1");
+
+  EXPECT_EQ(CodeUnitCompareIgnoringAsciiCase(lchar1, lchar2), 0);
+  EXPECT_EQ(CodeUnitCompareIgnoringAsciiCase(uchar1, uchar2), 0);
+  EXPECT_EQ(CodeUnitCompareIgnoringAsciiCase(empty_lchar, empty_lchar), 0);
+  EXPECT_EQ(CodeUnitCompareIgnoringAsciiCase(empty_uchar, empty_uchar), 0);
+
+  EXPECT_LT(CodeUnitCompareIgnoringAsciiCase(lchar1, lchar3), 0);
+  EXPECT_GT(CodeUnitCompareIgnoringAsciiCase(lchar3, lchar1), 0);
+  EXPECT_GT(CodeUnitCompareIgnoringAsciiCase(lchar1, lchar4), 0);
+  EXPECT_LT(CodeUnitCompareIgnoringAsciiCase(lchar4, lchar1), 0);
+  EXPECT_LT(CodeUnitCompareIgnoringAsciiCase(uchar1, uchar3), 0);
+  EXPECT_GT(CodeUnitCompareIgnoringAsciiCase(uchar3, uchar1), 0);
+  EXPECT_GT(CodeUnitCompareIgnoringAsciiCase(uchar1, uchar4), 0);
+  EXPECT_LT(CodeUnitCompareIgnoringAsciiCase(uchar4, uchar1), 0);
+  EXPECT_GT(CodeUnitCompareIgnoringAsciiCase(lchar1, empty_lchar), 0);
+  EXPECT_LT(CodeUnitCompareIgnoringAsciiCase(empty_lchar, lchar1), 0);
+
+  EXPECT_EQ(CodeUnitCompareIgnoringAsciiCase(lchar1, uchar2), 0);
+  EXPECT_EQ(CodeUnitCompareIgnoringAsciiCase(uchar1, lchar2), 0);
+  EXPECT_LT(CodeUnitCompareIgnoringAsciiCase(lchar1, uchar3), 0);
+  EXPECT_GT(CodeUnitCompareIgnoringAsciiCase(uchar3, lchar1), 0);
+  EXPECT_EQ(CodeUnitCompareIgnoringAsciiCase(lchar_ascii, uchar_nonascii), -1);
+  EXPECT_EQ(CodeUnitCompareIgnoringAsciiCase(lchar_nonascii, uchar_nonascii),
+            0);
+
+  EXPECT_TRUE(CodeUnitCompareIgnoringAsciiCaseLessThan(lchar1, lchar3));
+  EXPECT_FALSE(CodeUnitCompareIgnoringAsciiCaseLessThan(lchar3, lchar1));
+  EXPECT_FALSE(CodeUnitCompareIgnoringAsciiCaseLessThan(lchar1, lchar2));
+  EXPECT_TRUE(CodeUnitCompareIgnoringAsciiCaseLessThan(lchar4, lchar1));
 }
 
 TEST(StringImplTest, WtfReverseFind) {
@@ -204,6 +249,58 @@ TEST(StringImplTest, WtfReverseFind) {
   EXPECT_EQ(0u, ReverseFind(text, 'b', 0u));
 
   EXPECT_EQ(kNotFound, ReverseFind(text, 'd', 2u));
+}
+
+TEST(StringImplTest, Find) {
+  // 8 search and 8 match
+  scoped_refptr<StringImpl> test_string_impl =
+      StringImpl::Create(base::span_from_cstring("abcde"));
+  EXPECT_EQ(0u, test_string_impl->Find("a"));
+  EXPECT_EQ(4u, test_string_impl->Find("e"));
+  EXPECT_EQ(kNotFound, test_string_impl->Find("z"));
+  EXPECT_EQ(3u, test_string_impl->Find("de"));
+  EXPECT_EQ(kNotFound, test_string_impl->Find("def"));
+  EXPECT_EQ(kNotFound, test_string_impl->Find("abcdef"));
+  EXPECT_EQ(2u, test_string_impl->Find("cd"));
+  EXPECT_EQ(0u, test_string_impl->Find("abcde"));
+
+  // 8 search and 16 match
+  EXPECT_EQ(0u, test_string_impl->Find(u"a"));
+  EXPECT_EQ(4u, test_string_impl->Find(u"e"));
+  EXPECT_EQ(kNotFound, test_string_impl->Find(u"z"));
+  EXPECT_EQ(3u, test_string_impl->Find(u"de"));
+  EXPECT_EQ(kNotFound, test_string_impl->Find(u"def"));
+  EXPECT_EQ(kNotFound, test_string_impl->Find(u"abcdef"));
+  EXPECT_EQ(2u, test_string_impl->Find(u"cd"));
+  EXPECT_EQ(0u, test_string_impl->Find(u"abcde"));
+  EXPECT_EQ(kNotFound, test_string_impl->Find(u"\U0001F929"));
+
+  // 16 search and 8 match
+  scoped_refptr<StringImpl> test_string_impl16 =
+      StringImpl::Create(u"abcde\x4100\U0001F929\U0001F926");
+  EXPECT_EQ(0u, test_string_impl16->Find("a"));
+  EXPECT_EQ(4u, test_string_impl16->Find("e"));
+  EXPECT_EQ(kNotFound, test_string_impl16->Find("z"));
+  EXPECT_EQ(3u, test_string_impl16->Find("de"));
+  EXPECT_EQ(kNotFound, test_string_impl16->Find("def"));
+  EXPECT_EQ(kNotFound, test_string_impl16->Find("abcdef"));
+  EXPECT_EQ(2u, test_string_impl16->Find("cd"));
+  EXPECT_EQ(0u, test_string_impl16->Find("abcde"));
+
+  // 16 search and 16 match
+  EXPECT_EQ(0u, test_string_impl16->Find(u"a"));
+  EXPECT_EQ(4u, test_string_impl16->Find(u"e"));
+  EXPECT_EQ(kNotFound, test_string_impl16->Find(u"z"));
+  EXPECT_EQ(3u, test_string_impl16->Find(u"de"));
+  EXPECT_EQ(kNotFound, test_string_impl16->Find(u"def"));
+  EXPECT_EQ(kNotFound, test_string_impl16->Find(u"abcdef"));
+  EXPECT_EQ(2u, test_string_impl16->Find(u"cd"));
+  EXPECT_EQ(0u, test_string_impl16->Find(u"abcde"));
+  EXPECT_EQ(6u, test_string_impl16->Find(u"\U0001F929"));
+  EXPECT_EQ(6u, test_string_impl16->Find(u"\U0001F929\U0001F926"));
+  EXPECT_EQ(kNotFound,
+            test_string_impl16->Find(u"\U0001F929\U0001F926\U0001F926"));
+  EXPECT_EQ(5u, test_string_impl16->Find(u"\x4100"));
 }
 
 }  // namespace blink

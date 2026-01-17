@@ -6,6 +6,7 @@
 
 #import "base/apple/foundation_util.h"
 #import "base/functional/bind.h"
+#import "base/ios/ios_util.h"
 #import "base/location.h"
 #import "base/strings/string_number_conversions.h"
 #import "base/strings/sys_string_conversions.h"
@@ -13,14 +14,14 @@
 #import "base/test/bind.h"
 #import "base/test/ios/wait_util.h"
 #import "base/test/metrics/histogram_tester.h"
-#import "base/test/scoped_feature_list.h"
+#import "base/test/run_until.h"
 #import "components/affiliations/core/browser/fake_affiliation_service.h"
 #import "components/application_locale_storage/application_locale_storage.h"
-#import "components/feature_engagement/public/feature_constants.h"
 #import "components/google/core/common/google_util.h"
 #import "components/keyed_service/core/service_access_type.h"
 #import "components/password_manager/core/browser/leak_detection/mock_bulk_leak_check_service.h"
 #import "components/password_manager/core/browser/password_form.h"
+#import "components/password_manager/core/browser/password_manager_constants.h"
 #import "components/password_manager/core/browser/password_manager_test_utils.h"
 #import "components/password_manager/core/browser/password_store/test_password_store.h"
 #import "ios/chrome/browser/affiliations/model/ios_chrome_affiliation_service_factory.h"
@@ -32,11 +33,9 @@
 #import "ios/chrome/browser/passwords/model/ios_chrome_password_check_manager_factory.h"
 #import "ios/chrome/browser/passwords/model/ios_chrome_profile_password_store_factory.h"
 #import "ios/chrome/browser/passwords/model/password_check_observer_bridge.h"
-#import "ios/chrome/browser/passwords/model/save_passwords_consumer.h"
 #import "ios/chrome/browser/settings/ui_bundled/cells/inline_promo_cell.h"
 #import "ios/chrome/browser/settings/ui_bundled/cells/inline_promo_item.h"
 #import "ios/chrome/browser/settings/ui_bundled/cells/settings_check_item.h"
-#import "ios/chrome/browser/settings/ui_bundled/password/password_manager_ui_features.h"
 #import "ios/chrome/browser/settings/ui_bundled/password/password_manager_view_controller+Testing.h"
 #import "ios/chrome/browser/settings/ui_bundled/password/password_manager_view_controller_presentation_delegate.h"
 #import "ios/chrome/browser/settings/ui_bundled/password/passwords_consumer.h"
@@ -46,6 +45,7 @@
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_ios.h"
+#import "ios/chrome/browser/shared/ui/image/image_names.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_detail_text_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_item.h"
@@ -57,6 +57,7 @@
 #import "ios/chrome/common/ui/table_view/table_view_cells_constants.h"
 #import "ios/chrome/grit/ios_branded_strings.h"
 #import "ios/chrome/grit/ios_strings.h"
+#import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
 #import "ios/chrome/test/scoped_key_window.h"
 #import "ios/web/public/test/web_task_environment.h"
 #import "testing/gmock/include/gmock/gmock.h"
@@ -88,21 +89,19 @@ class PasswordManagerViewControllerTest
     TestProfileIOS::Builder builder;
     builder.AddTestingFactory(
         IOSChromeProfilePasswordStoreFactory::GetInstance(),
-        base::BindRepeating(
-            &password_manager::BuildPasswordStore<web::BrowserState,
+        base::BindOnce(
+            &password_manager::BuildPasswordStore<ProfileIOS,
                                                   TestPasswordStore>));
     builder.AddTestingFactory(
         IOSChromeBulkLeakCheckServiceFactory::GetInstance(),
-        base::BindRepeating(base::BindLambdaForTesting([](web::BrowserState*) {
-          return std::unique_ptr<KeyedService>(
-              std::make_unique<MockBulkLeakCheckService>());
-        })));
+        base::BindOnce([](ProfileIOS*) -> std::unique_ptr<KeyedService> {
+          return std::make_unique<MockBulkLeakCheckService>();
+        }));
     builder.AddTestingFactory(
         IOSChromeAffiliationServiceFactory::GetInstance(),
-        base::BindRepeating(base::BindLambdaForTesting([](web::BrowserState*) {
-          return std::unique_ptr<KeyedService>(
-              std::make_unique<affiliations::FakeAffiliationService>());
-        })));
+        base::BindOnce([](ProfileIOS*) -> std::unique_ptr<KeyedService> {
+          return std::make_unique<affiliations::FakeAffiliationService>();
+        }));
 
     profile_ = std::move(builder).Build();
     browser_ = std::make_unique<TestBrowser>(profile_.get());
@@ -349,6 +348,7 @@ class PasswordManagerViewControllerTest
   void RunUntilIdle() { task_environment_.RunUntilIdle(); }
 
   web::WebTaskEnvironment task_environment_;
+  IOSChromeScopedTestingLocalState scoped_testing_local_state_;
   std::unique_ptr<TestProfileIOS> profile_;
   std::unique_ptr<TestBrowser> browser_;
   PasswordsMediator* mediator_;
@@ -666,8 +666,9 @@ TEST_F(PasswordManagerViewControllerTest, TestOpenInSearchMode) {
 
   // Verify that the search controller is active and that the content of table
   // view model is as expected in search mode.
-  RunUntilIdle();
-  EXPECT_TRUE(passwords_controller.navigationItem.searchController.active);
+  EXPECT_TRUE(base::test::RunUntil([&]() {
+    return passwords_controller.navigationItem.searchController.active;
+  }));
   EXPECT_EQ(1, [[passwords_controller tableViewModel] numberOfSections]);
   EXPECT_TRUE([passwords_controller.tableViewModel
       hasSectionForSectionIdentifier:SectionIdentifierSavedPasswords]);
@@ -1236,112 +1237,8 @@ TEST_F(PasswordManagerViewControllerTest, WidgetPromo) {
   [GetPasswordManagerViewController() settingsWillBeDismissed];
 }
 
-// Tests that the right metric is logged when tapping the widget promo's close
-// button.
-TEST_F(PasswordManagerViewControllerTest, WidgetPromoCloseButtonMetric) {
-  AddSavedForm1();
-
-  // Make Password Manager show the promo.
-  GetPasswordManagerViewController().shouldShowPasswordManagerWidgetPromo = YES;
-  [GetPasswordManagerViewController() reloadData];
-
-  // Bucket count should be zero.
-  base::HistogramTester histogram_tester;
-  histogram_tester.ExpectBucketCount(kPasswordManagerWidgetPromoActionHistogram,
-                                     PasswordManagerWidgetPromoAction::kClose,
-                                     0);
-
-  NSIndexPath* index_path = [NSIndexPath
-      indexPathForRow:0
-            inSection:GetSectionIndex(SectionIdentifierWidgetPromo)];
-  InlinePromoCell* cell = base::apple::ObjCCastStrict<InlinePromoCell>(
-      [GetPasswordManagerViewController() tableView:controller().tableView
-                              cellForRowAtIndexPath:index_path]);
-
-  // Simulate tap on promo's close button.
-  [cell.closeButton sendActionsForControlEvents:UIControlEventTouchUpInside];
-
-  // Bucket count should now be one.
-  histogram_tester.ExpectBucketCount(kPasswordManagerWidgetPromoActionHistogram,
-                                     PasswordManagerWidgetPromoAction::kClose,
-                                     1);
-
-  [GetPasswordManagerViewController() settingsWillBeDismissed];
-}
-
-// Tests that the right metric is logged when tapping the widget promo's more
-// info button.
-TEST_F(PasswordManagerViewControllerTest, WidgetPromoMoreInfoButtonMetric) {
-  AddSavedForm1();
-
-  // Make Password Manager show the promo.
-  GetPasswordManagerViewController().shouldShowPasswordManagerWidgetPromo = YES;
-  [GetPasswordManagerViewController() reloadData];
-
-  // Bucket count should be zero.
-  base::HistogramTester histogram_tester;
-  histogram_tester.ExpectBucketCount(
-      kPasswordManagerWidgetPromoActionHistogram,
-      PasswordManagerWidgetPromoAction::kOpenInstructions, 0);
-
-  NSIndexPath* index_path = [NSIndexPath
-      indexPathForRow:0
-            inSection:GetSectionIndex(SectionIdentifierWidgetPromo)];
-  InlinePromoCell* cell = base::apple::ObjCCastStrict<InlinePromoCell>(
-      [GetPasswordManagerViewController() tableView:controller().tableView
-                              cellForRowAtIndexPath:index_path]);
-
-  OCMExpect([password_manager_view_controller_presentation_delegate_mock_
-      showPasswordManagerWidgetPromoInstructions]);
-
-  // Simulate tap on promo's more info button.
-  [cell.moreInfoButton sendActionsForControlEvents:UIControlEventTouchUpInside];
-
-  EXPECT_OCMOCK_VERIFY(
-      password_manager_view_controller_presentation_delegate_mock_);
-
-  // Bucket count should now be one.
-  histogram_tester.ExpectBucketCount(
-      kPasswordManagerWidgetPromoActionHistogram,
-      PasswordManagerWidgetPromoAction::kOpenInstructions, 1);
-
-  [GetPasswordManagerViewController() settingsWillBeDismissed];
-}
-
-// Test verifies that the Trusted Vault widget promo cell is not displayed when
-// the flag
-// `password_manager::features::kIOSEnablePasswordManagerTrustedVaultWidget` is
-// disabled.
-TEST_F(PasswordManagerViewControllerTest,
-       TrustedVaultWidgetPromoWhenFlagIsDisabled) {
-  base::HistogramTester histogram_tester;
-  AddSavedForm1();
-
-  GetPasswordManagerViewController().shouldShowTrustedVaultWidgetPromo = YES;
-  [GetPasswordManagerViewController() reloadData];
-
-  EXPECT_FALSE([GetPasswordManagerViewController().tableViewModel
-      hasSectionForSectionIdentifier:SectionIdentifierTrustedVaultWidgetPromo]);
-
-  // Bucket count should be zero.
-  histogram_tester.ExpectBucketCount(
-      kPasswordManagerPromoWithTrustedVaultKeyRetrievalActionHistogram,
-      PasswordManagerPromoWithTrustedVaultKeyRetrievalAction::kDisplayed, 0);
-
-  [GetPasswordManagerViewController() settingsWillBeDismissed];
-}
-
-// Test verifies the content of the Trusted Vault widget promo cell when the
-// flag
-// `password_manager::features::kIOSEnablePasswordManagerTrustedVaultWidget` is
-// enabled.
-TEST_F(PasswordManagerViewControllerTest,
-       TrustedVaultWidgetPromoWhenFlagIsEnabled) {
-  // Enable a flag `kIOSEnablePasswordManagerTrustedVaultWidget` for this test.
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(
-      password_manager::features::kIOSEnablePasswordManagerTrustedVaultWidget);
-
+// Test verifies the content of the Trusted Vault widget promo cell.
+TEST_F(PasswordManagerViewControllerTest, TrustedVaultWidgetPromo) {
   base::HistogramTester histogram_tester;
   AddSavedForm1();
 
@@ -1391,11 +1288,6 @@ TEST_F(PasswordManagerViewControllerTest,
 // recorded only once.
 TEST_F(PasswordManagerViewControllerTest,
        TrustedVaultWidgetPromoIpressionRecordedOnlyOnce) {
-  // Enable a flag `kIOSEnablePasswordManagerTrustedVaultWidget` for this test.
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(
-      password_manager::features::kIOSEnablePasswordManagerTrustedVaultWidget);
-
   base::HistogramTester histogram_tester;
   AddSavedForm1();
 
@@ -1416,11 +1308,6 @@ TEST_F(PasswordManagerViewControllerTest,
 // called when tapping the trusted vault widget promo's button.
 TEST_F(PasswordManagerViewControllerTest,
        TrustedVaultWidgetPromoTappingButton) {
-  // Enable a flag `kIOSEnablePasswordManagerTrustedVaultWidget` for this test.
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(
-      password_manager::features::kIOSEnablePasswordManagerTrustedVaultWidget);
-
   base::HistogramTester histogram_tester;
   AddSavedForm1();
 
@@ -1455,10 +1342,6 @@ TEST_F(PasswordManagerViewControllerTest,
 
 TEST_F(PasswordManagerViewControllerTest,
        TestTrustedVaultPromoIsNotPresentedWhileSearching) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(
-      password_manager::features::kIOSEnablePasswordManagerTrustedVaultWidget);
-
   root_view_controller_ = [[UIViewController alloc] init];
   scoped_window_.Get().rootViewController = root_view_controller_;
 

@@ -132,14 +132,15 @@ class SurfaceAggregatorPerfTest : public VizPerfTest {
         gfx::Rect visible_rect =
             j % 2 == 0 ? gfx::Rect(0, 0, 1, 2) : gfx::Rect(0, 1, 1, 1);
         bool needs_blending = false;
-        const gfx::PointF uv_top_left;
-        const gfx::PointF uv_bottom_right;
+        const gfx::PointF tex_coord_top_left;
+        const gfx::PointF tex_coord_bottom_right(1, 2);
         SkColor4f background_color = SkColors::kGreen;
         bool nearest_neighbor = false;
         quad->SetAll(sqs, rect, visible_rect, needs_blending, ResourceId(j),
-                     uv_top_left, uv_bottom_right, background_color,
-                     nearest_neighbor,
-                     /*secure_output=*/false, gfx::ProtectedVideoType::kClear);
+                     tex_coord_top_left, tex_coord_bottom_right,
+                     background_color, nearest_neighbor,
+                     /*secure_output=*/false, gfx::ProtectedVideoType::kClear,
+                     /*is_tex_coords_normalized=*/false);
       }
       sqs = pass->CreateAndAppendSharedQuadState();
       sqs->opacity = opacity;
@@ -424,7 +425,7 @@ class SurfaceAggregatorPerfTest : public VizPerfTest {
           auto& frame_sink = entry.second;
           bool is_root = frame_sink->is_root();
           frame_sink.reset();
-          manager_.InvalidateFrameSinkId(frame_sink_id);
+          manager_.InvalidateFrameSinkId(frame_sink_id, {});
           frame_sink = std::make_unique<CompositorFrameSinkSupport>(
               nullptr, &manager_, frame_sink_id, is_root);
         }

@@ -4,7 +4,6 @@
 
 #include "ui/ozone/platform/x11/x11_window_manager.h"
 
-#include "base/containers/contains.h"
 #include "ui/ozone/platform/x11/x11_window.h"
 
 namespace ui {
@@ -67,7 +66,7 @@ void X11WindowManager::AddWindow(X11Window* window) {
   DCHECK(window);
   auto widget = window->GetWidget();
   DCHECK_NE(gfx::kNullAcceleratedWidget, widget);
-  DCHECK(!base::Contains(windows_, widget));
+  DCHECK(!windows_.contains(widget));
   windows_.emplace(widget, window);
 }
 
@@ -96,7 +95,7 @@ void X11WindowManager::MouseOnWindow(X11Window* window) {
     return;
 
   window_mouse_currently_on_ = window;
-  window->OnMouseEnter();
+  window->OnCursorUpdate();
 }
 
 }  // namespace ui

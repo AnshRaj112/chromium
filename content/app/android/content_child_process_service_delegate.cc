@@ -27,7 +27,7 @@
 #include "content/public/android/content_app_jni/ContentChildProcessServiceDelegate_jni.h"
 
 using base::android::AttachCurrentThread;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 namespace content {
 
@@ -87,7 +87,7 @@ class ChildProcessSurfaceManager : public gpu::GpuSurfaceLookup,
   // input::InputTokenForwarder overrides.
   void ForwardVizInputTransferToken(
       int surface_id,
-      base::android::ScopedJavaGlobalRef<jobject> viz_input_token) override {
+      const jni_zero::JavaRef<>& viz_input_token) override {
     JNIEnv* env = base::android::AttachCurrentThread();
     content::Java_ContentChildProcessServiceDelegate_forwardInputTransferToken(
         env, service_impl_, surface_id, viz_input_token);
@@ -105,10 +105,10 @@ ChildProcessSurfaceManager* GetChildProcessSurfaceManager() {
 
 // Chrome actually uses the renderer code path for all of its child
 // processes such as renderers, plugins, etc.
-void JNI_ContentChildProcessServiceDelegate_InternalInitChildProcess(
+static void JNI_ContentChildProcessServiceDelegate_InternalInitChildProcess(
     JNIEnv* env,
-    const JavaParamRef<jobject>& service_impl,
-    jint cpu_count,
+    const JavaRef<jobject>& service_impl,
+    int32_t cpu_count,
     jlong cpu_features) {
   InitChildProcessCommon(cpu_count, cpu_features);
 
@@ -120,23 +120,24 @@ void JNI_ContentChildProcessServiceDelegate_InternalInitChildProcess(
 
 }  // namespace
 
-void JNI_ContentChildProcessServiceDelegate_InitChildProcess(
+static void JNI_ContentChildProcessServiceDelegate_InitChildProcess(
     JNIEnv* env,
-    const JavaParamRef<jobject>& obj,
-    jint cpu_count,
+    const JavaRef<jobject>& obj,
+    int32_t cpu_count,
     jlong cpu_features) {
   JNI_ContentChildProcessServiceDelegate_InternalInitChildProcess(
       env, obj, cpu_count, cpu_features);
 }
 
-void JNI_ContentChildProcessServiceDelegate_InitMemoryPressureListener(
+static void JNI_ContentChildProcessServiceDelegate_InitMemoryPressureListener(
     JNIEnv* env) {
   base::android::MemoryPressureListenerAndroid::Initialize(env);
 }
 
-void JNI_ContentChildProcessServiceDelegate_RetrieveFileDescriptorsIdsToKeys(
+static void
+JNI_ContentChildProcessServiceDelegate_RetrieveFileDescriptorsIdsToKeys(
     JNIEnv* env,
-    const JavaParamRef<jobject>& obj) {
+    const JavaRef<jobject>& obj) {
   std::map<int, std::string> ids_to_keys;
   std::string file_switch_value =
       base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
@@ -161,3 +162,5 @@ void JNI_ContentChildProcessServiceDelegate_RetrieveFileDescriptorsIdsToKeys(
 }
 
 }  // namespace content
+
+DEFINE_JNI(ContentChildProcessServiceDelegate)

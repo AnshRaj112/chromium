@@ -29,7 +29,7 @@ DataImporterBridge::DataImporterBridge(Profile* profile) : profile_(profile) {
   importer_ =
       std::make_unique<user_data_importer::StablePortabilityDataImporter>(
           history_service, bookmark_model, reading_list_model,
-          base::MakeRefCounted<user_data_importer::ContentBookmarkParser>());
+          std::make_unique<user_data_importer::ContentBookmarkParser>());
 }
 
 DataImporterBridge::~DataImporterBridge() = default;
@@ -40,7 +40,7 @@ void DataImporterBridge::Destroy(JNIEnv* env) {
 
 void DataImporterBridge::ImportBookmarks(
     JNIEnv* env,
-    jint owned_fd,
+    int32_t owned_fd,
     const base::android::JavaRef<jobject>& j_callback) {
   base::android::ScopedJavaGlobalRef<jobject> callback(j_callback);
   base::File file(owned_fd, base::File::FLAG_OPEN | base::File::FLAG_READ);
@@ -52,7 +52,7 @@ void DataImporterBridge::ImportBookmarks(
 
 void DataImporterBridge::ImportReadingList(
     JNIEnv* env,
-    jint owned_fd,
+    int32_t owned_fd,
     const base::android::JavaRef<jobject>& j_callback) {
   base::android::ScopedJavaGlobalRef<jobject> callback(j_callback);
   base::File file(owned_fd, base::File::FLAG_OPEN | base::File::FLAG_READ);
@@ -64,17 +64,14 @@ void DataImporterBridge::ImportReadingList(
 
 void DataImporterBridge::ImportHistory(
     JNIEnv* env,
-    jint owned_fd,
+    int32_t owned_fd,
     const base::android::JavaRef<jobject>& j_callback) {
   base::android::ScopedJavaGlobalRef<jobject> callback(j_callback);
   base::File file(owned_fd, base::File::FLAG_OPEN | base::File::FLAG_READ);
-  // TODO(crbug.com/430254294): Hook up to the importer once it supports taking
-  // a base::File.
-  ImportHistoryDone(callback, 0);
-  // importer_->ImportHistory(
-  //     std::move(file),
-  //     base::BindOnce(&DataImporterBridge::ImportHistoryDone,
-  //                    weak_ptr_factory_.GetWeakPtr(), callback));
+  importer_->ImportHistory(
+      std::move(file),
+      base::BindOnce(&DataImporterBridge::ImportHistoryDone,
+                     weak_ptr_factory_.GetWeakPtr(), callback));
 }
 
 void DataImporterBridge::ImportBookmarksDone(
@@ -99,3 +96,5 @@ static jlong JNI_DataImporterBridge_Init(JNIEnv* env, Profile* profile) {
   DataImporterBridge* bridge = new DataImporterBridge(profile);
   return reinterpret_cast<intptr_t>(bridge);
 }
+
+DEFINE_JNI(DataImporterBridge)

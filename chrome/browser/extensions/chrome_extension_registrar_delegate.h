@@ -73,7 +73,7 @@ class ChromeExtensionRegistrarDelegate : public ExtensionRegistrar::Delegate {
   // Disables the extension if the privilege level has increased
   // (e.g., due to an upgrade).
   void CheckPermissionsIncrease(const Extension* extension,
-                                bool is_extension_loaded);
+                                bool is_extension_installed);
 
   // Given an extension ID and/or path, loads that extension as a reload.
   void DoLoadExtensionForReload(const ExtensionId& extension_id,
@@ -94,7 +94,7 @@ class ChromeExtensionRegistrarDelegate : public ExtensionRegistrar::Delegate {
   // Called when reloading an unpacked extension fails.
   void OnUnpackedReloadFailure(const Extension* extension,
                                const base::FilePath& file_path,
-                               const std::string& error);
+                               const std::u16string& error);
 
   void RecordInstallHistograms(const Extension* extension);
 

@@ -689,7 +689,7 @@ int OutOfProcessNetworkFetcher::DialFetchService() {
   CHECK(!remote_.is_bound()) << "Fetcher cannot be reused.";
 
   // Gets the uid of the console user.
-  std::optional<uid_t> user_id = []() -> std::optional<uid_t> {
+  std::optional<uid_t> user_id = [] -> std::optional<uid_t> {
     static constexpr char kConsoleFile[] = "/dev/console";
     struct stat stat = {};
     const int result = lstat(kConsoleFile, &stat);
@@ -773,7 +773,7 @@ void OutOfProcessNetworkFetcher::PostRequest(
   if (const int dial_result = DialFetchService(); dial_result != kErrorOk) {
     LOG(ERROR) << "Failed to dial the fetch service: " << dial_result;
     std::move(post_request_complete_callback)
-        .Run(nullptr, dial_result, {}, {}, {}, -1);
+        .Run(std::nullopt, dial_result, {}, {}, {}, -1);
     return;
   }
 
@@ -910,12 +910,13 @@ NetworkFetcherFactory::~NetworkFetcherFactory() = default;
 std::unique_ptr<update_client::NetworkFetcher> NetworkFetcherFactory::Create()
     const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  return std::make_unique<FallbackNetFetcher>(
-      std::make_unique<NetworkFetcher>(impl_->event_logger()),
-      base::CommandLine::ForCurrentProcess()->HasSwitch(kNetWorkerSwitch)
-          ? nullptr  // Already a networker, should not fallback further.
-          : std::make_unique<OutOfProcessNetworkFetcher>(
-                impl_->event_logger()));
+  return std::make_unique<LoggingNetworkFetcher>(
+      std::make_unique<FallbackNetFetcher>(
+          std::make_unique<NetworkFetcher>(impl_->event_logger()),
+          base::CommandLine::ForCurrentProcess()->HasSwitch(kNetWorkerSwitch)
+              ? nullptr  // Already a networker, should not fallback further.
+              : std::make_unique<OutOfProcessNetworkFetcher>(
+                    impl_->event_logger())));
 }
 
 }  // namespace updater

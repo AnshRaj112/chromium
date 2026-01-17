@@ -18,8 +18,8 @@
 #import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_ios.h"
 #import "ios/chrome/browser/shared/model/web_state_list/test/web_state_list_builder_from_description.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
 #import "ios/web/public/test/fakes/fake_navigation_manager.h"
@@ -47,7 +47,7 @@ InstantMessage CreateInstantMessage(InstantNotificationLevel level) {
 // Creates a MockTabGroupSyncService with a VersioningMessageController.
 std::unique_ptr<KeyedService> CreateMockTabGroupSyncService(
     tab_groups::VersioningMessageController* versioning_message_controller,
-    web::BrowserState* context) {
+    ProfileIOS* profile) {
   auto tab_group_sync_service =
       std::make_unique<::testing::NiceMock<MockTabGroupSyncService>>();
   ON_CALL(*tab_group_sync_service.get(), GetVersioningMessageController())
@@ -78,10 +78,10 @@ class InstantMessagingServiceTest : public PlatformTest {
     profile_ = std::move(test_profile_builder).Build();
     service_ = InstantMessagingServiceFactory::GetForProfile(profile_.get());
     browser_ = std::make_unique<TestBrowser>(profile_.get());
-    application_handler_ = OCMProtocolMock(@protocol(ApplicationCommands));
+    application_handler_ = OCMProtocolMock(@protocol(SceneCommands));
     [browser_->GetCommandDispatcher()
         startDispatchingToTarget:application_handler_
-                     forProtocol:@protocol(ApplicationCommands)];
+                     forProtocol:@protocol(SceneCommands)];
     BrowserList* browser_list =
         BrowserListFactory::GetForProfile(profile_.get());
     browser_list->AddBrowser(browser_.get());
@@ -107,9 +107,7 @@ class InstantMessagingServiceTest : public PlatformTest {
     InfoBarManagerImpl::CreateForWebState(active_web_state_);
   }
 
-  ~InstantMessagingServiceTest() override {
-    InfoBarManagerImpl::FromWebState(active_web_state_)->ShutDown();
-  }
+  ~InstantMessagingServiceTest() override = default;
 
  protected:
   base::test::ScopedFeatureList scoped_feature_list_;
@@ -121,7 +119,7 @@ class InstantMessagingServiceTest : public PlatformTest {
   raw_ptr<InstantMessagingService> service_;
   raw_ptr<WebStateList> web_state_list_;
   raw_ptr<web::FakeWebState> active_web_state_;
-  id<ApplicationCommands> application_handler_;
+  id<SceneCommands> application_handler_;
 };
 
 // Tests the DisplayInstantaneousMessage method for an undefined level message.

@@ -37,7 +37,7 @@ import org.mockito.junit.MockitoRule;
 import org.robolectric.Robolectric;
 import org.robolectric.shadows.ShadowActivity;
 
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.Features.EnableFeatures;
@@ -63,13 +63,13 @@ import org.chromium.content_public.browser.WebContents;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.url.GURL;
 
-import java.util.LinkedList;
-import java.util.Optional;
+import java.util.ArrayList;
 
 /** Unit test for {@link AutofillVcnEnrollBottomSheetBridge}. */
 @RunWith(BaseRobolectricTestRunner.class)
 @SmallTest
 @EnableFeatures({AutofillFeatures.AUTOFILL_ENABLE_VIRTUAL_CARD_JAVA_PAYMENTS_DATA_MANAGER})
+@DisableFeatures({AutofillFeatures.AUTOFILL_ENABLE_WALLET_BRANDING})
 public final class AutofillVcnEnrollBottomSheetBridgeTest {
     private static final long NATIVE_AUTOFILL_VCN_ENROLL_BOTTOM_SHEET_BRIDGE = 0xa1fabe7a;
 
@@ -80,7 +80,7 @@ public final class AutofillVcnEnrollBottomSheetBridgeTest {
     @Mock private WebContents mWebContents;
     @Mock private ManagedBottomSheetController mBottomSheetController;
     @Mock private LayoutStateProvider mLayoutStateProvider;
-    @Mock private ObservableSupplier<TabModelSelector> mTabModelSelectorSupplier;
+    @Mock private MonotonicObservableSupplier<TabModelSelector> mTabModelSelectorSupplier;
     @Mock private Profile mProfile;
     @Mock private AutofillImageFetcher mImageFetcher;
 
@@ -107,12 +107,11 @@ public final class AutofillVcnEnrollBottomSheetBridgeTest {
                                 ImageType.CREDIT_CARD_ART_IMAGE,
                                 ImageSize.SMALL)))
                 .thenReturn(
-                        Optional.of(
-                                Bitmap.createBitmap(
-                                        /* colors= */ new int[4],
-                                        /* width= */ 2,
-                                        /* height= */ 2,
-                                        Config.ARGB_8888)));
+                        Bitmap.createBitmap(
+                                /* colors= */ new int[4],
+                                /* width= */ 2,
+                                /* height= */ 2,
+                                Config.ARGB_8888));
         BottomSheetControllerFactory.attach(mWindow, mBottomSheetController);
         mBridge = new AutofillVcnEnrollBottomSheetBridge();
 
@@ -129,9 +128,9 @@ public final class AutofillVcnEnrollBottomSheetBridgeTest {
     }
 
     private void requestShowContent(WebContents webContents) {
-        LinkedList<LegalMessageLine> googleLegalMessages = new LinkedList<>();
+        ArrayList<LegalMessageLine> googleLegalMessages = new ArrayList<>();
         googleLegalMessages.add(new LegalMessageLine("Google legal messages."));
-        LinkedList<LegalMessageLine> issuerLegalMessages = new LinkedList<>();
+        ArrayList<LegalMessageLine> issuerLegalMessages = new ArrayList<>();
         issuerLegalMessages.add(new LegalMessageLine("Issuer legal messages."));
 
         mBridge.requestShowContent(
@@ -305,6 +304,36 @@ public final class AutofillVcnEnrollBottomSheetBridgeTest {
                 mBridge.getCoordinatorForTesting()
                         .getPropertyModelForTesting()
                         .get(AutofillVcnEnrollBottomSheetProperties.SHOW_LOADING_STATE));
+    }
+
+    @Test
+    @EnableFeatures({AutofillFeatures.AUTOFILL_ENABLE_WALLET_BRANDING})
+    public void testInitialModelValues_GPayLogoVisibility_WalletBrandingEnabled() {
+        when(mWebContents.isDestroyed()).thenReturn(false);
+        when(mWebContents.getTopLevelNativeWindow()).thenReturn(mWindow);
+
+        requestShowContent(mWebContents);
+
+        // When Wallet branding is enabled, the GPay logo should be hidden.
+        assertFalse(
+                mBridge.getCoordinatorForTesting()
+                        .getPropertyModelForTesting()
+                        .get(AutofillVcnEnrollBottomSheetProperties.IS_GPAY_LOGO_VISIBLE));
+    }
+
+    @Test
+    @DisableFeatures({AutofillFeatures.AUTOFILL_ENABLE_WALLET_BRANDING})
+    public void testInitialModelValues_GPayLogoVisibility_WalletBrandingDisabled() {
+        when(mWebContents.isDestroyed()).thenReturn(false);
+        when(mWebContents.getTopLevelNativeWindow()).thenReturn(mWindow);
+
+        requestShowContent(mWebContents);
+
+        // When Wallet branding is disabled, the GPay logo should be visible.
+        assertTrue(
+                mBridge.getCoordinatorForTesting()
+                        .getPropertyModelForTesting()
+                        .get(AutofillVcnEnrollBottomSheetProperties.IS_GPAY_LOGO_VISIBLE));
     }
 
     @Test

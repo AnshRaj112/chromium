@@ -19,15 +19,16 @@
 #include "chrome/browser/ui/bookmarks/bookmark_stats.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/toolbar/app_menu_model.h"
+#include "chrome/browser/ui/ui_features.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/browser/bookmark_node.h"
 #include "components/bookmarks/common/bookmark_metrics.h"
 #include "components/bookmarks/common/bookmark_pref_names.h"
-#include "components/prefs/pref_service.h"
 #include "components/bookmarks/managed/managed_bookmark_service.h"
 #include "components/bookmarks/test/bookmark_test_helpers.h"
+#include "components/prefs/pref_service.h"
 #include "components/signin/public/base/signin_switches.h"
 #include "content/public/test/browser_test.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -55,6 +56,17 @@ MATCHER_P(BookmarkVariantMatcher, node, "") {
     return std::get<BookmarkParentFolder>(arg) ==
            BookmarkParentFolder::FromFolderNode(node);
   }
+}
+
+// Returns number of menu items in |folder| assuming it is
+// a root folder (no other bookmark folder contains it). This is
+// because we add two new menu items to such folders, see
+// BookmarkMenuDelegate::CreateMenu for more details.
+int RootFolderSizeOffset() {
+  if (base::FeatureList::IsEnabled(features::kTabGroupMenuImprovements)) {
+    return 2;
+  }
+  return 0;
 }
 
 }  // namespace
@@ -450,7 +462,8 @@ IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest, DragAndDropAfterNode) {
   ui::DropTargetEvent target_event(drop_data, gfx::PointF(menu_loc),
                                    gfx::PointF(menu_loc),
                                    ui::DragDropTypes::DRAG_COPY);
-  auto* f1a_item = root_item->GetSubmenu()->GetMenuItemAt(0);
+  auto* f1a_item =
+      root_item->GetSubmenu()->GetMenuItemAt(0 + RootFolderSizeOffset());
   EXPECT_TRUE(bookmark_menu_delegate_->CanDrop(f1a_item, drop_data));
   EXPECT_EQ(f1->children().size(), 2u);
 
@@ -488,7 +501,8 @@ IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest, DragAndDropOnNode) {
   ui::DropTargetEvent target_event(drop_data, gfx::PointF(menu_loc),
                                    gfx::PointF(menu_loc),
                                    ui::DragDropTypes::DRAG_COPY);
-  auto* f11_item = root_item->GetSubmenu()->GetMenuItemAt(1);
+  auto* f11_item =
+      root_item->GetSubmenu()->GetMenuItemAt(1 + RootFolderSizeOffset());
   const BookmarkNode* f11_node = f1->children()[1].get();
   EXPECT_TRUE(bookmark_menu_delegate_->CanDrop(f11_item, drop_data));
   EXPECT_EQ(f11_node->children().size(), 1u);
@@ -527,7 +541,8 @@ IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest, DragAndDropBeforeNode) {
   ui::DropTargetEvent target_event(drop_data, gfx::PointF(menu_loc),
                                    gfx::PointF(menu_loc),
                                    ui::DragDropTypes::DRAG_COPY);
-  auto* f11_item = root_item->GetSubmenu()->GetMenuItemAt(1);
+  auto* f11_item =
+      root_item->GetSubmenu()->GetMenuItemAt(1 + RootFolderSizeOffset());
   EXPECT_TRUE(bookmark_menu_delegate_->CanDrop(f11_item, drop_data));
   EXPECT_EQ(f1->children().size(), 2u);
 
@@ -797,12 +812,12 @@ IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest,
 // Tests moving a bookmark whose menu doesn't have a parent.
 IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest,
                        MoveBookmarkWithoutParentMenu) {
-  BookmarkParentFolderChildren bookamrk_bar_children =
+  BookmarkParentFolderChildren bookmark_bar_children =
       bookmark_service()->GetChildren(
           BookmarkParentFolder::BookmarkBarFolder());
-  ASSERT_EQ(bookamrk_bar_children.size(), 4u);
+  ASSERT_EQ(bookmark_bar_children.size(), 4u);
 
-  const BookmarkNode* const f1_node = bookamrk_bar_children[1];
+  const BookmarkNode* const f1_node = bookmark_bar_children[1];
 
   NewDelegate();
   bookmark_menu_delegate_->SetActiveMenu(
@@ -813,7 +828,7 @@ IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest,
   ASSERT_NE(f1_menu, nullptr);
   EXPECT_EQ(f1_menu->GetParentMenuItem(), nullptr);
 
-  const BookmarkNode* const f2_node = bookamrk_bar_children[2];
+  const BookmarkNode* const f2_node = bookmark_bar_children[2];
 
   // Move f1_node, which doesn't have a parent menu, to f2_node.
   // f1_node's menu should be a child of f2_node.
@@ -853,7 +868,7 @@ IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest,
   const BookmarkNode* a_node = bookmark_bar_children[0];
   bookmark_service()->Move(a_node, other_folder, 0, /*browser=*/nullptr);
   EXPECT_EQ(root_menu->GetSubmenu()->GetMenuItems().size(), 5u);
-  EXPECT_EQ(root_menu->GetSubmenu()->children().size(), 7u);  // + separators
+  EXPECT_EQ(root_menu->GetSubmenu()->children().size(), 7u);
 
   // Adding the bookmark back to the bookmark bar should add the title above
   // permanent nodes. The moved bookmark's menu should appear after the
@@ -861,7 +876,7 @@ IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest,
   bookmark_service()->Move(a_node, BookmarkParentFolder::BookmarkBarFolder(), 0,
                            /*browser=*/nullptr);
   EXPECT_EQ(root_menu->GetSubmenu()->GetMenuItems().size(), 6u);
-  EXPECT_EQ(root_menu->GetSubmenu()->children().size(), 8u);  // + separators
+  EXPECT_EQ(root_menu->GetSubmenu()->children().size(), 8u);
 
   views::MenuItemView* bookmarks_title =
       root_menu->GetSubmenu()->GetMenuItemAt(1);
@@ -926,9 +941,9 @@ IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest,
                        MovingBookmarkRespectsStartIndex) {
   BookmarkParentFolder bookmark_bar_folder =
       BookmarkParentFolder::BookmarkBarFolder();
-  BookmarkParentFolderChildren bookamrk_bar_children =
+  BookmarkParentFolderChildren bookmark_bar_children =
       bookmark_service()->GetChildren(bookmark_bar_folder);
-  ASSERT_EQ(bookamrk_bar_children.size(), 4u);
+  ASSERT_EQ(bookmark_bar_children.size(), 4u);
 
   NewDelegate();
   bookmark_menu_delegate_->SetActiveMenu(
@@ -937,9 +952,9 @@ IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest,
   views::MenuItemView* root_menu = menu();
   EXPECT_EQ(root_menu->GetSubmenu()->GetMenuItems().size(), 3u);
 
-  const BookmarkNode* f1_node = bookamrk_bar_children[1];
-  const BookmarkNode* f2_node = bookamrk_bar_children[2];
-  const BookmarkNode* b_node = bookamrk_bar_children[3];
+  const BookmarkNode* f1_node = bookmark_bar_children[1];
+  const BookmarkNode* f2_node = bookmark_bar_children[2];
+  const BookmarkNode* b_node = bookmark_bar_children[3];
 
   bookmark_service()->Move(f1_node, BookmarkParentFolder::OtherFolder(), 0,
                            /*browser=*/nullptr);
@@ -947,7 +962,7 @@ IN_PROC_BROWSER_TEST_F(BookmarkMenuDelegateTest,
                            /*browser=*/nullptr);
   bookmark_service()->Move(b_node, BookmarkParentFolder::OtherFolder(), 0,
                            /*browser=*/nullptr);
-  EXPECT_TRUE(root_menu->GetSubmenu()->GetMenuItems().empty());
+  EXPECT_TRUE(root_menu->GetSubmenu()->GetMenuItems().size() == 0);
 
   bookmark_service()->Move(f1_node, bookmark_bar_folder, 1,
                            /*browser=*/nullptr);

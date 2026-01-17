@@ -397,7 +397,7 @@ TEST_F(NetErrorHelperCoreTest, GetErrorPageStateStringPlaceholders) {
   const std::string failed_url_string_escaped =
       base::EscapeForHTML(failed_url_string);
   const GURL failed_url(failed_url_string);
-  const std::string failed_url_host(failed_url.host());
+  const std::string failed_url_host(failed_url.GetHost());
 
   struct FieldWithPlaceholder {
     std::string_view key;
@@ -474,6 +474,12 @@ TEST_F(NetErrorHelperCoreTest, GetErrorPageStateStringPlaceholders) {
           "case IDS_ERRORPAGES_SUMMARY_CONNECTION_CLOSED, "
           "IDS_ERRORPAGES_SUGGESTION_PROXY_DISABLE_PLATFORM",
           net::ERR_CONNECTION_CLOSED,
+          error_page::Error::kNetErrorDomain,
+          {{"summary.msg", failed_url_host}},
+      },
+      {
+          "case IDS_ERRORPAGES_SUMMARY_BLOCKED_IN_INCOGNITO_BY_ADMINISTRATOR",
+          net::ERR_BLOCKED_IN_INCOGNITO_BY_ADMINISTRATOR,
           error_page::Error::kNetErrorDomain,
           {{"summary.msg", failed_url_host}},
       },

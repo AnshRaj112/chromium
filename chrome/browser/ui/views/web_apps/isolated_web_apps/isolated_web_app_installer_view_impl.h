@@ -23,8 +23,11 @@ namespace views {
 class Widget;
 }  // namespace views
 
+class SkBitmap;
+
 namespace web_app {
 
+class InstallerDialogView;
 class DisabledView;
 class GetMetadataView;
 class InstallView;
@@ -73,6 +76,9 @@ class IsolatedWebAppInstallerViewImpl : public IsolatedWebAppInstallerView {
                                  const ui::DialogModelLabel& subtitle,
                                  const ui::ImageModel& icon,
                                  std::optional<int> ok_label);
+
+  void OnIconMaskedUpdateAppIcon(InstallerDialogView* view,
+                                 SkBitmap masked_bitmap);
 
   void ShowChildView(views::View* view);
 

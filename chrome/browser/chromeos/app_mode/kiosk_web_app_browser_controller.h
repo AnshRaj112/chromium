@@ -47,9 +47,9 @@ class KioskWebAppBrowserController : public web_app::AppBrowserController {
   bool IsUrlInAppScope(const GURL& url) const override;
   bool CanUserUninstall() const override;
   bool IsInstalled() const override;
-  bool IsHostedApp() const override;
   bool HasReloadButton() const override;
   bool ShouldShowCustomTabBar() const override;
+  bool IsIsolatedWebApp() const override;
 
  protected:
   // AppBrowserController:

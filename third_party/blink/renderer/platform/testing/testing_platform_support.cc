@@ -257,7 +257,7 @@ class V8ValueConverterForTest final : public WebV8ValueConverter {
         }
 
         result.Set(std::string(*name_utf8, name_utf8.length()),
-                   base::Value::FromUniquePtrValue(std::move(child)));
+                   std::move(*child));
       }
       return std::make_unique<base::Value>(std::move(result));
     }
@@ -336,8 +336,8 @@ ScopedUnittestsEnvironmentSetup::ScopedUnittestsEnvironmentSetup(int argc,
   InitializeWtf();
   Length::Initialize();
 
-  // This must be called after WTF::Initialize(), because ThreadSpecific<>
-  // used in this function depends on WTF::IsMainThread().
+  // This must be called after blink::InitializeWtf(), because ThreadSpecific<>
+  // used in this function depends on blink::IsMainThread().
   Platform::CreateMainThreadForTesting();
 
   testing_platform_support_ = std::make_unique<TestingPlatformSupport>();

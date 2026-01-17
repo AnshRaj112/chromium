@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 
+#include "third_party/blink/renderer/bindings/core/v8/v8_union_cssstylevalue_undefined.h"
 #include "third_party/blink/renderer/core/animation/compositor_animations.h"
 #include "third_party/blink/renderer/core/css/css_unparsed_declaration_value.h"
 #include "third_party/blink/renderer/core/css/css_variable_data.h"
@@ -34,8 +35,7 @@ class PaintWorkletStylePropertyMapIterationSource final
 
   bool FetchNextItem(ScriptState*,
                      String& key,
-                     CSSStyleValueVector& value,
-                     ExceptionState&) override {
+                     CSSStyleValueVector& value) override {
     if (index_ >= values_.size()) {
       return false;
     }
@@ -162,13 +162,17 @@ PaintWorkletStylePropertyMap::PaintWorkletStylePropertyMap(CrossThreadData data)
   DCHECK(!IsMainThread());
 }
 
-CSSStyleValue* PaintWorkletStylePropertyMap::get(
+V8UnionCSSStyleValueOrUndefined* PaintWorkletStylePropertyMap::get(
     const ExecutionContext* execution_context,
     const String& property_name,
     ExceptionState& exception_state) const {
   CSSStyleValueVector all_values =
       getAll(execution_context, property_name, exception_state);
-  return all_values.empty() ? nullptr : all_values[0];
+  return all_values.empty()
+             ? MakeGarbageCollected<V8UnionCSSStyleValueOrUndefined>(
+                   ToV8UndefinedGenerator())
+             : MakeGarbageCollected<V8UnionCSSStyleValueOrUndefined>(
+                   all_values[0]);
 }
 
 CSSStyleValueVector PaintWorkletStylePropertyMap::getAll(
@@ -205,9 +209,7 @@ unsigned PaintWorkletStylePropertyMap::size() const {
 }
 
 PaintWorkletStylePropertyMap::IterationSource*
-PaintWorkletStylePropertyMap::CreateIterationSource(
-    ScriptState* script_state,
-    ExceptionState& exception_state) {
+PaintWorkletStylePropertyMap::CreateIterationSource(ScriptState* script_state) {
   // TODO(xidachen): implement this function. Note that the output should be
   // sorted.
   HeapVector<PaintWorkletStylePropertyMap::StylePropertyMapEntry> result;

@@ -10,7 +10,6 @@
 #include <string>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/callback.h"
 #include "base/memory/ref_counted.h"
@@ -37,17 +36,13 @@ int AdSizeToPixels(double size, blink::AdSize::LengthUnit unit) {
     case blink::AdSize::LengthUnit::kPixels:
       return static_cast<int>(size);
     case blink::AdSize::LengthUnit::kScreenWidth: {
-      double screen_width = display::Screen::GetScreen()
-                                ->GetPrimaryDisplay()
-                                .GetSizeInPixel()
-                                .width();
+      double screen_width =
+          display::Screen::Get()->GetPrimaryDisplay().GetSizeInPixel().width();
       return static_cast<int>(size / 100.0 * screen_width);
     }
     case blink::AdSize::LengthUnit::kScreenHeight: {
-      double screen_height = display::Screen::GetScreen()
-                                 ->GetPrimaryDisplay()
-                                 .GetSizeInPixel()
-                                 .height();
+      double screen_height =
+          display::Screen::Get()->GetPrimaryDisplay().GetSizeInPixel().height();
       return static_cast<int>(size / 100.0 * screen_height);
     }
     case blink::AdSize::LengthUnit::kInvalid:
@@ -501,11 +496,11 @@ void FencedFrameURLMapping::SubstituteMappedURL(
 }
 
 bool FencedFrameURLMapping::IsMapped(const GURL& urn_uuid) const {
-  return base::Contains(urn_uuid_to_url_map_, urn_uuid);
+  return urn_uuid_to_url_map_.contains(urn_uuid);
 }
 
 bool FencedFrameURLMapping::IsPendingMapped(const GURL& urn_uuid) const {
-  return base::Contains(pending_urn_uuid_to_url_map_, urn_uuid);
+  return pending_urn_uuid_to_url_map_.contains(urn_uuid);
 }
 
 bool FencedFrameURLMapping::IsFull() const {

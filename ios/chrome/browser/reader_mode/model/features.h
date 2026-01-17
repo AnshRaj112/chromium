@@ -6,51 +6,31 @@
 #define IOS_CHROME_BROWSER_READER_MODE_MODEL_FEATURES_H_
 
 #import "base/feature_list.h"
-#import "base/metrics/field_trial_params.h"
+#import "base/time/time.h"
 
-// Feature to enable Reader Mode UI and entry points.
-BASE_DECLARE_FEATURE(kEnableReaderMode);
+// Feature to enable Reader Mode UI in the US country code.
+BASE_DECLARE_FEATURE(kEnableReaderModeInUS);
 
-// Feature to enable page eligibility heuristic to determine whether the Tools
-// menu Reader Mode entry point should be shown for the web page.
-BASE_DECLARE_FEATURE(kEnableReaderModePageEligibilityForToolsMenu);
+// Feature to enable Reader Mode omnibox entry point in the US country code.
+BASE_DECLARE_FEATURE(kEnableReaderModeOmniboxEntryPointInUS);
 
-// Feature to enable debugging information for Reader Mode UI.
-BASE_DECLARE_FEATURE(kEnableReaderModeDebugInfo);
+// Feature to enable Reader Mode translation with access to the translation
+// settings from the infobar framework.
+BASE_DECLARE_FEATURE(kEnableReaderModeTranslationWithInfobar);
 
 // Feature to enable Readability heuristic for page triggering eligibility.
 BASE_DECLARE_FEATURE(kEnableReadabilityHeuristic);
 
-// Feature to enable the default browser promo with Reading mode eligibility
-// criteria.
-BASE_DECLARE_FEATURE(kEnableReaderModeDefaultBrowserPromo);
-
-// Name to configure the duration string for heuristic page load delay. See
-// `base::TimeDeltaFromString` for valid duration string configurations.
-extern const char kReaderModeHeuristicPageLoadDelayDurationStringName[];
-
-// Name to configure the duration string for distillation timeout. See
-// `base::TimeDeltaFromString` for valid duration string configurations.
-extern const char kReaderModeDistillationTimeoutDurationStringName[];
-
-// Returns the timeout for distilling Reader Mode.
-const base::TimeDelta ReaderModeDistillationTimeout();
-
-// Returns the delay time before triggering Reader Mode heuristic on page load.
-const base::TimeDelta ReaderModeHeuristicPageLoadDelay();
+// Feature to enable optimization guide eligibility check.
+BASE_DECLARE_FEATURE(kEnableReaderModeOptimizationGuideEligibility);
 
 // Returns whether the Reader Mode feature is available.
 bool IsReaderModeAvailable();
 
-// Returns whether the Reader Mode snackbar is enabled.
-bool IsReaderModeSnackbarEnabled();
+// Returns whether the omnibox entrypoint is enabled.
+bool IsReaderModeOmniboxEntryPointEnabled();
 
-// Returns the number of days a user must be active to display the default
-// browser promo.
-int ReaderModeDefaultBrowserActiveDaysCriteria();
-
-// Returns the number of days to span to determine the Reading Mode default
-// browser eligibility criteria.
-int ReaderModeDefaultBrowserNumDaysCriteria();
+// Returns whether optimization guide eligibility check is enabled.
+bool IsReaderModeOptimizationGuideEligibilityAvailable();
 
 #endif  // IOS_CHROME_BROWSER_READER_MODE_MODEL_FEATURES_H_

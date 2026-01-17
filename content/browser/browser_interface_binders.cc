@@ -4,6 +4,8 @@
 
 #include "content/browser/browser_interface_binders.h"
 
+#include <concepts>
+
 #include "base/check_op.h"
 #include "base/command_line.h"
 #include "base/feature_list.h"
@@ -82,6 +84,7 @@
 #include "content/public/browser/global_routing_id.h"
 #include "content/public/browser/service_worker_context.h"
 #include "content/public/browser/service_worker_version_base_info.h"
+#include "content/public/browser/shape_detection_service.h"
 #include "content/public/browser/shared_worker_instance.h"
 #include "content/public/browser/site_isolation_policy.h"
 #include "content/public/browser/storage_partition.h"
@@ -226,18 +229,11 @@
 #endif
 
 #if BUILDFLAG(ENABLE_MEDIA_REMOTING)
-#include "media/mojo/mojom/remoting.mojom-forward.h"
 #endif
 
 #if BUILDFLAG(ENABLE_VR)
 #include "content/browser/xr/webxr_internals/mojom/webxr_internals.mojom.h"
 #include "content/browser/xr/webxr_internals/webxr_internals_ui.h"
-#endif
-
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING) && BUILDFLAG(IS_CHROMEOS)
-#include "content/public/browser/service_process_host.h"
-#else
-#include "content/browser/gpu/gpu_process_host.h"
 #endif
 
 #if BUILDFLAG(IS_MAC)
@@ -265,28 +261,6 @@ namespace content {
 namespace internal {
 
 namespace {
-
-shape_detection::mojom::ShapeDetectionService* GetShapeDetectionService() {
-  static base::NoDestructor<
-      mojo::Remote<shape_detection::mojom::ShapeDetectionService>>
-      remote;
-  if (!*remote) {
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING) && BUILDFLAG(IS_CHROMEOS)
-    ServiceProcessHost::Launch<shape_detection::mojom::ShapeDetectionService>(
-        remote->BindNewPipeAndPassReceiver(),
-        ServiceProcessHost::Options()
-            .WithDisplayName("Shape Detection Service")
-            .Pass());
-#else
-    auto* gpu = GpuProcessHost::Get();
-    if (gpu)
-      gpu->RunService(remote->BindNewPipeAndPassReceiver());
-#endif
-    remote->reset_on_disconnect();
-  }
-
-  return remote->get();
-}
 
 void BindBarcodeDetectionProvider(
     mojo::PendingReceiver<shape_detection::mojom::BarcodeDetectionProvider>
@@ -357,14 +331,16 @@ void BindColorChooserFactoryForFrame(
 }
 
 void BindQuotaManagerHost(
-    RenderFrameHostImpl* host,
+    RenderFrameHost* host,
     mojo::PendingReceiver<blink::mojom::QuotaManagerHost> receiver) {
-  host->GetStoragePartition()->GetQuotaContext()->BindQuotaManagerHost(
-      host->GetStorageKey(), std::move(receiver));
+  RenderFrameHostImpl::From(host)
+      ->GetStoragePartition()
+      ->GetQuotaContext()
+      ->BindQuotaManagerHost(host->GetStorageKey(), std::move(receiver));
 }
 
 void BindSharedWorkerConnector(
-    RenderFrameHostImpl* host,
+    RenderFrameHost* host,
     mojo::PendingReceiver<blink::mojom::SharedWorkerConnector> receiver) {
   SharedWorkerConnectorImpl::Create(host->GetGlobalId(), std::move(receiver));
 }
@@ -644,15 +620,9 @@ void EmptyBinderForFrame(RenderFrameHost* host,
            << " for the frame/document scope";
 }
 
-BatteryMonitorBinder& GetBatteryMonitorBinderOverride() {
-  static base::NoDestructor<BatteryMonitorBinder> binder;
-  return *binder;
-}
-
 void BindBatteryMonitor(
-    RenderFrameHostImpl* host,
+    RenderFrameHost* host,
     mojo::PendingReceiver<device::mojom::BatteryMonitor> receiver) {
-  const auto& binder = GetBatteryMonitorBinderOverride();
   // TODO(crbug.com/1007264, crbug.com/1290231): remove fenced frame specific
   // code when permission policy implements the battery status API support.
   if (host->IsNestedWithinFencedFrame()) {
@@ -661,15 +631,12 @@ void BindBatteryMonitor(
                                 BIBI_BIND_BATTERY_MONITOR_FOR_FENCED_FRAME);
     return;
   }
-  if (binder)
-    binder.Run(std::move(receiver));
-  else
-    GetDeviceService().BindBatteryMonitor(std::move(receiver));
+  GetDeviceService().BindBatteryMonitor(std::move(receiver));
 }
 
 #if BUILDFLAG(ENABLE_COMPUTE_PRESSURE)
 void BindPressureManager(
-    RenderFrameHostImpl* host,
+    RenderFrameHost* host,
     mojo::PendingReceiver<blink::mojom::WebPressureManager> receiver) {
   if (!network::IsOriginPotentiallyTrustworthy(
           host->GetLastCommittedOrigin())) {
@@ -703,23 +670,6 @@ void BindPressureManager(
 }
 #endif  // BUILDFLAG(ENABLE_COMPUTE_PRESSURE)
 
-VibrationManagerBinder& GetVibrationManagerBinderOverride() {
-  static base::NoDestructor<VibrationManagerBinder> binder;
-  return *binder;
-}
-
-void BindVibrationManager(
-    RenderFrameHostImpl* frame,
-    mojo::PendingReceiver<device::mojom::VibrationManager> receiver) {
-  const auto& binder = GetVibrationManagerBinderOverride();
-  if (binder) {
-    binder.Run(std::move(receiver), frame->CreateVibrationManagerListener());
-  } else {
-    GetDeviceService().BindVibrationManager(
-        std::move(receiver), frame->CreateVibrationManagerListener());
-  }
-}
-
 void BindMediaPlayerObserverClientHandler(
     RenderFrameHost* frame_host,
     mojo::PendingReceiver<media::mojom::MediaPlayerObserverClient> receiver) {
@@ -730,7 +680,7 @@ void BindMediaPlayerObserverClientHandler(
 }
 
 void BindSocketManager(
-    RenderFrameHostImpl* frame,
+    RenderFrameHost* frame,
     mojo::PendingReceiver<network::mojom::P2PSocketManager> receiver) {
   static_cast<RenderProcessHostImpl*>(frame->GetProcess())
       ->BindP2PSocketManager(
@@ -746,360 +696,20 @@ void BindDevicePostureProvider(
       ->Bind(std::move(receiver));
 }
 
+template <auto Method, typename Interface>
+void BindRenderFrameHostImpl(RenderFrameHost* host,
+                             mojo::PendingReceiver<Interface> receiver)
+  requires std::invocable<decltype(Method),
+                          RenderFrameHostImpl*,
+                          mojo::PendingReceiver<Interface>>
+{
+  (RenderFrameHostImpl::From(host)->*Method)(std::move(receiver));
+}
+
 }  // namespace
 
 // Documents/frames
 void PopulateFrameBinders(RenderFrameHostImpl* host, mojo::BinderMap* map) {
-  map->Add<blink::mojom::AudioContextManager>(base::BindRepeating(
-      &RenderFrameHostImpl::GetAudioContextManager, base::Unretained(host)));
-
-  map->Add<device::mojom::BatteryMonitor>(
-      base::BindRepeating(&BindBatteryMonitor, base::Unretained(host)));
-
-  map->Add<blink::mojom::CacheStorage>(base::BindRepeating(
-      &RenderFrameHostImpl::BindCacheStorage, base::Unretained(host)));
-
-  map->Add<blink::mojom::CodeCacheHost>(base::BindRepeating(
-      &RenderFrameHostImpl::CreateCodeCacheHost, base::Unretained(host)));
-
-  map->Add<blink::mojom::BlobURLStore>(base::BindRepeating(
-      &RenderFrameHostImpl::BindBlobUrlStoreReceiver, base::Unretained(host)));
-
-#if BUILDFLAG(ENABLE_COMPUTE_PRESSURE)
-  if (base::FeatureList::IsEnabled(blink::features::kComputePressure)) {
-    map->Add<blink::mojom::WebPressureManager>(
-        base::BindRepeating(&BindPressureManager, base::Unretained(host)));
-  }
-#endif  // BUILDFLAG(ENABLE_COMPUTE_PRESSURE)
-
-  map->Add<blink::mojom::ContactsManager>(
-      base::BindRepeating(ContactsManagerImpl::Create, base::Unretained(host)));
-
-  map->Add<blink::mojom::ContentSecurityNotifier>(base::BindRepeating(
-      [](RenderFrameHostImpl* host,
-         mojo::PendingReceiver<blink::mojom::ContentSecurityNotifier>
-             receiver) {
-        mojo::MakeSelfOwnedReceiver(
-            std::make_unique<ContentSecurityNotifier>(host->GetGlobalId()),
-            std::move(receiver));
-      },
-      base::Unretained(host)));
-
-  map->Add<blink::mojom::DedicatedWorkerHostFactory>(base::BindRepeating(
-      &RenderFrameHostImpl::CreateDedicatedWorkerHostFactory,
-      base::Unretained(host)));
-
-  map->Add<blink::mojom::DevicePostureProvider>(
-      base::BindRepeating(&BindDevicePostureProvider, base::Unretained(host)));
-
-  map->Add<blink::mojom::FeatureObserver>(base::BindRepeating(
-      &RenderFrameHostImpl::GetFeatureObserver, base::Unretained(host)));
-
-  map->Add<blink::mojom::FileSystemAccessManager>(
-      base::BindRepeating(&RenderFrameHostImpl::GetFileSystemAccessManager,
-                          base::Unretained(host)));
-
-  map->Add<blink::mojom::FileSystemManager>(base::BindRepeating(
-      &RenderFrameHostImpl::GetFileSystemManager, base::Unretained(host)));
-
-  if (base::FeatureList::IsEnabled(blink::features::kFontAccess)) {
-    map->Add<blink::mojom::FontAccessManager>(base::BindRepeating(
-        &RenderFrameHostImpl::GetFontAccessManager, base::Unretained(host)));
-  }
-
-  map->Add<device::mojom::GamepadHapticsManager>(
-      &device::GamepadHapticsManager::Create);
-
-  map->Add<blink::mojom::GeolocationService>(base::BindRepeating(
-      &RenderFrameHostImpl::GetGeolocationService, base::Unretained(host)));
-
-  map->Add<blink::mojom::IdleManager>(base::BindRepeating(
-      &RenderFrameHostImpl::BindIdleManager, base::Unretained(host)));
-
-#if BUILDFLAG(ENABLE_MDNS)
-  map->Add<network::mojom::MdnsResponder>(base::BindRepeating(
-      &RenderFrameHostImpl::CreateMdnsResponder, base::Unretained(host)));
-#endif  // BUILDFLAG(ENABLE_MDNS)
-
-  // BrowserMainLoop::GetInstance() may be null on unit tests.
-  if (BrowserMainLoop::GetInstance()) {
-    map->Add<midi::mojom::MidiSessionProvider>(
-        base::BindRepeating(&MidiHost::BindReceiver,
-                            host->GetProcess()->GetDeprecatedID(),
-                            BrowserMainLoop::GetInstance()->midi_service()),
-        GetIOThreadTaskRunner({}));
-  }
-
-  map->Add<media::mojom::MediaPlayerObserverClient>(base::BindRepeating(
-      &BindMediaPlayerObserverClientHandler, base::Unretained(host)));
-
-  map->Add<blink::mojom::NotificationService>(base::BindRepeating(
-      &RenderFrameHostImpl::CreateNotificationService, base::Unretained(host)));
-
-  // WebRTC p2p connections are disallowed in fenced frames. Creation of
-  // RTCPeerConnection is already disabled in the renderer, so in theory this
-  // unbound interface should never present an issue.
-  bool should_ban_p2p =
-      base::FeatureList::IsEnabled(
-          blink::features::kFencedFramesLocalUnpartitionedDataAccess) &&
-      host->IsNestedWithinFencedFrame();
-  if (!should_ban_p2p) {
-    map->Add<network::mojom::P2PSocketManager>(
-        base::BindRepeating(&BindSocketManager, base::Unretained(host)));
-  }
-
-  map->Add<blink::mojom::PeerConnectionTrackerHost>(
-      base::BindRepeating(&RenderFrameHostImpl::BindPeerConnectionTrackerHost,
-                          base::Unretained(host)));
-
-  map->Add<blink::mojom::PermissionService>(base::BindRepeating(
-      &RenderFrameHostImpl::CreatePermissionService, base::Unretained(host)));
-
-  map->Add<blink::mojom::PresentationService>(base::BindRepeating(
-      &RenderFrameHostImpl::GetPresentationService, base::Unretained(host)));
-
-  map->Add<blink::mojom::QuotaManagerHost>(
-      base::BindRepeating(&BindQuotaManagerHost, base::Unretained(host)));
-
-  map->Add<blink::mojom::ReportingServiceProxy>(base::BindRepeating(
-      &CreateReportingServiceProxyForFrame, base::Unretained(host)));
-
-  map->Add<blink::mojom::SharedWorkerConnector>(
-      base::BindRepeating(&BindSharedWorkerConnector, base::Unretained(host)));
-
-  map->Add<media::mojom::SpeechRecognizer>(
-      base::BindRepeating(&SpeechRecognitionDispatcherHost::Create,
-                          host->GetProcess()->GetDeprecatedID(),
-                          host->GetRoutingID()),
-      GetIOThreadTaskRunner({}));
-
-  map->Add<blink::mojom::SpeechSynthesis>(base::BindRepeating(
-      &RenderFrameHostImpl::GetSpeechSynthesis, base::Unretained(host)));
-
-#if !BUILDFLAG(IS_ANDROID)
-  map->Add<blink::mojom::DeviceAPIService>(base::BindRepeating(
-      &RenderFrameHostImpl::GetDeviceInfoService, base::Unretained(host)));
-  map->Add<blink::mojom::ManagedConfigurationService>(
-      base::BindRepeating(&RenderFrameHostImpl::GetManagedConfigurationService,
-                          base::Unretained(host)));
-#endif  // !BUILDFLAG(IS_ANDROID)
-
-  if (base::FeatureList::IsEnabled(features::kWebOTP)) {
-    map->Add<blink::mojom::WebOTPService>(
-        base::BindRepeating(&RenderFrameHostImpl::BindWebOTPServiceReceiver,
-                            base::Unretained(host)));
-  }
-
-  map->Add<blink::mojom::DigitalIdentityRequest>(base::BindRepeating(
-      &RenderFrameHostImpl::BindDigitalIdentityRequestReceiver,
-      base::Unretained(host)));
-
-  map->Add<blink::mojom::FederatedAuthRequest>(base::BindRepeating(
-      &RenderFrameHostImpl::BindFederatedAuthRequestReceiver,
-      base::Unretained(host)));
-
-  map->Add<blink::mojom::WebUsbService>(base::BindRepeating(
-      &RenderFrameHostImpl::CreateWebUsbService, base::Unretained(host)));
-
-  map->Add<blink::mojom::WebSocketConnector>(base::BindRepeating(
-      &RenderFrameHostImpl::CreateWebSocketConnector, base::Unretained(host)));
-
-  map->Add<blink::mojom::LockManager>(base::BindRepeating(
-      &RenderFrameHostImpl::CreateLockManager, base::Unretained(host)));
-
-  map->Add<blink::mojom::IDBFactory>(base::BindRepeating(
-      &RenderFrameHostImpl::CreateIDBFactory, base::Unretained(host)));
-
-  map->Add<blink::mojom::BucketManagerHost>(base::BindRepeating(
-      &RenderFrameHostImpl::CreateBucketManagerHost, base::Unretained(host)));
-
-  map->Add<blink::mojom::FileChooser>(
-      base::BindRepeating(&FileChooserImpl::Create, base::Unretained(host)));
-
-  map->Add<blink::mojom::FileUtilitiesHost>(
-      base::BindRepeating(FileUtilitiesHostImpl::Create,
-                          host->GetProcess()->GetDeprecatedID()),
-      base::ThreadPool::CreateSequencedTaskRunner(
-          {base::MayBlock(), base::TaskPriority::USER_VISIBLE}));
-
-  map->Add<device::mojom::GamepadMonitor>(&device::GamepadMonitor::Create);
-
-  map->Add<blink::mojom::WebSensorProvider>(base::BindRepeating(
-      &RenderFrameHostImpl::GetSensorProvider, base::Unretained(host)));
-
-  map->Add<device::mojom::VibrationManager>(
-      base::BindRepeating(&BindVibrationManager, base::Unretained(host)));
-
-  map->Add<payments::mojom::PaymentManager>(base::BindRepeating(
-      &RenderFrameHostImpl::CreatePaymentManager, base::Unretained(host)));
-
-  map->Add<handwriting::mojom::HandwritingRecognitionService>(
-      &CreateHandwritingRecognitionService);
-
-  if (base::FeatureList::IsEnabled(
-          webnn::mojom::features::kWebMachineLearningNeuralNetwork)) {
-    map->Add<webnn::mojom::WebNNContextProvider>(base::BindRepeating(
-        &BindWebNNContextProviderForRenderFrame, base::Unretained(host)));
-  }
-
-  map->Add<blink::mojom::WebBluetoothService>(base::BindRepeating(
-      &WebBluetoothServiceImpl::BindIfAllowed, base::Unretained(host)));
-
-  map->Add<blink::mojom::PushMessaging>(base::BindRepeating(
-      &RenderFrameHostImpl::GetPushMessaging, base::Unretained(host)));
-
-  map->Add<blink::mojom::WebTransportConnector>(
-      base::BindRepeating(&RenderFrameHostImpl::CreateWebTransportConnector,
-                          base::Unretained(host)));
-
-  map->Add<payments::mojom::SecurePaymentConfirmationService>(
-      base::BindRepeating(
-          &RenderFrameHostImpl::CreateSecurePaymentConfirmationService,
-          base::Unretained(host)));
-
-  // BrowserMainLoop::GetInstance() may be null on unit tests.
-  if (BrowserMainLoop::GetInstance()) {
-    // BrowserMainLoop, which owns MediaStreamManager, is alive for the lifetime
-    // of Mojo communication (see BrowserMainLoop::ShutdownThreadsAndCleanUp(),
-    // which shuts down Mojo). Hence, passing that MediaStreamManager instance
-    // as a raw pointer here is safe.
-    MediaStreamManager* media_stream_manager =
-        BrowserMainLoop::GetInstance()->media_stream_manager();
-
-    map->Add<blink::mojom::MediaDevicesDispatcherHost>(
-        base::BindRepeating(&MediaDevicesDispatcherHost::Create,
-                            host->GetMainFrame()->GetGlobalFrameToken(),
-                            host->GetGlobalId(),
-                            base::Unretained(media_stream_manager)),
-        GetIOThreadTaskRunner({}));
-
-    map->Add<blink::mojom::MediaStreamDispatcherHost>(
-        base::BindRepeating(&MediaStreamDispatcherHost::Create,
-                            host->GetGlobalId(),
-                            base::Unretained(media_stream_manager)),
-        GetIOThreadTaskRunner({}));
-
-    map->Add<media::mojom::VideoCaptureHost>(
-        base::BindRepeating(&VideoCaptureHost::Create, host->GetGlobalId(),
-                            base::Unretained(media_stream_manager)),
-        GetIOThreadTaskRunner({}));
-  }
-
-  map->Add<blink::mojom::RendererAudioInputStreamFactory>(
-      base::BindRepeating(&RenderFrameHostImpl::CreateAudioInputStreamFactory,
-                          base::Unretained(host)));
-
-  map->Add<blink::mojom::RendererAudioOutputStreamFactory>(
-      base::BindRepeating(&RenderFrameHostImpl::CreateAudioOutputStreamFactory,
-                          base::Unretained(host)));
-
-  map->Add<media::mojom::ImageCapture>(
-      base::BindRepeating(&ImageCaptureImpl::Create, base::Unretained(host)));
-
-  map->Add<media::mojom::InterfaceFactory>(base::BindRepeating(
-      &RenderFrameHostImpl::BindMediaInterfaceFactoryReceiver,
-      base::Unretained(host)));
-
-#if BUILDFLAG(ENABLE_LIBRARY_CDMS) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
-  map->Add<media::mojom::KeySystemSupport>(
-      base::BindRepeating(&RenderFrameHostImpl::BindKeySystemSupportReceiver,
-                          base::Unretained(host)));
-#endif
-
-  map->Add<media::mojom::MediaMetricsProvider>(base::BindRepeating(
-      &RenderFrameHostImpl::BindMediaMetricsProviderReceiver,
-      base::Unretained(host)));
-
-  map->Add<media::mojom::VideoEncoderMetricsProvider>(base::BindRepeating(
-      &RenderFrameHostImpl::BindVideoEncoderMetricsProviderReceiver,
-      base::Unretained(host)));
-
-  map->Add<media::mojom::WebrtcVideoPerfRecorder>(base::BindRepeating(
-      [](RenderFrameHostImpl* host,
-         mojo::PendingReceiver<media::mojom::WebrtcVideoPerfRecorder>
-             receiver) {
-        DCHECK_CURRENTLY_ON(BrowserThread::UI);
-        media::WebrtcVideoPerfRecorder::Create(
-            BrowserContextImpl::From(host->GetBrowserContext())
-                ->GetWebrtcVideoPerfHistory(),
-            std::move(receiver));
-      },
-      base::Unretained(host)));
-
-  map->Add<media::mojom::WebrtcVideoPerfHistory>(base::BindRepeating(
-      [](RenderFrameHostImpl* host,
-         mojo::PendingReceiver<media::mojom::WebrtcVideoPerfHistory> receiver) {
-        DCHECK_CURRENTLY_ON(BrowserThread::UI);
-        BrowserContextImpl::From(host->GetBrowserContext())
-            ->GetWebrtcVideoPerfHistory()
-            ->BindReceiver(std::move(receiver));
-      },
-      base::Unretained(host)));
-
-#if BUILDFLAG(ENABLE_MEDIA_REMOTING)
-  map->Add<media::mojom::RemoterFactory>(
-      base::BindRepeating(&RenderFrameHostImpl::BindMediaRemoterFactoryReceiver,
-                          base::Unretained(host)));
-#endif
-
-  map->Add<blink::mojom::OneShotBackgroundSyncService>(base::BindRepeating(
-      [](RenderFrameHostImpl* host,
-         mojo::PendingReceiver<blink::mojom::OneShotBackgroundSyncService>
-             receiver) {
-        host->GetProcess()->CreateOneShotSyncService(
-            host->GetStorageKey().origin(), std::move(receiver));
-      },
-      base::Unretained(host)));
-
-  map->Add<blink::mojom::PeriodicBackgroundSyncService>(base::BindRepeating(
-      [](RenderFrameHostImpl* host,
-         mojo::PendingReceiver<blink::mojom::PeriodicBackgroundSyncService>
-             receiver) {
-        host->GetProcess()->CreatePeriodicSyncService(
-            host->GetStorageKey().origin(), std::move(receiver));
-      },
-      base::Unretained(host)));
-
-  map->Add<media::mojom::VideoDecodePerfHistory>(
-      base::BindRepeating(&RenderProcessHost::BindVideoDecodePerfHistory,
-                          base::Unretained(host->GetProcess())));
-
-  map->Add<network::mojom::RestrictedCookieManager>(
-      base::BindRepeating(&RenderFrameHostImpl::BindRestrictedCookieManager,
-                          base::Unretained(host)));
-
-  map->Add<network::mojom::TrustTokenQueryAnswerer>(
-      base::BindRepeating(&RenderFrameHostImpl::BindTrustTokenQueryAnswerer,
-                          base::Unretained(host)));
-
-  map->Add<shape_detection::mojom::BarcodeDetectionProvider>(
-      &BindBarcodeDetectionProvider);
-
-  map->Add<shape_detection::mojom::FaceDetectionProvider>(
-      &BindFaceDetectionProvider);
-
-  map->Add<shape_detection::mojom::TextDetection>(&BindTextDetection);
-
-  auto* command_line = base::CommandLine::ForCurrentProcess();
-  if (command_line->HasSwitch(switches::kEnableGpuBenchmarking)) {
-    map->Add<mojom::InputInjector>(
-        base::BindRepeating(&RenderFrameHostImpl::BindInputInjectorReceiver,
-                            base::Unretained(host)));
-  }
-
-#if BUILDFLAG(IS_ANDROID) || (BUILDFLAG(IS_IOS) && !BUILDFLAG(IS_IOS_TVOS))
-  map->Add<device::mojom::NFC>(base::BindRepeating(
-      &RenderFrameHostImpl::BindNFCReceiver, base::Unretained(host)));
-#else
-  map->Add<blink::mojom::HidService>(base::BindRepeating(
-      &RenderFrameHostImpl::GetHidService, base::Unretained(host)));
-
-  map->Add<blink::mojom::InstalledAppProvider>(
-      base::BindRepeating(&RenderFrameHostImpl::CreateInstalledAppProvider,
-                          base::Unretained(host)));
-#endif  // BUILDFLAG(IS_ANDROID) || (BUILDFLAG(IS_IOS) &&
-        // !BUILDFLAG(IS_IOS_TVOS))
-
   map->Add<blink::mojom::SerialService>(base::BindRepeating(
       &RenderFrameHostImpl::BindSerialService, base::Unretained(host)));
 
@@ -1120,53 +730,42 @@ void PopulateFrameBinders(RenderFrameHostImpl* host, mojo::BinderMap* map) {
       base::BindRepeating(&RenderFrameHostImpl::BindNonAssociatedLocalFrameHost,
                           base::Unretained(host)));
 
+  map->Add<blink::mojom::AIManager>(base::BindRepeating(
+      [](ContentBrowserClient* browser_client, RenderFrameHostImpl* host,
+         mojo::PendingReceiver<blink::mojom::AIManager> receiver) {
+        browser_client->BindAIManager(host->GetBrowserContext(),
+                                      &host->document_associated_data(), host,
+                                      std::move(receiver));
+      },
+      base::Unretained(GetContentClient()->browser()), base::Unretained(host)));
+
 #if BUILDFLAG(IS_FUCHSIA)
   map->Add<media::mojom::FuchsiaMediaCodecProvider>(
       base::BindRepeating(&RenderProcessHost::BindMediaCodecProvider,
                           base::Unretained(host->GetProcess())));
 #endif
 
-  if (base::FeatureList::IsEnabled(blink::features::kBuiltInAIAPI)) {
-    // We take the `document_associated_data` when the callback runs because
-    // RenderFrameHosts live across multiple documents. Even though the current
-    // implementation of `document_associated_data` persists across documents,
-    // that is an implementation detail, without a guarantee.
-    map->Add<blink::mojom::AIManager>(base::BindRepeating(
-        [](ContentBrowserClient* browser_client, RenderFrameHostImpl* host,
-           mojo::PendingReceiver<blink::mojom::AIManager> receiver) {
-          browser_client->BindAIManager(host->GetBrowserContext(),
-                                        &host->document_associated_data(), host,
-                                        std::move(receiver));
-        },
-        base::Unretained(GetContentClient()->browser()),
-        base::Unretained(host)));
-  }
+  map->Add<blink::mojom::TranslationManager>(base::BindRepeating(
+      [](RenderFrameHostImpl* host,
+         mojo::PendingReceiver<blink::mojom::TranslationManager> receiver) {
+        GetContentClient()->browser()->BindTranslationManager(
+            host->GetProcess(), host->GetBrowserContext(),
+            &host->document_associated_data(), host->GetLastCommittedOrigin(),
+            std::move(receiver));
+      },
+      base::Unretained(host)));
 
-  if (base::FeatureList::IsEnabled(blink::features::kTranslationAPI)) {
-    map->Add<blink::mojom::TranslationManager>(base::BindRepeating(
-        [](RenderFrameHostImpl* host,
-           mojo::PendingReceiver<blink::mojom::TranslationManager> receiver) {
-          GetContentClient()->browser()->BindTranslationManager(
-              host->GetProcess(), host->GetBrowserContext(),
-              &host->document_associated_data(), host->GetLastCommittedOrigin(),
-              std::move(receiver));
-        },
-        base::Unretained(host)));
-  }
-
-  if (base::FeatureList::IsEnabled(blink::features::kLanguageDetectionAPI)) {
-    map->Add<language_detection::mojom::ContentLanguageDetectionDriver>(
-        base::BindRepeating(
-            [](RenderFrameHostImpl* host,
-               mojo::PendingReceiver<
-                   language_detection::mojom::ContentLanguageDetectionDriver>
-                   receiver) {
-              GetContentClient()->browser()->BindLanguageDetectionDriver(
-                  host->GetBrowserContext(), &host->document_associated_data(),
-                  std::move(receiver));
-            },
-            base::Unretained(host)));
-  }
+  map->Add<language_detection::mojom::ContentLanguageDetectionDriver>(
+      base::BindRepeating(
+          [](RenderFrameHostImpl* host,
+             mojo::PendingReceiver<
+                 language_detection::mojom::ContentLanguageDetectionDriver>
+                 receiver) {
+            GetContentClient()->browser()->BindLanguageDetectionDriver(
+                host->GetBrowserContext(), &host->document_associated_data(),
+                std::move(receiver));
+          },
+          base::Unretained(host)));
 }
 
 void PopulateBinderMapWithContext(
@@ -1210,8 +809,334 @@ void PopulateBinderMapWithContext(
       &EmptyBinderForFrame<blink::mojom::UnhandledTapNotifier>);
 #endif
 
+  map->Add<blink::mojom::AudioContextManager>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetAudioContextManager>);
+
+  map->Add<blink::mojom::CacheStorage>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::BindCacheStorage>);
+
+  map->Add<blink::mojom::CodeCacheHost>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::CreateCodeCacheHost>);
+
+  map->Add<blink::mojom::BlobURLStore>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::BindBlobUrlStoreReceiver>);
+
+#if BUILDFLAG(ENABLE_COMPUTE_PRESSURE)
+  if (base::FeatureList::IsEnabled(blink::features::kComputePressure)) {
+    map->Add<blink::mojom::WebPressureManager>(&BindPressureManager);
+  }
+#endif  // BUILDFLAG(ENABLE_COMPUTE_PRESSURE)
+
+  map->Add<blink::mojom::ContactsManager>(&ContactsManagerImpl::Create);
+
+  map->Add<blink::mojom::ContentSecurityNotifier>(base::BindRepeating(
+      [](RenderFrameHost* host,
+         mojo::PendingReceiver<blink::mojom::ContentSecurityNotifier>
+             receiver) {
+        mojo::MakeSelfOwnedReceiver(
+            std::make_unique<ContentSecurityNotifier>(host->GetGlobalId()),
+            std::move(receiver));
+      }));
+
+  map->Add<blink::mojom::DedicatedWorkerHostFactory>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::CreateDedicatedWorkerHostFactory>);
+
+  map->Add<blink::mojom::DevicePostureProvider>(&BindDevicePostureProvider);
+
+  map->Add<blink::mojom::FeatureObserver>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetFeatureObserver>);
+
+  map->Add<blink::mojom::FileSystemAccessManager>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::GetFileSystemAccessManager>);
+
+  map->Add<blink::mojom::FileSystemManager>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetFileSystemManager>);
+
+  if (base::FeatureList::IsEnabled(blink::features::kFontAccess)) {
+    map->Add<blink::mojom::FontAccessManager>(
+        &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetFontAccessManager>);
+  }
+
+  map->Add<device::mojom::GamepadHapticsManager>(
+      &device::GamepadHapticsManager::Create);
+
+  map->Add<blink::mojom::GeolocationService>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetGeolocationService>);
+
+  map->Add<blink::mojom::IdleManager>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::BindIdleManager>);
+
+#if BUILDFLAG(ENABLE_MDNS)
+  map->Add<network::mojom::MdnsResponder>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::CreateMdnsResponder>);
+#endif  // BUILDFLAG(ENABLE_MDNS)
+
+  // BrowserMainLoop::GetInstance() may be null on unit tests.
+  if (BrowserMainLoop::GetInstance()) {
+    map->Add<midi::mojom::MidiSessionProvider>(
+        base::BindRepeating(&MidiHost::BindReceiver,
+                            host->GetProcess()->GetID(),
+                            BrowserMainLoop::GetInstance()->midi_service()),
+        GetIOThreadTaskRunner({}));
+  }
+
+  map->Add<media::mojom::MediaPlayerObserverClient>(
+      &BindMediaPlayerObserverClientHandler);
+
+  map->Add<blink::mojom::NotificationService>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::CreateNotificationService>);
+
+  // WebRTC p2p connections are disallowed in fenced frames. Creation of
+  // RTCPeerConnection is already disabled in the renderer, so in theory this
+  // unbound interface should never present an issue.
+  bool should_ban_p2p =
+      base::FeatureList::IsEnabled(
+          blink::features::kFencedFramesLocalUnpartitionedDataAccess) &&
+      host->IsNestedWithinFencedFrame();
+  if (!should_ban_p2p) {
+    map->Add<network::mojom::P2PSocketManager>(&BindSocketManager);
+  }
+
+  map->Add<blink::mojom::PeerConnectionTrackerHost>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::BindPeerConnectionTrackerHost>);
+
+  map->Add<blink::mojom::PermissionService>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::CreatePermissionService>);
+
+  map->Add<blink::mojom::PresentationService>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetPresentationService>);
+
+  map->Add<blink::mojom::QuotaManagerHost>(&BindQuotaManagerHost);
+
+  map->Add<blink::mojom::ReportingServiceProxy>(
+      &CreateReportingServiceProxyForFrame);
+
+  map->Add<blink::mojom::SharedWorkerConnector>(&BindSharedWorkerConnector);
+
+  map->Add<media::mojom::SpeechRecognizer>(
+      base::BindRepeating(&SpeechRecognitionDispatcherHost::Create,
+                          host->GetProcess()->GetDeprecatedID(),
+                          host->GetRoutingID()),
+      GetIOThreadTaskRunner({}));
+
+  map->Add<blink::mojom::SpeechSynthesis>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetSpeechSynthesis>);
+
+#if !BUILDFLAG(IS_ANDROID)
+  map->Add<blink::mojom::DeviceAPIService>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetDeviceInfoService>);
+  map->Add<blink::mojom::ManagedConfigurationService>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::GetManagedConfigurationService>);
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+  map->Add<blink::mojom::WebUsbService>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::CreateWebUsbService>);
+
+  map->Add<blink::mojom::WebSocketConnector>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::CreateWebSocketConnector>);
+
+  map->Add<blink::mojom::LockManager>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::CreateLockManager>);
+
+  map->Add<blink::mojom::IDBFactory>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::CreateIDBFactory>);
+
+  map->Add<blink::mojom::BucketManagerHost>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::CreateBucketManagerHost>);
+
+  map->Add<blink::mojom::FileChooser>(&FileChooserImpl::Create);
+
+  map->Add<blink::mojom::FileUtilitiesHost>(
+      base::BindRepeating(&FileUtilitiesHostImpl::Create,
+                          host->GetProcess()->GetDeprecatedID()),
+      base::ThreadPool::CreateSequencedTaskRunner(
+          {base::MayBlock(), base::TaskPriority::USER_VISIBLE}));
+
+  map->Add<device::mojom::GamepadMonitor>(&device::GamepadMonitor::Create);
+
+  map->Add<blink::mojom::WebSensorProvider>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetSensorProvider>);
+
+  map->Add<payments::mojom::PaymentManager>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::CreatePaymentManager>);
+
+  map->Add<handwriting::mojom::HandwritingRecognitionService>(
+      &CreateHandwritingRecognitionService);
+
+  if (base::FeatureList::IsEnabled(
+          webnn::mojom::features::kWebMachineLearningNeuralNetwork)) {
+    map->Add<webnn::mojom::WebNNContextProvider>(
+        &BindWebNNContextProviderForRenderFrame);
+  }
+
+  map->Add<blink::mojom::WebBluetoothService>(
+      &WebBluetoothServiceImpl::BindIfAllowed);
+
+  map->Add<blink::mojom::PushMessaging>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetPushMessaging>);
+
+  map->Add<blink::mojom::WebTransportConnector>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::CreateWebTransportConnector>);
+
+  // BrowserMainLoop::GetInstance() may be null on unit tests.
+  if (BrowserMainLoop::GetInstance()) {
+    // BrowserMainLoop, which owns MediaStreamManager, is alive for the lifetime
+    // of Mojo communication (see BrowserMainLoop::ShutdownThreadsAndCleanUp(),
+    // which shuts down Mojo). Hence, passing that MediaStreamManager instance
+    // as a raw pointer here is safe.
+    MediaStreamManager* media_stream_manager =
+        BrowserMainLoop::GetInstance()->media_stream_manager();
+
+    map->Add<blink::mojom::MediaDevicesDispatcherHost>(
+        base::BindRepeating(&MediaDevicesDispatcherHost::Create,
+                            host->GetMainFrame()->GetGlobalFrameToken(),
+                            host->GetGlobalId(),
+                            base::Unretained(media_stream_manager)),
+        GetIOThreadTaskRunner({}));
+
+    map->Add<blink::mojom::MediaStreamDispatcherHost>(
+        base::BindRepeating(&MediaStreamDispatcherHost::Create,
+                            host->GetGlobalId(),
+                            base::Unretained(media_stream_manager)),
+        GetIOThreadTaskRunner({}));
+
+    map->Add<media::mojom::VideoCaptureHost>(
+        base::BindRepeating(&VideoCaptureHost::Create, host->GetGlobalId(),
+                            base::Unretained(media_stream_manager)),
+        GetIOThreadTaskRunner({}));
+  }
+
+  map->Add<blink::mojom::RendererAudioInputStreamFactory>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::CreateAudioInputStreamFactory>);
+
+  map->Add<blink::mojom::RendererAudioOutputStreamFactory>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::CreateAudioOutputStreamFactory>);
+
+  map->Add<media::mojom::ImageCapture>(&ImageCaptureImpl::Create);
+
+  map->Add<media::mojom::InterfaceFactory>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::BindMediaInterfaceFactoryReceiver>);
+
+#if BUILDFLAG(ENABLE_LIBRARY_CDMS) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
+  map->Add<media::mojom::KeySystemSupport>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::BindKeySystemSupportReceiver>);
+#endif
+
+  map->Add<media::mojom::MediaMetricsProvider>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::BindMediaMetricsProviderReceiver>);
+
+  map->Add<media::mojom::VideoEncoderMetricsProvider>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::BindVideoEncoderMetricsProviderReceiver>);
+
+  map->Add<media::mojom::WebrtcVideoPerfRecorder>(base::BindRepeating(
+      [](RenderFrameHost* host,
+         mojo::PendingReceiver<media::mojom::WebrtcVideoPerfRecorder>
+             receiver) {
+        DCHECK_CURRENTLY_ON(BrowserThread::UI);
+        media::WebrtcVideoPerfRecorder::Create(
+            BrowserContextImpl::From(host->GetBrowserContext())
+                ->GetWebrtcVideoPerfHistory(),
+            std::move(receiver));
+      }));
+
+  map->Add<media::mojom::WebrtcVideoPerfHistory>(base::BindRepeating(
+      [](RenderFrameHost* host,
+         mojo::PendingReceiver<media::mojom::WebrtcVideoPerfHistory> receiver) {
+        DCHECK_CURRENTLY_ON(BrowserThread::UI);
+        BrowserContextImpl::From(host->GetBrowserContext())
+            ->GetWebrtcVideoPerfHistory()
+            ->BindReceiver(std::move(receiver));
+      }));
+
+#if BUILDFLAG(ENABLE_MEDIA_REMOTING)
+  map->Add<media::mojom::RemoterFactory>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::BindMediaRemoterFactoryReceiver>);
+#endif
+
+  map->Add<blink::mojom::OneShotBackgroundSyncService>(base::BindRepeating(
+      [](RenderFrameHost* host,
+         mojo::PendingReceiver<blink::mojom::OneShotBackgroundSyncService>
+             receiver) {
+        host->GetProcess()->CreateOneShotSyncService(
+            host->GetStorageKey().origin(), std::move(receiver));
+      }));
+
+  map->Add<blink::mojom::PeriodicBackgroundSyncService>(base::BindRepeating(
+      [](RenderFrameHost* host,
+         mojo::PendingReceiver<blink::mojom::PeriodicBackgroundSyncService>
+             receiver) {
+        host->GetProcess()->CreatePeriodicSyncService(
+            host->GetStorageKey().origin(), std::move(receiver));
+      }));
+
+  map->Add<media::mojom::VideoDecodePerfHistory>(base::BindRepeating(
+      [](RenderFrameHost* host,
+         mojo::PendingReceiver<media::mojom::VideoDecodePerfHistory> receiver) {
+        host->GetProcess()->BindVideoDecodePerfHistory(std::move(receiver));
+      }));
+
+  map->Add<network::mojom::RestrictedCookieManager>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::BindRestrictedCookieManager>);
+
+  map->Add<network::mojom::TrustTokenQueryAnswerer>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::BindTrustTokenQueryAnswerer>);
+
+  map->Add<shape_detection::mojom::BarcodeDetectionProvider>(
+      base::BindRepeating(
+          [](RenderFrameHost* host,
+             mojo::PendingReceiver<
+                 shape_detection::mojom::BarcodeDetectionProvider> receiver) {
+            BindBarcodeDetectionProvider(std::move(receiver));
+          }));
+
+  map->Add<shape_detection::mojom::FaceDetectionProvider>(base::BindRepeating(
+      [](RenderFrameHost* host,
+         mojo::PendingReceiver<shape_detection::mojom::FaceDetectionProvider>
+             receiver) { BindFaceDetectionProvider(std::move(receiver)); }));
+
+  map->Add<shape_detection::mojom::TextDetection>(base::BindRepeating(
+      [](RenderFrameHost* host,
+         mojo::PendingReceiver<shape_detection::mojom::TextDetection>
+             receiver) { BindTextDetection(std::move(receiver)); }));
+
+  auto* command_line = base::CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch(switches::kEnableGpuBenchmarking)) {
+    map->Add<mojom::InputInjector>(
+        &BindRenderFrameHostImpl<
+            &RenderFrameHostImpl::BindInputInjectorReceiver>);
+  }
+
+#if BUILDFLAG(IS_ANDROID) || (BUILDFLAG(IS_IOS) && !BUILDFLAG(IS_IOS_TVOS))
+  map->Add<device::mojom::NFC>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::BindNFCReceiver>);
+#else
+  map->Add<blink::mojom::HidService>(
+      &BindRenderFrameHostImpl<&RenderFrameHostImpl::GetHidService>);
+
+  map->Add<blink::mojom::InstalledAppProvider>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::CreateInstalledAppProvider>);
+#endif  // BUILDFLAG(IS_ANDROID) || (BUILDFLAG(IS_IOS) &&
+        // !BUILDFLAG(IS_IOS_TVOS))
+
   map->Add<blink::mojom::BackgroundFetchService>(
       &BackgroundFetchServiceImpl::CreateForFrame);
+  map->Add<device::mojom::BatteryMonitor>(&BindBatteryMonitor);
   map->Add<blink::mojom::ColorChooserFactory>(&BindColorChooserFactoryForFrame);
   map->Add<blink::mojom::EyeDropperChooser>(&EyeDropperChooserImpl::Create);
   map->Add<blink::mojom::CookieStore>(
@@ -1265,15 +1190,35 @@ void PopulateBinderMapWithContext(
 #endif  // BUILDFLAG(IS_ANDROID)
 
   map->Add<blink::mojom::Authenticator>(
-      [](RenderFrameHost* host,
-         mojo::PendingReceiver<blink::mojom::Authenticator> receiver) {
-        static_cast<RenderFrameHostImpl*>(host)->GetWebAuthenticationService(
-            std::move(receiver));
-      });
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::GetWebAuthenticationService>);
+  if (base::FeatureList::IsEnabled(features::kWebOTP)) {
+    map->Add<blink::mojom::WebOTPService>(
+        &BindRenderFrameHostImpl<
+            &RenderFrameHostImpl::BindWebOTPServiceReceiver>);
+  }
+  map->Add<blink::mojom::DigitalIdentityRequest>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::BindDigitalIdentityRequestReceiver>);
+  map->Add<blink::mojom::FederatedAuthRequest>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::BindFederatedAuthRequestReceiver>);
+  map->Add<payments::mojom::SecurePaymentConfirmationService>(
+      &BindRenderFrameHostImpl<
+          &RenderFrameHostImpl::CreateSecurePaymentConfirmationService>);
+
   map->Add<blink::mojom::ClipboardHost>(&ClipboardHostImpl::Create);
   map->Add<blink::mojom::SpeculationHost>(&SpeculationHostImpl::Bind);
   map->Add<blink::mojom::AnchorElementInteractionHost>(
       &AnchorElementInteractionHostImpl::Create);
+
+  map->Add<device::mojom::VibrationManager>(
+      [](RenderFrameHost* host,
+         mojo::PendingReceiver<device::mojom::VibrationManager> receiver) {
+        GetDeviceService().BindVibrationManager(
+            std::move(receiver), static_cast<RenderFrameHostImpl*>(host)
+                                     ->CreateVibrationManagerListener());
+      });
 
 #if BUILDFLAG(IS_CHROMEOS)
   if (base::FeatureList::IsEnabled(features::kWebLockScreenApi)) {
@@ -1292,10 +1237,8 @@ void PopulateBinderMapWithContext(
 
   map->Add<optimization_guide::mojom::ModelBroker>(
       &EmptyBinderForFrame<optimization_guide::mojom::ModelBroker>);
-  if (base::FeatureList::IsEnabled(blink::features::kBuiltInAIAPI)) {
-    map->Add<blink::mojom::AIManager>(
-        &EmptyBinderForFrame<blink::mojom::AIManager>);
-  }
+  map->Add<blink::mojom::AIManager>(
+      &EmptyBinderForFrame<blink::mojom::AIManager>);
 
   // This should be last to allow overrides of any interface.
   GetContentClient()->browser()->RegisterBrowserInterfaceBindersForFrame(host,
@@ -1424,38 +1367,31 @@ void PopulateDedicatedWorkerBinders(DedicatedWorkerHost* host,
       host->GetAncestorRenderFrameHostId(),
       RenderProcessHost::NotificationServiceCreatorType::kDedicatedWorker,
       host));
-
-  if (base::FeatureList::IsEnabled(blink::features::kBuiltInAIAPI)) {
-    map->Add<blink::mojom::AIManager>(
-        base::BindRepeating(&ContentBrowserClient::BindAIManager,
-                            base::Unretained(GetContentClient()->browser()),
-                            host->GetProcessHost()->GetBrowserContext(),
-                            base::Unretained(host), /*rfh=*/nullptr));
-  }
-  if (base::FeatureList::IsEnabled(blink::features::kTranslationAPI)) {
-    map->Add<blink::mojom::TranslationManager>(base::BindRepeating(
-        [](DedicatedWorkerHost* host,
-           mojo::PendingReceiver<blink::mojom::TranslationManager> receiver) {
-          auto* process_host = host->GetProcessHost();
-          GetContentClient()->browser()->BindTranslationManager(
-              process_host, process_host->GetBrowserContext(), host,
-              host->GetStorageKey().origin(), std::move(receiver));
-        },
-        base::Unretained(host)));
-  }
-  if (base::FeatureList::IsEnabled(blink::features::kLanguageDetectionAPI)) {
-    map->Add<language_detection::mojom::ContentLanguageDetectionDriver>(
-        base::BindRepeating(
-            [](DedicatedWorkerHost* host,
-               mojo::PendingReceiver<
-                   language_detection::mojom::ContentLanguageDetectionDriver>
-                   receiver) {
-              GetContentClient()->browser()->BindLanguageDetectionDriver(
-                  host->GetProcessHost()->GetBrowserContext(), host,
-                  std::move(receiver));
-            },
-            base::Unretained(host)));
-  }
+  map->Add<blink::mojom::AIManager>(
+      base::BindRepeating(&ContentBrowserClient::BindAIManager,
+                          base::Unretained(GetContentClient()->browser()),
+                          host->GetProcessHost()->GetBrowserContext(),
+                          base::Unretained(host), /*rfh=*/nullptr));
+  map->Add<blink::mojom::TranslationManager>(base::BindRepeating(
+      [](DedicatedWorkerHost* host,
+         mojo::PendingReceiver<blink::mojom::TranslationManager> receiver) {
+        auto* process_host = host->GetProcessHost();
+        GetContentClient()->browser()->BindTranslationManager(
+            process_host, process_host->GetBrowserContext(), host,
+            host->GetStorageKey().origin(), std::move(receiver));
+      },
+      base::Unretained(host)));
+  map->Add<language_detection::mojom::ContentLanguageDetectionDriver>(
+      base::BindRepeating(
+          [](DedicatedWorkerHost* host,
+             mojo::PendingReceiver<
+                 language_detection::mojom::ContentLanguageDetectionDriver>
+                 receiver) {
+            GetContentClient()->browser()->BindLanguageDetectionDriver(
+                host->GetProcessHost()->GetBrowserContext(), host,
+                std::move(receiver));
+          },
+          base::Unretained(host)));
 }
 
 void PopulateBinderMapWithContext(
@@ -1521,6 +1457,8 @@ void PopulateSharedWorkerBinders(SharedWorkerHost* host, mojo::BinderMap* map) {
 
   map->Add<blink::mojom::WebTransportConnector>(base::BindRepeating(
       &SharedWorkerHost::CreateWebTransportConnector, base::Unretained(host)));
+  map->Add<blink::mojom::WebSocketConnector>(base::BindRepeating(
+      &SharedWorkerHost::CreateWebSocketConnector, base::Unretained(host)));
   map->Add<blink::mojom::CacheStorage>(base::BindRepeating(
       &SharedWorkerHost::BindCacheStorage, base::Unretained(host)));
   map->Add<blink::mojom::CodeCacheHost>(base::BindRepeating(
@@ -1534,6 +1472,12 @@ void PopulateSharedWorkerBinders(SharedWorkerHost* host, mojo::BinderMap* map) {
       &CreateReportingServiceProxyForSharedWorker, base::Unretained(host)));
   map->Add<blink::mojom::BucketManagerHost>(base::BindRepeating(
       &SharedWorkerHost::CreateBucketManagerHost, base::Unretained(host)));
+  map->Add<blink::mojom::AIManager>(
+      base::BindRepeating(&ContentBrowserClient::BindAIManager,
+                          base::Unretained(GetContentClient()->browser()),
+                          host->GetProcessHost()->GetBrowserContext(),
+                          base::Unretained(host), /*rfh=*/nullptr));
+
 #if BUILDFLAG(ENABLE_COMPUTE_PRESSURE)
   if (base::FeatureList::IsEnabled(blink::features::kComputePressure)) {
     map->Add<blink::mojom::WebPressureManager>(base::BindRepeating(
@@ -1546,37 +1490,26 @@ void PopulateSharedWorkerBinders(SharedWorkerHost* host, mojo::BinderMap* map) {
         &BindWebNNContextProviderForWorker<SharedWorkerHost>,
         base::Unretained(host)));
   }
-  if (base::FeatureList::IsEnabled(blink::features::kBuiltInAIAPI)) {
-    map->Add<blink::mojom::AIManager>(
-        base::BindRepeating(&ContentBrowserClient::BindAIManager,
-                            base::Unretained(GetContentClient()->browser()),
-                            host->GetProcessHost()->GetBrowserContext(),
-                            base::Unretained(host), /*rfh=*/nullptr));
-  }
-  if (base::FeatureList::IsEnabled(blink::features::kTranslationAPI)) {
-    map->Add<blink::mojom::TranslationManager>(base::BindRepeating(
-        [](SharedWorkerHost* host,
-           mojo::PendingReceiver<blink::mojom::TranslationManager> receiver) {
-          auto* process_host = host->GetProcessHost();
-          GetContentClient()->browser()->BindTranslationManager(
-              process_host, process_host->GetBrowserContext(), host,
-              host->GetStorageKey().origin(), std::move(receiver));
-        },
-        base::Unretained(host)));
-  }
-  if (base::FeatureList::IsEnabled(blink::features::kLanguageDetectionAPI)) {
-    map->Add<language_detection::mojom::ContentLanguageDetectionDriver>(
-        base::BindRepeating(
-            [](SharedWorkerHost* host,
-               mojo::PendingReceiver<
-                   language_detection::mojom::ContentLanguageDetectionDriver>
-                   receiver) {
-              GetContentClient()->browser()->BindLanguageDetectionDriver(
-                  host->GetProcessHost()->GetBrowserContext(), host,
-                  std::move(receiver));
-            },
-            base::Unretained(host)));
-  }
+  map->Add<blink::mojom::TranslationManager>(base::BindRepeating(
+      [](SharedWorkerHost* host,
+         mojo::PendingReceiver<blink::mojom::TranslationManager> receiver) {
+        auto* process_host = host->GetProcessHost();
+        GetContentClient()->browser()->BindTranslationManager(
+            process_host, process_host->GetBrowserContext(), host,
+            host->GetStorageKey().origin(), std::move(receiver));
+      },
+      base::Unretained(host)));
+  map->Add<language_detection::mojom::ContentLanguageDetectionDriver>(
+      base::BindRepeating(
+          [](SharedWorkerHost* host,
+             mojo::PendingReceiver<
+                 language_detection::mojom::ContentLanguageDetectionDriver>
+                 receiver) {
+            GetContentClient()->browser()->BindLanguageDetectionDriver(
+                host->GetProcessHost()->GetBrowserContext(), host,
+                std::move(receiver));
+          },
+          base::Unretained(host)));
 
 #if !BUILDFLAG(IS_ANDROID)
   map->Add<blink::mojom::DirectSocketsService>(base::BindRepeating(
@@ -1603,8 +1536,6 @@ void PopulateSharedWorkerBinders(SharedWorkerHost* host, mojo::BinderMap* map) {
   map->Add<blink::mojom::IDBFactory>(
       BindWorkerReceiverForStorageKeyAndBucketContext(
           &RenderProcessHostImpl::BindIndexedDB, host));
-  map->Add<blink::mojom::WebSocketConnector>(BindWorkerReceiverForStorageKey(
-      &RenderProcessHostImpl::CreateWebSocketConnector, host));
   map->Add<blink::mojom::LockManager>(BindWorkerReceiverForStorageKey(
       &RenderProcessHostImpl::CreateLockManager, host));
   map->Add<blink::mojom::QuotaManagerHost>(BindWorkerReceiverForStorageKey(
@@ -1648,6 +1579,9 @@ void PopulateSharedStorageWorkletBinders(SharedStorageWorkletHost* host,
   // |SharedStorageWorkletHost::broker_|.
   map->Add<blink::mojom::LockManager>(base::BindRepeating(
       &SharedStorageWorkletHost::GetLockManager, base::Unretained(host)));
+  map->Add<blink::mojom::ReportingServiceProxy>(
+      base::BindRepeating(&CreateReportingServiceProxyForSharedStorageWorklet,
+                          base::Unretained(host)));
 }
 
 void PopulateBinderMapWithContext(
@@ -1689,6 +1623,8 @@ void PopulateServiceWorkerBinders(ServiceWorkerHost* host,
   map->Add<ukm::mojom::UkmRecorderFactory>(&BindUkmRecorderFactory);
 
   // worker host binders
+  map->Add<blink::mojom::WebSocketConnector>(base::BindRepeating(
+      &ServiceWorkerHost::CreateWebSocketConnector, base::Unretained(host)));
   map->Add<blink::mojom::WebTransportConnector>(base::BindRepeating(
       &ServiceWorkerHost::CreateWebTransportConnector, base::Unretained(host)));
   map->Add<blink::mojom::CacheStorage>(base::BindRepeating(
@@ -1717,45 +1653,39 @@ void PopulateServiceWorkerBinders(ServiceWorkerHost* host,
       &ServiceWorkerHost::CreateBucketManagerHost, base::Unretained(host)));
   map->Add<blink::mojom::WebUsbService>(base::BindRepeating(
       &ServiceWorkerHost::BindUsbService, base::Unretained(host)));
+  map->Add<blink::mojom::AIManager>(base::BindRepeating(
+      &ServiceWorkerHost::BindAIManager, base::Unretained(host)));
+
   if (base::FeatureList::IsEnabled(
           webnn::mojom::features::kWebMachineLearningNeuralNetwork)) {
     map->Add<webnn::mojom::WebNNContextProvider>(base::BindRepeating(
         &BindWebNNContextProviderForWorker<ServiceWorkerHost>,
         base::Unretained(host)));
   }
-  if (base::FeatureList::IsEnabled(blink::features::kBuiltInAIAPI)) {
-    map->Add<blink::mojom::AIManager>(base::BindRepeating(
-        &ServiceWorkerHost::BindAIManager, base::Unretained(host)));
-  }
-  if (base::FeatureList::IsEnabled(blink::features::kTranslationAPI)) {
-    map->Add<blink::mojom::TranslationManager>(base::BindRepeating(
-        [](ServiceWorkerHost* host,
-           mojo::PendingReceiver<blink::mojom::TranslationManager> receiver) {
-          if (auto* process_host = static_cast<RenderProcessHostImpl*>(
-                  RenderProcessHost::FromID(host->worker_process_id()))) {
-            GetContentClient()->browser()->BindTranslationManager(
-                process_host, process_host->GetBrowserContext(), host,
-                host->GetBucketStorageKey().origin(), std::move(receiver));
-          }
-        },
-        base::Unretained(host)));
-  }
-  if (base::FeatureList::IsEnabled(blink::features::kLanguageDetectionAPI)) {
-    map->Add<language_detection::mojom::ContentLanguageDetectionDriver>(
-        base::BindRepeating(
-            [](ServiceWorkerHost* host,
-               mojo::PendingReceiver<
-                   language_detection::mojom::ContentLanguageDetectionDriver>
-                   receiver) {
-              if (auto* process_host = static_cast<RenderProcessHostImpl*>(
-                      RenderProcessHost::FromID(host->worker_process_id()))) {
-                GetContentClient()->browser()->BindLanguageDetectionDriver(
-                    process_host->GetBrowserContext(), host,
-                    std::move(receiver));
-              }
-            },
-            base::Unretained(host)));
-  }
+  map->Add<blink::mojom::TranslationManager>(base::BindRepeating(
+      [](ServiceWorkerHost* host,
+         mojo::PendingReceiver<blink::mojom::TranslationManager> receiver) {
+        if (auto* process_host = static_cast<RenderProcessHostImpl*>(
+                RenderProcessHost::FromID(host->worker_process_id()))) {
+          GetContentClient()->browser()->BindTranslationManager(
+              process_host, process_host->GetBrowserContext(), host,
+              host->GetBucketStorageKey().origin(), std::move(receiver));
+        }
+      },
+      base::Unretained(host)));
+  map->Add<language_detection::mojom::ContentLanguageDetectionDriver>(
+      base::BindRepeating(
+          [](ServiceWorkerHost* host,
+             mojo::PendingReceiver<
+                 language_detection::mojom::ContentLanguageDetectionDriver>
+                 receiver) {
+            if (auto* process_host = static_cast<RenderProcessHostImpl*>(
+                    RenderProcessHost::FromID(host->worker_process_id()))) {
+              GetContentClient()->browser()->BindLanguageDetectionDriver(
+                  process_host->GetBrowserContext(), host, std::move(receiver));
+            }
+          },
+          base::Unretained(host)));
 
   // RenderProcessHost binders
   map->Add<media::mojom::VideoDecodePerfHistory>(BindServiceWorkerReceiver(
@@ -1805,9 +1735,6 @@ void PopulateBinderMapWithContext(
   map->Add<blink::mojom::FileSystemAccessManager>(
       BindServiceWorkerReceiverForStorageKey(
           &RenderProcessHostImpl::BindFileSystemAccessManager, host));
-  map->Add<blink::mojom::WebSocketConnector>(
-      BindServiceWorkerReceiverForStorageKey(
-          &RenderProcessHostImpl::CreateWebSocketConnector, host));
   map->Add<blink::mojom::LockManager>(BindServiceWorkerReceiverForStorageKey(
       &RenderProcessHostImpl::CreateLockManager, host));
   map->Add<blink::mojom::QuotaManagerHost>(
@@ -1839,13 +1766,4 @@ void PopulateBinderMap(ServiceWorkerHost* host, mojo::BinderMap* map) {
 }
 
 }  // namespace internal
-
-void OverrideBatteryMonitorBinderForTesting(BatteryMonitorBinder binder) {
-  internal::GetBatteryMonitorBinderOverride() = std::move(binder);
-}
-
-void OverrideVibrationManagerBinderForTesting(VibrationManagerBinder binder) {
-  internal::GetVibrationManagerBinderOverride() = std::move(binder);
-}
-
 }  // namespace content

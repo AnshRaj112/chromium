@@ -4,6 +4,7 @@
 
 #include "chrome/services/speech/cros_speech_recognition_recognizer_impl.h"
 
+#include <algorithm>
 #include <string>
 
 #include "base/containers/flat_map.h"
@@ -87,7 +88,8 @@ CrosSpeechRecognitionRecognizerImpl::AddLiveCaptionLanguagesToConfig(
   for (const auto& config_path : config_paths) {
     if (config_path.first == primary_language_name) {
       continue;
-    } else if (!base::Contains(live_caption_languages, config_path.first)) {
+    } else if (!std::ranges::contains(live_caption_languages,
+                                      config_path.first)) {
       VLOG(1) << "Skipping multilang on captions of " << config_path.first
               << " as it is not listed as a live caption language.";
       continue;
@@ -130,8 +132,7 @@ void CrosSpeechRecognitionRecognizerImpl::
         GetSodaSpeechRecognitionMode(options_->recognition_mode);
     config->mask_offensive_words = mask_offensive_words();
     if (options_->recognition_mode ==
-            media::mojom::SpeechRecognitionMode::kCaption &&
-        base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+        media::mojom::SpeechRecognitionMode::kCaption) {
       config->multi_lang_config = AddLiveCaptionLanguagesToConfig(
           primary_language_name(), config_paths(),
           speech::SodaInstaller::GetInstance()

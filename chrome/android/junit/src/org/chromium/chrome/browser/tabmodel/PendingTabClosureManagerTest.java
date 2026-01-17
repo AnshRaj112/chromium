@@ -6,7 +6,9 @@ package org.chromium.chrome.browser.tabmodel;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import androidx.annotation.NonNull;
 
@@ -27,9 +29,9 @@ import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.MockTab;
 import org.chromium.chrome.browser.tab.Tab;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 
 /** Unit tests for {@link PendingTabClosureManager}. */
@@ -40,13 +42,13 @@ public class PendingTabClosureManagerTest {
     private PendingTabClosureManager mPendingTabClosureManager;
 
     private static class FakeTabModel extends EmptyTabModel {
-        private LinkedList<Tab> mTabs = new LinkedList<>();
+        private List<Tab> mTabs = new ArrayList<>();
         private int mIndex = TabModel.INVALID_TAB_INDEX;
 
         public FakeTabModel() {}
 
         public void setTabs(Tab[] tabs) {
-            mTabs = new LinkedList<>(Arrays.asList(tabs));
+            mTabs = new ArrayList<>(Arrays.asList(tabs));
         }
 
         public void clear() {
@@ -108,6 +110,11 @@ public class PendingTabClosureManagerTest {
 
         @Override
         public void notifyOnCancelingTabClosure(@NonNull Runnable undoRunnable) {}
+
+        @Override
+        public List<Tab> getAllTabs() {
+            return new ArrayList<>(mTabModel.mTabs);
+        }
     }
 
     FakeTabModel mTabModel;
@@ -471,5 +478,17 @@ public class PendingTabClosureManagerTest {
         delegateInOrder.verify(mDelegate).insertUndoneTabClosureAt(eq(tab1), eq(0));
         delegateInOrder.verify(mDelegate).insertUndoneTabClosureAt(eq(tab3), eq(2));
         checkRewoundState(mPendingTabClosureManager, tabList, true);
+    }
+
+    @Test
+    public void testNotifyTabAdded() {
+        Tab tab0 = new MockTab(0, mProfile);
+        mPendingTabClosureManager.notifyTabAdded(tab0, 0);
+
+        TabList rewoundList = mPendingTabClosureManager.getRewoundList();
+        Assert.assertEquals(1, rewoundList.getCount());
+        Assert.assertEquals(tab0, rewoundList.getTabAt(0));
+
+        verify(mDelegate, never()).getAllTabs();
     }
 }

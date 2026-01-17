@@ -4,9 +4,9 @@
 
 #include "components/autofill/core/browser/form_import/addresses/autofill_save_update_address_profile_delegate_ios.h"
 
+#include <algorithm>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/types/optional_util.h"
@@ -73,6 +73,18 @@ std::u16string AutofillSaveUpdateAddressProfileDelegateIOS::GetPhoneNumber()
   return GetProfileInfo(PHONE_HOME_WHOLE_NUMBER);
 }
 
+bool AutofillSaveUpdateAddressProfileDelegateIOS::IsOriginalProfileHomeProfile()
+    const {
+  return GetOriginalProfile() && GetOriginalProfile()->record_type() ==
+                                     AutofillProfile::RecordType::kAccountHome;
+}
+
+bool AutofillSaveUpdateAddressProfileDelegateIOS::IsOriginalProfileWorkProfile()
+    const {
+  return GetOriginalProfile() && GetOriginalProfile()->record_type() ==
+                                     AutofillProfile::RecordType::kAccountWork;
+}
+
 std::u16string AutofillSaveUpdateAddressProfileDelegateIOS::GetEmailAddress()
     const {
   return GetProfileInfo(EMAIL_ADDRESS);
@@ -104,8 +116,8 @@ std::u16string AutofillSaveUpdateAddressProfileDelegateIOS::GetSubtitle() {
   DCHECK(original_profile_);
   std::vector<ProfileValueDifference> differences =
       GetProfileDifferenceForUi(original_profile_.value(), profile_, locale_);
-  bool address_updated = base::Contains(differences, ADDRESS_HOME_ADDRESS,
-                                        &ProfileValueDifference::type);
+  bool address_updated = std::ranges::contains(
+      differences, ADDRESS_HOME_ADDRESS, &ProfileValueDifference::type);
   return GetProfileDescription(
       original_profile_.value(), locale_,
       /*include_address_and_contacts=*/!address_updated);
@@ -113,6 +125,11 @@ std::u16string AutofillSaveUpdateAddressProfileDelegateIOS::GetSubtitle() {
 
 std::u16string
 AutofillSaveUpdateAddressProfileDelegateIOS::GetMessageActionText() const {
+  if (IsOriginalProfileHomeProfile() || IsOriginalProfileWorkProfile()) {
+    return l10n_util::GetStringUTF16(
+        IDS_IOS_AUTOFILL_SAVE_HOME_WORK_ADDRESS_MESSAGE_PRIMARY_ACTION);
+  }
+
   return l10n_util::GetStringUTF16(
       original_profile_ ? IDS_IOS_AUTOFILL_UPDATE_ADDRESS_MESSAGE_PRIMARY_ACTION
                         : IDS_IOS_AUTOFILL_SAVE_ADDRESS_MESSAGE_PRIMARY_ACTION);
@@ -204,6 +221,12 @@ std::u16string AutofillSaveUpdateAddressProfileDelegateIOS::GetMessageText()
     return l10n_util::GetStringUTF16(
         IDS_IOS_AUTOFILL_SAVE_ADDRESS_IN_ACCOUNT_MESSAGE_TITLE);
   }
+
+  if (IsOriginalProfileHomeProfile() || IsOriginalProfileWorkProfile()) {
+    return l10n_util::GetStringUTF16(
+        IDS_IOS_AUTOFILL_SAVE_HOME_WORK_ADDRESS_MESSAGE_TITLE);
+  }
+
   return l10n_util::GetStringUTF16(
       original_profile_ ? IDS_IOS_AUTOFILL_UPDATE_ADDRESS_MESSAGE_TITLE
                         : IDS_IOS_AUTOFILL_SAVE_ADDRESS_MESSAGE_TITLE);

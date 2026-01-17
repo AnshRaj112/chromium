@@ -9,7 +9,6 @@
 #include <string>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/strings/stringprintf.h"
 #include "base/task/sequenced_task_runner.h"
@@ -17,7 +16,6 @@
 #include "base/trace_event/memory_dump_manager.h"
 #include "cc/base/container_util.h"
 #include "components/viz/common/gpu/raster_context_provider.h"
-#include "components/viz/common/resources/resource_sizes.h"
 #include "gpu/command_buffer/client/context_support.h"
 #include "gpu/command_buffer/client/raster_interface.h"
 #include "gpu/command_buffer/client/shared_image_interface.h"
@@ -87,7 +85,8 @@ void StagingBuffer::DestroyGLResources(gpu::raster::RasterInterface* ri,
     query_id = 0;
   }
   if (client_shared_image) {
-    sii->DestroySharedImage(sync_token, std::move(client_shared_image));
+    client_shared_image->UpdateDestructionSyncToken(sync_token);
+    client_shared_image.reset();
   }
 }
 
@@ -116,10 +115,6 @@ StagingBufferPool::StagingBufferPool(
   base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
       this, "cc::StagingBufferPool",
       base::SingleThreadTaskRunner::GetCurrentDefault());
-
-  memory_pressure_listener_ = std::make_unique<base::MemoryPressureListener>(
-      FROM_HERE, base::BindRepeating(&StagingBufferPool::OnMemoryPressure,
-                                     weak_ptr_factory_.GetWeakPtr()));
 
   reduce_memory_usage_callback_ = base::BindRepeating(
       &StagingBufferPool::ReduceMemoryUsage, weak_ptr_factory_.GetWeakPtr());
@@ -166,8 +161,8 @@ bool StagingBufferPool::OnMemoryDump(
     for (const StagingBuffer* buffer : buffers_) {
       buffer->OnMemoryDump(
           pmd, buffer->format,
-          base::Contains(free_buffers_, buffer,
-                         &std::unique_ptr<StagingBuffer>::get));
+          std::ranges::contains(free_buffers_, buffer,
+                                &std::unique_ptr<StagingBuffer>::get));
     }
   }
   return true;
@@ -175,7 +170,7 @@ bool StagingBufferPool::OnMemoryDump(
 
 void StagingBufferPool::AddStagingBuffer(const StagingBuffer* staging_buffer,
                                          viz::SharedImageFormat format) {
-  DCHECK(!base::Contains(buffers_, staging_buffer));
+  DCHECK(!buffers_.contains(staging_buffer));
   buffers_.insert(staging_buffer);
   int buffer_usage_in_bytes = format.EstimatedSizeInBytes(staging_buffer->size);
   staging_buffer_usage_in_bytes_ += buffer_usage_in_bytes;
@@ -183,7 +178,7 @@ void StagingBufferPool::AddStagingBuffer(const StagingBuffer* staging_buffer,
 
 void StagingBufferPool::RemoveStagingBuffer(
     const StagingBuffer* staging_buffer) {
-  DCHECK(base::Contains(buffers_, staging_buffer));
+  DCHECK(buffers_.contains(staging_buffer));
   buffers_.erase(staging_buffer);
   int buffer_usage_in_bytes =
       staging_buffer->format.EstimatedSizeInBytes(staging_buffer->size);
@@ -389,20 +384,6 @@ void StagingBufferPool::ReleaseBuffersNotUsedSince(base::TimeTicks time) {
       ri->OrderingBarrierCHROMIUM();
       worker_context_provider_->ContextSupport()->FlushPendingWork();
     }
-  }
-}
-
-void StagingBufferPool::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel level) {
-  base::AutoLock lock(lock_);
-  switch (level) {
-    case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE:
-    case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_MODERATE:
-      break;
-    case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL:
-      // Release all buffers, regardless of how recently they were used.
-      ReleaseBuffersNotUsedSince(base::TimeTicks() + base::TimeDelta::Max());
-      break;
   }
 }
 

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #import "components/commerce/core/commerce_feature_list.h"
-#import "ios/chrome/browser/settings/ui_bundled/notifications/notifications_earl_grey_app_interface.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey_ui.h"
@@ -28,18 +27,19 @@ using chrome_test_util::SettingsTrackingPriceTableView;
   // Feature parameters follow a key/value format to enable or disable
   // parameters.
   std::string shoppingListFlag = std::string("ShoppingList");
-  std::string settingsMenuItem = std::string("NotificationSettingsMenuItem");
 
-  config.additional_args.push_back("--enable-features=" + shoppingListFlag +
-                                   "," + settingsMenuItem);
+  config.additional_args.push_back("--enable-features=" + shoppingListFlag);
+
+  if ([self isRunningTest:@selector
+            (testTrackingPriceSwipeDown_FromUpdatedSettingsView)]) {
+    config.additional_args.push_back("--mock-shopping-service=is-eligible");
+  }
 
   return config;
 }
 
 // Tests that the settings page is dismissed by swiping down from the top.
 - (void)testTrackingPriceSwipeDown_FromUpdatedSettingsView {
-  [NotificationsEarlGreyAppInterface setUpMockShoppingService];
-
   [self openTrackingPriceSettingsFromUpdatedSettingsView];
 
   // Check that Tracking Price TableView is presented.

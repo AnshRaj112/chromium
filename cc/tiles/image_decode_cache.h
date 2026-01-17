@@ -7,7 +7,7 @@
 
 #include <atomic>
 
-#include "base/memory/ref_counted.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/notreached.h"
 #include "cc/base/devtools_instrumentation.h"
 #include "cc/cc_export.h"
@@ -88,6 +88,8 @@ class CC_EXPORT ImageDecodeCache {
         return ScopedImageType::kIco;
       case ImageType::kJPEG:
         return ScopedImageType::kJpeg;
+      case ImageType::kJXL:
+        return ScopedImageType::kJxl;
       case ImageType::kPNG:
         return ScopedImageType::kPng;
       case ImageType::kWEBP:
@@ -100,18 +102,14 @@ class CC_EXPORT ImageDecodeCache {
   virtual ~ImageDecodeCache() {}
 
   struct CC_EXPORT TaskResult {
-    explicit TaskResult(bool need_unref,
-                        bool is_at_raster_decode,
-                        bool can_do_hardware_accelerated_decode);
-    explicit TaskResult(scoped_refptr<TileTask> task,
-                        bool can_do_hardware_accelerated_decode);
+    explicit TaskResult(bool need_unref, bool is_at_raster_decode);
+    explicit TaskResult(scoped_refptr<TileTask> task);
     TaskResult(const TaskResult& result);
     ~TaskResult();
 
     scoped_refptr<TileTask> task;
     bool need_unref = false;
     bool is_at_raster_decode = false;
-    bool can_do_hardware_accelerated_decode = false;
   };
   // Fill in an TileTask which will decode the given image when run. In
   // case the image is already cached, fills in nullptr. Returns true if the

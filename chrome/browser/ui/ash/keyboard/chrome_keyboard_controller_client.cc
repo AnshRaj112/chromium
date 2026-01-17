@@ -13,7 +13,6 @@
 #include "ash/keyboard/ui/resources/keyboard_resource_util.h"
 #include "ash/public/cpp/keyboard/keyboard_switches.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/memory/ptr_util.h"
@@ -184,7 +183,7 @@ void ChromeKeyboardControllerClient::ClearEnableFlag(
 
 bool ChromeKeyboardControllerClient::IsEnableFlagSet(
     const keyboard::KeyboardEnableFlag& flag) {
-  return base::Contains(keyboard_enable_flags_, flag);
+  return keyboard_enable_flags_.contains(flag);
 }
 
 void ChromeKeyboardControllerClient::ReloadKeyboardIfNeeded() {
@@ -413,21 +412,9 @@ void ChromeKeyboardControllerClient::OnKeyboardContentsLoaded() {
 void ChromeKeyboardControllerClient::OnSessionStateChanged() {
   TRACE_EVENT0("login",
                "ChromeKeyboardControllerClient::OnSessionStateChanged");
-  if (base::FeatureList::IsEnabled(
-          ash::features::kTouchVirtualKeyboardPolicyListenPrefsAtLogin)) {
-    // We need to listen for pref changes even in login screen to control the
-    // virtual keyboard behavior on the login screen.
-    pref_change_registrar_.reset();
-  } else {
-    if (!session_manager::SessionManager::Get()->IsSessionStarted()) {
-      // Reset the registrar so that prefs are re-registered after a crash.
-      pref_change_registrar_.reset();
-      return;
-    }
-    if (pref_change_registrar_) {
-      return;
-    }
-  }
+  // We need to listen for pref changes even in login screen to control the
+  // virtual keyboard behavior on the login screen.
+  pref_change_registrar_.reset();
 
   Profile* profile = ProfileManager::GetPrimaryUserProfile();
   pref_change_registrar_ = std::make_unique<PrefChangeRegistrar>();

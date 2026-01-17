@@ -9,9 +9,10 @@
 #include <utility>
 #include <vector>
 
+#include "base/android/android_info.h"
 #include "base/android/apk_assets.h"
+#include "base/android/apk_info.h"
 #include "base/android/application_status_listener.h"
-#include "base/android/build_info.h"
 #include "base/android/jni_array.h"
 #include "base/base_switches.h"
 #include "base/feature_list.h"
@@ -19,9 +20,14 @@
 #include "base/i18n/icu_util.h"
 #include "base/logging.h"
 #include "base/metrics/field_trial.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/process/launch.h"
+#include "base/time/time.h"
+#include "base/trace_event/trace_event.h"
+#include "content/browser/android/spare_renderer_priority.h"
 #include "content/browser/child_process_launcher.h"
 #include "content/browser/child_process_launcher_helper_posix.h"
+#include "content/browser/memory_pressure/user_level_memory_pressure_signal_generator.h"
 #include "content/browser/posix_file_descriptor_info_impl.h"
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/public/browser/browser_task_traits.h"
@@ -38,7 +44,7 @@
 #include "content/public/android/content_jni_headers/ChildProcessLauncherHelperImpl_jni.h"
 
 using base::android::AttachCurrentThread;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaGlobalRef;
 using base::android::ScopedJavaLocalRef;
 using base::android::ToJavaArrayOfStrings;
@@ -48,16 +54,14 @@ namespace internal {
 namespace {
 
 // Controls whether to explicitly enable service group importance logic.
-BASE_FEATURE(kServiceGroupImportance,
-             "ServiceGroupImportance",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kServiceGroupImportance, base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Stops a child process based on the handle returned from StartChildProcess.
 void StopChildProcess(base::ProcessHandle handle) {
   DCHECK(CurrentlyOnProcessLauncherTaskRunner());
   JNIEnv* env = AttachCurrentThread();
   DCHECK(env);
-  Java_ChildProcessLauncherHelperImpl_stop(env, static_cast<jint>(handle));
+  Java_ChildProcessLauncherHelperImpl_stop(env, handle);
 }
 
 }  // namespace
@@ -114,17 +118,18 @@ bool ChildProcessLauncherHelper::BeforeLaunchOnLauncherThread(
 
   // The child processes can't correctly retrieve host package information so we
   // rather feed this information through the command line.
-  auto* build_info = base::android::BuildInfo::GetInstance();
-  command_line()->AppendSwitchASCII(switches::kHostPackageName,
-                                    build_info->host_package_name());
+  command_line()->AppendSwitchASCII(
+      switches::kHostPackageName, base::android::apk_info::host_package_name());
   command_line()->AppendSwitchASCII(switches::kPackageName,
-                                    build_info->package_name());
-  command_line()->AppendSwitchASCII(switches::kHostPackageLabel,
-                                    build_info->host_package_label());
-  command_line()->AppendSwitchASCII(switches::kHostVersionCode,
-                                    build_info->host_version_code());
-  command_line()->AppendSwitchASCII(switches::kPackageVersionName,
-                                    build_info->package_version_name());
+                                    base::android::apk_info::package_name());
+  command_line()->AppendSwitchASCII(
+      switches::kHostPackageLabel,
+      base::android::apk_info::host_package_label());
+  command_line()->AppendSwitchASCII(
+      switches::kHostVersionCode, base::android::apk_info::host_version_code());
+  command_line()->AppendSwitchASCII(
+      switches::kPackageVersionName,
+      base::android::apk_info::package_version_name());
 
   return true;
 }
@@ -134,6 +139,7 @@ ChildProcessLauncherHelper::LaunchProcessOnLauncherThread(
     const base::LaunchOptions* options,
     std::unique_ptr<PosixFileDescriptorInfo> files_to_register,
     bool can_use_warm_up_connection,
+    bool is_spare_renderer,
     bool* is_synchronous_launch,
     int* launch_result) {
   DCHECK(!options);
@@ -177,7 +183,7 @@ ChildProcessLauncherHelper::LaunchProcessOnLauncherThread(
   AddRef();  // Balanced by OnChildProcessStarted.
   java_peer_.Reset(Java_ChildProcessLauncherHelperImpl_createAndStart(
       env, reinterpret_cast<intptr_t>(this), j_argv, j_file_infos,
-      can_use_warm_up_connection));
+      can_use_warm_up_connection, is_spare_renderer));
 
   client_task_runner_->PostTask(
       FROM_HERE,
@@ -220,17 +226,19 @@ ChildProcessTerminationInfo ChildProcessLauncherHelper::GetTerminationInfo(
     // processes. So there is no need for base::GetTerminationInfo.
     info.status = base::TERMINATION_STATUS_NORMAL_TERMINATION;
   }
+  info.memory_pressure_metrics =
+      UserLevelMemoryPressureSignalGenerator::GetLatestMemoryMetrics();
   return info;
 }
 
 static void JNI_ChildProcessLauncherHelperImpl_SetTerminationInfo(
     JNIEnv* env,
     jlong termination_info_ptr,
-    jint binding_state,
-    jboolean killed_by_us,
-    jboolean clean_exit,
-    jboolean exception_during_init,
-    jboolean is_spare_renderer) {
+    int32_t binding_state,
+    bool killed_by_us,
+    bool clean_exit,
+    bool exception_during_init,
+    bool is_spare_renderer) {
   ChildProcessTerminationInfo* info =
       reinterpret_cast<ChildProcessTerminationInfo*>(termination_info_ptr);
   info->binding_state =
@@ -241,8 +249,8 @@ static void JNI_ChildProcessLauncherHelperImpl_SetTerminationInfo(
   info->is_spare_renderer = is_spare_renderer;
 }
 
-static jboolean
-JNI_ChildProcessLauncherHelperImpl_ServiceGroupImportanceEnabled(JNIEnv* env) {
+static bool JNI_ChildProcessLauncherHelperImpl_ServiceGroupImportanceEnabled(
+    JNIEnv* env) {
   // Not this is called on the launcher thread, not UI thread.
   //
   // Note that service grouping is mandatory for site isolation on pre-U devices
@@ -300,22 +308,40 @@ void ChildProcessLauncherHelper::DumpProcessStack(
 
 void ChildProcessLauncherHelper::SetRenderProcessPriorityOnLauncherThread(
     base::Process process,
-    const RenderProcessPriority& priority) {
+    const RenderProcessPriority& priority,
+    base::TimeTicks post_from_ui_thread_time) {
+  TRACE_EVENT(
+      "content",
+      "ChildProcessLauncherHelper::SetRenderProcessPriorityOnLauncherThread",
+      "pid", process.Handle());
   JNIEnv* env = AttachCurrentThread();
   DCHECK(env);
-  Java_ChildProcessLauncherHelperImpl_setPriority(
+  int32_t result = Java_ChildProcessLauncherHelperImpl_setPriority(
       env, java_peer_, process.Handle(), priority.visible,
       priority.has_media_stream, priority.has_immersive_xr_session,
       priority.has_foreground_service_worker, priority.frame_depth,
       priority.intersects_viewport, priority.boost_for_pending_views,
       priority.boost_for_loading, priority.is_spare_renderer,
-      static_cast<jint>(priority.importance));
+      static_cast<int32_t>(priority.importance), priority.has_active_clients);
+  if (result != static_cast<int32_t>(SpareRendererPriority::SPARE_NO_CHANGE)) {
+    client_task_runner_->PostTask(
+        FROM_HERE,
+        base::BindOnce(&ChildProcessLauncherHelper::
+                           OnSpareRendererPriorityGraduatedOnClientThread,
+                       this,
+                       result == static_cast<int32_t>(
+                                     SpareRendererPriority::SPARE_GRADUATED)));
+  }
+  base::UmaHistogramMicrosecondsTimes(
+      "Android.ChildProcessBinding.SetPriorityLatency",
+      base::TimeTicks::Now() - post_from_ui_thread_time);
 }
 
 // Called from ChildProcessLauncher.java when the ChildProcess was started.
 // |handle| is the processID of the child process as originated in Java, 0 if
 // the ChildProcess could not be created.
-void ChildProcessLauncherHelper::OnChildProcessStarted(JNIEnv*, jint handle) {
+void ChildProcessLauncherHelper::OnChildProcessStarted(JNIEnv*,
+                                                       int32_t handle) {
   DCHECK(CurrentlyOnProcessLauncherTaskRunner());
   scoped_refptr<ChildProcessLauncherHelper> ref(this);
   Release();  // Balances with LaunchProcessOnLauncherThread.
@@ -329,6 +355,15 @@ void ChildProcessLauncherHelper::OnChildProcessStarted(JNIEnv*, jint handle) {
   PostLaunchOnLauncherThread(std::move(process), launch_result);
 }
 
+void ChildProcessLauncherHelper::OnSpareRendererPriorityGraduatedOnClientThread(
+    bool is_alive) {
+  if (child_process_launcher_) {
+    child_process_launcher_->OnSpareRendererPriorityGraduated(is_alive);
+  }
+}
+
 }  // namespace internal
 
 }  // namespace content
+
+DEFINE_JNI(ChildProcessLauncherHelperImpl)

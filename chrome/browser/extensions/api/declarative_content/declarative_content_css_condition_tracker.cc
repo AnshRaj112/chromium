@@ -6,7 +6,6 @@
 
 #include <stddef.h>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
 #include "base/strings/stringprintf.h"
@@ -16,8 +15,11 @@
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/render_process_host.h"
 #include "extensions/browser/renderer_startup_helper.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/api/declarative/declarative_constants.h"
 #include "extensions/common/mojom/renderer.mojom.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -203,7 +205,7 @@ void DeclarativeContentCssConditionTracker::TrackForWebContents(
 void DeclarativeContentCssConditionTracker::OnWebContentsNavigation(
     content::WebContents* contents,
     content::NavigationHandle* navigation_handle) {
-  DCHECK(base::Contains(per_web_contents_tracker_, contents));
+  DCHECK(per_web_contents_tracker_.contains(contents));
   per_web_contents_tracker_[contents]->OnWebContentsNavigation(
       navigation_handle);
 }
@@ -211,7 +213,7 @@ void DeclarativeContentCssConditionTracker::OnWebContentsNavigation(
 void DeclarativeContentCssConditionTracker::OnWatchedPageChanged(
     content::WebContents* contents,
     const std::vector<std::string>& css_selectors) {
-  DCHECK(base::Contains(per_web_contents_tracker_, contents));
+  DCHECK(per_web_contents_tracker_.contains(contents));
   per_web_contents_tracker_[contents]->OnWatchedPageChanged(css_selectors);
 }
 
@@ -227,8 +229,9 @@ bool DeclarativeContentCssConditionTracker::EvaluatePredicate(
       loc->second->matching_css_selectors();
   for (const std::string& predicate_css_selector :
            typed_predicate->css_selectors()) {
-    if (!base::Contains(matching_css_selectors, predicate_css_selector))
+    if (!matching_css_selectors.contains(predicate_css_selector)) {
       return false;
+    }
   }
 
   return true;
@@ -278,7 +281,7 @@ InstructRenderProcessIfManagingBrowserContext(
 
 void DeclarativeContentCssConditionTracker::DeletePerWebContentsTracker(
     content::WebContents* contents) {
-  DCHECK(base::Contains(per_web_contents_tracker_, contents));
+  DCHECK(per_web_contents_tracker_.contains(contents));
   per_web_contents_tracker_.erase(contents);
 }
 

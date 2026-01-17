@@ -15,7 +15,6 @@
 #include "android_webview/nonembedded/component_updater/aw_component_updater_configurator.h"
 #include "base/android/path_utils.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/callback.h"
@@ -69,7 +68,8 @@ void CreateTestFiles(const base::FilePath& install_dir) {
 }
 
 void AssertOnDemandRequest(bool on_demand, std::string post_data) {
-  const auto root = base::JSONReader::Read(post_data);
+  const auto root =
+      base::JSONReader::Read(post_data, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ASSERT_TRUE(root);
   const auto* request = root->GetDict().FindDict("request");
   ASSERT_TRUE(request);
@@ -188,10 +188,10 @@ class FakeCrxNetworkFetcher : public update_client::NetworkFetcher {
         .Run(/* responseCode= */ 200, /* content_size= */ 0);
     std::string response_body;
     int network_error = 0;
-    if (base::Contains(post_data, "updatecheck")) {
+    if (post_data.contains("updatecheck")) {
       ASSERT_TRUE(base::ReadFileToString(
           GetTestFile("fake_component_update_response.json"), &response_body));
-    } else if (base::Contains(post_data, "eventtype")) {
+    } else if (post_data.contains("eventtype")) {
       ASSERT_TRUE(base::ReadFileToString(
           GetTestFile("fake_component_ping_response.json"), &response_body));
     } else {  // error post request not a ping nor update.

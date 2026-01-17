@@ -21,6 +21,7 @@ class GPUMappedDOMArrayBuffer;
 struct BoxedMappableWGPUBufferHandles;
 class ScriptState;
 class V8GPUBufferMapState;
+class WebGPUMailboxBuffer;
 
 class GPUBuffer : public DawnObject<wgpu::Buffer> {
   DEFINE_WRAPPERTYPEINFO();
@@ -33,6 +34,10 @@ class GPUBuffer : public DawnObject<wgpu::Buffer> {
             uint64_t size,
             wgpu::Buffer buffer,
             const String& label);
+  GPUBuffer(GPUDevice* device,
+            uint64_t size,
+            scoped_refptr<WebGPUMailboxBuffer> mailbox_buffer,
+            const String& label);
   ~GPUBuffer() override;
 
   GPUBuffer(const GPUBuffer&) = delete;
@@ -41,6 +46,15 @@ class GPUBuffer : public DawnObject<wgpu::Buffer> {
   void Trace(Visitor* visitor) const override;
 
   // gpu_buffer.idl {{{
+  void mapSync(ScriptState* script_state,
+               uint32_t mode,
+               uint64_t offset,
+               ExceptionState& exception_state);
+  void mapSync(ScriptState* script_state,
+               uint32_t mode,
+               uint64_t offset,
+               uint64_t size,
+               ExceptionState& exception_state);
   ScriptPromise<IDLUndefined> mapAsync(ScriptState* script_state,
                                        uint32_t mode,
                                        uint64_t offset,
@@ -66,7 +80,16 @@ class GPUBuffer : public DawnObject<wgpu::Buffer> {
 
   void DetachMappedArrayBuffers(v8::Isolate* isolate);
 
+  void DissociateMailbox();
+
+  scoped_refptr<WebGPUMailboxBuffer> GetMailboxBuffer();
+
  private:
+  void MapSyncImpl(ScriptState* script_state,
+                   uint32_t mode,
+                   uint64_t offset,
+                   std::optional<uint64_t> size,
+                   ExceptionState& exception_state);
   ScriptPromise<IDLUndefined> MapAsyncImpl(ScriptState* script_state,
                                            uint32_t mode,
                                            uint64_t offset,
@@ -92,6 +115,7 @@ class GPUBuffer : public DawnObject<wgpu::Buffer> {
   }
 
   uint64_t size_;
+  std::optional<wgpu::Future> map_async_future_;
 
   // Holds onto any ArrayBuffers returned by getMappedRange, mapReadAsync, or
   // mapWriteAsync.
@@ -104,6 +128,9 @@ class GPUBuffer : public DawnObject<wgpu::Buffer> {
 
   // List of ranges currently returned by getMappedRange, to avoid overlaps.
   Vector<std::pair<size_t, size_t>> mapped_ranges_;
+
+  // Buffer created from a shared image.
+  scoped_refptr<WebGPUMailboxBuffer> mailbox_buffer_;
 };
 
 }  // namespace blink

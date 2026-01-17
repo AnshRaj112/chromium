@@ -4,11 +4,12 @@
 
 package org.chromium.chrome.test.transit.tabmodel;
 
-import org.chromium.base.supplier.Supplier;
 import org.chromium.base.test.transit.ConditionStatusWithResult;
 import org.chromium.base.test.transit.ConditionWithResult;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
+
+import java.util.function.Supplier;
 
 /** Condition fulfilled when an initialized TabModel exists. */
 public class TabGroupModelFilterCondition extends ConditionWithResult<TabGroupModelFilter> {
@@ -26,10 +27,7 @@ public class TabGroupModelFilterCondition extends ConditionWithResult<TabGroupMo
     protected ConditionStatusWithResult<TabGroupModelFilter> resolveWithSuppliers()
             throws Exception {
         TabGroupModelFilter model =
-                mTabModelSelectorSupplier
-                        .get()
-                        .getTabGroupModelFilterProvider()
-                        .getTabGroupModelFilter(mIncognito);
+                mTabModelSelectorSupplier.get().getTabGroupModelFilter(mIncognito);
         if (model == null) {
             return notFulfilled("TabGroupModelFilter is null").withoutResult();
         }

@@ -16,7 +16,7 @@ import org.junit.Assert;
 
 import org.chromium.base.Log;
 import org.chromium.base.ThreadUtils;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.chrome.R;
@@ -28,7 +28,6 @@ import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabClosingSource;
 import org.chromium.chrome.browser.tab.TabCreationState;
-import org.chromium.chrome.browser.tab.TabHidingType;
 import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tab.TabWebContentsObserver;
@@ -41,10 +40,11 @@ import org.chromium.chrome.browser.tabmodel.TabModelSelectorSupplier;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.chrome.test.util.browser.TabTitleObserver;
 import org.chromium.content_public.browser.LoadUrlParams;
+import org.chromium.content_public.browser.NavigationController;
 import org.chromium.content_public.browser.RenderWidgetHostView;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.test.util.TestTouchUtils;
-import org.chromium.content_public.browser.test.util.WebContentsUtils;
+import org.chromium.content_public.common.ContentUrlConstants;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.url.GURL;
 
@@ -55,7 +55,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 
 /** A utility class that contains methods generic to all Tabs tests. */
 public class ChromeTabUtils {
@@ -131,31 +130,44 @@ public class ChromeTabUtils {
                 && !tab.getWebContents().shouldShowLoadingUI();
     }
 
-    public static String getTitleOnUiThread(Tab tab) {
-        AtomicReference<String> res = new AtomicReference<>();
-        ThreadUtils.runOnUiThreadBlocking(
+    public static Tab getActivityTab(ChromeActivity activity) {
+        return ThreadUtils.runOnUiThreadBlocking(() -> activity.getActivityTab());
+    }
+
+    public static int getIndexOnUiThread(TabModel tabModel) {
+        return ThreadUtils.runOnUiThreadBlocking(() -> tabModel.index());
+    }
+
+    public static int getTabCountOnUiThread(TabModel tabModel) {
+        return ThreadUtils.runOnUiThreadBlocking(() -> tabModel.getCount());
+    }
+
+    public static String getCurrentTabTitleOnUiThread(ChromeActivity activity) {
+        return ThreadUtils.runOnUiThreadBlocking(
                 () -> {
-                    res.set(tab.getTitle());
+                    Tab tab = activity.getActivityTab();
+                    return tab.getTitle();
                 });
-        return res.get();
+    }
+
+    public static String getTitleOnUiThread(Tab tab) {
+        return ThreadUtils.runOnUiThreadBlocking(() -> tab.getTitle());
+    }
+
+    public static String getCurrentTabUrlOnUiThread(ChromeActivity activity) {
+        return ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    Tab tab = activity.getActivityTab();
+                    return tab.getUrl().getSpec();
+                });
     }
 
     public static String getUrlStringOnUiThread(Tab tab) {
-        AtomicReference<String> res = new AtomicReference<>();
-        ThreadUtils.runOnUiThreadBlocking(
-                () -> {
-                    res.set(tab.getUrl().getSpec());
-                });
-        return res.get();
+        return ThreadUtils.runOnUiThreadBlocking(() -> tab.getUrl().getSpec());
     }
 
     public static GURL getUrlOnUiThread(Tab tab) {
-        AtomicReference<GURL> res = new AtomicReference<>();
-        ThreadUtils.runOnUiThreadBlocking(
-                () -> {
-                    res.set(tab.getUrl());
-                });
-        return res.get();
+        return ThreadUtils.runOnUiThreadBlocking(() -> tab.getUrl());
     }
 
     /**
@@ -347,78 +359,47 @@ public class ChromeTabUtils {
     }
 
     /**
-     * An observer that waits for a Tab to become interactable.
-     *
-     * Notifies the provided callback when:
-     *  - the page has become interactable
-     *  - the tab has been hidden and will not become interactable.
-     * Stops observing with a failure if the tab has crashed.
-     *
-     * We treat the hidden case as success to handle loads in which a page immediately closes itself
-     * or opens a new foreground tab (popup), and may not become interactable.
-     */
-    private static class TabPageInteractableObserver extends EmptyTabObserver {
-        private final Tab mTab;
-        private final CallbackHelper mCallback;
-
-        public TabPageInteractableObserver(Tab tab, CallbackHelper interactableCallback) {
-            mTab = tab;
-            mCallback = interactableCallback;
-        }
-
-        @Override
-        public void onCrash(Tab tab) {
-            mCallback.notifyFailed("Tab crashed :(");
-            mTab.removeObserver(this);
-        }
-
-        @Override
-        public void onHidden(Tab tab, @TabHidingType int type) {
-            mCallback.notifyCalled();
-            mTab.removeObserver(this);
-        }
-
-        @Override
-        public void onInteractabilityChanged(Tab tab, boolean interactable) {
-            if (interactable) {
-                mCallback.notifyCalled();
-                mTab.removeObserver(this);
-            }
-        }
-    }
-
-    /**
-     * Waits for the tab to become interactable. This occurs after load, once all view
-     * animations have completed.
+     * Waits for the tab to become interactable. This occurs after load, once all view animations
+     * have completed.
      *
      * @param tab The tab to wait for interactability on.
      */
     public static void waitForInteractable(final Tab tab) {
         Assert.assertFalse(ThreadUtils.runningOnUiThread());
 
-        final CallbackHelper interactableCallback = new CallbackHelper();
-        ThreadUtils.runOnUiThreadBlocking(
+        CriteriaHelper.pollUiThread(
                 () -> {
-                    // Paint-holding drops input event to the page until the renderer has pushed
-                    // content to the GPU.  Not all browser tests produce renderer content or rely
-                    // on the content, so we are enabling input events here by simulting the end
-                    // of paint-holding.
-                    WebContentsUtils.simulateEndOfPaintHolding(tab.getWebContents());
+                    if (tab.isHidden()) return true;
+                    if (!tab.isUserInteractable()) return false;
 
-                    // If a tab is hidden, don't wait for interactivity. See note in
-                    // TabPageInteractableObserver.
-                    if (tab.isUserInteractable() || tab.isHidden()) {
-                        interactableCallback.notifyCalled();
-                        return;
+                    // There are many cases where we don't expect hit test data to be present for
+                    // the WebContents, so treat those as interactable.
+                    if (tab.getUrl().isEmpty()
+                            || tab.getUrl().getSpec().equals(ContentUrlConstants.ABOUT_BLANK_URL)) {
+                        return true;
                     }
-                    tab.addObserver(new TabPageInteractableObserver(tab, interactableCallback));
-                });
-
-        try {
-            interactableCallback.waitForCallback(0, 1, 10L, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            throw new AssertionError("Page never became interactable.", e);
-        }
+                    if (tab.isNativePage()) return true;
+                    if (tab.getWebContents() == null) return true;
+                    NavigationController controller =
+                            tab.getWebContents().getNavigationController();
+                    // HTTP 204/205 No Content/Download pages will not get committed and won't have
+                    // hit test data. I don't know why http status codes likes 204/205 aren't
+                    // propagated to the NavigationEntry and I'm scared to ask. I also don't know
+                    // why we update the committed index even through the page does not commit.
+                    // However, since the page hasn't *actually* committed, the lastCommittedUrl is
+                    // blank and the NavigationController still thinks it's on the initial
+                    // navigation (which is supposed to become false when there's a committed
+                    // entry). WebContents#hasUncommittedNavigationInPrimaryMainFrame also for some
+                    // reason returns false...
+                    if (controller.isInitialNavigation()
+                            && controller.getLastCommittedEntryIndex() != -1) {
+                        return true;
+                    }
+                    return tab.getWebContents().getMainFrame().hasHitTestDataForTesting();
+                },
+                "Page never became interactable.",
+                10000,
+                CriteriaHelper.DEFAULT_POLLING_INTERVAL);
     }
 
     /** Switch to the given TabIndex in the current tabModel. */
@@ -532,7 +513,7 @@ public class ChromeTabUtils {
         }
         ThreadUtils.runOnUiThreadBlocking(() -> tabModel.removeObserver(observer));
 
-        Tab tab = activity.getActivityTab();
+        Tab tab = getActivityTab(activity);
         waitForTabPageLoaded(tab, (String) null);
         if (waitForNtpLoad) NewTabPageTestUtils.waitForNtpLoaded(tab);
         instrumentation.waitForIdleSync();
@@ -565,7 +546,7 @@ public class ChromeTabUtils {
             final boolean incognito) {
         newTabFromMenu(instrumentation, activity, incognito, false);
 
-        final Tab tab = activity.getActivityTab();
+        final Tab tab = getActivityTab(activity);
         waitForTabPageLoaded(
                 tab,
                 url,
@@ -684,12 +665,12 @@ public class ChromeTabUtils {
     /** Close all tabs and waits for all tabs pending closure to be observed. */
     public static void closeAllTabs(
             Instrumentation instrumentation,
-            ObservableSupplier<TabModelSelector> tabModelSelectorSupplier) {
+            MonotonicObservableSupplier<TabModelSelector> tabModelSelectorSupplier) {
         final CallbackHelper closeCallback = new CallbackHelper();
         final TabModelObserver observer =
                 new TabModelObserver() {
                     @Override
-                    public void multipleTabsPendingClosure(
+                    public void onTabClosePending(
                             List<Tab> tabs,
                             boolean isAllTabs,
                             @TabClosingSource int closingSource) {
@@ -740,7 +721,7 @@ public class ChromeTabUtils {
 
     /**
      * @deprecated Transitory method, use {@link #closeAllTabs(Instrumentation,
-     *     ObservableSupplier<TabModelSelector>)} instead. TODO(crbug.com/40191386): Remove this
+     *     MonotonicObservableSupplier <TabModelSelector>)} instead. TODO(crbug.com/40191386): Remove this
      *     after the usages are migrated.
      */
     public static void closeAllTabs(
@@ -797,7 +778,7 @@ public class ChromeTabUtils {
         Assert.assertTrue(ThreadUtils.runningOnUiThread());
         Assert.assertNotNull(windowAndroid);
 
-        final ObservableSupplier<TabModelSelector> supplier =
+        final MonotonicObservableSupplier<TabModelSelector> supplier =
                 TabModelSelectorSupplier.from(windowAndroid);
         Assert.assertNotNull(supplier);
 
@@ -808,8 +789,9 @@ public class ChromeTabUtils {
 
     /**
      * Groups together two tabs.
+     *
      * @param tab1 First tab to group.
-     * @param tab2 Second tab to group.
+     * @param tab2 Second tab to group.\
      */
     public static void mergeTabsToGroup(Tab tab1, Tab tab2) {
         Assert.assertTrue(ThreadUtils.runningOnUiThread());
@@ -817,9 +799,7 @@ public class ChromeTabUtils {
         // Verify that the two tabs do not belong with different models.
         Assert.assertEquals(tab1.isIncognito(), tab2.isIncognito());
         final TabModelSelector selector = getTabModelSelector(tab1.getWindowAndroid());
-        final TabGroupModelFilter filter =
-                selector.getTabGroupModelFilterProvider()
-                        .getTabGroupModelFilter(tab1.isIncognito());
+        final TabGroupModelFilter filter = selector.getTabGroupModelFilter(tab1.isIncognito());
 
         filter.mergeTabsToGroup(tab1.getId(), tab2.getId());
         Assert.assertEquals(tab1.getTabGroupId(), tab2.getTabGroupId());

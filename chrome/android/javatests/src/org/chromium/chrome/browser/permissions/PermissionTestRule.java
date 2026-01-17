@@ -22,21 +22,25 @@ import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.chrome.browser.app.ChromeActivity;
+import org.chromium.chrome.browser.omnibox.LocationBarCoordinator;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
-import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.InfoBarTestAnimationListener;
 import org.chromium.chrome.test.util.InfoBarUtil;
-import org.chromium.components.browser_ui.modaldialog.ModalDialogTestUtils;
 import org.chromium.components.browser_ui.modaldialog.ModalDialogView;
+import org.chromium.components.content_settings.ContentSettingsType;
 import org.chromium.components.infobars.InfoBar;
+import org.chromium.components.messages.MessagesTestHelper;
 import org.chromium.components.permissions.PermissionDialogController;
 import org.chromium.content_public.browser.test.util.TouchCommon;
+import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.modaldialog.ModalDialogManager;
-import org.chromium.ui.modaldialog.ModalDialogManager.ModalDialogType;
 import org.chromium.ui.modaldialog.ModalDialogProperties;
 import org.chromium.ui.test.util.ViewUtils;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
 /**
  * TestRule for permissions UI testing on Android.
@@ -64,6 +68,7 @@ public class PermissionTestRule extends ChromeTabbedActivityTestRule {
         PromptDecision.DENY,
         PromptDecision.NONE
     })
+    @Retention(RetentionPolicy.SOURCE)
     public @interface PromptDecision {
         int ALLOW = 0;
         int ALLOW_ONCE = 1;
@@ -89,8 +94,7 @@ public class PermissionTestRule extends ChromeTabbedActivityTestRule {
 
         @Override
         public void onTitleUpdated(Tab tab) {
-            if (ChromeTabUtils.getTitleOnUiThread(mActivity.getActivityTab())
-                    .equals(mExpectedTitle)) {
+            if (getTitle().equals(mExpectedTitle)) {
                 mCallbackHelper.notifyCalled();
             }
         }
@@ -109,12 +113,15 @@ public class PermissionTestRule extends ChromeTabbedActivityTestRule {
             // Update might have already happened, check before waiting for title udpdates.
             mExpectedTitle = mPrefix;
             if (numUpdates != 0) mExpectedTitle += numUpdates;
-            if (ChromeTabUtils.getTitleOnUiThread(mActivity.getActivityTab())
-                    .equals(mExpectedTitle)) {
+            if (getTitle().equals(mExpectedTitle)) {
                 return;
             }
 
             mCallbackHelper.waitForCallback(callbackCountBefore);
+        }
+
+        private String getTitle() {
+            return ThreadUtils.runOnUiThreadBlocking(() -> mActivity.getActivityTab().getTitle());
         }
     }
 
@@ -293,7 +300,7 @@ public class PermissionTestRule extends ChromeTabbedActivityTestRule {
     public void runJavaScriptCodeInCurrentTabWithGesture(String javascript)
             throws java.util.concurrent.TimeoutException {
         runJavaScriptCodeInCurrentTab("functionToRun = '" + javascript + "'");
-        TouchCommon.singleClickView(getActivity().getActivityTab().getView());
+        TouchCommon.singleClickView(getActivityTab().getView());
     }
 
     /**
@@ -308,12 +315,14 @@ public class PermissionTestRule extends ChromeTabbedActivityTestRule {
         Assert.assertNotNull(infobar);
 
         switch (decison) {
-            case PromptDecision.ALLOW -> Assert.assertTrue(
-                    "Allow button wasn't found", InfoBarUtil.clickPrimaryButton(infobar));
-            case PromptDecision.ALLOW_ONCE -> throw new AssertionError(
-                    "Allowing once is not supported on infobars.");
-            case PromptDecision.DENY -> Assert.assertTrue(
-                    "Block button wasn't found", InfoBarUtil.clickSecondaryButton(infobar));
+            case PromptDecision.ALLOW ->
+                    Assert.assertTrue(
+                            "Allow button wasn't found", InfoBarUtil.clickPrimaryButton(infobar));
+            case PromptDecision.ALLOW_ONCE ->
+                    throw new AssertionError("Allowing once is not supported on infobars.");
+            case PromptDecision.DENY ->
+                    Assert.assertTrue(
+                            "Block button wasn't found", InfoBarUtil.clickSecondaryButton(infobar));
         }
         updateWaiter.waitForNumUpdates(nUpdates);
     }
@@ -346,8 +355,8 @@ public class PermissionTestRule extends ChromeTabbedActivityTestRule {
         int buttonId =
                 switch (decision) {
                     case PromptDecision.ALLOW -> ModalDialogProperties.ButtonType.POSITIVE;
-                    case PromptDecision.ALLOW_ONCE -> ModalDialogProperties.ButtonType
-                            .POSITIVE_EPHEMERAL;
+                    case PromptDecision.ALLOW_ONCE ->
+                            ModalDialogProperties.ButtonType.POSITIVE_EPHEMERAL;
                     case PromptDecision.DENY -> ModalDialogProperties.ButtonType.NEGATIVE;
                     default -> throw new IllegalStateException("Unexpected value: " + decision);
                 };
@@ -367,10 +376,6 @@ public class PermissionTestRule extends ChromeTabbedActivityTestRule {
                 () -> {
                     boolean isDialogShownForTest =
                             PermissionDialogController.getInstance().isDialogShownForTest();
-                    if (isDialogShownForTest) {
-                        ModalDialogTestUtils.checkCurrentPresenter(
-                                dialogManager, ModalDialogType.TAB);
-                    }
                     Criteria.checkThat(isDialogShownForTest, Matchers.is(expectedShowState));
                 });
     }
@@ -378,5 +383,42 @@ public class PermissionTestRule extends ChromeTabbedActivityTestRule {
     /** Wait for the permission dialog to be shown. */
     public static void waitForDialog(ChromeActivity activity) {
         waitForDialogShownState(activity, true);
+    }
+
+    /** Verify the shown state of the message. */
+    protected void waitForMessageShownState(boolean expectedShowState) {
+        waitForMessageShownState(getActivity(), expectedShowState);
+    }
+
+    /** Wait for the message to be in the expected shown state. */
+    public static void waitForMessageShownState(
+            ChromeActivity activity, boolean expectedShowState) {
+        WindowAndroid windowAndroid = activity.getWindowAndroid();
+        CriteriaHelper.pollUiThread(
+                () -> {
+                    int messageCount = MessagesTestHelper.getMessageCount(windowAndroid);
+                    Criteria.checkThat(
+                            "Message shown state does not match expectation",
+                            messageCount > 0,
+                            Matchers.is(expectedShowState));
+                });
+    }
+
+    /** Wait for a specific permission state in the omnibox. */
+    public void waitForOmniboxPermissionState(
+            @ContentSettingsType.EnumType int contentSettingsType) {
+        CriteriaHelper.pollUiThread(
+                () -> {
+                    LocationBarCoordinator locationBar =
+                            (LocationBarCoordinator)
+                                    getActivity().getToolbarManager().getLocationBar();
+                    int lastPermission =
+                            locationBar
+                                    .getStatusCoordinator()
+                                    .getMediatorForTesting()
+                                    .getPermissionStatusHandler()
+                                    .getLastPermissionForTest();
+                    Criteria.checkThat(lastPermission, Matchers.is(contentSettingsType));
+                });
     }
 }

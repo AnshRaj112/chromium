@@ -15,7 +15,6 @@
 #include "build/build_config.h"
 #include "ui/accessibility/accessibility_features.h"
 #include "ui/accessibility/ax_computed_node_data.h"
-#include "ui/accessibility/ax_enums.mojom-shared.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_hypertext.h"
 #include "ui/accessibility/ax_language_detection.h"
@@ -2120,6 +2119,11 @@ std::string AXNode::GetValueForColorWell() const {
 }
 
 bool AXNode::IsIgnored() const {
+  // Row groups are ignored to enable proper column header navigation.
+  if(GetRole() == ax::mojom::Role::kRowGroup) {
+    return true;
+  }
+
   // If the focus has moved, then it could make a previously ignored node
   // unignored or vice versa. We never ignore focused nodes otherwise users of
   // assistive software might be unable to interact with the webpage.

@@ -4,13 +4,13 @@
 
 #include "components/desks_storage/core/desk_sync_bridge.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 
 #include "ash/constants/ash_features.h"
 #include "ash/public/cpp/desk_template.h"
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_writer.h"
@@ -272,6 +272,12 @@ std::string DeskSyncBridge::GetClientTag(
 std::string DeskSyncBridge::GetStorageKey(
     const syncer::EntityData& entity_data) const {
   return entity_data.specifics.workspace_desk().uuid();
+}
+
+bool DeskSyncBridge::IsEntityDataValid(
+    const syncer::EntityData& entity_data) const {
+  return desk_template_conversion::FromSyncProto(
+             entity_data.specifics.workspace_desk()) != nullptr;
 }
 
 DeskModel::GetAllEntriesResult DeskSyncBridge::GetAllEntries() {
@@ -650,14 +656,14 @@ void DeskSyncBridge::UploadLocalOnlyData(
 }
 
 bool DeskSyncBridge::HasUserTemplateWithName(const std::u16string& name) {
-  return base::Contains(desk_template_entries_, name,
-                        [](const DeskEntries::value_type& entry) {
-                          return entry.second->template_name();
-                        });
+  return std::ranges::contains(desk_template_entries_, name,
+                               [](const DeskEntries::value_type& entry) {
+                                 return entry.second->template_name();
+                               });
 }
 
 bool DeskSyncBridge::HasUuid(const base::Uuid& uuid) const {
-  return uuid.is_valid() && base::Contains(desk_template_entries_, uuid);
+  return uuid.is_valid() && desk_template_entries_.contains(uuid);
 }
 
 std::string DeskSyncBridge::GetCacheGuid() {

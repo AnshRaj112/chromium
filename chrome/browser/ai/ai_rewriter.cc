@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ai/ai_rewriter.h"
 
+#include "base/containers/fixed_flat_set.h"
 #include "base/functional/bind.h"
 #include "base/notimplemented.h"
 #include "base/strings/string_util.h"
@@ -72,8 +73,7 @@ optimization_guide::proto::WritingAssistanceApiOutputLength ToProtoLength(
 
 AIRewriter::AIRewriter(
     AIContextBoundObjectSet& context_bound_object_set,
-    std::unique_ptr<optimization_guide::OptimizationGuideModelExecutor::Session>
-        session,
+    std::unique_ptr<optimization_guide::OnDeviceSession> session,
     blink::mojom::AIRewriterCreateOptionsPtr options,
     mojo::PendingReceiver<blink::mojom::AIRewriter> receiver)
     : AIContextBoundObject(context_bound_object_set),
@@ -114,7 +114,7 @@ AIRewriter::ToProtoOptions(
 base::flat_set<std::string_view> AIRewriter::GetSupportedLanguageBaseCodes() {
   // Comma-separated language codes to enable; or "*" enables all supported.
   const base::FeatureParam<std::string> kAIRewriterAPILanguagesEnabled{
-      &blink::features::kAIWriterAPI, "langs", /*default_value=*/"en"};
+      &blink::features::kAIWriterAPI, "langs", /*default=*/"en,es,ja"};
   // TODO(crbug.com/394841624): Get supported languages from the model config.
   auto kSupportedBaseLanguages =
       base::MakeFixedFlatSet<std::string_view>({"en", "ja", "es"});
@@ -189,8 +189,7 @@ void AIRewriter::ModelExecutionCallback(
   }
   if (!result.response.has_value()) {
     AIUtils::SendStreamingStatus(
-        responder,
-        AIUtils::ConvertModelExecutionError(result.response.error().error()));
+        responder, AIUtils::ConvertOnDeviceError(result.response.error()));
     return;
   }
 

@@ -10,8 +10,8 @@
  */
 
 export {CustomizeButtonsElement} from 'chrome://new-tab-page/shared/customize_buttons/customize_buttons.js';
-export {SearchboxElement} from 'chrome://resources/cr_components/searchbox/searchbox.js';
-export {SearchboxBrowserProxy} from 'chrome://resources/cr_components/searchbox/searchbox_browser_proxy.js';
+export {PlaceholderTextCycler, SearchboxElement} from 'chrome://resources/cr_components/searchbox/searchbox.js';
+export {createAutocompleteMatch, SearchboxBrowserProxy} from 'chrome://resources/cr_components/searchbox/searchbox_browser_proxy.js';
 export {SearchboxIconElement} from 'chrome://resources/cr_components/searchbox/searchbox_icon.js';
 export {SearchboxMatchElement} from 'chrome://resources/cr_components/searchbox/searchbox_match.js';
 export {CrAutoImgElement} from 'chrome://resources/cr_elements/cr_auto_img/cr_auto_img.js';
@@ -19,15 +19,16 @@ export {BrowserCommandProxy} from 'chrome://resources/js/browser_command/browser
 export {BrowserProxyImpl} from 'chrome://resources/js/metrics_reporter/browser_proxy.js';
 export {MetricsReporterImpl} from 'chrome://resources/js/metrics_reporter/metrics_reporter.js';
 export {getTrustedHTML} from 'chrome://resources/js/static_types.js';
-export {AppElement, CUSTOMIZE_CHROME_BUTTON_ELEMENT_ID, NtpCustomizeChromeEntryPoint, NtpElement} from './app.js';
+export {AppElement, CONTEXTUAL_ENTRYPOINT_ELEMENT_ID, CUSTOMIZE_CHROME_BUTTON_ELEMENT_ID, NtpCustomizeChromeEntryPoint, NtpElement} from './app.js';
 export {BackgroundManager} from './background_manager.js';
 export {CustomizeButtonsProxy} from './customize_buttons_proxy.js';
 export {CustomizeDialogPage} from './customize_dialog_types.js';
 export {DoodleShareDialogElement} from './doodle_share_dialog.js';
 export {IframeElement} from './iframe.js';
-export {ProcessedFile, processFile} from './image_processor.js';
+export {processFile} from './image_processor.js';
+export type {ProcessedFile} from './image_processor.js';
 export {LogoElement} from './logo.js';
-export {recordBoolean, recordDuration, recordEnumeration, recordLoadDuration, recordOccurrence, recordPerdecage, recordSmallCount, recordSparseValueWithPersistentHash, recordValue} from './metrics_utils.js';
+export {recordBoolean, recordDuration, recordEnumeration, recordLinearValue, recordLoadDuration, recordLogValue, recordOccurrence, recordPerdecage, recordSmallCount, recordSparseValueWithPersistentHash} from './metrics_utils.js';
 export {NewTabPageProxy} from './new_tab_page_proxy.js';
 export {checkTransparency, isBMP, isPNG, isWebP} from './transparency.js';
 export {$$} from './utils.js';

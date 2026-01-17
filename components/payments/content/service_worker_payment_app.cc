@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
@@ -21,6 +20,7 @@
 #include "components/payments/content/payment_request_converter.h"
 #include "components/payments/core/features.h"
 #include "components/payments/core/method_strings.h"
+#include "components/payments/core/payments_experimental_features.h"
 #include "content/public/browser/payment_app_provider.h"
 #include "content/public/browser/payment_app_provider_util.h"
 #include "content/public/browser/web_contents.h"
@@ -39,6 +39,7 @@ ServiceWorkerPaymentApp::ServiceWorkerPaymentApp(
     base::WeakPtr<PaymentRequestSpec> spec,
     std::unique_ptr<content::StoredPaymentApp> stored_payment_app_info,
     bool is_incognito,
+    bool prefs_can_make_payment_,
     const base::RepeatingClosure& show_processing_spinner)
     : PaymentApp(0, PaymentApp::Type::SERVICE_WORKER_APP),
       top_origin_(top_origin),
@@ -47,9 +48,11 @@ ServiceWorkerPaymentApp::ServiceWorkerPaymentApp(
       stored_payment_app_info_(std::move(stored_payment_app_info)),
       delegate_(nullptr),
       is_incognito_(is_incognito),
+      prefs_can_make_payment_(prefs_can_make_payment_),
       show_processing_spinner_(show_processing_spinner),
       can_make_payment_result_(false),
       has_enrolled_instrument_result_(false),
+      can_make_payment_event_skipped_(false),
       needs_installation_(false),
       web_contents_(web_contents->GetWeakPtr()) {
   DCHECK(web_contents);
@@ -70,6 +73,7 @@ ServiceWorkerPaymentApp::ServiceWorkerPaymentApp(
     std::unique_ptr<WebAppInstallationInfo> installable_payment_app_info,
     const std::string& enabled_method,
     bool is_incognito,
+    bool prefs_can_make_payment_,
     const base::RepeatingClosure& show_processing_spinner)
     : PaymentApp(0, PaymentApp::Type::SERVICE_WORKER_APP),
       top_origin_(top_origin),
@@ -77,9 +81,11 @@ ServiceWorkerPaymentApp::ServiceWorkerPaymentApp(
       spec_(spec),
       delegate_(nullptr),
       is_incognito_(is_incognito),
+      prefs_can_make_payment_(prefs_can_make_payment_),
       show_processing_spinner_(show_processing_spinner),
       can_make_payment_result_(false),
       has_enrolled_instrument_result_(false),
+      can_make_payment_event_skipped_(false),
       needs_installation_(true),
       installable_web_app_info_(std::move(installable_payment_app_info)),
       installable_enabled_method_(enabled_method),
@@ -114,6 +120,13 @@ void ServiceWorkerPaymentApp::ValidateCanMakePayment(
   // Returns true if we are in incognito (avoiding sending the event to the
   // payment handler).
   if (is_incognito_) {
+    OnCanMakePaymentEventSkipped(std::move(callback));
+    return;
+  }
+
+  // Returns true if the `kCanMakePaymentEnabled` pref is disabled.
+  if (!prefs_can_make_payment_ && PaymentsExperimentalFeatures::IsEnabled(
+                                      features::kRestrictIsReadyToPayQuery)) {
     OnCanMakePaymentEventSkipped(std::move(callback));
     return;
   }
@@ -175,14 +188,14 @@ ServiceWorkerPaymentApp::CreateCanMakePaymentEventData() {
 
   DCHECK(spec_->details().modifiers);
   for (const auto& modifier : *spec_->details().modifiers) {
-    if (base::Contains(supported_url_methods,
-                       modifier->method_data->supported_method)) {
+    if (supported_url_methods.contains(
+            modifier->method_data->supported_method)) {
       event_data->modifiers.emplace_back(modifier.Clone());
     }
   }
 
   for (const auto& data : spec_->method_data()) {
-    if (base::Contains(supported_url_methods, data->supported_method)) {
+    if (supported_url_methods.contains(data->supported_method)) {
       event_data->method_data.push_back(data.Clone());
     }
   }
@@ -192,6 +205,7 @@ ServiceWorkerPaymentApp::CreateCanMakePaymentEventData() {
 
 void ServiceWorkerPaymentApp::OnCanMakePaymentEventSkipped(
     ValidateCanMakePaymentCallback callback) {
+  can_make_payment_event_skipped_ = true;
   // |can_make_payment| is true as long as there is a matching payment handler.
   can_make_payment_result_ = true;
   has_enrolled_instrument_result_ = false;
@@ -205,6 +219,7 @@ void ServiceWorkerPaymentApp::OnCanMakePaymentEventSkipped(
 void ServiceWorkerPaymentApp::OnCanMakePaymentEventResponded(
     ValidateCanMakePaymentCallback callback,
     mojom::CanMakePaymentResponsePtr response) {
+  can_make_payment_event_skipped_ = false;
   // |can_make_payment| is true as long as there is a matching payment handler.
   can_make_payment_result_ = true;
   has_enrolled_instrument_result_ = response->can_make_payment;
@@ -284,14 +299,13 @@ ServiceWorkerPaymentApp::CreatePaymentRequestEventData() {
 
   DCHECK(spec_->details().modifiers);
   for (const auto& modifier : *spec_->details().modifiers) {
-    if (base::Contains(GetAppMethodNames(),
-                       modifier->method_data->supported_method)) {
+    if (GetAppMethodNames().contains(modifier->method_data->supported_method)) {
       event_data->modifiers.emplace_back(modifier.Clone());
     }
   }
 
   for (const auto& data : spec_->method_data()) {
-    if (base::Contains(GetAppMethodNames(), data->supported_method)) {
+    if (GetAppMethodNames().contains(data->supported_method)) {
       event_data->method_data.push_back(data.Clone());
     }
   }

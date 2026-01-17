@@ -33,8 +33,8 @@ source_set("model") {
     "//components/network_time",
     "//components/password_manager/core/browser",
     "//components/password_manager/core/browser/sharing",
-    "//components/plus_addresses/settings",
-    "//components/plus_addresses/webdata",
+    "//components/plus_addresses/core/browser/settings",
+    "//components/plus_addresses/core/browser/webdata",
     "//components/pref_registry",
     "//components/prefs",
     "//components/reading_list/core",
@@ -62,6 +62,7 @@ source_set("model") {
     "//ios/chrome/browser/complex_tasks/model",
     "//ios/chrome/browser/consent_auditor/model",
     "//ios/chrome/browser/data_sharing/model",
+    "//ios/chrome/browser/data_sharing/model/personal_collaboration_data",
     "//ios/chrome/browser/dom_distiller/model",
     "//ios/chrome/browser/favicon/model",
     "//ios/chrome/browser/gcm/model",
@@ -73,7 +74,6 @@ source_set("model") {
     "//ios/chrome/browser/passwords/model:sharing_factory",
     "//ios/chrome/browser/passwords/model:store_factory",
     "//ios/chrome/browser/plus_addresses/model",
-    "//ios/chrome/browser/power_bookmarks/model",
     "//ios/chrome/browser/reading_list/model",
     "//ios/chrome/browser/saved_tab_groups/model",
     "//ios/chrome/browser/search_engines/model",
@@ -117,6 +117,7 @@ source_set("device_info_sync_service_factory") {
     ":data_type_store_service_factory",
     ":sync_invalidations_service_factory",
     "//base",
+    "//components/desktop_to_mobile_promos",
     "//components/send_tab_to_self",
     "//components/signin/public/base",
     "//components/sync/invalidations",
@@ -130,6 +131,7 @@ source_set("device_info_sync_service_factory") {
     "//ios/chrome/browser/shared/model/profile:profile_keyed_service_factory",
     "//ios/chrome/browser/signin/model",
     "//ios/chrome/common",
+    "//ios/web/public/thread",
   ]
 }
 
@@ -185,6 +187,7 @@ source_set("sync_error_browser_agent") {
     "//ios/chrome/browser/shared/ui/util",
     "//ios/chrome/browser/signin/model",
     "//ios/chrome/browser/signin/model:authentication_service_factory",
+    "//ios/chrome/browser/tabs/model:dependency_installer",
     "//ui/base",
   ]
   public_deps = [ "//ios/web/public" ]
@@ -242,11 +245,14 @@ source_set("unit_tests") {
     "//ios/chrome/browser/shared/model/browser/test:test_support",
     "//ios/chrome/browser/shared/model/profile/test",
     "//ios/chrome/browser/shared/model/url:constants",
+    "//ios/chrome/browser/shared/model/web_state_list",
+    "//ios/chrome/browser/shared/public/commands",
     "//ios/chrome/browser/shared/public/features",
     "//ios/chrome/browser/webdata_services/model",
     "//ios/chrome/test:test_support",
     "//ios/web/public/test",
     "//testing/gtest",
+    "//third_party/ocmock",
     "//ui/base",
   ]
 }

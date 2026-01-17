@@ -18,11 +18,13 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/task/sequenced_task_runner.h"
+#include "mojo/public/cpp/bindings/connection_error_callback.h"
+#include "mojo/public/cpp/bindings/interface_endpoint_client.h"
 #include "mojo/public/cpp/bindings/lib/sync_method_traits.h"
+#include "mojo/public/cpp/bindings/message_metadata_helpers.h"
 #include "mojo/public/cpp/bindings/pending_associated_receiver.h"
 #include "mojo/public/cpp/bindings/pending_associated_remote.h"
 #include "mojo/public/cpp/bindings/raw_ptr_impl_ref_traits.h"
-#include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/runtime_features.h"
 
 namespace mojo {
@@ -55,8 +57,9 @@ class COMPONENT_EXPORT(MOJO_CPP_BINDINGS) AssociatedReceiverBase {
 
   // Please see comments on the same method of InterfaceEndpointClient.
   void ResetFromAnotherSequenceUnsafe() {
-    if (endpoint_client_)
+    if (endpoint_client_) {
       endpoint_client_->ResetFromAnotherSequenceUnsafe();
+    }
   }
 
  protected:
@@ -320,8 +323,9 @@ class AssociatedReceiver : public internal::AssociatedReceiverBase {
         [](ReportBadMessageCallback inner_callback,
            base::WeakPtr<AssociatedReceiver> receiver, std::string_view error) {
           std::move(inner_callback).Run(error);
-          if (receiver)
+          if (receiver) {
             receiver->reset();
+          }
         },
         mojo::GetBadMessageCallback(), weak_ptr_factory_.GetWeakPtr());
   }

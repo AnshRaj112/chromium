@@ -9,7 +9,8 @@ import static androidx.test.espresso.matcher.ViewMatchers.withId;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
-import android.view.View;
+import static org.chromium.base.test.transit.ViewSpec.viewSpec;
+
 import android.widget.ListView;
 
 import androidx.annotation.IdRes;
@@ -25,7 +26,6 @@ import org.chromium.base.test.transit.ScrollableFacility;
 import org.chromium.base.test.transit.Station;
 import org.chromium.base.test.transit.TripBuilder;
 import org.chromium.base.test.transit.ViewElement;
-import org.chromium.base.test.transit.ViewSpec;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.settings.MainSettings;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuCoordinator;
@@ -36,7 +36,6 @@ import org.chromium.chrome.test.transit.ntp.RegularNewTabPageStation;
 import org.chromium.chrome.test.transit.quick_delete.QuickDeleteDialogFacility;
 import org.chromium.chrome.test.transit.settings.SettingsStation;
 import org.chromium.ui.modelutil.MVCListAdapter;
-import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
 
 import java.util.List;
 
@@ -51,22 +50,24 @@ public abstract class AppMenuFacility<HostStationT extends Station<?>>
     public ViewElement<ListView> menuListElement;
 
     public AppMenuFacility() {
-        menuListElement = declareView(ListView.class, withId(R.id.app_menu_list));
+        menuListElement =
+                declareContainerView(
+                        ListView.class, withId(R.id.app_menu_list), ViewElement.defaultOptions());
     }
 
     /** Create a new app menu item. */
     protected Item declareMenuItem(ItemsBuilder items, @IdRes int id) {
-        return items.declareItem(itemViewSpec(withId(id)), itemDataMatcher(id));
+        return items.declareItem(withId(id), withMenuItemId(id));
     }
 
     /** Create a new disabled app menu item. */
     protected Item declareDisabledMenuItem(ItemsBuilder items, @IdRes int id) {
-        return items.declareDisabledItem(itemViewSpec(withId(id)), itemDataMatcher(id));
+        return items.declareDisabledItem(viewSpec(withId(id)), withMenuItemId(id));
     }
 
     /** Create a new app menu item expected to be absent. */
     protected Item declareAbsentMenuItem(ItemsBuilder items, @IdRes int id) {
-        return items.declareAbsentItem(itemViewSpec(withId(id)), itemDataMatcher(id));
+        return items.declareAbsentItem(viewSpec(withId(id)), withMenuItemId(id));
     }
 
     /**
@@ -84,16 +85,15 @@ public abstract class AppMenuFacility<HostStationT extends Station<?>>
      * selected.
      */
     protected Item declarePossibleMenuItem(ItemsBuilder items, @IdRes int id) {
-        return items.declarePossibleItem(itemViewSpec(withId(id)), itemDataMatcher(id));
+        return items.declarePossibleItem(viewSpec(withId(id)), withMenuItemId(id));
     }
 
     public static final @IdRes int NEW_TAB_ID = R.id.new_tab_menu_id;
     public static final @IdRes int NEW_INCOGNITO_TAB_ID = R.id.new_incognito_tab_menu_id;
     public static final @IdRes int NEW_TAB_GROUP_ID = R.id.new_tab_group_menu_id;
     public static final @IdRes int ADD_TO_GROUP_ID = R.id.add_to_group_menu_id;
-    public static final @IdRes int PIN_TAB = R.id.pin_tab_menu_id;
-    public static final @IdRes int UNPIN_TAB = R.id.unpin_tab_menu_id;
     public static final @IdRes int NEW_WINDOW_ID = R.id.new_window_menu_id;
+    public static final @IdRes int NEW_INCOGNITO_WINDOW_ID = R.id.new_incognito_window_menu_id;
     public static final @IdRes int HISTORY_ID = R.id.open_history_menu_id;
     public static final @IdRes int DELETE_BROWSING_DATA_ID = R.id.quick_delete_menu_id;
     public static final @IdRes int DOWNLOADS_ID = R.id.downloads_menu_id;
@@ -102,6 +102,7 @@ public abstract class AppMenuFacility<HostStationT extends Station<?>>
     public static final @IdRes int SHARE_ID = R.id.share_menu_id;
     public static final @IdRes int FIND_IN_PAGE_ID = R.id.find_in_page_id;
     public static final @IdRes int TRANSLATE_ID = R.id.translate_id;
+    public static final @IdRes int READER_MODE_ID = R.id.reader_mode_menu_id;
     public static final @IdRes int ADD_TO_HOME_SCREEN_UNIVERSAL_INSTALL_ID = R.id.universal_install;
     public static final @IdRes int OPEN_WEBAPK_ID = R.id.open_webapk_id;
     public static final @IdRes int DESKTOP_SITE_ID = R.id.request_desktop_site_id;
@@ -114,13 +115,18 @@ public abstract class AppMenuFacility<HostStationT extends Station<?>>
     }
 
     /** Default behavior for "Open new Incognito tab". */
-    protected IncognitoNewTabPageStation createIncognitoNewTabPageStation() {
+    protected IncognitoNewTabPageStation createNewIncognitoTabPageStation() {
         return IncognitoNewTabPageStation.newBuilder().initOpeningNewTab().build();
     }
 
     /** Default behavior for "Open new window". */
     protected RegularNewTabPageStation createNewWindowStation() {
         return RegularNewTabPageStation.newBuilder().withEntryPoint().build();
+    }
+
+    /** Default behavior for "Open new incognito window". */
+    protected IncognitoNewTabPageStation createNewIncognitoWindowStation() {
+        return IncognitoNewTabPageStation.newBuilder().withEntryPoint().build();
     }
 
     /** Default behavior for "Delete browsing data". */
@@ -131,14 +137,6 @@ public abstract class AppMenuFacility<HostStationT extends Station<?>>
     /** Default behavior for "Settings". */
     protected SettingsStation<MainSettings> createSettingsStation() {
         return new SettingsStation<>(MainSettings.class);
-    }
-
-    protected ViewSpec<View> itemViewSpec(Matcher<View> matcher) {
-        return menuListElement.descendant(matcher);
-    }
-
-    protected static Matcher<ListItem> itemDataMatcher(@IdRes int id) {
-        return withMenuItemId(id);
     }
 
     protected static Matcher<MVCListAdapter.ListItem> withMenuItemId(@IdRes int id) {

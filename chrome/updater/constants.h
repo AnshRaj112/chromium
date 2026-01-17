@@ -90,6 +90,15 @@ inline constexpr char kCrashHandlerSwitch[] = "crash-handler";
 // Updates the updater.
 inline constexpr char kUpdateSwitch[] = "update";
 
+// Updates the apps.
+inline constexpr char kUpdateAppsSwitch[] = "update-apps";
+
+// Run as a patch worker.
+inline constexpr char kPatchWorkerSwitch[] = "patch-worker";
+
+// Run as an unzip worker.
+inline constexpr char kUnzipWorkerSwitch[] = "unzip-worker";
+
 // Run as a network worker.
 inline constexpr char kNetWorkerSwitch[] = "net-worker";
 
@@ -239,6 +248,10 @@ inline constexpr char kCmdLineExpectDeElevated[] = "expect-de-elevated";
 // is now trying to install the app per-user.
 inline constexpr char kCmdLinePrefersUser[] = "prefers-user";
 
+// The "installsource" switch allows an `installsource` that is reported in
+// pings to be user defined on the offline installer command line.
+inline constexpr char kInstallSourceSwitch[] = "installsource";
+
 // File system paths.
 //
 // The directory name where CRX apps get installed. This is provided for demo
@@ -260,6 +273,7 @@ inline constexpr char kDevOverrideKeyServerKeepAliveSeconds[] =
     "server_keep_alive";
 inline constexpr char kDevOverrideKeyCrxVerifierFormat[] =
     "crx_verifier_format";
+inline constexpr char kDevOverrideKeyCrxPublicKeyHash[] = "crx_public_key_hash";
 inline constexpr char kDevOverrideKeyMinumumEventLoggingCooldownSeconds[] =
     "minimum_event_logging_cooldown_seconds";
 inline constexpr char kDevOverrideKeyEventLoggingPermissionProviderAppId[] =
@@ -270,10 +284,6 @@ inline constexpr char
         "event_logging_permission_provider_directory_name";
 #endif
 inline constexpr char kDevOverrideKeyDictPolicies[] = "dict_policies";
-
-// TODO(crbug.com/389965546): remove this once the checked-in old updater builds
-// recognize "dict_policies".
-inline constexpr char kDevOverrideKeyGroupPolicies[] = "group_policies";
 
 inline constexpr char kDevOverrideKeyOverinstallTimeout[] =
     "overinstall_timeout";
@@ -551,6 +561,9 @@ inline constexpr int kErrorNoObserverCompletionInfo = kUpdaterErrorBase + 82;
 // No apps to install.
 inline constexpr int kErrorNoApps = kUpdaterErrorBase + 83;
 
+// A path references the parent directory.
+inline constexpr int kErrorPathReferencesParent = kUpdaterErrorBase + 84;
+
 // Policy Management constants.
 // The maximum value allowed for policy AutoUpdateCheckPeriodMinutes.
 inline constexpr int kMaxAutoUpdateCheckPeriodMinutes = 43200;
@@ -608,10 +621,12 @@ inline constexpr char kSourcePlatformPolicyManager[] = "not-defined";
 inline constexpr bool kCloudPolicyOverridesPlatformPolicyDefaultValue = true;
 #endif
 
-inline constexpr int kUninstallPingReasonUninstalled = 0;
-inline constexpr int kUninstallPingReasonUserNotAnOwner = 1;
-inline constexpr int kUninstallPingReasonNoAppsRemain = 2;
-inline constexpr int kUninstallPingReasonNeverHadApps = 3;
+enum class UninstallPingReason {
+  kUninstalled = 0,
+  kUserNotAnOwner = 1,
+  kNoAppsRemain = 2,
+  kNeverHadApps = 3,
+};
 
 // The file downloaded to a temporary location could not be moved.
 inline constexpr int kErrorFailedToMoveDownloadedFile = 5;
@@ -654,6 +669,10 @@ inline constexpr char kInstallSourceTaggedMetainstaller[] = "taggedmi";
 inline constexpr char kInstallSourceOffline[] = "offline";
 inline constexpr char kInstallSourcePolicy[] = "policy";
 inline constexpr char kInstallSourceOnDemand[] = "ondemand";
+inline constexpr char kInstallSourceEnterpriseMsi[] = "enterprisemsi";
+
+inline constexpr int kRegistrationSuccess = 0;
+inline constexpr int kRegistrationError = 1;
 
 }  // namespace updater
 

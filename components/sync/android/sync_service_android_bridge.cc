@@ -21,6 +21,7 @@
 #include "base/time/time.h"
 #include "components/signin/public/base/gaia_id_hash.h"
 #include "components/signin/public/identity_manager/account_info.h"
+#include "components/sync/base/features.h"
 #include "components/sync/base/user_selectable_type.h"
 #include "components/sync/service/local_data_description.h"
 #include "components/sync/service/sync_service.h"
@@ -37,7 +38,7 @@ using base::android::AppendJavaStringArrayToStringVector;
 using base::android::AttachCurrentThread;
 using base::android::ConvertJavaStringToUTF8;
 using base::android::ConvertUTF8ToJavaString;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 
 namespace syncer {
@@ -52,15 +53,12 @@ DataType IntToDataTypeChecked(int type) {
 
 ScopedJavaLocalRef<jintArray> DataTypeSetToJavaIntArray(JNIEnv* env,
                                                         DataTypeSet types) {
-  std::vector<int> type_vector;
-  for (DataType type : types) {
-    type_vector.push_back(type);
-  }
+  std::vector<int> type_vector(types.begin(), types.end());
   return base::android::ToJavaIntArray(env, type_vector);
 }
 
 DataTypeSet JavaIntArrayToDataTypeSet(JNIEnv* env,
-                                      const JavaParamRef<jintArray>& types) {
+                                      const JavaRef<jintArray>& types) {
   std::vector<int> types_vector;
   base::android::JavaIntArrayToIntVector(env, types, &types_vector);
   DataTypeSet data_type_set;
@@ -74,6 +72,7 @@ ScopedJavaLocalRef<jintArray> UserSelectableTypeSetToJavaIntArray(
     JNIEnv* env,
     UserSelectableTypeSet types) {
   std::vector<int> type_vector;
+  type_vector.reserve(types.size());
   for (UserSelectableType type : types) {
     type_vector.push_back(static_cast<int>(type));
   }
@@ -100,27 +99,16 @@ void NativeGetLocalDataDescriptionsCallback(
     const base::android::ScopedJavaGlobalRef<jobject>& callback,
     std::map<DataType, LocalDataDescription> localDataDescription) {
   std::vector<int> data_types;
+  data_types.reserve(localDataDescription.size());
   std::vector<LocalDataDescription> local_data_descriptions;
+  local_data_descriptions.reserve(localDataDescription.size());
   for (const auto& [data_type, description] : localDataDescription) {
     data_types.push_back(data_type);
     local_data_descriptions.push_back(description);
   }
-  base::android::ScopedJavaLocalRef<jclass> localdatadescription_clazz =
-      base::android::GetClass(
-          env, "org/chromium/components/sync/LocalDataDescription");
-  auto array = base::android::ScopedJavaLocalRef<jobjectArray>::Adopt(
-      env, env->NewObjectArray(local_data_descriptions.size(),
-                               localdatadescription_clazz.obj(), nullptr));
-  base::android::CheckException(env);
-
-  for (size_t i = 0; i < local_data_descriptions.size(); ++i) {
-    base::android::ScopedJavaLocalRef<jobject> item =
-        ConvertToJavaLocalDataDescription(env, local_data_descriptions[i]);
-    env->SetObjectArrayElement(array.obj(), i, item.obj());
-  }
 
   Java_SyncServiceImpl_onGetLocalDataDescriptionsResult(
-      env, callback, base::android::ToJavaIntArray(env, data_types), array);
+      env, callback, data_types, local_data_descriptions);
 }
 
 // Native callback for the JNI GetAllNodes method. When
@@ -190,26 +178,37 @@ void SyncServiceAndroidBridge::OnSyncShutdown(SyncService* sync) {
   // destroy it shortly.
 }
 
-jboolean SyncServiceAndroidBridge::IsSyncFeatureEnabled(JNIEnv* env) {
+void SyncServiceAndroidBridge::AcknowledgeBookmarksLimitExceededError(
+    JNIEnv* env,
+    jint source) {
+  native_sync_service_->AcknowledgeBookmarksLimitExceededError(
+      static_cast<SyncService::BookmarksLimitExceededHelpClickedSource>(
+          source));
+}
+
+jint SyncServiceAndroidBridge::GetBookmarksLimit(JNIEnv* env) {
+  return static_cast<jint>(kSyncBookmarksLimitValue.Get());
+}
+
+bool SyncServiceAndroidBridge::IsSyncFeatureEnabled(JNIEnv* env) {
   return native_sync_service_->IsSyncFeatureEnabled();
 }
 
-jboolean SyncServiceAndroidBridge::IsSyncFeatureActive(JNIEnv* env) {
+bool SyncServiceAndroidBridge::IsSyncFeatureActive(JNIEnv* env) {
   return native_sync_service_->IsSyncFeatureActive();
 }
 
-jboolean SyncServiceAndroidBridge::IsSyncDisabledByEnterprisePolicy(
-    JNIEnv* env) {
+bool SyncServiceAndroidBridge::IsSyncDisabledByEnterprisePolicy(JNIEnv* env) {
   return native_sync_service_->HasDisableReason(
       SyncService::DISABLE_REASON_ENTERPRISE_POLICY);
 }
 
-jboolean SyncServiceAndroidBridge::IsEngineInitialized(JNIEnv* env) {
+bool SyncServiceAndroidBridge::IsEngineInitialized(JNIEnv* env) {
   return native_sync_service_->IsEngineInitialized();
 }
 
 void SyncServiceAndroidBridge::SetSetupInProgress(JNIEnv* env,
-                                                  jboolean in_progress) {
+                                                  bool in_progress) {
   if (!in_progress) {
     sync_blocker_.reset();
     return;
@@ -220,14 +219,14 @@ void SyncServiceAndroidBridge::SetSetupInProgress(JNIEnv* env,
   }
 }
 
-jboolean SyncServiceAndroidBridge::IsInitialSyncFeatureSetupComplete(
-    JNIEnv* env) {
+bool SyncServiceAndroidBridge::IsInitialSyncFeatureSetupComplete(JNIEnv* env) {
   return native_sync_service_->GetUserSettings()
       ->IsInitialSyncFeatureSetupComplete();
 }
 
-void SyncServiceAndroidBridge::SetInitialSyncFeatureSetupComplete(JNIEnv* env,
-                                                                  jint source) {
+void SyncServiceAndroidBridge::SetInitialSyncFeatureSetupComplete(
+    JNIEnv* env,
+    int32_t source) {
   native_sync_service_->GetUserSettings()->SetInitialSyncFeatureSetupComplete(
       static_cast<SyncFirstSetupCompleteSource>(source));
 }
@@ -248,7 +247,7 @@ ScopedJavaLocalRef<jintArray> SyncServiceAndroidBridge::GetSelectedTypes(
 
 void SyncServiceAndroidBridge::GetTypesWithUnsyncedData(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& callback) {
+    const base::android::JavaRef<jobject>& callback) {
   base::android::ScopedJavaGlobalRef<jobject> java_callback;
   java_callback.Reset(env, callback);
   native_sync_service_->GetTypesWithUnsyncedData(
@@ -259,8 +258,8 @@ void SyncServiceAndroidBridge::GetTypesWithUnsyncedData(
 
 void SyncServiceAndroidBridge::GetLocalDataDescriptions(
     JNIEnv* env,
-    const base::android::JavaParamRef<jintArray>& types,
-    const base::android::JavaParamRef<jobject>& callback) {
+    const base::android::JavaRef<jintArray>& types,
+    const base::android::JavaRef<jobject>& callback) {
   base::android::ScopedJavaGlobalRef<jobject> java_callback;
   java_callback.Reset(env, callback);
 
@@ -272,27 +271,27 @@ void SyncServiceAndroidBridge::GetLocalDataDescriptions(
 
 void SyncServiceAndroidBridge::TriggerLocalDataMigration(
     JNIEnv* env,
-    const JavaParamRef<jintArray>& types) {
+    const JavaRef<jintArray>& types) {
   native_sync_service_->TriggerLocalDataMigration(
       JavaIntArrayToDataTypeSet(env, types));
 }
 
-jboolean SyncServiceAndroidBridge::IsTypeManagedByPolicy(JNIEnv* env,
-                                                         jint type) {
+bool SyncServiceAndroidBridge::IsTypeManagedByPolicy(JNIEnv* env,
+                                                     int32_t type) {
   return native_sync_service_->GetUserSettings()->IsTypeManagedByPolicy(
       IntToUserSelectableTypeChecked(type));
 }
 
-jboolean SyncServiceAndroidBridge::IsTypeManagedByCustodian(JNIEnv* env,
-                                                            jint type) {
+bool SyncServiceAndroidBridge::IsTypeManagedByCustodian(JNIEnv* env,
+                                                        int32_t type) {
   return native_sync_service_->GetUserSettings()->IsTypeManagedByCustodian(
       IntToUserSelectableTypeChecked(type));
 }
 
 void SyncServiceAndroidBridge::SetSelectedTypes(
     JNIEnv* env,
-    jboolean sync_everything,
-    const JavaParamRef<jintArray>& user_selectable_type_array) {
+    bool sync_everything,
+    const JavaRef<jintArray>& user_selectable_type_array) {
   if (native_sync_service_->GetAccountInfo().account_id.empty()) {
     // This function shouldn't be called while signed out, but evidence suggests
     // it sometimes does get called.
@@ -317,8 +316,8 @@ void SyncServiceAndroidBridge::SetSelectedTypes(
 }
 
 void SyncServiceAndroidBridge::SetSelectedType(JNIEnv* env,
-                                               jint type,
-                                               jboolean is_type_on) {
+                                               int32_t type,
+                                               bool is_type_on) {
   if (native_sync_service_->GetAccountInfo().account_id.empty()) {
     // This function shouldn't be called while signed out, but evidence suggests
     // it sometimes does get called.
@@ -333,64 +332,67 @@ void SyncServiceAndroidBridge::SetSelectedType(JNIEnv* env,
       IntToUserSelectableTypeChecked(type), is_type_on);
 }
 
-jboolean SyncServiceAndroidBridge::IsCustomPassphraseAllowed(JNIEnv* env) {
+bool SyncServiceAndroidBridge::IsCustomPassphraseAllowed(JNIEnv* env) {
   return native_sync_service_->GetUserSettings()->IsCustomPassphraseAllowed();
 }
 
-jboolean SyncServiceAndroidBridge::IsEncryptEverythingEnabled(JNIEnv* env) {
+bool SyncServiceAndroidBridge::IsEncryptEverythingEnabled(JNIEnv* env) {
   return native_sync_service_->GetUserSettings()->IsEncryptEverythingEnabled();
 }
 
-jboolean SyncServiceAndroidBridge::IsPassphraseRequiredForPreferredDataTypes(
+bool SyncServiceAndroidBridge::IsPassphraseRequiredForPreferredDataTypes(
     JNIEnv* env) {
   return native_sync_service_->GetUserSettings()
       ->IsPassphraseRequiredForPreferredDataTypes();
 }
 
-jboolean SyncServiceAndroidBridge::IsTrustedVaultKeyRequired(JNIEnv* env) {
+bool SyncServiceAndroidBridge::IsTrustedVaultKeyRequired(JNIEnv* env) {
   return native_sync_service_->GetUserSettings()->IsTrustedVaultKeyRequired();
 }
 
-jboolean
-SyncServiceAndroidBridge::IsTrustedVaultKeyRequiredForPreferredDataTypes(
+bool SyncServiceAndroidBridge::IsTrustedVaultKeyRequiredForPreferredDataTypes(
     JNIEnv* env) {
   return native_sync_service_->GetUserSettings()
       ->IsTrustedVaultKeyRequiredForPreferredDataTypes();
 }
 
-jboolean SyncServiceAndroidBridge::IsTrustedVaultRecoverabilityDegraded(
+bool SyncServiceAndroidBridge::IsTrustedVaultRecoverabilityDegraded(
     JNIEnv* env) {
   return native_sync_service_->GetUserSettings()
       ->IsTrustedVaultRecoverabilityDegraded();
 }
 
-jboolean SyncServiceAndroidBridge::IsUsingExplicitPassphrase(JNIEnv* env) {
+bool SyncServiceAndroidBridge::IsUsingExplicitPassphrase(JNIEnv* env) {
   return native_sync_service_->GetUserSettings()->IsUsingExplicitPassphrase();
 }
 
-jint SyncServiceAndroidBridge::GetPassphraseType(JNIEnv* env) {
+int32_t SyncServiceAndroidBridge::GetPassphraseType(JNIEnv* env) {
   // TODO(crbug.com/40923935): Mapping nullopt -> kImplicitPassphrase preserves
   // the historic behavior, but ideally we should propagate the nullopt state to
   // Java.
-  return static_cast<jint>(
+  return static_cast<int32_t>(
       native_sync_service_->GetUserSettings()->GetPassphraseType().value_or(
           PassphraseType::kImplicitPassphrase));
 }
 
-jint SyncServiceAndroidBridge::GetTransportState(JNIEnv* env) {
-  return static_cast<jint>(native_sync_service_->GetTransportState());
+int32_t SyncServiceAndroidBridge::GetTransportState(JNIEnv* env) {
+  return static_cast<int32_t>(native_sync_service_->GetTransportState());
+}
+
+int32_t SyncServiceAndroidBridge::GetUserActionableError(JNIEnv* env) {
+  return static_cast<int32_t>(native_sync_service_->GetUserActionableError());
 }
 
 void SyncServiceAndroidBridge::SetEncryptionPassphrase(
     JNIEnv* env,
-    const JavaParamRef<jstring>& passphrase) {
+    const JavaRef<jstring>& passphrase) {
   native_sync_service_->GetUserSettings()->SetEncryptionPassphrase(
       ConvertJavaStringToUTF8(env, passphrase));
 }
 
-jboolean SyncServiceAndroidBridge::SetDecryptionPassphrase(
+bool SyncServiceAndroidBridge::SetDecryptionPassphrase(
     JNIEnv* env,
-    const JavaParamRef<jstring>& passphrase) {
+    const JavaRef<jstring>& passphrase) {
   return native_sync_service_->GetUserSettings()->SetDecryptionPassphrase(
       ConvertJavaStringToUTF8(env, passphrase));
 }
@@ -401,9 +403,8 @@ jlong SyncServiceAndroidBridge::GetExplicitPassphraseTime(JNIEnv* env) {
       .InMillisecondsSinceUnixEpoch();
 }
 
-void SyncServiceAndroidBridge::GetAllNodes(
-    JNIEnv* env,
-    const JavaParamRef<jobject>& callback) {
+void SyncServiceAndroidBridge::GetAllNodes(JNIEnv* env,
+                                           const JavaRef<jobject>& callback) {
   base::android::ScopedJavaGlobalRef<jobject> java_callback;
   java_callback.Reset(env, callback);
   native_sync_service_->GetAllNodesForDebugging(
@@ -414,14 +415,6 @@ GoogleServiceAuthError SyncServiceAndroidBridge::GetAuthError(JNIEnv* env) {
   return native_sync_service_->GetAuthError();
 }
 
-jboolean SyncServiceAndroidBridge::HasUnrecoverableError(JNIEnv* env) {
-  return native_sync_service_->HasUnrecoverableError();
-}
-
-jboolean SyncServiceAndroidBridge::RequiresClientUpgrade(JNIEnv* env) {
-  return native_sync_service_->RequiresClientUpgrade();
-}
-
 base::android::ScopedJavaLocalRef<jobject>
 SyncServiceAndroidBridge::GetAccountInfo(JNIEnv* env) {
   CoreAccountInfo account_info = native_sync_service_->GetAccountInfo();
@@ -430,12 +423,11 @@ SyncServiceAndroidBridge::GetAccountInfo(JNIEnv* env) {
              : ConvertToJavaCoreAccountInfo(env, account_info);
 }
 
-jboolean SyncServiceAndroidBridge::HasSyncConsent(JNIEnv* env) {
+bool SyncServiceAndroidBridge::HasSyncConsent(JNIEnv* env) {
   return native_sync_service_->HasSyncConsent();
 }
 
-jboolean
-SyncServiceAndroidBridge::IsPassphrasePromptMutedForCurrentProductVersion(
+bool SyncServiceAndroidBridge::IsPassphrasePromptMutedForCurrentProductVersion(
     JNIEnv* env) {
   return native_sync_service_->GetUserSettings()
       ->IsPassphrasePromptMutedForCurrentProductVersion();
@@ -447,16 +439,18 @@ void SyncServiceAndroidBridge::
       ->MarkPassphrasePromptMutedForCurrentProductVersion();
 }
 
-jboolean SyncServiceAndroidBridge::HasKeepEverythingSynced(JNIEnv* env) {
+bool SyncServiceAndroidBridge::HasKeepEverythingSynced(JNIEnv* env) {
   return native_sync_service_->GetUserSettings()->IsSyncEverythingEnabled();
 }
 
-jboolean SyncServiceAndroidBridge::ShouldOfferTrustedVaultOptIn(JNIEnv* env) {
+bool SyncServiceAndroidBridge::ShouldOfferTrustedVaultOptIn(JNIEnv* env) {
   return syncer::ShouldOfferTrustedVaultOptIn(native_sync_service_);
 }
 
 void SyncServiceAndroidBridge::TriggerRefresh(JNIEnv* env) {
-  native_sync_service_->TriggerRefresh(DataTypeSet::All());
+  native_sync_service_->TriggerRefresh(
+      SyncService::TriggerRefreshSource::kAndroidSyncServiceBridge,
+      DataTypeSet::All());
 }
 
 jlong SyncServiceAndroidBridge::GetLastSyncedTimeForDebugging(JNIEnv* env) {
@@ -468,7 +462,7 @@ jlong SyncServiceAndroidBridge::GetLastSyncedTimeForDebugging(JNIEnv* env) {
 
 void SyncServiceAndroidBridge::KeepAccountSettingsPrefsOnlyForUsers(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobjectArray>& gaia_ids_array) {
+    const base::android::JavaRef<jobjectArray>& gaia_ids_array) {
   std::vector<std::string> gaia_id_strings;
   AppendJavaStringArrayToStringVector(env, gaia_ids_array, &gaia_id_strings);
   std::vector<GaiaId> gaia_ids;
@@ -480,3 +474,6 @@ void SyncServiceAndroidBridge::KeepAccountSettingsPrefsOnlyForUsers(
 }
 
 }  // namespace syncer
+
+DEFINE_JNI(SyncServiceImpl)
+DEFINE_JNI(SyncService)

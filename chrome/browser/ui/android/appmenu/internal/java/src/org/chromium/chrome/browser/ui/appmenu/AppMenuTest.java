@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 import android.app.Activity;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.os.Build.VERSION_CODES;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -22,6 +23,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
 
@@ -49,8 +51,10 @@ import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisableIf;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
+import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider.ControlsPosition;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.lifecycle.LifecycleObserver;
@@ -62,7 +66,10 @@ import org.chromium.components.browser_ui.widget.highlight.ViewHighlighterTestUt
 import org.chromium.ui.KeyboardVisibilityDelegate;
 import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.WindowAndroid;
+import org.chromium.ui.hierarchicalmenu.HierarchicalMenuController;
+import org.chromium.ui.hierarchicalmenu.HierarchicalMenuController.SubmenuHeaderFactory;
 import org.chromium.ui.modelutil.MVCListAdapter;
+import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.ui.test.util.BlankUiTestActivity;
 import org.chromium.ui.test.util.NightModeTestUtils;
@@ -71,6 +78,8 @@ import org.chromium.ui.widget.Toast;
 import org.chromium.ui.widget.ToastManager;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -80,6 +89,7 @@ import java.util.concurrent.TimeoutException;
  */
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
+@EnableFeatures({ChromeFeatureList.SUBMENUS_IN_APP_MENU})
 @Batch(Batch.PER_CLASS)
 public class AppMenuTest {
     @ClassRule
@@ -124,7 +134,7 @@ public class AppMenuTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> sActivity.setContentView(R.layout.test_app_menu_activity_layout));
         when(mWindowAndroid.getKeyboardDelegate()).thenReturn(mKeyboardDelegate);
-        when(mKeyboardDelegate.isKeyboardShowing(any(), any())).thenReturn(false);
+        when(mKeyboardDelegate.isKeyboardShowing(any())).thenReturn(false);
         when(mMockAppMenuHandler.getAppMenu()).thenReturn(mMockAppMenu);
         when(mMockAppMenuHandler.showAppMenu(any(), anyBoolean()))
                 .thenAnswer(
@@ -153,6 +163,20 @@ public class AppMenuTest {
         mDelegate = new TestAppMenuDelegate(sActivity);
         mTestMenuButtonDelegate = () -> sActivity.findViewById(R.id.top_button);
 
+        SubmenuHeaderFactory submenuHeaderFactory =
+                (clickedItem, backRunnable) -> {
+                    PropertyModel.Builder builder =
+                            new PropertyModel.Builder(AppMenuSubmenuHeaderItemProperties.ALL_KEYS);
+                    HierarchicalMenuController.populateDefaultHeaderProperties(
+                            builder,
+                            new AppMenuUtil.AppMenuKeyProvider(),
+                            clickedItem.model.get(AppMenuItemProperties.TITLE),
+                            backRunnable);
+                    builder.with(AppMenuItemProperties.MENU_ITEM_ID, R.id.submenu_header_menu_id);
+                    return new ListItem(
+                            AppMenuHandler.AppMenuItemType.SUBMENU_HEADER, builder.build());
+                };
+
         mAppMenuCoordinator =
                 new AppMenuCoordinatorImpl(
                         sActivity,
@@ -163,7 +187,9 @@ public class AppMenuTest {
                         sActivity.findViewById(R.id.menu_anchor_stub),
                         this::getAppRect,
                         mWindowAndroid,
-                        mBrowserControlsStateProvider);
+                        mBrowserControlsStateProvider,
+                        submenuHeaderFactory);
+
         mAppMenuHandler = mAppMenuCoordinator.getAppMenuHandlerImplForTesting();
         mMenuObserver = new TestAppMenuObserver();
         mAppMenuCoordinator.getAppMenuHandler().addObserver(mMenuObserver);
@@ -219,6 +245,9 @@ public class AppMenuTest {
 
     @Test
     @MediumTest
+    @DisableIf.Build(
+            sdk_is_greater_than = VERSION_CODES.VANILLA_ICE_CREAM,
+            message = "crbug.com/435724248")
     public void testShowAppMenu_AnchorTop() throws TimeoutException {
         AppMenuCoordinatorImpl.setHasPermanentMenuKeyForTesting(false);
         showMenuAndAssert(mAppMenuHandler);
@@ -339,6 +368,72 @@ public class AppMenuTest {
                 "Item selected callback should not have been called.",
                 0,
                 mDelegate.itemSelectedCallbackHelper.getCallCount());
+    }
+
+    @Test
+    @MediumTest
+    public void testSubmenu_ItemWithSubmenuAdded() throws TimeoutException {
+        showMenuAndAssert(mAppMenuHandler);
+
+        int menuItemWithSubmenuId = 30;
+        int menuItemSubmenuOneId = 31;
+        int menuItemSubmenuTwoId = 32;
+
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    List<ListItem> submenuItems = new ArrayList<>();
+                    submenuItems.add(
+                            new MVCListAdapter.ListItem(
+                                    AppMenuItemType.STANDARD,
+                                    new PropertyModel.Builder(AppMenuItemProperties.ALL_KEYS)
+                                            .with(
+                                                    AppMenuItemProperties.MENU_ITEM_ID,
+                                                    menuItemSubmenuOneId)
+                                            .with(AppMenuItemProperties.TITLE, "Submenu Item One")
+                                            .build()));
+
+                    submenuItems.add(
+                            new MVCListAdapter.ListItem(
+                                    AppMenuItemType.STANDARD,
+                                    new PropertyModel.Builder(AppMenuItemProperties.ALL_KEYS)
+                                            .with(
+                                                    AppMenuItemProperties.MENU_ITEM_ID,
+                                                    menuItemSubmenuTwoId)
+                                            .with(AppMenuItemProperties.TITLE, "Submenu Item Two")
+                                            .build()));
+
+                    ListItem menuItemWithSubmenu =
+                            new MVCListAdapter.ListItem(
+                                    AppMenuItemType.MENU_ITEM_WITH_SUBMENU,
+                                    new PropertyModel.Builder(
+                                                    AppMenuItemWithSubmenuProperties.ALL_KEYS)
+                                            .with(
+                                                    AppMenuItemProperties.MENU_ITEM_ID,
+                                                    menuItemWithSubmenuId)
+                                            .with(
+                                                    AppMenuItemProperties.TITLE,
+                                                    "Menu Item With Submenu")
+                                            .with(
+                                                    AppMenuItemWithSubmenuProperties.SUBMENU_ITEMS,
+                                                    submenuItems)
+                                            .build());
+
+                    mAppMenuHandler.getModelListForTesting().add(menuItemWithSubmenu);
+
+                    PropertyModel submenuItemOneModel =
+                            AppMenuTestSupport.getMenuItemPropertyModel(
+                                    mAppMenuCoordinator, menuItemSubmenuOneId);
+                    Assert.assertNotNull(
+                            submenuItemOneModel.get(AppMenuItemProperties.CLICK_HANDLER));
+                    Assert.assertEquals(0, submenuItemOneModel.get(AppMenuItemProperties.POSITION));
+
+                    PropertyModel submenuItemTwoModel =
+                            AppMenuTestSupport.getMenuItemPropertyModel(
+                                    mAppMenuCoordinator, menuItemSubmenuTwoId);
+                    Assert.assertNotNull(
+                            submenuItemTwoModel.get(AppMenuItemProperties.CLICK_HANDLER));
+                    Assert.assertEquals(1, submenuItemTwoModel.get(AppMenuItemProperties.POSITION));
+                });
     }
 
     @Test
@@ -517,6 +612,7 @@ public class AppMenuTest {
 
         ThreadUtils.runOnUiThreadBlocking(
                 () -> mAppMenuHandler.getModelListForTesting().removeAt(1));
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
 
         itemView = getViewAtPosition(1);
         Assert.assertEquals(
@@ -552,6 +648,7 @@ public class AppMenuTest {
 
         ThreadUtils.runOnUiThreadBlocking(
                 () -> mAppMenuHandler.getModelListForTesting().removeRange(0, 2));
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
 
         Assert.assertEquals(1, mAppMenuHandler.getModelListForTesting().size());
         itemView = getViewAtPosition(0);
@@ -710,6 +807,7 @@ public class AppMenuTest {
 
     @Test
     @MediumTest
+    @SuppressWarnings("DirectInvocationOnMock")
     public void testAppMenuButtonHelper_DownUp() throws Exception {
         // Use a mock app menu handler so we don't actually show the menu (which blocks the button)
         AppMenuButtonHelperImpl buttonHelper = new AppMenuButtonHelperImpl(mMockAppMenuHandler);
@@ -740,6 +838,7 @@ public class AppMenuTest {
 
     @Test
     @MediumTest
+    @SuppressWarnings("DirectInvocationOnMock")
     public void testAppMenuButtonHelper_DownCancel() throws Exception {
         // Use a mock app menu handler so we don't actually show the menu (which blocks the button)
         AppMenuButtonHelperImpl buttonHelper = new AppMenuButtonHelperImpl(mMockAppMenuHandler);
@@ -1157,7 +1256,7 @@ public class AppMenuTest {
     @Test
     @MediumTest
     public void testAppMenu_keyboardVisible() throws Exception {
-        doReturn(true).when(mKeyboardDelegate).isKeyboardShowing(any(), any());
+        doReturn(true).when(mKeyboardDelegate).isKeyboardShowing(any());
         ThreadUtils.runOnUiThreadBlocking(() -> mAppMenuCoordinator.showAppMenuForKeyboardEvent());
 
         verify(mKeyboardDelegate, timeout(500))
@@ -1199,15 +1298,20 @@ public class AppMenuTest {
     private void showMenuAndAssert(AppMenuHandlerImpl handler) throws TimeoutException {
         int currentCallCount = mMenuObserver.menuShownCallback.getCallCount();
         ThreadUtils.runOnUiThreadBlocking(() -> mAppMenuCoordinator.showAppMenuForKeyboardEvent());
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
         waitForMenuToShow(currentCallCount, handler);
     }
 
     private void waitForMenuToShow(int currentCallCount, AppMenuHandlerImpl handler)
             throws TimeoutException {
-        mMenuObserver.menuShownCallback.waitForCallback(currentCallCount);
-        Assert.assertTrue("Menu should be showing", handler.isAppMenuShowing());
-
-        ThreadUtils.runOnUiThreadBlocking(() -> handler.getAppMenu().finishAnimationsForTests());
+        CriteriaHelper.pollUiThread(
+                () -> {
+                    boolean appMenuShowing = handler.isAppMenuShowing();
+                    boolean callbackFired =
+                            mMenuObserver.menuShownCallback.getCallCount() > currentCallCount;
+                    return appMenuShowing && callbackFired;
+                },
+                "Menu was not shown or the show callback was not fired.");
     }
 
     private static class TestActivityLifecycleDispatcher implements ActivityLifecycleDispatcher {

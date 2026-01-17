@@ -18,7 +18,8 @@ export function getHtml(this: UserEducationInternalsElement) {
     @narrow-changed="${this.onNarrowChanged_}"
     narrow-threshold="920">
 </cr-toolbar>
-<div id="container">
+<div id="container" class="cr-scrollable">
+  <div class="cr-scrollable-top-shadow"></div>
   <div id="left" ?hidden="${this.narrow_}">
     <div role="navigation">
       <h2>Navigation</h2>
@@ -103,6 +104,28 @@ export function getHtml(this: UserEducationInternalsElement) {
       <div id="ntpPromos">
         <a name="ntpPromos"></a>
         <h2>NTP Promos</h2>
+        <div id="ntpPromoPreferences">
+          <cr-expand-button
+              ?expanded="${this.ntpPromoPreferencesExpanded_}"
+              @expanded-changed="${this.onNtpPromoPreferencesExpandedChanged_}">
+            <div id="label"><h3>NTP Promo Preferences</h3></div>
+          </cr-expand-button>
+          <div id="ntpPromoPrefData"
+              ?hidden="${!this.ntpPromoPreferencesExpanded_}">
+            ${this.ntpPromoPreferences_.map(item => html`
+              <p><b>${item.name}</b> ${item.value}</p>`)}
+            <p>
+              Clicking the button below will reset all NTP promo preferences
+              not tied to feature flags. These changes may not be reflected on
+              NTP tabs that are already open.
+            </p>
+            <cr-button
+                id="clearNtpPromoPreferences"
+                @click="${this.clearNtpPromoPreferences_}">
+              Clear All
+            </cr-button>
+          </div>
+        </div>
         ${this.ntpPromos_.map(item => html`
           <user-education-internals-card
               id="${item.internalName}"
@@ -115,7 +138,7 @@ export function getHtml(this: UserEducationInternalsElement) {
         <h2>What's New</h2>
         <if expr="is_chromeos == False">
           <div class="whats-new-section">
-            <cr-button @click=${this.launchWhatsNewStaging_}>
+            <cr-button @click="${this.launchWhatsNewStaging_}">
               Launch staging
             </cr-button>
           </div>

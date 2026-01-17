@@ -12,11 +12,9 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/sequence_checker.h"
 #include "base/task/sequenced_task_runner.h"
@@ -49,7 +47,9 @@ base::FilePath GetDebugdPathOfLog(const base::FilePath& log_file_name) {
            {"net.log", "netlog"},
            {"messages", "syslog"},
            {"ui.LATEST", "ui_log"},
-           {"debug_vboot_noisy.log", "verified boot"}});
+           {"debug_vboot_noisy.log", "verified boot"},
+           {"kiosk_apps.log", "kiosk_apps_log"},
+           {"kiosk_apps.1.log", "kiosk_apps_log.PREVIOUS"}});
   auto log_name = kDebugdLogNames.find(log_file_name.value());
   return log_name == kDebugdLogNames.end() ? log_file_name
                                            : base::FilePath(log_name->second);

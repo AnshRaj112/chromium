@@ -14,7 +14,10 @@
 #include "base/timer/timer.h"
 #include "base/trace_event/trace_event.h"
 #include "chrome/browser/extensions/api/identity/web_auth_flow_info_bar_delegate.h"
+#include "chrome/browser/extensions/browser_window_util.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/create_browser_window.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
@@ -25,17 +28,28 @@
 #include "extensions/buildflags/buildflags.h"
 #include "net/http/http_response_headers.h"
 #include "net/http/http_status_code.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
+#include "ui/base/base_window.h"
 #include "ui/base/page_transition_types.h"
 #include "url/gurl.h"
 #include "url/url_constants.h"
 
-using content::WebContents;
-using content::WebContentsObserver;
-
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window.h"
+#else
+static_assert(BUILDFLAG(ENABLE_DESKTOP_ANDROID_EXTENSIONS));
+#include "base/functional/callback_forward.h"
+#include "chrome/browser/android/tab_android.h"
+#include "chrome/browser/ui/android/tab_model/tab_model.h"
+#include "chrome/browser/ui/android/tab_model/tab_model_list.h"
+#include "chrome/browser/ui/tabs/tab_list_interface.h"
 #endif
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
+
+using content::WebContents;
+using content::WebContentsObserver;
 
 namespace extensions {
 
@@ -52,14 +66,13 @@ WebAuthFlow::WebAuthFlow(
       profile_(profile),
       provider_url_(provider_url),
       mode_(mode),
-#if BUILDFLAG(ENABLE_EXTENSIONS)
       user_gesture_(user_gesture),
-#endif
       abort_on_load_for_non_interactive_(abort_on_load_for_non_interactive),
       timeout_for_non_interactive_(timeout_for_non_interactive),
       non_interactive_timeout_timer_(std::make_unique<base::OneShotTimer>()),
       popup_bounds_(popup_bounds) {
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN0("identity", "WebAuthFlow", this);
+  TRACE_EVENT_BEGIN("identity", "WebAuthFlow",
+                    perfetto::Track::FromPointer(this));
   if (timeout_for_non_interactive_) {
     DCHECK_GE(*timeout_for_non_interactive_, base::TimeDelta());
     DCHECK_LE(*timeout_for_non_interactive_, base::Minutes(1));
@@ -73,8 +86,16 @@ WebAuthFlow::WebAuthFlow(
 
 WebAuthFlow::~WebAuthFlow() {
   DCHECK(!delegate_);
-
-  if (web_contents()) {
+  BrowserWindowInterface* popup_browser =
+      web_contents()
+          ? extensions::browser_window_util::GetBrowserForTabContents(
+                *web_contents())
+          : nullptr;
+  if (popup_browser) {
+    popup_browser->GetWindow()->Close();
+  } else if (web_contents()) {
+    // Explicitly close `web_contents()` if it's not displayed in any browser
+    // window.
     web_contents()->Close();
   }
 
@@ -84,7 +105,7 @@ WebAuthFlow::~WebAuthFlow() {
   // below may generate notifications.
   WebContentsObserver::Observe(nullptr);
 
-  TRACE_EVENT_NESTABLE_ASYNC_END0("identity", "WebAuthFlow", this);
+  TRACE_EVENT_END("identity", perfetto::Track::FromPointer(this));
 }
 
 void WebAuthFlow::SetClockForTesting(
@@ -145,13 +166,26 @@ void WebAuthFlow::CloseInfoBar() {
   }
 }
 
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_DESKTOP_ANDROID_EXTENSIONS)
+void WebAuthFlow::OnBrowserWindowInterfaceInitialized(
+    BrowserWindowInterface* browser) {
+  TabModel* tab_model =
+      TabModelList::FindTabModelWithWindowSessionId(browser->GetSessionID());
+  tab_model->CreateTab(
+      TabAndroid::FromWebContents(tab_model->GetActiveWebContents()),
+      std::move(web_contents_), TabModel::kInvalidIndex,
+      TabModel::TabLaunchType::FROM_RECENT_TABS_FOREGROUND,
+      /*should_pin=*/false);
+}
+#endif
+
 bool WebAuthFlow::DisplayAuthPageInPopupWindow() {
-  if (Browser::GetCreationStatusForProfile(profile_) !=
-      Browser::CreationStatus::kOk) {
+  if (GetBrowserWindowCreationStatusForProfile(*profile_) !=
+      BrowserWindowInterface::CreationStatus::kOk) {
     return false;
   }
 
+#if BUILDFLAG(ENABLE_EXTENSIONS)
   Browser::CreateParams browser_params(Browser::TYPE_POPUP, profile_,
                                        user_gesture_);
   browser_params.omit_from_session_restore = true;
@@ -167,13 +201,22 @@ bool WebAuthFlow::DisplayAuthPageInPopupWindow() {
       AddTabTypes::ADD_ACTIVE);
 
   browser->window()->Show();
+#else
+  static_assert(BUILDFLAG(ENABLE_DESKTOP_ANDROID_EXTENSIONS));
+  BrowserWindowCreateParams params(BrowserWindowInterface::TYPE_POPUP,
+                                   *profile_, user_gesture_);
+  if (popup_bounds_.has_value()) {
+    params.initial_bounds = popup_bounds_.value();
+  }
+
+  base::OnceCallback<void(BrowserWindowInterface*)> callback =
+      base::BindOnce(&WebAuthFlow::OnBrowserWindowInterfaceInitialized,
+                     weak_factory_.GetWeakPtr());
+  CreateBrowserWindow(std::move(params), std::move(callback));
+#endif
+
   return true;
 }
-#else
-bool WebAuthFlow::DisplayAuthPageInPopupWindow() {
-  return false;
-}
-#endif
 
 void WebAuthFlow::BeforeUrlLoaded(const GURL& url) {
   if (delegate_) {
@@ -320,15 +363,16 @@ void WebAuthFlow::DidFinishNavigation(
       // response headers.
     } else {
       failed = true;
-      TRACE_EVENT_NESTABLE_ASYNC_INSTANT1(
-          "identity", "DidFinishNavigationFailure", this, "error_code",
-          navigation_handle->GetNetErrorCode());
+      TRACE_EVENT_INSTANT("identity", "DidFinishNavigationFailure",
+                          perfetto::Track::FromPointer(this), "error_code",
+                          navigation_handle->GetNetErrorCode());
     }
   } else if (navigation_handle->GetResponseHeaders() &&
              navigation_handle->GetResponseHeaders()->response_code() >= 400) {
     failed = true;
-    TRACE_EVENT_NESTABLE_ASYNC_INSTANT1(
-        "identity", "DidFinishNavigationFailure", this, "response_code",
+    TRACE_EVENT_INSTANT(
+        "identity", "DidFinishNavigationFailure",
+        perfetto::Track::FromPointer(this), "response_code",
         navigation_handle->GetResponseHeaders()->response_code());
   }
 

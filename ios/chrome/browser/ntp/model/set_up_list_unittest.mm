@@ -9,9 +9,11 @@
 #import "base/test/gtest_util.h"
 #import "base/test/metrics/histogram_tester.h"
 #import "base/test/scoped_feature_list.h"
+#import "components/ntp_tiles/pref_names.h"
 #import "components/password_manager/core/browser/password_manager_util.h"
 #import "components/prefs/scoped_user_pref_update.h"
 #import "components/signin/public/base/signin_metrics.h"
+#import "components/signin/public/identity_manager/identity_manager.h"
 #import "components/sync/base/pref_names.h"
 #import "components/sync_preferences/testing_pref_service_syncable.h"
 #import "ios/chrome/browser/default_browser/model/utils.h"
@@ -35,6 +37,7 @@
 #import "ios/chrome/browser/signin/model/fake_authentication_service_delegate.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity_manager.h"
+#import "ios/chrome/browser/signin/model/identity_manager_factory.h"
 #import "ios/chrome/browser/sync/model/sync_service_factory.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
 #import "ios/web/public/test/web_task_environment.h"
@@ -72,8 +75,11 @@ class SetUpListTest : public PlatformTest {
   // Builds a new instance of SetUpList.
   void BuildSetUpList() {
     [set_up_list_ disconnect];
+
+    signin::IdentityManager* identity_manager =
+        IdentityManagerFactory::GetForProfile(GetProfile());
     set_up_list_ = [SetUpList buildFromPrefs:prefs_
-                       authenticationService:auth_service_
+                             identityManager:identity_manager
                                   localState:GetLocalState()];
   }
 
@@ -92,7 +98,7 @@ class SetUpListTest : public PlatformTest {
             base::BindOnce(
                 [](id<SystemIdentity> identity, ProfileAttributesIOS& attr) {
                   attr.SetAuthenticationInfo(
-                      GaiaId(identity.gaiaID),
+                      identity.gaiaId,
                       base::SysNSStringToUTF8(identity.userEmail));
                 },
                 identity));
@@ -269,13 +275,6 @@ TEST_F(SetUpListTest, BuildListWithNotifications_Content) {
             SetUpListItemState::kCompleteNotInList);
 }
 
-// Tests that the SetUpList uses the correct criteria when including the
-// Follow item.
-TEST_F(SetUpListTest, BuildListWithFollow) {
-  BuildSetUpList();
-  ExpectListToNotInclude(SetUpListItemType::kFollow);
-}
-
 // Tests that SetUpList observes local state changes, updates the item, and
 // calls the delegate.
 TEST_F(SetUpListTest, ObservesPrefs) {
@@ -337,7 +336,7 @@ TEST_F(SetUpListTest, RecordsAllItemsCompleteOnce) {
 // Tests that the Set Up List can be disabled.
 TEST_F(SetUpListTest, Disable) {
   EXPECT_FALSE(set_up_list_prefs::IsSetUpListDisabled(prefs_));
-  set_up_list_prefs::DisableSetUpList(prefs_);
+  prefs_->SetBoolean(ntp_tiles::prefs::kTipsHomeModuleEnabled, false);
   EXPECT_TRUE(set_up_list_prefs::IsSetUpListDisabled(prefs_));
 
   BuildSetUpList();

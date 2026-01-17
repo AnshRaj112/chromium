@@ -4,7 +4,6 @@
 
 #include "chromeos/ash/components/network/metrics/connection_info_metrics_logger.h"
 
-#include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "chromeos/ash/components/network/metrics/connection_results.h"
 #include "chromeos/ash/components/network/metrics/network_metrics_helper.h"
@@ -89,7 +88,7 @@ void ConnectionInfoMetricsLogger::NetworkListChanged() {
   // Only store visible network ConnectionInfo in |guid_to_connection_info_|.
   for (const auto& connection_info : old_guid_to_connection_info) {
     const std::string& guid = connection_info.first;
-    if (!base::Contains(visible_guids, guid))
+    if (!visible_guids.contains(guid))
       continue;
     guid_to_connection_info_.insert_or_assign(
         guid, old_guid_to_connection_info.find(guid)->second);
@@ -101,22 +100,25 @@ void ConnectionInfoMetricsLogger::NetworkConnectionStateChanged(
   UpdateConnectionInfo(network);
 }
 
-void ConnectionInfoMetricsLogger::ConnectToNetworkRequested(
+ConnectToNetworkRequestVerdict
+ConnectionInfoMetricsLogger::ConnectToNetworkRequested(
     const std::string& service_path) {
   if (!network_state_handler_) {
-    return;
+    return ConnectToNetworkRequestVerdict::kProceed;
   }
 
   const NetworkState* network =
       network_state_handler_->GetNetworkState(service_path);
 
   if (!network) {
-    return;
+    return ConnectToNetworkRequestVerdict::kProceed;
   }
 
   guid_to_connection_info_.insert_or_assign(
       network->guid(), ConnectionInfo(network,
                                       /*is_user_initiated=*/true));
+
+  return ConnectToNetworkRequestVerdict::kProceed;
 }
 
 void ConnectionInfoMetricsLogger::OnShuttingDown() {

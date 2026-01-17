@@ -32,6 +32,7 @@
 
 #include "base/containers/to_vector.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/unguessable_token.h"
 #include "net/storage_access_api/status.h"
 #include "services/network/public/mojom/referrer_policy.mojom-blink.h"
 #include "third_party/blink/public/common/loader/referrer_utils.h"
@@ -70,6 +71,7 @@
 #include "third_party/blink/renderer/core/html/plugin_document.h"
 #include "third_party/blink/renderer/core/layout/layout_object.h"
 #include "third_party/blink/renderer/core/page/page.h"
+#include "third_party/blink/renderer/core/script_tools/model_context_supplement.h"
 #include "third_party/blink/renderer/core/speculation_rules/document_speculation_rules.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/loader/fetch/resource_fetcher.h"
@@ -403,6 +405,38 @@ void WebDocument::SnapshotAccessibilityTree(
 
 size_t WebDocument::ActiveResourceRequestCount() const {
   return ConstUnwrap<Document>()->Fetcher()->ActiveRequestCount();
+}
+
+void WebDocument::ExecuteScriptTool(
+    const WebString& name,
+    const WebString& input_arguments,
+    ScriptToolExecutedCallback tool_executed_cb) {
+  if (auto* model_context = ModelContextSupplement::modelContext(
+          *Unwrap<Document>()->domWindow()->navigator())) {
+    model_context->ExecuteTool(name, input_arguments,
+                               std::move(tool_executed_cb));
+  }
+}
+
+void WebDocument::DispatchAutofillEvent(
+    std::vector<std::pair<WebFormControlElement, WebString>> field_data,
+    const base::UnguessableToken& fill_id,
+    bool supports_refill) {
+  Document* document = Unwrap<Document>();
+  CHECK(document);
+
+  HeapVector<std::pair<Member<Element>, String>> converted_field_data;
+  for (auto& pair : field_data) {
+    if (pair.first.IsNull()) {
+      continue;
+    }
+    HTMLFormControlElement* control_element = pair.first;
+    converted_field_data.push_back(
+        std::make_pair(control_element, String(std::move(pair.second))));
+  }
+
+  document->DispatchAutofillEvent(std::move(converted_field_data), fill_id,
+                                  supports_refill);
 }
 
 }  // namespace blink

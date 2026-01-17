@@ -44,6 +44,7 @@
 #include "content/browser/media/frameless_media_interface_proxy.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/gpu_data_manager_observer.h"
 #include "content/public/browser/gpu_utils.h"
 #include "content/public/common/content_client.h"
@@ -422,7 +423,11 @@ void CollectExtraDevicePerfInfo(const gpu::GPUInfo& gpu_info,
   const gpu::GPUInfo::GPUDevice& device = gpu_info.active_gpu();
   if (device.vendor_id == 0xffff /* internal flag for software rendering */ ||
       device.vendor_id == 0x15ad /* VMware */ ||
-      device.vendor_id == 0x1414 /* Microsoft software renderer */ ||
+      // Starting with Windows 8, an adapter called the "Microsoft Basic Render
+      // Driver" is always present. This adapter has a VendorId of 0x1414 and a
+      // DeviceID of 0x8c. The Microsoft vendor id is used for other,
+      // non-software devices such as Xbox, so we must also check the device id.
+      (device.vendor_id == 0x1414 && device.device_id == 0x8c) /* WARP */ ||
       gl::IsSoftwareGLImplementation(
           gpu_info.gl_implementation_parts) /* SwiftShader */) {
     device_perf_info->software_rendering = true;
@@ -531,7 +536,9 @@ void GpuDataManagerImplPrivate::InitializeGpuModes() {
     // support software compositing or sometimes fail dawn initialization.
     // TODO(b/323953910): Eliminate this fallback on each platform once Graphite
     // stability is sufficient on that platform.
+#if !(BUILDFLAG(IS_MAC) && defined(ARCH_CPU_ARM64))
     fallback_modes_.push_back(gpu::GpuMode::HARDWARE_GL);
+#endif
     fallback_modes_.push_back(gpu::GpuMode::HARDWARE_GRAPHITE);
   } else {
     // On Fuchsia Vulkan must be used when it's enabled by the WebEngine
@@ -779,7 +786,7 @@ void GpuDataManagerImplPrivate::RequestDawnInfo(bool delayed,
   base::OnceClosure task = base::BindOnce(
       [](bool collect_metrics) {
         GpuProcessHost* host = GpuProcessHost::Get(GPU_PROCESS_KIND_SANDBOXED,
-                                                   false /* force_create */);
+                                                   /*force_create=*/false);
         if (!host) {
           return;
         }
@@ -920,7 +927,7 @@ gpu::GpuFeatureStatus GpuDataManagerImplPrivate::GetFeatureStatus(
 void GpuDataManagerImplPrivate::RequestVideoMemoryUsageStatsUpdate(
     GpuDataManager::VideoMemoryUsageStatsCallback callback) const {
   GpuProcessHost::CallOnUI(
-      FROM_HERE, GPU_PROCESS_KIND_SANDBOXED, false /* force_create */,
+      FROM_HERE, GPU_PROCESS_KIND_SANDBOXED, /*force_create=*/false ,
       base::BindOnce(&RequestVideoMemoryUsageStats, std::move(callback)));
 }
 
@@ -978,6 +985,7 @@ void GpuDataManagerImplPrivate::UpdateGpuInfo(
 #endif
   gpu_info_ = gpu_info;
   RecordDiscreteGpuHistograms(gpu_info_);
+  RecordNpuHistograms(gpu_info_);
 #if BUILDFLAG(ENABLE_VULKAN)
   // Remember the initial hardware_supports_vulkan value so it doesn't change
   // if GPU process restarts as Vulkan might get disabled by GPU mode fallback.
@@ -1137,7 +1145,7 @@ void GpuDataManagerImplPrivate::TerminateInfoCollectionGpuProcess() {
   // directly here from TerminateInfoCollectionGpuProcess(), which also runs on
   // the IO thread.
   GpuProcessHost* host = GpuProcessHost::Get(GPU_PROCESS_KIND_INFO_COLLECTION,
-                                             false /* force_create */);
+                                             /*force_create=*/false );
   if (host)
     host->ForceShutdown();
 }
@@ -1343,6 +1351,16 @@ void GpuDataManagerImplPrivate::UpdateGpuPreferences(
   DCHECK(gpu_preferences);
 
   gpu_preferences->gpu_program_cache_size = gpu::GetDefaultGpuDiskCacheSize();
+#if BUILDFLAG(IS_ANDROID)
+  // Disable WebGPU if Android Advanced Protection is enabled.
+  // Directly toggling preferences instead of kWebGPUService to prevent
+  // bypass by enable_unsafe_webgpu.
+  if (GetContentClient()->browser()->IsAndroidAdvancedProtectionEnabled() &&
+      base::FeatureList::IsEnabled(features::kAAPMBlocksWebGPU)) {
+    gpu_preferences->enable_webgpu = false;
+    gpu_preferences->enable_unsafe_webgpu = false;
+  }
+#endif
 
   gpu_preferences->watchdog_starts_backgrounded = !application_is_visible_;
 
@@ -1452,17 +1470,15 @@ base::Value::List GpuDataManagerImplPrivate::GetLogMessages() const {
 void GpuDataManagerImplPrivate::HandleGpuSwitch() {
   base::AutoUnlock unlock(owner_->lock_);
   // Notify observers in the browser process.
-  ui::GpuSwitchingManager::GetInstance()->NotifyGpuSwitched(
-      active_gpu_heuristic_);
+  ui::GpuSwitchingManager::GetInstance()->NotifyGpuSwitched();
   // Pass the notification to the GPU process to notify observers there.
-  GpuProcessHost::CallOnUI(
-      FROM_HERE, GPU_PROCESS_KIND_SANDBOXED, false /* force_create */,
-      base::BindOnce(
-          [](gl::GpuPreference active_gpu, GpuProcessHost* host) {
-            if (host)
-              host->gpu_service()->GpuSwitched(active_gpu);
-          },
-          active_gpu_heuristic_));
+  GpuProcessHost::CallOnUI(FROM_HERE, GPU_PROCESS_KIND_SANDBOXED,
+                           /*force_create=*/false ,
+                           base::BindOnce([](GpuProcessHost* host) {
+                             if (host) {
+                               host->gpu_service()->GpuSwitched();
+                             }
+                           }));
 }
 
 void GpuDataManagerImplPrivate::OnDisplayAdded(
@@ -1473,7 +1489,7 @@ void GpuDataManagerImplPrivate::OnDisplayAdded(
   ui::GpuSwitchingManager::GetInstance()->NotifyDisplayAdded();
   // Pass the notification to the GPU process to notify observers there.
   GpuProcessHost::CallOnUI(FROM_HERE, GPU_PROCESS_KIND_SANDBOXED,
-                           false /* force_create */,
+                           /*force_create=*/false ,
                            base::BindOnce([](GpuProcessHost* host) {
                              if (host)
                                host->gpu_service()->DisplayAdded();
@@ -1488,7 +1504,7 @@ void GpuDataManagerImplPrivate::OnDisplaysRemoved(
   ui::GpuSwitchingManager::GetInstance()->NotifyDisplayRemoved();
   // Pass the notification to the GPU process to notify observers there.
   GpuProcessHost::CallOnUI(FROM_HERE, GPU_PROCESS_KIND_SANDBOXED,
-                           false /* force_create */,
+                           /*force_create=*/false ,
                            base::BindOnce([](GpuProcessHost* host) {
                              if (host)
                                host->gpu_service()->DisplayRemoved();
@@ -1504,7 +1520,7 @@ void GpuDataManagerImplPrivate::OnDisplayMetricsChanged(
   ui::GpuSwitchingManager::GetInstance()->NotifyDisplayMetricsChanged();
   // Pass the notification to the GPU process to notify observers there.
   GpuProcessHost::CallOnUI(FROM_HERE, GPU_PROCESS_KIND_SANDBOXED,
-                           false /* force_create */,
+                           /*force_create=*/false ,
                            base::BindOnce([](GpuProcessHost* host) {
                              if (host)
                                host->gpu_service()->DisplayMetricsChanged();
@@ -1562,7 +1578,7 @@ std::string GpuDataManagerImplPrivate::GetDomainFromURL(const GURL& url) const {
     return std::string();
   }
 
-  return url.host();
+  return url.GetHost();
 }
 
 void GpuDataManagerImplPrivate::BlockDomainsFrom3DAPIsAtTime(

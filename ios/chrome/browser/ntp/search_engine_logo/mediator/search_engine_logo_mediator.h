@@ -7,45 +7,46 @@
 
 #import <UIKit/UIKit.h>
 
+#import "base/memory/scoped_refptr.h"
 #import "url/gurl.h"
 
+class GoogleLogoService;
 @protocol SearchEngineLogoConsumer;
 enum class SearchEngineLogoState;
+class TemplateURLService;
+class UrlLoadingBrowserAgent;
 
-class Browser;
+namespace network {
+class SharedURLLoaderFactory;
+}  // namespace network
 namespace web {
 class WebState;
-}
+}  // namespace web
 
 @interface SearchEngineLogoMediator : NSObject
 
-// Whether the logo should be multicolor or monochrome.
+// Whether the logo should be multicolor or monochrome. If the logo is a doodle,
+// that will supercede a potential monochrome logo.
 @property(nonatomic, assign) BOOL usesMonochromeLogo;
 @property(nonatomic, weak) id<SearchEngineLogoConsumer> consumer;
 
 // View that shows a doodle or a search engine logo.
-// TODO(crbug.com/423883582): Need to be removed.
+// TODO(crbug.com/436228514): Need to be removed.
 @property(nonatomic, strong, readonly) UIView* view;
-// Whether or not the logo should be shown. Defaults to
-// SearchEngineLogoState::kLogo.
-// TODO(crbug.com/423883582): Need to be removed: the consumer is supposed to
-// rely on -[<SearchEngineLogoConsumer> searchEngineLogoStateDidChange:] to get
-// the value.
-@property(nonatomic, assign) SearchEngineLogoState logoState;
 
 // Designated initializer.
-- (instancetype)initWithBrowser:(Browser*)browser
-                       webState:(web::WebState*)webState
-    NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithWebState:(web::WebState*)webState
+              templateURLService:(TemplateURLService*)templateURLService
+                     logoService:(GoogleLogoService*)logoService
+          URLLoadingBrowserAgent:(UrlLoadingBrowserAgent*)URLLoadingBrowserAgent
+          sharedURLLoaderFactory:
+              (scoped_refptr<network::SharedURLLoaderFactory>)
+                  sharedURLLoaderFactory
+                    offTheRecord:(BOOL)offTheRecord NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;
 
 // Disconnect the instance.
 - (void)disconnect;
-
-// Checks for a new doodle.  Calling this method frequently will result in a
-// query being issued at most once per hour.
-// TODO(crbug.com/423883582): Need to be removed.
-- (void)fetchDoodle;
 
 // Updates the vendor's WebState.
 - (void)setWebState:(web::WebState*)webState;
@@ -58,6 +59,8 @@ class WebState;
 - (void)simulateDoodleTapped;
 // Sets the destination URL for the doodle tap handler.
 - (void)setClickURLText:(const GURL&)url;
+// Called when the search engine has changed.
+- (void)searchEngineChanged;
 
 @end
 

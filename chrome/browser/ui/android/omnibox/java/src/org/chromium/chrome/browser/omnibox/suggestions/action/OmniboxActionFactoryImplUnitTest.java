@@ -83,7 +83,14 @@ public class OmniboxActionFactoryImplUnitTest {
         assertNotNull(
                 OmniboxActionInSuggest.from(
                         OmniboxActionFactoryImpl.get()
-                                .buildActionInSuggest(0, "hint", "accessibility", 1, "url")));
+                                .buildActionInSuggest(
+                                        0,
+                                        "hint",
+                                        "accessibility",
+                                        1,
+                                        "url",
+                                        /* tabId= */ 0,
+                                        /* showAsActionButton= */ false)));
     }
 
     @Test
@@ -96,7 +103,9 @@ public class OmniboxActionFactoryImplUnitTest {
                                 "hint",
                                 "accessibility",
                                 SuggestTemplateInfo.TemplateAction.ActionType.CALL_VALUE,
-                                "url"));
+                                "url",
+                                /* tabId= */ 0,
+                                /* showAsActionButton= */ false));
     }
 
     @Test
@@ -109,6 +118,8 @@ public class OmniboxActionFactoryImplUnitTest {
                                 "hint",
                                 "accessibility",
                                 SuggestTemplateInfo.TemplateAction.ActionType.CALL_VALUE,
-                                "url"));
+                                "url",
+                                /* tabId= */ 0,
+                                /* showAsActionButton= */ false));
     }
 }

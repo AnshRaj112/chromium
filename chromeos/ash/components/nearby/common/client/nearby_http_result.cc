@@ -5,6 +5,7 @@
 #include "chromeos/ash/components/nearby/common/client/nearby_http_result.h"
 
 #include "net/base/net_errors.h"
+#include "net/http/http_response_headers.h"
 #include "net/http/http_status_code.h"
 #include "services/network/public/cpp/header_util.h"
 #include "services/network/public/cpp/simple_url_loader.h"
@@ -107,8 +108,7 @@ std::string NearbyHttpStatus::ToString() const {
   std::string net_code = net::ErrorToString(net_error_code_);
   std::string response_code =
       http_response_code_.has_value()
-          ? net::GetHttpReasonPhrase(
-                static_cast<net::HttpStatusCode>(*http_response_code_))
+          ? std::string(net::GetHttpReasonPhrase(*http_response_code_))
           : "[null]";
 
   return "status=" + status + ", net_code=" + net_code +

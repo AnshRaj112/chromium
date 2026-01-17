@@ -54,13 +54,22 @@ ${function() {
 </if>
 </div>
 <div class="footer">
-  <cr-button id="browseAsGuestButton"
-      @click="${this.onLaunchGuestProfileClick_}"
-      ?hidden="${!this.guestModeEnabled_}"
-      ?disabled="${this.pickerButtonsDisabled_}">
-    <cr-icon icon="profiles:account-circle" slot="prefix-icon"></cr-icon>
-    $i18n{browseAsGuestButton}
-  </cr-button>
+  <div class="footer-buttons-container">
+    <cr-button id="browseAsGuestButton"
+        @click="${this.onLaunchGuestProfileClick_}"
+        ?hidden="${!this.guestModeEnabled_}"
+        ?disabled="${this.pickerButtonsDisabled_}">
+      <cr-icon icon="profiles:account-box" slot="prefix-icon"></cr-icon>
+      $i18n{browseAsGuestButton}
+    </cr-button>
+    <cr-button id="openAllProfilesButton"
+        class="action-button"
+        @click="${this.onOpenAllProfilesClick_}"
+        ?hidden="${!this.shouldShowOpenAllProfilesButton_}"
+        ?disabled="${this.pickerButtonsDisabled_}">
+      $i18n{openAllProfilesButtonText}
+    </cr-button>
+  </div>
   <cr-checkbox id="askOnStartup" ?checked="${this.askOnStartup_}"
       @checked-changed="${this.onAskOnStartupChangedByUser_}"
       ?hidden="${this.hideAskOnStartup_}">
@@ -68,23 +77,7 @@ ${function() {
   </cr-checkbox>
 </div>
 
-<cr-dialog id="forceSigninErrorDialog">
-  <div slot="title" id="dialog-title" class="key-text">
-    ${this.forceSigninErrorDialogTitle_}</div>
-  <div slot="body" id="dialog-body" class="warning-message">
-    ${this.forceSigninErrorDialogBody_}
-  </div>
-  <div slot="button-container" class="button-container">
-    <cr-button id="cancel-button"
-        @click="${this.onForceSigninErrorDialogOkButtonClicked_}">
-      $i18n{ok}
-    </cr-button>
-    <cr-button id="button-sign-in" class="action-button"
-        @click="${this.onReauthClicked_}"
-        ?hidden="${!this.shouldShownSigninButton_}">
-      $i18n{needsSigninPrompt}
-    </cr-button>
-  </div>
-</cr-dialog>
+<signin-error-dialog id="signinErrorDialog">
+</signin-error-dialog>
 <!--_html_template_end_-->`;
 }

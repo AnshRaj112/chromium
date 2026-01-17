@@ -22,6 +22,7 @@
 #include "components/page_info/core/merchant_trust_service.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/vector_icons/vector_icons.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
@@ -120,7 +121,8 @@ bool MerchantTrustChipButtonController::ShouldBeVisible() {
 }
 
 void MerchantTrustChipButtonController::Show() {
-  const int radius = GetLayoutConstant(LOCATION_BAR_CHILD_CORNER_RADIUS);
+  const int radius =
+      GetLayoutConstant(LayoutConstant::kLocationBarChildCornerRadius);
   location_icon_view_->SetCornerRadii(
       gfx::RoundedCornersF(radius, 0, 0, radius));
   chip_button_->SetCornerRadii(gfx::RoundedCornersF(0, radius, radius, 0));

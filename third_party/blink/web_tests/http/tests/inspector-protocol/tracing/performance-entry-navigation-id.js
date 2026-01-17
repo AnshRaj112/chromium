@@ -36,10 +36,9 @@
     });
   }
 
-  async function firstEntryAfter(
-      timeStamp, entryType, includeSoftNavigationObservations = false) {
+  async function firstEntryAfter(timeStamp, entryType) {
     return session.evaluateAsync(
-        function(timeStamp, entryType, includeSoftNavigationObservations) {
+      function (timeStamp, entryType) {
           return new Promise(resolve => {
             new PerformanceObserver((list, observer) => {
               const e =
@@ -50,13 +49,11 @@
               }
             }).observe({
               type: entryType,
-              includeSoftNavigationObservations:
-                  includeSoftNavigationObservations,
               buffered: true
             });
           });
         },
-        timeStamp, entryType, includeSoftNavigationObservations);
+      timeStamp, entryType);
   }
 
   // Start tracing and observe the devtools.timeline category.
@@ -176,21 +173,22 @@
     name: 'hard-lcp (entry)'
   });
 
-  // There's no principled way to wait for the trace events to arrive,
-  // so we give it a second here, before we stop tracing.
-  await new Promise(resolve => setTimeout(resolve, 1000));
-
   const unfilteredEvents = await tracingHelper.stopTracing();
 
   const traceEntries = [];
   for (const event of unfilteredEvents.sort((a, b) => a.ts - b.ts)) {
-    if (event.name === 'largestContentfulPaint::Candidate') {
+    if (event.name === 'largestContentfulPaint::CandidateForSoftNavigation') {
+      traceEntries.push({
+        navigationId: event.args.data.performanceTimelineNavigationId,
+        name: 'LCP candidate for soft navigation (trace)'
+      });
+    } else if (event.name === 'largestContentfulPaint::Candidate') {
       traceEntries.push({
         navigationId: event.args.data.performanceTimelineNavigationId,
         name: 'LCP candidate (trace)'
       });
     } else if (
-        event.name === 'SoftNavigationHeuristics::EmitSoftNavigationEntry') {
+      event.name === 'SoftNavigationStart') {
       traceEntries.push({
         navigationId: event.args.context.performanceTimelineNavigationId,
         name: 'Soft navigation (trace)'

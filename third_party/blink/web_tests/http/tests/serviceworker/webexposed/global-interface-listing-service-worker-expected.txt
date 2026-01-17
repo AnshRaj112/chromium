@@ -69,6 +69,7 @@ interface Blob
     getter size
     getter type
     method arrayBuffer
+    method bytes
     method constructor
     method slice
     method stream
@@ -687,6 +688,7 @@ interface GPUBuffer
     method destroy
     method getMappedRange
     method mapAsync
+    method mapSync
     method unmap
     setter label
 interface GPUCanvasContext
@@ -744,6 +746,7 @@ interface GPUComputePassEncoder
     method popDebugGroup
     method pushDebugGroup
     method setBindGroup
+    method setImmediates
     method setPipeline
     method writeTimestamp
     setter label
@@ -824,6 +827,7 @@ interface GPUQueue
     attribute @@toStringTag
     getter label
     method constructor
+    method copyElementImageToTexture
     method copyExternalImageToTexture
     method onSubmittedWorkDone
     method submit
@@ -848,6 +852,7 @@ interface GPURenderBundleEncoder
     method popDebugGroup
     method pushDebugGroup
     method setBindGroup
+    method setImmediates
     method setIndexBuffer
     method setPipeline
     method setVertexBuffer
@@ -871,6 +876,7 @@ interface GPURenderPassEncoder
     method pushDebugGroup
     method setBindGroup
     method setBlendConstant
+    method setImmediates
     method setIndexBuffer
     method setPipeline
     method setScissorRect
@@ -930,6 +936,7 @@ interface GPUSupportedLimits
     getter maxComputeWorkgroupsPerDimension
     getter maxDynamicStorageBuffersPerPipelineLayout
     getter maxDynamicUniformBuffersPerPipelineLayout
+    getter maxImmediateSize
     getter maxInterStageShaderVariables
     getter maxSampledTexturesPerShaderStage
     getter maxSamplersPerShaderStage
@@ -961,6 +968,7 @@ interface GPUTexture
     getter label
     getter mipLevelCount
     getter sampleCount
+    getter textureBindingViewDimension
     getter usage
     getter width
     method constructor
@@ -1480,14 +1488,12 @@ interface OffscreenCanvasRenderingContext2D
     setter textRendering
     setter wordSpacing
 interface Origin
-    static method parse
+    static method from
     attribute @@toStringTag
     getter opaque
     method constructor
     method isSameOrigin
     method isSameSite
-    method toJSON
-    method toString
 interface Path2D
     attribute @@toStringTag
     method addPath
@@ -1690,28 +1696,6 @@ interface QuotaExceededError : DOMException
     getter quota
     getter requested
     method constructor
-interface RTCRtpAcks
-    attribute @@toStringTag
-    getter explicitCongestionNotification
-    getter receivedTime
-    getter remoteSendTimestamp
-    method acks
-    method constructor
-interface RTCRtpSendResult
-    attribute @@toStringTag
-    getter sent
-    getter unsent
-    method constructor
-interface RTCRtpSendStream
-    attribute @@toStringTag
-    method constructor
-    method sendRtp
-interface RTCRtpSent
-    attribute @@toStringTag
-    getter ackId
-    getter size
-    getter time
-    method constructor
 interface ReadableByteStreamController
     attribute @@toStringTag
     getter byobRequest
@@ -1794,6 +1778,7 @@ interface Request
     method clone
     method constructor
     method formData
+    method getRetryOptions
     method json
     method text
 interface Response
@@ -1820,6 +1805,39 @@ interface Response
 interface RestrictionTarget
     attribute @@toStringTag
     method constructor
+interface RtcReceivedPacket
+    attribute @@toStringTag
+    getter payloadByteLength
+    getter receiveTime
+    method constructor
+    method copyPayloadTo
+interface RtcTransport
+    attribute @@toStringTag
+    getter fingerprint
+    getter fingerprintDigestAlgorithm
+    getter onicecandidate
+    getter onwritablechange
+    method addRemoteCandidate
+    method constructor
+    method getReceivedPackets
+    method sendPackets
+    method setRemoteDtlsParameters
+    method writable
+    setter onicecandidate
+    setter onwritablechange
+interface RtcTransportIceCandidate
+    attribute @@toStringTag
+    getter address
+    getter password
+    getter port
+    getter type
+    getter usernameFragment
+    method constructor
+    method toJSON
+interface RtcTransportIceEvent : Event
+    attribute @@toStringTag
+    getter candidate
+    method constructor
 interface Scheduler
     attribute @@toStringTag
     method constructor
@@ -1832,6 +1850,7 @@ interface SecurityPolicyViolationEvent : Event
     getter disposition
     getter documentURI
     getter effectiveDirective
+    getter evalHash
     getter lineNumber
     getter originalPolicy
     getter referrer
@@ -2052,12 +2071,11 @@ interface TrustedTypePolicy
     method createHTML
     method createScript
     method createScriptURL
-interface TrustedTypePolicyFactory : EventTarget
+interface TrustedTypePolicyFactory
     attribute @@toStringTag
     getter defaultPolicy
     getter emptyHTML
     getter emptyScript
-    getter onbeforecreatepolicy
     method constructor
     method createPolicy
     method getAttributeType
@@ -2066,7 +2084,6 @@ interface TrustedTypePolicyFactory : EventTarget
     method isHTML
     method isScript
     method isScriptURL
-    setter onbeforecreatepolicy
 interface URL
     static method canParse
     static method parse
@@ -2869,7 +2886,6 @@ interface WebGL2RenderingContext
     method samplerParameterf
     method samplerParameteri
     method scissor
-    method setHitTestRegions
     method shaderSource
     method stencilFunc
     method stencilFuncSeparate
@@ -2878,6 +2894,7 @@ interface WebGL2RenderingContext
     method stencilOp
     method stencilOpSeparate
     method texElement2D
+    method texElementImage2D
     method texImage2D
     method texImage3D
     method texParameterf
@@ -3373,7 +3390,6 @@ interface WebGLRenderingContext
     method renderbufferStorage
     method sampleCoverage
     method scissor
-    method setHitTestRegions
     method shaderSource
     method stencilFunc
     method stencilFuncSeparate
@@ -3382,6 +3398,7 @@ interface WebGLRenderingContext
     method stencilOp
     method stencilOpSeparate
     method texElement2D
+    method texElementImage2D
     method texImage2D
     method texParameterf
     method texParameteri
@@ -3488,6 +3505,7 @@ interface WebTransport
     getter datagrams
     getter incomingBidirectionalStreams
     getter incomingUnidirectionalStreams
+    getter protocol
     getter ready
     method close
     method constructor
@@ -3662,6 +3680,18 @@ namespace GPUTextureUsage
     attribute RENDER_ATTACHMENT
     attribute STORAGE_BINDING
     attribute TEXTURE_BINDING
+    attribute TRANSIENT_ATTACHMENT
+namespace Temporal
+    attribute @@toStringTag
+    attribute Now
+    method Duration
+    method Instant
+    method PlainDate
+    method PlainDateTime
+    method PlainMonthDay
+    method PlainTime
+    method PlainYearMonth
+    method ZonedDateTime
 namespace console
     attribute @@toStringTag
     method assert

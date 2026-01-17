@@ -9,12 +9,12 @@
 
 #include "ash/public/cpp/child_accounts/parent_access_controller.h"
 #include "base/check.h"
-#include "base/containers/contains.h"
+#include "base/check_deref.h"
+#include "base/check_op.h"
 #include "base/logging.h"
 #include "base/no_destructor.h"
 #include "base/timer/timer.h"
 #include "base/values.h"
-#include "chrome/browser/browser_process.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/pref_names.h"
 #include "components/prefs/pref_registry_simple.h"
@@ -25,6 +25,8 @@ namespace ash {
 namespace parent_access {
 
 namespace {
+
+static ParentAccessService* g_instance = nullptr;
 
 // Returns true when the device owner is a child.
 bool IsDeviceOwnedByChild() {
@@ -61,8 +63,7 @@ void ParentAccessService::RegisterProfilePrefs(PrefRegistrySimple* registry) {
 
 // static
 ParentAccessService& ParentAccessService::Get() {
-  static base::NoDestructor<ParentAccessService> instance;
-  return *instance;
+  return CHECK_DEREF(g_instance);
 }
 
 // static
@@ -82,9 +83,16 @@ bool ParentAccessService::IsApprovalRequired(SupervisedAction action) {
   }
 }
 
-ParentAccessService::ParentAccessService() = default;
+ParentAccessService::ParentAccessService(PrefService* local_state)
+    : config_source_(local_state) {
+  CHECK(!g_instance);
+  g_instance = this;
+}
 
-ParentAccessService::~ParentAccessService() = default;
+ParentAccessService::~ParentAccessService() {
+  CHECK_EQ(g_instance, this);
+  g_instance = nullptr;
+}
 
 ParentCodeValidationResult ParentAccessService::ValidateParentAccessCode(
     const AccountId& account_id,
@@ -94,7 +102,7 @@ ParentCodeValidationResult ParentAccessService::ValidateParentAccessCode(
 
   if (config_source_.config_map().empty() ||
       (account_id.is_valid() &&
-       !base::Contains(config_source_.config_map(), account_id))) {
+       !config_source_.config_map().contains(account_id))) {
     result = ParentCodeValidationResult::kNoConfig;
     NotifyObservers(result, account_id);
     return result;
@@ -116,8 +124,14 @@ ParentCodeValidationResult ParentAccessService::ValidateParentAccessCode(
   return result;
 }
 
-void ParentAccessService::LoadConfigForUser(const user_manager::User* user) {
-  config_source_.LoadConfigForUser(user);
+void ParentAccessService::UpdateConfigForUser(
+    const AccountId& account_id,
+    std::optional<base::Value::Dict> config) {
+  if (config) {
+    config_source_.UpdateConfigForUser(account_id, std::move(config.value()));
+  } else {
+    config_source_.RemoveConfigForUser(account_id);
+  }
 }
 
 void ParentAccessService::AddObserver(Observer* observer) {

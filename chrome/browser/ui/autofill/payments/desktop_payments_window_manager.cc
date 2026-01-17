@@ -31,6 +31,10 @@
 #include "ui/gfx/geometry/rect.h"
 #include "url/gurl.h"
 
+#if BUILDFLAG(IS_LINUX)
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"  // nogncheck
+#endif  // BUILDFLAG(IS_LINUX)
+
 namespace autofill::payments {
 
 namespace {
@@ -47,10 +51,10 @@ gfx::Rect GetPopupSizeForVcn3ds() {
 
 gfx::Rect GetPopupSizeForBnpl() {
   // The first two arguments do not matter as position gets overridden by
-  // the tab modal pop-up code. The 600x640 size of the pop-up was decided as
+  // the tab modal pop-up code. The 600x840 size of the pop-up was decided as
   // the ideal size for user experience. This decision largely factored in how
   // to minimize scrolling while maintaining a presentable pop-up.
-  return gfx::Rect(/*x=*/0, /*y=*/0, /*width=*/600, /*height=*/640);
+  return gfx::Rect(/*x=*/0, /*y=*/0, /*width=*/600, /*height=*/840);
 }
 
 }  // namespace
@@ -59,7 +63,9 @@ DesktopPaymentsWindowManager::DesktopPaymentsWindowManager(
     ContentAutofillClient* client)
     : client_(CHECK_DEREF(client)) {
 #if BUILDFLAG(IS_LINUX)
-  scoped_observation_.Observe(BrowserList::GetInstance());
+  scoped_observation_.Observe(
+      ProfileBrowserCollection::GetForProfile(Profile::FromBrowserContext(
+          client_->GetWebContents().GetBrowserContext())));
 #endif  // BUILDFLAG(IS_LINUX)
 }
 
@@ -152,7 +158,8 @@ void DesktopPaymentsWindowManager::WebContentsDestroyed() {
 }
 
 #if BUILDFLAG(IS_LINUX)
-void DesktopPaymentsWindowManager::OnBrowserSetLastActive(Browser* browser) {
+void DesktopPaymentsWindowManager::OnBrowserActivated(
+    BrowserWindowInterface* browser) {
   // If there is an ongoing payments window manager pop-up flow, and the
   // original tab's WebContents become active, activate the pop-up's
   // WebContents. This functionality is only required on Linux, as on
@@ -161,7 +168,7 @@ void DesktopPaymentsWindowManager::OnBrowserSetLastActive(Browser* browser) {
   if (web_contents()) {
     CHECK(flow_state_.has_value());
     CHECK_NE(flow_state_->flow_type, FlowType::kNoFlow);
-    if (browser->tab_strip_model()->GetActiveWebContents() ==
+    if (browser->GetTabStripModel()->GetActiveWebContents() ==
         &client_->GetWebContents()) {
       web_contents()->GetDelegate()->ActivateContents(web_contents());
     }
@@ -181,7 +188,7 @@ void DesktopPaymentsWindowManager::CreatePopup(const GURL& url,
       Profile::FromBrowserContext(source_contents.GetBrowserContext()), url,
       ui::PAGE_TRANSITION_LINK);
   params.disposition = WindowOpenDisposition::NEW_POPUP;
-  params.window_action = NavigateParams::SHOW_WINDOW;
+  params.window_action = NavigateParams::WindowAction::kShowWindow;
   params.source_contents = &source_contents;
   params.is_tab_modal_popup_deprecated = true;
   params.window_features.bounds = std::move(popup_size);

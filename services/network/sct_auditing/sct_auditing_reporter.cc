@@ -4,8 +4,10 @@
 
 #include "services/network/sct_auditing/sct_auditing_reporter.h"
 
+#include <optional>
+#include <string>
+
 #include "base/base64.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/json/json_reader.h"
@@ -20,6 +22,7 @@
 #include "net/base/load_flags.h"
 #include "net/base/net_errors.h"
 #include "net/base/request_priority.h"
+#include "net/http/http_response_headers.h"
 #include "net/http/http_status_code.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "services/network/network_context.h"
@@ -357,7 +360,7 @@ void SCTAuditingReporter::SendLookupQuery() {
 }
 
 void SCTAuditingReporter::OnSendLookupQueryComplete(
-    std::unique_ptr<std::string> response_body) {
+    std::optional<std::string> response_body) {
   int response_code = 0;
   if (url_loader_->ResponseInfo() && url_loader_->ResponseInfo()->headers) {
     response_code = url_loader_->ResponseInfo()->headers->response_code();
@@ -370,8 +373,8 @@ void SCTAuditingReporter::OnSendLookupQueryComplete(
     return;
   }
 
-  std::optional<base::Value::Dict> result =
-      base::JSONReader::ReadDict(*response_body);
+  std::optional<base::Value::Dict> result = base::JSONReader::ReadDict(
+      *response_body, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!result) {
     RecordLookupQueryResult(LookupQueryResult::kInvalidJson);
     MaybeRetryRequest();
@@ -485,10 +488,9 @@ void SCTAuditingReporter::OnSendLookupQueryComplete(
   std::string hash_suffix = TruncateSuffix(sct_hashdance_metadata_->leaf_hash,
                                            kHashdanceHashPrefixLength);
   hash_suffix = base::Base64Encode(base::as_byte_span(hash_suffix));
-  base::Value hash_suffix_value(std::move(hash_suffix));
   // TODO(nsatragno): it would be neat if the backend returned a sorted list and
   // we could binary search it instead.
-  if (base::Contains(*suffix_value, hash_suffix_value)) {
+  if (suffix_value->contains(hash_suffix)) {
     // Found the SCT in the suffix list, all done.
     RecordLookupQueryResult(LookupQueryResult::kSCTSuffixFound);
     std::move(done_callback_).Run(reporter_key_);

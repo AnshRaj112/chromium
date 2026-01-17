@@ -98,9 +98,9 @@ class AutoDeletionService : public web::DownloadTaskObserver {
   // Auto-deletion for `task`.
   void MarkTaskForDeletion(web::DownloadTask* task, const base::FilePath& path);
 
-  // Schedules a file for auto-deletion if the `task` was marked for
-  // Auto-deletion.
-  void ScheduleFileForDeletion(web::DownloadTask* task);
+  // Schedules a file for auto-deletion if the DownloadTask associated with
+  // `task_id` was marked for Auto-deletion.
+  void ScheduleFileForDeletion(const std::string& task_id);
 
   // Deletes the files that have been marked as ready for deletion.
   void RemoveScheduledFilesReadyForDeletion(base::OnceClosure closure);
@@ -115,14 +115,23 @@ class AutoDeletionService : public web::DownloadTaskObserver {
 
   // Invoked after the download task data is read from data. It finishes
   // scheduling the file for deletion.
-  void MarkTaskForDeletionHelper(web::DownloadTask* task, NSData* data);
+  void UpdateAwaitingTaskOnResponseData(const std::string& task_id,
+                                        NSData* data);
+
+  // Updates the DownloadTaskDetails::file_content property associated with
+  // `task_id` if `data` is not null.
+  void MaybeUpdateAwaitingTaskFileContent(const std::string& task_id,
+                                          NSData* data);
 
   // Notifies the Scheduler to remove its expired ScheduledFiles.
   void OnFilesDeletedFromDisk(base::Time instant, base::OnceClosure closure);
 
   // Checks whether all the preconditions necessary to schedule a file for
   // Auto-deletion are set.
-  bool AreAllPreconditionsMet(web::DownloadTask* task);
+  bool AreAllPreconditionsMet(const std::string& task);
+
+  // Removes the task from observation once it is finished.
+  void MaybeRemoveObservation(web::DownloadTask* task);
 
   // web::DownloadTaskObserver:
   void OnDownloadUpdated(web::DownloadTask* download_task) override;
@@ -135,7 +144,7 @@ class AutoDeletionService : public web::DownloadTaskObserver {
   // This map stores DownloadTasks objects that are waiting for either the user
   // to decided whether to enroll them in Auto-deletion or the downloaded file's
   // permanent file location.
-  std::unordered_map<web::DownloadTask*, DownloadTaskDetails>
+  std::unordered_map<std::string, DownloadTaskDetails>
       tasks_awaiting_scheduling_;
 
   // Weak factory.

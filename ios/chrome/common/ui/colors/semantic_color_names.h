@@ -11,9 +11,12 @@
 // Element Colors
 // **************
 
+extern NSString* const kAimInputItemTopBackgroundColor;
+extern NSString* const kAimComposeboxButtonBackgroundColor;
 extern NSString* const kBackgroundColor;
 extern NSString* const kCloseButtonColor;
 extern NSString* const kDisabledTintColor;
+extern NSString* const kDestinationHighlightColor;
 // Background color used in the rounded squares behind favicons.
 extern NSString* const kFaviconBackgroundColor;
 // Primary grouped background color.
@@ -31,6 +34,7 @@ extern NSString* const kMDCSecondaryInkColor;
 extern NSString* const kPlaceholderImageTintColor;
 // Primary background color.
 extern NSString* const kPrimaryBackgroundColor;
+extern NSString* const kInvertedPrimaryBackgroundColor;
 extern NSString* const kScrimBackgroundColor;
 extern NSString* const kDarkerScrimBackgroundColor;
 // Secondary background color.
@@ -91,6 +95,7 @@ extern NSString* const kWhiteBlackAlpha50Color;
 // Lens overlay consent dialog description text color.
 extern NSString* const kLensOverlayConsentDialogDescriptionColor;
 extern NSString* const kLensOverlayConsentDialogAnimationPlayerButtonColor;
+
 // ***************
 // Standard Colors
 // ***************

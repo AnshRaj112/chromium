@@ -16,7 +16,7 @@
 #include <memory>
 #include <utility>
 
-#include "base/android/build_info.h"
+#include "base/android/android_info.h"
 #include "base/android/jni_array.h"
 #include "base/android/jni_string.h"
 #include "base/feature_list.h"
@@ -24,6 +24,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/logging.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/string_number_conversions.h"
@@ -50,7 +51,7 @@ using base::android::ConvertUTF8ToJavaString;
 using base::android::JavaByteArrayToByteVector;
 using base::android::JavaByteArrayToString;
 using base::android::JavaObjectArrayReader;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaGlobalRef;
 using base::android::ScopedJavaLocalRef;
 using base::android::ToJavaByteArray;
@@ -145,8 +146,8 @@ CdmKeyInformation::KeyStatus ConvertKeyStatus(KeyStatus key_status,
       // expect. See crbug.com/889272 for explanation.
       // TODO(jrummell): "KEY_STATUS_PENDING" should probably be renamed to
       // "STATUS_PENDING".
-      return (base::android::BuildInfo::GetInstance()->sdk_int() <=
-              base::android::SDK_VERSION_P)
+      return (base::android::android_info::sdk_int() <=
+              base::android::android_info::SDK_VERSION_P)
                  ? CdmKeyInformation::USABLE_IN_FUTURE
                  : CdmKeyInformation::KEY_STATUS_PENDING;
     case KeyStatus::KEY_STATUS_INTERNAL_ERROR:
@@ -324,6 +325,7 @@ std::string GetSecurityLevelString(
 int GetFirstApiLevel() {
   JNIEnv* env = AttachCurrentThread();
   int first_api_level = Java_MediaDrmBridge_getFirstApiLevel(env);
+  base::UmaHistogramSparse("Media.EME.MediaDrm.FirstApiLevel", first_api_level);
   return first_api_level;
 }
 
@@ -373,15 +375,21 @@ bool MediaDrmBridge::IsPerApplicationProvisioningSupported() {
   // and thus is cached.
   static int first_api_level = GetFirstApiLevel();
   DVLOG(1) << "first_api_level = " << first_api_level;
-  if (first_api_level >= base::android::SDK_VERSION_OREO) {
+  if (first_api_level >= base::android::android_info::SDK_VERSION_OREO) {
     return true;
   }
 
-  // If "ro.product.first_api_level" does not match, then check build number.
-  DVLOG(1) << "api_level = "
-           << base::android::BuildInfo::GetInstance()->sdk_int();
-  return base::android::BuildInfo::GetInstance()->sdk_int() >=
-         base::android::SDK_VERSION_OREO;
+  if (first_api_level == 0) {
+    // If "ro.product.first_api_level" is 0, that means it is unset, and does
+    // not exist. We should then verify against the build number, as that is
+    // what seems to communicate the first api level on devices that were
+    // released before "ro.product.first_api_level" was introduced.
+    DVLOG(1) << "api_level = " << base::android::android_info::sdk_int();
+    return base::android::android_info::sdk_int() >=
+           base::android::android_info::SDK_VERSION_OREO;
+  }
+
+  return false;
 }
 
 // static
@@ -451,9 +459,6 @@ MediaDrmBridge::CdmCreationResult MediaDrmBridge::CreateInternal(
     const SessionExpirationUpdateCB& session_expiration_update_cb) {
   // All paths requires the MediaDrmApis.
   DCHECK(!scheme_uuid.empty());
-
-  // TODO(crbug.com/41433110): Check that |origin_id| is specified on devices
-  // that support it.
 
   auto media_drm_bridge = base::MakeRefCounted<MediaDrmBridge>(
       base::PassKey<MediaDrmBridge>(), scheme_uuid, origin_id, security_level,
@@ -808,7 +813,7 @@ bool MediaDrmBridge::SetPropertyStringForTesting(
 
 void MediaDrmBridge::OnMediaCryptoReady(
     JNIEnv* env,
-    const JavaParamRef<jobject>& j_media_crypto) {
+    const JavaRef<jobject>& j_media_crypto) {
   DCHECK(task_runner_->BelongsToCurrentThread());
   DVLOG(1) << __func__;
 
@@ -821,8 +826,8 @@ void MediaDrmBridge::OnMediaCryptoReady(
 
 void MediaDrmBridge::OnProvisionRequest(
     JNIEnv* env,
-    const JavaParamRef<jstring>& j_default_url,
-    const JavaParamRef<jbyteArray>& j_request_data) {
+    const JavaRef<jstring>& j_default_url,
+    const JavaRef<jbyteArray>& j_request_data) {
   DVLOG(1) << __func__;
 
   std::string request_data;
@@ -845,8 +850,7 @@ void MediaDrmBridge::OnProvisioningComplete(
       FROM_HERE, base::BindOnce(std::move(provisioning_complete_cb_), success));
 }
 
-void MediaDrmBridge::OnPromiseResolved(JNIEnv* env,
-                                       jint j_promise_id) {
+void MediaDrmBridge::OnPromiseResolved(JNIEnv* env, int32_t j_promise_id) {
   task_runner_->PostTask(
       FROM_HERE, base::BindOnce(&MediaDrmBridge::ResolvePromise,
                                 weak_factory_.GetWeakPtr(), j_promise_id));
@@ -854,8 +858,8 @@ void MediaDrmBridge::OnPromiseResolved(JNIEnv* env,
 
 void MediaDrmBridge::OnPromiseResolvedWithSession(
     JNIEnv* env,
-    jint j_promise_id,
-    const JavaParamRef<jbyteArray>& j_session_id) {
+    int32_t j_promise_id,
+    const JavaRef<jbyteArray>& j_session_id) {
   std::string session_id;
   JavaByteArrayToString(env, j_session_id, &session_id);
   task_runner_->PostTask(
@@ -866,11 +870,11 @@ void MediaDrmBridge::OnPromiseResolvedWithSession(
 
 void MediaDrmBridge::OnPromiseRejected(
     JNIEnv* env,
-    jint j_promise_id,
-    jint j_system_code,
-    const JavaParamRef<jstring>& j_error_message) {
-  CHECK(j_system_code >= static_cast<jint>(MediaDrmSystemCode::MIN_VALUE) &&
-        j_system_code <= static_cast<jint>(MediaDrmSystemCode::MAX_VALUE));
+    int32_t j_promise_id,
+    int32_t j_system_code,
+    const JavaRef<jstring>& j_error_message) {
+  CHECK(j_system_code >= static_cast<int32_t>(MediaDrmSystemCode::MIN_VALUE) &&
+        j_system_code <= static_cast<int32_t>(MediaDrmSystemCode::MAX_VALUE));
   task_runner_->PostTask(
       FROM_HERE,
       base::BindOnce(&MediaDrmBridge::RejectPromise, weak_factory_.GetWeakPtr(),
@@ -879,11 +883,10 @@ void MediaDrmBridge::OnPromiseRejected(
                      ConvertJavaStringToUTF8(env, j_error_message)));
 }
 
-void MediaDrmBridge::OnSessionMessage(
-    JNIEnv* env,
-    const JavaParamRef<jbyteArray>& j_session_id,
-    jint j_message_type,
-    const JavaParamRef<jbyteArray>& j_message) {
+void MediaDrmBridge::OnSessionMessage(JNIEnv* env,
+                                      const JavaRef<jbyteArray>& j_session_id,
+                                      int32_t j_message_type,
+                                      const JavaRef<jbyteArray>& j_message) {
   DVLOG(2) << __func__;
 
   std::vector<uint8_t> message;
@@ -898,9 +901,8 @@ void MediaDrmBridge::OnSessionMessage(
                                 message_type, message));
 }
 
-void MediaDrmBridge::OnSessionClosed(
-    JNIEnv* env,
-    const JavaParamRef<jbyteArray>& j_session_id) {
+void MediaDrmBridge::OnSessionClosed(JNIEnv* env,
+                                     const JavaRef<jbyteArray>& j_session_id) {
   DVLOG(2) << __func__;
   std::string session_id;
   JavaByteArrayToString(env, j_session_id, &session_id);
@@ -912,8 +914,8 @@ void MediaDrmBridge::OnSessionClosed(
 
 void MediaDrmBridge::OnSessionKeysChange(
     JNIEnv* env,
-    const JavaParamRef<jbyteArray>& j_session_id,
-    const JavaParamRef<jobjectArray>& j_keys_info,
+    const JavaRef<jbyteArray>& j_session_id,
+    const JavaRef<jobjectArray>& j_keys_info,
     bool has_additional_usable_key,
     bool is_key_release) {
   DVLOG(2) << __func__;
@@ -930,7 +932,7 @@ void MediaDrmBridge::OnSessionKeysChange(
     JavaByteArrayToByteVector(env, j_key_id, &key_id);
     DCHECK(!key_id.empty());
 
-    jint j_status_code = Java_KeyStatus_getStatusCode(env, j_key_status);
+    int32_t j_status_code = Java_KeyStatus_getStatusCode(env, j_key_status);
     CdmKeyInformation::KeyStatus key_status =
         ConvertKeyStatus(static_cast<KeyStatus>(j_status_code), is_key_release);
 
@@ -968,7 +970,7 @@ void MediaDrmBridge::OnSessionKeysChange(
 // [5] https://github.com/w3c/encrypted-media/issues/58
 void MediaDrmBridge::OnSessionExpirationUpdate(
     JNIEnv* env,
-    const JavaParamRef<jbyteArray>& j_session_id,
+    const JavaRef<jbyteArray>& j_session_id,
     jlong expiry_time_ms) {
   DVLOG(2) << __func__ << ": " << expiry_time_ms << " ms";
   std::string session_id;
@@ -980,9 +982,9 @@ void MediaDrmBridge::OnSessionExpirationUpdate(
           base::Time::FromMillisecondsSinceUnixEpoch(expiry_time_ms)));
 }
 
-void MediaDrmBridge::OnCreateError(JNIEnv* env, jint j_error_code) {
-  CHECK(j_error_code >= static_cast<jint>(MediaDrmCreateError::MIN_VALUE) &&
-        j_error_code <= static_cast<jint>(MediaDrmCreateError::MAX_VALUE));
+void MediaDrmBridge::OnCreateError(JNIEnv* env, int32_t j_error_code) {
+  CHECK(j_error_code >= static_cast<int32_t>(MediaDrmCreateError::MIN_VALUE) &&
+        j_error_code <= static_cast<int32_t>(MediaDrmCreateError::MAX_VALUE));
 
   last_create_error_ = static_cast<MediaDrmCreateError>(j_error_code);
 }
@@ -1146,3 +1148,5 @@ void MediaDrmBridge::OnHasAdditionalUsableKey() {
 }
 
 }  // namespace media
+
+DEFINE_JNI(MediaDrmBridge)

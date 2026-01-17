@@ -1,25 +1,4 @@
 <style include="settings-shared"></style>
-<template is="dom-if" if="[[showCrostiniContainerUpgrade_]]">
-  <div id="container-upgrade" class="settings-box first">
-    <iron-icon icon="cr:file-download"></iron-icon>
-    <div class="middle settings-box-text" aria-hidden="true">
-      <div id="containerUpgradeLabel">
-        $i18n{crostiniContainerUpgrade}
-      </div>
-      <div class="secondary" id="containerUpgradeDescription">
-        $i18n{crostiniContainerUpgradeSubtext}
-      </div>
-    </div>
-    <cr-button id="containerUpgradeButton"
-        on-click="onContainerUpgradeClick_"
-        aria-labelledby="containerUpgradeLabel containerUpgradeButton"
-        aria-describedby="containerUpgradeDescription"
-        disabled="[[disableUpgradeButton_]]"
-        deep-link-focus-id$="[[Setting.kCrostiniContainerUpgrade]]">
-      $i18n{crostiniContainerUpgradeButton}
-    </cr-button>
-  </div>
-</template>
 <cr-link-row
     id="crostiniSharedPathsRow"
     class="hr"
@@ -49,15 +28,6 @@
       class="hr"
       label="$i18n{crostiniExportImportTitle}"
       on-click="onExportImportClick_"
-      role-description="$i18n{subpageArrowRoleDescription}">
-  </cr-link-row>
-</template>
-<template is="dom-if" if="[[showArcAdbSideloading_]]">
-  <cr-link-row
-      id="crostiniEnableArcAdbRow"
-      class="hr"
-      label="$i18n{crostiniArcAdbTitle}"
-      on-click="onEnableArcAdbClick_"
       role-description="$i18n{subpageArrowRoleDescription}">
   </cr-link-row>
 </template>
@@ -113,7 +83,7 @@
     <div slot="body">$i18n{crostiniMicDialogLabel}</div>
   </settings-guest-os-confirmation-dialog>
 </template>
-<template is="dom-if" if="[[!hideCrostiniUninstall_]]">
+<template is="dom-if" if="[[!installerShowing_]]">
   <div id="remove" class="settings-box">
     <div id="removeCrostiniLabel" class="start" aria-hidden="true">
       $i18n{crostiniRemove}

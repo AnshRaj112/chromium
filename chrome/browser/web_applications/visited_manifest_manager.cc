@@ -6,7 +6,6 @@
 
 #include <algorithm>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/strings/string_util.h"
 #include "third_party/blink/public/common/manifest/manifest_util.h"
@@ -17,7 +16,6 @@ namespace web_app {
 
 // TODO(crbug.com/366323698): Clean this up after m131 hits stable.
 BASE_FEATURE(kBlockMlPromotionInNestedPagesNoManifest,
-             "BlockMlPromotionInNestedPagesNoManifest",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 VisitedManifestManager::VisitedManifestManager(base::Clock* clock)

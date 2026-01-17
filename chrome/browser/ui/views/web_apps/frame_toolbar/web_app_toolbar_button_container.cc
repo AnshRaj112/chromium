@@ -14,8 +14,8 @@
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/extensions/extensions_toolbar_button.h"
-#include "chrome/browser/ui/views/extensions/extensions_toolbar_container.h"
 #include "chrome/browser/ui/views/extensions/extensions_toolbar_coordinator.h"
+#include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
 #include "chrome/browser/ui/views/page_action/action_ids.h"
@@ -149,7 +149,7 @@ WebAppToolbarButtonContainer::WebAppToolbarButtonContainer(
     }
 
     const int page_action_icon_size =
-        GetLayoutConstant(WEB_APP_PAGE_ACTION_ICON_SIZE);
+        GetLayoutConstant(LayoutConstant::kWebAppPageActionIconSize);
     const page_actions::PageActionViewParams page_action_params{
         .icon_size = page_action_icon_size,
         .icon_insets = PageActionIconInsetsFromSize(page_action_icon_size),
@@ -190,8 +190,8 @@ WebAppToolbarButtonContainer::WebAppToolbarButtonContainer(
                            features::kDesktopPWAsElidedExtensionsMenu) ||
                        // Extensions are not supported inside Isolated Web Apps.
                        app_controller->IsIsolatedWebApp())
-                          ? ExtensionsToolbarContainer::DisplayMode::kAutoHide
-                          : ExtensionsToolbarContainer::DisplayMode::kCompact;
+                          ? ExtensionsToolbarDesktop::DisplayMode::kAutoHide
+                          : ExtensionsToolbarDesktop::DisplayMode::kCompact;
 #if BUILDFLAG(IS_CHROMEOS)
   // Let the system web app decide if it needs to show the extensions container.
   // Use compact display mode because we do not render the app menu for system
@@ -199,7 +199,7 @@ WebAppToolbarButtonContainer::WebAppToolbarButtonContainer(
   if (app_controller->system_app()) {
     create_extensions_container =
         app_controller->system_app()->ShouldHaveExtensionsContainerInToolbar();
-    display_mode = ExtensionsToolbarContainer::DisplayMode::kCompact;
+    display_mode = ExtensionsToolbarDesktop::DisplayMode::kCompact;
   }
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
@@ -209,7 +209,7 @@ WebAppToolbarButtonContainer::WebAppToolbarButtonContainer(
     // extensions should hide before other toolbar buttons.
     constexpr int kLowPriorityFlexOrder = 2;
     extensions_container_ =
-        AddChildView(std::make_unique<ExtensionsToolbarContainer>(
+        AddChildView(std::make_unique<ExtensionsToolbarDesktop>(
             browser_view_->browser(), display_mode));
     extensions_toolbar_coordinator_ =
         std::make_unique<ExtensionsToolbarCoordinator>(browser_view_->browser(),
@@ -230,8 +230,9 @@ WebAppToolbarButtonContainer::WebAppToolbarButtonContainer(
   // Pinned buttons are not shown in web apps but buttons can be shown
   // ephemerally in this container and should have the same flex behavior as
   // other toolbar buttons.
-  pinned_toolbar_actions_container_ = AddChildView(
-      std::make_unique<PinnedToolbarActionsContainer>(browser_view_));
+  pinned_toolbar_actions_container_ =
+      AddChildView(std::make_unique<PinnedToolbarActionsContainer>(
+          browser_view_, toolbar_button_provider));
   views::SetHitTestComponent(pinned_toolbar_actions_container_,
                              static_cast<int>(HTCLIENT));
 
@@ -256,13 +257,12 @@ WebAppToolbarButtonContainer::WebAppToolbarButtonContainer(
                                       views::FlexSpecification());
   }
 
-  browser_view_->immersive_mode_controller()->AddObserver(this);
+  ImmersiveModeController::From(browser_view_->browser())->AddObserver(this);
 }
 
 WebAppToolbarButtonContainer::~WebAppToolbarButtonContainer() {
-  ImmersiveModeController* immersive_controller =
-      browser_view_->immersive_mode_controller();
-  if (immersive_controller) {
+  if (auto* const immersive_controller =
+          ImmersiveModeController::From(browser_view_->browser())) {
     immersive_controller->RemoveObserver(this);
   }
 }
@@ -336,7 +336,7 @@ void WebAppToolbarButtonContainer::AddPageActionIcon(
 }
 
 int WebAppToolbarButtonContainer::GetPageActionIconSize() const {
-  return GetLayoutConstant(WEB_APP_PAGE_ACTION_ICON_SIZE);
+  return GetLayoutConstant(LayoutConstant::kWebAppPageActionIconSize);
 }
 
 gfx::Insets WebAppToolbarButtonContainer::GetPageActionIconInsets(
@@ -361,7 +361,7 @@ gfx::Insets WebAppToolbarButtonContainer::PageActionIconInsetsFromSize(
 // highlight and icon fade in).
 bool WebAppToolbarButtonContainer::GetAnimate() const {
   return !g_animation_disabled_for_testing &&
-         !browser_view_->immersive_mode_controller()->IsEnabled();
+         !ImmersiveModeController::From(browser_view_->browser())->IsEnabled();
 }
 
 void WebAppToolbarButtonContainer::StartTitlebarAnimation() {

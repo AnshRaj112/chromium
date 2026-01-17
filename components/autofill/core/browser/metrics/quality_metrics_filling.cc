@@ -38,14 +38,15 @@ constexpr std::string_view kGarbageHadPredictionVariant =
 // Field types whose associated values typically are small numbers (< 100). When
 // determining the possible types of a submitted field, the small numbers have a
 // high chance of causing false positive matches.
-constexpr DenseSet<FieldType> kFieldTypesRepresentingSmallNumbers = {
+constexpr FieldTypeSet kFieldTypesRepresentingSmallNumbers = {
     CREDIT_CARD_EXP_MONTH,     CREDIT_CARD_EXP_2_DIGIT_YEAR,
     PHONE_HOME_COUNTRY_CODE,   PHONE_HOME_NUMBER_PREFIX,
     ADDRESS_HOME_HOUSE_NUMBER, ADDRESS_HOME_APT_NUM,
     ADDRESS_HOME_FLOOR};
 
 // Records the percentage of input text field characters that were autofilled.
-void LogAutomationRate(const FormStructure& form) {
+void LogAutomationRate(const FormStructure& form,
+                       bool suppress_if_ac_unrecognized) {
   size_t total_length_autofilled_fields = 0;
   size_t total_length = 0;
   for (const auto& field : form.fields()) {
@@ -68,7 +69,8 @@ void LogAutomationRate(const FormStructure& form) {
     total_length += field_size;
   }
   if (total_length > 0) {
-    for (const auto form_type : GetFormTypesForLogging(form)) {
+    for (const auto form_type :
+         GetFormTypesForLogging(form, suppress_if_ac_unrecognized)) {
       base::UmaHistogramPercentage(
           base::StrCat({"Autofill.AutomationRate.",
                         FormTypeNameForLoggingToStringView(form_type)}),
@@ -106,7 +108,7 @@ void LogDataUtilization(const FormStructure& form) {
       continue;
     }
     // Determine fillable possible types.
-    DenseSet<FieldType> fillable_possible_types;
+    FieldTypeSet fillable_possible_types;
     for (FieldType possible_type : field->possible_types()) {
       if (IsFillableFieldType(possible_type)) {
         fillable_possible_types.insert(possible_type);
@@ -127,7 +129,7 @@ void LogDataUtilization(const FormStructure& form) {
         AutofillMetrics::AutocompleteStateForSubmittedField(*field) ==
         AutofillMetrics::AutocompleteState::kGarbage;
 
-    FieldTypeSet field_types = {field->Type().GetStorableType()};
+    FieldTypeSet field_types = field->Type().GetTypes();
     field_types.erase_all({NO_SERVER_DATA, UNKNOWN_TYPE, EMPTY_TYPE});
 
     for (std::string_view histogram_base :
@@ -190,8 +192,9 @@ void LogDataUtilization(const FormStructure& form) {
 
 }  // namespace
 
-void LogFillingQualityMetrics(const FormStructure& form) {
-  LogAutomationRate(form);
+void LogFillingQualityMetrics(const FormStructure& form,
+                              bool suppress_if_ac_unrecognized) {
+  LogAutomationRate(form, suppress_if_ac_unrecognized);
   LogDataUtilization(form);
 }
 

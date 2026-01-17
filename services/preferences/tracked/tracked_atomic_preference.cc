@@ -5,6 +5,7 @@
 #include "services/preferences/tracked/tracked_atomic_preference.h"
 
 #include "base/values.h"
+#include "services/preferences/public/cpp/tracked/pref_names.h"
 #include "services/preferences/public/mojom/tracked_preference_validation_delegate.mojom.h"
 #include "services/preferences/tracked/pref_hash_store_transaction.h"
 
@@ -28,6 +29,10 @@ TrackedAtomicPreference::TrackedAtomicPreference(
 
 TrackedPreferenceType TrackedAtomicPreference::GetType() const {
   return TrackedPreferenceType::ATOMIC;
+}
+
+size_t TrackedAtomicPreference::GetReportingId() const {
+  return helper_.GetReportingId();
 }
 
 void TrackedAtomicPreference::OnNewValue(
@@ -77,6 +82,13 @@ bool TrackedAtomicPreference::EnforceAndReport(
   if (reset_action == TrackedPreferenceHelper::DO_RESET ||
       reset_action == TrackedPreferenceHelper::DO_RESET_LEGACY ||
       reset_action == TrackedPreferenceHelper::DO_RESET_ENCRYPTED) {
+    if (value) {
+      base::Value::List* reset_prefs_list =
+          pref_store_contents.EnsureList(user_prefs::kTrackedPreferencesReset);
+      if (!reset_prefs_list->contains(pref_path_)) {
+        reset_prefs_list->Append(pref_path_);
+      }
+    }
     pref_store_contents.RemoveByDottedPath(pref_path_);
     was_reset = true;
   }

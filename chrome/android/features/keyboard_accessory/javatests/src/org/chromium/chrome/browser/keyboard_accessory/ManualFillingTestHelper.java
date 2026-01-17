@@ -11,6 +11,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static org.hamcrest.core.AllOf.allOf;
 
 import static org.chromium.autofill.mojom.FocusedFieldType.FILLABLE_NON_SEARCH_FIELD;
+import static org.chromium.base.test.transit.ViewFinder.waitForNoView;
 import static org.chromium.base.test.util.CriteriaHelper.pollInstrumentationThread;
 import static org.chromium.base.test.util.CriteriaHelper.pollUiThread;
 import static org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryTestHelper.accessoryStartedHiding;
@@ -18,9 +19,6 @@ import static org.chromium.chrome.browser.keyboard_accessory.bar_component.Keybo
 import static org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryTestHelper.accessoryViewFullyHidden;
 import static org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAccessoryTestHelper.checkThatAccessoryViewFullyShown;
 import static org.chromium.ui.base.LocalizationUtils.setRtlForTesting;
-import static org.chromium.ui.test.util.ViewUtils.VIEW_GONE;
-import static org.chromium.ui.test.util.ViewUtils.VIEW_INVISIBLE;
-import static org.chromium.ui.test.util.ViewUtils.VIEW_NULL;
 import static org.chromium.ui.test.util.ViewUtils.onViewWaiting;
 import static org.chromium.ui.test.util.ViewUtils.waitForView;
 
@@ -28,8 +26,10 @@ import android.app.Activity;
 import android.text.method.PasswordTransformationMethod;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
+import androidx.annotation.IntRange;
 import androidx.annotation.StringRes;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.espresso.PerformException;
@@ -47,6 +47,7 @@ import org.junit.Assert;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
+import org.chromium.base.test.transit.ViewElement;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.chrome.browser.ChromeKeyboardVisibilityDelegate;
@@ -57,7 +58,7 @@ import org.chromium.chrome.browser.keyboard_accessory.bar_component.KeyboardAcce
 import org.chromium.chrome.browser.keyboard_accessory.button_group_component.KeyboardAccessoryButtonGroupView;
 import org.chromium.chrome.browser.keyboard_accessory.data.KeyboardAccessoryData;
 import org.chromium.chrome.browser.keyboard_accessory.data.KeyboardAccessoryData.AccessorySheetData;
-import org.chromium.chrome.browser.keyboard_accessory.data.PropertyProvider;
+import org.chromium.chrome.browser.keyboard_accessory.data.Provider;
 import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.AddressAccessorySheetCoordinator;
 import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.CreditCardAccessorySheetCoordinator;
 import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.PasswordAccessorySheetCoordinator;
@@ -71,8 +72,6 @@ import org.chromium.content_public.browser.test.util.TestInputMethodManagerWrapp
 import org.chromium.net.test.EmbeddedTestServer;
 import org.chromium.net.test.ServerCertificate;
 import org.chromium.ui.DropdownPopupWindowInterface;
-import org.chromium.ui.test.util.ViewUtils;
-import org.chromium.ui.widget.ChromeImageButton;
 
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -256,8 +255,7 @@ public class ManualFillingTestHelper {
         pollUiThread(
                 () -> {
                     Activity activity = mActivityTestRule.getActivity();
-                    return !getKeyboard()
-                            .isSoftKeyboardShowing(activity, activity.getCurrentFocus());
+                    return !getKeyboard().isSoftKeyboardShowing(activity.getCurrentFocus());
                 });
     }
 
@@ -278,7 +276,6 @@ public class ManualFillingTestHelper {
                             mActivityTestRule
                                     .getKeyboardDelegate()
                                     .isKeyboardShowing(
-                                            mActivityTestRule.getActivity(),
                                             mActivityTestRule.getActivity().getTabsView());
                     Criteria.checkThat(isKeyboardShowing, Matchers.is(true));
                 });
@@ -524,7 +521,7 @@ public class ManualFillingTestHelper {
                 for (int buttonIndex = 0;
                         buttonIndex < buttonGroupView.getButtons().size();
                         buttonIndex++) {
-                    final ChromeImageButton button = buttonGroupView.getButtons().get(buttonIndex);
+                    final ImageButton button = buttonGroupView.getButtons().get(buttonIndex);
                     if (descriptionToMatch.equals(button.getContentDescription())) {
                         PostTask.runOrPostTask(TaskTraits.UI_DEFAULT, button::performClick);
                         return;
@@ -588,13 +585,19 @@ public class ManualFillingTestHelper {
     }
 
     /**
-     * Use like {@link androidx.test.espresso.Espresso#onView}. It waits for a view matching
-     * the given |matcher| to be displayed and allows to chain checks/performs on the result.
+     * Use like {@link androidx.test.espresso.Espresso#onView}. It waits for a view matching the
+     * given |matcher| to be displayed and allows to chain checks/performs on the result.
+     *
      * @param matcher The matcher matching exactly the view that is expected to be displayed.
      * @return An interaction on the view matching |matcher|.
      */
     public static ViewInteraction whenDisplayed(Matcher<View> matcher) {
-        return onViewWaiting(allOf(matcher, isDisplayed()));
+        return onViewWaiting(matcher);
+    }
+
+    public static ViewInteraction whenDisplayed(
+            Matcher<View> matcher, @IntRange(from = 1, to = 100) int atLeast) {
+        return onViewWaiting(matcher, ViewElement.displayingAtLeastOption(atLeast));
     }
 
     public ViewInteraction waitForViewOnRoot(View root, Matcher<View> matcher) {
@@ -609,7 +612,7 @@ public class ManualFillingTestHelper {
     }
 
     public static void waitToBeHidden(Matcher<View> matcher) {
-        ViewUtils.waitForViewCheckingState(matcher, VIEW_INVISIBLE | VIEW_NULL | VIEW_GONE);
+        waitForNoView(matcher);
     }
 
     public String getAttribute(String node, String attribute)
@@ -622,8 +625,8 @@ public class ManualFillingTestHelper {
     // --------------------------------------------
 
     public void addGenerationButton() {
-        PropertyProvider<KeyboardAccessoryData.Action[]> generationActionProvider =
-                new PropertyProvider<>(AccessoryAction.GENERATE_PASSWORD_AUTOMATIC);
+        Provider<KeyboardAccessoryData.Action[]> generationActionProvider =
+                new Provider<>(AccessoryAction.GENERATE_PASSWORD_AUTOMATIC);
         getManualFillingCoordinator()
                 .registerActionProvider(mWebContentsRef.get(), generationActionProvider);
         ThreadUtils.runOnUiThreadBlocking(
@@ -647,8 +650,7 @@ public class ManualFillingTestHelper {
     public void registerSheetDataProvider(@AccessoryTabType int tabType) {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
-                    PropertyProvider<AccessorySheetData> sheetDataProvider =
-                            new PropertyProvider<>();
+                    Provider<AccessorySheetData> sheetDataProvider = new Provider<>();
                     getManualFillingCoordinator()
                             .registerSheetDataProvider(
                                     mWebContentsRef.get(), tabType, sheetDataProvider);

@@ -11,6 +11,7 @@
 
 #include "base/feature_list.h"
 #include "base/logging.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "base/unguessable_token.h"
 #include "content/browser/devtools/devtools_instrumentation.h"
@@ -277,21 +278,6 @@ bool ShouldReportDevToolsIssueForStatus(
              net::CookieInclusionStatus::ExemptionReason::k3PCDHeuristics;
 }
 
-bool IsCrossOriginSameSiteNetworkAccessWithStorageAccessEligible(
-    const network::mojom::CookieAccessDetailsPtr& cookie_details) {
-  if (!cookie_details->frame_origin ||
-      !cookie_details->cookie_setting_overrides.Has(
-          net::CookieSettingOverride::kStorageAccessGrantEligible)) {
-    // `frame_origin` is unset for script accesses, and network accesses whose
-    // IsolationInfo's `frame_origin` was nullptr.
-    return false;
-  }
-  const url::Origin origin = url::Origin::Create(cookie_details->url);
-  return !origin.IsSameOriginWith(cookie_details->frame_origin.value()) &&
-         net::SchemefulSite::IsSameSite(origin,
-                                        cookie_details->frame_origin.value());
-}
-
 }  // namespace
 
 void SplitCookiesIntoAllowedAndBlocked(
@@ -391,12 +377,10 @@ void EmitCookieWarningsAndMetrics(
 
   bool cookie_has_domain_non_ascii = false;
 
-  int cookies_exempted_by_top_level_storage_access = 0;
+  bool cookie_set_has_empty_name = false;
+  bool cookie_set_has_empty_name_and_ambiguous_value = false;
 
-  const bool cross_origin_same_site_with_storage_access_eligible =
-      IsCrossOriginSameSiteNetworkAccessWithStorageAccessEligible(
-          cookie_details);
-  bool cross_origin_same_site_cookie_via_storage_access_api = false;
+  int cookies_exempted_by_top_level_storage_access = 0;
 
   for (const network::mojom::CookieOrLineWithAccessResultPtr& cookie :
        cookie_details->cookie_list) {
@@ -523,11 +507,14 @@ void EmitCookieWarningsAndMetrics(
           days_since_refresh > 350 && days_since_refresh <= 400;
     }
 
-    cross_origin_same_site_cookie_via_storage_access_api |=
-        cross_origin_same_site_with_storage_access_eligible &&
-        cookie->access_result.status.IsInclude() &&
-        cookie->access_result.status.exemption_reason() ==
-            net::CookieInclusionStatus::ExemptionReason::kStorageAccess;
+    if (cookie_details->type == CookieAccessDetails::Type::kChange &&
+        cookie->cookie_or_line->is_cookie() &&
+        cookie->cookie_or_line->get_cookie().Name().empty()) {
+      cookie_set_has_empty_name = true;
+      if (cookie->cookie_or_line->get_cookie().Value().contains('=')) {
+        cookie_set_has_empty_name_and_ambiguous_value = true;
+      }
+    }
   }
 
   if (samesite_treated_as_lax_cookies) {
@@ -584,16 +571,21 @@ void EmitCookieWarningsAndMetrics(
         rfh, blink::mojom::WebFeature::kCookieDomainNonASCII);
   }
 
+  if (cookie_set_has_empty_name) {
+    GetContentClient()->browser()->LogWebFeatureForCurrentPage(
+        rfh, blink::mojom::WebFeature::kSetCookieWithEmptyName);
+  }
+
+  if (cookie_set_has_empty_name_and_ambiguous_value) {
+    GetContentClient()->browser()->LogWebFeatureForCurrentPage(
+        rfh,
+        blink::mojom::WebFeature::kSetCookieWithEmptyNameAndAmbiguousValue);
+  }
+
   if (cookies_exempted_by_top_level_storage_access) {
     RecordCookiesExemptedByTopLevelStorage(
         rfh->GetPageUkmSourceId(),
         cookies_exempted_by_top_level_storage_access);
-  }
-
-  if (cross_origin_same_site_cookie_via_storage_access_api) {
-    GetContentClient()->browser()->LogWebFeatureForCurrentPage(
-        rfh, blink::mojom::WebFeature::
-                 kCrossOriginSameSiteCookieAccessViaStorageAccessAPI);
   }
 }
 

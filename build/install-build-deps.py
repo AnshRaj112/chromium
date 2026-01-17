@@ -214,6 +214,7 @@ def apt_update(options):
 # Packages needed for development
 def dev_list():
   packages = [
+      "autoconf",
       "binutils",
       "bison",
       "bzip2",
@@ -224,6 +225,7 @@ def dev_list():
       "dpkg-dev",
       "elfutils",
       "fakeroot",
+      "fd-find",
       "flex",
       "git-core",
       "gperf",
@@ -272,6 +274,7 @@ def dev_list():
       "patch",
       "perl",
       "pkgconf",
+      "ripgrep",
       "rpm",
       "ruby",
       "uuid-dev",
@@ -374,7 +377,6 @@ def lib_list():
       "libpango-1.0-0",
       "libpangocairo-1.0-0",
       "libpci3",
-      "libpcre3",
       "libpixman-1-0",
       "libspeechd2",
       "libstdc++6",
@@ -580,6 +582,7 @@ def backwards_compatible_list(options):
       "libgtk2.0-0",
       "libgtk2.0-0:i386",
       "libgtk2.0-dev",
+      "libpcre3",
       "mesa-common-dev",
       "mesa-common-dev-lts-trusty",
       "mesa-common-dev-lts-xenial",
@@ -624,7 +627,6 @@ def backwards_compatible_list(options):
 
       # Packages to build NaCl, its toolchains, and its ports.
       "ant",
-      "autoconf",
       "bison",
       "cmake",
       "gawk",
@@ -862,10 +864,13 @@ def install_packages(options):
   try:
     packages = find_missing_packages(options)
     if packages:
-      cmd = ["sudo", "apt-get", "install"]
+      cmd = ["apt-get", "install"]
       if options.no_prompt:
-        cmd += ["-qq", "--allow-downgrades", "--assume-yes"]
-      subprocess.check_call(cmd + packages)
+        cmd = [
+            "DEBIAN_FRONTEND=noninteractive", *cmd, "-qq", "--allow-downgrades",
+            "--assume-yes"
+        ]
+      subprocess.check_call(["sudo", *cmd, *packages])
       logger.info("")
     else:
       logger.info("No missing packages, and the packages are up to date.")

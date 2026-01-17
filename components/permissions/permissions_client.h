@@ -10,16 +10,17 @@
 #include "base/functional/callback_forward.h"
 #include "base/memory/weak_ptr.h"
 #include "build/build_config.h"
+#include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/common/content_settings_types.h"
 #include "components/favicon/core/favicon_service.h"
 #include "components/permissions/features.h"
 #include "components/permissions/origin_keyed_permission_action_service.h"
-#include "components/permissions/permission_hats_trigger_helper.h"
 #include "components/permissions/permission_prompt.h"
 #include "components/permissions/permission_uma_util.h"
 #include "components/permissions/permission_util.h"
 #include "components/permissions/prediction_service/permission_ui_selector.h"
 #include "components/permissions/request_type.h"
+#include "components/permissions/resolvers/permission_prompt_options.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
 #include "url/origin.h"
 
@@ -38,10 +39,6 @@ class WebContents;
 namespace content_settings {
 class CookieSettings;
 }
-
-namespace privacy_sandbox {
-class TrackingProtectionSettings;
-}  // namespace privacy_sandbox
 
 namespace permissions {
 class ObjectPermissionContextBase;
@@ -77,10 +74,6 @@ class PermissionsClient {
   // Retrieves the CookieSettings for this context.
   virtual scoped_refptr<content_settings::CookieSettings> GetCookieSettings(
       content::BrowserContext* browser_context) = 0;
-
-  // Retrieves the TrackingProtectionSettings for this context.
-  virtual privacy_sandbox::TrackingProtectionSettings*
-  GetTrackingProtectionSettings(content::BrowserContext* browser_context) = 0;
 
   // Retrieves the subresource filter activation from browser website settings.
   virtual bool IsSubresourceFilterActivated(
@@ -129,14 +122,14 @@ class PermissionsClient {
       const GURL& origin);
 
   // Retrieves the ukm::SourceId (if any) associated with this
-  // |permission_type|, |browser_context|, and |web_contents|. |web_contents|
-  // may be null. |callback| will be called with the result, and may be run
-  // synchronously if the result is available immediately.
+  // |permission_type|, |browser_context|, and |render_frame_host|.
+  // |render_frame_host| may be null. |callback| will be called with the result,
+  // and may be run synchronously if the result is available immediately.
   using GetUkmSourceIdCallback =
       base::OnceCallback<void(std::optional<ukm::SourceId>)>;
   virtual void GetUkmSourceId(ContentSettingsType permission_type,
                               content::BrowserContext* browser_context,
-                              content::WebContents* web_contents,
+                              content::RenderFrameHost* render_frame_host,
                               const GURL& requesting_origin,
                               GetUkmSourceIdCallback callback);
 
@@ -171,13 +164,13 @@ class PermissionsClient {
           pepc_prompt_position,
       ContentSetting initial_permission_status,
       base::OnceCallback<void()> hats_shown_callback_,
-      std::optional<PermissionHatsTriggerHelper::PreviewParametersForHats>
-          preview_parameters);
+      PromptOptions prompt_options);
 
   // Called for each request type when a permission prompt is resolved.
   virtual void OnPromptResolved(
       const PermissionRequest* request,
       PermissionAction action,
+      const PromptOptions& prompt_options,
       PermissionPromptDisposition prompt_disposition,
       PermissionPromptDispositionReason prompt_disposition_reason,
       std::optional<QuietUiReason> quiet_ui_reason,
@@ -298,7 +291,7 @@ class PermissionsClient {
   // the custodian of a supervised user.
   virtual bool IsPermissionBlockedByDevicePolicy(
       content::WebContents* web_contents,
-      ContentSetting setting,
+      PermissionSetting setting,
       const content_settings::SettingInfo& info,
       ContentSettingsType type) const;
 
@@ -306,7 +299,7 @@ class PermissionsClient {
   // admins can use the whitelist to allow device access without prompt.
   virtual bool IsPermissionAllowedByDevicePolicy(
       content::WebContents* web_contents,
-      ContentSetting setting,
+      PermissionSetting setting,
       const content_settings::SettingInfo& info,
       ContentSettingsType type) const;
 
@@ -317,6 +310,10 @@ class PermissionsClient {
   // Returns `true` if Chrome can request system-level permission. Returns
   // `false` otherwise.
   virtual bool CanPromptSystemPermission(ContentSettingsType type) const;
+
+  // Returns true if an actor is currently operating on a tab.
+  virtual bool IsActorOperatingOnWebContents(
+      content::WebContents* web_contents) const;
 
   virtual favicon::FaviconService* GetFaviconService(
       content::BrowserContext* browser_context);

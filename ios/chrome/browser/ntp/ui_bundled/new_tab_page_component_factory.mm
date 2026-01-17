@@ -9,17 +9,21 @@
 #import "base/metrics/user_metrics_action.h"
 #import "components/feature_engagement/public/feature_constants.h"
 #import "components/feature_engagement/public/tracker.h"
+#import "components/omnibox/browser/aim_eligibility_service.h"
 #import "components/prefs/pref_service.h"
 #import "components/regional_capabilities/regional_capabilities_service.h"
+#import "ios/chrome/browser/aim/model/ios_chrome_aim_eligibility_service_factory.h"
 #import "ios/chrome/browser/browser_view/model/browser_view_visibility_notifier_browser_agent.h"
-#import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_coordinator.h"
-#import "ios/chrome/browser/content_suggestions/ui_bundled/user_account_image_update_delegate.h"
+#import "ios/chrome/browser/content_suggestions/coordinator/content_suggestions_coordinator.h"
+#import "ios/chrome/browser/content_suggestions/ui/user_account_image_update_delegate.h"
 #import "ios/chrome/browser/discover_feed/model/discover_feed_service.h"
 #import "ios/chrome/browser/discover_feed/model/discover_feed_service_factory.h"
 #import "ios/chrome/browser/discover_feed/model/discover_feed_visibility_browser_agent.h"
 #import "ios/chrome/browser/feature_engagement/model/tracker_factory.h"
 #import "ios/chrome/browser/home_customization/model/home_background_customization_service_factory.h"
+#import "ios/chrome/browser/home_customization/model/user_uploaded_image_manager_factory.h"
 #import "ios/chrome/browser/image_fetcher/model/image_fetcher_service_factory.h"
+#import "ios/chrome/browser/ntp/model/ntp_background_image_cache_service_factory.h"
 #import "ios/chrome/browser/ntp/shared/metrics/feed_metrics_recorder.h"
 #import "ios/chrome/browser/ntp/shared/metrics/new_tab_page_metrics_constants.h"
 #import "ios/chrome/browser/ntp/ui_bundled/feed_header_view_controller.h"
@@ -103,8 +107,12 @@
           ios::RegionalCapabilitiesServiceFactory::GetForProfile(profile);
   HomeBackgroundCustomizationService* backgroundCustomizationService =
       HomeBackgroundCustomizationServiceFactory::GetForProfile(profile);
+  NTPBackgroundImageCacheService* backgroundImageCacheService =
+      NTPBackgroundImageCacheServiceFactory::GetForProfile(profile);
   image_fetcher::ImageFetcherService* imageFetcherService =
       ImageFetcherServiceFactory::GetForProfile(profile);
+  UserUploadedImageManager* userUploadedImageManager =
+      UserUploadedImageManagerFactory::GetForProfile(profile);
   BrowserViewVisibilityNotifierBrowserAgent*
       browserViewVisibilityNotifierBrowserAgent =
           BrowserViewVisibilityNotifierBrowserAgent::FromBrowser(browser);
@@ -112,6 +120,8 @@
       DiscoverFeedVisibilityBrowserAgent::FromBrowser(browser);
   feature_engagement::Tracker* tracker =
       feature_engagement::TrackerFactory::GetForProfile(profile);
+  AimEligibilityService* aimEligibilityService =
+      IOSChromeAimEligibilityServiceFactory::GetForProfile(profile);
   return [[NewTabPageMediator alloc]
               initWithTemplateURLService:templateURLService
                                URLLoader:URLLoadingBrowserAgent
@@ -124,11 +134,14 @@
                              syncService:syncService
              regionalCapabilitiesService:regionalCapabilitiesService
           backgroundCustomizationService:backgroundCustomizationService
+             backgroundImageCacheService:backgroundImageCacheService
                      imageFetcherService:imageFetcherService
+                userUploadedImageManager:userUploadedImageManager
            browserViewVisibilityNotifier:
                browserViewVisibilityNotifierBrowserAgent
       discoverFeedVisibilityBrowserAgent:discoverFeedVisibilityBrowserAgent
-                featureEngagementTracker:tracker];
+                featureEngagementTracker:tracker
+                   aimEligibilityService:aimEligibilityService];
 }
 
 - (NewTabPageViewController*)NTPViewController {
@@ -142,30 +155,10 @@
   // Get the feed factory from the `browser` and create the feed model.
   DiscoverFeedService* feedService =
       DiscoverFeedServiceFactory::GetForProfile(browser->GetProfile());
-  FeedModelConfiguration* discoverFeedConfiguration =
-      [FeedModelConfiguration discoverFeedModelConfiguration];
-  feedService->CreateFeedModel(discoverFeedConfiguration);
+  feedService->CreateFeedModel();
 
   // Return Discover feed VC created with `viewControllerConfiguration`.
   return feedService->NewDiscoverFeedViewControllerWithConfiguration(
-      viewControllerConfiguration);
-}
-
-- (UIViewController*)followingFeedForBrowser:(Browser*)browser
-                 viewControllerConfiguration:
-                     (DiscoverFeedViewControllerConfiguration*)
-                         viewControllerConfiguration
-                                    sortType:(FollowingFeedSortType)sortType {
-  // Get the feed factory from the `browser` and create the feed model. Content
-  // is sorted by `sortType`.
-  DiscoverFeedService* feedService =
-      DiscoverFeedServiceFactory::GetForProfile(browser->GetProfile());
-  FeedModelConfiguration* followingFeedConfiguration =
-      [FeedModelConfiguration followingModelConfigurationWithSortType:sortType];
-  feedService->CreateFeedModel(followingFeedConfiguration);
-
-  // Return Following feed VC created with `viewControllerConfiguration`.
-  return feedService->NewFollowingFeedViewControllerWithConfiguration(
       viewControllerConfiguration);
 }
 

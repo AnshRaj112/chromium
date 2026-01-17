@@ -6,13 +6,13 @@
 
 #import <Foundation/Foundation.h>
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 
 #include "base/apple/bridging.h"
 #include "base/apple/foundation_util.h"
 #include "base/apple/osstatus_logging.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/logging.h"
 #include "base/mac/mac_util.h"
@@ -231,8 +231,8 @@ bool IsHardwareEncoder(VTSessionRef compression_session) {
   if (VTSessionCopyProperty(
           compression_session, kVTCompressionPropertyKey_EncoderID,
           kCFAllocatorDefault, encoder_id.InitializeInto()) == noErr) {
-    if (base::Contains(kRealtimeHardwareEncoderIDs,
-                       base::SysCFStringRefToUTF8(encoder_id.get()))) {
+    if (std::ranges::contains(kRealtimeHardwareEncoderIDs,
+                              base::SysCFStringRefToUTF8(encoder_id.get()))) {
       DVLOG(1) << "But " << encoder_id.get() << " is a known hardware encoder";
       return true;
     }
@@ -578,8 +578,8 @@ EncoderStatus VTVideoEncodeAccelerator::Initialize(
         << VideoPixelFormatToString(config.input_format);
     return {EncoderStatus::Codes::kEncoderInitializationError};
   }
-  if (!base::Contains(GetSupportedVideoCodecProfiles(),
-                      config.output_profile)) {
+  if (!std::ranges::contains(GetSupportedVideoCodecProfiles(),
+                             config.output_profile)) {
     MEDIA_LOG(ERROR, media_log) << "Output profile not supported= "
                                 << GetProfileName(config.output_profile);
     return {EncoderStatus::Codes::kEncoderInitializationError};
@@ -1132,10 +1132,21 @@ bool VTVideoEncodeAccelerator::ConfigureCompressionSession(VideoCodec codec) {
     }
   }
 
+  // Configuring the number of reference frames to 1, which will produce
+  // bitstream that follows WebRTC SVC spec for L1T2.
   if (@available(macOS 13.0, iOS 16.0, *)) {
-    // Configuring the number of reference frames to 1, which will produce
-    // bitstream that follows WebRTC SVC spec for L1T2.
-    if (session_property_setter.IsSupported(
+    bool skip_set_reference_buffer_count = false;
+    if (@available(macOS 26, *)) {
+      // We see that setting kVTCompressionPropertyKey_ReferenceBufferCount=1
+      // causes frame drops on Mac OS Tahoe when encoding H264,
+      // that's why we skip it. More info: http://crbug.com/450596068
+      // Using an extra flag here because @available checks can't be combined
+      // with other conditions in the same if statement,
+      // see the `unsupported-availability-guard` warning.
+      skip_set_reference_buffer_count = (codec == VideoCodec::kH264);
+    }
+    if (!skip_set_reference_buffer_count &&
+        session_property_setter.IsSupported(
             kVTCompressionPropertyKey_ReferenceBufferCount)) {
       if (!session_property_setter.Set(
               kVTCompressionPropertyKey_ReferenceBufferCount, 1)) {

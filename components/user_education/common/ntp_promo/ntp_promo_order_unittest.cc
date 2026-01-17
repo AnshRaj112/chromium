@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "base/functional/callback_helpers.h"
 #include "base/test/gtest_util.h"
 #include "base/test/mock_callback.h"
 #include "base/test/task_environment.h"
@@ -45,7 +46,7 @@ class NtpPromoOrderTest : public testing::Test {
         NtpPromoSpecification::EligibilityCallback(), base::DoNothing(),
         base::DoNothing(), std::move(show_after), user_education::Metadata()));
 
-    KeyedNtpPromoData pref;
+    NtpPromoData pref;
     pref.last_top_spot_session = last_top_spot_session;
     pref.top_spot_session_count = top_spot_session_count;
     pref.completed = completed_time;

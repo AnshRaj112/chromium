@@ -14,7 +14,6 @@
 #include "base/strings/string_util.h"
 #include "base/test/bind.h"
 #include "google_apis/gaia/gaia_id.h"
-#include "skia/rusty_png_feature.h"
 
 namespace ash {
 
@@ -77,19 +76,11 @@ TEST_F(InputDeviceSettingsMetadataManagerTest, DeviceImageForSettingsIsCached) {
   EXPECT_TRUE(data_url.has_value());
 
   // Based on the default ImageSkia produced by `TestImageDownloader`.
-  const char* kExpectedDataUri = nullptr;
-  if (skia::IsRustyPngEnabled()) {
-    kExpectedDataUri =
-        "data:image/png;base64,"
-        "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAUCAIAAAA7jDsBAAAAH0lE"
-        "QVR4nOzJIQEAAADCsAv6V4YGKCSzE6YQvN+bDgAAAP//NgNJQQAA"
-        "AAZJREFUAwDP2AFQaaaRAwAAAABJRU5ErkJggg==";
-  } else {
-    kExpectedDataUri =
-        "data:image/"
-        "png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAUCAIAAAA7jDsBAAAAF0lEQ"
-        "VQokWNk+M+ABzDhkxyVHpUmRRoAmpABJ+eiyP8AAAAASUVORK5CYII=";
-  }
+  const char* kExpectedDataUri =
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAUCAIAAAA7jDsBAAAAH0lE"
+      "QVR4nOzJIQEAAADCsAv6V4YGKCSzE6YQvN+bDgAAAP//NgNJQQAA"
+      "AAZJREFUAwDP2AFQaaaRAwAAAABJRU5ErkJggg==";
   EXPECT_EQ(kExpectedDataUri, data_url.value());
 }
 
@@ -116,14 +107,14 @@ TEST_F(InputDeviceSettingsMetadataManagerTest, GenerateImageRequestKey) {
   manager()->GetDeviceImage(test_device_key, account_1,
                             DeviceImageDestination::kNotification,
                             base::DoNothing());
-  EXPECT_TRUE((base::Contains(manager()->GetDeviceCallbackMapForTesting(),
-                              "0000:0001_0")));
+  EXPECT_TRUE(
+      (manager()->GetDeviceCallbackMapForTesting().contains("0000:0001_0")));
   base::RunLoop().RunUntilIdle();
   manager()->GetDeviceImage(test_device_key, account_1,
                             DeviceImageDestination::kSettings,
                             base::DoNothing());
-  EXPECT_TRUE((base::Contains(manager()->GetDeviceCallbackMapForTesting(),
-                              "0000:0001_1")));
+  EXPECT_TRUE(
+      (manager()->GetDeviceCallbackMapForTesting().contains("0000:0001_1")));
   base::RunLoop().RunUntilIdle();
 }
 

@@ -25,12 +25,12 @@
 #import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_ios.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/sync/model/mock_sync_service_utils.h"
 #import "ios/chrome/browser/sync/model/sync_service_factory.h"
-#import "ios/chrome/test/app/mock_reauthentication_module.h"
+#import "ios/chrome/common/ui/reauthentication/mock_reauthentication_module.h"
 #import "ios/chrome/test/scoped_key_window.h"
 #import "ios/web/public/test/web_task_environment.h"
 #import "testing/gtest/include/gtest/gtest.h"
@@ -52,17 +52,16 @@ class AddPasswordCoordinatorTest : public PlatformTest {
     // Add test password store. Used by the mediator.
     builder.AddTestingFactory(
         IOSChromeProfilePasswordStoreFactory::GetInstance(),
-        base::BindRepeating(
-            &password_manager::BuildPasswordStore<
-                web::BrowserState, password_manager::TestPasswordStore>));
+        base::BindOnce(&password_manager::BuildPasswordStore<
+                       ProfileIOS, password_manager::TestPasswordStore>));
 
     builder.AddTestingFactory(SyncServiceFactory::GetInstance(),
                               base::BindRepeating(&CreateMockSyncService));
 
     builder.AddTestingFactory(
         IOSPasswordRequirementsServiceFactory::GetInstance(),
-        base::BindRepeating(
-            [](web::BrowserState* /*unused*/) -> std::unique_ptr<KeyedService> {
+        base::BindOnce(
+            [](ProfileIOS*) -> std::unique_ptr<KeyedService> {
               return std::make_unique<
                   password_manager::PasswordRequirementsService>(nil);
             }));
@@ -74,13 +73,12 @@ class AddPasswordCoordinatorTest : public PlatformTest {
     profile_ = std::move(builder).Build();
     browser_ = std::make_unique<TestBrowser>(profile_.get(), scene_state_);
 
-    // Mock ApplicationCommands. Since ApplicationCommands conforms to
+    // Mock SceneCommands. Since SceneCommands conforms to
     // SettingsCommands, it must be mocked as well.
-    mocked_application_commands_handler_ =
-        OCMStrictProtocolMock(@protocol(ApplicationCommands));
+    mocked_scene_handler_ = OCMStrictProtocolMock(@protocol(SceneCommands));
     [browser_->GetCommandDispatcher()
-        startDispatchingToTarget:mocked_application_commands_handler_
-                     forProtocol:@protocol(ApplicationCommands)];
+        startDispatchingToTarget:mocked_scene_handler_
+                     forProtocol:@protocol(SceneCommands)];
     id mocked_application_settings_command_handler =
         OCMProtocolMock(@protocol(SettingsCommands));
     [browser_->GetCommandDispatcher()
@@ -152,7 +150,7 @@ class AddPasswordCoordinatorTest : public PlatformTest {
   UIViewController* base_view_controller_ = nil;
   MockReauthenticationModule* mock_reauth_module_ = nil;
   base::test::ScopedFeatureList scoped_feature_list_;
-  id mocked_application_commands_handler_;
+  id mocked_scene_handler_;
   base::HistogramTester histogram_tester_;
   AddPasswordCoordinator* coordinator_ = nil;
 };

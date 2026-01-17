@@ -8,11 +8,12 @@
 #include <memory>
 
 #include "build/build_config.h"
+#include "extensions/buildflags/buildflags.h"
 
-class Browser;
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
+
 class BrowserWindowInterface;
 class GURL;
-class Profile;
 
 namespace tabs {
 class TabInterface;
@@ -30,19 +31,15 @@ class ExtensionViewHostFactory {
   ExtensionViewHostFactory(const ExtensionViewHostFactory&) = delete;
   ExtensionViewHostFactory& operator=(const ExtensionViewHostFactory&) = delete;
 
-#if BUILDFLAG(IS_ANDROID)
   // Creates a new ExtensionHost with its associated view, grouping it in the
   // appropriate SiteInstance (and therefore process) based on the URL and
   // profile.
-  static std::unique_ptr<ExtensionViewHost> CreatePopupHost(const GURL& url,
-                                                            Profile* profile);
-#else   // BUILDFLAG(IS_ANDROID)
-  // Creates a new ExtensionHost with its associated view, grouping it in the
-  // appropriate SiteInstance (and therefore process) based on the URL and
-  // profile.
-  static std::unique_ptr<ExtensionViewHost> CreatePopupHost(const GURL& url,
-                                                            Browser* browser);
+  static std::unique_ptr<ExtensionViewHost> CreatePopupHost(
+      const Extension& extension,
+      const GURL& url,
+      BrowserWindowInterface* browser);
 
+#if BUILDFLAG(ENABLE_EXTENSIONS)
   // Creates a new ExtensionHost with its associated view, grouping it in the
   // appropriate SiteInstance (and therefore process) based on the URL and
   // profile.
@@ -51,7 +48,7 @@ class ExtensionViewHostFactory {
       const GURL& url,
       BrowserWindowInterface* browser,
       tabs::TabInterface* tab_interface);
-#endif  // BUILDFLAG(IS_ANDROID)
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 };
 
 }  // namespace extensions

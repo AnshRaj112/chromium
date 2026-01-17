@@ -69,9 +69,11 @@ void ColorPickerBridge::SetSelectedColor(SkColor color) {
   // we don't support that for now.
 }
 
-void ColorPickerBridge::OnColorChosen(JNIEnv* env, jint color) {
+void ColorPickerBridge::OnColorChosen(JNIEnv* env, int32_t color) {
   web_contents_->DidChooseColorInColorChooser(color);
   web_contents_->DidEndColorChooser();
 }
 
 }  // namespace web_contents_delegate_android
+
+DEFINE_JNI(ColorPickerBridge)

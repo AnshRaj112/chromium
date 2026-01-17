@@ -6,8 +6,8 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/json/json_string_value_serializer.h"
@@ -88,7 +88,7 @@ class ManagedConfigurationAPI::ManagedConfigurationDownloader {
       const ManagedConfigurationDownloader&) = delete;
 
   void Fetch(const std::string& data_url,
-             base::OnceCallback<void(std::unique_ptr<std::string>)> callback) {
+             base::OnceCallback<void(std::optional<std::string>)> callback) {
     // URLLoaders should be created at UI thread.
     DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
     auto resource_request = std::make_unique<network::ResourceRequest>();
@@ -152,7 +152,7 @@ void ManagedConfigurationAPI::GetOriginPolicyConfiguration(
     return;
   }
 
-  if (!base::Contains(store_map_, origin)) {
+  if (!store_map_.contains(origin)) {
     std::move(callback).Run(std::nullopt);
     return;
   }
@@ -184,7 +184,7 @@ void ManagedConfigurationAPI::RemoveObserver(Observer* observer) {
 }
 
 bool ManagedConfigurationAPI::CanHaveManagedStore(const url::Origin& origin) {
-  return base::Contains(managed_origins_, origin);
+  return managed_origins_.contains(origin);
 }
 
 const std::set<url::Origin>& ManagedConfigurationAPI::GetManagedOrigins()
@@ -223,7 +223,7 @@ void ManagedConfigurationAPI::OnConfigurationPolicyChanged() {
 
   // We need to clean configurations for origins that got their entry removed.
   for (const auto& store_entry : store_map_) {
-    if (!base::Contains(current_origins, store_entry.first)) {
+    if (!current_origins.contains(store_entry.first)) {
       UpdateStoredDataForOrigin(store_entry.first, std::string(),
                                 std::string());
     }
@@ -235,7 +235,7 @@ void ManagedConfigurationAPI::OnConfigurationPolicyChanged() {
 
 void ManagedConfigurationAPI::MaybeCreateStoreForOrigin(
     const url::Origin& origin) {
-  if (base::Contains(store_map_, origin)) {
+  if (store_map_.contains(origin)) {
     return;
   }
 
@@ -291,7 +291,7 @@ void ManagedConfigurationAPI::UpdateStoredDataForOrigin(
 
 void ManagedConfigurationAPI::DecodeData(const url::Origin& origin,
                                          const std::string& url_hash,
-                                         std::unique_ptr<std::string> data) {
+                                         std::optional<std::string> data) {
   downloaders_[origin].reset();
   if (!data) {
     return;
@@ -346,7 +346,7 @@ void ManagedConfigurationAPI::PostStoreConfiguration(
 void ManagedConfigurationAPI::InformObserversIfConfigurationChanged(
     const url::Origin& origin,
     bool has_changed) {
-  if (!has_changed || !base::Contains(observers_, origin)) {
+  if (!has_changed || !observers_.contains(origin)) {
     return;
   }
 

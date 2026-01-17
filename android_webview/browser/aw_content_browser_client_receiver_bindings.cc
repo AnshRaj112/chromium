@@ -261,21 +261,15 @@ void AwContentBrowserClient::RegisterBrowserInterfaceBindersForFrame(
 
 #if BUILDFLAG(ENABLE_SPELLCHECK)
   auto create_spellcheck_host =
-      [](content::RenderFrameHost* render_frame_host,
-         mojo::PendingReceiver<spellcheck::mojom::SpellCheckHost> receiver) {
+      [](mojo::PendingReceiver<spellcheck::mojom::SpellCheckHost> receiver) {
         mojo::MakeSelfOwnedReceiver(std::make_unique<SpellCheckHostImpl>(),
                                     std::move(receiver));
       };
   map->Add<spellcheck::mojom::SpellCheckHost>(
       create_spellcheck_host, content::GetUIThreadTaskRunner({}));
 #endif
-
-  if (base::FeatureList::IsEnabled(
-          features::kWebViewMediaIntegrityApiBlinkExtension)) {
-    map->Add<blink::mojom::WebViewMediaIntegrityService>(
-        &BindMediaIntegrityServiceReceiver);
-  }
-
+  map->Add<blink::mojom::WebViewMediaIntegrityService>(
+      &BindMediaIntegrityServiceReceiver);
   if (base::FeatureList::IsEnabled(::features::kWebPayments)) {
     map->Add<payments::mojom::PaymentRequest>(
         &ForwardToJavaFrame<payments::mojom::PaymentRequest>);

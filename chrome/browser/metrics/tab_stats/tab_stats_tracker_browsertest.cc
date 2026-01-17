@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/location.h"
 #include "base/memory/raw_ptr.h"
@@ -46,7 +45,7 @@
 #include "ui/display/screen.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #endif
 
 namespace metrics {
@@ -200,16 +199,19 @@ class TabStatsTrackerBrowserTest : public PlatformBrowserTest {
     // until it's added to the tab strip.
     content::WebContents::CreateParams create_params(tab_strip.GetProfile());
     create_params.initially_hidden = true;
-    content::WebContents* new_contents =
-        content::WebContents::Create(create_params).release();
+    std::unique_ptr<content::WebContents> contents =
+        content::WebContents::Create(create_params);
+    content::WebContents* raw_contents = contents.get();
 
     // CreateTab works with both OwningTestTabModel and the initial tab strip,
     // which is a production TabModel.
     tab_strip.tab_model()->CreateTab(
-        TabAndroid::FromWebContents(active_contents), new_contents,
-        /*select=*/true);
+        TabAndroid::FromWebContents(active_contents), std::move(contents),
+        TabModel::kInvalidIndex,
+        TabModel::TabLaunchType::FROM_RECENT_TABS_FOREGROUND,
+        /*should_pin=*/false);
 
-    NavigateNewTabToUrl(new_contents, url);
+    NavigateNewTabToUrl(raw_contents, url);
     return true;
   }
 
@@ -243,7 +245,7 @@ class TabStatsTrackerBrowserTest : public PlatformBrowserTest {
 
   bool AddTabToTabStrip(TabStripInterface& tab_strip,
                         const GURL& url = GURL("about:blank")) {
-    return AddTabAtIndexToBrowser(tab_strip.browser(), 1, url,
+    return AddTabAtIndexToBrowser(tab_strip.browser_window_interface(), 1, url,
                                   ui::PAGE_TRANSITION_TYPED);
   }
 
@@ -252,7 +254,7 @@ class TabStatsTrackerBrowserTest : public PlatformBrowserTest {
   }
 
   void CloseTabStrip(std::unique_ptr<TabStripInterface> tab_strip) {
-    Browser* browser = tab_strip->browser();
+    BrowserWindowInterface* browser = tab_strip->browser_window_interface();
     // Destroy `tab_strip` before `browser` to avoid a dangling raw_ref.
     tab_strip.reset();
     CloseBrowserSynchronously(browser);
@@ -557,12 +559,12 @@ IN_PROC_BROWSER_TEST_F(TabStatsTrackerBrowserTest,
   // This resizes the two windows so they're right next to each other.
   const gfx::NativeWindow window = browser()->window()->GetNativeWindow();
   gfx::Rect work_area =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(window).work_area();
+      display::Screen::Get()->GetDisplayNearestWindow(window).work_area();
   const gfx::Size size(work_area.width() / 3, work_area.height() / 2);
   gfx::Rect browser_rect(work_area.origin(), size);
   browser()->window()->SetBounds(browser_rect);
   browser_rect.set_x(browser_rect.right());
-  window2->browser()->window()->SetBounds(browser_rect);
+  window2->browser_window_interface()->GetWindow()->SetBounds(browser_rect);
   auto expected_window1_tab1_visibility = content::Visibility::VISIBLE;
 #endif
 
@@ -778,7 +780,8 @@ class TabStatsTrackerPrerenderBrowserTest : public TabStatsTrackerBrowserTest {
 
 // TODO(crbug.com/412634171): On desktop Android, the prerender fails with error
 // kActivationNavigationParameterMismatch. Find out why.
-#if BUILDFLAG(IS_DESKTOP_ANDROID)
+// TODO(crbug.com/455855986): Also starting failing on tablets.
+#if BUILDFLAG(IS_ANDROID)
 #define MAYBE_PrerenderingShouldNotCallOnPrimaryMainFrameNavigationCommitted \
   DISABLED_PrerenderingShouldNotCallOnPrimaryMainFrameNavigationCommitted
 #else
@@ -802,7 +805,7 @@ IN_PROC_BROWSER_TEST_F(
     tab_stats_tracker_->AddObserverAndSetInitialState(&mock_observer);
     EXPECT_CALL(mock_observer, OnPrimaryMainFrameNavigationCommitted(_))
         .Times(0);
-    content::FrameTreeNodeId host_id =
+    content::PrerenderHostId host_id =
         prerender_test_helper().AddPrerender(prerender_url);
     ASSERT_TRUE(GetWebContents());
     host_observer = std::make_unique<content::test::PrerenderHostObserver>(

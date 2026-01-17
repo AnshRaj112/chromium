@@ -12,14 +12,12 @@
 #include "base/memory/raw_ref.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "base/values.h"
 #include "chrome/browser/apps/app_service/app_icon_source.h"
 #include "chrome/browser/apps/app_service/app_launch_params.h"
-#include "chrome/browser/apps/app_service/app_service_proxy.h"
-#include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
-#include "chrome/browser/apps/app_service/browser_app_launcher.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_ui_util.h"
 #include "chrome/browser/extensions/launch_util.h"
@@ -36,12 +34,14 @@
 #include "chrome/browser/ui/webui/app_home/app_home.mojom-shared.h"
 #include "chrome/browser/ui/webui/extensions/extension_icon_source.h"
 #include "chrome/browser/web_applications/extension_status_utils.h"
+#include "chrome/browser/web_applications/extensions/launch.h"
 #include "chrome/browser/web_applications/locks/app_lock.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/proto/web_app_install_state.pb.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/browser/web_applications/web_app_ui_manager.h"
@@ -178,10 +178,9 @@ void AppHomePageHandler::LaunchAppInternal(
 
   web_app::WebAppRegistrar& registrar = web_app_provider_->registrar_unsafe();
   if (registrar.IsInstallState(
-          app_id,
-          {web_app::proto::InstallState::SUGGESTED_FROM_ANOTHER_DEVICE,
-           web_app::proto::InstallState::INSTALLED_WITHOUT_OS_INTEGRATION,
-           web_app::proto::InstallState::INSTALLED_WITH_OS_INTEGRATION})) {
+          app_id, {web_app::proto::SUGGESTED_FROM_ANOTHER_DEVICE,
+                   web_app::proto::INSTALLED_WITHOUT_OS_INTEGRATION,
+                   web_app::proto::INSTALLED_WITH_OS_INTEGRATION})) {
     type = extensions::Manifest::Type::TYPE_HOSTED_APP;
     full_launch_url = registrar.GetAppStartUrl(app_id);
     launch_container = web_app::ConvertDisplayModeToAppLaunchContainer(
@@ -224,9 +223,8 @@ void AppHomePageHandler::LaunchAppInternal(
             : apps::LaunchContainer::kLaunchContainerTab,
         disposition, apps::LaunchSource::kFromAppHomePage);
     params.override_url = override_url;
-    apps::AppServiceProxyFactory::GetForProfile(profile_)
-        ->BrowserAppLauncher()
-        ->LaunchAppWithParams(std::move(params), base::DoNothing());
+    web_app::LaunchExtensionOrWebApp(profile_, std::move(params),
+                                     base::DoNothing());
   } else {
     // To give a more "launchy" experience when using the NTP launcher, we close
     // it automatically. However, if the chrome://apps page is the LAST page in
@@ -247,27 +245,25 @@ void AppHomePageHandler::LaunchAppInternal(
                      : WindowOpenDisposition::NEW_FOREGROUND_TAB,
         apps::LaunchSource::kFromAppHomePage);
     params.override_url = override_url;
-    apps::AppServiceProxyFactory::GetForProfile(profile_)
-        ->BrowserAppLauncher()
-        ->LaunchAppWithParams(
-            std::move(params),
-            base::BindOnce(
-                [](base::WeakPtr<Browser> apps_page_browser,
-                   base::WeakPtr<content::WebContents> old_contents,
-                   content::WebContents* new_web_contents) {
-                  if (!apps_page_browser || !old_contents) {
-                    return;
-                  }
-                  if (new_web_contents != old_contents.get() &&
-                      apps_page_browser->tab_strip_model()->count() > 1) {
-                    // This will also destroy the handler, so do not perform
-                    // any actions after.
-                    chrome::CloseWebContents(apps_page_browser.get(),
-                                             old_contents.get(),
-                                             /*add_to_history=*/true);
-                  }
-                },
-                browser_ptr, old_contents_ptr));
+    web_app::LaunchExtensionOrWebApp(
+        profile_, std::move(params),
+        base::BindOnce(
+            [](base::WeakPtr<Browser> apps_page_browser,
+               base::WeakPtr<content::WebContents> old_contents,
+               content::WebContents* new_web_contents) {
+              if (!apps_page_browser || !old_contents) {
+                return;
+              }
+              if (new_web_contents != old_contents.get() &&
+                  apps_page_browser->tab_strip_model()->count() > 1) {
+                // This will also destroy the handler, so do not perform
+                // any actions after.
+                chrome::CloseWebContents(apps_page_browser.get(),
+                                         old_contents.get(),
+                                         /*add_to_history=*/true);
+              }
+            },
+            browser_ptr, old_contents_ptr));
   }
 }
 
@@ -329,7 +325,8 @@ void AppHomePageHandler::CreateExtensionAppShortcut(
 }
 
 app_home::mojom::AppInfoPtr AppHomePageHandler::CreateAppInfoPtrFromWebApp(
-    const webapps::AppId& app_id) {
+    const webapps::AppId& app_id,
+    bool is_update) {
   auto& registrar = web_app_provider_->registrar_unsafe();
 
   auto app_info = app_home::mojom::AppInfo::New();
@@ -342,7 +339,20 @@ app_home::mojom::AppInfoPtr AppHomePageHandler::CreateAppInfoPtrFromWebApp(
   std::string name = registrar.GetAppShortName(app_id);
   app_info->name = name;
 
-  app_info->icon_url = apps::AppIconSource::GetIconURL(app_id, kWebAppIconSize);
+  GURL app_icon_url = apps::AppIconSource::GetIconURL(app_id, kWebAppIconSize);
+  if (is_update) {
+    // For updating, the resource the url is pointing to changes even if the url
+    // itself shouldn't change. Adding the timestamp helps keep the url updated
+    // so that the latest resource can be loaded without refreshing the page.
+    GURL::Replacements query_add;
+    std::string query_timestamp =
+        "t=" +
+        base::NumberToString(
+            base::Time::Now().ToDeltaSinceWindowsEpoch().InMicroseconds());
+    query_add.SetQueryStr(query_timestamp);
+    app_icon_url = app_icon_url.ReplaceComponents(query_add);
+  }
+  app_info->icon_url = app_icon_url;
 
   bool is_locally_installed;
   if (registrar.GetInstallState(app_id) == std::nullopt) {
@@ -356,27 +366,29 @@ app_home::mojom::AppInfoPtr AppHomePageHandler::CreateAppInfoPtrFromWebApp(
       case web_app::proto::INSTALLED_WITHOUT_OS_INTEGRATION:
         is_locally_installed = true;
         break;
+      // Apps that will be migrated to should not be shown on UX surfaces.
+      case web_app::proto::SUGGESTED_FROM_MIGRATION:
+        NOTREACHED();
     }
   }
 
   const auto login_mode = registrar.GetAppRunOnOsLoginMode(app_id);
   // Only show the Run on OS Login menu item for locally installed web apps
-  app_info->may_show_run_on_os_login_mode =
-      base::FeatureList::IsEnabled(features::kDesktopPWAsRunOnOsLogin) &&
-      is_locally_installed;
+  app_info->may_show_run_on_os_login_mode = is_locally_installed;
   app_info->may_toggle_run_on_os_login_mode = login_mode.user_controllable;
   app_info->run_on_os_login_mode = login_mode.value;
 
   app_info->is_locally_installed = is_locally_installed;
   // Treat all other types of display mode as "open as window".
-  app_info->open_in_window = registrar.GetAppEffectiveDisplayMode(app_id) !=
-                             blink::mojom::DisplayMode::kBrowser;
+  app_info->open_in_window = registrar.AppMatches(
+      app_id, web_app::WebAppFilter::OpensInDedicatedWindow());
 
   app_info->store_page_url = std::nullopt;
   app_info->may_uninstall = registrar.CanUserUninstallWebApp(app_id);
-  app_info->app_type = registrar.IsIsolated(app_id)
-                           ? app_home::mojom::AppType::kIsolatedWebApp
-                           : app_home::mojom::AppType::kWebApp;
+  app_info->app_type =
+      registrar.AppMatches(app_id, web_app::WebAppFilter::IsIsolatedApp())
+          ? app_home::mojom::AppType::kIsolatedWebApp
+          : app_home::mojom::AppType::kWebApp;
   return app_info;
 }
 
@@ -434,6 +446,11 @@ void AppHomePageHandler::FillWebAppInfoList(
   web_app::WebAppRegistrar& registrar = web_app_provider_->registrar_unsafe();
 
   for (const webapps::AppId& web_app_id : registrar.GetAppIds()) {
+    // Do not show apps that are migration targets on chrome://apps.
+    if (registrar.IsInstallState(web_app_id,
+                                 {web_app::proto::SUGGESTED_FROM_MIGRATION})) {
+      continue;
+    }
     result->emplace_back(CreateAppInfoPtrFromWebApp(web_app_id));
   }
 }
@@ -555,6 +572,10 @@ void AppHomePageHandler::OnWebAppInstalled(const webapps::AppId& app_id) {
   page_->AddApp(CreateAppInfoPtrFromWebApp(app_id));
 }
 
+void AppHomePageHandler::OnWebAppManifestUpdated(const webapps::AppId& app_id) {
+  page_->UpdateApp(CreateAppInfoPtrFromWebApp(app_id, /*is_update=*/true));
+}
+
 void AppHomePageHandler::OnWebAppInstallManagerDestroyed() {
   install_manager_observation_.Reset();
 }
@@ -664,10 +685,9 @@ void AppHomePageHandler::UninstallApp(const std::string& app_id) {
   }
 
   if (web_app_provider_->registrar_unsafe().IsInstallState(
-          app_id,
-          {web_app::proto::InstallState::SUGGESTED_FROM_ANOTHER_DEVICE,
-           web_app::proto::InstallState::INSTALLED_WITHOUT_OS_INTEGRATION,
-           web_app::proto::InstallState::INSTALLED_WITH_OS_INTEGRATION})) {
+          app_id, {web_app::proto::SUGGESTED_FROM_ANOTHER_DEVICE,
+                   web_app::proto::INSTALLED_WITHOUT_OS_INTEGRATION,
+                   web_app::proto::INSTALLED_WITH_OS_INTEGRATION})) {
     UninstallWebApp(app_id);
     return;
   }
@@ -681,10 +701,9 @@ void AppHomePageHandler::UninstallApp(const std::string& app_id) {
 
 void AppHomePageHandler::ShowAppSettings(const std::string& app_id) {
   if (web_app_provider_->registrar_unsafe().IsInstallState(
-          app_id,
-          {web_app::proto::InstallState::SUGGESTED_FROM_ANOTHER_DEVICE,
-           web_app::proto::InstallState::INSTALLED_WITHOUT_OS_INTEGRATION,
-           web_app::proto::InstallState::INSTALLED_WITH_OS_INTEGRATION})) {
+          app_id, {web_app::proto::SUGGESTED_FROM_ANOTHER_DEVICE,
+                   web_app::proto::INSTALLED_WITHOUT_OS_INTEGRATION,
+                   web_app::proto::INSTALLED_WITH_OS_INTEGRATION})) {
     ShowWebAppSettings(app_id);
     return;
   }
@@ -704,10 +723,9 @@ void AppHomePageHandler::ShowAppSettings(const std::string& app_id) {
 void AppHomePageHandler::CreateAppShortcut(const std::string& app_id,
                                            CreateAppShortcutCallback callback) {
   if (web_app_provider_->registrar_unsafe().IsInstallState(
-          app_id,
-          {web_app::proto::InstallState::SUGGESTED_FROM_ANOTHER_DEVICE,
-           web_app::proto::InstallState::INSTALLED_WITHOUT_OS_INTEGRATION,
-           web_app::proto::InstallState::INSTALLED_WITH_OS_INTEGRATION})) {
+          app_id, {web_app::proto::SUGGESTED_FROM_ANOTHER_DEVICE,
+                   web_app::proto::INSTALLED_WITHOUT_OS_INTEGRATION,
+                   web_app::proto::INSTALLED_WITH_OS_INTEGRATION})) {
     CreateWebAppShortcut(app_id, std::move(callback));
     return;
   }
@@ -731,10 +749,6 @@ void AppHomePageHandler::LaunchApp(const std::string& app_id,
 void AppHomePageHandler::SetRunOnOsLoginMode(
     const std::string& app_id,
     web_app::RunOnOsLoginMode run_on_os_login_mode) {
-  if (!base::FeatureList::IsEnabled(features::kDesktopPWAsRunOnOsLogin)) {
-    return;
-  }
-
   if (run_on_os_login_mode != web_app::RunOnOsLoginMode::kNotRun &&
       run_on_os_login_mode != web_app::RunOnOsLoginMode::kWindowed) {
     return;  // Other login mode is not supported;
@@ -751,6 +765,15 @@ void AppHomePageHandler::LaunchDeprecatedAppDialog() {
 }
 
 void AppHomePageHandler::InstallAppLocally(const std::string& app_id) {
+  // TODO(crbug.com/456164619): Grey out web app sync if web app installs are
+  // not allowed via policy. Disallow InstallAppLocally to install sync apps if
+  // web app installs are not allowed via policy. Trigger not supported dialog.
+  if (!web_app::IsWebAppInstallByUserPolicyEnabled(profile_)) {
+    web_app::WebAppUiManager::TriggerInstallNotSupportedDialog(
+        web_ui_->GetWebContents(), profile_, base::DoNothing());
+    return;
+  }
+
   web_app_provider_->scheduler().InstallAppLocally(app_id, base::DoNothing());
 }
 

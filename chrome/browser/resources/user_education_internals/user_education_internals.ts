@@ -6,6 +6,7 @@ import '/strings.m.js';
 import 'chrome://resources/cr_components/help_bubble/help_bubble.js';
 import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_expand_button/cr_expand_button.js';
+import 'chrome://resources/cr_elements/cr_icon/cr_icon.js';
 import 'chrome://resources/cr_elements/cr_menu_selector/cr_menu_selector.js';
 import 'chrome://resources/cr_elements/cr_toast/cr_toast.js';
 import 'chrome://resources/cr_elements/cr_toolbar/cr_toolbar.js';
@@ -16,7 +17,6 @@ import './user_education_whats_new_internals_card.js';
 
 import {ColorChangeUpdater} from 'chrome://resources/cr_components/color_change_listener/colors_css_updater.js';
 import {HelpBubbleMixinLit} from 'chrome://resources/cr_components/help_bubble/help_bubble_mixin_lit.js';
-import {CrContainerShadowMixinLit} from 'chrome://resources/cr_elements/cr_container_shadow_mixin_lit.js';
 import type {CrMenuSelector} from 'chrome://resources/cr_elements/cr_menu_selector/cr_menu_selector.js';
 import type {CrToastElement} from 'chrome://resources/cr_elements/cr_toast/cr_toast.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
@@ -35,8 +35,7 @@ export interface UserEducationInternalsElement {
   };
 }
 
-const UserEducationInternalsElementBase =
-    CrContainerShadowMixinLit(HelpBubbleMixinLit(CrLitElement));
+const UserEducationInternalsElementBase = HelpBubbleMixinLit(CrLitElement);
 
 export class UserEducationInternalsElement extends
     UserEducationInternalsElementBase {
@@ -76,6 +75,11 @@ export class UserEducationInternalsElement extends
         type: Boolean,
         value: false,
       },
+
+      ntpPromoPreferencesExpanded_: {
+        type: Boolean,
+        value: false,
+      },
     };
   }
 
@@ -86,6 +90,8 @@ export class UserEducationInternalsElement extends
   protected whatsNewModules_: WhatsNewModuleDemoPageInfo[] = [];
   protected whatsNewEditions_: WhatsNewEditionDemoPageInfo[] = [];
   protected ntpPromos_: FeaturePromoDemoPageInfo[] = [];
+  protected ntpPromoPreferences_: FeaturePromoDemoPageData[] = [];
+  protected accessor ntpPromoPreferencesExpanded_: boolean = false;
   protected accessor featurePromoErrorMessage_: string = '';
   protected accessor narrow_: boolean = false;
   protected accessor sessionExpanded_: boolean = false;
@@ -146,6 +152,10 @@ export class UserEducationInternalsElement extends
 
     this.handler_.getNtpPromos().then(({ntpPromos}) => {
       this.ntpPromos_ = ntpPromos;
+    });
+
+    this.handler_.getNtpPromoPreferences().then(({ntpPromoPreferences}) => {
+      this.ntpPromoPreferences_ = ntpPromoPreferences;
     });
   }
 
@@ -300,6 +310,20 @@ export class UserEducationInternalsElement extends
     });
   }
 
+  protected clearNtpPromoPreferences_() {
+    this.handler_.clearNtpPromoPreferences().then(({errorMessage}) => {
+      this.featurePromoErrorMessage_ = errorMessage;
+      if (errorMessage !== '') {
+        this.$.errorMessageToast.show();
+      } else {
+        this.handler_.getNtpPromoPreferences().then(({ntpPromoPreferences}) => {
+          this.ntpPromoPreferences_ = ntpPromoPreferences;
+          this.requestUpdate();
+        });
+      }
+    });
+  }
+
   protected promoFilter_(promo: FeaturePromoDemoPageInfo) {
     return this.filter === '' ||
         promo.displayTitle.toLowerCase().includes(this.filter) ||
@@ -338,6 +362,11 @@ export class UserEducationInternalsElement extends
 
   protected onSessionExpandedChanged_(e: CustomEvent<{value: boolean}>) {
     this.sessionExpanded_ = e.detail.value;
+  }
+
+  protected onNtpPromoPreferencesExpandedChanged_(
+      e: CustomEvent<{value: boolean}>) {
+    this.ntpPromoPreferencesExpanded_ = e.detail.value;
   }
 
   protected launchWhatsNewStaging_() {

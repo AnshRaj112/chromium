@@ -4,24 +4,28 @@
 
 #include "chrome/browser/printing/web_api/web_printing_service_chromeos.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/containers/map_util.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/ash/printing/local_printer_impl.h"
 #include "chrome/browser/chromeos/printing/cups_wrapper.h"
-#include "chrome/browser/printing/local_printer_utils_chromeos.h"
 #include "chrome/browser/printing/pdf_blob_data_flattener.h"
 #include "chrome/browser/printing/print_job_controller.h"
 #include "chrome/browser/printing/web_api/web_printing_type_converters.h"
 #include "chrome/browser/printing/web_api/web_printing_utils.h"
 #include "chrome/browser/profiles/profile.h"
 #include "components/permissions/permission_request_data.h"
+#include "components/user_manager/user_manager.h"
 #include "content/public/browser/permission_controller.h"
 #include "content/public/browser/permission_descriptor_util.h"
+#include "content/public/browser/permission_result.h"
 #include "content/public/browser/render_frame_host.h"
+#include "crypto/hash.h"
 #include "printing/backend/cups_ipp_constants.h"
 #include "printing/backend/print_backend.h"
 #include "printing/metafile_skia.h"
@@ -33,17 +37,12 @@ namespace printing {
 
 namespace {
 
-blink::mojom::WebPrinterAttributesPtr ConvertResponse(
-    crosapi::mojom::CapabilitiesResponsePtr response) {
-  if (!response || !response->capabilities) {
+blink::mojom::WebPrinterAttributesPtr ConvertCaps(
+    const std::optional<PrinterSemanticCapsAndDefaults>& caps) {
+  if (!caps.has_value()) {
     return nullptr;
   }
-  return blink::mojom::WebPrinterAttributes::From(*response->capabilities);
-}
-
-std::optional<PrinterSemanticCapsAndDefaults> ExtractCapsAndDefaults(
-    crosapi::mojom::CapabilitiesResponsePtr response) {
-  return response ? response->capabilities : std::nullopt;
+  return blink::mojom::WebPrinterAttributes::From(*caps);
 }
 
 bool IsDuplexModeKnown(mojom::DuplexMode duplex_mode) {
@@ -105,9 +104,9 @@ bool ValidateAdvancedCapability(
   }
   // `requested_capability` is guaranteed to be a string -- it's set this way in
   // StructTraits<>.
-  return base::Contains(printer_capability->values,
-                        requested_capability->GetString(),
-                        &AdvancedCapabilityValue::name);
+  return std::ranges::contains(printer_capability->values,
+                               requested_capability->GetString(),
+                               &AdvancedCapabilityValue::name);
 }
 
 bool ValidateAttributesAndUpdateIfNecessary(
@@ -127,8 +126,8 @@ bool ValidateAttributesAndUpdateIfNecessary(
     return false;
   }
   if (IsDuplexModeKnown(pjt_attributes.duplex_mode()) &&
-      !base::Contains(printer_attributes.duplex_modes,
-                      pjt_attributes.duplex_mode())) {
+      !std::ranges::contains(printer_attributes.duplex_modes,
+                             pjt_attributes.duplex_mode())) {
     return false;
   }
   if (!IsDuplexModeKnown(pjt_attributes.duplex_mode()) &&
@@ -136,7 +135,8 @@ bool ValidateAttributesAndUpdateIfNecessary(
     return false;
   }
   if (!pjt_attributes.dpi_size().IsZero() &&
-      !base::Contains(printer_attributes.dpis, pjt_attributes.dpi_size())) {
+      !std::ranges::contains(printer_attributes.dpis,
+                             pjt_attributes.dpi_size())) {
     return false;
   }
   if (!ValidateMediaCol(pjt_attributes, printer_attributes)) {
@@ -234,9 +234,11 @@ void WebPrintingServiceChromeOS::FetchAttributes(
   }
 
   const std::string& printer_id = *printers_.current_context();
-  GetLocalPrinterInterface()->GetCapability(
+  ash::LocalPrinterImpl::Get()->GetCapability(
+      // TODO(crbug.com/354842935): Replace by ash::AnnotatedAccountId.
+      user_manager::UserManager::Get()->GetPrimaryUser()->GetAccountId(),
       printer_id,
-      base::BindOnce(&ConvertResponse)
+      base::BindOnce(&ConvertCaps)
           .Then(base::BindOnce(
               &WebPrintingServiceChromeOS::OnPrinterAttributesRetrieved,
               weak_factory_.GetWeakPtr(), printer_id, std::move(callback))));
@@ -254,40 +256,46 @@ void WebPrintingServiceChromeOS::Print(
 
   const std::string& printer_id = *printers_.current_context();
   attributes->set_device_name(base::UTF8ToUTF16(printer_id));
-  GetLocalPrinterInterface()->GetCapability(
+  ash::LocalPrinterImpl::Get()->GetCapability(
+      // TODO(crbug.com/354842935): Replace by ash::AnnotatedAccountId.
+      user_manager::UserManager::Get()->GetPrimaryUser()->GetAccountId(),
       printer_id,
-      base::BindOnce(&ExtractCapsAndDefaults)
-          .Then(base::BindOnce(
-              &WebPrintingServiceChromeOS::OnPrinterAttributesRetrievedForPrint,
-              weak_factory_.GetWeakPtr(), std::move(document),
-              std::move(attributes), std::move(callback), printer_id)));
+      base::BindOnce(
+          &WebPrintingServiceChromeOS::OnPrinterAttributesRetrievedForPrint,
+          weak_factory_.GetWeakPtr(), std::move(document),
+          std::move(attributes), std::move(callback), printer_id));
 }
 
 void WebPrintingServiceChromeOS::OnPermissionDecidedForGetPrinters(
     GetPrintersCallback callback,
-    blink::mojom::PermissionStatus permission_status) {
-  if (permission_status != blink::mojom::PermissionStatus::GRANTED) {
+    content::PermissionResult permission_result) {
+  if (permission_result.status != blink::mojom::PermissionStatus::GRANTED) {
     std::move(callback).Run(blink::mojom::GetPrintersResult::NewError(
         blink::mojom::GetPrintersError::kUserPermissionDenied));
     return;
   }
-  GetLocalPrinterInterface()->GetPrinters(
+  ash::LocalPrinterImpl::Get()->GetPrinters(
+      // TODO(crbug.com/354842935): Replace by ash::AnnotatedAccountId.
+      user_manager::UserManager::Get()->GetPrimaryUser()->GetAccountId(),
       base::BindOnce(&WebPrintingServiceChromeOS::OnPrintersRetrieved,
                      weak_factory_.GetWeakPtr(), std::move(callback)));
 }
 
 void WebPrintingServiceChromeOS::OnPrintersRetrieved(
     GetPrintersCallback callback,
-    std::vector<crosapi::mojom::LocalDestinationInfoPtr> printers) {
+    std::vector<chromeos::Printer> printers) {
   // TODO(b/302505962): Figure out the correct permissions UX.
   std::vector<blink::mojom::WebPrinterInfoPtr> web_printers;
   for (const auto& printer : printers) {
     mojo::PendingRemote<blink::mojom::WebPrinter> printer_remote;
     printers_.Add(this, printer_remote.InitWithNewPipeAndPassReceiver(),
-                  PrinterId(printer->id));
+                  PrinterId(printer.id()));
 
     auto printer_info = blink::mojom::WebPrinterInfo::New();
-    printer_info->printer_name = printer->name;
+    printer_info->printer_name = printer.display_name();
+    // Expose an opaque id to the web rather the internal id.
+    printer_info->printer_id =
+        base::HexEncode(crypto::hash::Sha256(printer.id()));
     printer_info->printer_remote = std::move(printer_remote);
     web_printers.push_back(std::move(printer_info));
   }
@@ -316,7 +324,7 @@ void WebPrintingServiceChromeOS::OnPrinterAttributesRetrievedForPrint(
     std::unique_ptr<PrintSettings> pjt_attributes,
     PrintCallback callback,
     const std::string& printer_id,
-    std::optional<PrinterSemanticCapsAndDefaults> printer_attributes) {
+    const std::optional<PrinterSemanticCapsAndDefaults>& printer_attributes) {
   if (!printer_attributes) {
     std::move(callback).Run(blink::mojom::WebPrintResult::NewError(
         blink::mojom::WebPrintError::kPrinterUnreachable));

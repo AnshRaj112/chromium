@@ -7,11 +7,11 @@
 
 #include "ash/public/cpp/default_user_image.h"
 #include "ash/public/cpp/personalization_app/user_display_info.h"
-#include "ash/webui/personalization_app/mojom/personalization_app.mojom-forward.h"
 #include "ash/webui/personalization_app/mojom/personalization_app.mojom.h"
 #include "ash/webui/personalization_app/mojom/personalization_app_mojom_traits.h"
 #include "base/containers/span.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"

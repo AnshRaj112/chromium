@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/location.h"
 #include "base/memory/scoped_refptr.h"
@@ -211,7 +210,7 @@ struct ExpectedReportWaiter {
         expected_body(std::move(body)),
         response(std::make_unique<net::test_server::ControllableHttpResponse>(
             server,
-            expected_url.path())) {}
+            expected_url.GetPath())) {}
 
   GURL expected_url;
   base::Value::Dict expected_body;
@@ -229,10 +228,10 @@ struct ExpectedReportWaiter {
     // The embedded test server resolves all urls to 127.0.0.1, so get the real
     // request host from the request headers.
     const net::test_server::HttpRequest& request = *response->http_request();
-    DCHECK(base::Contains(request.headers, "Host"));
+    DCHECK(request.headers.contains("Host"));
     const GURL& request_url = request.GetURL();
     GURL header_url = GURL("https://" + request.headers.at("Host"));
-    std::string host = header_url.host();
+    std::string host = header_url.GetHost();
     GURL::Replacements replace_host;
     replace_host.SetHostStr(host);
 
@@ -259,7 +258,7 @@ struct ExpectedReportWaiter {
     // for report url was not set properly.
     EXPECT_EQ(expected_url, request_url.ReplaceComponents(replace_host));
 
-    EXPECT_TRUE(base::Contains(request.headers, "User-Agent"));
+    EXPECT_TRUE(request.headers.contains("User-Agent"));
     EXPECT_EQ(request.headers.at("Content-Type"), "application/json");
   }
 };
@@ -465,8 +464,6 @@ class AttributionsBrowserTest : public AttributionsBrowserTestBase,
     if (enable_in_browser_migration) {
       enabled_features.emplace_back(
           blink::features::kKeepAliveInBrowserMigration);
-      enabled_features.emplace_back(
-          blink::features::kAttributionReportingInBrowserMigration);
     } else {
       disabled_features.emplace_back(
           blink::features::kKeepAliveInBrowserMigration);
@@ -669,10 +666,10 @@ IN_PROC_BROWSER_TEST_P(AttributionsBrowserTest,
 
   // Verify the navigation request does not contain the eligibility header.
   register_response1->WaitForRequest();
-  EXPECT_FALSE(base::Contains(register_response1->http_request()->headers,
-                              "Attribution-Reporting-Eligible"));
-  EXPECT_FALSE(base::Contains(register_response1->http_request()->headers,
-                              "Attribution-Reporting-Support"));
+  EXPECT_FALSE(register_response1->http_request()->headers.contains(
+      "Attribution-Reporting-Eligible"));
+  EXPECT_FALSE(register_response1->http_request()->headers.contains(
+      "Attribution-Reporting-Support"));
 
   auto http_response = std::make_unique<net::test_server::BasicHttpResponse>();
   http_response->set_code(net::HTTP_OK);
@@ -1140,7 +1137,7 @@ ATTRIBUTION_PRERENDER_BROWSER_TEST(NoConversionsOnPrerender) {
     // Pre-render the conversion url.
     const GURL kConversionUrl = https_server->GetURL(
         "d.test", "/attribution_reporting/page_with_conversion_redirect.html");
-    FrameTreeNodeId host_id = prerender_helper_.AddPrerender(kConversionUrl);
+    PrerenderHostId host_id = prerender_helper_.AddPrerender(kConversionUrl);
     content::test::PrerenderHostObserver host_observer(*web_contents(),
                                                        host_id);
 
@@ -1190,7 +1187,7 @@ ATTRIBUTION_PRERENDER_BROWSER_TEST(ConversionsRegisteredOnActivatedPrerender) {
     // Pre-render the conversion url.
     const GURL kConversionUrl = https_server()->GetURL(
         "d.test", "/attribution_reporting/page_with_conversion_redirect.html");
-    FrameTreeNodeId host_id = prerender_helper_.AddPrerender(kConversionUrl);
+    PrerenderHostId host_id = prerender_helper_.AddPrerender(kConversionUrl);
     content::test::PrerenderHostObserver host_observer(*web_contents(),
                                                        host_id);
 
@@ -1255,7 +1252,7 @@ ATTRIBUTION_PRERENDER_BROWSER_TEST(NoConversionsInSubframeOnPrerender) {
     const GURL kConversionUrl = https_server()->GetURL(
         "d.test",
         "/attribution_reporting/page_with_conversion_redirect_in_iframe.html");
-    FrameTreeNodeId host_id = prerender_helper_.AddPrerender(kConversionUrl);
+    PrerenderHostId host_id = prerender_helper_.AddPrerender(kConversionUrl);
     content::test::PrerenderHostObserver host_observer(*web_contents(),
                                                        host_id);
 
@@ -1303,7 +1300,7 @@ ATTRIBUTION_PRERENDER_BROWSER_TEST(
     const GURL kConversionUrl = https_server()->GetURL(
         "d.test",
         "/attribution_reporting/page_with_conversion_redirect_in_iframe.html");
-    FrameTreeNodeId host_id = prerender_helper_.AddPrerender(kConversionUrl);
+    PrerenderHostId host_id = prerender_helper_.AddPrerender(kConversionUrl);
     content::test::PrerenderHostObserver host_observer(*web_contents(),
                                                        host_id);
 
@@ -1373,7 +1370,7 @@ ATTRIBUTION_PRERENDER_BROWSER_TEST(
     const GURL kConversionUrl = https_server()->GetURL(
         "d.test",
         "/attribution_reporting/page_with_conversion_redirect_in_iframe.html");
-    FrameTreeNodeId host_id = prerender_helper_.AddPrerender(kConversionUrl);
+    PrerenderHostId host_id = prerender_helper_.AddPrerender(kConversionUrl);
     content::test::PrerenderHostObserver host_observer(*web_contents(),
                                                        host_id);
 
@@ -1842,9 +1839,7 @@ class AttributionsBrowserTestWithKeepAliveMigration
  public:
   AttributionsBrowserTestWithKeepAliveMigration() {
     scoped_feature_list_.InitWithFeatures(
-        {blink::features::kKeepAliveInBrowserMigration,
-         blink::features::kAttributionReportingInBrowserMigration},
-        {});
+        {blink::features::kKeepAliveInBrowserMigration}, {});
   }
 
  private:
@@ -1943,10 +1938,10 @@ void TestServiceWorker(const char* registration_js,
                     "a.test", "/attribution_reporting/register_source"))));
 
   register_response->WaitForRequest();
-  EXPECT_TRUE(base::Contains(register_response->http_request()->headers,
-                             "Attribution-Reporting-Eligible"));
-  EXPECT_TRUE(base::Contains(register_response->http_request()->headers,
-                             "Attribution-Reporting-Support"));
+  EXPECT_TRUE(register_response->http_request()->headers.contains(
+      "Attribution-Reporting-Eligible"));
+  EXPECT_TRUE(register_response->http_request()->headers.contains(
+      "Attribution-Reporting-Support"));
 }
 
 IN_PROC_BROWSER_TEST_P(

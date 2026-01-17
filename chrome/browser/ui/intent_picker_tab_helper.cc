@@ -98,7 +98,7 @@ bool IsValidIntentPickerUrl(const GURL& url, bool is_error_page) {
   // chrome://password-manager is a valid PWA, so it should be considered when
   // evaluating whether to show the intent picker.
   if (url.SchemeIs(content::kChromeUIScheme) &&
-      url.host() == password_manager::kChromeUIPasswordManagerHost) {
+      url.GetHost() == password_manager::kChromeUIPasswordManagerHost) {
     return true;
   }
 
@@ -227,7 +227,7 @@ void IntentPickerTabHelper::MaybeShowIconForApps(
 
       intent_picker_delegate_->LoadSingleAppIcon(
           apps[0].type, current_app_id_,
-          GetLayoutConstant(LOCATION_BAR_ICON_SIZE),
+          GetLayoutConstant(LayoutConstant::kLocationBarIconSize),
           base::BindOnce(&IntentPickerTabHelper::OnAppIconLoadedForChip,
                          per_navigation_weak_factory_.GetWeakPtr(),
                          current_app_id_));
@@ -258,8 +258,9 @@ IntentPickerTabHelper::IntentPickerTabHelper(content::WebContents* web_contents)
       std::make_unique<apps::ChromeOsAppsIntentPickerDelegate>(profile);
 #else
   intent_picker_delegate_ = std::make_unique<apps::WebAppsIntentPickerDelegate>(
-      profile, std::vector<int>{GetLayoutConstant(LOCATION_BAR_ICON_SIZE),
-                                GetIntentPickerBubbleIconSize()});
+      profile,
+      std::vector<int>{GetLayoutConstant(LayoutConstant::kLocationBarIconSize),
+                       GetIntentPickerBubbleIconSize()});
 #endif  // BUILDFLAG(IS_CHROMEOS)
 }
 

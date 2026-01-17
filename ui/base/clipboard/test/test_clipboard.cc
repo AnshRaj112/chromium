@@ -11,11 +11,11 @@
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/memory/ptr_util.h"
 #include "base/notreached.h"
 #include "base/numerics/safe_conversions.h"
+#include "base/strings/string_view_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/types/optional_ref.h"
 #include "base/types/optional_util.h"
@@ -92,10 +92,10 @@ bool TestClipboard::IsFormatAvailable(
   // Chrome can retrieve an image from the clipboard as either a bitmap or PNG.
   if (format == ClipboardFormatType::PngType() ||
       format == ClipboardFormatType::BitmapType()) {
-    return base::Contains(store.data, ClipboardFormatType::PngType()) ||
-           base::Contains(store.data, ClipboardFormatType::BitmapType());
+    return store.data.contains(ClipboardFormatType::PngType()) ||
+           store.data.contains(ClipboardFormatType::BitmapType());
   }
-  return base::Contains(store.data, format);
+  return store.data.contains(format);
 }
 
 void TestClipboard::Clear(ClipboardBuffer buffer) {
@@ -393,21 +393,16 @@ void TestClipboard::WriteBitmap(const SkBitmap& bitmap) {
 
 void TestClipboard::WriteData(const ClipboardFormatType& format,
                               base::span<const uint8_t> data) {
-  GetDefaultStore().data[format] =
-      std::string(reinterpret_cast<const char*>(data.data()), data.size());
+  GetDefaultStore().data[format] = std::string(base::as_string_view(data));
   ClipboardMonitor::GetInstance()->NotifyClipboardDataChanged();
 }
 
-void TestClipboard::WriteClipboardHistory() {
-  // TODO(crbug.com/40945200): Add support for this.
+void TestClipboard::StopUpdatingSequenceNumberForTesting() {
+  should_update_sequence_number_ = false;
 }
 
-void TestClipboard::WriteUploadCloudClipboard() {
-  // TODO(crbug.com/40945200): Add support for this.
-}
-
-void TestClipboard::WriteConfidentialDataForPassword() {
-  // TODO(crbug.com/40945200): Add support for this.
+void TestClipboard::UpdateSequenceManuallyForTesting(ClipboardBuffer buffer) {
+  GetStore(buffer).sequence_number = ClipboardSequenceNumberToken();
 }
 
 TestClipboard::DataStore::DataStore() = default;
@@ -462,7 +457,9 @@ const TestClipboard::DataStore& TestClipboard::GetStore(
 TestClipboard::DataStore& TestClipboard::GetStore(ClipboardBuffer buffer) {
   CHECK(IsSupportedClipboardBuffer(buffer));
   DataStore& store = stores_[buffer];
-  store.sequence_number = ClipboardSequenceNumberToken();
+  if (should_update_sequence_number_) {
+    store.sequence_number = ClipboardSequenceNumberToken();
+  }
   return store;
 }
 

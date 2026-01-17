@@ -313,8 +313,7 @@ void InputType::SetValueAsDouble(double double_value,
 }
 
 void InputType::SetValueAsDecimal(const Decimal& new_value,
-                                  TextFieldEventBehavior event_behavior,
-                                  ExceptionState&) const {
+                                  TextFieldEventBehavior event_behavior) const {
   GetElement().SetValue(Serialize(new_value), event_behavior);
 }
 
@@ -1108,7 +1107,7 @@ void InputType::ApplyStep(const Decimal& current,
           new_value.ToString()) != DispatchEventResult::kNotCanceled) {
     return;
   }
-  SetValueAsDecimal(new_value, event_behavior, exception_state);
+  SetValueAsDecimal(new_value, event_behavior);
 
   if (AXObjectCache* cache = GetElement().GetDocument().ExistingAXObjectCache())
     cache->HandleValueChanged(&GetElement());
@@ -1216,14 +1215,12 @@ void InputType::StepUpFromLayoutObject(int n) {
       current = step_range.Minimum() - next_diff;
     if (current > step_range.Maximum() - next_diff)
       current = step_range.Maximum() - next_diff;
-    SetValueAsDecimal(current, TextFieldEventBehavior::kDispatchNoEvent,
-                      IGNORE_EXCEPTION_FOR_TESTING);
+    SetValueAsDecimal(current, TextFieldEventBehavior::kDispatchNoEvent);
   }
   if ((sign > 0 && current < step_range.Minimum()) ||
       (sign < 0 && current > step_range.Maximum())) {
     SetValueAsDecimal(sign > 0 ? step_range.Minimum() : step_range.Maximum(),
-                      TextFieldEventBehavior::kDispatchChangeEvent,
-                      IGNORE_EXCEPTION_FOR_TESTING);
+                      TextFieldEventBehavior::kDispatchChangeEvent);
     return;
   }
   if ((sign > 0 && current >= step_range.Maximum()) ||
@@ -1315,8 +1312,12 @@ void InputType::AddWarningToConsole(const char* message_format,
       MakeGarbageCollected<ConsoleMessage>(
           mojom::ConsoleMessageSource::kRendering,
           mojom::ConsoleMessageLevel::kWarning,
-          String::Format(message_format,
-                         JSONValue::QuoteString(value).Utf8().c_str())));
+          UNSAFE_TODO(String::Format(
+              message_format, JSONValue::QuoteString(value).Utf8().c_str()))));
+}
+
+bool InputType::SupportsBaseAppearance(Element::BaseAppearanceValue) const {
+  return false;
 }
 
 }  // namespace blink

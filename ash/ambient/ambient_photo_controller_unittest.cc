@@ -29,10 +29,8 @@
 #include "base/barrier_closure.h"
 #include "base/base_paths.h"
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
-#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/path_service.h"
@@ -45,7 +43,7 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "cc/paint/skottie_resource_metadata.h"
-#include "crypto/hash.h"
+#include "crypto/obsolete/sha1.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "ui/gfx/image/image_skia.h"
 
@@ -86,11 +84,10 @@ class AmbientPhotoControllerTest : public AmbientAshTestBase {
     SetAmbientTheme(personalization_app::mojom::AmbientTheme::kSlideshow);
     // This is common to all AmbientPhotoConfigs and mimics real-world behavior:
     // When OnImagesReady() is called, the UI synchronously starts rendering.
-    ON_CALL(images_ready_observer_, OnImagesReady)
-        .WillByDefault(::testing::Invoke([this]() {
-          photo_controller()->OnMarkerHit(
-              AmbientPhotoConfig::Marker::kUiStartRendering);
-        }));
+    ON_CALL(images_ready_observer_, OnImagesReady).WillByDefault([this]() {
+      photo_controller()->OnMarkerHit(
+          AmbientPhotoConfig::Marker::kUiStartRendering);
+    });
     images_ready_observation_.Observe(
         photo_controller()->ambient_backend_model());
   }
@@ -168,10 +165,10 @@ class AmbientPhotoControllerTest : public AmbientAshTestBase {
     scoped_observation.Observe(photo_controller()->ambient_backend_model());
     bool images_ready = false;
     ON_CALL(mock_backend_observer, OnImagesReady)
-        .WillByDefault(::testing::Invoke([quit_closure, &images_ready]() {
+        .WillByDefault([quit_closure, &images_ready]() {
           quit_closure.Run();
           images_ready = true;
-        }));
+        });
     task_environment()->GetMainThreadTaskRunner()->PostDelayedTask(
         FROM_HERE, quit_closure, kTimeout);
     loop.Run();
@@ -188,12 +185,12 @@ class AmbientPhotoControllerTest : public AmbientAshTestBase {
         scoped_observation{&mock_backend_observer};
     scoped_observation.Observe(photo_controller()->ambient_backend_model());
     ON_CALL(mock_backend_observer, OnImageAdded)
-        .WillByDefault(::testing::Invoke(
+        .WillByDefault(
             [quit_closure, num_expected_topics, &num_topics_added]() {
               ++num_topics_added;
               if (num_topics_added >= num_expected_topics)
                 quit_closure.Run();
-            }));
+            });
     task_environment()->GetMainThreadTaskRunner()->PostDelayedTask(
         FROM_HERE, quit_closure, kTimeout);
     loop.Run();
@@ -609,8 +606,8 @@ TEST_F(AmbientPhotoControllerTest, ShouldDownloadBackupImagesWhenScheduled) {
   // Should have been two cache writes to backup data.
   const auto& backup_data = GetBackupCachedFiles();
   ASSERT_EQ(backup_data.size(), 2u);
-  ASSERT_TRUE(base::Contains(backup_data, 0));
-  ASSERT_TRUE(base::Contains(backup_data, 1));
+  ASSERT_TRUE(backup_data.contains(0));
+  ASSERT_TRUE(backup_data.contains(1));
   for (const auto& i : backup_data) {
     EXPECT_TRUE(i.second.primary_photo().details().empty());
     EXPECT_TRUE(i.second.related_photo().image().empty());
@@ -664,8 +661,8 @@ TEST_F(AmbientPhotoControllerTest,
   // two cache writes to backup cache.
   const auto& backup_data = GetBackupCachedFiles();
   ASSERT_EQ(backup_data.size(), 2u);
-  ASSERT_TRUE(base::Contains(backup_data, 0));
-  ASSERT_TRUE(base::Contains(backup_data, 1));
+  ASSERT_TRUE(backup_data.contains(0));
+  ASSERT_TRUE(backup_data.contains(1));
   for (const auto& i : backup_data) {
     EXPECT_TRUE(i.second.primary_photo().details().empty());
     EXPECT_TRUE(i.second.related_photo().image().empty());
@@ -712,7 +709,8 @@ TEST_F(AmbientPhotoControllerTest, ShouldNotLoadDuplicateImages) {
 
   // Should contain hash of downloaded data.
   EXPECT_TRUE(photo_controller()->ambient_backend_model()->IsHashDuplicate(
-      std::string(base::as_string_view(crypto::hash::Sha1(image_data)))));
+      std::string(base::as_string_view(crypto::obsolete::Sha1::HashForTesting(
+          base::as_byte_span(image_data))))));
   // Only one image should have been loaded.
   EXPECT_FALSE(photo_controller()->ambient_backend_model()->ImagesReady());
 
@@ -724,7 +722,8 @@ TEST_F(AmbientPhotoControllerTest, ShouldNotLoadDuplicateImages) {
 
   // Second image should have been loaded.
   EXPECT_TRUE(photo_controller()->ambient_backend_model()->IsHashDuplicate(
-      std::string(base::as_string_view(crypto::hash::Sha1(image_data_2)))));
+      std::string(base::as_string_view(crypto::obsolete::Sha1::HashForTesting(
+          base::as_byte_span(image_data_2))))));
   EXPECT_TRUE(photo_controller()->ambient_backend_model()->ImagesReady());
 }
 

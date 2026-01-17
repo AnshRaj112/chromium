@@ -23,14 +23,16 @@ use crate::token;
 #[cfg(feature = "full")]
 use crate::ty::ReturnType;
 use crate::ty::Type;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+#[cfg(feature = "printing")]
+use core::fmt::{self, Display};
+use core::hash::{Hash, Hasher};
+#[cfg(all(feature = "parsing", feature = "full"))]
+use core::mem;
 use proc_macro2::{Span, TokenStream};
 #[cfg(feature = "printing")]
 use quote::IdentFragment;
-#[cfg(feature = "printing")]
-use std::fmt::{self, Display};
-use std::hash::{Hash, Hasher};
-#[cfg(all(feature = "parsing", feature = "full"))]
-use std::mem;
 
 ast_enum_of_structs! {
     /// A Rust expression.
@@ -195,7 +197,7 @@ ast_enum_of_structs! {
         /// A parenthesized expression: `(a + b)`.
         Paren(ExprParen),
 
-        /// A path like `std::mem::replace` possibly containing generic
+        /// A path like `core::mem::replace` possibly containing generic
         /// parameters and a qualified self-type.
         ///
         /// A plain identifier like `x` is a path of length 1.
@@ -556,7 +558,7 @@ ast_struct! {
 }
 
 ast_struct! {
-    /// A path like `std::mem::replace` possibly containing generic
+    /// A path like `core::mem::replace` possibly containing generic
     /// parameters and a qualified self-type.
     ///
     /// A plain identifier like `x` is a path of length 1.
@@ -717,8 +719,8 @@ impl Expr {
     /// An unspecified invalid expression.
     ///
     /// ```
+    /// use core::mem;
     /// use quote::ToTokens;
-    /// use std::mem;
     /// use syn::{parse_quote, Expr};
     ///
     /// fn unparenthesize(e: &mut Expr) {
@@ -756,7 +758,7 @@ impl Expr {
     ///
     /// ```
     /// # struct S;
-    /// # impl std::ops::Deref for S {
+    /// # impl core::ops::Deref for S {
     /// #     type Target = bool;
     /// #     fn deref(&self) -> &Self::Target {
     /// #         &true
@@ -1189,7 +1191,7 @@ pub(crate) mod parsing {
         FieldValue, Index, Member,
     };
     #[cfg(feature = "full")]
-    use crate::generics::BoundLifetimes;
+    use crate::generics::{self, BoundLifetimes};
     use crate::ident::Ident;
     #[cfg(feature = "full")]
     use crate::lifetime::Lifetime;
@@ -1212,9 +1214,13 @@ pub(crate) mod parsing {
     #[cfg(feature = "full")]
     use crate::ty::{ReturnType, Type};
     use crate::verbatim;
+    use alloc::boxed::Box;
+    use alloc::format;
+    use alloc::string::ToString;
+    use alloc::vec::Vec;
+    use core::mem;
     #[cfg(feature = "full")]
     use proc_macro2::{Span, TokenStream};
-    use std::mem;
 
     // When we're parsing expressions which occur before blocks, like in an if
     // statement's condition, we cannot parse a struct literal.
@@ -1251,7 +1257,7 @@ pub(crate) mod parsing {
         } else if input.peek(Token![while]) {
             Expr::While(input.parse()?)
         } else if input.peek(Token![for])
-            && !(input.peek2(Token![<]) && (input.peek3(Lifetime) || input.peek3(Token![>])))
+            && !generics::parsing::choose_generics_over_qpath_after_keyword(input)
         {
             Expr::ForLoop(input.parse()?)
         } else if input.peek(Token![loop]) {
@@ -1803,8 +1809,7 @@ pub(crate) mod parsing {
         } else if input.peek(Token![|])
             || input.peek(Token![move])
             || input.peek(Token![for])
-                && input.peek2(Token![<])
-                && (input.peek3(Lifetime) || input.peek3(Token![>]))
+                && generics::parsing::choose_generics_over_qpath_after_keyword(input)
             || input.peek(Token![const]) && !input.peek2(token::Brace)
             || input.peek(Token![static])
             || input.peek(Token![async]) && (input.peek2(Token![|]) || input.peek2(Token![move]))
@@ -3146,7 +3151,7 @@ pub(crate) mod printing {
     #[cfg(feature = "full")]
     use crate::ty::ReturnType;
     use proc_macro2::{Literal, Span, TokenStream};
-    use quote::{ToTokens, TokenStreamExt};
+    use quote::{ToTokens, TokenStreamExt as _};
 
     #[cfg(feature = "full")]
     pub(crate) fn outer_attrs_to_tokens(attrs: &[Attribute], tokens: &mut TokenStream) {

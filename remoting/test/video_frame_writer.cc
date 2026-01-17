@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/i18n/time_formatting.h"
@@ -39,6 +40,7 @@ VideoFrameWriter::~VideoFrameWriter() = default;
 
 void VideoFrameWriter::WriteFrameToPath(const webrtc::DesktopFrame& frame,
                                         const base::FilePath& image_path) {
+  CHECK_EQ(frame.pixel_format(), webrtc::FOURCC_ARGB);
   uint8_t* frame_data = reinterpret_cast<unsigned char*>(frame.data());
 
   std::optional<std::vector<uint8_t>> png_encoded_data = gfx::PNGCodec::Encode(
@@ -127,11 +129,16 @@ void VideoFrameWriter::ShiftPixelColor(webrtc::DesktopFrame* frame,
                                        int x,
                                        int y,
                                        int shift_amount) {
-  uint8_t* frame_pos = UNSAFE_TODO(frame->data() + y * frame->stride() +
-                                   x * webrtc::DesktopFrame::kBytesPerPixel);
-  UNSAFE_TODO(frame_pos[2]) = UNSAFE_TODO(frame_pos[2]) + shift_amount;
-  UNSAFE_TODO(frame_pos[1]) = UNSAFE_TODO(frame_pos[1]) + shift_amount;
-  frame_pos[0] = frame_pos[0] + shift_amount;
+  // SAFETY: No safe interface to `webrtc::DesktopFrame`.
+  UNSAFE_BUFFERS(base::span<uint8_t> pixel(
+      frame->data() + y * frame->stride() +
+          x * webrtc::DesktopFrame::kBytesPerPixel,
+      static_cast<size_t>(webrtc::DesktopFrame::kBytesPerPixel)));
+
+  // Only shift RGB channels.
+  for (int i = 0; i < 3; ++i) {
+    pixel[i] += shift_amount;
+  }
 }
 
 }  // namespace remoting::test

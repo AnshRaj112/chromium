@@ -11,8 +11,8 @@
 #import "base/test/ios/wait_util.h"
 #import "build/branding_buildflags.h"
 #import "components/version_info/version_info.h"
-#import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_constants.h"
-#import "ios/chrome/browser/popup_menu/ui_bundled/popup_menu_constants.h"
+#import "ios/chrome/browser/content_suggestions/public/content_suggestions_constants.h"
+#import "ios/chrome/browser/popup_menu/public/popup_menu_constants.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey_ui.h"
@@ -103,8 +103,9 @@ GREYElementInteraction* RequestDesktopButton() {
 #define MAYBE_testOpenTabInTabStripBeforePrerenderedTab \
   DISABLED_testOpenTabInTabStripBeforePrerenderedTab
 #else
+// TODO(crbug.com/441756543): Re-enable this test once the flakiness is fixed.
 #define MAYBE_testOpenTabInTabStripBeforePrerenderedTab \
-  testOpenTabInTabStripBeforePrerenderedTab
+  FLAKY_testOpenTabInTabStripBeforePrerenderedTab
 #endif  // defined(OFFICIAL_BUILD)
 
 - (void)addURLToHistory {

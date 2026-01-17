@@ -5,15 +5,12 @@
 #ifndef COMPONENTS_TRANSLATE_CORE_BROWSER_TRANSLATE_MANAGER_H_
 #define COMPONENTS_TRANSLATE_CORE_BROWSER_TRANSLATE_MANAGER_H_
 
-#include <map>
 #include <memory>
 #include <set>
 #include <string>
 
 #include "base/callback_list.h"
-#include "base/feature_list.h"
 #include "base/functional/callback.h"
-#include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "components/language_detection/core/constants.h"
@@ -126,10 +123,12 @@ class TranslateManager {
   // Starts the translation process for the page in the |page_lang| language.
   void InitiateTranslation(const std::string& page_lang);
 
-  // Show the translation UI with the target language enforced to |target_lang|.
-  // If |auto_translate| is true the page gets translated to the target
-  // language.
-  void ShowTranslateUI(const std::string& target_lang,
+  // Show the translation UI with the target code enforced to |target_code|
+  // and the source code |source_code|. If these language codes are not
+  // provided, defaults to last known language settings. If |auto_translate| is
+  // true the page gets translated to the target language.
+  void ShowTranslateUI(std::optional<std::string> source_code,
+                       std::optional<std::string> target_code,
                        bool auto_translate = false,
                        bool triggered_from_menu = false);
 
@@ -228,6 +227,11 @@ class TranslateManager {
   // it would otherwise be prevented by user prefs.
   void SetPredefinedTargetLanguage(const std::string& language_code,
                                    bool should_auto_translate = false);
+
+  // Sets whether page auto translation is enabled for the translate manager.
+  // If false, pages will not be auto translated otherwise the notranslate
+  // meta tag and determined language will affect page auto translation.
+  void SetEnableAutoTranslate(bool enable_auto_translate);
 
   // Returns a reference to |active_translate_metrics_logger_|. In the event
   // that this value is null, a |NullTranslateMetricsLogger| (a null
@@ -361,6 +365,9 @@ class TranslateManager {
   std::unique_ptr<NullTranslateMetricsLogger> null_translate_metrics_logger_;
 
   LanguageState language_state_;
+
+  // Whether page auto translation is enabled for the translate manager.
+  bool enable_auto_translate_ = true;
 
   std::unique_ptr<metrics::TranslateEventProto> translate_event_;
 

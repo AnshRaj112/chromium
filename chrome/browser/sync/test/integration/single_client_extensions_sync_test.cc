@@ -8,14 +8,19 @@
 #include "base/containers/flat_set.h"
 #include "base/functional/bind.h"
 #include "chrome/browser/extensions/scoped_test_mv2_enabler.h"
+#include "chrome/browser/extensions/sync/account_extension_tracker.h"
 #include "chrome/browser/sync/test/integration/await_match_status_change_checker.h"
 #include "chrome/browser/sync/test/integration/extensions_helper.h"
 #include "chrome/browser/sync/test/integration/fake_server_match_status_checker.h"
+#include "chrome/browser/sync/test/integration/sync_service_impl_harness.h"
 #include "chrome/browser/sync/test/integration/sync_test.h"
 #include "chrome/browser/sync/test/integration/updated_progress_marker_checker.h"
+#include "components/browser_sync/browser_sync_switches.h"
 #include "components/sync/service/sync_service_impl.h"
 #include "components/sync/test/fake_server.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/test_launcher.h"
+#include "testing/gmock/include/gmock/gmock.h"
 
 namespace {
 
@@ -34,6 +39,17 @@ std::ostream& operator<<(std::ostream& os,
   return os;
 }
 
+base::flat_set<std::string> GetRemoteExtensionIds(
+    fake_server::FakeServer* fake_server) {
+  std::vector<sync_pb::SyncEntity> entities =
+      fake_server->GetSyncEntitiesByDataType(syncer::EXTENSIONS);
+  return base::MakeFlatSet<std::string>(
+      entities,
+      /*comp=*/{}, /*proj=*/[](const sync_pb::SyncEntity& e) {
+        return e.specifics().extension().id();
+      });
+}
+
 // Checks if server extension IDs match the IDs provided in the constructor.
 class TestServerExtensionIds
     : public fake_server::FakeServerMatchStatusChecker {
@@ -43,14 +59,8 @@ class TestServerExtensionIds
 
   // FakeServerMatchStatusChecker:
   bool IsExitConditionSatisfied(std::ostream* os) override {
-    std::vector<sync_pb::SyncEntity> entities =
-        fake_server()->GetSyncEntitiesByDataType(syncer::EXTENSIONS);
     base::flat_set<std::string> actual_extension_ids =
-        base::MakeFlatSet<std::string>(
-            entities,
-            /*comp=*/{}, /*proj=*/[](const sync_pb::SyncEntity& e) {
-              return e.specifics().extension().id();
-            });
+        GetRemoteExtensionIds(fake_server());
     *os << "Expected ids in fake server: " << expected_extension_ids_
         << ". Actual ids " << actual_extension_ids << ".";
     return expected_extension_ids_ == actual_extension_ids;
@@ -60,34 +70,63 @@ class TestServerExtensionIds
   base::flat_set<std::string> expected_extension_ids_;
 };
 
-class SingleClientExtensionsSyncTest : public SyncTest {
+class SingleClientExtensionsSyncTest
+    : public SyncTest,
+      public testing::WithParamInterface<SyncTest::SetupSyncMode> {
  public:
-  SingleClientExtensionsSyncTest() : SyncTest(SINGLE_CLIENT) {}
+  SingleClientExtensionsSyncTest() : SyncTest(SINGLE_CLIENT) {
+    if (GetSetupSyncMode() == SetupSyncMode::kSyncTransportOnly) {
+      scoped_feature_list_.InitAndEnableFeature(
+          syncer::kReplaceSyncPromosWithSignInPromos);
+    }
+  }
   ~SingleClientExtensionsSyncTest() override = default;
+
+  SyncTest::SetupSyncMode GetSetupSyncMode() const override {
+    return GetParam();
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
 
   // TODO(https://crbug.com/40804030): Remove when these tests use only MV3
   // extensions.
   extensions::ScopedTestMV2Enabler mv2_enabler_;
 };
 
-IN_PROC_BROWSER_TEST_F(SingleClientExtensionsSyncTest, StartWithNoExtensions) {
+INSTANTIATE_TEST_SUITE_P(,
+                         SingleClientExtensionsSyncTest,
+                         GetSyncTestModes(),
+                         testing::PrintToStringParamName());
+
+IN_PROC_BROWSER_TEST_P(SingleClientExtensionsSyncTest, StartWithNoExtensions) {
   ASSERT_TRUE(SetupSync());
   ASSERT_TRUE(TestServerExtensionIds({}).Wait());
 }
 
-IN_PROC_BROWSER_TEST_F(SingleClientExtensionsSyncTest,
+IN_PROC_BROWSER_TEST_P(SingleClientExtensionsSyncTest,
                        StartWithSomeExtensions) {
   ASSERT_TRUE(SetupClients());
 
   std::string id0 = InstallExtension(GetProfile(0), 0);
   std::string id1 = InstallExtension(GetProfile(0), 1);
-  std::string id2 = InstallExtension(GetProfile(0), 2);
 
   ASSERT_TRUE(SetupSync());
-  ASSERT_TRUE(TestServerExtensionIds({id0, id1, id2}).Wait());
+
+  // Add one more extension after enabling sync, to ensure there's something to
+  // wait for.
+  std::string id2 = InstallExtension(GetProfile(0), 2);
+
+  if (GetSetupSyncMode() == SyncTest::SetupSyncMode::kSyncTransportOnly) {
+    // Only the extension that was added after syncing was turned on should
+    // arrive on the server.
+    EXPECT_TRUE(TestServerExtensionIds({id2}).Wait());
+  } else {
+    EXPECT_TRUE(TestServerExtensionIds({id0, id1, id2}).Wait());
+  }
 }
 
-IN_PROC_BROWSER_TEST_F(SingleClientExtensionsSyncTest, InstallSomeExtensions) {
+IN_PROC_BROWSER_TEST_P(SingleClientExtensionsSyncTest, InstallSomeExtensions) {
   ASSERT_TRUE(SetupSync());
 
   std::string id0 = InstallExtension(GetProfile(0), 0);
@@ -110,12 +149,11 @@ static bool ExtensionCountCheck(Profile* profile,
 
 // Tests the case of an uninstall from the server conflicting with a local
 // modification, which we expect to be resolved in favor of the uninstall.
-IN_PROC_BROWSER_TEST_F(SingleClientExtensionsSyncTest, UninstallWinsConflicts) {
+IN_PROC_BROWSER_TEST_P(SingleClientExtensionsSyncTest, UninstallWinsConflicts) {
   ASSERT_TRUE(SetupClients());
 
-  // Start with an extension installed, and setup sync.
-  std::string id0 = InstallExtension(GetProfile(0), 0);
   ASSERT_TRUE(SetupSync());
+  std::string id0 = InstallExtension(GetProfile(0), 0);
   ASSERT_TRUE(TestServerExtensionIds({id0}).Wait());
 
   // Simulate a delete at the server.
@@ -143,5 +181,149 @@ IN_PROC_BROWSER_TEST_F(SingleClientExtensionsSyncTest, UninstallWinsConflicts) {
       GetFakeServer()->GetSyncEntitiesByDataType(syncer::EXTENSIONS);
   EXPECT_EQ(0ul, server_extensions.size());
 }
+
+// TODO(crbug.com/328400930): Investigate why these tests fail on ChromeOS.
+#if !BUILDFLAG(IS_CHROMEOS)
+class SingleClientExtensionsMigrateSyncingUserToSignedInSyncTest
+    : public SyncTest {
+ public:
+  SingleClientExtensionsMigrateSyncingUserToSignedInSyncTest()
+      : SyncTest(SINGLE_CLIENT) {
+    std::vector<base::test::FeatureRef> enabled_features = {
+        syncer::kReplaceSyncPromosWithSignInPromos};
+    std::vector<base::test::FeatureRef> disabled_features;
+    if (content::IsPreTest()) {
+      disabled_features.push_back(switches::kMigrateSyncingUserToSignedIn);
+    } else {
+      enabled_features.push_back(switches::kMigrateSyncingUserToSignedIn);
+    }
+    scoped_feature_list_.InitWithFeatures(enabled_features, disabled_features);
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(
+    SingleClientExtensionsMigrateSyncingUserToSignedInSyncTest,
+    PRE_PRE_ShouldDeduplicateLocalAndAccountExtension) {
+  ASSERT_TRUE(SetupClients());
+
+  extensions::ExtensionId extension_id = InstallExtension(GetProfile(0), 0);
+  ASSERT_THAT(extensions_helper::GetInstalledExtensions(GetProfile(0)),
+              testing::ElementsAre(0));
+
+  ASSERT_TRUE(SetupSyncWithMode(SyncTest::SetupSyncMode::kSyncTheFeature));
+  ASSERT_THAT(GetRemoteExtensionIds(GetFakeServer()),
+              testing::ElementsAre(extension_id));
+
+  // For some reason, the extension is not yet marked as
+  // `kAccountInstalledLocally` at this point.
+  ASSERT_EQ(extensions::AccountExtensionTracker::AccountExtensionType::kLocal,
+            extensions::AccountExtensionTracker::Get(GetProfile(0))
+                ->GetAccountExtensionType(extension_id));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    SingleClientExtensionsMigrateSyncingUserToSignedInSyncTest,
+    PRE_ShouldDeduplicateLocalAndAccountExtension) {
+  ASSERT_TRUE(SetupClients());
+  ASSERT_TRUE(GetClient(0)->AwaitSyncTransportActive());
+
+  ASSERT_THAT(extensions_helper::GetInstalledExtensions(GetProfile(0)),
+              testing::ElementsAre(0));
+
+  // The extension is now marked as `kAccountInstalledLocally` since the same
+  // extension was also on the server (uploaded during initial sync in the PRE_
+  // test).
+  EXPECT_EQ(
+      extensions::AccountExtensionTracker::AccountExtensionType::
+          kAccountInstalledLocally,
+      extensions::AccountExtensionTracker::Get(GetProfile(0))
+          ->GetAccountExtensionType(extensions_helper::GetExtensionId(0)));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    SingleClientExtensionsMigrateSyncingUserToSignedInSyncTest,
+    ShouldDeduplicateLocalAndAccountExtension) {
+  ASSERT_TRUE(SetupClients());
+  ASSERT_TRUE(GetClient(0)->AwaitSyncTransportActive());
+
+  ASSERT_THAT(extensions_helper::GetInstalledExtensions(GetProfile(0)),
+              testing::ElementsAre(0));
+
+  // The extension is now marked as `kAccountInstalledSignedIn` after the
+  // migration.
+  EXPECT_EQ(
+      extensions::AccountExtensionTracker::AccountExtensionType::
+          kAccountInstalledSignedIn,
+      extensions::AccountExtensionTracker::Get(GetProfile(0))
+          ->GetAccountExtensionType(extensions_helper::GetExtensionId(0)));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    SingleClientExtensionsMigrateSyncingUserToSignedInSyncTest,
+    PRE_ShouldNotDeduplicateLocalExtension) {
+  ASSERT_TRUE(SetupClients());
+
+  extensions::ExtensionId extension_id = InstallExtension(GetProfile(0), 0);
+  ASSERT_THAT(extensions_helper::GetInstalledExtensions(GetProfile(0)),
+              testing::ElementsAre(0));
+
+  ASSERT_TRUE(SetupSyncWithMode(SyncTest::SetupSyncMode::kSyncTransportOnly));
+  ASSERT_THAT(GetRemoteExtensionIds(GetFakeServer()), testing::IsEmpty());
+
+  ASSERT_EQ(extensions::AccountExtensionTracker::AccountExtensionType::kLocal,
+            extensions::AccountExtensionTracker::Get(GetProfile(0))
+                ->GetAccountExtensionType(extension_id));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    SingleClientExtensionsMigrateSyncingUserToSignedInSyncTest,
+    ShouldNotDeduplicateLocalExtension) {
+  ASSERT_TRUE(SetupClients());
+  ASSERT_TRUE(GetClient(0)->AwaitSyncTransportActive());
+
+  ASSERT_THAT(extensions_helper::GetInstalledExtensions(GetProfile(0)),
+              testing::ElementsAre(0));
+
+  // The extension is not marked as `kAccountInstalledSignedIn`.
+  EXPECT_EQ(
+      extensions::AccountExtensionTracker::AccountExtensionType::kLocal,
+      extensions::AccountExtensionTracker::Get(GetProfile(0))
+          ->GetAccountExtensionType(extensions_helper::GetExtensionId(0)));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    SingleClientExtensionsMigrateSyncingUserToSignedInSyncTest,
+    PRE_ShouldNotDeduplicateAccountExtension) {
+  ASSERT_TRUE(SetupSync());
+
+  extensions::ExtensionId extension_id = InstallExtension(GetProfile(0), 0);
+  ASSERT_THAT(extensions_helper::GetInstalledExtensions(GetProfile(0)),
+              testing::ElementsAre(0));
+
+  ASSERT_EQ(extensions::AccountExtensionTracker::AccountExtensionType::
+                kAccountInstalledSignedIn,
+            extensions::AccountExtensionTracker::Get(GetProfile(0))
+                ->GetAccountExtensionType(extension_id));
+}
+
+IN_PROC_BROWSER_TEST_F(
+    SingleClientExtensionsMigrateSyncingUserToSignedInSyncTest,
+    ShouldNotDeduplicateAccountExtension) {
+  ASSERT_TRUE(SetupClients());
+  ASSERT_TRUE(GetClient(0)->AwaitSyncTransportActive());
+
+  ASSERT_THAT(extensions_helper::GetInstalledExtensions(GetProfile(0)),
+              testing::ElementsAre(0));
+
+  EXPECT_EQ(
+      extensions::AccountExtensionTracker::AccountExtensionType::
+          kAccountInstalledSignedIn,
+      extensions::AccountExtensionTracker::Get(GetProfile(0))
+          ->GetAccountExtensionType(extensions_helper::GetExtensionId(0)));
+}
+#endif  // !BUILDFLAG(IS_CHROMEOS)
 
 }  // namespace

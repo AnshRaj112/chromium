@@ -4,13 +4,12 @@
 
 #import "ios/chrome/browser/settings/ui_bundled/search_engine_settings_test_case_base.h"
 
-#import "base/containers/contains.h"
 #import "base/ios/ios_util.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
 #import "base/test/ios/wait_util.h"
 #import "components/regional_capabilities/regional_capabilities_switches.h"
-#import "ios/chrome/browser/search_engine_choice/ui_bundled/search_engine_choice_earl_grey_ui_test_util.h"
+#import "ios/chrome/browser/search_engine_choice/test/search_engine_choice_earl_grey_ui_test_util.h"
 #import "ios/chrome/browser/settings/ui_bundled/search_engine_settings_test_case_base.h"
 #import "ios/chrome/browser/settings/ui_bundled/settings_app_interface.h"
 #import "ios/chrome/browser/settings/ui_bundled/settings_table_view_controller_constants.h"
@@ -52,11 +51,10 @@ std::unique_ptr<net::test_server::HttpResponse> SearchResponse(
       base::UTF16ToUTF8(TemplateURLPrepopulateData::google.keyword));
   const std::string secondSearchEngineKeyword(
       base::UTF16ToUTF8(secondPrepopulatedSearchEngine->keyword));
-  if (base::Contains(request.GetURL().path(), googleSearchEngineKeyword)) {
+  if (request.GetURL().GetPath().contains(googleSearchEngineKeyword)) {
     http_response->set_content(
         "<body>" + std::string(googleSearchEngineKeyword) + "</body>");
-  } else if (base::Contains(request.GetURL().path(),
-                            secondSearchEngineKeyword)) {
+  } else if (request.GetURL().GetPath().contains(secondSearchEngineKeyword)) {
     http_response->set_content(
         "<body>" + std::string(secondSearchEngineKeyword) + "</body>");
   }
@@ -137,7 +135,7 @@ std::unique_ptr<net::test_server::HttpResponse> StandardResponse(
 
 - (void)addURLRewriter {
   GURL url = self.testServer->GetURL(kPageURL);
-  NSString* port = base::SysUTF8ToNSString(url.port());
+  NSString* port = base::SysUTF8ToNSString(url.GetPort());
 
   const std::string googleSearchEngineKeyword(
       base::UTF16ToUTF8(TemplateURLPrepopulateData::google.keyword));

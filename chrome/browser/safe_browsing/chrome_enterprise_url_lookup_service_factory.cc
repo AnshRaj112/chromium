@@ -14,13 +14,14 @@
 #include "chrome/browser/safe_browsing/advanced_protection_status_manager.h"
 #include "chrome/browser/safe_browsing/advanced_protection_status_manager_factory.h"
 #include "chrome/browser/safe_browsing/chrome_user_population_helper.h"
+#include "chrome/browser/safe_browsing/client_side_detection_intelligent_scan_delegate_factory.h"
 #include "chrome/browser/safe_browsing/safe_browsing_navigation_observer_manager_factory.h"
 #include "chrome/browser/safe_browsing/safe_browsing_service.h"
 #include "chrome/browser/safe_browsing/verdict_cache_manager_factory.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "components/enterprise/connectors/core/content_area_user_provider.h"
 #include "components/safe_browsing/content/browser/safe_browsing_navigation_observer_manager.h"
-#include "components/safe_browsing/content/browser/web_ui/safe_browsing_ui.h"
+#include "components/safe_browsing/content/browser/web_ui/web_ui_content_info_singleton.h"
 #include "components/safe_browsing/core/browser/realtime/chrome_enterprise_url_lookup_service.h"
 #include "components/safe_browsing/core/browser/sync/safe_browsing_primary_account_token_fetcher.h"
 #include "components/safe_browsing/core/browser/sync/sync_utils.h"
@@ -85,6 +86,7 @@ ChromeEnterpriseRealTimeUrlLookupServiceFactory::
   DependsOn(SafeBrowsingNavigationObserverManagerFactory::GetInstance());
   DependsOn(IdentityManagerFactory::GetInstance());
   DependsOn(policy::ManagementServiceFactory::GetInstance());
+  DependsOn(ClientSideDetectionIntelligentScanDelegateFactory::GetInstance());
 }
 
 std::unique_ptr<KeyedService> ChromeEnterpriseRealTimeUrlLookupServiceFactory::
@@ -108,15 +110,18 @@ std::unique_ptr<KeyedService> ChromeEnterpriseRealTimeUrlLookupServiceFactory::
       SafeBrowsingNavigationObserverManagerFactory::GetForBrowserContext(
           profile),
       profile->GetPrefs(),
-      /*webui_delegate=*/WebUIInfoSingleton::GetInstance(),
+      /*webui_delegate=*/WebUIContentInfoSingleton::GetInstance(),
       IdentityManagerFactory::GetForProfile(profile),
       policy::ManagementServiceFactory::GetForProfile(profile),
       profile->IsOffTheRecord(), profile->IsGuestSession(),
       base::BindRepeating(&GetProfileEmail, profile),
-      base::BindRepeating(&enterprise_connectors::GetActiveContentAreaUser,
-                          IdentityManagerFactory::GetForProfile(profile)),
+      base::BindRepeating(
+          &enterprise_connectors::GetNavigationActiveContentAreaUser,
+          IdentityManagerFactory::GetForProfile(profile)),
       base::BindRepeating(&enterprise_util::IsProfileAffiliated, profile),
-      /*is_command_line_switch_supported=*/IsCommandLineSwitchSupported());
+      /*is_command_line_switch_supported=*/IsCommandLineSwitchSupported(),
+      ClientSideDetectionIntelligentScanDelegateFactory::GetForProfile(
+          profile));
 }
 
 }  // namespace safe_browsing

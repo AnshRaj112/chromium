@@ -23,6 +23,13 @@ ci.defaults.set(
     builder_group = "chromium.memory",
     builder_config_settings = builder_config.ci_settings(
         retry_failed_shards = True,
+        # Shards of browser_tests and interactive_ui_tests are fundamentally
+        # flaky on various sanitizer builds, and end up timing out without any
+        # results. Such shards are considered "invalid". crbug.com/429435587 is
+        # on file to address the fundamental flakiness, but a proper fix is
+        # not likely. So just retry all such invalid shards on all memory
+        # builders.
+        retry_invalid_shards = True,
     ),
     pool = ci_constants.DEFAULT_POOL,
     cores = 8,
@@ -33,6 +40,9 @@ ci.defaults.set(
     main_console_view = "main",
     contact_team_email = "chrome-sanitizer-builder-owners@google.com",
     execution_timeout = ci_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     health_spec = health_spec.default(),
     service_account = ci_constants.DEFAULT_SERVICE_ACCOUNT,
     shadow_service_account = ci_constants.DEFAULT_SHADOW_SERVICE_ACCOUNT,
@@ -82,7 +92,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -128,7 +137,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -141,6 +149,7 @@ linux_memory_builder(
                 ],
             ),
             "linux-jammy",
+            "retry_only_failed_tests",
         ],
         per_test_modifications = {
             "accessibility_unittests": targets.mixin(
@@ -149,12 +158,22 @@ linux_memory_builder(
                     "--gtest_filter=-AXPlatformNodeAuraLinuxTest.AtkComponentScrollTo:AtkUtilAuraLinuxTest.*",
                 ],
             ),
+            "blink_unittests": targets.mixin(
+                # These are very slow on the ASAN trybot for some reason.
+                # crbug.com/1257927
+                swarming = targets.swarming(
+                    shards = 5,
+                ),
+            ),
             "browser_tests": targets.mixin(
+                args = [
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/linux.asan.browser_tests.filter",
+                ],
                 ci_only = True,
                 # These are very slow on the ASAN trybot for some reason.
                 # crbug.com/1257927
                 swarming = targets.swarming(
-                    shards = 55,
+                    shards = 70,
                 ),
             ),
             "components_unittests": targets.mixin(
@@ -221,13 +240,6 @@ linux_memory_builder(
                     shards = 4,
                 ),
             ),
-            "webkit_unit_tests": targets.mixin(
-                # These are very slow on the ASAN trybot for some reason.
-                # crbug.com/1257927
-                swarming = targets.swarming(
-                    shards = 5,
-                ),
-            ),
         },
     ),
     console_view_entry = consoles.console_view_entry(
@@ -256,7 +268,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -290,7 +301,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -316,8 +326,7 @@ linux_memory_builder(
         per_test_modifications = {
             "browser_tests": targets.mixin(
                 swarming = targets.swarming(
-                    # https://crbug.com/1361973
-                    shards = 30,
+                    shards = 45,
                 ),
             ),
             "crashpad_tests": targets.remove(
@@ -335,7 +344,7 @@ linux_memory_builder(
             "interactive_ui_tests": targets.mixin(
                 # Slow on certain debug builders, see crbug.com/1513713.
                 swarming = targets.swarming(
-                    shards = 6,
+                    shards = 10,
                 ),
             ),
         },
@@ -368,7 +377,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.CHROMEOS,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -414,7 +422,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.CHROMEOS,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -430,6 +437,11 @@ linux_memory_builder(
             "linux-jammy",
         ],
         per_test_modifications = {
+            "angle_unittests": targets.mixin(
+                args = [
+                    "--gtest_filter=-TestSuiteTest.RunFlakyTests:TestSuiteTest.RunMockTests",
+                ],
+            ),
             "browser_tests": targets.mixin(
                 # These are very slow on the ASAN trybot for some reason.
                 # crbug.com/1257927
@@ -458,7 +470,7 @@ linux_memory_builder(
             "interactive_ui_tests": targets.mixin(
                 # These are slow on the ASan trybot for some reason, crbug.com/1257927
                 swarming = targets.swarming(
-                    shards = 12,
+                    shards = 30,
                 ),
             ),
             "net_unittests": targets.mixin(
@@ -466,6 +478,11 @@ linux_memory_builder(
                 # crbug.com/1257927
                 swarming = targets.swarming(
                     shards = 8,
+                ),
+            ),
+            "sync_integration_tests": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 6,
                 ),
             ),
             "unit_tests": targets.mixin(
@@ -502,7 +519,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.CHROMEOS,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -543,7 +559,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.CHROMEOS,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     targets = targets.bundle(
         # TODO(crbug.com/40126889): Use the main 'linux_chromeos_gtests' suite
@@ -586,7 +601,7 @@ linux_memory_builder(
                 # These are very slow on the Chrome OS MSAN trybot for some reason.
                 # crbug.com/865455
                 swarming = targets.swarming(
-                    shards = 5,
+                    shards = 8,
                 ),
             ),
             "net_unittests": targets.mixin(
@@ -633,7 +648,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -673,7 +687,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -691,7 +704,7 @@ linux_memory_builder(
         per_test_modifications = {
             "browser_tests": targets.mixin(
                 swarming = targets.swarming(
-                    shards = 40,
+                    shards = 52,
                 ),
             ),
             "content_browsertests": targets.mixin(
@@ -708,7 +721,7 @@ linux_memory_builder(
             ),
             "interactive_ui_tests": targets.mixin(
                 swarming = targets.swarming(
-                    shards = 10,
+                    shards = 15,
                 ),
             ),
             "services_unittests": targets.remove(
@@ -741,7 +754,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -783,7 +795,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -796,8 +807,14 @@ linux_memory_builder(
                 ],
             ),
             "linux-jammy",
+            "retry_only_failed_tests",
         ],
         per_test_modifications = {
+            "blink_unittests": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 2,
+                ),
+            ),
             "browser_tests": targets.remove(
                 reason = "https://crbug.com/368525",
             ),
@@ -827,13 +844,15 @@ linux_memory_builder(
                 reason = "https://crbug.com/crashpad/304",
             ),
             "gl_tests_passthrough": [
+                "gpu-swarming-pool",
+                "no_gpu",
+                "linux-jammy",
+                "x86-64",
                 targets.mixin(
                     args = [
-                        "--use-gpu-in-tests",
-                        "--no-xvfb",
+                        "--test-launcher-filter-file=../../testing/buildbot/filters/linux.swiftshader.tsan.gl_tests_passthrough.filter",
                     ],
                 ),
-                "linux_nvidia_gtx_1660_stable",
             ],
             "interactive_ui_tests": targets.mixin(
                 # https://crbug.com/1498240
@@ -860,11 +879,6 @@ linux_memory_builder(
                 ),
             ),
             "unit_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-            "webkit_unit_tests": targets.mixin(
                 swarming = targets.swarming(
                     shards = 2,
                 ),
@@ -897,7 +911,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -937,7 +950,6 @@ linux_memory_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -948,6 +960,11 @@ linux_memory_builder(
             "linux-jammy",
         ],
         per_test_modifications = {
+            "blink_unittests": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 2,
+                ),
+            ),
             "browser_tests": targets.mixin(
                 swarming = targets.swarming(
                     shards = 20,
@@ -964,11 +981,6 @@ linux_memory_builder(
                 ),
             ),
             "unit_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 2,
-                ),
-            ),
-            "webkit_unit_tests": targets.mixin(
                 swarming = targets.swarming(
                     shards = 2,
                 ),
@@ -1000,7 +1012,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -1082,7 +1093,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1165,7 +1175,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1246,7 +1255,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1316,13 +1324,15 @@ ci.builder(
         chromium_config = builder_config.chromium_config(
             config = "chromium_win_clang_asan",
             apply_configs = [
+                # TODO(https://crbug.com/440203328): cache is causing build
+                # failures.
+                "clobber",
                 "mb",
             ],
             build_config = builder_config.build_config.RELEASE,
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-memory-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1345,6 +1355,11 @@ ci.builder(
             "win10",
         ],
         per_test_modifications = {
+            "blink_unittests": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 6,
+                ),
+            ),
             "browser_tests": targets.mixin(
                 # Tests shows tests run faster with fewer retries by using fewer jobs crbug.com/1411912
                 args = [
@@ -1353,7 +1368,7 @@ ci.builder(
                 # These are very slow on the ASAN trybot for some reason.
                 # crbug.com/1257927
                 swarming = targets.swarming(
-                    shards = 60,
+                    shards = 80,
                 ),
             ),
             "components_unittests": targets.mixin(
@@ -1384,7 +1399,7 @@ ci.builder(
                     "--test-launcher-jobs=3",
                 ],
                 swarming = targets.swarming(
-                    shards = 12,
+                    shards = 18,
                 ),
             ),
             "net_unittests": targets.mixin(
@@ -1412,11 +1427,6 @@ ci.builder(
                 # crbug.com/369478225: These are slow and could timeout on the ASAN
                 swarming = targets.swarming(
                     shards = 2,
-                ),
-            ),
-            "webkit_unit_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 6,
                 ),
             ),
         },
@@ -1466,7 +1476,7 @@ ci.builder(
     gn_args = gn_args.config(
         configs = [
             "ios_simulator",
-            "x64",
+            "arm64",
             "release_builder",
             "remoteexec",
             "asan",
@@ -1483,10 +1493,10 @@ ci.builder(
         mixins = [
             "expand-as-isolated-script",
             "has_native_resultdb_integration",
-            "mac_default_x64",
+            "mac_beta_arm64",
             "mac_toolchain",
             "out_dir_arg",
-            "xcode_16_main",
+            "xcode_26_main",
             "xctest",
         ],
     ),

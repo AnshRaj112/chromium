@@ -15,7 +15,6 @@
 
 #include "base/compiler_specific.h"
 #include "base/component_export.h"
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
 #include "base/observer_list_types.h"
@@ -96,7 +95,7 @@ class COMPONENT_EXPORT(APP_UPDATE) AppRegistryCache {
   void AddObserver(Observer* observer);
   void RemoveObserver(Observer* observer);
 
-  AppType GetAppType(const std::string& app_id);
+  AppType GetAppType(std::string_view app_id);
 
   std::vector<AppPtr> GetAllApps();
 
@@ -131,7 +130,7 @@ class COMPONENT_EXPORT(APP_UPDATE) AppRegistryCache {
     for (const auto& d_iter : deltas_in_progress_) {
       const App* delta = d_iter.second;
 
-      if (base::Contains(states_, d_iter.first)) {
+      if (states_.contains(d_iter.first)) {
         continue;
       }
 
@@ -155,7 +154,7 @@ class COMPONENT_EXPORT(APP_UPDATE) AppRegistryCache {
   // f must be synchronous, and if it asynchronously calls ForOneApp again,
   // it's not guaranteed to see a consistent state.
   template <typename FunctionType>
-  bool ForOneApp(const std::string& app_id, FunctionType f) const {
+  bool ForOneApp(std::string_view app_id, FunctionType f) const {
     std::optional<AppUpdate> app_update = GetAppUpdate(app_id);
     if (app_update.has_value()) {
       f(*app_update);
@@ -201,7 +200,7 @@ class COMPONENT_EXPORT(APP_UPDATE) AppRegistryCache {
 
   // Returns true if the cache contains an app with id `app_id` whose
   // `Readiness()` corresponds to an installed state.
-  bool IsAppInstalled(const std::string& app_id) const;
+  bool IsAppInstalled(std::string_view app_id) const;
 
   // Clears all apps from the cache.
   void ReinitializeForTesting();
@@ -216,9 +215,6 @@ class COMPONENT_EXPORT(APP_UPDATE) AppRegistryCache {
   friend class AppRegistryCacheTest;
   friend class AppRegistryCacheWrapperTest;
   friend class PublisherTest;
-  friend class AppStorage;
-  friend class FakeAppStorage;
-  friend class AppStorageTest;
   friend class AppServiceProxyAsh;
   friend class AppServiceProxyBase;
 
@@ -284,7 +280,8 @@ class COMPONENT_EXPORT(APP_UPDATE) AppRegistryCache {
   // Nested OnApps calls are expected to be rare (but still dealt with
   // sensibly). In the typical case, OnApps should call DoOnApps exactly once,
   // and deltas_pending_ will stay empty.
-  std::map<std::string, raw_ptr<App, CtnExperimental>, std::less<>> deltas_in_progress_;
+  std::map<std::string, raw_ptr<App, CtnExperimental>, std::less<>>
+      deltas_in_progress_;
   std::vector<AppPtr> deltas_pending_;
 
   // Saves app types which will finish initialization, and OnAppTypeInitialized

@@ -254,21 +254,10 @@ void LogPresentingErrorPageFailedWithError(NSError* error) {
   auto decisionHandler = ^(WKNavigationActionPolicy policy) {
     preferences.preferredContentMode = contentMode;
     if (@available(iOS 16.0, *)) {
-      if ((policy == WKNavigationActionPolicyAllow) &&
-          isMainFrameNavigationAction) {
-        UMA_HISTOGRAM_BOOLEAN("IOS.MainFrameNavigationIsInLockdownMode",
-                              preferences.lockdownModeEnabled);
-      }
-
       if (!self.beingDestroyed) {
         bool browser_lockdown_mode_enabled =
             web::GetWebClient()->IsBrowserLockdownModeEnabled();
-        if ((policy == WKNavigationActionPolicyAllow) &&
-            isMainFrameNavigationAction) {
-          UMA_HISTOGRAM_BOOLEAN(
-              "IOS.MainFrameNavigationIsInBrowserLockdownMode",
-              browser_lockdown_mode_enabled);
-        }
+
         if (browser_lockdown_mode_enabled) {
           preferences.lockdownModeEnabled = true;
         }
@@ -685,11 +674,27 @@ void LogPresentingErrorPageFailedWithError(NSError* error) {
     // If there was a redirect, change the URL to have the URL of the first
     // page.
     NSMutableDictionary* userInfo = [error.userInfo mutableCopy];
-    userInfo[NSURLErrorFailingURLStringErrorKey] =
-        base::SysUTF8ToNSString(navigationContext->GetUrl().spec());
+    userInfo[NSURLErrorFailingURLErrorKey] =
+        net::NSURLWithGURL(navigationContext->GetUrl());
     error = [NSError errorWithDomain:error.domain
                                 code:error.code
                             userInfo:userInfo];
+  }
+
+  if (@available(iOS 26, *)) {
+    if ([error.domain isEqualToString:@(web::kWebKitErrorDomain)] &&
+        error.code == web::kWebKitErrorCannotShowUrl &&
+        !error.userInfo[NSURLErrorFailingURLErrorKey]) {
+      // URL is expected in these errors, but it broke on iOS 26. Apply
+      // workaround until WebKit fix is shipped.
+      // TODO(crbug.com/441372052): Remove workaround.
+      NSURL* url = net::NSURLWithGURL(navigationContext->GetUrl());
+      NSMutableDictionary* userInfo = [error.userInfo mutableCopy];
+      userInfo[NSURLErrorFailingURLErrorKey] = url;
+      error = [NSError errorWithDomain:error.domain
+                                  code:error.code
+                              userInfo:userInfo];
+    }
   }
 
   // Handle load cancellation for directly cancelled navigations without
@@ -1371,8 +1376,11 @@ void LogPresentingErrorPageFailedWithError(NSError* error) {
                                            (ui::PageTransition)pageTransition {
   GURL requestURL = net::GURLWithNSURL(action.request.URL);
   DCHECK(web::GetWebClient()->IsAppSpecificURL(requestURL));
-  if (web::GetWebClient()->IsAppSpecificURL(
-          self.webStateImpl->GetLastCommittedURL())) {
+  web::NavigationItem* lastItem =
+      self.webStateImpl->GetNavigationManager()->GetLastCommittedItem();
+  if (lastItem &&
+      (web::GetWebClient()->IsAppSpecificURL(lastItem->GetVirtualURL()) ||
+       web::GetWebClient()->IsAppSpecificURL(lastItem->GetURL()))) {
     // Last committed page is also app specific and navigation should be
     // allowed.
     return YES;
@@ -1383,19 +1391,25 @@ void LogPresentingErrorPageFailedWithError(NSError* error) {
     return YES;
   }
 
-  if (ui::PageTransitionTypeIncludingQualifiersIs(pageTransition,
-                                                  ui::PAGE_TRANSITION_TYPED)) {
+  if (pageTransition & ui::PAGE_TRANSITION_RELOAD) {
+    // Allow reload navigations.
     return YES;
   }
 
-  if (ui::PageTransitionTypeIncludingQualifiersIs(
-          pageTransition, ui::PAGE_TRANSITION_GENERATED)) {
-    return YES;
-  }
+  // Allow navigating to chrome:// pages if the navigation happens due to
+  //  - user typing the url in the omnibox,
+  //  - user tapping on a suggestion in the omnibox,
+  //  - user tapping on a bookmark.
+  static constexpr ui::PageTransition kAllowedTypes[] = {
+      ui::PAGE_TRANSITION_TYPED,
+      ui::PAGE_TRANSITION_GENERATED,
+      ui::PAGE_TRANSITION_AUTO_BOOKMARK,
+  };
 
-  if (ui::PageTransitionTypeIncludingQualifiersIs(
-          pageTransition, ui::PAGE_TRANSITION_AUTO_BOOKMARK)) {
-    return YES;
+  for (const ui::PageTransition allowedType : kAllowedTypes) {
+    if (ui::PageTransitionCoreTypeIs(pageTransition, allowedType)) {
+      return YES;
+    }
   }
 
   // Allow navigation to WebUI pages from error pages.
@@ -1403,17 +1417,13 @@ void LogPresentingErrorPageFailedWithError(NSError* error) {
     return YES;
   }
 
-  GURL mainDocumentURL = net::GURLWithNSURL(action.request.mainDocumentURL);
-  if (web::GetWebClient()->IsAppSpecificURL(mainDocumentURL)
-#if !defined(__IPHONE_26_0) || __IPHONE_OS_VERSION_MAX_ALLOWED < __IPHONE_26_0
-      // The `sourceFrame.mainFrame` property is now always non-null when
-      // compiling against the iOS26 SDK, breaking this check.
-      && !action.sourceFrame.mainFrame
-#endif
-  ) {
+  if (!action.sourceFrame.mainFrame) {
     // AppSpecific URLs are allowed inside iframe if the main frame is also
     // app specific page.
-    return YES;
+    GURL mainDocumentURL = net::GURLWithNSURL(action.request.mainDocumentURL);
+    if (web::GetWebClient()->IsAppSpecificURL(mainDocumentURL)) {
+      return YES;
+    }
   }
 
   return NO;
@@ -1958,11 +1968,11 @@ void LogPresentingErrorPageFailedWithError(NSError* error) {
 
   // Error page needs the URL string in the error's userInfo for proper
   // display.
-  if (!error.userInfo[NSURLErrorFailingURLStringErrorKey]) {
+  if (!error.userInfo[NSURLErrorFailingURLErrorKey]) {
     NSMutableDictionary* updatedUserInfo = [[NSMutableDictionary alloc] init];
     [updatedUserInfo addEntriesFromDictionary:error.userInfo];
-    [updatedUserInfo setObject:blockedNSURL.absoluteString
-                        forKey:NSURLErrorFailingURLStringErrorKey];
+    [updatedUserInfo setObject:blockedNSURL
+                        forKey:NSURLErrorFailingURLErrorKey];
 
     error = [NSError errorWithDomain:error.domain
                                 code:error.code
@@ -2121,7 +2131,7 @@ void LogPresentingErrorPageFailedWithError(NSError* error) {
       // `didReceiveAuthenticationChallenge:` is the OS constructed chain, while
       // `chain` is the chain from the server.
       NSArray* chain = error.userInfo[web::kNSErrorPeerCertificateChainKey];
-      NSURL* requestURL = error.userInfo[web::kNSErrorFailingURLKey];
+      NSURL* requestURL = error.userInfo[NSURLErrorFailingURLErrorKey];
       NSString* host = requestURL.host;
       scoped_refptr<net::X509Certificate> leafCert;
       if (chain.count && host.length) {
@@ -2144,9 +2154,8 @@ void LogPresentingErrorPageFailedWithError(NSError* error) {
       ssl_info = info;
     }
   }
-  NSString* failingURLString =
-      error.userInfo[NSURLErrorFailingURLStringErrorKey];
-  GURL failingURL(base::SysNSStringToUTF8(failingURLString));
+  GURL failingURL =
+      net::GURLWithNSURL(error.userInfo[NSURLErrorFailingURLErrorKey]);
   GURL itemURL = item->GetURL();
   if (itemURL != failingURL) {
     item->SetVirtualURL(failingURL);

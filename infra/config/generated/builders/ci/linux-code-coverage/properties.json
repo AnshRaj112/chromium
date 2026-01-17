@@ -13,7 +13,6 @@
               "project": "chromium"
             },
             "builder_spec": {
-              "build_gs_bucket": "chromium-fyi-archive",
               "builder_group": "chromium.coverage",
               "execution_mode": "COMPILE_AND_TEST",
               "legacy_chromium_config": {
@@ -49,7 +48,7 @@
           "group": "tryserver.chromium.linux"
         }
       ],
-      "targets_spec_directory": "src/infra/config/generated/builders/ci/linux-code-coverage/targets"
+      "targets_spec_directory": "infra/config/generated/builders/ci/linux-code-coverage/targets"
     }
   },
   "$build/code_coverage": {
@@ -65,10 +64,9 @@
       "builder"
     ],
     "enable_cloud_monitoring": true,
-    "enable_cloud_profiler": true,
     "enable_cloud_trace": true,
     "experiments": [],
-    "metrics_project": "chromium-reclient-metrics",
+    "profile_mode": "cloud",
     "project": "rbe-chromium-trusted",
     "remote_jobs": 250
   },

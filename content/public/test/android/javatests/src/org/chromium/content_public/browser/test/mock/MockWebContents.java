@@ -148,6 +148,9 @@ public class MockWebContents implements WebContents, WebContentsObserver.Observa
     }
 
     @Override
+    public void discard(Runnable onDiscarded) {}
+
+    @Override
     public boolean isLoading() {
         return false;
     }
@@ -382,6 +385,14 @@ public class MockWebContents implements WebContents, WebContentsObserver.Observa
     public void setLongPressLinkSelectText(boolean enabled) {}
 
     @Override
+    public void setCanAcceptLoadDrops(boolean enabled) {}
+
+    @Override
+    public boolean getCanAcceptLoadDropsForTesting() {
+        return true;
+    }
+
+    @Override
     public void updateOffsetTagDefinitions(
             BrowserControlsOffsetTagDefinitions offsetTagDefinitions) {}
 
@@ -399,6 +410,12 @@ public class MockWebContents implements WebContents, WebContentsObserver.Observa
     }
 
     @Override
+    public void updateWindowControlsOverlay(Rect rect) {}
+
+    @Override
+    public void setSupportsDraggableRegions(boolean supportsDraggableRegions) {}
+
+    @Override
     public <T extends UserData> @Nullable T getOrSetUserData(
             Class<T> key, @Nullable UserDataFactory<T> userDataFactory) {
         return null;
@@ -406,4 +423,9 @@ public class MockWebContents implements WebContents, WebContentsObserver.Observa
 
     @Override
     public <T extends UserData> void removeUserData(Class<T> key) {}
+
+    @Override
+    public @Nullable WebContents getDocumentPictureInPictureOpener() {
+        return null;
+    }
 }

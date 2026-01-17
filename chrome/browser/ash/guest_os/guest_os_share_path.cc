@@ -9,7 +9,6 @@
 #include <variant>
 
 #include "base/barrier_callback.h"
-#include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/logging.h"
 #include "base/task/thread_pool.h"
@@ -161,8 +160,8 @@ SharedPathInfo::SharedPathInfo(SharedPathInfo&&) = default;
 SharedPathInfo::~SharedPathInfo() = default;
 
 GuestOsSharePath::PathsToShare::PathsToShare() = default;
-GuestOsSharePath::PathsToShare::PathsToShare(GuestOsSharePath::PathsToShare&) =
-    default;
+GuestOsSharePath::PathsToShare::PathsToShare(
+    const GuestOsSharePath::PathsToShare&) = default;
 GuestOsSharePath::PathsToShare::~PathsToShare() = default;
 
 GuestOsSharePath::GuestOsSharePath(Profile* profile)
@@ -529,7 +528,7 @@ void GuestOsSharePath::RegisterPersistedPaths(
     for (const auto it : shared_paths) {
       base::FilePath shared(it.first);
       auto& vms = it.second;
-      auto vm_matches = base::Contains(vms.GetList(), base::Value(vm_name));
+      auto vm_matches = vms.GetList().contains(vm_name);
       if (path == shared) {
         already_shared = true;
         if (!vm_matches) {

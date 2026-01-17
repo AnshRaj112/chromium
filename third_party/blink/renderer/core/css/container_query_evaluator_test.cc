@@ -837,6 +837,31 @@ TEST_F(ContainerQueryEvaluatorTest, FindContainer) {
             outer_size);
 }
 
+TEST_F(ContainerQueryEvaluatorTest, FindNamedContainer) {
+  SetBodyInnerHTML(R"HTML(
+    <div style="container-name:outer">
+      <div style="container-name:inner">
+        <div>
+          <div></div>
+        </div>
+      </div>
+    </div>
+  )HTML");
+
+  UpdateAllLifecyclePhasesForTest();
+
+  Element* outer = GetDocument().body()->firstElementChild();
+  Element* inner = outer->firstElementChild();
+  Element* target = inner->firstElementChild()->firstElementChild();
+
+  EXPECT_EQ(ContainerQueryEvaluator::FindContainer(
+                target, ParseContainer("inner")->Selector(), &GetDocument()),
+            inner);
+  EXPECT_EQ(ContainerQueryEvaluator::FindContainer(
+                target, ParseContainer("outer")->Selector(), &GetDocument()),
+            outer);
+}
+
 TEST_F(ContainerQueryEvaluatorTest, FindStickyContainer) {
   SetBodyInnerHTML(R"HTML(
     <div style="container-type: scroll-state size">
@@ -1057,6 +1082,64 @@ TEST_P(UseCountEvalUnknownTest, All) {
   Eval(param.query_string, 100.0, 100.0, type_size, horizontal);
   EXPECT_EQ(GetDocument().IsUseCounted(WebFeature::kContainerQueryEvalUnknown),
             param.contains_unknown);
+}
+
+TEST_F(ContainerQueryEvaluatorTest, FailedTreeScope_UseCounted) {
+  GetDocument().ClearUseCounterForTesting(
+      WebFeature::kContainerNameQueryFailedTreeScope);
+
+  GetDocument().body()->SetHTMLUnsafeWithoutTrustedTypes(R"HTML(
+    <style>
+      @container --foo (width >= 0px) {
+        #target { color: green; }
+      }
+    </style>
+    <div>
+      <template shadowrootmode="open">
+        <div style="container: --foo / inline-size">
+          <slot></slot>
+        </div>
+      </template>
+      <div id="target"></div>
+    </div>
+  )HTML");
+  UpdateAllLifecyclePhasesForTest();
+
+  Element* target = GetDocument().getElementById(AtomicString("target"));
+  EXPECT_EQ(
+      target->ComputedStyleRef().VisitedDependentColor(GetCSSPropertyColor()),
+      Color(0, 128, 0));
+  EXPECT_TRUE(GetDocument().IsUseCounted(
+      WebFeature::kContainerNameQueryFailedTreeScope));
+}
+
+TEST_F(ContainerQueryEvaluatorTest, FailedTreeScope_NotUseCounted) {
+  GetDocument().ClearUseCounterForTesting(
+      WebFeature::kContainerNameQueryFailedTreeScope);
+
+  GetDocument().body()->SetHTMLUnsafeWithoutTrustedTypes(R"HTML(
+    <div id="host" style="container: --foo / inline-size">
+      <template shadowrootmode="open">
+        <style>
+          @container --foo (width >= 0px) {
+            #target { color: green; }
+          }
+        </style>
+        <div id="target"></div>
+      </template>
+    </div>
+  )HTML");
+  UpdateAllLifecyclePhasesForTest();
+
+  Element* target = GetDocument()
+                        .getElementById(AtomicString("host"))
+                        ->GetShadowRoot()
+                        ->getElementById(AtomicString("target"));
+  EXPECT_EQ(
+      target->ComputedStyleRef().VisitedDependentColor(GetCSSPropertyColor()),
+      Color(0, 128, 0));
+  EXPECT_FALSE(GetDocument().IsUseCounted(
+      WebFeature::kContainerNameQueryFailedTreeScope));
 }
 
 }  // namespace blink

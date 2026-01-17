@@ -15,7 +15,6 @@
 #include "base/auto_reset.h"
 #include "base/command_line.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/logging.h"
@@ -78,6 +77,8 @@
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "services/metrics/public/cpp/ukm_recorder.h"
 #include "services/tracing/public/cpp/perfetto/macros.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
+#include "third_party/perfetto/include/perfetto/tracing/track_event_args.h"
 #include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/geometry/vector2d_conversions.h"
 #include "ui/gfx/presentation_feedback.h"
@@ -375,6 +376,7 @@ void LayerTreeHost::DidBeginMainFrame() {
   DCHECK(IsMainThread());
   inside_main_frame_ = false;
   client_->DidBeginMainFrame();
+  force_commit_for_propagation_ = false;
 }
 
 void LayerTreeHost::BeginMainFrameNotExpectedSoon() {
@@ -427,6 +429,7 @@ std::unique_ptr<CommitState> LayerTreeHost::WillCommit(
     result = ActivateCommitState();
   swap_promise_manager_.WillCommit();
   mutator_host()->RemoveStaleTimelines();
+  mutator_host()->RemoveStaleTriggers();
   client_->WillCommit(has_updates ? *result : *pending_commit_state());
   pending_commit_state()->source_frame_number++;
   commit_completion_event_ = std::move(completion);
@@ -503,6 +506,7 @@ void LayerTreeHost::CommitComplete(int source_frame_number,
   // already signaled.
   if (!in_commit()) {
     mutator_host()->RemoveStaleTimelines();
+    mutator_host()->RemoveStaleTriggers();
   }
   if (commit_completion_event_ && commit_completion_event_->IsSignaled())
     WaitForCommitCompletion(/* for_protected_sequence */ false);
@@ -809,6 +813,13 @@ void LayerTreeHost::SetNeedsCommitWithForcedRedraw() {
   proxy_->SetNeedsCommit();
 }
 
+void LayerTreeHost::RequestMainFrameOnCompositorAnimation(
+    PropertyChangeForcesCommitCriteria criteria,
+    bool force_propagation) {
+  pending_commit_state()->property_change_forces_commit_criteria = criteria;
+  force_commit_for_propagation_ |= force_propagation;
+}
+
 void LayerTreeHost::SetDebugState(const LayerTreeDebugState& new_debug_state) {
   if (pending_commit_state()->debug_state == new_debug_state) {
     return;
@@ -860,14 +871,6 @@ void LayerTreeHost::SetShouldWarmUp() {
 bool LayerTreeHost::ShouldWarmUp() const {
   DCHECK(IsMainThread());
   return should_warm_up_;
-}
-
-void LayerTreeHost::LayoutAndUpdateLayers() {
-  DCHECK(IsSingleThreaded());
-  // This function is only valid when not using the scheduler.
-  DCHECK(!settings_.single_thread_proxy_scheduler);
-  RequestMainFrameUpdate(false);
-  UpdateLayers();
 }
 
 void LayerTreeHost::CompositeForTest(base::TimeTicks frame_begin_time,
@@ -968,9 +971,46 @@ void LayerTreeHost::AddViewTransitionRequest(
     std::unique_ptr<ViewTransitionRequest> request) {
   // Store the commit callback on LayerTreeHost, so that we can invoke them
   // when the request is finished.
-  DCHECK(!base::Contains(view_transition_callbacks_, request->sequence_id()));
+  DCHECK(!view_transition_callbacks_.contains(request->sequence_id()));
   if (auto callback = request->TakeFinishedCallback()) {
     view_transition_callbacks_[request->sequence_id()] = std::move(callback);
+  }
+  if (request->maybe_cross_frame_sink() &&
+      features::ShouldAckCOREarlyForViewTransition()) {
+    auto request_token = request->token();
+    auto request_type = request->type();
+    if (request_type == viz::CompositorFrameTransitionDirective::Type::kSave &&
+        !view_transition_needs_new_lsid_.contains(request_token) &&
+        view_transition_needs_new_lsid_.size() <
+            view_transition_needs_new_lsid_max_size_) {
+      view_transition_needs_new_lsid_[request_token] = true;
+    }
+    if (request_type ==
+            viz::CompositorFrameTransitionDirective::Type::kAnimateRenderer &&
+        view_transition_needs_new_lsid_.contains(request_token)) {
+      // For cross frame-sink view transitions, Animate directive from new
+      // document should come to a different Surface than that used for Save
+      // directive for old document, to allow viz to fulfill previous Surface's
+      // CopyOutputRequests in the same frame.
+      if (view_transition_needs_new_lsid_[request_token]) {
+        RequestNewLocalSurfaceId();
+      }
+      // We can be erase entry from the map as it is no longer needed.
+      view_transition_needs_new_lsid_.erase(request_token);
+    }
+    CHECK_NE(view_transition_needs_new_lsid_.size(),
+             view_transition_needs_new_lsid_max_size_);
+    // Clear this map if it has outgrown its size, removing all outdated
+    // ViewTransition requests that were unfulfilled.
+    if (view_transition_needs_new_lsid_.size() ==
+        view_transition_needs_new_lsid_max_size_) {
+      // This can have an effect on last ongoing ViewTransition request which
+      // was added to map on Save but does not have new LSId on Animate as it is
+      // cleared here (if map was filled already with 99 stale ViewTransitions),
+      // but better to clear here than future ViewTransition Animations having
+      // unfulfilled CORs due to same LocalSurfaceId.
+      view_transition_needs_new_lsid_.clear();
+    }
   }
   pending_commit_state()->view_transition_requests.push_back(
       std::move(request));
@@ -1051,7 +1091,7 @@ void LayerTreeHost::ApplyViewportChanges(
       commit_data.elastic_overscroll_delta.IsZero() &&
       !commit_data.top_controls_delta && !commit_data.bottom_controls_delta &&
       !commit_data.browser_controls_constraint_changed &&
-      !commit_data.scroll_end_data.scroll_gesture_did_end &&
+      commit_data.scroll_end_data.done_containers.empty() &&
       commit_data.is_pinch_gesture_active ==
           is_pinch_gesture_active_from_impl_) {
     return;
@@ -1065,6 +1105,7 @@ void LayerTreeHost::ApplyViewportChanges(
           pending_commit_state()->viewport_property_ids.inner_scroll)) {
     UpdateScrollOffsetFromImpl(
         inner_scroll->element_id, inner_viewport_scroll_delta,
+        ScrollSourceType::kNone,
         commit_data.inner_viewport_scroll.snap_target_element_ids);
   }
 
@@ -1078,15 +1119,16 @@ void LayerTreeHost::ApplyViewportChanges(
        commit_data.page_scale_delta, commit_data.is_pinch_gesture_active,
        commit_data.top_controls_delta, commit_data.bottom_controls_delta,
        commit_data.browser_controls_constraint,
-       commit_data.scroll_end_data.scroll_gesture_did_end});
+       !commit_data.scroll_end_data.done_containers.empty()});
   SetNeedsUpdateLayers();
 }
 
 void LayerTreeHost::UpdateScrollOffsetFromImpl(
     const ElementId& id,
     const gfx::Vector2dF& delta,
+    ScrollSourceType type,
     const std::optional<TargetSnapAreaElementIds>& snap_target_ids) {
-  property_tree_delegate_->UpdateScrollOffsetFromImpl(id, delta,
+  property_tree_delegate_->UpdateScrollOffsetFromImpl(id, delta, type,
                                                       snap_target_ids);
 }
 
@@ -1112,8 +1154,12 @@ void LayerTreeHost::ApplyCompositorChanges(CompositorCommitData* commit_data) {
 
   if (has_root_layer()) {
     for (auto& scroll : commit_data->scrolls) {
+      ScrollSourceType scroll_type = ScrollSourceType::kNone;
+      if (scroll.element_id == commit_data->scroll_latched_element_id) {
+        scroll_type = commit_data->scroll_type;
+      }
       UpdateScrollOffsetFromImpl(scroll.element_id, scroll.scroll_delta,
-                                 scroll.snap_target_element_ids);
+                                 scroll_type, scroll.snap_target_element_ids);
     }
     // const_cast to ensure the compiler chooses to the const version of
     // property_trees(), to avoid blocking on commit.
@@ -1355,12 +1401,12 @@ void LayerTreeHost::SetViewportRectAndScale(
       pending_commit_state()->local_surface_id_from_parent;
   SetLocalSurfaceIdFromParent(local_surface_id_from_parent);
 
-  TRACE_EVENT_NESTABLE_ASYNC_END1("cc", "LayerTreeHostSize",
-                                  TRACE_ID_LOCAL(this), "id", id_);
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN2("cc", "LayerTreeHostSize",
-                                    TRACE_ID_LOCAL(this), "size",
-                                    device_viewport_rect.ToString(), "lsid",
-                                    local_surface_id_from_parent.ToString());
+  TRACE_EVENT_END("cc", /*"LayerTreeHostSize"*/
+                  perfetto::Track::FromPointer(this), "id", id_);
+  TRACE_EVENT_BEGIN("cc", "LayerTreeHostSize",
+                    perfetto::Track::FromPointer(this), "size",
+                    device_viewport_rect.ToString(), "lsid",
+                    local_surface_id_from_parent.ToString());
 
   bool device_viewport_rect_changed = false;
   if (pending_commit_state()->device_viewport_rect != device_viewport_rect) {
@@ -1593,18 +1639,18 @@ void LayerTreeHost::SetLocalSurfaceIdFromParent(
   // incoming flow (it comes from a different process), and TRACE_ID_LOCAL for
   // the outgoing flow. The outgoing flow uses local to ensure that it doesn't
   // flow into the wrong trace in different process.
-  TRACE_EVENT_WITH_FLOW2(
-      TRACE_DISABLED_BY_DEFAULT("viz.surface_id_flow"),
-      "LocalSurfaceId.Submission.Flow",
-      TRACE_ID_GLOBAL(local_surface_id_from_parent.submission_trace_id()),
-      TRACE_EVENT_FLAG_FLOW_IN, "step", "SetLocalSurfaceIdFromParent",
-      "local_surface_id", local_surface_id_from_parent.ToString());
-  TRACE_EVENT_WITH_FLOW2(
-      TRACE_DISABLED_BY_DEFAULT("viz.surface_id_flow"),
-      "LocalSurfaceId.Submission.Flow",
-      TRACE_ID_LOCAL(local_surface_id_from_parent.submission_trace_id()),
-      TRACE_EVENT_FLAG_FLOW_OUT, "step", "SetLocalSurfaceIdFromParent",
-      "local_surface_id", local_surface_id_from_parent.ToString());
+  TRACE_EVENT(TRACE_DISABLED_BY_DEFAULT("viz.surface_id_flow"),
+              "LocalSurfaceId.Submission.Flow",
+              perfetto::TerminatingFlow::Global(
+                  local_surface_id_from_parent.submission_trace_id()),
+              "step", "SetLocalSurfaceIdFromParent", "local_surface_id",
+              local_surface_id_from_parent.ToString());
+  TRACE_EVENT(TRACE_DISABLED_BY_DEFAULT("viz.surface_id_flow"),
+              "LocalSurfaceId.Submission.Flow",
+              perfetto::Flow::ProcessScoped(
+                  local_surface_id_from_parent.submission_trace_id()),
+              "step", "SetLocalSurfaceIdFromParent", "local_surface_id",
+              local_surface_id_from_parent.ToString());
   // Always update the cached state of the viz::LocalSurfaceId to reflect the
   // latest value received from our parent.
   pending_commit_state()->local_surface_id_from_parent =
@@ -1937,10 +1983,6 @@ void LayerTreeHost::QueueImageDecode(const DrawImage& image,
   SetNeedsCommit();
 }
 
-bool LayerTreeHost::SpeculativeDecodeRequestInFlight() const {
-  return proxy_->SpeculativeDecodeRequestInFlight();
-}
-
 LayerListIterator LayerTreeHost::begin() {
   return LayerListIterator(root_layer());
 }
@@ -2054,12 +2096,6 @@ void LayerTreeHost::DropActiveScrollDeltaNextCommit(ElementId scroll_element) {
   pending_commit_state()->scrollers_clobbering_active_value.insert(
       scroll_element);
   SetNeedsCommit();
-}
-
-void LayerTreeHost::CrashGpuProcessForTesting() {
-  if (current_layer_tree_frame_sink_) {
-    current_layer_tree_frame_sink_->CrashGpuProcessForTesting();  // IN-TEST
-  }
 }
 
 }  // namespace cc

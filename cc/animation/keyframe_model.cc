@@ -16,6 +16,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/trace_event/trace_event.h"
 #include "cc/trees/target_property.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
 #include "ui/gfx/animation/keyframe/animation_curve.h"
 
 namespace cc {
@@ -140,17 +141,16 @@ int KeyframeModel::TargetProperty() const {
 void KeyframeModel::SetRunState(RunState new_run_state,
                                 base::TimeTicks monotonic_time) {
   char name_buffer[256];
-  base::SpanPrintf(name_buffer, "%s-%d-%d", curve()->TypeName(),
-                   TargetProperty(), group_);
+  UNSAFE_TODO(base::SpanPrintf(name_buffer, "%s-%d-%d", curve()->TypeName(),
+                               TargetProperty(), group_));
 
   bool is_waiting_to_start =
       run_state() == WAITING_FOR_TARGET_AVAILABILITY || run_state() == STARTING;
 
   if (is_controlling_instance_ && is_waiting_to_start &&
       new_run_state == RUNNING) {
-    TRACE_EVENT_NESTABLE_ASYNC_BEGIN1("cc", "KeyframeModel",
-                                      TRACE_ID_LOCAL(this), "Name",
-                                      TRACE_STR_COPY(name_buffer));
+    TRACE_EVENT_BEGIN("cc", "KeyframeModel", perfetto::Track::FromPointer(this),
+                      "Name", TRACE_STR_COPY(name_buffer));
   }
 
   bool was_finished = is_finished();
@@ -160,8 +160,7 @@ void KeyframeModel::SetRunState(RunState new_run_state,
   auto new_run_state_name = gfx::KeyframeModel::ToString(new_run_state);
 
   if (is_controlling_instance_ && !was_finished && is_finished()) {
-    TRACE_EVENT_NESTABLE_ASYNC_END0("cc", "KeyframeModel",
-                                    TRACE_ID_LOCAL(this));
+    TRACE_EVENT_END("cc", perfetto::Track::FromPointer(this));
   }
 
   char state_buffer[256];

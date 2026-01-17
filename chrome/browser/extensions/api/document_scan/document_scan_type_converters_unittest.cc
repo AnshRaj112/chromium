@@ -4,7 +4,7 @@
 
 #include "chrome/browser/extensions/api/document_scan/document_scan_type_converters.h"
 
-#include "base/containers/contains.h"
+#include "chrome/browser/ash/crosapi/document_scan_ash_type_converters.h"
 #include "chrome/browser/extensions/api/document_scan/document_scan_test_utils.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -486,8 +486,8 @@ TEST(DocumentScanTypeConvertersTest, OpenScannerResponse_NonEmpty) {
   ASSERT_TRUE(output.scanner_handle.has_value());
   EXPECT_EQ(output.scanner_handle.value(), "scanner_handle");
   ASSERT_TRUE(output.options.has_value());
-  EXPECT_TRUE(base::Contains(output.options->additional_properties, "name1"));
-  EXPECT_TRUE(base::Contains(output.options->additional_properties, "name2"));
+  EXPECT_TRUE(output.options->additional_properties.contains("name1"));
+  EXPECT_TRUE(output.options->additional_properties.contains("name2"));
 }
 
 TEST(DocumentScanTypeConvertersTest, GetOptionGroupsResponse_Empty) {
@@ -683,9 +683,11 @@ TEST(DocumentScanTypeConvertersTest, SetOptionsResponse_NonEmpty) {
       "name2", mojom::ScannerOperationResult::kSuccess));
   input->options.emplace();
   input->options->try_emplace(
-      "option1", extensions::CreateTestScannerOption("option1", 5));
+      "option1", mojo::ConvertForTesting(
+                     extensions::CreateTestScannerOption("option1", 5)));
   input->options->try_emplace(
-      "option2", extensions::CreateTestScannerOption("option2", 10));
+      "option2", mojo::ConvertForTesting(
+                     extensions::CreateTestScannerOption("option2", 10)));
 
   auto output = input.To<document_scan::SetOptionsResponse>();
   EXPECT_EQ(output.scanner_handle, "scanner-handle");
@@ -696,8 +698,8 @@ TEST(DocumentScanTypeConvertersTest, SetOptionsResponse_NonEmpty) {
   EXPECT_EQ(output.results[1].name, "name2");
   EXPECT_EQ(output.results[1].result, document_scan::OperationResult::kSuccess);
   ASSERT_TRUE(output.options.has_value());
-  EXPECT_TRUE(base::Contains(output.options->additional_properties, "option1"));
-  EXPECT_TRUE(base::Contains(output.options->additional_properties, "option2"));
+  EXPECT_TRUE(output.options->additional_properties.contains("option1"));
+  EXPECT_TRUE(output.options->additional_properties.contains("option2"));
 }
 
 TEST(DocumentScanTypeConvertersTest, StartScanOptions_Empty) {

@@ -95,6 +95,10 @@ enum ChromeDistanceMetric {
   DISTANCE_SIDE_PANEL_HEADER_BUTTON_MINIMUM_SIZE,
   // Horizontal spacing for separating side panel header border from controls.
   DISTANCE_SIDE_PANEL_HEADER_INTERIOR_MARGIN_HORIZONTAL,
+  // The corner radius for the content height side panel content.
+  DISTANCE_CONTENT_HEIGHT_SIDE_PANEL_CONTENT_RADIUS,
+  // The corner radius for the toolbar height side panel content.
+  DISTANCE_TOOLBAR_HEIGHT_SIDE_PANEL_CONTENT_RADIUS,
   // Horizontal padding between separator in the page info view.
   DISTANCE_HORIZONTAL_SEPARATOR_PADDING_PAGE_INFO_VIEW,
   // Horizontal padding applied between the icon and label in the infobar.
@@ -191,6 +195,10 @@ enum ChromeDistanceMetric {
   DISTANCE_FEATURE_FIRST_RUN_INFO_BOX_ROUNDED_BORDER_RADIUS,
   // Vertical spacing between infoboxes in the FFR dialog.
   DISTANCE_FEATURE_FIRST_RUN_INFO_BOX_VERTICAL,
+  // Vertical padding for the infobar buttons.
+  DISTANCE_INFOBAR_BUTTON_VERTICAL_PADDING,
+  // Horizontal padding for the infobar buttons.
+  DISTANCE_INFOBAR_BUTTON_HORIZONTAL_PADDING,
 };
 
 class ChromeLayoutProvider : public views::LayoutProvider {

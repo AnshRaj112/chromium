@@ -17,6 +17,7 @@ import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.VectorDrawable;
 
 import androidx.test.filters.SmallTest;
 
@@ -34,15 +35,20 @@ import org.robolectric.annotation.Config;
 import org.chromium.base.BaseSwitches;
 import org.chromium.base.Callback;
 import org.chromium.base.ContextUtils;
+import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.CommandLineFlags;
+import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider.ControlsPosition;
 import org.chromium.chrome.browser.omnibox.UrlBarEditingTextStateProvider;
 import org.chromium.chrome.browser.omnibox.styles.OmniboxDrawableState;
 import org.chromium.chrome.browser.omnibox.styles.OmniboxImageSupplier;
+import org.chromium.chrome.browser.omnibox.suggestions.AutocompleteUIContext;
 import org.chromium.chrome.browser.omnibox.suggestions.SuggestionHost;
 import org.chromium.chrome.browser.omnibox.suggestions.base.BaseSuggestionViewProperties;
 import org.chromium.chrome.browser.omnibox.suggestions.basic.BasicSuggestionProcessor.BookmarkState;
 import org.chromium.chrome.browser.omnibox.suggestions.basic.SuggestionViewProperties;
+import org.chromium.chrome.browser.share.ShareDelegate;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.components.omnibox.AutocompleteInput;
 import org.chromium.components.omnibox.AutocompleteMatch;
 import org.chromium.components.omnibox.AutocompleteMatchBuilder;
@@ -53,7 +59,7 @@ import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.url.GURL;
 import org.chromium.url.JUnitTestGURLs;
 
-import java.util.Optional;
+import java.util.function.Supplier;
 
 /** Tests for {@link EntitySuggestionProcessor}. */
 @RunWith(BaseRobolectricTestRunner.class)
@@ -72,6 +78,8 @@ public class EntitySuggestionProcessorUnitTest {
     private @Mock BookmarkState mBookmarkState;
     private @Mock UrlBarEditingTextStateProvider mTextProvider;
     private @Mock AutocompleteInput mInput;
+    private @Mock Supplier<Tab> mTabSupplier;
+    private @Mock Supplier<ShareDelegate> mShareDelegateSupplier;
 
     private EntitySuggestionProcessor mProcessor;
 
@@ -118,13 +126,17 @@ public class EntitySuggestionProcessorUnitTest {
 
     @Before
     public void setUp() {
-        mProcessor =
-                new EntitySuggestionProcessor(
+        AutocompleteUIContext uiContext =
+                new AutocompleteUIContext(
                         ContextUtils.getApplicationContext(),
                         mSuggestionHost,
                         mTextProvider,
-                        Optional.of(mImageSupplier),
-                        mBookmarkState);
+                        mImageSupplier,
+                        mBookmarkState,
+                        mTabSupplier,
+                        mShareDelegateSupplier,
+                        new ObservableSupplierImpl<>(ControlsPosition.TOP));
+        mProcessor = new EntitySuggestionProcessor(uiContext);
         doReturn("").when(mTextProvider).getTextWithoutAutocomplete();
     }
 
@@ -148,7 +160,7 @@ public class EntitySuggestionProcessorUnitTest {
         processSuggestion(suggHelper);
 
         Assert.assertNotNull(suggHelper.getIcon());
-        assertThat(suggHelper.getIcon(), instanceOf(BitmapDrawable.class));
+        assertThat(suggHelper.getIcon(), instanceOf(VectorDrawable.class));
     }
 
     @Test
@@ -158,7 +170,7 @@ public class EntitySuggestionProcessorUnitTest {
         SuggestionTestHelper suggHelper = createSuggestion("", "", "#fedcba", SEARCH_URL);
         processSuggestion(suggHelper);
 
-        assertThat(suggHelper.getIcon(), instanceOf(BitmapDrawable.class));
+        assertThat(suggHelper.getIcon(), instanceOf(VectorDrawable.class));
     }
 
     @Test
@@ -178,15 +190,15 @@ public class EntitySuggestionProcessorUnitTest {
         // Note, fallback is the bitmap drawable representing a search loupe.
         SuggestionTestHelper suggHelper = createSuggestion("", "", "", SEARCH_URL);
         processSuggestion(suggHelper);
-        assertThat(suggHelper.getIcon(), instanceOf(BitmapDrawable.class));
+        assertThat(suggHelper.getIcon(), instanceOf(VectorDrawable.class));
 
         suggHelper = createSuggestion("", "", "#", SEARCH_URL);
         processSuggestion(suggHelper);
-        assertThat(suggHelper.getIcon(), instanceOf(BitmapDrawable.class));
+        assertThat(suggHelper.getIcon(), instanceOf(VectorDrawable.class));
 
         suggHelper = createSuggestion("", "", "invalid", SEARCH_URL);
         processSuggestion(suggHelper);
-        assertThat(suggHelper.getIcon(), instanceOf(BitmapDrawable.class));
+        assertThat(suggHelper.getIcon(), instanceOf(VectorDrawable.class));
     }
 
     @Test
@@ -207,13 +219,17 @@ public class EntitySuggestionProcessorUnitTest {
     @Test
     @SmallTest
     public void fetchImage_withoutSupplier() {
-        mProcessor =
-                new EntitySuggestionProcessor(
+        AutocompleteUIContext uiContext =
+                new AutocompleteUIContext(
                         ContextUtils.getApplicationContext(),
                         mSuggestionHost,
                         mTextProvider,
-                        /* imageSupplier= */ Optional.empty(),
-                        mBookmarkState);
+                        /* imageSupplier= */ null,
+                        mBookmarkState,
+                        mTabSupplier,
+                        mShareDelegateSupplier,
+                        new ObservableSupplierImpl<>(ControlsPosition.TOP));
+        mProcessor = new EntitySuggestionProcessor(uiContext);
         SuggestionTestHelper suggHelper = createSuggestion("", "", "red", WEB_URL);
         processSuggestion(suggHelper);
         verifyNoMoreInteractions(mImageSupplier);

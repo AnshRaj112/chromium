@@ -13,7 +13,6 @@
 #include "ash/wm/window_state.h"
 #include "base/command_line.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_functions.h"
 #include "chromeos/ui/base/display_util.h"
@@ -138,7 +137,7 @@ void PersistentWindowController::OnDisplayMetricsChanged(
   }
 
   const bool was_landscape_before_rotation =
-      base::Contains(is_landscape_orientation_map_, display.id())
+      is_landscape_orientation_map_.contains(display.id())
           ? is_landscape_orientation_map_[display.id()]
           : false;
   for (aura::Window* window : GetWindowList()) {
@@ -185,7 +184,7 @@ void PersistentWindowController::OnWillProcessDisplayChanges() {
             window_state->persistent_window_info_of_display_removal();
         info) {
       info->set_display_id_after_removal(
-          display::Screen::GetScreen()->GetDisplayNearestWindow(window).id());
+          display::Screen::Get()->GetDisplayNearestWindow(window).id());
       continue;
     }
     // Place the window that needs persistent window info into the temporary
@@ -213,19 +212,19 @@ void PersistentWindowController::OnDidProcessDisplayChanges(
     std::move(screen_rotation_restore_callback_).Run();
   }
 
-  if (display::Screen::GetScreen()) {
-    for (const auto& display : display::Screen::GetScreen()->GetAllDisplays()) {
+  if (display::Screen::Get()) {
+    for (const auto& display : display::Screen::Get()->GetAllDisplays()) {
       is_landscape_orientation_map_[display.id()] = display.is_landscape();
     }
   }
 }
 
 void PersistentWindowController::OnFirstSessionStarted() {
-  if (!display::Screen::GetScreen()) {
+  if (!display::Screen::Get()) {
     return;
   }
 
-  for (const auto& display : display::Screen::GetScreen()->GetAllDisplays()) {
+  for (const auto& display : display::Screen::Get()->GetAllDisplays()) {
     is_landscape_orientation_map_[display.id()] = display.is_landscape();
   }
 }

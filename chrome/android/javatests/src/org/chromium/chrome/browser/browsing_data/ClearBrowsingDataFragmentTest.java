@@ -63,18 +63,21 @@ import org.mockito.junit.MockitoRule;
 import org.mockito.stubbing.Answer;
 
 import org.chromium.base.ThreadUtils;
-import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
+import org.chromium.base.test.util.DisabledTest;
+import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.Feature;
+import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.browsing_data.BrowsingDataBridge.OnClearBrowsingDataListener;
 import org.chromium.chrome.browser.browsing_data.ClearBrowsingDataFragment.DialogOption;
 import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncher;
 import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncherFactory;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
 import org.chromium.chrome.browser.notifications.channels.SiteChannelsManager;
@@ -93,6 +96,7 @@ import org.chromium.chrome.test.transit.ChromeTransitTestRules;
 import org.chromium.chrome.test.transit.FreshCtaTransitTestRule;
 import org.chromium.chrome.test.util.browser.signin.SigninTestRule;
 import org.chromium.components.browser_ui.settings.SpinnerPreference;
+import org.chromium.components.browser_ui.settings.search.SettingsIndexData;
 import org.chromium.components.browsing_data.DeleteBrowsingDataAction;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
 import org.chromium.components.signin.test.util.TestAccounts;
@@ -105,7 +109,8 @@ import java.util.Set;
 /** Tests for ClearBrowsingDataFragment interaction with underlying data model. */
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
-@Batch(Batch.PER_CLASS)
+@DoNotBatch(reason = "Manages sign-in state, which is global.")
+@DisableFeatures(ChromeFeatureList.SETTINGS_MULTI_COLUMN)
 public class ClearBrowsingDataFragmentTest {
     @Rule
     public FreshCtaTransitTestRule mActivityTestRule =
@@ -122,6 +127,8 @@ public class ClearBrowsingDataFragmentTest {
     @Mock private BrowsingDataBridge.Natives mBrowsingDataBridgeMock;
 
     @Mock private HelpAndFeedbackLauncher mHelpAndFeedbackLauncher;
+
+    @Mock private SettingsIndexData mSearchIndexDataMock;
 
     private final CallbackHelper mCallbackHelper = new CallbackHelper();
 
@@ -426,6 +433,32 @@ public class ClearBrowsingDataFragmentTest {
         startPreferences();
         ViewUtils.waitForVisibleView(withId(R.id.menu_id_targeted_help));
         onView(withText(R.string.clear_browsing_data_title)).check(matches(isDisplayed()));
+    }
+
+    @Test
+    @MediumTest
+    public void testSearchableIndex_SignOutText_AlwaysRemoved() {
+        var indexProvider = ClearBrowsingDataFragment.SEARCH_INDEX_DATA_PROVIDER;
+        indexProvider.updateDynamicPreferences(
+                mActivityTestRule.getActivity(), mSearchIndexDataMock, null);
+        verify(mSearchIndexDataMock)
+                .removeEntry(
+                        indexProvider.getUniqueId(
+                                ClearBrowsingDataFragment.PREF_SIGN_OUT_OF_CHROME_TEXT));
+    }
+
+    @Test
+    @MediumTest
+    public void testSearchableIndex_ClearTabs_NotRemovedIfContextIsNotSearchActivity() {
+        var indexProvider = ClearBrowsingDataFragment.SEARCH_INDEX_DATA_PROVIDER;
+        // Using ChromeTabbedActivity (from rule) which is not SearchActivity.
+        indexProvider.updateDynamicPreferences(
+                mActivityTestRule.getActivity(), mSearchIndexDataMock, null);
+        verify(mSearchIndexDataMock, never())
+                .removeEntry(
+                        indexProvider.getUniqueId(
+                                ClearBrowsingDataFragment.getPreferenceKey(
+                                        DialogOption.CLEAR_TABS)));
     }
 
     /**
@@ -851,6 +884,7 @@ public class ClearBrowsingDataFragmentTest {
 
     @Test
     @MediumTest
+    @DisabledTest(message = "https://crbug.com/462460128")
     public void testSnackbarShown_changeTimePeriod() throws Exception {
         setDataTypesToClear(DialogOption.CLEAR_CACHE);
 

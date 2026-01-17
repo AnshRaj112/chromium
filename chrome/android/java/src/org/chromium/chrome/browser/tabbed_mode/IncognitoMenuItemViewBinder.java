@@ -9,7 +9,6 @@ import android.view.View;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuItemProperties;
-import org.chromium.chrome.browser.ui.appmenu.AppMenuUtil;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter.HighlightParams;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter.HighlightShape;
@@ -23,16 +22,14 @@ import org.chromium.ui.widget.ChromeImageView;
 class IncognitoMenuItemViewBinder {
     /** Handles binding the view and models changes. */
     public static void bind(PropertyModel model, View view, PropertyKey key) {
-        AppMenuUtil.bindStandardItemEnterAnimation(model, view, key);
-
         if (key == AppMenuItemProperties.MENU_ITEM_ID) {
             int id = model.get(AppMenuItemProperties.MENU_ITEM_ID);
-            assert id == R.id.new_incognito_tab_menu_id;
+            assert id == R.id.new_incognito_tab_menu_id || id == R.id.new_incognito_window_menu_id;
             view.setId(id);
         } else if (key == AppMenuItemProperties.MANAGED) {
             ChromeImageView image = view.findViewById(R.id.trailing_icon);
             if (model.get(AppMenuItemProperties.MANAGED)) {
-                image.setImageResource(R.drawable.ic_business);
+                image.setImageResource(R.drawable.ic_domain);
                 image.setVisibility(View.VISIBLE);
             } else {
                 image.setVisibility(View.GONE);

@@ -175,6 +175,9 @@ class GPUDevice final : public EventTarget,
   void TrackTextureWithMailbox(GPUTexture* texture);
   void UntrackTextureWithMailbox(GPUTexture* texture);
 
+  void TrackBufferWithMailbox(GPUBuffer* buffer);
+  void UntrackBufferWithMailbox(GPUBuffer* buffer);
+
   bool ValidateTextureFormatUsage(V8GPUTextureFormat format,
                                   ExceptionState& exception_state);
   bool ValidateBlendFactor(V8GPUBlendFactor blend_factor,
@@ -200,10 +203,18 @@ class GPUDevice final : public EventTarget,
   void DissociateMailboxes();
   void UnmapAllMappableBuffers(v8::Isolate* isolate);
 
-  void OnUncapturedError(const wgpu::Device& device,
-                         wgpu::ErrorType errorType,
-                         wgpu::StringView message);
-  void OnLogging(wgpu::LoggingType loggingType, wgpu::StringView message);
+  // Both the uncaptured error callbacks and the logging callbacks run
+  // spontaneously (unlike other callbacks that run via ProcessEvents). When
+  // running on the main thread, they can run inline as usual, but when running
+  // off the main thread, i.e. on the IO thread, the StringView needs to be
+  // copied at the callsite, then proxied over to the main thread to actually
+  // run the callbacks. The complexity of the function signatures is a result of
+  // the restrictions when using blink's callbacks which implicitly wraps
+  // sequence checking. Further explanation of the callbacks are included at the
+  // implementation sites.
+  void OnUncapturedErrorImpl(wgpu::ErrorType errorType, const String& message);
+  void OnLoggingImpl(wgpu::LoggingType loggingType, const String& message);
+
   void OnDeviceLost(
       std::unique_ptr<
           WGPURepeatingCallback<wgpu::UncapturedErrorCallback<void>>>,
@@ -249,6 +260,9 @@ class GPUDevice final : public EventTarget,
 
   // Textures with mailboxes that should be dissociated before device.destroy().
   HeapHashSet<WeakMember<GPUTexture>> textures_with_mailbox_;
+
+  // Buffers with mailboxes that should be dissociated before device.destroy().
+  HeapHashSet<WeakMember<GPUBuffer>> buffers_with_mailbox_;
 
   HeapHashSet<WeakMember<GPUBuffer>> mappable_buffers_;
 

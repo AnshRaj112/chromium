@@ -23,10 +23,10 @@
 #import "ios/chrome/browser/shared/model/profile/features.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/browser_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/shared/public/commands/show_signin_command.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
@@ -77,9 +77,6 @@ using signin_metrics::PromoAction;
       [[GoogleServicesSettingsViewController alloc]
           initWithStyle:ChromeTableViewStyle()];
   viewController.presentationDelegate = self;
-  viewController.forcedSigninEnabled =
-      self.authService->GetServiceStatus() ==
-      AuthenticationService::ServiceStatus::SigninForcedByPolicy;
   self.viewController = viewController;
   self.mediator = [[GoogleServicesSettingsMediator alloc]
       initWithIdentityManager:IdentityManagerFactory::GetForProfile(
@@ -90,11 +87,9 @@ using signin_metrics::PromoAction;
   self.mediator.authService = self.authService;
   self.mediator.commandHandler = self;
   viewController.modelDelegate = self.mediator;
-  viewController.serviceDelegate = self.mediator;
 
   CommandDispatcher* dispatcher = self.browser->GetCommandDispatcher();
-  viewController.applicationHandler =
-      HandlerForProtocol(dispatcher, ApplicationCommands);
+  viewController.sceneHandler = HandlerForProtocol(dispatcher, SceneCommands);
   viewController.browserHandler =
       HandlerForProtocol(dispatcher, BrowserCommands);
   viewController.settingsHandler =
@@ -117,11 +112,8 @@ using signin_metrics::PromoAction;
 
 // Callback for the sign-out confirmation button.
 // Dismisses the alert coordinator and sign-out.
-- (void)
-    onSignoutConfirmationTappedWithTargetRect:(CGRect)targetRect
-                                   completion:
-                                       (signin_ui::SignoutCompletionCallback)
-                                           completion {
+- (void)onSignoutConfirmationTappedWithCompletion:
+    (signin_ui::SignoutCompletionCallback)completion {
   [self dismissSignoutCoordinator];
   [self signOutWithCompletion:completion];
 }
@@ -155,27 +147,25 @@ using signin_metrics::PromoAction;
     // the first sign-out coordinator.
     return;
   }
+  CGRect inCoordinateTargetRect =
+      [self.viewController.view convertRect:targetRect fromView:nil];
   self.signOutCoordinator = [[ActionSheetCoordinator alloc]
       initWithBaseViewController:self.viewController
                          browser:self.browser
                            title:nil
                          message:nil
-                            rect:targetRect
+                            rect:inCoordinateTargetRect
                             view:self.viewController.view];
 
   // Because setting `title` to nil automatically forces the title-style text on
   // `message` in the UIAlertController, the attributed message below
   // specifically denotes the font style to apply.
   if (warning) {
-    // If `kIdentityDiscAccountMenu` is enabled, signing out may also cause tabs
-    // to be closed, see `MainControllerAuthenticationServiceDelegate::
+    // Signing out may also cause tabs to be closed, see
+    // `MainControllerAuthenticationServiceDelegate::
     //    ClearBrowsingDataForSignedinPeriod`.
-    NSString* clearDataMessage =
-        IsIdentityDiscAccountMenuEnabled()
-            ? l10n_util::GetNSString(
-                  IDS_IOS_SIGNOUT_AND_DISALLOW_SIGNIN_CLOSES_TABS_AND_CLEARS_DATA_MESSAGE_WITH_MANAGED_ACCOUNT)
-            : l10n_util::GetNSString(
-                  IDS_IOS_SIGNOUT_AND_DISALLOW_SIGNIN_CLEARS_DATA_MESSAGE_WITH_MANAGED_ACCOUNT);
+    NSString* clearDataMessage = l10n_util::GetNSString(
+        IDS_IOS_SIGNOUT_AND_DISALLOW_SIGNIN_CLOSES_TABS_AND_CLEARS_DATA_MESSAGE_WITH_MANAGED_ACCOUNT);
     self.signOutCoordinator.attributedMessage = [[NSAttributedString alloc]
         initWithString:clearDataMessage
             attributes:@{
@@ -191,8 +181,7 @@ using signin_metrics::PromoAction;
                            IDS_IOS_SIGNOUT_DIALOG_SIGN_OUT_BUTTON)
                 action:^{
                   [weakSelf
-                      onSignoutConfirmationTappedWithTargetRect:targetRect
-                                                     completion:completion];
+                      onSignoutConfirmationTappedWithCompletion:completion];
                 }
                  style:UIAlertActionStyleDestructive];
 

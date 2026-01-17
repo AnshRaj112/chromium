@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "ui/ozone/platform/drm/gpu/drm_framebuffer.h"
 
+#include <algorithm>
 #include <utility>
 
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
 #include "base/logging.h"
 #include "ui/gfx/linux/drm_util_linux.h"
 #include "ui/gfx/linux/gbm_buffer.h"
@@ -33,13 +29,13 @@ bool ForceUsingOpaqueFormatWorkaround(
       DRM_FORMAT_ARGB2101010, DRM_FORMAT_ABGR2101010, DRM_FORMAT_RGBA1010102,
       DRM_FORMAT_BGRA1010102};
   const bool is_high_bit_depth_format_with_alpha =
-      base::Contains(kHighBitDepthARGBFormats, drm_fourcc);
+      std::ranges::contains(kHighBitDepthARGBFormats, drm_fourcc);
   if (!is_high_bit_depth_format_with_alpha)
     return false;
 
   const std::vector<uint32_t>& supported_formats =
       drm_device->plane_manager()->GetSupportedFormats();
-  return !base::Contains(supported_formats, drm_fourcc);
+  return !std::ranges::contains(supported_formats, drm_fourcc);
 }
 
 }  // namespace
@@ -56,12 +52,11 @@ scoped_refptr<DrmFramebuffer> DrmFramebuffer::AddFramebuffer(
   uint64_t modifiers[4] = {};
   if (params.modifier != DRM_FORMAT_MOD_INVALID) {
     for (size_t i = 0; i < params.num_planes; ++i)
-      modifiers[i] = params.modifier;
+      UNSAFE_TODO(modifiers[i]) = params.modifier;
   }
 
-  const auto buffer_format = GetBufferFormatFromFourCCFormat(params.format);
-  const uint32_t opaque_format =
-      GetFourCCFormatForOpaqueFramebuffer(buffer_format);
+  const auto si_format = GetSharedImageFormatFromFourCCFormat(params.format);
+  const uint32_t opaque_format = GetFourCCFormatForOpaqueFramebuffer(si_format);
   const auto drm_format =
       ForceUsingOpaqueFormatWorkaround(drm_device, params.format)
           ? opaque_format
@@ -114,9 +109,9 @@ scoped_refptr<DrmFramebuffer> DrmFramebuffer::AddFramebuffer(
   params.is_original_buffer = is_original_buffer;
   params.preferred_modifiers = preferred_modifiers;
   for (size_t i = 0; i < params.num_planes; ++i) {
-    params.handles[i] = buffer->GetPlaneHandle(i);
-    params.strides[i] = buffer->GetPlaneStride(i);
-    params.offsets[i] = buffer->GetPlaneOffset(i);
+    UNSAFE_TODO(params.handles[i]) = buffer->GetPlaneHandle(i);
+    UNSAFE_TODO(params.strides[i]) = buffer->GetPlaneStride(i);
+    UNSAFE_TODO(params.offsets[i]) = buffer->GetPlaneOffset(i);
   }
 
   // AddFramebuffer2 only considers the modifiers if addfb_flags has

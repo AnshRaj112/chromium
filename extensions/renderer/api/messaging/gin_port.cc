@@ -151,7 +151,9 @@ void GinPort::DisconnectHandler(gin::Arguments* arguments) {
 
   v8::Local<v8::Context> context = arguments->GetHolderCreationContext();
   InvalidateEvents(context);
-  delegate_->ClosePort(context, port_id_);
+  if (delegate_) {
+    delegate_->ClosePort(context, port_id_);
+  }
   state_ = State::kDisconnected;
 }
 
@@ -181,7 +183,14 @@ void GinPort::PostMessageHandler(gin::Arguments* arguments,
     return;
   }
 
-  delegate_->PostMessageToPort(context, port_id_, std::move(message));
+  if (delegate_) {
+    delegate_->PostMessageToPort(context, port_id_, std::move(message));
+  }
+}
+
+void GinPort::OnContextDestroyed() {
+  event_handler_ = nullptr;
+  delegate_ = nullptr;
 }
 
 std::string GinPort::GetName() {
@@ -216,7 +225,7 @@ v8::Local<v8::Object> GinPort::GetEvent(v8::Local<v8::Context> context,
   DCHECK(event_name == kOnMessageEvent || event_name == kOnDisconnectEvent);
   v8::Isolate* isolate = v8::Isolate::GetCurrent();
 
-  if (state_ == State::kInvalidated) {
+  if (state_ == State::kInvalidated || !event_handler_) {
     ThrowError(isolate, kContextInvalidatedError);
     return v8::Local<v8::Object>();
   }
@@ -253,7 +262,8 @@ void GinPort::DispatchEvent(v8::Local<v8::Context> context,
   gin::Converter<EventEmitter*>::FromV8(isolate, on_message, &emitter);
   CHECK(emitter);
   emitter->Fire(context, args, /*filter=*/nullptr,
-                /*callback=*/v8::Local<v8::Function>());
+                /*on_dispatched_callback=*/v8::Local<v8::Function>(),
+                /*listener_error_callback=*/v8::Local<v8::Function>());
 }
 
 void GinPort::OnContextInvalidated() {
@@ -267,7 +277,7 @@ void GinPort::InvalidateEvents(v8::Local<v8::Context> context) {
   // No need to invalidate the events if the context itself was already
   // invalidated; the APIEventHandler will have already cleaned up the
   // listeners.
-  if (state_ == State::kInvalidated) {
+  if (state_ == State::kInvalidated || !event_handler_) {
     return;
   }
 

@@ -4,20 +4,60 @@
 
 #include "third_party/blink/renderer/core/html/html_permission_icon_element.h"
 
+#include "base/functional/bind.h"
+#include "base/task/single_thread_task_runner.h"
 #include "third_party/blink/public/resources/grit/blink_resources.h"
+#include "third_party/blink/renderer/core/dom/document.h"
 #include "third_party/blink/renderer/core/html/html_permission_element_utils.h"
 #include "third_party/blink/renderer/core/html/shadow/shadow_element_names.h"
 #include "third_party/blink/renderer/core/style/computed_style.h"
 #include "third_party/blink/renderer/platform/data_resource_helper.h"
+#include "third_party/blink/renderer/platform/wtf/std_lib_extras.h"
 
 namespace blink {
 
 namespace {
 constexpr float kMaxIconSizeToFontSizeRatio = 1.5;
 constexpr float kMaxMarginInlineEndToFontSizeRatio = 3.0;
-}  // namespace
 
-using mojom::blink::PermissionName;
+// Helpers to get svg icon. We can use DEFINE_STATIC_LOCAL as all the icons are
+// using a single thread.
+const String& LocationPreciseIconSVG() {
+  DEFINE_STATIC_LOCAL(const String, svg,
+                      (UncompressResourceAsASCIIString(
+                          IDR_PERMISSION_ICON_LOCATION_PRECISE_SVG)));
+  return svg;
+}
+
+const String& LocationIconSVG() {
+  DEFINE_STATIC_LOCAL(
+      const String, kLocationIconSVG,
+      (UncompressResourceAsASCIIString(IDR_PERMISSION_ICON_LOCATION_SVG)));
+  return kLocationIconSVG;
+}
+
+const String& CameraIconSVG() {
+  DEFINE_STATIC_LOCAL(
+      const String, kCameraIconSVG,
+      (UncompressResourceAsASCIIString(IDR_PERMISSION_ICON_CAMERA_SVG)));
+  return kCameraIconSVG;
+}
+
+const String& MicrophoneIconSVG() {
+  DEFINE_STATIC_LOCAL(
+      const String, kMicrophoneIconSVG,
+      (UncompressResourceAsASCIIString(IDR_PERMISSION_ICON_MICROPHONE_SVG)));
+  return kMicrophoneIconSVG;
+}
+
+const String& InstallIconSVG() {
+  DEFINE_STATIC_LOCAL(
+      const String, kInstallIconSVG,
+      (UncompressResourceAsASCIIString(IDR_PERMISSION_ICON_INSTALL_SVG)));
+  return kInstallIconSVG;
+}
+
+}  // namespace
 
 HTMLPermissionIconElement::HTMLPermissionIconElement(Document& document)
     : HTMLSpanElement(document) {
@@ -26,29 +66,46 @@ HTMLPermissionIconElement::HTMLPermissionIconElement(Document& document)
   SetHasCustomStyleCallbacks();
 }
 
-void HTMLPermissionIconElement::SetIcon(PermissionName permission_type,
-                                        bool is_precise_location) {
-  if (is_icon_set_) {
+void HTMLPermissionIconElement::SetIcon(PermissionIconType icon_type) {
+  // We need `PostTask` here because creating a new element (the svg instead of
+  // setInnerHtml) starts dispatching events and it hits a DCHECK.
+  GetDocument()
+      .GetTaskRunner(TaskType::kInternalDefault)
+      ->PostTask(FROM_HERE, BindOnce(&HTMLPermissionIconElement::SetIconImpl,
+                                     WrapWeakPersistent(this), icon_type));
+}
+
+void HTMLPermissionIconElement::SetIconImpl(PermissionIconType icon_type) {
+  if (current_icon_type_ == icon_type) {
     return;
   }
-  switch (permission_type) {
-    case PermissionName::GEOLOCATION:
-      SetInnerHTMLWithoutTrustedTypes(UncompressResourceAsASCIIString(
-          is_precise_location ? IDR_PERMISSION_ICON_LOCATION_PRECISE_SVG
-                              : IDR_PERMISSION_ICON_LOCATION_SVG));
+
+  switch (icon_type) {
+    case PermissionIconType::kLocation: {
+      SetInnerHTMLWithoutTrustedTypes(LocationIconSVG());
       break;
-    case PermissionName::VIDEO_CAPTURE:
-      SetInnerHTMLWithoutTrustedTypes(String(
-          UncompressResourceAsASCIIString(IDR_PERMISSION_ICON_CAMERA_SVG)));
+    }
+    case PermissionIconType::kLocationPrecise: {
+      SetInnerHTMLWithoutTrustedTypes(LocationPreciseIconSVG());
       break;
-    case PermissionName::AUDIO_CAPTURE:
-      SetInnerHTMLWithoutTrustedTypes(
-          UncompressResourceAsASCIIString(IDR_PERMISSION_ICON_MICROPHONE_SVG));
+    }
+    case PermissionIconType::kCamera: {
+      SetInnerHTMLWithoutTrustedTypes(CameraIconSVG());
       break;
+    }
+    case PermissionIconType::kMicrophone: {
+      SetInnerHTMLWithoutTrustedTypes(MicrophoneIconSVG());
+      break;
+    }
+    case PermissionIconType::kInstall: {
+      SetInnerHTMLWithoutTrustedTypes(InstallIconSVG());
+      break;
+    }
+
     default:
       return;
   }
-  is_icon_set_ = true;
+  current_icon_type_ = icon_type;
 }
 
 void HTMLPermissionIconElement::AdjustStyle(ComputedStyleBuilder& builder) {

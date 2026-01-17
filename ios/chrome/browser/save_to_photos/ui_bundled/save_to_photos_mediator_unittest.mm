@@ -6,7 +6,7 @@
 
 #import <UIKit/UIKit.h>
 
-#import "base/functional/callback_forward.h"
+#import "base/functional/callback_helpers.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/test/metrics/histogram_tester.h"
 #import "components/prefs/pref_service.h"
@@ -22,10 +22,10 @@
 #import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_ios.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/google_one_commands.h"
 #import "ios/chrome/browser/shared/public/commands/manage_storage_alert_commands.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/signin/model/chrome_account_manager_service_factory.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity_manager.h"
@@ -137,11 +137,10 @@ class SaveToPhotosMediatorTest : public PlatformTest {
         FakeSystemIdentityManager::FromSystemIdentityManager(
             GetApplicationContext()->GetSystemIdentityManager());
     system_identity_manager->AddIdentity(fake_identity_);
-    mock_application_handler_ =
-        OCMStrictProtocolMock(@protocol(ApplicationCommands));
+    mock_application_handler_ = OCMStrictProtocolMock(@protocol(SceneCommands));
     [browser_->GetCommandDispatcher()
         startDispatchingToTarget:mock_application_handler_
-                     forProtocol:@protocol(ApplicationCommands)];
+                     forProtocol:@protocol(SceneCommands)];
     mock_manage_storage_alert_handler_ =
         OCMStrictProtocolMock(@protocol(ManageStorageAlertCommands));
     [browser_->GetCommandDispatcher()
@@ -192,7 +191,7 @@ class SaveToPhotosMediatorTest : public PlatformTest {
             accountManagerService:account_manager_service
                   identityManager:identity_manager
         manageStorageAlertHandler:mock_manage_storage_alert_handler_
-               applicationHandler:mock_application_handler_
+                     sceneHandler:mock_application_handler_
                  googleOneHandler:mock_google_one_handler_];
   }
 
@@ -303,9 +302,8 @@ TEST_F(SaveToPhotosMediatorTest,
 
   // This test assumes there is a default account memorized for Save to Photos
   // and that the user opted-in skipping the account picker.
-  profile_->GetPrefs()->SetString(
-      prefs::kIosSaveToPhotosDefaultGaiaId,
-      base::SysNSStringToUTF8(fake_identity_.gaiaID).c_str());
+  profile_->GetPrefs()->SetString(prefs::kIosSaveToPhotosDefaultGaiaId,
+                                  fake_identity_.gaiaId.ToString());
   profile_->GetPrefs()->SetBoolean(prefs::kIosSaveToPhotosSkipAccountPicker,
                                    true);
 
@@ -527,7 +525,7 @@ TEST_F(SaveToPhotosMediatorTest, SnackbarOpenButtonOpensPhotosAppIfInstalled) {
   // Expect that the mediator tries to open the Photos app and switch to the
   // Photos account associated with `fake_identity_`.
   NSString* recently_added_url_string = [kGooglePhotosRecentlyAddedURLString
-      stringByAppendingString:fake_identity_.gaiaID];
+      stringByAppendingString:fake_identity_.gaiaId.ToNSString()];
   NSURL* photos_url = [NSURL URLWithString:recently_added_url_string];
   OCMExpect([mock_application_
                 openURL:photos_url

@@ -81,12 +81,12 @@ gfx::ImageSkia CreateBackgroundImageSkia(const gfx::Size& size, SkColor color) {
 namespace qrcode_generator {
 
 QRCodeGeneratorBubble::QRCodeGeneratorBubble(
-    views::View* anchor_view,
+    views::BubbleAnchor anchor,
     base::WeakPtr<content::WebContents> web_contents,
     base::OnceClosure on_closing,
     base::OnceClosure on_back_button_pressed,
     const GURL& url)
-    : LocationBarBubbleDelegateView(anchor_view, nullptr),
+    : LocationBarBubbleDelegateView(anchor, nullptr),
       url_(url),
       on_closing_(std::move(on_closing)),
       on_back_button_pressed_(std::move(on_back_button_pressed)),
@@ -412,7 +412,7 @@ const std::u16string QRCodeGeneratorBubble::GetQRCodeFilenameForURL(
     return u"qrcode_chrome.png";
   }
 
-  return base::UTF8ToUTF16(base::StrCat({"qrcode_", url.host(), ".png"}));
+  return base::UTF8ToUTF16(base::StrCat({"qrcode_", url.GetHost(), ".png"}));
 }
 
 void QRCodeGeneratorBubble::SetQRCodeErrorForTesting(

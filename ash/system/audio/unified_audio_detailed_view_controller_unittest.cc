@@ -20,7 +20,6 @@
 #include "ash/system/unified/unified_system_tray_controller.h"
 #include "ash/system/unified/unified_system_tray_model.h"
 #include "ash/test/ash_test_base.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
@@ -265,7 +264,7 @@ class UnifiedAudioDetailedViewControllerTest : public AshTestBase {
 
     auto sliders_map =
         is_input_slider ? input_sliders_map_ : output_sliders_map_;
-    EXPECT_TRUE(base::Contains(sliders_map, device_id));
+    EXPECT_TRUE(sliders_map.contains(device_id));
 
     auto* unified_slider_view =
         static_cast<UnifiedSliderView*>(sliders_map.find(device_id)->second);
@@ -939,9 +938,7 @@ class UnifiedAudioDetailedViewControllerSodaTest
     // `ChromeBrowserMainPartsAsh` initializes). Create it here so that
     // calling speech::SodaInstaller::GetInstance() returns a valid instance.
     scoped_feature_list_.InitWithFeatures(
-        {ash::features::kOnDeviceSpeechRecognition,
-         media::kLiveCaptionMultiLanguage},
-        {});
+        {ash::features::kOnDeviceSpeechRecognition}, {});
     soda_installer_impl_ =
         std::make_unique<speech::SodaInstallerImplChromeOS>();
 

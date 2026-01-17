@@ -17,7 +17,6 @@
 #include "components/policy/core/common/cloud/cloud_policy_core.h"
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/identity_manager/primary_account_access_token_fetcher.h"
-#include "components/signin/public/identity_manager/scope_set.h"
 #include "google_apis/gaia/gaia_constants.h"
 
 namespace policy {
@@ -97,18 +96,15 @@ void UserCloudPolicyTokenForwarder::OverrideTimeForTesting(
 
 void UserCloudPolicyTokenForwarder::StartRequest() {
   refresh_oauth_token_timer_->Stop();
+
   // TODO(mnissler): Once a better way to reconfirm whether a user is on the
   // login allowlist is available there is no reason to fetch the OAuth2 token
   // for regular user here if the client is already registered. If it is not
   // recurring token fetch for child user check and bail out here.
-  signin::ScopeSet scopes;
-  scopes.insert(GaiaConstants::kDeviceManagementServiceOAuth);
-  scopes.insert(GaiaConstants::kGoogleUserInfoEmail);
-
   // NOTE: The primary account may not be available yet.
   access_token_fetcher_ =
       std::make_unique<signin::PrimaryAccountAccessTokenFetcher>(
-          "policy_token_forwarder", identity_manager_, scopes,
+          signin::OAuthConsumerId::kPolicyTokenForwarder, identity_manager_,
           base::BindOnce(
               &UserCloudPolicyTokenForwarder::OnAccessTokenFetchCompleted,
               base::Unretained(this)),

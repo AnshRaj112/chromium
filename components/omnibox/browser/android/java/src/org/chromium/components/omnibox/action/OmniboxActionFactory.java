@@ -33,6 +33,7 @@ public interface OmniboxActionFactory {
      * @param actionType the specific type of an action matching the {@link
      *     SuggestTemplateInfo.TemplateAction.ActionType}
      * @param actionUri the corresponding action URI/URL (serialized intent)
+     * @param showAsActionButton whether to show it as action button
      * @return new instance of an OmniboxActionInSuggest
      */
     @CalledByNative
@@ -41,18 +42,9 @@ public interface OmniboxActionFactory {
             String hint,
             String accessibilityHint,
             /* SuggestTemplateInfo.TemplateAction.ActionType */ int actionType,
-            String actionUri);
-
-    /**
-     * Construct a new OmniboxAnswerAction.
-     *
-     * @param nativeInstance Pointer to native instance of the object.
-     * @param hint Text that should be displayed in the associated action chip.
-     * @param accessibilityHint Text for screen reader to read when focusing action chip
-     */
-    @CalledByNative
-    OmniboxAction buildOmniboxAnswerAction(
-            long nativeInstance, String hint, String accessibilityHint);
+            String actionUri,
+            int tabId,
+            boolean showAsActionButton);
 
     @NativeMethods
     public interface Natives {

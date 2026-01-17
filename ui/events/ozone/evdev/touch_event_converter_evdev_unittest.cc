@@ -2413,11 +2413,11 @@ TEST_F(TouchEventConverterEvdevTest, ChangePen) {
 
   std::array<unsigned long, EVDEV_BITS_TO_LONGS(EV_CNT)> ev_bits = {};
   std::array<unsigned long, EVDEV_BITS_TO_LONGS(KEY_CNT)> key_bits = {};
-  ui::EvdevSetBit(ev_bits.data(), EV_KEY);
-  ui::EvdevSetBit(key_bits.data(), BTN_TOOL_PEN);
+  ui::EvdevSetBit(ev_bits, EV_KEY);
+  ui::EvdevSetBit(key_bits, BTN_TOOL_PEN);
 
-  devinfo.SetEventTypes(ev_bits.data(), ev_bits.size());
-  devinfo.SetKeyEvents(key_bits.data(), key_bits.size());
+  devinfo.SetEventTypes(ev_bits);
+  devinfo.SetKeyEvents(key_bits);
 
   dev->Initialize(devinfo);
 
@@ -2528,20 +2528,20 @@ TEST_F(TouchEventConverterEvdevTest, ChangeQuirkLeftButton) {
   // filtered out.
   for (int i = 0; i < EV_CNT; i++) {
     if (devinfo.HasEventType(i)) {
-      ui::EvdevSetBit(ev_bits.data(), i);
+      ui::EvdevSetBit(ev_bits, i);
     }
   }
   for (int i = 0; i < KEY_CNT; i++) {
     if (devinfo.HasKeyEvent(i) && i != BTN_TOUCH) {
-      ui::EvdevSetBit(key_bits.data(), i);
+      ui::EvdevSetBit(key_bits, i);
     }
   }
 
-  ui::EvdevSetBit(ev_bits.data(), EV_KEY);
-  ui::EvdevSetBit(key_bits.data(), BTN_LEFT);
+  ui::EvdevSetBit(ev_bits, EV_KEY);
+  ui::EvdevSetBit(key_bits, BTN_LEFT);
 
-  devinfo.SetEventTypes(ev_bits.data(), ev_bits.size());
-  devinfo.SetKeyEvents(key_bits.data(), key_bits.size());
+  devinfo.SetEventTypes(ev_bits);
+  devinfo.SetKeyEvents(key_bits);
 
   dev->Initialize(devinfo);
 

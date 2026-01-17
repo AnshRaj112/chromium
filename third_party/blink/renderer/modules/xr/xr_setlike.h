@@ -5,7 +5,6 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_XR_XR_SETLIKE_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_XR_XR_SETLIKE_H_
 
-#include "base/containers/contains.h"
 #include "third_party/blink/renderer/bindings/core/v8/iterable.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_set.h"
@@ -27,7 +26,7 @@ class XRSetlike : public ValueSyncIterable<InterfaceType> {
                      ExceptionState& exception_state) const {
     DCHECK(element);
     auto all_elements = elements();
-    return base::Contains(all_elements, element);
+    return all_elements.Contains(element);
   }
 
  protected:
@@ -46,8 +45,7 @@ class XRSetlike : public ValueSyncIterable<InterfaceType> {
     }
 
     bool FetchNextItem(ScriptState* script_state,
-                       ElementType*& value,
-                       ExceptionState& exception_state) override {
+                       ElementType*& value) override {
       if (index_ >= elements_.size()) {
         return false;
       }
@@ -72,8 +70,7 @@ class XRSetlike : public ValueSyncIterable<InterfaceType> {
   // Starts iteration over XRSetlike.
   // Needed for ValueSyncIterable to work properly.
   XRSetlike::IterationSource* CreateIterationSource(
-      ScriptState* script_state,
-      ExceptionState& exception_state) override {
+      ScriptState* script_state) override {
     return MakeGarbageCollected<XRSetlike::IterationSource>(elements());
   }
 };

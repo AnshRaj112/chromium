@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <string>
@@ -17,11 +18,10 @@
 #include "ash/display/screen_orientation_controller_test_api.h"
 #include "ash/keyboard/ui/keyboard_ui_controller.h"
 #include "ash/keyboard/ui/test/keyboard_test_util.h"
-#include "ash/multi_user/multi_user_window_manager_impl.h"
+#include "ash/multi_user/multi_user_window_manager.h"
+#include "ash/multi_user/multi_user_window_manager_observer.h"
 #include "ash/public/cpp/ash_prefs.h"
 #include "ash/public/cpp/event_rewriter_controller.h"
-#include "ash/public/cpp/multi_user_window_manager.h"
-#include "ash/public/cpp/multi_user_window_manager_observer.h"
 #include "ash/public/cpp/shelf_model.h"
 #include "ash/public/cpp/shelf_prefs.h"
 #include "ash/public/cpp/shelf_types.h"
@@ -48,7 +48,6 @@
 #include "ash/test/ash_test_base.h"
 #include "ash/test/ash_test_helper.h"
 #include "ash/test/ash_test_util.h"
-#include "ash/test/test_widget_builder.h"
 #include "ash/wm/desks/default_desk_button.h"
 #include "ash/wm/desks/desk.h"
 #include "ash/wm/desks/desk_action_button.h"
@@ -97,8 +96,6 @@
 #include "ash/wm/workspace/backdrop_controller.h"
 #include "ash/wm/workspace/workspace_layout_manager.h"
 #include "ash/wm/workspace_controller.h"
-#include "base/containers/contains.h"
-#include "base/functional/callback_forward.h"
 #include "base/i18n/rtl.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
@@ -108,10 +105,12 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/bind.h"
+#include "base/test/gtest_util.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/simple_test_clock.h"
 #include "base/time/time.h"
+#include "chromeos/components/kiosk/kiosk_test_utils.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "chromeos/ui/frame/caption_buttons/snap_controller.h"
 #include "chromeos/ui/frame/desks/move_to_desks_menu_delegate.h"
@@ -121,6 +120,8 @@
 #include "components/prefs/scoped_user_pref_update.h"
 #include "components/prefs/testing_pref_service.h"
 #include "components/session_manager/session_manager_types.h"
+#include "components/user_manager/fake_user_manager.h"
+#include "components/user_manager/scoped_user_manager.h"
 #include "ui/accessibility/ax_action_data.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/client/window_parenting_client.h"
@@ -134,7 +135,6 @@
 #include "ui/base/ui_base_types.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/compositor/test/layer_animation_stopped_waiter.h"
 #include "ui/compositor_extra/shadow.h"
 #include "ui/display/display.h"
@@ -155,11 +155,13 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/transform.h"
 #include "ui/gfx/image/image_unittest_util.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/menu/menu_item_view.h"
+#include "ui/views/test/test_widget_builder.h"
 #include "ui/views/test/views_test_utils.h"
 #include "ui/views/widget/any_widget_observer.h"
 #include "ui/views/widget/widget.h"
@@ -185,9 +187,9 @@ class StuckWidgetDelegate : public views::WidgetDelegate {
   ~StuckWidgetDelegate() override = default;
 
   // Overridden from WidgetDelegate:
-  std::unique_ptr<views::NonClientFrameView> CreateNonClientFrameView(
+  std::unique_ptr<views::FrameView> CreateFrameView(
       views::Widget* widget) override {
-    return Shell::Get()->CreateDefaultNonClientFrameView(widget);
+    return Shell::Get()->CreateDefaultFrameView(widget);
   }
 
   bool OnCloseRequested(views::Widget::ClosedReason close_reason) override {
@@ -226,8 +228,8 @@ std::unique_ptr<aura::Window> CreateTransientModalChildWindow(
 }
 
 bool DoesActiveDeskContainWindow(aura::Window* window) {
-  return base::Contains(DesksController::Get()->active_desk()->windows(),
-                        window);
+  return std::ranges::contains(DesksController::Get()->active_desk()->windows(),
+                               window);
 }
 
 // Combines or closes a desk.
@@ -380,21 +382,13 @@ class TestDeskObserver : public Desk::Observer {
 
   int notify_counts() const { return notify_counts_; }
 
-  const std::vector<uint64_t>& lacros_profile_id_updates() const {
-    return lacros_profile_id_updates_;
-  }
-
   // Desk::Observer:
   void OnContentChanged() override { ++notify_counts_; }
   void OnDeskDestroyed(const Desk* desk) override {}
   void OnDeskNameChanged(const std::u16string& new_name) override {}
-  void OnDeskProfileChanged(uint64_t lacros_profile_id) override {
-    lacros_profile_id_updates_.push_back(lacros_profile_id);
-  }
 
  private:
   int notify_counts_ = 0;
-  std::vector<uint64_t> lacros_profile_id_updates_;
 };
 
 class FullScreenStateObserver : public ShellObserver {
@@ -1757,7 +1751,7 @@ TEST_P(DesksTest, DragWindowToDesk) {
   EXPECT_TRUE(overview_controller->InOverviewSession());
   EXPECT_EQ(1u, overview_grid->GetNumWindows());
   EXPECT_FALSE(DoesActiveDeskContainWindow(win1.get()));
-  EXPECT_TRUE(base::Contains(desk_2->windows(), win1.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_2->windows(), win1.get()));
   EXPECT_FALSE(overview_grid->drop_target());
 
   // After dragging an item outside of overview to another desk, the focus
@@ -1853,7 +1847,7 @@ TEST_P(DesksTest, DragMinimizedWindowToDesk) {
                   GetEventGenerator(), GetParam().use_touch_gestures);
   EXPECT_TRUE(overview_controller->InOverviewSession());
   EXPECT_TRUE(overview_grid->empty());
-  EXPECT_TRUE(base::Contains(desk_2->windows(), window.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_2->windows(), window.get()));
   EXPECT_FALSE(overview_grid->drop_target());
   DeskSwitchAnimationWaiter waiter;
   LeftClickOn(desk_2_mini_view);
@@ -2005,8 +1999,8 @@ TEST_P(DesksTest, DragWindowAtZeroState) {
   EXPECT_TRUE(overview_controller->InOverviewSession());
   EXPECT_EQ(2u, desks_bar_view->mini_views().size());
   EXPECT_EQ(2u, controller->desks().size());
-  EXPECT_TRUE(
-      base::Contains(controller->GetDeskAtIndex(1)->windows(), win1.get()));
+  EXPECT_TRUE(std::ranges::contains(controller->GetDeskAtIndex(1)->windows(),
+                                    win1.get()));
   // The active desk should still be the first desk, even though a new desk
   // is created.
   EXPECT_EQ(DesksController::Get()->active_desk(),
@@ -2088,8 +2082,8 @@ TEST_P(DesksTest, DragWindowAtZeroStateWithoutDroppingItOnTheNewDesk) {
   EXPECT_FALSE(desks_bar_view->IsZeroState());
   EXPECT_FALSE(IsLazyInitViewVisible(desks_bar_view->new_desk_button_label()));
   EXPECT_EQ(1u, controller->desks().size());
-  EXPECT_TRUE(
-      base::Contains(controller->GetDeskAtIndex(0)->windows(), win1.get()));
+  EXPECT_TRUE(std::ranges::contains(controller->GetDeskAtIndex(0)->windows(),
+                                    win1.get()));
 }
 
 // Tests that dragging and dropping window to new desk while desks bar view is
@@ -2131,8 +2125,8 @@ TEST_P(DesksTest, DragWindowAtExpandedState) {
   EXPECT_TRUE(overview_controller->InOverviewSession());
   EXPECT_EQ(3u, desks_bar_view->mini_views().size());
   EXPECT_EQ(3u, controller->desks().size());
-  EXPECT_TRUE(
-      base::Contains(controller->GetDeskAtIndex(2)->windows(), win1.get()));
+  EXPECT_TRUE(std::ranges::contains(controller->GetDeskAtIndex(2)->windows(),
+                                    win1.get()));
 }
 
 // Tests that dragging and dropping a window on the new desk button does not
@@ -2192,8 +2186,8 @@ TEST_P(DesksTest, DragWindowAtMaximumDesksState) {
   EXPECT_EQ(desks_util::GetMaxNumberOfDesks(),
             desks_bar_view->mini_views().size());
   EXPECT_EQ(desks_util::GetMaxNumberOfDesks(), controller->desks().size());
-  EXPECT_TRUE(
-      base::Contains(controller->GetDeskAtIndex(0)->windows(), win1.get()));
+  EXPECT_TRUE(std::ranges::contains(controller->GetDeskAtIndex(0)->windows(),
+                                    win1.get()));
 }
 
 TEST_P(DesksTest, MruWindowTracker) {
@@ -2538,31 +2532,6 @@ TEST_P(DesksTest, MruFocusedOnDeskSwitchDualDisplay) {
   ASSERT_FALSE(win4->HasFocus());
 }
 
-// Tests that we can set a lacros profile ID on a desk and that observers get
-// notified.
-TEST_P(DesksTest, LacrosProfileId) {
-  auto* controller = DesksController::Get();
-  Desk* desk = controller->GetDeskAtIndex(0);
-
-  TestDeskObserver desk_observer;
-  desk->AddObserver(&desk_observer);
-
-  desk->SetLacrosProfileId(1001);
-  EXPECT_THAT(desk_observer.lacros_profile_id_updates(),
-              testing::ElementsAre(1001));
-
-  // Setting the same ID does not result in observer notifications.
-  desk->SetLacrosProfileId(1001);
-  EXPECT_THAT(desk_observer.lacros_profile_id_updates(),
-              testing::ElementsAre(1001));
-
-  desk->SetLacrosProfileId(2001);
-  EXPECT_THAT(desk_observer.lacros_profile_id_updates(),
-              testing::ElementsAre(1001, 2001));
-
-  desk->RemoveObserver(&desk_observer);
-}
-
 // Tests that a display can be removed during a desk switch.
 TEST_P(DesksTest, RemoveDisplayWhileSwitchingDesks) {
   auto* controller = DesksController::Get();
@@ -2572,8 +2541,8 @@ TEST_P(DesksTest, RemoveDisplayWhileSwitchingDesks) {
   UpdateDisplay("800x600,800x600");
   NewDesk();
 
-  ui::ScopedAnimationDurationScaleMode animation_scale(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode animation_scale(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   DeskSwitchAnimationWaiter desk_switch_waiter;
 
@@ -2596,8 +2565,8 @@ TEST_P(DesksTest, AddDeskWhileExitingOverview) {
   EnterOverview();
   EXPECT_TRUE(OverviewController::Get()->InOverviewSession());
 
-  ui::ScopedAnimationDurationScaleMode animation_scale(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode animation_scale(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   // Exit overview (with an animation) and immediately create a second desk.
   ExitOverview();
@@ -2800,7 +2769,7 @@ TEST_F(DesksWithMultiDisplayOverview, DropOnOtherDeskInOtherDisplay) {
   EXPECT_FALSE(win->IsVisible());
   auto* controller = DesksController::Get();
   const Desk* desk_2 = controller->GetDeskAtIndex(1);
-  EXPECT_TRUE(base::Contains(desk_2->windows(), win.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_2->windows(), win.get()));
 }
 
 // Tests that closing a desk while in overview before the overview starting
@@ -2809,8 +2778,8 @@ TEST_F(DesksWithMultiDisplayOverview, DropOnOtherDeskInOtherDisplay) {
 TEST_F(DesksWithMultiDisplayOverview, CloseDeskBeforeAnimationFinishes) {
   // We need a non-zero duration to ensure we can close the desk before the
   // animation completes.
-  ui::ScopedAnimationDurationScaleMode animation_scale(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode animation_scale(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   // Create a maximized window on Desk 1. This means that when entering
   // overview, we skip the wallpaper animation for Desk 1, so that the
@@ -2883,23 +2852,6 @@ std::vector<base::Uuid> GetDeskRestoreGuids(PrefService* user_prefs) {
     guids.emplace_back(base::Uuid::ParseLowercase(value.GetString()));
   }
   return guids;
-}
-
-// Returns the lacros profile IDs in the given `user_prefs`.
-std::vector<uint64_t> GetDeskRestoreLacrosProfileIds(PrefService* user_prefs) {
-  const base::Value::List& lacros_profile_ids_list =
-      user_prefs->GetList(prefs::kDesksLacrosProfileIdList);
-
-  std::vector<uint64_t> lacros_profile_ids;
-  for (const base::Value& value : lacros_profile_ids_list) {
-    uint64_t lacros_profile_id = 0;
-    if (base::StringToUint64(value.GetString(), &lacros_profile_id)) {
-      lacros_profile_ids.push_back(lacros_profile_id);
-    } else {
-      lacros_profile_ids.push_back(0);
-    }
-  }
-  return lacros_profile_ids;
 }
 
 class DesksEditableNamesTest : public DesksTest {
@@ -3302,7 +3254,7 @@ TEST_P(TabletModeDesksTest, Backdrops) {
                   desk_2_mini_view->GetBoundsInScreen().CenterPoint(),
                   GetEventGenerator());
   EXPECT_TRUE(overview_controller->InOverviewSession());
-  EXPECT_TRUE(base::Contains(desk_2->windows(), window.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_2->windows(), window.get()));
   EXPECT_FALSE(desk_1_backdrop_controller->backdrop_window());
   ASSERT_TRUE(desk_2_backdrop_controller->backdrop_window());
   EXPECT_FALSE(desk_2_backdrop_controller->backdrop_window()->IsVisible());
@@ -3373,8 +3325,8 @@ TEST_P(TabletModeDesksTest,
   {
     // For this test to fail the stacking test below, we need to drag and drop
     // while animations are enabled. https://crbug.com/1055732.
-    ui::ScopedAnimationDurationScaleMode normal_anim(
-        ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+    gfx::ScopedAnimationDurationScaleMode normal_anim(
+        gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
     DragItemToPoint(overview_item,
                     desk_2_mini_view->GetBoundsInScreen().CenterPoint(),
                     GetEventGenerator());
@@ -3382,7 +3334,7 @@ TEST_P(TabletModeDesksTest,
   // The backdrop should be destroyed for |desk_1|, and a new one should be
   // created for |window| in desk_2 and should be stacked below it.
   EXPECT_TRUE(overview_controller->InOverviewSession());
-  EXPECT_TRUE(base::Contains(desk_2->windows(), window.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_2->windows(), window.get()));
   EXPECT_FALSE(desk_1_backdrop_controller->backdrop_window());
   ASSERT_TRUE(desk_2_backdrop_controller->backdrop_window());
   EXPECT_FALSE(desk_1_backdrop_controller->window_having_backdrop());
@@ -3530,12 +3482,12 @@ TEST_P(
   std::unique_ptr<aura::Window> win1 = CreateTestWindow(gfx::Rect(small));
   aura::test::TestWindowDelegate win2_delegate;
   win2_delegate.set_minimum_size(big);
-  std::unique_ptr<aura::Window> win2(CreateTestWindowInShellWithDelegate(
-      &win2_delegate, /*id=*/-1, gfx::Rect(big)));
+  std::unique_ptr<aura::Window> win2(CreateTestWindowInShell(
+      {.delegate = &win2_delegate, .bounds = gfx::Rect(big)}));
   aura::test::TestWindowDelegate win3_delegate;
   win3_delegate.set_minimum_size(big);
-  std::unique_ptr<aura::Window> win3(CreateTestWindowInShellWithDelegate(
-      &win3_delegate, /*id=*/-1, gfx::Rect(big)));
+  std::unique_ptr<aura::Window> win3(CreateTestWindowInShell(
+      {.delegate = &win3_delegate, .bounds = gfx::Rect(big)}));
 
   ASSERT_TRUE(EnterOverview());
   split_view_controller()->SnapWindow(win1.get(), SnapPosition::kPrimary);
@@ -3833,8 +3785,8 @@ TEST_P(DesksTest, AutohiddenShelfAnimatesAfterDeskSwitch) {
   shelf->SetAutoHideBehavior(ShelfAutoHideBehavior::kAlways);
 
   // Enable animations so that we can make sure that they occur.
-  ui::ScopedAnimationDurationScaleMode non_zero_animation(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_animation(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   NewDesk();
 
@@ -4094,7 +4046,7 @@ class DesksPerDeskZOrderTest : public AshTestBase {
       // This is only used for multi-displays tests and will in those cases
       // represent the secondary display.
       display::Display secondary_display =
-          display::Screen::GetScreen()->GetAllDisplays().back();
+          display::Screen::Get()->GetAllDisplays().back();
 
       std::map<int, std::unique_ptr<aura::Window>> id_to_window;
       std::map<aura::Window*, int> window_to_id;
@@ -4837,7 +4789,7 @@ class DesksMultiUserTest : public NoSessionAshTestBase {
   ~DesksMultiUserTest() override = default;
 
   MultiUserWindowManager* multi_user_window_manager() {
-    return multi_user_window_manager_.get();
+    return Shell::Get()->multi_user_window_manager();
   }
   PrefService* user_1_prefs() { return user_1_prefs_; }
   PrefService* user_2_prefs() { return user_2_prefs_; }
@@ -4857,17 +4809,14 @@ class DesksMultiUserTest : public NoSessionAshTestBase {
   void TearDown() override {
     user_1_prefs_ = nullptr;
     user_2_prefs_ = nullptr;
-    multi_user_window_manager_.reset();
     NoSessionAshTestBase::TearDown();
   }
 
   void SimulateUser1Login() {
     auto account_id = SimulateUserLogin({kUser1Email}, std::nullopt,
                                         std::move(owned_user_1_prefs_));
-    multi_user_window_manager_ = MultiUserWindowManager::Create();
-    multi_user_window_manager_->SetPrimaryUser(account_id);
-    MultiUserWindowManagerImpl::Get()->SetAnimationSpeedForTest(
-        MultiUserWindowManagerImpl::ANIMATION_SPEED_DISABLED);
+    MultiUserWindowManager::Get()->SetAnimationSpeedForTest(
+        MultiUserWindowManager::ANIMATION_SPEED_DISABLED);
     GetSessionControllerClient()->SetSessionState(
         session_manager::SessionState::ACTIVE);
   }
@@ -4906,7 +4855,6 @@ class DesksMultiUserTest : public NoSessionAshTestBase {
   }
 
  private:
-  std::unique_ptr<MultiUserWindowManager> multi_user_window_manager_;
   std::unique_ptr<PrefService> owned_user_1_prefs_;
   std::unique_ptr<PrefService> owned_user_2_prefs_;
   raw_ptr<PrefService> user_1_prefs_ = nullptr;
@@ -5454,7 +5402,7 @@ TEST_P(DesksAcceleratorsTest, MoveWindowLeftRightDesk) {
   SendAccelerator(ui::VKEY_OEM_6, flags);
   EXPECT_EQ(nullptr, window_util::GetActiveWindow());
   EXPECT_TRUE(desk_1->windows().empty());
-  EXPECT_TRUE(base::Contains(desk_2->windows(), window.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_2->windows(), window.get()));
 
   // No more active windows on this desk, nothing happens.
   SendAccelerator(ui::VKEY_OEM_6, flags);
@@ -5472,7 +5420,7 @@ TEST_P(DesksAcceleratorsTest, MoveWindowLeftRightDesk) {
   SendAccelerator(ui::VKEY_OEM_4, flags);
   EXPECT_TRUE(desk_2->windows().empty());
   EXPECT_EQ(nullptr, window_util::GetActiveWindow());
-  EXPECT_TRUE(base::Contains(desk_1->windows(), window.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_1->windows(), window.get()));
 }
 
 TEST_P(DesksAcceleratorsTest, MoveWindowLeftRightDeskOverview) {
@@ -5509,7 +5457,7 @@ TEST_P(DesksAcceleratorsTest, MoveWindowLeftRightDeskOverview) {
   EXPECT_EQ(win0.get(), overview_session->GetFocusedWindow());
   SendAccelerator(ui::VKEY_OEM_6, flags);
   EXPECT_FALSE(DoesActiveDeskContainWindow(win0.get()));
-  EXPECT_TRUE(base::Contains(desk_2->windows(), win0.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_2->windows(), win0.get()));
   EXPECT_TRUE(overview_controller->InOverviewSession());
 
   // The focus ring should move to the next window if we call
@@ -5518,7 +5466,7 @@ TEST_P(DesksAcceleratorsTest, MoveWindowLeftRightDeskOverview) {
   EXPECT_EQ(win1.get(), overview_session->GetFocusedWindow());
   SendAccelerator(ui::VKEY_OEM_6, flags);
   EXPECT_FALSE(DoesActiveDeskContainWindow(win1.get()));
-  EXPECT_TRUE(base::Contains(desk_2->windows(), win1.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_2->windows(), win1.get()));
   EXPECT_TRUE(overview_controller->InOverviewSession());
 
   // Nothing is focused.
@@ -5560,8 +5508,8 @@ TEST_P(DesksAcceleratorsTest, HitAcceleratorWhenAlreadyAtEdge) {
   NewDesk();
 
   // Enable animations so that we can make sure that they occur.
-  ui::ScopedAnimationDurationScaleMode regular_animations(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode regular_animations(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   // First go right. Wait until the ending screenshot is taken.
   const int flags = ui::EF_COMMAND_DOWN;
@@ -5742,7 +5690,7 @@ class PerDeskShelfTest : public AshTestBase,
 
     views::View* item_view = view_model->view_at(index);
     const bool contained_in_visible_indices =
-        base::Contains(shelf_view->visible_views_indices(), index);
+        std::ranges::contains(shelf_view->visible_views_indices(), index);
 
     EXPECT_EQ(expected_visibility, item_view->GetVisible());
     EXPECT_EQ(expected_visibility, contained_in_visible_indices);
@@ -6615,7 +6563,7 @@ TEST_P(DesksTest, VisibleOnAllDesksMoveWindowToDeskViaDragAndDrop) {
   EXPECT_TRUE(desks_util::BelongsToActiveDesk(window.get()));
   EXPECT_EQ(1u, controller->visible_on_all_desks_windows().size());
   EXPECT_TRUE(desks_util::IsWindowVisibleOnAllWorkspaces(window.get()));
-  EXPECT_TRUE(base::Contains(desk_1->windows(), window.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_1->windows(), window.get()));
 }
 
 // Tests the behavior of a window that is visible on all desks when a user tries
@@ -6641,7 +6589,7 @@ TEST_P(DesksTest, VisibleOnAllDesksMoveWindowToDeskViaShortcuts) {
   EXPECT_FALSE(desks_util::BelongsToActiveDesk(window.get()));
   EXPECT_EQ(0u, controller->visible_on_all_desks_windows().size());
   EXPECT_FALSE(desks_util::IsWindowVisibleOnAllWorkspaces(window.get()));
-  EXPECT_TRUE(base::Contains(desk_2->windows(), window.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_2->windows(), window.get()));
 }
 
 // Tests the behavior of a window that is visible on all desks when a user tries
@@ -6664,7 +6612,7 @@ TEST_P(DesksTest, VisibleOnAllDesksMoveWindowToDeskViaContextMenu) {
   EXPECT_FALSE(desks_util::BelongsToActiveDesk(window.get()));
   EXPECT_EQ(0u, controller->visible_on_all_desks_windows().size());
   EXPECT_FALSE(desks_util::IsWindowVisibleOnAllWorkspaces(window.get()));
-  EXPECT_TRUE(base::Contains(desk_2->windows(), window.get()));
+  EXPECT_TRUE(std::ranges::contains(desk_2->windows(), window.get()));
 }
 
 // Tests that when a window that is visible on all desks is destroyed it is
@@ -6723,8 +6671,8 @@ TEST_P(DesksTest, DesksBarExitAnimation) {
   NewDesk();
 
   // Set to non-zero animation.
-  ui::ScopedAnimationDurationScaleMode animation(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode animation(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   // Enter then exit overview. When shutting down overview grid, the desk bar
   // slide animation will take over the ownership of the desk bar widget. This
@@ -7463,8 +7411,8 @@ TEST_P(DesksTest, ClickTargetLocationOfDroppedDesk) {
 
   event_generator->MoveMouseBy(0, desk_bar_view->height());
 
-  ui::ScopedAnimationDurationScaleMode normal_anim(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode normal_anim(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
   // Drop the desk and click on the mini view.
   event_generator->ReleaseLeftButton();
   EXPECT_TRUE(desk_bar_view->IsDraggingDesk());
@@ -7499,8 +7447,8 @@ TEST_P(DesksTest, DragNewDeskWhileSnappingBack) {
 
   event_generator->MoveMouseBy(0, desks_bar_view->height());
 
-  ui::ScopedAnimationDurationScaleMode normal_anim(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode normal_anim(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
 
   // Drop the desk and drag first desk.
   event_generator->ReleaseLeftButton();
@@ -7616,8 +7564,8 @@ TEST_P(DesksTest, DragMiniViewWhileRemoving) {
   LayerAnimationWaiter animation_waiter(mini_view->layer()->GetAnimator());
   {
     // This test requires animation to repro the asan failure.
-    ui::ScopedAnimationDurationScaleMode animation_scale(
-        ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+    gfx::ScopedAnimationDurationScaleMode animation_scale(
+        gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
 
     // This will trigger the mini view removal animation, and the miniview won't
     // be removed immediately.
@@ -7653,8 +7601,8 @@ TEST_P(DesksTest, FastDeskSwitches) {
   desks_controller->ActivateDesk(desks_controller->GetDeskAtIndex(3),
                                  DesksSwitchSource::kUserSwitch);
 
-  ui::ScopedAnimationDurationScaleMode normal_anim(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode normal_anim(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
 
   // Activate the first 2 desks very quickly, without waiting for screenshots to
   // be taken.
@@ -8410,8 +8358,8 @@ TEST_P(DesksCloseAllTest, ShortcutCloseAll) {
   ASSERT_EQ(2u, controller->desks().size());
   Desk* desk_1 = controller->GetDeskAtIndex(0);
   ASSERT_TRUE(desk_1->is_active());
-  ASSERT_TRUE(base::Contains(desk_1->windows(), window1.window()));
-  ASSERT_TRUE(base::Contains(desk_1->windows(), window2.window()));
+  ASSERT_TRUE(std::ranges::contains(desk_1->windows(), window1.window()));
+  ASSERT_TRUE(std::ranges::contains(desk_1->windows(), window2.window()));
 
   EnterOverview();
   auto* overview_session = OverviewController::Get()->overview_session();
@@ -8443,8 +8391,8 @@ TEST_P(DesksCloseAllTest, ShortcutUndoCloseAll) {
   ASSERT_EQ(2u, controller->desks().size());
   Desk* desk_1 = controller->GetDeskAtIndex(0);
   ASSERT_TRUE(desk_1->is_active());
-  ASSERT_TRUE(base::Contains(desk_1->windows(), window1.window()));
-  ASSERT_TRUE(base::Contains(desk_1->windows(), window2.window()));
+  ASSERT_TRUE(std::ranges::contains(desk_1->windows(), window1.window()));
+  ASSERT_TRUE(std::ranges::contains(desk_1->windows(), window2.window()));
 
   EnterOverview();
   auto* overview_session = OverviewController::Get()->overview_session();
@@ -8473,8 +8421,8 @@ TEST_P(DesksCloseAllTest, CloseActiveDeskCloseWindows) {
   ASSERT_EQ(2u, controller->desks().size());
   Desk* desk_1 = controller->GetDeskAtIndex(0);
   ASSERT_TRUE(desk_1->is_active());
-  ASSERT_TRUE(base::Contains(desk_1->windows(), window1.window()));
-  ASSERT_TRUE(base::Contains(desk_1->windows(), window2.window()));
+  ASSERT_TRUE(std::ranges::contains(desk_1->windows(), window1.window()));
+  ASSERT_TRUE(std::ranges::contains(desk_1->windows(), window2.window()));
 
   // Closes the active desk.
   RemoveDesk(desk_1, DeskCloseType::kCloseAllWindowsAndWait);
@@ -8499,8 +8447,8 @@ TEST_P(DesksCloseAllTest, ForceCloseWindows) {
   ASSERT_EQ(2u, controller->desks().size());
   Desk* desk_1 = controller->GetDeskAtIndex(0);
   ASSERT_TRUE(desk_1->is_active());
-  ASSERT_TRUE(base::Contains(desk_1->windows(), window1.window()));
-  ASSERT_TRUE(base::Contains(desk_1->windows(), window2.window()));
+  ASSERT_TRUE(std::ranges::contains(desk_1->windows(), window1.window()));
+  ASSERT_TRUE(std::ranges::contains(desk_1->windows(), window2.window()));
 
   RemoveDesk(desk_1, DeskCloseType::kCloseAllWindowsAndWait);
 
@@ -8784,7 +8732,7 @@ TEST_P(DesksCloseAllTest, ClosingWindowsHaveParent) {
   ASSERT_EQ(2u, controller->desks().size());
   Desk* desk_1 = controller->GetDeskAtIndex(0);
   ASSERT_TRUE(desk_1->is_active());
-  EXPECT_TRUE(base::Contains(desk_1->windows(), window.window()));
+  EXPECT_TRUE(std::ranges::contains(desk_1->windows(), window.window()));
 
   RemoveDesk(desk_1, DeskCloseType::kCloseAllWindowsAndWait);
 
@@ -8910,34 +8858,6 @@ TEST_P(DesksTest, DeskGuidsReorder) {
 
   EXPECT_THAT(GetDeskRestoreGuids(GetPrimaryUserPrefService()),
               testing::ElementsAre(desk1_guid, desk3_guid, desk2_guid));
-}
-
-TEST_P(DesksTest, DeskLacrosIdPrefs) {
-  NewDesk();
-  NewDesk();
-
-  auto* controller = DesksController::Get();
-  // Set some lacros profile IDs for the three desks.
-  controller->GetDeskAtIndex(0)->SetLacrosProfileId(1001);
-  controller->GetDeskAtIndex(1)->SetLacrosProfileId(2001);
-  controller->GetDeskAtIndex(2)->SetLacrosProfileId(3001);
-  EXPECT_THAT(GetDeskRestoreLacrosProfileIds(GetPrimaryUserPrefService()),
-              testing::ElementsAre(1001, 2001, 3001));
-
-  // Reorder the last two desks. We expect the prefs to update to match.
-  controller->ReorderDesk(1, 2);
-  EXPECT_THAT(GetDeskRestoreLacrosProfileIds(GetPrimaryUserPrefService()),
-              testing::ElementsAre(1001, 3001, 2001));
-
-  // Remove the first desk.
-  RemoveDesk(controller->GetDeskAtIndex(0));
-  EXPECT_THAT(GetDeskRestoreLacrosProfileIds(GetPrimaryUserPrefService()),
-              testing::ElementsAre(3001, 2001));
-
-  // Create a new desk, its lacros profile ID should default to 0.
-  NewDesk();
-  EXPECT_THAT(GetDeskRestoreLacrosProfileIds(GetPrimaryUserPrefService()),
-              testing::ElementsAre(3001, 2001, 0));
 }
 
 // Tests that windows are closed when the user interacts with the shelf.
@@ -9241,7 +9161,7 @@ class DeskBarTest : public AshTestBase,
 // Tests that `DeskTextfield` can be used outside overview.
 TEST_P(DeskBarTest, DeskTextfieldOutsideOverview) {
   auto widget =
-      TestWidgetBuilder()
+      views::test::TestWidgetBuilder()
           .SetDelegate(nullptr)
           .SetBounds(gfx::Rect(0, 0, 300, 300))
           .SetParent(Shell::GetPrimaryRootWindow())
@@ -9265,8 +9185,8 @@ TEST_P(DeskBarTest, ShutdownNoAnimation) {
 // Tests that shutting down when desk bar is alive does not crash with
 // animation.
 TEST_P(DeskBarTest, ShutdownWithAnimation) {
-  ui::ScopedAnimationDurationScaleMode animation_scale(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode animation_scale(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   OpenDeskBar();
 }
@@ -9583,8 +9503,8 @@ TEST_P(DeskBarTest, NewDeskButton) {
 
 // Tests that we can go to saved desk library directly via desk button desk bar.
 TEST_P(DeskBarTest, LibraryButton) {
-  ui::ScopedAnimationDurationScaleMode animation_scale(
-      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode animation_scale(
+      gfx::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
 
   // Add a saved desk, so that the library button can show up.
   AddSavedDeskEntry(desk_model(), base::Uuid::GenerateRandomV4(),
@@ -11465,6 +11385,18 @@ TEST_P(DesksAcceleratorsTest, DeskSwitchScreenshotMetricsRecording) {
                                     2);
   histogram_tester.ExpectBucketCount(kDeskSwitchScreenshotResultHistogramName,
                                      true, 2);
+}
+
+TEST_P(DesksTest, DeskCreationBlockedDuringKioskSession) {
+  // Enter Kiosk session.
+  TestingPrefServiceSimple local_state;
+  user_manager::UserManager::RegisterPrefs(local_state.registry());
+  user_manager::ScopedUserManager user_manager(
+      std::make_unique<user_manager::FakeUserManager>(&local_state));
+  chromeos::SetUpFakeChromeAppKioskSession();
+
+  DesksController* desks_controller = DesksController::Get();
+  ASSERT_FALSE(desks_controller->CanCreateDesks());
 }
 
 // TODO(afakhry): Add more tests:

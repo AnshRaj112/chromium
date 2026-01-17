@@ -6,7 +6,6 @@
 
 #include <set>
 
-#include "base/containers/contains.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/web_ui_controller.h"
 #include "content/public/common/content_client.h"
@@ -36,7 +35,7 @@ InternalWebUIConfig::~InternalWebUIConfig() {
 }
 
 bool IsInternalWebUI(const GURL& url) {
-  return GetInternalWebUIHostSet().contains(url.host());
+  return GetInternalWebUIHostSet().contains(url.GetHost());
 }
 
 }  // namespace content

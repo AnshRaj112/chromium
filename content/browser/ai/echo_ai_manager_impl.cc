@@ -20,8 +20,6 @@
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "third_party/blink/public/common/features_generated.h"
 #include "third_party/blink/public/mojom/ai/ai_common.mojom.h"
-#include "third_party/blink/public/mojom/ai/ai_language_model.mojom-forward.h"
-#include "third_party/blink/public/mojom/ai/ai_language_model.mojom-shared.h"
 #include "third_party/blink/public/mojom/ai/ai_language_model.mojom.h"
 
 namespace content {
@@ -174,10 +172,11 @@ void EchoAIManagerImpl::CreateLanguageModel(
     }
   }
 
-  auto return_language_model_callback = base::BindOnce(
-      &EchoAIManagerImpl::ReturnAILanguageModelCreationResult,
-      weak_ptr_factory_.GetWeakPtr(), std::move(client_remote),
-      std::move(options->sampling_params), enabled_input_types, initial_size);
+  auto return_language_model_callback =
+      base::BindOnce(&EchoAIManagerImpl::ReturnAILanguageModelCreationResult,
+                     weak_ptr_factory_.GetWeakPtr(), std::move(client_remote),
+                     std::move(options->sampling_params), enabled_input_types,
+                     std::move(options->initial_prompts), initial_size);
 
   if (!IsModelDownloadedForCurrentReciever()) {
     // Simulate downloading the model; cache state for the current receiver.
@@ -374,6 +373,7 @@ void EchoAIManagerImpl::ReturnAILanguageModelCreationResult(
         client_remote,
     blink::mojom::AILanguageModelSamplingParamsPtr sampling_params,
     base::flat_set<blink::mojom::AILanguageModelPromptType> enabled_input_types,
+    std::vector<blink::mojom::AILanguageModelPromptPtr> initial_prompts,
     uint32_t initial_input_usage) {
   mojo::PendingRemote<blink::mojom::AILanguageModel> language_model;
   auto model_sampling_params =
@@ -384,10 +384,11 @@ void EchoAIManagerImpl::ReturnAILanguageModelCreationResult(
                 optimization_guide::features::
                     GetOnDeviceModelDefaultTemperature());
 
-  mojo::MakeSelfOwnedReceiver(std::make_unique<EchoAILanguageModel>(
-                                  model_sampling_params->Clone(),
-                                  enabled_input_types, initial_input_usage),
-                              language_model.InitWithNewPipeAndPassReceiver());
+  mojo::MakeSelfOwnedReceiver(
+      std::make_unique<EchoAILanguageModel>(
+          model_sampling_params->Clone(), enabled_input_types,
+          std::move(initial_prompts), initial_input_usage),
+      language_model.InitWithNewPipeAndPassReceiver());
   client_remote->OnResult(
       std::move(language_model),
       blink::mojom::AILanguageModelInstanceInfo::New(

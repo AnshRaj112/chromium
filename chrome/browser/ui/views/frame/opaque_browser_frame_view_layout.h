@@ -63,10 +63,8 @@ class OpaqueBrowserFrameViewLayout : public views::LayoutManager {
       const std::vector<views::FrameButton>& leading_buttons,
       const std::vector<views::FrameButton>& trailing_buttons);
 
-  gfx::Rect GetBoundsForTabStripRegion(const gfx::Size& tabstrip_minimum_size,
-                                       int total_width) const;
-  gfx::Rect GetBoundsForWebAppFrameToolbar(
-      const gfx::Size& toolbar_preferred_size) const;
+  // Retrieves the given frame button, if present.
+  const views::Button* GetFrameButton(views::FrameButton which) const;
 
   // Returns the bounds of the window required to display the content area at
   // the specified bounds.
@@ -138,7 +136,7 @@ class OpaqueBrowserFrameViewLayout : public views::LayoutManager {
  protected:
   // Whether a specific button should be inserted on the leading or trailing
   // side.
-  enum ButtonAlignment { ALIGN_LEADING, ALIGN_TRAILING };
+  enum class ButtonAlignment { kAlignLeading, kAlignTrailing };
 
   struct TopAreaPadding {
     int leading;
@@ -180,6 +178,8 @@ class OpaqueBrowserFrameViewLayout : public views::LayoutManager {
   int minimum_size_for_buttons_ = 0;
 
  private:
+  friend class OpaqueBrowserFrameViewLayoutTest;
+
   // Layout various sub-components of this view.
   void LayoutWindowControls();
   void LayoutTitleBar();

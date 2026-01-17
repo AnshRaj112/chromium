@@ -32,7 +32,7 @@ namespace autofill {
 
 using base::android::ConvertJavaStringToUTF8;
 using base::android::ConvertUTF8ToJavaString;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 using base::android::ToJavaArrayOfStrings;
 using base::android::ToJavaIntArray;
@@ -91,7 +91,7 @@ static AutofillAddressEditorUiInfoAndroid
 JNI_AutofillProfileBridge_GetAddressEditorUiInfo(JNIEnv* env,
                                                  std::string& country_code,
                                                  std::string& language_code,
-                                                 jint j_validation_type) {
+                                                 int32_t j_validation_type) {
   std::string best_language_tag;
   Localization localization;
   localization.SetGetter(l10n_util::GetStringUTF8);
@@ -132,3 +132,5 @@ JNI_AutofillProfileBridge_GetAddressEditorUiInfo(JNIEnv* env,
 }
 
 }  // namespace autofill
+
+DEFINE_JNI(AutofillProfileBridge)

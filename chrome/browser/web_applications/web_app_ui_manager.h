@@ -22,7 +22,7 @@
 #include "components/webapps/browser/install_result_code.h"
 #include "components/webapps/browser/uninstall_result_code.h"
 #include "components/webapps/common/web_app_id.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 
 class Browser;
 class BrowserWindow;
@@ -122,10 +122,16 @@ class WebAppUiManager {
       const webapps::AppId& app_id,
       const base::CommandLine& command_line,
       const base::FilePath& current_directory,
-      const std::optional<GURL>& url_handler_launch_url,
       const std::optional<GURL>& protocol_handler_launch_url,
       const std::optional<GURL>& file_launch_url,
       const std::vector<base::FilePath>& launch_files);
+
+  // Triggers the install not supported dialog when a user attempts to install
+  // a web app from off-the-record profiles. Used for the Web Install API.
+  static void TriggerInstallNotSupportedDialog(
+      content::WebContents* web_contents,
+      Profile* profile,
+      base::OnceClosure callback);
 
   WebAppUiManager();
   virtual ~WebAppUiManager();
@@ -266,6 +272,7 @@ class WebAppUiManager {
       std::unique_ptr<webapps::MlInstallOperationTracker> tracker,
       const GURL& install_url,
       const std::optional<GURL>& manifest_id,
+      const GURL& last_committed_url,
       InstallCallback callback) = 0;
 
   using WebInstallAppLaunchAcceptanceCallback =

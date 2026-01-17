@@ -8,6 +8,7 @@
 #include "components/safe_browsing/buildflags.h"
 #include "components/safe_browsing/content/renderer/phishing_classifier/phishing_visual_feature_extractor.h"
 #include "components/safe_browsing/content/renderer/phishing_classifier/scorer.h"
+#include "components/safe_browsing/core/common/features.h"
 #include "content/public/renderer/render_frame.h"
 #include "third_party/blink/public/platform/web_url.h"
 #include "third_party/blink/public/platform/web_url_request.h"
@@ -15,6 +16,7 @@
 #include "third_party/blink/public/web/web_document_loader.h"
 #include "third_party/blink/public/web/web_local_frame.h"
 #include "third_party/blink/public/web/web_view.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
 
 namespace safe_browsing {
 
@@ -30,8 +32,8 @@ PhishingImageEmbedder::~PhishingImageEmbedder() {
 }
 
 void PhishingImageEmbedder::BeginImageEmbedding(DoneCallback done_callback) {
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN0("safe_browsing", "PhishingImageEmbedding",
-                                    this);
+  TRACE_EVENT_BEGIN("safe_browsing", "PhishingImageEmbedding",
+                    perfetto::Track::FromPointer(this));
   DCHECK(is_ready());
 
   // However, in an opt build, we will go ahead and clean up the pending
@@ -74,7 +76,8 @@ void PhishingImageEmbedder::CancelPendingImageEmbedding() {
 
 void PhishingImageEmbedder::OnImageEmbeddingDone(
     ImageFeatureEmbedding image_feature_embedding) {
-  if (image_feature_embedding.embedding_value_size() > 0) {
+  if (!base::FeatureList::IsEnabled(kClientSideDetectionDeprecateDOMModel) &&
+      image_feature_embedding.embedding_value_size() > 0) {
     Scorer* scorer = ScorerStorage::GetInstance()->GetScorer();
     image_feature_embedding.set_embedding_model_version(
         scorer->image_embedding_tflite_model_version());
@@ -84,8 +87,8 @@ void PhishingImageEmbedder::OnImageEmbeddingDone(
 
 void PhishingImageEmbedder::RunCallback(
     const ImageFeatureEmbedding& image_feature_embedding) {
-  TRACE_EVENT_NESTABLE_ASYNC_END0("safe_browsing", "PhishingImageEmbedding",
-                                  this);
+  TRACE_EVENT_END("safe_browsing", /* PhishingImageEmbedding */
+                  perfetto::Track::FromPointer(this));
   std::move(done_callback_).Run(image_feature_embedding);
   Clear();
 }

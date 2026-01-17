@@ -10,6 +10,7 @@
 #include "chrome/browser/login_detection/login_detection_util.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
+#include "components/password_manager/core/browser/password_manager_metrics_util.h"
 #include "components/ukm/test_ukm_recorder.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/web_contents.h"
@@ -68,6 +69,14 @@ TEST_F(LoginDetectionTabHelperTest, NoLogin) {
   VerifyLoginDetectionTypeMetrics(LoginDetectionType::kNoLogin);
 }
 
+TEST_F(LoginDetectionTabHelperTest,
+       NoLogin_BrowserAssistedLoginHistogramNotRecorded) {
+  NavigateAndCommit(GURL("https://foo.com/page.html"));
+  VerifyLoginDetectionTypeMetrics(LoginDetectionType::kNoLogin);
+  histogram_tester_->ExpectTotalCount(
+      "PasswordManager.BrowserAssistedLogin.Type", 0);
+}
+
 TEST_F(LoginDetectionTabHelperTest, SimpleOAuthLogin) {
   NavigateAndCommit(GURL("https://foo.com/page.html"));
   VerifyLoginDetectionTypeMetrics(LoginDetectionType::kNoLogin);
@@ -81,6 +90,10 @@ TEST_F(LoginDetectionTabHelperTest, SimpleOAuthLogin) {
   ResetMetricsTesters();
   NavigateAndCommit(GURL("https://foo.com/redirect?code=secret"));
   VerifyLoginDetectionTypeMetrics(LoginDetectionType::kOauthFirstTimeLoginFlow);
+  histogram_tester_->ExpectUniqueSample(
+      "PasswordManager.BrowserAssistedLogin.Type",
+      password_manager::metrics_util::BrowserAssistedLoginType::kNonFedCmOAuth,
+      1);
 }
 
 TEST_F(LoginDetectionTabHelperTest, NavigationToOAuthLoggedInSite) {

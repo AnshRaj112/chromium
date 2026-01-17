@@ -12,6 +12,8 @@ namespace updater {
 // App ids.
 inline constexpr char kUpdaterAppId[] = UPDATER_APPID;
 inline constexpr char kQualificationAppId[] = QUALIFICATION_APPID;
+inline constexpr char kPlatformExperienceHelperAppId[] =
+    PLATFORM_EXPERIENCE_HELPER_APPID;
 
 // Environment variables.
 inline constexpr char kUsageStatsEnabled[] =
@@ -19,6 +21,9 @@ inline constexpr char kUsageStatsEnabled[] =
 inline constexpr char kUsageStatsEnabledValueEnabled[] = "1";
 
 inline constexpr char kSetupMutex[] = SETUP_MUTEX;
+
+// The value of `request.updater` sent to the update server.
+inline constexpr char kProdId[] = PRODUCT_FULLNAME_STRING;
 
 }  // namespace updater
 

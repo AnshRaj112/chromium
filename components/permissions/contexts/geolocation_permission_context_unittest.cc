@@ -49,6 +49,7 @@
 #include "components/permissions/permission_util.h"
 #include "components/permissions/resolvers/content_setting_permission_resolver.h"
 #include "components/permissions/resolvers/geolocation_permission_resolver.h"
+#include "components/permissions/resolvers/permission_resolver.h"
 #include "components/permissions/test/mock_permission_prompt_factory.h"
 #include "components/permissions/test/permission_test_util.h"
 #include "components/permissions/test/test_permissions_client.h"
@@ -59,6 +60,7 @@
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/permission_controller.h"
 #include "content/public/browser/permission_descriptor_util.h"
+#include "content/public/browser/permission_result.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/mock_render_process_host.h"
@@ -71,13 +73,16 @@
 #include "services/device/public/cpp/geolocation/buildflags.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/public/common/permissions/permission_utils.h"
+#include "third_party/blink/public/mojom/permissions/permission.mojom.h"
 #include "url/origin.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "components/location/android/location_settings_dialog_outcome.h"
 #include "components/location/android/mock_location_settings.h"
+#include "components/permissions/android/android_permission_util.h"
 #include "components/permissions/contexts/geolocation_permission_context_android.h"
 #include "components/prefs/pref_service.h"
+#include "ui/android/window_android.h"
 #endif
 
 #if BUILDFLAG(OS_LEVEL_GEOLOCATION_PERMISSION_SUPPORTED)
@@ -139,7 +144,8 @@ class TestGeolocationPermissionContextDelegate
 
 class GeolocationPermissionContextTests
     : public content::RenderViewHostTestHarness,
-      public permissions::Observer {
+      public permissions::Observer,
+      public testing::WithParamInterface<bool> {
  public:
   GeolocationPermissionContextTests();
 
@@ -167,7 +173,7 @@ class GeolocationPermissionContextTests
       const GURL& requesting_origin);
 
   void PermissionResponse(const PermissionRequestID& id,
-                          PermissionStatus permission_status);
+                          content::PermissionResult permission_result);
   void CheckPermissionMessageSent(int request_id, bool allowed);
   void CheckPermissionMessageSentForTab(int tab, int request_id, bool allowed);
   void CheckPermissionMessageSentInternal(MockRenderProcessHost* process,
@@ -183,6 +189,13 @@ class GeolocationPermissionContextTests
                            const ContentSettingsPattern& secondary_pattern,
                            ContentSettingsTypeSet content_type_set) override;
 
+  ContentSettingsType GetGeolocationContentSettingsType() {
+    return base::FeatureList::IsEnabled(
+               content_settings::features::kApproximateGeolocationPermission)
+               ? ContentSettingsType::GEOLOCATION_WITH_OPTIONS
+               : ContentSettingsType::GEOLOCATION;
+  }
+
 #if BUILDFLAG(IS_ANDROID)
   bool RequestPermissionIsLSDShown(const GURL& origin);
   bool RequestPermissionIsLSDShownWithPermissionPrompt(const GURL& origin);
@@ -190,9 +203,10 @@ class GeolocationPermissionContextTests
 #endif
   void RequestManagerDocumentLoadCompleted();
   void RequestManagerDocumentLoadCompleted(content::WebContents* web_contents);
-  ContentSetting GetGeolocationContentSetting(GURL frame_0, GURL frame_1);
-  void SetGeolocationContentSetting(GURL frame_0,
-                                    GURL frame_1,
+  void ExpectGeolocationPermissionSettingAsk(const GURL& frame_0,
+                                             const GURL& frame_1);
+  void SetGeolocationContentSetting(const GURL& frame_0,
+                                    const GURL& frame_1,
                                     ContentSetting content_setting);
   bool HasActivePrompt();
   bool HasActivePrompt(content::WebContents* web_contents);
@@ -222,19 +236,24 @@ class GeolocationPermissionContextTests
 
   // A map between renderer child id and a pair represending the bridge id and
   // whether the requested permission was allowed.
-  std::map<int, std::pair<PermissionRequestID::RequestLocalId, bool>>
+  std::map<content::ChildProcessId,
+           std::pair<PermissionRequestID::RequestLocalId, bool>>
       responses_;
   int num_permission_updates_ = 0;
   raw_ptr<ContentSettingsPattern> expected_primary_pattern_ = nullptr;
   raw_ptr<ContentSettingsPattern> expected_secondary_pattern_ = nullptr;
+  std::vector<std::string> events_;
 
   base::test::ScopedFeatureList feature_list_;
 };
 
 GeolocationPermissionContextTests::GeolocationPermissionContextTests() {
+  feature_list_.InitWithFeatureStates({
 #if BUILDFLAG(IS_WIN)
-  feature_list_.InitAndEnableFeature(::features::kWinSystemLocationPermission);
+      {::features::kWinSystemLocationPermission, true},
 #endif  // BUILDFLAG(IS_WIN)
+      {content_settings::features::kApproximateGeolocationPermission,
+       GetParam()}});
 }
 
 PermissionRequestID GeolocationPermissionContextTests::RequestID(
@@ -257,13 +276,21 @@ void GeolocationPermissionContextTests::RequestGeolocationPermission(
     const GURL& requesting_frame,
     bool user_gesture,
     bool embedded_permission_element_initiated) {
-  std::unique_ptr<permissions::PermissionRequestData> request_data =
-      std::make_unique<permissions::PermissionRequestData>(
-          std::make_unique<ContentSettingPermissionResolver>(
-              ContentSettingsType::GEOLOCATION),
-          id, user_gesture, requesting_frame);
-  request_data->embedded_permission_element_initiated =
-      embedded_permission_element_initiated;
+  std::unique_ptr<PermissionResolver> resolver =
+      base::FeatureList::IsEnabled(
+          content_settings::features::kApproximateGeolocationPermission)
+          ? std::unique_ptr<PermissionResolver>(
+                std::make_unique<GeolocationPermissionResolver>(
+                    blink::mojom::PermissionDescriptor(
+                        blink::mojom::PermissionName::GEOLOCATION, nullptr)))
+          : std::make_unique<ContentSettingPermissionResolver>(
+                ContentSettingsType::GEOLOCATION);
+  auto request_data = std::make_unique<permissions::PermissionRequestData>(
+      std::move(resolver), id, user_gesture, requesting_frame);
+  if (embedded_permission_element_initiated) {
+    request_data->embedded_permission_request_descriptor =
+        blink::mojom::EmbeddedPermissionRequestDescriptor::New();
+  }
   geolocation_permission_context_->RequestPermission(
       std::move(request_data),
       base::BindOnce(&GeolocationPermissionContextTests::PermissionResponse,
@@ -294,12 +321,13 @@ GeolocationPermissionContextTests::GetPermissionStatus(
 
 void GeolocationPermissionContextTests::PermissionResponse(
     const PermissionRequestID& id,
-    PermissionStatus permission_status) {
+    content::PermissionResult permission_result) {
   LOG(ERROR) << "GeolocationPermissionContextTests::PermissionResponse "
-             << id.ToString() << " " << permission_status;
+             << id.ToString() << " " << permission_result.status;
   responses_[id.global_render_frame_host_id().child_id] =
       std::make_pair(id.request_local_id_for_testing(),
-                     permission_status == PermissionStatus::GRANTED);
+                     permission_result.status == PermissionStatus::GRANTED);
+  events_.push_back("PermissionResponse");
 }
 
 void GeolocationPermissionContextTests::OnPermissionChanged(
@@ -310,8 +338,9 @@ void GeolocationPermissionContextTests::OnPermissionChanged(
   EXPECT_TRUE(secondary_pattern.IsValid());
   EXPECT_EQ(*expected_primary_pattern_, primary_pattern);
   EXPECT_EQ(*expected_secondary_pattern_, secondary_pattern);
-  EXPECT_EQ(content_type_set.GetType(), ContentSettingsType::GEOLOCATION);
+  EXPECT_EQ(content_type_set.GetType(), GetGeolocationContentSettingsType());
   num_permission_updates_++;
+  events_.push_back("OnPermissionChanged");
 }
 
 void GeolocationPermissionContextTests::CheckPermissionMessageSent(
@@ -334,11 +363,11 @@ void GeolocationPermissionContextTests::CheckPermissionMessageSentInternal(
     MockRenderProcessHost* process,
     int request_id,
     bool allowed) {
-  ASSERT_EQ(responses_.count(process->GetDeprecatedID()), 1U);
+  ASSERT_EQ(responses_.count(process->GetID()), 1U);
   EXPECT_EQ(PermissionRequestID::RequestLocalId(request_id),
-            responses_[process->GetDeprecatedID()].first);
-  EXPECT_EQ(allowed, responses_[process->GetDeprecatedID()].second);
-  responses_.erase(process->GetDeprecatedID());
+            responses_[process->GetID()].first);
+  EXPECT_EQ(allowed, responses_[process->GetID()].second);
+  responses_.erase(process->GetID());
 }
 
 void GeolocationPermissionContextTests::AddNewTab(const GURL& url) {
@@ -356,11 +385,11 @@ void GeolocationPermissionContextTests::CheckTabContentsState(
   auto* content_settings =
       content_settings::PageSpecificContentSettings::GetForFrame(
           web_contents()->GetPrimaryMainFrame());
-  EXPECT_TRUE(
-      expected_content_setting == CONTENT_SETTING_BLOCK
-          ? content_settings->IsContentBlocked(ContentSettingsType::GEOLOCATION)
-          : content_settings->IsContentAllowed(
-                ContentSettingsType::GEOLOCATION));
+  EXPECT_TRUE(expected_content_setting == CONTENT_SETTING_BLOCK
+                  ? content_settings->IsContentBlocked(
+                        GetGeolocationContentSettingsType())
+                  : content_settings->IsContentAllowed(
+                        GetGeolocationContentSettingsType()));
 }
 
 std::unique_ptr<content::BrowserContext>
@@ -419,17 +448,9 @@ void GeolocationPermissionContextTests::SetUp() {
 
   PermissionManager* permission_manager = static_cast<PermissionManager*>(
       browser_context()->GetPermissionControllerDelegate());
-#if BUILDFLAG(IS_ANDROID)
-  permission_manager->PermissionContextsForTesting()
-      [base::FeatureList::IsEnabled(
-           content_settings::features::kApproximateGeolocationPermission)
-           ? ContentSettingsType::GEOLOCATION_WITH_OPTIONS
-           : ContentSettingsType::GEOLOCATION] = std::move(context);
-#else
   permission_manager
-      ->PermissionContextsForTesting()[ContentSettingsType::GEOLOCATION] =
+      ->PermissionContextsForTesting()[GetGeolocationContentSettingsType()] =
       std::move(context);
-#endif
 }
 
 void GeolocationPermissionContextTests::TearDown() {
@@ -493,22 +514,44 @@ void GeolocationPermissionContextTests::RequestManagerDocumentLoadCompleted(
       ->DocumentOnLoadCompletedInPrimaryMainFrame();
 }
 
-ContentSetting GeolocationPermissionContextTests::GetGeolocationContentSetting(
-    GURL frame_0,
-    GURL frame_1) {
-  return PermissionsClient::Get()
-      ->GetSettingsMap(browser_context())
-      ->GetContentSetting(frame_0, frame_1, ContentSettingsType::GEOLOCATION);
+void GeolocationPermissionContextTests::ExpectGeolocationPermissionSettingAsk(
+    const GURL& frame_0,
+    const GURL& frame_1) {
+  PermissionSetting permission_setting =
+      PermissionsClient::Get()
+          ->GetSettingsMap(browser_context())
+          ->GetPermissionSetting(frame_0, frame_1,
+                                 GetGeolocationContentSettingsType());
+  if (auto* content_setting =
+          std::get_if<ContentSetting>(&permission_setting)) {
+    EXPECT_EQ(CONTENT_SETTING_ASK, *content_setting);
+  } else if (auto* geolocation_setting =
+                 std::get_if<GeolocationSetting>(&permission_setting)) {
+    EXPECT_EQ(
+        (GeolocationSetting{PermissionOption::kAsk, PermissionOption::kAsk}),
+        *geolocation_setting);
+  } else {
+    NOTREACHED();
+  }
 }
 
 void GeolocationPermissionContextTests::SetGeolocationContentSetting(
-    GURL frame_0,
-    GURL frame_1,
+    const GURL& frame_0,
+    const GURL& frame_1,
     ContentSetting content_setting) {
+  PermissionSetting permission_setting = content_setting;
+  if (GetGeolocationContentSettingsType() ==
+      ContentSettingsType::GEOLOCATION_WITH_OPTIONS) {
+    permission_setting = GeolocationSetting{
+        .approximate = content_settings::ToPermissionOption(content_setting),
+        .precise = content_settings::ToPermissionOption(content_setting),
+    };
+  }
   return PermissionsClient::Get()
       ->GetSettingsMap(browser_context())
-      ->SetContentSettingDefaultScope(
-          frame_0, frame_1, ContentSettingsType::GEOLOCATION, content_setting);
+      ->SetPermissionSettingDefaultScope(frame_0, frame_1,
+                                         GetGeolocationContentSettingsType(),
+                                         permission_setting);
 }
 
 bool GeolocationPermissionContextTests::HasActivePrompt() {
@@ -559,7 +602,7 @@ std::u16string GeolocationPermissionContextTests::GetPromptText() {
   PermissionRequestManager* manager =
       PermissionRequestManager::FromWebContents(web_contents());
   auto& request = manager->Requests().front();
-#if BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
   return request
       ->GetDialogAnnotatedMessageText(
           /*embedding_origin=*/request->requesting_origin())
@@ -567,12 +610,12 @@ std::u16string GeolocationPermissionContextTests::GetPromptText() {
 #else
   return base::ASCIIToUTF16(request->requesting_origin().spec()) +
          request->GetMessageTextFragment();
-#endif
+#endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
 }
 
 // Tests ----------------------------------------------------------------------
 
-TEST_F(GeolocationPermissionContextTests, SinglePermissionPrompt) {
+TEST_P(GeolocationPermissionContextTests, SinglePermissionPrompt) {
   GURL requesting_frame("https://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
   RequestManagerDocumentLoadCompleted();
@@ -582,7 +625,7 @@ TEST_F(GeolocationPermissionContextTests, SinglePermissionPrompt) {
   ASSERT_TRUE(HasActivePrompt());
 }
 
-TEST_F(GeolocationPermissionContextTests,
+TEST_P(GeolocationPermissionContextTests,
        SinglePermissionPromptFailsOnInsecureOrigin) {
   GURL requesting_frame("http://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
@@ -595,7 +638,7 @@ TEST_F(GeolocationPermissionContextTests,
 
 #if BUILDFLAG(IS_ANDROID)
 // Tests concerning Android location settings permission
-TEST_F(GeolocationPermissionContextTests, GeolocationEnabledDisabled) {
+TEST_P(GeolocationPermissionContextTests, GeolocationEnabledDisabled) {
   GURL requesting_frame("https://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
   RequestManagerDocumentLoadCompleted();
@@ -624,7 +667,7 @@ TEST_F(GeolocationPermissionContextTests, GeolocationEnabledDisabled) {
   EXPECT_FALSE(HasActivePrompt());
 }
 
-TEST_F(GeolocationPermissionContextTests, AndroidEnabledCanPromptAndAccept) {
+TEST_P(GeolocationPermissionContextTests, AndroidEnabledCanPromptAndAccept) {
   GURL requesting_frame("https://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
   RequestManagerDocumentLoadCompleted();
@@ -643,7 +686,7 @@ TEST_F(GeolocationPermissionContextTests, AndroidEnabledCanPromptAndAccept) {
   CheckPermissionMessageSent(0, true);
 }
 
-TEST_F(GeolocationPermissionContextTests,
+TEST_P(GeolocationPermissionContextTests,
        AndroidEnabledCanPromptAndAcceptThisTime) {
   GURL requesting_frame("https://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
@@ -665,7 +708,7 @@ TEST_F(GeolocationPermissionContextTests,
   CheckPermissionMessageSent(0, true);
 }
 
-TEST_F(GeolocationPermissionContextTests, AndroidEnabledCantPrompt) {
+TEST_P(GeolocationPermissionContextTests, AndroidEnabledCantPrompt) {
   GURL requesting_frame("https://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
   RequestManagerDocumentLoadCompleted();
@@ -679,7 +722,7 @@ TEST_F(GeolocationPermissionContextTests, AndroidEnabledCantPrompt) {
   EXPECT_FALSE(HasActivePrompt());
 }
 
-TEST_F(GeolocationPermissionContextTests, SystemLocationOffLSDDisabled) {
+TEST_P(GeolocationPermissionContextTests, SystemLocationOffLSDDisabled) {
   GURL requesting_frame("https://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
   RequestManagerDocumentLoadCompleted();
@@ -693,7 +736,7 @@ TEST_F(GeolocationPermissionContextTests, SystemLocationOffLSDDisabled) {
   EXPECT_FALSE(MockLocationSettings::HasShownLocationSettingsDialog());
 }
 
-TEST_F(GeolocationPermissionContextTests, SystemLocationOnNoLSD) {
+TEST_P(GeolocationPermissionContextTests, SystemLocationOnNoLSD) {
   GURL requesting_frame("https://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
   RequestManagerDocumentLoadCompleted();
@@ -706,7 +749,7 @@ TEST_F(GeolocationPermissionContextTests, SystemLocationOnNoLSD) {
   EXPECT_FALSE(MockLocationSettings::HasShownLocationSettingsDialog());
 }
 
-TEST_F(GeolocationPermissionContextTests, SystemLocationOffLSDAccept) {
+TEST_P(GeolocationPermissionContextTests, SystemLocationOffLSDAccept) {
   GURL requesting_frame("https://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
   RequestManagerDocumentLoadCompleted();
@@ -725,7 +768,7 @@ TEST_F(GeolocationPermissionContextTests, SystemLocationOffLSDAccept) {
   EXPECT_TRUE(MockLocationSettings::HasShownLocationSettingsDialog());
 }
 
-TEST_F(GeolocationPermissionContextTests, SystemLocationOffLSDReject) {
+TEST_P(GeolocationPermissionContextTests, SystemLocationOffLSDReject) {
   GURL requesting_frame("https://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
   RequestManagerDocumentLoadCompleted();
@@ -744,7 +787,7 @@ TEST_F(GeolocationPermissionContextTests, SystemLocationOffLSDReject) {
   EXPECT_TRUE(MockLocationSettings::HasShownLocationSettingsDialog());
 }
 
-TEST_F(GeolocationPermissionContextTests, LSDBackOffDifferentSites) {
+TEST_P(GeolocationPermissionContextTests, LSDBackOffDifferentSites) {
   GURL requesting_frame_1("https://www.example.com/geolocation");
   GURL requesting_frame_2("https://www.example-2.com/geolocation");
   GURL requesting_frame_dse("https://www.dse.com/geolocation");
@@ -789,7 +832,7 @@ TEST_F(GeolocationPermissionContextTests, LSDBackOffDifferentSites) {
   EXPECT_FALSE(RequestPermissionIsLSDShown(requesting_frame_dse));
 }
 
-TEST_F(GeolocationPermissionContextTests, LSDBackOffTiming) {
+TEST_P(GeolocationPermissionContextTests, LSDBackOffTiming) {
   GURL requesting_frame("https://www.example.com/geolocation");
   SetGeolocationContentSetting(requesting_frame, requesting_frame,
                                CONTENT_SETTING_ALLOW);
@@ -848,7 +891,7 @@ TEST_F(GeolocationPermissionContextTests, LSDBackOffTiming) {
   EXPECT_FALSE(RequestPermissionIsLSDShown(requesting_frame));
 }
 
-TEST_F(GeolocationPermissionContextTests, LSDBackOffPermissionStatus) {
+TEST_P(GeolocationPermissionContextTests, LSDBackOffPermissionStatus) {
   GURL requesting_frame("https://www.example.com/geolocation");
   SetGeolocationContentSetting(requesting_frame, requesting_frame,
                                CONTENT_SETTING_ALLOW);
@@ -878,7 +921,7 @@ TEST_F(GeolocationPermissionContextTests, LSDBackOffPermissionStatus) {
       GetPermissionStatus(geolocation_permission_descriptor, requesting_frame));
 }
 
-TEST_F(GeolocationPermissionContextTests, LSDBackOffAskPromptsDespiteBackOff) {
+TEST_P(GeolocationPermissionContextTests, LSDBackOffAskPromptsDespiteBackOff) {
   GURL requesting_frame("https://www.example.com/geolocation");
   SetGeolocationContentSetting(requesting_frame, requesting_frame,
                                CONTENT_SETTING_ALLOW);
@@ -909,7 +952,7 @@ TEST_F(GeolocationPermissionContextTests, LSDBackOffAskPromptsDespiteBackOff) {
       RequestPermissionIsLSDShownWithPermissionPrompt(requesting_frame));
 }
 
-TEST_F(GeolocationPermissionContextTests,
+TEST_P(GeolocationPermissionContextTests,
        LSDBackOffAcceptPermissionResetsBackOff) {
   GURL requesting_frame("https://www.example.com/geolocation");
   SetGeolocationContentSetting(requesting_frame, requesting_frame,
@@ -949,7 +992,7 @@ TEST_F(GeolocationPermissionContextTests,
   EXPECT_TRUE(RequestPermissionIsLSDShown(requesting_frame));
 }
 
-TEST_F(GeolocationPermissionContextTests, LSDBackOffAcceptLSDResetsBackOff) {
+TEST_P(GeolocationPermissionContextTests, LSDBackOffAcceptLSDResetsBackOff) {
   GURL requesting_frame("https://www.example.com/geolocation");
   SetGeolocationContentSetting(requesting_frame, requesting_frame,
                                CONTENT_SETTING_ALLOW);
@@ -986,17 +1029,22 @@ TEST_F(GeolocationPermissionContextTests, LSDBackOffAcceptLSDResetsBackOff) {
 
 // Test that LSD won't be shown if there is an embedded permission
 // element in progress that will trigger LSD when finished.
-TEST_F(GeolocationPermissionContextTests,
+TEST_P(GeolocationPermissionContextTests,
        SystemLocationDelayedUntilPepcRequestResolved) {
   GURL requesting_frame("https://www.example.com/geolocation");
   NavigateAndCommit(requesting_frame);
   RequestManagerDocumentLoadCompleted();
+  std::unique_ptr<ui::WindowAndroid::ScopedWindowAndroidForTesting> window =
+      ui::WindowAndroid::CreateForTesting();
+  window.get()->get()->AddChild(web_contents()->GetNativeView());
   MockLocationSettings::SetLocationStatus(
       /*has_android_coarse_location_permission=*/false,
       /*has_android_fine_location_permission=*/false,
       /*is_system_location_setting_enabled=*/true);
   MockLocationSettings::SetCanPromptForAndroidPermission(true);
-
+  SetGeolocationContentSetting(requesting_frame, requesting_frame,
+                               CONTENT_SETTING_ALLOW);
+  auto system_location_setting = EnableSystemLocationSettingForTesting();
   EXPECT_FALSE(HasActivePrompt());
   RequestGeolocationPermission(RequestID(0), requesting_frame, true,
                                /*embedded_permission_element_initiated=*/true);
@@ -1024,7 +1072,7 @@ TEST_F(GeolocationPermissionContextTests,
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
-TEST_F(GeolocationPermissionContextTests, HashIsIgnored) {
+TEST_P(GeolocationPermissionContextTests, HashIsIgnored) {
   GURL url_a("https://www.example.com/geolocation#a");
   GURL url_b("https://www.example.com/geolocation#b");
 
@@ -1049,7 +1097,7 @@ TEST_F(GeolocationPermissionContextTests, HashIsIgnored) {
   CheckPermissionMessageSent(0, true);
 }
 
-TEST_F(GeolocationPermissionContextTests, DISABLED_PermissionForFileScheme) {
+TEST_P(GeolocationPermissionContextTests, DISABLED_PermissionForFileScheme) {
   // TODO(felt): The bubble is rejecting file:// permission requests.
   // Fix and enable this test. crbug.com/444047
   GURL requesting_frame("file://example/geolocation.html");
@@ -1067,14 +1115,12 @@ TEST_F(GeolocationPermissionContextTests, DISABLED_PermissionForFileScheme) {
   CheckPermissionMessageSent(0, true);
 
   // Make sure the setting is not stored.
-  EXPECT_EQ(CONTENT_SETTING_ASK,
-            GetGeolocationContentSetting(requesting_frame, requesting_frame));
+  ExpectGeolocationPermissionSettingAsk(requesting_frame, requesting_frame);
 }
 
-TEST_F(GeolocationPermissionContextTests, CancelGeolocationPermissionRequest) {
+TEST_P(GeolocationPermissionContextTests, CancelGeolocationPermissionRequest) {
   GURL frame_0("https://www.example.com/geolocation");
-  EXPECT_EQ(CONTENT_SETTING_ASK,
-            GetGeolocationContentSetting(frame_0, frame_0));
+  ExpectGeolocationPermissionSettingAsk(frame_0, frame_0);
 
   NavigateAndCommit(frame_0);
   RequestManagerDocumentLoadCompleted();
@@ -1091,11 +1137,10 @@ TEST_F(GeolocationPermissionContextTests, CancelGeolocationPermissionRequest) {
   ClosePrompt();
 
   // Ensure permission isn't persisted.
-  EXPECT_EQ(CONTENT_SETTING_ASK,
-            GetGeolocationContentSetting(frame_0, frame_0));
+  ExpectGeolocationPermissionSettingAsk(frame_0, frame_0);
 }
 
-TEST_F(GeolocationPermissionContextTests, InvalidURL) {
+TEST_P(GeolocationPermissionContextTests, InvalidURL) {
   // Navigate to the first url.
   GURL invalid_embedder("about:blank");
   GURL requesting_frame;
@@ -1109,7 +1154,7 @@ TEST_F(GeolocationPermissionContextTests, InvalidURL) {
   CheckPermissionMessageSent(0, false);
 }
 
-TEST_F(GeolocationPermissionContextTests, SameOriginMultipleTabs) {
+TEST_P(GeolocationPermissionContextTests, SameOriginMultipleTabs) {
   GURL url_a("https://www.example.com/geolocation");
   GURL url_b("https://www.example-2.com/geolocation");
   NavigateAndCommit(url_a);  // Tab A0
@@ -1138,10 +1183,9 @@ TEST_F(GeolocationPermissionContextTests, SameOriginMultipleTabs) {
   ASSERT_TRUE(HasActivePrompt(extra_tabs_[1].get()));
 }
 
-TEST_F(GeolocationPermissionContextTests, TabDestroyed) {
+TEST_P(GeolocationPermissionContextTests, TabDestroyed) {
   GURL requesting_frame("https://www.example.com/geolocation");
-  EXPECT_EQ(CONTENT_SETTING_ASK,
-            GetGeolocationContentSetting(requesting_frame, requesting_frame));
+  ExpectGeolocationPermissionSettingAsk(requesting_frame, requesting_frame);
 
   NavigateAndCommit(requesting_frame);
   RequestManagerDocumentLoadCompleted();
@@ -1150,12 +1194,11 @@ TEST_F(GeolocationPermissionContextTests, TabDestroyed) {
   RequestGeolocationPermission(RequestID(0), requesting_frame, false);
 
   ASSERT_TRUE(HasActivePrompt());
-  EXPECT_EQ(CONTENT_SETTING_ASK,
-            GetGeolocationContentSetting(requesting_frame, requesting_frame));
+  ExpectGeolocationPermissionSettingAsk(requesting_frame, requesting_frame);
 }
 
 #if BUILDFLAG(IS_ANDROID)
-TEST_F(GeolocationPermissionContextTests, GeolocationStatusAndroidDisabled) {
+TEST_P(GeolocationPermissionContextTests, GeolocationStatusAndroidDisabled) {
   GURL requesting_frame("https://www.example.com/geolocation");
   const auto geolocation_permission_descriptor = content::
       PermissionDescriptorUtil::CreatePermissionDescriptorForPermissionType(
@@ -1190,7 +1233,7 @@ TEST_F(GeolocationPermissionContextTests, GeolocationStatusAndroidDisabled) {
       GetPermissionStatus(geolocation_permission_descriptor, requesting_frame));
 }
 
-TEST_F(GeolocationPermissionContextTests, GeolocationStatusSystemDisabled) {
+TEST_P(GeolocationPermissionContextTests, GeolocationStatusSystemDisabled) {
   GURL requesting_frame("https://www.example.com/geolocation");
 
   // With the system permission off, but location allowed for a domain,
@@ -1302,7 +1345,7 @@ TEST_F(GeolocationAndroidPermissionIrregularProfileTest, DoesNotRecord) {
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(OS_LEVEL_GEOLOCATION_PERMISSION_SUPPORTED)
-TEST_F(GeolocationPermissionContextTests,
+TEST_P(GeolocationPermissionContextTests,
        AllSystemAndSitePermissionCombinations) {
   GURL requesting_frame("https://www.example.com/geolocation");
 
@@ -1346,7 +1389,7 @@ TEST_F(GeolocationPermissionContextTests,
   }
 }
 
-TEST_F(GeolocationPermissionContextTests, SystemPermissionUpdates) {
+TEST_P(GeolocationPermissionContextTests, SystemPermissionUpdates) {
   GURL requesting_frame("https://www.example.com/geolocation");
   ContentSettingsPattern primary_pattern =
       ContentSettingsPattern::FromURLNoWildcard(requesting_frame);
@@ -1368,5 +1411,35 @@ TEST_F(GeolocationPermissionContextTests, SystemPermissionUpdates) {
   geolocation_permission_context_->RemoveObserver(this);
 }
 #endif  // BUILDFLAG(OS_LEVEL_GEOLOCATION_PERMISSION_SUPPORTED)
+
+TEST_P(GeolocationPermissionContextTests, DecisionEventOrder) {
+  GURL requesting_frame("https://www.example.com/geolocation");
+  NavigateAndCommit(requesting_frame);
+  RequestManagerDocumentLoadCompleted();
+  // Clear any previous event order.
+  events_.clear();
+  ContentSettingsPattern primary_pattern =
+      ContentSettingsPattern::FromURLNoWildcard(requesting_frame);
+  ContentSettingsPattern secondary_pattern = ContentSettingsPattern::Wildcard();
+  expected_primary_pattern_ = &primary_pattern;
+  expected_secondary_pattern_ = &secondary_pattern;
+  geolocation_permission_context_->AddObserver(this);
+  RequestGeolocationPermission(RequestID(0), requesting_frame, true,
+                               /*embedded_permission_element_initiated=*/true);
+  AcceptPrompt();
+  content::RunAllTasksUntilIdle();
+  CheckPermissionMessageSent(0, true);
+  geolocation_permission_context_->RemoveObserver(this);
+
+  // Verify the order of events. OnPermissionChanged should be called before
+  // PermissionResponse.
+  ASSERT_EQ(2U, events_.size());
+  EXPECT_EQ("OnPermissionChanged", events_[0]);
+  EXPECT_EQ("PermissionResponse", events_[1]);
+}
+
+INSTANTIATE_TEST_SUITE_P(ApproximateGeolocation,
+                         GeolocationPermissionContextTests,
+                         testing::Values(true, false));
 
 }  // namespace permissions

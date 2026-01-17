@@ -10,10 +10,8 @@
 #include "ash/public/cpp/accelerators.h"
 #include "ash/public/mojom/accelerator_info.mojom-shared.h"
 #include "ash/test/ash_test_util.h"
-#include "base/containers/contains.h"
 #include "base/strings/strcat.h"
 #include "base/strings/stringprintf.h"
-#include "chromeos/ash/services/assistant/public/cpp/features.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/ui_base_features.h"
 
@@ -86,11 +84,11 @@ class AcceleratorLayoutMetadataTest : public testing::Test {
 
  protected:
   bool ShouldNotHaveLayouts(ash::AcceleratorAction action) {
-    return base::Contains(kAshAcceleratorsWithoutLayout, action);
+    return kAshAcceleratorsWithoutLayout.contains(action);
   }
 
   bool HasLayouts(ash::AcceleratorAction action) {
-    return base::Contains(ash_accelerator_with_layouts_, action);
+    return ash_accelerator_with_layouts_.contains(action);
   }
 
   // Ash accelerator with layouts.
@@ -144,13 +142,6 @@ TEST_F(AcceleratorLayoutMetadataTest, ModifyAcceleratorShouldUpdateLayout) {
   if (::features::IsImprovedKeyboardShortcutsEnabled()) {
     for (const AcceleratorData& data :
          ash::kEnabledWithImprovedDesksKeyboardShortcutsAcceleratorData) {
-      ash_accelerators.emplace_back(data);
-    }
-  }
-
-  if (!ash::assistant::features::IsNewEntryPointEnabled()) {
-    for (const AcceleratorData& data :
-         ash::kAssistantSearchPlusAAcceleratorData) {
       ash_accelerators.emplace_back(data);
     }
   }

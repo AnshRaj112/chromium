@@ -14,19 +14,22 @@
 #include "chrome/browser/enterprise/connectors/reporting/realtime_reporting_client.h"
 #include "chrome/browser/enterprise/connectors/reporting/realtime_reporting_client_factory.h"
 #include "chrome/browser/enterprise/connectors/test/deep_scanning_test_utils.h"
-#include "chrome/browser/extensions/api/safe_browsing_private/safe_browsing_private_event_router.h"
-#include "chrome/browser/extensions/api/safe_browsing_private/safe_browsing_private_event_router_factory.h"
 #include "chrome/browser/policy/dm_token_utils.h"
 #include "chrome/browser/printing/print_preview_test.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "components/enterprise/buildflags/buildflags.h"
+#include "components/enterprise/connectors/core/cloud_content_scanning/common.h"
 #include "components/enterprise/connectors/core/reporting_constants.h"
 #include "components/policy/core/common/cloud/mock_cloud_policy_client.h"
 #include "components/signin/public/identity_manager/identity_test_environment.h"
 #include "content/public/test/browser_task_environment.h"
 #include "printing/printing_features.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+#if BUILDFLAG(IS_LINUX)
+#include "components/dbus/thread_linux/dbus_thread_linux.h"
+#endif
 
 #if BUILDFLAG(ENTERPRISE_LOCAL_CONTENT_ANALYSIS)
 #include "chrome/browser/enterprise/connectors/test/fake_content_analysis_sdk_manager.h"  // nogncheck
@@ -136,7 +139,7 @@ class TestPagePrintRequestHandler
   static std::unique_ptr<PagePrintRequestHandler> Create(
       ContentAnalysisResponse::Result::TriggeredRule::Action action,
       enterprise_connectors::ContentAnalysisInfo* content_analysis_info,
-      safe_browsing::BinaryUploadService* upload_service,
+      enterprise_connectors::BinaryUploadService* upload_service,
       Profile* profile,
       GURL url,
       const std::string& printer_name,
@@ -158,7 +161,7 @@ class TestPagePrintRequestHandler
       override {
     ASSERT_EQ(request->printer_name(), kPrinterName);
     OnContentAnalysisResponse(
-        safe_browsing::BinaryUploadService::Result::SUCCESS,
+        enterprise_connectors::ScanRequestUploadResult::kSuccess,
         CreateResponse(action_));
   }
 
@@ -184,13 +187,6 @@ class PrintContentAnalysisUtilsTest
 
     client_ = std::make_unique<policy::MockCloudPolicyClient>();
 
-    extensions::SafeBrowsingPrivateEventRouterFactory::GetInstance()
-        ->SetTestingFactory(
-            profile(),
-            base::BindRepeating([](content::BrowserContext* context) {
-              return std::unique_ptr<KeyedService>(
-                  new extensions::SafeBrowsingPrivateEventRouter(context));
-            }));
     RealtimeReportingClientFactory::GetInstance()->SetTestingFactory(
         profile(), base::BindRepeating([](content::BrowserContext* context) {
           return std::unique_ptr<KeyedService>(
@@ -200,7 +196,7 @@ class PrintContentAnalysisUtilsTest
     RealtimeReportingClientFactory::GetForProfile(profile())
         ->SetBrowserCloudPolicyClientForTesting(client_.get());
     identity_test_environment_.MakePrimaryAccountAvailable(
-        kUserName, signin::ConsentLevel::kSync);
+        kUserName, signin::ConsentLevel::kSignin);
     RealtimeReportingClientFactory::GetForProfile(profile())
         ->SetIdentityManagerForTesting(
             identity_test_environment_.identity_manager());
@@ -216,6 +212,9 @@ class PrintContentAnalysisUtilsTest
         ->SetBrowserCloudPolicyClientForTesting(nullptr);
     SetDMTokenForTesting(policy::DMToken::CreateEmptyToken());
     enterprise_connectors::PagePrintRequestHandler::ResetFactoryForTesting();
+#if BUILDFLAG(IS_LINUX)
+    dbus_thread_linux::ShutdownOnDBusThreadAndBlock();
+#endif
     PrintPreviewTest::TearDown();
   }
 

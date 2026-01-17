@@ -205,8 +205,8 @@ void WebAppNavigationBrowserTest::SetUp() {
       [](const net::test_server::HttpRequest& request)
           -> std::unique_ptr<net::test_server::HttpResponse> {
         // Let the default request handlers handle redirections.
-        if (request.GetURL().path() == "/server-redirect" ||
-            request.GetURL().path() == "/client-redirect") {
+        if (request.GetURL().GetPath() == "/server-redirect" ||
+            request.GetURL().GetPath() == "/client-redirect") {
           return {};
         }
         auto response = std::make_unique<net::test_server::BasicHttpResponse>();
@@ -252,7 +252,7 @@ void WebAppNavigationBrowserTest::TearDownOnMainThread() {
   const WebAppRegistrar& registrar = provider->registrar_unsafe();
   std::vector<webapps::AppId> app_ids = registrar.GetAppIds();
   for (const auto& app_id : app_ids) {
-    if (!registrar.IsInRegistrar(app_id)) {
+    if (!registrar.GetInstallState(app_id).has_value()) {
       continue;
     }
     const WebApp* app = registrar.GetAppById(app_id);

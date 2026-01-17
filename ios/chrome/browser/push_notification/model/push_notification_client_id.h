@@ -14,6 +14,9 @@
 // PushNotificationClientManager to accurately associate the notification to the
 // desired feature.
 //
+// These values are sent to the UMA and sync servers and persisted. Do not
+// renumber or reuse existing values.
+//
 // Must be in sync with PushNotificationClientId enum in
 // tools/metrics/histograms/metadata/ios/enums.xml.
 // LINT.IfChange(PushNotificationClientId)
@@ -25,7 +28,8 @@ enum class PushNotificationClientId {
   kSafetyCheck = 5,
   kSendTab = 6,
   kReminders = 7,
-  kMaxValue = kReminders,
+  kCrossPlatformPromos = 8,
+  kMaxValue = kCrossPlatformPromos,
 };
 // LINT.ThenChange(/tools/metrics/histograms/metadata/ios/enums.xml:PushNotificationClientId)
 

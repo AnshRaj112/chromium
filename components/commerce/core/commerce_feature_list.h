@@ -6,6 +6,7 @@
 #define COMPONENTS_COMMERCE_CORE_COMMERCE_FEATURE_LIST_H_
 
 #include <string>
+#include <string_view>
 
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
@@ -38,15 +39,13 @@ extern const char kPriceInsightsShowFeedbackParam[];
 extern const base::FeatureParam<bool> kPriceInsightsShowFeedback;
 extern const char kPriceInsightsUseCacheParam[];
 extern const base::FeatureParam<bool> kPriceInsightsUseCache;
-BASE_DECLARE_FEATURE(kPriceTrackingPromo);
-BASE_DECLARE_FEATURE(kShopCard);
+BASE_DECLARE_FEATURE(kTabResumptionShopCard);
 BASE_DECLARE_FEATURE(kShopCardImpressionLimits);
 
 std::string ShopCardExperiment();
 
 BASE_DECLARE_FEATURE(kProductSpecifications);
 BASE_DECLARE_FEATURE(kProductSpecificationsClearMetadataOnNewlySupportedFields);
-BASE_DECLARE_FEATURE(kCompareConfirmationToast);
 BASE_DECLARE_FEATURE(kProductSpecificationsCache);
 
 BASE_DECLARE_FEATURE(kShoppingList);
@@ -55,16 +54,10 @@ BASE_DECLARE_FEATURE(kPriceTrackingSubscriptionServiceProductVersion);
 BASE_DECLARE_FEATURE(kShoppingPageTypes);
 BASE_DECLARE_FEATURE(kShoppingPDPMetrics);
 BASE_DECLARE_FEATURE(kSubscriptionsApi);
-BASE_DECLARE_FEATURE(kTrackByDefaultOnMobile);
 // Feature flag for showing discounts on checkout autofill.
 BASE_DECLARE_FEATURE(kDiscountAutofill);
 
 BASE_DECLARE_FEATURE(kShoppingAlternateServer);
-
-#if BUILDFLAG(IS_IOS)
-BASE_DECLARE_FEATURE(kPriceInsightsIos);
-BASE_DECLARE_FEATURE(kPriceInsightsHighPriceIos);
-#endif
 
 // Feature flag for Discounts on navigation.
 enum class DiscountDialogAutoPopupBehavior {
@@ -91,12 +84,6 @@ BASE_DECLARE_FEATURE(kRetailCoupons);
 BASE_DECLARE_FEATURE(kCommerceDeveloper);
 // Parameter for enabling feature variation of coupons with code.
 extern const char kRetailCouponsWithCodeParam[];
-
-// Feature flag for Discount user consent v2.
-BASE_DECLARE_FEATURE(kDiscountConsentV2);
-
-// Feature flag for Code-based RBD.
-BASE_DECLARE_FEATURE(kCodeBasedRBD);
 
 // Shopping list update interval.
 constexpr base::FeatureParam<base::TimeDelta>
@@ -171,15 +158,15 @@ constexpr base::FeatureParam<std::string> kCheckoutPatternMapping{
     ""};
 
 inline constexpr base::FeatureParam<std::string> kShopCardVariation{
-    &kShopCard, "ShopCardVariant", ""};
+    &kTabResumptionShopCard, "ShopCardVariant", ""};
 inline constexpr base::FeatureParam<std::string> kShopCardPosition{
-    &kShopCard, "ShopCardPosition", ""};
+    &kTabResumptionShopCard, "ShopCardPosition", ""};
 
 extern const char kShopCardArm1[];
-extern const char kShopCardArm2[];
 extern const char kShopCardArm3[];
 extern const char kShopCardArm4[];
 extern const char kShopCardArm5[];
+extern const char kShopCardArm6[];
 extern const char kShopCardFrontPosition[];
 extern const char kShopCardMaxImpressions[];
 
@@ -213,8 +200,8 @@ bool IsShoppingListAllowedForEnterprise(PrefService* prefs);
 // Check if commerce features are allowed to run for the specified country
 // and locale.
 bool IsEnabledForCountryAndLocale(const base::Feature& feature,
-                                  std::string country,
-                                  std::string locale);
+                                  std::string_view country,
+                                  std::string_view locale);
 
 // A feature check for the specified |feature|, which will return true if the
 // user has the feature flag enabled or (if applicable) is in an enabled

@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'chrome://resources/cr_elements/cr_link_row/cr_link_row.js';
 import '../settings_page/settings_section.js';
 
 import {PrefsMixin} from '/shared/settings/prefs/prefs_mixin.js';
-import {assert} from 'chrome://resources/js/assert.js';
+import {assert, assertNotReached} from 'chrome://resources/js/assert.js';
 import {OpenWindowProxyImpl} from 'chrome://resources/js/open_window_proxy.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
@@ -63,6 +64,7 @@ export class SettingsAiPageElement extends SettingsAiPageElementBase {
   declare private showHistorySearchControl_: boolean;
   declare private showTabOrganizationControl_: boolean;
   declare private showPasswordChangeControl_: boolean;
+
   private shouldRecordMetrics_: boolean = true;
   private metricsBrowserProxy_: MetricsBrowserProxy =
       MetricsBrowserProxyImpl.getInstance();
@@ -211,6 +213,8 @@ export class SettingsAiPageElement extends SettingsAiPageElementBase {
         assert(this.showTabOrganizationControl_);
         triggerId = 'tabOrganizationRowV2';
         break;
+      default:
+        assertNotReached();
     }
 
     assert(triggerId);

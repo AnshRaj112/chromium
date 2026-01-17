@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config/features.gni")
 import("//ios/web/public/js_messaging/optimize_js.gni")
 import("//ios/web/public/js_messaging/optimize_ts.gni")
 
@@ -52,13 +51,11 @@ source_set("browser") {
     "//components/autofill/ios/form_util",
     "//components/autofill/ios/form_util:autofill_form_features",
     "//components/autofill/ios/form_util:autofill_form_features_injector",
-    "//components/autofill/ios/form_util:autofill_renderer_id_feature",
     "//components/autofill/ios/form_util:child_frame_registrar",
     "//components/autofill/ios/form_util:form_handler_feature",
-    "//components/autofill/ios/form_util:form_util_feature",
     "//components/feature_engagement/public",
-    "//components/plus_addresses",
-    "//components/plus_addresses/resources/strings",
+    "//components/plus_addresses/core/browser",
+    "//components/plus_addresses/core/browser/resources/strings",
     "//components/prefs",
     "//components/prefs/ios",
     "//components/resources:components_resources_grit",
@@ -100,8 +97,8 @@ optimize_js("autofill_js") {
   sources = [ "resources/autofill_controller.js" ]
 
   deps = [
+    "//components/autofill/ios/form_util:fill_js_constants",
     "//components/autofill/ios/form_util:fill_js_dependencies",
-    "//components/autofill/ios/form_util:fill_js_namespace",
     "//ios/web/public/js_messaging:gcrweb",
     "//ios/web/public/js_messaging:util_scripts",
   ]
@@ -110,7 +107,10 @@ optimize_js("autofill_js") {
 optimize_ts("suggestion_controller_js") {
   sources = [ "resources/suggestion_controller.ts" ]
 
-  deps = [ "//ios/web/public/js_messaging:gcrweb" ]
+  deps = [
+    "//components/autofill/ios/form_util:fill_js_dependencies",
+    "//ios/web/public/js_messaging:gcrweb",
+  ]
 }
 
 source_set("test_support") {
@@ -128,10 +128,8 @@ source_set("test_support") {
     "new_frame_catcher.h",
     "new_frame_catcher.mm",
     "test_autofill_client_ios.h",
-    "test_autofill_client_ios.mm",
-    "test_autofill_java_script_feature_container.h",
-    "test_autofill_java_script_feature_container.mm",
     "test_autofill_manager_injector.h",
+    "test_autofill_manager_injector.mm",
   ]
   public_deps = [ ":browser" ]
   deps = [
@@ -139,9 +137,7 @@ source_set("test_support") {
     "//base/test:test_support",
     "//components/autofill/core/browser",
     "//components/autofill/core/browser:test_support",
-    "//components/autofill/ios/form_util:autofill_renderer_id_feature",
     "//components/autofill/ios/form_util:form_handler_feature",
-    "//components/autofill/ios/form_util:form_util_feature",
     "//components/autofill/ios/form_util:frame_registration_feature",
     "//components/leveldb_proto",
     "//ios/web/public",
@@ -155,6 +151,7 @@ source_set("unit_tests") {
     "autofill_across_iframes_unittest.mm",
     "autofill_agent_unittests.mm",
     "autofill_driver_ios_factory_unittest.mm",
+    "autofill_driver_ios_unittest.mm",
     "autofill_util_unittests.mm",
     "autofill_xhr_sumission_detection_unittest.mm",
     "form_fetch_batcher_unittest.mm",
@@ -176,7 +173,6 @@ source_set("unit_tests") {
     "//components/autofill/ios/common",
     "//components/autofill/ios/form_util:child_frame_registrar",
     "//components/autofill/ios/form_util:form_handler_feature",
-    "//components/autofill/ios/form_util:form_util_feature",
     "//components/autofill/ios/form_util:test_support",
     "//components/prefs:test_support",
     "//ios/testing:embedded_test_server_support",

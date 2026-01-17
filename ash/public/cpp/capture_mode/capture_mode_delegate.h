@@ -13,13 +13,17 @@
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/unguessable_token.h"
-#include "chromeos/crosapi/mojom/video_conference.mojom-shared.h"
 #include "chromeos/crosapi/mojom/video_conference.mojom.h"
 #include "components/search_engines/template_url.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
 
 class SkBitmap;
+
+namespace ash {
+enum class CaptureModeImageSearchResult;
+enum class CaptureModeTextDetectionResult;
+}  // namespace ash
 
 namespace aura {
 class Window;
@@ -71,6 +75,10 @@ using OnTextDetectionComplete =
 // that invokes this may be run multiple times for error; see
 // `LensOverlayQueryController::RunInteractionCallbackForError()`.
 using OnSearchUrlFetchedCallback = base::RepeatingCallback<void(GURL url)>;
+
+using OnLensErrorCallback =
+    base::OnceCallback<void(ash::CaptureModeImageSearchResult,
+                            ash::CaptureModeTextDetectionResult)>;
 
 // Defines the interface for the delegate of CaptureModeController, that can be
 // implemented by an ash client (e.g. Chrome). The CaptureModeController owns
@@ -265,7 +273,7 @@ class ASH_PUBLIC_EXPORT CaptureModeDelegate {
       const bool is_standalone_session,
       OnSearchUrlFetchedCallback search_callback,
       OnTextDetectionComplete text_callback,
-      base::OnceCallback<void()> error_callback) = 0;
+      OnLensErrorCallback error_callback) = 0;
 
   // Returns true if the network is currently in an offline or unknown state.
   virtual bool IsNetworkConnectionOffline() const = 0;

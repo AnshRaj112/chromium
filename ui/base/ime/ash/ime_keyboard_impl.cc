@@ -4,7 +4,6 @@
 
 #include "ui/base/ime/ash/ime_keyboard_impl.h"
 
-#include "base/functional/callback_forward.h"
 #include "base/time/time.h"
 #include "ui/base/ime/ash/ime_keyboard.h"
 #include "ui/ozone/public/input_controller.h"
@@ -19,11 +18,11 @@ ImeKeyboardImpl::~ImeKeyboardImpl() = default;
 
 void ImeKeyboardImpl::SetCurrentKeyboardLayoutByName(
     const std::string& layout_name,
-    base::OnceCallback<void(bool)> callback) {
-  const bool result =
-      ImeKeyboard::SetCurrentKeyboardLayoutByNameImpl(layout_name);
-  if (!result) {
-    std::move(callback).Run(false);
+    base::OnceCallback<void(bool success)> callback) {
+  const ImeKeyboard::Result result =
+      ImeKeyboard::SetCurrentKeyboardLayoutByNameImplBase(layout_name);
+  if (result == ImeKeyboard::Result::kSuccessNoOp) {
+    std::move(callback).Run(/*success=*/true);
     return;
   }
 

@@ -45,14 +45,14 @@ void SetAutofillFormFeatureFlags(WebFrame* web_frame) {
                          features::kAutofillAcrossIframesIosThrottling));
 
   AutofillFormFeaturesJavaScriptFeature::GetInstance()
+      ->SetAutofillDisallowMoreHyphenLikeLabels(
+          web_frame, base::FeatureList::IsEnabled(
+                         features::kAutofillDisallowMoreHyphenLikeLabels));
+
+  AutofillFormFeaturesJavaScriptFeature::GetInstance()
       ->SetAutofillIgnoreCheckableElements(
           web_frame, base::FeatureList::IsEnabled(
                          features::kAutofillIgnoreCheckableElements));
-
-  AutofillFormFeaturesJavaScriptFeature::GetInstance()
-      ->SetAutofillIsolatedContentWorld(
-          web_frame,
-          base::FeatureList::IsEnabled(kAutofillIsolatedWorldForJavascriptIos));
 
   AutofillFormFeaturesJavaScriptFeature::GetInstance()
       ->SetAutofillCorrectUserEditedBitInParsedField(

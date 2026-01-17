@@ -10,12 +10,10 @@
 #include <unordered_set>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "base/stl_util.h"
 #include "base/time/clock.h"
 #include "base/time/tick_clock.h"
-#include "net/base/features.h"
 #include "net/base/network_anonymization_key.h"
 #include "net/base/url_util.h"
 #include "net/log/net_log.h"
@@ -23,12 +21,9 @@
 
 namespace net {
 
-ReportingCacheImpl::ReportingCacheImpl(
-    ReportingContext* context,
-    const base::flat_map<std::string, GURL>& enterprise_reporting_endpoints)
+ReportingCacheImpl::ReportingCacheImpl(ReportingContext* context)
     : context_(context) {
   DCHECK(context_);
-  SetEnterpriseReportingEndpoints(enterprise_reporting_endpoints);
 }
 
 ReportingCacheImpl::~ReportingCacheImpl() = default;
@@ -201,12 +196,12 @@ std::vector<ReportingEndpoint> FilterEndpointsByOrigin(
     const std::map<base::UnguessableToken, std::vector<ReportingEndpoint>>&
         document_endpoints,
     const url::Origin& origin) {
-  std::set<std::string> group_names;
+  std::set<std::string_view> group_names;
   std::vector<ReportingEndpoint> result;
   for (const auto& token_and_endpoints : document_endpoints) {
     for (const auto& endpoint : token_and_endpoints.second) {
       if (endpoint.group_key.origin == origin) {
-        if (group_names.insert(endpoint.group_key.group_name).second) {
+        if (group_names.emplace(endpoint.group_key.group_name).second) {
           // Push the endpoint only when the insertion succeeds.
           result.push_back(endpoint);
         }
@@ -219,7 +214,8 @@ std::vector<ReportingEndpoint> FilterEndpointsByOrigin(
 base::flat_map<url::Origin, std::vector<ReportingEndpoint>>
 ReportingCacheImpl::GetV1ReportingEndpointsByOrigin() const {
   base::flat_map<url::Origin, std::vector<ReportingEndpoint>> result;
-  base::flat_map<url::Origin, base::flat_set<std::string>> group_name_helper;
+  base::flat_map<url::Origin, base::flat_set<std::string_view>>
+      group_name_helper;
   for (const auto& token_and_endpoints : document_endpoints_) {
     for (const auto& endpoint : token_and_endpoints.second) {
       // Document endpoints should have an origin.
@@ -227,7 +223,7 @@ ReportingCacheImpl::GetV1ReportingEndpointsByOrigin() const {
       auto origin = endpoint.group_key.origin.value();
       if (result.count(origin)) {
         if (group_name_helper.at(origin)
-                .insert(endpoint.group_key.group_name)
+                .emplace(endpoint.group_key.group_name)
                 .second) {
           // Push the endpoint only when the insertion succeeds.
           result.at(origin).push_back(endpoint);
@@ -237,8 +233,8 @@ ReportingCacheImpl::GetV1ReportingEndpointsByOrigin() const {
         endpoints_for_origin.push_back(endpoint);
         result.emplace(origin, endpoints_for_origin);
 
-        base::flat_set<std::string> group_names;
-        group_names.insert(endpoint.group_key.group_name);
+        base::flat_set<std::string_view> group_names;
+        group_names.emplace(endpoint.group_key.group_name);
         group_name_helper.emplace(origin, group_names);
       }
     }
@@ -486,28 +482,6 @@ void ReportingCacheImpl::OnParsedReportingEndpointsHeader(
   isolation_info_.insert({reporting_source, isolation_info});
   context_->NotifyEndpointsUpdatedForOrigin(
       FilterEndpointsByOrigin(document_endpoints_, origin));
-}
-
-void ReportingCacheImpl::SetEnterpriseReportingEndpoints(
-    const base::flat_map<std::string, GURL>& endpoints) {
-  if (!base::FeatureList::IsEnabled(
-          net::features::kReportingApiEnableEnterpriseCookieIssues)) {
-    return;
-  }
-  std::vector<ReportingEndpoint> new_enterprise_endpoints;
-  new_enterprise_endpoints.reserve(endpoints.size());
-  for (const auto& [endpoint_name, endpoint_url] : endpoints) {
-    ReportingEndpoint endpoint;
-    endpoint.group_key = ReportingEndpointGroupKey(
-        NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
-        /*origin=*/std::nullopt, endpoint_name,
-        ReportingTargetType::kEnterprise);
-    ReportingEndpoint::EndpointInfo endpoint_info;
-    endpoint_info.url = endpoint_url;
-    endpoint.info = endpoint_info;
-    new_enterprise_endpoints.push_back(endpoint);
-  }
-  enterprise_endpoints_.swap(new_enterprise_endpoints);
 }
 
 std::set<url::Origin> ReportingCacheImpl::GetAllOrigins() const {
@@ -871,11 +845,6 @@ ReportingEndpoint ReportingCacheImpl::GetEndpointForTesting(
   return ReportingEndpoint();
 }
 
-std::vector<ReportingEndpoint>
-ReportingCacheImpl::GetEnterpriseEndpointsForTesting() const {
-  return enterprise_endpoints_;
-}
-
 bool ReportingCacheImpl::EndpointGroupExistsForTesting(
     const ReportingEndpointGroupKey& group_key,
     OriginSubdomains include_subdomains,
@@ -1208,14 +1177,14 @@ void ReportingCacheImpl::ConsistencyCheckEndpoint(
   DCHECK_LE(0, endpoint.info.weight);
 
   // The endpoint is in the |endpoint_its_by_url_| index.
-  DCHECK(base::Contains(endpoint_its_by_url_, endpoint.info.url));
+  DCHECK(endpoint_its_by_url_.contains(endpoint.info.url));
   auto url_range = endpoint_its_by_url_.equal_range(endpoint.info.url);
   std::vector<EndpointMap::iterator> endpoint_its_for_url;
   for (auto index_it = url_range.first; index_it != url_range.second;
        ++index_it) {
     endpoint_its_for_url.push_back(index_it->second);
   }
-  DCHECK(base::Contains(endpoint_its_for_url, endpoint_it));
+  DCHECK(std::ranges::contains(endpoint_its_for_url, endpoint_it));
 #endif  // DCHECK_IS_ON()
 }
 
@@ -1360,7 +1329,7 @@ void ReportingCacheImpl::RemoveEndpointsInGroupOtherThan(
 
   const auto group_range = endpoints_.equal_range(group_key);
   for (auto it = group_range.first; it != group_range.second;) {
-    if (base::Contains(endpoints_to_keep_urls, it->second.info.url)) {
+    if (endpoints_to_keep_urls.contains(it->second.info.url)) {
       ++it;
       continue;
     }

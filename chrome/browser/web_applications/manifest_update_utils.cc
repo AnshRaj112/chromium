@@ -10,6 +10,7 @@
 #include "base/feature_list.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/web_applications/proto/web_app.equal.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
 #include "chrome/browser/web_applications/web_app_install_utils.h"
@@ -17,6 +18,7 @@
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/common/chrome_features.h"
 #include "components/webapps/common/web_app_id.h"
+#include "content/public/common/url_constants.h"
 #include "third_party/blink/public/common/features.h"
 #include "ui/gfx/skia_util.h"
 
@@ -165,20 +167,8 @@ std::optional<AppIconIdentityChange> CompareIdentityIconBitmaps(
 }
 
 bool CanWebAppSilentlyUpdateIdentity(const WebApp& web_app) {
-  if (web_app.IsPolicyInstalledApp() &&
-      base::FeatureList::IsEnabled(
-          features::kWebAppManifestPolicyAppIdentityUpdate)) {
-    return true;
-  }
-
-  // WebAppChromeOsData::oem_installed is not included in this statement as
-  // we would like to keep WebAppManagement::kOem and
-  // WebAppChromeOsData::oem_installed separate.
-  // WebAppChromeOsData::oem_installed will be migrated to
-  // WebAppManagement::kOem eventually.
-  return web_app.IsPreinstalledApp() || web_app.IsKioskInstalledApp() ||
-         web_app.GetSources().HasAny(
-             {WebAppManagement::kOem, WebAppManagement::kApsDefault});
+  return web_app.scope().SchemeIs(content::kChromeUIScheme) ||
+         web_app.WasInstalledByTrustedSources();
 }
 
 bool CanShowIdentityUpdateConfirmationDialog(const WebAppRegistrar& registrar,
@@ -215,7 +205,7 @@ ManifestDataChanges GetManifestDataChanges(
 
   // TODO(crbug.com/40201597): Check whether translations have been updated.
   result.app_name_changed =
-      new_install_info.title !=
+      new_install_info.title.value() !=
       base::UTF8ToUTF16(existing_web_app.untranslated_name());
 
   // TODO(crbug.com/40254036): Run these bitmap comparisons off the UI thread.
@@ -271,9 +261,6 @@ ManifestDataChanges GetManifestDataChanges(
         new_install_info.note_taking_new_note_url) {
       return true;
     }
-    if (existing_web_app.capture_links() != new_install_info.capture_links) {
-      return true;
-    }
     if (existing_web_app.file_handlers() != new_install_info.file_handlers) {
       return true;
     }
@@ -318,6 +305,10 @@ ManifestDataChanges GetManifestDataChanges(
     }
     if (existing_web_app.related_applications() !=
         new_install_info.related_applications) {
+      return true;
+    }
+    if (existing_web_app.unvalidated_migration_sources() !=
+        new_install_info.migration_sources) {
       return true;
     }
     // TODO(crbug.com/40611449): Check more manifest fields.

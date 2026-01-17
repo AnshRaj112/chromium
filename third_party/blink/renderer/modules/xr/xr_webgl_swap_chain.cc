@@ -53,10 +53,17 @@ void XRWebGLSwapChain::ClearCurrentTexture() {
 
   gl->Disable(GL_SCISSOR_TEST);
 
-  if (descriptor_.layers > 1) {
+  if (descriptor_.is_texture_array) {
     for (uint32_t i = 0; i < descriptor_.layers; ++i) {
       gl->FramebufferTextureLayer(GL_FRAMEBUFFER, attachment, texture->Object(),
                                   0, i);
+      gl->Clear(clear_bits);
+    }
+  } else if (IsCube()) {
+    for (uint32_t i = 0; i < 6; ++i) {
+      gl->FramebufferTexture2D(GL_FRAMEBUFFER, attachment,
+                               GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                               texture->Object(), 0);
       gl->Clear(clear_bits);
     }
   } else {
@@ -111,7 +118,8 @@ WebGLUnownedTexture* XRWebGLStaticSwapChain::ProduceTexture() {
     return nullptr;
   }
 
-  GLenum target = descriptor().layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
+  GLenum target =
+      descriptor().is_texture_array ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
   gl->GenTextures(1, &owned_texture_);
   gl->BindTexture(target, owned_texture_);
 
@@ -166,11 +174,12 @@ WebGLUnownedTexture* XRWebGLSharedImageSwapChain::ProduceTexture() {
     return nullptr;
   }
 
-  const XRLayerSharedImages& shared_images = layer()->GetSharedImages();
-  const XRSharedImageData& content_image_data =
-      shared_images.content_image_data;
+  const XRSharedImageData& content_image_data = layer()->SharedImage();
 
-  CHECK(content_image_data.shared_image);
+  if (!content_image_data.shared_image) {
+    return nullptr;
+  }
+
   CHECK(content_image_data.sync_token.HasData());
 
   // Create a texture backed by the shared image.

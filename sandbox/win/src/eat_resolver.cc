@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "sandbox/win/src/eat_resolver.h"
 
 #include <ntstatus.h>
 #include <stddef.h>
 
+#include "base/compiler_specific.h"
 #include "base/win/pe_image.h"
 #include "sandbox/win/src/nt_internals.h"
 #include "sandbox/win/src/sandbox_nt_util.h"
@@ -19,16 +15,13 @@
 namespace sandbox {
 
 NTSTATUS EatResolverThunk::Setup(const void* target_module,
-                                 const void* interceptor_module,
                                  const char* target_name,
-                                 const char* interceptor_name,
                                  const void* interceptor_entry_point,
                                  void* thunk_storage,
                                  size_t storage_bytes,
                                  size_t* storage_used) {
-  NTSTATUS ret =
-      Init(target_module, interceptor_module, target_name, interceptor_name,
-           interceptor_entry_point, thunk_storage, storage_bytes);
+  NTSTATUS ret = Init(target_module, target_name, interceptor_entry_point,
+                      thunk_storage, storage_bytes);
   if (!NT_SUCCESS(ret))
     return ret;
 
@@ -42,7 +35,8 @@ NTSTATUS EatResolverThunk::Setup(const void* target_module,
 
   size_t thunk_bytes = GetInternalThunkSize();
   storage_bytes -= thunk_bytes;
-  thunk_storage = reinterpret_cast<char*>(thunk_storage) + thunk_bytes;
+  thunk_storage =
+      UNSAFE_TODO(reinterpret_cast<char*>(thunk_storage) + thunk_bytes);
 #endif
 
   if (!SetInternalThunk(thunk_storage, storage_bytes, target_, interceptor_))

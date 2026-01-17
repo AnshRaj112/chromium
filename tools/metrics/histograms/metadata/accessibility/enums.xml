@@ -122,6 +122,17 @@ chromium-metrics-reviews@google.com.
 
 <!-- LINT.ThenChange(//ui/accessibility/platform/ax_platform_node_auralinux.cc:UmaAtkApi) -->
 
+<!-- LINT.IfChange(AccessibilityCaretBrowsingAction)-->
+
+<enum name="AccessibilityCaretBrowsingAction">
+  <summary>Tracks overall usage of caret browsing.</summary>
+  <int value="0" label="Enabled"/>
+  <int value="1" label="Disabled"/>
+  <int value="2" label="Cancel - Keyboard dialog dismissed"/>
+</enum>
+
+<!-- LINT.ThenChange(//chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/AccessibilitySettingsBridge.java:AccessibilityCaretBrowsingAction) -->
+
 <!-- LINT.IfChange(AccessibilityImageLabelModeAndroid)-->
 
 <enum name="AccessibilityImageLabelModeAndroid">
@@ -161,6 +172,7 @@ chromium-metrics-reviews@google.com.
   <int value="1" label="User Enabled"/>
   <int value="2" label="OS Enabled"/>
   <int value="3" label="User Disabled"/>
+  <int value="4" label="Form Factor Enabled"/>
 </enum>
 
 <!-- LINT.ThenChange(//components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/PageZoomUma.java:AccessibilityPageZoomAppMenuEnabledState) -->
@@ -1607,6 +1619,7 @@ Unknown properties are collapsed to zero. -->
   <int value="0" label="Success"/>
   <int value="1" label="Parse Failure"/>
   <int value="2" label="No Data"/>
+  <int value="3" label="Content Too Short"/>
 </enum>
 
 <!-- LINT.ThenChange(//components/dom_distiller/core/distiller_page.cc:DistillationParseResult) -->
@@ -1626,7 +1639,19 @@ Unknown properties are collapsed to zero. -->
              desktop version of the site."/>
 </enum>
 
-<!-- LINT.ThenChange(//chrome/android/java/src/org/chromium/chrome/browser/dom_distiller/ReaderModeManager.java.java:DistillationResult) -->
+<!-- LINT.ThenChange(//chrome/android/java/src/org/chromium/chrome/browser/dom_distiller/ReaderModeManager.java:DistillationResult) -->
+
+<!-- LINT.IfChange(DomDistillerEntryPoint)-->
+
+<enum name="DomDistillerEntryPoint">
+  <summary>Describes the end-state of the distillation result.</summary>
+  <int value="0" label="Through an unknown source"/>
+  <int value="1" label="Through a message"/>
+  <int value="2" label="Through the app menu item"/>
+  <int value="3" label="Through the toolbar button"/>
+</enum>
+
+<!-- LINT.ThenChange(//chrome/android/java/src/org/chromium/chrome/browser/dom_distiller/ReaderModeManager.java:EntryPoint) -->
 
 <!-- LINT.IfChange(JAWSMajorVersion)-->
 
@@ -1670,73 +1695,73 @@ Unknown properties are collapsed to zero. -->
   <int value="2" label="Open new tab"/>
   <int value="3" label="Open new tab incognito"/>
   <int value="4" label="Open new window"/>
-  <int value="5" label="Reload tab"/>
-  <int value="6" label="Reload tab, bypassing cache"/>
-  <int value="7" label="Move to tab left"/>
-  <int value="8" label="Move to tab right"/>
-  <int value="9" label="Move to specific tab"/>
-  <int value="10" label="Move to last tab"/>
-  <int value="11" label="Search currently-open tabs (not implemented)"/>
-  <int value="12" label="Toggle multi-task menu (not implemented)"/>
-  <int value="13" label="Close tab"/>
-  <int value="14" label="Close window (not implemented)"/>
-  <int value="15" label="Quit Chrome (not implemented)"/>
-  <int value="16" label="Jump to omnibox"/>
-  <int value="17" label="Jump to search"/>
-  <int value="18" label="Focus the next web contents pane (not implemented)"/>
-  <int value="19" label="Scroll down (not implemented)"/>
-  <int value="20" label="Scroll up (not implemented)"/>
-  <int value="21" label="Place keyboard focus on the toolbar"/>
-  <int value="22" label="Place keyboard focus on the bookmarks bar"/>
-  <int value="23"
+  <int value="5" label="Open new window incognito"/>
+  <int value="6" label="Reload tab"/>
+  <int value="7" label="Reload tab, bypassing cache"/>
+  <int value="8" label="Move to tab left"/>
+  <int value="9" label="Move to tab right"/>
+  <int value="10" label="Move to specific tab"/>
+  <int value="11" label="Move to last tab"/>
+  <int value="12" label="Search currently-open tabs (not implemented)"/>
+  <int value="13" label="Toggle multi-task menu (not implemented)"/>
+  <int value="14" label="Close tab"/>
+  <int value="15" label="Close window"/>
+  <int value="16" label="Quit Chrome (not implemented)"/>
+  <int value="17" label="Jump to omnibox"/>
+  <int value="18" label="Jump to search"/>
+  <int value="19" label="Focus the next web contents pane (not implemented)"/>
+  <int value="20" label="Scroll down (not implemented)"/>
+  <int value="21" label="Scroll up (not implemented)"/>
+  <int value="22" label="Place keyboard focus on the toolbar"/>
+  <int value="23" label="Place keyboard focus on the bookmarks bar"/>
+  <int value="24"
       label="Switch which row of the top controls (tab strip, toolbar,
              bookmarks bar) is keyboard-focused"/>
-  <int value="24"
-      label="Open the context menu for the keyboard-focused tab strip item"/>
   <int value="25"
-      label="Reorder the keyboard-focused tab strip item to the left (not
-             implemented)"/>
+      label="Open the context menu for the keyboard-focused tab strip item"/>
   <int value="26"
-      label="Reorder the keyboard-focused tab strip item to the right (not
-             implemented)"/>
+      label="Reorder the keyboard-focused tab strip item to the left"/>
   <int value="27"
-      label="Reorder the currently-open tab to the left (not implemented)"/>
+      label="Reorder the keyboard-focused tab strip item to the right"/>
   <int value="28"
+      label="Reorder the currently-open tab to the left (not implemented)"/>
+  <int value="29"
       label="Reorder the currently-open tab to the right (not implemented)"/>
-  <int value="29" label="Toggle caret browsing (not implemented)"/>
-  <int value="30" label="Focus on inactive dialogs (not implemented)"/>
-  <int value="31" label="Open bookmarks"/>
-  <int value="32" label="Bookmark page"/>
-  <int value="33" label="Bookmark all tabs (not implemented)"/>
-  <int value="34" label="Show or hide the bookmarks bar"/>
-  <int value="35" label="Toggle immersive mode (not implemented)"/>
-  <int value="36" label="Exit immersive mode (not implemented)"/>
-  <int value="37" label="Open developer tools"/>
-  <int value="38" label="Open developer tools console (not implemented)"/>
-  <int value="39"
+  <int value="30" label="Toggle caret browsing (not implemented)"/>
+  <int value="31" label="Focus on inactive dialogs (not implemented)"/>
+  <int value="32" label="Open bookmarks"/>
+  <int value="33" label="Bookmark page"/>
+  <int value="34" label="Bookmark all tabs (not implemented)"/>
+  <int value="35" label="Show or hide the bookmarks bar"/>
+  <int value="36" label="Toggle immersive mode (not implemented)"/>
+  <int value="37" label="Exit immersive mode (not implemented)"/>
+  <int value="38" label="Open developer tools"/>
+  <int value="39" label="Open developer tools console (not implemented)"/>
+  <int value="40"
       label="Open developer tools element inspection (not implemented)"/>
-  <int value="40" label="Toggle showing developer tools (not implemented)"/>
-  <int value="41" label="View page source (not implemented)"/>
-  <int value="42" label="Open task manager"/>
-  <int value="43" label="Save page"/>
-  <int value="44" label="Show downloads (not implemented)"/>
-  <int value="45" label="Open history"/>
-  <int value="46" label="Go back in history"/>
-  <int value="47" label="Go forward in history"/>
-  <int value="48" label="Clear browsing data (not implemented)"/>
-  <int value="49" label="Print"/>
-  <int value="50" label="Basic print (not implemented)"/>
-  <int value="51" label="Zoom in"/>
-  <int value="52" label="Zoom out"/>
-  <int value="53" label="Zoom reset"/>
-  <int value="54" label="Show avatar menu (not implemented)"/>
-  <int value="55" label="Show feedback form (not implemented)"/>
-  <int value="56" label="Find in page"/>
-  <int value="57" label="Go to home page (not implemented)"/>
-  <int value="58" label="Open help"/>
-  <int value="59" label="Open menu"/>
-  <int value="60"
+  <int value="41" label="Toggle showing developer tools (not implemented)"/>
+  <int value="42" label="View page source"/>
+  <int value="43" label="Open task manager"/>
+  <int value="44" label="Save page"/>
+  <int value="45" label="Show downloads"/>
+  <int value="46" label="Open history"/>
+  <int value="47" label="Go back in history"/>
+  <int value="48" label="Go forward in history"/>
+  <int value="49" label="Clear browsing data (not implemented)"/>
+  <int value="50" label="Print"/>
+  <int value="51" label="Basic print (not implemented)"/>
+  <int value="52" label="Zoom in"/>
+  <int value="53" label="Zoom out"/>
+  <int value="54" label="Zoom reset"/>
+  <int value="55" label="Show avatar menu (not implemented)"/>
+  <int value="56" label="Show feedback form"/>
+  <int value="57" label="Find in page"/>
+  <int value="58" label="Go to home page (not implemented)"/>
+  <int value="59" label="Open help"/>
+  <int value="60" label="Open menu"/>
+  <int value="61"
       label="Use a custom keyboard shortcut registered by an extension"/>
+  <int value="62" label="Toggle multiselect"/>
 </enum>
 
 <!-- LINT.ThenChange(//chrome/android/java/src/org/chromium/chrome/browser/KeyboardShortcuts.java:KeyboardShortcutsSemanticMeaning, //tools/metrics/histograms/metadata/accessibility/histograms.xml:KeyboardShortcutsSemanticMeaning) -->
@@ -2105,9 +2130,24 @@ Unknown properties are collapsed to zero. -->
   <int value="2" label="Dark"/>
   <int value="3" label="Yellow"/>
   <int value="4" label="Blue"/>
+  <int value="5" label="High contrast"/>
+  <int value="6" label="Low contrast"/>
+  <int value="7" label="Sepia light"/>
+  <int value="8" label="Sepia dark"/>
 </enum>
 
 <!-- LINT.ThenChange(//chrome/common/read_anything/read_anything.mojom:Colors) -->
+
+<!-- LINT.IfChange(ReadAnythingDistillationStatus) -->
+
+<enum name="ReadAnythingDistillationStatus">
+  <int value="0" label="Failed"/>
+  <int value="1" label="Success"/>
+  <int value="2" label="Still running"/>
+  <int value="3" label="Restarted"/>
+</enum>
+
+<!-- LINT.ThenChange(//chrome/common/read_anything/read_anything.mojom:DistillationStatus) -->
 
 <!-- LINT.IfChange(ReadAnythingEmptyState) -->
 
@@ -2117,6 +2157,20 @@ Unknown properties are collapsed to zero. -->
 </enum>
 
 <!-- LINT.ThenChange(//chrome/renderer/accessibility/read_anything/read_anything_app_model.h:ReadAnythingEmptyState) -->
+
+<!-- LINT.IfChange(ReadAnythingExtensionInstallationState) -->
+
+<enum name="ReadAnythingExtensionInstallationState">
+  <int value="0" label="Enabled"/>
+  <int value="1" label="Disabled"/>
+  <int value="2" label="Terminated"/>
+  <int value="3" label="Blocked"/>
+  <int value="4" label="Ready"/>
+  <int value="5" label="Installing"/>
+  <int value="6" label="Unknown"/>
+</enum>
+
+<!-- LINT.ThenChange(//chrome/browser/ui/webui/side_panel/read_anything/read_anything_untrusted_page_handler.h:EngineInstallationState) -->
 
 <!-- LINT.IfChange(ReadAnythingFontName) -->
 
@@ -2156,16 +2210,7 @@ Unknown properties are collapsed to zero. -->
   <int value="4" label="Hihglight sentence"/>
 </enum>
 
-<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/metrics_browser_proxy.ts:ReadAloudHighlightGranularity) -->
-
-<!-- LINT.IfChange(ReadAnythingHighlightState) -->
-
-<enum name="ReadAnythingHighlightState">
-  <int value="0" label="Reading highlight shown"/>
-  <int value="1" label="Reading highlight hidden"/>
-</enum>
-
-<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/metrics_browser_proxy.ts:ReadAloudHighlightState) -->
+<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/shared/metrics_browser_proxy.ts:ReadAloudHighlightGranularity) -->
 
 <!-- LINT.IfChange(ReadAnythingLetterSpacing) -->
 
@@ -2177,6 +2222,25 @@ Unknown properties are collapsed to zero. -->
 </enum>
 
 <!-- LINT.ThenChange(//chrome/common/read_anything/read_anything.mojom:LetterSpacing) -->
+
+<!-- LINT.IfChange(ReadAnythingLineFocus) -->
+
+<enum name="ReadAnythingLineFocus">
+  <int value="0" label="Off"/>
+  <int value="1" label="One Line Window (Deprecated)"/>
+  <int value="2" label="Three Line Window (Deprecated)"/>
+  <int value="3" label="Five Line Window (Deprecated)"/>
+  <int value="4" label="Static Line"/>
+  <int value="5" label="Cursor Line"/>
+  <int value="6" label="Small Static Window"/>
+  <int value="7" label="Medium Static Window"/>
+  <int value="8" label="Large Static Window"/>
+  <int value="9" label="Small Cursor Window"/>
+  <int value="10" label="Medium Cursor Window"/>
+  <int value="11" label="Large Cursor Window"/>
+</enum>
+
+<!-- LINT.ThenChange(//chrome/common/read_anything/read_anything.mojom:LineFocus) -->
 
 <!-- LINT.IfChange(ReadAnythingLineSpacing) -->
 
@@ -2196,7 +2260,7 @@ Unknown properties are collapsed to zero. -->
   <int value="1" label="Speech played on new page"/>
 </enum>
 
-<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/metrics_browser_proxy.ts:ReadAnythingNewPage) -->
+<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/shared/metrics_browser_proxy.ts:ReadAnythingNewPage) -->
 
 <!-- LINT.IfChange(ReadAnythingReadAloudSettingsChange) -->
 
@@ -2206,7 +2270,7 @@ Unknown properties are collapsed to zero. -->
   <int value="2" label="Highlight change"/>
 </enum>
 
-<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/metrics_browser_proxy.ts:ReadAloudSettingsChange) -->
+<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/shared/metrics_browser_proxy.ts:ReadAloudSettingsChange) -->
 
 <!-- LINT.IfChange(ReadAnythingReadAloudVoice2) -->
 
@@ -2217,7 +2281,7 @@ Unknown properties are collapsed to zero. -->
   <int value="3" label="System voice"/>
 </enum>
 
-<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/metrics_browser_proxy.ts:ReadAnythingVoiceType) -->
+<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/shared/metrics_browser_proxy.ts:ReadAnythingVoiceType) -->
 
 <!-- LINT.IfChange(ReadAnythingScrollEvent) -->
 
@@ -2240,9 +2304,12 @@ Unknown properties are collapsed to zero. -->
   <int value="4" label="Letter spacing change"/>
   <int value="5" label="Links enabled change"/>
   <int value="6" label="Images enabled change"/>
+  <int value="7" label="Line focus change (Deprecated)"/>
+  <int value="8" label="Line focus style change"/>
+  <int value="9" label="Line focus movement change"/>
 </enum>
 
-<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/metrics_browser_proxy.ts:ReadAnythingSettingsChange) -->
+<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/shared/metrics_browser_proxy.ts:ReadAnythingSettingsChange) -->
 
 <!-- LINT.IfChange(ReadAnythingSpeechError) -->
 
@@ -2258,7 +2325,7 @@ Unknown properties are collapsed to zero. -->
   <int value="8" label="Network"/>
 </enum>
 
-<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/metrics_browser_proxy.ts:ReadAnythingSpeechError) -->
+<!-- LINT.ThenChange(//chrome/browser/resources/side_panel/read_anything/shared/metrics_browser_proxy.ts:ReadAnythingSpeechError) -->
 
 <!-- LINT.IfChange(ReadAnythingSpeechStopSource) -->
 
@@ -2278,6 +2345,25 @@ Unknown properties are collapsed to zero. -->
 
 <!-- LINT.ThenChange(//chrome/renderer/accessibility/read_anything/read_aloud_app_model.h:ReadAloudStopSource) -->
 
+<!-- LINT.IfChange(ReaderModeContextualPageActionEvent) -->
+
+<enum name="ReaderModeContextualPageActionEvent">
+  <summary>
+    Track the type of action taken on the contextual page action button.
+  </summary>
+  <int value="0" label="Unknown action"/>
+  <int value="1" label="The page was not eligible for Reader Mode"/>
+  <int value="2" label="The page was eligible for Reader Mode"/>
+  <int value="3"
+      label="The action was suppressed from showing due to inactivity"/>
+  <int value="4" label="The action was shown"/>
+  <int value="5"
+      label="The action timed out and reverted back to the default action"/>
+  <int value="6" label="The action was clicked"/>
+</enum>
+
+<!-- LINT.ThenChange(//chrome/android/java/src/org/chromium/chrome/browser/dom_distiller/ReaderModeMetrics.java:ReaderModeContextualPageActionEvent) -->
+
 <!-- LINT.IfChange(ReaderModeEntryPoint) -->
 
 <enum name="ReaderModeEntryPoint">
@@ -2286,6 +2372,18 @@ Unknown properties are collapsed to zero. -->
 </enum>
 
 <!-- LINT.ThenChange(//components/dom_distiller/content/browser/uma_helper.h:ReaderModeEntryPoint) -->
+
+<enum name="ReaderModePrefsFontFamily">
+  <int value="0" label="Sans serif"/>
+  <int value="1" label="Serif"/>
+  <int value="2" label="Monospace"/>
+</enum>
+
+<enum name="ReaderModePrefsTheme">
+  <int value="0" label="Light"/>
+  <int value="1" label="Dark"/>
+  <int value="2" label="Sepia"/>
+</enum>
 
 <!-- LINT.IfChange(SodaLanguageCode) -->
 

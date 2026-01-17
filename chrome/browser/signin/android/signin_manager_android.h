@@ -30,6 +30,17 @@ class IdentityManager;
 struct CoreAccountInfo;
 class Profile;
 
+// TODO(crbug.com/469293318): Merge this enum with DataWipeOption in
+// SigninManager.
+enum class ClearedTypes {
+  // Clear the service worker caches for Google domains.
+  kGoogleServiceWorkerCaches,
+  // Clear all the sync data.
+  kSyncData,
+  // Clear all the profile data.
+  kAllData
+};
+
 // Android wrapper of Chrome's C++ identity management code which provides
 // access from the Java layer. Note that on Android, there's only a single
 // profile, and therefore a single instance of this wrapper. The name of the
@@ -62,11 +73,6 @@ class SigninManagerAndroid : public KeyedService {
 
   void StopApplyingCloudPolicy(JNIEnv* env);
 
-  void IsAccountManaged(
-      JNIEnv* env,
-      const base::android::JavaParamRef<jobject>& j_account_info,
-      const base::android::JavaParamRef<jobject>& j_callback);
-
   base::android::ScopedJavaLocalRef<jstring> GetManagementDomain(JNIEnv* env);
 
   // Delete all data for this profile.
@@ -75,6 +81,9 @@ class SigninManagerAndroid : public KeyedService {
   // Delete service worker caches for google.<eTLD>.
   void WipeGoogleServiceWorkerCaches(JNIEnv* env,
                                      const base::RepeatingClosure& callback);
+
+  // Delete sync data for this profile.
+  void WipeSyncUserData(JNIEnv* env, const base::RepeatingClosure& callback);
 
   void SetUserAcceptedAccountManagement(JNIEnv* env,
                                         bool accepted_account_management);
@@ -120,18 +129,12 @@ class SigninManagerAndroid : public KeyedService {
       base::OnceCallback<void()> policy_callback,
       const std::optional<ManagementCredentials>& credentials);
 
-  void OnPolicyRegisterDoneForIsAccountManaged(
-      const CoreAccountInfo& account,
-      base::android::ScopedJavaGlobalRef<jobject> callback,
-      base::Time start_time,
-      const std::optional<ManagementCredentials>& credentials);
-
   void FetchPolicyBeforeSignIn(const CoreAccountInfo& account_id,
                                base::OnceCallback<void()> policy_callback,
                                const ManagementCredentials& credentials);
 
   static void WipeData(Profile* profile,
-                       bool all_data,
+                       ClearedTypes cleared_types,
                        base::OnceClosure callback);
 
   const raw_ptr<Profile> profile_ = nullptr;
@@ -148,9 +151,6 @@ class SigninManagerAndroid : public KeyedService {
 
   // Java-side SigninManager object.
   base::android::ScopedJavaGlobalRef<jobject> java_signin_manager_;
-
-  // The last invocation of IsAccountManaged() is cached.
-  std::optional<CachedIsAccountManaged> cached_is_account_managed_;
 
   base::ThreadChecker thread_checker_;
 

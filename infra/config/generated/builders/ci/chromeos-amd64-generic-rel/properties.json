@@ -13,7 +13,6 @@
               "project": "chromium"
             },
             "builder_spec": {
-              "build_gs_bucket": "chromium-chromiumos-archive",
               "builder_group": "chromium.chromiumos",
               "execution_mode": "COMPILE_AND_TEST",
               "legacy_chromium_config": {
@@ -49,7 +48,6 @@
               "project": "chromium"
             },
             "builder_spec": {
-              "build_gs_bucket": "chromium-chromiumos-archive",
               "builder_group": "chromium.chromiumos",
               "execution_mode": "TEST",
               "legacy_chromium_config": {
@@ -88,7 +86,6 @@
               "project": "chromium"
             },
             "builder_spec": {
-              "build_gs_bucket": "chromium-chromiumos-archive",
               "builder_group": "chromium.chromiumos",
               "execution_mode": "TEST",
               "legacy_chromium_config": {
@@ -156,7 +153,8 @@
         }
       ],
       "retry_failed_shards": true,
-      "targets_spec_directory": "src/infra/config/generated/builders/ci/chromeos-amd64-generic-rel/targets"
+      "retry_invalid_shards": true,
+      "targets_spec_directory": "infra/config/generated/builders/ci/chromeos-amd64-generic-rel/targets"
     }
   },
   "$build/siso": {
@@ -164,10 +162,9 @@
       "builder"
     ],
     "enable_cloud_monitoring": true,
-    "enable_cloud_profiler": true,
     "enable_cloud_trace": true,
     "experiments": [],
-    "metrics_project": "chromium-reclient-metrics",
+    "profile_mode": "cloud",
     "project": "rbe-chromium-trusted",
     "remote_jobs": 500
   },

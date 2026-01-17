@@ -41,7 +41,7 @@ enum FILE_MODE_FLAGS {
   FMF_STANDARDNAMES=32,
 
   // Mode flags are not defined yet.
-  FMF_UNDEFINED=256
+  // FMF_UNDEFINED=256
 };
 
 enum FILE_READ_ERROR_MODE {
@@ -50,6 +50,10 @@ enum FILE_READ_ERROR_MODE {
   FREM_IGNORE        // Try to skip unreadable block and read further.
 };
 
+
+#if defined(CHROMIUM_UNRAR)
+#include "third_party/unrar/google/unrar_delegates.h"
+#endif
 
 class File
 {
@@ -73,8 +77,7 @@ class File
     bool AllowDelete;
     bool AllowExceptions;
 #ifdef _WIN_ALL
-    bool NoSequentialRead;
-    uint CreateMode;
+    // uint CreateMode;
 #endif
     bool PreserveAtime;
     bool TruncatedAfterReadError;
@@ -88,7 +91,7 @@ class File
     FILE_ERRORTYPE ErrorType;
 
 #if defined(CHROMIUM_UNRAR)
-    FileHandle hOpenFile;
+    third_party_unrar::RarReaderDelegate* reader_delegate_;
 #endif  // defined(CHROMIUM_UNRAR)
 
   public:
@@ -125,7 +128,11 @@ class File
     static void StatToRarTime(struct stat &st,RarTime *ftm,RarTime *ftc,RarTime *fta);
 #endif
     void GetOpenFileTime(RarTime *ftm,RarTime *ftc=NULL,RarTime *fta=NULL);
+#if defined(CHROMIUM_UNRAR)
+    virtual bool IsOpened() {return hFile!=FILE_BAD_HANDLE || reader_delegate_;} // 'virtual' for MultiFile class.
+#else
     virtual bool IsOpened() {return hFile!=FILE_BAD_HANDLE;} // 'virtual' for MultiFile class.
+#endif
     virtual int64 FileLength(); // 'virtual' for MultiFile class.
     void SetHandleType(FILE_HANDLETYPE Type) {HandleType=Type;}
     void SetLineInputMode(bool Mode) {LineInput=Mode;}
@@ -145,8 +152,8 @@ class File
 #if defined(CHROMIUM_UNRAR)
     // Since unrar runs in a sandbox, it doesn't have the permission to open
     // files on the filesystem. Instead, the caller opens the file and passes
-    // the file handle to unrar. This handle is then used to read the file.
-    void SetFileHandle(FileHandle file);
+    // the file delegate to unrar. This delegate is then used to read the file.
+    void SetReaderDelegate(third_party_unrar::RarReaderDelegate* delegate);
 #endif  // defined(CHROMIUM_UNRAR)
 
 #ifdef _UNIX

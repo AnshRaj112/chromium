@@ -7,10 +7,8 @@
 
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
-#include "chrome/browser/ui/webui/ash/office_fallback/office_fallback.mojom-shared.h"
 #include "chrome/browser/ui/webui/ash/office_fallback/office_fallback.mojom.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
-#include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 
 namespace ash::office_fallback {

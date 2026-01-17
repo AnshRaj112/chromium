@@ -41,7 +41,6 @@
 #include "chrome/browser/extensions/external_loader.h"
 #include "chrome/browser/extensions/external_provider_impl.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/common/chrome_paths.h"
 #include "chrome/common/pref_names.h"
 #include "chromeos/ash/components/system/statistics_provider.h"
 #include "components/pref_registry/pref_registry_syncable.h"
@@ -528,7 +527,7 @@ void ServicesCustomizationDocument::SetApplied(bool val) {
 // static
 base::FilePath ServicesCustomizationDocument::GetCustomizedWallpaperCacheDir() {
   base::FilePath custom_wallpaper_dir;
-  if (!base::PathService::Get(chrome::DIR_CHROMEOS_CUSTOM_WALLPAPERS,
+  if (!base::PathService::Get(ash::DIR_CUSTOM_WALLPAPERS,
                               &custom_wallpaper_dir)) {
     LOG(DFATAL) << "Unable to get custom wallpaper dir.";
     return base::FilePath();
@@ -588,7 +587,7 @@ void ServicesCustomizationDocument::StartFetching() {
     if (url_.SchemeIsFile()) {
       base::ThreadPool::PostTaskAndReplyWithResult(
           FROM_HERE, {base::TaskPriority::BEST_EFFORT, base::MayBlock()},
-          base::BindOnce(&ReadFileInBackground, base::FilePath(url_.path())),
+          base::BindOnce(&ReadFileInBackground, base::FilePath(url_.GetPath())),
           base::BindOnce(&ServicesCustomizationDocument::OnManifestRead,
                          weak_ptr_factory_.GetWeakPtr()));
     } else {
@@ -660,7 +659,7 @@ void ServicesCustomizationDocument::OnManifestLoaded() {
 }
 
 void ServicesCustomizationDocument::OnSimpleLoaderComplete(
-    std::unique_ptr<std::string> response_body) {
+    std::optional<std::string> response_body) {
   int response_code = -1;
   std::string mime_type;
   if (url_loader_->ResponseInfo() && url_loader_->ResponseInfo()->headers) {
@@ -858,8 +857,12 @@ void ServicesCustomizationDocument::StartOEMWallpaperDownload(
     NOTREACHED();
   }
 
+  // TODO(crbug.com/404131632): Avoid g_browser_process usage.
+  auto shared_url_loader_factory =
+      g_browser_process->shared_url_loader_factory();
+
   wallpaper_downloader_ = std::make_unique<CustomizationWallpaperDownloader>(
-      wallpaper_url, dir, file,
+      shared_url_loader_factory, wallpaper_url, dir, file,
       base::BindOnce(&ServicesCustomizationDocument::OnOEMWallpaperDownloaded,
                      weak_ptr_factory_.GetWeakPtr(), std::move(applying)));
 
@@ -979,8 +982,12 @@ void ServicesCustomizationDocument::OnOEMWallpaperDownloaded(
     VLOG(1) << "Setting default wallpaper to '"
             << GetCustomizedWallpaperDownloadedFileName().value() << "' ('"
             << wallpaper_url.spec() << "')";
+
+    // TODO(crbug.com/404131632): Avoid g_browser_process usage.
+    PrefService* local_state = g_browser_process->local_state();
+
     customization_wallpaper_util::StartSettingCustomizedDefaultWallpaper(
-        wallpaper_url, GetCustomizedWallpaperDownloadedFileName());
+        local_state, wallpaper_url, GetCustomizedWallpaperDownloadedFileName());
   }
   wallpaper_downloader_.reset();
   applying->Finished(success);

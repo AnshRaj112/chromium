@@ -29,14 +29,17 @@ import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.ui.R;
 import org.chromium.ui.UiUtils;
+import org.chromium.ui.hierarchicalmenu.HierarchicalMenuController;
+import org.chromium.ui.hierarchicalmenu.HierarchicalMenuController.AccessibilityListObserver;
 import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
 import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
 import org.chromium.ui.modelutil.ModelListAdapter;
 import org.chromium.ui.modelutil.PropertyModel;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * An implementation of a list menu. Uses app_menu_layout as the default layout of menu and
@@ -55,8 +58,7 @@ public class BasicListMenu implements ListMenu {
         PropertyModel.Builder builder =
                 new PropertyModel.Builder(ListSectionDividerProperties.ALL_KEYS);
         if (isIncognito) {
-            builder.with(
-                    ListSectionDividerProperties.COLOR_ID, R.color.divider_line_bg_color_light);
+            builder.with(ListSectionDividerProperties.COLOR_ID, R.color.divider_color_light);
         }
         return new ListItem(ListItemType.DIVIDER, builder.build());
     }
@@ -85,8 +87,8 @@ public class BasicListMenu implements ListMenu {
             boolean isIconTintable,
             boolean groupContainsIcon,
             boolean enabled,
-            View.@Nullable OnClickListener clickListener,
-            @Nullable Intent intent) {
+            @Nullable Intent intent,
+            int order) {
         PropertyModel.Builder modelBuilder =
                 new PropertyModel.Builder(ListMenuItemProperties.ALL_KEYS)
                         .with(ListMenuItemProperties.TITLE, title)
@@ -95,26 +97,33 @@ public class BasicListMenu implements ListMenu {
                         .with(ListMenuItemProperties.MENU_ITEM_ID, id)
                         .with(ListMenuItemProperties.START_ICON_DRAWABLE, startIcon)
                         .with(ListMenuItemProperties.ENABLED, enabled)
-                        .with(ListMenuItemProperties.CLICK_LISTENER, clickListener)
                         .with(ListMenuItemProperties.INTENT, intent)
                         .with(
                                 ListMenuItemProperties.KEEP_START_ICON_SPACING_WHEN_HIDDEN,
                                 groupContainsIcon)
                         .with(
                                 ListMenuItemProperties.TEXT_APPEARANCE_ID,
-                                R.style.TextAppearance_ListMenuItem)
+                                R.style.TextAppearance_DensityAdaptive_ListMenuItem)
                         .with(
                                 ListMenuItemProperties.ICON_TINT_COLOR_STATE_LIST_ID,
-                                isIconTintable ? R.color.list_menu_item_icon_color_list : 0);
+                                isIconTintable ? R.color.list_menu_item_icon_color_list : 0)
+                        .with(ListMenuItemProperties.ORDER, order);
         return new ListItem(ListItemType.MENU_ITEM, modelBuilder.build());
     }
 
-    private final ListView mListView;
-    private final ModelList mHeaderModelList = new ModelList();
+    private final View mListMenuLayout;
+
+    private final ListView mHeaderListView;
+    private final ModelList mHeaderModelList;
+    private final ModelListAdapter mHeaderAdapter;
+
+    private final ListView mContentListView;
     private final ModelList mContentModelList;
-    private final ModelListAdapter mAdapter;
-    private final View mContentView;
-    private final List<Runnable> mClickRunnables = new LinkedList<>();
+    private final ModelListAdapter mContentAdapter;
+
+    private final ContentListOnScrollChangeListener mScrollChangeListener;
+
+    private final List<Runnable> mClickRunnables = new ArrayList<>();
 
     /**
      * @param context The {@link Context} to inflate the layout.
@@ -135,47 +144,53 @@ public class BasicListMenu implements ListMenu {
             @DrawableRes int backgroundDrawable,
             @ColorRes int backgroundTintColor,
             @Nullable @ColorInt Integer bottomHairlineColor) {
-        View contentView = LayoutInflater.from(context).inflate(R.layout.list_menu_layout, null);
-        View hairline = contentView.findViewById(R.id.menu_header_bottom_hairline);
-        ListView listView = contentView.findViewById(R.id.menu_list);
-        mAdapter = createAdapter(data, Set.of(), (model) -> callDelegate(delegate, model));
-        mContentView = contentView;
-        mContentModelList = data;
-        mListView = listView;
-        mListView.setAdapter(mAdapter);
-        mListView.setDivider(null);
+        mListMenuLayout = LayoutInflater.from(context).inflate(R.layout.list_menu_layout, null);
+        View hairline = mListMenuLayout.findViewById(R.id.menu_header_bottom_hairline);
 
-        ListView headerListView = mContentView.findViewById(R.id.menu_header);
-        headerListView.setAdapter(
+        mContentModelList = data;
+        mContentAdapter =
+                createAdapter(data, Set.of(), (model, view) -> callDelegate(delegate, model, view));
+        mContentListView = mListMenuLayout.findViewById(R.id.menu_list);
+        mContentListView.setAdapter(mContentAdapter);
+        mContentListView.setDivider(null);
+
+        mHeaderModelList = new ModelList();
+        mHeaderAdapter =
                 createAdapter(
-                        mHeaderModelList, Set.of(), (model) -> callDelegate(delegate, model)));
+                        mHeaderModelList,
+                        Set.of(),
+                        (model, view) -> callDelegate(delegate, model, view));
+        mHeaderListView = mListMenuLayout.findViewById(R.id.menu_header);
+        mHeaderListView.setAdapter(mHeaderAdapter);
 
         // Allow keyboard focus + keyboard clicks on list items.
-        headerListView.setItemsCanFocus(true);
-        listView.setItemsCanFocus(true);
+        mHeaderListView.setItemsCanFocus(true);
+        mContentListView.setItemsCanFocus(true);
 
         if (backgroundDrawable != Resources.ID_NULL) {
-            contentView.setBackgroundResource(backgroundDrawable);
+            mListMenuLayout.setBackgroundResource(backgroundDrawable);
         }
         if (backgroundTintColor != 0) {
             ViewCompat.setBackgroundTintList(
-                    mContentView,
+                    mListMenuLayout,
                     ColorStateList.valueOf(ContextCompat.getColor(context, backgroundTintColor)));
         }
         if (bottomHairlineColor != null) {
             hairline.setBackgroundColor(bottomHairlineColor);
         }
 
-        mListView.setOnScrollChangeListener(new ContentListOnScrollChangeListener(hairline));
+        mScrollChangeListener =
+                new ContentListOnScrollChangeListener(hairline, () -> !mHeaderModelList.isEmpty());
+        mContentListView.setOnScrollChangeListener(mScrollChangeListener);
     }
 
     @Override
     public View getContentView() {
-        return mContentView;
+        return mListMenuLayout;
     }
 
     public ListView getListView() {
-        return mListView;
+        return mContentListView;
     }
 
     @Override
@@ -185,7 +200,7 @@ public class BasicListMenu implements ListMenu {
 
     @Override
     public int getMaxItemWidth() {
-        return UiUtils.computeListAdapterContentDimensions(mAdapter, mListView)[0];
+        return UiUtils.computeListAdapterContentDimensions(mContentAdapter, mContentListView)[0];
     }
 
     /**
@@ -194,16 +209,29 @@ public class BasicListMenu implements ListMenu {
      * @return an array with the menu's width stored at index 0, and the height stored at index 1.
      */
     public int[] getMenuDimensions() {
-        int[] result = UiUtils.computeListAdapterContentDimensions(mAdapter, mListView);
-        int horizontalPadding = mContentView.getPaddingLeft() + mContentView.getPaddingRight();
-        int verticalPadding = mContentView.getPaddingTop() + mContentView.getPaddingBottom();
+        // Compute vertical size of header + content.
+        int[] headerDimensions =
+                UiUtils.computeListAdapterContentDimensions(mHeaderAdapter, mHeaderListView);
+        int[] contentDimensions =
+                UiUtils.computeListAdapterContentDimensions(mContentAdapter, mContentListView);
+        // The header is above the content, so the result width is the max of the 2 widths and the
+        // result height is the addition of the 2 heights.
+        int[] result = {
+            Math.max(headerDimensions[0], contentDimensions[0]),
+            headerDimensions[1] + contentDimensions[1]
+        };
+        // Now add padding from the listMenuLayout (which contains the header and content -- note
+        // that the header and content don't have padding individually).
+        int horizontalPadding =
+                mListMenuLayout.getPaddingLeft() + mListMenuLayout.getPaddingRight();
+        int verticalPadding = mListMenuLayout.getPaddingTop() + mListMenuLayout.getPaddingBottom();
         result[0] += horizontalPadding;
         result[1] += verticalPadding;
         return result;
     }
 
-    public ModelListAdapter getAdapterForTesting() {
-        return mAdapter;
+    public ModelListAdapter getContentAdapter() {
+        return mContentAdapter;
     }
 
     /**
@@ -211,13 +239,27 @@ public class BasicListMenu implements ListMenu {
      * If an item doesn't already have a click callback in its model, no click callback is added.
      *
      * @param dismissDialog The {@link Runnable} to run.
+     * @param hierarchicalMenuController The {@link HierarchicalMenuController} to use.
      */
-    public void setupCallbacksRecursively(Runnable dismissDialog) {
-        ListMenuUtils.setupCallbacksRecursively(mHeaderModelList, mContentModelList, dismissDialog);
+    public void setupCallbacksRecursively(
+            Runnable dismissDialog, HierarchicalMenuController hierarchicalMenuController) {
+        AccessibilityListObserver observer =
+                hierarchicalMenuController
+                .new AccessibilityListObserver(
+                        mListMenuLayout,
+                        mHeaderListView,
+                        mContentListView,
+                        mHeaderModelList,
+                        mContentModelList);
+        mHeaderModelList.addObserver(observer);
+        mContentModelList.addObserver(observer);
+
+        hierarchicalMenuController.setupCallbacksRecursively(
+                mHeaderModelList, mContentModelList, dismissDialog);
     }
 
-    private void callDelegate(@Nullable Delegate delegate, PropertyModel model) {
-        if (delegate != null) delegate.onItemSelected(model);
+    private void callDelegate(@Nullable Delegate delegate, PropertyModel model, View view) {
+        if (delegate != null) delegate.onItemSelected(model, view);
         // We will run the runnables that are registered by the time this lambda
         // is called.
         for (Runnable r : mClickRunnables) {
@@ -229,25 +271,49 @@ public class BasicListMenu implements ListMenu {
     private static class ContentListOnScrollChangeListener implements View.OnScrollChangeListener {
 
         private final View mDivider;
+        private final Supplier<Boolean> mShowHairlinePrecondition;
         private int mVisibility = INVISIBLE; // "Cache" so we don't set visibility per scroll event
 
-        ContentListOnScrollChangeListener(View divider) {
+        /**
+         * Creates a {@link ContentListOnScrollChangeListener}.
+         *
+         * @param divider The divider whose appearance to control.
+         * @param showHairlinePrecondition A {@link Supplier}. This is checked before showing the
+         *     hairline. If false, hairline should not be shown.
+         */
+        ContentListOnScrollChangeListener(
+                View divider, Supplier<Boolean> showHairlinePrecondition) {
             mDivider = divider;
+            mShowHairlinePrecondition = showHairlinePrecondition;
         }
 
         @Override
         public void onScrollChange(
                 View view, int scrollX, int scrollY, int oldScrollX, int oldScrollY) {
-            int desiredVisibility = scrollY == 0 ? INVISIBLE : VISIBLE;
-            if (desiredVisibility != mVisibility) {
-                mVisibility = desiredVisibility;
-                mDivider.setVisibility(desiredVisibility);
+            if (view instanceof ListView listView) {
+                @Nullable View firstChild = listView.getChildAt(0);
+                if (firstChild == null) return;
+                // Estimation of list scroll Y, assuming that children are the same height.
+                int listScrollY =
+                        -firstChild.getTop()
+                                + (listView.getFirstVisiblePosition() * firstChild.getHeight());
+                int desiredVisibility =
+                        (mShowHairlinePrecondition.get() && listScrollY > 0) ? VISIBLE : INVISIBLE;
+                if (desiredVisibility != mVisibility) {
+                    mVisibility = desiredVisibility;
+                    mDivider.setVisibility(desiredVisibility);
+                }
             }
         }
     }
 
     public void clickItemForTesting(int i) {
-        mAdapter.getView(i, new View(mContentView.getContext()), (ViewGroup) mContentView)
+        mContentAdapter
+                .getView(i, new View(mListMenuLayout.getContext()), (ViewGroup) mListMenuLayout)
                 .performClick();
+    }
+
+    public View.OnScrollChangeListener getScrollChangeListenerForTesting() {
+        return mScrollChangeListener;
     }
 }

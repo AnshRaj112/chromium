@@ -16,7 +16,6 @@
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
-#include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "base/trace_event/memory_dump_provider.h"
@@ -25,6 +24,7 @@
 #include "gpu/command_buffer/common/gl2_types.h"
 #include "gpu/command_buffer/common/skia_utils.h"
 #include "gpu/command_buffer/service/gl_context_virtual_delegate.h"
+#include "gpu/command_buffer/service/gpu_persistent_cache.h"
 #include "gpu/command_buffer/service/gr_shader_cache.h"
 #include "gpu/command_buffer/service/memory_tracking.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_format_service_utils.h"
@@ -121,11 +121,13 @@ class GPU_GLES2_EXPORT SharedContextState
   SharedContextState(const SharedContextState&) = delete;
   SharedContextState& operator=(const SharedContextState&) = delete;
 
-  bool InitializeSkia(const GpuPreferences& gpu_preferences,
-                      const GpuDriverBugWorkarounds& workarounds,
-                      gpu::raster::GrShaderCache* cache = nullptr,
-                      GpuProcessShmCount* use_shader_cache_shm_count = nullptr,
-                      gl::ProgressReporter* progress_reporter = nullptr);
+  bool InitializeSkia(
+      const GpuPreferences& gpu_preferences,
+      const GpuDriverBugWorkarounds& workarounds,
+      gpu::raster::GrShaderCache* gr_cache = nullptr,
+      scoped_refptr<GpuPersistentCache> persistent_cache = nullptr,
+      GpuProcessShmCount* use_shader_cache_shm_count = nullptr,
+      gl::ProgressReporter* progress_reporter = nullptr);
   bool GrContextIsGL() const {
     return gr_context_type_ == GrContextType::kGL;
   }
@@ -158,8 +160,7 @@ class GPU_GLES2_EXPORT SharedContextState
   void MarkContextLost(error::ContextLostReason reason = error::kUnknown);
   bool IsCurrent(gl::GLSurface* surface, bool needs_gl = false);
 
-  void PurgeMemory(
-      base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level);
+  void PurgeMemory(base::MemoryPressureLevel memory_pressure_level);
 
   void UpdateSkiaOwnedMemorySize();
   uint64_t GetMemoryUsage();
@@ -309,7 +310,8 @@ class GPU_GLES2_EXPORT SharedContextState
   bool InitializeGanesh(
       const GpuPreferences& gpu_preferences,
       const GpuDriverBugWorkarounds& workarounds,
-      gpu::raster::GrShaderCache* cache,
+      gpu::raster::GrShaderCache* gr_cache = nullptr,
+      scoped_refptr<GpuPersistentCache> persistent_cache = nullptr,
       GpuProcessShmCount* use_shader_cache_shm_count = nullptr,
       gl::ProgressReporter* progress_reporter = nullptr);
 
@@ -356,7 +358,7 @@ class GPU_GLES2_EXPORT SharedContextState
       nullptr;
   bool created_on_compositor_gpu_thread_ = false;
   bool is_drdc_enabled_ = false;
-  raw_ptr<GrDirectContext, DanglingUntriaged> gr_context_ = nullptr;
+  raw_ptr<GrDirectContext> gr_context_ = nullptr;
   std::unique_ptr<skgpu::graphite::Recorder> gpu_main_graphite_recorder_;
   std::unique_ptr<skgpu::graphite::Recorder> viz_compositor_graphite_recorder_;
 
@@ -384,6 +386,7 @@ class GPU_GLES2_EXPORT SharedContextState
   std::vector<uint8_t> scratch_deserialization_buffer_;
   raw_ptr<gpu::raster::GrShaderCache, DanglingUntriaged> gr_shader_cache_ =
       nullptr;
+  scoped_refptr<GpuPersistentCache> persistent_cache_ = nullptr;
   raw_ptr<GpuProcessShmCount, DanglingUntriaged> use_shader_cache_shm_count_ =
       nullptr;
 

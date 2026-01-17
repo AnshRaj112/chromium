@@ -312,6 +312,10 @@ process is determined by command-line arguments:
         * The value of `installerdata` needs to be URL encoded.
         * The data will be decoded and written to a file same as in
           [installdataindex](#installdataindex).
+    *   --installsource=...
+        * A user defined `installsource` string for use with offline installs.
+          This is passed up in the `installsource` field in install type event
+          pings.
     *   --offlinedir={GUID}
         *   Performs offline install, which means no update check or file
             download is performed against the server during installation.
@@ -1302,6 +1306,13 @@ For example, if `app_id_` is `{8A69D345-D564-463C-AFF1-A69D9E530F96}`, the
 ### Update Formats
 The updater accepts updates packaged as CRX₃ files. All files are signed with a
 publisher key. The corresponding public key is hardcoded into the updater.
+
+CRX₃ files can carry an arbitrary number of signatures. The updater can be
+configured at compile-time to require an additional signature using a pinned
+public key, via the `crx_pkhash` field in `chrome/updater/branding.gni`. This
+field is the base64-encoded SHA256 hash of the public key material (as it
+appears in the CRX). Google-branded updaters use this to pin an additional
+public key.
 
 ### Differential Updates
 TODO(crbug.com/40227383): Implement and document differential update support.

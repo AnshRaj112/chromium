@@ -6,11 +6,11 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
@@ -44,7 +44,6 @@
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/profiles/profile_colors_util.h"
@@ -74,6 +73,7 @@
 #include "components/signin/public/identity_manager/accounts_mutator.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/primary_account_mutator.h"
+#include "components/sync/base/features.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_ui.h"
 #include "google_apis/gaia/gaia_auth_fetcher.h"
@@ -175,7 +175,7 @@ credential_provider::UiExitCodes ValidateSigninEmail(
       GetEmailDomainsFromParameter(email_domains_parameter);
   std::string email_domain = gaia::ExtractDomainName(signin_email);
 
-  return base::Contains(all_email_domains, email_domain)
+  return std::ranges::contains(all_email_domains, email_domain)
              ? credential_provider::kUiecSuccess
              : credential_provider::kUiecInvalidEmailDomain;
 }
@@ -283,11 +283,9 @@ void OnSigninComplete(Profile* profile,
   }
 
   if (!can_be_managed) {
-    BrowserList::CloseAllBrowsersWithProfile(
-        profile, base::BindRepeating(&LockProfileAndShowUserManager),
-        // Cannot be called because skip_beforeunload is true.
-        BrowserList::CloseCallback(),
-        /*skip_beforeunload=*/true);
+    chrome::CloseAllBrowsersWithProfile(
+        profile, /*skip_beforeunload=*/true,
+        base::BindRepeating(&LockProfileAndShowUserManager));
   }
 }
 
@@ -337,7 +335,7 @@ void InlineSigninHelper::OnClientOAuthSuccess(const ClientOAuthResult& result) {
         base::IgnoreArgs<Browser*>(base::BindOnce(
             &InlineSigninHelper::OnClientOAuthSuccessAndBrowserOpened,
             base::Unretained(this), result)),
-        true, false, profile_);
+        true, false, false, profile_);
   } else {
     OnClientOAuthSuccessAndBrowserOpened(result);
   }
@@ -434,11 +432,11 @@ void InlineSigninHelper::UntrustedSigninConfirmed(
   }
 
   base::RecordAction(base::UserMetricsAction("Signin_Undo_Signin"));
-  BrowserList::CloseAllBrowsersWithProfile(
-      profile_, base::BindRepeating(&LockProfileAndShowUserManager),
+  chrome::CloseAllBrowsersWithProfile(
+      profile_, /*skip_beforeunload=*/true,
+      base::BindRepeating(&LockProfileAndShowUserManager),
       // Cannot be called because  skip_beforeunload is true.
-      BrowserList::CloseCallback(),
-      /*skip_beforeunload=*/true);
+      chrome::ProfileBrowsersCloseCallback());
 }
 
 void InlineSigninHelper::CreateSyncStarter(const std::string& refresh_token) {
@@ -460,6 +458,12 @@ void InlineSigninHelper::CreateSyncStarter(const std::string& refresh_token) {
           signin_metrics::AccessPoint::kForcedSignin,
           signin_metrics::SourceForRefreshTokenOperation::
               kInlineLoginHandler_Signin);
+
+  if (base::FeatureList::IsEnabled(
+          syncer::kReplaceSyncPromosWithSignInPromos)) {
+    // The sync promo is deprecated; nothing to do.
+    return;
+  }
 
   std::unique_ptr<TurnSyncOnHelper::Delegate> delegate =
       std::make_unique<ForcedSigninTurnSyncOnHelperDelegate>(browser);
@@ -511,7 +515,7 @@ void InlineLoginHandlerImpl::SetExtraInitParams(base::Value::Dict& params) {
 
   const GURL& url = GaiaUrls::GetInstance()->embedded_signin_url();
   params.Set("clientId", GaiaUrls::GetInstance()->oauth2_chrome_client_id());
-  params.Set("gaiaPath", url.path().substr(1));
+  params.Set("gaiaPath", url.GetPath().substr(1));
 
 #if BUILDFLAG(IS_WIN)
   if (reason == HandlerSigninReason::kFetchLstOnly) {
@@ -544,7 +548,7 @@ void InlineLoginHandlerImpl::SetExtraInitParams(base::Value::Dict& params) {
 
     GURL windows_url = GaiaUrls::GetInstance()->embedded_setup_windows_url();
     // Redirect to specified gaia endpoint path for GCPW:
-    std::string windows_endpoint_path = windows_url.path().substr(1);
+    std::string windows_endpoint_path = windows_url.GetPath().substr(1);
     // Redirect to specified gaia endpoint path for GCPW:
     std::string gcpw_endpoint_path;
     if (net::GetValueForKeyInQuery(
@@ -712,7 +716,9 @@ void InlineLoginHandlerImpl::FinishCompleteLogin(
   switch (reason) {
     case HandlerSigninReason::kReauthentication:
     case HandlerSigninReason::kForcedSigninPrimaryAccount:
-      can_offer_error = CanOfferSignin(profile, params.gaia_id, params.email);
+      can_offer_error =
+          CanOfferSignin(profile, params.gaia_id, params.email,
+                         /*allow_account_from_other_profile=*/false);
       break;
     case HandlerSigninReason::kFetchLstOnly:
       break;

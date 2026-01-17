@@ -8,7 +8,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
@@ -282,7 +281,7 @@ ProcessManager::FrameSet ProcessManager::GetRenderFrameHostsForExtension(
 
 bool ProcessManager::IsRenderFrameHostRegistered(
     content::RenderFrameHost* render_frame_host) {
-  return base::Contains(all_extension_frames_, render_frame_host);
+  return all_extension_frames_.contains(render_frame_host);
 }
 
 void ProcessManager::AddObserver(ProcessManagerObserver* observer) {
@@ -399,13 +398,19 @@ ExtensionHost* ProcessManager::GetBackgroundHostForRenderFrameHost(
 
 bool ProcessManager::WakeEventPage(const ExtensionId& extension_id,
                                    base::OnceCallback<void(bool)> callback) {
-  if (GetBackgroundHostForExtension(extension_id)) {
+  const Extension* extension =
+      extension_registry_->enabled_extensions().GetByID(extension_id);
+  if ((extension && BackgroundInfo::IsServiceWorkerBased(extension) &&
+       !GetServiceWorkersForExtension(extension_id).empty()) ||
+      GetBackgroundHostForExtension(extension_id)) {
     // The extension is already awake.
     return false;
   }
 
   const auto context_id =
-      LazyContextId::ForBackgroundPage(browser_context_, extension_id);
+      extension
+          ? LazyContextId::ForExtension(browser_context_, extension)
+          : LazyContextId::ForBackgroundPage(browser_context_, extension_id);
   context_id.GetTaskQueue()->AddPendingTask(
       context_id,
       base::BindOnce(&PropagateExtensionWakeResult, std::move(callback)));
@@ -560,7 +565,7 @@ void ProcessManager::NetworkRequestDone(
   ExtensionHost* host = result->second;
   pending_network_requests_.erase(result);
 
-  if (!base::Contains(background_hosts_, host)) {
+  if (!background_hosts_.contains(host)) {
     return;
   }
 
@@ -667,7 +672,7 @@ void ProcessManager::CloseBackgroundHost(ExtensionHost* host) {
         mojom::ViewType::kExtensionBackgroundPage);
   delete host;
   // |host| should deregister itself from our structures.
-  CHECK(!base::Contains(background_hosts_, host));
+  CHECK(!background_hosts_.contains(host));
 
   for (auto& observer : observer_list_)
     observer.OnBackgroundHostClose(extension_id);
@@ -737,11 +742,6 @@ base::Uuid ProcessManager::IncrementServiceWorkerKeepaliveCount(
 
   service_worker_keepalives_[request_uuid] = ServiceWorkerKeepaliveData{
       worker_id, activity_type, extra_data, timeout_type, start_result};
-
-  base::UmaHistogramEnumeration(
-      "Extensions.ServiceWorkerBackground."
-      "ProcessManagerStartingExternalRequestResult",
-      start_result);
 
   return request_uuid;
 }
@@ -1035,7 +1035,7 @@ void ProcessManager::OnExtensionHostDestroyed(ExtensionHost* host) {
   TRACE_EVENT0("browser,startup", "ProcessManager::OnExtensionHostDestroyed");
   host->RemoveObserver(this);
 
-  DCHECK(base::Contains(background_hosts_, host));
+  DCHECK(background_hosts_.contains(host));
   background_hosts_.erase(host);
   // Note: |host->extension()| may be null at this point.
   ClearBackgroundPageData(host->extension_id());

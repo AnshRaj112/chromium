@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "chrome/install_static/install_modes.h"
 
 #include <windows.h>
 
 #include <cguid.h>
 
+#include "base/compiler_specific.h"
 #include "base/strings/string_util.h"
 #include "chrome/install_static/buildflags.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -36,7 +32,7 @@ namespace {
 MATCHER(ContainsIllegalProgIdChar, "") {
   const wchar_t* scan = arg;
   wchar_t c;
-  while ((c = *scan++) != 0) {
+  while ((c = *UNSAFE_TODO(scan++)) != 0) {
     if (!base::IsAsciiAlphaNumeric(c) && c != L'.') {
       return true;
     }
@@ -125,6 +121,9 @@ TEST(InstallModes, VerifyModes) {
 
     // Assert that pdf_doc_icon_resource_index is set.
     ASSERT_THAT(mode.pdf_doc_icon_resource_index, Ne(0));
+
+    // Every mode must specify a direct launch URL scheme; empty string is okay.
+    ASSERT_THAT(mode.direct_launch_url_scheme, Ne(nullptr));
 
     // UNSUPPORTED and USE_GOOGLE_UPDATE_INTEGRATION are mutually exclusive.
 #if !BUILDFLAG(USE_GOOGLE_UPDATE_INTEGRATION)

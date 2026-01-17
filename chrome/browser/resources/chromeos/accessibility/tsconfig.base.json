@@ -1,11 +1,9 @@
 {
   "extends": "../../../../../tools/typescript/tsconfig_base.json",
   "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "classic",
     "noUncheckedIndexedAccess": false,
-    "allowJs": true,
-    "typeRoots": ["../../../../../third_party/node/node_modules/@types"],
-    "types": [
-      "w3c-image-capture"
-    ]
+    "allowJs": true
   }
 }

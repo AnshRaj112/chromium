@@ -197,12 +197,12 @@ ExecutionContext* SVGScriptElement::GetExecutionContext() const {
 }
 
 Element& SVGScriptElement::CloneWithoutAttributesAndChildren(
-    Document& factory) const {
+    Document& factory,
+    CustomElementRegistry* registry) const {
   CreateElementFlags flags =
       CreateElementFlags::ByCloneNode().SetAlreadyStarted(
           loader_->AlreadyStarted());
-  return *factory.CreateElement(TagQName(), flags, IsValue(),
-                                /*registry*/ nullptr);
+  return *factory.CreateElement(TagQName(), flags, IsValue(), registry);
 }
 
 void SVGScriptElement::DispatchLoadEvent() {
@@ -229,9 +229,12 @@ bool SVGScriptElement::IsAnimatableAttribute(const QualifiedName& name) const {
 
 const AttrNameToTrustedType& SVGScriptElement::GetCheckedAttributeTypes()
     const {
-  DEFINE_STATIC_LOCAL(AttrNameToTrustedType, attribute_map,
-                      ({{"href", std::pair{SpecificTrustedType::kScriptURL,
-                                           "SVGScriptElement"}}}));
+  DEFINE_STATIC_LOCAL(
+      AttrNameToTrustedType, attribute_map,
+      ({{"href", std::pair{SpecificTrustedType::kScriptURL,
+                           trusted_types_names::kSVGScriptElement}}
+
+      }));
   return attribute_map;
 }
 

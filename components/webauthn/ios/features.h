@@ -12,4 +12,14 @@
 // Keep as a kill switch after enabling by default.
 BASE_DECLARE_FEATURE(kIOSPasskeyShim);
 
+// Allow modal passkey logins to happen directly in the browser, without using
+// the Credential Provider Extension.
+// This is a no-op if kIOSPasskeyShim is disabled.
+BASE_DECLARE_FEATURE(kIOSPasskeyModalLoginWithShim);
+
+// Allow conditional passkey logins to happen directly in the browser, without
+// using the Credential Provider Extension. This is a no-op if kIOSPasskeyShim
+// is disabled.
+BASE_DECLARE_FEATURE(kIOSPasskeyConditionalLoginWithShim);
+
 #endif  // COMPONENTS_WEBAUTHN_IOS_FEATURES_H_

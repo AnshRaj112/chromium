@@ -14,7 +14,6 @@
 
 #include "base/check_op.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/feature_list.h"
 #include "base/lazy_instance.h"
@@ -47,20 +46,20 @@ const char kTextPlain[] = "text/plain";
 
 // Javascript MIME type suffixes for use in CORB protection logging. See also
 // https://mimesniff.spec.whatwg.org/#javascript-mime-type.
-const char* kJavaScriptSuffixes[] = {"ecmascript",
-                                     "javascript",
-                                     "x-ecmascript",
-                                     "x-javascript",
-                                     "javascript1.0",
-                                     "javascript1.1",
-                                     "javascript1.2",
-                                     "javascript1.3",
-                                     "javascript1.4",
-                                     "javascript1.5",
-                                     "jscript",
-                                     "livescript",
-                                     "js",
-                                     "x-js"};
+constexpr const char* kJavaScriptSuffixes[] = {"ecmascript",
+                                               "javascript",
+                                               "x-ecmascript",
+                                               "x-javascript",
+                                               "javascript1.0",
+                                               "javascript1.1",
+                                               "javascript1.2",
+                                               "javascript1.3",
+                                               "javascript1.4",
+                                               "javascript1.5",
+                                               "jscript",
+                                               "livescript",
+                                               "js",
+                                               "x-js"};
 
 // TODO(lukasza): Remove kJsonProtobuf once this MIME type is not used in
 // practice.  See also https://crbug.com/826756#c3
@@ -218,8 +217,7 @@ MimeType GetCanonicalMimeType(std::string_view mime_type) {
     return MimeType::kPlain;
   }
 
-  if (base::Contains(GetNeverSniffedMimeTypes(),
-                     base::ToLowerASCII(mime_type))) {
+  if (GetNeverSniffedMimeTypes().contains(base::ToLowerASCII(mime_type))) {
     return MimeType::kNeverSniffed;
   }
 

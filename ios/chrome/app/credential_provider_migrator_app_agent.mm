@@ -6,7 +6,6 @@
 
 #import <map>
 
-#import "base/containers/contains.h"
 #import "base/functional/bind.h"
 #import "base/functional/callback.h"
 #import "base/functional/callback_helpers.h"
@@ -59,6 +58,14 @@ void MigrationCompleteForProfile(
     const std::string& profile_name,
     BOOL success,
     NSError* error) {
+  if (!success && error &&
+      [error.domain isEqualToString:kCredentialProviderMigratorErrorDomain] &&
+      error.code == kCredentialProviderMigratorErrorBackgroundedApp) {
+    // We can't attempt to migrate credentials while the app is backgrounded.
+    // Credentials will be imported when `appDidEnterForeground` is called.
+    return;
+  }
+
   DCHECK(success) << error.localizedDescription;
   [app_agent migrationCompleteForProfile:weak_profile.get()
                              profileName:profile_name];
@@ -138,6 +145,9 @@ void MigrationCompleteForProfile(
   }
 }
 
+- (void)passkeyModelDidChange {
+}
+
 #pragma mark - Private
 
 // Returns whether multiple profiles have at least one scene connected.
@@ -202,7 +212,7 @@ void MigrationCompleteForProfile(
                        userDefaults:(NSUserDefaults*)userDefaults {
   CHECK(profile);
   // Do nothing if the migration for the profile already started.
-  if (base::Contains(_migratorMap, profile->GetProfileName())) {
+  if (_migratorMap.contains(profile->GetProfileName())) {
     return;
   }
 
@@ -262,7 +272,7 @@ void MigrationCompleteForProfile(
 
 // Returns whether we already own an observer for the provided passkey model.
 - (BOOL)isObservingPasskeyModel:(webauthn::PasskeyModel*)passkeyModel {
-  return base::Contains(_passkeyModelObservers, passkeyModel);
+  return _passkeyModelObservers.contains(passkeyModel);
 }
 
 // Adds an observer for the provided passkey model.

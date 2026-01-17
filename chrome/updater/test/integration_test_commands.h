@@ -12,6 +12,7 @@
 #include "base/values.h"
 #include "build/build_config.h"
 #include "chrome/updater/external_constants.h"
+#include "chrome/updater/registration_data.h"
 #include "chrome/updater/test/integration_tests_impl.h"
 #include "chrome/updater/test/test_scope.h"
 #include "chrome/updater/update_service.h"
@@ -22,10 +23,6 @@ namespace base {
 class FilePath;
 class Version;
 }  // namespace base
-
-namespace updater {
-struct RegistrationRequest;
-}  // namespace updater
 
 namespace updater::test {
 
@@ -67,12 +64,14 @@ class IntegrationTestCommands
   virtual void SetActive(const std::string& app_id) const = 0;
   virtual void ExpectActive(const std::string& app_id) const = 0;
   virtual void ExpectNotActive(const std::string& app_id) const = 0;
-  virtual void ExpectSelfUpdateSequence(ScopedServer* test_server) const = 0;
-  virtual void ExpectPing(ScopedServer* test_server,
+  virtual void ExpectSelfUpdateSequence(ScopedServer& test_server) const = 0;
+  virtual void ExpectPing(ScopedServer& test_server,
                           int event_type,
                           std::optional<GURL> target_url) const = 0;
+  virtual void ExpectInstallSource(ScopedServer& test_server,
+                                   const std::string& install_source) const = 0;
   virtual void ExpectAppCommandPing(
-      ScopedServer* test_server,
+      ScopedServer& test_server,
       const std::string& appid,
       const std::string& appcommandid,
       int errorcode,
@@ -80,15 +79,15 @@ class IntegrationTestCommands
       int event_type,
       const base::Version& version,
       const base::Version& updater_version) const = 0;
-  virtual void ExpectUpdateCheckRequest(ScopedServer* test_server) const = 0;
+  virtual void ExpectUpdateCheckRequest(ScopedServer& test_server) const = 0;
   virtual void ExpectUpdateCheckSequence(
-      ScopedServer* test_server,
+      ScopedServer& test_server,
       const std::string& app_id,
       UpdateService::Priority priority,
       const base::Version& from_version,
       const base::Version& to_version,
       const base::Version& updater_version) const = 0;
-  virtual void ExpectUpdateSequence(ScopedServer* test_server,
+  virtual void ExpectUpdateSequence(ScopedServer& test_server,
                                     const std::string& app_id,
                                     const std::string& install_data_index,
                                     UpdateService::Priority priority,
@@ -97,15 +96,16 @@ class IntegrationTestCommands
                                     bool do_fault_injection,
                                     bool skip_download,
                                     const base::Version& updater_version,
-                                    const std::string& event_regex) const = 0;
+                                    const std::string& event_regex,
+                                    bool use_xz) const = 0;
   virtual void ExpectUpdateSequenceBadHash(
-      ScopedServer* test_server,
+      ScopedServer& test_server,
       const std::string& app_id,
       const std::string& install_data_index,
       UpdateService::Priority priority,
       const base::Version& from_version,
       const base::Version& to_version) const = 0;
-  virtual void ExpectInstallSequence(ScopedServer* test_server,
+  virtual void ExpectInstallSequence(ScopedServer& test_server,
                                      const std::string& app_id,
                                      const std::string& install_data_index,
                                      UpdateService::Priority priority,
@@ -116,7 +116,7 @@ class IntegrationTestCommands
                                      const base::Version& updater_version,
                                      const std::string& event_regex) const = 0;
   virtual void ExpectEnterpriseCompanionAppOTAInstallSequence(
-      ScopedServer* test_server) const = 0;
+      ScopedServer& test_server) const = 0;
   virtual void ExpectVersionActive(const std::string& version) const = 0;
   virtual void ExpectVersionNotActive(const std::string& version) const = 0;
   virtual void Uninstall() const = 0;
@@ -146,6 +146,8 @@ class IntegrationTestCommands
   virtual void RunWakeActive(int exit_code) const = 0;
   virtual void RunCrashMe() const = 0;
   virtual void RunServer(int exit_code, bool internal) const = 0;
+  virtual void RunUpdateApps(int exit_code,
+                             const base::Version& version) const = 0;
 
   virtual void RegisterApp(const RegistrationRequest& registration) const = 0;
   virtual void CheckForUpdate(const std::string& app_id) const = 0;
@@ -171,6 +173,7 @@ class IntegrationTestCommands
       int expected_error_code,
       bool cancel_when_downloading) const = 0;
   virtual void ExpectLegacyProcessLauncherSucceeds() const = 0;
+  virtual void ExpectProcessLauncherLaunchCmdLineSucceeds() const = 0;
   virtual void ExpectLegacyAppCommandWebSucceeds(
       const std::string& app_id,
       const std::string& command_id,
@@ -182,6 +185,15 @@ class IntegrationTestCommands
                                 const base::Version& version) const = 0;
   virtual void RunUninstallCmdLine() const = 0;
   virtual void RunHandoff(const std::string& app_id) const = 0;
+  virtual void InstallScheduledTask(bool run_elevated,
+                                    const std::string& task_name,
+                                    bool use_task_subfolders) const = 0;
+  virtual void IsScheduledTaskRegistered(bool run_elevated,
+                                         const std::string& task_name,
+                                         bool use_task_subfolders) const = 0;
+  virtual void DeleteScheduledTask(bool run_elevated,
+                                   const std::string& task_name,
+                                   bool use_task_subfolders) const = 0;
 #endif  // BUILDFLAG(IS_WIN)
   virtual void InstallAppViaService(
       const std::string& app_id,
@@ -222,7 +234,8 @@ class IntegrationTestCommands
   virtual void RunOfflineInstall(bool is_legacy_install,
                                  bool is_silent_install,
                                  int installer_result,
-                                 int installer_error) = 0;
+                                 int installer_error,
+                                 const std::string& install_source) = 0;
   virtual void RunOfflineInstallOsNotSupported(bool is_legacy_install,
                                                bool is_silent_install,
                                                const std::string& language) = 0;

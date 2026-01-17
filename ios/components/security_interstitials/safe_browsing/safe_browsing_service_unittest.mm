@@ -2,7 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#import <optional>
+#import <string>
+
 #import "base/files/scoped_temp_dir.h"
+#import "base/functional/callback_helpers.h"
 #import "base/memory/raw_ptr.h"
 #import "base/path_service.h"
 #import "base/run_loop.h"
@@ -176,7 +180,8 @@ class TestRealtimeUrlLookupService
             variations_service_getter,
             min_allowed_timestamp_for_referrer_chains_getter,
             referrer_chain_provider,
-            delegate) {}
+            delegate,
+            /*intelligent_scan_delegate=*/nullptr) {}
 
   bool CanCheckSafeBrowsingDb() const override {
     return can_check_safe_browsing_db_;
@@ -268,7 +273,7 @@ class SafeBrowsingServiceTest : public PlatformTest {
     threat_info->set_threat_type(
         safe_browsing::RTLookupResponse::ThreatInfo::SOCIAL_ENGINEERING);
     threat_info->set_cache_duration_sec(100);
-    threat_info->set_cache_expression_using_match_type(bad_url.host() + "/");
+    threat_info->set_cache_expression_using_match_type(bad_url.GetHost() + "/");
     threat_info->set_cache_expression_match_type(
         safe_browsing::RTLookupResponse::ThreatInfo::COVERING_MATCH);
     verdict_cache_manager_->CacheRealTimeUrlVerdict(response,
@@ -286,12 +291,12 @@ class SafeBrowsingServiceTest : public PlatformTest {
   sync_preferences::TestingPrefServiceSyncable pref_service_;
   scoped_refptr<SafeBrowsingService> safe_browsing_service_;
   std::unique_ptr<web::FakeBrowserState> browser_state_;
-  std::unique_ptr<FakeSafeBrowsingClient> safe_browsing_client_;
   safe_browsing::hash_realtime_utils::GoogleChromeBrandingPretenderForTesting
       apply_branding_;
   base::test::ScopedFeatureList scoped_feature_list_;
   web::FakeWebState web_state_;
   std::unique_ptr<TestRealtimeUrlLookupService> lookup_service_;
+  std::unique_ptr<FakeSafeBrowsingClient> safe_browsing_client_;
 
  private:
   void MarkUrlAsMalwareOnUIThread(const GURL& bad_url) {
@@ -348,12 +353,13 @@ class SafeBrowsingServiceTest : public PlatformTest {
   base::ScopedTempDir temp_dir_;
 
   // Owned by V4Database.
-  raw_ptr<safe_browsing::TestV4DatabaseFactory> v4_db_factory_;
+  raw_ptr<safe_browsing::TestV4DatabaseFactory, DanglingUntriaged>
+      v4_db_factory_;
   // Owned by V4GetHashProtocolManager.
-  raw_ptr<safe_browsing::TestV4GetHashProtocolManagerFactory>
+  raw_ptr<safe_browsing::TestV4GetHashProtocolManagerFactory, DanglingUntriaged>
       v4_get_hash_factory_;
   // Owned by V4Database.
-  raw_ptr<safe_browsing::TestV4StoreFactory> store_factory_;
+  raw_ptr<safe_browsing::TestV4StoreFactory, DanglingUntriaged> store_factory_;
   scoped_refptr<HostContentSettingsMap> host_content_settings_map_;
   std::unique_ptr<safe_browsing::VerdictCacheManager> verdict_cache_manager_;
 };
@@ -734,7 +740,7 @@ TEST_F(SafeBrowsingServiceTest, PersistentCookies) {
   base::RunLoop run_loop2;
   url_loader->DownloadToStringOfUnboundedSizeUntilCrashAndDie(
       safe_browsing_service_->GetURLLoaderFactory().get(),
-      base::BindLambdaForTesting([&](std::unique_ptr<std::string> body) {
+      base::BindLambdaForTesting([&](std::optional<std::string> body) {
         EXPECT_NE(std::string::npos, body->find(cookie));
         run_loop2.Quit();
       }));
@@ -781,7 +787,7 @@ TEST_F(SafeBrowsingServiceTest, ClearCookies) {
   base::RunLoop run_loop3;
   url_loader->DownloadToStringOfUnboundedSizeUntilCrashAndDie(
       safe_browsing_service_->GetURLLoaderFactory().get(),
-      base::BindLambdaForTesting([&](std::unique_ptr<std::string> body) {
+      base::BindLambdaForTesting([&](std::optional<std::string> body) {
         EXPECT_NE(std::string::npos, body->find(cookie));
         run_loop3.Quit();
       }));
@@ -802,7 +808,7 @@ TEST_F(SafeBrowsingServiceTest, ClearCookies) {
   base::RunLoop run_loop5;
   url_loader->DownloadToStringOfUnboundedSizeUntilCrashAndDie(
       safe_browsing_service_->GetURLLoaderFactory().get(),
-      base::BindLambdaForTesting([&](std::unique_ptr<std::string> body) {
+      base::BindLambdaForTesting([&](std::optional<std::string> body) {
         EXPECT_EQ(std::string::npos, body->find(cookie));
         run_loop5.Quit();
       }));
@@ -828,7 +834,7 @@ TEST_F(SafeBrowsingServiceTest, NonEmptyUserAgent) {
   base::RunLoop run_loop;
   url_loader->DownloadToStringOfUnboundedSizeUntilCrashAndDie(
       safe_browsing_service_->GetURLLoaderFactory().get(),
-      base::BindLambdaForTesting([&](std::unique_ptr<std::string> body) {
+      base::BindLambdaForTesting([&](std::optional<std::string> body) {
         EXPECT_FALSE(body->empty());
         run_loop.Quit();
       }));

@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <memory>
 
-#include "base/containers/contains.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/ime/mock_input_method.h"
 #include "ui/views/test/widget_test.h"
@@ -61,6 +60,9 @@ class TestHWNDMessageHandlerDelegate : public HWNDMessageHandlerDelegate {
   }
   void ResetWindowControls() override {}
   gfx::NativeViewAccessible GetNativeViewAccessible() override {
+    return nullptr;
+  }
+  gfx::NativeViewAccessible GetParentNativeViewAccessible() override {
     return nullptr;
   }
   void HandleActivationChanged(bool active) override {}
@@ -152,7 +154,7 @@ TEST_F(HWNDMessageHandlerTest, GetOwnedWindows) {
 
   std::vector<HWND> owned_windows = parent_handler->GetOwnedWindows();
   ASSERT_EQ(1u, owned_windows.size());
-  EXPECT_TRUE(base::Contains(owned_windows, child_handler->hwnd()));
+  EXPECT_TRUE(std::ranges::contains(owned_windows, child_handler->hwnd()));
 
   child_handler->CloseNow();
   parent_handler->CloseNow();
@@ -192,9 +194,9 @@ TEST_F(HWNDMessageHandlerTest, GetOwnedWindows_Depth3) {
 
   std::vector<HWND> owned_windows = grandparent_handler->GetOwnedWindows();
   ASSERT_EQ(3u, owned_windows.size());
-  EXPECT_TRUE(base::Contains(owned_windows, parent1_handler->hwnd()));
-  EXPECT_TRUE(base::Contains(owned_windows, parent2_handler->hwnd()));
-  EXPECT_TRUE(base::Contains(owned_windows, child_handler->hwnd()));
+  EXPECT_TRUE(std::ranges::contains(owned_windows, parent1_handler->hwnd()));
+  EXPECT_TRUE(std::ranges::contains(owned_windows, parent2_handler->hwnd()));
+  EXPECT_TRUE(std::ranges::contains(owned_windows, child_handler->hwnd()));
 
   child_handler->CloseNow();
   parent2_handler->CloseNow();

@@ -16,11 +16,9 @@
 
 #include "base/check.h"
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
@@ -237,7 +235,8 @@ class TestSharedStorageDevToolsClient : public TestDevToolsProtocolClient {
                                base::span<const uint8_t> message) override {
     std::string_view message_str(reinterpret_cast<const char*>(message.data()),
                                  message.size());
-    base::Value parsed = *base::JSONReader::Read(message_str);
+    base::Value parsed = *base::JSONReader::Read(
+        message_str, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
     std::optional<int> id = parsed.GetDict().FindInt("id");
     if (!id) {
       const std::string* notification = parsed.GetDict().FindString("method");
@@ -281,7 +280,6 @@ class TestSharedStorageDevToolsClient : public TestDevToolsProtocolClient {
 };
 
 }  // namespace
-
 
 class SharedStorageTrustedOriginsResponse
     : public net::test_server::BasicHttpResponse {
@@ -403,7 +401,7 @@ class SharedStorageBrowserTest : public SharedStorageBrowserTestBase,
   HandleSharedStorageTrustedOriginsRequest(
       const std::vector<base::Value>& json_well_known_trusted_origin_lists,
       const net::test_server::HttpRequest& request) {
-    const auto& path = request.GetURL().path();
+    const auto& path = request.GetURL().GetPath();
     if (path != kSharedStorageTrustedOriginsPath ||
         json_well_known_trusted_origin_lists.empty()) {
       return nullptr;
@@ -413,6 +411,19 @@ class SharedStorageBrowserTest : public SharedStorageBrowserTestBase,
     return std::make_unique<SharedStorageTrustedOriginsResponse>(
         &json_well_known_trusted_origin_lists[index], port(),
         force_server_error_);
+  }
+
+  bool NavigateToUrlMaybeWaitForRfhDeleted(Shell* shell, GURL url) {
+    auto* rfh = shell->web_contents()->GetPrimaryMainFrame();
+    bool result;
+    if (rfh->ShouldChangeRenderFrameHostOnSameSiteNavigation()) {
+      RenderFrameDeletedObserver observer(rfh);
+      result = NavigateToURL(shell, url);
+      observer.WaitUntilDeleted();
+    } else {
+      result = NavigateToURL(shell, url);
+    }
+    return result;
   }
 
  private:
@@ -614,6 +625,11 @@ IN_PROC_BROWSER_TEST_P(SharedStorageBrowserTest,
 
 IN_PROC_BROWSER_TEST_P(SharedStorageBrowserTest,
                        AddModue_TheThirdTimeCompilesWithV8CodeCache) {
+  if (blink::features::IsPersistentCacheForCodeCacheEnabled()) {
+    GTEST_SKIP() << "SharedStorage does not use a CodeCache when "
+                    "UsePersistentCacheForCodeCache is enabled.";
+  }
+
   // The test assumes pages get deleted after navigation. To ensure this,
   // disable back/forward cache.
   content::DisableBackForwardCacheForTesting(
@@ -788,7 +804,8 @@ IN_PROC_BROWSER_TEST_P(SharedStorageBrowserTest,
   content::FetchHistogramsFromChildProcesses();
 
   // Navigate to terminate the worklet.
-  EXPECT_TRUE(NavigateToURL(shell(), GURL(url::kAboutBlankURL)));
+  EXPECT_TRUE(
+      NavigateToUrlMaybeWaitForRfhDeleted(shell(), GURL(url::kAboutBlankURL)));
 
   histogram_tester_.ExpectUniqueSample(
       kDestroyedStatusHistogram,
@@ -1301,7 +1318,8 @@ IN_PROC_BROWSER_TEST_P(SharedStorageBrowserTest, WorkletDestroyed) {
   EXPECT_EQ(1u, test_runtime_manager().GetAttachedWorkletHostsCount());
   EXPECT_EQ(0u, test_runtime_manager().GetKeepAliveWorkletHostsCount());
 
-  EXPECT_TRUE(NavigateToURL(shell(), GURL(url::kAboutBlankURL)));
+  EXPECT_TRUE(
+      NavigateToUrlMaybeWaitForRfhDeleted(shell(), GURL(url::kAboutBlankURL)));
 
   EXPECT_EQ(0u, test_runtime_manager().GetAttachedWorkletHostsCount());
   EXPECT_EQ(0u, test_runtime_manager().GetKeepAliveWorkletHostsCount());
@@ -1368,7 +1386,8 @@ IN_PROC_BROWSER_TEST_P(SharedStorageBrowserTest, TwoWorklets) {
             base::UTF16ToUTF8(console_observer.messages()[2].message));
 
   // Navigate again to record histograms.
-  EXPECT_TRUE(NavigateToURL(shell(), GURL(url::kAboutBlankURL)));
+  EXPECT_TRUE(
+      NavigateToUrlMaybeWaitForRfhDeleted(shell(), GURL(url::kAboutBlankURL)));
   WaitForHistograms(
       {kDestroyedStatusHistogram, kTimingUsefulResourceHistogram});
 
@@ -1420,7 +1439,8 @@ IN_PROC_BROWSER_TEST_P(
                                EXECUTE_SCRIPT_NO_RESOLVE_PROMISES);
 
   // Navigate to trigger keep-alive
-  EXPECT_TRUE(NavigateToURL(shell(), GURL(url::kAboutBlankURL)));
+  EXPECT_TRUE(
+      NavigateToUrlMaybeWaitForRfhDeleted(shell(), GURL(url::kAboutBlankURL)));
 
   EXPECT_EQ(0u, test_runtime_manager().GetAttachedWorkletHostsCount());
   EXPECT_EQ(1u, test_runtime_manager().GetKeepAliveWorkletHostsCount());
@@ -1488,7 +1508,8 @@ IN_PROC_BROWSER_TEST_P(SharedStorageBrowserTest,
                                EXECUTE_SCRIPT_NO_RESOLVE_PROMISES);
 
   // Navigate to trigger keep-alive
-  EXPECT_TRUE(NavigateToURL(shell(), GURL(url::kAboutBlankURL)));
+  EXPECT_TRUE(
+      NavigateToUrlMaybeWaitForRfhDeleted(shell(), GURL(url::kAboutBlankURL)));
 
   EXPECT_EQ(0u, test_runtime_manager().GetAttachedWorkletHostsCount());
   EXPECT_EQ(1u, test_runtime_manager().GetKeepAliveWorkletHostsCount());
@@ -1564,7 +1585,8 @@ IN_PROC_BROWSER_TEST_P(
     )"));
 
   // Navigate to trigger keep-alive
-  EXPECT_TRUE(NavigateToURL(shell(), GURL(url::kAboutBlankURL)));
+  EXPECT_TRUE(
+      NavigateToUrlMaybeWaitForRfhDeleted(shell(), GURL(url::kAboutBlankURL)));
 
   EXPECT_EQ(0u, test_runtime_manager().GetAttachedWorkletHostsCount());
   EXPECT_EQ(1u, test_runtime_manager().GetKeepAliveWorkletHostsCount());
@@ -1682,7 +1704,8 @@ IN_PROC_BROWSER_TEST_P(
   EXPECT_TRUE(result.is_ok());
 
   // Navigate to trigger keep-alive
-  EXPECT_TRUE(NavigateToURL(shell(), GURL(url::kAboutBlankURL)));
+  EXPECT_TRUE(
+      NavigateToUrlMaybeWaitForRfhDeleted(shell(), GURL(url::kAboutBlankURL)));
 
   EXPECT_EQ(0u, test_runtime_manager().GetAttachedWorkletHostsCount());
   EXPECT_EQ(1u, test_runtime_manager().GetKeepAliveWorkletHostsCount());
@@ -1835,7 +1858,8 @@ IN_PROC_BROWSER_TEST_P(SharedStorageBrowserTest, KeepAlive_SubframeWorklet) {
             base::UTF16ToUTF8(console_observer.messages()[0].message));
 
   // Navigate again to record histograms.
-  EXPECT_TRUE(NavigateToURL(shell(), GURL(url::kAboutBlankURL)));
+  EXPECT_TRUE(
+      NavigateToUrlMaybeWaitForRfhDeleted(shell(), GURL(url::kAboutBlankURL)));
   WaitForHistograms({kDestroyedStatusHistogram, kTimingUsefulResourceHistogram,
                      kTimingKeepAliveDurationHistogram});
 
@@ -1891,11 +1915,8 @@ IN_PROC_BROWSER_TEST_P(
                                EXECUTE_SCRIPT_NO_RESOLVE_PROMISES);
 
   // Navigate to trigger keep-alive
-  RenderFrameDeletedObserver rfh_deleted_observer(
-      shell()->web_contents()->GetPrimaryMainFrame());
-  EXPECT_TRUE(NavigateToURL(shell(),
-                            https_server()->GetURL("c.test", kSimplePagePath)));
-  rfh_deleted_observer.WaitUntilDeleted();
+  EXPECT_TRUE(NavigateToUrlMaybeWaitForRfhDeleted(
+      shell(), https_server()->GetURL("c.test", kSimplePagePath)));
 
   EXPECT_EQ(0u, test_runtime_manager().GetAttachedWorkletHostsCount());
   EXPECT_EQ(1u, test_runtime_manager().GetKeepAliveWorkletHostsCount());
@@ -1933,11 +1954,8 @@ IN_PROC_BROWSER_TEST_P(
       EXECUTE_SCRIPT_NO_RESOLVE_PROMISES);
 
   // Navigate to trigger keep-alive
-  RenderFrameDeletedObserver rfh_deleted_observer(
-      shell()->web_contents()->GetPrimaryMainFrame());
-  EXPECT_TRUE(NavigateToURL(shell(),
-                            https_server()->GetURL("c.test", kSimplePagePath)));
-  rfh_deleted_observer.WaitUntilDeleted();
+  EXPECT_TRUE(NavigateToUrlMaybeWaitForRfhDeleted(
+      shell(), https_server()->GetURL("c.test", kSimplePagePath)));
 
   EXPECT_EQ(0u, test_runtime_manager().GetAttachedWorkletHostsCount());
   EXPECT_EQ(1u, test_runtime_manager().GetKeepAliveWorkletHostsCount());
@@ -4428,7 +4446,8 @@ IN_PROC_BROWSER_TEST_P(SharedStorageBrowserTest, WebLocksUsageHistograms) {
                          &out_script_url);
 
   // Navigate again to record histograms.
-  EXPECT_TRUE(NavigateToURL(shell(), GURL(url::kAboutBlankURL)));
+  EXPECT_TRUE(
+      NavigateToUrlMaybeWaitForRfhDeleted(shell(), GURL(url::kAboutBlankURL)));
 
   histogram_tester_.ExpectBucketCount(
       "Storage.SharedStorage.UpdateMethod.HasLockOption", true, 1);
@@ -5883,11 +5902,11 @@ class SharedStorageHeaderObserverBrowserTest
       const std::vector<std::string>& extra_headers) {
     response.WaitForRequest();
     if (expect_writable_header) {
-      ASSERT_TRUE(base::Contains(response.http_request()->headers,
-                                 "Sec-Shared-Storage-Writable"));
+      ASSERT_TRUE(response.http_request()->headers.contains(
+          "Sec-Shared-Storage-Writable"));
     } else {
-      EXPECT_FALSE(base::Contains(response.http_request()->headers,
-                                  "Sec-Shared-Storage-Writable"));
+      EXPECT_FALSE(response.http_request()->headers.contains(
+          "Sec-Shared-Storage-Writable"));
     }
     EXPECT_EQ(response.http_request()->content, "");
     response.Send(http_status, content_type,

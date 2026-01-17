@@ -17,7 +17,8 @@ export function getHtml(this: ColorPipelineInternalsAppElement) {
     @narrow-changed="${this.onNarrowChanged_}"
     narrow-threshold="780">
 </cr-toolbar>
-<div id="container">
+<div id="container" class="cr-scrollable">
+  <div class="cr-scrollable-top-shadow"></div>
   <div id="left" ?hidden="${this.narrow_}">
     <div role="navigation">
       <h2>Navigation</h2>
@@ -65,15 +66,16 @@ export function getHtml(this: ColorPipelineInternalsAppElement) {
   </div>
   <div id="right" ?hidden="${this.narrow_}">
     <h2>Color Info</h2>
-    <div id="colorInfo" ?hidden="${!this.currentColor_}"
-    <p>R: ${this.red_}</p>
-    <p>G: ${this.green_}</p>
-    <p>B: ${this.blue_}</p>
-    <p>A: ${this.alpha_}</p>
-    <p>In //resources/cr_elements/cr_shared_vars.css.js:</p>
-    <p class="varName">${this.cssName_}</p>
-    <p>In //ui/color/color_id.h:</p>
-    <p class="varName">${this.cppName_}</p>
+    <div id="colorInfo" ?hidden="${!this.currentColor_}">
+      <p>R: ${this.red_}</p>
+      <p>G: ${this.green_}</p>
+      <p>B: ${this.blue_}</p>
+      <p>A: ${this.alpha_}</p>
+      <p>In //resources/cr_elements/cr_shared_vars.css.js:</p>
+      <p class="varName">${this.cssName_}</p>
+      <p>In //ui/color/color_id.h:</p>
+      <p class="varName">${this.cppName_}</p>
+    </div>
   </div>
 </div>`;
   // clang-format on

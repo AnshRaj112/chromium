@@ -36,7 +36,7 @@ class TabListSceneLayer : public SceneLayer {
   void BeginBuildingFrame(JNIEnv* env);
   void FinishBuildingFrame(JNIEnv* env);
   void UpdateLayer(JNIEnv* env,
-                   jint background_color,
+                   int32_t background_color,
                    jfloat viewport_x,
                    jfloat viewport_y,
                    jfloat viewport_width,
@@ -45,15 +45,15 @@ class TabListSceneLayer : public SceneLayer {
   // used to indicate the currently selected tab for the TabLayer.
   // TODO(dtrainor): This method is ridiculous.  Break this apart?
   void PutTabLayer(JNIEnv* env,
-                   jint id,
-                   jint toolbar_resource_id,
-                   jint shadow_resource_id,
-                   jint contour_resource_id,
-                   jint border_resource_id,
-                   jint border_inner_shadow_resource_id,
-                   jboolean can_use_live_layer,
-                   jint tab_background_color,
-                   jboolean incognito,
+                   int32_t id,
+                   int32_t toolbar_resource_id,
+                   int32_t shadow_resource_id,
+                   int32_t contour_resource_id,
+                   int32_t border_resource_id,
+                   int32_t border_inner_shadow_resource_id,
+                   bool can_use_live_layer,
+                   int32_t tab_background_color,
+                   bool incognito,
                    jfloat x,
                    jfloat y,
                    jfloat width,
@@ -70,23 +70,23 @@ class TabListSceneLayer : public SceneLayer {
                    jfloat static_to_view_blend,
                    jfloat border_scale,
                    jfloat saturation,
-                   jboolean show_toolbar,
-                   jint default_theme_color,
-                   jint toolbar_background_color,
-                   jboolean anonymize_toolbar,
-                   jint toolbar_textbox_resource_id,
-                   jint toolbar_textbox_background_color,
+                   bool show_toolbar,
+                   int32_t default_theme_color,
+                   int32_t toolbar_background_color,
+                   bool anonymize_toolbar,
+                   int32_t toolbar_textbox_resource_id,
+                   int32_t toolbar_textbox_background_color,
                    jfloat content_offset);
 
   void PutBackgroundLayer(JNIEnv* env,
-                          jint resource_id,
+                          int32_t resource_id,
                           jfloat alpha,
-                          jint top_offset);
+                          int32_t top_offset);
 
   void SetDependencies(
       JNIEnv* env,
-      const base::android::JavaParamRef<jobject>& jtab_content_manager,
-      const base::android::JavaParamRef<jobject>& jresource_manager);
+      const base::android::JavaRef<jobject>& jtab_content_manager,
+      const base::android::JavaRef<jobject>& jresource_manager);
 
   void OnDetach() override;
   bool ShouldShowBackground() override;

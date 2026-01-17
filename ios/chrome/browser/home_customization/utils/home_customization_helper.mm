@@ -26,30 +26,17 @@
       return l10n_util::GetNSString(IDS_IOS_HOME_CUSTOMIZATION_DISCOVER_TITLE);
 
       // Magic Stack page toggles.
-    case CustomizationToggleType::kSetUpList:
-      return l10n_util::GetNSString(
-          IDS_IOS_HOME_CUSTOMIZATION_MAGIC_STACK_TITLE_SET_UP_LIST);
     case CustomizationToggleType::kSafetyCheck:
       return l10n_util::GetNSString(
           IDS_IOS_HOME_CUSTOMIZATION_MAGIC_STACK_TITLE_SAFETY_CHECK);
     case CustomizationToggleType::kTapResumption:
       return l10n_util::GetNSString(
           IDS_IOS_HOME_CUSTOMIZATION_MAGIC_STACK_TITLE_TAB_RESUMPTION);
-    case CustomizationToggleType::kParcelTracking:
-      return l10n_util::GetNSString(
-          IDS_IOS_HOME_CUSTOMIZATION_MAGIC_STACK_TITLE_PARCEL_TRACKING);
     case CustomizationToggleType::kTips:
       return l10n_util::GetNSString(IDS_IOS_MAGIC_STACK_TIP_TITLE);
     case CustomizationToggleType::kShopCard:
-      if (commerce::kShopCardVariation.Get() == commerce::kShopCardArm1) {
-        return l10n_util::GetNSString(
-            IDS_IOS_CONTENT_SUGGESTIONS_SHOPCARD_PRICE_TRACKING_CUSTOMIZE_CARDS);
-      } else if (commerce::kShopCardVariation.Get() ==
-                 commerce::kShopCardArm2) {
-        return l10n_util::GetNSString(
-            IDS_IOS_CONTENT_SUGGESTIONS_SHOPCARD_REVIEWS_CUSTOMIZE_CARDS_ALT_2);
-      }
-      return @"";
+      return l10n_util::GetNSString(
+          IDS_IOS_CONTENT_SUGGESTIONS_SHOPCARD_PRICE_TRACKING_CUSTOMIZE_CARDS);
   }
 }
 
@@ -67,31 +54,18 @@
           IDS_IOS_HOME_CUSTOMIZATION_DISCOVER_SUBTITLE);
 
       // Magic Stack page toggles.
-    case CustomizationToggleType::kSetUpList:
-      return l10n_util::GetNSString(
-          IDS_IOS_HOME_CUSTOMIZATION_MAGIC_STACK_SUBTITLE_SET_UP_LIST);
     case CustomizationToggleType::kSafetyCheck:
       return l10n_util::GetNSString(
           IDS_IOS_HOME_CUSTOMIZATION_MAGIC_STACK_SUBTITLE_SAFETY_CHECK);
     case CustomizationToggleType::kTapResumption:
       return l10n_util::GetNSString(
           IDS_IOS_HOME_CUSTOMIZATION_MAGIC_STACK_SUBTITLE_TAB_RESUMPTION);
-    case CustomizationToggleType::kParcelTracking:
-      return l10n_util::GetNSString(
-          IDS_IOS_HOME_CUSTOMIZATION_MAGIC_STACK_SUBTITLE_PARCEL_TRACKING);
     case CustomizationToggleType::kTips:
       return l10n_util::GetNSString(
           IDS_IOS_HOME_CUSTOMIZATION_MAGIC_STACK_SUBTITLE_TIPS);
     case CustomizationToggleType::kShopCard:
-      if (commerce::kShopCardVariation.Get() == commerce::kShopCardArm1) {
-        return l10n_util::GetNSString(
-            IDS_IOS_CONTENT_SUGGESTIONS_SHOPCARD_PRICE_TRACKING_CUSTOMIZE_CARDS_SUBTITLE);
-      } else if (commerce::kShopCardVariation.Get() ==
-                 commerce::kShopCardArm2) {
-        return l10n_util::GetNSString(
-            IDS_IOS_CONTENT_SUGGESTIONS_SHOPCARD_REVIEWS_CUSTOMIZE_CARDS_SUBTITLE);
-      }
-      return @"";
+      return l10n_util::GetNSString(
+          IDS_IOS_CONTENT_SUGGESTIONS_SHOPCARD_PRICE_TRACKING_CUSTOMIZE_CARDS_SUBTITLE);
   }
 }
 
@@ -108,17 +82,11 @@
                                         kToggleIconPointSize);
 
       // Magic Stack page toggles.
-    case CustomizationToggleType::kSetUpList:
-      return DefaultSymbolWithPointSize(kListBulletClipboardSymbol,
-                                        kToggleIconPointSize);
     case CustomizationToggleType::kSafetyCheck:
       return DefaultSymbolWithPointSize(kCheckmarkShieldSymbol,
                                         kToggleIconPointSize);
     case CustomizationToggleType::kTapResumption:
       return DefaultSymbolWithPointSize(kMacbookAndIPhoneSymbol,
-                                        kToggleIconPointSize);
-    case CustomizationToggleType::kParcelTracking:
-      return DefaultSymbolWithPointSize(kShippingBoxSymbol,
                                         kToggleIconPointSize);
     case CustomizationToggleType::kTips:
       return DefaultSymbolWithPointSize(kListBulletClipboardSymbol,
@@ -127,14 +95,8 @@
       UIImageSymbolConfiguration* fallbackImageConfig =
           [UIImageSymbolConfiguration
               configurationWithWeight:UIImageSymbolWeightLight];
-      if (commerce::kShopCardVariation.Get() == commerce::kShopCardArm1) {
-        return CustomSymbolWithConfiguration(kDownTrendSymbol,
-                                             fallbackImageConfig);
-      } else if (commerce::kShopCardVariation.Get() ==
-                 commerce::kShopCardArm2) {
-        return DefaultSymbolWithPointSize(kRectangleGroupBubble,
-                                          kToggleIconPointSize);
-      }
+      return CustomSymbolWithConfiguration(kDownTrendSymbol,
+                                           fallbackImageConfig);
       NOTREACHED();
     }
   }
@@ -152,23 +114,14 @@
       return kCustomizationToggleDiscoverIdentifier;
 
       // Magic Stack page toggles.
-    case CustomizationToggleType::kSetUpList:
-      return kCustomizationToggleSetUpListIdentifier;
     case CustomizationToggleType::kSafetyCheck:
       return kCustomizationToggleSafetyCheckIdentifier;
     case CustomizationToggleType::kTapResumption:
       return kCustomizationToggleTabResumptionIdentifier;
-    case CustomizationToggleType::kParcelTracking:
-      return kCustomizationToggleParcelTrackingIdentifier;
     case CustomizationToggleType::kTips:
       return kCustomizationToggleTipsIdentifier;
     case CustomizationToggleType::kShopCard:
-      if (commerce::kShopCardVariation.Get() == commerce::kShopCardArm1) {
-        return kCustomizationToggleShopCardPriceTrackingIdentifier;
-      } else if (commerce::kShopCardVariation.Get() ==
-                 commerce::kShopCardArm2) {
-        return kCustomizationToggleShopCardReviewsIdentifier;
-      }
+      return kCustomizationToggleShopCardPriceTrackingIdentifier;
       NOTREACHED();
   }
 }
@@ -185,13 +138,9 @@
       return kCustomizationToggleDiscoverNavigableIdentifier;
 
       // Magic Stack page toggles.
-    case CustomizationToggleType::kSetUpList:
-      return nil;
     case CustomizationToggleType::kSafetyCheck:
       return nil;
     case CustomizationToggleType::kTapResumption:
-      return nil;
-    case CustomizationToggleType::kParcelTracking:
       return nil;
     case CustomizationToggleType::kTips:
       return nil;
@@ -221,6 +170,8 @@
       return l10n_util::GetNSString(IDS_IOS_FEED_MANAGEMENT_ACTIVITY_TEXT);
     case CustomizationLinkType::kLearnMore:
       return l10n_util::GetNSString(IDS_IOS_DISCOVER_FEED_MENU_LEARN_MORE_ITEM);
+    case CustomizationLinkType::kEnterpriseLearnMore:
+      return nil;
   }
 }
 
@@ -233,6 +184,8 @@
     case CustomizationLinkType::kActivity:
       return l10n_util::GetNSString(IDS_IOS_FEED_MANAGEMENT_ACTIVITY_DETAIL);
     case CustomizationLinkType::kLearnMore:
+      return nil;
+    case CustomizationLinkType::kEnterpriseLearnMore:
       return nil;
   }
 }
@@ -247,6 +200,8 @@
       return kCustomizationLinkActivityIdentifier;
     case CustomizationLinkType::kLearnMore:
       return kCustomizationLinkLearnMoreIdentifier;
+    case CustomizationLinkType::kEnterpriseLearnMore:
+      return nil;
   }
 }
 

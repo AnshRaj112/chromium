@@ -9,7 +9,6 @@
 #include <string>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
@@ -120,7 +119,7 @@ class NativeRendererMessagingService::MessagePortScope
           port_host) {
     auto receiver_id =
         message_port_dispatchers_.Add(this, std::move(port), target_port_id);
-    CHECK(!base::Contains(message_port_hosts_, target_port_id));
+    CHECK(!message_port_hosts_.contains(target_port_id));
     auto& bound_port_host = message_port_hosts_[target_port_id] =
         mojo::AssociatedRemote(std::move(port_host));
     bound_port_host.set_disconnect_handler(
@@ -143,7 +142,7 @@ class NativeRendererMessagingService::MessagePortScope
         message_port_host_remote.InitWithNewEndpointAndPassReceiver();
     message_port_dispatchers_.Add(this, std::move(message_port_receiver),
                                   port_id);
-    CHECK(!base::Contains(message_port_hosts_, port_id));
+    CHECK(!message_port_hosts_.contains(port_id));
     auto& bound_port_host = message_port_hosts_[port_id] =
         mojo::AssociatedRemote(std::move(message_port_host_remote));
     bound_port_host.set_disconnect_handler(base::BindOnce(
@@ -184,7 +183,7 @@ class NativeRendererMessagingService::MessagePortScope
   }
 
   bool HasPort(const PortId& port_id) {
-    return base::Contains(message_port_hosts_, port_id);
+    return message_port_hosts_.contains(port_id);
   }
 
   mojom::MessagePortHost* GetMessagePortHost(const PortId& port_id) {
@@ -324,7 +323,7 @@ GinPort* NativeRendererMessagingService::Connect(
     return nullptr;
 
   MessagingPerContextData* data = GetPerContextData<MessagingPerContextData>(
-      script_context->v8_context(), kCreateIfMissing);
+      script_context->v8_context(), CreatePerContextData::kCreateIfMissing);
   if (!data)
     return nullptr;
 
@@ -359,7 +358,7 @@ v8::Local<v8::Promise> NativeRendererMessagingService::SendOneTimeMessage(
     return v8::Local<v8::Promise>();
 
   MessagingPerContextData* data = GetPerContextData<MessagingPerContextData>(
-      script_context->v8_context(), kCreateIfMissing);
+      script_context->v8_context(), CreatePerContextData::kCreateIfMissing);
 
   MessagePortScope* scope =
       GetMessagePortScope(script_context->GetRenderFrame());
@@ -367,13 +366,13 @@ v8::Local<v8::Promise> NativeRendererMessagingService::SendOneTimeMessage(
 
   // TODO(crbug.com/40321352): Instead of inferring the
   // mojom::SerializationFormat from Message, it'd be better to have the clients
-  // pass it directly. This is because, in case of `kStructuredCloned` to
+  // pass it directly. This is because, in case of `kStructuredClone` to
   // `kJson` fallback, the format for the ports will also be `kJson`. This is
   // inconsistent with what we do for ports for long-lived channels where the
   // port's `mojom::SerializationFormat` is always the same as that passed by
   // messaging clients and is independent of any fallback behavior.
   PortId port_id(script_context->context_id(), data->next_port_id++, is_opener,
-                 message.format);
+                 message.format());
   mojo::PendingAssociatedRemote<mojom::MessagePort> message_port;
   mojo::PendingAssociatedReceiver<mojom::MessagePortHost>
       message_port_host_receiver;
@@ -411,7 +410,7 @@ void NativeRendererMessagingService::ClosePort(v8::Local<v8::Context> context,
   CHECK(script_context);
 
   MessagingPerContextData* data = GetPerContextData<MessagingPerContextData>(
-      script_context->v8_context(), kDontCreateIfMissing);
+      script_context->v8_context(), CreatePerContextData::kDontCreateIfMissing);
   if (!data)
     return;
 
@@ -515,7 +514,7 @@ void NativeRendererMessagingService::DeliverMessageToWorker(
   v8::Isolate* isolate = script_context->isolate();
   v8::HandleScope handle_scope(isolate);
   std::unique_ptr<InteractionProvider::Scope> scoped_extension_interaction;
-  if (message.user_gesture) {
+  if (message.user_gesture()) {
     // TODO(crbug.com/41467311): Add logging for privilege level for
     // sender and receiver and decide if want to allow unprivileged to
     // privileged support.
@@ -533,8 +532,8 @@ void NativeRendererMessagingService::DeliverMessageToBackgroundPage(
     ScriptContext* script_context) {
   std::unique_ptr<blink::WebScopedWindowFocusAllowedIndicator>
       allow_window_focus;
-  if (message.user_gesture && script_context->web_frame()) {
-    bool sender_is_privileged = message.from_privileged_context;
+  if (message.user_gesture() && script_context->web_frame()) {
+    bool sender_is_privileged = message.from_privileged_context();
     bool receiver_is_privileged =
         script_context->context_type() ==
         extensions::mojom::ContextType::kPrivilegedExtension;
@@ -594,8 +593,8 @@ bool NativeRendererMessagingService::ContextHasMessagePort(
     return true;
   v8::HandleScope handle_scope(script_context->isolate());
   MessagingPerContextData* data = GetPerContextData<MessagingPerContextData>(
-      script_context->v8_context(), kDontCreateIfMissing);
-  return data && base::Contains(data->ports, port_id);
+      script_context->v8_context(), CreatePerContextData::kDontCreateIfMissing);
+  return data && data->ports.contains(port_id);
 }
 
 void NativeRendererMessagingService::DispatchOnConnectToListeners(
@@ -671,7 +670,8 @@ void NativeRendererMessagingService::DispatchOnConnectToListeners(
         isolate, {port->GetWrapper(isolate).ToLocalChecked()});
     bindings_system_->api_system()->event_handler()->FireEventInContext(
         event_name, v8_context, &args, /*filter=*/nullptr,
-        /*callback=*/v8::Local<v8::Function>());
+        /*on_dispatched_callback=*/v8::Local<v8::Function>(),
+        /*listener_error_callback=*/v8::Local<v8::Function>());
   }
   // Note: Arbitrary JS may have run; the context may now be deleted.
 
@@ -753,7 +753,7 @@ void NativeRendererMessagingService::DispatchOnDisconnectToListeners(
   }
 
   MessagingPerContextData* data = GetPerContextData<MessagingPerContextData>(
-      v8_context, kDontCreateIfMissing);
+      v8_context, CreatePerContextData::kDontCreateIfMissing);
   DCHECK(data);
   data->ports.erase(port_id);
 }
@@ -777,10 +777,10 @@ GinPort* NativeRendererMessagingService::CreatePort(
   else
     DCHECK_NE(port_id.context_id, script_context->context_id());
 
-  MessagingPerContextData* data =
-      GetPerContextData<MessagingPerContextData>(context, kCreateIfMissing);
+  MessagingPerContextData* data = GetPerContextData<MessagingPerContextData>(
+      context, CreatePerContextData::kCreateIfMissing);
   DCHECK(data);
-  DCHECK(!base::Contains(data->ports, port_id));
+  DCHECK(!data->ports.contains(port_id));
 
   GinPort* port = cppgc::MakeGarbageCollected<GinPort>(
       isolate->GetCppHeap()->GetAllocationHandle(), context, port_id,
@@ -799,9 +799,9 @@ GinPort* NativeRendererMessagingService::GetPort(
   v8::Isolate* isolate = script_context->isolate();
 
   MessagingPerContextData* data = GetPerContextData<MessagingPerContextData>(
-      script_context->v8_context(), kDontCreateIfMissing);
+      script_context->v8_context(), CreatePerContextData::kDontCreateIfMissing);
   DCHECK(data);
-  DCHECK(base::Contains(data->ports, port_id));
+  DCHECK(data->ports.contains(port_id));
 
   GinPort* port = nullptr;
   gin::Converter<GinPort*>::FromV8(isolate, data->ports[port_id].Get(isolate),
@@ -853,6 +853,24 @@ NativeRendererMessagingService::GetMessagePortHostIfExists(
   }
   return GetMessagePortScope(script_context->GetRenderFrame())
       ->GetMessagePortHostIfExists(port_id);
+}
+
+void NativeRendererMessagingService::InvalidatePorts(ScriptContext* context) {
+  v8::HandleScope handle_scope(context->isolate());
+  MessagingPerContextData* data = GetPerContextData<MessagingPerContextData>(
+      context->v8_context(), CreatePerContextData::kDontCreateIfMissing);
+  if (!data) {
+    return;
+  }
+
+  for (const auto& [port_id, port_obj] : data->ports) {
+    GinPort* port = nullptr;
+    gin::Converter<GinPort*>::FromV8(context->isolate(),
+                                     port_obj.Get(context->isolate()), &port);
+    if (port) {
+      port->OnContextDestroyed();
+    }
+  }
 }
 
 base::SafeRef<NativeRendererMessagingService>

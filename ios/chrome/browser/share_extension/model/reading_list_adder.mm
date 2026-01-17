@@ -22,12 +22,18 @@ ReadingListAdder::~ReadingListAdder() {}
 void ReadingListAdder::AddUrlToReadingListModel(ReadingListModel* model) {
   model->AddOrReplaceEntry(url_to_add_, title_to_add_,
                            reading_list::ADDED_VIA_EXTENSION,
-                           base::TimeDelta());
+                           /*estimated_read_time=*/std::nullopt,
+                           /*creation_time=*/std::nullopt);
   std::move(completion_).Run();
 }
 
 void ReadingListAdder::OnProfileLoaded(ScopedProfileKeepAliveIOS keep_alive,
                                        base::OnceClosure completion) {
+  if (!keep_alive.profile()) {
+    // Profile could not be loaded, abort the reading list item addition.
+    std::move(completion).Run();
+    return;
+  }
   keep_alive_ = std::move(keep_alive);
   completion_ = std::move(completion);
 

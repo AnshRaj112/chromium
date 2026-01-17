@@ -9,6 +9,8 @@
 #import "ios/chrome/browser/reader_mode/ui/reader_mode_options_mutator.h"
 #import "ios/chrome/browser/shared/public/commands/reader_mode_options_commands.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
+#import "ios/chrome/common/ui/util/button_util.h"
+#import "ios/chrome/common/ui/util/chrome_button.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util_mac.h"
@@ -19,21 +21,17 @@ namespace {
 constexpr CGFloat kMainStackViewInset = 16.0;
 
 // Top and bottom padding.
-constexpr CGFloat kTopPadding = 8;
-constexpr CGFloat kBottomPadding = 54;
+constexpr CGFloat kTopPadding = 8.0;
+constexpr CGFloat kBottomPadding = 54.0;
 
 // The spacing between items in the main stack view.
 constexpr CGFloat kMainStackViewSpacing = 16.0;
 
-// The corner radius for the "Hide Reader Mode" button.
-constexpr CGFloat kHideReaderModeButtonCornerRadius = 12.0;
-
-// The minimum height for the "Hide Reader Mode" button.
-constexpr CGFloat kHideReaderModeButtonMinHeight = 50.0;
+// The corner radius for the controls view.
+constexpr CGFloat kControlsViewMinimumCornerRadius = 24.0;
 
 // Opacity of the controls view when using a blur effect background.
 constexpr CGFloat kBlurEffectBackgroundControlsOpacity = 0.95;
-
 }  // namespace
 
 @interface ReaderModeOptionsViewController ()
@@ -67,7 +65,7 @@ constexpr CGFloat kBlurEffectBackgroundControlsOpacity = 0.95;
 
   // Add blurred background.
   UIBlurEffect* blurEffect =
-      [UIBlurEffect effectWithStyle:UIBlurEffectStyleRegular];
+      [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterial];
   UIVisualEffectView* blurEffectView =
       [[UIVisualEffectView alloc] initWithEffect:blurEffect];
   blurEffectView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -110,8 +108,14 @@ constexpr CGFloat kBlurEffectBackgroundControlsOpacity = 0.95;
 
 - (CGFloat)resolveDetentValueForSheetPresentation:
     (id<UISheetPresentationControllerDetentResolutionContext>)context {
+  CGFloat bottomPadding = kBottomPadding;
+  if (self.view.window.traitCollection.horizontalSizeClass ==
+      UIUserInterfaceSizeClassRegular) {
+    bottomPadding = kMainStackViewInset;
+  }
+
   CGFloat bottomPaddingAboveSafeArea =
-      kBottomPadding - self.view.safeAreaInsets.bottom;
+      bottomPadding - self.view.safeAreaInsets.bottom;
   return [self.mainStackView
              systemLayoutSizeFittingSize:UILayoutFittingCompressedSize]
              .height +
@@ -159,8 +163,18 @@ constexpr CGFloat kBlurEffectBackgroundControlsOpacity = 0.95;
   ReaderModeOptionsControlsView* controlsView =
       [[ReaderModeOptionsControlsView alloc] init];
   controlsView.translatesAutoresizingMaskIntoConstraints = NO;
-  controlsView.backgroundColor = [[UIColor colorNamed:kPrimaryBackgroundColor]
-      colorWithAlphaComponent:kBlurEffectBackgroundControlsOpacity];
+  controlsView.backgroundColor =
+      [[UIColor colorNamed:kGroupedSecondaryBackgroundColor]
+          colorWithAlphaComponent:kBlurEffectBackgroundControlsOpacity];
+
+  if (@available(iOS 26, *)) {
+    controlsView.cornerConfiguration = [UICornerConfiguration
+        configurationWithUniformRadius:
+            [UICornerRadius containerConcentricRadiusWithMinimum:
+                                kControlsViewMinimumCornerRadius]];
+  } else {
+    controlsView.layer.cornerRadius = kPrimaryButtonCornerRadius;
+  }
 
   _controlsView = controlsView;
   return _controlsView;
@@ -172,43 +186,17 @@ constexpr CGFloat kBlurEffectBackgroundControlsOpacity = 0.95;
     return _hideReaderModeButton;
   }
 
-  // Create button title attributed string.
-  UIFontDescriptor* boldDescriptor = [[UIFontDescriptor
-      preferredFontDescriptorWithTextStyle:UIFontTextStyleBody]
-      fontDescriptorWithSymbolicTraits:UIFontDescriptorTraitBold];
-  UIFont* fontAttribute = [UIFont fontWithDescriptor:boldDescriptor size:0.0];
-  UIColor* textColor = [UIColor colorNamed:kSolidWhiteColor];
-  NSDictionary* attributes = @{
-    NSFontAttributeName : fontAttribute,
-    NSForegroundColorAttributeName : textColor
-  };
-  NSMutableAttributedString* attributedTitle =
-      [[NSMutableAttributedString alloc]
-          initWithString:l10n_util::GetNSString(
-                             IDS_IOS_READER_MODE_OPTIONS_HIDE_BUTTON_LABEL)
-              attributes:attributes];
+  ChromeButton* button =
+      [[ChromeButton alloc] initWithStyle:ChromeButtonStylePrimary];
+  button.title =
+      l10n_util::GetNSString(IDS_IOS_READER_MODE_OPTIONS_HIDE_BUTTON_LABEL);
 
-  // Create button configuration.
-  UIButtonConfiguration* configuration =
-      [UIButtonConfiguration filledButtonConfiguration];
-  configuration.baseBackgroundColor = [UIColor colorNamed:kBlue600Color];
-  configuration.background.cornerRadius = kHideReaderModeButtonCornerRadius;
-  configuration.attributedTitle = attributedTitle;
-
-  // Create button.
-  UIButton* button = [UIButton buttonWithType:UIButtonTypeSystem];
-  button.translatesAutoresizingMaskIntoConstraints = NO;
-  button.configuration = configuration;
   button.maximumContentSizeCategory = UIContentSizeCategoryExtraExtraLarge;
   button.accessibilityIdentifier =
       kReaderModeOptionsTurnOffButtonAccessibilityIdentifier;
   [button addTarget:self
                 action:@selector(hideReaderMode)
       forControlEvents:UIControlEventTouchUpInside];
-
-  [button.heightAnchor
-      constraintGreaterThanOrEqualToConstant:kHideReaderModeButtonMinHeight]
-      .active = YES;
 
   _hideReaderModeButton = button;
   return _hideReaderModeButton;

@@ -10,6 +10,7 @@
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
@@ -302,7 +303,8 @@ PipelineStatus PipelineIntegrationTestBase::StartPipelineWithHlsManifest(
 
   auto engine = std::make_unique<HlsManifestDemuxerEngine>(
       std::move(hls_dsp), task_environment_.GetMainThreadTaskRunner(),
-      base::DoNothing(), base::DoNothing(),
+      std::make_unique<ForwardingTrackManager>(
+          base::DoNothing(), base::DoNothing(), base::DoNothing()),
       /*name=*/false, manifest_root, &media_log_);
   demuxer_ = std::make_unique<ManifestDemuxer>(
       task_environment_.GetMainThreadTaskRunner(), base::DoNothing(),
@@ -418,10 +420,10 @@ PipelineStatus PipelineIntegrationTestBase::Start(
                        prepend_audio_decoders_cb);
 }
 
-PipelineStatus PipelineIntegrationTestBase::Start(const uint8_t* data,
-                                                  size_t size,
-                                                  uint8_t test_type) {
-  return StartInternal(std::make_unique<MemoryDataSource>(data, size), nullptr,
+PipelineStatus PipelineIntegrationTestBase::Start(
+    base::span<const uint8_t> data,
+    uint8_t test_type) {
+  return StartInternal(std::make_unique<MemoryDataSource>(data), nullptr,
                        test_type);
 }
 
@@ -694,7 +696,7 @@ std::string PipelineIntegrationTestBase::GetVideoHash() {
   DCHECK(hashing_enabled_);
   std::array<uint8_t, crypto::hash::kSha256Size> digest;
   hash_context_->Finish(digest);
-  return base::ToLowerASCII(base::HexEncode(digest));
+  return base::HexEncodeLower(digest);
 }
 
 const AudioHash& PipelineIntegrationTestBase::GetAudioHash() const {

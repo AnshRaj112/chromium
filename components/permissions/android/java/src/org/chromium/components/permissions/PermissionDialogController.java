@@ -15,12 +15,12 @@ import org.jni_zero.CalledByNative;
 import org.chromium.base.ObserverList;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.components.content_settings.ContentSettingValues;
+import org.chromium.components.content_settings.ContentSetting;
 import org.chromium.components.content_settings.ContentSettingsType;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.modaldialog.ModalDialogProperties;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -41,18 +41,32 @@ public class PermissionDialogController {
          * @param window The {@link WindowAndroid} for the prompt that just finished.
          * @param permissions An array of ContentSettingsType, indicating the last dialog
          *     permissions.
-         * @param result A ContentSettingValues type, indicating the last dialog result.
+         * @param result A ContentSetting type, indicating the last dialog result.
          */
         void onDialogResult(
                 WindowAndroid window,
                 @ContentSettingsType.EnumType int[] permissions,
-                @ContentSettingValues int result);
+                @ContentSetting int result);
+
+        /**
+         * Notifies the observer that a quiet permission icon should be shown.
+         *
+         * @param window The {@link WindowAndroid} where the icon should be shown.
+         */
+        default void showPermissionClapperQuietIcon(WindowAndroid window) {}
+
+        /**
+         * Notifies the observer that a quiet permission icon should be dismissed.
+         *
+         * @param window The {@link WindowAndroid} where the icon should be dismissed.
+         */
+        default void dismissPermissionClapperQuietIcon(WindowAndroid window) {}
     }
 
     private class PermissionDialogCoordinatorDelegate
             implements PermissionDialogCoordinator.Delegate {
         @Override
-        public void onPermissionDialogResult(@ContentSettingValues int result) {
+        public void onPermissionDialogResult(@ContentSetting int result) {
             notifyObservers(result);
         }
 
@@ -92,7 +106,7 @@ public class PermissionDialogController {
     }
 
     private PermissionDialogController() {
-        mRequestQueue = new LinkedList<>();
+        mRequestQueue = new ArrayList<>();
         mObservers = new ObserverList<>();
     }
 
@@ -107,13 +121,57 @@ public class PermissionDialogController {
     }
 
     /**
+     * Called by native code to show the quiet permission icon.
+     *
+     * @param window The {@link WindowAndroid} where the icon should be shown.
+     */
+    @CalledByNative
+    public static void showPermissionClapperQuietIcon(WindowAndroid window) {
+        PermissionDialogController.getInstance().notifyShowPermissionClapperQuietIcon(window);
+    }
+
+    /**
+     * Called by native code to dismiss the quiet permission icon.
+     *
+     * @param window The {@link WindowAndroid} where the icon should be dismissed.
+     */
+    @CalledByNative
+    public static void dismissPermissionClapperQuietIcon(WindowAndroid window) {
+        PermissionDialogController.getInstance().notifyDismissPermissionClapperQuietIcon(window);
+    }
+
+    /**
+     * Notifies observers that a quiet permission icon should be shown.
+     *
+     * @param window The {@link WindowAndroid} where the icon should be shown.
+     */
+    public void notifyShowPermissionClapperQuietIcon(WindowAndroid window) {
+        for (Observer obs : mObservers) {
+            obs.showPermissionClapperQuietIcon(window);
+        }
+    }
+
+    /**
+     * Notifies observers that a quiet permission icon should be dismissed.
+     *
+     * @param window The {@link WindowAndroid} where the icon should be dismissed.
+     */
+    public void notifyDismissPermissionClapperQuietIcon(WindowAndroid window) {
+        for (Observer obs : mObservers) {
+            obs.dismissPermissionClapperQuietIcon(window);
+        }
+    }
+
+    /**
      * @param observer An observer to be notified of changes.
      */
     public void addObserver(Observer observer) {
         mObservers.addObserver(observer);
     }
 
-    /** @param observer The observer to remove. */
+    /**
+     * @param observer The observer to remove.
+     */
     public void removeObserver(Observer observer) {
         mObservers.removeObserver(observer);
     }
@@ -157,7 +215,7 @@ public class PermissionDialogController {
         // backgrounds the browser and cleanup has happened. In that case, we can't show a prompt,
         // so act as though the user dismissed it.
         if (context == null) {
-            notifyObservers(ContentSettingValues.DEFAULT);
+            notifyObservers(ContentSetting.DEFAULT);
             mDialogDelegate.onDismiss(DismissalType.AUTODISMISS_NO_CONTEXT);
             return;
         }
@@ -187,8 +245,8 @@ public class PermissionDialogController {
         }
     }
 
-    public void notifyObservers(@ContentSettingValues int result) {
-        if (result != ContentSettingValues.DEFAULT) {
+    public void notifyObservers(@ContentSetting int result) {
+        if (result != ContentSetting.DEFAULT) {
             assert mDialogDelegate != null;
             WindowAndroid currentWindow = mDialogDelegate.getWindow();
             for (Observer obs : mObservers) {
@@ -200,7 +258,7 @@ public class PermissionDialogController {
 
     public void notifyPermissionAllowed(PermissionDialogDelegate delegate) {
         if (mDialogDelegate == delegate) {
-            notifyObservers(ContentSettingValues.ALLOW);
+            notifyObservers(ContentSetting.ALLOW);
         }
     }
 

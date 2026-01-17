@@ -10,6 +10,7 @@
 
 #include "base/command_line.h"
 #include "base/notimplemented.h"
+#include "components/viz/common/resources/shared_image_format_utils.h"
 #include "gpu/vulkan/buildflags.h"
 #include "ui/gfx/native_pixmap.h"
 #include "ui/gl/gl_implementation.h"
@@ -20,6 +21,28 @@
 #if BUILDFLAG(ENABLE_VULKAN)
 #include "gpu/vulkan/vulkan_instance.h"
 #endif
+
+namespace {
+
+inline constexpr auto kMappableSharedImageFormats = {
+    viz::SinglePlaneFormat::kR_8,
+    viz::SinglePlaneFormat::kRG_88,
+    viz::SinglePlaneFormat::kR_16,
+    viz::SinglePlaneFormat::kRG_1616,
+    viz::SinglePlaneFormat::kBGR_565,
+    viz::SinglePlaneFormat::kRGBA_4444,
+    viz::SinglePlaneFormat::kRGBA_8888,
+    viz::SinglePlaneFormat::kRGBX_8888,
+    viz::SinglePlaneFormat::kBGRA_8888,
+    viz::SinglePlaneFormat::kBGRX_8888,
+    viz::SinglePlaneFormat::kRGBA_1010102,
+    viz::SinglePlaneFormat::kBGRA_1010102,
+    viz::SinglePlaneFormat::kRGBA_F16,
+    viz::MultiPlaneFormat::kYV12,
+    viz::MultiPlaneFormat::kNV12,
+    viz::MultiPlaneFormat::kP010,
+    viz::MultiPlaneFormat::kNV12A};
+}
 
 namespace ui {
 
@@ -52,7 +75,6 @@ scoped_refptr<gfx::NativePixmap>
 SurfaceFactoryOzone::CreateNativePixmapForVulkan(
     gfx::AcceleratedWidget widget,
     gfx::Size size,
-    gfx::BufferFormat format,
     gfx::BufferUsage usage,
     VkDevice vk_device,
     VkDeviceMemory* vk_device_memory,
@@ -82,14 +104,14 @@ scoped_refptr<gfx::NativePixmap> SurfaceFactoryOzone::CreateNativePixmap(
     gfx::AcceleratedWidget widget,
     gpu::VulkanDeviceQueue* device_queue,
     gfx::Size size,
-    gfx::BufferFormat format,
+    viz::SharedImageFormat format,
     gfx::BufferUsage usage,
     std::optional<gfx::Size> framebuffer_size) {
   return nullptr;
 }
 
 bool SurfaceFactoryOzone::CanCreateNativePixmapForFormat(
-    gfx::BufferFormat format) {
+    viz::SharedImageFormat format) {
   // It's up to specific implementations of this method to report an inability
   // to create native pixmap handles for a specific format.
   return true;
@@ -99,7 +121,7 @@ scoped_refptr<gfx::NativePixmap>
 SurfaceFactoryOzone::CreateNativePixmapFromHandle(
     gfx::AcceleratedWidget widget,
     gfx::Size size,
-    gfx::BufferFormat format,
+    viz::SharedImageFormat format,
     gfx::NativePixmapHandle handle) {
   return nullptr;
 }
@@ -108,7 +130,7 @@ scoped_refptr<gfx::NativePixmap>
 SurfaceFactoryOzone::CreateNativePixmapForProtectedBufferHandle(
     gfx::AcceleratedWidget widget,
     gfx::Size size,
-    gfx::BufferFormat format,
+    viz::SharedImageFormat format,
     gfx::NativePixmapHandle handle) {
   return nullptr;
 }
@@ -126,29 +148,28 @@ void SurfaceFactoryOzone::SetDrmModifiersFilter(
   NOTIMPLEMENTED();
 }
 
-std::vector<gfx::BufferFormat>
-SurfaceFactoryOzone::GetSupportedFormatsForTexturing() const {
-  return std::vector<gfx::BufferFormat>();
+bool SurfaceFactoryOzone::IsFormatSupportedForTexturing(
+    viz::SharedImageFormat format) const {
+  return false;
 }
 
-std::vector<gfx::BufferFormat>
+std::vector<viz::SharedImageFormat>
 SurfaceFactoryOzone::GetSupportedFormatsForGLNativePixmapImport() {
-  std::vector<gfx::BufferFormat> supported_buffer_formats;
+  std::vector<viz::SharedImageFormat> supported_formats;
   auto* gl_ozone = GetCurrentGLOzone();
   if (!gl_ozone) {
-    return supported_buffer_formats;
+    return supported_formats;
   }
 
-  for (int j = 0; j <= static_cast<int>(gfx::BufferFormat::LAST); ++j) {
-    const gfx::BufferFormat buffer_format = static_cast<gfx::BufferFormat>(j);
-    if (gl_ozone->CanImportNativePixmap(buffer_format)) {
-      supported_buffer_formats.push_back(buffer_format);
+  for (auto format : kMappableSharedImageFormats) {
+    if (gl_ozone->CanImportNativePixmap(format)) {
+      supported_formats.push_back(format);
     }
   }
-  return supported_buffer_formats;
+  return supported_formats;
 }
 
-std::optional<gfx::BufferFormat>
+std::optional<viz::SharedImageFormat>
 SurfaceFactoryOzone::GetPreferredFormatForSolidColor() const {
   return std::nullopt;
 }

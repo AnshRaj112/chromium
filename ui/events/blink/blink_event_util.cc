@@ -10,11 +10,11 @@
 #include <bitset>
 #include <limits>
 #include <memory>
+#include <utility>
 
 #include "base/numerics/angle_conversions.h"
 #include "base/time/time.h"
 #include "base/trace_event/typed_macros.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "build/build_config.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/common/input/web_mouse_wheel_event.h"
@@ -468,7 +468,7 @@ WebGestureEvent CreateWebGestureEvent(const GestureEventDetails& details,
       break;
     default:
       NOTREACHED() << "EventType provided wasn't a valid gesture event: "
-                   << base::to_underlying(details.type());
+                   << std::to_underlying(details.type());
   }
 
   return gesture;
@@ -836,7 +836,18 @@ std::unique_ptr<WebGestureEvent> CreateWebGestureEventFromGestureEventAndroid(
   // event's fields better when extended to handle more cases.
   web_event->SetPositionInWidget(event.location());
   web_event->SetPositionInScreen(event.screen_location());
-  web_event->SetSourceDevice(WebGestureDevice::kTouchscreen);
+  WebGestureDevice device_type = WebGestureDevice::kUninitialized;
+  switch (event.source()) {
+    case ui::GestureDeviceType::DEVICE_TOUCHPAD:
+      device_type = WebGestureDevice::kTouchpad;
+      break;
+    case ui::GestureDeviceType::DEVICE_TOUCHSCREEN:
+      device_type = WebGestureDevice::kTouchscreen;
+      break;
+    default:
+      NOTREACHED() << "Unexpected gesture device type";
+  }
+  web_event->SetSourceDevice(device_type);
   if (event.synthetic_scroll())
     web_event->SetSourceDevice(WebGestureDevice::kSyntheticAutoscroll);
   if (event_type == WebInputEvent::Type::kGesturePinchUpdate) {

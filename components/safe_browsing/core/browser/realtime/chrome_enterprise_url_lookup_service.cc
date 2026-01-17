@@ -35,6 +35,13 @@ namespace safe_browsing {
 
 namespace {
 
+// From chrome/common/webui_url_constants.h
+inline constexpr char kChromeUINewTabPageURL[] = "chrome://new-tab-page/";
+inline constexpr char kChromeUINewTabURL[] = "chrome://newtab/";
+
+// From content/public/common/url_constants.h
+inline constexpr char kChromeUIScheme[] = "chrome";
+
 // Return an override for the Url filtering endpoint set via command line.
 std::optional<GURL> GetUrlOverride(bool is_command_line_switch_supported) {
   // Ignore this flag on Stable and Beta to avoid abuse.
@@ -78,14 +85,16 @@ ChromeEnterpriseRealTimeUrlLookupService::
         base::RepeatingCallback<std::string(const GURL&)>
             get_content_area_account_email_callback,
         base::RepeatingCallback<bool()> is_profile_affiliated_callback,
-        bool is_command_line_switch_supported)
+        bool is_command_line_switch_supported,
+        IntelligentScanDelegate* intelligent_scan_delegate)
     : RealTimeUrlLookupServiceBase(url_loader_factory,
                                    cache_manager,
                                    get_user_population_callback,
                                    referrer_chain_provider,
                                    std::move(token_fetcher),
                                    pref_service,
-                                   webui_delegate),
+                                   webui_delegate,
+                                   intelligent_scan_delegate),
       connectors_service_(connectors_service),
       pref_service_(pref_service),
       identity_manager_(identity_manager),
@@ -209,6 +218,13 @@ ChromeEnterpriseRealTimeUrlLookupService::GetTrafficAnnotationTag() const {
 
 std::string ChromeEnterpriseRealTimeUrlLookupService::GetMetricSuffix() const {
   return ".Enterprise";
+}
+
+bool ChromeEnterpriseRealTimeUrlLookupService::
+    ShouldOverrideKnownSafeUrlDecision(const GURL& url) const {
+  // No need to check new tab to reduce number of rpc calls
+  bool new_tab = url == kChromeUINewTabPageURL || url == kChromeUINewTabURL;
+  return url.SchemeIs(kChromeUIScheme) && !new_tab;
 }
 
 bool ChromeEnterpriseRealTimeUrlLookupService::CanCheckUrl(const GURL& url) {

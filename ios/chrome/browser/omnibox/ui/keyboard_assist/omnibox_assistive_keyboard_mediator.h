@@ -9,12 +9,12 @@
 
 #import "ios/chrome/browser/omnibox/ui/keyboard_assist/omnibox_assistive_keyboard_delegate.h"
 
-@protocol ApplicationCommands;
 @protocol BrowserCoordinatorCommands;
 @protocol LensCommands;
-@class OmniboxTextFieldIOS;
-@protocol QRScannerCommands;
 @class OmniboxAssistiveKeyboardMediator;
+@protocol OmniboxTextInput;
+@protocol QRScannerCommands;
+@protocol SceneCommands;
 
 @protocol OmniboxAssistiveKeyboardMediatorDelegate <NSObject>
 
@@ -22,18 +22,21 @@
 /// available when `experimental_flags::IsOmniboxDebuggingEnabled()`.
 - (void)omniboxAssistiveKeyboardDidTapDebuggerButton;
 
+/// Presents the in product help for the lens button in the keyboard accessory.
+- (void)presentLensKeyboardInProductHelper;
+
 @end
 
 /// Mediator for interactions in the omnibox assistive keyboard.
 @interface OmniboxAssistiveKeyboardMediator
     : NSObject <OmniboxAssistiveKeyboardDelegate>
 
-@property(nonatomic, weak) id<ApplicationCommands> applicationCommandsHandler;
+@property(nonatomic, weak) id<SceneCommands> sceneHandler;
 @property(nonatomic, weak) id<BrowserCoordinatorCommands>
     browserCoordinatorCommandsHandler;
 @property(nonatomic, weak) id<LensCommands> lensCommandsHandler;
 @property(nonatomic, weak) id<QRScannerCommands> qrScannerCommandsHandler;
-@property(nonatomic, weak) OmniboxTextFieldIOS* omniboxTextField;
+@property(nonatomic, weak) id<OmniboxTextInput> omniboxTextInput;
 
 @property(nonatomic, weak) id<OmniboxAssistiveKeyboardMediatorDelegate>
     delegate;

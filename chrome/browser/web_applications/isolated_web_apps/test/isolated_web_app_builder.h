@@ -5,28 +5,36 @@
 #ifndef CHROME_BROWSER_WEB_APPLICATIONS_ISOLATED_WEB_APPS_TEST_ISOLATED_WEB_APP_BUILDER_H_
 #define CHROME_BROWSER_WEB_APPLICATIONS_ISOLATED_WEB_APPS_TEST_ISOLATED_WEB_APP_BUILDER_H_
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
+#include "base/check.h"
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_file.h"
 #include "base/functional/function_ref.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/traits_bag.h"
 #include "base/types/expected.h"
-#include "base/version.h"
-#include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_install_source.h"
+#include "chrome/browser/web_applications/isolated_web_apps/install/isolated_web_app_install_source.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_url_info.h"
+#include "chrome/browser/web_applications/model/display_override.h"
 #include "chrome/browser/web_applications/test/fake_web_contents_manager.h"
 #include "components/web_package/signed_web_bundles/signed_web_bundle_id.h"
-#include "components/web_package/test_support/signed_web_bundles/web_bundle_signer.h"
+#include "components/web_package/test_support/signed_web_bundles/key_pair.h"
+#include "components/webapps/isolated_web_apps/types/iwa_version.h"
+#include "components/webapps/isolated_web_apps/types/source.h"
 #include "net/http/http_status_code.h"
 #include "services/network/public/mojom/permissions_policy/permissions_policy_feature.mojom-forward.h"
+#include "third_party/blink/public/common/manifest/manifest.h"
+#include "third_party/blink/public/common/safe_url_pattern.h"
+#include "third_party/blink/public/mojom/manifest/display_mode.mojom-shared.h"
 #include "third_party/blink/public/mojom/manifest/manifest.mojom-forward.h"
 #include "ui/gfx/geometry/size.h"
 
@@ -91,7 +99,8 @@ class ManifestBuilder {
   //     cross-origin-isolated: ["self"]
   //   },
   // }
-  ManifestBuilder();
+  explicit ManifestBuilder(
+      bool include_cross_origin_isolated_permissions_policy = true);
   ManifestBuilder(const ManifestBuilder&);
 
   ~ManifestBuilder();
@@ -99,6 +108,7 @@ class ManifestBuilder {
   ManifestBuilder& SetName(std::string_view name);
   ManifestBuilder& SetVersion(std::string_view version);
   ManifestBuilder& SetStartUrl(std::string_view start_url);
+  ManifestBuilder& SetUpdateManifestUrl(const GURL& update_manifest_url);
   ManifestBuilder& SetDisplayMode(blink::mojom::DisplayMode display_mode);
   ManifestBuilder& SetLaunchHandlerClientMode(
       ClientMode launch_handler_client_mode);
@@ -107,7 +117,7 @@ class ManifestBuilder {
   // blocked, it falls back to the mode set through SetDisplayMode; see:
   // https://github.com/WICG/display-override/blob/main/explainer.md#part-1-display_override
   ManifestBuilder& SetDisplayModeOverride(
-      std::vector<blink::mojom::DisplayMode> display_mode_override);
+      std::vector<web_app::DisplayOverride> display_mode_override);
   ManifestBuilder& AddIcon(std::string_view resource_path,
                            gfx::Size size,
                            std::string_view content_type);
@@ -124,9 +134,12 @@ class ManifestBuilder {
   ManifestBuilder& AddFileHandler(std::string_view action,
                                   const FileHandlerAccept& accept);
 
+  ManifestBuilder& AddBorderlessUrlPattern(blink::SafeUrlPattern pattern);
+
   const std::string& start_url() const;
+  const std::optional<GURL>& update_manifest_url() const;
   const std::vector<IconMetadata>& icons() const;
-  base::Version version() const;
+  const IwaVersion& version() const;
 
   std::string ToJson() const;
   blink::mojom::ManifestPtr ToBlinkManifest(
@@ -134,17 +147,19 @@ class ManifestBuilder {
 
  private:
   std::string name_;
-  std::string version_;
+  IwaVersion version_;
   std::string start_url_;
+  std::optional<GURL> update_manifest_url_;
   blink::mojom::DisplayMode display_mode_ =
       blink::mojom::DisplayMode::kStandalone;
-  std::vector<blink::mojom::DisplayMode> display_mode_override_;
+  std::vector<web_app::DisplayOverride> display_mode_override_;
   std::optional<ClientMode> launch_handler_client_mode_;
   std::vector<IconMetadata> icons_;
   std::map<network::mojom::PermissionsPolicyFeature, PermissionsPolicy>
       permissions_policy_;
   std::vector<std::pair<std::string, std::string>> protocol_handlers_;
   std::map<std::string, FileHandlerAccept> file_handlers_;
+  std::vector<blink::SafeUrlPattern> borderless_url_patterns_;
 };
 
 // A builder for Isolated Web Apps that supports adding resources from disk
@@ -347,7 +362,7 @@ class BundledIsolatedWebApp {
     return web_bundle_id_;
   }
 
-  base::Version version() const { return manifest_builder_.version(); }
+  const IwaVersion& version() const { return manifest_builder_.version(); }
 
   std::string GetBundleData() const;
 

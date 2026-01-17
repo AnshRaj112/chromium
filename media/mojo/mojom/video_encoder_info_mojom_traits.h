@@ -100,6 +100,10 @@ class StructTraits<media::mojom::VideoEncoderInfoDataView,
       const media::VideoEncoderInfo& video_encoder_info) {
     return video_encoder_info.supports_frame_size_change;
   }
+  static uint64_t number_of_manual_reference_buffers(
+      const media::VideoEncoderInfo& video_encoder_info) {
+    return video_encoder_info.number_of_manual_reference_buffers;
+  }
   static base::span<const std::vector<uint8_t>,
                     media::VideoEncoderInfo::kMaxSpatialLayers>
   fps_allocation(const media::VideoEncoderInfo& video_encoder_info) {
@@ -108,6 +112,15 @@ class StructTraits<media::mojom::VideoEncoderInfoDataView,
   static const std::vector<media::ResolutionRateLimit>& resolution_rate_limits(
       const media::VideoEncoderInfo& video_encoder_info) {
     return video_encoder_info.resolution_rate_limits;
+  }
+  static const std::vector<media::VideoPixelFormat>&
+  gpu_supported_pixel_formats(
+      const media::VideoEncoderInfo& video_encoder_info) {
+    return video_encoder_info.gpu_supported_pixel_formats;
+  }
+  static bool supports_gpu_shared_images(
+      const media::VideoEncoderInfo& video_encoder_info) {
+    return video_encoder_info.supports_gpu_shared_images;
   }
 
   static bool Read(media::mojom::VideoEncoderInfoDataView data,

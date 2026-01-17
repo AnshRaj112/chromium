@@ -12,11 +12,13 @@
 #include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
-#include "base/memory/memory_pressure_monitor.h"
 #include "base/memory/raw_ptr.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/omnibox/omnibox_edit_model.h"
+#include "chrome/browser/ui/omnibox/omnibox_popup_view.h"
 #include "chrome/browser/ui/tabs/tab_style.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/chrome_widget_sublevel.h"
@@ -30,8 +32,6 @@
 #include "chrome/browser/ui/views/tabs/tab_strip_controller.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 #include "chrome/common/pref_names.h"
-#include "components/omnibox/browser/omnibox_edit_model.h"
-#include "components/omnibox/browser/omnibox_popup_view.h"
 #include "components/user_education/common/help_bubble/help_bubble_factory_registry.h"
 #include "components/user_education/views/help_bubble_factory_views.h"
 #include "components/user_education/views/help_bubble_view.h"
@@ -44,8 +44,6 @@
 #include "ui/views/widget/widget_observer.h"
 
 namespace {
-
-constexpr base::TimeDelta kMemoryPressureCaptureDelay = base::Milliseconds(500);
 
 base::TimeDelta GetPreviewImageCaptureDelay(
     ThumbnailImage::CaptureReadiness readiness) {
@@ -123,10 +121,12 @@ base::TimeDelta GetShowDelay(int tab_width) {
   return delay;
 }
 
-bool IsBrowserForSystemWebApp(const Browser* browser) {
+bool IsBrowserForSystemWebApp(
+    const BrowserWindowInterface* browser_window_interface) {
 #if BUILDFLAG(IS_CHROMEOS)
-  CHECK(browser);
-  const auto* const app_controller = browser->app_controller();
+  CHECK(browser_window_interface);
+  const auto* const app_controller =
+      web_app::AppBrowserController::From(browser_window_interface);
   if (app_controller && app_controller->system_app()) {
     return true;
   }
@@ -212,10 +212,11 @@ TabHoverCardController::TabHoverCardController(TabStrip* tab_strip)
 
     // Register for memory usage enabled pref change events. Exclude
     // tracking them for system web apps (e.g. ChromeOS terminal app).
-    Browser* browser = tab_strip_->GetBrowser();
-    if (!browser) {
+    BrowserWindowInterface* browser_window_interface =
+        tab_strip_->GetBrowserWindowInterface();
+    if (!browser_window_interface) {
       CHECK_IS_TEST();
-    } else if (!IsBrowserForSystemWebApp(browser)) {
+    } else if (!IsBrowserForSystemWebApp(browser_window_interface)) {
       OnHovercardMemoryUsageEnabledChanged();
       pref_change_registrar_.Add(
           prefs::kHoverCardMemoryUsageEnabled,
@@ -244,8 +245,7 @@ bool TabHoverCardController::UseAnimations() {
 }
 
 bool TabHoverCardController::IsHoverCardVisible() const {
-  return hover_card_ != nullptr && hover_card_->GetWidget() &&
-         !hover_card_->GetWidget()->IsClosed();
+  return hover_card_ && GetCardWidget() && !GetCardWidget()->IsClosed();
 }
 
 bool TabHoverCardController::IsHoverCardShowingForTab(Tab* tab) const {
@@ -274,7 +274,10 @@ void TabHoverCardController::UpdateHoverCard(
   }
 
   // If there's nothing to attach to then there's no point in creating a card.
-  if (!hover_card_ && (!tab || !tab_strip_->GetWidget())) {
+  // Note that this includes a check for whether the tab strip widget is
+  // visible (see crbug.com/454057267).
+  if (!hover_card_ && (!tab || !tab_strip_->GetWidget() ||
+                       !tab_strip_->GetWidget()->IsVisibleOnScreen())) {
     return;
   }
 
@@ -317,7 +320,7 @@ void TabHoverCardController::UpdateOrShowCard(
     TabSlotController::HoverCardUpdateType update_type) {
   // Close is asynchronous, so make sure that if we're closing we clear out all
   // of our data *now* rather than waiting for the deletion message.
-  if (hover_card_ && hover_card_->GetWidget()->IsClosed()) {
+  if (hover_card_ && GetCardWidget()->IsClosed()) {
     OnViewIsDeleting(hover_card_);
   }
 
@@ -417,12 +420,11 @@ void TabHoverCardController::ShowHoverCard(bool is_initial,
 
   slide_animator_->UpdateTargetBounds();
   MaybeStartThumbnailObservation(target_tab_, is_initial);
-  hover_card_->GetWidget()->SetZOrderSublevel(
-      ChromeWidgetSublevel::kSublevelHoverable);
+  GetCardWidget()->SetZOrderSublevel(ChromeWidgetSublevel::kSublevelHoverable);
 
   if (!is_initial || !UseAnimations()) {
     OnCardFullyVisible();
-    hover_card_->GetWidget()->Show();
+    GetCardWidget()->Show();
     return;
   }
 
@@ -430,7 +432,7 @@ void TabHoverCardController::ShowHoverCard(bool is_initial,
 }
 
 void TabHoverCardController::HideHoverCard() {
-  if (!hover_card_ || hover_card_->GetWidget()->IsClosed()) {
+  if (!hover_card_ || GetCardWidget()->IsClosed()) {
     return;
   }
 
@@ -450,7 +452,7 @@ void TabHoverCardController::HideHoverCard() {
   // This needs to be called whether we're doing a fade or a pop out.
   slide_animator_->StopAnimation();
   if (!UseAnimations()) {
-    hover_card_->GetWidget()->Close();
+    CloseCardWidget();
     return;
   }
   if (fade_animator_->IsFadingOut()) {
@@ -460,18 +462,22 @@ void TabHoverCardController::HideHoverCard() {
   fade_animator_->FadeOut();
 }
 
+void TabHoverCardController::OnCardClosing() {
+  tab_resource_usage_collector_observation_.Reset();
+  delayed_show_timer_.Stop();
+  hover_card_observation_.Reset();
+  event_sniffer_.reset();
+  slide_progressed_subscription_ = base::CallbackListSubscription();
+  slide_complete_subscription_ = base::CallbackListSubscription();
+  fade_complete_subscription_ = base::CallbackListSubscription();
+  slide_animator_.reset();
+  fade_animator_.reset();
+  hover_card_ = nullptr;
+}
+
 void TabHoverCardController::OnViewIsDeleting(views::View* observed_view) {
   if (hover_card_ == observed_view) {
-    tab_resource_usage_collector_->RemoveObserver(this);
-    delayed_show_timer_.Stop();
-    hover_card_observation_.Reset();
-    event_sniffer_.reset();
-    slide_progressed_subscription_ = base::CallbackListSubscription();
-    slide_complete_subscription_ = base::CallbackListSubscription();
-    fade_complete_subscription_ = base::CallbackListSubscription();
-    slide_animator_.reset();
-    fade_animator_.reset();
-    hover_card_ = nullptr;
+    OnCardClosing();
   } else if (target_tab_ == observed_view) {
     UpdateHoverCard(nullptr,
                     TabSlotController::HoverCardUpdateType::kTabRemoved);
@@ -497,7 +503,7 @@ void TabHoverCardController::OnViewVisibilityChanged(views::View* observed_view,
 }
 
 void TabHoverCardController::OnTabResourceMetricsRefreshed() {
-  if (hover_card_ != nullptr && target_tab_ != nullptr) {
+  if (hover_card_ && target_tab_) {
     UpdateHoverCard(target_tab_,
                     TabSlotController::HoverCardUpdateType::kTabDataChanged);
   }
@@ -511,7 +517,8 @@ void TabHoverCardController::CreateHoverCard(Tab* tab) {
   TabHoverCardBubbleView::InitParams params;
   params.use_animation = UseAnimations();
   // In some browser types (e.g. ChromeOS terminal app) hide the domain label.
-  params.show_domain = !IsBrowserForSystemWebApp(tab_strip_->GetBrowser());
+  params.show_domain =
+      !IsBrowserForSystemWebApp(tab_strip_->GetBrowserWindowInterface());
   params.show_memory_usage = hover_card_memory_usage_enabled_;
   params.show_image_preview = hover_card_image_previews_enabled_;
 
@@ -527,8 +534,7 @@ void TabHoverCardController::CreateHoverCard(Tab* tab) {
   slide_complete_subscription_ = slide_animator_->AddSlideCompleteCallback(
       base::BindRepeating(&TabHoverCardController::OnSlideAnimationComplete,
                           weak_ptr_factory_.GetWeakPtr()));
-  fade_animator_ =
-      std::make_unique<views::WidgetFadeAnimator>(hover_card_->GetWidget());
+  fade_animator_ = std::make_unique<views::WidgetFadeAnimator>(GetCardWidget());
   fade_complete_subscription_ = fade_animator_->AddFadeCompleteCallback(
       base::BindRepeating(&TabHoverCardController::OnFadeAnimationEnded,
                           weak_ptr_factory_.GetWeakPtr()));
@@ -540,7 +546,8 @@ void TabHoverCardController::CreateHoverCard(Tab* tab) {
                             weak_ptr_factory_.GetWeakPtr()));
   }
 
-  tab_resource_usage_collector_->AddObserver(this);
+  tab_resource_usage_collector_observation_.Observe(
+      tab_resource_usage_collector_);
 }
 
 void TabHoverCardController::UpdateCardContent(Tab* tab) {
@@ -608,22 +615,6 @@ void TabHoverCardController::MaybeStartThumbnailObservation(
           ? base::TimeDelta()
           : GetPreviewImageCaptureDelay(thumbnail->GetCaptureReadiness());
 
-  // Under memory pressure, we will additionally delay the initial capture, so
-  // that generating the image is a more deliberate choice from the user. The
-  // memory pressure monitor is disabled in tests.
-  if (const auto* const monitor = base::MemoryPressureMonitor::Get()) {
-    switch (monitor->GetCurrentPressureLevel()) {
-      case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL:
-        capture_delay = base::TimeDelta::Max();
-        break;
-      case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_MODERATE:
-        capture_delay += kMemoryPressureCaptureDelay;
-        break;
-      case base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE:
-        break;
-    }
-  }
-
   if (capture_delay.is_zero()) {
     thumbnail_observer_->Observe(thumbnail);
     return;
@@ -641,11 +632,7 @@ void TabHoverCardController::MaybeStartThumbnailObservation(
     thumbnail_wait_state_ = ThumbnailWaitState::kWaitingWithPlaceholder;
   }
 
-  // If we've elected to put off capture indefinitely (likely due to memory
-  // pressure), there's no additional work to do.
-  if (capture_delay.is_inf()) {
-    return;
-  }
+  CHECK(!capture_delay.is_inf());
 
   // Start a delayed capture.
   delayed_show_timer_.Start(
@@ -668,21 +655,6 @@ void TabHoverCardController::StartThumbnailObservation(Tab* tab) {
   DCHECK(tab);
   DCHECK(hover_card_);
   DCHECK(waiting_for_preview());
-
-  // Do not capture thumbnails during critical memory pressure.
-  const auto* const monitor = base::MemoryPressureMonitor::Get();
-  if (monitor &&
-      monitor->GetCurrentPressureLevel() ==
-          base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL) {
-    // Because we're blocked, we'll show a placeholder instead of nothing or
-    // the wrong image.
-    if (thumbnail_wait_state_ ==
-        ThumbnailWaitState::kWaitingWithoutPlaceholder) {
-      hover_card_->SetPlaceholderImage();
-      thumbnail_wait_state_ = ThumbnailWaitState::kWaitingWithPlaceholder;
-    }
-    return;
-  }
 
   auto thumbnail = tab->data().thumbnail;
   if (!thumbnail || thumbnail == thumbnail_observer_->current_image()) {
@@ -758,7 +730,7 @@ void TabHoverCardController::OnFadeAnimationEnded(
   }
 
   if (fade_type == views::WidgetFadeAnimator::FadeType::kFadeOut) {
-    hover_card_->GetWidget()->Close();
+    CloseCardWidget();
   }
 }
 
@@ -824,4 +796,12 @@ void TabHoverCardController::OnHovercardMemoryUsageEnabledChanged() {
   hover_card_memory_usage_enabled_ =
       g_browser_process->local_state()->GetBoolean(
           prefs::kHoverCardMemoryUsageEnabled);
+}
+
+views::Widget* TabHoverCardController::GetCardWidget() const {
+  return hover_card_->GetWidget();
+}
+
+void TabHoverCardController::CloseCardWidget() {
+  GetCardWidget()->Close();
 }

@@ -15,18 +15,31 @@
 class AuthenticationService;
 @class InstantSigninMediator;
 
+namespace signin {
+class IdentityManager;
+}  // namespace signin
+
 namespace signin_metrics {
 enum class AccessPoint;
 }  // namespace signin_metrics
+
+namespace signin_ui {
+enum class CancelationReason;
+}  // namespace signin_ui
 
 @protocol InstantSigninMediatorDelegate <NSObject>
 
 // Called when the sign-in is over.
 - (void)instantSigninMediator:(InstantSigninMediator*)mediator
-          didSigninWithResult:(SigninCoordinatorResult)result;
+    didSigninWithCancelationResult:
+        (signin_ui::CancelationReason)cancelationResult;
 
 // Called when the sign-in will be done in another profile.
 - (void)instantSigninMediatorWillSwitchProfile:(InstantSigninMediator*)mediator;
+
+// Called when sign-in is not available anymore.
+- (void)instantSigninMediatorSigninIsImpossible:
+    (InstantSigninMediator*)mediator;
 
 @end
 
@@ -36,6 +49,7 @@ enum class AccessPoint;
 - (instancetype)
       initWithAccessPoint:(signin_metrics::AccessPoint)accessPoint
     authenticationService:(AuthenticationService*)authenticationService
+          identityManager:(signin::IdentityManager*)identityManager
      continuationProvider:
          (const ChangeProfileContinuationProvider&)continuationProvider
     NS_DESIGNATED_INITIALIZER;

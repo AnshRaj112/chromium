@@ -21,15 +21,22 @@
 #include "base/metrics/user_metrics.h"
 #include "base/strings/strcat.h"
 #include "base/task/single_thread_task_runner.h"
+#include "components/crx_file/id_util.h"
 #include "content/public/browser/histogram_fetcher.h"
 #include "extensions/browser/api/extensions_api_client.h"
 #include "extensions/browser/api/metrics_private/metrics_private_delegate.h"
 #include "extensions/common/api/metrics_private.h"
+#include "extensions/common/extension.h"
+#include "services/metrics/public/cpp/ukm_builders.h"
+#include "services/metrics/public/cpp/ukm_recorder.h"
+#include "url/gurl.h"
 
 namespace extensions {
 
 namespace GetVariationParams = api::metrics_private::GetVariationParams;
 namespace RecordUserAction = api::metrics_private::RecordUserAction;
+namespace RecordExtensionUsageUkm =
+    api::metrics_private::RecordExtensionUsageUkm;
 namespace RecordValue = api::metrics_private::RecordValue;
 namespace RecordBoolean = api::metrics_private::RecordBoolean;
 namespace RecordEnumerationValue = api::metrics_private::RecordEnumerationValue;
@@ -94,6 +101,25 @@ MetricsPrivateRecordUserActionFunction::Run() {
   EXTENSION_FUNCTION_VALIDATE(params);
 
   base::RecordComputedAction(params->name);
+  return RespondNow(NoArguments());
+}
+
+ExtensionFunction::ResponseAction
+MetricsPrivateRecordExtensionUsageUkmFunction::Run() {
+  std::optional<RecordExtensionUsageUkm::Params> params =
+      RecordExtensionUsageUkm::Params::Create(args());
+  EXTENSION_FUNCTION_VALIDATE(params);
+  if (!crx_file::id_util::IdIsValid(params->extension_id)) {
+    return RespondNow(Error("Invalid extension ID: " + params->extension_id));
+  }
+
+  ukm::builders::Extensions_ExtensionUsage(
+      ukm::UkmRecorder::GetSourceIdForExtensionUrl(
+          base::PassKey<MetricsPrivateRecordExtensionUsageUkmFunction>(),
+          extensions::Extension::GetBaseURLFromExtensionId(
+              params->extension_id)))
+      .SetAction(static_cast<int64_t>(params->action))
+      .Record(ukm::UkmRecorder::Get());
   return RespondNow(NoArguments());
 }
 

@@ -26,6 +26,7 @@
 #include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/browser_test_utils.h"
+#include "device/vr/buildflags/buildflags.h"
 #include "url/gurl.h"
 
 #if BUILDFLAG(IS_ANDROID)
@@ -37,6 +38,10 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#endif
+
+#if BUILDFLAG(ENABLE_VR)
+#include "device/vr/public/cpp/features.h"
 #endif
 namespace vr {
 
@@ -64,6 +69,12 @@ const std::vector<std::pair<std::string, std::string>>
 
 XrBrowserTestBase::XrBrowserTestBase() : env_(base::Environment::Create()) {
   enable_features_.push_back(features::kLogJsConsoleMessages);
+#if BUILDFLAG(ENABLE_VR)
+  enable_features_.push_back(device::features::kWebXrVisibleBlurred);
+#if BUILDFLAG(IS_ANDROID)
+  enable_features_.push_back(device::features::kWebXRLayers);
+#endif
+#endif
 }
 
 XrBrowserTestBase::~XrBrowserTestBase() = default;
@@ -247,7 +258,9 @@ void XrBrowserTestBase::OpenNewTab(const std::string& url, bool incognito) {
       content::WebContents::Create(content::WebContents::CreateParams(profile));
   EXPECT_TRUE(content::NavigateToURL(contents.get(), GURL(url)));
   // TabModel takes ownership of the WebContents, so we release it here.
-  tab_model->CreateTab(first_tab, contents.release(), true);
+  tab_model->CreateTab(first_tab, std::move(contents), TabModel::kInvalidIndex,
+                       TabModel::TabLaunchType::FROM_RECENT_TABS_FOREGROUND,
+                       /*should_pin=*/false);
 #else
   if (incognito) {
     OpenURLOffTheRecord(browser()->profile(), GURL(url));

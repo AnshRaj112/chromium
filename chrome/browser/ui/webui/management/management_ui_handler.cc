@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "base/check_is_test.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -33,6 +32,8 @@
 #include "chrome/browser/enterprise/browser_management/management_service_factory.h"
 #include "chrome/browser/enterprise/identifiers/profile_id_service_factory.h"
 #include "chrome/browser/enterprise/reporting/prefs.h"
+#include "chrome/browser/media/webrtc/multi_capture/multi_capture_data_service.h"
+#include "chrome/browser/media/webrtc/multi_capture/multi_capture_data_service_factory.h"
 #include "chrome/browser/policy/chrome_browser_policy_connector.h"
 #include "chrome/browser/policy/policy_ui_utils.h"
 #include "chrome/browser/policy/profile_policy_connector.h"
@@ -502,7 +503,11 @@ base::Value::Dict ManagementUIHandler::GetThreatProtectionInfo(
   }
 
 #if BUILDFLAG(IS_CHROMEOS)
-  if (is_get_all_screens_media_allowed_for_any_origin_) {
+  const auto* multi_capture_data_service =
+      multi_capture::MultiCaptureDataServiceFactory::GetForBrowserContext(
+          profile);
+  if (multi_capture_data_service &&
+      multi_capture_data_service->IsMultiCaptureAllowedForAnyApp()) {
     AddThreatProtectionPermission(kManagementScreenCaptureEvent,
                                   kManagementScreenCaptureData, &info);
   }
@@ -551,7 +556,7 @@ base::Value::List ManagementUIHandler::GetApplicationsInfo(
 
   auto* provider = web_app::WebAppProvider::GetForWebApps(profile);
   // Only display web apps for the profile that contains them.
-  if (provider == nullptr) {
+  if (provider == nullptr || !provider->is_registry_ready()) {
     return applications;
   }
 

@@ -21,7 +21,11 @@ public abstract class CronetLogger {
         CRONET_SOURCE_PLAY_SERVICES,
         // The application is using the fallback implementation.
         CRONET_SOURCE_FALLBACK,
-        // The library is loaded through the bootclasspath.
+        // The library was built from the Android Platform repository.
+        // TODO(https://crbug.com/460049393): a more useful and less confusing definition would be
+        // "the library was loaded from the Android device bootclasspath through HttpEngine". In
+        // production the two definitions are equivalent, but that is not true in test code running
+        // against STATICALLY_LINKED in AOSP.
         CRONET_SOURCE_PLATFORM,
         // The application is using the fake implementation.
         CRONET_SOURCE_FAKE,
@@ -209,7 +213,6 @@ public abstract class CronetLogger {
         private final long mResponseHeaderSizeInBytes;
         private final long mResponseBodySizeInBytes;
         private final int mResponseStatusCode;
-        private final Duration mHeadersLatency;
         private final Duration mTotalLatency;
         private final String mNegotiatedProtocol;
         private final boolean mWasConnectionMigrationAttempted;
@@ -228,6 +231,12 @@ public abstract class CronetLogger {
         private final boolean mSocketReused;
         private final String mCronetVersion;
         private final CronetSource mCronetSource;
+        private final long mTimeToEstablishDnsMicros;
+        private final long mTimeToEstablishSSLMicros;
+        private final long mTimeToConnectMicros;
+        private final long mTimeToSendFirstByteMicros;
+        private final long mTimeToReceiveHeaderLastByteMicros;
+        private final Boolean mIsProxied;
 
         public CronetTrafficInfo(
                 long requestHeaderSizeInBytes,
@@ -235,7 +244,6 @@ public abstract class CronetLogger {
                 long responseHeaderSizeInBytes,
                 long responseBodySizeInBytes,
                 int responseStatusCode,
-                Duration headersLatency,
                 Duration totalLatency,
                 String negotiatedProtocol,
                 boolean wasConnectionMigrationAttempted,
@@ -253,13 +261,18 @@ public abstract class CronetLogger {
                 RequestFailureReason failureReason,
                 boolean sockedReused,
                 String cronetVersion,
-                CronetSource cronetSource) {
+                CronetSource cronetSource,
+                long timeToEstablishDnsMicros,
+                long timeToEstablishSSLMicros,
+                long timeToConnectMicros,
+                long timeToSendFirstByteMicros,
+                long timeToReceiveHeaderLastByteMicros,
+                Boolean isProxied) {
             mRequestHeaderSizeInBytes = requestHeaderSizeInBytes;
             mRequestBodySizeInBytes = requestBodySizeInBytes;
             mResponseHeaderSizeInBytes = responseHeaderSizeInBytes;
             mResponseBodySizeInBytes = responseBodySizeInBytes;
             mResponseStatusCode = responseStatusCode;
-            mHeadersLatency = headersLatency;
             mTotalLatency = totalLatency;
             mNegotiatedProtocol = negotiatedProtocol;
             mWasConnectionMigrationAttempted = wasConnectionMigrationAttempted;
@@ -278,6 +291,12 @@ public abstract class CronetLogger {
             mSocketReused = sockedReused;
             mCronetVersion = cronetVersion;
             mCronetSource = cronetSource;
+            mTimeToEstablishDnsMicros = timeToEstablishDnsMicros;
+            mTimeToEstablishSSLMicros = timeToEstablishSSLMicros;
+            mTimeToConnectMicros = timeToConnectMicros;
+            mTimeToSendFirstByteMicros = timeToSendFirstByteMicros;
+            mTimeToReceiveHeaderLastByteMicros = timeToReceiveHeaderLastByteMicros;
+            mIsProxied = isProxied;
         }
 
         /**
@@ -308,18 +327,7 @@ public abstract class CronetLogger {
         }
 
         /**
-         * The time it took from starting the request to receiving the full set of
-         * response headers.
-         *
-         * @return The time to get response headers
-         */
-        public Duration getHeadersLatency() {
-            return mHeadersLatency;
-        }
-
-        /**
-         * The time it took from starting the request to receiving the entire
-         * response.
+         * The time it took from starting the request to receiving the entire response.
          *
          * @return The time to get total response
          */
@@ -396,6 +404,30 @@ public abstract class CronetLogger {
 
         public CronetSource getCronetSource() {
             return mCronetSource;
+        }
+
+        public long getTimeToEstablishDNSMicros() {
+            return mTimeToEstablishDnsMicros;
+        }
+
+        public long getTimeToEstablishSSLMicros() {
+            return mTimeToEstablishSSLMicros;
+        }
+
+        public long getTimeToConnectMicros() {
+            return mTimeToConnectMicros;
+        }
+
+        public long getTimeToSendFirstByteMicros() {
+            return mTimeToSendFirstByteMicros;
+        }
+
+        public long getTimeToReceiveHeaderLastByteMicros() {
+            return mTimeToReceiveHeaderLastByteMicros;
+        }
+
+        public Boolean isProxied() {
+            return mIsProxied;
         }
     }
 

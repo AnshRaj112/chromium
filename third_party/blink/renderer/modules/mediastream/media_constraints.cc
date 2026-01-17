@@ -32,7 +32,8 @@
 
 #include <math.h>
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/memory/scoped_refptr.h"
 #include "third_party/blink/renderer/platform/wtf/text/string_builder.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
@@ -53,8 +54,9 @@ void MaybeEmitNamedNumber(StringBuilder& builder,
   if (builder.length() > 1) {
     builder.Append(", ");
   }
+  builder.Append("\"");
   builder.Append(name);
-  builder.Append(": ");
+  builder.Append("\": ");
   builder.AppendNumber(value);
 }
 
@@ -69,8 +71,9 @@ void MaybeEmitNamedString(StringBuilder& builder,
   if (builder.length() > 1) {
     builder.Append(", ");
   }
+  builder.Append("\"");
   builder.Append(name);
-  builder.Append(": ");
+  builder.Append("\": ");
   builder.Append(value);
 }
 
@@ -84,8 +87,9 @@ void MaybeEmitNamedBoolean(StringBuilder& builder,
   if (builder.length() > 1) {
     builder.Append(", ");
   }
+  builder.Append("\"");
   builder.Append(name);
-  builder.Append(": ");
+  builder.Append("\": ");
   if (value) {
     builder.Append("true");
   } else {
@@ -163,7 +167,7 @@ const String MediaConstraintsPrivate::ToString() const {
       if (builder.length() > 1) {
         builder.Append(", ");
       }
-      builder.Append("advanced: [");
+      builder.Append("\"advanced\": [");
       bool first = true;
       for (const auto& constraint_set : Advanced()) {
         if (!first) {
@@ -371,7 +375,7 @@ String StringConstraint::ToString() const {
   StringBuilder builder;
   builder.Append('{');
   if (!ideal_.empty()) {
-    builder.Append("ideal: [");
+    builder.Append("\"ideal\": [");
     bool first = true;
     for (const auto& iter : ideal_) {
       if (!first) {
@@ -388,7 +392,7 @@ String StringConstraint::ToString() const {
     if (builder.length() > 1) {
       builder.Append(", ");
     }
-    builder.Append("exact: [");
+    builder.Append("\"exact\": [");
     bool first = true;
     for (const auto& iter : exact_) {
       if (!first) {
@@ -567,7 +571,7 @@ bool MediaTrackConstraintSetPlatform::HasMandatoryOutsideSet(
     String& found_name) const {
   for (auto* const constraint : AllConstraints()) {
     if (constraint->HasMandatory()) {
-      if (!base::Contains(good_names, constraint->GetName())) {
+      if (!std::ranges::contains(good_names, constraint->GetName())) {
         found_name = constraint->GetName();
         return true;
       }
@@ -607,8 +611,9 @@ String MediaTrackConstraintSetPlatform::ToString() const {
       if (!first) {
         builder.Append(", ");
       }
+      builder.Append("\"");
       builder.Append(constraint->GetName());
-      builder.Append(": ");
+      builder.Append("\": ");
       builder.Append(constraint->ToString());
       first = false;
     }

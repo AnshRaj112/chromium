@@ -7,6 +7,7 @@
 #import "base/ios/ios_util.h"
 #import "base/strings/string_number_conversions.h"
 #import "components/omnibox/common/omnibox_features.h"
+#import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_feature.h"
 #import "ios/chrome/browser/omnibox/eg_tests/omnibox_app_interface.h"
 #import "ios/chrome/browser/omnibox/eg_tests/omnibox_test_util.h"
 #import "ios/chrome/browser/omnibox/public/omnibox_popup_accessibility_identifier_constants.h"
@@ -65,7 +66,7 @@ id<GREYMatcher> CarouselMatcher() {
 
 - (AppLaunchConfiguration)appConfigurationForTestCase {
   AppLaunchConfiguration config = [super appConfigurationForTestCase];
-
+  config.features_enabled.push_back(kMostVisitedTilesCustomizationIOS);
   // Disable AutocompleteProvider types: TYPE_SEARCH and TYPE_ON_DEVICE_HEAD.
   omnibox::DisableAutocompleteProviders(config, 1056);
 
@@ -103,7 +104,8 @@ id<GREYMatcher> CarouselMatcher() {
 }
 
 // Tests tapping the first tile and scroll to tap the last tile.
-- (void)testTappingAndScrollingMostVisitedTiles {
+// TODO(crbug.com/440575187): This test is flaky.
+- (void)FLAKY_testTappingAndScrollingMostVisitedTiles {
   [self addNumberOfMostVisitedTiles:kCarouselCapacity];
 
   // Test tapping the first tile.
@@ -125,7 +127,8 @@ id<GREYMatcher> CarouselMatcher() {
 #pragma mark - Context Menu
 
 // Tests deleting most visited tiles from context menu.
-- (void)testDeleteMostVisitedTiles {
+// TODO(crbug.com/440566014): This test is flaky.
+- (void)FLAKY_testDeleteMostVisitedTiles {
   // Visit page 1 and 2 multiple times.
   [self addNumberOfMostVisitedTiles:2];
   id<GREYMatcher> tile1 = TileWithTitle(PageTitle(Page(1)));
@@ -235,7 +238,7 @@ id<GREYMatcher> CarouselMatcher() {
   [self focusOmniboxFromWebPageZero];
   [self longPressMostVisitedTile:tile1];
 
-  [ChromeEarlGrey verifyOpenInNewTabActionWithURL:page1ServerURL.GetContent()];
+  [ChromeEarlGrey verifyOpenInNewTabActionWithURL:page1ServerURL];
 }
 
 // Tests the "Open in New Incognito Tab" action of the carousel context menu.
@@ -248,8 +251,7 @@ id<GREYMatcher> CarouselMatcher() {
   [self focusOmniboxFromWebPageZero];
   [self longPressMostVisitedTile:tile1];
 
-  [ChromeEarlGrey
-      verifyOpenInIncognitoActionWithURL:page1ServerURL.GetContent()];
+  [ChromeEarlGrey verifyOpenInIncognitoActionWithURL:page1ServerURL];
 }
 
 #pragma mark - Helpers
@@ -303,7 +305,7 @@ id<GREYMatcher> CarouselMatcher() {
   // Tap on remove.
   [[EarlGrey selectElementWithMatcher:
                  chrome_test_util::ContextMenuItemWithAccessibilityLabelId(
-                     IDS_IOS_CONTENT_SUGGESTIONS_REMOVE)]
+                     IDS_IOS_CONTENT_SUGGESTIONS_NEVER_SHOW_SITE)]
       performAction:grey_tap()];
   // Check tile is removed.
   [[EarlGrey selectElementWithMatcher:tile] assertWithMatcher:grey_nil()];

@@ -14,7 +14,6 @@
 
 #include "base/check.h"
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/map_util.h"
 #include "base/containers/span.h"
@@ -324,10 +323,12 @@ class ClipboardOzone::AsyncClipboardOzone {
            platform_clipboard_->IsSelectionBufferAvailable());
     if (buffer == ClipboardBuffer::kCopyPaste) {
       clipboard_sequence_number_ = ClipboardSequenceNumberToken();
+      // Only notify clipboard observers for regular clipboard changes,
+      // not primary selection changes (e.g., double-click text selection).
+      ClipboardMonitor::GetInstance()->NotifyClipboardDataChanged();
     } else {
       selection_sequence_number_ = ClipboardSequenceNumberToken();
     }
-    ClipboardMonitor::GetInstance()->NotifyClipboardDataChanged();
   }
 
   bool IsBufferSupported(ClipboardBuffer buffer) const {
@@ -394,7 +395,7 @@ bool ClipboardOzone::IsFormatAvailable(
     return false;
 
   auto available_types = async_clipboard_ozone_->RequestMimeTypes(buffer);
-  return base::Contains(available_types, format.GetName());
+  return std::ranges::contains(available_types, format.GetName());
 }
 
 void ClipboardOzone::Clear(ClipboardBuffer buffer) {
@@ -421,7 +422,7 @@ std::vector<std::u16string> ClipboardOzone::GetStandardFormats(
          mime_type == kMimeTypeLinuxText || mime_type == kMimeTypeLinuxString ||
          mime_type == kMimeTypeUtf8PlainText ||
          mime_type == kMimeTypeLinuxUtf8String) &&
-        !base::Contains(types, kMimeTypePlainText16)) {
+        !std::ranges::contains(types, kMimeTypePlainText16)) {
       types.push_back(kMimeTypePlainText16);
       continue;
     }
@@ -742,18 +743,6 @@ void ClipboardOzone::WriteData(const ClipboardFormatType& format,
                                base::span<const uint8_t> data) {
   std::vector<uint8_t> owned_data(data.begin(), data.end());
   async_clipboard_ozone_->InsertData(std::move(owned_data), {format.GetName()});
-}
-
-void ClipboardOzone::WriteClipboardHistory() {
-  // TODO(crbug.com/40945200): Add support for this.
-}
-
-void ClipboardOzone::WriteUploadCloudClipboard() {
-  // TODO(crbug.com/40945200): Add support for this.
-}
-
-void ClipboardOzone::WriteConfidentialDataForPassword() {
-  // TODO(crbug.com/40945200): Add support for this.
 }
 
 void ClipboardOzone::AddSourceToClipboard(

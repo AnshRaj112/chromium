@@ -36,6 +36,24 @@ struct MEDIA_EXPORT HLSQuirks {
   // other major implementations do not consider this restriction and play
   // content which is missing the trailing comma.
   static constexpr bool AllowMissingSegmentInfCommas() { return true; }
+
+  // datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis#section-4.4.4.1
+  // The format of the EXTINF tag is:
+  // #EXTINF:<duration>,[<title>]
+  // A space following the `#EXTINF:` and preceding <duration> is not allowed,
+  // however many major implementations do not consider this and allow the
+  // content to be played.
+  static constexpr bool AllowSpaceBetweenEXTINFAndTimestamp() { return true; }
+
+  // The spec says that the segment duration should not exceed the target
+  // duration after rounding to the nearest integer.
+  // https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis#section-4.4.3.1
+  // However, nearly 30% of all parser errors are caused by this error, so it
+  // might make sense to allow segments which exceed this duration by small
+  // numbers of seconds. NOTE: this may cause issues in playback, as the delays
+  // in network fetching between segments is based on calculations on the target
+  // duration.
+  static constexpr int AllowExceedingTargetDurationBySeconds() { return 2; }
 };
 
 }  // namespace media::hls

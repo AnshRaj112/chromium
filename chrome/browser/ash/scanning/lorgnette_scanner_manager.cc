@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/map_util.h"
 #include "base/functional/bind.h"
@@ -54,6 +53,7 @@ constexpr char kEpsonNoFlipModels[] =
     "|AM-C4000"
     "|AM-C5000"
     "|AM-C550"
+    "|AM-C550z"
     "|AM-C6000"
     "|DS-790WN"
     "|DS-800WN"
@@ -63,6 +63,7 @@ constexpr char kEpsonNoFlipModels[] =
     "|EM-C7100"
     "|EM-C800"
     "|EM-C8100"
+    "|EM-C8101"
     "|ES-C320W"
     "|ES-C380W"
     "|LM-C400"
@@ -646,7 +647,7 @@ class LorgnetteScannerManagerImpl final : public LorgnetteScannerManager {
     // Create tombstones for any previously-returned tokens that are no longer
     // part of the response.
     for (const auto& [token, id] : old_tokens) {
-      if (!base::Contains(new_tokens, token)) {
+      if (!new_tokens.contains(token)) {
         new_tokens.emplace(token, std::nullopt);
       }
     }

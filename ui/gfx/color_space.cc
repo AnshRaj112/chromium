@@ -11,6 +11,7 @@
 
 #include "base/atomic_sequence_num.h"
 #include "base/compiler_specific.h"
+#include "base/debug/crash_logging.h"
 #include "base/lazy_instance.h"
 #include "base/logging.h"
 #include "base/notreached.h"
@@ -110,9 +111,15 @@ ColorSpace::ColorSpace(const SkColorSpace& sk_color_space, bool is_hdr)
     SetCustomTransferFunction(fn, is_hdr);
   } else if (skcms_TransferFunction_isHLGish(&fn)) {
     transfer_ = TransferID::HLG;
+    transfer_params_[0] = 203.f;
+    transfer_params_[1] = 1000.f;
+    transfer_params_[2] = 1.2f;
   } else if (skcms_TransferFunction_isPQish(&fn)) {
     transfer_ = TransferID::PQ;
     transfer_params_[0] = GetSDRWhiteLevelFromPQSkTransferFunction(fn);
+    if (transfer_params_[0] == 10000.f) {
+      transfer_params_[0] = 203.f;
+    }
   } else if (skcms_TransferFunction_isHLG(&fn)) {
     transfer_ = TransferID::HLG;
     transfer_params_[0] = fn.a;
@@ -1127,6 +1134,16 @@ SkM44 ColorSpace::GetRangeAdjustMatrix(int bit_depth) const {
 }
 
 bool ColorSpace::ToSkYUVColorSpace(int bit_depth, SkYUVColorSpace* out) const {
+  // There should be no usages of RGB matrix for YUV conversion.
+  if (matrix_ == gfx::ColorSpace::MatrixID::RGB) {
+    [[maybe_unused]] static bool call_once = [&]() {
+      SCOPED_CRASH_KEY_STRING256("ToSkYUVColorSpace", "ColorSpace", ToString());
+      DUMP_WILL_BE_CHECK(false)
+          << "ToSkYUVColorSpace called on RGB color space = " << ToString();
+      return true;
+    }();
+  }
+
   switch (matrix_) {
     case MatrixID::BT709:
       *out = range_ == RangeID::FULL ? kRec709_Full_SkYUVColorSpace

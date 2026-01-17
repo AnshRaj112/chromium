@@ -20,14 +20,14 @@
 #import "components/policy/test_support/signature_provider.h"
 #import "components/safe_browsing/core/common/features.h"
 #import "components/strings/grit/components_strings.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey_ui_test_util.h"
-#import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_constants.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey_ui_test_util.h"
+#import "ios/chrome/browser/content_suggestions/public/content_suggestions_constants.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_constants.h"
 #import "ios/chrome/browser/policy/model/cloud/user_policy_constants.h"
 #import "ios/chrome/browser/policy/model/policy_app_interface.h"
 #import "ios/chrome/browser/policy/model/policy_earl_grey_utils.h"
-#import "ios/chrome/browser/popup_menu/ui_bundled/popup_menu_constants.h"
+#import "ios/chrome/browser/popup_menu/public/popup_menu_constants.h"
 #import "ios/chrome/browser/settings/ui_bundled/autofill/autofill_settings_constants.h"
 #import "ios/chrome/browser/settings/ui_bundled/elements/elements_constants.h"
 #import "ios/chrome/browser/settings/ui_bundled/language/language_settings_ui_constants.h"
@@ -61,13 +61,6 @@
 using policy_test_utils::SetPolicy;
 
 namespace {
-
-// TODO(crbug.com/40124201): Add helpers as needed for:
-//    - STRING
-//    - LIST (and subtypes, e.g. int list, string list, etc)
-//    - DICTIONARY (and subtypes, e.g. int dictionary, string dictionary, etc)
-//    - Deleting a policy value
-//    - Setting multiple policies at once
 
 // Verifies that a bool type policy sets the pref properly.
 void VerifyBoolPolicy(const std::string& policy_key,
@@ -144,6 +137,11 @@ ElementSelector* VisibleElementSelector(NSString* element_id) {
 NSString* const kDomain1 = @"domain1.com";
 NSString* const kDomain2 = @"domain2.com";
 constexpr char kEnrollmentToken[] = "fake-enrollment-token";
+
+// Path to the pony page.
+const char kTestPagePath[] = "/pony.html";
+// The text on the pony page.
+const char kTestPageText[] = "pony";
 
 }  // namespace
 
@@ -303,8 +301,7 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
 // Tests for the SavingBrowserHistoryDisabled policy.
 - (void)testSavingBrowserHistoryDisabled {
   GREYAssertTrue(self.testServer->Start(), @"Test server failed to start.");
-  const GURL testURL = self.testServer->GetURL("/pony.html");
-  const std::string pageText = "pony";
+  const GURL testURL = self.testServer->GetURL(kTestPagePath);
 
   // Set history to a clean state and verify it is clean.
   if (![ChromeTestCase forceRestartAndWipe]) {
@@ -332,7 +329,7 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
 
   // Perform a navigation and make sure the history isn't changed.
   [ChromeEarlGrey loadURL:testURL];
-  [ChromeEarlGrey waitForWebStateContainingText:pageText];
+  [ChromeEarlGrey waitForWebStateContainingText:kTestPageText];
   GREYAssertEqual([ChromeEarlGrey browsingHistoryEntryCount], 0,
                   @"History was unexpectedly non-empty");
 
@@ -344,7 +341,7 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
 
   // Perform a navigation and make sure history is being saved.
   [ChromeEarlGrey loadURL:testURL];
-  [ChromeEarlGrey waitForWebStateContainingText:pageText];
+  [ChromeEarlGrey waitForWebStateContainingText:kTestPageText];
   GREYAssertEqual([ChromeEarlGrey browsingHistoryEntryCount], 1,
                   @"History had an unexpected entry count");
 }
@@ -359,8 +356,7 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
 // button is disabled when the pref kOfferTranslateEnabled is set to false.
 - (void)testTranslateEnabled {
   GREYAssertTrue(self.testServer->Start(), @"Test server failed to start.");
-  const GURL testURL = self.testServer->GetURL("/pony.html");
-  const std::string pageText = "pony";
+  const GURL testURL = self.testServer->GetURL(kTestPagePath);
 
   // Set up a fake language detection observer.
   [TranslateAppInterface
@@ -385,9 +381,7 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
   // Make sure the Translate manual trigger button disabled.
   [ChromeEarlGreyUI openToolsMenu];
   id<GREYMatcher> toolsMenuMatcher =
-      [ChromeEarlGrey isNewOverflowMenuEnabled]
-          ? grey_accessibilityID(kPopupMenuToolsMenuActionListId)
-          : grey_accessibilityID(kPopupMenuToolsMenuTableViewId);
+      grey_accessibilityID(kPopupMenuToolsMenuActionListId);
   [[[EarlGrey selectElementWithMatcher:ToolsMenuTranslateButton()]
          usingSearchAction:grey_scrollInDirection(kGREYDirectionDown,
                                                   /*amount=*/200)
@@ -452,14 +446,13 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
                                         IDS_IOS_MANAGEMENT_UI_DESC)];
 
   // Check the navigation.
-  [[EarlGrey selectElementWithMatcher:chrome_test_util::OmniboxText(
-                                          kChromeUIManagementURL)]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:GURL(kChromeUIManagementURL)];
 }
 
 // Tests whether the managed item will be shown if UserPolicy is enabled and
 // the browser is signed in with a managed account.
-- (void)testPopupMenuItemWithUserPolicy {
+// TODO(crbug.com/435333773): Reenable this test.
+- (void)FLAKY_testPopupMenuItemWithUserPolicy {
   // Sign in with a managed account.
   NSString* managedAccountEmail = base::SysUTF8ToNSString(
       base::StrCat({"enterprise@", policy::SignatureProvider::kTestDomain1}));
@@ -481,9 +474,7 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
 
   // Check the navigation without assert the content (which is done in another
   // test case).
-  [[EarlGrey selectElementWithMatcher:chrome_test_util::OmniboxText(
-                                          kChromeUIManagementURL)]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:GURL(kChromeUIManagementURL)];
 }
 
 // Tests the chrome://management page when no machine level policy is set.
@@ -558,6 +549,63 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
       waitForWebStateContainingText:
           l10n_util::GetStringFUTF8(IDS_MANAGEMENT_SUBTITLE_PROFILE_MANAGED_BY,
                                     base::SysNSStringToUTF16(kDomain1))];
+}
+
+// Tests the chrome://management page when reporting is disabled.
+- (void)testManagementPageManagedWithoutReporting {
+  // Open the management page.
+  [ChromeEarlGrey loadURL:GURL(kChromeUIManagementURL)];
+  [ChromeEarlGrey
+      waitForWebStateContainingText:l10n_util::GetStringUTF8(
+                                        IDS_MANAGEMENT_BROWSER_REPORTING)];
+
+  // Expect the profile reporting section to be invisible.
+  GREYAssertFalse(
+      [ChromeEarlGrey webStateContainsElement:VisibleElementSelector(
+                                                  @"profile-reporting-info")],
+      @"Profile reporting section is visible.");
+}
+
+// Tests the chrome://management page when browser reporting is enabled.
+- (void)testManagementPageManagedWithBrowserReporting {
+  // Set up profile reporting.
+  SetPolicy(true, policy::key::kCloudReportingEnabled);
+
+  // Open the management page and check if the content is expected.
+  [ChromeEarlGrey loadURL:GURL(kChromeUIManagementURL)];
+  [ChromeEarlGrey waitForWebStateContainingText:
+                      l10n_util::GetStringUTF8(
+                          IDS_MANAGEMENT_BROWSER_REPORTING_EXPLANATION)];
+}
+
+// Tests the chrome://management page when profile reporting is enabled.
+- (void)testManagementPageManagedWithProfileReporting {
+  // Set up profile reporting.
+  SetPolicy(true, policy::key::kCloudProfileReportingEnabled);
+
+  // Open the management page and check if the content is expected.
+  [ChromeEarlGrey loadURL:GURL(kChromeUIManagementURL)];
+  [ChromeEarlGrey waitForWebStateContainingText:
+                      l10n_util::GetStringUTF8(
+                          IDS_MANAGEMENT_PROFILE_REPORTING_EXPLANATION)];
+}
+
+// Tests the chrome://management page when browser reporting is enabled.
+- (void)testManagementPageManagedWithBrowserAndProfileReporting {
+  // Set up profile reporting.
+  SetPolicy(true, policy::key::kCloudReportingEnabled);
+
+  // Open the management page and check if the content is expected.
+  [ChromeEarlGrey loadURL:GURL(kChromeUIManagementURL)];
+  [ChromeEarlGrey waitForWebStateContainingText:
+                      l10n_util::GetStringUTF8(
+                          IDS_MANAGEMENT_BROWSER_REPORTING_EXPLANATION)];
+
+  // If both are enabled, only show the browser reporting section.
+  GREYAssertFalse(
+      [ChromeEarlGrey webStateContainsElement:VisibleElementSelector(
+                                                  @"profile-reporting-info")],
+      @"Profile reporting section is visible.");
 }
 
 // Tests the chrome://management page when there are machine level policies and
@@ -809,9 +857,9 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
 }
 
 // Tests enterprise mode in the Privacy Safe Browsing settings as if the
-// enterprise selected Enhanced Protection as the choice of protection.
-- (void)testEnhancedSafeBrowsing {
-  SetPolicy(2, policy::key::kSafeBrowsingProtectionLevel);
+// enterprise selected No Protection as the choice of protection.
+- (void)testEnterpriseBubbleInEnhancedSafeBrowsingPage {
+  SetPolicy(0, policy::key::kSafeBrowsingProtectionLevel);
   [ChromeEarlGreyUI openSettingsMenu];
   [ChromeEarlGreyUI
       tapSettingsMenuButton:chrome_test_util::SettingsMenuPrivacyButton()];
@@ -821,12 +869,12 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
 
   // Tap the info button on row. Accessibility point has been changed in this
   // TableViewInfoButtonItem to be on the center of the row instead of on the
-  // "i" button. To tap the "i" button, we select the info button as the matcher
-  // instead of the row.
+  // "i" button. To tap the "i" button, we select the info button as the
+  // matcher instead of the row.
   [[EarlGrey
       selectElementWithMatcher:
           grey_allOf(grey_ancestor(grey_accessibilityID(
-                         kSettingsSafeBrowsingStandardProtectionCellId)),
+                         kSettingsSafeBrowsingEnhancedProtectionCellId)),
                      grey_accessibilityID(kTableViewCellInfoButtonViewId),
                      grey_sufficientlyVisible(), nil)]
       performAction:grey_tap()];
@@ -839,13 +887,58 @@ constexpr char kEnrollmentToken[] = "fake-enrollment-token";
   // Tap outside of the bubble.
   [[EarlGrey
       selectElementWithMatcher:
-          grey_accessibilityID(kSettingsSafeBrowsingStandardProtectionCellId)]
+          grey_accessibilityID(kSettingsSafeBrowsingEnhancedProtectionCellId)]
       performAction:grey_tap()];
 
   // Check if the contextual bubble is hidden.
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(
                                           kEnterpriseInfoBubbleViewId)]
       assertWithMatcher:grey_notVisible()];
+}
+
+// Tests print option is visible in share menu if PrintingEnabled is set to true
+// (default) and not visible when PrintingEnabled policy is set to false
+// (disabled).
+- (void)testPrintingDisabledInShare {
+  GREYAssertTrue(self.testServer->Start(), @"Test server failed to start.");
+  const GURL testURL = self.testServer->GetURL(kTestPagePath);
+
+  // Set and verify that PrintingEnabled pref is set to false correctly.
+  SetPolicy(true, policy::key::kPrintingEnabled);
+  GREYAssertTrue([ChromeEarlGrey userBooleanPref:prefs::kPrintingEnabled],
+                 @"PrintingEnabled preference was unexpectedly false");
+  [ChromeEarlGrey loadURL:testURL];
+  [ChromeEarlGrey waitForPageToFinishLoading];
+
+  // Open the share menu and tap the "more" button to check for the "print"
+  // option if we are on iOS 26. Other iOS version does not require tapping the
+  // "more" button to see the "print" option.
+  [ChromeEarlGreyUI openShareMenu];
+  [ChromeEarlGrey verifyActivitySheetVisible];
+  XCUIApplication* app = [[XCUIApplication alloc] init];
+  [ChromeEarlGrey tapMoreOptionButtonInActivitySheet];
+
+  // Check that "print" option exist.
+  XCUIElementQuery* print = [[app staticTexts] matchingIdentifier:@"Print"];
+  GREYAssertTrue(print.count == 1,
+                 @"'Print' option should have been on the share menu");
+  [ChromeTestCase removeAnyOpenMenusAndInfoBars];
+  [ChromeEarlGrey verifyActivitySheetNotVisible];
+
+  // Set and verify that PrintingEnabled pref is set to false correctly.
+  SetPolicy(false, policy::key::kPrintingEnabled);
+  GREYAssertFalse([ChromeEarlGrey userBooleanPref:prefs::kPrintingEnabled],
+                  @"PrintingEnabled preference was unexpectedly true");
+
+  [ChromeEarlGreyUI openShareMenu];
+  [ChromeEarlGrey verifyActivitySheetVisible];
+
+  [ChromeEarlGrey tapMoreOptionButtonInActivitySheet];
+
+  // Check that "print" option does not exist.
+  print = [[app staticTexts] matchingIdentifier:@"Print"];
+  GREYAssertTrue(print.count == 0,
+                 @"'Print' option should not have been on the share menu");
 }
 
 @end

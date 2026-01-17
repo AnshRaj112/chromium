@@ -35,6 +35,7 @@
 #include <optional>
 
 #include "base/time/time.h"
+#include "base/unguessable_token.h"
 #include "mojo/public/cpp/bindings/pending_associated_receiver.h"
 #include "mojo/public/cpp/bindings/pending_associated_remote.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -52,7 +53,6 @@
 #include "third_party/blink/public/mojom/fenced_frame/fenced_frame.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/frame/remote_frame.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/frame/triggering_event_info.mojom-blink-forward.h"
-#include "third_party/blink/public/platform/child_url_loader_factory_bundle.h"
 #include "third_party/blink/public/platform/scheduler/web_scoped_virtual_time_pauser.h"
 #include "third_party/blink/public/platform/web_background_resource_fetch_assets.h"
 #include "third_party/blink/public/platform/web_content_settings_client.h"
@@ -86,6 +86,7 @@ class SharedURLLoaderFactory;
 namespace blink {
 
 class AssociatedInterfaceProvider;
+class ChildURLLoaderFactoryBundle;
 class DocumentLoader;
 class HTMLFencedFrameElement;
 class HTMLFormElement;
@@ -155,7 +156,8 @@ class CORE_EXPORT LocalFrameClient : public FrameClient {
       mojom::blink::SameDocumentNavigationType,
       bool is_client_redirect,
       bool is_browser_initiated,
-      bool should_skip_screenshot) {}
+      bool should_skip_screenshot,
+      base::UnguessableToken same_document_metrics_token) {}
   virtual void DidFailAsyncSameDocumentCommit() {}
   virtual void DispatchDidOpenDocumentInputStream(const KURL&) {}
   virtual void DispatchDidReceiveTitle(const String&) = 0;
@@ -245,6 +247,11 @@ class CORE_EXPORT LocalFrameClient : public FrameClient {
   // A new soft navigation was observed.
   virtual void DidObserveSoftNavigation(
       SoftNavigationMetricsForReporting metrics) {}
+
+  // A new largest contentful paint candidate relating to the most recent
+  // soft navigation was observed. Also see DidObserveSoftNavigation().
+  virtual void DidObserveSoftLargestContentfulPaint(
+      const LargestContentfulPaintDetailsForReporting& lcp) {}
 
   // Reports that visible elements in the frame shifted (bit.ly/lsm-explainer).
   virtual void DidObserveLayoutShift(double score, bool after_input_or_scroll) {

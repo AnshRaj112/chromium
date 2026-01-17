@@ -15,6 +15,7 @@
 #include "base/time/time.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
+#include "components/supervised_user/core/browser/device_parental_controls.h"
 #include "components/supervised_user/core/browser/supervised_user_preferences.h"
 #include "components/supervised_user/core/browser/supervised_user_url_filter.h"
 #include "components/supervised_user/core/common/pref_names.h"
@@ -22,18 +23,6 @@
 namespace supervised_user {
 
 namespace {
-
-#if BUILDFLAG(IS_ANDROID)
-const char kDeviceSearchContentFiltersSyntheticFieldTrialName[] =
-    "AndroidDeviceSearchContentFilters";
-const char kDeviceBrowserContentFiltersSyntheticFieldTrialName[] =
-    "AndroidDeviceBrowserContentFilters";
-
-std::string GetDeviceFiltersSynthenticFieldTrialGroupName(bool filter_enabled) {
-  return filter_enabled ? "Enabled" : "Disabled";
-}
-#endif  // BUILDFLAG(IS_ANDROID)
-
 // Reports WebFilterType which indicates web filter behaviour are used for
 // current Family Link user.
 constexpr char kFamilyUserWebFilterTypeHistogramName[] =
@@ -69,8 +58,10 @@ std::string GetWebFilterTypeHistogramName(bool is_family_link,
                                           bool is_locally_supervised) {
   CHECK(is_family_link || is_locally_supervised)
       << "Callsite should assume at least one supervision type";
-  CHECK_NE(is_family_link, is_locally_supervised, base::NotFatalUntil::M150)
-      << "Two supervision types are mutually exclusive.";
+  // When the system is recovering from two supervision types available at the
+  // same time to settle in "Family Link", it will record in the target
+  // "FamilyLink" histogram.
+
   // LINT.IfChange(supervised_user_web_filter_type_user_type)
   return base::StrCat({kSupervisedUserWebFilterTypeHistogramBaseName,
                        is_family_link ? ".FamilyLink" : ".LocallySupervised"});
@@ -92,15 +83,18 @@ int SupervisedUserMetricsService::GetDayIdForTesting(base::Time time) {
 SupervisedUserMetricsService::SupervisedUserMetricsService(
     PrefService* pref_service,
     SupervisedUserService& supervised_user_service,
+    const SupervisedUserUrlFilteringService& url_filtering_service,
+    DeviceParentalControls& device_parental_controls,
     std::unique_ptr<SupervisedUserMetricsServiceExtensionDelegate>
         extensions_metrics_delegate,
-    std::unique_ptr<MetricsServiceAccessorDelegate>
-        metrics_service_accessor_delegate)
+    std::unique_ptr<SynteticFieldTrialDelegate> synthetic_field_trial_delegate)
     : pref_service_(pref_service),
       supervised_user_service_(supervised_user_service),
+      url_filtering_service_(url_filtering_service),
+      device_parental_controls_(device_parental_controls),
       extensions_metrics_delegate_(std::move(extensions_metrics_delegate)),
-      metrics_service_accessor_delegate_(
-          std::move(metrics_service_accessor_delegate)) {
+      synthetic_field_trial_delegate_(
+          std::move(synthetic_field_trial_delegate)) {
   DCHECK(pref_service_);
   supervised_user_service_observation_.Observe(&supervised_user_service);
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
@@ -114,10 +108,14 @@ SupervisedUserMetricsService::SupervisedUserMetricsService(
                &SupervisedUserMetricsService::CheckForNewDay);
 
 #if BUILDFLAG(IS_ANDROID)
-  CHECK(metrics_service_accessor_delegate_)
-      << "Metrics service accessor delegate must exist on Android";
-  OnBrowserContentFiltersChanged();
-  OnSearchContentFiltersChanged();
+  // Platforms that support parental controls must also provide a delegate to
+  // register synthetic field trials.
+  CHECK(synthetic_field_trial_delegate_)
+      << "Synthetic field trial delegate must exist on Android";
+  device_parental_controls_subscription_ =
+      device_parental_controls.Subscribe(base::BindRepeating(
+          &SupervisedUserMetricsService::OnDeviceParentalControlsChanged,
+          base::Unretained(this)));
 #endif  // BUILDFLAG(IS_ANDROID)
 }
 
@@ -154,25 +152,21 @@ void SupervisedUserMetricsService::RecordCurrentDay() {
                             GetDayId(base::Time::Now()));
 }
 
-void SupervisedUserMetricsService::OnBrowserContentFiltersChanged() {
-#if BUILDFLAG(IS_ANDROID)
-  metrics_service_accessor_delegate_->RegisterSyntheticFieldTrial(
-      kDeviceBrowserContentFiltersSyntheticFieldTrialName,
-      GetDeviceFiltersSynthenticFieldTrialGroupName(
-          supervised_user_service_->IsLocalBrowserFilteringEnabled()));
-#endif  // BUILDFLAG(IS_ANDROID)
-}
+void SupervisedUserMetricsService::OnDeviceParentalControlsChanged(
+    const DeviceParentalControls& device_parental_controls) {
+  device_parental_controls.RegisterDeviceLevelSyntheticFieldTrials(
+      *synthetic_field_trial_delegate_);
 
-void SupervisedUserMetricsService::OnSearchContentFiltersChanged() {
-#if BUILDFLAG(IS_ANDROID)
-  metrics_service_accessor_delegate_->RegisterSyntheticFieldTrial(
-      kDeviceSearchContentFiltersSyntheticFieldTrialName,
-      GetDeviceFiltersSynthenticFieldTrialGroupName(
-          supervised_user_service_->IsLocalSearchFilteringEnabled()));
-#endif  // BUILDFLAG(IS_ANDROID)
+  // This might be also called from OnURLFilterChanged() for the very same
+  // change (eg. if browser filter has changed, triggering url filtering
+  // changes) but that's not problematic (in metrics' context) since this
+  // recording is idempotent (subsequent emits within the same day are
+  // squashed).
+  TryEmittingMetricsAndRecordCurrentDay();
 }
 
 void SupervisedUserMetricsService::OnURLFilterChanged() {
+  // See comments in OnAndroidParentalControlsChanged about idempotency.
   TryEmittingMetricsAndRecordCurrentDay();
 }
 
@@ -182,7 +176,7 @@ bool SupervisedUserMetricsService::TryEmittingMetricsAndRecordCurrentDay() {
       TryEmittingFamilyLinkMetrics()) {
     emitted = true;
   }
-  if ((supervised_user_service_->IsSupervisedLocally() ||
+  if ((device_parental_controls_->IsEnabled() ||
        IsSubjectToParentalControls(*pref_service_.get())) &&
       TryEmittingSupervisedUserMetrics()) {
     emitted = true;
@@ -197,8 +191,7 @@ bool SupervisedUserMetricsService::TryEmittingMetricsAndRecordCurrentDay() {
 
 bool SupervisedUserMetricsService::TryEmittingFamilyLinkMetrics() {
   bool emitted = false;
-  WebFilterType web_filter_type =
-      supervised_user_service_->GetURLFilter()->GetWebFilterType();
+  WebFilterType web_filter_type = url_filtering_service_->GetWebFilterType();
   if (!last_recorded_family_link_web_filter_type_.has_value() ||
       *last_recorded_family_link_web_filter_type_ != web_filter_type) {
     base::UmaHistogramEnumeration(kFamilyUserWebFilterTypeHistogramName,
@@ -229,17 +222,15 @@ bool SupervisedUserMetricsService::TryEmittingFamilyLinkMetrics() {
 }
 
 bool SupervisedUserMetricsService::TryEmittingSupervisedUserMetrics() {
-  WebFilterType current =
-      supervised_user_service_->GetURLFilter()->GetWebFilterType();
-  if (last_recorded_supervised_user_web_filter_type_.has_value() &&
-      *last_recorded_supervised_user_web_filter_type_ == current) {
+  WebFilterType current = url_filtering_service_->GetWebFilterType();
+  if (last_recorded_supervised_user_web_filter_type_ == current) {
     return false;
   }
 
   base::UmaHistogramEnumeration(
       GetWebFilterTypeHistogramName(
           IsSubjectToParentalControls(*pref_service_.get()),
-          supervised_user_service_->IsSupervisedLocally()),
+          device_parental_controls_->IsEnabled()),
       current);
   last_recorded_supervised_user_web_filter_type_ = current;
   return true;
@@ -250,5 +241,4 @@ void SupervisedUserMetricsService::ClearMetricsCache() {
   last_recorded_family_link_web_filter_type_ = std::nullopt;
   last_recorded_supervised_user_web_filter_type_ = std::nullopt;
 }
-
 }  // namespace supervised_user

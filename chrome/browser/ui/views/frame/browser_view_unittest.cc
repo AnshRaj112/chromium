@@ -7,7 +7,9 @@
 #include <memory>
 #include <string_view>
 
+#include "base/byte_size.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
 #include "build/build_config.h"
@@ -15,11 +17,12 @@
 #include "chrome/browser/ui/actions/chrome_action_id.h"
 #include "chrome/browser/ui/browser_actions.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_navigator.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/performance_controls/tab_resource_usage_tab_helper.h"
-#include "chrome/browser/ui/tabs/alert/tab_alert.h"
 #include "chrome/browser/ui/tabs/tab_activity_simulator.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -27,7 +30,9 @@
 #include "chrome/browser/ui/toolbar/pinned_toolbar/pinned_toolbar_actions_model_factory.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
-#include "chrome/browser/ui/views/frame/browser_view_layout.h"
+#include "chrome/browser/ui/views/frame/browser_frame_view.h"
+#include "chrome/browser/ui/views/frame/browser_widget.h"
+#include "chrome/browser/ui/views/frame/layout/browser_view_layout.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/browser/ui/views/frame/test_with_browser_view.h"
 #include "chrome/browser/ui/views/frame/top_container_view.h"
@@ -68,10 +73,12 @@ namespace {
 
 // Tab strip bounds depend on the window frame sizes.
 gfx::Point ExpectedTabStripRegionOrigin(BrowserView* browser_view) {
-  gfx::Rect tabstrip_bounds(browser_view->frame()->GetBoundsForTabStripRegion(
-      browser_view->tab_strip_region_view()->GetMinimumSize()));
-  gfx::Point tabstrip_region_origin(tabstrip_bounds.origin());
-  views::View::ConvertPointToTarget(browser_view->parent(), browser_view,
+  auto* const frame = browser_view->browser_widget()->GetFrameView();
+  const auto params = frame->GetBrowserLayoutParams();
+  gfx::Point tabstrip_region_origin = params.visual_client_area.origin();
+  tabstrip_region_origin.Offset(
+      params.leading_exclusion.ContentWithPadding().width(), 0);
+  views::View::ConvertPointToTarget(frame, browser_view,
                                     &tabstrip_region_origin);
   return tabstrip_region_origin;
 }
@@ -172,20 +179,21 @@ class ScopedBrowser {
  public:
   explicit ScopedBrowser(Profile* profile) {
     Browser::CreateParams params(profile, true);
-    browser_view_ =
-        BrowserView::GetBrowserViewForBrowser(Browser::Create(params));
+    browser_ = Browser::DeprecatedCreateOwnedForTesting(params);
+    browser_view_ = BrowserView::GetBrowserViewForBrowser(browser_.get());
   }
   ScopedBrowser(const ScopedBrowser&) = delete;
   ScopedBrowser& operator=(const ScopedBrowser&) = delete;
   ~ScopedBrowser() {
-    browser_view_->browser()->tab_strip_model()->CloseAllTabs();
+    browser()->tab_strip_model()->CloseAllTabs();
     browser_view_.ExtractAsDangling()->GetWidget()->CloseNow();
     content::RunAllTasksUntilIdle();
   }
 
-  Browser* browser() { return browser_view_->browser(); }
+  Browser* browser() { return browser_.get(); }
 
  private:
+  std::unique_ptr<Browser> browser_;
   raw_ptr<BrowserView> browser_view_;
 };
 }  // namespace
@@ -205,20 +213,20 @@ TEST_F(BrowserViewTest, MAYBE_UpdateActiveBrowser) {
   // `BrowserView::Show()` has to be called first.
   ScopedBrowser scoped_browser(profile());
   Browser* browser2 = scoped_browser.browser();
-  EXPECT_EQ(2u, BrowserList::GetInstance()->size());
-  EXPECT_EQ(browser(), BrowserList::GetInstance()->GetLastActive());
+  EXPECT_EQ(2u, chrome::GetTotalBrowserCount());
+  EXPECT_EQ(browser(), GetLastActiveBrowserWindowInterfaceWithAnyProfile());
 
   browser2->window()->Show();
-  EXPECT_EQ(browser2, BrowserList::GetInstance()->GetLastActive());
+  EXPECT_EQ(browser2, GetLastActiveBrowserWindowInterfaceWithAnyProfile());
 
   browser()->window()->Show();
-  EXPECT_EQ(browser(), BrowserList::GetInstance()->GetLastActive());
+  EXPECT_EQ(browser(), GetLastActiveBrowserWindowInterfaceWithAnyProfile());
 
   browser2->window()->Activate();
-  EXPECT_EQ(browser2, BrowserList::GetInstance()->GetLastActive());
+  EXPECT_EQ(browser2, GetLastActiveBrowserWindowInterfaceWithAnyProfile());
 
   browser()->window()->Activate();
-  EXPECT_EQ(browser(), BrowserList::GetInstance()->GetLastActive());
+  EXPECT_EQ(browser(), GetLastActiveBrowserWindowInterfaceWithAnyProfile());
 
   browser2 = nullptr;
 }
@@ -230,14 +238,14 @@ TEST_F(BrowserViewTest, DISABLED_BrowserViewLayout) {
   // |browser_view_| owns the Browser, not the test class.
   Browser* browser = browser_view()->browser();
   TopContainerView* top_container = browser_view()->top_container();
-  TabStrip* tabstrip = browser_view()->tabstrip();
-  views::View* tabstrip_region = browser_view()->tabstrip()->parent();
+  TabStrip* tabstrip = browser_view()->horizontal_tab_strip_for_testing();
+  views::View* tabstrip_region =
+      browser_view()->horizontal_tab_strip_for_testing()->parent();
   ToolbarView* toolbar = browser_view()->toolbar();
-  views::View* contents_container =
-      browser_view()->GetContentsContainerForTest();
+  views::View* contents_container = browser_view()->contents_container();
   views::WebView* contents_web_view = browser_view()->contents_web_view();
   views::WebView* devtools_web_view =
-      browser_view()->GetDevToolsWebViewForTest();
+      browser_view()->GetActiveContentsContainerView()->devtools_web_view();
 
   // Start with a single tab open to a normal page.
   AddTab(browser, GURL("about:blank"));
@@ -267,7 +275,7 @@ TEST_F(BrowserViewTest, DISABLED_BrowserViewLayout) {
   EXPECT_EQ(expected_tabstrip_region_origin.y(), tabstrip_region->y());
   EXPECT_EQ(0, toolbar->x());
   EXPECT_EQ(tabstrip_region->bounds().bottom() -
-                GetLayoutConstant(TABSTRIP_TOOLBAR_OVERLAP),
+                GetLayoutConstant(LayoutConstant::kTabstripToolbarOverlap),
             toolbar->y());
   EXPECT_EQ(0, contents_container->x());
   EXPECT_EQ(toolbar->bounds().bottom(), contents_container->y());
@@ -281,7 +289,7 @@ TEST_F(BrowserViewTest, DISABLED_BrowserViewLayout) {
   BookmarkBarView* bookmark_bar = browser_view()->GetBookmarkBarView();
   EXPECT_FALSE(bookmark_bar->GetVisible());
   EXPECT_EQ(devtools_web_view->y(), bookmark_bar->height());
-  EXPECT_EQ(GetLayoutConstant(BOOKMARK_BAR_HEIGHT),
+  EXPECT_EQ(GetLayoutConstant(LayoutConstant::kBookmarkBarHeight),
             bookmark_bar->GetMinimumSize().height());
   chrome::ExecuteCommand(browser, IDC_SHOW_BOOKMARK_BAR);
   EXPECT_TRUE(bookmark_bar->GetVisible());
@@ -304,7 +312,7 @@ TEST_F(BrowserViewTest, DISABLED_BrowserViewLayout) {
   // Bookmark bar layout on NTP.
   EXPECT_EQ(0, bookmark_bar->x());
   EXPECT_EQ(tabstrip_region->bounds().bottom() + toolbar->height() -
-                GetLayoutConstant(TABSTRIP_TOOLBAR_OVERLAP),
+                GetLayoutConstant(LayoutConstant::kTabstripToolbarOverlap),
             bookmark_bar->y());
   EXPECT_EQ(bookmark_bar->height() + bookmark_bar->y(),
             contents_container->y());
@@ -324,8 +332,7 @@ TEST_F(BrowserViewTest, DISABLED_BrowserViewLayout) {
 TEST_F(BrowserViewTest, MAYBE_FindBarBoundingBoxLocationBar) {
   ASSERT_FALSE(base::i18n::IsRTL());
   const views::View* location_bar = browser_view()->GetLocationBarView();
-  const views::View* contents_container =
-      browser_view()->GetContentsContainerForTest();
+  const views::View* contents_container = browser_view()->contents_container();
 
   // Make sure we are testing the case where the location bar is visible.
   EXPECT_TRUE(location_bar->GetVisible());
@@ -346,8 +353,7 @@ TEST_F(BrowserViewTest, MAYBE_FindBarBoundingBoxLocationBar) {
 TEST_F(BrowserViewTest, FindBarBoundingBoxNoLocationBar) {
   ASSERT_FALSE(base::i18n::IsRTL());
   const views::View* location_bar = browser_view()->GetLocationBarView();
-  const views::View* contents_container =
-      browser_view()->GetContentsContainerForTest();
+  const views::View* contents_container = browser_view()->contents_container();
 
   // Make sure we are testing the case where the location bar is absent.
   browser_view()->GetLocationBarView()->SetVisible(false);
@@ -415,7 +421,7 @@ TEST_F(BrowserViewTest, FindBrowserWindowWithWebContentsTabSwitch) {
 #if !BUILDFLAG(IS_MAC)
 // Test that repeated accelerators are processed or ignored depending on the
 // commands that they refer to. The behavior for different commands is dictated
-// by IsCommandRepeatable() in chrome/browser/ui/views/accelerator_table.h.
+// by IsCommandRepeatable() in chrome/browser/ui/accelerator_table.h.
 TEST_F(BrowserViewTest, DISABLED_RepeatedAccelerators) {
   // A non-repeated Ctrl-L accelerator should be processed.
   const ui::Accelerator kLocationAccel(ui::VKEY_L, ui::EF_PLATFORM_ACCELERATOR);
@@ -432,81 +438,6 @@ TEST_F(BrowserViewTest, DISABLED_RepeatedAccelerators) {
   EXPECT_TRUE(browser_view()->AcceleratorPressed(kNextTabRepeatAccel));
 }
 #endif  // !BUILDFLAG(IS_MAC)
-
-// Test that bookmark bar view becomes invisible when closing the browser.
-// TODO(crbug.com/40097152): Flaky on Linux.
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
-#define MAYBE_BookmarkBarInvisibleOnShutdown \
-  DISABLED_BookmarkBarInvisibleOnShutdown
-#else
-#define MAYBE_BookmarkBarInvisibleOnShutdown BookmarkBarInvisibleOnShutdown
-#endif
-TEST_F(BrowserViewTest, MAYBE_BookmarkBarInvisibleOnShutdown) {
-  BookmarkBarView::DisableAnimationsForTesting(true);
-
-  Browser* browser = browser_view()->browser();
-  TabStripModel* tab_strip_model = browser->tab_strip_model();
-  EXPECT_EQ(0, tab_strip_model->count());
-
-  AddTab(browser, GURL("about:blank"));
-  EXPECT_EQ(1, tab_strip_model->count());
-
-  BookmarkBarView* bookmark_bar = browser_view()->GetBookmarkBarView();
-  chrome::ExecuteCommand(browser, IDC_SHOW_BOOKMARK_BAR);
-  EXPECT_TRUE(bookmark_bar->GetVisible());
-
-  tab_strip_model->CloseWebContentsAt(tab_strip_model->active_index(), 0);
-  EXPECT_EQ(0, tab_strip_model->count());
-  EXPECT_FALSE(bookmark_bar->GetVisible());
-
-  BookmarkBarView::DisableAnimationsForTesting(false);
-}
-
-TEST_F(BrowserViewTest, DISABLED_AccessibleWindowTitle) {
-  EXPECT_EQ(SubBrowserName(u"Untitled - ", u""),
-            browser_view()->GetAccessibleWindowTitleForChannelAndProfile(
-                version_info::Channel::STABLE, browser()->profile()));
-  EXPECT_EQ(SubBrowserName(u"Untitled - ", u" Beta"),
-            browser_view()->GetAccessibleWindowTitleForChannelAndProfile(
-                version_info::Channel::BETA, browser()->profile()));
-  EXPECT_EQ(SubBrowserName(u"Untitled - ", u" Dev"),
-            browser_view()->GetAccessibleWindowTitleForChannelAndProfile(
-                version_info::Channel::DEV, browser()->profile()));
-  EXPECT_EQ(SubBrowserName(u"Untitled - ", u" Canary"),
-            browser_view()->GetAccessibleWindowTitleForChannelAndProfile(
-                version_info::Channel::CANARY, browser()->profile()));
-
-  AddTab(browser(), GURL("about:blank"));
-  EXPECT_EQ(SubBrowserName(u"about:blank - ", u""),
-            browser_view()->GetAccessibleWindowTitleForChannelAndProfile(
-                version_info::Channel::STABLE, browser()->profile()));
-
-  Tab* tab = browser_view()->tabstrip()->tab_at(0);
-  TabRendererData start_media;
-  start_media.alert_state = {tabs::TabAlert::AUDIO_PLAYING};
-  tab->SetData(std::move(start_media));
-  EXPECT_EQ(SubBrowserName(u"about:blank - Audio playing - ", u""),
-            browser_view()->GetAccessibleWindowTitleForChannelAndProfile(
-                version_info::Channel::STABLE, browser()->profile()));
-
-  TabRendererData network_error;
-  network_error.network_state = TabNetworkState::kError;
-  tab->SetData(std::move(network_error));
-  EXPECT_EQ(SubBrowserName(u"about:blank - Network error - ", u" Beta"),
-            browser_view()->GetAccessibleWindowTitleForChannelAndProfile(
-                version_info::Channel::BETA, browser()->profile()));
-
-  TestingProfile* profile = profile_manager()->CreateTestingProfile("Sadia");
-  EXPECT_EQ(SubBrowserName(u"about:blank - Network error - ", u" Dev - Sadia"),
-            browser_view()->GetAccessibleWindowTitleForChannelAndProfile(
-                version_info::Channel::DEV, profile));
-
-  EXPECT_EQ(
-      SubBrowserName(u"about:blank - Network error - ", u" Canary (Incognito)"),
-      browser_view()->GetAccessibleWindowTitleForChannelAndProfile(
-          version_info::Channel::CANARY,
-          TestingProfile::Builder().BuildIncognito(profile)));
-}
 
 TEST_F(BrowserViewTest, UpdateWindowTitle) {
   AddTab(browser(), GURL("about:blank"));
@@ -527,20 +458,22 @@ TEST_F(BrowserViewTest, UpdateWindowTitle) {
 TEST_F(BrowserViewTest, WindowTitleOmitsLowMemoryUsage) {
   scoped_refptr<TabResourceUsage> tab_resource_usage_ =
       base::MakeRefCounted<TabResourceUsage>();
-  tab_resource_usage_->SetMemoryUsageInBytes(100);
+  tab_resource_usage_->SetMemoryUsage(base::ByteSize(100));
 
   TabRendererData memory_usage;
   memory_usage.tab_resource_usage = tab_resource_usage_;
 
   AddTab(browser(), GURL("about:blank"));
-  Tab* const tab = browser_view()->tabstrip()->tab_at(0);
+  Tab* const tab =
+      browser_view()->horizontal_tab_strip_for_testing()->tab_at(0);
   tab->SetData(std::move(memory_usage));
 
   // Expect that low memory usage isn't in the window title.
   EXPECT_EQ(SubBrowserName(u"about:blank - ", u""),
             browser_view()->GetAccessibleWindowTitle());
-  uint64_t memory_used = TabResourceUsage::kHighMemoryUsageThresholdBytes + 1;
-  tab_resource_usage_->SetMemoryUsageInBytes(memory_used);
+  base::ByteSize memory_used =
+      TabResourceUsage::kHighMemoryUsageThreshold + base::ByteSize(1);
+  tab_resource_usage_->SetMemoryUsage(memory_used);
 
   // Expect that high memory usage is in the window title.
   EXPECT_TRUE(browser_view()->GetAccessibleWindowTitle().find(
@@ -650,6 +583,57 @@ TEST_F(BrowserViewTest, UpdateAccessibleURL) {
             after_url);
 }
 
+TEST_F(BrowserViewTest, UpdateAccessibleURLOnTabSelection) {
+  // Create two tabs with different URLs
+  const GURL url1(u"data:text/html,tab1");
+  const GURL url2(u"data:text/html,tab2");
+
+  AddTab(browser(), url1);
+  AddTab(browser(), url2);
+
+  // Initially, the second tab should be active (most recently added)
+  // Note: AddTab inserts at index 0, so tab2 is at index 0, tab1 is at index 1
+  EXPECT_EQ(browser()->tab_strip_model()->GetActiveWebContents()->GetURL(),
+            url2);
+
+  ui::AXNodeData node_data;
+  browser_view()
+      ->GetWidget()
+      ->GetRootView()
+      ->GetViewAccessibility()
+      .GetAccessibleNodeData(&node_data);
+  EXPECT_EQ(node_data.GetStringAttribute(ax::mojom::StringAttribute::kUrl),
+            url2);
+
+  // Switch to the first tab (tab1 at index 1) by changing selection
+  browser()->tab_strip_model()->SelectTabAt(1);
+  EXPECT_EQ(browser()->tab_strip_model()->GetActiveWebContents()->GetURL(),
+            url1);
+
+  // Verify that the accessible URL was updated due to tab selection change
+  browser_view()
+      ->GetWidget()
+      ->GetRootView()
+      ->GetViewAccessibility()
+      .GetAccessibleNodeData(&node_data);
+  EXPECT_EQ(node_data.GetStringAttribute(ax::mojom::StringAttribute::kUrl),
+            url1);
+
+  // Switch back to the second tab (tab2 at index 0)
+  browser()->tab_strip_model()->SelectTabAt(0);
+  EXPECT_EQ(browser()->tab_strip_model()->GetActiveWebContents()->GetURL(),
+            url2);
+
+  // Verify that the accessible URL was updated again
+  browser_view()
+      ->GetWidget()
+      ->GetRootView()
+      ->GetViewAccessibility()
+      .GetAccessibleNodeData(&node_data);
+  EXPECT_EQ(node_data.GetStringAttribute(ax::mojom::StringAttribute::kUrl),
+            url2);
+}
+
 //  Macs do not have fullscreen policy.
 #if !BUILDFLAG(IS_MAC)
 
@@ -711,32 +695,44 @@ TEST_F(BrowserViewHostedAppTest, Layout) {
   // Add a tab because the browser starts out without any tabs at all.
   AddTab(browser(), GURL("about:blank"));
 
-  views::View* contents_container =
-      browser_view()->GetContentsContainerForTest();
+  const int contents_container_y = browser_view()->contents_container()->y();
 
   // The tabstrip, toolbar and bookmark bar should not be visible for hosted
   // apps.
-  EXPECT_FALSE(browser_view()->tabstrip()->GetVisible());
+  EXPECT_FALSE(
+      browser_view()->horizontal_tab_strip_for_testing()->GetVisible());
   EXPECT_FALSE(browser_view()->toolbar()->GetVisible());
   EXPECT_FALSE(browser_view()->IsBookmarkBarVisible());
 
-  gfx::Point header_offset;
-  views::View::ConvertPointToTarget(
-      browser_view(), browser_view()->frame()->non_client_view()->frame_view(),
-      &header_offset);
+  const auto* const frame_view =
+      browser_view()->browser_widget()->GetFrameView();
 
+  gfx::Point header_offset;
+  views::View::ConvertPointToTarget(browser_view(), frame_view, &header_offset);
+
+  const auto params = frame_view->GetBrowserLayoutParams();
+
+#if BUILDFLAG(IS_MAC)
+  // The system paints the caption area, so the contents start at the top of
+  // the layout.
+  const int bottom_of_header = 0;
+#else
   // The position of the bottom of the header (the bar with the window
-  // controls) in the coordinates of BrowserView.
-  int bottom_of_header =
-      browser_view()->frame()->GetTopInset() - header_offset.y();
+  // controls) in the coordinates of the browser view.
+  const int bottom_of_header = base::ClampCeil(
+      std::max(params.leading_exclusion.ContentWithPadding().height(),
+               params.trailing_exclusion.ContentWithPadding().height()));
+#endif
+
+  // The top of the browser view in the coordinates of the frame.
+  const int top_inset = bottom_of_header + params.visual_client_area.y();
 
   // The web contents should be flush with the bottom of the header.
-  EXPECT_EQ(bottom_of_header, contents_container->y());
+  EXPECT_EQ(bottom_of_header, contents_container_y);
 
-  // The find bar should butt against the 1px header/web-contents separator at
-  // the bottom of the header.
-  EXPECT_EQ(browser_view()->GetFindBarBoundingBox().y(),
-            browser_view()->frame()->GetTopInset());
+  // The find bar should be aligned with the bottom of the header in the
+  // coordinates of the frame.
+  EXPECT_EQ(top_inset, browser_view()->GetFindBarBoundingBox().y());
 }
 
 using BrowserViewWindowTypeTest = BrowserWithTestWindowTest;
@@ -760,12 +756,12 @@ TEST_F(TestWithBrowserView, LoadingAnimationNotRenderedWhenWindowHidden) {
       GURL("about:blank"), web_contents);
   navigation->SetKeepLoading(true);
 
-  browser_view()->frame()->Show();
+  browser_view()->browser_widget()->Show();
 
   EXPECT_TRUE(browser()->tab_strip_model()->TabsNeedLoadingUI());
   EXPECT_TRUE(browser_view()->IsLoadingAnimationRunning());
 
-  browser_view()->frame()->Hide();
+  browser_view()->browser_widget()->Hide();
 
   EXPECT_TRUE(browser()->tab_strip_model()->TabsNeedLoadingUI());
   EXPECT_FALSE(browser_view()->IsLoadingAnimationRunning());

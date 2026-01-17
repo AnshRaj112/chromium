@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "base/feature_list.h"
-#include "base/files/file_util.h"
 #include "base/memory/page_size.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/process/process_handle.h"
@@ -29,7 +28,6 @@
 #include "chromeos/ash/components/memory/userspace_swap/region.h"
 #include "chromeos/ash/components/memory/userspace_swap/swap_storage.h"
 #include "chromeos/ash/components/memory/userspace_swap/userfaultfd.h"
-#include "chromeos/ash/components/memory/userspace_swap/userspace_swap.mojom-forward.h"
 #include "chromeos/ash/components/memory/userspace_swap/userspace_swap.mojom.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "partition_alloc/address_pool_manager.h"

@@ -262,7 +262,7 @@ void EnrollmentScreenHandler::ShowAuthError(
     case GoogleServiceAuthError::CHALLENGE_RESPONSE_REQUIRED:
       ShowError(IDS_ENTERPRISE_ENROLLMENT_AUTH_FATAL_ERROR, /*retry=*/false);
       return;
-    case GoogleServiceAuthError::USER_NOT_SIGNED_UP:
+    case GoogleServiceAuthError::ACCOUNT_NOT_FOUND:
       ShowError(IDS_ENTERPRISE_ENROLLMENT_AUTH_ACCOUNT_ERROR, /*retry=*/true);
       return;
     case GoogleServiceAuthError::CONNECTION_FAILED:
@@ -820,7 +820,8 @@ base::Value::Dict EnrollmentScreenHandler::ScreenDataForOAuthEnrollment() {
   screen_data.Set("gaiaUrl", GaiaUrls::GetInstance()->gaia_url().spec());
   screen_data.Set(
       "gaiaPath",
-      GaiaUrls::GetInstance()->embedded_setup_chromeos_url().path().substr(1));
+      GaiaUrls::GetInstance()->embedded_setup_chromeos_url().GetPath().substr(
+          1));
   screen_data.Set("clientId",
                   GaiaUrls::GetInstance()->oauth2_chrome_client_id());
   screen_data.Set("management_domain", config_.management_domain);

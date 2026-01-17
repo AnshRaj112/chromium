@@ -90,8 +90,9 @@ TEST(ChromeBrowsingDataLifetimeManager, ScheduledRemovalWithSyncDisabled) {
   delegate.ExpectCallDontCareAboutFilterBuilder(
       delete_start_time, delete_end_time_3, remove_mask_3_unfilterable, 0);
 
-  testing_profile->GetPrefs()->Set(browsing_data::prefs::kBrowsingDataLifetime,
-                                   *base::JSONReader::Read(kPref));
+  testing_profile->GetPrefs()->Set(
+      browsing_data::prefs::kBrowsingDataLifetime,
+      *base::JSONReader::Read(kPref, base::JSON_PARSE_CHROMIUM_EXTENSIONS));
   browser_task_environment.RunUntilIdle();
   delegate.VerifyAndClearExpectations();
 
@@ -177,8 +178,9 @@ TEST(ChromeBrowsingDataLifetimeManager,
   // usual.
   testing_profile->GetPrefs()->Set(prefs::kSigninAllowed, base::Value(false));
 
-  testing_profile->GetPrefs()->Set(browsing_data::prefs::kBrowsingDataLifetime,
-                                   *base::JSONReader::Read(kPref));
+  testing_profile->GetPrefs()->Set(
+      browsing_data::prefs::kBrowsingDataLifetime,
+      *base::JSONReader::Read(kPref, base::JSON_PARSE_CHROMIUM_EXTENSIONS));
 
   // Delete until 30 minutes from current delete end time because a task is
   // scheduled for 30 minutes from now.
@@ -221,12 +223,11 @@ TEST(ChromeBrowsingDataLifetimeManager,
   builder.AddTestingFactory(TrustedVaultServiceFactory::GetInstance(),
                             TrustedVaultServiceFactory::GetDefaultFactory());
   builder.AddTestingFactory(SyncServiceFactory::GetInstance(),
-                            SyncServiceFactory::GetDefaultFactory());
+                            base::BindRepeating(&CreateTestSyncService));
 
   auto testing_profile = builder.Build();
   syncer::TestSyncService* sync_service = static_cast<syncer::TestSyncService*>(
-      SyncServiceFactory::GetInstance()->SetTestingFactoryAndUse(
-          testing_profile.get(), base::BindRepeating(&CreateTestSyncService)));
+      SyncServiceFactory::GetForProfile(testing_profile.get()));
 
   content::MockBrowsingDataRemoverDelegate delegate;
   auto* remover = testing_profile->GetBrowsingDataRemover();
@@ -246,8 +247,9 @@ TEST(ChromeBrowsingDataLifetimeManager,
       content::BrowsingDataRemover::ORIGIN_TYPE_PROTECTED_WEB;
 
   // Sync is enabled, so no deletion should be made.
-  testing_profile->GetPrefs()->Set(browsing_data::prefs::kBrowsingDataLifetime,
-                                   *base::JSONReader::Read(kPref));
+  testing_profile->GetPrefs()->Set(
+      browsing_data::prefs::kBrowsingDataLifetime,
+      *base::JSONReader::Read(kPref, base::JSON_PARSE_CHROMIUM_EXTENSIONS));
   browser_task_environment.RunUntilIdle();
   delegate.VerifyAndClearExpectations();
 

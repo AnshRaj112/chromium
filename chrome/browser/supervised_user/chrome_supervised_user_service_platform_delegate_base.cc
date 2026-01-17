@@ -11,11 +11,10 @@
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
-#include "chrome/browser/supervised_user/supervised_user_service_factory.h"
+#include "chrome/browser/supervised_user/supervised_user_url_filtering_service_factory.h"
 #include "chrome/common/channel_info.h"
 #include "components/policy/core/common/policy_pref_names.h"
 #include "components/supervised_user/core/browser/supervised_user_preferences.h"
-#include "components/supervised_user/core/browser/supervised_user_service.h"
 #include "components/variations/service/variations_service.h"
 #include "content/public/browser/storage_partition.h"
 
@@ -55,43 +54,47 @@ void ChromeSupervisedUserServicePlatformDelegateBase::
 
   // Add some detailed metrics to allow us to better spot any unexpected cases
   // where a supervised user can access incognito.
-  supervised_user::SupervisedUserService* supervised_user_service =
-      SupervisedUserServiceFactory::GetForProfileIfExists(&profile_.get());
   std::optional<supervised_user::SupervisedUserLogRecord::Segment>
       user_log_segment =
           supervised_user::SupervisedUserLogRecord::Create(
               IdentityManagerFactory::GetForProfile(&profile_.get()),
               *profile_->GetPrefs(),
               *HostContentSettingsMapFactory::GetForProfile(&profile_.get()),
-              supervised_user_service)
+              supervised_user::SupervisedUserUrlFilteringServiceFactory::
+                  GetForProfileIfExists(&profile_.get()),
+              g_browser_process->device_parental_controls())
               .GetSupervisionStatusForPrimaryAccount();
   if (!user_log_segment.has_value()) {
     return;
   }
 
+  bool incognito_is_managed =
+      profile_->GetPrefs()
+          ->FindPreference(policy::policy_prefs::kIncognitoModeAvailability)
+          ->IsManaged();
+
   switch (user_log_segment.value()) {
+    case supervised_user::SupervisedUserLogRecord::Segment::
+        kSupervisionEnabledLocally:
+      if (incognito_is_managed) {
+        // Incognito managed by policy trumps local supervision (it has higher
+        // priority that supervision features).
+        base::RecordAction(base::UserMetricsAction(
+            "IncognitoMode_Started_Supervised_Managed"));
+      } else {
+        base::RecordAction(base::UserMetricsAction(
+            "IncognitoMode_Started_Supervised_Unexpected"));
+      }
+      break;
     case supervised_user::SupervisedUserLogRecord::Segment::
         kSupervisionEnabledByFamilyLinkPolicy:
     case supervised_user::SupervisedUserLogRecord::Segment::
         kSupervisionEnabledByFamilyLinkUser:
-    case supervised_user::SupervisedUserLogRecord::Segment::
-        kSupervisionEnabledLocally:
-      if (!supervised_user_service->IsLocalBrowserFilteringEnabled()) {
-        CHECK(supervised_user_service->IsSupervisedLocally());
-        // This sub-state is exceptionally allowed: user is attributed to local
-        // supervision, but that supervision is enabled due to other reasons
-        // than browser content filtering (which would disable the incognito
-        // mode). In other words, that's a type of supervised user who can use
-        // incognito mode.
-        return;
-      }
 
       // This is a supervised profile. It is not expected for incognito to be
       // available except in some edge cases. Output the edge cases separately
       // from the "unexpected" bucket.
-      if (profile_->GetPrefs()
-              ->FindPreference(policy::policy_prefs::kIncognitoModeAvailability)
-              ->IsManaged()) {
+      if (incognito_is_managed) {
         // An Enterprise policy has taken higher precedence than the parental
         // control settings.
         base::RecordAction(base::UserMetricsAction(

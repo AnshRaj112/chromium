@@ -6,34 +6,42 @@ package org.chromium.chrome.browser.ui;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.PersistableBundle;
 
-import androidx.annotation.NonNull;
-
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.build.annotations.NullMarked;
 import org.chromium.chrome.browser.crypto.CipherFactory;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 
+import java.util.function.Supplier;
+
 /** A factory class to create {@link IncognitoRestoreAppLaunchDrawBlocker}. */
+@NullMarked
 public class IncognitoRestoreAppLaunchDrawBlockerFactory {
-    private final @NonNull Supplier<Bundle> mSavedInstanceStateSupplier;
-    private final @NonNull ObservableSupplier<TabModelSelector> mTabModelSelectorSupplier;
-    private final @NonNull CipherFactory mCipherFactory;
+    private final Supplier<Bundle> mSavedInstanceStateSupplier;
+    private final Supplier<PersistableBundle> mPersistentStateSupplier;
+    private final MonotonicObservableSupplier<TabModelSelector> mTabModelSelectorSupplier;
+    private final CipherFactory mCipherFactory;
 
     /**
      * @param savedInstanceStateSupplier A {@link Supplier<Bundle>} instance to pass in the bundle
      *     that was persisted during onSaveInstanceState that allows to look for signals on whether
      *     to block the draw or not.
-     * @param tabModelSelectorSupplier A {@link ObservableSupplier<TabModelSelector>} that allows to
+     * @param persistentStateSupplier A {@link Supplier<PersistableBundle>} instance to pass in the
+     *     PersistableBundle that was persisted during onSaveInstanceState that allows to look for
+     *     signals on whether to block the draw or not.
+     * @param tabModelSelectorSupplier A {@link MonotonicObservableSupplier <TabModelSelector>} that allows to
      *     listen for onTabStateInitialized signals which is used a fallback to unblock draw.
      * @param cipherFactory The {@link CipherFactory} used for encrypting and decrypting.
      */
     public IncognitoRestoreAppLaunchDrawBlockerFactory(
-            @NonNull Supplier<Bundle> savedInstanceStateSupplier,
-            @NonNull ObservableSupplier<TabModelSelector> tabModelSelectorSupplier,
-            @NonNull CipherFactory cipherFactory) {
+            Supplier<Bundle> savedInstanceStateSupplier,
+            Supplier<PersistableBundle> persistentStateSupplier,
+            MonotonicObservableSupplier<TabModelSelector> tabModelSelectorSupplier,
+            CipherFactory cipherFactory) {
         mSavedInstanceStateSupplier = savedInstanceStateSupplier;
+        mPersistentStateSupplier = persistentStateSupplier;
         mTabModelSelectorSupplier = tabModelSelectorSupplier;
         mCipherFactory = cipherFactory;
     }
@@ -48,12 +56,13 @@ public class IncognitoRestoreAppLaunchDrawBlockerFactory {
      * @param unblockDrawRunnable A {@link Runnable} to unblock the draw operation.
      */
     IncognitoRestoreAppLaunchDrawBlocker create(
-            @NonNull Supplier<Intent> intentSupplier,
-            @NonNull Supplier<Boolean> shouldIgnoreIntentSupplier,
-            @NonNull ActivityLifecycleDispatcher activityLifecycleDispatcher,
-            @NonNull Runnable unblockDrawRunnable) {
+            Supplier<Intent> intentSupplier,
+            Supplier<Boolean> shouldIgnoreIntentSupplier,
+            ActivityLifecycleDispatcher activityLifecycleDispatcher,
+            Runnable unblockDrawRunnable) {
         return new IncognitoRestoreAppLaunchDrawBlocker(
                 mSavedInstanceStateSupplier,
+                mPersistentStateSupplier,
                 mTabModelSelectorSupplier,
                 intentSupplier,
                 shouldIgnoreIntentSupplier,

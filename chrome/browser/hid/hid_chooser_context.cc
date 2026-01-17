@@ -4,11 +4,11 @@
 
 #include "chrome/browser/hid/hid_chooser_context.h"
 
+#include <algorithm>
 #include <set>
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/containers/map_util.h"
 #include "base/observer_list.h"
 #include "base/strings/string_number_conversions.h"
@@ -29,6 +29,7 @@
 #include "content/public/browser/device_service.h"
 #include "extensions/buildflags/buildflags.h"
 #include "services/device/public/cpp/device_features.h"
+#include "services/device/public/cpp/hid/hid_blocklist.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "url/origin.h"
 
@@ -39,7 +40,7 @@
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "base/containers/fixed_flat_set.h"
-
+#include "chrome/browser/hid/hid_common.h"
 #include "extensions/common/constants.h"
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
@@ -232,7 +233,7 @@ HidChooserContext::GetGrantedObjects(const url::Origin& origin) {
         // always be called after device initialization in HidChooserController
         // which always returns after the device list initialization in this
         // class.
-        DCHECK(base::Contains(devices_, guid));
+        DCHECK(devices_.contains(guid));
         objects.push_back(std::make_unique<Object>(
             origin, DeviceInfoToValue(*devices_[guid]),
             content_settings::SettingSource::kUser, IsOffTheRecord()));
@@ -243,8 +244,9 @@ HidChooserContext::GetGrantedObjects(const url::Origin& origin) {
   if (CanApplyPolicy()) {
     auto* policy = HidPolicyAllowedDevicesFactory::GetForProfile(profile_);
     for (const auto& entry : policy->device_policy()) {
-      if (!base::Contains(entry.second, origin))
+      if (!entry.second.contains(origin)) {
         continue;
+      }
 
       auto object =
           VendorAndProductIdsToValue(entry.first.first, entry.first.second);
@@ -253,8 +255,9 @@ HidChooserContext::GetGrantedObjects(const url::Origin& origin) {
     }
 
     for (const auto& entry : policy->vendor_policy()) {
-      if (!base::Contains(entry.second, origin))
+      if (!entry.second.contains(origin)) {
         continue;
+      }
 
       auto object = VendorIdToValue(entry.first);
       objects.push_back(std::make_unique<ObjectPermissionContextBase::Object>(
@@ -262,8 +265,9 @@ HidChooserContext::GetGrantedObjects(const url::Origin& origin) {
     }
 
     for (const auto& entry : policy->usage_policy()) {
-      if (!base::Contains(entry.second, origin))
+      if (!entry.second.contains(origin)) {
         continue;
+      }
 
       auto object =
           UsagePageAndUsageToValue(entry.first.first, entry.first.second);
@@ -272,15 +276,16 @@ HidChooserContext::GetGrantedObjects(const url::Origin& origin) {
     }
 
     for (const auto& entry : policy->usage_page_policy()) {
-      if (!base::Contains(entry.second, origin))
+      if (!entry.second.contains(origin)) {
         continue;
+      }
 
       auto object = UsagePageToValue(entry.first);
       objects.push_back(std::make_unique<ObjectPermissionContextBase::Object>(
           origin, std::move(object), SettingSource::kPolicy, IsOffTheRecord()));
     }
 
-    if (base::Contains(policy->all_devices_policy(), origin)) {
+    if (policy->all_devices_policy().contains(origin)) {
       base::Value::Dict object;
       object.Set(
           kHidDeviceNameKey,
@@ -305,7 +310,7 @@ HidChooserContext::GetAllGrantedObjects() {
       continue;
 
     for (const auto& guid : map_entry.second) {
-      DCHECK(base::Contains(devices_, guid));
+      DCHECK(devices_.contains(guid));
       objects.push_back(
           std::make_unique<Object>(origin, DeviceInfoToValue(*devices_[guid]),
                                    SettingSource::kUser, IsOffTheRecord()));
@@ -466,9 +471,9 @@ bool HidChooserContext::HasDevicePermission(
     const device::mojom::HidDeviceInfo& device,
     const std::optional<url::Origin>& embedding_origin_of_web_view) {
   if (device.is_excluded_by_blocklist) {
-    bool is_device_protected_due_to_fido =
-        base::Contains(device.collections, device::mojom::kPageFido,
-                       [](const auto& c) { return c->usage->usage_page; });
+    bool is_device_protected_due_to_fido = std::ranges::contains(
+        device.collections, device::mojom::kPageFido,
+        [](const auto& c) { return c->usage->usage_page; });
     if (base::FeatureList::IsEnabled(
             features::kSecurityKeyHidInterfacesAreFido) &&
         IsKnownSecurityKey(device)) {
@@ -494,8 +499,7 @@ bool HidChooserContext::HasDevicePermission(
   }
 
   auto it = ephemeral_devices_.find(origin);
-  if (it != ephemeral_devices_.end() &&
-      base::Contains(it->second, device.guid)) {
+  if (it != ephemeral_devices_.end() && it->second.contains(device.guid)) {
     return true;
   }
 
@@ -520,15 +524,8 @@ bool HidChooserContext::HasDevicePermission(
 
 bool HidChooserContext::IsFidoAllowedForOrigin(const url::Origin& origin) {
 #if BUILDFLAG(ENABLE_EXTENSIONS)
-  static constexpr auto kPrivilegedExtensionIds =
-      base::MakeFixedFlatSet<std::string_view>({
-          "ckcendljdlmgnhghiaomidhiiclmapok",  // gnubbyd-v3 dev
-          "lfboplenmmjcmpbkeemecobbadnmpfhi",  // gnubbyd-v3 prod
-          "gdmilihokhggmmlomocddffphkaikkke",  // gnubbyd-v3 flywheel
-      });
-
   if (origin.scheme() == extensions::kExtensionScheme &&
-      base::Contains(kPrivilegedExtensionIds, origin.host())) {
+      kPrivilegedFidoExtensionIds.contains(origin.host())) {
     return true;
   }
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
@@ -538,10 +535,8 @@ bool HidChooserContext::IsFidoAllowedForOrigin(const url::Origin& origin) {
 
 bool HidChooserContext::IsKnownSecurityKey(
     const device::mojom::HidDeviceInfo& device) {
-  static constexpr uint16_t kVendorGoogle = 0x18d1;
-  static constexpr uint16_t kProductTitan = 0x5026;
-  return device.vendor_id == kVendorGoogle &&
-         device.product_id == kProductTitan;
+  return device::HidBlocklist::IsKnownSecurityKey(device.vendor_id,
+                                                  device.product_id);
 }
 
 void HidChooserContext::AddDeviceObserver(DeviceObserver* observer) {
@@ -625,8 +620,9 @@ void HidChooserContext::DeviceAdded(device::mojom::HidDeviceInfoPtr device) {
   DCHECK(device);
 
   // Update the device list.
-  if (!base::Contains(devices_, device->guid))
+  if (!devices_.contains(device->guid)) {
     devices_.insert({device->guid, device->Clone()});
+  }
 
   // Notify all observers.
   for (auto& observer : device_observer_list_)
@@ -635,7 +631,7 @@ void HidChooserContext::DeviceAdded(device::mojom::HidDeviceInfoPtr device) {
 
 void HidChooserContext::DeviceRemoved(device::mojom::HidDeviceInfoPtr device) {
   DCHECK(device);
-  DCHECK(base::Contains(devices_, device->guid));
+  DCHECK(devices_.contains(device->guid));
 
   // Update the device list.
   devices_.erase(device->guid);
@@ -669,7 +665,7 @@ void HidChooserContext::DeviceRemoved(device::mojom::HidDeviceInfoPtr device) {
 
 void HidChooserContext::DeviceChanged(device::mojom::HidDeviceInfoPtr device) {
   DCHECK(device);
-  DCHECK(base::Contains(devices_, device->guid));
+  DCHECK(devices_.contains(device->guid));
 
   // Update the device list.
   devices_[device->guid] = device->Clone();

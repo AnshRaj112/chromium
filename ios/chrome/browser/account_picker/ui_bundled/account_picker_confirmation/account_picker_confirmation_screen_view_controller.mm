@@ -19,6 +19,7 @@
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/elements/branded_navigation_item_title_view.h"
 #import "ios/chrome/common/ui/util/button_util.h"
+#import "ios/chrome/common/ui/util/chrome_button.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/chrome/common/ui/util/pointer_interaction_util.h"
 #import "ios/chrome/grit/ios_branded_strings.h"
@@ -34,8 +35,8 @@ constexpr NSTimeInterval kIdentityButtonAnimationDuration = 0.1;
 constexpr CGFloat kContentMargin = 16.;
 // Space between elements in `_contentView`.
 constexpr CGFloat kContentSpacing = 16.;
-// Vertical insets of primary button.
-constexpr CGFloat kPrimaryButtonVerticalInsets = 15.5;
+// Corner radius for the identity button.
+constexpr CGFloat kIdentityButtonControlCornerRadius = 24.;
 
 // The coefficient to multiply the title view font with to get the logo size.
 constexpr CGFloat kLogoTitleFontMultiplier = 1.75;
@@ -104,7 +105,7 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
   // 1. confirm the default identity and sign-in when an account is available,
   // or
   // 2. add an account when no account is available on the device.
-  __strong UIButton* _primaryButton;
+  __strong ChromeButton* _primaryButton;
   // Title for `_primaryButton` when it needs to show the text "Continue
   // as…". This property is needed to hide the title the activity indicator is
   // shown.
@@ -142,7 +143,7 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
   _primaryButton.enabled = NO;
   // Text should not be empty, otherwise the top and bottom can’t apply to the
   // text buttom and top line anymore.
-  SetConfigurationTitle(_primaryButton, @" ");
+  _primaryButton.title = @" ";
   // Set accessibility label so that VoiceOver won't use the empty string.
   _primaryButton.accessibilityLabel =
       _configuration.submitButtonTappedAccessibilityLabel
@@ -165,7 +166,7 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
   _askEveryTimeSwitch.enabled = YES;
   _primaryButton.enabled = YES;
   DCHECK(_submitString);
-  SetConfigurationTitle(_primaryButton, _submitString);
+  _primaryButton.title = _submitString;
   _primaryButton.accessibilityLabel = nil;
 }
 
@@ -201,8 +202,7 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
   [super viewDidLoad];
   // Set the navigation title in the left bar button item to have left
   // alignment.
-  if (IsSaveToPhotosTitleImprovementEnabled() &&
-      _configuration.useBrandedTitle) {
+  if (_configuration.useBrandedTitle) {
     if (_configuration.brandedSymbolName) {
       self.navigationItem.titleView = CreateGooglePhotosImageView(
           _configuration.titleText, _configuration.brandedSymbolName);
@@ -210,6 +210,8 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
       self.navigationItem.titleView =
           CreateGooglePhotosTitleLabel(_configuration.titleText);
     }
+  } else if (@available(iOS 26, *)) {
+    self.navigationItem.title = _configuration.titleText;
   } else {
     // Set the navigation title in the left bar button item to have left
     // alignment.
@@ -230,11 +232,10 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
   self.navigationController.navigationBar.maximumContentSizeCategory =
       UIContentSizeCategoryExtraExtraLarge;
   // Create the skip button.
-  UIBarButtonItem* cancelButtonItem =
-      [[UIBarButtonItem alloc] initWithTitle:l10n_util::GetNSString(IDS_CANCEL)
-                                       style:UIBarButtonItemStylePlain
-                                      target:self
-                                      action:@selector(cancelButtonAction:)];
+  UIBarButtonItem* cancelButtonItem = [[UIBarButtonItem alloc]
+      initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
+                           target:self
+                           action:@selector(cancelButtonAction:)];
   cancelButtonItem.accessibilityIdentifier =
       kAccountPickerCancelButtonAccessibilityIdentifier;
   self.navigationItem.rightBarButtonItem = cancelButtonItem;
@@ -345,10 +346,8 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
     [_askEveryTimeSwitch addTarget:self
                             action:@selector(askEveryTimeSwitchAction:)
                   forControlEvents:UIControlEventValueChanged];
-    _askEveryTimeSwitch.on = YES;
-    if (IsSaveToPhotosAccountPickerImprovementEnabled()) {
-      _askEveryTimeSwitch.on = NO;
-    }
+    _askEveryTimeSwitch.on = NO;
+
     [_askEveryTimeSwitch
         setContentCompressionResistancePriority:UILayoutPriorityRequired
                                         forAxis:
@@ -395,12 +394,8 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
   ]];
 
   // Add the primary button (the "Continue as"/"Sign in" button).
-  _primaryButton = PrimaryActionButton(/* pointer_interaction_enabled */ YES);
-  UIButtonConfiguration* buttonConfiguration = _primaryButton.configuration;
-  buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
-      kPrimaryButtonVerticalInsets, 0, kPrimaryButtonVerticalInsets, 0);
-  _primaryButton.configuration = buttonConfiguration;
-
+  _primaryButton =
+      [[ChromeButton alloc] initWithStyle:ChromeButtonStylePrimary];
   _primaryButton.accessibilityIdentifier =
       kAccountPickerPrimaryButtonAccessibilityIdentifier;
   _primaryButton.translatesAutoresizingMaskIntoConstraints = NO;
@@ -415,9 +410,12 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
         constraintEqualToAnchor:_contentView.widthAnchor]
   ]];
 
-  if (!_configuration.defaultCornerRadius) {
-    // Adjust the identity button control rounded corners to the same value than
-    // the "continue as" button.
+  // Adjust the identity button control rounded corners to the same value than
+  // the "continue as" button.
+  if (@available(iOS 26, *)) {
+    _groupedIdentityButtonSection.layer.cornerRadius =
+        kIdentityButtonControlCornerRadius;
+  } else {
     _groupedIdentityButtonSection.layer.cornerRadius =
         _primaryButton.configuration.background.cornerRadius;
   }
@@ -446,8 +444,7 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
 }
 
 - (void)askEveryTimeSwitchAction:(id)sender {
-  BOOL shouldAskEveryTime = !(_askEveryTimeSwitch.on ==
-                              IsSaveToPhotosAccountPickerImprovementEnabled());
+  BOOL shouldAskEveryTime = !_askEveryTimeSwitch.on;
   [_actionDelegate
       accountPickerConfirmationScreenViewController:self
                                     setAskEveryTime:shouldAskEveryTime];
@@ -504,7 +501,7 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
 
   // If spinner is active, delay UI updates until stopSpinner() is called.
   if (!_activityIndicatorView) {
-    SetConfigurationTitle(_primaryButton, _submitString);
+    _primaryButton.title = _submitString;
     if (!_identityButtonControlShouldBeHidden) {
       _identityButtonControl.hidden = NO;
     }
@@ -519,7 +516,7 @@ UILabel* CreateGooglePhotosTitleLabel(NSString* title) {
   // Hide the IdentityButtonControl, and update the primary button to serve as
   // a "Sign in…" button.
   _groupedIdentityButtonSection.hidden = YES;
-  SetConfigurationTitle(_primaryButton, _configuration.submitButtonTitle);
+  _primaryButton.title = _configuration.submitButtonTitle;
 }
 
 @end

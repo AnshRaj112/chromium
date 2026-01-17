@@ -111,20 +111,6 @@ public class SyncServiceImpl implements SyncService, AccountsChangeObserver {
     }
 
     @Override
-    public boolean hasUnrecoverableError() {
-        mThreadChecker.assertOnValidThread();
-        assert mSyncServiceAndroidBridge != 0;
-        return SyncServiceImplJni.get().hasUnrecoverableError(mSyncServiceAndroidBridge);
-    }
-
-    @Override
-    public boolean requiresClientUpgrade() {
-        mThreadChecker.assertOnValidThread();
-        assert mSyncServiceAndroidBridge != 0;
-        return SyncServiceImplJni.get().requiresClientUpgrade(mSyncServiceAndroidBridge);
-    }
-
-    @Override
     public @Nullable CoreAccountInfo getAccountInfo() {
         mThreadChecker.assertOnValidThread();
         assert mSyncServiceAndroidBridge != 0;
@@ -316,6 +302,13 @@ public class SyncServiceImpl implements SyncService, AccountsChangeObserver {
     }
 
     @Override
+    public @UserActionableError int getUserActionableError() {
+        mThreadChecker.assertOnValidThread();
+        assert mSyncServiceAndroidBridge != 0;
+        return SyncServiceImplJni.get().getUserActionableError(mSyncServiceAndroidBridge);
+    }
+
+    @Override
     public boolean isUsingExplicitPassphrase() {
         mThreadChecker.assertOnValidThread();
         assert mSyncServiceAndroidBridge != 0;
@@ -407,6 +400,22 @@ public class SyncServiceImpl implements SyncService, AccountsChangeObserver {
     }
 
     @Override
+    public void acknowledgeBookmarksLimitExceededError(
+            @BookmarksLimitExceededHelpClickedSource int source) {
+        mThreadChecker.assertOnValidThread();
+        assert mSyncServiceAndroidBridge != 0;
+        SyncServiceImplJni.get()
+                .acknowledgeBookmarksLimitExceededError(mSyncServiceAndroidBridge, source);
+    }
+
+    @Override
+    public int getBookmarksLimit() {
+        mThreadChecker.assertOnValidThread();
+        assert mSyncServiceAndroidBridge != 0;
+        return SyncServiceImplJni.get().getBookmarksLimit(mSyncServiceAndroidBridge);
+    }
+
+    @Override
     public boolean shouldOfferTrustedVaultOptIn() {
         mThreadChecker.assertOnValidThread();
         assert mSyncServiceAndroidBridge != 0;
@@ -466,8 +475,9 @@ public class SyncServiceImpl implements SyncService, AccountsChangeObserver {
     @CalledByNative
     private static void onGetLocalDataDescriptionsResult(
             Callback<HashMap<Integer, LocalDataDescription>> callback,
-            int[] dataTypes,
-            LocalDataDescription[] localDataDescriptions) {
+            @JniType("std::vector<int>") int[] dataTypes,
+            @JniType("std::vector<syncer::LocalDataDescription>")
+                    LocalDataDescription[] localDataDescriptions) {
         HashMap<Integer, LocalDataDescription> localDataDescription =
                 new HashMap<Integer, LocalDataDescription>();
         for (int i = 0; i < dataTypes.length; i++) {
@@ -527,6 +537,11 @@ public class SyncServiceImpl implements SyncService, AccountsChangeObserver {
     @NativeMethods
     interface Natives {
         // Please keep all methods below in the same order as sync_service_android_bridge.h.
+        void acknowledgeBookmarksLimitExceededError(
+                long nativeSyncServiceAndroidBridge, int source);
+
+        int getBookmarksLimit(long nativeSyncServiceAndroidBridge);
+
         boolean isSyncFeatureEnabled(long nativeSyncServiceAndroidBridge);
 
         boolean isSyncFeatureActive(long nativeSyncServiceAndroidBridge);
@@ -588,6 +603,8 @@ public class SyncServiceImpl implements SyncService, AccountsChangeObserver {
 
         int getTransportState(long nativeSyncServiceAndroidBridge);
 
+        int getUserActionableError(long nativeSyncServiceAndroidBridge);
+
         void setEncryptionPassphrase(long nativeSyncServiceAndroidBridge, String passphrase);
 
         boolean setDecryptionPassphrase(long nativeSyncServiceAndroidBridge, String passphrase);
@@ -598,10 +615,6 @@ public class SyncServiceImpl implements SyncService, AccountsChangeObserver {
 
         @JniType("GoogleServiceAuthError")
         GoogleServiceAuthError getAuthError(long nativeSyncServiceAndroidBridge);
-
-        boolean hasUnrecoverableError(long nativeSyncServiceAndroidBridge);
-
-        boolean requiresClientUpgrade(long nativeSyncServiceAndroidBridge);
 
         @Nullable CoreAccountInfo getAccountInfo(long nativeSyncServiceAndroidBridge);
 

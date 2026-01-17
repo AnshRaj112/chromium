@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <set>
+#include <utility>
 
 #include "base/base64.h"
 #include "base/functional/bind.h"
@@ -23,7 +24,6 @@
 #include "base/strings/stringprintf.h"
 #include "base/time/time.h"
 #include "base/trace_event/common/trace_event_common.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "chrome/browser/ash/arc/tracing/arc_graphics_jank_detector.h"
 #include "chrome/browser/ash/arc/tracing/arc_tracing_event.h"
 #include "chrome/browser/ash/arc/tracing/arc_tracing_event_matcher.h"
@@ -618,7 +618,8 @@ std::string ArcTracingGraphicsModel::SerializeToJson() const {
 
 bool ArcTracingGraphicsModel::LoadFromJson(const std::string& json_data) {
   Reset();
-  std::optional<base::Value::Dict> root = base::JSONReader::ReadDict(json_data);
+  std::optional<base::Value::Dict> root = base::JSONReader::ReadDict(
+      json_data, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!root) {
     return false;
   }
@@ -727,7 +728,7 @@ bool ArcTracingGraphicsModel::EventsContainer::operator==(
 
 std::ostream& operator<<(std::ostream& os,
                          ArcTracingGraphicsModel::EventType event_type) {
-  return os << base::to_underlying(event_type);
+  return os << std::to_underlying(event_type);
 }
 
 }  // namespace arc

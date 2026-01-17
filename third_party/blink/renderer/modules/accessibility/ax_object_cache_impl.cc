@@ -35,7 +35,6 @@
 
 #include "base/auto_reset.h"
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
@@ -43,6 +42,7 @@
 #include "services/metrics/public/cpp/ukm_builders.h"
 #include "services/metrics/public/cpp/ukm_recorder.h"
 #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
+#include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/mojom/render_accessibility.mojom-blink.h"
 #include "third_party/blink/public/platform/task_type.h"
 #include "third_party/blink/public/web/web_local_frame_client.h"
@@ -67,6 +67,7 @@
 #include "third_party/blink/renderer/core/frame/web_local_frame_impl.h"
 #include "third_party/blink/renderer/core/html/canvas/html_canvas_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_button_element.h"
+#include "third_party/blink/renderer/core/html/forms/html_form_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_input_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_label_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_option_element.h"
@@ -110,6 +111,7 @@
 #include "third_party/blink/renderer/core/page/focus_controller.h"
 #include "third_party/blink/renderer/core/page/page.h"
 #include "third_party/blink/renderer/core/page/page_animator.h"
+#include "third_party/blink/renderer/core/style/computed_style_constants.h"
 #include "third_party/blink/renderer/core/style/content_data.h"
 #include "third_party/blink/renderer/core/svg/svg_graphics_element.h"
 #include "third_party/blink/renderer/core/svg/svg_style_element.h"
@@ -126,6 +128,7 @@
 #include "third_party/blink/renderer/modules/accessibility/ax_relation_cache.h"
 #include "third_party/blink/renderer/modules/accessibility/ax_slider.h"
 #include "third_party/blink/renderer/modules/accessibility/ax_validation_message.h"
+#include "third_party/blink/renderer/platform/graphics/compositor_element_id.h"
 #include "third_party/blink/renderer/platform/graphics/dom_node_id.h"
 #include "third_party/blink/renderer/platform/instrumentation/tracing/trace_event.h"
 #include "third_party/blink/renderer/platform/wtf/functional.h"
@@ -434,15 +437,17 @@ bool IsHiddenTextNodeRelevantForAccessibility(const Text& text_node,
   if (is_display_locked)
     return true;
 
+  // If unrendered and in <canvas>, consider even whitespace relevant.
+  if (text_node.ParentOrShadowHostElement() &&
+      text_node.ParentOrShadowHostElement()->IsCanvasOrInCanvasSubtree()) {
+    return true;
+  }
+
   // If unrendered + no parent, it is in a shadow tree. Consider irrelevant.
   if (!text_node.parentElement()) {
     DCHECK(text_node.IsInShadowTree());
     return false;
   }
-
-  // If unrendered and in <canvas>, consider even whitespace relevant.
-  if (text_node.parentElement()->IsInCanvasSubtree())
-    return true;
 
   // Must be unrendered because of CSS. Consider relevant if non-whitespace.
   // Allowing rendered non-whitespace to be considered relevant will allow
@@ -931,7 +936,7 @@ AXObject* AXObjectCacheImpl::Root() {
     return root;
   }
 
-  CommitAXUpdates(GetDocument(), /*force*/ true);
+  CommitAndSerializeAXUpdates(GetDocument(), /*force*/ true);
   return Get(document_);
 }
 
@@ -973,6 +978,75 @@ void AXObjectCacheImpl::UpdateLifecycleIfNeeded(Document& document) {
       DocumentUpdateReason::kAccessibility);
 }
 
+#if BUILDFLAG(IS_ANDROID)
+void AXObjectCacheImpl::AddLayerXrHitTestEntries(
+    const cc::Layer* layer,
+    HashMap<DOMNodeId, int>& order_map) {
+  const std::vector<cc::ElementId>* hit_test_order = layer->xr_hit_test_order();
+  if (!hit_test_order) {
+    return;
+  }
+
+  for (cc::ElementId element_id : *hit_test_order) {
+    DOMNodeId dom_node_id = DOMNodeIdFromCompositorElementId(element_id);
+    if (dom_node_id != kInvalidDOMNodeId) {
+      int next_paint_order = order_map.size() + 1;
+      order_map.Set(dom_node_id, next_paint_order);
+    }
+  }
+}
+
+// TODO(435244283): This approach has some limitations, notably
+// that different widgets have independent and overlapping paint
+// orders (so multi-widget scenarios may fail), and that there
+// may be temporary inconsistency of paint order in the same widget
+// due to timing of serialization. May need follow-up fixes.
+void AXObjectCacheImpl::ComputeXrHitTestOrder(
+    HashMap<DOMNodeId, int>& dom_node_hit_test_order_map) {
+  CHECK(blink::features::IsXrDevice());
+
+  dom_node_hit_test_order_map.clear();
+  Document& document = GetDocument();
+  if (LocalFrameView* local_frame_view = document.View()) {
+    if (cc::Layer* root_layer = local_frame_view->RootCcLayer()) {
+      AXObject* root_ax_object = Root();
+      if (!root_ax_object) {
+        LOG(ERROR)
+            << "AXObjectCacheImpl::ComputeXrHitTestOrder() Root() is null";
+        return;
+      }
+
+      // Build the hit test order map by collecting entries from the root
+      // layer and its direct children.
+      AddLayerXrHitTestEntries(root_layer, dom_node_hit_test_order_map);
+      for (const auto& child : root_layer->children()) {
+        AddLayerXrHitTestEntries(child.get(), dom_node_hit_test_order_map);
+        CHECK(
+            child.get()->children().empty());  // Tree should have only 2 levels
+      }
+    }
+  }
+}
+
+void AXObjectCacheImpl::ApplyXrHitTestOrder(
+    const HashMap<DOMNodeId, int>& order_map) {
+  CHECK(blink::features::IsXrDevice());
+
+  AXObject* root_ax_object = Root();
+  if (!root_ax_object) {
+    LOG(ERROR) << "AXObjectCacheImpl::ApplyXrHitTestOrder() Root() is null";
+    return;
+  }
+
+  // Recursively traverse the AXObject tree to apply the computed hit test
+  // order.
+  Document& document = GetDocument();
+  root_ax_object->AnnotateXrHitTestOrder(document, order_map,
+                                         /*inherited_paint_order*/ 0);
+}
+
+#endif
+
 void AXObjectCacheImpl::UpdateAXForAllDocuments() {
 #if DCHECK_IS_ON()
   DCHECK(!IsFrozen())
@@ -990,7 +1064,7 @@ void AXObjectCacheImpl::UpdateAXForAllDocuments() {
   // Next flush all accessibility events and dirty objects, for both the main
   // and popup document, and update tree if needed.
   if (IsDirty() || HasObjectsPendingSerialization()) {
-    CommitAXUpdates(GetDocument(), /*force*/ true);
+    CommitAndSerializeAXUpdates(GetDocument(), /*force*/ true);
   }
 }
 
@@ -1201,6 +1275,7 @@ AXObject* AXObjectCacheImpl::Get(AbstractInlineTextBox* inline_text_box) const {
 }
 
 AXObject* AXObjectCacheImpl::GetPositionedObjectForAnchor(const AXObject* obj) {
+  CHECK(!RuntimeEnabledFeatures::NoAriaDetailsForAnchorPosEnabled());
   return relation_cache_->GetPositionedObjectForAnchor(obj);
 }
 
@@ -1260,15 +1335,9 @@ bool AXObjectCacheImpl::IsRelevantSlotElement(const HTMLSlotElement& slot) {
   DCHECK(slot.SupportsAssignment());
 
   if (slot.IsInUserAgentShadowRoot() &&
-      IsA<HTMLSelectElement>(slot.OwnerShadowHost())) {
-    if (RuntimeEnabledFeatures::CustomizableSelectEnabled()) {
-      if (slot.GetIdAttribute() ==
-          shadow_element_names::kSelectPopoverOptions) {
-        return true;
-      }
-    } else if (slot.GetIdAttribute() == shadow_element_names::kSelectOptions) {
-      return true;
-    }
+      IsA<HTMLSelectElement>(slot.OwnerShadowHost()) &&
+      slot.GetIdAttribute() == shadow_element_names::kSelectPopoverOptions) {
+    return true;
   }
 
   // HasAssignedNodesNoRecalc() will return false when  the slot is not in the
@@ -1350,14 +1419,24 @@ bool AXObjectCacheImpl::IsRelevantPseudoElement(const Node& node) {
   }
 
   // The remaining possible pseudo-element types are not relevant.
-  if (node.IsBackdropPseudoElement() || node.IsViewTransitionPseudoElement()) {
-    return false;
+  switch (To<PseudoElement>(node).GetPseudoId()) {
+    case kPseudoIdBackdrop:
+    case kPseudoIdOverscrollAreaParent:
+    case kPseudoIdViewTransition:
+    case kPseudoIdViewTransitionGroup:
+    case kPseudoIdViewTransitionGroupChildren:
+    case kPseudoIdViewTransitionImagePair:
+    case kPseudoIdViewTransitionOld:
+    case kPseudoIdViewTransitionNew:
+      return false;
+
+    default:
+      // If this is reached, then a new pseudo-element type was added and is not
+      // yet handled by accessibility. See  PseudoElementTagName() in
+      // pseudo_element.cc for all possible types.
+      SANITIZER_NOTREACHED() << "Unhandled type of pseudo-element on: " << node;
   }
 
-  // If this is reached, then a new pseudo-element type was added and is not
-  // yet handled by accessibility. See  PseudoElementTagName() in
-  // pseudo_element.cc for all possible types.
-  SANITIZER_NOTREACHED() << "Unhandled type of pseudo-element on: " << node;
   return false;
 }
 
@@ -1511,7 +1590,7 @@ AXObject* AXObjectCacheImpl::CreateAndInit(Node* node,
   } else {
     axid = GenerateAXID();
   }
-  DCHECK(!base::Contains(objects_, axid));
+  DCHECK(!objects_.Contains(axid));
 
   // Create the new AXObject.
   AXObject* new_obj = nullptr;
@@ -1725,6 +1804,49 @@ void AXObjectCacheImpl::Remove(AXObject* object, bool notify_parent) {
   }
 }
 
+void AXObjectCacheImpl::RemoveFromRadioButtonGroupCache(AXID ax_id) {
+  AXObject* obj = ObjectFromAXID(ax_id);
+  if (!obj || obj->RoleValue() != ax::mojom::blink::Role::kRadioButton) {
+    return;
+  }
+
+  // If the cache is disposing, we don't need to invalidate peers.
+  if (IsDisposing() || HasBeenDisposed()) {
+    return;
+  }
+
+  if (auto* radio_button = DynamicTo<HTMLInputElement>(obj->GetNode())) {
+    if (RadioButtonGroup* cached_group =
+            GetCachedRadioButtonGroup(radio_button)) {
+      for (AXID peer_id : cached_group->members_) {
+        if (peer_id != ax_id) {
+          if (AXObject* peer = ObjectFromAXID(peer_id)) {
+            if (lifecycle().StateAllowsImmediateTreeUpdates()) {
+              MarkAXObjectDirtyWithCleanLayout(peer);
+            } else {
+              MarkAXObjectDirty(peer);
+            }
+          }
+        }
+      }
+    } else if (obj->GetNode() && obj->GetNode()->isConnected()) {
+      HeapVector<Member<HTMLInputElement>> group =
+          AXNodeObject::FindAllRadioButtonsWithSameName(radio_button);
+      for (auto& radio : group) {
+        if (AXObject* radio_obj = Get(radio)) {
+          if (radio_obj != obj) {
+            if (lifecycle().StateAllowsImmediateTreeUpdates()) {
+              MarkAXObjectDirtyWithCleanLayout(radio_obj);
+            } else {
+              MarkAXObjectDirty(radio_obj);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 // This is safe to call even if there isn't a current mapping.
 // This is called by other Remove() methods, called by Blink for DOM and layout
 // changes, iterating over all removed content in the subtree:
@@ -1743,6 +1865,8 @@ void AXObjectCacheImpl::Remove(AXID ax_id, bool notify_parent) {
   AXObject* obj = it != objects_.end() ? it->value : nullptr;
   if (!obj)
     return;
+
+  RemoveFromRadioButtonGroupCache(ax_id);
 
 #if AX_FAIL_FAST_BUILD()
   if (obj->CachedIsIncludedInTree()) {
@@ -2411,7 +2535,7 @@ void AXObjectCacheImpl::TextChanged(const LayoutObject* layout_object) {
       RemoveAXObjectsInLayoutSubtree(node->GetLayoutObject());
     } else if (AXID node_id = static_cast<AXID>(node->GetDomNodeId())) {
       // Text changed is redundant with children changed on the same node.
-      if (base::Contains(nodes_with_pending_children_changed_, node_id)) {
+      if (nodes_with_pending_children_changed_.Contains(node_id)) {
         return;
       }
     }
@@ -2844,6 +2968,19 @@ void AXObjectCacheImpl::NodeIsAttachedWithCleanLayout(Node* node) {
   AXObject* obj = Get(node);
   CHECK(obj);
   CHECK(obj->ParentObject());
+
+  if (obj->RoleValue() == ax::mojom::blink::Role::kRadioButton) {
+    if (auto* radio_button = DynamicTo<HTMLInputElement>(node)) {
+      if (!GetCachedRadioButtonGroup(radio_button)) {
+        auto* group = ComputeAndCacheRadioButtonGroup(radio_button, obj);
+        for (auto peer_id : group->members_) {
+          if (peer_id != obj->AXObjectID()) {
+            MarkAXObjectDirtyWithCleanLayout(ObjectFromAXID(peer_id));
+          }
+        }
+      }
+    }
+  }
 
   if (element) {
     MaybeNewRelationTarget(*node, obj);
@@ -3299,19 +3436,21 @@ int AXObjectCacheImpl::GetLocationSerializationDelay() {
   return kDelayForLocationUpdatesNonFocused;
 }
 
-void AXObjectCacheImpl::CommitAXUpdates(Document& document, bool force) {
+bool AXObjectCacheImpl::CommitAXUpdates(Document& document, bool force) {
+  needs_serialization_ = false;
+
   if (IsPopup(document)) {
     // Only process popup document together with main document.
     DCHECK_EQ(&document, GetPopupDocumentIfShowing());
     // Since a change occurred in the popup, processing of both documents will
     // be needed. A visual update on the main document will force this.
     ScheduleAXUpdate();
-    return;
+    return false;
   }
 
   DCHECK_EQ(document, GetDocument());
   if (!GetDocument().IsActive()) {
-    return;
+    return false;
   }
 
   CheckStyleIsComplete(document);
@@ -3323,7 +3462,7 @@ void AXObjectCacheImpl::CommitAXUpdates(Document& document, bool force) {
        node_to_parse_before_more_tree_updates_) &&
       !force) {
     if (IsParsingMainDocument()) {
-      return;
+      return false;
     }
     allowed_tree_update_pauses_remaining_ = 0;
     node_to_parse_before_more_tree_updates_ = nullptr;
@@ -3352,7 +3491,7 @@ void AXObjectCacheImpl::CommitAXUpdates(Document& document, bool force) {
     if (IsSerializationInFlight()) {
       // Another serialization is in flight. When it's finished, this method
       // will be called again.
-      return;
+      return false;
     }
 
     const auto now = base::TimeTicks::Now();
@@ -3369,13 +3508,12 @@ void AXObjectCacheImpl::CommitAXUpdates(Document& document, bool force) {
         document.GetTaskRunner(blink::TaskType::kInternalDefault)
             ->PostDelayedTask(
                 FROM_HERE,
-                WTF::BindOnce(
-                    &AXObjectCacheImpl::ScheduleAXUpdate,
-                    WrapPersistent(weak_factory_for_serialization_pipeline_
-                                       .GetWeakCell())),
+                BindOnce(&AXObjectCacheImpl::ScheduleAXUpdate,
+                         WrapPersistent(weak_factory_for_serialization_pipeline_
+                                            .GetWeakCell())),
                 delay_until_next_serialization);
       }
-      return;
+      return false;
     }
   }
 
@@ -3387,18 +3525,6 @@ void AXObjectCacheImpl::CommitAXUpdates(Document& document, bool force) {
   }
 
   lifecycle_.AdvanceTo(AXObjectCacheLifecycle::kProcessDeferredUpdates);
-
-  SCOPED_UMA_HISTOGRAM_TIMER_MICROS(
-      "Accessibility.Performance.TotalAccessibilityCleanLayoutLifecycleStages");
-  TRACE_EVENT0("accessibility",
-               load_sent_
-                   ? "TotalAccessibilityCleanLayoutLifecycleStages"
-                   : "TotalAccessibilityCleanLayoutLifecycleStagesLoading");
-
-  // Upon exiting this function, listen for tree updates again.
-  absl::Cleanup lifecycle_returns_to_queueing_updates = [this] {
-    lifecycle_.EnsureStateAtMost(AXObjectCacheLifecycle::kDeferTreeUpdates);
-  };
 
   SCOPED_DISALLOW_LIFECYCLE_TRANSITION();
 
@@ -3529,7 +3655,26 @@ void AXObjectCacheImpl::CommitAXUpdates(Document& document, bool force) {
     }
   }
 
+  needs_serialization_ = true;
+  return true;
+}
+
+void AXObjectCacheImpl::SerializeAXUpdatesIfNeeded(Document& document) {
+  // Upon exiting this function, listen for tree updates again.
+  absl::Cleanup lifecycle_returns_to_queueing_updates = [this] {
+    lifecycle_.EnsureStateAtMost(AXObjectCacheLifecycle::kDeferTreeUpdates);
+  };
+
+  if (!needs_serialization_) {
+    return;
+  }
+  needs_serialization_ = false;
+
+  CHECK(IsUpdatingTree());  // Confirm in kFinalizingTree lifecycle state
   lifecycle_.AdvanceTo(AXObjectCacheLifecycle::kSerialize);
+
+  SCOPED_DISALLOW_LIFECYCLE_TRANSITION();
+
   SCOPED_UMA_HISTOGRAM_TIMER_MICROS(
       "Accessibility.Performance.SerializeLifecycleStage");
   TRACE_EVENT0("accessibility", load_sent_ ? "SerializeLifecycleStage"
@@ -3598,6 +3743,15 @@ void AXObjectCacheImpl::CommitAXUpdates(Document& document, bool force) {
     DUMP_WILL_BE_CHECK(!HasObjectsPendingSerialization() || !did_serialize)
         << "A serialization occurred but dirty objects remained.";
   }
+}
+
+bool AXObjectCacheImpl::CommitAndSerializeAXUpdates(Document& document,
+                                                    bool force) {
+  if (CommitAXUpdates(document, force)) {
+    SerializeAXUpdatesIfNeeded(document);
+    return true;
+  }
+  return false;
 }
 
 bool AXObjectCacheImpl::SerializeUpdatesAndEvents() {
@@ -3804,6 +3958,67 @@ AXObjectCacheImpl::GetTreeUpdateCallbackQueue(Document& document) {
                            : tree_update_callback_queue_main_;
 }
 
+void AXObjectCacheImpl::RadioButtonGroup::Trace(Visitor* visitor) const {
+  visitor->Trace(form_);
+  visitor->Trace(tree_scope_);
+}
+
+AXObjectCacheImpl::RadioButtonGroup*
+AXObjectCacheImpl::GetCachedRadioButtonGroup(HTMLInputElement* radio_button) {
+  HTMLFormElement* form = radio_button->Form();
+  TreeScope& tree_scope = radio_button->GetTreeScope();
+  String name = radio_button->GetName();
+
+  auto it = radio_group_name_to_node_ids_.find(name);
+  if (it == radio_group_name_to_node_ids_.end()) {
+    return nullptr;
+  }
+
+  for (auto& group : it->value) {
+    if (group->form_ == form && group->tree_scope_ == &tree_scope) {
+      return group;
+    }
+  }
+  return nullptr;
+}
+
+AXObjectCacheImpl::RadioButtonGroup*
+AXObjectCacheImpl::ComputeAndCacheRadioButtonGroup(
+    HTMLInputElement* radio_button,
+    AXObject* ax_object) {
+  DCHECK(radio_button);
+  HeapVector<Member<HTMLInputElement>> group_members =
+      AXNodeObject::FindAllRadioButtonsWithSameName(radio_button);
+  Vector<AXID> ids;
+  for (auto& radio : group_members) {
+    if (AXObject* radio_obj = Get(radio)) {
+      ids.push_back(radio_obj->AXObjectID());
+    }
+  }
+
+  auto* new_group = MakeGarbageCollected<RadioButtonGroup>(
+      radio_button->Form(), &radio_button->GetTreeScope(), std::move(ids));
+
+  String name = radio_button->GetName();
+  auto result = radio_group_name_to_node_ids_.insert(
+      name, HeapVector<Member<RadioButtonGroup>>());
+  result.stored_value->value.push_back(new_group);
+  return new_group;
+}
+
+HeapVector<Member<AXObject>> AXObjectCacheImpl::GetRadioButtonGroupMembers(
+    HTMLInputElement* radio_button) {
+  HeapVector<Member<AXObject>> members;
+  if (RadioButtonGroup* group = GetCachedRadioButtonGroup(radio_button)) {
+    for (AXID id : group->members_) {
+      if (AXObject* obj = ObjectFromAXID(id)) {
+        members.push_back(obj);
+      }
+    }
+  }
+  return members;
+}
+
 void AXObjectCacheImpl::ProcessCleanLayoutCallbacks(Document& document) {
   SCOPED_DISALLOW_LIFECYCLE_TRANSITION();
 
@@ -3931,7 +4146,9 @@ void AXObjectCacheImpl::FireTreeUpdatedEventForAXID(
     return;
   }
 
-  CHECK(!ax_object->IsMissingParent(), base::NotFatalUntil::M140)
+  // TODO(crbug.com/452392024): Investigate why this fails, fix it, and move to
+  // a CHECK.
+  DUMP_WILL_BE_CHECK(!ax_object->IsMissingParent())
       << tree_update->ToString() << " on " << ax_object;
 
   // Update cached attributes for all changed nodes before serialization,
@@ -3947,8 +4164,7 @@ void AXObjectCacheImpl::FireTreeUpdatedEventForAXID(
   base::AutoReset<ax::mojom::blink::Action> event_from_action_resetter(
       &active_event_from_action_, tree_update->event_from_action);
   ScopedBlinkAXEventIntent defered_event_intents(
-      WTF::ToVector(tree_update->event_intents.Values()),
-      ax_object->GetDocument());
+      ToVector(tree_update->event_intents.Values()), ax_object->GetDocument());
 
   // Kept here for convenient debugging:
   // LOG(ERROR) << tree_update->ToString() << " on " << ax_object;
@@ -4005,7 +4221,9 @@ void AXObjectCacheImpl::FireTreeUpdatedEventForNode(
     return;
   }
 
-  CHECK(!ax_object->IsMissingParent(), base::NotFatalUntil::M140)
+  // TODO(crbug.com/452392024): Investigate why this fails, fix it, and move to
+  // a CHECK.
+  DUMP_WILL_BE_CHECK(!ax_object->IsMissingParent())
       << tree_update->ToString() << " on " << ax_object;
 
   base::AutoReset<ax::mojom::blink::EventFrom> event_from_resetter(
@@ -4013,7 +4231,7 @@ void AXObjectCacheImpl::FireTreeUpdatedEventForNode(
   base::AutoReset<ax::mojom::blink::Action> event_from_action_resetter(
       &active_event_from_action_, tree_update->event_from_action);
   ScopedBlinkAXEventIntent defered_event_intents(
-      WTF::ToVector(tree_update->event_intents.Values()), &node->GetDocument());
+      ToVector(tree_update->event_intents.Values()), &node->GetDocument());
 
   // Kept here for convenient debugging:
   // LOG(ERROR) << tree_update->ToString() << " on " << ax_object;
@@ -4209,24 +4427,22 @@ void AXObjectCacheImpl::ListboxActiveIndexChanged(HTMLSelectElement* select) {
 
 void AXObjectCacheImpl::SetMenuListOptionsBounds(
     HTMLSelectElement* select,
-    const WTF::Vector<gfx::Rect>& options_bounds) {
+    const Vector<gfx::Rect>& options_bounds) {
   CHECK(select->PopupIsVisible());
   CHECK_EQ(select->GetDocument(), GetDocument());
   options_bounds_ = options_bounds;
   current_menu_list_axid_ = select->GetDomNodeId();
 }
 
-const WTF::Vector<gfx::Rect>* AXObjectCacheImpl::GetOptionsBounds(
+const Vector<gfx::Rect>* AXObjectCacheImpl::GetOptionsBounds(
     const AXObject& ax_menu_list) const {
-  if (RuntimeEnabledFeatures::CustomizableSelectEnabled()) {
-    // Customizable select does not render in a special popup document and does
-    // not need to supply bounding boxes via options_bounds_.
-    HTMLSelectElement* select = To<HTMLSelectElement>(ax_menu_list.GetNode());
-    if (select->IsAppearanceBasePicker()) {
-      CHECK(!current_menu_list_axid_);
-      CHECK(options_bounds_.empty());
-      return nullptr;
-    }
+  // Customizable select does not render in a special popup document and does
+  // not need to supply bounding boxes via options_bounds_.
+  HTMLSelectElement* select = To<HTMLSelectElement>(ax_menu_list.GetNode());
+  if (select->IsAppearanceBasePicker()) {
+    CHECK(!current_menu_list_axid_);
+    CHECK(options_bounds_.empty());
+    return nullptr;
   }
 
   if (!current_menu_list_axid_ ||
@@ -4287,6 +4503,20 @@ AriaNotifications AXObjectCacheImpl::RetrieveAriaNotifications(
   // Conveniently, `Take` returns an empty `AriaNotifications` if there's no
   // entry in `aria_notifications_` associated to the given object.
   return aria_notifications_.Take(obj->AXObjectID());
+}
+
+ImeContext* AXObjectCacheImpl::GetImeContext(const AXObject* obj) {
+  DCHECK(obj);
+
+  if (ime_context_axid_ == obj->AXObjectID()) {
+    return &ime_context_;
+  }
+  return nullptr;
+}
+
+void AXObjectCacheImpl::ClearImeContext() {
+  ime_context_axid_ = ui::AXNodeData::kInvalidAXID;
+  ime_context_ = ImeContext();
 }
 
 void AXObjectCacheImpl::UpdateTableRoleWithCleanLayout(Node* table) {
@@ -4574,6 +4804,19 @@ void AXObjectCacheImpl::HandleRoleChangeWithCleanLayout(Node* node) {
       relation_cache_->UpdateAriaOwnsWithCleanLayout(new_object,
                                                      /*force*/ true);
       new_object->UpdateChildrenIfNecessary();
+      if (new_object->RoleValue() == ax::mojom::blink::Role::kRadioButton) {
+        if (auto* radio_button = DynamicTo<HTMLInputElement>(node)) {
+          auto* group = GetCachedRadioButtonGroup(radio_button);
+          if (!group) {
+            group = ComputeAndCacheRadioButtonGroup(radio_button, new_object);
+          }
+          for (auto peer_id : group->members_) {
+            if (peer_id != new_object->AXObjectID()) {
+              MarkAXObjectDirtyWithCleanLayout(ObjectFromAXID(peer_id));
+            }
+          }
+        }
+      }
       // Need to mark dirty because the dom_node_id-based ID remains the same,
       // and therefore the serializer may not automatically serialize this node
       // from the children changed on the parent.
@@ -4911,6 +5154,44 @@ void AXObjectCacheImpl::HandleEventListenerRemoved(
 
 void AXObjectCacheImpl::HandleReferenceTargetChanged(Element& element) {
   DeferTreeUpdate(TreeUpdateReason::kReferenceTargetChanged, &element);
+}
+
+void AXObjectCacheImpl::HandleSetComposition(Node* node,
+                                             mojom::blink::ImeState ime_state) {
+  if (!node) {
+    return;
+  }
+
+  AXObject* obj = Get(node);
+  if (!obj) {
+    return;
+  }
+
+  ime_context_axid_ = obj->AXObjectID();
+  ime_context_.has_composition = true;
+  ime_context_.ime_state = ime_state;
+}
+
+void AXObjectCacheImpl::HandleCommitText(Node* node,
+                                         int committed_text_length) {
+  if (committed_text_length == 0) {
+    return;
+  }
+
+  if (!node) {
+    return;
+  }
+
+  AXObject* obj = Get(node);
+  if (!obj) {
+    return;
+  }
+
+  ime_context_axid_ = obj->AXObjectID();
+  ime_context_.committed_text_length = committed_text_length;
+
+  // Text commit might cause no text value changes.
+  MarkAXObjectDirty(obj);
 }
 
 bool AXObjectCacheImpl::DoesEventListenerImpactIgnoredState(
@@ -5424,7 +5705,7 @@ void AXObjectCacheImpl::MarkDocumentDirty() {
 
   mark_all_dirty_ = true;
 
-  ScheduleAXUpdate();
+  ResetSerializer();
 }
 
 void AXObjectCacheImpl::MarkDocumentDirtyWithCleanLayout() {
@@ -5495,7 +5776,7 @@ void AXObjectCacheImpl::MarkElementDirty(const Node* element) {
   MarkAXObjectDirty(Get(element));
 }
 
-WTF::Vector<TextChangedOperation>*
+Vector<TextChangedOperation>*
 AXObjectCacheImpl::GetFromTextOperationInNodeIdMap(AXID id) {
   auto it = text_operation_in_node_ids_.find(id);
   if (it != text_operation_in_node_ids_.end()) {
@@ -5606,6 +5887,11 @@ void AXObjectCacheImpl::UpdateActiveAriaModalDialog(Node* focused_node) {
   Element* new_active_aria_modal = AncestorAriaModalDialog(focused_node);
   if (active_aria_modal_dialog_ == new_active_aria_modal)
     return;
+
+  // Don't update when the focus itself is the modal.
+  if (new_active_aria_modal == focused_node) {
+    return;
+  }
 
   active_aria_modal_dialog_ = new_active_aria_modal;
   MarkDocumentDirty();
@@ -5722,7 +6008,7 @@ void AXObjectCacheImpl::SerializeLocationChanges() {
       document.GetTaskRunner(blink::TaskType::kInternalDefault)
           ->PostDelayedTask(
               FROM_HERE,
-              WTF::BindOnce(
+              BindOnce(
                   &AXObjectCacheImpl::ScheduleAXUpdate,
                   WrapPersistent(
                       weak_factory_for_loc_updates_pipeline_.GetWeakCell())),
@@ -5981,7 +6267,7 @@ void AXObjectCacheImpl::GetUpdatesAndEventsForSerialization(
       continue;
     }
 
-    if (!base::Contains(already_serialized_ids, event.id)) {
+    if (!already_serialized_ids.Contains(event.id)) {
       // Node no longer exists or could not be serialized.
       // Kept here for convenient debugging:
       // DVLOG(1) << "Dropped AXEvent: " << event.event_type << " on "
@@ -6161,7 +6447,7 @@ void AXObjectCacheImpl::HandleDeletionOrInsertionInTextField(
                                              start_obj->AXObjectID(),
                                              end_obj->AXObjectID(), op));
   } else {
-    WTF::Vector<TextChangedOperation> info{
+    Vector<TextChangedOperation> info{
         TextChangedOperation(start_offset, end_offset, start_obj->AXObjectID(),
                              end_obj->AXObjectID(), op)};
     text_operation_in_node_ids_.Set(text_field_obj->AXObjectID(), info);
@@ -6338,8 +6624,14 @@ void AXObjectCacheImpl::HandleLoadComplete(Document* document) {
 }
 
 void AXObjectCacheImpl::HandleScrolledToAnchor(const Node* anchor_node) {
-  if (!anchor_node)
+  if (!anchor_node) {
     return;
+  }
+
+  if (!lifecycle_.StateAllowsDeferTreeUpdates()) {
+    // TODO(crbug.com/467491112): root cause needs investigation.
+    return;
+  }
 
   DeferTreeUpdate(TreeUpdateReason::kPostNotificationFromHandleScrolledToAnchor,
                   const_cast<Node*>(anchor_node),
@@ -6387,6 +6679,28 @@ void AXObjectCacheImpl::HandleScrollPositionChanged(
   }
 }
 
+void AXObjectCacheImpl::HandleScrollMarkerTabSelectionChanged(
+    Element* scroller) {
+  if (!scroller) {
+    return;
+  }
+
+  AXObject* obj = Get(scroller);
+  if (!obj) {
+    // There is no AXObject, so there is no subtree to mark dirty.
+    MarkElementDirty(scroller);
+    return;
+  }
+
+  // Check if the a11y lifecycle allows immediate tree updates (layout is
+  // clean), otherwise defer tree updates.
+  if (lifecycle_.StateAllowsImmediateTreeUpdates()) {
+    MarkAXSubtreeDirtyWithCleanLayout(obj);
+  } else {
+    MarkAXSubtreeDirty(obj);
+  }
+}
+
 const AtomicString& AXObjectCacheImpl::ComputedRoleForNode(Node* node) {
   // Accessibility tree must be updated before getting an object.
   // Disallow a scope transition on the main document (which needs to already be
@@ -6396,7 +6710,7 @@ const AtomicString& AXObjectCacheImpl::ComputedRoleForNode(Node* node) {
   // from the main document, and hence any forced update to the popup document's
   // lifecycle here is not re-entrance but rather a "forced" lifecycle update.
   DocumentLifecycle::DisallowTransitionScope scoped(document_->Lifecycle());
-  CommitAXUpdates(GetDocument(), /*force*/ true);
+  CommitAndSerializeAXUpdates(GetDocument(), /*force*/ true);
   ScopedFreezeAXCache scoped_freeze_cache(*this);
   AXObject* obj = Get(node);
   return AXObject::AriaRoleName(obj ? obj->ComputeFinalRoleForSerialization()
@@ -6407,7 +6721,7 @@ String AXObjectCacheImpl::ComputedNameForNode(Node* node) {
   // Accessibility tree must be updated before getting an object. See comment in
   // ComputedRoleForNode() for explanation of disallow transition scope usage.
   DocumentLifecycle::DisallowTransitionScope scoped(document_->Lifecycle());
-  CommitAXUpdates(GetDocument(), /*force*/ true);
+  CommitAndSerializeAXUpdates(GetDocument(), /*force*/ true);
   ScopedFreezeAXCache scoped_freeze_cache(*this);
   AXObject* obj = Get(node);
   return obj ? obj->ComputedName() : "";
@@ -6488,6 +6802,7 @@ void AXObjectCacheImpl::Trace(Visitor* visitor) const {
   visitor->Trace(node_to_parse_before_more_tree_updates_);
   visitor->Trace(weak_factory_for_serialization_pipeline_);
   visitor->Trace(weak_factory_for_loc_updates_pipeline_);
+  visitor->Trace(radio_group_name_to_node_ids_);
 
   AXObjectCache::Trace(visitor);
 }
@@ -6657,27 +6972,27 @@ void AXObjectCacheImpl::ComputeNodesOnLine(const LayoutObject* layout_object) {
     return;
   }
 
+  // Maximum number of attempts to try to find a next object on the line. Used
+  // to
+  // detect unlikely (but theoretically possible), loops.
+  constexpr int kMaxInlineCursorNextObjectCalls = 250000;
+  int runs = 0;
+
   do {
     InlineCursor line_cursor = cursor;
+    runs++;
+
+    if (runs >= kMaxInlineCursorNextObjectCalls) [[unlikely]] {
+      break;
+    }
 
     // Moves to first LayoutObject that a11y cares about.
     line_cursor.MoveToNextInlineLeaf();
 
-    // Maximum number of attempts to try to find a next object on the line. Used
-    // to
-    // detect unlikely (but theoretically possible), loops.
-    constexpr int kMaxInlineCursorNextObjectCalls = 250000;
-    int runs = 0;
     while (line_cursor) {
       runs++;
 
       if (runs >= kMaxInlineCursorNextObjectCalls) [[unlikely]] {
-        // TODO(crbug.com/378761505): Move DUMP_WILL_BE_NOTREACHED() to CHECK().
-        DUMP_WILL_BE_NOTREACHED()
-            << "Did not find an end to the processing of next / previous on "
-               "line candidates for "
-            << layout_object << "(" << Get(layout_object) << ") after " << runs
-            << " runs.";
         break;
       }
       auto* line_object = line_cursor.Current().GetLayoutObject();
@@ -6690,15 +7005,6 @@ void AXObjectCacheImpl::ComputeNodesOnLine(const LayoutObject* layout_object) {
           line_cursor ? line_cursor.Current().GetLayoutObject() : nullptr;
 
       if (line_object == next_line_object) [[unlikely]] {
-        // TODO(crbug.com/378761505): Move DUMP_WILL_BE_NOTREACHED() to
-        // CHECK().
-        DUMP_WILL_BE_NOTREACHED()
-            << "InlineCursor says it moved to the next inline leaf object "
-               "for a different LayyoutObject, but returned value is the "
-               "same as previous inline leaf."
-            << "same object was: " << line_object << "(" << Get(line_object)
-            << ") while processing " << layout_object << " after " << runs
-            << " runs.";
         break;
       }
       if (next_line_object) {
@@ -6762,6 +7068,19 @@ const LayoutObject* AXObjectCacheImpl::CachedPreviousOnLine(
     return it->value;
   }
   return nullptr;
+}
+
+void AXObjectCacheImpl::UpdateAccessibilityFocus(AXID id) {
+  accessibility_focus_ = id;
+
+  if (id == ui::AXNodeData::kInvalidAXID) {
+    return;
+  }
+
+  AXObject* obj = ObjectFromAXID(accessibility_focus_);
+  if (obj && obj->GetNode()) {
+    UpdateActiveAriaModalDialog(obj->GetNode());
+  }
 }
 
 void AXObjectCacheImpl::ClearCachedNodesOnLine() {

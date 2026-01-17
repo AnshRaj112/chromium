@@ -87,7 +87,7 @@ class ArrayBufferContentsSegmentReader : public SegmentReader {
   base::span<const uint8_t> GetSomeData(size_t position) const override {
     return segment_reader_->GetSomeData(position);
   }
-  sk_sp<SkData> GetAsSkData() const override {
+  sk_sp<const SkData> GetAsSkData() const override {
     return segment_reader_->GetAsSkData();
   }
 
@@ -517,7 +517,7 @@ void ImageDecoderExternal::MaybeSatisfyPendingDecodes() {
     ++num_submitted_decodes_;
     decoder_->AsyncCall(&ImageDecoderCore::Decode)
         .WithArgs(request->frame_index, request->complete_frames_only,
-                  WTF::CrossThreadUnretained(request->abort_flag.get()))
+                  CrossThreadUnretained(request->abort_flag.get()))
         .Then(CrossThreadBindOnce(&ImageDecoderExternal::OnDecodeReady,
                                   MakeUnwrappingCrossThreadHandle(
                                       decode_weak_factory_.GetWeakCell())));

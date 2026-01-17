@@ -7,11 +7,19 @@
 #include "base/notimplemented.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_command_controller.h"
+#include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/interaction/browser_elements.h"
+#include "chrome/browser/ui/views/bubble_anchor_util_views.h"
+#include "chrome/browser/ui/webui_browser/webui_browser_window.h"
+#include "ui/views/bubble/bubble_border.h"
+#include "ui/views/interaction/element_tracker_views.h"
 
-WebUILocationBar::WebUILocationBar(BrowserWindowInterface* browser)
-    : LocationBar(browser->GetBrowserForMigrationOnly()->command_controller()),
-      browser_(browser) {}
+WebUILocationBar::WebUILocationBar(WebUIBrowserWindow* window)
+    : LocationBar(window->browser()
+                      ->GetBrowserForMigrationOnly()
+                      ->command_controller()),
+      window_(window) {}
 
 WebUILocationBar::~WebUILocationBar() = default;
 
@@ -40,6 +48,16 @@ OmniboxView* WebUILocationBar::GetOmniboxView() {
   return nullptr;
 }
 
+OmniboxController* WebUILocationBar::GetOmniboxController() {
+  NOTIMPLEMENTED();
+  return nullptr;
+}
+
+ChipController* WebUILocationBar::GetChipController() {
+  NOTIMPLEMENTED();
+  return nullptr;
+}
+
 content::WebContents* WebUILocationBar::GetWebContents() {
   NOTIMPLEMENTED();
   return nullptr;
@@ -50,16 +68,54 @@ LocationBarModel* WebUILocationBar::GetLocationBarModel() {
   return nullptr;
 }
 
-void WebUILocationBar::OnChanged() {
-  NOTIMPLEMENTED();
+std::optional<bubble_anchor_util::AnchorConfiguration>
+WebUILocationBar::GetChipAnchor() {
+  ui::TrackedElement* location_button =
+      BrowserElements::From(window_->browser())
+          ->GetElement(kLocationIconElementId);
+  CHECK(location_button) << "Location button not found";
+  return {{location_button, nullptr, views::BubbleBorder::TOP_LEFT}};
 }
 
-void WebUILocationBar::OnPopupVisibilityChanged() {
+void WebUILocationBar::OnChanged() {
   NOTIMPLEMENTED();
 }
 
 void WebUILocationBar::UpdateWithoutTabRestore() {
   NOTIMPLEMENTED();
+}
+
+bool WebUILocationBar::IsVisible() const {
+  NOTIMPLEMENTED();
+  return true;
+}
+
+gfx::Rect WebUILocationBar::Bounds() const {
+  NOTIMPLEMENTED();
+  return gfx::Rect();
+}
+
+gfx::Size WebUILocationBar::MinimumSize() const {
+  NOTIMPLEMENTED();
+  return gfx::Size();
+}
+
+gfx::Size WebUILocationBar::PreferredSize() const {
+  NOTIMPLEMENTED();
+  return gfx::Size();
+}
+
+void WebUILocationBar::Update(content::WebContents* contents) {
+  NOTIMPLEMENTED();
+}
+
+void WebUILocationBar::ResetTabState(content::WebContents* contents) {
+  NOTIMPLEMENTED();
+}
+
+bool WebUILocationBar::HasSecurityStateChanged() {
+  NOTIMPLEMENTED();
+  return false;
 }
 
 LocationBarTesting* WebUILocationBar::GetLocationBarForTesting() {

@@ -7,6 +7,7 @@
 
 #include <string>
 
+#include "base/functional/callback_helpers.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
@@ -27,10 +28,6 @@ namespace autofill {
 
 class CreditCard;
 class PaymentsDataManager;
-
-using PaymentsNetworkInterfaceVariation =
-    std::variant<payments::PaymentsNetworkInterface*,
-                 payments::MultipleRequestPaymentsNetworkInterface*>;
 
 // This struct is passed into the controller when we show the
 // VirtualCardEnrollmentBubble, and it lets the controller customize the
@@ -103,7 +100,8 @@ class VirtualCardEnrollmentManager {
   // The parameters should outlive the VirtualCardEnrollmentManager.
   VirtualCardEnrollmentManager(
       PaymentsDataManager* payments_data_manager,
-      PaymentsNetworkInterfaceVariation payments_network_interface,
+      payments::MultipleRequestPaymentsNetworkInterface*
+          payments_network_interface,
       AutofillClient* autofill_client = nullptr);
   VirtualCardEnrollmentManager(const VirtualCardEnrollmentManager&) = delete;
   VirtualCardEnrollmentManager& operator=(const VirtualCardEnrollmentManager&) =
@@ -388,7 +386,8 @@ class VirtualCardEnrollmentManager {
 
   // The associated `payments_network_interface_` that is used for all requests
   // to the server.
-  const PaymentsNetworkInterfaceVariation payments_network_interface_;
+  const raw_ref<payments::MultipleRequestPaymentsNetworkInterface>
+      payments_network_interface_;
 
   // The database that is used to count instrument_id-keyed strikes to suppress
   // prompting users to enroll in virtual cards.

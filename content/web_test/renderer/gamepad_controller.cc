@@ -4,13 +4,18 @@
 
 #include "content/web_test/renderer/gamepad_controller.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <string>
 #include <utility>
 
 #include "base/compiler_specific.h"
 #include "base/functional/bind.h"
+#include "base/strings/utf_string_conversions.h"
 #include "content/public/renderer/render_frame.h"
+#include "device/gamepad/public/cpp/gamepad.h"
 #include "gin/arguments.h"
+#include "gin/handle.h"
 #include "gin/object_template_builder.h"
 #include "gin/wrappable.h"
 #include "mojo/public/cpp/system/platform_handle.h"
@@ -65,7 +70,8 @@ class GamepadControllerBindings final
   void Connect(int index);
   void DispatchConnected(int index);
   void Disconnect(int index);
-  void SetId(int index, const std::string& src);
+  void DispatchRawInputChanged(int index);
+  void SetId(int index, const std::u16string& src);
   void SetButtonCount(int index, int buttons);
   void SetButtonData(int index, int button, double data);
   void SetAxisCount(int index, int axes);
@@ -115,6 +121,8 @@ gin::ObjectTemplateBuilder GamepadControllerBindings::GetObjectTemplateBuilder(
       .SetMethod("dispatchConnected",
                  &GamepadControllerBindings::DispatchConnected)
       .SetMethod("disconnect", &GamepadControllerBindings::Disconnect)
+      .SetMethod("dispatchRawInputChanged",
+                 &GamepadControllerBindings::DispatchRawInputChanged)
       .SetMethod("setId", &GamepadControllerBindings::SetId)
       .SetMethod("setButtonCount", &GamepadControllerBindings::SetButtonCount)
       .SetMethod("setButtonData", &GamepadControllerBindings::SetButtonData)
@@ -143,7 +151,13 @@ void GamepadControllerBindings::Disconnect(int index) {
     controller_->Disconnect(index);
 }
 
-void GamepadControllerBindings::SetId(int index, const std::string& src) {
+void GamepadControllerBindings::DispatchRawInputChanged(int index) {
+  if (controller_) {
+    controller_->DispatchRawInputChanged(index);
+  }
+}
+
+void GamepadControllerBindings::SetId(int index, const std::u16string& src) {
   if (controller_)
     controller_->SetId(index, src);
 }
@@ -259,6 +273,14 @@ void GamepadController::MonitorImpl::DispatchDisconnected(
     observer_remote_->GamepadDisconnected(index, pad);
 }
 
+void GamepadController::MonitorImpl::DispatchRawInputChanged(
+    int index,
+    const device::Gamepad& pad) {
+  if (observer_remote_) {
+    observer_remote_->GamepadRawInputChanged(index, pad);
+  }
+}
+
 void GamepadController::MonitorImpl::Reset() {
   missed_dispatches_.reset();
 }
@@ -295,7 +317,7 @@ void GamepadController::Reset() {
   if (!gamepads_)
     return;  // Shared memory failed.
 
-  UNSAFE_TODO(memset(gamepads_, 0, sizeof(*gamepads_)));
+  gamepads_->data.items.fill(Gamepad());
   for (auto& monitor : monitors_)
     monitor->Reset();
 }
@@ -375,16 +397,33 @@ void GamepadController::Disconnect(int index) {
   gamepads_->seqlock.WriteEnd();
 }
 
-void GamepadController::SetId(int index, const std::string& src) {
-  if (index < 0 || index >= static_cast<int>(Gamepads::kItemsLengthCap))
+void GamepadController::DispatchRawInputChanged(int index) {
+  if (index < 0 || index >= static_cast<int>(Gamepads::kItemsLengthCap)) {
     return;
-  const char* p = src.c_str();
+  }
+
   const int64_t now = CurrentTimeInMicroseconds();
   gamepads_->seqlock.WriteBegin();
   Gamepad& pad = gamepads_->data.items[index];
-  UNSAFE_TODO(memset(pad.id, 0, sizeof(pad.id)));
-  for (unsigned i = 0; *p && i < Gamepad::kIdLengthCap - 1; ++i)
-    UNSAFE_TODO(pad.id[i]) = *UNSAFE_TODO(p++);
+  pad.timestamp = now;
+
+  for (auto& monitor : monitors_) {
+    monitor->DispatchRawInputChanged(index, pad);
+  }
+  gamepads_->seqlock.WriteEnd();
+}
+
+void GamepadController::SetId(int index, const std::u16string& u16str) {
+  if (index < 0 || index >= static_cast<int>(Gamepads::kItemsLengthCap))
+    return;
+  const int64_t now = CurrentTimeInMicroseconds();
+  gamepads_->seqlock.WriteBegin();
+  Gamepad& pad = gamepads_->data.items[index];
+  pad.id.fill(0);
+  for (size_t i = 0; i < std::min(u16str.length(), Gamepad::kIdLengthCap - 1);
+       ++i) {
+    pad.id[i] = u16str[i];
+  }
   pad.timestamp = now;
   gamepads_->seqlock.WriteEnd();
 }
@@ -410,8 +449,8 @@ void GamepadController::SetButtonData(int index, int button, double data) {
   const int64_t now = CurrentTimeInMicroseconds();
   gamepads_->seqlock.WriteBegin();
   Gamepad& pad = gamepads_->data.items[index];
-  UNSAFE_TODO(pad.buttons[button]).value = data;
-  UNSAFE_TODO(pad.buttons[button]).pressed = data > kButtonPressedThreshold;
+  pad.buttons[button].value = data;
+  pad.buttons[button].pressed = data > kButtonPressedThreshold;
   pad.timestamp = now;
   gamepads_->seqlock.WriteEnd();
 }
@@ -437,7 +476,7 @@ void GamepadController::SetAxisData(int index, int axis, double data) {
   const int64_t now = CurrentTimeInMicroseconds();
   gamepads_->seqlock.WriteBegin();
   Gamepad& pad = gamepads_->data.items[index];
-  UNSAFE_TODO(pad.axes[axis]) = data;
+  pad.axes[axis] = data;
   pad.timestamp = now;
   gamepads_->seqlock.WriteEnd();
 }
@@ -501,9 +540,9 @@ void GamepadController::SetTouchData(int index,
   gamepads_->seqlock.WriteBegin();
   Gamepad& pad = gamepads_->data.items[index];
   pad.supports_touch_events_ = true;
-  UNSAFE_TODO(pad.touch_events[touch]).touch_id = touch_id;
-  UNSAFE_TODO(pad.touch_events[touch]).x = position_x;
-  UNSAFE_TODO(pad.touch_events[touch]).y = position_y;
+  pad.touch_events[touch].touch_id = touch_id;
+  pad.touch_events[touch].x = position_x;
+  pad.touch_events[touch].y = position_y;
   pad.timestamp = now;
   gamepads_->seqlock.WriteEnd();
 }

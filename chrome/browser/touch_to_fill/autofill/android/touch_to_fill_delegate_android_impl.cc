@@ -4,17 +4,22 @@
 
 #include "chrome/browser/touch_to_fill/autofill/android/touch_to_fill_delegate_android_impl.h"
 
+#include <optional>
+#include <utility>
 #include <variant>
+#include <vector>
 
 #include "base/check_deref.h"
 #include "base/containers/to_vector.h"
 #include "base/feature_list.h"
+#include "base/functional/callback.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/affiliations/core/browser/affiliation_utils.h"
 #include "components/autofill/core/browser/autofill_browser_util.h"
 #include "components/autofill/core/browser/data_manager/payments/payments_data_manager.h"
 #include "components/autofill/core/browser/data_manager/valuables/valuables_data_manager.h"
+#include "components/autofill/core/browser/data_model/payments/bnpl_issuer.h"
 #include "components/autofill/core/browser/data_model/payments/credit_card.h"
 #include "components/autofill/core/browser/data_model/valuables/loyalty_card.h"
 #include "components/autofill/core/browser/field_types.h"
@@ -24,10 +29,11 @@
 #include "components/autofill/core/browser/foundations/browser_autofill_manager.h"
 #include "components/autofill/core/browser/integrators/fast_checkout/fast_checkout_client.h"
 #include "components/autofill/core/browser/logging/log_manager.h"
+#include "components/autofill/core/browser/payments/bnpl_manager.h"
 #include "components/autofill/core/browser/payments/iban_access_manager.h"
 #include "components/autofill/core/browser/payments/payments_autofill_client.h"
 #include "components/autofill/core/browser/studies/autofill_experiments.h"
-#include "components/autofill/core/browser/suggestions/payments/payments_suggestion_generator.h"
+#include "components/autofill/core/browser/suggestions/payments/payments_suggestion_generator_util.h"
 #include "components/autofill/core/browser/suggestions/suggestion_hiding_reason.h"
 #include "components/autofill/core/browser/suggestions/suggestion_type.h"
 #include "components/autofill/core/common/autofill_features.h"
@@ -71,7 +77,7 @@ bool IsFillingPerfect(const FormStructure& form) {
 bool IsFormPrefilled(const FormStructure& form) {
   return std::ranges::any_of(form.fields(),
                              [](const std::unique_ptr<AutofillField>& field) {
-                               return field->Type().GetStorableType() ==
+                               return field->Type().GetCreditCardType() ==
                                           FieldType::CREDIT_CARD_NUMBER &&
                                       !SanitizedFieldIsEmpty(field->value());
                              });
@@ -100,6 +106,14 @@ TouchToFillDelegateAndroidImpl::DryRunResult::operator=(DryRunResult&&) =
 
 TouchToFillDelegateAndroidImpl::DryRunResult::~DryRunResult() = default;
 
+TouchToFillDelegateAndroidImpl::BnplCallbacks::BnplCallbacks() = default;
+TouchToFillDelegateAndroidImpl::BnplCallbacks::BnplCallbacks(BnplCallbacks&&) =
+    default;
+TouchToFillDelegateAndroidImpl::BnplCallbacks&
+TouchToFillDelegateAndroidImpl::BnplCallbacks::operator=(BnplCallbacks&&) =
+    default;
+TouchToFillDelegateAndroidImpl::BnplCallbacks::~BnplCallbacks() = default;
+
 TouchToFillDelegateAndroidImpl::TouchToFillDelegateAndroidImpl(
     BrowserAutofillManager* manager)
     : manager_(CHECK_DEREF(manager)) {}
@@ -125,10 +139,13 @@ TouchToFillDelegateAndroidImpl::DryRun(FormGlobalId form_id,
   if (!field) {
     return {TriggerOutcome::kUnknownField, {}};
   }
-  // Trigger only if not shown before.
-  if (ttf_payment_method_state_ != TouchToFillState::kShouldShow) {
-    return {TriggerOutcome::kShownBefore, {}};
+  // Trigger only if Touch To Fill should not be shown or reshown.
+  if (ttf_payment_method_state_ != TouchToFillState::kShouldShow &&
+      ttf_payment_method_state_ !=
+          TouchToFillState::kShownAndShouldBeShownAgain) {
+    return {TriggerOutcome::kShownBeforeAndShouldNotBeShownAgain, {}};
   }
+
   // Trigger only if the client and the form are not insecure.
   if (IsFormOrClientNonSecure(manager_->client(), *form)) {
     return {TriggerOutcome::kFormOrClientNotSecure, {}};
@@ -142,14 +159,14 @@ TouchToFillDelegateAndroidImpl::DryRun(FormGlobalId form_id,
     return {TriggerOutcome::kCannotShowAutofillUi, {}};
   }
 
-  if (field->Type().group() == FieldTypeGroup::kIban) {
+  if (field->Type().GetGroups().contains(FieldTypeGroup::kIban)) {
     return DryRunForIban();
-  } else if (field->Type().group() == FieldTypeGroup::kCreditCard) {
+  } else if (field->Type().GetGroups().contains(FieldTypeGroup::kCreditCard)) {
     return DryRunForCreditCard(*field, *form);
-  } else if (field->Type().group() == FieldTypeGroup::kLoyaltyCard ||
-             (field->Type().GetStorableType() ==
-              EMAIL_OR_LOYALTY_MEMBERSHIP_ID)) {
-    return DryRunForLoyaltyCard();
+  } else if (field->Type().GetGroups().contains(FieldTypeGroup::kLoyaltyCard) ||
+             field->Type().GetLoyaltyCardType() ==
+                 EMAIL_OR_LOYALTY_MEMBERSHIP_ID) {
+    return DryRunForAffiliatedLoyaltyCard();
   }
 
   return {TriggerOutcome::kUnsupportedFieldType, {}};
@@ -188,7 +205,7 @@ TouchToFillDelegateAndroidImpl::DryRunForCreditCard(const AutofillField& field,
   // TODO(crbug.com/40227496): `*field` must contain the updated field
   // information.
   std::vector<CreditCard> cards_to_suggest = GetTouchToFillCardsToSuggest(
-      manager_->client(), field, field.Type().GetStorableType());
+      manager_->client(), field, field.Type().GetCreditCardType());
   return cards_to_suggest.empty()
              ? DryRunResult(TriggerOutcome::kNoValidPaymentMethods, {})
              : DryRunResult(TriggerOutcome::kShown,
@@ -196,7 +213,7 @@ TouchToFillDelegateAndroidImpl::DryRunForCreditCard(const AutofillField& field,
 }
 
 TouchToFillDelegateAndroidImpl::DryRunResult
-TouchToFillDelegateAndroidImpl::DryRunForLoyaltyCard() {
+TouchToFillDelegateAndroidImpl::DryRunForAffiliatedLoyaltyCard() {
   ValuablesDataManager* vdm = manager_->client().GetValuablesDataManager();
   if (!vdm) {
     return DryRunResult(TriggerOutcome::kNoValidPaymentMethods, {});
@@ -227,7 +244,7 @@ bool TouchToFillDelegateAndroidImpl::IntendsToShowTouchToFill(
       << LoggingScope::kTouchToFill << LogMessage::kTouchToFill
       << "dry run before parsing for form " << form_id << " and field "
       << field_id << " was " << (outcome == TriggerOutcome::kShown ? "" : "un")
-      << "successful (" << base::to_underlying(outcome) << ")";
+      << "successful (" << std::to_underlying(outcome) << ")";
   return outcome == TriggerOutcome::kShown;
 }
 
@@ -248,17 +265,16 @@ bool TouchToFillDelegateAndroidImpl::TryToShowTouchToFill(
                          return payments_client.ShowTouchToFillCreditCard(
                              GetWeakPtr(),
                              GetCreditCardSuggestionsForTouchToFill(
-                                 std::move(items_to_suggest),
-                                 manager_->client(),
-                                 manager_->GetCreditCardFormEventLogger()));
+                                 std::move(items_to_suggest), *manager_));
                        },
                        [&](std::vector<Iban> items_to_suggest) {
                          return payments_client.ShowTouchToFillIban(
                              GetWeakPtr(), std::move(items_to_suggest));
                        },
                        [&](std::vector<LoyaltyCard> items_to_suggest) {
-                         return payments_client.ShowTouchToFillLoyaltyCard(
-                             GetWeakPtr(), std::move(items_to_suggest));
+                         return payments_client
+                             .ShowTouchToFillAffiliatedLoyaltyCard(
+                                 GetWeakPtr(), std::move(items_to_suggest));
                        }},
         std::move(dry_run.items_to_suggest));
     if (!shown) {
@@ -273,7 +289,7 @@ bool TouchToFillDelegateAndroidImpl::TryToShowTouchToFill(
       << "dry run after parsing for form " << form.global_id() << " and field "
       << field.global_id() << " was "
       << (dry_run.outcome == TriggerOutcome::kShown ? "" : "un")
-      << "successful (" << base::to_underlying(dry_run.outcome) << ")";
+      << "successful (" << std::to_underlying(dry_run.outcome) << ")";
 
   if (dry_run.outcome != TriggerOutcome::kShown) {
     return false;
@@ -296,6 +312,33 @@ bool TouchToFillDelegateAndroidImpl::TryToShowTouchToFill(
                                  field.global_id(),
                                  /*update_suggestions_callback=*/{});
   }
+  return true;
+}
+
+bool TouchToFillDelegateAndroidImpl::ShowTouchToFillForAllLoyaltyCards(
+    const FormData& form,
+    const FormFieldData& field) {
+  query_form_ = form;
+  query_field_ = field;
+  payments::PaymentsAutofillClient& payments_client =
+      *manager_->client().GetPaymentsAutofillClient();
+  ValuablesDataManager* vdm = manager_->client().GetValuablesDataManager();
+  if (!vdm) {
+    return false;
+  }
+  const std::vector<LoyaltyCard> loyalty_cards =
+      vdm->GetLoyaltyCardsToSuggest();
+  const bool shown = payments_client.ShowTouchToFillForAllLoyaltyCards(
+      GetWeakPtr(), std::move(loyalty_cards));
+  if (!shown) {
+    return false;
+  }
+  ttf_payment_method_state_ = TouchToFillState::kIsShowing;
+  manager_->client().HideAutofillSuggestions(
+      SuggestionHidingReason::kOverlappingWithTouchToFillSurface);
+  manager_->DidShowSuggestions({Suggestion(SuggestionType::kLoyaltyCardEntry)},
+                               form, field.global_id(),
+                               /*update_suggestions_callback=*/{});
   return true;
 }
 
@@ -325,6 +368,13 @@ bool TouchToFillDelegateAndroidImpl::ShouldShowScanCreditCard() {
   }
 
   return !IsFormOrClientNonSecure(manager_->client(), query_form_);
+}
+
+bool TouchToFillDelegateAndroidImpl::ShouldShowGPayLogo() const {
+  return !manager_->client()
+              .GetPaymentsAutofillClient()
+              ->GetPaymentsDataManager()
+              .HasAllLocalCreditCards();
 }
 
 void TouchToFillDelegateAndroidImpl::ScanCreditCard() {
@@ -361,6 +411,25 @@ void TouchToFillDelegateAndroidImpl::CreditCardSuggestionSelected(
   manager_->FillOrPreviewForm(mojom::ActionPersistence::kFill, query_form_,
                               query_field_.global_id(), &card_to_fill,
                               AutofillTriggerSource::kTouchToFillCreditCard);
+}
+
+void TouchToFillDelegateAndroidImpl::BnplSuggestionSelected(
+    std::optional<int64_t> extracted_amount) {
+  payments::BnplManager* bnpl_manager = manager_->GetPaymentsBnplManager();
+  CHECK(bnpl_manager);
+  bnpl_manager->OnDidAcceptBnplSuggestion(
+      extracted_amount,
+      /*on_bnpl_vcn_fetched_callback=*/base::BindOnce(
+          [](base::WeakPtr<TouchToFillDelegateAndroidImpl> delegate,
+             const CreditCard& card) {
+            if (delegate) {
+              delegate->manager_->FillOrPreviewForm(
+                  mojom::ActionPersistence::kFill, delegate->query_form_,
+                  delegate->query_field_.global_id(), &card,
+                  AutofillTriggerSource::kTouchToFillCreditCard);
+            }
+          },
+          GetWeakPtr()));
 }
 
 void TouchToFillDelegateAndroidImpl::IbanSuggestionSelected(
@@ -405,11 +474,49 @@ void TouchToFillDelegateAndroidImpl::LoyaltyCardSuggestionSelected(
                                         query_field_.global_id());
 }
 
-void TouchToFillDelegateAndroidImpl::OnDismissed(bool dismissed_by_user) {
+void TouchToFillDelegateAndroidImpl::OnDismissed(bool dismissed_by_user,
+                                                 bool should_reshow) {
+  if (dismissed_by_user && bnpl_callbacks_.cancel_callback) {
+    std::move(bnpl_callbacks_.cancel_callback).Run();
+  } else {
+    bnpl_callbacks_.cancel_callback.Reset();
+  }
+
   if (IsShowingTouchToFill()) {
-    ttf_payment_method_state_ = TouchToFillState::kWasShown;
+    ttf_payment_method_state_ =
+        should_reshow && base::FeatureList::IsEnabled(
+                             features::kAutofillEnableTouchToFillReshowForBnpl)
+            ? TouchToFillState::kShownAndShouldBeShownAgain
+            : TouchToFillState::kShownAndShouldNotBeShownAgain;
     dismissed_by_user_ = dismissed_by_user;
   }
+}
+
+void TouchToFillDelegateAndroidImpl::OnBnplIssuerSuggestionSelected(
+    const std::string& issuer_id) {
+  // This check is a safeguard. `selected_issuer_callback` is set in
+  // `TouchToFillPaymentMethodControllerImpl::ShowBnplIssuers()` and should
+  // always be non-null here.
+  if (!bnpl_callbacks_.selected_issuer_callback) {
+    return;
+  }
+
+  std::vector<BnplIssuer> issuers = manager_->client()
+                                        .GetPaymentsAutofillClient()
+                                        ->GetPaymentsDataManager()
+                                        .GetBnplIssuers();
+  for (BnplIssuer& issuer : issuers) {
+    if (ConvertToBnplIssuerIdString(issuer.issuer_id()) == issuer_id) {
+      std::move(bnpl_callbacks_.selected_issuer_callback)
+          .Run(std::move(issuer));
+      break;
+    }
+  }
+}
+
+void TouchToFillDelegateAndroidImpl::OnBnplTosAccepted() {
+  CHECK(bnpl_callbacks_.accept_tos_callback);
+  std::move(bnpl_callbacks_.accept_tos_callback).Run();
 }
 
 void TouchToFillDelegateAndroidImpl::LogTriggerOutcomeMetrics(
@@ -421,11 +528,11 @@ void TouchToFillDelegateAndroidImpl::LogTriggerOutcomeMetrics(
   }
   const FormStructure* form = manager_->FindCachedFormById(form_id);
   const AutofillField* field = form ? form->GetFieldById(field_id) : nullptr;
-  FieldTypeGroup group =
-      field ? field->Type().group() : FieldTypeGroup::kNoGroup;
-  if (group == FieldTypeGroup::kIban) {
+  const FieldTypeGroupSet groups =
+      field ? field->Type().GetGroups() : FieldTypeGroupSet{};
+  if (groups.contains(FieldTypeGroup::kIban)) {
     base::UmaHistogramEnumeration(kUmaTouchToFillIbanTriggerOutcome, outcome);
-  } else if (group == FieldTypeGroup::kLoyaltyCard) {
+  } else if (groups.contains(FieldTypeGroup::kLoyaltyCard)) {
     base::UmaHistogramEnumeration(kUmaTouchToFillLoyaltyCardTriggerOutcome,
                                   outcome);
   } else {
@@ -437,8 +544,11 @@ void TouchToFillDelegateAndroidImpl::LogTriggerOutcomeMetrics(
 void TouchToFillDelegateAndroidImpl::LogMetricsAfterSubmission(
     const FormStructure& submitted_form) {
   // Log whether autofill was used after dismissing the touch to fill (without
-  // selecting any credit card for filling)
-  if (ttf_payment_method_state_ == TouchToFillState::kWasShown &&
+  // selecting any credit card for filling).
+  if ((ttf_payment_method_state_ ==
+           TouchToFillState::kShownAndShouldNotBeShownAgain ||
+       ttf_payment_method_state_ ==
+           TouchToFillState::kShownAndShouldBeShownAgain) &&
       query_form_.global_id() == submitted_form.global_id() &&
       HasAnyAutofilledFields(submitted_form)) {
     base::UmaHistogramBoolean(
@@ -453,6 +563,22 @@ void TouchToFillDelegateAndroidImpl::LogMetricsAfterSubmission(
           IsFillingCorrect(submitted_form));
     }
   }
+}
+
+void TouchToFillDelegateAndroidImpl::SetCancelCallback(
+    base::OnceClosure cancel_callback) {
+  bnpl_callbacks_.cancel_callback = std::move(cancel_callback);
+}
+
+void TouchToFillDelegateAndroidImpl::SetSelectedIssuerCallback(
+    base::OnceCallback<void(BnplIssuer)> selected_issuer_callback) {
+  bnpl_callbacks_.selected_issuer_callback =
+      std::move(selected_issuer_callback);
+}
+
+void TouchToFillDelegateAndroidImpl::SetBnplTosAcceptCallback(
+    base::OnceClosure accept_tos_callback) {
+  bnpl_callbacks_.accept_tos_callback = std::move(accept_tos_callback);
 }
 
 base::WeakPtr<TouchToFillDelegateAndroidImpl>

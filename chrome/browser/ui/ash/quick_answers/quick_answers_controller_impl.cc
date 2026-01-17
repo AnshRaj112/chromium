@@ -8,12 +8,13 @@
 
 #include "base/check_is_test.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/notreached.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
-#include "chrome/browser/ash/magic_boost/magic_boost_controller_ash.h"
+#include "chrome/browser/ash/magic_boost/magic_boost_controller.h"
 #include "chrome/browser/ui/ash/quick_answers/quick_answers_state_ash.h"
 #include "chrome/browser/ui/ash/quick_answers/quick_answers_ui_controller.h"
 #include "chrome/browser/ui/ash/read_write_cards/read_write_cards_ui_controller.h"
@@ -223,7 +224,14 @@ void QuickAnswersControllerImpl::OnTextAvailable(
     const gfx::Rect& anchor_bounds,
     const std::string& selected_text,
     const std::string& surrounding_text) {
+  base::ScopedClosureRunner runner(
+      std::move(on_text_available_callback_for_testing_));
+  if (runner) {
+    CHECK_IS_TEST();
+  }
+
   if (!ShouldShowQuickAnswers()) {
+    visibility_ = QuickAnswersVisibility::kClosed;
     return;
   }
 
@@ -569,6 +577,12 @@ void QuickAnswersControllerImpl::OverrideTimeTickNowForTesting(
   time_tick_now_function_ = time_tick_now_function;
 }
 
+void QuickAnswersControllerImpl::SetOnTextAvailableCallbackForTesting(
+    base::OnceClosure callback) {
+  CHECK_IS_TEST();
+  on_text_available_callback_for_testing_ = std::move(callback);
+}
+
 base::WeakPtr<QuickAnswersControllerImpl>
 QuickAnswersControllerImpl::GetWeakPtr() {
   return weak_factory_.GetWeakPtr();
@@ -604,14 +618,10 @@ QuickAnswersRequest QuickAnswersControllerImpl::BuildRequest() {
 }
 
 void QuickAnswersControllerImpl::ShowMagicBoostDisclaimerView() {
-  ash::MagicBoostControllerAsh::Get()->ShowDisclaimerUi(
-      // Display the magic boost disclaimer view in the display that most
-      // closely matches the anchor bounds.
-      /*display_id=*/display::Screen::GetScreen()
-          ->GetDisplayMatching(anchor_bounds())
-          .id(),
-      /*action=*/
-      crosapi::mojom::MagicBoostController::TransitionAction::kDoNothing,
-      /*opt_in_features=*/
-      crosapi::mojom::MagicBoostController::OptInFeatures::kOrcaAndHmr);
+  // Display the magic boost disclaimer view in the display that most
+  // closely matches the anchor bounds.
+  ash::MagicBoostController::Get()->ShowDisclaimerUi(
+      display::Screen::Get()->GetDisplayMatching(anchor_bounds()).id(),
+      ash::magic_boost::TransitionAction::kDoNothing,
+      ash::magic_boost::OptInFeatures::kOrcaAndHmr);
 }

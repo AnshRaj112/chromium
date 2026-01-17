@@ -107,6 +107,7 @@ struct SuggestionInfosWithNodeAndHighlightColor {
   Persistent<const Text> text_node;
   Color highlight_color;
   Vector<TextSuggestionInfo> suggestion_infos;
+  bool should_hide_suggestion_menu = true;
 };
 
 SuggestionInfosWithNodeAndHighlightColor ComputeSuggestionInfos(
@@ -167,6 +168,13 @@ SuggestionInfosWithNodeAndHighlightColor ComputeSuggestionInfos(
 
     const auto* marker = To<SuggestionMarker>(node_marker_pair.second.Get());
     const Vector<String>& marker_suggestions = marker->Suggestions();
+
+    // Only hide the suggestion menu if every marker hides it.
+    suggestion_infos_with_node_and_highlight_color.should_hide_suggestion_menu =
+        suggestion_infos_with_node_and_highlight_color
+            .should_hide_suggestion_menu &&
+        marker->ShouldHideSuggestionMenu();
+
     for (wtf_size_t suggestion_index = 0;
          suggestion_index < marker_suggestions.size(); ++suggestion_index) {
       const String& suggestion = marker_suggestions[suggestion_index];
@@ -413,6 +421,9 @@ void TextSuggestionController::ShowSpellCheckMenu(
     const std::pair<const Text*, DocumentMarker*>& node_spelling_marker_pair) {
   const Text* const marker_text_node = node_spelling_marker_pair.first;
   auto* const marker = To<SpellCheckMarker>(node_spelling_marker_pair.second);
+  if (marker->ShouldHideSuggestionMenu()) {
+    return;
+  }
 
   const EphemeralRange active_suggestion_range =
       EphemeralRange(Position(marker_text_node, marker->StartOffset()),
@@ -463,6 +474,10 @@ void TextSuggestionController::ShowSuggestionMenu(
   SuggestionInfosWithNodeAndHighlightColor
       suggestion_infos_with_node_and_highlight_color = ComputeSuggestionInfos(
           node_suggestion_marker_pairs, max_number_of_suggestions);
+  if (suggestion_infos_with_node_and_highlight_color
+          .should_hide_suggestion_menu) {
+    return;
+  }
 
   Vector<TextSuggestionInfo>& suggestion_infos =
       suggestion_infos_with_node_and_highlight_color.suggestion_infos;

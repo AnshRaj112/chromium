@@ -20,6 +20,7 @@
 #include "base/notreached.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
 #include "base/threading/sequence_bound.h"
@@ -49,7 +50,10 @@
 #endif
 
 #if BUILDFLAG(IS_LINUX)
+#include "base/command_line.h"
 #include "base/no_destructor.h"
+#include "components/printing/common/print_dialog_linux_factory.h"
+#include "content/public/common/content_switches.h"  // nogncheck
 #include "ui/linux/linux_ui.h"
 #include "ui/linux/linux_ui_delegate_stub.h"
 #include "ui/linux/linux_ui_factory.h"
@@ -68,7 +72,7 @@
 #include "printing/printing_features.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #endif
 
 namespace printing {
@@ -473,6 +477,10 @@ void PrintBackendServiceImpl::Init(
   // are using `TestPrintingContext`.
   InstantiateLinuxUiDelegate();
   ui::LinuxUi::SetInstance(ui::GetDefaultLinuxUi());
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kSingleProcess)) {
+    print_dialog_factory_ = std::make_unique<PrintDialogLinuxFactory>();
+  }
 #endif  // BUILDFLAG(IS_LINUX)
 
 #if BUILDFLAG(IS_WIN)
@@ -957,21 +965,20 @@ PrintBackendServiceImpl::GetXpsCapabilities(const std::string& printer_name) {
         return error;
       });
 
-  mojom::PrinterCapabilitiesValueResultPtr value_result;
-  if (!xml_parser_remote_->ParseXmlForPrinterCapabilities(xml, &value_result)) {
+  mojom::PrinterXmlParser::ParseXmlForPrinterCapabilitiesResult capabilities;
+  if (!xml_parser_remote_->ParseXmlForPrinterCapabilities(xml, &capabilities)) {
     DLOG(ERROR) << "Failure parsing XML of XPS capabilities of printer "
                 << printer_name
                 << ", error: ParseXmlForPrinterCapabilities failed";
     return base::unexpected(mojom::ResultCode::kFailed);
   }
-  if (value_result->is_result_code()) {
+  if (!capabilities.has_value()) {
     DLOG(ERROR) << "Failure parsing XML of XPS capabilities of printer "
-                << printer_name
-                << ", error: " << value_result->get_result_code();
-    return base::unexpected(value_result->get_result_code());
+                << printer_name << ", error: " << capabilities.error();
+    return base::unexpected(capabilities.error());
   }
 
-  return ParseValueForXpsPrinterCapabilities(value_result->get_capabilities())
+  return ParseValueForXpsPrinterCapabilities(capabilities.value())
       .transform_error([&](mojom::ResultCode code) {
         DLOG(ERROR) << "Failure parsing value of XPS capabilities of printer "
                     << printer_name << ", error: " << code;

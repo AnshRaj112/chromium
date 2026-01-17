@@ -19,7 +19,7 @@ found in the LICENSE file.
         android:layout_marginVertical="@dimen/autofill_bottom_sheet_spacing_extra_small"
         android:layout_width="@dimen/autofill_bottom_sheet_drag_handlebar_width"
         android:src="@drawable/drag_handlebar"
-        app:tint="@macro/drag_handlebar_color" />
+        app:tint="@macro/drag_handle_color" />
 
     <ScrollView
         android:id="@+id/scroll_view"
@@ -35,6 +35,7 @@ found in the LICENSE file.
 
             <!-- Google Pay logo -->
             <org.chromium.ui.widget.ChromeImageView
+                android:id="@+id/gpay_icon"
                 android:importantForAccessibility="no"
                 android:layout_gravity="center_horizontal"
                 android:layout_height="wrap_content"

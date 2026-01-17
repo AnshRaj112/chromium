@@ -5,6 +5,7 @@
 #import "ios/chrome/app/main_controller.h"
 
 #import <memory>
+#import <utility>
 
 #import "base/apple/bundle_locations.h"
 #import "base/apple/foundation_util.h"
@@ -12,6 +13,7 @@
 #import "base/check_op.h"
 #import "base/feature_list.h"
 #import "base/functional/callback.h"
+#import "base/functional/callback_helpers.h"
 #import "base/functional/concurrent_closures.h"
 #import "base/ios/ios_util.h"
 #import "base/memory/raw_ptr.h"
@@ -26,8 +28,6 @@
 #import "base/timer/timer.h"
 #import "components/application_locale_storage/application_locale_storage.h"
 #import "components/component_updater/component_updater_service.h"
-#import "components/component_updater/installer_policies/afp_content_rule_list_component_installer.h"
-#import "components/component_updater/installer_policies/autofill_states_component_installer.h"
 #import "components/component_updater/installer_policies/on_device_head_suggest_component_installer.h"
 #import "components/component_updater/installer_policies/optimization_hints_component_installer.h"
 #import "components/component_updater/installer_policies/plus_address_blocklist_component_installer.h"
@@ -37,6 +37,7 @@
 #import "components/metrics/metrics_service.h"
 #import "components/password_manager/core/common/password_manager_features.h"
 #import "components/password_manager/core/common/passwords_directory_util_ios.h"
+#import "components/policy/core/common/management/management_service.h"
 #import "components/prefs/ios/pref_observer_bridge.h"
 #import "components/prefs/pref_change_registrar.h"
 #import "components/prefs/scoped_user_pref_update.h"
@@ -52,7 +53,6 @@
 #import "ios/chrome/app/blocking_scene_commands.h"
 #import "ios/chrome/app/change_profile_animator.h"
 #import "ios/chrome/app/change_profile_commands.h"
-#import "ios/chrome/app/chrome_overlay_window.h"
 #import "ios/chrome/app/deferred_initialization_runner.h"
 #import "ios/chrome/app/deferred_initialization_task_names.h"
 #import "ios/chrome/app/enterprise_app_agent.h"
@@ -84,14 +84,14 @@
 #import "ios/chrome/browser/crash_report/model/crash_loop_detection_util.h"
 #import "ios/chrome/browser/crash_report/model/crash_report_helper.h"
 #import "ios/chrome/browser/credential_provider/model/credential_provider_buildflags.h"
+#import "ios/chrome/browser/default_browser/install_attribution/model/install_attribution_helper.h"
 #import "ios/chrome/browser/default_browser/model/features.h"
 #import "ios/chrome/browser/default_browser/model/utils.h"
 #import "ios/chrome/browser/device_orientation/ui_bundled/scoped_force_portrait_orientation.h"
 #import "ios/chrome/browser/discover_feed/model/discover_feed_app_agent.h"
 #import "ios/chrome/browser/download/model/download_directory_util.h"
 #import "ios/chrome/browser/first_run/model/first_run.h"
-#import "ios/chrome/browser/first_run/ui_bundled/first_run_util.h"
-#import "ios/chrome/browser/main/ui_bundled/browser_view_wrangler.h"
+#import "ios/chrome/browser/first_run/public/first_run_util.h"
 #import "ios/chrome/browser/memory/model/memory_debugger_manager.h"
 #import "ios/chrome/browser/metrics/model/first_user_action_recorder.h"
 #import "ios/chrome/browser/metrics/model/incognito_usage_app_state_agent.h"
@@ -100,6 +100,7 @@
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_feature.h"
 #import "ios/chrome/browser/omaha/model/omaha_service.h"
 #import "ios/chrome/browser/passwords/model/password_manager_util_ios.h"
+#import "ios/chrome/browser/policy/model/browser_management_service_factory.h"
 #import "ios/chrome/browser/saved_tab_groups/model/tab_group_sync_service_factory.h"
 #import "ios/chrome/browser/screenshot/model/screenshot_metrics_recorder.h"
 #import "ios/chrome/browser/search_engines/model/search_engines_util.h"
@@ -126,6 +127,7 @@
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/public/features/system_flags.h"
+#import "ios/chrome/browser/shared/ui/chrome_overlay_window/chrome_overlay_window.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/signin/model/account_profile_mapper.h"
 #import "ios/chrome/browser/signin/model/system_identity_manager.h"
@@ -167,16 +169,14 @@
 #endif
 
 #if !BUILDFLAG(IS_IOS_MACCATALYST)
-#import "ios/chrome/browser/default_browser/model/default_status/default_status_helper.h"
+#import "ios/chrome/browser/default_browser/default_status/model/default_status_helper.h"
 #endif  // !BUILDFLAG(IS_IOS_MACCATALYST)
 
 namespace {
 
 #if BUILDFLAG(FAST_APP_TERMINATE_ENABLED)
 // Skip chromeMain.reset() on shutdown, see crbug.com/1328891 for details.
-BASE_FEATURE(kFastApplicationWillTerminate,
-             "FastApplicationWillTerminate",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kFastApplicationWillTerminate, base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(FAST_APP_TERMINATE_ENABLED)
 
 // Constants for deferring memory debugging tools startup.
@@ -213,9 +213,6 @@ NSString* const kUploadCrashReports = @"UploadCrashReports";
 // Constants for deferring the enterprise managed device check.
 NSString* const kEnterpriseManagedDeviceCheck = @"EnterpriseManagedDeviceCheck";
 
-// Constants for deferred deletion of leftover session state files.
-NSString* const kPurgeWebSessionStates = @"PurgeWebSessionStates";
-
 // Constant for deffered memory experimentation.
 NSString* const kMemoryExperimentation = @"BeginMemoryExperimentation";
 
@@ -225,12 +222,16 @@ NSString* const kAutoDeletionFileRemoval = @"AutoDeletionFileRemoval";
 // Constant for deferred default browser status API check.
 NSString* const kDefaultBrowserStatusCheck = @"DefaultBrowserStatusCheck";
 
-// Constant for enabling share extension for multi-profile.
-NSString* const kShareExtensionForMultiprofileKey =
-    @"ShareExtensionForMultiprofileKey";
+// Constant for deferred logging of install attribution data from shared user
+// defaults.
+NSString* const kLogInstallAttribution = @"LogInstallAttribution";
 
 // Constant for enabling  multi-profile.
 NSString* const kMultiprofileKey = @"MultiprofileKey";
+
+// Constant for enabling the swap of confirmation button order.
+NSString* const kConfirmationButtonSwapOrderKey =
+    @"ConfirmationButtonSwapOrderKey";
 
 // Adapted from chrome/browser/ui/browser_init.cc.
 void RegisterComponentsForUpdate() {
@@ -240,11 +241,8 @@ void RegisterComponentsForUpdate() {
   RegisterOnDeviceHeadSuggestComponent(
       cus, GetApplicationContext()->GetApplicationLocaleStorage()->Get());
   RegisterSafetyTipsComponent(cus);
-  RegisterAutofillStatesComponent(cus,
-                                  GetApplicationContext()->GetLocalState());
   RegisterOptimizationHintsComponent(cus);
   RegisterPlusAddressBlocklistComponent(cus);
-  RegisterAntiFingerprintingContentRuleListComponent(cus);
 }
 
 // The delay before beginning memory experimentation.
@@ -492,8 +490,9 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
   // appropriate pref changes.
   MemoryDebuggerManager* _memoryDebuggerManager;
 
-  // Variable backing metricsMediator property.
-  __weak MetricsMediator* _metricsMediator;
+  // Metrics mediator used to check and update the metrics accordingly to the
+  // user preferences.
+  MetricsMediator* _metricsMediator;
 
   // Holds the ProfileController for all loaded profiles.
   std::map<std::string, ProfileController*, std::less<>> _profileControllers;
@@ -553,6 +552,7 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
   if ((self = [super init])) {
     _isFirstRun = ShouldPresentFirstRunExperience();
     _startupTasks = [[StartupTasks alloc] init];
+    _metricsMediator = [[MetricsMediator alloc] init];
   }
   return self;
 }
@@ -749,9 +749,7 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
     ProfileController* controller = pair.second;
     [controller applicationWillResignActive:application];
   }
-  if (IsShareExtensionForMultiprofileEnabled()) {
-    [_shareExtensionController applicationWillResignActive];
-  }
+  [_shareExtensionController applicationWillResignActive];
 }
 
 - (void)applicationWillTerminate:(UIApplication*)application {
@@ -888,9 +886,7 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
   // This will be a no-op if upload already started.
   crash_helper::UploadCrashReports();
 
-  if (IsShareExtensionForMultiprofileEnabled()) {
-    [_shareExtensionController applicationDidBecomeActive];
-  }
+  [_shareExtensionController applicationDidBecomeActive];
 }
 
 - (void)application:(UIApplication*)application
@@ -1046,7 +1042,6 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
         NOTREACHED();
 
       case ProfileInitStage::kLoadProfile:
-      case ProfileInitStage::kMigrateStorage:
       case ProfileInitStage::kPurgeDiscardedSessionsData:
       case ProfileInitStage::kProfileLoaded:
       case ProfileInitStage::kPrepareUI:
@@ -1085,7 +1080,6 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
         NOTREACHED();
 
       case ProfileInitStage::kLoadProfile:
-      case ProfileInitStage::kMigrateStorage:
       case ProfileInitStage::kPurgeDiscardedSessionsData:
         // Nothing to do.
         break;
@@ -1172,6 +1166,7 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
   BackgroundRefreshAppAgent* refreshAgent =
       [[BackgroundRefreshAppAgent alloc] init];
   refreshAgent.startupInformation = self;
+  refreshAgent.audience = _appState;
   [_appState addAgent:refreshAgent];
   // Register background refresh providers.
   [refreshAgent addAppRefreshProvider:[[TestRefresher alloc]
@@ -1485,12 +1480,12 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
           boolForKey:kWidgetKitRefreshFiveMinutes]),
       kFieldTrialVersionKey : @1,
     },
-    kShareExtensionForMultiprofileKey : @{
-      kFieldTrialValueKey : @(IsShareExtensionForMultiprofileEnabled()),
-      kFieldTrialVersionKey : @1,
-    },
     kMultiprofileKey : @{
       kFieldTrialValueKey : @(AreSeparateProfilesForManagedAccountsEnabled()),
+      kFieldTrialVersionKey : @1,
+    },
+    kConfirmationButtonSwapOrderKey : @{
+      kFieldTrialValueKey : @(IsConfirmationButtonSwapOrderEnabled()),
       kFieldTrialVersionKey : @1,
     },
   };
@@ -1510,11 +1505,9 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
 }
 
 - (void)logIfEnterpriseManagedDevice {
-  NSString* managedKey = @"com.apple.configuration.managed";
-  BOOL isManagedDevice = [[NSUserDefaults standardUserDefaults]
-                             dictionaryForKey:managedKey] != nil;
-
-  base::UmaHistogramBoolean("EnterpriseCheck.IsManaged2", isManagedDevice);
+  base::UmaHistogramBoolean(
+      "EnterpriseCheck.IsManaged2",
+      policy::BrowserManagementServiceFactory::GetForPlatform()->IsManaged());
 }
 
 - (void)startFreeMemoryMonitoring {
@@ -1541,13 +1534,12 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
   [self scheduleMemoryExperimentation];
   [self scheduleAutoDeletionFileRemoval];
   [self scheduleDefaultBrowserStatusCheck];
+  [self scheduleLogInstallAttribution];
 #if BUILDFLAG(IOS_ENABLE_SANDBOX_DUMP)
   [self scheduleDumpDocumentsStatistics];
 #endif  // BUILDFLAG(IOS_ENABLE_SANDBOX_DUMP)
 
-  if (IsShareExtensionForMultiprofileEnabled()) {
-    [self scheduleProcessingShareExtensionFiles];
-  }
+  [self scheduleProcessingShareExtensionFiles];
 }
 
 - (void)scheduleDeleteTempDownloadsDirectory {
@@ -1607,6 +1599,14 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
 #endif  // !BUILDFLAG(IS_IOS_MACCATALYST)
 }
 
+- (void)scheduleLogInstallAttribution {
+  [_appState.deferredRunner
+      enqueueBlockNamed:kLogInstallAttribution
+                  block:^{
+                    install_attribution::LogInstallAttribution();
+                  }];
+}
+
 #if BUILDFLAG(IOS_ENABLE_SANDBOX_DUMP)
 - (void)scheduleDumpDocumentsStatistics {
   if ([[NSUserDefaults standardUserDefaults]
@@ -1622,7 +1622,6 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
 #endif  // BUILDFLAG(IOS_ENABLE_SANDBOX_DUMP)
 
 - (void)scheduleProcessingShareExtensionFiles {
-  CHECK(IsShareExtensionForMultiprofileEnabled());
   _shareExtensionController = [[ShareExtensionController alloc] init];
   [_shareExtensionController startFilesProcessing];
 }
@@ -1798,7 +1797,7 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
 
     while (sceneState.activationLevel < savedLevel) {
       sceneState.activationLevel = static_cast<SceneActivationLevel>(
-          base::to_underlying(sceneState.activationLevel) + 1);
+          std::to_underlying(sceneState.activationLevel) + 1);
     }
   }
 
@@ -1968,8 +1967,8 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
 // Update the kLastUsedProfile preference if needed.
 - (void)updateLastUsedProfilePref {
   PrefService* localState = GetApplicationContext()->GetLocalState();
-  if (base::Contains(_profileControllers,
-                     localState->GetString(prefs::kLastUsedProfile))) {
+  if (_profileControllers.contains(
+          localState->GetString(prefs::kLastUsedProfile))) {
     // The last used profile is still loaded, no need to update the pref.
     return;
   }

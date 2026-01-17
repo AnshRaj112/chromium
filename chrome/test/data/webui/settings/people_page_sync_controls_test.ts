@@ -18,8 +18,13 @@ import {getSyncAllPrefs, getSyncAllPrefsManaged} from './sync_test_util.js';
 import {TestSyncBrowserProxy} from './test_sync_browser_proxy.js';
 
 // <if expr="not is_chromeos">
-import {PageStatus, routes, UserSelectableType} from 'chrome://settings/settings.js';
+import {isChildVisible} from 'chrome://webui-test/test_util.js';
+import {PageStatus, routes, UserSelectableType, SettingsPluralStringProxyImpl} from 'chrome://settings/settings.js';
 import {waitAfterNextRender, flushTasks} from 'chrome://webui-test/polymer_test_util.js';
+import {BatchUploadPromoProxyImpl} from 'chrome://settings/lazy_load.js';
+import {TestPluralStringProxy} from 'chrome://webui-test/test_plural_string_proxy.js';
+
+import {TestBatchUploadPromoProxy} from './test_batch_upload_promo_browser_proxy.js';
 // </if>
 
 // clang-format on
@@ -37,6 +42,10 @@ suite('SyncControlsTest', function() {
 
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
     syncControls = document.createElement('settings-sync-controls');
+    syncControls.syncStatus = {
+      signedInState: SignedInState.SYNCING,
+      statusAction: StatusAction.NO_ACTION,
+    };
     document.body.appendChild(syncControls);
 
     // Start with Sync All.
@@ -164,6 +173,29 @@ suite('SyncControlsTest', function() {
       statusAction: StatusAction.ENTER_PASSPHRASE,
     };
     // Controls are available when there is a passphrase error.
+    assertFalse(syncControls.hidden);
+  });
+
+  test('BookmarkLimitError', function() {
+    syncControls.syncStatus = {
+      disabled: false,
+      hasError: true,
+      signedInState: SignedInState.SYNCING,
+      statusAction: StatusAction.SHOW_BOOKMARKS_LIMIT_HELP_ARTICLE,
+    };
+    // Controls are available when there is a bookmark limit error.
+    assertFalse(syncControls.hidden);
+  });
+
+  // Regression test for crbug.com/467318495.
+  test('SyncNotConfirmed', function() {
+    syncControls.syncStatus = {
+      disabled: false,
+      hasError: true,
+      signedInState: SignedInState.SYNCING,
+      statusAction: StatusAction.CONFIRM_SYNC_SETTINGS,
+    };
+    // Controls are not hidden when sync is not yet confirmed.
     assertFalse(syncControls.hidden);
   });
 
@@ -303,12 +335,21 @@ suite('SyncControlsSubpageTest', function() {
 suite('SyncControlsAccountSettingsTest', function() {
   let syncControls: SettingsSyncControlsElement;
   let browserProxy: TestSyncBrowserProxy;
+  let batchUploadPromoProxy: TestBatchUploadPromoProxy;
+  let pluralStringProxy: TestPluralStringProxy;
 
   setup(async function() {
     browserProxy = new TestSyncBrowserProxy();
     SyncBrowserProxyImpl.setInstance(browserProxy);
 
-    loadTimeData.overrideValues({replaceSyncPromosWithSignInPromos: true});
+    batchUploadPromoProxy = new TestBatchUploadPromoProxy();
+    BatchUploadPromoProxyImpl.setInstance(batchUploadPromoProxy);
+
+    pluralStringProxy = new TestPluralStringProxy();
+    SettingsPluralStringProxyImpl.setInstance(pluralStringProxy);
+
+    loadTimeData.overrideValues(
+        {replaceSyncPromosWithSignInPromos: true, unoPhase2FollowUp: true});
     resetRouterForTesting();
 
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
@@ -330,7 +371,6 @@ suite('SyncControlsAccountSettingsTest', function() {
   });
 
   teardown(function() {
-    loadTimeData.overrideValues({replaceSyncPromosWithSignInPromos: false});
     resetRouterForTesting();
   });
 
@@ -388,8 +428,8 @@ suite('SyncControlsAccountSettingsTest', function() {
     assertFalse(isVisible(customizeSync));
   });
 
-  test('SignedIn', function() {
-    setupPrefs();
+  test('SignedIn', async function() {
+    await setupPrefs();
 
     // Controls are shown when signed in and there is no error.
     assertFalse(syncControls.hidden);
@@ -412,13 +452,42 @@ suite('SyncControlsAccountSettingsTest', function() {
     assertTrue(syncControls.hidden);
   });
 
+  test('SignedInBookmarkLimitError', function() {
+    // Controls are available by default.
+    assertFalse(syncControls.hidden);
+
+    syncControls.syncStatus = {
+      disabled: false,
+      hasError: true,
+      signedInState: SignedInState.SIGNED_IN,
+      statusAction: StatusAction.SHOW_BOOKMARKS_LIMIT_HELP_ARTICLE,
+    };
+    // Controls are not hidden when signed in and there is a bookmark limit
+    // error.
+    assertFalse(syncControls.hidden);
+  });
+
+  test('SignedInNeedsUpdate', function() {
+    // Controls are available by default.
+    assertFalse(syncControls.hidden);
+
+    syncControls.syncStatus = {
+      disabled: false,
+      hasError: true,
+      signedInState: SignedInState.SIGNED_IN,
+      statusAction: StatusAction.UPGRADE_CLIENT,
+    };
+    // Controls are not hidden when the user needs to update Chrome.
+    assertFalse(syncControls.hidden);
+  });
+
   test('SignedInPassphraseError', function() {
     // Controls are available by default.
     assertFalse(syncControls.hidden);
 
     syncControls.syncStatus = {
       disabled: false,
-      hasError: false,
+      hasError: true,
       signedInState: SignedInState.SIGNED_IN,
       statusAction: StatusAction.ENTER_PASSPHRASE,
     };
@@ -426,8 +495,24 @@ suite('SyncControlsAccountSettingsTest', function() {
     assertTrue(syncControls.hidden);
   });
 
+  test('SignedInLocalSyncEnabled', async function() {
+    await setupPrefs();
+
+    // Controls are available by default.
+    assertFalse(syncControls.hidden);
+
+    const syncPrefs = getSyncAllPrefs();
+    syncPrefs.localSyncEnabled = true;
+    webUIListenerCallback('sync-prefs-changed', syncPrefs);
+    await flushTasks();
+    await waitAfterNextRender(syncControls);
+
+    // Controls are hidden when signed in and local sync is enabled.
+    assertTrue(syncControls.hidden);
+  });
+
   test('ChangeDataTypeToggle', async function() {
-    setupPrefs();
+    await setupPrefs();
 
     // Make sure that the autofill toggle is present and can be interacted with.
     const autofillToggle =
@@ -455,62 +540,6 @@ suite('SyncControlsAccountSettingsTest', function() {
     assertEquals(pref, UserSelectableType.AUTOFILL);
     assertTrue(value);
     assertTrue(autofillToggle.checked);
-  });
-
-  test(
-      'DisableToggleAndHidePolicyIndicatorWhenSyncPrefsNotLoaded', async () => {
-        webUIListenerCallback('sync-prefs-changed', undefined);
-        await flushTasks();
-        await waitAfterNextRender(syncControls);
-
-        // Controls are still available when prefs are not loaded.
-        assertFalse(syncControls.hidden);
-
-        // However, they are disabled.
-        assertControlsEnabled(false);
-
-        // Assert that all policy indicators are hidden.
-        assertSyncDisabledPolicyIndicatorShown(false);
-        assertIndividualItemPolicyIndicatorsShown(false);
-      });
-
-  test('DisableToggleAndHidePolicyIndicatorWhenSyncIsDisabled', async () => {
-    setupPrefs();
-
-    syncControls.syncStatus = {
-      disabled: true,
-      hasError: false,
-      signedInState: SignedInState.SIGNED_IN,
-      statusAction: StatusAction.NO_ACTION,
-    };
-    await waitAfterNextRender(syncControls);
-
-    // Controls are still available when sync is disabled.
-    assertFalse(syncControls.hidden);
-
-    // However, they are disabled.
-    assertControlsEnabled(false);
-
-    // Assert that only the sync disabled policy indicator is shown.
-    assertSyncDisabledPolicyIndicatorShown(true);
-    assertIndividualItemPolicyIndicatorsShown(false);
-  });
-
-  test('DisableToggleAndShowPolicyIndicatorWhenDataTypeIsManaged', async () => {
-    // Set all prefs to managed.
-    webUIListenerCallback('sync-prefs-changed', getSyncAllPrefsManaged());
-    await flushTasks();
-    await waitAfterNextRender(syncControls);
-
-    // Controls are still available when data types are managed.
-    assertFalse(syncControls.hidden);
-
-    // However, they are disabled.
-    assertControlsEnabled(false);
-
-    // Assert that only individual items' policy indicators are shown.
-    assertSyncDisabledPolicyIndicatorShown(false);
-    assertIndividualItemPolicyIndicatorsShown(true);
   });
 
   test(
@@ -652,7 +681,7 @@ suite('SyncControlsAccountSettingsTest', function() {
       });
 
   test('DisableToggleAndHidePolicyIndicatorWhenSyncIsDisabled', async () => {
-    setupPrefs();
+    await setupPrefs();
 
     syncControls.syncStatus = {
       disabled: true,
@@ -688,6 +717,126 @@ suite('SyncControlsAccountSettingsTest', function() {
     // Assert that only individual items' policy indicators are shown.
     assertSyncDisabledPolicyIndicatorShown(false);
     assertIndividualItemPolicyIndicatorsShown(true);
+  });
+
+  // Before crbug.com/433895051, the toggles were not shown before a syncStatus
+  // update or refresh when the user navigated to the account settings page from
+  // a different settings page. This test verifies they are shown directly upon
+  // navigation.
+  test('TogglesVisibilityUpdatedUponNavigation', async () => {
+    const router = Router.getInstance();
+    router.navigateTo(routes.PEOPLE);
+
+    // Create the sync controls before navigating to the account settings page.
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    syncControls = document.createElement('settings-sync-controls');
+    document.body.appendChild(syncControls);
+    syncControls.syncStatus = {
+      signedInState: SignedInState.SIGNED_IN,
+      statusAction: StatusAction.NO_ACTION,
+    };
+    await waitAfterNextRender(syncControls);
+
+    router.navigateTo(routes.ACCOUNT);
+    assertFalse(syncControls.hidden);
+  });
+
+  test('BatchUploadPromoNotVisibleWithoutLocalData', async () => {
+    await setupPrefs();
+    await flushTasks();
+
+    assertFalse(isChildVisible(syncControls, '#batchUploadPromo'));
+  });
+
+  test('BatchUploadPromoWithLocalDataItemUponInitialization', async () => {
+    const localDataCount = 5;
+    batchUploadPromoProxy.handler.setBatchUploadPromoLocalDataCount(
+        localDataCount);
+
+    // Create the sync controls again with the initial local data count.
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    syncControls = document.createElement('settings-sync-controls');
+    document.body.appendChild(syncControls);
+    syncControls.syncStatus = {
+      signedInState: SignedInState.SIGNED_IN,
+      statusAction: StatusAction.NO_ACTION,
+    };
+    await setupPrefs();
+    const pluralStringArgs =
+        await pluralStringProxy.whenCalled('getPluralString');
+    await flushTasks();
+
+    assertEquals(localDataCount, pluralStringArgs.itemCount);
+    assertTrue(isChildVisible(syncControls, '#batchUploadPromo'));
+  });
+
+  test('BatchUploadPromoWithOneLocalDataItem', async () => {
+    const localDataCount = 1;
+    await setupPrefs();
+
+    // Notify the UI that there is one item to be uploaded and wait for the
+    // batch upload promo to show.
+    batchUploadPromoProxy.page.onLocalDataCountChanged(localDataCount);
+    const pluralStringArgs =
+        await pluralStringProxy.whenCalled('getPluralString');
+    await flushTasks();
+
+    const batchUploadElement =
+        syncControls.shadowRoot!.querySelector(`#batchUploadPromo`);
+    assertTrue(!!batchUploadElement);
+    assertTrue(isVisible(batchUploadElement));
+
+    // Check that the correct version of the string would be displayed.
+    assertEquals(localDataCount, pluralStringArgs.itemCount);
+  });
+
+  test('BatchUploadPromoWithMultipleLocalDataItems', async () => {
+    const localDataCount = 5;
+    await setupPrefs();
+
+    // Notify the UI that there are multiple items to be uploaded and wait for
+    // the batch upload promo to show.
+    batchUploadPromoProxy.page.onLocalDataCountChanged(localDataCount);
+    const pluralStringArgs =
+        await pluralStringProxy.whenCalled('getPluralString');
+    await flushTasks();
+
+    const batchUploadElement =
+        syncControls.shadowRoot!.querySelector(`#batchUploadPromo`);
+    assertTrue(!!batchUploadElement);
+    assertTrue(isVisible(batchUploadElement));
+
+    // Check that the correct version of the string would be displayed.
+    assertEquals(localDataCount, pluralStringArgs.itemCount);
+  });
+
+  test('BatchUploadPromoClickOpensDialog', async () => {
+    const localDataCount = 5;
+    await setupPrefs();
+
+    pluralStringProxy.text += ' <a id="openBatchUploadLink">link</a>';
+
+    // Notify the UI that there are multiple items to be uploaded and wait for
+    // the batch upload promo to show.
+    batchUploadPromoProxy.page.onLocalDataCountChanged(localDataCount);
+    const pluralStringArgs =
+        await pluralStringProxy.whenCalled('getPluralString');
+    await flushTasks();
+
+    assertTrue(isChildVisible(syncControls, '#batchUploadPromo'));
+    assertEquals(localDataCount, pluralStringArgs.itemCount);
+
+    const batchUploadLinkElement =
+        syncControls.shadowRoot!.querySelector<HTMLElement>(
+            '#openBatchUploadLink');
+    assertTrue(!!batchUploadLinkElement);
+    batchUploadLinkElement.click();
+
+    // Make sure the call to open the batch upload dialog is executed.
+    assertEquals(
+        1,
+        batchUploadPromoProxy.handler.getCallCount(
+            'onBatchUploadPromoClicked'));
   });
 });
 // </if>
@@ -803,6 +952,10 @@ suite('AutofillAndPaymentsToggles', function() {
 
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
     const syncControls = document.createElement('settings-sync-controls');
+    syncControls.syncStatus = {
+      signedInState: SignedInState.SIGNED_IN,
+      statusAction: StatusAction.NO_ACTION,
+    };
     document.body.appendChild(syncControls);
 
     webUIListenerCallback('sync-prefs-changed', getSyncAllPrefs());

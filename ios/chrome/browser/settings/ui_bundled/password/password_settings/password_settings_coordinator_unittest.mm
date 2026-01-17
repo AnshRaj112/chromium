@@ -20,15 +20,15 @@
 #import "ios/chrome/browser/settings/ui_bundled/password/password_manager_ui_features.h"
 #import "ios/chrome/browser/settings/ui_bundled/password/password_settings/password_settings_view_controller.h"
 #import "ios/chrome/browser/settings/ui_bundled/password/password_settings/scoped_password_settings_reauth_module_override.h"
-#import "ios/chrome/browser/settings/ui_bundled/password/reauthentication/reauthentication_view_controller.h"
+#import "ios/chrome/browser/settings/ui_bundled/password/reauthentication/local_reauthentication_view_controller.h"
 #import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_ios.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/browser_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/signin/model/authentication_service.h"
@@ -36,7 +36,7 @@
 #import "ios/chrome/browser/signin/model/fake_authentication_service_delegate.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity_manager.h"
-#import "ios/chrome/test/app/mock_reauthentication_module.h"
+#import "ios/chrome/common/ui/reauthentication/mock_reauthentication_module.h"
 #import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
 #import "ios/chrome/test/scoped_key_window.h"
 #import "ios/testing/protocol_fake.h"
@@ -62,9 +62,8 @@ class PasswordSettingsCoordinatorTest : public PlatformTest {
     // Add test password store. Used by the mediator.
     builder.AddTestingFactory(
         IOSChromeProfilePasswordStoreFactory::GetInstance(),
-        base::BindRepeating(
-            &password_manager::BuildPasswordStore<
-                web::BrowserState, password_manager::TestPasswordStore>));
+        base::BindOnce(&password_manager::BuildPasswordStore<
+                       ProfileIOS, password_manager::TestPasswordStore>));
     builder.AddTestingFactory(
         AuthenticationServiceFactory::GetInstance(),
         AuthenticationServiceFactory::GetFactoryWithDelegate(
@@ -78,7 +77,7 @@ class PasswordSettingsCoordinatorTest : public PlatformTest {
     browser_ = std::make_unique<TestBrowser>(profile_.get(), scene_state_);
 
     NSArray<Protocol*>* command_protocols = @[
-      @protocol(ApplicationCommands), @protocol(BrowserCommands),
+      @protocol(SceneCommands), @protocol(BrowserCommands),
       @protocol(SettingsCommands), @protocol(SnackbarCommands)
     ];
     fake_command_endpoint_ =

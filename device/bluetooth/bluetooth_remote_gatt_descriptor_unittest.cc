@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include <array>
 
+#include "base/compiler_specific.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
@@ -46,9 +42,6 @@ class BluetoothRemoteGattDescriptorTest :
 #else
     BluetoothTest::SetUp();
 #endif
-    if (!PlatformSupportsLowEnergy()) {
-      GTEST_SKIP() << "Bluetooth Low Energy unavailable.";
-    }
   }
 
   void TearDown() override {
@@ -934,7 +927,8 @@ TEST_F(BluetoothRemoteGattDescriptorTest, ReadRemoteDescriptor_NSNumber) {
   base::RunLoop().RunUntilIdle();
 
   uint8_t values[] = {0x34, 0x12};
-  std::vector<uint8_t> test_vector(values, values + std::size(values));
+  std::vector<uint8_t> test_vector(values,
+                                   UNSAFE_TODO(values + std::size(values)));
   EXPECT_EQ(test_vector, last_read_value_);
   EXPECT_EQ(test_vector, descriptor1_->GetValue());
 }

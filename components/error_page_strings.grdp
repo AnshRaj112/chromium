@@ -34,9 +34,6 @@
   <message name="IDS_ERRORPAGES_SUGGESTION_RELOAD_REPOST_SUMMARY" desc="When a page fails to load, sometimes we suggest reloading a page.  In the case that reloading the page requires resubmitting data to a website, this is displayed in a list.">
     Press the reload button to resubmit the data needed to load the page.
   </message>
-  <message name="IDS_ERRORPAGES_SUGGESTION_RELOAD_PRIVATE_NETWORK_ACCESS" desc="When a page fails to load because of private network access checks, we suggest reloading a page to allow the request.">
-    Press the reload button to allow the connection to devices or servers on your private network.
-  </message>
   <message name="IDS_ERRORPAGES_SUGGESTION_CHECK_CONNECTION_HEADER" desc="When a page fails to load, sometimes we suggest checking the network connections.  This is a header above some details.">
     Check your Internet connection
   </message>
@@ -270,8 +267,8 @@
     This content is blocked. Contact the site owner to fix the issue.
   </message>
 
-  <message name="IDS_ERRORPAGES_SUMMARY_BLOCKED_BY_PRIVATE_NETWORK_ACCESS_CHECKS" desc="Summary in the error page when the request has been blocked by private network access checks.">
-    The connection is blocked because it was initiated by a public page to connect to devices or servers on your private network. Reload this page to allow the connection.
+  <message name="IDS_ERRORPAGES_SUMMARY_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS" desc="Summary in the error page when the request has been blocked by local network access checks.">
+    The connection is blocked because it was initiated by a public page to connect to devices or servers on your local network.
   </message>
 
   <message name="IDS_ERRORPAGES_HTTP_POST_WARNING" desc="The error message displayed when the user navigates back or forward to a page which would resubmit post data. They can hit reload to send POST data again and load the page.">
@@ -423,5 +420,32 @@
   </message>
   <message name="IDS_ERRORPAGE_DINO_SLOW_SPEED_TOGGLE" desc="Label for a toggle which allows a user to select a slower speed for the dino game.">
     Start slower
+  </message>
+  <message name="IDS_ERRORPAGES_GAME_INSTRUCTIONS_TOUCH" desc="Instructions on how to start playing the offline game using touch.">
+    Tap the dino to play
+  </message>
+  <message name="IDS_ERRORPAGES_GAME_INSTRUCTIONS_KEYBOARD" desc="Instructions on how to start playing the offline game using a keyboard.">
+    Press space to play
+  </message>
+  <message name="IDS_ERRORPAGES_GAME_INSTRUCTIONS_HYBRID" desc="Instructions on how to start playing the offline game using either touch or a keyboard.">
+    Tap the dino or press space to play
+  </message>
+  <message name="IDS_ERRORPAGE_DINO_ARIA_LABEL_TOUCH" desc="Accessibility label for the dino game button when using touch.">
+    Dino game, tap to play
+  </message>
+  <message name="IDS_ERRORPAGE_DINO_ARIA_LABEL_KEYBOARD" desc="Accessibility label for the dino game button when using a keyboard.">
+    Dino game, press space to play
+  </message>
+  <message name="IDS_ERRORPAGE_DINO_ARIA_LABEL_HYBRID" desc="Accessibility label for the dino game button when using hybrid input.">
+    Dino game, tap the dino or press space to play
+  </message>
+  <message name="IDS_ERRORPAGES_HEADING_BLOCKED_IN_INCOGNITO_BY_ADMINISTRATOR" desc="Heading of the error page when an administrator policy blocks a URL in Incognito mode.">
+    You can’t visit this page in Incognito mode
+  </message>
+  <message name="IDS_ERRORPAGES_SUMMARY_BLOCKED_IN_INCOGNITO_BY_ADMINISTRATOR" desc="Summary in the error page when an administrator policy blocks a URL in Incognito mode.">
+    Your organization has blocked <ph name="HOST_NAME">&lt;span&gt;$1&lt;/span&gt;<ex>www.example.com</ex></ph> in Incognito mode.
+  </message>
+  <message name="IDS_ERRORPAGES_SUMMARY_BLOCKED_IN_INCOGNITO_BY_ADMINISTRATOR_SCHEME" desc="Summary in the error page when an administrator policy blocks a URL scheme in Incognito mode.">
+    Your organization has blocked “<ph name="HOST_NAME">&lt;span&gt;$1&lt;/span&gt;<ex>mailto</ex></ph>” links in Incognito mode.
   </message>
 </grit-part>

@@ -30,7 +30,6 @@ import org.robolectric.annotation.Config;
 
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.CallbackHelper;
-import org.chromium.chrome.browser.bookmarks.BookmarkModel;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
@@ -59,7 +58,6 @@ public class TabListEditorBookmarkActionUnitTest {
     @Mock private SelectionDelegate<TabListEditorItemSelectionId> mSelectionDelegate;
     @Mock private ActionDelegate mDelegate;
     @Mock private SnackbarManager mSnackbarManager;
-    @Mock private BookmarkModel mBookmarkModel;
     @Mock private Profile mProfile;
 
     @Mock
@@ -87,7 +85,7 @@ public class TabListEditorBookmarkActionUnitTest {
 
     @Test
     public void testInherentActionProperties() {
-        Drawable drawable = AppCompatResources.getDrawable(mActivity, R.drawable.star_outline_24dp);
+        Drawable drawable = AppCompatResources.getDrawable(mActivity, R.drawable.ic_star_24dp);
         drawable.setBounds(0, 0, drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight());
 
         Assert.assertEquals(

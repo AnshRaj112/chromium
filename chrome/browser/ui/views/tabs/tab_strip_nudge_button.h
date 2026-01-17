@@ -9,13 +9,17 @@
 #include "chrome/browser/ui/views/tabs/tab_strip_control_button.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 
-class TabStripController;
+class BrowserWindowInterface;
+
+namespace gfx {
+class SlideAnimation;
+}
 
 class TabStripNudgeButton : public TabStripControlButton {
   METADATA_HEADER(TabStripNudgeButton, TabStripControlButton)
 
  public:
-  TabStripNudgeButton(TabStripController* tab_strip_controller,
+  TabStripNudgeButton(BrowserWindowInterface* browser_window_interface,
                       PressedCallback pressed_callback,
                       PressedCallback close_pressed_callback,
                       const std::u16string& initial_label_text,
@@ -29,7 +33,7 @@ class TabStripNudgeButton : public TabStripControlButton {
   ~TabStripNudgeButton() override;
 
   void SetOpacity(float opacity);
-  void SetWidthFactor(float factor);
+  virtual void SetWidthFactor(float factor);
   float width_factor_for_testing() const { return width_factor_; }
 
   // TabStripControlButton:
@@ -40,8 +44,9 @@ class TabStripNudgeButton : public TabStripControlButton {
   float GetWidthFactor() const { return width_factor_; }
 
   virtual void SetIsShowingNudge(bool is_showing);
+  virtual bool GetIsShowingNudge() const;
 
-  bool GetIsShowingNudge() { return is_showing_nudge_; }
+  virtual gfx::SlideAnimation* GetExpansionAnimationForTesting();
 
  protected:
   // TabStripControlButton:
@@ -49,6 +54,8 @@ class TabStripNudgeButton : public TabStripControlButton {
   int GetFlatCornerRadius() const override;
   void SetCloseButtonFocusBehavior(views::View::FocusBehavior focus_behavior);
   bool is_showing_nudge_ = false;
+
+  views::View* close_button() { return close_button_; }
 
  private:
   void SetCloseButton(PressedCallback callback);

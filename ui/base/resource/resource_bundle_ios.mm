@@ -10,7 +10,6 @@
 #include "base/apple/bundle_locations.h"
 #include "base/apple/foundation_util.h"
 #include "base/files/file_path.h"
-#include "base/files/file_util.h"
 #include "base/memory/ref_counted_memory.h"
 #include "base/notreached.h"
 #include "base/strings/sys_string_conversions.h"
@@ -127,8 +126,8 @@ gfx::Image& ResourceBundle::GetNativeImageNamed(int resource_id) {
       base::apple::ScopedCFTypeRef<CGContextRef> context(CGBitmapContextCreate(
           /*data=*/nullptr, target_size.width, target_size.height, 8,
           target_size.width * 4, color_space.get(),
-          kCGImageAlphaPremultipliedFirst |
-              static_cast<CGImageAlphaInfo>(kCGBitmapByteOrder32Host)));
+          static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedFirst) |
+              kCGImageByteOrder32Host));
 
       CGRect target_rect = CGRectMake(0, 0,
                                       target_size.width, target_size.height);

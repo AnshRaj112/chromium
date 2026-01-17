@@ -38,8 +38,10 @@ class InfoCollectionTest(gpu_integration_test.GpuIntegrationTest):
         action='append',
         dest='expected_device_ids',
         default=[],
-        help='The expected device id. Can be specified multiple times.')
-    parser.add_argument('--expected-vendor-id', help='The expected vendor id')
+        help=('The expected device id in hexadecimal. Can be specified '
+              'multiple times.'))
+    parser.add_argument('--expected-vendor-id',
+                        help='The expected vendor id in hexadecimal.')
 
   @classmethod
   def GenerateGpuTests(cls, options: ct.ParsedCmdArgs) -> ct.TestGenerator:
@@ -66,6 +68,9 @@ class InfoCollectionTest(gpu_integration_test.GpuIntegrationTest):
             expected_vendor_id_str=options.expected_vendor_id,
             expected_device_id_strs=options.expected_device_ids)
     ])
+    yield ('InfoCollection_webGPU_android_advanced_protection_mode', '_',
+           ['_RunWebGPUAapmInfoTest',
+            InfoCollectionTestArgs()])
 
   @classmethod
   def SetUpProcess(cls) -> None:
@@ -88,6 +93,18 @@ class InfoCollectionTest(gpu_integration_test.GpuIntegrationTest):
     test_args = args[1]
     test_args.gpu = system_info.gpu
     getattr(self, test_func)(test_args)
+
+  def GetGpuFeatureStatusAndValidate(self) -> dict[str, str]:
+    system_info = self.browser.GetSystemInfo()
+    if not system_info:
+      self.fail("Browser doesn't support GetSystemInfo")
+    gpu = system_info.gpu
+    if not gpu:
+      self.fail("System Info doesn't have a gpu")
+    feature_status = gpu.feature_status
+    if not feature_status:
+      self.fail('GPU info does not have feature_status')
+    return feature_status
 
   ######################################
   # Helper functions for the tests below
@@ -112,12 +129,13 @@ class InfoCollectionTest(gpu_integration_test.GpuIntegrationTest):
 
     # Check expected and detected GPUs match
     if detected_vendor_id != expected_vendor_id:
-      self.fail(f'Vendor ID mismatch, expected {expected_vendor_id} but got '
-                f'{detected_vendor_id}.')
+      self.fail(f'Vendor ID mismatch, expected 0x{expected_vendor_id:x} but '
+                f'got 0x{detected_vendor_id:x}.')
 
     if detected_device_id not in expected_device_ids:
-      self.fail(f'Device ID mismatch, expected {expected_device_ids} but got '
-                f'{detected_device_id}.')
+      hex_ids = [f'0x{edi:x}' for edi in expected_device_ids]
+      self.fail(f'Device ID mismatch, expected one of [{", ".join(hex_ids)}] '
+                f'but got 0x{detected_device_id:x}.')
 
   def _RunDirectCompositionTest(self,
                                 test_args: InfoCollectionTestArgs) -> None:
@@ -211,6 +229,50 @@ class InfoCollectionTest(gpu_integration_test.GpuIntegrationTest):
       else:
         self.fail('Running with unknown GPU vendor')
 
+  def _RunWebGPUAapmInfoTest(self, _: InfoCollectionTestArgs) -> None:
+    os_name = self.browser.platform.GetOSName()
+    if os_name and os_name.lower() != 'android':
+      self.skipTest('Test only applicable on Android')
+    if self._finder_options.browser_type != 'android-chrome':
+      self.skipTest(
+          'Android Advanced Protection status requires internal browser apk ' +
+          '(android-chrome). Browser is: ' + self._finder_options.browser_type)
+
+    # Ensure Advanced Protection and WebGPU are available on browser.
+    feature_status = self.GetGpuFeatureStatusAndValidate()
+    if feature_status.get('webgpu') != 'enabled':
+      self.skipTest(
+          'WebGPU is not enabled for browser; unable to test disable via AAPM')
+
+    # Enable advanced protection (AAPM).
+    # pylint: disable=protected-access
+    device = self.browser.platform._platform_backend.device
+    # pylint: enable=protected-access
+    try:
+      device.RunShellCommand(
+          ['cmd', 'advanced_protection', 'set-protection-enabled', 'true'],
+          check_return=True)
+
+      aapm_enabled_output = device.RunShellCommand(
+          ['cmd', 'advanced_protection', 'is-protection-enabled'],
+          check_return=True)
+      if ''.join(aapm_enabled_output).lower().strip() != 'true':
+        self.fail('Failed to enable Android Advanced Protection Mode.')
+
+      # Restart browser after enabling AAPM to ensure status is propagated.
+      self.RestartBrowserIfNecessaryWithArgs(
+          ['--enable-features=AAPMBlocksWebGPU'], force_restart=True)
+
+      # Check if WebGPU was correctly disabled via AAPM.
+      feature_status = self.GetGpuFeatureStatusAndValidate()
+      self.assertEqual(
+          feature_status.get('webgpu'), 'disabled_off',
+          'WebGPU not disabled in Android Advanced Protection '
+          'Mode.')
+    finally:
+      device.RunShellCommand(
+          ['cmd', 'advanced_protection', 'set-protection-enabled', 'false'],
+          check_return=True)
 
   @staticmethod
   def _ValueToStr(value: str | bool) -> str:

@@ -6,6 +6,7 @@
 
 #include <windows.foundation.h>
 #include <windows.security.credentials.ui.h>
+#include <wtsapi32.h>
 
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
@@ -17,6 +18,7 @@
 #include "base/threading/scoped_thread_priority.h"
 #include "base/win/core_winrt_util.h"
 #include "base/win/post_async_results.h"
+#include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
 
 namespace device::fido::win {
 
@@ -100,6 +102,11 @@ std::optional<bool>& GetBiometricOverride() {
   return flag;
 }
 
+std::optional<bool>& GetRemoteDesktopSessionOverride() {
+  static std::optional<bool> flag;
+  return flag;
+}
+
 }  // namespace
 
 ScopedBiometricsOverride::ScopedBiometricsOverride(bool has_biometrics) {
@@ -129,6 +136,42 @@ void DeviceHasBiometricsAvailable(base::OnceCallback<void(bool)> callback) {
       FROM_HERE,
       base::BindOnce(&DeviceHasBiometricsAvailableInternal,
                      base::BindPostTaskToCurrentDefault(std::move(callback))));
+}
+
+bool IsRemoteDesktopSession() {
+  std::optional<bool>& flag = GetRemoteDesktopSessionOverride();
+  if (flag.has_value()) {
+    return *flag;
+  }
+  USHORT* result = nullptr;
+  DWORD result_size;
+  if (!WTSQuerySessionInformation(
+          WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSClientProtocolType,
+          reinterpret_cast<LPWSTR*>(&result), &result_size)) {
+    // An error occurred. Assume this is not a remote desktop session.
+    return false;
+  }
+  absl::Cleanup result_deleter = [result] { WTSFreeMemory(result); };
+  // `WTSClientProtocolType` should make the API return an USHORT value.
+  // Anything else is an API contract break, assume we are not under remote
+  // desktop.
+  if (result_size != sizeof(USHORT)) {
+    return false;
+  }
+  return *result != WTS_PROTOCOL_TYPE_CONSOLE;
+}
+
+ScopedIsRdpSessionOverride::ScopedIsRdpSessionOverride(bool is_rdp) {
+  std::optional<bool>& flag = GetRemoteDesktopSessionOverride();
+  // Overrides don't nest.
+  CHECK(!flag.has_value());
+  flag = is_rdp;
+}
+
+ScopedIsRdpSessionOverride::~ScopedIsRdpSessionOverride() {
+  std::optional<bool>& flag = GetRemoteDesktopSessionOverride();
+  CHECK(flag.has_value());
+  flag.reset();
 }
 
 }  // namespace device::fido::win

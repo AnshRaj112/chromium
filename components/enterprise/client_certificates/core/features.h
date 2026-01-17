@@ -10,18 +10,17 @@
 
 namespace client_certificates::features {
 
-// Controls whether the management of a client certificate for the browser
-// is enabled or not (still requires the policy to be enabled).
-BASE_DECLARE_FEATURE(kManagedBrowserClientCertificateEnabled);
-
-// Return true if the managed browser's client cert feature is enabled.
-bool IsManagedBrowserClientCertificateEnabled();
-
 // Controls whether user client certs storage relies on prefs or LevelDB.
 BASE_DECLARE_FEATURE(kManagedUserClientCertificateInPrefs);
 
 // Return true if the managed user certificate should be stored in prefs.
 bool IsManagedUserClientCertificateInPrefsEnabled();
+
+// Controls whether client certificate provisioning on Android is enabled.
+BASE_DECLARE_FEATURE(kEnableClientCertificateProvisioningOnAndroid);
+
+// Return true if client certificate provisioning on Android is enabled.
+bool IsClientCertificateProvisioningOnAndroidEnabled();
 
 #if BUILDFLAG(IS_WIN)
 // Controls whether Windows software keys are enabled or not.

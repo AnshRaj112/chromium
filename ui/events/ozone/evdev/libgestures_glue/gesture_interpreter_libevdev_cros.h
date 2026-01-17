@@ -14,6 +14,7 @@
 #include "base/component_export.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "ui/events/ozone/evdev/cursor_delegate_evdev.h"
 #include "ui/events/ozone/evdev/event_device_util.h"
 #include "ui/events/ozone/evdev/event_dispatch_callback.h"
@@ -77,6 +78,8 @@ class COMPONENT_EXPORT(EVDEV) GestureInterpreterLibevdevCros
   Evdev* evdev() { return evdev_; }
 
  private:
+  using EvdevKeyState = std::array<unsigned long, EVDEV_BITS_TO_LONGS(KEY_CNT)>;
+
   void OnGestureMove(const Gesture* gesture, const GestureMove* move);
   void OnGestureScroll(const Gesture* gesture, const GestureScroll* move);
   void OnGestureMouseWheel(const Gesture* gesture,
@@ -101,7 +104,9 @@ class COMPONENT_EXPORT(EVDEV) GestureInterpreterLibevdevCros
   void DispatchMouseButton(unsigned int button,
                            bool down,
                            stime_t time);
-  void DispatchChangedKeys(unsigned long* changed_keys, stime_t timestamp);
+  void DispatchChangedKeys(
+      base::span<unsigned long, EVDEV_BITS_TO_LONGS(KEY_CNT)> changed_keys,
+      stime_t timestamp);
   void ReleaseKeys(stime_t timestamp);
   bool SetMouseButtonState(unsigned int button, bool down);
   void ReleaseMouseButtons(stime_t timestamp);
@@ -119,19 +124,19 @@ class COMPONENT_EXPORT(EVDEV) GestureInterpreterLibevdevCros
   bool block_modifiers_;
 
   // Shared cursor state.
-  CursorDelegateEvdev* cursor_;
+  raw_ptr<CursorDelegateEvdev> cursor_;
 
   // Shared gesture property provider.
-  GesturePropertyProvider* property_provider_;
+  raw_ptr<GesturePropertyProvider> property_provider_;
 
   // Dispatcher for events.
-  DeviceEventDispatcherEvdev* dispatcher_;
+  raw_ptr<DeviceEventDispatcherEvdev> dispatcher_;
 
   // Gestures interpretation state.
-  gestures::GestureInterpreter* interpreter_ = nullptr;
+  raw_ptr<gestures::GestureInterpreter> interpreter_ = nullptr;
 
   // Last key state from libevdev.
-  unsigned long prev_key_state_[EVDEV_BITS_TO_LONGS(KEY_CNT)];
+  EvdevKeyState prev_key_state_;
 
   // Last mouse button state.
   static const int kMouseButtonCount = BTN_JOYSTICK - BTN_MOUSE;
@@ -141,7 +146,7 @@ class COMPONENT_EXPORT(EVDEV) GestureInterpreterLibevdevCros
   gfx::Vector2dF click_movement_;
 
   // Device pointer.
-  Evdev* evdev_ = nullptr;
+  raw_ptr<Evdev> evdev_ = nullptr;
 
   // Gesture lib device properties.
   std::unique_ptr<GestureDeviceProperties> device_properties_;

@@ -5,11 +5,12 @@
 #include "chrome/browser/safe_browsing/extension_telemetry/extension_telemetry_service.h"
 
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
+#include "base/files/file_util.h"
 #include "base/i18n/time_formatting.h"
 #include "base/json/values_util.h"
 #include "base/logging.h"
@@ -23,6 +24,7 @@
 #include "base/threading/sequence_bound.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "base/types/optional_ref.h"
 #include "chrome/browser/enterprise/browser_management/management_service_factory.h"
 #include "chrome/browser/extensions/extension_management.h"
 #include "chrome/browser/extensions/extension_service.h"
@@ -41,11 +43,14 @@
 #include "chrome/browser/safe_browsing/extension_telemetry/extension_telemetry_uploader.h"
 #include "chrome/browser/safe_browsing/extension_telemetry/potential_password_theft_signal_processor.h"
 #include "chrome/browser/safe_browsing/extension_telemetry/remote_host_contacted_signal_processor.h"
+#include "chrome/browser/safe_browsing/extension_telemetry/search_hijacking_detector.h"
 #include "chrome/browser/safe_browsing/extension_telemetry/tabs_api_signal_processor.h"
 #include "chrome/browser/safe_browsing/extension_telemetry/tabs_execute_script_signal_processor.h"
+#include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/common/pref_names.h"
 #include "components/enterprise/buildflags/buildflags.h"
+#include "components/omnibox/browser/autocomplete_match.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "components/safe_browsing/core/browser/sync/safe_browsing_primary_account_token_fetcher.h"
@@ -53,6 +58,7 @@
 #include "components/safe_browsing/core/common/features.h"
 #include "components/safe_browsing/core/common/proto/csd.pb.h"
 #include "components/safe_browsing/core/common/safe_browsing_prefs.h"
+#include "components/search_engines/template_url_service.h"
 #include "content/public/browser/browser_thread.h"
 #include "extensions/browser/blocklist_extension_prefs.h"
 #include "extensions/browser/blocklist_state.h"
@@ -84,6 +90,8 @@ using ExtensionInfo =
     ::safe_browsing::ExtensionTelemetryReportRequest_ExtensionInfo;
 using OffstoreExtensionVerdict =
     ::safe_browsing::ExtensionTelemetryReportResponse_OffstoreExtensionVerdict;
+using SearchHijackingSignal =
+    ::safe_browsing::ExtensionTelemetryReportRequest_SearchHijackingSignal;
 
 // The ExtensionTelemetryService saves offstore extensions file data such as
 // filenames and hashes in Prefs. This information is stored in the following
@@ -402,7 +410,7 @@ extensions::ExtensionSet CollectCommandLineExtensionInfo() {
     auto tmp_path = extensions::path_util::ResolveHomeDirectory(
         base::FilePath(t.token_piece()));
     auto extension_path = base::MakeAbsoluteFilePath(tmp_path);
-    std::string error;
+    std::u16string error;
     // Use default creation flags. Since we are not installing the extension,
     // it doesn't really mattter.
     int flags = extensions::Extension::FOLLOW_SYMLINKS_ANYWHERE |
@@ -519,6 +527,7 @@ void ExtensionTelemetryService::OnEnterprisePolicyChanged() {
 
 // Telemetry features for ESB include:
 // - ESB signals
+// - Search hijacking signal
 // - Off-store data collection
 // - Command line extensions file data
 // - Telemetry Configuration
@@ -534,16 +543,26 @@ void ExtensionTelemetryService::SetEnabledForESB(bool enable) {
     SetUpSignalProcessorsAndSubscribersForESB();
     SetUpOffstoreFileDataCollection();
 
-    // File data for Command Line extensions.
     if (base::FeatureList::IsEnabled(
-            kExtensionTelemetryFileDataForCommandLineExtensions)) {
-      base::ThreadPool::PostTaskAndReplyWithResult(
-          FROM_HERE, {base::MayBlock(), base::TaskPriority::BEST_EFFORT},
-          base::BindOnce(CollectCommandLineExtensionInfo),
-          base::BindOnce(
-              &ExtensionTelemetryService::OnCommandLineExtensionsInfoCollected,
-              weak_factory_.GetWeakPtr()));
+            kExtensionTelemetrySearchHijackingSignal)) {
+      auto* template_url_service =
+          TemplateURLServiceFactory::GetForProfile(profile_);
+      search_hijacking_detector_ = std::make_unique<SearchHijackingDetector>(
+          pref_service_, template_url_service);
+      search_hijacking_detector_->SetHeuristicCheckInterval(base::Seconds(
+          kExtensionTelemetrySearchHijackingSignalHeuristicCheckIntervalSeconds
+              .Get()));
+      search_hijacking_detector_->SetHeuristicThreshold(
+          kExtensionTelemetrySearchHijackingSignalHeuristicThreshold.Get());
     }
+
+    // File data for Command Line extensions.
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE, {base::MayBlock(), base::TaskPriority::BEST_EFFORT},
+        base::BindOnce(CollectCommandLineExtensionInfo),
+        base::BindOnce(
+            &ExtensionTelemetryService::OnCommandLineExtensionsInfoCollected,
+            weak_factory_.GetWeakPtr()));
 
     // Telemetry Configuration
     if (base::FeatureList::IsEnabled(kExtensionTelemetryConfiguration)) {
@@ -590,6 +609,12 @@ void ExtensionTelemetryService::SetEnabledForESB(bool enable) {
     signal_subscribers_.clear();
     // Destruct signal processors.
     signal_processors_.clear();
+    // Destruct search hijacking detector.
+    if (search_hijacking_detector_) {
+      // Clear all persisted data.
+      search_hijacking_detector_->ClearAllDataFromPrefs();
+      search_hijacking_detector_.reset();
+    }
     // Delete persisted files.
     if (!persister_.is_null()) {
       persister_.AsyncCall(&ExtensionTelemetryPersister::ClearPersistedFiles);
@@ -612,9 +637,11 @@ void ExtensionTelemetryService::SetEnabledForEnterprise(bool enable) {
     SetUpSignalProcessorsAndSubscribersForEnterprise();
     SetUpOffstoreFileDataCollection();
 
+#if BUILDFLAG(ENTERPRISE_CLOUD_CONTENT_ANALYSIS)
     enterprise_timer_.Start(
         FROM_HERE, kExtensionTelemetryEnterpriseReportingIntervalSeconds, this,
         &ExtensionTelemetryService::CreateAndSendEnterpriseReport);
+#endif  // BUILDFLAG(ENTERPRISE_CLOUD_CONTENT_ANALYSIS)
   } else {
     // Stop enterprise timer for periodic telemetry reports.
     enterprise_timer_.Stop();
@@ -677,12 +704,19 @@ void ExtensionTelemetryService::AddSignal(
   }
 }
 
+void ExtensionTelemetryService::OnOmniboxSearch(
+    const AutocompleteMatch& match) {
+  if (search_hijacking_detector_) {
+    search_hijacking_detector_->OnOmniboxSearch(match);
+  }
+}
+
 void ExtensionTelemetryService::AddSignalHelper(
     const ExtensionSignal& signal,
     ExtensionStore& store,
     SignalSubscribers& subscribers) {
   ExtensionSignalType signal_type = signal.GetType();
-  DCHECK(base::Contains(subscribers, signal_type));
+  DCHECK(subscribers.contains(signal_type));
 
   if (!store.contains(signal.extension_id())) {
     // This is the first signal triggered by this extension since the last
@@ -718,6 +752,15 @@ ExtensionTelemetryService::CreateReportWithCommonFieldsPopulated() {
       profile_->GetPrefs()->GetBoolean(prefs::kExtensionsUIDeveloperMode));
   telemetry_report_pb->set_creation_timestamp_msec(
       base::Time::Now().InMillisecondsSinceUnixEpoch());
+
+  if (search_hijacking_detector_) {
+    std::unique_ptr<SearchHijackingSignal> signal =
+        search_hijacking_detector_->GetSignalForReport();
+    if (signal) {
+      telemetry_report_pb->set_allocated_search_hijacking_signal(
+          signal.release());
+    }
+  }
 
   // Only collect if `is_shutdown_` is false, since BrowserContextHelper can be
   // destroyed already and cause a crash on ChromeOS.
@@ -780,14 +823,14 @@ void ExtensionTelemetryService::CreateAndSendEnterpriseReport() {
 
 void ExtensionTelemetryService::OnUploadComplete(
     bool success,
-    const std::string& response_data) {
+    base::optional_ref<std::string> response_data) {
   // TODO(crbug.com/40253384): Add `config_manager_` implementation
   // to check server response and update config.
   if (success) {
     SetLastUploadTimeForExtensionTelemetry(*pref_service_, base::Time::Now());
 
     ExtensionTelemetryReportResponse response;
-    if (response.ParseFromString(response_data)) {
+    if (response.ParseFromString(*response_data)) {
       ProcessOffstoreExtensionVerdicts(response);
     }
   }
@@ -860,6 +903,9 @@ void ExtensionTelemetryService::StartUploadCheck() {
 }
 
 void ExtensionTelemetryService::PersistOrUploadData() {
+  if (search_hijacking_detector_) {
+    search_hijacking_detector_->MaybeCheckForHeuristicMatch();
+  }
   if (GetLastUploadTimeForExtensionTelemetry(*pref_service_) +
           current_reporting_interval_ <=
       base::Time::Now()) {
@@ -1772,6 +1818,12 @@ ExtensionTelemetryService::GetOffstoreFileDataCollectionStartupDelaySeconds() {
 base::TimeDelta
 ExtensionTelemetryService::GetOffstoreFileDataCollectionIntervalSeconds() {
   return kOffstoreFileDataCollectionIntervalSeconds;
+}
+
+void ExtensionTelemetryService::OnDseSerpLoaded() {
+  if (search_hijacking_detector_) {
+    search_hijacking_detector_->OnDseSerpLoaded();
+  }
 }
 
 }  // namespace safe_browsing

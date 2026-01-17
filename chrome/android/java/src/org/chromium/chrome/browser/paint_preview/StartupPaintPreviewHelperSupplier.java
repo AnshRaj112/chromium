@@ -4,37 +4,44 @@
 
 package org.chromium.chrome.browser.paint_preview;
 
+import org.chromium.base.UnownedUserDataHost;
 import org.chromium.base.UnownedUserDataKey;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.UnownedUserDataSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.ui.base.WindowAndroid;
 
 /**
- * A {@link UnownedUserDataSupplier} which manages the supplier and UnownedUserData for a {@link
- * StartupPaintPreviewHelper}.
+ * A class which manages the supplier and UnownedUserData for a {@link StartupPaintPreviewHelper}.
  */
 @NullMarked
-public class StartupPaintPreviewHelperSupplier
-        extends UnownedUserDataSupplier<StartupPaintPreviewHelper> {
-    private static final UnownedUserDataKey<StartupPaintPreviewHelperSupplier> KEY =
-            new UnownedUserDataKey<>(StartupPaintPreviewHelperSupplier.class);
+public class StartupPaintPreviewHelperSupplier {
+    private static final UnownedUserDataKey<MonotonicObservableSupplier<StartupPaintPreviewHelper>>
+            KEY = new UnownedUserDataKey<>();
 
     /**
      * Return {@link StartupPaintPreviewHelper} supplier associated with the given {@link
      * WindowAndroid} or null if not yet initialized.
      */
-    public static @Nullable ObservableSupplier<StartupPaintPreviewHelper> from(
+    public static @Nullable MonotonicObservableSupplier<StartupPaintPreviewHelper> from(
             WindowAndroid windowAndroid) {
         return KEY.retrieveDataFromHost(windowAndroid.getUnownedUserDataHost());
     }
 
     /**
-     * Constructs a StartupPaintPreviewHelperSupplier and attaches it to the {@link
-     * WindowAndroid}
+     * Attach to the specified host.
+     *
+     * @param host The host to attach the supplier to.
      */
-    public StartupPaintPreviewHelperSupplier() {
-        super(KEY);
+    public static void attach(
+            UnownedUserDataHost host,
+            MonotonicObservableSupplier<StartupPaintPreviewHelper> supplier) {
+        KEY.attachToHost(host, supplier);
     }
+
+    public static void destroy(MonotonicObservableSupplier<StartupPaintPreviewHelper> supplier) {
+        KEY.detachFromAllHosts(supplier);
+    }
+
+    private StartupPaintPreviewHelperSupplier() {}
 }

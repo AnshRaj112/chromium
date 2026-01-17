@@ -9,12 +9,16 @@
 
 #include <optional>
 
-#import "base/memory/raw_ptr.h"
+#import "base/memory/weak_ptr.h"
 #include "components/autofill/core/browser/data_model/addresses/autofill_profile.h"
 #include "components/autofill/core/browser/data_model/addresses/autofill_profile_comparator.h"
 #include "ios/chrome/browser/overlays/model/public/overlay_request_config.h"
 
 class InfoBarIOS;
+
+namespace infobars {
+class InfoBar;
+} // namespace infobars
 
 namespace autofill_address_profile_infobar_overlays {
 
@@ -68,6 +72,10 @@ class SaveAddressProfileModalRequestConfig
     return is_profile_an_account_profile_;
   }
 
+  bool is_profile_a_home_profile() const { return is_profile_a_home_profile_; }
+
+  bool is_profile_a_work_profile() const { return is_profile_a_work_profile_; }
+
  private:
   friend class OverlayUserData<SaveAddressProfileModalRequestConfig>;
   explicit SaveAddressProfileModalRequestConfig(InfoBarIOS* infobar);
@@ -81,7 +89,7 @@ class SaveAddressProfileModalRequestConfig
       const std::vector<autofill::ProfileValueDifference>& profile_diff);
 
   // The InfoBar causing this modal.
-  raw_ptr<InfoBarIOS> infobar_ = nullptr;
+  base::WeakPtr<infobars::InfoBar> infobar_;
 
   // Configuration data extracted from `infobar_`'s save address profile
   // delegate.
@@ -105,6 +113,10 @@ class SaveAddressProfileModalRequestConfig
 
   // Denotes that the profile is an account profile.
   bool is_profile_an_account_profile_ = false;
+
+  // Denotes that the profile is a home/work profile.
+  bool is_profile_a_home_profile_ = false;
+  bool is_profile_a_work_profile_ = false;
 
   // Denotes the email address of the signed-in account.
   std::optional<std::u16string> user_email_;

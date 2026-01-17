@@ -35,15 +35,12 @@ class EVENTS_EXPORT MotionEventAndroidJava : public MotionEventAndroid {
   void operator=(const MotionEventAndroidJava&) = delete;
 
   // Start ui::MotionEvent overrides
-  float GetPressure(size_t pointer_index) const override;
   bool IsLatestEventTimeResampled() const override;
   // End ui::MotionEvent overrides
 
   // Start MotionEventAndroid overrides
   std::unique_ptr<MotionEventAndroid> CreateFor(
       const gfx::PointF& point) const override;
-  float GetXPix(size_t pointer_index) const override;
-  float GetYPix(size_t pointer_index) const override;
   base::android::ScopedJavaLocalRef<jobject> GetJavaObject() const override;
   // End MotionEventAndroid overrides
 
@@ -57,17 +54,17 @@ class EVENTS_EXPORT MotionEventAndroidJava : public MotionEventAndroid {
                          base::TimeTicks oldest_event_time,
                          base::TimeTicks latest_event_time,
                          base::TimeTicks down_time_ms,
-                         jint android_action,
-                         jint pointer_count,
-                         jint history_size,
-                         jint action_index,
-                         jint android_action_button,
-                         jint android_gesture_classification,
-                         jint android_button_state,
-                         jint meta_state,
+                         int32_t android_action,
+                         int32_t pointer_count,
+                         int32_t history_size,
+                         int32_t action_index,
+                         int32_t android_action_button,
+                         int32_t android_gesture_classification,
+                         int32_t android_button_state,
+                         int32_t meta_state,
                          jfloat raw_offset_x_pixels,
                          jfloat raw_offset_y_pixels,
-                         jboolean for_touch_handle,
+                         bool for_touch_handle,
                          const Pointer* const pointer0,
                          const Pointer* const pointer1,
                          std::unique_ptr<MotionEventAndroidSource> source);

@@ -7,8 +7,6 @@
 #include <algorithm>
 #include <optional>
 
-#include "base/android/android_hardware_buffer_compat.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/no_destructor.h"
 #include "base/task/bind_post_task.h"
@@ -23,6 +21,7 @@
 #include "device/vr/android/xr_java_coordinator.h"
 #include "device/vr/public/cpp/features.h"
 #include "device/vr/public/cpp/xr_frame_sink_client.h"
+#include "third_party/perfetto/include/perfetto/tracing/track_event_args.h"
 #include "ui/android/window_android.h"
 #include "ui/display/display.h"
 
@@ -82,12 +81,11 @@ ArCoreDevice::ArCoreDevice(
         GetSupportedFeatures());
 
   // Only support camera access if the device supports shared buffers.
-  if (base::AndroidHardwareBufferCompat::IsSupportAvailable())
-    device_features.emplace_back(mojom::XRSessionFeature::CAMERA_ACCESS);
+  device_features.emplace_back(mojom::XRSessionFeature::CAMERA_ACCESS);
 
   // Only support WebGPU sessions if the appropriate feature flag is enabled
   // and shared buffers will be used.
-  if (base::FeatureList::IsEnabled(features::kWebXrWebGpuBinding)) {
+  if (base::FeatureList::IsEnabled(features::kWebXRWebGPUBinding)) {
     device_features.emplace_back(mojom::XRSessionFeature::WEBGPU);
   }
 
@@ -148,10 +146,10 @@ void ArCoreDevice::RequestSession(
   session_state_->request_session_trace_id_ = options->trace_id;
 
   const bool use_dom_overlay =
-      base::Contains(options->required_features,
-                     device::mojom::XRSessionFeature::DOM_OVERLAY) ||
-      base::Contains(options->optional_features,
-                     device::mojom::XRSessionFeature::DOM_OVERLAY);
+      std::ranges::contains(options->required_features,
+                            device::mojom::XRSessionFeature::DOM_OVERLAY) ||
+      std::ranges::contains(options->optional_features,
+                            device::mojom::XRSessionFeature::DOM_OVERLAY);
 
   session_state_->depth_options_ = std::move(options->depth_options);
 
@@ -331,12 +329,11 @@ void ArCoreDevice::CallDeferredRequestSessionCallback(
       std::move(session_state_->pending_request_session_callback_);
 
   if (!initialize_result.has_value()) {
-    TRACE_EVENT_WITH_FLOW0(
+    TRACE_EVENT(
         "xr",
         "ArCoreDevice::CallDeferredRequestSessionCallback: GL initialization "
         "failed",
-        TRACE_ID_GLOBAL(session_state_->request_session_trace_id_),
-        TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT);
+        perfetto::Flow::Global(session_state_->request_session_trace_id_));
 
     std::move(deferred_callback).Run(nullptr);
     return;

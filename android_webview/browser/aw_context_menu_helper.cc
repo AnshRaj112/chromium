@@ -9,7 +9,6 @@
 #include "content/public/browser/render_process_host.h"
 #include "ui/android/view_android.h"
 
-using base::android::JavaParamRef;
 using base::android::JavaRef;
 
 namespace android_webview {
@@ -48,3 +47,5 @@ void AwContextMenuHelper::DismissContextMenu() {
 WEB_CONTENTS_USER_DATA_KEY_IMPL(AwContextMenuHelper);
 
 }  // namespace android_webview
+
+DEFINE_JNI(AwContextMenuHelper)

@@ -9,14 +9,13 @@
 #include "base/apple/foundation_util.h"
 #include "base/auto_reset.h"
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/mac/mac_util.h"
 #include "components/remote_cocoa/app_shim/features.h"
 #import "components/remote_cocoa/app_shim/immersive_mode_delegate_mac.h"
 #import "components/remote_cocoa/app_shim/native_widget_ns_window_bridge.h"
 #include "ui/display/screen.h"
 #include "ui/gfx/geometry/rect.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 
 namespace {
 // Workaround for https://crbug.com/1369643
@@ -24,6 +23,17 @@ const double kThinControllerHeight = 0.5;
 
 inline bool IsPermanentThinControllerEnabled() {
   return base::mac::MacOSMajorVersion() >= 13;
+}
+
+void CloseNSPopovers(NSWindow* parent_window) {
+  // Close any NSPopover that may be open.
+  Class popover_class = NSClassFromString(@"_NSPopoverWindow");
+  CHECK(popover_class);
+  for (NSWindow* child in [parent_window.childWindows copy]) {
+    if ([child isKindOfClass:popover_class]) {
+      [child close];
+    }
+  }
 }
 
 }  // namespace
@@ -222,7 +232,7 @@ ImmersiveModeControllerCocoa::ImmersiveModeControllerCocoa(
   immersive_mode_titlebar_view_controller_.layoutAttribute =
       NSLayoutAttributeBottom;
 
-  display_observation_.Observe(display::Screen::GetScreen());
+  display_observation_.Observe(display::Screen::Get());
 }
 
 ImmersiveModeControllerCocoa::~ImmersiveModeControllerCocoa() {
@@ -239,6 +249,13 @@ ImmersiveModeControllerCocoa::~ImmersiveModeControllerCocoa() {
 }
 
 void ImmersiveModeControllerCocoa::Init() {
+  // AppKit has a nullptr dereference bug that manifests as a crash when
+  // entering immersive fullscreen with a popover visible. This bug seems to
+  // have been fixed in macOS 26. See crbug.com/450581735.
+  if (base::mac::MacOSMajorVersion() < 26) {
+    CloseNSPopovers(browser_window_);
+  }
+
   DCHECK(!initialized_);
   initialized_ = true;
   [browser_window_ addTitlebarAccessoryViewController:
@@ -303,7 +320,7 @@ void ImmersiveModeControllerCocoa::OnTopViewBoundsChanged(
     const gfx::Rect& bounds) {
   // Set the height of the AppKit fullscreen view. The width will be
   // automatically handled by AppKit.
-  NSRect frame = NSRectFromCGRect(bounds.ToCGRect());
+  NSRect frame = bounds.ToCGRect();
   NSView* overlay_view = immersive_mode_titlebar_view_controller_.view;
   NSSize size = overlay_view.window.frame.size;
   if (frame.size.height != size.height) {
@@ -455,7 +472,7 @@ void ImmersiveModeControllerCocoa::OnChildWindowAdded(NSWindow* child) {
   // TODO(kerenzhu): the sole purpose of `window_lock_received_` is to
   // verify that we don't lock twice for a single window.
   // We can remove it once this is verified.
-  CHECK(!base::Contains(window_lock_received_, child));
+  CHECK(!window_lock_received_.contains(child));
   window_lock_received_.insert(child);
   RevealLock();
 
@@ -471,7 +488,7 @@ void ImmersiveModeControllerCocoa::OnChildWindowRemoved(NSWindow* child) {
   if (((NativeWidgetMacNSWindow*)child).isShufflingForOrdering) {
     return;
   }
-  CHECK(base::Contains(window_lock_received_, child));
+  CHECK(window_lock_received_.contains(child));
   window_lock_received_.erase(child);
   RevealUnlock();
 }

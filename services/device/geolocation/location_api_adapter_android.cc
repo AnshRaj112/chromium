@@ -16,30 +16,30 @@
 #include "services/device/geolocation/geolocation_jni_headers/LocationProviderAdapter_jni.h"
 
 using base::android::AttachCurrentThread;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using device::LocationApiAdapterAndroid;
 
-static void JNI_LocationProviderAdapter_NewLocationAvailable(
-    JNIEnv* env,
-    jdouble latitude,
-    jdouble longitude,
-    jdouble time_stamp,
-    jboolean has_altitude,
-    jdouble altitude,
-    jboolean has_accuracy,
-    jdouble accuracy,
-    jboolean has_heading,
-    jdouble heading,
-    jboolean has_speed,
-    jdouble speed) {
+static void JNI_LocationProviderAdapter_NewLocationAvailable(JNIEnv* env,
+                                                             jdouble latitude,
+                                                             jdouble longitude,
+                                                             jdouble time_stamp,
+                                                             bool has_altitude,
+                                                             jdouble altitude,
+                                                             bool has_accuracy,
+                                                             jdouble accuracy,
+                                                             bool has_heading,
+                                                             jdouble heading,
+                                                             bool has_speed,
+                                                             jdouble speed,
+                                                             bool is_precise) {
   LocationApiAdapterAndroid::OnNewLocationAvailable(
       latitude, longitude, time_stamp, has_altitude, altitude, has_accuracy,
-      accuracy, has_heading, heading, has_speed, speed);
+      accuracy, has_heading, heading, has_speed, speed, is_precise);
 }
 
 static void JNI_LocationProviderAdapter_NewErrorAvailable(
     JNIEnv* env,
-    const JavaParamRef<jstring>& message) {
+    const JavaRef<jstring>& message) {
   LocationApiAdapterAndroid::OnNewErrorAvailable(env, message);
 }
 
@@ -92,7 +92,8 @@ void LocationApiAdapterAndroid::OnNewLocationAvailable(double latitude,
                                                        bool has_heading,
                                                        double heading,
                                                        bool has_speed,
-                                                       double speed) {
+                                                       double speed,
+                                                       bool is_precise) {
   auto position = mojom::Geoposition::New();
   position->latitude = latitude;
   position->longitude = longitude;
@@ -105,6 +106,7 @@ void LocationApiAdapterAndroid::OnNewLocationAvailable(double latitude,
     position->heading = heading;
   if (has_speed)
     position->speed = speed;
+  position->is_precise = is_precise;
 
   LocationApiAdapterAndroid* self = GetInstance();
   self->task_runner_->PostTask(
@@ -151,3 +153,5 @@ void LocationApiAdapterAndroid::NotifyNewGeoposition(
 }
 
 }  // namespace device
+
+DEFINE_JNI(LocationProviderAdapter)

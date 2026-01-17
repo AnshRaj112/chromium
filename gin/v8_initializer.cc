@@ -197,7 +197,7 @@ void SetV8FlagsFormatted(const char* format, ...) {
   char buffer[128];
   va_list args;
   va_start(args, format);
-  int length = base::VSpanPrintf(buffer, format, args);
+  int length = UNSAFE_TODO(base::VSpanPrintf(buffer, format, args));
   if (length <= 0 || sizeof(buffer) <= static_cast<unsigned>(length)) {
     PLOG(ERROR) << "Invalid formatted V8 flag: " << format;
     return;
@@ -413,12 +413,12 @@ void SetFeatureFlags() {
     SetV8FlagsFormatted("--high-end-android-physical-memory-threshold=%i",
                         features::kV8HighEndAndroidMemoryThreshold.Get());
   }
-  SetV8FlagsIfOverridden(features::kV8IncrementalMarkingStartUserVisible,
-                         "--incremental-marking-start-user-visible",
-                         "--no-incremental-marking-start-user-visible");
   SetV8FlagsIfOverridden(features::kV8IdleGcOnContextDisposal,
                          "--idle-gc-on-context-disposal",
                          "--no-idle-gc-on-context-disposal");
+  SetV8FlagsIfOverridden(features::kV8MemoryPoolReleaseOnMallocFailures,
+                         "--memory-pool-release-on-malloc-failures",
+                         "--no-memory-pool-release-on-malloc-failures");
   SetV8FlagsIfOverridden(features::kV8MinorMS, "--minor-ms", "--no-minor-ms");
   if (base::FeatureList::IsEnabled(features::kV8ScavengerHigherCapacity)) {
     SetV8FlagsFormatted("--scavenger-max-new-space-capacity-mb=%i",
@@ -460,9 +460,6 @@ void SetFeatureFlags() {
       features::kV8SingleThreadedGCInBackgroundNoIncrementalMarking,
       "--no-incremental-marking-for-gc-in-background",
       "--incremental-marking-for-gc-in-background");
-  SetV8FlagsIfOverridden(features::kV8DecommitPooledPages,
-                         "--decommit-pooled-pages",
-                         "--no-decommit-pooled-pages");
 
   if (base::FeatureList::IsEnabled(features::kV8ConcurrentSparkplug)) {
     if (int max_threads = features::kV8ConcurrentSparkplugMaxThreads.Get()) {
@@ -490,8 +487,6 @@ void SetFeatureFlags() {
   bool any_slow_histograms_alias =
       base::FeatureList::IsEnabled(
           features::kV8SlowHistogramsCodeMemoryWriteProtection) ||
-      base::FeatureList::IsEnabled(
-          features::kV8SlowHistogramsIntelJCCErratumMitigation) ||
       base::FeatureList::IsEnabled(features::kV8SlowHistogramsSparkplug) ||
       base::FeatureList::IsEnabled(
           features::kV8SlowHistogramsSparkplugAndroid) ||
@@ -506,10 +501,6 @@ void SetFeatureFlags() {
   SetV8FlagsIfOverridden(features::kV8IgnitionElideRedundantTdzChecks,
                          "--ignition-elide-redundant-tdz-checks",
                          "--no-ignition-elide-redundant-tdz-checks");
-
-  SetV8FlagsIfOverridden(features::kV8IntelJCCErratumMitigation,
-                         "--intel-jcc-erratum-mitigation",
-                         "--no-intel-jcc-erratum-mitigation");
 
   SetV8FlagsIfOverridden(features::kV8UseLibmTrigFunctions,
                          "--use-libm-trig-functions",

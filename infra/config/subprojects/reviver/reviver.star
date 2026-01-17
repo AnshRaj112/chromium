@@ -20,7 +20,6 @@ luci.bucket(
             # TODO(crbug.com/40232487) Switch this to something more sensible once
             # the builders are verified
             users = [
-                "gbeaty@google.com",
                 "reviver-builder@chops-service-accounts.iam.gserviceaccount.com",
             ],
         ),
@@ -41,6 +40,9 @@ defaults.set(
     cores = 8,
     os = os.LINUX_DEFAULT,
     list_view = "reviver",
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     service_account = "reviver-builder@chops-service-accounts.iam.gserviceaccount.com",
 )
 
@@ -54,9 +56,13 @@ polymorphic.launcher(
     runner = "reviver/runner",
     target_builders = [
         "ci/android-10-x86-rel",
+        "ci/android-10-x86-nofieldtrial-rel",
         "ci/android-12-x64-rel",
         "ci/android-13-x64-rel",
+        "ci/android-14-x64-rel",
         "ci/android-15-x64-rel",
+        "ci/android-15-tablet-x64-rel",
+        "ci/android-15-tablet-landscape-x64-rel",
         "ci/android-16-x64-rel",
     ],
 )
@@ -86,13 +92,16 @@ polymorphic.launcher(
     ],
 )
 
+# TODO(https://crbug.com/465771089): Merge two x64 builders together.
 polymorphic.launcher(
-    name = "android-x64-launcher",
+    name = "android-12l-x64-dbg-launcher",
+    description_html = "Reviver launcher for Android 12L on x64 dbg",
     # To avoid peak hours, we run it at 2 AM, 5 AM, 8 AM, 11AM, 2 PM UTC.
     schedule = "0 2,5,8,11,14 * * *",
     pool = ci_constants.DEFAULT_POOL,
     cores = 8,
     os = os.LINUX_DEFAULT,
+    contact_team_email = "clank-engprod@google.com",
     runner = "reviver/runner",
     target_builders = [
         polymorphic.target_builder(
@@ -100,13 +109,70 @@ polymorphic.launcher(
             dimensions = dimensions.dimensions(
                 builderless = "",
                 cores = "",
-                os = "Ubuntu-22.04",
+                os = os.LINUX_DEFAULT,
                 ssd = "",
                 free_space = "",
                 builder = "Android x64 Builder (dbg)",
             ),
             testers = [
                 "ci/android-12l-x64-dbg-tests",
+            ],
+        ),
+    ],
+)
+
+# TODO(https://crbug.com/465771089): Merge two x64 builders together.
+polymorphic.launcher(
+    name = "android-16-x64-dbg-launcher",
+    description_html = "Reviver launcher for Android 16 on x64 dbg",
+    # To avoid peak hours, we run it at 2 AM, 5 AM, 8 AM, 11AM, 2 PM UTC.
+    schedule = "0 2,5,8,11,14 * * *",
+    pool = ci_constants.DEFAULT_POOL,
+    cores = 8,
+    os = os.LINUX_DEFAULT,
+    contact_team_email = "clank-engprod@google.com",
+    runner = "reviver/runner",
+    target_builders = [
+        polymorphic.target_builder(
+            builder = "ci/Android x64 Builder (dbg)",
+            dimensions = dimensions.dimensions(
+                builderless = "",
+                cores = "",
+                os = os.LINUX_DEFAULT,
+                ssd = "",
+                free_space = "",
+                builder = "Android x64 Builder (dbg)",
+            ),
+            testers = [
+                "ci/android-16-x64-dbg-tests",
+            ],
+        ),
+    ],
+)
+
+polymorphic.launcher(
+    name = "android-desktop-x64-launcher",
+    description_html = "Reviver launcher for Android Desktop on x64",
+    # To avoid peak hours, we run it at 2 AM, 5 AM, 8 AM, 11AM, 2 PM UTC.
+    schedule = "0 2,5,8,11,14 * * *",
+    pool = ci_constants.DEFAULT_POOL,
+    cores = 8,
+    os = os.LINUX_DEFAULT,
+    contact_team_email = "clank-engprod@google.com",
+    runner = "reviver/runner",
+    target_builders = [
+        polymorphic.target_builder(
+            builder = "ci/android-desktop-x64-compile-rel",
+            dimensions = dimensions.dimensions(
+                builderless = "",
+                cores = "",
+                os = os.LINUX_DEFAULT,
+                ssd = "",
+                free_space = "",
+                builder = "android-desktop-x64-compile-rel",
+            ),
+            testers = [
+                "ci/android-desktop-x64-rel-15-tests",
             ],
         ),
     ],

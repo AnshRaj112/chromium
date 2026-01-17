@@ -22,8 +22,9 @@ import androidx.core.view.MenuItemCompat;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceScreen;
 
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.ObservableSuppliers;
+import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
 import org.chromium.build.BuildConfig;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -31,6 +32,7 @@ import org.chromium.components.browser_ui.settings.ChromeImageViewPreference;
 import org.chromium.components.browser_ui.settings.CustomDividerFragment;
 import org.chromium.components.browser_ui.settings.EmbeddableSettingsPage;
 import org.chromium.components.browser_ui.settings.ManagedPreferencesUtils;
+import org.chromium.components.browser_ui.settings.search.BaseSearchIndexProvider;
 import org.chromium.components.browser_ui.util.TraceEventVectorDrawableCompat;
 
 import java.util.ArrayList;
@@ -63,7 +65,8 @@ public class ChosenObjectSettings extends BaseSiteSettingsFragment
     // If not blank, represents a substring to use to search for site names.
     private String mSearch = "";
 
-    private final ObservableSupplierImpl<String> mPageTitle = new ObservableSupplierImpl<>();
+    private final SettableMonotonicObservableSupplier<String> mPageTitle =
+            ObservableSuppliers.createMonotonic();
 
     @Override
     public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
@@ -94,7 +97,7 @@ public class ChosenObjectSettings extends BaseSiteSettingsFragment
     }
 
     @Override
-    public ObservableSupplier<String> getPageTitle() {
+    public MonotonicObservableSupplier<String> getPageTitle() {
         return mPageTitle;
     }
 
@@ -157,9 +160,7 @@ public class ChosenObjectSettings extends BaseSiteSettingsFragment
                             R.string.menu_help);
             help.setIcon(
                     TraceEventVectorDrawableCompat.create(
-                            getResources(),
-                            R.drawable.ic_help_and_feedback,
-                            getContext().getTheme()));
+                            getResources(), R.drawable.ic_help_24dp, getContext().getTheme()));
         }
     }
 
@@ -360,4 +361,9 @@ public class ChosenObjectSettings extends BaseSiteSettingsFragment
     public @AnimationType int getAnimationType() {
         return AnimationType.PROPERTY;
     }
+
+    // TODO(crbug.com/444470792): Determine what entries need to be created and added under
+    // #updateDynamicPreferences.
+    public static final BaseSearchIndexProvider SEARCH_INDEX_DATA_PROVIDER =
+            new BaseSearchIndexProvider(ChosenObjectSettings.class.getName(), 0);
 }

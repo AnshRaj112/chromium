@@ -30,6 +30,7 @@
 #include "third_party/blink/renderer/core/editing/commands/editing_commands_utilities.h"
 
 #include "third_party/blink/public/web/web_local_frame_client.h"
+#include "third_party/blink/renderer/core/clipboard/data_transfer.h"
 #include "third_party/blink/renderer/core/dom/text.h"
 #include "third_party/blink/renderer/core/editing/commands/selection_for_undo_step.h"
 #include "third_party/blink/renderer/core/editing/commands/typing_command.h"
@@ -41,6 +42,7 @@
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/frame/local_frame_client.h"
 #include "third_party/blink/renderer/core/frame/web_feature_forward.h"
+#include "third_party/blink/renderer/core/html/custom/custom_element_registry.h"
 #include "third_party/blink/renderer/core/html/html_body_element.h"
 #include "third_party/blink/renderer/core/html/html_frame_set_element.h"
 #include "third_party/blink/renderer/core/html/html_head_element.h"
@@ -376,9 +378,9 @@ bool LineBreakExistsAtVisiblePosition(const VisiblePosition& visible_position) {
 HTMLElement* CreateHTMLElement(Document& document, const QualifiedName& name) {
   DCHECK_EQ(name.NamespaceURI(), html_names::xhtmlNamespaceURI)
       << "Unexpected namespace: " << name;
-  return To<HTMLElement>(
-      document.CreateElement(name, CreateElementFlags::ByCloneNode(),
-                             g_null_atom, /*registry*/ nullptr));
+  return To<HTMLElement>(document.CreateElement(
+      name, CreateElementFlags::ByCloneNode(), g_null_atom,
+      CustomElementRegistry::DefaultRegistry(document)));
 }
 
 HTMLElement* EnclosingList(const Node* node) {
@@ -618,13 +620,23 @@ void DispatchEditableContentChangedEvents(Element* start_root,
 static void DispatchInputEvent(Element* target,
                                InputEvent::InputType input_type,
                                const String& data,
-                               InputEvent::EventIsComposing is_composing) {
+                               InputEvent::EventIsComposing is_composing,
+                               DataTransfer* data_transfer) {
   if (!target)
     return;
+
   // TODO(editing-dev): Pass appreciate |ranges| after it's defined on spec.
   // http://w3c.github.io/editing/input-events.html#dom-inputevent-inputtype
+
+  // If the parent node is a textarea or input, we should not use dataTransfer
+  // but data as defined on spec.
+  // https://www.w3.org/TR/input-events-1/#overview
+  bool use_data_transfer = data_transfer && !EnclosingTextControl(target);
   InputEvent* const input_event =
-      InputEvent::CreateInput(input_type, data, is_composing, nullptr);
+      use_data_transfer
+          ? InputEvent::CreateInput(input_type, data_transfer, is_composing,
+                                    nullptr)
+          : InputEvent::CreateInput(input_type, data, is_composing, nullptr);
   target->DispatchScopedEvent(*input_event);
 }
 
@@ -633,11 +645,14 @@ void DispatchInputEventEditableContentChanged(
     Element* end_root,
     InputEvent::InputType input_type,
     const String& data,
-    InputEvent::EventIsComposing is_composing) {
-  if (start_root)
-    DispatchInputEvent(start_root, input_type, data, is_composing);
+    InputEvent::EventIsComposing is_composing,
+    DataTransfer* data_transfer) {
+  if (start_root) {
+    DispatchInputEvent(start_root, input_type, data, is_composing,
+                       data_transfer);
+  }
   if (end_root && end_root != start_root)
-    DispatchInputEvent(end_root, input_type, data, is_composing);
+    DispatchInputEvent(end_root, input_type, data, is_composing, data_transfer);
 }
 
 SelectionInDOMTree CorrectedSelectionAfterCommand(

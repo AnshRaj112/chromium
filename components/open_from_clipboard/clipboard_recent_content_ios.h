@@ -6,6 +6,7 @@
 #define COMPONENTS_OPEN_FROM_CLIPBOARD_CLIPBOARD_RECENT_CONTENT_IOS_H_
 
 #include <string>
+#include <string_view>
 
 #include "base/time/time.h"
 #include "components/open_from_clipboard/clipboard_recent_content.h"
@@ -29,9 +30,8 @@ class ClipboardRecentContentIOS : public ClipboardRecentContent {
   // |group_user_defaults| is the NSUserDefaults used to store information on
   // pasteboard entry expiration. This information will be shared with other
   // application in the application group.
-  ClipboardRecentContentIOS(const std::string& application_scheme,
-                            NSUserDefaults* group_user_defaults,
-                            bool only_use_clipboard_async);
+  ClipboardRecentContentIOS(std::string_view application_scheme,
+                            NSUserDefaults* group_user_defaults);
 
   // Constructor that directly takes an |implementation|. For use in tests.
   explicit ClipboardRecentContentIOS(
@@ -44,12 +44,9 @@ class ClipboardRecentContentIOS : public ClipboardRecentContent {
   ~ClipboardRecentContentIOS() override;
 
   // ClipboardRecentContent implementation.
-  std::optional<GURL> GetRecentURLFromClipboard() override;
-  std::optional<std::u16string> GetRecentTextFromClipboard() override;
   std::optional<std::set<ClipboardContentType>> GetCachedClipboardContentTypes()
       override;
   void GetRecentImageFromClipboard(GetRecentImageCallback callback) override;
-  bool HasRecentImageFromClipboard() override;
   void HasRecentContentFromClipboard(std::set<ClipboardContentType> types,
                                      HasDataCallback callback) override;
   void GetRecentURLFromClipboard(GetRecentURLCallback callback) override;

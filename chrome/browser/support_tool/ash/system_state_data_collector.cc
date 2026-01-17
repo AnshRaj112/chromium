@@ -14,10 +14,8 @@
 #include <vector>
 
 #include "base/barrier_closure.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/sequence_checker.h"
 #include "base/strings/string_util.h"
@@ -191,8 +189,9 @@ void SystemStateDataCollector::OnGetFeedbackLogs(
 
   for (const auto& [log_name, log] : logs) {
     // Don't include `kExcludeList` in the output.
-    if (base::Contains(kExcludeList, log_name))
+    if (std::ranges::contains(kExcludeList, log_name)) {
       continue;
+    }
     system_logs_.emplace(log_name, SystemLog(log, {}));
   }
 

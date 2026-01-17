@@ -35,6 +35,7 @@
 <translation id="1249250836236328755">Lajityyppi</translation>
 <translation id="1254593899333212300">Suora internet-yhteys</translation>
 <translation id="1272293450992660632">PIN-koodit eivät täsmää.</translation>
+<translation id="1279040297980392566">Odotetaan skannauksen valmistumista, yritä myöhemmin uudelleen</translation>
 <translation id="1280820357415527819">Haetaan mobiiliverkkoja</translation>
 <translation id="1293556467332435079">Tiedostot</translation>
 <translation id="1297922636971898492">Google Drive ei ole juuri nyt käytettävissä. Lähetys käynnistyy automaattisesti, kun Google Drive on taas käytettävissä.</translation>
@@ -109,7 +110,6 @@
 <translation id="1813278315230285598">Palvelut</translation>
 <translation id="181434555916624618">Ihmisiä koskevia tuloksia ei tällä hetkellä näytetä. Kokeile toista kehotetta.</translation>
 <translation id="1829129547161959350">Pingviini</translation>
-<translation id="183183971458492120">Ladataan tietoja…</translation>
 <translation id="1832073788765803750">Kapea Katakana</translation>
 <translation id="1834290891154666894">Virheellinen aiheen vaihtoehtoisen nimen vastaavuusarvo</translation>
 <translation id="1838709767668011582">Google-sivusto</translation>
@@ -146,13 +146,13 @@
 <translation id="2142680004883808240">venäjä, foneettinen YaZHert-näppäimistö</translation>
 <translation id="2143778271340628265">Manuaalinen välityspalvelimen määritys</translation>
 <translation id="2148716181193084225">Tänään</translation>
+<translation id="2161573825856688200">Google-projekti</translation>
 <translation id="2163152940313951844">Virheellinen merkki: <ph name="CHARACTER_NAME" /></translation>
 <translation id="2178056538281447670">Microsoft 365</translation>
 <translation id="2184934335987813305">portugali, Yhdysvaltain kansainvälinen PC-näppäimistö</translation>
 <translation id="2193661397560634290"><ph name="SPACE_USED" /> käytetty</translation>
 <translation id="2198315389084035571">yksinkertaistettu kiina</translation>
 <translation id="22085916256174561">korea</translation>
-<translation id="2208919847696382164">Asenna Linux-versio</translation>
 <translation id="2215692307449050019">Akkuvirta on vähissä. Tiedostojen synkronointia jatketaan, kun olet yhdistettynä virtalähteeseen.</translation>
 <translation id="2225536596944493418">Haluatko varmasti poistaa <ph name="NUMBER_OF_ITEMS" /> kohdetta?</translation>
 <translation id="2230062665678605299">Kansiota <ph name="FOLDER_NAME" /> ei voi luoda. <ph name="ERROR_MESSAGE" /></translation>
@@ -213,7 +213,6 @@
 <translation id="2653059201992392941">Sinulla on <ph name="RETRIES" /> yritystä jäljellä.</translation>
 <translation id="2663066752008346276">burma (Myanmar), myansan-näppäimistö</translation>
 <translation id="2664412712123763093">Tiedoston sijainti</translation>
-<translation id="2718540689505416944">Asenna Linux-sovellus</translation>
 <translation id="2719020180254996569">Verkko <ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, lisätietoja</translation>
 <translation id="2724954091494693138">turkki, F-näppäimistö</translation>
 <translation id="2732288874651063549">Ylläpidä jakamista: <ph name="VM_NAME" /></translation>
@@ -222,7 +221,6 @@
 <translation id="2764206540577097904">Olet käyttänyt oman Google Workspace ‐tallennustilasi kokonaan.</translation>
 <translation id="2771816809568414714">Juusto</translation>
 <translation id="2781645665747935084">belgialainen</translation>
-<translation id="2782104745158847185">Virhe Linux-sovelluksen asennuksessa</translation>
 <translation id="2802583107108007218">Lue lisää näistä rajoituksista</translation>
 <translation id="2803375539583399270">Lisää PIN-koodi</translation>
 <translation id="2819519502129272135">Tiedostojen synkronointi on pois päältä</translation>
@@ -345,7 +343,6 @@
 <translation id="3786301125658655746">Olet offline-tilassa</translation>
 <translation id="3789841737615482174">Asenna</translation>
 <translation id="3793469551756281394">Noin <ph name="REMAINING_TIME_HOUR" /> <ph name="REMAINING_TIME_MINUTE" /> jäljellä</translation>
-<translation id="3798449238516105146">Versio</translation>
 <translation id="3801082500826908679">fääri</translation>
 <translation id="3809272675881623365">Jänis</translation>
 <translation id="3810973564298564668">Hallinnoi</translation>
@@ -353,14 +350,12 @@
 <translation id="3811494700605067549">1 tiedosto valittu</translation>
 <translation id="3817579325494460411">Ei annettu</translation>
 <translation id="3819448694985509187">Väärä PIN-koodi. Sinulla on 1 yritys jäljellä.</translation>
-<translation id="3822559385185038546">Järjestelmänvalvojasi edellyttää tämän välityspalvelimen käyttöä.</translation>
 <translation id="3830674330436234648">Toistoa ei ole saatavilla.</translation>
 <translation id="383652340667548381">serbia</translation>
 <translation id="3839045880592694915">Operaattori ei salli modeemin yhdistämistä. Pyydä lisätietoa operaattoriltasi.</translation>
 <translation id="385051799172605136">Takaisin</translation>
 <translation id="3855472144336161447">saksa, Neo 2</translation>
 <translation id="3858860766373142691">Nimi</translation>
-<translation id="3866249974567520381">Kuvaus</translation>
 <translation id="3899991606604168269">ranska (Kanada), monikielinen näppäimistö</translation>
 <translation id="3901991538546252627">Yhdistetään verkkoon <ph name="NAME" /></translation>
 <translation id="3906232975181435906">Asennetaan mobiiliprofiilia, verkko <ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" /></translation>
@@ -438,7 +433,6 @@
 <translation id="4477219268485577442">bulgaria, foneettinen</translation>
 <translation id="4508265954913339219">Aktivointi epäonnistui</translation>
 <translation id="4509667233588080747">englanti (Yhdysvallat), Workman International ‑näppäimistö</translation>
-<translation id="4522570452068850558">Tiedot</translation>
 <translation id="4527800702232535228">Tämä kansio on jaettu Parallels Desktopille</translation>
 <translation id="4552678318981539154">Osta lisää tallennustilaa</translation>
 <translation id="4552759165874948005"><ph name="NETWORK_TYPE" /> verkko, signaalin vahvuus <ph name="SIGNAL_STRENGTH" /> %</translation>
@@ -596,13 +590,13 @@
 <translation id="5596627076506792578">Lisäasetukset</translation>
 <translation id="5602622065581044566">bulgaria, foneettinen näppäimistö</translation>
 <translation id="5605830556594064952">USA, Dvorak</translation>
+<translation id="560739212255190568">Järjestelmänvalvoja on määrittänyt välityspalvelimen ohitussäännöt seuraavan välityspalvelimen pakottamisen lisäksi</translation>
 <translation id="5618330573454123917">Tämä tiedosto on tarkoitettu Windows-ohjelmistoa käyttävälle tietokoneelle. Se ei ole yhteensopiva Chrome-käyttöjärjestelmää käyttävän laitteesi kanssa. <ph name="BEGIN_LINK_HELP" />Lue lisää<ph name="END_LINK_HELP" /> tiedostojen avaamisesta Chrome-käyttöjärjestelmällä.</translation>
 <translation id="5625294776298156701">tamil, tamil99-näppäimistö</translation>
 <translation id="5633226425545095130">Kun tämä siirretään, se jaetaan kaikille, jotka voivat nähdä jaetun kansion "<ph name="DESTINATION_NAME" />"</translation>
 <translation id="5649768706273821470">Kuuntele</translation>
 <translation id="5650895901941743674">Tarkista APN-määritykset</translation>
 <translation id="5669691691057771421">Anna uusi PIN-koodi</translation>
-<translation id="5678784840044122290">Linux-sovellus on saatavilla terminaalissa. Käynnistysohjelmassa saattaa myös näkyä kuvake.</translation>
 <translation id="5686799162999241776"><ph name="BEGIN_BOLD" />Arkiston tai virtuaalilevyn yhteyden katkaisu epäonnistui<ph name="END_BOLD" />
    <ph name="LINE_BREAKS" />
    Sulje kaikki arkistossa tai virtuaalilevyllä olevat tiedostot ja yritä uudelleen.</translation>
@@ -637,7 +631,6 @@
 <translation id="5861477046012235702">Pelaaja</translation>
 <translation id="5864471791310927901">DHCP-haku epäonnistui</translation>
 <translation id="5896749729057314184">Verkko <ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, ei aktivoitu, signaalin voimakkuus <ph name="SIGNAL_STRENGTH" /> %, tiedot</translation>
-<translation id="5911887972742538906">Linux-sovellusta asennettaessa tapahtui virhe.</translation>
 <translation id="5912396950572065471">Muoto</translation>
 <translation id="5918480239180455431">Uusia hakuominaisuuksia saatavilla</translation>
 <translation id="5926082595146149752">hollanti (Alankomaat), Yhdysvaltain kansainvälinen PC-näppäimistö</translation>
@@ -806,7 +799,6 @@
 <translation id="7238097264433196391">Driven nimi</translation>
 <translation id="7238643356913091553"><ph name="NETWORK_NAME" />, tiedot</translation>
 <translation id="7246947237293279874">FTP-välityspalvelin</translation>
-<translation id="7248671827512403053">Sovellus</translation>
 <translation id="7256405249507348194">Tunnistamaton virhe: <ph name="DESC" /></translation>
 <translation id="7268659760406822741">Käytettävissä olevat palvelut</translation>
 <translation id="7291818353625820805">Haluatko näppäinten toistuvan? Laita aksenttimerkit pois päältä näppäimistön asetuksista</translation>
@@ -933,7 +925,6 @@
 <translation id="8151638057146502721">Määritä</translation>
 <translation id="8154666764013920974">{NUM_ERROR,plural, =1{1 virhe.}other{# virhettä.}}</translation>
 <translation id="8154842056504218462">Kaikki kohteet valittiin.</translation>
-<translation id="8157684860301034423">Sovellustietojen noutaminen epäonnistui.</translation>
 <translation id="8175731104491895765">ranska (Belgia)</translation>
 <translation id="8175799081768705361">Synkronoidaan <ph name="NUMBER_OF_FILES_SYNCING" /> Drive-tiedostoa</translation>
 <translation id="8179976553408161302">Enter</translation>
@@ -995,6 +986,7 @@
 <translation id="8540608333167683902">Verkko <ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, signaalin vahvuus <ph name="SIGNAL_STRENGTH" /> %, lisätietoja</translation>
 <translation id="8545476925160229291">englanti (Yhdysvallat)</translation>
 <translation id="854655314928502177">Verkkovälityspalvelimen automaattisen tunnistamisen URL-osoite:</translation>
+<translation id="8547747809824590510">Järjestelmänvalvoja on määrittänyt välityspalvelimen ohitussäännöt</translation>
 <translation id="8549186985808798022">italia</translation>
 <translation id="8551494947769799688">latvia</translation>
 <translation id="8560515948038859357">kantoninkiina</translation>
@@ -1055,6 +1047,7 @@
 <translation id="9038620279323455325">Tiedosto nimeltä <ph name="FILE_NAME" /> on jo olemassa. Valitse toinen nimi.</translation>
 <translation id="9046895021617826162">Yhdistäminen epäonnistui</translation>
 <translation id="9065512565307033593">Jos vahvistus ei onnistu, pääsy verkkoon estyy.</translation>
+<translation id="9079844694307518094">Järjestelmänvalvoja pakottaa seuraavan välityspalvelimen</translation>
 <translation id="908378762078012445">venäjä, foneettinen AATSEEL-näppäimistö</translation>
 <translation id="9086302186042011942">Synkronoidaan</translation>
 <translation id="9099674669267916096">Sivumäärä</translation>
@@ -1075,9 +1068,9 @@
 <translation id="9183302530794969518">Google Docs</translation>
 <translation id="9189836632794948435">kazakki</translation>
 <translation id="9200427192836333033"><ph name="NUMBER_OF_ITEMS" /> kohdetta noudettu</translation>
-<translation id="9213073329713032541">Asennus käynnistyi.</translation>
 <translation id="9219103736887031265">Kuvat</translation>
 <translation id="9219908252191632183">Kuu</translation>
+<translation id="931652069802536959">Käytäntö estää verkon</translation>
 <translation id="938470336146445890">Asenna käyttäjävarmenne.</translation>
 <translation id="939736085109172342">Uusi kansio</translation>
 <translation id="943972244133411984">Muokkaaja</translation>

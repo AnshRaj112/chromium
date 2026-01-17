@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 #include <stddef.h>
+
 #include <memory>
+#include <utility>
 
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/run_loop.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/test_message_loop.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "build/build_config.h"
 #include "components/ukm/test_ukm_recorder.h"
 #include "media/cdm/clear_key_cdm_common.h"
@@ -52,9 +53,7 @@ class MediaMetricsProviderTest : public testing::Test {
                       : MediaMetricsProvider::BrowsingMode::kNormal),
         (is_top_frame ? MediaMetricsProvider::FrameStatus::kTopFrame
                       : MediaMetricsProvider::FrameStatus::kNotTopFrame),
-        GetSourceId(), learning::FeatureValue(0),
-        VideoDecodePerfHistory::SaveCallback(),
-        MediaMetricsProvider::GetLearningSessionCallback(),
+        GetSourceId(), VideoDecodePerfHistory::SaveCallback(),
         base::BindRepeating(&MediaMetricsProviderTest::IsShuttingDown,
                             base::Unretained(this)),
         PictureInPictureEventsInfo::AutoPipReasonCallback(),
@@ -168,7 +167,7 @@ TEST_F(MediaMetricsProviderTest, TestUkm) {
       EXPECT_UKM(UkmEntry::kTimeToPlayReadyName,
                  kPlayReadyTime.InMilliseconds());
       EXPECT_UKM(UkmEntry::kContainerNameName,
-                 base::to_underlying(
+                 std::to_underlying(
                      container_names::MediaContainerName::kContainerMOV));
     }
   }
@@ -270,6 +269,22 @@ TEST_F(MediaMetricsProviderTest, TestPipelineUMANoAudioWithEme) {
                                      1);
   histogram_tester.ExpectBucketCount("Media.HasEverPlayed", true, 1);
   histogram_tester.ExpectBucketCount("Media.EME.IsIncognito", false, 1);
+}
+
+TEST_F(MediaMetricsProviderTest, TestPipelineUMAAudioDecoderType) {
+  base::HistogramTester histogram_tester;
+  Initialize(false, false, false, kTestOrigin, mojom::MediaURLScheme::kHttps);
+  provider_->SetAudioPipelineInfo(
+      {false, false, AudioDecoderType::kFFmpeg, EncryptionType::kClear});
+  provider_->SetHasAudio(AudioCodec::kOpus);
+  provider_->SetHasPlayed();
+  provider_->SetHaveEnough();
+  provider_.reset();
+  base::RunLoop().RunUntilIdle();
+  histogram_tester.ExpectBucketCount("Media.PipelineStatus.AudioOnly",
+                                     PIPELINE_OK, 1);
+  histogram_tester.ExpectBucketCount("Media.Audio.DecoderType",
+                                     AudioDecoderType::kFFmpeg, 1);
 }
 
 TEST_F(MediaMetricsProviderTest, TestPipelineUMADecoderFallback) {
@@ -374,6 +389,57 @@ TEST_F(MediaMetricsProviderTest, TestPipelineUMAHardwareDecoderHardwareSecure) {
       "Media.PipelineStatus.AudioVideo.VP9.HardwareSecure.HW", PIPELINE_OK, 1);
   histogram_tester.ExpectBucketCount("Media.HasEverPlayed", true, 1);
 }
+
+struct PipelineDDSTestCase {
+  bool is_eme;
+  bool is_hardware_secure;
+  bool is_platform_decoder;
+  const char* expected_suffix;
+};
+
+class MediaMetricsProviderDDSTest
+    : public MediaMetricsProviderTest,
+      public testing::WithParamInterface<PipelineDDSTestCase> {};
+
+TEST_P(MediaMetricsProviderDDSTest, TestDDSUMA) {
+  const auto& param = GetParam();
+  base::HistogramTester histogram_tester;
+  Initialize(false, false, false, kTestOrigin, mojom::MediaURLScheme::kHttps);
+
+  if (param.is_eme) {
+    provider_->SetIsEME();
+  }
+  if (param.is_hardware_secure) {
+    provider_->SetIsHardwareSecure();
+  }
+
+  provider_->SetAudioPipelineInfo(
+      {false, false, AudioDecoderType::kMojo, EncryptionType::kClear});
+  provider_->SetVideoPipelineInfo({param.is_platform_decoder, true,
+                                   VideoDecoderType::kMojo,
+                                   EncryptionType::kEncrypted});
+  provider_->SetHasVideo(VideoCodec::kVP9);
+  provider_->SetHasAudio(AudioCodec::kVorbis);
+  provider_->SetHasPlayed();
+  provider_->SetHaveEnough();
+  provider_.reset();
+  base::RunLoop().RunUntilIdle();
+
+  histogram_tester.ExpectBucketCount("Media.PipelineStatus.AudioVideo.VP9." +
+                                         std::string(param.expected_suffix),
+                                     PIPELINE_OK, 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    MediaMetricsProviderDDSTest,
+    testing::Values(
+        PipelineDDSTestCase{false, false, true, "DDS.HW"},
+        PipelineDDSTestCase{false, false, false, "DDS.SW"},
+        PipelineDDSTestCase{true, true, true, "HardwareSecure.DDS.HW"},
+        PipelineDDSTestCase{true, true, false, "HardwareSecure.DDS.SW"},
+        PipelineDDSTestCase{true, false, true, "SoftwareSecure.DDS.HW"},
+        PipelineDDSTestCase{true, false, false, "SoftwareSecure.DDS.SW"}));
 #endif  // BUILDFLAG(IS_ANDROID)
 
 // Note: Tests for various Acquire* methods are contained with the unittests for

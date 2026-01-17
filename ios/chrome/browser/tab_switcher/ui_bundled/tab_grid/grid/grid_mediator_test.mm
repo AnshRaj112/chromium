@@ -4,7 +4,8 @@
 
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/grid/grid_mediator_test.h"
 
-#import "base/containers/contains.h"
+#import <algorithm>
+
 #import "base/test/ios/wait_util.h"
 #import "components/saved_tab_groups/test_support/fake_tab_group_sync_service.h"
 #import "components/saved_tab_groups/test_support/mock_tab_group_sync_service.h"
@@ -73,9 +74,7 @@ constexpr web::ContentWorld kContentWorlds[] = {
 
 // Returns a `FakeTabGroupSyncService`.
 std::unique_ptr<KeyedService> CreateFakeTabGroupSyncService(
-    web::BrowserState* context) {
-  ProfileIOS* profile = ProfileIOS::FromBrowserState(context);
-
+    ProfileIOS* profile) {
   std::unique_ptr<tab_groups::TabGroupSyncService> tab_group_sync_service =
       std::make_unique<tab_groups::FakeTabGroupSyncService>();
 
@@ -83,7 +82,8 @@ std::unique_ptr<KeyedService> CreateFakeTabGroupSyncService(
   std::unique_ptr<tab_groups::TabGroupLocalUpdateObserver>
       local_update_observer =
           std::make_unique<tab_groups::TabGroupLocalUpdateObserver>(
-              browser_list, tab_group_sync_service.get());
+              browser_list, tab_group_sync_service.get(),
+              SessionRestorationServiceFactory::GetForProfile(profile));
 
   std::unique_ptr<tab_groups::IOSTabGroupSyncDelegate> delegate =
       std::make_unique<tab_groups::IOSTabGroupSyncDelegate>(
@@ -120,7 +120,7 @@ void GridMediatorTestClass::SetUp() {
                             TestSessionRestorationService::GetTestingFactory());
   builder.AddTestingFactory(
       tab_groups::TabGroupSyncServiceFactory::GetInstance(),
-      base::BindRepeating(&CreateFakeTabGroupSyncService));
+      base::BindOnce(&CreateFakeTabGroupSyncService));
   builder.AddTestingFactory(TipsManagerIOSFactory::GetInstance(),
                             TipsManagerIOSFactory::GetDefaultFactory());
   profile_ = std::move(builder).Build();
@@ -175,7 +175,7 @@ void GridMediatorTestClass::SetUp() {
     auto web_state = CreateFakeWebStateWithURL(GURL(urls[i]));
     web::WebStateID identifier = web_state.get()->GetUniqueIdentifier();
     // Tab IDs should be unique.
-    ASSERT_FALSE(base::Contains(identifiers, identifier));
+    ASSERT_FALSE(std::ranges::contains(identifiers, identifier));
     identifiers.push_back(identifier);
     browser_->GetWebStateList()->InsertWebState(
         std::move(web_state), WebStateList::InsertionParams::AtIndex(i));

@@ -221,9 +221,7 @@ class StubCompositorFrameSink
   void ForceImmediateDrawAndSwapIfPossible() override {}
   void UpdateRefreshRate(float refresh_rate) override {}
   void SetAdaptiveRefreshRateInfo(
-      bool has_support,
-      float suggested_high,
-      float device_scale_factor) override {}
+      viz::mojom::AdaptiveRefreshRateInfoPtr info) override {}
   void SetSupportedRefreshRates(
       const std::vector<float>& supported_refresh_rates) override {}
   void PreserveChildSurfaceControls() override {}
@@ -242,8 +240,7 @@ class StubCompositorFrameSink
 
   // mojom::CompositorFrameSink:
   void SetNeedsBeginFrame(bool needs_begin_frame) override {}
-  void SetWantsAnimateOnlyBeginFrames() override {}
-  void SetAutoNeedsBeginFrame() override {}
+  void SetParams(viz::mojom::CompositorFrameSinkParamsPtr params) override {}
   void SubmitCompositorFrame(
       const viz::LocalSurfaceId& local_surface_id,
       viz::CompositorFrame frame,

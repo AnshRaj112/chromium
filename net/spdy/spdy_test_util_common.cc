@@ -75,11 +75,11 @@ void ParseUrl(std::string_view url,
               std::string* path) {
   GURL gurl(url);
   path->assign(gurl.PathForRequest());
-  scheme->assign(gurl.scheme());
-  host->assign(gurl.host());
+  scheme->assign(gurl.GetScheme());
+  host->assign(gurl.GetHost());
   if (gurl.has_port()) {
     host->append(":");
-    host->append(gurl.port());
+    host->append(gurl.GetPort());
   }
 }
 
@@ -355,10 +355,10 @@ SpdySessionDependencies::SpdyCreateSessionWithSocketFactory(
 HttpNetworkSessionParams SpdySessionDependencies::CreateSessionParams(
     SpdySessionDependencies* session_deps) {
   HttpNetworkSessionParams params;
-  params.host_mapping_rules = session_deps->host_mapping_rules;
   params.enable_spdy_ping_based_connection_checking = session_deps->enable_ping;
   params.enable_user_alternate_protocol_ports =
       session_deps->enable_user_alternate_protocol_ports;
+  params.enable_http2 = session_deps->enable_http2;
   params.enable_quic = session_deps->enable_quic;
   params.spdy_session_max_recv_window_size =
       session_deps->session_max_recv_window_size;
@@ -373,8 +373,6 @@ HttpNetworkSessionParams SpdySessionDependencies::CreateSessionParams(
   params.greased_http2_frame = session_deps->greased_http2_frame;
   params.http2_end_stream_with_data_frame =
       session_deps->http2_end_stream_with_data_frame;
-  params.disable_idle_sockets_close_on_memory_pressure =
-      session_deps->disable_idle_sockets_close_on_memory_pressure;
   params.enable_early_data = session_deps->enable_early_data;
   params.key_auth_cache_server_entries_by_network_anonymization_key =
       session_deps->key_auth_cache_server_entries_by_network_anonymization_key;
@@ -433,7 +431,7 @@ CreateSpdyTestURLRequestContextBuilder(
 
 bool HasSpdySession(SpdySessionPool* pool, const SpdySessionKey& key) {
   return static_cast<bool>(pool->FindAvailableSession(
-      key, /* enable_ip_based_pooling = */ true,
+      key, /* enable_ip_based_pooling_for_h2 = */ true,
       /* is_websocket = */ false, NetLogWithSource()));
 }
 
@@ -443,9 +441,9 @@ base::WeakPtr<SpdySession> CreateSpdySessionHelper(
     HttpNetworkSession* http_session,
     const SpdySessionKey& key,
     const NetLogWithSource& net_log,
-    bool enable_ip_based_pooling) {
+    bool enable_ip_based_pooling_for_h2) {
   EXPECT_FALSE(http_session->spdy_session_pool()->FindAvailableSession(
-      key, enable_ip_based_pooling,
+      key, enable_ip_based_pooling_for_h2,
       /*is_websocket=*/false, NetLogWithSource()));
 
   auto connection = std::make_unique<ClientSocketHandle>();
@@ -464,7 +462,6 @@ base::WeakPtr<SpdySession> CreateSpdySessionHelper(
       socket_params, /*proxy_annotation_tag=*/std::nullopt, MEDIUM,
       key.socket_tag(), ClientSocketPool::RespectLimits::ENABLED,
       callback.callback(), ClientSocketPool::ProxyAuthCallback(),
-      /*fail_if_alias_requires_proxy_override=*/false,
       http_session->GetSocketPool(HttpNetworkSession::NORMAL_SOCKET_POOL,
                                   ProxyChain::Direct()),
       net_log);
@@ -475,7 +472,8 @@ base::WeakPtr<SpdySession> CreateSpdySessionHelper(
   rv =
       http_session->spdy_session_pool()->CreateAvailableSessionFromSocketHandle(
           key, std::move(connection), net_log,
-          MultiplexedSessionCreationInitiator::kUnknown, &spdy_session);
+          MultiplexedSessionCreationInitiator::kUnknown, &spdy_session,
+          std::nullopt);
   // Failure is reported asynchronously.
   EXPECT_THAT(rv, IsOk());
   EXPECT_TRUE(spdy_session);
@@ -493,7 +491,7 @@ base::WeakPtr<SpdySession> CreateSpdySession(HttpNetworkSession* http_session,
                                              const SpdySessionKey& key,
                                              const NetLogWithSource& net_log) {
   return CreateSpdySessionHelper(http_session, key, net_log,
-                                 /* enable_ip_based_pooling = */ true);
+                                 /* enable_ip_based_pooling_for_h2 = */ true);
 }
 
 base::WeakPtr<SpdySession> CreateSpdySessionWithIpBasedPoolingDisabled(
@@ -501,7 +499,7 @@ base::WeakPtr<SpdySession> CreateSpdySessionWithIpBasedPoolingDisabled(
     const SpdySessionKey& key,
     const NetLogWithSource& net_log) {
   return CreateSpdySessionHelper(http_session, key, net_log,
-                                 /* enable_ip_based_pooling = */ false);
+                                 /* enable_ip_based_pooling_for_h2 = */ false);
 }
 
 namespace {
@@ -567,7 +565,8 @@ base::WeakPtr<SpdySession> CreateFakeSpdySession(SpdySessionPool* pool,
   base::WeakPtr<SpdySession> spdy_session;
   int rv = pool->CreateAvailableSessionFromSocketHandle(
       key, std::move(handle), NetLogWithSource(),
-      MultiplexedSessionCreationInitiator::kUnknown, &spdy_session);
+      MultiplexedSessionCreationInitiator::kUnknown, &spdy_session,
+      std::nullopt);
   // Failure is reported asynchronously.
   EXPECT_THAT(rv, IsOk());
   EXPECT_TRUE(spdy_session);
@@ -1002,4 +1001,22 @@ SHA256HashValue GetTestHashValue(uint8_t label) {
 }
 
 }  // namespace test
+
+TestConnectionChangeObserver::TestConnectionChangeObserver() = default;
+TestConnectionChangeObserver::~TestConnectionChangeObserver() = default;
+
+void TestConnectionChangeObserver::OnSessionClosed() {
+  session_closed_++;
+}
+
+void TestConnectionChangeObserver::OnConnectionFailed() {
+  connection_failed_++;
+}
+
+void TestConnectionChangeObserver::OnNetworkEvent(
+    net::NetworkChangeEvent event) {
+  network_event_++;
+  last_network_event_ = event;
+}
+
 }  // namespace net

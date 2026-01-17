@@ -23,7 +23,7 @@ import org.chromium.base.Callback;
 import org.chromium.base.MemoryPressureListener;
 import org.chromium.base.ObserverList;
 import org.chromium.base.memory.MemoryPressureCallback;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -31,6 +31,7 @@ import org.chromium.chrome.R;
 import org.chromium.chrome.browser.app.feed.feedmanagement.FeedManagementActivity;
 import org.chromium.chrome.browser.feed.FeedSurfaceProvider.RestoringState;
 import org.chromium.chrome.browser.feed.Stream.ContentChangedListener;
+import org.chromium.chrome.browser.feed.componentinterfaces.SurfaceCoordinator;
 import org.chromium.chrome.browser.feed.sections.OnSectionHeaderSelectedListener;
 import org.chromium.chrome.browser.feed.sections.SectionHeaderListProperties;
 import org.chromium.chrome.browser.feed.sections.SectionHeaderProperties;
@@ -68,6 +69,8 @@ import org.chromium.components.prefs.PrefChangeRegistrar;
 import org.chromium.components.prefs.PrefService;
 import org.chromium.components.search_engines.TemplateUrlService;
 import org.chromium.components.search_engines.TemplateUrlService.TemplateUrlServiceObserver;
+import org.chromium.components.signin.SigninFeatureMap;
+import org.chromium.components.signin.SigninFeatures;
 import org.chromium.components.signin.identitymanager.IdentityManager;
 import org.chromium.components.signin.identitymanager.PrimaryAccountChangeEvent;
 import org.chromium.components.signin.metrics.SigninAccessPoint;
@@ -194,7 +197,8 @@ public class FeedSurfaceMediator
 
     /**
      * Wrapper class on top of {@link SigninPromoCoordinator} to also account for suggestions
-     * available signal.
+     * available signal. TODO(crbug.com/448227402): remove this class once Seamless Sign-in is
+     * launched.
      */
     private class FeedSigninPromo {
         private final SigninPromoCoordinator mSigninPromoCoordinator;
@@ -364,7 +368,7 @@ public class FeedSurfaceMediator
             Context context,
             @Nullable SnapScrollHelper snapScrollHelper,
             @Nullable PropertyModel headerModel,
-            @FeedSurfaceCoordinator.StreamTabId int openingTabId,
+            @SurfaceCoordinator.StreamTabId int openingTabId,
             FeedActionDelegate actionDelegate,
             FeedOptionsCoordinator optionsCoordinator,
             @Nullable UiConfig uiConfig,
@@ -692,7 +696,7 @@ public class FeedSurfaceMediator
                                         listener.onScrolled(dx, dy);
                                     }
                                     // Null if the stream has not been binded yet.
-                                    if (GestureNavigationUtils.areBackForwardTransitionsEnabled()
+                                    if (GestureNavigationUtils.shouldAnimateBackForwardTransitions()
                                             && mCoordinator.getHybridListRenderer() != null
                                             && mCoordinator
                                                             .getHybridListRenderer()
@@ -959,6 +963,7 @@ public class FeedSurfaceMediator
 
     /**
      * Notifies a bound stream of new header count number.
+     *
      * @param newHeaderCount Number of headers in the {@link RecyclerView}.
      */
     void notifyHeadersChanged(int newHeaderCount) {
@@ -985,8 +990,11 @@ public class FeedSurfaceMediator
      * @return Whether the SignPromo should be visible.
      */
     private boolean shouldShowSigninPromo() {
+        if (SigninFeatureMap.isEnabled(SigninFeatures.ENABLE_SEAMLESS_SIGNIN)) {
+            return false;
+        }
         // TODO(crbug.com/352735671): Move SignInPromo.shouldCreatePromo inside FeedSigninPromo
-        //  after phase 2 follow-up launch.
+        //  after phase 2 follow-up launch.§
         boolean shouldCreatePromo = SignInPromo.shouldCreatePromo();
         if (ChromeFeatureList.isEnabled(ChromeFeatureList.UNO_PHASE_2_FOLLOW_UP)) {
             if (!shouldCreatePromo) {
@@ -999,7 +1007,8 @@ public class FeedSurfaceMediator
         } else {
             AccountPickerBottomSheetStrings bottomSheetStrings =
                     new AccountPickerBottomSheetStrings.Builder(
-                                    R.string.signin_account_picker_bottom_sheet_title)
+                                    mContext.getString(
+                                            R.string.signin_account_picker_bottom_sheet_title))
                             .build();
             SyncPromoController promoController =
                     new SyncPromoController(
@@ -1054,6 +1063,7 @@ public class FeedSurfaceMediator
             if (mStreamHolder != null) {
                 assumeNonNull(mStreamContentChangedListener);
                 mStreamHolder.removeOnContentChangedListener(mStreamContentChangedListener);
+                mStreamHolder.destroy();
                 mStreamHolder = null;
             }
         }
@@ -1229,12 +1239,12 @@ public class FeedSurfaceMediator
 
     /** Returns the feed header text. */
     private @Nullable String getHeaderText(boolean isExpanded) {
-        if (isExpanded) {
+        if (isExpanded && ChromeFeatureList.isEnabled(ChromeFeatureList.FEED_HEADER_REMOVAL)) {
             String treatment =
                     ChromeFeatureList.getFieldTrialParamByFeature(
                             ChromeFeatureList.FEED_HEADER_REMOVAL, "treatment");
             // Returns null to indicate that no feed header is shown.
-            if (treatment.equals("none")) return null;
+            if (!treatment.equals("label")) return null;
         }
 
         Resources res = mContext.getResources();
@@ -1326,8 +1336,8 @@ public class FeedSurfaceMediator
     }
 
     /**
-     * @return Whether the touch events are enabled.
-     * TODO(huayinz): Move this method to a Model once a Model is introduced.
+     * @return Whether the touch events are enabled. TODO(huayinz): Move this method to a Model once
+     *     a Model is introduced.
      */
     boolean getTouchEnabled() {
         return mTouchEnabled;
@@ -1417,6 +1427,7 @@ public class FeedSurfaceMediator
 
     /**
      * Scrolls the page to show the view at the given {@code viewPosition} if not already visible.
+     *
      * @param viewPosition The position of the view that should be visible or scrolled to.
      */
     void scrollToViewIfNecessary(int viewPosition) {
@@ -1439,7 +1450,7 @@ public class FeedSurfaceMediator
     }
 
     @Override
-    public void onItemSelected(PropertyModel item) {
+    public void onItemSelected(PropertyModel item, View view) {
         assert mSectionHeaderModel != null;
         int itemId = item.get(ListMenuItemProperties.MENU_ITEM_ID);
         int feedType =
@@ -1497,7 +1508,7 @@ public class FeedSurfaceMediator
      *
      * @return The restoring state {@link RestoringState}.
      */
-    public ObservableSupplier<Integer> getRestoringStateSupplier() {
+    public MonotonicObservableSupplier<Integer> getRestoringStateSupplier() {
         return mGetRestoringStateSupplier;
     }
 

@@ -11,6 +11,7 @@
 
 #include "ash/constants/web_app_id_constants.h"
 #include "base/check.h"
+#include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/i18n/time_formatting.h"
@@ -40,6 +41,7 @@
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/hats/trust_safety_sentiment_service.h"
 #include "chrome/browser/ui/hats/trust_safety_sentiment_service_factory.h"
 #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
@@ -70,6 +72,8 @@
 #include "components/password_manager/core/browser/sharing/recipients_fetcher_impl.h"
 #include "components/password_manager/core/browser/ui/credential_ui_entry.h"
 #include "components/password_manager/core/browser/ui/credential_utils.h"
+#include "components/password_manager/core/browser/ui/passwords_provider.h"
+#include "components/password_manager/core/browser/ui/saved_passwords_presenter.h"
 #include "components/password_manager/core/common/password_manager_constants.h"
 #include "components/password_manager/core/common/password_manager_features.h"
 #include "components/password_manager/core/common/password_manager_pref_names.h"
@@ -82,6 +86,7 @@
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
+#include "device/fido/public/features.h"
 #include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "url/gurl.h"
@@ -291,15 +296,19 @@ std::u16string GetMessageForBiometricAuthenticationBeforeFillingSetting(
 
 void MaybeShowProfileSwitchIPH(Profile* profile) {
 #if !BUILDFLAG(IS_CHROMEOS)
-  Browser* launched_app = web_app::AppBrowserController::FindForWebApp(
-      *profile, ash::kPasswordManagerAppId);
+  BrowserWindowInterface* launched_app =
+      web_app::AppBrowserController::FindForWebApp(*profile,
+                                                   ash::kPasswordManagerAppId);
 
   // Try to show promo only if there is profile menu button and there are
   // multiple profiles.
-  if (launched_app && launched_app->app_controller() &&
-      launched_app->app_controller()->HasProfileMenuButton() &&
+  if (launched_app && web_app::AppBrowserController::IsWebApp(launched_app) &&
+      web_app::AppBrowserController::From(launched_app)
+          ->HasProfileMenuButton() &&
       extensions::profile_util::GetNumberOfProfiles() > 1) {
-    launched_app->window()->MaybeShowProfileSwitchIPH();
+    launched_app->GetBrowserForMigrationOnly()
+        ->window()
+        ->MaybeShowProfileSwitchIPH();
   }
 #endif
 }
@@ -307,37 +316,6 @@ void MaybeShowProfileSwitchIPH(Profile* profile) {
 // Returns a passkey model instance if the feature is enabled.
 webauthn::PasskeyModel* MaybeGetPasskeyModel(Profile* profile) {
   return PasskeyModelFactory::GetInstance()->GetForProfile(profile);
-}
-
-std::string GetGroupIconUrl(const password_manager::AffiliatedGroup& group,
-                            const syncer::SyncService* sync_service) {
-  if (!sync_service) {
-    return group.GetFallbackIconURL().spec();
-  }
-
-  if (sync_service->GetUserSettings()->IsUsingExplicitPassphrase()) {
-    // Users with explicit passphrase should only use fallback icon.
-    return group.GetFallbackIconURL().spec();
-  }
-
-  // TODO(crbug.com/40067296): Migrate away from `ConsentLevel::kSync` on
-  // desktop platforms.
-  if (password_manager::sync_util::IsSyncFeatureEnabledIncludingPasswords(
-          sync_service)) {
-    // Syncing users can use icon provided by the affiliation service.
-    return group.GetIconURL().spec();
-  }
-
-  for (const CredentialUIEntry& credential : group.GetCredentials()) {
-    if (credential.stored_in.contains(
-            password_manager::PasswordForm::Store::kAccountStore)) {
-      // If at least one credential is stored in the account, icon provided by
-      // the affiliation service can be used for the whole group.
-      return group.GetIconURL().spec();
-    }
-  }
-
-  return group.GetFallbackIconURL().spec();
 }
 
 }  // namespace
@@ -414,6 +392,11 @@ PasswordsPrivateDelegateImpl::GetDeviceAuthenticator(
 }
 #endif
 
+password_manager::SavedPasswordsPresenter*
+PasswordsPrivateDelegateImpl::GetSavedPasswordsPresenter() {
+  return &saved_passwords_presenter_;
+}
+
 void PasswordsPrivateDelegateImpl::GetSavedPasswordsList(
     UiEntriesCallback callback) {
   if (current_entries_initialized_) {
@@ -431,7 +414,8 @@ PasswordsPrivateDelegateImpl::GetCredentialGroups() {
     api::passwords_private::CredentialGroup group_api;
     group_api.name = group.GetDisplayName();
     group_api.icon_url =
-        GetGroupIconUrl(group, SyncServiceFactory::GetForProfile(profile_));
+        group.GetAllowedIconUrl(SyncServiceFactory::GetForProfile(profile_))
+            .spec();
 
     CHECK(!group.GetCredentials().empty());
     for (const CredentialUIEntry& credential : group.GetCredentials()) {
@@ -995,7 +979,7 @@ bool PasswordsPrivateDelegateImpl::IsConnectedToCloudAuthenticator(
     return false;
   }
 
-  return enclave_manager->is_registered();
+  return enclave_manager->IsRegistered();
 }
 
 void PasswordsPrivateDelegateImpl::DeleteAllPasswordManagerData(
@@ -1372,6 +1356,11 @@ PasswordsPrivateDelegateImpl::CreatePasswordUiEntryFromCredentialUiEntry(
             credential.backup_password->creation_timestamp,
             /*pattern=*/"MMM dd"));
     entry.backup_password = std::move(backup_password_info);
+  }
+  // Gate this behind a flag since other clients may be setting `hidden` to
+  // `true` before the Chrome desktop feature is ready.
+  if (base::FeatureList::IsEnabled(device::kWebAuthnSignalApiHidePasskeys)) {
+    entry.hidden = credential.hidden;
   }
   entry.id = credential_id_generator_.GenerateId(std::move(credential));
   return entry;

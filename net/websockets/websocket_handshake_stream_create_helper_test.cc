@@ -177,9 +177,7 @@ class MockClientSocketHandleFactory {
         scoped_refptr<ClientSocketPool::SocketParams>(),
         std::nullopt /* proxy_annotation_tag */, MEDIUM, SocketTag(),
         ClientSocketPool::RespectLimits::ENABLED, CompletionOnceCallback(),
-        ClientSocketPool::ProxyAuthCallback(),
-        /*fail_if_alias_requires_proxy_override=*/false, &pool_,
-        NetLogWithSource());
+        ClientSocketPool::ProxyAuthCallback(), &pool_, NetLogWithSource());
     return socket_handle;
   }
 
@@ -194,8 +192,11 @@ class TestConnectDelegate : public WebSocketStream::ConnectDelegate {
   ~TestConnectDelegate() override = default;
 
   void OnCreateRequest(URLRequest* request) override {}
-  void OnURLRequestConnected(URLRequest* request,
-                             const TransportInfo& info) override {}
+  int OnURLRequestConnected(URLRequest* request,
+                            const TransportInfo& info,
+                            CompletionOnceCallback) override {
+    return OK;
+  }
   void OnSuccess(
       std::unique_ptr<WebSocketStream> stream,
       std::unique_ptr<WebSocketHandshakeResponseInfo> response) override {}
@@ -241,8 +242,7 @@ class WebSocketHandshakeStreamCreateHelperTest
       public WithTaskEnvironment {
  protected:
   WebSocketHandshakeStreamCreateHelperTest()
-      : quic_version_(quic::HandshakeProtocol::PROTOCOL_TLS1_3,
-                      quic::QuicTransportVersion::QUIC_VERSION_IETF_RFC_V1),
+      : quic_version_(quic::QuicTransportVersion::QUIC_VERSION_IETF_RFC_V1),
         mock_quic_data_(quic_version_) {}
   std::unique_ptr<WebSocketStream> CreateAndInitializeStream(
       const std::vector<std::string>& sub_protocols,
@@ -496,11 +496,13 @@ class WebSocketHandshakeStreamCreateHelperTest
             /*server_info=*/nullptr,
             QuicSessionAliasKey(
                 url::SchemeHostPort(),
-                QuicSessionKey("mail.example.org", 80, PRIVACY_MODE_DISABLED,
-                               ProxyChain::Direct(), SessionUsage::kDestination,
-                               SocketTag(), NetworkAnonymizationKey(),
-                               SecureDnsPolicy::kAllow,
-                               /*require_dns_https_alpn=*/false)),
+                QuicSessionKey(
+                    "mail.example.org", 80, PRIVACY_MODE_DISABLED,
+                    ProxyChain::Direct(), SessionUsage::kDestination,
+                    SocketTag(), NetworkAnonymizationKey(),
+                    SecureDnsPolicy::kAllow,
+                    /*require_dns_https_alpn=*/false,
+                    /*disable_cert_verification_network_fetches=*/false)),
             /*require_confirmation=*/false,
             /*migrate_session_early_v2=*/false,
             /*migrate_session_on_network_change_v2=*/false,

@@ -18,6 +18,7 @@
 #include "chrome/browser/accessibility/media_app/ax_media_app_service_factory.h"
 #include "chrome/browser/accessibility/media_app/test/fake_ax_media_app.h"
 #include "chrome/browser/accessibility/media_app/test/test_ax_media_app_untrusted_service.h"
+#include "chrome/browser/preloading/scoped_prewarm_feature_list.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window.h"
@@ -36,7 +37,6 @@
 #include "services/screen_ai/public/mojom/screen_ai_service.mojom.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/accessibility/ax_action_data.h"
-#include "ui/accessibility/ax_enums.mojom-shared.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_event_generator.h"
 #include "ui/accessibility/ax_node.h"
@@ -149,6 +149,11 @@ class AXMediaAppUntrustedServiceTest : public InProcessBrowserTest {
   std::unique_ptr<TestAXMediaAppUntrustedService> service_;
 
  private:
+  // TODO(https://crbug.com/423465927): Explore a better approach to make the
+  // existing tests run with the prewarm feature enabled.
+  ::test::ScopedPrewarmFeatureList scoped_prewarm_feature_list_{
+      ::test::ScopedPrewarmFeatureList::PrewarmState::kDisabled};
+
   std::optional<content::ScopedAccessibilityModeOverride> mode_override_;
 };
 
@@ -1198,7 +1203,8 @@ IN_PROC_BROWSER_TEST_F(AXMediaAppUntrustedServiceTest, StitchDocumentTree) {
       "++++genericContainer\n"
       "++++++canvas htmlTag='canvas'\n"
       "++++++++staticText name='<newline>          '\n"
-      "++++++++staticText name='Text that is not replaced by child tree.'\n"
+      "++++++++paragraph htmlTag='p'\n"
+      "++++++++++staticText name='Text that is not replaced by child tree.'\n"
       "++++++++staticText name='<newline>        '\n"
       "++++++graphicsDocument htmlTag='div' name='graphics-document'\n"
       "++++++++paragraph htmlTag='p'\n"
@@ -1228,7 +1234,8 @@ IN_PROC_BROWSER_TEST_F(AXMediaAppUntrustedServiceTest, StitchDocumentTree) {
       "++++genericContainer\n"
       "++++++canvas htmlTag='canvas'\n"
       "++++++++staticText name='<newline>          '\n"
-      "++++++++staticText name='Text that is not replaced by child tree.'\n"
+      "++++++++paragraph htmlTag='p'\n"
+      "++++++++++staticText name='Text that is not replaced by child tree.'\n"
       "++++++++staticText name='<newline>        '\n"
       "++++++graphicsDocument htmlTag='div' name='graphics-document'\n",
       browser()

@@ -11,7 +11,6 @@
 
 #include "base/check.h"
 #include "base/compiler_specific.h"
-#include "base/files/file_util.h"
 #include "base/files/platform_file.h"
 #include "base/functional/bind.h"
 #include "base/memory/ref_counted.h"
@@ -74,8 +73,7 @@ class ProducerSocketConnector
       return base::unexpected(EINVAL);
     }
 
-    struct sockaddr_un saddr;
-    UNSAFE_TODO(memset(&saddr, 0, sizeof(saddr)));
+    struct sockaddr_un saddr = {};
     UNSAFE_TODO(memcpy(saddr.sun_path, producer_sock_name.data(),
                        producer_sock_name.size()));
     saddr.sun_family = AF_UNIX;

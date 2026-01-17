@@ -9,10 +9,11 @@
 
 #include "components/segmentation_platform/embedder/home_modules/home_modules_card_registry.h"
 
+#include <string>
 #include <string_view>
 
-#include "base/containers/contains.h"
 #include "base/metrics/field_trial_params.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_split.h"
 #include "components/commerce/core/commerce_feature_list.h"
 #include "components/segmentation_platform/embedder/home_modules/auxiliary_search_promo.h"
@@ -27,11 +28,14 @@
 #include "components/segmentation_platform/embedder/home_modules/tab_group_promo.h"
 #include "components/segmentation_platform/embedder/home_modules/tab_group_sync_promo.h"
 #include "components/segmentation_platform/embedder/home_modules/tips_manager/constants.h"
+#include "components/segmentation_platform/embedder/home_modules/tips_notifications_promo.h"
 #include "components/segmentation_platform/public/constants.h"
 #include "components/segmentation_platform/public/features.h"
 #if BUILDFLAG(IS_IOS)
 #include "components/segmentation_platform/embedder/home_modules/address_bar_position_ephemeral_module.h"
+#include "components/segmentation_platform/embedder/home_modules/app_bundle_promo_ephemeral_module.h"
 #include "components/segmentation_platform/embedder/home_modules/autofill_passwords_ephemeral_module.h"
+#include "components/segmentation_platform/embedder/home_modules/default_browser_promo_ephemeral_module.h"
 #include "components/segmentation_platform/embedder/home_modules/enhanced_safe_browsing_ephemeral_module.h"
 #include "components/segmentation_platform/embedder/home_modules/ephemeral_module_utils.h"
 #include "components/segmentation_platform/embedder/home_modules/lens_ephemeral_module.h"
@@ -65,6 +69,10 @@ const char kHistorySyncPromoImpressionCounterPref[] =
     "ephemeral_pref_counter.history_sync_promo_counter";
 const char kHistorySyncPromoInteractedPref[] =
     "ephemeral_pref_interacted.history_sync_promo_interacted";
+const char kTipsNotificationsPromoImpressionCounterPref[] =
+    "ephemeral_pref_counter.tips_notifications_promo_counter";
+const char kTipsNotificationsPromoInteractedPref[] =
+    "ephemeral_pref_interacted.tips_notifications_promo_interacted";
 #endif
 
 namespace {
@@ -91,6 +99,12 @@ const char kLensEphemeralModuleImpressionCounterPref[] =
 // Impression counter for the Send Tab ephemeral module.
 const char kSendTabPromoImpressionCounterPref[] =
     "ephemeral_pref_counter.send_tab_promo_counter";
+// Impression counter for the App Bundle promo ephemeral module.
+const char kAppBundlePromoEphemeralModuleImpressionCounterPref[] =
+    "ephemeral_pref_counter.app_bundle_promo_ephemeral_module_counter";
+// Impression counter for the Default Browser promo ephemeral module.
+const char kDefaultBrowserPromoEphemeralModuleImpressionCounterPref[] =
+    "ephemeral_pref_counter.default_browser_promo_ephemeral_module_counter";
 
 // Creates a card corresponding to the given ephemeral `tip` module and adds
 // it to the `cards` list if the module is enabled.
@@ -147,24 +161,49 @@ void AddCardForTip(TipIdentifier tip,
     }
   }
 }
+
+// Returns the default sequence of tips variations for iOS.
+std::string GetDefaultTipsExperimentTrain() {
+  return base::StrCat({kLensEphemeralModuleSearchVariation, ",",
+                       kEnhancedSafeBrowsingEphemeralModule});
+}
+
 #endif
 
 }  // namespace
 
-HomeModulesCardRegistry::HomeModulesCardRegistry(PrefService* profile_prefs)
-    : profile_prefs_(profile_prefs) {
+HomeModulesCardRegistry::HomeModulesCardRegistry(PrefService* profile_prefs,
+                                                 PrefService* local_state_prefs)
+    : profile_prefs_(profile_prefs), local_state_prefs_(local_state_prefs) {
+  CHECK(profile_prefs);
+  CHECK(local_state_prefs);
   CreateAllCards();
 }
 
 HomeModulesCardRegistry::HomeModulesCardRegistry(
     PrefService* profile_prefs,
+    PrefService* local_state_prefs,
     std::vector<std::unique_ptr<CardSelectionInfo>> cards)
-    : profile_prefs_(profile_prefs) {
+    : profile_prefs_(profile_prefs), local_state_prefs_(local_state_prefs) {
+  CHECK(profile_prefs);
+  CHECK(local_state_prefs);
   all_cards_by_priority_.swap(cards);
   InitializeAfterAddingCards();
 }
 
 HomeModulesCardRegistry::~HomeModulesCardRegistry() = default;
+
+// static
+void HomeModulesCardRegistry::RegisterLocalStatePrefs(
+    PrefRegistrySimple* registry) {
+#if BUILDFLAG(IS_IOS)
+  // Local state prefs are used for the `AppBundleEphemeralModule` because this
+  // promo relates to app installations on the device level, meaning impressions
+  // should be tracked per-device rather than per profile.
+  registry->RegisterIntegerPref(
+      kAppBundlePromoEphemeralModuleImpressionCounterPref, 0);
+#endif
+}
 
 //  static
 void HomeModulesCardRegistry::RegisterProfilePrefs(
@@ -196,6 +235,8 @@ void HomeModulesCardRegistry::RegisterProfilePrefs(
                                 false);
   registry->RegisterBooleanPref(
       kLensEphemeralModuleTranslateVariationInteractedPref, false);
+  registry->RegisterIntegerPref(
+      kDefaultBrowserPromoEphemeralModuleImpressionCounterPref, 0);
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
@@ -211,6 +252,9 @@ void HomeModulesCardRegistry::RegisterProfilePrefs(
   registry->RegisterBooleanPref(kQuickDeletePromoInteractedPref, false);
   registry->RegisterIntegerPref(kHistorySyncPromoImpressionCounterPref, 0);
   registry->RegisterBooleanPref(kHistorySyncPromoInteractedPref, false);
+  registry->RegisterIntegerPref(kTipsNotificationsPromoImpressionCounterPref,
+                                0);
+  registry->RegisterBooleanPref(kTipsNotificationsPromoInteractedPref, false);
 #endif
 }
 
@@ -272,6 +316,18 @@ void HomeModulesCardRegistry::NotifyCardShown(const char* card_name) {
         profile_prefs_->GetInteger(kSendTabPromoImpressionCounterPref);
     profile_prefs_->SetInteger(kSendTabPromoImpressionCounterPref,
                                impression_count + 1);
+  } else if (strcmp(card_name, kAppBundlePromoEphemeralModule) == 0) {
+    int local_impression_count = local_state_prefs_->GetInteger(
+        kAppBundlePromoEphemeralModuleImpressionCounterPref);
+    local_state_prefs_->SetInteger(
+        kAppBundlePromoEphemeralModuleImpressionCounterPref,
+        local_impression_count + 1);
+  } else if (strcmp(card_name, kDefaultBrowserPromoEphemeralModule) == 0) {
+    int impression_count = profile_prefs_->GetInteger(
+        kDefaultBrowserPromoEphemeralModuleImpressionCounterPref);
+    profile_prefs_->SetInteger(
+        kDefaultBrowserPromoEphemeralModuleImpressionCounterPref,
+        impression_count + 1);
   }
 #endif
 
@@ -309,6 +365,11 @@ void HomeModulesCardRegistry::NotifyCardShown(const char* card_name) {
       int freshness_impression_count =
           profile_prefs_->GetInteger(kHistorySyncPromoImpressionCounterPref);
       profile_prefs_->SetInteger(kHistorySyncPromoImpressionCounterPref,
+                                 freshness_impression_count + 1);
+    } else if (strcmp(card_name, kTipsNotificationsPromo) == 0) {
+      int freshness_impression_count = profile_prefs_->GetInteger(
+          kTipsNotificationsPromoImpressionCounterPref);
+      profile_prefs_->SetInteger(kTipsNotificationsPromoImpressionCounterPref,
                                  freshness_impression_count + 1);
     }
   }
@@ -369,6 +430,8 @@ void HomeModulesCardRegistry::NotifyCardInteracted(const char* card_name) {
     profile_prefs_->SetBoolean(kAuxiliarySearchPromoInteractedPref, true);
   } else if (strcmp(card_name, kHistorySyncPromo) == 0) {
     profile_prefs_->SetBoolean(kHistorySyncPromoInteractedPref, true);
+  } else if (strcmp(card_name, kTipsNotificationsPromo) == 0) {
+    profile_prefs_->SetBoolean(kTipsNotificationsPromoInteractedPref, true);
   }
 #endif
 }
@@ -379,56 +442,67 @@ void HomeModulesCardRegistry::CreateAllCards() {
       profile_prefs_->GetInteger(kPriceTrackingPromoImpressionCounterPref);
   int send_tab_promo_count =
       profile_prefs_->GetInteger(kSendTabPromoImpressionCounterPref);
+  int app_bundle_promo_count = local_state_prefs_->GetInteger(
+      kAppBundlePromoEphemeralModuleImpressionCounterPref);
   if (PriceTrackingNotificationPromo::IsEnabled(price_tracking_promo_count)) {
     all_cards_by_priority_.push_back(
         std::make_unique<PriceTrackingNotificationPromo>(
             price_tracking_promo_count));
   }
+  int default_browser_promo_count = profile_prefs_->GetInteger(
+      kDefaultBrowserPromoEphemeralModuleImpressionCounterPref);
 
-  if (base::FeatureList::IsEnabled(
-          features::kSegmentationPlatformTipsEphemeralCard)) {
-    std::optional<CardSelectionInfo::ShowResult> forced_result =
-        GetForcedEphemeralModuleShowResult();
+  std::optional<CardSelectionInfo::ShowResult> forced_result =
+      GetForcedEphemeralModuleShowResult();
 
-    // Determine the forced card identifier and label, if any.
-    TipIdentifier forced_identifier = TipIdentifier::kUnknown;
-    std::string_view forced_label;
+  // Determine the forced card identifier and label, if any.
+  TipIdentifier forced_identifier = TipIdentifier::kUnknown;
+  std::string_view forced_label;
 
-    if (forced_result.has_value() &&
-        forced_result.value().position == EphemeralHomeModuleRank::kTop) {
-      forced_label = forced_result.value().result_label.value();
-      forced_identifier = TipIdentifierForOutputLabel(forced_label);
+  if (forced_result.has_value() &&
+      forced_result.value().position == EphemeralHomeModuleRank::kTop) {
+    forced_label = forced_result.value().result_label.value();
+    forced_identifier = TipIdentifierForOutputLabel(forced_label);
 
-      if (forced_identifier != TipIdentifier::kUnknown) {
-        AddCardForTip(forced_identifier, all_cards_by_priority_,
-                      profile_prefs_);
-      }
+    if (forced_identifier != TipIdentifier::kUnknown) {
+      AddCardForTip(forced_identifier, all_cards_by_priority_, profile_prefs_);
+    }
+  }
+
+  // Iterate through variation labels and add unique cards.
+  for (std::string_view variation_label :
+       base::SplitString(GetDefaultTipsExperimentTrain(), ",",
+                         base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
+    TipIdentifier identifier = TipIdentifierForOutputLabel(variation_label);
+
+    // Skip adding if:
+    // 1. The identifier is unknown.
+    // 2. It matches the forced identifier.
+    // 3. Both belong to the same "family" of Lens cards.
+    if (identifier == TipIdentifier::kUnknown ||
+        identifier == forced_identifier ||
+        (LensEphemeralModule::IsModuleLabel(variation_label) &&
+         LensEphemeralModule::IsModuleLabel(forced_label))) {
+      continue;
     }
 
-    // Iterate through variation labels and add unique cards.
-    for (std::string_view variation_label :
-         base::SplitString(features::TipsExperimentTrainEnabled(), ",",
-                           base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
-      TipIdentifier identifier = TipIdentifierForOutputLabel(variation_label);
-
-      // Skip adding if:
-      // 1. The identifier is unknown.
-      // 2. It matches the forced identifier.
-      // 3. Both belong to the same "family" of Lens cards.
-      if (identifier == TipIdentifier::kUnknown ||
-          identifier == forced_identifier ||
-          (LensEphemeralModule::IsModuleLabel(variation_label) &&
-           LensEphemeralModule::IsModuleLabel(forced_label))) {
-        continue;
-      }
-
-      AddCardForTip(identifier, all_cards_by_priority_, profile_prefs_);
-    }
+    AddCardForTip(identifier, all_cards_by_priority_, profile_prefs_);
   }
 
   if (SendTabNotificationPromo::IsEnabled(send_tab_promo_count)) {
     all_cards_by_priority_.push_back(
         std::make_unique<SendTabNotificationPromo>(send_tab_promo_count));
+  }
+
+  if (AppBundlePromoEphemeralModule::IsEnabled(app_bundle_promo_count)) {
+    all_cards_by_priority_.push_back(
+        std::make_unique<AppBundlePromoEphemeralModule>());
+  }
+
+  if (DefaultBrowserPromoEphemeralModule::IsEnabled(
+          default_browser_promo_count)) {
+    all_cards_by_priority_.push_back(
+        std::make_unique<DefaultBrowserPromoEphemeralModule>());
   }
 #endif
 
@@ -440,50 +514,45 @@ void HomeModulesCardRegistry::CreateAllCards() {
   }
 
   // TODO(crbug.com/420897397): Move the forced card check out from each card.
-  std::vector<std::string> enabled_educational_tip_cards_list =
-      GetEnabledCardList();
-  auto is_in_enabled_cards_set = [&](const std::string& card_name) {
-    return enabled_educational_tip_cards_list.empty() ||
-           base::Contains(enabled_educational_tip_cards_list, card_name);
-  };
-
   int default_browser_promo_count =
       profile_prefs_->GetInteger(kDefaultBrowserPromoImpressionCounterPref);
   if (DefaultBrowserPromo::IsEnabled(
-          is_in_enabled_cards_set(kDefaultBrowserPromo),
           default_browser_promo_count)) {
     all_cards_by_priority_.push_back(
         std::make_unique<DefaultBrowserPromo>(profile_prefs_));
   }
   int history_sync_educational_promo_show_count =
       profile_prefs_->GetInteger(kHistorySyncPromoImpressionCounterPref);
-  if (HistorySyncPromo::IsEnabled(is_in_enabled_cards_set(kHistorySyncPromo),
-                                  history_sync_educational_promo_show_count)) {
+  if (HistorySyncPromo::IsEnabled(history_sync_educational_promo_show_count)) {
     all_cards_by_priority_.push_back(
         std::make_unique<HistorySyncPromo>(profile_prefs_));
   }
   int tab_group_promo_count =
       profile_prefs_->GetInteger(kTabGroupPromoImpressionCounterPref);
-  if (TabGroupPromo::IsEnabled(is_in_enabled_cards_set(kTabGroupPromo),
-                               tab_group_promo_count)) {
+  if (TabGroupPromo::IsEnabled(tab_group_promo_count)) {
     all_cards_by_priority_.push_back(
         std::make_unique<TabGroupPromo>(profile_prefs_));
   }
 
   int tab_group_sync_promo_count =
       profile_prefs_->GetInteger(kTabGroupSyncPromoImpressionCounterPref);
-  if (TabGroupSyncPromo::IsEnabled(is_in_enabled_cards_set(kTabGroupSyncPromo),
-                                   tab_group_sync_promo_count)) {
+  if (TabGroupSyncPromo::IsEnabled(tab_group_sync_promo_count)) {
     all_cards_by_priority_.push_back(
         std::make_unique<TabGroupSyncPromo>(profile_prefs_));
   }
 
   int quick_delete_promo_count =
       profile_prefs_->GetInteger(kQuickDeletePromoImpressionCounterPref);
-  if (QuickDeletePromo::IsEnabled(is_in_enabled_cards_set(kQuickDeletePromo),
-                                  quick_delete_promo_count)) {
+  if (QuickDeletePromo::IsEnabled(quick_delete_promo_count)) {
     all_cards_by_priority_.push_back(
         std::make_unique<QuickDeletePromo>(profile_prefs_));
+  }
+
+  int tips_notifications_promo_show_count =
+      profile_prefs_->GetInteger(kTipsNotificationsPromoImpressionCounterPref);
+  if (TipsNotificationsPromo::IsEnabled(tips_notifications_promo_show_count)) {
+    all_cards_by_priority_.push_back(
+        std::make_unique<TipsNotificationsPromo>(profile_prefs_));
   }
 
 #endif
@@ -523,13 +592,6 @@ void HomeModulesCardRegistry::AddCardLabels(
 
 base::WeakPtr<HomeModulesCardRegistry> HomeModulesCardRegistry::GetWeakPtr() {
   return weak_ptr_factory_.GetWeakPtr();
-}
-
-std::vector<std::string> HomeModulesCardRegistry::GetEnabledCardList() {
-  std::string raw_value = features::KNamesOfEphemeralCardsToShow.Get();
-  std::vector<std::string> result = base::SplitString(
-      raw_value, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
-  return result;
 }
 
 }  // namespace segmentation_platform::home_modules

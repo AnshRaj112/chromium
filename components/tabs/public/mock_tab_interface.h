@@ -5,13 +5,29 @@
 #ifndef COMPONENTS_TABS_PUBLIC_MOCK_TAB_INTERFACE_H_
 #define COMPONENTS_TABS_PUBLIC_MOCK_TAB_INTERFACE_H_
 
+#include <memory>
+#include <optional>
+
+#include "base/callback_list.h"
+#include "base/memory/weak_ptr.h"
+#include "base/types/pass_key.h"
 #include "components/tabs/public/split_tab_id.h"
+#include "components/tabs/public/tab_collection.h"
 #include "components/tabs/public/tab_interface.h"
 #include "testing/gmock/include/gmock/gmock.h"
-#include "ui/views/widget/widget.h"
-#include "ui/views/widget/widget_delegate.h"
+
+class BrowserWindowInterface;
+
+namespace content {
+class WebContents;
+}
+
+namespace ui {
+class UnownedUserDataHost;
+}
 
 namespace tabs {
+class TabFeatures;
 
 class MockTabInterface : public testing::NiceMock<TabInterface> {
  public:
@@ -78,6 +94,7 @@ class MockTabInterface : public testing::NiceMock<TabInterface> {
   MOCK_METHOD(TabFeatures*, GetTabFeatures, (), (override));
   MOCK_METHOD(const TabFeatures*, GetTabFeatures, (), (const override));
   MOCK_METHOD(bool, IsPinned, (), (const override));
+  MOCK_METHOD(bool, IsBlocked, (), (const override));
   MOCK_METHOD(bool, IsSplit, (), (const override));
   MOCK_METHOD(std::optional<tab_groups::TabGroupId>,
               GetGroup,

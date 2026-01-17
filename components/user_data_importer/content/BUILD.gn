@@ -18,11 +18,13 @@ source_set("content") {
   deps = [
     "//base",
     "//components/favicon_base",
+    "//components/history/core/browser",
     "//components/search_engines",
     "//components/strings:components_strings_grit",
     "//components/user_data_importer/common",
     "//components/user_data_importer/mojom",
-    "//components/user_data_importer/utility:safari_data_importer",
+    "//components/user_data_importer/utility",
+    "//components/user_data_importer/utility:bookmarks",
     "//components/user_data_importer/utility:zip_ffi_glue",
     "//content/public/browser",
     "//content/public/child",
@@ -48,6 +50,7 @@ source_set("test_support") {
 source_set("unit_tests") {
   testonly = true
   sources = [
+    "content_bookmark_parser_unittest.cc",
     "content_bookmark_parser_utils_unittest.cc",
     "stable_portability_data_importer_unittest.cc",
   ]
@@ -70,4 +73,8 @@ source_set("unit_tests") {
     "//content/test:test_support",
     "//testing/gtest",
   ]
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }

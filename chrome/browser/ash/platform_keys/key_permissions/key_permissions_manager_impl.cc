@@ -6,12 +6,12 @@
 
 #include <stdint.h>
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/containers/queue.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
@@ -24,7 +24,6 @@
 #include "chrome/browser/ash/platform_keys/platform_keys_service.h"
 #include "chrome/browser/ash/platform_keys/platform_keys_service_factory.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
-#include "chrome/browser/browser_process.h"
 #include "chrome/browser/chromeos/platform_keys/extension_key_permissions_service.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/pref_names.h"
@@ -253,15 +252,17 @@ void KeyPermissionsManagerImpl::SetSystemTokenKeyPermissionsManagerForTesting(
   g_system_token_kpm_for_testing = system_token_kpm_for_testing;
 }
 
+// static
 std::unique_ptr<KeyPermissionsManager>
-KeyPermissionsManagerImpl::CreateSystemTokenKeyPermissionsManager() {
+KeyPermissionsManagerImpl::CreateSystemTokenKeyPermissionsManager(
+    PrefService* local_state) {
   DCHECK(!g_system_token_key_permissions_manager);
 
   auto system_token_key_permissions_manager =
       std::make_unique<KeyPermissionsManagerImpl>(
           TokenId::kSystem, std::make_unique<SystemTokenArcKpmDelegate>(),
           PlatformKeysServiceFactory::GetInstance()->GetDeviceWideService(),
-          g_browser_process->local_state());
+          local_state);
   g_system_token_key_permissions_manager =
       system_token_key_permissions_manager.get();
   return std::move(system_token_key_permissions_manager);
@@ -312,7 +313,7 @@ void KeyPermissionsManagerImpl::OnGotTokens(
     return;
   }
 
-  if (!base::Contains(token_ids, token_id_)) {
+  if (!std::ranges::contains(token_ids, token_id_)) {
     LOG(ERROR) << "KeyPermissionsManager doesn't have access to token: "
                << static_cast<int>(token_id_);
     return;

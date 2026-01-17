@@ -31,6 +31,7 @@
 
 #include "third_party/blink/renderer/platform/fonts/shaping/harfbuzz_shaper.h"
 
+#include <hb-ot.h>
 #include <hb.h>
 #include <unicode/uchar.h>
 #include <unicode/uscript.h>
@@ -170,69 +171,6 @@ void CheckShapeResultRange(const ShapeResult* result,
   NOTREACHED() << log.ToString();
 }
 #endif
-
-struct TrackEmoji {
-  bool is_start;
-  unsigned tracked_cluster_index;
-  bool cluster_broken;
-
-  unsigned num_broken_clusters;
-  unsigned num_clusters;
-};
-
-// The algorithm is relying on the following assumption: If an emoji is shaped
-// correctly it will present as only one glyph. This definitely holds for
-// NotoColorEmoji. So if one sequence (which HarfBuzz groups as a cluster)
-// presents as multiple glyphs, it means an emoji is rendered as sequence that
-// the font did not understand and did not shape into only one glyph. If it
-// renders as only one glyph but that glyph is .notdef/Tofu, it also means it's
-// broken.  Due to the way flags work (pairs of regional indicators), broken
-// flags cannot be correctly identified with this method - as each regional
-// indicator will display as one emoji with Noto Color Emoji.
-void IdentifyBrokenEmoji(void* context,
-                         unsigned character_index,
-                         Glyph glyph,
-                         gfx::Vector2dF,
-                         float,
-                         bool,
-                         CanvasRotationInVertical,
-                         const SimpleFontData*) {
-  DCHECK(context);
-  TrackEmoji* track_emoji = reinterpret_cast<TrackEmoji*>(context);
-
-  if (character_index != track_emoji->tracked_cluster_index ||
-      track_emoji->is_start) {
-    // We have reached the next cluster and can decide for the previous cluster
-    // whether it was broken or not.
-    track_emoji->num_clusters++;
-    track_emoji->is_start = false;
-    track_emoji->tracked_cluster_index = character_index;
-    if (track_emoji->cluster_broken) {
-      track_emoji->num_broken_clusters++;
-    }
-    track_emoji->cluster_broken = glyph == 0;
-  } else {
-    // We have reached an additional glyph for the same cluster, which means the
-    // sequence was not identified by the font and is showing as multiple
-    // glyphs.
-    track_emoji->cluster_broken = true;
-  }
-}
-
-struct EmojiCorrectness {
-  unsigned num_clusters = 0;
-  unsigned num_broken_clusters = 0;
-};
-
-EmojiCorrectness ComputeBrokenEmojiPercentage(ShapeResult* shape_result,
-                                              unsigned start_index,
-                                              unsigned end_index) {
-  TrackEmoji track_emoji = {true, 0, false, 0, 0};
-  shape_result->ForEachGlyph(0.f, start_index, end_index, 0 /* index_offset */,
-                             IdentifyBrokenEmoji, &track_emoji);
-  track_emoji.num_broken_clusters += track_emoji.cluster_broken ? 1 : 0;
-  return {track_emoji.num_clusters, track_emoji.num_broken_clusters};
-}
 
 FontFallbackPriority ApplyFontVariantEmojiOnFallbackPriority(
     FontFallbackPriority curr_font_fallback_priority,
@@ -779,7 +717,8 @@ bool HarfBuzzShaper::CollectFallbackHintChars(
         // managed to find a character with a definite script since
         // FontFallbackIterator needs a character with a determined script to
         // perform meaningful system fallback.
-        if (!needs_hint_list && Character::HasDefiniteScript(hint_char)) {
+        if (!needs_hint_list &&
+            !Character::IsCommonOrInheritedScript(hint_char)) {
           return true;
         }
       }
@@ -798,7 +737,8 @@ bool HarfBuzzShaper::CollectFallbackHintChars(
       // managed to find a character with a definite script since
       // FontFallbackIterator needs a character with a determined script to
       // perform meaningful system fallback.
-      if (!needs_hint_list && Character::HasDefiniteScript(hint_char)) {
+      if (!needs_hint_list &&
+          !Character::IsCommonOrInheritedScript(hint_char)) {
         return true;
       }
       iterator.Advance();
@@ -903,6 +843,26 @@ CapsFeatureSettingsScopedOverlay::~CapsFeatureSettingsScopedOverlay() {
   features_->EraseAt(0, count_features_);
 }
 
+inline hb_language_t GetLanguageFromFontDescription(
+    const FontDescription& font_description) {
+  // Determines the HarfBuzz language used for shaping.
+  // If the `font-language-override property` is present, its value (a
+  // four-character OpenType language system tag) is converted to a HarfBuzz
+  // language using hb_ot_tag_to_language. The tag is derived from the string
+  // using hb_tag_from_string, with -1 indicating that the string is
+  // null-terminated. If no override is specified, the locale-based HarfBuzz
+  // language is used instead.
+  if (font_description.HasLanguageOverride()) {
+    const hb_language_t override_language =
+        hb_ot_tag_to_language(hb_tag_from_string(
+            font_description.FontLanguageOverride().Utf8().data(), -1));
+    if (override_language) {
+      return override_language;
+    }
+  }
+  return font_description.LocaleOrDefault().HarfbuzzLanguage();
+}
+
 }  // namespace
 
 void HarfBuzzShaper::ShapeSegment(
@@ -914,7 +874,9 @@ void HarfBuzzShaper::ShapeSegment(
   const Font* font = range_data->font;
   const FontDescription& font_description = font->GetFontDescription();
   const LayoutLocale& locale = font_description.LocaleOrDefault();
-  const hb_language_t language = locale.HarfbuzzLanguage();
+  const hb_language_t language =
+      GetLanguageFromFontDescription(font_description);
+
   bool needs_caps_handling =
       font_description.VariantCaps() != FontDescription::kCapsNormal;
   OpenTypeCapsSupport caps_support;
@@ -1084,22 +1046,10 @@ void HarfBuzzShaper::ShapeSegment(
     hb_buffer_reset(range_data->buffer.Get());
   }
 
+  han_kerning.DidShapeSegment(*result);
+
   // Set variation selector mode to the default state.
   HarfBuzzFace::SetVariationSelectorMode(kUseSpecifiedVariationSelector);
-
-  if (IsEmojiPresentationEmoji(segment.font_fallback_priority)) {
-    EmojiCorrectness emoji_correctness =
-        ComputeBrokenEmojiPercentage(result, segment.start, segment.end);
-    if (emoji_metrics_reporter_for_testing_) {
-      emoji_metrics_reporter_for_testing_.Run(
-          emoji_correctness.num_clusters,
-          emoji_correctness.num_broken_clusters);
-    } else {
-      range_data->font->ReportEmojiSegmentGlyphCoverage(
-          emoji_correctness.num_clusters,
-          emoji_correctness.num_broken_clusters);
-    }
-  }
 }
 
 ShapeResult* HarfBuzzShaper::Shape(const Font* font,

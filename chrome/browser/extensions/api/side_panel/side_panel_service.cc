@@ -10,15 +10,19 @@
 
 #include "base/no_destructor.h"
 #include "base/strings/stringprintf.h"
+#include "base/strings/to_string.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/extensions/extension_side_panel_utils.h"
 #include "chrome/common/extensions/api/side_panel.h"
 #include "chrome/common/extensions/api/side_panel/side_panel_info.h"
 #include "chrome/common/pref_names.h"
 #include "components/sessions/core/session_id.h"
+#include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/pref_types.h"
+#include "extensions/common/error_utils.h"
 
 namespace extensions {
 
@@ -32,10 +36,10 @@ constexpr PrefMap kOpenSidePanelOnIconClickPref = {
 
 api::side_panel::PanelOptions GetPanelOptionsFromManifest(
     const Extension& extension) {
-  auto path = SidePanelInfo::GetDefaultPath(&extension);
+  std::string path = SidePanelInfo::GetDefaultPath(&extension);
   api::side_panel::PanelOptions options;
   if (!path.empty()) {
-    options.path = std::string(path);
+    options.path = std::move(path);
     options.enabled = true;
   }
   return options;
@@ -72,6 +76,25 @@ bool SidePanelService::HasSidePanelAvailableForTab(const Extension& extension,
   api::side_panel::PanelOptions options = GetOptions(extension, tab_id);
   return options.enabled.has_value() && *options.enabled &&
          options.path.has_value();
+}
+
+bool SidePanelService::HasContextualPanelAvailableForTab(
+    const Extension& extension,
+    TabId tab_id,
+    bool verify_options) {
+  auto panels_iter = panels_.find(extension.id());
+  if (panels_iter != panels_.end()) {
+    auto tab_panels_iter = panels_iter->second.find(tab_id);
+    if (tab_panels_iter != panels_iter->second.end()) {
+      const auto& options = tab_panels_iter->second;
+      if (verify_options) {
+        CHECK(options.path && options.enabled && *options.enabled);
+      }
+      return options.path.has_value() && options.enabled.has_value() &&
+             options.enabled.value();
+    }
+  }
+  return false;
 }
 
 api::side_panel::PanelOptions SidePanelService::GetOptions(
@@ -231,14 +254,15 @@ base::expected<bool, std::string> SidePanelService::OpenSidePanelForWindow(
         base::StringPrintf("No active side panel for windowId: %d", window_id));
   }
 
-  Browser* browser = window_controller->GetBrowser();
-  if (!browser) {
+  BrowserWindowInterface* browser_window =
+      window_controller->GetBrowserWindowInterface();
+  if (!browser_window) {
     return base::unexpected(
-        base::StringPrintf("No browser for windowId: %d", window_id));
+        base::StringPrintf("No browser window for windowId: %d", window_id));
   }
 
   side_panel_util::OpenGlobalExtensionSidePanel(
-      *browser, /*web_contents=*/nullptr, extension.id());
+      *browser_window, /*web_contents=*/nullptr, extension.id());
   return true;
 }
 
@@ -255,14 +279,14 @@ base::expected<bool, std::string> SidePanelService::OpenSidePanelForTab(
                                     include_incognito_information, &window,
                                     &web_contents, nullptr) ||
       !window) {
-    return base::unexpected(
-        base::StringPrintf("No tab with tabId: %d", tab_id));
+    return base::unexpected(ErrorUtils::FormatErrorMessage(
+        ExtensionTabUtil::kTabNotFoundError, base::ToString(tab_id)));
   }
 
-  Browser* browser = window->GetBrowser();
-  if (!browser) {
+  BrowserWindowInterface* browser_window = window->GetBrowserWindowInterface();
+  if (!browser_window) {
     return base::unexpected(
-        base::StringPrintf("No browser for tabId: %d", tab_id));
+        base::StringPrintf("No browser window for tabId: %d", tab_id));
   }
 
   // If both `tab_id` and `window_id` were provided, ensure the tab is in
@@ -281,30 +305,40 @@ base::expected<bool, std::string> SidePanelService::OpenSidePanelForTab(
         base::StringPrintf("No active side panel for tabId: %d", tab_id));
   }
 
-  // If we do have an active panel, check if it's a contextual panel.
-  bool has_contextual_panel = false;
-  auto panels_iter = panels_.find(extension.id());
-  if (panels_iter != panels_.end()) {
-    auto tab_panels_iter = panels_iter->second.find(tab_id);
-    if (tab_panels_iter != panels_iter->second.end()) {
-      auto& options = tab_panels_iter->second;
-      CHECK(options.path);
-      CHECK(options.enabled.has_value());
-      CHECK(options.enabled.value());
-      has_contextual_panel = true;
-    }
-  }
-
   // Open the appropriate panel.
-  if (has_contextual_panel) {
-    side_panel_util::OpenContextualExtensionSidePanel(*browser, *web_contents,
-                                                      extension.id());
+  if (HasContextualPanelAvailableForTab(extension, tab_id,
+                                        /*verify_options=*/true)) {
+    side_panel_util::OpenContextualExtensionSidePanel(
+        *browser_window, *web_contents, extension.id());
   } else {
-    side_panel_util::OpenGlobalExtensionSidePanel(*browser, web_contents,
+    side_panel_util::OpenGlobalExtensionSidePanel(*browser_window, web_contents,
                                                   extension.id());
   }
 
   return true;
+}
+void SidePanelService::DispatchOnClosedEvent(const ExtensionId& extension_id,
+                                             int window_id,
+                                             std::optional<int> tab_id,
+                                             const std::string& path) {
+  auto* router = EventRouter::Get(browser_context_);
+  if (!router->ExtensionHasEventListener(
+          extension_id, api::side_panel::OnClosed::kEventName)) {
+    return;
+  }
+
+  base::Value::List args;
+  api::side_panel::PanelClosedInfo info;
+  info.window_id = window_id;
+  info.tab_id = std::move(tab_id);
+  info.path = path;
+  args.Append(info.ToValue());
+
+  auto event = std::make_unique<Event>(events::SIDE_PANEL_ON_CLOSED,
+                                       api::side_panel::OnClosed::kEventName,
+                                       std::move(args));
+
+  router->DispatchEventToExtension(extension_id, std::move(event));
 }
 
 api::side_panel::PanelLayout SidePanelService::GetSidePanelLayout() {
@@ -315,6 +349,104 @@ api::side_panel::PanelLayout SidePanelService::GetSidePanelLayout() {
           ? api::side_panel::Side::kRight
           : api::side_panel::Side::kLeft;
   return layout;
+}
+
+base::expected<bool, std::string> SidePanelService::CloseSidePanelForTab(
+    const Extension& extension,
+    content::BrowserContext* context,
+    int tab_id,
+    std::optional<int> window_id,
+    bool include_incognito_information) {
+  WindowController* window = nullptr;
+  content::WebContents* web_contents = nullptr;
+  if (!ExtensionTabUtil::GetTabById(tab_id, context,
+                                    include_incognito_information, &window,
+                                    &web_contents, /*tab_index=*/nullptr) ||
+      !web_contents) {
+    return base::unexpected(ErrorUtils::FormatErrorMessage(
+        ExtensionTabUtil::kTabNotFoundError, base::ToString(tab_id)));
+  }
+
+  // Retrieve the corresponding browser window, since the active side panel for
+  // the tab might be a global one.
+  BrowserWindowInterface* browser_window = window->GetBrowserWindowInterface();
+  if (!browser_window) {
+    return base::unexpected(
+        base::StringPrintf("No browser window for tabId: %d", tab_id));
+  }
+
+  // Check that the given `tab_id` belongs to the given `window_id`.
+  if (window_id.has_value() && *window_id != window->GetWindowId()) {
+    return base::unexpected(
+        "The specified tab does not belong to the specified window.");
+  }
+
+  // Verify that an active contextual side panel exists for the tab.
+  if (!HasContextualPanelAvailableForTab(extension, tab_id,
+                                         /*verify_options=*/false)) {
+    return base::unexpected(base::StringPrintf(
+        "No active tab-specific side panel for tabId: %d", tab_id));
+  }
+
+  side_panel_util::CloseContextualExtensionSidePanel(
+      browser_window, web_contents, extension.id());
+  return true;
+}
+
+base::expected<bool, std::string> SidePanelService::CloseSidePanelForWindow(
+    const Extension& extension,
+    content::BrowserContext* context,
+    int window_id,
+    bool include_incognito_information) {
+  std::string error;
+  WindowController* window_controller =
+      ExtensionTabUtil::GetControllerInProfileWithId(
+          Profile::FromBrowserContext(context), window_id,
+          include_incognito_information, &error);
+  if (!window_controller) {
+    return base::unexpected(error);
+  }
+
+  // Verify that an active global side panel exists for the window.
+  auto global_options = GetOptions(extension, /*tab_id=*/std::nullopt);
+  if (!global_options.path || !global_options.enabled.value_or(false)) {
+    return base::unexpected(
+        base::StringPrintf("No active side panel for windowId: %d", window_id));
+  }
+
+  BrowserWindowInterface* browser_window =
+      window_controller->GetBrowserWindowInterface();
+  if (!browser_window) {
+    return base::unexpected(
+        base::StringPrintf("No browser window for windowId: %d", window_id));
+  }
+
+  side_panel_util::CloseGlobalExtensionSidePanel(browser_window,
+                                                 extension.id());
+  return true;
+}
+
+void SidePanelService::DispatchOnOpenedEvent(const ExtensionId& extension_id,
+                                             int window_id,
+                                             std::optional<int> tab_id,
+                                             const std::string& path) {
+  auto* router = EventRouter::Get(browser_context_);
+  if (!router->ExtensionHasEventListener(
+          extension_id, api::side_panel::OnOpened::kEventName)) {
+    return;
+  }
+
+  api::side_panel::PanelOpenedInfo info;
+  info.window_id = window_id;
+  info.tab_id = std::move(tab_id);
+  info.path = path;
+
+  base::Value::List args;
+  args.Append(info.ToValue());
+  auto event = std::make_unique<Event>(events::SIDE_PANEL_ON_OPENED,
+                                       api::side_panel::OnOpened::kEventName,
+                                       std::move(args));
+  router->DispatchEventToExtension(extension_id, std::move(event));
 }
 
 void SidePanelService::AddObserver(Observer* observer) {

@@ -116,17 +116,9 @@ ExtensionWebContentsObserver::ExtensionWebContentsObserver(
     : content::WebContentsObserver(web_contents),
       browser_context_(web_contents->GetBrowserContext()),
       dispatcher_(browser_context_),
-      initialized_(false) {
-  dispatcher_.set_delegate(this);
-}
+      initialized_(false) {}
 
 ExtensionWebContentsObserver::~ExtensionWebContentsObserver() {
-}
-
-content::WebContents* ExtensionWebContentsObserver::GetAssociatedWebContents()
-    const {
-  DCHECK(initialized_);
-  return web_contents();
 }
 
 void ExtensionWebContentsObserver::InitializeRenderFrame(
@@ -184,7 +176,7 @@ void ExtensionWebContentsObserver::SetUpRenderFrameHost(
   // Note: Keep this logic in sync with related logic in
   // ChromeContentBrowserClient::RegisterNonNetworkSubresourceURLLoaderFactories.
   if (type == Manifest::TYPE_EXTENSION ||
-      type == Manifest::TYPE_LEGACY_PACKAGED_APP) {
+      type == Manifest::Type::kLegacyPackagedApp) {
     util::InitializeFileSchemeAccessForExtension(
         render_frame_host->GetProcess()->GetDeprecatedID(), extension->id(),
         browser_context_);

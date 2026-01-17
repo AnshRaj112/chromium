@@ -4,12 +4,12 @@
 
 #include "chrome/browser/media/android/cdm/media_drm_origin_id_manager.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_writer.h"
@@ -293,8 +293,8 @@ TEST_F(MediaDrmOriginIdManagerTest, OriginIdNotInList) {
   DVLOG(1) << "Checking preference " << kMediaDrmOriginIds;
   auto& dict = GetDict(kMediaDrmOriginIds);
   auto* list = dict.FindList(kAvailableOriginIds);
-  EXPECT_FALSE(
-      base::Contains(*list, base::UnguessableTokenToValue(origin_id.value())));
+  EXPECT_FALSE(std::ranges::contains(
+      *list, base::UnguessableTokenToValue(origin_id.value())));
 }
 
 TEST_F(MediaDrmOriginIdManagerTest, ProvisioningFail) {
@@ -413,9 +413,7 @@ TEST_F(MediaDrmOriginIdManagerTest, NetworkChange) {
   // Try to pre-provision a bunch of origin IDs. Provisioning will fail, so
   // there will not be a bunch of origin IDs created. However, it should be
   // watching for a network change.
-  // TODO(crbug.com/41433110): Currently the code returns an origin ID even if
-  // provisioning fails. Update this once it returns an empty origin ID when
-  // pre-provisioning fails.
+
   EXPECT_CALL(*this, GetProvisioningResult())
       .WillOnce(Return(std::nullopt))
       .WillRepeatedly(InvokeWithoutArgs(&base::UnguessableToken::Create));
@@ -463,9 +461,7 @@ TEST_F(MediaDrmOriginIdManagerTest, NetworkChangeFails) {
   // |kConnectionAttempts| connections to a network. GetProvisioningResult()
   // should only be called once for the GetOriginId() call +
   // |kConnectionAttempts| when a network connection is detected.
-  // TODO(crbug.com/41433110): Currently the code returns an origin ID even if
-  // provisioning fails. Update this once it returns an empty origin ID when
-  // pre-provisioning fails.
+
   EXPECT_CALL(*this, GetProvisioningResult())
       .Times(kConnectionAttempts + 1)
       .WillOnce(Return(std::nullopt));

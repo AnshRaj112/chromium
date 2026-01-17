@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ash/glanceables/classroom/glanceables_classroom_client.h"
@@ -21,13 +22,11 @@
 #include "ash/system/time/calendar_utils.h"
 #include "ash/system/time/date_helper.h"
 #include "base/check.h"
-#include "base/functional/callback_forward.h"
 #include "base/i18n/time_formatting.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
@@ -38,6 +37,7 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/button/button.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
@@ -46,7 +46,7 @@
 #include "ui/views/layout/flex_layout.h"
 #include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/layout/layout_types.h"
-#include "ui/views/metadata/view_factory_internal.h"
+#include "ui/views/metadata/view_factory.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 
@@ -119,7 +119,7 @@ std::unique_ptr<views::View> BuildIcon() {
   return views::Builder<views::ImageView>()
       .SetBackground(views::CreateRoundedRectBackground(
           cros_tokens::kCrosSysSystemOnBase1, kIconViewBackgroundRadius))
-      .SetID(base::to_underlying(GlanceablesViewId::kClassroomItemIcon))
+      .SetID(std::to_underlying(GlanceablesViewId::kClassroomItemIcon))
       .SetImage(ui::ImageModel::FromVectorIcon(
           kGlanceablesClassroomAssignmentIcon, cros_tokens::kCrosSysOnSurface,
           kIconSize))
@@ -145,7 +145,7 @@ std::unique_ptr<views::BoxLayoutView> BuildAssignmentTitleLabels(
                                    views::MaximumFlexSizeRule::kUnbounded))
       .AddChild(views::Builder<views::Label>()
                     .SetText(base::UTF8ToUTF16(assignment->course_work_title))
-                    .SetID(base::to_underlying(
+                    .SetID(std::to_underlying(
                         GlanceablesViewId::kClassroomItemCourseWorkTitleLabel))
                     .SetEnabledColor(cros_tokens::kCrosSysOnSurface)
                     .SetFontList(typography_provider->ResolveTypographyToken(
@@ -154,7 +154,7 @@ std::unique_ptr<views::BoxLayoutView> BuildAssignmentTitleLabels(
                         kAssignmentCourseWorkTypography)))
       .AddChild(views::Builder<views::Label>()
                     .SetText(base::UTF8ToUTF16(assignment->course_title))
-                    .SetID(base::to_underlying(
+                    .SetID(std::to_underlying(
                         GlanceablesViewId::kClassroomItemCourseTitleLabel))
                     .SetEnabledColor(cros_tokens::kCrosSysOnSurfaceVariant)
                     .SetFontList(typography_provider->ResolveTypographyToken(
@@ -177,7 +177,7 @@ std::unique_ptr<views::BoxLayoutView> BuildDueLabels(
       .SetProperty(views::kMarginsKey, kDueLabelsMargin)
       .AddChild(views::Builder<views::Label>()
                     .SetText(due_date)
-                    .SetID(base::to_underlying(
+                    .SetID(std::to_underlying(
                         GlanceablesViewId::kClassroomItemDueDateLabel))
                     .SetEnabledColor(cros_tokens::kCrosSysOnSurfaceVariant)
                     .SetFontList(typography_provider->ResolveTypographyToken(
@@ -188,7 +188,7 @@ std::unique_ptr<views::BoxLayoutView> BuildDueLabels(
                         kAssignmentCourseWorkTypography)))
       .AddChild(views::Builder<views::Label>()
                     .SetText(due_time)
-                    .SetID(base::to_underlying(
+                    .SetID(std::to_underlying(
                         GlanceablesViewId::kClassroomItemDueTimeLabel))
                     .SetEnabledColor(cros_tokens::kCrosSysOnSurfaceVariant)
                     .SetFontList(typography_provider->ResolveTypographyToken(

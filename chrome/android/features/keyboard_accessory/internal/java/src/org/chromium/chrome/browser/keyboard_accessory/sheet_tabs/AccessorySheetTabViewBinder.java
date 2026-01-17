@@ -14,11 +14,11 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import androidx.annotation.Nullable;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.keyboard_accessory.R;
 import org.chromium.chrome.browser.keyboard_accessory.data.KeyboardAccessoryData;
 import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.AccessorySheetTabItemsModel.AccessorySheetDataPiece;
@@ -58,6 +58,8 @@ class AccessorySheetTabViewBinder {
                 return new FooterCommandViewHolder(parent);
             case AccessorySheetDataPiece.Type.OPTION_TOGGLE:
                 return new OptionToggleViewHolder(parent);
+            case AccessorySheetDataPiece.Type.DIVIDER:
+                return new DividerViewHolder(parent);
         }
         assert false : "Unhandled type of data piece: " + viewType;
         return null;
@@ -74,6 +76,16 @@ class AccessorySheetTabViewBinder {
             titleView.setText(displayText);
             titleView.setContentDescription(displayText);
         }
+    }
+
+    /** Holds a view that is used as a divider. */
+    static class DividerViewHolder extends ElementViewHolder<Void, View> {
+        DividerViewHolder(ViewGroup parent) {
+            super(parent, R.layout.horizontal_divider);
+        }
+
+        @Override
+        protected void bind(Void unused, View view) {}
     }
 
     /** Holds a clickable {@link TextView} that represents a footer command. */
@@ -117,7 +129,7 @@ class AccessorySheetTabViewBinder {
     }
 
     static void initializeView(
-            RecyclerView view, @Nullable RecyclerView.OnScrollListener scrollListener) {
+            RecyclerView view, RecyclerView.@Nullable OnScrollListener scrollListener) {
         view.setLayoutManager(
                 new LinearLayoutManager(view.getContext(), LinearLayoutManager.VERTICAL, false));
         view.setItemAnimator(null);

@@ -32,9 +32,8 @@ import org.chromium.base.Callback;
 import org.chromium.base.Promise;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.metrics.RecordUserAction;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
-import org.chromium.base.supplier.Supplier;
 import org.chromium.base.supplier.SyncOneshotSupplierImpl;
 import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
@@ -73,6 +72,7 @@ import org.chromium.ui.resources.ResourceManager;
 
 import java.util.Collections;
 import java.util.function.DoubleConsumer;
+import java.util.function.Supplier;
 
 /**
  * A {@link Layout} for Hub that has an empty or single tab {@link SceneLayer}. Android UI for a
@@ -88,7 +88,7 @@ import java.util.function.DoubleConsumer;
 public class HubLayout extends Layout implements HubLayoutController, AppHeaderObserver {
     /**
      * Implementation of {@link HubLayoutAnimationListener} that updates an {@link
-     * ObservableSupplier<Boolean>} to reflect the animation state.
+     * MonotonicObservableSupplier <Boolean>} to reflect the animation state.
      */
     @VisibleForTesting
     static class HubLayoutAnimationListenerImpl implements HubLayoutAnimationListener {
@@ -244,7 +244,7 @@ public class HubLayout extends Layout implements HubLayoutController, AppHeaderO
     }
 
     @Override
-    public ObservableSupplier<Integer> getPreviousLayoutTypeSupplier() {
+    public MonotonicObservableSupplier<Integer> getPreviousLayoutTypeSupplier() {
         return mPreviousLayoutTypeSupplier;
     }
 
@@ -483,7 +483,7 @@ public class HubLayout extends Layout implements HubLayoutController, AppHeaderO
     @Override
     public void doneHiding() {
         try (TraceEvent e = TraceEvent.scoped("HubLayout.doneHiding")) {
-            HubContainerView containerView = mHubController.getContainerView();
+            HubContainerView containerView = mHubController.getContainerViewUnchecked();
             containerView.setVisibility(View.INVISIBLE);
             mRootView.removeView(containerView);
             mRootView.setVisibility(View.GONE);
@@ -705,7 +705,7 @@ public class HubLayout extends Layout implements HubLayoutController, AppHeaderO
     }
 
     @Override
-    public ObservableSupplier<Boolean> getIsAnimatingSupplier() {
+    public MonotonicObservableSupplier<Boolean> getIsAnimatingSupplier() {
         return mIsAnimatingSupplier;
     }
 

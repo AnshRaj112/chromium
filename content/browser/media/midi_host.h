@@ -11,7 +11,6 @@
 #include <memory>
 #include <vector>
 
-#include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/synchronization/lock.h"
 #include "base/thread_annotations.h"
@@ -19,6 +18,7 @@
 #include "content/common/content_export.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/child_process_id.h"
 #include "media/midi/midi_manager.h"
 #include "media/midi/midi_service.mojom.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
@@ -45,7 +45,7 @@ class CONTENT_EXPORT MidiHost : public midi::MidiManagerClient,
   // Creates an instance of MidiHost and binds |receiver| to the instance using
   // a self owned receiver. Should be called on the IO thread.
   static void BindReceiver(
-      int render_process_id,
+      ChildProcessId render_process_id,
       midi::MidiService* midi_service,
       mojo::PendingReceiver<midi::mojom::MidiSessionProvider> receiver);
 
@@ -58,8 +58,7 @@ class CONTENT_EXPORT MidiHost : public midi::MidiManagerClient,
   void SetInputPortState(uint32_t port, midi::mojom::PortState state) override;
   void SetOutputPortState(uint32_t port, midi::mojom::PortState state) override;
   void ReceiveMidiData(uint32_t port,
-                       const uint8_t* data,
-                       size_t length,
+                       base::span<const uint8_t> data,
                        base::TimeTicks timestamp) override;
   void AccumulateMidiBytesSent(size_t n) override;
   void Detach() override;
@@ -75,7 +74,7 @@ class CONTENT_EXPORT MidiHost : public midi::MidiManagerClient,
                 base::TimeTicks timestamp) override;
 
  protected:
-  MidiHost(int renderer_process_id, midi::MidiService* midi_service);
+  MidiHost(ChildProcessId renderer_process_id, midi::MidiService* midi_service);
 
   void SetHasMidiPermissionForTesting(bool value) {
     has_midi_permission_ = value;
@@ -89,7 +88,7 @@ class CONTENT_EXPORT MidiHost : public midi::MidiManagerClient,
 
   void EndSession();
 
-  const int renderer_process_id_;
+  const ChildProcessId renderer_process_id_;
 
   // Represents if the renderer has a permission to send/receive MIDI messages.
   bool has_midi_permission_;

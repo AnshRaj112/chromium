@@ -5,7 +5,6 @@
 #include "chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h"
 
 #include <algorithm>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <set>
@@ -13,26 +12,23 @@
 #include <variant>
 
 #include "base/auto_reset.h"
-#include "base/check_deref.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/i18n/rtl.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_auto_reset.h"
-#include "base/metrics/field_trial_params.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window.h"
-#include "chrome/browser/ui/layout_constants.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/sad_tab_helper.h"
 #include "chrome/browser/ui/tabs/features.h"
 #include "chrome/browser/ui/tabs/organization/metrics.h"
@@ -42,17 +38,14 @@
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/browser/ui/tabs/tab_strip_model_delegate.h"
 #include "chrome/browser/ui/ui_features.h"
-#include "chrome/browser/ui/views/chrome_widget_sublevel.h"
-#include "chrome/browser/ui/views/frame/browser_non_client_frame_view.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
 #include "chrome/browser/ui/views/tabs/dragging/drag_session_data.h"
+#include "chrome/browser/ui/views/tabs/dragging/tab_drag_context.h"
+#include "chrome/browser/ui/views/tabs/dragging/tab_drag_target.h"
 #include "chrome/browser/ui/views/tabs/tab.h"
 #include "chrome/browser/ui/views/tabs/tab_slot_view.h"
-#include "chrome/browser/ui/views/tabs/tab_strip.h"
-#include "chrome/browser/ui/views/tabs/tab_strip_layout_helper.h"
-#include "chrome/browser/ui/views/tabs/tab_style_views.h"
 #include "chrome/browser/ui/views/tabs/window_finder.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 #include "chrome/browser/ui/web_applications/web_app_launch_utils.h"
@@ -60,11 +53,10 @@
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
-#include "chrome/common/chrome_features.h"
-#include "chrome/grit/chrome_unscaled_resources.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/clipboard/clipboard_constants.h"
@@ -76,16 +68,15 @@
 #include "ui/display/screen.h"
 #include "ui/events/gestures/gesture_recognizer.h"
 #include "ui/events/types/event_type.h"
-#include "ui/gfx/geometry/point_conversions.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/image/image_skia_operations.h"
 #include "ui/gfx/range/range.h"
-#include "ui/views/controls/scroll_view.h"
 #include "ui/views/drag_utils.h"
 #include "ui/views/event_monitor.h"
 #include "ui/views/interaction/element_tracker_views.h"
+#include "ui/views/view.h"
 #include "ui/views/view_tracker.h"
-#include "ui/views/widget/root_view.h"
 #include "ui/views/widget/widget.h"
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -105,10 +96,6 @@
 #include "ui/aura/env.h"                            // nogncheck
 #include "ui/aura/window.h"                         // nogncheck
 #include "ui/wm/core/window_modality_controller.h"  // nogncheck
-#endif
-
-#if BUILDFLAG(IS_OZONE)
-#include "ui/ozone/public/ozone_platform.h"
 #endif
 
 using content::OpenURLParams;
@@ -187,9 +174,17 @@ void OffsetX(int x_offset, std::vector<gfx::Rect>* rects) {
   }
 }
 
-bool IsWindowDragUsingSystemDragDropAllowed() {
-  return base::FeatureList::IsEnabled(
-      features::kAllowWindowDragUsingSystemDragDrop);
+// Gets the source browser view during a tab dragging. Returns nullptr if there
+// is none.
+BrowserView* GetBrowserViewForContext(const TabDragContext* context) {
+  if (!context) {
+    return nullptr;
+  }
+  gfx::NativeWindow source_window = context->GetWidget()->GetNativeWindow();
+  if (source_window) {
+    return BrowserView::GetBrowserViewForNativeWindow(source_window);
+  }
+  return nullptr;
 }
 
 void UpdateSystemDnDDragImage(TabDragContext* attached_context,
@@ -210,9 +205,9 @@ class DefaultTabDragPointResolver : public TabDragPointResolver {
   DefaultTabDragPointResolver() = default;
   ~DefaultTabDragPointResolver() override = default;
 
-  TabDragDelegate* GetDragTarget(BrowserView& browser_view,
-                                 const gfx::Point& point_in_screen) override {
-    return browser_view.GetTabDragDelegate(point_in_screen);
+  TabDragTarget* GetDragTarget(BrowserView& browser_view,
+                               const gfx::Point& point_in_screen) override {
+    return browser_view.GetTabDragTarget(point_in_screen);
   }
 };
 
@@ -336,7 +331,7 @@ TabDragController::TabDragController()
       can_release_capture_(true),
       offset_to_width_ratio_(0),
       old_focused_view_tracker_(std::make_unique<views::ViewTracker>()),
-      detach_behavior_(DETACHABLE),
+      detach_behavior_(DetachBehavior::kDetachable),
       is_dragging_new_browser_(false),
       was_source_maximized_(false),
       was_source_fullscreen_(false),
@@ -375,12 +370,11 @@ TabDragController::Liveness TabDragController::Init(
     TabDragContext* source_context,
     TabSlotView* source_view,
     const std::vector<TabSlotView*>& dragging_views,
-    const gfx::Point& mouse_offset,
-    int source_view_offset,
+    const gfx::Point& offset_from_source_view,
     ui::ListSelectionModel initial_selection_model,
     ui::mojom::DragEventSource event_source) {
   DCHECK(!dragging_views.empty());
-  DCHECK(base::Contains(dragging_views, source_view));
+  DCHECK(std::ranges::contains(dragging_views, source_view));
 
   // There's some rare condition on Windows where we are destroying ourselves
   // during Init() at some point. It's unclear how this happens, so we'll take
@@ -410,9 +404,7 @@ TabDragController::Liveness TabDragController::Init(
   ref->can_release_capture_ = false;
 #endif
   ref->start_point_in_screen_ =
-      gfx::Point(source_view_offset, mouse_offset.y());
-  views::View::ConvertPointToScreen(source_view,
-                                    &(ref->start_point_in_screen_));
+      views::View::ConvertPointToScreen(source_view, offset_from_source_view);
   ref->event_source_ = event_source;
   ref->last_point_in_screen_ = start_point_in_screen_;
   // Detachable tabs are not supported on Mac if the window is an out-of-process
@@ -422,9 +414,10 @@ TabDragController::Liveness TabDragController::Init(
   if (ref->source_context_->GetWidget() &&
       remote_cocoa::IsWindowRemote(
           ref->source_context_->GetWidget()->GetNativeWindow())) {
-    ref->detach_behavior_ = NOT_DETACHABLE;
+    ref->detach_behavior_ = DetachBehavior::kNotDetachable;
   }
 #else
+#if BUILDFLAG(IS_CHROMEOS)
   // Tabs should not be detachable from the window if any of the following are
   // true:
   // 1. The app window is locked for OnTask. Not applicable for web browser
@@ -434,18 +427,13 @@ TabDragController::Liveness TabDragController::Init(
   Browser* source_browser = BrowserView::GetBrowserViewForNativeWindow(
                                 source_context->GetWidget()->GetNativeWindow())
                                 ->browser();
-#if BUILDFLAG(IS_CHROMEOS)
   if (source_browser->IsLockedForOnTask()) {
-    ref->detach_behavior_ = NOT_DETACHABLE;
+    ref->detach_behavior_ = DetachBehavior::kNotDetachable;
   }
 #endif  // BUILDFLAG(IS_CHROMEOS)
-  if (source_browser->app_controller() &&
-      source_browser->app_controller()->has_tab_strip() &&
-      web_app::HasPinnedHomeTab(source_browser->tab_strip_model())) {
-    for (TabSlotView* dragging_view : dragging_views) {
-      if (source_context->GetIndexOf(dragging_view) == 0) {
-        ref->detach_behavior_ = NOT_DETACHABLE;
-      }
+  for (TabSlotView* dragging_view : dragging_views) {
+    if (!source_context->IsTabDetachable(dragging_view)) {
+      ref->detach_behavior_ = DetachBehavior::kNotDetachable;
     }
   }
 #endif  // BUILDFLAG(IS_MAC)
@@ -481,16 +469,20 @@ TabDragController::Liveness TabDragController::Init(
   // Listen for Esc key presses and mouse releases.
   ref->event_tracker_ = std::make_unique<EventTracker>(
       base::BindOnce(&TabDragController::EndDrag, base::Unretained(this),
-                     END_DRAG_COMPLETE),
+                     EndDragReason::kComplete),
       base::BindOnce(&TabDragController::EndDrag, base::Unretained(this),
-                     END_DRAG_CANCEL),
+                     EndDragReason::kCancel),
       ref->source_context_->GetWidget()->GetNativeWindow());
 
   if (source_view->width() > 0) {
     ref->offset_to_width_ratio_ =
         static_cast<float>(
-            source_view->GetMirroredXInView(source_view_offset)) /
+            source_view->GetMirroredXInView(offset_from_source_view.x())) /
         source_view->width();
+  }
+  if (source_view->height() > 0) {
+    ref->offset_to_height_ratio_ =
+        static_cast<float>(offset_from_source_view.y()) / source_view->height();
   }
   ref->initial_selection_model_ = std::move(initial_selection_model);
 
@@ -515,17 +507,17 @@ TabDragController::Liveness TabDragController::Init(
     // Chrome. This may result in the drag ending, destroying `this`. This
     // behavior has been observed on Windows in https://crbug.com/964322 and
     // ChromeOS in https://crbug.com/1431369.
-    if (SetCapture(ref->source_context_) == Liveness::DELETED) {
-      return Liveness::DELETED;
+    if (SetCapture(ref->source_context_) == Liveness::kDeleted) {
+      return Liveness::kDeleted;
     }
   }
 
   CHECK(ref);
-  return Liveness::ALIVE;
+  return Liveness::kAlive;
 }
 
 // static
-bool TabDragController::IsAttachedTo(const TabDragContextBase* context) {
+bool TabDragController::IsAttachedTo(const TabDragContext* context) {
   return (g_tab_drag_controller && g_tab_drag_controller->active() &&
           g_tab_drag_controller->attached_context() == context);
 }
@@ -573,7 +565,7 @@ void TabDragController::OnSystemDnDEnded() {
   // drag might put us in an infinite loop of being notified about the drag end,
   // requesting to cancel the drag, being notified again, and so on.
   g_tab_drag_controller->system_drag_and_drop_session_running_ = false;
-  g_tab_drag_controller->EndDrag(END_DRAG_COMPLETE);
+  g_tab_drag_controller->EndDrag(EndDragReason::kComplete);
 }
 
 // static
@@ -592,7 +584,7 @@ void TabDragController::TabWasAdded() {
   // called means a tab was added to the source window of the drag. We don't
   // need to cancel the drag in that case.
   if (current_state_ == DragState::kDraggingWindow && !is_mutating_) {
-    EndDrag(END_DRAG_COMPLETE);
+    EndDrag(EndDragReason::kComplete);
   }
 }
 
@@ -600,7 +592,7 @@ void TabDragController::OnTabWillBeRemoved(content::WebContents* contents) {
   // End the drag before we remove a tab that's being dragged, to avoid
   // complex special cases that could result.
   if (!CanRemoveTabDuringDrag(contents)) {
-    EndDrag(END_DRAG_COMPLETE);
+    EndDrag(EndDragReason::kComplete);
   }
 }
 
@@ -635,28 +627,28 @@ TabDragController::Liveness TabDragController::Drag(
   if (current_state_ == DragState::kWaitingToExitRunLoop ||
       current_state_ == DragState::kWaitingToDragTabs ||
       current_state_ == DragState::kStopped) {
-    return Liveness::ALIVE;
+    return Liveness::kAlive;
   }
 
   bring_to_front_timer_.Stop();
 
   if (current_state_ == DragState::kNotStarted) {
     if (!CanStartDrag(point_in_screen)) {
-      return Liveness::ALIVE;  // User hasn't dragged far enough yet.
+      return Liveness::kAlive;  // User hasn't dragged far enough yet.
     }
 
     // If any of the tabs have disappeared (e.g. closed or discarded), cancel
     // the drag session. See crbug.com/1445776.
     if (GetViewsMatchingDraggedContents(source_context_).empty()) {
-      EndDrag(END_DRAG_CANCEL);
-      return Liveness::DELETED;
+      EndDrag(EndDragReason::kCancel);
+      return Liveness::kDeleted;
     }
 
     // On windows SaveFocus() may trigger a capture lost, which destroys us.
     {
       const Liveness alive = SaveFocus();
-      if (alive == Liveness::DELETED) {
-        return Liveness::DELETED;
+      if (alive == Liveness::kDeleted) {
+        return Liveness::kDeleted;
       }
     }
 
@@ -685,7 +677,7 @@ TabDragController::Liveness TabDragController::Drag(
     }
 
     current_state_ = DragState::kDraggingTabs;
-    StartDraggingTabsSession(true, point_in_screen);
+      StartDraggingTabsSession(true, point_in_screen);
   }
 
   return ContinueDragging(point_in_screen);
@@ -701,7 +693,7 @@ void TabDragController::EndDrag(EndDragReason reason) {
 
   // Some drags need to react to the model being mutated before the model can
   // change its state.
-  if (reason == END_DRAG_MODEL_ADDED_TAB) {
+  if (reason == EndDragReason::kModelAddedTab) {
     // If a group is being dragged, we must place the
     // drag at the current position in the tabstrip or else we will be
     // re-entering into tabstrip mutation code.
@@ -714,7 +706,8 @@ void TabDragController::EndDrag(EndDragReason reason) {
     }
 
     if (group_dragged) {
-      EndDragImpl(source_context_ == attached_context_ ? CANCELED : NORMAL);
+      EndDragImpl(source_context_ == attached_context_ ? EndDragType::kCanceled
+                                                       : EndDragType::kNormal);
     }
     return;
   }
@@ -722,13 +715,13 @@ void TabDragController::EndDrag(EndDragReason reason) {
   // If we're dragging a window ignore capture lost since it'll ultimately
   // trigger the move loop to end and we'll revert the drag when RunMoveLoop()
   // finishes.
-  if (reason == END_DRAG_CAPTURE_LOST &&
+  if (reason == EndDragReason::kCaptureLost &&
       current_state_ == DragState::kDraggingWindow) {
     return;
   }
 
   // We always lose capture when hiding `attached_context_`, just ignore it.
-  if (reason == END_DRAG_CAPTURE_LOST &&
+  if (reason == EndDragReason::kCaptureLost &&
       current_state_ == DragState::kDraggingUsingSystemDnD) {
     return;
   }
@@ -740,8 +733,9 @@ void TabDragController::EndDrag(EndDragReason reason) {
     GetAttachedBrowserWidget()->EndMoveLoop();
   }
 
-  EndDragImpl(reason != END_DRAG_COMPLETE && source_context_ ? CANCELED
-                                                             : NORMAL);
+  EndDragImpl(reason != EndDragReason::kComplete && source_context_
+                  ? EndDragType::kCanceled
+                  : EndDragType::kNormal);
 }
 
 void TabDragController::SetDragLoopDoneCallbackForTesting(
@@ -801,13 +795,17 @@ std::unique_ptr<tabs::TabModel> TabDragController::DetachTabAtForInsertion(
   base::AutoReset<bool> is_removing_last_tab_setter(&is_moving_last_tab_, true);
   std::unique_ptr<tabs::TabModel> detached_tab =
       attached_context_->GetTabStripModel()->DetachTabAtForInsertion(from_idx);
-  attached_context_->DraggedTabsDetached();
+  OnContextDraggedTabsDetached();
 
   return detached_tab;
 }
 
 const DragSessionData& TabDragController::GetSessionData() const {
   return drag_data_;
+}
+
+const TabDragContext* TabDragController::GetAttachedContext() const {
+  return attached_context();
 }
 
 void TabDragController::OnSourceTabStripEmpty() {
@@ -850,7 +848,7 @@ TabDragController::Liveness TabDragController::SaveFocus() {
   source_context_->GetWidget()->GetFocusManager()->ClearFocus();
 
   // WARNING: we may have been deleted.
-  return ref ? Liveness::ALIVE : Liveness::DELETED;
+  return ref ? Liveness::kAlive : Liveness::kDeleted;
 }
 
 void TabDragController::RestoreFocus() {
@@ -858,16 +856,33 @@ void TabDragController::RestoreFocus() {
     if (is_dragging_new_browser_) {
       content::WebContents* active_contents =
           drag_data_.source_dragged_contents();
-      if (active_contents && !active_contents->FocusLocationBarByDefault()) {
-        active_contents->Focus();
+      if (active_contents) {
+        // If the tab is split, make the last active split tab stay active
+        // instead of the drag source.
+        const tabs::TabInterface* tab =
+            tabs::TabInterface::GetFromContents(active_contents);
+
+        if (tab->IsSplit()) {
+          TabStripModel* tab_strip_model =
+              attached_context_->GetTabStripModel();
+          active_contents = tab_strip_model->GetWebContentsAt(
+              split_tabs::GetIndexOfLastActiveTab(tab_strip_model,
+                                                  tab->GetSplit().value()));
+        }
+
+        if (!active_contents->FocusLocationBarByDefault()) {
+          active_contents->Focus();
+        }
       }
     }
     return;
   }
+
   views::View* old_focused_view = old_focused_view_tracker_->view();
   if (!old_focused_view || !old_focused_view->GetFocusManager()) {
     return;
   }
+
   old_focused_view->GetFocusManager()->SetFocusedView(old_focused_view);
 }
 
@@ -893,15 +908,20 @@ TabDragController::Liveness TabDragController::ContinueDragging(
   DCHECK(attached_context_);
 
   TabDragContext* target_context = source_context_;
-  if (detach_behavior_ == DETACHABLE) {
+  if (detach_behavior_ == DetachBehavior::kDetachable) {
     auto [alive, context, drop_target] = GetDragTargetForPoint(point_in_screen);
-    if (alive == Liveness::DELETED) {
-      return Liveness::DELETED;
+    if (alive == Liveness::kDeleted) {
+      return Liveness::kDeleted;
     }
     target_context = context;
     UpdateDragTarget(drop_target);
-    if (current_drag_delegate_) {
-      current_drag_delegate_->OnTabDragUpdated(*this, point_in_screen);
+    if (current_drag_target_) {
+      TabDragContext* delegate_context =
+          current_drag_target_->OnTabDragUpdated(*this, point_in_screen);
+      if (!delegate_context && current_state_ == DragState::kDraggingWindow) {
+        delegate_context = attached_context_;
+      }
+      target_context = delegate_context;
     }
   }
 
@@ -919,27 +939,28 @@ TabDragController::Liveness TabDragController::ContinueDragging(
                        base::Unretained(this), point_in_screen));
   }
 
-  if (current_state_ == DragState::kDraggingTabs) {
+  if (current_state_ == DragState::kDraggingTabs &&
+      attached_context_->GetPositioningDelegate()) {
     dragging_tabs_session_->MoveAttached(point_in_screen);
   }
-  return Liveness::ALIVE;
+  return Liveness::kAlive;
 }
 
-void TabDragController::UpdateDragTarget(TabDragDelegate* new_target) {
-  if (current_drag_delegate_ && current_drag_delegate_ != new_target) {
-    current_drag_delegate_->OnTabDragExited();
+void TabDragController::UpdateDragTarget(TabDragTarget* new_target) {
+  if (current_drag_target_ && current_drag_target_ != new_target) {
+    current_drag_target_->OnTabDragExited();
   }
-  current_drag_delegate_ = new_target;
-  if (current_drag_delegate_) {
-    current_drag_delegate_->OnTabDragEntered();
-    drag_delegate_destroyed_subscription_ =
-        current_drag_delegate_->RegisterWillDestroyCallback(base::BindOnce(
+  current_drag_target_ = new_target;
+  if (current_drag_target_) {
+    current_drag_target_->OnTabDragEntered();
+    drag_target_destroyed_subscription_ =
+        current_drag_target_->RegisterWillDestroyCallback(base::BindOnce(
             &TabDragController::ResetDragTarget, base::Unretained(this)));
   }
 }
 
 void TabDragController::ResetDragTarget() {
-  current_drag_delegate_ = nullptr;
+  current_drag_target_ = nullptr;
 }
 
 TabDragController::Liveness TabDragController::DragBrowserToNewTabStrip(
@@ -977,7 +998,7 @@ TabDragController::Liveness TabDragController::DragBrowserToNewTabStrip(
     if (can_release_capture_) {
       browser_widget->ReleaseCapture();
     } else {
-      CHECK_EQ(SetCapture(target_context), Liveness::ALIVE);
+      CHECK_EQ(SetCapture(target_context), Liveness::kAlive);
     }
 
 #if !BUILDFLAG(IS_LINUX)
@@ -1004,7 +1025,8 @@ TabDragController::Liveness TabDragController::DragBrowserToNewTabStrip(
     } else {
       // We already transferred ownership of `this` above, before we released
       // capture.
-      DetachAndAttachToNewContext(DONT_RELEASE_CAPTURE, target_context);
+      DetachAndAttachToNewContext(ReleaseCapture::kDontReleaseCapture,
+                                  target_context);
 
       // Enter kWaitingToExitRunLoop until we actually have exited the nested
       // run loop. Otherwise, we might attempt to start another nested run loop,
@@ -1016,7 +1038,7 @@ TabDragController::Liveness TabDragController::DragBrowserToNewTabStrip(
       attached_context_->GetWidget()->Activate();
     }
 
-    return Liveness::ALIVE;
+    return Liveness::kAlive;
   }
 
   if (current_state_ == DragState::kDraggingUsingSystemDnD) {
@@ -1032,16 +1054,16 @@ TabDragController::Liveness TabDragController::DragBrowserToNewTabStrip(
   // tabstrip to trigger dragging a window;
   // - or the platform does not support RunMoveLoop() and this is the normal
   // behaviour.
-  DetachAndAttachToNewContext(DONT_RELEASE_CAPTURE, target_context);
+  DetachAndAttachToNewContext(ReleaseCapture::kDontReleaseCapture,
+                              target_context);
 
   StartDraggingTabsSession(false, point_in_screen);
   attached_context_->GetWidget()->Activate();
-  return Liveness::ALIVE;
+  return Liveness::kAlive;
 }
 
 bool TabDragController::ShouldDragWindowUsingSystemDnD() {
-  return IsWindowDragUsingSystemDragDropAllowed() &&
-         !GetAttachedBrowserWidget()->IsMoveLoopSupported();
+  return !GetAttachedBrowserWidget()->IsMoveLoopSupported();
 }
 
 void TabDragController::RequestTabThumbnail() {
@@ -1057,14 +1079,16 @@ void TabDragController::RequestTabThumbnail() {
     // empty target size means no scaling (as we don't know the surface
     // size, it's easier to scale the bitmap to the correct size later).
     rwhv->CopyFromSurface(
-        gfx::Rect(), gfx::Size(),
+        gfx::Rect(), gfx::Size(), base::TimeDelta(),
         base::BindOnce(&TabDragController::OnTabThumbnailAvailable,
                        weak_factory_.GetWeakPtr(), scale));
   }
 }
 
-void TabDragController::OnTabThumbnailAvailable(float window_scale,
-                                                const SkBitmap& thumbnail) {
+void TabDragController::OnTabThumbnailAvailable(
+    float window_scale,
+    const content::CopyFromSurfaceResult& result) {
+  const SkBitmap& thumbnail = result.has_value() ? result->bitmap : SkBitmap();
   VLOG(1) << __func__ << " " << thumbnail.width() << "x" << thumbnail.height();
   constexpr size_t kTargetHeightDip = 200;
   constexpr int kRoundedCornerRadius = 4;
@@ -1092,7 +1116,7 @@ void TabDragController::OnTabThumbnailAvailable(float window_scale,
 TabDragController::Liveness TabDragController::StartSystemDnDSessionIfNecessary(
     TabDragContext* context,
     gfx::Point point_in_screen) {
-  CHECK(IsWindowDragUsingSystemDragDropAllowed());
+  CHECK(ShouldDragWindowUsingSystemDnD());
   CHECK(ui::ResourceBundle::HasSharedInstance());
   current_state_ = DragState::kDraggingUsingSystemDnD;
 
@@ -1100,7 +1124,7 @@ TabDragController::Liveness TabDragController::StartSystemDnDSessionIfNecessary(
     // Show the drag image again.
     UpdateSystemDnDDragImage(attached_context_, drag_image_);
 
-    return Liveness::ALIVE;
+    return Liveness::kAlive;
   }
 
   system_drag_and_drop_session_running_ = true;
@@ -1166,14 +1190,14 @@ TabDragController::Liveness TabDragController::StartSystemDnDSessionIfNecessary(
   // to end the drag session ourselves.
   if (ref && current_state_ == DragState::kDraggingUsingSystemDnD) {
     VLOG(1) << __func__ << " Ending drag";
-    EndDrag(END_DRAG_COMPLETE);
+    EndDrag(EndDragReason::kComplete);
   }
 
   if (drag_loop_done_callback) {
     std::move(drag_loop_done_callback).Run();
   }
 
-  return ref ? Liveness::ALIVE : Liveness::DELETED;
+  return ref ? Liveness::kAlive : Liveness::kDeleted;
 }
 
 void TabDragController::HideAttachedContext() {
@@ -1197,7 +1221,7 @@ void TabDragController::DetachAndAttachToNewContext(
   AttachToNewContext(target_context, std::move(me), std::move(owned_tabs));
 }
 
-std::tuple<TabDragController::Liveness, TabDragContext*, TabDragDelegate*>
+std::tuple<TabDragController::Liveness, TabDragContext*, TabDragTarget*>
 TabDragController::GetDragTargetForPoint(gfx::Point point_in_screen) {
   TRACE_EVENT1("views", "TabDragController::GetTargetTabStripForPoint",
                "point_in_screen", point_in_screen.ToString());
@@ -1206,31 +1230,28 @@ TabDragController::GetDragTargetForPoint(gfx::Point point_in_screen) {
   const Liveness state = GetLocalProcessWindow(
       point_in_screen, current_state_ == DragState::kDraggingWindow,
       &local_window);
-  if (state == Liveness::DELETED) {
-    return std::tuple(Liveness::DELETED, nullptr, nullptr);
+  if (state == Liveness::kDeleted) {
+    return std::tuple(Liveness::kDeleted, nullptr, nullptr);
   }
 
   if (local_window && CanAttachTo(local_window)) {
     BrowserView* browser_view =
         BrowserView::GetBrowserViewForNativeWindow(local_window);
     TabDragContext* destination_tab_strip =
-        browser_view->tabstrip()->GetDragContext();
+        browser_view->tab_strip_view()->GetDragContext();
     if (destination_tab_strip) {
       if (DoesTabStripContain(destination_tab_strip, point_in_screen)) {
-        return std::tuple(Liveness::ALIVE, destination_tab_strip, nullptr);
-      } else if (TabDragDelegate* candidate =
+        return std::tuple(Liveness::kAlive, destination_tab_strip, nullptr);
+      } else if (TabDragTarget* candidate =
                      GetTabDragPointResolver()->GetDragTarget(
                          *browser_view, point_in_screen)) {
-        return std::tuple(Liveness::ALIVE,
-                          current_state_ == DragState::kDraggingWindow
-                              ? attached_context_.get()
-                              : nullptr,
-                          candidate);
+        // The delegate will provide the context to attach to.
+        return std::tuple(Liveness::kAlive, nullptr, candidate);
       }
     }
   }
 
-  return std::tuple(Liveness::ALIVE,
+  return std::tuple(Liveness::kAlive,
                     current_state_ == DragState::kDraggingWindow
                         ? attached_context_.get()
                         : nullptr,
@@ -1240,12 +1261,17 @@ TabDragController::GetDragTargetForPoint(gfx::Point point_in_screen) {
 bool TabDragController::DoesTabStripContain(
     TabDragContext* context,
     const gfx::Point& point_in_screen) const {
+  TabDragPositioningDelegate* positioning_delegate =
+      context->GetPositioningDelegate();
+  if (!positioning_delegate) {
+    return false;
+  }
   // Make sure the specified screen point is actually within the bounds of the
   // specified context...
   gfx::Rect tabstrip_bounds = GetTabstripScreenBounds(context);
   const int x_in_strip = point_in_screen.x() - tabstrip_bounds.x();
-  return (x_in_strip >= context->TabDragAreaBeginX()) &&
-         (x_in_strip < context->TabDragAreaEndX()) &&
+  return (x_in_strip >= positioning_delegate->TabDragAreaBeginX()) &&
+         (x_in_strip < positioning_delegate->TabDragAreaEndX()) &&
          DoesRectContainVerticalPointExpanded(
              tabstrip_bounds, kVerticalDetachMagnetism, point_in_screen.y());
 }
@@ -1254,7 +1280,7 @@ void TabDragController::StartDrag() {
   // `source_context_` already owns `this` (it created us, even), so no need
   // to hand off ownership.
   CHECK_EQ(source_context_->GetDragController(), this);
-  CHECK(!current_drag_delegate_);
+  CHECK(!current_drag_target_);
   attached_context_ = source_context_;
 
   AttachImpl();
@@ -1269,7 +1295,7 @@ void TabDragController::StartDrag() {
 void TabDragController::AttachToNewContext(
     TabDragContext* attached_context,
     std::unique_ptr<TabDragController> controller,
-    std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
+    std::vector<std::variant<std::unique_ptr<DetachedTab>,
                              std::unique_ptr<DetachedTabCollection>>>
         owned_tabs_and_collections) {
   // We should already have detached by the time we get here.
@@ -1284,13 +1310,15 @@ void TabDragController::AttachToNewContext(
   // the new model.
   CHECK(GetViewsMatchingDraggedContents(attached_context_).empty());
 
-  selection_model_before_attach_ =
-      attached_context_->GetTabStripModel()->selection_model();
+  selection_model_before_attach_ = attached_context_->GetTabStripModel()
+                                       ->selection_model()
+                                       .GetListSelectionModel();
 
   // Insert at any valid index in the tabstrip. We'll fix up the insertion
   // index in MoveAttached() later, if we're transitioning to kDraggingTabs;
   // if we're transitioning to kDraggingWindow this is the correct index, 0.
-  size_t index = attached_context_->GetPinnedTabCount();
+  size_t index =
+      attached_context_->GetTabStripModel()->IndexOfFirstNonPinnedTab();
 
   base::AutoReset<bool> setter(&is_mutating_, true);
 
@@ -1307,14 +1335,14 @@ void TabDragController::AttachToNewContext(
 
   for (auto& tab_or_collection : owned_tabs_and_collections) {
     if (auto* tab =
-            std::get_if<std::unique_ptr<tabs::TabModel>>(&tab_or_collection)) {
-      const tabs::TabInterface* tab_ptr = tab->get();
+            std::get_if<std::unique_ptr<DetachedTab>>(&tab_or_collection)) {
+      const WebContents* web_contents = tab->get()->tab->GetContents();
       // If it's a tab - we add it to the tabstrip.
       int add_types = AddTabTypes::ADD_NONE;
       TabDragData& tab_data = *std::find_if(
           drag_data_.tab_drag_data_.begin(), drag_data_.tab_drag_data_.end(),
-          [tab_ptr](TabDragData& tab_data) {
-            return tab_ptr->GetContents() == tab_data.contents;
+          [web_contents](TabDragData& tab_data) {
+            return web_contents == tab_data.contents;
           });
       if (tab_data.pinned) {
         add_types |= AddTabTypes::ADD_PINNED;
@@ -1322,7 +1350,7 @@ void TabDragController::AttachToNewContext(
 
       const size_t inserted_index =
           attached_context_->GetTabStripModel()->InsertDetachedTabAt(
-              index, std::move(*tab), add_types);
+              index, std::move(tab->get()->tab), add_types);
       CHECK_EQ(inserted_index, index);
       update_sad_tab.Run(index);
       index++;
@@ -1377,11 +1405,11 @@ void TabDragController::AttachImpl() {
 
   // This should be called after ResetSelection() in order to generate
   // bounds correctly. http://crbug.com/836004
-  attached_context_->StartedDragging(views);
+  OnContextStartedDragging(views);
 
   // Make sure the window has capture. This is important so that if activation
   // changes the drag isn't prematurely canceled.
-  CHECK_EQ(SetCapture(attached_context_), Liveness::ALIVE);
+  CHECK_EQ(SetCapture(attached_context_), Liveness::kAlive);
 
   attached_context_tabs_closed_tracker_ =
       std::make_unique<DraggedTabsClosedTracker>(
@@ -1389,7 +1417,7 @@ void TabDragController::AttachImpl() {
 }
 
 std::tuple<std::unique_ptr<TabDragController>,
-           std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
+           std::vector<std::variant<std::unique_ptr<DetachedTab>,
                                     std::unique_ptr<DetachedTabCollection>>>>
 TabDragController::Detach(ReleaseCapture release_capture) {
   TRACE_EVENT1("views", "TabDragController::Detach", "release_capture",
@@ -1407,7 +1435,7 @@ TabDragController::Detach(ReleaseCapture release_capture) {
       attached_context_->ReleaseDragController();
   DCHECK_EQ(me.get(), this);
 
-  if (release_capture == RELEASE_CAPTURE) {
+  if (release_capture == ReleaseCapture::kReleaseCapture) {
     attached_context_->GetWidget()->ReleaseCapture();
   }
 
@@ -1429,41 +1457,20 @@ TabDragController::Detach(ReleaseCapture release_capture) {
   }
 
   std::vector<int> dragged_indices;
-  for (int dragged_index :
-       attached_model->selection_model().selected_indices()) {
+
+  // TODO(crbug.com/435178910) Remove this usage of ListSelectionModel.
+  for (int dragged_index : attached_model->selection_model()
+                               .GetListSelectionModel()
+                               .selected_indices()) {
     dragged_indices.push_back(dragged_index);
   }
   const std::vector<tab_groups::TabGroupId> groups_to_move =
       attached_model->GetGroupsDestroyedFromRemovingIndices(dragged_indices);
 
-  std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
+  std::vector<std::variant<std::unique_ptr<DetachedTab>,
                            std::unique_ptr<DetachedTabCollection>>>
-      owned_tabs_and_collections;
-  for (TabDragData& tab_drag_datum : drag_data_.tab_drag_data_) {
-    const int index =
-        attached_model->GetIndexOfWebContents(tab_drag_datum.contents);
-
-    if (index == TabStripModel::kNoTab) {
-      // If this is a tab, we already moved it as part of its group.
-      // If this is a header, we will move it when we get to its first tab.
-      continue;
-    }
-
-    const std::optional<tab_groups::TabGroupId> group =
-        attached_model->GetTabGroupForTab(index);
-    if (std::find(groups_to_move.begin(), groups_to_move.end(), group) !=
-        groups_to_move.end()) {
-      owned_tabs_and_collections.emplace_back(
-          attached_model->DetachTabGroupForInsertion(group.value()));
-    } else if (attached_model->GetTabAtIndex(index)->IsSplit()) {
-      owned_tabs_and_collections.emplace_back(
-          attached_model->DetachSplitTabForInsertion(
-              attached_model->GetTabAtIndex(index)->GetSplit().value()));
-    } else {
-      owned_tabs_and_collections.emplace_back(
-          attached_model->DetachTabAtForInsertion(index));
-    }
-  }
+      owned_tabs_and_collections =
+          attached_model->DetachTabsAndCollectionsForInsertion(dragged_indices);
 
   // If we've removed the last Tab from the TabDragContext, hide the
   // frame now.
@@ -1480,7 +1487,7 @@ TabDragController::Detach(ReleaseCapture release_capture) {
     }
   }
 
-  attached_context_->DraggedTabsDetached();
+  OnContextDraggedTabsDetached();
   attached_context_ = nullptr;
 
   return std::make_tuple(std::move(me), std::move(owned_tabs_and_collections));
@@ -1517,13 +1524,18 @@ TabDragController::DetachIntoNewBrowserAndRunMoveLoop(
     return RunMoveLoop(point_in_screen, drag_offset);
   }
 
-  const int previous_tab_area_width = attached_context_->GetTabDragAreaWidth();
   const gfx::Size new_size = CalculateDraggedWindowSize(attached_context_);
-  const int first_tab_leading_x =
-      GetTabOffsetForDetachedWindow(point_in_screen);
-  const std::vector<gfx::Rect> drag_bounds =
-      attached_context_->CalculateBoundsForDraggedViews(
-          drag_data_.attached_views());
+
+  int previous_tab_area_width;
+  int first_tab_leading_x;
+  std::vector<gfx::Rect> drag_bounds;
+  if (TabDragPositioningDelegate* positioning_delegate =
+          attached_context_->GetPositioningDelegate()) {
+    previous_tab_area_width = positioning_delegate->GetTabDragAreaWidth();
+    first_tab_leading_x = GetTabOffsetForDetachedWindow(point_in_screen);
+    drag_bounds = positioning_delegate->CalculateBoundsForDraggedViews(
+        drag_data_.attached_views());
+  }
 
   Browser* browser = CreateBrowserForDrag(attached_context_, new_size);
 
@@ -1554,18 +1566,24 @@ TabDragController::DetachIntoNewBrowserAndRunMoveLoop(
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)
+  dragged_widget->GetNativeWindow()->SetProperty(
+      ash::kTabDraggingSourceWindowKey,
+      attached_context_->GetWidget()->GetNativeWindow());
+
   // On ChromeOS, Detach should release capture; `can_release_capture_` is
   // false on ChromeOS because it can cancel touches, but for this cases
   // the touches are already transferred, so releasing is fine. Without
   // releasing, the capture remains and further touch events can be sent to a
   // wrong target.
-  const ReleaseCapture release_capture = RELEASE_CAPTURE;
+  const ReleaseCapture release_capture = ReleaseCapture::kReleaseCapture;
 #else
   const ReleaseCapture release_capture =
-      can_release_capture_ ? RELEASE_CAPTURE : DONT_RELEASE_CAPTURE;
+      can_release_capture_ ? ReleaseCapture::kReleaseCapture
+                           : ReleaseCapture::kDontReleaseCapture;
 #endif
-  DetachAndAttachToNewContext(
-      release_capture, dragged_browser_view->tabstrip()->GetDragContext());
+  TabDragContext* new_context =
+      attached_context_->GetContextForNewBrowser(dragged_browser_view);
+  DetachAndAttachToNewContext(release_capture, new_context);
 
   if (ShouldDragWindowUsingSystemDnD()) {
     // Keep the new window hidden and start a system DnD session.
@@ -1574,8 +1592,11 @@ TabDragController::DetachIntoNewBrowserAndRunMoveLoop(
     // attached to is hidden and thus can't start the drag session.
     return StartSystemDnDSessionIfNecessary(source_context_, point_in_screen);
   }
-  AdjustTabBoundsForDrag(previous_tab_area_width, first_tab_leading_x,
-                         drag_bounds);
+
+  if (attached_context_->GetPositioningDelegate()) {
+    AdjustTabBoundsForDrag(previous_tab_area_width, first_tab_leading_x,
+                           drag_bounds);
+  }
 
   const gfx::Vector2d drag_offset = CalculateWindowDragOffset();
 #if (!BUILDFLAG(IS_MAC))
@@ -1603,7 +1624,7 @@ TabDragController::DetachIntoNewBrowserAndRunMoveLoop(
     base::WeakPtr<TabDragController> ref(weak_factory_.GetWeakPtr());
     browser->window()->Activate();
     if (!ref) {
-      return Liveness::DELETED;
+      return Liveness::kDeleted;
     }
   }
   return RunMoveLoop(point_in_screen, drag_offset);
@@ -1664,7 +1685,7 @@ TabDragController::Liveness TabDragController::RunMoveLoop(
   }
 
   if (!ref) {
-    return Liveness::DELETED;
+    return Liveness::kDeleted;
   }
 
   in_move_loop_ = false;
@@ -1675,7 +1696,7 @@ TabDragController::Liveness TabDragController::RunMoveLoop(
     current_state_ = DragState::kDraggingTabs;
   } else if (current_state_ == DragState::kWaitingToDragTabs) {
     DCHECK(tab_strip_to_attach_to_after_exit_);
-    DetachAndAttachToNewContext(DONT_RELEASE_CAPTURE,
+    DetachAndAttachToNewContext(ReleaseCapture::kDontReleaseCapture,
                                 tab_strip_to_attach_to_after_exit_);
     current_state_ = DragState::kDraggingTabs;
 
@@ -1684,17 +1705,17 @@ TabDragController::Liveness TabDragController::RunMoveLoop(
     attached_context_->GetWidget()->Activate();
     // Activate may trigger a focus loss, destroying us.
     if (!ref) {
-      return Liveness::DELETED;
+      return Liveness::kDeleted;
     }
     tab_strip_to_attach_to_after_exit_ = nullptr;
   } else if (current_state_ == DragState::kDraggingWindow) {
     EndDrag(result == views::Widget::MoveLoopResult::kCanceled
-                ? END_DRAG_CANCEL
-                : END_DRAG_COMPLETE);
-    return Liveness::DELETED;
+                ? EndDragReason::kCancel
+                : EndDragReason::kComplete);
+    return Liveness::kDeleted;
   }
 
-  return Liveness::ALIVE;
+  return Liveness::kAlive;
 }
 
 std::vector<TabSlotView*> TabDragController::GetViewsMatchingDraggedContents(
@@ -1703,12 +1724,12 @@ std::vector<TabSlotView*> TabDragController::GetViewsMatchingDraggedContents(
   std::vector<TabSlotView*> views;
   for (const TabDragData& tab_drag_datum : drag_data_.tab_drag_data_) {
     if (tab_drag_datum.view_type == TabSlotView::ViewType::kTab) {
-      const int model_index =
-          model->GetIndexOfWebContents(tab_drag_datum.contents);
-      if (model_index == TabStripModel::kNoTab) {
+      TabSlotView* tab_view =
+          context->GetTabForContents(tab_drag_datum.contents);
+      if (!tab_view) {
         return {};
       }
-      views.push_back(context->GetTabAt(model_index));
+      views.push_back(tab_view);
     } else {
       // Return empty vector if the group is not present in the model.
       if (!model->group_model()->ContainsTabGroup(
@@ -1716,17 +1737,17 @@ std::vector<TabSlotView*> TabDragController::GetViewsMatchingDraggedContents(
         return {};
       }
 
-      TabGroupHeader* header =
+      TabSlotView* header_view =
           context->GetTabGroupHeader(tab_drag_datum.tab_group_data->group_id);
-      CHECK(header);
-      views.push_back(header);
+      CHECK(header_view);
+      views.push_back(header_view);
     }
   }
   return views;
 }
 
 void TabDragController::EndDragImpl(EndDragType type) {
-  VLOG(1) << __func__ << " type=" << type
+  VLOG(1) << __func__ << " type=" << static_cast<int>(type)
           << " state=" << static_cast<int>(current_state_);
 
   DragState previous_state = current_state_;
@@ -1739,7 +1760,7 @@ void TabDragController::EndDragImpl(EndDragType type) {
   // dragged from out of a tab group into a tab group.
   NotifyEventIfTabAddedToGroup();
 
-  if (type != TAB_DESTROYED) {
+  if (type != EndDragType::kTabDestroyed) {
     // We only finish up the drag if we were actually dragging. If start_drag_
     // is false, the user just clicked and released and didn't move the mouse
     // enough to trigger a drag.
@@ -1753,7 +1774,7 @@ void TabDragController::EndDragImpl(EndDragType type) {
       }
 
       GetAttachedBrowserWidget()->SetCanAppearInExistingFullscreenSpaces(false);
-      if (type == CANCELED) {
+      if (type == EndDragType::kCanceled) {
         RevertDrag();
       } else {
         if (previous_state == DragState::kDraggingUsingSystemDnD) {
@@ -1787,8 +1808,8 @@ void TabDragController::EndDragImpl(EndDragType type) {
 
   // Clear out drag data so we don't attempt to do anything with it.
   drag_data_.tab_drag_data_.clear();
-  if (current_drag_delegate_) {
-    current_drag_delegate_->OnTabDragEnded();
+  if (current_drag_target_) {
+    current_drag_target_->OnTabDragEnded();
     ResetDragTarget();
   }
 
@@ -1800,6 +1821,8 @@ void TabDragController::EndDragImpl(EndDragType type) {
 void TabDragController::RevertDrag() {
   CHECK(attached_context_);
   CHECK(source_context_);
+
+  dragging_tabs_session_ = nullptr;
 
   // If we're dragging a saved tab group, suspend tracking during the revert.
   // Otherwise, the group will get emptied out as we revert all the tabs.
@@ -1852,9 +1875,9 @@ void TabDragController::RevertDrag() {
     MaximizeAttachedWindow();
   }
   if (attached_context_ == source_context_) {
-    source_context_->StoppedDragging();
+    OnContextStoppedDragging();
   } else {
-    attached_context_->DraggedTabsDetached();
+    OnContextDraggedTabsDetached();
   }
 
   // If tabs were closed during this drag, the initial selection might include
@@ -2112,16 +2135,16 @@ void TabDragController::CompleteDrag() {
   CHECK_NE(current_state_, DragState::kNotStarted);
   CHECK(attached_context_);
 
-  if (current_drag_delegate_ && current_drag_delegate_->CanDropTab()) {
-    current_drag_delegate_->HandleTabDrop(*this);
-    attached_context_->StoppedDragging();
+  if (current_drag_target_ && current_drag_target_->CanDropTab()) {
+    current_drag_target_->HandleTabDrop(*this);
+    OnContextStoppedDragging();
 
     // The delegate is expected to handle all tab dragging finalization, and
     // therefore we return here.
     // The logic below is specific for dragging to a tabstrip, most of which
-    // should be moved to tabstrip's `TabDragDelegate` implementation. Some
+    // should be moved to tabstrip's `TabDragTarget` implementation. Some
     // functionality, such as restoring tab model selection, may be shared as
-    // part of the `TabDragDelegate::DragController` interface.
+    // part of the `TabDragTarget::DragController` interface.
     return;
   }
 
@@ -2146,7 +2169,7 @@ void TabDragController::CompleteDrag() {
     }
 #endif  // !BUILDFLAG(IS_WIN) && !BUILDFLAG(IS_LINUX) && !BUILDFLAG(IS_MAC)
   }
-  attached_context_->StoppedDragging();
+  OnContextStoppedDragging();
 
   // Tabbed PWAs with a home tab should have a home tab in every window.
   // This means when dragging tabs out to create a new window, a home tab
@@ -2221,7 +2244,7 @@ void TabDragController::BringWindowUnderPointToFront(
     const gfx::Point& point_in_screen) {
   gfx::NativeWindow native_window;
   if (GetLocalProcessWindow(point_in_screen, true, &native_window) ==
-      Liveness::DELETED) {
+      Liveness::kDeleted) {
     return;
   }
 
@@ -2284,7 +2307,7 @@ TabDragController::Liveness TabDragController::SetCapture(
     TabDragContext* context) {
   auto ref = weak_factory_.GetWeakPtr();
   context->GetWidget()->SetCapture(context);
-  return ref ? Liveness::ALIVE : Liveness::DELETED;
+  return ref ? Liveness::kAlive : Liveness::kDeleted;
 }
 
 bool TabDragController::IsDraggingTab(content::WebContents* contents) const {
@@ -2324,7 +2347,7 @@ gfx::Size TabDragController::CalculateDraggedWindowSize(
 
   // Limit the window size to the current display's size, less some insets.
   const gfx::Size work_area =
-      display::Screen::GetScreen()
+      display::Screen::Get()
           ->GetDisplayNearestPoint(last_point_in_screen_)
           .work_area()
           .size();
@@ -2350,14 +2373,17 @@ gfx::Size TabDragController::CalculateDraggedWindowSize(
 
 int TabDragController::GetTabOffsetForDetachedWindow(
     gfx::Point point_in_screen) {
-  DCHECK(attached_context_);
+  CHECK(attached_context_);
+  TabDragPositioningDelegate* positioning_delegate =
+      attached_context_->GetPositioningDelegate();
+  CHECK(positioning_delegate);
   const gfx::Point attached_point =
       views::View::ConvertPointFromScreen(attached_context_, point_in_screen);
-  if (attached_point.x() < attached_context_->TabDragAreaBeginX()) {
+  if (attached_point.x() < positioning_delegate->TabDragAreaBeginX()) {
     // Detaching to the left; tabs should be at the beginning of the window.
     return 0;
   }
-  if (attached_point.x() >= attached_context_->TabDragAreaEndX()) {
+  if (attached_point.x() >= positioning_delegate->TabDragAreaEndX()) {
     // Detaching to the right; tabs should be at the beginning of the window.
     return 0;
   }
@@ -2371,9 +2397,13 @@ void TabDragController::AdjustTabBoundsForDrag(
     int first_tab_leading_x,
     std::vector<gfx::Rect> drag_bounds) {
   CHECK(!ShouldDragWindowUsingSystemDnD());
+  TabDragPositioningDelegate* positioning_delegate =
+      attached_context_->GetPositioningDelegate();
+  CHECK(positioning_delegate);
 
-  attached_context_->ForceLayout();
-  const int current_tab_area_width = attached_context_->GetTabDragAreaWidth();
+  positioning_delegate->ForceLayout();
+  const int current_tab_area_width =
+      positioning_delegate->GetTabDragAreaWidth();
 
   // If the new tabstrip region is smaller than the old, resize and reposition
   // the tabs to provide a sense of continuity.
@@ -2402,7 +2432,8 @@ void TabDragController::AdjustTabBoundsForDrag(
   } else {
     OffsetX(first_tab_leading_x, &drag_bounds);
   }
-  attached_context_->SetBoundsForDrag(drag_data_.attached_views(), drag_bounds);
+  positioning_delegate->SetBoundsForDrag(drag_data_.attached_views(),
+                                         drag_bounds);
 }
 
 std::optional<webapps::AppId> TabDragController::GetControllingAppForDrag(
@@ -2471,9 +2502,8 @@ Browser* TabDragController::CreateBrowserForDrag(TabDragContext* source,
   create_params.restore_id = Browser::kDefaultRestoreId;
 
   // Open the window in the same display.
-  display::Display display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(
-          source->GetWidget()->GetNativeWindow());
+  display::Display display = display::Screen::Get()->GetDisplayNearestWindow(
+      source->GetWidget()->GetNativeWindow());
   create_params.display_id = display.id();
 #endif
   // Do not copy attached window's show state as the attached window might be a
@@ -2518,19 +2548,24 @@ gfx::Point TabDragController::GetCursorScreenPoint() {
   return aura::Env::GetInstance()->GetLastPointerPoint(
       event_source_, widget_window, /*fallback=*/last_point_in_screen_);
 #else
-  return display::Screen::GetScreen()->GetCursorScreenPoint();
+  return display::Screen::Get()->GetCursorScreenPoint();
 #endif
 }
 
 gfx::Vector2d TabDragController::CalculateWindowDragOffset() {
-  const gfx::Rect source_tab_bounds =
-      drag_data_.attached_views()[drag_data_.source_view_index_]->bounds();
-  const int cursor_offset_within_tab =
+  const views::View* source_view =
+      drag_data_.attached_views()[drag_data_.source_view_index_];
+  const gfx::Rect source_tab_bounds = source_view->bounds();
+  const int cursor_x_offset_within_tab =
       base::ClampRound(source_tab_bounds.width() * offset_to_width_ratio_);
+  const int cursor_y_offset_within_tab =
+      base::ClampRound(source_tab_bounds.height() * offset_to_height_ratio_);
   gfx::Point desired_cursor_pos_in_widget(
       attached_context_->GetMirroredXInView(source_tab_bounds.x() +
-                                            cursor_offset_within_tab),
-      source_tab_bounds.height() / 2);
+                                            cursor_x_offset_within_tab),
+      source_tab_bounds.y() + cursor_y_offset_within_tab);
+  desired_cursor_pos_in_widget = views::View::ConvertPointToTarget(
+      source_view->parent(), attached_context_, desired_cursor_pos_in_widget);
   views::View::ConvertPointToWidget(attached_context_,
                                     &desired_cursor_pos_in_widget);
   return desired_cursor_pos_in_widget.OffsetFromOrigin();
@@ -2555,15 +2590,17 @@ TabDragController::Liveness TabDragController::GetLocalProcessWindow(
   // window which was used for dragging is not hidden once all of its tabs are
   // attached to another browser window in DragBrowserToNewTabStrip().
   // TODO(pkotwicz): Fix this properly (crbug.com/358482)
-  for (Browser* browser : *BrowserList::GetInstance()) {
-    if (browser->tab_strip_model()->empty()) {
-      exclude.insert(browser->window()->GetNativeWindow());
-    }
-  }
+  ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+      [&exclude](BrowserWindowInterface* browser) {
+        if (browser->GetTabStripModel()->empty()) {
+          exclude.insert(browser->GetWindow()->GetNativeWindow());
+        }
+        return true;
+      });
 #endif
   base::WeakPtr<TabDragController> ref(weak_factory_.GetWeakPtr());
   *window = window_finder_->GetLocalProcessWindowAtPoint(screen_point, exclude);
-  return ref ? Liveness::ALIVE : Liveness::DELETED;
+  return ref ? Liveness::kAlive : Liveness::kDeleted;
 }
 
 bool TabDragController::CanAttachTo(gfx::NativeWindow window) {
@@ -2574,6 +2611,15 @@ bool TabDragController::CanAttachTo(gfx::NativeWindow window) {
   if (window == GetAttachedBrowserWidget()->GetNativeWindow()) {
     return true;
   }
+
+#if BUILDFLAG(IS_CHROMEOS)
+  // TODO(crbug.com/447246798): Don't allow dragging into an overview item as
+  // the implementation is buggy. Triggering this appears to require drag by
+  // touch, as drag by click causes the overview session to end immediately.
+  if (window->GetProperty(chromeos::kIsShowingInOverviewKey)) {
+    return false;
+  }
+#endif  // BUILDFLAG(IS_CHROMEOS)
 
   // Return false if `other_browser_view` is null or already closed. The latter
   // check is required since the widget may still alive on asynchronous
@@ -2623,13 +2669,14 @@ bool TabDragController::CanAttachTo(gfx::NativeWindow window) {
   }
 #endif  // BUILDFLAG(IS_MAC)
 
-  if (model->IsTabBlocked(active_index)) {
+  if (model->GetActiveTab()->IsBlocked()) {
     return false;
   }
 #endif  // BUILDFLAG(USE_AURA)
 
   // We don't allow drops on windows that don't have tabstrips.
-  if (!other_browser->SupportsWindowFeature(Browser::FEATURE_TABSTRIP)) {
+  if (!other_browser->SupportsWindowFeature(
+          Browser::WindowFeature::kFeatureTabStrip)) {
     return false;
   }
 
@@ -2681,16 +2728,10 @@ void TabDragController::NotifyEventIfTabAddedToGroup() {
       continue;
     }
 
-    ui::TrackedElement* element =
-        views::ElementTrackerViews::GetInstance()->GetElementForView(
-            tab_drag_datum.attached_view);
-    if (!element) {
-      continue;
+    if (views::ElementTrackerViews::GetInstance()->NotifyCustomEvent(
+            kTabGroupedCustomEventId, tab_drag_datum.attached_view)) {
+      break;
     }
-
-    ui::ElementTracker::GetFrameworkDelegate()->NotifyCustomEvent(
-        element, kTabGroupedCustomEventId);
-    break;
   }
 }
 
@@ -2705,7 +2746,7 @@ void TabDragController::MaybePauseTrackingSavedTabGroup() {
           ->browser();
 
   tab_groups::TabGroupSyncService* tab_group_service =
-      tab_groups::SavedTabGroupUtils::GetServiceForProfile(browser->profile());
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(browser->profile());
 
   if (!tab_group_service ||
       !tab_group_service->GetGroup(drag_data_.group_drag_data_.value().group)) {
@@ -2726,7 +2767,7 @@ void TabDragController::MaybeResumeTrackingSavedTabGroup() {
           ->browser();
 
   tab_groups::TabGroupSyncService* tab_group_service =
-      tab_groups::SavedTabGroupUtils::GetServiceForProfile(browser->profile());
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(browser->profile());
 
   if (!tab_group_service) {
     return;
@@ -2765,10 +2806,15 @@ void TabDragController::StartDraggingTabsSession(
   CHECK(current_state_ == DragState::kDraggingTabs ||
         current_state_ == DragState::kWaitingToExitRunLoop);
   CHECK_EQ(dragging_tabs_session_, nullptr);
+  CHECK(attached_context_);
+  if (!attached_context_->GetPositioningDelegate()) {
+    return;
+  }
 
   dragging_tabs_session_ = std::make_unique<DraggingTabsSession>(
-      drag_data_, attached_context_, offset_to_width_ratio_, initial_move,
-      start_point_in_screen);
+      drag_data_, *attached_context_,
+      *attached_context_->GetPositioningDelegate(), offset_to_width_ratio_,
+      initial_move, start_point_in_screen);
 }
 
 #if defined(USE_AURA)
@@ -2783,3 +2829,70 @@ void TabDragController::OnDragDropClientDestroying() {
   drag_drop_client_observation_.Reset();
 }
 #endif  // defined(USE_AURA)
+
+void TabDragController::OnContextStartedDragging(
+    const std::vector<TabSlotView*>& views) {
+  CHECK(attached_context_);
+  const bool dragging_window =
+      views.size() ==
+      static_cast<size_t>(attached_context_->GetTabStripModel()->count());
+  BrowserView* attached_browser_view =
+      GetBrowserViewForContext(attached_context_);
+  CHECK(attached_browser_view);
+  attached_browser_view->browser_widget()->SetTabDragKind(
+      dragging_window ? TabDragKind::kAllTabs : TabDragKind::kTab);
+
+  // Update the source browser as well to ensure fast-resizing is enabled
+  // during dragging.
+  BrowserView* source_browser_view = GetBrowserViewForContext(source_context_);
+  if (source_browser_view && source_browser_view != attached_browser_view) {
+    source_browser_view->browser_widget()->SetTabDragKind(TabDragKind::kTab);
+  }
+
+#if BUILDFLAG(IS_CHROMEOS)
+  attached_browser_view->GetWidget()->GetNativeWindow()->SetProperty(
+      ash::kIsDraggingTabsKey, true);
+#endif  // BUILDFLAG(IS_CHROMEOS)
+  attached_context_->StartedDragging(views);
+}
+
+void TabDragController::OnContextStoppedDragging() {
+  UpdateBrowserViewsForDragEnd();
+  attached_context_->StoppedDragging();
+}
+
+void TabDragController::OnContextDraggedTabsDetached() {
+  UpdateBrowserViewsForDragEnd();
+  attached_context_->DraggedTabsDetached();
+}
+
+void TabDragController::UpdateBrowserViewsForDragEnd() {
+  CHECK(attached_context_);
+  BrowserView* source_browser_view = GetBrowserViewForContext(source_context_);
+  BrowserView* attached_browser_view =
+      GetBrowserViewForContext(attached_context_);
+  CHECK(attached_browser_view);
+  // Only reset the source window's fast resize bit after the entire drag
+  // ends.
+  if (attached_browser_view != source_browser_view) {
+    attached_browser_view->browser_widget()->SetTabDragKind(TabDragKind::kNone);
+  }
+  if (source_browser_view && !IsActive()) {
+    source_browser_view->browser_widget()->SetTabDragKind(TabDragKind::kNone);
+  }
+
+#if BUILDFLAG(IS_CHROMEOS)
+  // Clear the drag properties unless the drag browser's tabs got merged into
+  // another browser, in which case SplitViewController::TabDragWindowObserver
+  // still needs to read the properties. We detect this case by checking if the
+  // tab strip model is now empty. Since it was non-empty originally and the
+  // drag browser can't have any pending downloads. we know that it's about to
+  // get destroyed anyways.
+  if (!attached_context_->GetTabStripModel()->empty()) {
+    attached_browser_view->GetWidget()->GetNativeWindow()->ClearProperty(
+        ash::kIsDraggingTabsKey);
+    attached_browser_view->GetWidget()->GetNativeWindow()->ClearProperty(
+        ash::kTabDraggingSourceWindowKey);
+  }
+#endif  // BUILDFLAG(IS_CHROMEOS)
+}

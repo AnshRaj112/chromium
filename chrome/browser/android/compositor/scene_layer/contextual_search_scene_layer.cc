@@ -25,7 +25,6 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/android/chrome_jni_headers/ContextualSearchSceneLayer_jni.h"
 
-using base::android::JavaParamRef;
 using base::android::JavaRef;
 
 namespace android {
@@ -52,7 +51,7 @@ ContextualSearchSceneLayer::ContextualSearchSceneLayer(
 
 void ContextualSearchSceneLayer::CreateContextualSearchLayer(
     JNIEnv* env,
-    const JavaParamRef<jobject>& jresource_manager) {
+    const JavaRef<jobject>& jresource_manager) {
   ui::ResourceManager* resource_manager =
       ui::ResourceManagerImpl::FromJavaObject(jresource_manager);
   contextual_search_layer_ = ContextualSearchLayer::Create(resource_manager);
@@ -67,35 +66,35 @@ ContextualSearchSceneLayer::~ContextualSearchSceneLayer() = default;
 
 void ContextualSearchSceneLayer::UpdateContextualSearchLayer(
     JNIEnv* env,
-    jint search_bar_background_resource_id,
-    jint search_bar_background_color,
-    jint search_context_resource_id,
-    jint search_term_resource_id,
-    jint search_caption_resource_id,
-    jint search_bar_shadow_resource_id,
-    jint search_provider_icon_resource_id,
-    jint quick_action_icon_resource_id,
-    jint drag_handlebar_resource_id,
-    jint open_tab_icon_resource_id,
-    jint close_icon_resource_id,
-    jint progress_bar_background_resource_id,
-    jint progress_bar_background_tint,
-    jint progress_bar_resource_id,
-    jint progress_bar_tint,
-    jint search_promo_resource_id,
+    int32_t search_bar_background_resource_id,
+    int32_t search_bar_background_color,
+    int32_t search_context_resource_id,
+    int32_t search_term_resource_id,
+    int32_t search_caption_resource_id,
+    int32_t search_bar_shadow_resource_id,
+    int32_t search_provider_icon_resource_id,
+    int32_t quick_action_icon_resource_id,
+    int32_t drag_handlebar_resource_id,
+    int32_t open_tab_icon_resource_id,
+    int32_t close_icon_resource_id,
+    int32_t progress_bar_background_resource_id,
+    int32_t progress_bar_background_tint,
+    int32_t progress_bar_resource_id,
+    int32_t progress_bar_tint,
+    int32_t search_promo_resource_id,
     jfloat dp_to_px,
     jfloat layout_width,
     jfloat layout_height,
     jfloat base_page_brightness,
     jfloat base_page_offset,
     content::WebContents* web_contents,
-    jboolean search_promo_visible,
+    bool search_promo_visible,
     jfloat search_promo_height,
     jfloat search_promo_opacity,
-    jint search_promo_background_color,
+    int32_t search_promo_background_color,
     // Related Searches
-    jint related_searches_in_bar_resource_id,
-    jboolean related_searches_in_bar_visible,
+    int32_t related_searches_in_bar_resource_id,
+    bool related_searches_in_bar_visible,
     jfloat related_searches_in_bar_height,
     jfloat related_searches_in_bar_redundant_padding,
     // Panel position etc
@@ -112,28 +111,28 @@ void ContextualSearchSceneLayer::UpdateContextualSearchLayer(
     jfloat search_term_opacity,
     jfloat search_term_caption_spacing,
     jfloat search_caption_animation_percentage,
-    jboolean search_caption_visible,
-    jboolean search_bar_border_visible,
+    bool search_caption_visible,
+    bool search_bar_border_visible,
     jfloat search_bar_border_height,
-    jboolean quick_action_icon_visible,
-    jboolean thumbnail_visible,
+    bool quick_action_icon_visible,
+    bool thumbnail_visible,
     std::string& thumbnail_url,
     jfloat custom_image_visibility_percentage,
-    jint bar_image_size,
-    jint icon_color,
-    jint drag_handlebar_color,
+    int32_t bar_image_size,
+    int32_t icon_color,
+    int32_t drag_handlebar_color,
     jfloat close_icon_opacity,
-    jboolean progress_bar_visible,
+    bool progress_bar_visible,
     jfloat progress_bar_height,
     jfloat progress_bar_opacity,
     jfloat progress_bar_completion,
-    jboolean touch_highlight_visible,
+    bool touch_highlight_visible,
     jfloat touch_highlight_x_offset,
     jfloat touch_highlight_width,
     Profile* profile,
-    jint rounded_bar_top_resource_id,
-    jint separator_line_color,
-    jint callout_resource_id,
+    int32_t rounded_bar_top_resource_id,
+    int32_t separator_line_color,
+    int32_t callout_resource_id,
     jfloat callout_opacity) {
   // Load the thumbnail if necessary.
   if (thumbnail_url != thumbnail_url_) {
@@ -247,7 +246,7 @@ void ContextualSearchSceneLayer::OnFetchComplete(const GURL& url,
 
 void ContextualSearchSceneLayer::SetContentTree(
     JNIEnv* env,
-    const JavaParamRef<jobject>& jcontent_tree) {
+    const JavaRef<jobject>& jcontent_tree) {
   SceneLayer* content_tree = FromJavaObject(env, jcontent_tree);
   if (!content_tree || !content_tree->layer())
     return;
@@ -269,9 +268,8 @@ void ContextualSearchSceneLayer::HideTree(JNIEnv* env) {
   content_container_->SetPosition(gfx::PointF(0.0f, 0.0f));
 }
 
-static jlong JNI_ContextualSearchSceneLayer_Init(
-    JNIEnv* env,
-    const JavaParamRef<jobject>& jobj) {
+static jlong JNI_ContextualSearchSceneLayer_Init(JNIEnv* env,
+                                                 const JavaRef<jobject>& jobj) {
   // This will automatically bind to the Java object and pass ownership there.
   ContextualSearchSceneLayer* tree_provider =
       new ContextualSearchSceneLayer(env, jobj);
@@ -279,3 +277,5 @@ static jlong JNI_ContextualSearchSceneLayer_Init(
 }
 
 }  // namespace android
+
+DEFINE_JNI(ContextualSearchSceneLayer)

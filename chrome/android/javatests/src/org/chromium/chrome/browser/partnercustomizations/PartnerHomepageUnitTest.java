@@ -22,9 +22,9 @@ import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.Feature;
-import org.chromium.chrome.browser.common.ChromeUrlConstants;
 import org.chromium.chrome.browser.homepage.HomepageManager;
 import org.chromium.chrome.browser.homepage.HomepageTestRule;
+import org.chromium.chrome.browser.url_constants.UrlConstantResolverFactory;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.partnercustomizations.TestPartnerBrowserCustomizationsDelayedProvider;
 import org.chromium.chrome.test.partnercustomizations.TestPartnerBrowserCustomizationsProvider;
@@ -86,7 +86,8 @@ public class PartnerHomepageUnitTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     mHomepageManager.setJavaPrefHomepageEnabled(true);
-                    mHomepageManager.setHomepagePreferences(false, true, TEST_CUSTOM_HOMEPAGE_GURL);
+                    mHomepageManager.setJavaHomepageSelection(
+                            false, true, TEST_CUSTOM_HOMEPAGE_GURL);
                 });
 
         // Note that unlike other tests in this file, we test if Chrome ignores a customizations
@@ -121,7 +122,8 @@ public class PartnerHomepageUnitTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     mHomepageManager.setJavaPrefHomepageEnabled(true);
-                    mHomepageManager.setHomepagePreferences(false, true, TEST_CUSTOM_HOMEPAGE_GURL);
+                    mHomepageManager.setJavaHomepageSelection(
+                            false, true, TEST_CUSTOM_HOMEPAGE_GURL);
                 });
 
         CustomizationProviderDelegateUpstreamImpl.setProviderAuthorityForTesting(
@@ -152,7 +154,8 @@ public class PartnerHomepageUnitTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     mHomepageManager.setJavaPrefHomepageEnabled(false);
-                    mHomepageManager.setHomepagePreferences(false, true, TEST_CUSTOM_HOMEPAGE_GURL);
+                    mHomepageManager.setJavaHomepageSelection(
+                            false, true, TEST_CUSTOM_HOMEPAGE_GURL);
                 });
 
         CustomizationProviderDelegateUpstreamImpl.setProviderAuthorityForTesting(
@@ -173,7 +176,7 @@ public class PartnerHomepageUnitTest {
                 TestPartnerBrowserCustomizationsProvider.HOMEPAGE_URI,
                 mPartnerBrowserCustomizations.getHomePageUrl().getSpec());
         Assert.assertFalse(mHomepageManager.isHomepageEnabled());
-        Assert.assertTrue(mHomepageManager.getHomepageGurl().isEmpty());
+        Assert.assertTrue(mHomepageManager.getHomepageGurl(/* isIncognito= */ false).isEmpty());
     }
 
     /**
@@ -187,7 +190,7 @@ public class PartnerHomepageUnitTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     mHomepageManager.setJavaPrefHomepageEnabled(true);
-                    mHomepageManager.setHomepagePreferences(
+                    mHomepageManager.setJavaHomepageSelection(
                             false, false, TEST_CUSTOM_HOMEPAGE_GURL);
                 });
 
@@ -209,7 +212,9 @@ public class PartnerHomepageUnitTest {
                 TestPartnerBrowserCustomizationsProvider.HOMEPAGE_URI,
                 mPartnerBrowserCustomizations.getHomePageUrl().getSpec());
         Assert.assertTrue(mHomepageManager.isHomepageEnabled());
-        Assert.assertEquals(TEST_CUSTOM_HOMEPAGE_GURL, mHomepageManager.getHomepageGurl());
+        Assert.assertEquals(
+                TEST_CUSTOM_HOMEPAGE_GURL,
+                mHomepageManager.getHomepageGurl(/* isIncognito= */ false));
     }
 
     /**
@@ -224,7 +229,8 @@ public class PartnerHomepageUnitTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     mHomepageManager.setJavaPrefHomepageEnabled(true);
-                    mHomepageManager.setHomepagePreferences(false, true, TEST_CUSTOM_HOMEPAGE_GURL);
+                    mHomepageManager.setJavaHomepageSelection(
+                            false, true, TEST_CUSTOM_HOMEPAGE_GURL);
                 });
 
         CustomizationProviderDelegateUpstreamImpl.setProviderAuthorityForTesting(
@@ -242,7 +248,7 @@ public class PartnerHomepageUnitTest {
         Assert.assertFalse(mPartnerBrowserCustomizations.isHomepageProviderAvailableAndEnabled());
         Assert.assertNull(mPartnerBrowserCustomizations.getHomePageUrl());
         Assert.assertFalse(mHomepageManager.isHomepageEnabled());
-        Assert.assertTrue(mHomepageManager.getHomepageGurl().isEmpty());
+        Assert.assertTrue(mHomepageManager.getHomepageGurl(/* isIncognito= */ false).isEmpty());
 
         mPartnerBrowserCustomizations.setOnInitializeAsyncFinished(mTestRule.getCallback(), 2000);
 
@@ -268,7 +274,8 @@ public class PartnerHomepageUnitTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     mHomepageManager.setJavaPrefHomepageEnabled(true);
-                    mHomepageManager.setHomepagePreferences(false, true, TEST_CUSTOM_HOMEPAGE_GURL);
+                    mHomepageManager.setJavaHomepageSelection(
+                            false, true, TEST_CUSTOM_HOMEPAGE_GURL);
                 });
 
         CustomizationProviderDelegateUpstreamImpl.setProviderAuthorityForTesting(
@@ -288,7 +295,7 @@ public class PartnerHomepageUnitTest {
         Assert.assertFalse(mPartnerBrowserCustomizations.isHomepageProviderAvailableAndEnabled());
         Assert.assertNull(mPartnerBrowserCustomizations.getHomePageUrl());
         Assert.assertFalse(mHomepageManager.isHomepageEnabled());
-        Assert.assertTrue(mHomepageManager.getHomepageGurl().isEmpty());
+        Assert.assertTrue(mHomepageManager.getHomepageGurl(/* isIncognito= */ false).isEmpty());
 
         mPartnerBrowserCustomizations.setOnInitializeAsyncFinished(mTestRule.getCallback(), 3000);
 
@@ -302,7 +309,7 @@ public class PartnerHomepageUnitTest {
         Assert.assertTrue(mHomepageManager.isHomepageEnabled());
         Assert.assertEquals(
                 TestPartnerBrowserCustomizationsDelayedProvider.HOMEPAGE_URI,
-                mHomepageManager.getHomepageGurl().getSpec());
+                mHomepageManager.getHomepageGurl(/* isIncognito= */ false).getSpec());
     }
 
     /**
@@ -316,7 +323,8 @@ public class PartnerHomepageUnitTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     mHomepageManager.setJavaPrefHomepageEnabled(true);
-                    mHomepageManager.setHomepagePreferences(false, true, TEST_CUSTOM_HOMEPAGE_GURL);
+                    mHomepageManager.setJavaHomepageSelection(
+                            false, true, TEST_CUSTOM_HOMEPAGE_GURL);
                 });
 
         CustomizationProviderDelegateUpstreamImpl.setProviderAuthorityForTesting(
@@ -339,12 +347,14 @@ public class PartnerHomepageUnitTest {
         Assert.assertTrue(mHomepageManager.isHomepageEnabled());
         Assert.assertEquals(
                 TestPartnerBrowserCustomizationsProvider.HOMEPAGE_URI,
-                mHomepageManager.getHomepageGurl().getSpec());
+                mHomepageManager.getHomepageGurl(/* isIncognito= */ false).getSpec());
     }
 
     private void assertHomePageIsNtp() {
         // The home page should default to the NTP
         Assert.assertTrue(mHomepageManager.isHomepageEnabled());
-        Assert.assertEquals(ChromeUrlConstants.nativeNtpGurl(), mHomepageManager.getHomepageGurl());
+        Assert.assertEquals(
+                UrlConstantResolverFactory.getOriginalResolver().getNtpGurl(),
+                mHomepageManager.getHomepageGurl(/* isIncognito= */ false));
     }
 }

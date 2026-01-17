@@ -6,10 +6,10 @@
 #define CONTENT_PUBLIC_BROWSER_BACK_FORWARD_CACHE_H_
 
 #include <cstdint>
-#include <map>
 #include <optional>
 #include <set>
 
+#include "base/time/time.h"
 #include "content/common/content_export.h"
 #include "content/public/browser/global_routing_id.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
@@ -120,7 +120,8 @@ class CONTENT_EXPORT BackForwardCache {
     kCacheLimitPrunedOnModerateMemoryPressure = 70,
     kCacheLimitPrunedOnCriticalMemoryPressure = 71,
     kSharedWorkerMessage = 72,
-    kMaxValue = kSharedWorkerMessage,
+    kSharedWorkerWithNoActiveClient = 73,
+    kMaxValue = kSharedWorkerWithNoActiveClient,
   };
   // LINT.ThenChange(//tools/metrics/histograms/metadata/navigation/enums.xml:BackForwardCacheNotRestoredReason)
 

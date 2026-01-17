@@ -38,7 +38,6 @@ class FilterOperations;
 class Occlusion;
 class LayerImpl;
 class LayerTreeImpl;
-class PictureLayerImpl;
 
 struct RenderSurfacePropertyChangedFlags {
  public:
@@ -274,9 +273,6 @@ class CC_EXPORT RenderSurfaceImpl {
   CreateViewTransitionCaptureRenderPass(
       const base::flat_set<blink::ViewTransitionToken>&
           capture_view_transition_tokens = {});
-  viz::ResourceId GetMaskResourceFromLayer(PictureLayerImpl* mask_layer,
-                                           gfx::Size* mask_texture_size,
-                                           gfx::RectF* mask_uv_rect) const;
   void AppendQuads(const AppendQuadsContext& context,
                    viz::CompositorRenderPass* render_pass,
                    AppendQuadsData* append_quads_data);
@@ -328,9 +324,10 @@ class CC_EXPORT RenderSurfaceImpl {
   ElementId id_;
   int effect_tree_index_;
 
-  // A unique id in the same namespace as `Layer::layer_id_`, so viz can
-  // identify `RenderPassDrawQuads` across the frame, similarly to other quads.
-  uint32_t layer_id_ = 0;
+  // A unique id in the same namespace as
+  // `LayerImpl::stable_id_for_shared_quad_state`, so viz can identify
+  // `RenderPassDrawQuads` across the frame, similarly to other quads.
+  const int stable_id_for_shared_quad_state_ = 0;
 
   // Container for properties that render surfaces need to compute before they
   // can be drawn.

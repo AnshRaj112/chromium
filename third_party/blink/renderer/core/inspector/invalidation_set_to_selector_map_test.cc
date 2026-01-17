@@ -5,6 +5,7 @@
 #include "third_party/blink/renderer/core/inspector/invalidation_set_to_selector_map.h"
 
 #include "base/test/trace_event_analyzer.h"
+#include "base/test/trace_test_utils.h"
 #include "third_party/blink/public/web/web_css_origin.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_css_style_sheet_init.h"
 #include "third_party/blink/renderer/core/css/css_test_helpers.h"
@@ -53,6 +54,8 @@ class InvalidationSetToSelectorMapTest : public PageTestBase {
   InvalidationSetToSelectorMap* GetInstance() {
     return InvalidationSetToSelectorMap::GetInstanceReference().Get();
   }
+
+  base::test::TracingEnvironment tracing_environment_;
 };
 
 TEST_F(InvalidationSetToSelectorMapTest, TrackerLifetime) {
@@ -1209,8 +1212,9 @@ TEST_F(InvalidationSetToSelectorMapTest, AdoptedStylesheets) {
     test_element.sheet =
         CSSStyleSheet::Create(GetDocument(), init, ASSERT_NO_EXCEPTION);
     test_element.sheet->insertRule(
-        String::Format(".a .b {background: %s;}", test_element.color), 0,
-        ASSERT_NO_EXCEPTION);
+        UNSAFE_TODO(
+            String::Format(".a .b {background: %s;}", test_element.color)),
+        0, ASSERT_NO_EXCEPTION);
     HeapVector<Member<CSSStyleSheet>> stylesheets;
     stylesheets.push_back(test_element.sheet);
     shadow_root.SetAdoptedStyleSheetsForTesting(stylesheets);

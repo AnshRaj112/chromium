@@ -4,6 +4,8 @@
 
 #include "components/power_metrics/system_power_monitor.h"
 
+#include <string_view>
+
 #include "base/compiler_specific.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/task_environment.h"
@@ -32,23 +34,24 @@ class FakeDelegate : public SystemPowerMonitorDelegate {
                          base::TimeTicks timestamp,
                          int64_t power) override {
     timestamp_ = timestamp;
-    if (UNSAFE_TODO(strcmp(category, "Package Power (mW)")) == 0) {
+    std::string_view category_str_view(category);
+    if (category_str_view == "Package Power (mW)") {
       system_power_.package_nanojoules = static_cast<uint64_t>(power);
-    } else if (UNSAFE_TODO(strcmp(category, "CPU Power (mW)")) == 0) {
+    } else if (category_str_view == "CPU Power (mW)") {
       system_power_.cpu_nanojoules = static_cast<uint64_t>(power);
-    } else if (UNSAFE_TODO(strcmp(category, "iGPU Power (mW)")) == 0) {
+    } else if (category_str_view == "iGPU Power (mW)") {
       system_power_.gpu_nanojoules = static_cast<uint64_t>(power);
-    } else if (UNSAFE_TODO(strcmp(category, "DRAM Power (mW)")) == 0) {
+    } else if (category_str_view == "DRAM Power (mW)") {
       system_power_.dram_nanojoules = static_cast<uint64_t>(power);
-    } else if (UNSAFE_TODO(strcmp(category, "Psys Power (mW)")) == 0) {
+    } else if (category_str_view == "Psys Power (mW)") {
       system_power_.psys_nanojoules = static_cast<uint64_t>(power);
-    } else if (UNSAFE_TODO(strcmp(category, "VDDCR VDD (mW)")) == 0) {
+    } else if (category_str_view == "VDDCR VDD (mW)") {
       system_power_.vdd_nanojoules = static_cast<uint64_t>(power);
-    } else if (UNSAFE_TODO(strcmp(category, "VDDCR SOC (mW)")) == 0) {
+    } else if (category_str_view == "VDDCR SOC (mW)") {
       system_power_.soc_nanojoules = static_cast<uint64_t>(power);
-    } else if (UNSAFE_TODO(strcmp(category, "Current Socket (mW)")) == 0) {
+    } else if (category_str_view == "Current Socket (mW)") {
       system_power_.socket_nanojoules = static_cast<uint64_t>(power);
-    } else if (UNSAFE_TODO(strcmp(category, "APU Power (mW)")) == 0) {
+    } else if (category_str_view == "APU Power (mW)") {
       system_power_.apu_nanojoules = static_cast<uint64_t>(power);
     }
   }
@@ -83,7 +86,11 @@ class SystemPowerMonitorHelperTest : public testing::Test {
                                                          std::move(delegate));
   }
 
-  void TearDown() override { helper_.reset(); }
+  void TearDown() override {
+    delegate_ = nullptr;
+    provider_ = nullptr;
+    helper_.reset();
+  }
 
   base::test::TaskEnvironment& task_environment() { return task_environment_; }
   SystemPowerMonitorHelper* helper() { return helper_.get(); }
@@ -95,8 +102,8 @@ class SystemPowerMonitorHelperTest : public testing::Test {
 
  private:
   std::unique_ptr<SystemPowerMonitorHelper> helper_;
-  raw_ptr<FakeDelegate, DanglingUntriaged> delegate_;
-  raw_ptr<FakeProvider, DanglingUntriaged> provider_;
+  raw_ptr<FakeDelegate> delegate_;
+  raw_ptr<FakeProvider> provider_;
 };
 
 class SystemPowerMonitorTest : public testing::Test {
@@ -108,13 +115,19 @@ class SystemPowerMonitorTest : public testing::Test {
 
     // Assign a valid metric to provider, so the timer can start successfully.
     provider->set_metrics({1llu});
-    monitor_.reset(new SystemPowerMonitor(std::move(provider),
-                                          std::make_unique<FakeDelegate>()));
+    auto delegate = std::make_unique<FakeDelegate>();
+    delegate_ = delegate.get();
+    monitor_.reset(
+        new SystemPowerMonitor(std::move(provider), std::move(delegate)));
   }
 
-  void TearDown() override { monitor_.reset(); }
+  void TearDown() override {
+    delegate_ = nullptr;
+    monitor_.reset();
+  }
 
   SystemPowerMonitor* monitor() { return monitor_.get(); }
+  FakeDelegate* delegate() { return delegate_.get(); }
   base::SequenceBound<SystemPowerMonitorHelper>* helper() {
     return monitor_->GetHelperForTesting();
   }
@@ -124,6 +137,7 @@ class SystemPowerMonitorTest : public testing::Test {
 
  private:
   std::unique_ptr<SystemPowerMonitor> monitor_;
+  raw_ptr<FakeDelegate> delegate_;
 };
 
 TEST_F(SystemPowerMonitorHelperTest, MonitorHelperStartStop) {
@@ -229,7 +243,9 @@ TEST_F(SystemPowerMonitorTest, TraceLogEnableDisable) {
   ASSERT_NE(helper(), nullptr);
 
   base::test::TestFuture<bool> future_enable;
-  monitor()->OnTraceLogEnabled();
+  helper()
+      ->AsyncCall(&SystemPowerMonitorHelper::OnStart)
+      .WithArgs(perfetto::DataSourceBase::StartArgs{});
   helper()
       ->AsyncCall(&SystemPowerMonitorHelper::IsTimerRunningForTesting)
       .Then(base::BindOnce(
@@ -239,8 +255,10 @@ TEST_F(SystemPowerMonitorTest, TraceLogEnableDisable) {
           future_enable.GetCallback()));
   EXPECT_TRUE(future_enable.Get());
 
+  delegate()->set_trace_category_enabled(false);
+  helper()->AsyncCall(&SystemPowerMonitorHelper::Sample);
+
   base::test::TestFuture<bool> future_disable;
-  monitor()->OnTraceLogDisabled();
   helper()
       ->AsyncCall(&SystemPowerMonitorHelper::IsTimerRunningForTesting)
       .Then(base::BindOnce(

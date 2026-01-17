@@ -2,16 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <sstream>
+#include <string>
+#include <tuple>
+
 #include "base/strings/strcat.h"
+#include "base/test/bind.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
+#include "base/test/test_timeouts.h"
+#include "chrome/browser/actor/actor_features.h"
 #include "chrome/browser/actor/actor_test_util.h"
 #include "chrome/browser/actor/tools/tool_request.h"
 #include "chrome/browser/actor/tools/tools_test_util.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/common/actor.mojom.h"
+#include "chrome/common/chrome_features.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
+#include "content/public/test/download_test_observer.h"
+#include "pdf/buildflags.h"
+#include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gfx/geometry/point_conversions.h"
+
+#if BUILDFLAG(ENABLE_PDF)
+#include "components/pdf/browser/pdf_document_helper.h"
+#include "pdf/pdf_features.h"
+#endif  // BUILDFLAG(ENABLE_PDF)
 
 using base::test::TestFuture;
 using content::ChildFrameAt;
@@ -25,8 +43,84 @@ namespace actor {
 
 namespace {
 
+#if BUILDFLAG(ENABLE_PDF) && !BUILDFLAG(IS_CHROMEOS)
+void CheckForConditionAndWaitMoreIfNeeded(
+    base::RepeatingCallback<bool()> condition,
+    base::OnceClosure quit_closure) {
+  if (condition.Run()) {
+    std::move(quit_closure).Run();
+    return;
+  }
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE,
+      base::BindOnce(&CheckForConditionAndWaitMoreIfNeeded,
+                     std::move(condition), std::move(quit_closure)),
+      TestTimeouts::tiny_timeout());
+}
+
+// Wait until |condition| returns true.
+void WaitForCondition(base::RepeatingCallback<bool()> condition,
+                      const std::string& description) {
+  base::RunLoop run_loop;
+  CheckForConditionAndWaitMoreIfNeeded(condition, run_loop.QuitClosure());
+  run_loop.Run();
+
+  ASSERT_TRUE(condition.Run())
+      << "Timeout waiting for condition: " << description;
+}
+#endif
+
+// This observer detects when WebContents receives notification of a user
+// gesture having occurred, following a user input event targeted to
+// a RenderWidgetHost under that WebContents.
+class UserInteractionObserver : public content::WebContentsObserver {
+ public:
+  explicit UserInteractionObserver(content::WebContents* web_contents)
+      : WebContentsObserver(web_contents) {}
+
+  UserInteractionObserver(const UserInteractionObserver&) = delete;
+  UserInteractionObserver& operator=(const UserInteractionObserver&) = delete;
+
+  ~UserInteractionObserver() override {}
+
+  // Retrieve the flag. There is no need to wait on a loop since
+  // DidGetUserInteraction() should be called synchronously with the input
+  // event processing in the browser process.
+  bool WasUserInteractionReceived() { return user_interaction_received_; }
+
+  void Reset() { user_interaction_received_ = false; }
+
+ private:
+  // WebContentsObserver
+  void DidGetUserInteraction(const blink::WebInputEvent& event) override {
+    user_interaction_received_ = true;
+  }
+
+  bool user_interaction_received_ = false;
+};
+
+class ActorClickToolBrowserTest : public ActorToolsTest {
+ public:
+  ActorClickToolBrowserTest() {
+    feature_list_.InitAndEnableFeatureWithParameters(
+        ::features::kGlicActor,
+        {{features::kGlicActorClickDelay.name, "200ms"}});
+  }
+
+  ~ActorClickToolBrowserTest() override = default;
+
+  void SetUpOnMainThread() override {
+    ActorToolsTest::SetUpOnMainThread();
+    ASSERT_TRUE(embedded_test_server()->Start());
+    ASSERT_TRUE(embedded_https_test_server().Start());
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
 // Basic test to ensure sending a click to an element works.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToElement) {
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest, ClickTool_SentToElement) {
   const GURL url =
       embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
@@ -38,11 +132,13 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToElement) {
 
     std::unique_ptr<ToolRequest> action =
         MakeClickRequest(*main_frame(), body_id.value());
-    TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+    ActResultFuture result;
     actor_task().Act(ToRequestList(action), result.GetCallback());
     ExpectOkResult(result);
-    EXPECT_EQ("mousedown[BODY#],mouseup[BODY#],click[BODY#]",
-              EvalJs(web_contents(), "mouse_event_log.join(',')"));
+    EXPECT_THAT(
+        EvalJs(web_contents(), "mouse_event_log.join(',')").ExtractString(),
+        testing::EndsWith(
+            "mousemove[BODY#],mousedown[BODY#],mouseup[BODY#],click[BODY#]"));
   }
 
   ASSERT_TRUE(ExecJs(web_contents(), "mouse_event_log = []"));
@@ -55,13 +151,14 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToElement) {
 
     std::unique_ptr<ToolRequest> action =
         MakeClickRequest(*main_frame(), button_id.value());
-    TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+    ActResultFuture result;
     actor_task().Act(ToRequestList(action), result.GetCallback());
     ExpectOkResult(result);
-    EXPECT_EQ(
-        "mousedown[BUTTON#clickable],mouseup[BUTTON#clickable],click[BUTTON#"
-        "clickable]",
-        EvalJs(web_contents(), "mouse_event_log.join(',')"));
+    EXPECT_THAT(
+        EvalJs(web_contents(), "mouse_event_log.join(',')").ExtractString(),
+        testing::EndsWith(
+            "mousemove[BUTTON#clickable],mousedown[BUTTON#clickable],"
+            "mouseup[BUTTON#clickable],click[BUTTON#clickable]"));
 
     // Ensure the button's event handler was invoked.
     EXPECT_EQ(true, EvalJs(web_contents(), "button_clicked"));
@@ -69,7 +166,8 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToElement) {
 }
 
 // Sending a click to an element that doesn't exist fails.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_NonExistentElement) {
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest,
+                       ClickTool_NonExistentElement) {
   const GURL url =
       embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
@@ -77,17 +175,19 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_NonExistentElement) {
   // Use a random node id that doesn't exist.
   std::unique_ptr<ToolRequest> action =
       MakeClickRequest(*main_frame(), kNonExistentContentNodeId);
-  TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result_fail;
+  ActResultFuture result_fail;
   actor_task().Act(ToRequestList(action), result_fail.GetCallback());
   // The node id doesn't exist so the tool will return false.
   ExpectErrorResult(result_fail, mojom::ActionResultCode::kInvalidDomNodeId);
 
-  // The page should not have received any events.
-  EXPECT_EQ("", EvalJs(web_contents(), "mouse_event_log.join(',')"));
+  // The page should not have received any click events.
+  EXPECT_THAT(
+      EvalJs(web_contents(), "mouse_event_log.join(',')").ExtractString(),
+      testing::Not(testing::HasSubstr("mousedown")));
 }
 
 // Sending a click to a disabled element should fail without dispatching events.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_DisabledElement) {
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest, ClickTool_DisabledElement) {
   const GURL url =
       embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
@@ -97,20 +197,25 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_DisabledElement) {
 
   std::unique_ptr<ToolRequest> action =
       MakeClickRequest(*main_frame(), button_id.value());
-  TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result_fail;
+  ActResultFuture result_fail;
   actor_task().Act(ToRequestList(action), result_fail.GetCallback());
   ExpectErrorResult(result_fail, mojom::ActionResultCode::kElementDisabled);
 
-  // The page should not have received any events.
-  EXPECT_EQ("", EvalJs(web_contents(), "mouse_event_log.join(',')"));
+  // The page should not have received any click events.
+  EXPECT_THAT(
+      EvalJs(web_contents(), "mouse_event_log.join(',')").ExtractString(),
+      testing::Not(testing::HasSubstr("mousedown")));
 }
 
-// Sending a click to an element that's not in the viewport should fail without
-// dispatching events.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_OffscreenElement) {
+// Sending a click to an element that's not in the viewport should cause it to
+// first be scrolled into view then clicked.
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest, ClickTool_OffscreenElement) {
   const GURL url =
       embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Page starts unscrolled
+  ASSERT_EQ(0, EvalJs(web_contents(), "window.scrollY"));
 
   std::optional<int> button_id =
       GetDOMNodeId(*main_frame(), "button#offscreen");
@@ -118,16 +223,49 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_OffscreenElement) {
 
   std::unique_ptr<ToolRequest> action =
       MakeClickRequest(*main_frame(), button_id.value());
-  TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result_fail;
-  actor_task().Act(ToRequestList(action), result_fail.GetCallback());
-  ExpectErrorResult(result_fail, mojom::ActionResultCode::kElementOffscreen);
+  ActResultFuture result;
+  actor_task().Act(ToRequestList(action), result.GetCallback());
+  ExpectOkResult(result);
 
+  // Page is now scrolled.
+  ASSERT_GT(EvalJs(web_contents(), "window.scrollY"), 0);
   // The page should not have received any events.
-  EXPECT_EQ("", EvalJs(web_contents(), "mouse_event_log.join(',')"));
+  EXPECT_THAT(
+      EvalJs(web_contents(), "mouse_event_log.join(',')").ExtractString(),
+      testing::EndsWith(
+          "mousemove[BUTTON#offscreen],mousedown[BUTTON#offscreen],"
+          "mouseup[BUTTON#offscreen],click[BUTTON#offscreen]"));
+}
+
+// Sending a click to an element that's not in the viewport should cause it to
+// first be scrolled into view then clicked.
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest,
+                       ClickTool_OffscreenHiddenElement) {
+  const GURL url = embedded_test_server()->GetURL("/actor/oov_elements.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  for (const char* selector :
+       {"#detailButton", "#hiddenButton", "#autoButton"}) {
+    SCOPED_TRACE(selector);
+    // Starts unscrolled
+    ASSERT_TRUE(EvalJs(web_contents(), "window.scroll(0,0)").is_ok());
+
+    std::optional<int> button_id = GetDOMNodeId(*main_frame(), selector);
+    ASSERT_TRUE(button_id);
+
+    std::unique_ptr<ToolRequest> action =
+        MakeClickRequest(*main_frame(), button_id.value());
+    ActResultFuture result;
+    actor_task().Act(ToRequestList(action), result.GetCallback());
+    ExpectOkResult(result);
+
+    // Page is now scrolled.
+    EXPECT_GT(EvalJs(web_contents(), "window.scrollY"), 0);
+  }
 }
 
 // Ensure clicks can be sent to elements that are only partially onscreen.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_ClippedElements) {
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest, ClickTool_ClippedElements) {
   const GURL url =
       embedded_test_server()->GetURL("/actor/click_with_overflow_clip.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
@@ -143,7 +281,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_ClippedElements) {
 
     std::unique_ptr<ToolRequest> action =
         MakeClickRequest(*main_frame(), button_id.value());
-    TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+    ActResultFuture result;
     actor_task().Act(ToRequestList(action), result.GetCallback());
     ExpectOkResult(result);
     EXPECT_EQ(button, EvalJs(web_contents(), "clicked_button"));
@@ -153,7 +291,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_ClippedElements) {
 }
 
 // Ensure clicks can be sent to a coordinate onscreen.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinate) {
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest, ClickTool_SentToCoordinate) {
   const GURL url =
       embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
@@ -162,11 +300,13 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinate) {
   {
     std::unique_ptr<ToolRequest> action =
         MakeClickRequest(*active_tab(), gfx::Point(0, 0));
-    TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+    ActResultFuture result;
     actor_task().Act(ToRequestList(action), result.GetCallback());
     ExpectOkResult(result);
-    EXPECT_EQ("mousedown[HTML#],mouseup[HTML#],click[HTML#]",
-              EvalJs(web_contents(), "mouse_event_log.join(',')"));
+    EXPECT_THAT(
+        EvalJs(web_contents(), "mouse_event_log.join(',')").ExtractString(),
+        testing::EndsWith(
+            "mousemove[HTML#],mousedown[HTML#],mouseup[HTML#],click[HTML#]"));
   }
 
   ASSERT_TRUE(ExecJs(web_contents(), "mouse_event_log = []"));
@@ -178,13 +318,14 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinate) {
 
     std::unique_ptr<ToolRequest> action =
         MakeClickRequest(*active_tab(), click_point);
-    TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+    ActResultFuture result;
     actor_task().Act(ToRequestList(action), result.GetCallback());
     ExpectOkResult(result);
-    EXPECT_EQ(
-        "mousedown[BUTTON#clickable],mouseup[BUTTON#clickable],click[BUTTON#"
-        "clickable]",
-        EvalJs(web_contents(), "mouse_event_log.join(',')"));
+    EXPECT_THAT(
+        EvalJs(web_contents(), "mouse_event_log.join(',')").ExtractString(),
+        testing::EndsWith(
+            "mousemove[BUTTON#clickable],mousedown[BUTTON#clickable],"
+            "mouseup[BUTTON#clickable],click[BUTTON#clickable]"));
 
     // Ensure the button's event handler was invoked.
     EXPECT_EQ(true, EvalJs(web_contents(), "button_clicked"));
@@ -193,7 +334,8 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinate) {
 
 // Sending a click to a coordinate not in the viewport should fail without
 // dispatching events.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinateOffScreen) {
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest,
+                       ClickTool_SentToCoordinateOffScreen) {
   const GURL url =
       embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
@@ -203,13 +345,15 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinateOffScreen) {
     gfx::Point negative_offscreen = {-1, 0};
     std::unique_ptr<ToolRequest> action =
         MakeClickRequest(*active_tab(), negative_offscreen);
-    TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result_fail;
+    ActResultFuture result_fail;
     actor_task().Act(ToRequestList(action), result_fail.GetCallback());
     ExpectErrorResult(result_fail,
                       mojom::ActionResultCode::kCoordinatesOutOfBounds);
 
-    // The page should not have received any events.
-    EXPECT_EQ("", EvalJs(web_contents(), "mouse_event_log.join(',')"));
+    // The page should not have received any click events.
+    EXPECT_THAT(
+        EvalJs(web_contents(), "mouse_event_log.join(',')").ExtractString(),
+        testing::Not(testing::HasSubstr("mousedown")));
   }
 
   // Send a click to a positive coordinate offscreen.
@@ -218,17 +362,20 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinateOffScreen) {
         GetCenterCoordinatesOfElementWithId(web_contents(), "offscreen"));
     std::unique_ptr<ToolRequest> action =
         MakeClickRequest(*active_tab(), positive_offscreen);
-    TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result_fail;
+    ActResultFuture result_fail;
     actor_task().Act(ToRequestList(action), result_fail.GetCallback());
     ExpectErrorResult(result_fail,
                       mojom::ActionResultCode::kCoordinatesOutOfBounds);
-    // The page should not have received any events.
-    EXPECT_EQ("", EvalJs(web_contents(), "mouse_event_log.join(',')"));
+    // The page should not have received any click events.
+    EXPECT_THAT(
+        EvalJs(web_contents(), "mouse_event_log.join(',')").ExtractString(),
+        testing::Not(testing::HasSubstr("mousedown")));
   }
 }
 
 // Ensure click is using viewport coordinate.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_ViewportCoordinate) {
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest,
+                       ClickTool_ViewportCoordinate) {
   const GURL url =
       embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
@@ -243,13 +390,14 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_ViewportCoordinate) {
 
     std::unique_ptr<ToolRequest> action =
         MakeClickRequest(*active_tab(), click_point);
-    TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+    ActResultFuture result;
     actor_task().Act(ToRequestList(action), result.GetCallback());
     ExpectOkResult(result);
-    EXPECT_EQ(
-        "mousedown[BUTTON#offscreen],mouseup[BUTTON#offscreen],click[BUTTON#"
-        "offscreen]",
-        EvalJs(web_contents(), "mouse_event_log.join(',')"));
+    EXPECT_THAT(
+        EvalJs(web_contents(), "mouse_event_log.join(',')").ExtractString(),
+        testing::EndsWith(
+            "mousemove[BUTTON#offscreen],mousedown[BUTTON#offscreen],"
+            "mouseup[BUTTON#offscreen],click[BUTTON#offscreen]"));
 
     // Ensure the button's event handler was invoked.
     EXPECT_EQ(true, EvalJs(web_contents(), "offscreen_button_clicked"));
@@ -258,7 +406,8 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_ViewportCoordinate) {
 
 // Ensure click works correctly when clicking on a cross process iframe using a
 // DomNodeId
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_Subframe_DomNodeId) {
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest,
+                       ClickTool_Subframe_DomNodeId) {
   // This test only applies if cross-origin frames are put into separate
   // processes.
   if (!content::AreAllSitesIsolatedForTesting()) {
@@ -284,7 +433,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_Subframe_DomNodeId) {
   std::unique_ptr<ToolRequest> action =
       MakeClickRequest(*subframe, button_id.value());
 
-  TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+  ActResultFuture result;
   actor_task().Act(ToRequestList(action), result.GetCallback());
   ExpectOkResult(result);
 
@@ -294,7 +443,8 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_Subframe_DomNodeId) {
 
 // Ensure that page tools (click is arbitrary here) correctly add the acted on
 // tab to the task's tab set.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_RecordActingOnTask) {
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest,
+                       ClickTool_RecordActingOnTask) {
   ASSERT_TRUE(actor_task().GetTabs().empty());
 
   // Send a click to the document body.
@@ -303,12 +453,208 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_RecordActingOnTask) {
 
   std::unique_ptr<ToolRequest> action =
       MakeClickRequest(*main_frame(), body_id.value());
-  TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+  ActResultFuture result;
   actor_task().Act(ToRequestList(action), result.GetCallback());
   ExpectOkResult(result);
 
   EXPECT_TRUE(actor_task().GetTabs().contains(active_tab()->GetHandle()));
 }
+
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest, ClickTool_Delay) {
+  const GURL url =
+      embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  std::optional<int> body_id = GetDOMNodeId(*main_frame(), "body");
+  ASSERT_TRUE(body_id);
+
+  std::unique_ptr<ToolRequest> action =
+      MakeClickRequest(*main_frame(), body_id.value());
+  ActResultFuture result;
+  actor_task().Act(ToRequestList(action), result.GetCallback());
+  ExpectOkResult(result);
+
+  const double mousedown_timestamp = EvalJs(main_frame(), R"(
+        let index = mouse_event_log.findIndex(
+          (entry) => entry.startsWith('mousedown'));
+        mouse_event_timestamps[index]
+      )")
+                                         .ExtractDouble();
+  const double mouseup_timestamp = EvalJs(main_frame(), R"(
+        let index = mouse_event_log.findIndex(
+          (entry) => entry.startsWith('mouseup'));
+        mouse_event_timestamps[index]
+      )")
+                                       .ExtractDouble();
+  const base::TimeDelta delta =
+      base::Milliseconds(mouseup_timestamp - mousedown_timestamp);
+
+  EXPECT_GE(delta, features::kGlicActorClickDelay.Get());
+}
+
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest, UserInteractionTriggered) {
+  const GURL start_url =
+      embedded_https_test_server().GetURL("example.com", "/actor/blank.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), start_url));
+
+  UserInteractionObserver observer(web_contents());
+
+  std::unique_ptr<ToolRequest> action =
+      MakeClickRequest(*active_tab(), gfx::Point(1, 1));
+
+  ASSERT_FALSE(observer.WasUserInteractionReceived());
+
+  ActResultFuture result;
+  actor_task().Act(ToRequestList(action), result.GetCallback());
+  ExpectOkResult(result);
+
+  ASSERT_TRUE(observer.WasUserInteractionReceived());
+}
+
+// Test that we can dispatch a click to a checkbox that's entirely overlaid by
+// a pseudo element in its associated label.
+IN_PROC_BROWSER_TEST_F(ActorClickToolBrowserTest, CheckboxOverlayedByPseudo) {
+  const GURL start_url = embedded_https_test_server().GetURL(
+      "example.com", "/actor/page_with_clickable_element.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), start_url));
+
+  std::optional<int> checkbox_id =
+      GetDOMNodeId(*main_frame(), "#checkboxPseudo");
+  ASSERT_TRUE(checkbox_id);
+
+  std::unique_ptr<ToolRequest> action =
+      MakeClickRequest(*main_frame(), checkbox_id.value());
+  ActResultFuture result;
+  actor_task().Act(ToRequestList(action), result.GetCallback());
+  ExpectOkResult(result);
+}
+
+class ActorClickToolScaledBrowserTest : public ActorToolsTest {
+ public:
+  ActorClickToolScaledBrowserTest() = default;
+  ~ActorClickToolScaledBrowserTest() override = default;
+
+  void SetUpOnMainThread() override {
+    ActorToolsTest::SetUpOnMainThread();
+    ASSERT_TRUE(embedded_test_server()->Start());
+    ASSERT_TRUE(embedded_https_test_server().Start());
+  }
+
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    ActorToolsTest::SetUpCommandLine(command_line);
+    command_line->RemoveSwitch(switches::kForceDeviceScaleFactor);
+    command_line->AppendSwitchASCII(switches::kForceDeviceScaleFactor, "2");
+  }
+};
+
+// Ensure clicks can be sent to elements that are only partially onscreen with
+// scaling.
+IN_PROC_BROWSER_TEST_F(ActorClickToolScaledBrowserTest,
+                       ClickTool_ScaledClippedElements) {
+  const GURL url =
+      embedded_test_server()->GetURL("/actor/click_with_overflow_clip.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  std::vector<std::string> test_cases = {
+      "offscreenButton", "overflowHiddenButton", "overflowScrollButton"};
+
+  for (auto button : test_cases) {
+    SCOPED_TRACE(testing::Message() << "WHILE TESTING: " << button);
+    std::optional<int> button_id =
+        GetDOMNodeId(*main_frame(), base::StrCat({"#", button}));
+    ASSERT_TRUE(button_id);
+
+    std::unique_ptr<ToolRequest> action =
+        MakeClickRequest(*main_frame(), button_id.value());
+    ActResultFuture result;
+    actor_task().Act(ToRequestList(action), result.GetCallback());
+    ExpectOkResult(result);
+    EXPECT_EQ(button, EvalJs(web_contents(), "clicked_button"));
+
+    ASSERT_TRUE(ExecJs(web_contents(), "clicked_button = ''"));
+  }
+}
+
+#if BUILDFLAG(ENABLE_PDF) && !BUILDFLAG(IS_CHROMEOS)
+
+class ActorClickToolPDFBrowserTest
+    : public ActorToolsTest,
+      public ::testing::WithParamInterface<bool> {
+ public:
+  ActorClickToolPDFBrowserTest() {
+    if (BypaassTOUValidationForGuestView()) {
+      feature_list_.InitWithFeatures({kActorBypassTOUValidationForGuestView},
+                                     {chrome_pdf::features::kPdfOopif});
+    } else {
+      feature_list_.InitWithFeatures({},
+                                     {chrome_pdf::features::kPdfOopif,
+                                      kActorBypassTOUValidationForGuestView});
+    }
+  }
+
+  ~ActorClickToolPDFBrowserTest() override = default;
+
+  bool BypaassTOUValidationForGuestView() { return GetParam(); }
+
+  void SetUpOnMainThread() override {
+    ActorToolsTest::SetUpOnMainThread();
+    ASSERT_TRUE(embedded_test_server()->Start());
+    ASSERT_TRUE(embedded_https_test_server().Start());
+  }
+
+  static std::string DescribeParams(
+      const testing::TestParamInfo<ParamType>& info) {
+    return info.param ? "BypassGuestViewTOU" : "CheckGuestViewTOU";
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+// Ensure clicks can rotate on a PDF.
+IN_PROC_BROWSER_TEST_P(ActorClickToolPDFBrowserTest, Click) {
+  const GURL url = embedded_test_server()->GetURL("/pdf/test.pdf");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  WaitForCondition(
+      base::BindLambdaForTesting([this]() {
+        auto* pdf_helper =
+            pdf::PDFDocumentHelper::MaybeGetForWebContents(web_contents());
+        if (!pdf_helper) {
+          return false;
+        }
+        return pdf_helper->IsDocumentLoadComplete();
+      }),
+      "PDF Loaded");
+
+  while (true) {
+    GetPageApc();
+    std::unique_ptr<ToolRequest> action =
+        MakeClickRequest(*active_tab(), gfx::Point(650, 25));
+    ActResultFuture future;
+    actor_task().Act(ToRequestList(action), future.GetCallback());
+    if (BypaassTOUValidationForGuestView()) {
+      // This should always pass the first time.
+      ExpectOkResult(future);
+      break;
+    } else {
+      // Sometimes it might be allowed, but it will fail eventually. Keep
+      // looping until we fail.
+      const auto& result = *(future.Get<0>());
+      if (result.code ==
+          mojom::ActionResultCode::kFrameLocationChangedSinceObservation) {
+        break;
+      }
+    }
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(,
+                         ActorClickToolPDFBrowserTest,
+                         ::testing::Bool(),
+                         &ActorClickToolPDFBrowserTest::DescribeParams);
+
+#endif  // BUILDFLAG(ENABLE_PDF) && !BUILDFLAG(IS_CHROMEOS)
 
 }  // namespace
 }  // namespace actor

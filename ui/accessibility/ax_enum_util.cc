@@ -4,7 +4,6 @@
 
 #include "ui/accessibility/ax_enum_util.h"
 
-#include "ui/accessibility/ax_enums.mojom-shared.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 
 namespace ui {
@@ -436,6 +435,8 @@ const char* ToString(ax::mojom::Role role) {
       return "menuItemCheckBox";
     case ax::mojom::Role::kMenuItemRadio:
       return "menuItemRadio";
+    case ax::mojom::Role::kMenuItemSeparator:
+      return "menuItemSeparator";
     case ax::mojom::Role::kMenuListOption:
       return "menuListOption";
     case ax::mojom::Role::kMenuListPopup:
@@ -868,6 +869,8 @@ ax::mojom::Role StringToRole(const std::string& role) {
     return ax::mojom::Role::kMenuItemCheckBox;
   } else if (role == "kMenuItemRadio") {
     return ax::mojom::Role::kMenuItemRadio;
+  } else if (role == "kMenuItemSeparator") {
+    return ax::mojom::Role::kMenuItemSeparator;
   } else if (role == "kMenuListOption") {
     return ax::mojom::Role::kMenuListOption;
   } else if (role == "kMenuListPopup") {
@@ -1178,6 +1181,8 @@ const char* ToString(ax::mojom::Action action) {
       return "suspendMedia";
     case ax::mojom::Action::kLongClick:
       return "longClick";
+    case ax::mojom::Action::kRequestLayoutBasedAction:
+      return "requestLayoutBasedAction";
   }
 
   return "";
@@ -1239,6 +1244,10 @@ const char* ToString(ax::mojom::DefaultActionVerb default_action_verb) {
       return "select";
     case ax::mojom::DefaultActionVerb::kUncheck:
       return "uncheck";
+    case ax::mojom::DefaultActionVerb::kClickInHitTest:
+      return "clickInHitTest";
+    case ax::mojom::DefaultActionVerb::kClickNotInHitTest:
+      return "clickNotInHitTest";
   }
 
   return "";
@@ -1588,6 +1597,10 @@ const char* ToString(ax::mojom::IntAttribute int_attribute) {
       return "ariaNotificationPriority";
     case ax::mojom::IntAttribute::kMaxLength:
       return "maxLength";
+    case ax::mojom::IntAttribute::kPaintOrder:
+      return "paintOrder";
+    case ax::mojom::IntAttribute::kCommittedTextLength:
+      return "committedTextLength";
   }
 
   return "";
@@ -1808,6 +1821,10 @@ const char* ToString(ax::mojom::BoolAttribute bool_attribute) {
       return "longClickable";
     case ax::mojom::BoolAttribute::kHasHiddenOffscreenNodes:
       return "hasHiddenOffscreenNodes";
+    case ax::mojom::BoolAttribute::kHasComposition:
+      return "hasComposition";
+    case ax::mojom::BoolAttribute::kTextSuggestionSelectedByIME:
+      return "textSuggestionSelectedByIME";
   }
 
   return "";

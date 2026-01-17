@@ -10,14 +10,12 @@
 #include <variant>
 #include <vector>
 
-#include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
 #include "ash/constants/web_app_id_constants.h"
 #include "ash/public/cpp/app_list/app_list_config.h"
 #include "base/auto_reset.h"
 #include "base/check.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
@@ -569,19 +567,15 @@ void AppListSyncableService::BuildModel() {
 
   app_service_apps_builder_ =
       std::make_unique<AppServiceAppModelBuilder>(controller);
-  if (ash::features::ArePromiseIconsEnabled()) {
-    app_service_promise_apps_builder_ =
-        std::make_unique<AppServicePromiseAppModelBuilder>(controller);
-  }
+  app_service_promise_apps_builder_ =
+      std::make_unique<AppServicePromiseAppModelBuilder>(controller);
 
   DCHECK(profile_);
   SyncStarted();
 
   app_service_apps_builder_->Initialize(this, profile_, model_updater_.get());
-  if (ash::features::ArePromiseIconsEnabled()) {
-    app_service_promise_apps_builder_->Initialize(this, profile_,
-                                                  model_updater_.get());
-  }
+  app_service_promise_apps_builder_->Initialize(this, profile_,
+                                                model_updater_.get());
 
   HandleUpdateFinished(false /* clean_up_after_init_sync */);
 
@@ -1251,8 +1245,9 @@ void AppListSyncableService::PruneEmptySyncFolders() {
     if (sync_item->item_id == ash::kOemFolderId)
       continue;
 
-    if (!base::Contains(parent_ids, sync_item->item_id))
+    if (!parent_ids.contains(sync_item->item_id)) {
       DeleteSyncItem(sync_item->item_id);
+    }
   }
 }
 
@@ -1460,9 +1455,7 @@ std::string AppListSyncableService::GetClientTag(
 
 void AppListSyncableService::Shutdown() {
   app_service_apps_builder_.reset();
-  if (ash::features::ArePromiseIconsEnabled()) {
-    app_service_promise_apps_builder_.reset();
-  }
+  app_service_promise_apps_builder_.reset();
   // Set `extension_registrar_` and `extension_registry_` to be null to make
   // sure they won't be used after `Shutdown`.
   extension_registrar_ = nullptr;
@@ -1685,11 +1678,11 @@ AppListSyncableService::SyncItem* AppListSyncableService::CreateSyncItem(
     const std::string& item_id,
     sync_pb::AppListSpecifics::AppListItemType item_type,
     bool is_new) {
-  DCHECK(!base::Contains(sync_items_, item_id));
+  DCHECK(!sync_items_.contains(item_id));
   sync_items_[item_id] = std::make_unique<SyncItem>(item_id, item_type, is_new);
 
   // In case we have pending attributes to apply, process it asynchronously.
-  if (base::Contains(pending_transfer_map_, item_id)) {
+  if (pending_transfer_map_.contains(item_id)) {
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(&AppListSyncableService::ApplyAppAttributes,
                                   weak_ptr_factory_.GetWeakPtr(), item_id,

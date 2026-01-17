@@ -14,6 +14,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
 #include "base/task/sequenced_task_runner.h"
+#include "chrome/updater/mojom/updater_service.mojom.h"
 #include "chrome/updater/registration_data.h"
 #include "chrome/updater/update_service.h"
 #include "chrome/updater/updater_scope.h"
@@ -21,7 +22,9 @@
 namespace base {
 class Version;
 class FilePath;
-}
+}  // namespace base
+
+namespace updater {
 
 // Cross-platform client to communicate between the browser and the Chromium
 // updater. It helps the browser register to the Chromium updater and invokes
@@ -30,21 +33,12 @@ class BrowserUpdaterClient
     : public base::RefCountedThreadSafe<BrowserUpdaterClient> {
  public:
   // Must be called on the program's main sequence.
+  static scoped_refptr<BrowserUpdaterClient> Create(UpdaterScope scope);
   static scoped_refptr<BrowserUpdaterClient> Create(
-      updater::UpdaterScope scope);
-  static scoped_refptr<BrowserUpdaterClient> Create(
-      base::RepeatingCallback<scoped_refptr<updater::UpdateService>()>
-          proxy_provider,
-      updater::UpdaterScope scope);
-  static std::optional<updater::UpdateService::UpdateState>
-  GetLastOnDemandUpdateState();
-  static std::optional<updater::UpdateService::AppState>
-  GetLastKnownBrowserRegistration();
-  static std::optional<updater::UpdateService::AppState>
-  GetLastKnownUpdaterRegistration();
+      base::RepeatingCallback<scoped_refptr<UpdateService>()> proxy_provider,
+      UpdaterScope scope);
 
-  explicit BrowserUpdaterClient(
-      scoped_refptr<updater::UpdateService> update_service);
+  explicit BrowserUpdaterClient(scoped_refptr<UpdateService> update_service);
 
   // Registers the browser to the Chromium updater via IPC registration API.
   // When registration is completed, it will call RegistrationCompleted().
@@ -58,7 +52,7 @@ class BrowserUpdaterClient
   // completes. Must be called on the sequence on which the BrowserUpdateClient
   // was created. `version_updater_callback` will be run on the same sequence.
   void CheckForUpdate(
-      base::RepeatingCallback<void(const updater::UpdateService::UpdateState&)>
+      base::RepeatingCallback<void(const UpdateService::UpdateState&)>
           version_updater_callback);
 
   // Launches the updater to run its periodic background tasks. This is a
@@ -79,6 +73,13 @@ class BrowserUpdaterClient
   // will be run on the same sequence.
   void IsBrowserRegistered(base::OnceCallback<void(bool)> callback);
 
+  // Queries the current state of the updater.
+  void GetUpdaterState(
+      base::OnceCallback<void(const UpdateService::UpdaterState&)> callback);
+
+  // Gets the current enterprise policies for the updater as a JSON blob.
+  void GetPoliciesJson(base::OnceCallback<void(const std::string&)> callback);
+
   // Returns the browser's app ID. App IDs are case-insensitive and it may not
   // be in the same case used elsewhere in the browser.
   static std::string GetAppId();
@@ -92,29 +93,43 @@ class BrowserUpdaterClient
 
  private:
   SEQUENCE_CHECKER(sequence_checker_);
-  static bool AppMatches(const updater::UpdateService::AppState& app);
-  updater::RegistrationRequest GetRegistrationRequest();
+  static bool AppMatches(const UpdateService::AppState& app);
+  RegistrationRequest GetRegistrationRequest();
 
+  // Methods which call into updater_service_ should have a "Completed" function
+  // to ensure that the BrowserUpdaterClient outlives the request. Otherwise,
+  // sequential calls from methods in updater.h can cause multiple service
+  // proxies to be instantiated, which causes interference and dropped messages.
   void RegistrationCompleted(base::OnceClosure complete, int result);
   void GetUpdaterVersionCompleted(
       base::OnceCallback<void(const base::Version&)> callback,
       const base::Version& version);
   void UpdateCompleted(
-      base::RepeatingCallback<void(const updater::UpdateService::UpdateState&)>
-          callback,
-      updater::UpdateService::Result result);
+      base::RepeatingCallback<void(const UpdateService::UpdateState&)> callback,
+      UpdateService::Result result);
   void RunPeriodicTasksCompleted(base::OnceClosure callback);
   void IsBrowserRegisteredCompleted(
       base::OnceCallback<void(bool)> callback,
-      const std::vector<updater::UpdateService::AppState>& apps);
+      const std::vector<UpdateService::AppState>& apps);
+  void GetUpdaterStateCompleted(
+      base::OnceCallback<void(const UpdateService::UpdaterState&)> callback,
+      const UpdateService::UpdaterState& updater_state);
+  void GetPoliciesJsonCompleted(
+      base::OnceCallback<void(const std::string&)> callback,
+      const std::string& policies);
 
-  template <updater::UpdaterScope scope>
+  template <UpdaterScope scope>
   static scoped_refptr<BrowserUpdaterClient> GetClient(
-      base::RepeatingCallback<scoped_refptr<updater::UpdateService>()>
-          proxy_provider);
+      base::RepeatingCallback<scoped_refptr<UpdateService>()> proxy_provider);
 
-  scoped_refptr<updater::UpdateService> update_service_;
+  scoped_refptr<UpdateService> update_service_;
   base::WeakPtrFactory<BrowserUpdaterClient> weak_ptr_factory_{this};
 };
+
+std::optional<mojom::AppState>& GetLastKnownBrowserRegistrationStorage();
+std::optional<mojom::AppState>& GetLastKnownUpdaterRegistrationStorage();
+std::optional<mojom::UpdateState>& GetLastOnDemandUpdateStateStorage();
+
+}  // namespace updater
 
 #endif  // CHROME_BROWSER_UPDATER_BROWSER_UPDATER_CLIENT_H_

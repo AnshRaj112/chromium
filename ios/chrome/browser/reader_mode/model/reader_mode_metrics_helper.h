@@ -39,8 +39,10 @@ class ReaderModeMetricsHelper
   bool ReaderModeIsRecentlyUsed();
 
   // Records histograms for the Reading Mode distillation event.
-  void RecordReaderDistillerTriggered(ReaderModeAccessPoint access_point);
-  void RecordReaderDistillerCompleted(ReaderModeDistillerResult result);
+  void RecordReaderDistillerTriggered(ReaderModeAccessPoint access_point,
+                                      bool is_incognito);
+  void RecordReaderDistillerCompleted(ReaderModeAccessPoint access_point,
+                                      ReaderModeDistillerResult result);
 
   // Records the distillation timeout and resets state for the next event.
   void RecordReaderDistillerTimedOut();
@@ -49,11 +51,13 @@ class ReaderModeMetricsHelper
   void RecordReaderShown();
 
   // Records the last state of Reading Mode events.
-  void Flush();
+  void Flush(ReaderModeDeactivationReason reason);
 
   // dom_distiller::DistilledPagePrefs::Observer implementation.
   void OnChangeFontFamily(dom_distiller::mojom::FontFamily font) override;
-  void OnChangeTheme(dom_distiller::mojom::Theme theme) override;
+  void OnChangeTheme(
+      dom_distiller::mojom::Theme theme,
+      dom_distiller::ThemeSettingsUpdateSource source) override;
   void OnChangeFontScaling(float scaling) override;
 
  private:
@@ -67,6 +71,8 @@ class ReaderModeMetricsHelper
 
   // Tracks the last state that was recorded in the Reading Mode events.
   std::optional<ReaderModeState> last_reader_mode_state_;
+  // Access point used to trigger Reading Mode distillation.
+  std::optional<ReaderModeAccessPoint> reader_mode_distilled_access_point_;
   raw_ptr<web::WebState> web_state_;
   raw_ptr<dom_distiller::DistilledPagePrefs> distilled_page_prefs_;
   base::ScopedObservation<dom_distiller::DistilledPagePrefs,

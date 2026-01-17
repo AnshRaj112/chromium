@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "media/midi/midi_message_queue.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
+#include <algorithm>
+
+#include "base/compiler_specific.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace midi {
@@ -51,26 +49,19 @@ const uint8_t kReservedMessage1WithDataBytes[] = {0xf4, 0x01, 0x01,
 
 template <typename T, size_t N>
 void Add(MidiMessageQueue* queue, const T(&array)[N]) {
-  queue->Add(array, N);
+  queue->Add(array);
 }
 
 template <typename T, size_t N>
 ::testing::AssertionResult ExpectEqualSequence(
     const char* expr1, const char* expr2,
     const T(&expected)[N], const std::vector<T>& actual) {
-  if (actual.size() != N) {
-    return ::testing::AssertionFailure()
-        << "expected: " << ::testing::PrintToString(expected)
-        << ", actual: " << ::testing::PrintToString(actual);
+  if (std::ranges::equal(expected, actual)) {
+    return ::testing::AssertionSuccess();
   }
-  for (size_t i = 0; i < N; ++i) {
-    if (expected[i] != actual[i]) {
-      return ::testing::AssertionFailure()
-          << "expected: " << ::testing::PrintToString(expected)
-          << ", actual: " << ::testing::PrintToString(actual);
-    }
-  }
-  return ::testing::AssertionSuccess();
+  return ::testing::AssertionFailure()
+         << "expected: " << ::testing::PrintToString(expected)
+         << ", actual: " << ::testing::PrintToString(actual);
 }
 
 #define EXPECT_MESSAGE(expected, actual)  \

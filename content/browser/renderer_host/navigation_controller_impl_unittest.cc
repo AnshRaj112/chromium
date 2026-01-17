@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "content/browser/renderer_host/navigation_controller_impl.h"
 
 #include <stddef.h>
@@ -18,7 +13,7 @@
 #include <tuple>
 #include <utility>
 
-#include "base/files/file_util.h"
+#include "base/compiler_specific.h"
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
 #include "base/strings/string_util.h"
@@ -38,6 +33,7 @@
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/common/content_navigation_policy.h"
 #include "content/common/frame.mojom.h"
+#include "content/public/browser/navigation_details.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -100,8 +96,8 @@ bool DoImagesMatch(const gfx::Image& a, const gfx::Image& b) {
   // memcmp(nullptr, nullptr, 0) is undefined, so empty bitmaps must be
   // special-cased.
   return a_bitmap.computeByteSize() == 0 ||
-         memcmp(a_bitmap.getPixels(), b_bitmap.getPixels(),
-                a_bitmap.computeByteSize()) == 0;
+         UNSAFE_TODO(memcmp(a_bitmap.getPixels(), b_bitmap.getPixels(),
+                            a_bitmap.computeByteSize())) == 0;
 }
 
 class MockPageBroadcast : public blink::mojom::PageBroadcast {
@@ -165,6 +161,11 @@ class MockPageBroadcast : public blink::mojom::PageBroadcast {
   MOCK_METHOD(void,
               SetPageAttributionSupport,
               (network::mojom::AttributionSupport support),
+              (override));
+
+  MOCK_METHOD(void,
+              SetSupportsDraggableRegions,
+              (bool supports_draggable_regions),
               (override));
 
   mojo::PendingAssociatedRemote<blink::mojom::PageBroadcast> GetRemote() {
@@ -1153,9 +1154,15 @@ TEST_F(NavigationControllerTest, LoadURL_IgnorePreemptsPending) {
   EXPECT_EQ(-1, controller.GetPendingEntryIndex());
   EXPECT_FALSE(controller.GetPendingEntry());
   // The pending entry deletion and commit of the new NavigationEntry both
-  // counts as "navigation state change".
+  // count as "navigation state change", though only one notification will be
+  // sent if kSkipRedundantNavigationStateNotification is enabled.
   EXPECT_EQ(0, controller.GetLastCommittedEntryIndex());
-  EXPECT_EQ(3, delegate->navigation_state_change_count());
+  if (base::FeatureList::IsEnabled(
+          features::kSkipRedundantNavigationStateNotification)) {
+    EXPECT_EQ(2, delegate->navigation_state_change_count());
+  } else {
+    EXPECT_EQ(3, delegate->navigation_state_change_count());
+  }
 
   contents()->SetDelegate(nullptr);
 }
@@ -2337,6 +2344,7 @@ TEST_F(NavigationControllerTest, SameDocument_Replace) {
   params->method = "GET";
   params->page_state = blink::PageState::CreateFromURL(url2);
   params->post_id = -1;
+  params->document_sequence_number = 1;
 
   // This should NOT generate a new entry, nor prune the list.
   LoadCommittedDetailsObserver observer(contents());
@@ -2361,6 +2369,7 @@ TEST_F(NavigationControllerTest, PushStateWithOnlyInitialEntry) {
   params->method = "GET";
   params->should_update_history = true;
   params->post_id = -1;
+  params->document_sequence_number = 1;
   main_test_rfh()->SendRendererInitiatedNavigationRequest(
       url, false /* has_user_gesture */);
   main_test_rfh()->PrepareForCommit();
@@ -3596,6 +3605,7 @@ TEST_F(NavigationControllerTest, PushStateUpdatesTitleAndFavicon) {
   params->method = "GET";
   params->should_update_history = true;
   params->post_id = -1;
+  params->document_sequence_number = 1;
   main_test_rfh()->SendNavigateWithParams(std::move(params), true);
 
   // The title should immediately be visible on the new NavigationEntry.
@@ -3919,7 +3929,8 @@ TEST_F(NavigationControllerTest, NoURLRewriteForSubframes) {
       false /* should_replace_current_entry */,
       blink::NavigationDownloadPolicy(), "GET", nullptr, "",
       network::mojom::SourceLocation::New(), nullptr,
-      false /*is_form_submission*/, std::nullopt,
+      false /* is_form_submission */, std::nullopt,
+      false /* has_user_gesture */,
       blink::mojom::NavigationInitiatorActivationAndAdStatus::
           kDidNotStartWithTransientActivation,
       base::TimeTicks::Now() /* actual_navigation_start_time */,
@@ -3964,7 +3975,8 @@ TEST_F(NavigationControllerTest,
       Referrer(), ui::PAGE_TRANSITION_LINK, should_replace_current_entry,
       blink::NavigationDownloadPolicy(), "GET", nullptr, "",
       network::mojom::SourceLocation::New(), nullptr,
-      false /*is_form_submission*/, std::nullopt,
+      false /* is_form_submission */, std::nullopt,
+      false /* has_user_gesture */,
       blink::mojom::NavigationInitiatorActivationAndAdStatus::
           kDidNotStartWithTransientActivation,
       base::TimeTicks::Now() /* actual_navigation_start_time */,
@@ -4351,7 +4363,8 @@ TEST_F(NavigationControllerFencedFrameTest, NoURLRewriteForFencedFrames) {
       false /* should_replace_current_entry */,
       blink::NavigationDownloadPolicy(), "GET", nullptr, "",
       network::mojom::SourceLocation::New(), nullptr,
-      false /*is_form_submission*/, std::nullopt,
+      false /* is_form_submission */, std::nullopt,
+      false /* has_user_gesture */,
       blink::mojom::NavigationInitiatorActivationAndAdStatus::
           kDidNotStartWithTransientActivation,
       base::TimeTicks::Now() /* actual_navigation_start_time */,

@@ -52,7 +52,6 @@
 #include "chromeos/ash/components/nearby/presence/nearby_presence_service.h"
 #include "chromeos/ash/services/nearby/public/cpp/nearby_process_manager.h"
 #include "chromeos/ash/services/nearby/public/mojom/nearby_decoder_types.mojom.h"
-#include "chromeos/ash/services/nearby/public/mojom/nearby_share_settings.mojom-shared.h"
 #include "chromeos/ash/services/nearby/public/mojom/nearby_share_settings.mojom.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "device/bluetooth/bluetooth_adapter.h"
@@ -525,7 +524,6 @@ class NearbySharingServiceImpl
   base::flat_map<std::string, ShareTarget> outgoing_share_target_map_;
   // A map of ShareTarget id to OutgoingShareTargetInfo. This lets us know which
   // endpoint and public certificate are related to the outgoing share target.
-  // TODO(crbug.com/40132032) update this map when handling payloads
   base::flat_map<base::UnguessableToken, OutgoingShareTargetInfo>
       outgoing_share_target_info_map_;
   // For metrics. The IDs of ShareTargets that are cancelled while trying to

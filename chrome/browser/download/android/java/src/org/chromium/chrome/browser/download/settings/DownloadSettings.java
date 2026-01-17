@@ -4,11 +4,12 @@
 
 package org.chromium.chrome.browser.download.settings;
 
+import android.content.Context;
 import android.os.Bundle;
 
 import androidx.preference.Preference;
 
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -19,11 +20,14 @@ import org.chromium.chrome.browser.download.MimeUtils;
 import org.chromium.chrome.browser.download.R;
 import org.chromium.chrome.browser.pdf.PdfUtils;
 import org.chromium.chrome.browser.preferences.Pref;
+import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.settings.ChromeBaseSettingsFragment;
 import org.chromium.chrome.browser.settings.ChromeManagedPreferenceDelegate;
+import org.chromium.chrome.browser.settings.search.ChromeBaseSearchIndexProvider;
 import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
 import org.chromium.components.browser_ui.settings.ManagedPreferenceDelegate;
 import org.chromium.components.browser_ui.settings.SettingsUtils;
+import org.chromium.components.browser_ui.settings.search.SettingsIndexData;
 import org.chromium.components.user_prefs.UserPrefs;
 
 /** Fragment containing Download settings. */
@@ -55,8 +59,7 @@ public class DownloadSettings extends ChromeBaseSettingsFragment
                     }
                 };
         mLocationPromptEnabledPref.setManagedPreferenceDelegate(mLocationPromptEnabledPrefDelegate);
-        if (PdfUtils.shouldOpenPdfInline(getProfile().isOffTheRecord())
-                && DownloadDirectoryProvider.getSecondaryStorageDownloadDirectories().isEmpty()) {
+        if (shouldEnableLocationPromptPref(getProfile())) {
             mLocationPromptEnabledPref.setVisible(false);
         } else {
             mLocationPromptEnabledPref.setOnPreferenceChangeListener(this);
@@ -67,7 +70,7 @@ public class DownloadSettings extends ChromeBaseSettingsFragment
 
         mAutoOpenPdfEnabledPref =
                 (ChromeSwitchPreference) findPreference(PREF_AUTO_OPEN_PDF_ENABLED);
-        if (PdfUtils.shouldOpenPdfInline(getProfile().isOffTheRecord())) {
+        if (shouldEnableAutoOpenPdf(getProfile())) {
             mAutoOpenPdfEnabledPref.setVisible(false);
         } else {
             mAutoOpenPdfEnabledPref.setOnPreferenceChangeListener(this);
@@ -82,8 +85,17 @@ public class DownloadSettings extends ChromeBaseSettingsFragment
         }
     }
 
+    private static boolean shouldEnableLocationPromptPref(Profile profile) {
+        return PdfUtils.shouldOpenPdfInline(profile.isOffTheRecord())
+                && DownloadDirectoryProvider.getSecondaryStorageDownloadDirectories().isEmpty();
+    }
+
+    private static boolean shouldEnableAutoOpenPdf(Profile profile) {
+        return PdfUtils.shouldOpenPdfInline(profile.isOffTheRecord());
+    }
+
     @Override
-    public ObservableSupplier<String> getPageTitle() {
+    public MonotonicObservableSupplier<String> getPageTitle() {
         return mPageTitle;
     }
 
@@ -157,4 +169,25 @@ public class DownloadSettings extends ChromeBaseSettingsFragment
     public @AnimationType int getAnimationType() {
         return AnimationType.PROPERTY;
     }
+
+    @Override
+    public @Nullable String getMainMenuKey() {
+        return "downloads";
+    }
+
+    public static final ChromeBaseSearchIndexProvider SEARCH_INDEX_DATA_PROVIDER =
+            new ChromeBaseSearchIndexProvider(
+                    DownloadSettings.class.getName(), R.xml.download_preferences) {
+
+                @Override
+                public void updateDynamicPreferences(
+                        Context context, SettingsIndexData indexData, Profile profile) {
+                    if (shouldEnableLocationPromptPref(profile)) {
+                        indexData.removeEntry(getUniqueId(PREF_LOCATION_PROMPT_ENABLED));
+                    }
+                    if (shouldEnableAutoOpenPdf(profile)) {
+                        indexData.removeEntry(getUniqueId(PREF_AUTO_OPEN_PDF_ENABLED));
+                    }
+                }
+            };
 }

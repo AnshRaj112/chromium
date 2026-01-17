@@ -16,12 +16,14 @@ namespace password_manager::features {
 // without a passcode set.
 BASE_DECLARE_FEATURE(kIOSEnablePasscodeSettings);
 
+// Enable a fix to mitigate an issue where child coordinators on the password
+// checkup UI (e.g. the password issues UI) are double started. Enabled by
+// default, act as a kill switch.
+BASE_DECLARE_FEATURE(kPasswordCheckupUIDoubleStartMitigation);
+
 // Feature switch for adding or not Suggest Strong Password field in the add
 // password page.
 BASE_DECLARE_FEATURE(kSuggestStrongPasswordInAddPassword);
-
-// Feature switch for enabling the Password Manager Trusted Vault widget.
-BASE_DECLARE_FEATURE(kIOSEnablePasswordManagerTrustedVaultWidget);
 
 // Helper function returning the status of `kIOSEnablePasscodeSettings`.
 bool IsPasscodeSettingsEnabled();
@@ -29,10 +31,6 @@ bool IsPasscodeSettingsEnabled();
 // Helper function returning the status of
 // `kSuggestStrongPasswordInAddPassword`.
 bool IsSuggestStrongPasswordInAddPasswordEnabled();
-
-// Helper function returning the status of
-// `kIOSEnablePasswordManagerTrustedVaultWidget`.
-bool IsPasswordManagerTrustedVaultWidgetEnabled();
 
 }  // namespace password_manager::features
 

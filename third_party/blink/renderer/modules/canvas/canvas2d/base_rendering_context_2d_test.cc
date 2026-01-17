@@ -93,7 +93,7 @@ class TestRenderingContext2D final
   int Width() const override { return 300; }
   int Height() const override { return 300; }
 
-  bool CanCreateCanvas2dResourceProvider() override { return false; }
+  bool CanCreateResourceProvider() override { return false; }
 
   RespectImageOrientationEnum RespectImageOrientation() const override {
     return kRespectImageOrientation;
@@ -171,19 +171,17 @@ class TestRenderingContext2D final
     return true;
   }
 
-  CanvasResourceProvider* GetResourceProviderForCanvas2D() const override {
+  CanvasResourceProvider* GetResourceProvider() const override {
     return nullptr;
   }
 
-  CanvasResourceProvider* GetOrCreateCanvas2DResourceProvider() override {
+  CanvasResourceProvider* GetOrCreateResourceProvider() override {
     return nullptr;
   }
 
   // Implementing pure virtual functions from CanvasRenderingContext.
-  scoped_refptr<StaticBitmapImage> GetImage(FlushReason) override {
-    return nullptr;
-  }
-  std::unique_ptr<CanvasResourceProvider> ReplaceResourceProviderForCanvas2D(
+  scoped_refptr<StaticBitmapImage> GetImage() override { return nullptr; }
+  std::unique_ptr<CanvasResourceProvider> ReplaceResourceProvider(
       std::unique_ptr<CanvasResourceProvider>) override {
     return nullptr;
   }

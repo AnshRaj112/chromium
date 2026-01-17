@@ -68,6 +68,7 @@ class ImmersiveModeTester : public ImmersiveModeController::Observer {
   ImmersiveModeTester& operator=(const ImmersiveModeTester&) = delete;
   ~ImmersiveModeTester() override;
 
+  ImmersiveModeController* GetController();
   BrowserView* GetBrowserView();
 
   // Runs the given command, verifies that a reveal happens and the expected tab
@@ -84,6 +85,12 @@ class ImmersiveModeTester : public ImmersiveModeController::Observer {
   // Waits for the immersive fullscreen to end (or returns immediately if
   // immersive fullscreen already ended).
   void WaitForFullscreenToExit();
+
+  // Waits for the revaled state.
+  void WaitForRevealStarted();
+
+  // Waits for the reveal ended state.
+  void WaitForRevealEnded();
 
   // ImmersiveModeController::Observer:
   void OnImmersiveRevealStarted() override;

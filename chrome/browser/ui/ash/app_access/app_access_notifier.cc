@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ui/ash/app_access/app_access_notifier.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <vector>
@@ -14,7 +15,6 @@
 #include "ash/system/privacy_hub/camera_privacy_switch_controller.h"
 #include "base/check.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -145,7 +145,7 @@ bool AppAccessNotifier::MapContainsAppId(const MruAppIdMap& id_map,
   if (it == id_map.end()) {
     return false;
   }
-  return base::Contains(it->second, app_id);
+  return std::ranges::contains(it->second, app_id);
 }
 
 void AppAccessNotifier::OnCapabilityAccessUpdate(

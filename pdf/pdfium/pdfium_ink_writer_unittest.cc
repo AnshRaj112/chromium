@@ -14,6 +14,7 @@
 #include "base/files/file_path.h"
 #include "base/time/time.h"
 #include "pdf/pdf_ink_brush.h"
+#include "pdf/pdfium/pdfium_api_wrappers.h"
 #include "pdf/pdfium/pdfium_engine.h"
 #include "pdf/pdfium/pdfium_ink_reader.h"
 #include "pdf/pdfium/pdfium_page.h"
@@ -32,7 +33,6 @@
 #include "third_party/pdfium/public/fpdfview.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/size.h"
-#include "ui/gfx/geometry/test/geometry_util.h"
 
 namespace chrome_pdf {
 
@@ -85,12 +85,12 @@ std::unique_ptr<PdfInkBrush> CreateTestBrush() {
 using PDFiumInkWriterTest = PDFiumTestBase;
 
 TEST_P(PDFiumInkWriterTest, BasicWriteAndRead) {
-  TestClient client;
+  TestClient client(/*use_skia_renderer=*/GetParam());
   std::unique_ptr<PDFiumEngine> engine =
       InitializeEngine(&client, FILE_PATH_LITERAL("blank.pdf"));
   ASSERT_TRUE(engine);
 
-  PDFiumPage& pdfium_page = GetPDFiumPageForTest(*engine, 0);
+  PDFiumPage& pdfium_page = GetPDFiumPage(*engine, 0);
   FPDF_PAGE page = pdfium_page.GetPage();
   ASSERT_TRUE(page);
 
@@ -115,12 +115,12 @@ TEST_P(PDFiumInkWriterTest, BasicWriteAndRead) {
 
   // Load `saved_pdf_data` into `saved_engine` and get a handle to the one and
   // only page.
-  TestClient saved_client;
+  TestClient saved_client(/*use_skia_renderer=*/GetParam());
   std::unique_ptr<PDFiumEngine> saved_engine =
       InitializeEngineFromData(&saved_client, std::move(saved_pdf_data));
   ASSERT_TRUE(saved_engine);
   ASSERT_EQ(saved_engine->GetNumberOfPages(), 1);
-  PDFiumPage& saved_pdfium_page = GetPDFiumPageForTest(*saved_engine, 0);
+  PDFiumPage& saved_pdfium_page = GetPDFiumPage(*saved_engine, 0);
   FPDF_PAGE saved_page = saved_pdfium_page.GetPage();
   ASSERT_TRUE(saved_page);
 
@@ -163,12 +163,12 @@ TEST_P(PDFiumInkWriterTest, BasicWriteAndRead) {
 }
 
 TEST_P(PDFiumInkWriterTest, WriteToCroppedPage) {
-  TestClient client;
+  TestClient client(/*use_skia_renderer=*/GetParam());
   std::unique_ptr<PDFiumEngine> engine =
       InitializeEngine(&client, FILE_PATH_LITERAL("hello_world_cropped.pdf"));
   ASSERT_TRUE(engine);
 
-  PDFiumPage& pdfium_page = GetPDFiumPageForTest(*engine, 0);
+  PDFiumPage& pdfium_page = GetPDFiumPage(*engine, 0);
   FPDF_PAGE page = pdfium_page.GetPage();
   ASSERT_TRUE(page);
 
@@ -198,12 +198,12 @@ TEST_P(PDFiumInkWriterTest, WriteToCroppedPage) {
 
   // Load `saved_pdf_data` into `saved_engine` and get a handle to the one and
   // only page.
-  TestClient saved_client;
+  TestClient saved_client(/*use_skia_renderer=*/GetParam());
   std::unique_ptr<PDFiumEngine> saved_engine =
       InitializeEngineFromData(&saved_client, std::move(saved_pdf_data));
   ASSERT_TRUE(saved_engine);
   ASSERT_EQ(saved_engine->GetNumberOfPages(), 1);
-  PDFiumPage& saved_pdfium_page = GetPDFiumPageForTest(*saved_engine, 0);
+  PDFiumPage& saved_pdfium_page = GetPDFiumPage(*saved_engine, 0);
   FPDF_PAGE saved_page = saved_pdfium_page.GetPage();
   ASSERT_TRUE(saved_page);
 
@@ -215,31 +215,28 @@ TEST_P(PDFiumInkWriterTest, WriteToCroppedPage) {
       ReadV2InkPathsFromPageAsModeledShapes(saved_page);
   ASSERT_EQ(saved_results.size(), 1u);
 
-  float left;
-  float bottom;
-  float right;
-  float top;
-  bool get_bounds = FPDFPageObj_GetBounds(saved_results[0].page_object, &left,
-                                          &bottom, &right, &top);
-  ASSERT_TRUE(get_bounds);
+  const std::optional<PdfRect> maybe_bounds =
+      GetPageObjectBounds(saved_results[0].page_object);
+  ASSERT_TRUE(maybe_bounds.has_value());
+  const auto& bounds = maybe_bounds.value();
+
   // While the cropped image shows the stroke on the visible page at an X coord
   // of 92, that object's position in the PDF page is relative to the MediaBox,
   // not the CropBox.  So its bounding box should be 55 points to the right of
   // that.
-  EXPECT_RECTF_NEAR(gfx::RectF(gfx::PointF(left, bottom),
-                               gfx::SizeF(right - left, top - bottom)),
-                    gfx::RectF(gfx::PointF(147.3787f, 49.5206f),
-                               gfx::SizeF(12.5402f, 11.6486f)),
-                    /*abs_error=*/0.0001f);
+  EXPECT_FLOAT_EQ(147.3787f, bounds.left());
+  EXPECT_FLOAT_EQ(49.520641f, bounds.bottom());
+  EXPECT_FLOAT_EQ(159.91898f, bounds.right());
+  EXPECT_FLOAT_EQ(61.169273f, bounds.top());
 }
 
 TEST_P(PDFiumInkWriterTest, EmptyStroke) {
-  TestClient client;
+  TestClient client(/*use_skia_renderer=*/GetParam());
   std::unique_ptr<PDFiumEngine> engine =
       InitializeEngine(&client, FILE_PATH_LITERAL("blank.pdf"));
   ASSERT_TRUE(engine);
 
-  PDFiumPage& pdfium_page = GetPDFiumPageForTest(*engine, 0);
+  PDFiumPage& pdfium_page = GetPDFiumPage(*engine, 0);
   FPDF_PAGE page = pdfium_page.GetPage();
   ASSERT_TRUE(page);
 
@@ -250,12 +247,12 @@ TEST_P(PDFiumInkWriterTest, EmptyStroke) {
 }
 
 TEST_P(PDFiumInkWriterTest, NoPage) {
-  TestClient client;
+  TestClient client(/*use_skia_renderer=*/GetParam());
   std::unique_ptr<PDFiumEngine> engine =
       InitializeEngine(&client, FILE_PATH_LITERAL("blank.pdf"));
   ASSERT_TRUE(engine);
 
-  PDFiumPage& pdfium_page = GetPDFiumPageForTest(*engine, 0);
+  PDFiumPage& pdfium_page = GetPDFiumPage(*engine, 0);
   FPDF_PAGE page = pdfium_page.GetPage();
   ASSERT_TRUE(page);
 

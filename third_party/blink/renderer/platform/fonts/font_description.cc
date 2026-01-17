@@ -37,6 +37,7 @@
 #include "base/strings/to_string.h"
 #include "build/build_config.h"
 #include "third_party/blink/public/platform/web_font_description.h"
+#include "third_party/blink/renderer/platform/geometry/evaluation_input.h"
 #include "third_party/blink/renderer/platform/language.h"
 #include "third_party/blink/renderer/platform/wtf/hash_functions.h"
 #include "third_party/blink/renderer/platform/wtf/size_assertions.h"
@@ -65,6 +66,7 @@ struct SameSizeAsFontDescription {
   ResolvedFontFeatures resolved_font_features_;
   FontSelectionRequest selection_request_;
   FieldsAsUnsignedType bitfields;
+  AtomicString language_override_;
 };
 
 ASSERT_SIZE(FontDescription, SameSizeAsFontDescription);
@@ -400,6 +402,10 @@ unsigned FontDescription::StyleHashWithoutFamilyList() const {
 
   if (VariationSettings()) {
     AddIntToHash(hash, VariationSettings()->GetHash());
+  }
+
+  if (HasLanguageOverride()) {
+    AddIntToHash(hash, language_override_.Hash());
   }
 
   if (font_palette_) {
@@ -744,7 +750,7 @@ String FontDescription::ToString(
 }
 
 String FontDescription::VariantLigatures::ToString() const {
-  return String::Format(
+  return UNSAFE_TODO(String::Format(
       "common=%s, discretionary=%s, historical=%s, contextual=%s",
       FontDescription::ToString(static_cast<LigaturesState>(common))
           .Ascii()
@@ -757,7 +763,7 @@ String FontDescription::VariantLigatures::ToString() const {
           .data(),
       FontDescription::ToString(static_cast<LigaturesState>(contextual))
           .Ascii()
-          .data());
+          .data()));
 }
 
 String FontDescription::Size::ToString() const {
@@ -786,7 +792,7 @@ String FontDescription::ToString(FontVariantPosition variant_position) {
 }
 
 String FontDescription::ToString() const {
-  return String::Format(
+  return UNSAFE_TODO(String::Format(
       "family_list=[%s], feature_settings=[%s], variation_settings=[%s], "
       "locale=%s, "
       "specified_size=%f, computed_size=%f, adjusted_size=%f, "
@@ -838,7 +844,7 @@ String FontDescription::ToString() const {
       FontDescription::ToString(GetFontSynthesisStyle()).Ascii().c_str(),
       FontDescription::ToString(GetFontSynthesisSmallCaps()).Ascii().c_str(),
       FontDescription::ToString(VariantPosition()).Ascii().c_str(),
-      blink::ToString(VariantEmoji()).Ascii().c_str());
+      blink::ToString(VariantEmoji()).Ascii().c_str()));
 }
 
 }  // namespace blink

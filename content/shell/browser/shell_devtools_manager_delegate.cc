@@ -6,11 +6,10 @@
 
 #include <stdint.h>
 
+#include <atomic>
 #include <vector>
 
-#include "base/atomicops.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -48,7 +47,7 @@ namespace {
 
 const int kBackLog = 10;
 
-base::subtle::Atomic32 g_last_used_port;
+std::atomic<int> g_last_used_port;
 
 #if BUILDFLAG(IS_ANDROID)
 class UnixDomainServerSocketFactory : public content::DevToolsSocketFactory {
@@ -99,7 +98,7 @@ class TCPServerSocketFactory : public content::DevToolsSocketFactory {
 
     net::IPEndPoint endpoint;
     if (socket->GetLocalAddress(&endpoint) == net::OK)
-      base::subtle::NoBarrier_Store(&g_last_used_port, endpoint.port());
+      g_last_used_port.store(endpoint.port(), std::memory_order_release);
 
     return socket;
   }
@@ -161,7 +160,7 @@ std::unique_ptr<content::DevToolsSocketFactory> CreateSocketFactory() {
 
 // static
 int ShellDevToolsManagerDelegate::GetHttpHandlerPort() {
-  return base::subtle::NoBarrier_Load(&g_last_used_port);
+  return g_last_used_port.load(std::memory_order_acquire);
 }
 
 // static
@@ -197,7 +196,7 @@ BrowserContext* ShellDevToolsManagerDelegate::GetDefaultBrowserContext() {
 void ShellDevToolsManagerDelegate::ClientAttached(
     content::DevToolsAgentHostClientChannel* channel) {
   // Make sure we don't receive notifications twice for the same client.
-  CHECK(!base::Contains(sessions_, channel));
+  CHECK(!sessions_.contains(channel));
   sessions_.emplace(
       channel,
       std::make_unique<shell::protocol::ShellDevToolsSession>(

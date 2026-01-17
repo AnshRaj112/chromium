@@ -20,14 +20,22 @@ include_rules = [
   "+chrome/browser/ash/login",
   "+chrome/browser/ash/net",
   "+chrome/browser/ash/settings",
-  "+chrome/browser/browser_process.h",
   "+chrome/browser/extensions/external_loader.h",
   "+chrome/browser/extensions/external_provider_impl.h",
   "+chrome/browser/net",
   "+chrome/browser/prefs",
   "+chrome/browser/profiles",
   "+chrome/browser/ui/webui/ash/login",
-  "+chrome/common/chrome_paths.h",
   "+chrome/common/pref_names.h",
   "+chrome/test/base",
 ]
+
+specific_include_rules = {
+  "customization_document\\.cc": [
+    "+chrome/browser/browser_process.h",
+  ],
+
+  "customization_document_browsertest\\.cc": [
+    "+chrome/browser/browser_process.h",
+  ],
+}

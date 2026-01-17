@@ -22,6 +22,7 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/window/caption_button_layout_constants.h"
+#include "ui/views/window/frame_buttons.h"
 #include "ui/views/window/frame_caption_button.h"
 
 namespace {
@@ -73,31 +74,18 @@ void OpaqueBrowserFrameViewLayout::SetButtonOrdering(
   trailing_buttons_ = trailing_buttons;
 }
 
-gfx::Rect OpaqueBrowserFrameViewLayout::GetBoundsForTabStripRegion(
-    const gfx::Size& tabstrip_minimum_size,
-    int total_width) const {
-  const int x = available_space_leading_x_;
-  const int available_width = available_space_trailing_x_ - x;
-  return gfx::Rect(x, NonClientTopHeight(false), std::max(0, available_width),
-                   tabstrip_minimum_size.height());
-}
-
-gfx::Rect OpaqueBrowserFrameViewLayout::GetBoundsForWebAppFrameToolbar(
-    const gfx::Size& toolbar_preferred_size) const {
-  if (delegate_->IsFullscreen()) {
-    return gfx::Rect();
+const views::Button* OpaqueBrowserFrameViewLayout::GetFrameButton(
+    views::FrameButton which) const {
+  switch (which) {
+    case views::FrameButton::kClose:
+      return close_button_;
+    case views::FrameButton::kMinimize:
+      return minimize_button_;
+    case views::FrameButton::kMaximize:
+      return delegate_->IsMaximized() || delegate_->IsMinimized()
+                 ? restore_button_
+                 : maximize_button_;
   }
-
-  // Adding 2px of vertical padding puts at least 1 px of space on the top and
-  // bottom of the element.
-  constexpr int kVerticalPadding = 2;
-
-  const int x = available_space_leading_x_;
-  const int available_width = available_space_trailing_x_ - x;
-  return gfx::Rect(x, FrameEdgeInsets(false).top(),
-                   std::max(0, available_width),
-                   toolbar_preferred_size.height() + kVerticalPadding +
-                       kContentEdgeShadowThickness);
 }
 
 gfx::Size OpaqueBrowserFrameViewLayout::GetMinimumSize(
@@ -109,13 +97,6 @@ gfx::Size OpaqueBrowserFrameViewLayout::GetMinimumSize(
     // strip.
     return min_size;
   }
-
-  // Ensure that we can, at minimum, hold our window controls and a tab strip.
-  int top_width = minimum_size_for_buttons_;
-  if (delegate_->IsTabStripVisible()) {
-    top_width += delegate_->GetTabstripMinimumSize().width();
-  }
-  min_size.set_width(std::max(min_size.width(), top_width));
 
   // Account for the frame.
   const auto border_insets = FrameBorderInsets(false);
@@ -302,12 +283,12 @@ void OpaqueBrowserFrameViewLayout::LayoutWindowControls() {
 
   if (delegate_->ShouldShowCaptionButtons()) {
     for (const auto& button : leading_buttons_) {
-      ConfigureButton(button, ALIGN_LEADING);
+      ConfigureButton(button, ButtonAlignment::kAlignLeading);
       std::erase(buttons_not_shown, button);
     }
 
     for (const auto& button : base::Reversed(trailing_buttons_)) {
-      ConfigureButton(button, ALIGN_TRAILING);
+      ConfigureButton(button, ButtonAlignment::kAlignTrailing);
       std::erase(buttons_not_shown, button);
     }
   }
@@ -493,15 +474,16 @@ void OpaqueBrowserFrameViewLayout::SetBoundsForButton(
     DCHECK_EQ(views::ImageButton::kViewClassName, button->GetClassName());
     auto* const image_button = static_cast<views::ImageButton*>(button);
     image_button->SetImageHorizontalAlignment(
-        (alignment == ALIGN_LEADING) ? views::ImageButton::ALIGN_RIGHT
-                                     : views::ImageButton::ALIGN_LEFT);
+        (alignment == ButtonAlignment::kAlignLeading)
+            ? views::ImageButton::ALIGN_RIGHT
+            : views::ImageButton::ALIGN_LEFT);
     image_button->SetImageVerticalAlignment(views::ImageButton::ALIGN_BOTTOM);
   }
 
   TopAreaPadding top_area_padding = GetTopAreaPadding();
 
   switch (alignment) {
-    case ALIGN_LEADING: {
+    case ButtonAlignment::kAlignLeading: {
       int extra_width = top_area_padding.leading;
       int button_start_spacing =
           GetWindowCaptionSpacing(button_id, true, !placed_leading_button_);
@@ -529,7 +511,7 @@ void OpaqueBrowserFrameViewLayout::SetBoundsForButton(
       placed_leading_button_ = true;
       break;
     }
-    case ALIGN_TRAILING: {
+    case ButtonAlignment::kAlignTrailing: {
       int extra_width = top_area_padding.trailing;
       int button_start_spacing =
           GetWindowCaptionSpacing(button_id, true, !placed_trailing_button_);

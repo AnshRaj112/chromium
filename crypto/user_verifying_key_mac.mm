@@ -22,9 +22,8 @@
 #include "base/threading/scoped_thread_priority.h"
 #include "base/types/expected.h"
 #include "crypto/apple/keychain_v2.h"
-#include "crypto/scoped_lacontext.h"
+#include "crypto/apple/unexportable_key_apple.h"
 #include "crypto/unexportable_key.h"
-#include "crypto/unexportable_key_mac.h"
 
 namespace crypto {
 
@@ -63,7 +62,7 @@ std::string ToString(const std::vector<uint8_t>& vec) {
 }
 
 // User verifying key implementation that delegates the heavy lifting to
-// UnexportableKeyMac.
+// UnexportableKeyApple.
 class UserVerifyingSigningKeyMac : public UserVerifyingSigningKey {
  public:
   explicit UserVerifyingSigningKeyMac(
@@ -99,7 +98,7 @@ class UserVerifyingSigningKeyMac : public UserVerifyingSigningKey {
     return key_name_;
   }
 
-  bool IsHardwareBacked() const override  { return true; }
+  bool IsHardwareBacked() const override { return true; }
 
  private:
   // The key's wrapped key as a binary string.
@@ -113,8 +112,8 @@ DoGenerateKey(base::span<const SignatureVerifier::SignatureAlgorithm>
                   acceptable_algorithms,
               UnexportableKeyProvider::Config config,
               LAContext* lacontext) {
-  std::unique_ptr<UnexportableKeyProviderMac> key_provider =
-      GetUnexportableKeyProviderMac(std::move(config));
+  std::unique_ptr<apple::UnexportableKeyProviderApple> key_provider =
+      apple::GetUnexportableKeyProviderApple(std::move(config));
   if (!key_provider) {
     return base::unexpected(UserVerifyingKeyCreationError::kPlatformApiError);
   }
@@ -132,8 +131,8 @@ base::expected<std::unique_ptr<UserVerifyingSigningKey>,
 DoGetKey(std::vector<uint8_t> wrapped_key,
          UnexportableKeyProvider::Config config,
          LAContext* lacontext) {
-  std::unique_ptr<UnexportableKeyProviderMac> key_provider =
-      GetUnexportableKeyProviderMac(std::move(config));
+  std::unique_ptr<apple::UnexportableKeyProviderApple> key_provider =
+      apple::GetUnexportableKeyProviderApple(std::move(config));
   if (!key_provider) {
     return base::unexpected(UserVerifyingKeyCreationError::kPlatformApiError);
   }
@@ -152,7 +151,11 @@ bool DoDeleteKey(std::vector<uint8_t> wrapped_key,
   if (!key_provider) {
     return false;
   }
-  return key_provider->DeleteSigningKeySlowly(wrapped_key);
+  StatefulUnexportableKeyProvider* stateful_key_provider =
+      key_provider->AsStatefulUnexportableKeyProvider();
+  return !stateful_key_provider ||
+         stateful_key_provider->DeleteSigningKeysSlowly({wrapped_key})
+             .value_or(0);
 }
 
 class UserVerifyingKeyProviderMac : public UserVerifyingKeyProvider {

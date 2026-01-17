@@ -11,6 +11,8 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/system/sys_info.h"
+#include "build/build_config.h"
 #include "chrome/browser/browser_features.h"
 #include "chrome/browser/headless/headless_mode_util.h"
 #include "chrome/browser/preloading/chrome_preloading.h"
@@ -19,11 +21,17 @@
 #include "chrome/browser/preloading/prefetch/search_prefetch/search_prefetch_service_factory.h"
 #include "chrome/browser/preloading/prerender/prerender_utils.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "components/omnibox/browser/autocomplete_match.h"
 #include "components/page_load_metrics/browser/navigation_handle_user_data.h"
+#include "components/page_load_metrics/google/browser/prerender_prewarm_navigation_data.h"
+#include "components/search_engines/template_url_service.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/devtools_agent_host.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
+#include "content/public/browser/preload_pipeline_info.h"
 #include "content/public/browser/preloading.h"
 #include "content/public/browser/preloading_data.h"
 #include "content/public/browser/prerender_handle.h"
@@ -35,6 +43,16 @@
 #include "net/base/url_util.h"
 #include "url/gurl.h"
 
+#if !BUILDFLAG(IS_ANDROID)
+#include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_finder.h"
+#include "chrome/browser/ui/web_applications/app_browser_controller.h"
+#endif
+
+#if BUILDFLAG(IS_CHROMEOS)
+#include "chromeos/components/kiosk/kiosk_utils.h"
+#endif
+
 namespace internal {
 const char kHistogramPrerenderPredictionStatusDefaultSearchEngine[] =
     "Prerender.Experimental.PredictionStatus.DefaultSearchEngine";
@@ -45,6 +63,9 @@ const char kHistogramPrerenderPredictionStatusDirectUrlInput[] =
 namespace {
 
 using content::PreloadingTriggeringOutcome;
+
+const char kHistogramPrerenderPrewarmDecision[] =
+    "Prerender.Experimental.PrewarmDecision";
 
 void MarkPreloadingAttemptAsDuplicate(
     content::PreloadingAttempt* preloading_attempt) {
@@ -62,8 +83,6 @@ content::PreloadingFailureReason ToPreloadingFailureReason(
 }
 
 }  // namespace
-
-PrerenderManager::~PrerenderManager() = default;
 
 class PrerenderManager::SearchPrerenderTask {
  public:
@@ -154,6 +173,8 @@ class PrerenderManager::SearchPrerenderTask {
   const GURL prerendered_canonical_search_url_;
 };
 
+PrerenderManager::~PrerenderManager() = default;
+
 void PrerenderManager::DidFinishNavigation(
     content::NavigationHandle* navigation_handle) {
   if (!navigation_handle->HasCommitted() ||
@@ -207,7 +228,8 @@ PrerenderManager::StartPrerenderDirectUrlInput(
       content::PreloadPipelineInfo::Create(
           /*planned_max_preloading_type=*/content::PreloadingType::kPrerender),
       &preloading_attempt,
-      /*url_match_predicate=*/{}, /*prerender_navigation_handle_callback=*/{},
+      /*url_match_predicate=*/{},
+      /*prerender_navigation_handle_callback=*/{},
       /*allow_reuse=*/false);
 
   if (direct_url_input_prerender_handle_) {
@@ -219,24 +241,10 @@ PrerenderManager::StartPrerenderDirectUrlInput(
 bool PrerenderManager::MaybeStartPrewarmSearchResult() {
   // TODO(https://crbug.com/423465927): Revalidate the handle when the prewarm
   // is reused for prerendering.
-  if (search_prewarm_handle_ ||
-      !base::FeatureList::IsEnabled(features::kPrewarm) ||
-      headless::IsHeadlessMode() || headless::IsOldHeadlessMode() ||
-      (content::DevToolsAgentHost::IsDebuggerAttached(web_contents()) &&
-       !features::kForceEnableWithDevTools.Get())) {
-    // We just return in the following cases;
-    // - The prewarm was already triggered.
-    // - The prewarm feature is disabled.
-    // - Running in a headless mode.
-    // - A Debugger is attached (this condition can be masked by a parameter).
-    return false;
-  }
-
-  const GURL prewarm_url =
-      prewarm_url_for_testing_.value_or(GURL(features::kPrewarmUrl.Get()));
-  if (!prewarm_url.is_valid()) {
-    // A valid URL would not be provided if the feature is enabled from
-    // chrome://flags, or arbitrary command line options.
+  GURL prewarm_url;
+  PrewarmDecision decision = ShouldPrewarm(prewarm_url);
+  base::UmaHistogramEnumeration(kHistogramPrerenderPrewarmDecision, decision);
+  if (decision != PrewarmDecision::kReady) {
     return false;
   }
 
@@ -256,10 +264,8 @@ bool PrerenderManager::MaybeStartPrewarmSearchResult() {
       /*no_vary_search_hint=*/std::nullopt,
       ui::PageTransitionFromInt(ui::PAGE_TRANSITION_GENERATED |
                                 ui::PAGE_TRANSITION_FROM_ADDRESS_BAR),
-      // TODO(https://crbug.com/406378765): Consider enabling rendering
-      // warm-ups when we support process reuse.
-      /*should_warm_up_compositor=*/false,
-      /*should_prepare_paint_tree=*/false,
+      /*should_warm_up_compositor=*/true,
+      /*should_prepare_paint_tree=*/true,
       content::PreloadingHoldbackStatus::kUnspecified,
       content::PreloadPipelineInfo::Create(
           /*planned_max_preloading_type=*/content::PreloadingType::kPrerender),
@@ -273,7 +279,9 @@ bool PrerenderManager::MaybeStartPrewarmSearchResult() {
           [](const GURL& url, const std::optional<content::UrlMatchType>&) {
             return false;
           }),
-      /*prerender_navigation_handle_callback=*/{},
+      base::BindRepeating(
+          &PrerenderManager::OnSearchPrewarmPrerenderNavigationHandle,
+          GetWeakPtr()),
       /*allow_reuse=*/true);
 
   return search_prewarm_handle_ != nullptr;
@@ -420,6 +428,91 @@ void PrerenderManager::ResetPrerenderHandlesOnPrimaryPageChanged(
 
     search_prerender_task_.reset();
   }
+}
+
+PrerenderManager::PrewarmDecision PrerenderManager::ShouldPrewarm(
+    GURL& prewarm_url) {
+  if (search_prewarm_handle_ || HasSearchResultPagePrerendered()) {
+    return PrewarmDecision::kAlreadyExists;
+  }
+  if (!base::FeatureList::IsEnabled(features::kPrewarm)) {
+    return PrewarmDecision::kDisabled;
+  }
+  if (static_cast<uint64_t>(features::kMinMemoryThresholdMb.Get()) >
+      base::SysInfo::AmountOfTotalPhysicalMemory().InMiB()) {
+    return PrewarmDecision::kLowMemory;
+  }
+  if (headless::IsHeadlessMode()) {
+    return PrewarmDecision::kInHeadlessMode;
+  }
+  if (content::DevToolsAgentHost::IsDebuggerAttached(web_contents()) &&
+      !features::kForceEnableWithDevTools.Get()) {
+    // TODO(https://crbug.com/431928370): Allows this once the prewarm support
+    // is implemented in the CDP.
+    return PrewarmDecision::kDebuggerAttached;
+  }
+  prewarm_url =
+      prewarm_url_for_testing_.value_or(GURL(features::kPrewarmUrl.Get()));
+  if (!prewarm_url.is_valid()) {
+    // A valid URL would not be provided if the feature is enabled from
+    // chrome://flags, or arbitrary command line options.
+    return PrewarmDecision::kInvalidUrl;
+  }
+  if (!prewarm_url_for_testing_.has_value() &&
+      features::kPrewarmZeroSuggestTrigger.Get()) {
+    // Check if the prewarm URL is aligned with the default search provider.
+    // This check should be done only when the feature is correctly configured
+    // for the production.
+    // TODO(https://crbug.com/434823934): Once we ensure the feature is
+    // promising, integrate it with the template service for other search
+    // providers.
+    auto* template_url_service = TemplateURLServiceFactory::GetForProfile(
+        Profile::FromBrowserContext(web_contents()->GetBrowserContext()));
+    if (!template_url_service) {
+      return PrewarmDecision::kNoTemplateUrlService;
+    }
+    if (!template_url_service->GetDefaultSearchProviderOrigin()
+             .IsSameOriginWith(prewarm_url)) {
+      return PrewarmDecision::kNotSameOriginWithDSE;
+    }
+  }
+  if (web_contents()->GetPictureInPictureOptions().has_value()) {
+    // Disables the feature in the Picture-in-Picture window as it disallows
+    // any navigation. See,
+    // https://wicg.github.io/document-picture-in-picture/#close-on-navigate.
+    return PrewarmDecision::kInPictureInPicture;
+  }
+
+#if !BUILDFLAG(IS_ANDROID)
+  if (auto* tab = tabs::TabInterface::MaybeGetFromContents(web_contents())) {
+    if (web_app::AppBrowserController::IsIsolatedWebApp(
+            tab->GetBrowserWindowInterface())) {
+      // Disable the feature in the Isolated Web App window as it disallows
+      // cross-origin navigation.
+      return PrewarmDecision::kInIsolatedWebApp;
+    }
+  }
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_CHROMEOS)
+  if (chromeos::IsKioskSession()) {
+    return PrewarmDecision::kInKioskSession;
+  }
+#endif  // BUILDFLAG(IS_CHROMEOS)
+
+  return PrewarmDecision::kReady;
+}
+
+void PrerenderManager::OnSearchPrewarmPrerenderNavigationHandle(
+    content::NavigationHandle& navigation_handle) {
+  // Set the PrerenderPrewarmNavigationData for the navigation. This is used to
+  // determine if a navigation is a DSE prewarm navigation, and if the
+  // navigation happened after a DSE prewarm. Note that `prerender_host_reused`
+  // is set to false here because this is a new navigation and we are not
+  // certain if this is a prerender navigation or not yet.
+  page_load_metrics::PrerenderPrewarmNavigationData::GetOrCreate(
+      &navigation_handle,
+      /*prewarm_committed=*/true);
 }
 
 PrerenderManager::PrerenderManager(content::WebContents* web_contents)

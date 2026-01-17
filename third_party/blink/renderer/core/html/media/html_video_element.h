@@ -32,7 +32,7 @@
 #include "third_party/blink/renderer/core/html/html_image_loader.h"
 #include "third_party/blink/renderer/core/html/media/html_media_element.h"
 #include "third_party/blink/renderer/core/imagebitmap/image_bitmap_source.h"
-#include "third_party/blink/renderer/platform/graphics/canvas_resource_provider.h"
+#include "third_party/blink/renderer/platform/graphics/canvas_snapshot_provider.h"
 #include "third_party/blink/renderer/platform/timer.h"
 
 namespace blink {
@@ -79,12 +79,10 @@ class CORE_EXPORT HTMLVideoElement final
   unsigned webkitDecodedFrameCount() const;
   unsigned webkitDroppedFrameCount() const;
 
-  // Used by canvas to gain raw pixel access
-  //
-  // |paint_flags| is optional. If unspecified, its blend mode defaults to kSrc.
+  // Used by canvas to gain raw pixel access.
   void PaintCurrentFrame(cc::PaintCanvas*,
                          const gfx::Rect&,
-                         const cc::PaintFlags* paint_flags) const;
+                         const cc::PaintFlags&) const;
 
   bool HasAvailableVideoFrame() const;
   bool HasReadableVideoFrame() const;
@@ -101,19 +99,20 @@ class CORE_EXPORT HTMLVideoElement final
 
   // Helper for GetSourceImageForCanvas() and other external callers who want a
   // StaticBitmapImage of the current VideoFrame. If `allow_accelerated_images`
-  // is set to false a software backed CanvasResourceProvider will be used to
+  // is set to false a software backed CanvasSnapshotProvider will be used to
   // produce the StaticBitmapImage. If `size` is specified, the image will be
   // scaled to it, otherwise the image will be in its natural size. If
   // `reinterpret_as_srgb` is true, then reinterpret the video as thought it
   // is in sRGB color space.
+  // TODO(crbug.com/40170349): Remove `allow_accelerated_images` after M145 is
+  // stable and all callers are removed.
   scoped_refptr<StaticBitmapImage> CreateStaticBitmapImage(
       bool allow_accelerated_images = true,
       std::optional<gfx::Size> size = std::nullopt,
       bool reinterpret_as_srgb = false);
 
   // CanvasImageSource implementation
-  scoped_refptr<Image> GetSourceImageForCanvas(FlushReason,
-                                               SourceImageStatus*,
+  scoped_refptr<Image> GetSourceImageForCanvas(SourceImageStatus*,
                                                const gfx::SizeF&) override;
   bool IsVideoElement() const override { return true; }
   bool WouldTaintOrigin() const override;
@@ -276,7 +275,7 @@ class CORE_EXPORT HTMLVideoElement final
 
   // Used to fulfill blink::Image requests (CreateImage(),
   // GetSourceImageForCanvas(), etc). Created on demand.
-  std::unique_ptr<CanvasResourceProvider> resource_provider_;
+  std::unique_ptr<CanvasSnapshotProvider> snapshot_provider_;
   bool allow_accelerated_images_ = true;
   HeapTaskRunnerTimer<HTMLVideoElement> cache_deleting_timer_;
 

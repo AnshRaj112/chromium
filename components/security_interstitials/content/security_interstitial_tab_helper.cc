@@ -143,8 +143,7 @@ void SecurityInterstitialTabHelper::BindInterstitialCommands(
 
 bool SecurityInterstitialTabHelper::IsInterstitialPendingForNavigation(
     int64_t navigation_id) const {
-  return base::Contains(blocking_documents_for_pending_navigations_,
-                        navigation_id);
+  return blocking_documents_for_pending_navigations_.contains(navigation_id);
 }
 
 bool SecurityInterstitialTabHelper::ShouldDisplayURL() const {
@@ -165,8 +164,8 @@ bool SecurityInterstitialTabHelper::HasPendingOrActiveInterstitial() const {
 
 bool SecurityInterstitialTabHelper::IsInterstitialCommittedForFrame(
     content::FrameTreeNodeId frame_tree_node_id) const {
-  return base::Contains(blocking_documents_for_committed_navigations_,
-                        frame_tree_node_id);
+  return blocking_documents_for_committed_navigations_.contains(
+      frame_tree_node_id);
 }
 
 security_interstitials::SecurityInterstitialPage*
@@ -327,6 +326,38 @@ void SecurityInterstitialTabHelper::OpenAndroidAdvancedProtectionSettings() {
                     CMD_OPEN_ANDROID_ADVANCED_PROTECTION_SETTINGS);
 }
 #endif  // BUILDFLAG(IS_ANDROID)
+
+void SecurityInterstitialTabHelper::OpenHelpCenterInNewTab() {
+  HandleCommand(security_interstitials::SecurityInterstitialCommand::
+                    CMD_OPEN_HELP_CENTER_IN_NEW_TAB);
+}
+
+void SecurityInterstitialTabHelper::OpenDiagnosticInNewTab() {
+  HandleCommand(security_interstitials::SecurityInterstitialCommand::
+                    CMD_OPEN_DIAGNOSTIC_IN_NEW_TAB);
+}
+
+void SecurityInterstitialTabHelper::OpenReportingPrivacyInNewTab() {
+  HandleCommand(security_interstitials::SecurityInterstitialCommand::
+                    CMD_OPEN_REPORTING_PRIVACY_IN_NEW_TAB);
+}
+
+void SecurityInterstitialTabHelper::OpenWhitepaperInNewTab() {
+  HandleCommand(security_interstitials::SecurityInterstitialCommand::
+                    CMD_OPEN_WHITEPAPER_IN_NEW_TAB);
+}
+
+void SecurityInterstitialTabHelper::ReportPhishingErrorInNewTab() {
+  HandleCommand(security_interstitials::SecurityInterstitialCommand::
+                    CMD_REPORT_PHISHING_ERROR_IN_NEW_TAB);
+}
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+void SecurityInterstitialTabHelper::ShowCertificateViewer() {
+  HandleCommand(security_interstitials::SecurityInterstitialCommand::
+                    CMD_SHOW_CERTIFICATE_VIEWER);
+}
+#endif
 
 WEB_CONTENTS_USER_DATA_KEY_IMPL(SecurityInterstitialTabHelper);
 

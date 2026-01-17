@@ -5,9 +5,13 @@
 #import "ios/chrome/browser/safari_data_import/coordinator/safari_data_import_export_coordinator.h"
 
 #import "base/check_op.h"
+#import "ios/chrome/browser/ntp/model/set_up_list_item_type.h"
+#import "ios/chrome/browser/ntp/model/set_up_list_prefs.h"
 #import "ios/chrome/browser/safari_data_import/coordinator/safari_data_import_child_coordinator_delegate.h"
 #import "ios/chrome/browser/safari_data_import/coordinator/safari_data_import_import_coordinator.h"
+#import "ios/chrome/browser/safari_data_import/public/metrics.h"
 #import "ios/chrome/browser/safari_data_import/ui/safari_data_import_export_view_controller.h"
+#import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/common/ui/confirmation_alert/confirmation_alert_action_handler.h"
 #import "ios/public/provider/chrome/browser/safari_data_import/safari_data_import_api.h"
 
@@ -31,8 +35,17 @@
   viewController.actionHandler = self;
   _navigationController = [[UINavigationController alloc]
       initWithRootViewController:viewController];
+  viewController.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+      initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
+                           target:self
+                           action:@selector(didTapCancelButton)];
   _navigationController.delegate = self;
   _navigationController.modalInPresentation = YES;
+
+  // Opening the Safari Data import steps page marks the Safari Import item as
+  // completed in prefs.
+  set_up_list_prefs::MarkItemComplete(GetApplicationContext()->GetLocalState(),
+                                      SetUpListItemType::kSafariImport);
   [self.baseViewController presentViewController:_navigationController
                                         animated:YES
                                       completion:nil];
@@ -51,20 +64,22 @@
 #pragma mark - ConfirmationAlertActionHandler
 
 - (void)confirmationAlertPrimaryAction {
+  RecordActionOnSafariExportEducationScreen(
+      SafariDataImportExportEducationAction::kGoToSetting);
   ios::provider::OpenSettingsToExportDataFromSafari();
 }
 
 - (void)confirmationAlertSecondaryAction {
-  CHECK(!_importCoordinator);
+  if (_importCoordinator) {
+    return;
+  }
+  RecordActionOnSafariExportEducationScreen(
+      SafariDataImportExportEducationAction::kContinue);
   _importCoordinator = [[SafariDataImportImportCoordinator alloc]
       initWithBaseNavigationController:_navigationController
                                browser:self.browser];
   _importCoordinator.delegate = self.delegate;
   [_importCoordinator start];
-}
-
-- (void)confirmationAlertDismissAction {
-  [self.delegate safariDataImportCoordinatorWillDismissWorkflow:self];
 }
 
 #pragma mark - UINavigationControllerDelegate
@@ -73,11 +88,22 @@
        didShowViewController:(UIViewController*)viewController
                     animated:(BOOL)animated {
   CHECK_EQ(navigationController, _navigationController);
-  if (viewController == _navigationController.viewControllers[0]) {
+  if (_importCoordinator &&
+      viewController == _navigationController.viewControllers[0]) {
     /// Handle user going back from import stage.
+    RecordSafariDataImportTapsBackAtImportStage(_importCoordinator.importStage);
     [_importCoordinator stop];
     _importCoordinator = nil;
   }
+}
+
+#pragma mark - Private
+
+// Dismisses the sheet.
+- (void)didTapCancelButton {
+  RecordActionOnSafariExportEducationScreen(
+      SafariDataImportExportEducationAction::kCancel);
+  [self.delegate safariDataImportCoordinatorWillDismissWorkflow:self];
 }
 
 @end

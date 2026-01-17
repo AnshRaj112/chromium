@@ -6,12 +6,14 @@
 #define MOJO_PUBLIC_CPP_BINDINGS_LIB_MESSAGE_FRAGMENT_H_
 
 #include <stddef.h>
+
 #include <type_traits>
 
 #include "base/bits.h"
 #include "base/check_op.h"
 #include "base/component_export.h"
 #include "base/memory/raw_ptr_exclusion.h"
+#include "base/numerics/checked_math.h"
 #include "mojo/public/cpp/bindings/lib/bindings_internal.h"
 #include "mojo/public/cpp/bindings/message.h"
 

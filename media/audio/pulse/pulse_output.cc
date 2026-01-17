@@ -18,6 +18,7 @@
 #include "media/audio/audio_device_description.h"
 #include "media/audio/audio_manager_base.h"
 #include "media/audio/pulse/pulse_util.h"
+#include "media/base/audio_bus.h"
 #include "media/base/audio_sample_types.h"
 
 namespace media {
@@ -154,7 +155,7 @@ void PulseAudioOutputStream::SendLogMessage(const char* format, ...) {
     return;
   va_list args;
   va_start(args, format);
-  log_callback_.Run("PAOS::" + base::StringPrintV(format, args) +
+  log_callback_.Run("PAOS::" + UNSAFE_TODO(base::StringPrintV(format, args)) +
                     base::StringPrintf(" [this=%p]", this));
   va_end(args);
 }

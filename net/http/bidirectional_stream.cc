@@ -211,7 +211,7 @@ void BidirectionalStream::StartRequest() {
   stream_request_ =
       session_->http_stream_factory()->RequestBidirectionalStreamImpl(
           http_request_info, request_info_->priority, /*allowed_bad_certs=*/{},
-          this, /* enable_ip_based_pooling = */ true,
+          this, /* enable_ip_based_pooling_for_h2 = */ true,
           /* enable_alternative_services = */ true, net_log_);
   // Check that this call does not fail.
   DCHECK(stream_request_);
@@ -261,7 +261,7 @@ void BidirectionalStream::OnHeadersReceived(
   session_->http_stream_factory()->ProcessAlternativeServices(
       session_, NetworkAnonymizationKey(), response_info.headers.get(),
       url::SchemeHostPort(request_info_->url));
-  delegate_->OnHeadersReceived(response_headers);
+  delegate_->OnHeadersReceived(response_headers, used_proxy_info_);
 }
 
 void BidirectionalStream::OnDataRead(int bytes_read) {
@@ -357,6 +357,8 @@ void BidirectionalStream::OnBidirectionalStreamImplReady(
             "This feature is not used in Chrome."
         }
     )");
+
+  used_proxy_info_ = used_proxy_info;
 
   stream_request_.reset();
   stream_impl_ = std::move(stream);

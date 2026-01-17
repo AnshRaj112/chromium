@@ -16,10 +16,12 @@
 #include "chrome/browser/ui/views/webid/fake_delegate.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/common/content_features.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/test_renderer_host.h"
 #include "content/public/test/web_contents_tester.h"
+#include "ui/views/widget/widget_interactive_uitest_utils.h"
 
 namespace webid {
 
@@ -51,6 +53,7 @@ class FedCmAccountSelectionViewBrowserTest : public DialogBrowserTest {
     accounts_ = {base::MakeRefCounted<Account>(
         "id", "display_identifier", "display_name", "email", "name",
         "given_name", GURL(), "tel", "username",
+        /*potentially_approved_origin_hashes=*/std::vector<std::string>(),
         /*login_hints=*/std::vector<std::string>(),
         /*domain_hints=*/std::vector<std::string>(),
         /*labels=*/std::vector<std::string>())};
@@ -81,6 +84,12 @@ class FedCmAccountSelectionViewBrowserTest : public DialogBrowserTest {
 
   views::Widget* GetDialog() {
     return account_selection_view_->GetDialogWidget();
+  }
+
+  bool IsDialogVisible() { return GetDialog() && GetDialog()->IsVisible(); }
+
+  bool HasDialogContentsView() {
+    return account_selection_view_->HasDialogContentsViewForTesting();
   }
 
   FakeDelegate* delegate() { return delegate_.get(); }
@@ -127,15 +136,34 @@ IN_PROC_BROWSER_TEST_F(FedCmAccountSelectionViewBrowserTest, NavigateAway) {
 
 IN_PROC_BROWSER_TEST_F(FedCmAccountSelectionViewBrowserTest, ReShow) {
   Show();
+
+  // The dialog is initially shown on the visible tab.
+  tabs::TabInterface* tab_with_dialog =
+      browser()->tab_strip_model()->GetTabAtIndex(0);
+  ASSERT_TRUE(tab_with_dialog->IsVisible());
+
+  ASSERT_TRUE(GetDialog());
+  EXPECT_TRUE(GetDialog()->IsVisible());
+
+  views::test::PropertyWaiter hide_tab_waiter(
+      base::BindRepeating(&tabs::TabInterface::IsVisible,
+                          base::Unretained(tab_with_dialog)),
+      false);
   EXPECT_TRUE(AddTabAtIndex(1, GURL("about:blank"), ui::PAGE_TRANSITION_TYPED));
 
-  // The tab is currently hidden.
+  // When the tab is hidden, the dialog is hidden.
+  ASSERT_TRUE(hide_tab_waiter.Wait());
   ASSERT_TRUE(GetDialog());
   EXPECT_FALSE(GetDialog()->IsVisible());
 
+  views::test::PropertyWaiter show_tab_waiter(
+      base::BindRepeating(&tabs::TabInterface::IsVisible,
+                          base::Unretained(tab_with_dialog)),
+      true);
   browser()->tab_strip_model()->ActivateTabAt(0);
 
-  // The dialog should be reshown after the WebContents is Visible.
+  // The dialog should be reshown after the tab is made visible again.
+  ASSERT_TRUE(show_tab_waiter.Wait());
   ASSERT_TRUE(GetDialog());
   EXPECT_TRUE(GetDialog()->IsVisible());
 }
@@ -147,12 +175,20 @@ IN_PROC_BROWSER_TEST_F(FedCmAccountSelectionViewBrowserTest, ShowWhileHidden) {
   EXPECT_TRUE(AddTabAtIndex(1, GURL("about:blank"), ui::PAGE_TRANSITION_TYPED));
   ShowUi("");
 
-  // Since Show() was called while hidden, the dialog should have been created,
-  // but should not be visible.
+  // Since Show() was called while hidden, the dialog should not be visible but
+  // Still has the contents.
   ASSERT_TRUE(GetDialog());
-  EXPECT_FALSE(GetDialog()->IsVisible());
+  EXPECT_FALSE(IsDialogVisible());
+  EXPECT_TRUE(HasDialogContentsView());
 
+  views::test::PropertyWaiter show_tab_waiter(
+      base::BindRepeating(
+          &tabs::TabInterface::IsVisible,
+          base::Unretained(browser()->tab_strip_model()->GetTabAtIndex(0))),
+      true);
   browser()->tab_strip_model()->ActivateTabAt(0);
+  ASSERT_TRUE(show_tab_waiter.Wait());
+
   ASSERT_TRUE(GetDialog());
   EXPECT_TRUE(GetDialog()->IsVisible());
 }
@@ -164,9 +200,10 @@ IN_PROC_BROWSER_TEST_F(FedCmAccountSelectionViewBrowserTest,
 
   Show();
   // Since Show() was called while the web contents is too small, the dialog
-  // should have been created, but should not be visible.
+  // should not be visible, but the contents should still be available.
   ASSERT_TRUE(GetDialog());
-  EXPECT_FALSE(GetDialog()->IsVisible());
+  EXPECT_FALSE(IsDialogVisible());
+  EXPECT_TRUE(HasDialogContentsView());
 }
 
 IN_PROC_BROWSER_TEST_F(FedCmAccountSelectionViewBrowserTest,
@@ -334,6 +371,7 @@ class FedCmMixin {
     accounts_ = {base::MakeRefCounted<Account>(
         "id", "display_identifier", "display_name", "email", "name",
         "given_name", GURL(), "phone", "username",
+        /*potentially_approved_origin_hashes=*/std::vector<std::string>(),
         /*login_hints=*/std::vector<std::string>(),
         /*domain_hints=*/std::vector<std::string>(),
         /*labels=*/std::vector<std::string>())};
@@ -445,7 +483,7 @@ IN_PROC_BROWSER_TEST_F(FedCmAccountSelectionViewPopupTest,
         account_selection_view_->account_selection_view());
     EXPECT_TRUE(
         popup->GetActiveTabInterface()->GetContents()->GetViewBounds().Contains(
-            bubble->GetBubbleBounds()));
+            bubble->GetBubbleBounds(gfx::Rect())));
     Reset();
   }
 

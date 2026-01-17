@@ -7,6 +7,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "base/unguessable_token.h"
+#include "content/browser/devtools/devtools_manager.h"
 #include "content/browser/devtools/protocol/io_handler.h"
 #include "content/browser/devtools/protocol/target_auto_attacher.h"
 #include "content/browser/devtools/protocol/target_handler.h"
@@ -74,13 +75,16 @@ class WebContentsDevToolsAgentHost::AutoAttacher
 
  private:
   void UpdateAutoAttach(base::OnceClosure callback) override {
-    UpdateAssociatedPages();
+    if (web_contents_ && !web_contents_->IsBeingDestroyed()) {
+      UpdateAssociatedPages();
+    }
     protocol::TargetAutoAttacher::UpdateAutoAttach(std::move(callback));
   }
 
   base::flat_set<scoped_refptr<DevToolsAgentHost>> UpdateAssociatedPages() {
     base::flat_set<scoped_refptr<DevToolsAgentHost>> hosts;
     if (auto_attach() && web_contents_) {
+      CHECK(!web_contents_->IsBeingDestroyed());
       auto* rfh = static_cast<RenderFrameHostImpl*>(
           web_contents_->GetPrimaryMainFrame());
       web_contents_->ForEachRenderFrameHost(
@@ -145,7 +149,13 @@ bool WebContentsDevToolsAgentHost::IsDebuggerAttached(
 // static
 void WebContentsDevToolsAgentHost::AddAllAgentHosts(
     DevToolsAgentHost::List* result) {
+  auto* delegate = DevToolsManager::GetInstance()->delegate();
   for (WebContentsImpl* wc : WebContentsImpl::GetAllWebContents()) {
+    if (delegate && !delegate->ShouldReportAsTabTarget(wc).value_or(true)) {
+      // Skip the target if delegate explicitly indicates that it should not be
+      // reported as Tab.
+      continue;
+    }
     result->push_back(GetOrCreateFor(wc));
   }
 }
@@ -335,6 +345,9 @@ WebContentsDevToolsAgentHost::GetOrCreatePrimaryFrameAgent() {
 }
 
 void WebContentsDevToolsAgentHost::WebContentsDestroyed() {
+  // Detach auto-attacher early so it doesn't do anything weird on a
+  // half-destroyed WC while sessions are being detached below.
+  auto_attacher_->SetWebContents(nullptr);
   auto retain_this = ForceDetachAllSessionsImpl();
   InnerDetach();
 }

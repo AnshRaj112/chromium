@@ -13,6 +13,7 @@
 #include "chrome/browser/ui/thumbnails/thumbnail_capture_info.h"
 #include "chrome/browser/ui/thumbnails/thumbnail_image.h"
 #include "content/public/browser/navigation_handle.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/browser/web_contents_user_data.h"
 
@@ -57,7 +58,7 @@ class ThumbnailTabHelper
   void StopVideoCapture();
 
   void StoreThumbnailForTabSwitch(base::TimeTicks start_time,
-                                  const SkBitmap& bitmap);
+                                  const content::CopyFromSurfaceResult& result);
   void StoreThumbnailForBackgroundCapture(const SkBitmap& bitmap,
                                           uint64_t frame_id);
   void StoreThumbnail(CaptureType type,

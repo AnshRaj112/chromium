@@ -19,8 +19,9 @@
 #include "chrome/browser/ui/toolbar/pinned_toolbar/pinned_toolbar_actions_model.h"
 #include "chrome/browser/ui/toolbar_controller_util.h"
 #include "chrome/browser/ui/ui_features.h"
-#include "chrome/browser/ui/views/extensions/extensions_toolbar_container.h"
+#include "chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/layout/browser_view_layout.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_coordinator.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_util.h"
 #include "chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.h"
@@ -567,10 +568,11 @@ IN_PROC_BROWSER_TEST_F(ToolbarControllerUiTest,
                   ActivateMenuItemWithElementId(
                       ChromeActionIds::kActionSidePanelShowBookmarks),
                   WaitForShow(kSidePanelElementId), Check([this]() {
-                    auto* coordinator =
-                        browser()->GetFeatures().side_panel_coordinator();
-                    return coordinator->IsSidePanelEntryShowing(
-                        SidePanelEntry::Key(SidePanelEntry::Id::kBookmarks));
+                    return browser()
+                        ->GetFeatures()
+                        .side_panel_ui()
+                        ->IsSidePanelEntryShowing(SidePanelEntry::Key(
+                            SidePanelEntry::Id::kBookmarks));
                   }));
 }
 
@@ -651,13 +653,9 @@ IN_PROC_BROWSER_TEST_F(ToolbarControllerUiTest,
 // be visible because there's enough space for it. Extensions container should
 // not have animation because its visibility didn't change.
 // TODO(crbug.com/41495158): Flaky on Windows and Mac.
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
-#define MAYBE_ExtensionHasNoAnimationLoop DISABLED_ExtensionHasNoAnimationLoop
-#else
-#define MAYBE_ExtensionHasNoAnimationLoop ExtensionHasNoAnimationLoop
-#endif
+// TODO(crbug.com/472508632): Test is failing on Linux & CrOS.
 IN_PROC_BROWSER_TEST_F(ToolbarControllerUiTest,
-                       MAYBE_ExtensionHasNoAnimationLoop) {
+                       DISABLED_ExtensionHasNoAnimationLoop) {
   RunTestSequence(
       LoadAndPinExtensionButton(), PinBookmarkToToolbar(),
       PinReadingModeToToolbar(), Do([this]() {

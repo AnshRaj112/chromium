@@ -9,9 +9,7 @@
       return obj.text;
     }
 
-    const automationDelegate = window.automationDelegate;
-
-    automationDelegate.registerTool({
+    navigator.modelContext.registerTool({
       execute: echo,
       name: "echo",
       description: "echo input",

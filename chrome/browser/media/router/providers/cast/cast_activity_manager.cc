@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "chrome/browser/media/router/providers/cast/cast_activity_manager.h"
 
 #include <algorithm>
@@ -15,7 +10,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
@@ -959,8 +953,8 @@ void CastActivityManager::HandleLaunchSessionResponse(
 
   activity_it->second->SetOrUpdateSession(*session, sink, hash_token_);
 
-  if (!client_id.empty() && base::Contains(session->message_namespaces(),
-                                           cast_channel::kMediaNamespace)) {
+  if (!client_id.empty() &&
+      session->message_namespaces().contains(cast_channel::kMediaNamespace)) {
     // Request media status from the receiver.
     base::Value::Dict request;
     request.Set("type", cast_util::EnumToString<

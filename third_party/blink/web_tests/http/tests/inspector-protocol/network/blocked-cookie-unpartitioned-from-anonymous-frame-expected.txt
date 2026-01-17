@@ -1,6 +1,6 @@
 Verifies that unpartitioned cookie access is blocked with correct reason from anonymous frame.
 
-requestWillBeSentExtraInfo associated cookies:[
+requestWillBeSentExtraInfo associated cookies: [
     [0] : {
         blockedReasons : [
             [0] : AnonymousContext
@@ -12,7 +12,6 @@ requestWillBeSentExtraInfo associated cookies:[
             name : unpartitioned
             path : /inspector-protocol/network/resources
             priority : Medium
-            sameParty : false
             secure : false
             session : true
             size : 18
@@ -33,7 +32,6 @@ requestWillBeSentExtraInfo associated cookies:[
             partitionKeyOpaque : false
             path : /inspector-protocol/network/resources
             priority : Medium
-            sameParty : false
             secure : false
             session : true
             size : 11

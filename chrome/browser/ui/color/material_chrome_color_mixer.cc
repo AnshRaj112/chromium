@@ -36,12 +36,9 @@ void ApplyDefaultChromeRefreshToolbarColors(ui::ColorMixer& mixer,
   mixer[kColorAppMenuHighlightSeverityMedium] = {kColorAppMenuHighlightDefault};
   mixer[kColorAppMenuHighlightSeverityHigh] = {kColorAppMenuHighlightDefault};
 
-  if (base::FeatureList::IsEnabled(
-          features::kEnableAppMenuButtonColorsForDefaultAvatarButtonStates)) {
-    mixer[kColorAvatarButtonHighlightDefaultForeground] = {
-        kColorAppMenuExpandedForegroundDefault};
-    mixer[kColorAvatarButtonHighlightDefault] = {kColorAppMenuHighlightDefault};
-  }
+  mixer[kColorAvatarButtonHighlightDefaultForeground] = {
+      kColorAppMenuExpandedForegroundDefault};
+  mixer[kColorAvatarButtonHighlightDefault] = {kColorAppMenuHighlightDefault};
 
   mixer[kColorAvatarButtonHighlightManagementForeground] = {
       kColorAvatarButtonHighlightDefaultForeground};
@@ -176,9 +173,7 @@ void AddMaterialChromeColorMixer(ui::ColorProvider* provider,
 
   // Split View colors.
   mixer[kColorSplitViewBackground] = {ui::kColorSysSurface2};
-  mixer[kColorSplitViewScrim] = ui::SetAlpha(ui::kColorRefNeutral99, 0x99);
-  mixer[kColorMulitContentsViewMiniToolbarForeground] = {
-      ui::kColorSysOnSurfaceSubtle};
+  mixer[kColorMultiContentsViewMiniToolbarForeground] = {kColorToolbarText};
 
   // Side Panel colors.
   mixer[kColorSidePanelBackground] = {ui::kColorSysBaseContainer};
@@ -273,6 +268,13 @@ void AddMaterialChromeColorMixer(ui::ColorProvider* provider,
     return;
   }
 
+  mixer[kColorActorUiHandoffButtonBorder] = {ui::kColorSysActorUiBorder};
+  mixer[kColorActorUiOverlayBorder] = {ui::kColorSysActorUiBorder};
+  mixer[kColorActorUiOverlayBorderGlow] = {ui::kColorSysActorUiGradientEnd};
+  mixer[kColorActorUiScrimStart] = {ui::kColorSysActorUiGradientStart};
+  mixer[kColorActorUiScrimMiddle] = {ui::kColorSysActorUiGradientMiddle};
+  mixer[kColorActorUiScrimEnd] = {ui::kColorSysActorUiGradientEnd};
+  mixer[kColorActorUiMagicCursor] = {ui::kColorSysActorUiBorder};
   mixer[kColorAppMenuHighlightDefault] = {ui::kColorSysTonalContainer};
   mixer[kColorAppMenuHighlightSeverityLow] = {kColorAppMenuHighlightDefault};
   mixer[kColorAppMenuHighlightSeverityMedium] = {kColorAppMenuHighlightDefault};
@@ -281,13 +283,9 @@ void AddMaterialChromeColorMixer(ui::ColorProvider* provider,
       ui::kColorSysOnTonalContainer};
   mixer[kColorAppMenuChipInkDropHover] = {ui::kColorSysStateHoverOnSubtle};
   mixer[kColorAppMenuChipInkDropRipple] = {ui::kColorSysStateRipplePrimary};
-  if (!base::FeatureList::IsEnabled(
-          features::kEnableAppMenuButtonColorsForDefaultAvatarButtonStates)) {
-    mixer[kColorAvatarButtonHighlightDefault] = {ui::kColorSysTonalContainer};
-    mixer[kColorAvatarButtonHighlightDefaultForeground] = {
-        ui::kColorSysOnTonalContainer};
-  }
   mixer[kColorAvatarButtonHighlightSyncPaused] = {
+      kColorAvatarButtonHighlightDefault};
+  mixer[kColorAvatarButtonHighlightPasskeysLocked] = {
       kColorAvatarButtonHighlightDefault};
   mixer[kColorAvatarButtonHighlightSigninPaused] = {
       kColorAvatarButtonHighlightDefault};
@@ -335,6 +333,13 @@ void AddMaterialChromeColorMixer(ui::ColorProvider* provider,
   mixer[kColorMediaRouterIconActive] =
       ui::PickGoogleColor(ui::kColorSysPrimary, kColorToolbar,
                           color_utils::kMinimumVisibleContrastRatio);
+
+  mixer[kColorMultiContentsViewMiniToolbarForeground] = {
+      ui::kColorSysOnSurfaceSubtle};
+  mixer[kColorMultiContentsViewActiveContentOutline] = {ui::kColorSysOutline};
+  mixer[kColorMultiContentsViewInactiveContentOutline] = {
+      ui::kColorSysNeutralOutline};
+
   mixer[kColorNewTabButtonFocusRing] = ui::PickGoogleColorTwoBackgrounds(
       ui::kColorSysStateFocusRing,
       ui::GetResultingPaintColor(kColorNewTabButtonBackgroundFrameActive,
@@ -419,4 +424,15 @@ void AddMaterialChromeColorMixer(ui::ColorProvider* provider,
   mixer[kColorToolbarTextDefault] = {ui::kColorSysOnSurfaceSecondary};
   mixer[kColorToolbarTextDisabled] = {kColorToolbarTextDisabledDefault};
   mixer[kColorToolbarTextDisabledDefault] = {ui::kColorSysStateDisabled};
+
+  // Glic colors.
+  mixer[kColorGlicActiveTabUnderlineGradient1] = {ui::kColorGlicTabUnderline1};
+  mixer[kColorGlicActiveTabUnderlineGradient2] = {ui::kColorGlicTabUnderline2};
+  mixer[kColorGlicActiveTabUnderlineGradient3] = {ui::kColorGlicTabUnderline3};
+  mixer[kColorGlicInactiveTabUnderlineGradient1] = {
+      ui::kColorGlicTabUnderline1};
+  mixer[kColorGlicInactiveTabUnderlineGradient2] = {
+      ui::kColorGlicTabUnderline2};
+  mixer[kColorGlicInactiveTabUnderlineGradient3] = {
+      ui::kColorGlicTabUnderline3};
 }

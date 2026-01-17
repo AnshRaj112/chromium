@@ -4,8 +4,17 @@
 
 #include "crypto/unexportable_key_metrics.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <functional>
 #include <memory>
+#include <optional>
+#include <set>
+#include <utility>
+#include <vector>
 
+#include "base/containers/span.h"
+#include "base/containers/to_vector.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "crypto/signature_verifier.h"
 #include "crypto/unexportable_key.h"
@@ -18,7 +27,8 @@ namespace {
 // Mock that wraps the stateless software unexportable key provider while
 // tracking key creation and removal. CHECKs if there are keys left that have
 // not been removed when destroyed.
-class MockTrackingUnexportableKeyProvider : public UnexportableKeyProvider {
+class MockTrackingUnexportableKeyProvider
+    : public StatefulUnexportableKeyProvider {
  public:
   MockTrackingUnexportableKeyProvider()
       : key_provider_(GetSoftwareUnsecureUnexportableKeyProvider()) {}
@@ -50,10 +60,37 @@ class MockTrackingUnexportableKeyProvider : public UnexportableKeyProvider {
         << "Attempted to delete non existing key";
     return key_provider_->FromWrappedSigningKeySlowly(wrapped_key);
   }
-  bool DeleteSigningKeySlowly(base::span<const uint8_t> wrapped_key) override {
-    key_provider_->DeleteSigningKeySlowly(wrapped_key);
-    return keys_.erase(
-        std::vector<uint8_t>(wrapped_key.begin(), wrapped_key.end()));
+
+  StatefulUnexportableKeyProvider* AsStatefulUnexportableKeyProvider()
+      override {
+    return this;
+  }
+
+  // StatefulUnexportableKeyProvider:
+  std::optional<std::vector<std::unique_ptr<UnexportableSigningKey>>>
+  GetAllSigningKeysSlowly() override {
+    return base::ToVector(keys_, [&](const std::vector<uint8_t>& key) {
+      return FromWrappedSigningKeySlowly(key);
+    });
+  }
+
+  std::optional<size_t> DeleteSigningKeysSlowly(
+      base::span<const base::span<const uint8_t>> wrapped_keys) override {
+    if (StatefulUnexportableKeyProvider* stateful_key_provider =
+            key_provider_->AsStatefulUnexportableKeyProvider()) {
+      stateful_key_provider->DeleteSigningKeysSlowly(wrapped_keys);
+    }
+    return std::ranges::count_if(wrapped_keys, [&](auto key) {
+      return keys_.erase(ToVector(key)) != 0;
+    });
+  }
+
+  std::optional<size_t> DeleteAllSigningKeysSlowly() override {
+    if (StatefulUnexportableKeyProvider* stateful_key_provider =
+            key_provider_->AsStatefulUnexportableKeyProvider()) {
+      stateful_key_provider->DeleteAllSigningKeysSlowly();
+    }
+    return std::exchange(keys_, {}).size();
   }
 
  private:

@@ -13,7 +13,6 @@
 
 #include "base/bits.h"
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/debug/alias.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
@@ -442,7 +441,8 @@ PersistentMemoryAllocator::PersistentMemoryAllocator(Memory memory,
   } else {
     if (shared_meta()->size == 0 ||
         (shared_meta()->version != kGlobalVersion &&
-         !Contains(kOldCompatibleVersions, shared_meta()->version)) ||
+         !std::ranges::contains(kOldCompatibleVersions,
+                                shared_meta()->version)) ||
         shared_meta()->freeptr.load(std::memory_order_relaxed) == 0 ||
         shared_meta()->tailptr == 0 || shared_meta()->queue.cookie == 0 ||
         shared_meta()->queue.next.load(std::memory_order_relaxed) == 0) {
@@ -1350,12 +1350,14 @@ span<uint8_t> DelayedPersistentAllocation::GetUntyped() const {
   SCOPED_CRASH_KEY_STRING32(
       PMA, "ref_value_before",
       ref_is_magic_number
-          ? NumberToString((reference_ - 1)->load(std::memory_order_relaxed))
+          ? NumberToString(
+                (UNSAFE_TODO(reference_ - 1))->load(std::memory_order_relaxed))
           : "N/A");
   SCOPED_CRASH_KEY_STRING32(
       PMA, "ref_value_after",
       ref_is_magic_number
-          ? NumberToString((reference_ + 1)->load(std::memory_order_relaxed))
+          ? NumberToString(
+                (UNSAFE_TODO(reference_ + 1))->load(std::memory_order_relaxed))
           : "N/A");
   SCOPED_CRASH_KEY_BOOL(PMA, "ref_found", ref_found);
   SCOPED_CRASH_KEY_BOOL(PMA, "race_detected", race_detected);

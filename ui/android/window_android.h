@@ -12,7 +12,6 @@
 
 #include "base/android/jni_weak_ref.h"
 #include "base/android/scoped_java_ref.h"
-#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
 #include "base/time/time.h"
@@ -55,10 +54,16 @@ class UI_ANDROID_EXPORT WindowAndroid : public ViewAndroid {
     raw_ptr<WindowAndroid> window_;
   };
 
+  struct FrameRateVelocityPoint {
+    float frame_per_second;
+    float dp_per_second;
+  };
+
   struct AdaptiveRefreshRateInfo {
     bool supports_adaptive_refresh_rate = false;
     // Fields below are valid only if `supports_adaptive_refresh_rate` is true.
     float suggested_frame_rate_high = 0.f;
+    std::vector<FrameRateVelocityPoint> velocity_mapping;
 
     AdaptiveRefreshRateInfo();
     AdaptiveRefreshRateInfo(const AdaptiveRefreshRateInfo& other);
@@ -67,7 +72,7 @@ class UI_ANDROID_EXPORT WindowAndroid : public ViewAndroid {
   };
 
   static WindowAndroid* FromJavaWindowAndroid(
-      const base::android::JavaParamRef<jobject>& jwindow_android);
+      const base::android::JavaRef<jobject>& jwindow_android);
 
   WindowAndroid(JNIEnv* env,
                 const base::android::JavaRef<jobject>& obj,
@@ -109,14 +114,19 @@ class UI_ANDROID_EXPORT WindowAndroid : public ViewAndroid {
                            float refresh_rate);
   void OnSupportedRefreshRatesUpdated(
       JNIEnv* env,
-      const base::android::JavaParamRef<jfloatArray>& supported_refresh_rates);
-  void OnAdaptiveRefreshRateInfoChanged(JNIEnv* env,
-                                        jboolean supports_adaptive_refresh_rate,
-                                        jfloat suggested_frame_rate_high);
+      const base::android::JavaRef<jfloatArray>& supported_refresh_rates);
+  void OnAdaptiveRefreshRateInfoChanged(
+      JNIEnv* env,
+      bool supports_adaptive_refresh_rate,
+      jfloat suggested_frame_rate_high,
+      const std::vector<jfloat> frame_per_second,
+      const std::vector<jfloat> dp_per_second);
   void OnOverlayTransformUpdated(JNIEnv* env);
   void SendUnfoldLatencyBeginTimestamp(JNIEnv* env, jlong begin_time);
 
   void OnWindowPointerLockRelease(JNIEnv* env);
+
+  void OnWindowPositionChanged(JNIEnv* env);
 
   void ShowToast(const std::string text);
 
@@ -153,6 +163,12 @@ class UI_ANDROID_EXPORT WindowAndroid : public ViewAndroid {
   bool HasPointerLock(ViewAndroid& view_android);
 
   void ReleasePointerLock(ViewAndroid& view_android);
+
+  bool SetHasKeyboardCapture(bool keyboard_capture);
+
+  // Returns bounds of this window in global dp coordinates (takes display
+  // topology into account).
+  std::optional<gfx::Rect> GetBoundsInScreenCoordinates();
 
   class TestHooks {
    public:

@@ -25,7 +25,6 @@
 #include "ash/test/ash_test_base.h"
 #include "ash/test/ash_test_util.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -34,8 +33,8 @@
 #include "chromeos/ash/components/audio/cras_audio_handler.h"
 #include "components/session_manager/session_manager_types.h"
 #include "ui/base/l10n/l10n_util.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/events/test/event_generator.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/message_center/message_center.h"
 #include "ui/message_center/public/cpp/message_center_constants.h"
 #include "ui/message_center/views/message_view.h"
@@ -191,7 +190,7 @@ TEST_P(PrivacyIndicatorsControllerTest, NotificationMetadata) {
           notification_id);
 
   // Notification message should contains app name.
-  EXPECT_TRUE(base::Contains((notification->title()), app_name));
+  EXPECT_TRUE(notification->title().contains(app_name));
 
   // Privacy indicators notification should not be a popup. It is silently added
   // to the tray.
@@ -335,11 +334,13 @@ TEST_P(PrivacyIndicatorsControllerTest, NotificationWithTwoApps) {
 }
 
 // Tests privacy indicators tray item visibility across all status area widgets.
-TEST_P(PrivacyIndicatorsControllerTest, PrivacyIndicatorsTrayItemView) {
+// TODO(crbug.com/475195986): Re-enable flaky test.
+TEST_P(PrivacyIndicatorsControllerTest,
+       DISABLED_PrivacyIndicatorsTrayItemView) {
   // Uses normal animation duration so that the icons would not be immediately
   // hidden after the animation.
-  ui::ScopedAnimationDurationScaleMode animation_scale(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode animation_scale(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
 
   // Make sure privacy indicators work on multiple displays.
   UpdateDisplay("300x200,500x400");

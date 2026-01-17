@@ -47,6 +47,9 @@ ci.defaults.set(
     cores = 32,
     ssd = True,
     execution_timeout = 20 * time.hour,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     health_spec = health_spec.default(),
     priority = ci_constants.DEFAULT_FYI_PRIORITY,
     service_account = ci_constants.DEFAULT_SERVICE_ACCOUNT,
@@ -109,7 +112,6 @@ coverage_builder(
             target_platform = builder_config.target_platform.ANDROID,
         ),
         android_config = builder_config.android_config(config = "base_config"),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -176,7 +178,6 @@ coverage_webview_builder(
             target_platform = builder_config.target_platform.ANDROID,
         ),
         android_config = builder_config.android_config(config = "base_config"),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -245,7 +246,6 @@ coverage_builder(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -287,6 +287,7 @@ coverage_builder(
             "emulator-4-cores",
             "linux-jammy",
             "x86-64",
+            "retry_only_failed_tests",
         ],
         per_test_modifications = {
             # Keep this same as android-10-x86-rel
@@ -306,10 +307,11 @@ coverage_builder(
                     shards = 2,
                 ),
             ),
+
             # Keep this same as android-10-x86-rel
             "chrome_public_test_apk": targets.mixin(
                 args = [
-                    "--test-launcher-filter-file=../../testing/buildbot/filters/android.emulator_o.chrome_public_test_apk.filter",
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/android.emulator_10.chrome_public_test_apk.filter",
                 ],
                 swarming = targets.swarming(
                     dimensions = {
@@ -407,7 +409,6 @@ coverage_builder(
             # Keep this same as android-10-x86-rel
             "webview_instrumentation_test_apk_multiple_process_mode": targets.mixin(
                 args = [
-                    "--test-launcher-filter-file=../../testing/buildbot/filters/android.emulator_10.webview_instrumentation_test_apk.filter",
                     "--use-persistent-shell",
                 ],
                 swarming = targets.swarming(
@@ -466,7 +467,6 @@ coverage_builder(
             target_platform = builder_config.target_platform.ANDROID,
         ),
         android_config = builder_config.android_config(config = "base_config"),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     # No symbols to prevent linker file too large error on
     # android_webview_unittests target.
@@ -593,7 +593,6 @@ coverage_webview_builder(
             target_platform = builder_config.target_platform.ANDROID,
         ),
         android_config = builder_config.android_config(config = "base_config"),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     # No symbols to prevent linker file too large error on
     # android_webview_unittests target.
@@ -676,7 +675,6 @@ coverage_builder(
             target_platform = builder_config.target_platform.ANDROID,
         ),
         android_config = builder_config.android_config(config = "base_config"),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     # No symbols to prevent linker file too large error on
     # android_webview_unittests target.
@@ -745,7 +743,6 @@ coverage_builder(
             target_platform = builder_config.target_platform.ANDROID,
         ),
         android_config = builder_config.android_config(config = "base_config"),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     # No symbols to prevent linker file too large error on
     # android_webview_unittests target.
@@ -809,7 +806,6 @@ coverage_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.FUCHSIA,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -861,17 +857,21 @@ coverage_builder(
             ),
             "components_browsertests": targets.mixin(
                 swarming = targets.swarming(
-                    shards = 4,
+                    shards = 8,
                 ),
             ),
-            "content_browsertests": targets.mixin(
-                args = [
-                    "--test-launcher-filter-file=../../testing/buildbot/filters/fuchsia.coverage.content_browsertests.filter",
-                    "--test-launcher-jobs=1",
-                ],
+            "components_unittests": targets.mixin(
                 swarming = targets.swarming(
-                    shards = 41,
+                    shards = 24,
                 ),
+            ),
+            "content_browsertests": targets.remove(
+                reason = [
+                    "The test suite is consistently failing after ",
+                    "29.20250815.6.1 due to the potential memory usage ",
+                    "increment and OOM restart.",
+                    "TODO: Reenable these test suite in code coverage builder.",
+                ],
             ),
             "content_unittests": targets.mixin(
                 swarming = targets.swarming(
@@ -962,15 +962,14 @@ coverage_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.IOS,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
             "use_clang_coverage",
             "debug_static_builder",
             "remoteexec",
-            "x64",
-            "ios",
+            "arm64",
+            "ios_simulator",
             "xctest",
         ],
     ),
@@ -983,10 +982,10 @@ coverage_builder(
             "has_native_resultdb_integration",
             "ios_output_disabled_tests",
             "isolate_profile_data",
-            "mac_default_x64",
+            "mac_default_arm64",
             "mac_toolchain",
             "out_dir_arg",
-            "xcode_16_main",
+            "xcode_26_main",
             "xctest",
         ],
     ),
@@ -1025,7 +1024,6 @@ coverage_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.CHROMEOS,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1101,7 +1099,6 @@ coverage_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1154,7 +1151,6 @@ coverage_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.CHROMEOS,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1221,6 +1217,7 @@ coverage_builder(
             "release",
             "linux",
             "x64",
+            "no_clang_modules",
         ],
     ),
     builderless = True,
@@ -1231,6 +1228,9 @@ coverage_builder(
             short_name = "lnx-fuzz",
         ),
     ],
+    # TODO(crbug.com/449026537): Remove elevated timeout once performance
+    # improves.
+    execution_timeout = 32 * time.hour,
     notifies = ["chrome-fuzzing-core"],
     properties = {
         "collect_fuzz_coverage": True,
@@ -1283,6 +1283,9 @@ coverage_builder(
         ),
     ],
     contact_team_email = "chrome-fuzzing-core@google.com",
+    # TODO(crbug.com/449026537): Remove elevated timeout once performance
+    # improves.
+    execution_timeout = 24 * time.hour,
     notifies = ["chrome-fuzzing-core"],
     properties = {
         "collect_fuzz_coverage": True,
@@ -1359,7 +1362,6 @@ coverage_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1500,7 +1502,6 @@ coverage_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.MAC,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1576,7 +1577,6 @@ coverage_builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.WIN,
         ),
-        build_gs_bucket = "chromium-fyi-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1602,6 +1602,11 @@ coverage_builder(
             "win10",
         ],
         per_test_modifications = {
+            "blink_unittests": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 4,
+                ),
+            ),
             "browser_tests": targets.mixin(
                 swarming = targets.swarming(
                     dimensions = {
@@ -1613,6 +1618,7 @@ coverage_builder(
             ),
             "components_unittests": targets.mixin(
                 swarming = targets.swarming(
+                    hard_timeout_sec = 5400,
                     shards = 6,
                 ),
             ),
@@ -1627,6 +1633,7 @@ coverage_builder(
             ),
             "content_unittests": targets.mixin(
                 swarming = targets.swarming(
+                    hard_timeout_sec = 5400,
                     shards = 2,
                 ),
             ),
@@ -1683,11 +1690,6 @@ coverage_builder(
             ),
             "webgpu_cts_shared_worker_tests": targets.remove(
                 reason = "Dedicated worker tests are probably sufficient.",
-            ),
-            "webkit_unit_tests": targets.mixin(
-                swarming = targets.swarming(
-                    shards = 4,
-                ),
             ),
         },
     ),

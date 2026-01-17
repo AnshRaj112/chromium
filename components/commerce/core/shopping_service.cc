@@ -4,11 +4,11 @@
 
 #include "components/commerce/core/shopping_service.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "base/barrier_callback.h"
 #include "base/check_is_test.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
@@ -20,11 +20,12 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
 #include "base/values.h"
-#include "commerce_types.h"
 #include "components/bookmarks/browser/bookmark_model.h"
+#include "components/commerce/core/account_checker.h"
 #include "components/commerce/core/bookmark_update_manager.h"
 #include "components/commerce/core/commerce_constants.h"
 #include "components/commerce/core/commerce_feature_list.h"
+#include "components/commerce/core/commerce_types.h"
 #include "components/commerce/core/commerce_utils.h"
 #include "components/commerce/core/compare/cluster_manager.h"
 #include "components/commerce/core/compare/cluster_server_proxy.h"
@@ -121,14 +122,14 @@ class ProductSpecificationsUrlObserver
     // First remove any references to URLs that are no longer in the product
     // spec set.
     for (const auto& url : before.urls()) {
-      if (!base::Contains(after.urls(), url)) {
+      if (!std::ranges::contains(after.urls(), url)) {
         cache_->RemoveRef(url);
       }
     }
 
     // Now add any URLs that weren't previously referenced.
     for (const auto& url : after.urls()) {
-      if (!base::Contains(before.urls(), url)) {
+      if (!std::ranges::contains(before.urls(), url)) {
         cache_->AddRef(url);
       }
     }
@@ -1111,7 +1112,7 @@ void ShoppingService::HandleOptGuideProductInfoResponse(
     if (attempt_on_demand && commerce_info_cache_.IsUrlReferenced(url) &&
         entry) {
       if (entry->run_product_info_on_demand) {
-        DCHECK(!base::Contains(on_demand_product_info_callbacks_, url));
+        DCHECK(!on_demand_product_info_callbacks_.contains(url));
         entry->run_product_info_on_demand = false;
         on_demand_product_info_callbacks_[url].push_back(std::move(callback));
 
@@ -1138,7 +1139,7 @@ void ShoppingService::HandleOptGuideProductInfoResponse(
                 AsWeakPtr(),
                 base::BindRepeating(&ShoppingService::OnGetOnDemandProductInfo,
                                     AsWeakPtr())));
-      } else if (base::Contains(on_demand_product_info_callbacks_, url)) {
+      } else if (on_demand_product_info_callbacks_.contains(url)) {
         // If there is a on demand call running, add callback to the queue.
         on_demand_product_info_callbacks_[url].push_back(std::move(callback));
       } else {

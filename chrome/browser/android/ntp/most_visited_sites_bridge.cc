@@ -36,14 +36,14 @@
 
 using base::android::AttachCurrentThread;
 using base::android::ConvertJavaStringToUTF8;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaGlobalRef;
 using base::android::ScopedJavaLocalRef;
 using ntp_tiles::MostVisitedSites;
 using ntp_tiles::NTPTilesVector;
 using ntp_tiles::SectionType;
-using ntp_tiles::TileTitleSource;
 using ntp_tiles::TileSource;
+using ntp_tiles::TileTitleSource;
 using ntp_tiles::TileVisualType;
 
 namespace {
@@ -51,7 +51,7 @@ namespace {
 class JavaHomepageClient : public MostVisitedSites::HomepageClient {
  public:
   JavaHomepageClient(JNIEnv* env,
-                     const JavaParamRef<jobject>& obj,
+                     const JavaRef<jobject>& obj,
                      Profile* profile);
 
   JavaHomepageClient(const JavaHomepageClient&) = delete;
@@ -73,7 +73,7 @@ class JavaHomepageClient : public MostVisitedSites::HomepageClient {
 };
 
 JavaHomepageClient::JavaHomepageClient(JNIEnv* env,
-                                       const JavaParamRef<jobject>& obj,
+                                       const JavaRef<jobject>& obj,
                                        Profile* profile)
     : client_(env, obj), profile_(profile) {
   DCHECK(profile);
@@ -97,7 +97,6 @@ void JavaHomepageClient::QueryHomepageTitle(TitleCallback title_callback) {
   // and the callback will not be called. Therefore, base::Unretained works.
   history_service->QueryURL(
       url,
-      /*want_visits=*/false,
       base::BindOnce(&JavaHomepageClient::OnTitleEntryFound,
                      base::Unretained(this), std::move(title_callback)),
       &task_tracker_);
@@ -130,7 +129,7 @@ GURL JavaHomepageClient::GetHomepageUrl() const {
 
 class MostVisitedSitesBridge::JavaObserver : public MostVisitedSites::Observer {
  public:
-  JavaObserver(JNIEnv* env, const JavaParamRef<jobject>& obj);
+  JavaObserver(JNIEnv* env, const JavaRef<jobject>& obj);
 
   JavaObserver(const JavaObserver&) = delete;
   JavaObserver& operator=(const JavaObserver&) = delete;
@@ -145,9 +144,8 @@ class MostVisitedSitesBridge::JavaObserver : public MostVisitedSites::Observer {
   ScopedJavaGlobalRef<jobject> observer_;
 };
 
-MostVisitedSitesBridge::JavaObserver::JavaObserver(
-    JNIEnv* env,
-    const JavaParamRef<jobject>& obj)
+MostVisitedSitesBridge::JavaObserver::JavaObserver(JNIEnv* env,
+                                                   const JavaRef<jobject>& obj)
     : observer_(env, obj) {}
 
 void MostVisitedSitesBridge::JavaObserver::OnURLsAvailable(
@@ -179,7 +177,10 @@ MostVisitedSitesBridge::MostVisitedSitesBridge(Profile* profile,
     : most_visited_(ChromeMostVisitedSitesFactory::NewForProfile(profile)),
       profile_(profile) {
   DCHECK(!profile->IsOffTheRecord());
-  most_visited_->EnableCustomLinks(enable_custom_links);
+  most_visited_->EnableTileTypes(
+      ntp_tiles::MostVisitedSites::EnableTileTypesOptions()
+          .with_top_sites(true)
+          .with_custom_links(enable_custom_links));
 }
 
 MostVisitedSitesBridge::~MostVisitedSitesBridge() = default;
@@ -194,36 +195,35 @@ void MostVisitedSitesBridge::OnHomepageStateChanged(JNIEnv* env) {
 
 void MostVisitedSitesBridge::SetHomepageClient(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& j_client) {
+    const base::android::JavaRef<jobject>& j_client) {
   most_visited_->SetHomepageClient(
       std::make_unique<JavaHomepageClient>(env, j_client, profile_));
 }
 
-void MostVisitedSitesBridge::SetObserver(
-    JNIEnv* env,
-    const JavaParamRef<jobject>& j_observer,
-    jint num_sites) {
+void MostVisitedSitesBridge::SetObserver(JNIEnv* env,
+                                         const JavaRef<jobject>& j_observer,
+                                         int32_t num_sites) {
   java_observer_ = std::make_unique<JavaObserver>(env, j_observer);
   most_visited_->AddMostVisitedURLsObserver(java_observer_.get(), num_sites);
 }
 
-jboolean MostVisitedSitesBridge::AddCustomLinkTo(JNIEnv* env,
-                                                 const std::u16string& name,
-                                                 const GURL& url,
-                                                 jint pos) {
+bool MostVisitedSitesBridge::AddCustomLinkTo(JNIEnv* env,
+                                             const std::u16string& name,
+                                             const GURL& url,
+                                             int32_t pos) {
   return most_visited_->AddCustomLinkTo(url, name, pos);
 }
 
-jboolean MostVisitedSitesBridge::AddCustomLink(JNIEnv* env,
-                                               const std::u16string& name,
-                                               const GURL& url) {
+bool MostVisitedSitesBridge::AddCustomLink(JNIEnv* env,
+                                           const std::u16string& name,
+                                           const GURL& url) {
   return most_visited_->AddCustomLink(url, name);
 }
 
-jboolean MostVisitedSitesBridge::AssignCustomLink(JNIEnv* env,
-                                                  const GURL& key_url,
-                                                  const std::u16string& name,
-                                                  const GURL& url) {
+bool MostVisitedSitesBridge::AssignCustomLink(JNIEnv* env,
+                                              const GURL& key_url,
+                                              const std::u16string& name,
+                                              const GURL& url) {
   if (most_visited_->HasCustomLink(key_url)) {
     // Update existing Custom link. In rare cases (e.g., split-window editing
     // and/or race conditions) HasCustomLink() can output stale results. But
@@ -236,44 +236,42 @@ jboolean MostVisitedSitesBridge::AssignCustomLink(JNIEnv* env,
   return most_visited_->AddCustomLink(url, name);
 }
 
-jboolean MostVisitedSitesBridge::DeleteCustomLink(JNIEnv* env,
-                                                  const GURL& key_url) {
+bool MostVisitedSitesBridge::DeleteCustomLink(JNIEnv* env,
+                                              const GURL& key_url) {
   return most_visited_->DeleteCustomLink(key_url);
 }
 
-jboolean MostVisitedSitesBridge::HasCustomLink(JNIEnv* env,
-                                               const GURL& key_url) {
+bool MostVisitedSitesBridge::HasCustomLink(JNIEnv* env, const GURL& key_url) {
   return most_visited_->HasCustomLink(key_url);
 }
 
-jboolean MostVisitedSitesBridge::ReorderCustomLink(JNIEnv* env,
-                                                   const GURL& key_url,
-                                                   jint new_pos) {
+bool MostVisitedSitesBridge::ReorderCustomLink(JNIEnv* env,
+                                               const GURL& key_url,
+                                               int32_t new_pos) {
   return most_visited_->ReorderCustomLink(key_url, new_pos);
 }
 
 void MostVisitedSitesBridge::AddOrRemoveBlockedUrl(
     JNIEnv* env,
-    const JavaParamRef<jobject>& j_url,
-    jboolean add_url) {
+    const JavaRef<jobject>& j_url,
+    bool add_url) {
   GURL url = url::GURLAndroid::ToNativeGURL(env, j_url);
   most_visited_->AddOrRemoveBlockedUrl(url, add_url);
 }
 
-void MostVisitedSitesBridge::RecordPageImpression(
-    JNIEnv* env,
-    jint jtiles_count) {
+void MostVisitedSitesBridge::RecordPageImpression(JNIEnv* env,
+                                                  int32_t jtiles_count) {
   ntp_tiles::metrics::RecordPageImpression(jtiles_count);
 }
 
 void MostVisitedSitesBridge::RecordTileImpression(
     JNIEnv* env,
-    jint jindex,
-    jint jvisual_type,
-    jint jicon_type,
-    jint jtitle_source,
-    jint jsource,
-    const JavaParamRef<jobject>& jurl) {
+    int32_t jindex,
+    int32_t jvisual_type,
+    int32_t jicon_type,
+    int32_t jtitle_source,
+    int32_t jsource,
+    const JavaRef<jobject>& jurl) {
   GURL url = url::GURLAndroid::ToNativeGURL(env, jurl);
   TileTitleSource title_source = static_cast<TileTitleSource>(jtitle_source);
   TileSource source = static_cast<TileSource>(jsource);
@@ -285,12 +283,11 @@ void MostVisitedSitesBridge::RecordTileImpression(
       jindex, source, title_source, visual_type, icon_type, url));
 }
 
-void MostVisitedSitesBridge::RecordOpenedMostVisitedItem(
-    JNIEnv* env,
-    jint index,
-    jint tile_type,
-    jint title_source,
-    jint source) {
+void MostVisitedSitesBridge::RecordOpenedMostVisitedItem(JNIEnv* env,
+                                                         int32_t index,
+                                                         int32_t tile_type,
+                                                         int32_t title_source,
+                                                         int32_t source) {
   ntp_tiles::metrics::RecordTileClick(ntp_tiles::NTPTileImpression(
       index, static_cast<TileSource>(source),
       static_cast<TileTitleSource>(title_source),
@@ -305,8 +302,11 @@ jdouble MostVisitedSitesBridge::GetSuggestionScore(JNIEnv* env,
 
 static jlong JNI_MostVisitedSitesBridge_Init(JNIEnv* env,
                                              Profile* profile,
-                                             jboolean enable_custom_links) {
+                                             bool enable_custom_links) {
   MostVisitedSitesBridge* most_visited_sites =
       new MostVisitedSitesBridge(profile, enable_custom_links);
   return reinterpret_cast<intptr_t>(most_visited_sites);
 }
+
+DEFINE_JNI(MostVisitedSitesBridge)
+DEFINE_JNI(MostVisitedSites)

@@ -16,6 +16,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//chrome/android:chrome_public_smoke_test",
+        "module_scheme": "junit",
         "name": "chrome_public_smoke_test",
         "resultdb": {
           "enable": true,
@@ -51,6 +53,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//chrome/android:chrome_public_test_apk",
+        "module_scheme": "junit",
         "name": "chrome_public_test_apk",
         "precommit_args": [
           "--gerrit-issue=${patch_issue}",
@@ -91,6 +95,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//chrome/android:chrome_public_test_vr_apk",
+        "module_scheme": "junit",
         "name": "chrome_public_test_vr_apk",
         "resultdb": {
           "enable": true,
@@ -127,6 +133,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//chrome/android:chrome_public_unit_test_apk",
+        "module_scheme": "junit",
         "name": "chrome_public_unit_test_apk",
         "precommit_args": [
           "--gerrit-issue=${patch_issue}",
@@ -167,6 +175,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//content/shell/android:content_shell_test_apk",
+        "module_scheme": "junit",
         "name": "content_shell_test_apk",
         "resultdb": {
           "enable": true,
@@ -204,6 +214,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//cc:cc_unittests",
+        "module_scheme": "gtest",
         "name": "layer_list_mode_cc_unittests",
         "resultdb": {
           "enable": true,
@@ -238,6 +250,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//mojo/public/java/system:mojo_test_apk",
+        "module_scheme": "junit",
         "name": "mojo_test_apk",
         "resultdb": {
           "enable": true,
@@ -259,6 +273,88 @@
       },
       {
         "args": [
+          "--enable-features=TreesInViz",
+          "--test-launcher-filter-file=../../testing/buildbot/filters/trees_in_viz.blink_platform_unittests.filter",
+          "--git-revision=${got_revision}",
+          "--gs-results-bucket=chromium-result-details",
+          "--recover-devices"
+        ],
+        "isolate_profile_data": true,
+        "merge": {
+          "args": [
+            "--bucket",
+            "chromium-result-details",
+            "--test-name",
+            "trees_in_viz_blink_platform_unittests"
+          ],
+          "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
+        },
+        "module_name": "//third_party/blink/renderer/platform:blink_platform_unittests",
+        "module_scheme": "gtest",
+        "name": "trees_in_viz_blink_platform_unittests",
+        "precommit_args": [
+          "--gerrit-issue=${patch_issue}",
+          "--gerrit-patchset=${patch_set}",
+          "--buildbucket-id=${buildbucket_build_id}"
+        ],
+        "resultdb": {
+          "enable": true,
+          "has_native_resultdb_integration": true
+        },
+        "swarming": {
+          "dimensions": {
+            "device_os": "QQ1A.191205.008",
+            "device_os_flavor": "google",
+            "device_os_type": "userdebug",
+            "device_type": "walleye",
+            "os": "Android",
+            "pool": "chromium.tests"
+          },
+          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
+        },
+        "test": "blink_platform_unittests",
+        "test_id_prefix": "ninja://third_party/blink/renderer/platform:blink_platform_unittests/"
+      },
+      {
+        "args": [
+          "--enable-features=TreesInViz",
+          "--test-launcher-filter-file=../../testing/buildbot/filters/trees_in_viz.cc_unittests.filter",
+          "--gs-results-bucket=chromium-result-details",
+          "--recover-devices"
+        ],
+        "isolate_profile_data": true,
+        "merge": {
+          "args": [
+            "--bucket",
+            "chromium-result-details",
+            "--test-name",
+            "trees_in_viz_cc_unittests"
+          ],
+          "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
+        },
+        "module_name": "//cc:cc_unittests",
+        "module_scheme": "gtest",
+        "name": "trees_in_viz_cc_unittests",
+        "resultdb": {
+          "enable": true,
+          "has_native_resultdb_integration": true
+        },
+        "swarming": {
+          "dimensions": {
+            "device_os": "QQ1A.191205.008",
+            "device_os_flavor": "google",
+            "device_os_type": "userdebug",
+            "device_type": "walleye",
+            "os": "Android",
+            "pool": "chromium.tests"
+          },
+          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
+        },
+        "test": "cc_unittests",
+        "test_id_prefix": "ninja://cc:cc_unittests/"
+      },
+      {
+        "args": [
           "--gs-results-bucket=chromium-result-details",
           "--recover-devices"
         ],
@@ -272,6 +368,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//chrome/browser/android/vr:vr_android_unittests",
+        "module_scheme": "gtest",
         "name": "vr_android_unittests",
         "resultdb": {
           "enable": true,
@@ -307,6 +405,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//android_webview/test:webview_instrumentation_test_apk",
+        "module_scheme": "junit",
         "name": "webview_instrumentation_test_apk_multiple_process_mode",
         "resultdb": {
           "enable": true,
@@ -343,6 +443,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//android_webview/test:webview_instrumentation_test_apk",
+        "module_scheme": "junit",
         "name": "webview_instrumentation_test_apk_single_process_mode",
         "resultdb": {
           "enable": true,
@@ -378,6 +480,8 @@
           ],
           "script": "//build/android/pylib/results/presentation/test_results_presentation.py"
         },
+        "module_name": "//android_webview/tools/automated_ui_tests:webview_ui_test_app_test_apk",
+        "module_scheme": "junit",
         "name": "webview_ui_test_app_test_apk",
         "resultdb": {
           "enable": true,
@@ -404,6 +508,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//android_webview/test:android_webview_junit_tests",
+        "module_scheme": "junit",
         "name": "android_webview_junit_tests",
         "resultdb": {
           "enable": true,
@@ -426,6 +532,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//base:base_junit_tests",
+        "module_scheme": "junit",
         "name": "base_junit_tests",
         "resultdb": {
           "enable": true,
@@ -448,6 +556,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//build/android:build_junit_tests",
+        "module_scheme": "junit",
         "name": "build_junit_tests",
         "resultdb": {
           "enable": true,
@@ -470,6 +580,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//chrome/test/android:chrome_java_test_pagecontroller_junit_tests",
+        "module_scheme": "junit",
         "name": "chrome_java_test_pagecontroller_junit_tests",
         "resultdb": {
           "enable": true,
@@ -492,6 +604,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//chrome/android:chrome_junit_tests",
+        "module_scheme": "junit",
         "name": "chrome_junit_tests",
         "resultdb": {
           "enable": true,
@@ -514,6 +628,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//components:components_junit_tests",
+        "module_scheme": "junit",
         "name": "components_junit_tests",
         "resultdb": {
           "enable": true,
@@ -536,6 +652,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//content/public/android:content_junit_tests",
+        "module_scheme": "junit",
         "name": "content_junit_tests",
         "resultdb": {
           "enable": true,
@@ -558,6 +676,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//device:device_junit_tests",
+        "module_scheme": "junit",
         "name": "device_junit_tests",
         "resultdb": {
           "enable": true,
@@ -580,6 +700,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//testing/android/junit:junit_unit_tests",
+        "module_scheme": "junit",
         "name": "junit_unit_tests",
         "resultdb": {
           "enable": true,
@@ -602,6 +724,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//chrome/android/features/keyboard_accessory:keyboard_accessory_junit_tests",
+        "module_scheme": "junit",
         "name": "keyboard_accessory_junit_tests",
         "resultdb": {
           "enable": true,
@@ -624,6 +748,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//media/base/android:media_base_junit_tests",
+        "module_scheme": "junit",
         "name": "media_base_junit_tests",
         "resultdb": {
           "enable": true,
@@ -646,6 +772,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//components/module_installer/android:module_installer_junit_tests",
+        "module_scheme": "junit",
         "name": "module_installer_junit_tests",
         "resultdb": {
           "enable": true,
@@ -668,6 +796,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//net/android:net_junit_tests",
+        "module_scheme": "junit",
         "name": "net_junit_tests",
         "resultdb": {
           "enable": true,
@@ -690,6 +820,32 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//components/one_time_tokens/android/backend/sms:one_time_tokens_junit_tests",
+        "module_scheme": "junit",
+        "name": "one_time_tokens_junit_tests",
+        "resultdb": {
+          "enable": true,
+          "has_native_resultdb_integration": true
+        },
+        "swarming": {
+          "dimensions": {
+            "cores": "8",
+            "cpu": "x86-64",
+            "os": "Ubuntu-22.04",
+            "pool": "chromium.tests"
+          },
+          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
+        },
+        "test": "one_time_tokens_junit_tests",
+        "test_id_prefix": "ninja://components/one_time_tokens/android/backend/sms:one_time_tokens_junit_tests/"
+      },
+      {
+        "isolate_profile_data": true,
+        "merge": {
+          "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
+        },
+        "module_name": "//components/paint_preview/player/android:paint_preview_junit_tests",
+        "module_scheme": "junit",
         "name": "paint_preview_junit_tests",
         "resultdb": {
           "enable": true,
@@ -712,28 +868,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
-        "name": "password_check_junit_tests",
-        "resultdb": {
-          "enable": true,
-          "has_native_resultdb_integration": true
-        },
-        "swarming": {
-          "dimensions": {
-            "cores": "8",
-            "cpu": "x86-64",
-            "os": "Ubuntu-22.04",
-            "pool": "chromium.tests"
-          },
-          "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com"
-        },
-        "test": "password_check_junit_tests",
-        "test_id_prefix": "ninja://chrome/browser/password_check/android:password_check_junit_tests/"
-      },
-      {
-        "isolate_profile_data": true,
-        "merge": {
-          "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
-        },
+        "module_name": "//chrome/browser/password_manager/android:password_manager_junit_tests",
+        "module_scheme": "junit",
         "name": "password_manager_junit_tests",
         "resultdb": {
           "enable": true,
@@ -756,6 +892,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//services:services_junit_tests",
+        "module_scheme": "junit",
         "name": "services_junit_tests",
         "resultdb": {
           "enable": true,
@@ -778,6 +916,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//chrome/browser/touch_to_fill/password_manager/android:touch_to_fill_junit_tests",
+        "module_scheme": "junit",
         "name": "touch_to_fill_junit_tests",
         "resultdb": {
           "enable": true,
@@ -800,6 +940,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//ui:ui_junit_tests",
+        "module_scheme": "junit",
         "name": "ui_junit_tests",
         "resultdb": {
           "enable": true,
@@ -822,6 +964,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//chrome/android/webapk/libs/client:webapk_client_junit_tests",
+        "module_scheme": "junit",
         "name": "webapk_client_junit_tests",
         "resultdb": {
           "enable": true,
@@ -844,6 +988,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//chrome/android/webapk/shell_apk:webapk_shell_apk_h2o_junit_tests",
+        "module_scheme": "junit",
         "name": "webapk_shell_apk_h2o_junit_tests",
         "resultdb": {
           "enable": true,
@@ -866,6 +1012,8 @@
         "merge": {
           "script": "//testing/merge_scripts/standard_isolated_script_merge.py"
         },
+        "module_name": "//chrome/android/webapk/shell_apk:webapk_shell_apk_junit_tests",
+        "module_scheme": "junit",
         "name": "webapk_shell_apk_junit_tests",
         "resultdb": {
           "enable": true,

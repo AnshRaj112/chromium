@@ -266,8 +266,8 @@ ScriptPromise<ImageBitmap> ImageBitmapFactories::CreateImageBitmap(
     const ImageBitmapOptions* options,
     ExceptionState& exception_state) {
   if (crop_rect && (crop_rect->width() == 0 || crop_rect->height() == 0)) {
-    exception_state.ThrowRangeError(String::Format(
-        "The crop rect %s is 0.", crop_rect->width() ? "height" : "width"));
+    exception_state.ThrowRangeError(UNSAFE_TODO(String::Format(
+        "The crop rect %s is 0.", crop_rect->width() ? "height" : "width")));
     return EmptyPromise();
   }
 
@@ -413,8 +413,8 @@ void DecodeImageOnDecoderThread(
     ArrayBufferContents contents,
     ImageDecoder::AlphaOption alpha_option,
     ColorBehavior color_behavior,
-    WTF::CrossThreadOnceFunction<
-        void(sk_sp<SkImage>, const ImageOrientationEnum)> result_callback) {
+    CrossThreadOnceFunction<void(sk_sp<SkImage>, const ImageOrientationEnum)>
+        result_callback) {
   const bool data_complete = true;
   std::unique_ptr<ImageDecoder> decoder = ImageDecoder::Create(
       SegmentReader::CreateFromSkData(

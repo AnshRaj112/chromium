@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
 #include "base/test/scoped_feature_list.h"
@@ -18,7 +17,6 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "chrome/test/payments/payment_app_install_util.h"
-#include "components/network_session_configurator/common/network_switches.h"
 #include "components/payments/content/web_payments_web_data_service.h"
 #include "components/payments/core/const_csp_checker.h"
 #include "components/payments/core/features.h"
@@ -80,13 +78,6 @@ class ServiceWorkerPaymentAppFinderBrowserTest : public InProcessBrowserTest {
       const ServiceWorkerPaymentAppFinderBrowserTest&) = delete;
 
   ~ServiceWorkerPaymentAppFinderBrowserTest() override = default;
-
-  void SetUpCommandLine(base::CommandLine* command_line) override {
-    // HTTPS server only serves a valid cert for localhost, so this is needed to
-    // load pages from the test servers with custom hostnames without an
-    // interstitial.
-    command_line->AppendSwitch(switches::kIgnoreCertificateErrors);
-  }
 
   permissions::PermissionRequestManager* GetPermissionRequestManager() {
     return permissions::PermissionRequestManager::FromWebContents(
@@ -243,13 +234,13 @@ class ServiceWorkerPaymentAppFinderBrowserTest : public InProcessBrowserTest {
     ASSERT_FALSE(apps().empty());
     content::StoredPaymentApp* app = nullptr;
     for (const auto& it : apps()) {
-      if (it.second->scope.path() == scope) {
+      if (it.second->scope.GetPath() == scope) {
         app = it.second.get();
         break;
       }
     }
     ASSERT_NE(nullptr, app) << "No app found in scope " << scope;
-    EXPECT_TRUE(base::Contains(app->enabled_methods, expected_method))
+    EXPECT_TRUE(std::ranges::contains(app->enabled_methods, expected_method))
         << "Unable to find payment method " << expected_method
         << " in the list of enabled methods for the app installed from "
         << app->scope;
@@ -296,6 +287,9 @@ class ServiceWorkerPaymentAppFinderBrowserTest : public InProcessBrowserTest {
   bool StartTestServer(const std::string& hostname,
                        net::EmbeddedTestServer* test_server) {
     host_resolver()->AddRule(hostname, "127.0.0.1");
+    if (!hostname.empty()) {
+      test_server->SetCertHostnames({hostname});
+    }
     if (!test_server->InitializeAndListen()) {
       return false;
     }

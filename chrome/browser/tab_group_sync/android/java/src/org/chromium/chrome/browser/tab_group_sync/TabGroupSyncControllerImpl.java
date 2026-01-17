@@ -7,7 +7,6 @@ package org.chromium.chrome.browser.tab_group_sync;
 import static org.chromium.build.NullUtil.assertNonNull;
 
 import org.chromium.base.CallbackController;
-import org.chromium.base.supplier.Supplier;
 import org.chromium.build.annotations.MonotonicNonNull;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -23,6 +22,8 @@ import org.chromium.components.tab_group_sync.TabGroupSyncController;
 import org.chromium.components.tab_group_sync.TabGroupSyncService;
 import org.chromium.components.tab_group_sync.TabGroupUiActionHandler;
 import org.chromium.url.GURL;
+
+import java.util.function.Supplier;
 
 /**
  * Central class responsible for making things happen. i.e. apply remote changes to local and local
@@ -121,10 +122,7 @@ public final class TabGroupSyncControllerImpl
 
         mNavigationTracker = new NavigationTracker();
         mTabGroupModelFilter =
-                assertNonNull(
-                        tabModelSelector
-                                .getTabGroupModelFilterProvider()
-                                .getTabGroupModelFilter(/* isIncognito= */ false));
+                assertNonNull(tabModelSelector.getTabGroupModelFilter(/* isIncognito= */ false));
 
         mTabCreationDelegate =
                 new TabCreationDelegateImpl(

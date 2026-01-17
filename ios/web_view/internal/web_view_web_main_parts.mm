@@ -11,12 +11,12 @@
 #import "base/feature_list.h"
 #import "base/path_service.h"
 #import "base/strings/string_util.h"
+#import "base/time/default_clock.h"
 #import "components/autofill/core/common/autofill_features.h"
 #import "components/autofill/core/common/autofill_payments_features.h"
 #import "components/component_updater/installer_policies/safety_tips_component_installer.h"
 #import "components/password_manager/core/common/password_manager_features.h"
 #import "components/signin/public/base/signin_switches.h"
-#import "components/sync/base/features.h"
 #import "components/variations/variations_ids_provider.h"
 #import "ios/web/public/webui/web_ui_ios_controller_factory.h"
 #import "ios/web_view/internal/app/application_context.h"
@@ -54,7 +54,7 @@ WebViewWebMainParts::~WebViewWebMainParts() {
 #if DCHECK_IS_ON()
   // Make sure that all display observers are removed at the end.
   display::ScreenBase* screen =
-      static_cast<display::ScreenBase*>(display::Screen::GetScreen());
+      static_cast<display::ScreenBase*>(display::Screen::Get());
   DCHECK(!screen->HasDisplayObservers());
 #endif
 }
@@ -77,15 +77,16 @@ void WebViewWebMainParts::PreCreateThreads() {
 
   ApplicationContext::GetInstance()->PreCreateThreads();
 
-  variations::VariationsIdsProvider::Create(
-      variations::VariationsIdsProvider::Mode::kUseSignedInState);
+  // TODO: crbug.com/442849530 - Use VariationsNetworkClock instead of
+  // base::DefaultClock.
+  variations::VariationsIdsProvider::CreateInstance(
+      variations::VariationsIdsProvider::Mode::kUseSignedInState,
+      std::make_unique<base::DefaultClock>());
 
   std::unique_ptr<base::FeatureList> feature_list(new base::FeatureList);
 
   std::vector<const base::Feature*> enabled_features = {
       &autofill::features::kAutofillUpstream,
-
-      &syncer::kSyncPasswordCleanUpAccidentalBatchDeletions,
   };
   std::vector<const base::Feature*> disabled_features;
   if ([CWVGlobalState sharedInstance].autofillAcrossIframesEnabled) {

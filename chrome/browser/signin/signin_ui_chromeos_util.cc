@@ -13,6 +13,7 @@ account_manager::AccountManagerFacade::AccountAdditionSource
 GetAddAccountSourceFromAccessPoint(signin_metrics::AccessPoint access_point) {
   switch (access_point) {
     case signin_metrics::AccessPoint::kSettings:
+    case signin_metrics::AccessPoint::kSettingsYourSavedInfo:
       return account_manager::AccountManagerFacade::AccountAdditionSource::
           kChromeSettingsTurnOnSyncButton;
     case signin_metrics::AccessPoint::kAvatarBubbleSignIn:
@@ -26,7 +27,6 @@ GetAddAccountSourceFromAccessPoint(signin_metrics::AccessPoint access_point) {
     case signin_metrics::AccessPoint::kExtensionInstallBubble:
     case signin_metrics::AccessPoint::kRecentTabs:
     case signin_metrics::AccessPoint::kTabOrganization:
-    case signin_metrics::AccessPoint::kSearchCompanion:
     case signin_metrics::AccessPoint::kWebauthnModalDialog:
       return account_manager::AccountManagerFacade::AccountAdditionSource::
           kChromeSyncPromoAddAccount;
@@ -47,6 +47,7 @@ GetAccountReauthSourceFromAccessPoint(
     signin_metrics::AccessPoint access_point) {
   switch (access_point) {
     case signin_metrics::AccessPoint::kSettings:
+    case signin_metrics::AccessPoint::kSettingsYourSavedInfo:
       return account_manager::AccountManagerFacade::AccountAdditionSource::
           kChromeSettingsReauthAccountButton;
     case signin_metrics::AccessPoint::kAvatarBubbleSignIn:
@@ -60,7 +61,6 @@ GetAccountReauthSourceFromAccessPoint(
     case signin_metrics::AccessPoint::kExtensionInstallBubble:
     case signin_metrics::AccessPoint::kRecentTabs:
     case signin_metrics::AccessPoint::kTabOrganization:
-    case signin_metrics::AccessPoint::kSearchCompanion:
     case signin_metrics::AccessPoint::kWebauthnModalDialog:
       return account_manager::AccountManagerFacade::AccountAdditionSource::
           kChromeSyncPromoReauth;

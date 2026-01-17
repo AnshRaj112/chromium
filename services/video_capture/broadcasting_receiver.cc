@@ -136,9 +136,6 @@ BroadcastingReceiver::BufferContext::CloneBufferHandle(
   }
 
   switch (target_buffer_type) {
-    case media::VideoCaptureBufferType::kMailboxHolder:
-      NOTREACHED() << "Cannot convert buffer type to kMailboxHolder from "
-                      "handle type other than mailbox handles.";
     case media::VideoCaptureBufferType::kSharedMemory:
       if (buffer_handle_->is_unsafe_shmem_region()) {
         return media::mojom::VideoBufferHandle::NewUnsafeShmemRegion(
@@ -156,6 +153,8 @@ BroadcastingReceiver::BufferContext::CloneBufferHandle(
 #else
       NOTREACHED() << "Unexpected GpuMemoryBuffer handle type";
 #endif
+    case media::VideoCaptureBufferType::kSharedImage:
+      NOTREACHED() << "Unexpected SharedImage handle type";
   }
   return media::mojom::VideoBufferHandlePtr();
 }
@@ -346,12 +345,11 @@ void BroadcastingReceiver::OnFrameDropped(
   }
 }
 
-void BroadcastingReceiver::OnNewSubCaptureTargetVersion(
-    uint32_t sub_capture_target_version) {
+void BroadcastingReceiver::OnNewCaptureVersion(
+    media::CaptureVersion capture_version) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   for (auto& client : clients_) {
-    client.second.client()->OnNewSubCaptureTargetVersion(
-        sub_capture_target_version);
+    client.second.client()->OnNewCaptureVersion(capture_version);
   }
 }
 

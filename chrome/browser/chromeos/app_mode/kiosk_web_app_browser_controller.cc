@@ -35,10 +35,6 @@ bool KioskWebAppBrowserController::HasMinimalUiButtons() const {
   return true;
 }
 
-bool KioskWebAppBrowserController::IsHostedApp() const {
-  return true;
-}
-
 bool KioskWebAppBrowserController::HasReloadButton() const {
   return false;
 }
@@ -84,6 +80,11 @@ bool KioskWebAppBrowserController::IsInstalled() const {
       app_id(), {web_app::proto::InstallState::SUGGESTED_FROM_ANOTHER_DEVICE,
                  web_app::proto::InstallState::INSTALLED_WITHOUT_OS_INTEGRATION,
                  web_app::proto::InstallState::INSTALLED_WITH_OS_INTEGRATION});
+}
+
+bool KioskWebAppBrowserController::IsIsolatedWebApp() const {
+  return registrar().AppMatches(app_id(),
+                                web_app::WebAppFilter::IsIsolatedApp());
 }
 
 void KioskWebAppBrowserController::OnTabInserted(

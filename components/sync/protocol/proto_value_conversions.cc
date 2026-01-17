@@ -15,6 +15,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/values.h"
 #include "components/sync/base/unique_position.h"
+#include "components/sync/protocol/account_setting_specifics.pb.h"
 #include "components/sync/protocol/app_list_specifics.pb.h"
 #include "components/sync/protocol/app_setting_specifics.pb.h"
 #include "components/sync/protocol/app_specifics.pb.h"
@@ -335,6 +336,7 @@ class ToValueVisitor {
     return ToValueVisitor(options).ToValue(proto);                         \
   }
 
+IMPLEMENT_PROTO_TO_VALUE(AccountSettingSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(AppListSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(AppSettingSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(AppSpecifics)
@@ -342,6 +344,7 @@ IMPLEMENT_PROTO_TO_VALUE(ArcPackageSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(AutofillOfferSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(AutofillProfileSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(AutofillSpecifics)
+IMPLEMENT_PROTO_TO_VALUE(AutofillValuableMetadataSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(AutofillWalletCredentialSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(AutofillWalletSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(AutofillWalletUsageSpecifics)
@@ -354,6 +357,7 @@ IMPLEMENT_PROTO_TO_VALUE(CookieSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(CrossUserSharingPublicKey)
 IMPLEMENT_PROTO_TO_VALUE(DebugEventInfo)
 IMPLEMENT_PROTO_TO_VALUE(DebugInfo)
+IMPLEMENT_PROTO_TO_VALUE(DesktopToMobilePromoMessage)
 IMPLEMENT_PROTO_TO_VALUE(DeviceDetails)
 IMPLEMENT_PROTO_TO_VALUE(DeviceInfoSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(DictionarySpecifics)
@@ -389,6 +393,7 @@ IMPLEMENT_PROTO_TO_VALUE(PrinterSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(PrintersAuthorizationServerSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(PriorityPreferenceSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(ProductComparisonSpecifics)
+IMPLEMENT_PROTO_TO_VALUE(PushNotificationMessage)
 IMPLEMENT_PROTO_TO_VALUE(ReadingListSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(SavedTabGroupSpecifics)
 IMPLEMENT_PROTO_TO_VALUE(SearchEngineSpecifics)

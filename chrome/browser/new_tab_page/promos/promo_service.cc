@@ -4,6 +4,8 @@
 
 #include "chrome/browser/new_tab_page/promos/promo_service.h"
 
+#include <optional>
+#include <string>
 #include <utility>
 
 #include "base/feature_list.h"
@@ -18,7 +20,6 @@
 #include "base/strings/stringprintf.h"
 #include "base/time/time.h"
 #include "base/values.h"
-#include "chrome/browser/browser_features.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/webui_url_constants.h"
@@ -182,13 +183,10 @@ void PromoService::Refresh() {
           ntp_features::kNtpMiddleSlotPromoDismissalParam) == "fake") {
     command_id = base::NumberToString(
         static_cast<int>(browser_command::mojom::Command::kNoOpCommand));
-  } else {
-    command_id = base::GetFieldTrialParamValueByFeature(
-        features::kPromoBrowserCommands, features::kBrowserCommandIdParam);
   }
 
   if (!command_id.empty()) {
-    auto fake_promo_json = std::make_unique<std::string>(base::StringPrintf(
+    auto fake_promo_json = std::make_optional<std::string>(base::StringPrintf(
         kFakePromo, kWarningSymbol, command_id.c_str(), command_id.c_str(),
         command_id.c_str(), command_id.c_str()));
     OnLoadDone(std::move(fake_promo_json));
@@ -233,7 +231,7 @@ void PromoService::Refresh() {
       1024 * 1024);
 }
 
-void PromoService::OnLoadDone(std::unique_ptr<std::string> response_body) {
+void PromoService::OnLoadDone(std::optional<std::string> response_body) {
   if (!response_body) {
     // This represents network errors (i.e. the server did not provide a
     // response).
@@ -242,8 +240,7 @@ void PromoService::OnLoadDone(std::unique_ptr<std::string> response_body) {
     return;
   }
 
-  std::string response;
-  response.swap(*response_body);
+  std::string response = std::move(response_body).value();
 
   // The response may start with )]}'. Ignore this.
   auto remainder = base::RemovePrefix(response, kXSSIResponsePreamble);
@@ -319,7 +316,6 @@ void PromoService::BlocklistPromo(const std::string& promo_id) {
     promo_data_ = PromoData();
     promo_status_ = Status::OK_BUT_BLOCKED;
     NotifyObservers();
-    // TODO(crbug.com/40098612): hide promos on existing, already-opened NTPs.
   }
 }
 

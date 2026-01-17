@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <tuple>
 #include <utility>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
@@ -75,6 +75,8 @@
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
+#include "base/android/android_info.h"
+#include "base/android/device_info.h"
 #include "base/android/jni_android.h"
 #include "content/browser/renderer_host/render_widget_host_view_android.h"
 #include "content/test/mock_overscroll_refresh_handler_android.h"
@@ -115,7 +117,8 @@ class TestInputEventObserver : public RenderWidgetHost::InputEventObserver {
   const blink::WebInputEvent& event() const { return *event_; }
 
   void OnInputEvent(const RenderWidgetHost& widget,
-                    const blink::WebInputEvent& event) override {
+                    const blink::WebInputEvent& event,
+                    InputEventSource source) override {
     events_received_.push_back(event.GetType());
     event_ = event.Clone();
   }
@@ -658,7 +661,8 @@ void HitTestRootWindowTransform(
 
 #if defined(USE_AURA)
 bool ConvertJSONToPoint(const std::string& str, gfx::PointF* point) {
-  std::optional<base::Value> value = base::JSONReader::Read(str);
+  std::optional<base::Value> value =
+      base::JSONReader::Read(str, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!value)
     return false;
   base::Value::Dict* root = value->GetIfDict();
@@ -674,7 +678,8 @@ bool ConvertJSONToPoint(const std::string& str, gfx::PointF* point) {
 }
 
 bool ConvertJSONToRect(const std::string& str, gfx::Rect* rect) {
-  std::optional<base::Value> value = base::JSONReader::Read(str);
+  std::optional<base::Value> value =
+      base::JSONReader::Read(str, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!value)
     return false;
   base::Value::Dict* root = value->GetIfDict();
@@ -846,7 +851,11 @@ std::unique_ptr<ui::MotionEventAndroid> GetMotionEventAndroid(
 
 class SitePerProcessHitTestBrowserTest : public SitePerProcessBrowserTestBase {
  public:
-  SitePerProcessHitTestBrowserTest() {}
+  SitePerProcessHitTestBrowserTest() {
+#if BUILDFLAG(IS_ANDROID)
+    feature_list_.InitWithFeatures({kTooltips}, {});
+#endif
+  }
 
 #if defined(USE_AURA)
   void PreRunTestOnMainThread() override {
@@ -869,6 +878,9 @@ class SitePerProcessHitTestBrowserTest : public SitePerProcessBrowserTestBase {
 
 #if defined(USE_AURA)
   SystemEventRewriter event_rewriter_;
+#endif
+#if BUILDFLAG(IS_ANDROID)
+  base::test::ScopedFeatureList feature_list_;
 #endif
 };
 
@@ -1608,8 +1620,8 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessHitTestBrowserTest,
               kScaleTolerance);
   EXPECT_NEAR(0.5f * scale_factor, transform_from_child.rc(1, 1),
               kScaleTolerance);
-  EXPECT_EQ(child_origin.x(), transform_from_child.rc(0, 3));
-  EXPECT_EQ(child_origin.y(), transform_from_child.rc(1, 3));
+  EXPECT_NEAR(child_origin.x(), transform_from_child.rc(0, 3), kScaleTolerance);
+  EXPECT_NEAR(child_origin.y(), transform_from_child.rc(1, 3), kScaleTolerance);
 
   gfx::Transform transform_child_to_child =
       transform_from_child * transform_to_child;
@@ -1834,7 +1846,8 @@ class OutgoingEventWaiter : public RenderWidgetHost::InputEventObserver {
   }
 
   void OnInputEvent(const RenderWidgetHost& widget,
-                    const blink::WebInputEvent& event) override {
+                    const blink::WebInputEvent& event,
+                    InputEventSource source) override {
     if (event.GetType() == type_) {
       seen_event_ = true;
       if (quit_closure_)
@@ -1873,7 +1886,8 @@ class BadInputEventObserver : public RenderWidgetHost::InputEventObserver {
   }
 
   void OnInputEvent(const RenderWidgetHost& widget,
-                    const blink::WebInputEvent& event) override {
+                    const blink::WebInputEvent& event,
+                    InputEventSource source) override {
     EXPECT_NE(type_, event.GetType())
         << "Unexpected " << blink::WebInputEvent::GetName(event.GetType());
   }
@@ -2533,8 +2547,8 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessHitTestBrowserTest, ScrollEventToOOPIF) {
 
   // Verify that this a mouse wheel event was sent to the child frame renderer.
   EXPECT_TRUE(child_frame_monitor.EventWasReceived());
-  EXPECT_TRUE(base::Contains(child_frame_monitor.events_received(),
-                             blink::WebInputEvent::Type::kMouseWheel));
+  EXPECT_TRUE(std::ranges::contains(child_frame_monitor.events_received(),
+                                    blink::WebInputEvent::Type::kMouseWheel));
 }
 
 IN_PROC_BROWSER_TEST_F(SitePerProcessHitTestBrowserTest,
@@ -3236,7 +3250,7 @@ class TooltipMonitor : public RenderWidgetHostViewBase::TooltipObserver {
 
   void WaitUntil(const std::u16string& tooltip_text) {
     tooltip_text_wanted_ = tooltip_text;
-    if (base::Contains(tooltips_received_, tooltip_text))
+    if (std::ranges::contains(tooltips_received_, tooltip_text))
       return;
     run_loop_->Run();
   }
@@ -3249,6 +3263,14 @@ class TooltipMonitor : public RenderWidgetHostViewBase::TooltipObserver {
 
 IN_PROC_BROWSER_TEST_F(SitePerProcessHitTestBrowserTest,
                        CrossProcessTooltipTest) {
+#if BUILDFLAG(IS_ANDROID)
+  // Tooltips are only supported on desktop devices up to B.
+  if (base::android::android_info::sdk_int() <=
+          base::android::android_info::SDK_VERSION_BAKLAVA &&
+      !base::android::device_info::is_desktop()) {
+    return;
+  }
+#endif
   GURL main_url(embedded_test_server()->GetURL(
       "a.com", "/cross_site_iframe_factory.html?a(b)"));
   EXPECT_TRUE(NavigateToURL(shell(), main_url));
@@ -4778,8 +4800,8 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessMouseWheelHitTestBrowserTest,
 
   // Verify that this a mouse wheel event was sent to the child frame renderer.
   EXPECT_TRUE(child_frame_monitor.EventWasReceived());
-  EXPECT_TRUE(base::Contains(child_frame_monitor.events_received(),
-                             blink::WebInputEvent::Type::kMouseWheel));
+  EXPECT_TRUE(std::ranges::contains(child_frame_monitor.events_received(),
+                                    blink::WebInputEvent::Type::kMouseWheel));
 
   // Kill the wheel target view process. This must reset the wheel_target_.
   RenderProcessHost* child_process =
@@ -5276,8 +5298,9 @@ void SendTouchpadPinchSequenceWithExpectedTarget(
   UpdateEventRootLocation(&pinch_end, root_view_aura);
   root_view_aura->OnGestureEvent(&pinch_end);
   EXPECT_TRUE(target_monitor.EventWasReceived());
-  EXPECT_TRUE(base::Contains(target_monitor.events_received(),
-                             blink::WebInputEvent::Type::kGesturePinchEnd));
+  EXPECT_TRUE(
+      std::ranges::contains(target_monitor.events_received(),
+                            blink::WebInputEvent::Type::kGesturePinchEnd));
   EXPECT_EQ(nullptr, router_touchpad_gesture_target);
 }
 

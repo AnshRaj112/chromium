@@ -143,7 +143,7 @@ SurfaceTreeHost::~SurfaceTreeHost() {
     auto* context_factory = aura::Env::GetInstance()->context_factory();
     auto* host_frame_sink_manager = context_factory->GetHostFrameSinkManager();
     host_frame_sink_manager->InvalidateFrameSinkId(frame_sink_id_,
-                                                   host_window());
+                                                   host_window(), {});
   }
 }
 
@@ -319,8 +319,7 @@ void SurfaceTreeHost::OnFrameSinkLost() {
 // SurfaceTreeHost, protected:
 
 void SurfaceTreeHost::UpdateDisplayOnTree() {
-  auto display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(host_window());
+  auto display = display::Screen::Get()->GetDisplayNearestWindow(host_window());
   if (output_display_id_ != display.id()) {
     if (root_surface_) {
       if (root_surface_->UpdateDisplay(output_display_id_, display.id())) {
@@ -407,7 +406,7 @@ void SurfaceTreeHost::SubmitCompositorFrame() {
     }
     frame.metadata.content_color_usage =
         std::max(frame.metadata.content_color_usage,
-                 resource.color_space.GetContentColorUsage());
+                 resource.GetColorSpace().GetContentColorUsage());
   }
 
   frame.metadata.may_contain_video = root_surface_->ContainsVideo();
@@ -658,7 +657,8 @@ viz::CompositorFrame SurfaceTreeHost::PrepareToSubmitCompositorFrame() {
   gfx::Size output_surface_size_in_pixels =
       root_surface_->surface_hierarchy_content_bounds().size();
   if (!client_submits_surfaces_in_pixel_coordinates_) {
-    // TODO(crbug.com/40150290): Should this be ceil? Why do we choose floor?
+    // This scaling logic is part of a legacy scheme that has since been updated.
+    // See crbug.com/40150290 for historical context on using floor here.
     output_surface_size_in_pixels = gfx::ScaleToFlooredSize(
         output_surface_size_in_pixels, device_scale_factor);
   }

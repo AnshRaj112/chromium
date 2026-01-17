@@ -60,6 +60,10 @@ class SSLPrivateKey;
 class X509Certificate;
 }  // namespace net
 
+namespace os_crypt_async {
+class OSCryptAsync;
+}
+
 namespace chromecast {
 class CastService;
 class CastSystemMemoryPressureEvaluatorAdjuster;
@@ -68,7 +72,6 @@ class CastWindowManager;
 class CastFeatureListCreator;
 class DisplaySettingsManager;
 class GeneralAudienceBrowsingService;
-class MemoryPressureControllerImpl;
 class ServiceConnector;
 
 namespace media {
@@ -288,9 +291,6 @@ class CastContentBrowserClient
     return cast_browser_main_parts_;
   }
 
-  void BindMediaRenderer(
-      mojo::PendingReceiver<::media::mojom::Renderer> receiver);
-
   void GetApplicationMediaInfo(std::string* application_session_id,
                                bool* mixer_audio_enabled,
                                content::RenderFrameHost* render_frame_host);
@@ -331,10 +331,6 @@ class CastContentBrowserClient
 
   // A static cache to hold crash_handlers for each process_type
   std::map<std::string, breakpad::CrashHandlerHostLinux*> crash_handlers_;
-
-  // Notify renderers of memory pressure (Android renderers register directly
-  // with OS for this).
-  std::unique_ptr<MemoryPressureControllerImpl> memory_pressure_controller_;
 #endif  // !BUILDFLAG(IS_ANDROID)
 #endif  // !BUILDFLAG(IS_FUCHSIA)
 
@@ -360,6 +356,7 @@ class CastContentBrowserClient
 
   // Created by CastContentBrowserClient but owned by BrowserMainLoop.
   CastBrowserMainParts* cast_browser_main_parts_;
+  std::unique_ptr<os_crypt_async::OSCryptAsync> os_crypt_async_;
   std::unique_ptr<CastNetworkContexts> cast_network_contexts_;
   std::unique_ptr<media::CmaBackendFactory> cma_backend_factory_;
   std::unique_ptr<GeneralAudienceBrowsingService>

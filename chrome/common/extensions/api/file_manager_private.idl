@@ -90,7 +90,8 @@ enum MountError {
   unsupported_filesystem,
   need_password,
   cancelled,
-  busy
+  busy,
+  corrupted
 };
 
 // Filesystem to format to.
@@ -98,13 +99,6 @@ enum FormatFileSystemType { vfat, exfat, ntfs };
 
 // File transfer progress state.
 enum TransferState { in_progress, queued, completed, failed };
-
-// The response when starting installing a Linux package.
-enum InstallLinuxPackageStatus {
-  started,
-  failed,
-  install_already_active
-};
 
 // Specifies type of event that is raised.
 enum FileWatchEventType { changed, error };
@@ -996,17 +990,6 @@ dictionary FileSystemProviderAction {
   DOMString? title;
 };
 
-// Information about a Linux package in response to GetLinuxPackageInfo.
-dictionary LinuxPackageInfo {
-  DOMString name;
-  DOMString version;
-
-  // A one-line summary of the project. Almost always present.
-  DOMString? summary;
-  // A longer description of the project. Almost always present.
-  DOMString? description;
-};
-
 // Payload data for crostini event.
 dictionary CrostiniEvent {
   // Is the event raised for enable, disable, share, or unshare.
@@ -1357,15 +1340,6 @@ dictionary BulkPinProgress {
   boolean emptiedQueue;
 };
 
-// Represents a custom view of files to be displayed.
-dictionary MaterializedView {
-  // Unique indentifier for the view.
-  long viewId;
-
-  // Name of the view displayed to the user.
-  DOMString name;
-};
-
 // Used by EntryData to store the file system of the entry.
 dictionary FileSystemData {
   // Name of the file system. Will be unique.
@@ -1518,12 +1492,6 @@ callback GetVolumeRootCallback =
 callback GetCrostiniSharedPathsCallback =
     void(CrostiniSharedPathResponse response);
 
-// |linux_package_info| Package info for the queried package.
-callback GetLinuxPackageInfoCallback =
-    void(LinuxPackageInfo linux_package_info);
-
-callback InstallLinuxPackageCallback = void(InstallLinuxPackageStatus status);
-
 // |apps| List of Android picker apps.
 callback GetAndroidPickerAppsCallback = void(AndroidApp[] apps);
 
@@ -1536,10 +1504,6 @@ callback ListMountableGuestsCallback = void(MountableGuest[] guest);
 callback ParseTrashInfoFilesCallback = void(ParsedTrashInfoFile[] files);
 
 callback GetBulkPinProgressCallback = void(BulkPinProgress progress);
-
-callback GetMaterializedViewsCallback = void(MaterializedView[] views);
-
-callback ReadMaterializedViewCallback = void(EntryData[] files);
 
 interface Functions {
   // Cancels file selection.
@@ -1943,16 +1907,6 @@ interface Functions {
                                      DOMString vmName,
                                      GetCrostiniSharedPathsCallback callback);
 
-  // Requests information about a Linux package. |entry| is a .deb file.
-  [nocompile, doesNotSupportPromises]
-  static void getLinuxPackageInfo([instanceOf=Entry] object entry,
-                                  GetLinuxPackageInfoCallback callback);
-
-  // Starts installation of a Linux package.
-  [nocompile, doesNotSupportPromises]
-  static void installLinuxPackage([instanceOf=Entry] object entry,
-                                  InstallLinuxPackageCallback callback);
-
   // Imports a Crostini Image File (.tini). This overrides the existing Linux
   // apps and files.
   [nocompile]
@@ -2082,13 +2036,6 @@ interface Functions {
   // drive.
   [doesNotSupportPromises]
   static void calculateBulkPinRequiredSpace(SimpleCallback callback);
-
-  // Returns a list of views that can be displayed to the user.
-  static void getMaterializedViews(GetMaterializedViewsCallback callback);
-
-  // Returns the list of entries contained in the view identified by `viewId`.
-  static void readMaterializedView(long viewId,
-                                   ReadMaterializedViewCallback callback);
 };
 
 // Events supported by fileManagerPrivate API. These events are broadcasted.

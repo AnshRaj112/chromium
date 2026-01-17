@@ -12,18 +12,16 @@
 #import "components/application_locale_storage/application_locale_storage.h"
 #import "components/google/core/common/google_util.h"
 #import "components/password_manager/core/browser/password_manager_constants.h"
-#import "components/plus_addresses/features.h"
+#import "components/plus_addresses/core/common/features.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_action_cell.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_cell_utils.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_constants.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_password_cell.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_plus_address_cell.h"
-#import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_text_cell.h"
 #import "ios/chrome/browser/net/model/crurl.h"
 #import "ios/chrome/browser/passwords/ui_bundled/password_suggestion_utils.h"
 #import "ios/chrome/browser/settings/ui_bundled/password/create_password_manager_title_view.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
-#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/list_model/list_item+Controller.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_link_header_footer_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_text_header_footer_item.h"
@@ -81,8 +79,6 @@ enum ManualFallbackItemType : NSInteger {
   self.searchController.obscuresBackgroundDuringPresentation = NO;
   self.navigationItem.searchController = self.searchController;
   self.navigationItem.hidesSearchBarWhenScrolling = NO;
-  self.searchController.searchBar.accessibilityIdentifier =
-      manual_fill::kPasswordSearchBarAccessibilityIdentifier;
   self.title = l10n_util::GetNSString(IDS_IOS_PASSWORD_MANAGER);
 
   if (self.searchController) {
@@ -132,10 +128,6 @@ enum ManualFallbackItemType : NSInteger {
     TableViewLinkHeaderFooterView* linkHeader =
         base::apple::ObjCCastStrict<TableViewLinkHeaderFooterView>(view);
     linkHeader.delegate = self;
-
-    // When the Keyboard Accessory Upgrade feature is disabled, indents are
-    // needed for the header to be aligned with the other table view items.
-    [linkHeader setForceIndents:!IsKeyboardAccessoryUpgradeEnabled()];
   }
 
   return view;
@@ -161,25 +153,13 @@ enum ManualFallbackItemType : NSInteger {
   // If no items were posted and there is no search bar, present the empty item
   // and return.
   if (!credentials.count && !self.searchController) {
-    if (IsKeyboardAccessoryUpgradeEnabled()) {
-      TableViewTextHeaderFooterItem* textHeaderFooterItem =
-          [[TableViewTextHeaderFooterItem alloc]
-              initWithType:manual_fill::ManualFallbackItemType::
-                               kNoCredentialsMessage];
-      textHeaderFooterItem.text =
-          l10n_util::GetNSString(IDS_IOS_MANUAL_FALLBACK_NO_PASSWORDS_FOR_SITE);
-      self.noRegularDataItemsToShowHeaderItem = textHeaderFooterItem;
-    } else {
-      ManualFillTextItem* emptyCredentialItem = [[ManualFillTextItem alloc]
-          initWithType:manual_fill::ManualFallbackItemType::
-                           kNoCredentialsMessage];
-      emptyCredentialItem.text =
-          l10n_util::GetNSString(IDS_IOS_MANUAL_FALLBACK_NO_PASSWORDS_FOR_SITE);
-      emptyCredentialItem.textColor = [UIColor colorNamed:kDisabledTintColor];
-      emptyCredentialItem.showSeparator = YES;
-      [self presentDataItems:@[ emptyCredentialItem ]];
-      return;
-    }
+    TableViewTextHeaderFooterItem* textHeaderFooterItem =
+        [[TableViewTextHeaderFooterItem alloc]
+            initWithType:manual_fill::ManualFallbackItemType::
+                             kNoCredentialsMessage];
+    textHeaderFooterItem.text =
+        l10n_util::GetNSString(IDS_IOS_MANUAL_FALLBACK_NO_PASSWORDS_FOR_SITE);
+    self.noRegularDataItemsToShowHeaderItem = textHeaderFooterItem;
   }
 
   if (!self.searchController &&
@@ -281,9 +261,6 @@ enum ManualFallbackItemType : NSInteger {
 
   ManualFillCredentialItem* passwordItem =
       base::apple::ObjCCastStrict<ManualFillCredentialItem>(item);
-  if (passwordItem.isConnectedToPreviousItem) {
-    return;
-  }
 
   ManualFillPasswordCell* passwordCell =
       base::apple::ObjCCastStrict<ManualFillPasswordCell>(cell);

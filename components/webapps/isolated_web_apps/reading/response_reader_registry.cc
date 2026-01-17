@@ -24,7 +24,6 @@
 #include "components/web_package/signed_web_bundles/signed_web_bundle_id.h"
 #include "components/webapps/isolated_web_apps/client.h"
 #include "components/webapps/isolated_web_apps/error/uma_logging.h"
-#include "components/webapps/isolated_web_apps/iwa_key_distribution_info_provider.h"
 #include "components/webapps/isolated_web_apps/reading/response_reader.h"
 #include "components/webapps/isolated_web_apps/reading/response_reader_factory.h"
 #include "components/webapps/isolated_web_apps/reading/signed_web_bundle_reader.h"
@@ -243,8 +242,11 @@ IsolatedWebAppReaderRegistry::IsolatedWebAppReaderRegistry(
     : browser_context_(*browser_context),
       reader_factory_(std::move(reader_factory)),
       cache_(std::make_unique<Cache>()) {
-  key_distribution_info_observation_.Observe(
-      &IwaKeyDistributionInfoProvider::GetInstance());
+  if (auto* provider = IwaClient::GetInstance()->GetRuntimeDataProvider()) {
+    runtime_data_changed_subscription_ = provider->OnRuntimeDataChanged(
+        base::BindRepeating(&IsolatedWebAppReaderRegistry::OnRuntimeDataChanged,
+                            weak_ptr_factory_.GetWeakPtr()));
+  }
 }
 
 IsolatedWebAppReaderRegistry::~IsolatedWebAppReaderRegistry() {
@@ -253,12 +255,10 @@ IsolatedWebAppReaderRegistry::~IsolatedWebAppReaderRegistry() {
 
 void IsolatedWebAppReaderRegistry::ReadResponse(
     const base::FilePath& web_bundle_path,
-    bool dev_mode,
     const web_package::SignedWebBundleId& web_bundle_id,
     const network::ResourceRequest& resource_request,
     ReadResponseCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(!web_bundle_id.is_for_proxy_mode());
 
   Cache::Key cache_key = web_bundle_path;
 
@@ -302,33 +302,19 @@ void IsolatedWebAppReaderRegistry::ReadResponse(
   bool skip_signature_verification = verified_files_.contains(web_bundle_path);
 #endif
 
-  IsolatedWebAppResponseReaderFactory::Flags flags;
-  if (dev_mode) {
-    flags.Put(IsolatedWebAppResponseReaderFactory::Flag::kDevModeBundle);
-  }
-  if (skip_signature_verification) {
-    flags.Put(
-        IsolatedWebAppResponseReaderFactory::Flag::kSkipSignatureVerification);
-  }
-
   reader_factory_->CreateResponseReader(
-      web_bundle_path, web_bundle_id, flags,
+      web_bundle_path, web_bundle_id,
+      /*verify_signatures=*/!skip_signature_verification,
       base::BindOnce(&IsolatedWebAppReaderRegistry::OnResponseReaderCreated,
                      // `base::Unretained` can be used here since `this` owns
                      // `reader_factory`.
-                     base::Unretained(this), web_bundle_path, web_bundle_id));
+                     base::Unretained(this), web_bundle_path));
 }
 
-// Processes a component update event and queues close requests for readers
+// Processes a key data change event and queues close requests for readers
 // corresponding to bundles that might be affected by key rotation. These
 // requests will be fulfilled once the app closes.
-void IsolatedWebAppReaderRegistry::OnComponentUpdateSuccess(
-    const base::Version& version,
-    bool is_preloaded) {
-  if (is_preloaded) {
-    return;
-  }
-
+void IsolatedWebAppReaderRegistry::OnRuntimeDataChanged() {
   std::vector<std::pair<base::FilePath, web_package::SignedWebBundleId>>
       affected_ready_readers;
   for (auto& [path, entry] : *cache_) {
@@ -382,7 +368,6 @@ void IsolatedWebAppReaderRegistry::ClearCacheForPath(
 
 void IsolatedWebAppReaderRegistry::OnResponseReaderCreated(
     const base::FilePath& web_bundle_path,
-    const web_package::SignedWebBundleId& web_bundle_id,
     base::expected<std::unique_ptr<IsolatedWebAppResponseReader>,
                    UnusableSwbnFileError> maybe_reader) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -499,8 +484,7 @@ void IsolatedWebAppReaderRegistry::OnResponseRead(
 IsolatedWebAppReaderRegistry::ReadResponseError
 IsolatedWebAppReaderRegistry::ReadResponseError::ForError(
     const UnusableSwbnFileError& error) {
-  return ForOtherError(
-      IsolatedWebAppResponseReaderFactory::ErrorToString(error));
+  return ForOtherError(error.ToString());
 }
 
 // static

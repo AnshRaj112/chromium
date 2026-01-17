@@ -17,22 +17,26 @@
 #include "base/strings/pattern.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/bind.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/extensions/api/sessions/sessions_api.h"
 #include "chrome/browser/extensions/api/tabs/tabs_api.h"
 #include "chrome/browser/extensions/extension_apitest.h"
+#include "chrome/browser/extensions/extension_browsertest.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/sync/session_sync_service_factory.h"
+#include "chrome/browser/ui/browser_dialogs.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/test/base/in_process_browser_test.h"
-#include "chrome/test/base/test_browser_window.h"
 #include "chrome/test/base/testing_browser_process.h"
-#include "chrome/test/base/ui_test_utils.h"
+#include "components/sessions/content/content_live_tab.h"
 #include "components/sync/base/client_tag_hash.h"
 #include "components/sync/engine/data_type_activation_response.h"
 #include "components/sync/model/data_type_activation_request.h"
@@ -45,13 +49,22 @@
 #include "components/sync_sessions/session_store.h"
 #include "components/sync_sessions/session_sync_service.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/browser_test_utils.h"
 #include "extensions/browser/api_test_utils.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension_builder.h"
 #include "google_apis/gaia/gaia_id.h"
 
 #if BUILDFLAG(IS_CHROMEOS)
 #include "ash/constants/ash_switches.h"
 #endif
+
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+#include "chrome/test/base/test_browser_window.h"
+#include "chrome/test/base/ui_test_utils.h"
+#endif
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -66,6 +79,7 @@ constexpr std::array kSessionTags = {"tag0", "tag1", "tag2", "tag3", "tag4"};
 constexpr auto kTabIDs = std::to_array<SessionID::id_type>({5, 10, 13, 17});
 constexpr int kActiveTabIndex = 2;
 constexpr int kActiveTabId = kTabIDs[kActiveTabIndex];
+
 void BuildSessionSpecifics(const std::string& tag,
                            sync_pb::SessionSpecifics* meta) {
   meta->set_session_tag(tag);
@@ -158,8 +172,12 @@ syncer::ClientTagHash TagHashFromSpecifics(
 
 }  // namespace
 
-class ExtensionSessionsTest : public InProcessBrowserTest {
+class ExtensionSessionsTest : public ExtensionBrowserTest {
  public:
+  ExtensionSessionsTest() = default;
+  ~ExtensionSessionsTest() override = default;
+
+  // ExtensionBrowserTest:
   void SetUpCommandLine(base::CommandLine* command_line) override;
   void SetUpOnMainThread() override;
 
@@ -179,12 +197,14 @@ class ExtensionSessionsTest : public InProcessBrowserTest {
 };
 
 void ExtensionSessionsTest::SetUpCommandLine(base::CommandLine* command_line) {
+  ExtensionBrowserTest::SetUpCommandLine(command_line);
 #if BUILDFLAG(IS_CHROMEOS)
   command_line->AppendSwitch(ash::switches::kIgnoreUserProfileMappingForTests);
 #endif
 }
 
 void ExtensionSessionsTest::SetUpOnMainThread() {
+  ExtensionBrowserTest::SetUpOnMainThread();
   CreateTestExtension();
 }
 
@@ -202,7 +222,7 @@ void ExtensionSessionsTest::CreateSessionModels() {
   request.authenticated_gaia_id = GaiaId("SomeGaiaId");
 
   sync_sessions::SessionSyncService* service =
-      SessionSyncServiceFactory::GetForProfile(browser()->profile());
+      SessionSyncServiceFactory::GetForProfile(GetProfile());
 
   base::test::TestFuture<std::unique_ptr<syncer::DataTypeActivationResponse>>
       sync_start_future;
@@ -265,7 +285,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, GetDevices) {
   base::Value::List result =
       utils::ToList(utils::RunFunctionAndReturnSingleResult(
           CreateFunction<SessionsGetDevicesFunction>(true).get(),
-          "[{\"maxResults\": 0}]", browser()->profile()));
+          "[{\"maxResults\": 0}]", GetProfile()));
   EXPECT_TRUE(CheckSessionModels(result, 0u));
 }
 
@@ -274,7 +294,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, GetDevicesMaxResults) {
   base::Value::List result =
       utils::ToList(utils::RunFunctionAndReturnSingleResult(
           CreateFunction<SessionsGetDevicesFunction>(true).get(), "[]",
-          browser()->profile()));
+          GetProfile()));
   EXPECT_TRUE(CheckSessionModels(result, 1u));
 }
 
@@ -282,23 +302,26 @@ IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, GetDevicesListEmpty) {
   base::Value::List devices(
       utils::ToList(utils::RunFunctionAndReturnSingleResult(
           CreateFunction<SessionsGetDevicesFunction>(true).get(), "[]",
-          browser()->profile())));
+          GetProfile())));
 
   EXPECT_TRUE(devices.empty());
 }
 
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+// TODO(crbug.com/405219627): Support window restore on desktop Android. Also,
+// this test depends on the tabs (window) API.
 IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, RestoreForeignSessionWindow) {
   CreateSessionModels();
 
   const base::Value::Dict restored_window_session =
       utils::ToDict(utils::RunFunctionAndReturnSingleResult(
           CreateFunction<SessionsRestoreFunction>(true).get(), "[\"tag3.3\"]",
-          browser()->profile(), api_test_utils::FunctionMode::kIncognito));
+          GetProfile(), api_test_utils::FunctionMode::kIncognito));
 
   base::Value::List windows(
       utils::ToList(utils::RunFunctionAndReturnSingleResult(
           CreateFunction<WindowsGetAllFunction>(true).get(), "[]",
-          browser()->profile())));
+          GetProfile())));
 
   EXPECT_EQ(2u, windows.size());
   const base::Value::Dict restored_window =
@@ -313,6 +336,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, RestoreForeignSessionWindow) {
   }
   EXPECT_EQ(restored_id, api_test_utils::GetInteger(window, "id"));
 }
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
 IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, RestoreForeignSessionInvalidId) {
   CreateSessionModels();
@@ -320,28 +344,32 @@ IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, RestoreForeignSessionInvalidId) {
   EXPECT_TRUE(base::MatchPattern(
       utils::RunFunctionAndReturnError(
           CreateFunction<SessionsRestoreFunction>(true).get(), "[\"tag3.0\"]",
-          browser()->profile()),
+          GetProfile()),
       "Invalid session id: \"tag3.0\"."));
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, RestoreInIncognito) {
   CreateSessionModels();
 
-  EXPECT_TRUE(base::MatchPattern(
-      utils::RunFunctionAndReturnError(
-          CreateFunction<SessionsRestoreFunction>(true).get(), "[\"1\"]",
-          CreateIncognitoBrowser()->profile()),
-      "Can not restore sessions in incognito mode."));
+  std::string error = utils::RunFunctionAndReturnError(
+      CreateFunction<SessionsRestoreFunction>(true).get(), "[\"1\"]",
+      CreateIncognitoBrowserWindow()->GetProfile());
+  EXPECT_TRUE(
+      base::MatchPattern(error, "Can not restore sessions in incognito mode."))
+      << error;
 }
 
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+// TODO(crbug.com/405219627): Port to desktop Android when Android has support
+// for HasEditableTabstrip. See BrowserExtensionWindowController.
 IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, RestoreNonEditableTabstrip) {
   CreateSessionModels();
 
   // Set up a browser with a non-editable tabstrip, simulating one in the midst
   // of a tab dragging session.
   Browser* non_editable_browser =
-      Browser::Create(Browser::CreateParams(browser()->profile(), true));
-  non_editable_browser->window()->SetTabStripNotEditableForTesting();
+      Browser::Create(Browser::CreateParams(GetProfile(), true));
+  non_editable_browser->window()->DisableTabStripEditingForTesting();
 
   EXPECT_TRUE(base::MatchPattern(
       utils::RunFunctionAndReturnError(
@@ -349,51 +377,66 @@ IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, RestoreNonEditableTabstrip) {
           non_editable_browser->profile()),
       ExtensionTabUtil::kTabStripNotEditableError));
 }
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
 IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, GetRecentlyClosedIncognito) {
   base::Value::List sessions(
       utils::ToList(utils::RunFunctionAndReturnSingleResult(
           CreateFunction<SessionsGetRecentlyClosedFunction>(true).get(), "[]",
-          CreateIncognitoBrowser()->profile())));
+          CreateIncognitoBrowserWindow()->GetProfile())));
   EXPECT_TRUE(sessions.empty());
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, GetRecentlyClosedMaxResults) {
+  // Start with an empty tab restore service.
+  sessions::TabRestoreService* service =
+      TabRestoreServiceFactory::GetForProfile(GetProfile());
+  ASSERT_TRUE(service);
+  ASSERT_EQ(0u, service->entries().size());
+
+  // The browser starts the test with 1 tab.
+  ASSERT_EQ(1, GetTabCount());
+  // Open 3 more tabs, closing each one after it is opened.
   const size_t kTabCount = 3;
-  ASSERT_EQ(1, browser()->tab_strip_model()->count());
   for (size_t i = 0; i < kTabCount; ++i) {
-    ui_test_utils::NavigateToURLWithDisposition(
-        browser(), GURL("data:text/html"),
-        WindowOpenDisposition::NEW_FOREGROUND_TAB,
-        ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP);
+    // Open a new tab. This method automatically waits for load stop. Use URL
+    // about:blank because data URLs on Android result in multiple historical
+    // tabs for unclear reasons.
+    NavigateToURLInNewTab(GURL("about:blank"));
+    // Close the tab we just opened (at index 1).
     int tab_index = 1;
-    content::WebContentsDestroyedWatcher destroyed_watcher(
-        browser()->tab_strip_model()->GetWebContentsAt(tab_index));
-    browser()->tab_strip_model()->CloseWebContentsAt(
-        tab_index, TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB);
-    destroyed_watcher.Wait();
+    content::WebContents* tab = GetWebContentsAt(tab_index);
+    // Our cross-platform utility function to close a tab doesn't allow
+    // requesting the creation of a historical tab, so do it manually.
+    service->CreateHistoricalTab(
+        sessions::ContentLiveTab::GetOrCreateForWebContents(tab), tab_index);
+    // Close the tab (and wait for its destruction internally).
+    CloseTabForWebContents(tab);
   }
 
   {
+    // Querying for all recently closed tabs should return 3 tabs.
     std::optional<base::Value> result = utils::RunFunctionAndReturnSingleResult(
         CreateFunction<SessionsGetRecentlyClosedFunction>(true).get(), "[]",
-        browser()->profile());
+        GetProfile());
     ASSERT_TRUE(result);
     ASSERT_TRUE(result->is_list());
     EXPECT_EQ(kTabCount, result->GetList().size());
   }
   {
+    // Querying with a maxResults limit of 0 should return 0 tabs.
     std::optional<base::Value> result = utils::RunFunctionAndReturnSingleResult(
         CreateFunction<SessionsGetRecentlyClosedFunction>(true).get(),
-        "[{\"maxResults\": 0}]", browser()->profile());
+        "[{\"maxResults\": 0}]", GetProfile());
     ASSERT_TRUE(result);
     ASSERT_TRUE(result->is_list());
     EXPECT_EQ(0u, result->GetList().size());
   }
   {
+    // Querying with a maxResults limit of 2 should return 2 tabs.
     std::optional<base::Value> result = utils::RunFunctionAndReturnSingleResult(
         CreateFunction<SessionsGetRecentlyClosedFunction>(true).get(),
-        "[{\"maxResults\": 2}]", browser()->profile());
+        "[{\"maxResults\": 2}]", GetProfile());
     ASSERT_TRUE(result);
     ASSERT_TRUE(result->is_list());
     EXPECT_EQ(2u, result->GetList().size());
@@ -414,7 +457,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, CheckActiveTabStatus) {
   const base::Value::List result =
       utils::ToList(utils::RunFunctionAndReturnSingleResult(
           CreateFunction<SessionsGetDevicesFunction>(true).get(), "[]",
-          browser()->profile()));
+          GetProfile()));
 
   ASSERT_FALSE(result.empty()) << "No devices found.";
 

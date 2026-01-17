@@ -14,7 +14,6 @@
 #include <utility>
 
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/containers/span_writer.h"
 #include "base/functional/bind.h"
@@ -233,11 +232,6 @@ base::Value::Dict NetLogSpdySessionCloseParams(int net_error,
       .Set("description", description);
 }
 
-base::Value::Dict NetLogSpdySessionParams(const HostPortProxyPair& host_pair) {
-  return base::Value::Dict()
-      .Set("host", host_pair.first.ToString())
-      .Set("proxy", host_pair.second.ToDebugString());
-}
 
 base::Value::Dict NetLogSpdyInitializedParams(NetLogSource source) {
   base::Value::Dict dict;
@@ -846,12 +840,14 @@ SpdySession::SpdySession(
       network_quality_estimator_(network_quality_estimator),
       session_creation_initiator_(session_creation_initiator),
       spdy_session_initiator_(spdy_session_initiator) {
-  net_log_.BeginEvent(NetLogEventType::HTTP2_SESSION, [&] {
-    return NetLogSpdySessionParams(host_port_proxy_pair());
+  net_log_.BeginEvent(NetLogEventType::HTTP2_SESSION, [&]() {
+    return base::Value::Dict()
+        .Set("host", host_port_pair().ToString())
+        .Set("proxy", spdy_session_key_.proxy_chain().ToDebugString());
   });
 
-  DCHECK(base::Contains(initial_settings_, spdy::SETTINGS_HEADER_TABLE_SIZE));
-  DCHECK(base::Contains(initial_settings_, spdy::SETTINGS_INITIAL_WINDOW_SIZE));
+  DCHECK(initial_settings_.contains(spdy::SETTINGS_HEADER_TABLE_SIZE));
+  DCHECK(initial_settings_.contains(spdy::SETTINGS_INITIAL_WINDOW_SIZE));
 
   if (greased_http2_frame_) {
     // See https://tools.ietf.org/html/draft-bishop-httpbis-grease-00
@@ -1275,7 +1271,7 @@ void SpdySession::ResetStream(spdy::SpdyStreamId stream_id,
 }
 
 bool SpdySession::IsStreamActive(spdy::SpdyStreamId stream_id) const {
-  return base::Contains(active_streams_, stream_id);
+  return active_streams_.contains(stream_id);
 }
 
 LoadState SpdySession::GetLoadState() const {
@@ -1399,7 +1395,7 @@ base::Value::Dict SpdySession::GetInfoAsValue() const {
       base::Value::Dict()
           .Set("source_id", static_cast<int>(net_log_.source().id))
           .Set("host_port_pair", host_port_pair().ToString())
-          .Set("proxy", host_port_proxy_pair().second.ToDebugString())
+          .Set("proxy", spdy_session_key_.proxy_chain().ToDebugString())
           .Set("network_anonymization_key",
                spdy_session_key_.network_anonymization_key().ToDebugString())
           .Set("active_streams", static_cast<int>(active_streams_.size()))
@@ -1723,8 +1719,9 @@ bool SpdySession::CancelStreamRequest(
   for (int i = MINIMUM_PRIORITY; i <= MAXIMUM_PRIORITY; ++i) {
     if (priority == i)
       continue;
-    DCHECK(!base::Contains(pending_create_stream_queues_[i], request.get(),
-                           &base::WeakPtr<SpdyStreamRequest>::get));
+    DCHECK(!std::ranges::contains(pending_create_stream_queues_[i],
+                                  request.get(),
+                                  &base::WeakPtr<SpdyStreamRequest>::get));
   }
 #endif
 
@@ -3095,8 +3092,9 @@ void SpdySession::OnAltSvc(
     if (origin.empty())
       return;
     const GURL gurl(origin);
-    if (!gurl.is_valid() || gurl.host().empty())
+    if (!gurl.is_valid() || gurl.GetHost().empty()) {
       return;
+    }
     if (!gurl.SchemeIs(url::kHttpsScheme))
       return;
     SSLInfo ssl_info;
@@ -3104,7 +3102,7 @@ void SpdySession::OnAltSvc(
       return;
     }
     if (!CanPool(transport_security_state_, ssl_info, *ssl_config_service_,
-                 host_port_pair().host(), gurl.host_piece())) {
+                 host_port_pair().host(), gurl.host())) {
       return;
     }
     scheme_host_port = url::SchemeHostPort(gurl);

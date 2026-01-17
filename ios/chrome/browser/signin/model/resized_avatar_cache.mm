@@ -21,7 +21,7 @@
 @property(nonatomic, strong)
     NSCache<id<SystemIdentity>, UIImage*>* resizedImages;
 // Holds weak references to the cached avatar image from the
-// ChromeIdentityService. Key is Chrome Identity.
+// SystemIdentityManager. Key is Chrome Identity.
 @property(nonatomic, strong)
     NSMapTable<id<SystemIdentity>, UIImage*>* originalImages;
 
@@ -29,10 +29,10 @@
 
 @implementation ResizedAvatarCache
 
-- (instancetype)initWithSize:(CGSize)size {
+- (instancetype)initWithIdentityAvatarSize:(IdentityAvatarSize)avatarSize {
   self = [super init];
   if (self) {
-    _expectedSize = size;
+    _expectedSize = GetSizeForIdentityAvatarSize(avatarSize);
     _resizedImages = [[NSCache alloc] init];
     _originalImages = [NSMapTable strongToWeakObjectsMapTable];
     [[NSNotificationCenter defaultCenter]
@@ -44,12 +44,8 @@
   return self;
 }
 
-- (instancetype)initWithIdentityAvatarSize:(IdentityAvatarSize)avatarSize {
-  CGSize size = GetSizeForIdentityAvatarSize(avatarSize);
-  return [self initWithSize:size];
-}
-
 - (UIImage*)resizedAvatarForIdentity:(id<SystemIdentity>)identity {
+  CHECK(identity, base::NotFatalUntil::M150);
   SystemIdentityManager* system_identity_manager =
       GetApplicationContext()->GetSystemIdentityManager();
 

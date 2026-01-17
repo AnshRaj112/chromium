@@ -4,6 +4,9 @@
 
 package J;
 
+import javax.annotation.processing.Generated;
+
+@Generated("JNI Zero")
 public class N {
   // Original name: org.jni_zero.SampleProxyEdgeCases#addStructB
   public static native int MYplquli(Object caller, Object b);
@@ -21,4 +24,13 @@ public class N {
   public static native boolean MWbFhvyA(Object sb);
   // Original name: org.jni_zero.SampleProxyEdgeCases#setStringBuilder
   public static native int MWbFhvyA(int sb);
+  public static void org_jni_1zero_SampleProxyEdgeCases_fooForTest() {
+    throw new RuntimeException("Native method not present");
+  }
+  public static void org_jni_1zero_SampleProxyEdgeCases_fooForTesting() {
+    throw new RuntimeException("Native method not present");
+  }
+  public static void org_jni_1zero_SampleProxyEdgeCases_fooForTests() {
+    throw new RuntimeException("Native method not present");
+  }
 }

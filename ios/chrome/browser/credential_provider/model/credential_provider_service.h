@@ -6,7 +6,7 @@
 #define IOS_CHROME_BROWSER_CREDENTIAL_PROVIDER_MODEL_CREDENTIAL_PROVIDER_SERVICE_H_
 
 #import "base/memory/raw_ptr.h"
-#include "base/memory/ref_counted.h"
+#include "base/memory/scoped_refptr.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/password_manager/core/browser/password_form.h"
 #include "components/password_manager/core/browser/password_store/password_store_backend_error.h"
@@ -147,6 +147,9 @@ class CredentialProviderService
   // Syncs whether or not PRF is enabled.
   void UpdatePasskeyPRFSetting();
 
+  // Syncs whether or not Large Blob is enabled.
+  void UpdatePasskeyLargeBlobSetting();
+
   // Syncs whether or not signal API is enabled.
   void UpdateSignalAPISetting();
 
@@ -170,6 +173,7 @@ class CredentialProviderService
 
   // syncer::SyncServiceObserver:
   void OnStateChanged(syncer::SyncService* sync) override;
+  void OnSyncShutdown(syncer::SyncService* sync) override;
 
   // Observer for change in enabled or managed state of prefs that govern the
   // CPE.

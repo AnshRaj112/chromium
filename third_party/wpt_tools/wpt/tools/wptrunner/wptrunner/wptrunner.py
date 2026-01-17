@@ -333,6 +333,7 @@ def run_test_iteration(test_status, test_loader, test_queue_builder,
                           recording=recording,
                           max_restarts=kwargs["max_restarts"],
                           max_restart_backoff=kwargs["max_restart_backoff"],
+                          update_status_on_crash=kwargs["update_status_on_crash"]
                           ) as manager_group:
             try:
                 handle_interrupt_signals()
@@ -567,14 +568,14 @@ def check_stability(**kwargs):
                                      **kwargs)
 
 
-def start(**kwargs):
+def start(**kwargs: Any) -> int:
     assert logger is not None
 
     logged_critical = wptlogging.LoggedAboveLevelHandler("CRITICAL")
     handler = handlers.LogLevelFilter(logged_critical, "CRITICAL")
     logger.add_handler(handler)
 
-    rv = False
+    rv = 0
     try:
         if kwargs["list_test_groups"]:
             list_test_groups(**kwargs)
@@ -585,12 +586,19 @@ def start(**kwargs):
         elif kwargs["list_tests_json"]:
             list_tests_json(**kwargs)
         elif kwargs["verify"] or kwargs["stability"]:
-            rv = check_stability(**kwargs) or logged_critical.has_log
+            rv = check_stability(**kwargs) or 0
         else:
-            rv = not run_tests(**kwargs)[0] or logged_critical.has_log
+            rv = int(not run_tests(**kwargs)[0])
     finally:
         logger.shutdown()
         logger.remove_handler(handler)
+
+    # Reserve everything above 64 for our global usage.
+    assert 0 <= rv < 64, "Exit codes above 64 are reserved"
+    if logged_critical.has_log:
+        print("Did log critical")
+        rv = 64
+
     return rv
 
 

@@ -15,13 +15,14 @@ import org.chromium.url.GURL;
 
 import java.util.Objects;
 
-/** Autofill suggestion container used to store information needed for each Autofill popup entry. */
+/** A container representing a single entry in an Autofill UI (e.g. keyboard accessory). */
 @NullMarked
 public class AutofillSuggestion extends DropdownItemBase {
     private final @Nullable String mLabel;
     private final @Nullable String mSecondaryLabel;
     private final String mSublabel;
     private final @Nullable String mSecondarySublabel;
+    private final @Nullable String mVoiceOver;
     private final int mIconId;
     private final @SuggestionType int mSuggestionType;
     private final boolean mIsDeletable;
@@ -31,7 +32,7 @@ public class AutofillSuggestion extends DropdownItemBase {
     private final @Nullable GURL mCustomIconUrl;
     private final @Nullable Payload mPayload;
 
-    public static sealed interface Payload permits AutofillProfilePayload, PaymentsPayload {}
+    public sealed interface Payload permits AutofillProfilePayload, PaymentsPayload {}
 
     /**
      * Constructs a Autofill suggestion container. Use the {@link AutofillSuggestion.Builder}
@@ -39,9 +40,10 @@ public class AutofillSuggestion extends DropdownItemBase {
      *
      * @param label The main label of the Autofill suggestion.
      * @param sublabel The describing sublabel of the Autofill suggestion.
+     * @param voiceOver Voice over text read for the Autofill suggestion.
      * @param iconId The resource ID for the icon associated with the suggestion, or {@code
      *     DropdownItem.NO_ICON} for no icon.
-     * @param popupItemId The type of suggestion.
+     * @param suggestionType The type of suggestion.
      * @param isDeletable Whether the item can be deleted by the user.
      * @param applyDeactivatedStyle Whether to apply deactivated style to the suggestion.
      * @param featureForIph The IPH feature for the autofill suggestion. If present, it'll be
@@ -55,8 +57,9 @@ public class AutofillSuggestion extends DropdownItemBase {
             @Nullable String secondaryLabel,
             String sublabel,
             @Nullable String secondarySublabel,
+            @Nullable String voiceOver,
             int iconId,
-            @SuggestionType int popupItemId,
+            @SuggestionType int suggestionType,
             boolean isDeletable,
             boolean applyDeactivatedStyle,
             @Nullable String featureForIph,
@@ -67,8 +70,9 @@ public class AutofillSuggestion extends DropdownItemBase {
         mSecondaryLabel = secondaryLabel;
         mSublabel = sublabel;
         mSecondarySublabel = secondarySublabel;
+        mVoiceOver = voiceOver;
         mIconId = iconId;
-        mSuggestionType = popupItemId;
+        mSuggestionType = suggestionType;
         mIsDeletable = isDeletable;
         mApplyDeactivatedStyle = applyDeactivatedStyle;
         mFeatureForIph = featureForIph;
@@ -140,6 +144,10 @@ public class AutofillSuggestion extends DropdownItemBase {
         return mIphDescriptionText;
     }
 
+    public @Nullable String getVoiceOver() {
+        return mVoiceOver;
+    }
+
     public @Nullable AutofillProfilePayload getAutofillProfilePayload() {
         if (mPayload instanceof AutofillProfilePayload) {
             return (AutofillProfilePayload) mPayload;
@@ -159,10 +167,9 @@ public class AutofillSuggestion extends DropdownItemBase {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof AutofillSuggestion)) {
+        if (!(o instanceof AutofillSuggestion other)) {
             return false;
         }
-        AutofillSuggestion other = (AutofillSuggestion) o;
         return Objects.equals(this.mLabel, other.mLabel)
                 && Objects.equals(this.mSecondaryLabel, other.mSecondaryLabel)
                 && this.mSublabel.equals(other.mSublabel)
@@ -177,6 +184,23 @@ public class AutofillSuggestion extends DropdownItemBase {
                 && Objects.equals(this.mPayload, other.mPayload);
     }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                this.mLabel,
+                this.mSecondaryLabel,
+                this.mSublabel,
+                this.mSecondarySublabel,
+                this.mIconId,
+                this.mSuggestionType,
+                this.mIsDeletable,
+                this.mApplyDeactivatedStyle,
+                this.mFeatureForIph,
+                this.mIphDescriptionText,
+                this.mCustomIconUrl,
+                this.mPayload);
+    }
+
     /** Builder for the {@link AutofillSuggestion}. */
     public static final class Builder {
         private int mIconId;
@@ -189,6 +213,7 @@ public class AutofillSuggestion extends DropdownItemBase {
         private @Nullable String mSecondaryLabel;
         private @Nullable String mSubLabel;
         private @Nullable String mSecondarySubLabel;
+        private @Nullable String mVoiceOver;
         private int mSuggestionType;
         private @Nullable Payload mPayload;
 
@@ -242,8 +267,13 @@ public class AutofillSuggestion extends DropdownItemBase {
             return this;
         }
 
-        public Builder setSuggestionType(int popupItemId) {
-            this.mSuggestionType = popupItemId;
+        public Builder setSuggestionType(int suggestionType) {
+            this.mSuggestionType = suggestionType;
+            return this;
+        }
+
+        public Builder setVoiceOver(String voiceOver) {
+            this.mVoiceOver = voiceOver;
             return this;
         }
 
@@ -262,6 +292,7 @@ public class AutofillSuggestion extends DropdownItemBase {
                     mSecondaryLabel,
                     mSubLabel,
                     mSecondarySubLabel,
+                    mVoiceOver,
                     mIconId,
                     mSuggestionType,
                     mIsDeletable,

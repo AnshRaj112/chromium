@@ -6,9 +6,9 @@
 
 #include <stddef.h>
 
+#include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/metrics/histogram.h"
@@ -20,6 +20,7 @@
 #include "google_apis/gcm/monitoring/gcm_stats_recorder.h"
 #include "net/base/load_flags.h"
 #include "net/http/http_request_headers.h"
+#include "net/http/http_response_headers.h"
 #include "net/http/http_status_code.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "services/network/public/cpp/resource_request.h"
@@ -56,35 +57,35 @@ const char kInvalidTargetVersion[] = "INVALID_TARGET_VERSION";
 const char kFisAuthError[] = "FIS_AUTH_ERROR";
 
 // Gets correct status from the error message.
-RegistrationRequest::Status GetStatusFromError(const std::string& error) {
-  if (base::Contains(error, kDeviceRegistrationError)) {
+RegistrationRequest::Status GetStatusFromError(std::string_view error) {
+  if (error.contains(kDeviceRegistrationError)) {
     return RegistrationRequest::DEVICE_REGISTRATION_ERROR;
   }
-  if (base::Contains(error, kAuthenticationFailed)) {
+  if (error.contains(kAuthenticationFailed)) {
     return RegistrationRequest::AUTHENTICATION_FAILED;
   }
-  if (base::Contains(error, kInvalidSender)) {
+  if (error.contains(kInvalidSender)) {
     return RegistrationRequest::INVALID_SENDER;
   }
-  if (base::Contains(error, kInvalidParameters)) {
+  if (error.contains(kInvalidParameters)) {
     return RegistrationRequest::INVALID_PARAMETERS;
   }
-  if (base::Contains(error, kInternalServerError)) {
+  if (error.contains(kInternalServerError)) {
     return RegistrationRequest::INTERNAL_SERVER_ERROR;
   }
-  if (base::Contains(error, kQuotaExceeded)) {
+  if (error.contains(kQuotaExceeded)) {
     return RegistrationRequest::QUOTA_EXCEEDED;
   }
-  if (base::Contains(error, kTooManyRegistrations)) {
+  if (error.contains(kTooManyRegistrations)) {
     return RegistrationRequest::TOO_MANY_REGISTRATIONS;
   }
-  if (base::Contains(error, kTooManySubscribers)) {
+  if (error.contains(kTooManySubscribers)) {
     return RegistrationRequest::TOO_MANY_SUBSCRIBERS;
   }
-  if (base::Contains(error, kInvalidTargetVersion)) {
+  if (error.contains(kInvalidTargetVersion)) {
     return RegistrationRequest::INVALID_TARGET_VERSION;
   }
-  if (base::Contains(error, kFisAuthError)) {
+  if (error.contains(kFisAuthError)) {
     return RegistrationRequest::FIS_AUTH_ERROR;
   }
   // Should not be reached, unless the server adds new error types.
@@ -268,26 +269,25 @@ void RegistrationRequest::RetryWithBackoff() {
 
 RegistrationRequest::Status RegistrationRequest::ParseResponse(
     const network::SimpleURLLoader* source,
-    std::unique_ptr<std::string> body,
+    std::optional<std::string> body,
     std::string* token) {
   if (source->NetError() != net::OK) {
     LOG(ERROR) << "Registration URL fetching failed.";
     return URL_FETCHING_FAILED;
   }
 
-  std::string response;
   if (!body) {
     LOG(ERROR) << "Failed to get registration response body.";
     return NO_RESPONSE_BODY;
   }
-  response = std::move(*body);
+  std::string response = std::move(body).value();
 
   // If we are able to parse a meaningful known error, let's do so. Note that
   // some errors will have HTTP_OK response code!
   size_t error_pos = response.find(kErrorPrefix);
   if (error_pos != std::string::npos) {
-    std::string error =
-        response.substr(error_pos + std::size(kErrorPrefix) - 1);
+    std::string_view error = std::string_view(response).substr(
+        error_pos + std::size(kErrorPrefix) - 1);
     LOG(ERROR) << "Registration response error message: " << error;
     RegistrationRequest::Status status = GetStatusFromError(error);
     return status;
@@ -319,7 +319,7 @@ RegistrationRequest::Status RegistrationRequest::ParseResponse(
 
 void RegistrationRequest::OnURLLoadComplete(
     const network::SimpleURLLoader* source,
-    std::unique_ptr<std::string> body) {
+    std::optional<std::string> body) {
   std::string token;
   Status status = ParseResponse(source, std::move(body), &token);
   recorder_->RecordRegistrationResponse(request_info_.app_id(),

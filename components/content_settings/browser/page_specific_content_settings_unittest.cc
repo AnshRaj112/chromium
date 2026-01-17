@@ -15,6 +15,7 @@
 #include "components/browsing_data/content/browsing_data_helper.h"
 #include "components/content_settings/browser/test_page_specific_content_settings_delegate.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
+#include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/common/content_settings_pattern.h"
 #include "components/content_settings/core/common/content_settings_types.h"
 #include "components/content_settings/core/common/features.h"
@@ -1544,6 +1545,78 @@ TEST_F(PageSpecificContentSettingsTest, ObjectBasedInUseIndicator) {
       ContentSettingsType::SMART_CARD_GUARD));
 }
 #endif
+
+#if BUILDFLAG(IS_WIN)
+TEST_F(PageSpecificContentSettingsTest, ProtectedMediaIdentifier) {
+  MockPageSpecificContentSettingsDelegate* mock_delegate =
+      InstallMockDelegate();
+  NavigateAndCommit(GURL("http://google.com"));
+
+  PageSpecificContentSettings* pscs = PageSpecificContentSettings::GetForFrame(
+      web_contents()->GetPrimaryMainFrame());
+  ASSERT_NE(pscs, nullptr);
+
+  // Allowed
+  EXPECT_CALL(*mock_delegate,
+              OnContentAllowed(ContentSettingsType::PROTECTED_MEDIA_IDENTIFIER))
+      .Times(1);
+  pscs->OnProtectedMediaIdentifierPermissionSet(
+      web_contents()->GetLastCommittedURL(), /*allowed=*/true);
+
+  // Blocked
+  EXPECT_CALL(*mock_delegate,
+              OnContentBlocked(ContentSettingsType::PROTECTED_MEDIA_IDENTIFIER))
+      .Times(1);
+  pscs->OnProtectedMediaIdentifierPermissionSet(
+      web_contents()->GetLastCommittedURL(), /*allowed=*/false);
+}
+#endif  // BUILDFLAG(IS_WIN)
+
+class PageSpecificContentSettingsTestWithApproximateLocation
+    : public PageSpecificContentSettingsTest {
+ private:
+  base::test::ScopedFeatureList enable_approximate_location_{
+      features::kApproximateGeolocationPermission};
+};
+
+TEST_F(PageSpecificContentSettingsTestWithApproximateLocation,
+       GeolocationWithOptions) {
+  GURL url("https://example.com");
+  NavigateAndCommit(url);
+
+  PageSpecificContentSettings* pscs = PageSpecificContentSettings::GetForFrame(
+      web_contents()->GetPrimaryMainFrame());
+
+  settings_map()->SetPermissionSettingDefaultScope(
+      url, url, ContentSettingsType::GEOLOCATION_WITH_OPTIONS,
+      GeolocationSetting{.approximate = PermissionOption::kAllowed,
+                         .precise = PermissionOption::kAllowed});
+  pscs->OnContentAllowed(ContentSettingsType::GEOLOCATION_WITH_OPTIONS);
+  EXPECT_TRUE(
+      pscs->IsContentAllowed(ContentSettingsType::GEOLOCATION_WITH_OPTIONS));
+  EXPECT_FALSE(
+      pscs->IsContentBlocked(ContentSettingsType::GEOLOCATION_WITH_OPTIONS));
+
+  // Denying only precise location shouldn't change anything.
+  settings_map()->SetPermissionSettingDefaultScope(
+      url, url, ContentSettingsType::GEOLOCATION_WITH_OPTIONS,
+      GeolocationSetting{.approximate = PermissionOption::kAllowed,
+                         .precise = PermissionOption::kDenied});
+  EXPECT_TRUE(
+      pscs->IsContentAllowed(ContentSettingsType::GEOLOCATION_WITH_OPTIONS));
+  EXPECT_FALSE(
+      pscs->IsContentBlocked(ContentSettingsType::GEOLOCATION_WITH_OPTIONS));
+
+  // Denying also approximate location should update the blocked status.
+  settings_map()->SetPermissionSettingDefaultScope(
+      url, url, ContentSettingsType::GEOLOCATION_WITH_OPTIONS,
+      GeolocationSetting{.approximate = PermissionOption::kDenied,
+                         .precise = PermissionOption::kDenied});
+  EXPECT_FALSE(
+      pscs->IsContentAllowed(ContentSettingsType::GEOLOCATION_WITH_OPTIONS));
+  EXPECT_TRUE(
+      pscs->IsContentBlocked(ContentSettingsType::GEOLOCATION_WITH_OPTIONS));
+}
 
 class PageSpecificContentSettingsIframeTest
     : public PageSpecificContentSettingsTest {

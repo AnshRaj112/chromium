@@ -6,11 +6,11 @@
 
 #include <xf86drm.h>
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/logging.h"
 #include "base/notimplemented.h"
@@ -58,8 +58,8 @@ class MockGbmBuffer final : public ui::GbmBuffer {
   uint64_t GetFormatModifier() const override { return format_modifier_; }
   uint32_t GetFlags() const override { return flags_; }
   gfx::Size GetSize() const override { return size_; }
-  gfx::BufferFormat GetBufferFormat() const override {
-    return ui::GetBufferFormatFromFourCCFormat(format_);
+  viz::SharedImageFormat GetSharedImageFormat() const override {
+    return ui::GetSharedImageFormatFromFourCCFormat(format_);
   }
   bool AreFdsValid() const override {
     if (planes_.empty())
@@ -163,7 +163,7 @@ std::unique_ptr<GbmBuffer> MockGbmDevice::CreateBufferWithModifiers(
   uint64_t format_modifier =
       modifiers.empty() ? DRM_FORMAT_MOD_NONE : modifiers.back();
 
-  if (!base::Contains(supported_modifiers_, format_modifier)) {
+  if (!std::ranges::contains(supported_modifiers_, format_modifier)) {
     PLOG(ERROR) << "Unsupported format modifier: " << std::hex
                 << format_modifier;
     return nullptr;

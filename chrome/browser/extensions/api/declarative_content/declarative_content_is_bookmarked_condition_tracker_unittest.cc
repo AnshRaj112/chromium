@@ -9,7 +9,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/strings/to_string.h"
@@ -24,9 +23,12 @@
 #include "components/bookmarks/test/bookmark_test_helpers.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_builder.h"
 #include "testing/gmock/include/gmock/gmock.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -90,7 +92,7 @@ class DeclarativeContentIsBookmarkedConditionTrackerTest
 
     // ContentPredicateEvaluator::Delegate:
     void NotifyPredicateStateUpdated(content::WebContents* contents) override {
-      EXPECT_FALSE(base::Contains(evaluation_requests_, contents));
+      EXPECT_FALSE(evaluation_requests_.contains(contents));
       evaluation_requests_.insert(contents);
     }
 

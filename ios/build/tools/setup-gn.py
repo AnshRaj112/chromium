@@ -143,6 +143,9 @@ class GnGenerator(object):
     if os.environ.get('FORCE_MAC_TOOLCHAIN', '0') == '1':
       args.append(('use_system_xcode', False))
 
+    if os.environ.get('ENABLE_SWIFT_CXX_INTEROP', '0') == '1':
+      args.append(('enable_swift_cxx_interop', True))
+
     target_cpu = self.TARGET_CPU_VALUES[self._target];
     if (self._target == 'iphoneos' and
         self._settings.getboolean('build', 'use_arm64e')):
@@ -312,13 +315,12 @@ def GenerateXcodeProject(gn_path, root_dir, proj_name, out_dir, settings):
 
 def CreateLLDBInitFile(root_dir, out_dir, settings):
   '''
-  Generate an .lldbinit file for the project that load the script that fixes
-  the mapping of source files (see docs/ios/build_instructions.md#debugging).
+  Generate an .lldbinit file for the project that fixes the mapping of source files.
   '''
+  absolute_root_dir = os.path.abspath(root_dir)
   with open(os.path.join(out_dir, 'build', '.lldbinit'), 'w') as lldbinit:
-    lldb_script_dir = os.path.join(os.path.abspath(root_dir), 'tools', 'lldb')
-    lldbinit.write('script sys.path[:0] = [\'%s\']\n' % lldb_script_dir)
-    lldbinit.write('script import lldbinit\n')
+    lldbinit.write(f'settings set target.env-vars CHROMIUM_LLDBINIT_SOURCED=1\n')
+    lldbinit.write(f'settings set target.source-map ../.. {absolute_root_dir}\n')
 
     workspace_name = settings.getstring(
         'gn_args',
@@ -397,7 +399,7 @@ def Main(args):
       help='name of the generated Xcode project (default: %(default)s)')
   parser.add_argument(
       '--no-xcode-project', action='store_true', default=False,
-      help='do not generate the build directory with XCode project')
+      help='do not generate the build directory with Xcode project')
   args = parser.parse_args(args)
 
   # Load configuration (first global and then any user overrides).

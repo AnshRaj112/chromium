@@ -41,7 +41,7 @@ class CORE_EXPORT CSSValue : public GarbageCollected<CSSValue> {
   // TODO(sashab): Remove this method and move logic to the caller.
   static CSSValue* Create(const Length& value, float zoom);
 
-  WTF::String CssText() const;
+  String CssText() const;
   unsigned Hash() const;
 
   bool IsNumericLiteralValue() const {
@@ -89,6 +89,9 @@ class CORE_EXPORT CSSValue : public GarbageCollected<CSSValue> {
   bool IsColorValue() const { return class_type_ == kColorClass; }
   bool IsColorMixValue() const { return class_type_ == kColorMixClass; }
   bool IsCounterValue() const { return class_type_ == kCounterClass; }
+  bool IsCounterContentValue() const {
+    return class_type_ == kCounterContentClass;
+  }
   bool IsCursorImageValue() const { return class_type_ == kCursorImageClass; }
   bool IsCrossfadeValue() const { return class_type_ == kCrossfadeClass; }
   bool IsDynamicRangeLimitMixValue() const {
@@ -125,8 +128,9 @@ class CORE_EXPORT CSSValue : public GarbageCollected<CSSValue> {
   bool IsUnsetValue() const { return class_type_ == kUnsetClass; }
   bool IsRevertValue() const { return class_type_ == kRevertClass; }
   bool IsRevertLayerValue() const { return class_type_ == kRevertLayerClass; }
+  bool IsRevertRuleValue() const { return class_type_ == kRevertRuleClass; }
   bool IsCSSWideKeyword() const {
-    return class_type_ >= kInheritedClass && class_type_ <= kRevertLayerClass;
+    return class_type_ >= kInheritedClass && class_type_ <= kRevertRuleClass;
   }
   bool IsLayoutFunctionValue() const {
     return class_type_ == kLayoutFunctionClass;
@@ -154,6 +158,7 @@ class CORE_EXPORT CSSValue : public GarbageCollected<CSSValue> {
   bool IsStringValue() const { return class_type_ == kStringClass; }
   bool IsSuperellipseValue() const { return class_type_ == kSuperellipseClass; }
   bool IsURIValue() const { return class_type_ == kURIClass; }
+  bool IsURLPatternValue() const { return class_type_ == kURLPatternClass; }
   bool IsLinearTimingFunctionValue() const {
     return class_type_ == kLinearTimingFunctionClass;
   }
@@ -234,7 +239,6 @@ class CORE_EXPORT CSSValue : public GarbageCollected<CSSValue> {
   void ReResolveUrl(const Document&) const;
 
   bool operator==(const CSSValue&) const;
-  bool operator!=(const CSSValue& o) const { return !(*this == o); }
 
   // Returns the same CSS value, but populated with the given tree scope for
   // tree-scoped names and references.
@@ -246,8 +250,12 @@ class CORE_EXPORT CSSValue : public GarbageCollected<CSSValue> {
   }
   bool IsScopedValue() const { return !needs_tree_scope_population_; }
 
+  bool IsTriggerAttachmentValue() const {
+    return class_type_ == kTriggerAttachmentClass;
+  }
+
 #if DCHECK_IS_ON()
-  WTF::String ClassTypeToString() const;
+  String ClassTypeToString() const;
 #endif
 
   void TraceAfterDispatch(blink::Visitor* visitor) const {}
@@ -266,10 +274,12 @@ class CORE_EXPORT CSSValue : public GarbageCollected<CSSValue> {
     kUnresolvedColorClass,
     kColorMixClass,
     kCounterClass,
+    kCounterContentClass,
     kQuadClass,
     kCustomIdentClass,
     kStringClass,
     kURIClass,
+    kURLPatternClass,
     kValuePairClass,
     kLightDarkValuePairClass,
     kScrollClass,
@@ -320,6 +330,7 @@ class CORE_EXPORT CSSValue : public GarbageCollected<CSSValue> {
     kUnsetClass,
     kRevertClass,
     kRevertLayerClass,
+    kRevertRuleClass,
 
     kReflectClass,
     kShadowClass,
@@ -348,6 +359,8 @@ class CORE_EXPORT CSSValue : public GarbageCollected<CSSValue> {
     kRepeatStyleClass,
 
     kSuperellipseClass,
+
+    kTriggerAttachmentClass,
 
     // List class types must appear after ValueListClass.
     kValueListClass,

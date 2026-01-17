@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "components/omnibox/browser/autocomplete_provider.h"
 
 #include <stddef.h>
@@ -31,10 +26,12 @@
 #include "base/test/task_environment.h"
 #include "base/test/values_test_util.h"
 #include "components/omnibox/browser/autocomplete_controller.h"
+#include "components/omnibox/browser/autocomplete_controller_config.h"
 #include "components/omnibox/browser/autocomplete_input.h"
 #include "components/omnibox/browser/autocomplete_match.h"
 #include "components/omnibox/browser/autocomplete_match_classification.h"
 #include "components/omnibox/browser/autocomplete_provider_listener.h"
+#include "components/omnibox/browser/fake_autocomplete_provider_client.h"
 #include "components/omnibox/browser/keyword_provider.h"
 #include "components/omnibox/browser/mock_autocomplete_provider_client.h"
 #include "components/omnibox/browser/omnibox_prefs.h"
@@ -51,6 +48,7 @@
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_service.h"
 #include "components/search_engines/template_url_service_client.h"
+#include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/metrics_proto/omnibox_event.pb.h"
 #include "third_party/metrics_proto/omnibox_focus_type.pb.h"
@@ -299,7 +297,7 @@ void TestProvider::AddResultsWithSearchTermsArgs(
     if (!match_keyword_.empty()) {
       match.keyword = match_keyword_;
       ASSERT_NE(nullptr,
-                match.GetTemplateURL(client_->GetTemplateURLService(), false));
+                match.GetTemplateURL(client_->GetTemplateURLService()));
     }
 
     matches_.push_back(match);
@@ -363,6 +361,13 @@ class AutocompleteProviderTest : public testing::Test {
     base::flat_set<omnibox::SuggestSubtype> subtypes;
   };
 
+  void SetUp() override {
+    omnibox::RegisterProfilePrefs(
+        static_cast<sync_preferences::TestingPrefServiceSyncable*>(
+            client_->GetPrefs())
+            ->registry());
+  }
+
   // Registers a test TemplateURL under the given keyword.
   void RegisterTemplateURL(const std::u16string& keyword,
                            const std::string& template_url,
@@ -425,10 +430,6 @@ class AutocompleteProviderTest : public testing::Test {
     experiment_stats_v2s.push_back(experiment_stat_v2);
   }
 
-  PrefService* GetPrefs() {
-    return &search_engines_test_environment_.pref_service();
-  }
-
   // Resets the controller with the given |type|. |type| is a bitmap containing
   // AutocompleteProvider::Type values that will (potentially, depending on
   // platform, flags, etc.) be instantiated.
@@ -451,10 +452,7 @@ class AutocompleteProviderTest : public testing::Test {
 };
 
 AutocompleteProviderTest::AutocompleteProviderTest()
-    : client_(new MockAutocompleteProviderClient()) {
-  client_->set_template_url_service(
-      search_engines_test_environment_.template_url_service());
-}
+    : client_(new FakeAutocompleteProviderClient()) {}
 
 AutocompleteProviderTest::~AutocompleteProviderTest() {
   EXPECT_TRUE(client_owned_);
@@ -588,7 +586,8 @@ void AutocompleteProviderTest::ResetControllerWithKeywordProvider() {
 void AutocompleteProviderTest::ResetControllerWithType(int type) {
   EXPECT_FALSE(client_owned_);
   controller_ = std::make_unique<AutocompleteController>(
-      base::WrapUnique(client_.get()), type);
+      base::WrapUnique(client_.get()),
+      AutocompleteControllerConfig{.provider_types = type});
   client_owned_ = true;
 }
 
@@ -620,10 +619,8 @@ void AutocompleteProviderTest::RunKeywordTest(
   result.AppendMatches(matches);
   controller_->UpdateAssociatedKeywords(&result);
   for (size_t j = 0; j < result.size(); ++j) {
-    EXPECT_EQ(match_data[j].expected_associated_keyword,
-              result.match_at(j)->associated_keyword
-                  ? result.match_at(j)->associated_keyword->keyword
-                  : std::u16string());
+    EXPECT_EQ(result.match_at(j)->associated_keyword,
+              match_data[j].expected_associated_keyword);
   }
 }
 
@@ -677,8 +674,8 @@ void AutocompleteProviderTest::RunSearchboxStatsTest(
   }
   result_.Reset();
   result_.AppendMatches(matches);
-  result_.MergeSuggestionGroupsMap(
-      omnibox::BuildDefaultGroupsForInput(AutocompleteInput()));
+  result_.MergeSuggestionGroupsMap(omnibox::BuildDefaultGroupsForInput(
+      AutocompleteInput(), /*is_incognito=*/false));
   result_.set_zero_prefix_enabled_in_session(input_is_zero_suggest);
 
   // Update Searchbox stats.
@@ -1042,9 +1039,6 @@ TEST_F(AutocompleteProviderTest, SuggestionGroups) {
 
 TEST_F(AutocompleteProviderTest, UpdateSearchboxStats) {
   ResetControllerWithTestProviders(false, nullptr, nullptr);
-
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndEnableFeature(omnibox::kCategoricalSuggestions);
 
   {
     omnibox::metrics::ChromeSearchboxStats searchbox_stats;
@@ -1442,29 +1436,29 @@ TEST_F(AutocompleteProviderTest, GetDestinationURL) {
   AutocompleteMatch match(nullptr, 1100, false,
                           AutocompleteMatchType::SEARCH_SUGGEST);
   GURL url(GetDestinationURL(match, base::Milliseconds(2456)));
-  EXPECT_TRUE(url.path().empty());
+  EXPECT_TRUE(url.GetPath().empty());
 
   // The protocol needs to be https.
   RegisterTemplateURL(kTestTemplateURLKeyword,
                       "https://foo/{searchTerms}/{google:assistedQueryStats}");
   url = GetDestinationURL(match, base::Milliseconds(2456));
-  EXPECT_TRUE(url.path().empty());
+  EXPECT_TRUE(url.GetPath().empty());
 
   // There needs to be a keyword provider.
   match.keyword = kTestTemplateURLKeyword;
   url = GetDestinationURL(match, base::Milliseconds(2456));
-  EXPECT_TRUE(url.path().empty());
+  EXPECT_TRUE(url.GetPath().empty());
 
   // search_terms_args needs to be set.
   match.search_terms_args =
       std::make_unique<TemplateURLRef::SearchTermsArgs>(std::u16string());
   url = GetDestinationURL(match, base::Milliseconds(2456));
-  EXPECT_TRUE(url.path().empty());
+  EXPECT_TRUE(url.GetPath().empty());
 
   // searchbox_stats need to have been set.
   match.search_terms_args->searchbox_stats.set_client_name("chrome");
   url = GetDestinationURL(match, base::Milliseconds(2456));
-  EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajBqMA&", url.path());
+  EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajBqMA&", url.GetPath());
   // Make sure searchbox_stats is serialized and encoded correctly.
   {
     std::string serialized_proto;
@@ -1479,7 +1473,7 @@ TEST_F(AutocompleteProviderTest, GetDestinationURL) {
   // Test field trial triggered bit set.
   set_remote_search_feature_triggered_in_session(true);
   url = GetDestinationURL(match, base::Milliseconds(2456));
-  EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajFqMA&", url.path());
+  EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajFqMA&", url.GetPath());
   // Make sure searchbox_stats is serialized and encoded correctly.
   {
     std::string serialized_proto;
@@ -1495,7 +1489,7 @@ TEST_F(AutocompleteProviderTest, GetDestinationURL) {
   set_remote_search_feature_triggered_in_session(false);
   set_current_page_classification(metrics::OmniboxEventProto::OTHER);
   url = GetDestinationURL(match, base::Milliseconds(2456));
-  EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajBqNA&", url.path());
+  EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajBqNA&", url.GetPath());
   // Make sure searchbox_stats is serialized and encoded correctly.
   {
     std::string serialized_proto;
@@ -1511,7 +1505,7 @@ TEST_F(AutocompleteProviderTest, GetDestinationURL) {
   set_remote_search_feature_triggered_in_session(true);
   set_current_page_classification(metrics::OmniboxEventProto::OTHER);
   url = GetDestinationURL(match, base::Milliseconds(2456));
-  EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajFqNA&", url.path());
+  EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajFqNA&", url.GetPath());
   // Make sure searchbox_stats is serialized and encoded correctly.
   {
     std::string serialized_proto;
@@ -1529,7 +1523,7 @@ TEST_F(AutocompleteProviderTest, GetDestinationURL) {
     controller_->SetSteadyStateOmniboxPosition(
         metrics::OmniboxEventProto::TOP_POSITION);
     url = GetDestinationURL(match_copy, base::Milliseconds(2456));
-    EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajFqNOIDBBgBIF8&", url.path());
+    EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajFqNOIDBBgBIF8&", url.GetPath());
     // Make sure searchbox_stats is serialized and encoded correctly.
     std::string serialized_proto;
     EXPECT_TRUE(base::Base64UrlDecode(
@@ -1546,7 +1540,7 @@ TEST_F(AutocompleteProviderTest, GetDestinationURL) {
     controller_->SetSteadyStateOmniboxPosition(
         metrics::OmniboxEventProto::BOTTOM_POSITION);
     url = GetDestinationURL(match_copy, base::Milliseconds(2456));
-    EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajFqNOIDBBgCIF8&", url.path());
+    EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajFqNOIDBBgCIF8&", url.GetPath());
     // Make sure searchbox_stats is serialized and encoded correctly.
     std::string serialized_proto;
     EXPECT_TRUE(base::Base64UrlDecode(
@@ -1569,7 +1563,7 @@ TEST_F(AutocompleteProviderTest, GetDestinationURL) {
   add_zero_suggest_provider_experiment_stats_v2(experiment_stats_v2);
   url = GetDestinationURL(match, base::Milliseconds(2456));
   EXPECT_EQ("//gs_lcrp=EgZjaHJvbWXSAQgyNDU2ajFqNOIDCRIEMCw2NyCRTg&",
-            url.path());
+            url.GetPath());
   // Make sure searchbox_stats is serialized and encoded correctly.
   {
     std::string serialized_proto;
@@ -1871,12 +1865,6 @@ TEST_F(AutocompleteProviderPrefetchTest, SupportedProvider_NonPrefetch) {
 
 TEST_F(AutocompleteProviderPrefetchTest, SupportedProvider_Prefetch) {
   // Add a test provider that supports prefetch requests.
-
-  base::test::ScopedFeatureList features;
-  features.InitWithFeatures(
-      /*enabled_features=*/{omnibox::kZeroSuggestPrefetching},
-      /*disabled_features=*/{});
-
   TestProvider* provider = new TestProvider(kResultsPerProvider, u"http://a",
                                             kTestTemplateURLKeyword, client_);
   provider->set_supports_prefetch(true);
@@ -1913,10 +1901,6 @@ TEST_F(AutocompleteProviderPrefetchTest, SupportedProvider_Prefetch) {
 }
 
 TEST_F(AutocompleteProviderPrefetchTest, SupportedProvider_OngoingNonPrefetch) {
-  base::test::ScopedFeatureList features;
-  features.InitWithFeatures(
-      /*enabled_features=*/{omnibox::kZeroSuggestPrefetching},
-      /*disabled_features=*/{});
   // Add a test provider that supports prefetch requests.
   TestProvider* provider = new TestProvider(kResultsPerProvider, u"http://a",
                                             kTestTemplateURLKeyword, client_);
@@ -1964,10 +1948,6 @@ TEST_F(AutocompleteProviderPrefetchTest, SupportedProvider_OngoingNonPrefetch) {
 }
 
 TEST_F(AutocompleteProviderPrefetchTest, UnsupportedProvider_Prefetch) {
-  base::test::ScopedFeatureList features;
-  features.InitWithFeatures(
-      /*enabled_features=*/{omnibox::kZeroSuggestPrefetching},
-      /*disabled_features=*/{});
   // Add a test provider that does not support prefetch requests.
   TestProvider* provider = new TestProvider(kResultsPerProvider, u"http://a",
                                             kTestTemplateURLKeyword, client_);

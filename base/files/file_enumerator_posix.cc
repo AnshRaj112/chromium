@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "base/files/file_enumerator.h"
 
 #include <dirent.h>
@@ -15,12 +10,14 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "base/compiler_specific.h"
 #include "base/logging.h"
 #include "base/threading/scoped_blocking_call.h"
 #include "build/build_config.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/android/content_uri_utils.h"
+#include "base/files/file_util.h"
 #endif
 
 namespace base {
@@ -34,7 +31,7 @@ bool GetStat(const FilePath& path, bool show_links, stat_wrapper_t* st) {
     // symlinks.
     DPLOG_IF(ERROR, errno != ENOENT || show_links)
         << "Cannot stat '" << path << "'";
-    memset(st, 0, sizeof(*st));
+    UNSAFE_TODO(memset(st, 0, sizeof(*st)));
     return false;
   }
 
@@ -62,7 +59,7 @@ bool ShouldTrackVisitedDirectories(int file_type) {
 // FileEnumerator::FileInfo ----------------------------------------------------
 
 FileEnumerator::FileInfo::FileInfo() {
-  memset(&stat_, 0, sizeof(stat_));
+  UNSAFE_TODO(memset(&stat_, 0, sizeof(stat_)));
 }
 
 #if BUILDFLAG(IS_ANDROID)
@@ -72,7 +69,7 @@ FileEnumerator::FileInfo::FileInfo(FilePath content_uri,
                                    off_t size,
                                    Time time)
     : content_uri_(std::move(content_uri)), filename_(std::move(filename)) {
-  memset(&stat_, 0, sizeof(stat_));
+  UNSAFE_TODO(memset(&stat_, 0, sizeof(stat_)));
   stat_.st_mode = is_directory ? S_IFDIR : S_IFREG;
   stat_.st_size = size;
   stat_.st_mtime = time.ToTimeT();
@@ -145,12 +142,10 @@ FileEnumerator::FileEnumerator(const FilePath& root_path,
   DCHECK(!(recursive && (INCLUDE_DOT_DOT & file_type_)));
 
 #if BUILDFLAG(IS_ANDROID)
-  // Content-URIs have limited support.
-  if (root_path.IsContentUri()) {
-    CHECK_EQ(file_type_, FileType::FILES | FileType::DIRECTORIES);
+  if (auto content_uri = base::ResolveToContentUri(root_path); content_uri) {
     // Get display-name of root path.
     FileInfo root_info;
-    internal::ContentUriGetFileInfo(root_path, &root_info);
+    internal::ContentUriGetFileInfo(*content_uri, &root_info);
     pending_subdirs_.push(
         std::vector<std::string>({root_info.GetName().value()}));
   }
@@ -190,10 +185,11 @@ FilePath FileEnumerator::Next() {
     pending_paths_.pop();
 
 #if BUILDFLAG(IS_ANDROID)
-    if (root_path_.IsContentUri()) {
+    if (auto content_uri = base::ResolveToContentUri(root_path_); content_uri) {
       subdirs_ = pending_subdirs_.top();
       pending_subdirs_.pop();
-      directory_entries_ = internal::ListContentUriDirectory(root_path_);
+      directory_entries_ =
+          internal::ListContentUriDirectory(*content_uri, file_type_);
       current_directory_entry_ = 0;
       if (directory_entries_.empty()) {
         continue;
@@ -310,7 +306,7 @@ FilePath FileEnumerator::Next() {
   }
 
 #if BUILDFLAG(IS_ANDROID)
-  if (root_path_.IsContentUri()) {
+  if (root_path_.IsContentUri() || root_path_.IsVirtualDocumentPath()) {
     return directory_entries_[current_directory_entry_].content_uri_;
   }
 #endif

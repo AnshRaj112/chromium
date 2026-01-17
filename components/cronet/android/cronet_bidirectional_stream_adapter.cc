@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "components/cronet/android/cronet_bidirectional_stream_adapter.h"
+
+#include <cstddef>
+#include <optional>
+#include <tuple>
 #ifdef UNSAFE_BUFFERS_BUILD
 // TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
 #pragma allow_unsafe_buffers
 #endif
-
-#include "cronet_bidirectional_stream_adapter.h"
 
 #include <string>
 #include <utility>
@@ -23,6 +26,7 @@
 #include "components/cronet/android/url_request_close_source.h"
 #include "components/cronet/android/url_request_error.h"
 #include "components/cronet/metrics_util.h"
+#include "net/base/host_port_pair.h"
 #include "net/base/http_user_agent_settings.h"
 #include "net/base/net_errors.h"
 #include "net/base/request_priority.h"
@@ -39,6 +43,7 @@
 
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "components/cronet/android/cronet_jni_headers/CronetBidirectionalStream_jni.h"
+#include "components/cronet/android/cronet_jni_headers/CronetMetrics_jni.h"
 
 using base::android::ConvertUTF8ToJavaString;
 using base::android::ConvertJavaStringToUTF8;
@@ -62,12 +67,16 @@ size_t SafeGetArrayLength(JNIEnv* env, JavaArrayType jarray) {
 
 }  // namespace
 
+CronetMetrics::CronetMetrics() = default;
+CronetMetrics::CronetMetrics(const CronetMetrics& metrics) = default;
+CronetMetrics::~CronetMetrics() = default;
+
 PendingWriteData::PendingWriteData(
     JNIEnv* env,
     const JavaRef<jobjectArray>& jwrite_buffer_list,
     const JavaRef<jintArray>& jwrite_buffer_pos_list,
     const JavaRef<jintArray>& jwrite_buffer_limit_list,
-    jboolean jwrite_end_of_stream) {
+    bool jwrite_end_of_stream) {
   this->jwrite_buffer_list.Reset(jwrite_buffer_list);
   this->jwrite_buffer_pos_list.Reset(jwrite_buffer_pos_list);
   this->jwrite_buffer_limit_list.Reset(jwrite_buffer_limit_list);
@@ -83,13 +92,13 @@ PendingWriteData::~PendingWriteData() {
 
 static jlong JNI_CronetBidirectionalStream_CreateBidirectionalStream(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& jbidi_stream,
+    const base::android::JavaRef<jobject>& jbidi_stream,
     jlong jurl_request_context_adapter,
-    jboolean jsend_request_headers_automatically,
-    jboolean jtraffic_stats_tag_set,
-    jint jtraffic_stats_tag,
-    jboolean jtraffic_stats_uid_set,
-    jint jtraffic_stats_uid,
+    bool jsend_request_headers_automatically,
+    bool jtraffic_stats_tag_set,
+    int32_t jtraffic_stats_tag,
+    bool jtraffic_stats_uid_set,
+    int32_t jtraffic_stats_uid,
     jlong jnetwork_handle) {
   CronetContextAdapter* context_adapter =
       reinterpret_cast<CronetContextAdapter*>(jurl_request_context_adapter);
@@ -108,7 +117,7 @@ static jlong JNI_CronetBidirectionalStream_CreateBidirectionalStream(
 CronetBidirectionalStreamAdapter::CronetBidirectionalStreamAdapter(
     CronetContextAdapter* context,
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& jbidi_stream,
+    const base::android::JavaRef<jobject>& jbidi_stream,
     bool send_request_headers_automatically,
     bool traffic_stats_tag_set,
     int32_t traffic_stats_tag,
@@ -137,13 +146,13 @@ void CronetBidirectionalStreamAdapter::SendRequestHeaders(JNIEnv* env) {
           base::Unretained(this)));
 }
 
-jint CronetBidirectionalStreamAdapter::Start(
+int32_t CronetBidirectionalStreamAdapter::Start(
     JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& jurl,
-    jint jpriority,
-    const base::android::JavaParamRef<jstring>& jmethod,
-    const base::android::JavaParamRef<jobjectArray>& jheaders,
-    jboolean jend_of_stream) {
+    const base::android::JavaRef<jstring>& jurl,
+    int32_t jpriority,
+    const base::android::JavaRef<jstring>& jmethod,
+    const base::android::JavaRef<jobjectArray>& jheaders,
+    bool jend_of_stream) {
   // Prepare request info here to be able to return the error.
   std::unique_ptr<net::BidirectionalStreamRequestInfo> request_info(
       new net::BidirectionalStreamRequestInfo());
@@ -180,11 +189,11 @@ jint CronetBidirectionalStreamAdapter::Start(
   return 0;
 }
 
-jboolean CronetBidirectionalStreamAdapter::ReadData(
+bool CronetBidirectionalStreamAdapter::ReadData(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& jbyte_buffer,
-    jint jposition,
-    jint jlimit) {
+    const base::android::JavaRef<jobject>& jbyte_buffer,
+    int32_t jposition,
+    int32_t jlimit) {
   DCHECK_LT(jposition, jlimit);
 
   scoped_refptr<IOBufferWithByteBuffer> read_buffer(
@@ -199,12 +208,12 @@ jboolean CronetBidirectionalStreamAdapter::ReadData(
   return JNI_TRUE;
 }
 
-jboolean CronetBidirectionalStreamAdapter::WritevData(
+bool CronetBidirectionalStreamAdapter::WritevData(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobjectArray>& jbyte_buffers,
-    const base::android::JavaParamRef<jintArray>& jbyte_buffers_pos,
-    const base::android::JavaParamRef<jintArray>& jbyte_buffers_limit,
-    jboolean jend_of_stream) {
+    const base::android::JavaRef<jobjectArray>& jbyte_buffers,
+    const base::android::JavaRef<jintArray>& jbyte_buffers_pos,
+    const base::android::JavaRef<jintArray>& jbyte_buffers_limit,
+    bool jend_of_stream) {
   size_t buffers_array_size = SafeGetArrayLength(env, jbyte_buffers.obj());
   size_t pos_array_size = SafeGetArrayLength(env, jbyte_buffers.obj());
   size_t limit_array_size = SafeGetArrayLength(env, jbyte_buffers.obj());
@@ -225,10 +234,10 @@ jboolean CronetBidirectionalStreamAdapter::WritevData(
     void* data = env->GetDirectBufferAddress(jbuffer.obj());
     if (!data)
       return JNI_FALSE;
-    jint pos;
+    int32_t pos;
     env->GetIntArrayRegion(pending_write_data->jwrite_buffer_pos_list.obj(), i,
                            1, &pos);
-    jint limit;
+    int32_t limit;
     env->GetIntArrayRegion(pending_write_data->jwrite_buffer_limit_list.obj(),
                            i, 1, &limit);
     auto write_buffer = base::MakeRefCounted<net::WrappedIOBuffer>(
@@ -246,8 +255,7 @@ jboolean CronetBidirectionalStreamAdapter::WritevData(
   return JNI_TRUE;
 }
 
-void CronetBidirectionalStreamAdapter::Destroy(JNIEnv* env,
-                                               jboolean jsend_on_canceled) {
+void CronetBidirectionalStreamAdapter::Destroy(JNIEnv* env) {
   // Destroy could be called from any thread, including network thread (if
   // posting task to executor throws an exception), but is posted, so |this|
   // is valid until calling task is complete. Destroy() is always called from
@@ -255,8 +263,9 @@ void CronetBidirectionalStreamAdapter::Destroy(JNIEnv* env,
   // network thread with the adapter pointer.
   context_->PostTaskToNetworkThread(
       FROM_HERE,
-      base::BindOnce(&CronetBidirectionalStreamAdapter::DestroyOnNetworkThread,
-                     base::Unretained(this), jsend_on_canceled));
+      base::BindOnce(
+          &CronetBidirectionalStreamAdapter::DestroyOnNetworkThreadThenCallback,
+          base::Unretained(this)));
 }
 
 void CronetBidirectionalStreamAdapter::OnStreamReady(
@@ -268,11 +277,12 @@ void CronetBidirectionalStreamAdapter::OnStreamReady(
 }
 
 void CronetBidirectionalStreamAdapter::OnHeadersReceived(
-    const quiche::HttpHeaderBlock& response_headers) {
+    const quiche::HttpHeaderBlock& response_headers,
+    const net::ProxyInfo& used_proxy_info) {
   DCHECK(context_->IsOnNetworkThread());
   JNIEnv* env = base::android::AttachCurrentThread();
   // Get http status code from response headers.
-  jint http_status_code = 0;
+  int32_t http_status_code = 0;
   const auto http_status_header = response_headers.find(":status");
   if (http_status_header != response_headers.end()) {
     base::StringToInt(http_status_header->second, &http_status_code);
@@ -290,10 +300,16 @@ void CronetBidirectionalStreamAdapter::OnHeadersReceived(
       break;
   }
 
+  net::ProxyChain invalid_proxy_chain = net::ProxyChain();
+  const net::ProxyChain& proxy_chain = used_proxy_info.is_empty()
+                                           ? invalid_proxy_chain
+                                           : used_proxy_info.proxy_chain();
   cronet::Java_CronetBidirectionalStream_onResponseHeadersReceived(
       env, owner_, http_status_code, ConvertUTF8ToJavaString(env, protocol),
       GetHeadersArray(env, response_headers),
-      bidi_stream_->GetTotalReceivedBytes());
+      bidi_stream_->GetTotalReceivedBytes(),
+      metrics_util::GetProxy(proxy_chain),
+      metrics_util::IsProxied(proxy_chain));
 }
 
 void CronetBidirectionalStreamAdapter::OnDataRead(int bytes_read) {
@@ -427,14 +443,18 @@ void CronetBidirectionalStreamAdapter::WritevDataOnNetworkThread(
                           end_of_stream);
 }
 
-void CronetBidirectionalStreamAdapter::DestroyOnNetworkThread(
-    bool send_on_canceled) {
+void CronetBidirectionalStreamAdapter::DestroyOnNetworkThreadThenCallback() {
   DCHECK(context_->IsOnNetworkThread());
-  if (send_on_canceled) {
-    JNIEnv* env = base::android::AttachCurrentThread();
-    cronet::Java_CronetBidirectionalStream_onCanceled(env, owner_);
-  }
-  MaybeReportMetrics();
+  JNIEnv* env = base::android::AttachCurrentThread();
+  std::optional<CronetMetrics> metrics = GetMetrics();
+  cronet::Java_CronetBidirectionalStream_onNativeStreamAdapterDestroyed(
+      env, owner_, metrics.has_value() ? metrics->cronet_metrics : nullptr,
+      /*quicConnectionMigrationAttempted= */
+      metrics.has_value() ? metrics->quic_connection_migration_attempted
+                          : false,
+      /*quicConnectionMigrationSuccessful */
+      metrics.has_value() ? metrics->quic_connection_migration_successful
+                          : false);
   delete this;
 }
 
@@ -466,19 +486,23 @@ CronetBidirectionalStreamAdapter::GetHeadersArray(
   return base::android::ToJavaArrayOfStrings(env, headers);
 }
 
-void CronetBidirectionalStreamAdapter::MaybeReportMetrics() {
-  if (!bidi_stream_)
-    return;
-  net::LoadTimingInfo load_timing_info;
-  bidi_stream_->GetLoadTimingInfo(&load_timing_info);
+std::optional<CronetMetrics> CronetBidirectionalStreamAdapter::GetMetrics() {
   JNIEnv* env = base::android::AttachCurrentThread();
+  // There can exist a scenario where we don't have an underlying bidi stream
+  // but the adapter has been created (e.g. user passes bad headers). In this
+  // scenario, there will be no metrics.
+  if (!bidi_stream_) {
+    return std::nullopt;
+  }
+  CronetMetrics metrics;
+  net::LoadTimingInfo load_timing_info;
+  net::NetErrorDetails net_error_details;
+  bidi_stream_->GetLoadTimingInfo(&load_timing_info);
+  bidi_stream_->PopulateNetErrorDetails(&net_error_details);
   base::Time start_time = load_timing_info.request_start_time;
   base::TimeTicks start_ticks = load_timing_info.request_start;
-  net::NetErrorDetails net_error_details;
-  bidi_stream_->PopulateNetErrorDetails(&net_error_details);
-  cronet::Java_CronetBidirectionalStream_onMetricsCollected(
-      env, owner_,
-      metrics_util::ConvertTime(start_ticks, start_ticks, start_time),
+  metrics.cronet_metrics = cronet::Java_CronetMetrics_Constructor(
+      env, metrics_util::ConvertTime(start_ticks, start_ticks, start_time),
       metrics_util::ConvertTime(
           load_timing_info.connect_timing.domain_lookup_start, start_ticks,
           start_time),
@@ -506,11 +530,16 @@ void CronetBidirectionalStreamAdapter::MaybeReportMetrics() {
       metrics_util::ConvertTime(base::TimeTicks::Now(), start_ticks,
                                 start_time),
       load_timing_info.socket_reused, bidi_stream_->GetTotalSentBytes(),
-      bidi_stream_->GetTotalReceivedBytes(),
-      net_error_details.quic_connection_migration_attempted ? JNI_TRUE
-                                                            : JNI_FALSE,
-      net_error_details.quic_connection_migration_successful ? JNI_TRUE
-                                                             : JNI_FALSE);
+      bidi_stream_->GetTotalReceivedBytes()),
+
+  metrics.quic_connection_migration_attempted =
+      net_error_details.quic_connection_migration_attempted;
+  metrics.quic_connection_migration_successful =
+      net_error_details.quic_connection_migration_successful;
+  return metrics;
 }
 
 }  // namespace cronet
+
+DEFINE_JNI(CronetBidirectionalStream)
+DEFINE_JNI(CronetMetrics)

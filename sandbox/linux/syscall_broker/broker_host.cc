@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "sandbox/linux/syscall_broker/broker_host.h"
 
 #include <errno.h>
@@ -25,6 +20,7 @@
 #include <tuple>
 #include <utility>
 
+#include "base/compiler_specific.h"
 #include "base/files/scoped_file.h"
 #include "base/logging.h"
 #include "base/posix/eintr_wrapper.h"
@@ -61,7 +57,7 @@ int sys_open(const char* pathname, int flags) {
 std::optional<std::string> BrokerHost::RewritePathname(const char* pathname) {
   if (base::StartsWith(pathname, kProcSelf)) {
     return base::StringPrintf("/proc/%d/%s", sandboxed_process_pid_,
-                              pathname + kProcSelfNumChars);
+                              UNSAFE_TODO(pathname + kProcSelfNumChars));
   }
 
   return std::nullopt;
@@ -225,9 +221,14 @@ void BrokerHost::ReadlinkFileForIPC(const char* requested_filename,
   if (result < 0) {
     RAW_CHECK(reply->AddIntToMessage(-errno));
     return;
+  } else if (static_cast<size_t>(result) > PATH_MAX) {
+    RAW_CHECK(reply->AddIntToMessage(result));
+    return;
   }
+  // At this point, `result` is guaranteed to be in the range [0, PATH_MAX]
   RAW_CHECK(reply->AddIntToMessage(result));
-  RAW_CHECK(reply->AddDataToMessage(buf, result));
+  auto byte_span = base::as_byte_span(buf).first(static_cast<size_t>(result));
+  RAW_CHECK(reply->AddDataToMessage(byte_span));
 }
 
 void BrokerHost::RmdirFileForIPC(const char* requested_filename,
@@ -286,8 +287,7 @@ void BrokerHost::StatFileForIPC(BrokerCommand command_type,
       return;
     }
     RAW_CHECK(reply->AddIntToMessage(0));
-    RAW_CHECK(
-        reply->AddDataToMessage(reinterpret_cast<char*>(&sb), sizeof(sb)));
+    RAW_CHECK(reply->AddDataToMessage(base::byte_span_from_ref(sb)));
   } else {
 #if defined(__NR_fstatat64)
     DCHECK(command_type == COMMAND_STAT64);
@@ -300,8 +300,8 @@ void BrokerHost::StatFileForIPC(BrokerCommand command_type,
       return;
     }
     RAW_CHECK(reply->AddIntToMessage(0));
-    RAW_CHECK(
-        reply->AddDataToMessage(reinterpret_cast<char*>(&sb), sizeof(sb)));
+    RAW_CHECK(reply->AddDataToMessage(
+        base::byte_span_from_ref(reinterpret_cast<char*>(&sb))));
 #else  // defined(__NR_fstatat64)
     // We should not reach here on 64-bit systems, as the *stat*64() are only
     // necessary on 32-bit.

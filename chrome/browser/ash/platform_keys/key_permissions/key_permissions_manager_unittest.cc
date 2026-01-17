@@ -7,6 +7,7 @@
 #include <map>
 #include <vector>
 
+#include "base/no_destructor.h"
 #include "base/test/gmock_callback_support.h"
 #include "base/test/gmock_move_support.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -508,7 +509,7 @@ TEST_P(KeyPermissionsManagerArcAllowedChangesTest,
   logging::SetLogMessageHandler([](int severity, const char* file, int line,
                                    size_t start,
                                    const std::string& str) -> bool {
-    if (base::Contains(str, kExpectedErrorLog)) {
+    if (str.contains(kExpectedErrorLog)) {
       *log_string = str;
     }
     return false;
@@ -597,7 +598,7 @@ TEST_F(KeyPermissionsManagerTest, FailsUpdatingKeysAndStops) {
   logging::SetLogMessageHandler([](int severity, const char* file, int line,
                                    size_t start,
                                    const std::string& str) -> bool {
-    if (base::Contains(str, kExpectedErrorLog)) {
+    if (str.contains(kExpectedErrorLog)) {
       *log_string = str;
     }
     return false;
@@ -645,7 +646,7 @@ TEST_F(KeyPermissionsManagerTest, FailsToFetchTokensNeverBecomesAvailable) {
   logging::SetLogMessageHandler([](int severity, const char* file, int line,
                                    size_t start,
                                    const std::string& str) -> bool {
-    if (base::Contains(str, kExpectedErrorLog)) {
+    if (str.contains(kExpectedErrorLog)) {
       *log_string = str;
     }
     return false;
@@ -676,7 +677,7 @@ TEST_F(KeyPermissionsManagerTest, TokenIsNotAllowedNeverBecomesAvailable) {
   logging::SetLogMessageHandler([](int severity, const char* file, int line,
                                    size_t start,
                                    const std::string& str) -> bool {
-    if (base::Contains(str, kExpectedErrorLog)) {
+    if (str.contains(kExpectedErrorLog)) {
       *log_string = str;
     }
     return false;

@@ -34,7 +34,6 @@ namespace ash::settings {
 class CrostiniHandler : public ::settings::SettingsPageUIHandler,
                         public crostini::CrostiniDialogStatusObserver,
                         public crostini::CrostiniExportImport::Observer,
-                        public crostini::CrostiniContainerPropertiesObserver,
                         public crostini::CrostiniPortForwarder::Observer,
                         public guest_os::ContainerStartedObserver,
                         public crostini::ContainerShutdownObserver {
@@ -58,14 +57,15 @@ class CrostiniHandler : public ::settings::SettingsPageUIHandler,
   void HandleExportCrostiniContainer(const base::Value::List& args);
   // Import the crostini container.
   void HandleImportCrostiniContainer(const base::Value::List& args);
+  // Export a guest disk image.
+  void HandleExportDiskImage(const base::Value::List& args);
+  // Import a guest disk image.
+  void HandleImportDiskImage(const base::Value::List& args);
   // Handle a request for the CrostiniInstallerView status.
   void HandleCrostiniInstallerStatusRequest(const base::Value::List& args);
   // crostini::CrostiniDialogStatusObserver
   void OnCrostiniDialogStatusChanged(crostini::DialogType dialog_type,
                                      bool open) override;
-  // crostini::CrostiniContainerPropertiesObserver
-  void OnContainerOsReleaseChanged(const guest_os::GuestId& container_id,
-                                   bool can_upgrade) override;
   // Handle a request for the CrostiniExportImport operation status.
   void HandleCrostiniExportImportOperationStatusRequest(
       const base::Value::List& args);
@@ -86,17 +86,10 @@ class CrostiniHandler : public ::settings::SettingsPageUIHandler,
   // Launch the Crostini terminal, with |intent| specifying any non-default
   // container id.
   void LaunchTerminal(apps::IntentPtr intent);
-  // Handle a request for showing the container upgrade view.
-  void HandleRequestContainerUpgradeView(const base::Value::List& args);
   // Callback of HandleQueryArcAdbRequest.
   void OnQueryAdbSideload(
       SessionManagerClient::AdbSideloadResponseCode response_code,
       bool enabled);
-  // Handle a request for the CrostiniUpgraderDialog status.
-  void HandleCrostiniUpgraderDialogStatusRequest(const base::Value::List& args);
-  // Handle a request for the availability of a container upgrade.
-  void HandleCrostiniContainerUpgradeAvailableRequest(
-      const base::Value::List& args);
   // Handles a request for forwarding a new port.
   void HandleAddCrostiniPortForward(const base::Value::List& args);
   // Handles a request for removing one port.

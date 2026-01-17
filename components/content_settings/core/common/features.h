@@ -38,12 +38,6 @@ BASE_DECLARE_FEATURE(
 COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
 BASE_DECLARE_FEATURE(kActiveContentSettingExpiry);
 
-// Determines the frequency at which permissions of sites are checked whether
-// they are unused.
-COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
-extern const base::FeatureParam<base::TimeDelta>
-    kSafetyCheckUnusedSitePermissionsRepeatedUpdateInterval;
-
 // When enabled, site permissions will be considered as unused immediately in
 // order to facilitate testing.
 COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
@@ -55,25 +49,8 @@ COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
 extern const base::FeatureParam<bool>
     kSafetyCheckUnusedSitePermissionsWithDelay;
 
-// Determines the time interval after which sites are considered to be unused
-// and its permissions will be revoked.
-COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
-extern const base::FeatureParam<base::TimeDelta>
-    kSafetyCheckUnusedSitePermissionsRevocationThreshold;
-
-// Determines the time interval after which the revoked permissions of unused
-// sites are cleaned up and no longer shown to users, starting from the point
-// in time that permissions for a site were revoked.
-COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
-extern const base::FeatureParam<base::TimeDelta>
-    kSafetyCheckUnusedSitePermissionsRevocationCleanUpThreshold;
-
 COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
 BASE_DECLARE_FEATURE(kApproximateGeolocationPermission);
-
-COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
-extern const base::FeatureParam<bool>
-    kApproximateGeolocationPermissionSampleData;
 
 COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
 extern const base::FeatureParam<int> kApproximateGeolocationPermissionPromptArm;
@@ -126,6 +103,11 @@ BASE_DECLARE_FEATURE(kTrackingProtection3pcd);
 // Forces unpartitioned storage access with third-party cookie blocking.
 COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
 BASE_DECLARE_FEATURE(kNativeUnpartitionedStoragePermittedWhen3PCOff);
+
+// Shows the option to disable the v8 optimizer for unfamiliar sites on the
+// site settings page.
+COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
+BASE_DECLARE_FEATURE(kBlockV8OptimizerOnUnfamiliarSitesSetting);
 
 ////////////////////////////////////////////////////////////
 // Start of third-party cookie access heuristics features //
@@ -194,8 +176,6 @@ extern const char kTpcdWritePopupCurrentInteractionHeuristicsGrantsName[];
 COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
 extern const char kTpcdWritePopupPastInteractionHeuristicsGrantsName[];
 COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
-extern const char kTpcdBackfillPopupHeuristicsGrantsName[];
-COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
 extern const char kTpcdPopupHeuristicDisableForAdTaggedPopupsName[];
 
 enum class EnableForIframeTypes { kNone = 0, kFirstParty = 1, kAll = 2 };
@@ -231,13 +211,6 @@ COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
 extern const base::FeatureParam<base::TimeDelta>
     kTpcdWritePopupPastInteractionHeuristicsGrants;
 
-// The lookback and duration of the storage access grants created when
-// backfilling the Popup With Current Interaction scenario on onboarding to
-// 3PCD. If set to zero duration, to not create backfill grants.
-COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
-extern const base::FeatureParam<base::TimeDelta>
-    kTpcdBackfillPopupHeuristicsGrants;
-
 // Whether to disable writing Popup heuristic grants when the popup is opened
 // via an ad-tagged frame.
 COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
@@ -247,11 +220,6 @@ extern const base::FeatureParam<bool>
 //////////////////////////////////////////////////////////
 // End of third-party cookie access heuristics features //
 //////////////////////////////////////////////////////////
-
-// Whether we should partition content settings (by StoragePartitions for
-// non-ios platforms).
-COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
-BASE_DECLARE_FEATURE(kContentSettingsPartitioning);
 
 COMPONENT_EXPORT(CONTENT_SETTINGS_FEATURES)
 extern const char kUseTestMetadataName[];

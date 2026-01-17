@@ -155,18 +155,21 @@ void VideoFrameValidator::ProcessVideoFrameTask(
   DCHECK_CALLED_ON_VALID_SEQUENCE(validator_thread_sequence_checker_);
 
   scoped_refptr<const VideoFrame> frame = video_frame;
-  // If this is a DMABuf-backed memory frame we need to map it before accessing.
+  // If this is a MappableSI-backed memory frame we need to map it before
+  // accessing.
 #if BUILDFLAG(USE_LINUX_VIDEO_ACCELERATION)
-  if (frame->storage_type() == VideoFrame::STORAGE_GPU_MEMORY_BUFFER) {
+  if (frame->HasMappableSharedImage()) {
     // TODO(andrescj): This is a workaround. ClientNativePixmapFactoryDmabuf
-    // creates ClientNativePixmapOpaque for SCANOUT_VDA_WRITE buffers which
-    // does not allow us to map GpuMemoryBuffers easily for testing.
+    // creates ClientNativePixmapOpaque, which cannot be mapped via MappableSI,
+    // for SCANOUT_VDA_WRITE buffers. However, we need to map the contents of
+    // the frame for verification (see the creation and use of
+    // VideoFrameMapper below).
     // Therefore, we extract the dma-buf FDs. Alternatively, we could consider
     // creating our own ClientNativePixmapFactory for testing.
     frame = CreateDmabufVideoFrame(frame.get());
     if (!frame) {
       LOG(ERROR) << "Failed to create Dmabuf-backed VideoFrame from "
-                 << "GpuMemoryBuffer-based VideoFrame";
+                 << "MappableSI-based VideoFrame";
       return;
     }
   }
@@ -355,7 +358,7 @@ std::string MD5VideoFrameValidator::ComputeMD5FromVideoFrame(
       hasher.Update(plane.subspan(stride * row, visible_row_bytes));
     }
   }
-  return base::ToLowerASCII(base::HexEncode(hasher.Finish()));
+  return base::HexEncodeLower(hasher.Finish());
 }
 
 struct RawVideoFrameValidator::RawMismatchedFrameInfo

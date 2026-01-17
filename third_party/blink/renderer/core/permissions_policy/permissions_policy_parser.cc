@@ -3,10 +3,10 @@
 
 #include "third_party/blink/renderer/core/permissions_policy/permissions_policy_parser.h"
 
+#include <algorithm>
 #include <bitset>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/metrics/histogram_macros.h"
 #include "net/http/structured_headers.h"
@@ -194,12 +194,12 @@ std::optional<network::mojom::PermissionsPolicyFeature>
 ParsingContext::ParseFeatureName(const String& feature_name) {
   DCHECK(!feature_name.empty());
   if (!feature_names_.Contains(feature_name)) {
-    logger_.Warn("Unrecognized feature: '" + feature_name + "'.");
+    logger_.Warn(StrCat({"Unrecognized feature: '", feature_name, "'."}));
     return std::nullopt;
   }
   if (DisabledByOriginTrial(feature_name, execution_context_)) {
-    logger_.Warn("Origin trial controlled feature not enabled: '" +
-                 feature_name + "'.");
+    logger_.Warn(StrCat({"Origin trial controlled feature not enabled: '",
+                         feature_name, "'."}));
     return std::nullopt;
   }
   network::mojom::PermissionsPolicyFeature feature =
@@ -306,7 +306,7 @@ ParsingContext::ParsedAllowlist ParsingContext::ParseAllowlist(
           origin_with_possible_wildcards =
               *maybe_origin_with_possible_wildcards;
         } else {
-          logger_.Warn("Unrecognized origin: '" + origin_string + "'.");
+          logger_.Warn(StrCat({"Unrecognized origin: '", origin_string, "'."}));
           continue;
         }
       }
@@ -399,9 +399,9 @@ PermissionsPolicyParser::Node ParsingContext::ParseFeaturePolicyToIR(
       network::OriginWithPossibleWildcards::NodeType::kAttribute};
 
   if (policy.length() > MAX_LENGTH_PARSE) {
-    logger_.Error("Feature policy declaration exceeds size limit(" +
-                  String::Number(policy.length()) + ">" +
-                  String::Number(MAX_LENGTH_PARSE) + ")");
+    logger_.Error(StrCat({"Feature policy declaration exceeds size limit(",
+                          String::Number(policy.length()), ">",
+                          String::Number(MAX_LENGTH_PARSE), ")"}));
     return {};
   }
 
@@ -462,9 +462,9 @@ PermissionsPolicyParser::Node ParsingContext::ParseFeaturePolicyToIR(
 PermissionsPolicyParser::Node ParsingContext::ParsePermissionsPolicyToIR(
     const String& policy) {
   if (policy.length() > MAX_LENGTH_PARSE) {
-    logger_.Error("Permissions policy declaration exceeds size limit(" +
-                  String::Number(policy.length()) + ">" +
-                  String::Number(MAX_LENGTH_PARSE) + ")");
+    logger_.Error(StrCat({"Permissions policy declaration exceeds size limit(",
+                          String::Number(policy.length()), ">",
+                          String::Number(MAX_LENGTH_PARSE), ")"}));
     return {};
   }
 
@@ -495,8 +495,8 @@ PermissionsPolicyParser::Node ParsingContext::ParsePermissionsPolicyToIR(
     Vector<String> allowlist;
     for (const auto& parameterized_item : value.member) {
       if (!parameterized_item.params.empty()) {
-        logger_.Warn(String::Format("Feature %s's parameters are ignored.",
-                                    feature_name));
+        logger_.Warn(UNSAFE_TODO(String::Format(
+            "Feature %s's parameters are ignored.", feature_name)));
       }
 
       String allowlist_item;
@@ -504,10 +504,10 @@ PermissionsPolicyParser::Node ParsingContext::ParsePermissionsPolicyToIR(
         // All special keyword appears as token, i.e. self, src and *.
         const std::string& token_value = parameterized_item.item.GetString();
         if (token_value != "*" && token_value != "self") {
-          logger_.Warn(String::Format(
+          logger_.Warn(UNSAFE_TODO(String::Format(
               "Invalid allowlist item(%s) for feature %s. Allowlist item "
               "must be *, self or quoted url.",
-              token_value.c_str(), feature_name));
+              token_value.c_str(), feature_name)));
           continue;
         }
 
@@ -519,10 +519,10 @@ PermissionsPolicyParser::Node ParsingContext::ParsePermissionsPolicyToIR(
       } else if (parameterized_item.item.is_string()) {
         allowlist_item = parameterized_item.item.GetString().c_str();
       } else {
-        logger_.Warn(
+        logger_.Warn(UNSAFE_TODO(
             String::Format("Invalid allowlist item for feature %s. Allowlist "
                            "item must be *, self, or quoted url.",
-                           feature_name));
+                           feature_name)));
         continue;
       }
       if (!allowlist_item.empty()) {
@@ -653,8 +653,8 @@ PermissionsPolicyParser::ParsePermissionsPolicyForTest(
 
 bool IsFeatureDeclared(network::mojom::PermissionsPolicyFeature feature,
                        const network::ParsedPermissionsPolicy& policy) {
-  return base::Contains(policy, feature,
-                        &network::ParsedPermissionsPolicyDeclaration::feature);
+  return std::ranges::contains(
+      policy, feature, &network::ParsedPermissionsPolicyDeclaration::feature);
 }
 
 bool RemoveFeatureIfPresent(network::mojom::PermissionsPolicyFeature feature,

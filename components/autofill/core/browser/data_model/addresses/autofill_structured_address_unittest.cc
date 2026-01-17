@@ -854,10 +854,12 @@ TEST_F(AutofillStructuredAddress,
                               VerificationStatus::kParsed);
   new_shorter_street->SetValue(u"123 Main St Av", VerificationStatus::kParsed);
 
-  old_street_1->MergeWithComponent(*new_longer_street);
+  old_street_1->MergeWithComponent(*new_longer_street,
+                                   /*newer_was_more_recently_used=*/true);
   EXPECT_EQ(old_street_1->GetValue(), new_longer_street->GetValue());
 
-  old_street_2->MergeWithComponent(*new_shorter_street);
+  old_street_2->MergeWithComponent(*new_shorter_street,
+                                   /*newer_was_more_recently_used=*/true);
   EXPECT_NE(old_street_2->GetValue(), new_shorter_street->GetValue());
 }
 
@@ -944,7 +946,8 @@ TEST_P(MergeStatesWithCanonicalNamesTest, MergeTest) {
       i18n_model_definition::CreateAddressComponentModel();
   SetTestValues(expectation_address.Root(), expectation_values);
 
-  older_address.Root()->MergeWithComponent(*newer_address.Root());
+  older_address.Root()->MergeWithComponent(
+      *newer_address.Root(), /*newer_was_more_recently_used=*/true);
   EXPECT_TRUE(older_address.Root()->SameAs(*expectation_address.Root()));
 }
 
@@ -2233,6 +2236,24 @@ TEST_F(AutofillStructuredAddress, ParseStreetAddressPL) {
        .apartment = "m.10",
        .apartment_type = "m.",
        .apartment_num = "10"},
+      {.country_code = "PL",
+       .street_address = "Ulubiona 9A/m.10",
+       .street_location = "Ulubiona 9A/m.10",
+       .street_name = "Ulubiona",
+       .building_and_unit = "9A/m.10",
+       .house_number = "9A",
+       .apartment = "m.10",
+       .apartment_type = "m.",
+       .apartment_num = "10"},
+      {.country_code = "PL",
+       .street_address = "ul.Ulubiona 9A/m.10",
+       .street_location = "ul.Ulubiona 9A/m.10",
+       .street_name = "Ulubiona",
+       .building_and_unit = "9A/m.10",
+       .house_number = "9A",
+       .apartment = "m.10",
+       .apartment_type = "m.",
+       .apartment_num = "10"}
   };
 
   for (const auto& test_case : test_cases) {
@@ -2980,6 +3001,30 @@ TEST_F(AutofillStructuredAddress, ZipCodeParsing) {
        .zip = "163-8001",
        .zip_prefix = "163",
        .zip_suffix = "8001"},
+      {.country_code = "JP",
+       .zip = "1638001",
+       .zip_prefix = "163",
+       .zip_suffix = "8001"},
+      {.country_code = "JP",
+       .zip = "〒163-8001",
+       .zip_prefix = "163",
+       .zip_suffix = "8001"},
+      {.country_code = "JP",
+       .zip = "〒 163-8001",
+       .zip_prefix = "163",
+       .zip_suffix = "8001"},
+      {.country_code = "JP",
+       .zip = "〒1638001",
+       .zip_prefix = "163",
+       .zip_suffix = "8001"},
+      {.country_code = "JP",
+       .zip = "１６３－８００１",
+       .zip_prefix = "１６３",
+       .zip_suffix = "８００１"},
+      {.country_code = "JP",
+       .zip = "〒１６３－８００１",
+       .zip_prefix = "１６３",
+       .zip_suffix = "８００１"},
       {.country_code = "PL",
        .zip = "00-843",
        .zip_prefix = "00",
@@ -3043,8 +3088,10 @@ TEST_F(AutofillStructuredAddress, ZipCodeParsing) {
 }
 
 TEST_F(AutofillStructuredAddress, ZipCodeFormatting) {
-  base::test::ScopedFeatureList scoped_feature_list_{
-      features::kAutofillSupportSplitZipCode};
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{features::kAutofillSupportSplitZipCode},
+      /*disabled_features=*/{features::kAutofillUseINAddressModel});
   std::vector<AddressLineParsingTestCase> test_cases = {
       {.country_code = "US",
        .zip = "94043-4100",
@@ -3078,6 +3125,22 @@ TEST_F(AutofillStructuredAddress, ZipCodeFormatting) {
       {.country_code = "PT",
        .zip = "1000-001",
        .zip_prefix = "1000",
+       .zip_suffix = "001"},
+      {.country_code = "GB",
+       .zip = "SW1A 1AA",
+       .zip_prefix = "SW1A",
+       .zip_suffix = "1AA"},
+      {.country_code = "IE",
+       .zip = "D02 X285",
+       .zip_prefix = "D02",
+       .zip_suffix = "X285"},
+      {.country_code = "SE",
+       .zip = "114 55",
+       .zip_prefix = "114",
+       .zip_suffix = "55"},
+      {.country_code = "IN",
+       .zip = "110 001",
+       .zip_prefix = "110",
        .zip_suffix = "001"}};
 
   for (const auto& test_case : test_cases) {
@@ -3114,6 +3177,238 @@ TEST_F(AutofillStructuredAddress, ZipCodeFormatting) {
     VerifyTestValues(address.Root(), expectation);
   }
 }
+
+struct HouseNumberTestCase {
+  std::u16string input;
+  std::u16string expected;
+};
+
+class AutofillStructuredAddressHouseNumberTest
+    : public AutofillStructuredAddress,
+      public testing::WithParamInterface<HouseNumberTestCase> {
+ private:
+  base::test::ScopedFeatureList features_{
+      features::kAutofillUseChildrenAndReformatMergeMode};
+};
+
+TEST_P(AutofillStructuredAddressHouseNumberTest,
+       DiscardWhitespaceWhenNormalizingHouseNumber) {
+  const HouseNumberTestCase& test_case = GetParam();
+
+  AddressComponentsStore address =
+      i18n_model_definition::CreateAddressComponentModel();
+  AddressComponent* house_number_node =
+      test_api(*address.Root()).GetNodeForType(ADDRESS_HOME_HOUSE_NUMBER);
+
+  ASSERT_TRUE(house_number_node->SetValueForType(
+      ADDRESS_HOME_HOUSE_NUMBER, test_case.input,
+      VerificationStatus::kObserved));
+  ASSERT_EQ(house_number_node->GetValue(), test_case.input);
+  EXPECT_EQ(house_number_node->GetValueForComparisonForType(
+                ADDRESS_HOME_HOUSE_NUMBER, house_number_node->GetCountryCode()),
+            test_case.expected);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ,
+    AutofillStructuredAddressHouseNumberTest,
+    ::testing::ValuesIn<HouseNumberTestCase>(
+        {{u" 123 ", u"123"},
+         {u"123 A", u"123a"},
+         {u"123   a", u"123a"},
+         {u" 45 B ", u"45b"},
+         {u"123", u"123"},
+         {u"   ", u""},
+         {u"apt. 123", u"apt123"},
+         // Test cases below are considered equal because normalization removes
+         // character such as "/", "-" and whitespaces. The risks of merging
+         // profiles with "12/3" and "123" are considered acceptable as it
+         // requires other profile fields to match as well. Such cases are
+         // expected to be rare compared to the "123 A" and "123a".
+         {u"12/3", u"123"},
+         {u"12-3", u"123"}}));
+
+struct MergeChildrenAndReformatTestCase {
+  std::string country_code;
+  AddressComponentTestValues old_address;
+  AddressComponentTestValues new_address;
+  AddressComponentTestValues expected_address;
+};
+
+class AutofillStructuredAddressMergeReformatTest
+    : public AutofillStructuredAddress,
+      public testing::WithParamInterface<MergeChildrenAndReformatTestCase> {
+ private:
+  base::test::ScopedFeatureList features_{
+      features::kAutofillUseChildrenAndReformatMergeMode};
+};
+
+// Tests that the merge and reformat logic works as expected for different
+// countries with the `kAutofillUseChildrenAndReformatMergeMode` feature
+// enabled.
+TEST_P(AutofillStructuredAddressMergeReformatTest, MergeAndReformat) {
+  const MergeChildrenAndReformatTestCase& test_case = GetParam();
+
+  AddressComponentsStore older_address =
+      i18n_model_definition::CreateAddressComponentModel(
+          AddressCountryCode(test_case.country_code));
+  SetTestValues(older_address.Root(), test_case.old_address);
+
+  AddressComponentsStore newer_address =
+      i18n_model_definition::CreateAddressComponentModel(
+          AddressCountryCode(test_case.country_code));
+  SetTestValues(newer_address.Root(), test_case.new_address);
+
+  older_address.Root()->MergeWithComponent(
+      *newer_address.Root(), /*newer_was_more_recently_used=*/true);
+  older_address.Root()->CompleteFullTree();
+  VerifyTestValues(older_address.Root(), test_case.expected_address);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ,
+    AutofillStructuredAddressMergeReformatTest,
+    ::testing::Values<MergeChildrenAndReformatTestCase>(
+        // The test case for DE address with the same verification statuses
+        // where the new address overwrites the older and parent nodes
+        // (ADDRESS_HOME_STREET_ADDRESS/ADDRESS_HOME_STREET_LOCATION) are
+        // reformatted based on merged children.
+        MergeChildrenAndReformatTestCase{
+            .country_code = "DE",
+            .old_address = {{.type = ADDRESS_HOME_STREET_NAME,
+                             .value = "Main Street",
+                             .status = VerificationStatus::kObserved},
+                            {.type = ADDRESS_HOME_HOUSE_NUMBER,
+                             .value = "123 A",
+                             .status = VerificationStatus::kObserved}},
+            .new_address = {{.type = ADDRESS_HOME_STREET_NAME,
+                             .value = "Main Street",
+                             .status = VerificationStatus::kObserved},
+                            {.type = ADDRESS_HOME_HOUSE_NUMBER,
+                             .value = "123A",
+                             .status = VerificationStatus::kObserved}},
+            .expected_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                                  .value = "Main Street 123A",
+                                  .status = VerificationStatus::kFormatted},
+                                 {.type = ADDRESS_HOME_STREET_LOCATION,
+                                  .value = "Main Street 123A",
+                                  .status = VerificationStatus::kFormatted},
+                                 {.type = ADDRESS_HOME_STREET_NAME,
+                                  .value = "Main Street",
+                                  .status = VerificationStatus::kObserved},
+                                 {.type = ADDRESS_HOME_HOUSE_NUMBER,
+                                  .value = "123A",
+                                  .status = VerificationStatus::kObserved}}},
+        // The test case for AU, with a different formatting rule where
+        // new address is user verified and the parent nodes are reformatted
+        // based on merged children.
+        MergeChildrenAndReformatTestCase{
+            .country_code = "AU",
+            .old_address = {{.type = ADDRESS_HOME_STREET_NAME,
+                             .value = "Main Street",
+                             .status = VerificationStatus::kObserved},
+                            {.type = ADDRESS_HOME_HOUSE_NUMBER,
+                             .value = "123/A",
+                             .status = VerificationStatus::kObserved}},
+            .new_address = {{.type = ADDRESS_HOME_STREET_NAME,
+                             .value = "Main Street",
+                             .status = VerificationStatus::kUserVerified},
+                            {.type = ADDRESS_HOME_HOUSE_NUMBER,
+                             .value = "123a",
+                             .status = VerificationStatus::kUserVerified}},
+            .expected_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                                  .value = "123a Main Street",
+                                  .status = VerificationStatus::kFormatted},
+                                 {.type = ADDRESS_HOME_STREET_LOCATION,
+                                  .value = "123a Main Street",
+                                  .status = VerificationStatus::kFormatted},
+                                 {.type = ADDRESS_HOME_STREET_NAME,
+                                  .value = "Main Street",
+                                  .status = VerificationStatus::kUserVerified},
+                                 {.type = ADDRESS_HOME_HOUSE_NUMBER,
+                                  .value = "123a",
+                                  .status =
+                                      VerificationStatus::kUserVerified}}},
+        // The test case for PL, to test the parsing correctly works for
+        // child nodes of ADDRESS_HOME_STREET_LOCATION and where the new address
+        // is user verified.
+        MergeChildrenAndReformatTestCase{
+            .country_code = "PL",
+            .old_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                             .value = "al. Jana Pawla 10 A / 123",
+                             .status = VerificationStatus::kObserved}},
+            .new_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                             .value = "al. Jana Pawla 10A/123",
+                             .status = VerificationStatus::kUserVerified}},
+            .expected_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                                  .value = "al. Jana Pawla 10A/123",
+                                  .status = VerificationStatus::kUserVerified},
+                                 {.type = ADDRESS_HOME_STREET_LOCATION,
+                                  .value = "al. Jana Pawla 10A/123",
+                                  .status = VerificationStatus::kFormatted},
+                                 {.type = ADDRESS_HOME_STREET_NAME,
+                                  .value = "al. Jana Pawla",
+                                  .status = VerificationStatus::kParsed},
+                                 {.type = ADDRESS_HOME_HOUSE_NUMBER_AND_APT,
+                                  .value = "10A/123",
+                                  .status = VerificationStatus::kFormatted},
+                                 {.type = ADDRESS_HOME_HOUSE_NUMBER,
+                                  .value = "10A",
+                                  .status = VerificationStatus::kParsed},
+                                 {.type = ADDRESS_HOME_APT,
+                                  .value = "123",
+                                  .status = VerificationStatus::kParsed}}},
+        // The test case for NL, to test the parsing and formatting correctly
+        // works for child nodes of ADDRESS_HOME_STREET_LOCATION and where the
+        // new address is user verified.
+        MergeChildrenAndReformatTestCase{
+            .country_code = "NL",
+            .old_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                             .value = "Severenstraat 146A02",
+                             .status = VerificationStatus::kObserved}},
+            .new_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                             .value = "Severenstraat 146-A02",
+                             .status = VerificationStatus::kUserVerified}},
+            .expected_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                                  .value = "Severenstraat 146-A02",
+                                  .status = VerificationStatus::kUserVerified},
+                                 {.type = ADDRESS_HOME_STREET_LOCATION,
+                                  .value = "Severenstraat 146-A02",
+                                  .status = VerificationStatus::kFormatted},
+                                 {.type = ADDRESS_HOME_STREET_NAME,
+                                  .value = "Severenstraat",
+                                  .status = VerificationStatus::kParsed},
+                                 {.type = ADDRESS_HOME_HOUSE_NUMBER_AND_APT,
+                                  .value = "146-A02",
+                                  .status = VerificationStatus::kFormatted},
+                                 {.type = ADDRESS_HOME_HOUSE_NUMBER,
+                                  .value = "146",
+                                  .status = VerificationStatus::kParsed},
+                                 {.type = ADDRESS_HOME_APT,
+                                  .value = "A02",
+                                  .status = VerificationStatus::kParsed}}},
+        // The test case for XX, to test that kDefault merge mode works as
+        // expected with token equivalent values.
+        MergeChildrenAndReformatTestCase{
+            .country_code = "XX",
+            .old_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                             .value = "Main Street 123A",
+                             .status = VerificationStatus::kObserved}},
+            .new_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                             .value = "Main Street 123A",
+                             .status = VerificationStatus::kObserved}},
+            .expected_address = {{.type = ADDRESS_HOME_STREET_ADDRESS,
+                                  .value = "Main Street 123A",
+                                  .status = VerificationStatus::kObserved},
+                                 {.type = ADDRESS_HOME_STREET_LOCATION,
+                                  .value = "Main Street 123A",
+                                  .status = VerificationStatus::kFormatted},
+                                 {.type = ADDRESS_HOME_STREET_NAME,
+                                  .value = "Main Street",
+                                  .status = VerificationStatus::kParsed},
+                                 {.type = ADDRESS_HOME_HOUSE_NUMBER,
+                                  .value = "123A",
+                                  .status = VerificationStatus::kParsed}}}));
 
 }  // namespace
 

@@ -16,6 +16,7 @@ import android.view.View;
 import androidx.annotation.ColorInt;
 import androidx.annotation.ColorRes;
 import androidx.annotation.DrawableRes;
+import androidx.annotation.StringRes;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.graphics.drawable.DrawableCompat;
@@ -174,15 +175,37 @@ public class StatusProperties {
         public static final int INNER_ICON_DP = 20;
 
         private final boolean mIsIncognito;
+        private final @StringRes int mContentDescriptionRes;
 
         PermissionIconResource(@Nullable Drawable drawable, boolean isIncognito) {
             super(drawable);
             mIsIncognito = isIncognito;
+            mContentDescriptionRes = 0;
+        }
+
+        PermissionIconResource(
+                @Nullable Drawable drawable,
+                boolean isIncognito,
+                @StringRes int contentDescriptionRes) {
+            super(drawable);
+            mIsIncognito = isIncognito;
+            mContentDescriptionRes = contentDescriptionRes;
         }
 
         PermissionIconResource(Drawable drawable, boolean isIncognito, String iconIdentifier) {
             super(drawable, iconIdentifier);
             mIsIncognito = isIncognito;
+            mContentDescriptionRes = 0;
+        }
+
+        /**
+         * Returns the resource ID for the accessibility description string associated with the
+         * current permission icon. This is used by screen readers to announce the permission status
+         * to the user. Can be 0 (unset).
+         */
+        @StringRes
+        int getContentDescriptionRes() {
+            return mContentDescriptionRes;
         }
 
         /** Returns a {@link Drawable} for this StatusIconResource. */
@@ -288,6 +311,9 @@ public class StatusProperties {
     /** Specifies width of the verbose status text field. */
     static final WritableIntPropertyKey VERBOSE_STATUS_TEXT_WIDTH = new WritableIntPropertyKey();
 
+    /** Specifies the preferred size of the Status field. */
+    static final WritableBooleanPropertyKey USE_SMALL_WIDGET = new WritableBooleanPropertyKey();
+
     /**
      * Whether the status view is shown. This is different from SHOW_STATUS_ICON, which is
      * responsible for whether the icon sub-view is shown or not and is managed independently.
@@ -312,6 +338,7 @@ public class StatusProperties {
                 STATUS_VIEW_TOOLTIP_TEXT,
                 STATUS_VIEW_BACKGROUND,
                 TRANSLATION_X,
+                USE_SMALL_WIDGET,
                 VERBOSE_STATUS_TEXT_COLOR,
                 VERBOSE_STATUS_TEXT_STRING_RES,
                 VERBOSE_STATUS_TEXT_VISIBLE,

@@ -19,7 +19,6 @@
 #include "ui/events/base_event_utils.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/rect.h"
-#include "ui/gfx/native_widget_types.h"
 #include "ui/ozone/platform/wayland/host/dump_util.h"
 #include "ui/ozone/platform/wayland/host/org_kde_kwin_appmenu.h"
 #include "ui/ozone/platform/wayland/host/wayland_bubble.h"
@@ -136,8 +135,11 @@ void WaylandToplevelWindow::Show(bool inactive) {
 
   UpdateWindowScale(false);
 
-  if (inactive)
+  if (inactive) {
     Deactivate();
+  } else {
+    Activate();
+  }
 
   WaylandWindow::Show(inactive);
 }
@@ -280,7 +282,9 @@ void WaylandToplevelWindow::Restore() {
     return;
   }
 
-  SetWindowState(PlatformWindowState::kNormal, display::kInvalidDisplayId);
+  SetWindowState(previously_maximized_ ? PlatformWindowState::kMaximized
+                                       : PlatformWindowState::kNormal,
+                 display::kInvalidDisplayId);
 }
 
 void WaylandToplevelWindow::ShowWindowControlsMenu(const gfx::Point& point) {
@@ -293,17 +297,20 @@ void WaylandToplevelWindow::ShowWindowControlsMenu(const gfx::Point& point) {
 
 void WaylandToplevelWindow::ActivateWithToken(std::string token) {
   DCHECK(connection()->xdg_activation());
-  bool can_activate = IsSurfaceConfigured();
 
   // Stacking the dragged xdg toplevel as the topmost one (and tied to the
   // pointer cursor) is reponsibility of the Wayland compositor, so bail out
   // if `this` is currently being dragged.
   if (auto* drag_controller = connection()->window_drag_controller()) {
-    can_activate &= !drag_controller->IsDraggingWindow(this);
+    if (drag_controller->IsDraggingWindow(this)) {
+      return;
+    }
   }
 
-  if (can_activate) {
+  if (IsSurfaceConfigured()) {
     connection()->xdg_activation()->Activate(root_surface()->surface(), token);
+  } else {
+    pending_configure_activation_token_ = token;
   }
 }
 
@@ -472,11 +479,16 @@ void WaylandToplevelWindow::HandleToplevelConfigureWithOrigin(
   VLOG(3) << __func__ << " states=[ " << window_states.ToString() << "]";
 
   PlatformWindowState window_state = PlatformWindowState::kUnknown;
-  if ((GetLatestRequestedState().window_state ==
-           PlatformWindowState::kMinimized &&
-       !window_states.is_activated) ||
-      window_states.is_minimized) {
+  if (window_states.is_minimized) {
     window_state = PlatformWindowState::kMinimized;
+  } else if (GetLatestRequestedState().window_state ==
+             PlatformWindowState::kMinimized) {
+    if (!window_states.is_activated) {
+      window_state = PlatformWindowState::kMinimized;
+    } else {
+      // The minimize request likely wasn't processed yet.
+      window_state = PlatformWindowState::kUnknown;
+    }
   } else if (window_states.is_fullscreen) {
     window_state = PlatformWindowState::kFullScreen;
   } else if (window_states.is_maximized) {
@@ -506,7 +518,9 @@ void WaylandToplevelWindow::HandleToplevelConfigureWithOrigin(
   }
 
   pending_configure_state_.tiled_edges = window_states.tiled_edges;
-  pending_configure_state_.window_state = window_state;
+  if (window_state != PlatformWindowState::kUnknown) {
+    pending_configure_state_.window_state = window_state;
+  }
 
   // Width or height set to 0 means that we should decide on width and height by
   // ourselves, but we don't want to set them to anything else. Use restored
@@ -666,6 +680,13 @@ void WaylandToplevelWindow::AckConfigure(uint32_t serial) {
   if (xdg_toplevel()) {
     xdg_toplevel()->AckConfigure(serial);
   }
+
+  if (pending_configure_activation_token_.has_value()) {
+    DCHECK(connection()->xdg_activation());
+    connection()->xdg_activation()->Activate(
+        root_surface()->surface(), pending_configure_activation_token_.value());
+    pending_configure_activation_token_.reset();
+  }
 }
 
 base::WeakPtr<WaylandWindow> WaylandToplevelWindow::AsWeakPtr() {
@@ -793,13 +814,20 @@ void WaylandToplevelWindow::TriggerStateChanges(
     } else if (window_state == PlatformWindowState::kFullScreen) {
       xdg_toplevel_->SetFullscreen(
           GetWaylandOutputForDisplayId(fullscreen_display_id_));
-    } else if (GetLatestRequestedState().window_state ==
-               PlatformWindowState::kFullScreen) {
-      xdg_toplevel_->UnSetFullscreen();
     } else if (window_state == PlatformWindowState::kMaximized) {
+      if (GetLatestRequestedState().window_state ==
+          PlatformWindowState::kFullScreen) {
+        xdg_toplevel_->UnSetFullscreen();
+      }
       xdg_toplevel_->SetMaximized();
     } else if (window_state == PlatformWindowState::kNormal) {
-      xdg_toplevel_->UnSetMaximized();
+      if (GetLatestRequestedState().window_state ==
+          PlatformWindowState::kFullScreen) {
+        xdg_toplevel_->UnSetFullscreen();
+      } else if (GetLatestRequestedState().window_state ==
+                 PlatformWindowState::kMaximized) {
+        xdg_toplevel_->UnSetMaximized();
+      }
     }
   }
 
@@ -886,12 +914,31 @@ void WaylandToplevelWindow::SetSizeConstraints() {
 
   auto min_size_dip = delegate()->GetMinimumSizeForWindow();
   auto max_size_dip = delegate()->GetMaximumSizeForWindow();
+  const gfx::Insets insets_dip =
+      delegate()->CalculateInsetsInDIP(applied_state().window_state);
 
-  if (min_size_dip.has_value())
-    xdg_toplevel_->SetMinSize(min_size_dip->width(), min_size_dip->height());
+  if (min_size_dip.has_value()) {
+    gfx::Size adjusted_min_size = *min_size_dip;
+    adjusted_min_size.Enlarge(-insets_dip.width(), -insets_dip.height());
+    adjusted_min_size.SetToMax(gfx::Size(1, 1));
+    xdg_toplevel_->SetMinSize(adjusted_min_size.width(),
+                              adjusted_min_size.height());
+  }
 
-  if (max_size_dip.has_value())
-    xdg_toplevel_->SetMaxSize(max_size_dip->width(), max_size_dip->height());
+  if (max_size_dip.has_value()) {
+    gfx::Size adjusted_max_size = *max_size_dip;
+    // Zero means "no maximum" and should be preserved.
+    if (adjusted_max_size.width() > 0) {
+      adjusted_max_size.set_width(
+          std::max(1, adjusted_max_size.width() - insets_dip.width()));
+    }
+    if (adjusted_max_size.height() > 0) {
+      adjusted_max_size.set_height(
+          std::max(1, adjusted_max_size.height() - insets_dip.height()));
+    }
+    xdg_toplevel_->SetMaxSize(adjusted_max_size.width(),
+                              adjusted_max_size.height());
+  }
 
   connection()->Flush();
 }

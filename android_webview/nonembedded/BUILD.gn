@@ -4,6 +4,7 @@
 
 import("//build/config/android/rules.gni")
 import("//third_party/jni_zero/jni_zero.gni")
+import("//third_party/protobuf/proto_library.gni")
 
 generate_jni("nonembedded_jni_headers") {
   sources = [
@@ -238,8 +239,6 @@ android_resources("devui_resources") {
     "java/res_devui/drawable/ic_action_home.xml",
     "java/res_devui/drawable/ic_alert_error.xml",
     "java/res_devui/drawable/ic_clear_text.xml",
-    "java/res_devui/drawable/ic_delete.xml",
-    "java/res_devui/drawable/ic_devui_search.xml",
     "java/res_devui/drawable/ic_flag.xml",
     "java/res_devui/drawable/ic_net_log.xml",
     "java/res_devui/layout/activity_main.xml",
@@ -267,6 +266,7 @@ android_resources("devui_resources") {
     "java/res_devui/values-night/colors.xml",
     "java/res_devui/values-night/styles.xml",
     "java/res_devui/values/colors.xml",
+    "java/res_devui/values/drawables.xml",
     "java/res_devui/values/strings.xml",
     "java/res_devui/values/styles.xml",
     "java/res_devui/xml/provider_paths.xml",
@@ -275,9 +275,4 @@ android_resources("devui_resources") {
 
 java_group("devui_launcher_icon_resources") {
   mergeable_android_manifests = [ "java/DeveloperUiLauncherManifest.xml" ]
-}
-
-java_group("monochrome_devui_launcher_icon_resources") {
-  mergeable_android_manifests =
-      [ "java/MonochromeDeveloperUiLauncherManifest.xml" ]
 }

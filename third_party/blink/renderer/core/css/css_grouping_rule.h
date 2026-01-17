@@ -25,13 +25,16 @@
 
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/css/css_rule.h"
-#include "third_party/blink/renderer/core/css/style_rule.h"
+#include "third_party/blink/renderer/core/css/parser/css_nesting_type.h"
+#include "third_party/blink/renderer/platform/wtf/casting.h"
 #include "third_party/blink/renderer/platform/wtf/vector.h"
 
 namespace blink {
 
 class ExceptionState;
 class CSSRuleList;
+class StyleRule;
+class StyleRuleGroup;
 
 StyleRule* FindClosestParentStyleRuleOrNull(CSSRule* parent);
 
@@ -134,12 +137,16 @@ struct DowncastTraits<CSSGroupingRule> {
       // CSSGroupingRule:
       case CSSRule::kFunctionRule:
       case CSSRule::kLayerBlockRule:
+      case CSSRule::kMixinRule:
       case CSSRule::kPageRule:
+      case CSSRule::kNavigationRule:
       case CSSRule::kScopeRule:
       case CSSRule::kStartingStyleRule:
         return true;
       // go/keep-sorted start
+      case CSSRule::kApplyMixinRule:
       case CSSRule::kCharsetRule:
+      case CSSRule::kContentsMixinRule:
       case CSSRule::kCounterStyleRule:
       case CSSRule::kCustomMediaRule:
       case CSSRule::kFontFaceRule:
@@ -156,6 +163,7 @@ struct DowncastTraits<CSSGroupingRule> {
       case CSSRule::kNestedDeclarationsRule:
       case CSSRule::kPositionTryRule:
       case CSSRule::kPropertyRule:
+      case CSSRule::kRouteRule:
       case CSSRule::kStyleRule:
       case CSSRule::kViewTransitionRule:
         // go/keep-sorted end

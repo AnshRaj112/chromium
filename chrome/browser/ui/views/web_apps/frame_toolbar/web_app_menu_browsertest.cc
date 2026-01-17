@@ -14,6 +14,7 @@
 #include "chrome/browser/ui/web_applications/test/isolated_web_app_test_utils.h"
 #include "chrome/browser/ui/web_applications/web_app_browsertest_base.h"
 #include "chrome/browser/web_applications/isolated_web_apps/test/isolated_web_app_builder.h"
+#include "chrome/browser/web_applications/model/display_override.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registry_update.h"
 #include "chrome/browser/web_applications/web_app_sync_bridge.h"
@@ -73,7 +74,8 @@ class WebAppMenuBrowserTest
       web_app_info->title = u"Test App";
       web_app_info->user_display_mode = mojom::UserDisplayMode::kStandalone;
       if (app_type == AppType::kTabbed) {
-        web_app_info->display_override = {blink::mojom::DisplayMode::kTabbed};
+        web_app_info->display_override = {web_app::DisplayOverride::Create(
+            blink::mojom::DisplayMode::kTabbed)};
         web_app_info->title = u"Tabbed App";
       }
       app_id_ = InstallWebApp(std::move(web_app_info));
@@ -165,6 +167,7 @@ IN_PROC_BROWSER_TEST_F(WebAppMenuBrowserTest, InvokeUi_main_pending_update) {
     ScopedRegistryUpdate update = provider().sync_bridge_unsafe().BeginUpdate();
     proto::PendingUpdateInfo update_info;
     update_info.set_name("Updated app name");
+    update_info.set_was_ignored(false);
     update->UpdateApp(app_id())->SetPendingUpdateInfo(std::move(update_info));
   }
 

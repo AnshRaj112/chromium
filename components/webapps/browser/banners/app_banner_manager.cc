@@ -12,7 +12,6 @@
 
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
@@ -293,7 +292,7 @@ AppBannerManager::UrlType AppBannerManager::GetUrlType(
   // There is never a need to trigger a banner for a WebUI page, except
   // for PasswordManager WebUI.
   if (content::HasWebUIScheme(url) &&
-      (url.host() != password_manager::kChromeUIPasswordManagerHost)) {
+      (url.GetHost() != password_manager::kChromeUIPasswordManagerHost)) {
     return UrlType::kInvalidPrimaryFrameUrl;
   }
 
@@ -584,6 +583,7 @@ void AppBannerManager::SetInstallableWebAppCheckResult(
       break;
   }
 
+  InstallableWebAppStatusUpdate();
   for (Observer& observer : observer_list_) {
     observer.OnInstallableWebAppStatusUpdated(result, web_app_data_);
   }
@@ -705,17 +705,25 @@ void AppBannerManager::DidFailLoad(content::RenderFrameHost* render_frame_host,
 void AppBannerManager::DidUpdateWebManifestURL(
     content::RenderFrameHost* target_frame,
     const GURL& manifest_url) {
-  if (state_ == State::INACTIVE ||
-      (state_ == State::COMPLETE && manifest_url.is_empty()) ||
-      !target_frame->IsInPrimaryMainFrame()) {
+  if (state_ == State::INACTIVE || !target_frame->IsInPrimaryMainFrame()) {
     return;
   }
-  Terminate(manifest_url.is_empty()
-                ? InstallableStatusCode::NO_MANIFEST
-                : InstallableStatusCode::MANIFEST_URL_CHANGED);
-  if (!manifest_url.is_empty()) {
-    RecheckInstallabilityForLoadedPage();
+
+  if (manifest_url.is_empty()) {
+    // Manifest link was removed from the page. Update the installability
+    // status since the page is no longer installable as a PWA.
+    SetInstallableWebAppCheckResult(InstallableWebAppCheckResult::kNo);
+
+    // Terminate the pipeline if it's still running.
+    if (state_ != State::COMPLETE) {
+      Terminate(InstallableStatusCode::NO_MANIFEST);
+    }
+    return;
   }
+
+  // Manifest URL changed to a new non-empty URL.
+  Terminate(InstallableStatusCode::MANIFEST_URL_CHANGED);
+  RecheckInstallabilityForLoadedPage();
 }
 
 void AppBannerManager::MediaStartedPlaying(const MediaPlayerInfo& media_info,

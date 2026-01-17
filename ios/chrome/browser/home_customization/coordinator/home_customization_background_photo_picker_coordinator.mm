@@ -6,14 +6,21 @@
 
 #import "base/check.h"
 #import "base/values.h"
+#import "ios/chrome/app/tests_hook.h"
+#import "ios/chrome/browser/google/model/google_logo_service_factory.h"
+#import "ios/chrome/browser/home_customization/coordinator/home_customization_background_photo_framing_mediator.h"
 #import "ios/chrome/browser/home_customization/model/home_background_customization_service_factory.h"
-#import "ios/chrome/browser/home_customization/model/home_customization_background_photo_framing_mediator.h"
+#import "ios/chrome/browser/home_customization/model/user_uploaded_image_manager_factory.h"
 #import "ios/chrome/browser/home_customization/ui/home_customization_background_photo_framing_view_controller.h"
+#import "ios/chrome/browser/home_customization/ui/home_customization_search_engine_logo_mediator_provider.h"
 #import "ios/chrome/browser/ntp/search_engine_logo/mediator/search_engine_logo_mediator.h"
+#import "ios/chrome/browser/search_engines/model/template_url_service_factory.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/url_loading/model/url_loading_browser_agent.h"
 #import "ios/chrome/grit/ios_strings.h"
+#import "services/network/public/cpp/shared_url_loader_factory.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 
 @interface HomeCustomizationBackgroundPhotoPickerCoordinator () <
@@ -28,6 +35,12 @@
 }
 
 - (void)start {
+  // In tests, it's hard to control the PHPickerViewController, so bypass it.
+  UIImage* imageForTest = tests_hook::GetPHPickerViewControllerImage();
+  if (imageForTest) {
+    [self handleSelectedImage:imageForTest];
+    return;
+  }
   [self presentPhotoPicker];
 }
 
@@ -96,25 +109,21 @@
   if (!_mediator) {
     HomeBackgroundCustomizationService* backgroundService =
         HomeBackgroundCustomizationServiceFactory::GetForProfile(self.profile);
+    UserUploadedImageManager* userUploadedImageManager =
+        UserUploadedImageManagerFactory::GetForProfile(self.profile);
     _mediator = [[HomeCustomizationBackgroundPhotoFramingMediator alloc]
-         initWithFilePath:self.profile->GetStatePath()
-        backgroundService:backgroundService];
+        initWithUserUploadedImageManager:userUploadedImageManager
+                       backgroundService:backgroundService];
   }
 
-  // Create the logo vendor
-  web::WebState* webState =
-      self.browser->GetWebStateList()->GetActiveWebState();
-  SearchEngineLogoMediator* searchEngineLogoMediator =
-      [[SearchEngineLogoMediator alloc] initWithBrowser:self.browser
-                                               webState:webState];
-
   // Create the framing view controller.
-  _framingViewController = [[HomeCustomizationImageFramingViewController alloc]
-                 initWithImage:image
-      searchEngineLogoMediator:searchEngineLogoMediator];
+  _framingViewController =
+      [[HomeCustomizationImageFramingViewController alloc] initWithImage:image];
 
   _framingViewController.mutator = _mediator;
   _framingViewController.delegate = self;
+  _framingViewController.searchEngineLogoMediatorProvider =
+      self.searchEngineLogoMediatorProvider;
 
   _framingViewController.modalPresentationStyle =
       UIModalPresentationOverFullScreen;
@@ -133,6 +142,7 @@
     (HomeCustomizationImageFramingViewController*)controller {
   // Dismiss the framing view controller.
   __weak __typeof(self) weakSelf = self;
+  [_mediator discardBackground];
   [controller
       dismissViewControllerAnimated:YES
                          completion:^{

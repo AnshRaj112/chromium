@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "ui/aura/window.h"
 
 #include <stddef.h>
@@ -16,8 +11,8 @@
 #include <utility>
 
 #include "base/check.h"
+#include "base/compiler_specific.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
@@ -162,7 +157,7 @@ class ScopedCursorHider {
       client::CursorClient* cursor_client = client::GetCursorClient(window_);
       if (cursor_client) {
         const display::Display& display =
-            display::Screen::GetScreen()->GetDisplayNearestWindow(window_);
+            display::Screen::Get()->GetDisplayNearestWindow(window_);
         cursor_client->SetDisplay(display);
         cursor_client->ShowCursor();
       }
@@ -191,6 +186,8 @@ Window::Window(WindowDelegate* delegate, client::WindowType type)
 }
 
 Window::~Window() {
+  // TODO(crbug.com/461127606): Crash on re-entrant destruction.
+  CHECK(!is_destroying_, base::NotFatalUntil::M149);
   is_destroying_ = true;
   WindowOcclusionTracker::ScopedPause pause_occlusion_tracking;
 
@@ -257,7 +254,7 @@ Window::~Window() {
   if (frame_sink_id_.is_valid() && !embeds_external_client_) {
     auto* context_factory = Env::GetInstance()->context_factory();
     auto* host_frame_sink_manager = context_factory->GetHostFrameSinkManager();
-    host_frame_sink_manager->InvalidateFrameSinkId(frame_sink_id_, this);
+    host_frame_sink_manager->InvalidateFrameSinkId(frame_sink_id_, this, {});
   }
 }
 
@@ -393,7 +390,11 @@ bool Window::IsVisible() const {
 }
 
 Window::OcclusionState Window::GetOcclusionState() const {
+#if BUILDFLAG(IS_CHROMEOS)
+  return occlusion_state_override_.value_or(occlusion_state_);
+#else
   return occlusion_state_;
+#endif
 }
 
 ScopedWindowCaptureRequest Window::MakeWindowCapturable() {
@@ -552,7 +553,7 @@ void Window::AddChild(Window* child) {
 
   Window* old_root = child->GetRootWindow();
 
-  DCHECK(!base::Contains(children_, child));
+  DCHECK(!std::ranges::contains(children_, child));
   if (child->parent())
     child->parent()->RemoveChildImpl(child, this);
 
@@ -1019,7 +1020,7 @@ void Window::RemoveOrDestroyChildren() {
     if (child->owned_by_parent_) {
       delete child;
       // Deleting the child so remove it from out children_ list.
-      DCHECK(!base::Contains(children_, child));
+      DCHECK(!std::ranges::contains(children_, child));
     } else {
       // Even if we can't delete the child, we still need to remove it from the
       // parent so that relevant bookkeeping (parent_ back-pointers etc) are
@@ -1119,6 +1120,13 @@ void Window::SetOcclusionInfo(OcclusionState occlusion_state,
   OcclusionState old_occlusion_state = occlusion_state_;
   occlusion_state_ = occlusion_state;
   occluded_region_in_root_ = occluded_region;
+
+#if BUILDFLAG(IS_CHROMEOS)
+  if (occlusion_state_override_) {
+    return;
+  }
+#endif  // BUILDFLAG(IS_CHROMEOS)
+
   if (delegate_)
     delegate_->OnWindowOcclusionChanged(old_occlusion_state, occlusion_state);
 
@@ -1521,6 +1529,28 @@ void Window::SetOpaqueRegionsForOcclusion(
     observer.OnWindowOpaqueRegionsForOcclusionChanged(this);
 }
 
+#if BUILDFLAG(IS_CHROMEOS)
+void Window::SetOcclusionStateOverride(
+    std::optional<OcclusionState> occlusion_state) {
+  if (occlusion_state == occlusion_state_override_) {
+    return;
+  }
+  auto old_occlusion_state =
+      occlusion_state ? occlusion_state_override_.value_or(occlusion_state_)
+                      : occlusion_state_override_.value();
+  occlusion_state_override_ = occlusion_state;
+
+  if (delegate_) {
+    delegate_->OnWindowOcclusionChanged(old_occlusion_state,
+                                        GetOcclusionState());
+  }
+
+  for (WindowObserver& observer : observers_) {
+    observer.OnWindowOcclusionChanged(this);
+  }
+}
+#endif
+
 void Window::NotifyResizeLoopStarted() {
   for (auto& observer : observers_)
     observer.OnResizeLoopStarted(this);
@@ -1566,13 +1596,13 @@ void Window::OnLayerBoundsChanged(const gfx::Rect& old_bounds,
 
   // Trigger the changed notification for each of the bounds "properties".
   if (old_bounds.x() != bounds_.x())
-    TriggerChangedCallback(&bounds_ + kBoundsX);
+    TriggerChangedCallback(UNSAFE_TODO(&bounds_ + kBoundsX));
   if (old_bounds.y() != bounds_.y())
-    TriggerChangedCallback(&bounds_ + kBoundsY);
+    TriggerChangedCallback(UNSAFE_TODO(&bounds_ + kBoundsY));
   if (old_bounds.width() != bounds_.width())
-    TriggerChangedCallback(&bounds_ + kBoundsWidth);
+    TriggerChangedCallback(UNSAFE_TODO(&bounds_ + kBoundsWidth));
   if (old_bounds.height() != bounds_.height())
-    TriggerChangedCallback(&bounds_ + kBoundsHeight);
+    TriggerChangedCallback(UNSAFE_TODO(&bounds_ + kBoundsHeight));
 }
 
 void Window::OnLayerOpacityChanged(ui::PropertyChangeReason reason) {

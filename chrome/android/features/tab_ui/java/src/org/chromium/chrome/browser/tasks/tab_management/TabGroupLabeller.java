@@ -7,7 +7,7 @@ package org.chromium.chrome.browser.tasks.tab_management;
 import static org.chromium.build.NullUtil.assumeNonNull;
 
 import org.chromium.base.Token;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.profiles.Profile;
@@ -19,17 +19,18 @@ import org.chromium.components.collaboration.messaging.PersistentMessage;
 import org.chromium.components.collaboration.messaging.PersistentNotificationType;
 
 import java.util.List;
-import java.util.Optional;
 
 /** Pushes label updates to UI for tab groups. */
 @NullMarked
 public class TabGroupLabeller extends TabObjectLabeller {
-    private final ObservableSupplier<@Nullable TabGroupModelFilter> mTabGroupModelFilterSupplier;
+    private final MonotonicObservableSupplier<@Nullable TabGroupModelFilter>
+            mTabGroupModelFilterSupplier;
 
     public TabGroupLabeller(
             Profile profile,
             TabListNotificationHandler tabListNotificationHandler,
-            ObservableSupplier<@Nullable TabGroupModelFilter> tabGroupModelFilterSupplier) {
+            MonotonicObservableSupplier<@Nullable TabGroupModelFilter>
+                    tabGroupModelFilterSupplier) {
         super(profile, tabListNotificationHandler);
         mTabGroupModelFilterSupplier = tabGroupModelFilterSupplier;
     }
@@ -50,8 +51,7 @@ public class TabGroupLabeller extends TabObjectLabeller {
 
     @Override
     protected List<PersistentMessage> getAllMessages() {
-        return mMessagingBackendService.getMessages(
-                Optional.of(PersistentNotificationType.DIRTY_TAB_GROUP));
+        return mMessagingBackendService.getMessages(PersistentNotificationType.DIRTY_TAB_GROUP);
     }
 
     @Override

@@ -19,7 +19,6 @@
 #include "base/debug/stack_trace.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/memory/raw_ptr.h"
@@ -217,6 +216,12 @@ class CallCountingTickClock : public TickClock {
 class FixtureWithMockTaskRunner final : public Fixture {
  public:
   FixtureWithMockTaskRunner()
+      : FixtureWithMockTaskRunner(SequenceManager::PrioritySettings(
+            TestQueuePriority::kQueuePriorityCount,
+            TestQueuePriority::kDefaultPriority)) {}
+
+  explicit FixtureWithMockTaskRunner(
+      SequenceManager::PrioritySettings priority_settings)
       : test_task_runner_(MakeRefCounted<TestMockTimeTaskRunner>(
             TestMockTimeTaskRunner::Type::kBoundToThread)),
         call_counting_clock_(BindRepeating(&TestMockTimeTaskRunner::NowTicks,
@@ -228,9 +233,7 @@ class FixtureWithMockTaskRunner final : public Fixture {
             SequenceManager::Settings::Builder()
                 .SetMessagePumpType(MessagePumpType::DEFAULT)
                 .SetTickClock(mock_tick_clock())
-                .SetPrioritySettings(SequenceManager::PrioritySettings(
-                    TestQueuePriority::kQueuePriorityCount,
-                    TestQueuePriority::kDefaultPriority))
+                .SetPrioritySettings(std::move(priority_settings))
                 .Build())) {
     // A null clock triggers some assertions.
     AdvanceMockTickClock(Milliseconds(1));
@@ -1942,9 +1945,11 @@ namespace {
 
 class MockTaskObserver : public TaskObserver {
  public:
-  MOCK_METHOD1(DidProcessTask, void(const PendingTask& task));
-  MOCK_METHOD2(WillProcessTask,
-               void(const PendingTask& task, bool was_blocked_or_low_priority));
+  MOCK_METHOD(void, DidProcessTask, (const PendingTask& task), (override));
+  MOCK_METHOD(void,
+              WillProcessTask,
+              (const PendingTask& task, bool was_blocked_or_low_priority),
+              (override));
 };
 
 }  // namespace
@@ -2529,9 +2534,9 @@ namespace {
 
 class MockObserver : public SequenceManager::Observer {
  public:
-  MOCK_METHOD0(OnTriedToExecuteBlockedTask, void());
-  MOCK_METHOD0(OnBeginNestedRunLoop, void());
-  MOCK_METHOD0(OnExitNestedRunLoop, void());
+  MOCK_METHOD(void, OnTriedToExecuteBlockedTask, ());
+  MOCK_METHOD(void, OnBeginNestedRunLoop, (), (override));
+  MOCK_METHOD(void, OnExitNestedRunLoop, (), (override));
 };
 
 }  // namespace
@@ -2642,9 +2647,9 @@ class MockTaskQueueThrottler : public TaskQueue::Throttler {
   MockTaskQueueThrottler() = default;
   ~MockTaskQueueThrottler() = default;
 
-  MOCK_METHOD1(OnWakeUp, void(LazyNow*));
-  MOCK_METHOD0(OnHasImmediateTask, void());
-  MOCK_METHOD1(GetNextAllowedWakeUp_DesiredWakeUpTime, void(TimeTicks));
+  MOCK_METHOD(void, OnWakeUp, (LazyNow*), (override));
+  MOCK_METHOD(void, OnHasImmediateTask, (), (override));
+  MOCK_METHOD(void, GetNextAllowedWakeUp_DesiredWakeUpTime, (TimeTicks));
 
   std::optional<WakeUp> GetNextAllowedWakeUp(
       LazyNow* lazy_now,
@@ -4883,7 +4888,7 @@ class MockTimeDomain : public TimeDomain {
     return MaybeFastForwardToWakeUp(quit_when_idle_requested);
   }
 
-  MOCK_METHOD1(MaybeFastForwardToWakeUp, bool(bool quit_when_idle_requested));
+  MOCK_METHOD(bool, MaybeFastForwardToWakeUp, (bool quit_when_idle_requested));
 
   const char* GetName() const override { return "Test"; }
 
@@ -5153,11 +5158,16 @@ namespace {
 
 class MockCrashKeyImplementation : public debug::CrashKeyImplementation {
  public:
-  MOCK_METHOD2(Allocate,
-               debug::CrashKeyString*(const char name[], debug::CrashKeySize));
-  MOCK_METHOD2(Set, void(debug::CrashKeyString*, std::string_view));
-  MOCK_METHOD1(Clear, void(debug::CrashKeyString*));
-  MOCK_METHOD1(OutputCrashKeysToStream, void(std::ostream&));
+  MOCK_METHOD(debug::CrashKeyString*,
+              Allocate,
+              (const char name[], debug::CrashKeySize),
+              (override));
+  MOCK_METHOD(void,
+              Set,
+              (debug::CrashKeyString*, std::string_view),
+              (override));
+  MOCK_METHOD(void, Clear, (debug::CrashKeyString*), (override));
+  MOCK_METHOD(void, OutputCrashKeysToStream, (std::ostream&), (override));
 };
 
 }  // namespace
@@ -6059,10 +6069,10 @@ TEST(
       SingleThreadTaskRunner::GetCurrentDefault();
 
   StrictMock<MockCallback<base::OnceClosure>> cb;
-  EXPECT_CALL(cb, Run).WillOnce(testing::Invoke([expected_task_runner] {
+  EXPECT_CALL(cb, Run).WillOnce([expected_task_runner] {
     EXPECT_EQ(SingleThreadTaskRunner::GetCurrentDefault(),
               expected_task_runner);
-  }));
+  });
 
   static base::SequenceLocalStorageSlot<std::unique_ptr<DestructionCallback>>
       storage_slot;
@@ -6106,6 +6116,54 @@ TEST(SequenceManagerTest, BindOnDifferentThreadWithActiveVoters) {
   done_event.Wait();
   thread.Stop();
   EXPECT_THAT(results, ElementsAre(false, true));
+}
+
+TEST(SequenceManagerTest, BestEffortPriority_SinglePriority) {
+  enum class SinglePriority : TaskQueue::QueuePriority {
+    kOnlyPriority = 0,
+    kPriorityCount = 1,
+  };
+  FixtureWithMockTaskRunner fixture(SequenceManager::PrioritySettings(
+      SinglePriority::kPriorityCount, SinglePriority::kOnlyPriority));
+  EXPECT_EQ(
+      fixture.sequence_manager()->GetPriorityCount(),
+      static_cast<TaskQueue::QueuePriority>(SinglePriority::kPriorityCount));
+  // Only one priority defined.
+  EXPECT_EQ(fixture.sequence_manager()->GetBestEffortPriority(), std::nullopt);
+}
+
+TEST(SequenceManagerTest, BestEffortPriority_ManyHighPriorities) {
+  enum class ManyHighPriorities : TaskQueue::QueuePriority {
+    kHighestPriority = 0,
+    kHigherPriority = 1,
+    kDefaultPriority = 2,
+    kPriorityCount = 3,
+  };
+  FixtureWithMockTaskRunner fixture(
+      SequenceManager::PrioritySettings(ManyHighPriorities::kPriorityCount,
+                                        ManyHighPriorities::kDefaultPriority));
+  EXPECT_EQ(fixture.sequence_manager()->GetPriorityCount(),
+            static_cast<TaskQueue::QueuePriority>(
+                ManyHighPriorities::kPriorityCount));
+  // Default is the lowest priority.
+  EXPECT_EQ(fixture.sequence_manager()->GetBestEffortPriority(), std::nullopt);
+}
+
+TEST(SequenceManagerTest, BestEffortPriority_ManyLowPriorities) {
+  enum class ManyLowPriorities : TaskQueue::QueuePriority {
+    kDefaultPriority = 0,
+    kLowerPriority = 1,
+    kLowestPriority = 2,
+    kPriorityCount = 3,
+  };
+  FixtureWithMockTaskRunner fixture(SequenceManager::PrioritySettings(
+      ManyLowPriorities::kPriorityCount, ManyLowPriorities::kDefaultPriority));
+  EXPECT_EQ(
+      fixture.sequence_manager()->GetPriorityCount(),
+      static_cast<TaskQueue::QueuePriority>(ManyLowPriorities::kPriorityCount));
+  EXPECT_THAT(fixture.sequence_manager()->GetBestEffortPriority(),
+              ::testing::Optional(static_cast<TaskQueue::QueuePriority>(
+                  ManyLowPriorities::kLowestPriority)));
 }
 
 }  // namespace base::sequence_manager::internal

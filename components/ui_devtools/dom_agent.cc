@@ -86,6 +86,56 @@ bool FindMatchInDomProperties(const std::string& query,
   return false;
 }
 
+// Returns a string of spaces for indentation based on the depth level.
+std::string IndentString(int indent) {
+  return std::string(indent * 2, ' ');
+}
+
+// Recursively serializes a UIElement and its children into a simplified
+// markup-like string (e.g. <Widget>, <View> hierarchy) with attributes.
+std::string SerializeUIElementToMarkup(const ui_devtools::UIElement* element,
+                                       int indent = 0) {
+  if (!element) {
+    return {};
+  }
+
+  std::string markup;
+
+  // Start tag with element type, e.g. <View
+  markup += IndentString(indent) + "<" + element->GetTypeName();
+
+  // UIElement::GetAttributes() always returns a flat vector of
+  // name/value pairs: [name1, value1, name2, value2, ...].
+  // Iterate in steps of 2 to serialize each attribute as name="value".
+  auto attrs = element->GetAttributes();
+  for (size_t i = 0; i + 1 < attrs.size(); i += 2) {
+    markup += " " + attrs[i] + "=\"" + attrs[i + 1] + "\"";
+  }
+
+  const auto& children = element->children();
+  if (children.empty()) {
+    // If there are no children, output explicit closing tag
+    // instead of self-closing syntax so that copied markup matches
+    // what UI DevTools shows in the Elements panel.
+    // Example: <View name="RootView"></View>
+    markup += "></" + element->GetTypeName() + ">\n";
+    return markup;
+  }
+
+  // Close the start tag and add a newline before children.
+  markup += ">\n";
+
+  // Recursively serialize child elements, increasing indentation.
+  for (const auto& child : children) {
+    markup += SerializeUIElementToMarkup(child, indent + 1);
+  }
+
+  // Append closing tag with proper indentation.
+  markup += IndentString(indent) + "</" + element->GetTypeName() + ">\n";
+
+  return markup;
+}
+
 }  // namespace
 
 struct DOMAgent::Query {
@@ -422,10 +472,13 @@ protocol::Response DOMAgent::dispatchMouseEvent(
   if (!base::FeatureList::IsEnabled(
           ui_devtools::kUIDebugToolsEnableSyntheticEvents))
     return Response::ServerError("Dispatch mouse events is not enabled.");
-  if (node_id_to_ui_element_.count(node_id) == 0)
+  auto it = node_id_to_ui_element_.find(node_id);
+  if (it == node_id_to_ui_element_.end()) {
     return Response::ServerError("Element not found on node id");
-  if (!node_id_to_ui_element_[node_id]->DispatchMouseEvent(event.get()))
+  }
+  if (!it->second->DispatchMouseEvent(event.get())) {
     return Response::ServerError("Failed to dispatch mouse event for node id");
+  }
   return Response::Success();
 }
 
@@ -435,21 +488,25 @@ protocol::Response DOMAgent::dispatchKeyEvent(
   if (!base::FeatureList::IsEnabled(
           ui_devtools::kUIDebugToolsEnableSyntheticEvents))
     return Response::ServerError("Dispatch key events is not enabled.");
-  if (node_id_to_ui_element_.count(node_id) == 0)
+  auto it = node_id_to_ui_element_.find(node_id);
+  if (it == node_id_to_ui_element_.end()) {
     return Response::ServerError("Element not found on node id");
-  if (!node_id_to_ui_element_[node_id]->DispatchKeyEvent(event.get()))
+  }
+  if (!it->second->DispatchKeyEvent(event.get())) {
     return Response::ServerError("Failed to dispatch key event for node id");
+  }
   return Response::Success();
 }
 
 protocol::Response DOMAgent::getNodeBoundsInScreen(
     int node_id,
     std::unique_ptr<protocol::DOM::Rect>* bounds_in_screen) {
-  if (node_id_to_ui_element_.count(node_id) == 0) {
+  auto it = node_id_to_ui_element_.find(node_id);
+  if (it == node_id_to_ui_element_.end()) {
     return Response::ServerError("Element not found on node id");
   }
 
-  UIElement* ui_element = node_id_to_ui_element_[node_id];
+  UIElement* ui_element = it->second;
   gfx::Rect bounds = ui_element->GetNodeBoundsInScreen();
 
   *bounds_in_screen = protocol::DOM::Rect::create()
@@ -464,17 +521,28 @@ protocol::Response DOMAgent::getNodeBoundsInScreen(
 
 protocol::Response DOMAgent::getDeviceScaleFactor(int node_id,
                                                   double* device_scale_factor) {
-  if (node_id_to_ui_element_.count(node_id) == 0) {
+  auto it = node_id_to_ui_element_.find(node_id);
+  if (it == node_id_to_ui_element_.end()) {
     return Response::ServerError("Element not found on node id");
   }
 
-  UIElement* ui_element = node_id_to_ui_element_[node_id];
+  UIElement* ui_element = it->second;
   if (ui_element->type() != UIElementType::WINDOW) {
     return Response::ServerError(
         "Node ID does not correspond to a window element");
   }
 
   *device_scale_factor = ui_element->GetDeviceScaleFactor();
+  return Response::Success();
+}
+
+protocol::Response DOMAgent::getOuterHTML(int node_id,
+                                          protocol::String* outer_html) {
+  auto* element = GetElementFromNodeId(node_id);
+  if (!element) {
+    return Response::ServerError("Element not found on node id");
+  }
+  *outer_html = SerializeUIElementToMarkup(element);
   return Response::Success();
 }
 

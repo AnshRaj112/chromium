@@ -21,6 +21,7 @@
 #include "extensions/browser/extension_util.h"
 #include "extensions/browser/extensions_browser_client.h"
 #include "extensions/browser/process_map.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_id.h"
@@ -32,6 +33,8 @@
 #include "third_party/blink/public/common/loader/resource_type_util.h"
 #include "url/gurl.h"
 #include "url/origin.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 using extensions::PermissionsData;
 
@@ -198,7 +201,7 @@ bool IsSensitiveGoogleClientUrl(const extensions::WebRequestInfo& request) {
     return false;
   }
 
-  std::string_view host = url.host_piece();
+  std::string_view host = url.host();
 
   while (base::EndsWith(host, ".")) {
     host.remove_suffix(1u);
@@ -327,7 +330,9 @@ bool WebRequestPermissions::HideRequest(
       DCHECK(extensions::ExtensionsBrowserClient::Get()
                  ->IsWebUIAllowedToMakeNetworkRequests(*request.initiator))
           << "Unsupported network request from "
-          << request.initiator->GetURL().spec() << " for " << url.spec();
+          << request.initiator->GetTupleOrPrecursorTupleIfOpaque().GetURL()
+          << " for " << url << " with request type "
+          << WebRequestResourceTypeToString(request.web_request_type);
     }
 #endif  // DCHECK_IS_ON()
 
@@ -371,7 +376,7 @@ bool WebRequestPermissions::HideRequest(
       extension_urls::IsBlocklistUpdateUrl(url) ||
       extension_urls::IsSafeBrowsingUrl(url) ||
       (url.DomainIs("chrome.google.com") &&
-       base::StartsWith(url.path_piece(), "/webstore",
+       base::StartsWith(url.path(), "/webstore",
                         base::CompareCase::SENSITIVE)) ||
       url.DomainIs(extension_urls::GetNewWebstoreLaunchURL().host())) {
     return true;

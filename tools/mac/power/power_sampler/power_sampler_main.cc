@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <signal.h>
+
 #include <cstdio>
 #include <iostream>
 #include <memory>
@@ -11,6 +12,7 @@
 #include "base/files/file.h"
 #include "base/files/file_path.h"
 #include "base/logging.h"
+#include "base/logging/logging_settings.h"
 #include "base/power_monitor/iopm_power_source_sampling_event_source.h"
 #include "base/power_monitor/timer_sampling_event_source.h"
 #include "base/process/process_handle.h"
@@ -111,8 +113,8 @@ bool MaybeAddSamplerToController(
 
 bool ConsumeSamplerName(const std::string& sampler_name,
                         base::flat_set<std::string>& sampler_names) {
-  if (sampler_names.contains(sampler_name)) {
-    sampler_names.erase(sampler_name);
+  if (auto it = sampler_names.find(sampler_name); it != sampler_names.end()) {
+    sampler_names.erase(it);
     return true;
   }
   return false;

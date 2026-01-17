@@ -5,13 +5,16 @@
 package org.chromium.chrome.browser.bookmarks.bar;
 
 import android.app.Activity;
+import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.res.Configuration;
 
 import androidx.annotation.NonNull;
 
 import org.chromium.base.Callback;
+import org.chromium.base.ContextUtils;
+import org.chromium.base.DeviceInfo;
 import org.chromium.base.ObserverList;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.bookmarks.R;
@@ -49,20 +52,21 @@ public class BookmarkBarVisibilityProvider {
          * Called when the max width of a bookmark in the Bookmark Bar changes based on the
          * configuration of the device.
          *
+         * @param minWidth The new (now current) min width of a bookmark in the Bookmark Bar.
          * @param maxWidth The new (now current) max width of a bookmark in the Bookmark Bar.
          */
-        default void onMaxWidthChanged(int maxWidth) {}
+        default void onItemWidthConstraintsChanged(int minWidth, int maxWidth) {}
     }
 
     private final Activity mActivity;
     private final ActivityLifecycleDispatcher mActivityLifecycleDispatcher;
     private final ConfigurationChangedObserver mConfigurationChangedListener;
-    private final ObservableSupplier<Profile> mProfileSupplier;
+    private final MonotonicObservableSupplier<Profile> mProfileSupplier;
     private final Callback<Profile> mProfileSupplierObserver;
     private final ObserverList<BookmarkBarVisibilityObserver> mObservers;
 
     private @Nullable PrefChangeRegistrar mPrefChangeRegistrar;
-    private final @Nullable PrefObserver mPrefObserver;
+    private @Nullable OnSharedPreferenceChangeListener mDevicePrefsListener;
 
     /**
      * Constructor.
@@ -74,7 +78,7 @@ public class BookmarkBarVisibilityProvider {
     public BookmarkBarVisibilityProvider(
             @NonNull Activity activity,
             @NonNull ActivityLifecycleDispatcher activityLifecycleDispatcher,
-            @NonNull ObservableSupplier<Profile> profileSupplier) {
+            @NonNull MonotonicObservableSupplier<Profile> profileSupplier) {
         mActivity = activity;
         mActivityLifecycleDispatcher = activityLifecycleDispatcher;
         mProfileSupplier = profileSupplier;
@@ -87,13 +91,19 @@ public class BookmarkBarVisibilityProvider {
         mProfileSupplierObserver = this::processProfileChange;
         mProfileSupplier.addObserver(mProfileSupplierObserver);
 
-        mPrefObserver =
-                new PrefObserver() {
-                    @Override
-                    public void onPreferenceChange() {
-                        processPrefChange();
-                    }
-                };
+        // On tablets we use local device prefs.
+        if (!DeviceInfo.isDesktop()) {
+            mDevicePrefsListener =
+                    (sharedPreferences, key) -> {
+                        if (key != null
+                                && key.equals(
+                                        BookmarkBarConstants.BOOKMARK_BAR_SHOW_BOOKMARK_BAR)) {
+                            processPrefChange();
+                        }
+                    };
+            ContextUtils.getAppSharedPreferences()
+                    .registerOnSharedPreferenceChangeListener(mDevicePrefsListener);
+        }
     }
 
     /**
@@ -120,6 +130,7 @@ public class BookmarkBarVisibilityProvider {
         mActivityLifecycleDispatcher.unregister(mConfigurationChangedListener);
         mProfileSupplier.removeObserver(mProfileSupplierObserver);
         destroyPrefChangeRegistrar();
+        destroySharedPrefListener();
         mObservers.clear();
     }
 
@@ -132,10 +143,12 @@ public class BookmarkBarVisibilityProvider {
     }
 
     private void processConfigurationChange(Configuration configuration) {
+        int minWidth =
+                mActivity.getResources().getDimensionPixelSize(R.dimen.bookmark_bar_item_min_width);
         int maxWidth =
                 mActivity.getResources().getDimensionPixelSize(R.dimen.bookmark_bar_item_max_width);
         for (BookmarkBarVisibilityObserver observer : mObservers) {
-            observer.onMaxWidthChanged(maxWidth);
+            observer.onItemWidthConstraintsChanged(minWidth, maxWidth);
         }
 
         // Configuration changes can also result in visibility changes (e.g. window size change).
@@ -170,7 +183,20 @@ public class BookmarkBarVisibilityProvider {
         }
     }
 
+    private void destroySharedPrefListener() {
+        if (mDevicePrefsListener != null) {
+            ContextUtils.getAppSharedPreferences()
+                    .unregisterOnSharedPreferenceChangeListener(mDevicePrefsListener);
+            mDevicePrefsListener = null;
+        }
+    }
+
     @Nullable PrefObserver getPrefObserverForTesting() {
-        return mPrefObserver;
+        return new PrefObserver() {
+            @Override
+            public void onPreferenceChange() {
+                processPrefChange();
+            }
+        };
     }
 }

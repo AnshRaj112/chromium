@@ -22,20 +22,28 @@ std::string StdStringFromCanonOutput(const url::CanonOutput& output,
                      component.len);
 }
 
-bool ContainsForbiddenHostnameCodePoint(std::string_view input) {
+}  // namespace
+
+bool ContainsForbiddenHostnameCodePoint(std::string_view input,
+                                        const bool allow_ipv6_delimiters) {
   // The full list of forbidden code points is defined at:
   //
   //  https://url.spec.whatwg.org/#forbidden-host-code-point
   //
   // We only check the code points the chromium URL parser incorrectly permits.
   // See: crbug.com/1065667#c18
-  return std::ranges::any_of(input, [](char c) {
-    return c == ' ' || c == '#' || c == ':' || c == '<' || c == '>' ||
-           c == '@' || c == '[' || c == ']' || c == '|';
-  });
+  if (!allow_ipv6_delimiters) {
+    return std::ranges::any_of(input, [](char c) {
+      return c == ' ' || c == '#' || c == ':' || c == '<' || c == '>' ||
+             c == '@' || c == '[' || c == ']' || c == '|';
+    });
+  } else {
+    return std::ranges::any_of(input, [](char c) {
+      return c == ' ' || c == '#' || c == '<' || c == '>' || c == '@' ||
+             c == '|';
+    });
+  }
 }
-
-}  // namespace
 
 base::expected<std::string, absl::Status> ProtocolEncodeCallback(
     std::string_view input) {
@@ -146,7 +154,7 @@ base::expected<std::string, absl::Status> HostnameEncodeCallback(
   url::Component component;
 
   bool result = url::CanonicalizeHost(
-      input.data(), url::Component(0, base::checked_cast<int>(input.size())),
+      input, url::Component(0, base::checked_cast<int>(input.size())),
       &canon_output, &component);
 
   if (!result) {
@@ -166,9 +174,8 @@ base::expected<std::string, absl::Status> PortEncodeCallback(
   url::RawCanonOutputT<char> canon_output;
   url::Component component;
 
-  bool result = url::CanonicalizePort(
-      input.data(), url::Component(0, base::checked_cast<int>(input.size())),
-      url::PORT_UNSPECIFIED, &canon_output, &component);
+  bool result = url::CanonicalizePort(input, url::PORT_UNSPECIFIED,
+                                      &canon_output, &component);
 
   if (!result) {
     return base::unexpected(absl::InvalidArgumentError(
@@ -205,7 +212,7 @@ base::expected<std::string, absl::Status> PathURLPathnameEncodeCallback(
 
   url::RawCanonOutputT<char> canon_output;
   url::Component component;
-  url::CanonicalizePathURLPath(input, &canon_output, &component);
+  url::CanonicalizePathUrlPath(input, &canon_output, &component);
 
   return StdStringFromCanonOutput(canon_output, component);
 }

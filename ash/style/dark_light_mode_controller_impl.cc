@@ -4,6 +4,8 @@
 
 #include "ash/style/dark_light_mode_controller_impl.h"
 
+#include <algorithm>
+
 #include "ash/constants/ash_constants.h"
 #include "ash/constants/ash_features.h"
 #include "ash/constants/ash_pref_names.h"
@@ -136,12 +138,12 @@ bool DarkLightModeControllerImpl::IsDarkModeEnabled() const {
 
   if (oobe_state_ != OobeDialogState::HIDDEN) {
     if (active_user_pref_service_) {
-      const PrefService::Preference* pref =
-          active_user_pref_service_->FindPreference(
-              prefs::kDarkModeScheduleType);
       // Managed users do not see the theme selection screen, so to avoid
-      // confusion they should always see light colors during OOBE
-      if (pref->IsManaged() || pref->IsRecommended()) {
+      // confusion they should always see light colors during OOBE.
+      if (const PrefService::Preference* pref =
+              active_user_pref_service_->FindPreference(
+                  prefs::kDarkModeScheduleType);
+          pref->IsManaged() || pref->IsRecommended()) {
         return false;
       }
 
@@ -149,22 +151,17 @@ bool DarkLightModeControllerImpl::IsDarkModeEnabled() const {
         return false;
       }
     }
-    return base::Contains(kStatesSupportingDarkTheme, oobe_state_);
+    return std::ranges::contains(kStatesSupportingDarkTheme, oobe_state_);
+  }
+
+  if (active_user_pref_service_) {
+    return active_user_pref_service_->GetBoolean(prefs::kDarkModeEnabled);
   }
 
   // On the login screen use the preference of the focused pod's user if they
   // had the preference stored in the known_user and the pod is focused.
-  if (!active_user_pref_service_ &&
-      is_dark_mode_enabled_for_focused_pod_.has_value()) {
-    return is_dark_mode_enabled_for_focused_pod_.value();
-  }
-
-  // Keep the color mode as DARK in login screen.
-  if (!active_user_pref_service_) {
-    return true;
-  }
-
-  return active_user_pref_service_->GetBoolean(prefs::kDarkModeEnabled);
+  // Otherwise keep the color mode as DARK.
+  return is_dark_mode_enabled_for_focused_pod_.value_or(true);
 }
 
 void DarkLightModeControllerImpl::SetDarkModeEnabledForTest(bool enabled) {

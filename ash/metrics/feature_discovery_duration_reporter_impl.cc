@@ -6,7 +6,6 @@
 
 #include "ash/public/cpp/feature_discovery_metric_util.h"
 #include "ash/shell.h"
-#include "base/containers/contains.h"
 #include "base/json/values_util.h"
 #include "base/metrics/histogram_functions.h"
 #include "components/prefs/pref_registry_simple.h"
@@ -134,14 +133,14 @@ void FeatureDiscoveryDurationReporterImpl::MaybeActivateObservation(
     // Record the current tablet mode if `feature`'s discovery duration data
     // should be separated by tablet mode.
     observed_feature_data.Set(kActivatedInTablet,
-                              display::Screen::GetScreen()->InTabletMode());
+                              display::Screen::Get()->InTabletMode());
   }
 
   ScopedDictPrefUpdate update(active_pref_service_, kObservedFeatures);
   update->Set(feature_name, std::move(observed_feature_data));
 
   // Record observation start time.
-  DCHECK(!base::Contains(active_time_recordings_, feature));
+  DCHECK(!active_time_recordings_.contains(feature));
   active_time_recordings_.emplace(feature, base::TimeTicks::Now());
 }
 

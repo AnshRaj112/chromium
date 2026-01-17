@@ -78,6 +78,13 @@ class UserPolicyOidcSigninService : public UserPolicySigninServiceBase,
   // CloudPolicyClient::Observer implementation:
   void OnPolicyFetched(CloudPolicyClient* client) override;
 
+  // UserPolicySigninServiceBase implementation:
+  void ShutdownCloudPolicyManager() override;
+
+  // Shutdown GAIA policy service and restart `UserCloudPolicyManager` for a
+  // clean slate.
+  void ResetGaiaPolicyManagement();
+
   void FetchPolicyForOidcUser(
       const AccountId& account_id,
       const std::string& dm_token,
@@ -92,7 +99,10 @@ class UserPolicyOidcSigninService : public UserPolicySigninServiceBase,
   // Attempt to restore the policies for the current profile using backup DM
   // token.
   void AttemptToRestorePolicy();
+
  private:
+  friend class UserPolicyOidcSigninServiceTestBase;
+
   // policy::CloudPolicyStore::Observer interface:
   void OnStoreLoaded(CloudPolicyStore* store) override;
   void OnStoreError(CloudPolicyStore* store) override;

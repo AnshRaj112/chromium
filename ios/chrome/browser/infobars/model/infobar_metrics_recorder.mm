@@ -163,6 +163,17 @@ const char kInfobarCollaborationOutOfDateModalEventHistogram[] =
 const char kInfobarCollaborationOutOfDateBadgeTappedHistogram[] =
     "Mobile.Messages.Badge.Tapped.kInfobarCollaborationOutOfDate";
 
+// Histogram names for InfobarTypeSaveCvc Banner.
+const char kInfobarSaveCvcBannerEventHistogram[] =
+    "Mobile.Messages.Banner.Event.InfobarTypeSaveCvc";
+const char kInfobarSaveCvcBannerDismissTypeHistogram[] =
+    "Mobile.Messages.Banner.Dismiss.InfobarTypeSaveCvc";
+// Modal.
+const char kInfobarSaveCvcModalEventHistogram[] =
+    "Mobile.Messages.Modal.Event.InfobarTypeSaveCvc";
+// Badge.
+const char kInfobarSaveCvcBadgeTappedHistogram[] =
+    "Mobile.Messages.Badge.Tapped.InfobarTypeSaveCvc";
 }  // namespace
 
 @interface InfobarMetricsRecorder ()
@@ -231,6 +242,12 @@ const char kInfobarCollaborationOutOfDateBadgeTappedHistogram[] =
       UMA_HISTOGRAM_ENUMERATION(
           kInfobarCollaborationOutOfDateBannerEventHistogram, event);
       break;
+    case InfobarType::kInfobarTypeSaveCvc:
+      UMA_HISTOGRAM_ENUMERATION(kInfobarSaveCvcBannerEventHistogram, event);
+      break;
+    case InfobarType::kInfobarTypeReaderMode:
+      // Reader Mode infobar does not support banners.
+      NOTREACHED();
   }
 }
 
@@ -290,6 +307,13 @@ const char kInfobarCollaborationOutOfDateBadgeTappedHistogram[] =
           kInfobarCollaborationOutOfDateBannerDismissTypeHistogram,
           dismissType);
       break;
+    case InfobarType::kInfobarTypeSaveCvc:
+      UMA_HISTOGRAM_ENUMERATION(kInfobarSaveCvcBannerDismissTypeHistogram,
+                                dismissType);
+      break;
+    case InfobarType::kInfobarTypeReaderMode:
+      // Reader Mode infobar does not support banners.
+      NOTREACHED();
   }
 }
 
@@ -346,6 +370,12 @@ const char kInfobarCollaborationOutOfDateBadgeTappedHistogram[] =
       UMA_HISTOGRAM_ENUMERATION(
           kInfobarCollaborationOutOfDateModalEventHistogram, event);
       break;
+    case InfobarType::kInfobarTypeSaveCvc:
+      UMA_HISTOGRAM_ENUMERATION(kInfobarSaveCvcModalEventHistogram, event);
+      break;
+    case InfobarType::kInfobarTypeReaderMode:
+      // Reader Mode infobar does not support modals.
+      NOTREACHED();
   }
 }
 
@@ -397,6 +427,12 @@ const char kInfobarCollaborationOutOfDateBadgeTappedHistogram[] =
       UMA_HISTOGRAM_ENUMERATION(
           kInfobarCollaborationOutOfDateBadgeTappedHistogram, state);
       break;
+    case InfobarType::kInfobarTypeSaveCvc:
+      UMA_HISTOGRAM_ENUMERATION(kInfobarSaveCvcBadgeTappedHistogram, state);
+      break;
+    case InfobarType::kInfobarTypeReaderMode:
+      // Reader Mode infobar badge is not interactive.
+      NOTREACHED();
   }
 }
 

@@ -4,10 +4,12 @@
 
 #include "extensions/common/manifest_handlers/permissions_parser.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/strings/stringprintf.h"
 #include "base/test/values_test_util.h"
 #include "chrome/common/extensions/manifest_tests/chrome_manifest_test.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/error_utils.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/manifest_constants.h"
@@ -15,6 +17,8 @@
 #include "extensions/common/permissions/permissions_data.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -246,7 +250,8 @@ TEST_F(PermissionsParserTest, ChromeFavicon) {
     InstallWarning expected_warning(ErrorUtils::FormatErrorMessage(
         manifest_errors::kInvalidPermissionScheme, permissions_key,
         kFaviconPattern));
-    return base::Contains(extension.install_warnings(), expected_warning);
+    return std::ranges::contains(extension.install_warnings(),
+                                 expected_warning);
   };
 
   {

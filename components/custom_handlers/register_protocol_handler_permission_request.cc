@@ -4,12 +4,15 @@
 
 #include "components/custom_handlers/register_protocol_handler_permission_request.h"
 
+#include <variant>
+
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/metrics/user_metrics.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/custom_handlers/protocol_handler_registry.h"
 #include "components/permissions/permission_decision.h"
+#include "components/permissions/permission_prompt_decision.h"
 #include "components/permissions/permission_request_data.h"
 #include "components/permissions/request_type.h"
 #include "components/permissions/resolvers/content_setting_permission_resolver.h"
@@ -62,16 +65,16 @@ RegisterProtocolHandlerPermissionRequest::GetMessageTextFragment() const {
              : l10n_util::GetStringFUTF16(
                    IDS_REGISTER_PROTOCOL_HANDLER_CONFIRM_REPLACE_FRAGMENT,
                    handler_.GetProtocolDisplayName(),
-                   base::UTF8ToUTF16(old_handler.url().host_piece()));
+                   base::UTF8ToUTF16(old_handler.url().host()));
 }
 
 void RegisterProtocolHandlerPermissionRequest::PermissionDecided(
-    PermissionDecision decision,
-    bool is_final_decision,
+    const permissions::PermissionPromptDecision& decision,
     const permissions::PermissionRequestData& request_data) {
-  DCHECK(decision != PermissionDecision::kAllowThisTime);
-  DCHECK(is_final_decision);
-  if (decision == PermissionDecision::kAllow) {
+  DCHECK(decision.overall_decision != PermissionDecision::kAllowThisTime);
+  CHECK(std::holds_alternative<std::monostate>(decision.prompt_options));
+  DCHECK(decision.is_final);
+  if (decision.overall_decision == PermissionDecision::kAllow) {
     base::RecordAction(
         base::UserMetricsAction("RegisterProtocolHandler.Infobar_Accept"));
     registry_->OnAcceptRegisterProtocolHandler(handler_);

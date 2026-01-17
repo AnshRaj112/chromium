@@ -70,7 +70,7 @@
           "group": "tryserver.chromium.mac"
         }
       ],
-      "targets_spec_directory": "src/infra/config/generated/builders/ci/Mac FYI Retina ASAN (AMD)/targets"
+      "targets_spec_directory": "infra/config/generated/builders/ci/Mac FYI Retina ASAN (AMD)/targets"
     }
   },
   "$recipe_engine/resultdb/test_presentation": {

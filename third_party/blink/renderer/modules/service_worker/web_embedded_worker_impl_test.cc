@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "base/feature_list.h"
+#include "base/functional/callback_helpers.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
@@ -56,6 +57,7 @@
 #include "third_party/blink/renderer/platform/testing/unit_test_helpers.h"
 #include "third_party/blink/renderer/platform/testing/url_loader_mock_factory.h"
 #include "third_party/blink/renderer/platform/testing/url_test_helpers.h"
+#include "third_party/blink/renderer/platform/wtf/functional.h"
 
 namespace blink {
 namespace {
@@ -250,12 +252,11 @@ class MojoHandleWatcher {
       : handle_watcher_(FROM_HERE,
                         mojo::SimpleWatcher::ArmingPolicy::MANUAL,
                         base::SequencedTaskRunner::GetCurrentDefault()) {
-    handle_watcher_.Watch(handle,
-                          MOJO_HANDLE_SIGNAL_READABLE |
-                              MOJO_HANDLE_SIGNAL_WRITABLE |
-                              MOJO_HANDLE_SIGNAL_PEER_CLOSED,
-                          base::BindRepeating(&MojoHandleWatcher::OnReady,
-                                              base::Unretained(this)));
+    handle_watcher_.Watch(
+        handle,
+        MOJO_HANDLE_SIGNAL_READABLE | MOJO_HANDLE_SIGNAL_WRITABLE |
+            MOJO_HANDLE_SIGNAL_PEER_CLOSED,
+        blink::BindRepeating(&MojoHandleWatcher::OnReady, Unretained(this)));
   }
 
   void Wait() {
@@ -315,7 +316,7 @@ class TestDataUploader : public network::mojom::blink::ChunkedDataPipeGetter {
 
     handle_watcher_ = std::make_unique<MojoHandleWatcher>(producer_.get());
     handle_watcher_->WaitAsync(
-        base::BindOnce(&TestDataUploader::OnMojoReady, base::Unretained(this)));
+        blink::BindOnce(&TestDataUploader::OnMojoReady, Unretained(this)));
   }
 
   void OnMojoReady() {
@@ -615,7 +616,7 @@ class WebEmbeddedWorkerImplTest : public testing::Test {
   void TearDown() override {
     // Drain queued tasks posted from the worker thread in order to avoid tasks
     // bound with unretained objects from running after tear down. Worker
-    // termination may post such tasks (see https://crbug,com/1007616).
+    // termination may post such tasks (see https://crbug.com/1007616).
     // TODO(nhiroki): Stop using synchronous WaitableEvent, and instead use
     // QuitClosure to wait until all the tasks run before test completion.
     test::RunPendingTasks();

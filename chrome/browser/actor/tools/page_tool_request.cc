@@ -4,6 +4,9 @@
 
 #include "chrome/browser/actor/tools/page_tool_request.h"
 
+#include <optional>
+
+#include "base/notimplemented.h"
 #include "chrome/browser/actor/tools/page_tool.h"
 #include "chrome/common/actor.mojom.h"
 #include "chrome/common/actor/action_result.h"
@@ -24,7 +27,7 @@ using tabs::TabHandle;
 namespace {
 constexpr absl::Overload ToMojoFn{
     [](const gfx::Point& pt) -> mojom::ToolTargetPtr {
-      return actor::mojom::ToolTarget::NewCoordinate(pt);
+      return actor::mojom::ToolTarget::NewCoordinateDip(pt);
     },
     [](const DomNode& node) -> mojom::ToolTargetPtr {
       return actor::mojom::ToolTarget::NewDomNodeId(node.node_id);
@@ -45,13 +48,15 @@ PageToolRequest::PageToolRequest(const PageToolRequest& other) = default;
 
 ToolRequest::CreateToolResult PageToolRequest::CreateTool(
     TaskId task_id,
-    AggregatedJournal& journal) const {
+    ToolDelegate& tool_delegate) const {
   if (!GetTabHandle().Get()) {
     return {/*tool=*/nullptr, MakeResult(mojom::ActionResultCode::kTabWentAway,
+                                         /*requires_page_stabilization=*/false,
                                          "The tab is no longer present.")};
   }
 
-  return {std::make_unique<PageTool>(task_id, journal, *this), MakeOkResult()};
+  return {std::make_unique<PageTool>(task_id, tool_delegate, *this),
+          MakeOkResult()};
 }
 
 const PageTarget& PageToolRequest::GetTarget() const {

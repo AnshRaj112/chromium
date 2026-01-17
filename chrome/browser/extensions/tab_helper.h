@@ -20,9 +20,12 @@
 #include "extensions/browser/extension_registry_observer.h"
 #include "extensions/browser/permissions_manager.h"
 #include "extensions/browser/script_executor.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension_id.h"
 #include "extensions/common/stack_frame.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace content {
 class RenderFrameHost;
@@ -81,8 +84,7 @@ class TabHelper : public content::WebContentsObserver,
   void WebContentsDestroyed() override;
 
   // ExtensionFunctionDispatcher::Delegate overrides.
-  WindowController* GetExtensionWindowController() const override;
-  content::WebContents* GetAssociatedWebContents() const override;
+  WindowController* GetExtensionWindowController() override;
 
   // ExtensionRegistryObserver:
   void OnExtensionLoaded(content::BrowserContext* browser_context,

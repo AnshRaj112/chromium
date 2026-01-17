@@ -107,27 +107,41 @@ WebFrameInternal* FakeWebFrameImpl::GetWebFrameInternal() {
 std::string FakeWebFrameImpl::GetFrameId() const {
   return frame_id_;
 }
+
 bool FakeWebFrameImpl::IsMainFrame() const {
   return is_main_frame_;
 }
+
 url::Origin FakeWebFrameImpl::GetSecurityOrigin() const {
   return security_origin_;
+}
+
+GURL FakeWebFrameImpl::GetUrl() const {
+  return GURL();
 }
 
 BrowserState* FakeWebFrameImpl::GetBrowserState() {
   return browser_state_;
 }
 
-void FakeWebFrameImpl::set_call_java_script_function_callback(
+void FakeWebFrameImpl::SetJavaScriptFunctionCallback(
+    const std::string& java_script_feature_name,
     base::RepeatingClosure callback) {
-  call_java_script_function_callback_ = std::move(callback);
+  if (callback) {
+    call_java_script_function_callback_[java_script_feature_name] =
+        std::move(callback);
+  } else {
+    call_java_script_function_callback_.erase(java_script_feature_name);
+  }
 }
 
 bool FakeWebFrameImpl::CallJavaScriptFunction(
     const std::string& name,
     const base::Value::List& parameters) {
-  if (call_java_script_function_callback_) {
-    call_java_script_function_callback_.Run();
+  auto iter = call_java_script_function_callback_.find(name);
+  if (iter != call_java_script_function_callback_.end()) {
+    CHECK(iter->second);
+    iter->second.Run();
   }
 
   std::optional<std::pair<std::string_view, std::string_view>> name_parts =
@@ -156,8 +170,7 @@ bool FakeWebFrameImpl::CallJavaScriptFunction(
       javascript_call += u", ";
     }
     first = false;
-    std::string paramString;
-    base::JSONWriter::Write(param, &paramString);
+    std::string paramString = base::WriteJson(param).value_or("");
     javascript_call += base::UTF8ToUTF16(paramString);
   }
   javascript_call += u"]);";

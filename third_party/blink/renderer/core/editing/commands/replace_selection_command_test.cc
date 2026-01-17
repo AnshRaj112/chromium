@@ -51,7 +51,8 @@ TEST_F(ReplaceSelectionCommandTest, pastingEmptySpan) {
       ReplaceSelectionCommand::kSelectReplacement |
       ReplaceSelectionCommand::kSmartReplace;
   auto* command = MakeGarbageCollected<ReplaceSelectionCommand>(
-      GetDocument(), fragment, options);
+      GetDocument(), fragment, options,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho);
 
   EXPECT_TRUE(command->Apply()) << "the replace command should have succeeded";
   EXPECT_EQ("foo", GetDocument().body()->GetInnerHTMLString())
@@ -73,11 +74,13 @@ TEST_F(ReplaceSelectionCommandTest, pasteSpanInText) {
       SetSelectionOptions());
 
   DocumentFragment* fragment = GetDocument().createDocumentFragment();
-  fragment->ParseHTML("<span><div>bar</div></span>", b_element);
+  fragment->ParseHTML("<span><div>bar</div></span>", b_element,
+                      /*registry*/ nullptr);
 
   ReplaceSelectionCommand::CommandOptions options = 0;
   auto* command = MakeGarbageCollected<ReplaceSelectionCommand>(
-      GetDocument(), fragment, options);
+      GetDocument(), fragment, options,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho);
 
   EXPECT_TRUE(command->Apply()) << "the replace command should have succeeded";
   EXPECT_EQ("<b>t</b>bar<b>ext</b>", GetDocument().body()->GetInnerHTMLString())
@@ -119,13 +122,14 @@ TEST_F(ReplaceSelectionCommandTest, TextAutosizingDoesntInflateText) {
       SetSelectionOptions());
 
   DocumentFragment* fragment = GetDocument().createDocumentFragment();
-  fragment->ParseHTML("baz", span);
+  fragment->ParseHTML("baz", span, /*registry*/ nullptr);
 
   ReplaceSelectionCommand::CommandOptions options =
       ReplaceSelectionCommand::kMatchStyle;
 
   auto* command = MakeGarbageCollected<ReplaceSelectionCommand>(
-      GetDocument(), fragment, options);
+      GetDocument(), fragment, options,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho);
 
   EXPECT_TRUE(command->Apply()) << "the replace command should have succeeded";
   // The span element should not have been split to increase the font size.
@@ -139,10 +143,12 @@ TEST_F(ReplaceSelectionCommandTest, TrailingNonVisibleTextCrash) {
                            SetSelectionOptions());
 
   DocumentFragment* fragment = GetDocument().createDocumentFragment();
-  fragment->ParseHTML("<div>bar</div> ", QuerySelector("div"));
+  fragment->ParseHTML("<div>bar</div> ", QuerySelector("div"),
+                      /*registry*/ nullptr);
   ReplaceSelectionCommand::CommandOptions options = 0;
   auto* command = MakeGarbageCollected<ReplaceSelectionCommand>(
-      GetDocument(), fragment, options);
+      GetDocument(), fragment, options,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho);
 
   // Crash should not occur on applying ReplaceSelectionCommand
   EXPECT_FALSE(command->Apply());
@@ -155,7 +161,8 @@ TEST_F(ReplaceSelectionCommandTest, CrashWithNoSelection) {
   SetBodyContent("<div></div>");
   ReplaceSelectionCommand::CommandOptions options = 0;
   auto* command = MakeGarbageCollected<ReplaceSelectionCommand>(
-      GetDocument(), nullptr, options);
+      GetDocument(), nullptr, options,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho);
 
   // Crash should not occur on applying ReplaceSelectionCommand
   EXPECT_FALSE(command->Apply());
@@ -177,6 +184,7 @@ TEST_F(ReplaceSelectionCommandTest, SmartPlainTextPaste) {
       ReplaceSelectionCommand::kSmartReplace;
   auto& command = *MakeGarbageCollected<ReplaceSelectionCommand>(
       GetDocument(), &fragment, options,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho,
       InputEvent::InputType::kInsertFromPaste);
 
   EXPECT_TRUE(command.Apply());
@@ -199,6 +207,7 @@ TEST_F(ReplaceSelectionCommandTest, TableAndImages) {
   fragment->AppendChild(GetDocument().CreateRawElement(html_names::kImgTag));
   auto& command = *MakeGarbageCollected<ReplaceSelectionCommand>(
       GetDocument(), fragment, ReplaceSelectionCommand::kPreventNesting,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho,
       InputEvent::InputType::kNone);
 
   // Should not crash
@@ -217,6 +226,7 @@ TEST_F(ReplaceSelectionCommandTest, InsertImageAfterEmptyBlockInInline) {
   fragment.appendChild(GetDocument().CreateRawElement(html_names::kImgTag));
   auto& command = *MakeGarbageCollected<ReplaceSelectionCommand>(
       GetDocument(), &fragment, ReplaceSelectionCommand::kPreventNesting,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho,
       InputEvent::InputType::kNone);
 
   // Should not crash
@@ -237,6 +247,7 @@ TEST_F(ReplaceSelectionCommandTest, InsertImageAfterWhiteSpace) {
   fragment.appendChild(GetDocument().CreateRawElement(html_names::kImgTag));
   auto& command = *MakeGarbageCollected<ReplaceSelectionCommand>(
       GetDocument(), &fragment, ReplaceSelectionCommand::kPreventNesting,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho,
       InputEvent::InputType::kNone);
 
   // Should not crash
@@ -258,6 +269,7 @@ TEST_F(ReplaceSelectionCommandTest, InsertImageInNonEditableBlock1) {
   fragment.appendChild(GetDocument().CreateRawElement(html_names::kImgTag));
   auto& command = *MakeGarbageCollected<ReplaceSelectionCommand>(
       GetDocument(), &fragment, ReplaceSelectionCommand::kPreventNesting,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho,
       InputEvent::InputType::kNone);
 
   // Should not crash
@@ -281,6 +293,7 @@ TEST_F(ReplaceSelectionCommandTest, InsertImageInNonEditableBlock2) {
   fragment.appendChild(GetDocument().CreateRawElement(html_names::kImgTag));
   auto& command = *MakeGarbageCollected<ReplaceSelectionCommand>(
       GetDocument(), &fragment, ReplaceSelectionCommand::kPreventNesting,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho,
       InputEvent::InputType::kNone);
 
   // Should not crash
@@ -300,21 +313,43 @@ TEST_F(ReplaceSelectionCommandTest, InsertLineFeedsToTextArea) {
   fragment.appendChild(Text::Create(GetDocument(), "\nfoo\n"));
 
   auto& command = *MakeGarbageCollected<ReplaceSelectionCommand>(
-      GetDocument(), &fragment, /* options */ 0, InputEvent::InputType::kNone);
+      GetDocument(), &fragment, /* options */ 0,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho,
+      InputEvent::InputType::kNone);
 
   EXPECT_TRUE(command.Apply());
-  if (RuntimeEnabledFeatures::TextareaLineEndingsAsBrEnabled()) {
-    EXPECT_EQ(
-        "<textarea><div><br>foo|<br>"
-        "<br id=\"textarea-placeholder-break\"></div></textarea>",
-        GetSelectionTextInFlatTreeFromBody(
-            Selection().ComputeVisibleSelectionInFlatTree().AsSelection()));
-  } else {
-    EXPECT_EQ(
-        "<textarea><div>\nfoo|\n<br></div></textarea>",
-        GetSelectionTextInFlatTreeFromBody(
-            Selection().ComputeVisibleSelectionInFlatTree().AsSelection()));
-  }
+  EXPECT_EQ(
+      "<textarea><div><br>foo|<br>"
+      "<br id=\"textarea-placeholder-break\"></div></textarea>",
+      GetSelectionTextInFlatTreeFromBody(
+          Selection().ComputeVisibleSelectionInFlatTree().AsSelection()));
+}
+
+TEST_F(ReplaceSelectionCommandTest, TrivialFragmentTextDataForInputEvent) {
+  SetBodyContent("<textarea></textarea>");
+  Element* textarea = QuerySelector("textarea");
+  textarea->Focus();
+
+  // Create a fragment with span wrapper around text content
+  DocumentFragment& fragment = *GetDocument().createDocumentFragment();
+  Element* span = GetDocument().CreateRawElement(html_names::kSpanTag);
+  span->appendChild(Text::Create(GetDocument(), "test content"));
+  fragment.appendChild(span);
+
+  // Use insertFromDrop input type to test the TextDataForInputEvent
+  // functionality
+  auto& command = *MakeGarbageCollected<ReplaceSelectionCommand>(
+      GetDocument(), &fragment, /* options */ 0,
+      EditCommand::PasswordEchoBehavior::kDoNotEcho,
+      InputEvent::InputType::kInsertFromDrop);
+
+  // Apply the command
+  EXPECT_TRUE(command.Apply()) << "ReplaceSelectionCommand should succeed";
+
+  // After Apply(), verify TextDataForInputEvent returns the correct text.
+  String result = command.TextDataForInputEvent();
+  EXPECT_EQ("test content", result) << "TextDataForInputEvent should return "
+                                       "the correct trivial text after Apply";
 }
 
 }  // namespace blink

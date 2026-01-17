@@ -39,7 +39,6 @@ namespace features {
 
 // If enabled, suppresses LoadingPredictor (https://crbug.com/350519234)
 BASE_FEATURE(kSuppressesLoadingPredictorOnSlowNetwork,
-             "SuppressesLoadingPredictorOnSlowNetwork",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 const base::FeatureParam<base::TimeDelta>
@@ -315,11 +314,11 @@ void LoadingPredictor::OnNavigationFinished(NavigationId navigation_id,
 
   loading_data_collector()->RecordFinishNavigation(
       navigation_id, new_main_frame_url, is_error_page);
-  if (active_urls_to_navigations_.find(old_main_frame_url) !=
-      active_urls_to_navigations_.end()) {
-    active_urls_to_navigations_[old_main_frame_url].erase(navigation_id);
-    if (active_urls_to_navigations_[old_main_frame_url].empty()) {
-      active_urls_to_navigations_.erase(old_main_frame_url);
+  if (auto it = active_urls_to_navigations_.find(old_main_frame_url);
+      it != active_urls_to_navigations_.end()) {
+    it->second.erase(navigation_id);
+    if (it->second.empty()) {
+      active_urls_to_navigations_.erase(it);
     }
   }
   active_navigations_.erase(navigation_id);
@@ -395,7 +394,7 @@ bool LoadingPredictor::HandleHintByOrigin(const GURL& url,
                                           bool only_allow_https,
                                           PreconnectData& preconnect_data) {
   if (!url.is_valid() || !url.has_host() || !IsPreconnectEnabled() ||
-      (only_allow_https && url.scheme() != url::kHttpsScheme)) {
+      (only_allow_https && url.GetScheme() != url::kHttpsScheme)) {
     return false;
   }
 

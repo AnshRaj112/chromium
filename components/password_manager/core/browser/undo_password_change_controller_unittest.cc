@@ -15,7 +15,6 @@
 #include "components/autofill/core/common/form_data.h"
 #include "components/autofill/core/common/form_data_test_api.h"
 #include "components/autofill/core/common/password_form_fill_data.h"
-#include "components/os_crypt/sync/os_crypt_mocker.h"
 #include "components/password_manager/core/browser/fake_form_fetcher.h"
 #include "components/password_manager/core/browser/features/password_features.h"
 #include "components/password_manager/core/browser/mock_password_manager.h"
@@ -90,8 +89,6 @@ class UndoPasswordChangeControllerTest : public testing::Test {
   UndoPasswordChangeControllerTest() = default;
 
   void SetUp() override {
-    // PasswordFormManager::OnFetchCompleted makes a call to OSCrypt.
-    OSCryptMocker::SetUp();
     ON_CALL(driver_, GetPasswordManager)
         .WillByDefault(Return(&password_manager_));
     ON_CALL(password_manager_, GetPasswordFormCache)
@@ -140,8 +137,6 @@ class UndoPasswordChangeControllerTest : public testing::Test {
     controller_.OnNavigation(url::Origin::Create(GURL("https://example.com")),
                              ukm::UkmRecorder::GetNewSourceID());
   }
-
-  void TearDown() override { OSCryptMocker::TearDown(); }
 
   // Creates a form manager and triggers parsing by calling
   // `form_fetcher_.NotifyFetchCompleted()`.
@@ -230,7 +225,7 @@ TEST_F(UndoPasswordChangeControllerTest, OnTroubleSigningIn) {
   const auto password_details = GetSuggestionDetails(credential);
   base::HistogramTester histogram_tester;
   ukm::TestAutoSetUkmRecorder test_ukm_recorder;
-  const auto expected_metric_state = password_manager::
+  const auto expected_metric_state = password_manager::metrics_util::
       PasswordChangeRecoveryFlowState::kTroubleSigningInClicked;
 
   controller_.OnSuggestionSelected(credential);
@@ -338,8 +333,40 @@ TEST_F(UndoPasswordChangeControllerTest, OnLoginPotentiallyFailedFlagOff) {
 }
 
 TEST_F(UndoPasswordChangeControllerTest,
+       OnLoginPotentiallyFailed_UnfocusablePassword) {
+  base::test::ScopedFeatureList feature_list(features::kShowRecoveryPassword);
+  best_match_form_.SetPasswordBackupNote(kBackupPassword);
+  auto form_manager = CreateFormManager(best_match_form_);
+  test_api(failed_login_form_.form_data)
+      .fields()[kPasswordFieldIndex]
+      .set_is_focusable(false);
+
+  controller_.OnLoginPotentiallyFailed(&driver_, failed_login_form_);
+
+  EXPECT_FALSE(controller_.failed_login_form());
+}
+
+TEST_F(UndoPasswordChangeControllerTest,
        OnLoginPotentiallyFailedNoBackupIgnored) {
   base::test::ScopedFeatureList feature_list(features::kShowRecoveryPassword);
+  auto form_manager = CreateFormManager(best_match_form_);
+
+  controller_.OnLoginPotentiallyFailed(&driver_, failed_login_form_);
+  EXPECT_CALL(driver_, TriggerPasswordRecoverySuggestions(
+                           failed_login_form_.password_element_renderer_id))
+      .Times(0);
+  static_cast<PasswordFormManagerObserver*>(&controller_)
+      ->OnPasswordFormParsed(form_manager.get());
+
+  EXPECT_EQ(controller_.GetState(kUsername),
+            PasswordRecoveryState::kRegularFlow);
+}
+
+TEST_F(UndoPasswordChangeControllerTest,
+       OnLoginPotentiallyFailed_BackupUsed_Ignored) {
+  base::test::ScopedFeatureList feature_list(features::kShowRecoveryPassword);
+  failed_login_form_.password_value = kBackupPassword;
+  best_match_form_.SetPasswordBackupNote(kBackupPassword);
   auto form_manager = CreateFormManager(best_match_form_);
 
   controller_.OnLoginPotentiallyFailed(&driver_, failed_login_form_);
@@ -406,7 +433,7 @@ TEST_F(UndoPasswordChangeControllerTest, OnSuggestionsHidden) {
   base::RunLoop run_loop;
   base::HistogramTester histogram_tester;
   ukm::TestAutoSetUkmRecorder test_ukm_recorder;
-  const auto expected_metric_state = password_manager::
+  const auto expected_metric_state = password_manager::metrics_util::
       PasswordChangeRecoveryFlowState::kProactiveRecoveryPopupShown;
 
   controller_.OnLoginPotentiallyFailed(&driver_, failed_login_form_);

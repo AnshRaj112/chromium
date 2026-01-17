@@ -4,7 +4,6 @@
 
 #include "ui/aura/window_tree_host.h"
 
-#include "base/containers/contains.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
 #include "build/build_config.h"
@@ -90,44 +89,44 @@ TEST_F(WindowTreeHostTest,
   host()->SetBoundsInPixels(gfx::Rect(0, 0, 400, 300));
   test_screen()->SetDisplayRotation(display::Display::ROTATE_0);
   EXPECT_EQ(host()->GetBoundsInPixels(), gfx::Rect(0, 0, 400, 300));
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().rotation(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().rotation(),
             display::Display::ROTATE_0);
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().GetSizeInPixel(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().GetSizeInPixel(),
             gfx::Size(400, 300));
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().bounds(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().bounds(),
             gfx::Rect(0, 0, 400, 300));
   EXPECT_EQ(gfx::Rect(400, 300), host()->window()->bounds());
 
   host()->SetBoundsInPixels(gfx::Rect(0, 0, 400, 300));
   test_screen()->SetDisplayRotation(display::Display::ROTATE_90);
   EXPECT_EQ(host()->GetBoundsInPixels(), gfx::Rect(0, 0, 400, 300));
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().rotation(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().rotation(),
             display::Display::ROTATE_90);
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().GetSizeInPixel(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().GetSizeInPixel(),
             gfx::Size(300, 400));
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().bounds(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().bounds(),
             gfx::Rect(0, 0, 300, 400));
   EXPECT_EQ(gfx::Rect(300, 400), host()->window()->bounds());
 
   host()->SetBoundsInPixels(gfx::Rect(0, 0, 400, 300));
   test_screen()->SetDisplayRotation(display::Display::ROTATE_180);
   EXPECT_EQ(host()->GetBoundsInPixels(), gfx::Rect(0, 0, 400, 300));
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().rotation(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().rotation(),
             display::Display::ROTATE_180);
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().GetSizeInPixel(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().GetSizeInPixel(),
             gfx::Size(400, 300));
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().bounds(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().bounds(),
             gfx::Rect(0, 0, 400, 300));
   EXPECT_EQ(gfx::Rect(400, 300), host()->window()->bounds());
 
   host()->SetBoundsInPixels(gfx::Rect(0, 0, 400, 300));
   test_screen()->SetDisplayRotation(display::Display::ROTATE_270);
   EXPECT_EQ(host()->GetBoundsInPixels(), gfx::Rect(0, 0, 400, 300));
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().rotation(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().rotation(),
             display::Display::ROTATE_270);
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().GetSizeInPixel(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().GetSizeInPixel(),
             gfx::Size(300, 400));
-  EXPECT_EQ(display::Screen::GetScreen()->GetPrimaryDisplay().bounds(),
+  EXPECT_EQ(display::Screen::Get()->GetPrimaryDisplay().bounds(),
             gfx::Rect(0, 0, 300, 400));
   EXPECT_EQ(gfx::Rect(300, 400), host()->window()->bounds());
 }
@@ -507,7 +506,7 @@ TEST_F(WindowTreeHostWithThrottleTest, Basic) {
   EXPECT_TRUE(test::GetThrottledHosts().empty());
   host()->SetNativeWindowOcclusionState(Window::OcclusionState::OCCLUDED, {});
   EXPECT_TRUE(host()->compositor()->IsVisible());
-  EXPECT_TRUE(base::Contains(test::GetThrottledHosts(), host()));
+  EXPECT_TRUE(test::GetThrottledHosts().contains(host()));
   host()->SetNativeWindowOcclusionState(Window::OcclusionState::VISIBLE, {});
   EXPECT_TRUE(test::GetThrottledHosts().empty());
   EXPECT_TRUE(host()->compositor()->IsVisible());
@@ -524,7 +523,7 @@ TEST_F(WindowTreeHostWithThrottleTest, CallHideDirectly) {
   EXPECT_TRUE(test::GetThrottledHosts().empty());
   host()->SetNativeWindowOcclusionState(Window::OcclusionState::OCCLUDED, {});
   EXPECT_TRUE(host()->compositor()->IsVisible());
-  EXPECT_TRUE(base::Contains(test::GetThrottledHosts(), host()));
+  EXPECT_TRUE(test::GetThrottledHosts().contains(host()));
   host()->Hide();
   EXPECT_TRUE(test::GetThrottledHosts().empty());
   EXPECT_FALSE(host()->compositor()->IsVisible());
@@ -625,7 +624,7 @@ TEST_F(WindowTreeHostWithThrottleAndReleaseTest, ToggleOccluded) {
   EXPECT_TRUE(test::GetThrottledHosts().empty());
   host()->SetNativeWindowOcclusionState(Window::OcclusionState::OCCLUDED, {});
   EXPECT_FALSE(host()->compositor()->IsVisible());
-  EXPECT_TRUE(base::Contains(test::GetThrottledHosts(), host()));
+  EXPECT_TRUE(test::GetThrottledHosts().contains(host()));
   host()->SetNativeWindowOcclusionState(Window::OcclusionState::VISIBLE, {});
   EXPECT_TRUE(host()->compositor()->IsVisible());
   EXPECT_TRUE(test::GetThrottledHosts().empty());
@@ -657,7 +656,7 @@ TEST_F(WindowTreeHostWithThrottleAndReleaseTest, DestroyWhileThrottled) {
   EXPECT_TRUE(test::GetThrottledHosts().empty());
   host()->SetNativeWindowOcclusionState(Window::OcclusionState::OCCLUDED, {});
   EXPECT_FALSE(host()->compositor()->IsVisible());
-  EXPECT_TRUE(base::Contains(test::GetThrottledHosts(), host()));
+  EXPECT_TRUE(test::GetThrottledHosts().contains(host()));
   // Expect not to crash after destroying WindowTreeHost after this.
 }
 
@@ -672,7 +671,7 @@ TEST_F(WindowTreeHostWithThrottleAndReleaseTest,
   EXPECT_TRUE(test::GetThrottledHosts().empty());
   host()->SetNativeWindowOcclusionState(Window::OcclusionState::OCCLUDED, {});
   EXPECT_FALSE(host()->compositor()->IsVisible());
-  EXPECT_TRUE(base::Contains(test::GetThrottledHosts(), host()));
+  EXPECT_TRUE(test::GetThrottledHosts().contains(host()));
   std::unique_ptr<WindowTreeHost::VideoCaptureLock> lock =
       host()->CreateVideoCaptureLock();
   EXPECT_TRUE(host()->compositor()->IsVisible());
@@ -685,7 +684,7 @@ TEST_F(WindowTreeHostWithThrottleAndReleaseTest,
   EXPECT_TRUE(test::GetThrottledHosts().empty());
   lock.reset();
   EXPECT_FALSE(host()->compositor()->IsVisible());
-  EXPECT_TRUE(base::Contains(test::GetThrottledHosts(), host()));
+  EXPECT_TRUE(test::GetThrottledHosts().contains(host()));
   host()->SetNativeWindowOcclusionState(Window::OcclusionState::VISIBLE, {});
   EXPECT_TRUE(host()->compositor()->IsVisible());
   EXPECT_TRUE(test::GetThrottledHosts().empty());

@@ -66,7 +66,7 @@ bool DisplayItem::EqualsForUnderInvalidation(const DisplayItem& other) const {
 
 #if DCHECK_IS_ON()
 
-static WTF::String PaintPhaseAsDebugString(int paint_phase) {
+static String PaintPhaseAsDebugString(int paint_phase) {
   // Must be kept in sync with PaintPhase.
   switch (paint_phase) {
     case 0:
@@ -116,7 +116,7 @@ static WTF::String PaintPhaseAsDebugString(int paint_phase) {
   default:           \
     NOTREACHED();
 
-static WTF::String SpecialDrawingTypeAsDebugString(DisplayItem::Type type) {
+static String SpecialDrawingTypeAsDebugString(DisplayItem::Type type) {
   switch (type) {
     DEBUG_STRING_CASE(BoxDecorationBackground);
     DEBUG_STRING_CASE(FixedAttachmentBackground);
@@ -149,7 +149,7 @@ static WTF::String SpecialDrawingTypeAsDebugString(DisplayItem::Type type) {
   }
 }
 
-static WTF::String DrawingTypeAsDebugString(DisplayItem::Type type) {
+static String DrawingTypeAsDebugString(DisplayItem::Type type) {
   PAINT_PHASE_BASED_DEBUG_STRINGS(Drawing);
   return StrCat({"Drawing", SpecialDrawingTypeAsDebugString(type)});
 }
@@ -169,7 +169,7 @@ static String ForeignLayerTypeAsDebugString(DisplayItem::Type type) {
   }
 }
 
-WTF::String DisplayItem::TypeAsDebugString(Type type) {
+String DisplayItem::TypeAsDebugString(Type type) {
   if (IsDrawingType(type))
     return DrawingTypeAsDebugString(type);
 
@@ -185,6 +185,7 @@ WTF::String DisplayItem::TypeAsDebugString(Type type) {
     DEBUG_STRING_CASE(HitTest);
     DEBUG_STRING_CASE(WebPluginHitTest);
     DEBUG_STRING_CASE(RegionCapture);
+    DEBUG_STRING_CASE(TrackedElement);
     DEBUG_STRING_CASE(ScrollHitTest);
     DEBUG_STRING_CASE(ResizerScrollHitTest);
     DEBUG_STRING_CASE(ScrollbarHitTest);
@@ -242,7 +243,7 @@ void DisplayItem::PropertiesAsJSON(JSONObject& json,
 String DisplayItem::Id::ToString() const {
 #if DCHECK_IS_ON()
   return String::Format("%p:%s:%d", reinterpret_cast<void*>(client_id),
-                        DisplayItem::TypeAsDebugString(type).Utf8().data(),
+                        DisplayItem::TypeAsDebugString(type).Utf8().c_str(),
                         fragment);
 #else
   return String::Format("%p:%d:%d", reinterpret_cast<void*>(client_id),

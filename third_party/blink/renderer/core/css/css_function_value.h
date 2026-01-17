@@ -16,13 +16,16 @@ class CSSFunctionValue : public CSSValueList {
   CSSFunctionValue(CSSValueID id)
       : CSSValueList(kFunctionClass, kCommaSeparator), value_id_(id) {}
 
+  CSSFunctionValue(CSSValueID id, ValueListSeparator argument_separator)
+      : CSSValueList(kFunctionClass, argument_separator), value_id_(id) {}
+
   CSSFunctionValue(CSSValueID id,
                    ValueListSeparator argument_separator,
                    HeapVector<Member<const CSSValue>, 4> values)
       : CSSValueList(kFunctionClass, argument_separator, std::move(values)),
         value_id_(id) {}
 
-  WTF::String CustomCSSText() const;
+  String CustomCSSText() const;
 
   bool Equals(const CSSFunctionValue& other) const {
     return value_id_ == other.value_id_ && CSSValueList::Equals(other);

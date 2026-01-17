@@ -39,7 +39,6 @@
 #include "chromeos/ash/services/bluetooth_config/public/mojom/cros_bluetooth_config.mojom.h"
 #include "chromeos/ash/services/bluetooth_config/scoped_bluetooth_config_test_helper.h"
 #include "chromeos/ash/services/multidevice_setup/public/cpp/fake_multidevice_setup.h"
-#include "chromeos/ash/services/multidevice_setup/public/mojom/multidevice_setup.mojom-shared.h"
 #include "chromeos/ash/services/multidevice_setup/public/mojom/multidevice_setup.mojom.h"
 #include "chromeos/ash/services/network_config/public/cpp/cros_network_config_test_helper.h"
 #include "chromeos/services/network_config/public/cpp/cros_network_config_util.h"
@@ -51,6 +50,7 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "third_party/cros_system_api/dbus/shill/dbus-constants.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/chromeos/styles/cros_tokens_color_mappings.h"
 #include "ui/gfx/paint_vector_icon.h"
 #include "ui/gfx/skia_util.h"
 #include "ui/views/controls/button/toggle_button.h"
@@ -444,8 +444,7 @@ class NetworkListViewControllerTest : public AshTestBase,
     }
     const gfx::ImageSkia managed_icon = gfx::CreateVectorIcon(
         kSystemTrayManagedIcon,
-        AshColorProvider::Get()->GetContentLayerColor(
-            AshColorProvider::ContentLayerType::kIconColorPrimary));
+        AshColorProvider::Get()->GetColor(cros_tokens::kIconColorPrimary));
     return gfx::BitmapsAreEqual(*icon->GetImage().bitmap(),
                                 *managed_icon.bitmap());
   }
@@ -459,8 +458,7 @@ class NetworkListViewControllerTest : public AshTestBase,
     }
     const gfx::ImageSkia system_icon = gfx::CreateVectorIcon(
         kSystemMenuInfoIcon,
-        AshColorProvider::Get()->GetContentLayerColor(
-            AshColorProvider::ContentLayerType::kIconColorPrimary));
+        AshColorProvider::Get()->GetColor(cros_tokens::kIconColorPrimary));
     return gfx::BitmapsAreEqual(*icon->GetImage().bitmap(),
                                 *system_icon.bitmap());
   }

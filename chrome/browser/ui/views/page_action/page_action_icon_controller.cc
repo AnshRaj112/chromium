@@ -6,7 +6,6 @@
 
 #include <algorithm>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/immediate_crash.h"
@@ -16,7 +15,6 @@
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sharing/click_to_call/click_to_call_ui_controller.h"
-#include "chrome/browser/sharing/sms/sms_remote_fetcher_ui_controller.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/page_action/page_action_icon_type.h"
 #include "chrome/browser/ui/ui_features.h"
@@ -31,6 +29,7 @@
 #include "chrome/browser/ui/views/commerce/price_tracking_icon_view.h"
 #include "chrome/browser/ui/views/commerce/product_specifications_icon_view.h"
 #include "chrome/browser/ui/views/file_system_access/file_system_access_icon_view.h"
+#include "chrome/browser/ui/views/location_bar/ai_mode_page_action_icon_view.h"
 #include "chrome/browser/ui/views/location_bar/cookie_controls/cookie_controls_icon_view.h"
 #include "chrome/browser/ui/views/location_bar/find_bar_icon.h"
 #include "chrome/browser/ui/views/location_bar/intent_picker_view.h"
@@ -233,19 +232,6 @@ void PageActionIconController::Init(const PageActionIconParams& params,
                       params.command_updater, params.icon_label_bubble_delegate,
                       params.page_action_icon_delegate));
         break;
-      case PageActionIconType::kSmsRemoteFetcher:
-        add_page_action_icon(
-            type,
-            std::make_unique<SharingIconView>(
-                params.icon_label_bubble_delegate,
-                params.page_action_icon_delegate,
-                base::BindRepeating([](content::WebContents* contents) {
-                  return static_cast<SharingUiController*>(
-                      SmsRemoteFetcherUiController::GetOrCreateFromWebContents(
-                          contents));
-                }),
-                base::BindRepeating(SharingDialogView::GetAsBubble)));
-        break;
       case PageActionIconType::kTranslate:
         DCHECK(params.command_updater);
         add_page_action_icon(
@@ -276,6 +262,12 @@ void PageActionIconController::Init(const PageActionIconParams& params,
                       params.browser, params.icon_label_bubble_delegate,
                       params.page_action_icon_delegate));
         break;
+      case PageActionIconType::kAiMode:
+        add_page_action_icon(
+            type, std::make_unique<AiModePageActionIconView>(
+                      params.icon_label_bubble_delegate,
+                      params.page_action_icon_delegate, params.browser));
+        break;
       case PageActionIconType::kLensOverlayHomework:
         add_page_action_icon(
             type, std::make_unique<LensOverlayHomeworkPageActionIconView>(
@@ -293,6 +285,11 @@ void PageActionIconController::Init(const PageActionIconParams& params,
             type, std::make_unique<CollaborationMessagingPageActionIconView>(
                       params.browser, params.icon_label_bubble_delegate,
                       params.page_action_icon_delegate));
+        break;
+      case PageActionIconType::kReadingMode:
+      case PageActionIconType::kContextualSidePanel:
+      case PageActionIconType::kJsOptimizations:
+        // Do nothing as these actions were added after the migration.
         break;
     }
   }
@@ -316,7 +313,7 @@ PageActionIconView* PageActionIconController::GetIconView(
 }
 
 PageActionIconType PageActionIconController::GetIconType(
-    PageActionIconView* view) {
+    const PageActionIconView* view) const {
   for (auto& page_action : page_action_icon_views_) {
     if (page_action.second == view) {
       return page_action.first;
@@ -372,7 +369,8 @@ void PageActionIconController::OnPageActionIconViewShown(
   }
   std::vector<raw_ptr<PageActionIconView, VectorExperimental>>
       excluded_actions_on_page = page_actions_excluded_from_logging_[url];
-  if (!view->ephemeral() || base::Contains(excluded_actions_on_page, view)) {
+  if (!view->ephemeral() ||
+      std::ranges::contains(excluded_actions_on_page, view)) {
     return;
   }
   RecordOverallMetrics();
@@ -445,7 +443,7 @@ void PageActionIconController::RecordMetricsOnURLChange(GURL url) {
   RecordOverallMetrics();
   for (auto icon_item : page_action_icon_views_) {
     if (!icon_item.second->ephemeral() || !icon_item.second->GetVisible() ||
-        base::Contains(excluded_actions_on_page, icon_item.second)) {
+        std::ranges::contains(excluded_actions_on_page, icon_item.second)) {
       continue;
     }
     RecordIndividualMetrics(icon_item.first, icon_item.second);

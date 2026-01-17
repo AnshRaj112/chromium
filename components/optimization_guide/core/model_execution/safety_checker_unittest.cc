@@ -9,7 +9,6 @@
 #include <sstream>
 #include <string>
 
-#include "base/files/file_util.h"
 #include "base/files/scoped_temp_file.h"
 #include "base/logging.h"
 #include "base/memory/weak_ptr.h"
@@ -32,10 +31,12 @@
 #include "components/optimization_guide/proto/features/tab_organization.pb.h"
 #include "components/optimization_guide/proto/substitution.pb.h"
 #include "components/optimization_guide/proto/text_safety_model_metadata.pb.h"
+#include "components/optimization_guide/public/mojom/model_broker.mojom-shared.h"
 #include "mojo/public/cpp/bindings/receiver_set.h"
 #include "services/on_device_model/public/cpp/service_client.h"
 #include "services/on_device_model/public/cpp/test_support/fake_service.h"
 #include "services/on_device_model/public/cpp/text_safety_assets.h"
+#include "services/on_device_model/public/mojom/on_device_model.mojom.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -86,12 +87,18 @@ class SafetyClientFixture {
   explicit SafetyClientFixture(proto::FeatureTextSafetyConfiguration config)
       : safety_asset_(std::move(config)) {
     safety_client_.SetLanguageDetectionModel(language_asset_.model_info());
-    safety_client_.MaybeUpdateSafetyModel(safety_asset_.model_info());
+
+    auto safety_model_info = SafetyModelInfo::Load(
+        SafetyModelInfo::SafetyModelType::kTextSafetyModel,
+        safety_asset_.model_info());
+    if (safety_model_info) {
+      safety_client_.MaybeUpdateSafetyModel(std::move(safety_model_info));
+    }
   }
 
   std::unique_ptr<SafetyChecker> MakeSafetyChecker() {
     return safety_client_
-        .MakeSafetyChecker(ModelBasedCapabilityKey::kCompose, false)
+        .MakeSafetyChecker(mojom::OnDeviceFeature::kCompose, false)
         .value();
   }
 

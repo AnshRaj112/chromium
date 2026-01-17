@@ -177,7 +177,7 @@ class CORE_EXPORT BoxFragmentPainter : public BoxPainterBase {
                     const PhysicalOffset& paint_offset,
                     const PhysicalOffset& parent_offset);
   void PaintFloatingItems(const PaintInfo& paint_info, InlineCursor* cursor);
-  void PaintFloatingChildren(const PhysicalFragment&,
+  void PaintFloatingChildren(const PhysicalBoxFragment&,
                              const PaintInfo& paint_info);
   void PaintFloats(const PaintInfo&);
   void PaintMask(const PaintInfo&, const PhysicalOffset& paint_offset);
@@ -195,10 +195,6 @@ class CORE_EXPORT BoxFragmentPainter : public BoxPainterBase {
       const PhysicalOffset& paint_offset,
       const DisplayItemClient* background_client,
       const std::optional<ScopedBoxContentsPaintState>& contents_paint_state);
-  void PaintGaps(GridTrackSizingDirection track_direction,
-                 const PaintInfo& paint_info,
-                 const PhysicalRect& paint_rect,
-                 const GapGeometry& gap_geometry);
 
   InlinePaintContext& EnsureInlineContext();
 
@@ -208,6 +204,12 @@ class CORE_EXPORT BoxFragmentPainter : public BoxPainterBase {
                                const DisplayItemClient& background_client);
 
   bool ShouldRecordHitTestData(const PaintInfo&);
+
+  static void RecordRegionCaptureAndTrackedElementData(
+      Element* element,
+      const PaintInfo& paint_info,
+      const PhysicalRect& paint_rect,
+      const DisplayItemClient& display_item_client);
 
   // This struct has common data needed while traversing trees for the hit
   // testing.
@@ -264,7 +266,7 @@ class CORE_EXPORT BoxFragmentPainter : public BoxPainterBase {
                             const PhysicalBoxFragment& container,
                             const InlineCursor& children);
   bool HitTestFloatingChildren(const HitTestContext& hit_test,
-                               const PhysicalFragment& container,
+                               const PhysicalBoxFragment& container,
                                const PhysicalOffset& accumulated_offset);
   bool HitTestFloatingChildItems(const HitTestContext& hit_test,
                                  const InlineCursor& children,

@@ -17,11 +17,15 @@
 #include "chrome/browser/extensions/extension_browser_test_util.h"
 #include "chrome/browser/extensions/extension_install_prompt.h"
 #include "chrome/browser/extensions/extension_service.h"
-#include "chrome/browser/extensions/load_error_reporter.h"
+#include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/extensions/updater/extension_updater.h"
 #include "chrome/browser/extensions/window_controller.h"
 #include "chrome/browser/notifications/notification_display_service_tester.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/browser_window/public/create_browser_window.h"
+#include "chrome/browser/ui/tabs/tab_list_interface.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/chrome_test_utils.h"
 #include "components/crx_file/crx_verifier.h"
@@ -36,6 +40,7 @@
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/extension_util.h"
+#include "extensions/browser/load_error_reporter.h"
 #include "extensions/browser/scoped_ignore_content_verifier_for_test.h"
 #include "extensions/browser/service_worker/service_worker_test_utils.h"
 #include "extensions/browser/test_extension_registry_observer.h"
@@ -56,18 +61,23 @@
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
+#include "base/base_switches.h"
 #include "base/check.h"
 #include "chrome/browser/android/tab_android.h"
+#include "chrome/browser/flags/android/chrome_feature_list.h"
 #include "chrome/browser/ui/android/tab_model/tab_model.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_list.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_test_helper.h"
 #include "chrome/test/base/android/android_ui_test_utils.h"
+#include "components/feed/feed_feature_list.h"
 #include "content/public/browser/web_contents.h"
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS)
 #include "ash/constants/ash_switches.h"
 #endif
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 namespace {
@@ -180,6 +190,19 @@ ExtensionBrowserTest::ExtensionBrowserTest(ContextType context_type)
 #endif
       verifier_format_override_(crx_file::VerifierFormat::CRX3) {
   EXPECT_TRUE(temp_dir_.CreateUniqueTempDir());
+
+#if BUILDFLAG(IS_ANDROID)
+  feature_list_.InitWithFeatures(
+      /*enabled_features=*/
+      {// Disable ChromeTabbedActivity instance limit so that the total number
+       // of windows created by the entire test suite won't be limited. See Java
+       // MultiWindowUtils#getMaxInstances() for details.
+       chrome::android::kDisableInstanceLimit,
+
+       // Enable incognito windows on Android.
+       feed::kAndroidOpenIncognitoAsWindow},
+      /*disabled_features=*/{});
+#endif
 }
 
 ExtensionBrowserTest::~ExtensionBrowserTest() = default;
@@ -251,6 +274,19 @@ void ExtensionBrowserTest::SetUpCommandLine(base::CommandLine* command_line) {
   if (ShouldAllowMV2Extensions()) {
     mv2_enabler_.emplace();
   }
+
+#if BUILDFLAG(IS_ANDROID)
+  // Disable the first-run experience (FRE) so that when a function under
+  // test launches an Intent for ChromeTabbedActivity, ChromeTabbedActivity
+  // will be shown instead of FirstRunActivity.
+  command_line->AppendSwitch("disable-fre");
+
+  // Force DeviceInfo#isDesktop() to be true so that the kDisableInstanceLimit
+  // flag in the constructor can be effective when running tests on an emulator
+  // without "--force-desktop-android". See Java
+  // MultiWindowUtils#getMaxInstances() for details.
+  command_line->AppendSwitch(switches::kForceDesktopAndroid);
+#endif
 }
 
 void ExtensionBrowserTest::SetUpOnMainThread() {
@@ -703,14 +739,22 @@ void ExtensionBrowserTest::ReloadExtension(
   test_notification_observer_->WaitForExtensionViewsToLoad();
 }
 
-content::WebContents* ExtensionBrowserTest::GetActiveWebContents() const {
-#if !BUILDFLAG(IS_ANDROID)
-  // Some tests may not immediately open a browser. Handle this gracefully.
-  if (!browser()) {
+content::WebContents* ExtensionBrowserTest::GetActiveWebContents() {
+  if (!browser_window_interface()) {
     return nullptr;
   }
-#endif
-  return chrome_test_utils::GetActiveWebContents(this);
+  tabs::TabInterface* active_tab =
+      TabListInterface::From(browser_window_interface())->GetActiveTab();
+  return active_tab ? active_tab->GetContents() : nullptr;
+}
+
+content::WebContents* ExtensionBrowserTest::GetWebContentsAt(int index) {
+  if (!browser_window_interface()) {
+    return nullptr;
+  }
+  return TabListInterface::From(browser_window_interface())
+      ->GetTab(index)
+      ->GetContents();
 }
 
 base::FilePath ExtensionBrowserTest::PackExtension(
@@ -773,15 +817,20 @@ base::FilePath ExtensionBrowserTest::PackExtensionWithOptions(
   return crx_path;
 }
 
-bool ExtensionBrowserTest::NavigateToURL(const GURL& url) {
-  content::WebContents* web_contents = GetActiveWebContents();
-  content::TestNavigationObserver observer(web_contents);
-  // The return value is ignored because some tests load URLs that cause
-  // redirects, or are blocked URLs, which make NavigateToURL return false.
-  (void)content::NavigateToURL(web_contents, url);
-  // Ensure the navigation happened.
-  observer.Wait();
-  return observer.last_navigation_succeeded();
+bool ExtensionBrowserTest::NavigateToURL(content::WebContents* web_contents,
+                                         const GURL& url) {
+  return chrome_test_utils::NavigateToURL(web_contents, url);
+}
+
+bool ExtensionBrowserTest::NavigateToURL(BrowserWindowInterface* browser_window,
+                                         const GURL& url) {
+#if BUILDFLAG(IS_ANDROID)
+  NOTREACHED() << "Not supported on Android.";
+#else
+  auto* web_contents =
+      browser_window->GetTabStripModel()->GetActiveWebContents();
+  return NavigateToURL(web_contents, url);
+#endif
 }
 
 bool ExtensionBrowserTest::GetCurrentTabTitle(std::u16string* title) {
@@ -803,6 +852,8 @@ content::WebContents* ExtensionBrowserTest::PlatformOpenURLOffTheRecord(
     const GURL& url) {
 #if BUILDFLAG(IS_ANDROID)
   // Android doesn't have an OpenURLOffTheRecord() helper so we roll our own.
+  // TODO(crbug.com/424860292): Delete this code when CreateBrowserWindow()
+  // works on desktop Android for incognito windows.
   Profile* incognito_profile =
       this->profile()->GetPrimaryOTRProfile(/*create_if_needed=*/true);
   // Close any old incognito tabs before creating the new tab model.
@@ -824,6 +875,30 @@ content::WebContents* ExtensionBrowserTest::PlatformOpenURLOffTheRecord(
   Browser* otr_browser = OpenURLOffTheRecord(profile, url);
   return otr_browser->tab_strip_model()->GetActiveWebContents();
 #endif
+}
+
+BrowserWindowInterface* ExtensionBrowserTest::CreateBrowserWindowWithType(
+    BrowserWindowInterface::Type type) {
+  BrowserWindowCreateParams create_params = BrowserWindowCreateParams(
+      type, *GetProfile(), /*from_user_gesture=*/false);
+  if (type == BrowserWindowInterface::Type::TYPE_APP) {
+    // Apps must have an app name.
+    create_params.app_name = "app_name";
+  }
+  base::test::TestFuture<BrowserWindowInterface*> future;
+  CreateBrowserWindow(std::move(create_params), future.GetCallback());
+  return future.Get();
+}
+
+BrowserWindowInterface* ExtensionBrowserTest::CreateIncognitoBrowserWindow() {
+  auto type = BrowserWindowInterface::Type::TYPE_NORMAL;
+  Profile* incognito_profile =
+      GetProfile()->GetPrimaryOTRProfile(/*create_if_needed=*/true);
+  BrowserWindowCreateParams create_params = BrowserWindowCreateParams(
+      type, *incognito_profile, /*from_user_gesture=*/false);
+  base::test::TestFuture<BrowserWindowInterface*> future;
+  CreateBrowserWindow(std::move(create_params), future.GetCallback());
+  return future.Get();
 }
 
 content::RenderFrameHost* ExtensionBrowserTest::NavigateToURLInNewTab(
@@ -895,7 +970,7 @@ ExtensionHost* ExtensionBrowserTest::FindHostWithPath(ProcessManager* manager,
   ExtensionHost* result_host = nullptr;
   int num_hosts = 0;
   for (ExtensionHost* host : manager->background_hosts()) {
-    if (host->GetLastCommittedURL().path() == path) {
+    if (host->GetLastCommittedURL().GetPath() == path) {
       EXPECT_FALSE(result_host);
       result_host = host;
     }
@@ -916,45 +991,23 @@ content::ServiceWorkerContext* ExtensionBrowserTest::GetServiceWorkerContext(
 }
 
 int ExtensionBrowserTest::GetTabCount() {
-#if BUILDFLAG(IS_ANDROID)
-  TabModel* tab_model =
-      TabModelList::GetTabModelForWebContents(GetActiveWebContents());
-  return tab_model->GetTabCount();
-#else
-  return browser()->tab_strip_model()->count();
-#endif
+  return TabListInterface::From(browser_window_interface())->GetTabCount();
 }
 
 bool ExtensionBrowserTest::IsTabSelected(int index) {
-#if BUILDFLAG(IS_ANDROID)
-  TabModel* tab_model =
-      TabModelList::GetTabModelForWebContents(GetActiveWebContents());
-  return tab_model->GetActiveIndex() == index;
-#else
-  return browser()->tab_strip_model()->IsTabSelected(index);
-#endif
+  return TabListInterface::From(browser_window_interface())->GetActiveIndex() ==
+         index;
 }
 
 void ExtensionBrowserTest::CloseTabForWebContents(
     content::WebContents* web_contents) {
-#if BUILDFLAG(IS_ANDROID)
-  TabModel* tab_model = TabModelList::GetTabModelForWebContents(web_contents);
-  CHECK(tab_model);
-  for (int index = 0; index < tab_model->GetTabCount(); ++index) {
-    if (tab_model->GetWebContentsAt(index) == web_contents) {
-      tab_model->CloseTabAt(index);
-      return;
-    }
-  }
-  NOTREACHED() << "WebContents not found";
-#else
-  Browser* browser = chrome::FindBrowserWithTab(web_contents);
-  CHECK(browser);
-  int index = browser->tab_strip_model()->GetIndexOfWebContents(web_contents);
-  CHECK_GE(index, 0) << "WebContents not found";
-  return browser->tab_strip_model()->CloseWebContentsAt(
-      index, TabCloseTypes::CLOSE_NONE);
-#endif
+  content::WebContentsDestroyedWatcher destroyed_watcher(web_contents);
+  TabListInterface* tab_list = nullptr;
+  int tab_index = -1;
+  ASSERT_TRUE(ExtensionTabUtil::GetTabListInterface(*web_contents, &tab_list,
+                                                    &tab_index));
+  tab_list->CloseTab(tab_list->GetTab(tab_index)->GetHandle());
+  destroyed_watcher.Wait();
 }
 
 base::Value ExtensionBrowserTest::ExecuteScriptInBackgroundPage(
@@ -1028,16 +1081,26 @@ content::WebContents* ExtensionBrowserTest::web_contents() {
   return web_contents_.get();
 }
 
+BrowserWindowInterface* ExtensionBrowserTest::browser_window_interface() {
+#if BUILDFLAG(IS_ANDROID)
+  std::vector<BrowserWindowInterface*> all_browsers =
+      GetAllBrowserWindowInterfaces();
+  return all_browsers.empty() ? nullptr : all_browsers.front();
+#else
+  return browser();
+#endif
+}
+
 ExtensionService* ExtensionBrowserTest::extension_service() {
   return ExtensionSystem::Get(profile())->extension_service();
 }
 
-void ExtensionBrowserTest::UseHttpsTestServer() {
+void ExtensionBrowserTest::UseHttpsTestServer(
+    net::EmbeddedTestServer::ServerCertificate server_certificate) {
   https_test_server_ = std::make_unique<net::EmbeddedTestServer>(
       net::EmbeddedTestServer::TYPE_HTTPS);
   https_test_server_.get()->AddDefaultHandlers(GetChromeTestDataDir());
-  https_test_server_.get()->SetSSLConfig(
-      net::EmbeddedTestServer::CERT_TEST_NAMES);
+  https_test_server_.get()->SetSSLConfig(server_certificate);
 }
 
 }  // namespace extensions

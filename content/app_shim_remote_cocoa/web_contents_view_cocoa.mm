@@ -6,7 +6,6 @@
 
 #include <AppKit/AppKit.h>
 
-#include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #import "base/mac/mac_util.h"
@@ -16,7 +15,6 @@
 #import "content/app_shim_remote_cocoa/web_drag_source_mac.h"
 #import "content/browser/web_contents/web_contents_view_mac.h"
 #import "content/browser/web_contents/web_drag_dest_mac.h"
-#include "content/common/features.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/common/content_client.h"
 #include "ui/base/clipboard/clipboard_constants.h"
@@ -75,10 +73,10 @@ class DroppedScreenShotCopierMac {
  private:
   bool IsPathScreenShot(const base::FilePath& path) const {
     const std::string& value = path.value();
-    if (!base::Contains(value, "/var")) {
+    if (!value.contains("/var")) {
       return false;
     }
-    if (!base::Contains(value, "screencaptureui")) {
+    if (!value.contains("screencaptureui")) {
       return false;
     }
     return true;
@@ -128,6 +126,11 @@ STATIC_ASSERT_ENUM(NSDragOperationMove, ui::DragDropTypes::DRAG_MOVE);
 }
 
 + (void)initialize {
+  if (![WebContentsOcclusionCheckerMac
+          manualOcclusionDetectionSupportedForCurrentMacOSVersion]) {
+    return;
+  }
+
   // Create the WebContentsOcclusionCheckerMac shared instance.
   [WebContentsOcclusionCheckerMac sharedInstance];
 }

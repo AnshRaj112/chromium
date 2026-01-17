@@ -20,6 +20,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/location.h"
+#include "base/memory/memory_pressure_listener_registry.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
@@ -93,10 +94,12 @@ gpu::SyncToken GenSyncToken() {
                         next_release++);
 }
 
-viz::TransferableResource MakeFakeResource() {
+viz::TransferableResource MakeFakeResource(
+    const viz::TransferableResource::MetadataOverride& override = {}) {
   return viz::TransferableResource::Make(
       gpu::ClientSharedImage::CreateForTesting(),
-      viz::TransferableResource::ResourceSource::kTest, GenSyncToken());
+      viz::TransferableResource::ResourceSource::kTest, GenSyncToken(),
+      override);
 }
 
 viz::TransferableResource MakeFakeSoftwareResource() {
@@ -329,12 +332,13 @@ TEST_F(TextureLayerTest, ShutdownWithResource) {
   }
 }
 
-class TestMailboxHolder : public TextureLayer::TransferableResourceHolder {
+class TestTransferableResourceHolder
+    : public TextureLayer::TransferableResourceHolder {
  public:
   using TextureLayer::TransferableResourceHolder::Create;
 
  protected:
-  ~TestMailboxHolder() override = default;
+  ~TestTransferableResourceHolder() override = default;
 };
 
 class TextureLayerWithResourceTest : public TextureLayerTest {
@@ -398,7 +402,9 @@ TEST_F(TextureLayerWithResourceTest, AffectedByHdr) {
   EXPECT_CALL(*layer_tree_host_, SetNeedsCommit()).Times(AtLeast(1));
 
   // sRGB is unaffected by HDR parameters.
-  test_resource1_.resource.color_space = gfx::ColorSpace::CreateSRGB();
+  test_resource1_.resource =
+      MakeFakeResource({.color_space = gfx::ColorSpace::CreateSRGB()});
+  test_resource1_.creation_sync_token = test_resource1_.resource.sync_token();
   test_layer->SetTransferableResource(test_resource1_.resource,
                                       test_resource1_.release_callback);
   Mock::VerifyAndClearExpectations(layer_tree_host_.get());
@@ -407,7 +413,9 @@ TEST_F(TextureLayerWithResourceTest, AffectedByHdr) {
   test_resource1_.ExpectRelease();
 
   // HDR10 is affected by HDR parameters.
-  test_resource2_.resource.color_space = gfx::ColorSpace::CreateHDR10();
+  test_resource2_.resource =
+      MakeFakeResource({.color_space = gfx::ColorSpace::CreateHDR10()});
+  test_resource2_.creation_sync_token = test_resource2_.resource.sync_token();
   test_layer->SetTransferableResource(test_resource2_.resource,
                                       test_resource2_.release_callback);
   Mock::VerifyAndClearExpectations(layer_tree_host_.get());
@@ -424,9 +432,9 @@ TEST_F(TextureLayerWithResourceTest, AffectedByHdr) {
   EXPECT_TRUE(test_layer->RequiresSetNeedsDisplayOnHdrHeadroomChange());
 }
 
-class TextureLayerMailboxHolderTest : public TextureLayerTest {
+class TextureLayerTransferableResourceHolderTest : public TextureLayerTest {
  public:
-  TextureLayerMailboxHolderTest() : main_thread_("MAIN") {
+  TextureLayerTransferableResourceHolderTest() : main_thread_("MAIN") {
     main_thread_.Start();
     sync_token1_ = GenSyncToken();
     sync_token2_ = GenSyncToken();
@@ -442,7 +450,7 @@ class TextureLayerMailboxHolderTest : public TextureLayerTest {
   }
 
   void CreateMainRef() {
-    resource_holder_ = TestMailboxHolder::Create(
+    resource_holder_ = TestTransferableResourceHolder::Create(
         test_resource1_.resource, test_resource1_.release_callback);
   }
 
@@ -463,13 +471,15 @@ class TextureLayerMailboxHolderTest : public TextureLayerTest {
   gpu::SyncToken sync_token2_;
 };
 
-TEST_F(TextureLayerMailboxHolderTest, TwoCompositors_BothReleaseThenMain) {
+TEST_F(TextureLayerTransferableResourceHolderTest,
+       TwoCompositors_BothReleaseThenMain) {
   scoped_refptr<TextureLayer> test_layer = TextureLayer::Create(nullptr);
   ASSERT_TRUE(test_layer.get());
 
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::CreateMainRef,
-                                base::Unretained(this)));
+      FROM_HERE,
+      base::BindOnce(&TextureLayerTransferableResourceHolderTest::CreateMainRef,
+                     base::Unretained(this)));
 
   Wait(main_thread_);
 
@@ -477,17 +487,19 @@ TEST_F(TextureLayerMailboxHolderTest, TwoCompositors_BothReleaseThenMain) {
   // impl tree.
   viz::ReleaseCallback compositor1;
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::CreateImplRef,
-                                base::Unretained(this), &compositor1,
-                                main_thread_.task_runner()));
+      FROM_HERE,
+      base::BindOnce(&TextureLayerTransferableResourceHolderTest::CreateImplRef,
+                     base::Unretained(this), &compositor1,
+                     main_thread_.task_runner()));
 
   // Then the texture layer is removed and attached to compositor2, and passes a
   // reference to its impl tree.
   viz::ReleaseCallback compositor2;
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::CreateImplRef,
-                                base::Unretained(this), &compositor2,
-                                main_thread_.task_runner()));
+      FROM_HERE,
+      base::BindOnce(&TextureLayerTransferableResourceHolderTest::CreateImplRef,
+                     base::Unretained(this), &compositor2,
+                     main_thread_.task_runner()));
 
   Wait(main_thread_);
   test_resource1_.Verify();
@@ -506,19 +518,23 @@ TEST_F(TextureLayerMailboxHolderTest, TwoCompositors_BothReleaseThenMain) {
   test_resource1_.ExpectReleaseWithSyncToken(sync_token2_, false);
 
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::ReleaseMainRef,
-                                base::Unretained(this)));
+      FROM_HERE,
+      base::BindOnce(
+          &TextureLayerTransferableResourceHolderTest::ReleaseMainRef,
+          base::Unretained(this)));
   Wait(main_thread_);
   test_resource1_.Verify();
 }
 
-TEST_F(TextureLayerMailboxHolderTest, TwoCompositors_MainReleaseBetween) {
+TEST_F(TextureLayerTransferableResourceHolderTest,
+       TwoCompositors_MainReleaseBetween) {
   scoped_refptr<TextureLayer> test_layer = TextureLayer::Create(nullptr);
   ASSERT_TRUE(test_layer.get());
 
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::CreateMainRef,
-                                base::Unretained(this)));
+      FROM_HERE,
+      base::BindOnce(&TextureLayerTransferableResourceHolderTest::CreateMainRef,
+                     base::Unretained(this)));
 
   Wait(main_thread_);
 
@@ -526,17 +542,19 @@ TEST_F(TextureLayerMailboxHolderTest, TwoCompositors_MainReleaseBetween) {
   // impl tree.
   viz::ReleaseCallback compositor1;
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::CreateImplRef,
-                                base::Unretained(this), &compositor1,
-                                main_thread_.task_runner()));
+      FROM_HERE,
+      base::BindOnce(&TextureLayerTransferableResourceHolderTest::CreateImplRef,
+                     base::Unretained(this), &compositor1,
+                     main_thread_.task_runner()));
 
   // Then the texture layer is removed and attached to compositor2, and passes a
   // reference to its impl tree.
   viz::ReleaseCallback compositor2;
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::CreateImplRef,
-                                base::Unretained(this), &compositor2,
-                                main_thread_.task_runner()));
+      FROM_HERE,
+      base::BindOnce(&TextureLayerTransferableResourceHolderTest::CreateImplRef,
+                     base::Unretained(this), &compositor2,
+                     main_thread_.task_runner()));
 
   Wait(main_thread_);
   test_resource1_.ExpectNoRelease().Verify();
@@ -546,8 +564,10 @@ TEST_F(TextureLayerMailboxHolderTest, TwoCompositors_MainReleaseBetween) {
 
   // Then the main thread reference is destroyed.
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::ReleaseMainRef,
-                                base::Unretained(this)));
+      FROM_HERE,
+      base::BindOnce(
+          &TextureLayerTransferableResourceHolderTest::ReleaseMainRef,
+          base::Unretained(this)));
 
   Wait(main_thread_);
 
@@ -561,13 +581,15 @@ TEST_F(TextureLayerMailboxHolderTest, TwoCompositors_MainReleaseBetween) {
   test_resource1_.Verify();
 }
 
-TEST_F(TextureLayerMailboxHolderTest, TwoCompositors_MainReleasedFirst) {
+TEST_F(TextureLayerTransferableResourceHolderTest,
+       TwoCompositors_MainReleasedFirst) {
   scoped_refptr<TextureLayer> test_layer = TextureLayer::Create(nullptr);
   ASSERT_TRUE(test_layer.get());
 
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::CreateMainRef,
-                                base::Unretained(this)));
+      FROM_HERE,
+      base::BindOnce(&TextureLayerTransferableResourceHolderTest::CreateMainRef,
+                     base::Unretained(this)));
 
   Wait(main_thread_);
 
@@ -575,25 +597,29 @@ TEST_F(TextureLayerMailboxHolderTest, TwoCompositors_MainReleasedFirst) {
   // impl tree.
   viz::ReleaseCallback compositor1;
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::CreateImplRef,
-                                base::Unretained(this), &compositor1,
-                                main_thread_.task_runner()));
+      FROM_HERE,
+      base::BindOnce(&TextureLayerTransferableResourceHolderTest::CreateImplRef,
+                     base::Unretained(this), &compositor1,
+                     main_thread_.task_runner()));
 
   // Then the texture layer is removed and attached to compositor2, and passes a
   // reference to its impl tree.
   viz::ReleaseCallback compositor2;
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::CreateImplRef,
-                                base::Unretained(this), &compositor2,
-                                main_thread_.task_runner()));
+      FROM_HERE,
+      base::BindOnce(&TextureLayerTransferableResourceHolderTest::CreateImplRef,
+                     base::Unretained(this), &compositor2,
+                     main_thread_.task_runner()));
 
   Wait(main_thread_);
   test_resource1_.ExpectNoRelease().Verify();
 
   // The main thread reference is destroyed first.
   main_thread_.task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&TextureLayerMailboxHolderTest::ReleaseMainRef,
-                                base::Unretained(this)));
+      FROM_HERE,
+      base::BindOnce(
+          &TextureLayerTransferableResourceHolderTest::ReleaseMainRef,
+          base::Unretained(this)));
 
   // One compositor destroys their impl tree.
   std::move(compositor2).Run(sync_token2_, false);
@@ -1586,7 +1612,7 @@ class SoftwareTextureLayerPurgeMemoryTest : public SoftwareTextureLayerTest {
     // registered again on the next draw.
     if (step_ == 1)
       base::MemoryPressureListener::SimulatePressureNotification(
-          base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL);
+          base::MEMORY_PRESSURE_LEVEL_CRITICAL);
   }
 
   void DisplayReceivedCompositorFrameOnThread(
@@ -1599,13 +1625,14 @@ class SoftwareTextureLayerPurgeMemoryTest : public SoftwareTextureLayerTest {
     SoftwareTextureLayerTest::AfterTest();
   }
 
+  base::MemoryPressureListenerRegistry memory_pressure_listener_registry_;
   int step_ = 0;
   int verified_frames_ = 0;
 };
 
 // Run the single thread test only.
-// MemoryPressureListener::DoNotifyMemoryPressure() is called in this
-// PurgeMemoryTest. Although the observation is targeted on certain
+// MemoryPressureListenerRegistry::DoNotifyMemoryPressure() is called in
+// this PurgeMemoryTest. Although the observation is targeted on certain
 // configurations and will be dismissed later, it triggers a "CHECK failed:
 // checker.CalledOnValidSequence(&bound_at)" first on the multithreading
 // setting.
@@ -1714,12 +1741,35 @@ class SoftwareTextureLayerLoseFrameSinkTest : public SoftwareTextureLayerTest {
         // Release the TransferableResource before shutdown, the test ends when
         // it is released.
         texture_layer_->ClearClient();
+        break;
+      case 4:
+        // DisplayReceivedCompositorFrameOnThread and DidCommitAndDrawFrame
+        // may happen in random order since they are on different threads.
+        // In TreesInViz mode, DisplayReceivedCompositorFrameOnThread is
+        // further delayed, making the behavior more flaky. Therefore, here
+        // we explicitly wait until both happen before calling EndTest().
+        if (last_received_frame_ < step_) {
+          may_end_test_ = true;
+        } else {
+          EndTest();
+        }
     }
   }
 
   void DisplayReceivedCompositorFrameOnThread(
       const viz::CompositorFrame& frame) override {
+    MainThreadTaskRunner()->PostTask(
+        FROM_HERE,
+        base::BindOnce(&SoftwareTextureLayerLoseFrameSinkTest::VerifyFrame,
+                       base::Unretained(this), frame.metadata.frame_token));
+  }
+
+  void VerifyFrame(int frame_token) {
     verified_frames_++;
+    last_received_frame_ = frame_token;
+    if (may_end_test_) {
+      EndTest();
+    }
   }
 
   void WillCommit(const CommitState& commit_state) override {
@@ -1733,18 +1783,20 @@ class SoftwareTextureLayerLoseFrameSinkTest : public SoftwareTextureLayerTest {
 
     EXPECT_EQ(source_frame_number_, 3);
     released_ = true;
-    EndTest();
   }
 
   void AfterTest() override {
     EXPECT_EQ(4, verified_frames_);
+    EXPECT_TRUE(released_);
     SoftwareTextureLayerTest::AfterTest();
   }
 
   int step_ = 0;
   int verified_frames_ = 0;
   int source_frame_number_ = 0;
+  int last_received_frame_ = 0;
   bool released_ = false;
+  bool may_end_test_ = false;
 };
 
 SINGLE_AND_MULTI_THREAD_TEST_F(SoftwareTextureLayerLoseFrameSinkTest);

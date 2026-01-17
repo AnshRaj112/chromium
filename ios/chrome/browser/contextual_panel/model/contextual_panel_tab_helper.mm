@@ -18,7 +18,8 @@
 
 ContextualPanelTabHelper::ContextualPanelTabHelper(
     web::WebState* web_state,
-    std::map<ContextualPanelItemType, raw_ptr<ContextualPanelModel>> models)
+    std::map<ContextualPanelItemType,
+             raw_ptr<ContextualPanelModel, DanglingUntriaged>> models)
     : web_state_(web_state), models_(models), weak_ptr_factory_(this) {
   web_state_observation_.Observe(web_state_);
 }
@@ -90,6 +91,14 @@ void ContextualPanelTabHelper::SetLoudMomentEntrypointShown(bool shown) {
   loud_moment_entrypoint_shown_for_curent_page_navigation_ = shown;
 }
 
+bool ContextualPanelTabHelper::WasLoudMomentEntrypointCanceled() {
+  return loud_moment_entrypoint_canceled_for_curent_page_navigation_;
+}
+
+void ContextualPanelTabHelper::SetLoudMomentEntrypointCanceled(bool canceled) {
+  loud_moment_entrypoint_canceled_for_curent_page_navigation_ = canceled;
+}
+
 std::optional<ContextualPanelTabHelper::EntrypointMetricsData>&
 ContextualPanelTabHelper::GetMetricsData() {
   return metrics_data_;
@@ -103,10 +112,8 @@ void ContextualPanelTabHelper::SetMetricsData(
 bool ContextualPanelTabHelper::ShouldRefreshData(
     web::WebState* web_state,
     web::NavigationContext* navigation_context) {
-  // Refresh data if navigation is to a new URL (ignoring ref) or a new
-  // document.
-  return previous_url_ != navigation_context->GetUrl().GetWithoutRef() ||
-         !navigation_context->IsSameDocument();
+  // Refresh data if navigation is not to the same document.
+  return !navigation_context->IsSameDocument();
 }
 
 #pragma mark - WebStateObserver
@@ -130,6 +137,7 @@ void ContextualPanelTabHelper::DidStartNavigation(
 
   metrics_data_ = std::nullopt;
   loud_moment_entrypoint_shown_for_curent_page_navigation_ = false;
+  loud_moment_entrypoint_canceled_for_curent_page_navigation_ = false;
 
   // Clear the configs and notify the observers.
   sorted_weak_configurations_.clear();

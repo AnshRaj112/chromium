@@ -296,7 +296,7 @@ bool DesktopWindowTreeHostLinux::IsOverrideRedirect(
 }
 
 gfx::Rect DesktopWindowTreeHostLinux::GetGuessedFullScreenSizeInPx() const {
-  display::Screen* screen = display::Screen::GetScreen();
+  display::Screen* screen = display::Screen::Get();
   const display::Display display =
       screen->GetDisplayMatching(GetWindowBoundsInScreen());
   return gfx::Rect(gfx::ScaleToFlooredPoint(display.bounds().origin(),
@@ -346,6 +346,35 @@ DesktopWindowTreeHostLinux::GetKeyboardLayoutMap() {
     return linux_ui->GetKeyboardLayoutMap();
   }
   return WindowTreeHostPlatform::GetKeyboardLayoutMap();
+}
+
+bool DesktopWindowTreeHostLinux::SupportsMouseLock() {
+  auto* wayland_extension = ui::GetWaylandToplevelExtension(*platform_window());
+  if (!wayland_extension) {
+    return false;
+  }
+
+  return wayland_extension->SupportsPointerLock();
+}
+
+void DesktopWindowTreeHostLinux::LockMouse(aura::Window* window) {
+  DesktopWindowTreeHostPlatform::LockMouse(window);
+
+  if (SupportsMouseLock()) {
+    auto* wayland_extension =
+        ui::GetWaylandToplevelExtension(*platform_window());
+    wayland_extension->LockPointer(true /*enabled*/);
+  }
+}
+
+void DesktopWindowTreeHostLinux::UnlockMouse(aura::Window* window) {
+  DesktopWindowTreeHostPlatform::UnlockMouse(window);
+
+  if (SupportsMouseLock()) {
+    auto* wayland_extension =
+        ui::GetWaylandToplevelExtension(*platform_window());
+    wayland_extension->LockPointer(false /*enabled*/);
+  }
 }
 
 void DesktopWindowTreeHostLinux::OnCompleteSwapWithNewSize(

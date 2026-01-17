@@ -8,10 +8,13 @@
 
 #include "base/files/file_util.h"
 #include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
+#include "base/strings/strcat.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "base/test/run_until.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/test_file_util.h"
 #include "chrome/browser/enterprise/identifiers/profile_id_service_factory.h"
@@ -45,10 +48,12 @@
 #include "components/policy/core/common/cloud/cloud_external_data_manager.h"
 #include "components/policy/core/common/cloud/mock_cloud_policy_client.h"
 #include "components/policy/core/common/cloud/mock_cloud_policy_store.h"
+#include "components/policy/core/common/cloud/mock_device_management_service.h"
 #include "components/policy/core/common/cloud/mock_profile_cloud_policy_store.h"
 #include "components/policy/core/common/cloud/mock_user_cloud_policy_store.h"
 #include "components/policy/core/common/cloud/profile_cloud_policy_manager.h"
 #include "components/policy/core/common/cloud/user_cloud_policy_manager.h"
+#include "components/policy/core/common/schema_registry.h"
 #include "components/policy/proto/device_management_backend.pb.h"
 #include "google_apis/gaia/core_account_id.h"
 #include "services/network/test/test_network_connection_tracker.h"
@@ -57,10 +62,11 @@
 #include "url/gurl.h"
 
 using testing::_;
+using testing::DoAll;
 using testing::Invoke;
 using testing::Return;
+using testing::SaveArg;
 
-using policy::MockCloudPolicyClient;
 using policy::MockProfileCloudPolicyStore;
 using policy::MockUserCloudPolicyStore;
 using policy::ProfileCloudPolicyManager;
@@ -70,7 +76,9 @@ using RegistrationParameters =
 
 using signin::IdentityManager;
 
+namespace policy {
 namespace {
+
 const char kOidcEnrollmentHistogramName[] = "Enterprise.OidcEnrollment";
 
 const ProfileManagementOidcTokens kExampleOidcTokens =
@@ -149,19 +157,24 @@ class FakeBubbleHandle : public ScopedWebSigninInterceptionBubbleHandle {
 
 // Fake OIDC policy sign in service that simulates policy fetch success/failure.
 class FakeUserPolicyOidcSigninService
-    : public policy::MockUserPolicyOidcSigninService {
+    : public policy::UserPolicyOidcSigninService {
  public:
   static std::unique_ptr<KeyedService> CreateFakeUserPolicyOidcSigninService(
       bool will_policy_fetch_succeed,
+      MockJobCreationHandler* job_creation_handler,
+      FakeDeviceManagementService* device_management_service,
       content::BrowserContext* context) {
     Profile* profile = Profile::FromBrowserContext(context);
+
     auto fake_service =
         (profile->GetUserCloudPolicyManager())
             ? std::make_unique<FakeUserPolicyOidcSigninService>(
-                  profile, profile->GetUserCloudPolicyManager(),
+                  profile, job_creation_handler, device_management_service,
+                  profile->GetUserCloudPolicyManager(),
                   will_policy_fetch_succeed)
             : std::make_unique<FakeUserPolicyOidcSigninService>(
-                  profile, profile->GetProfileCloudPolicyManager(),
+                  profile, job_creation_handler, device_management_service,
+                  profile->GetProfileCloudPolicyManager(),
                   will_policy_fetch_succeed);
 
     return std::move(fake_service);
@@ -169,16 +182,21 @@ class FakeUserPolicyOidcSigninService
 
   FakeUserPolicyOidcSigninService(
       Profile* profile,
+      MockJobCreationHandler* job_creation_handler,
+      FakeDeviceManagementService* device_management_service,
       std::variant<UserCloudPolicyManager*, ProfileCloudPolicyManager*>
           policy_manager,
       bool will_policy_fetch_succeed)
-      : policy::MockUserPolicyOidcSigninService(profile,
-                                                nullptr,
-                                                nullptr,
-                                                policy_manager,
-                                                nullptr,
-                                                nullptr),
+      : policy::UserPolicyOidcSigninService(
+            profile,
+            TestingBrowserProcess::GetGlobal()->local_state(),
+            static_cast<DeviceManagementService*>(device_management_service),
+            policy_manager,
+            IdentityManagerFactory::GetForProfile(profile),
+            nullptr),
         test_profile_(profile),
+        job_creation_handler_(job_creation_handler),
+        device_management_service_(device_management_service),
         will_policy_fetch_succeed_(will_policy_fetch_succeed) {}
 
   // policy::UserPolicySigninServiceBase:
@@ -193,23 +211,46 @@ class FakeUserPolicyOidcSigninService
       std::move(callback).Run(will_policy_fetch_succeed_);
       return;
     }
-    auto policy_data = std::make_unique<enterprise_management::PolicyData>();
-    policy_data->set_gaia_id(kExampleGaiaId.ToString());
-    if (test_profile_->GetProfileCloudPolicyManager()) {
-      static_cast<MockProfileCloudPolicyStore*>(
-          test_profile_->GetProfileCloudPolicyManager()->core()->store())
-          ->set_policy_data_for_testing(std::move(policy_data));
-    } else {
-      static_cast<MockUserCloudPolicyStore*>(
-          test_profile_->GetUserCloudPolicyManager()->core()->store())
-          ->set_policy_data_for_testing(std::move(policy_data));
-    }
 
-    std::move(callback).Run(will_policy_fetch_succeed_);
+    captured_callback_ = std::move(callback);
+
+    EXPECT_CALL(*job_creation_handler_, OnJobCreation)
+        .WillOnce(DoAll(
+            device_management_service_->CaptureJobType(&captured_job_type_),
+            [this]() { SimulatePolicyFetch(); }));
+
+    UserPolicySigninServiceBase::FetchPolicyForSignedInUser(
+        account_id, dm_token, client_id, user_affiliation_ids,
+        test_shared_loader_factory, base::DoNothing());
+  }
+
+  void SimulatePolicyFetch() {
+    if (captured_job_type_ ==
+        DeviceManagementService::JobConfiguration::TYPE_POLICY_FETCH) {
+      auto policy_data = std::make_unique<enterprise_management::PolicyData>();
+      policy_data->set_gaia_id(kExampleGaiaId.ToString());
+      if (test_profile_->GetProfileCloudPolicyManager()) {
+        static_cast<MockProfileCloudPolicyStore*>(
+            test_profile_->GetProfileCloudPolicyManager()->core()->store())
+            ->set_policy_data_for_testing(std::move(policy_data));
+      } else {
+        static_cast<MockUserCloudPolicyStore*>(
+            test_profile_->GetUserCloudPolicyManager()->core()->store())
+            ->set_policy_data_for_testing(std::move(policy_data));
+      }
+
+      std::move(captured_callback_).Run(will_policy_fetch_succeed_);
+    }
   }
 
   raw_ptr<Profile> test_profile_ = nullptr;
+  raw_ptr<MockJobCreationHandler> job_creation_handler_;
+  raw_ptr<FakeDeviceManagementService> device_management_service_;
   bool will_policy_fetch_succeed_;
+
+  DeviceManagementService::JobConfiguration::JobType captured_job_type_ =
+      DeviceManagementService::JobConfiguration::TYPE_INVALID;
+  PolicyFetchCallback captured_callback_;
 };
 
 std::unique_ptr<KeyedService> CreateMalfunctionProfileIdService(
@@ -238,10 +279,15 @@ std::unique_ptr<KeyedService> BuildMockInterceptor(
 // up for testing.
 class UnittestProfileManager : public FakeProfileManager {
  public:
-  explicit UnittestProfileManager(const base::FilePath& user_data_dir,
-                                  bool will_policy_fetch_succeed_on_new_profile,
-                                  bool will_id_service_succeed_on_new_profile)
+  explicit UnittestProfileManager(
+      const base::FilePath& user_data_dir,
+      MockJobCreationHandler* job_creation_handler,
+      FakeDeviceManagementService* device_management_service,
+      bool will_policy_fetch_succeed_on_new_profile,
+      bool will_id_service_succeed_on_new_profile)
       : FakeProfileManager(user_data_dir),
+        job_creation_handler_(job_creation_handler),
+        device_management_service_(device_management_service),
         will_policy_fetch_succeed_on_new_profile_(
             will_policy_fetch_succeed_on_new_profile),
         will_id_service_succeed_on_new_profile_(
@@ -258,19 +304,23 @@ class UnittestProfileManager : public FakeProfileManager {
 
     if (std::holds_alternative<std::unique_ptr<UserCloudPolicyManager>>(
             policy_manager_)) {
-      builder.SetUserCloudPolicyManager(std::move(
-          std::get<std::unique_ptr<UserCloudPolicyManager>>(policy_manager_)));
+      auto user_cloud_policy_manager = std::move(
+          std::get<std::unique_ptr<UserCloudPolicyManager>>(policy_manager_));
+      builder.SetUserCloudPolicyManager(std::move(user_cloud_policy_manager));
     } else {
-      builder.SetProfileCloudPolicyManager(
+      auto profile_cloud_policy_manager =
           std::move(std::get<std::unique_ptr<ProfileCloudPolicyManager>>(
-              policy_manager_)));
+              policy_manager_));
+      builder.SetProfileCloudPolicyManager(
+          std::move(profile_cloud_policy_manager));
     }
 
     builder.AddTestingFactory(
         policy::UserPolicyOidcSigninServiceFactory::GetInstance(),
         base::BindRepeating(&FakeUserPolicyOidcSigninService::
                                 CreateFakeUserPolicyOidcSigninService,
-                            will_policy_fetch_succeed_on_new_profile_));
+                            will_policy_fetch_succeed_on_new_profile_,
+                            job_creation_handler_, device_management_service_));
     builder.AddTestingFactory(
         OidcAuthenticationSigninInterceptorFactory::GetInstance(),
         base::BindRepeating(&BuildMockInterceptor,
@@ -303,6 +353,8 @@ class UnittestProfileManager : public FakeProfileManager {
   std::variant<std::unique_ptr<UserCloudPolicyManager>,
                std::unique_ptr<ProfileCloudPolicyManager>>
       policy_manager_;
+  raw_ptr<MockJobCreationHandler> job_creation_handler_;
+  raw_ptr<FakeDeviceManagementService> device_management_service_;
   bool will_policy_fetch_succeed_on_new_profile_;
   bool will_id_service_succeed_on_new_profile_;
   int number_of_windows_;
@@ -337,6 +389,10 @@ class MockDelegate : public OidcAuthenticationSigninInterceptor::Delegate {
                const CoreAccountId&,
                WebSigninInterceptor::SigninInterceptionType),
               (override));
+  MOCK_METHOD(void,
+              ShowSigninError,
+              (content::WebContents*, const SigninUIError&),
+              (override));
 };
 
 }  // namespace
@@ -364,6 +420,7 @@ class OidcAuthenticationSigninInterceptorTest
   ~OidcAuthenticationSigninInterceptorTest() override = default;
 
   void SetUp() override {
+    device_management_service_.ScheduleInitialization(0);
     // Without setting test dm token storage, the profile ID service will fail
     // to retrieve client ID hence failing the service.
     policy::BrowserDMTokenStorage::SetForTesting(&storage_);
@@ -372,7 +429,8 @@ class OidcAuthenticationSigninInterceptorTest
     auto profile_path = base::MakeAbsoluteFilePath(
         base::CreateUniqueTempDirectoryScopedToTest());
     auto profile_manager_unique = std::make_unique<UnittestProfileManager>(
-        profile_path, will_policy_fetch_succeed_, will_id_service_succeed_);
+        profile_path, &job_creation_handler_, &device_management_service_,
+        will_policy_fetch_succeed_, will_id_service_succeed_);
     unit_test_profile_manager_ = profile_manager_unique.get();
     SetUpProfileManager(profile_path, std::move(profile_manager_unique));
     BrowserWithTestWindowTest::SetUp();
@@ -419,12 +477,25 @@ class OidcAuthenticationSigninInterceptorTest
         std::make_unique<MockUserCloudPolicyStore>();
     EXPECT_CALL(*mock_user_cloud_policy_store, Load())
         .Times(testing::AnyNumber());
+    std::unique_ptr<MockUserCloudPolicyStore>
+        mock_user_cloud_policy_extension_install_store;
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+    mock_user_cloud_policy_extension_install_store =
+        std::make_unique<MockUserCloudPolicyStore>();
+    EXPECT_CALL(*mock_user_cloud_policy_extension_install_store, Load())
+        .Times(testing::AnyNumber());
+#endif
 
-    return std::make_unique<UserCloudPolicyManager>(
-        std::move(mock_user_cloud_policy_store), base::FilePath(),
+    auto policy_manager = std::make_unique<UserCloudPolicyManager>(
+        std::move(mock_user_cloud_policy_store),
+        std::move(mock_user_cloud_policy_extension_install_store),
+        base::FilePath(),
         /*cloud_external_data_manager=*/nullptr,
         base::SingleThreadTaskRunner::GetCurrentDefault(),
         network::TestNetworkConnectionTracker::CreateGetter());
+
+    policy_manager->Init(&schema_registry_);
+    return policy_manager;
   }
 
   std::unique_ptr<ProfileCloudPolicyManager> BuildProfileCloudPolicyManager() {
@@ -432,12 +503,25 @@ class OidcAuthenticationSigninInterceptorTest
         std::make_unique<MockProfileCloudPolicyStore>();
     EXPECT_CALL(*mock_profile_cloud_policy_store, Load())
         .Times(testing::AnyNumber());
+    std::unique_ptr<MockProfileCloudPolicyStore>
+        mock_profile_cloud_policy_extension_install_store;
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+    mock_profile_cloud_policy_extension_install_store =
+        std::make_unique<MockProfileCloudPolicyStore>();
+    EXPECT_CALL(*mock_profile_cloud_policy_extension_install_store, Load())
+        .Times(testing::AnyNumber());
+#endif
 
-    return std::make_unique<ProfileCloudPolicyManager>(
-        std::move(mock_profile_cloud_policy_store), base::FilePath(),
+    auto policy_manager = std::make_unique<ProfileCloudPolicyManager>(
+        std::move(mock_profile_cloud_policy_store),
+        std::move(mock_profile_cloud_policy_extension_install_store),
+        base::FilePath(),
         /*cloud_external_data_manager=*/nullptr,
         base::SingleThreadTaskRunner::GetCurrentDefault(),
         network::TestNetworkConnectionTracker::CreateGetter());
+
+    policy_manager->Init(&schema_registry_);
+    return policy_manager;
   }
 
   // Test if profile is correctly created (or not created) by the interceptor
@@ -469,41 +553,41 @@ class OidcAuthenticationSigninInterceptorTest
           *mock_client_ptr,
           RegisterWithOidcResponse(_, kExampleOidcTokens.auth_token,
                                    kExampleOidcTokens.id_token, _, _, _, _))
-          .WillOnce(Invoke([&](const RegistrationParameters&,
-                               const std::string&, const std::string&,
-                               const std::string&, const base::TimeDelta&, bool,
-                               CloudPolicyClient::ResultCallback callback) {
+          .WillOnce([&](const RegistrationParameters&, const std::string&,
+                        const std::string&, const std::string&,
+                        const base::TimeDelta&, bool,
+                        CloudPolicyClient::ResultCallback callback) {
             mock_client_ptr->SetStatus(policy::DM_STATUS_TEMPORARY_UNAVAILABLE);
             mock_client_ptr->NotifyClientError();
             std::move(callback).Run(CloudPolicyClient::Result(
                 policy::DM_STATUS_TEMPORARY_UNAVAILABLE, /*net_error=*/1));
             register_run_loop.Quit();
-          }));
+          });
     } else if (expect_registration_attempt == RegistrationResult::kTimeout) {
       EXPECT_CALL(
           *mock_client_ptr,
           RegisterWithOidcResponse(_, kExampleOidcTokens.auth_token,
                                    kExampleOidcTokens.id_token, _, _, _, _))
-          .WillOnce(Invoke([&](const RegistrationParameters&,
-                               const std::string&, const std::string&,
-                               const std::string&, const base::TimeDelta&, bool,
-                               CloudPolicyClient::ResultCallback callback) {
+          .WillOnce([&](const RegistrationParameters&, const std::string&,
+                        const std::string&, const std::string&,
+                        const base::TimeDelta&, bool,
+                        CloudPolicyClient::ResultCallback callback) {
             mock_client_ptr->SetStatus(policy::DM_STATUS_TEMPORARY_UNAVAILABLE);
             mock_client_ptr->NotifyClientError();
             std::move(callback).Run(CloudPolicyClient::Result(
                 policy::DM_STATUS_TEMPORARY_UNAVAILABLE,
                 /*net_error=*/net::ERR_TIMED_OUT));
             register_run_loop.Quit();
-          }));
+          });
     } else if (expect_registration_attempt == RegistrationResult::kSuccess) {
       EXPECT_CALL(
           *mock_client_ptr,
           RegisterWithOidcResponse(_, kExampleOidcTokens.auth_token,
                                    kExampleOidcTokens.id_token, _, _, _, _))
-          .WillOnce(Invoke([&](const RegistrationParameters&,
-                               const std::string&, const std::string&,
-                               const std::string&, const base::TimeDelta&, bool,
-                               CloudPolicyClient::ResultCallback callback) {
+          .WillOnce([&](const RegistrationParameters&, const std::string&,
+                        const std::string&, const std::string&,
+                        const base::TimeDelta&, bool,
+                        CloudPolicyClient::ResultCallback callback) {
             mock_client_ptr->SetDMToken(kExampleDmToken);
             mock_client_ptr->SetStatus(policy::DM_STATUS_SUCCESS);
             mock_client_ptr->client_id_ = kExampleClientId;
@@ -518,7 +602,7 @@ class OidcAuthenticationSigninInterceptorTest
             std::move(callback).Run(CloudPolicyClient::Result(
                 policy::DM_STATUS_SUCCESS, /*net_error=*/0));
             register_run_loop.Quit();
-          }));
+          });
     }
 
     interceptor_->SetCloudPolicyClientForTesting(std::move(mock_client));
@@ -549,17 +633,17 @@ class OidcAuthenticationSigninInterceptorTest
             OidcProfileCreationResult::kSwitchedToExistingProfile) {
       EXPECT_CALL(*delegate_, ShowSigninInterceptionBubble(_, _, _))
           .Times(1)
-          .WillRepeatedly(Invoke(
+          .WillRepeatedly(
               [](content::WebContents*,
                  const WebSigninInterceptor::Delegate::BubbleParameters&,
                  base::OnceCallback<void(SigninInterceptionResult)> callback) {
                 std::move(callback).Run(SigninInterceptionResult::kAccepted);
                 return nullptr;
-              }));
+              });
     } else if (expect_dialog_to_show) {
       EXPECT_CALL(*delegate_, ShowOidcInterceptionDialog(_, _, _, _, _))
           .Times(1)
-          .WillRepeatedly(Invoke(
+          .WillRepeatedly(
               [&](content::WebContents*,
                   const WebSigninInterceptor::Delegate::BubbleParameters&,
                   signin::SigninChoiceWithConfirmAndRetryCallback callback,
@@ -569,7 +653,7 @@ class OidcAuthenticationSigninInterceptorTest
                     expected_operation_result);
                 fake_bubble_handle_ = fake_bubble_handle->AsWeakPtr();
                 return fake_bubble_handle;
-              }));
+              });
     } else {
       EXPECT_CALL(*delegate_, ShowOidcInterceptionDialog(_, _, _, _, _))
           .Times(0);
@@ -600,7 +684,7 @@ class OidcAuthenticationSigninInterceptorTest
     EXPECT_EQ(expected_num_profiles_after, num_profiles_after);
 
     if (expect_profile_created) {
-      ASSERT_TRUE(added_profile_);
+      ASSERT_TRUE(base::test::RunUntil([&]() { return !!added_profile_; }));
       auto* entry =
           TestingBrowserProcess::GetGlobal()
               ->profile_manager()
@@ -654,6 +738,24 @@ class OidcAuthenticationSigninInterceptorTest
       std::variant<OidcInterceptionResult, OidcProfileCreationResult>
           expected_enrollment_result,
       RegistrationResult expect_registration_attempt) {
+    ASSERT_TRUE(base::test::RunUntil([&]() {
+      if (std::holds_alternative<OidcInterceptionResult>(
+              expected_enrollment_result)) {
+        return histogram_tester_->GetBucketCount(
+                   base::StrCat({kOidcEnrollmentHistogramName,
+                                 kOidcInterceptionSuffix, kOidcResultSuffix}),
+                   std::get<OidcInterceptionResult>(
+                       expected_enrollment_result)) >= 1;
+      } else {
+        return histogram_tester_->GetBucketCount(
+                   base::StrCat({kOidcEnrollmentHistogramName,
+                                 kOidcProfileCreationSuffix, kOidcResultSuffix,
+                                 GetIdentitySuffix()}),
+                   std::get<OidcProfileCreationResult>(
+                       expected_enrollment_result)) >= 1;
+      }
+    }));
+
     if (std::holds_alternative<OidcInterceptionFunnelStep>(
             expected_last_funnel_step)) {
       histogram_tester_->ExpectBucketCount(
@@ -727,6 +829,12 @@ class OidcAuthenticationSigninInterceptorTest
   base::test::ScopedFeatureList scoped_feature_list_;
   bool will_policy_fetch_succeed_;
   bool will_id_service_succeed_;
+
+  policy::SchemaRegistry schema_registry_;
+
+  testing::StrictMock<policy::MockJobCreationHandler> job_creation_handler_;
+  policy::FakeDeviceManagementService device_management_service_{
+      &job_creation_handler_};
 
   raw_ptr<Profile> added_profile_;
   raw_ptr<UnittestProfileManager> unit_test_profile_manager_;
@@ -870,19 +978,17 @@ TEST_P(OidcAuthenticationSigninInterceptorTest, PolicyRecoveryFromPref) {
   policy::UserPolicyOidcSigninServiceFactory::GetForProfile(added_profile_)
       ->AttemptToRestorePolicy();
 
-  base::RunLoop().RunUntilIdle();
-
-  if (is_3p_identity_synced()) {
-    CHECK(added_profile_->GetUserCloudPolicyManager()
-              ->core()
-              ->store()
-              ->has_policy());
-  } else {
-    CHECK(added_profile_->GetProfileCloudPolicyManager()
-              ->core()
-              ->store()
-              ->has_policy());
-  }
+  ASSERT_TRUE(base::test::RunUntil([&]() {
+    return is_3p_identity_synced()
+               ? added_profile_->GetUserCloudPolicyManager()
+                     ->core()
+                     ->store()
+                     ->has_policy()
+               : added_profile_->GetProfileCloudPolicyManager()
+                     ->core()
+                     ->store()
+                     ->has_policy();
+  }));
 }
 
 INSTANTIATE_TEST_SUITE_P(All,
@@ -936,3 +1042,5 @@ TEST_P(OidcAuthenticationSigninInterceptorIdFailureTest, DeviceIdFailure) {
 INSTANTIATE_TEST_SUITE_P(All,
                          OidcAuthenticationSigninInterceptorIdFailureTest,
                          /*is_3p_identity_synced=*/testing::Bool());
+
+}  // namespace policy

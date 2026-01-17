@@ -6,6 +6,8 @@
 
 #include <stddef.h>
 
+#include <utility>
+
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
@@ -14,7 +16,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/synchronization/lock.h"
 #include "base/test/scoped_feature_list.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "build/build_config.h"
 #include "content/browser/media/session/media_session_impl.h"
 #include "content/public/browser/media_session_service.h"
@@ -59,7 +60,8 @@ class MediaInternalsTestBase {
     const std::string::size_type first_brace = utf8_update.find('{');
     const std::string::size_type last_brace = utf8_update.rfind('}');
     std::optional<base::Value> output_value = base::JSONReader::Read(
-        utf8_update.substr(first_brace, last_brace - first_brace + 1));
+        utf8_update.substr(first_brace, last_brace - first_brace + 1),
+        base::JSON_PARSE_CHROMIUM_EXTENSIONS);
     ASSERT_TRUE(output_value);
     ASSERT_TRUE(output_value->is_dict());
 
@@ -257,7 +259,7 @@ TEST_P(MediaInternalsAudioLogTest, AudioLogCreateStartStopErrorClose) {
   ExpectString("effects", "ECHO_CANCELLER | DUCKING");
   ExpectString("device_id", kTestDeviceID);
   ExpectInt("component_id", kTestComponentID);
-  ExpectInt("component_type", base::to_underlying(test_component_));
+  ExpectInt("component_type", std::to_underlying(test_component_));
   ExpectStatus("created");
 
   // Verify OnStarted().

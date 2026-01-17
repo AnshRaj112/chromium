@@ -8,13 +8,13 @@ import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
 
 import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import android.app.Activity;
 import android.graphics.drawable.ColorDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 
 import androidx.core.content.ContextCompat;
 
@@ -30,6 +30,7 @@ import org.robolectric.annotation.Config;
 
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.omnibox.R;
+import org.chromium.chrome.browser.omnibox.suggestions.SuggestionListViewBinder.SuggestionListViewHolder;
 import org.chromium.chrome.browser.ui.theme.BrandedColorScheme;
 import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
 import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
@@ -48,7 +49,7 @@ public class SuggestionListViewBinderUnitTest {
     private @Mock DropdownItemViewInfo mDropdownItem;
 
     private PropertyModel mListModel;
-    private ViewGroup mContainer;
+    private OmniboxSuggestionsContainer mContainer;
     private OmniboxSuggestionsDropdown mDropdown;
     private ModelList mSuggestionModels;
     private final Activity mActivity = Robolectric.buildActivity(Activity.class).setup().get();
@@ -61,13 +62,13 @@ public class SuggestionListViewBinderUnitTest {
                         .with(SuggestionListProperties.SUGGESTION_MODELS, mSuggestionModels)
                         .build();
         mContainer =
-                (ViewGroup)
+                (OmniboxSuggestionsContainer)
                         LayoutInflater.from(mActivity)
                                 .inflate(R.layout.omnibox_results_container, /* root= */ null);
-        mDropdown = mContainer.findViewById(R.id.omnibox_suggestions_dropdown);
+        mDropdown = spy(mContainer.findViewById(R.id.omnibox_suggestions_dropdown));
         PropertyModelChangeProcessor.create(
                 mListModel,
-                new SuggestionListViewBinder.SuggestionListViewHolder(mContainer, mDropdown),
+                new SuggestionListViewHolder(mContainer, mDropdown),
                 SuggestionListViewBinder::bind);
     }
 
@@ -128,9 +129,10 @@ public class SuggestionListViewBinderUnitTest {
 
     @Test
     public void suggestionsContainerNotVisible_colorScheme() {
+        mListModel.set(SuggestionListProperties.IS_LARGE_SCREEN, true);
         mListModel.set(SuggestionListProperties.COLOR_SCHEME, BrandedColorScheme.APP_DEFAULT);
         mListModel.set(SuggestionListProperties.CONTAINER_ALWAYS_VISIBLE, false);
-        assertNull(mContainer.getBackground());
+        assertEquals(0, ((ColorDrawable) mContainer.getBackground()).getAlpha());
     }
 
     @Test
@@ -154,5 +156,13 @@ public class SuggestionListViewBinderUnitTest {
         assertEquals(
                 ContextCompat.getColor(mActivity, R.color.omnibox_suggestion_dropdown_bg),
                 background.getColor());
+    }
+
+    @Test
+    public void suggestionList_resetSelectionWhenItemsInserted() {
+        List<ListItem> suggestionsList = new ArrayList<>();
+        suggestionsList.add(mDropdownItem);
+        mSuggestionModels.set(suggestionsList);
+        verify(mDropdown).resetSelection();
     }
 }

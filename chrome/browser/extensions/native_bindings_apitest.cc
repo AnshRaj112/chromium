@@ -8,13 +8,13 @@
 #include "base/run_loop.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "chrome/browser/devtools/devtools_window.h"
 #include "chrome/browser/extensions/extension_action_dispatcher.h"
 #include "chrome/browser/extensions/extension_apitest.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/renderer_context_menu/render_view_context_menu_test_util.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/test/base/ui_test_utils.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -210,16 +210,15 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, DeclarativeEvents) {
   // The extension's page action should currently be hidden.
   ExtensionAction* action =
       ExtensionActionManager::Get(profile())->GetExtensionAction(*extension);
-  content::WebContents* web_contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
+  content::WebContents* web_contents = GetActiveWebContents();
   int tab_id = sessions::SessionTabHelper::IdForTab(web_contents).id();
   EXPECT_FALSE(action->GetIsVisible(tab_id));
   EXPECT_TRUE(action->GetDeclarativeIcon(tab_id).IsEmpty());
 
   // Navigating to example.com should show the page action.
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(
-      browser(), embedded_test_server()->GetURL(
-                     "example.com", "/native_bindings/simple.html")));
+  ASSERT_TRUE(NavigateToURL(
+      web_contents, embedded_test_server()->GetURL(
+                        "example.com", "/native_bindings/simple.html")));
   base::RunLoop().RunUntilIdle();
   EXPECT_TRUE(action->GetIsVisible(tab_id));
   EXPECT_FALSE(action->GetDeclarativeIcon(tab_id).IsEmpty());
@@ -279,16 +278,14 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, WebRequest) {
   ASSERT_TRUE(extension);
   ASSERT_TRUE(catcher.GetNextResult()) << catcher.message();
 
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(
-      browser(), embedded_test_server()->GetURL(
-                     "example.com", "/native_bindings/simple.html")));
+  auto* web_contents = GetActiveWebContents();
+  ASSERT_TRUE(NavigateToURL(
+      web_contents, embedded_test_server()->GetURL(
+                        "example.com", "/native_bindings/simple.html")));
 
   GURL expected_url = embedded_test_server()->GetURL(
       "example.com", "/native_bindings/simple2.html");
-  EXPECT_EQ(expected_url, browser()
-                              ->tab_strip_model()
-                              ->GetActiveWebContents()
-                              ->GetLastCommittedURL());
+  EXPECT_EQ(expected_url, web_contents->GetLastCommittedURL());
 }
 
 // Tests the context menu API, which includes calling sendRequest with an
@@ -322,8 +319,7 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, ContextMenusTest) {
     EXPECT_TRUE(listener.WaitUntilSatisfied());
   }
 
-  content::WebContents* web_contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
+  content::WebContents* web_contents = GetActiveWebContents();
   std::unique_ptr<TestRenderViewContextMenu> menu(
       TestRenderViewContextMenu::Create(web_contents,
                                         GURL("https://www.example.com")));
@@ -368,9 +364,10 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, ErrorsInCallbackTest) {
            });
          });)");
 
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(
-      browser(), embedded_test_server()->GetURL(
-                     "example.com", "/native_bindings/simple.html")));
+  ASSERT_TRUE(
+      NavigateToURL(GetActiveWebContents(),
+                    embedded_test_server()->GetURL(
+                        "example.com", "/native_bindings/simple.html")));
 
   ExtensionTestMessageListener listener("callback");
   ASSERT_TRUE(LoadExtension(test_dir.UnpackedPath()));
@@ -379,10 +376,8 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, ErrorsInCallbackTest) {
 
 // Tests that bindings are available in WebUI pages.
 IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, WebUIBindings) {
-  ASSERT_TRUE(
-      ui_test_utils::NavigateToURL(browser(), GURL("chrome://extensions")));
-  content::WebContents* web_contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
+  auto* web_contents = GetActiveWebContents();
+  ASSERT_TRUE(NavigateToURL(web_contents, GURL("chrome://extensions")));
 
   EXPECT_TRUE(ApiExists(web_contents, "chrome.developerPrivate"));
   EXPECT_TRUE(ApiExists(web_contents,
@@ -559,115 +554,6 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, PromiseBasedAPI) {
                    functions::HistogramValue::TABS_CREATE));
 }
 
-// Tests that calling an API which supports promises using an MV2 extension does
-// not get a promise based return and still needs to use callbacks when
-// required.
-IN_PROC_BROWSER_TEST_F(NativeBindingsApiTest, MV2PromisesNotSupported) {
-  base::HistogramTester histogram_tester;
-  ASSERT_TRUE(StartEmbeddedTestServer());
-
-  TestExtensionDir test_dir;
-  test_dir.WriteManifest(
-      R"({
-           "name": "Promises",
-           "manifest_version": 2,
-           "version": "0.1",
-           "background": {
-             "scripts": ["background.js"]
-           },
-           "permissions": ["tabs", "storage", "contentSettings", "privacy"]
-         })");
-  constexpr char kBackgroundJs[] =
-      R"(let tabIdGooge;
-
-         chrome.test.getConfig((config) => {
-           let exampleUrl = `https://example.com:${config.testServer.port}/`;
-           let googleUrl = `https://google.com:${config.testServer.port}/`
-
-           chrome.test.runTests([
-             function createNewTabPromise() {
-               let result = chrome.tabs.create({url: exampleUrl});
-               chrome.test.assertEq(undefined, result);
-               chrome.test.assertNoLastError();
-               chrome.test.succeed();
-             },
-             function queryTabPromise() {
-               let expectedError = 'Error in invocation of tabs.query(object ' +
-                   'queryInfo, function callback): No matching signature.';
-               chrome.test.assertThrows(chrome.tabs.query,
-                                        [{url: exampleUrl}],
-                                        expectedError);
-               chrome.test.succeed();
-             },
-             function storageAreaPromise() {
-               let expectedError = 'Error in invocation of storage.get(' +
-                   'optional [string|array|object] keys, function callback): ' +
-                   'No matching signature.';
-               chrome.test.assertThrows(chrome.storage.local.get,
-                                        chrome.storage.local,
-                                        ['foo'], expectedError);
-               chrome.test.succeed();
-             },
-             function contentSettingPromise() {
-               let expectedError = 'Error in invocation of contentSettings' +
-                   '.ContentSetting.get(object details, function callback): ' +
-                   'No matching signature.';
-               chrome.test.assertThrows(chrome.contentSettings.cookies.get,
-                                        chrome.contentSettings.cookies,
-                                        [{primaryUrl: exampleUrl}],
-                                        expectedError);
-               chrome.test.succeed();
-             },
-             function chromeSettingPromise() {
-               let expectedError = 'Error in invocation of types' +
-                   '.ChromeSetting.get(object details, function callback): ' +
-                   'No matching signature.';
-               chrome.test.assertThrows(
-                   chrome.privacy.websites.doNotTrackEnabled.get,
-                   chrome.privacy.websites.doNotTrackEnabled,
-                   [{}],
-                   expectedError);
-               chrome.test.succeed();
-             },
-             function createNewTabCallback() {
-               chrome.tabs.create({url: googleUrl}, (tab) => {
-                 let url = tab.pendingUrl;
-                 chrome.test.assertEq(googleUrl, url);
-                 tabIdGoogle = tab.id;
-                 chrome.test.assertNoLastError();
-                 chrome.test.succeed();
-               });
-             },
-             function queryTabCallback() {
-               chrome.tabs.query({url: googleUrl}, (tabs) => {
-                 chrome.test.assertTrue(tabs instanceof Array);
-                 chrome.test.assertEq(1, tabs.length);
-                 chrome.test.assertEq(tabIdGoogle, tabs[0].id);
-                 chrome.test.assertNoLastError();
-                 chrome.test.succeed();
-               });
-             }
-           ]);
-         });)";
-  test_dir.WriteFile(FILE_PATH_LITERAL("background.js"), kBackgroundJs);
-  ResultCatcher catcher;
-  ASSERT_TRUE(LoadExtension(test_dir.UnpackedPath()));
-  ASSERT_TRUE(catcher.GetNextResult()) << catcher.message();
-
-  // The above test makes 2 calls to chrome.tabs.create, so check that those
-  // have been logged in the histograms we expect, but not to the histograms
-  // specifically tracking service worker and MV3 calls.
-  EXPECT_EQ(2, histogram_tester.GetBucketCount(
-                   "Extensions.Functions.ExtensionCalls",
-                   functions::HistogramValue::TABS_CREATE));
-  EXPECT_EQ(0, histogram_tester.GetBucketCount(
-                   "Extensions.Functions.ExtensionServiceWorkerCalls",
-                   functions::HistogramValue::TABS_CREATE));
-  EXPECT_EQ(0, histogram_tester.GetBucketCount(
-                   "Extensions.Functions.ExtensionMV3Calls",
-                   functions::HistogramValue::TABS_CREATE));
-}
-
 class NativeBindingsBrowserNamespaceTest : public NativeBindingsApiTest {
  public:
   NativeBindingsBrowserNamespaceTest() {
@@ -708,13 +594,14 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsBrowserNamespaceTest,
 
   // Content script.
   ResultCatcher catcher;
-  ASSERT_TRUE(content::NavigateToURL(GetActiveWebContents(), test_website));
+  auto* web_contents = GetActiveWebContents();
+  ASSERT_TRUE(NavigateToURL(web_contents, test_website));
   ASSERT_TRUE(catcher.GetNextResult()) << catcher.message();
 
   // Extension page.
   ResultCatcher extension_resource_catcher;
-  ASSERT_TRUE(content::NavigateToURL(
-      GetActiveWebContents(),
+  ASSERT_TRUE(NavigateToURL(
+      web_contents,
       GURL(extension->GetResourceURL("extension_resource_page.html"))));
   ASSERT_TRUE(catcher.GetNextResult()) << catcher.message();
 }
@@ -741,9 +628,8 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsBrowserNamespaceTest,
   test_dir.WriteFile(FILE_PATH_LITERAL("background.js"), "");
   ASSERT_TRUE(LoadExtension(test_dir.UnpackedPath()));
 
-  ASSERT_TRUE(content::NavigateToURL(GetActiveWebContents(), test_website));
-  content::WebContents* web_contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
+  auto* web_contents = GetActiveWebContents();
+  ASSERT_TRUE(NavigateToURL(web_contents, test_website));
 
   EXPECT_TRUE(ApiExists(web_contents, "chrome.runtime"));
   EXPECT_TRUE(ApiExists(web_contents, "browser.runtime"));
@@ -754,10 +640,8 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsBrowserNamespaceTest,
 // Tests that the `browser` namespace is not available in WebUI.
 IN_PROC_BROWSER_TEST_F(NativeBindingsBrowserNamespaceTest, WebUIBindings) {
   ASSERT_TRUE(StartEmbeddedTestServer());
-  ASSERT_TRUE(
-      ui_test_utils::NavigateToURL(browser(), GURL("chrome://extensions")));
-  content::WebContents* web_contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
+  auto* web_contents = GetActiveWebContents();
+  ASSERT_TRUE(NavigateToURL(web_contents, GURL("chrome://extensions")));
 
   EXPECT_TRUE(ObjectIsDefined(web_contents, "chrome"));
   EXPECT_FALSE(ObjectIsDefined(web_contents, "browser"));
@@ -770,12 +654,204 @@ IN_PROC_BROWSER_TEST_F(NativeBindingsBrowserNamespaceTest,
   ASSERT_TRUE(StartEmbeddedTestServer());
   const GURL& test_website =
       embedded_test_server()->GetURL("a.com", "/title1.html");
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), test_website));
-  content::WebContents* web_contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
+  auto* web_contents = GetActiveWebContents();
+  ASSERT_TRUE(NavigateToURL(web_contents, test_website));
 
   EXPECT_TRUE(ObjectIsDefined(web_contents, "chrome"));
   EXPECT_FALSE(ObjectIsDefined(web_contents, "browser"));
+}
+
+// Tests that the browser namespace includes the devtools API.
+// Regression test for https://crbug.com/470092691.
+IN_PROC_BROWSER_TEST_F(NativeBindingsBrowserNamespaceTest,
+                       ChromeAndBrowserObjects_DevTools) {
+  // Load an extension that creates a devtools page/panel.
+  TestExtensionDir test_dir;
+  test_dir.WriteManifest(
+      R"({
+          "name": "DevTools test extension",
+          "version": "0.1",
+          "manifest_version": 3,
+          "devtools_page": "devtools.html"
+        })");
+  test_dir.WriteFile(FILE_PATH_LITERAL("devtools.html"),
+                     "<script src='devtools.js'></script>");
+  // Tests that the extension devtools page can access the devtools API.
+  test_dir.WriteFile(FILE_PATH_LITERAL("devtools.js"),
+                     R"(chrome.test.runTests([
+                        function checkDevTools() {
+                          chrome.test.assertTrue(chrome.devtools !== undefined,
+                                                 'chrome.devtools');
+                          chrome.test.assertTrue(browser.devtools !== undefined,
+                                                 'browser.devtools');
+                          chrome.test.succeed();
+                        }
+                      ]);)");
+
+  ResultCatcher catcher;
+  const Extension* extension = LoadExtension(test_dir.UnpackedPath());
+  ASSERT_TRUE(extension);
+
+  // Open a devtools window to get the extension devtools page (and tests) to
+  // load.
+  DevToolsWindow::OpenDevToolsWindow(GetActiveWebContents(),
+                                     DevToolsToggleAction::Show(),
+                                     DevToolsOpenedByAction::kUnknown);
+
+  // Wait for the devtools tests to run.
+  ASSERT_TRUE(catcher.GetNextResult()) << catcher.message();
+}
+
+// Tests that standard APIs like `runtime` are distinct objects in the `chrome`
+// and `browser` namespaces, even if they point to the same underlying API.
+IN_PROC_BROWSER_TEST_F(NativeBindingsBrowserNamespaceTest,
+                       ChromeAndBrowserObjects_ApiAliasing) {
+  TestExtensionDir test_dir;
+  test_dir.WriteManifest(
+      R"({
+          "name": "Api Aliasing test",
+          "version": "0.1",
+          "manifest_version": 3,
+          "background": {"service_worker": "background.js"}
+        })");
+  test_dir.WriteFile(FILE_PATH_LITERAL("background.js"),
+                     R"(chrome.test.runTests([
+                        function checkApiAliasing() {
+                          // Standard APIs like runtime are independently
+                          // created for both chrome and browser namespaces.
+                          // They are not aliases of each other identity-wise,
+                          // but they provide the same functionality.
+
+                          // Try to modify chrome.runtime as representative of
+                          // most APIs since they use the same bindings
+                          // accessor. In a non-devtools-page context like this,
+                          // the API root on chrome is typically writable.
+                          let originalRuntimeApi = chrome.runtime;
+                          chrome.runtime = 'bar';
+                          chrome.test.assertEq('bar', chrome.runtime);
+
+                          // Verify that browser.runtime was not affected by
+                          // the change to chrome.runtime, confirming it's an
+                          // independent object instance.
+                          chrome.test.assertEq(originalRuntimeApi,
+                                               browser.runtime);
+
+                          // Revert modification for the following tests.
+                          chrome.runtime = originalRuntimeApi;
+                          chrome.test.assertEq(originalRuntimeApi,
+                                               chrome.runtime);
+
+                          // Modify a member of chrome.runtime and confirm
+                          // browser.runtime reflects that change, because
+                          // both independent binding objects point to the
+                          // same underlying API implementation.
+                          chrome.runtime.sendMessage = 'bar';
+                          chrome.test.assertEq('bar',
+                                               chrome.runtime.sendMessage);
+                          chrome.test.assertEq(chrome.runtime.sendMessage,
+                                               browser.runtime.sendMessage);
+
+                          chrome.test.succeed();
+                        }
+                      ]);)");
+
+  ResultCatcher catcher;
+  const Extension* extension = LoadExtension(test_dir.UnpackedPath());
+  ASSERT_TRUE(extension);
+  ASSERT_TRUE(catcher.GetNextResult()) << catcher.message();
+}
+
+// Tests that browser.devtools is aliased to chrome.devtools in a devtools
+// context. This is unique because devtools API is injected by the devtools
+// frontend rather than the standard extension bindings system.
+IN_PROC_BROWSER_TEST_F(NativeBindingsBrowserNamespaceTest,
+                       ChromeAndBrowserObjects_DevToolsApiAliasing) {
+  TestExtensionDir test_dir;
+  test_dir.WriteManifest(
+      R"({
+          "name": "DevTools Aliasing test",
+          "version": "0.1",
+          "manifest_version": 3,
+          "devtools_page": "devtools.html"
+        })");
+  test_dir.WriteFile(FILE_PATH_LITERAL("devtools.html"),
+                     "<script src='devtools.js'></script>");
+  test_dir.WriteFile(FILE_PATH_LITERAL("devtools.js"),
+                     R"(chrome.test.runTests([
+                        function checkDevtoolsApiAliasing() {
+                          // Unlike other APIs, browser.devtools is a dynamic
+                          // alias (via a getter) to chrome.devtools. This is
+                          // necessary because devtools is injected by the
+                          // devtools frontend.
+
+                          // Attempts to overwrite the root chrome.devtools
+                          // object do not succeed though. In this context
+                          // (devtools page), it is non-writable/configurable.
+                          let originalDevtoolsApi = chrome.devtools;
+                          chrome.devtools = 'bar';
+                          chrome.test.assertEq(originalDevtoolsApi,
+                                               chrome.devtools);
+
+                          // Since browser.devtools is a getter that looks up
+                          // chrome.devtools, it still matches whatever is on
+                          // chrome.
+                          chrome.test.assertEq(chrome.devtools,
+                                               browser.devtools);
+
+                          // Modify a member of chrome.devtools and confirm
+                          // browser.devtools reflects that change, because
+                          // it is a direct dynamic alias to the same
+                          // underlying object.
+                          chrome.devtools.panels = 'bar';
+                          chrome.test.assertEq('bar', browser.devtools.panels);
+
+                          chrome.test.succeed();
+                        }
+                      ]);)");
+
+  ResultCatcher catcher;
+  const Extension* extension = LoadExtension(test_dir.UnpackedPath());
+  ASSERT_TRUE(extension);
+
+  DevToolsWindow::OpenDevToolsWindow(GetActiveWebContents(),
+                                     DevToolsToggleAction::Show(),
+                                     DevToolsOpenedByAction::kUnknown);
+
+  ASSERT_TRUE(catcher.GetNextResult()) << catcher.message();
+}
+
+// Tests that devtools is NOT available if the extension doesn't have a
+// devtools page.
+IN_PROC_BROWSER_TEST_F(NativeBindingsBrowserNamespaceTest,
+                       ChromeAndBrowserObjects_NoDevTools) {
+  TestExtensionDir test_dir;
+  test_dir.WriteManifest(
+      R"({
+          "name": "No DevTools test extension",
+          "version": "0.1",
+          "manifest_version": 3
+        })");
+  test_dir.WriteFile(FILE_PATH_LITERAL("page.html"),
+                     "<script src='page.js'></script>");
+  test_dir.WriteFile(FILE_PATH_LITERAL("page.js"),
+                     R"(chrome.test.runTests([
+                        function checkNoDevTools() {
+                          chrome.test.assertEq(undefined, chrome.devtools);
+                          chrome.test.assertEq(undefined, browser.devtools);
+                          chrome.test.succeed();
+                        }
+                      ]);)");
+
+  ResultCatcher catcher;
+  const Extension* extension = LoadExtension(test_dir.UnpackedPath());
+  ASSERT_TRUE(extension);
+
+  // Navigate to the extension page to run devtools tests.
+  ASSERT_TRUE(NavigateToURL(GetActiveWebContents(),
+                            extension->GetResourceURL("page.html")));
+
+  // Wait for the devtools tests to run.
+  ASSERT_TRUE(catcher.GetNextResult()) << catcher.message();
 }
 
 // TODO(crbug.com/401226626): Test that the browser object also has dev mode
@@ -909,9 +985,8 @@ IN_PROC_BROWSER_TEST_P(DeveloperModeNativeBindingsApiTest,
   const GURL extension_url = extension->GetResourceURL("page.html");
 
   // Navigate to the extension page.
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), extension_url));
-  content::WebContents* existing_tab =
-      browser()->tab_strip_model()->GetActiveWebContents();
+  auto* existing_tab = GetActiveWebContents();
+  ASSERT_TRUE(NavigateToURL(existing_tab, extension_url));
   ASSERT_EQ(extension_url, existing_tab->GetLastCommittedURL());
 
   ScriptResultQueue result_queue;

@@ -39,13 +39,7 @@ content::BrowserContext* DownloadItemMetadata::GetBrowserContext() const {
 }
 
 safe_browsing::ReferrerChain DownloadItemMetadata::GetReferrerChain() const {
-  std::unique_ptr<safe_browsing::ReferrerChainData> referrer_chain_data =
-      safe_browsing::IdentifyReferrerChain(
-          *item_, enterprise_connectors::kReferrerUserGestureLimit);
-  if (referrer_chain_data && referrer_chain_data->GetReferrerChain()) {
-    return *referrer_chain_data->GetReferrerChain();
-  }
-  return safe_browsing::ReferrerChain();
+  return GetOrIdentifyReferrerChainForEnterprise(*item_);
 }
 
 const base::FilePath& DownloadItemMetadata::GetFullPath() const {
@@ -138,6 +132,8 @@ enterprise_connectors::EventResult DownloadItemMetadata::GetPreScanEventResult(
     case download::DOWNLOAD_DANGER_TYPE_ASYNC_SCANNING:
     case download::DOWNLOAD_DANGER_TYPE_ASYNC_LOCAL_PASSWORD_SCANNING:
     case download::DOWNLOAD_DANGER_TYPE_BLOCKED_SCAN_FAILED:
+    case download::DOWNLOAD_DANGER_TYPE_FORCE_SAVE_TO_GDRIVE:
+    case download::DOWNLOAD_DANGER_TYPE_FORCE_SAVE_TO_ONEDRIVE:
     case download::DOWNLOAD_DANGER_TYPE_MAX:
       NOTREACHED();
   }
@@ -146,8 +142,8 @@ enterprise_connectors::EventResult DownloadItemMetadata::GetPreScanEventResult(
 std::unique_ptr<DownloadRequestMaker>
 DownloadItemMetadata::CreateDownloadRequestFromMetadata(
     scoped_refptr<BinaryFeatureExtractor> binary_feature_extractor) const {
-  return DownloadRequestMaker::CreateFromDownloadItem(binary_feature_extractor,
-                                                      item_);
+  return DownloadRequestMaker::CreateFromDownloadItem(
+      binary_feature_extractor, item_, std::nullopt, IsObfuscated());
 }
 
 std::unique_ptr<DeepScanningMetadata::DownloadScopedObservation>
@@ -236,6 +232,10 @@ DownloadItemMetadata::CollectFrameUrls() const {
   return enterprise_connectors::CollectFrameUrls(
       content::DownloadItemUtils::GetWebContents(item_),
       enterprise_connectors::DeepScanAccessPoint::DOWNLOAD);
+}
+
+content::WebContents* DownloadItemMetadata::web_contents() const {
+  return content::DownloadItemUtils::GetOriginalWebContents(item_.get());
 }
 
 base::WeakPtr<DownloadItemMetadata> DownloadItemMetadata::GetWeakPtr() {

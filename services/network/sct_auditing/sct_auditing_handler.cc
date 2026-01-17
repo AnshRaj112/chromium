@@ -128,8 +128,7 @@ void SCTAuditingHandler::MaybeEnqueueReport(
     // hashdance lookup query.
     sct_metadata.emplace();
     const net::ct::SignedCertificateTimestamp* sct =
-        validated_scts.at(base::RandInt(0, validated_scts.size() - 1))
-            .sct.get();
+        base::RandomChoice(validated_scts).sct.get();
     sct_metadata->issued = sct->timestamp;
     net::ct::MerkleTreeLeaf tree_leaf;
     bool result = net::ct::GetMerkleTreeLeaf(validated_certificate_chain, sct,
@@ -214,18 +213,15 @@ std::optional<std::string> SCTAuditingHandler::SerializeData() {
     reports.Append(std::move(report_entry));
   }
 
-  std::string output;
-  if (!base::JSONWriter::Write(reports, &output)) {
-    return std::nullopt;
-  }
-  return output;
+  return base::WriteJson(reports);
 }
 
 void SCTAuditingHandler::DeserializeData(const std::string& serialized) {
   DCHECK(foreground_runner_->RunsTasksInCurrentSequence());
 
   // Parse the serialized reports.
-  std::optional<base::Value> value = base::JSONReader::Read(serialized);
+  std::optional<base::Value> value =
+      base::JSONReader::Read(serialized, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!value || !value->is_list()) {
     base::UmaHistogramCounts100(
         "Security.SCTAuditing.NumPersistedReportsLoaded", 0);

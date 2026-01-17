@@ -35,7 +35,10 @@ enum class NotificationType {
   kReminder = 17,
   kCommerce = 18,
   kContent = 19,
-  kMaxValue = kContent,
+  kCrossPlatformPromoPasswords = 20,
+  kCrossPlatformPromoESB = 21,
+  kCrossPlatformPromoLens = 22,
+  kMaxValue = kCrossPlatformPromoLens,
 };
 // LINT.ThenChange(/tools/metrics/histograms/metadata/ios/enums.xml)
 
@@ -252,6 +255,9 @@ extern const char kSafetyCheckNotificationKey[];
 // `kFeaturePushNotificationPermissions`.
 extern const char kReminderNotificationKey[];
 
+// Key of Cross-Platform Promos notification used in pref
+// `kFeaturePushNotificationPermissions`.
+extern const char kCrossPlatformPromosNotificationKey[];
 // Action identifier for the Content Notifications Feedback action.
 extern NSString* const kContentNotificationFeedbackActionIdentifier;
 
@@ -275,6 +281,11 @@ extern const char kContentNotificationActionHistogramName[];
 
 // The max amount of NAU sends per session.
 extern const int kDeliveredNAUMaxSendsPerSession;
+
+// Key for the desktop_to_mobile_promo::PromoType of the associated notification
+// in the push notification payload. Used for Cross Platform Growth Promo
+// notifications.
+extern NSString* const kDesktopToMobilePromoTypeKey;
 
 // Key for the Push Notification Client Id type in notification payload. Used
 // for Send Tab notifications.

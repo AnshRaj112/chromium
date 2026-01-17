@@ -6,33 +6,136 @@ package org.chromium.components.omnibox;
 
 import android.text.TextUtils;
 
+import org.chromium.build.BuildConfig;
 import org.chromium.build.annotations.Initializer;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.components.metrics.OmniboxEventProtos.OmniboxEventProto.PageClassification;
+import org.chromium.components.omnibox.AimToolsProto.ToolMode;
+import org.chromium.url.GURL;
+
+import java.util.Locale;
 
 /** AutocompleteInput encompasses the input to autocomplete. */
 @NullMarked
 public class AutocompleteInput {
+    private GURL mPageUrl;
     private int mPageClassification;
+    private String mPageTitle;
     private String mUserText;
     private boolean mAllowExactKeywordMatch;
+    private boolean mHasAttachments;
+    private @AutocompleteRequestType int mRequestType;
 
     public AutocompleteInput() {
         reset();
     }
 
-    /** Set the PageClassification for the input. */
-    public void setPageClassification(int pageClassification) {
+    /**
+     * Set the PageClassification for the input.
+     *
+     * @param pageClassification The page classification to be used for this input.
+     * @return The AutocompleteInput object.
+     */
+    public AutocompleteInput setPageClassification(int pageClassification) {
         mPageClassification = pageClassification;
+        return this;
+    }
+
+    private int getComposeboxEquivalentOfPageClassification() {
+        return switch (mPageClassification) {
+            // LINT.IfChange(FuseboxSupportedPageClassifications)
+            case PageClassification.INSTANT_NTP_WITH_OMNIBOX_AS_STARTING_FOCUS_VALUE ->
+                    PageClassification.NTP_COMPOSEBOX_VALUE;
+            case PageClassification.SEARCH_RESULT_PAGE_NO_SEARCH_TERM_REPLACEMENT_VALUE ->
+                    PageClassification.SRP_OMNIBOX_COMPOSEBOX_VALUE;
+            case PageClassification.OTHER_VALUE ->
+                    PageClassification.OTHER_OMNIBOX_COMPOSEBOX_VALUE;
+            // LINT.ThenChange(/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/fusebox/FuseboxCoordinator.java:FuseboxSupportedPageClassifications)
+            default -> {
+                // TODO(crbug.com/474808407): address the issue with top resumed activity change and
+                // remove condition, making assertion live again.
+                if (BuildConfig.ENABLE_DEBUG_LOGS) {
+                    assert false
+                            : String.format(
+                                    Locale.ROOT,
+                                    "Unrecognized page classification: %d",
+                                    mPageClassification);
+                }
+                yield PageClassification.OTHER_OMNIBOX_COMPOSEBOX_VALUE;
+            }
+        };
     }
 
     /** Returns the current page classification. */
     public int getPageClassification() {
-        return mPageClassification;
+        return switch (mRequestType) {
+            case AutocompleteRequestType.AI_MODE, AutocompleteRequestType.IMAGE_GENERATION ->
+                    getComposeboxEquivalentOfPageClassification();
+            default -> mPageClassification;
+        };
     }
 
-    /** Set the text as currently typed by the User. */
-    public void setUserText(String text) {
+    /**
+     * Set the page URL for the input.
+     *
+     * @param pageUrl The URL of the page the user is currently on.
+     * @return The AutocompleteInput object.
+     */
+    public AutocompleteInput setPageUrl(GURL pageUrl) {
+        mPageUrl = pageUrl;
+        return this;
+    }
+
+    /** Returns the current page URL. */
+    public GURL getPageUrl() {
+        return mPageUrl;
+    }
+
+    /**
+     * Set the page title for the input.
+     *
+     * @param pageTitle The title of the page the user is currently on.
+     * @return The AutocompleteInput object.
+     */
+    public AutocompleteInput setPageTitle(String pageTitle) {
+        mPageTitle = pageTitle;
+        return this;
+    }
+
+    /** Returns the current page title. */
+    public String getPageTitle() {
+        return mPageTitle;
+    }
+
+    /** Set the AutocompleteRequestType */
+    public void setRequestType(@AutocompleteRequestType int type) {
+        mRequestType = type;
+    }
+
+    /** Returns the AutocompleteRequestType value. */
+    public @AutocompleteRequestType int getRequestType() {
+        return mRequestType;
+    }
+
+    /** Returns the Autocomplete Tool to use to fulfill the Request. */
+    public /* ToolMode */ int getToolMode() {
+        return switch (mRequestType) {
+            case AutocompleteRequestType.IMAGE_GENERATION ->
+                    mHasAttachments
+                            ? ToolMode.TOOL_MODE_IMAGE_GEN_UPLOAD_VALUE
+                            : ToolMode.TOOL_MODE_IMAGE_GEN_VALUE;
+            default -> ToolMode.TOOL_MODE_UNSPECIFIED_VALUE;
+        };
+    }
+
+    /**
+     * Set the text as currently typed by the User. This also updates the state for keyword
+     * matching.
+     *
+     * @param text The user-typed text.
+     * @return The AutocompleteInput object.
+     */
+    public AutocompleteInput setUserText(String text) {
         boolean oldTextUsesKeywordActivator =
                 !TextUtils.isEmpty(mUserText) && TextUtils.indexOf(mUserText, ' ') > 0;
         boolean newTextUsesKeywordActivator =
@@ -44,6 +147,7 @@ public class AutocompleteInput {
         mAllowExactKeywordMatch &= !(oldTextUsesKeywordActivator && !newTextUsesKeywordActivator);
 
         mUserText = text;
+        return this;
     }
 
     /** Returns whether exact keyword match is allowed with current input. */
@@ -82,9 +186,24 @@ public class AutocompleteInput {
         }
     }
 
+    public void setHasAttachments(boolean hasAttachments) {
+        mHasAttachments = hasAttachments;
+    }
+
+    /**
+     * Resets the AutocompleteInput to its default state.
+     *
+     * @return The reset AutocompleteInput object.
+     */
     @Initializer
-    public void reset() {
+    public AutocompleteInput reset() {
         mUserText = "";
         mAllowExactKeywordMatch = false;
+        mPageUrl = GURL.emptyGURL();
+        mPageTitle = "";
+        mHasAttachments = false;
+        mPageClassification = PageClassification.BLANK_VALUE;
+
+        return this;
     }
 }

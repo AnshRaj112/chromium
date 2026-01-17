@@ -13,6 +13,7 @@
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
+#include "base/memory/memory_pressure_listener_registry.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/field_trial_param_associator.h"
 #include "base/metrics/field_trial_params.h"
@@ -88,7 +89,7 @@ std::unique_ptr<FrameSchedulerImpl> CreateFrameScheduler(
     bool is_in_embedded_frame_tree,
     FrameScheduler::FrameType frame_type) {
   auto frame_scheduler = page_scheduler->CreateFrameScheduler(
-      delegate, is_in_embedded_frame_tree, frame_type);
+      delegate, LocalFrameToken(), is_in_embedded_frame_tree, frame_type);
   std::unique_ptr<FrameSchedulerImpl> frame_scheduler_impl(
       static_cast<FrameSchedulerImpl*>(frame_scheduler.release()));
   return frame_scheduler_impl;
@@ -604,6 +605,7 @@ class FrameSchedulerImplTest : public testing::Test {
         {GetUnreportedTaskTime()});
   }
 
+  base::MemoryPressureListenerRegistry memory_pressure_listener_registry_;
   base::test::ScopedFeatureList feature_list_;
   base::test::TaskEnvironment task_environment_;
   std::unique_ptr<MainThreadSchedulerImpl> scheduler_;
@@ -2170,7 +2172,7 @@ TEST_F(FrameSchedulerImplTest, ReportFMPAndFCPForMainFrames) {
 
   EXPECT_CALL(mock_main_thread_scheduler, OnMainFramePaint).Times(2);
 
-  main_frame_scheduler->OnFirstMeaningfulPaint(base::TimeTicks::Now());
+  main_frame_scheduler->OnFirstMeaningfulPaint();
   main_frame_scheduler->OnFirstContentfulPaintInMainFrame();
 
   main_frame_scheduler = nullptr;
@@ -2195,7 +2197,7 @@ TEST_F(FrameSchedulerImplTest, DontReportFMPAndFCPForSubframes) {
 
     EXPECT_CALL(mock_main_thread_scheduler, OnMainFramePaint).Times(0);
 
-    subframe_scheduler->OnFirstMeaningfulPaint(base::TimeTicks::Now());
+    subframe_scheduler->OnFirstMeaningfulPaint();
   }
 
   // Now test for embedded main frames.
@@ -2207,7 +2209,7 @@ TEST_F(FrameSchedulerImplTest, DontReportFMPAndFCPForSubframes) {
 
     EXPECT_CALL(mock_main_thread_scheduler, OnMainFramePaint).Times(0);
 
-    subframe_scheduler->OnFirstMeaningfulPaint(base::TimeTicks::Now());
+    subframe_scheduler->OnFirstMeaningfulPaint();
   }
 
   page_scheduler = nullptr;

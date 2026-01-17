@@ -37,7 +37,6 @@
 #include "ash/user_education/user_education_class_properties.h"
 #include "base/check.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/task/sequenced_task_runner.h"
@@ -47,6 +46,7 @@
 #include "ui/aura/client/drag_drop_client.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
 #include "ui/base/dragdrop/mojom/drag_drop_types.mojom.h"
+#include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_id.h"
@@ -161,7 +161,6 @@ std::unique_ptr<views::ImageView> CreateDefaultTrayIcon(
   return icon;
 }
 
-// TODO(http://b/276741422): Add pixel test for drop target state.
 // Creates the icon to be parented by the drop target overlay to indicate that
 // the parent view is a drop target and is capable of handling the current drag
 // payload.
@@ -770,7 +769,7 @@ void HoldingSpaceTray::UpdatePreviewsIcon() {
     if (!IsPreviewable(item)) {
       continue;
     }
-    if (base::Contains(paths_with_previews, item->file().file_path)) {
+    if (paths_with_previews.contains(item->file().file_path)) {
       continue;
     }
     items_with_previews.push_back(item.get());

@@ -7,7 +7,6 @@
 
 #include <string_view>
 
-#include "base/task/single_thread_task_runner.h"
 #include "mojo/public/cpp/bindings/generic_pending_receiver.h"
 #include "third_party/blink/public/mojom/browser_interface_broker.mojom-blink.h"
 #include "third_party/blink/public/platform/browser_interface_broker_proxy.h"
@@ -17,6 +16,10 @@
 #include "third_party/blink/renderer/platform/wtf/hash_map.h"
 #include "third_party/blink/renderer/platform/wtf/text/string_hash.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
+
+namespace base {
+class SingleThreadTaskRunner;
+}
 
 namespace blink {
 
@@ -52,9 +55,9 @@ class PLATFORM_EXPORT TestableBrowserInterfaceBrokerProxy
   TestBinder* FindTestBinder(std::string_view interface_name) const;
 
  private:
-  using BinderMap = WTF::HashMap<
-      String,
-      base::RepeatingCallback<void(mojo::ScopedMessagePipeHandle)>>;
+  using BinderMap =
+      HashMap<String,
+              base::RepeatingCallback<void(mojo::ScopedMessagePipeHandle)>>;
   mutable BinderMap binder_map_for_testing_;
 };
 

@@ -5,6 +5,8 @@
 #include "components/enterprise/connectors/core/reporting_utils.h"
 
 #include "base/logging.h"
+#include "base/notreached.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/enterprise/common/proto/synced/browser_events.pb.h"
@@ -21,6 +23,9 @@ namespace enterprise_connectors {
 namespace {
 // Namespace alias to reduce verbosity when using event protos.
 namespace proto = ::chrome::cros::reporting::proto;
+
+// Max url size before truncation
+constexpr int kMaxUrlLength = 2048;
 
 // Alias to reduce verbosity when using PasswordBreachEvent::TriggerType.
 using TriggerType =
@@ -39,6 +44,10 @@ using InterstitialThreatType = ::chrome::cros::reporting::proto::
 // Alias to reduce verbosity when using EventResult and to differentiate from
 // the EventResult struct.
 using ProtoEventResult = ::chrome::cros::reporting::proto::EventResult;
+
+// Alias to reduce verbosity when using DangerousDownloadThreatType.
+using ThreatType = ::chrome::cros::reporting::proto::
+    SafeBrowsingDangerousDownloadEvent::DangerousDownloadThreatType;
 
 const char kMaskedUsername[] = "*****";
 
@@ -71,6 +80,8 @@ ProtoEventResult GetEventResult(EventResult event_result) {
       return proto::EventResult::EVENT_RESULT_BLOCKED;
     case EventResult::BYPASSED:
       return proto::EventResult::EVENT_RESULT_BYPASSED;
+    case EventResult::FORCED_SAVE_TO_CLOUD:
+      return proto::EventResult::EVENT_RESULT_FORCED_SAVE_TO_CLOUD;
   }
 }
 
@@ -170,6 +181,9 @@ proto::DataTransferEventTrigger ToProtoDataTransferEventTrigger(
   if (trigger == kPagePrintDataTransferEventTrigger) {
     return proto::DataTransferEventTrigger::PAGE_PRINT;
   }
+  if (trigger == kClipboardCopyDataTransferEventTrigger) {
+    return proto::DataTransferEventTrigger::CLIPBOARD_COPY;
+  }
   if (trigger == kUrlVisitedDataTransferEventTrigger) {
     return proto::DataTransferEventTrigger::URL_VISITED;
   }
@@ -212,6 +226,60 @@ proto::ContentTransferMethod ToProtoContentTransferMethod(
   NOTREACHED();
 }
 
+ThreatType ToProtoThreatType(const std::string& threat_type) {
+  if (threat_type == kDangerousDownloadThreatType) {
+    return proto::SafeBrowsingDangerousDownloadEvent::DANGEROUS;
+  }
+  if (threat_type == kDangerousHostDownloadThreatType) {
+    return proto::SafeBrowsingDangerousDownloadEvent::DANGEROUS_HOST;
+  }
+  if (threat_type == kPotentiallyUnwantedDownloadThreatType) {
+    return proto::SafeBrowsingDangerousDownloadEvent::POTENTIALLY_UNWANTED;
+  }
+  if (threat_type == kUncommonDownloadThreatType) {
+    return proto::SafeBrowsingDangerousDownloadEvent::UNCOMMON;
+  }
+  if (threat_type == kUnknownDownloadThreatType) {
+    return proto::SafeBrowsingDangerousDownloadEvent::UNKNOWN;
+  }
+  if (threat_type == kDangerousFileTypeDownloadThreatType) {
+    return proto ::SafeBrowsingDangerousDownloadEvent::DANGEROUS_FILE_TYPE;
+  }
+  if (threat_type == kDangerousUrlDownloadThreatType) {
+    return proto ::SafeBrowsingDangerousDownloadEvent::DANGEROUS_URL;
+  }
+  if (threat_type == kDangerousAccountCompromiseDownloadThreatType) {
+    return proto ::SafeBrowsingDangerousDownloadEvent::
+        DANGEROUS_ACCOUNT_COMPROMISE;
+  }
+  if (threat_type.empty()) {
+    return proto::SafeBrowsingDangerousDownloadEvent::
+        DANGEROUS_DOWNLOAD_THREAT_TYPE_UNSPECIFIED;
+  }
+  NOTREACHED();
+}
+
+proto::TriggeredRuleInfo::Action ActionProtoFromTriggerRuleAction(
+    const TriggeredRule::Action& action) {
+  switch (action) {
+    case TriggeredRule::Action::
+        ContentAnalysisResponse_Result_TriggeredRule_Action_ACTION_UNSPECIFIED:
+      return proto::TriggeredRuleInfo::ACTION_UNKNOWN;
+    case TriggeredRule::Action::
+        ContentAnalysisResponse_Result_TriggeredRule_Action_REPORT_ONLY:
+      return proto::TriggeredRuleInfo::REPORT_ONLY;
+    case TriggeredRule::Action::
+        ContentAnalysisResponse_Result_TriggeredRule_Action_WARN:
+      return proto::TriggeredRuleInfo::WARN;
+    case TriggeredRule::Action::
+        ContentAnalysisResponse_Result_TriggeredRule_Action_FORCE_SAVE_TO_CLOUD:
+      return proto::TriggeredRuleInfo::FORCE_SAVE_TO_CLOUD;
+    case TriggeredRule::Action::
+        ContentAnalysisResponse_Result_TriggeredRule_Action_BLOCK:
+      return proto::TriggeredRuleInfo::BLOCK;
+  }
+}
+
 google::protobuf::RepeatedPtrField<proto::TriggeredRuleInfo>
 GetTriggerRulesFromContentAnalysisResult(
     const ContentAnalysisResponse::Result& result) {
@@ -225,11 +293,61 @@ GetTriggerRulesFromContentAnalysisResult(
     if (base::StringToInt(trigger.rule_id(), &rule_id_int)) {
       triggered_rule.set_rule_id(rule_id_int);
     }
+    triggered_rule.set_action(
+        ActionProtoFromTriggerRuleAction(trigger.action()));
     *triggered_rules.Add() = triggered_rule;
   }
 
   return triggered_rules;
 }
+
+#if BUILDFLAG(ENTERPRISE_DATA_CONTROLS)
+google::protobuf::RepeatedPtrField<proto::TriggeredRuleInfo>
+GetTriggerRulesFromDataControlsRules(
+    const data_controls::Verdict::TriggeredRules& data_control_rules) {
+  google::protobuf::RepeatedPtrField<proto::TriggeredRuleInfo> triggered_rules;
+  for (const auto& [index, rule] : data_control_rules) {
+    proto::TriggeredRuleInfo triggered_rule;
+    triggered_rule.set_rule_name(rule.rule_name);
+
+    int rule_id_int = 0;
+    if (base::StringToInt(rule.rule_id, &rule_id_int)) {
+      triggered_rule.set_rule_id(rule_id_int);
+    }
+    *triggered_rules.Add() = triggered_rule;
+  }
+
+  return triggered_rules;
+}
+#endif  // BUILDFLAG(ENTERPRISE_DATA_CONTROLS)
+
+void TruncateUrl(std::string* url) {
+  if (url->length() > kMaxUrlLength) {
+    url->resize(kMaxUrlLength);
+  }
+}
+
+void TruncateUrlInfo(::chrome::cros::reporting::proto::UrlInfo* url_info) {
+  TruncateUrl(url_info->mutable_url());
+}
+
+#define TRUNCATE_STRING_URL(event_ptr, field_name) \
+  TruncateUrl((event_ptr)->mutable_##field_name());
+
+#define TRUNCATE_REPEATED_STRING_URL(event_ptr, field_name)    \
+  for (int i = 0; i < (event_ptr)->field_name##_size(); ++i) { \
+    TruncateUrl((event_ptr)->mutable_##field_name(i));         \
+  }
+
+#define TRUNCATE_URL_INFO(event_ptr, field_name)          \
+  if ((event_ptr)->has_##field_name()) {                  \
+    TruncateUrlInfo((event_ptr)->mutable_##field_name()); \
+  }
+
+#define TRUNCATE_REPEATED_URL_INFO(event_ptr, field_name)      \
+  for (int i = 0; i < (event_ptr)->field_name##_size(); ++i) { \
+    TruncateUrlInfo((event_ptr)->mutable_##field_name(i));     \
+  }
 
 }  // namespace
 
@@ -571,13 +689,15 @@ proto::DlpSensitiveDataEvent GetDlpSensitiveDataEvent(
     const std::string& trigger,
     const std::string& scan_id,
     const std::string& content_transfer_method,
-    const std::string& source_email,
+    const std::string& source_active_user_email,
     const std::string& content_area_account_email,
     const std::string& profile_identifier,
     const std::string& profile_username,
+    std::optional<std::u16string> user_justification,
     const int64_t content_size,
     const ContentAnalysisResponse::Result& result,
     const ReferrerChain& referrer_chain,
+    const FrameUrlChain& frame_url_chain,
     EventResult event_result) {
   proto::DlpSensitiveDataEvent event;
   event.set_url(url.spec());
@@ -599,12 +719,16 @@ proto::DlpSensitiveDataEvent GetDlpSensitiveDataEvent(
     event.set_web_app_signed_in_account(content_area_account_email);
   }
 
-  if (!source_email.empty()) {
-    event.set_source_web_app_signed_in_account(source_email);
+  if (!source_active_user_email.empty()) {
+    event.set_source_web_app_signed_in_account(source_active_user_email);
   }
 
   event.set_profile_identifier(profile_identifier);
   event.set_profile_user_name(profile_username);
+
+  if (user_justification.has_value()) {
+    event.set_user_justification(base::UTF16ToUTF8(user_justification.value()));
+  }
 
   // |content_size| can be set to -1 to indicate an unknown size, in
   // which case the field is not set.
@@ -629,8 +753,122 @@ proto::DlpSensitiveDataEvent GetDlpSensitiveDataEvent(
   event.set_event_result(GetEventResult(event_result));
   event.set_clicked_through(event_result == EventResult::BYPASSED);
 
+  *event.mutable_iframe_urls() = frame_url_chain;
+
   return event;
 }
+
+proto::SafeBrowsingDangerousDownloadEvent GetDangerousDownloadEvent(
+    const GURL& url,
+    const GURL& tab_url,
+    const std::string& source,
+    const std::string& destination,
+    const std::string& file_name,
+    const std::string& download_digest_sha256,
+    const std::string& threat_type,
+    const std::string& mime_type,
+    const std::string& trigger,
+    const std::string& scan_id,
+    const std::string& content_transfer_method,
+    const std::string& profile_identifier,
+    const std::string& profile_username,
+    const int64_t content_size,
+    const ReferrerChain& referrer_chain,
+    const FrameUrlChain& frame_url_chain,
+    EventResult event_result) {
+  proto::SafeBrowsingDangerousDownloadEvent event;
+  event.set_url(url.spec());
+  event.set_tab_url(tab_url.spec());
+  event.set_source(source);
+  event.set_destination(destination);
+  event.set_file_name(file_name);
+  event.set_download_digest_sha256(download_digest_sha256);
+  event.set_threat_type(ToProtoThreatType(threat_type));
+  event.set_content_type(mime_type);
+  event.set_trigger(ToProtoDataTransferEventTrigger(trigger));
+  event.set_scan_id(scan_id);
+
+  if (!content_transfer_method.empty()) {
+    event.set_content_transfer_method(
+        ToProtoContentTransferMethod(content_transfer_method));
+  }
+
+  event.set_profile_identifier(profile_identifier);
+  event.set_profile_user_name(profile_username);
+
+  // |content_size| can be set to -1 to indicate an unknown size, in
+  // which case the field is not set.
+  if (content_size >= 0) {
+    event.set_content_size(content_size);
+  }
+
+  if (base::FeatureList::IsEnabled(safe_browsing::kEnhancedFieldsForSecOps)) {
+    for (const auto& referrer : referrer_chain) {
+      proto::UrlInfo url_info;
+      if (referrer.ip_addresses().size() > 0) {
+        url_info.set_ip(referrer.ip_addresses()[0]);
+      }
+      url_info.set_url(referrer.url());
+      *event.add_referrers() = url_info;
+    }
+  }
+
+  event.set_event_result(GetEventResult(event_result));
+  event.set_clicked_through(event_result == EventResult::BYPASSED);
+
+  *event.mutable_iframe_urls() = frame_url_chain;
+
+  return event;
+}
+
+#if BUILDFLAG(ENTERPRISE_DATA_CONTROLS)
+chrome::cros::reporting::proto::DlpSensitiveDataEvent
+GetDataControlsSensitiveDataEvent(
+    const GURL& url,
+    const GURL& tab_url,
+    const std::string& source,
+    const std::string& destination,
+    const std::string& mime_type,
+    const std::string& trigger,
+    const std::string& source_active_user_email,
+    const std::string& content_area_account_email,
+    const std::string& profile_identifier,
+    const std::string& profile_username,
+    int64_t content_size,
+    const data_controls::Verdict::TriggeredRules& triggered_rules,
+    EventResult event_result) {
+  proto::DlpSensitiveDataEvent event;
+  event.set_url(url.spec());
+  event.set_tab_url(tab_url.spec());
+  event.set_source(source);
+  event.set_destination(destination);
+  event.set_content_type(mime_type);
+  event.set_trigger(ToProtoDataTransferEventTrigger(trigger));
+
+  if (!content_area_account_email.empty()) {
+    event.set_web_app_signed_in_account(content_area_account_email);
+  }
+
+  if (!source_active_user_email.empty()) {
+    event.set_source_web_app_signed_in_account(source_active_user_email);
+  }
+
+  event.set_profile_identifier(profile_identifier);
+  event.set_profile_user_name(profile_username);
+
+  // |content_size| can be set to -1 to indicate an unknown size, in
+  // which case the field is not set.
+  if (content_size >= 0) {
+    event.set_content_size(content_size);
+  }
+
+  *event.mutable_triggered_rule_info() =
+      GetTriggerRulesFromDataControlsRules(triggered_rules);
+  event.set_event_result(GetEventResult(event_result));
+
+  return event;
+}
+#endif  // BUILDFLAG(ENTERPRISE_DATA_CONTROLS)
 
 std::vector<std::string> GetLocalIpAddresses() {
   net::NetworkInterfaceList list;
@@ -661,6 +899,98 @@ void AddReferrerChainToEvent(
     }
   }
   event.Set(kKeyReferrers, std::move(referrers));
+}
+
+void AddFrameUrlChainToEvent(
+    const google::protobuf::RepeatedPtrField<std::string>& frame_url_chain,
+    base::Value::Dict& event) {
+  base::Value::List iframe_urls;
+  for (const auto& frame_url : frame_url_chain) {
+    iframe_urls.Append(frame_url);
+  }
+  event.Set(kKeyIframeUrls, std::move(iframe_urls));
+}
+
+void MaybeTruncateLongUrls(proto::Event& event_variant) {
+  switch (event_variant.event_case()) {
+    case proto::Event::kPasswordReuseEvent: {
+      auto* event = event_variant.mutable_password_reuse_event();
+      TRUNCATE_STRING_URL(event, url);
+      TRUNCATE_REPEATED_STRING_URL(event, referral_urls);
+      break;
+    }
+    case proto::Event::kDangerousDownloadEvent: {
+      auto* event = event_variant.mutable_dangerous_download_event();
+      TRUNCATE_STRING_URL(event, url);
+      TRUNCATE_STRING_URL(event, tab_url);
+      TRUNCATE_URL_INFO(event, url_info);
+      TRUNCATE_URL_INFO(event, tab_url_info);
+      TRUNCATE_REPEATED_STRING_URL(event, referral_urls);
+      TRUNCATE_REPEATED_URL_INFO(event, referrers);
+      TRUNCATE_REPEATED_STRING_URL(event, iframe_urls);
+      break;
+    }
+    case proto::Event::kInterstitialEvent: {
+      auto* event = event_variant.mutable_interstitial_event();
+      TRUNCATE_STRING_URL(event, url);
+      TRUNCATE_REPEATED_STRING_URL(event, referral_urls);
+      TRUNCATE_URL_INFO(event, url_info);
+      TRUNCATE_REPEATED_URL_INFO(event, referrers);
+      break;
+    }
+    case proto::Event::kSensitiveDataEvent: {
+      auto* event = event_variant.mutable_sensitive_data_event();
+      TRUNCATE_STRING_URL(event, url);
+      TRUNCATE_STRING_URL(event, tab_url);
+      TRUNCATE_URL_INFO(event, url_info);
+      TRUNCATE_REPEATED_STRING_URL(event, referral_urls);
+      TRUNCATE_REPEATED_URL_INFO(event, referrers);
+      TRUNCATE_REPEATED_STRING_URL(event, iframe_urls);
+      break;
+    }
+    case proto::Event::kUnscannedFileEvent: {
+      auto* event = event_variant.mutable_unscanned_file_event();
+      TRUNCATE_STRING_URL(event, url);
+      TRUNCATE_STRING_URL(event, tab_url);
+      TRUNCATE_REPEATED_STRING_URL(event, referral_urls);
+      break;
+    }
+    case proto::Event::kLoginEvent: {
+      auto* event = event_variant.mutable_login_event();
+      TRUNCATE_STRING_URL(event, url);
+      TRUNCATE_STRING_URL(event, federated_origin);
+      break;
+    }
+    case proto::Event::kPasswordBreachEvent: {
+      auto* event = event_variant.mutable_password_breach_event();
+      for (int i = 0; i < event->identities_size(); ++i) {
+        TruncateUrl(event->mutable_identities(i)->mutable_url());
+      }
+      break;
+    }
+    case proto::Event::kUrlFilteringInterstitialEvent: {
+      auto* event = event_variant.mutable_url_filtering_interstitial_event();
+      TRUNCATE_STRING_URL(event, url);
+      TRUNCATE_URL_INFO(event, url_info);
+      TRUNCATE_REPEATED_STRING_URL(event, referrer_urls);
+      TRUNCATE_REPEATED_URL_INFO(event, referrers);
+      break;
+    }
+    case proto::Event::kPasswordChangedEvent:
+    case proto::Event::kPolicyValidationReportEvent:
+    case proto::Event::kExtensionAppInstallEvent:
+    case proto::Event::kReportingRecordEvent:
+    case proto::Event::kContentTransferEvent:
+    case proto::Event::kBrowserExtensionInstallEvent:
+    case proto::Event::kBrowserCrashEvent:
+    case proto::Event::kExtensionTelemetryEvent:
+    case proto::Event::kUrlNavigationEvent:
+    case proto::Event::kSuspiciousUrlEvent:
+    case proto::Event::kPrototypeRawEvent:
+    case proto::Event::kTelomereEvent:
+    case proto::Event::EVENT_NOT_SET:
+      break;
+  }
 }
 
 }  // namespace enterprise_connectors

@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/json/json_reader.h"
@@ -73,7 +72,7 @@ void ExtensionJSBrowserTest::SetUpOnMainThread() {
         base::BindRepeating([](content::DevToolsAgentHost* host) {
           const auto& ext_ids = GetExtensionIdsToCollectCoverage();
           for (const auto& ext_id : ext_ids) {
-            if (base::Contains(host->GetURL().path(), ext_id) &&
+            if (host->GetURL().GetPath().contains(ext_id) &&
                 host->GetType() == "background_page") {
               return true;
             }
@@ -164,7 +163,8 @@ bool ExtensionJSBrowserTest::RunJavascriptTestF(bool is_async,
   }
 
   std::string result_str = result.GetString();
-  std::optional<base::Value> value_result = base::JSONReader::Read(result_str);
+  std::optional<base::Value> value_result =
+      base::JSONReader::Read(result_str, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   const base::Value::Dict& dict_value = value_result->GetDict();
 
   bool test_result = dict_value.FindBool("result").value();

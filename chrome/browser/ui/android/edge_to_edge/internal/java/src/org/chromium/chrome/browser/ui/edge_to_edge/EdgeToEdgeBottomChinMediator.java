@@ -19,14 +19,13 @@ import org.chromium.chrome.browser.browser_controls.BottomControlsStacker.LayerS
 import org.chromium.chrome.browser.browser_controls.BottomControlsStacker.LayerType;
 import org.chromium.chrome.browser.browser_controls.BottomControlsStacker.LayerVisibility;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsOffsetTagsInfo;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.fullscreen.FullscreenManager;
 import org.chromium.chrome.browser.fullscreen.FullscreenOptions;
 import org.chromium.chrome.browser.layouts.LayoutManager;
 import org.chromium.chrome.browser.layouts.LayoutStateProvider;
 import org.chromium.chrome.browser.tab.Tab;
-import org.chromium.components.browser_ui.edge_to_edge.EdgeToEdgeSupplier;
 import org.chromium.ui.KeyboardVisibilityDelegate;
+import org.chromium.ui.edge_to_edge.EdgeToEdgeSupplier;
 import org.chromium.ui.insets.InsetObserver;
 import org.chromium.ui.modelutil.PropertyModel;
 
@@ -146,7 +145,7 @@ class EdgeToEdgeBottomChinMediator
 
     private boolean isVisible() {
         // This assumes the chin is at the very bottom, or all layers below the chin are scrollable.
-        if (ChromeFeatureList.sBcivBottomControls.isEnabled() && mModel.get(OFFSET_TAG) != null) {
+        if (mModel.get(OFFSET_TAG) != null) {
             return mBottomControlsStacker.getBrowserControls().getBottomControlOffset()
                     < mModel.get(HEIGHT);
         } else {
@@ -300,8 +299,6 @@ class EdgeToEdgeBottomChinMediator
 
     @Override
     public void onBrowserControlsOffsetUpdate(int layerYOffset) {
-        assert BottomControlsStacker.isDispatchingYOffset();
-
         mYOffset = layerYOffset;
 
         if (isVisible()) {

@@ -81,6 +81,7 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
   AXObjectInclusion ShouldIncludeBasedOnSemantics(
       IgnoredReasons* = nullptr) const;
   bool ComputeIsIgnored(IgnoredReasons*) const override;
+  bool ComputeIsIgnoredAsInsideInactiveScrollMarkerTab() const override;
   ax::mojom::blink::Role DetermineRoleValue() override;
   ax::mojom::blink::Role NativeRoleIgnoringAria() const override;
   void AlterSliderOrSpinButtonValue(bool increase);
@@ -419,7 +420,6 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
   void AddPopupChildren();
   bool HasValidHTMLTableStructureAndLayout() const;
   void AddTableChildren();
-  void AddSelectChildren();
   bool FindAllTableCellsWithRole(ax::mojom::blink::Role, AXObjectVector&) const;
   void AddValidationMessageChild();
   void AddAccessibleNodeChildren();
@@ -453,6 +453,8 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
   Member<LayoutObject> layout_object_;
 
   friend class AXObject;  // For GetNode().
+  friend class AXObjectCacheImpl;
+  FRIEND_TEST_ALL_PREFIXES(AccessibilityTest, RadioButtonsInGroupInTableRows);
 };
 
 template <>

@@ -49,18 +49,18 @@
 #include "third_party/blink/renderer/platform/platform_export.h"
 #include "third_party/blink/renderer/platform/weborigin/kurl.h"
 #include "third_party/blink/renderer/platform/wtf/allocator/allocator.h"
-#include "third_party/blink/renderer/platform/wtf/date_math.h"
 #include "third_party/blink/renderer/platform/wtf/ref_counted.h"
 #include "third_party/blink/renderer/platform/wtf/text/atomic_string.h"
 #include "third_party/blink/renderer/platform/wtf/vector.h"
 
+namespace network {
+struct IntegrityMetadata;
+}
+
 namespace blink {
 
-class FeatureContext;
-class UnencodedDigest;
 class ResourceLoadTiming;
 class ServiceWorkerRouterInfo;
-class UseCounter;
 
 // A ResourceResponse is a "response" object used in blink. Conceptually
 // it is https://fetch.spec.whatwg.org/#concept-response, but it contains
@@ -170,13 +170,12 @@ class PLATFORM_EXPORT ResourceResponse final {
   bool CacheControlContainsMustRevalidate() const;
   bool HasCacheValidatorFields() const;
   std::optional<base::TimeDelta> CacheControlMaxAge() const;
-  std::optional<base::Time> Date(UseCounter&) const;
+  std::optional<base::Time> Date() const;
   std::optional<base::TimeDelta> Age() const;
-  std::optional<base::Time> Expires(UseCounter&) const;
-  std::optional<base::Time> LastModified(UseCounter&) const;
+  std::optional<base::Time> Expires() const;
+  std::optional<base::Time> LastModified() const;
   // Will always return values >= 0.
   base::TimeDelta CacheControlStaleWhileRevalidate() const;
-  std::optional<blink::UnencodedDigest> UnencodedDigest(const FeatureContext*) const;
 
   unsigned ConnectionID() const;
   void SetConnectionID(unsigned);
@@ -326,15 +325,6 @@ class PLATFORM_EXPORT ResourceResponse final {
   }
   void SetClientAddressSpace(network::mojom::IPAddressSpace value) {
     client_address_space_ = value;
-  }
-
-  network::mojom::PrivateNetworkAccessPreflightResult
-  PrivateNetworkAccessPreflightResult() const {
-    return private_network_access_preflight_result_;
-  }
-  void SetPrivateNetworkAccessPreflightResult(
-      network::mojom::PrivateNetworkAccessPreflightResult result) {
-    private_network_access_preflight_result_ = result;
   }
 
   bool WasAlpnNegotiated() const { return was_alpn_negotiated_; }
@@ -493,12 +483,8 @@ class PLATFORM_EXPORT ResourceResponse final {
     return device_bound_session_usage_;
   }
 
-  // Returns true if the request was routed through an IP Protection proxy.
-  bool IsIpProtectionUsed() const { return is_ip_protection_used_; }
-  // Sets the flag indicating IP Protection usage.
-  void SetIsIpProtectionUsed(bool is_ip_protection_used) {
-    is_ip_protection_used_ = is_ip_protection_used;
-  }
+  const Vector<network::IntegrityMetadata>& GetUnencodedDigests() const;
+  void SetUnencodedDigests(Vector<network::IntegrityMetadata> digests);
 
  private:
   void UpdateHeaderParsedState(const AtomicString& name);
@@ -525,12 +511,6 @@ class PLATFORM_EXPORT ResourceResponse final {
   // https://wicg.github.io/private-network-access/#policy-container-ip-address-space
   network::mojom::IPAddressSpace client_address_space_ =
       network::mojom::IPAddressSpace::kUnknown;
-
-  // The result of any PNA preflight sent for this request, if any.
-  // TODO(https://crbug.com/1268378): Remove this once preflights are enforced.
-  network::mojom::PrivateNetworkAccessPreflightResult
-      private_network_access_preflight_result_ =
-          network::mojom::PrivateNetworkAccessPreflightResult::kNone;
 
   network::mojom::DeviceBoundSessionUsage device_bound_session_usage_ =
       network::mojom::DeviceBoundSessionUsage::kUnknown;
@@ -719,13 +699,7 @@ class PLATFORM_EXPORT ResourceResponse final {
 
   bool emitted_extra_info_ = false;
 
-  // Flag indicating if the request used IP Protection proxies.
-  // This differs from the `is_for_ip_protection` used in the network proxy
-  // chain, but uses `is_for_ip_protection`, along with whether the response was
-  // cached, to determine if the request was actively sent through an IP
-  // Protection proxy. This value is currently only set if
-  // kIpPrivacyEnableIppInDevTools is enabled.
-  bool is_ip_protection_used_ = false;
+  Vector<network::IntegrityMetadata> unencoded_digests_;
 };
 
 }  // namespace blink

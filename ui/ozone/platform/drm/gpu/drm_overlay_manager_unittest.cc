@@ -7,6 +7,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/test/task_environment.h"
+#include "components/viz/common/resources/shared_image_format.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/ozone/public/overlay_surface_candidate.h"
@@ -22,12 +23,7 @@ class TestDrmOverlayManager : public DrmOverlayManager {
  public:
   explicit TestDrmOverlayManager(
       bool allow_sync_and_real_buffer_page_flip_testing)
-      : DrmOverlayManager(/*handle_overlays_swap_failure=*/false,
-                          allow_sync_and_real_buffer_page_flip_testing) {}
-  TestDrmOverlayManager(bool handle_overlays_swap_failure,
-                        bool allow_sync_and_real_buffer_page_flip_testing)
-      : DrmOverlayManager(handle_overlays_swap_failure,
-                          allow_sync_and_real_buffer_page_flip_testing) {}
+      : DrmOverlayManager(allow_sync_and_real_buffer_page_flip_testing) {}
   TestDrmOverlayManager() : TestDrmOverlayManager(false) {}
   ~TestDrmOverlayManager() override = default;
 
@@ -65,10 +61,6 @@ class TestDrmOverlayManager : public DrmOverlayManager {
     receive_callback.Run(hardware_capabilities);
   }
 
-  base::TimeTicks GetDisallowFullscreenOverlaysEndTime() const {
-    return disallow_fullscreen_overlays_end_time();
-  }
-
   int num_planes_response_ = 0;
 
  private:
@@ -79,7 +71,7 @@ OverlaySurfaceCandidate CreateCandidate(const gfx::Rect& rect,
                                         int plane_z_order) {
   OverlaySurfaceCandidate candidate;
   candidate.transform = gfx::OVERLAY_TRANSFORM_NONE;
-  candidate.format = gfx::BufferFormat::YUV_420_BIPLANAR;
+  candidate.format = viz::MultiPlaneFormat::kNV12;
   candidate.plane_z_order = plane_z_order;
   candidate.buffer_size = rect.size();
   candidate.display_rect = gfx::RectF(rect);
@@ -92,10 +84,10 @@ class DrmOverlayManagerTest : public testing::Test {
   DrmOverlayManagerTest() = default;
 
   void SetUp() override {
-    manager_.SetSupportedBufferFormats(kPrimaryWidget,
-                                       {gfx::BufferFormat::YUV_420_BIPLANAR});
-    manager_.SetSupportedBufferFormats(kSecondaryWidget,
-                                       {gfx::BufferFormat::YUV_420_BIPLANAR});
+    manager_.SetSupportedSharedImageFormats(kPrimaryWidget,
+                                            {viz::MultiPlaneFormat::kNV12});
+    manager_.SetSupportedSharedImageFormats(kSecondaryWidget,
+                                            {viz::MultiPlaneFormat::kNV12});
   }
 
  protected:
@@ -445,22 +437,22 @@ TEST_F(DrmOverlayManagerTest, MultiClipRectUnderlaySupport) {
   EXPECT_TRUE(manager_.requests()[0][2].overlay_handled);
 }
 
-TEST_F(DrmOverlayManagerTest, SupportedBufferFormat) {
+TEST_F(DrmOverlayManagerTest, SupportedSharedImageFormat) {
   // Make the manager to use sync testing for convenience.
   TestDrmOverlayManager manager(true);
-  manager.SetSupportedBufferFormats(
+  manager.SetSupportedSharedImageFormats(
       kPrimaryWidget,
-      {gfx::BufferFormat::BGRA_8888, gfx::BufferFormat::RGBA_8888});
-  manager.SetSupportedBufferFormats(kSecondaryWidget,
-                                    {gfx::BufferFormat::YUV_420_BIPLANAR});
+      {viz::SinglePlaneFormat::kBGRA_8888, viz::SinglePlaneFormat::kRGBA_8888});
+  manager.SetSupportedSharedImageFormats(kSecondaryWidget,
+                                         {viz::MultiPlaneFormat::kNV12});
 
   std::vector<OverlaySurfaceCandidate> candidates = {
       CreateCandidate(gfx::Rect(0, 0, 150, 150), -1),
       CreateCandidate(gfx::Rect(0, 0, 100, 100), 0),
       CreateCandidate(gfx::Rect(10, 10, 20, 20), 1)};
-  candidates[0].format = gfx::BufferFormat::RGBA_8888;
-  candidates[1].format = gfx::BufferFormat::YUV_420_BIPLANAR;
-  candidates[2].format = gfx::BufferFormat::BGRA_8888;
+  candidates[0].format = viz::SinglePlaneFormat::kRGBA_8888;
+  candidates[1].format = viz::MultiPlaneFormat::kNV12;
+  candidates[2].format = viz::SinglePlaneFormat::kBGRA_8888;
 
   // Primary widget supports BGRA/RGBA only.
   manager.CheckOverlaySupport(&candidates, kPrimaryWidget);
@@ -489,10 +481,10 @@ TEST_F(DrmOverlayManagerTest, SupportedBufferFormat) {
   reset_candidates(candidates);
 
   // Make primary widget support more buffer formats.
-  manager.SetSupportedBufferFormats(
+  manager.SetSupportedSharedImageFormats(
       kPrimaryWidget,
-      {gfx::BufferFormat::YUV_420_BIPLANAR, gfx::BufferFormat::BGRA_8888,
-       gfx::BufferFormat::RGBA_8888});
+      {viz::MultiPlaneFormat::kNV12, viz::SinglePlaneFormat::kBGRA_8888,
+       viz::SinglePlaneFormat::kRGBA_8888});
 
   // Primary widget supports BGRA/RGBA and NV12 now.
   manager.CheckOverlaySupport(&candidates, kPrimaryWidget);
@@ -500,80 +492,6 @@ TEST_F(DrmOverlayManagerTest, SupportedBufferFormat) {
   EXPECT_TRUE(candidates[1].overlay_handled);
   EXPECT_TRUE(candidates[2].overlay_handled);
   EXPECT_EQ(manager.requests().size(), 1u);
-}
-
-// Verifies that the |TestDrmOverlayManager| uses fast path for fullscreen
-// overlays. That is, if |handle_overlays_swap_failure| is enabled, it marks
-// fullscreen overlays as suitable candidates, but once it gets a swap failure
-// notification, it fallbacks to drm testing.
-TEST_F(DrmOverlayManagerTest, HandleFastPathFullScreenOverlays) {
-  base::test::SingleThreadTaskEnvironment env(
-      base::test::TaskEnvironment::TimeSource::MOCK_TIME);
-  TestDrmOverlayManager manager(
-      /*handle_overlays_swap_failure=*/true,
-      /*allow_sync_and_real_buffer_page_flip_testing=*/true);
-  manager.SetSupportedBufferFormats(kPrimaryWidget,
-                                    {gfx::BufferFormat::YUV_420_BIPLANAR});
-
-  // Check overlay support and expect fullscreen is handled without any requests
-  // for overlays' validation sent.
-  std::vector<OverlaySurfaceCandidate> candidates = {
-      CreateCandidate(gfx::Rect(0, 0, 100, 100), 0)};
-  candidates.front().overlay_type = gfx::OverlayType::kFullScreen;
-
-  manager.CheckOverlaySupport(&candidates, kPrimaryWidget);
-
-  EXPECT_EQ(manager.requests().size(), 0u);
-  EXPECT_TRUE(candidates.front().overlay_handled);
-
-  // Notify the manager that the fullscreen overlay were promoted and the
-  // next swap is a fullscreen one.
-  manager.OnPromotedOverlayTypes({gfx::OverlayType::kFullScreen});
-
-  // Store the current time and use it later to fast forward it.
-  const auto time_now = base::TimeTicks::Now();
-  // The swap has failed. The manager must stop fullscreen overlays' promotion.
-  manager.OnSwapBuffersComplete(
-      gfx::SwapResult::SWAP_NON_SIMPLE_OVERLAYS_FAILED);
-  EXPECT_TRUE(!manager.GetDisallowFullscreenOverlaysEndTime().is_null());
-
-  // Now that the previous fullscreen overlay's swap failed, the manager must
-  // fallback to drm test for these overlays as well.
-  std::vector<OverlaySurfaceCandidate> candidates2 = {
-      CreateCandidate(gfx::Rect(0, 0, 100, 100), 0)};
-  candidates2.front().overlay_type = gfx::OverlayType::kFullScreen;
-
-  manager.CheckOverlaySupport(&candidates, kPrimaryWidget);
-
-  // As expected, there are validation requests.
-  EXPECT_EQ(manager.requests().size(), 1u);
-  EXPECT_TRUE(candidates.front().overlay_handled);
-  manager.requests().clear();
-
-  // Fast forward the time as the manager waits X hours until it can promote
-  // the fullscreen overlays again.
-  size_t kFastForwardAttempts = 5;
-  while (!manager.GetDisallowFullscreenOverlaysEndTime().is_null()) {
-    env.FastForwardBy(manager.GetDisallowFullscreenOverlaysEndTime() -
-                      time_now);
-    // Break in case if something goes very wrong.
-    if (--kFastForwardAttempts <= 0) {
-      break;
-    }
-  }
-  std::vector<OverlaySurfaceCandidate> candidates3 = {
-      CreateCandidate(gfx::Rect(0, 0, 100, 100), 0)};
-  candidates3.front().overlay_type = gfx::OverlayType::kFullScreen;
-
-  manager.CheckOverlaySupport(&candidates, kPrimaryWidget);
-
-  // Sanity check.
-  ASSERT_TRUE(manager.GetDisallowFullscreenOverlaysEndTime().is_null());
-
-  // As expected, there are no validation requests now and fullscreen overlays
-  // can be promoted without validation now.
-  EXPECT_EQ(manager.requests().size(), 0u);
-  EXPECT_TRUE(candidates.front().overlay_handled);
 }
 
 }  // namespace ui

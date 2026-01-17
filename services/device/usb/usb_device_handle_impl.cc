@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "services/device/usb/usb_device_handle_impl.h"
 
 #include <algorithm>
@@ -16,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
@@ -373,7 +368,8 @@ UsbDeviceHandleImpl::Transfer::CreateIsochronousTransfer(
       &Transfer::PlatformCallback, transfer.get(), timeout);
 
   for (size_t i = 0; i < packet_lengths.size(); ++i)
-    transfer->platform_transfer_->iso_packet_desc[i].length = packet_lengths[i];
+    UNSAFE_TODO(transfer->platform_transfer_->iso_packet_desc[i]).length =
+        packet_lengths[i];
 
   return transfer;
 }
@@ -492,7 +488,8 @@ void UsbDeviceHandleImpl::Transfer::TransferComplete(UsbTransferStatus status,
         platform_transfer_->num_iso_packets);
     for (size_t i = 0; i < packets.size(); ++i) {
       packets[i] = mojom::UsbIsochronousPacket::New();
-      packets[i]->length = platform_transfer_->iso_packet_desc[i].length;
+      packets[i]->length =
+          UNSAFE_TODO(platform_transfer_->iso_packet_desc[i]).length;
       packets[i]->transferred_length = 0;
       packets[i]->status = status;
     }
@@ -513,11 +510,12 @@ void UsbDeviceHandleImpl::Transfer::IsochronousTransferComplete() {
       platform_transfer_->num_iso_packets);
   for (size_t i = 0; i < packets.size(); ++i) {
     packets[i] = mojom::UsbIsochronousPacket::New();
-    packets[i]->length = platform_transfer_->iso_packet_desc[i].length;
+    packets[i]->length =
+        UNSAFE_TODO(platform_transfer_->iso_packet_desc[i]).length;
     packets[i]->transferred_length =
-        platform_transfer_->iso_packet_desc[i].actual_length;
-    packets[i]->status =
-        ConvertTransferStatus(platform_transfer_->iso_packet_desc[i].status);
+        UNSAFE_TODO(platform_transfer_->iso_packet_desc[i]).actual_length;
+    packets[i]->status = ConvertTransferStatus(
+        UNSAFE_TODO(platform_transfer_->iso_packet_desc[i]).status);
   }
   task_runner_->PostTask(
       FROM_HERE, base::BindOnce(&UsbDeviceHandleImpl::TransferComplete,
@@ -586,7 +584,7 @@ void UsbDeviceHandleImpl::ClaimInterface(int interface_number,
     std::move(callback).Run(false);
     return;
   }
-  if (base::Contains(claimed_interfaces_, interface_number)) {
+  if (claimed_interfaces_.contains(interface_number)) {
     std::move(callback).Run(true);
     return;
   }
@@ -600,7 +598,7 @@ void UsbDeviceHandleImpl::ReleaseInterface(int interface_number,
                                            ResultCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  if (!device_ || !base::Contains(claimed_interfaces_, interface_number)) {
+  if (!device_ || !claimed_interfaces_.contains(interface_number)) {
     task_runner_->PostTask(FROM_HERE,
                            base::BindOnce(std::move(callback), false));
     return;
@@ -628,7 +626,7 @@ void UsbDeviceHandleImpl::SetInterfaceAlternateSetting(
     ResultCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  if (!device_ || !base::Contains(claimed_interfaces_, interface_number)) {
+  if (!device_ || !claimed_interfaces_.contains(interface_number)) {
     std::move(callback).Run(false);
     return;
   }
@@ -1067,7 +1065,7 @@ void UsbDeviceHandleImpl::SubmitTransfer(std::unique_ptr<Transfer> transfer) {
 void UsbDeviceHandleImpl::TransferComplete(Transfer* transfer,
                                            base::OnceClosure callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(base::Contains(transfers_, transfer)) << "Missing transfer completed";
+  DCHECK(transfers_.contains(transfer)) << "Missing transfer completed";
   transfers_.erase(transfer);
 
   std::move(callback).Run();

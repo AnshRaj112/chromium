@@ -11,6 +11,7 @@
 #import "ios/chrome/browser/content_settings/model/host_content_settings_map_factory.h"
 #import "ios/chrome/browser/context_menu/ui_bundled/context_menu_configuration_provider.h"
 #import "ios/chrome/browser/dialogs/ui_bundled/nsurl_protection_space_util.h"
+#import "ios/chrome/browser/enterprise/data_controls/model/data_controls_tab_helper.h"
 #import "ios/chrome/browser/overlays/model/public/overlay_callback_manager.h"
 #import "ios/chrome/browser/overlays/model/public/overlay_modality.h"
 #import "ios/chrome/browser/overlays/model/public/overlay_request.h"
@@ -93,21 +94,17 @@ bool IsMicOrCameraAccessSubjectToParentalControls(
 
 }  // namespace
 
-WebStateDelegateBrowserAgent::WebStateDelegateBrowserAgent(
-    Browser* browser,
-    TabInsertionBrowserAgent* tab_insertion_agent)
+WebStateDelegateBrowserAgent::WebStateDelegateBrowserAgent(Browser* browser)
     : BrowserUserData(browser),
       web_state_list_(browser->GetWebStateList()),
-      tab_insertion_agent_(tab_insertion_agent) {
-  DCHECK(tab_insertion_agent_);
-
+      browser_(browser) {
   // All the BrowserAgent are attached to the Browser during the creation,
   // the WebStateList must be empty at this point.
   DCHECK(web_state_list_->empty())
       << "WebStateDelegateBrowserAgent created for a Browser with a non-empty "
          "WebStateList.";
 
-  StartObserving(web_state_list_, Policy::kOnlyRealized);
+  StartObserving(browser, Policy::kOnlyRealized);
 }
 
 WebStateDelegateBrowserAgent::~WebStateDelegateBrowserAgent() {
@@ -190,7 +187,7 @@ web::WebState* WebStateDelegateBrowserAgent::CreateNewWebState(
   // Requested web state should not be blocked from opening.
   SnapshotTabHelper::FromWebState(source)->UpdateSnapshotWithCallback(nil);
 
-  return tab_insertion_agent_->InsertWebStateOpenedByDOM(source);
+  return tab_insertion_agent()->InsertWebStateOpenedByDOM(source);
 }
 
 void WebStateDelegateBrowserAgent::CloseWebState(web::WebState* source) {
@@ -218,8 +215,8 @@ web::WebState* WebStateDelegateBrowserAgent::OpenURLFromWebState(
     case WindowOpenDisposition::NEW_BACKGROUND_TAB: {
       insertion_params.in_background =
           params.disposition == WindowOpenDisposition::NEW_BACKGROUND_TAB;
-      return tab_insertion_agent_->InsertWebState(load_params,
-                                                  insertion_params);
+      return tab_insertion_agent()->InsertWebState(load_params,
+                                                   insertion_params);
     }
     case WindowOpenDisposition::CURRENT_TAB: {
       source->GetNavigationManager()->LoadURLWithParams(load_params);
@@ -227,8 +224,8 @@ web::WebState* WebStateDelegateBrowserAgent::OpenURLFromWebState(
     }
     case WindowOpenDisposition::NEW_POPUP: {
       insertion_params.opened_by_dom = true;
-      return tab_insertion_agent_->InsertWebState(load_params,
-                                                  insertion_params);
+      return tab_insertion_agent()->InsertWebState(load_params,
+                                                   insertion_params);
     }
     default:
       NOTIMPLEMENTED();
@@ -351,4 +348,35 @@ void WebStateDelegateBrowserAgent::OnNewWebViewCreated(web::WebState* source) {
   // Focusing a newly-created web view allows it to request auth-based API. See
   // crbug.com/369996712.
   [source->GetWebViewProxy() becomeFirstResponder];
+}
+
+void WebStateDelegateBrowserAgent::ShouldAllowCopy(
+    web::WebState* source,
+    base::OnceCallback<void(bool)> callback) {
+  data_controls::DataControlsTabHelper::GetOrCreateForWebState(source)
+      ->ShouldAllowCopy(std::move(callback));
+}
+
+void WebStateDelegateBrowserAgent::ShouldAllowPaste(
+    web::WebState* source,
+    base::OnceCallback<void(bool)> callback) {
+  data_controls::DataControlsTabHelper::GetOrCreateForWebState(source)
+      ->ShouldAllowPaste(std::move(callback));
+}
+
+void WebStateDelegateBrowserAgent::ShouldAllowCut(
+    web::WebState* source,
+    base::OnceCallback<void(bool)> callback) {
+  data_controls::DataControlsTabHelper::GetOrCreateForWebState(source)
+      ->ShouldAllowCut(std::move(callback));
+}
+
+void WebStateDelegateBrowserAgent::DidFinishClipboardRead(
+    web::WebState* source) {
+  data_controls::DataControlsTabHelper::GetOrCreateForWebState(source)
+      ->DidFinishClipboardRead();
+}
+
+TabInsertionBrowserAgent* WebStateDelegateBrowserAgent::tab_insertion_agent() {
+  return TabInsertionBrowserAgent::FromBrowser(browser_);
 }

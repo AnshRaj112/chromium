@@ -6,8 +6,8 @@
 #import <variant>
 #import <vector>
 
-#import "base/containers/contains.h"
 #import "base/containers/flat_set.h"
+#import "base/containers/to_vector.h"
 #import "base/strings/strcat.h"
 #import "base/strings/utf_string_conversions.h"
 #import "base/test/ios/wait_util.h"
@@ -37,7 +37,6 @@
 #import "components/autofill/ios/form_util/autofill_test_with_web_state.h"
 #import "components/autofill/ios/form_util/child_frame_registrar.h"
 #import "components/autofill/ios/form_util/form_handlers_java_script_feature.h"
-#import "components/autofill/ios/form_util/form_util_java_script_feature.h"
 #import "components/prefs/testing_pref_service.h"
 #import "ios/testing/embedded_test_server_handlers.h"
 #import "ios/web/public/js_messaging/web_frame.h"
@@ -217,8 +216,7 @@ struct TestCreditCardForm {
         return AssertionFailure()
                << "frame with id " << frame_id << " couldn't be found";
       }
-      const bool should_be_filled =
-          base::Contains(filled_field_ids, field.global_id);
+      const bool should_be_filled = filled_field_ids.contains(field.global_id);
 
       const std::u16string expected_filled_value =
           should_be_filled ? base::UTF8ToUTF16(field.fill_value) : u"";
@@ -322,10 +320,9 @@ class TestAutofillManager : public BrowserAutofillManager {
     BrowserAutofillManager::OnFormsSeen(updated_forms, removed_forms);
   }
 
-  void OnDidFillAutofillFormData(const FormData& form,
-                                 base::TimeTicks timestamp) override {
+  void OnDidAutofillForm(const FormData& form) override {
     filled_forms_.push_back(form);
-    BrowserAutofillManager::OnDidFillAutofillFormData(form, timestamp);
+    BrowserAutofillManager::OnDidAutofillForm(form);
   }
 
   void OnFormSubmitted(const FormData& form,
@@ -387,7 +384,7 @@ class TestAutofillManager : public BrowserAutofillManager {
 
   TestAutofillManagerWaiter did_fill_forms_waiter_{
       *this,
-      {AutofillManagerEvent::kDidFillAutofillFormData}};
+      {AutofillManagerEvent::kDidAutofillForm}};
 
   TestAutofillManagerWaiter did_submit_forms_waiter_{
       *this,
@@ -423,7 +420,6 @@ class AutofillAcrossIframesTest : public AutofillTestWithWebState {
         static_cast<web::FakeWebClient*>(GetWebClient());
     web_client->SetJavaScriptFeatures(
         {AutofillJavaScriptFeature::GetInstance(),
-         FormUtilJavaScriptFeature::GetInstance(),
          FormHandlersJavaScriptFeature::GetInstance()});
 
     // We need an AutofillAgent to exist or else the form will never get parsed.
@@ -443,6 +439,11 @@ class AutofillAcrossIframesTest : public AutofillTestWithWebState {
             web_state());
   }
 
+  void TearDown() override {
+    autofill_manager_injector_.reset();
+    AutofillTestWithWebState::TearDown();
+  }
+
   web::WebFrame* WaitForMainFrame() {
     __block web::WebFrame* main_frame = nullptr;
     EXPECT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
@@ -459,9 +460,10 @@ class AutofillAcrossIframesTest : public AutofillTestWithWebState {
     NewFrameCatcher* catcher_ptr = &catcher;
     EXPECT_TRUE(base::test::ios::WaitUntilConditionOrTimeout(
         kWaitForJSCompletionTimeout, ^bool {
-          return !!catcher_ptr->latest_new_frame();
+          return !!catcher_ptr->latest_new_frame_id();
         }));
-    return catcher_ptr->latest_new_frame();
+    return web_frames_manager()->GetFrameWithId(
+        catcher.latest_new_frame_id().value_or(""));
   }
 
   // Wait for the browser form to be considered as completed (fully constructed)
@@ -646,7 +648,9 @@ class AutofillAcrossIframesTest : public AutofillTestWithWebState {
         GetDriverForFrame(trigger_frame)
             ->ApplyFormAction(mojom::FormActionType::kFill,
                               mojom::ActionPersistence::kFill, fields,
-                              trigger_origin, field_type_map, Section());
+                              FillId::Create(),
+                              /*supports_refill=*/false, trigger_origin,
+                              field_type_map, Section());
 
     // Verify that filled fields correspond to the expected ones by comparing
     // their global ids.
@@ -1025,7 +1029,9 @@ TEST_F(AutofillAcrossIframesTest, Fill_MainFrameForm) {
 
   main_frame_driver()->ApplyFormAction(
       mojom::FormActionType::kFill, mojom::ActionPersistence::kFill,
-      form.fields(), form.main_frame_origin(), field_type_map, Section());
+      form.fields(), FillId::Create(),
+      /*supports_refill=*/false, form.main_frame_origin(), field_type_map,
+      Section());
 
   ASSERT_TRUE(main_frame_manager().WaitForFormsFilled(1));
   ASSERT_EQ(main_frame_manager().filled_forms().size(), 1u);
@@ -1090,7 +1096,8 @@ TEST_F(AutofillAcrossIframesTest, Fill_MultiFrameForm) {
   base::flat_set<FieldGlobalId> filled_field_ids =
       main_frame_driver()->ApplyFormAction(
           mojom::FormActionType::kFill, mojom::ActionPersistence::kFill, fields,
-          form.main_frame_origin(), field_type_map, Section());
+          FillId::Create(), /*supports_refill=*/false, form.main_frame_origin(),
+          field_type_map, Section());
 
   EXPECT_THAT(filled_field_ids, UnorderedElementsAre(name_field->global_id(),
                                                      phone_field->global_id()));
@@ -1205,9 +1212,8 @@ TEST_F(AutofillAcrossIframesTest, SubmitMultiFrameForm) {
   ASSERT_EQ(form.child_frames().size(), 2u);
   ASSERT_EQ(form.fields().size(), 2u);
 
-  std::vector<FieldGlobalId> field_global_ids(form.fields().size());
-  std::ranges::transform(
-      form.fields(), field_global_ids.begin(),
+  std::vector<FieldGlobalId> field_global_ids = base::ToVector(
+      form.fields(),
       [](const FormFieldData& field) { return field.global_id(); });
 
   main_frame_driver()->FormSubmitted(main_frame_manager().seen_forms().front(),
@@ -1253,10 +1259,8 @@ TEST_F(AutofillAcrossIframesTest, SubmitMultiFrameForm_XHR) {
   ASSERT_EQ(browser_form.child_frames().size(), 2u);
   ASSERT_EQ(browser_form.fields().size(), 2u);
 
-  std::vector<FieldGlobalId> field_global_ids(browser_form.fields().size());
-  std::ranges::transform(
-      browser_form.fields(), field_global_ids.begin(),
-      [](const FormFieldData& field) { return field.global_id(); });
+  std::vector<FieldGlobalId> field_global_ids =
+      base::ToVector(browser_form.fields(), &FormFieldData::global_id);
 
   std::set frames = web_frames_manager()->GetAllWebFrames();
 
@@ -1374,10 +1378,8 @@ TEST_F(AutofillAcrossIframesTest, AskForFillDataOnMultiFrameForm) {
   ASSERT_EQ(form.child_frames().size(), 2u);
   ASSERT_EQ(form.fields().size(), 2u);
 
-  std::vector<FieldGlobalId> field_global_ids(form.fields().size());
-  std::ranges::transform(
-      form.fields(), field_global_ids.begin(),
-      [](const FormFieldData& field) { return field.global_id(); });
+  std::vector<FieldGlobalId> field_global_ids =
+      base::ToVector(form.fields(), &FormFieldData::global_id);
 
   std::vector<FormFieldData> fields = form.fields();
 
@@ -1427,10 +1429,8 @@ TEST_F(AutofillAcrossIframesTest, TextChangeOnMultiFrameForm) {
   ASSERT_EQ(form.child_frames().size(), 2u);
   ASSERT_EQ(form.fields().size(), 2u);
 
-  std::vector<FieldGlobalId> field_global_ids(form.fields().size());
-  std::ranges::transform(
-      form.fields(), field_global_ids.begin(),
-      [](const FormFieldData& field) { return field.global_id(); });
+  std::vector<FieldGlobalId> field_global_ids =
+      base::ToVector(form.fields(), &FormFieldData::global_id);
 
   std::vector<FormFieldData> fields = form.fields();
 
@@ -1505,7 +1505,8 @@ TEST_F(AutofillAcrossIframesTest, UpdateOnFrameDeletion) {
   // only one.
   ASSERT_THAT(main_frame_driver()->ApplyFormAction(
                   mojom::FormActionType::kFill, mojom::ActionPersistence::kFill,
-                  fields, form.main_frame_origin(), field_type_map, Section()),
+                  fields, FillId::Create(), /*supports_refill=*/false,
+                  form.main_frame_origin(), field_type_map, Section()),
               SizeIs(1));
 
   // Wait on the fill to be done.
@@ -1561,7 +1562,7 @@ TEST_F(AutofillAcrossIframesTest, UpdateOnFormDeletion) {
 
   // Verify that the field count is now 1 for the xframes browser form since
   // there was one form containing one field that was deleted.
-  FormStructure* form =
+  const FormStructure* form =
       main_frame_manager().FindCachedFormById(browser_form_global_id);
   ASSERT_TRUE(form);
   EXPECT_EQ(1u, form->field_count());
@@ -1609,7 +1610,7 @@ TEST_F(AutofillAcrossIframesTest, UpdateOnFormDeletion_Synthetic) {
 
   // Verify that the field count is now 2 for the xframe browser form since
   // the synthetic form in one of the frames was deleted.
-  FormStructure* form =
+  const FormStructure* form =
       main_frame_manager().FindCachedFormById(browser_form_global_id);
   ASSERT_TRUE(form);
   EXPECT_EQ(2u, form->field_count());
@@ -1658,7 +1659,7 @@ TEST_F(AutofillAcrossIframesTest, UpdateOnFormDeletion_Synthetic_Partial) {
 
   // Verify that the field count is still 4 for the xframe browser form since
   // the synthetic form in one of the frames was deleted.
-  FormStructure* form =
+  const FormStructure* form =
       main_frame_manager().FindCachedFormById(browser_form_global_id);
   ASSERT_TRUE(form);
   EXPECT_EQ(4u, form->field_count());
@@ -1807,7 +1808,8 @@ TEST_F(AutofillAcrossIframesTest, FrameDoubleRegistration_Unregister) {
   // in the unregistered frame shouldn't be filled.
   EXPECT_THAT(main_frame_driver()->ApplyFormAction(
                   mojom::FormActionType::kFill, mojom::ActionPersistence::kFill,
-                  fields_to_fill, browser_form.main_frame_origin(),
+                  fields_to_fill, FillId::Create(),
+                  /*supports_refill=*/false, browser_form.main_frame_origin(),
                   field_type_map, Section()),
               UnorderedElementsAre(phone_field->global_id()));
 
@@ -1835,7 +1837,7 @@ TEST_F(AutofillAcrossIframesTest, FrameAndFormIdsDontMatch) {
     web::WebFrame* main_frame = WaitForMainFrame();
     std::string new_frame_id = main_frame->GetFrameId();
     // Reverse the main frame id to make it a brand new id.
-    std::reverse(new_frame_id.begin(), new_frame_id.end());
+    std::ranges::reverse(new_frame_id);
 
     // Change the frame ID provided by getFrameId() to simulate a different
     // frame receiving the forms extraction request.
@@ -1922,10 +1924,9 @@ TEST_F(AutofillAcrossIframesFillSecurityTest, XoriginTrigger) {
                 cc_form_info.all_fields());
 }
 
-// Test that the shared-autofill permission isn't propagated to the nested
-// frames on the main origin that aren't a direct children of the main
-// frame. Fields on the same origin as the trigger field should be filled even
-// if nested.
+// Test that the "autofill" permission isn't propagated to the nested frames on
+// the main origin that aren't a direct children of the main frame. Fields on
+// the same origin as the trigger field should be filled even if nested.
 //
 // Representation of the tested xframe form structure with the expected outcome
 // in [] next to each input field and the trigger field indicated with <--:

@@ -14,7 +14,6 @@
 #include "base/containers/flat_map.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
-#include "chrome/browser/ui/webui/app_service_internals/app_service_internals.mojom-forward.h"
 #include "chrome/browser/ui/webui/app_service_internals/app_service_internals.mojom.h"
 #include "components/services/app_service/public/cpp/app_update.h"
 #include "components/services/app_service/public/cpp/capability_access_update.h"
@@ -24,7 +23,6 @@
 #include "components/services/app_service/public/cpp/preferred_app.h"
 
 #if BUILDFLAG(IS_CHROMEOS)
-#include "ash/constants/ash_features.h"
 #include "chrome/browser/apps/app_service/promise_apps/promise_app.h"
 #include "chrome/browser/apps/app_service/promise_apps/promise_app_registry_cache.h"
 #endif  // BUILDFLAG(IS_CHROMEOS)
@@ -84,8 +82,7 @@ std::vector<mojom::app_service_internals::PromiseAppInfoPtr> GetPromiseApps(
   std::vector<mojom::app_service_internals::PromiseAppInfoPtr> promise_apps;
 
 #if BUILDFLAG(IS_CHROMEOS)
-  if (!ash::features::ArePromiseIconsEnabled() ||
-      !proxy->PromiseAppRegistryCache()) {
+  if (!proxy->PromiseAppRegistryCache()) {
     return promise_apps;
   }
 

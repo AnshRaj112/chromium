@@ -22,6 +22,8 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
 #import "base/values.h"
+#import "components/autofill/core/common/autofill_data_validation.h"
+#import "components/autofill/core/common/autofill_util.h"
 #import "components/autofill/core/common/field_data_manager.h"
 #import "components/autofill/core/common/form_data.h"
 #import "components/autofill/core/common/unique_ids.h"
@@ -32,7 +34,6 @@
 #import "components/autofill/ios/form_util/child_frame_registrar.h"
 #import "components/autofill/ios/form_util/form_activity_observer.h"
 #import "components/autofill/ios/form_util/form_activity_params.h"
-#import "components/autofill/ios/form_util/form_util_java_script_feature.h"
 #import "ios/web/public/js_messaging/content_world.h"
 #import "ios/web/public/js_messaging/script_message.h"
 #import "ios/web/public/js_messaging/web_frame.h"
@@ -274,10 +275,6 @@ std::optional<std::pair<WebFrame*, LocalFrameToken>> GetIsolatedFrame(
     const std::string& page_world_frame_id,
     const std::string& remote_frame_token,
     web::WebState* web_state) {
-  if (!base::FeatureList::IsEnabled(kAutofillIsolatedWorldForJavascriptIos)) {
-    return std::nullopt;
-  }
-
   std::optional<LocalFrameToken> local_frame_token =
       LookupLocalFrame(remote_frame_token, web_state);
 
@@ -521,9 +518,13 @@ void FormActivityTabHelper::FormSubmissionHandler(
                               *programmatic_submission);
   }
 
+  // A form is considered "perfectly filled" if none of its fields were edited
+  // by the user, unless that field was autofilled in the first place.
+  const bool perfect_filling = IsFormPerfectlyFilled(form);
+
   for (auto& observer : observers_) {
-    observer.DocumentSubmitted(web_state, sender_frame, form,
-                               submitted_by_user);
+    observer.DocumentSubmitted(web_state, sender_frame, form, submitted_by_user,
+                               perfect_filling);
   }
 
   RecordFormSubmissionOutcome(FormSubmissionOutcome::kHandled);

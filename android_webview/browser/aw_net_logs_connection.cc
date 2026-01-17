@@ -11,7 +11,6 @@
 #include "base/base64.h"
 #include "base/files/file.h"
 #include "base/files/file_path.h"
-#include "base/files/file_util.h"
 #include "base/files/scoped_file.h"
 #include "base/logging.h"
 #include "net/log/file_net_log_observer.h"
@@ -21,7 +20,7 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "android_webview/browser_jni_headers/AwNetLogsConnection_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 namespace android_webview {
 
@@ -60,7 +59,8 @@ AwNetLogsConnection* GetInstance() {
   return instance;
 }
 
-static void JNI_AwNetLogsConnection_StartNetLogs(JNIEnv* env, const jint j_fd) {
+static void JNI_AwNetLogsConnection_StartNetLogs(JNIEnv* env,
+                                                 const int32_t j_fd) {
   GetInstance()->startNetLogBounded(j_fd);
 }
 
@@ -69,3 +69,5 @@ static void JNI_AwNetLogsConnection_StopNetLogs(JNIEnv* env) {
 }
 
 }  // namespace android_webview
+
+DEFINE_JNI(AwNetLogsConnection)

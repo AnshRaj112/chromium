@@ -35,6 +35,7 @@ import java.util.function.Function;
 @NullMarked
 public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
         implements OnMenuItemClickListener, OnClickListener {
+    @SuppressWarnings("HidingField")
     private @Nullable SelectionDelegate<BookmarkId> mSelectionDelegate;
 
     private boolean mEditButtonVisible;
@@ -44,6 +45,7 @@ public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
     private boolean mSelectionShowOpenInNewTab;
     private boolean mSelectionShowOpenInIncognito;
     private boolean mSelectionShowMove;
+    private boolean mSelectionShowCopyLink;
     private boolean mSelectionShowMarkRead;
     private boolean mSelectionShowMarkUnread;
 
@@ -131,6 +133,12 @@ public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
         mSelectionShowMove = show;
         if (show) assert mIsSelectionEnabled;
         getMenu().findItem(R.id.selection_mode_move_menu_id).setVisible(show);
+    }
+
+    void setSelectionShowCopyLink(boolean show) {
+        mSelectionShowCopyLink = show;
+        if (show) assert mIsSelectionEnabled;
+        getMenu().findItem(R.id.selection_mode_copy_link).setVisible(show);
     }
 
     void setSelectionShowMarkRead(boolean show) {
@@ -225,6 +233,7 @@ public class BookmarkToolbar extends SelectableListToolbar<BookmarkId>
         setSelectionShowOpenInNewTab(mSelectionShowOpenInNewTab);
         setSelectionShowOpenInIncognito(mSelectionShowOpenInIncognito);
         setSelectionShowMove(mSelectionShowMove);
+        setSelectionShowCopyLink(mSelectionShowCopyLink);
         setSelectionShowMarkRead(mSelectionShowMarkRead);
         setSelectionShowMarkUnread(mSelectionShowMarkUnread);
     }

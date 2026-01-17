@@ -25,10 +25,6 @@
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "url/gurl.h"
 
-#if BUILDFLAG(IS_ANDROID)
-#include "components/password_manager/core/browser/split_stores_and_local_upm.h"
-#endif  // BUILDFLAG(IS_ANDROID)
-
 namespace browsing_data {
 namespace {
 
@@ -159,7 +155,7 @@ void PasswordStoreFetcher::OnGetPasswordStoreResults(
         result->url,
         net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES);
     if (domain.empty())
-      domain = result->url.host();
+      domain = result->url.GetHost();
     sorted_domains.emplace_back(domain);
   }
   // Only consecutive duplicates are removed below. Since we're only listing two

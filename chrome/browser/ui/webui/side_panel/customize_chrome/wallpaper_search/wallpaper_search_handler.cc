@@ -5,6 +5,7 @@
 #include "chrome/browser/ui/webui/side_panel/customize_chrome/wallpaper_search/wallpaper_search_handler.h"
 
 #include <optional>
+#include <string>
 #include <tuple>
 #include <utility>
 #include <variant>
@@ -12,10 +13,10 @@
 
 #include "base/barrier_callback.h"
 #include "base/base64.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/strings/strcat.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/time/time.h"
@@ -165,7 +166,7 @@ WallpaperSearchHandler::~WallpaperSearchHandler() {
 
   bool is_result = false;
   if (background_id) {
-    if (base::Contains(wallpaper_search_results_, *background_id)) {
+    if (wallpaper_search_results_.contains(*background_id)) {
       base::UmaHistogramEnumeration(
           "NewTabPage.WallpaperSearch.SessionSetTheme",
           NtpWallpaperSearchThemeType::kResult);
@@ -418,7 +419,7 @@ void WallpaperSearchHandler::SetBackgroundToWallpaperSearchResult(
     const base::Token& result_id,
     double time,
     side_panel::customize_chrome::mojom::ResultDescriptorsPtr descriptors) {
-  CHECK(base::Contains(wallpaper_search_results_, result_id));
+  CHECK(wallpaper_search_results_.contains(result_id));
   auto& [image_quality, render_time, bitmap] =
       wallpaper_search_results_[result_id];
   if (image_quality) {
@@ -556,7 +557,7 @@ void WallpaperSearchHandler::OpenHelpArticle() {
   NavigateParams navigate_params(profile_,
                                  GURL(chrome::kWallpaperSearchLearnMorePageURL),
                                  ui::PAGE_TRANSITION_LINK);
-  navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
+  navigate_params.window_action = NavigateParams::WindowAction::kShowWindow;
   navigate_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
   Navigate(&navigate_params);
 }
@@ -619,7 +620,7 @@ void WallpaperSearchHandler::DecodeHistoryImage(
 
 void WallpaperSearchHandler::OnDescriptorsRetrieved(
     GetDescriptorsCallback callback,
-    std::unique_ptr<std::string> response_body) {
+    std::optional<std::string> response_body) {
   if (!response_body) {
     // Network errors (i.e. the server did not provide a response).
     DVLOG(1) << "Request failed with error: "
@@ -628,8 +629,7 @@ void WallpaperSearchHandler::OnDescriptorsRetrieved(
     return;
   }
 
-  std::string response;
-  response.swap(*response_body);
+  std::string response = std::move(response_body).value();
 
   // The response may start with . Ignore this.
   constexpr char kXSSIResponsePreamble[] = ")]}'";
@@ -784,7 +784,7 @@ void WallpaperSearchHandler::OnHistoryDecoded(
 void WallpaperSearchHandler::OnInspirationImageDownloaded(
     const base::Token& id,
     base::ElapsedTimer timer,
-    std::unique_ptr<std::string> response_body) {
+    std::optional<std::string> response_body) {
   if (!response_body) {
     // Network errors (i.e. the server did not provide a response).
     DVLOG(1) << "Request failed with error: "
@@ -809,7 +809,7 @@ void WallpaperSearchHandler::OnInspirationImageDecoded(
 
 void WallpaperSearchHandler::OnInspirationsRetrieved(
     GetInspirationsCallback callback,
-    std::unique_ptr<std::string> response_body) {
+    std::optional<std::string> response_body) {
   if (!response_body) {
     // Network errors (i.e. the server did not provide a response).
     DVLOG(1) << "Request failed with error: "
@@ -818,8 +818,7 @@ void WallpaperSearchHandler::OnInspirationsRetrieved(
     return;
   }
 
-  std::string response;
-  response.swap(*response_body);
+  std::string response = std::move(response_body).value();
 
   // The response may start with . Ignore this.
   const char kXSSIResponsePreamble[] = ")]}'";
@@ -1068,7 +1067,7 @@ void WallpaperSearchHandler::SetResultRenderTime(
     const std::vector<base::Token>& result_ids,
     double time) {
   for (const auto& id : result_ids) {
-    CHECK(base::Contains(wallpaper_search_results_, id));
+    CHECK(wallpaper_search_results_.contains(id));
     auto& tuple = wallpaper_search_results_[id];
     std::get<1>(tuple) =
         std::make_optional(base::Time::FromMillisecondsSinceUnixEpoch(time));

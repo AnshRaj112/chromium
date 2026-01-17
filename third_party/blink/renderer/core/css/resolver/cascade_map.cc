@@ -37,7 +37,7 @@ const CascadePriority* CascadeMap::Find(const CSSPropertyName& name) const {
   size_t index = static_cast<size_t>(name.Id());
   DCHECK_LT(index, static_cast<size_t>(kNumCSSProperties));
   return native_properties_.Bits().Has(name.Id())
-             ? UNSAFE_TODO(&native_properties_.Buffer()[index])
+             ? UNSAFE_BUFFERS(&native_properties_.Buffer()[index])
                    .Top(backing_vector_)
              : nullptr;
 }
@@ -69,7 +69,8 @@ const CascadePriority* CascadeMap::Find(const CSSPropertyName& name,
   DCHECK(native_properties_.Bits().Has(name.Id()));
   size_t index = static_cast<size_t>(name.Id());
   DCHECK_LT(index, static_cast<size_t>(kNumCSSProperties));
-  return find_origin(UNSAFE_TODO(native_properties_.Buffer()[index]), origin);
+  return find_origin(UNSAFE_BUFFERS(native_properties_.Buffer()[index]),
+                     origin);
 }
 
 CascadePriority& CascadeMap::Top(CascadePriorityList& list) {
@@ -99,8 +100,36 @@ const CascadePriority* CascadeMap::FindRevertLayer(const CSSPropertyName& name,
   DCHECK(native_properties_.Bits().Has(name.Id()));
   size_t index = static_cast<size_t>(name.Id());
   DCHECK_LT(index, static_cast<size_t>(kNumCSSProperties));
-  return find_revert_layer(UNSAFE_TODO(native_properties_.Buffer()[index]),
+  return find_revert_layer(UNSAFE_BUFFERS(native_properties_.Buffer()[index]),
                            revert_from);
+}
+
+const CascadePriority* CascadeMap::FindRevertRule(
+    const CSSPropertyName& name,
+    wtf_size_t revert_from) const {
+  auto find_revert_rule =
+      [this](const CascadeMap::CascadePriorityList& list,
+             wtf_size_t revert_from) -> const CascadePriority* {
+    for (auto iter = list.Begin(backing_vector_);
+         iter != list.End(backing_vector_); ++iter) {
+      if (iter->GetRuleIndex() < revert_from) {
+        return &(*iter);
+      }
+    }
+    return nullptr;
+  };
+
+  if (name.IsCustomProperty()) {
+    DCHECK(custom_properties_.Contains(name.ToAtomicString()));
+    return find_revert_rule(
+        custom_properties_.find(name.ToAtomicString())->value, revert_from);
+  }
+
+  DCHECK(native_properties_.Bits().Has(name.Id()));
+  size_t index = static_cast<size_t>(name.Id());
+  DCHECK_LT(index, static_cast<size_t>(kNumCSSProperties));
+  return find_revert_rule(UNSAFE_BUFFERS(native_properties_.Buffer()[index]),
+                          revert_from);
 }
 
 void CascadeMap::Add(const AtomicString& custom_property_name,
@@ -125,7 +154,8 @@ void CascadeMap::Add(CSSPropertyID id, CascadePriority priority) {
 
   has_important_ |= priority.IsImportant();
 
-  CascadePriorityList* list = UNSAFE_TODO(&native_properties_.Buffer()[index]);
+  CascadePriorityList* list =
+      UNSAFE_BUFFERS(&native_properties_.Buffer()[index]);
   if (!native_properties_.Bits().Has(id)) {
     native_properties_.Bits().Set(id);
     new (list) CascadeMap::CascadePriorityList(backing_vector_, priority);
@@ -152,11 +182,7 @@ void CascadeMap::Add(CascadePriorityList* list, CascadePriority priority) {
     // style computation), false positives are fine.
     inline_style_lost_ = true;
   }
-  if (top.ForLayerComparison() < priority.ForLayerComparison()) {
-    list->Push(backing_vector_, priority);
-  } else {
-    top = priority;
-  }
+  list->Push(backing_vector_, priority);
 }
 
 void CascadeMap::Reset() {

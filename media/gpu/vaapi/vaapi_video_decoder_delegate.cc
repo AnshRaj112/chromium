@@ -4,7 +4,7 @@
 
 #include "media/gpu/vaapi/vaapi_video_decoder_delegate.h"
 
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/numerics/safe_conversions.h"
@@ -28,8 +28,9 @@ namespace {
 void ctr128_inc64(uint8_t* counter) {
   uint32_t n = 16;
   do {
-    if (++counter[--n] != 0)
+    if (UNSAFE_TODO(++counter[--n]) != 0) {
       return;
+    }
   } while (n > 8);
 }
 
@@ -159,8 +160,9 @@ VaapiVideoDecoderDelegate::SetupDecryptDecode(
     segment_info.segment_length = segment_info.init_byte_length = size;
     if (decrypt_config_) {
       // We need to specify the IV even if the segment is clear.
-      memcpy(segment_info.aes_cbc_iv_or_ctr, decrypt_config_->iv().data(),
-             DecryptConfig::kDecryptionKeySize);
+      UNSAFE_TODO(memcpy(segment_info.aes_cbc_iv_or_ctr,
+                         decrypt_config_->iv().data(),
+                         DecryptConfig::kDecryptionKeySize));
     }
     segments->emplace_back(std::move(segment_info));
     crypto_params->num_segments++;
@@ -183,7 +185,7 @@ VaapiVideoDecoderDelegate::SetupDecryptDecode(
   DCHECK(decrypt_config_);
   // We also need to make sure we have the key data for the active
   // DecryptConfig now that the protected session exists.
-  if (!base::Contains(hw_key_data_map_, decrypt_config_->key_id())) {
+  if (!hw_key_data_map_.contains(decrypt_config_->key_id())) {
     DVLOG(1) << "Looking up the key data for: " << decrypt_config_->key_id();
     chromeos_cdm_context_->GetHwKeyData(
         decrypt_config_.get(), hw_identifier_,
@@ -213,8 +215,8 @@ VaapiVideoDecoderDelegate::SetupDecryptDecode(
     VAEncryptionSegmentInfo segment_info = {};
     segment_info.segment_start_offset = offset;
     segment_info.segment_length = entry.clear_bytes + entry.cypher_bytes;
-    memcpy(segment_info.aes_cbc_iv_or_ctr, iv.data(),
-           DecryptConfig::kDecryptionKeySize);
+    UNSAFE_TODO(memcpy(segment_info.aes_cbc_iv_or_ctr, iv.data(),
+                       DecryptConfig::kDecryptionKeySize));
     if (ctr) {
       size_t partial_block_size =
           (DecryptConfig::kDecryptionKeySize -
@@ -238,9 +240,9 @@ VaapiVideoDecoderDelegate::SetupDecryptDecode(
     offset += entry.clear_bytes + entry.cypher_bytes;
     segments->emplace_back(std::move(segment_info));
   }
-  memcpy(crypto_params->wrapped_decrypt_blob,
-         hw_key_data_map_[decrypt_config_->key_id()].data(),
-         DecryptConfig::kDecryptionKeySize);
+  UNSAFE_TODO(memcpy(crypto_params->wrapped_decrypt_blob,
+                     hw_key_data_map_[decrypt_config_->key_id()].data(),
+                     DecryptConfig::kDecryptionKeySize));
   crypto_params->key_blob_size = DecryptConfig::kDecryptionKeySize;
   crypto_params->segment_info = &segments->front();
   return protected_session_state_;
@@ -296,7 +298,7 @@ void VaapiVideoDecoderDelegate::OnGetHwKeyData(
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   // There's a special case here where we are updating usage times/checking on
   // key validity, and in that case the key is already in the map.
-  if (base::Contains(hw_key_data_map_, key_id)) {
+  if (hw_key_data_map_.contains(key_id)) {
     if (status == Decryptor::Status::kSuccess)
       return;
     // This key is no longer valid, decryption will fail, so stop playback

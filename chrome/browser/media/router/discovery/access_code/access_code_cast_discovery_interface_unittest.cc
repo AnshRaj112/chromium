@@ -5,6 +5,7 @@
 #include "chrome/browser/media/router/discovery/access_code/access_code_cast_discovery_interface.h"
 
 #include "base/command_line.h"
+#include "base/feature_list.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/mock_callback.h"
 #include "base/test/task_environment.h"
@@ -18,6 +19,7 @@
 #include "components/endpoint_fetcher/endpoint_fetcher.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/identity_test_environment.h"
+#include "components/sync/base/features.h"
 #include "content/public/test/browser_task_environment.h"
 #include "net/http/http_util.h"
 #include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
@@ -48,7 +50,6 @@ using AddSinkResultCode = access_code_cast::mojom::AddSinkResultCode;
 
 using ::testing::_;
 using ::testing::Eq;
-using ::testing::Invoke;
 using ::testing::InvokeArgument;
 using ::testing::Mock;
 using ::testing::NiceMock;
@@ -60,10 +61,9 @@ namespace {
 
 const char kMockPostData[] = "mock_post_data";
 constexpr base::TimeDelta kMockTimeout = base::Milliseconds(1000000);
-const char kMockOAuthConsumerName[] = "mock_oauth_consumer_name";
-const char kMockScope[] = "mock_scope";
 const char kMockEndpoint[] = "https://my-endpoint.com";
-const char kHttpMethod[] = "POST";
+constexpr endpoint_fetcher::HttpMethod kHttpMethod =
+    endpoint_fetcher::HttpMethod::kPost;
 const char kMockContentType[] = "mock_content_type";
 const char kEmail[] = "mock_email@gmail.com";
 const char kDefaultURL[] = "https://castedumessaging-pa.googleapis.com";
@@ -200,15 +200,27 @@ class AccessCodeCastDiscoveryInterfaceTest : public testing::Test {
         profile, "123456", logger_.get(),
         identity_test_env_.identity_manager());
 
-    // TODO(crbug.com/40067771): ConsentLevel::kSync is deprecated and should be
-    //     removed. See ConsentLevel::kSync documentation for details.
+    // TODO(crbug.com/417950948): ConsentLevel::kSync is deprecated and should
+    // be removed. See ConsentLevel::kSync documentation for details.
+    signin::ConsentLevel consent_level =
+        base::FeatureList::IsEnabled(syncer::kReplaceSyncPromosWithSignInPromos)
+            ? signin::ConsentLevel::kSignin
+            : signin::ConsentLevel::kSync;
+
     discovery_interface_->SetEndpointFetcherForTesting(
         std::make_unique<EndpointFetcher>(
-            kMockOAuthConsumerName, GURL(kMockEndpoint), kHttpMethod,
-            kMockContentType, std::vector<std::string>{kMockScope},
-            kMockTimeout, kMockPostData, TRAFFIC_ANNOTATION_FOR_TESTS,
             test_url_loader_factory, identity_test_env_.identity_manager(),
-            signin::ConsentLevel::kSync));
+            EndpointFetcher::RequestParams::Builder(
+                kHttpMethod, TRAFFIC_ANNOTATION_FOR_TESTS)
+                .SetAuthType(endpoint_fetcher::OAUTH)
+                .SetOAuthConsumerId(
+                    signin::OAuthConsumerId::kAccessCodeCastDiscovery)
+                .SetConsentLevel(consent_level)
+                .SetContentType(kMockContentType)
+                .SetTimeout(kMockTimeout)
+                .SetUrl(GURL(kMockEndpoint))
+                .SetPostData(kMockPostData)
+                .Build()));
 
     in_process_data_decoder_ =
         std::make_unique<data_decoder::test::InProcessDataDecoder>();
@@ -256,7 +268,11 @@ class AccessCodeCastDiscoveryInterfaceTest : public testing::Test {
   }
 
   void SignIn() {
-    SetProfileConsent(signin::ConsentLevel::kSync);
+    signin::ConsentLevel consent_level =
+        base::FeatureList::IsEnabled(syncer::kReplaceSyncPromosWithSignInPromos)
+            ? signin::ConsentLevel::kSignin
+            : signin::ConsentLevel::kSync;
+    SetProfileConsent(consent_level);
     identity_test_env_.SetAutomaticIssueOfAccessTokens(true);
   }
 
@@ -330,6 +346,11 @@ TEST_F(AccessCodeCastDiscoveryInterfaceTest, ServerError) {
 #if !BUILDFLAG(IS_CHROMEOS)
 // Revoking Sync consent is not possible on ChromeOS.
 TEST_F(AccessCodeCastDiscoveryInterfaceTest, SyncError) {
+  if (base::FeatureList::IsEnabled(
+          syncer::kReplaceSyncPromosWithSignInPromos)) {
+    GTEST_SKIP() << "RevokeSyncConsent() is no-op as Sync is deprecated";
+  }
+
   // Test to validate a fetch request without sync set for the account will
   // return a SYNC_ERROR.
   MockDiscoveryDeviceCallback mock_callback;

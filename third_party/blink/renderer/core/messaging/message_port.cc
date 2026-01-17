@@ -49,6 +49,7 @@
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/frame/user_activation.h"
 #include "third_party/blink/renderer/core/messaging/blink_transferable_message_mojom_traits.h"
+#include "third_party/blink/renderer/core/scheduler/task_attribution_util.h"
 #include "third_party/blink/renderer/core/workers/worker_global_scope.h"
 #include "third_party/blink/renderer/core/workers/worker_or_worklet_global_scope.h"
 #include "third_party/blink/renderer/core/workers/worker_thread.h"
@@ -121,7 +122,8 @@ void MessagePort::postMessage(ScriptState* script_state,
     if (transferables.message_ports[i] == this) {
       exception_state.ThrowDOMException(
           DOMExceptionCode::kDataCloneError,
-          "Port at index " + String::Number(i) + " contains the source port.");
+          StrCat({"Port at index ", String::Number(i),
+                  " contains the source port."}));
       return;
     }
   }
@@ -142,24 +144,20 @@ void MessagePort::postMessage(ScriptState* script_state,
 
   msg.sender_agent_cluster_id = GetExecutionContext()->GetAgentClusterID();
   msg.locked_to_sender_agent_cluster = msg.message->IsLockedToAgentCluster();
+  msg.task_state_id = std::nullopt;
 
   // Only pass the task state ID if we're in the main world, as isolated world
   // task tracking is not yet supported. Also, only pass the task state if the
   // port is still entangled to its initially entangled port.
-  if (auto* tracker =
-          scheduler::TaskAttributionTracker::From(script_state->GetIsolate());
-      initially_entangled_port_ && tracker &&
-      script_state->World().IsMainWorld()) {
+  if (initially_entangled_port_) {
     if (scheduler::TaskAttributionInfo* task_state =
-            tracker->CurrentTaskState()) {
+            CaptureCurrentTaskStateIfMainWorld(script_state)) {
       // Since `initially_entangled_port_` is not nullptr, neither should be
       // `post_message_task_container_`.
       CHECK(post_message_task_container_);
       post_message_task_container_->AddPostMessageTask(task_state);
       msg.task_state_id =
           std::optional<scheduler::TaskAttributionId>(task_state->Id());
-    } else {
-      msg.task_state_id = std::nullopt;
     }
   }
 
@@ -241,7 +239,7 @@ void MessagePort::Entangle(MessagePortDescriptor port_descriptor,
   // 2. when the execution context is destroyed, the connector_ is reset.
   connector_->set_incoming_receiver(this);
   connector_->set_connection_error_handler(
-      WTF::BindOnce(&MessagePort::OnConnectionError, WrapWeakPersistent(this)));
+      BindOnce(&MessagePort::OnConnectionError, WrapWeakPersistent(this)));
 }
 
 void MessagePort::Entangle(MessagePortChannel channel) {
@@ -291,7 +289,7 @@ Vector<MessagePortChannel> MessagePort::DisentanglePorts(
         type = "a duplicate";
       exception_state.ThrowDOMException(
           DOMExceptionCode::kDataCloneError,
-          "Port at index " + String::Number(i) + " is " + type + ".");
+          StrCat({"Port at index ", String::Number(i), " is ", type, "."}));
       return Vector<MessagePortChannel>();
     }
     if (port->closed_)
@@ -375,10 +373,9 @@ bool MessagePort::Accept(mojo::Message* mojo_message) {
     // BFCache tasks.
     dispatch_event_task_runner_->PostTask(
         FROM_HERE,
-        WTF::BindOnce(
-            &MessagePort::DispatchMessageEvent,
-            WrapPersistent(weak_cell_factory_for_dispatch_.GetWeakCell()),
-            std::move(message)));
+        BindOnce(&MessagePort::DispatchMessageEvent,
+                 WrapPersistent(weak_cell_factory_for_dispatch_.GetWeakCell()),
+                 std::move(message)));
   } else {
     MessagePort::DispatchMessageEvent(std::move(message));
   }
@@ -417,9 +414,8 @@ void MessagePort::DispatchMessageEvent(BlinkTransferableMessage message) {
       scheduler::TaskAttributionInfo* task_state =
           entangled_port->post_message_task_container_
               ->GetAndDecrementPostMessageTask(message.task_state_id);
-      task_attribution_scope = tracker->CreateTaskScope(
-          task_state,
-          scheduler::TaskAttributionTracker::TaskScopeType::kPostMessage);
+      task_attribution_scope = tracker->SetCurrentTaskStateIfTopLevel(
+          task_state, TaskScopeType::kPostMessage);
     }
   }
 

@@ -9,11 +9,13 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "components/lens/contextual_input.h"
 #include "components/omnibox/browser/actions/omnibox_action.h"
 #include "components/omnibox/browser/autocomplete_match_type.h"
 #include "components/omnibox/browser/autocomplete_provider_client.h"
 #include "components/omnibox/browser/omnibox.mojom-shared.h"
 #include "components/omnibox/browser/omnibox_navigation_observer.h"
+#include "components/omnibox/browser/prewarm_trigger.h"
 #include "components/omnibox/common/omnibox_focus_state.h"
 #include "components/security_state/core/security_state.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
@@ -41,6 +43,9 @@ struct VectorIcon;
 
 class AutocompleteControllerEmitter;
 class PrefService;
+namespace omnibox {
+class OmniboxPopupCloser;
+}  // namespace omnibox
 
 // Interface that allows the omnibox component to interact with its embedder
 // (e.g., getting information about the current page, retrieving objects
@@ -97,10 +102,17 @@ class OmniboxClient {
   virtual PrefService* GetPrefs() = 0;
   virtual const PrefService* GetPrefs() const = 0;
   virtual bookmarks::BookmarkModel* GetBookmarkModel();
+  const bookmarks::BookmarkModel* GetBookmarkModel() const {
+    return const_cast<OmniboxClient*>(this)->GetBookmarkModel();
+  }
   virtual AutocompleteControllerEmitter* GetAutocompleteControllerEmitter() = 0;
   virtual TemplateURLService* GetTemplateURLService();
+  const TemplateURLService* GetTemplateURLService() const {
+    return const_cast<OmniboxClient*>(this)->GetTemplateURLService();
+  }
   virtual const AutocompleteSchemeClassifier& GetSchemeClassifier() const = 0;
   virtual AutocompleteClassifier* GetAutocompleteClassifier();
+  virtual omnibox::OmniboxPopupCloser* GetOmniboxPopupCloser();
   virtual bool ShouldDefaultTypedNavigationsToHttps() const = 0;
   // Returns the port used by the embedded https server in tests. This is used
   // to determine the correct port while upgrading typed URLs to https if the
@@ -151,6 +163,13 @@ class OmniboxClient {
   virtual metrics::OmniboxEventProto::PageClassification GetPageClassification(
       bool is_prefetch) const = 0;
 
+  // Classify the current page being viewed as, for example, the new tab
+  // page or a normal web page.  Used for logging omnibox events for
+  // UMA opted-in users.  Examines the user's profile to determine if the
+  // current page is the user's home page.
+  virtual metrics::OmniboxEventProto::PageClassification
+  GetOmniboxComposeboxPageClassification() const;
+
   // Returns the security level that the toolbar should display.
   virtual security_state::SecurityLevel GetSecurityLevel() const = 0;
 
@@ -165,6 +184,10 @@ class OmniboxClient {
   // Returns the LensOverlaySuggestInputs if available.
   virtual std::optional<lens::proto::LensOverlaySuggestInputs>
   GetLensOverlaySuggestInputs() const;
+
+  // Returns ContextualInputData if available.
+  virtual std::optional<lens::ContextualInputData> GetContextualInputData()
+      const;
 
   // Asks the `ExtensionOmniboxEventRouter` to process `match` for it.
   // Some more processing is done to separate the keyword from the
@@ -203,7 +226,7 @@ class OmniboxClient {
   // with the arguments being the index of the result, the URL of the bitmap,
   // and the bitmap itself.
   using BitmapFetchedCallback = base::RepeatingCallback<
-      void(int result_index, const GURL& icon_url, const SkBitmap& bitmap)>;
+      void(int result_index, const GURL& icon_url, const SkBitmap bitmap)>;
   virtual void OnResultChanged(const AutocompleteResult& result,
                                bool default_match_changed,
                                bool should_preload,
@@ -220,11 +243,28 @@ class OmniboxClient {
   virtual gfx::Image GetFaviconForPageUrl(
       const GURL& page_url,
       FaviconFetchedCallback on_favicon_fetched);
+  gfx::Image GetFaviconForPageUrl(
+      const GURL& page_url,
+      FaviconFetchedCallback on_favicon_fetched) const {
+    return const_cast<OmniboxClient*>(this)->GetFaviconForPageUrl(
+        page_url, std::move(on_favicon_fetched));
+  }
   virtual gfx::Image GetFaviconForDefaultSearchProvider(
       FaviconFetchedCallback on_favicon_fetched);
+  gfx::Image GetFaviconForDefaultSearchProvider(
+      FaviconFetchedCallback on_favicon_fetched) const {
+    return const_cast<OmniboxClient*>(this)->GetFaviconForDefaultSearchProvider(
+        std::move(on_favicon_fetched));
+  }
   virtual gfx::Image GetFaviconForKeywordSearchProvider(
       const TemplateURL* template_url,
       FaviconFetchedCallback on_favicon_fetched);
+  gfx::Image GetFaviconForKeywordSearchProvider(
+      const TemplateURL* template_url,
+      FaviconFetchedCallback on_favicon_fetched) const {
+    return const_cast<OmniboxClient*>(this)->GetFaviconForKeywordSearchProvider(
+        template_url, std::move(on_favicon_fetched));
+  }
 
   // Called when the text may have changed in the edit.
   virtual void OnTextChanged(const AutocompleteMatch& current_match,
@@ -281,6 +321,10 @@ class OmniboxClient {
   // Called when the thumbnail image has been removed.
   virtual void OnThumbnailRemoved() {}
 
+  // Navigates to `gurl` in the current tab. Used for handling activations of
+  // the AI Mode page action icon.
+  virtual void OpenUrl(GURL gurl) {}
+
   // Even though IPH suggestions aren't selectable like normal matches, they can
   // have a 'learn more' or next-steps link. `OpenIphLink()` allows opening
   // these in a new tab.
@@ -291,7 +335,14 @@ class OmniboxClient {
 
   // Optionally warm-up for the default search engine so that we can navigate to
   // the search result page effectively.
-  virtual void MaybePrewarmForDefaultSearchEngine() {}
+  virtual void MaybePrewarmForDefaultSearchEngine(PrewarmTrigger trigger) {}
+
+  // Whether WebUi Omnibox's aim popup is enabled and the user is eligible to
+  // use it.
+  virtual bool IsAimPopupEnabled() const;
+
+  // Returns the current enabled tool mode if any.
+  virtual omnibox::ToolMode AimToolMode() const;
 
   virtual base::WeakPtr<OmniboxClient> AsWeakPtr() = 0;
 };

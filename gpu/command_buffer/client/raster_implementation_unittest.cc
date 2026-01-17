@@ -40,7 +40,6 @@ using testing::AtLeast;
 using testing::AnyNumber;
 using testing::DoAll;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Mock;
 using testing::Sequence;
 using testing::StrictMock;
@@ -116,8 +115,7 @@ class RasterImplementationTest : public testing::Test {
 
         gl_ = std::make_unique<RasterImplementation>(
             helper_.get(), transfer_buffer_.get(),
-            lose_context_when_out_of_memory, gpu_control_.get(),
-            nullptr /* image_decode_accelerator */);
+            lose_context_when_out_of_memory, gpu_control_.get());
       }
 
       // The client should be set to something non-null.
@@ -254,8 +252,7 @@ class RasterImplementationTest : public testing::Test {
     ExpectedMemoryInfo mem;
 
     // Temporarily allocate memory and expect that memory block to be reused.
-    mem.ptr = static_cast<uint8_t*>(
-        gl_->mapped_memory_->Alloc(size, &mem.id, &mem.offset));
+    mem.ptr = gl_->mapped_memory_->Alloc(size, &mem.id, &mem.offset).data();
     gl_->mapped_memory_->Free(mem.ptr);
 
     return mem;
@@ -731,10 +728,10 @@ TEST_F(RasterImplementationTest, SignalSyncToken) {
   // run when the sync token is reached.
   base::OnceClosure signal_closure;
   EXPECT_CALL(*gpu_control_, DoSignalSyncToken(_, _))
-      .WillOnce(Invoke([&signal_closure](const SyncToken& sync_token,
-                                         base::OnceClosure* callback) {
+      .WillOnce([&signal_closure](const SyncToken& sync_token,
+                                  base::OnceClosure* callback) {
         signal_closure = std::move(*callback);
-      }));
+      });
   EXPECT_CALL(*gpu_control_, CanWaitUnverifiedSyncToken(sync_token))
       .WillOnce(Return(true));
   gl_->SignalSyncToken(sync_token,
@@ -766,10 +763,10 @@ TEST_F(RasterImplementationTest, SignalSyncTokenAfterContextLoss) {
   // run when the sync token is reached.
   base::OnceClosure signal_closure;
   EXPECT_CALL(*gpu_control_, DoSignalSyncToken(_, _))
-      .WillOnce(Invoke([&signal_closure](const SyncToken& sync_token,
-                                         base::OnceClosure* callback) {
+      .WillOnce([&signal_closure](const SyncToken& sync_token,
+                                  base::OnceClosure* callback) {
         signal_closure = std::move(*callback);
-      }));
+      });
   EXPECT_CALL(*gpu_control_, CanWaitUnverifiedSyncToken(sync_token))
       .WillOnce(Return(true));
   gl_->SignalSyncToken(sync_token,

@@ -11,7 +11,6 @@ import org.chromium.base.ResettersForTesting;
 import org.chromium.base.shared_preferences.SharedPreferencesManager;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.init.ChromeBrowserInitializer;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
@@ -19,6 +18,7 @@ import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.preferences.PrefServiceUtil;
 import org.chromium.chrome.browser.profiles.ProfileManager;
 import org.chromium.components.browser_ui.settings.ManagedPreferencesUtils.BooleanPolicyState;
+import org.chromium.components.embedder_support.util.UrlUtilities;
 import org.chromium.components.prefs.PrefChangeRegistrar;
 import org.chromium.components.prefs.PrefChangeRegistrar.PrefObserver;
 import org.chromium.components.prefs.PrefService;
@@ -43,14 +43,16 @@ public class HomepagePolicyManager implements PrefObserver {
     private static @Nullable HomepagePolicyManager sInstance;
 
     private static @Nullable PrefService sPrefServiceForTesting;
+    private static @Nullable GURL sHomepageUrlForTesting;
+    private static @Nullable Boolean sHomepageIsNtpForTesting;
+    private static @Nullable Boolean sIsHomepageManagedForTesting;
+    private static @Nullable Boolean sIsInitializedWithNativeForTesting;
 
     private boolean mIsHomepageLocationManaged;
     private GURL mHomepageUrl;
 
     @BooleanPolicyState private int mHomeButtonPolicyState;
-
-    private boolean mHomepageIsNtpManaged;
-    private boolean mHomepageIsNtpPolicyValue;
+    @BooleanPolicyState private int mHomepageSelectionPolicyState;
 
     private boolean mIsInitializedWithNative;
     private @Nullable PrefChangeRegistrar mPrefChangeRegistrar;
@@ -68,6 +70,18 @@ public class HomepagePolicyManager implements PrefObserver {
         return sInstance;
     }
 
+    public static void setHomepageForTesting(boolean isManaged, GURL homepageUrl, boolean isNtp) {
+        sIsHomepageManagedForTesting = isManaged;
+        sHomepageUrlForTesting = homepageUrl;
+        sHomepageIsNtpForTesting = isNtp;
+        ResettersForTesting.register(
+                () -> {
+                    sIsHomepageManagedForTesting = null;
+                    sHomepageUrlForTesting = null;
+                    sHomepageIsNtpForTesting = null;
+                });
+    }
+
     /**
      * If policies such as HomepageLocation are enabled on this device, the home page will be marked
      * as managed.
@@ -75,6 +89,9 @@ public class HomepagePolicyManager implements PrefObserver {
      * @return True if the current home page is managed by enterprise policy.
      */
     public static boolean isHomepageLocationManaged() {
+        if (sIsHomepageManagedForTesting != null) {
+            return sIsHomepageManagedForTesting;
+        }
         return getInstance().isHomepageLocationPolicyManaged();
     }
 
@@ -82,6 +99,9 @@ public class HomepagePolicyManager implements PrefObserver {
      * @return The homepage URL from the homepage preference.
      */
     public static GURL getHomepageUrl() {
+        if (sHomepageUrlForTesting != null) {
+            return sHomepageUrlForTesting;
+        }
         return getInstance().getHomepageLocationPolicyUrl();
     }
 
@@ -115,6 +135,32 @@ public class HomepagePolicyManager implements PrefObserver {
     }
 
     /**
+     * @return True if the homepage location or homepageIsNTP have recommended value(s) from an
+     *     enterprise policy.
+     */
+    public static boolean isHomepageSelectionRecommended() {
+        return getInstance().isHomepageSelectionPolicyRecommended();
+    }
+
+    /**
+     * @return True if the user's selection for the homepage matches the recommended value of all
+     *     recommendations set by the homepage location and homeIsNTP enterprise policies.
+     */
+    public static boolean isFollowingHomepageSelectionRecommendation() {
+        return getInstance().isFollowingHomepageSelectionPolicyRecommendation();
+    }
+
+    /**
+     * Sets the user's preference for the homepage location. This method is the bridge to the native
+     * PrefService.
+     *
+     * @param homepageUrl The user's desired homepage URL.
+     */
+    public static void setNativeHomepageLocation(String homepageUrl) {
+        getInstance().getPrefService().setString(Pref.HOME_PAGE, homepageUrl);
+    }
+
+    /**
      * Sets the user's preference for whether the home button is shown in the native. This method is
      * the bridge to the native PrefService. Prefer calling {@link
      * HomepageManager#setPrefHomepageEnabled()} to keep native and java in sync.
@@ -123,6 +169,16 @@ public class HomepagePolicyManager implements PrefObserver {
      */
     public static void setNativeShowHomeButtonState(boolean enabled) {
         getInstance().getPrefService().setBoolean(Pref.SHOW_HOME_BUTTON, enabled);
+    }
+
+    /**
+     * Sets the user's preference for whether the homepage is the new tab page. This method is the
+     * bridge to the native PrefService.
+     *
+     * @param isNtp The user's desired setting for whether the homepage is the new tab page.
+     */
+    public static void setNativeHomepageIsNtp(boolean isNtp) {
+        getInstance().getPrefService().setBoolean(Pref.HOME_PAGE_IS_NEW_TAB_PAGE, isNtp);
     }
 
     /**
@@ -144,6 +200,9 @@ public class HomepagePolicyManager implements PrefObserver {
      * Returns true if HomepageIsNewTabPage policy is managed and has a value of true, else false.
      */
     public static boolean isHomepageNewTabPageEnabled() {
+        if (sHomepageIsNtpForTesting != null) {
+            return sHomepageIsNtpForTesting;
+        }
         return isHomepageNewTabPageManaged() && getHomepageNewTabPageValue();
     }
 
@@ -152,11 +211,20 @@ public class HomepagePolicyManager implements PrefObserver {
      * HomepagePolicyManager can only return valid result after initialing with native.
      */
     public static boolean isInitializedWithNative() {
+        if (sIsInitializedWithNativeForTesting != null) {
+            return sIsInitializedWithNativeForTesting;
+        }
         return getInstance().isInitialized();
+    }
+
+    public static void setIsInitializedWithNativeForTesting(boolean isInitialized) {
+        sIsInitializedWithNativeForTesting = isInitialized;
+        ResettersForTesting.register(() -> sIsInitializedWithNativeForTesting = null);
     }
 
     /**
      * Adds a HomepagePolicyStateListener to receive updates when the homepage policy changes.
+     *
      * @param listener Object that would like to listen to changes from homepage policy.
      */
     public void addListener(HomepagePolicyStateListener listener) {
@@ -209,23 +277,14 @@ public class HomepagePolicyManager implements PrefObserver {
 
         mIsHomepageLocationManaged = !mHomepageUrl.isEmpty();
 
-        if (ChromeFeatureList.sShowHomeButtonPolicyAndroid.isEnabled()) {
-            mHomeButtonPolicyState =
-                    mSharedPreferenceManager.readInt(
-                            ChromePreferenceKeys.SHOW_HOME_BUTTON_POLICY_STATE,
-                            BooleanPolicyState.UNMANAGED);
-        }
-
-        if (ChromeFeatureList.sHomepageIsNewTabPagePolicyAndroid.isEnabled()) {
-            mHomepageIsNtpManaged =
-                    mSharedPreferenceManager.readBoolean(
-                            ChromePreferenceKeys.HOMEPAGE_IS_NEW_TAB_PAGE_POLICY_MANAGED, false);
-            if (mHomepageIsNtpManaged) {
-                mHomepageIsNtpPolicyValue =
-                        mSharedPreferenceManager.readBoolean(
-                                ChromePreferenceKeys.HOMEPAGE_IS_NEW_TAB_PAGE_POLICY_VALUE, true);
-            }
-        }
+        mHomeButtonPolicyState =
+                mSharedPreferenceManager.readInt(
+                        ChromePreferenceKeys.SHOW_HOME_BUTTON_POLICY_STATE,
+                        BooleanPolicyState.UNMANAGED);
+        mHomepageSelectionPolicyState =
+                mSharedPreferenceManager.readInt(
+                        ChromePreferenceKeys.HOMEPAGE_SELECTION_POLICY_STATE,
+                        BooleanPolicyState.UNMANAGED);
 
         ChromeBrowserInitializer.getInstance()
                 .runNowOrAfterFullBrowserStarted(this::onFinishNativeInitialization);
@@ -290,34 +349,76 @@ public class HomepagePolicyManager implements PrefObserver {
         }
 
         @BooleanPolicyState int homeButtonPolicyState = BooleanPolicyState.UNMANAGED;
-        if (ChromeFeatureList.sShowHomeButtonPolicyAndroid.isEnabled()) {
-            boolean isManaged = prefService.isManagedPreference(Pref.SHOW_HOME_BUTTON);
-            if (isManaged) {
-                homeButtonPolicyState =
-                        prefService.getBoolean(Pref.SHOW_HOME_BUTTON)
-                                ? BooleanPolicyState.MANAGED_BY_POLICY_ON
-                                : BooleanPolicyState.MANAGED_BY_POLICY_OFF;
-            } else if (prefService.isFollowingRecommendation(Pref.SHOW_HOME_BUTTON)) {
-                homeButtonPolicyState = BooleanPolicyState.RECOMMENDED_IS_FOLLOWED;
-            } else if (prefService.hasRecommendation(Pref.SHOW_HOME_BUTTON)) {
-                homeButtonPolicyState = BooleanPolicyState.RECOMMENDED_IS_NOT_FOLLOWED;
-            }
+        boolean isManaged = prefService.isManagedPreference(Pref.SHOW_HOME_BUTTON);
+        if (isManaged) {
+            homeButtonPolicyState =
+                    prefService.getBoolean(Pref.SHOW_HOME_BUTTON)
+                            ? BooleanPolicyState.MANAGED_BY_POLICY_ON
+                            : BooleanPolicyState.MANAGED_BY_POLICY_OFF;
+        } else if (prefService.isFollowingRecommendation(Pref.SHOW_HOME_BUTTON)) {
+            homeButtonPolicyState = BooleanPolicyState.RECOMMENDED_IS_FOLLOWED;
+        } else if (prefService.hasRecommendation(Pref.SHOW_HOME_BUTTON)) {
+            homeButtonPolicyState = BooleanPolicyState.RECOMMENDED_IS_NOT_FOLLOWED;
         }
 
-        boolean isHomepageNtpManaged = false;
-        boolean homepageIsNtpVal = mHomepageIsNtpPolicyValue;
-        if (ChromeFeatureList.sHomepageIsNewTabPagePolicyAndroid.isEnabled()) {
-            isHomepageNtpManaged = prefService.isManagedPreference(Pref.HOME_PAGE_IS_NEW_TAB_PAGE);
-            if (isHomepageNtpManaged) {
-                homepageIsNtpVal = prefService.getBoolean(Pref.HOME_PAGE_IS_NEW_TAB_PAGE);
+        @BooleanPolicyState int homepageSelectionPolicyState = BooleanPolicyState.UNMANAGED;
+
+        boolean isHomepageNtpManaged =
+                prefService.isManagedPreference(Pref.HOME_PAGE_IS_NEW_TAB_PAGE);
+
+        if (isHomepageNtpManaged) {
+            homepageSelectionPolicyState =
+                    prefService.getBoolean(Pref.HOME_PAGE_IS_NEW_TAB_PAGE)
+                            ? BooleanPolicyState.MANAGED_BY_POLICY_ON
+                            : BooleanPolicyState.MANAGED_BY_POLICY_OFF;
+        } else if (isHomepageLocationManaged) {
+            // Admin provided NTP is indistinguishable from HomepageIsNTP managed and true.
+            boolean isNtp = UrlUtilities.isNtpUrl(homepage);
+            homepageSelectionPolicyState =
+                    isNtp
+                            ? BooleanPolicyState.MANAGED_BY_POLICY_ON
+                            : BooleanPolicyState.MANAGED_BY_POLICY_OFF;
+        } else {
+            boolean hasNtpRecommendation =
+                    prefService.hasRecommendation(Pref.HOME_PAGE_IS_NEW_TAB_PAGE);
+            boolean hasLocationRecommendation = prefService.hasRecommendation(Pref.HOME_PAGE);
+
+            if (hasNtpRecommendation || hasLocationRecommendation) {
+                boolean isEitherRecommendationOverridden =
+                        (hasNtpRecommendation
+                                        && !prefService.isFollowingRecommendation(
+                                                Pref.HOME_PAGE_IS_NEW_TAB_PAGE))
+                                || (hasLocationRecommendation
+                                        && !prefService.isFollowingRecommendation(Pref.HOME_PAGE));
+                homepageSelectionPolicyState =
+                        isEitherRecommendationOverridden
+                                ? BooleanPolicyState.RECOMMENDED_IS_NOT_FOLLOWED
+                                : BooleanPolicyState.RECOMMENDED_IS_FOLLOWED;
+
+                // If admin changes recommendation that user has not overridden, update prefs.
+                boolean usesLocationRecommendation =
+                        prefService.isRecommendedPreference(Pref.HOME_PAGE);
+                boolean usesNtpRecommendation =
+                        prefService.isRecommendedPreference(Pref.HOME_PAGE_IS_NEW_TAB_PAGE);
+                if (usesNtpRecommendation) {
+                    boolean homepageIsNtp = prefService.getBoolean(Pref.HOME_PAGE_IS_NEW_TAB_PAGE);
+                    mSharedPreferenceManager.writeBoolean(
+                            ChromePreferenceKeys.HOMEPAGE_USE_CHROME_NTP, homepageIsNtp);
+                }
+                if (usesLocationRecommendation) {
+                    GURL homepageGURL = new GURL(prefService.getString(Pref.HOME_PAGE));
+                    mSharedPreferenceManager.writeBoolean(
+                            ChromePreferenceKeys.HOMEPAGE_USE_CHROME_NTP, false);
+                    mSharedPreferenceManager.writeString(
+                            ChromePreferenceKeys.HOMEPAGE_CUSTOM_GURL, homepageGURL.serialize());
+                }
             }
         }
 
         // Early return when nothing changes
         if (isHomepageLocationManaged == mIsHomepageLocationManaged
                 && homeButtonPolicyState == mHomeButtonPolicyState
-                && isHomepageNtpManaged == mHomepageIsNtpManaged
-                && homepageIsNtpVal == mHomepageIsNtpPolicyValue
+                && homepageSelectionPolicyState == mHomepageSelectionPolicyState
                 && homepage.equals(mHomepageUrl)) {
             return;
         }
@@ -326,37 +427,22 @@ public class HomepagePolicyManager implements PrefObserver {
         mHomepageUrl = homepage;
 
         mHomeButtonPolicyState = homeButtonPolicyState;
-
-        mHomepageIsNtpManaged = isHomepageNtpManaged;
-        mHomepageIsNtpPolicyValue = homepageIsNtpVal;
+        mHomepageSelectionPolicyState = homepageSelectionPolicyState;
 
         // Update shared preference
         mSharedPreferenceManager.writeString(
                 ChromePreferenceKeys.HOMEPAGE_LOCATION_POLICY_GURL, mHomepageUrl.serialize());
-        if (ChromeFeatureList.sShowHomeButtonPolicyAndroid.isEnabled()) {
-            mSharedPreferenceManager.writeInt(
-                    ChromePreferenceKeys.SHOW_HOME_BUTTON_POLICY_STATE, mHomeButtonPolicyState);
-            // If admin changes recommendation that user has not overridden.
-            if (prefService.isRecommendedPreference(Pref.SHOW_HOME_BUTTON)) {
-                boolean enabled = prefService.getBoolean(Pref.SHOW_HOME_BUTTON);
-                mSharedPreferenceManager.writeBoolean(
-                        ChromePreferenceKeys.HOMEPAGE_ENABLED, enabled);
-            }
-        } else {
-            mSharedPreferenceManager.removeKey(ChromePreferenceKeys.SHOW_HOME_BUTTON_POLICY_STATE);
+        mSharedPreferenceManager.writeInt(
+                ChromePreferenceKeys.SHOW_HOME_BUTTON_POLICY_STATE, mHomeButtonPolicyState);
+        // If admin changes recommendation that user has not overridden.
+        if (prefService.isRecommendedPreference(Pref.SHOW_HOME_BUTTON)) {
+            boolean enabled = prefService.getBoolean(Pref.SHOW_HOME_BUTTON);
+            mSharedPreferenceManager.writeBoolean(ChromePreferenceKeys.HOMEPAGE_ENABLED, enabled);
         }
-        if (ChromeFeatureList.sHomepageIsNewTabPagePolicyAndroid.isEnabled()) {
-            mSharedPreferenceManager.writeBoolean(
-                    ChromePreferenceKeys.HOMEPAGE_IS_NEW_TAB_PAGE_POLICY_MANAGED,
-                    isHomepageNtpManaged);
-            mSharedPreferenceManager.writeBoolean(
-                    ChromePreferenceKeys.HOMEPAGE_IS_NEW_TAB_PAGE_POLICY_VALUE, homepageIsNtpVal);
-        } else {
-            mSharedPreferenceManager.removeKey(
-                    ChromePreferenceKeys.HOMEPAGE_IS_NEW_TAB_PAGE_POLICY_MANAGED);
-            mSharedPreferenceManager.removeKey(
-                    ChromePreferenceKeys.HOMEPAGE_IS_NEW_TAB_PAGE_POLICY_VALUE);
-        }
+
+        mSharedPreferenceManager.writeInt(
+                ChromePreferenceKeys.HOMEPAGE_SELECTION_POLICY_STATE,
+                mHomepageSelectionPolicyState);
 
         // Update the listeners about the status
         for (HomepagePolicyStateListener listener : mListeners) {
@@ -418,14 +504,27 @@ public class HomepagePolicyManager implements PrefObserver {
     }
 
     @VisibleForTesting
+    public boolean isHomepageSelectionPolicyRecommended() {
+        return mHomepageSelectionPolicyState == BooleanPolicyState.RECOMMENDED_IS_FOLLOWED
+                || mHomepageSelectionPolicyState == BooleanPolicyState.RECOMMENDED_IS_NOT_FOLLOWED;
+    }
+
+    @VisibleForTesting
+    public boolean isFollowingHomepageSelectionPolicyRecommendation() {
+        assert isHomepageSelectionPolicyRecommended();
+        return mHomepageSelectionPolicyState == BooleanPolicyState.RECOMMENDED_IS_FOLLOWED;
+    }
+
+    @VisibleForTesting
     public boolean isHomepageIsNtpPolicyManaged() {
-        return mHomepageIsNtpManaged;
+        return mHomepageSelectionPolicyState == BooleanPolicyState.MANAGED_BY_POLICY_ON
+                || mHomepageSelectionPolicyState == BooleanPolicyState.MANAGED_BY_POLICY_OFF;
     }
 
     @VisibleForTesting
     public boolean getHomepageIsNtpPolicyValue() {
-        assert mHomepageIsNtpManaged;
-        return mHomepageIsNtpPolicyValue;
+        assert isHomepageIsNtpPolicyManaged();
+        return mHomepageSelectionPolicyState == BooleanPolicyState.MANAGED_BY_POLICY_ON;
     }
 
     @VisibleForTesting

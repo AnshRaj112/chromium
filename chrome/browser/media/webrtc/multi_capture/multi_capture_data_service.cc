@@ -5,26 +5,25 @@
 #include "chrome/browser/media/webrtc/multi_capture/multi_capture_data_service.h"
 
 #include "base/barrier_closure.h"
-#include "base/check_is_test.h"
-#include "base/containers/contains.h"
 #include "base/memory/ptr_util.h"
 #include "base/types/expected_macros.h"
 #include "chrome/browser/media/webrtc/capture_policy_utils.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/web_applications/isolated_web_apps/commands/isolated_web_app_install_command_helper.h"
+#include "chrome/browser/web_applications/isolated_web_apps/runtime_data/chrome_iwa_runtime_data_provider.h"
+#include "chrome/browser/web_applications/web_app_icon_manager.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "components/content_settings/core/common/content_settings_pattern.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/prefs/pref_service.h"
-#include "components/webapps/isolated_web_apps/iwa_key_distribution_info_provider.h"
 
 namespace multi_capture {
 
 MultiCaptureDataService::MultiCaptureDataService(
     web_app::WebAppProvider* provider,
     PrefService* prefs)
-    : info_provider_(web_app::IwaKeyDistributionInfoProvider::GetInstance()),
+    : data_provider_(web_app::ChromeIwaRuntimeDataProvider::GetInstance()),
       provider_(provider),
       prefs_(prefs) {
   CHECK(provider_);
@@ -38,6 +37,9 @@ MultiCaptureDataService::~MultiCaptureDataService() {
 std::unique_ptr<MultiCaptureDataService> MultiCaptureDataService::Create(
     web_app::WebAppProvider* provider,
     PrefService* prefs) {
+  if (!provider || !prefs) {
+    return nullptr;
+  }
   auto service = base::WrapUnique(new MultiCaptureDataService(provider, prefs));
   service->Init();
   return service;
@@ -51,6 +53,29 @@ MultiCaptureDataService::GetCaptureAppsWithNotification() const {
 const std::map<webapps::AppId, std::string>&
 MultiCaptureDataService::GetCaptureAppsWithoutNotification() const {
   return capture_apps_without_notification_;
+}
+
+gfx::ImageSkia MultiCaptureDataService::GetAppIcon(
+    const webapps::AppId& app_id) const {
+  if (app_icons_.contains(app_id)) {
+    return app_icons_.at(app_id);
+  }
+  return gfx::ImageSkia();
+}
+
+bool MultiCaptureDataService::IsMultiCaptureAllowed(const GURL& url) const {
+  return std::ranges::any_of(
+      multi_screen_capture_allowlist_on_login_,
+      [url](const base::Value& value) {
+        ContentSettingsPattern pattern =
+            ContentSettingsPattern::FromString(value.GetString());
+        // Despite |url| being a GURL, the path is ignored when matching.
+        return pattern.IsValid() && pattern.Matches(url);
+      });
+}
+
+bool MultiCaptureDataService::IsMultiCaptureAllowedForAnyApp() const {
+  return multi_screen_capture_allowlist_on_login_.size();
 }
 
 void MultiCaptureDataService::AddObserver(Observer* observer) {
@@ -74,6 +99,10 @@ void MultiCaptureDataService::OnWebAppInstalled(const webapps::AppId& app_id) {
 void MultiCaptureDataService::OnWebAppUninstalled(
     const webapps::AppId& app_id,
     webapps::WebappUninstallSource uninstall_source) {
+  if (app_icons_.contains(app_id)) {
+    app_icons_.erase(app_id);
+  }
+
   if (capture_apps_with_notification_.contains(app_id)) {
     capture_apps_with_notification_.erase(app_id);
     observers_.Notify(&Observer::MultiCaptureDataChanged);
@@ -97,7 +126,7 @@ void MultiCaptureDataService::Init() {
                          weak_ptr_factory_.GetWeakPtr()));
   provider_->on_registry_ready().Post(FROM_HERE,
                                       initialized_components_barrier);
-  info_provider_->OnMaybeDownloadedComponentDataReady().Post(
+  data_provider_->OnBestEffortRuntimeDataReady().Post(
       FROM_HERE, initialized_components_barrier);
 }
 
@@ -109,7 +138,7 @@ void MultiCaptureDataService::LoadData() {
           .Clone();
 
   const std::vector<std::string> app_without_notification_bundle_ids_vector =
-      info_provider_->GetSkipMultiCaptureNotificationBundleIds();
+      data_provider_->GetSkipMultiCaptureNotificationBundleIds();
   app_without_notification_bundle_ids_ = {
       app_without_notification_bundle_ids_vector.begin(),
       app_without_notification_bundle_ids_vector.end()};
@@ -132,8 +161,14 @@ void MultiCaptureDataService::LoadData() {
       continue;
     }
 
-    const bool can_skip_active_notification = base::Contains(
-        app_without_notification_bundle_ids_, allowlisted_app_url.host());
+    provider_->icon_manager().ReadFavicons(
+        *app_id, web_app::IconPurpose::ANY,
+        base::BindOnce(&MultiCaptureDataService::OnIconReceived,
+                       weak_ptr_factory_.GetWeakPtr(), *app_id));
+
+    const bool can_skip_active_notification =
+        app_without_notification_bundle_ids_.contains(
+            allowlisted_app_url.GetHost());
     const std::string app_name = registrar.GetAppShortName(*app_id);
     if (can_skip_active_notification) {
       capture_apps_without_notification_[*app_id] = app_name;
@@ -147,10 +182,13 @@ void MultiCaptureDataService::LoadData() {
   // Listen for app installation changes after initial processing.
   if (!install_manager_observation_.IsObserving()) {
     install_manager_observation_.Observe(&provider_->install_manager());
-  } else {
-    CHECK_IS_TEST();
   }
   is_initialized_ = true;
+}
+
+void MultiCaptureDataService::OnIconReceived(const webapps::AppId& app_id,
+                                             gfx::ImageSkia icon) {
+  app_icons_[app_id] = std::move(icon);
 }
 
 bool MultiCaptureDataService::MaybeAddAppToCaptureAppLists(
@@ -170,11 +208,16 @@ bool MultiCaptureDataService::MaybeAddAppToCaptureAppLists(
                               return false;
                             }
                             const GURL url(value.GetString());
-                            return url.is_valid() && url.host() == bundle_id;
+                            return url.is_valid() && url.GetHost() == bundle_id;
                           });
   if (!capture_allowed_by_policy) {
     return false;
   }
+
+  provider_->icon_manager().ReadFavicons(
+      app_id, web_app::IconPurpose::ANY,
+      base::BindOnce(&MultiCaptureDataService::OnIconReceived,
+                     weak_ptr_factory_.GetWeakPtr(), app_id));
 
   if (app_without_notification_bundle_ids_.contains(bundle_id)) {
     capture_apps_without_notification_[app_id] =

@@ -17,7 +17,7 @@
 #include "ui/accessibility/platform/ax_platform_node_delegate.h"
 #include "ui/accessibility/platform/ax_unique_id.h"
 #include "ui/gfx/geometry/rect.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 
 namespace ui {
 
@@ -37,7 +37,8 @@ class COMPONENT_EXPORT(AX_PLATFORM) AXSystemCaretWin
 
   ~AXSystemCaretWin() override;
 
-  Microsoft::WRL::ComPtr<IAccessible> GetCaret() const;
+  // Returns an unowned pointer to the caret's IAccessible interface.
+  IAccessible* GetCaret() const;
   void MoveCaretTo(const gfx::Rect& bounds_physical_pixels);
   void Hide();
 
@@ -53,8 +54,12 @@ class COMPONENT_EXPORT(AX_PLATFORM) AXSystemCaretWin
   AXPlatformNodeId GetUniqueId() const override;
 
   const AXUniqueId unique_id_{AXUniqueId::Create()};
-  gfx::AcceleratedWidget event_target_;
+  const gfx::AcceleratedWidget event_target_;
   AXPlatformNode::Pointer caret_;
+
+  // The IAccessible of the caret's parent HWND. Created lazily on first use.
+  mutable Microsoft::WRL::ComPtr<IAccessible> parent_;
+
   AXNodeData data_;
 
   friend class AXPlatformNodeWin;

@@ -37,10 +37,6 @@ bool BeginFrameSourceIOS::WantsAnimateOnlyBeginFrames() const {
   return false;
 }
 
-bool BeginFrameSourceIOS::IsRoot() const {
-  return true;
-}
-
 mojo::PendingAssociatedRemote<viz::mojom::ExternalBeginFrameControllerClient>
 BeginFrameSourceIOS::CreateExternalBeginFrameControllerClient() {
   mojo::PendingAssociatedRemote<viz::mojom::ExternalBeginFrameControllerClient>
@@ -63,6 +59,11 @@ void BeginFrameSourceIOS::SetNeedsBeginFrame(bool needs_begin_frames) {
 
 void BeginFrameSourceIOS::SetPreferredInterval(base::TimeDelta interval) {
   begin_frame_source_.SetPreferredInterval(interval);
+}
+
+void BeginFrameSourceIOS::NeedsBeginFrameWithId(int64_t display_id,
+                                                bool needs_begin_frames) {
+  // Should do nothing on iOS crbug.com/469887778#comment3.
 }
 
 }  // namespace content

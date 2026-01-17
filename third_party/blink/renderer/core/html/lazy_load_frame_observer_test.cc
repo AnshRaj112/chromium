@@ -20,6 +20,7 @@
 #include "third_party/blink/renderer/core/frame/web_local_frame_impl.h"
 #include "third_party/blink/renderer/core/html_names.h"
 #include "third_party/blink/renderer/core/paint/paint_layer_scrollable_area.h"
+#include "third_party/blink/renderer/core/scroll/scrollbar.h"
 #include "third_party/blink/renderer/core/testing/sim/sim_compositor.h"
 #include "third_party/blink/renderer/core/testing/sim/sim_request.h"
 #include "third_party/blink/renderer/core/testing/sim/sim_test.h"
@@ -201,7 +202,8 @@ TEST_P(LazyLoadFramesParamsTest, BelowTheFoldButNearViewportFrame) {
 
   // Scroll down until the child frame is visible.
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
-      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic);
+      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic,
+      cc::ScrollSourceType::kNone);
 
   Compositor().BeginFrame();
   test::RunPendingTasks();
@@ -213,7 +215,8 @@ TEST_P(LazyLoadFramesParamsTest, LoadCrossOriginFrameFarFromViewport) {
 
   // Scroll down near the child frame to cause the child frame to start loading.
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
-      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic);
+      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic,
+      cc::ScrollSourceType::kNone);
 
   Compositor().BeginFrame();
   test::RunPendingTasks();
@@ -231,7 +234,7 @@ TEST_P(LazyLoadFramesParamsTest, LoadCrossOriginFrameFarFromViewport) {
   // Scroll down so that the child frame is visible.
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
       ScrollOffset(0, GetLoadingDistanceThreshold() + 150),
-      mojom::blink::ScrollType::kProgrammatic);
+      mojom::blink::ScrollType::kProgrammatic, cc::ScrollSourceType::kNone);
 
   Compositor().BeginFrame();
   test::RunPendingTasks();
@@ -248,7 +251,7 @@ TEST_P(LazyLoadFramesParamsTest,
   // Scroll down so that the child frame is visible.
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
       ScrollOffset(0, GetLoadingDistanceThreshold() + 150),
-      mojom::blink::ScrollType::kProgrammatic);
+      mojom::blink::ScrollType::kProgrammatic, cc::ScrollSourceType::kNone);
 
   Compositor().BeginFrame();
   test::RunPendingTasks();
@@ -269,7 +272,8 @@ TEST_P(LazyLoadFramesParamsTest, NestedFrameInCrossOriginFrameFarFromViewport) {
       LoadPageWithCrossOriginFrameFarFromViewport();
 
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
-      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic);
+      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic,
+      cc::ScrollSourceType::kNone);
 
   Compositor().BeginFrame();
   test::RunPendingTasks();
@@ -328,7 +332,8 @@ TEST_P(LazyLoadFramesParamsTest, AboutBlankChildFrameNavigation) {
 
   // Scroll down near the child frame to cause the child frame to start loading.
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
-      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic);
+      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic,
+      cc::ScrollSourceType::kNone);
 
   Compositor().BeginFrame();
   test::RunPendingTasks();
@@ -433,7 +438,8 @@ TEST_P(LazyLoadFramesParamsTest,
 
   // Scroll down near the child frame to cause the child frame to start loading.
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
-      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic);
+      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic,
+      cc::ScrollSourceType::kNone);
 
   Compositor().BeginFrame();
   test::RunPendingTasks();
@@ -451,7 +457,7 @@ TEST_P(LazyLoadFramesParamsTest,
   // Scroll down so that the child frame is visible.
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
       ScrollOffset(0, GetLoadingDistanceThreshold() + 150),
-      mojom::blink::ScrollType::kProgrammatic);
+      mojom::blink::ScrollType::kProgrammatic, cc::ScrollSourceType::kNone);
 
   Compositor().BeginFrame();
   test::RunPendingTasks();
@@ -516,7 +522,8 @@ TEST_P(LazyLoadFramesParamsTest,
 
   // Scroll down near the child frame to cause the child frame to start loading.
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
-      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic);
+      ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic,
+      cc::ScrollSourceType::kNone);
 
   Compositor().BeginFrame();
   test::RunPendingTasks();
@@ -671,7 +678,7 @@ class LazyLoadFramesTest : public SimTest {
                                     "text/html");
     LoadURL("https://example.com/");
 
-    main_resource.Complete(String::Format(
+    main_resource.Complete(UNSAFE_TODO(String::Format(
         R"HTML(
           <body onload='console.log("main body onload");'>
           <div style='height: %dpx;'></div>
@@ -680,7 +687,7 @@ class LazyLoadFramesTest : public SimTest {
                onload='console.log("child frame element onload");'></iframe>
           </body>)HTML",
         kViewportHeight + kLoadingDistanceThresholdPx + 100,
-        iframe_attributes));
+        iframe_attributes)));
 
     Compositor().BeginFrame();
     test::RunPendingTasks();
@@ -697,7 +704,7 @@ class LazyLoadFramesTest : public SimTest {
     SimRequest main_resource("https://example.com/", "text/html");
     LoadURL("https://example.com/");
 
-    main_resource.Complete(String::Format(
+    main_resource.Complete(UNSAFE_TODO(String::Format(
         R"HTML(
           <body onload='console.log("main body onload");'>
           <div style='height: %dpx;'></div>
@@ -706,7 +713,7 @@ class LazyLoadFramesTest : public SimTest {
                onload='console.log("child frame element onload");'></iframe>
           </body>)HTML",
         kViewportHeight + kLoadingDistanceThresholdPx + 100,
-        iframe_attributes));
+        iframe_attributes)));
 
     Compositor().BeginFrame();
     test::RunPendingTasks();
@@ -721,7 +728,8 @@ class LazyLoadFramesTest : public SimTest {
     // Scroll down near the child frame to cause the child frame to start
     // loading.
     GetDocument().View()->LayoutViewport()->SetScrollOffset(
-        ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic);
+        ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic,
+        cc::ScrollSourceType::kNone);
 
     Compositor().BeginFrame();
     test::RunPendingTasks();
@@ -743,7 +751,7 @@ class LazyLoadFramesTest : public SimTest {
     SimRequest main_resource("https://example.com/", "text/html");
     MainFrame().StartReload(WebFrameLoadType::kReload);
 
-    main_resource.Complete(String::Format(
+    main_resource.Complete(UNSAFE_TODO(String::Format(
         R"HTML(
             <body onload='console.log("main body onload");'>
             <div style='height: %dpx;'></div>
@@ -753,7 +761,7 @@ class LazyLoadFramesTest : public SimTest {
             </body>)HTML",
         LazyLoadFramesTest::kViewportHeight +
             LazyLoadFramesTest::kLoadingDistanceThresholdPx + 100,
-        iframe_attributes));
+        iframe_attributes)));
 
     if (is_deferral_expected_on_reload) {
       // The body's load event should have already fired.
@@ -761,7 +769,8 @@ class LazyLoadFramesTest : public SimTest {
       EXPECT_FALSE(ConsoleMessages().Contains("child frame element onload"));
 
       GetDocument().View()->LayoutViewport()->SetScrollOffset(
-          ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic);
+          ScrollOffset(0, 150), mojom::blink::ScrollType::kProgrammatic,
+          cc::ScrollSourceType::kNone);
 
       SimRequest child_frame_resource("https://crossorigin.com/subframe.html",
                                       "text/html");
@@ -775,7 +784,7 @@ class LazyLoadFramesTest : public SimTest {
       GetDocument().View()->LayoutViewport()->SetScrollOffset(
           ScrollOffset(0, LazyLoadFramesTest::kViewportHeight +
                               LazyLoadFramesTest::kLoadingDistanceThresholdPx),
-          mojom::blink::ScrollType::kProgrammatic);
+          mojom::blink::ScrollType::kProgrammatic, cc::ScrollSourceType::kNone);
 
       Compositor().BeginFrame();
       test::RunPendingTasks();

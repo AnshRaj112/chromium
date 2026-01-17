@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/files/file.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -145,8 +144,9 @@ void UsbServiceLinux::BlockingTaskRunnerHelper::OnDeviceAdded(
   base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
                                                 base::BlockingType::MAY_BLOCK);
   const char* subsystem = udev_device_get_subsystem(device.get());
-  CHECK(subsystem);
-  CHECK_EQ(subsystem, kUsbSubsystem);
+  if (!subsystem || subsystem != kUsbSubsystem) {
+    return;
+  }
 
   const char* value = udev_device_get_devnode(device.get());
   if (!value)
@@ -251,7 +251,7 @@ void UsbServiceLinux::OnDeviceAdded(
     std::unique_ptr<UsbDeviceDescriptor> descriptor) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  if (base::Contains(devices_by_path_, device_path)) {
+  if (devices_by_path_.contains(device_path)) {
     USB_LOG(ERROR) << "Got duplicate add event for path: " << device_path;
     return;
   }
@@ -289,9 +289,9 @@ void UsbServiceLinux::DeviceReady(scoped_refptr<UsbDeviceLinux> device) {
 
   // If |device| was disconnected while descriptors were being read then it
   // will have been removed from |devices_by_path_|.
-  bool device_added = base::Contains(devices_by_path_, device->device_path());
+  bool device_added = devices_by_path_.contains(device->device_path());
   if (device_added) {
-    DCHECK(!base::Contains(devices(), device->guid()));
+    DCHECK(!devices().contains(device->guid()));
     devices()[device->guid()] = device;
 
     USB_LOG(USER) << "USB device added: path=" << device->device_path()

@@ -9,14 +9,17 @@
 #include "base/base64.h"
 #include "base/functional/callback.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "components/os_crypt/async/common/encryptor.h"
 #include "components/os_crypt/sync/os_crypt.h"
 #include "components/os_crypt/sync/os_crypt_mocker.h"
 #include "components/signin/public/identity_manager/account_info.h"
+#include "components/sync/base/features.h"
 #include "components/sync/base/time.h"
 #include "components/sync/engine/nigori/key_derivation_params.h"
 #include "components/sync/engine/nigori/nigori.h"
 #include "components/sync/engine/sync_status.h"
 #include "components/sync/test/mock_sync_engine.h"
+#include "components/sync/test/sync_service_crypto_test_utils.h"
 #include "components/trusted_vault/test/fake_trusted_vault_client.h"
 #include "google_apis/gaia/gaia_id.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -70,7 +73,12 @@ std::string CreateBootstrapToken(const std::string& passphrase,
   EXPECT_FALSE(serialized_key.empty());
 
   std::string encrypted_key;
-  EXPECT_TRUE(OSCrypt::EncryptString(serialized_key, &encrypted_key));
+  if (base::FeatureList::IsEnabled(kSyncUseOsCryptAsync)) {
+    EXPECT_TRUE(
+        GetEncryptorForTest().EncryptString(serialized_key, &encrypted_key));
+  } else {
+    EXPECT_TRUE(OSCrypt::EncryptString(serialized_key, &encrypted_key));
+  }
 
   return base::Base64Encode(encrypted_key);
 }
@@ -92,8 +100,14 @@ MATCHER_P2(BootstrapTokenDerivedFrom,
   }
 
   std::string decrypted_key;
-  if (!OSCrypt::DecryptString(decoded_key, &decrypted_key)) {
-    return false;
+  if (base::FeatureList::IsEnabled(kSyncUseOsCryptAsync)) {
+    if (!GetEncryptorForTest().DecryptString(decoded_key, &decrypted_key)) {
+      return false;
+    }
+  } else {
+    if (!OSCrypt::DecryptString(decoded_key, &decrypted_key)) {
+      return false;
+    }
   }
 
   sync_pb::NigoriKey given_key;
@@ -145,6 +159,11 @@ class SyncServiceCryptoTest : public testing::Test {
     trusted_vault_client_.server()->StoreKeysOnServer(kSyncingAccount.gaia,
                                                       kInitialTrustedVaultKeys);
 
+    if (base::FeatureList::IsEnabled(kSyncUseOsCryptAsync)) {
+      crypto_.SetEncryptor(
+          std::make_unique<os_crypt_async::Encryptor>(GetEncryptorForTest()));
+    }
+
     ON_CALL(delegate_, GetPassphraseType())
         .WillByDefault(ReturnPointee(&passphrase_type_));
     ON_CALL(delegate_, PassphraseTypeChanged(_))
@@ -163,9 +182,11 @@ class SyncServiceCryptoTest : public testing::Test {
            testing::Mock::VerifyAndClearExpectations(&engine_);
   }
 
-  void MimicKeyRetrievalByUser() {
+  void MimicKeyRetrievalByUser(
+      std::optional<trusted_vault::TrustedVaultUserActionTriggerForUMA>
+          trigger = std::nullopt) {
     trusted_vault_client_.server()->MimicKeyRetrievalByUser(
-        kSyncingAccount.gaia, &trusted_vault_client_);
+        kSyncingAccount.gaia, &trusted_vault_client_, trigger);
   }
 
   std::optional<PassphraseType> passphrase_type_;
@@ -526,6 +547,7 @@ TEST_F(SyncServiceCryptoTest, ShouldGetDecryptionKeyFromBootstrapToken) {
 
   // Verify that GetExplicitPassphraseDecryptionNigoriKey() result equals to
   // `expected_nigori`.
+  crypto_.SetSyncEngine(CoreAccountInfo(), &engine_);
   std::unique_ptr<Nigori> stored_nigori =
       crypto_.GetExplicitPassphraseDecryptionNigoriKey();
   ASSERT_THAT(stored_nigori, NotNull());
@@ -540,6 +562,7 @@ TEST_F(SyncServiceCryptoTest, ShouldGetDecryptionKeyFromBootstrapToken) {
 TEST_F(SyncServiceCryptoTest,
        ShouldGetNullDecryptionKeyFromEmptyBootstrapToken) {
   // GetEncryptionBootstrapToken() returns empty string by default.
+  crypto_.SetSyncEngine(CoreAccountInfo(), &engine_);
   EXPECT_THAT(crypto_.GetExplicitPassphraseDecryptionNigoriKey(), IsNull());
 }
 
@@ -548,6 +571,7 @@ TEST_F(SyncServiceCryptoTest,
   // Mimic corrupted bootstrap token being stored.
   ON_CALL(delegate_, GetEncryptionBootstrapToken)
       .WillByDefault(Return("corrupted_token"));
+  crypto_.SetSyncEngine(CoreAccountInfo(), &engine_);
   EXPECT_THAT(crypto_.GetExplicitPassphraseDecryptionNigoriKey(), IsNull());
 }
 
@@ -593,6 +617,56 @@ TEST_F(SyncServiceCryptoTest,
   EXPECT_THAT(trusted_vault_client_.fetch_count(), Eq(1));
   EXPECT_THAT(trusted_vault_client_.keys_marked_as_stale_count(), Eq(0));
   EXPECT_THAT(trusted_vault_client_.server_request_count(), Eq(0));
+}
+
+TEST_F(SyncServiceCryptoTest,
+       ShouldRecordTrustedVaultAddKeysSuccessfullyHistogram) {
+  const std::vector<std::vector<uint8_t>> kNewKeys = {{2, 3, 4, 5}};
+  base::HistogramTester histogram_tester;
+
+  // Cache `kInitialTrustedVaultKeys` into `trusted_vault_client_` prior to
+  // engine initialization. In this test, `kInitialTrustedVaultKeys` does not
+  // match the Nigori keys (i.e. the engine continues to think trusted vault
+  // keys are required until `kNewKeys` are provided).
+  MimicKeyRetrievalByUser();
+
+  // The engine replies with OnTrustedVaultKeyAccepted() only if `kNewKeys` are
+  // provided.
+  ON_CALL(engine_, AddTrustedVaultDecryptionKeys)
+      .WillByDefault([&](const std::vector<std::vector<uint8_t>>& keys,
+                         base::OnceClosure done_cb) {
+        if (keys == kNewKeys) {
+          crypto_.OnTrustedVaultKeyAccepted();
+        }
+        std::move(done_cb).Run();
+      });
+
+  // Mimic initialization of the engine where trusted vault keys are needed and
+  // `kInitialTrustedVaultKeys` are fetched, which are insufficient, and hence
+  // IsTrustedVaultKeyRequired() is exposed.
+  crypto_.SetSyncEngine(kSyncingAccount, &engine_);
+  crypto_.OnTrustedVaultKeyRequired();
+  // Note that this initial attempt involves two fetches, where both return
+  // `kInitialTrustedVaultKeys`.
+  ASSERT_TRUE(trusted_vault_client_.CompleteAllPendingRequests());
+  ASSERT_TRUE(trusted_vault_client_.CompleteAllPendingRequests());
+  ASSERT_TRUE(crypto_.IsTrustedVaultKeyRequired());
+
+  // Mimic server-side key reset and a new retrieval with a user action trigger.
+  trusted_vault_client_.server()->StoreKeysOnServer(kSyncingAccount.gaia,
+                                                    kNewKeys);
+  MimicKeyRetrievalByUser(
+      trusted_vault::TrustedVaultUserActionTriggerForUMA::kSettings);
+
+  EXPECT_TRUE(trusted_vault_client_.CompleteAllPendingRequests());
+
+  // Now, the relevant histogram for the specified trigger should have been
+  // emitted.
+  histogram_tester.ExpectUniqueSample(
+      "Sync.TrustedVaultAddKeysSuccessfully",
+      /*sample=*/
+      trusted_vault::TrustedVaultUserActionTriggerForUMA::kSettings,
+      /*expected_bucket_count=*/1);
 }
 
 TEST_F(SyncServiceCryptoTest,

@@ -48,6 +48,7 @@
 #include "ui/base/ui_base_switches.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/dom/dom_code.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/test/widget_test.h"
 #include "ui/views/widget/widget.h"
@@ -103,12 +104,17 @@ class DiceWebSigninInterceptionBubbleBrowserTest
   WebSigninInterceptor::Delegate::BubbleParameters
   GetTestBubbleParametersWithInterceptType(
       WebSigninInterceptor::SigninInterceptionType intercept_type) {
-    AccountInfo account;
-    account.account_id = CoreAccountId::FromGaiaId(GaiaId("ID1"));
+    AccountInfo account =
+        AccountInfo::Builder(GaiaId("ID1"), "test1@example.com")
+            .SetAccountId(CoreAccountId::FromGaiaId(GaiaId("ID1")))
+            .Build();
     AccountInfo primary_account;
     if (intercept_type !=
         WebSigninInterceptor::SigninInterceptionType::kChromeSignin) {
-      primary_account.account_id = CoreAccountId::FromGaiaId(GaiaId("ID2"));
+      primary_account =
+          AccountInfo::Builder(GaiaId("ID2"), "test2@example.com")
+              .SetAccountId(CoreAccountId::FromGaiaId(GaiaId("ID2")))
+              .Build();
     }
 
     ProfileAttributesEntry* entry =
@@ -149,6 +155,11 @@ class DiceWebSigninInterceptionBubbleBrowserTest
 
   std::optional<SigninInterceptionResult> callback_result_;
   std::unique_ptr<ScopedWebSigninInterceptionBubbleHandle> bubble_handle_;
+
+ private:
+  gfx::ScopedAnimationDurationScaleMode zero_duration_mode_ =
+      gfx::ScopedAnimationDurationScaleMode(
+          gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
 };
 
 // Tests that the callback is called once when the bubble is ignored.
@@ -717,6 +728,43 @@ IN_PROC_BROWSER_TEST_F(DiceWebSigninInterceptionBubbleBrowserTest,
       SigninInterceptionDismissReason::kUserNotEligible, 1);
   histogram_tester.ExpectTotalCount(
       "Signin.Intercept.ChromeSignin.ResponseTimeDismissed", 1);
+}
+
+// The regression test for https://crbug.com/464474819 to ensure that the
+// browser doesn't crash when an empty account is used as a primary account.
+IN_PROC_BROWSER_TEST_F(DiceWebSigninInterceptionBubbleBrowserTest,
+                       EmptyPrimaryAccount) {
+  WebSigninInterceptor::Delegate::BubbleParameters bubble_parameters =
+      GetTestBubbleParameters();
+  bubble_parameters.primary_account = AccountInfo();
+
+  // Creating the bubble through the static function.
+  std::unique_ptr<ScopedWebSigninInterceptionBubbleHandle> handle =
+      DiceWebSigninInterceptionBubbleView::CreateBubble(
+          browser(), GetAvatarButton(), bubble_parameters,
+          base::BindOnce(&DiceWebSigninInterceptionBubbleBrowserTest::
+                             OnInterceptionComplete,
+                         base::Unretained(this)));
+  // `bubble` is owned by the view hierarchy.
+  DiceWebSigninInterceptionBubbleView* bubble =
+      static_cast<DiceWebSigninInterceptionBubbleView::ScopedHandle*>(
+          handle.get())
+          ->GetBubbleViewForTesting();
+
+  views::Widget* widget = bubble->GetWidget();
+  views::test::WidgetVisibleWaiter visible_waiter(widget);
+  visible_waiter.Wait();
+  EXPECT_FALSE(callback_result_.has_value());
+
+  // The bubble loads the WebUI. The crash happens when the WebUI sends the
+  // 'pageLoaded' message, which triggers HandlePageLoaded in the handler.
+  // We wait for the load to finish.
+  content::WebContents* web_contents = bubble->GetBubbleWebContentsForTesting();
+  EXPECT_TRUE(content::WaitForLoadStop(web_contents));
+
+  views::test::WidgetDestroyedWaiter closed_waiter(widget);
+  widget->CloseWithReason(views::Widget::ClosedReason::kUnspecified);
+  closed_waiter.Wait();
 }
 
 IN_PROC_BROWSER_TEST_F(DiceWebSigninInterceptionBubbleBrowserTest,

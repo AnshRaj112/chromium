@@ -9,7 +9,6 @@
 #include <limits>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/strings/stringprintf.h"
 #include "media/base/limits.h"
 #include "media/base/video_types.h"
@@ -37,7 +36,7 @@ using BoolSet = media_constraints::DiscreteSet<bool>;
 // TODO(crbug.com/704136): Replace VideoInputDeviceCapabilities with Blink
 // mojo pointer type once dependent types are migrated to Blink.
 using DeviceInfo = VideoInputDeviceCapabilities;
-using DistanceVector = WTF::Vector<double>;
+using DistanceVector = Vector<double>;
 
 // Number of default settings to be used as final tie-breaking criteria for
 // settings that are equally good at satisfying constraints:
@@ -406,12 +405,12 @@ class CandidateFormat {
     }
 
     if (basic_constraint_set.resize_mode.HasIdeal()) {
-      if (!base::Contains(basic_constraint_set.resize_mode.Ideal(),
-                          WebMediaStreamTrack::kResizeModeNone)) {
+      if (!std::ranges::contains(basic_constraint_set.resize_mode.Ideal(),
+                                 WebMediaStreamTrack::kResizeModeNone)) {
         track_fitness_without_rescale += 1.0;
       }
-      if (!base::Contains(basic_constraint_set.resize_mode.Ideal(),
-                          WebMediaStreamTrack::kResizeModeRescale)) {
+      if (!std::ranges::contains(basic_constraint_set.resize_mode.Ideal(),
+                                 WebMediaStreamTrack::kResizeModeRescale)) {
         track_fitness_with_rescale += 1.0;
       }
     }

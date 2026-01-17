@@ -4,8 +4,10 @@
 
 #include "extensions/browser/api/extensions_api_client.h"
 
+#include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
 #include "extensions/browser/api/messaging/native_message_host.h"
+#include "extensions/browser/api/messaging/native_message_port_dispatcher.h"
 
 namespace extensions {
 
@@ -59,7 +61,7 @@ void ExtensionsAPIClient::UpdateActionCount(content::BrowserContext* context,
 void ExtensionsAPIClient::ClearActionCount(content::BrowserContext* context,
                                            const Extension& extension) {}
 
-void ExtensionsAPIClient::OpenFileUrl(
+void ExtensionsAPIClient::OpenFileUrlForTesting(
     const GURL& file_url,
     content::BrowserContext* browser_context) {}
 

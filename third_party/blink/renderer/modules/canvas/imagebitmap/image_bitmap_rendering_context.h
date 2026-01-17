@@ -5,6 +5,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_CANVAS_IMAGEBITMAP_IMAGE_BITMAP_RENDERING_CONTEXT_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_CANVAS_IMAGEBITMAP_IMAGE_BITMAP_RENDERING_CONTEXT_H_
 
+#include "base/byte_size.h"
 #include "base/memory/scoped_refptr.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_typedefs.h"
 #include "third_party/blink/renderer/core/html/canvas/canvas_rendering_context.h"
@@ -21,6 +22,7 @@ class Layer;
 namespace blink {
 
 class ExceptionState;
+class ExecutionContext;
 class ImageBitmap;
 class ImageLayerBridge;
 class V8UnionHTMLCanvasElementOrOffscreenCanvas;
@@ -41,6 +43,7 @@ class MODULES_EXPORT ImageBitmapRenderingContext final
     ~Factory() override = default;
 
     CanvasRenderingContext* Create(
+        ExecutionContext*,
         CanvasRenderingContextHost*,
         const CanvasContextCreationAttributesCore&) override;
     CanvasRenderingContext::CanvasRenderingAPI GetRenderingAPI()
@@ -61,7 +64,7 @@ class MODULES_EXPORT ImageBitmapRenderingContext final
   // If SetImage receives a null imagebitmap, it will Reset the internal bitmap
   // to a black and transparent bitmap.
   void SetImage(ImageBitmap*);
-  scoped_refptr<StaticBitmapImage> GetImage(FlushReason) final;
+  scoped_refptr<StaticBitmapImage> GetImage() final;
 
   void SetUV(const gfx::PointF& left_top, const gfx::PointF& right_bottom);
 
@@ -81,11 +84,12 @@ class MODULES_EXPORT ImageBitmapRenderingContext final
 
   void Reset() override;
 
+  base::ByteSize AllocatedBufferSize() const override;
+
   void Stop() override;
 
   scoped_refptr<StaticBitmapImage> PaintRenderingResultsToSnapshot(
-      SourceDrawingBuffer source_buffer,
-      FlushReason reason) override;
+      SourceDrawingBuffer source_buffer) override;
 
   bool IsPaintable() const final;
 
@@ -108,11 +112,12 @@ class MODULES_EXPORT ImageBitmapRenderingContext final
   // This is used to follow the standard regarding transferToBitmap
   scoped_refptr<StaticBitmapImage> GetImageAndResetInternal();
 
-  CanvasResourceProvider* GetOrCreateResourceProviderForOffscreenCanvas();
+  CanvasResourceProviderSharedImage*
+  GetOrCreateResourceProviderForOffscreenCanvas();
   void ResetInternalBitmapToBlackTransparent(int width, int height);
 
   Member<ImageLayerBridge> image_layer_bridge_;
-  std::unique_ptr<CanvasResourceProvider>
+  std::unique_ptr<CanvasResourceProviderSharedImage>
       resource_provider_for_offscreen_canvas_;
 };
 

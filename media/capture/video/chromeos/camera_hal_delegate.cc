@@ -51,7 +51,7 @@ namespace {
 constexpr int32_t kDefaultFps = 30;
 constexpr char kVirtualPrefix[] = "VIRTUAL_";
 
-const std::unordered_set<int32_t> module_id_set = {
+const absl::flat_hash_set<int32_t> module_id_set = {
     static_cast<int32_t>(
         CameraHalDelegate::PopularCamPeriphModuleID::kLifeCamHD3000_Microsoft),
     static_cast<int32_t>(
@@ -989,7 +989,7 @@ int32_t CameraHalDelegate::GetMaskedModuleID(const std::string& module_id) {
     int vid = strtol(module_id.substr(0, 4).c_str(), nullptr, 16);
     int pid = strtol(module_id.substr(5, 8).c_str(), nullptr, 16);
     int decimal_module_id = (vid << 16) + pid;
-    if (base::Contains(module_id_set, decimal_module_id)) {
+    if (module_id_set.contains(decimal_module_id)) {
       return decimal_module_id;
     }
   }

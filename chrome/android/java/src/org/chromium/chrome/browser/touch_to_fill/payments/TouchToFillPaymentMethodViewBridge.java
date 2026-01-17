@@ -22,6 +22,9 @@ import org.chromium.components.autofill.AutofillSuggestion;
 import org.chromium.components.autofill.AutofillSuggestion.Payload;
 import org.chromium.components.autofill.LoyaltyCard;
 import org.chromium.components.autofill.SuggestionType;
+import org.chromium.components.autofill.payments.BnplIssuerContext;
+import org.chromium.components.autofill.payments.BnplIssuerTosDetail;
+import org.chromium.components.autofill.payments.TouchToFillDisplayOptions;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetControllerProvider;
 import org.chromium.ui.base.WindowAndroid;
@@ -38,6 +41,7 @@ class TouchToFillPaymentMethodViewBridge {
 
     private TouchToFillPaymentMethodViewBridge(
             TouchToFillPaymentMethodComponent.Delegate delegate,
+            Profile profile,
             Context context,
             AutofillImageFetcher imageFetcher,
             BottomSheetController bottomSheetController,
@@ -45,6 +49,7 @@ class TouchToFillPaymentMethodViewBridge {
         mComponent = new TouchToFillPaymentMethodCoordinator();
         mComponent.initialize(
                 context,
+                profile,
                 imageFetcher,
                 bottomSheetController,
                 delegate,
@@ -64,6 +69,7 @@ class TouchToFillPaymentMethodViewBridge {
         if (bottomSheetController == null) return null;
         return new TouchToFillPaymentMethodViewBridge(
                 delegate,
+                profile,
                 context,
                 AutofillImageFetcherFactory.getForProfile(profile),
                 bottomSheetController,
@@ -71,11 +77,12 @@ class TouchToFillPaymentMethodViewBridge {
     }
 
     @CalledByNative
-    private void showCreditCards(
-            @JniType("std::vector") Object[] suggestions, boolean shouldShowScanCreditCard) {
-        mComponent.showCreditCards(
+    private void showPaymentMethods(
+            @JniType("std::vector") Object[] suggestions,
+            TouchToFillDisplayOptions touchToFillDisplayOptions) {
+        mComponent.showPaymentMethods(
                 (List<AutofillSuggestion>) (List<?>) Arrays.asList(suggestions),
-                shouldShowScanCreditCard);
+                touchToFillDisplayOptions);
     }
 
     @CalledByNative
@@ -84,16 +91,60 @@ class TouchToFillPaymentMethodViewBridge {
     }
 
     @CalledByNative
-    private void showLoyaltyCards(
+    private void showAffiliatedLoyaltyCards(
             @JniType("base::span<const LoyaltyCard>") List<LoyaltyCard> affiliatedLoyaltyCards,
             @JniType("base::span<const LoyaltyCard>") List<LoyaltyCard> allLoyaltyCards,
             boolean firstTimeUsage) {
-        mComponent.showLoyaltyCards(affiliatedLoyaltyCards, allLoyaltyCards, firstTimeUsage);
+        mComponent.showAffiliatedLoyaltyCards(
+                affiliatedLoyaltyCards, allLoyaltyCards, firstTimeUsage);
+    }
+
+    @CalledByNative
+    private void showAllLoyaltyCards(
+            @JniType("base::span<const LoyaltyCard>") List<LoyaltyCard> allLoyaltyCards) {
+        mComponent.showAllLoyaltyCards(allLoyaltyCards);
+    }
+
+    @CalledByNative
+    private void onPurchaseAmountExtracted(
+            @JniType("std::vector") List<BnplIssuerContext> bnplIssuerContexts,
+            @JniType("std::optional<int64_t>") @Nullable Long extractedAmount,
+            boolean isAmountSupportedByAnyIssuer) {
+        mComponent.onPurchaseAmountExtracted(
+                bnplIssuerContexts, extractedAmount, isAmountSupportedByAnyIssuer);
+    }
+
+    @CalledByNative
+    private void showProgressScreen() {
+        mComponent.showProgressScreen();
+    }
+
+    @CalledByNative
+    private void showBnplIssuers(
+            @JniType("std::vector") List<BnplIssuerContext> bnplIssuerContexts) {
+        mComponent.showBnplIssuers(bnplIssuerContexts);
+    }
+
+    @CalledByNative
+    private void showErrorScreen(
+            @JniType("std::u16string") String title,
+            @JniType("std::u16string") String description) {
+        mComponent.showErrorScreen(title, description);
+    }
+
+    @CalledByNative
+    private void showBnplIssuerTos(BnplIssuerTosDetail bnplIssuerTosDetail) {
+        mComponent.showBnplIssuerTos(bnplIssuerTosDetail);
     }
 
     @CalledByNative
     private void hideSheet() {
         mComponent.hideSheet();
+    }
+
+    @CalledByNative
+    private void setVisible(boolean visible) {
+        mComponent.setVisible(visible);
     }
 
     @CalledByNative

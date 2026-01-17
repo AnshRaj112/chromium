@@ -19,7 +19,7 @@ namespace autofill {
 class MockAutofillAiManager : public AutofillAiManager {
  public:
   MockAutofillAiManager(autofill::AutofillClient* client,
-                        autofill::StrikeDatabase* strike_database);
+                        strike_database::StrikeDatabaseBase* strike_database);
   ~MockAutofillAiManager() override;
 
   MOCK_METHOD(std::vector<autofill::Suggestion>,
@@ -38,7 +38,7 @@ class MockAutofillAiManager : public AutofillAiManager {
               OnSuggestionsShown,
               (const FormStructure&,
                const AutofillField&,
-               DenseSet<EntityType> suggested_entity_types,
+               base::span<const Suggestion> shown_suggestions,
                ukm::SourceId),
               (override));
   MOCK_METHOD(void, OnFormSeen, (const FormStructure&), (override));

@@ -11,11 +11,11 @@
 #import "base/apple/bundle_locations.h"
 #import "base/check.h"
 #import "base/functional/bind.h"
+#import "base/functional/callback_helpers.h"
 #import "base/ios/ns_error_util.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/autofill/ios/browser/autofill_java_script_feature.h"
 #import "components/autofill/ios/browser/suggestion_controller_java_script_feature.h"
-#import "components/autofill/ios/common/features.h"
 #import "components/autofill/ios/form_util/form_handlers_java_script_feature.h"
 #import "components/autofill/ios/form_util/programmatic_form_submission_handler_java_script_feature.h"
 #import "components/language/ios/browser/language_detection_java_script_feature.h"
@@ -108,13 +108,9 @@ std::vector<web::JavaScriptFeature*> WebViewWebClient::GetJavaScriptFeatures(
           GetInstance(),
       translate::TranslateJavaScriptFeature::GetInstance(),
       WebViewMessageHandlerJavaScriptFeature::FromBrowserState(browser_state),
-      WebViewScriptsJavaScriptFeature::FromBrowserState(browser_state)};
-
-  if (base::FeatureList::IsEnabled(kAutofillIsolatedWorldForJavascriptIos)) {
-    features.push_back(
-        autofill::ProgrammaticFormSubmissionHandlerJavaScriptFeature::
-            GetInstance());
-  }
+      WebViewScriptsJavaScriptFeature::FromBrowserState(browser_state),
+      autofill::ProgrammaticFormSubmissionHandlerJavaScriptFeature::
+          GetInstance()};
 
   return features;
 }

@@ -119,10 +119,6 @@ class CORE_EXPORT SpeculationRuleSet final
   const HeapVector<Member<SpeculationRule>>& prefetch_rules() const {
     return prefetch_rules_;
   }
-  const HeapVector<Member<SpeculationRule>>& prefetch_with_subresources_rules()
-      const {
-    return prefetch_with_subresources_rules_;
-  }
   const HeapVector<Member<SpeculationRule>>& prerender_rules() const {
     return prerender_rules_;
   }
@@ -153,6 +149,8 @@ class CORE_EXPORT SpeculationRuleSet final
   bool HasWarnings() const;
   bool ShouldReportUMAForError() const;
 
+  const String& tag() const { return tag_; }
+
   void AddConsoleMessageForValidation(ScriptElementBase& script_element);
   void AddConsoleMessageForValidation(Document& element_document,
                                       SpeculationRulesResource& resource);
@@ -164,11 +162,11 @@ class CORE_EXPORT SpeculationRuleSet final
 
  private:
   void SetError(SpeculationRuleSetErrorType error_type, String error_message);
+  void SetTag(String tag);
   void AddWarnings(base::span<const String> warning_messages);
 
   SpeculationRuleSetId inspector_id_;
   HeapVector<Member<SpeculationRule>> prefetch_rules_;
-  HeapVector<Member<SpeculationRule>> prefetch_with_subresources_rules_;
   HeapVector<Member<SpeculationRule>> prerender_rules_;
   HeapVector<Member<SpeculationRule>> prerender_until_script_rules_;
   // The original source is reused to reparse speculation rule sets when the
@@ -187,6 +185,8 @@ class CORE_EXPORT SpeculationRuleSet final
       SpeculationRuleSetErrorType::kNoError;
   String error_message_;
   Vector<String> warning_messages_;
+
+  String tag_;
 };
 
 }  // namespace blink

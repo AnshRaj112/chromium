@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
 import static org.chromium.ui.test.util.ViewUtils.VIEW_NULL;
 import static org.chromium.ui.test.util.ViewUtils.waitForView;
 
@@ -71,6 +72,7 @@ import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Features.DisableFeatures;
+import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.feed.sections.SectionHeaderListProperties;
@@ -78,6 +80,7 @@ import org.chromium.chrome.browser.feed.v2.FeedV2TestHelper;
 import org.chromium.chrome.browser.feed.v2.TestFeedServer;
 import org.chromium.chrome.browser.firstrun.FirstRunUtils;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
+import org.chromium.chrome.browser.gesturenav.GestureNavigationUtils;
 import org.chromium.chrome.browser.ntp.NewTabPage;
 import org.chromium.chrome.browser.ntp.cards.SignInPromo;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
@@ -95,8 +98,8 @@ import org.chromium.chrome.test.util.NewTabPageTestUtils;
 import org.chromium.chrome.test.util.browser.signin.SigninTestRule;
 import org.chromium.chrome.test.util.browser.suggestions.SuggestionsDependenciesRule;
 import org.chromium.chrome.test.util.browser.suggestions.mostvisited.FakeMostVisitedSites;
-import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.components.externalauth.ExternalAuthUtils;
+import org.chromium.components.signin.SigninFeatures;
 import org.chromium.components.signin.test.util.TestAccounts;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.test.util.Coordinates;
@@ -212,6 +215,7 @@ public class FeedV2NewTabPageTest {
         mMostVisitedSites = new FakeMostVisitedSites();
         mMostVisitedSites.setTileSuggestions(mSiteSuggestions);
         mSuggestionsDeps.getFactory().mostVisitedSites = mMostVisitedSites;
+        GestureNavigationUtils.setMinRequiredPhysicalRamMbForTesting(0);
     }
 
     @After
@@ -222,8 +226,8 @@ public class FeedV2NewTabPageTest {
     }
 
     private void openNewTabPage() {
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
-        mTab = mActivityTestRule.getActivity().getActivityTab();
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
+        mTab = mActivityTestRule.getActivityTab();
         NewTabPageTestUtils.waitForNtpLoaded(mTab);
 
         Assert.assertTrue(mTab.getNativePage() instanceof NewTabPage);
@@ -259,7 +263,6 @@ public class FeedV2NewTabPageTest {
     @MediumTest
     @Feature({"FeedNewTabPage"})
     @CommandLineFlags.Add({
-        "enable-features=BackForwardTransitions",
         "force-prefers-no-reduced-motion",
         // Resampling can make scroll offsets non-deterministic so turn it off.
         "disable-features=ResamplingScrollEvents",
@@ -290,12 +293,12 @@ public class FeedV2NewTabPageTest {
 
         WebContentsUtils.waitForCopyableViewInWebContents(webContents);
 
-        float width_px =
+        float widthPx =
                 webContents.getWidth() * Coordinates.createFor(webContents).getDeviceScaleFactor();
 
         // Drag far enough to cause the back gesture to invoke.
         float fromEdgeStart = 5.0f;
-        float dragDistance = width_px - 10.0f;
+        float dragDistance = widthPx - 10.0f;
 
         // from left edge EDGE_LEFT
         float fromX = fromEdgeStart;
@@ -384,6 +387,7 @@ public class FeedV2NewTabPageTest {
     @Test
     @MediumTest
     @Feature({"FeedNewTabPage"})
+    @DisableFeatures(SigninFeatures.ENABLE_SEAMLESS_SIGNIN)
     public void testSignInPromo_AccountsNotReady() {
         try (var unused = mSigninTestRule.blockGetAccountsUpdate(false)) {
             openNewTabPage();
@@ -397,6 +401,19 @@ public class FeedV2NewTabPageTest {
     @Test
     @MediumTest
     @Feature({"FeedNewTabPage"})
+    @EnableFeatures(SigninFeatures.ENABLE_SEAMLESS_SIGNIN)
+    public void testSignInPromo_AccountsNotReady_SeamlessSignin() {
+        try (var unused = mSigninTestRule.blockGetAccountsUpdate(false)) {
+            openNewTabPage();
+            // Check that the sign-in promo is not shown if accounts are not ready.
+            onView(withId(R.id.signin_promo_view_container)).check(doesNotExist());
+        }
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"FeedNewTabPage"})
+    @DisableFeatures(SigninFeatures.ENABLE_SEAMLESS_SIGNIN)
     public void testSignInPromo_AccountsReady() {
         openNewTabPage();
         // Check that the sign-in promo is displayed this time.
@@ -408,6 +425,17 @@ public class FeedV2NewTabPageTest {
     @Test
     @MediumTest
     @Feature({"FeedNewTabPage"})
+    @EnableFeatures(SigninFeatures.ENABLE_SEAMLESS_SIGNIN)
+    public void testSignInPromo_AccountsReady_SeamlessSignin() {
+        openNewTabPage();
+        // Check that the sign-in promo is displayed this time.
+        onView(withId(R.id.signin_promo_view_container)).check(matches(isDisplayed()));
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"FeedNewTabPage"})
+    @DisableFeatures(SigninFeatures.ENABLE_SEAMLESS_SIGNIN)
     public void testSignInPromo_NotShownAfterSignIn() {
         openNewTabPage();
         // Check that the sign-in promo is displayed.
@@ -425,12 +453,42 @@ public class FeedV2NewTabPageTest {
     @Test
     @MediumTest
     @Feature({"FeedNewTabPage"})
+    @EnableFeatures(SigninFeatures.ENABLE_SEAMLESS_SIGNIN)
+    public void testSignInPromo_NotShownAfterSignIn_SeamlessSignin() {
+        openNewTabPage();
+        // Check that the sign-in promo is displayed.
+        onView(withId(R.id.signin_promo_view_container)).check(matches(isDisplayed()));
+
+        mSigninTestRule.addAccountThenSignin(TestAccounts.ACCOUNT1);
+
+        onView(withId(R.id.signin_promo_view_container))
+                .check(matches(withEffectiveVisibility(Visibility.GONE)));
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"FeedNewTabPage"})
+    @DisableFeatures(SigninFeatures.ENABLE_SEAMLESS_SIGNIN)
     public void testSignInPromoWhenDefaultAccountCannotShowHistorySyncWithoutMinorRestrictions() {
         mSigninTestRule.addAccount(TestAccounts.AADC_MINOR_ACCOUNT);
 
         openNewTabPage();
         onView(withId(R.id.feed_stream_recycler_view))
                 .perform(RecyclerViewActions.scrollToPosition(SIGNIN_PROMO_POSITION));
+
+        // Check that the sign-in promo is displayed.
+        onView(withId(R.id.signin_promo_view_container)).check(matches(isDisplayed()));
+    }
+
+    @Test
+    @MediumTest
+    @Feature({"FeedNewTabPage"})
+    @EnableFeatures(SigninFeatures.ENABLE_SEAMLESS_SIGNIN)
+    public void
+            testSignInPromoWhenDefaultAccountCannotShowHistorySyncWithoutMinorRestrictionsSeamlessSignin() {
+        mSigninTestRule.addAccount(TestAccounts.AADC_MINOR_ACCOUNT);
+
+        openNewTabPage();
 
         // Check that the sign-in promo is displayed.
         onView(withId(R.id.signin_promo_view_container)).check(matches(isDisplayed()));
@@ -519,16 +577,14 @@ public class FeedV2NewTabPageTest {
 
         ChromeTabbedActivity cta = mActivityTestRule.getActivity();
         assertEquals(
-                cta.getResources()
-                        .getDimensionPixelSize(org.chromium.chrome.R.dimen.ntp_search_box_height),
-                cta.findViewById(org.chromium.chrome.R.id.search_box).getLayoutParams().height);
+                cta.getResources().getDimensionPixelSize(R.dimen.ntp_search_box_height),
+                cta.findViewById(R.id.search_box).getLayoutParams().height);
 
         // Drag the Feed header title to scroll the toolbar to the top.
         int toY =
                 -getFakeboxTop(mNtp)
                         + cta.getResources()
-                                .getDimensionPixelSize(
-                                        org.chromium.chrome.R.dimen.modern_toolbar_background_size);
+                                .getDimensionPixelSize(R.dimen.modern_toolbar_background_size);
         TestTouchUtils.dragCompleteView(
                 InstrumentationRegistry.getInstrumentation(),
                 cta.findViewById(R.id.header_title),
@@ -543,8 +599,7 @@ public class FeedV2NewTabPageTest {
             // There might be a rounding issue for some devices.
             assertEquals(
                     toolbar.getLocationBarBackgroundHeightForTesting(),
-                    cta.getResources()
-                            .getDimension(org.chromium.chrome.R.dimen.ntp_search_box_height),
+                    cta.getResources().getDimension(R.dimen.ntp_search_box_height),
                     0.5);
         }
     }
@@ -567,6 +622,7 @@ public class FeedV2NewTabPageTest {
 
     /**
      * Toggles the header and checks whether the header has the right status.
+     *
      * @param expanded Whether the header should be expanded.
      */
     private void toggleHeader(boolean expanded) {

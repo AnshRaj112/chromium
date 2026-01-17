@@ -4,6 +4,7 @@
 
 #include "chrome/browser/web_applications/test/os_integration_test_override_impl.h"
 
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <optional>
@@ -14,7 +15,6 @@
 
 #include "base/base_paths.h"
 #include "base/check_is_test.h"
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
@@ -57,6 +57,8 @@
 #include "base/files/scoped_temp_dir.h"
 #include "chrome/browser/shell_integration.h"
 #include "chrome/browser/web_applications/os_integration/mac/app_shim_registry.h"
+#include "chrome/browser/web_applications/os_integration/mac/bundle_info_plist.h"
+#include "chrome/browser/web_applications/os_integration/mac/web_app_shortcut_mac.h"
 #include "net/base/filename_util.h"
 #import "skia/ext/skia_utils_mac.h"
 #endif
@@ -67,7 +69,6 @@
 #include <shellapi.h>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
 #include "base/strings/strcat.h"
@@ -88,7 +89,7 @@
 #include "chrome/installer/util/install_util.h"
 #include "chrome/installer/util/shell_util.h"
 #include "third_party/re2/src/re2/re2.h"
-#include "ui/gfx/icon_util.h"
+#include "ui/gfx/win/icon_util.h"
 #endif
 
 namespace web_app {
@@ -141,14 +142,14 @@ std::optional<SkBitmap> IconManagerReadIconForSize(
   }
   std::optional<SkBitmap> result = std::nullopt;
   base::RunLoop run_loop;
-  icon_manager.ReadIcons(
-      app_id, IconPurpose::ANY, {size_px},
-      base::BindLambdaForTesting(
-          [&](std::map<SquareSizePx, SkBitmap> icon_bitmaps) {
-            CHECK(base::Contains(icon_bitmaps, size_px));
-            result = icon_bitmaps.at(size_px);
-            run_loop.Quit();
-          }));
+  icon_manager.ReadTrustedIconsWithFallbackToManifestIcons(
+      app_id, {size_px}, IconPurpose::ANY,
+      base::BindLambdaForTesting([&](IconMetadataFromDisk icon_metadata) {
+        SizeToBitmap icon_bitmaps = std::move(icon_metadata.icons_map);
+        CHECK(icon_bitmaps.contains(size_px));
+        result = icon_bitmaps[size_px];
+        run_loop.Quit();
+      }));
   run_loop.Run();
   return result;
 }
@@ -322,7 +323,7 @@ bool OsIntegrationTestOverrideImpl::SimulateDeleteShortcutsByUser(
   CHECK(base::PathExists(desktop_shortcut_path));
   return base::DeleteFile(desktop_shortcut_path);
 #else
-  NOTREACHED() << "Not implemented on ChromeOS/Fuchsia ";
+  NOTREACHED() << "Not implemented on ChromeOS";
 #endif
 }
 
@@ -390,7 +391,7 @@ bool OsIntegrationTestOverrideImpl::IsRunOnOsLoginEnabled(
       chrome_apps_folder().Append(shortcut_filename);
   return startup_enabled_[app_shortcut_path];
 #else
-  NOTREACHED() << "Not implemented on ChromeOS/Fuchsia ";
+  NOTREACHED() << "Not implemented on ChromeOS";
 #endif
 }
 
@@ -410,7 +411,7 @@ bool OsIntegrationTestOverrideImpl::IsFileExtensionHandled(
   for (const auto& file_handler_prog_id : file_handler_prog_ids) {
     const std::vector<std::wstring> supported_file_extensions =
         GetFileExtensionsForProgId(file_handler_prog_id);
-    if (base::Contains(supported_file_extensions, extension)) {
+    if (std::ranges::contains(supported_file_extensions, extension)) {
       const std::wstring reg_key = std::wstring(ShellUtil::kRegClasses) +
                                    base::FilePath::kSeparators[0] + extension +
                                    base::FilePath::kSeparators[0] +
@@ -435,12 +436,11 @@ bool OsIntegrationTestOverrideImpl::IsFileExtensionHandled(
   base::FilePath user_applications_dir = applications();
   bool database_update_called = false;
   for (const LinuxFileRegistration& command : linux_file_registration_) {
-    if (base::Contains(command.xdg_command, app_id) &&
-        base::Contains(command.xdg_command,
-                       profile->GetPath().BaseName().value())) {
+    if (command.xdg_command.contains(app_id) &&
+        command.xdg_command.contains(profile->GetPath().BaseName().value())) {
       if (base::StartsWith(command.xdg_command, "xdg-mime install")) {
-        is_file_handled = base::Contains(command.file_contents,
-                                         "\"*" + file_extension + "\"");
+        is_file_handled =
+            command.file_contents.contains("\"*" + file_extension + "\"");
       } else {
         CHECK(base::StartsWith(command.xdg_command, "xdg-mime uninstall"))
             << command.xdg_command;
@@ -452,7 +452,7 @@ bool OsIntegrationTestOverrideImpl::IsFileExtensionHandled(
     // web_app_file_handler_registration_linux.cc for more information.
     if (base::StartsWith(command.xdg_command, "update-desktop-database")) {
       database_update_called =
-          base::Contains(command.xdg_command, user_applications_dir.value());
+          command.xdg_command.contains(user_applications_dir.value());
     }
   }
   is_file_handled = is_file_handled && database_update_called;
@@ -489,7 +489,7 @@ std::optional<SkBitmap> OsIntegrationTestOverrideImpl::GetShortcutIcon(
   return IconManagerReadIconForSize(provider->icon_manager(), app_id,
                                     suggested_size_px);
 #else
-  NOTREACHED() << "Not implemented on Fuchsia";
+  NOTREACHED() << "Not implemented";
 #endif
 }
 
@@ -531,21 +531,22 @@ base::FilePath OsIntegrationTestOverrideImpl::GetShortcutPath(
     }
   }
 #elif BUILDFLAG(IS_MAC)
-  std::string shortcut_filename = app_name + ".app";
-  base::FilePath shortcut_path = shortcut_dir.Append(shortcut_filename);
-  // Exits early if the app id is empty because the verification won't work.
-  // TODO(crbug.com/40212146): Figure a way to find the profile that has the app
-  //                          installed without using app ID.
-  if (app_id.empty()) {
-    return shortcut_path;
-  }
-
   AppShimRegistry* registry = AppShimRegistry::Get();
   std::set<base::FilePath> app_installed_profiles =
       registry->GetInstalledProfilesForApp(app_id);
-  if (app_installed_profiles.find(profile->GetPath()) !=
+  if (app_installed_profiles.find(profile->GetPath()) ==
       app_installed_profiles.end()) {
-    return shortcut_path;
+    return base::FilePath();
+  }
+
+  std::string bundle_id = GetBundleIdentifierForShim(app_id);
+  auto bundles = BundleInfoPlist::SearchForBundlesById(bundle_id, shortcut_dir);
+  // `SearchForBundlesById` can find bundles in multiple locations. For this
+  // test, only the bundle in the given `shortcut_dir` is desired.
+  for (const auto& bundle : bundles) {
+    if (bundle.bundle_path().DirName() == shortcut_dir) {
+      return bundle.bundle_path();
+    }
   }
 #elif BUILDFLAG(IS_LINUX)
   std::string shortcut_filename =
@@ -577,7 +578,7 @@ bool OsIntegrationTestOverrideImpl::IsShortcutCreated(
       GetShortcutPath(profile, desktop(), app_id, app_name);
   return base::PathExists(desktop_shortcut_path);
 #else
-  NOTREACHED() << "Not implemented on ChromeOS/Fuchsia ";
+  NOTREACHED() << "Not implemented on ChromeOS";
 #endif
 }
 
@@ -607,7 +608,7 @@ int OsIntegrationTestOverrideImpl::GetCountOfShortcutIconsCreated(
 
 bool OsIntegrationTestOverrideImpl::IsShortcutsMenuRegisteredForApp(
     const std::wstring& app_user_model_id) {
-  return base::Contains(jump_list_entry_map_, app_user_model_id);
+  return jump_list_entry_map_.contains(app_user_model_id);
 }
 
 #endif  // BUILDFLAG(IS_WIN)
@@ -700,7 +701,7 @@ OsIntegrationTestOverrideImpl::IsUninstallRegisteredWithOs(
   }
   std::wstring expected_uninstall_substr =
       base::StrCat({L"--uninstall-app-id=", base::UTF8ToWide(app_id)});
-  if (!base::Contains(uninstall_string, expected_uninstall_substr)) {
+  if (!uninstall_string.contains(expected_uninstall_substr)) {
     return base::unexpected(base::StrCat({"Could not find uninstall flag: ",
                                           base::WideToUTF8(uninstall_string)}));
   }

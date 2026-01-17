@@ -20,10 +20,10 @@
 #include "ui/accessibility/ax_enums.mojom-shared.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/compositor/layer.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
 #include "ui/gfx/geometry/transform_util.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/animation/animation_builder.h"
 #include "ui/views/widget/widget.h"
 #include "ui/wm/core/window_util.h"
@@ -75,7 +75,7 @@ SavedDeskGridView::SavedDeskGridView()
   // Bounds animator is unaffected by debug tools such as "--ui-slow-animations"
   // flag, so manually multiply the duration here.
   bounds_animator_.SetAnimationDuration(
-      ui::ScopedAnimationDurationScaleMode::duration_multiplier() *
+      gfx::ScopedAnimationDurationScaleMode::duration_multiplier() *
       kBoundsChangeAnimationDuration);
   bounds_animator_.set_tween_type(gfx::Tween::LINEAR);
 }
@@ -301,7 +301,7 @@ void SavedDeskGridView::AnimateGridItems(
     // This is a new grid_item, so do the scale up to identity and fade in
     // animation. The animation is delayed to sync up with the
     // `bounds_animator_` animation.
-    if (base::Contains(new_grid_items, grid_item)) {
+    if (std::ranges::contains(new_grid_items, grid_item)) {
       grid_item->SetBoundsRect(target_bounds);
 
       ui::Layer* layer = grid_item->layer();

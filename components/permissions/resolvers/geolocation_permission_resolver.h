@@ -6,6 +6,11 @@
 #define COMPONENTS_PERMISSIONS_RESOLVERS_GEOLOCATION_PERMISSION_RESOLVER_H_
 
 #include "components/permissions/resolvers/permission_resolver.h"
+#include "third_party/blink/public/mojom/permissions/permission_status.mojom-forward.h"
+
+namespace blink::mojom {
+class PermissionDescriptor;
+}  // namespace blink::mojom
 
 namespace permissions {
 
@@ -13,7 +18,8 @@ namespace permissions {
 // approximate/precise location requests.
 class GeolocationPermissionResolver : public PermissionResolver {
  public:
-  explicit GeolocationPermissionResolver(bool requested_precise);
+  explicit GeolocationPermissionResolver(
+      const blink::mojom::PermissionDescriptor& permission_descriptor);
 
   blink::mojom::PermissionStatus DeterminePermissionStatus(
       const PermissionSetting& setting) const override;
@@ -25,6 +31,8 @@ class GeolocationPermissionResolver : public PermissionResolver {
 
   PromptParameters GetPromptParameters(
       const PermissionSetting& current_setting_state) const override;
+
+  bool requested_precise() { return requested_precise_; }
 
  private:
   bool requested_precise_;

@@ -2,41 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <memory>
+#include "services/image_annotation/annotator.h"
 
-#include "base/memory/ptr_util.h"
-#include "base/test/scoped_feature_list.h"
-#include "base/values.h"
-#include "components/manta/anchovy/anchovy_provider.h"
-#include "components/manta/manta_status.h"
-#include "services/network/public/cpp/shared_url_loader_factory.h"
-#include "ui/accessibility/accessibility_features.h"
-
+#include <algorithm>
 #include <array>
 #include <cstring>
+#include <memory>
 #include <optional>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/memory/ptr_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "base/time/time.h"
+#include "base/values.h"
+#include "components/manta/anchovy/anchovy_provider.h"
+#include "components/manta/manta_status.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver_set.h"
 #include "net/base/net_errors.h"
 #include "net/http/http_status_code.h"
-#include "services/image_annotation/annotator.h"
 #include "services/image_annotation/image_annotation_metrics.h"
 #include "services/image_annotation/public/mojom/image_annotation.mojom.h"
+#include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
 #include "services/network/public/mojom/url_loader.mojom-shared.h"
 #include "services/network/test/test_url_loader_factory.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "ui/accessibility/accessibility_features.h"
 
 namespace image_annotation {
 
@@ -328,17 +327,16 @@ class TestServerURLLoaderFactory {
     }
 
     // Extract request body.
-    std::string actual_body;
+    std::string_view actual_body;
     if (request.request_body) {
-      const std::vector<network::DataElement>* const elements =
-          request.request_body->elements();
-
       // We only support the simplest body structure.
-      if (elements && elements->size() == 1 &&
-          (*elements)[0].type() ==
+      const std::vector<network::DataElement>& elements =
+          *request.request_body->elements();
+      if (elements.size() == 1 &&
+          elements[0].type() ==
               network::mojom::DataElementDataView::Tag::kBytes) {
-        actual_body = std::string(
-            (*elements)[0].As<network::DataElementBytes>().AsStringPiece());
+        actual_body =
+            elements[0].As<network::DataElementBytes>().AsStringView();
       }
     }
 
@@ -362,13 +360,10 @@ class TestServerURLLoaderFactory {
 // Returns a "canonically" formatted version of a JSON string by parsing and
 // then rewriting it.
 std::string ReformatJson(const std::string& in) {
-  const std::optional<base::Value> json = base::JSONReader::Read(in);
-  CHECK(json);
-
-  std::string out;
-  base::JSONWriter::Write(*json, &out);
-
-  return out;
+  return base::WriteJson(
+             base::JSONReader::Read(in, base::JSON_PARSE_CHROMIUM_EXTENSIONS)
+                 .value())
+      .value_or("");
 }
 
 // Receives the result of an annotation request and writes the result data into
@@ -2451,7 +2446,7 @@ TEST(AnnotatorTest, FetchServerLanguages) {
 
   // Assert that initially server_languages_ doesn't contain the made-up
   // language code zz.
-  EXPECT_FALSE(base::Contains(annotator.server_languages_, "zz"));
+  EXPECT_FALSE(std::ranges::contains(annotator.server_languages_, "zz"));
 
   test_url_factory.ExpectRequestAndSimulateResponse(
       "langs", {} /* expected headers */, "" /* body */,
@@ -2467,7 +2462,7 @@ TEST(AnnotatorTest, FetchServerLanguages) {
       net::HTTP_OK);
   test_task_env.RunUntilIdle();
 
-  EXPECT_TRUE(base::Contains(annotator.server_languages_, "zz"));
+  EXPECT_TRUE(std::ranges::contains(annotator.server_languages_, "zz"));
 }
 
 // If the server langs don't contain English, they're ignored.
@@ -2485,7 +2480,7 @@ TEST(AnnotatorTest, ServerLanguagesMustContainEnglish) {
 
   // Assert that initially server_languages_ does contain "en" but
   // doesn't contain the made-up language code zz.
-  EXPECT_FALSE(base::Contains(annotator.server_languages_, "zz"));
+  EXPECT_FALSE(std::ranges::contains(annotator.server_languages_, "zz"));
 
   // The server response doesn't include "en", so we should ignore it.
   test_url_factory.ExpectRequestAndSimulateResponse(
@@ -2502,8 +2497,8 @@ TEST(AnnotatorTest, ServerLanguagesMustContainEnglish) {
 
   // We shouldn't have updated our languages because the response didn't
   // include "en".
-  EXPECT_TRUE(base::Contains(annotator.server_languages_, "en"));
-  EXPECT_FALSE(base::Contains(annotator.server_languages_, "zz"));
+  EXPECT_TRUE(std::ranges::contains(annotator.server_languages_, "en"));
+  EXPECT_FALSE(std::ranges::contains(annotator.server_languages_, "zz"));
 }
 
 // Alternative Routing Tests.
@@ -2596,7 +2591,7 @@ void SimpleAnchovySuccessTest(std::string str_type,
       &annotations);
 
   EXPECT_FALSE(annotations.empty());
-  EXPECT_EQ(1, (int)annotations.size());
+  EXPECT_EQ(1u, annotations.size());
   auto annotation = annotations[0];
   EXPECT_EQ(annotation.text, best_text);
   EXPECT_EQ(annotation.score, best_score);
@@ -2643,7 +2638,7 @@ TEST(AnnotatorTest, AnchovySuccessMultiple) {
       &annotations);
 
   EXPECT_FALSE(annotations.empty());
-  EXPECT_EQ(2, (int)annotations.size());
+  EXPECT_EQ(2u, annotations.size());
   auto annotation_caption = annotations[0];
   EXPECT_EQ(annotation_caption.text, text_caption);
   EXPECT_EQ(annotation_caption.score, score);

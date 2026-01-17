@@ -17,9 +17,7 @@
 #include "third_party/jni_zero/jni_export.h"
 #include "third_party/jni_zero/logging.h"
 
-#if !defined(JNI_ZERO_ENABLE_COMPAT_API) && defined(WEBRTC_ANDROID)
-#define JNI_ZERO_ENABLE_COMPAT_API 1
-#else
+#if !defined(JNI_ZERO_ENABLE_COMPAT_API)
 #define JNI_ZERO_ENABLE_COMPAT_API 0
 #endif
 
@@ -477,9 +475,10 @@ class JNI_ZERO_COMPONENT_BUILD_EXPORT LeakedJavaGlobalRef : public JavaRef<T> {
   }
 };
 
-// TODO(crbug.com/40425392): Remove this alias.
+#if JNI_ZERO_ENABLE_COMPAT_API
 template <typename T>
 using JavaParamRef = JavaRef<T>;
+#endif
 
 }  // namespace jni_zero
 

@@ -28,6 +28,7 @@
 #include "third_party/blink/renderer/platform/graphics/gpu/dawn_control_client_holder.h"
 #include "third_party/blink/renderer/platform/graphics/gpu/webgpu_callback.h"
 #include "third_party/blink/renderer/platform/graphics/skia/skia_utils.h"
+#include "third_party/blink/renderer/platform/graphics/static_bitmap_image.h"
 #include "third_party/blink/renderer/platform/graphics/web_graphics_context_3d_provider_util.h"
 #include "third_party/blink/renderer/platform/weborigin/kurl.h"
 #include "third_party/blink/renderer/platform/wtf/functional.h"
@@ -360,6 +361,105 @@ class PartialGLES2ForObjects : public gpu::gles2::GLES2InterfaceStub {
 
 }  // anonymous namespace
 
+// We proxy all the WebGPU commands related to wgpu::Instance that ANGLE does
+// through this class. This is necessary because we wait to intercept WaitAny
+// calls with timeout > 0 and Flush the DawnControlClient in that case (to
+// support blocking WaitAnys).
+class ProxyDawnInstanceForANGLE {
+ public:
+  explicit ProxyDawnInstanceForANGLE(
+      wgpu::Instance instance,
+      scoped_refptr<DawnControlClientHolder> dawn_control_client)
+      : instance_(std::move(instance)),
+        dawn_control_client_(std::move(dawn_control_client)) {
+    // Prepare the proc table with overridden procs that use the proxy instance
+    // instead. This is the proc table that will be given to ANGLE.
+    procs_ = *GetDawnProcs();
+
+    // Proxy WaitAny with logic to Flush the WebGPU commands if needed. This is
+    // necessary for ANGLE to be able to block on WGPUFuture completion. If we
+    // didn't do a flush, the GPU process could never receive the commands that
+    // will eventually signal the future, and ANGLE would block forever.
+    procs_.instanceWaitAny =
+        [](WGPUInstance angle_instance, size_t future_count,
+           WGPUFutureWaitInfo* futures, uint64_t timeout_ns) -> WGPUWaitStatus {
+      if (timeout_ns > 0) {
+        FromWGPU(angle_instance)->dawn_control_client_->Flush();
+      }
+
+      WGPUInstance actual_instance = FromWGPU(angle_instance)->instance_.Get();
+      return GetDawnProcs()->instanceWaitAny(actual_instance, future_count,
+                                             futures, timeout_ns);
+    };
+
+    // ANGLE should use the instance we give it and not recreate one.
+    procs_.createInstance = [](const WGPUInstanceDescriptor*) -> WGPUInstance {
+      NOTREACHED();
+    };
+
+    // Ignore refcounts since we ensure the instance outlives ANGLE.
+    procs_.instanceAddRef = [](WGPUInstance) {};
+    procs_.instanceRelease = [](WGPUInstance) {};
+
+    // The rest are passthrough
+    procs_.instanceCreateSurface =
+        [](WGPUInstance angle_instance,
+           const WGPUSurfaceDescriptor* descriptor) -> WGPUSurface {
+      WGPUInstance actual_instance = FromWGPU(angle_instance)->instance_.Get();
+      return GetDawnProcs()->instanceCreateSurface(actual_instance, descriptor);
+    };
+    procs_.instanceGetWGSLLanguageFeatures =
+        [](WGPUInstance angle_instance,
+           WGPUSupportedWGSLLanguageFeatures* features) {
+          WGPUInstance actual_instance =
+              FromWGPU(angle_instance)->instance_.Get();
+          return GetDawnProcs()->instanceGetWGSLLanguageFeatures(
+              actual_instance, features);
+        };
+    procs_.instanceHasWGSLLanguageFeature =
+        [](WGPUInstance angle_instance,
+           WGPUWGSLLanguageFeatureName feature) -> WGPUBool {
+      WGPUInstance actual_instance = FromWGPU(angle_instance)->instance_.Get();
+      return GetDawnProcs()->instanceHasWGSLLanguageFeature(actual_instance,
+                                                            feature);
+    };
+    procs_.instanceProcessEvents = [](WGPUInstance angle_instance) {
+      WGPUInstance actual_instance = FromWGPU(angle_instance)->instance_.Get();
+      return GetDawnProcs()->instanceProcessEvents(actual_instance);
+    };
+    procs_.instanceRequestAdapter =
+        [](WGPUInstance angle_instance,
+           const WGPURequestAdapterOptions* options,
+           WGPURequestAdapterCallbackInfo callback) -> WGPUFuture {
+      WGPUInstance actual_instance = FromWGPU(angle_instance)->instance_.Get();
+      return GetDawnProcs()->instanceRequestAdapter(actual_instance, options,
+                                                    callback);
+    };
+  }
+
+  ProxyDawnInstanceForANGLE(const ProxyDawnInstanceForANGLE&) = delete;
+  ProxyDawnInstanceForANGLE& operator=(const ProxyDawnInstanceForANGLE&) =
+      delete;
+
+  EGLAttrib GetProcTableForANGLE() const {
+    return reinterpret_cast<EGLAttrib>(&procs_);
+  }
+
+  EGLAttrib GetInstanceForANGLE() const {
+    return reinterpret_cast<EGLAttrib>(this);
+  }
+
+ private:
+  WGPUInstance ToWGPU() { return reinterpret_cast<WGPUInstance>(this); }
+  static ProxyDawnInstanceForANGLE* FromWGPU(WGPUInstance instance) {
+    return reinterpret_cast<ProxyDawnInstanceForANGLE*>(instance);
+  }
+
+  wgpu::Instance instance_;
+  scoped_refptr<DawnControlClientHolder> dawn_control_client_;
+  DawnProcTable procs_;
+};
+
 #define RETURN_IF_GL_ERROR(code, ...)        \
   {                                          \
     CheckAndClearErrorCallbackState();       \
@@ -390,23 +490,17 @@ HTMLCanvasElement* WebGLRenderingContextWebGPUBase::canvas() const {
   return static_cast<HTMLCanvasElement*>(Host());
 }
 
-ScriptPromise<IDLUndefined> WebGLRenderingContextWebGPUBase::initAsync(
-    ScriptState* script_state) {
-  auto* resolver =
-      MakeGarbageCollected<ScriptPromiseResolver<IDLUndefined>>(script_state);
-  auto promise = resolver->Promise();
-
+bool WebGLRenderingContextWebGPUBase::Initialize(
+    ExecutionContext* execution_context,
+    String* error_msg) {
   // Synchronously connect to the GPU process to use WebGPU.
-  ExecutionContext* execution_context = ExecutionContext::From(script_state);
   std::unique_ptr<WebGraphicsContext3DProvider> context_provider =
       Platform::Current()->CreateWebGPUGraphicsContext3DProvider(
-          execution_context->Url());
+          execution_context->Url(), Platform::WebGPUReplyThread::kIOThread);
 
   if (context_provider == nullptr) {
-    resolver->RejectWithDOMException(
-        DOMExceptionCode::kOperationError,
-        "Failed to create a WebGPU context provider");
-    return promise;
+    *error_msg = "Failed to create a WebGPU context provider";
+    return false;
   }
 
   // The context provider requires being bound on a single thread because it was
@@ -421,68 +515,16 @@ ScriptPromise<IDLUndefined> WebGLRenderingContextWebGPUBase::initAsync(
   dawn_control_client_ = DawnControlClientHolder::Create(
       std::move(context_provider),
       execution_context->GetTaskRunner(TaskType::kWebGPU));
-
-  // Request the adapter, making it resolve the result promise when it is done.
-  auto* callback =
-      MakeWGPUOnceCallback(resolver->WrapCallbackInScriptScope(WTF::BindOnce(
-          &WebGLRenderingContextWebGPUBase::InitRequestAdapterCallback,
-          WrapPersistent(this), WrapPersistent(script_state))));
-
-  dawn_control_client_->GetWGPUInstance().RequestAdapter(
-      nullptr, wgpu::CallbackMode::AllowSpontaneous,
-      callback->UnboundCallback(), callback->AsUserdata());
-  dawn_control_client_->EnsureFlush(ToEventLoop(script_state));
-
-  return promise;
-}
-
-void WebGLRenderingContextWebGPUBase::InitRequestAdapterCallback(
-    ScriptState* script_state,
-    ScriptPromiseResolver<IDLUndefined>* resolver,
-    wgpu::RequestAdapterStatus status,
-    wgpu::Adapter adapter,
-    wgpu::StringView error_message) {
-  if (status != wgpu::RequestAdapterStatus::Success) {
-    resolver->RejectWithDOMException(
-        DOMExceptionCode::kOperationError,
-        WTF::String::FromUTF8WithLatin1Fallback(error_message));
-    return;
-  }
-
-  adapter_ = std::move(adapter);
-
-  // Request the device.
-  auto* callback = MakeWGPUOnceCallback(
-      WTF::BindOnce(&WebGLRenderingContextWebGPUBase::InitRequestDeviceCallback,
-                    WrapPersistent(this), WrapPersistent(script_state),
-                    WrapPersistent(resolver)));
-
-  adapter_.RequestDevice(nullptr, wgpu::CallbackMode::AllowSpontaneous,
-                         callback->UnboundCallback(), callback->AsUserdata());
-  dawn_control_client_->EnsureFlush(ToEventLoop(script_state));
-}
-
-void WebGLRenderingContextWebGPUBase::InitRequestDeviceCallback(
-    ScriptState* script_state,
-    ScriptPromiseResolver<IDLUndefined>* resolver,
-    wgpu::RequestDeviceStatus status,
-    wgpu::Device device,
-    wgpu::StringView error_message) {
-  if (status != wgpu::RequestDeviceStatus::Success) {
-    resolver->RejectWithDOMException(
-        DOMExceptionCode::kOperationError,
-        WTF::String::FromUTF8WithLatin1Fallback(error_message));
-    return;
-  }
-
-  device_ = std::move(device);
+  instance_ = dawn_control_client_->GetWGPUInstance();
+  proxy_instance_ = std::make_unique<ProxyDawnInstanceForANGLE>(
+      instance_, dawn_control_client_);
 
   InitializeContext();
 
   // We are required to present to the compositor on context creation.
   EnsureDefaultFramebuffer();
 
-  resolver->Resolve();
+  return true;
 }
 
 // ****************************************************************************
@@ -511,25 +553,27 @@ GLenum WebGLRenderingContextWebGPUBase::drawingBufferFormat() const {
   return GL_RGBA8;
 }
 
-V8PredefinedColorSpace
-WebGLRenderingContextWebGPUBase::drawingBufferColorSpace() const {
+V8PredefinedColorSpace WebGLRenderingContextWebGPUBase::drawingBufferColorSpace(
+    ScriptState*) const {
   NOTIMPLEMENTED();
   return V8PredefinedColorSpace(V8PredefinedColorSpace::Enum::kSRGB);
 }
 
 void WebGLRenderingContextWebGPUBase::setDrawingBufferColorSpace(
+    ScriptState*,
     const V8PredefinedColorSpace& color_space,
     ExceptionState&) {
   NOTIMPLEMENTED();
 }
 
-V8PredefinedColorSpace WebGLRenderingContextWebGPUBase::unpackColorSpace()
-    const {
+V8PredefinedColorSpace WebGLRenderingContextWebGPUBase::unpackColorSpace(
+    ScriptState*) const {
   NOTIMPLEMENTED();
   return V8PredefinedColorSpace(V8PredefinedColorSpace::Enum::kSRGB);
 }
 
 void WebGLRenderingContextWebGPUBase::setUnpackColorSpace(
+    ScriptState*,
     const V8PredefinedColorSpace& color_space,
     ExceptionState&) {
   NOTIMPLEMENTED();
@@ -742,7 +786,7 @@ void WebGLRenderingContextWebGPUBase::clearColor(GLfloat red,
 }
 
 void WebGLRenderingContextWebGPUBase::clearDepth(GLfloat depth) {
-  driver_gl_.fn.glClearDepthFn(depth);
+  driver_gl_.fn.glClearDepthfFn(depth);
 }
 
 void WebGLRenderingContextWebGPUBase::clearStencil(GLint stencil) {
@@ -882,14 +926,15 @@ void WebGLRenderingContextWebGPUBase::deleteTexture(WebGLTexture* texture) {
     return;
   }
 
-  size_t texture_type_idx =
-      static_cast<size_t>(GLenumToTextureTarget(texture->GetTarget()));
-  for (size_t texture_unit_idx = 0; texture_unit_idx < bound_textures_.size();
-       texture_unit_idx++) {
-    Member<WebGLTexture>& bound_texture =
-        bound_textures_[texture_type_idx][texture_unit_idx];
-    if (bound_texture == texture) {
-      bound_texture = nullptr;
+  TextureTarget texture_target = GLenumToTextureTarget(texture->GetTarget());
+  if (texture_target != TextureTarget::kUnkown) {
+    size_t texture_type_idx = static_cast<size_t>(texture_target);
+    CHECK_LT(texture_type_idx, bound_textures_.size());
+    auto& bound_textures_for_type = bound_textures_[texture_type_idx];
+    for (auto& bound_texture : bound_textures_for_type) {
+      if (bound_texture == texture) {
+        bound_texture = nullptr;
+      }
     }
   }
 
@@ -1425,7 +1470,7 @@ void WebGLRenderingContextWebGPUBase::pixelStorei(GLenum pname, GLint param) {
 
 void WebGLRenderingContextWebGPUBase::polygonOffset(GLfloat factor,
                                                     GLfloat units) {
-  driver_gl_.fn.glPolygonModeFn(factor, units);
+  driver_gl_.fn.glPolygonOffsetFn(factor, units);
 }
 
 void WebGLRenderingContextWebGPUBase::readPixels(
@@ -2228,6 +2273,62 @@ void WebGLRenderingContextWebGPUBase::texImage2D(
   NOTIMPLEMENTED();
 }
 
+void WebGLRenderingContextWebGPUBase::texElementImage2D(
+    GLenum target,
+    GLint level,
+    GLint internalformat,
+    GLenum format,
+    GLenum type,
+    Element* element,
+    ExceptionState& exception_state) {
+  NOTIMPLEMENTED();
+}
+
+void WebGLRenderingContextWebGPUBase::texElementImage2D(
+    GLenum target,
+    GLint level,
+    GLint internalformat,
+    GLsizei width,
+    GLsizei height,
+    GLenum format,
+    GLenum type,
+    Element* element,
+    ExceptionState& exception_state) {
+  NOTIMPLEMENTED();
+}
+
+void WebGLRenderingContextWebGPUBase::texElementImage2D(
+    GLenum target,
+    GLint level,
+    GLint internalformat,
+    GLfloat sx,
+    GLfloat sy,
+    GLfloat swidth,
+    GLfloat sheight,
+    GLenum format,
+    GLenum type,
+    Element* element,
+    ExceptionState& exception_state) {
+  NOTIMPLEMENTED();
+}
+
+void WebGLRenderingContextWebGPUBase::texElementImage2D(
+    GLenum target,
+    GLint level,
+    GLint internalformat,
+    GLfloat sx,
+    GLfloat sy,
+    GLfloat swidth,
+    GLfloat sheight,
+    GLsizei width,
+    GLsizei height,
+    GLenum format,
+    GLenum type,
+    Element* element,
+    ExceptionState& exception_state) {
+  NOTIMPLEMENTED();
+}
+
 void WebGLRenderingContextWebGPUBase::texElement2D(
     GLenum target,
     GLint level,
@@ -2239,8 +2340,47 @@ void WebGLRenderingContextWebGPUBase::texElement2D(
   NOTIMPLEMENTED();
 }
 
-void WebGLRenderingContextWebGPUBase::setHitTestRegions(
-    VectorOf<CanvasElementHitTestRegion> hit_test_regions,
+void WebGLRenderingContextWebGPUBase::texElement2D(
+    GLenum target,
+    GLint level,
+    GLint internalformat,
+    GLsizei width,
+    GLsizei height,
+    GLenum format,
+    GLenum type,
+    Element* element,
+    ExceptionState& exception_state) {
+  NOTIMPLEMENTED();
+}
+
+void WebGLRenderingContextWebGPUBase::texElement2D(
+    GLenum target,
+    GLint level,
+    GLint internalformat,
+    GLfloat sx,
+    GLfloat sy,
+    GLfloat swidth,
+    GLfloat sheight,
+    GLenum format,
+    GLenum type,
+    Element* element,
+    ExceptionState& exception_state) {
+  NOTIMPLEMENTED();
+}
+
+void WebGLRenderingContextWebGPUBase::texElement2D(
+    GLenum target,
+    GLint level,
+    GLint internalformat,
+    GLfloat sx,
+    GLfloat sy,
+    GLfloat swidth,
+    GLfloat sheight,
+    GLsizei width,
+    GLsizei height,
+    GLenum format,
+    GLenum type,
+    Element* element,
     ExceptionState& exception_state) {
   NOTIMPLEMENTED();
 }
@@ -2833,7 +2973,8 @@ void WebGLRenderingContextWebGPUBase::uniform2fv(
                         &data)) {
     return;
   }
-  driver_gl_.fn.glUniform2fvFn(location->Location(), data.size(), data.data());
+  driver_gl_.fn.glUniform2fvFn(location->Location(), data.size() / 2,
+                               data.data());
 }
 
 void WebGLRenderingContextWebGPUBase::uniform3fv(
@@ -2846,7 +2987,8 @@ void WebGLRenderingContextWebGPUBase::uniform3fv(
                         &data)) {
     return;
   }
-  driver_gl_.fn.glUniform3fvFn(location->Location(), data.size(), data.data());
+  driver_gl_.fn.glUniform3fvFn(location->Location(), data.size() / 3,
+                               data.data());
 }
 
 void WebGLRenderingContextWebGPUBase::uniform4fv(
@@ -2859,7 +3001,8 @@ void WebGLRenderingContextWebGPUBase::uniform4fv(
                         &data)) {
     return;
   }
-  driver_gl_.fn.glUniform4fvFn(location->Location(), data.size(), data.data());
+  driver_gl_.fn.glUniform4fvFn(location->Location(), data.size() / 4,
+                               data.data());
 }
 
 void WebGLRenderingContextWebGPUBase::uniform1iv(
@@ -2885,7 +3028,8 @@ void WebGLRenderingContextWebGPUBase::uniform2iv(
                         &data)) {
     return;
   }
-  driver_gl_.fn.glUniform2ivFn(location->Location(), data.size(), data.data());
+  driver_gl_.fn.glUniform2ivFn(location->Location(), data.size() / 2,
+                               data.data());
 }
 
 void WebGLRenderingContextWebGPUBase::uniform3iv(
@@ -2898,7 +3042,8 @@ void WebGLRenderingContextWebGPUBase::uniform3iv(
                         &data)) {
     return;
   }
-  driver_gl_.fn.glUniform3ivFn(location->Location(), data.size(), data.data());
+  driver_gl_.fn.glUniform3ivFn(location->Location(), data.size() / 3,
+                               data.data());
 }
 
 void WebGLRenderingContextWebGPUBase::uniform4iv(
@@ -2911,7 +3056,8 @@ void WebGLRenderingContextWebGPUBase::uniform4iv(
                         &data)) {
     return;
   }
-  driver_gl_.fn.glUniform4ivFn(location->Location(), data.size(), data.data());
+  driver_gl_.fn.glUniform4ivFn(location->Location(), data.size() / 4,
+                               data.data());
 }
 
 void WebGLRenderingContextWebGPUBase::uniform1uiv(
@@ -2937,7 +3083,8 @@ void WebGLRenderingContextWebGPUBase::uniform2uiv(
                         &data)) {
     return;
   }
-  driver_gl_.fn.glUniform2uivFn(location->Location(), data.size(), data.data());
+  driver_gl_.fn.glUniform2uivFn(location->Location(), data.size() / 2,
+                                data.data());
 }
 
 void WebGLRenderingContextWebGPUBase::uniform3uiv(
@@ -2950,7 +3097,8 @@ void WebGLRenderingContextWebGPUBase::uniform3uiv(
                         &data)) {
     return;
   }
-  driver_gl_.fn.glUniform3uivFn(location->Location(), data.size(), data.data());
+  driver_gl_.fn.glUniform3uivFn(location->Location(), data.size() / 3,
+                                data.data());
 }
 
 void WebGLRenderingContextWebGPUBase::uniform4uiv(
@@ -2963,7 +3111,8 @@ void WebGLRenderingContextWebGPUBase::uniform4uiv(
                         &data)) {
     return;
   }
-  driver_gl_.fn.glUniform4uivFn(location->Location(), data.size(), data.data());
+  driver_gl_.fn.glUniform4uivFn(location->Location(), data.size() / 4,
+                                data.data());
 }
 
 void WebGLRenderingContextWebGPUBase::uniformMatrix2fv(
@@ -2977,7 +3126,7 @@ void WebGLRenderingContextWebGPUBase::uniformMatrix2fv(
                         src_length, &data)) {
     return;
   }
-  driver_gl_.fn.glUniformMatrix2fvFn(location->Location(), data.size(),
+  driver_gl_.fn.glUniformMatrix2fvFn(location->Location(), data.size() / 4,
                                      transpose, data.data());
 }
 
@@ -2992,7 +3141,7 @@ void WebGLRenderingContextWebGPUBase::uniformMatrix3fv(
                         src_length, &data)) {
     return;
   }
-  driver_gl_.fn.glUniformMatrix3fvFn(location->Location(), data.size(),
+  driver_gl_.fn.glUniformMatrix3fvFn(location->Location(), data.size() / 9,
                                      transpose, data.data());
 }
 
@@ -3007,7 +3156,7 @@ void WebGLRenderingContextWebGPUBase::uniformMatrix4fv(
                         src_length, &data)) {
     return;
   }
-  driver_gl_.fn.glUniformMatrix4fvFn(location->Location(), data.size(),
+  driver_gl_.fn.glUniformMatrix4fvFn(location->Location(), data.size() / 16,
                                      transpose, data.data());
 }
 
@@ -3022,7 +3171,7 @@ void WebGLRenderingContextWebGPUBase::uniformMatrix2x3fv(
                         src_length, &data)) {
     return;
   }
-  driver_gl_.fn.glUniformMatrix2x3fvFn(location->Location(), data.size(),
+  driver_gl_.fn.glUniformMatrix2x3fvFn(location->Location(), data.size() / 6,
                                        transpose, data.data());
 }
 
@@ -3037,7 +3186,7 @@ void WebGLRenderingContextWebGPUBase::uniformMatrix3x2fv(
                         src_length, &data)) {
     return;
   }
-  driver_gl_.fn.glUniformMatrix3x2fvFn(location->Location(), data.size(),
+  driver_gl_.fn.glUniformMatrix3x2fvFn(location->Location(), data.size() / 6,
                                        transpose, data.data());
 }
 
@@ -3052,7 +3201,7 @@ void WebGLRenderingContextWebGPUBase::uniformMatrix2x4fv(
                         src_length, &data)) {
     return;
   }
-  driver_gl_.fn.glUniformMatrix2x4fvFn(location->Location(), data.size(),
+  driver_gl_.fn.glUniformMatrix2x4fvFn(location->Location(), data.size() / 8,
                                        transpose, data.data());
 }
 
@@ -3067,7 +3216,7 @@ void WebGLRenderingContextWebGPUBase::uniformMatrix4x2fv(
                         src_length, &data)) {
     return;
   }
-  driver_gl_.fn.glUniformMatrix4x2fvFn(location->Location(), data.size(),
+  driver_gl_.fn.glUniformMatrix4x2fvFn(location->Location(), data.size() / 8,
                                        transpose, data.data());
 }
 
@@ -3082,7 +3231,7 @@ void WebGLRenderingContextWebGPUBase::uniformMatrix3x4fv(
                         src_length, &data)) {
     return;
   }
-  driver_gl_.fn.glUniformMatrix3x4fvFn(location->Location(), data.size(),
+  driver_gl_.fn.glUniformMatrix3x4fvFn(location->Location(), data.size() / 12,
                                        transpose, data.data());
 }
 
@@ -3097,7 +3246,7 @@ void WebGLRenderingContextWebGPUBase::uniformMatrix4x3fv(
                         src_length, &data)) {
     return;
   }
-  driver_gl_.fn.glUniformMatrix4x3fvFn(location->Location(), data.size(),
+  driver_gl_.fn.glUniformMatrix4x3fvFn(location->Location(), data.size() / 12,
                                        transpose, data.data());
 }
 
@@ -3512,20 +3661,19 @@ gfx::ColorSpace WebGLRenderingContextWebGPUBase::GetColorSpace() const {
   return gfx::ColorSpace::CreateSRGB();
 }
 
-int WebGLRenderingContextWebGPUBase::AllocatedBufferCountPerPixel() {
-  // Front and back buffers.
-  // TODO(413078308): Add support configuring MSAA and depth-stencil.
-  // Note: If/once this class creates a CanvasResourceProvider it should track
-  // the memory of the provider here as well.
-  return 2;
+base::ByteSize WebGLRenderingContextWebGPUBase::AllocatedBufferSize() const {
+  base::ByteSize result;
+  if (swap_buffers_) {
+    result += swap_buffers_->EstimatedSizeInBytes();
+  }
+  return result;
 }
 
 bool WebGLRenderingContextWebGPUBase::isContextLost() const {
   return IsLost();
 }
 
-scoped_refptr<StaticBitmapImage> WebGLRenderingContextWebGPUBase::GetImage(
-    FlushReason) {
+scoped_refptr<StaticBitmapImage> WebGLRenderingContextWebGPUBase::GetImage() {
   NOTIMPLEMENTED();
   return nullptr;
 }
@@ -3549,8 +3697,7 @@ void WebGLRenderingContextWebGPUBase::PageVisibilityChanged() {
 
 scoped_refptr<StaticBitmapImage>
 WebGLRenderingContextWebGPUBase::PaintRenderingResultsToSnapshot(
-    SourceDrawingBuffer source_buffer,
-    FlushReason reason) {
+    SourceDrawingBuffer source_buffer) {
   NOTIMPLEMENTED();
   return nullptr;
 }
@@ -3651,14 +3798,14 @@ void WebGLRenderingContextWebGPUBase::OnDebugMessage(GLenum source,
                                                      const GLchar* message) {
   if (type == GL_DEBUG_TYPE_ERROR && source == GL_DEBUG_SOURCE_API) {
     had_error_callback_ = true;
-    String formatted_message =
-        String::Format("WebGL: %s: %s", GetErrorString(id), message);
+    String formatted_message = UNSAFE_TODO(
+        String::Format("WebGL: %s: %s", GetErrorString(id), message));
     PrintGLErrorToConsole(formatted_message);
   } else {
-    String formatted_message = String::Format(
+    String formatted_message = UNSAFE_TODO(String::Format(
         "WebGL: (%s, %s, %s, %d): %s", gl::GetDebugSourceString(source),
         gl::GetDebugTypeString(type), gl::GetDebugSeverityString(severity), id,
-        message);
+        message));
     PrintWarningToConsole(formatted_message);
   }
 }
@@ -3679,6 +3826,7 @@ void WebGLRenderingContextWebGPUBase::EnsureDefaultFramebuffer() {
 
   scoped_refptr<WebGPUMailboxTexture> mailbox_texture =
       swap_buffers_->GetNewTexture(texDesc, GetAlphaType());
+  Host()->UpdateMemoryUsage();
   mailbox_texture->SetNeedsPresent(true);
 
   current_swap_buffer_ = mailbox_texture->GetTexture();
@@ -3756,21 +3904,13 @@ void WebGLRenderingContextWebGPUBase::InitializeContext() {
 
   // Initialize the EGL display using the device and the dawn wire client proc
   // table.
-  // Force-enable the avoidWaitAny feature because synchronous waiting is not
-  // possible yet in dawn wire client.
-  constexpr const char* display_enabled_features[] = {
-      "avoidWaitAny",
-      nullptr,
-  };
   const EGLAttrib display_attribs[] = {
       EGL_PLATFORM_ANGLE_TYPE_ANGLE,
       EGL_PLATFORM_ANGLE_TYPE_WEBGPU_ANGLE,
-      EGL_PLATFORM_ANGLE_WEBGPU_DEVICE_ANGLE,
-      reinterpret_cast<EGLAttrib>(device_.Get()),
       EGL_PLATFORM_ANGLE_DAWN_PROC_TABLE_ANGLE,
-      reinterpret_cast<EGLAttrib>(GetDawnProcs()),
-      EGL_FEATURE_OVERRIDES_ENABLED_ANGLE,
-      reinterpret_cast<EGLAttrib>(display_enabled_features),
+      proxy_instance_->GetProcTableForANGLE(),
+      EGL_PLATFORM_ANGLE_WEBGPU_INSTANCE_ANGLE,
+      proxy_instance_->GetInstanceForANGLE(),
       EGL_NONE,
   };
   display_ = driver_egl_.fn.eglGetPlatformDisplayFn(EGL_PLATFORM_ANGLE_ANGLE,
@@ -3783,6 +3923,19 @@ void WebGLRenderingContextWebGPUBase::InitializeContext() {
 
   // Setup the ANGLE platform for internal logging and trace events
   angle::InitializePlatform(display_, get_proc_address);
+
+  // Query the wgpu::Device that was created by ANGLE.
+  EGLAttrib eglDevice = 0;
+  driver_egl_.fn.eglQueryDisplayAttribEXTFn(display_, EGL_DEVICE_EXT,
+                                            &eglDevice);
+  CHECK_NE(0, eglDevice);
+
+  EGLAttrib wgpuDevice = 0;
+  driver_egl_.fn.eglQueryDeviceAttribEXTFn(
+      reinterpret_cast<EGLDeviceEXT>(eglDevice), EGL_WEBGPU_DEVICE_ANGLE,
+      &wgpuDevice);
+  CHECK_NE(0, wgpuDevice);
+  device_ = wgpu::Device::Acquire(reinterpret_cast<WGPUDevice>(wgpuDevice));
 
   // Create a GL Context.
   // TODO(413078308): Request version 2 vs 3 depending on WebGL version.
@@ -3797,6 +3950,12 @@ void WebGLRenderingContextWebGPUBase::InitializeContext() {
       EGL_FALSE,
       EGL_CONTEXT_OPENGL_BACKWARDS_COMPATIBLE_ANGLE,
       EGL_FALSE,
+      EGL_CONTEXT_CLIENT_ARRAYS_ENABLED_ANGLE,
+      EGL_FALSE,
+      EGL_CONTEXT_BIND_GENERATES_RESOURCE_CHROMIUM,
+      EGL_FALSE,
+      EGL_ROBUST_RESOURCE_INITIALIZATION_ANGLE,
+      EGL_TRUE,
       EGL_NONE,
   };
   context_ = driver_egl_.fn.eglCreateContextFn(display_, EGL_NO_CONFIG_KHR,
@@ -3893,6 +4052,7 @@ void WebGLRenderingContextWebGPUBase::Destroy() {
     display_ = EGL_NO_DISPLAY;
   }
   driver_egl_.ClearBindings();
+  proxy_instance_ = nullptr;
 }
 
 bool WebGLRenderingContextWebGPUBase::ValidateFitsNonNegInt32(
@@ -3900,12 +4060,12 @@ bool WebGLRenderingContextWebGPUBase::ValidateFitsNonNegInt32(
     const char* param_name,
     int64_t value) {
   if (value < 0) {
-    String error_msg = String(param_name) + " < 0";
+    String error_msg = StrCat({param_name, " < 0"});
     InsertGLError(GL_INVALID_VALUE, function_name, error_msg.Ascii().c_str());
     return false;
   }
   if (value > static_cast<int64_t>(std::numeric_limits<int32_t>::max())) {
-    String error_msg = String(param_name) + " more than 32-bit";
+    String error_msg = StrCat({param_name, " more than 32-bit"});
     InsertGLError(GL_INVALID_OPERATION, function_name,
                   error_msg.Ascii().c_str());
     return false;
@@ -4084,8 +4244,8 @@ void WebGLRenderingContextWebGPUBase::InsertGLError(GLenum error,
   }
 
   String error_type = GetErrorString(error);
-  String message = String("WebGL: ") + error_type + ": " +
-                   String(function_name) + ": " + String(description);
+  String message =
+      StrCat({"WebGL: ", error_type, ": ", function_name, ": ", description});
 
   PrintGLErrorToConsole(message);
   probe::DidFireWebGLError(canvas(), error_type);

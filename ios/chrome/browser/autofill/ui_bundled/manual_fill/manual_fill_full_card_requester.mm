@@ -75,10 +75,10 @@ class CreditCard;
   if (recordType == kVirtualCard) {
     virtualCard = autofill::CreditCard::CreateVirtualCard(card);
   }
-  autofill::CreditCardAccessManager& creditCardAccessManager =
+  autofill::CreditCardAccessManager* creditCardAccessManager =
       autofillManager.GetCreditCardAccessManager();
   __weak __typeof(self) weakSelf = self;
-  creditCardAccessManager.FetchCreditCard(
+  creditCardAccessManager->FetchCreditCard(
       (recordType == kVirtualCard ? &virtualCard : &card),
       base::BindOnce(^(const autofill::CreditCard& fetchedCard) {
         [weakSelf onCreditCardFetched:fetchedCard fieldType:fieldType];
@@ -95,7 +95,9 @@ class CreditCard;
 // the process succeeded.
 - (void)onCreditCardFetched:(const autofill::CreditCard&)fetchedCard
                   fieldType:(manual_fill::PaymentFieldType)fieldType {
-  [_delegate onFullCardRequestSucceeded:fetchedCard fieldType:fieldType];
+  [_delegate onFullCardRequestSucceeded:fetchedCard
+                              fieldType:fieldType
+                            forWebState:self.webStateList->GetActiveWebState()];
 }
 
 @end

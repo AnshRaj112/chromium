@@ -4,21 +4,33 @@
 
 source_set("public") {
   sources = [
-    "password_import_item.h",
-    "password_import_item.mm",
+    "safari_data_import_entry_point.h",
     "safari_data_import_stage.h",
-    "safari_data_item.h",
-    "safari_data_item.mm",
-    "safari_data_item_consumer.h",
+    "safari_data_import_ui_handler.h",
+    "utils.h",
+    "utils.mm",
   ]
   deps = [ "//base" ]
   frameworks = [ "Foundation.framework" ]
 }
 
-source_set("utils") {
+source_set("metrics") {
   sources = [
-    "utils.h",
-    "utils.mm",
+    "metrics.h",
+    "metrics.mm",
+  ]
+  deps = [
+    ":public",
+    "//base",
   ]
   frameworks = [ "Foundation.framework" ]
+}
+
+source_set("ui_utils") {
+  sources = [
+    "ui_utils.h",
+    "ui_utils.mm",
+  ]
+  deps = [ "//ios/chrome/common/ui/util" ]
+  frameworks = [ "UIKit.framework" ]
 }

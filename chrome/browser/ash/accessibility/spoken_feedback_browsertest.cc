@@ -35,6 +35,7 @@
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
+#include "base/metrics/statistics_recorder.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/bind.h"
@@ -117,7 +118,7 @@ const base::TimeDelta kExpectedPhoneticSpeechAndHintDelay = base::Seconds(1);
 }  // namespace
 
 LoggedInSpokenFeedbackTest::LoggedInSpokenFeedbackTest()
-    : animation_mode_(ui::ScopedAnimationDurationScaleMode::ZERO_DURATION) {}
+    : animation_mode_(gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION) {}
 
 LoggedInSpokenFeedbackTest::~LoggedInSpokenFeedbackTest() = default;
 
@@ -333,7 +334,8 @@ IN_PROC_BROWSER_TEST_P(LoggedInSpokenFeedbackTest, ChromeVoxSpeaksIntro) {
   if (histogram_tester
           .GetAllSamples("Accessibility.ChromeVox.StartUpSpeechDelay")
           .size() == 0) {
-    HistogramWaiter("Accessibility.ChromeVox.StartUpSpeechDelay").Wait();
+    base::StatisticsRecorder::HistogramWaiter(
+        "Accessibility.ChromeVox.StartUpSpeechDelay").Wait();
   }
 }
 
@@ -445,7 +447,7 @@ IN_PROC_BROWSER_TEST_P(LoggedInSpokenFeedbackTest, OpenLogPage) {
 
 IN_PROC_BROWSER_TEST_P(LoggedInSpokenFeedbackTest,
                        CheckChromeVoxPerformCommandMetric) {
-  chromevox_test_utils()->EnableChromeVox(/*check_for_intro=*/false);
+  chromevox_test_utils()->EnableChromeVox();
   base::HistogramTester histogram_tester;
 
   // Command.ANNOUNCE_BATTERY_DESCRIPTION
@@ -785,6 +787,18 @@ INSTANTIATE_TEST_SUITE_P(
     ManifestV2GuestUser,
     SpokenFeedbackTest,
     ::testing::Values(SpokenFeedbackTestConfig(ManifestVersion::kTwo,
+                                               kTestAsGuestUser)));
+
+INSTANTIATE_TEST_SUITE_P(
+    ManifestV3NormalUser,
+    SpokenFeedbackTest,
+    ::testing::Values(SpokenFeedbackTestConfig(ManifestVersion::kThree,
+                                               kTestAsNormalUser)));
+
+INSTANTIATE_TEST_SUITE_P(
+    ManifestV3GuestUser,
+    SpokenFeedbackTest,
+    ::testing::Values(SpokenFeedbackTestConfig(ManifestVersion::kThree,
                                                kTestAsGuestUser)));
 
 IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, EnableSpokenFeedback) {
@@ -1260,6 +1274,9 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, OpenStatusTray) {
   sm()->Replay();
 }
 
+// TODO(https://crbug.com/388867840): Re-enable this test on MSAN. Note that
+// MAYBE_ doesn't work well with parameterized tests.
+#if !defined(MEMORY_SANITIZER)
 IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, OpenSettingsFromPanel) {
   chromevox_test_utils()->EnableChromeVox();
   base::RunLoop waiter;
@@ -1282,8 +1299,9 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, OpenSettingsFromPanel) {
   // We should have tried to open the settings subpage.
   waiter.Run();
 }
+#endif  // !defined(MEMORY_SANITIZER)
 
-// Fails on ASAN. See http://crbug.com/776308 . (Note MAYBE_ doesn't work well
+// Fails on ASAN. See http://crbug.com/776308. (Note MAYBE_ doesn't work well
 // with parameterized tests).
 #if !defined(ADDRESS_SANITIZER)
 IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, NavigateSystemTray) {
@@ -1816,6 +1834,41 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, ShowLinksList) {
   sm()->Replay();
 }
 
+IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, ShowTablesList) {
+  chromevox_test_utils()->EnableChromeVox();
+
+  sm()->Call([this]() {
+    NavigateToUrl(GURL(R"(data:text/html;charset=utf-8,
+        <button autofocus>Start here</button>
+        <table>
+          <caption>Can Collection Drive Results</caption>
+          <tr><th>Name</th> <th>Date</th> <th>Cans collected</th></tr>
+          <tr><td>Joey</td> <td>12/1</td> <td>177</td></tr>
+          <tr><td>Moss</td> <td>12/2</td> <td>122</td></tr>
+        </table>
+        <table>
+          <caption>Types of Can Received</caption>
+          <tr><th>Food</th>   <th>Count</th></tr>
+          <tr><td>Soup</td>   <td>101</td></tr>
+          <tr><td>Beans</td>  <td>88</td></tr>
+          <tr><td>Pumpkin</td><td>87</td></tr>
+        </table>)"));
+  });
+
+  sm()->ExpectSpeech("Start here");
+  // Open the Tables menu.
+  sm()->Call([this]() { SendKeyPressWithSearchAndControl(ui::VKEY_T); });
+  sm()->ExpectSpeech("Table Menu");
+  sm()->ExpectSpeech("Can Collection Drive Results");
+  sm()->ExpectSpeech("Menu item 1 of 2");
+  sm()->Call([this]() { SendKeyPress(ui::VKEY_DOWN); });
+  sm()->ExpectSpeech("Types of Can Received");
+  sm()->ExpectSpeech("Menu item 2 of 2");
+  sm()->Call([this]() { SendKeyPress(ui::VKEY_UP); });
+  sm()->ExpectSpeech("Can Collection Drive Results");
+  sm()->Replay();
+}
+
 IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest,
                        TouchExploreRightEdgeVolumeSliderOn) {
   chromevox_test_utils()->EnableChromeVox();
@@ -1943,7 +1996,7 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TouchExploreSecondaryDisplay) {
   display::test::DisplayManagerTestApi display_manager_test_api(
       shell_test_api.display_manager());
 
-  display::Screen* screen = display::Screen::GetScreen();
+  display::Screen* screen = display::Screen::Get();
   int64_t display2 = display_manager_test_api.GetSecondaryDisplay().id();
   screen->SetDisplayForNewWindows(display2);
 
@@ -2282,23 +2335,29 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, ResetTtsSettings) {
 // Tests the keyboard shortcut to cycle the punctuation echo setting,
 // Search+A then P.
 IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TogglePunctuationEcho) {
+  AccessibilityManager::Get()->profile()->GetPrefs()->SetInteger(
+      prefs::kAccessibilityChromeVoxPunctuationEcho, 1);
   chromevox_test_utils()->EnableChromeVox();
   StablizeChromeVoxState();
+  sm()->Call([this]() { chromevox_test_utils()->WaitForPunctuationEcho(1); });
   sm()->Call([this]() {
     SendKeyPressWithSearch(ui::VKEY_A);
     SendKeyPress(ui::VKEY_P);
   });
   sm()->ExpectSpeech("All punctuation");
+  sm()->Call([this]() { chromevox_test_utils()->WaitForPunctuationEcho(2); });
   sm()->Call([this]() {
     SendKeyPressWithSearch(ui::VKEY_A);
     SendKeyPress(ui::VKEY_P);
   });
   sm()->ExpectSpeech("No punctuation");
+  sm()->Call([this]() { chromevox_test_utils()->WaitForPunctuationEcho(0); });
   sm()->Call([this]() {
     SendKeyPressWithSearch(ui::VKEY_A);
     SendKeyPress(ui::VKEY_P);
   });
   sm()->ExpectSpeech("Some punctuation");
+  sm()->Call([this]() { chromevox_test_utils()->WaitForPunctuationEcho(1); });
   sm()->Replay();
 }
 
@@ -2756,12 +2815,15 @@ class ShortcutsAppSpokenFeedbackTest : public LoggedInSpokenFeedbackTest {
   ~ShortcutsAppSpokenFeedbackTest() override = default;
 };
 
-// TODO(crbug.com/388867840): Add manifest v3 variant when migration is
-// complete.
 INSTANTIATE_TEST_SUITE_P(
     ManifestV2,
     ShortcutsAppSpokenFeedbackTest,
     ::testing::Values(SpokenFeedbackTestConfig(ManifestVersion::kTwo)));
+
+INSTANTIATE_TEST_SUITE_P(
+    ManifestV3,
+    ShortcutsAppSpokenFeedbackTest,
+    ::testing::Values(SpokenFeedbackTestConfig(ManifestVersion::kThree)));
 
 // TODO(b/288602247): The test is flaky.
 IN_PROC_BROWSER_TEST_P(ShortcutsAppSpokenFeedbackTest,
@@ -2821,12 +2883,15 @@ class SpokenFeedbackWithCandidateWindowTest
   raw_ptr<ui::ime::CandidateWindowView> candidate_window_view_;
 };
 
-// TODO(crbug.com/388867840): Add manifest v3 variant when migration is
-// complete.
 INSTANTIATE_TEST_SUITE_P(
     ManifestV2,
     SpokenFeedbackWithCandidateWindowTest,
     ::testing::Values(SpokenFeedbackTestConfig(ManifestVersion::kTwo)));
+
+INSTANTIATE_TEST_SUITE_P(
+    ManifestV3,
+    SpokenFeedbackWithCandidateWindowTest,
+    ::testing::Values(SpokenFeedbackTestConfig(ManifestVersion::kThree)));
 
 IN_PROC_BROWSER_TEST_P(SpokenFeedbackWithCandidateWindowTest,
                        SpeakSelectedItem) {
@@ -2974,6 +3039,18 @@ INSTANTIATE_TEST_SUITE_P(
     ManifestV2GuestUser,
     SpokenFeedbackWithMagnifierTest,
     ::testing::Values(SpokenFeedbackTestConfig(ManifestVersion::kTwo,
+                                               kTestAsGuestUser)));
+
+INSTANTIATE_TEST_SUITE_P(
+    ManifestV3NormalUser,
+    SpokenFeedbackWithMagnifierTest,
+    ::testing::Values(SpokenFeedbackTestConfig(ManifestVersion::kThree,
+                                               kTestAsNormalUser)));
+
+INSTANTIATE_TEST_SUITE_P(
+    ManifestV3GuestUser,
+    SpokenFeedbackWithMagnifierTest,
+    ::testing::Values(SpokenFeedbackTestConfig(ManifestVersion::kThree,
                                                kTestAsGuestUser)));
 
 IN_PROC_BROWSER_TEST_P(SpokenFeedbackWithMagnifierTest,

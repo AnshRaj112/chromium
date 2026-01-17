@@ -14,7 +14,6 @@
 
 #include "base/base_paths.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
@@ -24,17 +23,13 @@
 #include "base/notimplemented.h"
 #include "base/one_shot_event.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
-#include "chrome/browser/apps/app_service/app_service_proxy.h"
-#include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
-#include "chrome/browser/apps/app_service/browser_app_launcher.h"
 #include "chrome/browser/background/extensions/background_application_list_model.h"
-#include "chrome/browser/background/extensions/background_mode_optimizer.h"
-#include "chrome/browser/background/startup_launch_manager.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/extensions/extension_service.h"
-#include "chrome/browser/glic/glic_enabling.h"
+#include "chrome/browser/glic/public/glic_enabling.h"
 #include "chrome/browser/lifetime/application_lifetime_desktop.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/lifetime/termination_notification.h"
@@ -44,6 +39,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_attributes_entry.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/startup/startup_launch_manager.h"
 #include "chrome/browser/status_icons/status_icon.h"
 #include "chrome/browser/status_icons/status_tray.h"
 #include "chrome/browser/ui/browser.h"
@@ -54,6 +50,7 @@
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/extensions/app_launch_params.h"
 #include "chrome/browser/ui/profiles/profile_picker.h"
+#include "chrome/browser/web_applications/extensions/launch.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/extensions/extension_constants.h"
@@ -76,6 +73,7 @@
 #include "ui/base/models/image_model.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/gfx/image/image_family.h"
+#include "ui/gfx/image/image_skia.h"
 
 #if BUILDFLAG(IS_WIN)
 #include "chrome/browser/win/app_icon.h"
@@ -313,7 +311,6 @@ BackgroundModeManager::BackgroundModeManager(
     // in a mode that doesn't open a browser window. It will be resumed when the
     // first browser window is opened.
     SuspendBackgroundMode();
-    optimizer_ = BackgroundModeOptimizer::Create();
   }
 
   // If the --keep-alive-for-test flag is passed, then always keep the browser
@@ -355,7 +352,7 @@ void BackgroundModeManager::RegisterPrefs(PrefRegistrySimple* registry) {
 
 void BackgroundModeManager::RegisterProfile(Profile* profile) {
   // We don't want to register multiple times for one profile.
-  DCHECK(!base::Contains(background_mode_data_, profile));
+  DCHECK(!background_mode_data_.contains(profile));
   auto bmd = std::make_unique<BackgroundModeData>(this, profile,
                                                   &command_id_handler_vector_);
   BackgroundModeData* bmd_ptr = bmd.get();
@@ -398,7 +395,7 @@ bool BackgroundModeManager::UnregisterProfile(Profile* profile) {
   background_mode_data_.erase(it);
   // If there are no background mode profiles any longer, then turn off
   // background mode.
-  UpdateEnableLaunchOnStartup();
+  startup_launch_client_.SetLaunchOnStartup(ShouldLaunchOnStartup());
   if (!ShouldBeInBackgroundMode()) {
     EndBackgroundMode();
   }
@@ -412,13 +409,12 @@ void BackgroundModeManager::LaunchBackgroundApplication(
     Profile* profile,
     const Extension* extension) {
 #if !BUILDFLAG(IS_CHROMEOS)
-  apps::AppServiceProxyFactory::GetForProfile(profile)
-      ->BrowserAppLauncher()
-      ->LaunchAppWithParams(
-          CreateAppLaunchParamsUserContainer(
-              profile, extension, WindowOpenDisposition::NEW_FOREGROUND_TAB,
-              apps::LaunchSource::kFromBackgroundMode),
-          base::DoNothing());
+  web_app::LaunchExtensionOrWebApp(
+      profile,
+      CreateAppLaunchParamsUserContainer(
+          profile, extension, WindowOpenDisposition::NEW_FOREGROUND_TAB,
+          apps::LaunchSource::kFromBackgroundMode),
+      base::DoNothing());
 #else
   // background mode is not used in Chrome OS platform.
   // TODO(crbug.com/40212901): Remove the background mode manager from Chrome OS
@@ -476,7 +472,7 @@ void BackgroundModeManager::OnExtensionsReady(Profile* profile) {
 }
 
 void BackgroundModeManager::OnBackgroundModeEnabledPrefChanged() {
-  UpdateEnableLaunchOnStartup();
+  startup_launch_client_.SetLaunchOnStartup(ShouldLaunchOnStartup());
   if (IsBackgroundModePrefEnabled()) {
     EnableBackgroundMode();
   } else {
@@ -644,7 +640,6 @@ void BackgroundModeManager::ExecuteCommand(int command_id, int event_flags) {
 //  BackgroundModeManager, private
 void BackgroundModeManager::ReleaseStartupKeepAliveCallback() {
   keep_alive_for_startup_.reset();
-  optimizer_ = BackgroundModeOptimizer::Create();
 }
 
 void BackgroundModeManager::ReleaseStartupKeepAlive() {
@@ -706,7 +701,7 @@ void BackgroundModeManager::EnableBackgroundMode() {
   if (!in_background_mode_ && ShouldBeInBackgroundMode()) {
     StartBackgroundMode();
 
-    UpdateEnableLaunchOnStartup();
+    startup_launch_client_.SetLaunchOnStartup(ShouldLaunchOnStartup());
   }
 }
 
@@ -765,7 +760,7 @@ void BackgroundModeManager::OnClientsChanged(
         HasPersistentBackgroundClientForProfile(profile));
   }
 
-  UpdateEnableLaunchOnStartup();
+  startup_launch_client_.SetLaunchOnStartup(ShouldLaunchOnStartup());
   if (!ShouldBeInBackgroundMode()) {
     // We've uninstalled our last background client, make sure we exit
     // background mode and no longer launch on startup.
@@ -838,22 +833,8 @@ void BackgroundModeManager::OnBackgroundClientInstalled(
   DisplayClientInstalledNotification(name);
 }
 
-void BackgroundModeManager::UpdateEnableLaunchOnStartup() {
-  const bool new_launch_on_startup =
-      ShouldBeInBackgroundMode() && HasPersistentBackgroundClient();
-  if (launch_on_startup_enabled_ &&
-      new_launch_on_startup == *launch_on_startup_enabled_) {
-    return;
-  }
-  launch_on_startup_enabled_.emplace(new_launch_on_startup);
-
-  StartupLaunchManager* const launch_manager =
-      StartupLaunchManager::GetInstance();
-  if (launch_on_startup_enabled_.value()) {
-    launch_manager->RegisterLaunchOnStartup(StartupLaunchReason::kExtensions);
-  } else {
-    launch_manager->UnregisterLaunchOnStartup(StartupLaunchReason::kExtensions);
-  }
+bool BackgroundModeManager::ShouldLaunchOnStartup() const {
+  return ShouldBeInBackgroundMode() && HasPersistentBackgroundClient();
 }
 
 namespace {

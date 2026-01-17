@@ -17,7 +17,6 @@ static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 class TabsEventRouter;
-class TabsEventRouterAndroid;
 class WindowsEventRouter;
 
 // TabsWindowsAPI is a BrowserContextKeyedAPI that manages the TabsEventRouter
@@ -35,12 +34,9 @@ class TabsWindowsAPI : public BrowserContextKeyedAPI,
   // Creates the tabs event router. Visible for testing.
   void InitTabsEventRouter();
 
-#if BUILDFLAG(IS_ANDROID)
-  TabsEventRouterAndroid* tabs_event_router_android();
-#else
   TabsEventRouter* tabs_event_router();
+
   WindowsEventRouter* windows_event_router();
-#endif
 
   // KeyedService implementation.
   void Shutdown() override;
@@ -62,14 +58,8 @@ class TabsWindowsAPI : public BrowserContextKeyedAPI,
   }
   static const bool kServiceIsNULLWhileTesting = true;
 
-#if BUILDFLAG(IS_ANDROID)
-  // TODO(crbug.com/427503497): Remove this once TabsEventRouter works on
-  // Android.
-  std::unique_ptr<TabsEventRouterAndroid> tabs_event_router_android_;
-#else
   std::unique_ptr<TabsEventRouter> tabs_event_router_;
   std::unique_ptr<WindowsEventRouter> windows_event_router_;
-#endif
 };
 
 }  // namespace extensions

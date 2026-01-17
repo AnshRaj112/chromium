@@ -6,8 +6,9 @@
 
 #include <GLES2/gl2extchromium.h>
 
+#include <algorithm>
+
 #include "base/barrier_closure.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/run_loop.h"
 #include "base/test/bind.h"
@@ -90,30 +91,20 @@ TEST_F(BufferTest, ReleaseCallback) {
 
   buffer->OnAttach();
   // Produce a transferable resource for the contents of the buffer.
-  int release_resource_count = 0;
-  base::RunLoop run_loop_2;
   std::optional<viz::TransferableResource> resource =
       buffer->ProduceTransferableResource(
           frame_sink_holder->resource_manager(), nullptr, false,
-          gfx::ColorSpace::CreateSRGB(), nullptr,
-          test::CreateExplicitReleaseCallback(&release_resource_count,
-                                              run_loop_2.QuitClosure()),
-          gpu::SyncToken(),
-          viz::TransferableResource::SynchronizationType::kSyncToken);
+          gfx::ColorSpace::CreateSRGB(), nullptr);
   ASSERT_TRUE(resource);
 
   // Release buffer.
   std::vector<viz::ReturnedResource> resources;
-  resources.emplace_back(resource->id, resource->sync_token(),
-                         /*release_fence=*/gfx::GpuFenceHandle(),
-                         /*count=*/0, /*lost=*/false);
+  resources.emplace_back(
+      resource->id,
+      gpu::SharedImageExportResult::CreateForTesting(resource->sync_token()),
+      /*release_fence=*/gfx::GpuFenceHandle(),
+      /*count=*/0, /*lost=*/false);
   frame_sink_holder->ReclaimResources(std::move(resources));
-
-  run_loop_2.Run();
-
-  ASSERT_EQ(release_call_count, 0);
-  // The resource should have been released even if the whole buffer hasn't.
-  ASSERT_EQ(release_resource_count, 1);
 
   buffer->OnDetach();
 
@@ -140,24 +131,20 @@ TEST_F(BufferTest, SolidColorReleaseCallback) {
 
   buffer->OnAttach();
   // Produce a transferable resource for the contents of the buffer.
-  int release_resource_count = 0;
   std::optional<viz::TransferableResource> resource =
       buffer->ProduceTransferableResource(
           frame_sink_holder->resource_manager(), nullptr, false,
-          gfx::ColorSpace::CreateSRGB(), nullptr,
-          test::CreateExplicitReleaseCallback(&release_resource_count,
-                                              base::DoNothing()),
-          gpu::SyncToken(),
-          viz::TransferableResource::SynchronizationType::kSyncToken);
+          gfx::ColorSpace::CreateSRGB(), nullptr);
   // Solid color buffer is immediately released after commit.
-  EXPECT_EQ(release_resource_count, 1);
   EXPECT_FALSE(resource);
 
   // Release buffer.
   std::vector<viz::ReturnedResource> resources;
-  resources.emplace_back(viz::kInvalidResourceId, gpu::SyncToken(),
-                         /*release_fence=*/gfx::GpuFenceHandle(),
-                         /*count=*/0, /*lost=*/false);
+  resources.emplace_back(
+      viz::kInvalidResourceId,
+      gpu::SharedImageExportResult::CreateForTesting(gpu::SyncToken()),
+      /*release_fence=*/gfx::GpuFenceHandle(),
+      /*count=*/0, /*lost=*/false);
   frame_sink_holder->ReclaimResources(std::move(resources));
 
   // We expect that Release() is not called, no matter whether we have a wait
@@ -183,15 +170,10 @@ TEST_F(BufferTest, IsLost) {
   buffer->OnAttach();
   {
     // Acquire a texture transferable resource for the contents of the buffer.
-    base::RunLoop run_loop_1;
     std::optional<viz::TransferableResource> resource =
         buffer->ProduceTransferableResource(
             frame_sink_holder->resource_manager(), nullptr, false,
-            gfx::ColorSpace::CreateSRGB(), nullptr,
-            test::CreateExplicitReleaseCallback(nullptr,
-                                                run_loop_1.QuitClosure()),
-            gpu::SyncToken(),
-            viz::TransferableResource::SynchronizationType::kSyncToken);
+            gfx::ColorSpace::CreateSRGB(), nullptr);
     ASSERT_TRUE(resource);
 
     scoped_refptr<viz::RasterContextProvider> context_provider =
@@ -205,34 +187,31 @@ TEST_F(BufferTest, IsLost) {
 
     // Release buffer.
     std::vector<viz::ReturnedResource> resources;
-    resources.emplace_back(resource->id, gpu::SyncToken(),
-                           /*release_fence=*/gfx::GpuFenceHandle(),
-                           /*count=*/0, /*lost=*/true);
+    resources.emplace_back(
+        resource->id,
+        gpu::SharedImageExportResult::CreateForTesting(gpu::SyncToken()),
+        /*release_fence=*/gfx::GpuFenceHandle(),
+        /*count=*/0, /*lost=*/true);
     frame_sink_holder->ReclaimResources(std::move(resources));
-    run_loop_1.Run();
   }
 
   {
     // Producing a new texture transferable resource for the contents of the
     // buffer.
-    base::RunLoop run_loop_2;
     std::optional<viz::TransferableResource> new_resource =
         buffer->ProduceTransferableResource(
             frame_sink_holder->resource_manager(), nullptr, false,
-            gfx::ColorSpace::CreateSRGB(), nullptr,
-            test::CreateExplicitReleaseCallback(nullptr,
-                                                run_loop_2.QuitClosure()),
-            gpu::SyncToken(),
-            viz::TransferableResource::SynchronizationType::kSyncToken);
+            gfx::ColorSpace::CreateSRGB(), nullptr);
     ASSERT_TRUE(new_resource);
     buffer->OnDetach();
 
     std::vector<viz::ReturnedResource> resources2;
-    resources2.emplace_back(new_resource->id, gpu::SyncToken(),
-                            /*release_fence=*/gfx::GpuFenceHandle(),
-                            /*count=*/0, /*lost=*/false);
+    resources2.emplace_back(
+        new_resource->id,
+        gpu::SharedImageExportResult::CreateForTesting(gpu::SyncToken()),
+        /*release_fence=*/gfx::GpuFenceHandle(),
+        /*count=*/0, /*lost=*/false);
     frame_sink_holder->ReclaimResources(std::move(resources2));
-    run_loop_2.Run();
   }
 }
 
@@ -251,9 +230,7 @@ TEST_F(BufferTest, OnLostResources) {
   std::optional<viz::TransferableResource> resource =
       buffer->ProduceTransferableResource(
           frame_sink_holder->resource_manager(), nullptr, false,
-          gfx::ColorSpace::CreateSRGB(), nullptr, base::DoNothing(),
-          gpu::SyncToken(),
-          viz::TransferableResource::SynchronizationType::kSyncToken);
+          gfx::ColorSpace::CreateSRGB(), nullptr);
   ASSERT_TRUE(resource);
 
   viz::RasterContextProvider* context_provider =
@@ -286,22 +263,15 @@ TEST_F(BufferTest, SurfaceTreeHostDestruction) {
   int release_call_count = 0;
 
   base::RunLoop run_loop;
-  auto combined_quit_closure = BarrierClosure(2, run_loop.QuitClosure());
-
   buffer->set_release_callback(test::CreateReleaseBufferClosure(
-      &release_call_count, combined_quit_closure));
+      &release_call_count, run_loop.QuitClosure()));
 
   buffer->OnAttach();
   // Produce a transferable resource for the contents of the buffer.
-  int release_resource_count = 0;
   std::optional<viz::TransferableResource> resource =
       buffer->ProduceTransferableResource(
           frame_sink_holder->resource_manager(), nullptr, false,
-          gfx::ColorSpace::CreateSRGB(), nullptr,
-          test::CreateExplicitReleaseCallback(&release_resource_count,
-                                              combined_quit_closure),
-          gpu::SyncToken(),
-          viz::TransferableResource::SynchronizationType::kSyncToken);
+          gfx::ColorSpace::CreateSRGB(), nullptr);
   ASSERT_TRUE(resource);
 
   // Submit frame with resource.
@@ -318,12 +288,10 @@ TEST_F(BufferTest, SurfaceTreeHostDestruction) {
   // more likely to find out.
   task_environment()->FastForwardBy(base::Seconds(1));
   ASSERT_EQ(release_call_count, 0);
-  ASSERT_EQ(release_resource_count, 0);
 
   shell_surface.reset();
   run_loop.Run();
   ASSERT_EQ(release_call_count, 1);
-  ASSERT_EQ(release_resource_count, 1);
 }
 
 TEST_F(BufferTest, SurfaceTreeHostLastFrame) {
@@ -347,22 +315,16 @@ TEST_F(BufferTest, SurfaceTreeHostLastFrame) {
   int release_call_count = 0;
 
   base::RunLoop run_loop;
-  auto combined_quit_closure = BarrierClosure(2, run_loop.QuitClosure());
 
   buffer->set_release_callback(test::CreateReleaseBufferClosure(
-      &release_call_count, combined_quit_closure));
+      &release_call_count, run_loop.QuitClosure()));
 
   buffer->OnAttach();
   // Produce a transferable resource for the contents of the buffer.
-  int release_resource_count = 0;
   std::optional<viz::TransferableResource> resource =
       buffer->ProduceTransferableResource(
           frame_sink_holder->resource_manager(), nullptr, false,
-          gfx::ColorSpace::CreateSRGB(), nullptr,
-          test::CreateExplicitReleaseCallback(&release_resource_count,
-                                              combined_quit_closure),
-          gpu::SyncToken(),
-          viz::TransferableResource::SynchronizationType::kSyncToken);
+          gfx::ColorSpace::CreateSRGB(), nullptr);
   ASSERT_TRUE(resource);
 
   // Submit frame with resource.
@@ -375,9 +337,11 @@ TEST_F(BufferTest, SurfaceTreeHostLastFrame) {
     // Try to release buffer in last frame. This can happen during a resize
     // when frame sink id changes.
     std::vector<viz::ReturnedResource> resources;
-    resources.emplace_back(resource->id, resource->sync_token(),
-                           /*release_fence=*/gfx::GpuFenceHandle(),
-                           /*count=*/0, /*lost=*/false);
+    resources.emplace_back(
+        resource->id,
+        gpu::SharedImageExportResult::CreateForTesting(resource->sync_token()),
+        /*release_fence=*/gfx::GpuFenceHandle(),
+        /*count=*/0, /*lost=*/false);
     frame_sink_holder->ReclaimResources(std::move(resources));
   }
 
@@ -390,7 +354,6 @@ TEST_F(BufferTest, SurfaceTreeHostLastFrame) {
   task_environment()->FastForwardBy(base::Seconds(1));
   // Release() should not have been called as resource is used by last frame.
   ASSERT_EQ(release_call_count, 0);
-  ASSERT_EQ(release_resource_count, 0);
 
   // Submit frame without resource. This should cause buffer to be released.
   shell_surface->SubmitCompositorFrameForTesting(CreateCompositorFrame(
@@ -399,7 +362,6 @@ TEST_F(BufferTest, SurfaceTreeHostLastFrame) {
   run_loop.Run();
   // Release() should have been called exactly once.
   ASSERT_EQ(release_call_count, 1);
-  ASSERT_EQ(release_resource_count, 1);
 }
 
 class TestLayerTreeFrameSinkHolder : public LayerTreeFrameSinkHolder {
@@ -459,22 +421,16 @@ TEST_F(BufferTest, SurfaceTreeHostNotReclaimCachedFrameResources) {
   int release_call_count = 0;
 
   base::RunLoop run_loop1;
-  auto combined_quit_closure = BarrierClosure(2, run_loop1.QuitClosure());
 
   buffer->set_release_callback(test::CreateReleaseBufferClosure(
-      &release_call_count, combined_quit_closure));
+      &release_call_count, run_loop1.QuitClosure()));
 
   buffer->OnAttach();
   // Produce a transferable resource for the contents of the buffer.
-  int release_resource_count = 0;
   std::optional<viz::TransferableResource> resource =
       buffer->ProduceTransferableResource(
           frame_sink_holder->resource_manager(), nullptr, false,
-          gfx::ColorSpace::CreateSRGB(), nullptr,
-          test::CreateExplicitReleaseCallback(&release_resource_count,
-                                              combined_quit_closure),
-          gpu::SyncToken(),
-          viz::TransferableResource::SynchronizationType::kSyncToken);
+          gfx::ColorSpace::CreateSRGB(), nullptr);
   ASSERT_TRUE(resource);
 
   // Submit frame with `resource`.
@@ -489,7 +445,7 @@ TEST_F(BufferTest, SurfaceTreeHostNotReclaimCachedFrameResources) {
   frame_sink_holder->set_pre_reclaim_callback(base::BindLambdaForTesting(
       [&](const std::vector<viz::ReturnedResource>& resources) {
         // Skip if it is not a notification for reclaiming `resource`.
-        if (!base::Contains(
+        if (!std::ranges::contains(
                 resources, resource->id,
                 [](const viz::ReturnedResource& r) { return r.id; })) {
           return;
@@ -524,7 +480,6 @@ TEST_F(BufferTest, SurfaceTreeHostNotReclaimCachedFrameResources) {
 
   // Release() should not have been called.
   ASSERT_EQ(release_call_count, 0);
-  ASSERT_EQ(release_resource_count, 0);
 
   buffer->OnDetach();
 
@@ -535,7 +490,6 @@ TEST_F(BufferTest, SurfaceTreeHostNotReclaimCachedFrameResources) {
   run_loop1.Run();
   // Release() should have been called exactly once.
   ASSERT_EQ(release_call_count, 1);
-  ASSERT_EQ(release_resource_count, 1);
 }
 
 TEST_F(BufferTest, SurfaceTreeHostDiscardFrameNotReclaimNewFrameResources) {
@@ -556,22 +510,16 @@ TEST_F(BufferTest, SurfaceTreeHostDiscardFrameNotReclaimNewFrameResources) {
   int release_call_count = 0;
 
   base::RunLoop run_loop;
-  auto combined_quit_closure = BarrierClosure(2, run_loop.QuitClosure());
 
   buffer->set_release_callback(test::CreateReleaseBufferClosure(
-      &release_call_count, combined_quit_closure));
+      &release_call_count, run_loop.QuitClosure()));
 
   buffer->OnAttach();
   // Produce a transferable resource for the contents of the buffer.
-  int release_resource_count = 0;
   std::optional<viz::TransferableResource> resource =
       buffer->ProduceTransferableResource(
           frame_sink_holder->resource_manager(), nullptr, false,
-          gfx::ColorSpace::CreateSRGB(), nullptr,
-          test::CreateExplicitReleaseCallback(&release_resource_count,
-                                              combined_quit_closure),
-          gpu::SyncToken(),
-          viz::TransferableResource::SynchronizationType::kSyncToken);
+          gfx::ColorSpace::CreateSRGB(), nullptr);
   ASSERT_TRUE(resource);
 
   frame_sink_holder->ClearPendingBeginFramesForTesting();
@@ -599,7 +547,6 @@ TEST_F(BufferTest, SurfaceTreeHostDiscardFrameNotReclaimNewFrameResources) {
 
   // Release() should not have been called.
   ASSERT_EQ(release_call_count, 0);
-  ASSERT_EQ(release_resource_count, 0);
 
   // Submit another frame without resource.
   shell_surface->SubmitCompositorFrameForTesting(CreateCompositorFrame(
@@ -610,7 +557,6 @@ TEST_F(BufferTest, SurfaceTreeHostDiscardFrameNotReclaimNewFrameResources) {
 
   // Release() should have been called exactly once.
   ASSERT_EQ(release_call_count, 1);
-  ASSERT_EQ(release_resource_count, 1);
 }
 
 TEST_F(BufferTest, SurfaceTreeHostDiscardFrameNotReclaimInUseResources) {
@@ -635,22 +581,16 @@ TEST_F(BufferTest, SurfaceTreeHostDiscardFrameNotReclaimInUseResources) {
   int release_call_count = 0;
 
   base::RunLoop run_loop1;
-  auto combined_quit_closure = BarrierClosure(2, run_loop1.QuitClosure());
 
   buffer->set_release_callback(test::CreateReleaseBufferClosure(
-      &release_call_count, combined_quit_closure));
+      &release_call_count, run_loop1.QuitClosure()));
 
   buffer->OnAttach();
   // Produce a transferable resource for the contents of the buffer.
-  int release_resource_count = 0;
   std::optional<viz::TransferableResource> resource =
       buffer->ProduceTransferableResource(
           frame_sink_holder->resource_manager(), nullptr, false,
-          gfx::ColorSpace::CreateSRGB(), nullptr,
-          test::CreateExplicitReleaseCallback(&release_resource_count,
-                                              combined_quit_closure),
-          gpu::SyncToken(),
-          viz::TransferableResource::SynchronizationType::kSyncToken);
+          gfx::ColorSpace::CreateSRGB(), nullptr);
   ASSERT_TRUE(resource);
 
   // Submit frame with `resource`.
@@ -665,7 +605,7 @@ TEST_F(BufferTest, SurfaceTreeHostDiscardFrameNotReclaimInUseResources) {
   frame_sink_holder->set_pre_reclaim_callback(base::BindLambdaForTesting(
       [&](const std::vector<viz::ReturnedResource>& resources) {
         // Skip if it is not a notification for reclaiming `resource`.
-        if (!base::Contains(
+        if (!std::ranges::contains(
                 resources, resource->id,
                 [](const viz::ReturnedResource& r) { return r.id; })) {
           return;
@@ -678,7 +618,6 @@ TEST_F(BufferTest, SurfaceTreeHostDiscardFrameNotReclaimInUseResources) {
         // The evicted cached frame with `resource` shouldn't have caused
         // Release() to be called.
         ASSERT_EQ(release_call_count, 0);
-        ASSERT_EQ(release_resource_count, 0);
       }));
 
   frame_sink_holder->ClearPendingBeginFramesForTesting();
@@ -703,7 +642,6 @@ TEST_F(BufferTest, SurfaceTreeHostDiscardFrameNotReclaimInUseResources) {
 
   // Release() should have been called exactly once.
   ASSERT_EQ(release_call_count, 1);
-  ASSERT_EQ(release_resource_count, 1);
 }
 
 }  // namespace

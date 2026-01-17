@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "components/spellcheck/renderer/spellcheck_provider.h"
 
 #include <algorithm>
 #include <unordered_map>
 #include <vector>
 
+#include "base/compiler_specific.h"
 #include "base/containers/to_vector.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
@@ -38,6 +34,7 @@
 #include "third_party/blink/public/web/web_text_checking_completion.h"
 #include "third_party/blink/public/web/web_text_checking_result.h"
 #include "third_party/blink/public/web/web_text_decoration_type.h"
+#include "ui/gfx/range/range.h"
 
 using blink::WebElement;
 using blink::WebLocalFrame;
@@ -46,11 +43,11 @@ using blink::WebTextCheckingCompletion;
 using blink::WebTextCheckingResult;
 using blink::WebTextDecorationType;
 
-static_assert(int(blink::kWebTextDecorationTypeSpelling) ==
-                  int(SpellCheckResult::SPELLING),
+static_assert(static_cast<int>(blink::kWebTextDecorationTypeSpelling) ==
+                  static_cast<int>(spellcheck::Decoration::SPELLING),
               "mismatching enums");
-static_assert(int(blink::kWebTextDecorationTypeGrammar) ==
-                  int(SpellCheckResult::GRAMMAR),
+static_assert(static_cast<int>(blink::kWebTextDecorationTypeGrammar) ==
+                  static_cast<int>(spellcheck::Decoration::GRAMMAR),
               "mismatching enums");
 
 class SpellCheckProvider::DictionaryUpdateObserverImpl
@@ -110,6 +107,9 @@ void SpellCheckProvider::ResetDictionaryUpdateObserverForTesting() {
 
 void SpellCheckProvider::RequestTextChecking(
     const std::u16string& text,
+    const std::vector<gfx::Range>& spelling_markers,
+    blink::WebTextCheckClient::ShouldForceRefreshTextCheckService
+        should_force_refresh,
     std::unique_ptr<WebTextCheckingCompletion> completion) {
   // Ignore invalid requests.
   if (text.empty() || !HasWordCharacters(text, 0)) {
@@ -118,8 +118,11 @@ void SpellCheckProvider::RequestTextChecking(
   }
 
   // Try to satisfy check from cache.
-  if (SatisfyRequestFromCache(text, completion.get()))
+  if (should_force_refresh ==
+          blink::WebTextCheckClient::ShouldForceRefreshTextCheckService::kNo &&
+      SatisfyRequestFromCache(text, completion.get())) {
     return;
+  }
 
   // Send this text to a browser. A browser checks the user profile and send
   // this text to the Spelling service only if a user enables this feature.
@@ -130,9 +133,7 @@ void SpellCheckProvider::RequestTextChecking(
 #if BUILDFLAG(USE_BROWSER_SPELLCHECKER)
   if (spellcheck::UseBrowserSpellChecker()) {
 #if BUILDFLAG(IS_WIN)
-    if (base::FeatureList::IsEnabled(
-            spellcheck::kWinDelaySpellcheckServiceInit) &&
-        !dictionaries_loaded_) {
+    if (!dictionaries_loaded_) {
       // Initialize the spellcheck service on demand (this spellcheck request
       // could be the result of the first click in editable content), then
       // complete the text check request when the dictionaries are loaded.
@@ -150,7 +151,7 @@ void SpellCheckProvider::RequestTextChecking(
     }
 #endif  // BUILDFLAG(IS_WIN)
 
-    RequestTextCheckingFromBrowser(text);
+    RequestTextCheckingFromBrowser(text, spelling_markers);
   }
 #endif  // BUILDFLAG(USE_BROWSER_SPELLCHECKER)
 
@@ -166,7 +167,8 @@ void SpellCheckProvider::RequestTextChecking(
 
 #if BUILDFLAG(USE_BROWSER_SPELLCHECKER)
 void SpellCheckProvider::RequestTextCheckingFromBrowser(
-    const std::u16string& text) {
+    const std::u16string& text,
+    const std::vector<gfx::Range>& spelling_markers) {
   DCHECK(spellcheck::UseBrowserSpellChecker());
 #if BUILDFLAG(IS_WIN)
 
@@ -204,8 +206,9 @@ void SpellCheckProvider::RequestTextCheckingFromBrowser(
   // available for browser process, so we ask the system spellchecker
   // over mojo or return an empty result if the checker is not available.
   GetSpellCheckHost().RequestTextCheck(
-      text, base::BindOnce(&SpellCheckProvider::OnRespondTextCheck,
-                           weak_factory_.GetWeakPtr(), last_identifier_, text));
+      text, spelling_markers,
+      base::BindOnce(&SpellCheckProvider::OnRespondTextCheck,
+                     weak_factory_.GetWeakPtr(), last_identifier_, text));
 }
 
 #if BUILDFLAG(IS_WIN)
@@ -225,7 +228,7 @@ void SpellCheckProvider::OnRespondInitializeDictionaries(
   // the SpellChecker is initialized before performing a spellcheck.
   spellcheck_->Initialize(std::move(dictionaries), custom_words, enable);
 
-  RequestTextCheckingFromBrowser(text);
+  RequestTextCheckingFromBrowser(text, /*spelling_markers=*/{});
 }
 #endif  // BUILDFLAG(IS_WIN)
 #endif  // BUILDFLAG(USE_BROWSER_SPELLCHECKER)
@@ -305,8 +308,12 @@ void SpellCheckProvider::CheckSpelling(
 
 void SpellCheckProvider::RequestCheckingOfText(
     const WebString& text,
+    const std::vector<gfx::Range>& spelling_markers,
+    blink::WebTextCheckClient::ShouldForceRefreshTextCheckService
+        should_force_refresh,
     std::unique_ptr<WebTextCheckingCompletion> completion) {
-  RequestTextChecking(text.Utf16(), std::move(completion));
+  RequestTextChecking(text.Utf16(), spelling_markers, should_force_refresh,
+                      std::move(completion));
   spellcheck_renderer_metrics::RecordAsyncCheckedTextLength(
       base::saturated_cast<int>(text.length()));
 }
@@ -350,7 +357,7 @@ bool SpellCheckProvider::HasWordCharacters(const std::u16string& text,
   size_t length = text.length();
   while (index < length) {
     uint32_t code = 0;
-    U16_NEXT(data, index, length, code);
+    UNSAFE_TODO(U16_NEXT(data, index, length, code));
     UErrorCode error = U_ZERO_ERROR;
     if (uscript_getScript(code, &error) != USCRIPT_COMMON)
       return true;

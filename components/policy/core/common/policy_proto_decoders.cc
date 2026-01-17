@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "components/policy/core/common/policy_proto_decoders.h"
 
 #include <cstring>
 #include <limits>
 #include <memory>
 
+#include "base/compiler_specific.h"
 #include "base/json/json_reader.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
+#include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "build/build_config.h"
@@ -24,6 +22,7 @@
 #include "components/policy/core/common/policy_map.h"
 #include "components/policy/policy_constants.h"
 #include "components/policy/proto/cloud_policy.pb.h"
+#include "components/policy/proto/device_management_backend.pb.h"
 #include "components/strings/grit/components_strings.h"
 
 namespace policy {
@@ -135,13 +134,110 @@ bool UseExternalDataFetcher(const char* policy_name,
     return true;
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
-  if (strcmp(policy_name, key::kWebAppInstallForceList) == 0)
+  if (UNSAFE_TODO(strcmp(policy_name, key::kWebAppInstallForceList)) == 0) {
     return true;
+  }
 #endif
   return false;
 }
 
 }  // namespace
+
+ExtensionInstallDecision ConvertToExtensionInstallDecision(
+    const enterprise_management::ExtensionInstallPolicies& policies,
+    const ExtensionIdAndVersion& extension_id_and_version) {
+  for (em::ExtensionInstallPolicy policy : policies.policies()) {
+    if (!policy.has_extension_id()) {
+      VLOG_POLICY(1, POLICY_PROCESSING)
+          << "ExtensionInstallCloudPolicy missing extension id";
+      continue;
+    }
+    if (!policy.has_extension_version()) {
+      VLOG_POLICY(1, POLICY_PROCESSING) << base::StringPrintf(
+          "ExtensionInstallCloudPolicy - %s: missing version",
+          policy.extension_id());
+      continue;
+    }
+    std::string policy_key = base::StringPrintf("%s@%s", policy.extension_id(),
+                                                policy.extension_version());
+
+    if (!policy.has_action()) {
+      VLOG_POLICY(1, POLICY_PROCESSING) << base::StringPrintf(
+          "ExtensionInstallCloudPolicy - %s:missing action", policy_key);
+      continue;
+    }
+
+    if (policy.extension_id() == extension_id_and_version.extension_id &&
+        policy.extension_version() ==
+            extension_id_and_version.extension_version) {
+      std::set<enterprise_management::ExtensionInstallPolicy::Reason> reasons;
+      for (const auto& reason : policy.reasons()) {
+        reasons.insert(
+            static_cast<enterprise_management::ExtensionInstallPolicy::Reason>(
+                reason));
+      }
+      return ExtensionInstallDecision(policy.action(), std::move(reasons));
+    }
+  }
+  VLOG_POLICY(1, POLICY_PROCESSING) << base::StringPrintf(
+      "ExtensionInstallCloudPolicy - %s@%s:missing policy",
+      extension_id_and_version.extension_id,
+      extension_id_and_version.extension_version);
+  return ExtensionInstallDecision();
+}
+
+void DecodeProtoFields(const em::ExtensionInstallPolicies& policies,
+                       PolicySource source,
+                       PolicyScope scope,
+                       PolicyMap* map) {
+  std::map<std::string, base::Value> extension_id_to_policy_value;
+  for (const em::ExtensionInstallPolicy& policy : policies.policies()) {
+    if (!policy.has_extension_id()) {
+      VLOG_POLICY(2, POLICY_PROCESSING)
+          << "ExtensionInstallPolicy missing extension id";
+      continue;
+    }
+    if (!policy.has_extension_version()) {
+      VLOG_POLICY(2, POLICY_PROCESSING)
+          << base::StringPrintf("ExtensionInstallPolicy - %s: missing version",
+                                policy.extension_id());
+      continue;
+    }
+
+    if (!policy.has_action()) {
+      VLOG_POLICY(2, POLICY_PROCESSING) << base::StringPrintf(
+          "ExtensionInstallPolicy - %s - version %s: missing action",
+          policy.extension_id(), policy.extension_version());
+      continue;
+    }
+    base::Value action(policy.action());
+    base::Value::List reasons;
+    for (const auto& reason : policy.reasons()) {
+      reasons.Append(reason);
+    }
+
+    VLOG_POLICY(2, POLICY_PROCESSING) << base::StringPrintf(
+        "ExtensionInstallPolicy - %s - version:%s action: %s, reasons: %s",
+        policy.extension_id(), policy.extension_version(), action.DebugString(),
+        reasons.DebugString());
+
+    base::Value policy_value(base::Value::Type::DICT);
+    policy_value.GetDict().Set("action", std::move(action));
+    policy_value.GetDict().Set("reasons", std::move(reasons));
+
+    if (!extension_id_to_policy_value.contains(policy.extension_id())) {
+      extension_id_to_policy_value.emplace(
+          policy.extension_id(), base::Value(base::Value::Type::DICT));
+    }
+    extension_id_to_policy_value[policy.extension_id()].GetDict().Set(
+        policy.extension_version(), std::move(policy_value));
+  }
+  for (auto& [extension_id, policy_value] :
+       extension_id_to_policy_value) {
+    map->Set(extension_id, POLICY_LEVEL_MANDATORY, scope, source,
+             std::move(policy_value), /*external_data_fetcher=*/nullptr);
+  }
+}
 
 void DecodeProtoFields(
     const em::CloudPolicySettings& policy,

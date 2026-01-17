@@ -7,7 +7,10 @@ package org.chromium.components.signin.base;
 import android.graphics.Bitmap;
 import android.text.TextUtils;
 
+import com.google.errorprone.annotations.DoNotMock;
+
 import org.jni_zero.CalledByNative;
+import org.jni_zero.JNINamespace;
 import org.jni_zero.JniType;
 
 import org.chromium.build.annotations.NullMarked;
@@ -23,9 +26,11 @@ import java.util.HashMap;
 /**
  * Stores all the information known about an account.
  *
- * This class has a native counterpart called AccountInfo.
+ * <p>This class has a native counterpart called AccountInfo.
  */
 @NullMarked
+@DoNotMock("Use TestAccounts or create a real instance.")
+@JNINamespace("signin")
 public class AccountInfo extends CoreAccountInfo {
     /** Used to instantiate `AccountInfo`. */
     public static class Builder {
@@ -173,11 +178,13 @@ public class AccountInfo extends CoreAccountInfo {
     }
 
     /** Gets the account's image. It can be the image user uploaded, monogram or null. */
+    @CalledByNative
     public @Nullable Bitmap getAccountImage() {
         return mAccountImage;
     }
 
     /** Returns the capability values associated with the account. */
+    @CalledByNative
     public AccountCapabilities getAccountCapabilities() {
         return mAccountCapabilities;
     }

@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "base/containers/to_vector.h"
 #include "base/format_macros.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -20,6 +21,7 @@
 #include "components/autofill/core/browser/autofill_type.h"
 #include "components/autofill/core/browser/country_type.h"
 #include "components/autofill/core/browser/data_model/addresses/autofill_profile_comparator.h"
+#include "components/autofill/core/browser/data_model/addresses/autofill_structured_address_component.h"
 #include "components/autofill/core/browser/data_quality/addresses/profile_token_quality.h"
 #include "components/autofill/core/browser/data_quality/addresses/profile_token_quality_test_api.h"
 #include "components/autofill/core/browser/field_types.h"
@@ -36,6 +38,7 @@
 namespace autofill {
 
 using base::UTF8ToUTF16;
+using testing::IsEmpty;
 using ObservationType = ProfileTokenQuality::ObservationType;
 
 namespace {
@@ -594,59 +597,6 @@ TEST_F(AutofillProfileTest, CreateInferredLabelsFallsBackToFullName) {
   EXPECT_EQ(u"88 Nowhere Ave., Johnny K Doe", labels[1]);
 }
 
-// Test that we use the triggering field to decide whether an additional
-// differentiating label should be added.
-TEST_F(
-    AutofillProfileTest,
-    CreateInferredLabels_TriggeringFieldUsedToDecideWhetherToAddADifferentiatingLabel) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeatureWithParameters(
-      features::kAutofillImprovedLabels,
-      {{features::
-            kAutofillImprovedLabelsParamWithDifferentiatingLabelsInFrontParam
-                .name,
-        "true"}});
-
-  AutofillProfile profile1 = test::GetFullProfile();
-  AutofillProfile profile2 = test::GetFullProfile();
-  profile1.SetRawInfo(EMAIL_ADDRESS, u"hoa@gmail.com");
-  profile2.SetRawInfo(EMAIL_ADDRESS, u"pham@gmail.com");
-
-  // First check that when `triggering_field_type` is not present, a second
-  // differentiating label is added.
-  std::vector<std::u16string> labels = AutofillProfile::CreateInferredLabels(
-      {&profile1, &profile2},
-      /*suggested_fields=*/std::nullopt,
-      /*triggering_field_type=*/std::nullopt,
-      /*excluded_fields=*/{}, /*minimal_fields_shown=*/1, "en-US");
-  ASSERT_EQ(2U, labels.size());
-  EXPECT_EQ(u"John H. Doe, hoa@gmail.com", labels[0]);
-  EXPECT_EQ(u"John H. Doe, pham@gmail.com", labels[1]);
-
-  // If the `triggering_field_type` is present and is unique, there is no need
-  // for a second differentiating label.
-  labels = AutofillProfile::CreateInferredLabels(
-      {&profile1, &profile2},
-      /*suggested_fields=*/std::nullopt,
-      /*triggering_field_type=*/EMAIL_ADDRESS,
-      /*excluded_fields=*/{}, /*minimal_fields_shown=*/1, "en-US",
-      /*use_improved_labels_order=*/true);
-  ASSERT_EQ(2U, labels.size());
-  EXPECT_EQ(u"John H. Doe", labels[0]);
-  EXPECT_EQ(u"John H. Doe", labels[1]);
-
-  // If the `triggering_field_type` is present and is not unique, a second
-  // differentiating label is added.
-  labels = AutofillProfile::CreateInferredLabels(
-      {&profile1, &profile2},
-      /*suggested_fields=*/std::nullopt,
-      /*triggering_field_type=*/NAME_FIRST,
-      /*excluded_fields=*/{}, /*minimal_fields_shown=*/1, "en-US",
-      /*use_improved_labels_order=*/true);
-  ASSERT_EQ(2U, labels.size());
-  EXPECT_EQ(u"hoa@gmail.com, John H. Doe", labels[0]);
-  EXPECT_EQ(u"pham@gmail.com, John H. Doe", labels[1]);
-}
 
 // Test that we do not show duplicate fields in the labels.
 TEST_F(AutofillProfileTest, CreateInferredLabelsNoDuplicatedFields) {
@@ -733,36 +683,6 @@ TEST_F(AutofillProfileTest, CreateInferredLabelsFlattensMultiLineValues) {
   EXPECT_EQ(u"88 Nowhere Ave., Apt. 42", labels[0]);
 }
 
-// Test that `ADDRESS_HOME_LINE2` is used as a differentiating label if
-// necessary.
-TEST_F(AutofillProfileTest, CreateInferredLabelsDifferentiateByAddressLine2) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeatureWithParameters(
-      features::kAutofillImprovedLabels,
-      {{features::
-            kAutofillImprovedLabelsParamWithDifferentiatingLabelsInFrontParam
-                .name,
-        "true"}});
-
-  std::vector<std::unique_ptr<AutofillProfile>> profiles;
-  profiles.push_back(std::make_unique<AutofillProfile>(
-      i18n_model_definition::kLegacyHierarchyCountryCode));
-  test::SetProfileInfo(profiles[0].get(), "John", "", "Doe", "", "",
-                       "88 Nowhere Ave.", "Apt. 42", "", "", "", "", "");
-  profiles.push_back(std::make_unique<AutofillProfile>(
-      i18n_model_definition::kLegacyHierarchyCountryCode));
-  test::SetProfileInfo(profiles[1].get(), "John", "", "Doe", "", "",
-                       "88 Nowhere Ave.", "Apt. 43", "", "", "", "", "");
-
-  std::vector<std::u16string> labels = AutofillProfile::CreateInferredLabels(
-      ToRawPointerVector(profiles), /*suggested_fields=*/std::nullopt,
-      /*triggering_field_type=*/NAME_FULL, {NAME_FULL},
-      /*minimal_fields_shown=*/1, "en-US",
-      /*use_improved_labels_order=*/true);
-  ASSERT_EQ(2U, labels.size());
-  EXPECT_EQ(u"Apt. 42, 88 Nowhere Ave.", labels[0]);
-  EXPECT_EQ(u"Apt. 43, 88 Nowhere Ave.", labels[1]);
-}
 
 TEST_F(AutofillProfileTest, IsSubsetOf) {
   AutofillProfileComparator comparator("en-US");
@@ -900,6 +820,102 @@ TEST_F(AutofillProfileTest, IsSubsetOfForFieldSet_DifferentNonStreetAddresses) {
   EXPECT_FALSE(profile2.IsSubsetOfForFieldSet(
       comparator, profile1,
       {NAME_FULL, ADDRESS_HOME_STREET_ADDRESS, ADDRESS_HOME_CITY}));
+}
+
+TEST_F(AutofillProfileTest, SetInfo_DynamicallyCreatingAlternativeNameTree) {
+  base::test::ScopedFeatureList feature_list{
+      features::kAutofillSupportPhoneticNameForJP};
+  // Initially the profile's country does not support alternative names, so
+  // setting it should do nothing.
+  AutofillProfile profile(i18n_model_definition::kLegacyHierarchyCountryCode);
+  profile.SetInfoWithVerificationStatus(ALTERNATIVE_GIVEN_NAME, u"alt_name",
+                                        "en-US", VerificationStatus::kObserved);
+  ASSERT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), IsEmpty());
+
+  // Changing the profile's country does to one that supports alternative names
+  // should result in the value being stored correctly.
+  profile.SetInfoWithVerificationStatus(ADDRESS_HOME_COUNTRY, u"JP", "en-US",
+                                        VerificationStatus::kObserved);
+  profile.SetInfoWithVerificationStatus(ALTERNATIVE_GIVEN_NAME, u"alt_name",
+                                        "en-US", VerificationStatus::kObserved);
+  EXPECT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), u"alt_name");
+}
+
+TEST_F(AutofillProfileTest, SetInfo_DynamicallyDeletingAlternativeNameTree) {
+  base::test::ScopedFeatureList feature_list{
+      features::kAutofillSupportPhoneticNameForJP};
+  // Initially the profile's country supports alternative names, so setting it
+  // should store the value as usual.
+  AutofillProfile profile(AddressCountryCode("JP"));
+  profile.SetInfoWithVerificationStatus(ALTERNATIVE_GIVEN_NAME, u"alt_name",
+                                        "en-US", VerificationStatus::kObserved);
+  ASSERT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), u"alt_name");
+
+  // Changing the profile's country to one that doesn't support alternative
+  // names should result in the value being wiped and not set in the future.
+  profile.SetInfoWithVerificationStatus(ADDRESS_HOME_COUNTRY, u"XX", "en-US",
+                                        VerificationStatus::kObserved);
+  EXPECT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), IsEmpty());
+  profile.SetInfoWithVerificationStatus(ALTERNATIVE_GIVEN_NAME, u"alt_name",
+                                        "en-US", VerificationStatus::kObserved);
+  EXPECT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), IsEmpty());
+}
+
+TEST_F(AutofillProfileTest,
+       SetInfo_AlternativeNameTreeNotRecratedIfCountryDoesNotChange) {
+  base::test::ScopedFeatureList feature_list{
+      features::kAutofillSupportPhoneticNameForJP};
+  // Initially the profile's country supports alternative names, so setting it
+  // should store the value as usual.
+  AutofillProfile profile(AddressCountryCode("JP"));
+  profile.SetInfoWithVerificationStatus(ALTERNATIVE_GIVEN_NAME, u"alt_name",
+                                        "en-US", VerificationStatus::kObserved);
+  ASSERT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), u"alt_name");
+
+  // Setting the profile's country value to the existing one, shouldn't wipe the
+  // data in the tree.
+  profile.SetInfoWithVerificationStatus(ADDRESS_HOME_COUNTRY, u"Japan", "en-US",
+                                        VerificationStatus::kObserved);
+  EXPECT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), u"alt_name");
+}
+
+TEST_F(AutofillProfileTest, SetRawInfo_DynamicallyCreatingAlternativeNameTree) {
+  base::test::ScopedFeatureList feature_list{
+      features::kAutofillSupportPhoneticNameForJP};
+  // Initially the profile's country does not support alternative names, so
+  // setting it should do nothing.
+  AutofillProfile profile(i18n_model_definition::kLegacyHierarchyCountryCode);
+  profile.SetRawInfoWithVerificationStatus(ALTERNATIVE_GIVEN_NAME, u"alt_name",
+                                           VerificationStatus::kObserved);
+  ASSERT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), IsEmpty());
+
+  // Changing the profile's country does to one that supports alternative names
+  // should result in the value being stored correctly.
+  profile.SetRawInfoWithVerificationStatus(ADDRESS_HOME_COUNTRY, u"JP",
+                                           VerificationStatus::kObserved);
+  profile.SetRawInfoWithVerificationStatus(ALTERNATIVE_GIVEN_NAME, u"alt_name",
+                                           VerificationStatus::kObserved);
+  EXPECT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), u"alt_name");
+}
+
+TEST_F(AutofillProfileTest, SetRawInfo_DynamicallyDeletingAlternativeNameTree) {
+  base::test::ScopedFeatureList feature_list{
+      features::kAutofillSupportPhoneticNameForJP};
+  // Initially the profile's country supports alternative names, so setting it
+  // should store the value as usual.
+  AutofillProfile profile(AddressCountryCode("JP"));
+  profile.SetRawInfoWithVerificationStatus(ALTERNATIVE_GIVEN_NAME, u"alt_name",
+                                           VerificationStatus::kObserved);
+  ASSERT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), u"alt_name");
+
+  // Changing the profile's country to one that doesn't support alternative
+  // names should result in the value being wiped and not set in the future.
+  profile.SetRawInfoWithVerificationStatus(ADDRESS_HOME_COUNTRY, u"XX",
+                                           VerificationStatus::kObserved);
+  EXPECT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), IsEmpty());
+  profile.SetRawInfoWithVerificationStatus(ALTERNATIVE_GIVEN_NAME, u"alt_name",
+                                           VerificationStatus::kObserved);
+  EXPECT_THAT(profile.GetInfo(ALTERNATIVE_GIVEN_NAME, "en-US"), IsEmpty());
 }
 
 TEST_F(AutofillProfileTest,
@@ -1451,12 +1467,10 @@ TEST_F(AutofillProfileTest, Compare_StructuredTypes) {
 
   ASSERT_NE(value1, value2);
   ASSERT_NE(status1, status2);
-  std::vector<AddressCountryCode> country_codes;
-  std::ranges::transform(country_data_map->country_codes(),
-                         back_inserter(country_codes),
-                         [](const std::string& country_code) {
-                           return AddressCountryCode(country_code);
-                         });
+  std::vector<AddressCountryCode> country_codes = base::ToVector(
+      country_data_map->country_codes(), [](const std::string& country_code) {
+        return AddressCountryCode(country_code);
+      });
   // Include the legacy country code as well.
   country_codes.push_back(i18n_model_definition::kLegacyHierarchyCountryCode);
 
@@ -1633,11 +1647,23 @@ TEST_F(AutofillProfileTest, ConvertToAccountProfile) {
   EXPECT_EQ(kAccountProfile.record_type(),
             AutofillProfile::RecordType::kAccount);
   EXPECT_EQ(kAccountProfile.initial_creator_id(),
-            AutofillProfile::kInitialCreatorOrModifierChrome);
-  EXPECT_EQ(kAccountProfile.last_modifier_id(),
-            AutofillProfile::kInitialCreatorOrModifierChrome);
+            AutofillProfile::kInitialCreatorChrome);
   EXPECT_NE(kLocalProfile.guid(), kAccountProfile.guid());
   EXPECT_EQ(kLocalProfile.Compare(kAccountProfile), 0);
+}
+
+TEST_F(AutofillProfileTest, ConvertToLocalOrSyncableProfile) {
+  const AutofillProfile account_name_email_profile =
+      test::AccountNameEmailProfile();
+  ASSERT_EQ(account_name_email_profile.record_type(),
+            AutofillProfile::RecordType::kAccountNameEmail);
+  const AutofillProfile local_or_syncable_profile =
+      account_name_email_profile.ConvertToLocalOrSyncableProfile();
+  EXPECT_EQ(local_or_syncable_profile.record_type(),
+            AutofillProfile::RecordType::kLocalOrSyncable);
+  EXPECT_NE(account_name_email_profile.guid(),
+            local_or_syncable_profile.guid());
+  EXPECT_EQ(account_name_email_profile.Compare(local_or_syncable_profile), 0);
 }
 
 TEST_F(AutofillProfileTest, RemoveInaccessibleProfileValues) {
@@ -1764,63 +1790,6 @@ TEST_F(AutofillProfileTest, EmitsDaysUntilFirstUsageProfile) {
           .size(),
       1UL);
 }
-
-enum Expectation { GREATER, LESS };
-struct ProfileRankingTestCase {
-  const int use_count_a;
-  const base::TimeDelta days_since_last_use_a;
-  const int use_count_b;
-  const base::TimeDelta days_since_last_use_b;
-  const Expectation expectation;
-};
-
-class ProfileRankingTest
-    : public AutofillProfileTest,
-      public testing::WithParamInterface<ProfileRankingTestCase> {
- private:
-  base::test::ScopedFeatureList feature_{
-      features::kAutofillEnableRankingFormulaAddressProfiles};
-};
-
-TEST_P(ProfileRankingTest, HasGreaterRankingThan) {
-  const ProfileRankingTestCase& test_case = GetParam();
-
-  const base::Time now = base::Time::Now();
-  AutofillProfile profile1 = test::GetFullProfile();
-  profile1.usage_history().set_use_count(test_case.use_count_a);
-  profile1.usage_history().set_use_date(now - test_case.days_since_last_use_a);
-
-  AutofillProfile profile2 = test::GetFullProfile();
-  profile2.usage_history().set_use_count(test_case.use_count_b);
-  profile2.usage_history().set_use_date(now - test_case.days_since_last_use_b);
-
-  EXPECT_EQ(test_case.expectation == GREATER,
-            profile1.HasGreaterRankingThan(&profile2, now));
-  EXPECT_NE(test_case.expectation == GREATER,
-            profile2.HasGreaterRankingThan(&profile1, now));
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    AutofillProfileTest,
-    ProfileRankingTest,
-    testing::Values(
-        // Same days since last use, profile1 has a bigger use count.
-        ProfileRankingTestCase{10, base::Days(0), 8, base::Days(0), GREATER},
-        // Same days since last use, profile1 has a smaller use count.
-        ProfileRankingTestCase{8, base::Days(0), 10, base::Days(0), LESS},
-        // Same use count, profile1 has smaller days since last use.
-        ProfileRankingTestCase{8, base::Days(0), 8, base::Days(1), GREATER},
-        // Same use count, profile2 has smaller days since last use.
-        ProfileRankingTestCase{8, base::Days(1), 8, base::Days(0), LESS},
-        // Special case: occasional profiles. A profile with relatively low
-        // usage and used recently (profile2) should not rank higher than a more
-        // used profile that has been unused for a short amount of time
-        // (profile1).
-        ProfileRankingTestCase{300, base::Days(5), 10, base::Days(1), GREATER},
-        // Special case: moving. A new profile used frequently (profile2) should
-        // rank higher than a profile with more usage that has not been used for
-        // a while (profile1).
-        ProfileRankingTestCase{90, base::Days(20), 10, base::Days(5), LESS}));
 
 }  // namespace
 

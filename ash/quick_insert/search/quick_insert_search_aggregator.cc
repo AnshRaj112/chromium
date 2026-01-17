@@ -25,7 +25,6 @@
 #include "base/notreached.h"
 #include "base/substring_set_matcher/matcher_string_pattern.h"
 #include "base/time/time.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "components/url_matcher/url_matcher.h"
 #include "third_party/abseil-cpp/absl/functional/overload.h"
 
@@ -178,7 +177,6 @@ QuickInsertSearchAggregator::QuickInsertSearchAggregator(
   current_callback_ = std::move(callback);
   CHECK(!current_callback_.is_null());
 
-  // TODO: b/324154537 - Show a loading animation while waiting for results.
   burn_in_timer_.Start(FROM_HERE, burn_in_period, this,
                        &QuickInsertSearchAggregator::PublishBurnInResults);
 }
@@ -194,7 +192,7 @@ void QuickInsertSearchAggregator::HandleSearchSourceResults(
   const QuickInsertSectionType section_type =
       SectionTypeFromSearchSource(source);
   UnpublishedResults& accumulated =
-      accumulated_results_[base::to_underlying(section_type)];
+      accumulated_results_[std::to_underlying(section_type)];
   // Suggested results have multiple sources, which we store in any order and
   // explicitly do not append if post-burn-in.
   if (section_type == QuickInsertSectionType::kNone ||
@@ -356,7 +354,7 @@ QuickInsertSearchAggregator::UnpublishedResults*
 QuickInsertSearchAggregator::AccumulatedResultsForSection(
     QuickInsertSectionType type) {
   UnpublishedResults& accumulated =
-      accumulated_results_[base::to_underlying(type)];
+      accumulated_results_[std::to_underlying(type)];
   if (accumulated.results.empty()) {
     return nullptr;
   }

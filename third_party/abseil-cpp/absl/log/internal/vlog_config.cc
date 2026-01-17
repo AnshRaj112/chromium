@@ -45,13 +45,25 @@ ABSL_NAMESPACE_BEGIN
 namespace log_internal {
 
 namespace {
-bool ModuleIsPath(absl::string_view module_pattern) {
+
 #ifdef _WIN32
-  return module_pattern.find_first_of("/\\") != module_pattern.npos;
+constexpr char kPathSeparators[] = "/\\";
 #else
-  return module_pattern.find('/') != module_pattern.npos;
+constexpr char kPathSeparators[] = "/";
 #endif
+
+bool ModuleIsPath(absl::string_view module_pattern) {
+  return module_pattern.find_first_of(kPathSeparators) != module_pattern.npos;
 }
+
+absl::string_view Basename(absl::string_view file) {
+  auto sep = file.find_last_of(kPathSeparators);
+  if (sep != file.npos) {
+    file.remove_prefix(sep + 1);
+  }
+  return file;
+}
+
 }  // namespace
 
 bool VLogSite::SlowIsEnabled(int stale_v, int level) {
@@ -94,12 +106,12 @@ ABSL_CONST_INIT absl::base_internal::SpinLock mutex(
 
 // `GetUpdateSitesMutex()` serializes updates to all of the sites (i.e. those in
 // `site_list_head`) themselves.
-absl::Mutex* GetUpdateSitesMutex() {
+absl::Mutex& GetUpdateSitesMutex() {
   // Chromium requires no global destructors, so we can't use the
   // absl::kConstInit idiom since absl::Mutex as a non-trivial destructor.
   static absl::NoDestructor<absl::Mutex> update_sites_mutex ABSL_ACQUIRED_AFTER(
       mutex);
-  return update_sites_mutex.get();
+  return *update_sites_mutex;
 }
 
 ABSL_CONST_INIT int global_v ABSL_GUARDED_BY(mutex) = 0;
@@ -129,21 +141,9 @@ int VLogLevel(absl::string_view file, const std::vector<VModuleInfo>* infos,
   // parsing flags).  We can't allocate in `VLOG`, so we treat null as empty
   // here and press on.
   if (!infos || infos->empty()) return current_global_v;
-  // Get basename for file
-  absl::string_view basename = file;
-  {
-    const size_t sep = basename.rfind('/');
-    if (sep != basename.npos) {
-      basename.remove_prefix(sep + 1);
-#ifdef _WIN32
-    } else {
-      const size_t sep = basename.rfind('\\');
-      if (sep != basename.npos) basename.remove_prefix(sep + 1);
-#endif
-    }
-  }
 
-  absl::string_view stem = file, stem_basename = basename;
+  absl::string_view stem = file;
+  absl::string_view stem_basename = Basename(stem);
   {
     const size_t sep = stem_basename.find('.');
     if (sep != stem_basename.npos) {
@@ -159,10 +159,10 @@ int VLogLevel(absl::string_view file, const std::vector<VModuleInfo>* infos,
       // If there are any slashes in the pattern, try to match the full
       // name.
       if (FNMatch(info.module_pattern, stem)) {
-        return info.vlog_level == kUseFlag ? current_global_v : info.vlog_level;
+        return info.vlog_level;
       }
     } else if (FNMatch(info.module_pattern, stem_basename)) {
-      return info.vlog_level == kUseFlag ? current_global_v : info.vlog_level;
+      return info.vlog_level;
     }
   }
 
@@ -222,7 +222,7 @@ int PrependVModuleLocked(absl::string_view module_pattern, int log_level)
 }  // namespace
 
 int VLogLevel(absl::string_view file) ABSL_LOCKS_EXCLUDED(mutex) {
-  absl::base_internal::SpinLockHolder l(&mutex);
+  absl::base_internal::SpinLockHolder l(mutex);
   return VLogLevel(file, vmodule_info, global_v);
 }
 

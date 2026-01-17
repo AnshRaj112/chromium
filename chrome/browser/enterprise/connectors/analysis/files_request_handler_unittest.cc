@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-
 #include "chrome/browser/enterprise/connectors/analysis/files_request_handler.h"
 
 #include <map>
@@ -25,7 +24,6 @@
 #include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
 #include "build/build_config.h"
-#include "chrome/browser/enterprise/connectors/analysis/content_analysis_features.h"
 #include "chrome/browser/enterprise/connectors/analysis/content_analysis_info.h"
 #include "chrome/browser/enterprise/connectors/common.h"
 #include "chrome/browser/enterprise/connectors/connectors_service.h"
@@ -33,7 +31,6 @@
 #include "chrome/browser/enterprise/connectors/test/fake_content_analysis_delegate.h"
 #include "chrome/browser/enterprise/connectors/test/fake_files_request_handler.h"
 #include "chrome/browser/policy/dm_token_utils.h"
-#include "chrome/browser/safe_browsing/cloud_content_scanning/binary_upload_service.h"
 #include "chrome/browser/safe_browsing/cloud_content_scanning/deep_scanning_utils.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/testing_browser_process.h"
@@ -41,6 +38,7 @@
 #include "chrome/test/base/testing_profile_manager.h"
 #include "components/enterprise/buildflags/buildflags.h"
 #include "components/enterprise/common/proto/connectors.pb.h"
+#include "components/enterprise/connectors/core/cloud_content_scanning/binary_upload_service.h"
 #include "components/file_access/test/mock_scoped_file_access_delegate.h"
 #include "components/prefs/testing_pref_service.h"
 #include "components/safe_browsing/core/common/features.h"
@@ -173,7 +171,7 @@ class TestContentAnalysisInfo : public ContentAnalysisInfo {
 
   signin::IdentityManager* identity_manager() const override { return nullptr; }
 
-  // These methods correspond to fields in `BinaryUploadService::Request`.
+  // These methods correspond to fields in `BinaryUploadRequest`.
   int user_action_requests_count() const override {
     return user_action_requests_count_;
   }
@@ -184,7 +182,7 @@ class TestContentAnalysisInfo : public ContentAnalysisInfo {
 
   std::string email() const override { return "test@user.com"; }
 
-  std::string url() const override { return kTestUrl; }
+  const GURL& url() const override { return tab_url(); }
 
   const GURL& tab_url() const override {
     static GURL url(kTestUrl);
@@ -205,6 +203,8 @@ class TestContentAnalysisInfo : public ContentAnalysisInfo {
       const override {
     return {};
   }
+
+  content::WebContents* web_contents() const override { return nullptr; }
 
  private:
   const raw_ref<const enterprise_connectors::AnalysisSettings> settings_;
@@ -243,6 +243,9 @@ void PrintTo(const RequestHandlerResult& request_handler_result,
       break;
     case FinalContentAnalysisResult::SUCCESS:
       *os << "SUCCESS";
+      break;
+    case FinalContentAnalysisResult::FORCE_SAVE_TO_CLOUD:
+      *os << "FORCE_SAVE_TO_CLOUD";
       break;
   }
   *os << "), tag: \"" << request_handler_result.tag << "\")";
@@ -362,9 +365,9 @@ class FilesRequestHandlerTest : public BaseTest {
 
   void FakeFileUploadCallback(
       bool is_cloud_analysis,
-      safe_browsing::BinaryUploadService::Result result,
+      ScanRequestUploadResult result,
       const base::FilePath& path,
-      std::unique_ptr<safe_browsing::BinaryUploadService::Request> request,
+      std::unique_ptr<BinaryUploadRequest> request,
       test::FakeFilesRequestHandler::FakeFileRequestCallback callback) {
     EXPECT_FALSE(path.empty());
     if (is_cloud_analysis) {
@@ -639,8 +642,7 @@ TEST_F(FilesRequestHandlerTest, FileIsLarge) {
   base::ScopedTempDir temp_dir;
   ASSERT_TRUE(temp_dir.CreateUniqueTempDir());
   base::FilePath file_path = temp_dir.GetPath().AppendASCII("large.doc");
-  std::string contents(
-      safe_browsing::BinaryUploadService::kMaxUploadSizeBytes + 1, 'a');
+  std::string contents(BinaryUploadService::kMaxUploadSizeBytes + 1, 'a');
   base::WriteFile(file_path, contents);
   paths.emplace_back(file_path);
   SetExpectedUserActionRequestsCount(1);
@@ -669,8 +671,7 @@ TEST_F(FilesRequestHandlerTest, FileIsLarge_LocalAnalysis) {
   base::ScopedTempDir temp_dir;
   ASSERT_TRUE(temp_dir.CreateUniqueTempDir());
   base::FilePath file_path = temp_dir.GetPath().AppendASCII("large.doc");
-  std::string contents(
-      safe_browsing::BinaryUploadService::kMaxUploadSizeBytes + 1, 'a');
+  std::string contents(BinaryUploadService::kMaxUploadSizeBytes + 1, 'a');
   base::WriteFile(file_path, contents);
   paths.emplace_back(file_path);
   SetExpectedUserActionRequestsCount(1);
@@ -707,8 +708,7 @@ TEST_F(FilesRequestHandlerTest, FileIsLarge_PolicyAllows) {
   base::ScopedTempDir temp_dir;
   ASSERT_TRUE(temp_dir.CreateUniqueTempDir());
   base::FilePath file_path = temp_dir.GetPath().AppendASCII("large.doc");
-  std::string contents(
-      safe_browsing::BinaryUploadService::kMaxUploadSizeBytes + 1, 'a');
+  std::string contents(BinaryUploadService::kMaxUploadSizeBytes + 1, 'a');
   base::WriteFile(file_path, contents);
   paths.emplace_back(file_path);
   SetExpectedUserActionRequestsCount(1);

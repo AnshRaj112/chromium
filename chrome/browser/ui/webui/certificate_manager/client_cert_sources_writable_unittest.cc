@@ -23,7 +23,6 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
-#include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/test/base/testing_profile_manager.h"
@@ -86,7 +85,7 @@ bool SlotContainsCertWithHash(PK11SlotInfo* slot, std::string_view hash_hex) {
 }
 
 std::string HexHash(base::span<const uint8_t> data) {
-  return base::ToLowerASCII(base::HexEncode(crypto::SHA256Hash(data)));
+  return base::HexEncodeLower(crypto::SHA256Hash(data));
 }
 
 class FakeCertificateManagerPage

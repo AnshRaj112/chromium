@@ -8,6 +8,11 @@
 //    clang-format -i -style=chromium filename
 // DO NOT EDIT!
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include <string.h>
 
 #include "base/notreached.h"
@@ -4776,10 +4781,9 @@ MockGLInterface::GetGLProcAddress(const char* name) {
     return reinterpret_cast<GLFunctionPointerType>(Mock_glBlitFramebufferANGLE);
   if (strcmp(name, "glBlitFramebufferNV") == 0)
     return reinterpret_cast<GLFunctionPointerType>(Mock_glBlitFramebufferNV);
-  if (strcmp(name, "glBlobCacheCallbacksANGLE") == 0) {
+  if (strcmp(name, "glBlobCacheCallbacksANGLE") == 0)
     return reinterpret_cast<GLFunctionPointerType>(
         Mock_glBlobCacheCallbacksANGLE);
-  }
   if (strcmp(name, "glBufferData") == 0)
     return reinterpret_cast<GLFunctionPointerType>(Mock_glBufferData);
   if (strcmp(name, "glBufferSubData") == 0)

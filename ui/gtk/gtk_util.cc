@@ -16,18 +16,18 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_tokenizer.h"
 #include "base/strings/string_util.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/aura/window_tree_host.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/gfx/color_palette.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/size.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/gtk/gtk_compat.h"
 #include "ui/gtk/gtk_types.h"
 #include "ui/gtk/gtk_ui.h"
 #include "ui/gtk/gtk_ui_platform.h"
 #include "ui/linux/linux_ui.h"
-#include "ui/native_theme/common_theme.h"
 #include "ui/ozone/public/ozone_platform.h"
 #include "ui/views/widget/desktop_aura/desktop_window_tree_host_linux.h"
 
@@ -202,14 +202,16 @@ bool GtkInitFromCommandLine(int* argc, char** argv) {
   return GtkInitCheck(argc, argv);
 }
 
-void SetGtkTransientForAura(GtkWidget* dialog, aura::Window* parent) {
+void SetGtkTransientForAura(GtkWidget* dialog,
+                            aura::Window* parent,
+                            GtkUiPlatform* platform) {
   if (!parent || !parent->GetHost()) {
     return;
   }
 
   gtk_widget_realize(dialog);
   gfx::AcceleratedWidget parent_id = parent->GetHost()->GetAcceleratedWidget();
-  GtkUi::GetPlatform()->SetGtkWidgetTransientFor(dialog, parent_id);
+  platform->SetGtkWidgetTransientFor(dialog, parent_id);
 
   // We also set the |parent| as a property of |dialog|, so that we can unlink
   // the two later.
@@ -221,7 +223,10 @@ aura::Window* GetAuraTransientParent(GtkWidget* dialog) {
       g_object_get_data(G_OBJECT(dialog), kAuraTransientParent));
 }
 
-void ClearAuraTransientParent(GtkWidget* dialog, aura::Window* parent) {
+void ClearAuraTransientParent(GtkWidget* dialog,
+                              aura::Window* parent,
+                              GtkUiPlatform* platform) {
+  CHECK(dialog);
   g_object_set_data(G_OBJECT(dialog), kAuraTransientParent, nullptr);
 
   if (!parent || !parent->GetHost()) {
@@ -229,7 +234,7 @@ void ClearAuraTransientParent(GtkWidget* dialog, aura::Window* parent) {
   }
 
   gfx::AcceleratedWidget parent_id = parent->GetHost()->GetAcceleratedWidget();
-  GtkUi::GetPlatform()->ClearTransientFor(parent_id);
+  platform->ClearTransientFor(parent_id);
 }
 
 base::OnceClosure DisableHostInputHandling(GtkWidget* dialog,
@@ -287,6 +292,15 @@ CairoSurface::CairoSurface(SkBitmap& bitmap)
           bitmap.width(),
           bitmap.height(),
           cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, bitmap.width()))),
+      cairo_(cairo_create(surface_)) {}
+
+CairoSurface::CairoSurface(void* pixels, int width, int height)
+    : surface_(cairo_image_surface_create_for_data(
+          static_cast<unsigned char*>(pixels),
+          CAIRO_FORMAT_ARGB32,
+          width,
+          height,
+          cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, width))),
       cairo_(cairo_create(surface_)) {}
 
 CairoSurface::CairoSurface(const gfx::Size& size)

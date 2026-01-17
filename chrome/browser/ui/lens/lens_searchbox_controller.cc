@@ -4,9 +4,6 @@
 
 #include "chrome/browser/ui/lens/lens_searchbox_controller.h"
 
-#include "base/functional/bind.h"
-#include "base/task/task_traits.h"
-#include "base/task/thread_pool.h"
 #include "chrome/browser/lens/core/mojom/lens_ghost_loader.mojom.h"
 #include "chrome/browser/ui/lens/lens_overlay_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_side_panel_coordinator.h"
@@ -14,40 +11,19 @@
 #include "chrome/browser/ui/lens/lens_search_contextualization_controller.h"
 #include "chrome/browser/ui/lens/lens_search_controller.h"
 #include "chrome/browser/ui/lens/lens_session_metrics_logger.h"
-#include "chrome/browser/ui/webui/util/image_util.h"
 #include "components/lens/lens_features.h"
+#include "components/lens/lens_url_utils.h"
 #include "components/lens/proto/server/lens_overlay_response.pb.h"
 #include "components/omnibox/browser/lens_suggest_inputs_utils.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/sessions/core/session_id.h"
-#include "net/base/url_util.h"
-#include "skia/ext/codec_utils.h"
 #include "third_party/metrics_proto/omnibox_event.pb.h"
-#include "ui/gfx/image/image_skia_operations.h"
 #include "url/gurl.h"
 
-namespace {
-// The size of the thumbnail to send to the searchbox.
-inline constexpr float kMaxThumbnailWidth = 100.0f;
-inline constexpr float kMaxThumbnailHeight = 100.0f;
-
-std::string ScaleBitmapAndEncodeToDataUri(SkBitmap bitmap) {
-  float scale = std::min(kMaxThumbnailWidth / bitmap.width(),
-                         kMaxThumbnailHeight / bitmap.height());
-  int target_height = static_cast<int>(bitmap.height() * scale);
-  int target_width = static_cast<int>(bitmap.width() * scale);
-
-  SkBitmap scaled_bitmap = skia::ImageOperations::Resize(
-      bitmap, skia::ImageOperations::RESIZE_BEST, target_width, target_height);
-  if (scaled_bitmap.drawsNothing()) {
-    return std::string();
-  }
-
-  return skia::EncodePngAsDataUri(scaled_bitmap.pixmap());
-}
-}  // namespace
-
 namespace lens {
+
+LensSearchboxController::LensSearchboxInitializationData::
+    LensSearchboxInitializationData() = default;
 
 LensSearchboxController::LensSearchboxController(
     LensSearchController* lens_search_controller)
@@ -58,6 +34,13 @@ void LensSearchboxController::BindOverlayGhostLoader(
     mojo::PendingRemote<lens::mojom::LensGhostLoaderPage> page) {
   overlay_ghost_loader_page_.reset();
   overlay_ghost_loader_page_.Bind(std::move(page));
+
+  // If the page is not context eligible, show the error state once the ghost
+  // loader is bound.
+  if (!lens_search_controller_->lens_search_contextualization_controller()
+           ->GetCurrentPageContextEligibility()) {
+    ShowGhostLoaderErrorState();
+  }
 }
 
 void LensSearchboxController::BindSidePanelGhostLoader(
@@ -66,9 +49,10 @@ void LensSearchboxController::BindSidePanelGhostLoader(
   side_panel_ghost_loader_page_.Bind(std::move(page));
 }
 
-void LensSearchboxController::OnSessionStart() {
+void LensSearchboxController::OnSessionStart(bool suppress_contextualization) {
   // Initialize any data needed for the searchbox.
   init_data_ = std::make_unique<LensSearchboxInitializationData>();
+  init_data_->suppress_contextualization = suppress_contextualization;
 }
 
 void LensSearchboxController::SetSidePanelSearchboxHandler(
@@ -115,7 +99,8 @@ void LensSearchboxController::SetSearchboxThumbnail(
   if (side_panel_searchbox_handler_ &&
       side_panel_searchbox_handler_->IsRemoteBound()) {
     side_panel_searchbox_handler_->SetThumbnail(
-        thumbnail_uri, /*is_deletable=*/!IsContextualSearchbox());
+        init_data_->show_side_panel_thumbnail ? thumbnail_uri : "",
+        /*is_deletable=*/!IsContextualSearchbox());
   }
 
   if (overlay_searchbox_handler_ &&
@@ -125,60 +110,18 @@ void LensSearchboxController::SetSearchboxThumbnail(
   }
 }
 
-void LensSearchboxController::HandleThumbnailCreatedBitmap(
-    const SkBitmap& thumbnail) {
-  if (!lens::features::GetVisualSelectionUpdatesEnableCsbThumbnail() ||
-      thumbnail.drawsNothing()) {
-    return;
-  }
-
-  // SkBitmap is ref-counted, so a copy is cheap and safe for task posting.
-  SkBitmap thumbnail_copy = thumbnail;
-
-  // Downscale the bitmap to a size that is appropriate for the searchbox.
-  // Keeping it full resolution will cause stuttering when the UI opens. Push
-  // off the main thread to avoid blocking the overlay initialization.
-  base::ThreadPool::PostTaskAndReplyWithResult(
-      FROM_HERE, {base::TaskPriority::USER_VISIBLE},
-      base::BindOnce(&ScaleBitmapAndEncodeToDataUri, std::move(thumbnail_copy)),
-      base::BindOnce(&LensSearchboxController::OnThumbnailProcessed,
-                     weak_factory_.GetWeakPtr()));
-}
-
-void LensSearchboxController::HandleThumbnailCreated(
-    const std::string& thumbnail_bytes) {
-  init_data_->thumbnail_uri =
-      webui::MakeDataURIForImage(base::as_byte_span(thumbnail_bytes), "jpeg");
-  SetSearchboxThumbnail(init_data_->thumbnail_uri);
-}
-
-void LensSearchboxController::HandleSuggestInputsResponse(
-    lens::proto::LensOverlaySuggestInputs suggest_inputs) {
+void LensSearchboxController::SetShowSidePanelSearchboxThumbnail(bool shown) {
   if (!init_data_) {
-    DCHECK(init_data_)
-        << "The initialization data should be set on searchbox startup, which "
-           "should have happened before any suggest inputs were received.";
     return;
   }
 
-  // If the handshake was already complete, without the new suggest inputs,
-  // exit early so that LensOverlayController::OnHandshakeComplete() isn't
-  // called multiple times.
-  if (lens_search_controller_->IsHandshakeComplete()) {
-    init_data_->suggest_inputs_ = suggest_inputs;
-    return;
-  }
+  init_data_->show_side_panel_thumbnail = shown;
 
-  // Check if the handshake with the server has been completed with the new
-  // inputs. If so, this is the first time the suggest inputs satisfy the
-  // handshake criteria, so notify the overlay that the handshake is complete.
-  init_data_->suggest_inputs_ = suggest_inputs;
-  if (lens_search_controller_->IsHandshakeComplete()) {
-    // Notify the overlay that it is now safe to query autocomplete.
-    lens_search_controller_->lens_overlay_controller()->OnHandshakeComplete();
-
-    // Send the suggest inputs to any pending callbacks.
-    pending_suggest_inputs_callbacks_.Notify(GetLensSuggestInputs());
+  if (side_panel_searchbox_handler_ &&
+      side_panel_searchbox_handler_->IsRemoteBound()) {
+    side_panel_searchbox_handler_->SetThumbnail(
+        shown ? init_data_->thumbnail_uri : "",
+        /*is_deletable=*/!IsContextualSearchbox());
   }
 }
 
@@ -220,10 +163,16 @@ LensSearchboxController::GetLensSuggestInputsWhenReady(
 
   // If the handshake is complete, return the Lens suggest inputs immediately.
   if (lens_search_controller_->IsHandshakeComplete()) {
-    std::move(callback).Run(init_data_->suggest_inputs_);
+    std::move(callback).Run(GetLensSuggestInputs());
     return {};
   }
   return pending_suggest_inputs_callbacks_.Add(std::move(callback));
+}
+
+void LensSearchboxController::NotifySuggestInputsReady(
+    lens::proto::LensOverlaySuggestInputs suggest_inputs) {
+  // Send the suggest inputs to any pending callbacks.
+  pending_suggest_inputs_callbacks_.Notify(suggest_inputs);
 }
 
 const GURL& LensSearchboxController::GetPageURL() const {
@@ -245,11 +194,16 @@ LensSearchboxController::GetPageClassification() const {
   // visual search path.
   const LensOverlayController::State state =
       lens_search_controller_->lens_overlay_controller()->state();
-  if (state == LensOverlayController::State::kLivePageAndResults ||
-      state == LensOverlayController::State::kOverlay ||
+  bool state_supports_contextualization =
+      state == LensOverlayController::State::kHidden ||
+      (state == LensOverlayController::State::kOverlay &&
+       !lens_search_controller_->lens_overlay_side_panel_coordinator()
+            ->IsEntryShowing()) ||
       (state == LensOverlayController::State::kOff &&
        lens_search_controller_->lens_search_contextualization_controller()
-           ->IsActive())) {
+           ->IsActive());
+  if (state_supports_contextualization &&
+      !init_data_->suppress_contextualization) {
     return metrics::OmniboxEventProto::CONTEXTUAL_SEARCHBOX;
   }
   return init_data_->thumbnail_uri.empty()
@@ -261,11 +215,14 @@ std::string& LensSearchboxController::GetThumbnail() {
   return init_data_->thumbnail_uri;
 }
 
-const lens::proto::LensOverlaySuggestInputs&
+lens::proto::LensOverlaySuggestInputs
 LensSearchboxController::GetLensSuggestInputs() const {
-  return init_data_
-             ? init_data_->suggest_inputs_
-             : lens::proto::LensOverlaySuggestInputs().default_instance();
+  auto* query_router = lens_search_controller_->query_router();
+  if (!query_router) {
+    return lens::proto::LensOverlaySuggestInputs();
+  }
+  auto suggest_inputs = query_router->GetSuggestInputs();
+  return suggest_inputs.value_or(lens::proto::LensOverlaySuggestInputs());
 }
 
 void LensSearchboxController::OnTextModified() {
@@ -289,7 +246,7 @@ void LensSearchboxController::OnSuggestionAccepted(
   // this class.
   lens_search_controller_->lens_overlay_controller()->IssueSearchBoxRequest(
       query_start_time, query_text, match_type, is_zero_prefix_suggestion,
-      additional_query_parameters);
+      additional_query_parameters, std::nullopt);
 }
 
 void LensSearchboxController::OnFocusChanged(bool focused) {
@@ -337,15 +294,6 @@ void LensSearchboxController::OnZeroSuggestShown() {
 void LensSearchboxController::AddSearchboxStateToSearchQuery(
     lens::SearchQuery& search_query) {
   search_query.selected_region_thumbnail_uri_ = init_data_->thumbnail_uri;
-}
-
-void LensSearchboxController::OnThumbnailProcessed(
-    const std::string& thumbnail_uri) {
-  if (!init_data_) {
-    return;
-  }
-  init_data_->thumbnail_uri = thumbnail_uri;
-  SetSearchboxThumbnail(init_data_->thumbnail_uri);
 }
 
 content::WebContents* LensSearchboxController::GetTabWebContents() const {

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/compiler_specific.h"
+#include "base/containers/to_vector.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/run_loop.h"
@@ -70,7 +71,7 @@ class FlossAdminClientTest : public testing::Test,
   void SetUp() override {
     ::dbus::Bus::Options options;
     options.bus_type = ::dbus::Bus::BusType::SYSTEM;
-    bus_ = base::MakeRefCounted<::dbus::MockBus>(options);
+    bus_ = base::MakeRefCounted<::dbus::MockBus>(std::move(options));
     client_ = FlossAdminClient::Create();
     client_->AddObserver(this);
 
@@ -132,10 +133,10 @@ class FlossAdminClientTest : public testing::Test,
 
     // Expected call to RegisterAdminCallback when client is initialized
     EXPECT_CALL(*object_proxy_.get(),
-                DoCallMethodWithErrorResponse(
+                CallMethodWithErrorResponse(
                     HasMemberOf(admin::kRegisterCallback), _, _))
         .WillOnce([this](::dbus::MethodCall* method_call, int timeout_ms,
-                         ::dbus::ObjectProxy::ResponseOrErrorCallback* cb) {
+                         ::dbus::ObjectProxy::ResponseOrErrorCallback cb) {
           dbus::MessageReader msg(method_call);
           // D-Bus method call should have 1 parameter.
           dbus::ObjectPath param1;
@@ -146,7 +147,7 @@ class FlossAdminClientTest : public testing::Test,
           auto response = ::dbus::Response::CreateEmpty();
           dbus::MessageWriter writer(response.get());
           writer.AppendUint32(kTestCallbackId);
-          std::move(*cb).Run(response.get(), /*err=*/nullptr);
+          std::move(cb).Run(response.get(), /*err=*/nullptr);
         });
     ASSERT_FALSE(IsClientRegistered());
     client_->Init(bus_.get(), kAdapterInterface, adapter_index_,
@@ -159,10 +160,10 @@ class FlossAdminClientTest : public testing::Test,
 
     // Expected call to UnregisterAdminCallback when client is destroyed
     EXPECT_CALL(*object_proxy_.get(),
-                DoCallMethodWithErrorResponse(
+                CallMethodWithErrorResponse(
                     HasMemberOf(admin::kUnregisterCallback), _, _))
         .WillOnce([](::dbus::MethodCall* method_call, int timeout_ms,
-                     ::dbus::ObjectProxy::ResponseOrErrorCallback* cb) {
+                     ::dbus::ObjectProxy::ResponseOrErrorCallback cb) {
           dbus::MessageReader msg(method_call);
           // D-Bus method call should have 1 parameter.
           uint32_t param1;
@@ -175,23 +176,20 @@ class FlossAdminClientTest : public testing::Test,
   void TestSetServiceAllowlist() {
     // Expected call to SetAllowedServices
     EXPECT_CALL(*object_proxy_.get(),
-                DoCallMethodWithErrorResponse(
+                CallMethodWithErrorResponse(
                     HasMemberOf(admin::kSetAllowedServices), _, _))
         .WillOnce([](::dbus::MethodCall* method_call, int timeout_ms,
-                     ::dbus::ObjectProxy::ResponseOrErrorCallback* cb) {
+                     ::dbus::ObjectProxy::ResponseOrErrorCallback cb) {
           dbus::MessageReader reader(method_call);
           dbus::MessageReader array_reader(nullptr);
-          const uint8_t* buf;
-          size_t sz;
+          base::span<const uint8_t> buf;
 
           EXPECT_TRUE(reader.PopArray(&array_reader));
 
-          for (auto* uuid_in_bytes : kTestUuidInBytes) {
-            EXPECT_TRUE(array_reader.PopArrayOfBytes(&buf, &sz));
-            EXPECT_EQ(sz, kUUIDSize);
-            UNSAFE_TODO(EXPECT_EQ(
-                std::vector<uint8_t>(uuid_in_bytes, uuid_in_bytes + sz),
-                std::vector<uint8_t>(buf, buf + sz)));
+          for (const auto& uuid_in_bytes : kTestUuidInBytes) {
+            EXPECT_TRUE(array_reader.PopArrayOfBytes(&buf));
+            EXPECT_EQ(buf.size(), kUUIDSize);
+            EXPECT_EQ(buf, uuid_in_bytes);
           }
           EXPECT_FALSE(reader.HasMoreData());
           EXPECT_FALSE(array_reader.HasMoreData());
@@ -200,7 +198,7 @@ class FlossAdminClientTest : public testing::Test,
           auto response = ::dbus::Response::CreateEmpty();
           dbus::MessageWriter writer(response.get());
           writer.AppendUint32(kTestCallbackId);
-          std::move(*cb).Run(response.get(), /*err=*/nullptr);
+          std::move(cb).Run(response.get(), /*err=*/nullptr);
         });
 
     client_->SetAllowedServices(
@@ -210,10 +208,10 @@ class FlossAdminClientTest : public testing::Test,
   void TestSetSimpleSecurePairingEnabled() {
     // Expected call to SetSimpleSecurePairingEnabled
     EXPECT_CALL(*object_proxy_.get(),
-                DoCallMethodWithErrorResponse(
+                CallMethodWithErrorResponse(
                     HasMemberOf(admin::kSetSimpleSecurePairingEnabled), _, _))
         .WillOnce([](::dbus::MethodCall* method_call, int timeout_ms,
-                     ::dbus::ObjectProxy::ResponseOrErrorCallback* cb) {
+                     ::dbus::ObjectProxy::ResponseOrErrorCallback cb) {
           dbus::MessageReader reader(method_call);
           bool enable;
 
@@ -224,7 +222,7 @@ class FlossAdminClientTest : public testing::Test,
           auto response = ::dbus::Response::CreateEmpty();
           dbus::MessageWriter writer(response.get());
           writer.AppendUint32(kTestCallbackId);
-          std::move(*cb).Run(response.get(), /*err=*/nullptr);
+          std::move(cb).Run(response.get(), /*err=*/nullptr);
         });
 
     client_->SetSimpleSecurePairingEnabled(

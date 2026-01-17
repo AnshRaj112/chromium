@@ -33,7 +33,6 @@ class MockIdentityRequestDialogController
                const std::vector<IdentityProviderDataPtr>&,
                const std::vector<IdentityRequestAccountPtr>&,
                blink::mojom::RpMode,
-               const std::vector<IdentityRequestAccountPtr>&,
                AccountSelectionCallback,
                LoginToIdPCallback,
                DismissCallback,
@@ -83,6 +82,7 @@ class MockIdentityRequestDialogController
               (const GURL&, blink::mojom::RpMode rp_mode, DismissCallback),
               (override));
   MOCK_METHOD(void, CloseModalDialog, (), (override));
+  MOCK_METHOD(void, OnFlowCompleted, (bool success), (override));
   MOCK_METHOD(void, NotifyAutofillSourceReadyForTesting, (), (override));
 
   // Request the IdP Registration permission.
@@ -90,6 +90,7 @@ class MockIdentityRequestDialogController
               RequestIdPRegistrationPermision,
               (const url::Origin&, base::OnceCallback<void(bool accepted)>),
               (override));
+  MOCK_METHOD(bool, DidShowUi, (), (const override));
 };
 
 }  // namespace content

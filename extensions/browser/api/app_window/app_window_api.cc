@@ -4,6 +4,7 @@
 
 #include "extensions/browser/api/app_window/app_window_api.h"
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
@@ -241,7 +242,7 @@ ExtensionFunction::ResponseAction AppWindowCreateFunction::Run() {
     if (!GetFrameOptions(*options, &create_params, &error))
       return RespondNow(Error(std::move(error)));
 
-    if (extension()->GetType() == Manifest::TYPE_EXTENSION) {
+    if (extension()->GetType() == Manifest::Type::kExtension) {
       // Allowlisted IME extensions are allowed to use this API to create IME
       // specific windows to show accented characters or suggestions.
       if (!extension()->permissions_data()->HasAPIPermission(
@@ -286,7 +287,8 @@ ExtensionFunction::ResponseAction AppWindowCreateFunction::Run() {
           "F16F23C83C5F6DAD9B65A120448B34056DD80691",
           "0F585FB1D0FDFBEBCE1FEB5E9DFFB6DA476B8C9B"};
       if (AppWindowClient::Get()->IsCurrentChannelOlderThanDev() &&
-          !base::Contains(kAllowlist, extension()->hashed_id().value())) {
+          !std::ranges::contains(kAllowlist,
+                                 extension()->hashed_id().value())) {
         return RespondNow(
             Error(app_window_constants::kAlphaEnabledWrongChannel));
       }

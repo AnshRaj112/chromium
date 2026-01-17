@@ -9,6 +9,7 @@ import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static org.chromium.build.NullUtil.assumeNonNull;
 
 import android.app.Activity;
+import android.content.res.TypedArray;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,14 +22,17 @@ import androidx.annotation.LayoutRes;
 import androidx.annotation.StyleRes;
 import androidx.appcompat.widget.Toolbar;
 
-import org.chromium.base.BuildInfo;
+import org.chromium.base.DeviceInfo;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.components.browser_ui.edge_to_edge.layout.EdgeToEdgeLayoutCoordinator;
-import org.chromium.components.browser_ui.styles.SemanticColorUtils;
 import org.chromium.components.browser_ui.util.AutomotiveUtils;
 import org.chromium.ui.base.ImmutableWeakReference;
+import org.chromium.ui.edge_to_edge.WindowSystemBarColorHelper;
+import org.chromium.ui.edge_to_edge.layout.EdgeToEdgeLayoutCoordinator;
 import org.chromium.ui.insets.InsetObserver;
+import org.chromium.ui.insets.InsetObserver.WindowInsetsConsumer;
+import org.chromium.ui.insets.InsetObserver.WindowInsetsConsumer.InsetConsumerSource;
+import org.chromium.ui.util.AttrUtils;
 
 /**
  * Dialog class in Chrome
@@ -43,7 +47,9 @@ public class ChromeDialog extends ComponentDialog {
     private final Activity mActivity;
     @Nullable private InsetObserver mInsetObserver;
     @Nullable private EdgeToEdgeLayoutCoordinator mEdgeToEdgeLayoutCoordinator;
+    @Nullable private WindowInsetsConsumer mWindowInsetsConsumer;
     private final boolean mShouldPadForWindowInsets;
+    private final WindowSystemBarColorHelper mWindowColorHelper;
 
     /**
      * Constructs the dialog class in Chrome.
@@ -57,13 +63,13 @@ public class ChromeDialog extends ComponentDialog {
             Activity activity, @StyleRes int themeResId, boolean shouldPadForWindowInsets) {
         super(activity, themeResId);
         mActivity = activity;
-        if (themeResId == R.style.ThemeOverlay_BrowserUI_Fullscreen) {
-            mIsFullScreen = true;
-        } else {
-            mIsFullScreen = false;
-        }
+
+        TypedArray a = getContext().obtainStyledAttributes(themeResId, R.styleable.ChromeDialog);
+        mIsFullScreen = a.getBoolean(R.styleable.ChromeDialog_isDialogFullscreen, false);
+        a.recycle();
+
         mShouldPadForWindowInsets = shouldPadForWindowInsets;
-        if (mShouldPadForWindowInsets && getWindow() != null) {
+        if (getWindow() != null) {
             mInsetObserver =
                     new InsetObserver(
                             new ImmutableWeakReference<>(getWindow().getDecorView().getRootView()),
@@ -77,11 +83,30 @@ public class ChromeDialog extends ComponentDialog {
         // InsetObserver is reliably being created.
         // TODO(crbug.com/402995103): Clean up getWindow() null check assert.
         assert getWindow() != null : "Checking if there are cases when getWindow() is null";
+        mWindowColorHelper = new WindowSystemBarColorHelper(getWindow());
+    }
+
+    /**
+     * Registers a window insets consumer with a specified priority.
+     *
+     * <p>Consumers are notified in the order of their pre-defined priority value as defined in
+     * {@link InsetConsumerSource}. A lower-indexed source allows this consumer to process insets
+     * <b>before</b> components with higher-indexed sources.
+     *
+     * @param insetConsumer The consumer to receive window insets.
+     * @param source The priority source from {@link InsetConsumerSource}.
+     */
+    public void addInsetsConsumer(
+            WindowInsetsConsumer insetConsumer, @InsetConsumerSource int source) {
+        if (mInsetObserver == null) return;
+
+        mWindowInsetsConsumer = insetConsumer;
+        mInsetObserver.addInsetsConsumer(insetConsumer, source);
     }
 
     @Override
     public void setContentView(@LayoutRes int layoutResID) {
-        if (BuildInfo.getInstance().isAutomotive && mIsFullScreen) {
+        if (DeviceInfo.isAutomotive() && mIsFullScreen) {
             super.setContentView(
                     AutomotiveUtils.getAutomotiveLayoutWithBackButtonToolbar(mActivity));
             setAutomotiveToolbarBackButtonAction();
@@ -100,7 +125,7 @@ public class ChromeDialog extends ComponentDialog {
 
     @Override
     public void setContentView(View view) {
-        if (BuildInfo.getInstance().isAutomotive && mIsFullScreen) {
+        if (DeviceInfo.isAutomotive() && mIsFullScreen) {
             super.setContentView(
                     AutomotiveUtils.getAutomotiveLayoutWithBackButtonToolbar(mActivity));
             setAutomotiveToolbarBackButtonAction();
@@ -115,7 +140,7 @@ public class ChromeDialog extends ComponentDialog {
 
     @Override
     public void setContentView(View view, ViewGroup.@Nullable LayoutParams params) {
-        if (BuildInfo.getInstance().isAutomotive && mIsFullScreen) {
+        if (DeviceInfo.isAutomotive() && mIsFullScreen) {
             super.setContentView(
                     AutomotiveUtils.getAutomotiveLayoutWithBackButtonToolbar(mActivity));
             setAutomotiveToolbarBackButtonAction();
@@ -130,7 +155,7 @@ public class ChromeDialog extends ComponentDialog {
 
     @Override
     public void addContentView(View view, ViewGroup.@Nullable LayoutParams params) {
-        if (BuildInfo.getInstance().isAutomotive
+        if (DeviceInfo.isAutomotive()
                 && mIsFullScreen
                 && assumeNonNull(params).width == MATCH_PARENT
                 && params.height == MATCH_PARENT) {
@@ -154,6 +179,20 @@ public class ChromeDialog extends ComponentDialog {
         }
     }
 
+    /**
+     * Set the navigation bar color. This is useful when the view attaching to the nav bar is
+     * different than the dialog's background.
+     *
+     * @param color Nav bar color for the current dialog.
+     */
+    public void setNavBarColor(int color) {
+        if (mEdgeToEdgeLayoutCoordinator != null) {
+            mEdgeToEdgeLayoutCoordinator.setNavigationBarColor(color);
+        } else {
+            mWindowColorHelper.setNavigationBarColor(color);
+        }
+    }
+
     private void setAutomotiveToolbarBackButtonAction() {
         Toolbar backButtonToolbarForAutomotive = findViewById(R.id.back_button_toolbar);
         if (backButtonToolbarForAutomotive != null) {
@@ -169,16 +208,27 @@ public class ChromeDialog extends ComponentDialog {
             mEdgeToEdgeLayoutCoordinator =
                     new EdgeToEdgeLayoutCoordinator(mActivity, mInsetObserver);
             mEdgeToEdgeLayoutCoordinator.setNavigationBarColor(
-                    SemanticColorUtils.getDefaultBgColor(mActivity));
+                    AttrUtils.resolveColor(
+                            getContext().getTheme(), android.R.attr.navigationBarColor));
             mEdgeToEdgeLayoutCoordinator.setNavigationBarDividerColor(
-                    SemanticColorUtils.getDefaultBgColor(mActivity));
+                    AttrUtils.resolveColor(
+                            getContext().getTheme(), android.R.attr.navigationBarDividerColor));
             mEdgeToEdgeLayoutCoordinator.setStatusBarColor(
-                    SemanticColorUtils.getDefaultBgColor(mActivity));
+                    AttrUtils.resolveColor(getContext().getTheme(), android.R.attr.statusBarColor));
         }
         return mEdgeToEdgeLayoutCoordinator;
     }
 
     @Nullable EdgeToEdgeLayoutCoordinator getEdgeToEdgeLayoutCoordinatorForTesting() {
         return mEdgeToEdgeLayoutCoordinator;
+    }
+
+    public void destroy() {
+        if (isShowing()) {
+            dismiss();
+        }
+        if (mInsetObserver != null && mWindowInsetsConsumer != null) {
+            mInsetObserver.removeInsetsConsumer(mWindowInsetsConsumer);
+        }
     }
 }

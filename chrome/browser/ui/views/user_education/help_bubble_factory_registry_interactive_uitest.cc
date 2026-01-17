@@ -115,7 +115,8 @@ IN_PROC_BROWSER_TEST_F(HelpBubbleFactoryRegistryInteractiveUitest,
         // wait for each element to appear and then do the next step.
         base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
             FROM_HERE, base::BindLambdaForTesting([this]() {
-              auto* tab = GetBrowserView()->tabstrip()->tab_at(0);
+              views::View* tab =
+                  GetBrowserView()->tab_strip_view()->GetTabAnchorViewAt(0);
               tab->ShowContextMenu(tab->bounds().CenterPoint(),
                                    ui::mojom::MenuSourceType::kMouse);
             }));
@@ -147,7 +148,9 @@ IN_PROC_BROWSER_TEST_F(HelpBubbleFactoryRegistryInteractiveUitest,
           // will clean up all of the secondary UI.
           Do([this]() {
             static_cast<BrowserTabStripController*>(
-                GetBrowserView()->tabstrip()->controller())
+                GetBrowserView()
+                    ->horizontal_tab_strip_for_testing()
+                    ->controller())
                 ->CloseContextMenuForTesting();
           })
 #if BUILDFLAG(IS_MAC)

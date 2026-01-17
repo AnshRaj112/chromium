@@ -4,6 +4,9 @@
 
 package org.chromium.chrome.browser.payments;
 
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
+
 import androidx.annotation.Nullable;
 import androidx.test.filters.MediumTest;
 
@@ -21,6 +24,8 @@ import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
+import org.chromium.chrome.browser.preferences.Pref;
+import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.transit.ChromeTransitTestRules;
 import org.chromium.chrome.test.transit.FreshCtaTransitTestRule;
@@ -29,6 +34,7 @@ import org.chromium.components.payments.AndroidPaymentAppFinder;
 import org.chromium.components.payments.AppCreationFailureReason;
 import org.chromium.components.payments.CSPChecker;
 import org.chromium.components.payments.DialogController;
+import org.chromium.components.payments.MethodStrings;
 import org.chromium.components.payments.MockPackageManagerDelegate;
 import org.chromium.components.payments.MockPackageManagerDelegate.PackageInfoState;
 import org.chromium.components.payments.PaymentApp;
@@ -38,7 +44,8 @@ import org.chromium.components.payments.PaymentAppFactoryParams;
 import org.chromium.components.payments.PaymentFeatureList;
 import org.chromium.components.payments.PaymentManifestDownloader;
 import org.chromium.components.payments.PaymentManifestParser;
-import org.chromium.components.payments.PaymentManifestWebDataService;
+import org.chromium.components.payments.WebPaymentsWebDataService;
+import org.chromium.components.user_prefs.UserPrefs;
 import org.chromium.content_public.browser.RenderFrameHost;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.payments.mojom.PaymentDetailsModifier;
@@ -80,7 +87,9 @@ public class AndroidPaymentAppFinderTest
          * @param url The URL of the test server.
          */
         /* package */ void setTestServerUrl(GURL url) {
-            assert mTestServerUrl == null : "Test server URL should be set only once";
+            assertWithMessage("Test server URL should be set only once")
+                    .that(mTestServerUrl)
+                    .isNull();
             mTestServerUrl = url;
         }
 
@@ -106,8 +115,7 @@ public class AndroidPaymentAppFinderTest
             GURL changedUrl =
                     new GURL(url.getSpec().replaceAll("https://", mTestServerUrl.getSpec()));
             if (!changedUrl.isValid()) {
-                assert false;
-                return null;
+                throw new AssertionError();
             }
             return changedUrl;
         }
@@ -117,6 +125,7 @@ public class AndroidPaymentAppFinderTest
     private WebPageStation mStartingPage;
     private List<PaymentApp> mPaymentApps;
     private boolean mAllPaymentAppsCreated;
+    private boolean mInternalPaymentAppFactoryPresent;
     private Map<String, PaymentMethodData> mMethodData;
     private PaymentOptions mPaymentOptions;
     private String mTwaPackageName;
@@ -146,6 +155,15 @@ public class AndroidPaymentAppFinderTest
 
     // PaymentAppFactoryDelegate implementation.
     @Override
+    public boolean prefsCanMakePayment() {
+        WebContents webContents = getWebContents();
+        return webContents != null
+                && UserPrefs.get(Profile.fromWebContents(webContents))
+                        .getBoolean(Pref.CAN_MAKE_PAYMENT_ENABLED);
+    }
+
+    // PaymentAppFactoryDelegate implementation.
+    @Override
     public void onDoneCreatingPaymentApps(PaymentAppFactoryInterface unusedFactory) {
         mAllPaymentAppsCreated = true;
     }
@@ -169,6 +187,12 @@ public class AndroidPaymentAppFinderTest
     @Override
     public DialogController getDialogController() {
         return null;
+    }
+
+    // PaymentAppFactoryDelegate implementation.
+    @Override
+    public boolean internalPaymentAppFactoryPresent() {
+        return mInternalPaymentAppFactoryPresent;
     }
 
     // PaymentAppFactoryParams implementation.
@@ -254,6 +278,7 @@ public class AndroidPaymentAppFinderTest
         mAllPaymentAppsCreated = false;
         mPaymentOptions = new PaymentOptions();
         mTwaPackageName = null;
+        mInternalPaymentAppFactoryPresent = false;
     }
 
     /** Absence of installed apps should result in no payment apps. */
@@ -1814,6 +1839,93 @@ public class AndroidPaymentAppFinderTest
         Assert.assertTrue(mPaymentApps.get(0).isPreferred());
     }
 
+    /**
+     * Test that with the deduplication feature disabled, a mock Google Pay app is still found even
+     * if an internal factory is present.
+     */
+    @Test
+    @Feature({"Payments"})
+    @DisableFeatures({PaymentFeatureList.DEDUPLICATE_NATIVE_PAYMENT_APPS})
+    public void testFindsGooglePayWithInternalFactory() throws Throwable {
+        Set<String> methods = new HashSet<>();
+        methods.add(MethodStrings.GOOGLE_PAY);
+        mPackageManager.installPaymentApp(
+                "GooglePay",
+                "com.google.pay",
+                MethodStrings.GOOGLE_PAY,
+                /* signature= */ "01020304050607080900");
+        // An internal factory is present, but should not matter since the feature is disabled.
+        mInternalPaymentAppFactoryPresent = true;
+
+        findApps(methods);
+
+        assertPaymentAppsCreated("com.google.pay");
+    }
+
+    /**
+     * Test that with the deduplication feature enabled, a mock Google Pay app is not found if an
+     * internal factory is present.
+     */
+    @Test
+    @EnableFeatures({PaymentFeatureList.DEDUPLICATE_NATIVE_PAYMENT_APPS})
+    @Feature({"Payments"})
+    public void testSkipsGooglePayWithInternalFactory() throws Throwable {
+        Set<String> methods = new HashSet<>();
+        methods.add(MethodStrings.GOOGLE_PAY);
+        mPackageManager.installPaymentApp(
+                "GooglePay",
+                "com.google.pay",
+                MethodStrings.GOOGLE_PAY,
+                /* signature= */ "01020304050607080900");
+        mInternalPaymentAppFactoryPresent = true;
+
+        findApps(methods);
+
+        assertNoPaymentAppsCreated();
+    }
+
+    /**
+     * Test that when we are preferring the Android intent path, a mock Google Pay app is still
+     * found even if an internal factory is present.
+     */
+    @Test
+    @EnableFeatures({PaymentFeatureList.GOOGLE_PAY_VIA_ANDROID_INTENTS})
+    @Feature({"Payments"})
+    public void testFindsGooglePayWithInternalFactoryWhenPreferringIntentApps() throws Throwable {
+        Set<String> methods = new HashSet<>();
+        methods.add(MethodStrings.GOOGLE_PAY);
+        mPackageManager.installPaymentApp(
+                "GooglePay",
+                "com.google.pay",
+                MethodStrings.GOOGLE_PAY,
+                /* signature= */ "01020304050607080900");
+        // Although an internal factory is present, we should still create a payment app for Google
+        // Pay since we are preferring the intent path.
+        mInternalPaymentAppFactoryPresent = true;
+
+        findApps(methods);
+
+        assertPaymentAppsCreated("com.google.pay");
+    }
+
+    /** Test that a mock Google Pay app is still found if an internal factory is not present. */
+    @Test
+    @Feature({"Payments"})
+    public void testFindsGooglePayWithNoInternalFactory() throws Throwable {
+        Set<String> methods = new HashSet<>();
+        methods.add(MethodStrings.GOOGLE_PAY);
+        mPackageManager.installPaymentApp(
+                "GooglePay",
+                "com.google.pay",
+                MethodStrings.GOOGLE_PAY,
+                /* signature= */ "01020304050607080900");
+        mInternalPaymentAppFactoryPresent = false;
+
+        findApps(methods);
+
+        assertPaymentAppsCreated("com.google.pay");
+    }
+
     private void findApps(Set<String> methodNames) throws Throwable {
         addAppStoreMethodAndFindApps(
                 /* appStorePackageName= */ null, /* appStorePaymentMethod= */ null, methodNames);
@@ -1827,7 +1939,7 @@ public class AndroidPaymentAppFinderTest
                 () -> {
                     AndroidPaymentAppFinder finder =
                             new AndroidPaymentAppFinder(
-                                    new PaymentManifestWebDataService(getWebContents()),
+                                    new WebPaymentsWebDataService(getWebContents()),
                                     mDownloader,
                                     new PaymentManifestParser(),
                                     mPackageManager,
@@ -1835,8 +1947,8 @@ public class AndroidPaymentAppFinderTest
                                     /* factory= */ null);
                     AndroidPaymentAppFinder.bypassIsReadyToPayServiceInTest();
                     if (appStorePackageName != null) {
-                        assert appStorePaymentMethod != null;
-                        assert appStorePaymentMethod.isValid();
+                        assertThat(appStorePaymentMethod).isNotNull();
+                        assertThat(appStorePaymentMethod.isValid()).isTrue();
                         finder.addAppStoreForTest(appStorePackageName, appStorePaymentMethod);
                     }
                     finder.findAndroidPaymentApps();

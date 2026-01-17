@@ -6,10 +6,10 @@ package org.chromium.chrome.browser.share.link_to_text;
 
 import static org.chromium.build.NullUtil.assumeNonNull;
 
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.NullableObservableSupplier;
 import org.chromium.build.annotations.MonotonicNonNull;
 import org.chromium.build.annotations.NullMarked;
-import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
 import org.chromium.chrome.browser.profiles.Profile;
@@ -43,14 +43,14 @@ public class LinkToTextIphController {
     /**
      * Creates an {@link LinkToTextIphController}.
      *
-     * @param tabSupplier An {@link ObservableSupplier} for {@link Tab} where the IPH will be
+     * @param tabSupplier An {@link MonotonicObservableSupplier} for {@link Tab} where the IPH will be
      *     rendered.
      * @param tabModelSelector The {@link TabModelSelector} to open a new tab.
      */
     public LinkToTextIphController(
-            ObservableSupplier<@Nullable Tab> tabSupplier,
+            NullableObservableSupplier<Tab> tabSupplier,
             TabModelSelector tabModelSelector,
-            ObservableSupplier<Profile> profileSupplier) {
+            MonotonicObservableSupplier<Profile> profileSupplier) {
         mTabModelSelector = tabModelSelector;
         new CurrentTabObserver(
                 tabSupplier,

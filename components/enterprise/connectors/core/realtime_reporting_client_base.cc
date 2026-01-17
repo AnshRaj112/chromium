@@ -4,9 +4,9 @@
 
 #include "components/enterprise/connectors/core/realtime_reporting_client_base.h"
 
+#include <algorithm>
 #include <ctime>
 
-#include "base/containers/contains.h"
 #include "base/containers/to_value_list.h"
 #include "base/i18n/time_formatting.h"
 #include "base/logging.h"
@@ -222,8 +222,8 @@ void RealtimeReportingClientBase::ReportEventWithTimestampDeprecated(
 #ifndef NDEBUG
   // Make sure the event is included in the kAllReportingEnabledEvents or the
   // kAllReportingOptInEvents array.
-  bool found = base::Contains(kAllReportingEnabledEvents, name) ||
-               base::Contains(kAllReportingOptInEvents, name);
+  bool found = std::ranges::contains(kAllReportingEnabledEvents, name) ||
+               std::ranges::contains(kAllReportingOptInEvents, name);
   DCHECK(found);
 #endif
 
@@ -255,15 +255,12 @@ void RealtimeReportingClientBase::UploadSecurityEvent(
     ::chrome::cros::reporting::proto::Event event,
     policy::CloudPolicyClient* client,
     const ReportingSettings& settings) {
-  if (base::FeatureList::IsEnabled(safe_browsing::kLocalIpAddressInEvents)) {
-    base::ThreadPool::PostTaskAndReplyWithResult(
-        FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
-        base::BindOnce(&GetLocalIpAddresses),
-        base::BindOnce(&RealtimeReportingClientBase::OnIpAddressesFetched,
-                       AsWeakPtr(), std::move(event), client, settings));
-    return;
-  }
-  FinishUploadSecurityEvent(std::move(event), client, settings);
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
+      base::BindOnce(&GetLocalIpAddresses),
+      base::BindOnce(&RealtimeReportingClientBase::OnIpAddressesFetched,
+                     AsWeakPtr(), std::move(event), client, settings));
+  return;
 }
 
 void RealtimeReportingClientBase::OnIpAddressesFetched(
@@ -279,6 +276,7 @@ void RealtimeReportingClientBase::FinishUploadSecurityEvent(
     ::chrome::cros::reporting::proto::Event event,
     policy::CloudPolicyClient* client,
     const ReportingSettings& settings) {
+  MaybeTruncateLongUrls(event);
   auto event_type =
       enterprise_connectors::GetUmaEnumFromEventCase(event.event_case());
   ::chrome::cros::reporting::proto::UploadEventsRequest request =
@@ -303,18 +301,13 @@ void RealtimeReportingClientBase::UploadSecurityEventReportDeprecated(
       base::Value::Dict()
           .Set("time", base::TimeFormatAsIso8601(time))
           .Set(name, std::move(event));
-  if (base::FeatureList::IsEnabled(safe_browsing::kLocalIpAddressInEvents)) {
-    base::ThreadPool::PostTaskAndReplyWithResult(
-        FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
-        base::BindOnce(&GetLocalIpAddresses),
-        base::BindOnce(
-            &RealtimeReportingClientBase::OnIpAddressesFetchedDeprecated,
-            AsWeakPtr(), std::move(event_wrapper), client, name, settings,
-            time));
-    return;
-  }
-  FinishUploadSecurityEventReportDeprecated(std::move(event_wrapper), client,
-                                            name, settings);
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
+      base::BindOnce(&GetLocalIpAddresses),
+      base::BindOnce(
+          &RealtimeReportingClientBase::OnIpAddressesFetchedDeprecated,
+          AsWeakPtr(), std::move(event_wrapper), client, name, settings, time));
+  return;
 }
 
 void RealtimeReportingClientBase::OnIpAddressesFetchedDeprecated(

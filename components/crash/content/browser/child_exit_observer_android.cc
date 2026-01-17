@@ -7,8 +7,6 @@
 #include <unistd.h>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
-#include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "components/crash/content/browser/crash_memory_metrics_collector_android.h"
 #include "content/public/browser/browser_thread.h"
@@ -20,12 +18,6 @@ using content::BrowserThread;
 namespace crash_reporter {
 
 namespace {
-
-// Processed terminated by RenderProcessHost::Cleanup() is marked as
-// normal_termination in ChildExitObserver::TerminationInfo.
-BASE_FEATURE(kCleanupToBeNormalTermination,
-             "CleanupToBeNormalTermination",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 void PopulateTerminationInfo(
     const content::ChildProcessTerminationInfo& content_info,
@@ -39,6 +31,9 @@ void PopulateTerminationInfo(
   info->renderer_was_subframe = content_info.renderer_was_subframe;
   info->is_spare_renderer = content_info.is_spare_renderer;
   info->has_spare_renderer = content_info.has_spare_renderer;
+  info->last_spare_renderer_creation_info =
+      content_info.last_spare_renderer_creation_info;
+  info->memory_pressure_metrics = content_info.memory_pressure_metrics;
 }
 
 }  // namespace
@@ -75,7 +70,7 @@ void ChildExitObserver::ChildReceivedCrashSignal(base::ProcessId pid,
   DCHECK(result);
 }
 
-void ChildExitObserver::OnRenderProcessHostCreated(
+void ChildExitObserver::OnRenderProcessLaunched(
     content::RenderProcessHost* host) {
   // The child process pid isn't available when process is gone, keep a mapping
   // between process_host_id and pid, so we can find it later.
@@ -132,7 +127,7 @@ void ChildExitObserver::BrowserChildProcessKilled(
     const content::ChildProcessData& data,
     const content::ChildProcessTerminationInfo& content_info) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  DCHECK(!base::Contains(browser_child_process_info_, data.id));
+  DCHECK(!browser_child_process_info_.contains(data.id));
   TerminationInfo info;
   info.process_host_id = data.id;
   info.pid = data.GetProcess().Pid();
@@ -185,9 +180,7 @@ void ChildExitObserver::ProcessRenderProcessHostLifetimeEndEvent(
     // FastShutdownIfPossible() is marked as FastShutdownStarted() and
     // RenderProcessHost terminating by Cleanup() is marked as IsDeletingSoon().
     info.normal_termination =
-        rph->FastShutdownStarted() ||
-        (rph->IsDeletingSoon() &&
-         base::FeatureList::IsEnabled(kCleanupToBeNormalTermination));
+        rph->FastShutdownStarted() || rph->IsDeletingSoon();
     info.renderer_shutdown_requested = rph->ShutdownRequested();
     info.app_state = base::android::ApplicationStatusListener::GetState();
     PopulateTerminationInfo(*content_info, &info);

@@ -6,7 +6,6 @@
 
 #include "base/containers/to_value_list.h"
 #include "base/values.h"
-#include "base/version.h"
 #include "components/webapps/isolated_web_apps/types/update_channel.h"
 
 namespace web_app {
@@ -29,7 +28,7 @@ void PersistFieldsForUpdateImpl(IsolationData::Builder& builder,
 
 IsolationData::IsolationData(
     IsolatedWebAppStorageLocation location,
-    base::Version version,
+    IwaVersion version,
     std::set<std::string> controlled_frame_partitions,
     std::optional<PendingUpdateInfo> pending_update_info,
     std::optional<IsolatedWebAppIntegrityBlockData> integrity_block_data,
@@ -87,7 +86,7 @@ base::Value IsolationData::AsDebugValue() const {
 
 IsolationData::PendingUpdateInfo::PendingUpdateInfo(
     IsolatedWebAppStorageLocation location,
-    base::Version version,
+    IwaVersion version,
     std::optional<IsolatedWebAppIntegrityBlockData> integrity_block_data)
     : location(std::move(location)),
       version(std::move(version)),
@@ -131,7 +130,7 @@ IsolationData::OpenedTabsCounterNotificationState::GetState() const {
 }
 
 IsolationData::Builder::Builder(IsolatedWebAppStorageLocation location,
-                                base::Version version)
+                                IwaVersion version)
     : location_(std::move(location)), version_(std::move(version)) {}
 
 IsolationData::Builder::Builder(const IsolationData& isolation_data)
@@ -217,9 +216,6 @@ IsolationData::Builder&& IsolationData::Builder::SetIntegrityBlockData(
 
 IsolationData::Builder& IsolationData::Builder::SetUpdateManifestUrl(
     GURL update_manifest_url) & {
-  CHECK(location_.dev_mode())
-      << "This field is supposed to be used only with dev mode installs via "
-         "chrome://web-app-internals.";
   CHECK(update_manifest_url.is_valid(), base::NotFatalUntil::M138);
   update_manifest_url_ = std::move(update_manifest_url);
   return *this;
@@ -227,9 +223,6 @@ IsolationData::Builder& IsolationData::Builder::SetUpdateManifestUrl(
 
 IsolationData::Builder&& IsolationData::Builder::SetUpdateManifestUrl(
     GURL update_manifest_url) && {
-  CHECK(location_.dev_mode())
-      << "This field is supposed to be used only with dev mode installs via "
-         "chrome://web-app-internals.";
   CHECK(update_manifest_url.is_valid(), base::NotFatalUntil::M138);
   update_manifest_url_ = std::move(update_manifest_url);
   return std::move(*this);

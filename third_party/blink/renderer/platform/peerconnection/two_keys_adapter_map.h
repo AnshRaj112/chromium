@@ -10,7 +10,6 @@
 #include <utility>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "third_party/blink/renderer/platform/wtf/hash_map.h"
 
 namespace blink {
@@ -38,7 +37,7 @@ class TwoKeysAdapterMap {
   // map. There must not already exist a mapping for this primary key, in other
   // words |!FindByPrimary(primary)| must hold.
   Value* Insert(PrimaryKey primary, Value value) {
-    DCHECK(!base::Contains(entries_by_primary_, primary));
+    DCHECK(!entries_by_primary_.Contains(primary));
     auto* add_result =
         entries_by_primary_
             .insert(std::move(primary),
@@ -131,7 +130,7 @@ class TwoKeysAdapterMap {
     Value value;
 
     // The primary and secondary keys are cached here, instead of the
-    // respective iterators, because WTF::HashMap invalidates iterators
+    // respective iterators, because blink::HashMap invalidates iterators
     // upon changes on the set (eg insertion, deletions).
     //
     // Entries are only created in TwoKeysAdapterMap::Insert, which initializes
@@ -145,8 +144,8 @@ class TwoKeysAdapterMap {
     std::optional<SecondaryKey> secondary_key;
   };
 
-  using PrimaryMap = WTF::HashMap<PrimaryKey, std::unique_ptr<Entry>>;
-  using SecondaryMap = WTF::HashMap<SecondaryKey, Entry*>;
+  using PrimaryMap = HashMap<PrimaryKey, std::unique_ptr<Entry>>;
+  using SecondaryMap = HashMap<SecondaryKey, Entry*>;
 
   PrimaryMap entries_by_primary_;
   SecondaryMap entries_by_secondary_;

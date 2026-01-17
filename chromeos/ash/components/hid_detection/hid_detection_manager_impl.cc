@@ -4,7 +4,6 @@
 
 #include "chromeos/ash/components/hid_detection/hid_detection_manager_impl.h"
 
-#include "base/containers/contains.h"
 #include "base/no_destructor.h"
 #include "chromeos/ash/components/hid_detection/bluetooth_hid_detector_impl.h"
 #include "chromeos/ash/components/hid_detection/hid_detection_utils.h"
@@ -18,7 +17,7 @@ using InputState = HidDetectionManager::InputState;
 // In floss, a virtual device is created when a HID is bonded or paired.
 // We do not want to include this virtual device to our list of added devices.
 // (b/299955128)
-const char* kBlockedDeviceNames[] = {"VIRTUAL_SUSPEND_UHID"};
+constexpr const char* kBlockedDeviceNames[] = {"VIRTUAL_SUSPEND_UHID"};
 
 HidDetectionManagerImpl::InputDeviceManagerBinder&
 GetInputDeviceManagerBinderOverride() {
@@ -112,7 +111,7 @@ void HidDetectionManagerImpl::InputDeviceAdded(
 }
 
 void HidDetectionManagerImpl::InputDeviceRemoved(const std::string& id) {
-  if (!base::Contains(device_id_to_device_map_, id)) {
+  if (!device_id_to_device_map_.contains(id)) {
     // Some devices may be removed that were not registered in
     // InputDeviceAdded() or OnGetDevicesAndSetClient().
     HID_LOG(EVENT)

@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "ui/events/ozone/evdev/tablet_event_converter_evdev.h"
 
 #include <errno.h>
 #include <linux/input.h>
 #include <stddef.h>
 
+#include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/logging.h"
 #include "base/trace_event/trace_event.h"
 #include "ui/events/event.h"
@@ -101,8 +98,11 @@ void TabletEventConverterEvdev::OnFileCanReadWithoutBlocking(int fd) {
   if (!IsEnabled())
     return;
 
-  DCHECK_EQ(read_size % sizeof(*inputs), 0u);
-  ProcessEvents(inputs, read_size / sizeof(*inputs));
+  DCHECK_EQ(read_size % sizeof(inputs[0]), 0u);
+  // SAFETY: `read_size` is the number of bytes read from the file descriptor.
+  // It is capped by `sizeof(inputs)`, so it cannot overflow the buffer.
+  ProcessEvents(
+      UNSAFE_BUFFERS(base::span(inputs, read_size / sizeof(inputs[0]))));
 }
 
 bool TabletEventConverterEvdev::HasGraphicsTablet() const {
@@ -126,10 +126,9 @@ std::ostream& TabletEventConverterEvdev::DescribeForLog(
   return EventConverterEvdev::DescribeForLog(os);
 }
 
-void TabletEventConverterEvdev::ProcessEvents(const input_event* inputs,
-                                              int count) {
-  for (int i = 0; i < count; ++i) {
-    const input_event& input = inputs[i];
+void TabletEventConverterEvdev::ProcessEvents(
+    base::span<const input_event> inputs) {
+  for (const input_event& input : inputs) {
     switch (input.type) {
       case EV_KEY:
         ConvertKeyEvent(input);

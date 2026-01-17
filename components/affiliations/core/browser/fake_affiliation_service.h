@@ -5,6 +5,7 @@
 #ifndef COMPONENTS_AFFILIATIONS_CORE_BROWSER_FAKE_AFFILIATION_SERVICE_H_
 #define COMPONENTS_AFFILIATIONS_CORE_BROWSER_FAKE_AFFILIATION_SERVICE_H_
 
+#include "base/memory/weak_ptr.h"
 #include "components/affiliations/core/browser/affiliation_service.h"
 
 namespace affiliations {
@@ -28,11 +29,15 @@ class FakeAffiliationService : public AffiliationService {
   void TrimUnusedCache(std::vector<FacetURI> facet_uris) override;
   void GetGroupingInfo(std::vector<FacetURI> facet_uris,
                        GroupsCallback callback) override;
-  void GetPSLExtensions(base::OnceCallback<void(std::vector<std::string>)>
-                            callback) const override;
+  void GetPSLExtensions(
+      base::OnceCallback<void(std::vector<std::string>)> callback) override;
   void UpdateAffiliationsAndBranding(const std::vector<FacetURI>& facets,
                                      base::OnceClosure callback) override;
   void RegisterSource(std::unique_ptr<AffiliationSource> source) override;
+  base::WeakPtr<AffiliationService> AsWeakPtr() override;
+
+ private:
+  base::WeakPtrFactory<FakeAffiliationService> weak_ptr_factory_{this};
 };
 
 }  // namespace affiliations

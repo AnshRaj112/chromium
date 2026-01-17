@@ -16,7 +16,6 @@
 #include "base/functional/callback.h"
 #include "base/logging.h"
 #include "base/memory/scoped_refptr.h"
-#include "base/syslog_logging.h"
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/app_mode/app_mode_utils.h"
 #include "chrome/browser/ash/account_manager/account_manager_util.h"
@@ -31,12 +30,12 @@
 #include "chrome/browser/ash/login/existing_user_controller.h"
 #include "chrome/browser/ash/login/login_wizard.h"
 #include "chrome/browser/ash/login/session/session_length_limiter.h"
+#include "chrome/browser/ash/login/session/session_manager_delegate_impl.h"
 #include "chrome/browser/ash/login/session/user_session_initializer.h"
 #include "chrome/browser/ash/login/session/user_session_manager.h"
 #include "chrome/browser/ash/profiles/signin_profile_handler.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browser_process_platform_part_ash.h"
-#include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
@@ -74,6 +73,10 @@
 namespace ash {
 
 namespace {
+
+void RemoveObsoleteKioskCryptohomes() {
+  KioskController::Get().RemoveObsoleteCryptohomes();
+}
 
 // Starts kiosk app launch and shows the splash screen.
 void StartKioskSession(KioskAppId app, bool is_auto_launch = false) {
@@ -243,6 +246,11 @@ void StartUserSession(user_manager::UserManager* user_manager,
     UserSessionManager::GetInstance()->StartTetherServiceIfPossible(
         user_profile);
 
+    // There was no authentication, but for the purpose of online sign-in
+    // conditions this is the same as offline auth flow.
+    UserSessionManager::GetInstance()->EnsureTrackingOfOnlineSignInConditions(
+        user_profile, UserContext::AUTH_FLOW_OFFLINE);
+
     // Associates AppListClient with the current active profile.
     AppListClientImpl::GetInstance()->UpdateProfile();
   }
@@ -363,8 +371,10 @@ void InitFeaturesSessionType(const user_manager::User* user) {
 
 }  // namespace
 
-ChromeSessionManager::ChromeSessionManager()
-    : oobe_configuration_(std::make_unique<OobeConfiguration>()),
+ChromeSessionManager::ChromeSessionManager(
+    std::unique_ptr<session_manager::SessionManagerDelegate> delegate)
+    : session_manager::SessionManager(std::move(delegate)),
+      oobe_configuration_(std::make_unique<OobeConfiguration>()),
       user_session_initializer_(std::make_unique<UserSessionInitializer>()) {
   AddObserver(user_session_initializer_.get());
 }
@@ -435,7 +445,7 @@ void ChromeSessionManager::Initialize(
   const AccountId login_account_id(
       known_user.GetAccountIdByCryptohomeId(cryptohome_id));
 
-  KioskCryptohomeRemover::RemoveObsoleteCryptohomes();
+  RemoveObsoleteKioskCryptohomes();
 
   if (ShouldAutoLaunchKioskApp(parsed_command_line, local_state)) {
     VLOG(1) << "Starting Chrome with kiosk auto launch.";
@@ -485,21 +495,6 @@ void ChromeSessionManager::OnSessionCreated(bool browser_restart) {
   // session limit is defined by the policy.
   session_length_limiter_ = std::make_unique<SessionLengthLimiter>(
       /*delegate=*/nullptr, browser_restart);
-}
-
-void ChromeSessionManager::OnUsersSignInConstraintsChanged() {
-  const user_manager::UserList& logged_in_users =
-      user_manager()->GetLoggedInUsers();
-  for (user_manager::User* user : logged_in_users) {
-    if (user->IsDeviceLocalAccount()) {
-      continue;
-    }
-    if (!user_manager()->IsUserAllowed(*user)) {
-      SYSLOG(ERROR)
-          << "The current user is not allowed, terminating the session.";
-      chrome::AttemptUserExit();
-    }
-  }
 }
 
 }  // namespace ash

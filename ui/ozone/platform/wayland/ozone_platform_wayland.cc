@@ -28,9 +28,9 @@
 #include "ui/events/devices/device_data_manager.h"
 #include "ui/events/event.h"
 #include "ui/events/ozone/layout/keyboard_layout_engine_manager.h"
-#include "ui/gfx/buffer_format_util.h"
+#include "ui/gfx/buffer_types.h"
 #include "ui/gfx/linux/client_native_pixmap_dmabuf.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/ozone/common/base_keyboard_hook.h"
 #include "ui/ozone/common/features.h"
 #include "ui/ozone/platform/wayland/common/drm_render_node_handle.h"
@@ -190,7 +190,7 @@ class OzonePlatformWayland : public OzonePlatform,
 
   WaylandUtils* GetPlatformUtils() override { return wayland_utils_.get(); }
 
-  bool IsNativePixmapConfigSupported(gfx::BufferFormat format,
+  bool IsNativePixmapConfigSupported(viz::SharedImageFormat format,
                                      gfx::BufferUsage usage) const override {
 #if defined(WAYLAND_GBM)
     // If there is no drm render node device available, native pixmaps are not
@@ -199,7 +199,7 @@ class OzonePlatformWayland : public OzonePlatform,
       return false;
 
     // When OzonePlatform instance is called from GPU process,
-    // |supported_buffer_formats_| is empty. Supported buffer formats are sent
+    // |supported_formats_| is empty. Supported shared image formats are sent
     // to |buffer_manager_| via IPC after gpu service init in that case.
     if (buffer_manager_) {
       if (!buffer_manager_->SupportsFormat(format)) {
@@ -211,12 +211,11 @@ class OzonePlatformWayland : public OzonePlatform,
       // imported as wl_buffer.
       auto* gbm_device = buffer_manager_->GetGbmDevice();
       if (!gbm_device || !gbm_device->CanCreateBufferForFormat(
-                             GetFourCCFormatFromBufferFormat(format))) {
+                             GetFourCCFormatFromSharedImageFormat(format))) {
         return false;
       }
     } else {
-      if (supported_buffer_formats_.find(format) ==
-          supported_buffer_formats_.end()) {
+      if (supported_formats_.find(format) == supported_formats_.end()) {
         return false;
       }
     }
@@ -290,13 +289,13 @@ class OzonePlatformWayland : public OzonePlatform,
     }
 
     buffer_manager_connector_ = std::make_unique<WaylandBufferManagerConnector>(
-        connection_->buffer_manager_host());
+        connection_.get(), connection_->buffer_manager_host());
     cursor_factory_ = std::make_unique<WaylandCursorFactory>(connection_.get());
     input_controller_ = std::make_unique<StubInputController>();
     gpu_platform_support_host_.reset(CreateStubGpuPlatformSupportHost());
 
-    supported_buffer_formats_ =
-        connection_->buffer_manager_host()->GetSupportedBufferFormats();
+    supported_formats_ =
+        connection_->buffer_manager_host()->GetSupportedSharedImageFormats();
     linux_ui_delegate_ =
         std::make_unique<LinuxUiDelegateWayland>(connection_.get());
 
@@ -364,9 +363,6 @@ class OzonePlatformWayland : public OzonePlatform,
       // support, probably backed by org.freedesktop.portal.Screenshot.PickColor
       // API is implemented.
       properties->supports_color_picker_dialog = false;
-
-      // TODO(crbug.com/425715421): Remove this once support is implemented.
-      properties->supports_split_view_drag_and_drop = false;
 
       initialised = true;
     }
@@ -488,12 +484,12 @@ class OzonePlatformWayland : public OzonePlatform,
   }
 
   void PostMainMessageLoopRun() override {
-    // TODO(b/324294360): This will cause a lot of dangling pointers, which
-    // breaks linux wayland bot. Fix them and enable on linux as well.
-#if BUILDFLAG(IS_CHROMEOS) || !PA_BUILDFLAG(ENABLE_DANGLING_RAW_PTR_CHECKS)
+    linux_ui_delegate_.reset();
+    wayland_utils_.reset();
+    menu_utils_.reset();
+    buffer_manager_connector_.reset();
     cursor_factory_.reset();
     connection_.reset();
-#endif
   }
 
   std::unique_ptr<PlatformKeyboardHook> CreateKeyboardHook(
@@ -549,9 +545,9 @@ class OzonePlatformWayland : public OzonePlatform,
   std::unique_ptr<WaylandOverlayManager> overlay_manager_;
   std::unique_ptr<WaylandGLEGLUtility> gl_egl_utility_;
 
-  // Provides supported buffer formats for native gpu memory buffers
+  // Provides supported shared image formats for native gpu memory buffers
   // framework.
-  wl::BufferFormatsWithModifiersMap supported_buffer_formats_;
+  wl::SharedImageFormatsWithModifiersMap supported_formats_;
 
 #if defined(WAYLAND_GBM)
   // This is used both in the gpu and browser processes to find out if a drm

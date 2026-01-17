@@ -15,7 +15,6 @@
 
 #include "base/base64.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
@@ -27,6 +26,7 @@
 #include "base/strings/string_util.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
+#include "base/time/time.h"
 #include "base/values.h"
 #include "build/buildflag.h"
 #include "chrome/browser/extensions/api/web_authentication_proxy/web_authentication_proxy_service.h"
@@ -58,8 +58,8 @@
 #include "content/public/browser/web_contents.h"
 #include "crypto/unexportable_key.h"
 #include "device/fido/enclave/constants.h"
-#include "device/fido/features.h"
 #include "device/fido/mac/credential_metadata.h"
+#include "device/fido/public/features.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
@@ -108,7 +108,7 @@ bool IsWebAuthnRPIDListedInSecurityKeyPermitAttestationPolicy(
   const PrefService* prefs = profile->GetPrefs();
   const base::Value::List& permit_attestation =
       prefs->GetList(prefs::kSecurityKeyPermitAttestation);
-  return base::Contains(permit_attestation, relying_party_id);
+  return permit_attestation.contains(relying_party_id);
 }
 
 bool IsOriginListedInEnterpriseAttestationSwitch(
@@ -194,13 +194,15 @@ void DeleteUnacceptedPasskeys(
       PasskeyModelFactory::GetInstance()->GetForProfile(
           Profile::FromBrowserContext(web_contents->GetBrowserContext()));
   bool is_passkey_deleted = false;
-  for (const auto& passkey :
-       passkey_store->GetPasskeysForRelyingPartyId(relying_party_id)) {
+  for (const auto& passkey : passkey_store->GetPasskeys(
+           relying_party_id,
+           webauthn::PasskeyModel::ShadowedCredentials::kExclude)) {
     if (std::vector<uint8_t>(passkey.user_id().begin(),
                              passkey.user_id().end()) == user_id &&
-        !base::Contains(all_accepted_credentials_ids,
-                        std::vector<uint8_t>(passkey.credential_id().begin(),
-                                             passkey.credential_id().end()))) {
+        !std::ranges::contains(
+            all_accepted_credentials_ids,
+            std::vector<uint8_t>(passkey.credential_id().begin(),
+                                 passkey.credential_id().end()))) {
       passkey_store->DeletePasskey(passkey.credential_id(), FROM_HERE);
       is_passkey_deleted = true;
     }
@@ -240,7 +242,9 @@ void HideAndRestorePasskeys(
       PasskeyModelFactory::GetInstance()->GetForProfile(
           Profile::FromBrowserContext(web_contents->GetBrowserContext()));
   std::vector<sync_pb::WebauthnCredentialSpecifics> passkeys =
-      passkey_store->GetPasskeysForRelyingPartyId(relying_party_id);
+      passkey_store->GetPasskeys(
+          relying_party_id,
+          webauthn::PasskeyModel::ShadowedCredentials::kExclude);
   const auto passkey_it =
       std::ranges::find_if(passkeys, [&user_id](const auto& passkey) {
         return std::vector<uint8_t>(passkey.user_id().begin(),
@@ -252,10 +256,10 @@ void HideAndRestorePasskeys(
             kNoPasskeyChanged);
     return;
   }
-  bool passkey_in_list =
-      base::Contains(all_accepted_credentials_ids,
-                     std::vector<uint8_t>(passkey_it->credential_id().begin(),
-                                          passkey_it->credential_id().end()));
+  bool passkey_in_list = std::ranges::contains(
+      all_accepted_credentials_ids,
+      std::vector<uint8_t>(passkey_it->credential_id().begin(),
+                           passkey_it->credential_id().end()));
   if ((passkey_in_list && !passkey_it->hidden()) ||
       (!passkey_in_list && passkey_it->hidden())) {
     LogSignalAllAcceptedCredentials(
@@ -263,8 +267,12 @@ void HideAndRestorePasskeys(
             kNoPasskeyChanged);
     return;
   }
-  passkey_store->SetPasskeyHidden(passkey_it->credential_id(),
-                                  !passkey_in_list);
+
+  if (passkey_in_list) {
+    passkey_store->UnhidePasskey(passkey_it->credential_id());
+  } else {
+    passkey_store->HidePasskey(passkey_it->credential_id(), base::Time::Now());
+  }
   quota_tracker->TrackChange(origin);
   LogSignalAllAcceptedCredentials(
       passkey_in_list ? ChromeWebAuthenticationDelegate::
@@ -439,7 +447,9 @@ void ChromeWebAuthenticationDelegate::PasskeyUnrecognized(
   std::string credential_id(passkey_credential_id.begin(),
                             passkey_credential_id.end());
   std::optional<sync_pb::WebauthnCredentialSpecifics> credential_specifics =
-      passkey_store->GetPasskeyByCredentialId(relying_party_id, credential_id);
+      passkey_store->GetPasskey(
+          relying_party_id, credential_id,
+          webauthn::PasskeyModel::ShadowedCredentials::kExclude);
   if (!credential_specifics) {
     LogSignalUnknownCredential(SignalUnknownCredentialResult::kPasskeyNotFound);
     return;
@@ -451,8 +461,8 @@ void ChromeWebAuthenticationDelegate::PasskeyUnrecognized(
       return;
     }
     quota_tracker->TrackChange(origin);
-    passkey_store->SetPasskeyHidden(std::move(credential_id),
-                                    /*hidden=*/true);
+    passkey_store->HidePasskey(std::move(credential_id),
+                               /*hidden_time=*/base::Time::Now());
     LogSignalUnknownCredential(SignalUnknownCredentialResult::kPasskeyHidden);
   } else {
     passkey_store->DeletePasskey(std::move(credential_id), FROM_HERE);
@@ -500,8 +510,9 @@ void ChromeWebAuthenticationDelegate::UpdateUserPasskeys(
       PasskeyModelFactory::GetInstance()->GetForProfile(
           Profile::FromBrowserContext(web_contents->GetBrowserContext()));
   bool is_passkey_updated = false;
-  for (const auto& passkey :
-       passkey_store->GetPasskeysForRelyingPartyId(relying_party_id)) {
+  for (const auto& passkey : passkey_store->GetPasskeys(
+           relying_party_id,
+           webauthn::PasskeyModel::ShadowedCredentials::kExclude)) {
     if (std::vector<uint8_t>(passkey.user_id().begin(),
                              passkey.user_id().end()) == user_id &&
         (passkey.user_name() != name ||

@@ -13,9 +13,13 @@
 #include <optional>
 #include <utility>
 
+#include "base/compiler_specific.h"
+#include "base/containers/span.h"
+#include "base/strings/string_number_conversions_win.h"
 #include "base/win/atl.h"
 #include "base/win/scoped_handle.h"
 #include "base/win/security_util.h"
+#include "base/win/win_util.h"
 #include "base/win/windows_version.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -117,6 +121,15 @@ void CompareElevated(const AccessToken& token,
   EXPECT_EQ(token.IsElevated(), !!elevation.TokenIsElevated);
 }
 
+void CompareSplitTokens(const AccessToken& token,
+                        const ATL::CAccessToken& atl_token) {
+  TOKEN_ELEVATION_TYPE elevation_type;
+  DWORD size = sizeof(elevation_type);
+  ASSERT_TRUE(::GetTokenInformation(atl_token.GetHandle(), TokenElevationType,
+                                    &elevation_type, size, &size));
+  EXPECT_EQ(token.IsSplitToken(), elevation_type != TokenElevationTypeDefault);
+}
+
 bool GetLinkedToken(const ATL::CAccessToken& token,
                     ATL::CAccessToken* linked_token) {
   TOKEN_LINKED_TOKEN value;
@@ -206,6 +219,7 @@ void CompareTokens(const AccessToken& token,
   EXPECT_EQ(token.SessionId(), session_id);
   CompareIntegrityLevel(token, atl_token);
   CompareElevated(token, atl_token);
+  CompareSplitTokens(token, atl_token);
   EXPECT_EQ(token.IsRestricted(), atl_token.IsTokenRestricted());
   TOKEN_TYPE token_type;
   ASSERT_TRUE(atl_token.GetType(&token_type));
@@ -374,7 +388,10 @@ typedef struct _TOKEN_SECURITY_ATTRIBUTE_V1 {
   USHORT Reserved;
   ULONG Flags;
   ULONG ValueCount;
-  PLONG64 pInt64;
+  union {
+    PULONG64 pUint64;
+    PUNICODE_STRING pString;
+  } Values;
 } TOKEN_SECURITY_ATTRIBUTE_V1, *PTOKEN_SECURITY_ATTRIBUTE_V1;
 
 typedef struct _TOKEN_SECURITY_ATTRIBUTES_INFORMATION {
@@ -385,28 +402,94 @@ typedef struct _TOKEN_SECURITY_ATTRIBUTES_INFORMATION {
 } TOKEN_SECURITY_ATTRIBUTES_INFORMATION,
     *PTOKEN_SECURITY_ATTRIBUTES_INFORMATION;
 
-#define TOKEN_SECURITY_ATTRIBUTE_TYPE_INT64 0x01U
+#define TOKEN_SECURITY_ATTRIBUTE_TYPE_UINT64 0x02U
+#define TOKEN_SECURITY_ATTRIBUTE_TYPE_STRING 0x03U
 
 #define TOKEN_SECURITY_ATTRIBUTE_NON_INHERITABLE 0x0001U
 #define TOKEN_SECURITY_ATTRIBUTE_MANDATORY 0x0020U
 
-void CheckSecurityAttribute(const AccessToken& token,
-                            const std::wstring& name) {
+constexpr wchar_t kProcUniqueAttribute[] = L"TSA://ProcUnique";
+
+template <typename T>
+void CompareValues(T* ptr,
+                   size_t size,
+                   const std::vector<std::wstring>& values,
+                   std::wstring (*convert)(T)) {
+  auto cmp = UNSAFE_BUFFERS(span(ptr, size));
+  ASSERT_EQ(cmp.size(), values.size());
+  for (size_t index = 0; index < cmp.size(); ++index) {
+    EXPECT_EQ(values[index], convert(cmp[index]));
+  }
+}
+
+std::wstring ConvertString(UNICODE_STRING str) {
+  return std::wstring(UnicodeStringToView(str));
+}
+
+void CheckSecurityAttribute(
+    const AccessToken& token,
+    std::optional<AccessToken::SecurityAttribute> attr) {
+  ASSERT_TRUE(attr);
   UNICODE_STRING attr_name;
-  RtlInitUnicodeString(&attr_name, name.c_str());
+  ASSERT_TRUE(ViewToUnicodeString(attr->name(), attr_name));
   BYTE buffer[256];
   DWORD return_length = 0;
   NTSTATUS status = NtQuerySecurityAttributesToken(
       token.get(), &attr_name, 1, buffer, sizeof(buffer), &return_length);
   ASSERT_EQ(status, 0);
-  PTOKEN_SECURITY_ATTRIBUTE_V1 attr =
+  PTOKEN_SECURITY_ATTRIBUTE_V1 attr_native =
       reinterpret_cast<PTOKEN_SECURITY_ATTRIBUTES_INFORMATION>(buffer)
           ->pAttributeV1;
-  EXPECT_EQ(attr->Flags, TOKEN_SECURITY_ATTRIBUTE_NON_INHERITABLE |
-                             TOKEN_SECURITY_ATTRIBUTE_MANDATORY);
-  ASSERT_EQ(attr->ValueCount, 1UL);
-  ASSERT_EQ(attr->ValueType, TOKEN_SECURITY_ATTRIBUTE_TYPE_INT64);
-  ASSERT_EQ(attr->pInt64[0], 0L);
+  EXPECT_EQ(attr_native->Flags, attr->flags());
+  EXPECT_EQ(attr_native->ValueType, attr->type());
+  ASSERT_EQ(attr_native->ValueCount, attr->values().size());
+  ASSERT_EQ(attr_native->ValueType == TOKEN_SECURITY_ATTRIBUTE_TYPE_STRING,
+            attr->is_string());
+  switch (attr_native->ValueType) {
+    case TOKEN_SECURITY_ATTRIBUTE_TYPE_STRING:
+      CompareValues(attr_native->Values.pString, attr_native->ValueCount,
+                    attr->values(), ConvertString);
+      break;
+    case TOKEN_SECURITY_ATTRIBUTE_TYPE_UINT64:
+      CompareValues(attr_native->Values.pUint64, attr_native->ValueCount,
+                    attr->values(), NumberToWString);
+      break;
+    default:
+      NOTREACHED();
+  }
+}
+
+std::optional<AccessToken> AddSecurityAttribute(const AccessToken& token,
+                                                std::wstring_view name,
+                                                bool inherit,
+                                                std::wstring_view value) {
+  std::optional<AccessToken> dup =
+      token.DuplicatePrimary(TOKEN_QUERY | TOKEN_ADJUST_DEFAULT);
+  if (!dup) {
+    return std::nullopt;
+  }
+  if (!dup->AddSecurityAttribute(name, inherit, value)) {
+    return std::nullopt;
+  }
+  return dup;
+}
+
+void TestAddSecurityAttribute(const AccessToken& token, bool inherit) {
+  constexpr wchar_t kAttributeName[] = L"TEST://CHROMEATTR";
+  constexpr wchar_t kAttributeValue[] = L"ABC";
+  std::optional<AccessToken> dup =
+      AddSecurityAttribute(token, kAttributeName, inherit, kAttributeValue);
+  ASSERT_TRUE(dup);
+  ULONG flags = TOKEN_SECURITY_ATTRIBUTE_MANDATORY;
+  if (!inherit) {
+    flags |= TOKEN_SECURITY_ATTRIBUTE_NON_INHERITABLE;
+  }
+
+  CheckSecurityAttribute(
+      *dup, AccessToken::SecurityAttribute(kAttributeName,
+                                           TOKEN_SECURITY_ATTRIBUTE_TYPE_STRING,
+                                           flags, {kAttributeValue}));
+  EXPECT_TRUE(dup->HasSecurityAttribute(kAttributeName).value_or(false));
 }
 
 }  // namespace
@@ -983,13 +1066,54 @@ TEST(AccessTokenTest, AddSecurityAttribute) {
   if (!token->SetPrivilege(SE_TCB_NAME, true)) {
     GTEST_SKIP() << "Skipping test, must be run with SeTcbPrivilege.";
   }
+  TestAddSecurityAttribute(*token, /*inherit=*/false);
+  TestAddSecurityAttribute(*token, /*inherit=*/true);
+}
 
-  std::optional<AccessToken> dup =
-      token->DuplicatePrimary(TOKEN_QUERY | TOKEN_ADJUST_DEFAULT);
+TEST(AccessTokenTest, HasSecurityAttribute) {
+  std::optional<AccessToken> token = AccessToken::FromCurrentProcess();
+  ASSERT_TRUE(token);
+  // Empirically, this SA is present on every process token.
+  EXPECT_TRUE(
+      token->HasSecurityAttribute(kProcUniqueAttribute).value_or(false));
+  EXPECT_FALSE(token->HasSecurityAttribute(L"InvalidSA").value_or(true));
+}
+
+TEST(AccessTokenTest, GetSecurityAttribute) {
+  std::optional<AccessToken> token =
+      AccessToken::FromCurrentProcess(false, TOKEN_ALL_ACCESS);
+  ASSERT_TRUE(token);
+  EXPECT_FALSE(token->GetSecurityAttribute(L"InvalidSA"));
+  CheckSecurityAttribute(*token,
+                         token->GetSecurityAttribute(kProcUniqueAttribute));
+}
+
+TEST(AccessTokenTest, GetSecurityAttributeTcb) {
+  std::optional<AccessToken> token =
+      AccessToken::FromCurrentProcess(false, TOKEN_ALL_ACCESS);
+  ASSERT_TRUE(token);
+  if (!token->SetPrivilege(SE_TCB_NAME, true)) {
+    GTEST_SKIP() << "Skipping test, must be run with SeTcbPrivilege.";
+  }
+  constexpr wchar_t kAttributeName[] = L"TEST://STRING";
+  constexpr wchar_t kAttributeValue[] = L"ThisIsATestString";
+  std::optional<AccessToken> dup = AddSecurityAttribute(
+      *token, kAttributeName, /*inherit=*/true, kAttributeValue);
   ASSERT_TRUE(dup);
-  std::wstring name = L"TEST://CHROMEATTR";
-  ASSERT_TRUE(dup->AddSecurityAttribute(name, /*inherit=*/false));
-  CheckSecurityAttribute(*dup, name);
+  CheckSecurityAttribute(*dup, dup->GetSecurityAttribute(kAttributeName));
+}
+
+TEST(AccessTokenTest, AnonymousTokenHasNoSecurityAttributes) {
+  ATL::CAccessToken atl_anon_token;
+  ASSERT_TRUE(::ImpersonateAnonymousToken(::GetCurrentThread()));
+  bool result = atl_anon_token.GetThreadToken(TOKEN_QUERY);
+  ASSERT_TRUE(result);
+  ::RevertToSelf();
+  std::optional<AccessToken> anon_token =
+      AccessToken::FromToken(atl_anon_token.GetHandle());
+  ASSERT_TRUE(anon_token);
+  EXPECT_FALSE(
+      anon_token->HasSecurityAttribute(kProcUniqueAttribute).value_or(true));
 }
 
 }  // namespace base::win

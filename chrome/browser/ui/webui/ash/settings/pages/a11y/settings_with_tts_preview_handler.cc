@@ -78,7 +78,8 @@ void SettingsWithTtsPreviewHandler::HandlePreviewTtsVoice(
     return;
   }
 
-  std::optional<base::Value> json = base::JSONReader::Read(voice_id);
+  std::optional<base::Value> json =
+      base::JSONReader::Read(voice_id, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   std::string name;
   std::string extension_id;
   if (const std::string* ptr = json->GetDict().FindString("name")) {
@@ -116,20 +117,16 @@ void SettingsWithTtsPreviewHandler::RegisterMessages() {
 }
 
 void SettingsWithTtsPreviewHandler::OnJavascriptAllowed() {
-  content::TtsController::GetInstance()->AddVoicesChangedDelegate(this);
+  tts_observation_.Observe(content::TtsController::GetInstance());
 }
 
 void SettingsWithTtsPreviewHandler::OnJavascriptDisallowed() {
-  RemoveTtsControllerDelegates();
+  tts_observation_.Reset();
 }
 
 void SettingsWithTtsPreviewHandler::RefreshTtsVoices(
     const base::Value::List& args) {
   content::TtsController::GetInstance()->RefreshVoices();
-}
-
-void SettingsWithTtsPreviewHandler::RemoveTtsControllerDelegates() {
-  content::TtsController::GetInstance()->RemoveVoicesChangedDelegate(this);
 }
 
 }  // namespace ash::settings

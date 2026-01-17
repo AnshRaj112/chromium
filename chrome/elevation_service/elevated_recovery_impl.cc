@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "chrome/elevation_service/elevated_recovery_impl.h"
 
 #include <objbase.h>
 
+#include <optional>
 #include <string>
 #include <utility>
 
 #include "base/base_paths.h"
 #include "base/command_line.h"
+#include "base/compiler_specific.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -135,22 +132,28 @@ HRESULT CopyFileImpersonated(const base::FilePath from,
   std::vector<char> buffer(kBufferSize);
 
   for (uint64_t total_bytes_read = 0;;) {
-    const int bytes_read =
-        from_file.ReadAtCurrentPos(buffer.data(), buffer.size());
-    if (bytes_read < 0)
+    const std::optional<size_t> bytes_read =
+        from_file.ReadAtCurrentPos(base::as_writable_byte_span(buffer));
+    if (!bytes_read) {
       return HRESULTFromLastError();
-    if (bytes_read == 0)
+    }
+    if (bytes_read == 0) {
       return S_OK;
+    }
 
-    total_bytes_read += bytes_read;
-    if (total_bytes_read > kMaxFileSize)
+    total_bytes_read += *bytes_read;
+    if (total_bytes_read > kMaxFileSize) {
       return E_INVALIDARG;
+    }
 
-    const int bytes_written = to_file.WriteAtCurrentPos(&buffer[0], bytes_read);
-    if (bytes_written < 0)
+    const std::optional<size_t> bytes_written = to_file.WriteAtCurrentPos(
+        base::as_byte_span(buffer).first(*bytes_read));
+    if (!bytes_written) {
       return HRESULTFromLastError();
-    if (bytes_written != bytes_read)
+    }
+    if (bytes_written != bytes_read) {
       return E_UNEXPECTED;
+    }
   }
 
   NOTREACHED();
@@ -250,18 +253,6 @@ HRESULT ValidateCRXArgs(const std::wstring& browser_appid,
   return ::IIDFromString(session_id.c_str(), &session_guid);
 }
 
-// Deletes all the files and subdirectories within |directory_path|. Errors are
-// ignored.
-void DeleteDirectoryFiles(const base::FilePath& directory_path) {
-  base::FileEnumerator file_enum(
-      directory_path, false,
-      base::FileEnumerator::FILES | base::FileEnumerator::DIRECTORIES);
-  for (base::FilePath current = file_enum.Next(); !current.empty();
-       current = file_enum.Next()) {
-    base::DeletePathRecursively(current);
-  }
-}
-
 // Schedules deletion after reboot of |dir_name| as well as all the files and
 // subdirectories within |dir_name|. Errors are ignored.
 void ScheduleDirectoryForDeletion(const base::FilePath& dir_name) {
@@ -306,7 +297,7 @@ HRESULT CleanupChromeRecoveryDirectory() {
   if (FAILED(hr))
     return hr;
 
-  DeleteDirectoryFiles(recovery_dir);
+  base::DeletePathRecursively(recovery_dir);
 
   return S_OK;
 }

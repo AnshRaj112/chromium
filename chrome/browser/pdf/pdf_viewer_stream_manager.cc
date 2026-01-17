@@ -10,10 +10,10 @@
 #include <tuple>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/weak_ptr.h"
+#include "base/strings/to_string.h"
 #include "base/supports_user_data.h"
 #include "components/crash/core/common/crash_key.h"
 #include "components/pdf/browser/pdf_frame_util.h"
@@ -323,6 +323,12 @@ void PdfViewerStreamManager::SetPluginCanSave(
   stream_info->set_plugin_can_save(plugin_can_save);
 }
 
+bool PdfViewerStreamManager::ContainsUnclaimedStreamInfo(
+    content::FrameTreeNodeId frame_tree_node_id) const {
+  return stream_infos_.contains(
+      GetUnclaimedEmbedderHostInfo(frame_tree_node_id));
+}
+
 void PdfViewerStreamManager::DeleteUnclaimedStreamInfo(
     content::FrameTreeNodeId frame_tree_node_id) {
   CHECK(stream_infos_.erase(GetUnclaimedEmbedderHostInfo(frame_tree_node_id)));
@@ -524,11 +530,11 @@ void PdfViewerStreamManager::DidFinishNavigation(
         // zoom not affecting the browser UI.
         const GURL pdf_extension_url = stream_info->stream()->handler_url();
         CHECK_EQ(pdf_extension_url, navigation_handle->GetURL());
-        CHECK_EQ(extensions::kExtensionScheme, pdf_extension_url.scheme());
+        CHECK_EQ(extensions::kExtensionScheme, pdf_extension_url.GetScheme());
         content::HostZoomMap::Get(
             navigation_handle->GetRenderFrameHost()->GetSiteInstance())
-            ->SetZoomLevelForHostAndScheme(pdf_extension_url.scheme(),
-                                           pdf_extension_url.host(), 0);
+            ->SetZoomLevelForHostAndScheme(pdf_extension_url.GetScheme(),
+                                           pdf_extension_url.GetHost(), 0);
         // Set ZoomController on the extension host.
         zoom::ZoomController::CreateForWebContentsAndRenderFrameHost(
             web_contents(),
@@ -630,12 +636,6 @@ PdfViewerStreamManager::GetClaimedStreamInfoFromPdfContentNavigation(
   CHECK(embedder_host);
 
   return GetClaimedStreamInfo(embedder_host);
-}
-
-bool PdfViewerStreamManager::ContainsUnclaimedStreamInfo(
-    content::FrameTreeNodeId frame_tree_node_id) const {
-  return base::Contains(stream_infos_,
-                        GetUnclaimedEmbedderHostInfo(frame_tree_node_id));
 }
 
 PdfViewerStreamManager::StreamInfo* PdfViewerStreamManager::ClaimStreamInfo(

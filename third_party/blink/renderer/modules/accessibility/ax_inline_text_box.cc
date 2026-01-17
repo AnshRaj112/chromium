@@ -288,35 +288,9 @@ AXObject* AXInlineTextBox::PreviousOnLine() const {
   if (IsDetached())
     return nullptr;
 
-  if (IsPartOfAListItem()) {
+  if (IsPartOfAListItem() &&
+      ParentObject()->FirstChildIncludingIgnored() == this) {
     AXObject* candidate = ParentObject()->PreviousOnLine();
-    if (candidate) {
-      return candidate;
-    }
-    // It may be that the previous item has ignored content we must step over.
-    // Ignored content isn't guarenteed to have its line attributes serialized,
-    // so we must step over them.
-    // TODO: Investigate whether this should be applied more broadly.
-    candidate = ParentObject()->PreviousSiblingIncludingIgnored();
-    // Shadow content does not bubble its line breaking status to the host.
-    // TODO: Investigate if this should be refactored into IsLineBreakingObject.
-    // This could be considered breaking if this is in the same tree, so
-    // any future refactoring of IsLineBreakingObject would need this additional
-    // context to work as expected.
-    if (candidate && candidate->IsLineBreakingObject() &&
-        (candidate->GetClosestNode()->GetTreeScope() ==
-         GetClosestNode()->GetTreeScope())) {
-      return nullptr;
-    }
-    while (candidate && candidate->IsIgnored()) {
-      if (candidate->IsLineBreakingObject() &&
-          (candidate->GetClosestNode()->GetTreeScope() ==
-           GetClosestNode()->GetTreeScope())) {
-        // If the candidate is a line breaking object, we need to return.
-        return nullptr;
-      }
-      candidate = candidate->PreviousSiblingIncludingIgnored();
-    }
     return candidate;
   }
 
@@ -379,6 +353,8 @@ void AXInlineTextBox::SerializeMarkerAttributes(
       GetAriaSpellingOrGrammarMarker();
   if (aria_marker_type) {
     marker_types.push_back(ToAXMarkerType(aria_marker_type.value()));
+    highlight_types.push_back(
+        static_cast<int32_t>(ax::mojom::blink::HighlightType::kNone));
     marker_starts.push_back(ax_range.Start().TextOffset());
     marker_ends.push_back(ax_range.End().TextOffset());
   }
@@ -453,11 +429,12 @@ void AXInlineTextBox::SerializeMarkerAttributes(
     }
 
     marker_types.push_back(int32_t{ToAXMarkerType(marker->GetType())});
-    highlight_types.push_back(static_cast<int32_t>(highlight_type));
+    highlight_types.push_back(highlight_type);
     marker_starts.push_back(local_start_offset);
     marker_ends.push_back(local_end_offset);
   }
 
+  DCHECK_EQ(marker_types.size(), highlight_types.size());
   DCHECK_EQ(marker_types.size(), marker_starts.size());
   DCHECK_EQ(marker_types.size(), marker_ends.size());
 

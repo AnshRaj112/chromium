@@ -6,9 +6,7 @@
 
 #include <limits>
 
-#include "base/containers/contains.h"
 #include "base/files/file_enumerator.h"
-#include "base/files/file_util.h"
 #include "base/i18n/case_conversion.h"
 #include "base/memory/ptr_util.h"
 #include "base/metrics/field_trial_params.h"
@@ -256,7 +254,7 @@ void OnDeviceHeadProvider::HeadModelSearchDone(
   // Extract search query from current URL.
   std::string previous_query, query_str;
   const GURL& current_url = params->input.current_url();
-  if (current_url.path() == "/search" &&
+  if (current_url.GetPath() == "/search" &&
       net::GetValueForKeyInQuery(current_url, "q", &query_str)) {
     previous_query = query_str;
   }
@@ -370,7 +368,7 @@ bool OnDeviceHeadProvider::ShouldFetchTailSuggestions(
     // Determines if the prefix contains multiple words by checking if it has
     // whitespaces; Note this does not work when the prefix is not using
     // whitespace as delimiter, e.g. CJK languages.
-    bool is_single_word_prefix = !base::Contains(sanitized_input, " ");
+    bool is_single_word_prefix = !sanitized_input.contains(" ");
     if (is_single_word_prefix) {
       return false;
     }

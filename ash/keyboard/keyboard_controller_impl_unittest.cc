@@ -21,7 +21,6 @@
 #include "ash/test/ash_test_base.h"
 #include "ash/test/ash_test_helper.h"
 #include "ash/wm/tablet_mode/tablet_mode_controller_test_api.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
 #include "base/test/bind.h"
@@ -142,8 +141,6 @@ class KeyboardControllerImplTest : public AshTestBase {
     test_observer()->set_config(keyboard_controller()->GetKeyboardConfig());
   }
 
-  void TearDown() override { AshTestBase::TearDown(); }
-
   KeyboardControllerImpl* keyboard_controller() {
     return Shell::Get()->keyboard_controller();
   }
@@ -179,8 +176,8 @@ class KeyboardControllerImplTest : public AshTestBase {
 
   void CreateFocusedTestWindowInRootWindow(aura::Window* root_window) {
     // Owned by |root_window|.
-    aura::Window* focusable_window =
-        CreateTestWindowInShellWithBounds(root_window->GetBoundsInScreen());
+    aura::Window* focusable_window = CreateTestWindowInShell(
+        {.bounds = root_window->GetBoundsInScreen(), .window_id = 0});
     focusable_window->Focus();
   }
 
@@ -302,28 +299,23 @@ TEST_F(KeyboardControllerImplTest, EnableFlags) {
   keyboard_controller()->SetEnableFlag(KeyboardEnableFlag::kExtensionEnabled);
   std::set<keyboard::KeyboardEnableFlag> enable_flags =
       keyboard_controller()->GetEnableFlags();
-  EXPECT_TRUE(
-      base::Contains(enable_flags, KeyboardEnableFlag::kExtensionEnabled));
+  EXPECT_TRUE(enable_flags.contains(KeyboardEnableFlag::kExtensionEnabled));
   EXPECT_EQ(enable_flags, test_observer()->enable_flags());
   EXPECT_TRUE(keyboard_controller()->IsKeyboardEnabled());
 
   // Set the enable override to disable the keyboard.
   keyboard_controller()->SetEnableFlag(KeyboardEnableFlag::kPolicyDisabled);
   enable_flags = keyboard_controller()->GetEnableFlags();
-  EXPECT_TRUE(
-      base::Contains(enable_flags, KeyboardEnableFlag::kExtensionEnabled));
-  EXPECT_TRUE(
-      base::Contains(enable_flags, KeyboardEnableFlag::kPolicyDisabled));
+  EXPECT_TRUE(enable_flags.contains(KeyboardEnableFlag::kExtensionEnabled));
+  EXPECT_TRUE(enable_flags.contains(KeyboardEnableFlag::kPolicyDisabled));
   EXPECT_EQ(enable_flags, test_observer()->enable_flags());
   EXPECT_FALSE(keyboard_controller()->IsKeyboardEnabled());
 
   // Clear the enable override; should enable the keyboard.
   keyboard_controller()->ClearEnableFlag(KeyboardEnableFlag::kPolicyDisabled);
   enable_flags = keyboard_controller()->GetEnableFlags();
-  EXPECT_TRUE(
-      base::Contains(enable_flags, KeyboardEnableFlag::kExtensionEnabled));
-  EXPECT_FALSE(
-      base::Contains(enable_flags, KeyboardEnableFlag::kPolicyDisabled));
+  EXPECT_TRUE(enable_flags.contains(KeyboardEnableFlag::kExtensionEnabled));
+  EXPECT_FALSE(enable_flags.contains(KeyboardEnableFlag::kPolicyDisabled));
   EXPECT_EQ(enable_flags, test_observer()->enable_flags());
   EXPECT_TRUE(keyboard_controller()->IsKeyboardEnabled());
 }
@@ -708,7 +700,7 @@ TEST_F(KeyboardControllerImplTest, SwipeUpToShowHotSeat) {
   ASSERT_TRUE(keyboard::test::WaitUntilShown());
 
   gfx::Rect display_bounds =
-      display::Screen::GetScreen()->GetPrimaryDisplay().bounds();
+      display::Screen::Get()->GetPrimaryDisplay().bounds();
   const gfx::Point start(display_bounds.bottom_center());
   const gfx::Point end(start + gfx::Vector2d(0, -80));
   const base::TimeDelta time_delta = base::Milliseconds(100);
@@ -734,7 +726,7 @@ TEST_F(KeyboardControllerImplTest, FlingUpToShowOverviewMode) {
   ASSERT_TRUE(keyboard::test::WaitUntilShown());
 
   gfx::Rect display_bounds =
-      display::Screen::GetScreen()->GetPrimaryDisplay().bounds();
+      display::Screen::Get()->GetPrimaryDisplay().bounds();
   const gfx::Point start(display_bounds.bottom_center());
   const gfx::Point end(start + gfx::Vector2d(0, -200));
   const int fling_speed =
@@ -763,7 +755,7 @@ TEST_F(KeyboardControllerImplTest, SwipeUpDoesntHideKeyboardInClamshellMode) {
   ASSERT_TRUE(keyboard::test::WaitUntilShown());
 
   gfx::Rect display_bounds =
-      display::Screen::GetScreen()->GetPrimaryDisplay().bounds();
+      display::Screen::Get()->GetPrimaryDisplay().bounds();
   const gfx::Point start(display_bounds.bottom_center());
   const gfx::Point end(start + gfx::Vector2d(0, -80));
   const base::TimeDelta time_delta = base::Milliseconds(100);
@@ -784,7 +776,7 @@ TEST_F(KeyboardControllerImplTest, RecordsKeyRepeatSettings) {
   histogram_tester.ExpectTotalCount(
       "ChromeOS.Settings.Device.KeyboardAutoRepeatInterval", /*count=*/0u);
 
-  SimulateUserLogin({"user1"});
+  auto account_id = SimulateUserLogin({"user1"});
 
   histogram_tester.ExpectTotalCount(
       "ChromeOS.Settings.Device.KeyboardAutoRepeatDelay", /*count=*/1u);
@@ -802,7 +794,7 @@ TEST_F(KeyboardControllerImplTest, RecordsKeyRepeatSettings) {
   histogram_tester.ExpectTotalCount(
       "ChromeOS.Settings.Device.KeyboardAutoRepeatInterval", /*count=*/2u);
 
-  SimulateUserLogin({"user1"});
+  SwitchActiveUser(account_id);
 
   histogram_tester.ExpectTotalCount(
       "ChromeOS.Settings.Device.KeyboardAutoRepeatDelay", /*count=*/2u);

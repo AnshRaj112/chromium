@@ -7,11 +7,16 @@
 #include <cstdint>
 #include <optional>
 
+#include "base/check.h"
+#include "base/functional/bind.h"
 #include "base/strings/to_string.h"
 #include "base/time/time.h"
 #include "base/types/expected.h"
+#include "chrome/common/actor.mojom-shared.h"
 #include "chrome/common/actor/action_result.h"
 #include "chrome/common/actor/actor_logging.h"
+#include "chrome/common/actor/journal_details_builder.h"
+#include "chrome/renderer/actor/click_dispatcher.h"
 #include "chrome/renderer/actor/tool_utils.h"
 #include "content/public/renderer/render_frame.h"
 #include "third_party/abseil-cpp/absl/strings/str_format.h"
@@ -38,7 +43,7 @@ using ::blink::WebMouseEvent;
 using ::blink::WebNode;
 
 ClickTool::ClickTool(content::RenderFrame& frame,
-                     Journal::TaskId task_id,
+                     TaskId task_id,
                      Journal& journal,
                      mojom::ClickActionPtr action,
                      mojom::ToolTargetPtr target,
@@ -59,44 +64,58 @@ void ClickTool::Execute(ToolFinishedCallback callback) {
     return;
   }
 
-  gfx::PointF click_point = validated_result.value();
-
   WebMouseEvent::Button button;
   switch (action_->type) {
-    case mojom::ClickAction::Type::kLeft: {
+    case mojom::ClickType::kLeft: {
       button = WebMouseEvent::Button::kLeft;
       break;
     }
-    case mojom::ClickAction::Type::kRight: {
+    case mojom::ClickType::kRight: {
       button = WebMouseEvent::Button::kRight;
       break;
     }
   }
   int click_count;
   switch (action_->count) {
-    case mojom::ClickAction::Count::kSingle: {
+    case mojom::ClickCount::kSingle: {
       click_count = 1;
       break;
     }
-    case mojom::ClickAction::Count::kDouble: {
+    case mojom::ClickCount::kDouble: {
       click_count = 2;
       break;
     }
   }
 
+  ResolvedTarget target = validated_result.value();
   journal_->Log(
       task_id_, "ClickTool::Execute",
-      absl::StrFormat("Dispatching click at point %s", click_point.ToString()));
+      JournalDetailsBuilder().Add("point", target.widget_point).Build());
 
-  mojom::ActionResultPtr result = CreateAndDispatchClick(
-      button, click_count, click_point, frame_->GetWebFrame()->FrameWidget());
-  std::move(callback).Run(std::move(result));
+  // TODO(b/467336183): For debugging; should be removed once this bug is
+  // resolved.
+  journal_->SendLogBuffer();
+
+  CHECK(!click_dispatcher_);
+  click_dispatcher_.emplace(button, click_count, target, *this,
+                            std::move(callback));
 }
 
 std::string ClickTool::DebugString() const {
   return absl::StrFormat("ClickTool[%s;type(%s);count(%s)]",
                          ToDebugString(target_), base::ToString(action_->type),
                          base::ToString(action_->count));
+}
+
+bool ClickTool::SupportsPaintStability() const {
+  return true;
+}
+
+void ClickTool::Cancel() {
+  if (click_dispatcher_) {
+    click_dispatcher_->Cancel();
+    click_dispatcher_.reset();
+  }
 }
 
 ClickTool::ValidatedResult ClickTool::Validate() const {
@@ -116,11 +135,12 @@ ClickTool::ValidatedResult ClickTool::Validate() const {
     if (!form_element.IsNull() && !form_element.IsEnabled()) {
       return base::unexpected(MakeResult(
           mojom::ActionResultCode::kElementDisabled,
+          /*requires_page_stabilization=*/false,
           absl::StrFormat("[Element %s]", base::ToString(form_element))));
     }
   }
 
-  return resolved_target->point;
+  return resolved_target;
 }
 
 }  // namespace actor

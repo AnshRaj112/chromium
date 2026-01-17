@@ -11,8 +11,6 @@
 #include <vector>
 
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
-#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
@@ -21,7 +19,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/synchronization/atomic_flag.h"
 #include "base/task/single_thread_task_runner.h"
-#include "base/test/scoped_feature_list.h"
 #include "base/threading/platform_thread.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
@@ -31,11 +28,11 @@
 #include "chrome/browser/profiles/profile_attributes_entry.h"
 #include "chrome/browser/profiles/profile_attributes_storage.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/sessions/session_service_base_observer.h"
 #include "chrome/browser/sessions/session_service_base_test_helper.h"
 #include "chrome/browser/sessions/session_service_log.h"
 #include "chrome/browser/sessions/session_service_test_helper.h"
 #include "chrome/browser/signin/signin_util.h"
-#include "chrome/browser/ui/ui_features.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/test/base/browser_with_test_window_test.h"
@@ -57,6 +54,7 @@
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/web_contents_tester.h"
+#include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/public/common/page_state/page_state.h"
 #include "third_party/blink/public/common/user_agent/user_agent_metadata.h"
@@ -74,10 +72,7 @@ using sessions::SerializedNavigationEntryTestHelper;
 
 class SessionServiceTest : public BrowserWithTestWindowTest {
  public:
-  SessionServiceTest() : window_bounds(0, 1, 2, 3) {
-    scoped_feature_list_.InitWithFeatures(
-        {features::kSideBySide, features::kSideBySideSessionRestore}, {});
-  }
+  SessionServiceTest() : window_bounds(0, 1, 2, 3) {}
 
  protected:
   void SetUp() override {
@@ -221,7 +216,14 @@ class SessionServiceTest : public BrowserWithTestWindowTest {
 
   std::unique_ptr<SessionService> session_service_;
   SessionServiceTestHelper helper_;
-  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+class MockSessionServiceBaseObserver : public SessionServiceBaseObserver {
+ public:
+  MockSessionServiceBaseObserver() = default;
+  ~MockSessionServiceBaseObserver() override = default;
+
+  MOCK_METHOD(void, OnDestroying, (SessionServiceBase*), (override));
 };
 
 TEST_F(SessionServiceTest, Basic) {
@@ -1250,7 +1252,7 @@ TEST_F(SessionServiceTest, TabGroupMetadataSaved) {
 
   for (int group_ndx = 0; group_ndx < kNumGroups; ++group_ndx) {
     const tab_groups::TabGroupId group_id = group_ids[group_ndx];
-    ASSERT_TRUE(base::Contains(tab_groups, group_id));
+    ASSERT_TRUE(tab_groups.contains(group_id));
     EXPECT_EQ(visual_data[group_ndx], tab_groups[group_id]->visual_data);
     if (tab_groups[group_id]->saved_guid.has_value()) {
       EXPECT_EQ(saved_guids[group_ndx],
@@ -1334,7 +1336,7 @@ TEST_F(SessionServiceTest, SplitTabDataSaved) {
 
   for (int split_ndx = 0; split_ndx < kNumSplitTabs; ++split_ndx) {
     const split_tabs::SplitTabId split_id = split_ids[split_ndx];
-    ASSERT_TRUE(base::Contains(split_tab_map, split_id));
+    ASSERT_TRUE(split_tab_map.contains(split_id));
     EXPECT_EQ(visual_data[split_ndx],
               split_tab_map[split_id]->split_visual_data_);
   }
@@ -1359,8 +1361,7 @@ TEST_F(SessionServiceTest, Workspace) {
                                                 window_workspace);
   for (const auto& command : pending_commands) {
     if (command->id() == workspace_command->id() &&
-        command->contents_as_string_piece() ==
-            workspace_command->contents_as_string_piece()) {
+        command->contents() == workspace_command->contents()) {
       found_workspace_command = true;
       break;
     }
@@ -1388,8 +1389,7 @@ TEST_F(SessionServiceTest, WorkspaceSavedOnOpened) {
                                                 workspace);
   for (const auto& command : pending_commands) {
     if (command->id() == workspace_command->id() &&
-        command->contents_as_string_piece() ==
-            workspace_command->contents_as_string_piece()) {
+        command->contents() == workspace_command->contents()) {
       found_workspace_command = true;
       break;
     }
@@ -1419,8 +1419,7 @@ TEST_F(SessionServiceTest, VisibleOnAllWorkspaces) {
           /*visible_on_all_workspaces=*/true);
   for (const auto& command : pending_commands) {
     if (command->id() == visible_on_all_workspaces_command->id() &&
-        command->contents_as_string_piece() ==
-            visible_on_all_workspaces_command->contents_as_string_piece()) {
+        command->contents() == visible_on_all_workspaces_command->contents()) {
       found_visible_on_all_workspaces_command = true;
       break;
     }
@@ -1450,8 +1449,7 @@ TEST_F(SessionServiceTest, PinnedAfterReset) {
 
   for (const auto& command : pending_commands) {
     if (command->id() == pinned_command->id() &&
-        command->contents_as_string_piece() ==
-            pinned_command->contents_as_string_piece()) {
+        command->contents() == pinned_command->contents()) {
       found_pinned_command = true;
       break;
     }
@@ -1578,6 +1576,15 @@ TEST_F(SessionServiceTest, DisableSaving) {
   EXPECT_TRUE(helper_.command_storage_manager()->pending_reset());
 }
 
+TEST_F(SessionServiceTest, ObserverNotifiedOnDestruction) {
+  MockSessionServiceBaseObserver observer;
+  service()->AddObserver(&observer);
+
+  EXPECT_CALL(observer, OnDestroying(service()));
+
+  DestroySessionService();
+}
+
 #if BUILDFLAG(IS_CHROMEOS)
 class SessionServiceKioskTest : public SessionServiceTest {
  public:
@@ -1586,7 +1593,7 @@ class SessionServiceKioskTest : public SessionServiceTest {
   }
 
   void LogIn(std::string_view email, const GaiaId& gaia_id) override {
-    chromeos::SetUpFakeKioskSession(std::string(email));
+    chromeos::SetUpFakeChromeAppKioskSession(std::string(email));
   }
 };
 

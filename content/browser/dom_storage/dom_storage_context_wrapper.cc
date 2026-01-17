@@ -4,24 +4,29 @@
 
 #include "content/browser/dom_storage/dom_storage_context_wrapper.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
+#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/memory/weak_ptr.h"
+#include "base/metrics/histogram_functions.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/syslog_logging.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
+#include "base/task/thread_pool.h"
 #include "build/build_config.h"
 #include "components/services/storage/dom_storage/local_storage_impl.h"
 #include "components/services/storage/dom_storage/session_storage_impl.h"
+#include "components/services/storage/public/cpp/constants.h"
 #include "components/services/storage/public/mojom/storage_policy_update.mojom.h"
 #include "components/services/storage/public/mojom/storage_service.mojom.h"
 #include "components/services/storage/public/mojom/storage_usage_info.mojom.h"
@@ -44,8 +49,6 @@
 #include "third_party/blink/public/common/storage_key/storage_key.h"
 
 namespace content {
-
-using StorageLifecycle = storage::mojom::StorageLifecycle;
 
 namespace {
 
@@ -75,18 +78,6 @@ void AdaptStorageUsageInfo(
   std::move(callback).Run(result);
 }
 
-StorageLifecycle GetStorageLifecycle(bool recovering,
-                                     bool storage_service_remote_was_bound) {
-  if (recovering) {
-    return storage_service_remote_was_bound
-               ? StorageLifecycle::kRecovering
-               : StorageLifecycle::kRecoveringWithUnboundStorageService;
-  }
-  return storage_service_remote_was_bound
-             ? StorageLifecycle::kInitializing
-             : StorageLifecycle::kInitializingWithUnboundStorageService;
-}
-
 }  // namespace
 
 scoped_refptr<DOMStorageContextWrapper> DOMStorageContextWrapper::Create(
@@ -110,23 +101,34 @@ scoped_refptr<DOMStorageContextWrapper> DOMStorageContextWrapper::Create(
 DOMStorageContextWrapper::DOMStorageContextWrapper(
     StoragePartitionImpl* partition)
     : partition_(partition) {
-  memory_pressure_listener_ = std::make_unique<base::MemoryPressureListener>(
-      FROM_HERE,
-      base::BindRepeating(&DOMStorageContextWrapper::OnMemoryPressure,
-                          base::Unretained(this)));
-
   // `partition_` can be null in test environments.
   if (!partition_) {
     return;
   }
 
-  // Binding Session or Local storage will result in the storage service getting
-  // bound. So, we capture this state before those calls.
-  StorageLifecycle lifecycle = GetStorageLifecycle(
-      /*recovering=*/false, partition_->IsStorageServiceRemoteValid());
+  MaybeBindSessionStorageControl();
+  MaybeBindLocalStorageControl();
 
-  MaybeBindSessionStorageControl(lifecycle);
-  MaybeBindLocalStorageControl(lifecycle);
+  // Report on disk LocalStorage db size.
+  if (partition_->GetStoragePartitionPath()) {
+    // Path to the LocalStorage leveldb directory.
+    base::FilePath db_path = storage::GetLocalStorageDatabasePath(
+        *partition_->GetStoragePartitionPath());
+
+    // Offload the blocking file operation and report the result.
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE, {base::MayBlock()},
+        base::BindOnce(
+            [](const base::FilePath& path) -> int64_t {
+              return base::ComputeDirectorySize(path);
+            },
+            db_path),
+        base::BindOnce([](int64_t db_size) {
+          int size_kb = base::saturated_cast<int>(db_size / 1024);
+          base::UmaHistogramMemoryKB("LocalStorage.DatabaseOnDiskSizeKB",
+                                     size_kb);
+        }));
+  }
 }
 
 DOMStorageContextWrapper::~DOMStorageContextWrapper() {
@@ -232,7 +234,7 @@ void DOMStorageContextWrapper::StartScavengingUnusedSessionStorage() {
     return;
   }
 
-  session_storage_control_->ScavengeUnusedNamespaces(base::NullCallback());
+  session_storage_control_->ScavengeUnusedNamespaces();
 }
 
 void DOMStorageContextWrapper::SetForceKeepSessionState() {
@@ -252,7 +254,6 @@ void DOMStorageContextWrapper::Shutdown() {
   // Signals the implementation to perform shutdown operations.
   session_storage_control_.reset();
   local_storage_control_.reset();
-  memory_pressure_listener_.reset();
 
   // Make sure the observer drops its reference to |this|.
   storage_policy_observer_.reset();
@@ -279,8 +280,6 @@ void DOMStorageContextWrapper::OpenLocalStorage(
   DCHECK(local_storage_control_);
   local_storage_control_->BindStorageArea(storage_key, std::move(receiver));
   if (storage_policy_observer_) {
-    // TODO(crbug.com/40177656): Pass the real StorageKey when
-    // StoragePolicyObserver is converted.
     storage_policy_observer_->StartTrackingOrigin(storage_key.origin());
   }
 }
@@ -290,8 +289,7 @@ void DOMStorageContextWrapper::BindNamespace(
     mojo::ReportBadMessageCallback bad_message_callback,
     mojo::PendingReceiver<blink::mojom::SessionStorageNamespace> receiver) {
   DCHECK(session_storage_control_);
-  session_storage_control_->BindNamespace(namespace_id, std::move(receiver),
-                                          base::DoNothing());
+  session_storage_control_->BindNamespace(namespace_id, std::move(receiver));
 }
 
 void DOMStorageContextWrapper::BindStorageArea(
@@ -307,8 +305,8 @@ void DOMStorageContextWrapper::BindStorageArea(
     return;
   }
   DCHECK(session_storage_control_);
-  session_storage_control_->BindStorageArea(
-      storage_key, namespace_id, std::move(receiver), base::DoNothing());
+  session_storage_control_->BindStorageArea(storage_key, namespace_id,
+                                            std::move(receiver));
 }
 
 bool DOMStorageContextWrapper::IsRequestValid(
@@ -356,12 +354,7 @@ bool DOMStorageContextWrapper::IsRequestValid(
 
 void DOMStorageContextWrapper::OnSessionStorageDisconnected() {
   DCHECK(partition_);
-
-  // Binding Session storage will result in the storage service getting bound.
-  // So, we capture this state before that call.
-  StorageLifecycle lifecycle = GetStorageLifecycle(
-      /*recovering=*/true, partition_->IsStorageServiceRemoteValid());
-  MaybeBindSessionStorageControl(lifecycle);
+  MaybeBindSessionStorageControl();
 
   // Make sure the service is aware of namespaces we asked a previous instance
   // to create, so it can properly service renderers trying to manipulate those
@@ -369,18 +362,17 @@ void DOMStorageContextWrapper::OnSessionStorageDisconnected() {
   base::AutoLock lock(alive_namespaces_lock_);
   for (const auto& entry : alive_namespaces_)
     session_storage_control_->CreateNamespace(entry.first);
-  session_storage_control_->ScavengeUnusedNamespaces(base::NullCallback());
+  session_storage_control_->ScavengeUnusedNamespaces();
 
   partition_->ResetSessionStorageConnections();
 }
 
-void DOMStorageContextWrapper::MaybeBindSessionStorageControl(
-    StorageLifecycle lifecycle) {
+void DOMStorageContextWrapper::MaybeBindSessionStorageControl() {
   if (!partition_)
     return;
   session_storage_control_.reset();
   partition_->GetStorageService()->BindSessionStorageControl(
-      partition_->GetStoragePartitionPath(), lifecycle,
+      partition_->GetStoragePartitionPath(),
       session_storage_control_.BindNewPipeAndPassReceiver());
   session_storage_control_.set_disconnect_handler(
       base::BindOnce(&DOMStorageContextWrapper::OnSessionStorageDisconnected,
@@ -390,23 +382,17 @@ void DOMStorageContextWrapper::MaybeBindSessionStorageControl(
 void DOMStorageContextWrapper::OnLocalStorageDisconnected() {
   DCHECK(partition_);
 
-  // Binding Local storage will result in the storage service getting bound. So,
-  // we capture this state before that call.
-  StorageLifecycle lifecycle = GetStorageLifecycle(
-      /*recovering=*/true, partition_->IsStorageServiceRemoteValid());
-  MaybeBindLocalStorageControl(lifecycle);
-
+  MaybeBindLocalStorageControl();
   partition_->ResetLocalStorageConnections();
 }
 
-void DOMStorageContextWrapper::MaybeBindLocalStorageControl(
-    StorageLifecycle lifecycle) {
+void DOMStorageContextWrapper::MaybeBindLocalStorageControl() {
   if (!partition_) {
     return;
   }
   local_storage_control_.reset();
   partition_->GetStorageService()->BindLocalStorageControl(
-      partition_->GetStoragePartitionPath(), lifecycle,
+      partition_->GetStoragePartitionPath(),
       local_storage_control_.BindNewPipeAndPassReceiver());
   local_storage_control_.set_disconnect_handler(
       base::BindOnce(&DOMStorageContextWrapper::OnLocalStorageDisconnected,
@@ -425,25 +411,15 @@ void DOMStorageContextWrapper::AddNamespace(
     const std::string& namespace_id,
     SessionStorageNamespaceImpl* session_namespace) {
   base::AutoLock lock(alive_namespaces_lock_);
-  DCHECK(!base::Contains(alive_namespaces_, namespace_id));
+  DCHECK(!alive_namespaces_.contains(namespace_id));
   alive_namespaces_[namespace_id] = session_namespace;
 }
 
 void DOMStorageContextWrapper::RemoveNamespace(
     const std::string& namespace_id) {
   base::AutoLock lock(alive_namespaces_lock_);
-  DCHECK(base::Contains(alive_namespaces_, namespace_id));
+  DCHECK(alive_namespaces_.contains(namespace_id));
   alive_namespaces_.erase(namespace_id);
-}
-
-void DOMStorageContextWrapper::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level) {
-  PurgeOption purge_option = PURGE_UNOPENED;
-  if (memory_pressure_level ==
-      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL) {
-    purge_option = PURGE_AGGRESSIVE;
-  }
-  PurgeMemory(purge_option);
 }
 
 void DOMStorageContextWrapper::PurgeMemory(PurgeOption purge_option) {
@@ -468,8 +444,6 @@ void DOMStorageContextWrapper::OnStartupUsageRetrieved(
   for (const auto& info : usage) {
     origins.emplace_back(std::move(info->storage_key.origin()));
   }
-  // TODO(crbug.com/40177656): Pass the real StorageKey when
-  // StoragePolicyObserver is converted.
   storage_policy_observer_->StartTrackingOrigins(std::move(origins));
 }
 

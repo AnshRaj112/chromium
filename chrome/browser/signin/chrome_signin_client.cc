@@ -38,9 +38,11 @@
 #include "chrome/browser/ui/hats/survey_config.h"
 #include "chrome/common/buildflags.h"
 #include "chrome/common/channel_info.h"
+#include "chrome/common/chrome_features.h"
 #include "chrome/common/pref_names.h"
 #include "components/content_settings/core/browser/cookie_settings.h"
 #include "components/metrics/metrics_service.h"
+#include "components/plus_addresses/core/common/features.h"
 #include "components/policy/core/browser/browser_policy_connector.h"
 #include "components/prefs/pref_service.h"
 #include "components/signin/core/browser/cookie_settings_util.h"
@@ -54,11 +56,11 @@
 #include "components/signin/public/identity_manager/access_token_info.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/primary_account_change_event.h"
-#include "components/signin/public/identity_manager/scope_set.h"
 #include "components/variations/synthetic_trials.h"
 #include "components/version_info/channel.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/storage_partition.h"
+#include "google_apis/gaia/gaia_auth_fetcher.h"
 #include "google_apis/gaia/gaia_constants.h"
 #include "google_apis/gaia/gaia_urls.h"
 #include "ui/base/models/tree_node_iterator.h"
@@ -79,7 +81,8 @@
 #endif
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
-#include "chrome/browser/ui/browser_list.h"
+#include "chrome/browser/ui/browser_finder.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/profiles/profile_picker.h"
 #endif
 
@@ -184,6 +187,29 @@ std::string HatsSurveyTriggerForAccessPoint(
   }
 }
 
+class ChromeOAuthConsumerRegistry : public signin::OAuthConsumerRegistry {
+ protected:
+  signin::OAuthConsumer GetOAuthConsumerForEnterprisePlusAddress()
+      const override {
+    CHECK(base::FeatureList::IsEnabled(
+        plus_addresses::features::kPlusAddressesEnabled));
+    return signin::OAuthConsumer(
+        signin::oauth_consumer_name::kEnterprisePlusAddressName,
+        {plus_addresses::features::kEnterprisePlusAddressOAuthScope.Get()});
+  }
+
+  signin::OAuthConsumer GetOAuthConsumerForGlicUserStatus() const override {
+#if BUILDFLAG(ENABLE_GLIC)
+    CHECK(base::FeatureList::IsEnabled(features::kGlicUserStatusCheck));
+    return signin::OAuthConsumer(
+        signin::oauth_consumer_name::kGlicUserStatusName,
+        {features::kGeminiOAuth2Scope.Get()});
+#else
+    NOTREACHED();
+#endif
+  }
+};
+
 }  // namespace
 
 ChromeSigninClient::ChromeSigninClient(Profile* profile)
@@ -194,7 +220,9 @@ ChromeSigninClient::ChromeSigninClient(Profile* profile)
           std::make_unique<WaitForNetworkCallbackHelperChrome>()
 #endif
               ),
-      profile_(profile) {
+      profile_(profile),
+      oauth_consumer_registry_(
+          std::make_unique<ChromeOAuthConsumerRegistry>()) {
   // Makes sure to register groups on Startup if previously set.
   RegisterSyntheticTrialsFromPrefs();
 }
@@ -286,6 +314,11 @@ network::mojom::CookieManager* ChromeSigninClient::GetCookieManager() {
       ->GetCookieManagerForBrowserProcess();
 }
 
+network::mojom::DeviceBoundSessionManager*
+ChromeSigninClient::GetDeviceBoundSessionManager() const {
+  return profile_->GetDefaultStoragePartition()->GetDeviceBoundSessionManager();
+}
+
 network::mojom::NetworkContext* ChromeSigninClient::GetNetworkContext() {
   return profile_->GetDefaultStoragePartition()->GetNetworkContext();
 }
@@ -311,23 +344,15 @@ void ChromeSigninClient::RemoveContentSettingsObserver(
       observer);
 }
 
-bool ChromeSigninClient::IsClearPrimaryAccountAllowed(
-    bool has_sync_account) const {
-  return GetSignoutDecision(has_sync_account,
-                            /*signout_source=*/std::nullopt) ==
+bool ChromeSigninClient::IsClearPrimaryAccountAllowed() const {
+  return GetSignoutDecision(
+             /*signout_source=*/std::nullopt) ==
          SigninClient::SignoutDecision::ALLOW;
-}
-
-bool ChromeSigninClient::IsRevokeSyncConsentAllowed() const {
-  return GetSignoutDecision(/*has_sync_account=*/true,
-                            /*signout_source=*/std::nullopt) !=
-         SigninClient::SignoutDecision::REVOKE_SYNC_DISALLOWED;
 }
 
 void ChromeSigninClient::PreSignOut(
     base::OnceCallback<void(SignoutDecision)> on_signout_decision_reached,
-    signin_metrics::ProfileSignout signout_source_metric,
-    bool has_sync_account) {
+    signin_metrics::ProfileSignout signout_source_metric) {
   DCHECK(on_signout_decision_reached);
   DCHECK(!on_signout_decision_reached_) << "SignOut already in-progress!";
   on_signout_decision_reached_ = std::move(on_signout_decision_reached);
@@ -340,8 +365,6 @@ void ChromeSigninClient::PreSignOut(
   // `signin_metrics::ProfileSignout::kRevokeSyncFromSettings` when the user
   // turns off sync from the settings, we should also keep the window open at
   // this point.
-  // TODO(crbug.com/40280466): Check for managed accounts to be modified
-  // when aligning Managed vs Consumer accounts.
   bool user_declines_sync_after_consenting_to_management =
       (signout_source_metric == signin_metrics::ProfileSignout::kAbortSignin ||
        signout_source_metric ==
@@ -360,25 +383,25 @@ void ChromeSigninClient::PreSignOut(
   if (signin_util::IsForceSigninEnabled() && !profile_->IsSystemProfile() &&
       !profile_->IsGuestSession() && !profile_->IsChild() &&
       !keep_window_opened) {
-    BrowserList::CloseAllBrowsersWithProfile(
+    chrome::CloseAllBrowsersWithProfile(
         profile_,
-        base::BindRepeating(&ChromeSigninClient::OnCloseBrowsersSuccess,
-                            base::Unretained(this), signout_source_metric,
-                            /*should_sign_out=*/true, has_sync_account),
-        base::BindRepeating(&ChromeSigninClient::OnCloseBrowsersAborted,
-                            base::Unretained(this)),
         signout_source_metric == signin_metrics::ProfileSignout::kAbortSignin ||
             signout_source_metric == signin_metrics::ProfileSignout::
                                          kAuthenticationFailedWithForceSignin ||
             signout_source_metric ==
                 signin_metrics::ProfileSignout::
-                    kCancelSyncConfirmationOnWebOnlySignedIn);
+                    kCancelSyncConfirmationOnWebOnlySignedIn,
+        base::BindRepeating(&ChromeSigninClient::OnCloseBrowsersSuccess,
+                            base::Unretained(this), signout_source_metric,
+                            /*should_sign_out=*/true),
+        base::BindRepeating(&ChromeSigninClient::OnCloseBrowsersAborted,
+                            base::Unretained(this)));
   } else {
 #else
   {
 #endif
     std::move(on_signout_decision_reached_)
-        .Run(GetSignoutDecision(has_sync_account, signout_source_metric));
+        .Run(GetSignoutDecision(signout_source_metric));
   }
 }
 
@@ -448,18 +471,23 @@ void ChromeSigninClient::OnPrimaryAccountChanged(
 std::unique_ptr<signin::BoundSessionOAuthMultiLoginDelegate>
 ChromeSigninClient::CreateBoundSessionOAuthMultiloginDelegate() const {
 #if BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
-  if (BoundSessionCookieRefreshService* bound_session_cookie_refresh_service =
-          BoundSessionCookieRefreshServiceFactory::GetForProfile(profile_);
-      bound_session_cookie_refresh_service) {
+  BoundSessionCookieRefreshService* bound_session_cookie_refresh_service =
+      BoundSessionCookieRefreshServiceFactory::GetForProfile(profile_);
+  if (bound_session_cookie_refresh_service) {
     return std::make_unique<BoundSessionOAuthMultiLoginDelegateImpl>(
-        bound_session_cookie_refresh_service->GetWeakPtr());
+        bound_session_cookie_refresh_service->GetWeakPtr(),
+        IdentityManagerFactory::GetForProfile(profile_));
   }
 #endif  // BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
   return nullptr;
 }
 
+signin::OAuthConsumer ChromeSigninClient::GetOAuthConsumerFromId(
+    signin::OAuthConsumerId oauth_consumer_id) const {
+  return oauth_consumer_registry_->GetOAuthConsumerFromId(oauth_consumer_id);
+}
+
 SigninClient::SignoutDecision ChromeSigninClient::GetSignoutDecision(
-    bool has_sync_account,
     const std::optional<signin_metrics::ProfileSignout> signout_source) const {
   // TODO(crbug.com/40239707): Revisit |kAlwaysAllowedSignoutSources|.
   for (const auto& always_allowed_source : kAlwaysAllowedSignoutSources) {
@@ -489,8 +517,7 @@ SigninClient::SignoutDecision ChromeSigninClient::GetSignoutDecision(
 #if !BUILDFLAG(IS_ANDROID)
   // Check if managed user.
   if (enterprise_util::UserAcceptedAccountManagement(profile_)) {
-    // Allow revoke sync but disallow signout regardless of consent level of
-    // the primary account.
+    // Disallow signout regardless of consent level of the primary account.
     return SigninClient::SignoutDecision::CLEAR_PRIMARY_ACCOUNT_DISALLOWED;
   }
 #endif
@@ -520,18 +547,15 @@ void ChromeSigninClient::OnTokenFetchComplete(bool token_is_valid) {
   // Token is not valid, we close all the browsers and open the Profile
   // Picker.
   should_display_user_manager_ = true;
-  BrowserList::CloseAllBrowsersWithProfile(
+  chrome::CloseAllBrowsersWithProfile(
       profile_,
+      /*skip_beforeunload=*/true,
       base::BindRepeating(
           &ChromeSigninClient::OnCloseBrowsersSuccess, base::Unretained(this),
           signin_metrics::ProfileSignout::kAuthenticationFailedWithForceSignin,
           // Do not sign the user out to allow them to reauthenticate from the
           // profile picker.
-          /*should_sign_out=*/false,
-          // Sync value is not used since we are not signing out.
-          /*has_sync_account=*/false),
-      /*on_close_aborted=*/base::DoNothing(),
-      /*skip_beforeunload=*/true);
+          /*should_sign_out=*/false));
 }
 #endif
 
@@ -552,14 +576,17 @@ void ChromeSigninClient::RecordOpenTabCount(
     tabs_count += model->GetTabCount();
   }
 #else   // !BUILDFLAG(IS_ANDROID)
-  for (Browser* browser : *BrowserList::GetInstance()) {
-    if (browser->profile() != profile_) {
-      continue;
-    }
-    if (TabStripModel* tab_strip_model = browser->tab_strip_model()) {
-      tabs_count += tab_strip_model->count();
-    }
-  }
+  ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+      [this, &tabs_count](BrowserWindowInterface* browser) {
+        if (browser->GetProfile() != profile_) {
+          return true;
+        }
+        if (TabStripModel* const tab_strip_model =
+                browser->GetTabStripModel()) {
+          tabs_count += tab_strip_model->count();
+        }
+        return true;
+      });
 #endif  // !BUILDFLAG(IS_ANDROID)
 
   signin_metrics::RecordOpenTabCountOnSignin(consent_level, tabs_count);
@@ -582,7 +609,6 @@ void ChromeSigninClient::SetURLLoaderFactoryForTest(
 void ChromeSigninClient::OnCloseBrowsersSuccess(
     const signin_metrics::ProfileSignout signout_source_metric,
     bool should_sign_out,
-    bool has_sync_account,
     const base::FilePath& profile_path) {
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
   if (signin_util::IsForceSigninEnabled() && force_signin_verifier_.get()) {
@@ -592,7 +618,7 @@ void ChromeSigninClient::OnCloseBrowsersSuccess(
 
   if (should_sign_out) {
     std::move(on_signout_decision_reached_)
-        .Run(GetSignoutDecision(has_sync_account, signout_source_metric));
+        .Run(GetSignoutDecision(signout_source_metric));
   }
 
   LockForceSigninProfile(profile_path);
@@ -610,7 +636,7 @@ void ChromeSigninClient::OnCloseBrowsersAborted(
 
   // Disallow sign-out (aborted).
   std::move(on_signout_decision_reached_)
-      .Run(SignoutDecision::REVOKE_SYNC_DISALLOWED);
+      .Run(SignoutDecision::CLEAR_PRIMARY_ACCOUNT_DISALLOWED);
 }
 
 void ChromeSigninClient::LockForceSigninProfile(

@@ -12,7 +12,6 @@
 
 #include "ash/app_list/app_list_model_provider.h"
 #include "ash/app_list/model/app_list_item.h"
-#include "ash/constants/ash_features.h"
 #include "ash/constants/ash_switches.h"
 #include "ash/public/cpp/app_list/app_list_types.h"
 #include "ash/public/cpp/app_menu_constants.h"
@@ -88,8 +87,7 @@ class AppServicePromiseAppItemBrowserTest
       public PromiseAppRegistryCache::Observer {
  public:
   AppServicePromiseAppItemBrowserTest() {
-    scoped_feature_list_.InitWithFeatures(
-        {ash::features::kPromiseIcons, arc::kSyncInstallPriority}, {});
+    scoped_feature_list_.InitWithFeatures({arc::kSyncInstallPriority}, {});
   }
   ~AppServicePromiseAppItemBrowserTest() override = default;
 
@@ -139,7 +137,7 @@ class AppServicePromiseAppItemBrowserTest
     // Mock a response to ensure that the test does not stay hanging for an
     // Almanac response. It will be a failure response so the promise app will
     // fall back to a placeholder icon.
-    if (base::Contains(request.relative_url, "v1/promise-app/")) {
+    if (request.relative_url.contains("v1/promise-app/")) {
       auto response = std::make_unique<net::test_server::BasicHttpResponse>();
       response->set_code(net::HTTP_INTERNAL_SERVER_ERROR);
       response->set_content_type("application/x-protobuf");

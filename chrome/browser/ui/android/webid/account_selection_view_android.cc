@@ -17,7 +17,6 @@
 #include "content/public/browser/render_widget_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/webid/identity_request_dialog_controller.h"
-#include "third_party/blink/public/mojom/webid/federated_auth_request.mojom-shared.h"
 #include "third_party/blink/public/mojom/webid/federated_auth_request.mojom.h"
 #include "ui/android/color_utils_android.h"
 #include "ui/android/window_android.h"
@@ -32,12 +31,13 @@
 #include "chrome/browser/ui/android/webid/jni_headers/IdentityCredentialTokenError_jni.h"
 #include "chrome/browser/ui/android/webid/jni_headers/IdentityProviderData_jni.h"
 #include "chrome/browser/ui/android/webid/jni_headers/IdentityProviderMetadata_jni.h"
+#include "chrome/browser/ui/android/webid/jni_headers/RelyingPartyData_jni.h"
 
 using base::android::AppendJavaStringArrayToStringVector;
 using base::android::AttachCurrentThread;
 using base::android::ConvertJavaStringToUTF8;
 using base::android::ConvertUTF8ToJavaString;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 using DismissReason = content::IdentityRequestDialogController::DismissReason;
 
@@ -134,6 +134,18 @@ ScopedJavaLocalRef<jobject> ConvertToJavaClientIdMetadata(
                                            brand_icon_bitmap);
 }
 
+ScopedJavaLocalRef<jobject> ConvertToJavaRelyingPartyData(
+    JNIEnv* env,
+    const content::RelyingPartyData& rp_data) {
+  ScopedJavaLocalRef<jobject> rp_icon_bitmap = nullptr;
+  if (!rp_data.rp_icon.IsEmpty()) {
+    rp_icon_bitmap = gfx::ConvertToJavaBitmap(*rp_data.rp_icon.ToSkBitmap());
+  }
+  return Java_RelyingPartyData_Constructor(
+      env, rp_data.rp_for_display, rp_data.iframe_for_display, rp_icon_bitmap,
+      rp_data.display_strings_may_change);
+}
+
 ScopedJavaLocalRef<jobjectArray> ConvertToJavaAccounts(
     JNIEnv* env,
     const std::vector<IdentityRequestAccountPtr>& accounts,
@@ -167,7 +179,7 @@ ScopedJavaLocalRef<jobject> ConvertToJavaIdentityProviderData(
       ConvertToJavaIdentityProviderMetadata(env, idp_data->idp_metadata,
                                             rp_mode),
       ConvertToJavaClientIdMetadata(env, idp_data->client_metadata),
-      static_cast<jint>(idp_data->rp_context),
+      static_cast<int32_t>(idp_data->rp_context),
       ConvertFieldsToJavaArray(env, idp_data->disclosure_fields),
       idp_data->has_login_status_mismatch);
 }
@@ -207,15 +219,18 @@ ScopedJavaLocalRef<jobjectArray> ConvertToJavaIdentityProvidersList(
 
 // These values are persisted to logs. Entries should not be renumbered and
 // numeric values should never be reused.
+// LINT.IfChange(FedCmJavaObjectCreationOutcome)
+
 enum class FedCmJavaObjectCreationOutcome {
   kNewObjectCreated = 0,
   kObjectReused = 1,
   kObjectCreationFailed = 2,
   kNoNativeView = 3,
   kNoWindow = 4,
-
   kMaxValue = kNoWindow
 };
+
+// LINT.ThenChange(//tools/metrics/histograms/metadata/blink/enums.xml:FedCmJavaObjectCreationOutcome)
 
 void RecordJavaObjectCreationOutcome(
     std::optional<blink::mojom::RpMode> rp_mode,
@@ -284,8 +299,8 @@ bool AccountSelectionViewAndroid::Show(
       ConvertToJavaIdentityProvidersList(env, identity_providers_map);
 
   return Java_AccountSelectionBridge_showAccounts(
-      env, java_object_internal_, rp_data.rp_for_display, accounts_obj,
-      identity_providers_list, new_accounts_obj);
+      env, java_object_internal_, ConvertToJavaRelyingPartyData(env, rp_data),
+      accounts_obj, identity_providers_list, new_accounts_obj);
 }
 
 bool AccountSelectionViewAndroid::ShowFailureDialog(
@@ -308,10 +323,9 @@ bool AccountSelectionViewAndroid::ShowFailureDialog(
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jobject> idp_metadata_obj =
       ConvertToJavaIdentityProviderMetadata(env, idp_metadata, rp_mode);
-  // TODO(crbug.com/382086282): Pass RelyingPartyData to Java.
   return Java_AccountSelectionBridge_showFailureDialog(
-      env, java_object_internal_, rp_data.rp_for_display, idp_for_display,
-      idp_metadata_obj, static_cast<jint>(rp_context));
+      env, java_object_internal_, ConvertToJavaRelyingPartyData(env, rp_data),
+      idp_for_display, idp_metadata_obj, static_cast<int32_t>(rp_context));
 }
 
 bool AccountSelectionViewAndroid::ShowErrorDialog(
@@ -331,10 +345,9 @@ bool AccountSelectionViewAndroid::ShowErrorDialog(
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jobject> idp_metadata_obj =
       ConvertToJavaIdentityProviderMetadata(env, idp_metadata, rp_mode);
-  // TODO(crbug.com/382086282): Pass RelyingPartyData to Java.
   return Java_AccountSelectionBridge_showErrorDialog(
-      env, java_object_internal_, rp_data.rp_for_display, idp_for_display,
-      idp_metadata_obj, static_cast<jint>(rp_context),
+      env, java_object_internal_, ConvertToJavaRelyingPartyData(env, rp_data),
+      idp_for_display, idp_metadata_obj, static_cast<int32_t>(rp_context),
       ConvertToJavaIdentityCredentialTokenError(env, error));
 }
 
@@ -351,10 +364,9 @@ bool AccountSelectionViewAndroid::ShowLoadingDialog(
     return false;
   }
   JNIEnv* env = AttachCurrentThread();
-  // TODO(crbug.com/382086282): Pass RelyingPartyData to Java.
   return Java_AccountSelectionBridge_showLoadingDialog(
-      env, java_object_internal_, rp_data.rp_for_display, idp_for_display,
-      static_cast<jint>(rp_context));
+      env, java_object_internal_, ConvertToJavaRelyingPartyData(env, rp_data),
+      idp_for_display, static_cast<int32_t>(rp_context));
 }
 
 bool AccountSelectionViewAndroid::ShowVerifyingDialog(
@@ -382,8 +394,8 @@ bool AccountSelectionViewAndroid::ShowVerifyingDialog(
       /*is_multi_idp=*/false, idp_obj, device_scale_factor);
 
   return Java_AccountSelectionBridge_showVerifyingDialog(
-      env, java_object_internal_, account_obj,
-      sign_in_mode == Account::SignInMode::kAuto);
+      env, java_object_internal_, ConvertToJavaRelyingPartyData(env, rp_data),
+      account_obj, sign_in_mode == Account::SignInMode::kAuto);
 }
 
 std::string AccountSelectionViewAndroid::GetTitle() const {
@@ -452,7 +464,8 @@ void AccountSelectionViewAndroid::OnAccountSelected(
   // See https://crbug.com/1393650 for details.
 }
 
-void AccountSelectionViewAndroid::OnDismiss(JNIEnv* env, jint dismiss_reason) {
+void AccountSelectionViewAndroid::OnDismiss(JNIEnv* env,
+                                            int32_t dismiss_reason) {
   delegate_->OnDismiss(static_cast<DismissReason>(dismiss_reason));
 }
 
@@ -492,7 +505,7 @@ bool AccountSelectionViewAndroid::MaybeCreateJavaObject(
       env, reinterpret_cast<intptr_t>(this),
       delegate_->GetWebContents()->GetJavaWebContents(),
       delegate_->GetNativeView()->GetWindowAndroid()->GetJavaObject(),
-      static_cast<jint>(rp_mode.value_or(blink::mojom::RpMode::kPassive)));
+      static_cast<int32_t>(rp_mode.value_or(blink::mojom::RpMode::kPassive)));
 
   if (!!java_object_internal_) {
     RecordJavaObjectCreationOutcome(
@@ -514,11 +527,19 @@ std::unique_ptr<AccountSelectionView> AccountSelectionView::Create(
 int AccountSelectionView::GetBrandIconMinimumSize(
     blink::mojom::RpMode rp_mode) {
   return Java_AccountSelectionBridge_getBrandIconMinimumSize(
-      base::android::AttachCurrentThread(), static_cast<jint>(rp_mode));
+      base::android::AttachCurrentThread(), static_cast<int32_t>(rp_mode));
 }
 
 // static
 int AccountSelectionView::GetBrandIconIdealSize(blink::mojom::RpMode rp_mode) {
   return Java_AccountSelectionBridge_getBrandIconIdealSize(
-      base::android::AttachCurrentThread(), static_cast<jint>(rp_mode));
+      base::android::AttachCurrentThread(), static_cast<int32_t>(rp_mode));
 }
+
+DEFINE_JNI(AccountSelectionBridge)
+DEFINE_JNI(Account)
+DEFINE_JNI(ClientIdMetadata)
+DEFINE_JNI(IdentityCredentialTokenError)
+DEFINE_JNI(IdentityProviderData)
+DEFINE_JNI(IdentityProviderMetadata)
+DEFINE_JNI(RelyingPartyData)

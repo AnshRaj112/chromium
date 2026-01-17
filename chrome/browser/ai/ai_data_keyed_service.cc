@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ai/ai_data_keyed_service.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -11,10 +12,8 @@
 #include "base/barrier_callback.h"
 #include "base/base64.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/functional/concurrent_callbacks.h"
 #include "base/functional/concurrent_closures.h"
@@ -51,6 +50,7 @@
 #include "components/optimization_guide/proto/features/model_prototyping.pb.h"
 #include "components/site_engagement/content/site_engagement_service.h"
 #include "components/tabs/public/tab_interface.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_widget_host_view.h"
@@ -60,6 +60,7 @@
 #include "services/service_manager/public/cpp/interface_provider.h"
 #include "third_party/blink/public/mojom/content_extraction/ai_page_content.mojom.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/accessibility/ax_mode.h"
 #include "ui/accessibility/ax_tree_update.h"
 #include "ui/gfx/codec/png_codec.h"
 #include "ui/gfx/geometry/rect.h"
@@ -88,11 +89,11 @@ constexpr size_t kPdfUploadLimitBytes = 128 * kBytesPerMegabyte;
 
 void OnGotAIPageContentForModelPrototyping(
     AiDataKeyedService::AiDataCallback continue_callback,
-    std::optional<optimization_guide::AIPageContentResult> page_content) {
+    optimization_guide::AIPageContentResultOrError page_content) {
   TRACE_EVENT("browser", "OnGotAIPageContentForModelPrototyping");
 
   AiDataKeyedService::BrowserData data;
-  if (page_content) {
+  if (page_content.has_value()) {
     *data.mutable_page_context()->mutable_annotated_page_content() =
         std::move(page_content->proto);
     std::move(continue_callback).Run(std::move(data));
@@ -104,12 +105,12 @@ void OnGotAIPageContentForModelPrototyping(
 
 void OnGotAIPageContentWithActionableElementsForModelPrototyping(
     AiDataKeyedService::AiDataCallback continue_callback,
-    std::optional<optimization_guide::AIPageContentResult> page_content) {
+    optimization_guide::AIPageContentResultOrError page_content) {
   TRACE_EVENT("browser",
               "OnGotAIPageContentWithActionableElementsForModelPrototyping");
 
   AiDataKeyedService::BrowserData data;
-  if (page_content) {
+  if (page_content.has_value()) {
     *data.mutable_action_annotated_page_content() =
         std::move(page_content->proto);
     std::move(continue_callback).Run(std::move(data));
@@ -124,8 +125,8 @@ void GetAIPageContentForModelPrototyping(
     AiDataKeyedService::AiDataCallback continue_callback) {
   TRACE_EVENT("browser", "GetAIPageContentForModelPrototyping");
 
-  auto options = optimization_guide::DefaultAIPageContentOptions();
-  options->on_critical_path = true;
+  auto options = optimization_guide::DefaultAIPageContentOptions(
+      /*on_critical_path =*/true);
   optimization_guide::OnAIPageContentDone callback = base::BindOnce(
       &OnGotAIPageContentForModelPrototyping, std::move(continue_callback));
   optimization_guide::GetAIPageContent(web_contents, std::move(options),
@@ -138,8 +139,8 @@ void GetAIPageContentWithActionableElementsForModelPrototyping(
   TRACE_EVENT("browser",
               "GetAIPageContentWithActionableElementsForModelPrototyping");
 
-  auto options = optimization_guide::ActionableAIPageContentOptions();
-  options->on_critical_path = true;
+  auto options = optimization_guide::ActionableAIPageContentOptions(
+      /*on_critical_path =*/true);
   optimization_guide::OnAIPageContentDone callback = base::BindOnce(
       &OnGotAIPageContentWithActionableElementsForModelPrototyping,
       std::move(continue_callback));
@@ -489,7 +490,7 @@ void GetFormDataByFieldGlobalIdForModelPrototyping(
     std::move(continue_callback).Run(std::move(data));
     return;
   }
-  autofill::FormStructure* form_structure =
+  const autofill::FormStructure* form_structure =
       autofill_driver->GetAutofillManager().FindCachedFormById(global_id);
   if (!form_structure) {
     std::move(continue_callback).Run(std::move(data));
@@ -524,13 +525,18 @@ void OnEncodePng(AiDataKeyedService::AiDataCallback continue_callback,
 
 void OnGetTabScreenshotForModelPrototyping(
     AiDataKeyedService::AiDataCallback continue_callback,
-    const SkBitmap& bitmap) {
+    const content::CopyFromSurfaceResult& result) {
   TRACE_EVENT0("browser", "OnGetTabScreenshotForModelPrototyping");
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE,
       {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
        base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN},
-      base::BindOnce(&EncodePngOnBackgroundThread, base::OwnedRef(bitmap)),
+      base::BindOnce(
+          &EncodePngOnBackgroundThread,
+          base::OwnedRef(
+              // TODO(crbug.com/466199824): Update callsite to handle error
+              // case.
+              result.value_or(viz::CopyOutputBitmapWithMetadata()).bitmap)),
       base::BindOnce(&OnEncodePng, std::move(continue_callback)));
 }
 
@@ -543,10 +549,11 @@ void GetTabScreenshotForModelPrototyping(
   if (!view) {
     return std::move(continue_callback).Run(std::nullopt);
   }
-  SkBitmap empty;
+  viz::CopyOutputBitmapWithMetadata empty;
   view->CopyFromSurface(
       gfx::Rect(),  // Copy entire surface area.
       gfx::Size(),  // Result contains device-level detail.
+      base::TimeDelta(),
       mojo::WrapCallbackWithDefaultInvokeIfNotRun(
           base::BindOnce(&OnGetTabScreenshotForModelPrototyping,
                          std::move(continue_callback)),
@@ -680,9 +687,7 @@ void GetModelPrototypingAiData(AiDataKeyedService::AiDataSpecifier specifiers,
 }
 
 // Feature to add allow listed extensions remotely for data collection.
-BASE_FEATURE(kAllowlistedAiDataExtensions,
-             "AllowlistedAiDataExtensions",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kAllowlistedAiDataExtensions, base::FEATURE_DISABLED_BY_DEFAULT);
 
 const base::FeatureParam<std::string> kAllowlistedExtensionsForData{
     &kAllowlistedAiDataExtensions, "allowlisted_extension_ids",
@@ -693,9 +698,7 @@ const base::FeatureParam<std::string> kBlocklistedExtensionsForData{
     /*default_value=*/""};
 
 // Feature to add allow listed extensions remotely for actions.
-BASE_FEATURE(kAllowlistedActionsExtensions,
-             "AllowlistedActionsExtensions",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kAllowlistedActionsExtensions, base::FEATURE_DISABLED_BY_DEFAULT);
 
 const base::FeatureParam<std::string> kAllowlistedExtensionsForActions{
     &kAllowlistedActionsExtensions, "allowlisted_extension_ids",
@@ -764,7 +767,7 @@ bool AiDataKeyedService::IsExtensionAllowlistedForData(
   std::vector<std::string> blocklisted_extensions =
       base::SplitString(kBlocklistedExtensionsForData.Get(), ",",
                         base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
-  if (base::Contains(blocklisted_extensions, extension_id)) {
+  if (std::ranges::contains(blocklisted_extensions, extension_id)) {
     return false;
   }
 
@@ -783,14 +786,14 @@ bool AiDataKeyedService::IsExtensionAllowlistedForData(
                                        "fiamdfnbelfkjlacoaeiclobkdmckaoa",
                                        // https://issues.chromium.org/427296150
                                        "mofldjifenhadohlkkngamgbifiofbnd"});
-  if (base::Contains(*kHardcodedAllowlistedExtensions, extension_id)) {
+  if (std::ranges::contains(*kHardcodedAllowlistedExtensions, extension_id)) {
     return true;
   }
 
   std::vector<std::string> allowlisted_extensions =
       base::SplitString(kAllowlistedExtensionsForData.Get(), ",",
                         base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
-  if (base::Contains(allowlisted_extensions, extension_id)) {
+  if (std::ranges::contains(allowlisted_extensions, extension_id)) {
     return true;
   }
 
@@ -802,7 +805,7 @@ bool AiDataKeyedService::IsExtensionAllowlistedForActions(
   std::vector<std::string> blocklisted_extensions =
       base::SplitString(kBlocklistedExtensionsForActions.Get(), ",",
                         base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
-  if (base::Contains(blocklisted_extensions, extension_id)) {
+  if (std::ranges::contains(blocklisted_extensions, extension_id)) {
     return false;
   }
 
@@ -812,14 +815,14 @@ bool AiDataKeyedService::IsExtensionAllowlistedForActions(
           // api_test/experimental_actor/manifest.json
           "kbanhggbnnaciicfpdkheonkpkeakfal",
       });
-  if (base::Contains(*kHardcodedAllowlistedExtensions, extension_id)) {
+  if (std::ranges::contains(*kHardcodedAllowlistedExtensions, extension_id)) {
     return true;
   }
 
   std::vector<std::string> allowlisted_extensions =
       base::SplitString(kAllowlistedExtensionsForActions.Get(), ",",
                         base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
-  if (base::Contains(allowlisted_extensions, extension_id)) {
+  if (std::ranges::contains(allowlisted_extensions, extension_id)) {
     return true;
   }
 
@@ -838,5 +841,5 @@ bool AiDataKeyedService::IsExtensionAllowlistedForStable(
   static const base::NoDestructor<std::vector<std::string>>
       kStableChannelAllowlistedIds({// https://issues.chromium.org/427296150
                                     "mofldjifenhadohlkkngamgbifiofbnd"});
-  return base::Contains(*kStableChannelAllowlistedIds, extension_id);
+  return std::ranges::contains(*kStableChannelAllowlistedIds, extension_id);
 }

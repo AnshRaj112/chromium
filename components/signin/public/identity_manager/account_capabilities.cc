@@ -11,8 +11,12 @@
 
 #include "base/containers/heap_array.h"
 #include "base/containers/span.h"
+#include "base/feature_list.h"
+#include "base/no_destructor.h"
 #include "base/notreached.h"
+#include "build/build_config.h"
 #include "components/signin/internal/identity_manager/account_capabilities_constants.h"
+#include "components/signin/public/base/signin_switches.h"
 #include "components/signin/public/identity_manager/tribool.h"
 
 #if BUILDFLAG(IS_ANDROID)
@@ -35,12 +39,26 @@ AccountCapabilities& AccountCapabilities::operator=(
 // static
 base::span<const std::string_view>
 AccountCapabilities::GetSupportedAccountCapabilityNames() {
-  static constexpr auto kCapabilityNames = std::to_array<std::string_view>({
-#define ACCOUNT_CAPABILITY(cpp_label, java_label, value) cpp_label,
+  static const base::NoDestructor<std::vector<std::string_view>>
+      supported_capabilities(GetSupportedAccountCapabilityNamesInternal());
+
+  return *supported_capabilities;
+}
+
+// static
+std::vector<std::string_view>
+AccountCapabilities::GetSupportedAccountCapabilityNamesInternal() {
+  std::vector<std::string_view> capabilities;
+#define ACCOUNT_CAPABILITY(cpp_label, java_label, value) \
+  capabilities.push_back(cpp_label);
+#define ACCOUNT_CAPABILITY_F(cpp_label, java_label, value, feature) \
+  if (base::FeatureList::IsEnabled(feature)) {                      \
+    capabilities.push_back(cpp_label);                              \
+  }
 #include "components/signin/internal/identity_manager/account_capabilities_list.h"
 #undef ACCOUNT_CAPABILITY
-  });
-  return kCapabilityNames;
+#undef ACCOUNT_CAPABILITY_F
+  return capabilities;
 }
 
 bool AccountCapabilities::AreAnyCapabilitiesKnown() const {
@@ -73,20 +91,32 @@ signin::Tribool AccountCapabilities::GetCapabilityByName(
 }
 
 // clang-format off
-// keep-sorted start newline_separated=yes sticky_prefixes=#if group_prefixes=#endif,can,has,is,must block=yes
+// keep-sorted start newline_separated=yes sticky_prefixes=#if group_prefixes=AccountCapabilities,#endif block=yes
 // clang-format on
 signin::Tribool AccountCapabilities::can_fetch_family_member_info() const {
   return GetCapabilityByName(kCanFetchFamilyMemberInfoCapabilityName);
 }
 
+#if !BUILDFLAG(IS_IOS)
 signin::Tribool AccountCapabilities::can_have_email_address_displayed() const {
   return GetCapabilityByName(kCanHaveEmailAddressDisplayedCapabilityName);
 }
+#endif
 
+#if !BUILDFLAG(IS_ANDROID)
+signin::Tribool
+AccountCapabilities::can_make_chrome_search_engine_choice_screen_choice()
+    const {
+  return GetCapabilityByName(kCanMakeChromeSearchEngineChoiceScreenChoice);
+}
+#endif
+
+#if !BUILDFLAG(IS_IOS)
 signin::Tribool AccountCapabilities::can_run_chrome_privacy_sandbox_trials()
     const {
   return GetCapabilityByName(kCanRunChromePrivacySandboxTrialsCapabilityName);
 }
+#endif
 
 signin::Tribool AccountCapabilities::
     can_show_history_sync_opt_ins_without_minor_mode_restrictions() const {
@@ -94,13 +124,11 @@ signin::Tribool AccountCapabilities::
       kCanShowHistorySyncOptInsWithoutMinorModeRestrictionsCapabilityName);
 }
 
+#if BUILDFLAG(IS_CHROMEOS)
 signin::Tribool AccountCapabilities::can_toggle_auto_updates() const {
   return GetCapabilityByName(kCanToggleAutoUpdatesName);
 }
-
-signin::Tribool AccountCapabilities::can_use_chrome_ip_protection() const {
-  return GetCapabilityByName(kCanUseChromeIpProtectionName);
-}
+#endif
 
 #if BUILDFLAG(IS_CHROMEOS)
 signin::Tribool AccountCapabilities::can_use_chromeos_generative_ai() const {
@@ -108,28 +136,38 @@ signin::Tribool AccountCapabilities::can_use_chromeos_generative_ai() const {
 }
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
-signin::Tribool AccountCapabilities::can_use_copyeditor_feature() const {
-  return GetCapabilityByName(kCanUseCopyEditorFeatureName);
-}
-
+#if !BUILDFLAG(IS_IOS)
 signin::Tribool AccountCapabilities::can_use_devtools_generative_ai_features()
     const {
   return GetCapabilityByName(kCanUseDevToolsGenerativeAiFeaturesCapabilityName);
 }
+#endif
 
+#if !BUILDFLAG(IS_IOS)
 signin::Tribool AccountCapabilities::can_use_edu_features() const {
   return GetCapabilityByName(kCanUseEduFeaturesCapabilityName);
 }
+#endif
 
+#if !BUILDFLAG(IS_IOS)
+signin::Tribool AccountCapabilities::can_use_gemini_in_chrome() const {
+  return GetCapabilityByName(kCanUseGeminiInChromeCapabilityName);
+}
+#endif
+
+#if BUILDFLAG(IS_CHROMEOS)
 signin::Tribool AccountCapabilities::can_use_generative_ai_in_recorder_app()
     const {
   return GetCapabilityByName(kCanUseGenerativeAiInRecorderApp);
 }
+#endif
 
+#if BUILDFLAG(IS_CHROMEOS)
 signin::Tribool AccountCapabilities::can_use_generative_ai_photo_editing()
     const {
   return GetCapabilityByName(kCanUseGenerativeAiPhotoEditing);
 }
+#endif
 
 signin::Tribool AccountCapabilities::can_use_manta_service() const {
   return GetCapabilityByName(kCanUseMantaServiceName);
@@ -151,6 +189,12 @@ signin::Tribool AccountCapabilities::is_allowed_for_machine_learning() const {
 signin::Tribool AccountCapabilities::is_opted_in_to_parental_supervision()
     const {
   return GetCapabilityByName(kIsOptedInToParentalSupervisionCapabilityName);
+}
+
+signin::Tribool
+AccountCapabilities::is_subject_to_account_level_enterprise_policies() const {
+  return GetCapabilityByName(
+      kIsSubjectToAccountLevelEnterprisePoliciesCapabilityName);
 }
 
 signin::Tribool AccountCapabilities::
@@ -232,13 +276,17 @@ AccountCapabilities::ConvertToJavaAccountCapabilities(JNIEnv* env) const {
 }
 #endif
 
-#if BUILDFLAG(IS_IOS)
 AccountCapabilities::AccountCapabilities(
     base::flat_map<std::string, bool> capabilities)
     : capabilities_map_(std::move(capabilities)) {}
 
+#if BUILDFLAG(IS_IOS)
 const base::flat_map<std::string, bool>&
 AccountCapabilities::ConvertToAccountCapabilitiesIOS() {
   return capabilities_map_;
 }
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+DEFINE_JNI(AccountCapabilities)
 #endif

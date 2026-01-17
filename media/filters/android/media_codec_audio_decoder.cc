@@ -7,7 +7,7 @@
 #include <cmath>
 #include <memory>
 
-#include "base/android/build_info.h"
+#include "base/android/android_info.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
@@ -188,7 +188,7 @@ bool MediaCodecAudioDecoder::CreateMediaCodecLoop() {
   }
 
   codec_loop_ = std::make_unique<MediaCodecLoop>(
-      base::android::BuildInfo::GetInstance()->sdk_int(), this,
+      base::android::android_info::sdk_int(), this,
       std::move(audio_codec_bridge),
       scoped_refptr<base::SingleThreadTaskRunner>());
 
@@ -445,7 +445,11 @@ bool MediaCodecAudioDecoder::OnDecodedFrame(
 #if BUILDFLAG(ENABLE_PLATFORM_DTS_AUDIO)
     } else if (config_.codec() == AudioCodec::kDTS) {
       frame_count = media::dts::ParseTotalSampleCount(
-          audio_buffer->channel_data()[0], out.size, AudioCodec::kDTS);
+          // TODO(crbug.com/373960632): Use spans from AudioBuffer directly once
+          // that class is spanified.
+          UNSAFE_TODO(base::span<const uint8_t>(audio_buffer->channel_data()[0],
+                                                out.size)),
+          AudioCodec::kDTS);
       DVLOG(2) << ": DTS Frame Count = " << frame_count;
 #endif  // BUILDFLAG(ENABLE_PLATFORM_DTS_AUDIO)
     } else {

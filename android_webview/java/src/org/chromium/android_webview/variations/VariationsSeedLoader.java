@@ -23,7 +23,9 @@ import org.jni_zero.JniType;
 import org.jni_zero.NativeMethods;
 
 import org.chromium.android_webview.AwBrowserProcess;
+import org.chromium.android_webview.common.AwFeatures;
 import org.chromium.android_webview.common.AwSwitches;
+import org.chromium.android_webview.common.WebViewCachedFlags;
 import org.chromium.android_webview.common.services.IVariationsSeedServer;
 import org.chromium.android_webview.common.services.IVariationsSeedServerCallback;
 import org.chromium.android_webview.common.services.ServiceConnectionDelayRecorder;
@@ -114,8 +116,8 @@ public class VariationsSeedLoader {
     private static final String SEED_LOAD_RESULT_HISTOGRAM_NAME = "Variations.SeedLoadResult";
     // These two variables below are used for caching the difference between Seed and
     // AppSeed Freshness.
-    private static long sCachedSeedFreshness;
-    private static long sCachedAppSeedFreshness;
+    private static @Nullable Long sCachedSeedFreshness;
+    private static @Nullable Long sCachedAppSeedFreshness;
 
     @Nullable private FutureTask<SeedLoadResult> mLoadTask;
     private final SeedServerCallback mSeedServerCallback = new SeedServerCallback();
@@ -149,7 +151,7 @@ public class VariationsSeedLoader {
             return;
         }
         sCachedAppSeedFreshness = appSeedFreshnessMinutes;
-        calculateSeedFreshnessDiff();
+        maybeLogSeedFreshnessDiff();
     }
 
     // This method is to cache the SeedFreshness value
@@ -160,13 +162,13 @@ public class VariationsSeedLoader {
             return;
         }
         sCachedSeedFreshness = seedFreshness;
-        calculateSeedFreshnessDiff();
+        maybeLogSeedFreshnessDiff();
     }
 
-    // This method is to calculate the difference between SeedFreshness
+    // This method is to calculate and log the difference between SeedFreshness
     // and AppSeedFreshness
-    private static void calculateSeedFreshnessDiff() {
-        if (sCachedSeedFreshness == 0 || sCachedAppSeedFreshness == 0) {
+    private static void maybeLogSeedFreshnessDiff() {
+        if (sCachedSeedFreshness == null || sCachedAppSeedFreshness == null) {
             return;
         }
         long diff = sCachedSeedFreshness - sCachedAppSeedFreshness;
@@ -175,15 +177,16 @@ public class VariationsSeedLoader {
 
     // This method is to record the difference between SeedFreshness
     // and AppSeedFreshness
-    private static void recordAppSeedFreshnessDiff(long diff) {
+    @VisibleForTesting
+    public static void recordAppSeedFreshnessDiff(long diff) {
         RecordHistogram.recordCustomCountHistogram(
                 SEED_FRESHNESS_DIFF_HISTOGRAM_NAME,
                 (int) diff,
                 /* min= */ 1,
                 /* max= */ (int) TimeUnit.DAYS.toMinutes(30),
                 /* numBuckets= */ 50);
-        sCachedSeedFreshness = 0;
-        sCachedAppSeedFreshness = 0;
+        sCachedSeedFreshness = null;
+        sCachedAppSeedFreshness = null;
     }
 
     private static void recordMinuteHistogram(String name, long value, long maxValue) {
@@ -199,6 +202,10 @@ public class VariationsSeedLoader {
         long maxRequestPeriodMillis =
                 VariationsUtils.getDurationSwitchValueInMillis(
                         AwSwitches.FINCH_SEED_MIN_UPDATE_PERIOD, MAX_REQUEST_PERIOD_MILLIS);
+        if (WebViewCachedFlags.get()
+                .isCachedFeatureEnabled(AwFeatures.WEBVIEW_REDUCED_SEED_REQUEST_PERIOD)) {
+            maxRequestPeriodMillis /= 2;
+        }
         return now < lastRequestTime + maxRequestPeriodMillis;
     }
 
@@ -206,6 +213,10 @@ public class VariationsSeedLoader {
         long expirationDuration =
                 VariationsUtils.getDurationSwitchValueInMillis(
                         AwSwitches.FINCH_SEED_EXPIRATION_AGE, SEED_EXPIRATION_MILLIS);
+        if (WebViewCachedFlags.get()
+                .isCachedFeatureEnabled(AwFeatures.WEBVIEW_REDUCED_SEED_EXPIRATION)) {
+            expirationDuration /= 2;
+        }
         return getCurrentTimeMillis() > seedFileTime + expirationDuration;
     }
 
@@ -317,7 +328,7 @@ public class VariationsSeedLoader {
     private void updateSeedFileAndRequestNewFromServiceOnBackgroundThread(
             boolean foundNewSeed, boolean needNewSeed, long seedFileTime) {
         // This work is not time critical.
-        PostTask.postTask(
+        PostTask.postDelayedTask(
                 TaskTraits.BEST_EFFORT_MAY_BLOCK,
                 () -> {
                     if (foundNewSeed) {
@@ -336,7 +347,8 @@ public class VariationsSeedLoader {
                     }
 
                     onBackgroundWorkFinished();
-                });
+                },
+                2500);
     }
 
     // Connects to VariationsSeedServer service. Sends a file descriptor for our local copy of the

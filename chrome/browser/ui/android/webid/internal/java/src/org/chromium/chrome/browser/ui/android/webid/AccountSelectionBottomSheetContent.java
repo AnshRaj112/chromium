@@ -15,12 +15,15 @@ import androidx.annotation.StringRes;
 import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
-import org.chromium.base.supplier.ObservableSupplierImpl;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.NonNullObservableSupplier;
+import org.chromium.base.supplier.ObservableSuppliers;
+import org.chromium.base.supplier.SettableNonNullObservableSupplier;
 import org.chromium.blink.mojom.RpMode;
 import org.chromium.chrome.R;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetContent;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+
+import java.util.function.Supplier;
 
 /**
  * This view renders content that gets displayed inside the bottom sheet. This is a simple container
@@ -46,8 +49,8 @@ public class AccountSelectionBottomSheetContent implements BottomSheetContent {
     private final Supplier<Integer> mScrollOffsetSupplier;
     private final @RpMode.EnumType int mRpMode;
     private @Nullable Runnable mBackPressHandler;
-    private final ObservableSupplierImpl<Boolean> mBackPressStateChangedSupplier =
-            new ObservableSupplierImpl<>();
+    private final SettableNonNullObservableSupplier<Boolean> mBackPressStateChangedSupplier =
+            ObservableSuppliers.createNonNull(false);
 
     private boolean mIsMultipleIdps;
     // Used to disable the half state in passive mode to enable proper a11y traversal.
@@ -281,7 +284,7 @@ public class AccountSelectionBottomSheetContent implements BottomSheetContent {
     }
 
     @Override
-    public ObservableSupplierImpl<Boolean> getBackPressStateChangedSupplier() {
+    public NonNullObservableSupplier<Boolean> getBackPressStateChangedSupplier() {
         return mBackPressStateChangedSupplier;
     }
 

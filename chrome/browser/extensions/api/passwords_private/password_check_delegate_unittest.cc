@@ -10,7 +10,6 @@
 #include <string_view>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/memory/ptr_util.h"
@@ -62,6 +61,7 @@
 #include "extensions/browser/extension_event_histogram_value.h"
 #include "extensions/browser/test_event_router.h"
 #include "extensions/browser/test_event_router_observer.h"
+#include "net/base/net_errors.h"
 #include "services/network/test/test_shared_url_loader_factory.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -374,7 +374,7 @@ TEST_F(PasswordCheckDelegateTest, WeakCheckNotifiesObservers) {
       api::passwords_private::OnInsecureCredentialsChanged::kEventName;
 
   // Verify that the event was not fired during construction.
-  EXPECT_FALSE(base::Contains(event_router_observer().events(), kEventName));
+  EXPECT_FALSE(event_router_observer().events().contains(kEventName));
 
   // Verify that the event gets fired after weak check is complete.
   delegate().StartPasswordCheck(
@@ -544,7 +544,7 @@ TEST_F(PasswordCheckDelegateTest, OnGetInsecureCredentials) {
       api::passwords_private::OnInsecureCredentialsChanged::kEventName;
 
   // Verify that the event was not fired during construction.
-  EXPECT_FALSE(base::Contains(event_router_observer().events(), kEventName));
+  EXPECT_FALSE(event_router_observer().events().contains(kEventName));
 
   // Verify that the event gets fired once the compromised credential provider
   // is initialized.
@@ -901,7 +901,7 @@ TEST_F(PasswordCheckDelegateTest,
       api::passwords_private::OnPasswordCheckStatusChanged::kEventName;
 
   // Verify that the event was not fired during construction.
-  EXPECT_FALSE(base::Contains(event_router_observer().events(), kEventName));
+  EXPECT_FALSE(event_router_observer().events().contains(kEventName));
 
   // Verify that the event gets fired once the saved passwords provider is
   // initialized.
@@ -924,7 +924,7 @@ TEST_F(PasswordCheckDelegateTest,
       api::passwords_private::OnPasswordCheckStatusChanged::kEventName;
 
   // Verify that the event was not fired during construction.
-  EXPECT_FALSE(base::Contains(event_router_observer().events(), kEventName));
+  EXPECT_FALSE(event_router_observer().events().contains(kEventName));
 
   // Verify that the event gets fired once the saved passwords provider is
   // initialized.
@@ -1058,7 +1058,7 @@ TEST_F(PasswordCheckDelegateTest, WellKnownChangePasswordUrl) {
   RunUntilIdle();
   GURL change_password_url(
       *delegate().GetInsecureCredentials().at(0).change_password_url);
-  EXPECT_EQ(change_password_url.path(),
+  EXPECT_EQ(change_password_url.GetPath(),
             password_manager::kWellKnownChangePasswordPath);
 }
 
@@ -1077,7 +1077,7 @@ TEST_F(PasswordCheckDelegateTest, WellKnownChangePasswordUrl_androidrealm) {
 
   EXPECT_FALSE(delegate().GetInsecureCredentials().at(0).change_password_url);
   EXPECT_EQ(GURL(*delegate().GetInsecureCredentials().at(1).change_password_url)
-                .path(),
+                .GetPath(),
             password_manager::kWellKnownChangePasswordPath);
 }
 
@@ -1146,13 +1146,13 @@ TEST_F(PasswordCheckDelegateTest, NoNotificationsWithoutRouter) {
       api::passwords_private::OnInsecureCredentialsChanged::kEventName;
 
   // Verify that the event was not fired during construction.
-  EXPECT_FALSE(base::Contains(event_router_observer().events(), kEventName));
+  EXPECT_FALSE(event_router_observer().events().contains(kEventName));
 
   // Verify that the event gets fired after weak check is complete.
   delegate().StartPasswordCheck(
       password_manager::LeakDetectionInitiator::kBulkSyncedPasswordsCheck);
   RunUntilIdle();
-  EXPECT_FALSE(base::Contains(event_router_observer().events(), kEventName));
+  EXPECT_FALSE(event_router_observer().events().contains(kEventName));
 }
 
 }  // namespace extensions

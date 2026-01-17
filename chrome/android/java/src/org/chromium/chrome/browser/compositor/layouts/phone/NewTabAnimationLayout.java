@@ -7,12 +7,9 @@ package org.chromium.chrome.browser.compositor.layouts.phone;
 import static org.chromium.build.NullUtil.assumeNonNull;
 
 import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
-import android.animation.RectEvaluator;
-import android.animation.ValueAnimator;
 import android.content.Context;
+import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -24,11 +21,11 @@ import android.view.ViewGroup;
 
 import androidx.annotation.ColorInt;
 import androidx.annotation.Px;
-import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Callback;
+import org.chromium.base.Log;
 import org.chromium.base.metrics.RecordHistogram;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.EnsuresNonNull;
 import org.chromium.build.annotations.EnsuresNonNullIf;
 import org.chromium.build.annotations.NullMarked;
@@ -42,19 +39,18 @@ import org.chromium.chrome.browser.compositor.layouts.LayoutRenderHost;
 import org.chromium.chrome.browser.compositor.layouts.LayoutUpdateHost;
 import org.chromium.chrome.browser.compositor.layouts.components.LayoutTab;
 import org.chromium.chrome.browser.compositor.layouts.eventfilter.BlackHoleEventFilter;
+import org.chromium.chrome.browser.compositor.layouts.phone.NewBackgroundTabAnimationHostView.AnimationType;
 import org.chromium.chrome.browser.compositor.scene_layer.StaticTabSceneLayer;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.fullscreen.BrowserControlsManager;
 import org.chromium.chrome.browser.hub.NewTabAnimationUtils;
 import org.chromium.chrome.browser.hub.NewTabAnimationUtils.RectStart;
-import org.chromium.chrome.browser.hub.RoundedCornerAnimatorUtil;
-import org.chromium.chrome.browser.hub.ShrinkExpandAnimator;
-import org.chromium.chrome.browser.hub.ShrinkExpandImageView;
 import org.chromium.chrome.browser.layouts.EventFilter;
 import org.chromium.chrome.browser.layouts.LayoutStateProvider;
 import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.layouts.scene_layer.SceneLayer;
 import org.chromium.chrome.browser.ntp.NewTabPage;
+import org.chromium.chrome.browser.ntp_customization.NtpCustomizationUtils;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabContextMenuData;
 import org.chromium.chrome.browser.tab.TabId;
@@ -63,17 +59,20 @@ import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tab_ui.TabContentManager;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
+import org.chromium.chrome.browser.theme.ThemeUtils;
 import org.chromium.chrome.browser.toolbar.CustomTabCount;
 import org.chromium.chrome.browser.toolbar.ToolbarManager;
 import org.chromium.chrome.browser.toolbar.ToolbarPositionController;
 import org.chromium.chrome.browser.toolbar.top.ToggleTabStackButton;
+import org.chromium.chrome.browser.ui.edge_to_edge.TopInsetProvider;
+import org.chromium.chrome.browser.ui.theme.BrandedColorScheme;
+import org.chromium.components.browser_ui.widget.animation.CancelAwareAnimatorListener;
 import org.chromium.components.embedder_support.util.UrlUtilities;
 import org.chromium.components.sensitive_content.SensitiveContentClient;
 import org.chromium.components.sensitive_content.SensitiveContentFeatures;
 import org.chromium.ui.animation.RunOnNextLayout;
 import org.chromium.ui.base.LocalizationUtils;
 import org.chromium.ui.base.ViewUtils;
-import org.chromium.ui.interpolators.Interpolators;
 import org.chromium.ui.resources.ResourceManager;
 import org.chromium.ui.util.TokenHolder;
 
@@ -88,9 +87,9 @@ import java.util.Collections;
  */
 @NullMarked
 public class NewTabAnimationLayout extends Layout {
-    private static final long FOREGROUND_ANIMATION_DURATION_MS = 300L;
-    private static final long FOREGROUND_FADE_DURATION_MS = 150L;
     private static final long ANIMATION_TIMEOUT_MS = 800L;
+    private static final String TAG = "NTAnimLayout";
+    private final boolean mLogsEnabled;
     private final LayoutStateProvider mLayoutStateProvider;
     private final ViewGroup mContentContainer;
     private final ViewGroup mAnimationHostView;
@@ -98,27 +97,28 @@ public class NewTabAnimationLayout extends Layout {
     private final BlackHoleEventFilter mBlackHoleEventFilter;
     private final Handler mHandler;
     private final ToolbarManager mToolbarManager;
-    private final ObservableSupplier<Boolean> mScrimVisibilitySupplier;
+    private final MonotonicObservableSupplier<Boolean> mScrimVisibilitySupplier;
     private final CustomTabCount mCustomTabCount;
     private final BrowserStateBrowserControlsVisibilityDelegate mBrowserVisibilityDelegate;
+    private final MonotonicObservableSupplier<TopInsetProvider> mTopInsetProviderSupplier;
+    private final Callback<TopInsetProvider> mTopInsetProviderObserver =
+            this::onTopInsetProviderAvailable;
 
     private @Nullable StaticTabSceneLayer mSceneLayer;
-    private @Nullable AnimatorSet mTabCreatedForegroundAnimation;
-    private @Nullable AnimatorSet mTabCreatedBackgroundAnimation;
-    private @Nullable ObjectAnimator mFadeAnimator;
-    // Retains a strong reference to the {@link ShrinkExpandAnimator} on the class to prevent it
-    // from being prematurely GC'd when using {@link ObjectAnimator}.
-    private @Nullable ShrinkExpandAnimator mExpandAnimator;
-    private @Nullable ObjectAnimator mRectAnimator;
-    private @Nullable ValueAnimator mCornerAnimator;
-    private @Nullable ShrinkExpandImageView mRectView;
     private @Nullable NewBackgroundTabAnimationHostView mBackgroundHostView;
     private @Nullable NewForegroundTabAnimationHostView mForegroundHostView;
+    private @Nullable AnimatorSet mTabCreatedBackgroundAnimation;
+    // The real tab switcher button view. This is used to update the view visibility based on the
+    // background animation progress.
+    private @Nullable View mTabSwitcherButton;
+    private @Nullable TopInsetProvider mTopInsetProvider;
     private @Nullable Runnable mAnimationRunnable;
     private @Nullable Runnable mTimeoutRunnable;
     private @Nullable Callback<Boolean> mVisibilityObserver;
     private @TabId int mNextTabId = Tab.INVALID_TAB_ID;
-    private int mToken = TokenHolder.INVALID_TOKEN;
+    private int mBrowserControlsVisibilityToken = TokenHolder.INVALID_TOKEN;
+    private int mCustomTabCountToken = TokenHolder.INVALID_TOKEN;
+    private int mTopPadding;
     private boolean mSkipForceAnimationToFinish;
     private boolean mRunOnNextLayoutImmediatelyForTesting;
 
@@ -133,6 +133,7 @@ public class NewTabAnimationLayout extends Layout {
      * @param compositorViewHolderSupplier Supplier to the {@link CompositorViewHolder} instance.
      * @param animationHostView The host view for animations.
      * @param toolbarManager The {@link ToolbarManager} instance.
+     * @param browserControlsManager The {@link BrowserControlsManager} instance.
      * @param scrimVisibilitySupplier Supplier for the Scrim visibility.
      */
     public NewTabAnimationLayout(
@@ -141,11 +142,12 @@ public class NewTabAnimationLayout extends Layout {
             LayoutRenderHost renderHost,
             LayoutStateProvider layoutStateProvider,
             ViewGroup contentContainer,
-            ObservableSupplier<CompositorViewHolder> compositorViewHolderSupplier,
+            MonotonicObservableSupplier<CompositorViewHolder> compositorViewHolderSupplier,
             ViewGroup animationHostView,
             ToolbarManager toolbarManager,
             BrowserControlsManager browserControlsManager,
-            ObservableSupplier<Boolean> scrimVisibilitySupplier) {
+            MonotonicObservableSupplier<Boolean> scrimVisibilitySupplier,
+            MonotonicObservableSupplier<TopInsetProvider> topInsetProviderSupplier) {
         super(context, updateHost, renderHost);
         mLayoutStateProvider = layoutStateProvider;
         mContentContainer = contentContainer;
@@ -157,6 +159,9 @@ public class NewTabAnimationLayout extends Layout {
         mScrimVisibilitySupplier = scrimVisibilitySupplier;
         mCustomTabCount = mToolbarManager.getCustomTabCount();
         mBrowserVisibilityDelegate = browserControlsManager.getBrowserVisibilityDelegate();
+        mLogsEnabled = ChromeFeatureList.sShowNewTabAnimationsLogs.getValue();
+        mTopInsetProviderSupplier = topInsetProviderSupplier;
+        topInsetProviderSupplier.addSyncObserverAndCallIfNonNull(mTopInsetProviderObserver);
     }
 
     @Override
@@ -166,6 +171,9 @@ public class NewTabAnimationLayout extends Layout {
 
     @Override
     public void destroy() {
+        if (mTopInsetProvider == null) {
+            mTopInsetProviderSupplier.removeObserver(mTopInsetProviderObserver);
+        }
         if (mSceneLayer != null) {
             mSceneLayer.destroy();
             mSceneLayer = null;
@@ -236,11 +244,24 @@ public class NewTabAnimationLayout extends Layout {
     @Override
     protected void forceAnimationToFinish() {
         if (mSkipForceAnimationToFinish) {
+            if (mLogsEnabled) Log.i(TAG, "forceAnimationToFinish: skipped");
             mSkipForceAnimationToFinish = false;
-        } else {
-            runQueuedRunnableIfExists();
-            if (mTabCreatedForegroundAnimation != null) mTabCreatedForegroundAnimation.end();
-            if (mTabCreatedBackgroundAnimation != null) mTabCreatedBackgroundAnimation.end();
+            return;
+        }
+        runQueuedRunnableIfExists();
+        if (mForegroundHostView != null) {
+            if (mLogsEnabled) {
+                Log.i(TAG, "forceAnimationToFinish: mForegroundHostView#forceAnimationToFinish");
+            }
+            mForegroundHostView.forceAnimationToFinish();
+            mAnimationHostView.removeView(mForegroundHostView);
+            mForegroundHostView = null;
+        }
+        if (mTabCreatedBackgroundAnimation != null) {
+            if (mLogsEnabled) {
+                Log.i(TAG, "forceAnimationToFinish: mTabCreatedBackgroundAnimation#end");
+            }
+            mTabCreatedBackgroundAnimation.end();
         }
     }
 
@@ -263,9 +284,11 @@ public class NewTabAnimationLayout extends Layout {
             float originX,
             float originY) {
         assert mTabModelSelector != null;
+        mTopPadding = 0;
         Tab newTab = mTabModelSelector.getModel(newIsIncognito).getTabById(id);
         if (newTab != null
-                && newTab.getLaunchType() == TabLaunchType.FROM_COLLABORATION_BACKGROUND_IN_GROUP) {
+                && (newTab.getLaunchType() == TabLaunchType.FROM_COLLABORATION_BACKGROUND_IN_GROUP
+                        || newTab.getLaunchType() == TabLaunchType.FROM_TIPS_NOTIFICATIONS)) {
             // Tab selection will no-op for Tab.INVALID_TAB_ID. This operation should not change
             // the current tab. If for some reason this is the last tab it will be automatically
             // selected.
@@ -276,6 +299,9 @@ public class NewTabAnimationLayout extends Layout {
 
         ensureSourceTabCreated(sourceId);
         updateAnimationHostViewSensitivity(sourceId);
+        mSkipForceAnimationToFinish = false;
+        if (mLogsEnabled) Log.i(TAG, "onTabCreated: forceAnimationToFinish");
+        forceAnimationToFinish();
         @Nullable Tab oldTab = mTabModelSelector.getTabById(sourceId);
 
         if (background && oldTab != null) {
@@ -306,15 +332,15 @@ public class NewTabAnimationLayout extends Layout {
                 }
             }
 
-            ObservableSupplier<Boolean> visibilitySupplier =
+            MonotonicObservableSupplier<Boolean> visibilitySupplier =
                     data != null && !isRegularNtp
                             ? data.getTabContextMenuVisibilitySupplier()
                             : mScrimVisibilitySupplier;
             tabCreatedInBackground(oldTab, isRegularNtp, x, y, visibilitySupplier);
         } else {
             assumeNonNull(newTab);
-            tabCreatedInForeground(
-                    id, sourceId, newIsIncognito, getForegroundRectStart(oldTab, newTab));
+            mTopPadding = getTopInsetIfNeeded(newTab);
+            tabCreatedInForeground(id, sourceId, newIsIncognito, oldTab, newTab);
         }
     }
 
@@ -335,10 +361,11 @@ public class NewTabAnimationLayout extends Layout {
             ResourceManager resourceManager,
             BrowserControlsStateProvider browserControls) {
         ensureSceneLayerExists();
+        if (!hasLayoutTab()) return;
 
         LayoutTab layoutTab = getLayoutTab();
         layoutTab.set(LayoutTab.IS_ACTIVE_LAYOUT, isActive());
-        layoutTab.set(LayoutTab.CONTENT_OFFSET, browserControls.getContentOffset());
+        layoutTab.set(LayoutTab.CONTENT_OFFSET, browserControls.getContentOffset() + mTopPadding);
         mSceneLayer.update(layoutTab);
     }
 
@@ -356,7 +383,15 @@ public class NewTabAnimationLayout extends Layout {
      */
     @Override
     public boolean isRunningAnimations() {
-        return mTabCreatedForegroundAnimation != null;
+        boolean isRunning =
+                mForegroundHostView != null && mForegroundHostView.isExpandAnimationRunning();
+        return isRunning;
+    }
+
+    @Override
+    public void startHiding() {
+        if (mLogsEnabled) Log.i(TAG, "startHiding");
+        super.startHiding();
     }
 
     private void reset() {
@@ -468,7 +503,15 @@ public class NewTabAnimationLayout extends Layout {
             mHandler.removeCallbacks(mTimeoutRunnable);
             mTimeoutRunnable.run();
         } else if (mAnimationRunnable != null) {
-            if (mForegroundHostView != null) mForegroundHostView.runOnNextLayoutRunnables();
+            if (mForegroundHostView != null) {
+                mForegroundHostView.runOnNextLayoutRunnables();
+                if (mLogsEnabled) {
+                    Log.i(
+                            TAG,
+                            "runQueuedRunnableIfExists:"
+                                    + " mForegroundHostView#runOnNextLayoutRunnables");
+                }
+            }
             if (mBackgroundHostView != null) mBackgroundHostView.runOnNextLayoutRunnables();
         }
         assert mTimeoutRunnable == null : "Timeout runnable exists";
@@ -481,39 +524,20 @@ public class NewTabAnimationLayout extends Layout {
     }
 
     /**
-     * Forces the new tab animation to finish.
-     *
-     * <p>This method is intended for internal use within {@link NewTabAnimationLayout}. It ensures
-     * {@link #mFadeAnimator} runs after calling {@link #startHiding}, preventing premature
-     * termination by external calls to {@link #forceAnimationToFinish} from {@link
-     * org.chromium.chrome.browser.compositor.layouts.LayoutManagerImpl#startShowing}.
-     */
-    @VisibleForTesting
-    void forceNewTabAnimationToFinish() {
-        runQueuedRunnableIfExists();
-        if (mTabCreatedForegroundAnimation != null) {
-            mAnimationHostView.removeView(mForegroundHostView);
-            mForegroundHostView = null;
-            mRectView = null;
-            mFadeAnimator = null;
-            mTabCreatedForegroundAnimation.end();
-        } else if (mFadeAnimator != null) {
-            mFadeAnimator.end();
-        }
-        if (mTabCreatedBackgroundAnimation != null) mTabCreatedBackgroundAnimation.end();
-        mSkipForceAnimationToFinish = false;
-    }
-
-    /**
      * Animates opening a tab in the foreground.
      *
      * @param id The id of the new tab to animate.
      * @param sourceId The id of the tab that spawned this new tab.
      * @param newIsIncognito True if the new tab is an incognito tab.
-     * @param rectStart Origin point where the animation starts.
+     * @param oldTab The current {@link Tab}.
+     * @param newTab The new {@link Tab} to animate.
      */
     private void tabCreatedInForeground(
-            @TabId int id, @TabId int sourceId, boolean newIsIncognito, @RectStart int rectStart) {
+            @TabId int id,
+            @TabId int sourceId,
+            boolean newIsIncognito,
+            @Nullable Tab oldTab,
+            Tab newTab) {
         LayoutTab newLayoutTab = createLayoutTab(id, newIsIncognito);
         if (mLayoutTabs == null || mLayoutTabs.length == 0) {
             mLayoutTabs = new LayoutTab[] {newLayoutTab};
@@ -522,31 +546,26 @@ public class NewTabAnimationLayout extends Layout {
             mLayoutTabs = new LayoutTab[] {mLayoutTabs[0], newLayoutTab};
             updateCacheVisibleIds(new ArrayList<>(Arrays.asList(id, sourceId)));
         }
-        forceNewTabAnimationToFinish();
 
-        // TODO(crbug.com/40933120): Investigate why the old tab flickers when switching to the new
+        // TODO(crbug.com/463341238): Investigate why the old tab flickers when switching to the new
         // tab.
         requestUpdate();
 
         Context context = getContext();
-        mRectView = new ShrinkExpandImageView(context);
-        @ColorInt
-        int backgroundColor = NewTabAnimationUtils.getBackgroundColor(context, newIsIncognito);
-        mRectView.setRoundedFillColor(backgroundColor);
 
         boolean isRtl = LocalizationUtils.isLayoutRtl();
-        mRectView.setLayoutDirection(isRtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-
-        Rect initialRect = new Rect();
-        Rect finalRect = new Rect();
-        Rect hostViewRect = new Rect();
-        mAnimationHostView.getGlobalVisibleRect(hostViewRect);
 
         int radius =
                 context.getResources()
                         .getDimensionPixelSize(R.dimen.new_tab_animation_rect_corner_radius);
         int[] startRadii = new int[4];
         Arrays.fill(startRadii, radius);
+
+        Rect initialRect = new Rect();
+        Rect finalRect = new Rect();
+        Rect hostViewRect = new Rect();
+        mAnimationHostView.getGlobalVisibleRect(hostViewRect);
+        @RectStart int rectStart = getForegroundRectStart(oldTab, newTab);
 
         if (rectStart != RectStart.CENTER) {
             RectF compositorViewportRectf = new RectF();
@@ -586,56 +605,39 @@ public class NewTabAnimationLayout extends Layout {
             finalRect.top = 0;
         }
 
-        NewTabAnimationUtils.updateRects(rectStart, isRtl, initialRect, finalRect);
+        if (mTopInsetProvider != null) {
+            // Adjust rect proportions for top padding in E2E.
+            final boolean isNewTabE2E = mTopPadding > 0;
+            final boolean isOldTabE2E = NtpCustomizationUtils.supportsEnableEdgeToEdgeOnTop(oldTab);
+            if (isNewTabE2E && isOldTabE2E) {
+                // Case: E2E -> E2E.
+                finalRect.top += mTopPadding;
+            } else if (isNewTabE2E) {
+                // Case: non-E2E -> E2E, or null -> E2E.
+                finalRect.offset(0, mTopPadding);
+            } else if (isOldTabE2E) {
+                // Case: E2E -> non-E2E.
+                finalRect.bottom -= mTopInsetProvider.getSystemTopInset();
+            }
+        }
 
-        mExpandAnimator =
-                new ShrinkExpandAnimator(
-                        mRectView, initialRect, finalRect, /* searchBoxHeight= */ 0);
-        mRectAnimator =
-                ObjectAnimator.ofObject(
-                        mExpandAnimator,
-                        ShrinkExpandAnimator.RECT,
-                        new RectEvaluator(),
-                        initialRect,
-                        finalRect);
+        NewTabAnimationUtils.updateRects(rectStart, isRtl, initialRect, finalRect);
 
         float scaleFactor = (float) initialRect.width() / finalRect.width();
         int[] endRadii = new int[4];
         for (int i = 0; i < 4; ++i) {
             endRadii[i] = Math.round(startRadii[i] * scaleFactor);
         }
-        mRectView.setRoundedCorners(startRadii[0], startRadii[1], startRadii[2], startRadii[3]);
-        mCornerAnimator =
-                RoundedCornerAnimatorUtil.createRoundedCornerAnimator(
-                        mRectView, startRadii, endRadii);
 
-        mFadeAnimator = ObjectAnimator.ofFloat(mRectView, ShrinkExpandImageView.ALPHA, 1f, 0f);
-        mFadeAnimator.setInterpolator(Interpolators.FAST_OUT_LINEAR_IN_INTERPOLATOR);
-        mFadeAnimator.setDuration(FOREGROUND_FADE_DURATION_MS);
-        mFadeAnimator.addListener(
-                new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        mFadeAnimator = null;
-                        mAnimationHostView.removeView(mForegroundHostView);
-                        mRectView = null;
-                        mForegroundHostView = null;
-                    }
-                });
+        @ColorInt
+        int backgroundColor = NewTabAnimationUtils.getBackgroundColor(context, newIsIncognito);
 
-        mTabCreatedForegroundAnimation = new AnimatorSet();
-        mTabCreatedForegroundAnimation.setInterpolator(Interpolators.STANDARD_INTERPOLATOR);
-        mTabCreatedForegroundAnimation.setDuration(FOREGROUND_ANIMATION_DURATION_MS);
-        mTabCreatedForegroundAnimation.playTogether(mRectAnimator, mCornerAnimator);
-        mTabCreatedForegroundAnimation.addListener(
-                new AnimatorListenerAdapter() {
+        NewForegroundTabAnimationHostView.Listener listener =
+                new NewForegroundTabAnimationHostView.Listener() {
                     @Override
-                    public void onAnimationEnd(Animator animation) {
-                        mTabCreatedForegroundAnimation = null;
-                        mExpandAnimator = null;
-                        mRectAnimator = null;
-                        mCornerAnimator = null;
-                        if (mFadeAnimator != null) mFadeAnimator.start();
+                    public void onExpandAnimationFinished() {
+                        if (mLogsEnabled) Log.i(TAG, "Listener: onExpandAnimationFinished");
+                        mSkipForceAnimationToFinish = true;
                         startHiding();
                         assumeNonNull(mTabModelSelector);
                         mTabModelSelector.selectModel(newIsIncognito);
@@ -643,27 +645,33 @@ public class NewTabAnimationLayout extends Layout {
                     }
 
                     @Override
-                    public void onAnimationCancel(Animator animation) {
-                        assumeNonNull(mTabCreatedForegroundAnimation);
-                        mTabCreatedForegroundAnimation.end();
+                    public void onForegroundAnimationFinished() {
+                        if (mLogsEnabled) Log.i(TAG, "Listener: onForegroundAnimationFinished");
+                        assumeNonNull(mForegroundHostView);
+                        mAnimationHostView.removeView(mForegroundHostView);
+                        mForegroundHostView = null;
                     }
-                });
+                };
+
+        final Rect finalAnimationRect = new Rect(finalRect);
         mAnimationRunnable =
                 () -> {
                     mAnimationRunnable = null;
                     // Make View visible once the animation is ready to start.
-                    assumeNonNull(mRectView);
-                    mRectView.setVisibility(View.VISIBLE);
-                    assumeNonNull(mTabCreatedForegroundAnimation);
-                    mTabCreatedForegroundAnimation.start();
+                    assumeNonNull(mForegroundHostView);
+                    mForegroundHostView.startAnimation(finalAnimationRect, endRadii);
                 };
 
-        // {@link View#INVISIBLE} is needed to generate the geometry information.
-        mRectView.setVisibility(View.INVISIBLE);
-        mForegroundHostView = new NewForegroundTabAnimationHostView(context);
-        mForegroundHostView.addView(mRectView);
+        mForegroundHostView =
+                new NewForegroundTabAnimationHostView(
+                        context,
+                        initialRect,
+                        startRadii,
+                        backgroundColor,
+                        isRtl,
+                        listener,
+                        mLogsEnabled);
         mAnimationHostView.addView(mForegroundHostView);
-        mRectView.reset(initialRect);
         setRunOnNextLayout(mForegroundHostView, mAnimationRunnable);
     }
 
@@ -682,20 +690,22 @@ public class NewTabAnimationLayout extends Layout {
             boolean isRegularNtp,
             @Px int x,
             @Px int y,
-            ObservableSupplier<Boolean> visibilitySupplier) {
+            MonotonicObservableSupplier<Boolean> visibilitySupplier) {
         boolean isIncognito = animationTab.isIncognitoBranded();
         assert assumeNonNull(mLayoutTabs).length == 1;
-        forceNewTabAnimationToFinish();
         mSkipForceAnimationToFinish = true;
-        startHiding();
+        forceHidingImmediatelyIfNeeded(isRegularNtp);
 
-        if (!isRegularNtp && mToken == TokenHolder.INVALID_TOKEN) {
-            mToken = mBrowserVisibilityDelegate.showControlsPersistent();
+        if (!isRegularNtp && mBrowserControlsVisibilityToken == TokenHolder.INVALID_TOKEN) {
+            mBrowserControlsVisibilityToken = mBrowserVisibilityDelegate.showControlsPersistent();
         }
 
         ToggleTabStackButton tabSwitcherButton =
                 mAnimationHostView.findViewById(R.id.tab_switcher_button);
         assert tabSwitcherButton != null;
+        Rect tabSwitcherRect = new Rect();
+        boolean tabSwitcherButtonIsVisible =
+                tabSwitcherButton.getGlobalVisibleRect(tabSwitcherRect);
 
         Context context = getContext();
         mBackgroundHostView =
@@ -707,31 +717,59 @@ public class NewTabAnimationLayout extends Layout {
                                         false);
         assumeNonNull(mTabModelSelector);
         int prevTabCount = mTabModelSelector.getModel(isIncognito).getCount() - 1;
-        mCustomTabCount.set(prevTabCount);
+        mCustomTabCountToken = mCustomTabCount.setCount(prevTabCount);
+
         @ColorInt
         int toolbarColor =
                 isRegularNtp
                         ? NewTabAnimationUtils.getBackgroundColor(context, isIncognito)
                         : mToolbarManager.getPrimaryColor();
-
         int[] toolbarPosition = new int[2];
         mAnimationHostView.findViewById(R.id.toolbar).getLocationInWindow(toolbarPosition);
-        Rect compositorViewRect = new Rect();
-        mCompositorViewHolder.getGlobalVisibleRect(compositorViewRect);
         boolean isTopToolbar =
                 isRegularNtp || ToolbarPositionController.shouldShowToolbarOnTop(animationTab);
+        int toolbarHeight = toolbarPosition[1] + getTopInsetIfNeeded(animationTab);
+
+        Rect compositorViewRect = new Rect();
+        mCompositorViewHolder.getGlobalVisibleRect(compositorViewRect);
+
+        MonotonicObservableSupplier<Float> ntpSearchBoxTransitionPercentageSupplier =
+                mToolbarManager.getNtpSearchBoxTransitionPercentageSupplier();
+
+        @AnimationType
+        int animationType =
+                NewBackgroundTabAnimationHostView.calculateAnimationType(
+                        tabSwitcherButtonIsVisible,
+                        isRegularNtp,
+                        ntpSearchBoxTransitionPercentageSupplier.get());
+
+        @BrandedColorScheme int brandedColorScheme;
+        if (isRegularNtp
+                && animationType == AnimationType.DEFAULT
+                && NtpCustomizationUtils.shouldAdjustIconTintForNtp(/* isTablet= */ false)) {
+            brandedColorScheme = BrandedColorScheme.DARK_BRANDED_THEME;
+        } else {
+            brandedColorScheme =
+                    ThemeUtils.getBrandedColorScheme(context, toolbarColor, isIncognito);
+        }
+
+        if (mTopInsetProvider != null && animationType == AnimationType.DEFAULT) {
+            mTabSwitcherButton = tabSwitcherButton;
+            toolbarColor = Color.TRANSPARENT;
+        }
 
         mBackgroundHostView.setUpAnimation(
                 tabSwitcherButton,
-                isRegularNtp,
+                tabSwitcherRect,
                 isIncognito,
                 isTopToolbar,
                 toolbarColor,
+                animationType,
+                brandedColorScheme,
                 prevTabCount,
-                toolbarPosition[1],
+                toolbarHeight,
                 compositorViewRect.top,
-                compositorViewRect.left,
-                mToolbarManager.getNtpTransitionPercentage());
+                compositorViewRect.left);
 
         // {@link View#INVISIBLE} is needed to generate the geometry information.
         mBackgroundHostView.setVisibility(View.INVISIBLE);
@@ -754,36 +792,54 @@ public class NewTabAnimationLayout extends Layout {
                     mAnimationRunnable = null;
                     mTimeoutRunnable = null;
                     assumeNonNull(mTabModelSelector);
+                    assumeNonNull(mBackgroundHostView);
+                    boolean shouldObserveNtp =
+                            isRegularNtp && animationType == AnimationType.DEFAULT;
                     AnimationInterruptor interruptor =
                             new AnimationInterruptor(
                                     mLayoutStateProvider,
                                     mTabModelSelector.getCurrentTabSupplier(),
                                     animationTab,
                                     mScrimVisibilitySupplier,
-                                    this::forceNewTabAnimationToFinish);
+                                    ntpSearchBoxTransitionPercentageSupplier,
+                                    shouldObserveNtp,
+                                    this::forceAnimationToFinish);
                     assumeNonNull(mBackgroundHostView);
                     mTabCreatedBackgroundAnimation = mBackgroundHostView.getAnimatorSet(x, y);
+                    AnimationFreezeChecker checker =
+                            new AnimationFreezeChecker(AnimationFreezeChecker.BACKGROUND_TAG);
                     mTabCreatedBackgroundAnimation.addListener(
-                            new AnimatorListenerAdapter() {
+                            new CancelAwareAnimatorListener() {
+                                private void internalBackgroundCleanUp() {
+                                    interruptor.destroy();
+                                    cleanUpBackgroundAnimation();
+                                }
+
                                 @Override
-                                public void onAnimationStart(Animator animation) {
+                                public void onStart(Animator animation) {
+                                    checker.onAnimationStart();
+
+                                    if (mTabSwitcherButton != null) {
+                                        mTabSwitcherButton.setVisibility(View.INVISIBLE);
+                                    }
                                     // Release custom tab count as soon as the animation starts to
                                     // avoid showing the old tab count if the user decides to scroll
                                     // up during AnimationType.NTP_PARTIAL_SCROLL or
                                     // AnimationType.NTP_FULL_SCROLL.
-                                    mCustomTabCount.release();
+                                    mCustomTabCount.releaseCount(mCustomTabCountToken);
+                                    mCustomTabCountToken = TokenHolder.INVALID_TOKEN;
                                 }
 
                                 @Override
-                                public void onAnimationEnd(Animator animation) {
-                                    interruptor.destroy();
-                                    cleanUpAnimation();
+                                public void onEnd(Animator animation) {
+                                    checker.onAnimationEnd();
+                                    internalBackgroundCleanUp();
                                 }
 
                                 @Override
-                                public void onAnimationCancel(Animator animation) {
-                                    assumeNonNull(mTabCreatedBackgroundAnimation);
-                                    mTabCreatedBackgroundAnimation.end();
+                                public void onCancel(Animator animation) {
+                                    checker.onAnimationCancel();
+                                    internalBackgroundCleanUp();
                                 }
                             });
                     mBackgroundHostView.setVisibility(View.VISIBLE);
@@ -795,8 +851,9 @@ public class NewTabAnimationLayout extends Layout {
                     if (mTimeoutRunnable == null) return;
                     mTimeoutRunnable = null;
                     mAnimationRunnable = null;
-                    cleanUpAnimation();
-                    mCustomTabCount.release();
+                    cleanUpBackgroundAnimation();
+                    mCustomTabCount.releaseCount(mCustomTabCountToken);
+                    mCustomTabCountToken = TokenHolder.INVALID_TOKEN;
                     if (mVisibilityObserver != null) {
                         visibilitySupplier.removeObserver(mVisibilityObserver);
                         mVisibilityObserver = null;
@@ -819,22 +876,42 @@ public class NewTabAnimationLayout extends Layout {
 
         if (visibilitySupplier.get()) {
             visibilitySupplier.addObserver(mVisibilityObserver);
-            // TODO(crbug.com/40282469): Check with UX about the NTP bottom sheet's scrim taking a
-            // bit to disappear and decrease the timeout.
             mHandler.postDelayed(mTimeoutRunnable, ANIMATION_TIMEOUT_MS);
         } else {
             setRunOnNextLayout(mBackgroundHostView, mAnimationRunnable);
         }
     }
 
-    private void cleanUpAnimation() {
+    private void cleanUpBackgroundAnimation() {
+        if (mTabSwitcherButton != null) {
+            mTabSwitcherButton.setVisibility(View.VISIBLE);
+            mTabSwitcherButton = null;
+        }
         mTabCreatedBackgroundAnimation = null;
         mAnimationHostView.removeView(mBackgroundHostView);
         mBackgroundHostView = null;
-        if (mToken != TokenHolder.INVALID_TOKEN) {
-            mBrowserVisibilityDelegate.releasePersistentShowingToken(mToken);
-            mToken = TokenHolder.INVALID_TOKEN;
+        if (mBrowserControlsVisibilityToken != TokenHolder.INVALID_TOKEN) {
+            mBrowserVisibilityDelegate.releasePersistentShowingToken(
+                    mBrowserControlsVisibilityToken);
+            mBrowserControlsVisibilityToken = TokenHolder.INVALID_TOKEN;
         }
+    }
+
+    private int getTopInsetIfNeeded(@Nullable Tab tab) {
+        if (mTopInsetProvider != null && NtpCustomizationUtils.supportsEnableEdgeToEdgeOnTop(tab)) {
+            return mTopInsetProvider.getSystemTopInset();
+        }
+        return 0;
+    }
+
+    private void forceHidingImmediatelyIfNeeded(boolean isNtp) {
+        startHiding();
+        if (mTopInsetProvider != null && isNtp) doneHiding();
+    }
+
+    private void onTopInsetProviderAvailable(TopInsetProvider topInsetCoordinator) {
+        mTopInsetProviderSupplier.removeObserver(mTopInsetProviderObserver);
+        mTopInsetProvider = topInsetCoordinator;
     }
 
     protected void setRunOnNextLayoutImmediatelyForTesting(boolean runImmediately) {

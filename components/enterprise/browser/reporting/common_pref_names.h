@@ -29,6 +29,14 @@ extern const char kUserSecuritySignalsReporting[];
 
 extern const char kUserSecurityAuthenticatedReporting[];
 
+extern const char kPoliciesEverFetchedWithProfileId[];
+
+extern const char kSaasUsageDomainUrlsForBrowser[];
+
+extern const char kSaasUsageDomainUrlsForProfile[];
+
+extern const char kSaasUsageReport[];
+
 }  // namespace enterprise_reporting
 
 #endif  // COMPONENTS_ENTERPRISE_BROWSER_REPORTING_COMMON_PREF_NAMES_H_

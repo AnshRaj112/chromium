@@ -4,7 +4,6 @@
 
 #import "ios/chrome/browser/profile/model/profile_manager_ios_impl.h"
 
-#import "base/containers/contains.h"
 #import "base/files/file_util.h"
 #import "base/functional/bind.h"
 #import "base/functional/callback.h"
@@ -117,7 +116,7 @@ class ProfileManagerIOSImplTest : public TestWithProfile {
 
       const std::string& profile_name = profile->GetProfileName();
 
-      CHECK(!base::Contains(profile_names, profile_name));
+      CHECK(!profile_names.contains(profile_name));
       profile_names.insert(profile_name);
     }
     return profile_names;
@@ -711,4 +710,24 @@ TEST_F(ProfileManagerIOSImplTest, PurgeProfilesMarkedForDeletion) {
   EXPECT_FALSE(profile_manager().HasProfileWithName(profile1));
   EXPECT_FALSE(profile_manager().HasProfileWithName(profile2));
   EXPECT_TRUE(profile_manager().HasProfileWithName(profile3));
+}
+
+// Tests that GetProfilePath() works for both loaded and non-loaded profiles.
+TEST_F(ProfileManagerIOSImplTest, GetProfilePath) {
+  // Create a few profiles synchronously.
+  ScopedProfileKeepAliveIOS keep_alive1 = CreateProfile(kProfileName1);
+  ScopedProfileKeepAliveIOS keep_alive2 = CreateProfile(kProfileName2);
+
+  keep_alive2.Reset();
+
+  ASSERT_TRUE(profile_manager().HasProfileWithName(kProfileName1));
+  ASSERT_TRUE(profile_manager().HasProfileWithName(kProfileName2));
+
+  ASSERT_TRUE(profile_manager().GetProfileWithName(kProfileName1));
+  ASSERT_FALSE(profile_manager().GetProfileWithName(kProfileName2));
+
+  EXPECT_EQ(base::FilePath::FromASCII(kProfileName1),
+            profile_manager().GetProfilePath(kProfileName1).BaseName());
+  EXPECT_EQ(base::FilePath::FromASCII(kProfileName2),
+            profile_manager().GetProfilePath(kProfileName2).BaseName());
 }

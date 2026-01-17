@@ -7,8 +7,8 @@
 #include "base/compiler_specific.h"
 #include "ipc/ipc_message_attachment.h"
 #include "ipc/ipc_message_attachment_set.h"
-#include "ipc/native_handle_type_converters.h"
 #include "mojo/public/cpp/bindings/lib/message_fragment.h"
+#include "mojo/public/cpp/bindings/lib/native_handle_type_converters.h"
 #include "mojo/public/cpp/bindings/lib/serialization.h"
 #include "mojo/public/cpp/bindings/lib/serialization_forward.h"
 
@@ -19,8 +19,9 @@ namespace internal {
 void UnmappedNativeStructSerializerImpl::Serialize(
     const native::NativeStructPtr& input,
     MessageFragment<native::internal::NativeStruct_Data>& fragment) {
-  if (!input)
+  if (!input) {
     return;
+  }
 
   fragment.Allocate();
   MessageFragment<Array_Data<uint8_t>> data_fragment(fragment.message());
@@ -99,14 +100,16 @@ bool UnmappedNativeStructSerializerImpl::DeserializeMessageAttachments(
     native::internal::NativeStruct_Data* data,
     Message* message,
     IPC::Message* ipc_message) {
-  if (data->handles.is_null())
+  if (data->handles.is_null()) {
     return true;
+  }
 
   auto* handles_data = data->handles.Get();
   for (size_t i = 0; i < handles_data->size(); ++i) {
     auto* handle_data = handles_data->at(i).Get();
-    if (!handle_data)
+    if (!handle_data) {
       return false;
+    }
     ScopedHandle handle;
     internal::Serializer<ScopedHandle, ScopedHandle>::Deserialize(
         &handle_data->the_handle, &handle, message);

@@ -42,15 +42,19 @@
 #include "base/system/system_monitor.h"
 #include "base/task/current_thread.h"
 #include "base/task/deferred_sequenced_task_runner.h"
+#include "base/task/execution_fence.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool/initialization_util.h"
+#include "base/task/thread_pool/thread_pool_instance.h"
+#include "base/threading/platform_thread_metrics.h"
 #include "base/threading/thread.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "base/timer/hi_res_timer_manager.h"
 #include "base/trace_event/memory_dump_manager.h"
 #include "base/trace_event/trace_event.h"
+#include "build/android_buildflags.h"
 #include "build/branding_buildflags.h"
 #include "build/build_config.h"
 #include "build/chromecast_buildflags.h"
@@ -80,7 +84,6 @@
 #include "content/browser/gpu/gpu_process_host.h"
 #include "content/browser/media/media_internals.h"
 #include "content/browser/media/media_keys_listener_manager_impl.h"
-#include "content/browser/memory_pressure/user_level_memory_pressure_signal_generator.h"
 #include "content/browser/metrics/histogram_synchronizer.h"
 #include "content/browser/network/browser_online_state_observer.h"
 #include "content/browser/network_service_instance_impl.h"
@@ -172,7 +175,6 @@
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/android/jni_android.h"
-#include "base/trace_event/cpufreq_monitor_android.h"
 #include "components/input/android/input_token_forwarder.h"
 #include "components/tracing/common/graphics_memory_dump_provider_android.h"
 #include "content/browser/android/browser_startup_controller.h"
@@ -180,6 +182,7 @@
 #include "content/browser/android/launcher_thread.h"
 #include "content/browser/android/tracing_controller_android.h"
 #include "content/browser/font_unique_name_lookup/font_unique_name_lookup_android.h"
+#include "content/browser/memory_pressure/user_level_memory_pressure_signal_generator.h"
 #include "content/browser/screen_orientation/screen_orientation_delegate_android.h"
 #include "media/base/android/media_drm_bridge_client.h"
 #include "ui/android/screen_android.h"
@@ -391,16 +394,6 @@ std::unique_ptr<base::MemoryPressureMonitor> CreateMemoryPressureMonitor(
   return monitor;
 }
 
-#if BUILDFLAG(IS_CHROMEOS)
-mojo::PendingRemote<data_decoder::mojom::BleScanParser> GetBleScanParser() {
-  static base::NoDestructor<data_decoder::DataDecoder> decoder;
-  mojo::PendingRemote<data_decoder::mojom::BleScanParser> ble_scan_parser;
-  decoder->GetService()->BindBleScanParser(
-      ble_scan_parser.InitWithNewPipeAndPassReceiver());
-  return ble_scan_parser;
-}
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
 class OopDataDecoder : public data_decoder::ServiceProvider {
  public:
   OopDataDecoder() { data_decoder::ServiceProvider::Set(this); }
@@ -488,7 +481,7 @@ media::AudioManager* BrowserMainLoop::GetAudioManager() {
 
 BrowserMainLoop::BrowserMainLoop(
     MainFunctionParams parameters,
-    std::unique_ptr<base::ThreadPoolInstance::ScopedExecutionFence>
+    std::unique_ptr<base::ScopedThreadPoolExecutionFence>
         scoped_execution_fence)
     : parameters_(std::move(parameters)),
       parsed_command_line_(*parameters_.command_line),
@@ -644,7 +637,10 @@ void BrowserMainLoop::CreateMainMessageLoop() {
 
   TRACE_EVENT0("startup", "BrowserMainLoop::CreateMainMessageLoop");
 
-  base::PlatformThread::SetName("CrBrowserMain");
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableMainThreadNameOverride)) {
+    base::PlatformThread::SetName("CrBrowserMain");
+  }
 
   // Register the main thread. The main thread's task runner should already have
   // been initialized but it's not yet known as BrowserThread::UI.
@@ -752,9 +748,6 @@ void BrowserMainLoop::PostCreateMainMessageLoop() {
     screen_orientation_delegate_ =
         std::make_unique<ScreenOrientationDelegateAndroid>();
   }
-
-  base::trace_event::TraceLog::GetInstance()->AddEnabledStateObserver(
-      base::trace_event::CPUFreqMonitor::GetInstance());
 #endif
 
   if (UsingInProcessGpu()) {
@@ -770,10 +763,7 @@ void BrowserMainLoop::PostCreateMainMessageLoop() {
 
   base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
       sql::SqlMemoryDumpProvider::GetInstance(), "Sql", nullptr);
-#if BUILDFLAG(IS_CHROMEOS)
-  device::BluetoothAdapterFactory::SetBleScanParserCallback(
-      base::BindRepeating(&GetBleScanParser));
-#else
+#if !BUILDFLAG(IS_CHROMEOS)
   // Chrome Remote Desktop needs TransitionalURLLoaderFactoryOwner on ChromeOS.
   network::TransitionalURLLoaderFactoryOwner::DisallowUsageInProcess();
 #endif
@@ -801,7 +791,7 @@ int BrowserMainLoop::PreCreateThreads() {
 
   InitializeMemoryManagementComponent();
 #if BUILDFLAG(IS_ANDROID)
-  memory_pressure::UserLevelMemoryPressureSignalGenerator::Initialize();
+  content::UserLevelMemoryPressureSignalGenerator::Initialize();
 #endif
 
 #if BUILDFLAG(ENABLE_PLUGINS)
@@ -860,6 +850,15 @@ int BrowserMainLoop::PreCreateThreads() {
   base::UmaHistogramBoolean("SiteIsolation.IsSitePerProcessOrStricter",
                             SiteIsolationPolicy::IsSitePerProcessOrStricter());
 
+#if BUILDFLAG(IS_ANDROID) && BUILDFLAG(IS_DESKTOP_ANDROID)
+  base::UmaHistogramBoolean(
+      "SiteIsolation.IsSitePerProcessOrStricter.AndroidDesktop",
+      SiteIsolationPolicy::IsSitePerProcessOrStricter());
+  base::UmaHistogramEnumeration(
+      "SiteIsolation.DisabledReason.AndroidDesktop",
+      SiteIsolationPolicy::GetSiteIsolationDisabledReason());
+#endif
+
   // Generate the browser process salt. This is then accessible by calls to
   // GetPseudonymizationSalt in the browser process. This generation is only
   // needed in the browser process, because for other processes it is
@@ -884,7 +883,7 @@ void BrowserMainLoop::CreateStartupTasks() {
       GetUIThreadTaskRunner({BrowserTaskType::kStartup}));
 #else
   startup_task_runner_ = std::make_unique<StartupTaskRunner>(
-      base::OnceCallback<void(int, base::TimeDelta)>(),
+      base::OnceCallback<void(int, base::TimeDelta, base::TimeDelta)>(),
       base::SingleThreadTaskRunner::GetCurrentDefault());
 #endif
   StartupTask pre_create_threads = base::BindOnce(
@@ -922,7 +921,7 @@ void BrowserMainLoop::CreateStartupTasks() {
 #if BUILDFLAG(IS_ANDROID)
   startup_task_runner_->StartRunningTasksAsync();
 #else
-  startup_task_runner_->RunAllTasksNow();
+  startup_task_runner_->RunAllTasksNow(false);
 #endif
 }
 
@@ -945,8 +944,8 @@ BrowserMainLoop::gpu_channel_establish_factory() const {
 }
 
 #if BUILDFLAG(IS_ANDROID)
-void BrowserMainLoop::SynchronouslyFlushStartupTasks() {
-  startup_task_runner_->RunAllTasksNow();
+void BrowserMainLoop::SynchronouslyFlushStartupTasks(bool was_posted) {
+  startup_task_runner_->RunAllTasksNow(was_posted);
 }
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -1059,6 +1058,16 @@ int BrowserMainLoop::PreMainMessageLoopRun() {
                         BindOnce(enable_message_pump_metrics, "BrowserIO"));
                   },
                   base::Unretained(this)));
+
+#if BUILDFLAG(IS_ANDROID)
+  base::PlatformThreadPriorityMonitor::Get().RegisterCurrentThread("UIThread");
+  GetIOThreadTaskRunner({})->PostTask(
+      FROM_HERE, base::BindOnce([] {
+        base::PlatformThreadPriorityMonitor::Get().RegisterCurrentThread(
+            "IOThread");
+      }));
+  base::PlatformThreadPriorityMonitor::Get().Start();
+#endif  // BUILDFLAG(IS_ANDROID)
 
   // If the UI thread blocks, the whole UI is unresponsive. Do not allow
   // unresponsive tasks from the UI thread and instantiate a

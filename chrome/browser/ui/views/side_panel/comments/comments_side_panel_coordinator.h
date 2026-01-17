@@ -9,8 +9,9 @@
 
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "components/saved_tab_groups/public/tab_group_sync_service.h"
 
-class BrowserView;
+class BrowserWindowInterface;
 class SidePanelEntryScope;
 class SidePanelRegistry;
 
@@ -19,7 +20,8 @@ class TabStripModelChange;
 struct TabStripSelectionChange;
 
 namespace tab_groups {
-class TabGroupSyncService;
+class SavedTabGroup;
+enum class TriggerSource;
 }  // namespace tab_groups
 
 namespace views {
@@ -28,11 +30,13 @@ class View;
 
 // CommentsSidePanelCoordinator handles the creation and registration of
 // the comments SidePanelEntry.
-class CommentsSidePanelCoordinator : public TabStripModelObserver {
+class CommentsSidePanelCoordinator
+    : public TabStripModelObserver,
+      public tab_groups::TabGroupSyncService::Observer {
  public:
   // TODO(crbug.com/434203413): Remove dependency on BrowserView by implementing
   // a PinnedToolbarActionsController.
-  explicit CommentsSidePanelCoordinator(BrowserView* browser_view);
+  explicit CommentsSidePanelCoordinator(BrowserWindowInterface* browser);
   ~CommentsSidePanelCoordinator() override;
 
   // TabStripModelObserver
@@ -40,6 +44,15 @@ class CommentsSidePanelCoordinator : public TabStripModelObserver {
       TabStripModel* tab_strip_model,
       const TabStripModelChange& change,
       const TabStripSelectionChange& selection) override;
+  void TabGroupedStateChanged(TabStripModel* tab_strip_model,
+                              std::optional<tab_groups::TabGroupId> old_group,
+                              std::optional<tab_groups::TabGroupId> new_group,
+                              tabs::TabInterface* tab,
+                              int index) override;
+
+  // TabGroupSyncService::Observer
+  void OnTabGroupUpdated(const tab_groups::SavedTabGroup& group,
+                         tab_groups::TriggerSource source) override;
 
   // Returns whether CommentsSidePanelCoordinator is supported.
   // If this returns false, it should not be registered with the side
@@ -57,7 +70,10 @@ class CommentsSidePanelCoordinator : public TabStripModelObserver {
 
   // Determine if the comments action should be shown in the toolbar for the
   // active tab.
-  bool ShouldShowCommentsAction(const TabStripSelectionChange& selection);
+  bool ShouldShowCommentsAction(const tabs::TabInterface* tab);
+
+  // Updates the visuals of the comments action and side panel.
+  void UpdateVisuals(const tabs::TabInterface* tab);
 
   // Updates the visibility of the comments action in the toolbar.
   void UpdateCommentsActionVisibility(bool should_show_comments_action);
@@ -80,8 +96,8 @@ class CommentsSidePanelCoordinator : public TabStripModelObserver {
   // restore the side panel.
   bool side_panel_should_be_resumed_ = false;
 
-  raw_ptr<BrowserView> browser_view_;
-  raw_ptr<tab_groups::TabGroupSyncService> tab_group_sync_service_;
+  raw_ptr<BrowserWindowInterface> browser_ = nullptr;
+  raw_ptr<tab_groups::TabGroupSyncService> tab_group_sync_service_ = nullptr;
 };
 
 #endif  // CHROME_BROWSER_UI_VIEWS_SIDE_PANEL_COMMENTS_COMMENTS_SIDE_PANEL_COORDINATOR_H_

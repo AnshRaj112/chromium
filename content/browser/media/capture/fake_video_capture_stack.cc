@@ -23,7 +23,6 @@
 #include "content/browser/browser_main_loop.h"
 #include "content/browser/media/capture/frame_test_util.h"
 #include "content/test/gpu_browsertest_helpers.h"
-#include "gpu/command_buffer/common/mailbox_holder.h"
 #include "gpu/ipc/client/client_shared_image_interface.h"
 #include "gpu/ipc/client/gpu_channel_host.h"
 #include "media/base/video_frame.h"
@@ -39,7 +38,7 @@ namespace content {
 
 namespace {
 
-scoped_refptr<gpu::ClientSharedImageInterface> GetSharedImageInterface() {
+scoped_refptr<gpu::SharedImageInterface> GetSharedImageInterface() {
   auto gpu_channel = GpuBrowsertestEstablishGpuChannelSyncRunLoop();
   return gpu_channel->CreateClientSharedImageInterface();
 }
@@ -180,7 +179,7 @@ class FakeVideoCaptureStackReceiver final : public media::VideoFrameReceiver {
     CHECK(sii_);
     auto shared_image = sii_->CreateSharedImage(
         {viz::MultiPlaneFormat::kNV12, frame.frame_info->coded_size,
-         gfx::ColorSpace(), gpu::SharedImageUsageSet(si_usage),
+         frame.frame_info->color_space, gpu::SharedImageUsageSet(si_usage),
          "FakeVideoCaptureStack"},
         gpu::kNullSurfaceHandle, gfx::BufferUsage::SCANOUT_VEA_CPU_READ,
         gmb_handle.Clone());
@@ -267,8 +266,7 @@ class FakeVideoCaptureStackReceiver final : public media::VideoFrameReceiver {
 
   void OnFrameDropped(media::VideoCaptureFrameDropReason) override {}
 
-  void OnNewSubCaptureTargetVersion(
-      uint32_t sub_capture_target_version) override {}
+  void OnNewCaptureVersion(media::CaptureVersion capture_version) override {}
 
   void OnFrameWithEmptyRegionCapture() override {}
 
@@ -297,7 +295,7 @@ class FakeVideoCaptureStackReceiver final : public media::VideoFrameReceiver {
   base::flat_map<int, media::mojom::VideoBufferHandlePtr> buffers_
       GUARDED_BY_CONTEXT(receiver_sequence_checker_);
 
-  scoped_refptr<gpu::ClientSharedImageInterface> sii_;
+  scoped_refptr<gpu::SharedImageInterface> sii_;
 
   // Task runner on which we should be calling into capture stack:
   scoped_refptr<base::SequencedTaskRunner> capture_stack_task_runner_;

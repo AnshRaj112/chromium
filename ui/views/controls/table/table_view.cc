@@ -13,7 +13,6 @@
 #include <utility>
 
 #include "base/auto_reset.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/i18n/rtl.h"
@@ -23,6 +22,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
+#include "third_party/skia/include/core/SkPath.h"
 #include "ui/accessibility/ax_action_data.h"
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -53,6 +53,7 @@
 #include "ui/views/controls/table/table_view_observer.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/layout_provider.h"
+#include "ui/views/property_effects.h"
 #include "ui/views/style/typography_provider.h"
 #include "ui/views/view_utils.h"
 
@@ -194,7 +195,7 @@ class TableView::HighlightPathGenerator : public views::HighlightPathGenerator {
     // Draw a focus indicator around the active cell.
     gfx::Rect bounds = table->GetActiveCellBounds();
     bounds.set_x(table->GetMirroredXForRect(bounds));
-    return SkPath().addRect(gfx::RectToSkRect(bounds));
+    return SkPath::Rect(gfx::RectToSkRect(bounds));
   }
 };
 
@@ -329,7 +330,7 @@ void TableView::SetTableType(TableType table_type) {
     return;
   }
   table_type_ = table_type;
-  OnPropertyChanged(&table_type_, PropertyEffects::kPropertyEffectsLayout);
+  OnPropertyChanged(&table_type_, PropertyEffects::kLayout);
 }
 
 TableType TableView::GetTableType() const {
@@ -341,7 +342,7 @@ void TableView::SetSingleSelection(bool single_selection) {
     return;
   }
   single_selection_ = single_selection;
-  OnPropertyChanged(&single_selection_, PropertyEffects::kPropertyEffectsPaint);
+  OnPropertyChanged(&single_selection_, PropertyEffects::kPaint);
 }
 
 bool TableView::GetSingleSelection() const {
@@ -494,13 +495,13 @@ void TableView::SetSortDescriptors(const SortDescriptors& sort_descriptors) {
 }
 
 bool TableView::IsColumnVisible(int id) const {
-  return base::Contains(visible_columns_, id, [](const VisibleColumn& column) {
-    return column.column.id;
-  });
+  return std::ranges::contains(
+      visible_columns_, id,
+      [](const VisibleColumn& column) { return column.column.id; });
 }
 
 bool TableView::HasColumn(int id) const {
-  return base::Contains(columns_, id, &ui::TableColumn::id);
+  return std::ranges::contains(columns_, id, &ui::TableColumn::id);
 }
 
 bool TableView::GetHasFocusIndicator() const {
@@ -513,7 +514,7 @@ void TableView::SetObserver(TableViewObserver* observer) {
     return;
   }
   observer_ = observer;
-  OnPropertyChanged(&observer_, PropertyEffects::kPropertyEffectsNone);
+  OnPropertyChanged(&observer_, PropertyEffects::kNone);
 }
 
 TableViewObserver* TableView::GetObserver() const {
@@ -598,7 +599,7 @@ void TableView::SetSelectOnRemove(bool select_on_remove) {
   }
 
   select_on_remove_ = select_on_remove;
-  OnPropertyChanged(&select_on_remove_, kPropertyEffectsNone);
+  OnPropertyChanged(&select_on_remove_, PropertyEffects::kNone);
 }
 
 bool TableView::GetSortOnPaint() const {
@@ -611,7 +612,7 @@ void TableView::SetSortOnPaint(bool sort_on_paint) {
   }
 
   sort_on_paint_ = sort_on_paint;
-  OnPropertyChanged(&sort_on_paint_, kPropertyEffectsNone);
+  OnPropertyChanged(&sort_on_paint_, PropertyEffects::kNone);
 }
 
 void TableView::SetAlternatingRowColorsEnabled(
@@ -875,7 +876,7 @@ void TableView::SyncHoverToScroll() {
 
 void TableView::ForceHoverUpdate() {
   SetHover(ConvertPointFromScreen(
-      this, display::Screen::GetScreen()->GetCursorScreenPoint()));
+      this, display::Screen::Get()->GetCursorScreenPoint()));
 }
 
 void TableView::SetHover(gfx::Point view_coordinates) {
@@ -1575,6 +1576,12 @@ void TableView::SortItemsAndUpdateMapping(bool schedule_paint) {
   GetViewAccessibility().SetTableRowCount(static_cast<int32_t>(GetRowCount()));
   UpdateVirtualAccessibilityChildrenBounds();
 
+  // Clear the selection if the active row is out of bounds.
+  if (selection_model_.active().has_value() &&
+      selection_model_.active().value() >= row_count) {
+    selection_model_.Clear();
+  }
+
   if (schedule_paint) {
     SchedulePaint();
     UpdateFocusRings();
@@ -1842,7 +1849,7 @@ void TableView::SetActiveVisibleColumnIndex(std::optional<size_t> index) {
   }
   UpdateFocusRings();
   ScheduleUpdateAccessibilityFocusIfNeeded();
-  OnPropertyChanged(&active_visible_column_index_, kPropertyEffectsNone);
+  OnPropertyChanged(&active_visible_column_index_, PropertyEffects::kNone);
 }
 
 void TableView::SelectByViewIndex(std::optional<size_t> view_index) {

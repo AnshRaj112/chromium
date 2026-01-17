@@ -7,12 +7,12 @@
 #include <algorithm>
 #include <set>
 #include <string_view>
+#include <utility>
 
 #include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/functional/callback_helpers.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "build/build_config.h"
 #include "media/base/media_switches.h"
 #include "media/base/media_track.h"
@@ -321,29 +321,6 @@ bool SourceBufferState::EvictCodedFrames(base::TimeDelta media_time,
 
   DVLOG(3) << __func__ << " success=" << success;
   return success;
-}
-
-void SourceBufferState::OnMemoryPressure(
-    base::TimeDelta media_time,
-    base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level,
-    bool force_instant_gc) {
-  // TODO(sebmarchand): Check if MEMORY_PRESSURE_LEVEL_MODERATE should also be
-  // ignored.
-  if (memory_pressure_level ==
-      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_NONE) {
-    return;
-  }
-
-  // Notify video streams about memory pressure first, since video typically
-  // takes up the most memory and that's where we can expect most savings.
-  for (const auto& it : video_streams_) {
-    it.second->OnMemoryPressure(media_time, memory_pressure_level,
-                                force_instant_gc);
-  }
-  for (const auto& it : audio_streams_) {
-    it.second->OnMemoryPressure(media_time, memory_pressure_level,
-                                force_instant_gc);
-  }
 }
 
 Ranges<base::TimeDelta> SourceBufferState::GetBufferedRanges(
@@ -740,7 +717,7 @@ bool SourceBufferState::OnNewConfigs(std::unique_ptr<MediaTracks> tracks) {
                                            media_log_);
     } else {
       MEDIA_LOG(ERROR, media_log_) << "Error: unsupported media track type "
-                                   << base::to_underlying(track->type());
+                                   << std::to_underlying(track->type());
       return false;
     }
   }

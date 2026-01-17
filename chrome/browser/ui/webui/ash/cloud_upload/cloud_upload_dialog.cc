@@ -4,6 +4,8 @@
 
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_dialog.h"
 
+#include <utility>
+
 #include "ash/constants/web_app_id_constants.h"
 #include "ash/public/cpp/new_window_delegate.h"
 #include "ash/resources/vector_icons/vector_icons.h"
@@ -24,7 +26,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "base/timer/elapsed_timer.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
 #include "chrome/browser/ash/arc/fileapi/arc_documents_provider_util.h"
@@ -46,6 +47,7 @@
 #include "chrome/browser/ui/ash/system_web_apps/system_web_app_ui_utils.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload.mojom.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_ui.h"
 #include "chrome/browser/ui/webui/ash/cloud_upload/cloud_upload_util.h"
@@ -705,10 +707,10 @@ void CloudOpenTask::OnGoogleDriveGetMetadata(
     } else if (!hosted_url.is_valid()) {
       LOG(ERROR) << "Invalid URL";
       open_result = OfficeDriveOpenErrors::kInvalidAlternateUrl;
-    } else if (hosted_url.host() == "drive.google.com") {
+    } else if (hosted_url.GetHost() == "drive.google.com") {
       LOG(ERROR) << "URL was from drive.google.com";
       open_result = OfficeDriveOpenErrors::kDriveAlternateUrl;
-    } else if (hosted_url.host() != "docs.google.com") {
+    } else if (hosted_url.GetHost() != "docs.google.com") {
       LOG(ERROR) << "URL was not from docs.google.com";
       open_result = OfficeDriveOpenErrors::kUnexpectedAlternateUrl;
     } else {
@@ -1183,7 +1185,7 @@ void CloudOpenTask::ShowDialog(
   if (resulting_tasks) {
     SetTaskArgs(args, std::move(resulting_tasks));
 
-    if (chromeos::features::IsUploadOfficeToCloudForEnterpriseEnabled()) {
+    if (chromeos::features::IsUploadOfficeToCloudEnabled()) {
       const auto& file_handler_dialog_args =
           args->dialog_specific_args->get_file_handler_dialog_args();
       // When there is only one possible task (Microsoft or Google) and no
@@ -1234,6 +1236,12 @@ void CloudOpenTask::ShowDialog(
   gfx::NativeWindow modal_parent =
       files_app_browser_ ? files_app_browser_->GetNativeWindow() : nullptr;
 
+  if (files_app_browser_) {
+    files_app_close_subscription_ =
+        files_app_browser_->GetBrowser().RegisterBrowserDidClose(
+            base::BindRepeating(&CloudOpenTask::OnBrowserDidClose,
+                                base::Unretained(this)));
+  }
   if (!modal_parent) {
     need_new_files_app_ = true;
     DCHECK(!pending_dialog_);
@@ -1293,18 +1301,20 @@ void CloudOpenTask::OnBrowserAdded(Browser* browser) {
   }
   need_new_files_app_ = false;
   files_app_browser_ = BrowserController::GetInstance()->GetDelegate(browser);
+
+  files_app_close_subscription_ =
+      browser->RegisterBrowserDidClose(base::BindRepeating(
+          &CloudOpenTask::OnBrowserDidClose, base::Unretained(this)));
   pending_dialog_->ShowSystemDialog(files_app_browser_->GetNativeWindow());
   // The dialog is deleted in `SystemWebDialogDelegate::OnDialogClosed`.
   pending_dialog_ = nullptr;
 }
 
-void CloudOpenTask::OnBrowserClosing(Browser* browser) {
-  if (BrowserController::GetInstance()->GetDelegate(browser) ==
-      files_app_browser_) {
-    // The Files app that the dialog is modal to is closed. This will close the
-    // dialog with an empty user response.
-    files_app_closed_ = true;
-  }
+void CloudOpenTask::OnBrowserDidClose(
+    BrowserWindowInterface* browser_window_interface) {
+  // The Files app that the dialog is modal to is closed. This will close the
+  // dialog with an empty user response.
+  files_app_closed_ = true;
 }
 
 // Receive user's setup dialog response and acts accordingly. `user_response` is
@@ -1472,7 +1482,7 @@ void CloudOpenTask::LocalTaskExecuted(
     LOG(ERROR) << "Execution of local file task with app id " << task.app_id
                << " to open office files. Led to error message: "
                << error_message
-               << " and result: " << base::to_underlying(result);
+               << " and result: " << std::to_underlying(result);
     return;
   }
 

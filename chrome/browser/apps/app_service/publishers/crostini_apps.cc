@@ -11,8 +11,6 @@
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/menu_util.h"
 #include "chrome/browser/ash/crostini/crostini_features.h"
-#include "chrome/browser/ash/crostini/crostini_package_service.h"
-#include "chrome/browser/ash/crostini/crostini_package_service_factory.h"
 #include "chrome/browser/ash/crostini/crostini_util.h"
 #include "chrome/grit/chrome_unscaled_resources.h"
 #include "chrome/grit/generated_resources.h"
@@ -21,11 +19,6 @@
 #include "ui/display/display.h"
 #include "ui/display/screen.h"
 #include "ui/strings/grit/ui_strings.h"
-
-// TODO(crbug.com/40569217): the equivalent of
-// CrostiniAppModelBuilder::MaybeCreateRootFolder. Does some sort of "root
-// folder" abstraction belong here (on the publisher side of the App Service)
-// or should we hard-code that in one particular subscriber (the App List UI)?
 
 namespace {
 
@@ -39,7 +32,7 @@ bool ShouldShowDisplayDensityMenuItem(const std::string& app_id,
   }
 
   display::Display d;
-  if (!display::Screen::GetScreen()->GetDisplayWithDisplayId(display_id, &d)) {
+  if (!display::Screen::Get()->GetDisplayWithDisplayId(display_id, &d)) {
     return true;
   }
 
@@ -100,14 +93,6 @@ void CrostiniApps::LaunchAppWithIntent(const std::string& app_id,
             std::move(callback).Run(ConvertBoolToLaunchResult(success));
           },
           std::move(callback)));
-}
-
-void CrostiniApps::Uninstall(const std::string& app_id,
-                             UninstallSource uninstall_source,
-                             bool clear_site_data,
-                             bool report_abuse) {
-  crostini::CrostiniPackageServiceFactory::GetForProfile(profile())
-      ->QueueUninstallApplication(app_id);
 }
 
 void CrostiniApps::GetMenuModel(const std::string& app_id,

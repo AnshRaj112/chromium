@@ -52,6 +52,66 @@ void GPUComputePassEncoder::setBindGroup(
       data_span.size(), data_span.data());
 }
 
+void GPUComputePassEncoder::setImmediates(uint32_t range_offset,
+                                          const DOMArrayBufferBase* data,
+                                          uint64_t data_offset,
+                                          ExceptionState& exception_state) {
+  base::span<const uint8_t> data_span;
+  if (!ValidateSetImmediatesAndSubSpan(
+          exception_state, &data_span, range_offset,
+          data->ByteSpanMaybeShared(), 1, data_offset)) {
+    return;
+  }
+
+  GetHandle().SetImmediates(range_offset, data_span.data(), data_span.size());
+}
+
+void GPUComputePassEncoder::setImmediates(uint32_t range_offset,
+                                          const DOMArrayBufferBase* data,
+                                          uint64_t data_offset,
+                                          uint64_t size,
+                                          ExceptionState& exception_state) {
+  base::span<const uint8_t> data_span;
+  if (!ValidateSetImmediatesAndSubSpan(
+          exception_state, &data_span, range_offset,
+          data->ByteSpanMaybeShared(), 1, data_offset, size)) {
+    return;
+  }
+
+  GetHandle().SetImmediates(range_offset, data_span.data(), data_span.size());
+}
+
+void GPUComputePassEncoder::setImmediates(
+    uint32_t range_offset,
+    const MaybeShared<DOMArrayBufferView>& data,
+    uint64_t data_offset,
+    ExceptionState& exception_state) {
+  base::span<const uint8_t> data_span;
+  if (!ValidateSetImmediatesAndSubSpan(
+          exception_state, &data_span, range_offset,
+          data->ByteSpanMaybeShared(), data->TypeSize(), data_offset)) {
+    return;
+  }
+
+  GetHandle().SetImmediates(range_offset, data_span.data(), data_span.size());
+}
+
+void GPUComputePassEncoder::setImmediates(
+    uint32_t range_offset,
+    const MaybeShared<DOMArrayBufferView>& data,
+    uint64_t data_offset,
+    uint64_t size,
+    ExceptionState& exception_state) {
+  base::span<const uint8_t> data_span;
+  if (!ValidateSetImmediatesAndSubSpan(
+          exception_state, &data_span, range_offset,
+          data->ByteSpanMaybeShared(), data->TypeSize(), data_offset, size)) {
+    return;
+  }
+
+  GetHandle().SetImmediates(range_offset, data_span.data(), data_span.size());
+}
+
 void GPUComputePassEncoder::writeTimestamp(
     const DawnObject<wgpu::QuerySet>* querySet,
     uint32_t queryIndex,
@@ -59,11 +119,11 @@ void GPUComputePassEncoder::writeTimestamp(
   V8GPUFeatureName::Enum requiredFeatureEnum =
       V8GPUFeatureName::Enum::kChromiumExperimentalTimestampQueryInsidePasses;
   if (!device_->features()->Has(requiredFeatureEnum)) {
-    exception_state.ThrowTypeError(String::Format(
+    exception_state.ThrowTypeError(UNSAFE_TODO(String::Format(
         "Use of the writeTimestamp() method on compute pass requires the '%s' "
         "feature to be enabled on %s.",
         V8GPUFeatureName(requiredFeatureEnum).AsCStr(),
-        device_->GetFormattedLabel().c_str()));
+        device_->GetFormattedLabel().c_str())));
     return;
   }
   GetHandle().WriteTimestamp(querySet->GetHandle(), queryIndex);

@@ -4,36 +4,49 @@
 
 package org.chromium.chrome.browser.signin;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 
 import androidx.annotation.MainThread;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import org.chromium.base.ResettersForTesting;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.base.supplier.OneshotSupplier;
+import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.profiles.ProfileProvider;
+import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncConfig;
+import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncCoordinator;
 import org.chromium.chrome.browser.ui.signin.FullscreenSigninAndHistorySyncConfig;
 import org.chromium.chrome.browser.ui.signin.R;
 import org.chromium.chrome.browser.ui.signin.SigninAndHistorySyncActivityLauncher;
 import org.chromium.chrome.browser.ui.signin.SigninAndHistorySyncCoordinator;
 import org.chromium.chrome.browser.ui.signin.history_sync.HistorySyncConfig;
+import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+import org.chromium.components.browser_ui.device_lock.DeviceLockActivityLauncher;
 import org.chromium.components.browser_ui.settings.ManagedPreferencesUtils;
 import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.user_prefs.UserPrefs;
+import org.chromium.ui.base.ActivityResultTracker;
+import org.chromium.ui.base.WindowAndroid;
+import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.widget.Toast;
+
+import java.util.function.Supplier;
 
 /**
  * SigninAndHistorySyncActivityLauncherImpl creates the proper intent and then launches the {@link
  * SigninAndHistorySyncActivity} in different scenarios.
  */
+@NullMarked
 public final class SigninAndHistorySyncActivityLauncherImpl
         implements SigninAndHistorySyncActivityLauncher {
-    private static SigninAndHistorySyncActivityLauncher sLauncher;
+    private static @Nullable SigninAndHistorySyncActivityLauncher sLauncher;
 
     /** Singleton instance getter */
     @MainThread
@@ -55,9 +68,9 @@ public final class SigninAndHistorySyncActivityLauncherImpl
 
     @Override
     public @Nullable Intent createBottomSheetSigninIntentOrShowError(
-            @NonNull Context context,
-            @NonNull Profile profile,
-            @NonNull BottomSheetSigninAndHistorySyncConfig config,
+            Context context,
+            Profile profile,
+            BottomSheetSigninAndHistorySyncConfig config,
             @AccessPoint int accessPoint) {
 
         if (canStartSigninAndHistorySyncOrShowError(
@@ -94,6 +107,33 @@ public final class SigninAndHistorySyncActivityLauncherImpl
                     .show();
         }
         return false;
+    }
+
+    @MainThread
+    @Override
+    public BottomSheetSigninAndHistorySyncCoordinator
+            createBottomSheetSigninCoordinatorAndObserveAddAccountResult(
+                    WindowAndroid windowAndroid,
+                    Activity activity,
+                    ActivityResultTracker activityResultTracker,
+                    BottomSheetSigninAndHistorySyncCoordinator.Delegate delegate,
+                    DeviceLockActivityLauncher deviceLockActivityLauncher,
+                    OneshotSupplier<ProfileProvider> profileSupplier,
+                    BottomSheetController bottomSheetController,
+                    Supplier<ModalDialogManager> modalDialogManagerSupplier,
+                    SnackbarManager snackbarManager,
+                    @SigninAccessPoint int signinAccessPoint) {
+        return BottomSheetSigninAndHistorySyncCoordinator.createAndObserveAddAccountResult(
+                windowAndroid,
+                activity,
+                activityResultTracker,
+                delegate,
+                deviceLockActivityLauncher,
+                profileSupplier,
+                bottomSheetController,
+                modalDialogManagerSupplier,
+                snackbarManager,
+                signinAccessPoint);
     }
 
     @Override

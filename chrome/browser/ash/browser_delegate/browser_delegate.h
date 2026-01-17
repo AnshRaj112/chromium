@@ -26,6 +26,10 @@ namespace tab_groups {
 struct TabGroupInfo;
 }  // namespace tab_groups
 
+namespace ui {
+class BaseWindow;
+}  // namespace ui
+
 namespace ash {
 
 // Abstraction of the `Browser` class from chrome/browser/ui/browser.h for use
@@ -66,21 +70,42 @@ class BrowserDelegate {
   // be nullptr even if index is in bounds, just like GetActiveWebContents().
   virtual content::WebContents* GetWebContentsAt(size_t index) const = 0;
 
+  // Returns the inspected web contents if this is a kDevTools type browser.
+  // Returns nullptr otherwise.
+  // Can also be nullptr while the browser is initialized/shutdown.
+  virtual content::WebContents* GetInspectedWebContents() const = 0;
+
+  // Returns the window. Can be nullptr, e.g. when the browser is being
+  // closed.
+  virtual ui::BaseWindow* GetWindow() const = 0;
+
   // Returns the native window. Can be nullptr, e.g. when the browser is being
   // closed.
   virtual aura::Window* GetNativeWindow() const = 0;
 
-  // Returns the browser application id, if applicable.
+  // Returns the non-empty browser application id, if applicable.
   virtual std::optional<webapps::AppId> GetAppId() const = 0;
 
   // Returns whether the browser is a web app window/pop-up.
   virtual bool IsWebApp() const = 0;
 
+  // Returns true during the initial phase of the browser being closed, when
+  // `beforeunload` handlers are running (async). It may be aborted.
+  virtual bool IsAttemptingToClose() const = 0;
+
   // Returns whether the browser is in the process of being closed and deleted.
+  // In this phase, closing committed, browser is hidden and deletion is
+  // scheduled. It cannot be aborted.
   virtual bool IsClosing() const = 0;
 
   // Returns whether the browser window is active.
   virtual bool IsActive() const = 0;
+
+  // Returns whether the browser window is minimized.
+  virtual bool IsMinimized() const = 0;
+
+  // Returns whether the browser window is visible.
+  virtual bool IsVisible() const = 0;
 
   // Shows the browser window, or activates it if it's already visible.
   virtual void Show() = 0;
@@ -98,7 +123,7 @@ class BrowserDelegate {
   // Closes the browser as soon as possible.
   virtual void Close() = 0;
 
-  // Load the given URL in a new tab.
+  // Loads the given URL in a new tab.
   // If the `url` is empty the new tab-page is loaded.
   // If an `index` is given, the tab is placed at the corresponding position in
   // the tab strip. Otherwise it is added to the end.
@@ -106,6 +131,12 @@ class BrowserDelegate {
   virtual void AddTab(const GURL& url,
                       std::optional<size_t> index,
                       TabDisposition disposition) = 0;
+
+  // Closes the contents at the given index, triggering its destruction.
+  // If UserGesture::kYes is given, the contents will first be marked as closed
+  // by user gesture.
+  enum class UserGesture { kYes, kNo };
+  virtual void CloseWebContentsAt(size_t index, UserGesture user_gesture) = 0;
 
   // Navigates the browser to the given URL.
   // The browser must be of `kApp` or `kAppPopup` type.
@@ -125,6 +156,12 @@ class BrowserDelegate {
   // Moves the given tab to the given `target_browser`, where it's placed at the
   // end of the tab strip.
   virtual void MoveTab(size_t tab_index, BrowserDelegate& target_browser) = 0;
+
+  // Initiates user install of a WebApp for the current page.
+  virtual bool CreateWebAppFromActiveWebContents() = 0;
+
+  // Resets the location bar so that its permanent text is shown.
+  virtual void ResetLocationBar() = 0;
 
  protected:
   ~BrowserDelegate() = default;

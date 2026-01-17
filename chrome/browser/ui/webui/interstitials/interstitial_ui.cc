@@ -328,7 +328,7 @@ CreateSafeBrowsingBlockingPage(content::WebContents* web_contents) {
   resource.url = request_url;
   resource.threat_type = threat_type;
   resource.rfh_locator = UnsafeResourceLocator::CreateForRenderFrameToken(
-      primary_main_frame_id.child_id,
+      primary_main_frame_id.child_id.value(),
       primary_main_frame->GetFrameToken().value());
   resource.threat_source =
       g_browser_process->safe_browsing_service()
@@ -388,7 +388,7 @@ std::unique_ptr<EnterpriseWarnPage> CreateEnterpriseWarnPage(
   resource.threat_type =
       safe_browsing::SBThreatType::SB_THREAT_TYPE_MANAGED_POLICY_WARN;
   resource.rfh_locator = UnsafeResourceLocator::CreateForRenderFrameToken(
-      primary_main_frame_id.child_id,
+      primary_main_frame_id.child_id.value(),
       primary_main_frame->GetFrameToken().value());
   resource.threat_source =
       g_browser_process->safe_browsing_service()
@@ -412,7 +412,7 @@ CreateSupervisedUserVerificationPageForYouTube(
   const GURL kRequestUrl("https://supervised-user-verification.example.net");
   return std::make_unique<SupervisedUserVerificationPageForYouTube>(
       web_contents, "first.last@gmail.com", kRequestUrl,
-      /*child_account_service*/ nullptr, ukm::kInvalidSourceId,
+      /*child_account_service*/ nullptr,
       std::make_unique<SupervisedUserVerificationControllerClient>(
           web_contents,
           Profile::FromBrowserContext(web_contents->GetBrowserContext())
@@ -477,7 +477,7 @@ CreateSafeBrowsingQuietBlockingPage(content::WebContents* web_contents) {
   resource.url = request_url;
   resource.threat_type = threat_type;
   resource.rfh_locator = UnsafeResourceLocator::CreateForRenderFrameToken(
-      primary_main_frame_id.child_id,
+      primary_main_frame_id.child_id.value(),
       primary_main_frame->GetFrameToken().value());
   resource.threat_source =
       g_browser_process->safe_browsing_service()
@@ -600,7 +600,7 @@ void InterstitialHTMLSource::StartDataRequest(
   // query (everything after the ? character).
   GURL url =
       GURL(chrome::kChromeUIInterstitialURL).GetWithEmptyPath().Resolve(path);
-  std::string path_without_query = url.path();
+  std::string path_without_query = url.GetPath();
   if (path_without_query == "/ssl") {
     interstitial_delegate = CreateSslBlockingPage(web_contents);
   } else if (path_without_query == "/mitm-software-ssl") {

@@ -29,7 +29,7 @@
 namespace customtabs {
 
 using autofill::AutofillManager;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 using content::GlobalRenderFrameHostId;
 using content::RenderFrameHost;
@@ -59,8 +59,8 @@ AutofillObserverImpl::~AutofillObserverImpl() {
   Invalidate();
 }
 
-void AutofillObserverImpl::OnFormSubmitted(autofill::AutofillManager&,
-                                           const autofill::FormData&) {
+void AutofillObserverImpl::OnBeforeFormSubmitted(autofill::AutofillManager&,
+                                                 const autofill::FormData&) {
   OnFormInteraction();
 }
 
@@ -258,22 +258,21 @@ void TabInteractionRecorderAndroid::StartObservingFrame(
 WEB_CONTENTS_USER_DATA_KEY_IMPL(TabInteractionRecorderAndroid);
 
 // JNI methods
-jboolean TabInteractionRecorderAndroid::DidGetUserInteraction(
-    JNIEnv* env) const {
+bool TabInteractionRecorderAndroid::DidGetUserInteraction(JNIEnv* env) const {
   return did_get_user_interaction_;
 }
 
-jboolean TabInteractionRecorderAndroid::HadFormInteractionInSession(
+bool TabInteractionRecorderAndroid::HadFormInteractionInSession(
     JNIEnv* env) const {
   return has_form_interactions_in_session();
 }
 
-jboolean TabInteractionRecorderAndroid::HadNavigationInteraction(
+bool TabInteractionRecorderAndroid::HadNavigationInteraction(
     JNIEnv* env) const {
   return did_get_user_interaction_ && HasNavigatedFromFirstPage();
 }
 
-jboolean TabInteractionRecorderAndroid::HadFormInteractionInActivePage(
+bool TabInteractionRecorderAndroid::HadFormInteractionInActivePage(
     JNIEnv* env) const {
   return HasActiveFormInteraction();
 }
@@ -282,9 +281,9 @@ void TabInteractionRecorderAndroid::Reset(JNIEnv* env) {
   ResetImpl();
 }
 
-ScopedJavaLocalRef<jobject> JNI_TabInteractionRecorder_GetFromTab(
+static ScopedJavaLocalRef<jobject> JNI_TabInteractionRecorder_GetFromTab(
     JNIEnv* env,
-    const JavaParamRef<jobject>& jtab) {
+    const JavaRef<jobject>& jtab) {
   TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
   if (!tab || !tab->web_contents() || tab->web_contents()->IsBeingDestroyed()) {
     return ScopedJavaLocalRef<jobject>::Adopt(env, nullptr);
@@ -296,9 +295,9 @@ ScopedJavaLocalRef<jobject> JNI_TabInteractionRecorder_GetFromTab(
       env, reinterpret_cast<int64_t>(recorder));
 }
 
-ScopedJavaLocalRef<jobject> JNI_TabInteractionRecorder_CreateForTab(
+static ScopedJavaLocalRef<jobject> JNI_TabInteractionRecorder_CreateForTab(
     JNIEnv* env,
-    const JavaParamRef<jobject>& jtab) {
+    const JavaRef<jobject>& jtab) {
   TabAndroid* tab = TabAndroid::GetNativeTab(env, jtab);
   if (!tab || !tab->web_contents() || tab->web_contents()->IsBeingDestroyed()) {
     return ScopedJavaLocalRef<jobject>::Adopt(env, nullptr);
@@ -313,3 +312,5 @@ ScopedJavaLocalRef<jobject> JNI_TabInteractionRecorder_CreateForTab(
 }
 
 }  // namespace customtabs
+
+DEFINE_JNI(TabInteractionRecorder)

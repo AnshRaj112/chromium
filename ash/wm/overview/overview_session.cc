@@ -52,7 +52,6 @@
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_util.h"
 #include "base/auto_reset.h"
-#include "base/containers/contains.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
@@ -68,6 +67,7 @@
 #include "ui/events/devices/haptic_touchpad_effects.h"
 #include "ui/events/event.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/metadata/view_factory.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/wm/core/coordinate_conversion.h"
@@ -102,7 +102,7 @@ aura::Window* GetWindowForSelection(
   // When the given `overview_item` is a group item, return the first window in
   // the `window_list` that is contained in `item_windows`.
   for (aura::Window* window : window_list) {
-    if (base::Contains(item_windows, window)) {
+    if (std::ranges::contains(item_windows, window)) {
       return window;
     }
   }
@@ -277,12 +277,6 @@ void OverviewSession::Init(
                                    OverviewTransition::kEnter);
   }
 
-  // TODO(http://b/326091611): In the case of dragging a window from the shelf
-  // with one window total, this will create the no windows widget. Then, we
-  // will be notified the drag has started and a drop target will be added,
-  // hiding the no windows widget. This all happens before the frame is
-  // presented so it looks ok from the users perspective, but we should avoid
-  // creating it in the first place.
   const bool is_continuous_enter =
       enter_exit_overview_type_ ==
       OverviewEnterExitType::kContinuousAnimationEnterOnScrollUpdate;
@@ -960,7 +954,7 @@ void OverviewSession::OnWindowActivating(
   // logic to end overview when app list (i.e., home launcher) is open in tablet
   // mode, so do not handle it here.
   if (gained_active == Shell::Get()->app_list_controller()->GetWindow() &&
-      !display::Screen::GetScreen()->InTabletMode()) {
+      !display::Screen::Get()->InTabletMode()) {
     RestoreWindowActivation(false);
     EndOverview(OverviewEndAction::kAppListActivatedInClamshell);
     return;
@@ -1070,7 +1064,8 @@ void OverviewSession::RestoreWindowActivation(bool restore) {
     return;
 
   // Do not restore focus to a window that exists on an inactive desk.
-  restore &= base::Contains(DesksController::Get()->active_desk()->windows(),
+  restore &=
+      std::ranges::contains(DesksController::Get()->active_desk()->windows(),
                             active_window_before_overview_);
 
   // Ensure the window is still in the window hierarchy and not in the middle
@@ -1194,8 +1189,7 @@ void OverviewSession::ShowSavedDeskLibrary(
   // occlusion computations. These should not cause use to exit overview.
   base::AutoReset<bool> ignore(&ignore_activations_, true);
 
-  if (display::Screen::GetScreen()->InTabletMode() ||
-      IsShowingSavedDeskLibrary()) {
+  if (display::Screen::Get()->InTabletMode() || IsShowingSavedDeskLibrary()) {
     return;
   }
 
@@ -1404,7 +1398,7 @@ void OverviewSession::OnKeyEvent(ui::KeyEvent* event) {
   // we let the app list to handle the key event.
   // TODO(crbug.com/40622922): Explore better ways to handle this splitview +
   // overview + applist case.
-  if (!display::Screen::GetScreen()->InTabletMode() &&
+  if (!display::Screen::Get()->InTabletMode() &&
       Shell::Get()->app_list_controller()->IsVisible()) {
     return;
   }
@@ -1668,7 +1662,7 @@ void OverviewSession::Move(bool reverse) {
 }
 
 bool OverviewSession::ProcessForScrolling(const ui::KeyEvent& event) {
-  if (!display::Screen::GetScreen()->InTabletMode()) {
+  if (!display::Screen::Get()->InTabletMode()) {
     return false;
   }
 

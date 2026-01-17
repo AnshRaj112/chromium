@@ -12,6 +12,7 @@ build_webui("build") {
   static_files = [ "actor_overlay.html" ]
 
   ts_files = [
+    "app.html.ts",
     "app.ts",
     "browser_proxy.ts",
   ]

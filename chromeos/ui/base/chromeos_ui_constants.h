@@ -10,8 +10,10 @@
 
 namespace chromeos {
 
-// Radius of the header's top corners when the window is restored.
-inline constexpr int kTopCornerRadiusWhenRestored = 2;
+// Radius of the window corner radius when the window is restored.
+// See `chromeos::GetWindowRoundedCorners()` for the context.
+inline constexpr int kRoundedWindowCornerRadius = 12;
+inline constexpr int kRoundedWindowSmallCornerRadius = 2;
 
 // Rounded corner radius for Pip window.
 inline constexpr int kPipRoundedCornerRadius = 12;
@@ -35,16 +37,6 @@ inline constexpr SkColor kDefaultFrameColor = SkColorSetRGB(0xFD, 0xFE, 0xFF);
 // The default duration for animating frame color changes.
 inline constexpr base::TimeDelta kDefaultFrameColorChangeAnimationDuration =
     base::Milliseconds(240);
-
-enum ViewID {
-  VIEW_ID_NONE = 0,
-
-  // ChromeOS IDs start above the range used in Chrome and Ash.
-  VIEW_ID_CHROMEOS_UI_START = 20000,
-
-  // Frame Caption Button Container used in browser and app frames.
-  VIEW_ID_CAPTION_BUTTON_CONTAINER,
-};
 
 }  // namespace chromeos
 

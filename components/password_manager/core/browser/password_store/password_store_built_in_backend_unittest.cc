@@ -10,7 +10,6 @@
 #include <variant>
 
 #include "base/check.h"
-#include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -21,12 +20,12 @@
 #include "base/test/task_environment.h"
 #include "base/time/time.h"
 #include "base/types/pass_key.h"
+#include "build/build_config.h"
 #include "components/affiliations/core/browser/fake_affiliation_service.h"
-#include "components/os_crypt/sync/os_crypt_mocker.h"
+#include "components/os_crypt/async/browser/test_utils.h"
 #include "components/password_manager/core/browser/affiliation/affiliated_match_helper.h"
 #include "components/password_manager/core/browser/affiliation/mock_affiliated_match_helper.h"
 #include "components/password_manager/core/browser/password_form.h"
-#include "components/password_manager/core/browser/password_manager_buildflags.h"
 #include "components/password_manager/core/browser/password_manager_test_utils.h"
 #include "components/password_manager/core/browser/password_store/login_database.h"
 #include "components/password_manager/core/browser/password_store/login_database_async_helper.h"
@@ -107,7 +106,7 @@ class BadLoginDatabase : public LoginDatabase {
   // LoginDatabase:
   bool Init(base::RepeatingCallback<void(password_manager::IsAccountStore)>
                 on_undecryptable_passwords_removed,
-            std::unique_ptr<os_crypt_async::Encryptor> encryptor) override {
+            os_crypt_async::Encryptor encryptor) override {
     return false;
   }
 };
@@ -134,16 +133,9 @@ class PasswordStoreBuiltInBackendBaseTest : public testing::Test {
   PasswordStoreBuiltInBackendBaseTest() = default;
 
   void SetUp() override {
-    OSCryptMocker::SetUp();
     ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
-#if !BUILDFLAG(USE_LOGIN_DATABASE_AS_BACKEND)
-    pref_service_.registry()->RegisterBooleanPref(
-        password_manager::prefs::kEmptyProfileStoreLoginDatabase, false);
-#endif
-#if !BUILDFLAG(IS_ANDROID)
     pref_service_.registry()->RegisterBooleanPref(
         prefs::kClearingUndecryptablePasswords, false);
-#endif
     pref_service_.registry()->RegisterIntegerPref(
         password_manager::prefs::kPasswordRemovalReasonForAccount, 0);
     pref_service_.registry()->RegisterIntegerPref(
@@ -161,7 +153,6 @@ class PasswordStoreBuiltInBackendBaseTest : public testing::Test {
         [](std::unique_ptr<PasswordStoreBackend> backend) { backend.reset(); },
         std::move(store_)));
     RunUntilIdle();
-    OSCryptMocker::TearDown();
     ASSERT_TRUE(temp_dir_.Delete());
   }
 
@@ -200,7 +191,10 @@ class PasswordStoreBuiltInBackendTest
     : public testing::WithParamInterface<bool>,
       public PasswordStoreBuiltInBackendBaseTest {
  public:
-  PasswordStoreBuiltInBackendTest() = default;
+  PasswordStoreBuiltInBackendTest() {
+    os_crypt_async_ = os_crypt_async::GetTestOSCryptAsyncForTesting(
+        /*is_sync_for_unittests=*/true);
+  }
 
   PasswordStoreBackend* CreateBackend(
       std::unique_ptr<LoginDatabase> database = nullptr) {
@@ -212,7 +206,7 @@ class PasswordStoreBuiltInBackendTest
 
     store_ = std::make_unique<PasswordStoreBuiltInBackend>(
         std::move(database), syncer::WipeModelUponSyncDisabledBehavior::kNever,
-        pref_service());
+        pref_service(), os_crypt_async_.get());
     return store_.get();
   }
 
@@ -225,6 +219,9 @@ class PasswordStoreBuiltInBackendTest
                          /*completion=*/base::DoNothing());
     RunUntilIdle();
   }
+
+ private:
+  std::unique_ptr<os_crypt_async::OSCryptAsync> os_crypt_async_;
 };
 
 TEST_P(PasswordStoreBuiltInBackendTest, NonASCIIData) {
@@ -861,28 +858,6 @@ TEST_P(PasswordStoreBuiltInBackendTest,
   RunUntilIdle();
 }
 
-#if !BUILDFLAG(USE_LOGIN_DATABASE_AS_BACKEND)
-TEST_P(PasswordStoreBuiltInBackendTest, NotAbleToSavePasswordsEmptyDB) {
-  pref_service()->SetBoolean(
-      password_manager::prefs::kEmptyProfileStoreLoginDatabase, true);
-  PasswordStoreBackend* backend = CreateBackend();
-  InitializeBackend(backend);
-  EXPECT_FALSE(backend->IsAbleToSavePasswords());
-}
-
-TEST_P(PasswordStoreBuiltInBackendTest,
-       NotAbleToSavePasswordsAfterDeprecation) {
-  // Pretend the login DB is not empty, because saving passwords to an
-  // empty login DB has already been disallowed before.
-  pref_service()->SetBoolean(
-      password_manager::prefs::kEmptyProfileStoreLoginDatabase, false);
-  PasswordStoreBackend* backend = CreateBackend();
-  InitializeBackend(backend);
-  EXPECT_FALSE(backend->IsAbleToSavePasswords());
-}
-
-#endif
-
 TEST_P(PasswordStoreBuiltInBackendTest, NotAbleSavePasswordsWhenDatabaseIsBad) {
   PasswordStoreBackend* bad_backend =
       CreateBackend(std::make_unique<BadLoginDatabase>(GetParam()));
@@ -904,7 +879,10 @@ class PasswordStoreBuiltInBackendPasswordLossMetricsTest
     : public testing::WithParamInterface<PasswordLossMetricsTestCase>,
       public PasswordStoreBuiltInBackendBaseTest {
  public:
-  PasswordStoreBuiltInBackendPasswordLossMetricsTest() = default;
+  PasswordStoreBuiltInBackendPasswordLossMetricsTest() {
+    os_crypt_async_ = os_crypt_async::GetTestOSCryptAsyncForTesting(
+        /*is_sync_for_unittests=*/true);
+  }
 
   PasswordStoreBackend* Initialize() {
     std::unique_ptr<LoginDatabase> database = std::make_unique<LoginDatabase>(
@@ -917,7 +895,7 @@ class PasswordStoreBuiltInBackendPasswordLossMetricsTest
 
     store_ = std::make_unique<PasswordStoreBuiltInBackend>(
         std::move(database), syncer::WipeModelUponSyncDisabledBehavior::kNever,
-        pref_service());
+        pref_service(), os_crypt_async_.get());
     PasswordStoreBackend* backend = store_.get();
     backend->InitBackend(&mock_affiliated_match_helper,
                          /*remote_form_changes_received=*/base::DoNothing(),
@@ -931,6 +909,9 @@ class PasswordStoreBuiltInBackendPasswordLossMetricsTest
   base::PassKey<class PasswordStoreBuiltInBackendPasswordLossMetricsTest>
       pass_key = base::PassKey<
           class PasswordStoreBuiltInBackendPasswordLossMetricsTest>();
+
+ private:
+  std::unique_ptr<os_crypt_async::OSCryptAsync> os_crypt_async_;
 };
 
 TEST_P(PasswordStoreBuiltInBackendPasswordLossMetricsTest,

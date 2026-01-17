@@ -10,7 +10,6 @@
 
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_value.h"
-#include "third_party/blink/renderer/bindings/core/v8/v8_canvas_element_hit_test_region.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_predefined_color_space.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_webgl_context_attributes.h"
 #include "third_party/blink/renderer/core/html/canvas/canvas_rendering_context.h"
@@ -30,6 +29,7 @@ class HTMLImageElement;
 class HTMLVideoElement;
 class ImageBitmap;
 class ImageData;
+class ProxyDawnInstanceForANGLE;
 class ScriptState;
 class V8PredefinedColorSpace;
 class V8UnionHTMLCanvasElementOrOffscreenCanvas;
@@ -66,11 +66,10 @@ class MODULES_EXPORT WebGLRenderingContextWebGPUBase
   WebGLRenderingContextWebGPUBase& operator=(
       const WebGLRenderingContextWebGPUBase&) = delete;
 
-  HTMLCanvasElement* canvas() const;
+  // Returns true on success, false and an error_msg on failure.
+  bool Initialize(ExecutionContext*, String* error_msg);
 
-  // Extra Web-exposed initAsync while until Dawn operations can be made
-  // blocking in the renderer process.
-  ScriptPromise<IDLUndefined> initAsync(ScriptState* script_state);
+  HTMLCanvasElement* canvas() const;
 
   // **************************************************************************
   // Start of WebGLRenderingContextBase's IDL methods
@@ -80,11 +79,13 @@ class MODULES_EXPORT WebGLRenderingContextWebGPUBase
   int drawingBufferWidth() const;
   int drawingBufferHeight() const;
   GLenum drawingBufferFormat() const;
-  V8PredefinedColorSpace drawingBufferColorSpace() const;
-  void setDrawingBufferColorSpace(const V8PredefinedColorSpace& color_space,
+  V8PredefinedColorSpace drawingBufferColorSpace(ScriptState*) const;
+  void setDrawingBufferColorSpace(ScriptState*,
+                                  const V8PredefinedColorSpace& color_space,
                                   ExceptionState&);
-  V8PredefinedColorSpace unpackColorSpace() const;
-  void setUnpackColorSpace(const V8PredefinedColorSpace& color_space,
+  V8PredefinedColorSpace unpackColorSpace(ScriptState*) const;
+  void setUnpackColorSpace(ScriptState*,
+                           const V8PredefinedColorSpace& color_space,
                            ExceptionState&);
 
   void activeTexture(GLenum texture);
@@ -597,6 +598,50 @@ class MODULES_EXPORT WebGLRenderingContextWebGPUBase
                   MaybeShared<DOMArrayBufferView> data,
                   int64_t src_offset);
 
+  void texElementImage2D(GLenum target,
+                         GLint level,
+                         GLint internalformat,
+                         GLenum format,
+                         GLenum type,
+                         Element* element,
+                         ExceptionState& exception_state);
+
+  void texElementImage2D(GLenum target,
+                         GLint level,
+                         GLint internalformat,
+                         GLsizei width,
+                         GLsizei height,
+                         GLenum format,
+                         GLenum type,
+                         Element* element,
+                         ExceptionState& exception_state);
+
+  void texElementImage2D(GLenum target,
+                         GLint level,
+                         GLint internalformat,
+                         GLfloat sx,
+                         GLfloat sy,
+                         GLfloat swidth,
+                         GLfloat sheight,
+                         GLenum format,
+                         GLenum type,
+                         Element* element,
+                         ExceptionState& exception_state);
+
+  void texElementImage2D(GLenum target,
+                         GLint level,
+                         GLint internalformat,
+                         GLfloat sx,
+                         GLfloat sy,
+                         GLfloat swidth,
+                         GLfloat sheight,
+                         GLsizei width,
+                         GLsizei height,
+                         GLenum format,
+                         GLenum type,
+                         Element* element,
+                         ExceptionState& exception_state);
+
   void texElement2D(GLenum target,
                     GLint level,
                     GLint internalformat,
@@ -605,8 +650,41 @@ class MODULES_EXPORT WebGLRenderingContextWebGPUBase
                     Element* element,
                     ExceptionState& exception_state);
 
-  void setHitTestRegions(VectorOf<CanvasElementHitTestRegion> hit_test_regions,
-                         ExceptionState& exception_state);
+  void texElement2D(GLenum target,
+                    GLint level,
+                    GLint internalformat,
+                    GLsizei width,
+                    GLsizei height,
+                    GLenum format,
+                    GLenum type,
+                    Element* element,
+                    ExceptionState& exception_state);
+
+  void texElement2D(GLenum target,
+                    GLint level,
+                    GLint internalformat,
+                    GLfloat sx,
+                    GLfloat sy,
+                    GLfloat swidth,
+                    GLfloat sheight,
+                    GLenum format,
+                    GLenum type,
+                    Element* element,
+                    ExceptionState& exception_state);
+
+  void texElement2D(GLenum target,
+                    GLint level,
+                    GLint internalformat,
+                    GLfloat sx,
+                    GLfloat sy,
+                    GLfloat swidth,
+                    GLfloat sheight,
+                    GLsizei width,
+                    GLsizei height,
+                    GLenum format,
+                    GLenum type,
+                    Element* element,
+                    ExceptionState& exception_state);
 
   void texSubImage2D(GLenum target,
                      GLint level,
@@ -1270,17 +1348,16 @@ class MODULES_EXPORT WebGLRenderingContextWebGPUBase
   SkAlphaType GetAlphaType() const override;
   viz::SharedImageFormat GetSharedImageFormat() const override;
   gfx::ColorSpace GetColorSpace() const override;
-  int AllocatedBufferCountPerPixel() override;
+  base::ByteSize AllocatedBufferSize() const override;
   bool isContextLost() const override;
-  scoped_refptr<StaticBitmapImage> GetImage(FlushReason) override;
+  scoped_refptr<StaticBitmapImage> GetImage() override;
   void SetHdrMetadata(const gfx::HDRMetadata& hdr_metadata) override;
 
   bool IsComposited() const override;
   bool IsPaintable() const override;
   void PageVisibilityChanged() override;
   scoped_refptr<StaticBitmapImage> PaintRenderingResultsToSnapshot(
-      SourceDrawingBuffer source_buffer,
-      FlushReason reason) override;
+      SourceDrawingBuffer source_buffer) override;
   bool CopyRenderingResultsToVideoFrame(
       WebGraphicsContext3DVideoFramePool*,
       SourceDrawingBuffer,
@@ -1314,17 +1391,6 @@ class MODULES_EXPORT WebGLRenderingContextWebGPUBase
                       const GLchar* message);
 
  private:
-  void InitRequestAdapterCallback(ScriptState* script_state,
-                                  ScriptPromiseResolver<IDLUndefined>* resolver,
-                                  wgpu::RequestAdapterStatus status,
-                                  wgpu::Adapter adapter,
-                                  wgpu::StringView error_message);
-  void InitRequestDeviceCallback(ScriptState* script_state,
-                                 ScriptPromiseResolver<IDLUndefined>* resolver,
-                                 wgpu::RequestDeviceStatus status,
-                                 wgpu::Device device,
-                                 wgpu::StringView error_message);
-
   // Must be called when an operation happens that should cause the drawing
   // buffer to be present to the compositor. See WebGL spec Section 2.2 The
   // Drawing Buffer.
@@ -1406,7 +1472,8 @@ class MODULES_EXPORT WebGLRenderingContextWebGPUBase
   WebGLFramebuffer* GetBoundFramebuffer(GLenum target) const;
 
   scoped_refptr<DawnControlClientHolder> dawn_control_client_;
-  wgpu::Adapter adapter_;
+  std::unique_ptr<ProxyDawnInstanceForANGLE> proxy_instance_;
+  wgpu::Instance instance_;
   wgpu::Device device_;
   std::unique_ptr<gpu::gles2::GLES2Interface> gles2_for_objects_;
 

@@ -11,7 +11,6 @@
 #include <string>
 #include <vector>
 
-#include "base/android/build_info.h"
 #include "base/android/jni_array.h"
 #include "base/android/jni_string.h"
 #include "base/feature_list.h"
@@ -40,7 +39,7 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/android/chrome_jni_headers/WebApkUpdateDataFetcher_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 
 namespace {
@@ -53,13 +52,13 @@ bool IsInScope(const GURL& url, const GURL& scope) {
 
 }  // anonymous namespace
 
-jlong JNI_WebApkUpdateDataFetcher_Initialize(
+static jlong JNI_WebApkUpdateDataFetcher_Initialize(
     JNIEnv* env,
-    const JavaParamRef<jobject>& obj,
+    const JavaRef<jobject>& obj,
     std::string& java_start_url,
     std::string& java_scope_url,
     std::string& java_web_manifest_url,
-    const JavaParamRef<jstring>& java_web_manifest_id) {
+    const JavaRef<jstring>& java_web_manifest_id) {
   GURL start_url(java_start_url);
   GURL scope(java_scope_url);
   GURL web_manifest_url(java_web_manifest_url);
@@ -93,7 +92,7 @@ WebApkUpdateDataFetcher::~WebApkUpdateDataFetcher() = default;
 
 void WebApkUpdateDataFetcher::ReplaceWebContents(
     JNIEnv* env,
-    const JavaParamRef<jobject>& java_web_contents) {
+    const JavaRef<jobject>& java_web_contents) {
   content::WebContents* web_contents =
       content::WebContents::FromJavaWebContents(java_web_contents);
   content::WebContentsObserver::Observe(web_contents);
@@ -103,9 +102,8 @@ void WebApkUpdateDataFetcher::Destroy(JNIEnv* env) {
   delete this;
 }
 
-void WebApkUpdateDataFetcher::Start(
-    JNIEnv* env,
-    const JavaParamRef<jobject>& java_web_contents) {
+void WebApkUpdateDataFetcher::Start(JNIEnv* env,
+                                    const JavaRef<jobject>& java_web_contents) {
   ReplaceWebContents(env, java_web_contents);
   if (!web_contents()->IsLoading())
     FetchInstallableData();
@@ -216,9 +214,9 @@ void WebApkUpdateDataFetcher::OnGotIconMurmur2Hashes(
       icons[info_.best_primary_icon_url]->hash();
   ScopedJavaLocalRef<jobject> java_primary_icon =
       gfx::ConvertToJavaBitmap(primary_icon_);
-  jboolean java_is_primary_icon_maskable = info_.is_primary_icon_maskable;
+  bool java_is_primary_icon_maskable = info_.is_primary_icon_maskable;
 
-  jboolean java_is_splash_icon_maskable = info_.is_splash_image_maskable;
+  bool java_is_splash_icon_maskable = info_.is_splash_image_maskable;
   std::string splash_icon_hash = "";
   std::string splash_icon_data = "";
   {
@@ -237,8 +235,8 @@ void WebApkUpdateDataFetcher::OnGotIconMurmur2Hashes(
   std::string share_action;
   std::u16string share_params_title;
   std::u16string share_params_text;
-  jboolean java_share_params_is_method_post = false;
-  jboolean java_share_params_is_enctype_multipart = false;
+  bool java_share_params_is_method_post = false;
+  bool java_share_params_is_enctype_multipart = false;
   ScopedJavaLocalRef<jobjectArray> java_share_params_file_names;
   ScopedJavaLocalRef<jobjectArray> java_share_params_accepts;
   if (info_.share_target.has_value() && info_.share_target->action.is_valid()) {
@@ -312,3 +310,5 @@ void WebApkUpdateDataFetcher::OnGotIconMurmur2Hashes(
       base::android::ToJavaArrayOfStringArray(env, shortcuts),
       base::android::ToJavaArrayOfByteArray(env, shortcut_icon_data));
 }
+
+DEFINE_JNI(WebApkUpdateDataFetcher)

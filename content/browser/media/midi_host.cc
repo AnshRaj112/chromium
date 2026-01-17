@@ -4,7 +4,8 @@
 
 #include "content/browser/media/midi_host.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
@@ -44,7 +45,8 @@ using midi::kSysExByte;
 using midi::mojom::PortState;
 using midi::mojom::Result;
 
-MidiHost::MidiHost(int renderer_process_id, midi::MidiService* midi_service)
+MidiHost::MidiHost(ChildProcessId renderer_process_id,
+                   midi::MidiService* midi_service)
     : renderer_process_id_(renderer_process_id),
       has_midi_permission_(false),
       has_midi_sysex_permission_(false),
@@ -64,7 +66,7 @@ MidiHost::~MidiHost() {
 
 // static
 void MidiHost::BindReceiver(
-    int render_process_id,
+    ChildProcessId render_process_id,
     midi::MidiService* midi_service,
     mojo::PendingReceiver<midi::mojom::MidiSessionProvider> receiver) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
@@ -106,8 +108,7 @@ void MidiHost::SetOutputPortState(uint32_t port, PortState state) {
 }
 
 void MidiHost::ReceiveMidiData(uint32_t port,
-                               const uint8_t* data,
-                               size_t length,
+                               base::span<const uint8_t> data,
                                base::TimeTicks timestamp) {
   TRACE_EVENT0("midi", "MidiHost::ReceiveMidiData");
 
@@ -122,7 +123,7 @@ void MidiHost::ReceiveMidiData(uint32_t port,
         std::make_unique<midi::MidiMessageQueue>(true);
   }
 
-  received_messages_queues_[port]->Add(data, length);
+  received_messages_queues_[port]->Add(data);
   std::vector<uint8_t> message;
   while (true) {
     received_messages_queues_[port]->Get(&message);
@@ -234,7 +235,7 @@ void MidiHost::SendData(uint32_t port,
   // in JavaScript. The actual permission check for security purposes
   // happens here in the browser process.
   if (base::FeatureList::IsEnabled(blink::features::kBlockMidiByDefault)) {
-    if (!has_midi_permission_ && !base::Contains(data, kSysExByte)) {
+    if (!has_midi_permission_ && !std::ranges::contains(data, kSysExByte)) {
       has_midi_permission_ =
           ChildProcessSecurityPolicyImpl::GetInstance()->CanSendMidiMessage(
               renderer_process_id_);
@@ -248,7 +249,7 @@ void MidiHost::SendData(uint32_t port,
 
   // Check `has_midi_sysex_permission_` here to avoid searching kSysExByte in
   // large bulk data transfers for correct uses.
-  if (!has_midi_sysex_permission_ && base::Contains(data, kSysExByte)) {
+  if (!has_midi_sysex_permission_ && std::ranges::contains(data, kSysExByte)) {
     has_midi_sysex_permission_ =
         ChildProcessSecurityPolicyImpl::GetInstance()->CanSendMidiSysExMessage(
             renderer_process_id_);

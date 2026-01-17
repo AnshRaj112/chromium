@@ -31,17 +31,13 @@
 #include "chrome/common/buildflags.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "components/media_device_salt/media_device_salt_service.h"
-#include "components/network_session_configurator/common/network_switches.h"
 #include "content/public/browser/audio_service.h"
-#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/media_device_id.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "extensions/browser/api_test_utils.h"
 #include "extensions/buildflags/buildflags.h"
-#include "extensions/common/permissions/permission_set.h"
-#include "extensions/common/permissions/permissions_data.h"
 #include "media/audio/audio_device_description.h"
 #include "media/audio/audio_system.h"
 #include "media/base/media_switches.h"
@@ -257,12 +253,11 @@ class HangoutServicesBrowserTest : public AudioWaitingExtensionTest {
     command_line->AppendSwitchASCII(
         switches::kAutoplayPolicy,
         switches::autoplay::kNoUserGestureRequiredPolicy);
-    // This is necessary to use https with arbitrary hostnames.
-    command_line->AppendSwitch(switches::kIgnoreCertificateErrors);
   }
 
   void SetUpOnMainThread() override {
     https_server().AddDefaultHandlers(GetChromeTestDataDir());
+    https_server().SetCertHostnames({"meet.google.com"});
     host_resolver()->AddRule("*", "127.0.0.1");
     AudioWaitingExtensionTest::SetUpOnMainThread();
   }
@@ -297,10 +292,10 @@ IN_PROC_BROWSER_TEST_F(HangoutServicesBrowserTest,
   // This runs the end-to-end JavaScript test for the Hangout Services
   // component extension, which uses the webrtcAudioPrivate API among
   // others.
-  ASSERT_TRUE(NavigateToURL(https_server().GetURL(
-      "meet.google.com", "/extensions/hangout_services_test.html")));
-
   WebContents* tab = GetActiveWebContents();
+  ASSERT_TRUE(NavigateToURL(
+      tab, https_server().GetURL("meet.google.com",
+                                 "/extensions/hangout_services_test.html")));
   WaitUntilAudioIsPlaying(tab);
 
   // Use a test server URL for uploading.

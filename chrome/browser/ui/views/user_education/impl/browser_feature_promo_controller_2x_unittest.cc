@@ -9,7 +9,6 @@
 #include "base/callback_list.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
@@ -28,6 +27,7 @@
 #include "chrome/browser/feature_engagement/tracker_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
+#include "chrome/browser/ui/interaction/browser_elements.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/test_with_browser_view.h"
 #include "chrome/browser/ui/views/tabs/tab_group_editor_bubble_view.h"
@@ -79,6 +79,7 @@
 #include "ui/views/interaction/element_tracker_views.h"
 #include "ui/views/interaction/interaction_test_util_views.h"
 #include "ui/views/interaction/interactive_views_test.h"
+#include "ui/views/test/test_views.h"
 #include "ui/views/test/widget_test.h"
 #include "ui/views/view_class_properties.h"
 
@@ -500,7 +501,7 @@ class BrowserFeaturePromoController2xTestBase
     EXPECT_TRUE(promo_handle.is_valid());
     EXPECT_EQ(FeaturePromoStatus::kContinued,
               controller_->GetPromoStatus(*feature));
-    EXPECT_EQ(browser()->window()->GetElementContext(),
+    EXPECT_EQ(BrowserElements::From(browser())->GetContext(),
               context->GetElementContext());
     promo_handle.Release();
     EXPECT_EQ(FeaturePromoStatus::kNotRunning,
@@ -574,7 +575,7 @@ class BrowserFeaturePromoController2xTest
     // Ensure that tests start after the grace period. The grace period itself
     // will be tested in the policy tests.
     ResetSessionDataImpl(kMoreThanGracePeriod, base::TimeDelta(),
-                         browser()->window()->AsBrowserView());
+                         BrowserView::GetBrowserViewForBrowser(browser()));
   }
 
   void TimeOutQueuedPromo() {
@@ -951,11 +952,13 @@ TEST_P(BrowserFeaturePromoController2xTrackerInitializedTest,
   // Add two random views to the browser with the same element ID.
   browser_view()
       ->toolbar()
-      ->AddChildView(std::make_unique<views::View>())
+      ->AddChildView(
+          std::make_unique<views::StaticSizedView>(gfx::Size(10, 10)))
       ->SetProperty(views::kElementIdentifierKey, kOneOffIPHElementId);
   browser_view()
       ->toolbar()
-      ->AddChildView(std::make_unique<views::View>())
+      ->AddChildView(
+          std::make_unique<views::StaticSizedView>(gfx::Size(10, 10)))
       ->SetProperty(views::kElementIdentifierKey, kOneOffIPHElementId);
 
   ExpectPromoResult(kOneOffIPHFeature, FeaturePromoResult::Success(), false);
@@ -990,11 +993,13 @@ TEST_P(BrowserFeaturePromoController2xTrackerInitializedTest,
   // Add two random views to the browser with the same element ID.
   browser_view()
       ->toolbar()
-      ->AddChildView(std::make_unique<views::View>())
+      ->AddChildView(
+          std::make_unique<views::StaticSizedView>(gfx::Size(10, 10)))
       ->SetProperty(views::kElementIdentifierKey, kOneOffIPHElementId);
   browser_view()
       ->toolbar()
-      ->AddChildView(std::make_unique<views::View>())
+      ->AddChildView(
+          std::make_unique<views::StaticSizedView>(gfx::Size(10, 10)))
       ->SetProperty(views::kElementIdentifierKey, kOneOffIPHElementId);
 
   // Create a second widget with an element with the target identifier.
@@ -1554,14 +1559,14 @@ DEFINE_LOCAL_CUSTOM_ELEMENT_EVENT_TYPE(kPromoShownEvent);
 }  // namespace
 
 class BrowserFeaturePromoController2xViewsTestBase
-    : public views::test::InteractiveViewsTestT<
+    : public views::test::InteractiveViewsTestMixin<
           BrowserFeaturePromoController2xTestBase> {
  public:
   BrowserFeaturePromoController2xViewsTestBase() = default;
   ~BrowserFeaturePromoController2xViewsTestBase() override = default;
 
   void SetUp() override {
-    InteractiveViewsTestT<BrowserFeaturePromoController2xTestBase>::SetUp();
+    InteractiveViewsTestMixin<BrowserFeaturePromoController2xTestBase>::SetUp();
     SetContextWidget(browser_view()->GetWidget());
   }
 

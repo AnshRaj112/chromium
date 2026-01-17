@@ -179,6 +179,7 @@ class PeopleHandler : public SettingsPageUIHandler,
 
   // syncer::SyncServiceObserver implementation.
   void OnStateChanged(syncer::SyncService* sync_service) override;
+  void OnSyncShutdown(syncer::SyncService* sync_service) override;
 
   // content::WebContentsObserver implementation
   void BeforeUnloadDialogCancelled() override;
@@ -206,6 +207,7 @@ class PeopleHandler : public SettingsPageUIHandler,
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
   void HandleGetChromeSigninUserChoiceInfo(const base::Value::List& args);
   void HandleSetChromeSigninUserChoice(const base::Value::List& args);
+  void HandleRecordSigninPendingOffered(const base::Value::List& args);
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -222,6 +224,7 @@ class PeopleHandler : public SettingsPageUIHandler,
   void HandlePauseSync(const base::Value::List& args);
 #endif
   void HandleStartKeyRetrieval(const base::Value::List& args);
+  void HandleSyncShowBookmarkLimitExceededHelp(const base::Value::List& args);
   void HandleGetSyncStatus(const base::Value::List& args);
 
 #if !BUILDFLAG(IS_CHROMEOS)

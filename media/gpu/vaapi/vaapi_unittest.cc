@@ -17,15 +17,15 @@
 #include <va/va_str.h>
 #include <xf86drm.h>
 
+#include <algorithm>
 #include <map>
 #include <optional>
 #include <vector>
 
 #include "base/bits.h"
-#include "base/containers/contains.h"
+#include "base/containers/span.h"
 #include "base/cpu.h"
 #include "base/files/file.h"
-#include "base/files/file_util.h"
 #include "base/files/scoped_file.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
@@ -291,11 +291,10 @@ std::string GetVaInfo(std::vector<std::string> argv) {
   EXPECT_TRUE(LaunchProcess(argv, options).IsValid());
   write_pipe_fd.reset();
 
-  char buf[262144] = {};
-  int n = read_pipe.ReadAtCurrentPos(buf, sizeof(buf));
-  PCHECK(n >= 0);
-  EXPECT_LT(n, 262144);
-  std::string output(buf, n);
+  uint8_t buf[262144] = {};
+  std::optional<size_t> n = read_pipe.ReadAtCurrentPos(buf);
+  PCHECK(n);
+  auto output = std::string(base::as_string_view(base::span(buf).first(*n)));
   DVLOG(4) << output;
   return output;
 }
@@ -318,7 +317,7 @@ TEST_F(VaapiTest, VaapiSandboxInitialization) {
 // [1] https://github.com/intel/libva/commit/6f69256f8ccc9a73c0b196ab77ac69ab1f4f33c2
 TEST_F(VaapiTest, VerifyNoVAProfileH264Baseline) {
   const auto va_info = RetrieveVAInfoOutput();
-  EXPECT_FALSE(base::Contains(va_info, VAProfileH264Baseline));
+  EXPECT_FALSE(va_info.contains(VAProfileH264Baseline));
 }
 
 // Verifies that every VAProfile from VaapiWrapper::GetSupportedDecodeProfiles()
@@ -331,7 +330,7 @@ TEST_F(VaapiTest, GetSupportedDecodeProfiles) {
     const auto va_profile = ConvertToVAProfile(profile.profile);
     ASSERT_TRUE(va_profile.has_value());
 
-    EXPECT_TRUE(base::Contains(va_info.at(*va_profile), VAEntrypointVLD))
+    EXPECT_TRUE(std::ranges::contains(va_info.at(*va_profile), VAEntrypointVLD))
         << " profile: " << GetProfileName(profile.profile)
         << ", va profile: " << vaProfileStr(*va_profile);
     EXPECT_TRUE(VaapiWrapper::IsDecodeSupported(*va_profile))
@@ -358,10 +357,12 @@ TEST_F(VaapiTest, GetSupportedEncodeProfiles) {
     };
     // Check if VaapiWrapper reports a profile that is not supported by
     // VaapiVideoEncodeAccelerator.
-    ASSERT_TRUE(base::Contains(kSupportableVideoEncoderProfiles, va_profile));
+    ASSERT_TRUE(
+        std::ranges::contains(kSupportableVideoEncoderProfiles, va_profile));
 
-    EXPECT_TRUE(base::Contains(va_info.at(*va_profile), VAEntrypointEncSlice) ||
-                base::Contains(va_info.at(*va_profile), VAEntrypointEncSliceLP))
+    EXPECT_TRUE(
+        std::ranges::contains(va_info.at(*va_profile), VAEntrypointEncSlice) ||
+        std::ranges::contains(va_info.at(*va_profile), VAEntrypointEncSliceLP))
         << " profile: " << GetProfileName(profile.profile)
         << ", va profile: " << vaProfileStr(*va_profile);
   }
@@ -429,8 +430,8 @@ TEST_F(VaapiTest, VaapiProfileProtected) {
   if (impl == VAImplementation::kIntelIHD) {
     const auto va_info = RetrieveVAInfoOutput();
 
-    EXPECT_TRUE(base::Contains(va_info.at(VAProfileProtected),
-                               VAEntrypointProtectedContent))
+    EXPECT_TRUE(std::ranges::contains(va_info.at(VAProfileProtected),
+                                      VAEntrypointProtectedContent))
         << ", va profile: " << vaProfileStr(VAProfileProtected);
   } else {
     EXPECT_EQ(impl, VAImplementation::kMesaGallium);
@@ -445,10 +446,11 @@ TEST_F(VaapiTest, VaapiProfilesJPEG) {
   const auto va_info = RetrieveVAInfoOutput();
 
   EXPECT_EQ(VaapiWrapper::IsDecodeSupported(VAProfileJPEGBaseline),
-            base::Contains(va_info.at(VAProfileJPEGBaseline), VAEntrypointVLD));
+            std::ranges::contains(va_info.at(VAProfileJPEGBaseline),
+                                  VAEntrypointVLD));
   EXPECT_EQ(VaapiWrapper::IsJpegEncodeSupported(),
-            base::Contains(va_info.at(VAProfileJPEGBaseline),
-                           VAEntrypointEncPicture));
+            std::ranges::contains(va_info.at(VAProfileJPEGBaseline),
+                                  VAEntrypointEncPicture));
 }
 
 // Verifies that the default VAEntrypoint as per VaapiWrapper is indeed among
@@ -464,7 +466,8 @@ TEST_F(VaapiTest, DefaultEntrypointIsSupported) {
           VaapiWrapper::GetDefaultVaEntryPoint(wrapper_mode,
                                                profile_and_entrypoints.first);
       const auto& supported_entrypoints = profile_and_entrypoints.second;
-      EXPECT_TRUE(base::Contains(supported_entrypoints, default_entrypoint))
+      EXPECT_TRUE(
+          std::ranges::contains(supported_entrypoints, default_entrypoint))
           << "Default VAEntrypoint " << vaEntrypointStr(default_entrypoint)
           << " (VaapiWrapper mode = " << wrapper_mode
           << ") is not supported for "
@@ -481,7 +484,7 @@ TEST_F(VaapiTest, UnsupportedVAProfile) {
           VaapiWrapper::kDecode);
   // H.263 decoding is NOT supported anywhere, but leave an ASSERT JIC.
   constexpr auto kUnsupportedVAProfile = VAProfileH263Baseline;
-  ASSERT_FALSE(base::Contains(configurations, kUnsupportedVAProfile));
+  ASSERT_FALSE(configurations.contains(kUnsupportedVAProfile));
 
   auto wrapper_or_error =
       VaapiWrapper::Create(VaapiWrapper::kDecode, kUnsupportedVAProfile,
@@ -499,7 +502,7 @@ TEST_F(VaapiTest, TooManyDecoderInstances) {
           VaapiWrapper::kDecode);
   // H.264 decoding is currently supported everywhere, but leave an ASSERT.
   constexpr auto kVAProfile = VAProfileH264ConstrainedBaseline;
-  ASSERT_TRUE(base::Contains(configurations, kVAProfile));
+  ASSERT_TRUE(configurations.contains(kVAProfile));
 
   const int kMaxNumOfInstances = VaapiWrapper::GetMaxNumDecoderInstances();
   std::vector<scoped_refptr<VaapiWrapper>> vaapi_wrappers(kMaxNumOfInstances);
@@ -529,7 +532,7 @@ TEST_F(VaapiTest, EncryptionSchemeNeedsCodecMode) {
           VaapiWrapper::kDecode);
   // H.264 decoding is currently supported everywhere, but leave an ASSERT.
   constexpr auto kVAProfile = VAProfileH264ConstrainedBaseline;
-  ASSERT_TRUE(base::Contains(configurations, kVAProfile));
+  ASSERT_TRUE(configurations.contains(kVAProfile));
 
   auto wrapper_or_error =
       VaapiWrapper::Create(VaapiWrapper::kDecode, kVAProfile,
@@ -550,8 +553,8 @@ TEST_F(VaapiTest, LowQualityEncodingSetting) {
       base::MatchPattern(cpuid.cpu_brand(), "Intel(R) Core(TM) *Y CPU*");
   const bool is_low_power_intel =
       cpuid.family() == kPentiumAndLaterFamily &&
-      (base::Contains(cpuid.cpu_brand(), "Pentium") ||
-       base::Contains(cpuid.cpu_brand(), "Celeron") || is_core_y_processor);
+      (cpuid.cpu_brand().contains("Pentium") ||
+       cpuid.cpu_brand().contains("Celeron") || is_core_y_processor);
   if (!is_low_power_intel)
     GTEST_SKIP() << "Not an Intel low power processor";
 
@@ -575,7 +578,8 @@ TEST_F(VaapiTest, LowQualityEncodingSetting) {
       // supported and enabled). Query VaapiWrapper's mandated entry point.
       const VAEntrypoint entrypoint =
           VaapiWrapper::GetDefaultVaEntryPoint(codec_mode, va_profile);
-      ASSERT_TRUE(base::Contains(profile_and_entrypoints.second, entrypoint));
+      ASSERT_TRUE(
+          std::ranges::contains(profile_and_entrypoints.second, entrypoint));
 
       VAConfigAttrib attrib{};
       attrib.type = VAConfigAttribEncQualityRange;

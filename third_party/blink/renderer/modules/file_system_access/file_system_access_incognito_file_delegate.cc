@@ -12,6 +12,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/system/string_data_source.h"
@@ -66,10 +67,10 @@ void WriteDataToProducer(
   // the duration of the write.
   producer_raw->Write(
       std::move(data_source),
-      WTF::BindOnce([](std::unique_ptr<mojo::DataPipeProducer>,
-                       scoped_refptr<base::RefCountedData<Vector<uint8_t>>>,
-                       MojoResult) {},
-                    std::move(producer), std::move(data)));
+      blink::BindOnce([](std::unique_ptr<mojo::DataPipeProducer>,
+                         scoped_refptr<base::RefCountedData<Vector<uint8_t>>>,
+                         MojoResult) {},
+                      std::move(producer), std::move(data)));
 }
 
 }  // namespace

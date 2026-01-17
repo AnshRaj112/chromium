@@ -17,6 +17,7 @@
 #include "base/test/test_future.h"
 #include "base/time/time.h"
 #include "base/timer/elapsed_timer.h"
+#include "components/unexportable_keys/background_task_origin.h"
 #include "components/unexportable_keys/unexportable_key_service_impl.h"
 #include "components/unexportable_keys/unexportable_key_task_manager.h"
 #include "crypto/scoped_fake_unexportable_key_provider.h"
@@ -45,6 +46,8 @@ constexpr crypto::SignatureVerifier::SignatureAlgorithm
     kAcceptableAlgorithms[] = {crypto::SignatureVerifier::ECDSA_SHA256};
 constexpr unexportable_keys::BackgroundTaskPriority kTaskPriority =
     unexportable_keys::BackgroundTaskPriority::kUserBlocking;
+constexpr unexportable_keys::BackgroundTaskOrigin kTaskOrigin =
+    unexportable_keys::BackgroundTaskOrigin::kDeviceBoundSessionCredentials;
 
 perf_test::PerfResultReporter SetUpDbscSSReporter(const std::string& story) {
   perf_test::PerfResultReporter reporter(kMetricPrefixDbscSS, story);
@@ -56,8 +59,6 @@ perf_test::PerfResultReporter SetUpDbscSSReporter(const std::string& story) {
 
 class DBSCSessionStorePerfTest : public testing::Test {
  public:
-  DBSCSessionStorePerfTest() : key_service_(task_manager_) {}
-
   void CreateStore() {
     store_ = std::make_unique<SessionStoreImpl>(
         temp_dir_.GetPath().Append(dbsc_filename), key_service_);
@@ -166,9 +167,9 @@ class DBSCSessionStorePerfTest : public testing::Test {
   base::ScopedTempDir temp_dir_;
   std::unique_ptr<SessionStoreImpl> store_;
   crypto::ScopedFakeUnexportableKeyProvider scoped_key_provider_;
-  unexportable_keys::UnexportableKeyTaskManager task_manager_{
-      crypto::UnexportableKeyProvider::Config()};
-  unexportable_keys::UnexportableKeyServiceImpl key_service_;
+  unexportable_keys::UnexportableKeyTaskManager task_manager_;
+  unexportable_keys::UnexportableKeyServiceImpl key_service_{
+      task_manager_, kTaskOrigin, crypto::UnexportableKeyProvider::Config()};
   base::Time perf_measurement_start_;
 };
 

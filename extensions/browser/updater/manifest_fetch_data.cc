@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/notreached.h"
 #include "base/strings/escape.h"
 #include "base/strings/string_number_conversions.h"
@@ -147,7 +146,7 @@ bool ManifestFetchData::AddExtension(const std::string& id,
                                      DownloadFetchPriority fetch_priority) {
   DCHECK(!is_all_external_policy_download_ ||
          extension_location == ManifestLocation::kExternalPolicyDownload);
-  if (base::Contains(extensions_data_, id)) {
+  if (extensions_data_.contains(id)) {
     NOTREACHED() << "Duplicate extension id " << id;
   }
 
@@ -230,7 +229,7 @@ void ManifestFetchData::AddAssociatedTask(ExtensionDownloaderTask task) {
 
 void ManifestFetchData::UpdateFullUrl(const std::string& base_query_params) {
   std::string query =
-      full_url_.has_query() ? full_url_.query() + "&" : std::string();
+      full_url_.has_query() ? full_url_.GetQuery() + "&" : std::string();
   query += base_query_params;
   GURL::Replacements replacements;
   replacements.SetQueryStr(query);
@@ -268,7 +267,7 @@ ExtensionIdSet ManifestFetchData::GetExtensionIds() const {
 }
 
 bool ManifestFetchData::Includes(const ExtensionId& extension_id) const {
-  return base::Contains(extensions_data_, extension_id);
+  return extensions_data_.contains(extension_id);
 }
 
 bool ManifestFetchData::DidPing(const ExtensionId& extension_id,

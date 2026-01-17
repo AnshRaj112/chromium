@@ -4,11 +4,6 @@
 //
 // This file defines utility functions for working with strings.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #ifndef BASE_STRINGS_STRING_UTIL_H_
 #define BASE_STRINGS_STRING_UTIL_H_
 
@@ -43,7 +38,6 @@ namespace base {
 // Wrapper for vsnprintf that always null-terminates and always returns the
 // number of characters that would be in an untruncated formatted
 // string, even when truncation occurs.
-// TODO(tsepez): should be UNSAFE_BUFFER_USAGE.
 PRINTF_FORMAT(3, 0)
 int vsnprintf(char* buffer, size_t size, const char* format, va_list arguments);
 
@@ -51,13 +45,12 @@ int vsnprintf(char* buffer, size_t size, const char* format, va_list arguments);
 
 // We separate the declaration from the implementation of this inline
 // function just so the PRINTF_FORMAT works.
-// TODO(tsepez): should be UNSAFE_BUFFER_USAGE.
 PRINTF_FORMAT(3, 4)
 inline int snprintf(char* buffer, size_t size, const char* format, ...);
 inline int snprintf(char* buffer, size_t size, const char* format, ...) {
   va_list arguments;
   va_start(arguments, format);
-  int result = vsnprintf(buffer, size, format, arguments);
+  int result = UNSAFE_TODO(vsnprintf(buffer, size, format, arguments));
   va_end(arguments);
   return result;
 }
@@ -530,12 +523,6 @@ constexpr bool IsWhitespace(Char c) {
     return IsAsciiWhitespace(c);
   }
 }
-
-// Return a byte string in human-readable format with a unit suffix. Not
-// appropriate for use in any UI; use of FormatBytes and friends in ui/base is
-// highly recommended instead. TODO(avi): Figure out how to get callers to use
-// FormatBytes instead; remove this.
-BASE_EXPORT std::u16string FormatBytesUnlocalized(int64_t bytes);
 
 // Starting at |start_offset| (usually 0), replace the first instance of
 // |find_this| with |replace_with|.

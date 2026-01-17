@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <algorithm>
 #include <memory>
 
 #include "ash/constants/ash_features.h"
@@ -9,7 +10,6 @@
 #include "ash/public/cpp/login_screen_test_api.h"
 #include "base/check_deref.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/location.h"
 #include "base/run_loop.h"
 #include "base/task/single_thread_task_runner.h"
@@ -24,7 +24,6 @@
 #include "chrome/browser/ash/login/test/oobe_screen_waiter.h"
 #include "chrome/browser/ash/login/test/scoped_policy_update.h"
 #include "chrome/browser/ash/login/test/user_adding_screen_utils.h"
-#include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
 #include "chrome/browser/ash/login/wizard_controller.h"
 #include "chrome/browser/ash/policy/core/device_policy_cros_browser_test.h"
 #include "chrome/browser/ash/settings/stub_cros_settings_provider.h"
@@ -41,7 +40,6 @@
 #include "components/account_id/account_id.h"
 #include "components/prefs/pref_service.h"
 #include "components/user_manager/known_user.h"
-#include "components/user_manager/scoped_user_manager.h"
 #include "components/user_manager/user_manager.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/test_utils.h"
@@ -106,10 +104,14 @@ class LoginUIKeyboardTest : public LoginManagerTest {
   // Should be called from PRE_ test so that local_state is saved to disk, and
   // reloaded in the main test.
   void InitUserLastInputMethod() {
-    input_method::SetUserLastInputMethodPreferenceForTesting(
-        test_users_[0], user_input_methods[0]);
-    input_method::SetUserLastInputMethodPreferenceForTesting(
-        test_users_[1], user_input_methods[1]);
+    input_method::InputMethodPersistence::
+        SetUserLastInputMethodPreferenceForTesting(
+            *g_browser_process->local_state(), test_users_[0],
+            user_input_methods[0]);
+    input_method::InputMethodPersistence::
+        SetUserLastInputMethodPreferenceForTesting(
+            *g_browser_process->local_state(), test_users_[1],
+            user_input_methods[1]);
   }
 
  protected:
@@ -246,14 +248,6 @@ class LoginUIKeyboardTestWithUsersAndOwner : public LoginManagerTest {
   LoginUIKeyboardTestWithUsersAndOwner() = default;
   ~LoginUIKeyboardTestWithUsersAndOwner() override = default;
 
-  void SetUp() override {
-    LoginManagerTest::SetUp();
-
-    auto user_manager = std::make_unique<ash::FakeChromeUserManager>();
-    scoped_user_manager_ = std::make_unique<user_manager::ScopedUserManager>(
-        std::move(user_manager));
-  }
-
   void SetUpOnMainThread() override {
     user_input_methods.push_back("xkb:fr::fra");
     user_input_methods.push_back("xkb:de::ger");
@@ -262,7 +256,7 @@ class LoginUIKeyboardTestWithUsersAndOwner : public LoginManagerTest {
     input_method::InputMethodManager::Get()->GetMigratedInputMethodIDs(
         &user_input_methods);
 
-    GetFakeUserManager().SetOwnerId(
+    user_manager::UserManager::Get()->SetOwnerId(
         AccountId::FromUserEmailGaiaId(kTestUser3, kTestUser3GaiaId));
 
     LoginManagerTest::SetUpOnMainThread();
@@ -271,31 +265,32 @@ class LoginUIKeyboardTestWithUsersAndOwner : public LoginManagerTest {
   // Should be called from PRE_ test so that local_state is saved to disk, and
   // reloaded in the main test.
   void InitUserLastInputMethod() {
-    input_method::SetUserLastInputMethodPreferenceForTesting(
-        AccountId::FromUserEmailGaiaId(kTestUser1, kTestUser1GaiaId),
-        user_input_methods[0]);
-    input_method::SetUserLastInputMethodPreferenceForTesting(
-        AccountId::FromUserEmailGaiaId(kTestUser2, kTestUser2GaiaId),
-        user_input_methods[1]);
-    input_method::SetUserLastInputMethodPreferenceForTesting(
-        AccountId::FromUserEmailGaiaId(kTestUser3, kTestUser3GaiaId),
-        user_input_methods[2]);
-
     PrefService* local_state = g_browser_process->local_state();
+
+    input_method::InputMethodPersistence::
+        SetUserLastInputMethodPreferenceForTesting(
+            *local_state,
+            AccountId::FromUserEmailGaiaId(kTestUser1, kTestUser1GaiaId),
+            user_input_methods[0]);
+    input_method::InputMethodPersistence::
+        SetUserLastInputMethodPreferenceForTesting(
+            *local_state,
+            AccountId::FromUserEmailGaiaId(kTestUser2, kTestUser2GaiaId),
+            user_input_methods[1]);
+    input_method::InputMethodPersistence::
+        SetUserLastInputMethodPreferenceForTesting(
+            *local_state,
+            AccountId::FromUserEmailGaiaId(kTestUser3, kTestUser3GaiaId),
+            user_input_methods[2]);
+
     local_state->SetString(language_prefs::kPreferredKeyboardLayout,
                            user_input_methods[2]);
-  }
-
-  ash::FakeChromeUserManager& GetFakeUserManager() {
-    return CHECK_DEREF(static_cast<ash::FakeChromeUserManager*>(
-        user_manager::UserManager::Get()));
   }
 
   void CheckGaiaKeyboard();
 
  protected:
   std::vector<std::string> user_input_methods;
-  std::unique_ptr<user_manager::ScopedUserManager> scoped_user_manager_;
 };
 
 void LoginUIKeyboardTestWithUsersAndOwner::CheckGaiaKeyboard() {
@@ -454,8 +449,9 @@ IN_PROC_BROWSER_TEST_F(LoginUIDevicePolicyUserAdding, PolicyNotHonored) {
             default_input_methods);
 
   EXPECT_EQ(user_adding_ime_state->GetAllowedInputMethodIds().size(), 0u);
-  EXPECT_FALSE(base::Contains(user_adding_ime_state->GetEnabledInputMethodIds(),
-                              allowed_input_method.front()));
+  EXPECT_FALSE(
+      std::ranges::contains(user_adding_ime_state->GetEnabledInputMethodIds(),
+                            allowed_input_method.front()));
 }
 
 class FirstLoginKeyboardTest : public LoginManagerTest {
@@ -493,8 +489,9 @@ IN_PROC_BROWSER_TEST_F(FirstLoginKeyboardTest,
   locker_tester.Lock();
 
   // Clear user input method.
-  input_method::SetUserLastInputMethodPreferenceForTesting(test_user_,
-                                                           std::string());
+  input_method::InputMethodPersistence::
+      SetUserLastInputMethodPreferenceForTesting(
+          *g_browser_process->local_state(), test_user_, std::string());
   EXPECT_TRUE(lock_screen_utils::GetUserLastInputMethodId(test_user_).empty());
 
   locker_tester.UnlockWithPassword(test_user_, "password");

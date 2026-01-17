@@ -120,16 +120,15 @@ class StringBuilder:
       self(f'\n}}  // namespace{value}\n')
 
   @contextlib.contextmanager
-  def block(self, *, indent=2, after=None):
+  def block(self, *, indent=2, after=None, no_trailing_newline=False):
     self(' {\n')
     with self.indent(indent):
       yield
+    self('}')
     if after:
-      self('}')
       self(after)
+    if not no_trailing_newline:
       self('\n')
-    else:
-      self('}\n')
 
   @contextlib.contextmanager
   def indent(self, amount):
@@ -201,8 +200,11 @@ def add_to_zip_hermetic(zip_file, zip_path, data=None):
   zip_file.writestr(zipinfo, data, zipfile.ZIP_STORED)
 
 
-def should_rename_package(package_name, filter_list_string):
-  # If the filter list is empty, all packages should be renamed.
+def should_prefix_package(package_name, filter_list_string):
+  # Never prefix system packages.
+  if package_name.startswith(('android.', 'java.')):
+    return False
+  # If the filter list is empty, all packages should be prefixed.
   if not filter_list_string:
     return True
 

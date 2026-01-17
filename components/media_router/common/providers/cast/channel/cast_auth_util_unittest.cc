@@ -22,8 +22,7 @@
 #include "third_party/openscreen/src/cast/common/certificate/proto/test_suite.pb.h"
 #include "third_party/openscreen/src/cast/common/channel/proto/cast_channel.pb.h"
 
-using openscreen::cast::proto::SHA1;
-using openscreen::cast::proto::SHA256;
+namespace cast_pb = openscreen::cast::proto;
 
 namespace cast_channel {
 namespace {
@@ -58,7 +57,7 @@ class CastAuthUtilTest : public testing::Test {
  protected:
   static AuthResponse CreateAuthResponse(
       std::string* signed_data,
-      openscreen::cast::proto::HashAlgorithm digest_algorithm) {
+      cast_pb::HashAlgorithm digest_algorithm) {
     auto chain = cast_certificate::ReadCertificateChainFromFile(
         cast_certificate::testing::GetCastCertificatesSubDirectory()
             .AppendASCII("chromecast_gen1.pem"));
@@ -76,10 +75,10 @@ class CastAuthUtilTest : public testing::Test {
 
     response.set_hash_algorithm(digest_algorithm);
     switch (digest_algorithm) {
-      case SHA1:
+      case cast_pb::SHA1:
         response.set_signature(signature_data.signature_sha1);
         break;
-      case SHA256:
+      case cast_pb::SHA256:
         response.set_signature(signature_data.signature_sha256);
         break;
     }
@@ -97,7 +96,8 @@ class CastAuthUtilTest : public testing::Test {
 // being verified doesn't expire until 2032!
 TEST_F(CastAuthUtilTest, VerifySuccess) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   base::Time now = base::Time::Now();
   AuthResult result = VerifyCredentialsForTest(
       auth_response, signed_data, cast_certificate::CRLPolicy::CRL_OPTIONAL,
@@ -110,7 +110,8 @@ TEST_F(CastAuthUtilTest, VerifySuccess) {
 
 TEST_F(CastAuthUtilTest, VerifyBadCA) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   MangleString(auth_response.mutable_intermediate_certificate(0));
   AuthResult result = VerifyCredentials(auth_response, signed_data);
   EXPECT_FALSE(result.success());
@@ -120,7 +121,8 @@ TEST_F(CastAuthUtilTest, VerifyBadCA) {
 
 TEST_F(CastAuthUtilTest, VerifyBadClientAuthCert) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   MangleString(auth_response.mutable_client_auth_certificate());
   AuthResult result = VerifyCredentials(auth_response, signed_data);
   EXPECT_FALSE(result.success());
@@ -131,7 +133,8 @@ TEST_F(CastAuthUtilTest, VerifyBadClientAuthCert) {
 
 TEST_F(CastAuthUtilTest, VerifyBadSignature) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   MangleString(auth_response.mutable_signature());
   AuthResult result = VerifyCredentials(auth_response, signed_data);
   EXPECT_FALSE(result.success());
@@ -141,7 +144,8 @@ TEST_F(CastAuthUtilTest, VerifyBadSignature) {
 
 TEST_F(CastAuthUtilTest, VerifyEmptySignature) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   auth_response.mutable_signature()->clear();
   AuthResult result = VerifyCredentials(auth_response, signed_data);
   EXPECT_FALSE(result.success());
@@ -149,23 +153,9 @@ TEST_F(CastAuthUtilTest, VerifyEmptySignature) {
   EXPECT_EQ(kFlagsAcceptedWithMissingCRL, result.flags);
 }
 
-TEST_F(CastAuthUtilTest, VerifyUnsupportedDigest) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(kEnforceSHA256Checking);
-  std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA1);
-  base::Time now = base::Time::Now();
-  AuthResult result = VerifyCredentialsForTest(
-      auth_response, signed_data, cast_certificate::CRLPolicy::CRL_OPTIONAL,
-      nullptr, now);
-  EXPECT_FALSE(result.success());
-  EXPECT_EQ(AuthResult::ERROR_DIGEST_UNSUPPORTED, result.error_type);
-  EXPECT_EQ(kFlagsSHA1AndCRLMissing, result.flags);
-}
-
 TEST_F(CastAuthUtilTest, VerifyBackwardsCompatibleDigest) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA1);
+  AuthResponse auth_response = CreateAuthResponse(&signed_data, cast_pb::SHA1);
   base::Time now = base::Time::Now();
   AuthResult result = VerifyCredentialsForTest(
       auth_response, signed_data, cast_certificate::CRLPolicy::CRL_OPTIONAL,
@@ -176,7 +166,8 @@ TEST_F(CastAuthUtilTest, VerifyBackwardsCompatibleDigest) {
 
 TEST_F(CastAuthUtilTest, VerifyCrlRequiredWithFallback) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   base::Time now = base::Time::Now();
   AuthResult result = VerifyCredentialsForTest(
       auth_response, signed_data,
@@ -189,7 +180,8 @@ TEST_F(CastAuthUtilTest, VerifyCrlRequiredWithFallback) {
 
 TEST_F(CastAuthUtilTest, VerifyCrlOptionalWithFallback) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   base::Time now = base::Time::Now();
   AuthResult result = VerifyCredentialsForTest(
       auth_response, signed_data,
@@ -202,7 +194,8 @@ TEST_F(CastAuthUtilTest, VerifyCrlOptionalWithFallback) {
 
 TEST_F(CastAuthUtilTest, VerifyCrlRequiredWithExpiredFallback) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   base::Time now = base::Time::Now() + base::Seconds(12096000);  // 20 weeks
   AuthResult result = VerifyCredentialsForTest(
       auth_response, signed_data,
@@ -214,7 +207,8 @@ TEST_F(CastAuthUtilTest, VerifyCrlRequiredWithExpiredFallback) {
 
 TEST_F(CastAuthUtilTest, VerifyCrlRequiredWithNotExpiredFallback) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   base::Time now = base::Time::Now() + base::Seconds(10);
   AuthResult result = VerifyCredentialsForTest(
       auth_response, signed_data,
@@ -227,7 +221,8 @@ TEST_F(CastAuthUtilTest, VerifyCrlRequiredWithNotExpiredFallback) {
 
 TEST_F(CastAuthUtilTest, VerifyCrlRequiredWithFallbackCRL) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   AuthResult result = VerifyCredentials(auth_response, signed_data);
   EXPECT_TRUE(result.success());
   EXPECT_EQ(static_cast<unsigned>(AuthResult::POLICY_NONE),
@@ -237,7 +232,8 @@ TEST_F(CastAuthUtilTest, VerifyCrlRequiredWithFallbackCRL) {
 
 TEST_F(CastAuthUtilTest, VerifyCrlRequiredWithInvalidFallbackCRL) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   base::Time now = base::Time::Now() + base::Hours(100000000);
   AuthResult result = VerifyCredentialsForTest(
       auth_response, signed_data,
@@ -249,7 +245,8 @@ TEST_F(CastAuthUtilTest, VerifyCrlRequiredWithInvalidFallbackCRL) {
 
 TEST_F(CastAuthUtilTest, VerifyParsingError) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   MangleString(auth_response.mutable_client_auth_certificate());
   AuthResult result = VerifyCredentials(auth_response, signed_data);
   EXPECT_FALSE(result.success());
@@ -259,7 +256,8 @@ TEST_F(CastAuthUtilTest, VerifyParsingError) {
 
 TEST_F(CastAuthUtilTest, VerifyCrlOptionalWithInvalidFallbackCRL) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   base::Time now = base::Time::Now() + base::Hours(100000000);
   AuthResult result = VerifyCredentialsForTest(
       auth_response, signed_data,
@@ -271,7 +269,8 @@ TEST_F(CastAuthUtilTest, VerifyCrlOptionalWithInvalidFallbackCRL) {
 
 TEST_F(CastAuthUtilTest, VerifyBadPeerCert) {
   std::string signed_data;
-  AuthResponse auth_response = CreateAuthResponse(&signed_data, SHA256);
+  AuthResponse auth_response =
+      CreateAuthResponse(&signed_data, cast_pb::SHA256);
   MangleString(&signed_data);
   AuthResult result = VerifyCredentials(auth_response, signed_data);
   EXPECT_FALSE(result.success());
@@ -279,41 +278,7 @@ TEST_F(CastAuthUtilTest, VerifyBadPeerCert) {
   EXPECT_EQ(kFlagsAcceptedWithMissingCRL, result.flags);
 }
 
-TEST_F(CastAuthUtilTest, VerifySenderNonceMatch) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(kEnforceNonceChecking);
-  AuthContext context = AuthContext::Create();
-  AuthResult result = context.VerifySenderNonce(context.nonce());
-  EXPECT_TRUE(result.success());
-  EXPECT_EQ(kCastChannelFlagsNone, result.flags);
-}
 
-TEST_F(CastAuthUtilTest, VerifySenderNonceMismatch) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(kEnforceNonceChecking);
-  AuthContext context = AuthContext::Create();
-  std::string received_nonce = "test2";
-  EXPECT_NE(received_nonce, context.nonce());
-  AuthResult result = context.VerifySenderNonce(received_nonce);
-  EXPECT_FALSE(result.success());
-  EXPECT_EQ(AuthResult::ERROR_SENDER_NONCE_MISMATCH, result.error_type);
-  EXPECT_EQ(
-      static_cast<CastChannelFlags>(CastChannelFlag::kSenderNonceMismatch),
-      result.flags);
-}
-
-TEST_F(CastAuthUtilTest, VerifySenderNonceMissing) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndEnableFeature(kEnforceNonceChecking);
-  AuthContext context = AuthContext::Create();
-  std::string received_nonce;
-  EXPECT_FALSE(context.nonce().empty());
-  AuthResult result = context.VerifySenderNonce(received_nonce);
-  EXPECT_FALSE(result.success());
-  EXPECT_EQ(AuthResult::ERROR_SENDER_NONCE_MISMATCH, result.error_type);
-  EXPECT_EQ(static_cast<CastChannelFlags>(CastChannelFlag::kSenderNonceMissing),
-            result.flags);
-}
 
 TEST_F(CastAuthUtilTest, VerifyTLSCertificateSuccess) {
   auto tls_cert_der = cast_certificate::ReadCertificateChainFromFile(
@@ -404,7 +369,7 @@ AuthResult TestVerifyRevocation(
 }
 
 // Runs a single test case.
-bool RunTest(const openscreen::cast::proto::DeviceCertTest& test_case) {
+bool RunTest(const cast_pb::DeviceCertTest& test_case) {
   std::unique_ptr<cast_certificate::testing::ScopedCastTrustStoreConfig>
       scoped_cast_trust_store =
           test_case.use_test_trust_anchors()
@@ -438,39 +403,47 @@ bool RunTest(const openscreen::cast::proto::DeviceCertTest& test_case) {
   std::string crl_bundle = test_case.crl_bundle();
   AuthResult result;
   switch (test_case.expected_result()) {
-    case openscreen::cast::proto::PATH_VERIFICATION_FAILED:
-      result =
-          TestVerifyRevocation(certificate_chain, crl_bundle, verification_time,
-                               false, crl_trust_store.get());
-      EXPECT_EQ(result.error_type,
-                AuthResult::ERROR_CERT_NOT_SIGNED_BY_TRUSTED_CA);
-      return result.error_type ==
-             AuthResult::ERROR_CERT_NOT_SIGNED_BY_TRUSTED_CA;
-    case openscreen::cast::proto::CRL_VERIFICATION_FAILED:
+    case cast_pb::PATH_VERIFICATION_FAILED:
+      if (test_case.description() ==
+          "Invalid cert (expired), valid path, no revocation checking.") {
+        // By-pass this test because it is exempted -- the internal google3
+        // generated test binary needs to be updated to allow for long-term
+        // expired certificates. See b/416790717.
+        return true;
+      } else {
+        result = TestVerifyRevocation(certificate_chain, crl_bundle,
+                                      verification_time, false,
+                                      crl_trust_store.get());
+        EXPECT_EQ(result.error_type,
+                  AuthResult::ERROR_CERT_NOT_SIGNED_BY_TRUSTED_CA);
+        return result.error_type ==
+               AuthResult::ERROR_CERT_NOT_SIGNED_BY_TRUSTED_CA;
+      }
+    case cast_pb::CRL_VERIFICATION_FAILED:
     // Fall-through intended.
-    case openscreen::cast::proto::REVOCATION_CHECK_FAILED_WITHOUT_CRL:
+    case cast_pb::REVOCATION_CHECK_FAILED_WITHOUT_CRL:
       result =
           TestVerifyRevocation(certificate_chain, crl_bundle, verification_time,
                                true, crl_trust_store.get());
       EXPECT_EQ(result.error_type, AuthResult::ERROR_CRL_INVALID);
       return result.error_type == AuthResult::ERROR_CRL_INVALID;
-    case openscreen::cast::proto::CRL_EXPIRED_AFTER_INITIAL_VERIFICATION:
+    case cast_pb::CRL_EXPIRED_AFTER_INITIAL_VERIFICATION:
       // By-pass this test because CRL is always verified at the time the
       // certificate is verified.
       return true;
-    case openscreen::cast::proto::REVOCATION_CHECK_FAILED:
+    case cast_pb::REVOCATION_CHECK_FAILED:
       result =
           TestVerifyRevocation(certificate_chain, crl_bundle, verification_time,
                                true, crl_trust_store.get());
       EXPECT_EQ(result.error_type, AuthResult::ERROR_CERT_REVOKED);
       return result.error_type == AuthResult::ERROR_CERT_REVOKED;
-    case openscreen::cast::proto::SUCCESS:
+    case cast_pb::SUCCESS:
       result =
           TestVerifyRevocation(certificate_chain, crl_bundle, verification_time,
                                false, crl_trust_store.get());
       EXPECT_EQ(result.error_type, AuthResult::ERROR_SIGNED_BLOBS_MISMATCH);
       return result.error_type == AuthResult::ERROR_SIGNED_BLOBS_MISMATCH;
-    case openscreen::cast::proto::UNKNOWN:
+    case cast_pb::UNKNOWN:
       return false;
   }
   return false;
@@ -487,23 +460,37 @@ void RunTestSuite(const std::string& test_suite_file_name) {
           test_suite_file_name),
       &testsuite_raw);
 
-  openscreen::cast::proto::DeviceCertTestSuite test_suite;
+  cast_pb::DeviceCertTestSuite test_suite;
   EXPECT_TRUE(test_suite.ParseFromString(testsuite_raw));
   uint16_t success = 0;
   uint16_t failed = 0;
   std::vector<std::string> failed_tests;
 
+  // List of test descriptions to exempt from failure logging.
+  // NOTE: consider using a more performant data structure if this list grows
+  // significantly.
+  // TODO(b/416790717): update the testsuite1.pb test binary file to
+  // have appropriate expectations here.
+  constexpr std::array<const char*, 1> kExemptions = {
+      {"Invalid cert (expired), valid path, no revocation checking."}};
   for (auto const& test_case : test_suite.tests()) {
     LOG(INFO) << "[ RUN      ] " << test_case.description();
-    bool result = RunTest(test_case);
-    EXPECT_TRUE(result);
-    if (!result) {
-      LOG(INFO) << "[  FAILED  ] " << test_case.description();
-      ++failed;
-      failed_tests.push_back(test_case.description());
-    } else {
+    if (RunTest(test_case)) {
       LOG(INFO) << "[  PASSED  ] " << test_case.description();
       ++success;
+    } else {
+      // First, check for exemptions.
+      if (std::find(kExemptions.begin(), kExemptions.end(),
+                    test_case.description()) != kExemptions.end()) {
+        LOG(INFO) << "[  EXEMPT  ] " << test_case.description();
+        // This counts as a success due to exemption.
+        ++success;
+      } else {
+        LOG(INFO) << "[  FAILED  ] " << test_case.description();
+        ADD_FAILURE() << "Test failed: " << test_case.description();
+        failed_tests.push_back(test_case.description());
+        ++failed;
+      }
     }
   }
   LOG(INFO) << "[  PASSED  ] " << success << " test(s).";

@@ -6,32 +6,37 @@ package org.chromium.chrome.browser.autofill;
 
 import android.graphics.Rect;
 
-import androidx.annotation.Nullable;
-
 import org.chromium.base.Callback;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.fullscreen.BrowserControlsManager;
 import org.chromium.chrome.browser.keyboard_accessory.ManualFillingComponent;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.ui.base.ViewAndroidDelegate;
 import org.chromium.ui.widget.RectProvider;
 
+import java.util.function.Supplier;
+
 /**
  * Helper class that computes the visible rect of a given {@link WebContents} objects. It observes
  * the given {@link WebContents} object to update the observed suppliers of browser controls and
  * filling component. Use like a standard {@link RectProvider}.
  *
+ * <pre>
  * Examples for observed changes:
  * - {@link BrowserControlsManager} providing height for elements like the Omnibox.
  * - {@link ManualFillingComponent} providing filling surface height like Keyboard Accessory.
  * - A Bottom Inset supplier for the Soft-keyboard.
+ * </pre>
  */
+@NullMarked
 class WebContentsViewRectProvider extends RectProvider {
     private final WebContents mWebContents;
-    private ObservableSupplier<BrowserControlsManager> mBrowserControlsSupplier;
-    private ObservableSupplier<ManualFillingComponent> mManualFillingComponentSupplier;
-    private ObservableSupplier<Integer> mBottomInsetSupplier;
+    private @Nullable MonotonicObservableSupplier<BrowserControlsManager> mBrowserControlsSupplier;
+    private @Nullable MonotonicObservableSupplier<ManualFillingComponent>
+            mManualFillingComponentSupplier;
+    private @Nullable MonotonicObservableSupplier<Integer> mBottomInsetSupplier;
 
     private final Callback<ManualFillingComponent> mOnManualFillingComponentChanged =
             fillComponent -> observeBottomInsetSupplier(fillComponent.getBottomInsetSupplier());
@@ -47,13 +52,13 @@ class WebContentsViewRectProvider extends RectProvider {
      * rect, it's immediately computed.
      *
      * @param webContents A required, non-null {@link WebContents} object.
-     * @param browserControlsSupplier A {@link ObservableSupplier<BrowserControlsManager>}.
-     * @param manualFillingComponentSupplier A {@link ObservableSupplier<ManualFillingComponent>}.
+     * @param browserControlsSupplier A {@link MonotonicObservableSupplier <BrowserControlsManager>}.
+     * @param manualFillingComponentSupplier A {@link MonotonicObservableSupplier <ManualFillingComponent>}.
      */
     public WebContentsViewRectProvider(
             WebContents webContents,
-            ObservableSupplier<BrowserControlsManager> browserControlsSupplier,
-            ObservableSupplier<ManualFillingComponent> manualFillingComponentSupplier) {
+            MonotonicObservableSupplier<BrowserControlsManager> browserControlsSupplier,
+            MonotonicObservableSupplier<ManualFillingComponent> manualFillingComponentSupplier) {
         assert webContents != null;
         assert webContents.getViewAndroidDelegate() != null;
         assert webContents.getViewAndroidDelegate().getContainerView() != null;
@@ -70,7 +75,7 @@ class WebContentsViewRectProvider extends RectProvider {
     }
 
     private void observeBrowserControlsSupplier(
-            @Nullable ObservableSupplier<BrowserControlsManager> supplier) {
+            @Nullable MonotonicObservableSupplier<BrowserControlsManager> supplier) {
         if (mBrowserControlsSupplier != null) {
             mBrowserControlsSupplier.removeObserver(mOnBrowserControlsChanged);
         }
@@ -83,7 +88,7 @@ class WebContentsViewRectProvider extends RectProvider {
     }
 
     private void observeManualFillingComponentSupplier(
-            @Nullable ObservableSupplier<ManualFillingComponent> supplier) {
+            @Nullable MonotonicObservableSupplier<ManualFillingComponent> supplier) {
         if (mManualFillingComponentSupplier != null) {
             observeBottomInsetSupplier(null);
             mManualFillingComponentSupplier.removeObserver(mOnManualFillingComponentChanged);
@@ -92,13 +97,14 @@ class WebContentsViewRectProvider extends RectProvider {
         if (mManualFillingComponentSupplier != null) {
             mManualFillingComponentSupplier.addObserver(mOnManualFillingComponentChanged);
             observeBottomInsetSupplier(
-                    mManualFillingComponentSupplier.hasValue()
+                    mManualFillingComponentSupplier.get() != null
                             ? mManualFillingComponentSupplier.get().getBottomInsetSupplier()
                             : null);
         }
     }
 
-    private void observeBottomInsetSupplier(@Nullable ObservableSupplier<Integer> supplier) {
+    private void observeBottomInsetSupplier(
+            @Nullable MonotonicObservableSupplier<Integer> supplier) {
         if (mBottomInsetSupplier != null) {
             mBottomInsetSupplier.removeObserver(mOnBottomInsetChanged);
         }

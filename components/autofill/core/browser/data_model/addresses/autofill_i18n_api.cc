@@ -4,10 +4,10 @@
 
 #include "components/autofill/core/browser/data_model/addresses/autofill_i18n_api.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/feature_list.h"
 #include "base/notreached.h"
@@ -55,7 +55,7 @@ std::u16string GetFormattingExpressionOverrides(
            "SG", "LK", "TH", "GB", "US", "VN", "ZA"});
 
   if (field_type == ADDRESS_HOME_STREET_LOCATION) {
-    if (base::Contains(kHouseNumberFirstCountriesSet, country_code.value())) {
+    if (kHouseNumberFirstCountriesSet.contains(country_code.value())) {
       return u"${ADDRESS_HOME_HOUSE_NUMBER;;} ${ADDRESS_HOME_STREET_NAME;;}";
     }
   }
@@ -68,7 +68,33 @@ std::u16string GetFormattingExpressionOverrides(
            u"${ADDRESS_HOME_FLOOR;, ;º}${ADDRESS_HOME_APT_NUM;, ;ª}";
   }
 
+  // The set of countries without separate address model
+  // with space zip code separator.
+  static constexpr auto kSpaceZipCodeSeparatorCountriesSet =
+      base::MakeFixedFlatSet<std::string_view>(
+          {"CZ", "GB", "GR", "HR", "IE", "LB", "MT", "SE", "SK", "IN"});
+
+  if (field_type == ADDRESS_HOME_ZIP &&
+      base::FeatureList::IsEnabled(features::kAutofillSupportSplitZipCode)) {
+    if (kSpaceZipCodeSeparatorCountriesSet.contains(country_code.value())) {
+      return u"${ADDRESS_HOME_ZIP_PREFIX;;} ${ADDRESS_HOME_ZIP_SUFFIX;;}";
+    }
+  }
+
   return u"";
+}
+
+// Returns true if a standalone parsing rule is available for the country and
+// type. This is used to enable parsing rules defined for countries without
+// custom hierarchy.
+bool IsStandaloneParsingRuleAvailable(AddressCountryCode country_code,
+                                      FieldType field_type) {
+  if (field_type == ADDRESS_HOME_ZIP && country_code.value() == "JP" &&
+      base::FeatureList::IsEnabled(features::kAutofillSupportSplitZipCode)) {
+    return true;
+  }
+
+  return false;
 }
 
 // Returns an instance of the `AddressComponent` implementation that matches
@@ -84,8 +110,10 @@ std::unique_ptr<AddressComponent> BuildTreeNode(
       return std::make_unique<AddressNode>(std::move(children));
     case ADDRESS_HOME_ADMIN_LEVEL2:
       return std::make_unique<AdminLevel2Node>(std::move(children));
-    case ADDRESS_HOME_APT_NUM:
+    case ADDRESS_HOME_APT:
       return std::make_unique<ApartmentNode>(std::move(children));
+    case ADDRESS_HOME_APT_NUM:
+      return std::make_unique<ApartmentNumNode>(std::move(children));
     case ADDRESS_HOME_BETWEEN_STREETS:
       return std::make_unique<BetweenStreetsNode>(std::move(children));
     case ADDRESS_HOME_BETWEEN_STREETS_1:
@@ -102,6 +130,8 @@ std::unique_ptr<AddressComponent> BuildTreeNode(
       return std::make_unique<FloorNode>(std::move(children));
     case ADDRESS_HOME_HOUSE_NUMBER:
       return std::make_unique<HouseNumberNode>(std::move(children));
+    case ADDRESS_HOME_HOUSE_NUMBER_AND_APT:
+      return std::make_unique<HouseNumberAndApartmentNode>(std::move(children));
     case ADDRESS_HOME_LANDMARK:
       return std::make_unique<LandmarkNode>(std::move(children));
     case ADDRESS_HOME_SORTING_CODE:
@@ -129,9 +159,7 @@ std::unique_ptr<AddressComponent> BuildTreeNode(
     case ADDRESS_HOME_LINE1:
     case ADDRESS_HOME_LINE2:
     case ADDRESS_HOME_LINE3:
-    case ADDRESS_HOME_APT:
     case ADDRESS_HOME_APT_TYPE:
-    case ADDRESS_HOME_HOUSE_NUMBER_AND_APT:
     case ADDRESS_HOME_OTHER_SUBUNIT:
     case ADDRESS_HOME_ADDRESS_WITH_NAME:
     case ADDRESS_HOME_STREET_LOCATION_AND_LOCALITY:
@@ -206,7 +234,6 @@ std::unique_ptr<AddressComponent> BuildTreeNode(
     case ONE_TIME_CODE:
     case SINGLE_USERNAME_FORGOT_PASSWORD:
     case SINGLE_USERNAME_WITH_INTERMEDIATE_VALUES:
-    case PASSPORT_NAME_TAG:
     case PASSPORT_NUMBER:
     case PASSPORT_ISSUING_COUNTRY:
     case PASSPORT_EXPIRATION_DATE:
@@ -214,14 +241,12 @@ std::unique_ptr<AddressComponent> BuildTreeNode(
     case LOYALTY_MEMBERSHIP_PROGRAM:
     case LOYALTY_MEMBERSHIP_PROVIDER:
     case LOYALTY_MEMBERSHIP_ID:
-    case VEHICLE_OWNER_TAG:
     case VEHICLE_LICENSE_PLATE:
     case VEHICLE_VIN:
     case VEHICLE_MAKE:
     case VEHICLE_MODEL:
     case VEHICLE_YEAR:
     case VEHICLE_PLATE_STATE:
-    case DRIVERS_LICENSE_NAME_TAG:
     case DRIVERS_LICENSE_REGION:
     case DRIVERS_LICENSE_NUMBER:
     case DRIVERS_LICENSE_EXPIRATION_DATE:
@@ -231,6 +256,15 @@ std::unique_ptr<AddressComponent> BuildTreeNode(
     case NATIONAL_ID_CARD_EXPIRATION_DATE:
     case NATIONAL_ID_CARD_ISSUE_DATE:
     case NATIONAL_ID_CARD_ISSUING_COUNTRY:
+    case REDRESS_NUMBER:
+    case KNOWN_TRAVELER_NUMBER:
+    case KNOWN_TRAVELER_NUMBER_EXPIRATION_DATE:
+    case FLIGHT_RESERVATION_FLIGHT_NUMBER:
+    case FLIGHT_RESERVATION_TICKET_NUMBER:
+    case FLIGHT_RESERVATION_CONFIRMATION_CODE:
+    case FLIGHT_RESERVATION_ARRIVAL_AIRPORT:
+    case FLIGHT_RESERVATION_DEPARTURE_AIRPORT:
+    case FLIGHT_RESERVATION_DEPARTURE_DATE:
     case MAX_VALID_FIELD_TYPE:
       return nullptr;
   }
@@ -399,7 +433,8 @@ i18n_model_definition::ValueParsingResults ParseValueByI18nRegularExpression(
   // custom parsing structure (if exist).
   // Otherwise try using a legacy parsing expression (if exist).
   AddressCountryCode country_code_for_parsing =
-      IsCustomHierarchyAvailableForCountry(country_code)
+      (IsCustomHierarchyAvailableForCountry(country_code) ||
+       IsStandaloneParsingRuleAvailable(country_code, field_type))
           ? country_code
           : kLegacyHierarchyCountryCode;
 
@@ -430,7 +465,7 @@ bool IsTypeEnabledForCountry(FieldType field_type,
   return std::ranges::any_of(
       it->second, [field_type](const FieldTypeDescription& description) {
         return description.field_type == field_type ||
-               base::Contains(description.children, field_type);
+               std::ranges::contains(description.children, field_type);
       });
 }
 

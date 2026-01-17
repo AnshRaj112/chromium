@@ -9,34 +9,40 @@
 # marked as such in gnrt_config.toml.
 
 [package]
+edition = "2021"
 name = "chromium"
 version = "0.1.0"
-edition = "2021"
 
 [workspace]
 
 [dependencies]
+antlr4rust = "0.5.2"
 anyhow = "1.0.98"
 base64 = "0.22"
 bitflags = "2"
 bytes = "1"
 cxx = "1"
 fend-core = "1"
-font-types = "0.9"
+font-types = "0.11"
 hex = "0.4"
+hmac-sha256 = "1.1.12"
+indexmap = "2.12.1"
 lazy_static = "1"
 libc = "0.2"
+minijinja = "2.14.0"
 png = "=0.18.0-rc"
 proc-macro2 = "1"
 prost = "0.14.1"
 qr_code = "2"
 quote = "1"
-read-fonts = "0.31.1"
+read-fonts = "0.37.0"
 rustc-demangle-capi = "0.1"
 serde = "1.0.219"
-skrifa = "0.33.1"
+serde_json = "1.0.149"
+skrifa = "0.40.0"
 small_ctor = "0.1"
 static_assertions = "1"
+xml = "1.2.0"
 
 [dependencies.bytemuck]
 version = "1"
@@ -55,32 +61,41 @@ version = "1"
 artifact = "bin"
 
 [dependencies.icu_casemap]
-version = "2.0.0"
+version = "2.1.1"
 default-features = false
 features = ["compiled_data"]
 
 [dependencies.icu_experimental]
-version = "0.3.0"
+version = "0.4.0"
 default-features = false
 features = ["compiled_data"]
 
 [dependencies.icu_locale_core]
-version = "2.0.0"
+version = "2.1.1"
 default-features = false
 
 [dependencies.icu_normalizer]
-version = "2.0.0"
+version = "2.1.1"
 default-features = false
 features = ["compiled_data"]
 
 [dependencies.icu_properties]
-version = "2.0.0"
+version = "2.1.1"
 default-features = false
 features = ["compiled_data"]
 
 [dependencies.icu_provider]
-version = "2.0.0"
+version = "2.1.1"
 default-features = false
+
+[dependencies.image]
+version = "0.25.9"
+default-features = false
+features = ["bmp"]
+
+[dependencies.jxl]
+version = "0.2.2"
+features = ["all-simd"]
 
 [dependencies.llguidance]
 version = "1.0.0"
@@ -121,10 +136,16 @@ version = "2"
 features = ["full"]
 
 [dependencies.temporal_capi]
-version = "0.0.11"
-features = ["compiled_data"]
+version = "0.1.2"
+features = ["zoneinfo64"]
+
+[dependencies.temporal_rs]
+version = "0.1.2"
+default-features = false
+# This is necessary to enable a spec-compliance quirk
+features = ["float64_representable_durations"]
 
 [dependencies.zip]
-version = "4.1.0"
+version = "7.1.0"
 default-features = false
 features = ["deflate-flate2"]

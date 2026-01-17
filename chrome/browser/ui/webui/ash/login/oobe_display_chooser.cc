@@ -6,8 +6,9 @@
 
 #include <stdint.h>
 
+#include <algorithm>
+
 #include "ash/public/ash_interfaces.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/strings/string_number_conversions.h"
@@ -33,7 +34,7 @@ const uint16_t kDeviceIds[] = {0x0457, 0x266e, 0x222a};
 // Returns true if `vendor_id` is a valid vendor id that may be made the primary
 // display.
 bool IsAllowListedVendorId(uint16_t vendor_id) {
-  return base::Contains(kDeviceIds, vendor_id);
+  return std::ranges::contains(kDeviceIds, vendor_id);
 }
 
 }  // namespace
@@ -55,7 +56,7 @@ void OobeDisplayChooser::TryToPlaceUiOnTouchDisplay() {
   }
 
   display::Display primary_display =
-      display::Screen::GetScreen()->GetPrimaryDisplay();
+      display::Screen::Get()->GetPrimaryDisplay();
 
   if (primary_display.is_valid() && !TouchSupportAvailable(primary_display)) {
     content::GetUIThreadTaskRunner({})->PostTask(

@@ -9,7 +9,6 @@
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/json/json_file_value_serializer.h"
@@ -197,6 +196,9 @@ std::ostream& operator<<(std::ostream& output, const ParseResult& result) {
     case ParseResult::ERROR_EMPTY_REQUEST_DOMAINS_LIST:
       output << "ERROR_EMPTY_REQUEST_DOMAINS_LIST";
       break;
+    case ParseResult::ERROR_EMPTY_TOP_DOMAINS_LIST:
+      output << "ERROR_EMPTY_TOP_DOMAINS_LIST";
+      break;
     case ParseResult::ERROR_DOMAINS_AND_INITIATOR_DOMAINS_BOTH_SPECIFIED:
       output << "ERROR_DOMAINS_AND_INITIATOR_DOMAINS_BOTH_SPECIFIED";
       break;
@@ -240,6 +242,12 @@ std::ostream& operator<<(std::ostream& output, const ParseResult& result) {
       break;
     case ParseResult::ERROR_NON_ASCII_EXCLUDED_REQUEST_DOMAIN:
       output << "ERROR_NON_ASCII_EXCLUDED_REQUEST_DOMAIN";
+      break;
+    case ParseResult::ERROR_NON_ASCII_TOP_DOMAIN:
+      output << "ERROR_NON_ASCII_TOP_DOMAIN";
+      break;
+    case ParseResult::ERROR_NON_ASCII_EXCLUDED_TOP_DOMAIN:
+      output << "ERROR_NON_ASCII_EXCLUDED_TOP_DOMAIN";
       break;
     case ParseResult::ERROR_INVALID_URL_FILTER:
       output << "ERROR_INVALID_URL_FILTER";
@@ -563,7 +571,7 @@ void WarningServiceObserver::WaitForWarning() {
 
 void WarningServiceObserver::ExtensionWarningsChanged(
     const ExtensionIdSet& affected_extensions) {
-  if (!base::Contains(affected_extensions, extension_id_)) {
+  if (!affected_extensions.contains(extension_id_)) {
     return;
   }
 
@@ -597,7 +605,8 @@ base::flat_set<int> GetDisabledRuleIdsFromMatcherForTesting(
 RequestParams CreateRequestWithResponseHeaders(
     const GURL& url,
     const net::HttpResponseHeaders* headers) {
-  return RequestParams(url, url::Origin(), dnr_api::ResourceType::kSubFrame,
+  return RequestParams(url, url::Origin(), url::Origin(),
+                       dnr_api::ResourceType::kSubFrame,
                        dnr_api::RequestMethod::kGet, -1, headers);
 }
 

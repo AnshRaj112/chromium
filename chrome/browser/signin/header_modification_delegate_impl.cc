@@ -27,8 +27,10 @@
 #include "content/public/browser/storage_partition.h"
 #include "google_apis/gaia/gaia_auth_util.h"
 #include "net/base/schemeful_site.h"
+#include "net/base/url_util.h"
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
+#include "content/public/browser/site_instance.h"
 #include "extensions/browser/guest_view/web_view/web_view_renderer_state.h"
 #endif
 
@@ -37,10 +39,14 @@
 #endif
 
 #if BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
+#include "base/containers/flat_set.h"
+#include "chrome/browser/signin/bound_session_credentials/bound_session_cookie_refresh_service.h"
 #include "chrome/browser/signin/bound_session_credentials/bound_session_cookie_refresh_service_factory.h"
 #include "chrome/browser/signin/bound_session_credentials/bound_session_registration_fetcher.h"
 #include "chrome/browser/signin/bound_session_credentials/bound_session_registration_fetcher_impl.h"
 #include "chrome/browser/signin/bound_session_credentials/unexportable_key_service_factory.h"
+#include "net/base/features.h"
+#include "net/device_bound_sessions/registration_fetcher_param.h"
 #endif
 
 namespace signin {
@@ -55,6 +61,54 @@ bool IsFirstPartyRequest(ResponseAdapter* response_adapter) {
              *top_frame_origin,
              url::Origin::Create(response_adapter->GetUrl()));
 }
+
+void ProcessBoundSessionResponseHeaders(
+    BoundSessionCookieRefreshService* bound_session_cookie_refresh_service,
+    ResponseAdapter* response_adapter) {
+  if (!bound_session_cookie_refresh_service) {
+    return;
+  }
+
+  const net::HttpResponseHeaders* headers = response_adapter->GetHeaders();
+  if (!headers) {
+    return;
+  }
+
+  // Terminate the session if session termination header is set.
+  bound_session_cookie_refresh_service->MaybeTerminateSession(
+      response_adapter->GetUrl(), headers);
+
+  // If an equivalent standard DBSC session is going to be triggered by the same
+  // response, ignore the session registration.
+  base::flat_set<GURL> ignored_registration_endpoints;
+  if (base::FeatureList::IsEnabled(net::features::kDeviceBoundSessions)) {
+    // Per the spec, a response with a WebSocket scheme should be
+    // rewritten to HTTP(S). See https://crbug.com/379241469.
+    const GURL& url = response_adapter->GetUrl();
+    GURL normalized_url = url.SchemeIsWSOrWSS()
+                              ? net::ChangeWebSocketSchemeToHttpScheme(url)
+                              : url;
+    std::vector<net::device_bound_sessions::RegistrationFetcherParam>
+        standard_registrations =
+            net::device_bound_sessions::RegistrationFetcherParam::CreateIfValid(
+                normalized_url, headers);
+    for (const auto& standard_registration : standard_registrations) {
+      ignored_registration_endpoints.insert(
+          standard_registration.registration_endpoint());
+    }
+  }
+
+  for (auto& param : BoundSessionRegistrationFetcherParam::CreateFromHeaders(
+           response_adapter->GetUrl(), headers)) {
+    if (ignored_registration_endpoints.contains(
+            param.registration_endpoint())) {
+      continue;
+    }
+    bound_session_cookie_refresh_service->CreateRegistrationRequest(
+        std::move(param));
+  }
+}
+
 }  // namespace
 #endif  // BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
 
@@ -137,7 +191,7 @@ void HeaderModificationDelegateImpl::ProcessRequest(
       identity_manager->GetPrimaryAccountInfo(consent_level);
   signin::Tribool is_child_account =
       // Defaults to kUnknown if the account is not found.
-      identity_manager->FindExtendedAccountInfo(account).is_child_account;
+      identity_manager->FindExtendedAccountInfo(account).IsChildAccount();
 
   int incognito_mode_availability =
       prefs->GetInteger(policy::policy_prefs::kIncognitoModeAvailability);
@@ -175,21 +229,9 @@ void HeaderModificationDelegateImpl::ProcessResponse(
 #if BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
   if (gaia::HasGaiaSchemeHostPort(response_adapter->GetUrl()) &&
       IsFirstPartyRequest(response_adapter)) {
-    BoundSessionCookieRefreshService* bound_session_cookie_refresh_service =
-        BoundSessionCookieRefreshServiceFactory::GetForProfile(profile_);
-    if (bound_session_cookie_refresh_service) {
-      // Terminate the session if session termination header is set.
-      bound_session_cookie_refresh_service->MaybeTerminateSession(
-          response_adapter->GetUrl(), response_adapter->GetHeaders());
-      for (auto& param :
-           BoundSessionRegistrationFetcherParam::CreateFromHeaders(
-               response_adapter->GetUrl(), response_adapter->GetHeaders())) {
-        // TODO(b/274774185): modify `CreateRegistrationRequest()` to accept a
-        // vector of params.
-        bound_session_cookie_refresh_service->CreateRegistrationRequest(
-            std::move(param));
-      }
-    }
+    ProcessBoundSessionResponseHeaders(
+        BoundSessionCookieRefreshServiceFactory::GetForProfile(profile_),
+        response_adapter);
   }
 #endif
 

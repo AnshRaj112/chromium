@@ -16,12 +16,17 @@
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "chrome/app/vector_icons/vector_icons.h"
+#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
+#include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
+#include "chrome/browser/ui/tabs/tab_group_attention_indicator.h"
+#include "chrome/browser/ui/tabs/tab_group_features.h"
 #include "chrome/browser/ui/tabs/tab_style.h"
 #include "chrome/browser/ui/ui_features.h"
+#include "chrome/browser/ui/views/tabs/tab_group_editor_bubble_tracker.h"
 #include "chrome/browser/ui/views/tabs/tab_group_editor_bubble_view.h"
 #include "chrome/browser/ui/views/tabs/tab_group_style.h"
 #include "chrome/browser/ui/views/tabs/tab_group_underline.h"
@@ -39,13 +44,13 @@
 #include "components/tab_groups/tab_group_color.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
-#include "third_party/skia/include/core/SkColor.h"
+#include "components/tabs/public/tab_group.h"
 #include "third_party/skia/include/core/SkPath.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/base/interaction/element_identifier.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
-#include "ui/base/mojom/menu_source_type.mojom-forward.h"
 #include "ui/base/mojom/menu_source_type.mojom-shared.h"
 #include "ui/color/color_id.h"
 #include "ui/gfx/canvas.h"
@@ -93,10 +98,10 @@ class TabGroupHighlightPathGenerator : public views::HighlightPathGenerator {
 
   // views::HighlightPathGenerator:
   SkPath GetHighlightPath(const views::View* view) override {
-    return SkPath().addRoundRect(
+    return SkPath::RRect(SkRRect::MakeRectXY(
         gfx::RectToSkRect(chip_->bounds()),
         style_->GetHighlightPathGeneratorCornerRadius(title_),
-        style_->GetHighlightPathGeneratorCornerRadius(title_));
+        style_->GetHighlightPathGeneratorCornerRadius(title_)));
   }
 
  private:
@@ -122,8 +127,22 @@ TabGroupHeader::TabGroupHeader(TabSlotController& tab_slot_controller,
       group_title_(u""),
       color_(tab_slot_controller_->GetPaintedGroupColor(
           tab_slot_controller_->GetGroupColorId(group))),
-      is_collapsed_(tab_slot_controller_->IsGroupCollapsed(group)),
-      editor_bubble_tracker_(tab_slot_controller) {}
+      is_collapsed_(tab_slot_controller_->IsGroupCollapsed(group)) {
+  editor_bubble_opened_subscription_ =
+      editor_bubble_tracker_.RegisterOnBubbleOpened(
+          base::BindRepeating(&TabSlotController::NotifyTabstripBubbleOpened,
+                              base::Unretained(tab_slot_controller_)));
+  editor_bubble_closed_subscription_ =
+      editor_bubble_tracker_.RegisterOnBubbleClosed(
+          base::BindRepeating(&TabSlotController::NotifyTabstripBubbleClosed,
+                              base::Unretained(tab_slot_controller_)));
+
+  TabGroup* tab_group = tab_slot_controller_->GetTabGroup(group);
+  if (tab_group) {
+    attention_indicator_observation_.Observe(
+        tab_group->GetTabGroupFeatures()->attention_indicator());
+  }
+}
 
 TabGroupHeader::~TabGroupHeader() = default;
 
@@ -153,6 +172,8 @@ void TabGroupHeader::Init(const tab_groups::TabGroupId& group) {
   SetProperty(views::kDrawFocusRingBackgroundOutline, true);
 
   SetProperty(views::kElementIdentifierKey, kTabGroupHeaderElementId);
+  attention_indicator_->SetProperty(views::kElementIdentifierKey,
+                                    kAttentionIndicatorViewElementId);
 
   SetEventTargeter(std::make_unique<views::ViewTargeter>(this));
 
@@ -234,24 +255,21 @@ bool TabGroupHeader::OnMouseDragged(const ui::MouseEvent& event) {
 void TabGroupHeader::OnMouseReleased(const ui::MouseEvent& event) {
   if (!dragging()) {
     bool open_editor_bubble =
-        base::FeatureList::IsEnabled(tab_groups::kLeftClickOpensTabGroupBubble)
-            ? (event.IsLeftMouseButton() && !editor_bubble_tracker_.is_open())
-            : (event.IsRightMouseButton() && !editor_bubble_tracker_.is_open());
-    bool toggle_collapse =
-        base::FeatureList::IsEnabled(tab_groups::kLeftClickOpensTabGroupBubble)
-            ? event.IsRightMouseButton()
-            : event.IsLeftMouseButton();
+        event.IsRightMouseButton() && !editor_bubble_tracker_.is_open();
+    bool toggle_collapse = event.IsLeftMouseButton();
 
     if (open_editor_bubble) {
       editor_bubble_tracker_.Opened(TabGroupEditorBubbleView::Show(
-          tab_slot_controller_->GetBrowser(), group().value(), this));
+          tab_slot_controller_->GetBrowser(), group().value(),
+          /*anchor_view=*/this, /*anchor_rect=*/std::nullopt,
+          /*stop_context_menu_propagation=*/false));
     } else if (toggle_collapse) {
       tab_slot_controller_->ToggleTabGroupCollapsedState(
           group().value(), ToggleTabGroupCollapsedStateOrigin::kMouse);
     }
   }
 
-  tab_slot_controller_->EndDrag(END_DRAG_COMPLETE);
+  tab_slot_controller_->EndDrag(EndDragReason::kComplete);
 }
 
 void TabGroupHeader::OnMouseEntered(const ui::MouseEvent& event) {
@@ -276,7 +294,9 @@ void TabGroupHeader::OnGestureEvent(ui::GestureEvent* event) {
       break;
     case ui::EventType::kGestureLongTap: {
       editor_bubble_tracker_.Opened(TabGroupEditorBubbleView::Show(
-          tab_slot_controller_->GetBrowser(), group().value(), this));
+          tab_slot_controller_->GetBrowser(), group().value(),
+          /*anchor_view=*/this, /*anchor_rect=*/std::nullopt,
+          /*stop_context_menu_propagation=*/false));
       break;
     }
     case ui::EventType::kGestureScrollBegin: {
@@ -354,10 +374,7 @@ void TabGroupHeader::ShowContextMenuForViewImpl(
     ui::mojom::MenuSourceType source_type) {
   // Right click toggles ShowContextMenuForViewImpl, which we dont want to occur
   // if the left click should toggle the context menu.
-  if ((source_type == ui::mojom::MenuSourceType::kMouse &&
-       base::FeatureList::IsEnabled(
-           tab_groups::kLeftClickOpensTabGroupBubble)) ||
-      editor_bubble_tracker_.is_open()) {
+  if (editor_bubble_tracker_.is_open()) {
     return;
   }
 
@@ -390,7 +407,7 @@ void TabGroupHeader::ShowContextMenuForViewImpl(
 
   editor_bubble_tracker_.Opened(TabGroupEditorBubbleView::Show(
       tab_slot_controller_->GetBrowser(), group().value(), this, std::nullopt,
-      nullptr, kStopContextMenuPropagation));
+      kStopContextMenuPropagation));
 }
 
 bool TabGroupHeader::DoesIntersectRect(const views::View* target,
@@ -404,7 +421,7 @@ bool TabGroupHeader::DoesIntersectRect(const views::View* target,
 
   gfx::Rect contents_rect = GetLocalBounds();
   contents_rect.Inset(gfx::Insets::TLBR(
-      extend_hittest ? 0 : GetLayoutConstant(TAB_STRIP_PADDING),
+      extend_hittest ? 0 : GetLayoutConstant(LayoutConstant::kTabStripPadding),
       tab_style_->GetTabOverlap() / 2, 0, tab_style_->GetTabOverlap() / 2));
   return contents_rect.Intersects(rect);
 }
@@ -485,8 +502,7 @@ void TabGroupHeader::UpdateAccessibleName() {
 
   if (SupportsDataSharing() && should_show_header_icon_) {
     shared_state = l10n_util::GetStringUTF16(IDS_SAVED_GROUP_AX_LABEL_SHARED);
-
-    if (needs_attention_) {
+    if (ShouldShowAttentionIndicator()) {
       group_status += u", " + l10n_util::GetStringUTF16(
                                   DATA_SHARING_GROUP_LABEL_NEW_ACTIVITY);
     }
@@ -516,9 +532,9 @@ bool TabGroupHeader::ShouldShowHeaderIcon() const {
   }
 
   tab_groups::TabGroupSyncService* tab_group_service =
-      tab_slot_controller_->GetBrowser()
-          ? tab_groups::SavedTabGroupUtils::GetServiceForProfile(
-                tab_slot_controller_->GetBrowser()->profile())
+      tab_slot_controller_->GetBrowserWindowInterface()
+          ? tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+                tab_slot_controller_->GetBrowserWindowInterface()->GetProfile())
           : nullptr;
   if (!tab_group_service) {
     return false;
@@ -573,7 +589,7 @@ void TabGroupHeader::UpdateAttentionIndicatorView() {
     return;
   }
 
-  const bool should_show_attention_indicator = GetShowingAttentionIndicator();
+  const bool should_show_attention_indicator = ShouldShowAttentionIndicator();
   attention_indicator_->SetVisible(should_show_attention_indicator);
   if (should_show_attention_indicator) {
     attention_indicator_->SetImage(ui::ImageModel::FromVectorIcon(
@@ -595,7 +611,7 @@ void TabGroupHeader::CreateHeaderWithoutTitle() {
   const int sync_icon_width = group_style_->GetSyncIconWidth();
 
   if (should_show_header_icon_) {
-    const bool should_show_attention_indicator = GetShowingAttentionIndicator();
+    const bool should_show_attention_indicator = ShouldShowAttentionIndicator();
     if (should_show_attention_indicator) {
       const gfx::Insets title_chip_insets =
           group_style_->GetInsetsForHeaderChip();
@@ -645,7 +661,7 @@ void TabGroupHeader::CreateHeaderWithTitle() {
   // Only show attention indicator if header icon will show and
   // attention indicator is enabled.
   const bool should_show_attention_indicator =
-      should_show_header_icon_ && GetShowingAttentionIndicator();
+      should_show_header_icon_ && ShouldShowAttentionIndicator();
   const int attention_indicator_width =
       should_show_attention_indicator
           ? group_style_->GetAttentionIndicatorWidth() +
@@ -709,58 +725,25 @@ void TabGroupHeader::CreateHeaderWithTitle() {
   }
 }
 
-void TabGroupHeader::RemoveObserverFromWidget(views::Widget* widget) {
-  widget->RemoveObserver(&editor_bubble_tracker_);
+void TabGroupHeader::OnAttentionStateChanged() {
+  VisualsChanged();
 }
 
-bool TabGroupHeader::GetShowingAttentionIndicator() {
+bool TabGroupHeader::ShouldShowAttentionIndicator() const {
   // Attention should only be shown if the group is collapsed.
-  return is_collapsed_ && needs_attention_;
-}
-
-void TabGroupHeader::SetTabGroupNeedsAttention(bool needs_attention) {
-  const bool supports_attention_indicator = SupportsDataSharing();
-  if (!supports_attention_indicator) {
-    return;
+  TabGroup* tab_group = tab_slot_controller_->GetTabGroup(group().value());
+  if (!tab_group || tab_group->IsEmpty()) {
+    return false;
   }
 
-  if (needs_attention_ != needs_attention) {
-    needs_attention_ = needs_attention;
-    VisualsChanged();
-  }
+  return is_collapsed_ && tab_group->GetTabGroupFeatures()
+                              ->attention_indicator()
+                              ->GetHasAttention();
 }
 
 BEGIN_METADATA(TabGroupHeader)
 ADD_READONLY_PROPERTY_METADATA(int, DesiredWidth)
 END_METADATA
 
-TabGroupHeader::EditorBubbleTracker::EditorBubbleTracker(
-    TabSlotController& tab_slot_controller)
-    : tab_slot_controller_(tab_slot_controller) {}
-
-TabGroupHeader::EditorBubbleTracker::~EditorBubbleTracker() {
-  if (is_open_ && widget_) {
-    widget_->RemoveObserver(this);
-    widget_->Close();
-    tab_slot_controller_->NotifyTabstripBubbleClosed();
-  }
-  CHECK(!IsInObserverList());
-}
-
-void TabGroupHeader::EditorBubbleTracker::Opened(views::Widget* bubble_widget) {
-  DCHECK(bubble_widget);
-  DCHECK(!is_open_);
-  widget_ = bubble_widget;
-  is_open_ = true;
-  bubble_widget->AddObserver(this);
-  tab_slot_controller_->NotifyTabstripBubbleOpened();
-}
-
-void TabGroupHeader::EditorBubbleTracker::OnWidgetDestroying(
-    views::Widget* bubble_widget) {
-  CHECK(widget_ == bubble_widget);
-  is_open_ = false;
-  widget_->RemoveObserver(this);
-  widget_ = nullptr;
-  tab_slot_controller_->NotifyTabstripBubbleClosed();
-}
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(TabGroupHeader,
+                                      kAttentionIndicatorViewElementId);

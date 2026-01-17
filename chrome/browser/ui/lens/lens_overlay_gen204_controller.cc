@@ -4,6 +4,9 @@
 
 #include "chrome/browser/ui/lens/lens_overlay_gen204_controller.h"
 
+#include <optional>
+#include <string>
+
 #include "base/base64url.h"
 #include "base/containers/span.h"
 #include "base/format_macros.h"
@@ -16,12 +19,14 @@
 #include "chrome/browser/ui/lens/lens_overlay_url_builder.h"
 #include "components/base32/base32.h"
 #include "components/lens/lens_features.h"
+#include "components/lens/lens_url_utils.h"
 #include "components/metrics_services_manager/metrics_services_manager.h"
 #include "components/search_engines/template_url_service.h"
 #include "net/base/url_util.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
+#include "third_party/lens_server_proto/lens_overlay_request_id.pb.h"
 
 namespace lens {
 
@@ -197,8 +202,8 @@ void LensOverlayGen204Controller::SendLatencyGen204IfEnabled(
                               ->search_terms_data()
                               .GoogleBaseURLValue())
                          .Resolve(query);
-    fetch_url =
-        lens::AppendInvocationSourceParamToURL(fetch_url, invocation_source_);
+    fetch_url = lens::AppendInvocationSourceParamToURL(
+        fetch_url, invocation_source_, /*is_contextual_tasks=*/false);
     if (encoded_analytics_id.has_value()) {
       fetch_url = net::AppendOrReplaceQueryParameter(
           fetch_url, kEncodedAnalyticsIdParameter,
@@ -250,8 +255,8 @@ void LensOverlayGen204Controller::SendTaskCompletionGen204IfEnabled(
                               ->search_terms_data()
                               .GoogleBaseURLValue())
                          .Resolve(query);
-    fetch_url =
-        lens::AppendInvocationSourceParamToURL(fetch_url, invocation_source_);
+    fetch_url = lens::AppendInvocationSourceParamToURL(
+        fetch_url, invocation_source_, /*is_contextual_tasks=*/false);
     CheckMetricsConsentAndIssueGen204NetworkRequest(fetch_url);
   }
 }
@@ -277,8 +282,8 @@ void LensOverlayGen204Controller::SendSemanticEventGen204IfEnabled(
                               ->search_terms_data()
                               .GoogleBaseURLValue())
                          .Resolve(query);
-    fetch_url =
-        lens::AppendInvocationSourceParamToURL(fetch_url, invocation_source_);
+    fetch_url = lens::AppendInvocationSourceParamToURL(
+        fetch_url, invocation_source_, /*is_contextual_tasks=*/false);
     if (request_id.has_value()) {
       fetch_url = net::AppendOrReplaceQueryParameter(
           fetch_url, kEncodedRequestIdParameter,
@@ -317,7 +322,7 @@ void LensOverlayGen204Controller::
 
 void LensOverlayGen204Controller::OnGen204NetworkResponse(
     const network::SimpleURLLoader* source,
-    std::unique_ptr<std::string> response_body) {
+    std::optional<std::string> response_body) {
   std::erase_if(
       gen204_loaders_,
       [source](const std::unique_ptr<network::SimpleURLLoader>& loader) {

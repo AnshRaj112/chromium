@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "base/feature_list.h"
-#include "base/functional/callback_forward.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/time/default_tick_clock.h"
@@ -53,6 +52,8 @@ namespace blink {
 
 namespace {
 
+BASE_FEATURE(kPaintTimingUseDelayedTaskAt, base::FEATURE_ENABLED_BY_DEFAULT);
+
 WindowPerformance* GetPerformanceInstance(LocalFrame* frame) {
   WindowPerformance* performance = nullptr;
   if (frame && frame->DomWindow()) {
@@ -65,12 +66,6 @@ struct PendingPaintTimingRecord {
   HashSet<PaintEvent> paint_events;
   base::TimeTicks rendering_update_end_time;
 };
-
-// When enabled, `PaintTiming::MarkPaintTimingInternal()` is only called from
-// `PaintTiming::NotifyPaintFinished()`.
-BASE_FEATURE(kMarkPaintTimingInternalOnlyOnFinish,
-             "MarkPaintTimingInternalOnlyOnFinish",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 }  // namespace
 
@@ -200,7 +195,7 @@ void PaintTiming::SetFirstMeaningfulPaintCandidate(base::TimeTicks timestamp) {
     return;
   first_meaningful_paint_candidate_ = timestamp;
   if (GetFrame() && GetFrame()->View() && !GetFrame()->View()->IsAttached()) {
-    GetFrame()->GetFrameScheduler()->OnFirstMeaningfulPaint(timestamp);
+    GetFrame()->GetFrameScheduler()->OnFirstMeaningfulPaint();
   }
 }
 
@@ -239,10 +234,6 @@ void PaintTiming::NotifyPaint(bool is_first_paint,
 
   if (is_first_paint)
     GetFrame()->OnFirstPaint(text_painted, image_painted);
-
-  if (!base::FeatureList::IsEnabled(kMarkPaintTimingInternalOnlyOnFinish)) {
-    MarkPaintTimingInternal();
-  }
 }
 
 // https://w3c.github.io/paint-timing/#mark-paint-timing
@@ -301,7 +292,7 @@ void PaintTiming::MarkPaintTimingInternal() {
 
   // 10. Let flushPaintTimings be the following steps:
   PaintTimingCallback flush_paint_timings =
-      WTF::BindOnce(
+      blink::BindOnce(
           [](WindowPerformance* performance,
              const PendingPaintTimingRecord& record,
              AnimationFrameTimingInfo* frame_timing_info,
@@ -384,7 +375,7 @@ void PaintTiming::MarkPaintTimingInternal() {
   // 12. Run the following steps In parallel:
   // 12.1 Wait until an implementation-defined time when the current frame has
   //    been presented to the user.
-  RegisterNotifyPresentationTime(WTF::BindOnce(
+  RegisterNotifyPresentationTime(blink::BindOnce(
       [](PaintTiming* self, PaintTimingCallback flush_paint_timings,
          const PendingPaintTimingRecord& record,
          const viz::FrameTimingDetails& frame_timing_details) {
@@ -444,9 +435,24 @@ void PaintTiming::MarkPaintTimingInternal() {
               performance->GetTimeOriginInternal() +
               base::Milliseconds(paint_timing_info.presentation_time);
 
-          performance->GetTaskRunner().PostDelayedTask(
-              FROM_HERE, std::move(flush),
-              target_time - base::TimeTicks::Now());
+          if (base::FeatureList::IsEnabled(kPaintTimingUseDelayedTaskAt)) {
+            // It's possible to get multiple callbacks with the same
+            // presentation time, e.g. if a frame gets dropped, which leads to
+            // multiple frames having the same `target_time`. We expect the
+            // callbacks to arrive in order, but the order the `flush` tasks run
+            // depends on delayed task scheduling. PostDelayedTaskAt() uses the
+            // `target_time` directly, using posting order to break ties, which
+            // avoids potential task reordering due to needing to compute the
+            // delayed runtime based on delay.
+            performance->GetTaskRunner().PostDelayedTaskAt(
+                base::subtle::PostDelayedTaskPassKey{}, FROM_HERE,
+                std::move(flush), target_time,
+                base::subtle::DelayPolicy::kPrecise);
+          } else {
+            performance->GetTaskRunner().PostDelayedTask(
+                FROM_HERE, std::move(flush),
+                target_time - base::TimeTicks::Now());
+          }
         } else {
           std::move(flush).Run();
         }
@@ -527,10 +533,10 @@ void PaintTiming::Mark(PaintEvent event) {
 void PaintTiming::
     RegisterNotifyFirstPaintAfterBackForwardCacheRestorePresentationTime(
         wtf_size_t index) {
-  RegisterNotifyPresentationTime(WTF::BindOnce(
-      &PaintTiming::
-          ReportFirstPaintAfterBackForwardCacheRestorePresentationTime,
-      WrapWeakPersistent(this), index));
+  RegisterNotifyPresentationTime(
+      BindOnce(&PaintTiming::
+                   ReportFirstPaintAfterBackForwardCacheRestorePresentationTime,
+               WrapWeakPersistent(this), index));
 }
 
 void PaintTiming::RegisterNotifyPresentationTime(ReportTimeCallback callback) {
@@ -636,11 +642,7 @@ void PaintTiming::SetFirstContentfulPaintPresentation(
       GetSupplementable(), "firstContentfulPaint",
       relevant_paint_details.first_contentful_paint_presentation_.since_origin()
           .InSecondsF());
-  WindowPerformance* performance = GetPerformanceInstance(GetFrame());
-  if (GetFrame()) {
-    GetFrame()->OnFirstContentfulPaint();
-    GetFrame()->Loader().Progress().DidFirstContentfulPaint();
-  }
+
   NotifyPaintTimingChanged();
   fmp_detector_->NotifyFirstContentfulPaint(
       paint_details_.first_contentful_paint_presentation_);
@@ -650,14 +652,22 @@ void PaintTiming::SetFirstContentfulPaintPresentation(
     interactive_detector->OnFirstContentfulPaint(
         paint_details_.first_contentful_paint_presentation_);
   }
-  auto* coordinator = GetSupplementable()->GetResourceCoordinator();
-  if (coordinator && GetFrame() && GetFrame()->IsOutermostMainFrame()) {
+
+  WindowPerformance* performance = GetPerformanceInstance(GetFrame());
+  if (GetFrame()) {
     PerformanceTimingForReporting* timing_for_reporting =
         performance->timingForReporting();
-    base::TimeDelta fcp =
-        paint_timing_info.presentation_time -
-        timing_for_reporting->NavigationStartAsMonotonicTime();
-    coordinator->OnFirstContentfulPaint(fcp);
+    GetFrame()->OnFirstContentfulPaint(
+        paint_timing_info.presentation_time,
+        timing_for_reporting->NavigationStartAsMonotonicTime());
+    GetFrame()->Loader().Progress().DidFirstContentfulPaint();
+
+    auto* coordinator = GetSupplementable()->GetResourceCoordinator();
+    if (coordinator && GetFrame()->IsOutermostMainFrame()) {
+      coordinator->OnFirstContentfulPaint(
+          paint_timing_info.presentation_time -
+          timing_for_reporting->NavigationStartAsMonotonicTime());
+    }
   }
 }
 

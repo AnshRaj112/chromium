@@ -13,7 +13,7 @@
 
 AndroidLiveTabContextCloseWrapper::AndroidLiveTabContextCloseWrapper(
     TabModel* tab_model,
-    std::vector<raw_ptr<TabAndroid, VectorExperimental>>&& closed_tabs,
+    std::vector<TabAndroid*>&& closed_tabs,
     std::map<int, tab_groups::TabGroupId>&& tab_id_to_tab_group,
     std::map<tab_groups::TabGroupId, tab_groups::TabGroupVisualData>&&
         tab_group_visual_data,
@@ -45,7 +45,7 @@ sessions::LiveTab* AndroidLiveTabContextCloseWrapper::GetLiveTabAt(
   scoped_web_contents_ = historical_tab_saver::ScopedWebContents::CreateForTab(
       GetTabAt(relative_index), &web_contents_state_[relative_index]);
   DCHECK(scoped_web_contents_->web_contents());
-  return sessions::ContentLiveTab::GetForWebContents(
+  return sessions::ContentLiveTab::GetOrCreateForWebContents(
       scoped_web_contents_->web_contents());
 }
 
@@ -74,7 +74,7 @@ AndroidLiveTabContextCloseWrapper::GetSavedTabGroupIdForGroup(
 TabAndroid* AndroidLiveTabContextCloseWrapper::GetTabAt(
     int relative_index) const {
   DCHECK_LT(base::checked_cast<size_t>(relative_index), closed_tabs_.size());
-  auto* tab_android = closed_tabs_[relative_index].get();
+  auto* tab_android = closed_tabs_[relative_index];
   DCHECK(tab_android);
   return tab_android;
 }
@@ -111,7 +111,7 @@ sessions::LiveTab* AndroidLiveTabContextRestoreWrapper::AddRestoredTab(
       original_session_type);
   if (tab.group) {
     TabAndroid* restored_tab = TabAndroid::FromWebContents(
-        static_cast<sessions::ContentLiveTab*>(live_tab)->web_contents());
+        &static_cast<sessions::ContentLiveTab*>(live_tab)->GetWebContents());
     DCHECK(restored_tab);
     TabGroup& tab_group = tab_groups_[*tab.group];
     tab_group.visual_data = *tab.group_visual_data;

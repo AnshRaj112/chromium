@@ -16,6 +16,8 @@
 #include "third_party/blink/renderer/platform/graphics/paint/subsequence_recorder.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 #include "third_party/blink/renderer/platform/testing/paint_test_configurations.h"
+#include "third_party/skia/include/core/SkPath.h"
+#include "third_party/skia/include/core/SkPathBuilder.h"
 
 using testing::ElementsAre;
 
@@ -1904,13 +1906,14 @@ void DrawPath(GraphicsContext& context,
     return;
 
   DrawingRecorder recorder(context, client, type, gfx::Rect(0, 0, 100, 100));
-  SkPath path;
-  path.moveTo(0, 0);
-  path.lineTo(0, 100);
-  path.lineTo(50, 50);
-  path.lineTo(100, 100);
-  path.lineTo(100, 0);
-  path.close();
+  const SkPath path = SkPathBuilder()
+                          .moveTo(0, 0)
+                          .lineTo(0, 100)
+                          .lineTo(50, 50)
+                          .lineTo(100, 100)
+                          .lineTo(100, 0)
+                          .close()
+                          .detach();
   cc::PaintFlags flags;
   flags.setAntiAlias(true);
   for (unsigned i = 0; i < count; i++)
@@ -2164,6 +2167,26 @@ TEST_P(PaintControllerTest, RecordRegionCaptureDataValidData) {
   const PaintChunks& chunks = GetPersistentData().GetPaintChunks();
   EXPECT_EQ(1u, chunks.size());
   EXPECT_EQ(kBounds, chunks[0].region_capture_data->map.find(kCropId)->second);
+}
+
+TEST_P(PaintControllerTest, RecordTrackedElementData) {
+  static const auto kId = TrackedElementId(base::Token::CreateRandom());
+  static const gfx::Rect kBounds(1, 2, 640, 480);
+
+  FakeDisplayItemClient& client =
+      *MakeGarbageCollected<FakeDisplayItemClient>("client");
+  {
+    AutoCommitPaintController paint_controller(GetPersistentData());
+    GraphicsContext context(paint_controller);
+    InitRootChunk(paint_controller);
+    paint_controller.RecordTrackedElementData(client, kId, kBounds);
+  }
+
+  ASSERT_EQ(1u, GetPersistentData().GetPaintChunks().size());
+  const auto& chunk = GetPersistentData().GetPaintChunks()[0];
+  ASSERT_TRUE(chunk.tracked_element_data);
+  ASSERT_EQ(1u, chunk.tracked_element_data->map.size());
+  EXPECT_EQ(kBounds, chunk.tracked_element_data->map.find(kId)->second);
 }
 
 // Death tests don't work properly on Android.

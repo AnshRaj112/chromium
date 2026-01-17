@@ -19,7 +19,6 @@
 
 #include "base/allocator/allocator_check.h"
 #include "base/allocator/partition_alloc_support.h"
-#include "base/android/background_thread_pool_field_trial.h"
 #include "base/at_exit.h"
 #include "base/base_switches.h"
 #include "base/command_line.h"
@@ -51,6 +50,7 @@
 #include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/threading/hang_watcher.h"
 #include "base/threading/platform_thread.h"
+#include "base/time/default_clock.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
 #include "build/branding_buildflags.h"
@@ -76,7 +76,7 @@
 #include "content/child/field_trial.h"
 #include "content/child/memory_coordinator/child_memory_consumer_registry.h"
 #include "content/common/content_constants_internal.h"
-#include "content/common/process_visibility_tracker.h"
+#include "content/common/process_priority_tracker.h"
 #include "content/common/url_schemes.h"
 #include "content/gpu/in_process_gpu_thread.h"
 #include "content/public/app/content_main_delegate.h"
@@ -109,6 +109,7 @@
 #include "mojo/public/cpp/system/invitation.h"
 #include "mojo/public/cpp/system/message_pipe.h"
 #include "net/first_party_sets/local_set_declaration.h"
+#include "sandbox/policy/linux/landlock_util.h"
 #include "sandbox/policy/sandbox.h"
 #include "sandbox/policy/sandbox_type.h"
 #include "sandbox/policy/switches.h"
@@ -186,6 +187,7 @@
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
+#include "base/android/background_thread_pool_field_trial.h"
 #include "base/system/sys_info.h"
 #include "content/browser/android/battery_metrics.h"
 #include "content/browser/android/browser_startup_controller.h"
@@ -260,7 +262,9 @@ std::string GetSnapshotDataDescriptor(const base::CommandLine& command_line) {
 
 #if defined(ADDRESS_SANITIZER)
 NO_SANITIZE("address")
-void AsanProcessInfoCB(const char*, bool*) {
+void AsanProcessInfoCB(const char* reason,
+                       bool* should_exit_cleanly,
+                       bool* should_abort) {
   auto* cmd_line = base::CommandLine::ForCurrentProcess();
 #if BUILDFLAG(IS_WIN)
   std::string cmd_string = base::WideToUTF8(cmd_line->GetCommandLineString());
@@ -291,27 +295,7 @@ void LoadV8SnapshotFile(const base::CommandLine& command_line) {
   gin::V8Initializer::LoadV8Snapshot(snapshot_type);
 }
 
-bool ShouldLoadV8Snapshot(const base::CommandLine& command_line,
-                          const std::string& process_type) {
-  // The gpu does not need v8, and the browser only needs v8 when in single
-  // process mode.
-  if (process_type == switches::kGpuProcess ||
-      (process_type.empty() &&
-       !command_line.HasSwitch(switches::kSingleProcess))) {
-    return false;
-  }
-  return true;
-}
-
 #endif  // V8_USE_EXTERNAL_STARTUP_DATA
-
-void LoadV8SnapshotIfNeeded(const base::CommandLine& command_line,
-                            const std::string& process_type) {
-#if defined(V8_USE_EXTERNAL_STARTUP_DATA)
-  if (ShouldLoadV8Snapshot(command_line, process_type))
-    LoadV8SnapshotFile(command_line);
-#endif  // V8_USE_EXTERNAL_STARTUP_DATA
-}
 
 #if BUILDFLAG(USE_ZYGOTE)
 pid_t LaunchZygoteHelper(base::CommandLine* cmd_line,
@@ -634,17 +618,19 @@ NO_STACK_PROTECTOR int RunZygote(ContentMainDelegate* delegate) {
 
   // Once Zygote forks and feature list initializes we can start a thread to
   // begin tracing immediately.
+  if (delegate->ShouldInitializePerfetto(invoked_in_child)) {
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
-  if (process_type == switches::kGpuProcess) {
-    tracing::InitTracingPostFeatureList(/*enable_consumer=*/false,
-                                        /*will_trace_thread_restart=*/true);
-  } else {
-    main_params.needs_startup_tracing_after_sandbox_init = true;
-  }
+    if (process_type == switches::kGpuProcess) {
+      tracing::InitTracingPostFeatureList(/*enable_consumer=*/false,
+                                          /*will_trace_thread_restart=*/true);
+    } else {
+      main_params.needs_startup_tracing_after_sandbox_init = true;
+    }
 #else
-  tracing::InitTracingPostFeatureList(/*enable_consumer=*/false,
-                                      /*will_trace_thread_restart=*/false);
+    tracing::InitTracingPostFeatureList(/*enable_consumer=*/false,
+                                        /*will_trace_thread_restart=*/false);
 #endif
+  }
 
   // The hang watcher needs to be created once the feature list is available
   // but before the IO thread is started.
@@ -722,6 +708,10 @@ NO_STACK_PROTECTOR int RunOtherNamedProcessTypeMain(
       {switches::kGpuProcess, GpuMain},
   });
 
+  // TODO(406578344): Remove `memory_pressure_listener_registry` when the
+  // base::MemoryPressureListener API is deleted in favor of
+  // base::MemoryConsumer.
+  base::MemoryPressureListenerRegistry memory_pressure_listener_registry;
   // Create the memory consumer registry as early as possible.
   base::ScopedMemoryConsumerRegistry<ChildMemoryConsumerRegistry>
       child_memory_consumer_registry;
@@ -953,7 +943,11 @@ int ContentMainRunnerImpl::Initialize(ContentMainParams params) {
     return TerminateForFatalInitializationError();
 #endif  // BUILDFLAG(IS_ANDROID) && (ICU_UTIL_DATA_IMPL == ICU_UTIL_DATA_FILE)
 
-  LoadV8SnapshotIfNeeded(command_line, process_type);
+#if defined(V8_USE_EXTERNAL_STARTUP_DATA)
+  if (delegate_->ShouldLoadV8Snapshot(process_type)) {
+    LoadV8SnapshotFile(command_line);
+  }
+#endif  // V8_USE_EXTERNAL_STARTUP_DATA
 
   blink::TrialTokenValidator::SetOriginTrialPolicyGetter(
       base::BindRepeating([]() -> blink::OriginTrialPolicy* {
@@ -1036,7 +1030,7 @@ int ContentMainRunnerImpl::Initialize(ContentMainParams params) {
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
   if (process_type.empty()) {
     // Check if Landlock is supported.
-    sandbox::policy::SandboxLinux::ReportLandlockStatus();
+    sandbox::policy::ReportLandlockStatus();
   }
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 
@@ -1077,17 +1071,22 @@ NO_STACK_PROTECTOR int ContentMainRunnerImpl::Run() {
               ContentMainDelegate::InvokedInChildProcess())) {
         InitializeFieldTrialAndFeatureList();
       }
+      if (delegate_->ShouldInitializePerfetto(
+              ContentMainDelegate::InvokedInChildProcess())) {
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
-      if (process_type == switches::kGpuProcess) {
-        tracing::InitTracingPostFeatureList(/*enable_consumer=*/false,
-                                            /*will_trace_thread_restart=*/true);
-      } else {
-        needs_startup_tracing_after_sandbox_init = true;
-      }
+        if (process_type == switches::kGpuProcess) {
+          tracing::InitTracingPostFeatureList(
+              /*enable_consumer=*/false,
+              /*will_trace_thread_restart=*/true);
+        } else {
+          needs_startup_tracing_after_sandbox_init = true;
+        }
 #else
-      tracing::InitTracingPostFeatureList(/*enable_consumer=*/false,
-                                          /*will_trace_thread_restart=*/false);
+        tracing::InitTracingPostFeatureList(
+            /*enable_consumer=*/false,
+            /*will_trace_thread_restart=*/false);
 #endif
+      }
       if (delegate_->ShouldInitializeMojo(
               ContentMainDelegate::InvokedInChildProcess())) {
         InitializeMojoCore();
@@ -1095,8 +1094,10 @@ NO_STACK_PROTECTOR int ContentMainRunnerImpl::Run() {
       delegate_->PostEarlyInitialization(
           ContentMainDelegate::InvokedInChildProcess());
 
-      base::allocator::PartitionAllocSupport::Get()
-          ->ReconfigureAfterFeatureListInit(process_type);
+      if (delegate_->ShouldReconfigurePartitionAlloc()) {
+        base::allocator::PartitionAllocSupport::Get()
+            ->ReconfigureAfterFeatureListInit(process_type);
+      }
     }
   }
 
@@ -1158,6 +1159,7 @@ int ContentMainRunnerImpl::RunBrowser(MainFunctionParams main_params,
       InitializeMojoCore();
     }
 
+    memory_pressure_listener_registry_.emplace();
     browser_memory_consumer_registry_ = std::make_unique<
         base::ScopedMemoryConsumerRegistry<BrowserMemoryConsumerRegistry>>();
 
@@ -1174,16 +1176,21 @@ int ContentMainRunnerImpl::RunBrowser(MainFunctionParams main_params,
     }
 #endif
 
-    // Register the TaskExecutor for posting task to the BrowserThreads. It is
-    // incorrect to post to a BrowserThread before this point. This instantiates
-    // and binds the MessageLoopForUI on the main thread (but it's only labeled
-    // as BrowserThread::UI in BrowserMainLoop::CreateMainMessageLoop).
-    BrowserTaskExecutor::Create();
+    // When this is enabled, these things will have already been initialized.
+    if (!delegate_->IsInitFeatureListEarly()) {
+      // Register the TaskExecutor for posting task to the BrowserThreads. It is
+      // incorrect to post to a BrowserThread before this point. This
+      // instantiates and binds the MessageLoopForUI on the main thread (but
+      // it's only labeled as BrowserThread::UI in
+      // BrowserMainLoop::CreateMainMessageLoop).
+      BrowserTaskExecutor::Create();
 
-    auto* provider = delegate_->CreateVariationsIdsProvider();
-    if (!provider) {
-      variations::VariationsIdsProvider::Create(
-          variations::VariationsIdsProvider::Mode::kUseSignedInState);
+      auto* provider = delegate_->CreateVariationsIdsProvider();
+      if (!provider) {
+        variations::VariationsIdsProvider::CreateInstance(
+            variations::VariationsIdsProvider::Mode::kUseSignedInState,
+            std::make_unique<base::DefaultClock>());
+      }
     }
 
     std::optional<int> post_early_initialization_exit_code =
@@ -1207,12 +1214,21 @@ int ContentMainRunnerImpl::RunBrowser(MainFunctionParams main_params,
       base::HangWatcher::GetInstance()->Start();
     }
 
-    tracing::InitTracingPostFeatureList(
-        /*enable_consumer=*/true, /*will_trace_thread_restart=*/false,
-        base::BindRepeating(&ShouldAllowSystemTracingConsumer));
+    // WebView may have already initialized perfetto, so check if we should do
+    // it here.
+    if (delegate_->ShouldInitializePerfetto(invoked_in_browser)) {
+      tracing::InitTracingPostFeatureList(
+          /*enable_consumer=*/true, /*will_trace_thread_restart=*/false,
+          base::BindRepeating(&ShouldAllowSystemTracingConsumer));
+    }
 
-    // The FeatureList needs to be created before starting the ThreadPool.
-    StartBrowserThreadPool();
+    if (!delegate_->IsInitFeatureListEarly()) {
+      // The FeatureList needs to be created before starting the ThreadPool.
+      StartBrowserThreadPool();
+
+      BrowserTaskExecutor::
+          InstallPartitionAllocSchedulerLoopQuarantineTaskObserver();
+    }
 
     // PowerMonitor is needed in reduced mode. BrowserMainLoop will safely skip
     // initializing it again if it has already been initialized.
@@ -1220,7 +1236,7 @@ int ContentMainRunnerImpl::RunBrowser(MainFunctionParams main_params,
         MakePowerMonitorDeviceSource(), /*emit_global_event=*/true);
 
     // Ensure the visibility tracker is created on the main thread.
-    ProcessVisibilityTracker::GetInstance();
+    ProcessPriorityTracker::GetInstance();
 
 #if BUILDFLAG(IS_ANDROID)
     SetupCpuTimeMetrics();
@@ -1264,6 +1280,11 @@ int ContentMainRunnerImpl::RunBrowser(MainFunctionParams main_params,
       ->ReconfigureAfterFeatureListInit("");
   base::allocator::PartitionAllocSupport::Get()->ReconfigureAfterTaskRunnerInit(
       "");
+  BrowserTaskExecutor::GetIOThreadTaskRunner({base::TaskPriority::BEST_EFFORT})
+      ->PostTask(FROM_HERE, base::BindOnce([] {
+                   base::allocator::ReconfigureSchedulerLoopQuarantineBranch(
+                       base::allocator::SchedulerLoopQuarantineBranchType::kIO);
+                 }));
 
   if (start_minimal_browser) {
     DVLOG(0) << "Chrome is running in minimal browser mode.";

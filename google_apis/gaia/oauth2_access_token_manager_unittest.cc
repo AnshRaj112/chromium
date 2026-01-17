@@ -6,13 +6,13 @@
 
 #include <memory>
 
-#include "base/containers/contains.h"
 #include "base/memory/ref_counted.h"
 #include "base/test/bind.h"
 #include "base/test/task_environment.h"
 #include "google_apis/gaia/gaia_access_token_fetcher.h"
 #include "google_apis/gaia/gaia_constants.h"
 #include "google_apis/gaia/gaia_id.h"
+#include "google_apis/gaia/gaia_id_literal.h"
 #include "google_apis/gaia/gaia_urls.h"
 #include "google_apis/gaia/google_service_auth_error.h"
 #include "google_apis/gaia/oauth2_access_token_fetcher_impl.h"
@@ -25,7 +25,7 @@
 
 namespace {
 
-constexpr GaiaId::Literal kTestAccountId("test_user_account_id");
+constexpr GaiaIdLiteral kTestAccountId("test_user_account_id");
 
 class FakeOAuth2AccessTokenManagerDelegate
     : public OAuth2AccessTokenManager::Delegate {
@@ -43,7 +43,7 @@ class FakeOAuth2AccessTokenManagerDelegate
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
       OAuth2AccessTokenConsumer* consumer,
       const std::string& token_binding_challenge) override {
-    EXPECT_TRUE(base::Contains(account_ids_to_refresh_tokens_, account_id));
+    EXPECT_TRUE(account_ids_to_refresh_tokens_.contains(account_id));
     return GaiaAccessTokenFetcher::
         CreateExchangeRefreshTokenForAccessTokenInstance(
             consumer, url_loader_factory,
@@ -51,7 +51,7 @@ class FakeOAuth2AccessTokenManagerDelegate
   }
 
   bool HasRefreshToken(const CoreAccountId& account_id) const override {
-    return base::Contains(account_ids_to_refresh_tokens_, account_id);
+    return account_ids_to_refresh_tokens_.contains(account_id);
   }
 
   scoped_refptr<network::SharedURLLoaderFactory> GetURLLoaderFactory()
@@ -396,7 +396,7 @@ TEST_F(OAuth2AccessTokenManagerTest, ClearCache) {
   base::RunLoop run_loop1;
   consumer_.SetResponseCompletedClosure(run_loop1.QuitClosure());
 
-  std::set<std::string> scope_list;
+  OAuth2AccessTokenManager::ScopeSet scope_list;
   scope_list.insert("scope");
   std::unique_ptr<OAuth2AccessTokenManager::Request> request(
       token_manager_->StartRequest(account_id_, scope_list, &consumer_));
@@ -517,7 +517,7 @@ TEST_F(OAuth2AccessTokenManagerTest, OnAccessTokenInvalidated) {
 TEST_F(OAuth2AccessTokenManagerTest, OnAccessTokenFetchedOnRequestCanceled) {
   GoogleServiceAuthError::State error_states[] = {
       GoogleServiceAuthError::REQUEST_CANCELED,
-      GoogleServiceAuthError::USER_NOT_SIGNED_UP};
+      GoogleServiceAuthError::ACCOUNT_NOT_FOUND};
   for (const auto& state : error_states) {
     GoogleServiceAuthError error(state);
     SCOPED_TRACE(error.ToString());
@@ -633,8 +633,8 @@ TEST_F(OAuth2AccessTokenManagerTest,
   scopeset.insert("scope");
   base::RunLoop run_loop;
   // |account_id| doesn't have a refresh token, OnFetchAccessTokenComplete
-  // should report GoogleServiceAuthError::USER_NOT_SIGNED_UP.
-  GoogleServiceAuthError error(GoogleServiceAuthError::USER_NOT_SIGNED_UP);
+  // should report GoogleServiceAuthError::ACCOUNT_NOT_FOUND.
+  GoogleServiceAuthError error(GoogleServiceAuthError::ACCOUNT_NOT_FOUND);
   const CoreAccountId account_id =
       CoreAccountId::FromGaiaId(GaiaId("new_account_id"));
   observer.SetOnFetchAccessTokenComplete(account_id, consumer_.id(), scopeset,

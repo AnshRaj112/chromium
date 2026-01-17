@@ -4,14 +4,13 @@
 
 #include "chrome/browser/ui/webui/top_chrome/webui_contents_preload_manager.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <string>
 
 #include "base/auto_reset.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
-#include "base/memory/memory_pressure_monitor.h"
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/no_destructor.h"
@@ -71,7 +70,7 @@ class FixedCandidateSelector : public webui::PreloadCandidateSelector {
 
   // webui::PreloadCandidateSelector:
   void Init(const std::vector<GURL>& preloadable_urls) override {
-    DCHECK(base::Contains(preloadable_urls, webui_url_));
+    DCHECK(std::ranges::contains(preloadable_urls, webui_url_));
   }
   std::optional<GURL> GetURLToPreload(
       const webui::PreloadContext& context) const override {
@@ -251,7 +250,10 @@ RequestResult::~RequestResult() = default;
 RequestResult::RequestResult(RequestResult&&) = default;
 RequestResult& RequestResult::operator=(RequestResult&&) = default;
 
-WebUIContentsPreloadManager::WebUIContentsPreloadManager() {
+WebUIContentsPreloadManager::WebUIContentsPreloadManager()
+    : memory_pressure_listener_registration_(
+          base::MemoryPressureListenerTag::kWebUIContentsPreloadManager,
+          this) {
   preload_mode_ =
       static_cast<PreloadMode>(features::kPreloadTopChromeWebUIMode.Get());
   webui_controller_embedder_stub_ =
@@ -416,7 +418,7 @@ RequestResult WebUIContentsPreloadManager::Request(
   // TODO(325836830): allow navigations between WebUIs.
   if (preloaded_web_contents_ &&
       preloaded_web_contents_->GetBrowserContext() == browser_context &&
-      (preloaded_web_contents_->GetURL().host() == webui_url.host() ||
+      (preloaded_web_contents_->GetURL().GetHost() == webui_url.GetHost() ||
        preloaded_web_contents_->GetURL().IsAboutBlank() ||
        webui_url.IsAboutBlank())) {
     preload_result = WebUIPreloadResult::kHit;
@@ -433,7 +435,7 @@ RequestResult WebUIContentsPreloadManager::Request(
 
   // Navigate to path if the request URL has a different path.
   if (!is_navigation_disabled_for_test_ &&
-      webui_url.path() != web_contents_ret->GetURL().path()) {
+      webui_url.GetPath() != web_contents_ret->GetURL().GetPath()) {
     CHECK(url::IsSameOriginWith(webui_url, web_contents_ret->GetURL()));
     LoadURLForContents(web_contents_ret.get(), webui_url);
   }
@@ -546,10 +548,7 @@ bool WebUIContentsPreloadManager::ShouldPreloadForBrowserContext(
   }
 
   // Don't preload if under heavy memory pressure.
-  const auto* memory_monitor = base::MemoryPressureMonitor::Get();
-  if (memory_monitor && memory_monitor->GetCurrentPressureLevel() >=
-                            base::MemoryPressureMonitor::MemoryPressureLevel::
-                                MEMORY_PRESSURE_LEVEL_MODERATE) {
+  if (memory_pressure_level() >= base::MEMORY_PRESSURE_LEVEL_MODERATE) {
     return false;
   }
 

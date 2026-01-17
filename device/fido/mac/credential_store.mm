@@ -17,7 +17,6 @@
 #include "base/apple/foundation_util.h"
 #include "base/apple/osstatus_logging.h"
 #include "base/apple/scoped_cftyperef.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/logging.h"
 #include "base/numerics/safe_conversions.h"
@@ -318,6 +317,10 @@ TouchIdCredentialStore::CreateCredentialLegacyCredentialForTesting(
         objc_storage_->authentication_context;
   }
 
+  // Legacy credentials used to set kSecAttrApplicationTag to a CFStringRef
+  // encoding the RP ID and user ID, but MacOS Sequoia returns an internal error
+  // when setting an application tag of type CFStringRef. Skip the field in that
+  // case, as application tags are ignored for legacy credentials anyway.
   NSDictionary* params = @{
     CFToNSPtrCast(kSecAttrAccessGroup) :
         base::SysUTF8ToNSString(config_.keychain_access_group),
@@ -329,8 +332,6 @@ TouchIdCredentialStore::CreateCredentialLegacyCredentialForTesting(
         CFToNSPtrCast(kSecAttrTokenIDSecureEnclave),
     CFToNSPtrCast(kSecAttrLabel) :
         base::SysUTF8ToNSString(EncodeRpId(config_.metadata_secret, rp_id)),
-    CFToNSPtrCast(kSecAttrApplicationTag) : base::SysUTF8ToNSString(
-        EncodeRpIdAndUserIdDeprecated(config_.metadata_secret, rp_id, user.id)),
     CFToNSPtrCast(kSecAttrApplicationLabel) :
         [NSData dataWithBytes:credential_id.data() length:credential_id.size()],
     CFToNSPtrCast(kSecPrivateKeyAttrs) : private_key_params,
@@ -366,8 +367,7 @@ TouchIdCredentialStore::FindCredentialsFromCredentialDescriptorList(
   for (const auto& descriptor : descriptors) {
     if (descriptor.credential_type == CredentialType::kPublicKey &&
         (descriptor.transports.empty() ||
-         base::Contains(descriptor.transports,
-                        FidoTransportProtocol::kInternal))) {
+         descriptor.transports.contains(FidoTransportProtocol::kInternal))) {
       credential_ids.insert(descriptor.id);
     }
   }
@@ -562,8 +562,7 @@ TouchIdCredentialStore::FindCredentialsImpl(
     auto credential_id_span = base::apple::CFDataToSpan(application_label);
     const std::vector<uint8_t> credential_id(credential_id_span.begin(),
                                              credential_id_span.end());
-    if (!credential_ids.empty() &&
-        !base::Contains(credential_ids, credential_id)) {
+    if (!credential_ids.empty() && !credential_ids.contains(credential_id)) {
       continue;
     }
 

@@ -10,9 +10,7 @@
 #include "base/files/scoped_temp_dir.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
-#include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
-#include "chrome/browser/enterprise/connectors/analysis/content_analysis_features.h"
 #include "chrome/browser/enterprise/connectors/common.h"
 #include "components/download/public/common/mock_download_item.h"
 
@@ -202,6 +200,19 @@ TEST_F(ContentAnalysisDownloadsDelegateTest,
                           u"administrator says: \"",
                           kTestMessage2, u"\""}),
             *(delegate.GetCustomMessage()));
+}
+
+TEST_F(ContentAnalysisDownloadsDelegateTest, TestFilenameNulloptIfEmpty) {
+  // Most arguments copied from other tests
+  ContentAnalysisDownloadsDelegate delegate(
+      u"", kTestMessage, GURL(kTestUrl), true,
+      base::BindOnce(&ContentAnalysisDownloadsDelegateTest::OpenCallback,
+                     base::Unretained(this)),
+      base::BindOnce(&ContentAnalysisDownloadsDelegateTest::DiscardCallback,
+                     base::Unretained(this)),
+      nullptr, CreateSampleCustomRuleMessage(kTestMessage2, kTestInvalidUrl));
+
+  EXPECT_EQ(delegate.GetFilename(), std::nullopt);
 }
 
 }  // namespace enterprise_connectors

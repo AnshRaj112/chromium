@@ -4,8 +4,6 @@
 
 #import "ios/chrome/browser/authentication/ui_bundled/signout_action_sheet/signout_action_sheet_coordinator.h"
 
-#import <MaterialComponents/MaterialSnackbar.h>
-
 #import "base/check.h"
 #import "base/format_macros.h"
 #import "base/metrics/histogram_functions.h"
@@ -26,7 +24,7 @@
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
-#import "ios/chrome/browser/shared/ui/util/snackbar_util.h"
+#import "ios/chrome/browser/shared/public/snackbar/snackbar_message.h"
 #import "ios/chrome/browser/signin/model/authentication_service.h"
 #import "ios/chrome/browser/signin/model/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/model/identity_manager_factory.h"
@@ -251,8 +249,19 @@ using signin_metrics::SignoutDataLossAlertReason;
 // data type, otherwise the sign-out is triggered without dialog.
 - (void)continueSignOutWithUnsyncedDataTypeSet:(syncer::DataTypeSet)set {
   [self allowUserInteraction];
-  if (!set.empty()) {
+
+  syncer::SyncService* syncService =
+      SyncServiceFactory::GetForProfile(self.profile);
+  BOOL bookmarksLimitExceeded =
+      syncService &&
+      syncService->GetUserActionableError() ==
+          syncer::SyncService::UserActionableError::kBookmarksLimitExceeded;
+
+  if (!set.empty() || bookmarksLimitExceeded) {
     for (syncer::DataType type : set) {
+      // TODO(crbug.com/452968646) The current metric won't be recorded if the
+      //  signout is aborted due to the bookmarks limit exceeded. Implement a
+      //  new metric to cover this case for each platform.
       base::UmaHistogramEnumeration("Sync.UnsyncedDataOnSignout2",
                                     syncer::DataTypeHistogramValue(type));
     }
@@ -319,7 +328,7 @@ using signin_metrics::SignoutDataLossAlertReason;
   [self preventUserInteraction];
   // Prepare the signout snackbar before account switching.
   // The snackbar message might be nil if the snackbar is not needed.
-  MDCSnackbarMessage* snackbarMessage = [self signoutSnackbarMessage];
+  SnackbarMessage* snackbarMessage = [self signoutSnackbarMessage];
 
   // Strongly retain completionWrapper in the blocks to ensure that the
   // completion callback will be invoked even if the UI is destroyed
@@ -340,7 +349,7 @@ using signin_metrics::SignoutDataLossAlertReason;
 }
 
 // Returns snackbar if needed.
-- (MDCSnackbarMessage*)signoutSnackbarMessage {
+- (SnackbarMessage*)signoutSnackbarMessage {
   if (self.isForceSigninEnabled) {
     // Snackbar should be skipped since force sign-in dialog will be shown right
     // after.
@@ -354,8 +363,8 @@ using signin_metrics::SignoutDataLossAlertReason;
               HasManagedSyncDataType(syncService)
           ? IDS_IOS_GOOGLE_ACCOUNT_SETTINGS_SIGN_OUT_SNACKBAR_MESSAGE_ENTERPRISE
           : IDS_IOS_GOOGLE_ACCOUNT_SETTINGS_SIGN_OUT_SNACKBAR_MESSAGE;
-  MDCSnackbarMessage* message =
-      CreateSnackbarMessage(l10n_util::GetNSString(message_id));
+  SnackbarMessage* message = [[SnackbarMessage alloc]
+      initWithTitle:l10n_util::GetNSString(message_id)];
   return message;
 }
 

@@ -8,6 +8,7 @@
 
 #import <string>
 
+#import "base/functional/callback_helpers.h"
 #import "base/test/metrics/histogram_tester.h"
 #import "components/autofill/core/browser/payments/autofill_save_card_delegate.h"
 #import "components/autofill/core/browser/payments/autofill_save_card_ui_info.h"
@@ -20,10 +21,10 @@
 #import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_ios.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/autofill_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/web/public/test/fakes/fake_web_frames_manager.h"
 #import "ios/web/public/test/fakes/fake_web_state.h"
 #import "ios/web/public/test/web_task_environment.h"
@@ -75,11 +76,10 @@ class SaveCardBottomSheetCoordinatorTest : public PlatformTest {
     [window_ addSubview:window_.rootViewController.view];
     UIView.animationsEnabled = NO;
 
-    application_commands_handler_ =
-        OCMProtocolMock(@protocol(ApplicationCommands));
+    scene_handler_ = OCMProtocolMock(@protocol(SceneCommands));
     [browser_->GetCommandDispatcher()
-        startDispatchingToTarget:application_commands_handler_
-                     forProtocol:@protocol(ApplicationCommands)];
+        startDispatchingToTarget:scene_handler_
+                     forProtocol:@protocol(SceneCommands)];
 
     autofill_commands_handler_ = OCMProtocolMock(@protocol(AutofillCommands));
     [browser_->GetCommandDispatcher()
@@ -92,7 +92,7 @@ class SaveCardBottomSheetCoordinatorTest : public PlatformTest {
   }
 
   ~SaveCardBottomSheetCoordinatorTest() override {
-    EXPECT_OCMOCK_VERIFY((id)application_commands_handler_);
+    EXPECT_OCMOCK_VERIFY((id)scene_handler_);
     EXPECT_OCMOCK_VERIFY((id)autofill_commands_handler_);
   }
 
@@ -101,7 +101,7 @@ class SaveCardBottomSheetCoordinatorTest : public PlatformTest {
   std::unique_ptr<TestProfileIOS> profile_;
   std::unique_ptr<TestBrowser> browser_;
   UIWindow* window_;
-  id<ApplicationCommands> application_commands_handler_;
+  id<SceneCommands> scene_handler_;
   id<AutofillCommands> autofill_commands_handler_;
   SaveCardBottomSheetCoordinator* coordinator_;
 };
@@ -115,7 +115,7 @@ TEST_F(SaveCardBottomSheetCoordinatorTest, OpensNewTabForLinkClicked) {
   CrURL* url = [[CrURL alloc]
       initWithNSURL:[NSURL URLWithString:@"https://example.test"]];
 
-  OCMExpect([application_commands_handler_
+  OCMExpect([scene_handler_
       openURLInNewTab:[OCMArg checkWithBlock:^(OpenNewTabCommand* command) {
         return command.URL == url.gurl;
       }]]);

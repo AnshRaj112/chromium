@@ -18,13 +18,12 @@
 #include "ui/views/view_targeter_delegate.h"
 
 namespace {
-class WebAppNonClientFrameViewChromeOSTest;
+class WebAppFrameViewChromeOSTest;
 class LocationBarViewQuietNotificationInteractiveUITest;
 }  // namespace
 
 namespace views {
 class View;
-class ViewTargeterDelegate;
 }  // namespace views
 
 class BrowserView;
@@ -33,11 +32,11 @@ class PageActionIconController;
 class PinnedToolbarActionsContainer;
 class WebAppNavigationButtonContainer;
 class WebAppToolbarButtonContainer;
+class WebAppFrameToolbarView;
 
 // A container for web app buttons in the title bar.
 class WebAppFrameToolbarView : public views::AccessiblePaneView,
-                               public ToolbarButtonProvider,
-                               public views::ViewTargeterDelegate {
+                               public ToolbarButtonProvider {
   METADATA_HEADER(WebAppFrameToolbarView, views::AccessiblePaneView)
 
  public:
@@ -64,6 +63,11 @@ class WebAppFrameToolbarView : public views::AccessiblePaneView,
                                         int available_height);
   gfx::Rect LayoutInContainer(gfx::Rect available_space);
 
+  // Determines how big the center container would be in a toolbar of
+  // `available_size` - this is the space in which elements like the title can
+  // be laid out.
+  gfx::Rect GetCenterContainerForSize(const gfx::Size& available_size) const;
+
   // Sets own bounds within the available_space.
   void LayoutForWindowControlsOverlay(gfx::Rect available_space);
 
@@ -72,7 +76,7 @@ class WebAppFrameToolbarView : public views::AccessiblePaneView,
   }
 
   // ToolbarButtonProvider:
-  ExtensionsToolbarContainer* GetExtensionsToolbarContainer() override;
+  ExtensionsToolbarDesktop* GetExtensionsToolbarDesktop() override;
   PinnedToolbarActionsContainer* GetPinnedToolbarActionsContainer() override;
   gfx::Size GetToolbarButtonSize() const override;
   views::View* GetDefaultExtensionDialogAnchorView() override;
@@ -84,16 +88,15 @@ class WebAppFrameToolbarView : public views::AccessiblePaneView,
   views::AccessiblePaneView* GetAsAccessiblePaneView() override;
   views::View* GetAnchorView(
       std::optional<actions::ActionId> action_id) override;
+  views::BubbleAnchor GetBubbleAnchor(
+      std::optional<actions::ActionId> action_id) override;
   void ZoomChangedForActiveTab(bool can_show_bubble) override;
   AvatarToolbarButton* GetAvatarToolbarButton() override;
   ToolbarButton* GetBackButton() override;
-  ReloadButton* GetReloadButton() override;
+  ReloadControl* GetReloadButton() override;
   IntentChipButton* GetIntentChipButton() override;
   ToolbarButton* GetDownloadButton() override;
-
-  // views::ViewTargeterDelegate
-  bool DoesIntersectRect(const View* target,
-                         const gfx::Rect& rect) const override;
+  WebUIToolbarWebView* GetWebUIToolbarViewForTesting() override;
 
   void OnWindowControlsOverlayEnabledChanged();
   void UpdateBorderlessModeEnabled();
@@ -113,9 +116,11 @@ class WebAppFrameToolbarView : public views::AccessiblePaneView,
   void OnThemeChanged() override;
 
  private:
+  class ViewTargeter;
+  friend class WebAppFrameToolbarViewTargeter;
   friend class ImmersiveModeControllerChromeosWebAppBrowserTest;
   friend class WebAppAshInteractiveUITest;
-  friend class WebAppNonClientFrameViewChromeOSTest;
+  friend class WebAppFrameViewChromeOSTest;
   friend class LocationBarViewQuietNotificationInteractiveUITest;
 
   views::View* GetContentSettingContainerForTesting();

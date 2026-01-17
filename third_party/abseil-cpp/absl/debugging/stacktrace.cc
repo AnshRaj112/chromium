@@ -38,6 +38,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include <algorithm>
 #include <atomic>
@@ -46,46 +47,23 @@
 #include "absl/base/config.h"
 #include "absl/base/optimization.h"
 #include "absl/base/port.h"
+#include "absl/debugging/internal/borrowed_fixup_buffer.h"
 #include "absl/debugging/internal/stacktrace_config.h"
-
-#ifdef ABSL_INTERNAL_HAVE_ALLOCA
-#error ABSL_INTERNAL_HAVE_ALLOCA cannot be directly set
-#endif
-
-#ifdef _WIN32
-#include <malloc.h>
-#define ABSL_INTERNAL_HAVE_ALLOCA 1
-#else
-#ifdef __has_include
-#if __has_include(<alloca.h>)
-#include <alloca.h>
-#define ABSL_INTERNAL_HAVE_ALLOCA 1
-#elif !defined(alloca)
-static void* alloca(size_t) noexcept { return nullptr; }
-#endif
-#endif
-#endif
-
-#ifdef ABSL_INTERNAL_HAVE_ALLOCA
-static constexpr bool kHaveAlloca = true;
-#else
-static constexpr bool kHaveAlloca = false;
-#endif
 
 #if defined(ABSL_STACKTRACE_INL_HEADER)
 #include ABSL_STACKTRACE_INL_HEADER
 #else
-# error Cannot calculate stack trace: will need to write for your environment
+#error Cannot calculate stack trace: will need to write for your environment
 
-# include "absl/debugging/internal/stacktrace_aarch64-inl.inc"
-# include "absl/debugging/internal/stacktrace_arm-inl.inc"
-# include "absl/debugging/internal/stacktrace_emscripten-inl.inc"
-# include "absl/debugging/internal/stacktrace_generic-inl.inc"
-# include "absl/debugging/internal/stacktrace_powerpc-inl.inc"
-# include "absl/debugging/internal/stacktrace_riscv-inl.inc"
-# include "absl/debugging/internal/stacktrace_unimplemented-inl.inc"
-# include "absl/debugging/internal/stacktrace_win32-inl.inc"
-# include "absl/debugging/internal/stacktrace_x86-inl.inc"
+#include "absl/debugging/internal/stacktrace_aarch64-inl.inc"
+#include "absl/debugging/internal/stacktrace_arm-inl.inc"
+#include "absl/debugging/internal/stacktrace_emscripten-inl.inc"
+#include "absl/debugging/internal/stacktrace_generic-inl.inc"
+#include "absl/debugging/internal/stacktrace_powerpc-inl.inc"
+#include "absl/debugging/internal/stacktrace_riscv-inl.inc"
+#include "absl/debugging/internal/stacktrace_unimplemented-inl.inc"
+#include "absl/debugging/internal/stacktrace_win32-inl.inc"
+#include "absl/debugging/internal/stacktrace_x86-inl.inc"
 #endif
 
 namespace absl {
@@ -99,21 +77,32 @@ template <bool IS_STACK_FRAMES, bool IS_WITH_CONTEXT>
 ABSL_ATTRIBUTE_ALWAYS_INLINE inline int Unwind(void** result, uintptr_t* frames,
                                                int* sizes, size_t max_depth,
                                                int skip_count, const void* uc,
-                                               int* min_dropped_frames) {
-  bool unwind_with_fixup = internal_stacktrace::ShouldFixUpStack();
+                                               int* min_dropped_frames,
+                                               bool unwind_with_fixup = true) {
+  unwind_with_fixup =
+      unwind_with_fixup && internal_stacktrace::ShouldFixUpStack();
+
+#ifdef _WIN32
   if (unwind_with_fixup) {
-    if constexpr (kHaveAlloca) {
-      // Some implementations of FixUpStack may need to be passed frame
-      // information from Unwind, even if the caller doesn't need that
-      // information. We allocate the necessary buffers for such implementations
-      // here.
-      if (frames == nullptr) {
-        frames = static_cast<uintptr_t*>(alloca(max_depth * sizeof(*frames)));
-      }
-      if (sizes == nullptr) {
-        sizes = static_cast<int*>(alloca(max_depth * sizeof(*sizes)));
-      }
-    }
+    // TODO(b/434184677): Fixups are flaky and not supported on Windows
+    unwind_with_fixup = false;
+#ifndef NDEBUG
+    abort();
+#endif
+  }
+#endif
+
+  // Some implementations of FixUpStack may need to be passed frame
+  // information from Unwind, even if the caller doesn't need that
+  // information. We allocate the necessary buffers for such implementations
+  // here.
+  const internal_stacktrace::BorrowedFixupBuffer fixup_buffer(
+      unwind_with_fixup ? max_depth : 0);
+  if (frames == nullptr) {
+    frames = fixup_buffer.frames();
+  }
+  if (sizes == nullptr) {
+    sizes = fixup_buffer.sizes();
   }
 
   Unwinder g = custom.load(std::memory_order_acquire);
@@ -140,6 +129,7 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE inline int Unwind(void** result, uintptr_t* frames,
   if (unwind_with_fixup) {
     internal_stacktrace::FixUpStack(result, frames, sizes, max_depth, size);
   }
+
   ABSL_BLOCK_TAIL_CALL_OPTIMIZATION();
   return static_cast<int>(size);
 }
@@ -162,6 +152,14 @@ internal_stacktrace::GetStackFramesWithContext(void** result, uintptr_t* frames,
   return Unwind<true, true>(result, frames, sizes,
                             static_cast<size_t>(max_depth), skip_count, uc,
                             min_dropped_frames);
+}
+
+ABSL_ATTRIBUTE_NOINLINE ABSL_ATTRIBUTE_NO_TAIL_CALL int
+internal_stacktrace::GetStackTraceNoFixup(void** result, int max_depth,
+                                          int skip_count) {
+  return Unwind<false, false>(result, nullptr, nullptr,
+                              static_cast<size_t>(max_depth), skip_count,
+                              nullptr, nullptr, /*unwind_with_fixup=*/false);
 }
 
 ABSL_ATTRIBUTE_NOINLINE ABSL_ATTRIBUTE_NO_TAIL_CALL int GetStackTrace(

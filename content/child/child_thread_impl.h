@@ -12,6 +12,7 @@
 #include <string>
 
 #include "base/auto_reset.h"
+#include "base/memory/memory_pressure_level.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
@@ -25,10 +26,8 @@
 #include "content/public/child/child_thread.h"
 #include "ipc/ipc.mojom.h"
 #include "ipc/ipc_listener.h"
-#include "ipc/ipc_platform_file.h"
 #include "mojo/public/cpp/bindings/associated_receiver_set.h"
 #include "mojo/public/cpp/bindings/generic_pending_receiver.h"
-#include "mojo/public/cpp/bindings/pending_associated_receiver.h"
 #include "mojo/public/cpp/bindings/shared_remote.h"
 #include "mojo/public/cpp/system/message_pipe.h"
 #include "services/tracing/public/mojom/background_tracing_agent.mojom.h"
@@ -149,11 +148,9 @@ class ChildThreadImpl : public IPC::Listener, virtual public ChildThread {
 
   bool IsInBrowserProcess() const;
 
-#if BUILDFLAG(IS_ANDROID)
   // Received memory pressure signal sent by the browser process.
   virtual void OnMemoryPressureFromBrowserReceived(
-      base::MemoryPressureListener::MemoryPressureLevel level);
-#endif
+      base::MemoryPressureLevel level);
 
  private:
   class IOThreadState;
@@ -162,7 +159,7 @@ class ChildThreadImpl : public IPC::Listener, virtual public ChildThread {
 
   // IPC message handlers.
 
-  void EnsureConnected();
+  void EnsureConnected(int connection_timeout);
 
 #if BUILDFLAG(IS_WIN)
   const mojo::Remote<mojom::FontCacheWin>& GetFontCacheWin();

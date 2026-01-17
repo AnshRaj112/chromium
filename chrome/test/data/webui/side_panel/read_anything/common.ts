@@ -3,13 +3,28 @@
 // found in the LICENSE file.
 import type {CrActionMenuElement} from '//resources/cr_elements/cr_action_menu/cr_action_menu.js';
 import type {CrLazyRenderLitElement} from '//resources/cr_elements/cr_lazy_render/cr_lazy_render_lit.js';
-import type {AppElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
-import {MetricsBrowserProxyImpl, NodeStore, playFromSelectionTimeout, ReadAnythingLogger, ToolbarEvent, VoiceLanguageController} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import type {AppElement, SettingsPrefs, SimpleActionMenuElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import {DEFAULT_SETTINGS, MetricsBrowserProxyImpl, NodeStore, playFromSelectionTimeout, ReadAloudNode, ReadAnythingLogger, ToolbarEvent, VoiceLanguageController} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import type {Segment} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import {assertEquals, assertNotDeepEquals} from 'chrome-untrusted://webui-test/chai_assert.js';
 import {MockTimer} from 'chrome-untrusted://webui-test/mock_timer.js';
 import {microtasksFinished} from 'chrome-untrusted://webui-test/test_util.js';
 
 import {TestMetricsBrowserProxy} from './test_metrics_browser_proxy.js';
+import type {TestReadAloudModelBrowserProxy} from './test_read_aloud_browser_proxy.js';
 import type {TestSpeechBrowserProxy} from './test_speech_browser_proxy.js';
+
+export const TEST_RANDOM_VALUE_SETTINGS: SettingsPrefs = {
+  letterSpacing: 101,
+  lineSpacing: 102,
+  theme: 103,
+  speechRate: 104,
+  font: 'font',
+  highlightGranularity: 105,
+  lineFocus: 106,
+  linksEnabled: true,
+  imagesEnabled: false,
+};
 
 export async function createApp(): Promise<AppElement> {
   const app = document.createElement('read-anything-app');
@@ -55,11 +70,45 @@ export function getItemsInMenu(
   return Array.from(menu.querySelectorAll<HTMLButtonElement>('.dropdown-item'));
 }
 
+function assertCheckMarkVisible(
+    checkMarks: NodeListOf<HTMLElement>, expectedIndex: number): void {
+  checkMarks.forEach((element, index) => {
+    assertEquals(
+        index === expectedIndex ? 'visible' : 'hidden',
+        element.style.visibility);
+  });
+}
+
+export function assertCheckMarksForDropdown(dropdown: HTMLElement): void {
+  const buttons =
+      dropdown.querySelectorAll<HTMLButtonElement>('.dropdown-item');
+  const checkMarks = dropdown.querySelectorAll<HTMLElement>('.check-mark');
+  assertEquals(buttons.length, checkMarks.length);
+  buttons.forEach((button, index) => {
+    button.click();
+    assertCheckMarkVisible(checkMarks, index);
+  });
+}
+
+export function assertHeadersForDropdown(
+    dropdown: SimpleActionMenuElement, shouldHaveHeaders: boolean): void {
+  const headers =
+      dropdown.$.lazyMenu.get().querySelector<HTMLElement>('.has-header-true');
+  assertEquals(shouldHaveHeaders, !!headers);
+}
+
 export function createSpeechErrorEvent(
     utterance: SpeechSynthesisUtterance,
     errorCode: SpeechSynthesisErrorCode): SpeechSynthesisErrorEvent {
   return new SpeechSynthesisErrorEvent(
       'type', {utterance: utterance, error: errorCode});
+}
+
+export function createWordBoundaryEvent(
+    utterance: SpeechSynthesisUtterance, charIndex: number,
+    charLength?: number) {
+  return new SpeechSynthesisEvent(
+      'type', {name: 'word', utterance, charIndex, charLength});
 }
 
 export function setupBasicSpeech(speech: TestSpeechBrowserProxy) {
@@ -99,34 +148,20 @@ export function createSpeechSynthesisVoice(
       overrides || {});
 }
 
-
-export function setSimpleAxTreeWithText(text: string) {
-  const axTree = {
-    rootId: 1,
-    nodes: [
-      {
-        id: 1,
-        role: 'rootWebArea',
-        htmlTag: '#document',
-        childIds: [2],
-      },
-      {id: 2, role: 'staticText', name: text},
-    ],
-  };
-  chrome.readingMode.setContentForTesting(axTree, [2]);
-}
-
-export function setSimpleNodeStoreWithText(text: string) {
+export function setContent(
+    text: string, model: TestReadAloudModelBrowserProxy): Node {
   const id = 2;
-  chrome.readingMode.getCurrentText = () => [id];
-  chrome.readingMode.getTextContent = () => text;
-  chrome.readingMode.getCurrentTextStartIndex = () => 0;
-  chrome.readingMode.getCurrentTextEndIndex = () => text.length;
-  NodeStore.getInstance().setDomNode(document.createTextNode(text), id);
+  const node = document.createTextNode(text);
+  NodeStore.getInstance().setDomNode(node, id);
+  const segments: Segment[] =
+      [{node: ReadAloudNode.create(node)!, start: 0, length: text.length}];
+  if (model) {
+    model.setCurrentTextSegments(segments);
+    model.setCurrentTextContent(text);
+  }
+  return node;
 }
 
-// Sets up the simple AX tree and node store with the given text.
-export function setSimpleTreeWithText(text: string) {
-  setSimpleAxTreeWithText(text);
-  setSimpleNodeStoreWithText(text);
+export function assertTestSettingsAreNotDefaultSettings() {
+  assertNotDeepEquals(DEFAULT_SETTINGS, TEST_RANDOM_VALUE_SETTINGS);
 }

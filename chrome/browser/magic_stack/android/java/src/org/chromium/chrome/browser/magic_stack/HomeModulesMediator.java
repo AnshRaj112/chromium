@@ -11,16 +11,17 @@ import android.os.SystemClock;
 
 import androidx.annotation.VisibleForTesting;
 
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.segmentation_platform.client_util.HomeModulesRankingHelper;
+import org.chromium.components.segmentation_platform.InputContext;
 import org.chromium.components.segmentation_platform.PredictionOptions;
 import org.chromium.ui.modelutil.MVCListAdapter;
 import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
 import org.chromium.ui.modelutil.PropertyModel;
-import org.chromium.ui.modelutil.SimpleRecyclerViewAdapter;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 /** The mediator which implements the logic to add, update and remove modules. */
 @NullMarked
@@ -42,7 +42,7 @@ public class HomeModulesMediator {
     // Freshness score was logged older than 24h are considered stale, and rejected.
     static final long FRESHNESS_THRESHOLD_MS = TimeUnit.HOURS.toMillis(24);
 
-    private final Supplier<Profile> mProfileSupplier;
+    private final MonotonicObservableSupplier<Profile> mProfileSupplier;
     private final ModelList mModel;
     private final ModuleRegistry mModuleRegistry;
     private final ModuleDelegateHost mModuleDelegateHost;
@@ -60,7 +60,7 @@ public class HomeModulesMediator {
      * An array of cached responses (data) from modules. The size of the array is the number of
      * modules to show.
      */
-    private SimpleRecyclerViewAdapter.@Nullable ListItem @Nullable [] mModuleFetchResultsCache;
+    private MVCListAdapter.@Nullable ListItem @Nullable [] mModuleFetchResultsCache;
 
     /**
      * An array of cached responses from modules to indicate whether they have data to show. There
@@ -86,7 +86,7 @@ public class HomeModulesMediator {
      * @param model The instance of {@link ModelList} of the RecyclerView.
      */
     public HomeModulesMediator(
-            Supplier<Profile> profileSupplier,
+            MonotonicObservableSupplier<Profile> profileSupplier,
             ModelList model,
             ModuleRegistry moduleRegistry,
             ModuleDelegateHost moduleDelegateHost,
@@ -101,9 +101,15 @@ public class HomeModulesMediator {
     /** Shows the magic stack with profile ready. */
     void showModules(Runnable onHomeModulesChangedCallback, ModuleDelegate moduleDelegate) {
         long segmentationServiceCallTimeMs = SystemClock.elapsedRealtime();
+        Profile profile = mProfileSupplier.get();
+        assert profile != null;
+        List<Integer> rankedModules = new ArrayList<>();
+        InputContext inputContext =
+                createInputContextForRankingAndUpdateManuallyRankedModuleList(rankedModules);
+
         HomeModulesRankingHelper.fetchModulesRank(
-                mProfileSupplier.get(),
-                mModuleRegistry.createInputContext(),
+                profile,
+                inputContext,
                 (orderedLabels) -> {
                     // It is possible that the result is received after the magic stack has been
                     // hidden, exit now.
@@ -111,18 +117,51 @@ public class HomeModulesMediator {
                         return;
                     }
                     long durationMs = SystemClock.elapsedRealtime() - segmentationServiceCallTimeMs;
+                    List<Integer> modulesToShow =
+                            getCombinedRankedModules(orderedLabels, rankedModules);
                     buildModulesAndShow(
-                            filterEnabledModuleList(orderedLabels, getFilteredEnabledModuleSet()),
+                            modulesToShow,
                             moduleDelegate,
                             onHomeModulesChangedCallback,
                             durationMs);
                 });
     }
 
+    /**
+     * Creates an InputContext for the segmentation platform, excluding manually ranked modules. The
+     * manually ranked modules will be added in manuallyRankedModules.
+     *
+     * @param manuallyRankedModules A list to which the {@link ModuleType}s of manually ranked
+     *     modules will be added.
+     * @return An {@link InputContext} containing signals from non-manually ranked modules.
+     */
+    InputContext createInputContextForRankingAndUpdateManuallyRankedModuleList(
+            List<Integer> manuallyRankedModules) {
+        InputContext inputContext = new InputContext();
+        boolean skipManuallyRankedModules = mModuleDelegateHost.getTrackingTab() != null;
+
+        for (@ModuleType int moduleType : mModuleRegistry.getAllRegisteredModuleTypes()) {
+            ModuleProviderBuilder builder = mModuleRegistry.getModuleProviderBuilder(moduleType);
+            if (builder.hasManualOrdering()) {
+                // TODO (https://crbug.com/469425754): implement ranking logic using segmentation
+                // platform.
+                if (!skipManuallyRankedModules) {
+                    manuallyRankedModules.add(moduleType);
+                }
+            } else {
+                // inputContext is only required modules that need to be ranked
+                inputContext.mergeFrom(builder.createInputContext());
+            }
+        }
+        return inputContext;
+    }
+
     /** Called to notify that a module view is created. */
     void onModuleViewCreated(@ModuleType int moduleType) {
+        Profile profile = mProfileSupplier.get();
+        assert profile != null;
         HomeModulesRankingHelper.notifyCardShown(
-                mProfileSupplier.get(), HomeModulesMetricsUtils.getModuleName(moduleType));
+                profile, HomeModulesMetricsUtils.getModuleName(moduleType));
 
         if (HomeModulesUtils.belongsToEducationalTipModule(moduleType)) {
             HomeModulesUtils.increaseImpressionCountBeforeInteraction(moduleType);
@@ -131,8 +170,10 @@ public class HomeModulesMediator {
 
     /** Called to notify that a module was clicked. */
     void onModuleClicked(@ModuleType int moduleType) {
+        Profile profile = mProfileSupplier.get();
+        assert profile != null;
         HomeModulesRankingHelper.notifyCardInteracted(
-                mProfileSupplier.get(), HomeModulesMetricsUtils.getModuleName(moduleType));
+                profile, HomeModulesMetricsUtils.getModuleName(moduleType));
 
         if (HomeModulesUtils.belongsToEducationalTipModule(moduleType)) {
             HomeModulesMetricsUtils.recordEducationalTipModuleImpressionCountBeforeInteraction(
@@ -189,7 +230,7 @@ public class HomeModulesMediator {
         cacheRanking(mModuleListToShow);
 
         mModuleResultsWaitingIndex = 0;
-        mModuleFetchResultsCache = new SimpleRecyclerViewAdapter.ListItem[mModuleListToShow.size()];
+        mModuleFetchResultsCache = new MVCListAdapter.ListItem[mModuleListToShow.size()];
         mModuleFetchResultsIndicator = new Boolean[mModuleListToShow.size()];
         mShowModuleStartTimeMs = new long[mModuleListToShow.size()];
         boolean hasModuleBuilt = false;
@@ -297,7 +338,7 @@ public class HomeModulesMediator {
             if (propertyModel != null) {
                 // This module is the highest ranking one that we are waiting for, adds its data to
                 // the RecyclerView.
-                append(new SimpleRecyclerViewAdapter.ListItem(moduleType, propertyModel));
+                append(new MVCListAdapter.ListItem(moduleType, propertyModel));
             }
             // Stores the responses based on whether the module has data or not and increases the
             // waiting index for the next highest ranking module.
@@ -311,7 +352,7 @@ public class HomeModulesMediator {
             mModuleFetchResultsIndicator[index] = propertyModel != null;
             mModuleFetchResultsCache[index] =
                     propertyModel != null
-                            ? new SimpleRecyclerViewAdapter.ListItem(moduleType, propertyModel)
+                            ? new MVCListAdapter.ListItem(moduleType, propertyModel)
                             : null;
         }
 
@@ -335,7 +376,7 @@ public class HomeModulesMediator {
             return;
         }
 
-        mModel.update(position, new SimpleRecyclerViewAdapter.ListItem(moduleType, propertyModel));
+        mModel.update(position, new MVCListAdapter.ListItem(moduleType, propertyModel));
     }
 
     /**
@@ -420,7 +461,7 @@ public class HomeModulesMediator {
      * @param item The item to add.
      */
     @VisibleForTesting
-    void append(SimpleRecyclerViewAdapter.ListItem item) {
+    void append(MVCListAdapter.ListItem item) {
         mModel.add(item);
 
         HomeModulesMetricsUtils.recordModuleBuiltPosition(
@@ -610,6 +651,24 @@ public class HomeModulesMediator {
     }
 
     /**
+     * Combines manually ranked modules with segmentation platform ranked modules.
+     *
+     * @param orderedLabels A list of module labels ordered by the segmentation platform.
+     * @param manuallyRankedModules A list of {@link ModuleType}s that have manual ordering.
+     * @return A single list with manually ranked modules first, followed by enabled modules from
+     *     orderedLabels.
+     */
+    @VisibleForTesting
+    List<Integer> getCombinedRankedModules(
+            List<String> orderedLabels, List<Integer> manuallyRankedModules) {
+        List<Integer> combinedList = new ArrayList<>(manuallyRankedModules);
+        List<Integer> filteredEnabledModules =
+                filterEnabledModuleList(orderedLabels, getFilteredEnabledModuleSet());
+        combinedList.addAll(filteredEnabledModules);
+        return combinedList;
+    }
+
+    /**
      * This function filters the mEnabledModuleSet by using heuristic logic.
      *
      * @return A set of the filtered enabled modules.
@@ -685,8 +744,7 @@ public class HomeModulesMediator {
         return mModuleTypeToRankingIndexMap;
     }
 
-    SimpleRecyclerViewAdapter.@Nullable ListItem @Nullable []
-            getModuleFetchResultsCacheForTesting() {
+    MVCListAdapter.@Nullable ListItem @Nullable [] getModuleFetchResultsCacheForTesting() {
         return mModuleFetchResultsCache;
     }
 

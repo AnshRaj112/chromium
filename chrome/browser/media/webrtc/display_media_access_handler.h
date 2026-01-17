@@ -25,6 +25,7 @@ namespace extensions {
 class Extension;
 }
 
+
 // MediaAccessHandler for getDisplayMedia API, see
 // https://w3c.github.io/mediacapture-screen-share.
 class DisplayMediaAccessHandler : public CaptureAccessHandlerBase,

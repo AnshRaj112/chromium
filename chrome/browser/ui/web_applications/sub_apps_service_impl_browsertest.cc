@@ -21,7 +21,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/browser/ui/web_applications/sub_apps_install_dialog_controller.h"
+#include "chrome/browser/ui/views/web_apps/sub_apps_install_dialog_controller.h"
 #include "chrome/browser/ui/web_applications/test/isolated_web_app_test_utils.h"
 #include "chrome/browser/ui/web_applications/web_app_browsertest_base.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_url_info.h"
@@ -31,6 +31,7 @@
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/browser/web_applications/web_app_management_type.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
@@ -50,6 +51,13 @@
 #include "third_party/blink/public/common/features.h"
 #include "url/gurl.h"
 #include "url/origin.h"
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#include "chrome/browser/web_applications/web_app_utils.h"
+#include "components/policy/core/browser/browser_policy_connector.h"
+#include "components/policy/core/common/mock_configuration_policy_provider.h"
+#include "components/policy/policy_constants.h"
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
 using blink::mojom::SubAppsService;
 using blink::mojom::SubAppsServiceAddParameters;
@@ -169,9 +177,10 @@ class SubAppsServiceImplBrowserTest : public IsolatedWebAppBrowserTestHarness {
     IsolatedWebAppUrlInfo parent_app = app->InstallChecked(profile());
     parent_app_id_ = parent_app.app_id();
 
-    EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-              provider().registrar_unsafe().GetInstallState(parent_app_id_));
-    EXPECT_TRUE(provider().registrar_unsafe().IsIsolated(parent_app_id_));
+    EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+        parent_app_id_, WebAppFilter::InstalledInOperatingSystemForTesting()));
+    EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+        parent_app_id_, WebAppFilter::IsIsolatedApp()));
     EXPECT_EQ(0ul, GetAllSubAppIds(parent_app_id_).size());
 
     return parent_app;
@@ -360,11 +369,10 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest, AddSingle) {
   webapps::AppId sub_app_id =
       GenerateSubAppIdFromPath(kSub1, iwa_frame, parent_manifest_id());
 
-  EXPECT_EQ(proto::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id));
-  EXPECT_EQ(
-      DisplayMode::kStandalone,
-      provider().registrar_unsafe().GetAppEffectiveDisplayMode(sub_app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id, WebAppFilter::OpensInDedicatedWindow()));
 
   const WebApp* sub_app = provider().registrar_unsafe().GetAppById(sub_app_id);
   EXPECT_EQ(sub_app_id, sub_app->app_id());
@@ -404,10 +412,10 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest,
   webapps::AppId sub_app_id =
       GenerateSubAppIdFromPath(kSubAppPath, iwa_frame, parent_manifest_id());
 
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id));
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(standalone_app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      standalone_app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   EXPECT_EQ(1ul, GetAllSubAppIds(parent_app_id_).size());
   EXPECT_EQ(sub_app_id, GetAllSubAppIds(parent_app_id_)[0]);
@@ -423,9 +431,10 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest,
   EXPECT_NE(sub_app_id, standalone_app_id);
 
   CallRemove({kSubAppPath});
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(sub_app_id));
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(standalone_app_id));
+  EXPECT_FALSE(
+      provider().registrar_unsafe().GetInstallState(sub_app_id).has_value());
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      standalone_app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   // Inverting the order of installations.
   webapps::AppId standalone_app_id2 = InstallPwaFromPath(kSubAppPath2);
@@ -435,10 +444,11 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest,
       {{GetURLFromPath(kSubAppPath2), SubAppsServiceResultCode::kSuccess}},
       {{kSubAppPath2, kSubAppPath2}});
 
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id2));
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(standalone_app_id2));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id2, WebAppFilter::InstalledInOperatingSystemForTesting()));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      standalone_app_id2,
+      WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   EXPECT_EQ(1ul, GetAllSubAppIds(parent_app_id_).size());
   EXPECT_EQ(sub_app_id2, GetAllSubAppIds(parent_app_id_)[0]);
@@ -455,9 +465,11 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest,
   EXPECT_NE(sub_app_id2, standalone_app_id2);
 
   CallRemove({kSubAppPath2});
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(sub_app_id2));
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(standalone_app_id2));
+  EXPECT_FALSE(
+      provider().registrar_unsafe().GetInstallState(sub_app_id2).has_value());
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      standalone_app_id2,
+      WebAppFilter::InstalledInOperatingSystemForTesting()));
 }
 
 // Add call should fail if the parent app isn't installed.
@@ -574,16 +586,14 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest, AddDoesntForceReinstall) {
       {{kSubAppPath, kSubAppPath}});
   webapps::AppId sub_app_id =
       GenerateSubAppIdFromPath(kSubAppPath, iwa_frame, parent_manifest_id());
-  EXPECT_EQ(
-      DisplayMode::kStandalone,
-      provider().registrar_unsafe().GetAppEffectiveDisplayMode(sub_app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id, WebAppFilter::OpensInDedicatedWindow()));
 
   ExpectCallAdd(
       {{GetURLFromPath(kSubAppPath), SubAppsServiceResultCode::kSuccess}},
       {{kSubAppPath, kSubAppPathMinimalUi}});
-  EXPECT_EQ(
-      DisplayMode::kStandalone,
-      provider().registrar_unsafe().GetAppEffectiveDisplayMode(sub_app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id, WebAppFilter::OpensInDedicatedWindow()));
 }
 
 // Add call should fail if calling app is already a sub app.
@@ -856,20 +866,26 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest,
   webapps::AppId sub_app_id_3 =
       GenerateSubAppIdFromPath(kSubAppPath3, iwa_frame, parent_manifest_id());
 
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id_1));
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id_2));
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id_3));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id_1, WebAppFilter::InstalledInOperatingSystemForTesting()));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id_2, WebAppFilter::InstalledInOperatingSystemForTesting()));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id_3, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   UninstallParentApp();
 
   // Verify that both parent app and sub-apps are no longer installed.
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(parent_app_id_));
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(sub_app_id_1));
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(sub_app_id_2));
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(sub_app_id_3));
+  EXPECT_FALSE(provider()
+                   .registrar_unsafe()
+                   .GetInstallState(parent_app_id_)
+                   .has_value());
+  EXPECT_FALSE(
+      provider().registrar_unsafe().GetInstallState(sub_app_id_1).has_value());
+  EXPECT_FALSE(
+      provider().registrar_unsafe().GetInstallState(sub_app_id_2).has_value());
+  EXPECT_FALSE(
+      provider().registrar_unsafe().GetInstallState(sub_app_id_3).has_value());
 }
 
 // Verify that uninstalling one source of the parent app which has multiple
@@ -898,25 +914,25 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest,
       GenerateSubAppIdFromPath(kSubAppPath, iwa_frame, parent_manifest_id());
   webapps::AppId sub_app_id_2 =
       GenerateSubAppIdFromPath(kSubAppPath2, iwa_frame, parent_manifest_id());
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id_1));
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id_2));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id_1, WebAppFilter::InstalledInOperatingSystemForTesting()));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id_2, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   UninstallParentAppBySource(WebAppManagement::kDefault);
 
   // Verify that the parent app and the sub-apps are still installed, only the
   // default install source is removed from the parent app.
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(parent_app_id_));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      parent_app_id_, WebAppFilter::InstalledInOperatingSystemForTesting()));
   EXPECT_FALSE(provider()
                    .registrar_unsafe()
                    .GetAppById(parent_app_id_)
                    ->IsPreinstalledApp());
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id_1));
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id_2));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id_1, WebAppFilter::InstalledInOperatingSystemForTesting()));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id_2, WebAppFilter::InstalledInOperatingSystemForTesting()));
 }
 
 // Verify that uninstalling an app that has a sub-app with more than one install
@@ -929,8 +945,8 @@ IN_PROC_BROWSER_TEST_F(
 
   // Install app as standalone app.
   webapps::AppId standalone_app_id = InstallPwaFromPath(kSubAppPath2);
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(standalone_app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      standalone_app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   // Add another sub-app to verify standalone app install/uninstall does not
   // affect normal sub-app uninstalls.
@@ -940,8 +956,8 @@ IN_PROC_BROWSER_TEST_F(
 
   webapps::AppId sub_app_id =
       GenerateSubAppIdFromPath(kSubAppPath, iwa_frame, parent_manifest_id());
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   // Add standalone app as sub-app.
   ExpectCallAdd(
@@ -964,11 +980,12 @@ IN_PROC_BROWSER_TEST_F(
   UninstallParentApp();
 
   // Verify that the second sub-app is uninstalled.
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(sub_app_id));
+  EXPECT_FALSE(
+      provider().registrar_unsafe().GetInstallState(sub_app_id).has_value());
 
   // Verify that previous standalone is still installed.
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(standalone_app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      standalone_app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   // Verify that there are no apps registered as parent app's sub apps.
   EXPECT_EQ(0ul, GetAllSubAppIds(parent_app_id_).size());
@@ -1080,11 +1097,11 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest,
           ->Install(profile()));
   content::RenderFrameHost* iwa_frame_2 = OpenApp(parent_app_2.app_id());
 
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(parent_app_id_));
-  EXPECT_EQ(
-      proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-      provider().registrar_unsafe().GetInstallState(parent_app_2.app_id()));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      parent_app_id_, WebAppFilter::InstalledInOperatingSystemForTesting()));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      parent_app_2.app_id(),
+      WebAppFilter::InstalledInOperatingSystemForTesting()));
   EXPECT_NE(parent_app_id_, parent_app_2.app_id());
 
   // Call Add for both IWAs.
@@ -1127,14 +1144,15 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest, RemoveOneApp) {
   webapps::AppId app_id =
       GenerateSubAppIdFromPath(kSubAppPath, iwa_frame, parent_manifest_id());
   EXPECT_EQ(1ul, GetAllSubAppIds(parent_app_id_).size());
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   EXPECT_EQ(
       SingleRemoveResultMojo(kSubAppPath, SubAppsServiceResultCode::kSuccess),
       CallRemove({kSubAppPath}));
   EXPECT_EQ(0ul, GetAllSubAppIds(parent_app_id_).size());
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(app_id));
+  EXPECT_FALSE(
+      provider().registrar_unsafe().GetInstallState(app_id).has_value());
   EXPECT_TRUE(UninstallNotificationShown());
 }
 
@@ -1167,10 +1185,16 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest, RemoveListOfApps) {
 
   webapps::ManifestId sub_app_id_1 = GetURLFromPath(kSubAppPath);
   webapps::ManifestId sub_app_id_2 = GetURLFromPath(kSubAppPath2);
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(
-      GenerateAppIdFromManifestId(sub_app_id_1, parent_manifest_id())));
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(
-      GenerateAppIdFromManifestId(sub_app_id_2, parent_manifest_id())));
+  EXPECT_FALSE(provider()
+                   .registrar_unsafe()
+                   .GetInstallState(GenerateAppIdFromManifestId(
+                       sub_app_id_1, parent_manifest_id()))
+                   .has_value());
+  EXPECT_FALSE(provider()
+                   .registrar_unsafe()
+                   .GetInstallState(GenerateAppIdFromManifestId(
+                       sub_app_id_2, parent_manifest_id()))
+                   .has_value());
 
   std::optional<message_center::Notification> uninstall_notification =
       notification_display_service_->GetNotification(
@@ -1195,13 +1219,13 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest, RemoveEmptyList) {
       {{GetURLFromPath(kSubAppPath), SubAppsServiceResultCode::kSuccess}},
       {{kSubAppPath, kSubAppPath}});
   EXPECT_EQ(1ul, GetAllSubAppIds(parent_app_id_).size());
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   CallRemove({});
   EXPECT_EQ(1ul, GetAllSubAppIds(parent_app_id_).size());
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(sub_app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      sub_app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
   EXPECT_FALSE(UninstallNotificationShown());
 }
 
@@ -1287,5 +1311,64 @@ IN_PROC_BROWSER_TEST_F(SubAppsServiceImplBrowserTest, RemoveFailWrongOrigin) {
       << "Disconnect handler not invoked.";
   EXPECT_FALSE(UninstallNotificationShown());
 }
+
+/******** Tests for policy-disabled scenarios ********/
+
+// Test class for SubApps API when WebAppInstallByUserEnabled policy is
+// disabled.
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+class SubAppsServiceImplPolicyDisabledBrowserTest
+    : public SubAppsServiceImplBrowserTest {
+ public:
+  SubAppsServiceImplPolicyDisabledBrowserTest() = default;
+  SubAppsServiceImplPolicyDisabledBrowserTest(
+      const SubAppsServiceImplPolicyDisabledBrowserTest&) = delete;
+
+  void SetUpInProcessBrowserTestFixture() override {
+    SubAppsServiceImplBrowserTest::SetUpInProcessBrowserTestFixture();
+
+    // Set up the policy provider to disable web app installs
+    policy_provider_.SetDefaultReturns(
+        /*is_initialization_complete_return=*/true,
+        /*is_first_policy_load_complete_return=*/true);
+    policy::BrowserPolicyConnector::SetPolicyProviderForTesting(
+        &policy_provider_);
+
+    // Create policy map with disabled web app user installs
+    policy::PolicyMap policies;
+    policies.Set(policy::key::kWebAppInstallByUserEnabled,
+                 policy::POLICY_LEVEL_MANDATORY, policy::POLICY_SCOPE_USER,
+                 policy::POLICY_SOURCE_ENTERPRISE_DEFAULT, base::Value(false),
+                 nullptr);
+    policy_provider_.UpdateChromePolicy(policies);
+  }
+
+ private:
+  testing::NiceMock<policy::MockConfigurationPolicyProvider> policy_provider_;
+};
+
+// Verify that the Add API fails when WebAppInstallByUserEnabled policy is
+// disabled.
+IN_PROC_BROWSER_TEST_F(SubAppsServiceImplPolicyDisabledBrowserTest,
+                       AddFailsWhenPolicyDisabled) {
+  // Verify the policy is disabled from startup
+  ASSERT_FALSE(AreWebAppsUserInstallable(
+      Profile::FromBrowserContext(browser()->profile())));
+
+  content::RenderFrameHost* iwa_frame = InstallAndOpenParentIwaApp();
+  BindRemote(iwa_frame);
+
+  EXPECT_EQ(0ul, GetAllSubAppIds(parent_app_id_).size());
+
+  // Attempt to add sub-apps should fail due to policy
+  ExpectCallAdd(
+      {{GetURLFromPath(kSubAppPath), SubAppsServiceResultCode::kFailure},
+       {GetURLFromPath(kSubAppPath2), SubAppsServiceResultCode::kFailure}},
+      {{kSubAppPath, kSubAppPath}, {kSubAppPath2, kSubAppPath2}});
+
+  // Verify no sub-apps were actually installed
+  EXPECT_EQ(0ul, GetAllSubAppIds(parent_app_id_).size());
+}
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
 }  // namespace web_app

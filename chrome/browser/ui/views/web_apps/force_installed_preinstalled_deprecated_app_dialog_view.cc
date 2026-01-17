@@ -8,10 +8,8 @@
 
 #include "ash/constants/web_app_id_constants.h"
 #include "base/auto_reset.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/ptr_util.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/no_destructor.h"
@@ -113,7 +111,7 @@ void ForceInstalledPreinstalledDeprecatedAppDialogView::CreateAndShowDialog(
   if (GetLinkConfigForTesting()) {                    // IN-TEST
     link_config = GetLinkConfigForTesting().value();  // IN-TEST
   } else {
-    CHECK(base::Contains(GetChromeAppConfigs(), extension_id));
+    CHECK(GetChromeAppConfigs().contains(extension_id));
     link_config = GetChromeAppConfigs().at(extension_id);
   }
 

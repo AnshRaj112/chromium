@@ -10,7 +10,6 @@
 #include "ash/system/video_conference/video_conference_common.h"
 #include "base/memory/raw_ptr.h"
 #include "base/unguessable_token.h"
-#include "chromeos/crosapi/mojom/video_conference.mojom-shared.h"
 #include "chromeos/crosapi/mojom/video_conference.mojom.h"
 
 namespace ash {
@@ -36,11 +35,10 @@ void VideoConferenceClientWrapper::ReturnToApp(
 
 void VideoConferenceClientWrapper::SetSystemMediaDeviceStatus(
     crosapi::mojom::VideoConferenceMediaDevice device,
-    bool disabled,
+    bool enabled,
     crosapi::mojom::VideoConferenceManagerClient::
         SetSystemMediaDeviceStatusCallback callback) {
-  cpp_client_->SetSystemMediaDeviceStatus(device, disabled,
-                                          std::move(callback));
+  cpp_client_->SetSystemMediaDeviceStatus(device, enabled, std::move(callback));
 }
 
 void VideoConferenceClientWrapper::StopAllScreenShare() {

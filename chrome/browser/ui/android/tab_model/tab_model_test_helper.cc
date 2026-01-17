@@ -17,16 +17,25 @@
 #include "base/notreached.h"
 #include "base/observer_list.h"
 #include "base/sequence_checker.h"
+#include "build/android_buildflags.h"
 #include "chrome/browser/android/tab_android.h"
 #include "chrome/browser/flags/android/chrome_session_state.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/android/tab_model/tab_model.h"
+#include "chrome/browser/ui/android/tab_model/tab_model_jni_bridge.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_list.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_observer.h"
 #include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test_utils.h"
+#include "ui/gfx/range/range.h"
 #include "url/gurl.h"
+
+// "chrome/browser/ui/browser_window" is available on desktop Android, but not
+// other Android builds.
+#if BUILDFLAG(IS_DESKTOP_ANDROID)
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"  // nogncheck
+#endif
 
 TestTabModel::TestTabModel(Profile* profile,
                            chrome::android::ActivityType activity_type)
@@ -68,9 +77,14 @@ base::android::ScopedJavaLocalRef<jobject> TestTabModel::GetJavaObject() const {
   return nullptr;
 }
 
-void TestTabModel::CreateTab(TabAndroid* parent,
-                             content::WebContents* web_contents,
-                             bool select) {}
+tabs::TabInterface* TestTabModel::CreateTab(
+    TabAndroid* parent,
+    std::unique_ptr<content::WebContents> web_contents,
+    int index,
+    TestTabModel::TabLaunchType type,
+    bool should_pin) {
+  return nullptr;
+}
 
 void TestTabModel::HandlePopupNavigation(TabAndroid* parent,
                                          NavigateParams* params) {}
@@ -134,7 +148,17 @@ int TestTabModel::GetTabCountNavigatedInTimeWindow(
 void TestTabModel::CloseTabsNavigatedInTimeWindow(const base::Time& begin_time,
                                                   const base::Time& end_time) {}
 
-void TestTabModel::OpenTab(const GURL& url, int index) {
+void TestTabModel::ActivateTab(tabs::TabHandle tab) {
+  NOTIMPLEMENTED();
+}
+
+tabs::TabInterface* TestTabModel::OpenTab(const GURL& url, int index) {
+  NOTIMPLEMENTED();
+  return nullptr;
+}
+
+void TestTabModel::SetOpenerForTab(tabs::TabHandle target,
+                                   tabs::TabHandle opener) {
   NOTIMPLEMENTED();
 }
 
@@ -142,8 +166,9 @@ void TestTabModel::DiscardTab(tabs::TabHandle tab) {
   NOTIMPLEMENTED();
 }
 
-void TestTabModel::DuplicateTab(tabs::TabHandle tab) {
+tabs::TabInterface* TestTabModel::DuplicateTab(tabs::TabHandle tab) {
   NOTIMPLEMENTED();
+  return nullptr;
 }
 
 tabs::TabInterface* TestTabModel::GetTab(int index) {
@@ -182,6 +207,40 @@ void TestTabModel::UnpinTab(tabs::TabHandle tab) {
   NOTIMPLEMENTED();
 }
 
+bool TestTabModel::ContainsTabGroup(tab_groups::TabGroupId group_id) {
+  NOTIMPLEMENTED();
+  return false;
+}
+
+std::vector<tab_groups::TabGroupId> TestTabModel::ListTabGroups() {
+  NOTIMPLEMENTED();
+  return {};
+}
+
+std::optional<tab_groups::TabGroupVisualData>
+TestTabModel::GetTabGroupVisualData(tab_groups::TabGroupId group_id) {
+  NOTIMPLEMENTED();
+  return std::nullopt;
+}
+
+gfx::Range TestTabModel::GetTabGroupTabIndices(
+    tab_groups::TabGroupId group_id) {
+  NOTIMPLEMENTED();
+  return {};
+}
+
+std::optional<tab_groups::TabGroupId> TestTabModel::CreateTabGroup(
+    const std::vector<tabs::TabHandle>& tabs) {
+  NOTIMPLEMENTED();
+  return std::nullopt;
+}
+
+void TestTabModel::SetTabGroupVisualData(
+    tab_groups::TabGroupId group_id,
+    const tab_groups::TabGroupVisualData& visual_data) {
+  NOTIMPLEMENTED();
+}
+
 std::optional<tab_groups::TabGroupId> TestTabModel::AddTabsToGroup(
     std::optional<tab_groups::TabGroupId> group_id,
     const std::set<tabs::TabHandle>& tabs) {
@@ -196,6 +255,26 @@ void TestTabModel::Ungroup(const std::set<tabs::TabHandle>& tabs) {
 void TestTabModel::MoveGroupTo(tab_groups::TabGroupId group_id, int index) {
   NOTIMPLEMENTED();
 }
+
+void TestTabModel::MoveTabToWindow(tabs::TabHandle tab,
+                                   SessionID destination_window_id,
+                                   int destination_index) {
+  NOTIMPLEMENTED();
+}
+
+void TestTabModel::MoveTabGroupToWindow(tab_groups::TabGroupId group_id,
+                                        SessionID destination_window_id,
+                                        int destination_index) {
+  NOTIMPLEMENTED();
+}
+
+#if BUILDFLAG(IS_DESKTOP_ANDROID)
+void TestTabModel::AssociateWithBrowserWindow(BrowserWindowInterface* browser) {
+  scoped_unowned_user_data_ =
+      std::make_unique<ui::ScopedUnownedUserData<TabModel>>(
+          browser->GetUnownedUserDataHost(), *this);
+}
+#endif
 
 OwningTestTabModel::OwningTestTabModel(
     Profile* profile,
@@ -292,15 +371,26 @@ void OwningTestTabModel::CloseTabAt(int index) {
   observer_list_.Notify(&TabModelObserver::TabRemoved, tab.get());
 }
 
-void OwningTestTabModel::CreateTab(TabAndroid* parent,
-                                   content::WebContents* web_contents,
-                                   bool select) {
+tabs::TabInterface* OwningTestTabModel::CreateTab(
+    TabAndroid* parent,
+    std::unique_ptr<content::WebContents> web_contents,
+    int index,
+    TestTabModel::TabLaunchType type,
+    bool should_pin) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
+  size_t insertion_index =
+      (index == TabModel::kInvalidIndex) ? owned_tabs_.size() : index;
+
+  bool is_new_tab_incognito =
+      web_contents->GetBrowserContext()->IsOffTheRecord();
+  bool select_tab = TabModelJniBridge::IsTabLaunchedInForeground(
+      type, is_new_tab_incognito, GetProfile()->IsOffTheRecord());
+
   // Take ownership of the WebContents.
-  AddTabFromWebContents(std::unique_ptr<content::WebContents>(web_contents),
-                        owned_tabs_.size(), select,
-                        TabModel::TabLaunchType::FROM_RESTORE);
+  return AddTabFromWebContents(std::move(web_contents), insertion_index,
+                               select_tab,
+                               TabModel::TabLaunchType::FROM_RESTORE);
 }
 
 bool OwningTestTabModel::IsActiveModel() const {
@@ -354,7 +444,17 @@ void OwningTestTabModel::CloseTabsNavigatedInTimeWindow(
   NOTIMPLEMENTED();
 }
 
-void OwningTestTabModel::OpenTab(const GURL& url, int index) {
+void OwningTestTabModel::ActivateTab(tabs::TabHandle tab) {
+  NOTIMPLEMENTED();
+}
+
+tabs::TabInterface* OwningTestTabModel::OpenTab(const GURL& url, int index) {
+  NOTIMPLEMENTED();
+  return nullptr;
+}
+
+void OwningTestTabModel::SetOpenerForTab(tabs::TabHandle target,
+                                         tabs::TabHandle opener) {
   NOTIMPLEMENTED();
 }
 
@@ -362,8 +462,9 @@ void OwningTestTabModel::DiscardTab(tabs::TabHandle tab) {
   NOTIMPLEMENTED();
 }
 
-void OwningTestTabModel::DuplicateTab(tabs::TabHandle tab) {
+tabs::TabInterface* OwningTestTabModel::DuplicateTab(tabs::TabHandle tab) {
   NOTIMPLEMENTED();
+  return nullptr;
 }
 
 tabs::TabInterface* OwningTestTabModel::GetTab(int index) {
@@ -402,6 +503,40 @@ void OwningTestTabModel::UnpinTab(tabs::TabHandle tab) {
   NOTIMPLEMENTED();
 }
 
+bool OwningTestTabModel::ContainsTabGroup(tab_groups::TabGroupId group_id) {
+  NOTIMPLEMENTED();
+  return false;
+}
+
+std::optional<tab_groups::TabGroupId> OwningTestTabModel::CreateTabGroup(
+    const std::vector<tabs::TabHandle>& tabs) {
+  NOTIMPLEMENTED();
+  return std::nullopt;
+}
+
+std::vector<tab_groups::TabGroupId> OwningTestTabModel::ListTabGroups() {
+  NOTIMPLEMENTED();
+  return {};
+}
+
+std::optional<tab_groups::TabGroupVisualData>
+OwningTestTabModel::GetTabGroupVisualData(tab_groups::TabGroupId group_id) {
+  NOTIMPLEMENTED();
+  return std::nullopt;
+}
+
+gfx::Range OwningTestTabModel::GetTabGroupTabIndices(
+    tab_groups::TabGroupId group_id) {
+  NOTIMPLEMENTED();
+  return {};
+}
+
+void OwningTestTabModel::SetTabGroupVisualData(
+    tab_groups::TabGroupId group_id,
+    const tab_groups::TabGroupVisualData& visual_data) {
+  NOTIMPLEMENTED();
+}
+
 std::optional<tab_groups::TabGroupId> OwningTestTabModel::AddTabsToGroup(
     std::optional<tab_groups::TabGroupId> group_id,
     const std::set<tabs::TabHandle>& tabs) {
@@ -415,6 +550,18 @@ void OwningTestTabModel::Ungroup(const std::set<tabs::TabHandle>& tabs) {
 
 void OwningTestTabModel::MoveGroupTo(tab_groups::TabGroupId group_id,
                                      int index) {
+  NOTIMPLEMENTED();
+}
+
+void OwningTestTabModel::MoveTabToWindow(tabs::TabHandle tab,
+                                         SessionID destination_window_id,
+                                         int destination_index) {
+  NOTIMPLEMENTED();
+}
+
+void OwningTestTabModel::MoveTabGroupToWindow(tab_groups::TabGroupId group_id,
+                                              SessionID destination_window_id,
+                                              int destination_index) {
   NOTIMPLEMENTED();
 }
 

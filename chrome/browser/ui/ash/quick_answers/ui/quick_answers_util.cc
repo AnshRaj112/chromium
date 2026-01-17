@@ -16,6 +16,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_id.h"
 #include "ui/views/background.h"
+#include "ui/views/border.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/separator.h"
@@ -23,6 +24,7 @@
 #include "ui/views/layout/flex_layout.h"
 #include "ui/views/layout/flex_layout_view.h"
 #include "ui/views/layout/layout_provider.h"
+#include "ui/views/metadata/view_factory.h"
 
 namespace {
 

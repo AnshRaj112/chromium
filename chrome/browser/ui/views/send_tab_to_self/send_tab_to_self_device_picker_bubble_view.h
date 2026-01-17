@@ -5,7 +5,6 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_SEND_TAB_TO_SELF_SEND_TAB_TO_SELF_DEVICE_PICKER_BUBBLE_VIEW_H_
 #define CHROME_BROWSER_UI_VIEWS_SEND_TAB_TO_SELF_SEND_TAB_TO_SELF_DEVICE_PICKER_BUBBLE_VIEW_H_
 
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -30,8 +29,8 @@ class SendTabToSelfDevicePickerBubbleView : public SendTabToSelfBubbleView {
   METADATA_HEADER(SendTabToSelfDevicePickerBubbleView, SendTabToSelfBubbleView)
 
  public:
-  // Bubble will be anchored to |anchor_view|.
-  SendTabToSelfDevicePickerBubbleView(views::View* anchor_view,
+  // Bubble will be anchored to `anchor`.
+  SendTabToSelfDevicePickerBubbleView(views::BubbleAnchor anchor,
                                       content::WebContents* web_contents);
 
   SendTabToSelfDevicePickerBubbleView(

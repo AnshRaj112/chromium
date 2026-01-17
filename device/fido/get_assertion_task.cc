@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "device/base/features.h"
 #include "device/fido/authenticator_get_assertion_response.h"
@@ -25,7 +24,7 @@ bool MayFallbackToU2fWithAppIdExtension(
     const CtapGetAssertionRequest& request) {
   bool ctap2_device_supports_u2f =
       device.device_info() &&
-      base::Contains(device.device_info()->versions, ProtocolVersion::kU2f);
+      device.device_info()->versions.contains(ProtocolVersion::kU2f);
   return request.alternative_application_parameter &&
          ctap2_device_supports_u2f && !request.allow_list.empty();
 }
@@ -41,8 +40,8 @@ bool SetResponseCredential(
     const std::vector<PublicKeyCredentialDescriptor>& allow_list) {
   if (response->credential) {
     if (!allow_list.empty() &&
-        !base::Contains(allow_list, response->credential->id,
-                        &PublicKeyCredentialDescriptor::id)) {
+        !std::ranges::contains(allow_list, response->credential->id,
+                               &PublicKeyCredentialDescriptor::id)) {
       return false;
     }
 
@@ -170,7 +169,7 @@ void GetAssertionTask::GetAssertion() {
                        weak_factory_.GetWeakPtr(), request_.allow_list),
         base::BindOnce(&ReadCTAPGetAssertionResponse,
                        device()->DeviceTransport()),
-        StringFixupPredicate);
+        StringFixupPredicate, base::BindOnce(RedactCtapGetAssertionResponse));
     sign_operation_->Start();
     return;
   }
@@ -192,7 +191,8 @@ void GetAssertionTask::GetAssertion() {
                        weak_factory_.GetWeakPtr()),
         base::BindOnce(&ReadCTAPMakeCredentialResponse,
                        device()->DeviceTransport()),
-        /*string_fixup_predicate=*/nullptr);
+        /*string_fixup_predicate=*/nullptr,
+        base::BindOnce(RedactCtapGetAssertionResponse));
     dummy_register_operation_->Start();
     return;
   }
@@ -213,7 +213,7 @@ void GetAssertionTask::GetAssertion() {
                        weak_factory_.GetWeakPtr(), request.allow_list),
         base::BindOnce(&ReadCTAPGetAssertionResponse,
                        device()->DeviceTransport()),
-        StringFixupPredicate);
+        StringFixupPredicate, base::BindOnce(RedactCtapGetAssertionResponse));
     sign_operation_->Start();
     return;
   }
@@ -229,7 +229,8 @@ void GetAssertionTask::GetAssertion() {
                          weak_factory_.GetWeakPtr()),
           base::BindOnce(&ReadCTAPGetAssertionResponse,
                          device()->DeviceTransport()),
-          /*string_fixup_predicate=*/nullptr);
+          /*string_fixup_predicate=*/nullptr,
+          base::BindOnce(RedactCtapGetAssertionResponse));
   sign_operation_->Start();
 }
 
@@ -263,7 +264,8 @@ void GetAssertionTask::HandleResponse(
                        weak_factory_.GetWeakPtr()),
         base::BindOnce(&ReadCTAPMakeCredentialResponse,
                        device()->DeviceTransport()),
-        /*string_fixup_predicate=*/nullptr);
+        /*string_fixup_predicate=*/nullptr,
+        base::BindOnce(RedactCtapGetAssertionResponse));
     dummy_register_operation_->Start();
     return;
   }
@@ -336,7 +338,8 @@ void GetAssertionTask::HandleNextResponse(
                        weak_factory_.GetWeakPtr(), num_responses),
         base::BindOnce(&ReadCTAPGetAssertionResponse,
                        device()->DeviceTransport()),
-        GetAssertionTask::StringFixupPredicate);
+        GetAssertionTask::StringFixupPredicate,
+        base::BindOnce(RedactCtapGetAssertionResponse));
     next_assertion_operation_->Start();
     return;
   }
@@ -377,7 +380,8 @@ void GetAssertionTask::HandleResponseToSilentRequest(
                        weak_factory_.GetWeakPtr(), request.allow_list),
         base::BindOnce(&ReadCTAPGetAssertionResponse,
                        device()->DeviceTransport()),
-        /*string_fixup_predicate=*/nullptr);
+        /*string_fixup_predicate=*/nullptr,
+        base::BindOnce(RedactCtapGetAssertionResponse));
     sign_operation_->Start();
     return;
   }
@@ -392,7 +396,8 @@ void GetAssertionTask::HandleResponseToSilentRequest(
                        weak_factory_.GetWeakPtr()),
         base::BindOnce(&ReadCTAPGetAssertionResponse,
                        device()->DeviceTransport()),
-        /*string_fixup_predicate=*/nullptr);
+        /*string_fixup_predicate=*/nullptr,
+        base::BindOnce(RedactCtapGetAssertionResponse));
     sign_operation_->Start();
     return;
   }
@@ -411,7 +416,8 @@ void GetAssertionTask::HandleResponseToSilentRequest(
                      weak_factory_.GetWeakPtr()),
       base::BindOnce(&ReadCTAPMakeCredentialResponse,
                      device()->DeviceTransport()),
-      /*string_fixup_predicate=*/nullptr);
+      /*string_fixup_predicate=*/nullptr,
+      base::BindOnce(RedactCtapGetAssertionResponse));
   dummy_register_operation_->Start();
 }
 

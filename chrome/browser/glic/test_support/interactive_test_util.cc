@@ -17,17 +17,29 @@ namespace glic::test {
 namespace internal {
 
 GlicFreShowingDialogObserver::GlicFreShowingDialogObserver(
-    GlicFreController* controller)
+    const GlicFreController& controller)
     : PollingStateObserver(
-          [controller]() { return controller->IsShowingDialog(); }) {}
+          [&controller]() { return controller.IsShowingDialog(); }) {}
 GlicFreShowingDialogObserver::~GlicFreShowingDialogObserver() = default;
 
 DEFINE_STATE_IDENTIFIER_VALUE(GlicFreShowingDialogObserver,
                               kGlicFreShowingDialogState);
 
 GlicWindowControllerStateObserver::GlicWindowControllerStateObserver(
-    const GlicWindowController& controller)
-    : PollingStateObserver([&controller]() { return controller.state(); }) {}
+    const GlicWindowController& controller,
+    tabs::TabInterface* tab)
+    : PollingStateObserver([&controller, tab]() {
+        if (!tab) {
+          return controller.state();
+        }
+
+        auto* instance = controller.GetInstanceForTab(tab);
+        if (instance && instance->IsShowing()) {
+          return GlicWindowController::State::kOpen;
+        } else {
+          return GlicWindowController::State::kClosed;
+        }
+      }) {}
 GlicWindowControllerStateObserver::~GlicWindowControllerStateObserver() =
     default;
 
@@ -59,6 +71,12 @@ void GlicAppStateObserver::WebUiStateChanged(mojom::WebUiState state) {
 }
 
 DEFINE_STATE_IDENTIFIER_VALUE(GlicAppStateObserver, kGlicAppState);
+
+WaitingStateObserver::WaitingStateObserver() {
+  OnStateObserverStateChanged(true);
+}
+
+WaitingStateObserver::~WaitingStateObserver() = default;
 
 WebUiStateObserver::WebUiStateObserver(Host* host) : host_(host) {
   observation_.Observe(host);

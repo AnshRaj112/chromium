@@ -29,14 +29,12 @@
 #include "components/signin/public/base/signin_prefs.h"
 #include "components/signin/public/base/signin_switches.h"
 #include "components/signin/public/identity_manager/account_info.h"
+#include "components/sync/base/features.h"
 #include "google_apis/gaia/core_account_id.h"
 #include "google_apis/gaia/gaia_id.h"
 
 using signin::PrimaryAccountChangeEvent;
 
-BASE_FEATURE(kRestorePrimaryAccountInfo,
-             "RestorePrimaryAccountInfo",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 namespace {
 
 // Registers that the sign in occurred with an explicit user action.
@@ -208,12 +206,7 @@ PrimaryAccountManager::PrimaryAccountManager(
   DCHECK(account_tracker_service_);
   ScopedPrefCommit scoped_pref_commit(client_->GetPrefs(),
                                       /*commit_on_destroy=*/false);
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
-  signin_allowed_.Init(
-      prefs::kSigninAllowed, client_->GetPrefs(),
-      base::BindRepeating(&PrimaryAccountManager::OnSigninAllowedPrefChanged,
-                          base::Unretained(this)));
-#else
+#if !BUILDFLAG(ENABLE_DICE_SUPPORT)
   scoped_pref_commit.ClearPref(prefs::kExplicitBrowserSignin);
 #endif
 
@@ -248,10 +241,6 @@ PrimaryAccountManager::PrimaryAccountManager(
                                    account_info.gaia.ToString());
       scoped_pref_commit.SetString(prefs::kGoogleServicesLastSyncingUsername,
                                    account_info.email);
-    } else if (ShouldSigninAllowedPrefAffectPrimaryAccount(
-                   pref_consented_to_sync)) {
-      SetPrimaryAccountInternal(CoreAccountInfo(), /*consented_to_sync=*/false,
-                                scoped_pref_commit);
     } else {
       SetPrimaryAccountInternal(account_info, /*consented_to_sync=*/false,
                                 scoped_pref_commit);
@@ -338,6 +327,8 @@ void PrimaryAccountManager::RegisterProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterBooleanPref(prefs::kExplicitBrowserSignin, false);
   registry->RegisterBooleanPref(
       prefs::kPrefsThemesSearchEnginesAccountStorageEnabled, false);
+  registry->RegisterBooleanPref(prefs::kPrimaryAccountSetAfterSigninMigration,
+                                false);
 }
 
 // static
@@ -429,22 +420,15 @@ PrimaryAccountManager::GetOrRestorePrimaryAccountInfoOnInitialize(
             kEmptyAccountInfo_RestoreFailedAccountIdDontMatch);
   }
 
-  if (base::FeatureList::IsEnabled(kRestorePrimaryAccountInfo)) {
-    CHECK_EQ(
-        account_id,
-        account_tracker_service_->SeedAccountInfo(
-            last_syncing_gaia_id, last_syncing_email,
-            signin_metrics::AccessPoint::kRestorePrimaryAccountOnProfileLoad));
+  CHECK_EQ(
+      account_id,
+      account_tracker_service_->SeedAccountInfo(
+          last_syncing_gaia_id, last_syncing_email,
+          signin_metrics::AccessPoint::kRestorePrimaryAccountOnProfileLoad));
 
-    return std::make_pair(account_tracker_service_->GetAccountInfo(account_id),
-                          InitializeAccountInfoState::
-                              kEmptyAccountInfo_RestoreSuccessFromLastSyncInfo);
-  } else {
-    return std::make_pair(
-        CoreAccountInfo(),
-        InitializeAccountInfoState::
-            kEmptyAccountInfo_RestoreFailedAsRestoreFeatureIsDisabled);
-  }
+  return std::make_pair(account_tracker_service_->GetAccountInfo(account_id),
+                        InitializeAccountInfoState::
+                            kEmptyAccountInfo_RestoreSuccessFromLastSyncInfo);
 }
 
 const PrimaryAccountManager::PrimaryAccount&
@@ -637,7 +621,7 @@ void PrimaryAccountManager::StartSignOut(
       base::BindOnce(&PrimaryAccountManager::OnSignoutDecisionReached,
                      base::Unretained(this), signout_source_metric,
                      remove_option),
-      signout_source_metric, HasPrimaryAccount(signin::ConsentLevel::kSync));
+      signout_source_metric);
 }
 
 void PrimaryAccountManager::OnSignoutDecisionReached(
@@ -647,22 +631,15 @@ void PrimaryAccountManager::OnSignoutDecisionReached(
   VLOG(1) << "OnSignoutDecisionReached: "
           << (signout_decision == SigninClient::SignoutDecision::ALLOW);
 
-  // |REVOKE_SYNC_DISALLOWED| implies that removing the primary account is not
-  // allowed as the sync consent is attached to the primary account. Therefore,
-  // there is no need to check |remove_option| as regardless of its value, this
-  // function will be no-op.
   bool abort_signout =
       GetPrimaryAccount().account_info.IsEmpty() ||
-      signout_decision ==
-          SigninClient::SignoutDecision::REVOKE_SYNC_DISALLOWED ||
       (remove_option == RemoveAccountsOption::kRemoveAllAccounts &&
        signout_decision ==
            SigninClient::SignoutDecision::CLEAR_PRIMARY_ACCOUNT_DISALLOWED);
 
   if (abort_signout) {
     // TODO(crbug.com/40240858): Add 'NOTREACHED()' after updating the
-    // 'SigninManager', 'Dice Response Handler',
-    // 'Lacros Profile Account Mapper'.
+    // 'SigninManager', 'Dice Response Handler'.
     VLOG(1) << "Ignoring attempt to sign out while signout disallowed";
     return;
   }
@@ -718,7 +695,7 @@ PrimaryAccountChangeEvent::State PrimaryAccountManager::GetPrimaryAccountState()
   return state;
 }
 
-void PrimaryAccountManager::ComputeExplicitBrowserSignin(
+void PrimaryAccountManager::SetExplicitBrowserSigninPrefs(
     const PrimaryAccountChangeEvent& event_details,
     ScopedPrefCommit& scoped_pref_commit) {
   switch (event_details.GetEventTypeFor(signin::ConsentLevel::kSignin)) {
@@ -736,6 +713,12 @@ void PrimaryAccountManager::ComputeExplicitBrowserSignin(
           event_details.GetSetPrimaryAccountAccessPoint().value();
       GaiaId current_gaia_id =
           event_details.GetCurrentState().primary_account.gaia;
+
+      if (base::FeatureList::IsEnabled(
+              syncer::kReplaceSyncPromosWithSignInPromos)) {
+        scoped_pref_commit.SetBoolean(
+            prefs::kPrimaryAccountSetAfterSigninMigration, true);
+      }
 
       bool is_implicit_signin =
           access_point == signin_metrics::AccessPoint::kUnknown ||
@@ -842,7 +825,7 @@ void PrimaryAccountManager::FirePrimaryAccountChanged(
 
   LogPrimaryAccountChangeMetrics(event_details);
 
-  ComputeExplicitBrowserSignin(event_details, scoped_pref_commit);
+  SetExplicitBrowserSigninPrefs(event_details, scoped_pref_commit);
 
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
   if (event_details.GetEventTypeFor(signin::ConsentLevel::kSignin) ==
@@ -888,30 +871,5 @@ void PrimaryAccountManager::OnRefreshTokensLoaded() {
       }
     }
   }
-#endif
-}
-
-void PrimaryAccountManager::OnSigninAllowedPrefChanged() {
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
-  if (ShouldSigninAllowedPrefAffectPrimaryAccount(
-          /*is_sync_consent=*/GetPrimaryAccountState().consent_level ==
-          signin::ConsentLevel::kSync)) {
-    ClearPrimaryAccount(signin_metrics::ProfileSignout::kPrefChanged);
-  }
-#endif
-}
-
-bool PrimaryAccountManager::ShouldSigninAllowedPrefAffectPrimaryAccount(
-    bool is_sync_consent) {
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
-  return !signin_allowed_.GetValue() &&
-         // If sync is enabled, we do not directly clear the primary account.
-         // This is handled by `PrimaryAccountPolicyManager`. That flow is
-         // extremely hard to follow especially for the case when the user is
-         // syncing with a managed account as in that case the whole profile
-         // needs to be deleted.
-         !is_sync_consent;
-#else
-  return false;
 #endif
 }

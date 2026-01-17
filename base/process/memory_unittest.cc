@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40284755): Remove this and spanify to fix the errors.
-#pragma allow_unsafe_buffers
-#endif
-
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "base/process/memory.h"
@@ -47,7 +42,7 @@
 #include "base/test/malloc_wrapper.h"
 #endif
 #if BUILDFLAG(IS_ANDROID)
-#include "base/android/build_info.h"
+#include "base/android/android_info.h"
 #endif
 
 #if BUILDFLAG(IS_WIN)
@@ -188,8 +183,8 @@ class OutOfMemoryDeathTest : public OutOfMemoryTest {
   // These tests don't work properly on old x86 Android; crbug.com/1181112
   bool ShouldSkipTest() {
 #if BUILDFLAG(IS_ANDROID) && defined(ARCH_CPU_X86)
-    return base::android::BuildInfo::GetInstance()->sdk_int() <
-           base::android::SDK_VERSION_NOUGAT;
+    return base::android::android_info::sdk_int() <
+           base::android::android_info::SDK_VERSION_NOUGAT;
 #else
     return false;
 #endif
@@ -699,7 +694,7 @@ TEST_F(OutOfMemoryHandledTest, UncheckedCalloc) {
   EXPECT_TRUE(ptr != nullptr);
   const char* bytes = static_cast<const char*>(ptr);
   for (size_t i = 0; i < kSafeMallocSize; ++i) {
-    EXPECT_EQ(0, bytes[i]);
+    EXPECT_EQ(0, UNSAFE_TODO(bytes[i]));
   }
   base::UncheckedFree(ptr);
 
@@ -707,13 +702,30 @@ TEST_F(OutOfMemoryHandledTest, UncheckedCalloc) {
   EXPECT_TRUE(ptr != nullptr);
   bytes = static_cast<const char*>(ptr);
   for (size_t i = 0; i < (kSafeCallocItems * kSafeCallocSize); ++i) {
-    EXPECT_EQ(0, bytes[i]);
+    EXPECT_EQ(0, UNSAFE_TODO(bytes[i]));
   }
   base::UncheckedFree(ptr);
 
   EXPECT_FALSE(base::UncheckedCalloc(1, test_size_, &ptr));
   EXPECT_TRUE(ptr == nullptr);
 }
+
+#if BUILDFLAG(IS_WIN)
+TEST_F(OutOfMemoryHandledTest, UncheckedAlignedAlloc) {
+  static constexpr size_t kAlignment = 32;
+  void* ptr;
+  EXPECT_TRUE(base::UncheckedAlignedAlloc(kSafeMallocSize, kAlignment, &ptr));
+  EXPECT_TRUE(ptr != nullptr);
+  EXPECT_TRUE(base::IsAligned(ptr, 32));
+  base::UncheckedAlignedFree(ptr);
+
+  // test_size_ is too big for the aligned case. Scale it back a bit.
+  const size_t test_size =
+      std::numeric_limits<std::ptrdiff_t>::max() - 3 * base::GetPageSize();
+  EXPECT_FALSE(base::UncheckedAlignedAlloc(test_size, kAlignment, &ptr));
+  EXPECT_TRUE(ptr == nullptr);
+}
+#endif  // BUILDFLAG(IS_WIN)
 
 #endif  // BUILDFLAG(IS_ANDROID)
 #endif  // !BUILDFLAG(IS_OPENBSD) && PA_BUILDFLAG(USE_ALLOCATOR_SHIM) &&

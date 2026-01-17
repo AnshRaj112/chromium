@@ -15,11 +15,10 @@
 #import "base/strings/sys_string_conversions.h"
 #import "components/omnibox/common/omnibox_features.h"
 #import "components/prefs/pref_service.h"
-#import "components/signin/public/base/signin_switches.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/bubble/public/in_product_help_type.h"
-#import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_collection_utils.h"
-#import "ios/chrome/browser/content_suggestions/ui_bundled/ntp_home_constant.h"
+#import "ios/chrome/browser/content_suggestions/public/ntp_home_constants.h"
+#import "ios/chrome/browser/content_suggestions/ui/content_suggestions_collection_utils.h"
 #import "ios/chrome/browser/home_customization/coordinator/home_customization_delegate.h"
 #import "ios/chrome/browser/ntp/model/new_tab_page_tab_helper.h"
 #import "ios/chrome/browser/ntp/search_engine_logo/mediator/search_engine_logo_mediator.h"
@@ -34,6 +33,7 @@
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_header_constants.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_header_view.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_header_view_controller_delegate.h"
+#import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_image_background_trait.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_mutator.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_shortcuts_handler.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_trait.h"
@@ -50,9 +50,9 @@
 #import "ios/chrome/browser/shared/ui/util/util_swift.h"
 #import "ios/chrome/browser/signin/model/authentication_service.h"
 #import "ios/chrome/browser/start_surface/ui_bundled/start_surface_features.h"
-#import "ios/chrome/browser/toolbar/ui_bundled/public/fakebox_focuser.h"
-#import "ios/chrome/browser/toolbar/ui_bundled/public/toolbar_utils.h"
-#import "ios/chrome/browser/toolbar/ui_bundled/tab_groups/ui/tab_group_indicator_view.h"
+#import "ios/chrome/browser/toolbar/legacy/ui_bundled/public/fakebox_focuser.h"
+#import "ios/chrome/browser/toolbar/legacy/ui_bundled/public/toolbar_utils.h"
+#import "ios/chrome/browser/toolbar/tab_group/ui/tab_group_indicator_view.h"
 #import "ios/chrome/common/NSString+Chromium.h"
 #import "ios/chrome/common/material_timing.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
@@ -150,22 +150,20 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
     _useNewBadgeForLensButton = useNewBadgeForLensButton;
     _useNewBadgeForCustomizationMenu = useNewBadgeForCustomizationMenu;
 
-    if (@available(iOS 17, *)) {
-      NSArray<UITrait>* traits = TraitCollectionSetForTraits(@[
-        UITraitHorizontalSizeClass.class,
-        UITraitPreferredContentSizeCategory.class,
-        UITraitUserInterfaceStyle.class
-      ]);
-      __weak __typeof(self) weakSelf = self;
-      UITraitChangeHandler handler = ^(id<UITraitEnvironment> traitEnvironment,
-                                       UITraitCollection* previousCollection) {
-        [weakSelf updateUIOnTraitChange:previousCollection];
-      };
-      [self registerForTraitChanges:traits withHandler:handler];
-      if (IsNTPBackgroundCustomizationEnabled()) {
-        [self registerForTraitChanges:@[ NewTabPageTrait.class ]
-                           withAction:@selector(applyBackgroundColors)];
-      }
+    NSArray<UITrait>* traits = TraitCollectionSetForTraits(@[
+      UITraitHorizontalSizeClass.class,
+      UITraitPreferredContentSizeCategory.class, UITraitUserInterfaceStyle.class
+    ]);
+    __weak __typeof(self) weakSelf = self;
+    UITraitChangeHandler handler = ^(id<UITraitEnvironment> traitEnvironment,
+                                     UITraitCollection* previousCollection) {
+      [weakSelf updateUIOnTraitChange:previousCollection];
+    };
+    [self registerForTraitChanges:traits withHandler:handler];
+    if (IsNTPBackgroundCustomizationEnabled()) {
+      [self registerForTraitChanges:
+                @[ NewTabPageTrait.class, NewTabPageImageBackgroundTrait.class ]
+                         withAction:@selector(applyBackgroundTheme)];
     }
   }
   return self;
@@ -180,17 +178,6 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 - (UIView*)fakeOmniboxView {
   return self.headerView.omnibox;
 }
-
-#if !defined(__IPHONE_17_0) || __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_17_0
-- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
-  [super traitCollectionDidChange:previousTraitCollection];
-  if (@available(iOS 17, *)) {
-    return;
-  }
-
-  [self updateUIOnTraitChange:previousTraitCollection];
-}
-#endif
 
 - (void)willTransitionToTraitCollection:(UITraitCollection*)newCollection
               withTransitionCoordinator:
@@ -309,7 +296,7 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 
 - (CGFloat)pinnedOffsetY {
   CGFloat offsetY = [self headerHeight];
-  if (IsSplitToolbarMode(self)) {
+  if (IsSplitToolbarMode(self) && !CanShowTabStrip(self)) {
     offsetY -= content_suggestions::FakeToolbarHeight();
   }
 
@@ -371,10 +358,9 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
                         fakeOmnibox:self.fakeOmnibox
                       andHeaderView:self.headerView];
 
-    [_searchEngineLogoMediator fetchDoodle];
     self.headerView.tintAdjustmentMode = UIViewTintAdjustmentModeNormal;
     if (IsNTPBackgroundCustomizationEnabled()) {
-      [self applyBackgroundColors];
+      [self applyBackgroundTheme];
     }
   }
 }
@@ -402,9 +388,6 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
   DCHECK(self.identityDiscButton);
   DCHECK(self.identityDiscImage);
   DCHECK(self.identityDiscButton.accessibilityLabel);
-  if (!IsSignInButtonNoAvatarEnabled()) {
-    DCHECK([self.identityDiscButton imageForState:UIControlStateNormal]);
-  }
 
   [self maybeShowSwitchAccountsIPH];
 }
@@ -586,6 +569,11 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 
   // Initially set the constraints of the identity disc.
   [self updateIdentityDiscConstraints];
+
+  if (_hasAccountError) {
+    // updateADPBadgeWithErrorFound was invoked before the view was created.
+    [self.headerView setIdentityDiscErrorBadge];
+  }
 }
 
 // Creates the Home customization menu and adds it to the header view.
@@ -593,26 +581,20 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
   UIButton* customizationMenuButton =
       [[ExtendedTouchTargetButton alloc] initWithFrame:CGRectZero];
 
-  UIImage* icon = DefaultSymbolTemplateWithPointSize(
-      kPencilSymbol,
-      IsSignInButtonNoAvatarEnabled()
-          ? ntp_home::kCustomizationMenuIconSizeWhenSignInButtonHasNoAvatar
-          : ntp_home::kCustomizationMenuIconSize);
-  [customizationMenuButton setImage:icon forState:UIControlStateNormal];
-
   if (!IsNTPBackgroundCustomizationEnabled()) {
-    UIColor* backgroundColor =
-        IsSignInButtonNoAvatarEnabled()
-            ? [[UIColor colorNamed:kSolidWhiteColor]
-                  colorWithAlphaComponent:0.75]
-            : [[UIColor colorNamed:@"fake_omnibox_solid_background_color"]
-                  colorWithAlphaComponent:0.8];
-    customizationMenuButton.backgroundColor = backgroundColor;
+    UIImage* icon = DefaultSymbolTemplateWithPointSize(
+        kPencilSymbol,
+        ntp_home::kCustomizationMenuIconSizeWhenSignInButtonHasNoAvatar);
+    [customizationMenuButton setImage:icon forState:UIControlStateNormal];
+    customizationMenuButton.backgroundColor =
+        [self defaultButtonBackgroundColor];
 
-    UIColor* tintColor = [UIColor
-        colorNamed:(IsSignInButtonNoAvatarEnabled() ? kBlue600Color
-                                                    : kTextSecondaryColor)];
+    UIColor* tintColor = [UIColor colorNamed:kBlue600Color];
     customizationMenuButton.tintColor = tintColor;
+
+    customizationMenuButton.layer.cornerRadius =
+        ntp_home::kCustomizationMenuButtonCornerRadius;
+    customizationMenuButton.clipsToBounds = YES;
   }
 
   customizationMenuButton.accessibilityIdentifier =
@@ -635,7 +617,11 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
   DCHECK(self.identityDiscAccessibilityLabel);
 
   UIButton* button = self.identityDiscButton;
-  if (!IsSignInButtonNoAvatarEnabled() || self.isSignedIn) {
+
+  button.accessibilityLabel = self.identityDiscAccessibilityLabel;
+  button.clipsToBounds = YES;
+
+  if (self.isSignedIn) {
     UIImage* image = self.identityDiscImage;
     button.configuration = nil;
     [button setImage:image forState:UIControlStateNormal];
@@ -643,39 +629,76 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
     button.imageView.layer.cornerRadius = image.size.width / 2;
     button.imageView.layer.masksToBounds = YES;
     button.layer.cornerRadius = image.size.width;
-  } else {
-    NewTabPageColorPalette* colorPalette =
-        IsNTPBackgroundCustomizationEnabled()
-            ? [self.traitCollection objectForNewTabPageTrait]
-            : nil;
-    button.layer.cornerRadius = 0;
+    return;
+  }
+
+  // Other configuration uses UIButtonConfiguration, not this property.
+  button.layer.cornerRadius = 0;
+
+  if (!IsNTPBackgroundCustomizationEnabled()) {
     [button setImage:nil forState:UIControlStateNormal];
-    UIButtonConfiguration* config =
+    UIButtonConfiguration* buttonConfiguration =
         [UIButtonConfiguration plainButtonConfiguration];
-    config.background.backgroundColor =
-        colorPalette ? colorPalette.secondaryColor
-                     : [[UIColor colorNamed:kSolidWhiteColor]
-                           colorWithAlphaComponent:0.75];
+    buttonConfiguration.background.backgroundColor =
+        [self defaultButtonBackgroundColor];
     NSDictionary* attributes = @{
       NSFontAttributeName : PreferredFontForTextStyle(
           UIFontTextStyleSubheadline, UIFontWeightSemibold,
           kIdentityDiscMaxFontSize),
-      NSForegroundColorAttributeName : colorPalette
-          ? colorPalette.tintColor
-          : [UIColor colorNamed:kBlue600Color],
+      NSForegroundColorAttributeName : [UIColor colorNamed:kBlue600Color],
     };
-    config.attributedTitle = [[NSAttributedString alloc]
+    buttonConfiguration.attributedTitle = [[NSAttributedString alloc]
         initWithString:l10n_util::GetNSString(IDS_IOS_SIGNIN_BUTTON_TEXT)
             attributes:attributes];
-    config.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
-    config.contentInsets = NSDirectionalEdgeInsetsMake(
+    buttonConfiguration.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
+    buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
         kPillVerticalPadding, kPillHorizontalPadding, kPillVerticalPadding,
         kPillHorizontalPadding);
-    button.configuration = config;
+    button.configuration = buttonConfiguration;
+    return;
   }
 
-  button.accessibilityLabel = self.identityDiscAccessibilityLabel;
-  button.clipsToBounds = YES;
+  [button setImage:nil forState:UIControlStateNormal];
+
+  UIButtonConfiguration* buttonConfiguration =
+      [UIButtonConfiguration plainButtonConfiguration];
+  UIColor* foregroundColor;
+  if ([self.traitCollection boolForNewTabPageImageBackgroundTrait]) {
+    UIVisualEffect* blurEffect =
+        [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterial];
+    UIVisualEffectView* blurBackgroundView =
+        [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+    buttonConfiguration.background.customView = blurBackgroundView;
+
+    foregroundColor = [UIColor colorNamed:kTextPrimaryColor];
+  } else {
+    NewTabPageColorPalette* colorPalette =
+        [self.traitCollection objectForNewTabPageTrait];
+    foregroundColor = colorPalette ? colorPalette.tintColor
+                                   : [UIColor colorNamed:kBlue600Color];
+
+    UIColor* backgroundColor = colorPalette
+                                   ? colorPalette.headerButtonColor
+                                   : [self defaultButtonBackgroundColor];
+    buttonConfiguration.background.backgroundColor = backgroundColor;
+  }
+
+  buttonConfiguration.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
+  buttonConfiguration.contentInsets =
+      NSDirectionalEdgeInsetsMake(kPillVerticalPadding, kPillHorizontalPadding,
+                                  kPillVerticalPadding, kPillHorizontalPadding);
+
+  NSDictionary* attributes = @{
+    NSFontAttributeName : PreferredFontForTextStyle(UIFontTextStyleSubheadline,
+                                                    UIFontWeightSemibold,
+                                                    kIdentityDiscMaxFontSize),
+    NSForegroundColorAttributeName : foregroundColor,
+  };
+  buttonConfiguration.attributedTitle = [[NSAttributedString alloc]
+      initWithString:l10n_util::GetNSString(IDS_IOS_SIGNIN_BUTTON_TEXT)
+          attributes:attributes];
+
+  button.configuration = buttonConfiguration;
 }
 
 - (void)fakeTapViewTapped {
@@ -694,10 +717,6 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
                                   self.fakeOmnibox);
 }
 
-// TODO(crbug.com/41367911) The fakebox is currently a collection of views
-// spread between NewTabPageHeaderViewController and inside
-// NewTabPageHeaderView.  Post refresh this can be coalesced into one
-// control, and the KVO highlight logic below can be removed.
 - (void)observeValueForKeyPath:(NSString*)keyPath
                       ofObject:(id)object
                         change:(NSDictionary*)change
@@ -718,20 +737,11 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
                                                     self.traitCollection)];
   self.fakeOmnibox.hidden =
       CanShowTabStrip(self) &&
-      (_searchEngineLogoState != SearchEngineLogoState::kNone);
+      (_searchEngineLogoState == SearchEngineLogoState::kNone);
   [self.headerView layoutIfNeeded];
   self.headerViewHeightConstraint.constant =
       content_suggestions::HeightForLogoHeader(_searchEngineLogoState,
                                                self.traitCollection);
-}
-
-// If Google is not the default search engine, hides the logo, doodle and
-// fakebox. Makes them appear if Google is set as default.
-- (void)updateLogoAndFakeboxDisplay {
-  if (_searchEngineLogoMediator.logoState != _searchEngineLogoState) {
-    _searchEngineLogoMediator.logoState = _searchEngineLogoState;
-    [self updateFakeboxDisplay];
-  }
 }
 
 // Ensures the state of the Voice Search button matches whether or not it's
@@ -761,7 +771,8 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
       constraintEqualToConstant:content_suggestions::FakeOmniboxHeight()];
   self.fakeOmniboxTopMarginConstraint = [logoView.bottomAnchor
       constraintEqualToAnchor:fakeOmnibox.topAnchor
-                     constant:-content_suggestions::SearchFieldTopMargin()];
+                     constant:-content_suggestions::SearchFieldTopMargin(
+                                  _searchEngineLogoState)];
   self.headerViewHeightConstraint =
       [headerView.heightAnchor constraintEqualToConstant:[self headerHeight]];
   self.headerViewHeightConstraint.active = YES;
@@ -848,6 +859,7 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 
 - (void)searchEngineLogoStateDidChange:(SearchEngineLogoState)logoState {
   _searchEngineLogoState = logoState;
+  self.headerView.logoState = logoState;
   [self.doodleHeightConstraint
       setConstant:content_suggestions::DoodleHeight(_searchEngineLogoState,
                                                     self.traitCollection)];
@@ -857,37 +869,22 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
   self.headerViewHeightConstraint.constant =
       content_suggestions::HeightForLogoHeader(_searchEngineLogoState,
                                                self.traitCollection);
+  self.fakeOmniboxTopMarginConstraint.constant =
+      -content_suggestions::SearchFieldTopMargin(_searchEngineLogoState);
   // Trigger relayout so that it immediately returns the updated content height
   // for the NTP to update content inset.
   [self.view setNeedsLayout];
   [self.view layoutIfNeeded];
   [self.commandHandler updateForHeaderSizeChange];
+  [self updateFakeboxDisplay];
 }
 
 #pragma mark - NewTabPageHeaderConsumer
-
-- (void)setSearchEngineLogoState:(SearchEngineLogoState)logoState {
-  _searchEngineLogoState = logoState;
-  [self updateLogoAndFakeboxDisplay];
-}
 
 - (void)setSearchEngineLogoMediator:
     (SearchEngineLogoMediator*)searchEngineLogoMediator {
   _searchEngineLogoMediator = searchEngineLogoMediator;
   _searchEngineLogoMediator.consumer = self;
-  [self updateLogoAndFakeboxDisplay];
-}
-
-- (void)updateLogoColor:(UIColor*)logoTintColor {
-  CHECK(_searchEngineLogoMediator);
-
-  if (logoTintColor) {
-    _searchEngineLogoMediator.usesMonochromeLogo = YES;
-    _searchEngineLogoMediator.view.tintColor = logoTintColor;
-  } else {
-    _searchEngineLogoMediator.usesMonochromeLogo = NO;
-    _searchEngineLogoMediator.view.tintColor = nil;
-  }
 }
 
 - (void)setVoiceSearchIsEnabled:(BOOL)voiceSearchIsEnabled {
@@ -924,10 +921,6 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 - (void)updateADPBadgeWithErrorFound:(BOOL)hasAccountError
                                 name:(NSString*)name
                                email:(NSString*)email {
-  CHECK(
-      base::FeatureList::IsEnabled(switches::kEnableErrorBadgeOnIdentityDisc) ||
-      base::FeatureList::IsEnabled(switches::kEnableIdentityInAuthError));
-
   if (hasAccountError == _hasAccountError) {
     return;
   }
@@ -955,10 +948,7 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
   self.isSignedIn = NO;
 
   self.identityDiscAccessibilityLabel =
-      IsSignInButtonNoAvatarEnabled()
-          ? l10n_util::GetNSString(IDS_IOS_SIGN_IN_BUTTON_ACCESSIBILITY_LABEL)
-          : l10n_util::GetNSString(
-                IDS_IOS_IDENTITY_DISC_SIGNED_OUT_ACCESSIBILITY_LABEL);
+      l10n_util::GetNSString(IDS_IOS_SIGN_IN_BUTTON_ACCESSIBILITY_LABEL);
 
   // `self.identityDiscButton` should not be updated if the view has not been
   // created yet.
@@ -1025,10 +1015,40 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 
 #pragma mark - Private
 
+// Returns the default background color for buttons based on the current
+// appearance.
+- (UIColor*)defaultButtonBackgroundColor {
+  return
+      [UIColor colorWithDynamicProvider:^UIColor*(UITraitCollection* traits) {
+        return traits.userInterfaceStyle == UIUserInterfaceStyleDark
+                   ? [UIColor colorNamed:kTabGroupFaviconBackgroundColor]
+                   : [[UIColor colorNamed:kSolidWhiteColor]
+                         colorWithAlphaComponent:0.75];
+      }];
+}
 // Sets the background using the current color palette, or defaults if none is
 // set.
-- (void)applyBackgroundColors {
+- (void)applyBackgroundTheme {
   [self updateIdentityDiscState];
+
+  BOOL hasBlurredBackground =
+      [self.traitCollection boolForNewTabPageImageBackgroundTrait];
+  if (hasBlurredBackground) {
+    _searchEngineLogoMediator.usesMonochromeLogo = YES;
+    _searchEngineLogoMediator.view.tintColor = UIColor.whiteColor;
+    return;
+  }
+
+  NewTabPageColorPalette* colorPalette =
+      [self.traitCollection objectForNewTabPageTrait];
+  if (colorPalette) {
+    _searchEngineLogoMediator.usesMonochromeLogo = YES;
+    _searchEngineLogoMediator.view.tintColor = colorPalette.tintColor;
+    return;
+  }
+
+  _searchEngineLogoMediator.usesMonochromeLogo = NO;
+  _searchEngineLogoMediator.view.tintColor = nil;
 }
 
 - (void)setIsSignedIn:(BOOL)isSignedIn {
@@ -1048,8 +1068,7 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 // Activates or deactivates the identity disc constraints based on sign-in
 // state.
 - (void)updateIdentityDiscConstraints {
-  BOOL showSignInButtonWithoutAvatar =
-      IsSignInButtonNoAvatarEnabled() && !self.isSignedIn;
+  BOOL showSignInButtonWithoutAvatar = !self.isSignedIn;
 
   CGFloat dimension = ntp_home::kIdentityAvatarDimension +
                       kMarginMultiplier * ntp_home::kHeaderIconMargin;
@@ -1058,58 +1077,49 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 
   if (showSignInButtonWithoutAvatar) {
     identityAvatarPadding *= kMarginMultiplier;
-  } else if (IsIdentityDiscAccountMenuEnabled()) {
+  } else {
     dimension += ntp_home::kHeaderIconMargin;
     identityAvatarPadding -= ntp_home::kHeaderIconMargin / 2;
   }
 
   _identityDiscWidthConstraint.constant = dimension;
   _identityDiscHeightConstraint.constant = dimension;
-  _identityDiscWidthConstraint.active = !showSignInButtonWithoutAvatar;
-  _identityDiscHeightConstraint.active = !showSignInButtonWithoutAvatar;
+  if (showSignInButtonWithoutAvatar) {
+    _identityDiscWidthConstraint.active = NO;
+    _identityDiscHeightConstraint.active = NO;
+    _identityDiscCapsuleWidthConstraint.active = YES;
+  } else {
+    _identityDiscCapsuleWidthConstraint.active = NO;
+    _identityDiscWidthConstraint.active = YES;
+    _identityDiscHeightConstraint.active = YES;
+  }
   _identityDiscTrailingConstraint.constant = -identityAvatarPadding;
-  _identityDiscCapsuleWidthConstraint.active = showSignInButtonWithoutAvatar;
 }
 
 - (void)updateIdentityDiscAccessibilityLabelWithName:(NSString*)name
                                                email:(NSString*)email {
   NSString* accountButtonLabel;
-  if (base::FeatureList::IsEnabled(kIdentityDiscAccountMenu)) {
-    // _hasAccountError is only set if the feature
-    // `kEnableErrorBadgeOnIdentityDisc` is enabled, and the primary identity
-    // has an error.
-    if (name) {
-      accountButtonLabel =
-          _hasAccountError
-              ? l10n_util::GetNSStringF(
-                    IDS_IOS_IDENTITY_DISC_WITH_NAME_AND_EMAIL_OPEN_ACCOUNT_MENU_WITH_ERROR,
-                    base::SysNSStringToUTF16(name),
-                    base::SysNSStringToUTF16(email))
-              : l10n_util::GetNSStringF(
-                    IDS_IOS_IDENTITY_DISC_WITH_NAME_AND_EMAIL_OPEN_ACCOUNT_MENU,
-                    base::SysNSStringToUTF16(name),
-                    base::SysNSStringToUTF16(email));
-    } else {
-      accountButtonLabel =
-          _hasAccountError
-              ? l10n_util::GetNSStringF(
-                    IDS_IOS_IDENTITY_DISC_WITH_EMAIL_OPEN_ACCOUNT_MENU_WITH_ERROR,
-                    base::SysNSStringToUTF16(email))
-              : l10n_util::GetNSStringF(
-                    IDS_IOS_IDENTITY_DISC_WITH_EMAIL_OPEN_ACCOUNT_MENU,
-                    base::SysNSStringToUTF16(email));
-    }
+  // `_hasAccountError` is only set if the primary identity has an error.
+  if (name) {
+    accountButtonLabel =
+        _hasAccountError
+            ? l10n_util::GetNSStringF(
+                  IDS_IOS_IDENTITY_DISC_WITH_NAME_AND_EMAIL_OPEN_ACCOUNT_MENU_WITH_ERROR,
+                  base::SysNSStringToUTF16(name),
+                  base::SysNSStringToUTF16(email))
+            : l10n_util::GetNSStringF(
+                  IDS_IOS_IDENTITY_DISC_WITH_NAME_AND_EMAIL_OPEN_ACCOUNT_MENU,
+                  base::SysNSStringToUTF16(name),
+                  base::SysNSStringToUTF16(email));
   } else {
-    // TODO(crbug.com/389915527): Update the following strings to reflect the
-    // error badge introduced with kEnableErrorBadgeOnIdentityDisc.
-    if (name) {
-      accountButtonLabel = l10n_util::GetNSStringF(
-          IDS_IOS_IDENTITY_DISC_WITH_NAME_AND_EMAIL,
-          base::SysNSStringToUTF16(name), base::SysNSStringToUTF16(email));
-    } else {
-      accountButtonLabel = l10n_util::GetNSStringF(
-          IDS_IOS_IDENTITY_DISC_WITH_EMAIL, base::SysNSStringToUTF16(email));
-    }
+    accountButtonLabel =
+        _hasAccountError
+            ? l10n_util::GetNSStringF(
+                  IDS_IOS_IDENTITY_DISC_WITH_EMAIL_OPEN_ACCOUNT_MENU_WITH_ERROR,
+                  base::SysNSStringToUTF16(email))
+            : l10n_util::GetNSStringF(
+                  IDS_IOS_IDENTITY_DISC_WITH_EMAIL_OPEN_ACCOUNT_MENU,
+                  base::SysNSStringToUTF16(email));
   }
 
   self.identityDiscAccessibilityLabel = accountButtonLabel;
@@ -1129,12 +1139,6 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
       previousTraitCollection.preferredContentSizeCategory !=
           self.traitCollection.preferredContentSizeCategory) {
     [self updateFakeboxDisplay];
-  }
-  if (previousTraitCollection.userInterfaceStyle !=
-      self.traitCollection.userInterfaceStyle) {
-    [self.headerView
-        updateButtonsForUserInterfaceStyle:self.traitCollection
-                                               .userInterfaceStyle];
   }
 }
 

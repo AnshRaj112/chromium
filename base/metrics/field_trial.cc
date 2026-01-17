@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "base/metrics/field_trial.h"
 
 #include <algorithm>
@@ -15,10 +10,12 @@
 
 #include "base/base_switches.h"
 #include "base/command_line.h"
+#include "base/compiler_specific.h"
 #include "base/containers/span.h"
 #include "base/debug/crash_logging.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
+#include "base/metrics/field_trial_entry.h"
 #include "base/metrics/field_trial_param_associator.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
@@ -202,63 +199,6 @@ FieldTrial::PickleState::PickleState() = default;
 FieldTrial::PickleState::PickleState(const PickleState& other) = default;
 
 FieldTrial::PickleState::~PickleState() = default;
-
-bool FieldTrial::FieldTrialEntry::GetState(std::string_view& trial_name,
-                                           std::string_view& group_name,
-                                           bool& overridden) const {
-  PickleIterator iter = GetPickleIterator();
-  return ReadHeader(iter, trial_name, group_name, overridden);
-}
-
-bool FieldTrial::FieldTrialEntry::GetParams(
-    std::map<std::string, std::string>* params) const {
-  PickleIterator iter = GetPickleIterator();
-  std::string_view tmp_string;
-  bool tmp_bool;
-  // Skip reading trial and group name, and overridden bit.
-  if (!ReadHeader(iter, tmp_string, tmp_string, tmp_bool)) {
-    return false;
-  }
-
-  while (true) {
-    std::string_view key;
-    std::string_view value;
-    if (!ReadStringPair(&iter, &key, &value)) {
-      return key.empty();  // Non-empty is bad: got one of a pair.
-    }
-    (*params)[std::string(key)] = std::string(value);
-  }
-}
-
-PickleIterator FieldTrial::FieldTrialEntry::GetPickleIterator() const {
-  Pickle pickle = Pickle::WithUnownedBuffer(
-      // TODO(crbug.com/40284755): FieldTrialEntry should be constructed with a
-      // span over the pickle memory.
-      UNSAFE_TODO(
-          span(GetPickledDataPtr(), checked_cast<size_t>(pickle_size))));
-  return PickleIterator(pickle);
-}
-
-bool FieldTrial::FieldTrialEntry::ReadHeader(PickleIterator& iter,
-                                             std::string_view& trial_name,
-                                             std::string_view& group_name,
-                                             bool& overridden) const {
-  return ReadStringPair(&iter, &trial_name, &group_name) &&
-         iter.ReadBool(&overridden);
-}
-
-bool FieldTrial::FieldTrialEntry::ReadStringPair(
-    PickleIterator* iter,
-    std::string_view* trial_name,
-    std::string_view* group_name) const {
-  if (!iter->ReadStringPiece(trial_name)) {
-    return false;
-  }
-  if (!iter->ReadStringPiece(group_name)) {
-    return false;
-  }
-  return true;
-}
 
 void FieldTrial::AppendGroup(const std::string& name,
                              Probability group_probability) {
@@ -681,13 +621,13 @@ std::set<std::string> FieldTrialList::GetActiveTrialsOfParentProcess() {
 
   FieldTrialAllocator* allocator = global_->field_trial_allocator_.get();
   FieldTrialAllocator::Iterator mem_iter(allocator);
-  const FieldTrial::FieldTrialEntry* entry;
-  while ((entry = mem_iter.GetNextOfObject<FieldTrial::FieldTrialEntry>()) !=
+  const internal::FieldTrialEntry* entry;
+  while ((entry = mem_iter.GetNextOfObject<internal::FieldTrialEntry>()) !=
          nullptr) {
     std::string_view trial_name;
     std::string_view group_name;
     bool is_overridden;
-    if (subtle::NoBarrier_Load(&entry->activated) &&
+    if (entry->activated.load(std::memory_order_relaxed) &&
         entry->GetState(trial_name, group_name, is_overridden)) {
       result.emplace(trial_name);
     }
@@ -939,13 +879,12 @@ bool FieldTrialList::GetParamsFromSharedMemory(
   }
 
   size_t allocated_size = 0;
-  const FieldTrial::FieldTrialEntry* entry =
-      global_->field_trial_allocator_->GetAsObject<FieldTrial::FieldTrialEntry>(
+  const internal::FieldTrialEntry* entry =
+      global_->field_trial_allocator_->GetAsObject<internal::FieldTrialEntry>(
           field_trial->ref_, &allocated_size);
   CHECK(entry);
 
-  uint64_t actual_size =
-      sizeof(FieldTrial::FieldTrialEntry) + entry->pickle_size;
+  uint64_t actual_size = sizeof(internal::FieldTrialEntry) + entry->pickle_size;
   if (allocated_size < actual_size) {
     return false;
   }
@@ -975,11 +914,11 @@ void FieldTrialList::ClearParamsFromSharedMemoryForTesting() {
   std::vector<FieldTrial::FieldTrialRef> new_refs;
 
   FieldTrial::FieldTrialRef prev_ref;
-  while ((prev_ref = mem_iter.GetNextOfType<FieldTrial::FieldTrialEntry>()) !=
+  while ((prev_ref = mem_iter.GetNextOfType<internal::FieldTrialEntry>()) !=
          FieldTrialAllocator::kReferenceNull) {
     // Get the existing field trial entry in shared memory.
-    const FieldTrial::FieldTrialEntry* prev_entry =
-        allocator->GetAsObject<FieldTrial::FieldTrialEntry>(prev_ref);
+    const internal::FieldTrialEntry* prev_entry =
+        allocator->GetAsObject<internal::FieldTrialEntry>(prev_ref);
     std::string_view trial_name;
     std::string_view group_name;
     bool is_overridden;
@@ -994,8 +933,8 @@ void FieldTrialList::ClearParamsFromSharedMemoryForTesting() {
     pickle.WriteBool(is_overridden);
 
     if (prev_entry->pickle_size == pickle.size() &&
-        memcmp(prev_entry->GetPickledDataPtr(), pickle.data(), pickle.size()) ==
-            0) {
+        UNSAFE_TODO(memcmp(prev_entry->GetPickledDataPtr(), pickle.data(),
+                           pickle.size())) == 0) {
       // If the new entry is going to be the exact same as the existing one,
       // then simply keep the existing one to avoid taking extra space in the
       // allocator. This should mean that this trial has no params.
@@ -1005,19 +944,21 @@ void FieldTrialList::ClearParamsFromSharedMemoryForTesting() {
       continue;
     }
 
-    size_t total_size = sizeof(FieldTrial::FieldTrialEntry) + pickle.size();
-    FieldTrial::FieldTrialEntry* new_entry =
-        allocator->New<FieldTrial::FieldTrialEntry>(total_size);
+    size_t total_size = sizeof(internal::FieldTrialEntry) + pickle.size();
+    internal::FieldTrialEntry* new_entry =
+        allocator->New<internal::FieldTrialEntry>(total_size);
     DCHECK(new_entry)
         << "Failed to allocate a new entry, likely because the allocator is "
            "full. Consider increasing kFieldTrialAllocationSize.";
-    subtle::NoBarrier_Store(&new_entry->activated,
-                            subtle::NoBarrier_Load(&prev_entry->activated));
+    new_entry->activated.store(
+        prev_entry->activated.load(std::memory_order_relaxed),
+        std::memory_order_relaxed);
     new_entry->pickle_size = pickle.size();
 
     // TODO(lawrencewu): Modify base::Pickle to be able to write over a section
     // in memory, so we can avoid this memcpy.
-    memcpy(new_entry->GetPickledDataPtr(), pickle.data(), pickle.size());
+    UNSAFE_TODO(
+        memcpy(new_entry->GetPickledDataPtr(), pickle.data(), pickle.size()));
 
     // Update the ref on the field trial and add it to the list to be made
     // iterable.
@@ -1028,7 +969,7 @@ void FieldTrialList::ClearParamsFromSharedMemoryForTesting() {
 
     // Mark the existing entry as unused.
     allocator->ChangeType(prev_ref, 0,
-                          FieldTrial::FieldTrialEntry::kPersistentTypeId,
+                          internal::FieldTrialEntry::kPersistentTypeId,
                           /*clear=*/false);
   }
 
@@ -1047,20 +988,6 @@ void FieldTrialList::DumpAllFieldTrialsToPersistentAllocator(
   for (const auto& registered : global_->registered_) {
     AddToAllocatorWhileLocked(allocator, registered.second);
   }
-}
-
-// static
-std::vector<const FieldTrial::FieldTrialEntry*>
-FieldTrialList::GetAllFieldTrialsFromPersistentAllocator(
-    PersistentMemoryAllocator const& allocator) {
-  std::vector<const FieldTrial::FieldTrialEntry*> entries;
-  FieldTrialAllocator::Iterator iter(&allocator);
-  const FieldTrial::FieldTrialEntry* entry;
-  while ((entry = iter.GetNextOfObject<FieldTrial::FieldTrialEntry>()) !=
-         nullptr) {
-    entries.push_back(entry);
-  }
-  return entries;
 }
 
 // static
@@ -1127,8 +1054,8 @@ bool FieldTrialList::CreateTrialsFromSharedMemoryMapping(
   FieldTrialAllocator* shalloc = global_->field_trial_allocator_.get();
   FieldTrialAllocator::Iterator mem_iter(shalloc);
 
-  const FieldTrial::FieldTrialEntry* entry;
-  while ((entry = mem_iter.GetNextOfObject<FieldTrial::FieldTrialEntry>()) !=
+  const internal::FieldTrialEntry* entry;
+  while ((entry = mem_iter.GetNextOfObject<internal::FieldTrialEntry>()) !=
          nullptr) {
     std::string_view trial_name;
     std::string_view group_name;
@@ -1141,7 +1068,7 @@ bool FieldTrialList::CreateTrialsFromSharedMemoryMapping(
     FieldTrial* trial = CreateFieldTrial(
         trial_name, group_name, /*is_low_anonymity=*/false, is_overridden);
     trial->ref_ = mem_iter.GetAsReference(entry);
-    if (subtle::NoBarrier_Load(&entry->activated)) {
+    if (entry->activated.load(std::memory_order_relaxed)) {
       // Mark the trial as "used" and notify observers, if any.
       // This is useful to ensure that field trials created in child
       // processes are properly reported in crash reports.
@@ -1215,21 +1142,21 @@ void FieldTrialList::AddToAllocatorWhileLocked(
   Pickle pickle;
   PickleFieldTrial(trial_state, &pickle);
 
-  size_t total_size = sizeof(FieldTrial::FieldTrialEntry) + pickle.size();
+  size_t total_size = sizeof(internal::FieldTrialEntry) + pickle.size();
   FieldTrial::FieldTrialRef ref = allocator->Allocate(
-      total_size, FieldTrial::FieldTrialEntry::kPersistentTypeId);
+      total_size, internal::FieldTrialEntry::kPersistentTypeId);
   if (ref == FieldTrialAllocator::kReferenceNull) {
     NOTREACHED();
   }
 
-  FieldTrial::FieldTrialEntry* entry =
-      allocator->GetAsObject<FieldTrial::FieldTrialEntry>(ref);
-  subtle::NoBarrier_Store(&entry->activated, trial_state.activated);
+  internal::FieldTrialEntry* entry =
+      allocator->GetAsObject<internal::FieldTrialEntry>(ref);
+  entry->activated.store(trial_state.activated, std::memory_order_relaxed);
   entry->pickle_size = pickle.size();
 
   // TODO(lawrencewu): Modify base::Pickle to be able to write over a section in
   // memory, so we can avoid this memcpy.
-  memcpy(entry->GetPickledDataPtr(), pickle.data(), pickle.size());
+  UNSAFE_TODO(memcpy(entry->GetPickledDataPtr(), pickle.data(), pickle.size()));
 
   allocator->MakeIterable(ref);
   field_trial->ref_ = ref;
@@ -1254,9 +1181,9 @@ void FieldTrialList::ActivateFieldTrialEntryWhileLocked(
     // It's also okay to do this even though the callee doesn't have a lock --
     // the only thing that happens on a stale read here is a slight performance
     // hit from the child re-synchronizing activation state.
-    FieldTrial::FieldTrialEntry* entry =
-        allocator->GetAsObject<FieldTrial::FieldTrialEntry>(ref);
-    subtle::NoBarrier_Store(&entry->activated, 1);
+    internal::FieldTrialEntry* entry =
+        allocator->GetAsObject<internal::FieldTrialEntry>(ref);
+    entry->activated.store(true, std::memory_order_relaxed);
   }
 }
 

@@ -21,7 +21,7 @@
 #include "ui/events/ozone/evdev/event_factory_evdev.h"
 #include "ui/events/ozone/layout/keyboard_layout_engine_manager.h"
 #include "ui/events/ozone/layout/stub/stub_keyboard_layout_engine.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/ozone/platform/cast/overlay_manager_cast.h"
 #include "ui/ozone/platform/cast/platform_window_cast.h"
 #include "ui/ozone/platform/cast/surface_factory_cast.h"
@@ -115,9 +115,9 @@ class OzonePlatformCast : public OzonePlatform {
     return std::make_unique<InputMethodMinimal>(ime_key_event_dispatcher);
   }
 
-  bool IsNativePixmapConfigSupported(gfx::BufferFormat format,
+  bool IsNativePixmapConfigSupported(viz::SharedImageFormat format,
                                      gfx::BufferUsage usage) const override {
-    return format == gfx::BufferFormat::BGRA_8888 &&
+    return format == viz::SinglePlaneFormat::kBGRA_8888 &&
            usage == gfx::BufferUsage::SCANOUT;
   }
 

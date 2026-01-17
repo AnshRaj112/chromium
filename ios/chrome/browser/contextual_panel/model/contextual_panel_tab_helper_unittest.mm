@@ -54,7 +54,9 @@ class ContextualPanelTabHelperTest : public PlatformTest {
     observer_.run_loop_ = &run_loop_;
     sample_model_ = std::make_unique<SamplePanelModel>();
 
-    std::map<ContextualPanelItemType, raw_ptr<ContextualPanelModel>> models;
+    std::map<ContextualPanelItemType,
+             raw_ptr<ContextualPanelModel, DanglingUntriaged>>
+        models;
     models.emplace(ContextualPanelItemType::SamplePanelItem,
                    sample_model_.get());
     ContextualPanelTabHelper::CreateForWebState(&web_state_, models);
@@ -120,4 +122,19 @@ TEST_F(ContextualPanelTabHelperTest,
   tester.ExpectUniqueTimeSample(
       "IOS.ContextualPanel.SamplePanelItem.ModelResponseTime", base::Seconds(0),
       1);
+}
+
+// Tests that data is only refreshed for navigations that are not same document.
+TEST_F(ContextualPanelTabHelperTest, ShouldRefreshData) {
+  // Test with a different document navigation.
+  web::FakeNavigationContext different_document_context;
+  different_document_context.SetIsSameDocument(false);
+  EXPECT_TRUE(ContextualPanelTabHelper()->ShouldRefreshData(
+      &web_state_, &different_document_context));
+
+  // Test with a same document navigation.
+  web::FakeNavigationContext same_document_context;
+  same_document_context.SetIsSameDocument(true);
+  EXPECT_FALSE(ContextualPanelTabHelper()->ShouldRefreshData(
+      &web_state_, &same_document_context));
 }

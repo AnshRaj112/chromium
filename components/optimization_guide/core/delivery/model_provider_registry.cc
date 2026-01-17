@@ -4,7 +4,6 @@
 
 #include "components/optimization_guide/core/delivery/model_provider_registry.h"
 
-#include "base/containers/contains.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "components/optimization_guide/core/delivery/model_util.h"
@@ -49,7 +48,7 @@ bool IsModelMetadataTypeOnServerAllowlist(const proto::Any& model_metadata) {
       "google.privacy.webpermissionpredictions.aiv3.v1."
       "PermissionsAiv3ModelMetadata"};
 
-  return base::Contains(*kAllowList, model_metadata.type_url());
+  return kAllowList->contains(model_metadata.type_url());
 }
 
 }  // namespace
@@ -67,6 +66,7 @@ ModelProviderRegistry::ModelRegistrationInfo::~ModelRegistrationInfo() =
 void ModelProviderRegistry::AddObserverForOptimizationTargetModel(
     proto::OptimizationTarget optimization_target,
     const std::optional<proto::Any>& model_metadata,
+    scoped_refptr<base::SequencedTaskRunner> model_task_runner,
     OptimizationTargetModelObserver* observer) {
   CHECK(!model_metadata ||
         IsModelMetadataTypeOnServerAllowlist(*model_metadata));

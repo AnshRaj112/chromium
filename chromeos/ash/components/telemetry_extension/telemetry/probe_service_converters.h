@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "base/check.h"
-#include "chromeos/ash/services/cros_healthd/public/mojom/cros_healthd_probe.mojom-forward.h"
 #include "chromeos/ash/services/cros_healthd/public/mojom/cros_healthd_probe.mojom.h"
 #include "chromeos/ash/services/cros_healthd/public/mojom/nullable_primitives.mojom-forward.h"
 #include "chromeos/crosapi/mojom/nullable_primitives.mojom-forward.h"
@@ -269,8 +268,8 @@ template <class InputT,
           class... Types,
           class OutputT = decltype(unchecked::UncheckedConvertPtr(
               std::declval<InputT>(),
-              std::declval<Types>()...)),
-          class = std::enable_if_t<std::is_default_constructible_v<OutputT>>>
+              std::declval<Types>()...))>
+  requires(std::is_default_constructible_v<OutputT>)
 OutputT ConvertProbePtr(InputT input) {
   return (!input.is_null()) ? unchecked::UncheckedConvertPtr(std::move(input))
                             : OutputT();

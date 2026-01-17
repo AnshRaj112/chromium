@@ -118,6 +118,7 @@ bufferedRendering
 captionSide
 caretAnimation
 caretColor
+caretShape
 clear
 clip
 clipPath
@@ -130,12 +131,14 @@ colorScheme
 columnCount
 columnFill
 columnGap
+columnHeight
 columnRule
 columnRuleColor
 columnRuleStyle
 columnRuleWidth
 columnSpan
 columnWidth
+columnWrap
 columns
 contain
 containIntrinsicBlockSize
@@ -201,6 +204,7 @@ fontDisplay
 fontFamily
 fontFeatureSettings
 fontKerning
+fontLanguageOverride
 fontOpticalSizing
 fontPalette
 fontSize
@@ -261,6 +265,9 @@ insetInline
 insetInlineEnd
 insetInlineStart
 interactivity
+interestDelay
+interestDelayEnd
+interestDelayStart
 interpolateSize
 isolation
 item
@@ -479,6 +486,7 @@ textEmphasisColor
 textEmphasisPosition
 textEmphasisStyle
 textIndent
+textJustify
 textOrientation
 textOverflow
 textRendering

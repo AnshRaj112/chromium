@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "base/test/scoped_feature_list.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/common/pref_names.h"
@@ -18,17 +19,27 @@
 #include "components/content_settings/core/browser/website_settings_registry.h"
 #include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/common/content_settings_types.h"
+#include "components/content_settings/core/common/features.h"
 #include "components/content_settings/core/test/content_settings_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "components/prefs/testing_pref_service.h"
 #include "content/public/test/browser_task_environment.h"
+#include "services/network/public/cpp/features.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "url/gurl.h"
 
 using ::testing::_;
 
 namespace content_settings {
+
+namespace {
+constexpr char kGeolocationMigrateDefaultValue[] =
+    "profile.default_content_setting_values.migrate_geolocation";
+
+constexpr char kLocalNetworkAccessMigrateDefaultValuePref[] =
+    "profile.default_content_setting_values.has_migrated_local_network_access";
+}
 
 class ContentSettingsDefaultProviderTest : public testing::Test {
  public:
@@ -52,8 +63,7 @@ TEST_F(ContentSettingsDefaultProviderTest, DefaultValues) {
   provider_.SetWebsiteSetting(
       ContentSettingsPattern::Wildcard(), ContentSettingsPattern::Wildcard(),
       ContentSettingsType::COOKIES, base::Value(CONTENT_SETTING_BLOCK),
-      /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      /*constraints=*/{});
   EXPECT_EQ(CONTENT_SETTING_BLOCK,
             TestUtils::GetContentSetting(&provider_, GURL(), GURL(),
                                          ContentSettingsType::COOKIES, false));
@@ -64,8 +74,7 @@ TEST_F(ContentSettingsDefaultProviderTest, DefaultValues) {
   provider_.SetWebsiteSetting(
       ContentSettingsPattern::Wildcard(), ContentSettingsPattern::Wildcard(),
       ContentSettingsType::GEOLOCATION, base::Value(CONTENT_SETTING_BLOCK),
-      /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      /*constraints=*/{});
   EXPECT_EQ(
       CONTENT_SETTING_BLOCK,
       TestUtils::GetContentSetting(&provider_, GURL(), GURL(),
@@ -90,12 +99,11 @@ TEST_F(ContentSettingsDefaultProviderTest, DefaultPermissionSettings) {
 
   base::Value block_setting = PermissionSettingToValue(
       info,
-      GeolocationSetting{PermissionOption::kAsk, PermissionOption::kDenied});
+      GeolocationSetting{PermissionOption::kDenied, PermissionOption::kDenied});
   provider_.SetWebsiteSetting(
       ContentSettingsPattern::Wildcard(), ContentSettingsPattern::Wildcard(),
       ContentSettingsType::GEOLOCATION_WITH_OPTIONS, block_setting.Clone(),
-      /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      /*constraints=*/{});
   EXPECT_EQ(block_setting,
             TestUtils::GetContentSettingValue(
                 &provider_, GURL(), GURL(),
@@ -104,8 +112,7 @@ TEST_F(ContentSettingsDefaultProviderTest, DefaultPermissionSettings) {
   provider_.SetWebsiteSetting(
       ContentSettingsPattern::Wildcard(), ContentSettingsPattern::Wildcard(),
       ContentSettingsType::GEOLOCATION_WITH_OPTIONS, base::Value(),
-      /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      /*constraints=*/{});
 
   EXPECT_EQ(default_setting,
             TestUtils::GetContentSettingValue(
@@ -124,8 +131,7 @@ TEST_F(ContentSettingsDefaultProviderTest, IgnoreNonDefaultSettings) {
       ContentSettingsPattern::FromURL(primary_url),
       ContentSettingsPattern::FromURL(secondary_url),
       ContentSettingsType::COOKIES, base::Value(CONTENT_SETTING_BLOCK),
-      /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      /*constraints=*/{});
   EXPECT_FALSE(owned);
   EXPECT_EQ(CONTENT_SETTING_ALLOW,
             TestUtils::GetContentSetting(&provider_, primary_url, secondary_url,
@@ -140,16 +146,14 @@ TEST_F(ContentSettingsDefaultProviderTest, Observer) {
   provider_.SetWebsiteSetting(
       ContentSettingsPattern::Wildcard(), ContentSettingsPattern::Wildcard(),
       ContentSettingsType::COOKIES, base::Value(CONTENT_SETTING_BLOCK),
-      /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      /*constraints=*/{});
 
   EXPECT_CALL(mock_observer,
               OnContentSettingChanged(_, _, ContentSettingsType::GEOLOCATION));
   provider_.SetWebsiteSetting(
       ContentSettingsPattern::Wildcard(), ContentSettingsPattern::Wildcard(),
       ContentSettingsType::GEOLOCATION, base::Value(CONTENT_SETTING_BLOCK),
-      /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      /*constraints=*/{});
 }
 
 TEST_F(ContentSettingsDefaultProviderTest, ObservePref) {
@@ -158,8 +162,7 @@ TEST_F(ContentSettingsDefaultProviderTest, ObservePref) {
   provider_.SetWebsiteSetting(
       ContentSettingsPattern::Wildcard(), ContentSettingsPattern::Wildcard(),
       ContentSettingsType::COOKIES, base::Value(CONTENT_SETTING_BLOCK),
-      /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      /*constraints=*/{});
   EXPECT_EQ(CONTENT_SETTING_BLOCK,
             TestUtils::GetContentSetting(&provider_, GURL(), GURL(),
                                          ContentSettingsType::COOKIES, false));
@@ -185,6 +188,12 @@ TEST_F(ContentSettingsDefaultProviderTest, DiscardObsoletePreferences) {
       "profile.default_content_setting_values.nfc";
   static const char kObsoletePrivateNetworkGuardDefaultPref[] =
       "profile.default_content_setting_values.private_network_guard";
+  static const char kObsoleteTpcdTrialDefaultPref[] =
+      "profile.default_content_setting_values.3pcd_support";
+  static const char kObsoleteTopLevelTpcdTrialDefaultPref[] =
+      "profile.default_content_setting_values.top_level_3pcd_support";
+  static const char kObsoleteTopLevelTpcdOriginTrialDefaultPref[] =
+      "profile.default_content_setting_values.top_level_3pcd_origin_trial";
 #if !BUILDFLAG(IS_ANDROID)
   static const char kMouselockPrefPath[] =
       "profile.default_content_setting_values.mouselock";
@@ -213,6 +222,11 @@ TEST_F(ContentSettingsDefaultProviderTest, DiscardObsoletePreferences) {
   prefs->SetInteger(kGeolocationPrefPath, CONTENT_SETTING_BLOCK);
   prefs->SetInteger(kObsoletePrivateNetworkGuardDefaultPref,
                     CONTENT_SETTING_BLOCK);
+  prefs->SetInteger(kObsoleteTpcdTrialDefaultPref, CONTENT_SETTING_ALLOW);
+  prefs->SetInteger(kObsoleteTopLevelTpcdTrialDefaultPref,
+                    CONTENT_SETTING_ALLOW);
+  prefs->SetInteger(kObsoleteTopLevelTpcdOriginTrialDefaultPref,
+                    CONTENT_SETTING_ALLOW);
 
   // Instantiate a new DefaultProvider; can't use |provider_| because we want to
   // test the constructor's behavior after setting the above.
@@ -221,6 +235,9 @@ TEST_F(ContentSettingsDefaultProviderTest, DiscardObsoletePreferences) {
   // Check that obsolete prefs have been deleted.
   EXPECT_FALSE(prefs->HasPrefPath(kNfcPrefPath));
   EXPECT_FALSE(prefs->HasPrefPath(kObsoletePrivateNetworkGuardDefaultPref));
+  EXPECT_FALSE(prefs->HasPrefPath(kObsoleteTpcdTrialDefaultPref));
+  EXPECT_FALSE(prefs->HasPrefPath(kObsoleteTopLevelTpcdTrialDefaultPref));
+  EXPECT_FALSE(prefs->HasPrefPath(kObsoleteTopLevelTpcdOriginTrialDefaultPref));
 #if !BUILDFLAG(IS_ANDROID)
   EXPECT_FALSE(prefs->HasPrefPath(kMouselockPrefPath));
   EXPECT_FALSE(prefs->HasPrefPath(kObsoletePluginsDefaultPref));
@@ -251,8 +268,7 @@ TEST_F(ContentSettingsDefaultProviderTest, OffTheRecord) {
   provider_.SetWebsiteSetting(
       ContentSettingsPattern::Wildcard(), ContentSettingsPattern::Wildcard(),
       ContentSettingsType::COOKIES, base::Value(CONTENT_SETTING_BLOCK),
-      /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      /*constraints=*/{});
   EXPECT_EQ(CONTENT_SETTING_BLOCK,
             TestUtils::GetContentSetting(&provider_, GURL(), GURL(),
                                          ContentSettingsType::COOKIES,
@@ -267,8 +283,7 @@ TEST_F(ContentSettingsDefaultProviderTest, OffTheRecord) {
   bool owned = otr_provider.SetWebsiteSetting(
       ContentSettingsPattern::Wildcard(), ContentSettingsPattern::Wildcard(),
       ContentSettingsType::COOKIES, base::Value(CONTENT_SETTING_ALLOW),
-      /*constraints=*/{},
-      content_settings::PartitionKey::GetDefaultForTesting());
+      /*constraints=*/{});
   EXPECT_TRUE(owned);
   EXPECT_EQ(CONTENT_SETTING_BLOCK,
             TestUtils::GetContentSetting(&provider_, GURL(), GURL(),
@@ -290,6 +305,109 @@ TEST_F(ContentSettingsDefaultProviderTest, OffTheRecord) {
 
   otr_provider.ShutdownOnUIThread();
   otr_provider2.ShutdownOnUIThread();
+}
+
+TEST_F(ContentSettingsDefaultProviderTest,
+       MigrateGeolocationDisabledToEnabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kApproximateGeolocationPermission);
+  auto* prefs = profile_.GetPrefs();
+  prefs->SetBoolean(kGeolocationMigrateDefaultValue, false);
+  prefs->SetInteger("profile.default_content_setting_values.geolocation",
+                    CONTENT_SETTING_BLOCK);
+
+  DefaultProvider provider(prefs, false, false);
+
+  GeolocationSetting expected_setting{PermissionOption::kDenied,
+                                      PermissionOption::kDenied};
+  EXPECT_EQ(PermissionSetting{expected_setting},
+            *TestUtils::GetPermissionSetting(
+                &provider, GURL(), GURL(),
+                ContentSettingsType::GEOLOCATION_WITH_OPTIONS, false));
+  EXPECT_TRUE(prefs->GetBoolean(kGeolocationMigrateDefaultValue));
+}
+
+TEST_F(ContentSettingsDefaultProviderTest,
+       MigrateGeolocationEnabledToDisabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
+      features::kApproximateGeolocationPermission);
+  auto* prefs = profile_.GetPrefs();
+  prefs->SetBoolean(kGeolocationMigrateDefaultValue, true);
+  auto* info = PermissionSettingsRegistry::GetInstance()->Get(
+      ContentSettingsType::GEOLOCATION_WITH_OPTIONS);
+  base::Value geolocation_with_options_value = PermissionSettingToValue(
+      info,
+      GeolocationSetting{PermissionOption::kDenied, PermissionOption::kDenied});
+  prefs->Set("profile.default_content_setting_values.geolocation_with_options",
+             geolocation_with_options_value);
+
+  DefaultProvider provider(prefs, false, false);
+
+  EXPECT_EQ(
+      CONTENT_SETTING_BLOCK,
+      TestUtils::GetContentSetting(&provider, GURL(), GURL(),
+                                   ContentSettingsType::GEOLOCATION, false));
+  EXPECT_FALSE(prefs->GetBoolean(kGeolocationMigrateDefaultValue));
+}
+
+TEST_F(ContentSettingsDefaultProviderTest,
+       MigrateLocalNetworkAccessDisabledToEnabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{network::features::kLocalNetworkAccessChecks,
+                            network::features::
+                                kLocalNetworkAccessChecksSplitPermissions},
+      /*disabled_features=*/{});
+  auto* prefs = profile_.GetPrefs();
+  prefs->SetBoolean(kLocalNetworkAccessMigrateDefaultValuePref, false);
+  prefs->SetInteger(
+      "profile.default_content_setting_values.local_network_access",
+      CONTENT_SETTING_BLOCK);
+
+  DefaultProvider provider(prefs, false, false);
+
+  // Migrate LOCAL_NETWORK default.
+  EXPECT_EQ(
+      CONTENT_SETTING_BLOCK,
+      TestUtils::GetContentSetting(&provider, GURL(), GURL(),
+                                   ContentSettingsType::LOCAL_NETWORK, false));
+  // Don't migrate LOOPBACK_NETWORK default.
+  EXPECT_EQ(CONTENT_SETTING_ASK,
+            TestUtils::GetContentSetting(&provider, GURL(), GURL(),
+                                         ContentSettingsType::LOOPBACK_NETWORK,
+                                         false));
+  EXPECT_TRUE(prefs->GetBoolean(kLocalNetworkAccessMigrateDefaultValuePref));
+}
+
+TEST_F(ContentSettingsDefaultProviderTest,
+       MigrateLocalNetworkAccessEnabledToDisabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{network::features::kLocalNetworkAccessChecks,
+                            network::features::
+                                kLocalNetworkAccessChecksSplitPermissions},
+      /*disabled_features=*/{});
+  auto* prefs = profile_.GetPrefs();
+  prefs->SetBoolean(kLocalNetworkAccessMigrateDefaultValuePref, true);
+  prefs->SetInteger(
+      "profile.default_content_setting_values.local_network_access",
+      CONTENT_SETTING_BLOCK);
+  prefs->SetInteger("profile.default_content_setting_values.local_network",
+                    CONTENT_SETTING_ALLOW);
+  prefs->SetInteger("profile.default_content_setting_values.loopback_network",
+                    CONTENT_SETTING_ALLOW);
+
+  DefaultProvider provider(prefs, false, false);
+
+  // Default shouldn't change.
+  EXPECT_EQ(CONTENT_SETTING_BLOCK,
+            TestUtils::GetContentSetting(
+                &provider, GURL(), GURL(),
+                ContentSettingsType::LOCAL_NETWORK_ACCESS, false));
+  // But migration bit should be false.
+  EXPECT_FALSE(prefs->GetBoolean(kGeolocationMigrateDefaultValue));
 }
 
 }  // namespace content_settings

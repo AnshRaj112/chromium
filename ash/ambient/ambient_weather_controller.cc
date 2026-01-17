@@ -22,7 +22,7 @@
 #include "base/functional/callback.h"
 #include "base/location.h"
 #include "base/memory/ptr_util.h"
-#include "chromeos/ash/components/geolocation/simple_geolocation_provider.h"
+#include "chromeos/ash/components/geolocation/system_location_provider.h"
 #include "components/account_id/account_id.h"
 #include "components/prefs/pref_service.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
@@ -88,7 +88,7 @@ AmbientWeatherController::ScopedRefresher::~ScopedRefresher() {
 }
 
 AmbientWeatherController::AmbientWeatherController(
-    SimpleGeolocationProvider* const location_permission_provider)
+    SystemLocationProvider* const location_permission_provider)
     : location_permission_provider_(location_permission_provider),
       weather_model_(std::make_unique<AmbientWeatherModel>()) {
   CHECK_NE(location_permission_provider_, nullptr);
@@ -189,9 +189,9 @@ bool AmbientWeatherController::IsGeolocationUsageAllowed() {
 bool AmbientWeatherController::IsWeatherDisabledByPolicy() {
   const auto* pref_service = GetPrefService();
   return !pref_service ||
-         !base::Contains(pref_service->GetList(
-                             prefs::kContextualGoogleIntegrationsConfiguration),
-                         prefs::kWeatherIntegrationName);
+         !pref_service
+              ->GetList(prefs::kContextualGoogleIntegrationsConfiguration)
+              .contains(prefs::kWeatherIntegrationName);
 }
 
 void AmbientWeatherController::ClearAmbientWeatherModel() {

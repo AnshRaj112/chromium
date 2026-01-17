@@ -11,7 +11,6 @@
 #include <utility>
 
 #include "base/check_deref.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "components/autofill/content/renderer/autofill_agent.h"
 #include "components/autofill/content/renderer/form_autofill_util.h"
@@ -23,8 +22,6 @@
 #include "third_party/blink/public/web/web_form_element.h"
 
 namespace autofill {
-
-using form_util::ExtractOption;
 
 namespace {
 
@@ -113,7 +110,8 @@ FormCache::UpdateFormCacheResult FormCache::UpdateFormCache(
       FormRendererId form_id = form.renderer_id();
       auto it = old_extracted_forms.find(form_id);
       if (it == old_extracted_forms.end() || !it->second ||
-          !FormData::DeepEqual(std::move(*it->second), form)) {
+          !FormData::IdenticalAndEquivalentDomElements(
+              *it->second, form, {FormFieldData::Exclusion::kValue})) {
         r.updated_forms.push_back(form);
       }
       r.removed_forms.erase(form_id);

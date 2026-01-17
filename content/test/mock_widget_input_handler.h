@@ -88,7 +88,8 @@ class MockWidgetInputHandler : public blink::mojom::WidgetInputHandler {
                          const std::vector<ui::ImeTextSpan>& ime_text_spans,
                          const gfx::Range& range,
                          int32_t start,
-                         int32_t end);
+                         int32_t end,
+                         blink::mojom::ImeState ime_state);
 
     DispatchedIMEMessage(const DispatchedIMEMessage&) = delete;
     DispatchedIMEMessage& operator=(const DispatchedIMEMessage&) = delete;
@@ -103,7 +104,8 @@ class MockWidgetInputHandler : public blink::mojom::WidgetInputHandler {
                  const std::vector<ui::ImeTextSpan>& ime_text_spans,
                  const gfx::Range& range,
                  int32_t start,
-                 int32_t end) const;
+                 int32_t end,
+                 blink::mojom::ImeState ime_state) const;
 
    private:
     std::u16string text_;
@@ -111,6 +113,7 @@ class MockWidgetInputHandler : public blink::mojom::WidgetInputHandler {
     gfx::Range range_;
     int32_t start_;
     int32_t end_;
+    blink::mojom::ImeState ime_state_;
   };
 
   // A DispatchedMessage that stores the IME compositing parameters
@@ -249,6 +252,7 @@ class MockWidgetInputHandler : public blink::mojom::WidgetInputHandler {
                          const gfx::Range& range,
                          int32_t start,
                          int32_t end,
+                         blink::mojom::ImeState ime_state,
                          ImeSetCompositionCallback callback) override;
   void ImeCommitText(const std::u16string& text,
                      const std::vector<ui::ImeTextSpan>& ime_text_spans,
@@ -260,11 +264,15 @@ class MockWidgetInputHandler : public blink::mojom::WidgetInputHandler {
   void RequestCompositionUpdates(bool immediate_request,
                                  bool monitor_request) override;
 
-  void DispatchEvent(std::unique_ptr<blink::WebCoalescedInputEvent> event,
-                     DispatchEventCallback callback) override;
+  void DispatchEvent(
+      std::unique_ptr<blink::WebCoalescedInputEvent> event,
+      std::optional<std::unique_ptr<blink::WebCoalescedInputEvent>>
+          original_event_for_gesture,
+      DispatchEventCallback callback) override;
   void DispatchNonBlockingEvent(
       std::unique_ptr<blink::WebCoalescedInputEvent> event) override;
   void WaitForInputProcessed(WaitForInputProcessedCallback callback) override;
+  void PingMainThread(PingMainThreadCallback callback) override;
 #if BUILDFLAG(IS_ANDROID)
   void AttachSynchronousCompositor(
       mojo::PendingRemote<blink::mojom::SynchronousCompositorControlHost>

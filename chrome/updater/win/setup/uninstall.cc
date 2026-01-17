@@ -11,17 +11,18 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <typeinfo>
 #include <vector>
 
 #include "base/base_paths.h"
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/logging.h"
 #include "base/path_service.h"
 #include "base/process/launch.h"
 #include "base/process/process.h"
+#include "base/strings/strcat.h"
 #include "base/strings/strcat_win.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/win/registry.h"

@@ -37,6 +37,7 @@
 #include "third_party/blink/renderer/modules/webaudio/audio_node_wiring.h"
 #include "third_party/blink/renderer/modules/webaudio/audio_param.h"
 #include "third_party/blink/renderer/modules/webaudio/base_audio_context.h"
+#include "third_party/blink/renderer/modules/webaudio/script_processor_handler.h"
 #include "third_party/blink/renderer/platform/bindings/exception_messages.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/wtf/text/strcat.h"
@@ -192,7 +193,8 @@ AudioNode* AudioNode::connect(AudioNode* destination,
   // receive?  Just disallow this.
   if (Handler().GetNodeType() ==
           AudioHandler::NodeType::kNodeTypeScriptProcessor &&
-      Handler().NumberOfOutputChannels() == 0) {
+      static_cast<ScriptProcessorHandler&>(Handler())
+          .NumberOfOutputChannels() == 0) {
     exception_state.ThrowDOMException(DOMExceptionCode::kInvalidAccessError,
                                       "cannot connect a ScriptProcessorNode "
                                       "with 0 output channels to any "
@@ -621,9 +623,9 @@ void AudioNode::DidAddOutput(unsigned number_of_outputs) {
 
 void AudioNode::SendLogMessage(const char* const function_name,
                                const String& message) {
-  WebRtcLogMessage(
-      String::Format("[WA]AN::%s %s", function_name, message.Utf8().c_str())
-          .Utf8());
+  WebRtcLogMessage(UNSAFE_TODO(String::Format("[WA]AN::%s %s", function_name,
+                                              message.Utf8().c_str()))
+                       .Utf8());
 }
 
 }  // namespace blink

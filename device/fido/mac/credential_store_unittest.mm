@@ -10,11 +10,10 @@
 #include <optional>
 
 #include "base/apple/foundation_util.h"
-#include "base/mac/mac_util.h"
 #include "crypto/apple/scoped_fake_keychain_v2.h"
 #include "device/fido/mac/authenticator_config.h"
 #include "device/fido/mac/credential_store.h"
-#include "device/fido/public_key_credential_user_entity.h"
+#include "device/fido/public/public_key_credential_user_entity.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -130,14 +129,6 @@ TEST_F(CredentialStoreTest,
 // credentials with IDs that have an old metadata version.
 TEST_F(CredentialStoreTest,
        FindCredentialsFromCredentialDescriptorList_LegacyCredentials) {
-#if BUILDFLAG(IS_MAC)
-  // See https://crbug.com/354937434 .
-  if (base::mac::MacOSMajorVersion() == 15 ||
-      base::mac::MacOSMajorVersion() == 26) {
-    GTEST_SKIP() << "Disabled on macOS Sequoia and Tahoe.";
-  }
-#endif
-
   std::vector<Credential> credentials;
   for (const auto version :
        {CredentialMetadata::Version::kV0, CredentialMetadata::Version::kV1,

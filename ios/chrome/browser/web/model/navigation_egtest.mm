@@ -20,7 +20,6 @@ using base::test::ios::kWaitForUIElementTimeout;
 using chrome_test_util::BackButton;
 using chrome_test_util::ForwardButton;
 using chrome_test_util::NTPCollectionView;
-using chrome_test_util::OmniboxText;
 
 namespace {
 
@@ -55,8 +54,8 @@ NSString* const kGoBackID = @"go-back";
 NSString* const kGoBackTwoID = @"go-back-2";
 
 // URLs and labels for testWindowLocation* tests.
-NSString* kHashChangeWithHistoryLabel = @"hashChangedWithHistory";
-NSString* kHashChangeWithoutHistoryLabel = @"hashChangedWithoutHistory";
+NSString* const kHashChangeWithHistoryLabel = @"hashChangedWithHistory";
+NSString* const kHashChangeWithoutHistoryLabel = @"hashChangedWithoutHistory";
 const char kPage1URL[] = "/page1/";
 const char kHashChangedWithHistoryURL[] = "/page1/#hashChangedWithHistory";
 const char kHashChangedWithoutHistoryURL[] =
@@ -120,32 +119,6 @@ std::unique_ptr<net::test_server::HttpResponse> WindowLocationHashHandlers(
   }
   http_response->set_content(kHashChangedHTML);
   return std::move(http_response);
-}
-
-// This works reasonably well on iOS26, although sometimes the swipe doesn't
-// take, so retry a few times. This does not work on <iOS26.
-void SwipeWebInDirection(GREYDirection direction) {
-  auto block = ^BOOL {
-    NSInteger index = [ChromeEarlGrey navigationBackListItemsCount];
-    XCUIApplication* app = [[XCUIApplication alloc] init];
-    XCUIElement* view = [app.scrollViews elementBoundByIndex:0];
-    if (direction == kGREYDirectionLeft) {
-      [view swipeRightWithVelocity:XCUIGestureVelocityFast];
-    } else {
-      [view swipeLeftWithVelocity:XCUIGestureVelocityFast];
-    }
-    GREYWaitForAppToIdle(@"App failed to idle");
-    NSInteger new_index = [ChromeEarlGrey navigationBackListItemsCount];
-    return index != new_index;
-  };
-
-  NSString* errorString =
-      [NSString stringWithFormat:@"Waiting to swipe %d", (int)direction];
-  GREYCondition* SwipeInDirection = [GREYCondition conditionWithName:errorString
-                                                               block:block];
-  GREYAssertTrue(
-      [SwipeInDirection waitWithTimeout:base::Seconds(45).InSecondsF()],
-      @"Failed to swipe to navigate");
 }
 
 }  // namespace
@@ -246,14 +219,12 @@ void SwipeWebInDirection(GREYDirection direction) {
   // Tap button to go back 3 pages.
   [ChromeEarlGrey tapWebStateElementWithID:@"goBack3"];
   [ChromeEarlGrey waitForWebStateContainingText:kOnLoadText];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(firstURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:firstURL];
 
   // Tap button to go forward 2 pages.
   [ChromeEarlGrey tapWebStateElementWithID:kGoTwoID];
   [ChromeEarlGrey waitForWebStateContainingText:"pony"];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(thirdURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:thirdURL];
 }
 
 // Tests that calls to window.history.go() that span multiple documents causes
@@ -295,14 +266,12 @@ void SwipeWebInDirection(GREYDirection direction) {
   // Tap the back button in the HTML and verify the first URL is loaded.
   [ChromeEarlGrey tapWebStateElementWithID:kGoBackID];
   [ChromeEarlGrey waitForWebStateContainingText:"pony"];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(firstURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:firstURL];
 
   // Tap the forward button in the toolbar and verify the second URL is loaded.
   [[EarlGrey selectElementWithMatcher:ForwardButton()]
       performAction:grey_tap()];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(secondURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:secondURL];
 }
 
 // Tests going back via back button then forward via history.forward().
@@ -320,14 +289,12 @@ void SwipeWebInDirection(GREYDirection direction) {
   // is loaded.
   [[EarlGrey selectElementWithMatcher:BackButton()] performAction:grey_tap()];
   [ChromeEarlGrey waitForWebStateContainingText:kOnLoadText];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(firstURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:firstURL];
 
   // Tap the forward button in the HTML and verify the second URL is loaded.
   [ChromeEarlGrey tapWebStateElementWithID:kGoForwardID];
   [ChromeEarlGrey waitForWebStateContainingText:"pony"];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(secondURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:secondURL];
 
   // Verify that the forward button is visible but not enabled.
   id<GREYMatcher> disabledForwardButton =
@@ -377,10 +344,7 @@ void SwipeWebInDirection(GREYDirection direction) {
   std::string backHashChangeContent = "backHashChange";
   [self addHashChangeListenerWithContent:backHashChangeContent];
   [[EarlGrey selectElementWithMatcher:BackButton()] performAction:grey_tap()];
-  const std::string page1OmniboxText =
-      net::GetContentAndFragmentForUrl(page1URL);
-  [[EarlGrey selectElementWithMatcher:OmniboxText(page1OmniboxText)]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:page1URL];
   [ChromeEarlGrey waitForWebStateContainingText:backHashChangeContent];
 
   // Navigate forward to the new URL. This should fire a hashchange event.
@@ -388,11 +352,7 @@ void SwipeWebInDirection(GREYDirection direction) {
   [self addHashChangeListenerWithContent:forwardHashChangeContent];
   [[EarlGrey selectElementWithMatcher:ForwardButton()]
       performAction:grey_tap()];
-  const std::string hashChangedWithHistoryOmniboxText =
-      net::GetContentAndFragmentForUrl(hashChangedWithHistoryURL);
-  [[EarlGrey
-      selectElementWithMatcher:OmniboxText(hashChangedWithHistoryOmniboxText)]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:hashChangedWithHistoryURL];
   [ChromeEarlGrey waitForWebStateContainingText:forwardHashChangeContent];
 
   // Load a hash URL directly. This shouldn't fire a hashchange event.
@@ -418,26 +378,16 @@ void SwipeWebInDirection(GREYDirection direction) {
 
   // Tap link to replace the location value.
   [ChromeEarlGrey tapWebStateElementWithID:kHashChangeWithoutHistoryLabel];
-  const std::string hashChangedWithoutHistoryOmniboxText =
-      net::GetContentAndFragmentForUrl(hashChangedWithoutHistoryURL);
-  [[EarlGrey selectElementWithMatcher:OmniboxText(
-                                          hashChangedWithoutHistoryOmniboxText)]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:hashChangedWithoutHistoryURL];
 
   // Tap link to update the location.hash with a new value.
   [ChromeEarlGrey tapWebStateElementWithID:kHashChangeWithHistoryLabel];
-  const std::string hashChangedWithHistoryOmniboxText =
-      net::GetContentAndFragmentForUrl(hashChangedWithHistoryURL);
-  [[EarlGrey
-      selectElementWithMatcher:OmniboxText(hashChangedWithHistoryOmniboxText)]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:hashChangedWithHistoryURL];
 
   // Navigate back and verify that the URL that replaced window.location
   // has been reached.
   [[EarlGrey selectElementWithMatcher:BackButton()] performAction:grey_tap()];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(
-                                          hashChangedWithoutHistoryOmniboxText)]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:hashChangedWithoutHistoryURL];
 }
 
 // Loads a URL and modifies window.location.hash twice, verifying that there is
@@ -454,28 +404,19 @@ void SwipeWebInDirection(GREYDirection direction) {
 
   // Tap link to update location.hash with a new value.
   [ChromeEarlGrey tapWebStateElementWithID:kHashChangeWithHistoryLabel];
-  const std::string hashChangedWithHistoryOmniboxText =
-      net::GetContentAndFragmentForUrl(hashChangedWithHistoryURL);
-  [[EarlGrey
-      selectElementWithMatcher:OmniboxText(hashChangedWithHistoryOmniboxText)]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:hashChangedWithHistoryURL];
 
   // Tap link to update location.hash with the same value.
   [ChromeEarlGrey tapWebStateElementWithID:kHashChangeWithHistoryLabel];
 
   // Tap back once to return to original URL.
   [[EarlGrey selectElementWithMatcher:BackButton()] performAction:grey_tap()];
-  const std::string page1OmniboxText =
-      net::GetContentAndFragmentForUrl(page1URL);
-  [[EarlGrey selectElementWithMatcher:OmniboxText(page1OmniboxText)]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:page1URL];
 
   // Navigate forward and verify the URL.
   [[EarlGrey selectElementWithMatcher:ForwardButton()]
       performAction:grey_tap()];
-  [[EarlGrey
-      selectElementWithMatcher:OmniboxText(hashChangedWithHistoryOmniboxText)]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:hashChangedWithHistoryURL];
 }
 
 #pragma mark Redirect operations
@@ -494,19 +435,16 @@ void SwipeWebInDirection(GREYDirection direction) {
 
   [ChromeEarlGrey loadURL:initialURL];
   [ChromeEarlGrey loadURL:originURL];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(destinationURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:destinationURL];
 
   // Navigating back takes the user to the new tab page.
   [[EarlGrey selectElementWithMatcher:BackButton()] performAction:grey_tap()];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(initialURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:initialURL];
 
   // Navigating forward take the user to destination page.
   [[EarlGrey selectElementWithMatcher:ForwardButton()]
       performAction:grey_tap()];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(destinationURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:destinationURL];
 }
 
 // Test to load a page that contains a redirect window, then does multiple back
@@ -557,50 +495,45 @@ void SwipeWebInDirection(GREYDirection direction) {
           [NSString stringWithCString:redirectLabel.c_str()
                              encoding:[NSString defaultCStringEncoding]]];
   [ChromeEarlGrey waitForWebStateContainingText:"You've arrived"];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(destinationURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:destinationURL];
 
   // Navigate to a new URL, navigate back and assert that the resulting page is
   // the proper destination.
   [ChromeEarlGrey loadURL:lastURL];
   [[EarlGrey selectElementWithMatcher:BackButton()] performAction:grey_tap()];
   [ChromeEarlGrey waitForWebStateContainingText:"You've arrived"];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(destinationURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:destinationURL];
 
   // Navigate back and assert that the resulting page is the initial index.
   [[EarlGrey selectElementWithMatcher:BackButton()] performAction:grey_tap()];
   [ChromeEarlGrey waitForWebStateContainingText:redirectLabel];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(indexURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:indexURL];
 
   // Navigate forward and assert the the resulting page is the proper
   // destination.
   [[EarlGrey selectElementWithMatcher:ForwardButton()]
       performAction:grey_tap()];
   [ChromeEarlGrey waitForWebStateContainingText:"You've arrived"];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(destinationURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:destinationURL];
 }
 
 // Tests that navigating forward from a WebUI URL works when resuming from
 // session restore. This is a regression test for https://crbug.com/814790.
 - (void)testRestoreHistoryToWebUIAndNavigateForward {
   GREYAssertTrue(self.testServer->Start(), @"Test server failed to start.");
+  const GURL versionURL = GURL("chrome://version/");
   const GURL destinationURL = self.testServer->GetURL(kSimpleFileBasedTestURL);
-  [ChromeEarlGrey loadURL:GURL("chrome://version")];
+  [ChromeEarlGrey loadURL:versionURL];
   [ChromeEarlGrey loadURL:destinationURL];
   [ChromeEarlGrey goBack];
 
   [self triggerRestoreByRestartingApplication];
 
   [ChromeEarlGrey waitForWebStateContainingText:"Revision"];
-  [[EarlGrey selectElementWithMatcher:OmniboxText("chrome://version")]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:versionURL];
   [ChromeEarlGrey goForward];
   [ChromeEarlGrey waitForWebStateContainingText:"pony"];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(destinationURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:destinationURL];
 }
 
 // Tests that navigating forward from NTP works when resuming from session
@@ -618,28 +551,24 @@ void SwipeWebInDirection(GREYDirection direction) {
   // Navigating right after session restore seems to sometimes be slow, so wait
   // with twice the usual timeout.
   [ChromeEarlGrey waitForWebStateContainingText:"pony"];
-  [[EarlGrey selectElementWithMatcher:OmniboxText(destinationURL.GetContent())]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:destinationURL];
 }
 
 // Tests that restoring a placeholder URL is correctly restored.  This is a
 // regression test from http://crbug.com/1011758.
 - (void)testRestoreHistoryToPlaceholderURL {
   GREYAssertTrue(self.testServer->Start(), @"Test server failed to start.");
-  const GURL destinationURL("chrome://crash");
+  const GURL destinationURL("chrome://crash/");
   [ChromeEarlGrey loadURL:destinationURL];
   [self triggerRestoreByRestartingApplication];
-  [[EarlGrey selectElementWithMatcher:OmniboxText("chrome://crash")]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey waitForWebStateVisibleURL:destinationURL];
 }
 
 - (void)testEdgeSwipe {
-#if !defined(__IPHONE_26_0) || __IPHONE_OS_VERSION_MAX_ALLOWED < __IPHONE_26_0
   if (iOS26_OR_ABOVE()) {
     EARL_GREY_TEST_SKIPPED(@"The swipe gesture when running iOS26 simulators "
                            @"with Xcode 16 is difficult. Skip this edge case.");
   }
-#endif
 
   GREYAssertTrue(self.testServer->Start(), @"Test server failed to start.");
   [ChromeEarlGrey loadURL:self.testServer->GetURL(kSimpleFileBasedTestURL)];
@@ -659,7 +588,12 @@ void SwipeWebInDirection(GREYDirection direction) {
 
   // Swipe back twice.
   if (iOS26_OR_ABOVE()) {
-    SwipeWebInDirection(kGREYDirectionLeft);
+    XCUICoordinate* swipeRightiOS26 =
+        [leftEdgeCoord coordinateWithOffset:CGVectorMake(50, 0.5)];
+    [leftEdgeCoord pressForDuration:0.1f
+               thenDragToCoordinate:swipeRightiOS26
+                       withVelocity:XCUIGestureVelocityFast
+                thenHoldForDuration:0.001];
   } else {
     [leftEdgeCoord pressForDuration:0.1f thenDragToCoordinate:swipeRight];
   }
@@ -689,11 +623,17 @@ void SwipeWebInDirection(GREYDirection direction) {
   GREYWaitForAppToIdle(@"App failed to idle");
   [ChromeEarlGrey waitForWebStateContainingText:"pony"];
 
+  XCUICoordinate* rightEdgeCoord =
+      [app coordinateWithNormalizedOffset:CGVectorMake(rightEdge, 0.5)];
   if (iOS26_OR_ABOVE()) {
-    SwipeWebInDirection(kGREYDirectionRight);
+    XCUICoordinate* swipeLeft =
+        [rightEdgeCoord coordinateWithOffset:CGVectorMake(-50, 0.5)];
+    [rightEdgeCoord pressForDuration:0.1f
+                thenDragToCoordinate:swipeLeft
+                        withVelocity:XCUIGestureVelocityFast
+                 thenHoldForDuration:0.001];
+
   } else {
-    XCUICoordinate* rightEdgeCoord =
-        [app coordinateWithNormalizedOffset:CGVectorMake(rightEdge, 0.5)];
     XCUICoordinate* swipeLeft =
         [rightEdgeCoord coordinateWithOffset:CGVectorMake(-600, 0.5)];
     [rightEdgeCoord pressForDuration:0.1f thenDragToCoordinate:swipeLeft];

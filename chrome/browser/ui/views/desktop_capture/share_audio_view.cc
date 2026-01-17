@@ -16,8 +16,11 @@
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/view_class_properties.h"
 
-ShareAudioView::ShareAudioView(const std::u16string& label_text,
-                               bool audio_offered) {
+ShareAudioView::ShareAudioView(
+    const std::u16string& label_text,
+    bool audio_offered,
+    base::RepeatingCallback<void(void)> audio_check_callback)
+    : audio_check_callback_(audio_check_callback) {
   SetProperty(views::kMarginsKey, gfx::Insets::TLBR(8, 16, 16, 16));
 
   views::ImageView* audio_icon_view =
@@ -25,7 +28,7 @@ ShareAudioView::ShareAudioView(const std::u16string& label_text,
   audio_icon_view->SetImage(ui::ImageModel::FromVectorIcon(
       vector_icons::kVolumeUpIcon,
       audio_offered ? ui::kColorIcon : ui::kColorIconDisabled,
-      GetLayoutConstant(PAGE_INFO_ICON_SIZE)));
+      GetLayoutConstant(LayoutConstant::kPageInfoIconSize)));
 
   audio_toggle_label_ = AddChildView(std::make_unique<views::Label>());
   audio_toggle_label_->SetHorizontalAlignment(
@@ -33,8 +36,10 @@ ShareAudioView::ShareAudioView(const std::u16string& label_text,
   audio_toggle_label_->SetText(label_text);
 
   if (audio_offered) {
-    audio_toggle_button_ =
-        AddChildView(std::make_unique<views::ToggleButton>());
+    // Unretained is safe since this owns the ToggleButton.
+    audio_toggle_button_ = AddChildView(std::make_unique<views::ToggleButton>(
+        base::BindRepeating(&ShareAudioView::OnAudioToggleButtonPressed,
+                            base::Unretained(this))));
     audio_toggle_button_->GetViewAccessibility().SetName(label_text);
   } else {
     audio_toggle_label_->SetTextStyle(views::style::TextStyle::STYLE_DISABLED);
@@ -67,6 +72,12 @@ void ShareAudioView::SetAudioSharingApprovedByUser(bool is_on) {
 std::u16string_view ShareAudioView::GetAudioLabelText() const {
   return audio_toggle_label_ ? audio_toggle_label_->GetText()
                              : std::u16string_view();
+}
+
+void ShareAudioView::OnAudioToggleButtonPressed() {
+  if (audio_check_callback_) {
+    audio_check_callback_.Run();
+  }
 }
 
 BEGIN_METADATA(ShareAudioView)

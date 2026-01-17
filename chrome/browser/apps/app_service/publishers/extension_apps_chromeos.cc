@@ -12,11 +12,11 @@
 #include <vector>
 
 #include "ash/constants/ash_features.h"
+#include "ash/multi_user/multi_user_window_manager.h"
 #include "ash/public/cpp/app_list/app_list_metrics.h"
 #include "ash/public/cpp/app_menu_constants.h"
-#include "ash/public/cpp/multi_user_window_manager.h"
 #include "ash/public/cpp/shelf_types.h"
-#include "base/containers/contains.h"
+#include "ash/shell.h"
 #include "base/containers/extend.h"
 #include "base/feature_list.h"
 #include "base/files/safe_base_name.h"
@@ -56,7 +56,6 @@
 #include "chrome/browser/policy/system_features_disable_list_policy_handler.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/ash/multi_user/multi_user_util.h"
-#include "chrome/browser/ui/ash/multi_user/multi_user_window_manager_helper.h"
 #include "chrome/browser/ui/ash/session/session_controller_client_impl.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
@@ -200,7 +199,7 @@ std::vector<base::SafeBaseName> GetBaseNamesForIntent(
   std::vector<base::SafeBaseName> base_names;
   for (const auto& file : intent.files) {
     std::optional<base::SafeBaseName> optional_base_name =
-        base::SafeBaseName::Create(file->url.path());
+        base::SafeBaseName::Create(file->url.GetPath());
 
     // Launch requires that every file have a base name.
     if (!optional_base_name.has_value() ||
@@ -434,8 +433,7 @@ void ExtensionAppsChromeOs::GetMenuModel(
   if (!is_platform_app) {
     CreateOpenNewSubmenu(
         extensions::GetLaunchType(extensions::ExtensionPrefs::Get(profile()),
-                                  extension) ==
-                extensions::LaunchType::LAUNCH_TYPE_WINDOW
+                                  extension) == extensions::LaunchType::kWindow
             ? IDS_APP_LIST_CONTEXT_MENU_NEW_WINDOW
             : IDS_APP_LIST_CONTEXT_MENU_NEW_TAB,
         menu_items);
@@ -567,7 +565,7 @@ void ExtensionAppsChromeOs::OnAppWindowAdded(
   // of the window correctly.
   if (SessionControllerClientImpl::IsMultiProfileAvailable()) {
     auto* multi_user_window_manager =
-        MultiUserWindowManagerHelper::GetWindowManager();
+        ash::Shell::Get()->multi_user_window_manager();
     if (multi_user_window_manager) {
       multi_user_window_manager->SetWindowOwner(
           window, multi_user_util::GetAccountIdFromProfile(profile()));
@@ -932,7 +930,7 @@ bool ExtensionAppsChromeOs::ShouldShownInLauncher(
 AppPtr ExtensionAppsChromeOs::CreateApp(const extensions::Extension* extension,
                                         Readiness readiness) {
   CHECK(extension);
-  const bool is_app_disabled = base::Contains(disabled_apps_, extension->id());
+  const bool is_app_disabled = disabled_apps_.contains(extension->id());
 
   auto app = CreateAppImpl(
       extension, is_app_disabled ? Readiness::kDisabledByPolicy : readiness);
@@ -984,7 +982,7 @@ IconEffects ExtensionAppsChromeOs::GetIconEffects(
     icon_effects =
         static_cast<IconEffects>(icon_effects | IconEffects::kPaused);
   }
-  if (base::Contains(disabled_apps_, extension->id())) {
+  if (disabled_apps_.contains(extension->id())) {
     icon_effects =
         static_cast<IconEffects>(icon_effects | IconEffects::kBlocked);
   }
@@ -1048,7 +1046,7 @@ void ExtensionAppsChromeOs::RegisterInstance(extensions::AppWindow* app_window,
   }
 
   if (new_state == InstanceState::kDestroyed) {
-    DCHECK(base::Contains(app_window_to_aura_window_, app_window));
+    DCHECK(app_window_to_aura_window_.contains(app_window));
     window = app_window_to_aura_window_[app_window];
   }
   InstanceParams params(app_window->extension_id(), window);
@@ -1093,14 +1091,13 @@ void ExtensionAppsChromeOs::UpdateAppDisabledState(
     int feature,
     const std::string& app_id,
     bool is_disabled_mode_changed) {
-  const bool is_disabled =
-      base::Contains(disabled_system_features_pref, base::Value(feature));
+  const bool is_disabled = disabled_system_features_pref.contains(feature);
   // Sometimes the policy is updated before the app is installed, so this way
   // the disabled_apps_ is updated regardless the Publish should happen or not
   // and the app will be published with the correct readiness upon its
   // installation.
   const bool should_publish =
-      (base::Contains(disabled_apps_, app_id) != is_disabled) ||
+      (disabled_apps_.contains(app_id) != is_disabled) ||
       is_disabled_mode_changed;
 
   if (is_disabled) {

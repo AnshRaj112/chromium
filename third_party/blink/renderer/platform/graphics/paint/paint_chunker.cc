@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/platform/graphics/paint/paint_chunker.h"
 
+#include "third_party/blink/public/common/features.h"
 #include "third_party/blink/renderer/platform/graphics/paint/drawing_display_item.h"
 #include "third_party/blink/renderer/platform/graphics/paint/foreign_layer_display_item.h"
 #include "third_party/blink/renderer/platform/graphics/paint/scrollbar_display_item.h"
@@ -173,6 +174,22 @@ bool PaintChunker::AddHitTestDataToCurrentChunk(
       wheel_event_rects.push_back(rect);
     }
   }
+#if BUILDFLAG(IS_ANDROID)
+  // TODO: add appropriate condition here to check for interactable or
+  // occluding an interactable.
+  if (blink::features::IsXrDevice()) {
+    DOMNodeId dom_node_id = client.OwnerNodeId(/*is_internal_content=*/false);
+    if (dom_node_id != kInvalidDOMNodeId) {
+      CompositorElementId compositor_element_id =
+          CompositorElementIdFromDOMNodeId(dom_node_id);
+
+      auto& xr_regions = chunk.EnsureHitTestData().xr_regions;
+      if (xr_regions.empty() || xr_regions.back() != compositor_element_id) {
+        xr_regions.push_back(compositor_element_id);
+      }
+    }
+  }
+#endif
   return created_new_chunk;
 }
 
@@ -199,6 +216,23 @@ bool PaintChunker::AddRegionCaptureDataToCurrentChunk(
     chunk.region_capture_data = MakeGarbageCollected<RegionCaptureData>();
   }
   chunk.region_capture_data->map.insert_or_assign(crop_id, std::move(rect));
+  return created_new_chunk;
+}
+
+bool PaintChunker::AddTrackedElementDataToCurrentChunk(
+    const PaintChunk::Id& id,
+    const DisplayItemClient& client,
+    const TrackedElementId& tracked_element_id,
+    const gfx::Rect& rect) {
+  CheckNotFinished();
+  DCHECK(!tracked_element_id->is_zero());
+  bool created_new_chunk = EnsureCurrentChunk(id, client);
+  auto& chunk = chunks_.back();
+  if (!chunk.tracked_element_data) {
+    chunk.tracked_element_data = MakeGarbageCollected<TrackedElementData>();
+  }
+
+  chunk.tracked_element_data->map.insert_or_assign(tracked_element_id, rect);
   return created_new_chunk;
 }
 

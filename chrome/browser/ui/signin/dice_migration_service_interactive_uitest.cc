@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "base/test/metrics/histogram_tester.h"
+#include "base/test/metrics/user_action_tester.h"
 #include "base/test/scoped_feature_list.h"
+#include "chrome/browser/enterprise/util/managed_browser_utils.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/signin/signin_browser_test_base.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
@@ -10,6 +13,7 @@
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/signin/dice_migration_service.h"
 #include "chrome/browser/ui/signin/dice_migration_service_factory.h"
+#include "chrome/browser/ui/toasts/api/toast_id.h"
 #include "chrome/browser/ui/toasts/toast_controller.h"
 #include "chrome/browser/ui/toasts/toast_view.h"
 #include "chrome/browser/ui/toolbar/app_menu_model.h"
@@ -18,14 +22,28 @@
 #include "chrome/test/interaction/interactive_browser_test.h"
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/signin/public/base/signin_switches.h"
+#include "components/signin/public/identity_manager/account_managed_status_finder.h"
 #include "components/signin/public/identity_manager/identity_utils.h"
 #include "content/public/test/browser_test.h"
 #include "ui/base/interaction/interactive_test.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/test/widget_test.h"
 #include "ui/views/window/dialog_client_view.h"
 
 namespace {
 constexpr char kTestEmail[] = "test@gmail.com";
+
+constexpr char kDiceMigrationDialogCloseReasonHistogram[] =
+    "Signin.DiceMigrationDialog.CloseReason";
+constexpr char kToastTriggeredHistogram[] =
+    "Signin.DiceMigrationDialog.ToastTriggered";
+constexpr char kToastTriggerToShowHistogram[] = "Toast.TriggeredToShow";
+constexpr char kToastDismissedHistogram[] = "Toast.DiceUserMigrated.Dismissed";
+constexpr char kToastActionButtonUserAction[] =
+    "Toast.ActionButtonClicked.DiceUserMigrated";
+constexpr char kToastCloseButtonUserAction[] =
+    "Toast.CloseButtonClicked.DiceUserMigrated";
+constexpr char kForceMigratedHistogram[] = "Signin.DiceMigration.ForceMigrated";
 
 // Utility macro to implicitly sign in the user in a PRE test.
 // NOTE: `test_suite` must be a subclass of
@@ -38,6 +56,12 @@ constexpr char kTestEmail[] = "test@gmail.com";
 
 class DiceMigrationServiceInteractiveUiTest : public InteractiveBrowserTest {
  public:
+  DiceMigrationServiceInteractiveUiTest() {
+    scoped_feature_list_.InitWithFeatures(
+        /*enabled_features=*/{switches::kOfferMigrationToDiceUsers},
+        /*disabled_features=*/{switches::kForcedDiceMigration});
+  }
+
   Profile* GetProfile() { return browser()->profile(); }
 
   DiceMigrationService* GetDiceMigrationService() {
@@ -88,9 +112,15 @@ class DiceMigrationServiceInteractiveUiTest : public InteractiveBrowserTest {
     });
   }
 
+ protected:
+  base::test::ScopedFeatureList scoped_feature_list_;
+  base::HistogramTester histogram_tester_;
+  base::UserActionTester user_action_tester_;
+
  private:
-  base::test::ScopedFeatureList scoped_feature_list_{
-      switches::kOfferMigrationToDiceUsers};
+  gfx::ScopedAnimationDurationScaleMode zero_duration_mode_ =
+      gfx::ScopedAnimationDurationScaleMode(
+          gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
 };
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
@@ -110,6 +140,11 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
                   WaitForHide(DiceMigrationService::kAcceptButtonElementId));
 
   ASSERT_FALSE(GetDiceMigrationService()->GetDialogWidgetForTesting());
+  EXPECT_FALSE(
+      GetProfile()->GetPrefs()->GetBoolean(kDiceMigrationMigrated));
+  histogram_tester_.ExpectUniqueSample(
+      kDiceMigrationDialogCloseReasonHistogram,
+      DiceMigrationService::DialogCloseReason::kCancelled, 1);
 }
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
@@ -135,6 +170,11 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
                   WaitForHide(DiceMigrationService::kAcceptButtonElementId));
 
   ASSERT_FALSE(GetDiceMigrationService()->GetDialogWidgetForTesting());
+  EXPECT_FALSE(
+      GetProfile()->GetPrefs()->GetBoolean(kDiceMigrationMigrated));
+  histogram_tester_.ExpectUniqueSample(
+      kDiceMigrationDialogCloseReasonHistogram,
+      DiceMigrationService::DialogCloseReason::kClosed, 1);
 }
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
@@ -155,6 +195,11 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
                   WaitForHide(DiceMigrationService::kAcceptButtonElementId));
 
   ASSERT_FALSE(GetDiceMigrationService()->GetDialogWidgetForTesting());
+  EXPECT_TRUE(
+      GetProfile()->GetPrefs()->GetBoolean(kDiceMigrationMigrated));
+  histogram_tester_.ExpectUniqueSample(
+      kDiceMigrationDialogCloseReasonHistogram,
+      DiceMigrationService::DialogCloseReason::kAccepted, 1);
 }
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest, EscClosesDialog) {
@@ -176,6 +221,11 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest, EscClosesDialog) {
       EnsureNotPresent(DiceMigrationService::kAcceptButtonElementId));
 
   ASSERT_FALSE(GetDiceMigrationService()->GetDialogWidgetForTesting());
+  EXPECT_FALSE(
+      GetProfile()->GetPrefs()->GetBoolean(kDiceMigrationMigrated));
+  histogram_tester_.ExpectUniqueSample(
+      kDiceMigrationDialogCloseReasonHistogram,
+      DiceMigrationService::DialogCloseReason::kEscKeyPressed, 1);
 }
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
@@ -196,6 +246,11 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
                   WaitForHide(DiceMigrationService::kAcceptButtonElementId));
 
   ASSERT_FALSE(GetDiceMigrationService()->GetDialogWidgetForTesting());
+  EXPECT_FALSE(
+      GetProfile()->GetPrefs()->GetBoolean(kDiceMigrationMigrated));
+  histogram_tester_.ExpectUniqueSample(
+      kDiceMigrationDialogCloseReasonHistogram,
+      DiceMigrationService::DialogCloseReason::kAvatarButtonClicked, 1);
 }
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
@@ -223,6 +278,8 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
                   EnsurePresent(DiceMigrationService::kAcceptButtonElementId));
 
   ASSERT_TRUE(GetDiceMigrationService()->GetDialogWidgetForTesting());
+  histogram_tester_.ExpectTotalCount(kDiceMigrationDialogCloseReasonHistogram,
+                                     0);
 }
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
@@ -246,6 +303,8 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
                   EnsurePresent(DiceMigrationService::kAcceptButtonElementId));
 
   ASSERT_TRUE(GetDiceMigrationService()->GetDialogWidgetForTesting());
+  histogram_tester_.ExpectTotalCount(kDiceMigrationDialogCloseReasonHistogram,
+                                     0);
 }
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
@@ -320,6 +379,10 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest, ShowToast) {
                   // The toast should auto dismiss when the timer goes off.
                   FireToastCloseTimer(),
                   WaitForHide(toasts::ToastView::kToastViewId));
+
+  histogram_tester_.ExpectUniqueSample(kToastTriggeredHistogram, true, 1);
+  histogram_tester_.ExpectUniqueSample(kToastTriggerToShowHistogram,
+                                       ToastId::kDiceUserMigrated, 1);
 }
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
@@ -352,6 +415,11 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
           kActiveTab, chrome::GetSettingsUrl(chrome::kSyncSetupSubPage)),
 
       WaitForHide(toasts::ToastView::kToastViewId));
+
+  histogram_tester_.ExpectUniqueSample(
+      kToastDismissedHistogram, toasts::ToastCloseReason::kActionButton, 1);
+  EXPECT_EQ(user_action_tester_.GetActionCount(kToastActionButtonUserAction),
+            1);
 }
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest, ToastCloseButton) {
@@ -375,6 +443,10 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest, ToastCloseButton) {
                   PressButton(toasts::ToastView::kToastCloseButton),
 
                   WaitForHide(toasts::ToastView::kToastViewId));
+
+  histogram_tester_.ExpectUniqueSample(
+      kToastDismissedHistogram, toasts::ToastCloseReason::kCloseButton, 1);
+  EXPECT_EQ(user_action_tester_.GetActionCount(kToastCloseButtonUserAction), 1);
 }
 
 DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
@@ -447,6 +519,80 @@ DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
                   // The toast should still be visible because the timeout
                   // hasn't passed yet.
                   EnsurePresent(toasts::ToastView::kToastViewId));
+}
+
+DICE_MIGRATION_TEST_F(DiceMigrationServiceInteractiveUiTest,
+                      IdentityPillExpandsWhenShowingDialog) {
+  // The user is implicitly signed in.
+  ASSERT_TRUE(
+      GetIdentityManager()->HasPrimaryAccount(signin::ConsentLevel::kSignin));
+  ASSERT_FALSE(
+      GetProfile()->GetPrefs()->GetBoolean(prefs::kExplicitBrowserSignin));
+
+  RunTestSequence(
+      // The identity pill is not expanded by default.
+      CheckViewProperty(kToolbarAvatarButtonElementId,
+                        &views::LabelButton::GetText, u""),
+
+      TriggerDialog(),
+
+      WaitForShow(DiceMigrationService::kAcceptButtonElementId),
+
+      // The identity pill is expanded when the dialog is shown.
+      CheckViewProperty(kToolbarAvatarButtonElementId,
+                        &views::LabelButton::GetText, u"test@gmail.com"),
+
+      // Press the avatar button.
+      PressButton(kToolbarAvatarButtonElementId),
+
+      WaitForHide(DiceMigrationService::kAcceptButtonElementId),
+
+      // The identity pill is collapsed again.
+      CheckViewProperty(kToolbarAvatarButtonElementId,
+                        &views::LabelButton::GetText, u""));
+}
+
+class DiceMigrationServiceForcedMigrationInteractiveUiTest
+    : public DiceMigrationServiceInteractiveUiTest {
+  base::test::ScopedFeatureList scoped_feature_list_{
+      switches::kForcedDiceMigration};
+};
+
+IN_PROC_BROWSER_TEST_F(DiceMigrationServiceForcedMigrationInteractiveUiTest,
+                       PRE_AccountWithAccountManagement) {
+  ImplicitlySignIn();
+
+  // The user has accepted account management.
+  enterprise_util::SetUserAcceptedAccountManagement(GetProfile(), true);
+  ASSERT_TRUE(enterprise_util::UserAcceptedAccountManagement(GetProfile()));
+}
+
+IN_PROC_BROWSER_TEST_F(DiceMigrationServiceForcedMigrationInteractiveUiTest,
+                       AccountWithAccountManagement) {
+  // The user is explicitly signed in.
+  ASSERT_TRUE(
+      GetIdentityManager()->HasPrimaryAccount(signin::ConsentLevel::kSignin));
+  ASSERT_TRUE(
+      GetProfile()->GetPrefs()->GetBoolean(prefs::kExplicitBrowserSignin));
+  histogram_tester_.ExpectUniqueSample(kForceMigratedHistogram, true, 1);
+
+  RunTestSequence(If(
+                      [&]() {
+                        return GetDiceMigrationService()
+                            ->GetDialogTriggerTimerForTesting()
+                            .IsRunning();
+                      },
+                      Then(TriggerDialog())),
+
+                  // The toast should be shown following the forced migration.
+                  WaitForShow(toasts::ToastView::kToastViewId),
+
+                  // The toast should auto dismiss when the timer goes off.
+                  FireToastCloseTimer(),
+                  WaitForHide(toasts::ToastView::kToastViewId));
+
+  histogram_tester_.ExpectUniqueSample(kToastTriggerToShowHistogram,
+                                       ToastId::kDiceUserMigrated, 1);
 }
 
 }  // namespace

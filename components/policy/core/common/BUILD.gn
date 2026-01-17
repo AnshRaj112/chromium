@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config/features.gni")
 import("//testing/libfuzzer/fuzzer_test.gni")
 
 group("policy_namespace") {
@@ -83,6 +82,8 @@ source_set("internal") {
     "cloud/cloud_policy_client.h",
     "cloud/cloud_policy_client_registration_helper.cc",
     "cloud/cloud_policy_client_registration_helper.h",
+    "cloud/cloud_policy_client_types.cc",
+    "cloud/cloud_policy_client_types.h",
     "cloud/cloud_policy_core.cc",
     "cloud/cloud_policy_core.h",
     "cloud/cloud_policy_manager.cc",
@@ -231,6 +232,7 @@ source_set("internal") {
 
   deps = [
     "//base:i18n",
+    "//build:android_buildflags",
     "//components/account_id",
     "//components/enterprise/common:strings",
     "//components/enterprise/common/proto:chrome_reporting_entity",
@@ -375,6 +377,8 @@ source_set("internal") {
 
     if (is_ios) {
       sources += [
+        "management/platform_management_status_provider_ios.h",
+        "management/platform_management_status_provider_ios.mm",
         "policy_loader_ios.h",
         "policy_loader_ios.mm",
       ]
@@ -446,6 +450,13 @@ static_library("test_support") {
     ]
   }
 
+  if (is_linux || is_win || is_mac || is_chromeos) {
+    sources += [
+      "field_validation_test_utils.cc",
+      "field_validation_test_utils.h",
+    ]
+  }
+
   public_deps = [
     ":common",
     "//base",
@@ -478,7 +489,6 @@ source_set("common_constants") {
     "../../policy_export.h",
     "cloud/cloud_policy_constants.cc",
     "cloud/cloud_policy_constants.h",
-    "policy_pref_names.cc",
     "policy_pref_names.h",
     "policy_switches.cc",
     "policy_switches.h",

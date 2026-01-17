@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.app.tabmodel;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import static org.chromium.base.ThreadUtils.runOnUiThreadBlocking;
 
 import android.os.Looper;
@@ -14,7 +16,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.mockito.quality.Strictness;
@@ -22,11 +23,8 @@ import org.mockito.quality.Strictness;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DoNotBatch;
-import org.chromium.base.test.util.Features.DisableFeatures;
-import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.DeferredStartupHandler;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.TabArchiveSettings;
@@ -47,8 +45,6 @@ import java.util.List;
 @RunWith(ChromeJUnit4ClassRunner.class)
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 @DoNotBatch(reason = "Test interacts with activity shutdown and thus is incompatible with batching")
-@EnableFeatures({ChromeFeatureList.ANDROID_TAB_DECLUTTER_RESCUE_KILLSWITCH})
-@DisableFeatures(ChromeFeatureList.ANDROID_TAB_DECLUTTER_ARCHIVE_ALL_BUT_ACTIVE)
 public class ArchivedTabsTest {
     private static class FakeDeferredStartupHandler extends DeferredStartupHandler {
         private final List<Runnable> mTasks = new ArrayList<>();
@@ -75,8 +71,6 @@ public class ArchivedTabsTest {
             ChromeTransitTestRules.freshChromeTabbedActivityRule();
 
     @Rule public MockitoRule mMockitoRule = MockitoJUnit.rule().strictness(Strictness.LENIENT);
-
-    @Mock private ArchivedTabModelOrchestrator.Observer mObserver;
 
     private Profile mProfile;
     private FakeDeferredStartupHandler mDeferredStartupHandler;
@@ -109,7 +103,7 @@ public class ArchivedTabsTest {
         runOnUiThreadBlocking(
                 () -> {
                     mDeferredStartupHandler.runAllTasks();
-                    assert mOrchestrator.areTabModelsInitialized();
+                    assertThat(mOrchestrator.areTabModelsInitialized()).isTrue();
                     mOrchestrator.getTabArchiveSettings().resetSettingsForTesting();
                     mArchivedTabModel = mOrchestrator.getTabModelSelector().getModel(false);
                     mRegularTabModel = mActivityTestRule.getActivity().getCurrentTabModel();

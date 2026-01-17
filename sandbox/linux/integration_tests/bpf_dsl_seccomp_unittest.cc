@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -23,12 +18,13 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <memory>
 #include <vector>
 
+#include "base/compiler_specific.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 
 #if defined(ANDROID)
@@ -668,7 +664,7 @@ BPF_TEST_C(SandboxBPF, ForwardSyscall, PrctlPolicy) {
   // unaffected by our policy.
   struct utsname uts = {};
   BPF_ASSERT(!uname(&uts));
-  BPF_ASSERT(!strcmp(uts.sysname, "Linux"));
+  UNSAFE_TODO(BPF_ASSERT(!strcmp(uts.sysname, "Linux")));
 }
 
 intptr_t AllowRedirectedSyscall(const struct arch_seccomp_data& args, void*) {
@@ -1074,7 +1070,8 @@ class EqualityStressTest {
     // arg_value.tests[]. In most cases, the current value of "mismatched"
     // would fit this requirement. But on the off-chance that it happens
     // to collide, we double-check.
-    while (base::Contains(arg_value.tests, mismatched, &Tests::k_value)) {
+    while (
+        std::ranges::contains(arg_value.tests, mismatched, &Tests::k_value)) {
       ++mismatched;
     }
     // Now verify that we see the expected return value from system calls,
@@ -1701,24 +1698,19 @@ intptr_t PthreadTrapHandler(const struct arch_seccomp_data& args, void* aux) {
     // call. But if we ever get called for anything else, we want to verbosely
     // print as much information as possible.
     const char* msg = (const char*)aux;
-    printf(
-        "Clone() was called with unexpected arguments\n"
-        "  nr: %d\n"
-        "  1: 0x%llX\n"
-        "  2: 0x%llX\n"
-        "  3: 0x%llX\n"
-        "  4: 0x%llX\n"
-        "  5: 0x%llX\n"
-        "  6: 0x%llX\n"
-        "%s\n",
-        args.nr,
-        (long long)args.args[0],
-        (long long)args.args[1],
-        (long long)args.args[2],
-        (long long)args.args[3],
-        (long long)args.args[4],
-        (long long)args.args[5],
-        msg);
+    UNSAFE_TODO(
+        printf("Clone() was called with unexpected arguments\n"
+               "  nr: %d\n"
+               "  1: 0x%llX\n"
+               "  2: 0x%llX\n"
+               "  3: 0x%llX\n"
+               "  4: 0x%llX\n"
+               "  5: 0x%llX\n"
+               "  6: 0x%llX\n"
+               "%s\n",
+               args.nr, (long long)args.args[0], (long long)args.args[1],
+               (long long)args.args[2], (long long)args.args[3],
+               (long long)args.args[4], (long long)args.args[5], msg));
   }
   return -EPERM;
 }
@@ -2073,7 +2065,7 @@ bool FullPwrite64(int fd, const char* buffer, size_t count, off64_t offset) {
       return false;
     }
     count -= transfered;
-    buffer += transfered;
+    UNSAFE_TODO(buffer += transfered);
     offset += transfered;
   }
   return true;
@@ -2086,7 +2078,7 @@ bool FullPread64(int fd, char* buffer, size_t count, off64_t offset) {
       return false;
     }
     count -= transfered;
-    buffer += transfered;
+    UNSAFE_TODO(buffer += transfered);
     offset += transfered;
   }
   return true;
@@ -2140,7 +2132,8 @@ BPF_TEST_C(SandboxBPF, Pread64, TrapPread64Policy) {
                          read_test_string,
                          sizeof(read_test_string),
                          kLargeOffset));
-  BPF_ASSERT_EQ(0, memcmp(kTestString, read_test_string, sizeof(kTestString)));
+  UNSAFE_TODO(BPF_ASSERT_EQ(
+      0, memcmp(kTestString, read_test_string, sizeof(kTestString))));
   BPF_ASSERT(pread_64_was_forwarded);
 }
 

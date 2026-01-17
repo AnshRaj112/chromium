@@ -8,7 +8,6 @@
 
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/json/json_writer.h"
@@ -27,7 +26,7 @@ const char kPathSeparator = '.';
 // Determines if a key passed to Register() is valid. No path separators can
 // be present in the key and it must not be empty.
 bool IsValidRegisterKey(const std::string& key) {
-  return !key.empty() && !base::Contains(key, kPathSeparator);
+  return !key.empty() && !key.contains(kPathSeparator);
 }
 
 // Determines if a path is valid. This is true if there are no empty keys
@@ -97,16 +96,13 @@ void DeviceCapabilities::Validator::SetPrivateValidatedValue(
   capabilities_->SetPrivateValidatedValue(path, std::move(new_value));
 }
 
-DeviceCapabilities::Data::Data() {
-  base::JSONWriter::Write(dictionary_, &json_string_);
-}
+DeviceCapabilities::Data::Data() : Data(base::Value::Dict()) {}
 
 DeviceCapabilities::Data::Data(base::Value::Dict dictionary)
-    : dictionary_(std::move(dictionary)) {
-  base::JSONWriter::Write(dictionary_, &json_string_);
-}
+    : dictionary_(std::move(dictionary)),
+      json_string_(base::WriteJson(dictionary_).value_or("")) {}
 
-DeviceCapabilitiesImpl::Data::~Data() {}
+DeviceCapabilitiesImpl::Data::~Data() = default;
 
 DeviceCapabilitiesImpl::ValidatorInfo::ValidatorInfo(Validator* validator)
     : validator_(validator),

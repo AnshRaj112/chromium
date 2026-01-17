@@ -16,7 +16,7 @@ class Origin;
 namespace content {
 
 // Forwards IdpNetworkRequestManager calls to delegate. The purpose of this
-// class is to enable querying the delegate after FederatedAuthRequestImpl
+// class is to enable querying the delegate after RequestService
 // destroys the DelegatedIdpNetworkRequestManager.
 class DelegatedIdpNetworkRequestManager : public MockIdpNetworkRequestManager {
  public:
@@ -32,7 +32,6 @@ class DelegatedIdpNetworkRequestManager : public MockIdpNetworkRequestManager {
   void FetchWellKnown(const GURL& provider,
                       FetchWellKnownCallback callback) override;
   void FetchConfig(const GURL& provider,
-                   blink::mojom::RpMode rp_mode,
                    int idp_brand_icon_ideal_size,
                    int idp_brand_icon_minimum_size,
                    FetchConfigCallback callback) override;
@@ -41,7 +40,7 @@ class DelegatedIdpNetworkRequestManager : public MockIdpNetworkRequestManager {
                            int rp_brand_icon_ideal_size,
                            int rp_brand_icon_minimum_size,
                            FetchClientMetadataCallback callback) override;
-  void SendAccountsRequest(const url::Origin& idp_origin,
+  bool SendAccountsRequest(const url::Origin& idp_origin,
                            const GURL& accounts_url,
                            const std::string& client_id,
                            AccountsRequestCallback callback) override;
@@ -49,9 +48,10 @@ class DelegatedIdpNetworkRequestManager : public MockIdpNetworkRequestManager {
       const GURL& token_url,
       const std::string& account,
       const std::string& url_encoded_post_data,
-      bool idp_blidness,
+      bool idp_blindness,
       TokenRequestCallback callback,
-      ContinueOnCallback continue_on_callback,
+      ContinueOnCallback continue_on,
+      RedirectToCallback redirect_to,
       RecordErrorMetricsCallback record_error_metrics_callback) override;
   void SendSuccessfulTokenRequestMetrics(
       const GURL& metrics_endpoint_url,
@@ -62,7 +62,7 @@ class DelegatedIdpNetworkRequestManager : public MockIdpNetworkRequestManager {
   void SendFailedTokenRequestMetrics(
       const GURL& metrics_endpoint_url,
       bool did_show_ui,
-      MetricsEndpointErrorCode error_code) override;
+      webid::MetricsEndpointErrorCode error_code) override;
   void SendLogout(const GURL& logout_url, LogoutCallback callback) override;
   void SendDisconnectRequest(const GURL& disconnect_url,
                              const std::string& account_hint,

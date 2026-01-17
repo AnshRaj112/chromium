@@ -6,6 +6,7 @@ package org.chromium.chrome.browser.bookmarks;
 
 import static org.chromium.build.NullUtil.assumeNonNull;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.view.LayoutInflater;
@@ -16,17 +17,19 @@ import android.view.ViewGroup;
 import androidx.annotation.LayoutRes;
 import androidx.annotation.VisibleForTesting;
 import androidx.lifecycle.LifecycleOwner;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.ItemAnimator;
 import androidx.recyclerview.widget.RecyclerView.OnScrollListener;
-import androidx.recyclerview.widget.RecyclerView.ViewHolder;
 
 import org.chromium.base.metrics.RecordUserAction;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.NonNullObservableSupplier;
+import org.chromium.base.supplier.ObservableSuppliers;
 import org.chromium.base.supplier.OneshotSupplierImpl;
+import org.chromium.base.supplier.SettableNonNullObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
+import org.chromium.chrome.browser.back_press.BackPressManager;
 import org.chromium.chrome.browser.bookmarks.BookmarkListEntry.ViewType;
 import org.chromium.chrome.browser.bookmarks.BookmarkUiPrefs.BookmarkRowDisplayPref;
 import org.chromium.chrome.browser.commerce.ShoppingServiceFactory;
@@ -43,7 +46,6 @@ import org.chromium.chrome.browser.ui.signin.signin_promo.BookmarkSigninPromoDel
 import org.chromium.chrome.browser.ui.signin.signin_promo.SigninPromoCoordinator;
 import org.chromium.components.bookmarks.BookmarkId;
 import org.chromium.components.bookmarks.BookmarkItem;
-import org.chromium.components.browser_ui.edge_to_edge.EdgeToEdgePadAdjuster;
 import org.chromium.components.browser_ui.modaldialog.AppModalPresenter;
 import org.chromium.components.browser_ui.util.GlobalDiscardableReferencePool;
 import org.chromium.components.browser_ui.widget.dragreorder.DragReorderableRecyclerViewAdapter;
@@ -57,10 +59,14 @@ import org.chromium.components.image_fetcher.ImageFetcher;
 import org.chromium.components.image_fetcher.ImageFetcherConfig;
 import org.chromium.components.image_fetcher.ImageFetcherFactory;
 import org.chromium.ui.KeyboardVisibilityDelegate;
+import org.chromium.ui.base.Clipboard;
+import org.chromium.ui.edge_to_edge.EdgeToEdgePadAdjuster;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modaldialog.ModalDialogManager.ModalDialogType;
 import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
 import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
+import org.chromium.ui.modelutil.PropertyModel;
+import org.chromium.ui.modelutil.SimpleRecyclerViewAdapter;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -74,7 +80,7 @@ public class BookmarkManagerCoordinator
     private final SelectionDelegate<BookmarkId> mSelectionDelegate =
             new SelectionDelegate<>() {
                 @Override
-                public boolean toggleSelectionForItem(@Nullable BookmarkId bookmarkId) {
+                public boolean toggleSelectionForItem(BookmarkId bookmarkId) {
                     BookmarkItem bookmarkItem = mBookmarkModel.getBookmarkById(bookmarkId);
                     if (bookmarkItem != null && !bookmarkItem.isEditable()) {
                         return false;
@@ -89,7 +95,7 @@ public class BookmarkManagerCoordinator
         }
 
         @Override
-        public boolean onFailedToRecycleView(ViewHolder holder) {
+        public boolean onFailedToRecycleView(SimpleRecyclerViewAdapter.ViewHolder holder) {
             // The view has transient state, which is probably because there's an outstanding
             // fade animation. Theoretically we could clear it and let the RecyclerView continue
             // normally, but it seems sometimes this is called after bind, and the transient
@@ -101,7 +107,7 @@ public class BookmarkManagerCoordinator
         }
 
         @Override
-        public void onViewRecycled(ViewHolder holder) {
+        public void onViewRecycled(SimpleRecyclerViewAdapter.ViewHolder holder) {
             if (holder.itemView instanceof CancelableAnimator cancelable) {
                 // Try to eagerly clean up any in progress animations if there are anything. This
                 // should reduce the amount of transient state the view has, which could get in the
@@ -113,8 +119,8 @@ public class BookmarkManagerCoordinator
         }
     }
 
-    private final ObservableSupplierImpl<Boolean> mBackPressStateSupplier =
-            new ObservableSupplierImpl<>();
+    private final SettableNonNullObservableSupplier<Boolean> mBackPressStateSupplier =
+            ObservableSuppliers.createNonNull(false);
     private final Context mContext;
     private final ViewGroup mMainView;
     private final SelectableListLayout<BookmarkId> mSelectableListLayout;
@@ -131,6 +137,7 @@ public class BookmarkManagerCoordinator
     private final BookmarkUiPrefs mBookmarkUiPrefs;
     private final ModalDialogManager mModalDialogManager;
     private final ModelList mModelList;
+    private final @Nullable BackPressManager mBackPressManager;
 
     /**
      * Creates an instance of {@link BookmarkManagerCoordinator}. It also initializes resources,
@@ -145,6 +152,7 @@ public class BookmarkManagerCoordinator
      * @param bookmarkManagerOpener Helper class to open bookmark activities.
      * @param priceDropNotificationManager Manages price drop notifications.
      * @param edgeToEdgePadAdjusterGenerator Generator for the edge to edge pad adjuster.
+     * @param backPressManager BackPressManager for processing back press events.
      */
     public BookmarkManagerCoordinator(
             Context context,
@@ -155,7 +163,8 @@ public class BookmarkManagerCoordinator
             BookmarkOpener bookmarkOpener,
             BookmarkManagerOpener bookmarkManagerOpener,
             PriceDropNotificationManager priceDropNotificationManager,
-            @Nullable Function<View, EdgeToEdgePadAdjuster> edgeToEdgePadAdjusterGenerator) {
+            @Nullable Function<View, EdgeToEdgePadAdjuster> edgeToEdgePadAdjusterGenerator,
+            @Nullable BackPressManager backPressManager) {
         mContext = context;
         mProfile = profile;
         mImageFetcher =
@@ -182,6 +191,11 @@ public class BookmarkManagerCoordinator
         mModelList = new ModelList();
         DragReorderableRecyclerViewAdapter dragReorderableRecyclerViewAdapter =
                 new DragAndCancelAdapter(context, mModelList);
+
+        // Disable the default long press so that our custom one can be used.
+        dragReorderableRecyclerViewAdapter.setDefaultLongPressDragEnabled(
+                !ChromeFeatureList.sAndroidBookmarkBarFastFollow.isEnabled());
+
         mRecyclerView =
                 mSelectableListLayout.initializeRecyclerView(
                         dragReorderableRecyclerViewAdapter,
@@ -219,6 +233,7 @@ public class BookmarkManagerCoordinator
                         this::onEndSearch,
                         () -> IncognitoUtils.isIncognitoModeEnabled(profile),
                         bookmarkManagerOpener,
+                        mSnackbarManager,
                         /* nextFocusableView= */ mMainView.findViewById(R.id.list_content));
         mSelectableListLayout.configureWideDisplayStyle();
 
@@ -260,7 +275,8 @@ public class BookmarkManagerCoordinator
                         this::canShowSigninPromo,
                         onScrollListenerConsumer,
                         bookmarkManagerOpener,
-                        priceDropNotificationManager);
+                        priceDropNotificationManager,
+                        Clipboard.getInstance());
         mPromoHeaderManager = mMediator.getPromoHeaderManager();
 
         bookmarkDelegateSupplier.set(/* object= */ mMediator);
@@ -308,13 +324,13 @@ public class BookmarkManagerCoordinator
                 ViewType.IMPROVED_BOOKMARK_VISUAL,
                 BookmarkManagerCoordinator::buildVisualImprovedBookmarkRow,
                 ImprovedBookmarkRowViewBinder::bind,
-                (viewHolder, itemTouchHelper) -> {},
+                this::bindDragProperties,
                 mMediator.getDraggabilityProvider());
         dragReorderableRecyclerViewAdapter.registerDraggableType(
                 ViewType.IMPROVED_BOOKMARK_COMPACT,
                 BookmarkManagerCoordinator::buildCompactImprovedBookmarkRow,
                 ImprovedBookmarkRowViewBinder::bind,
-                (viewHolder, itemTouchHelper) -> {},
+                this::bindDragProperties,
                 mMediator.getDraggabilityProvider());
         dragReorderableRecyclerViewAdapter.registerType(
                 ViewType.SEARCH_BOX,
@@ -328,6 +344,13 @@ public class BookmarkManagerCoordinator
         RecordUserAction.record("MobileBookmarkManagerOpen");
         if (!isDialogUi) {
             RecordUserAction.record("MobileBookmarkManagerPageOpen");
+        }
+
+        if (ChromeFeatureList.isEnabled(
+                ChromeFeatureList.ENABLE_ESCAPE_HANDLING_FOR_SECONDARY_ACTIVITIES)) {
+            mBackPressManager = backPressManager;
+        } else {
+            mBackPressManager = null;
         }
     }
 
@@ -394,7 +417,22 @@ public class BookmarkManagerCoordinator
     }
 
     @Override
-    public ObservableSupplier<Boolean> getHandleBackPressChangedSupplier() {
+    public Boolean handleEscPress() {
+        // Delegate the escape key press event to the mediator, which contains the actual logic.
+        // The mediator's onEscapePressed() will return true if it cleared the search bar,
+        // and false otherwise.
+        return mMediator.onEscapePressed();
+    }
+
+    @Override
+    public boolean invokeBackActionOnEscape() {
+        // Back action should NOT be invoked on escape for tablets.
+        return !ChromeFeatureList.isEnabled(
+                ChromeFeatureList.ENABLE_ESCAPE_HANDLING_FOR_SECONDARY_ACTIVITIES);
+    }
+
+    @Override
+    public NonNullObservableSupplier<Boolean> getHandleBackPressChangedSupplier() {
         return mBackPressStateSupplier;
     }
 
@@ -522,17 +560,17 @@ public class BookmarkManagerCoordinator
 
             @Override
             public @Nullable ImprovedBookmarkRow getBookmarkRowByPosition(int position) {
-                ViewHolder viewHolder = getBookmarkViewHolderByPosition(position);
+                RecyclerView.ViewHolder viewHolder = getBookmarkViewHolderByPosition(position);
                 return viewHolder == null ? null : (ImprovedBookmarkRow) viewHolder.itemView;
             }
 
             @Override
-            public @Nullable ViewHolder getBookmarkViewHolderByPosition(int position) {
+            public RecyclerView.@Nullable ViewHolder getBookmarkViewHolderByPosition(int position) {
                 return getViewHolderByPosition(getBookmarkStartIndex() + position);
             }
 
             @Override
-            public @Nullable ViewHolder getViewHolderByPosition(int position) {
+            public RecyclerView.@Nullable ViewHolder getViewHolderByPosition(int position) {
                 return mRecyclerView.findViewHolderForAdapterPosition(position);
             }
 
@@ -581,9 +619,52 @@ public class BookmarkManagerCoordinator
 
     private void openSettings() {
         SettingsNavigationFactory.createSettingsNavigation()
-                .startSettings(
+                .startSettings(mContext, ManageSyncSettings.class);
+    }
+
+    @Nullable BackPressManager getBackPressManagerForTesting() {
+        return mBackPressManager;
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private void bindDragProperties(
+            RecyclerView.ViewHolder viewHolder, ItemTouchHelper itemTouchHelper) {
+        if (!ChromeFeatureList.sAndroidBookmarkBarFastFollow.isEnabled()) return;
+
+        int position = viewHolder.getBindingAdapterPosition();
+        if (position == RecyclerView.NO_POSITION) return;
+
+        // Get the model for this specific row.
+        PropertyModel model = mModelList.get(position).model;
+        BookmarkListEntry entry = model.get(BookmarkManagerProperties.BOOKMARK_LIST_ENTRY);
+        BookmarkItem bookmarkItem = entry.getBookmarkItem();
+        if (bookmarkItem == null) return;
+        BookmarkId bookmarkId = bookmarkItem.getId();
+
+        // This was set in the mediator.
+        boolean isDragEnabled = model.get(ImprovedBookmarkRowProperties.IS_DRAG_ENABLED);
+
+        BookmarkManagerDragHelper dragHelper =
+                new BookmarkManagerDragHelper(
                         mContext,
-                        ManageSyncSettings.class,
-                        ManageSyncSettings.createArguments(false));
+                        bookmarkId,
+                        mSelectionDelegate,
+                        itemTouchHelper,
+                        mRecyclerView,
+                        viewHolder,
+                        isDragEnabled);
+
+        model.set(ImprovedBookmarkRowProperties.DRAG_HELPER, dragHelper);
+
+        model.set(
+                ImprovedBookmarkRowProperties.ROW_BODY_TOUCH_LISTENER, dragHelper::onRowBodyTouch);
+        model.set(
+                ImprovedBookmarkRowProperties.DRAG_HANDLE_TOUCH_LISTENER,
+                dragHelper::onDragHandleTouch);
+        model.set(
+                ImprovedBookmarkRowProperties.DRAG_HANDLE_HOVER_LISTENER,
+                dragHelper::onDragHandleHover);
+        model.set(
+                ImprovedBookmarkRowProperties.ROW_BODY_HOVER_LISTENER, dragHelper::onRowBodyHover);
     }
 }

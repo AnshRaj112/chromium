@@ -37,8 +37,6 @@ extern crate rustc_ast_pretty;
 extern crate rustc_data_structures;
 extern crate rustc_driver;
 extern crate rustc_span;
-extern crate smallvec;
-extern crate thin_vec;
 
 use crate::common::eq::SpanlessEq;
 use crate::common::parse;
@@ -210,10 +208,10 @@ fn librustc_parenthesize(mut librustc_expr: Box<ast::Expr>) -> Box<ast::Expr> {
     use rustc_ast::mut_visit::{walk_flat_map_assoc_item, MutVisitor};
     use rustc_ast::visit::{AssocCtxt, BoundKind};
     use rustc_data_structures::flat_map_in_place::FlatMapInPlace;
+    use rustc_data_structures::smallvec::SmallVec;
+    use rustc_data_structures::thin_vec::ThinVec;
     use rustc_span::DUMMY_SP;
-    use smallvec::SmallVec;
     use std::ops::DerefMut;
-    use thin_vec::ThinVec;
 
     struct FullyParenthesize;
 
@@ -264,7 +262,9 @@ fn librustc_parenthesize(mut librustc_expr: Box<ast::Expr>) -> Box<ast::Expr> {
                     fields,
                     rest,
                 } = expr.deref_mut();
-                vis.visit_qself(qself);
+                if let Some(qself) = qself {
+                    vis.visit_qself(qself);
+                }
                 vis.visit_path(path);
                 fields.flat_map_in_place(|field| flat_map_field(field, vis));
                 if let StructRest::Base(rest) = rest {
@@ -383,7 +383,9 @@ fn librustc_parenthesize(mut librustc_expr: Box<ast::Expr>) -> Box<ast::Expr> {
 
 fn syn_parenthesize(syn_expr: syn::Expr) -> syn::Expr {
     use syn::fold::{fold_expr, fold_generic_argument, Fold};
-    use syn::{token, BinOp, Expr, ExprParen, GenericArgument, MetaNameValue, Pat, Stmt, Type};
+    use syn::{
+        token, BinOp, Expr, ExprParen, GenericArgument, Lit, MetaNameValue, Pat, Stmt, Type,
+    };
 
     struct FullyParenthesize;
 
@@ -460,6 +462,13 @@ fn syn_parenthesize(syn_expr: syn::Expr) -> syn::Expr {
 
         fn fold_type(&mut self, ty: Type) -> Type {
             ty
+        }
+
+        fn fold_lit(&mut self, lit: Lit) -> Lit {
+            if let Lit::Verbatim(lit) = &lit {
+                panic!("unexpected verbatim literal: {lit}");
+            }
+            lit
         }
     }
 

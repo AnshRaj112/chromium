@@ -5,8 +5,8 @@
 #include "gpu/command_buffer/service/webgpu_decoder.h"
 
 #include <memory>
+#include <utility>
 
-#include "base/types/cxx23_to_underlying.h"
 #include "build/build_config.h"
 #include "gpu/command_buffer/client/client_test_helper.h"
 #include "gpu/command_buffer/common/webgpu_cmd_format.h"
@@ -35,10 +35,10 @@ class WebGPUDecoderTest : public ::testing::Test {
     decoder_client_ = std::make_unique<FakeDecoderClient>();
     command_buffer_service_ = std::make_unique<FakeCommandBufferServiceBase>();
 
-    decoder_.reset(WebGPUDecoder::Create(
+    decoder_ = WebGPUDecoder::Create(
         decoder_client_.get(), command_buffer_service_.get(), nullptr, nullptr,
         &outputter_, {}, nullptr, DawnCacheOptions(),
-        &mock_isolation_key_provider_));
+        &mock_isolation_key_provider_);
     ASSERT_EQ(decoder_->Initialize(GpuFeatureInfo()), ContextResult::kSuccess);
   }
 
@@ -78,7 +78,7 @@ TEST_F(WebGPUDecoderTest, IsolationKeyFromDocument) {
       .Times(1);
 
   cmds::SetWebGPUExecutionContextToken cmd;
-  cmd.Init(base::to_underlying(wgpu_context_token.variant_index()), high >> 32,
+  cmd.Init(std::to_underlying(wgpu_context_token.variant_index()), high >> 32,
            high, low >> 32, low);
   ExecuteCmd(cmd);
 }
@@ -93,7 +93,7 @@ TEST_F(WebGPUDecoderTest, IsolationKeyFromWorker) {
       .Times(1);
 
   cmds::SetWebGPUExecutionContextToken cmd;
-  cmd.Init(base::to_underlying(wgpu_context_token.variant_index()), high >> 32,
+  cmd.Init(std::to_underlying(wgpu_context_token.variant_index()), high >> 32,
            high, low >> 32, low);
   ExecuteCmd(cmd);
 }

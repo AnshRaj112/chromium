@@ -14,7 +14,6 @@
 #import "components/segmentation_platform/embedder/home_modules/tips_manager/signal_constants.h"
 #import "ios/chrome/browser/feature_engagement/model/tracker_factory.h"
 #import "ios/chrome/browser/first_run/public/best_features_item.h"
-#import "ios/chrome/browser/first_run/public/features.h"
 #import "ios/chrome/browser/intents/model/intents_donation_helper.h"
 #import "ios/chrome/browser/lens/ui_bundled/features.h"
 #import "ios/chrome/browser/lens/ui_bundled/lens_availability.h"
@@ -46,6 +45,7 @@
 #import "ios/chrome/browser/url_loading/model/url_loading_browser_agent.h"
 #import "ios/chrome/browser/url_loading/model/url_loading_params.h"
 #import "ios/chrome/browser/web/model/web_navigation_util.h"
+#import "ios/chrome/browser/welcome_back/model/features.h"
 #import "ios/chrome/common/NSString+Chromium.h"
 #import "ios/chrome/common/app_group/app_group_constants.h"
 #import "ios/chrome/grit/ios_strings.h"
@@ -209,9 +209,7 @@ const base::TimeDelta kCloseLensViewTimeout = base::Seconds(10);
         [weakSelf openWebLoadParams:params];
       }));
 
-  if (IsSegmentationTipsManagerEnabled()) {
-    [self recordLensUsage];
-  }
+  [self recordLensUsage];
 }
 
 - (void)lensOverlayDidDismissWithCause:
@@ -260,6 +258,11 @@ const base::TimeDelta kCloseLensViewTimeout = base::Seconds(10);
     DCHECK(featureTracker);
     featureTracker->NotifyEvent(
         feature_engagement::events::kLensButtonKeyboardUsed);
+  } else if (entrypoint == LensEntrypoint::Composebox) {
+    feature_engagement::Tracker* featureTracker = self.tracker;
+    DCHECK(featureTracker);
+    featureTracker->NotifyEvent(
+        feature_engagement::events::kIOSLensButtonComposeboxUsed);
   }
 
   if (!isIncognito) {
@@ -323,6 +326,9 @@ const base::TimeDelta kCloseLensViewTimeout = base::Seconds(10);
     case LensEntrypoint::Keyboard:
       RecordCameraOpen(CameraOpenEntryPoint::KEYBOARD);
       break;
+    case LensEntrypoint::Composebox:
+      RecordCameraOpen(CameraOpenEntryPoint::COMPOSE_BOX);
+      break;
     case LensEntrypoint::Spotlight:
       RecordCameraOpen(CameraOpenEntryPoint::SPOTLIGHT);
       break;
@@ -333,12 +339,10 @@ const base::TimeDelta kCloseLensViewTimeout = base::Seconds(10);
   GetApplicationContext()->GetLocalState()->SetTime(prefs::kLensLastOpened,
                                                     base::Time::Now());
 
-  if (IsSegmentationTipsManagerEnabled()) {
-    [self recordLensUsage];
-  }
+  [self recordLensUsage];
 
   // Notify Welcome Back to remove Lens from the eligible features.
-  if (IsWelcomeBackInFirstRunEnabled()) {
+  if (IsWelcomeBackEnabled()) {
     MarkWelcomeBackFeatureUsed(BestFeaturesItemType::kLensSearch);
   }
 }
@@ -484,8 +488,6 @@ const base::TimeDelta kCloseLensViewTimeout = base::Seconds(10);
 // Manager to provide relevant tips or guidance to the user about the Lens
 // feature.
 - (void)recordLensUsage {
-  CHECK(IsSegmentationTipsManagerEnabled());
-
   if (!self.browser) {
     return;
   }
@@ -493,8 +495,10 @@ const base::TimeDelta kCloseLensViewTimeout = base::Seconds(10);
   TipsManagerIOS* tipsManager =
       TipsManagerIOSFactory::GetForProfile(self.profile);
 
-  tipsManager->NotifySignal(
-      segmentation_platform::tips_manager::signals::kLensUsed);
+  if (tipsManager) {
+    tipsManager->NotifySignal(
+        segmentation_platform::tips_manager::signals::kLensUsed);
+  }
 }
 
 - (void)openWebLoadParams:(const web::NavigationManager::WebLoadParams&)params {

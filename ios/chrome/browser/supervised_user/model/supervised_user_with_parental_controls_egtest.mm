@@ -6,21 +6,22 @@
 #import "components/browsing_data/core/pref_names.h"
 #import "components/policy/policy_constants.h"
 #import "components/signin/internal/identity_manager/account_capabilities_constants.h"
+#import "components/strings/grit/components_strings.h"
 #import "components/supervised_user/core/browser/supervised_user_url_filter.h"
 #import "components/supervised_user/core/common/features.h"
 #import "components/supervised_user/core/common/supervised_user_constants.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey_ui_test_util.h"
-#import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_constants.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey.h"
+#import "ios/chrome/browser/authentication/test/signin_earl_grey_ui_test_util.h"
+#import "ios/chrome/browser/content_suggestions/public/content_suggestions_constants.h"
 #import "ios/chrome/browser/metrics/model/metrics_app_interface.h"
 #import "ios/chrome/browser/policy/model/policy_app_interface.h"
 #import "ios/chrome/browser/policy/model/policy_earl_grey_utils.h"
 #import "ios/chrome/browser/policy/model/policy_util.h"
-#import "ios/chrome/browser/popup_menu/ui_bundled/popup_menu_constants.h"
-#import "ios/chrome/browser/settings/ui_bundled/clear_browsing_data/features.h"
+#import "ios/chrome/browser/popup_menu/public/popup_menu_constants.h"
 #import "ios/chrome/browser/settings/ui_bundled/google_services/manage_sync_settings_constants.h"
 #import "ios/chrome/browser/settings/ui_bundled/supervised_user_settings_app_interface.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/public/snackbar/snackbar_constants.h"
 #import "ios/chrome/browser/signin/model/capabilities_types.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity.h"
 #import "ios/chrome/browser/supervised_user/ui/constants.h"
@@ -69,7 +70,6 @@ static const char* kInterstitialDetails = "Details";
 
 - (AppLaunchConfiguration)appConfigurationForTestCase {
   AppLaunchConfiguration config = [super appConfigurationForTestCase];
-  config.features_enabled_and_params.push_back({kIOSQuickDelete, {}});
 
   if ([self isRunningTest:@selector
             (testSupervisedUserLocalWebApprovalDismissedAfterTimeout)]) {
@@ -790,9 +790,7 @@ static const char* kInterstitialDetails = "Details";
       grey_accessibilityID(kToolsMenuTextZoom), grey_accessibilityTrait(trait),
       grey_sufficientlyVisible(), nil);
   id<GREYMatcher> tableViewMatcher =
-      [ChromeEarlGrey isNewOverflowMenuEnabled]
-          ? grey_accessibilityID(kPopupMenuToolsMenuActionListId)
-          : grey_accessibilityID(kPopupMenuToolsMenuTableViewId);
+      grey_accessibilityID(kPopupMenuToolsMenuActionListId);
   [[[EarlGrey selectElementWithMatcher:zoomActionMatcher]
          usingSearchAction:grey_scrollInDirection(kGREYDirectionDown, 200)
       onElementWithMatcher:tableViewMatcher] assertWithMatcher:grey_notNil()];
@@ -896,8 +894,8 @@ static const char* kInterstitialDetails = "Details";
 
   // Switch to landscape and check visibility.
   GREYAssert(
-      [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationLandscapeLeft
-                                    error:nil],
+      [EarlGrey rotateInterfaceToOrientation:UIInterfaceOrientationLandscapeLeft
+                                       error:nil],
       @"Could not rotate device to Landscape Left");
   [[EarlGrey
       selectElementWithMatcher:grey_accessibilityID(
@@ -905,9 +903,10 @@ static const char* kInterstitialDetails = "Details";
       assertWithMatcher:grey_sufficientlyVisible()];
 
   // Switch back to portrait and check visibility.
-  GREYAssert([EarlGrey rotateDeviceToOrientation:UIDeviceOrientationPortrait
-                                           error:nil],
-             @"Could not rotate device to Portrait");
+  GREYAssert(
+      [EarlGrey rotateInterfaceToOrientation:UIInterfaceOrientationPortrait
+                                       error:nil],
+      @"Could not rotate device to Portrait");
   [[EarlGrey
       selectElementWithMatcher:grey_accessibilityID(
                                    kParentAccessViewAccessibilityIdentifier)]
@@ -973,8 +972,11 @@ static const char* kInterstitialDetails = "Details";
           grey_accessibilityID(kParentAccessViewAccessibilityIdentifier)];
 
   // Wait for the error snackbar message to be visible and tap to dismiss it.
-  id<GREYMatcher> snackbarCloseButton =
-      grey_accessibilityID(kParentAccessSnackbarClose);
+  id<GREYMatcher> snackbarCloseButton = grey_allOf(
+      grey_accessibilityID(kSnackbarButtonAccessibilityId),
+      grey_accessibilityLabel(l10n_util::GetNSString(
+          IDS_PARENTAL_LOCAL_APPROVAL_SNACKBAR_GENERIC_ERROR_BACK_BUTTON)),
+      nil);
   [ChromeEarlGrey
       waitForSufficientlyVisibleElementWithMatcher:snackbarCloseButton];
   [[EarlGrey selectElementWithMatcher:snackbarCloseButton]

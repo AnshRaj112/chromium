@@ -28,6 +28,7 @@ include_rules = [
   "+components/attribution_reporting",
   "+components/browsing_topics/common",
   "+components/content_settings/core/common",
+  "+components/history/core/browser/features.h",
   "+components/input",
   "+components/memory_pressure",
   "+components/optimization_guide/public/mojom",
@@ -42,6 +43,7 @@ include_rules = [
   "+components/services/font/public",
   "+components/services/font_data/public",
   "+components/startup_metric_utils",
+  "+components/url_pattern",
   "+components/variations",
   "+components/value_store",
 
@@ -108,7 +110,6 @@ include_rules = [
   "+ui/shell_dialogs",
   "+ui/snapshot",
   "+ui/strings/grit/ui_strings.h",
-  "+ui/surface",
   "+ui/touch_selection",
   "+ui/webui/resources/grit/webui_resources.h",
   "+ui/webui/resources/grit/webui_resources_map.h",

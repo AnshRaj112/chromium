@@ -54,6 +54,16 @@ id<GREYMatcher> ButtonWithForegroundColor(NSString* colorName);
 // `colorName` and accessibility trait UIAccessibilityTraitButton.
 id<GREYMatcher> ButtonWithBackgroundColor(NSString* colorName);
 
+// Returns a matcher for element with with background/foreground colors related
+// to the Primary type and accessibility trait UIAccessibilityTraitButton.
+id<GREYMatcher> ButtonWithPrimaryColor();
+// Returns a matcher for element with with background/foreground colors related
+// to the Secondary type and accessibility trait UIAccessibilityTraitButton.
+id<GREYMatcher> ButtonWithSecondaryColor();
+// Returns a matcher for element with with background/foreground colors related
+// to the Equal Weight type and accessibility trait UIAccessibilityTraitButton.
+id<GREYMatcher> ButtonWithEqualWeightColor();
+
 // Returns a matcher for context menu items with accessibility label
 // corresponding to `label`.
 id<GREYMatcher> ContextMenuItemWithAccessibilityLabel(NSString* label);
@@ -198,6 +208,9 @@ id<GREYMatcher> OmniboxContainingAutocompleteText(NSString* text);
 // view.
 id<GREYMatcher> LocationViewContainingText(const std::string& text);
 
+// Returns matcher for the location view being empty.
+id<GREYMatcher> LocationViewEmpty();
+
 // Returns a matcher for Tools menu button.
 id<GREYMatcher> ToolsMenuButton();
 
@@ -253,6 +266,9 @@ id<GREYMatcher> OpenLinkInIncognitoButton();
 // Returns a matcher for the Open in New Window option in the context menu when
 // long pressing a link.
 id<GREYMatcher> OpenLinkInNewWindowButton();
+
+// Returns a matcher for the close button on the navigation bar.
+id<GREYMatcher> NavigationBarCloseButton();
 
 // Returns a matcher for the done button on the navigation bar.
 id<GREYMatcher> NavigationBarDoneButton();
@@ -334,16 +350,6 @@ id<GREYMatcher> IdentityChooserScrim();
 
 // Returns matcher for the cancel button in the fake add account flow.
 id<GREYMatcher> FakeAddAccountScreenCancelButton();
-
-// Returns matcher for the primary button (typically labeled somethings like
-// "Yes") in various promo screens, including sign-in, history sync, default
-// browser choice, and more.
-id<GREYMatcher> PromoScreenPrimaryButtonMatcher();
-
-// Returns matcher for the secondary button (typically labeled somethings like
-// "No Thanks") in various promo screens, including sign-in, history sync,
-// default browser choice, and more.
-id<GREYMatcher> PromoScreenSecondaryButtonMatcher();
 
 // Returns a matcher for the button for the currently signed in account in the
 // settings menu.
@@ -530,6 +536,9 @@ id<GREYMatcher> NewTabPageOmnibox();
 // Returns a matcher for a fake omnibox on a new tab page.
 id<GREYMatcher> FakeOmnibox();
 
+// Returns a matcher for the snackbar view.
+id<GREYMatcher> SnackbarViewMatcher();
+
 // Returns a matcher for a header label of the Discover feed.
 id<GREYMatcher> DiscoverHeaderLabel();
 
@@ -607,6 +616,9 @@ id<GREYMatcher> TabGroupActivityLabelOnGridCellAtIndex(unsigned int index);
 
 // Returns a matcher for the button that closes the tab grid.
 id<GREYMatcher> TabGridDoneButton();
+
+// Returns a matcher for the tab grid overflow menu button.
+id<GREYMatcher> TabGridOverflowMenuButton();
 
 // Returns a matcher for the button that reverts the close all tabs action
 // in the tab grid.
@@ -739,14 +751,6 @@ id<GREYMatcher> UseSuggestedPasswordMatcher();
 // Matcher for Toolbar element item corresponding to the given accessibility ID
 // `button_id`.
 id<GREYMatcher> ToolbarButtonWithID(NSString* button_id);
-
-#pragma mark - Promo style view controller
-
-// Returns matcher for the primary action button.
-id<GREYMatcher> PromoScreenPrimaryButtonMatcher();
-
-// Returns matcher for the secondary action button.
-id<GREYMatcher> PromoScreenSecondaryButtonMatcher();
 
 #pragma mark - Incognito Interstitial
 
@@ -965,6 +969,20 @@ id<GREYMatcher> FakeJoinFlowView();
 
 // Returns the matcher for the tab groups page of the tab grid.
 id<GREYMatcher> TabGroupsPanel();
+
+#pragma mark - Button Stack
+
+// Returns a matcher for the primary button in a button stack.
+id<GREYMatcher> ButtonStackPrimaryButton();
+
+// Returns a matcher for the secondary button in a button stack.
+id<GREYMatcher> ButtonStackSecondaryButton();
+
+// Returns a matcher for the tertiary button in a button stack.
+id<GREYMatcher> ButtonStackTertiaryButton();
+
+// Returns a matcher for the checkmark symbol in a button stack.
+id<GREYMatcher> ButtonStackCheckmarkSymbol();
 
 }  // namespace chrome_test_util
 

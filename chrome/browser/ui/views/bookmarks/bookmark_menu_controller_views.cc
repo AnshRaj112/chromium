@@ -11,6 +11,7 @@
 #include "chrome/browser/bookmarks/bookmark_merged_surface_service.h"
 #include "chrome/browser/bookmarks/bookmark_merged_surface_service_observer.h"
 #include "chrome/browser/ui/bookmarks/bookmark_stats.h"
+#include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
 #include "chrome/browser/ui/views/bookmarks/bookmark_menu_controller_observer.h"
 #include "chrome/browser/ui/views/bookmarks/bookmark_menu_delegate.h"
@@ -49,6 +50,10 @@ BookmarkMenuController::BookmarkMenuController(
   int run_type = 0;
   if (for_drop) {
     run_type |= views::MenuRunner::FOR_DROP;
+  }
+
+  if (base::FeatureList::IsEnabled(features::kTabGroupMenuImprovements)) {
+    run_type |= views::MenuRunner::HAS_MNEMONICS;
   }
   menu_runner_ = std::make_unique<views::MenuRunner>(
       base::WrapUnique<MenuItemView>(menu_delegate_->menu()), run_type);
@@ -191,7 +196,8 @@ views::MenuItemView* BookmarkMenuController::GetSiblingMenu(
   menu_delegate_->SetActiveMenu(*folder, start_index);
   *button = bookmark_bar_->GetMenuButtonForFolder(*folder);
   bookmark_bar_->GetAnchorPositionForButton(*button, anchor);
-  *has_mnemonics = false;
+  *has_mnemonics =
+      base::FeatureList::IsEnabled(features::kTabGroupMenuImprovements);
   return this->menu();
 }
 

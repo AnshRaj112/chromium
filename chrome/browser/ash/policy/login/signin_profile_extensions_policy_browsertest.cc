@@ -19,8 +19,7 @@
 #include "base/version.h"
 #include "chrome/browser/ash/policy/login/signin_profile_extensions_policy_test_base.h"
 #include "chrome/browser/extensions/crx_installer.h"
-#include "chrome/browser/extensions/install_observer.h"
-#include "chrome/browser/extensions/install_tracker.h"
+#include "chrome/browser/extensions/install_tracker_factory.h"
 #include "chrome/browser/extensions/updater/extension_updater.h"
 #include "chrome/browser/policy/extension_force_install_mixin.h"
 #include "chrome/browser/profiles/profile.h"
@@ -33,6 +32,8 @@
 #include "extensions/browser/extension_registrar.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_util.h"
+#include "extensions/browser/install_observer.h"
+#include "extensions/browser/install_tracker.h"
 #include "extensions/browser/test_extension_registry_observer.h"
 #include "extensions/browser/update_observer.h"
 #include "extensions/common/extension.h"
@@ -103,7 +104,8 @@ class ExtensionInstallErrorObserver : public extensions::InstallObserver {
   ExtensionInstallErrorObserver(Profile* profile,
                                 const std::string& extension_id)
       : extension_id_(extension_id) {
-    auto* tracker = extensions::InstallTracker::Get(profile);
+    auto* tracker =
+        extensions::InstallTrackerFactory::GetForBrowserContext(profile);
     CHECK(tracker);
     observation_.Observe(tracker);
   }
@@ -204,7 +206,7 @@ class SigninProfileExtensionsPolicyTest
 
 }  // namespace
 
-// Tests that a allowlisted app gets installed.
+// Tests that an allowlisted app gets installed.
 IN_PROC_BROWSER_TEST_F(SigninProfileExtensionsPolicyTest,
                        AllowlistedAppInstallation) {
   EXPECT_TRUE(extension_force_install_mixin_.ForceInstallFromCrx(
@@ -235,7 +237,7 @@ IN_PROC_BROWSER_TEST_F(SigninProfileExtensionsPolicyTest,
       kNotAllowlistedAppId));
 }
 
-// Tests that a allowlisted extension is installed. Force-installed extensions
+// Tests that an allowlisted extension is installed. Force-installed extensions
 // on the sign-in screen should also automatically have the
 // |login_screen_extension| type.
 IN_PROC_BROWSER_TEST_F(SigninProfileExtensionsPolicyTest,

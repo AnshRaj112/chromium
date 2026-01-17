@@ -28,6 +28,7 @@ import org.chromium.components.autofill.AutofillProfile;
 import org.chromium.components.autofill.IbanRecordType;
 import org.chromium.components.autofill.VirtualCardEnrollmentState;
 import org.chromium.components.autofill.payments.BankAccount;
+import org.chromium.components.autofill.payments.BnplIssuerForSettings;
 import org.chromium.components.autofill.payments.Ewallet;
 import org.chromium.components.prefs.PrefService;
 import org.chromium.components.user_prefs.UserPrefs;
@@ -597,9 +598,9 @@ public class PersonalDataManager implements Destroyable {
 
         @Override
         public boolean equals(Object obj) {
-            if (obj == null) return false;
+
             if (this == obj) return true;
-            if (getClass() != obj.getClass()) return false;
+            if (!(obj instanceof Iban)) return false;
 
             Iban otherIban = (Iban) obj;
 
@@ -1140,6 +1141,37 @@ public class PersonalDataManager implements Destroyable {
         return mPrefService.getBoolean(Pref.FACILITATED_PAYMENTS_A2A_TRIGGERED_ONCE);
     }
 
+    /** Returns whether the BNPL preference should be shown on the settings page. */
+    public boolean shouldShowBnplSettings() {
+        ThreadUtils.assertOnUiThread();
+        return PersonalDataManagerJni.get().shouldShowBnplSettings(mPersonalDataManagerAndroid);
+    }
+
+    /**
+     * @return Whether the buy now pay later feature {@code kAutofillEnableBuyNowPayLater}, which is
+     *     defined in {@code components/autofill/core/common/autofill_payments_features.cc}, is
+     *     enabled.
+     */
+    public boolean isBuyNowPayLaterEnabled() {
+        return mPrefService.getBoolean(Pref.AUTOFILL_BNPL_ENABLED);
+    }
+
+    /**
+     * Enables or disables the buy now pay later feature {@code kAutofillEnableBuyNowPayLater},
+     * which is defined in {@code components/autofill/core/common/autofill_payments_features.cc}.
+     *
+     * @param enable True to enable buy now pay later, false otherwise.
+     */
+    public void setBuyNowPayLater(boolean enable) {
+        mPrefService.setBoolean(Pref.AUTOFILL_BNPL_ENABLED, enable);
+    }
+
+    /** Gets the BNPL issuers to show in the settings page. */
+    public BnplIssuerForSettings[] getBnplIssuersForSettings() {
+        ThreadUtils.assertOnUiThread();
+        return PersonalDataManagerJni.get().getBnplIssuersForSettings(mPersonalDataManagerAndroid);
+    }
+
     @NativeMethods
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     public interface Natives {
@@ -1246,9 +1278,14 @@ public class PersonalDataManager implements Destroyable {
 
         BankAccount[] getMaskedBankAccounts(long nativePersonalDataManagerAndroid);
 
+        @JniType("base::span<const autofill::Ewallet>")
         Ewallet[] getEwallets(long nativePersonalDataManagerAndroid);
 
         boolean isCardEligibleForBenefits(
                 long nativePersonalDataManagerAndroid, @JniType("std::string") String guid);
+
+        boolean shouldShowBnplSettings(long nativePersonalDataManagerAndroid);
+
+        BnplIssuerForSettings[] getBnplIssuersForSettings(long nativePersonalDataManagerAndroid);
     }
 }

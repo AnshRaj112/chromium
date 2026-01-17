@@ -14,15 +14,11 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "build/build_config.h"
-#include "chrome/browser/policy/policy_test_utils.h"
 #include "chrome/browser/ssl/cert_verifier_browser_test.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/test/base/ui_test_utils.h"
-#include "components/policy/core/common/policy_map.h"
-#include "components/policy/policy_constants.h"
-#include "components/tpcd/enterprise_reporting/enterprise_reporting_tab_helper.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
@@ -31,7 +27,6 @@
 #include "content/public/common/url_constants.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
-#include "content/public/test/content_mock_cert_verifier.h"
 #include "content/public/test/no_renderer_crashes_assertion.h"
 #include "content/public/test/test_navigation_observer.h"
 #include "net/base/features.h"
@@ -237,18 +232,9 @@ class ReportingBrowserTestCrashReportingStorage
 
   ~ReportingBrowserTestCrashReportingStorage() override = default;
 
-  void SetUp() override {
-    scoped_feature_list_.InitAndEnableFeature(
-        blink::features::kCrashReportingStorageAPI);
-    BaseReportingBrowserTest::SetUp();
-  }
-
-  void SetUpOnMainThread() override {
-    BaseReportingBrowserTest::SetUpOnMainThread();
-  }
-
  private:
-  base::test::ScopedFeatureList scoped_feature_list_;
+  base::test::ScopedFeatureList scoped_feature_list_{
+      blink::features::kCrashReportingStorageAPI};
 };
 
 class ReportingBrowserTestSpecifyCrashEndpoint
@@ -323,89 +309,6 @@ class JSCallStackReportingBrowserTest : public BaseReportingBrowserTest {
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
-};
-
-class EnterpriseReportingBrowserTest : public policy::PolicyTest {
- public:
-  EnterpriseReportingBrowserTest()
-      : https_server_(net::test_server::EmbeddedTestServer::TYPE_HTTPS) {
-    scoped_feature_list_.InitWithFeatures(
-        // enabled_features
-        {net::features::kForceThirdPartyCookieBlocking,
-         net::features::kReportingApiEnableEnterpriseCookieIssues,
-         network::features::kReporting},
-        // disabled_features
-        {});
-  }
-
-  ~EnterpriseReportingBrowserTest() override = default;
-
-  void SetUpCommandLine(base::CommandLine* command_line) override {
-    mock_cert_verifier_.SetUpCommandLine(command_line);
-  }
-
-  void SetUpInProcessBrowserTestFixture() override {
-    PolicyTest::SetUpInProcessBrowserTestFixture();
-    mock_cert_verifier_.SetUpInProcessBrowserTestFixture();
-  }
-
-  void TearDownInProcessBrowserTestFixture() override {
-    PolicyTest::TearDownInProcessBrowserTestFixture();
-    mock_cert_verifier_.TearDownInProcessBrowserTestFixture();
-  }
-
-  void SetUp() override {
-    PolicyTest::SetUp();
-
-    // Making the report delivery happen instantly for testing.
-    net::ReportingPolicy policy;
-    policy.delivery_interval = base::Seconds(0);
-    net::ReportingPolicy::UsePolicyForTesting(policy);
-  }
-
-  void SetUpOnMainThread() override {
-    PolicyTest::SetUpOnMainThread();
-    host_resolver()->AddRule("*", "127.0.0.1");
-    preflight_response_ =
-        std::make_unique<net::test_server::ControllableHttpResponse>(server(),
-                                                                     "/upload");
-    payload_response_ =
-        std::make_unique<net::test_server::ControllableHttpResponse>(server(),
-                                                                     "/upload");
-
-    mock_cert_verifier_.mock_cert_verifier()->set_default_result(net::OK);
-    server()->AddDefaultHandlers(GetChromeTestDataDir());
-    ASSERT_TRUE(server()->Start());
-  }
-
-  void UpdateReportingEndpointsPolicy(base::Value::Dict dict) {
-    SetPolicy(&policies_, policy::key::kReportingEndpoints,
-              base::Value(std::move(dict)));
-    UpdateProviderPolicy(policies_);
-  }
-
-  net::EmbeddedTestServer* server() { return &https_server_; }
-
-  net::test_server::ControllableHttpResponse* preflight_response() {
-    return preflight_response_.get();
-  }
-
-  net::test_server::ControllableHttpResponse* payload_response() {
-    return payload_response_.get();
-  }
-
-  GURL GetCollectorURL() const {
-    return https_server_.GetURL(kReportingHost, "/upload");
-  }
-
- private:
-  content::ContentMockCertVerifier mock_cert_verifier_;
-  base::test::ScopedFeatureList scoped_feature_list_;
-  policy::PolicyMap policies_;
-  net::test_server::EmbeddedTestServer https_server_;
-  std::unique_ptr<net::test_server::ControllableHttpResponse>
-      preflight_response_;
-  std::unique_ptr<net::test_server::ControllableHttpResponse> payload_response_;
 };
 
 class HistogramReportingBrowserTest : public BaseReportingBrowserTest {
@@ -751,11 +654,16 @@ IN_PROC_BROWSER_TEST_P(ReportingBrowserTestCrashReportingStorage,
   // Use the crash reporting storage API, to collect some data about the current
   // page. In this case, just the current origin and a custom key, to verify
   // they come out on the other end of the crash report.
-  EXPECT_TRUE(ExecJs(contents->GetPrimaryMainFrame(),
-                     "crashReport.set('self.origin', self.origin + "
-                     "'/');crashReport.set('custom_key', 'custom_value')"));
-  EXPECT_TRUE(ExecJs(contents->GetPrimaryMainFrame(),
-                     "crashReport.remove('custom_key')"));
+  EXPECT_TRUE(content::EvalJs(contents->GetPrimaryMainFrame(), R"(
+    (async () => {
+      await crashReport.initialize(1024);
+      crashReport.set('self.origin', self.origin + '/');
+      crashReport.set('outer_height', window.outerHeight);
+      crashReport.set('custom_key', 'custom_value');
+      crashReport.delete('custom_key');
+    })();
+  )")
+                  .is_ok());
 
   // Simulate the page being killed due to being unresponsive.
   content::ScopedAllowRendererCrashes allow_renderer_crashes(contents);
@@ -775,8 +683,12 @@ IN_PROC_BROWSER_TEST_P(ReportingBrowserTestCrashReportingStorage,
   const std::string* url = report.FindString("url");
   const base::Value::Dict* body = report.FindDict("body");
   const std::string* reason = body->FindString("reason");
-  const std::string* self_origin = body->FindString("self.origin");
-  const std::string* custom_key = body->FindString("custom_key");
+  const base::Value::Dict* crash_report_api_body =
+      body->FindDict("crash_report_api");
+  const std::string* self_origin =
+      crash_report_api_body->FindString("self.origin");
+  const std::string* custom_key =
+      crash_report_api_body->FindString("custom_key");
 
   EXPECT_EQ("crash", *type);
   EXPECT_EQ(main_url, *url);
@@ -784,9 +696,119 @@ IN_PROC_BROWSER_TEST_P(ReportingBrowserTestCrashReportingStorage,
   EXPECT_EQ(
       contents->GetPrimaryMainFrame()->GetLastCommittedOrigin().GetURL().spec(),
       *self_origin);
-  // Because `crashReport.remove('custom_key')` was called before the process
+  // Because `crashReport.delete('custom_key')` was called before the process
   // crashed, this value is not present in the report body.
   EXPECT_EQ(custom_key, nullptr);
+}
+
+IN_PROC_BROWSER_TEST_P(ReportingBrowserTestCrashReportingStorage,
+                       CrashStorageAPIDuplicateValue) {
+  content::WebContents* contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+
+  // Navigate to reporting-enabled page.
+  GURL main_url = server()->GetURL(
+      kReportingHost, "/set-header?" + GetAppropriateReportingHeader());
+  EXPECT_TRUE(NavigateToURL(contents, main_url));
+
+  // Use the crash reporting storage API, to collect some data about the current
+  // page. In this case, a custom key gets written to twice, to verify that the
+  // most recent write gets recorded and comes out on the other end of the crash
+  // report.
+  EXPECT_TRUE(content::EvalJs(contents->GetPrimaryMainFrame(), R"(
+    (async () => {
+      await crashReport.initialize(100);
+      crashReport.set('custom_key', 'value_1');
+      crashReport.set('custom_key', 'value_2');
+    })();
+  )")
+                  .is_ok());
+
+  // Simulate the page being killed due to being unresponsive.
+  content::ScopedAllowRendererCrashes allow_renderer_crashes(contents);
+  contents->GetPrimaryMainFrame()->GetProcess()->Shutdown(
+      content::RESULT_CODE_HUNG);
+
+  upload_response()->WaitForRequest();
+  base::Value::List request =
+      ParseReportUpload(upload_response()->http_request()->content);
+  upload_response()->Send("HTTP/1.1 200 OK\r\n");
+  upload_response()->Send("\r\n");
+  upload_response()->Done();
+
+  // Verify the contents of the report that we received.
+  const base::Value::Dict& report = request.begin()->GetDict();
+  const std::string* type = report.FindString("type");
+  const std::string* url = report.FindString("url");
+  const base::Value::Dict* body = report.FindDict("body");
+  const std::string* reason = body->FindString("reason");
+  const base::Value::Dict* crash_report_api_body =
+      body->FindDict("crash_report_api");
+  const std::string* custom_key =
+      crash_report_api_body->FindString("custom_key");
+
+  EXPECT_EQ("crash", *type);
+  EXPECT_EQ(main_url, *url);
+  EXPECT_EQ("unresponsive", *reason);
+  EXPECT_EQ("value_2", *custom_key);
+}
+
+IN_PROC_BROWSER_TEST_P(ReportingBrowserTestCrashReportingStorage,
+                       CrashStorageAPIFullBuffer) {
+  content::WebContents* contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+
+  // Navigate to reporting-enabled page.
+  GURL main_url = server()->GetURL(
+      kReportingHost, "/set-header?" + GetAppropriateReportingHeader());
+  EXPECT_TRUE(NavigateToURL(contents, main_url));
+
+  // It takes exactly 29 bytes to write the JSON stringified data containing
+  // this key/value pair to shared memory, because of the extra JSON characters.
+  // Request exactly 29 bytes, and verify that the key/value are preserved.
+  // Because the browser needs to store a leading integer before the
+  // developer-supplied bytes to track how many bytes of shared memory are
+  // actually used, this means that the browser must internally allocate
+  // 29 + `sizeof(uint32_t)` bytes, the first `sizeof(uint32_t)` of which are
+  // reserved for the leading integer. This test ensures that the browser
+  // allocates the right number of bytes, instead of using some of the
+  // developer-requested bytes to store the leading integer; if it did that, the
+  // key/value data that requires all 29 bytes will be truncated.
+  EXPECT_TRUE(content::EvalJs(contents->GetPrimaryMainFrame(), R"(
+    (async () => {
+      await crashReport.initialize(29);
+      crashReport.set('custom_key', 'custom_value');
+    })();
+  )")
+                  .is_ok());
+
+  // Simulate the page being killed due to being unresponsive.
+  content::ScopedAllowRendererCrashes allow_renderer_crashes(contents);
+  contents->GetPrimaryMainFrame()->GetProcess()->Shutdown(
+      content::RESULT_CODE_HUNG);
+
+  upload_response()->WaitForRequest();
+  base::Value::List request =
+      ParseReportUpload(upload_response()->http_request()->content);
+  upload_response()->Send("HTTP/1.1 200 OK\r\n");
+  upload_response()->Send("\r\n");
+  upload_response()->Done();
+
+  // Verify the contents of the report that we received.
+  const base::Value::Dict& report = request.begin()->GetDict();
+  const std::string* type = report.FindString("type");
+  const std::string* url = report.FindString("url");
+  const base::Value::Dict* body = report.FindDict("body");
+  const std::string* reason = body->FindString("reason");
+  const base::Value::Dict* crash_report_api_body =
+      body->FindDict("crash_report_api");
+  const std::string* custom_key =
+      crash_report_api_body->FindString("custom_key");
+
+  EXPECT_EQ(*type, "crash");
+  EXPECT_EQ(*url, main_url);
+  EXPECT_EQ(*reason, "unresponsive");
+  EXPECT_EQ(*custom_key, "custom_value");
 }
 
 IN_PROC_BROWSER_TEST_P(ReportingBrowserTestMoreContextData,
@@ -1151,131 +1173,6 @@ IN_PROC_BROWSER_TEST_P(JSCallStackReportingBrowserTest,
   } else {
     EXPECT_EQ(nullptr, call_stack);
   }
-}
-
-// Tests that enterprise reports generated by a RenderFrameHost cookie error are
-// properly delivered to an endpoint configured by the enterprise policy.
-IN_PROC_BROWSER_TEST_F(EnterpriseReportingBrowserTest,
-                       RenderFrameHostCookieError) {
-  ASSERT_TRUE(base::FeatureList::IsEnabled(
-      net::features::kForceThirdPartyCookieBlocking));
-  ASSERT_TRUE(base::FeatureList::IsEnabled(network::features::kReporting));
-  ASSERT_TRUE(base::FeatureList::IsEnabled(
-      net::features::kReportingApiEnableEnterpriseCookieIssues));
-
-  // Configure an enterprise policy endpoint for report delivery.
-  UpdateReportingEndpointsPolicy(base::Value::Dict().Set(
-      "enterprise-third-party-cookie-access-error", GetCollectorURL().spec()));
-
-  // Generate and queue a report for delivery from a RenderFrameHost cookie
-  // error
-  content::WebContents* web_contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
-  GURL url_a = server()->GetURL("a.test", "/iframe_blank.html");
-  GURL url_b = server()->GetURL("b.test", "/title1.html");
-  ASSERT_TRUE(content::NavigateToURL(web_contents, url_a));
-  ASSERT_TRUE(content::NavigateIframeToURL(web_contents, "test", url_b));
-  ASSERT_TRUE(
-      content::ExecJs(content::ChildFrameAt(web_contents, 0),
-                      "document.cookie = 'foo=bar;SameSite=None;Secure'"));
-
-  preflight_response()->WaitForRequest();
-  preflight_response()->Send("HTTP/1.1 204 OK\r\n");
-  preflight_response()->Send("Access-Control-Allow-Origin: *\r\n");
-  preflight_response()->Send("Access-Control-Allow-Headers: *\r\n");
-  preflight_response()->Send("\r\n");
-  preflight_response()->Done();
-
-  payload_response()->WaitForRequest();
-  base::Value::List actualReport =
-      ParseReportUpload(payload_response()->http_request()->content);
-  payload_response()->Send("HTTP/1.1 204 OK\r\n");
-  payload_response()->Send("\r\n");
-  payload_response()->Done();
-
-  base::Value::List expectedReport =
-      base::test::ParseJsonList(base::StringPrintf(
-          R"json(
-          [
-            {
-              "body": {
-                "frameUrl": "%s",
-                "accessUrl": "%s",
-                "name": "foo",
-                "domain": "b.test",
-                "path": "/",
-                "accessOperation": "write"
-              },
-              "type": "enterprise-third-party-cookie-access-error",
-              "url": "%s",
-              "user_agent": "Mozilla/1.0"
-            },
-          ]
-        )json",
-          url_b.spec().c_str(), url_b.spec().c_str(), url_a.spec().c_str()));
-  EXPECT_EQ(expectedReport, actualReport);
-}
-
-// Tests that enterprise reports generated by a NavigationHandle cookie error
-// are properly delivered to an endpoint configured by the enterprise policy.
-IN_PROC_BROWSER_TEST_F(EnterpriseReportingBrowserTest,
-                       NavigationHandleCookieError) {
-  ASSERT_TRUE(base::FeatureList::IsEnabled(
-      net::features::kForceThirdPartyCookieBlocking));
-  ASSERT_TRUE(base::FeatureList::IsEnabled(network::features::kReporting));
-  ASSERT_TRUE(base::FeatureList::IsEnabled(
-      net::features::kReportingApiEnableEnterpriseCookieIssues));
-
-  // Configure an enterprise policy endpoint for report delivery.
-  UpdateReportingEndpointsPolicy(base::Value::Dict().Set(
-      "enterprise-third-party-cookie-access-error", GetCollectorURL().spec()));
-
-  // Generate and queue a report for delivery from a NavigationHandle cookie
-  // error
-  content::WebContents* web_contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
-  GURL url_a = server()->GetURL("a.test", "/iframe_blank.html");
-  GURL url_b = server()->GetURL("b.test", "/title1.html");
-  ASSERT_TRUE(content::SetCookie(web_contents->GetBrowserContext(), url_b,
-                                 "foo=bar;SameSite=None;Secure"));
-  ASSERT_TRUE(content::NavigateToURL(web_contents, url_a));
-  ASSERT_TRUE(content::NavigateIframeToURL(web_contents, "test", url_b));
-
-  preflight_response()->WaitForRequest();
-  preflight_response()->Send("HTTP/1.1 204 OK\r\n");
-  preflight_response()->Send("Access-Control-Allow-Origin: *\r\n");
-  preflight_response()->Send("Access-Control-Allow-Headers: *\r\n");
-  preflight_response()->Send("\r\n");
-  preflight_response()->Done();
-
-  payload_response()->WaitForRequest();
-  base::Value::List actualReport =
-      ParseReportUpload(payload_response()->http_request()->content);
-  payload_response()->Send("HTTP/1.1 204 OK\r\n");
-  payload_response()->Send("\r\n");
-  payload_response()->Done();
-
-  base::Value::List expectedReport =
-      base::test::ParseJsonList(base::StringPrintf(
-          R"json(
-          [
-            {
-              "body": {
-                "frameUrl": "%s",
-                "accessUrl": "%s",
-                "name": "foo",
-                "domain": "b.test",
-                "path": "/",
-                "accessOperation": "read"
-              },
-              "type": "enterprise-third-party-cookie-access-error",
-              "url": "%s",
-              "user_agent": "Mozilla/1.0"
-            },
-          ]
-        )json",
-          url_b.spec().c_str(), url_b.spec().c_str(), url_a.spec().c_str()));
-  EXPECT_EQ(expectedReport, actualReport);
 }
 
 IN_PROC_BROWSER_TEST_P(HistogramReportingBrowserTest,

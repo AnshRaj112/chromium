@@ -5,6 +5,7 @@
 package org.chromium.chrome.browser.educational_tip;
 
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -137,26 +138,54 @@ public class EducationalTipModuleMediatorUnitTest {
                 R.string.educational_tip_history_sync_title,
                 R.string.educational_tip_history_sync_description,
                 R.drawable.history_sync_promo_logo);
+
+        // Test showing tips notifications promo card.
+        testShowModuleImpl(
+                ModuleType.TIPS_NOTIFICATIONS_PROMO,
+                R.string.educational_tip_tips_notifications_title,
+                R.string.educational_tip_tips_notifications_description,
+                R.drawable.tips_notifications_promo_logo);
+    }
+
+    @Test
+    @SmallTest
+    @EnableFeatures({
+        ChromeFeatureList.EDUCATIONAL_TIP_MODULE,
+        ChromeFeatureList.ANDROID_SETUP_LIST
+    })
+    public void testShowSetupList_EnhancedSafeBrowsingPromo() {
+        // Test showing enhance safe browsing promo card.
+        testShowModuleImpl(
+                ModuleType.ENHANCED_SAFE_BROWSING_PROMO,
+                R.string.educational_tip_enhanced_safe_browsing_title,
+                R.string.educational_tip_enhanced_safe_browsing_description,
+                R.drawable.enhanced_safe_browsing_promo_logo);
+    }
+
+    @Test
+    @SmallTest
+    @EnableFeatures({
+        ChromeFeatureList.EDUCATIONAL_TIP_MODULE,
+        ChromeFeatureList.ANDROID_SETUP_LIST
+    })
+    public void testShowSetupList_AddressBarPlacementPromo() {
+        // Test showing address bar placement promo card.
+        testShowModuleImpl(
+                ModuleType.ADDRESS_BAR_PLACEMENT_PROMO,
+                R.string.educational_tip_address_bar_placement_title,
+                R.string.educational_tip_address_bar_placement_description,
+                R.drawable.address_bar_placement_promo_logo);
     }
 
     @Test
     @SmallTest
     @EnableFeatures({ChromeFeatureList.EDUCATIONAL_TIP_MODULE})
-    public void testOnViewCreated_DefaultBrowserPromo() {
+    public void testOnViewCreated_DefaultBrowserPromo_TrackerInitialized_ShouldDisplay() {
         assertTrue(ChromeFeatureList.sEducationalTipModule.isEnabled());
-
-        mEducationalTipModuleMediator =
-                new EducationalTipModuleMediator(
-                        ModuleType.DEFAULT_BROWSER_PROMO,
-                        mModel,
-                        mModuleDelegate,
-                        mActionDelegate,
-                        mProfile);
-
+        when(mTracker.isInitialized()).thenReturn(true);
         when(mTracker.shouldTriggerHelpUi(FeatureConstants.DEFAULT_BROWSER_PROMO_MAGIC_STACK))
                 .thenReturn(true);
 
-        mEducationalTipModuleMediator.setModuleTypeForTesting(ModuleType.DEFAULT_BROWSER_PROMO);
         mEducationalTipModuleMediator.showModule();
         mEducationalTipModuleMediator.onViewCreated();
         verify(mMockDefaultBrowserPromoUtils)
@@ -164,22 +193,51 @@ public class EducationalTipModuleMediatorUnitTest {
                         mEducationalTipModuleMediator
                                 .getDefaultBrowserPromoTriggerStateListenerForTesting());
         verify(mMockDefaultBrowserPromoUtils).notifyDefaultBrowserPromoVisible();
+    }
 
-        mEducationalTipModuleMediator =
-                new EducationalTipModuleMediator(
-                        ModuleType.TAB_GROUP_PROMO,
-                        mModel,
-                        mModuleDelegate,
-                        mActionDelegate,
-                        mProfile);
-        mEducationalTipModuleMediator.setModuleTypeForTesting(ModuleType.TAB_GROUP_PROMO);
+    @Test
+    @SmallTest
+    @EnableFeatures({ChromeFeatureList.EDUCATIONAL_TIP_MODULE})
+    public void testOnViewCreated_DefaultBrowserPromo_TrackerInitialized_ShouldNotDisplay() {
+        assertTrue(ChromeFeatureList.sEducationalTipModule.isEnabled());
+        when(mTracker.isInitialized()).thenReturn(true);
+        when(mTracker.shouldTriggerHelpUi(FeatureConstants.DEFAULT_BROWSER_PROMO_MAGIC_STACK))
+                .thenReturn(false);
+
         mEducationalTipModuleMediator.showModule();
         mEducationalTipModuleMediator.onViewCreated();
-        verify(mMockDefaultBrowserPromoUtils, never())
+        verify(mMockDefaultBrowserPromoUtils, never()).removeListener(any());
+        verify(mMockDefaultBrowserPromoUtils, never()).notifyDefaultBrowserPromoVisible();
+    }
+
+    @Test
+    @SmallTest
+    @EnableFeatures({ChromeFeatureList.EDUCATIONAL_TIP_MODULE})
+    public void testOnViewCreated_DefaultBrowserPromo_TrackerNotInitialized() {
+        assertTrue(ChromeFeatureList.sEducationalTipModule.isEnabled());
+        when(mTracker.isInitialized()).thenReturn(false);
+
+        mEducationalTipModuleMediator.showModule();
+        mEducationalTipModuleMediator.onViewCreated();
+        verify(mMockDefaultBrowserPromoUtils)
                 .removeListener(
                         mEducationalTipModuleMediator
                                 .getDefaultBrowserPromoTriggerStateListenerForTesting());
         verify(mMockDefaultBrowserPromoUtils).notifyDefaultBrowserPromoVisible();
+        verify(mTracker).addOnInitializedCallback(any());
+    }
+
+    @Test
+    @SmallTest
+    @EnableFeatures({ChromeFeatureList.EDUCATIONAL_TIP_MODULE})
+    public void testOnViewCreated_OtherPromoType() {
+        assertTrue(ChromeFeatureList.sEducationalTipModule.isEnabled());
+        mEducationalTipModuleMediator.setModuleTypeForTesting(ModuleType.TAB_GROUP_PROMO);
+
+        mEducationalTipModuleMediator.showModule();
+        mEducationalTipModuleMediator.onViewCreated();
+        verify(mMockDefaultBrowserPromoUtils, never()).removeListener(any());
+        verify(mMockDefaultBrowserPromoUtils, never()).notifyDefaultBrowserPromoVisible();
     }
 
     @Test

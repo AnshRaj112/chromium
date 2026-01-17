@@ -17,7 +17,7 @@
 
 using base::android::ConvertJavaStringToUTF8;
 using base::android::ConvertUTF8ToJavaString;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaGlobalRef;
 using base::android::ScopedJavaLocalRef;
 using ResultCallback =
@@ -29,7 +29,7 @@ namespace collaboration {
 
 static void JNI_CollaborationControllerDelegateImpl_RunResultCallback(
     JNIEnv* env,
-    jint joutcome,
+    int32_t joutcome,
     jlong callback) {
   std::unique_ptr<ResultCallback> callback_ptr =
       conversion::GetNativeResultCallbackFromJava(callback);
@@ -57,9 +57,9 @@ static void JNI_CollaborationControllerDelegateImpl_DeleteExitCallback(
 static void
 JNI_CollaborationControllerDelegateImpl_RunResultWithGroupTokenCallback(
     JNIEnv* env,
-    jint joutcome,
-    const JavaParamRef<jstring>& group_id,
-    const JavaParamRef<jstring>& access_token,
+    int32_t joutcome,
+    const JavaRef<jstring>& group_id,
+    const JavaRef<jstring>& access_token,
     jlong callback) {
   std::unique_ptr<ResultWithGroupTokenCallback> callback_ptr =
       conversion::GetNativeResultWithGroupTokenCallbackFromJava(callback);
@@ -77,7 +77,7 @@ JNI_CollaborationControllerDelegateImpl_RunResultWithGroupTokenCallback(
 
 static jlong JNI_CollaborationControllerDelegateImpl_CreateNativeObject(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& j_object) {
+    const base::android::JavaRef<jobject>& j_object) {
   std::unique_ptr<CollaborationControllerDelegate> delegate_unique_ptr =
       std::make_unique<CollaborationControllerDelegateAndroid>(j_object);
 
@@ -85,7 +85,7 @@ static jlong JNI_CollaborationControllerDelegateImpl_CreateNativeObject(
 }
 
 CollaborationControllerDelegateAndroid::CollaborationControllerDelegateAndroid(
-    const base::android::JavaParamRef<jobject>& j_object) {
+    const base::android::JavaRef<jobject>& j_object) {
   DCHECK(j_object);
   java_obj_.Reset(base::android::ScopedJavaGlobalRef<jobject>(j_object));
 }
@@ -113,7 +113,7 @@ void CollaborationControllerDelegateAndroid::ShowError(const ErrorInfo& error,
                                                        ResultCallback result) {
   JNIEnv* env = base::android::AttachCurrentThread();
   Java_CollaborationControllerDelegateImpl_showError(
-      env, java_obj_, static_cast<jint>(error.type()),
+      env, java_obj_, static_cast<int32_t>(error.type()),
       base::android::ConvertUTF8ToJavaString(env, error.error_header),
       base::android::ConvertUTF8ToJavaString(env, error.error_body),
       conversion::GetJavaResultCallbackPtr(std::move(result)));
@@ -272,3 +272,5 @@ CollaborationControllerDelegateAndroid::GetJavaObject() {
 }
 
 }  // namespace collaboration
+
+DEFINE_JNI(CollaborationControllerDelegateImpl)

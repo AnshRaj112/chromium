@@ -45,6 +45,12 @@ public interface InterceptNavigationDelegateClient {
     void closeTab();
 
     /**
+     * Called when a tab should be closed and handles cases where a tab was launched from an
+     * external app.
+     */
+    void handleShouldCloseTab();
+
+    /**
      * Loads a URL as specified by |loadUrlParams| if possible. May fail in exceptional conditions
      * (e.g., if there is no valid tab).
      *
@@ -65,9 +71,16 @@ public interface InterceptNavigationDelegateClient {
     boolean isInDesktopWindowingMode();
 
     /**
-     * Starts the repareting process for this Tab. Reparenting is an async task that "moves" an
+     * Starts the reparenting process for this Tab. Reparenting is an async task that "moves" an
      * existing tab into a separate Task. Currently, only reparenting towards Chrome browser is
      * supported.
      */
     void startReparentingTask();
+
+    /**
+     * Starts the reparenting process for this Tab to a new window. Reparenting is an async task
+     * that "moves" an existing tab into a separate Task. Currently, only reparenting towards Chrome
+     * browser is supported.
+     */
+    void startReparentingTaskToNewWindow();
 }

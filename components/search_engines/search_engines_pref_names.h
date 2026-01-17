@@ -41,6 +41,11 @@ inline constexpr char kDefaultSearchProviderChoiceScreenCompletionTimestamp[] =
 inline constexpr char kDefaultSearchProviderChoiceScreenCompletionVersion[] =
     "default_search_provider.choice_screen_completion_version";
 
+// The regional program for which the user made a search engine choice.
+// See `regional_capabilities::Program` for the format.
+inline constexpr char kDefaultSearchProviderChoiceScreenCompletionProgram[] =
+    "default_search_provider.choice_screen_completion_program";
+
 // Prepopulated id of the search engine chosen in a guest session if the user
 // decides to propagate the default search engine to all guest sessions. The
 // prepopulated id indicates that the search engine choice dialog should not be
@@ -71,6 +76,21 @@ inline constexpr char kDefaultSearchProviderContextMenuAccessAllowed[] =
 // Whether having a default search provider is enabled.
 inline constexpr char kDefaultSearchProviderEnabled[] =
     "default_search_provider.enabled";
+
+// Tracks if a default search engine reset has occurred that the user hasn't
+// been notified of. This is set to true when a reset occurs and false after the
+// notification is shown.
+inline constexpr char kUnacknowledgedDefaultSearchEngineResetOccurred[] =
+    "default_search_provider.reset_occurred";
+
+// The time the last mirror check based reset occurred.
+inline constexpr char kDefaultSearchEngineMirrorCheckResetTimeStamp[] =
+    "default_search_provider.reset_time";
+
+// The time of the default search engine reset for which the last notification
+// was shown.
+inline constexpr char kResetTimeForLastShownNotification[] =
+    "default_search_provider.notification_reset_time";
 
 // The dictionary key used when the default search providers are given
 // in the preferences file. Normally they are copied from the main

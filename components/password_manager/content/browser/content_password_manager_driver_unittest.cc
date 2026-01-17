@@ -132,7 +132,8 @@ class FakePasswordAutofillAgent
               FillField,
               (autofill::FieldRendererId,
                const std::u16string&,
-               autofill::AutofillSuggestionTriggerSource),
+               autofill::FieldPropertiesMask,
+               base::OnceCallback<void(bool)>),
               (override));
   MOCK_METHOD(void,
               FillChangePasswordForm,
@@ -143,16 +144,16 @@ class FakePasswordAutofillAgent
                const std::u16string&,
                FillChangePasswordFormCallback),
               (override));
-  MOCK_METHOD(void,
-              SubmitFormWithEnter,
-              (autofill::FieldRendererId, SubmitFormWithEnterCallback),
-              (override));
 #if BUILDFLAG(IS_ANDROID)
   MOCK_METHOD(void, TriggerFormSubmission, (), (override));
 #endif
   MOCK_METHOD(void,
               AnnotateFieldsWithParsingResult,
               (const ParsingResult&),
+              (override));
+  MOCK_METHOD(void,
+              CheckViewAreaVisible,
+              (autofill::FieldRendererId, CheckViewAreaVisibleCallback),
               (override));
 
  private:
@@ -240,10 +241,6 @@ MATCHER(WerePasswordsCleared, "Passwords not cleared") {
     }
   }
   return true;
-}
-
-MATCHER_P(FormDataEqualTo, form_data, "") {
-  return autofill::FormData::DeepEqual(arg, form_data);
 }
 
 }  // namespace
@@ -400,8 +397,7 @@ TEST_F(ContentPasswordManagerDriverURLTest, PasswordFormsParsed) {
   form.set_full_url(GURL("http://evil.com/path"));
 
   EXPECT_CALL(password_manager_,
-              OnPasswordFormsParsed(
-                  _, ElementsAre(FormDataEqualTo(ExpectedFormData()))));
+              OnPasswordFormsParsed(_, ElementsAre(ExpectedFormData())));
 
   driver()->PasswordFormsParsed({form});
 }
@@ -412,8 +408,7 @@ TEST_F(ContentPasswordManagerDriverURLTest, PasswordFormsRendered) {
   form.set_full_url(GURL("http://evil.com/path"));
 
   EXPECT_CALL(password_manager_,
-              OnPasswordFormsRendered(
-                  _, ElementsAre(FormDataEqualTo(ExpectedFormData()))));
+              OnPasswordFormsRendered(_, ElementsAre(ExpectedFormData())));
 
   driver()->PasswordFormsRendered({form});
 }
@@ -424,7 +419,7 @@ TEST_F(ContentPasswordManagerDriverURLTest, PasswordFormSubmitted) {
   form.set_full_url(GURL("http://evil.com/path"));
 
   EXPECT_CALL(password_manager_,
-              OnPasswordFormSubmitted(_, FormDataEqualTo(ExpectedFormData())));
+              OnPasswordFormSubmitted(_, ExpectedFormData()));
 
   driver()->PasswordFormSubmitted(form);
 }
@@ -434,8 +429,7 @@ TEST_F(ContentPasswordManagerDriverURLTest, PasswordFormCleared) {
   form.set_url(GURL("http://evil.com"));
   form.set_full_url(GURL("http://evil.com/path"));
 
-  EXPECT_CALL(password_manager_,
-              OnPasswordFormCleared(_, FormDataEqualTo(ExpectedFormData())));
+  EXPECT_CALL(password_manager_, OnPasswordFormCleared(_, ExpectedFormData()));
 
   driver()->PasswordFormCleared(form);
 }

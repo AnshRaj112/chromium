@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include "third_party/blink/renderer/modules/smart_card/smart_card_context.h"
+
+#include "base/task/single_thread_task_runner.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_smart_card_connect_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_smart_card_connect_result.h"
@@ -104,7 +106,7 @@ SmartCardContext::SmartCardContext(
   scard_context_.Bind(
       std::move(pending_context),
       execution_context->GetTaskRunner(TaskType::kMiscPlatformAPI));
-  scard_context_.set_disconnect_handler(WTF::BindOnce(
+  scard_context_.set_disconnect_handler(BindOnce(
       &SmartCardContext::CloseMojoConnection, WrapWeakPersistent(this)));
 }
 
@@ -121,9 +123,9 @@ ScriptPromise<IDLSequence<IDLString>> SmartCardContext::listReaders(
           script_state, exception_state.GetContext());
 
   SetOperationInProgress(resolver);
-  scard_context_->ListReaders(
-      WTF::BindOnce(&SmartCardContext::OnListReadersDone, WrapPersistent(this),
-                    WrapPersistent(resolver)));
+  scard_context_->ListReaders(BindOnce(&SmartCardContext::OnListReadersDone,
+                                       WrapPersistent(this),
+                                       WrapPersistent(resolver)));
 
   return resolver->Promise();
 }
@@ -163,9 +165,9 @@ SmartCardContext::getStatusChange(
   SetOperationInProgress(resolver);
   scard_context_->GetStatusChange(
       timeout, ToMojomReaderStatesIn(reader_states),
-      WTF::BindOnce(&SmartCardContext::OnGetStatusChangeDone,
-                    WrapPersistent(this), WrapPersistent(resolver),
-                    WrapPersistent(signal), WrapPersistent(abort_handle)));
+      BindOnce(&SmartCardContext::OnGetStatusChangeDone, WrapPersistent(this),
+               WrapPersistent(resolver), WrapPersistent(signal),
+               WrapPersistent(abort_handle)));
 
   return resolver->Promise();
 }
@@ -192,8 +194,8 @@ ScriptPromise<SmartCardConnectResult> SmartCardContext::connect(
   scard_context_->Connect(
       reader_name, ToMojoSmartCardShareMode(access_mode),
       ToMojoSmartCardProtocols(preferred_protocols), mojo::NullRemote(),
-      WTF::BindOnce(&SmartCardContext::OnConnectDone, WrapPersistent(this),
-                    WrapPersistent(resolver)));
+      BindOnce(&SmartCardContext::OnConnectDone, WrapPersistent(this),
+               WrapPersistent(resolver)));
 
   return resolver->Promise();
 }
@@ -211,7 +213,7 @@ void SmartCardContext::Cancel() {
     return;
   }
   scard_context_->Cancel(
-      WTF::BindOnce(&SmartCardContext::OnCancelDone, WrapPersistent(this)));
+      BindOnce(&SmartCardContext::OnCancelDone, WrapPersistent(this)));
 }
 
 bool SmartCardContext::EnsureNoOperationInProgress(

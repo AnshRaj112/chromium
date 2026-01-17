@@ -5,6 +5,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_EDITING_IME_EDIT_CONTEXT_H_
 #define THIRD_PARTY_BLINK_RENDERER_CORE_EDITING_IME_EDIT_CONTEXT_H_
 
+#include "third_party/blink/public/mojom/input/input_handler.mojom-blink.h"
 #include "third_party/blink/public/platform/web_text_input_type.h"
 #include "third_party/blink/public/web/web_input_method_controller.h"
 #include "third_party/blink/renderer/bindings/core/v8/active_script_wrappable.h"
@@ -136,6 +137,12 @@ class CORE_EXPORT EditContext final : public EventTarget,
                       const std::vector<ui::ImeTextSpan>& ime_text_spans,
                       const WebRange& replacement_range,
                       int selection_start,
+                      int selection_end,
+                      mojom::blink::ImeState ime_state) override;
+  bool SetComposition(const WebString& text,
+                      const std::vector<ui::ImeTextSpan>& ime_text_spans,
+                      const WebRange& replacement_range,
+                      int selection_start,
                       int selection_end) override;
   bool CommitText(const WebString& text,
                   const std::vector<ui::ImeTextSpan>& ime_text_spans,
@@ -204,6 +211,7 @@ class CORE_EXPORT EditContext final : public EventTarget,
   // page that the selection has changed.
   void SetSelection(int start,
                     int end,
+                    bool sync_selection = true,
                     bool dispatch_text_update_event = false);
 
   // Sets rect_in_viewport to the surrounding rect, in physical pixels,
@@ -270,9 +278,11 @@ class CORE_EXPORT EditContext final : public EventTarget,
 
   bool HasValidCompositionBounds() const;
 
+  // Notify browser process to cancel the ongoing composition.
+  void CancelComposition();
   // Delete the characters in the existing composition range and end the
   // composition.
-  void CancelComposition();
+  void OnCancelComposition();
 
   void ClearCompositionState();
 
@@ -282,6 +292,13 @@ class CORE_EXPORT EditContext final : public EventTarget,
   // Returns selection_end_ if selection_end_ >= selection_start_,
   // otherwise returns selection_start_.
   uint32_t OrderedSelectionEnd() const;
+
+  // TODO(crbug.com/379170477): These can be removed when `updateText` adjusts
+  // the selection offsets to stay within `text_` bounds.
+  // Returns minimum of `selection_start_` and `text_` length.
+  uint32_t BoundedSelectionStart() const;
+  // Returns minimum of `selection_end_` and `text_` length.
+  uint32_t BoundedSelectionEnd() const;
 
   // EditContext member variables.
   String text_;

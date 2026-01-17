@@ -7,6 +7,7 @@
 
 #include "base/component_export.h"
 #include "base/feature_list.h"
+#include "base/metrics/field_trial_params.h"
 
 namespace display {
 namespace features {
@@ -25,11 +26,13 @@ BASE_DECLARE_FEATURE(kEnableExternalDisplayHDR10Mode);
 
 COMPONENT_EXPORT(DISPLAY_FEATURES)
 BASE_DECLARE_FEATURE(kCtmColorManagement);
+
+COMPONENT_EXPORT(DISPLAY_FEATURES)
+BASE_DECLARE_FEATURE(kDrmColorSpaceDefaultIsRec709);
 #endif
 
-COMPONENT_EXPORT(DISPLAY_FEATURES) BASE_DECLARE_FEATURE(kListAllDisplayModes);
-
-COMPONENT_EXPORT(DISPLAY_FEATURES) bool IsListAllDisplayModesEnabled();
+COMPONENT_EXPORT(DISPLAY_FEATURES)
+BASE_DECLARE_FEATURE(kCADisplayLinkInBrowser);
 
 COMPONENT_EXPORT(DISPLAY_FEATURES)
 BASE_DECLARE_FEATURE(kEnableEdidBasedDisplayIds);
@@ -83,10 +86,14 @@ COMPONENT_EXPORT(DISPLAY_FEATURES)
 bool IsScreenWinDisplayLookupByHMONITOREnabled();
 
 COMPONENT_EXPORT(DISPLAY_FEATURES)
-BASE_DECLARE_FEATURE(kMaximumDisplaySupportedNotification);
+BASE_DECLARE_FEATURE(kMaxExternalDisplaySupportedNotification);
 
 COMPONENT_EXPORT(DISPLAY_FEATURES)
-bool IsMaximumDisplaySupportedNotifacationEnabled();
+extern const base::FeatureParam<int>
+    kMaxExternalDisplaySupportedNotificationLimit;
+
+COMPONENT_EXPORT(DISPLAY_FEATURES)
+bool IsMaxExternalDisplaySupportedNotificationEnabled();
 
 }  // namespace features
 }  // namespace display

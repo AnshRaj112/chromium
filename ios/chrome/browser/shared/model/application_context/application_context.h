@@ -10,15 +10,14 @@
 #include <string>
 
 #include "base/memory/scoped_refptr.h"
-#import "components/optimization_guide/optimization_guide_buildflags.h"
-
-#if BUILDFLAG(BUILD_WITH_INTERNAL_OPTIMIZATION_GUIDE)
-#include "base/memory/weak_ptr.h"
-#endif  // BUILDFLAG(BUILD_WITH_INTERNAL_OPTIMIZATION_GUIDE)
 
 namespace auto_deletion {
 class AutoDeletionService;
 }  // namespace auto_deletion
+
+namespace activity_reporter {
+class ActivityReporter;
+}
 
 namespace component_updater {
 class ComponentUpdateService;
@@ -57,12 +56,9 @@ namespace network_time {
 class NetworkTimeTracker;
 }
 
-#if BUILDFLAG(BUILD_WITH_INTERNAL_OPTIMIZATION_GUIDE)
 namespace optimization_guide {
-class OnDeviceModelComponentStateManager;
-class OnDeviceModelServiceController;
+class OptimizationGuideGlobalState;
 }  // namespace optimization_guide
-#endif  // BUILDFLAG(BUILD_WITH_INTERNAL_OPTIMIZATION_GUIDE)
 
 namespace os_crypt_async {
 class OSCryptAsync;
@@ -70,7 +66,12 @@ class OSCryptAsync;
 
 namespace signin {
 class ActivePrimaryAccountsMetricsRecorder;
-}
+class AvatarProvider;
+}  // namespace signin
+
+namespace supervised_user {
+class DeviceParentalControls;
+}  // namespace supervised_user
 
 namespace ukm {
 class UkmRecorder;
@@ -177,7 +178,18 @@ class ApplicationContext {
 
   virtual net_log::NetExportFileWriter* GetNetExportFileWriter() = 0;
 
-  // Gets the NetworkTimeTracker.
+  // Gets the NetworkTimeTracker. The returned NetworkTimeTracker may not be
+  // fully initialized, but it can be subscribed to. It is permitted to call
+  // this method very early during startup (i.e., before the local state pref
+  // service and network services have started). This function may safely be
+  // called multiple times; it is idempotent.
+  virtual network_time::NetworkTimeTracker*
+  GetNetworkTimeTrackerMaybeUninitialized() = 0;
+
+  // Gets the NetworkTimeTracker. The returned NetworkTimeTracker will be fully
+  // initialized. It is not safe to call this method before threads are created,
+  // local state is initialized, and network services are started. This function
+  // may safely be called multiple times; it is idempotent.
   virtual network_time::NetworkTimeTracker* GetNetworkTimeTracker() = 0;
 
   // Gets the IOSChromeIOThread.
@@ -185,6 +197,9 @@ class ApplicationContext {
 
   // Gets the GCMDriver.
   virtual gcm::GCMDriver* GetGCMDriver() = 0;
+
+  // Gets the ActivityReporter.
+  virtual activity_reporter::ActivityReporter* GetActivityReporter() = 0;
 
   // Gets the ComponentUpdateService.
   virtual component_updater::ComponentUpdateService*
@@ -202,6 +217,9 @@ class ApplicationContext {
 
   // Returns the SingleSignOnService instance used by this application.
   virtual id<SingleSignOnService> GetSingleSignOnService() = 0;
+
+  // Returns the caches for avatars of accounts on the device.
+  virtual signin::AvatarProvider* GetIdentityAvatarProvider() = 0;
 
   // Returns the SystemIdentityManager instance used by this application.
   virtual SystemIdentityManager* GetSystemIdentityManager() = 0;
@@ -227,14 +245,15 @@ class ApplicationContext {
   // Returns the AutoDeletionService instance.
   virtual auto_deletion::AutoDeletionService* GetAutoDeletionService() = 0;
 
-#if BUILDFLAG(BUILD_WITH_INTERNAL_OPTIMIZATION_GUIDE)
-  // Returns the application's OnDeviceModelServiceController which manages the
-  // on-device model service.
-  virtual optimization_guide::OnDeviceModelServiceController*
-  GetOnDeviceModelServiceController(
-      base::WeakPtr<optimization_guide::OnDeviceModelComponentStateManager>
-          on_device_component_manager) = 0;
-#endif  // BUILD_WITH_INTERNAL_OPTIMIZATION_GUIDE
+  // Returns the OptimizationGuideGlobalState instance.
+  virtual optimization_guide::OptimizationGuideGlobalState*
+  GetOptimizationGuideGlobalState() = 0;
+
+  // Returns a not-null handle to the manager of device parental controls, which
+  // are independent from the profile. On platforms not implementing device
+  // parental controls, it will be a no-op stub.
+  virtual supervised_user::DeviceParentalControls&
+  GetDeviceParentalControls() = 0;
 
  protected:
   // Sets the global ApplicationContext instance.

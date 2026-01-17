@@ -11,21 +11,21 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/browser/ssl/android/jni_headers/HttpsFirstModeBridge_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
-static jint JNI_HttpsFirstModeBridge_GetCurrentSetting(
+static int32_t JNI_HttpsFirstModeBridge_GetCurrentSetting(
     JNIEnv* env,
-    const JavaParamRef<jobject>& j_profile) {
+    const JavaRef<jobject>& j_profile) {
   HttpsFirstModeService* hfm_service =
       HttpsFirstModeServiceFactory::GetForProfile(
           Profile::FromJavaObject(j_profile));
-  return static_cast<jint>(hfm_service->GetCurrentSetting());
+  return static_cast<int32_t>(hfm_service->GetCurrentSetting());
 }
 
 static void JNI_HttpsFirstModeBridge_UpdatePrefs(
     JNIEnv* env,
-    const JavaParamRef<jobject>& j_profile,
-    jint setting) {
+    const JavaRef<jobject>& j_profile,
+    int32_t setting) {
   HttpsFirstModeService* hfm_service =
       HttpsFirstModeServiceFactory::GetForProfile(
           Profile::FromJavaObject(j_profile));
@@ -34,9 +34,11 @@ static void JNI_HttpsFirstModeBridge_UpdatePrefs(
   return;
 }
 
-static jboolean JNI_HttpsFirstModeBridge_IsManaged(
+static bool JNI_HttpsFirstModeBridge_IsManaged(
     JNIEnv* env,
-    const JavaParamRef<jobject>& j_profile) {
+    const JavaRef<jobject>& j_profile) {
   Profile* profile = Profile::FromJavaObject(j_profile);
   return profile->GetPrefs()->IsManagedPreference(prefs::kHttpsOnlyModeEnabled);
 }
+
+DEFINE_JNI(HttpsFirstModeBridge)

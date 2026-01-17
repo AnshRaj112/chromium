@@ -22,9 +22,9 @@
 #include "build/build_config.h"
 #include "components/browsing_data/content/cookie_helper.h"
 #include "components/content_settings/common/content_settings_agent.mojom.h"
-#include "components/content_settings/core/browser/content_settings_info.h"
-#include "components/content_settings/core/browser/content_settings_registry.h"
 #include "components/content_settings/core/browser/content_settings_utils.h"
+#include "components/content_settings/core/browser/permission_settings_info.h"
+#include "components/content_settings/core/browser/permission_settings_registry.h"
 #include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/common/content_settings_pattern_parser.h"
 #include "components/content_settings/core/common/content_settings_types.h"
@@ -48,6 +48,7 @@
 #include "content/public/browser/web_contents_user_data.h"
 #include "content/public/common/content_constants.h"
 #include "net/base/schemeful_site.h"
+#include "net/device_bound_sessions/session_access.h"
 #include "services/network/public/mojom/shared_dictionary_access_observer.mojom.h"
 #include "third_party/abseil-cpp/absl/functional/overload.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
@@ -875,6 +876,10 @@ bool PageSpecificContentSettings::IsContentBlocked(
       content_type == ContentSettingsType::CLIPBOARD_READ_WRITE ||
       content_type == ContentSettingsType::SENSORS ||
       content_type == ContentSettingsType::GEOLOCATION ||
+      content_type == ContentSettingsType::GEOLOCATION_WITH_OPTIONS ||
+#if BUILDFLAG(IS_WIN)
+      content_type == ContentSettingsType::PROTECTED_MEDIA_IDENTIFIER ||
+#endif
       content_type == ContentSettingsType::NOTIFICATIONS) {
     const auto& it = content_settings_status_.find(content_type);
     if (it != content_settings_status_.end()) {
@@ -901,6 +906,10 @@ bool PageSpecificContentSettings::IsContentAllowed(
       content_type != ContentSettingsType::CLIPBOARD_READ_WRITE &&
       content_type != ContentSettingsType::SENSORS &&
       content_type != ContentSettingsType::GEOLOCATION &&
+      content_type != ContentSettingsType::GEOLOCATION_WITH_OPTIONS &&
+#if BUILDFLAG(IS_WIN)
+      content_type != ContentSettingsType::PROTECTED_MEDIA_IDENTIFIER &&
+#endif
       content_type != ContentSettingsType::NOTIFICATIONS) {
     return false;
   }
@@ -936,7 +945,7 @@ void PageSpecificContentSettings::OnContentBlocked(ContentSettingsType type) {
     return;
   }
 
-  if (!content_settings::ContentSettingsRegistry::GetInstance()->Get(type)) {
+  if (!content_settings::PermissionSettingsRegistry::GetInstance()->Get(type)) {
     return;
   }
 
@@ -1024,16 +1033,16 @@ void PageSpecificContentSettings::OnTwoSitePermissionChanged(
   switch (content_setting) {
     case CONTENT_SETTING_ASK:
     case CONTENT_SETTING_DEFAULT:
-      if (site_map.contains(requesting_site)) {
-        site_map.erase(requesting_site);
+      if (auto it = site_map.find(requesting_site); it != site_map.end()) {
+        site_map.erase(it);
         access_changed = true;
       }
       break;
     case CONTENT_SETTING_ALLOW:
     case CONTENT_SETTING_BLOCK: {
       bool is_allowed = content_setting == CONTENT_SETTING_ALLOW;
-      if (!site_map.contains(requesting_site) ||
-          site_map[requesting_site] != is_allowed) {
+      if (auto it = site_map.find(requesting_site);
+          it == site_map.end() || it->second != is_allowed) {
         site_map[requesting_site] = is_allowed;
         access_changed = true;
       }
@@ -1367,6 +1376,8 @@ void PageSpecificContentSettings::OnContentSettingChanged(
   }
 
   ContentSettingsStatus& status = content_settings_status_[content_type];
+  auto* info = PermissionSettingsRegistry::GetInstance()->Get(content_type);
+
   switch (content_type) {
     case ContentSettingsType::MEDIASTREAM_MIC:
     case ContentSettingsType::MEDIASTREAM_CAMERA: {
@@ -1388,12 +1399,13 @@ void PageSpecificContentSettings::OnContentSettingChanged(
       status.blocked = setting == CONTENT_SETTING_BLOCK;
       break;
     }
-    case ContentSettingsType::GEOLOCATION: {
-      ContentSetting geolocation_setting =
-          map_->GetContentSetting(current_url, current_url, content_type);
-      if (geolocation_setting == CONTENT_SETTING_ALLOW) {
+    case ContentSettingsType::GEOLOCATION:
+    case ContentSettingsType::GEOLOCATION_WITH_OPTIONS: {
+      PermissionSetting geolocation_setting =
+          map_->GetPermissionSetting(current_url, current_url, content_type);
+      if (info->delegate().IsAnyPermissionAllowed(geolocation_setting)) {
         geolocation_was_just_granted_on_site_level_ = true;
-      } else if (geolocation_setting == CONTENT_SETTING_ASK) {
+      } else if (info->delegate().IsUndecided(geolocation_setting)) {
         // On manual permission revocation as well as automatic permission
         // revocation (e.g. due to content setting expiry), the content setting
         // icon for the permission needs to be hidden, hence a location bar
@@ -1415,16 +1427,21 @@ void PageSpecificContentSettings::OnContentSettingChanged(
     case ContentSettingsType::ADS:
     case ContentSettingsType::SOUND:
     case ContentSettingsType::CLIPBOARD_READ_WRITE:
+#if BUILDFLAG(IS_WIN)
+    case ContentSettingsType::PROTECTED_MEDIA_IDENTIFIER:
+#endif
     case ContentSettingsType::SENSORS: {
-      ContentSetting setting =
-          map_->GetContentSetting(current_url, current_url, content_type);
+      // Geolocation and Notification falls through to this logic.
+      PermissionSetting setting =
+          map_->GetPermissionSetting(current_url, current_url, content_type);
       // If an indicator is shown and the content settings has changed, swap the
       // indicator for the one with the opposite meaning (allowed <=> blocked).
-      if (setting == CONTENT_SETTING_BLOCK && status.allowed) {
+      if (info->delegate().IsBlocked(setting) && status.allowed) {
         status.blocked = false;
         status.allowed = false;
         OnContentBlocked(content_type);
-      } else if (setting == CONTENT_SETTING_ALLOW && status.blocked) {
+      } else if (info->delegate().IsAnyPermissionAllowed(setting) &&
+                 status.blocked) {
         status.blocked = false;
         status.allowed = false;
         OnContentAllowed(content_type);
@@ -1458,9 +1475,9 @@ void PageSpecificContentSettings::ClearContentSettingsChangedViaPageInfo() {
 }
 
 void PageSpecificContentSettings::BlockAllContentForTesting() {
-  content_settings::ContentSettingsRegistry* registry =
-      content_settings::ContentSettingsRegistry::GetInstance();
-  for (const content_settings::ContentSettingsInfo* info : *registry) {
+  content_settings::PermissionSettingsRegistry* registry =
+      content_settings::PermissionSettingsRegistry::GetInstance();
+  for (const content_settings::PermissionSettingsInfo* info : *registry) {
     ContentSettingsType type = info->website_settings_info()->type();
     if (type != ContentSettingsType::MEDIASTREAM_MIC &&
         type != ContentSettingsType::MEDIASTREAM_CAMERA) {
@@ -1495,7 +1512,8 @@ std::vector<privacy_sandbox::CanonicalTopic>
 PageSpecificContentSettings::GetAccessedTopics() const {
   if (accessed_topics_.empty() &&
       privacy_sandbox::kPrivacySandboxSettings4ShowSampleDataForTesting.Get() &&
-      page().GetMainDocument().GetLastCommittedURL().host() == "example.com") {
+      page().GetMainDocument().GetLastCommittedURL().GetHost() ==
+          "example.com") {
     // TODO(crbug.com/40210776): Remove sample topic when API is ready.
     return {privacy_sandbox::CanonicalTopic(browsing_topics::Topic(3),
                                             kTopicsAPISampleDataTaxonomy),
@@ -1549,8 +1567,11 @@ void PageSpecificContentSettings::OnCapturingStateChanged(
 
   // If `is_capturing` is true, we should not hide an indicator. Erasing an
   // entry from `indicators_hiding_delay_timer_` will stop a dedicated timer.
-  if (indicators_hiding_delay_timer_.contains(type) && is_capturing) {
-    indicators_hiding_delay_timer_.erase(type);
+  if (is_capturing) {
+    if (auto it = indicators_hiding_delay_timer_.find(type);
+        it != indicators_hiding_delay_timer_.end()) {
+      indicators_hiding_delay_timer_.erase(it);
+    }
   }
 
   // Check if media indicators should be hidden.
@@ -1694,28 +1715,31 @@ const base::Time PageSpecificContentSettings::GetLastUsedTime(
   }
 
   content_settings::SettingInfo info;
-  map_->GetContentSetting(GetWebContents()->GetLastCommittedURL(),
-                          GetWebContents()->GetLastCommittedURL(), type, &info);
+  map_->GetPermissionSetting(GetWebContents()->GetLastCommittedURL(),
+                             GetWebContents()->GetLastCommittedURL(), type,
+                             &info);
 
   return info.metadata.last_used();
 }
 
 void PageSpecificContentSettings::OnActivityIndicatorBubbleOpened(
     ContentSettingsType type) {
-  if (indicators_hiding_delay_timer_.contains(type) &&
-      indicators_hiding_delay_timer_[type].IsRunning()) {
-    indicators_hiding_delay_timer_[type].Stop();
-  } else if (media_blocked_indicator_timer_.contains(type) &&
-             media_blocked_indicator_timer_[type].IsRunning()) {
-    media_blocked_indicator_timer_[type].Stop();
+  if (auto it = indicators_hiding_delay_timer_.find(type);
+      it != indicators_hiding_delay_timer_.end() && it->second.IsRunning()) {
+    it->second.Stop();
+  } else if (auto jt = media_blocked_indicator_timer_.find(type);
+             jt != media_blocked_indicator_timer_.end() &&
+             jt->second.IsRunning()) {
+    jt->second.Stop();
   }
 }
 
 void PageSpecificContentSettings::OnActivityIndicatorBubbleClosed(
     ContentSettingsType type) {
-  if (indicators_hiding_delay_timer_.contains(type)) {
+  if (auto it = indicators_hiding_delay_timer_.find(type);
+      it != indicators_hiding_delay_timer_.end()) {
     // In use indicator timer was stopped, relaunch.
-    indicators_hiding_delay_timer_[type].Start(
+    it->second.Start(
         FROM_HERE, kMediaIndicatorHoldAfterUseDuration,
         base::BindOnce(
             &PageSpecificContentSettings::OnCapturingStateChangedInternal,
@@ -1774,6 +1798,10 @@ void PageSpecificContentSettings::ResetMediaBlockedState(
   if (update_indicators) {
     MaybeUpdateLocationBar();
   }
+}
+
+void PageSpecificContentSettings::OnRegisteredForAutoPictureInPictureChanged() {
+  MaybeUpdateLocationBar();
 }
 
 void PageSpecificContentSettings::MaybeNotifySiteDataObservers(

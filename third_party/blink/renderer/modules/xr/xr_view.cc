@@ -6,7 +6,6 @@
 
 #include <algorithm>
 
-#include "base/containers/contains.h"
 #include "base/trace_event/trace_event.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_xr_eye.h"
 #include "third_party/blink/renderer/modules/xr/xr_camera.h"
@@ -57,15 +56,11 @@ XRViewport* XRView::Viewport(double framebuffer_scale) {
 }
 
 V8XREye XRView::eye() const {
-  switch (eye_) {
-    case device::mojom::blink::XREye::kLeft:
-      return V8XREye(V8XREye::Enum::kLeft);
-    case device::mojom::blink::XREye::kRight:
-      return V8XREye(V8XREye::Enum::kRight);
-    case device::mojom::blink::XREye::kNone:
-      return V8XREye(V8XREye::Enum::kNone);
-  }
-  NOTREACHED();
+  return GetV8Eye(eye_);
+}
+
+unsigned XRView::index() const {
+  return view_data_->index();
 }
 
 XRFrame* XRView::frame() const {
@@ -81,7 +76,8 @@ NotShared<DOMFloat32Array> XRView::projectionMatrix() const {
     // A page may take the projection matrix value and detach it so
     // projection_matrix_ is a detached array buffer.  This breaks the
     // inspector, so return an empty array instead.
-    return NotShared<DOMFloat32Array>(DOMFloat32Array::Create(0));
+    projection_matrix_ =
+        transformationMatrixToDOMFloat32Array(view_data_->ProjectionMatrix());
   }
 
   return projection_matrix_;
@@ -164,8 +160,7 @@ XRViewData::XRViewData(
       index_(index),
       eye_(view->eye),
       viewport_(view->viewport) {
-  if (base::Contains(enabled_feature_set,
-                     device::mojom::XRSessionFeature::DEPTH)) {
+  if (enabled_feature_set.Contains(device::mojom::XRSessionFeature::DEPTH)) {
     if (!device_config.depth_configuration) {
       DCHECK(false)
           << "The session reports that depth sensing is supported but "
@@ -190,6 +185,9 @@ void XRViewData::UpdateView(device::mojom::blink::XRViewPtr view,
   if (depth_manager_) {
     depth_manager_->ProcessDepthInformation(std::move(view->depth_data));
   }
+
+  visibility_mask_ = std::move(view->visibility_mask);
+  visibility_mask_id_ = view->visibility_mask_id;
 }
 
 XRCPUDepthInformation* XRViewData::GetCpuDepthInformation(
@@ -245,6 +243,18 @@ bool XRViewData::ApplyViewportScaleForFrame() {
   SetViewportModifiable(false);
 
   return changed;
+}
+
+void XRViewData::OnVisibilityMaskChangeEvent() {
+  last_evented_visibility_mask_id_ = visibility_mask_id_;
+}
+
+bool XRViewData::NeedsVisibilityMaskChangeEvent() const {
+  if (!last_evented_visibility_mask_id_) {
+    return true;
+  }
+
+  return last_evented_visibility_mask_id_.value() != visibility_mask_id_;
 }
 
 void XRViewData::Trace(Visitor* visitor) const {

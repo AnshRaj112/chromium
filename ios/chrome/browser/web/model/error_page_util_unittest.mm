@@ -21,7 +21,7 @@ namespace {
 
 // URL string passed from ios/web layer to ios/chrome and rendered on the error
 // page.
-NSString* kTestUrl = @"https://chromium.test/";
+NSString* const kTestUrl = @"https://chromium.test/";
 
 // Returns string for the given error code.
 NSString* ErrorAsString(int net_error) {
@@ -31,7 +31,7 @@ NSString* ErrorAsString(int net_error) {
 // Returns error in the same format as passed from ios/web layer to ios/chrome.
 NSError* CreateTestError(NSInteger url_error) {
   NSDictionary* info = @{
-    NSURLErrorFailingURLStringErrorKey : kTestUrl,
+    NSURLErrorFailingURLErrorKey : [NSURL URLWithString:kTestUrl],
   };
   return web::testing::CreateTestNetError(
       [NSError errorWithDomain:NSURLErrorDomain code:url_error userInfo:info]);
@@ -72,7 +72,8 @@ TEST_F(ErrorPageUtilTest, PostNonOtrError) {
   EXPECT_TRUE([html containsString:@"<head>"]);
 
   EXPECT_TRUE([html containsString:ErrorAsString(ERR_CONNECTION_TIMED_OUT)]);
-  EXPECT_TRUE([html containsString:base::SysUTF8ToNSString(test_url.host())]);
+  EXPECT_TRUE(
+      [html containsString:base::SysUTF8ToNSString(test_url.GetHost())]);
   EXPECT_FALSE([html containsString:GetNSString(IDS_ERRORPAGES_BUTTON_RELOAD)]);
 }
 
@@ -106,11 +107,12 @@ TEST_F(ErrorPageUtilTest, PostOtrError) {
   EXPECT_TRUE([html containsString:@"<head>"]);
 
   EXPECT_TRUE([html containsString:ErrorAsString(ERR_CONNECTION_TIMED_OUT)]);
-  EXPECT_TRUE([html containsString:base::SysUTF8ToNSString(test_url.host())]);
+  EXPECT_TRUE(
+      [html containsString:base::SysUTF8ToNSString(test_url.GetHost())]);
   EXPECT_FALSE([html containsString:GetNSString(IDS_ERRORPAGES_BUTTON_RELOAD)]);
 }
 
-// Tests error page for error without NSURLErrorFailingURLStringErrorKey key.
+// Tests error page for error without NSURLErrorFailingURLErrorKey key.
 // This test only makes sure that absence of the spec is handled gracefully.
 TEST_F(ErrorPageUtilTest, NoUrlSpec) {
   NSError* error = web::testing::CreateTestNetError([NSError

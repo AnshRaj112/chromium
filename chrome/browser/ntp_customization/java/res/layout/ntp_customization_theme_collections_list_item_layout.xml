@@ -10,7 +10,10 @@ found in the LICENSE file.
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="@dimen/ntp_customization_theme_list_item_padding_vertical">
+    android:paddingHorizontal="@dimen/ntp_customization_theme_collection_list_item_padding_horizontal"
+    android:paddingBottom="@dimen/ntp_customization_theme_collection_list_item_padding_bottom"
+    android:clickable="true"
+    android:focusable="true">
 
   <ImageView
       android:id="@+id/theme_collection_image"
@@ -19,10 +22,23 @@ found in the LICENSE file.
       android:scaleType="centerCrop"
       android:importantForAccessibility="no"
       android:clipToOutline="true"
-      app:layout_constraintDimensionRatio="1:1"
+      android:background="@drawable/ntp_customization_theme_collections_list_item_background"
+      android:foreground="@drawable/ntp_customization_theme_collections_list_item_foreground_selector"
       app:layout_constraintTop_toTopOf="parent"
       app:layout_constraintStart_toStartOf="parent"
       app:layout_constraintEnd_toEndOf="parent" />
+
+  <ProgressBar
+      android:id="@+id/spinner"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:indeterminate="true"
+      android:visibility="gone"
+      android:elevation="@dimen/ntp_customization_theme_collections_spinner_elevation"
+      app:layout_constraintBottom_toBottomOf="@id/theme_collection_image"
+      app:layout_constraintEnd_toEndOf="@id/theme_collection_image"
+      app:layout_constraintStart_toStartOf="@id/theme_collection_image"
+      app:layout_constraintTop_toTopOf="@id/theme_collection_image" />
 
   <TextView
       android:id="@+id/theme_collection_title"

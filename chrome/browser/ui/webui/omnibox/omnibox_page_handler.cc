@@ -36,6 +36,7 @@
 #include "components/omnibox/browser/actions/omnibox_pedal.h"
 #include "components/omnibox/browser/autocomplete_classifier.h"
 #include "components/omnibox/browser/autocomplete_controller.h"
+#include "components/omnibox/browser/autocomplete_controller_config.h"
 #include "components/omnibox/browser/autocomplete_controller_emitter.h"
 #include "components/omnibox/browser/autocomplete_match.h"
 #include "components/omnibox/browser/autocomplete_provider.h"
@@ -166,7 +167,7 @@ void OmniboxPageHandler::OnMlScored(AutocompleteController* controller,
 
 void OmniboxPageHandler::OnBitmapFetched(mojom::AutocompleteControllerType type,
                                          const GURL& image_url,
-                                         const SkBitmap& bitmap) {
+                                         const SkBitmap bitmap) {
   auto data = gfx::Image::CreateFrom1xBitmap(bitmap).As1xPNGBytes();
   std::string base_64 = base::Base64Encode(*data);
   const char kDataUrlPrefix[] = "data:image/png;base64,";
@@ -279,8 +280,9 @@ std::unique_ptr<AutocompleteController> OmniboxPageHandler::CreateController(
   }
 
   auto controller = std::make_unique<AutocompleteController>(
-      std::make_unique<ChromeAutocompleteProviderClient>(profile_), providers,
-      false, ml_disabled);
+      std::make_unique<ChromeAutocompleteProviderClient>(profile_),
+      AutocompleteControllerConfig{.provider_types = providers,
+                                   .disable_ml = ml_disabled});
   // We will observe our internal AutocompleteController directly, so there's
   // no reason to hook it up to the profile-keyed AutocompleteControllerEmitter.
   controller->AddObserver(this);

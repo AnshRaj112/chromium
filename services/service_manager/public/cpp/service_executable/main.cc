@@ -2,15 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <algorithm>
+
 #include "base/at_exit.h"
 #include "base/base_switches.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/debug/debugger.h"
 #include "base/debug/stack_trace.h"
+#include "base/feature_list.h"
 #include "base/files/file_path.h"
 #include "base/i18n/icu_util.h"
 #include "base/logging.h"
+#include "base/logging/logging_settings.h"
 #include "base/metrics/field_trial.h"
 #include "base/process/launch.h"
 #include "base/strings/string_split.h"
@@ -48,7 +51,7 @@ void WaitForDebuggerIfNecessary() {
         break;
       }
     }
-    if (apps_to_debug.empty() || base::Contains(apps_to_debug, app)) {
+    if (apps_to_debug.empty() || std::ranges::contains(apps_to_debug, app)) {
 #if BUILDFLAG(IS_WIN)
       std::wstring appw = base::UTF8ToWide(app);
       std::wstring message = base::UTF8ToWide(

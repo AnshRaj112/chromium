@@ -53,13 +53,22 @@ with devil_env.SysPath(
     os.path.join(_DIR_SOURCE_ROOT, 'build', 'android', 'gyp')):
   import bundletool
 
+with devil_env.SysPath(os.path.join(_DIR_SOURCE_ROOT, 'build', 'util')):
+  import android_chrome_version
+
 BASE_MODULE = 'base'
+
+# These need to be in order of low to high.
+LOGCAT_LEVELS = "VDIWEF"
+
+
+def _IsTrichrome():
+  calling_script_name = os.path.basename(sys.argv[0])
+  return 'trichrome' in calling_script_name
 
 
 def _Colorize(text, style=''):
-  return (style
-      + text
-      + colorama.Style.RESET_ALL)
+  return style + text + colorama.Style.RESET_ALL
 
 
 def _InstallApk(devices, apk, install_dict):
@@ -190,7 +199,11 @@ def _NormalizeProcessName(debug_process_name, package_name):
   return debug_process_name
 
 
-def _ResolveActivity(device, package_name, category, action):
+def _ResolveActivity(device,
+                     package_name,
+                     category,
+                     action,
+                     preferred_activity=None):
   # E.g.:
   # Activity Resolver Table:
   #   Schemes:
@@ -242,7 +255,7 @@ def _ResolveActivity(device, package_name, category, action):
     raise Exception(f'Did not find {category_text}, {action_text} in\n{data}')
   if len(matched_entries) > 1:
     # When there are multiple matches, look for the one marked as default.
-    # Necessary for Monochrome, which also has MonochromeLauncherActivity.
+    # Added for Monochrome.
     default_entries = [
         e for e in matched_entries if 'android.intent.category.DEFAULT' in e
     ]
@@ -252,6 +265,22 @@ def _ResolveActivity(device, package_name, category, action):
   activity_names = {activity_name_from_entry(e) for e in matched_entries}
 
   if len(activity_names) > 1:
+    # If a preferred activity is specified, try to use it
+    if preferred_activity and preferred_activity in activity_names:
+      return preferred_activity
+
+    # If no preferred activity is specified, try to find the main activity
+    main_activity = None
+    for activity in activity_names:
+      # Look for the activity that ends with exactly ".Main"
+      # (not ".Main1", ".Main2", etc.)
+      if activity.endswith('.Main'):
+        main_activity = activity
+        break
+
+    if main_activity:
+      return main_activity
+
     raise Exception('Found multiple launcher activities:\n * ' +
                     '\n * '.join(sorted(activity_names)))
   return next(iter(activity_names))
@@ -307,7 +336,8 @@ def _LaunchUrl(devices,
                url=None,
                wait_for_java_debugger=False,
                debug_process_name=None,
-               nokill=None):
+               nokill=None,
+               preferred_activity=None):
   if argv and command_line_flags_file is None:
     raise Exception('This apk does not support any flags.')
 
@@ -321,7 +351,8 @@ def _LaunchUrl(devices,
     action = 'android.intent.action.VIEW'
 
   def launch(device):
-    activity = _ResolveActivity(device, package_name, category, action)
+    activity = _ResolveActivity(device, package_name, category, action,
+                                preferred_activity)
     # --persistent is required to have Settings.Global.DEBUG_APP be set, which
     # we currently use to allow reading of flags. https://crbug.com/784947
     if not nokill:
@@ -761,6 +792,8 @@ class _LogcatProcessor:
                deobfuscate=None,
                verbose=False,
                exit_on_match=None,
+               filter_regex=None,
+               log_level="V",
                extra_package_names=None):
     self._device = device
     self._package_name = package_name
@@ -772,6 +805,8 @@ class _LogcatProcessor:
     else:
       self._exit_on_match = None
     self._found_exit_match = False
+    self._filter = re.compile(filter_regex) if filter_regex else None
+    self._log_level_idx = LOGCAT_LEVELS.find(log_level)
     if stack_script_context:
       self._print_func = _LogcatProcessor.NativeStackSymbolizer(
           stack_script_context, self._PrintParsedLine).AddLine
@@ -847,7 +882,7 @@ class _LogcatProcessor:
     return style
 
   def _ParseLine(self, line):
-    tokens = line.split(None, 6)
+    tokens = line.split(None, 5)
 
     def consume_token_or_default(default):
       return tokens.pop(0) if len(tokens) > 0 else default
@@ -866,22 +901,30 @@ class _LogcatProcessor:
     pid = consume_integer_token_or_default(-1)
     tid = consume_integer_token_or_default(-1)
     priority = consume_token_or_default('')
-    tag = consume_token_or_default('')
-    original_message = consume_token_or_default('')
+    tag_and_message = consume_token_or_default('')
 
     # Example:
     #   09-19 06:35:51.113  9060  9154 W GCoreFlp: No location...
     #   09-19 06:01:26.174  9060 10617 I Auth    : [ReflectiveChannelBinder]...
     # Parsing "GCoreFlp:" vs "Auth    :", we only want tag to contain the word,
     # and we don't want to keep the colon for the message.
-    if tag and tag[-1] == ':':
-      tag = tag[:-1]
-    elif len(original_message) > 2:
-      original_message = original_message[2:]
+    colon_index = tag_and_message.find(':')
+    if colon_index != -1:
+      tag = tag_and_message[:colon_index].strip()
+      original_message = tag_and_message[colon_index + 1:].strip()
+    else:
+      tag = tag_and_message.strip()
+      original_message = ''
+
     return self.ParsedLine(
         date, invokation_time, pid, tid, priority, tag, original_message)
 
   def _PrintParsedLine(self, parsed_line, dim=False):
+    if LOGCAT_LEVELS.find(parsed_line.priority) < self._log_level_idx:
+      return
+    if self._filter and not (self._filter.search(parsed_line.tag)
+                             or self._filter.search(parsed_line.message)):
+      return
     if self._exit_on_match and self._exit_on_match.search(parsed_line.message):
       self._found_exit_match = True
 
@@ -978,12 +1021,16 @@ def _RunLogcat(device,
                deobfuscate,
                verbose,
                exit_on_match=None,
+               filter_regex=None,
+               log_level="V",
                extra_package_names=None):
   logcat_processor = _LogcatProcessor(device,
                                       package_name,
                                       stack_script_context,
                                       deobfuscate,
                                       verbose,
+                                      filter_regex=filter_regex,
+                                      log_level=log_level,
                                       exit_on_match=exit_on_match,
                                       extra_package_names=extra_package_names)
   device.RunShellCommand(['log', logcat_processor.nonce])
@@ -1345,8 +1392,7 @@ class _Command:
   def _FindSupportedDevices(self, devices):
     """Returns supported devices and reasons for each not supported one."""
     app_abis = self.apk_helper.GetAbis()
-    calling_script_name = os.path.basename(sys.argv[0])
-    is_webview = 'webview' in calling_script_name
+    is_webview = _IsWebViewProvider(self.apk_helper)
     requires_32_bit = self.apk_helper.Get32BitAbiOverride() == '0xffffffff'
     logging.debug('App supports (requires 32bit: %r, is webview: %r): %r',
                   requires_32_bit, is_webview, app_abis)
@@ -1538,6 +1584,20 @@ class _PackageInfoCommand(_Command):
     print('targetSdkVersion: %s' % self.apk_helper.GetTargetSdkVersion())
     print('Supported ABIs: %r' % self.apk_helper.GetAbis())
 
+    if len(str(self.apk_helper.GetVersionCode())) == 9:
+      # android_chrome_version expects Trichrome to be is_webview=False, even if
+      # this is TrichromeWebView.
+      is_webview = (_IsWebViewProvider(self.apk_helper) and not _IsTrichrome())
+      x = android_chrome_version.TranslateVersionCode(
+          str(self.apk_helper.GetVersionCode()), is_webview)
+      print(f'Decoded versionCode: build_number={x.build_number} '
+            f'patch_number={x.patch_number} sku={x.package_name} abi={x.abi}')
+    else:
+      # This does not follow the chromium versionCode scheme. This might be a
+      # test APK, a utiltiy APK (like WebView shell browser), or it could just
+      # be any other non-chromium APK.
+      print('Decoded versionCode: N/A')
+
 
 class _InstallCommand(_Command):
   name = 'install'
@@ -1634,11 +1694,18 @@ class _LaunchCommand(_Command):
                        help='Do not set the debug-app, nor set command-line '
                             'flags. Useful to load a URL without having the '
                              'app restart.')
+    group.add_argument('--preferred-activity',
+                       help='Preferred activity to launch when multiple '
+                            'launcher activities are available.')
     group.add_argument('url', nargs='?', help='A URL to launch with.')
 
   def Run(self):
     if self.is_test_apk:
       raise Exception('Use the bin/run_* scripts to run test apks.')
+    if self.args.wait_for_java_debugger:
+      if self.apk_helper and not self.apk_helper.GetIsDebuggable():
+        raise Exception('Passed --wait-for-java-debugger flag but did not set '
+                        'debuggable_apks = true in GN args')
     _LaunchUrl(self.devices,
                self.args.package_name,
                argv=self.args.args,
@@ -1646,7 +1713,8 @@ class _LaunchCommand(_Command):
                url=self.args.url,
                wait_for_java_debugger=self.args.wait_for_java_debugger,
                debug_process_name=self.args.debug_process_name,
-               nokill=self.args.nokill)
+               nokill=self.args.nokill,
+               preferred_activity=self.args.preferred_activity)
 
 
 class _StopCommand(_Command):
@@ -1831,6 +1899,8 @@ To disable filtering, (but keep coloring), use --verbose.
                  deobfuscate,
                  bool(self.args.verbose_count),
                  self.args.exit_on_match,
+                 filter_regex=self.args.filter,
+                 log_level=self.args.log_level,
                  extra_package_names=extra_package_names)
     except KeyboardInterrupt:
       pass  # Don't show stack trace upon Ctrl-C
@@ -1852,6 +1922,11 @@ To disable filtering, (but keep coloring), use --verbose.
                        help='Exits logcat when a message matches this regex.')
 
 
+    group.add_argument("--log-level",
+                       choices=list(LOGCAT_LEVELS),
+                       default="V",
+                       help="Minimum log level.")
+    group.add_argument("--filter", help="Regex to filter logcat output.")
 class _PsCommand(_Command):
   name = 'ps'
   description = 'Show PIDs of any APK processes currently running.'

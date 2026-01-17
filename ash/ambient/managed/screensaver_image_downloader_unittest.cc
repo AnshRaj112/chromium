@@ -4,11 +4,11 @@
 
 #include "ash/ambient/managed/screensaver_image_downloader.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 
 #include "ash/ambient/metrics/managed_screensaver_metrics.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
@@ -20,7 +20,7 @@
 #include "base/test/task_environment.h"
 #include "base/test/test_future.h"
 #include "build/build_config.h"
-#include "crypto/hash.h"
+#include "crypto/obsolete/sha1.h"
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
 #include "services/network/test/test_url_loader_factory.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -91,7 +91,8 @@ class ScreensaverImageDownloaderTest : public testing::Test {
   }
 
   base::FilePath GetExpectedFilePath(const std::string& url) {
-    const std::string encoded_hash = base::HexEncode(crypto::hash::Sha1(url));
+    const std::string encoded_hash = base::HexEncode(
+        crypto::obsolete::Sha1::HashForTesting(base::as_byte_span(url)));
     return test_download_folder_.AppendASCII(encoded_hash + kCacheFileExt);
   }
 
@@ -106,7 +107,7 @@ class ScreensaverImageDownloaderTest : public testing::Test {
     ASSERT_EQ(expected_images.size(), image_list.size());
 
     for (const auto& [path, file_content] : expected_images) {
-      ASSERT_TRUE(base::Contains(image_list, path));
+      ASSERT_TRUE(std::ranges::contains(image_list, path));
       ASSERT_TRUE(base::PathExists(path));
 
       std::string actual_file_contents;

@@ -1,6 +1,6 @@
 Verifies that Cookie blocks when ports do not match.
 
-Cookie ports do not match:[
+Cookie ports do not match: [
     [0] : {
         blockedReasons : [
             [0] : PortMismatch
@@ -12,7 +12,6 @@ Cookie ports do not match:[
             name : foo
             path : /
             priority : Medium
-            sameParty : false
             sameSite : None
             secure : true
             session : true

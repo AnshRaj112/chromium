@@ -70,7 +70,7 @@
           "group": "tryserver.chromium.linux"
         }
       ],
-      "targets_spec_directory": "src/infra/config/generated/builders/ci/Linux FYI Release (AMD RX 7600)/targets"
+      "targets_spec_directory": "infra/config/generated/builders/ci/Linux FYI Release (AMD RX 7600)/targets"
     }
   },
   "$recipe_engine/resultdb/test_presentation": {

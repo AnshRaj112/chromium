@@ -7,12 +7,10 @@
 #include <set>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/files/file.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/task/task_traits.h"
@@ -197,7 +195,7 @@ WritableFileChecker::WritableFileChecker(
 void WritableFileChecker::Check() {
   outstanding_tasks_ = paths_.size();
   for (const auto& path : paths_) {
-    bool is_directory = base::Contains(directory_paths_, path);
+    bool is_directory = directory_paths_.contains(path);
 #if BUILDFLAG(IS_CHROMEOS)
     NonNativeFileSystemDelegate* delegate =
         ExtensionsAPIClient::Get()->GetNonNativeFileSystemDelegate();
@@ -544,7 +542,7 @@ std::vector<extensions::EntryInfo> CreateEntryInfos(
   for (size_t i = 0; i < entry_paths.size(); ++i) {
     const std::string mime_type =
         mime_types[i].empty() ? kFallbackMimeType : mime_types[i];
-    bool is_directory = base::Contains(directory_paths, entry_paths[i]);
+    bool is_directory = directory_paths.contains(entry_paths[i]);
     entry_infos.emplace_back(entry_paths[i], mime_type, is_directory);
   }
   return entry_infos;

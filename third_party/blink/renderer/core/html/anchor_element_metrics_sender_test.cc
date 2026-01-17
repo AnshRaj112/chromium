@@ -4,7 +4,8 @@
 
 #include "third_party/blink/renderer/core/html/anchor_element_metrics_sender.h"
 
-#include "base/containers/contains.h"
+#include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/simple_test_tick_clock.h"
@@ -61,16 +62,14 @@ class MockAnchorElementMetricsHost
   }
 
   void ReportAnchorElementsEnteredViewport(
-      WTF::Vector<mojom::blink::AnchorElementEnteredViewportPtr> elements)
-      override {
+      Vector<mojom::blink::AnchorElementEnteredViewportPtr> elements) override {
     for (auto& element : elements) {
       entered_viewport_.emplace_back(std::move(element));
     }
   }
 
   void ReportAnchorElementsLeftViewport(
-      WTF::Vector<mojom::blink::AnchorElementLeftViewportPtr> elements)
-      override {
+      Vector<mojom::blink::AnchorElementLeftViewportPtr> elements) override {
     for (auto& element : elements) {
       left_viewport_.emplace_back(std::move(element));
     }
@@ -98,16 +97,16 @@ class MockAnchorElementMetricsHost
   }
 
   void ReportAnchorElementsPositionUpdate(
-      WTF::Vector<mojom::blink::AnchorElementPositionUpdatePtr>
-          position_updates) override {
+      Vector<mojom::blink::AnchorElementPositionUpdatePtr> position_updates)
+      override {
     for (auto& position_update : position_updates) {
       positions_[position_update->anchor_id] = std::move(position_update);
     }
   }
 
   void ReportNewAnchorElements(
-      WTF::Vector<mojom::blink::AnchorElementMetricsPtr> elements,
-      const WTF::Vector<uint32_t>& removed_elements) override {
+      Vector<mojom::blink::AnchorElementMetricsPtr> elements,
+      const Vector<uint32_t>& removed_elements) override {
     for (auto& element : elements) {
       auto [it, inserted] = anchor_ids_.insert(element->anchor_id);
       // Ignore duplicates.
@@ -162,11 +161,23 @@ class AnchorElementMetricsSenderTest : public SimTest {
     // Allows WidgetInputHandlerManager::InitOnInputHandlingThread() to run.
     platform_->RunForPeriod(base::Milliseconds(1));
     // Report all anchors to avoid non-deterministic behavior.
-    std::map<std::string, std::string> params;
-    params["random_anchor_sampling_period"] = "1";
+    std::map<std::string, std::string> nav_predictor_params;
+    nav_predictor_params["random_anchor_sampling_period"] = "1";
+    nav_predictor_params["intersection_observation_after_fcp_only"] = "false";
+    // Set "eager" hover time to the same as "moderate" hover time to avoid test
+    // flakiness.
+    const std::string eager_hover_time = base::StrCat(
+        {base::NumberToString(
+             AnchorElementInteractionTracker::kModerateHoverDwellTime
+                 .InMilliseconds()),
+         "ms"});
+    std::map<std::string, std::string> eager_heuristics_params = {
+        {{"hover_dwell_time", eager_hover_time}}};
 
-    feature_list_.InitAndEnableFeatureWithParameters(
-        features::kNavigationPredictor, params);
+    feature_list_.InitWithFeaturesAndParameters(
+        {{features::kNavigationPredictor, nav_predictor_params},
+         {features::kPreloadingEagerHoverHeuristics, eager_heuristics_params}},
+        {});
 
     IntersectionObserver::SetThrottleDelayEnabledForTesting(false);
 
@@ -176,8 +187,7 @@ class AnchorElementMetricsSenderTest : public SimTest {
 
     MainFrame().GetFrame()->GetBrowserInterfaceBroker().SetBinderForTesting(
         mojom::blink::AnchorElementMetricsHost::Name_,
-        WTF::BindRepeating(&AnchorElementMetricsSenderTest::Bind,
-                           WTF::Unretained(this)));
+        BindRepeating(&AnchorElementMetricsSenderTest::Bind, Unretained(this)));
   }
 
   void TearDown() override {
@@ -753,7 +763,7 @@ TEST_F(AnchorElementMetricsSenderTest, AnchorElementLeftViewport) {
 
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
       ScrollOffset(0, 2 * kViewportHeight),
-      mojom::blink::ScrollType::kProgrammatic);
+      mojom::blink::ScrollType::kProgrammatic, cc::ScrollSourceType::kNone);
   ProcessEvents(1);
   EXPECT_EQ(1u, mock_host->entered_viewport_.size());
   EXPECT_EQ(
@@ -767,7 +777,7 @@ TEST_F(AnchorElementMetricsSenderTest, AnchorElementLeftViewport) {
   clock_.Advance(time_in_viewport_1);
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
       ScrollOffset(0, -2 * kViewportHeight),
-      mojom::blink::ScrollType::kProgrammatic);
+      mojom::blink::ScrollType::kProgrammatic, cc::ScrollSourceType::kNone);
   ProcessEvents(1);
   EXPECT_EQ(1u, mock_host->entered_viewport_.size());
   EXPECT_EQ(1u, mock_host->left_viewport_.size());
@@ -780,7 +790,7 @@ TEST_F(AnchorElementMetricsSenderTest, AnchorElementLeftViewport) {
   clock_.Advance(wait_time2);
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
       ScrollOffset(0, 2 * kViewportHeight),
-      mojom::blink::ScrollType::kProgrammatic);
+      mojom::blink::ScrollType::kProgrammatic, cc::ScrollSourceType::kNone);
   ProcessEvents(1);
   EXPECT_EQ(2u, mock_host->entered_viewport_.size());
   EXPECT_EQ(
@@ -794,7 +804,7 @@ TEST_F(AnchorElementMetricsSenderTest, AnchorElementLeftViewport) {
   clock_.Advance(time_in_viewport_2);
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
       ScrollOffset(0, -2 * kViewportHeight),
-      mojom::blink::ScrollType::kProgrammatic);
+      mojom::blink::ScrollType::kProgrammatic, cc::ScrollSourceType::kNone);
   ProcessEvents(1);
   EXPECT_EQ(2u, mock_host->entered_viewport_.size());
   EXPECT_EQ(2u, mock_host->left_viewport_.size());
@@ -969,7 +979,7 @@ TEST_F(AnchorElementMetricsSenderTest, AnchorElementEnteredViewportLater) {
   // Scroll down. Now the anchor element is visible.
   GetDocument().View()->LayoutViewport()->SetScrollOffset(
       ScrollOffset(0, 2 * kViewportHeight),
-      mojom::blink::ScrollType::kProgrammatic);
+      mojom::blink::ScrollType::kProgrammatic, cc::ScrollSourceType::kNone);
   ProcessEvents(1);
   EXPECT_EQ(1u, hosts_.size());
   EXPECT_EQ(0u, mock_host->clicks_.size());
@@ -1046,19 +1056,21 @@ TEST_F(AnchorElementMetricsSenderTest,
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(1u, hosts_.size());
   const auto& mock_host = hosts_[0];
-  EXPECT_EQ(1u, mock_host->pointer_data_on_hover_.size());
-  EXPECT_TRUE(
-      mock_host->pointer_data_on_hover_[0]->pointer_data->is_mouse_pointer);
-  EXPECT_NEAR(
-      20.0 * std::sqrt(2.0),
-      mock_host->pointer_data_on_hover_[0]->pointer_data->mouse_velocity, 0.5);
+  // Must have at least one hover data.
+  EXPECT_LE(1u, mock_host->pointer_data_on_hover_.size());
+  for (const auto& data : mock_host->pointer_data_on_hover_) {
+    EXPECT_TRUE(data->pointer_data->is_mouse_pointer);
+    EXPECT_NEAR(20.0 * std::sqrt(2.0), data->pointer_data->mouse_velocity, 0.5);
+  }
 }
 
 TEST_F(AnchorElementMetricsSenderTest, MaxIntersectionObservations) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeatureWithParameters(
-      features::kNavigationPredictor, {{"max_intersection_observations", "3"},
-                                       {"random_anchor_sampling_period", "1"}});
+      features::kNavigationPredictor,
+      {{"max_intersection_observations", "3"},
+       {"random_anchor_sampling_period", "1"},
+       {"intersection_observation_after_fcp_only", "false"}});
 
   String source("https://example.com/p1");
   SimRequest main_resource(source, "text/html");
@@ -1133,8 +1145,10 @@ TEST_F(AnchorElementMetricsSenderTest, MaxIntersectionObservations) {
 TEST_F(AnchorElementMetricsSenderTest, AnchorUnobservedByIntersectionObserver) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeatureWithParameters(
-      features::kNavigationPredictor, {{"max_intersection_observations", "1"},
-                                       {"random_anchor_sampling_period", "1"}});
+      features::kNavigationPredictor,
+      {{"max_intersection_observations", "1"},
+       {"random_anchor_sampling_period", "1"},
+       {"intersection_observation_after_fcp_only", "false"}});
 
   String source("https://example.com/p1");
   SimRequest main_resource(source, "text/html");
@@ -1198,8 +1212,10 @@ TEST_F(AnchorElementMetricsSenderTest,
        AnchorNotInViewportUnobservedByIntersectionObserver) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeatureWithParameters(
-      features::kNavigationPredictor, {{"max_intersection_observations", "1"},
-                                       {"random_anchor_sampling_period", "1"}});
+      features::kNavigationPredictor,
+      {{"max_intersection_observations", "1"},
+       {"random_anchor_sampling_period", "1"},
+       {"intersection_observation_after_fcp_only", "false"}});
 
   String source("https://example.com/p1");
   SimRequest main_resource(source, "text/html");
@@ -1238,7 +1254,8 @@ TEST_F(AnchorElementMetricsSenderTest, IntersectionObserverDelay) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeatureWithParameters(
       features::kNavigationPredictor,
-      {{"intersection_observer_delay", "252ms"}});
+      {{"intersection_observer_delay", "252ms"},
+       {"intersection_observation_after_fcp_only", "false"}});
 
   String source("https://foo.com/bar.html");
   SimRequest main_resource(source, "text/html");
@@ -1365,7 +1382,7 @@ TEST_F(AnchorElementMetricsSenderTest, PositionUpdate) {
   EXPECT_FLOAT_EQ(7.5f * unit / kViewportHeight,
                   get_position_ratio((anchor_2_id)));
   // anchor_3 is not in the viewport, so a ratio isn't reported.
-  EXPECT_TRUE(!base::Contains(positions, anchor_3_id));
+  EXPECT_TRUE(!positions.contains(anchor_3_id));
   positions.clear();
 
   // Zoom (visual as opposed to logical), and scroll up by 2 units post-zoom.
@@ -1405,7 +1422,7 @@ TEST_F(AnchorElementMetricsSenderTest, PositionUpdate) {
                   get_distance_ratio(anchor_2_id));
   EXPECT_FLOAT_EQ(13.0f * unit / kViewportHeight,
                   get_position_ratio(anchor_2_id));
-  EXPECT_TRUE(!base::Contains(positions, anchor_3_id));
+  EXPECT_TRUE(!positions.contains(anchor_3_id));
 }
 
 // TODO(crbug.com/347719430): This test can be removed if
@@ -1760,8 +1777,7 @@ TEST_F(AnchorElementMetricsSenderTest, SubframeWithObservedAnchorsDetached) {
 
   EXPECT_EQ(1u, mock_host->positions_.size());
   EXPECT_EQ(1u, mock_host->removed_anchor_ids_.size());
-  EXPECT_TRUE(
-      base::Contains(mock_host->removed_anchor_ids_, subframe_anchor_id));
+  EXPECT_TRUE(mock_host->removed_anchor_ids_.contains(subframe_anchor_id));
 }
 
 TEST_F(AnchorElementMetricsSenderTest,
@@ -1828,8 +1844,10 @@ TEST_F(AnchorElementMetricsSenderTest,
        ObservedAnchorInIframeHasHrefUnsetAndIsRemoved) {
   base::test::ScopedFeatureList scoped_feature_list;
   scoped_feature_list.InitAndEnableFeatureWithParameters(
-      features::kNavigationPredictor, {{"max_intersection_observations", "1"},
-                                       {"random_anchor_sampling_period", "1"}});
+      features::kNavigationPredictor,
+      {{"max_intersection_observations", "1"},
+       {"random_anchor_sampling_period", "1"},
+       {"intersection_observation_after_fcp_only", "false"}});
 
   // Navigate the main frame.
   String source("https://foo.com");
@@ -1959,7 +1977,7 @@ TEST_F(AnchorElementMetricsSenderTest,
 }
 
 // TODO(crbug.com/372053392): Remove this test if we enable-by-default and
-// remove kPreloadingViewportHeuristics.
+// remove kPreloadingModerateViewportHeuristics.
 // Simulates a scenario where AnchorElementViewportPositionTracker is created
 // when we mark FCP, resulting in AEVPT::OnFirstContenfulPaint() being called
 // immediately after the object is created.
@@ -1970,7 +1988,7 @@ TEST_F(AnchorElementMetricsSenderTest, RegressionTestForCrbug384610894) {
         {{"random_anchor_sampling_period", "1"},
          {"intersection_observation_after_fcp_only", "true"},
          {"post_fcp_observation_delay", "200ms"}}}},
-      {features::kPreloadingViewportHeuristics});
+      {features::kPreloadingModerateViewportHeuristics});
 
   String source("https://foo.com");
   SimRequest main_resource(source, "text/html");

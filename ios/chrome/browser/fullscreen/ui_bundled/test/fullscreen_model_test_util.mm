@@ -5,7 +5,7 @@
 #import "ios/chrome/browser/fullscreen/ui_bundled/test/fullscreen_model_test_util.h"
 
 #import "ios/chrome/browser/fullscreen/ui_bundled/fullscreen_model.h"
-#import "ios/chrome/browser/toolbar/ui_bundled/fullscreen/toolbars_size.h"
+#import "ios/chrome/browser/toolbar/legacy/ui_bundled/fullscreen/toolbars_size.h"
 #import "testing/gtest/include/gtest/gtest.h"
 
 void SetUpFullscreenModelForTesting(FullscreenModel* model,
@@ -38,6 +38,16 @@ void SimulateFullscreenUserScrollForProgress(FullscreenModel* model,
   ASSERT_LE(progress, 1.0);
   SimulateFullscreenUserScrollWithDelta(
       model, GetFullscreenOffsetDeltaForProgress(model, progress));
+}
+
+// Simulates a user scroll to the bottom of the scroll view.
+void SimulateScrollToBottom(FullscreenModel* model) {
+  model->SetScrollViewIsDragging(true);
+  model->SetScrollViewIsScrolling(true);
+  CGFloat max_offset = model->GetContentHeight() - model->GetScrollViewHeight();
+  model->SetYContentOffset(max_offset);
+  model->SetScrollViewIsDragging(false);
+  model->SetScrollViewIsScrolling(false);
 }
 
 CGFloat GetFullscreenOffsetDeltaForProgress(FullscreenModel* model,

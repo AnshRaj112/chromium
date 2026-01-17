@@ -6,7 +6,7 @@
 
 #include "ash/accessibility/caption_bubble_context_ash.h"
 #include "ash/webui/settings/public/constants/routes.mojom.h"
-#include "base/functional/callback_forward.h"
+#include "base/check_deref.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/strcat.h"
 #include "chrome/browser/accessibility/live_caption/live_caption_controller_factory.h"
@@ -17,6 +17,8 @@
 #include "chrome/browser/speech/speech_recognition_client_browser_interface_factory.h"
 #include "chrome/browser/speech/speech_recognizer_delegate.h"
 #include "chrome/browser/ui/settings_window_manager_chromeos.h"
+#include "chromeos/ash/components/browser_context_helper/browser_context_helper.h"
+#include "chromeos/ash/experiences/settings_ui/settings_app_manager.h"
 #include "components/live_caption/live_caption_controller.h"
 #include "components/live_caption/pref_names.h"
 #include "components/live_caption/translation_util.h"
@@ -25,7 +27,6 @@
 #include "components/soda/constants.h"
 #include "media/audio/audio_device_description.h"
 #include "media/base/media_switches.h"
-#include "media/mojo/mojom/speech_recognition.mojom-forward.h"
 #include "media/mojo/mojom/speech_recognition.mojom.h"
 #include "system_live_caption_service.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -385,8 +386,10 @@ std::string SystemLiveCaptionService::GetPrimaryLanguageCode() const {
 }
 
 void SystemLiveCaptionService::OpenCaptionSettings() {
-  chrome::SettingsWindowManager::GetInstance()->ShowOSSettings(
-      profile_, chromeos::settings::mojom::kAudioAndCaptionsSubpagePath);
+  ash::SettingsAppManager::Get()->Open(
+      CHECK_DEREF(
+          BrowserContextHelper::Get()->GetUserByBrowserContext(profile_)),
+      {.sub_page = chromeos::settings::mojom::kAudioAndCaptionsSubpagePath});
 }
 
 uint32_t SystemLiveCaptionService::GetNumberOfNonChromeOutputStreams() {

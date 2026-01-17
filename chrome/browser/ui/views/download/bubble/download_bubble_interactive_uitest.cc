@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "base/strings/strcat.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
 #include "build/buildflag.h"
@@ -145,10 +146,10 @@ class TestDownloadManagerDelegate : public ChromeDownloadManagerDelegate {
 };
 
 class DownloadBubbleInteractiveUiTest
-    : public InteractiveFeaturePromoTestT<DownloadTestBase> {
+    : public InteractiveFeaturePromoTestMixin<DownloadTestBase> {
  public:
   DownloadBubbleInteractiveUiTest()
-      : InteractiveFeaturePromoTestT(UseDefaultTrackerAllowingPromos(
+      : InteractiveFeaturePromoTestMixin(UseDefaultTrackerAllowingPromos(
             {feature_engagement::kIPHDownloadEsbPromoFeature})) {
 #if BUILDFLAG(IS_MAC)
     // TODO(chlily): Add test coverage for immersive fullscreen disabled on Mac.
@@ -157,7 +158,7 @@ class DownloadBubbleInteractiveUiTest
   }
 
   void SetUpInProcessBrowserTestFixture() override {
-    InteractiveFeaturePromoTestT::SetUpInProcessBrowserTestFixture();
+    InteractiveFeaturePromoTestMixin::SetUpInProcessBrowserTestFixture();
     policy_provider_.SetDefaultReturns(
         /*is_initialization_complete_return=*/true,
         /*is_first_policy_load_complete_return=*/true);
@@ -166,7 +167,7 @@ class DownloadBubbleInteractiveUiTest
   }
 
   void SetUpOnMainThread() override {
-    InteractiveFeaturePromoTestT::SetUpOnMainThread();
+    InteractiveFeaturePromoTestMixin::SetUpOnMainThread();
     embedded_test_server()->ServeFilesFromDirectory(GetTestDataDirectory());
     ASSERT_TRUE(embedded_test_server()->Start());
   }
@@ -266,7 +267,7 @@ class DownloadBubbleInteractiveUiTest
     return base::BindLambdaForTesting([&, displayed = displayed]() {
       ExclusiveAccessBubbleViews* bubble =
           BrowserView::GetBrowserViewForBrowser(browser())
-              ->exclusive_access_bubble();
+              ->GetExclusiveAccessBubble();
       return displayed ==
              (bubble ? IsExclusiveAccessBubbleVisible(bubble) : false);
     });
@@ -277,7 +278,7 @@ class DownloadBubbleInteractiveUiTest
     return base::BindLambdaForTesting([&, for_download = for_download]() {
       ExclusiveAccessBubbleViews* bubble =
           BrowserView::GetBrowserViewForBrowser(browser())
-              ->exclusive_access_bubble();
+              ->GetExclusiveAccessBubble();
       return for_download ==
              (bubble ? ExclusiveAccessTest::IsBubbleDownloadNotification(bubble)
                      : false);
@@ -293,12 +294,15 @@ class DownloadBubbleInteractiveUiTest
     return [&]() {
       auto* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
       return browser_view->GetWidget()->IsFullscreen() &&
-             browser_view->immersive_mode_controller()->IsEnabled();
+             ImmersiveModeController::From(browser())->IsEnabled();
     };
   }
 #endif  // BUILDFLAG(IS_MAC)
 
   bool IsPartialViewEnabled() {
+    // TODO(chlily): This is now solely a function of Profile prefs. Add
+    // explicit coverage for the pref being enabled/disabled, and simplify the
+    // rest of the tests by assuming the pref's default value.
     return download::IsDownloadBubblePartialViewEnabled(browser()->profile());
   }
 
@@ -491,7 +495,7 @@ IN_PROC_BROWSER_TEST_F(
   fullscreen_accelerator =
       ui::Accelerator(ui::VKEY_F, ui::EF_COMMAND_DOWN | ui::EF_CONTROL_DOWN);
 #else
-  chrome::AcceleratorProviderForBrowser(browser())->GetAcceleratorForCommandId(
+  AcceleratorProviderForBrowser(browser())->GetAcceleratorForCommandId(
       IDC_FULLSCREEN, &fullscreen_accelerator);
 #endif
 
@@ -501,8 +505,7 @@ IN_PROC_BROWSER_TEST_F(
   auto tab_fullscreen_waiter = std::make_unique<FullscreenWaiter>(
       browser(), FullscreenWaiter::Expectation{.tab_fullscreen = true});
 
-  RunTestSequenceInContext(
-      browser()->window()->GetElementContext(),
+  RunTestSequence(
       InstrumentTab(kWebContentsElementId),
       NavigateWebContents(kWebContentsElementId,
                           embedded_test_server()->GetURL("/empty.html")),
@@ -581,6 +584,30 @@ IN_PROC_BROWSER_TEST_F(DownloadBubbleInteractiveUiTest,
             "Main view is shown after clicking button."),
       // The main view widget should be active.
       Check(DownloadBubbleIsActive(true), "Main view is active."),
+      // Hide the bubble so it's not showing while tearing down the
+      // test browser (which causes a crash on Mac).
+      Do(ChangeBubbleVisibility(false)), Do(ChangeButtonVisibility(false)),
+      WaitForState(kDownloadsButtonVisible, false));
+}
+
+IN_PROC_BROWSER_TEST_F(DownloadBubbleInteractiveUiTest,
+                       ClosePartialBubbleOnEscKeypress) {
+  RunTestSequence(
+      // Download a test file so that the partial view shows up.
+      Do(DownloadTestFile()),
+      ObserveState(kDownloadsButtonVisible, GetContainerView()),
+      WaitForState(kDownloadsButtonVisible, true),
+      Check(DownloadBubbleIsShowingDetails(IsPartialViewEnabled()),
+            "Partial view shows after download, if enabled."),
+      If([&] { return IsPartialViewEnabled(); },
+         // The bubble, if enabled, should be shown as inactive to avoid
+         // stealing focus from the page.
+         Then(Check(DownloadBubbleIsActive(false),
+                    "Partial view, if enabled, is inactive."))),
+      SendKeyPress(kBrowserViewElementId, ui::VKEY_ESCAPE),
+      EnsureNotPresent(kToolbarDownloadBubbleElementId),
+      Check(DownloadBubbleIsShowingDetails(false),
+            "Inactive bubble was closed"),
       // Hide the bubble so it's not showing while tearing down the
       // test browser (which causes a crash on Mac).
       Do(ChangeBubbleVisibility(false)), Do(ChangeButtonVisibility(false)),

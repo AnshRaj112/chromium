@@ -4,7 +4,6 @@
 
 #include "ios/chrome/browser/omnibox/eg_tests/fake_suggestions_database.h"
 
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/json/json_reader.h"
@@ -61,7 +60,7 @@ void FakeSuggestionsDatabase::LoadSuggestionsFromFile(
 
 bool FakeSuggestionsDatabase::HasFakeSuggestions(const GURL& url) const {
   std::u16string search_terms = ExtractSearchTerms(url);
-  return base::Contains(data_, search_terms);
+  return data_.contains(search_terms);
 }
 
 std::string FakeSuggestionsDatabase::GetFakeSuggestions(const GURL& url) const {

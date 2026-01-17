@@ -17,8 +17,8 @@
 #include "base/containers/span.h"
 #include "base/memory/raw_ptr.h"
 #include "net/base/completion_once_callback.h"
-#include "net/base/host_mapping_rules.h"
 #include "net/base/proxy_server.h"
+#include "net/base/reconnect_notifier.h"
 #include "net/base/request_priority.h"
 #include "net/base/test_completion_callback.h"
 #include "net/cert/mock_cert_verifier.h"
@@ -196,11 +196,11 @@ struct SpdySessionDependencies {
   std::unique_ptr<ReportingService> reporting_service;
   std::unique_ptr<NetworkErrorLoggingService> network_error_logging_service;
 #endif
-  HostMappingRules host_mapping_rules;
   bool enable_ip_pooling = true;
   bool enable_ping = false;
   bool enable_user_alternate_protocol_ports = false;
   bool enable_quic = false;
+  bool enable_http2 = true;
   bool enable_server_push_cancellation = false;
   size_t session_max_recv_window_size = kDefaultInitialWindowSize;
   int session_max_queued_capped_frames = kSpdySessionMaxQueuedCappedFrames;
@@ -211,7 +211,6 @@ struct SpdySessionDependencies {
   std::optional<SpdySessionPool::GreasedHttp2Frame> greased_http2_frame;
   bool http2_end_stream_with_data_frame = false;
   raw_ptr<NetLog> net_log = nullptr;
-  bool disable_idle_sockets_close_on_memory_pressure = false;
   bool enable_early_data = false;
   bool key_auth_cache_server_entries_by_network_anonymization_key = false;
   bool enable_priority_update = false;
@@ -498,6 +497,32 @@ namespace test {
 SHA256HashValue GetTestHashValue(uint8_t label);
 
 }  // namespace test
+
+class TestConnectionChangeObserver : public ConnectionChangeNotifier::Observer {
+ public:
+  TestConnectionChangeObserver();
+  ~TestConnectionChangeObserver() override;
+
+  void OnSessionClosed() override;
+
+  void OnConnectionFailed() override;
+
+  void OnNetworkEvent(net::NetworkChangeEvent event) override;
+
+  int session_closed() const { return session_closed_; }
+  int connection_failed() const { return connection_failed_; }
+  int network_event() const { return network_event_; }
+  std::optional<net::NetworkChangeEvent> last_network_event() const {
+    return last_network_event_;
+  }
+
+ private:
+  int session_closed_ = 0;
+  int connection_failed_ = 0;
+  int network_event_ = 0;
+  std::optional<net::NetworkChangeEvent> last_network_event_;
+};
+
 }  // namespace net
 
 #endif  // NET_SPDY_SPDY_TEST_UTIL_COMMON_H_

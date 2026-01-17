@@ -5,11 +5,9 @@
 package org.chromium.chrome.browser.tab_group_sync;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -29,13 +27,11 @@ import org.mockito.junit.MockitoRule;
 import org.robolectric.annotation.Config;
 
 import org.chromium.base.Token;
-import org.chromium.base.supplier.Supplier;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabCreator;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
-import org.chromium.chrome.browser.tabmodel.TabGroupModelFilterProvider;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorObserver;
 import org.chromium.chrome.test.util.browser.tabmodel.MockTabModel;
@@ -45,6 +41,7 @@ import org.chromium.components.tab_group_sync.TabGroupSyncController;
 import org.chromium.components.tab_group_sync.TabGroupSyncService;
 
 import java.util.ArrayList;
+import java.util.function.Supplier;
 
 /** Unit tests for the {@link TabGroupSyncControllerImpl}. */
 @RunWith(BaseRobolectricTestRunner.class)
@@ -73,12 +70,7 @@ public class TabGroupSyncControllerImplUnitTest {
     public void setUp() {
         mTabModel = spy(new MockTabModel(mProfile, null));
         when(mTabGroupModelFilter.getTabModel()).thenReturn(mTabModel);
-        TabGroupModelFilterProvider tabGroupModelFilterProvider =
-                mock(TabGroupModelFilterProvider.class);
-        when(mTabModelSelector.getTabGroupModelFilterProvider())
-                .thenReturn(tabGroupModelFilterProvider);
-        when(tabGroupModelFilterProvider.getTabGroupModelFilter(false))
-                .thenReturn(mTabGroupModelFilter);
+        when(mTabModelSelector.getTabGroupModelFilter(false)).thenReturn(mTabGroupModelFilter);
         doNothing().when(mTabModelSelector).addObserver(mTabModelSelectorObserverCaptor.capture());
         mTabModel.setTabCreatorForTesting(mTabCreator);
         doNothing()
@@ -88,7 +80,6 @@ public class TabGroupSyncControllerImplUnitTest {
         // Prepare mock tab.
         when(mTab1.getTabGroupId()).thenReturn(TOKEN_1);
         when(mTab1.getId()).thenReturn(TAB_ID_1);
-        when(mTab1.getRootId()).thenReturn(TAB_ID_1);
         when(mTabGroupModelFilter.tabGroupExists(TOKEN_1)).thenReturn(true);
         when(mTabCreator.createNewTab(any(), anyString(), anyInt(), any(), anyInt()))
                 .thenReturn(mTab1);
@@ -135,7 +126,7 @@ public class TabGroupSyncControllerImplUnitTest {
         SavedTabGroup savedTabGroup = TabGroupSyncTestUtils.createSavedTabGroup();
         when(mTabGroupSyncService.getGroup(savedTabGroup.syncId)).thenReturn(savedTabGroup);
         mController.openTabGroup(savedTabGroup.syncId);
-        verify(mTabGroupModelFilter, times(1)).mergeListOfTabsToGroup(any(), any(), anyBoolean());
+        verify(mTabGroupModelFilter, times(1)).mergeListOfTabsToGroup(any(), any(), anyInt());
     }
 
     @Test
@@ -149,6 +140,6 @@ public class TabGroupSyncControllerImplUnitTest {
         SavedTabGroup savedTabGroup = TabGroupSyncTestUtils.createSavedTabGroup();
         when(mTabGroupSyncService.getGroup(savedTabGroup.syncId)).thenReturn(savedTabGroup);
         mController.openTabGroup(savedTabGroup.syncId);
-        verify(mTabGroupModelFilter, never()).mergeListOfTabsToGroup(any(), any(), anyBoolean());
+        verify(mTabGroupModelFilter, never()).mergeListOfTabsToGroup(any(), any(), anyInt());
     }
 }

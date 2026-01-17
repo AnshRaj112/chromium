@@ -71,6 +71,14 @@ CSSAtRuleID CssAtRuleID(StringView name) {
   if (EqualIgnoringASCIICase(name, "property")) {
     return CSSAtRuleID::kCSSAtRuleProperty;
   }
+  if (RuntimeEnabledFeatures::RouteMatchingEnabled()) {
+    if (EqualIgnoringASCIICase(name, "route")) {
+      return CSSAtRuleID::kCSSAtRuleRoute;
+    }
+    if (EqualIgnoringASCIICase(name, "navigation")) {
+      return CSSAtRuleID::kCSSAtRuleNavigation;
+    }
+  }
   if (EqualIgnoringASCIICase(name, "container")) {
     return CSSAtRuleID::kCSSAtRuleContainer;
   }
@@ -151,6 +159,9 @@ CSSAtRuleID CssAtRuleID(StringView name) {
     if (EqualIgnoringASCIICase(name, "apply")) {
       return CSSAtRuleID::kCSSAtRuleApplyMixin;
     }
+    if (EqualIgnoringASCIICase(name, "contents")) {
+      return CSSAtRuleID::kCSSAtRuleContents;
+    }
   }
 
   if (RuntimeEnabledFeatures::CSSCustomMediaEnabled()) {
@@ -188,6 +199,10 @@ StringView CssAtRuleIDToString(CSSAtRuleID id) {
       return "@position-try";
     case CSSAtRuleID::kCSSAtRuleProperty:
       return "@property";
+    case CSSAtRuleID::kCSSAtRuleRoute:
+      return "@route";
+    case CSSAtRuleID::kCSSAtRuleNavigation:
+      return "@navigation";
     case CSSAtRuleID::kCSSAtRuleContainer:
       return "@container";
     case CSSAtRuleID::kCSSAtRuleCounterStyle:
@@ -252,6 +267,8 @@ StringView CssAtRuleIDToString(CSSAtRuleID id) {
       return "@mixin";
     case CSSAtRuleID::kCSSAtRuleApplyMixin:
       return "@apply";
+    case CSSAtRuleID::kCSSAtRuleContents:
+      return "@contents";
     case CSSAtRuleID::kCSSAtRuleCustomMedia:
       return "@custom-media";
     case CSSAtRuleID::kCSSAtRuleInvalid:
@@ -309,6 +326,9 @@ std::optional<WebFeature> AtRuleFeature(CSSAtRuleID rule_id) {
       return WebFeature::kCSSAtRulePageMargin;
     case CSSAtRuleID::kCSSAtRuleProperty:
       return WebFeature::kCSSAtRuleProperty;
+    case CSSAtRuleID::kCSSAtRuleRoute:
+    case CSSAtRuleID::kCSSAtRuleNavigation:
+      return WebFeature::kCSSAtRuleRoute;
     case CSSAtRuleID::kCSSAtRuleContainer:
       return WebFeature::kCSSAtRuleContainer;
     case CSSAtRuleID::kCSSAtRuleCounterStyle:
@@ -335,6 +355,7 @@ std::optional<WebFeature> AtRuleFeature(CSSAtRuleID rule_id) {
       return WebFeature::kCSSFunctions;
     case CSSAtRuleID::kCSSAtRuleMixin:
     case CSSAtRuleID::kCSSAtRuleApplyMixin:
+    case CSSAtRuleID::kCSSAtRuleContents:
       return WebFeature::kCSSMixins;
     case CSSAtRuleID::kCSSAtRuleCustomMedia:
       return WebFeature::kCSSCustomMedia;

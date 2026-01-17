@@ -4,8 +4,10 @@
 
 #include "components/media_router/common/providers/cast/certificate/net_parsed_certificate.h"
 
+#include <algorithm>
+
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
+#include "base/strings/string_view_util.h"
 #include "crypto/evp.h"
 #include "net/cert/time_conversions.h"
 #include "net/cert/x509_util.h"
@@ -23,8 +25,7 @@ ErrorOr<std::unique_ptr<ParsedCertificate>> ParsedCertificate::ParseFromDER(
     openscreen::ByteView der_cert) {
   std::shared_ptr<const bssl::ParsedCertificate> cert =
       bssl::ParsedCertificate::Create(
-          net::x509_util::CreateCryptoBuffer(UNSAFE_TODO(
-              base::span<const uint8_t>(der_cert.cbegin(), der_cert.cend()))),
+          net::x509_util::CreateCryptoBuffer(der_cert),
           cast_certificate::GetCertParsingOptions(), nullptr);
   if (!cert) {
     return Error::Code::kErrCertsParse;
@@ -135,7 +136,7 @@ std::string NetParsedCertificate::GetCommonName() const {
 }
 
 std::string NetParsedCertificate::GetSpkiTlv() const {
-  return cert_->tbs().spki_tlv.AsString();
+  return std::string(base::as_string_view(cert_->tbs().spki_tlv));
 }
 
 ErrorOr<uint64_t> NetParsedCertificate::GetSerialNumber() const {
@@ -191,7 +192,7 @@ bool NetParsedCertificate::HasPolicyOid(const openscreen::ByteView& oid) const {
     return false;
   }
   const std::vector<bssl::der::Input>& policies = cert_->policy_oids();
-  return base::Contains(policies, bssl::der::Input(oid));
+  return std::ranges::contains(policies, bssl::der::Input(oid));
 }
 
 void NetParsedCertificate::SetNotBeforeTimeForTesting(time_t not_before) {

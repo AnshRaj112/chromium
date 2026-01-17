@@ -28,6 +28,7 @@ const char kTokenHandleLastCheckedPref[] = "TokenHandleLastChecked";
 
 const char kHandleStatusValid[] = "valid";
 const char kHandleStatusInvalid[] = "invalid";
+const char kHandleStatusStale[] = "stale";
 
 constexpr int kMaxRetries = 3;
 
@@ -50,7 +51,8 @@ bool MaybeReturnCachedStatus(
     return true;
   }
 
-  if (*saved_status == kHandleStatusInvalid) {
+  if (*saved_status == kHandleStatusInvalid ||
+      *saved_status == kHandleStatusStale) {
     std::move(*callback).Run(account_id, token, /*reauth_required=*/true);
     return true;
   }
@@ -231,10 +233,20 @@ void TokenHandleUtil::StoreTokenHandle(const AccountId& account_id,
 }
 
 void TokenHandleUtil::MaybeFetchTokenHandle(
+    PrefService* token_handle_mapping_store,
     scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
     const AccountId& account_id,
     const std::string& access_token,
     const std::string& refresh_token_hash) {
+  NOTREACHED() << "This is a new interface method not defined for the legacy"
+               << "implementation and should not be accessed";
+}
+
+void TokenHandleUtil::DiagnoseTokenHandleMapping(
+    PrefService* token_handle_mapping_store,
+    account_manager::AccountManager* account_manager,
+    const AccountId& account_id,
+    const std::string& token) const {
   NOTREACHED() << "This is a new interface method not defined for the legacy"
                << "implementation and should not be accessed";
 }

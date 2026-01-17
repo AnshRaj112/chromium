@@ -7,7 +7,6 @@
 
 #include <stdint.h>
 
-#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -15,7 +14,6 @@
 #include "base/atomicops.h"
 #include "base/functional/callback.h"
 #include "base/location.h"
-#include "base/memory/memory_pressure_listener.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
@@ -212,12 +210,6 @@ class GpuProcessHost final : public BrowserChildProcessHostDelegate,
 
   void RunServiceImpl(mojo::GenericPendingReceiver receiver);
 
-#if !BUILDFLAG(IS_ANDROID)
-  // Memory pressure handler, called by |memory_pressure_listener_|.
-  void OnMemoryPressure(
-      base::MemoryPressureListener::MemoryPressureLevel level);
-#endif
-
   // The serial number of the GpuProcessHost.
   int host_id_;
 
@@ -237,6 +229,9 @@ class GpuProcessHost final : public BrowserChildProcessHostDelegate,
 
   // Whether we actually launched a GPU process.
   bool process_launched_;
+
+  // When the process was successfully launched.
+  base::TimeTicks process_start_time_;
 
   GpuTerminationOrigin termination_origin_ =
       GpuTerminationOrigin::kUnknownOrigin;
@@ -275,12 +270,6 @@ class GpuProcessHost final : public BrowserChildProcessHostDelegate,
   // received, assume all of these URLs are guilty, and block
   // automatic execution of 3D content from those domains.
   std::multiset<GURL> urls_with_live_offscreen_contexts_;
-
-#if !BUILDFLAG(IS_ANDROID)
-  // Responsible for forwarding the memory pressure notifications from the
-  // browser process to the GPU process.
-  std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
-#endif
 
   std::unique_ptr<viz::GpuHostImpl> gpu_host_;
 

@@ -44,6 +44,7 @@
 #include "third_party/blink/renderer/core/css/css_font_style_range_value.h"
 #include "third_party/blink/renderer/core/css/css_font_variation_value.h"
 #include "third_party/blink/renderer/core/css/css_identifier_value.h"
+#include "third_party/blink/renderer/core/css/css_markup.h"
 #include "third_party/blink/renderer/core/css/css_property_value_set.h"
 #include "third_party/blink/renderer/core/css/css_unicode_range_value.h"
 #include "third_party/blink/renderer/core/css/css_value_list.h"
@@ -55,6 +56,7 @@
 #include "third_party/blink/renderer/core/css/offscreen_font_selector.h"
 #include "third_party/blink/renderer/core/css/parser/at_rule_descriptor_parser.h"
 #include "third_party/blink/renderer/core/css/parser/css_parser.h"
+#include "third_party/blink/renderer/core/css/properties/css_parsing_utils.h"
 #include "third_party/blink/renderer/core/css/remote_font_face_source.h"
 #include "third_party/blink/renderer/core/css/resolver/style_builder_converter.h"
 #include "third_party/blink/renderer/core/css/style_engine.h"
@@ -160,6 +162,7 @@ FontFace* FontFace::Create(ExecutionContext* context,
                            const FontFaceDescriptors* descriptors) {
   FontFace* font_face =
       MakeGarbageCollected<FontFace>(context, family, descriptors);
+  font_face->SetIsInvalidFontFamilyIfNeeded(family);
 
   const CSSValue* src = ParseCSSValue(context, source, AtRuleDescriptorID::Src);
   if (!src || !src->IsValueList()) {
@@ -183,9 +186,11 @@ FontFace* FontFace::Create(ExecutionContext* context,
   return font_face;
 }
 
-FontFace* FontFace::Create(Document* document,
-                           const StyleRuleFontFace* font_face_rule,
-                           bool is_user_style) {
+FontFace* FontFace::Create(
+    Document* document,
+    const CascadeLayered<const StyleRuleFontFace>& layered_font_face_rule,
+    bool is_user_style) {
+  const StyleRuleFontFace* font_face_rule = layered_font_face_rule.value;
   const CSSPropertyValueSet& properties = font_face_rule->Properties();
 
   // Obtain the font-family property and the src property. Both must be defined.
@@ -200,7 +205,7 @@ FontFace* FontFace::Create(Document* document,
   }
 
   FontFace* font_face = MakeGarbageCollected<FontFace>(
-      document->GetExecutionContext(), font_face_rule, is_user_style);
+      document->GetExecutionContext(), layered_font_face_rule, is_user_style);
   font_face->SetFamilyValue(*family);
 
   if (font_face->SetPropertyFromStyle(properties,
@@ -235,7 +240,7 @@ FontFace* FontFace::Create(Document* document,
 }
 
 FontFace::FontFace(ExecutionContext* context,
-                   const StyleRuleFontFace* style_rule,
+                   const CascadeLayered<const StyleRuleFontFace>& style_rule,
                    bool is_user_style)
     : ActiveScriptWrappable<FontFace>({}),
       ExecutionContextClient(context),
@@ -279,6 +284,11 @@ FontFace::FontFace(ExecutionContext* context,
 }
 
 FontFace::~FontFace() = default;
+
+AtomicString FontFace::family() const {
+  return is_invalid_font_family_ ? AtomicString(SerializeFontFamily(family_))
+                                 : family_;
+}
 
 String FontFace::style() const {
   return style_ ? style_->CssText() : "normal";
@@ -491,6 +501,10 @@ void FontFace::SetFamilyValue(const CSSFontFamilyValue& family_value) {
   family_ = family_value.Value();
 }
 
+void FontFace::SetIsInvalidFontFamilyIfNeeded(const AtomicString& family_name) {
+  is_invalid_font_family_ = css_parsing_utils::IsInvalidFontFamily(family_name);
+}
+
 V8FontFaceLoadStatus FontFace::status() const {
   switch (status_) {
     case kUnloaded:
@@ -519,23 +533,23 @@ void FontFace::SetLoadStatus(LoadStatusType status) {
         GetExecutionContext()
             ->GetTaskRunner(TaskType::kDOMManipulation)
             ->PostTask(FROM_HERE,
-                       WTF::BindOnce(&LoadedProperty::Resolve<FontFace*>,
-                                     WrapPersistent(loaded_property_.Get()),
-                                     WrapPersistent(this)));
+                       BindOnce(&LoadedProperty::Resolve<FontFace*>,
+                                WrapPersistent(loaded_property_.Get()),
+                                WrapPersistent(this)));
       } else {
         GetExecutionContext()
             ->GetTaskRunner(TaskType::kDOMManipulation)
             ->PostTask(FROM_HERE,
-                       WTF::BindOnce(&LoadedProperty::Reject<DOMException*>,
-                                     WrapPersistent(loaded_property_.Get()),
-                                     WrapPersistent(error_.Get())));
+                       BindOnce(&LoadedProperty::Reject<DOMException*>,
+                                WrapPersistent(loaded_property_.Get()),
+                                WrapPersistent(error_.Get())));
       }
     }
 
     GetExecutionContext()
         ->GetTaskRunner(TaskType::kDOMManipulation)
-        ->PostTask(FROM_HERE, WTF::BindOnce(&FontFace::RunCallbacks,
-                                            WrapPersistent(this)));
+        ->PostTask(FROM_HERE,
+                   BindOnce(&FontFace::RunCallbacks, WrapPersistent(this)));
   }
 }
 

@@ -74,7 +74,7 @@ class OffscreenCanvasPlaceholderTest : public Test {
   test::TaskEnvironment task_environment_;
   OffscreenCanvasPlaceholder placeholder_;
   std::unique_ptr<MockCanvasResourceDispatcher> dispatcher_;
-  std::unique_ptr<CanvasResourceProvider> resource_provider_;
+  std::unique_ptr<CanvasResourceProviderSharedImage> resource_provider_;
   std::unique_ptr<WebGraphicsSharedImageInterfaceProvider>
       test_web_shared_image_interface_provider_;
   unsigned placeholder_id_ = 0;
@@ -108,14 +108,18 @@ void OffscreenCanvasPlaceholderTest::CreateDispatcher() {
 }
 
 void OffscreenCanvasPlaceholderTest::DrawSomething() {
-  // 'needs_will_draw=true' is required to ensure the CanvasResourceProvider
-  // does not retain a reference on the previous frame.
-  resource_provider_->Canvas(/*needs_will_draw=*/true).clear(SkColors::kWhite);
+  // ExternalCanvasDrawHelper() guarantees that `resource_provider_` will invoke
+  // WillDrawIfNeeded() which ensures the CanvasResourceProvider does not retain
+  // a reference on the previous frame.
+  resource_provider_->ExternalCanvasDrawHelper(
+      [&](MemoryManagedPaintCanvas& canvas) {
+        canvas.clear(SkColors::kWhite);
+      });
 }
 
 CanvasResource* OffscreenCanvasPlaceholderTest::DispatchOneFrame() {
   scoped_refptr<CanvasResource> resource =
-      resource_provider_->ProduceCanvasResource(FlushReason::kTesting);
+      resource_provider_->ProduceCanvasResource(FlushReason::kOther);
   CanvasResource* resource_raw_ptr = resource.get();
   dispatcher_->DispatchFrame(std::move(resource), SkIRect::MakeEmpty(),
                              /*is_opaque=*/false);

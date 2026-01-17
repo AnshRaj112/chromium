@@ -30,7 +30,6 @@ import org.chromium.android_webview.AwContents;
 import org.chromium.android_webview.AwSettings;
 import org.chromium.android_webview.AwSettings.LayoutAlgorithm;
 import org.chromium.android_webview.AwWebResourceRequest;
-import org.chromium.android_webview.ManifestMetadataUtil;
 import org.chromium.android_webview.common.AwFeatureMap;
 import org.chromium.android_webview.common.AwFeatures;
 import org.chromium.android_webview.test.AwActivityTestRule.TestDependencyFactory;
@@ -54,8 +53,6 @@ import org.chromium.base.test.util.TestFileUtil;
 import org.chromium.base.test.util.UrlUtils;
 import org.chromium.blink_public.common.BlinkFeatures;
 import org.chromium.components.embedder_support.util.WebResourceResponseInfo;
-import org.chromium.content_public.browser.ContentFeatureList;
-import org.chromium.content_public.browser.ContentFeatureMap;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
 import org.chromium.content_public.browser.test.util.HistoryUtils;
@@ -71,9 +68,6 @@ import org.chromium.ui.display.DisplayUtil;
 import java.io.File;
 import java.io.FileInputStream;
 import java.net.URLEncoder;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1571,6 +1565,8 @@ public class AwSettingsTest {
         private static final String BAD_SCHEME_URL = "htt://nonsense";
         private static final String PREV_TITLE = "cuencpobgjhfdmdovhmfdkjf";
         private static final int MAX_TIME_LOADING_ERROR_PAGE = 1000;
+
+        @SuppressWarnings("HidingField")
         private final AwContents mAwContents;
 
         AwSettingsWillSuppressErrorPageTestHelper(
@@ -1677,7 +1673,10 @@ public class AwSettingsTest {
 
         private final TestAwContentsClient mContentClient;
         private final AwTestContainerView mTestContainerView;
+
+        @SuppressWarnings("HidingField")
         private final AwContents mAwContents;
+
         private final AwSettings mAwSettings;
 
         public final String mContentMainUrl;
@@ -2760,7 +2759,7 @@ public class AwSettingsTest {
     private static class AudioEvent {
         private final CallbackHelper mCallback;
 
-        public AudioEvent(CallbackHelper callback) {
+        AudioEvent(CallbackHelper callback) {
             mCallback = callback;
         }
 
@@ -3674,21 +3673,6 @@ public class AwSettingsTest {
     @Test
     @SmallTest
     @Feature({"AndroidWebView", "Preferences"})
-    @CommandLineFlags.Add({"enable-features=DIPS"})
-    public void testDipsSettingsForWebView() {
-        Map<String, String> mapDipsTtl =
-                ContentFeatureMap.getInstance()
-                        .getFieldTrialParamsForFeature(ContentFeatureList.DIPS_TTL);
-        Assert.assertTrue(mapDipsTtl.size() > 0);
-
-        String expectedTtl = "30d";
-        String gotDipsTtl = mapDipsTtl.get("interaction_ttl");
-        Assert.assertEquals(expectedTtl, gotDipsTtl);
-    }
-
-    @Test
-    @SmallTest
-    @Feature({"AndroidWebView", "Preferences"})
     public void testUpdatingUserAgentWhileLoadingCausesReload() throws Throwable {
         final TestAwContentsClient contentClient = new TestAwContentsClient();
         final AwTestContainerView testContainerView =
@@ -3735,7 +3719,7 @@ public class AwSettingsTest {
             extends TestDependencyFactory {
         private final boolean mAllow;
 
-        public EmptyDocumentPersistenceTestDependencyFactory(boolean allow) {
+        EmptyDocumentPersistenceTestDependencyFactory(boolean allow) {
             mAllow = allow;
         }
 
@@ -3819,7 +3803,7 @@ public class AwSettingsTest {
     private static class SelectionRangeTestDependencyFactory extends TestDependencyFactory {
         private final boolean mDoNotUpdate;
 
-        public SelectionRangeTestDependencyFactory(boolean doNotUpdate) {
+        SelectionRangeTestDependencyFactory(boolean doNotUpdate) {
             mDoNotUpdate = doNotUpdate;
         }
 
@@ -3928,42 +3912,6 @@ public class AwSettingsTest {
     @Feature({"AndroidWebView", "Selection"})
     public void testUpdateSelectionOnMutatingSelectionRange() throws Throwable {
         selectionUpdateOnMutatingSelectionRangeTest(false);
-    }
-
-    @Test
-    @SmallTest
-    @Feature({"AndroidWebView", "Preferences"})
-    public void testGetUpdatedXrwAllowList() throws Throwable {
-        TestAwContentsClient contentClient = new TestAwContentsClient();
-        AwTestContainerView testContainerView =
-                mActivityTestRule.createAwTestContainerViewOnMainSync(contentClient);
-        AwContents awContents = testContainerView.getAwContents();
-        AwSettings awSettings = mActivityTestRule.getAwSettingsOnUiThread(awContents);
-
-        final Set<String> allowList = Set.of("https://*.example.com", "https://*.google.com");
-
-        Assert.assertEquals(
-                Collections.emptySet(), awSettings.getRequestedWithHeaderOriginAllowList());
-
-        awSettings.setRequestedWithHeaderOriginAllowList(allowList);
-
-        Assert.assertEquals(allowList, awSettings.getRequestedWithHeaderOriginAllowList());
-    }
-
-    @Test
-    @SmallTest
-    @Feature({"AndroidWebView", "Preferences"})
-    public void testXRequestedWithAllowListSetByManifest() throws Throwable {
-        final Set<String> allowList = Set.of("https://*.example.com", "https://*.google.com");
-        try (var a = ManifestMetadataUtil.setXRequestedWithAllowListScopedForTesting(allowList)) {
-            TestAwContentsClient contentClient = new TestAwContentsClient();
-            AwTestContainerView testContainerView =
-                    mActivityTestRule.createAwTestContainerViewOnMainSync(contentClient);
-            AwContents awContents = testContainerView.getAwContents();
-            AwSettings awSettings = mActivityTestRule.getAwSettingsOnUiThread(awContents);
-            Set<String> changedList = awSettings.getRequestedWithHeaderOriginAllowList();
-            Assert.assertEquals(allowList, changedList);
-        }
     }
 
     static class ViewPair {
@@ -4127,5 +4075,191 @@ public class AwSettingsTest {
 
     private boolean isTablet() {
         return DeviceFormFactor.isNonMultiDisplayContextOnTablet(mActivityTestRule.getActivity());
+    }
+
+    class AwSettingsTextScaleMetaTagTestHelper extends AwSettingsTextAutosizingTestHelper<Integer> {
+        protected final float mInitialActualFontSize;
+        protected static final int INITIAL_TEXT_ZOOM = 100;
+
+        AwSettingsTextScaleMetaTagTestHelper(
+                AwTestContainerView containerView, TestAwContentsClient contentViewClient)
+                throws Throwable {
+            super(
+                    containerView,
+                    contentViewClient,
+                    !AwFeatureMap.isEnabled(BlinkFeatures.FORCE_OFF_TEXT_AUTOSIZING));
+            // Enable JavaScript for reading font size.
+            mAwSettings.setJavaScriptEnabled(true);
+            // Always set autosizing here, but we control it via flags later.
+            mAwSettings.setLayoutAlgorithm(AwSettings.LAYOUT_ALGORITHM_TEXT_AUTOSIZING);
+            mInitialActualFontSize = getActualFontSize();
+        }
+
+        @Override
+        protected String getData() {
+            return "<html>"
+                    + "<head>"
+                    + "<meta name=\"text-scale\" content=\"scale\">"
+                    + "<script>"
+                    + "function setTitleToActualFontSize() {"
+                    + "  document.title = parseFloat(getComputedStyle("
+                    + "    document.getElementById('par'))"
+                    + ".getPropertyValue('font-size'));"
+                    + "}</script></head>"
+                    + "<body>"
+                    + "<p id=\"par\">"
+                    + "Hello, World! Hello, World! "
+                    + "</p>"
+                    + "<p id=\"fixed\" style=\"font-size: 20px\">Fixed Text</p>"
+                    + "<div id=\"env-test\" style=\"width: calc(100px *"
+                    + " env(preferred-text-scale));\"></div>"
+                    + "</body></html>";
+        }
+
+        @Override
+        protected Integer getAlteredValue() {
+            return INITIAL_TEXT_ZOOM * 2;
+        }
+
+        @Override
+        protected Integer getInitialValue() {
+            return INITIAL_TEXT_ZOOM;
+        }
+
+        @Override
+        protected Integer getCurrentValue() {
+            return mAwSettings.getTextZoom();
+        }
+
+        @Override
+        protected void setCurrentValue(Integer value) throws Throwable {
+            super.setCurrentValue(value);
+            mAwSettings.setTextZoom(value);
+            // If the meta tag is disabled but autosizing is enabled, the font size will not change
+            // at all in this scenario, so we skip the wait to avoid timeouts.
+            if (!AwFeatureMap.isEnabled(BlinkFeatures.TEXT_SCALE_META_TAG) && mAutosizingEnabled) {
+                mNeedToWaitForFontSizeChange = false;
+            }
+        }
+
+        @Override
+        protected void doEnsureSettingHasValue(Integer value) throws Throwable {
+            final float actualFontSize = getActualFontSize();
+            // With OR without the meta tag, setTextZoom should scale the default font size of
+            // medium.
+            float expectedRatio = value / (float) INITIAL_TEXT_ZOOM;
+            if (!AwFeatureMap.isEnabled(BlinkFeatures.TEXT_SCALE_META_TAG) && mAutosizingEnabled) {
+                expectedRatio = 1.0f;
+            }
+
+            final float ratiosDelta =
+                    Math.abs((actualFontSize / mInitialActualFontSize) - expectedRatio);
+            Assert.assertTrue(
+                    "|("
+                            + actualFontSize
+                            + " / "
+                            + mInitialActualFontSize
+                            + ") - ("
+                            + expectedRatio
+                            + ")| = "
+                            + ratiosDelta,
+                    ratiosDelta <= 0.2f);
+
+            // Retrieve the size of the text that had a fixed font size.
+            String fixedSizeStr =
+                    executeJavaScriptAndWaitForResult(
+                            "parseFloat(getComputedStyle(document.getElementById('fixed'))"
+                                    + ".getPropertyValue('font-size'))");
+            float fixedSize = Float.parseFloat(fixedSizeStr);
+
+            // Retrieve the value of the environment variable.
+            String envWidthStr =
+                    executeJavaScriptAndWaitForResult(
+                            "parseFloat(getComputedStyle(document.getElementById"
+                                    + "('env-test')).width)");
+            float envWidth = Float.parseFloat(envWidthStr);
+
+            if (AwFeatureMap.isEnabled(BlinkFeatures.TEXT_SCALE_META_TAG)) {
+                Assert.assertEquals("Fixed font size should NOT scale", 20.0f, fixedSize, 0.5f);
+
+                // The meta tag makes us populate env(preferred-text-scale).
+                float expectedWidth = value;
+                Assert.assertEquals(
+                        "env(preferred-text-scale) width", expectedWidth, envWidth, 1.0f);
+
+            } else {
+                // TextScaleMetaTag Disabled: Fixed font size SHOULD scale (legacy behavior).
+                float expectedFixedSize = 20.0f * (value / (float) INITIAL_TEXT_ZOOM);
+                if (mAutosizingEnabled) {
+                    expectedFixedSize = 20.0f;
+                }
+                Assert.assertEquals(
+                        "Fixed font size should scale", expectedFixedSize, fixedSize, 2.0f);
+
+                if (mAutosizingEnabled) {
+                    float expectedWidth = value;
+                    Assert.assertEquals(
+                            "env() should track scale when autosizing on",
+                            expectedWidth,
+                            envWidth,
+                            1.0f);
+                } else {
+                    Assert.assertEquals(
+                            "no meta & no autosizing? env(preferred-text-scale) should be 1 ",
+                            100.0f,
+                            envWidth,
+                            1.0f);
+                }
+            }
+        }
+    }
+
+    @Test
+    @SmallTest
+    @EnableFeatures(BlinkFeatures.TEXT_SCALE_META_TAG)
+    @Feature({"AndroidWebView", "Preferences"})
+    public void testTextScaleMetaTagWithTwoViews() throws Throwable {
+        ViewPair views = createViews();
+        runPerViewSettingsTest(
+                new AwSettingsTextScaleMetaTagTestHelper(views.getContainer0(), views.getClient0()),
+                new AwSettingsTextScaleMetaTagTestHelper(
+                        views.getContainer1(), views.getClient1()));
+    }
+
+    @Test
+    @SmallTest
+    @EnableFeatures(BlinkFeatures.TEXT_SCALE_META_TAG)
+    @DisableFeatures(BlinkFeatures.FORCE_OFF_TEXT_AUTOSIZING)
+    @Feature({"AndroidWebView", "Preferences"})
+    public void testTextScaleMetaTagWithTwoViewsWithAutosizingEnabled() throws Throwable {
+        ViewPair views = createViews();
+        runPerViewSettingsTest(
+                new AwSettingsTextScaleMetaTagTestHelper(views.getContainer0(), views.getClient0()),
+                new AwSettingsTextScaleMetaTagTestHelper(
+                        views.getContainer1(), views.getClient1()));
+    }
+
+    @Test
+    @SmallTest
+    @DisableFeatures(BlinkFeatures.TEXT_SCALE_META_TAG)
+    @Feature({"AndroidWebView", "Preferences"})
+    public void testTextScaleMetaTagWithTwoViewsDisabled() throws Throwable {
+        ViewPair views = createViews();
+        runPerViewSettingsTest(
+                new AwSettingsTextScaleMetaTagTestHelper(views.getContainer0(), views.getClient0()),
+                new AwSettingsTextScaleMetaTagTestHelper(
+                        views.getContainer1(), views.getClient1()));
+    }
+
+    @Test
+    @SmallTest
+    @DisableFeatures({BlinkFeatures.TEXT_SCALE_META_TAG, BlinkFeatures.FORCE_OFF_TEXT_AUTOSIZING})
+    @Feature({"AndroidWebView", "Preferences"})
+    public void testTextScaleMetaTagWithTwoViewsWithAutosizingEnabledDisabled() throws Throwable {
+        ViewPair views = createViews();
+        runPerViewSettingsTest(
+                new AwSettingsTextScaleMetaTagTestHelper(views.getContainer0(), views.getClient0()),
+                new AwSettingsTextScaleMetaTagTestHelper(
+                        views.getContainer1(), views.getClient1()));
     }
 }

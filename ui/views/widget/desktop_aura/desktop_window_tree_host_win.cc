@@ -15,6 +15,7 @@
 #include "base/containers/flat_set.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/functional/bind.h"
+#include "base/logging.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/trace_event/trace_event.h"
@@ -49,7 +50,7 @@
 #include "ui/events/platform/platform_event_source.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/vector2d.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/gfx/path_win.h"
 #include "ui/views/corewm/tooltip_aura.h"
 #include "ui/views/views_features.h"
@@ -91,7 +92,7 @@ void UpdateMouseLockRegion(aura::Window* window, bool locked) {
   }
 
   RECT window_rect =
-      display::Screen::GetScreen()
+      display::Screen::Get()
           ->DIPToScreenRectInWindow(window, window->GetBoundsInScreen())
           .ToRECT();
   window_rect.left += kMouseCaptureRegionBorder;
@@ -199,7 +200,15 @@ void DesktopWindowTreeHostWin::Init(const Widget::InitParams& params) {
     DWM_SYSTEMBACKDROP_TYPE backdrop = DWMSBT_MAINWINDOW;
     HRESULT hr = DwmSetWindowAttribute(GetHWND(), DWMWA_SYSTEMBACKDROP_TYPE,
                                        &backdrop, sizeof(backdrop));
-    CHECK_EQ(hr, S_OK);
+    if (FAILED(hr)) {
+      // If DwmSetWindowAttribute fails, it indicates that there was a problem
+      // setting the system backdrop type. In this state, the backdrop is not
+      // applied, and the worst that can happen is a transparent window appears
+      // while the GPU process is being started.
+      LOG(ERROR) << "Failed to set DWM system backdrop type: "
+                 << logging::SystemErrorCodeToString(
+                        static_cast<logging::SystemErrorCode>(hr));
+    }
   }
 
   UpdateBackdropColorMode();
@@ -238,15 +247,11 @@ void DesktopWindowTreeHostWin::OnActiveWindowChanged(bool active) {}
 
 void DesktopWindowTreeHostWin::OnWidgetInitDone() {}
 
-void DesktopWindowTreeHostWin::OnWidgetThemeChanged(
-    ui::ColorProviderKey::ColorMode color_mode,
-    std::optional<SkColor> background_color) {
+void DesktopWindowTreeHostWin::SetBackgroundColor(SkColor background_color) {
   UpdateBackdropColorMode();
-  if (background_color) {
-    ClearBackgroundPaintBrush();
-    background_paint_brush_ =
-        CreateSolidBrush(skia::SkColorToCOLORREF(*background_color));
-  }
+  ClearBackgroundPaintBrush();
+  background_paint_brush_ =
+      CreateSolidBrush(skia::SkColorToCOLORREF(background_color));
 }
 
 std::unique_ptr<corewm::Tooltip> DesktopWindowTreeHostWin::CreateTooltip() {
@@ -262,6 +267,9 @@ DesktopWindowTreeHostWin::CreateDragDropClient() {
 }
 
 void DesktopWindowTreeHostWin::Close() {
+  // Do not generate synthesized events during shutdown.
+  dispatcher()->Shutdown();
+
   // Calling Hide() can detach the content window's layer, so store it
   // beforehand so we can access it below.
   auto* window_layer = content_window()->layer();
@@ -556,8 +564,7 @@ void DesktopWindowTreeHostWin::SetVisibilityChangedAnimationsEnabled(
   }
 }
 
-std::unique_ptr<NonClientFrameView>
-DesktopWindowTreeHostWin::CreateNonClientFrameView() {
+std::unique_ptr<FrameView> DesktopWindowTreeHostWin::CreateFrameView() {
   return (ShouldUseNativeFrame() && native_widget_delegate_)
              ? std::make_unique<NativeFrameView>(
                    native_widget_delegate_->AsWidget())
@@ -924,10 +931,7 @@ void DesktopWindowTreeHostWin::GetWindowMask(const gfx::Size& size_px,
   if (!path->isEmpty()) {
     const float scale =
         display::win::GetScreenWin()->GetScaleFactorForHWND(GetHWND());
-    SkScalar sk_scale = SkFloatToScalar(scale);
-    SkMatrix matrix;
-    matrix.setScale(sk_scale, sk_scale);
-    path->transform(matrix);
+    *path = path->makeTransform(SkMatrix::Scale(scale, scale));
   }
 }
 
@@ -990,6 +994,22 @@ gfx::NativeViewAccessible DesktopWindowTreeHostWin::GetNativeViewAccessible() {
     return widget->GetRootView()->GetNativeViewAccessible();
   }
   return nullptr;
+}
+
+gfx::NativeViewAccessible
+DesktopWindowTreeHostWin::GetParentNativeViewAccessible() {
+  views::Widget* widget = GetWidget();
+  if (!widget) {
+    return nullptr;
+  }
+
+  views::Widget* parent_widget = widget->parent();
+  if (!parent_widget) {
+    return nullptr;
+  }
+
+  views::View* parent_root = parent_widget->GetRootView();
+  return parent_root ? parent_root->GetNativeViewAccessible() : nullptr;
 }
 
 void DesktopWindowTreeHostWin::HandleActivationChanged(bool active) {
@@ -1215,7 +1235,7 @@ void DesktopWindowTreeHostWin::HandleTouchEvent(ui::TouchEvent* event) {
     return;
   }
   if (event->type() == ui::EventType::kTouchPressed) {
-    display::Screen* screen = display::Screen::GetScreen();
+    display::Screen* screen = display::Screen::Get();
     CHECK(screen);
     aura::Window* window =
         screen->GetWindowAtScreenPoint(screen->GetCursorScreenPoint());
@@ -1370,7 +1390,7 @@ void DesktopWindowTreeHostWin::SetBoundsInDIP(const gfx::Rect& bounds) {
   // details.
   aura::Window* root = nullptr;
   const gfx::Rect bounds_in_pixels =
-      display::Screen::GetScreen()->DIPToScreenRectInWindow(
+      display::Screen::Get()->DIPToScreenRectInWindow(
           root, AdjustedContentBounds(bounds));
   AsWindowTreeHost()->SetBoundsInPixels(bounds_in_pixels);
 }
@@ -1447,7 +1467,7 @@ bool DesktopWindowTreeHostWin::IsModalWindowActive() const {
 
 void DesktopWindowTreeHostWin::CheckForMonitorChange() {
   display::Display nearest_display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(window());
+      display::Screen::Get()->GetDisplayNearestWindow(window());
   if (nearest_display == last_nearest_display_) {
     return;
   }
@@ -1507,12 +1527,13 @@ void DesktopWindowTreeHostWin::UpdateBackdropColorMode() {
       GetWidget()->GetColorMode() == ui::ColorProviderKey::ColorMode::kDark;
   HRESULT hr = DwmSetWindowAttribute(GetHWND(), DWMWA_USE_IMMERSIVE_DARK_MODE,
                                      &use_dark_mode, sizeof(use_dark_mode));
-  if FAILED (hr) {
-    // TODO(crbug.com/415385215) DwmSetWindowAttribute can fail in certain
-    // scenarios. Create a dump so that these scenarios can be studied and
-    // prevented.
-    base::debug::Alias(&hr);
-    base::debug::DumpWithoutCrashing();
+  if (FAILED(hr)) {
+    // If DwmSetWindowAttribute fails, it indicates that there was a problem
+    // setting dark mode for the window. In this state, the mode change is not
+    // applied and the backdrop will remain in its previous state.
+    LOG(ERROR) << "Failed to set DWM immersive dark mode: "
+               << logging::SystemErrorCodeToString(
+                      static_cast<logging::SystemErrorCode>(hr));
   }
 }
 

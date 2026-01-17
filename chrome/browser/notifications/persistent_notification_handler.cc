@@ -25,7 +25,6 @@
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service_factory.h"
 #include "chrome/browser/permissions/notifications_engagement_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/safe_browsing/notification_content_detection/notification_content_detection_util.h"
 #include "chrome/browser/ui/safety_hub/disruptive_notification_permissions_manager.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/content_settings/core/common/content_settings.h"
@@ -34,8 +33,7 @@
 #include "components/permissions/features.h"
 #include "components/permissions/permission_uma_util.h"
 #include "components/permissions/permission_util.h"
-#include "components/safe_browsing/content/browser/notification_content_detection/notification_content_detection_constants.h"
-#include "components/safe_browsing/core/common/features.h"
+#include "components/safe_browsing/buildflags.h"
 #include "components/site_engagement/content/site_engagement_service.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_event_dispatcher.h"
@@ -47,8 +45,16 @@
 #include "content/public/common/persistent_notification_status.h"
 #include "services/metrics/public/cpp/ukm_recorder.h"
 #include "third_party/blink/public/common/permissions/permission_utils.h"
+#include "ui/message_center/message_center_stats_collector.h"
 #include "url/gurl.h"
 #include "url/origin.h"
+
+#if BUILDFLAG(SAFE_BROWSING_AVAILABLE)
+#include "chrome/browser/safe_browsing/notification_content_detection/notification_content_detection_util.h"
+#include "components/safe_browsing/content/browser/notification_content_detection/notification_content_detection_constants.h"
+#include "components/safe_browsing/core/browser/safe_browsing_metrics_collector.h"
+#include "components/safe_browsing/core/common/features.h"
+#endif
 
 #if BUILDFLAG(ENABLE_BACKGROUND_MODE)
 #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
@@ -299,7 +305,8 @@ void PersistentNotificationHandler::OnAppTerminating() {
 void PersistentNotificationHandler::DisableNotifications(
     Profile* profile,
     const GURL& origin,
-    const std::optional<std::string>& notification_id) {
+    const std::optional<std::string>& notification_id,
+    const std::optional<bool>& is_suspicious) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   permissions::PermissionUmaUtil::ScopedRevocationReporter
       scoped_revocation_reporter(
@@ -314,6 +321,8 @@ void PersistentNotificationHandler::DisableNotifications(
   NotificationPermissionContext::UpdatePermission(profile, origin,
                                                   CONTENT_SETTING_BLOCK);
 #endif
+
+#if BUILDFLAG(SAFE_BROWSING_AVAILABLE)
   // Remove `origin` from user allowlisted sites when user unsubscribes. On
   // Android, log the suspicious notification unsubscribe ukm event if the
   // notification was suspicious.
@@ -330,14 +339,30 @@ void PersistentNotificationHandler::DisableNotifications(
       safe_browsing::MaybeLogSuspiciousNotificationUnsubscribeUkm(
           hcsm, origin, notification_id.value(), profile);
     }
-#endif
+    if (is_suspicious.has_value()) {
+      safe_browsing::SafeBrowsingMetricsCollector::
+          LogSafeBrowsingNotificationRevocationSourceHistogram(
+              is_suspicious.value()
+                  ? safe_browsing::NotificationRevocationSource::
+                        kSuspiciousWarningOneTapUnsubscribe
+                  : safe_browsing::NotificationRevocationSource::
+                        kStandardOneTapUnsubscribe);
+    }
+#endif  // BUILDFLAG(IS_ANDROID)
   }
+#endif  // BUILDFLAG(SAFE_BROWSING_AVAILABLE)
 }
 
 void PersistentNotificationHandler::OpenSettings(Profile* profile,
                                                  const GURL& origin) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   NotificationCommon::OpenNotificationSettings(profile, origin);
+  UMA_HISTOGRAM_ENUMERATION(
+      "Notifications.Actions",
+      message_center::MessageCenterStatsCollector::NotificationActionType::
+          NOTIFICATION_ACTION_OPEN_SETTINGS_BUTTON_CLICK,
+      message_center::MessageCenterStatsCollector::NotificationActionType::
+          NOTIFICATION_ACTION_COUNT);
 }
 
 void PersistentNotificationHandler::ReportNotificationAsSafe(
@@ -375,6 +400,18 @@ void PersistentNotificationHandler::OnShowOriginalNotification(
               safe_browsing::SuspiciousNotificationWarningInteractions::
                   kShowOriginalNotification),
           url, notification_id, profile);
+  if (base::FeatureList::IsEnabled(
+          safe_browsing::kAutoRevokeSuspiciousNotification)) {
+    auto* hcsm = HostContentSettingsMapFactory::GetForProfile(profile);
+    if (hcsm && !url.is_empty()) {
+      hcsm->SetWebsiteSettingCustomScope(
+          ContentSettingsPattern::FromURLNoWildcard(url),
+          ContentSettingsPattern::Wildcard(),
+          ContentSettingsType::SUSPICIOUS_NOTIFICATION_SHOW_ORIGINAL,
+          base::Value(base::Value::Dict().Set(
+              safe_browsing::kSuspiciousNotificationShowOriginalKey, true)));
+    }
+  }
 #endif
 }
 
@@ -386,6 +423,7 @@ void PersistentNotificationHandler::OnMaybeReport(
     bool did_user_unsubscribe) {
   CHECK(profile);
 
+#if BUILDFLAG(SAFE_BROWSING_AVAILABLE)
   // In case the data volume becomes excessive, logging should happen at a
   // sampled rate. This rate is defined by the
   // `kReportNotificationContentDetectionDataRate` feature parameter.
@@ -420,6 +458,7 @@ void PersistentNotificationHandler::OnMaybeReport(
               ->GetWeakPtr(),
           safe_browsing::NotificationContentDetectionMQLSMetadata(
               did_show_warning, did_user_unsubscribe, engagement_level)));
+#endif  // BUILDFLAG(SAFE_BROWSING_AVAILABLE)
 }
 
 #if BUILDFLAG(ENABLE_BACKGROUND_MODE)

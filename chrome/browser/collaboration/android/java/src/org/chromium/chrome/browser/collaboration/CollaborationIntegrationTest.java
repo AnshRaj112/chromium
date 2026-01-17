@@ -48,6 +48,7 @@ import org.mockito.junit.MockitoRule;
 
 import org.chromium.base.Callback;
 import org.chromium.base.ThreadUtils;
+import org.chromium.base.test.transit.ViewElement;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
@@ -431,6 +432,11 @@ public class CollaborationIntegrationTest {
         mCollaborationTestUtils.prepareToShareGroup(
                 mCollaborationTestUtils.getLocalTabGroupId(cta), TEST_COLLABORATION_ID);
 
+        // Assert that sdk delegate has been initialized.
+        assertTrue(
+                "DataSharingSDKDelegateBridge should be initialized for shared tab group.",
+                DataSharingSDKDelegateBridge.isInitializedForTesting());
+
         // Check share button changes to manage.
         onViewWaiting(withContentDescription(R.string.manage_sharing_content_description))
                 .check(matches(isDisplayed()));
@@ -459,6 +465,7 @@ public class CollaborationIntegrationTest {
 
     @Test
     @MediumTest
+    @DisabledTest(message = "Flaky test, see crbug.com/441333492")
     public void testDataSharingDeleteGroup() {
         mCollaborationTestUtils.setUpSyncAndSignIn();
         final ChromeTabbedActivity cta = mActivityTestRule.getActivity();
@@ -507,6 +514,7 @@ public class CollaborationIntegrationTest {
 
     @Test
     @MediumTest
+    @DisabledTest(message = "Flaky, see crbug.com/440302092")
     public void testDataSharingLeaveGroup() {
         mCollaborationTestUtils.setUpSyncAndSignIn();
         final ChromeTabbedActivity cta = mActivityTestRule.getActivity();
@@ -583,7 +591,7 @@ public class CollaborationIntegrationTest {
                 .check(matches(isDisplayed()));
 
         // Click "Close group" from the menu.
-        onViewWaiting(withId(R.id.toolbar_menu_button))
+        onViewWaiting(withId(R.id.toolbar_menu_button), ViewElement.displayingAtLeastOption(51))
                 .perform(CollaborationTestUtils.relaxedClick());
         onViewWaiting(withText(R.string.tab_grid_dialog_toolbar_close_group)).perform(click());
 
@@ -733,6 +741,7 @@ public class CollaborationIntegrationTest {
     @MediumTest
     @Feature({"RenderTest"})
     @Restriction(DeviceFormFactor.PHONE)
+    @DisabledTest(message = "crbug.com/475253781")
     public void testTilesBottomStripRender() throws Exception {
         mDataSharingUIDelegate.overrideAvatarColor(ACCOUNT1.getGaiaId(), Color.RED);
         mDataSharingUIDelegate.overrideAvatarColor(ACCOUNT2.getGaiaId(), Color.BLUE);

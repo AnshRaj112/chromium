@@ -10,7 +10,6 @@
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/utf_string_conversions.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "base/values.h"
 #include "chrome/browser/password_manager/android/protos/list_affiliated_passwords_result.pb.h"
 #include "chrome/browser/password_manager/android/protos/list_passwords_result.pb.h"
@@ -114,8 +113,8 @@ std::optional<FormData> DeserializeFormData(
 
 void DeserializeOpaqueLocalData(const std::string& opaque_metadata,
                                 PasswordForm& password_form) {
-  std::optional<base::Value::Dict> root =
-      base::JSONReader::ReadDict(opaque_metadata);
+  std::optional<base::Value::Dict> root = base::JSONReader::ReadDict(
+      opaque_metadata, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!root) {
     return;
   }

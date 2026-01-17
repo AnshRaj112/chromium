@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "ui/base/l10n/l10n_util.h"
 
 #include <algorithm>
@@ -21,7 +16,6 @@
 #include "base/compiler_specific.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/containers/span.h"
-#include "base/files/file_util.h"
 #include "base/i18n/file_util_icu.h"
 #include "base/i18n/message_formatter.h"
 #include "base/i18n/number_formatting.h"
@@ -552,7 +546,9 @@ std::string GetApplicationLocaleInternalNonMac(std::string_view pref_locale) {
   DCHECK(languages);  // A valid pointer is guaranteed.
   DCHECK(*languages);  // At least one entry, "C", is guaranteed.
 
-  for (; *languages; ++languages) {
+  // SAFETY: g_get_language_names returns a valid NULL-terminated array.
+  // See: https://docs.gtk.org/glib/func.get_language_names.html
+  for (; *languages; UNSAFE_BUFFERS(++languages)) {
     candidates.push_back(base::i18n::GetCanonicalLocale(*languages));
   }
 #else

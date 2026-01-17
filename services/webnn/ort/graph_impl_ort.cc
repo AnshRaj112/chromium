@@ -5,6 +5,7 @@
 #include "services/webnn/ort/graph_impl_ort.h"
 
 #include "base/command_line.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/notimplemented.h"
 #include "base/task/bind_post_task.h"
 #include "base/task/thread_pool.h"
@@ -18,34 +19,35 @@
 #include "services/webnn/ort/platform_functions_ort.h"
 #include "services/webnn/ort/scoped_ort_types.h"
 #include "services/webnn/ort/tensor_impl_ort.h"
+#include "services/webnn/public/cpp/execution_providers_info.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
 #include "services/webnn/public/mojom/webnn_error.mojom.h"
 #include "services/webnn/public/mojom/webnn_graph.mojom.h"
-#include "services/webnn/resource_task.h"
 #include "services/webnn/webnn_constant_operand.h"
 #include "services/webnn/webnn_graph_impl.h"
-#include "third_party/onnxruntime_headers/src/include/onnxruntime/core/session/onnxruntime_c_api.h"
+#include "third_party/windows_app_sdk_headers/src/inc/abi/winml/winml/onnxruntime_c_api.h"
 
 namespace webnn::ort {
 
 namespace {
 
-std::vector<std::pair<std::string,
-                      scoped_refptr<QueueableResourceState<BufferContentOrt>>>>
-ToNamedBufferStates(
-    const base::flat_map<std::string, scoped_refptr<WebNNTensorImpl>>&
-        named_tensors) {
-  std::vector<std::pair<
-      std::string, scoped_refptr<QueueableResourceState<BufferContentOrt>>>>
-      buffer_states_vec;
-  buffer_states_vec.reserve(named_tensors.size());
+std::optional<uint32_t> GetBatchedMatMulKDimensionLimit(
+    const OrtEpDevice* first_selected_device) {
+  const OrtApi* ort_api = PlatformFunctions::GetInstance()->ort_api();
 
-  for (const auto& [name, tensor] : named_tensors) {
-    auto* ort_tensor = static_cast<TensorImplOrt*>(tensor.get());
-    buffer_states_vec.emplace_back(name, ort_tensor->GetBufferState());
+  const char* ep_name = ort_api->EpDevice_EpName(first_selected_device);
+  const auto iter = kKnownEPs.find(UNSAFE_BUFFERS(base::cstring_view(ep_name)));
+  if (iter == kKnownEPs.end()) {
+    return std::nullopt;
   }
 
-  return buffer_states_vec;
+  OrtHardwareDeviceType hardware_device_type = ort_api->HardwareDevice_Type(
+      ort_api->EpDevice_Device(first_selected_device));
+  if (hardware_device_type != OrtHardwareDeviceType_NPU) {
+    return std::nullopt;
+  }
+
+  return iter->second.workarounds.npu_batched_matmul_k_dimension_limit;
 }
 
 }  // namespace
@@ -73,9 +75,13 @@ class GraphImplOrt::ComputeResources {
 
   ~ComputeResources() = default;
 
-  void OrtRunSync(
-      std::vector<std::pair<std::string, const OrtValue*>> named_input_tensors,
-      std::vector<std::pair<std::string, OrtValue*>> named_output_tensors) {
+  ScopedOrtStatus OrtRunSync(
+      base::flat_map<std::string, scoped_refptr<WebNNTensorImpl>>
+          named_input_tensors,
+      base::flat_map<std::string, scoped_refptr<WebNNTensorImpl>>
+          named_output_tensors) {
+    SCOPED_UMA_HISTOGRAM_TIMER("WebNN.ORT.TimingMs.Inference");
+
     ScopedTrace scoped_trace("GraphImplOrt::ComputeResources::OrtRunSync");
     std::vector<const char*> input_names;
     std::vector<const OrtValue*> input_tensors;
@@ -84,7 +90,8 @@ class GraphImplOrt::ComputeResources {
     for (const auto& [name, tensor] : named_input_tensors) {
       input_names.push_back(
           operand_input_name_to_onnx_input_name_.at(name).c_str());
-      input_tensors.push_back(tensor);
+      input_tensors.push_back(
+          static_cast<TensorImplOrt*>(tensor.get())->tensor());
     }
 
     std::vector<const char*> output_names;
@@ -94,15 +101,15 @@ class GraphImplOrt::ComputeResources {
     for (const auto& [name, tensor] : named_output_tensors) {
       output_names.push_back(
           operand_output_name_to_onnx_output_name_.at(name).c_str());
-      output_tensors.push_back(tensor);
+      output_tensors.push_back(
+          static_cast<TensorImplOrt*>(tensor.get())->tensor());
     }
 
     const OrtApi* ort_api = PlatformFunctions::GetInstance()->ort_api();
-    // TODO(crbug.com/433543131): Handle the inference error of MLGraph.
-    CALL_ORT_FUNC(ort_api->Run(session_.get(), nullptr, input_names.data(),
-                               input_tensors.data(), input_names.size(),
-                               output_names.data(), output_names.size(),
-                               output_tensors.data()));
+    return CALL_ORT_FUNC(ort_api->Run(
+        session_.get(), nullptr, input_names.data(), input_tensors.data(),
+        input_names.size(), output_names.data(), output_names.size(),
+        output_tensors.data()));
   }
 
  private:
@@ -136,13 +143,12 @@ void GraphImplOrt::CreateAndBuild(
 
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE,
-      {base::TaskPriority::USER_BLOCKING,
+      {base::TaskPriority::BEST_EFFORT,
        base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN, base::MayBlock()},
-      base::BindOnce(
-          &GraphImplOrt::CreateAndBuildOnBackgroundThread,
-          std::move(graph_info), context->session_options(), context->env(),
-          context->properties(), std::move(constant_operands),
-          context->is_external_data_supported(), std::move(scoped_trace)),
+      base::BindOnce(&GraphImplOrt::CreateAndBuildOnBackgroundThread,
+                     std::move(graph_info), context->session_options(),
+                     context->env(), context->properties(),
+                     std::move(constant_operands), std::move(scoped_trace)),
       base::BindOnce(&GraphImplOrt::DidCreateAndBuild, std::move(receiver),
                      context->AsWeakPtr(), std::move(compute_resource_info),
                      std::move(callback)));
@@ -157,14 +163,17 @@ GraphImplOrt::CreateAndBuildOnBackgroundThread(
     ContextProperties context_properties,
     base::flat_map<OperandId, std::unique_ptr<WebNNConstantOperand>>
         constant_operands,
-    bool is_external_data_supported,
     ScopedTrace scoped_trace) {
+  SCOPED_UMA_HISTOGRAM_TIMER("WebNN.ORT.TimingMs.Compilation");
+
   scoped_trace.AddStep("Create model info");
-  ASSIGN_OR_RETURN(
-      std::unique_ptr<ModelEditor::ModelInfo> model_info,
-      GraphBuilderOrt::CreateAndBuild(
-          *graph_info, std::move(context_properties),
-          std::move(constant_operands), is_external_data_supported));
+  std::optional<uint32_t> batched_matmul_k_dimension_limit =
+      GetBatchedMatMulKDimensionLimit(session_options->first_selected_device());
+  ASSIGN_OR_RETURN(std::unique_ptr<ModelEditor::ModelInfo> model_info,
+                   GraphBuilderOrt::CreateAndBuild(
+                       *graph_info, std::move(context_properties),
+                       std::move(constant_operands),
+                       std::move(batched_matmul_k_dimension_limit)));
 
   scoped_trace.AddStep("Create session from model");
   ScopedOrtSession session;
@@ -220,88 +229,24 @@ GraphImplOrt::GraphImplOrt(
     : WebNNGraphImpl(std::move(receiver),
                      std::move(context),
                      std::move(compute_resource_info),
-                     std::move(devices)) {
-  compute_resources_state_ =
-      base::MakeRefCounted<QueueableResourceState<ComputeResources>>(
-          std::move(compute_resources));
-}
+                     std::move(devices)),
+      compute_resources_(std::move(compute_resources)) {}
 
 void GraphImplOrt::DispatchImpl(
     base::flat_map<std::string, scoped_refptr<WebNNTensorImpl>>
         named_input_tensors,
     base::flat_map<std::string, scoped_refptr<WebNNTensorImpl>>
         named_output_tensors) {
-  ScopedTrace scoped_trace("GraphImplOrt::DispatchImpl");
-  std::vector<std::pair<
-      std::string, scoped_refptr<QueueableResourceState<BufferContentOrt>>>>
-      named_input_buffer_states = ToNamedBufferStates(named_input_tensors);
-  std::vector<std::pair<
-      std::string, scoped_refptr<QueueableResourceState<BufferContentOrt>>>>
-      named_output_buffer_states = ToNamedBufferStates(named_output_tensors);
-
-  // Input tensors will be read from while the graph is executing, so lock them
-  // them as shared/read-only.
-  std::vector<scoped_refptr<QueueableResourceStateBase>> shared_resources;
-  shared_resources.reserve(named_input_tensors.size());
-  for (const auto& [_, buffer_state] : named_input_buffer_states) {
-    shared_resources.push_back(buffer_state);
+  const OrtApi* ort_api = PlatformFunctions::GetInstance()->ort_api();
+  // Ort runs the graph on its own thread, so this call blocks until execution
+  // completes.
+  ScopedOrtStatus status = compute_resources_->OrtRunSync(
+      std::move(named_input_tensors), std::move(named_output_tensors));
+  if (status.is_valid()) {
+    static_cast<ContextImplOrt*>(context_.get())
+        ->HandleContextLostOrCrash("Failed to run session.",
+                                   ort_api->GetErrorCode(status.get()));
   }
-
-  // Exclusively reserve all output tensors, which will be written to.
-  std::vector<scoped_refptr<QueueableResourceStateBase>> exclusive_resources;
-  // Extra +1 is for the compute resources.
-  exclusive_resources.reserve(1 + named_output_tensors.size());
-  exclusive_resources.push_back(compute_resources_state_);
-  for (const auto& [_, buffer_state] : named_output_buffer_states) {
-    exclusive_resources.push_back(buffer_state);
-  }
-
-  auto task = base::MakeRefCounted<ResourceTask>(
-      std::move(shared_resources), std::move(exclusive_resources),
-      base::BindOnce(
-          [](scoped_refptr<QueueableResourceState<ComputeResources>>
-                 compute_resources_state,
-             std::vector<std::pair<
-                 std::string,
-                 scoped_refptr<QueueableResourceState<BufferContentOrt>>>>
-                 named_input_buffer_states,
-             std::vector<std::pair<
-                 std::string,
-                 scoped_refptr<QueueableResourceState<BufferContentOrt>>>>
-                 named_output_buffer_states,
-             base::OnceClosure completion_closure) {
-            ComputeResources* raw_compute_resources =
-                compute_resources_state->GetExclusivelyLockedResource();
-
-            std::vector<std::pair<std::string, const OrtValue*>>
-                named_input_tensors;
-            named_input_tensors.reserve(named_input_buffer_states.size());
-            std::vector<std::pair<std::string, OrtValue*>> named_output_tensors;
-            named_output_tensors.reserve(named_output_buffer_states.size());
-
-            for (const auto& [name, buffer] : named_input_buffer_states) {
-              named_input_tensors.emplace_back(
-                  name, buffer->GetSharedLockedResource().tensor());
-            }
-            for (const auto& [name, buffer] : named_output_buffer_states) {
-              named_output_tensors.emplace_back(
-                  name, buffer->GetExclusivelyLockedResource()->tensor());
-            }
-
-            // Compute tasks can take a significant amount of time, use the
-            // thread pool to avoid blocking the main thread.
-            base::ThreadPool::PostTaskAndReply(
-                FROM_HERE,
-                base::BindOnce(&ComputeResources::OrtRunSync,
-                               base::Unretained(raw_compute_resources),
-                               std::move(named_input_tensors),
-                               std::move(named_output_tensors)),
-                std::move(completion_closure));
-          },
-          compute_resources_state_, std::move(named_input_buffer_states),
-          std::move(named_output_buffer_states)));
-
-  task->Enqueue();
 }
 
 }  // namespace webnn::ort

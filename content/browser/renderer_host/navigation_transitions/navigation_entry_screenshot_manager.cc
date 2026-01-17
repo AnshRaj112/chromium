@@ -28,15 +28,10 @@ NavigationEntryScreenshotManager::NavigationEntryScreenshotManager()
       tick_clock_(base::DefaultTickClock::GetInstance()),
       cleanup_delay_(
           NavigationTransitionConfig::GetCleanupDelayForInvisibleCaches()) {
-  CHECK(NavigationTransitionConfig::AreBackForwardTransitionsEnabled());
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   max_cache_size_in_bytes_ =
       NavigationTransitionConfig::ComputeCacheSizeInBytes();
-  listener_ = std::make_unique<base::MemoryPressureListener>(
-      FROM_HERE,
-      base::BindRepeating(&NavigationEntryScreenshotManager::OnMemoryPressure,
-                          base::Unretained(this)));
-  if (auto* screen = display::Screen::GetScreen()) {
+  if (auto* screen = display::Screen::Get()) {
     screen->AddObserver(this);
   }
 
@@ -45,7 +40,7 @@ NavigationEntryScreenshotManager::NavigationEntryScreenshotManager()
 }
 
 NavigationEntryScreenshotManager::~NavigationEntryScreenshotManager() {
-  if (auto* screen = display::Screen::GetScreen()) {
+  if (auto* screen = display::Screen::Get()) {
     screen->RemoveObserver(this);
   }
 }
@@ -226,25 +221,6 @@ void NavigationEntryScreenshotManager::EvictIfOutOfMemoryBudget() {
       it = managed_caches_.rbegin();
     }
   }
-}
-
-void NavigationEntryScreenshotManager::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (memory_pressure_level !=
-      base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL) {
-    return;
-  }
-  // Using a while loop because `Purge` erases the iterator.
-  auto it = managed_caches_.begin();
-  while (it != managed_caches_.end()) {
-    auto* cache = *it;
-    cache->Purge(
-        NavigationEntryScreenshotCacheEvictor::PurgeReason::kMemoryPressure);
-    CHECK(cache->IsEmpty());
-    it = managed_caches_.begin();
-  }
-  CHECK(IsEmpty());
 }
 
 void NavigationEntryScreenshotManager::RecordScreenshotCacheSizeAfterDelay() {

@@ -11,6 +11,7 @@
 #include "third_party/blink/renderer/core/css/css_to_length_conversion_data.h"
 #include "third_party/blink/renderer/core/css/css_view_value.h"
 #include "third_party/blink/renderer/core/css/parser/css_parser_context.h"
+#include "third_party/blink/renderer/core/css/parser/css_parser_local_context.h"
 #include "third_party/blink/renderer/core/css/parser/css_parser_token_stream.h"
 #include "third_party/blink/renderer/core/css/parser/css_tokenizer.h"
 #include "third_party/blink/renderer/core/dom/document.h"
@@ -18,6 +19,7 @@
 #include "third_party/blink/renderer/core/html/html_html_element.h"
 #include "third_party/blink/renderer/core/testing/dummy_page_holder.h"
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
+#include "third_party/blink/renderer/platform/testing/runtime_enabled_features_test_helpers.h"
 #include "third_party/blink/renderer/platform/testing/task_environment.h"
 
 namespace blink {
@@ -84,7 +86,9 @@ double ConsumeAngleValue(String target) {
   // This function only works on calc() expressions that can be resolved at
   // parse time.
   CSSToLengthConversionData conversion_data(/*element=*/nullptr);
-  return ConsumeAngle(stream, *MakeContext(), std::nullopt)
+  CSSParserLocalContext local_context =
+      CSSParserLocalContext::CreateWithoutPropertyForTest();
+  return ConsumeAngle(stream, *MakeContext(), local_context, std::nullopt)
       ->ComputeDegrees(conversion_data);
 }
 
@@ -93,7 +97,10 @@ double ConsumeAngleValue(String target, double min, double max) {
   // This function only works on calc() expressions that can be resolved at
   // parse time.
   CSSToLengthConversionData conversion_data(/*element=*/nullptr);
-  return ConsumeAngle(stream, *MakeContext(), std::nullopt, min, max)
+  CSSParserLocalContext local_context =
+      CSSParserLocalContext::CreateWithoutPropertyForTest();
+  return ConsumeAngle(stream, *MakeContext(), local_context, std::nullopt, min,
+                      max)
       ->ComputeDegrees(conversion_data);
 }
 
@@ -221,13 +228,17 @@ TEST(CSSParsingUtilsTest, ConsumeAbsoluteColor) {
   auto ConsumeColorForTest = [](String css_text) {
     CSSParserTokenStream stream(css_text);
     CSSParserContext* context = MakeContext();
-    return ConsumeColor(stream, *context,
+    CSSParserLocalContext local_context =
+        CSSParserLocalContext::CreateWithoutPropertyForTest();
+    return ConsumeColor(stream, *context, local_context,
                         css_parsing_utils::ColorParserContext());
   };
   auto ConsumeAbsoluteColorForTest = [](String css_text) {
     CSSParserTokenStream stream(css_text);
     CSSParserContext* context = MakeContext();
-    return ConsumeAbsoluteColor(stream, *context);
+    CSSParserLocalContext local_context =
+        CSSParserLocalContext::CreateWithoutPropertyForTest();
+    return ConsumeAbsoluteColor(stream, *context, local_context);
   };
 
   struct {
@@ -263,7 +274,10 @@ TEST(CSSParsingUtilsTest, ConsumeAbsoluteColor) {
 TEST(CSSParsingUtilsTest, InternalColorsOnlyAllowedInUaMode) {
   auto ConsumeColorForTest = [](String css_text, CSSParserMode mode) {
     CSSParserTokenStream stream(css_text);
-    return css_parsing_utils::ConsumeColor(stream, *MakeContext(mode));
+    CSSParserLocalContext local_context =
+        CSSParserLocalContext::CreateWithoutPropertyForTest();
+    return css_parsing_utils::ConsumeColor(stream, *MakeContext(mode),
+                                           local_context);
   };
 
   struct {
@@ -315,7 +329,10 @@ TEST(CSSParsingUtilsTest, ConsumeColorRangePreservation) {
     String input(test);
     SCOPED_TRACE(input);
     CSSParserTokenStream stream(input);
-    EXPECT_EQ(nullptr, css_parsing_utils::ConsumeColor(stream, *MakeContext()));
+    CSSParserLocalContext local_context =
+        CSSParserLocalContext::CreateWithoutPropertyForTest();
+    EXPECT_EQ(nullptr, css_parsing_utils::ConsumeColor(stream, *MakeContext(),
+                                                       local_context));
     EXPECT_EQ(test, stream.RemainingText());
   }
 }
@@ -324,8 +341,10 @@ TEST(CSSParsingUtilsTest, InternalPositionTryFallbacksInUAMode) {
   auto ConsumePositionTryFallbackForTest = [](String css_text,
                                               CSSParserMode mode) {
     CSSParserTokenStream stream(css_text);
+    CSSParserLocalContext local_context =
+        CSSParserLocalContext::CreateWithoutPropertyForTest();
     return css_parsing_utils::ConsumeSinglePositionTryFallback(
-        stream, *MakeContext(mode));
+        stream, *MakeContext(mode), local_context);
   };
 
   struct {
@@ -357,8 +376,10 @@ TEST(CSSParsingUtilsTest, InternalPositionTryFallbacksInUAMode) {
 TEST(CSSParsingUtilsTest, ConsumePositionTryFallbacksInUAMode) {
   String css_text = "block-start span-inline-end";
   CSSParserTokenStream stream(css_text);
+  CSSParserLocalContext local_context =
+      CSSParserLocalContext::CreateWithoutPropertyForTest();
   CSSValue* value = css_parsing_utils::ConsumePositionTryFallbacks(
-      stream, *MakeContext(kUASheetMode));
+      stream, *MakeContext(kUASheetMode), local_context);
   ASSERT_TRUE(value);
   EXPECT_EQ("block-start span-inline-end", value->CssText());
 }
@@ -423,14 +444,51 @@ TEST(CSSParsingUtilsTest, ConsumeProgressType) {
   };
   for (auto& expectation : expectations) {
     CSSParserTokenStream stream(expectation.input);
-    CSSValue* progress =
-        css_parsing_utils::ConsumeProgressType(stream, *MakeContext());
+    CSSParserLocalContext local_context =
+        CSSParserLocalContext::CreateWithoutPropertyForTest();
+    CSSValue* progress = css_parsing_utils::ConsumeProgressType(
+        stream, *MakeContext(), local_context);
     if (!expectation.output) {
       EXPECT_FALSE(progress);
     } else {
       EXPECT_TRUE(*progress == *expectation.output);
     }
   }
+}
+
+struct XYSelfTestCase {
+  // The input string to parse as position-area value.
+  const char* input;
+
+  // The expected serialization of the parsed value if accepted.
+  const char* expected;
+};
+
+const XYSelfTestCase legacy_xy_self_position_area_tests[] = {
+    {"x-self-start y-self-start", "self-x-start self-y-start"},
+    {"x-self-end y-self-end", "self-x-end self-y-end"},
+    {"span-x-self-start span-y-self-start",
+     "span-self-x-start span-self-y-start"},
+    {"span-x-self-end span-y-self-end", "span-self-x-end span-self-y-end"},
+};
+
+class PositionAreaXYSelfParseTest
+    : public ::testing::TestWithParam<XYSelfTestCase> {};
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         PositionAreaXYSelfParseTest,
+                         testing::ValuesIn(legacy_xy_self_position_area_tests));
+
+TEST_P(PositionAreaXYSelfParseTest, ConsumeLegacyXYSelfPositionArea) {
+  // Old *x/y-self* are aliases for *self-x/y* values with PositionAreaXYSelf
+  // enabled.
+  ScopedPositionAreaXYSelfForTest enabled(true);
+  auto param = GetParam();
+  SCOPED_TRACE(param.input);
+  CSSParserTokenStream stream(param.input);
+  CSSValue* val = css_parsing_utils::ConsumePositionArea(stream);
+  ASSERT_TRUE(val);
+  EXPECT_EQ(val->CssText(), String(param.expected));
 }
 
 }  // namespace

@@ -15,8 +15,8 @@
 #include "build/build_config.h"
 #include "components/policy/core/browser/browser_policy_connector.h"
 #include "components/prefs/pref_service.h"
-#include "components/safe_browsing/core/browser/db/hit_report.h"
 #include "components/safe_browsing/core/common/features.h"
+#include "components/safe_browsing/core/common/threat_enums.h"
 #include "components/security_interstitials/core/unsafe_resource.h"
 #include "crypto/sha2.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
@@ -135,7 +135,7 @@ bool CanGetReputationOfUrl(const GURL& url) {
   if (!url.is_valid() || !url.SchemeIsHTTPOrHTTPS() || net::IsLocalhost(url)) {
     return false;
   }
-  const std::string hostname = url.host();
+  const std::string hostname = url.GetHost();
   // There is no reason to send URLs with very short or single-label hosts.
   // The Safe Browsing server does not check them.
   if (hostname.size() < 4 || std::ranges::count(hostname, '.') < 1) {

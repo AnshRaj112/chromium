@@ -24,6 +24,7 @@
 #include "third_party/blink/public/common/frame/frame_visual_properties.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/mojom/frame/intrinsic_sizing_info.mojom.h"
+#include "third_party/perfetto/include/perfetto/tracing/track_event_args.h"
 #include "ui/base/cursor/cursor.h"
 #include "ui/gfx/geometry/dip_util.h"
 
@@ -141,6 +142,14 @@ void CrossProcessFrameConnector::RenderProcessGone() {
 
   frame_proxy_in_parent_renderer_->ChildProcessGone();
 
+  // The following call might discard the WebContents by
+  // DiscardPageWithCrashedSubframePolicy, which in turn calls
+  // NavigationController::SetNeedsReload(). It is safe to potentially call
+  // SetNeedsReload() again below, as it is a lightweight operation that just
+  // overwrites the type of the reload needed, which only affects metrics.
+  GetContentClient()->browser()->CrossProcessSubframeRenderProcessGone(
+      current_child_rfh);
+
   if (current_child_rfh->delegate()) {
     // If a subframe crashed on a hidden tab, mark the tab for reload to avoid
     // showing a sad frame to the user if they ever switch back to that tab. Do
@@ -155,11 +164,8 @@ void CrossProcessFrameConnector::RenderProcessGone() {
     if (current_child_rfh->delegate()->GetVisibility() != Visibility::VISIBLE &&
         visibility_ != blink::mojom::FrameVisibility::kNotRendered &&
         base::FeatureList::IsEnabled(
-            features::kReloadHiddenTabsWithCrashedSubframes) && (
-              !base::FeatureList::IsEnabled(
-                  features::kReloadHiddenTabsWithActiveCrashedSubframes) ||
-              current_child_rfh->IsActive()
-            )) {
+            features::kReloadHiddenTabsWithCrashedSubframes) &&
+        current_child_rfh->IsActive()) {
       frame_proxy_in_parent_renderer_->frame_tree_node()
           ->frame_tree()
           .controller()
@@ -284,14 +290,14 @@ void CrossProcessFrameConnector::UnlockPointer() {
 
 void CrossProcessFrameConnector::OnSynchronizeVisualProperties(
     const blink::FrameVisualProperties& visual_properties) {
-  TRACE_EVENT_WITH_FLOW2(
+  TRACE_EVENT(
       TRACE_DISABLED_BY_DEFAULT("viz.surface_id_flow"),
       "CrossProcessFrameConnector::OnSynchronizeVisualProperties Receive "
       "Message",
-      TRACE_ID_GLOBAL(visual_properties.local_surface_id.submission_trace_id()),
-      TRACE_EVENT_FLAG_FLOW_IN, "message",
-      "FrameHostMsg_SynchronizeVisualProperties", "new_local_surface_id",
-      visual_properties.local_surface_id.ToString());
+      perfetto::TerminatingFlow::Global(
+          visual_properties.local_surface_id.submission_trace_id()),
+      "message", "FrameHostMsg_SynchronizeVisualProperties",
+      "new_local_surface_id", visual_properties.local_surface_id.ToString());
   // If the |rect_in_local_root| or current ScreenInfo of the frame has
   // changed, then the viz::LocalSurfaceId must also change.
   if ((last_received_local_frame_size_ != visual_properties.local_frame_size ||

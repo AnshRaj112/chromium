@@ -37,8 +37,6 @@
 #include "components/viz/common/resources/shared_image_format.h"
 #include "third_party/skia/include/core/SkColorType.h"
 
-class GrDirectContext;
-
 namespace cc {
 class ImageDecodeCache;
 }  // namespace cc
@@ -46,7 +44,6 @@ class ImageDecodeCache;
 namespace gpu {
 struct Capabilities;
 class ContextSupport;
-class GLHelper;
 struct GpuFeatureInfo;
 class InterfaceBase;
 class SharedImageInterface;
@@ -96,13 +93,9 @@ class WebGraphicsContext3DProvider {
   virtual gpu::ContextSupport* ContextSupport() = 0;
   virtual bool IsContextLost() = 0;  // Has the GPU driver lost this context?
   virtual bool BindToCurrentSequence() = 0;
-  virtual GrDirectContext* GetGrContext() = 0;
   virtual const gpu::Capabilities& GetCapabilities() const = 0;
   virtual const gpu::GpuFeatureInfo& GetGpuFeatureInfo() const = 0;
   virtual const WebglPreferences& GetWebglPreferences() const = 0;
-  // Creates a gpu::GLHelper after first call and returns that instance. This
-  // method cannot return null.
-  virtual gpu::GLHelper* GetGLHelper() = 0;
 
   virtual void SetLostContextCallback(base::RepeatingClosure) = 0;
   virtual void SetErrorMessageCallback(
@@ -111,8 +104,6 @@ class WebGraphicsContext3DProvider {
   virtual cc::ImageDecodeCache* ImageDecodeCache(SkColorType color_type) = 0;
   virtual gpu::SharedImageInterface* SharedImageInterface() = 0;
   virtual viz::RasterContextProvider* RasterContextProvider() const = 0;
-  virtual unsigned int GetGrGLTextureFormat(
-      viz::SharedImageFormat format) const = 0;
 };
 
 }  // namespace blink

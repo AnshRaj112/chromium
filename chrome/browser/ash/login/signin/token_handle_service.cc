@@ -18,7 +18,6 @@
 #include "components/signin/public/identity_manager/access_token_info.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/primary_account_access_token_fetcher.h"
-#include "components/signin/public/identity_manager/scope_set.h"
 #include "components/user_manager/user.h"
 #include "google_apis/gaia/gaia_constants.h"
 
@@ -30,8 +29,6 @@
 
 namespace ash {
 namespace {
-
-const char kAccessTokenFetchId[] = "token_handle_service";
 
 account_manager::AccountManager* GetAccountManager(Profile* profile) {
   return g_browser_process->platform_part()
@@ -97,12 +94,9 @@ void TokenHandleService::FetchAccessToken(const AccountId& account_id) {
   if (signin::IdentityManager* const identity_manager =
           IdentityManagerFactory::GetForProfile(profile_);
       identity_manager) {
-    signin::ScopeSet scopes;
-    scopes.insert(GaiaConstants::kOAuth1LoginScope);
-
     access_token_fetcher_ =
         std::make_unique<signin::PrimaryAccountAccessTokenFetcher>(
-            kAccessTokenFetchId, identity_manager, scopes,
+            signin::OAuthConsumerId::kTokenHandleService, identity_manager,
             base::BindOnce(&TokenHandleService::OnAccessTokenFetchComplete,
                            weak_factory_.GetWeakPtr(), account_id),
             signin::PrimaryAccountAccessTokenFetcher::Mode::kWaitUntilAvailable,
@@ -140,9 +134,9 @@ void TokenHandleService::MaybeFetchTokenHandle(
     const std::string& access_token,
     const std::string& refresh_token_hash) {
   VLOG(1) << "TokenHandleService::OnGetRefreshTokenHash";
-  token_handle_store_->MaybeFetchTokenHandle(profile_->GetURLLoaderFactory(),
-                                             account_id, access_token,
-                                             refresh_token_hash);
+  token_handle_store_->MaybeFetchTokenHandle(
+      profile_->GetPrefs(), profile_->GetURLLoaderFactory(), account_id,
+      access_token, refresh_token_hash);
 }
 
 void TokenHandleService::Shutdown() {

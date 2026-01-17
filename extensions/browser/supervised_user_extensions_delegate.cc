@@ -27,21 +27,19 @@ void SupervisedUserExtensionsDelegate::RequestToAddExtensionOrShowError(
     const extensions::Extension& extension,
     content::WebContents* web_contents,
     const gfx::ImageSkia& icon,
-    SupervisedUserExtensionParentApprovalEntryPoint
-        extension_approval_entry_point,
     ExtensionApprovalDoneCallback extension_approval_callback) {
   NOTIMPLEMENTED();
-  std::move(extension_approval_callback).Run(ExtensionApprovalResult::kBlocked);
+  std::move(extension_approval_callback)
+      .Run(SupervisedExtensionApprovalResult::kBlocked);
 }
 
 void SupervisedUserExtensionsDelegate::RequestToEnableExtensionOrShowError(
     const extensions::Extension& extension,
     content::WebContents* web_contents,
-    SupervisedUserExtensionParentApprovalEntryPoint
-        extension_approval_entry_point,
     ExtensionApprovalDoneCallback extension_approval_callback) {
   NOTIMPLEMENTED();
-  std::move(extension_approval_callback).Run(ExtensionApprovalResult::kBlocked);
+  std::move(extension_approval_callback)
+      .Run(SupervisedExtensionApprovalResult::kBlocked);
 }
 
 bool SupervisedUserExtensionsDelegate::CanInstallExtensions() const {

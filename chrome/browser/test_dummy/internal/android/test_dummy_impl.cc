@@ -10,7 +10,7 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/browser/test_dummy/internal/jni_headers/TestDummyImpl_jni.h"
 
-static int JNI_TestDummyImpl_Execute(JNIEnv* env, jboolean arg) {
+static int JNI_TestDummyImpl_Execute(JNIEnv* env, bool arg) {
   CHECK(arg);
   LOG(INFO) << "Running test dummy native library";
   return 123;
@@ -24,3 +24,5 @@ JNI_TestDummyImpl_LoadResource(JNIEnv* env) {
   LOG(INFO) << "Loading dummy native resource: " << resource;
   return base::android::ConvertUTF8ToJavaString(env, resource);
 }
+
+DEFINE_JNI(TestDummyImpl)

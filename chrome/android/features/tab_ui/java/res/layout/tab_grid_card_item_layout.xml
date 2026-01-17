@@ -90,13 +90,12 @@ found in the LICENSE file.
           android:textAppearance="@style/TextAppearance.TextMediumThick.Primary"/>
         <ImageView
             android:id="@+id/media_indicator_icon"
-            android:src="@drawable/volume_up_24dp"
-            android:layout_height="@dimen/tab_grid_card_header_height"
-            android:layout_width="@dimen/tab_grid_card_header_height"
-            android:layout_gravity="center_vertical"
-            android:padding="@dimen/tab_grid_card_favicon_padding_start"
+            android:layout_height="@dimen/tab_grid_close_button_size"
+            android:layout_width="@dimen/tab_grid_close_button_size"
+            android:layout_marginEnd="@dimen/tab_grid_card_media_indicator_margin_end"
             android:importantForAccessibility="no"
-            app:layout_constraintTop_toTopOf="@id/card_view"
+            app:layout_constraintTop_toTopOf="@id/tab_title"
+            app:layout_constraintBottom_toBottomOf="@id/tab_title"
             app:layout_constraintEnd_toStartOf="@id/action_button"
             android:visibility="gone"/>
         <org.chromium.chrome.browser.tab_ui.TabThumbnailView
@@ -156,11 +155,12 @@ found in the LICENSE file.
             android:layout_width="@dimen/tab_list_card_action_button_size"
             android:layout_height="@dimen/tab_list_card_action_button_size"
             android:layout_margin="@dimen/tab_list_card_action_button_margin"
-            android:scaleType="center"
             android:layout_gravity="end"
             android:tint="@macro/default_icon_color"
             android:importantForAccessibility="no"
+            android:cropToPadding="true"
+            android:padding="@dimen/tab_list_card_action_button_padding"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            app:layout_constraintEnd_toEndOf="parent"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </merge>

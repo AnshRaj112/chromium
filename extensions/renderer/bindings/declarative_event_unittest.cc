@@ -10,6 +10,7 @@
 #include "base/functional/bind.h"
 #include "base/strings/stringprintf.h"
 #include "base/values.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension_api.h"
 #include "extensions/renderer/bindings/api_binding_test.h"
 #include "extensions/renderer/bindings/api_binding_test_util.h"
@@ -20,8 +21,11 @@
 #include "extensions/renderer/bindings/api_type_reference_map.h"
 #include "extensions/renderer/bindings/argument_spec.h"
 #include "extensions/renderer/bindings/test_interaction_provider.h"
+#include "gin/handle.h"
 #include "v8/include/cppgc/allocation.h"
 #include "v8/include/v8-cppgc.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 

@@ -30,6 +30,7 @@ class FakeWebFrameImpl : public FakeWebFrame, public WebFrameInternal {
   std::string GetFrameId() const override;
   bool IsMainFrame() const override;
   url::Origin GetSecurityOrigin() const override;
+  GURL GetUrl() const override;
   BrowserState* GetBrowserState() override;
   bool CallJavaScriptFunction(const std::string& name,
                               const base::Value::List& parameters) override;
@@ -57,7 +58,8 @@ class FakeWebFrameImpl : public FakeWebFrame, public WebFrameInternal {
   void AddResultForExecutedJs(base::Value* js_result,
                               const std::u16string& executed_js) override;
   void set_force_timeout(bool force_timeout) override;
-  void set_call_java_script_function_callback(
+  void SetJavaScriptFunctionCallback(
+      const std::string& java_script_feature_name,
       base::RepeatingClosure callback) override;
 
   // WebFrameInternal:
@@ -111,7 +113,8 @@ class FakeWebFrameImpl : public FakeWebFrame, public WebFrameInternal {
   bool force_timeout_ = false;
   raw_ptr<BrowserState> browser_state_;
 
-  base::RepeatingClosure call_java_script_function_callback_;
+  std::map<std::string, base::RepeatingClosure>
+      call_java_script_function_callback_;
 
   base::WeakPtrFactory<WebFrame> weak_ptr_factory_{this};
 };

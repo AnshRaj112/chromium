@@ -12,7 +12,6 @@
 #include <variant>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/json/json_reader.h"
 #include "base/memory/ptr_util.h"
 #include "base/no_destructor.h"
@@ -28,6 +27,10 @@
 #include "ui/base/clipboard/clipboard_util.h"
 #include "ui/gfx/geometry/size.h"
 #include "url/gurl.h"
+
+#if BUILDFLAG(IS_LINUX)
+#include "ui/linux/linux_ui.h"
+#endif
 
 namespace ui {
 
@@ -74,6 +77,20 @@ bool Clipboard::IsSupportedClipboardBuffer(ClipboardBuffer buffer) {
 }
 
 // static
+bool Clipboard::IsMiddleClickPasteEnabled() {
+#if BUILDFLAG(IS_LINUX)
+  if (auto* linux_ui = ui::LinuxUi::instance()) {
+    return linux_ui->PrimaryPasteEnabled();
+  }
+#endif
+
+  // This code is most likely never hit on other platforms, but
+  // if it happens to be, let's return `true` to preserve
+  // middle click paste behavior without a preference.
+  return true;
+}
+
+// static
 void Clipboard::SetAllowedThreads(
     const std::vector<base::PlatformThreadId>& allowed_threads) {
   base::AutoLock lock(ClipboardMapLock());
@@ -90,7 +107,7 @@ void Clipboard::SetClipboardForCurrentThread(
 
   ClipboardMap* clipboard_map = ClipboardMapPtr();
   // This shouldn't happen. The clipboard should not already exist.
-  DCHECK(!base::Contains(*clipboard_map, id));
+  DCHECK(!clipboard_map->contains(id));
   clipboard_map->insert({id, std::move(platform_clipboard)});
 }
 
@@ -167,8 +184,8 @@ std::map<std::string, std::string> Clipboard::ExtractCustomPlatformNames(
     ReadData(ui::ClipboardFormatType::WebCustomFormatMap(), data_dst,
              &custom_format_json);
     if (!custom_format_json.empty()) {
-      std::optional<base::Value> json_val =
-          base::JSONReader::Read(custom_format_json);
+      std::optional<base::Value> json_val = base::JSONReader::Read(
+          custom_format_json, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
       if (json_val.has_value() && json_val->is_dict()) {
         for (const auto it : json_val->GetDict()) {
           const std::string* custom_format_name = it.second.GetIfString();
@@ -334,7 +351,8 @@ base::PlatformThreadId Clipboard::GetAndValidateThreadID() {
   // clipboard. To prevented unbounded memory use, CHECK that the current thread
   // was allowlisted to use the clipboard. This is a CHECK rather than a DCHECK
   // to catch incorrect usage in production (e.g. https://crbug.com/872737).
-  CHECK(AllowedThreads().empty() || base::Contains(AllowedThreads(), id));
+  CHECK(AllowedThreads().empty() ||
+        std::ranges::contains(AllowedThreads(), id));
 
   return id;
 }

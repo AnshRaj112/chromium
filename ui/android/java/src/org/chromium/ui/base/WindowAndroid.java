@@ -19,9 +19,11 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Rect;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.Process;
+import android.os.SystemClock;
 import android.util.TypedValue;
 import android.view.Display;
 import android.view.Surface;
@@ -31,13 +33,16 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.window.TrustedPresentationThresholds;
 
+import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 
 import org.jni_zero.CalledByNative;
 import org.jni_zero.CalledByNativeForTesting;
 import org.jni_zero.JNINamespace;
+import org.jni_zero.JniType;
 import org.jni_zero.NativeMethods;
 
+import org.chromium.base.AconfigFlaggedApiDelegate;
 import org.chromium.base.ActivityState;
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.Callback;
@@ -49,8 +54,10 @@ import org.chromium.base.TraceEvent;
 import org.chromium.base.UnownedUserDataHost;
 import org.chromium.base.lifetime.Destroyable;
 import org.chromium.base.lifetime.LifetimeAssert;
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.ObservableSuppliers;
+import org.chromium.base.supplier.SettableNonNullObservableSupplier;
 import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
 import org.chromium.build.annotations.NullMarked;
@@ -59,8 +66,10 @@ import org.chromium.build.annotations.RequiresNonNull;
 import org.chromium.ui.KeyboardVisibilityDelegate;
 import org.chromium.ui.display.DisplayAndroid;
 import org.chromium.ui.display.DisplayAndroid.DisplayAndroidObserver;
+import org.chromium.ui.display.DisplayUtil;
 import org.chromium.ui.gfx.OverlayTransform;
 import org.chromium.ui.insets.InsetObserver;
+import org.chromium.ui.insets.InsetObserver.WindowInsetObserver;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.permissions.AndroidPermissionDelegate;
 import org.chromium.ui.permissions.PermissionCallback;
@@ -117,8 +126,8 @@ public class WindowAndroid
     private @Nullable View mAnimationPlaceholderView;
 
     /** A mechanism for observing and updating the application window's bottom inset. */
-    private final ApplicationViewportInsetSupplier mApplicationBottomInsetSupplier =
-            new ApplicationViewportInsetSupplier();
+    private final ApplicationViewportInsetTracker mApplicationBottomInsetSupplier =
+            new ApplicationViewportInsetTracker();
 
     private @Nullable AndroidPermissionDelegate mPermissionDelegate;
 
@@ -152,7 +161,7 @@ public class WindowAndroid
         // The color of the hairline.
         public int hairlineColor;
 
-        public static interface Provider {
+        public interface Provider {
             ProgressBarConfig getProgressBarConfig();
         }
     }
@@ -204,11 +213,14 @@ public class WindowAndroid
     private final boolean mTrackOcclusion;
 
     /** True when this window is occluded. */
-    private final ObservableSupplierImpl<Boolean> mOcclusionSupplier =
-            new ObservableSupplierImpl<>(false);
+    private final SettableNonNullObservableSupplier<Boolean> mOcclusionSupplier =
+            ObservableSuppliers.createNonNull(false);
 
     private boolean mIsTopResumedActivity;
     private final boolean mActivityTopResumedSupported;
+
+    private @Nullable WindowInsetObserver mWindowInsetObserver;
+    private @Nullable Rect mLastWindowBounds;
 
     /**
      * @param context The application {@link Context}.
@@ -236,6 +248,16 @@ public class WindowAndroid
         mIntentRequestTracker = (IntentRequestTrackerImpl) tracker;
         mInsetObserver = insetObserver;
         mApplicationBottomInsetSupplier.setInsetObserver(mInsetObserver);
+        if (mInsetObserver != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            mWindowInsetObserver =
+                    new WindowInsetObserver() {
+                        @Override
+                        public void onInsetChanged() {
+                            maybeSendWindowPositionChangedEventToNative();
+                        }
+                    };
+            mInsetObserver.addObserver(mWindowInsetObserver);
+        }
     }
 
     /**
@@ -255,6 +277,7 @@ public class WindowAndroid
         mLifetimeAssert = LifetimeAssert.create(this);
         // context does not have the same lifetime guarantees as an application context so we can't
         // hold a strong reference to it.
+        assert context != null : "Context when creating WindowAndroid must not be null.";
         mContextRef = new ImmutableWeakReference<>(context);
         mDisplayAndroid = display;
         mDisplayAndroid.addObserver(this);
@@ -356,7 +379,7 @@ public class WindowAndroid
     }
 
     /** A supplier that returns whether the window is occluded or not. */
-    public ObservableSupplier<Boolean> getOcclusionSupplier() {
+    public MonotonicObservableSupplier<Boolean> getOcclusionSupplier() {
         return mOcclusionSupplier;
     }
 
@@ -796,10 +819,11 @@ public class WindowAndroid
     public interface IntentCallback {
         /**
          * Handles the data returned by the requested intent.
+         *
          * @param resultCode Result code of the requested intent.
          * @param data The data returned by the intent.
          */
-        void onIntentCompleted(int resultCode, Intent data);
+        void onIntentCompleted(int resultCode, @Nullable Intent data);
     }
 
     /**
@@ -903,8 +927,13 @@ public class WindowAndroid
         return mNativeWindowAndroid;
     }
 
+    /* package */ void setNativePointerForTesting(long ptr) {
+        mNativeWindowAndroid = ptr;
+    }
+
     /**
      * Returns current wheel scroll factor (physical pixels per mouse scroll click).
+     *
      * @return wheel scroll factor or zero if attr retrieval fails.
      */
     private float getMouseWheelScrollFactor() {
@@ -971,7 +1000,7 @@ public class WindowAndroid
     /**
      * @return A mechanism for updating and observing the bottom inset of the browser window.
      */
-    public ApplicationViewportInsetSupplier getApplicationBottomInsetSupplier() {
+    public ApplicationViewportInsetTracker getApplicationBottomInsetTracker() {
         return mApplicationBottomInsetSupplier;
     }
 
@@ -1082,11 +1111,25 @@ public class WindowAndroid
     @Override
     public void onAdaptiveRefreshRateInfoChanged(DisplayAndroid.AdaptiveRefreshRateInfo arrInfo) {
         if (mNativeWindowAndroid == 0) return;
+        int velocityArraySize =
+                arrInfo.velocityMapping == null ? 0 : arrInfo.velocityMapping.size();
+        float[] framePerSecondArray = new float[velocityArraySize];
+        float[] dpPerSecondArray = new float[velocityArraySize];
+        if (arrInfo.velocityMapping != null) {
+            int index = 0;
+            for (AconfigFlaggedApiDelegate.FrameRateVelocityPoint point : arrInfo.velocityMapping) {
+                framePerSecondArray[index] = point.getFramePerSecond();
+                dpPerSecondArray[index] = point.getDpPerSecond();
+                ++index;
+            }
+        }
         WindowAndroidJni.get()
                 .onAdaptiveRefreshRateInfoChanged(
                         mNativeWindowAndroid,
                         arrInfo.supportsAdaptiveRefreshRate,
-                        arrInfo.suggestedFrameRateHigh);
+                        arrInfo.suggestedFrameRateHigh,
+                        framePerSecondArray,
+                        dpPerSecondArray);
     }
 
     @CalledByNative
@@ -1123,7 +1166,6 @@ public class WindowAndroid
                     && currentMode.getPhysicalHeight() == supportedModes.get(i).getPhysicalHeight()
                     && currentMode.getRefreshRate() != supportedModes.get(i).getRefreshRate()) {
                 supportedRefreshRateModes.add(supportedModes.get(i));
-                continue;
             }
         }
 
@@ -1350,6 +1392,77 @@ public class WindowAndroid
         mPointerLockingViewPrvFocusChangeListener = null;
     }
 
+    @Nullable View getPointerLockChangeViewForTesting() {
+        return mPointerLockChangeView;
+    }
+
+    View.@Nullable OnFocusChangeListener getPointerLockingViewFocusChangeListenerForTesting() {
+        return mPointerLockingViewFocusChangeListener;
+    }
+
+    @CalledByNative
+    private boolean setHasKeyboardCapture(boolean hasCapture) {
+        Window window = getWindow();
+        if (window == null) return false;
+        AconfigFlaggedApiDelegate aconfigFlaggedApiDelegate =
+                AconfigFlaggedApiDelegate.getInstance();
+        if (aconfigFlaggedApiDelegate == null) return false;
+        return aconfigFlaggedApiDelegate.setKeyboardCaptureEnabled(window, hasCapture);
+    }
+
+    /**
+     * Returns bounds of this window in global dp coordinates (takes display topology into account).
+     */
+    @CalledByNative
+    @VisibleForTesting(otherwise = PRIVATE)
+    public int @Nullable [] getBoundsInScreenCoordinates() {
+        // For older API levels fall through to default behavior.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return null;
+        }
+
+        final Context context = getContext().get();
+        if (context == null) {
+            return null;
+        }
+
+        final WindowManager wm = context.getSystemService(WindowManager.class);
+        final Rect boundsPx = wm.getCurrentWindowMetrics().getBounds();
+        final DisplayAndroid display = getDisplay();
+        final Rect globalBoundsDp =
+                DisplayUtil.convertLocalPxToGlobalDipCoordinates(display, boundsPx);
+
+        return new int[] {
+            globalBoundsDp.left, globalBoundsDp.top, globalBoundsDp.width(), globalBoundsDp.height()
+        }; // x, y, width, height
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    private void maybeSendWindowPositionChangedEventToNative() {
+        final long startTimeMs = SystemClock.elapsedRealtime();
+
+        if (mNativeWindowAndroid == 0) {
+            return;
+        }
+
+        final Context context = mContextRef.get();
+        if (context == null) {
+            return;
+        }
+
+        final WindowManager wm = context.getSystemService(WindowManager.class);
+        final Rect boundsPx = wm.getCurrentWindowMetrics().getBounds();
+        if (boundsPx.equals(mLastWindowBounds)) {
+            return;
+        }
+        mLastWindowBounds = boundsPx;
+
+        WindowAndroidJni.get().onWindowPositionChanged(mNativeWindowAndroid);
+
+        final long durationMs = SystemClock.elapsedRealtime() - startTimeMs;
+        RecordHistogram.recordTimesHistogram("Android.Window.TimeToUpdateWindowBounds", durationMs);
+    }
+
     @NativeMethods
     interface Natives {
         long init(
@@ -1374,12 +1487,16 @@ public class WindowAndroid
         void onAdaptiveRefreshRateInfoChanged(
                 long nativeWindowAndroid,
                 boolean supportsAdaptiveRefreshRate,
-                float suggestedFrameRateHigh);
+                float suggestedFrameRateHigh,
+                @JniType("std::vector<jfloat>") float[] framePerSecondArray,
+                @JniType("std::vector<jfloat>") float[] dpPerSecondArray);
 
         void onOverlayTransformUpdated(long nativeWindowAndroid);
 
         void sendUnfoldLatencyBeginTimestamp(long nativeWindowAndroid, long beginTimestampMs);
 
         void onWindowPointerLockRelease(long nativeWindowAndroid);
+
+        void onWindowPositionChanged(long nativeWindowAndroid);
     }
 }

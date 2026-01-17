@@ -4,6 +4,7 @@ URL: https://android.googlesource.com/platform/external/puffin
 Version: 1.0.0
 Date: 2022-10-05
 Revision: e0820dcfebfb4df925be2e37ad8f56c00dc624f5
+Update Mechanism: Static.HardFork (https://crbug.com/422347134)
 License: BSD-3-Clause
 License File: LICENSE
 Security Critical: yes
@@ -65,3 +66,4 @@ issue in nonembedded android component_updater.
 - Updated puffdiff.cc to use spans for endian conversion and memcpy.
 - Replaced LOG with VLOG to avoid unnecessary logging unless logging is enabled.
 - Add missing includes to common.h and stream.h.
+- Changed the chromium base::File invocations to use the span-based API.

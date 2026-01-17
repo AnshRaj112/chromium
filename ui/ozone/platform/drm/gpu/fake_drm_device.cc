@@ -2,18 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "ui/ozone/platform/drm/gpu/fake_drm_device.h"
 
 #include <algorithm>
 #include <utility>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
 #include "base/logging.h"
 #include "skia/ext/legacy_display_globals.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -111,8 +106,8 @@ ScopedDrmObjectPropertyPtr CreatePropertyObject(
   drm_properties->prop_values = static_cast<uint64_t*>(
       drmMalloc(sizeof(uint64_t) * drm_properties->count_props));
   for (size_t i = 0; i < properties.size(); ++i) {
-    drm_properties->props[i] = properties[i].id;
-    drm_properties->prop_values[i] = properties[i].value;
+    UNSAFE_TODO(drm_properties->props[i]) = properties[i].id;
+    UNSAFE_TODO(drm_properties->prop_values[i]) = properties[i].value;
   }
 
   return drm_properties;
@@ -139,7 +134,7 @@ uint32_t GetUniqueNumber() {
 }
 
 bool IsPropertyValueBlob(uint32_t prop_id) {
-  return base::Contains(kBlobPropertyIds, prop_id);
+  return std::ranges::contains(kBlobPropertyIds, prop_id);
 }
 
 }  // namespace
@@ -243,7 +238,7 @@ FakeDrmDevice::ConnectorProperties& FakeDrmDevice::AddConnector() {
   connector_property.id = next_connector_id;
   for (const auto& pair : kConnectorRequiredPropertyNames) {
     connector_property.properties.push_back({.id = pair.first, .value = 0});
-    if (!base::Contains(drm_state_.property_names, pair.first)) {
+    if (!drm_state_.property_names.contains(pair.first)) {
       drm_state_.property_names.emplace(pair.first, pair.second);
     }
   }
@@ -268,7 +263,7 @@ FakeDrmDevice::CrtcProperties& FakeDrmDevice::AddCrtc() {
   crtc_property.id = next_crtc_id;
   for (const auto& pair : kCrtcRequiredPropertyNames) {
     crtc_property.properties.push_back({.id = pair.first, .value = 0});
-    if (!base::Contains(drm_state_.property_names, pair.first)) {
+    if (!drm_state_.property_names.contains(pair.first)) {
       drm_state_.property_names.emplace(pair.first, pair.second);
     }
   }
@@ -302,7 +297,7 @@ FakeDrmDevice::PlaneProperties& FakeDrmDevice::AddPlane(
 
   size_t crtc_mask = 0u;
   for (size_t i = 0; i < drm_state_.crtc_properties.size(); ++i) {
-    if (base::Contains(crtc_ids, drm_state_.crtc_properties[i].id)) {
+    if (std::ranges::contains(crtc_ids, drm_state_.crtc_properties[i].id)) {
       crtc_mask |= (1 << i);
     }
   }
@@ -313,7 +308,7 @@ FakeDrmDevice::PlaneProperties& FakeDrmDevice::AddPlane(
   plane.crtc_mask = crtc_mask;
   for (const auto& pair : kPlaneRequiredPropertyNames) {
     plane.properties.push_back({.id = pair.first, .value = 0});
-    if (!base::Contains(drm_state_.property_names, pair.first)) {
+    if (!drm_state_.property_names.contains(pair.first)) {
       drm_state_.property_names.emplace(pair.first, pair.second);
     }
   }
@@ -377,12 +372,13 @@ ScopedDrmPropertyBlob FakeDrmDevice::CreateInFormatsBlob(
   std::vector<uint8_t> data(header.modifiers_offset +
                             sizeof(drm_format_modifier) *
                                 header.count_modifiers);
-  memcpy(data.data(), &header, sizeof(header));
-  memcpy(data.data() + header.formats_offset, supported_formats.data(),
-         sizeof(uint32_t) * header.count_formats);
-  memcpy(data.data() + header.modifiers_offset,
-         supported_format_modifiers.data(),
-         sizeof(drm_format_modifier) * header.count_modifiers);
+  UNSAFE_TODO(memcpy(data.data(), &header, sizeof(header)));
+  UNSAFE_TODO(memcpy(data.data() + header.formats_offset,
+                     supported_formats.data(),
+                     sizeof(uint32_t) * header.count_formats));
+  UNSAFE_TODO(memcpy(data.data() + header.modifiers_offset,
+                     supported_format_modifiers.data(),
+                     sizeof(drm_format_modifier) * header.count_modifiers));
 
   return CreatePropertyBlob(data.data(), data.size());
 }
@@ -395,7 +391,8 @@ ScopedDrmPropertyBlob FakeDrmDevice::CreateSizeHintsBlob(
     hints[i].height = sizes[i].height();
   }
   std::vector<uint8_t> data(sizeof(drm_plane_size_hint) * hints.size());
-  memcpy(data.data(), hints.data(), sizeof(drm_plane_size_hint) * hints.size());
+  UNSAFE_TODO(memcpy(data.data(), hints.data(),
+                     sizeof(drm_plane_size_hint) * hints.size()));
   return CreatePropertyBlob(data.data(), data.size());
 }
 
@@ -461,19 +458,20 @@ ScopedDrmResourcesPtr FakeDrmDevice::GetResources() const {
   resources->crtcs = static_cast<uint32_t*>(
       drmMalloc(sizeof(uint32_t) * resources->count_crtcs));
   for (size_t i = 0; i < drm_state_.crtc_properties.size(); ++i)
-    resources->crtcs[i] = drm_state_.crtc_properties[i].id;
+    UNSAFE_TODO(resources->crtcs[i]) = drm_state_.crtc_properties[i].id;
 
   resources->count_connectors = drm_state_.connector_properties.size();
   resources->connectors = static_cast<uint32_t*>(
       drmMalloc(sizeof(uint32_t) * resources->count_connectors));
   for (size_t i = 0; i < drm_state_.connector_properties.size(); ++i)
-    resources->connectors[i] = drm_state_.connector_properties[i].id;
+    UNSAFE_TODO(resources->connectors[i]) =
+        drm_state_.connector_properties[i].id;
 
   resources->count_encoders = drm_state_.encoder_properties.size();
   resources->encoders = static_cast<uint32_t*>(
       drmMalloc(sizeof(uint32_t) * resources->count_encoders));
   for (size_t i = 0; i < drm_state_.encoder_properties.size(); ++i)
-    resources->encoders[i] = drm_state_.encoder_properties[i].id;
+    UNSAFE_TODO(resources->encoders[i]) = drm_state_.encoder_properties[i].id;
 
   return resources;
 }
@@ -484,7 +482,7 @@ ScopedDrmPlaneResPtr FakeDrmDevice::GetPlaneResources() const {
   resources->planes = static_cast<uint32_t*>(
       drmMalloc(sizeof(uint32_t) * resources->count_planes));
   for (size_t i = 0; i < drm_state_.plane_properties.size(); ++i)
-    resources->planes[i] = drm_state_.plane_properties[i].id;
+    UNSAFE_TODO(resources->planes[i]) = drm_state_.plane_properties[i].id;
 
   return resources;
 }
@@ -556,8 +554,9 @@ ScopedDrmConnectorPtr FakeDrmDevice::GetConnector(uint32_t connector_id) const {
   connector->props = DrmAllocator<uint32_t>(count_props);
   connector->prop_values = DrmAllocator<uint64_t>(count_props);
   for (uint32_t i = 0; i < count_props; ++i) {
-    connector->props[i] = mock_connector->properties[i].id;
-    connector->prop_values[i] = mock_connector->properties[i].value;
+    UNSAFE_TODO(connector->props[i]) = mock_connector->properties[i].id;
+    UNSAFE_TODO(connector->prop_values[i]) =
+        mock_connector->properties[i].value;
   }
 
   // Copy modes.
@@ -567,12 +566,13 @@ ScopedDrmConnectorPtr FakeDrmDevice::GetConnector(uint32_t connector_id) const {
   for (uint32_t i = 0; i < count_modes; ++i) {
     const gfx::Size resolution = mock_connector->modes[i].first;
     const uint32_t vrefresh = mock_connector->modes[i].second;
-    connector->modes[i].clock = resolution.GetArea() * vrefresh / 1000;
-    connector->modes[i].hdisplay = resolution.width();
-    connector->modes[i].htotal = resolution.width();
-    connector->modes[i].vdisplay = resolution.height();
-    connector->modes[i].vtotal = resolution.height();
-    connector->modes[i].vrefresh = vrefresh;
+    UNSAFE_TODO(connector->modes[i]).clock =
+        resolution.GetArea() * vrefresh / 1000;
+    UNSAFE_TODO(connector->modes[i]).hdisplay = resolution.width();
+    UNSAFE_TODO(connector->modes[i]).htotal = resolution.width();
+    UNSAFE_TODO(connector->modes[i]).vdisplay = resolution.height();
+    UNSAFE_TODO(connector->modes[i]).vtotal = resolution.height();
+    UNSAFE_TODO(connector->modes[i]).vrefresh = vrefresh;
   }
 
   // Copy associated encoders.
@@ -580,7 +580,7 @@ ScopedDrmConnectorPtr FakeDrmDevice::GetConnector(uint32_t connector_id) const {
   connector->count_encoders = count_encoders;
   connector->encoders = DrmAllocator<uint32_t>(count_encoders);
   for (uint32_t i = 0; i < count_encoders; ++i)
-    connector->encoders[i] = mock_connector->encoders[i];
+    UNSAFE_TODO(connector->encoders[i]) = mock_connector->encoders[i];
 
   return connector;
 }
@@ -676,7 +676,7 @@ ScopedDrmPropertyPtr FakeDrmDevice::GetProperty(uint32_t id) const {
 
   ScopedDrmPropertyPtr property(DrmAllocator<drmModePropertyRes>());
   property->prop_id = id;
-  strcpy(property->name, it->second.c_str());
+  UNSAFE_TODO(strcpy(property->name, it->second.c_str()));
 
   if (IsPropertyValueBlob(property->prop_id)) {
     property->flags = DRM_MODE_PROP_BLOB;
@@ -701,7 +701,7 @@ ScopedDrmPropertyBlob FakeDrmDevice::CreatePropertyBlob(const void* blob,
   DCHECK(blob_state.ref_count == 0);
   blob_state.ref_count = 1;
   const uint8_t* blob_uint8 = reinterpret_cast<const uint8_t*>(blob);
-  blob_state.data.assign(blob_uint8, blob_uint8 + size);
+  blob_state.data.assign(blob_uint8, UNSAFE_TODO(blob_uint8 + size));
   return std::make_unique<DrmPropertyBlobMetadata>(this, id);
 }
 
@@ -761,7 +761,7 @@ ScopedDrmPropertyBlobPtr FakeDrmDevice::GetPropertyBlob(
   blob->id = property_id;
   blob->length = it->second.data.size();
   blob->data = drmMalloc(blob->length);
-  memcpy(blob->data, it->second.data.data(), blob->length);
+  UNSAFE_TODO(memcpy(blob->data, it->second.data.data(), blob->length));
 
   return blob;
 }
@@ -887,7 +887,7 @@ bool FakeDrmDevice::CommitProperties(
   base::flat_map<uint64_t, int> crtc_planes_counter;
 
   for (uint32_t i = 0; i < request->cursor; ++i) {
-    const drmModeAtomicReqItem& item = request->items[i];
+    const drmModeAtomicReqItem& item = UNSAFE_TODO(request->items[i]);
     if (!ValidatePropertyValue(item.property_id, item.value))
       return false;
 
@@ -921,9 +921,9 @@ bool FakeDrmDevice::CommitProperties(
 
   // Only update values if not testing.
   for (uint32_t i = 0; i < request->cursor; ++i) {
-    bool res =
-        UpdateProperty(request->items[i].object_id,
-                       request->items[i].property_id, request->items[i].value);
+    bool res = UpdateProperty(UNSAFE_TODO(request->items[i]).object_id,
+                              UNSAFE_TODO(request->items[i]).property_id,
+                              UNSAFE_TODO(request->items[i]).value);
     if (!res)
       return false;
   }
@@ -971,8 +971,8 @@ bool FakeDrmDevice::SetMaster() {
 }
 
 bool FakeDrmDevice::DropMaster() {
-  has_master_ = false;
-  return true;
+  has_master_ = !succeed_drm_master_drop_;
+  return succeed_drm_master_drop_;
 }
 
 bool FakeDrmDevice::has_master() const {
@@ -1018,8 +1018,8 @@ void FakeDrmDevice::FillPossibleValuesForEnumProperty(
   property->enums = DrmAllocator<drm_mode_property_enum>(enum_values.size());
 
   for (size_t i = 0; i < enum_values.size(); i++) {
-    property->enums[i].value = enum_values[i].first;
-    strcpy(property->enums[i].name, enum_values[i].second.c_str());
+    UNSAFE_TODO(property->enums[i]).value = enum_values[i].first;
+    UNSAFE_TODO(strcpy(property->enums[i].name, enum_values[i].second.c_str()));
   }
 }
 
@@ -1089,8 +1089,9 @@ bool FakeDrmDevice::ValidatePropertyValue(uint32_t id, uint64_t value) {
 
   std::vector<std::string> blob_properties = {"CTM", "DEGAMMA_LUT", "GAMMA_LUT",
                                               "PLANE_CTM"};
-  if (base::Contains(blob_properties, it->second))
-    return base::Contains(allocated_blobs_, value);
+  if (std::ranges::contains(blob_properties, it->second)) {
+    return allocated_blobs_.contains(value);
+  }
 
   return true;
 }

@@ -69,7 +69,8 @@ void AndroidInputHelper::ResetGestureDetection() {
     return;
   }
 
-  const ui::MotionEvent* last_event = gesture_provider.GetLastEvent();
+  const ui::MotionEvent* last_event =
+      gesture_provider.GetLastEventWithoutHistory();
   CHECK(last_event);
 
   std::unique_ptr<ui::MotionEvent> cancel_event;

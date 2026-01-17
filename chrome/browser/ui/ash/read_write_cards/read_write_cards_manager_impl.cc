@@ -12,9 +12,9 @@
 #include "ash/constants/ash_features.h"
 #include "base/command_line.h"
 #include "base/functional/callback.h"
-#include "base/hash/sha1.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/types/expected.h"
+#include "chrome/browser/ash/magic_boost/magic_boost_controller.h"
 #include "chrome/browser/ui/ash/editor_menu/editor_menu_controller_impl.h"
 #include "chrome/browser/ui/ash/magic_boost/magic_boost_card_controller.h"
 #include "chrome/browser/ui/ash/quick_answers/quick_answers_controller_impl.h"
@@ -24,15 +24,12 @@
 #include "chromeos/components/quick_answers/public/cpp/quick_answers_state.h"
 #include "chromeos/components/quick_answers/quick_answers_client.h"
 #include "chromeos/constants/chromeos_features.h"
-#include "chromeos/crosapi/mojom/magic_boost.mojom.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/context_menu_params.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "third_party/blink/public/mojom/context_menu/context_menu.mojom-shared.h"
 
 namespace chromeos {
-
-using OptInFeatures = crosapi::mojom::MagicBoostController::OptInFeatures;
 
 ReadWriteCardsManagerImpl::ReadWriteCardsManagerImpl(
     ApplicationLocaleStorage* application_locale_storage,
@@ -122,16 +119,12 @@ ReadWriteCardsManagerImpl::GetControllers(
 
   // When the magic boost revamp logic is enabled.
   if (opt_in_features && !chromeos::features::IsMagicBoostRevampEnabled()) {
-    crosapi::mojom::MagicBoostController::TransitionAction action =
-        crosapi::mojom::MagicBoostController::TransitionAction::kDoNothing;
-
     // Calculate the action to take after the opt-in flow.
+    auto action = ash::magic_boost::TransitionAction::kDoNothing;
     if (should_show_editor_menu) {
-      action = crosapi::mojom::MagicBoostController::TransitionAction::
-          kShowEditorPanel;
+      action = ash::magic_boost::TransitionAction::kShowEditorPanel;
     } else if (ShouldShowMahi(params)) {
-      action =
-          crosapi::mojom::MagicBoostController::TransitionAction::kShowHmrPanel;
+      action = ash::magic_boost::TransitionAction::kShowHmrPanel;
     }
 
     // Always set the transition action to handle the edge case that this code
@@ -159,7 +152,7 @@ ReadWriteCardsManagerImpl::GetControllers(
   auto* magic_boost_state = chromeos::MagicBoostState::Get();
   bool should_show_hmr_card = true;
   if (magic_boost_card_controller_ &&
-      magic_boost_state->IsMagicBoostAvailable()) {
+      magic_boost_state->IsUserEligibleForGenAIFeatures()) {
     should_show_hmr_card = magic_boost_state->ShouldShowHmrCard();
 
     // Ensure the disclaimer view is closed before moving to the next step
@@ -205,12 +198,12 @@ bool ReadWriteCardsManagerImpl::ShouldShowMahi(
          mahi_menu_controller_->IsFocusedPageDistillable();
 }
 
-std::optional<OptInFeatures>
+std::optional<ash::magic_boost::OptInFeatures>
 ReadWriteCardsManagerImpl::GetMagicBoostOptInFeatures(
     const content::ContextMenuParams& params,
     const editor_menu::EditorMenuCardContext& editor_menu_card_context) {
   if (!magic_boost_card_controller_ ||
-      !chromeos::MagicBoostState::Get()->IsMagicBoostAvailable()) {
+      !chromeos::MagicBoostState::Get()->IsUserEligibleForGenAIFeatures()) {
     return std::nullopt;
   }
 
@@ -229,7 +222,7 @@ ReadWriteCardsManagerImpl::GetMagicBoostOptInFeatures(
   if (should_show_editor_menu) {
     if (should_opt_in_orca) {
       // We should opt in both Orca and HMR if we are opting-in Orca.
-      return OptInFeatures::kOrcaAndHmr;
+      return ash::magic_boost::OptInFeatures::kOrcaAndHmr;
     }
 
     return std::nullopt;
@@ -241,8 +234,8 @@ ReadWriteCardsManagerImpl::GetMagicBoostOptInFeatures(
       MagicBoostState::Get()->hmr_consent_status();
   if ((ShouldShowQuickAnswers(params) || ShouldShowMahi(params)) &&
       hmr_consent_status == HMRConsentStatus::kUnset) {
-    return should_opt_in_orca ? OptInFeatures::kOrcaAndHmr
-                              : OptInFeatures::kHmrOnly;
+    return should_opt_in_orca ? ash::magic_boost::OptInFeatures::kOrcaAndHmr
+                              : ash::magic_boost::OptInFeatures::kHmrOnly;
   }
 
   return std::nullopt;

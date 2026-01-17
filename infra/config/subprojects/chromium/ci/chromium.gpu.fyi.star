@@ -24,6 +24,9 @@ ci.defaults.set(
     gardener_rotations = gardener_rotations.CHROMIUM_GPU,
     contact_team_email = "chrome-gpu-infra@google.com",
     execution_timeout = 6 * time.hour,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     health_spec = health_spec.default(),
     properties = {
         "perf_dashboard_machine_group": "ChromiumGPUFYI",
@@ -51,6 +54,7 @@ consoles.console_view(
     name = "chromium.gpu.fyi",
     branch_selector = [
         branches.selector.ANDROID_BRANCHES,
+        branches.selector.MAC_BRANCHES,
     ],
     ordering = {
         None: ["Windows", "Mac", "Linux"],
@@ -65,7 +69,6 @@ consoles.console_view(
         "Windows|10|x64|Intel": "*type*",
         "Windows|10|x64|Nvidia": "*type*",
         "Windows|10|x86|Nvidia": "*type*",
-        "Windows|7|x64|Nvidia": "*type*",
         "Mac": "*builder*",
         "Mac|Builder": "*type*",
         "Mac|AMD|Retina": "*type*",
@@ -75,7 +78,7 @@ consoles.console_view(
         "Linux|Builder": "*type*",
         "Linux|Intel": "*type*",
         "Linux|Nvidia": "*type*",
-        "Android": ["Builder", "L32", "M64", "P32", "R32", "S64"],
+        "Android": ["Builder", "arm", "arm64"],
         "Wayland": "*builder*",
     },
 )
@@ -125,7 +128,7 @@ ci.thin_tester(
         use_android_merge_script_by_default = False,
     ),
     console_view_entry = consoles.console_view_entry(
-        category = "Android|P32|NVDA",
+        category = "Android|arm|NVDA",
         short_name = "STV",
     ),
 )
@@ -157,7 +160,7 @@ ci.thin_tester(
     targets = targets.bundle(
         targets = [
             "gpu_fyi_android_gtests",
-            "gpu_pixel_2_telemetry_tests",
+            "gpu_pixel_02_telemetry_tests",
         ],
         mixins = [
             "chromium_pixel_2_q",
@@ -184,7 +187,7 @@ ci.thin_tester(
         use_android_merge_script_by_default = False,
     ),
     console_view_entry = consoles.console_view_entry(
-        category = "Android|P32|QCOM",
+        category = "Android|arm|QCOM",
         short_name = "P2",
     ),
 )
@@ -216,7 +219,7 @@ ci.thin_tester(
     targets = targets.bundle(
         targets = [
             "gpu_fyi_android_gtests",
-            "gpu_pixel_4_telemetry_tests",
+            "gpu_pixel_04_telemetry_tests",
             "android_webview_gpu_telemetry_tests",
         ],
         mixins = [
@@ -292,7 +295,7 @@ ci.thin_tester(
         use_android_merge_script_by_default = False,
     ),
     console_view_entry = consoles.console_view_entry(
-        category = "Android|R32|QCOM",
+        category = "Android|arm|QCOM",
         short_name = "P4",
     ),
 )
@@ -329,7 +332,7 @@ ci.thin_tester(
     targets = targets.bundle(
         targets = [
             "gpu_fyi_android_gtests",
-            "gpu_pixel_6_telemetry_tests",
+            "gpu_pixel_06_telemetry_tests",
         ],
         mixins = [
             "has_native_resultdb_integration",
@@ -358,7 +361,7 @@ ci.thin_tester(
         use_android_merge_script_by_default = False,
     ),
     console_view_entry = consoles.console_view_entry(
-        category = "Android|S64|ARM",
+        category = "Android|arm64|ARM",
         short_name = "P6",
     ),
 )
@@ -397,7 +400,7 @@ ci.thin_tester(
         # should be running the same tests as 'Android FYI Release (Pixel 6)'.
         targets = [
             "gpu_fyi_android_gtests",
-            "gpu_pixel_6_telemetry_tests",
+            "gpu_pixel_06_telemetry_tests",
         ],
         mixins = [
             "has_native_resultdb_integration",
@@ -428,10 +431,78 @@ ci.thin_tester(
     ),
     # Uncomment this entry when this experimental tester is actually in use.
     console_view_entry = consoles.console_view_entry(
-        category = "Android|S64|ARM",
-        short_name = "exp",
+        category = "Android|arm64|ARM",
+        short_name = "P6e",
     ),
     list_view = "chromium.gpu.experimental",
+)
+
+ci.thin_tester(
+    name = "Android FYI Release (Pixel 10)",
+    description_html = "Runs release GPU tests on stable Pixel 10 configs",
+    parent = "GPU FYI Android arm64 Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+            apply_configs = [
+                "android",
+            ],
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "main_builder",
+            apply_configs = [
+                "mb",
+                "download_xr_test_apks",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_arch = builder_config.target_arch.ARM,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.ANDROID,
+        ),
+        android_config = builder_config.android_config(
+            config = "base_config",
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        targets = [
+            "gpu_fyi_android_gtests",
+            "gpu_pixel_10_telemetry_tests",
+            "android_webview_gpu_telemetry_tests",
+        ],
+        mixins = [
+            "has_native_resultdb_integration",
+            "gpu_pixel_10_stable",
+        ],
+        per_test_modifications = {
+            "gl_tests_passthrough": targets.mixin(
+                args = [
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/android.pixel_10.gl_tests_passthrough.filter",
+                ],
+            ),
+            "gl_tests_validating": targets.remove(
+                reason = [
+                    "Passthrough is default on Pixel 10",
+                ],
+            ),
+            "webcodecs_tests": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 9,  # due to many timeouts crbug.com/447317875
+                ),
+            ),
+        },
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.ANDROID_CHROMIUM,
+        os_type = targets.os_type.ANDROID,
+        use_android_merge_script_by_default = False,
+    ),
+    gardener_rotations = args.ignore_default(None),
+    console_view_entry = consoles.console_view_entry(
+        category = "Android|arm64|IMG",
+        short_name = "P10",
+    ),
 )
 
 ci.thin_tester(
@@ -483,7 +554,7 @@ ci.thin_tester(
         use_android_merge_script_by_default = False,
     ),
     console_view_entry = consoles.console_view_entry(
-        category = "Android|S32|ARM",
+        category = "Android|arm|ARM",
         short_name = "A13",
     ),
 )
@@ -537,7 +608,7 @@ ci.thin_tester(
         use_android_merge_script_by_default = False,
     ),
     console_view_entry = consoles.console_view_entry(
-        category = "Android|S32|QCOM",
+        category = "Android|arm|QCOM",
         short_name = "A23",
     ),
 )
@@ -576,6 +647,7 @@ ci.thin_tester(
             "has_native_resultdb_integration",
             "gpu_samsung_s23_stable",
             "limited_capacity_bot",
+            "no_tombstones",
         ],
     ),
     targets_settings = targets.settings(
@@ -584,7 +656,7 @@ ci.thin_tester(
         use_android_merge_script_by_default = False,
     ),
     console_view_entry = consoles.console_view_entry(
-        category = "Android|U64|QCOM",
+        category = "Android|arm64|QCOM",
         short_name = "S23",
     ),
 )
@@ -680,95 +752,6 @@ gpu.ci.linux_builder(
     # Runs a lot of tests + VMs are slower than real hardware, so increase the
     # timeout.
     execution_timeout = 8 * time.hour,
-    siso_remote_jobs = siso.remote_jobs.HIGH_JOBS_FOR_CI,
-)
-
-gpu.ci.linux_builder(
-    name = "ChromeOS FYI Release Skylab (volteer)",
-    description_html = "Runs release GPU tests on Skylab-hosted ChromeOS volteer devices",
-    builder_spec = builder_config.builder_spec(
-        gclient_config = builder_config.gclient_config(
-            config = "chromium",
-            apply_configs = [
-                "chromeos",
-            ],
-        ),
-        chromium_config = builder_config.chromium_config(
-            config = "chromium",
-            apply_configs = [
-                "mb",
-            ],
-            build_config = builder_config.build_config.RELEASE,
-            target_arch = builder_config.target_arch.INTEL,
-            target_bits = 64,
-            target_platform = builder_config.target_platform.CHROMEOS,
-            target_cros_boards = [
-                "volteer",
-            ],
-        ),
-        # Tests are not run serially on this tester due to the increased
-        # overhead from Skylab making builds take ~2x as long compared to
-        # the VM builder. A 6+ hour cycle time for a CI tester is quite
-        # long, so enable parallel suites to reduce build times.
-        skylab_upload_location = builder_config.skylab_upload_location(
-            gs_bucket = "chromium-ci-skylab",
-            gs_extra = "chromeos_gpu",
-        ),
-    ),
-    gn_args = gn_args.config(
-        configs = [
-            "gpu_tests",
-            "chromeos_device",
-            "volteer",
-            "ozone_headless",
-            "release_builder",
-            "try_builder",
-            "remoteexec",
-            "dcheck_off",
-            "no_symbols",
-            "is_skylab",
-            "chromeos",
-            "x64",
-        ],
-    ),
-    targets = targets.bundle(
-        targets = [
-            targets.bundle(
-                targets = [
-                    "gpu_fyi_chromeos_release_gtests_volteer_skylab",
-                    "gpu_fyi_chromeos_release_telemetry_tests_volteer_skylab",
-                ],
-            ),
-        ],
-        additional_compile_targets = [
-            "chromiumos_preflight",
-        ],
-        per_test_modifications = {
-            "expected_color_pixel_passthrough_test VOLTEER_PUBLIC_RELEASE_LKGM": targets.mixin(
-                args = [
-                    "--service-account=/creds/service_accounts/skylab-drone.json",
-                ],
-            ),
-            "pixel_skia_gold_passthrough_test VOLTEER_PUBLIC_RELEASE_LKGM": targets.mixin(
-                args = [
-                    "--service-account=/creds/service_accounts/skylab-drone.json",
-                ],
-            ),
-        },
-    ),
-    targets_settings = targets.settings(
-        browser_config = targets.browser_config.CROS_CHROME,
-        os_type = targets.os_type.CROS,
-        use_android_merge_script_by_default = False,
-        use_swarming = False,
-    ),
-    # TODO(crbug.com/40942991): This config is experimental and currently
-    # is too difficult for gardeners to keep green.
-    gardener_rotations = args.ignore_default(None),
-    console_view_entry = consoles.console_view_entry(
-        category = "ChromeOS|Intel",
-        short_name = "vlt",
-    ),
     siso_remote_jobs = siso.remote_jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -999,11 +982,21 @@ gpu.ci.linux_builder(
     targets = targets.bundle(
         # This bot doesn't run any browser-based tests (tab_capture_end2end_tests)
         targets = [
-            "gpu_fyi_linux_debug_gtests",
+            "gpu_common_gtests_passthrough_swiftshader",
         ],
         mixins = [
-            "linux_nvidia_gtx_1660_stable",
+            "gpu-swarming-pool",
+            "no_gpu",
+            "linux-jammy",
+            "x86-64",
         ],
+        per_test_modifications = {
+            "gl_tests_passthrough": targets.mixin(
+                args = [
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/linux.swiftshader.tsan.gl_tests_passthrough.filter",
+                ],
+            ),
+        },
     ),
     # This bot doesn't run any Telemetry-based tests so doesn't
     # need the browser_config parameter.
@@ -1044,8 +1037,6 @@ gpu.ci.mac_builder(
         ],
     ),
     targets = targets.bundle(),
-    cores = None,
-    cpu = cpu.ARM64,
     console_view_entry = consoles.console_view_entry(
         category = "Mac|Builder",
         short_name = "rel",
@@ -1081,6 +1072,10 @@ gpu.ci.mac_builder(
         ],
     ),
     targets = targets.bundle(),
+    # //tools/grit:brotli_mac_asan_workaround doesn't create bundle
+    # `obj/tools/grit/brotli_mac_asan_workaround/` when cross compiling
+    # from ARM host.
+    cpu = cpu.X86_64,
     console_view_entry = consoles.console_view_entry(
         category = "Mac|Builder",
         short_name = "asn",
@@ -1115,8 +1110,6 @@ gpu.ci.mac_builder(
         ],
     ),
     targets = targets.bundle(),
-    cores = None,
-    cpu = cpu.ARM64,
     console_view_entry = consoles.console_view_entry(
         category = "Mac|Builder",
         short_name = "dbg",
@@ -1125,6 +1118,7 @@ gpu.ci.mac_builder(
 
 gpu.ci.mac_builder(
     name = "GPU FYI Mac arm64 Builder",
+    branch_selector = branches.selector.MAC_BRANCHES,
     description_html = "Builds release Mac arm64 binaries for GPU testing",
     builder_spec = builder_config.builder_spec(
         gclient_config = builder_config.gclient_config(
@@ -1151,8 +1145,6 @@ gpu.ci.mac_builder(
             "mac",
         ],
     ),
-    cores = None,
-    cpu = cpu.ARM64,
     console_view_entry = consoles.console_view_entry(
         category = "Mac|Builder",
         short_name = "arm",
@@ -1285,6 +1277,49 @@ ci.thin_tester(
 )
 
 ci.thin_tester(
+    name = "Linux FYI Experimental Release (Intel Arc 140V)",
+    description_html = "GPU tests on exp Linux Intel Arc 140V configs",
+    parent = "GPU FYI Linux Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.LINUX,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        targets = [
+            "gpu_noop_sleep_telemetry_test",
+        ],
+        mixins = [
+            "very_limited_capacity_bot",
+            "gpu_intel_arc_140v_linux_experimental",
+        ],
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE,
+        os_type = targets.os_type.LINUX,
+    ),
+    gardener_rotations = args.ignore_default(None),
+    # Uncomment this entry when this experimental tester is actually in use.
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "Linux|Intel",
+    #     short_name = "exp",
+    # ),
+    list_view = "chromium.gpu.experimental",
+    execution_timeout = 12 * time.hour,
+)
+
+ci.thin_tester(
     name = "Linux FYI Experimental Release (Intel UHD 630)",
     description_html = "Runs release GPU tests on experimental Linux/Intel UHD 630 configs",
     parent = "GPU FYI Linux Builder",
@@ -1360,8 +1395,7 @@ ci.thin_tester(
         # only be running 'gpu_noop_sleep_telemetry_test'. Otherwise, this
         # should be running the same tests as 'Linux FYI Release (NVIDIA)'.
         targets = [
-            "gpu_fyi_linux_release_gtests",
-            "gpu_fyi_linux_release_vulkan_telemetry_tests",
+            "gpu_noop_sleep_telemetry_test",
         ],
         mixins = [
             "limited_capacity_bot",
@@ -1373,10 +1407,10 @@ ci.thin_tester(
         os_type = targets.os_type.LINUX,
     ),
     # Uncomment this entry when this experimental tester is actually in use.
-    console_view_entry = consoles.console_view_entry(
-        category = "Linux|Nvidia",
-        short_name = "exp",
-    ),
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "Linux|Nvidia",
+    #     short_name = "exp",
+    # ),
     list_view = "chromium.gpu.experimental",
 )
 
@@ -1420,7 +1454,46 @@ ci.thin_tester(
     ),
     console_view_entry = consoles.console_view_entry(
         category = "Linux|Nvidia",
-        short_name = "rel",
+        short_name = "1660",
+    ),
+)
+
+ci.thin_tester(
+    name = "Linux FYI Release (NVIDIA RTX 4070 Super)",
+    description_html = "Runs release GPU tests on stable Linux/NVIDIA RTX 4070 Super configs",
+    parent = "GPU FYI Linux Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.LINUX,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        targets = [
+            "gpu_fyi_linux_release_gtests",
+            "gpu_fyi_linux_release_vulkan_telemetry_tests",
+        ],
+        mixins = [
+            "linux_nvidia_rtx_4070_super_stable",
+        ],
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE,
+        os_type = targets.os_type.LINUX,
+    ),
+    console_view_entry = consoles.console_view_entry(
+        category = "Linux|Nvidia",
+        short_name = "4070",
     ),
 )
 
@@ -1485,10 +1558,8 @@ ci.thin_tester(
     ),
     targets = targets.bundle(
         targets = [
-            "gpu_noop_sleep_telemetry_test",
-            # TODO(crbug.com/396611134): Enable actual tests.
-            # "gpu_fyi_linux_release_gtests",
-            # "gpu_fyi_linux_release_telemetry_tests",
+            "gpu_fyi_linux_release_gtests",
+            "gpu_fyi_linux_release_telemetry_tests",
         ],
         mixins = [
             "linux_amd_rx_7600_stable",
@@ -1502,6 +1573,94 @@ ci.thin_tester(
         category = "Linux|AMD",
         short_name = "7600",
     ),
+)
+
+ci.thin_tester(
+    name = "Linux FYI Experimental Release (AMD 780M)",
+    description_html = "Runs release GPU tests on experimental Linux/AMD 780M configs",
+    parent = "GPU FYI Linux Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.LINUX,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        # When the experimental OS version is identical to the stable version,
+        # the gpu_noop_sleep_telemetry_test test should be used. Otherwise, this
+        # should have the same test suites as "Linux FYI Release (AMD 780M)".
+        targets = [
+            "gpu_noop_sleep_telemetry_test",
+        ],
+        mixins = [
+            "very_limited_capacity_bot",
+            "linux_amd_780m_experimental",
+        ],
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE,
+        os_type = targets.os_type.LINUX,
+    ),
+    # Uncomment this entry when this experimental tester is actually in use.
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "Linux|AMD",
+    #     short_name = "780m",
+    # ),
+    list_view = "chromium.gpu.experimental",
+)
+
+ci.thin_tester(
+    name = "Linux FYI Experimental Release (AMD 890M)",
+    description_html = "Runs release GPU tests on experimental Linux/AMD 890M configs",
+    parent = "GPU FYI Linux Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.LINUX,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        # When the experimental OS version is identical to the stable version,
+        # the gpu_noop_sleep_telemetry_test test should be used. Otherwise, this
+        # should have the same test suites as "Linux FYI Release (AMD 890M)".
+        targets = [
+            "gpu_noop_sleep_telemetry_test",
+        ],
+        mixins = [
+            "very_limited_capacity_bot",
+            "linux_amd_890m_experimental",
+        ],
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE,
+        os_type = targets.os_type.LINUX,
+    ),
+    # Uncomment this entry when this experimental tester is actually in use.
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "Linux|AMD",
+    #     short_name = "890m",
+    # ),
+    list_view = "chromium.gpu.experimental",
 )
 
 ci.thin_tester(
@@ -1670,6 +1829,40 @@ ci.thin_tester(
         mixins = [
             "mac_arm64_apple_m1_gpu_experimental",
         ],
+        per_test_modifications = {
+            "webgl_conformance_metal_passthrough_graphite_tests": targets.per_test_modification(
+                mixins = targets.mixin(
+                    args = [
+                        # TODO(crbug.com/414723481): Remove this once Graphite +
+                        # Metal no longer has issues when used in parallel.
+                        "--jobs=1",
+                    ],
+                ),
+                replacements = targets.replacements(
+                    args = {
+                        # Magic substitution happens after regular replacement, so remove it
+                        # now since we are manually applying the number of jobs above.
+                        targets.magic_args.GPU_PARALLEL_JOBS: None,
+                    },
+                ),
+            ),
+            "webgl2_conformance_metal_passthrough_graphite_tests": targets.per_test_modification(
+                mixins = targets.mixin(
+                    args = [
+                        # TODO(crbug.com/414723481): Remove this once Graphite +
+                        # Metal no longer has issues when used in parallel.
+                        "--jobs=1",
+                    ],
+                ),
+                replacements = targets.replacements(
+                    args = {
+                        # Magic substitution happens after regular replacement, so remove it
+                        # now since we are manually applying the number of jobs above.
+                        targets.magic_args.GPU_PARALLEL_JOBS: None,
+                    },
+                ),
+            ),
+        },
     ),
     targets_settings = targets.settings(
         browser_config = targets.browser_config.RELEASE,
@@ -1757,8 +1950,7 @@ ci.thin_tester(
         # should have the combination of test_suites as 'Mac FYI Retina Release (AMD)'
         # and 'Mac Retina Release (AMD)'.
         targets = [
-            "gpu_fyi_mac_release_gtests",
-            "gpu_fyi_only_mac_release_telemetry_tests",
+            "gpu_noop_sleep_telemetry_test",
         ],
         mixins = [
             "limited_capacity_bot",
@@ -1770,10 +1962,10 @@ ci.thin_tester(
         os_type = targets.os_type.MAC,
     ),
     # Uncomment this entry when this experimental tester is actually in use.
-    console_view_entry = consoles.console_view_entry(
-        category = "Mac|AMD|Retina",
-        short_name = "exp",
-    ),
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "Mac|AMD|Retina",
+    #     short_name = "exp",
+    # ),
     list_view = "chromium.gpu.experimental",
 )
 
@@ -1852,6 +2044,40 @@ ci.thin_tester(
         mixins = [
             "mac_arm64_apple_m1_gpu_stable",
         ],
+        per_test_modifications = {
+            "webgl_conformance_metal_passthrough_graphite_tests": targets.per_test_modification(
+                mixins = targets.mixin(
+                    args = [
+                        # TODO(crbug.com/414723481): Remove this once Graphite +
+                        # Metal no longer has issues when used in parallel.
+                        "--jobs=1",
+                    ],
+                ),
+                replacements = targets.replacements(
+                    args = {
+                        # Magic substitution happens after regular replacement, so remove it
+                        # now since we are manually applying the number of jobs above.
+                        targets.magic_args.GPU_PARALLEL_JOBS: None,
+                    },
+                ),
+            ),
+            "webgl2_conformance_metal_passthrough_graphite_tests": targets.per_test_modification(
+                mixins = targets.mixin(
+                    args = [
+                        # TODO(crbug.com/414723481): Remove this once Graphite +
+                        # Metal no longer has issues when used in parallel.
+                        "--jobs=1",
+                    ],
+                ),
+                replacements = targets.replacements(
+                    args = {
+                        # Magic substitution happens after regular replacement, so remove it
+                        # now since we are manually applying the number of jobs above.
+                        targets.magic_args.GPU_PARALLEL_JOBS: None,
+                    },
+                ),
+            ),
+        },
     ),
     targets_settings = targets.settings(
         browser_config = targets.browser_config.RELEASE,
@@ -1864,7 +2090,50 @@ ci.thin_tester(
 )
 
 ci.thin_tester(
+    name = "Mac FYI Retina Release (AMD Radeon Pro 555X)",
+    description_html = "Runs release GPU tests on 15\" 2019 Macbook Pros w/ AMD Radeon Pro 555X GPUs",
+    parent = "GPU FYI Mac Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.MAC,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        # Different targets than 'Mac FYI Retina Release (AMD)' since there is
+        # no tester on chromium.gpu running a subset of tests.
+        targets = [
+            "gpu_fyi_mac_release_gtests",
+            "gpu_fyi_only_mac_release_telemetry_tests",
+        ],
+        mixins = [
+            "limited_capacity_bot",
+            "mac_retina_amd_555x_gpu_stable",
+        ],
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE,
+        os_type = targets.os_type.MAC,
+    ),
+    console_view_entry = consoles.console_view_entry(
+        category = "Mac|AMD|Retina",
+        short_name = "555x",
+    ),
+)
+
+ci.thin_tester(
     name = "Mac FYI Retina Release (Apple M2)",
+    branch_selector = branches.selector.MAC_BRANCHES,
     description_html = "Runs release GPU tests on stable Mac/M2 Macbook Pro configs",
     parent = "GPU FYI Mac arm64 Builder",
     builder_spec = builder_config.builder_spec(
@@ -2388,6 +2657,13 @@ ci.thin_tester(
                     },
                 ),
             ),
+            "trace_test": targets.per_test_modification(
+                mixins = targets.mixin(
+                    swarming = targets.swarming(
+                        shards = 2,
+                    ),
+                ),
+            ),
         },
     ),
     targets_settings = targets.settings(
@@ -2654,6 +2930,8 @@ ci.thin_tester(
 )
 
 ci.thin_tester(
+    # TODO(crbug.com/473587145): Rename this to "Win11" when the upgrade goes
+    # to stable.
     name = "Win10 FYI x64 Release (AMD RX 5500 XT)",
     description_html = "Runs release GPU tests on stable Windows 10/AMD RX 5500 XT configs",
     parent = "GPU FYI Win x64 Builder",
@@ -2689,7 +2967,7 @@ ci.thin_tester(
             ),
             "media_foundation_browser_tests": targets.remove(
                 reason = [
-                    "TODO(crbug.com/40912267): Enable Media Foundation browser tests on NVIDIA",
+                    "TODO(crbug.com/40912267): Enable Media Foundation browser tests on AMD",
                     "gpu bots once the Windows OS supports HW secure decryption.",
                 ],
             ),
@@ -2934,6 +3212,59 @@ ci.thin_tester(
 )
 
 ci.thin_tester(
+    name = "Win11 FYI x64 Experimental Release (AMD RX 5500XT)",
+    description_html = "Runs release GPU tests on experimental Win/AMD RX 5500XT configs",
+    parent = "GPU FYI Win x64 Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.WIN,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        # When the experimental OS version is identical to the stable version,
+        # the gpu_noop_sleep_telemetry_test test should be used. Otherwise, this
+        # should have the same test suites as "Win10 FYI x64 Release (AMD
+        # RX 5500XT)".
+        targets = [
+            "gpu_fyi_win_gtests",
+            "gpu_fyi_win_amd_release_telemetry_tests",
+        ],
+        mixins = [
+            "limited_capacity_bot",
+            "win11_amd_rx_5500_xt_experimental",
+        ],
+        per_test_modifications = {
+            "gl_unittests": targets.mixin(
+                args = [
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/win.amd.5500xt.gl_unittests.filter",
+                ],
+            ),
+        },
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE_X64,
+        os_type = targets.os_type.WINDOWS,
+    ),
+    # Uncomment this entry when this experimental tester is actually in use.
+    console_view_entry = consoles.console_view_entry(
+        category = "Windows|11|x64|AMD",
+        short_name = "rel",
+    ),
+    list_view = "chromium.gpu.experimental",
+)
+
+ci.thin_tester(
     name = "Win11 FYI x64 Release (AMD RX 7600)",
     description_html = "Runs release GPU tests on stable Windows 11/AMD RX 7600 configs",
     parent = "GPU FYI Win x64 Builder",
@@ -2982,6 +3313,155 @@ ci.thin_tester(
         category = "Windows|11|x64|AMD",
         short_name = "rel",
     ),
+)
+
+ci.thin_tester(
+    name = "Win11 FYI x64 Experimental Release (AMD 780M)",
+    description_html = "Runs release GPU tests on experimental Win/AMD 780M configs",
+    parent = "GPU FYI Win x64 Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.WIN,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        # When the experimental OS version is identical to the stable version,
+        # the gpu_noop_sleep_telemetry_test test should be used. Otherwise, this
+        # should have the same test suites as "Win11 FYI x64 Release (AMD
+        # 780M)".
+        targets = [
+            "gpu_noop_sleep_telemetry_test",
+        ],
+        mixins = [
+            "very_limited_capacity_bot",
+            "win11_amd_780m_experimental",
+        ],
+        per_test_modifications = {
+            # "gl_unittests": targets.mixin(
+            #     args = [
+            #         "--test-launcher-filter-file=../../testing/buildbot/filters/win.amd.780m.gl_unittests.filter",
+            #     ],
+            # ),
+        },
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE_X64,
+        os_type = targets.os_type.WINDOWS,
+    ),
+    # Uncomment this entry when this experimental tester is actually in use.
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "Windows|11|x64|AMD",
+    #     short_name = "780m",
+    # ),
+    list_view = "chromium.gpu.experimental",
+)
+
+ci.thin_tester(
+    name = "Win11 FYI x64 Experimental Release (AMD 890M)",
+    description_html = "Runs release GPU tests on experimental Win/AMD 890M configs",
+    parent = "GPU FYI Win x64 Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.WIN,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        # When the experimental OS version is identical to the stable version,
+        # the gpu_noop_sleep_telemetry_test test should be used. Otherwise, this
+        # should have the same test suites as "Win11 FYI x64 Release (AMD
+        # 890M)".
+        targets = [
+            "gpu_noop_sleep_telemetry_test",
+        ],
+        mixins = [
+            "very_limited_capacity_bot",
+            "win11_amd_890m_experimental",
+        ],
+        per_test_modifications = {
+            # "gl_unittests": targets.mixin(
+            #     args = [
+            #         "--test-launcher-filter-file=../../testing/buildbot/filters/win.amd.890m.gl_unittests.filter",
+            #     ],
+            # ),
+        },
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE_X64,
+        os_type = targets.os_type.WINDOWS,
+    ),
+    # Uncomment this entry when this experimental tester is actually in use.
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "Windows|11|x64|AMD",
+    #     short_name = "890m",
+    # ),
+    list_view = "chromium.gpu.experimental",
+)
+
+ci.thin_tester(
+    name = "Win11 FYI x64 Experimental Release (NVIDIA RTX 4070 Super)",
+    description_html = "Runs release GPU tests on experimental Windows 11/NVIDIA RTX 4070 configs",
+    parent = "GPU FYI Win x64 Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.WIN,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        # When the experimental driver is identical to the stable driver, this
+        # should be running the gpu_noop_sleep_telemetry_test. Otherwise, it
+        # should be running the same test_suites as
+        # 'Win11 FYI x64 Release (NVIDIA RTX 4070 Super)'
+        targets = [
+            "gpu_noop_sleep_telemetry_test",
+        ],
+        mixins = [
+            "limited_capacity_bot",
+            "win11_nvidia_rtx_4070_super_experimental",
+        ],
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE_X64,
+        os_type = targets.os_type.WINDOWS,
+    ),
+    # Uncomment this entry when this experimental tester is actually in use.
+    # console_view_entry = consoles.console_view_entry(
+    #     category = "Windows|11|x64|Nvidia",
+    #     short_name = "exp",
+    # ),
+    list_view = "chromium.gpu.experimental",
 )
 
 ci.thin_tester(
@@ -3249,6 +3729,80 @@ ci.thin_tester(
     console_view_entry = consoles.console_view_entry(
         category = "Windows|11|arm64|Qualcomm",
         short_name = "rel",
+    ),
+)
+
+ci.thin_tester(
+    name = "Win11 FYI arm64 Release (Qualcomm Snapdragon X Elite)",
+    description_html = "Runs release GPU tests on stable Windows 11/Snapdragon X Elite configs (Dell Latitude 7455)",
+    parent = "GPU FYI Win arm64 Builder",
+    builder_spec = builder_config.builder_spec(
+        execution_mode = builder_config.execution_mode.TEST,
+        gclient_config = builder_config.gclient_config(
+            config = "chromium",
+        ),
+        chromium_config = builder_config.chromium_config(
+            config = "chromium",
+            apply_configs = [
+                "mb",
+            ],
+            build_config = builder_config.build_config.RELEASE,
+            target_bits = 64,
+            target_platform = builder_config.target_platform.WIN,
+        ),
+        run_tests_serially = True,
+    ),
+    targets = targets.bundle(
+        targets = [
+            "gpu_fyi_win_gtests",
+            "gpu_fyi_win_release_telemetry_tests",
+        ],
+        mixins = [
+            "win11_qualcomm_snapdragon_x_elite_stable",
+        ],
+        per_test_modifications = {
+            "context_lost_passthrough_graphite_tests": targets.remove(
+                reason = "Graphite on ARM is currently not supported.",
+            ),
+            "expected_color_pixel_passthrough_graphite_test": targets.remove(
+                reason = "Graphite on ARM is currently not supported.",
+            ),
+            "gl_tests_passthrough": targets.mixin(
+                args = [
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/win.qualcomm.snapdragon_x_elite.gl_tests_passthrough.filter",
+                ],
+            ),
+            "gl_unittests": targets.mixin(
+                args = [
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/win.qualcomm.snapdragon_x_elite.gl_unittests.filter",
+                ],
+            ),
+            "pixel_skia_gold_passthrough_graphite_test": targets.remove(
+                reason = "Graphite on ARM is currently not supported.",
+            ),
+            "screenshot_sync_passthrough_graphite_tests": targets.remove(
+                reason = "Graphite on ARM is currently not supported.",
+            ),
+            "services_webnn_unittests": targets.mixin(
+                args = [
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/win.qualcomm.snapdragon_x_elite.services_webnn_unittests.filter",
+                ],
+            ),
+            "webgl_conformance_d3d9_passthrough_tests": targets.remove(
+                reason = "Per discussion on crbug.com/1523698, we aren't interested in testing D3D9 on this newer hardware.",
+            ),
+            "xr_browser_tests": targets.remove(
+                reason = "No Windows arm64 devices currently support XR features, so don't bother running related tests.",
+            ),
+        },
+    ),
+    targets_settings = targets.settings(
+        browser_config = targets.browser_config.RELEASE,
+        os_type = targets.os_type.WINDOWS,
+    ),
+    console_view_entry = consoles.console_view_entry(
+        category = "Windows|11|arm64|Qualcomm",
+        short_name = "sdx",
     ),
 )
 

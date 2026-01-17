@@ -19,6 +19,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_paths.h"
+#include "chrome/test/base/chrome_test_utils.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "content/public/browser/web_contents.h"
@@ -32,10 +33,10 @@
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/extensions/scoped_test_mv2_enabler.h"
-#include "chrome/browser/extensions/unpacked_installer.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/test_extension_registry_observer.h"
+#include "extensions/browser/unpacked_installer.h"
 #include "extensions/common/extension.h"
 #endif
 
@@ -149,7 +150,7 @@ IN_PROC_BROWSER_TEST_F(NoBestEffortTasksTest,
 // TODO(crbug.com/40932711): Disabled due to excessive flakiness.
 IN_PROC_BROWSER_TEST_F(NoBestEffortTasksTest, DISABLED_LoadAndPaintFileScheme) {
   constexpr base::FilePath::CharType kFile[] = FILE_PATH_LITERAL("links.html");
-  GURL file_url(ui_test_utils::GetTestUrl(
+  GURL file_url(chrome_test_utils::GetTestUrl(
       base::FilePath(base::FilePath::kCurrentDirectory),
       base::FilePath(kFile)));
   ASSERT_TRUE(file_url.SchemeIs(url::kFileScheme));

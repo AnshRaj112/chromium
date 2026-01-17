@@ -21,8 +21,6 @@
 #include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/typed_macros.h"
-#include "base/types/cxx23_to_underlying.h"
-#include "mojo/public/cpp/bindings/features.h"
 #include "mojo/public/cpp/bindings/lib/default_construct_tag_internal.h"
 #include "mojo/public/cpp/bindings/lib/generated_code_util.h"
 #include "mojo/public/cpp/bindings/lib/message_internal.h"
@@ -299,10 +297,10 @@ const char* ResultInterface::MessageToMethodName_(mojo::Message& message) {
 
 #if !BUILDFLAG(IS_FUCHSIA)
 uint32_t ResultInterface::Method_Sym::IPCStableHash() {
-  // This method's address is used for identifiying the mojo method name after
+  // This method's address is used for identifying the mojo method name after
   // symbolization. So each IPCStableHash should have a unique address.
   // We cannot use NO_CODE_FOLDING() here - it relies on the uniqueness of
-  // __LINE__ value, which is not unique accross different mojo modules.
+  // __LINE__ value, which is not unique across different mojo modules.
   // The code below is very similar to NO_CODE_FOLDING, but it uses a unique
   // hash instead of __LINE__.
   static constexpr uint32_t kHash = 0x826d7762;  // IPCStableHash for golden::ResultInterface::Method
@@ -311,10 +309,10 @@ uint32_t ResultInterface::Method_Sym::IPCStableHash() {
   return hash;
 }
 uint32_t ResultInterface::SyncMethod_Sym::IPCStableHash() {
-  // This method's address is used for identifiying the mojo method name after
+  // This method's address is used for identifying the mojo method name after
   // symbolization. So each IPCStableHash should have a unique address.
   // We cannot use NO_CODE_FOLDING() here - it relies on the uniqueness of
-  // __LINE__ value, which is not unique accross different mojo modules.
+  // __LINE__ value, which is not unique across different mojo modules.
   // The code below is very similar to NO_CODE_FOLDING, but it uses a unique
   // hash instead of __LINE__.
   static constexpr uint32_t kHash = 0x42fd29bb;  // IPCStableHash for golden::ResultInterface::SyncMethod
@@ -414,7 +412,7 @@ void ResultInterfaceProxy::Method(
   const size_t estimated_payload_size =
     0;
   mojo::Message message(
-      base::to_underlying(messages::ResultInterface::kMethod), kFlags, estimated_payload_size);
+      std::to_underlying(messages::ResultInterface::kMethod), kFlags, estimated_payload_size);
   mojo::internal::MessageFragment<
       ::golden::internal::ResultInterface_Method_Params_Data> params(
           message);
@@ -464,7 +462,7 @@ base::expected<
   const size_t estimated_payload_size =
     0;
   mojo::Message message(
-      base::to_underlying(messages::ResultInterface::kSyncMethod), kFlags, estimated_payload_size);
+      std::to_underlying(messages::ResultInterface::kSyncMethod), kFlags, estimated_payload_size);
   mojo::internal::MessageFragment<
       ::golden::internal::ResultInterface_SyncMethod_Params_Data> params(
           message);
@@ -522,7 +520,7 @@ void ResultInterfaceProxy::SyncMethod(
   const size_t estimated_payload_size =
     0;
   mojo::Message message(
-      base::to_underlying(messages::ResultInterface::kSyncMethod), kFlags, estimated_payload_size);
+      std::to_underlying(messages::ResultInterface::kSyncMethod), kFlags, estimated_payload_size);
   mojo::internal::MessageFragment<
       ::golden::internal::ResultInterface_SyncMethod_Params_Data> params(
           message);
@@ -652,7 +650,7 @@ void ResultInterface_Method_ProxyToResponder::Run(
   const size_t estimated_payload_size =
     0;
   mojo::Message message(
-      base::to_underlying(messages::ResultInterface::kMethod), kFlags, estimated_payload_size);
+      std::to_underlying(messages::ResultInterface::kMethod), kFlags, estimated_payload_size);
   mojo::internal::MessageFragment<
       ::golden::internal::ResultInterface_Method_ResponseParams_Data> params(
           message);
@@ -802,7 +800,7 @@ void ResultInterface_SyncMethod_ProxyToResponder::Run(
   const size_t estimated_payload_size =
     0;
   mojo::Message message(
-      base::to_underlying(messages::ResultInterface::kSyncMethod), kFlags, estimated_payload_size);
+      std::to_underlying(messages::ResultInterface::kSyncMethod), kFlags, estimated_payload_size);
   mojo::internal::MessageFragment<
       ::golden::internal::ResultInterface_SyncMethod_ResponseParams_Data> params(
           message);

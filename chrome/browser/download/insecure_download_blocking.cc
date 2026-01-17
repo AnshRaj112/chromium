@@ -24,6 +24,7 @@
 #include "components/download/public/common/download_stats.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/download_item_utils.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
 #include "net/base/url_util.h"
@@ -270,7 +271,7 @@ struct InsecureDownloadData {
     bool insecure_nonunique = false;
     if (initiator_.has_value() &&
         !network::IsUrlPotentiallyTrustworthy(initiator_->GetURL()) &&
-        net::IsHostnameNonUnique(initiator_->GetURL().host())) {
+        net::IsHostnameNonUnique(initiator_->GetURL().GetHost())) {
       insecure_nonunique = true;
     }
 
@@ -355,9 +356,22 @@ struct InsecureDownloadData {
           !net::IsLocalhost(dl_url);
     }
 
-    is_user_initiated_on_webui_ =
-        item->GetTabUrl().SchemeIs(content::kChromeUIScheme) &&
-        download_source == DownloadSource::CONTEXT_MENU;
+    // A download is considered initiated from a trusted WebUI (e.g. chrome://)
+    // if either:
+    // 1. The download's Tab URL is a trusted WebUI scheme. This covers cases
+    //    where the user clicked a link on a WebUI page. This URL persists even
+    //    if the user navigates away or closes the tab (in which case the
+    //    RenderFrameHost might be null or point to a different page).
+    // 2. The RenderFrameHost's last committed URL is a trusted WebUI scheme.
+    //    This covers top-level navigations (e.g. typing a file URL in the
+    //    Omnibox on the NTP). In this case, the download's Tab URL reflects the
+    //    pending file URL (not the NTP), so we must rely on the RenderFrameHost
+    //    to identify the initiating context.
+    content::RenderFrameHost* rfh =
+        content::DownloadItemUtils::GetRenderFrameHost(item);
+    is_initiated_from_trusted_webui_ =
+        item->GetTabUrl().SchemeIs(content::kChromeUIScheme) ||
+        (rfh && rfh->GetLastCommittedURL().SchemeIs(content::kChromeUIScheme));
   }
 
   std::optional<url::Origin> initiator_;
@@ -370,8 +384,14 @@ struct InsecureDownloadData {
   bool is_mixed_content_;
   // Was the download initiated by an insecure origin or delivered insecurely?
   bool is_insecure_download_;
-  // Was the download initiated by a user on a chrome:// WebUI?
-  bool is_user_initiated_on_webui_;
+  // Was the download initiated from a trusted WebUI page (chrome://...)?
+  // This can happen in the following cases:
+  // 1) Clicking on a HTTP downloadable link on a WebUI page (e.g. NTP or
+  //    chrome://history).
+  // 2) Right clicking "Save Link As..." to a HTTP link on a WebUI page.
+  // 3) Top-level navigation to a downloadable HTTP URL initiated from a WebUI
+  //    page (e.g. typing a file URL in the Omnibox on NTP).
+  bool is_initiated_from_trusted_webui_;
 };
 
 // Check if |extension| is contained in the comma separated |extension_list|.
@@ -413,11 +433,11 @@ void PrintConsoleMessage(const InsecureDownloadData& data) {
     return;
   }
 
-  // The user can right-click and save a HTTP link from a chrome:// WebUI
+  // The user saved a HTTP resource from a chrome:// WebUI page
   // (e.g. NTP or history). This is arguably a valid use case unless we
   // completely ban users from visiting HTTP sites, so don't warn. Otherwise,
   // an error will be generated and uploaded to the crash server.
-  if (data.is_user_initiated_on_webui_) {
+  if (data.is_initiated_from_trusted_webui_) {
     return;
   }
 

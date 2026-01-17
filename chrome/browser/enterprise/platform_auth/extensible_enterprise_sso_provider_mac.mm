@@ -34,8 +34,9 @@ namespace enterprise_auth {
 
 namespace {
 
-constexpr std::array<const char*, 1> kSupportedIdps{
+constexpr std::array<const char*, 2> kSupportedIdps{
     kMicrosoftIdentityProvider,
+    kOktaIdentityProvider,
 };
 
 // Empty function used to ensure SSOServiceEntraAuthControllerDelegate does not
@@ -117,7 +118,7 @@ void ExtensibleEnterpriseSSOProvider::FetchOrigins(
 void ExtensibleEnterpriseSSOProvider::GetData(
     const GURL& url,
     PlatformAuthProviderManager::GetDataCallback callback) {
-  auto metrics = std::make_unique<Metrics>(url.host());
+  auto metrics = std::make_unique<Metrics>(url.GetHost());
   NSURL* nativeUrl = net::NSURLWithGURL(url);
   ASAuthorizationSingleSignOnProvider* auth_provider =
       [ASAuthorizationSingleSignOnProvider

@@ -6,9 +6,11 @@
 #define IOS_CHROME_BROWSER_READER_MODE_MODEL_READER_MODE_TEST_H_
 
 #import "base/test/scoped_feature_list.h"
+#import "components/translate/core/language_detection/language_detection_model.h"
 #import "ios/chrome/browser/reader_mode/model/constants.h"
 #import "ios/chrome/browser/reader_mode/model/reader_mode_tab_helper.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_ios.h"
+#import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
 #import "ios/web/public/test/fakes/fake_web_frame.h"
 #import "ios/web/public/test/fakes/fake_web_frames_manager.h"
 #import "ios/web/public/test/fakes/fake_web_state.h"
@@ -27,6 +29,7 @@ class ReaderModeTest : public PlatformTest {
 
  protected:
   void SetUp() override;
+  void TearDown() override;
 
   // Creates a fake web state for use in Reader Mode functions.
   std::unique_ptr<web::FakeWebState> CreateWebState();
@@ -46,14 +49,22 @@ class ReaderModeTest : public PlatformTest {
                           ReaderModeHeuristicResult eligibility,
                           std::string distilled_content);
 
-  // Waits for Reader Mode content to be loaded and ready to query.
-  void WaitForReaderModeContentReady();
+  // Waits after a page load for the page content to be distillable.
+  void WaitForPageLoadDelayAndRunUntilIdle();
+
+  // Waits for Reader mode content availability.
+  bool WaitForAvailableReaderModeContentInWebState(web::WebState* web_state);
 
   web::WebTaskEnvironment* task_environment() { return &task_environment_; }
 
   TestProfileIOS* profile() { return profile_.get(); }
 
  private:
+  // Triggers the Reading Mode with the result from the DOM distiller heuristic.
+  void OnDomFeaturesRetrieved(base::WeakPtr<web::WebState> weak_web_state,
+                              base::WeakPtr<web::WebFrame> weak_web_frame,
+                              ReaderModeHeuristicResult result);
+
   // Adds the given heuristic result to the Readability heuristic JavasScript
   // callback for the specified frame.
   void AddReadabilityHeuristicResultToFrame(ReaderModeHeuristicResult result,
@@ -62,11 +73,15 @@ class ReaderModeTest : public PlatformTest {
   web::WebTaskEnvironment task_environment_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   base::test::ScopedFeatureList scoped_feature_list_;
+  IOSChromeScopedTestingLocalState scoped_testing_local_state_;
 
   std::unique_ptr<TestProfileIOS> profile_;
+  translate::LanguageDetectionModel language_detection_model_;
 
   std::vector<std::unique_ptr<base::Value>> distiller_result_values_;
   std::unique_ptr<base::Value> readability_heuristic_value_;
+
+  base::WeakPtrFactory<ReaderModeTest> weak_ptr_factory_{this};
 };
 
 #endif  // IOS_CHROME_BROWSER_READER_MODE_MODEL_READER_MODE_TEST_H_

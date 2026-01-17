@@ -16,7 +16,6 @@
 #include "base/android/child_process_service.h"
 #include "base/android/command_line_android.h"
 #include "base/android/device_info.h"
-#include "base/android/jni_onload.h"
 #include "base/android/library_loader/library_loader_hooks.h"
 #include "base/command_line.h"
 #include "base/functional/bind.h"
@@ -246,10 +245,8 @@ ScopedAStatus ChildProcessService::onMemoryPressure(int32_t pressure) {
     // renderer, so we trust what it sends entirely.
     base::ThreadPool::PostTask(
         FROM_HERE,
-        base::BindOnce(
-            &base::MemoryPressureListener::NotifyMemoryPressure,
-            static_cast<base::MemoryPressureListener::MemoryPressureLevel>(
-                pressure)));
+        base::BindOnce(&base::MemoryPressureListener::NotifyMemoryPressure,
+                       static_cast<base::MemoryPressureLevel>(pressure)));
   }
   return ScopedAStatus::ok();
 }
@@ -287,16 +284,17 @@ std::shared_ptr<content::ChildProcessService>& getChildProcessService() {
   return *service_ptr.get();
 }
 
-std::set<void const*>& getBindTokens() {
-  static base::NoDestructor<std::set<void const*>> tokens;
+std::set<uint64_t>& getBindTokens() {
+  static base::NoDestructor<std::set<uint64_t>> tokens;
   return *tokens.get();
 }
 
 void onDestroy(ANativeService* service) {}
 
 AIBinder* onBind(ANativeService* service,
-                 void const* bindToken,
-                 char const* action) {
+                 uint64_t bindToken,
+                 char const* action,
+                 char const* data) {
   auto& child_process_service = getChildProcessService();
   if (!child_process_service) {
     child_process_service =
@@ -311,9 +309,9 @@ AIBinder* onBind(ANativeService* service,
   return result;
 }
 
-void onRebind(ANativeService* service, void const* bindToken) {}
+void onRebind(ANativeService* service, uint64_t bindToken) {}
 
-bool onUnbind(ANativeService* service, void const* bindToken) {
+bool onUnbind(ANativeService* service, uint64_t bindToken) {
   auto& tokens = getBindTokens();
   tokens.erase(bindToken);
   if (tokens.empty()) {

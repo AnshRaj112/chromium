@@ -42,6 +42,7 @@
 #include "components/autofill/core/browser/foundations/test_autofill_client.h"
 #include "components/autofill/core/browser/foundations/test_autofill_driver.h"
 #include "components/autofill/core/browser/foundations/test_browser_autofill_manager.h"
+#include "components/autofill/core/browser/foundations/with_test_autofill_client_driver_manager.h"
 #include "components/autofill/core/browser/metrics/autofill_metrics.h"
 #include "components/autofill/core/browser/metrics/payments/credit_card_save_metrics.h"
 #include "components/autofill/core/browser/payments/client_behavior_constants.h"
@@ -49,6 +50,7 @@
 #include "components/autofill/core/browser/payments/payments_autofill_client.h"
 #include "components/autofill/core/browser/payments/payments_customer_data.h"
 #include "components/autofill/core/browser/payments/payments_util.h"
+#include "components/autofill/core/browser/payments/test/mock_multiple_request_payments_network_interface.h"
 #include "components/autofill/core/browser/payments/test/mock_virtual_card_enrollment_manager.h"
 #include "components/autofill/core/browser/payments/test_credit_card_save_manager.h"
 #include "components/autofill/core/browser/payments/test_legal_message_line.h"
@@ -99,7 +101,7 @@ using ::testing::SaveArg;
 using ::testing::UnorderedElementsAre;
 
 using UkmCardUploadDecisionType = ukm::builders::Autofill_CardUploadDecision;
-using UkmDeveloperEngagementType = ukm::builders::Autofill_DeveloperEngagement;
+using SaveCardPromptResult = autofill_metrics::SaveCardPromptResult;
 using SaveCreditCardOptions =
     payments::PaymentsAutofillClient::SaveCreditCardOptions;
 using SaveCardOfferUserDecision =
@@ -107,21 +109,11 @@ using SaveCardOfferUserDecision =
 using UserProvidedCardDetails =
     payments::PaymentsAutofillClient::UserProvidedCardDetails;
 
+constexpr bool is_ios = !!BUILDFLAG(IS_IOS);
+
 #if !BUILDFLAG(IS_IOS)
 base::TimeDelta kVeryLargeDelta = base::Days(365) * 75;
 #endif
-
-bool FixFlowDetectedValuesOverriddenOnIos() {
-#if BUILDFLAG(IS_IOS)
-  // On iOS, if the flag is disabled, `DetectedValues` for missing cardholder
-  // name and expiry date are defaulted as true. Tests verifying the detection
-  // bits for presence of a fix flow should skip running the test.
-  return !base::FeatureList::IsEnabled(
-      features::kAutofillDisableDefaultSaveCardFixFlowDetection);
-#else
-  return false;
-#endif
-}
 
 std::string FiveMonthsFromNow() {
   base::Time::Exploded now;
@@ -213,6 +205,7 @@ class MockPaymentsAutofillClient : public payments::TestPaymentsAutofillClient {
        std::optional<PaymentsAutofillClient::OnConfirmationClosedCallback>
            on_confirmation_closed_callback),
       (override));
+  MOCK_METHOD(bool, LocalCardSaveIsSupported, (), (override));
   MOCK_METHOD(void, HideSaveCardPrompt, (), (override));
 
 #if BUILDFLAG(IS_ANDROID)
@@ -302,6 +295,7 @@ class MockAutofillClient : public TestAutofillClient {
   MockAutofillClient() {
     TestPersonalDataManager& pdm = GetPersonalDataManager();
     pdm.set_payments_data_manager(std::make_unique<MockPaymentsDataManager>());
+    pdm.test_payments_data_manager().SetPrefService(GetPrefs());
     set_payments_autofill_client(
         std::make_unique<MockPaymentsAutofillClient>(this));
   }
@@ -312,78 +306,86 @@ class MockAutofillClient : public TestAutofillClient {
 // The anonymous namespace needs to end here because of `friend`ships between
 // the tests and the production code.
 
-class CreditCardSaveManagerTest : public testing::Test {
+class CreditCardSaveManagerTest
+    : public testing::Test,
+      public WithTestAutofillClientDriverManager<MockAutofillClient,
+                                                 TestAutofillDriver,
+                                                 TestBrowserAutofillManager,
+                                                 MockPaymentsAutofillClient> {
  public:
   void SetUp() override {
     // Change the year to be 20XX.
     task_environment_.FastForwardBy(base::Days(365) * 31);
-
-    autofill_client_.SetPrefs(test::PrefServiceForTesting());
-    autofill_client_.set_test_strike_database(
+    InitAutofillClient();
+    autofill_client().set_test_strike_database(
         std::make_unique<TestStrikeDatabase>());
     test_api(personal_data().address_data_manager())
         .set_auto_accept_address_imports(true);
-    personal_data().SetPrefService(autofill_client_.GetPrefs());
     personal_data().SetSyncServiceForTest(&sync_service_);
-    autofill_driver_ = std::make_unique<TestAutofillDriver>(&autofill_client_);
-    autofill_client_.GetPaymentsAutofillClient()
-        ->set_payments_network_interface(
-            std::make_unique<payments::TestPaymentsNetworkInterface>(
-                autofill_client_.GetURLLoaderFactory(),
-                autofill_client_.GetIdentityManager(), &personal_data()));
-    payments_client().set_virtual_card_enrollment_manager(
+    CreateAutofillDriver();
+    payments_autofill_client().set_payments_network_interface(
+        std::make_unique<payments::TestPaymentsNetworkInterface>(
+            autofill_client().GetURLLoaderFactory(),
+            autofill_client().GetIdentityManager(), &personal_data()));
+    payments_autofill_client().set_multiple_request_payments_network_interface(
+        std::make_unique<payments::MockMultipleRequestPaymentsNetworkInterface>(
+            autofill_client().GetURLLoaderFactory(),
+            *autofill_client().GetIdentityManager()));
+    payments_autofill_client().set_virtual_card_enrollment_manager(
         std::make_unique<MockVirtualCardEnrollmentManager>(
-            &payments_data_manager(), &payments_network_interface(),
-            &autofill_client_));
-    payments_client().SetLocalSaveCallbackOfferDecision(
+            &payments_data_manager(),
+            &multiple_request_payments_network_interface(),
+            &autofill_client()));
+    payments_autofill_client().SetLocalSaveCallbackOfferDecision(
         SaveCardOfferUserDecision::kAccepted);
-    payments_client().SetCloudSaveCallbackOfferDecision(
+    payments_autofill_client().SetCloudSaveCallbackOfferDecision(
         SaveCardOfferUserDecision::kAccepted);
     auto credit_card_save_manager =
-        std::make_unique<TestCreditCardSaveManager>(&autofill_client_);
-    credit_card_save_manager_ = credit_card_save_manager.get();
-    credit_card_save_manager_->SetCreditCardUploadEnabled(true);
-    test_api(*autofill_client_.GetFormDataImporter())
+        std::make_unique<TestCreditCardSaveManager>(&autofill_client());
+    credit_card_save_manager->SetCreditCardUploadEnabled(true);
+    test_api(*autofill_client().GetFormDataImporter())
         .set_credit_card_save_manager(std::move(credit_card_save_manager));
-    autofill_client_.GetStrikeDatabase();
-    browser_autofill_manager_ =
-        std::make_unique<TestBrowserAutofillManager>(autofill_driver_.get());
-    autofill_client_.GetVotesUploader().set_expected_observed_submission(true);
+    autofill_client().GetStrikeDatabase();
+    autofill_client().GetVotesUploader().set_expected_observed_submission(true);
+    ON_CALL(payments_autofill_client(), LocalCardSaveIsSupported)
+        .WillByDefault(Return(true));
   }
 
   void TearDown() override {
-    // Order of destruction is important as BrowserAutofillManager relies on
-    // PersonalDataManager to be around when it gets destroyed.
-    browser_autofill_manager_.reset();
-    autofill_driver_.reset();
+    DeleteAllAutofillDrivers();
+    DestroyAutofillClient();
+  }
 
-    personal_data().SetPrefService(nullptr);
-    personal_data().test_payments_data_manager().ClearCreditCards();
+  // TODO(crbug.com/40818490): Refactor to use the real CreditCardSaveManager.
+  // Ends up getting owned (and destroyed) by TestFormDataImporter:
+  TestCreditCardSaveManager& credit_card_save_manager() {
+    return static_cast<TestCreditCardSaveManager&>(
+        *autofill_client().GetFormDataImporter()->GetCreditCardSaveManager());
   }
 
   void FormsSeen(const std::vector<FormData>& forms) {
-    browser_autofill_manager_->OnFormsSeen(/*updated_forms=*/forms,
-                                           /*removed_forms=*/{});
+    autofill_manager().OnFormsSeen(/*updated_forms=*/forms,
+                                   /*removed_forms=*/{});
   }
 
   void FormSubmitted(const FormData& form) {
-    browser_autofill_manager_->OnFormSubmitted(
+    autofill_manager().OnFormSubmitted(
         form, mojom::SubmissionSource::FORM_SUBMISSION);
   }
 
   void UserHasAcceptedCardUpload(
       UserProvidedCardDetails user_provided_card_details) {
-    credit_card_save_manager_->OnUserDidDecideOnUploadSave(
+    credit_card_save_manager().OnUserDidDecideOnUploadSave(
         SaveCardOfferUserDecision::kAccepted, user_provided_card_details);
   }
 
   void UserDidDecideCvcLocalSave(SaveCardOfferUserDecision user_decision) {
-    credit_card_save_manager_->OnUserDidDecideOnCvcLocalSave(user_decision);
+    credit_card_save_manager().OnUserDidDecideOnCvcLocalSave(user_decision);
   }
 
   void UserHasAcceptedCvcUpload(
       UserProvidedCardDetails user_provided_card_details) {
-    credit_card_save_manager_->OnUserDidDecideOnCvcUploadSave(
+    credit_card_save_manager().OnUserDidDecideOnCvcUploadSave(
         SaveCardOfferUserDecision::kAccepted, user_provided_card_details);
   }
 
@@ -395,15 +397,15 @@ class CreditCardSaveManagerTest : public testing::Test {
       ASSERT_TRUE(user_provided_details.expiration_date_month.empty());
       ASSERT_TRUE(user_provided_details.expiration_date_year.empty());
 
-      payments_client().ExpectAccountFixFlow(
+      payments_autofill_client().ExpectAccountFixFlow(
           user_provided_details.cardholder_name);
     } else {
-      payments_client().ExpectExpirationDateFixFlow(
+      payments_autofill_client().ExpectExpirationDateFixFlow(
           user_provided_details.expiration_date_month,
           user_provided_details.expiration_date_year);
     }
 #else
-    payments_client().SetCloudSaveCallbackOfferDecision(
+    payments_autofill_client().SetCloudSaveCallbackOfferDecision(
         SaveCardOfferUserDecision::kAccepted, user_provided_details);
 #endif
   }
@@ -488,21 +490,9 @@ class CreditCardSaveManagerTest : public testing::Test {
     test_api(form).field(2).set_value(ASCIIToUTF16(test::NextMonth()));
     test_api(form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
 
-    EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally);
+    EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally);
 
     FormSubmitted(form);
-  }
-
-  void ExpectUniqueFillableFormParsedUkm() {
-    ukm::TestUkmRecorder* test_ukm_recorder = autofill_client_.GetUkmRecorder();
-    auto entries = test_ukm_recorder->GetEntriesByName(
-        UkmDeveloperEngagementType::kEntryName);
-    EXPECT_EQ(1u, entries.size());
-    for (const ukm::mojom::UkmEntry* const entry : entries) {
-      test_ukm_recorder->ExpectEntryMetric(
-          entry, UkmDeveloperEngagementType::kDeveloperEngagementName,
-          1 << AutofillMetrics::FILLABLE_FORM_PARSED_WITHOUT_TYPE_HINTS);
-    }
   }
 
   void ExpectUniqueCardUploadDecision(
@@ -530,18 +520,12 @@ class CreditCardSaveManagerTest : public testing::Test {
                  1 /* expected_num_matching_entries */);
   }
 
-  void ExpectFillableFormParsedUkm(int num_fillable_forms_parsed) {
-    ExpectMetric(UkmDeveloperEngagementType::kDeveloperEngagementName,
-                 UkmDeveloperEngagementType::kEntryName,
-                 1 << AutofillMetrics::FILLABLE_FORM_PARSED_WITHOUT_TYPE_HINTS,
-                 num_fillable_forms_parsed);
-  }
-
   void ExpectMetric(const char* metric_name,
                     const char* entry_name,
                     int expected_metric_value,
                     size_t expected_num_matching_entries) {
-    ukm::TestUkmRecorder* test_ukm_recorder = autofill_client_.GetUkmRecorder();
+    ukm::TestUkmRecorder* test_ukm_recorder =
+        autofill_client().GetUkmRecorder();
     auto entries = test_ukm_recorder->GetEntriesByName(entry_name);
     EXPECT_EQ(expected_num_matching_entries, entries.size());
     for (const ukm::mojom::UkmEntry* const entry : entries) {
@@ -552,34 +536,29 @@ class CreditCardSaveManagerTest : public testing::Test {
 
  protected:
   TestPersonalDataManager& personal_data() {
-    return autofill_client_.GetPersonalDataManager();
+    return autofill_client().GetPersonalDataManager();
   }
   MockPaymentsDataManager& payments_data_manager() {
     return static_cast<MockPaymentsDataManager&>(
         personal_data().payments_data_manager());
   }
-  MockPaymentsAutofillClient& payments_client() {
-    return static_cast<MockPaymentsAutofillClient&>(
-        *autofill_client_.GetPaymentsAutofillClient());
-  }
   payments::TestPaymentsNetworkInterface& payments_network_interface() {
     return static_cast<payments::TestPaymentsNetworkInterface&>(
-        *payments_client().GetPaymentsNetworkInterface());
+        *payments_autofill_client().GetPaymentsNetworkInterface());
+  }
+  payments::MockMultipleRequestPaymentsNetworkInterface&
+  multiple_request_payments_network_interface() {
+    return *payments_autofill_client()
+                .GetMultipleRequestPaymentsNetworkInterface();
   }
   TestStrikeDatabase& strike_database() {
-    return *autofill_client_.GetStrikeDatabase();
+    return *autofill_client().GetStrikeDatabase();
   }
 
   base::test::TaskEnvironment task_environment_{
       base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   test::AutofillUnitTestEnvironment autofill_test_environment_;
-  std::unique_ptr<TestAutofillDriver> autofill_driver_;
-  std::unique_ptr<TestBrowserAutofillManager> browser_autofill_manager_;
   syncer::TestSyncService sync_service_;
-  MockAutofillClient autofill_client_;
-  // TODO(crbug.com/40818490): Refactor to use the real CreditCardSaveManager.
-  // Ends up getting owned (and destroyed) by TestFormDataImporter:
-  raw_ptr<TestCreditCardSaveManager> credit_card_save_manager_ = nullptr;
 
  private:
   int ToHistogramSample(autofill_metrics::CardUploadDecision metric) {
@@ -600,7 +579,7 @@ class CreditCardSaveManagerTest : public testing::Test {
 #define MAYBE_ImportFormDataCreditCardHTTPS ImportFormDataCreditCardHTTPS
 #endif
 TEST_F(CreditCardSaveManagerTest, MAYBE_ImportFormDataCreditCardHTTPS) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
   TestSaveCreditCards(true);
 }
 
@@ -612,7 +591,7 @@ TEST_F(CreditCardSaveManagerTest, MAYBE_ImportFormDataCreditCardHTTPS) {
 #define MAYBE_ImportFormDataCreditCardHTTP ImportFormDataCreditCardHTTP
 #endif
 TEST_F(CreditCardSaveManagerTest, MAYBE_ImportFormDataCreditCardHTTP) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
   TestSaveCreditCards(false);
 }
 
@@ -626,7 +605,7 @@ TEST_F(CreditCardSaveManagerTest, MAYBE_ImportFormDataCreditCardHTTP) {
   CreditCardSavedWhenAutocompleteOff
 #endif
 TEST_F(CreditCardSaveManagerTest, MAYBE_CreditCardSavedWhenAutocompleteOff) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
 
   // Set up our form data.
   FormData form = CreateTestCreditCardFormData(
@@ -643,7 +622,7 @@ TEST_F(CreditCardSaveManagerTest, MAYBE_CreditCardSavedWhenAutocompleteOff) {
   test_api(form).field(2).set_value(ASCIIToUTF16(test::NextMonth()));
   test_api(form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally);
 
   FormSubmitted(form);
 }
@@ -663,13 +642,13 @@ TEST_F(CreditCardSaveManagerTest, InvalidCreditCardNumberIsNotSaved) {
   test_api(form).field(2).set_value(ASCIIToUTF16(test::NextMonth()));
   test_api(form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(form);
 }
 
 TEST_F(CreditCardSaveManagerTest, CreditCardDisabledDoesNotSave) {
-  autofill_client_.SetAutofillPaymentMethodsEnabled(false);
+  payments_autofill_client().SetAutofillPaymentMethodsEnabled(false);
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -693,11 +672,11 @@ TEST_F(CreditCardSaveManagerTest, CreditCardDisabledDoesNotSave) {
   base::HistogramTester histogram_tester;
 
   // The credit card should neither be saved locally or uploaded.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that no histogram entry was logged.
   histogram_tester.ExpectTotalCount("Autofill.CardUploadDecisionMetric", 0);
@@ -711,7 +690,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_OnlyCountryInAddresses) {
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -719,7 +697,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_OnlyCountryInAddresses) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -732,11 +709,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_OnlyCountryInAddresses) {
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 #if BUILDFLAG(IS_ANDROID)
   EXPECT_THAT(payments_network_interface().client_behavior_signals_in_request(),
               UnorderedElementsAre(
@@ -781,7 +758,7 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_OnlyCountryInAddresses) {
 
 // Tests that local save is not called when expiration date is missing.
 TEST_F(CreditCardSaveManagerTest, LocalCreditCard_ExpirationDateMissing) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
 
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
@@ -801,7 +778,7 @@ TEST_F(CreditCardSaveManagerTest, LocalCreditCard_ExpirationDateMissing) {
   test_api(credit_card_form).field(3).set_value(u"");
   test_api(credit_card_form).field(4).set_value(u"123");
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 }
@@ -809,13 +786,12 @@ TEST_F(CreditCardSaveManagerTest, LocalCreditCard_ExpirationDateMissing) {
 // Tests local card save will still work as usual when supporting unfocused card
 // form feature is already on.
 TEST_F(CreditCardSaveManagerTest, LocalCreditCard_WithNonFocusableField) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
 
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -837,17 +813,17 @@ TEST_F(CreditCardSaveManagerTest, LocalCreditCard_WithNonFocusableField) {
   test_api(credit_card_form).field(4).set_value(ASCIIToUTF16(test::NextYear()));
   test_api(credit_card_form).field(5).set_value(u"123");
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 }
 
 // Tests ShowSaveCreditCardLocally is called with correct number of strikes on
 // the card.
 TEST_F(CreditCardSaveManagerTest, SaveCreditCardLocallyWithNumStrikes) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
   TestCreditCardSaveStrikeDatabase credit_card_save_strike_database =
       TestCreditCardSaveStrikeDatabase(&strike_database());
 
@@ -866,7 +842,7 @@ TEST_F(CreditCardSaveManagerTest, SaveCreditCardLocallyWithNumStrikes) {
   test_api(credit_card_form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
   test_api(credit_card_form).field(4).set_value(u"123");
 
-  EXPECT_CALL(payments_client(),
+  EXPECT_CALL(payments_autofill_client(),
               ShowSaveCreditCardLocally(
                   /*card=*/_,
                   /*options=*/
@@ -879,7 +855,7 @@ TEST_F(CreditCardSaveManagerTest, SaveCreditCardLocallyWithNumStrikes) {
                   /*callback=*/_));
 
   FormSubmitted(credit_card_form);
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 }
 
 // TODO(crbug.com/40947875): Remove duplicate code present between server and
@@ -888,7 +864,7 @@ TEST_F(CreditCardSaveManagerTest, SaveCreditCardLocallyWithNumStrikes) {
 // `kCvcSaveOnly` option.
 TEST_F(CreditCardSaveManagerTest,
        AttemptToOfferCvcLocalSave_ShouldShowSaveCardLocallyWithCvcSaveOnly) {
-  EXPECT_CALL(payments_client(),
+  EXPECT_CALL(payments_autofill_client(),
               ShowSaveCreditCardLocally(
                   /*card=*/_,
                   /*options=*/
@@ -901,7 +877,7 @@ TEST_F(CreditCardSaveManagerTest,
                                   kCvcSaveOnly)),
                   /*callback=*/_));
 
-  credit_card_save_manager_->AttemptToOfferCvcLocalSave(test::GetCreditCard());
+  credit_card_save_manager().AttemptToOfferCvcLocalSave(test::GetCreditCard());
 }
 
 // Tests that when triggering AttemptToOfferCvcUploadSave function, SaveCard
@@ -910,7 +886,7 @@ TEST_F(CreditCardSaveManagerTest,
        AttemptToOfferCvcUploadSave_ShouldShowSaveCardWithCvcSaveOnly) {
   CreditCard credit_card = test::WithCvc(test::GetMaskedServerCard());
 
-  EXPECT_CALL(payments_client(),
+  EXPECT_CALL(payments_autofill_client(),
               ShowSaveCreditCardToCloud(
                   _, _,
                   AllOf(Field(&payments::PaymentsAutofillClient::
@@ -922,7 +898,7 @@ TEST_F(CreditCardSaveManagerTest,
                                   kCvcSaveOnly)),
                   _));
 
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(credit_card);
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(credit_card);
 }
 
 // Tests that when triggering AttemptToOfferCvcLocalSave function and user
@@ -933,8 +909,8 @@ TEST_F(CreditCardSaveManagerTest,
   const std::u16string kCvc = u"123";
   local_card.set_cvc(kCvc);
 
-  payments_client().ExpectLocalSaveWithPromptShown(true);
-  credit_card_save_manager_->AttemptToOfferCvcLocalSave(local_card);
+  payments_autofill_client().ExpectLocalSaveWithPromptShown(true);
+  credit_card_save_manager().AttemptToOfferCvcLocalSave(local_card);
 
   EXPECT_CALL(payments_data_manager(), UpdateLocalCvc(local_card.guid(), kCvc));
   UserDidDecideCvcLocalSave(SaveCardOfferUserDecision::kAccepted);
@@ -955,8 +931,8 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Verify that the CVC prompt is offered and reset the strike count for that
   // CVC.
-  payments_client().ExpectLocalSaveWithPromptShown(true);
-  credit_card_save_manager_->AttemptToOfferCvcLocalSave(local_card);
+  payments_autofill_client().ExpectLocalSaveWithPromptShown(true);
+  credit_card_save_manager().AttemptToOfferCvcLocalSave(local_card);
   EXPECT_EQ(0, cvc_storage_strike_database.GetStrikes(local_card.guid()));
 }
 
@@ -974,8 +950,12 @@ TEST_F(CreditCardSaveManagerTest,
             cvc_storage_strike_database.GetStrikes(local_card.guid()));
 
   // Verify that CVC prompt is not offered.
-  payments_client().ExpectLocalSaveWithPromptShown(false);
-  credit_card_save_manager_->AttemptToOfferCvcLocalSave(local_card);
+#if BUILDFLAG(IS_IOS)
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
+#else
+  payments_autofill_client().ExpectLocalSaveWithPromptShown(false);
+#endif
+  credit_card_save_manager().AttemptToOfferCvcLocalSave(local_card);
 }
 
 // Tests that max strikes will be added if user declines the save CVC
@@ -985,10 +965,10 @@ TEST_F(CreditCardSaveManagerTest,
   CvcStorageStrikeDatabase cvc_storage_strike_database =
       CvcStorageStrikeDatabase(&strike_database());
   CreditCard local_card = test::GetCreditCard();
-  payments_client().SetLocalSaveCallbackOfferDecision(
+  payments_autofill_client().SetLocalSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kDeclined);
 
-  credit_card_save_manager_->AttemptToOfferCvcLocalSave(local_card);
+  credit_card_save_manager().AttemptToOfferCvcLocalSave(local_card);
 
   // Verify that the user declining an offer will count as the max strike.
   EXPECT_EQ(cvc_storage_strike_database.GetMaxStrikesLimit(),
@@ -1002,9 +982,11 @@ TEST_F(CreditCardSaveManagerTest,
   CvcStorageStrikeDatabase cvc_storage_strike_database =
       CvcStorageStrikeDatabase(&strike_database());
   CreditCard local_card = test::GetCreditCard();
-
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally)
-      .Times(3)
+  // On iOS, the prompt is suppressed when the delay condition is not met,
+  // resulting in 2 calls. On other platforms (like Desktop), the client is
+  // called even when suppressed, resulting in 3 calls.
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally)
+      .Times(is_ios ? 2 : 3)
       .WillRepeatedly(
           [](const CreditCard&, SaveCreditCardOptions,
              payments::PaymentsAutofillClient::LocalSaveCardPromptCallback
@@ -1013,7 +995,7 @@ TEST_F(CreditCardSaveManagerTest,
                                         SaveCardOfferUserDecision::kIgnored);
           });
 
-  credit_card_save_manager_->AttemptToOfferCvcLocalSave(local_card);
+  credit_card_save_manager().AttemptToOfferCvcLocalSave(local_card);
 
   // Verify that the user ignoring an offer will add a strike count for that
   // CVC.
@@ -1024,7 +1006,7 @@ TEST_F(CreditCardSaveManagerTest,
   task_environment_.FastForwardBy(
       cvc_storage_strike_database.GetRequiredDelaySinceLastStrike().value() /
       2);
-  credit_card_save_manager_->AttemptToOfferCvcLocalSave(local_card);
+  credit_card_save_manager().AttemptToOfferCvcLocalSave(local_card);
 
   // Verify that user ignoring an offer will not add a strike count for that
   // CVC as the there hasn't been enough delay.
@@ -1035,7 +1017,7 @@ TEST_F(CreditCardSaveManagerTest,
   task_environment_.FastForwardBy(
       cvc_storage_strike_database.GetRequiredDelaySinceLastStrike().value() /
       2);
-  credit_card_save_manager_->AttemptToOfferCvcLocalSave(local_card);
+  credit_card_save_manager().AttemptToOfferCvcLocalSave(local_card);
 
   // Verify that user ignoring an offer after sufficient delay time will add a
   // strike count for that CVC.
@@ -1049,9 +1031,9 @@ TEST_F(CreditCardSaveManagerTest,
   CvcStorageStrikeDatabase cvc_storage_strike_database =
       CvcStorageStrikeDatabase(&strike_database());
   CreditCard local_card = test::GetCreditCard();
-  payments_client().SetLocalSaveCallbackOfferDecision(
+  payments_autofill_client().SetLocalSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kIgnored);
-  credit_card_save_manager_->AttemptToOfferCvcLocalSave(local_card);
+  credit_card_save_manager().AttemptToOfferCvcLocalSave(local_card);
 
   // Verify that the user ignoring an offer will add a strike count for that
   // CVC.
@@ -1061,9 +1043,9 @@ TEST_F(CreditCardSaveManagerTest,
   // decision of `kDeclined`.
   task_environment_.FastForwardBy(
       cvc_storage_strike_database.GetRequiredDelaySinceLastStrike().value());
-  payments_client().SetLocalSaveCallbackOfferDecision(
+  payments_autofill_client().SetLocalSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kDeclined);
-  credit_card_save_manager_->AttemptToOfferCvcLocalSave(local_card);
+  credit_card_save_manager().AttemptToOfferCvcLocalSave(local_card);
 
   // Verify that the user declining an offer will count as the max strike.
   EXPECT_EQ(cvc_storage_strike_database.GetMaxStrikesLimit(),
@@ -1086,8 +1068,8 @@ TEST_F(CreditCardSaveManagerTest,
       cvc_storage_strike_database.GetRequiredDelaySinceLastStrike().value());
 
   // Verify that the CVC prompt is offered
-  payments_client().ExpectCloudSaveWithPromptShown(true);
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(server_card);
+  payments_autofill_client().ExpectCloudSaveWithPromptShown(true);
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(server_card);
 
   // Verify that the strike count was reset for that CVC.
   EXPECT_EQ(0, cvc_storage_strike_database.GetStrikes(
@@ -1110,8 +1092,12 @@ TEST_F(CreditCardSaveManagerTest,
                 base::NumberToString(server_card.instrument_id())));
 
   // Verify that CVC prompt is not offered.
-  payments_client().ExpectCloudSaveWithPromptShown(false);
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(server_card);
+#if BUILDFLAG(IS_IOS)
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardToCloud).Times(0);
+#else
+  payments_autofill_client().ExpectCloudSaveWithPromptShown(false);
+#endif
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(server_card);
 }
 
 // Tests that if the required delay has not passed, CVC save will not be offered
@@ -1127,8 +1113,12 @@ TEST_F(CreditCardSaveManagerTest,
       1, base::NumberToString(server_card.instrument_id()));
 
   // Verify that CVC prompt is not offered.
-  payments_client().ExpectCloudSaveWithPromptShown(false);
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(server_card);
+#if BUILDFLAG(IS_IOS)
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardToCloud).Times(0);
+#else
+  payments_autofill_client().ExpectCloudSaveWithPromptShown(false);
+#endif
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(server_card);
 }
 
 // Tests that max strikes will be added if the user declines the save CVC
@@ -1140,9 +1130,9 @@ TEST_F(CreditCardSaveManagerTest,
   // AttemptToOfferCvcUpload save and user declined.
   CvcStorageStrikeDatabase cvc_storage_strike_database =
       CvcStorageStrikeDatabase(&strike_database());
-  payments_client().SetCloudSaveCallbackOfferDecision(
+  payments_autofill_client().SetCloudSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kDeclined);
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(server_card);
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(server_card);
 
   // Verify that the user declining an offer will count as the max strike.
   EXPECT_EQ(cvc_storage_strike_database.GetMaxStrikesLimit(),
@@ -1159,9 +1149,9 @@ TEST_F(CreditCardSaveManagerTest,
   // AttemptToOfferCvcUpload save and user ignored.
   CvcStorageStrikeDatabase cvc_storage_strike_database =
       CvcStorageStrikeDatabase(&strike_database());
-  payments_client().SetCloudSaveCallbackOfferDecision(
+  payments_autofill_client().SetCloudSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kIgnored);
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(server_card);
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(server_card);
 
   // Verify that the user ignoring an offer will add a strike count for that
   // CVC.
@@ -1173,9 +1163,9 @@ TEST_F(CreditCardSaveManagerTest,
   task_environment_.FastForwardBy(
       cvc_storage_strike_database.GetRequiredDelaySinceLastStrike().value() /
       2);
-  payments_client().SetCloudSaveCallbackOfferDecision(
+  payments_autofill_client().SetCloudSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kIgnored);
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(server_card);
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(server_card);
 
   // Verify that user ignoring an offer will not add a strike count for that
   // CVC as the there hasn't been enough delay.
@@ -1187,9 +1177,9 @@ TEST_F(CreditCardSaveManagerTest,
   task_environment_.FastForwardBy(
       cvc_storage_strike_database.GetRequiredDelaySinceLastStrike().value() /
       2);
-  payments_client().SetCloudSaveCallbackOfferDecision(
+  payments_autofill_client().SetCloudSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kIgnored);
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(server_card);
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(server_card);
 
   // Verify that user ignoring an offer after sufficient delay time will add a
   // strike count for that CVC.
@@ -1206,9 +1196,9 @@ TEST_F(CreditCardSaveManagerTest,
   // AttemptToOfferCvcUpload save and user ignored.
   CvcStorageStrikeDatabase cvc_storage_strike_database =
       CvcStorageStrikeDatabase(&strike_database());
-  payments_client().SetCloudSaveCallbackOfferDecision(
+  payments_autofill_client().SetCloudSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kIgnored);
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(server_card);
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(server_card);
 
   // Verify that the user ignoring an offer will add a strike count for that
   // CVC.
@@ -1219,9 +1209,9 @@ TEST_F(CreditCardSaveManagerTest,
   // decision of `kDeclined`.
   task_environment_.FastForwardBy(
       cvc_storage_strike_database.GetRequiredDelaySinceLastStrike().value());
-  payments_client().SetCloudSaveCallbackOfferDecision(
+  payments_autofill_client().SetCloudSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kDeclined);
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(server_card);
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(server_card);
 
   // Verify that the user declining an offer will count as the max strike.
   EXPECT_EQ(cvc_storage_strike_database.GetMaxStrikesLimit(),
@@ -1239,9 +1229,9 @@ TEST_F(
   const std::u16string kCvc = u"555";
   credit_card.set_cvc(kCvc);
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardToCloud);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardToCloud);
 
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(credit_card);
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(credit_card);
 
   EXPECT_CALL(payments_data_manager(),
               AddServerCvc(credit_card.instrument_id(), kCvc));
@@ -1260,9 +1250,9 @@ TEST_F(
   const std::u16string kNewCvc = u"555";
   credit_card.set_cvc(kNewCvc);
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardToCloud);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardToCloud);
 
-  credit_card_save_manager_->AttemptToOfferCvcUploadSave(credit_card);
+  credit_card_save_manager().AttemptToOfferCvcUploadSave(credit_card);
 
   EXPECT_CALL(payments_data_manager(),
               UpdateServerCvc(credit_card.instrument_id(), kNewCvc));
@@ -1283,12 +1273,12 @@ class CvcStorageMetricTest
     if (record_type == CreditCard::RecordType::kLocalCard) {
       card = test::GetCreditCard();
       cvc_storage_strike_database.AddStrikes(strike, card.guid());
-      credit_card_save_manager_->AttemptToOfferCvcLocalSave(card);
+      credit_card_save_manager().AttemptToOfferCvcLocalSave(card);
     } else if (record_type == CreditCard::RecordType::kMaskedServerCard) {
       card = test::GetMaskedServerCard();
       cvc_storage_strike_database.AddStrikes(
           strike, base::NumberToString(card.instrument_id()));
-      credit_card_save_manager_->AttemptToOfferCvcUploadSave(card);
+      credit_card_save_manager().AttemptToOfferCvcUploadSave(card);
     }
     return card;
   }
@@ -1337,9 +1327,9 @@ TEST_P(CvcStorageMetricTest,
   task_environment_.FastForwardBy(
       cvc_storage_strike_database.GetRequiredDelaySinceLastStrike().value());
   if (record_type == CreditCard::RecordType::kLocalCard) {
-    credit_card_save_manager_->AttemptToOfferCvcLocalSave(card);
+    credit_card_save_manager().AttemptToOfferCvcLocalSave(card);
   } else if (record_type == CreditCard::RecordType::kMaskedServerCard) {
-    credit_card_save_manager_->AttemptToOfferCvcUploadSave(card);
+    credit_card_save_manager().AttemptToOfferCvcUploadSave(card);
   }
 
   histogram_tester.ExpectUniqueSample(
@@ -1358,7 +1348,7 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NotSavedLocally) {
   personal_data().test_payments_data_manager().ClearCreditCards();
   personal_data().test_address_data_manager().ClearProfiles();
 
-  credit_card_save_manager_->SetCreditCardUploadEnabled(true);
+  credit_card_save_manager().SetCreditCardUploadEnabled(true);
 
   payments::UploadCardResponseDetails upload_card_response_details;
   payments_network_interface().SetUploadCardResponseDetailsForUploadCard(
@@ -1387,14 +1377,14 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NotSavedLocally) {
   test_api(credit_card_form).field(4).set_value(u"123");
 
   FormSubmitted(credit_card_form);
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Don't keep a copy of the card on this device.
   EXPECT_TRUE(personal_data().payments_data_manager().GetCreditCards().empty());
 }
 
 TEST_F(CreditCardSaveManagerTest, UploadCreditCard_FeatureNotEnabled) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
 
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
@@ -1419,25 +1409,24 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_FeatureNotEnabled) {
   base::HistogramTester histogram_tester;
 
   // The save prompt should be shown instead of doing an upload.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that no histogram entry was logged.
   histogram_tester.ExpectTotalCount("Autofill.CardUploadDecisionMetric", 0);
 }
 
-// TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
-// permanently if the test doesn't apply to iOS flow.
-#if !BUILDFLAG(IS_IOS)
 TEST_F(CreditCardSaveManagerTest, UploadCreditCard_CvcUnavailable) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kAutofillEnableCvcStorageAndFilling);
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -1445,7 +1434,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_CvcUnavailable) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -1460,11 +1448,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_CvcUnavailable) {
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing CVC value.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -1474,12 +1462,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_CvcUnavailable) {
   ExpectCardUploadDecisionUkm(autofill_metrics::UPLOAD_OFFERED |
                               autofill_metrics::CVC_VALUE_NOT_FOUND);
 }
-#endif
 
-// TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
-// permanently if the test doesn't apply to iOS flow.
-#if !BUILDFLAG(IS_IOS)
 TEST_F(CreditCardSaveManagerTest, UploadCreditCard_CvcInvalidLength) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kAutofillEnableCvcStorageAndFilling);
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -1504,11 +1491,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_CvcInvalidLength) {
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the invalid CVC value.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -1518,12 +1505,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_CvcInvalidLength) {
   ExpectCardUploadDecisionUkm(autofill_metrics::UPLOAD_OFFERED |
                               autofill_metrics::INVALID_CVC_VALUE);
 }
-#endif
 
-// TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
-// permanently if the test doesn't apply to iOS flow.
-#if !BUILDFLAG(IS_IOS)
 TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MultipleCvcFields) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kAutofillEnableCvcStorageAndFilling);
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -1566,11 +1552,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MultipleCvcFields) {
   base::HistogramTester histogram_tester;
 
   // A CVC value appeared in one of the two CVC fields, upload should happen.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entry (and only that) was logged.
   ExpectUniqueCardUploadDecision(histogram_tester,
@@ -1578,12 +1564,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MultipleCvcFields) {
   // Verify that the correct UKM was logged.
   ExpectCardUploadDecisionUkm(autofill_metrics::UPLOAD_OFFERED);
 }
-#endif
 
-// TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
-// permanently if the test doesn't apply to iOS flow.
-#if !BUILDFLAG(IS_IOS)
 TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoCvcFieldOnForm) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kAutofillEnableCvcStorageAndFilling);
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -1622,11 +1607,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoCvcFieldOnForm) {
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing CVC value.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -1636,13 +1621,12 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoCvcFieldOnForm) {
   ExpectCardUploadDecisionUkm(autofill_metrics::UPLOAD_OFFERED |
                               autofill_metrics::CVC_FIELD_NOT_FOUND);
 }
-#endif
 
-// TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
-// permanently if the test doesn't apply to iOS flow.
-#if !BUILDFLAG(IS_IOS)
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_NoCvcFieldOnForm_InvalidCvcInNonCvcField) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kAutofillEnableCvcStorageAndFilling);
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -1684,11 +1668,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the invalid CVC value.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -1698,13 +1682,12 @@ TEST_F(CreditCardSaveManagerTest,
   ExpectCardUploadDecisionUkm(autofill_metrics::UPLOAD_OFFERED |
                               autofill_metrics::CVC_FIELD_NOT_FOUND);
 }
-#endif
 
-// TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
-// permanently if the test doesn't apply to iOS flow.
-#if !BUILDFLAG(IS_IOS)
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_NoCvcFieldOnForm_CvcInNonCvcField) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kAutofillEnableCvcStorageAndFilling);
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -1746,11 +1729,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing CVC value.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -1762,13 +1745,12 @@ TEST_F(CreditCardSaveManagerTest,
       autofill_metrics::UPLOAD_OFFERED |
       autofill_metrics::FOUND_POSSIBLE_CVC_VALUE_IN_NON_CVC_FIELD);
 }
-#endif
 
-// TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
-// permanently if the test doesn't apply to iOS flow.
-#if !BUILDFLAG(IS_IOS)
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_NoCvcFieldOnForm_CvcInAddressField) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kAutofillEnableCvcStorageAndFilling);
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -1810,11 +1792,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing CVC value.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -1824,7 +1806,6 @@ TEST_F(CreditCardSaveManagerTest,
   ExpectCardUploadDecisionUkm(autofill_metrics::UPLOAD_OFFERED |
                               autofill_metrics::CVC_FIELD_NOT_FOUND);
 }
-#endif
 
 // TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
 // permanently if the test doesn't apply to iOS flow.
@@ -1849,11 +1830,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoProfileAvailable) {
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing name/address.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -1898,11 +1879,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoRecentlyUsedProfile) {
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing name/address.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -1940,11 +1921,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing CVC, name, and address.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -1963,11 +1944,6 @@ TEST_F(CreditCardSaveManagerTest,
 // Tests that if credit card form is submitted with a missing cardholder name,
 // the cardholder name is requested and card is uploaded on providing the name.
 TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoNameAvailable) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Add a profile without a name to the PersonalDataManager.
   AutofillProfile profile(AddressCountryCode("US"));
   profile.SetRawInfo(ADDRESS_HOME_ZIP, u"77401");
@@ -1989,17 +1965,18 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoNameAvailable) {
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing name.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name, to be used as an user provided name for cardholder
   // name fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -2016,7 +1993,7 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoNameAvailable) {
 
   // Verify the card details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -2037,11 +2014,11 @@ TEST_F(CreditCardSaveManagerTest,
   test_api(credit_card_form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
   test_api(credit_card_form).field(4).set_value(u"123");
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Confirm that client_behavior_signals vector does contain the
   // kShowAccountEmailInLegalMessage signal.
@@ -2081,6 +2058,7 @@ TEST_F(CreditCardSaveManagerTest,
               testing::Contains(ClientBehaviorConstants::kOfferingToSaveCvc));
 }
 
+#if !BUILDFLAG(IS_IOS)
 TEST_F(CreditCardSaveManagerTest,
        AttemptToOfferCardUploadSave_DoNotSendSaveCvcSignalIfCvcEmpty) {
   // Set up the flags to enable the Tos for Save Card CVC UI.
@@ -2112,6 +2090,7 @@ TEST_F(CreditCardSaveManagerTest,
               testing::Not(testing::Contains(
                   ClientBehaviorConstants::kOfferingToSaveCvc)));
 }
+#endif  // !BUILDFLAG(IS_IOS)
 
 TEST_F(
     CreditCardSaveManagerTest,
@@ -2156,7 +2135,7 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Disable the CVC storage pref, implying that the user has opted-out of the
   // feature.
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(), false);
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(), false);
 
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
@@ -2185,11 +2164,6 @@ TEST_F(CreditCardSaveManagerTest,
 // the cardholder name is requested and card is uploaded on providing the name.
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_NoNameAvailableAndNoProfileAvailable) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Don't fill or submit an address form.
 
   // Set up our credit card form data.
@@ -2208,17 +2182,18 @@ TEST_F(CreditCardSaveManagerTest,
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing names/address.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name. Represents an user provided name for cardholder name
   // fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -2239,7 +2214,7 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Verify the cardholder name in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -2256,7 +2231,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_ZipCodesConflict) {
   address_forms.push_back(address_form1);
   address_forms.push_back(address_form2);
   FormsSeen(address_forms);
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   ManuallyFillAddressForm("Jane", "Doe", "77401-8294", "US", &address_form1);
   FormSubmitted(address_form1);
@@ -2267,7 +2241,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_ZipCodesConflict) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(3 /* num_fillable_forms_parsed */);
 
   // Edit the data and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -2282,11 +2255,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_ZipCodesConflict) {
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the conflicting zip codes.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -2298,6 +2271,118 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_ZipCodesConflict) {
       autofill_metrics::UPLOAD_NOT_OFFERED_CONFLICTING_ZIPS);
 }
 #endif
+
+#if BUILDFLAG(IS_IOS)
+// Tests that for the iOS bottom sheet, the kOfferingToSaveCvc signal is NOT
+// sent if the CVC is missing from the form.
+TEST_F(CreditCardSaveManagerTest,
+       IOS_BottomSheet_DoNotSendSaveCvcSignalIfCvcEmpty) {
+  // Enable the bottom sheet feature.
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{features::kAutofillEnableCvcStorageAndFilling,
+                            features::kAutofillSaveCardBottomSheet},
+      /*disabled_features=*/{});
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(), true);
+
+  // Set up form data with no strikes and no fix flows required.
+  FormData credit_card_form = CreateTestCreditCardFormData();
+  FormsSeen({credit_card_form});
+  test_api(credit_card_form).field(0).set_value(u"Jane Doe");
+  test_api(credit_card_form).field(1).set_value(u"4111111111111111");
+  test_api(credit_card_form)
+      .field(2)
+      .set_value(ASCIIToUTF16(test::NextMonth()));
+  test_api(credit_card_form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
+  test_api(credit_card_form).field(4).set_value(u"");  // CVC is empty.
+
+  FormSubmitted(credit_card_form);
+
+  // For the bottom sheet, the signal should NOT be sent if the CVC is empty.
+  EXPECT_THAT(payments_network_interface().client_behavior_signals_in_request(),
+              testing::Not(testing::Contains(
+                  ClientBehaviorConstants::kOfferingToSaveCvc)));
+}
+
+// Tests that for the iOS infobar/detail page flow (triggered by disabling
+// the bottom sheet feature), the kOfferingToSaveCvc signal IS sent, even if
+// the CVC is missing from the form.
+TEST_F(CreditCardSaveManagerTest,
+       IOS_Infobar_SendSaveCvcSignalIfCvcEmpty_FeatureDisabled) {
+  // Disable the bottom sheet feature to force the infobar flow.
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{features::kAutofillEnableCvcStorageAndFilling},
+      /*disabled_features=*/{features::kAutofillSaveCardBottomSheet});
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(), true);
+
+  // Set up form data.
+  FormData credit_card_form = CreateTestCreditCardFormData();
+  FormsSeen({credit_card_form});
+  test_api(credit_card_form).field(1).set_value(u"4111111111111111");
+  test_api(credit_card_form).field(4).set_value(u"");  // CVC is empty.
+
+  FormSubmitted(credit_card_form);
+
+  // For the infobar flow, the signal SHOULD be sent even if the CVC is empty.
+  EXPECT_THAT(payments_network_interface().client_behavior_signals_in_request(),
+              testing::Contains(ClientBehaviorConstants::kOfferingToSaveCvc));
+}
+
+// Tests that for the iOS infobar/detail page flow (triggered by strikes),
+// the kOfferingToSaveCvc signal IS sent, even if the CVC is missing.
+TEST_F(CreditCardSaveManagerTest,
+       IOS_Infobar_SendSaveCvcSignalIfCvcEmpty_WithStrikes) {
+  // Enable the bottom sheet feature.
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{features::kAutofillEnableCvcStorageAndFilling,
+                            features::kAutofillSaveCardBottomSheet},
+      /*disabled_features=*/{});
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(), true);
+
+  // Add one strike to the card to force the infobar flow.
+  TestCreditCardSaveStrikeDatabase(&strike_database()).AddStrike("1111");
+
+  // Set up form data.
+  FormData credit_card_form = CreateTestCreditCardFormData();
+  FormsSeen({credit_card_form});
+  test_api(credit_card_form).field(1).set_value(u"4111111111111111");
+  test_api(credit_card_form).field(4).set_value(u"");  // CVC is empty.
+
+  FormSubmitted(credit_card_form);
+
+  // For the infobar flow (due to strikes), the signal SHOULD be sent.
+  EXPECT_THAT(payments_network_interface().client_behavior_signals_in_request(),
+              testing::Contains(ClientBehaviorConstants::kOfferingToSaveCvc));
+}
+
+// Tests that for the iOS infobar/detail page flow (triggered by a name fix
+// flow), the kOfferingToSaveCvc signal IS sent, even if the CVC is missing.
+TEST_F(CreditCardSaveManagerTest,
+       IOS_Infobar_SendSaveCvcSignalIfCvcEmpty_NameFixFlow) {
+  // Enable the bottom sheet feature.
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitWithFeatures(
+      /*enabled_features=*/{features::kAutofillEnableCvcStorageAndFilling,
+                            features::kAutofillSaveCardBottomSheet},
+      /*disabled_features=*/{});
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(), true);
+
+  // Set up form data to trigger a name fix flow (name is missing).
+  FormData credit_card_form = CreateTestCreditCardFormData();
+  FormsSeen({credit_card_form});
+  test_api(credit_card_form).field(0).set_value(u"");
+  test_api(credit_card_form).field(1).set_value(u"4111111111111111");
+  test_api(credit_card_form).field(4).set_value(u"");  // CVC is empty.
+
+  FormSubmitted(credit_card_form);
+
+  // For the infobar flow (due to fix flow), the signal SHOULD be sent.
+  EXPECT_THAT(payments_network_interface().client_behavior_signals_in_request(),
+              testing::Contains(ClientBehaviorConstants::kOfferingToSaveCvc));
+}
+#endif  // BUILDFLAG(IS_IOS)
 
 // TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
 // permanently if the test doesn't apply to iOS flow.
@@ -2335,11 +2420,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the conflicting zip codes.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -2387,11 +2472,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_ZipCodesHavePrefixMatch) {
   base::HistogramTester histogram_tester;
 
   // One zip is a prefix of the other, upload should happen.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entry (and only that) was logged.
   ExpectUniqueCardUploadDecision(histogram_tester,
@@ -2436,11 +2521,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoZipCodeAvailable) {
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing zip code.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -2486,11 +2571,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_CCFormHasMiddleInitial) {
   base::HistogramTester histogram_tester;
 
   // Names match loosely, upload should happen.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entry (and only that) was logged.
   ExpectUniqueCardUploadDecision(histogram_tester,
@@ -2531,11 +2616,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoMiddleInitialInCCForm) {
   base::HistogramTester histogram_tester;
 
   // Names match loosely, upload should happen.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entry (and only that) was logged.
   ExpectUniqueCardUploadDecision(histogram_tester,
@@ -2550,11 +2635,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NoMiddleInitialInCCForm) {
 // name.
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_CCFormHasCardholderMiddleNameNoAddressMiddleName) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Create, fill and submit address form without middle name.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen({address_form});
@@ -2578,17 +2658,18 @@ TEST_F(CreditCardSaveManagerTest,
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the mismatching names.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name, to be used as an user provided name for cardholder
   // name fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -2605,7 +2686,7 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Verify the card details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -2615,11 +2696,6 @@ TEST_F(CreditCardSaveManagerTest,
 // name.
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_CCFormHasAddressMiddleNameNoCardholderMiddleName) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Create, fill and submit address form with middle name.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen({address_form});
@@ -2643,17 +2719,18 @@ TEST_F(CreditCardSaveManagerTest,
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the mismatching names.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name, to be used as an user provided name for cardholder
   // name fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -2670,7 +2747,7 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Verify the card details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -2679,11 +2756,6 @@ TEST_F(CreditCardSaveManagerTest,
 // name, the cardholder name is requested and card is uploaded on providing the
 // name.
 TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NamesCanMismatch) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Create, fill and submit two address forms with different names.
   FormData address_form1 = test::CreateTestAddressFormData("1");
   FormData address_form2 = test::CreateTestAddressFormData("2");
@@ -2716,17 +2788,18 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NamesCanMismatch) {
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the mismatching names.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name, to be used as an user provided name for cardholder
   // name fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -2743,7 +2816,7 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NamesCanMismatch) {
 
   // Verify the card details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -2783,11 +2856,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_IgnoreOldProfiles) {
   base::HistogramTester histogram_tester;
 
   // Name matches recently used profile, should offer upload.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entry (and only that) was logged.
   ExpectUniqueCardUploadDecision(histogram_tester,
@@ -2825,17 +2898,18 @@ TEST_F(
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing name.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name. Represents user provided name during cardholder name
   // fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entry and DetectedValue for "Cardholder
   // name explicitly requested" was logged.
@@ -2843,12 +2917,12 @@ TEST_F(
       histogram_tester,
       autofill_metrics::USER_REQUESTED_TO_PROVIDE_CARDHOLDER_NAME);
   EXPECT_TRUE(payments_network_interface().detected_values_in_upload_details() &
-              CreditCardSaveManager::DetectedValue::USER_PROVIDED_NAME);
-  EXPECT_TRUE(credit_card_save_manager_->should_request_name_from_user());
+              CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_NAME);
+  EXPECT_TRUE(credit_card_save_manager().should_request_name_from_user());
 
   // Verify the cardholder name in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -2883,17 +2957,18 @@ TEST_F(
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing name.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name. Represents user provided name during cardholder name
   // fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entry and DetectedValue for "Cardholder
   // name explicitly requested" was logged.
@@ -2901,12 +2976,12 @@ TEST_F(
       histogram_tester,
       autofill_metrics::USER_REQUESTED_TO_PROVIDE_CARDHOLDER_NAME);
   EXPECT_TRUE(payments_network_interface().detected_values_in_upload_details() &
-              CreditCardSaveManager::DetectedValue::USER_PROVIDED_NAME);
-  EXPECT_TRUE(credit_card_save_manager_->should_request_name_from_user());
+              CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_NAME);
+  EXPECT_TRUE(credit_card_save_manager().should_request_name_from_user());
 
   // Verify the cardholder name in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -2936,11 +3011,11 @@ TEST_F(CreditCardSaveManagerTest,
   base::HistogramTester histogram_tester;
 
   // The credit card should neither be saved locally or uploaded.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that no histogram entry was logged.
   histogram_tester.ExpectTotalCount("Autofill.CardUploadDecisionMetric", 0);
@@ -2948,7 +3023,7 @@ TEST_F(CreditCardSaveManagerTest,
 
 TEST_F(CreditCardSaveManagerTest,
        GoogleHostSite_ShouldOfferSaveIfUploadDisabled) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
 
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
@@ -2974,11 +3049,11 @@ TEST_F(CreditCardSaveManagerTest,
   base::HistogramTester histogram_tester;
 
   // The credit card should be saved locally.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 }
 
 // Tests that if credit card form is submitted with a cardholder
@@ -2987,11 +3062,6 @@ TEST_F(CreditCardSaveManagerTest,
 TEST_F(
     CreditCardSaveManagerTest,
     UploadCreditCard_DoNotRequestCardholderNameIfNameExistsAndNoPaymentsCustomer) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -3014,11 +3084,11 @@ TEST_F(
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Because everything went smoothly, verify that there was no histogram entry
   // or DetectedValue for "Cardholder name explicitly requested" logged.
@@ -3027,8 +3097,8 @@ TEST_F(
       autofill_metrics::USER_REQUESTED_TO_PROVIDE_CARDHOLDER_NAME);
   EXPECT_FALSE(
       payments_network_interface().detected_values_in_upload_details() &
-      CreditCardSaveManager::DetectedValue::USER_PROVIDED_NAME);
-  EXPECT_FALSE(credit_card_save_manager_->should_request_name_from_user());
+      CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_NAME);
+  EXPECT_FALSE(credit_card_save_manager().should_request_name_from_user());
 }
 
 // On iOS, the cardholder name is required even if the user has a Google
@@ -3069,11 +3139,11 @@ TEST_F(
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing name.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that there was no histogram entry or DetectedValue for "Cardholder
   // name explicitly requested" logged.
@@ -3082,8 +3152,8 @@ TEST_F(
       autofill_metrics::USER_REQUESTED_TO_PROVIDE_CARDHOLDER_NAME);
   EXPECT_FALSE(
       payments_network_interface().detected_values_in_upload_details() &
-      CreditCardSaveManager::DetectedValue::USER_PROVIDED_NAME);
-  EXPECT_FALSE(credit_card_save_manager_->should_request_name_from_user());
+      CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_NAME);
+  EXPECT_FALSE(credit_card_save_manager().should_request_name_from_user());
 }
 
 // Tests that if credit card form is submitted with a conflicting cardholder
@@ -3121,11 +3191,11 @@ TEST_F(
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing name.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that there was no histogram entry or DetectedValue for "Cardholder
   // name explicitly requested" logged.
@@ -3134,8 +3204,8 @@ TEST_F(
       autofill_metrics::USER_REQUESTED_TO_PROVIDE_CARDHOLDER_NAME);
   EXPECT_FALSE(
       payments_network_interface().detected_values_in_upload_details() &
-      CreditCardSaveManager::DetectedValue::USER_PROVIDED_NAME);
-  EXPECT_FALSE(credit_card_save_manager_->should_request_name_from_user());
+      CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_NAME);
+  EXPECT_FALSE(credit_card_save_manager().should_request_name_from_user());
 }
 
 // Tests consecutive credit card form submissions to verify if
@@ -3168,25 +3238,25 @@ TEST_F(
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing name.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name. Represents user provided name for cardholder name
   // fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
 
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify the `credit_card_save_manager_` is requesting cardholder name.
-  EXPECT_TRUE(credit_card_save_manager_->should_request_name_from_user());
+  EXPECT_TRUE(credit_card_save_manager().should_request_name_from_user());
 
   // Verify the card details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 
@@ -3200,13 +3270,13 @@ TEST_F(
   personal_data().test_payments_data_manager().ClearCreditCards();
   personal_data().test_address_data_manager().ClearProfiles();
 
-  payments_client().SetCloudSaveCallbackOfferDecision(
+  payments_autofill_client().SetCloudSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kAccepted);
 
   FormSubmitted(credit_card_form);
 
   // Verify the `credit_card_save_manager_` is not requesting cardholder name.
-  EXPECT_FALSE(credit_card_save_manager_->should_request_name_from_user());
+  EXPECT_FALSE(credit_card_save_manager().should_request_name_from_user());
 }
 #endif  // !BUILDFLAG(IS_IOS)
 
@@ -3246,13 +3316,14 @@ TEST_F(
 
   // Set a cardholder name, to be used as an user provided name in the save card
   // dialog after form is submitted.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify the correct histogram entry and DetectedValue for "Cardholder
   // name explicitly requested" logged.
@@ -3260,12 +3331,12 @@ TEST_F(
       histogram_tester,
       autofill_metrics::USER_REQUESTED_TO_PROVIDE_CARDHOLDER_NAME);
   EXPECT_TRUE(payments_network_interface().detected_values_in_upload_details() &
-              CreditCardSaveManager::DetectedValue::USER_PROVIDED_NAME);
-  EXPECT_TRUE(credit_card_save_manager_->should_request_name_from_user());
+              CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_NAME);
+  EXPECT_TRUE(credit_card_save_manager().should_request_name_from_user());
 
   // Verify the card details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -3278,11 +3349,6 @@ TEST_F(
 TEST_F(
     CreditCardSaveManagerTest,
     UploadCreditCard_ShouldRequestExpirationDate_ResetBetweenConsecutiveSaves) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -3303,28 +3369,28 @@ TEST_F(
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing expiration date.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a valid expiry date. Represents user provided expiry date for fix flow.
-  UserProvidedCardDetails user_provided_details = {
-      .expiration_date_month = ASCIIToUTF16(test::NextMonth()),
-      .expiration_date_year = ASCIIToUTF16(test::NextYear())};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.expiration_date_month = ASCIIToUTF16(test::NextMonth());
+  user_provided_details.expiration_date_year = ASCIIToUTF16(test::NextYear());
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify the `credit_card_save_manager_` is requesting expiration date.
   EXPECT_TRUE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 
   // Verify expiry details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_MONTH, "en-US"),
             user_provided_details.expiration_date_month);
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_4_DIGIT_YEAR, "en-US"),
             user_provided_details.expiration_date_year);
 
@@ -3339,21 +3405,21 @@ TEST_F(
       .set_value(ASCIIToUTF16(FiveYearsFromNow()));
   test_api(credit_card_form).field(4).set_value(u"123");
 
-  payments_client().SetCloudSaveCallbackOfferDecision(
+  payments_autofill_client().SetCloudSaveCallbackOfferDecision(
       SaveCardOfferUserDecision::kAccepted);
 
   FormSubmitted(credit_card_form);
 
   // Verify the `credit_card_save_manager_` is NOT requesting expiration date.
   EXPECT_FALSE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 
   // Verify expiry details in `UploadRequest` matches the one provided during
   // the second form submission.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_MONTH, "en-US"),
             ASCIIToUTF16(FiveMonthsFromNow()));
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_4_DIGIT_YEAR, "en-US"),
             ASCIIToUTF16(FiveYearsFromNow()));
 }
@@ -3392,13 +3458,13 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Save should not be offered because implicit Sync + Expiration date fix flow
   // aborts offering save
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
   EXPECT_TRUE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 }
 
 // Tests that if credit card form is submitted with a missing expiry date and
@@ -3431,28 +3497,28 @@ TEST_F(CreditCardSaveManagerTest,
 
   // With the offer-to-save decision deferred to Google Payments, Payments can
   // still decide to allow saving despite the missing expiration date.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a valid expiry date. Represents user provided expiry date for fix flow.
-  UserProvidedCardDetails user_provided_details = {
-      .expiration_date_month = ASCIIToUTF16(test::NextMonth()),
-      .expiration_date_year = ASCIIToUTF16(test::NextYear())};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.expiration_date_month = ASCIIToUTF16(test::NextMonth());
+  user_provided_details.expiration_date_year = ASCIIToUTF16(test::NextYear());
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify the `credit_card_save_manager_` is requesting expiration date.
   EXPECT_TRUE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 
   // Verify expiry details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_MONTH, "en-US"),
             user_provided_details.expiration_date_month);
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_4_DIGIT_YEAR, "en-US"),
             user_provided_details.expiration_date_year);
 }
@@ -3484,14 +3550,14 @@ TEST_F(CreditCardSaveManagerTest,
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
-  EXPECT_TRUE(credit_card_save_manager_->should_request_name_from_user());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().should_request_name_from_user());
   EXPECT_TRUE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 }
 #endif  // !BUILDFLAG(IS_IOS)
 
@@ -3522,84 +3588,37 @@ TEST_F(CreditCardSaveManagerTest,
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a valid cardholder name and expiry date. Represents user provided
   // cardholder name and expiry date in the save card dialog after form is
   // submitted.
-  UserProvidedCardDetails user_provided_details = {
-      .cardholder_name = u"Chrome User",
-      .expiration_date_month = ASCIIToUTF16(test::NextMonth()),
-      .expiration_date_year = ASCIIToUTF16(test::NextYear())};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+  user_provided_details.expiration_date_month = ASCIIToUTF16(test::NextMonth());
+  user_provided_details.expiration_date_year = ASCIIToUTF16(test::NextYear());
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify missing cardholder name and expiry date is requested.
-  EXPECT_TRUE(credit_card_save_manager_->should_request_name_from_user());
+  EXPECT_TRUE(credit_card_save_manager().should_request_name_from_user());
   EXPECT_TRUE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 
   // Verify the details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_MONTH, "en-US"),
             user_provided_details.expiration_date_month);
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_4_DIGIT_YEAR, "en-US"),
             user_provided_details.expiration_date_year);
-}
-
-// Tests that DetectedValues for missing cardholder name and
-// expiry date are defaulted as true when
-// `kAutofillDisableDefaultSaveCardFixFlowDetection` is not enabled.
-TEST_F(
-    CreditCardSaveManagerTest,
-    UploadCreditCard_AlwaysDetectMissingCardholderNameAndExpirationDate_WhenFlagNotEnabledOnIOS) {
-  base::test::ScopedFeatureList scoped_feature_list;
-  scoped_feature_list.InitAndDisableFeature(
-      features::kAutofillDisableDefaultSaveCardFixFlowDetection);
-
-  // Create, fill and submit an address form in order to establish a recent
-  // profile which can be selected for the upload request.
-  FormData address_form = CreateTestAddressFormData();
-  FormsSeen(std::vector<FormData>(1, address_form));
-  ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
-  FormSubmitted(address_form);
-
-  // Set up our credit card form data.
-  FormData credit_card_form = CreateTestCreditCardFormData();
-  FormsSeen(std::vector<FormData>(1, credit_card_form));
-
-  // Edit the data, and submit.
-  test_api(credit_card_form).field(0).set_value(u"John Smith");
-  test_api(credit_card_form).field(1).set_value(u"4111111111111111");
-  test_api(credit_card_form)
-      .field(2)
-      .set_value(ASCIIToUTF16(test::NextMonth()));
-  test_api(credit_card_form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
-  test_api(credit_card_form).field(4).set_value(u"123");
-
-  base::HistogramTester histogram_tester;
-
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
-
-  FormSubmitted(credit_card_form);
-
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
-
-  // Verify fix flow DetectedValue bits are always set even when data is not
-  // missing.
-  EXPECT_TRUE(
-      payments_network_interface().detected_values_in_upload_details() &
-      CreditCardSaveManager::DetectedValue::USER_PROVIDED_EXPIRATION_DATE);
-  EXPECT_TRUE(payments_network_interface().detected_values_in_upload_details() &
-              CreditCardSaveManager::DetectedValue::USER_PROVIDED_NAME);
 }
 #endif  // BUILDFLAG(IS_IOS)
 
@@ -3608,11 +3627,6 @@ TEST_F(
 // date.
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_RequestExpirationDateViaExpDateFixFlow) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -3633,12 +3647,12 @@ TEST_F(CreditCardSaveManagerTest,
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a valid expiry date. Represents user provided expiry date for fix flow.
-  UserProvidedCardDetails user_provided_details = {
-      .expiration_date_month = ASCIIToUTF16(test::NextMonth()),
-      .expiration_date_year = ASCIIToUTF16(test::NextYear())};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.expiration_date_month = ASCIIToUTF16(test::NextMonth());
+  user_provided_details.expiration_date_year = ASCIIToUTF16(test::NextYear());
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
@@ -3653,19 +3667,19 @@ TEST_F(CreditCardSaveManagerTest,
       autofill_metrics::SaveCardRequestExpirationDateReason::
           kMonthAndYearMissing,
       1);
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
   EXPECT_TRUE(
       payments_network_interface().detected_values_in_upload_details() &
-      CreditCardSaveManager::DetectedValue::USER_PROVIDED_EXPIRATION_DATE);
+      CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_EXPIRATION_DATE);
   EXPECT_TRUE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 
   // Verify expiry details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_MONTH, "en-US"),
             user_provided_details.expiration_date_month);
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_4_DIGIT_YEAR, "en-US"),
             user_provided_details.expiration_date_year);
 }
@@ -3675,11 +3689,6 @@ TEST_F(CreditCardSaveManagerTest,
 // month.
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_RequestExpirationDateIfOnlyMonthMissing) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -3700,13 +3709,13 @@ TEST_F(CreditCardSaveManagerTest,
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a valid expiry month. Represents user provided expiry date for fix
   // flow.
-  UserProvidedCardDetails user_provided_details = {
-      .expiration_date_month = ASCIIToUTF16(test::NextMonth()),
-      .expiration_date_year = ASCIIToUTF16(FiveYearsFromNow())};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.expiration_date_month = ASCIIToUTF16(test::NextMonth());
+  user_provided_details.expiration_date_year = ASCIIToUTF16(FiveYearsFromNow());
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
@@ -3720,19 +3729,19 @@ TEST_F(CreditCardSaveManagerTest,
       "Autofill.SaveCardRequestExpirationDateReason",
       autofill_metrics::SaveCardRequestExpirationDateReason::kMonthMissingOnly,
       1);
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
   EXPECT_TRUE(
       payments_network_interface().detected_values_in_upload_details() &
-      CreditCardSaveManager::DetectedValue::USER_PROVIDED_EXPIRATION_DATE);
+      CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_EXPIRATION_DATE);
   EXPECT_TRUE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 
   // Verify expiry details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_MONTH, "en-US"),
             user_provided_details.expiration_date_month);
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_4_DIGIT_YEAR, "en-US"),
             user_provided_details.expiration_date_year);
 }
@@ -3742,11 +3751,6 @@ TEST_F(CreditCardSaveManagerTest,
 // year.
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_RequestExpirationDateIfOnlyYearMissing) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -3769,12 +3773,13 @@ TEST_F(CreditCardSaveManagerTest,
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a valid expiry year. Represents user provided expiry year for fix flow.
-  UserProvidedCardDetails user_provided_details = {
-      .expiration_date_month = ASCIIToUTF16(FiveMonthsFromNow()),
-      .expiration_date_year = ASCIIToUTF16(test::NextYear())};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.expiration_date_month =
+      ASCIIToUTF16(FiveMonthsFromNow());
+  user_provided_details.expiration_date_year = ASCIIToUTF16(test::NextYear());
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
@@ -3788,19 +3793,19 @@ TEST_F(CreditCardSaveManagerTest,
       "Autofill.SaveCardRequestExpirationDateReason",
       autofill_metrics::SaveCardRequestExpirationDateReason::kYearMissingOnly,
       1);
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
   EXPECT_TRUE(
       payments_network_interface().detected_values_in_upload_details() &
-      CreditCardSaveManager::DetectedValue::USER_PROVIDED_EXPIRATION_DATE);
+      CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_EXPIRATION_DATE);
   EXPECT_TRUE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 
   // Verify expiry details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_MONTH, "en-US"),
             user_provided_details.expiration_date_month);
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_4_DIGIT_YEAR, "en-US"),
             user_provided_details.expiration_date_year);
 }
@@ -3810,11 +3815,6 @@ TEST_F(CreditCardSaveManagerTest,
 // date.
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_RequestExpirationDateIfExpirationDateInputIsExpired) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -3835,12 +3835,12 @@ TEST_F(CreditCardSaveManagerTest,
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a valid expiry date. Represents user provided expiry date for fix flow.
-  UserProvidedCardDetails user_provided_details = {
-      .expiration_date_month = ASCIIToUTF16(test::NextMonth()),
-      .expiration_date_year = ASCIIToUTF16(test::NextYear())};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.expiration_date_month = ASCIIToUTF16(test::NextMonth());
+  user_provided_details.expiration_date_year = ASCIIToUTF16(test::NextYear());
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
@@ -3855,19 +3855,19 @@ TEST_F(CreditCardSaveManagerTest,
       autofill_metrics::SaveCardRequestExpirationDateReason::
           kExpirationDatePresentButExpired,
       1);
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
   EXPECT_TRUE(
       payments_network_interface().detected_values_in_upload_details() &
-      CreditCardSaveManager::DetectedValue::USER_PROVIDED_EXPIRATION_DATE);
+      CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_EXPIRATION_DATE);
   EXPECT_TRUE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 
   // Verify expiry details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_MONTH, "en-US"),
             user_provided_details.expiration_date_month);
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_4_DIGIT_YEAR, "en-US"),
             user_provided_details.expiration_date_year);
 }
@@ -3878,11 +3878,6 @@ TEST_F(CreditCardSaveManagerTest,
 TEST_F(
     CreditCardSaveManagerTest,
     UploadCreditCard_RequestExpirationDateIfExpirationDateInputIsTwoDigitAndExpired) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Make sure that the card will be expired.
   task_environment_.FastForwardBy(base::Days(365 * 15));
 
@@ -3906,12 +3901,12 @@ TEST_F(
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a valid expiry date. Represents user provided expiry date for fix flow.
-  UserProvidedCardDetails user_provided_details = {
-      .expiration_date_month = ASCIIToUTF16(test::NextMonth()),
-      .expiration_date_year = ASCIIToUTF16(test::NextYear())};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.expiration_date_month = ASCIIToUTF16(test::NextMonth());
+  user_provided_details.expiration_date_year = ASCIIToUTF16(test::NextYear());
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
@@ -3926,19 +3921,19 @@ TEST_F(
       autofill_metrics::SaveCardRequestExpirationDateReason::
           kExpirationDatePresentButExpired,
       1);
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
   EXPECT_TRUE(
       payments_network_interface().detected_values_in_upload_details() &
-      CreditCardSaveManager::DetectedValue::USER_PROVIDED_EXPIRATION_DATE);
+      CreditCardSaveManager::DetectedValue::USER_MUST_PROVIDE_EXPIRATION_DATE);
   EXPECT_TRUE(
-      credit_card_save_manager_->should_request_expiration_date_from_user());
+      credit_card_save_manager().should_request_expiration_date_from_user());
 
   // Verify expiry details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_MONTH, "en-US"),
             user_provided_details.expiration_date_month);
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_EXP_4_DIGIT_YEAR, "en-US"),
             user_provided_details.expiration_date_year);
 }
@@ -3949,7 +3944,7 @@ TEST_F(
 TEST_F(CreditCardSaveManagerTest, UploadCreditCard_UploadDetailsFails) {
   // Anything other than "en-US" will cause GetUploadDetails to return a failure
   // response.
-  autofill_client_.set_app_locale("pt-BR");
+  autofill_client().set_app_locale("pt-BR");
 
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
@@ -3974,11 +3969,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_UploadDetailsFails) {
   base::HistogramTester histogram_tester;
 
   // The save prompt should be shown instead of doing an upload.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entry (and only that) was logged.
   ExpectUniqueCardUploadDecision(
@@ -4022,19 +4017,15 @@ TEST_F(CreditCardSaveManagerTest, DuplicateMaskedCreditCard_NoUpload) {
 
   // Local save prompt should not be shown as there is already masked
   // card with same |TypeAndLastFourDigits|.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 }
 
 TEST_F(CreditCardSaveManagerTest,
        OfferSaveForCardWithSameLastFour_CvcAvailable) {
-  // Set up the flags and prefs.
-  base::test::ScopedFeatureList feature_list{
-      features::kAutofillRequireCvcForPossibleCardUpdate};
-
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -4064,15 +4055,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 }
 
 TEST_F(CreditCardSaveManagerTest,
        DoNotOfferSaveForCardWithSameLastFour_CvcMissing) {
-  // Set up the flags and prefs.
-  base::test::ScopedFeatureList feature_list{
-      features::kAutofillRequireCvcForPossibleCardUpdate};
-
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -4102,12 +4089,12 @@ TEST_F(CreditCardSaveManagerTest,
   test_api(credit_card_form).field(4).set_value(u"");
 
   // Local save prompt should not be shown, and upload should not be offered.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   base::HistogramTester histogram_tester;
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
   // The flow aborting due to missing CVC should also be logged.
 
   // Verify that platform-agnostic save card metric for prompt not shown is
@@ -4116,69 +4103,35 @@ TEST_F(CreditCardSaveManagerTest,
       "Autofill.SaveCreditCardPromptOffer.Server",
       autofill_metrics::SaveCardPromptOffer::kCvcMissingForPotentialUpdate, 1);
 
-  // TODO(crbug.com/430588721): Verify ios specific metrics
-  std::string platform_name;
 #if BUILDFLAG(IS_ANDROID)
-  platform_name = ".Android";
-#elif !BUILDFLAG(IS_IOS)
-  platform_name = ".Desktop";
-#endif
-
-#if !BUILDFLAG(IS_IOS)
   histogram_tester.ExpectUniqueSample(
-      base::StrCat(
-          {"Autofill.SaveCreditCardPromptOffer", platform_name, ".Server"}),
+      "Autofill.SaveCreditCardPromptOffer.Android.Server",
       autofill_metrics::SaveCardPromptOffer::kCvcMissingForPotentialUpdate, 1);
   histogram_tester.ExpectUniqueSample(
-      base::StrCat({"Autofill.SaveCreditCardPromptOffer", platform_name,
-                    ".Server.WithSameLastFourButDifferentExpiration"}),
+      "Autofill.SaveCreditCardPromptOffer.Android.Server."
+      "WithSameLastFourButDifferentExpiration",
+      autofill_metrics::SaveCardPromptOffer::kCvcMissingForPotentialUpdate, 1);
+#elif BUILDFLAG(IS_IOS)
+  histogram_tester.ExpectBucketCount(
+      "Autofill.SaveCreditCardPromptOffer.IOS.Server.BottomSheet",
+      autofill_metrics::SaveCardPromptOffer::kCvcMissingForPotentialUpdate, 1);
+  histogram_tester.ExpectBucketCount(
+      "Autofill.SaveCreditCardPromptOffer.IOS.Server.BottomSheet.NumStrikes.0."
+      "NoFixFlow",
+      autofill_metrics::SaveCardPromptOffer::kCvcMissingForPotentialUpdate, 1);
+#else  // BUILDFLAG(IS_DESKTOP)
+  histogram_tester.ExpectUniqueSample(
+      "Autofill.SaveCreditCardPromptOffer.Desktop.Server",
+      autofill_metrics::SaveCardPromptOffer::kCvcMissingForPotentialUpdate, 1);
+  histogram_tester.ExpectUniqueSample(
+      "Autofill.SaveCreditCardPromptOffer.Desktop.Server."
+      "WithSameLastFourButDifferentExpiration",
       autofill_metrics::SaveCardPromptOffer::kCvcMissingForPotentialUpdate, 1);
 #endif
 
   histogram_tester.ExpectUniqueSample(
       "Autofill.SaveCreditCardPromptOffer.Upload.FirstShow",
       autofill_metrics::SaveCardPromptOffer::kCvcMissingForPotentialUpdate, 1);
-}
-
-TEST_F(CreditCardSaveManagerTest,
-       StillOffersSaveForCardWithSameLastFour_CvcMissing_FlagOff) {
-  // Set up the flags and prefs.
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(
-      features::kAutofillRequireCvcForPossibleCardUpdate);
-
-  // Create, fill and submit an address form in order to establish a recent
-  // profile which can be selected for the upload request.
-  FormData address_form = CreateTestAddressFormData();
-  FormsSeen(std::vector<FormData>(1, address_form));
-  ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
-  FormSubmitted(address_form);
-
-  // Add a masked credit card whose `TypeAndLastFourDigits` matches what we will
-  // enter below, but with a different expiration date.
-  CreditCard credit_card(CreditCard::RecordType::kMaskedServerCard, "a123");
-  test::SetCreditCardInfo(&credit_card, "Jane Doe", "1111",
-                          /*expiration_month=*/"5", test::NextYear().c_str(),
-                          /*billing_address_id=*/"1", /*cvc=*/u"123");
-  credit_card.SetNetworkForMaskedCard(kVisaCard);
-  personal_data().test_payments_data_manager().AddServerCreditCard(credit_card);
-
-  // Set up our credit card form data.
-  FormData credit_card_form = CreateTestCreditCardFormData();
-  FormsSeen(std::vector<FormData>(1, credit_card_form));
-
-  // Edit the data, choosing a different expiration month, removing CVC, and
-  // submit.
-  test_api(credit_card_form).field(0).set_value(u"Jane Doe");
-  test_api(credit_card_form).field(1).set_value(u"4111111111111111");
-  test_api(credit_card_form).field(2).set_value(u"10");
-  test_api(credit_card_form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
-  test_api(credit_card_form).field(4).set_value(u"");
-
-  FormSubmitted(credit_card_form);
-
-  // With the flag off, save is offered anyway, though it may fail server-side.
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
 }
 
 TEST_F(CreditCardSaveManagerTest, NothingIfNothingFound) {
@@ -4691,7 +4644,7 @@ TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_LogAdditionalErrorsWithUploadDetailsFailure) {
   // Anything other than "en-US" will cause GetUploadDetails to return a failure
   // response.
-  autofill_client_.set_app_locale("pt-BR");
+  autofill_client().set_app_locale("pt-BR");
 
   // Set up a new address profile without a name or postal code.
   AutofillProfile profile(AddressCountryCode("US"));
@@ -4748,7 +4701,7 @@ TEST_F(
     UploadCreditCard_ShouldOfferLocalSaveIfEverythingDetectedAndPaymentsDeclines) {
   // Anything other than "en-US" will cause GetUploadDetails to return a failure
   // response.
-  autofill_client_.set_app_locale("pt-BR");
+  autofill_client().set_app_locale("pt-BR");
 
   // Set up a new address profile.
   AutofillProfile profile(AddressCountryCode("US"));
@@ -4778,11 +4731,11 @@ TEST_F(
   // Because Payments rejects the offer to upload save but CVC + name + address
   // were all found, the local save prompt should be shown instead of the upload
   // prompt.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 }
 
 TEST_F(
@@ -4790,7 +4743,7 @@ TEST_F(
     UploadCreditCard_ShouldNotOfferLocalSaveIfSomethingNotDetectedAndPaymentsDeclines) {
   // Anything other than "en-US" will cause GetUploadDetails to return a failure
   // response.
-  autofill_client_.set_app_locale("pt-BR");
+  autofill_client().set_app_locale("pt-BR");
 
   // Set up a new address profile without a name or postal code.
   AutofillProfile profile(AddressCountryCode("US"));
@@ -4817,11 +4770,11 @@ TEST_F(
 
   // Because Payments rejects the offer to upload save but not all of CVC + name
   // + address were detected, the local save prompt should not be shown either.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 }
 
 // TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
@@ -4853,11 +4806,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Payments should be asked whether upload save can be offered.
   // (Unit tests assume they reply yes and save is successful.)
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -4877,11 +4830,6 @@ TEST_F(CreditCardSaveManagerTest,
 // on providing the name.
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_PaymentsDecidesOfferToSaveIfNoName) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Add a profile without a name to the PersonalDataManager.
   AutofillProfile profile(AddressCountryCode("US"));
   profile.SetRawInfo(ADDRESS_HOME_ZIP, u"77401");
@@ -4904,17 +4852,18 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Payments should be asked whether upload save can be offered.
   // (Unit tests assume they reply yes and save is successful.)
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name, to be used as an user provided name for cardholder
   // name fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -4934,7 +4883,7 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Verify the card details in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -4944,11 +4893,6 @@ TEST_F(CreditCardSaveManagerTest,
 // uploaded on providing the name.
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_PaymentsDecidesOfferToSaveIfConflictingNames) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Create, fill and submit an address form in order to establish a recent
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
@@ -4973,17 +4917,18 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Payments should be asked whether upload save can be offered.
   // (Unit tests assume they reply yes and save is successful.)
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name. Represents an user provided name for cardholder name
   // fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -5003,7 +4948,7 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Verify the cardholder name in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -5039,11 +4984,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Payments should be asked whether upload save can be offered.
   // (Unit tests assume they reply yes and save is successful.)
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -5098,11 +5043,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Payments should be asked whether upload save can be offered.
   // (Unit tests assume they reply yes and save is successful.)
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -5122,11 +5067,6 @@ TEST_F(CreditCardSaveManagerTest,
 // on providing the name.
 TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_PaymentsDecidesOfferToSaveIfNothingFound) {
-  if (FixFlowDetectedValuesOverriddenOnIos()) {
-    GTEST_SKIP() << "Skip this test on iOS, since detected fix flow values "
-                    "have been overridden.";
-  }
-
   // Set up a new address profile without a name or postal code.
   AutofillProfile profile(AddressCountryCode("US"));
   profile.set_guid("00000000-0000-0000-0000-000000000200");
@@ -5152,15 +5092,16 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Payments should be asked whether upload save can be offered.
   // (Unit tests assume they reply yes and save is successful.)
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   // Set a cardholder name. Represents an user provided name for fix flow.
-  UserProvidedCardDetails user_provided_details = {.cardholder_name =
-                                                       u"Chrome User"};
+  UserProvidedCardDetails user_provided_details;
+  user_provided_details.cardholder_name = u"Chrome User";
+
   SetCardDetailsForFixFlow(user_provided_details);
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries were logged.
   ExpectCardUploadDecision(histogram_tester, autofill_metrics::UPLOAD_OFFERED);
@@ -5185,7 +5126,7 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Verify the cardholder name in `UploadRequest` matches the one in
   // `UserProvidedCardDetails`.
-  EXPECT_EQ(credit_card_save_manager_->upload_request()->card.GetInfo(
+  EXPECT_EQ(credit_card_save_manager().upload_request()->card.GetInfo(
                 CREDIT_CARD_NAME_FULL, "en-US"),
             user_provided_details.cardholder_name);
 }
@@ -5204,7 +5145,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_UploadOfLocalCard) {
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -5212,7 +5152,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_UploadOfLocalCard) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5225,11 +5164,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_UploadOfLocalCard) {
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that metrics noted it was an existing local card for which credit
   // card upload was offered and accepted.
@@ -5246,7 +5185,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_UploadOfNewCard) {
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -5254,7 +5192,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_UploadOfNewCard) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5267,11 +5204,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_UploadOfNewCard) {
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that metrics noted it was a brand new card for which credit card
   // upload was offered and accepted.
@@ -5289,7 +5226,7 @@ TEST_F(CreditCardSaveManagerTest,
        UploadCreditCard_DenyingUploadOfLocalCardShouldNotOfferLocalSave) {
   // Anything other than "en-US" will cause GetUploadDetails to return a failure
   // response.
-  autofill_client_.set_app_locale("pt-BR");
+  autofill_client().set_app_locale("pt-BR");
 
   // Add a local credit card whose |TypeAndLastFourDigits| matches what we will
   // enter below.
@@ -5304,7 +5241,6 @@ TEST_F(CreditCardSaveManagerTest,
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -5312,7 +5248,6 @@ TEST_F(CreditCardSaveManagerTest,
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5326,11 +5261,11 @@ TEST_F(CreditCardSaveManagerTest,
   base::HistogramTester histogram_tester;
 
   // Neither local or upload save should be offered in this case.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that metrics noted it was an existing local card for which credit
   // card upload was offered and accepted.
@@ -5367,11 +5302,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Confirm that upload happened and that no experiment flag state was sent in
   // the request.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
   EXPECT_THAT(
       payments_network_interface().client_behavior_signals_in_request(),
       UnorderedElementsAre(ClientBehaviorConstants::kOfferingToSaveCvc));
@@ -5465,7 +5400,7 @@ TEST_F(CreditCardSaveManagerTest,
 
   // Confirm that the preflight request contained the correct UploadCardSource.
   FormSubmitted(credit_card_form);
-  EXPECT_EQ(payments::UploadCardSource::UPSTREAM_CHECKOUT_FLOW,
+  EXPECT_EQ(payments::UploadCardSource::kUpstreamCheckoutFlow,
             payments_network_interface().upload_card_source_in_request());
 }
 
@@ -5473,7 +5408,7 @@ TEST_F(CreditCardSaveManagerTest,
 // the save bubble/infobar.
 TEST_F(CreditCardSaveManagerTest,
        LocallySaveCreditCard_NotEnoughStrikesStillShowsOfferToSave) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
   TestCreditCardSaveStrikeDatabase credit_card_save_strike_database =
       TestCreditCardSaveStrikeDatabase(&strike_database());
 
@@ -5484,7 +5419,6 @@ TEST_F(CreditCardSaveManagerTest,
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(1 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5498,9 +5432,9 @@ TEST_F(CreditCardSaveManagerTest,
   base::HistogramTester histogram_tester;
   // Verify that the offer-to-save bubble was still shown because the card did
   // not have too many strikes.
-  payments_client().ExpectLocalSaveWithPromptShown(true);
+  payments_autofill_client().ExpectLocalSaveWithPromptShown(true);
   FormSubmitted(credit_card_form);
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that histogram for local save card prompt shown is logged.
   histogram_tester.ExpectUniqueSample(
@@ -5528,7 +5462,6 @@ TEST_F(CreditCardSaveManagerTest,
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -5536,7 +5469,6 @@ TEST_F(CreditCardSaveManagerTest,
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5549,14 +5481,14 @@ TEST_F(CreditCardSaveManagerTest,
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
   // Verify that the offer-to-save bubble was still shown because the card did
   // not have too many strikes.
-  payments_client().ExpectCloudSaveWithPromptShown(true);
+  payments_autofill_client().ExpectCloudSaveWithPromptShown(true);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that histogram for server save card prompt shown is logged.
   histogram_tester.ExpectUniqueSample(
@@ -5573,7 +5505,7 @@ TEST_F(CreditCardSaveManagerTest,
 // Tests that a card with max strikes does not offer save on mobile at all.
 TEST_F(CreditCardSaveManagerTest,
        LocallySaveCreditCard_MaxStrikesDisallowsSave) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
   TestCreditCardSaveStrikeDatabase credit_card_save_strike_database =
       TestCreditCardSaveStrikeDatabase(&strike_database());
 
@@ -5586,7 +5518,6 @@ TEST_F(CreditCardSaveManagerTest,
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(1 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5600,11 +5531,11 @@ TEST_F(CreditCardSaveManagerTest,
   base::HistogramTester histogram_tester;
 
   // No form of credit card save should be shown.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries for card save not offered due to
   // max strikes were logged.
@@ -5619,12 +5550,13 @@ TEST_F(CreditCardSaveManagerTest,
   histogram_tester.ExpectUniqueSample(
       "Autofill.SaveCreditCardPromptOffer.Android.Local",
       autofill_metrics::SaveCardPromptOffer::kNotShownMaxStrikesReached, 1);
+#else
+  histogram_tester.ExpectBucketCount(
+      "Autofill.SaveCreditCardPromptOffer.IOS.Local.Banner",
+      autofill_metrics::SaveCardPromptOffer::kNotShownMaxStrikesReached, 1);
 #endif
 }
 
-// TODO(crbug.com/40710040): Create an equivalent test for iOS, or skip
-// permanently if the test doesn't apply to iOS flow.
-#if !BUILDFLAG(IS_IOS)
 // Tests that a card with max strikes does not offer save on mobile at all.
 TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MaxStrikesDisallowsSave) {
   TestCreditCardSaveStrikeDatabase credit_card_save_strike_database =
@@ -5640,7 +5572,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MaxStrikesDisallowsSave) {
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -5648,7 +5579,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MaxStrikesDisallowsSave) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5662,11 +5592,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MaxStrikesDisallowsSave) {
   base::HistogramTester histogram_tester;
 
   // No form of credit card save should be shown.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries for card save not offered due to
   // max strikes were logged.
@@ -5679,14 +5609,21 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MaxStrikesDisallowsSave) {
   histogram_tester.ExpectUniqueSample(
       "Autofill.SaveCreditCardPromptOffer.Server",
       autofill_metrics::SaveCardPromptOffer::kNotShownMaxStrikesReached, 1);
+#if BUILDFLAG(IS_ANDROID)
   histogram_tester.ExpectUniqueSample(
       "Autofill.SaveCreditCardPromptOffer.Android.Server",
       autofill_metrics::SaveCardPromptOffer::kNotShownMaxStrikesReached, 1);
+#else
+  histogram_tester.ExpectBucketCount(
+      "Autofill.SaveCreditCardPromptOffer.IOS.Server.Banner",
+      autofill_metrics::SaveCardPromptOffer::kNotShownMaxStrikesReached, 1);
+#endif
   // Verify that the correct UKM was logged.
   ExpectCardUploadDecisionUkm(
       autofill_metrics::UPLOAD_NOT_OFFERED_MAX_STRIKES_ON_MOBILE);
 }
 
+#if !BUILDFLAG(IS_IOS)
 TEST_F(CreditCardSaveManagerTest,
        SaveCreditCard_RequestingMissingData_MaxStrikesDisallowsSave) {
   TestCreditCardSaveStrikeDatabase credit_card_save_strike_database =
@@ -5702,7 +5639,6 @@ TEST_F(CreditCardSaveManagerTest,
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -5710,7 +5646,6 @@ TEST_F(CreditCardSaveManagerTest,
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the credit card data without expiration month, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5721,11 +5656,11 @@ TEST_F(CreditCardSaveManagerTest,
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries for card save not offered due to
   // max strikes were logged.
@@ -5751,7 +5686,7 @@ TEST_F(CreditCardSaveManagerTest,
 // the omnibox icon, but that the offer-to-save bubble itself is not shown.
 TEST_F(CreditCardSaveManagerTest,
        LocallySaveCreditCard_MaxStrikesStillAllowsSave) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
   TestCreditCardSaveStrikeDatabase credit_card_save_strike_database =
       TestCreditCardSaveStrikeDatabase(&strike_database());
 
@@ -5764,7 +5699,6 @@ TEST_F(CreditCardSaveManagerTest,
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(1 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5778,9 +5712,9 @@ TEST_F(CreditCardSaveManagerTest,
   base::HistogramTester histogram_tester;
   // Verify that the offer-to-save bubble was not shown because the card had too
   // many strikes.
-  payments_client().ExpectLocalSaveWithPromptShown(false);
+  payments_autofill_client().ExpectLocalSaveWithPromptShown(false);
   FormSubmitted(credit_card_form);
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries for card save not offered due to
   // max strikes were logged.
@@ -5808,7 +5742,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MaxStrikesStillAllowsSave) {
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -5816,7 +5749,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MaxStrikesStillAllowsSave) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5829,14 +5761,14 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MaxStrikesStillAllowsSave) {
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
   // Verify that the offer-to-save bubble was not shown because the card had too
   // many strikes.
-  payments_client().ExpectCloudSaveWithPromptShown(false);
+  payments_autofill_client().ExpectCloudSaveWithPromptShown(false);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that the correct histogram entries for card save not offered due to
   // max strikes were logged.
@@ -5851,7 +5783,7 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_MaxStrikesStillAllowsSave) {
 
 // Tests that adding a card clears all strikes for that card.
 TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_ClearStrikesOnAdd) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
   TestCreditCardSaveStrikeDatabase credit_card_save_strike_database =
       TestCreditCardSaveStrikeDatabase(&strike_database());
 
@@ -5863,7 +5795,6 @@ TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_ClearStrikesOnAdd) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(1 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5874,25 +5805,28 @@ TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_ClearStrikesOnAdd) {
   test_api(credit_card_form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
   test_api(credit_card_form).field(4).set_value(u"123");
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that adding the card reset the strike count for that card.
   EXPECT_EQ(0, credit_card_save_strike_database.GetStrikes("1111"));
 }
 
-#if !BUILDFLAG(IS_IOS)
 TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_WithCvc_PrefOn) {
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(), true);
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kAutofillEnableCvcStorageAndFilling);
+  // On iOS WebView, save with cvc is not enabled.
+  autofill_client().set_is_cvc_saving_supported(true);
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(), true);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
 
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(1 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5905,7 +5839,7 @@ TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_WithCvc_PrefOn) {
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
   EXPECT_EQ(
       1u, personal_data().payments_data_manager().GetLocalCreditCards().size());
   EXPECT_EQ(u"123", personal_data()
@@ -5916,13 +5850,17 @@ TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_WithCvc_PrefOn) {
 }
 
 TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_WithCvc_PrefOff) {
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(), false);
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kAutofillEnableCvcStorageAndFilling);
+  // On iOS WebView, save with cvc is not enabled.
+  autofill_client().set_is_cvc_saving_supported(true);
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(), false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
 
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(1 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5935,7 +5873,7 @@ TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_WithCvc_PrefOff) {
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
   EXPECT_EQ(
       1u, personal_data().payments_data_manager().GetLocalCreditCards().size());
   EXPECT_EQ(u"", personal_data()
@@ -5944,7 +5882,45 @@ TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_WithCvc_PrefOff) {
                      .front()
                      ->cvc());
 }
-#endif  // !BUILDFLAG(IS_IOS)
+
+#if BUILDFLAG(IS_IOS)
+// Verify CVC is not saved in iOS WebView, even when the pref is on.
+TEST_F(CreditCardSaveManagerTest,
+       LocallySaveCreditCard_WithCvc_PrefOn_UnsupportedClient) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kAutofillEnableCvcStorageAndFilling);
+  // Simulate the iOS WebView context.
+  autofill_client().set_is_cvc_saving_supported(false);
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(), true);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
+
+  // Set up our credit card form data.
+  FormData credit_card_form = CreateTestCreditCardFormData();
+  FormsSeen(std::vector<FormData>(1, credit_card_form));
+
+  // Edit the data, and submit.
+  test_api(credit_card_form).field(0).set_value(u"Jane Doe");
+  test_api(credit_card_form).field(1).set_value(u"4111111111111111");
+  test_api(credit_card_form)
+      .field(2)
+      .set_value(ASCIIToUTF16(test::NextMonth()));
+  test_api(credit_card_form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
+  test_api(credit_card_form).field(4).set_value(u"123");
+
+  FormSubmitted(credit_card_form);
+
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
+  EXPECT_EQ(
+      1u, personal_data().payments_data_manager().GetLocalCreditCards().size());
+  // CVC should be empty because it should have been cleared for iOS WebView.
+  EXPECT_EQ(u"", personal_data()
+                     .payments_data_manager()
+                     .GetLocalCreditCards()
+                     .front()
+                     ->cvc());
+}
+#endif
 
 // Tests that adding a card clears all strikes for that card.
 TEST_F(CreditCardSaveManagerTest, UploadCreditCard_ClearStrikesOnAdd) {
@@ -5960,7 +5936,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_ClearStrikesOnAdd) {
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -5968,7 +5943,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_ClearStrikesOnAdd) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -5979,11 +5953,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_ClearStrikesOnAdd) {
   test_api(credit_card_form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
   test_api(credit_card_form).field(4).set_value(u"123");
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that adding the card reset the strike count for that card.
   EXPECT_EQ(0, credit_card_save_strike_database.GetStrikes("1111"));
@@ -5991,7 +5965,7 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_ClearStrikesOnAdd) {
 
 // Tests that adding a card clears all strikes for that card.
 TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_NumStrikesLoggedOnAdd) {
-  credit_card_save_manager_->SetCreditCardUploadEnabled(false);
+  credit_card_save_manager().SetCreditCardUploadEnabled(false);
 
   TestCreditCardSaveStrikeDatabase credit_card_save_strike_database =
       TestCreditCardSaveStrikeDatabase(&strike_database());
@@ -6004,7 +5978,6 @@ TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_NumStrikesLoggedOnAdd) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(1 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -6017,11 +5990,11 @@ TEST_F(CreditCardSaveManagerTest, LocallySaveCreditCard_NumStrikesLoggedOnAdd) {
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that adding the card logged the number of strikes it had previously.
   histogram_tester.ExpectUniqueSample(
@@ -6043,7 +6016,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NumStrikesLoggedOnAdd) {
   // profile which can be selected for the upload request.
   FormData address_form = CreateTestAddressFormData();
   FormsSeen(std::vector<FormData>(1, address_form));
-  ExpectUniqueFillableFormParsedUkm();
 
   ManuallyFillAddressForm("Jane", "Doe", "77401", "US", &address_form);
   FormSubmitted(address_form);
@@ -6051,7 +6023,6 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NumStrikesLoggedOnAdd) {
   // Set up our credit card form data.
   FormData credit_card_form = CreateTestCreditCardFormData();
   FormsSeen(std::vector<FormData>(1, credit_card_form));
-  ExpectFillableFormParsedUkm(2 /* num_fillable_forms_parsed */);
 
   // Edit the data, and submit.
   test_api(credit_card_form).field(0).set_value(u"Jane Doe");
@@ -6064,11 +6035,11 @@ TEST_F(CreditCardSaveManagerTest, UploadCreditCard_NumStrikesLoggedOnAdd) {
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 
   // Verify that adding the card logged the number of strikes it had previously.
   histogram_tester.ExpectUniqueSample(
@@ -6089,10 +6060,10 @@ TEST_F(CreditCardSaveManagerTest,
 
   // If upload failed and the bubble was shown, strike count should increase
   // by 1.
-  credit_card_save_manager_->set_show_save_prompt(true);
-  credit_card_save_manager_->set_upload_request_card_number(
+  credit_card_save_manager().set_show_save_prompt(true);
+  credit_card_save_manager().set_upload_request_card_number(
       u"4111111111111111");
-  credit_card_save_manager_->OnDidUploadCard(
+  credit_card_save_manager().OnDidUploadCard(
       payments::PaymentsAutofillClient::PaymentsRpcResult::kTryAgainFailure,
       upload_card_response_details);
   EXPECT_EQ(1, credit_card_save_strike_database.GetStrikes("1111"));
@@ -6111,10 +6082,10 @@ TEST_F(CreditCardSaveManagerTest,
 
   // If upload timed out on the client side and the bubble was shown, strike
   // count should increase by 1.
-  credit_card_save_manager_->set_show_save_prompt(true);
-  credit_card_save_manager_->set_upload_request_card_number(
+  credit_card_save_manager().set_show_save_prompt(true);
+  credit_card_save_manager().set_upload_request_card_number(
       u"4111111111111111");
-  credit_card_save_manager_->OnDidUploadCard(
+  credit_card_save_manager().OnDidUploadCard(
       payments::PaymentsAutofillClient::PaymentsRpcResult::kClientSideTimeout,
       upload_card_response_details);
   EXPECT_EQ(1, credit_card_save_strike_database.GetStrikes("1111"));
@@ -6151,11 +6122,11 @@ TEST_F(CreditCardSaveManagerTest, UploadSaveNotOfferedForUnsupportedCard) {
 
   // Since card isn't in any of the supported ranges, local save should be
   // offered and upload save should not.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_FALSE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_FALSE(credit_card_save_manager().CreditCardWasUploaded());
 }
 
 // Tests that if a card doesn't fall in any of the supported bin ranges, but is
@@ -6188,7 +6159,7 @@ TEST_F(CreditCardSaveManagerTest, LocalSaveNotOfferedForSavedUnsupportedCard) {
   test_api(credit_card_form).field(4).set_value(u"123");
 
   // Since card is already saved, local save should not be offered.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 }
@@ -6216,11 +6187,11 @@ TEST_F(CreditCardSaveManagerTest, UploadSaveOfferedForSupportedCard) {
 
   // Since card is in one of the supported ranges(4111-4113), upload save should
   // be offered.
-  EXPECT_CALL(payments_client(), ShowSaveCreditCardLocally).Times(0);
+  EXPECT_CALL(payments_autofill_client(), ShowSaveCreditCardLocally).Times(0);
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 }
 
 // Tests that if the PaymentsNetworkInterface returns an invalid legal message,
@@ -6253,7 +6224,7 @@ TEST_F(CreditCardSaveManagerTest, InvalidLegalMessageInOnDidGetUploadDetails) {
 
   base::HistogramTester histogram_tester;
 
-  EXPECT_CALL(payments_client(),
+  EXPECT_CALL(payments_autofill_client(),
               ShowSaveCreditCardLocally(
                   /*card=*/_,
                   /*options=*/
@@ -6297,7 +6268,7 @@ TEST_F(CreditCardSaveManagerTest, LegalMessageInOnDidGetUploadDetails) {
   test_api(credit_card_form).field(3).set_value(ASCIIToUTF16(test::NextYear()));
   test_api(credit_card_form).field(4).set_value(u"123");
 
-  EXPECT_CALL(payments_client(),
+  EXPECT_CALL(payments_autofill_client(),
               ShowSaveCreditCardToCloud(
                   _, _,
                   Field(&payments::PaymentsAutofillClient::
@@ -6337,7 +6308,7 @@ TEST_F(CreditCardSaveManagerTest, ExistingServerCard_DifferentExpiration) {
   test_api(credit_card_form).field(4).set_value(u"123");
 
   EXPECT_CALL(
-      payments_client(),
+      payments_autofill_client(),
       ShowSaveCreditCardToCloud(
           _, _,
           Field(
@@ -6348,48 +6319,62 @@ TEST_F(CreditCardSaveManagerTest, ExistingServerCard_DifferentExpiration) {
 
   FormSubmitted(credit_card_form);
 
-  EXPECT_TRUE(credit_card_save_manager_->CreditCardWasUploaded());
+  EXPECT_TRUE(credit_card_save_manager().CreditCardWasUploaded());
 }
 
-class SaveCvcTest
-    : public CreditCardSaveManagerTest,
-      public testing::WithParamInterface<
-          std::
-              tuple<bool, bool, FormDataImporter::CreditCardImportType, bool>> {
+class SaveCvcTest : public CreditCardSaveManagerTest,
+                    public testing::WithParamInterface<
+                        std::tuple<bool,
+                                   bool,
+                                   FormDataImporter::CreditCardImportType,
+                                   bool,
+                                   bool>> {
  public:
   SaveCvcTest() {
-    feature_list.InitWithFeatureState(
+    feature_list_.InitWithFeatureState(
         features::kAutofillEnableCvcStorageAndFilling,
         IsSaveCvcFeatureEnabled());
-    prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(),
-                                IsSaveCvcPrefEnabled());
   }
+
+  void SetUp() override {
+    CreditCardSaveManagerTest::SetUp();
+    prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(),
+                                IsSaveCvcPrefEnabled());
+    autofill_client().set_is_cvc_saving_supported(IsCvcSavingSupported());
+  }
+
   // This bool indicates if save CVC storage flag is enabled.
   bool IsSaveCvcFeatureEnabled() const { return std::get<0>(GetParam()); }
+
   // This bool indicates if user has opted-in to the features on the settings
   // page.
   bool IsSaveCvcPrefEnabled() const { return std::get<1>(GetParam()); }
+
   // Returns the credit card import type.
   FormDataImporter::CreditCardImportType CreditCardImportType() const {
     return std::get<2>(GetParam());
   }
+
   // This bool indicates whether the user has credit card upload enabled.
   bool IsCreditCardUpstreamEnabled() const { return std::get<3>(GetParam()); }
 
+  // This bool indicates whether the client supports saving CVC.
+  bool IsCvcSavingSupported() const { return std::get<4>(GetParam()); }
+
  private:
-  base::test::ScopedFeatureList feature_list;
+  base::test::ScopedFeatureList feature_list_;
 };
 
 // Tests that server CVC is added to PaymentsAutofillTable during credit card
 // upload save.
 TEST_P(SaveCvcTest, OnDidUploadCard_SaveServerCvc) {
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(),
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(),
                               IsSaveCvcPrefEnabled());
   // Set up upload_request card.
   CreditCard card = test::GetCreditCard();
   const std::u16string kCvc = u"111";
   card.set_cvc(kCvc);
-  credit_card_save_manager_->set_upload_request_card(card);
+  credit_card_save_manager().set_upload_request_card(card);
 
   // Set up upload card response and upload.
   const int64_t kInstrumentId = 12345L;
@@ -6398,12 +6383,13 @@ TEST_P(SaveCvcTest, OnDidUploadCard_SaveServerCvc) {
 
   // Confirm CVC is added to PaymentsAutofillTable only if CVC storage feature
   // and pref were enabled.
-  if (IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled()) {
+  if (IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled() &&
+      IsCvcSavingSupported()) {
     EXPECT_CALL(payments_data_manager(), AddServerCvc(kInstrumentId, kCvc));
   } else {
     EXPECT_CALL(payments_data_manager(), AddServerCvc).Times(0);
   }
-  credit_card_save_manager_->OnDidUploadCard(
+  credit_card_save_manager().OnDidUploadCard(
       payments::PaymentsAutofillClient::PaymentsRpcResult::kSuccess,
       upload_card_response_details);
 }
@@ -6417,7 +6403,7 @@ TEST_P(SaveCvcTest, ShouldNotOfferCvcSaveWithEmptyCvc) {
   // We should not offer CVC save if the user entered empty CVC during
   // checkout.
   card.set_cvc(u"");
-  EXPECT_FALSE(credit_card_save_manager_->ShouldOfferCvcSave(
+  EXPECT_FALSE(credit_card_save_manager().ShouldOfferCvcSave(
       card, CreditCardImportType(), IsCreditCardUpstreamEnabled()));
 }
 
@@ -6434,7 +6420,7 @@ TEST_P(SaveCvcTest, ShouldNotOfferCvcSaveWithoutExistingCard) {
 
   // We should not offer CVC save if we don't have an existing card
   // that matches the card in the form.
-  EXPECT_FALSE(credit_card_save_manager_->ShouldOfferCvcSave(
+  EXPECT_FALSE(credit_card_save_manager().ShouldOfferCvcSave(
       card, CreditCardImportType(), IsCreditCardUpstreamEnabled()));
 }
 
@@ -6450,7 +6436,7 @@ TEST_P(SaveCvcTest, ShouldNotOfferCvcSaveWithSameCvc) {
                         : server_card;
 
   // We should not offer CVC save with same CVC.
-  EXPECT_FALSE(credit_card_save_manager_->ShouldOfferCvcSave(
+  EXPECT_FALSE(credit_card_save_manager().ShouldOfferCvcSave(
       card, CreditCardImportType(), IsCreditCardUpstreamEnabled()));
 }
 
@@ -6467,23 +6453,24 @@ TEST_P(SaveCvcTest, ShouldNotOfferCvcSaveForCardInfoRetrievalEnrolled) {
   personal_data().test_payments_data_manager().AddServerCreditCard(server_card);
 
   // We should not offer CVC save for card info retrieval enrolled cards.
-  EXPECT_FALSE(credit_card_save_manager_->ShouldOfferCvcSave(
+  EXPECT_FALSE(credit_card_save_manager().ShouldOfferCvcSave(
       server_card, CreditCardImportType(), IsCreditCardUpstreamEnabled()));
 }
 
 // Tests that we should OfferCvcLocalSave with expected input.
 TEST_P(SaveCvcTest, ShouldOfferCvcLocalSave) {
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(),
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(),
                               IsSaveCvcPrefEnabled());
   CreditCard card = test::WithCvc(test::GetCreditCard(), u"123");
   personal_data().payments_data_manager().AddCreditCard(card);
   card.set_cvc(u"234");
-  if (IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled()) {
-    EXPECT_TRUE(credit_card_save_manager_->ShouldOfferCvcSave(
+  if (IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled() &&
+      IsCvcSavingSupported()) {
+    EXPECT_TRUE(credit_card_save_manager().ShouldOfferCvcSave(
         card, FormDataImporter::CreditCardImportType::kLocalCard,
         IsCreditCardUpstreamEnabled()));
   } else {
-    EXPECT_FALSE(credit_card_save_manager_->ShouldOfferCvcSave(
+    EXPECT_FALSE(credit_card_save_manager().ShouldOfferCvcSave(
         card, FormDataImporter::CreditCardImportType::kLocalCard,
         IsCreditCardUpstreamEnabled()));
   }
@@ -6491,24 +6478,24 @@ TEST_P(SaveCvcTest, ShouldOfferCvcLocalSave) {
 
 // Tests that we should OfferCvcUploadSave with expected input.
 TEST_P(SaveCvcTest, ShouldOfferCvcUploadSave) {
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(),
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(),
                               IsSaveCvcPrefEnabled());
   CreditCard card = test::WithCvc(test::GetMaskedServerCard(), u"123");
   personal_data().test_payments_data_manager().AddServerCreditCard(card);
   card.set_cvc(u"234");
   if (IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled() &&
-      IsCreditCardUpstreamEnabled()) {
-    EXPECT_TRUE(credit_card_save_manager_->ShouldOfferCvcSave(
+      IsCreditCardUpstreamEnabled() && IsCvcSavingSupported()) {
+    EXPECT_TRUE(credit_card_save_manager().ShouldOfferCvcSave(
         card, FormDataImporter::CreditCardImportType::kServerCard,
         IsCreditCardUpstreamEnabled()));
-    EXPECT_TRUE(credit_card_save_manager_->ShouldOfferCvcSave(
+    EXPECT_TRUE(credit_card_save_manager().ShouldOfferCvcSave(
         card, FormDataImporter::CreditCardImportType::kDuplicateLocalServerCard,
         IsCreditCardUpstreamEnabled()));
   } else {
-    EXPECT_FALSE(credit_card_save_manager_->ShouldOfferCvcSave(
+    EXPECT_FALSE(credit_card_save_manager().ShouldOfferCvcSave(
         card, FormDataImporter::CreditCardImportType::kServerCard,
         IsCreditCardUpstreamEnabled()));
-    EXPECT_FALSE(credit_card_save_manager_->ShouldOfferCvcSave(
+    EXPECT_FALSE(credit_card_save_manager().ShouldOfferCvcSave(
         card, FormDataImporter::CreditCardImportType::kDuplicateLocalServerCard,
         IsCreditCardUpstreamEnabled()));
   }
@@ -6524,35 +6511,56 @@ INSTANTIATE_TEST_SUITE_P(
             FormDataImporter::CreditCardImportType::kServerCard,
             FormDataImporter::CreditCardImportType::kLocalCard,
             FormDataImporter::CreditCardImportType::kDuplicateLocalServerCard),
-        testing::Bool()));
+        testing::Bool(),
+#if BUILDFLAG(IS_IOS)
+        testing::Bool()
+#else
+        testing::Values(false)
+#endif
+            ));
 
 class ProceedWithSavingIfApplicableTest
     : public CreditCardSaveManagerTest,
       public testing::WithParamInterface<
-          std::
-              tuple<bool, bool, FormDataImporter::CreditCardImportType, bool>> {
+          std::tuple<bool,
+                     bool,
+                     FormDataImporter::CreditCardImportType,
+                     bool,
+                     bool>> {
  public:
   ProceedWithSavingIfApplicableTest() {
     feature_list_.InitWithFeatureState(
         features::kAutofillEnableCvcStorageAndFilling,
         IsSaveCvcFeatureEnabled());
-    prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(),
-                                IsSaveCvcPrefEnabled());
   }
+
+  void SetUp() override {
+    CreditCardSaveManagerTest::SetUp();
+    prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(),
+                                IsSaveCvcPrefEnabled());
+    autofill_client().set_is_cvc_saving_supported(IsCvcSavingSupported());
+  }
+
   // This bool indicates if save CVC storage flag is enabled.
   bool IsSaveCvcFeatureEnabled() const { return std::get<0>(GetParam()); }
+
   // This bool indicates if user has opted-in to the features on the settings
   // page.
   bool IsSaveCvcPrefEnabled() const { return std::get<1>(GetParam()); }
+
   // Returns the credit card import type.
   FormDataImporter::CreditCardImportType CreditCardImportType() const {
     return std::get<2>(GetParam());
   }
+
   // This bool indicates whether the user has credit card upload enabled.
   bool IsCreditCardUpstreamEnabled() const { return std::get<3>(GetParam()); }
 
+  // This bool indicates whether the client supports saving CVC.
+  bool IsCvcSavingSupported() const { return std::get<4>(GetParam()); }
+
   ukm::SourceId ukm_source_id() {
-    return autofill_driver_->GetPageUkmSourceId();
+    return autofill_driver().GetPageUkmSourceId();
   }
 
  private:
@@ -6561,9 +6569,10 @@ class ProceedWithSavingIfApplicableTest
 
 // Tests that the correct SaveCardOption is passed.
 TEST_P(ProceedWithSavingIfApplicableTest, CardWithCorrectSaveCardOption) {
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(),
+  autofill_client().set_is_cvc_saving_supported(IsCvcSavingSupported());
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(),
                               IsSaveCvcPrefEnabled());
-  credit_card_save_manager_->SetCreditCardUploadEnabled(
+  credit_card_save_manager().SetCreditCardUploadEnabled(
       IsCreditCardUpstreamEnabled());
 
   // Set up our credit card form data.
@@ -6580,12 +6589,13 @@ TEST_P(ProceedWithSavingIfApplicableTest, CardWithCorrectSaveCardOption) {
   test_api(credit_card_form).field(4).set_value(u"123");
 
   auto card_save_type =
-      (IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled())
+      (IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled() &&
+       IsCvcSavingSupported())
           ? payments::PaymentsAutofillClient::CardSaveType::kCardSaveWithCvc
           : payments::PaymentsAutofillClient::CardSaveType::kCardSaveOnly;
 
   if (IsCreditCardUpstreamEnabled()) {
-    EXPECT_CALL(payments_client(),
+    EXPECT_CALL(payments_autofill_client(),
                 ShowSaveCreditCardToCloud(
                     _, _,
                     Field(&payments::PaymentsAutofillClient::
@@ -6593,7 +6603,7 @@ TEST_P(ProceedWithSavingIfApplicableTest, CardWithCorrectSaveCardOption) {
                           card_save_type),
                     _));
   } else {
-    EXPECT_CALL(payments_client(),
+    EXPECT_CALL(payments_autofill_client(),
                 ShowSaveCreditCardLocally(
                     /*card=*/_,
                     /*options=*/
@@ -6612,16 +6622,16 @@ TEST_P(ProceedWithSavingIfApplicableTest, ProceedWithSavingIfApplicable_Card) {
   FormData form;
   FormStructure form_structure(form);
   CreditCard card = test::WithCvc(test::GetCreditCard(), u"123");
-  credit_card_save_manager_->ProceedWithSavingIfApplicable(
+  credit_card_save_manager().ProceedWithSavingIfApplicable(
       form_structure, card, CreditCardImportType(),
       IsCreditCardUpstreamEnabled(), ukm_source_id());
-  EXPECT_EQ(credit_card_save_manager_->CreditCardWasUploaded(),
+  EXPECT_EQ(credit_card_save_manager().CreditCardWasUploaded(),
             IsCreditCardUpstreamEnabled() &&
                 (CreditCardImportType() ==
                      FormDataImporter::CreditCardImportType::kNewCard ||
                  CreditCardImportType() ==
                      FormDataImporter::CreditCardImportType::kLocalCard));
-  EXPECT_EQ(credit_card_save_manager_->CardLocalSaveStarted(),
+  EXPECT_EQ(credit_card_save_manager().CardLocalSaveStarted(),
             CreditCardImportType() ==
                     FormDataImporter::CreditCardImportType::kNewCard &&
                 !IsCreditCardUpstreamEnabled());
@@ -6630,38 +6640,38 @@ TEST_P(ProceedWithSavingIfApplicableTest, ProceedWithSavingIfApplicable_Card) {
 // Tests that ProceedWithSavingIfApplicable should initiate CVC save or upload
 // flow with expected input.
 TEST_P(ProceedWithSavingIfApplicableTest, ProceedWithSavingIfApplicable_Cvc) {
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(),
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(),
                               IsSaveCvcPrefEnabled());
   FormData form;
   FormStructure form_structure(form);
   CreditCard local_card = test::WithCvc(test::GetCreditCard(), u"123");
   personal_data().payments_data_manager().AddCreditCard(local_card);
   local_card.set_cvc(u"234");
-  credit_card_save_manager_->ProceedWithSavingIfApplicable(
+  credit_card_save_manager().ProceedWithSavingIfApplicable(
       form_structure, local_card,
       FormDataImporter::CreditCardImportType::kLocalCard,
       IsCreditCardUpstreamEnabled(), ukm_source_id());
-  EXPECT_EQ(credit_card_save_manager_->CvcLocalSaveStarted(),
+  EXPECT_EQ(credit_card_save_manager().CvcLocalSaveStarted(),
             IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled() &&
-                !IsCreditCardUpstreamEnabled());
+                !IsCreditCardUpstreamEnabled() && IsCvcSavingSupported());
 
   CreditCard server_card = test::WithCvc(test::GetMaskedServerCard(), u"123");
   personal_data().test_payments_data_manager().AddServerCreditCard(server_card);
   server_card.set_cvc(u"234");
-  credit_card_save_manager_->ProceedWithSavingIfApplicable(
+  credit_card_save_manager().ProceedWithSavingIfApplicable(
       form_structure, server_card,
       FormDataImporter::CreditCardImportType::kServerCard,
       IsCreditCardUpstreamEnabled(), ukm_source_id());
-  EXPECT_EQ(credit_card_save_manager_->CvcUploadSaveStarted(),
+  EXPECT_EQ(credit_card_save_manager().CvcUploadSaveStarted(),
             IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled() &&
-                IsCreditCardUpstreamEnabled());
+                IsCreditCardUpstreamEnabled() && IsCvcSavingSupported());
 }
 
 // Tests that ProceedWithSavingIfApplicable should initiate CVC save flow with
 // expected input with duplicate case.
 TEST_P(ProceedWithSavingIfApplicableTest,
        ProceedWithSavingIfApplicable_Cvc_Duplicate_Local) {
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(),
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(),
                               IsSaveCvcPrefEnabled());
   FormStructure form_structure(CreateTestCreditCardFormData());
   CreditCard local_card = test::WithCvc(test::GetCreditCard(), u"123");
@@ -6672,20 +6682,21 @@ TEST_P(ProceedWithSavingIfApplicableTest,
 
   // Save local card CVC to local even if duplicate local and server card
   // detected.
-  credit_card_save_manager_->ProceedWithSavingIfApplicable(
+  credit_card_save_manager().ProceedWithSavingIfApplicable(
       form_structure, local_card,
       FormDataImporter::CreditCardImportType::kDuplicateLocalServerCard,
       /*is_credit_card_upstream_enabled=*/true, ukm_source_id());
-  EXPECT_EQ(credit_card_save_manager_->CvcLocalSaveStarted(),
-            IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled());
-  EXPECT_FALSE(credit_card_save_manager_->CvcUploadSaveStarted());
+  EXPECT_EQ(credit_card_save_manager().CvcLocalSaveStarted(),
+            IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled() &&
+                IsCvcSavingSupported());
+  EXPECT_FALSE(credit_card_save_manager().CvcUploadSaveStarted());
 }
 
 // Tests that ProceedWithSavingIfApplicable should initiate CVC upload flow with
 // expected input with duplicate case.
 TEST_P(ProceedWithSavingIfApplicableTest,
        ProceedWithSavingIfApplicable_Cvc_Duplicate_Server) {
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(),
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(),
                               IsSaveCvcPrefEnabled());
   FormStructure form_structure(CreateTestCreditCardFormData());
   CreditCard local_card = test::WithCvc(test::GetCreditCard(), u"123");
@@ -6696,14 +6707,14 @@ TEST_P(ProceedWithSavingIfApplicableTest,
 
   // Save server card CVC to server even if duplicate local and server card
   // detected.
-  credit_card_save_manager_->ProceedWithSavingIfApplicable(
+  credit_card_save_manager().ProceedWithSavingIfApplicable(
       form_structure, server_card,
       FormDataImporter::CreditCardImportType::kDuplicateLocalServerCard,
       IsCreditCardUpstreamEnabled(), ukm_source_id());
-  EXPECT_EQ(credit_card_save_manager_->CvcUploadSaveStarted(),
+  EXPECT_EQ(credit_card_save_manager().CvcUploadSaveStarted(),
             IsSaveCvcFeatureEnabled() && IsSaveCvcPrefEnabled() &&
-                IsCreditCardUpstreamEnabled());
-  EXPECT_FALSE(credit_card_save_manager_->CvcLocalSaveStarted());
+                IsCreditCardUpstreamEnabled() && IsCvcSavingSupported());
+  EXPECT_FALSE(credit_card_save_manager().CvcLocalSaveStarted());
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -6717,7 +6728,13 @@ INSTANTIATE_TEST_SUITE_P(
             FormDataImporter::CreditCardImportType::kLocalCard,
             FormDataImporter::CreditCardImportType::kNewCard,
             FormDataImporter::CreditCardImportType::kDuplicateLocalServerCard),
-        testing::Bool()));
+        testing::Bool(),
+#if BUILDFLAG(IS_IOS)
+        testing::Bool()
+#else
+        testing::Values(false)
+#endif
+            ));
 
 // Tests that server CVC is not added to PaymentsAutofillTable during credit
 // card upload save if CVC was empty.
@@ -6727,12 +6744,12 @@ TEST_F(CreditCardSaveManagerTest,
   base::test::ScopedFeatureList feature_list;
   feature_list.InitAndEnableFeature(
       features::kAutofillEnableCvcStorageAndFilling);
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(), true);
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(), true);
 
   // Set up upload_request card with empty CVC.
   CreditCard card = test::GetCreditCard();
   card.set_cvc(u"");
-  credit_card_save_manager_->set_upload_request_card(card);
+  credit_card_save_manager().set_upload_request_card(card);
 
   // Set up upload card response and upload.
   payments::UploadCardResponseDetails upload_card_response_details;
@@ -6741,7 +6758,7 @@ TEST_F(CreditCardSaveManagerTest,
   // Confirm CVC is not added to PaymentsAutofillTable if CVC was empty.
   EXPECT_CALL(payments_data_manager(), AddServerCvc).Times(0);
 
-  credit_card_save_manager_->OnDidUploadCard(
+  credit_card_save_manager().OnDidUploadCard(
       payments::PaymentsAutofillClient::PaymentsRpcResult::kSuccess,
       upload_card_response_details);
 }
@@ -6754,11 +6771,11 @@ TEST_F(CreditCardSaveManagerTest,
   base::test::ScopedFeatureList feature_list;
   feature_list.InitAndEnableFeature(
       features::kAutofillEnableCvcStorageAndFilling);
-  prefs::SetPaymentCvcStorage(autofill_client_.GetPrefs(), true);
+  prefs::SetPaymentCvcStorage(autofill_client().GetPrefs(), true);
 
   // Set up upload_request card.
   CreditCard card = test::WithCvc(test::GetCreditCard());
-  credit_card_save_manager_->set_upload_request_card(card);
+  credit_card_save_manager().set_upload_request_card(card);
 
   // Set up upload card response without instrument_id and upload.
   payments::UploadCardResponseDetails
@@ -6768,7 +6785,7 @@ TEST_F(CreditCardSaveManagerTest,
   // empty.
   EXPECT_CALL(payments_data_manager(), AddServerCvc).Times(0);
 
-  credit_card_save_manager_->OnDidUploadCard(
+  credit_card_save_manager().OnDidUploadCard(
       payments::PaymentsAutofillClient::PaymentsRpcResult::kSuccess,
       upload_card_response_details_without_instrument_id);
 }
@@ -6778,12 +6795,12 @@ TEST_F(CreditCardSaveManagerTest,
 TEST_F(CreditCardSaveManagerTest, InitVirtualCardEnroll) {
   payments::GetDetailsForEnrollmentResponseDetails
       get_details_for_enrollment_response_details;
-  EXPECT_CALL(payments_client(), HideSaveCardPrompt);
+  EXPECT_CALL(payments_autofill_client(), HideSaveCardPrompt);
   EXPECT_CALL(*static_cast<MockVirtualCardEnrollmentManager*>(
-                  payments_client().GetVirtualCardEnrollmentManager()),
+                  payments_autofill_client().GetVirtualCardEnrollmentManager()),
               InitVirtualCardEnroll);
 
-  credit_card_save_manager_->InitVirtualCardEnroll(
+  credit_card_save_manager().InitVirtualCardEnroll(
       test::GetCreditCard(),
       std::move(get_details_for_enrollment_response_details));
 }
@@ -6791,11 +6808,27 @@ TEST_F(CreditCardSaveManagerTest, InitVirtualCardEnroll) {
 // Tests that if server card upload fails, we fallback to a local card save.
 TEST_F(CreditCardSaveManagerTest,
        OnDidUploadCard_FallbackToLocalSaveOnServerUploadFailure) {
-  credit_card_save_manager_->set_upload_request_card(test::GetCreditCard());
+  credit_card_save_manager().set_upload_request_card(test::GetCreditCard());
 
   EXPECT_CALL(payments_data_manager(), SaveCardLocallyIfNew);
 
-  credit_card_save_manager_->OnDidUploadCard(
+  credit_card_save_manager().OnDidUploadCard(
+      payments::PaymentsAutofillClient::PaymentsRpcResult::kPermanentFailure,
+      payments::UploadCardResponseDetails());
+}
+
+// Test that if server card upload fails, fallback local card save is not
+// offered if it's not supported by the client.
+TEST_F(
+    CreditCardSaveManagerTest,
+    OnDidUploadCard_NotFallbackToLocalSaveOnServerUploadFailureIfNotSupported) {
+  ON_CALL(payments_autofill_client(), LocalCardSaveIsSupported)
+      .WillByDefault(Return(false));
+  credit_card_save_manager().set_upload_request_card(test::GetCreditCard());
+
+  EXPECT_CALL(payments_data_manager(), SaveCardLocallyIfNew).Times(0);
+
+  credit_card_save_manager().OnDidUploadCard(
       payments::PaymentsAutofillClient::PaymentsRpcResult::kPermanentFailure,
       payments::UploadCardResponseDetails());
 }
@@ -6806,11 +6839,11 @@ TEST_F(CreditCardSaveManagerTest,
        OnDidUploadCard_SkipLocalSaveIfMissingExpirationDate) {
   auto card = test::GetCreditCard();
   card.SetExpirationMonth(0);
-  credit_card_save_manager_->set_upload_request_card(card);
+  credit_card_save_manager().set_upload_request_card(card);
 
   EXPECT_CALL(payments_data_manager(), SaveCardLocallyIfNew).Times(0);
 
-  credit_card_save_manager_->OnDidUploadCard(
+  credit_card_save_manager().OnDidUploadCard(
       payments::PaymentsAutofillClient::PaymentsRpcResult::kPermanentFailure,
       payments::UploadCardResponseDetails());
 }
@@ -6825,8 +6858,8 @@ TEST_F(CreditCardSaveManagerTest,
   ON_CALL(payments_data_manager(), SaveCardLocallyIfNew)
       .WillByDefault(Return(true));
 
-  credit_card_save_manager_->set_upload_request_card(test::GetCreditCard());
-  credit_card_save_manager_->OnDidUploadCard(
+  credit_card_save_manager().set_upload_request_card(test::GetCreditCard());
+  credit_card_save_manager().OnDidUploadCard(
       payments::PaymentsAutofillClient::PaymentsRpcResult::kPermanentFailure,
       payments::UploadCardResponseDetails());
 
@@ -6844,8 +6877,8 @@ TEST_F(CreditCardSaveManagerTest,
   ON_CALL(payments_data_manager(), SaveCardLocallyIfNew)
       .WillByDefault(Return(false));
 
-  credit_card_save_manager_->set_upload_request_card(test::GetCreditCard());
-  credit_card_save_manager_->OnDidUploadCard(
+  credit_card_save_manager().set_upload_request_card(test::GetCreditCard());
+  credit_card_save_manager().OnDidUploadCard(
       payments::PaymentsAutofillClient::PaymentsRpcResult::kPermanentFailure,
       payments::UploadCardResponseDetails());
 
@@ -6891,7 +6924,7 @@ TEST_P(CreditCardSaveManagerWithVirtualCardEnrollTestParameterized,
   std::optional<payments::GetDetailsForEnrollmentResponseDetails>
       arg_get_details_for_enrollment_response_details;
 
-  EXPECT_CALL(payments_client(),
+  EXPECT_CALL(payments_autofill_client(),
               CreditCardUploadCompleted(
                   payments::PaymentsAutofillClient::PaymentsRpcResult::kSuccess,
                   A<std::optional<payments::PaymentsAutofillClient::
@@ -6899,24 +6932,25 @@ TEST_P(CreditCardSaveManagerWithVirtualCardEnrollTestParameterized,
 
   if (GetEnrollmentState() ==
       CreditCard::VirtualCardEnrollmentState::kUnenrolledAndEligible) {
-    EXPECT_CALL(*static_cast<MockVirtualCardEnrollmentManager*>(
-                    payments_client().GetVirtualCardEnrollmentManager()),
-                InitVirtualCardEnroll)
+    EXPECT_CALL(
+        *static_cast<MockVirtualCardEnrollmentManager*>(
+            payments_autofill_client().GetVirtualCardEnrollmentManager()),
+        InitVirtualCardEnroll)
         .WillOnce(DoAll(
             SaveArg<0>(&arg_credit_card),
             SaveArg<1>(&arg_virtual_card_enrollment_source),
             SaveArg<3>(&arg_get_details_for_enrollment_response_details)));
   }
-  credit_card_save_manager_->set_upload_request_card(test::GetCreditCard());
-  credit_card_save_manager_->OnDidUploadCard(
+  credit_card_save_manager().set_upload_request_card(test::GetCreditCard());
+  credit_card_save_manager().OnDidUploadCard(
       payments::PaymentsAutofillClient::PaymentsRpcResult::kSuccess,
       upload_card_response_details);
 
   // `InitVirtualCardEnroll` is passed as a closure to save card bubble
   // controller that executes it after bubble is closed. Since there is no
   // actual bubble, calling `InitVirtualCardEnroll` from here.
-  credit_card_save_manager_->InitVirtualCardEnroll(
-      credit_card_save_manager_->upload_request()->card,
+  credit_card_save_manager().InitVirtualCardEnroll(
+      credit_card_save_manager().upload_request()->card,
       std::move(upload_card_response_details
                     .get_details_for_enrollment_response_details));
 
@@ -6964,5 +6998,66 @@ INSTANTIATE_TEST_SUITE_P(
             CreditCard::VirtualCardEnrollmentState::kUnenrolled,
             CreditCard::VirtualCardEnrollmentState::kUnenrolledAndEligible,
             CreditCard::VirtualCardEnrollmentState::kEnrolled)));
+
+class CreditCardSaveManagerWithSaveCardUserDecisionParameterized
+    : public CreditCardSaveManagerTest,
+      public testing::WithParamInterface<
+          std::tuple<SaveCardOfferUserDecision>> {
+ public:
+  SaveCardPromptResult GetExpectedSaveCardPromptResult() const {
+    switch (GetSaveCardOfferUserDecision()) {
+      case SaveCardOfferUserDecision::kAccepted:
+        return SaveCardPromptResult::kAccepted;
+      case SaveCardOfferUserDecision::kDeclined:
+      case SaveCardOfferUserDecision::kIgnored:
+        return SaveCardPromptResult::kClosed;
+    }
+  }
+
+  SaveCardOfferUserDecision GetSaveCardOfferUserDecision() const {
+    return std::get<0>(GetParam());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    CreditCardSaveManagerTest,
+    CreditCardSaveManagerWithSaveCardUserDecisionParameterized,
+    testing::Combine(
+        /*user_decision*/ testing::Values(
+            SaveCardOfferUserDecision::kAccepted,
+            SaveCardOfferUserDecision::kDeclined,
+            SaveCardOfferUserDecision::kIgnored)));
+
+TEST_P(CreditCardSaveManagerWithSaveCardUserDecisionParameterized,
+       LogUploadSaveUserDecision) {
+  base::HistogramTester histogram_tester;
+  FormData form;
+  FormStructure form_structure(form);
+  CreditCard server_card = test::GetCreditCard();
+
+  payments_autofill_client().SetCloudSaveCallbackOfferDecision(
+      GetSaveCardOfferUserDecision());
+  credit_card_save_manager().AttemptToOfferCardUploadSave(
+      form_structure, server_card, /*uploading_local_card=*/false,
+      autofill_driver().GetPageUkmSourceId());
+
+  histogram_tester.ExpectUniqueSample(
+      "Autofill.SaveCreditCardPromptResult.Server",
+      GetExpectedSaveCardPromptResult(), 1);
+}
+
+TEST_P(CreditCardSaveManagerWithSaveCardUserDecisionParameterized,
+       LogLocalSaveUserDecision) {
+  base::HistogramTester histogram_tester;
+  CreditCard local_card = test::GetCreditCard();
+
+  payments_autofill_client().SetLocalSaveCallbackOfferDecision(
+      GetSaveCardOfferUserDecision());
+  credit_card_save_manager().AttemptToOfferCardLocalSave(local_card);
+
+  histogram_tester.ExpectUniqueSample(
+      "Autofill.SaveCreditCardPromptResult.Local",
+      GetExpectedSaveCardPromptResult(), 1);
+}
 
 }  // namespace autofill

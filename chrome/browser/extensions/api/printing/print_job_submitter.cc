@@ -4,11 +4,11 @@
 
 #include "chrome/browser/extensions/api/printing/print_job_submitter.h"
 
+#include <algorithm>
 #include <cstring>
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
@@ -34,7 +34,7 @@
 #include "printing/print_settings.h"
 #include "printing/printing_utils.h"
 #include "third_party/skia/include/codec/SkCodec.h"
-#include "third_party/skia/include/codec/SkPngDecoder.h"
+#include "third_party/skia/include/codec/SkPngRustDecoder.h"
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/core/SkRefCnt.h"
@@ -76,7 +76,7 @@ bool IsUserConfirmationRequired(content::BrowserContext* browser_context,
       Profile::FromBrowserContext(browser_context)
           ->GetPrefs()
           ->GetList(prefs::kPrintingAPIExtensionsAllowlist);
-  return !base::Contains(list, base::Value(extension_id));
+  return !std::ranges::contains(list, base::Value(extension_id));
 }
 
 }  // namespace
@@ -210,9 +210,10 @@ void PrintJobSubmitter::OnPdfReadAndFlattened(
 void PrintJobSubmitter::OnImageDataRead(std::string data,
                                         int64_t /*blob_total_size*/) {
   // Note: `data` must outlive `image_data` and `codec`.
-  sk_sp<SkData> image_data =
-      gfx::MakeSkDataFromSpanWithoutCopy(base::as_byte_span(data));
-  std::unique_ptr<SkCodec> codec = SkPngDecoder::Decode(image_data, nullptr);
+  std::unique_ptr<SkMemoryStream> image_data = std::make_unique<SkMemoryStream>(
+      gfx::MakeSkDataFromSpanWithoutCopy(base::as_byte_span(data)));
+  std::unique_ptr<SkCodec> codec =
+      SkPngRustDecoder::Decode(std::move(image_data), nullptr);
   if (!codec) {
     LOG(WARNING) << "Failed to decode PNG";
     FireErrorCallback(kInvalidData);

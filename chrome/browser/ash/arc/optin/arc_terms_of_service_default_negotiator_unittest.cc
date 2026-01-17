@@ -12,8 +12,8 @@
 #include "ash/constants/ash_pref_names.h"
 #include "ash/system/privacy_hub/privacy_hub_controller.h"
 #include "base/functional/bind.h"
-#include "base/hash/sha1.h"
 #include "base/run_loop.h"
+#include "base/strings/string_view_util.h"
 #include "base/test/bind.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/values.h"
@@ -25,6 +25,7 @@
 #include "chrome/browser/ash/settings/stats_reporting_controller.h"
 #include "chrome/browser/consent_auditor/consent_auditor_factory.h"
 #include "chrome/browser/consent_auditor/consent_auditor_test_utils.h"
+#include "chrome/browser/global_features.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/browser_with_test_window_test.h"
@@ -46,6 +47,7 @@
 #include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "content/public/test/browser_task_environment.h"
 #include "content/public/test/test_utils.h"
+#include "crypto/obsolete/sha1.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -161,7 +163,12 @@ class ArcTermsOfServiceDefaultNegotiatorTest
         local_state_.registry());
     ash::StatsReportingController::Initialize(&local_state_);
 
-    support_host_ = std::make_unique<ArcSupportHost>(profile());
+    support_host_ = std::make_unique<ArcSupportHost>(
+        TestingBrowserProcess::GetGlobal()->local_state(),
+        TestingBrowserProcess::GetGlobal()
+            ->GetFeatures()
+            ->application_locale_storage(),
+        profile());
     fake_arc_support_ = std::make_unique<FakeArcSupport>(support_host_.get());
     negotiator_ = std::make_unique<ArcTermsOfServiceDefaultNegotiator>(
         profile()->GetPrefs(), support_host(), test_metrics_service_.get());
@@ -293,7 +300,8 @@ ArcGoogleLocationServiceConsent CreateBaseGoogleLocationServiceConsent() {
 ArcPlayTermsOfServiceConsent CreateBasePlayConsent() {
   ArcPlayTermsOfServiceConsent play_consent;
   play_consent.set_play_terms_of_service_hash(
-      base::SHA1HashString(std::string(kFakeToSContent)));
+      base::as_string_view(crypto::obsolete::Sha1::HashForTesting(
+          base::as_byte_span(std::string(kFakeToSContent)))));
   play_consent.set_play_terms_of_service_text_length(
       (std::string(kFakeToSContent).length()));
   play_consent.set_consent_flow(ArcPlayTermsOfServiceConsent::SETUP);

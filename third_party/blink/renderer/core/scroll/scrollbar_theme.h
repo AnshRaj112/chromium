@@ -95,8 +95,6 @@ class CORE_EXPORT ScrollbarTheme {
   // parameter on Mac.
   virtual bool BlinkControlsOverlayVisibility() const { return true; }
 
-  virtual bool InvalidateOnMouseEnterExit() const { return false; }
-
   // Returns parts of the scrollbar which must be repainted following a change
   // in the thumb position, given scroll positions before and after.
   virtual ScrollbarPart PartsToInvalidateOnThumbPositionChange(
@@ -141,7 +139,7 @@ class CORE_EXPORT ScrollbarTheme {
   // scroll position.
   virtual int ThumbPosition(const Scrollbar&, float scroll_position) const;
   // The length of the thumb along the axis of the scrollbar.
-  virtual int ThumbLength(const Scrollbar&) const;
+  int ThumbLength(const Scrollbar&) const;
   // The position of the track relative to the scrollbar.
   virtual int TrackPosition(const Scrollbar&) const;
   // The length of the track along the axis of the scrollbar.

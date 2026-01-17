@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
@@ -52,6 +51,7 @@
 #include "components/autofill/content/common/mojom/autofill_driver.mojom.h"
 #include "components/autofill/core/browser/field_types.h"
 #include "components/autofill/core/browser/proto/api_v1.pb.h"
+#include "components/autofill/core/common/autofill_debug_features.h"
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/autofill/core/common/autofill_switches.h"
 #include "components/autofill/core/common/form_field_data.h"
@@ -184,7 +184,7 @@ class PasswordManagerVotingBrowserTest : public PasswordManagerBrowserTest {
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_{
-      autofill::features::test::kAutofillServerCommunication};
+      autofill::features::debug::kAutofillServerCommunication};
   std::unique_ptr<content::URLLoaderInterceptor> url_loader_interceptor_;
 };
 
@@ -254,7 +254,7 @@ std::unique_ptr<net::test_server::HttpResponse> HandleTestAuthRequest(
     return nullptr;
   }
   auto http_response = std::make_unique<net::test_server::BasicHttpResponse>();
-  if (base::Contains(request.headers, "Authorization")) {
+  if (request.headers.contains("Authorization")) {
     http_response->set_code(net::HTTP_OK);
     http_response->set_content("Success!");
   } else {
@@ -335,7 +335,7 @@ void SubmitInjectedPasswordForm(content::WebContents* web_contents,
       "document.getElementById('password_field').value = 'pa55w0rd';"
       "document.getElementById('testform').submit();";
   PasswordsNavigationObserver observer(web_contents);
-  observer.SetPathToWaitFor(action_url.path());
+  observer.SetPathToWaitFor(action_url.GetPath());
   ASSERT_TRUE(content::ExecJs(frame, submit_form));
   ASSERT_TRUE(observer.Wait());
 }
@@ -1306,7 +1306,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTest,
   content::SimulateMouseClickOrTapElementWithId(WebContents(),
                                                 "input_submit_button");
   ASSERT_TRUE(submit_observer.Wait());
-  std::string query = WebContents()->GetLastCommittedURL().query();
+  std::string query = WebContents()->GetLastCommittedURL().GetQuery();
   EXPECT_THAT(query, testing::HasSubstr("random_secret"));
 }
 
@@ -1629,8 +1629,16 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTest,
 
 // Tests that obsolete HTTP credentials are moved when a site migrated to HTTPS
 // and has HSTS enabled.
+// TODO(crbug.com/440205556): Flaky on Win.
+#if BUILDFLAG(IS_WIN)
+#define MAYBE_ObsoleteHttpCredentialMovedOnMigrationToHstsSite \
+  DISABLED_ObsoleteHttpCredentialMovedOnMigrationToHstsSite
+#else
+#define MAYBE_ObsoleteHttpCredentialMovedOnMigrationToHstsSite \
+  ObsoleteHttpCredentialMovedOnMigrationToHstsSite
+#endif
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTest,
-                       ObsoleteHttpCredentialMovedOnMigrationToHstsSite) {
+                       MAYBE_ObsoleteHttpCredentialMovedOnMigrationToHstsSite) {
   // Add an http credential to the password store.
   GURL https_origin = https_test_server().base_url();
   ASSERT_TRUE(https_origin.SchemeIs(url::kHttpsScheme));
@@ -4477,7 +4485,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerPrerenderBrowserTest,
 
   // Ensure that the prerender has started.
   registry_observer.WaitForTrigger(prerender_url);
-  content::FrameTreeNodeId prerender_id =
+  content::PrerenderHostId prerender_id =
       prerender_helper()->GetHostForUrl(prerender_url);
   EXPECT_TRUE(prerender_id);
   content::test::PrerenderHostObserver host_observer(*WebContents(),
@@ -4521,7 +4529,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerPrerenderBrowserTest,
   auto prerender_url =
       embedded_test_server()->GetURL("/password/password_form.html");
   // Loads a page in the prerender.
-  content::FrameTreeNodeId host_id =
+  content::PrerenderHostId host_id =
       prerender_helper()->AddPrerender(prerender_url);
   content::test::PrerenderHostObserver host_observer(*WebContents(), host_id);
   content::RenderFrameHost* render_frame_host =
@@ -4572,7 +4580,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerPrerenderBrowserTest,
   auto prerender_url =
       embedded_test_server()->GetURL("/password/password_form.html");
   // Loads a page in the prerender.
-  content::FrameTreeNodeId host_id =
+  content::PrerenderHostId host_id =
       prerender_helper()->AddPrerender(prerender_url);
   content::test::PrerenderHostObserver host_observer(*web_contents(), host_id);
   content::RenderFrameHost* render_frame_host =

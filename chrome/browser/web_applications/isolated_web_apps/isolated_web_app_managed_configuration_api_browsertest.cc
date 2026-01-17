@@ -10,13 +10,15 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/web_applications/test/isolated_web_app_test_utils.h"
-#include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_update_server_mixin.h"
+#include "chrome/browser/web_applications/isolated_web_apps/runtime_data/chrome_iwa_runtime_data_provider.h"
+#include "chrome/browser/web_applications/isolated_web_apps/test/fake_iwa_runtime_data_provider_mixin.h"
 #include "chrome/browser/web_applications/isolated_web_apps/test/isolated_web_app_builder.h"
-#include "chrome/browser/web_applications/isolated_web_apps/test/test_signed_web_bundle_builder.h"
+#include "chrome/browser/web_applications/isolated_web_apps/test/isolated_web_app_test_update_server.h"
 #include "chrome/browser/web_applications/policy/web_app_policy_constants.h"
 #include "chrome/browser/web_applications/test/web_app_test_observers.h"
 #include "chrome/common/pref_names.h"
 #include "components/prefs/pref_service.h"
+#include "components/webapps/isolated_web_apps/test_support/signing_keys.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
@@ -45,7 +47,7 @@ struct ResponseTemplate {
 std::unique_ptr<net::test_server::HttpResponse> HandleRequest(
     std::map<std::string, ResponseTemplate> templates,
     const net::test_server::HttpRequest& request) {
-  if (!base::Contains(templates, request.relative_url)) {
+  if (!templates.contains(request.relative_url)) {
     return std::make_unique<net::test_server::HungResponse>();
   }
 
@@ -88,7 +90,8 @@ class ManagedConfigurationAPIInIsolatedWebAppTest
   }
 
  protected:
-  IsolatedWebAppUpdateServerMixin update_server_mixin_{&mixin_host_};
+  IsolatedWebAppTestUpdateServer iwa_test_update_server_;
+  FakeIwaRuntimeDataProviderMixin data_provider_{&mixin_host_};
 };
 
 IN_PROC_BROWSER_TEST_F(ManagedConfigurationAPIInIsolatedWebAppTest,
@@ -100,14 +103,16 @@ IN_PROC_BROWSER_TEST_F(ManagedConfigurationAPIInIsolatedWebAppTest,
   SetConfiguration(kConfigurationUrl, kConfigurationHash,
                    url_info.origin().Serialize());
 
-  update_server_mixin_.AddBundle(
+  iwa_test_update_server_.AddBundle(
       IsolatedWebAppBuilder(ManifestBuilder())
           .BuildBundle(GetWebBundleId(), {test::GetDefaultEd25519KeyPair()}));
 
+  data_provider_->Update(
+      [&](auto& update) { update.AddToManagedAllowlist(GetWebBundleId()); });
   profile()->GetPrefs()->SetList(
       prefs::kIsolatedWebAppInstallForceList,
       base::Value::List().Append(
-          update_server_mixin_.CreateForceInstallPolicyEntry(
+          iwa_test_update_server_.CreateForceInstallPolicyEntry(
               GetWebBundleId())));
 
   WebAppTestInstallObserver install_observer(profile());

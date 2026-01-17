@@ -162,21 +162,6 @@ public interface TabObserver {
     void onRestoreFailed(Tab tab);
 
     /**
-     * Called when the WebContents of a {@link Tab} is about to be swapped.
-     * @param tab The notifying {@link Tab}
-     */
-    void webContentsWillSwap(Tab tab);
-
-    /**
-     * Called when the WebContents of a {@link Tab} have been swapped.
-     * @param tab The notifying {@link Tab}.
-     * @param didStartLoad Whether WebContentsObserver::DidStartProvisionalLoadForFrame() has
-     *     already been called.
-     * @param didFinishLoad Whether WebContentsObserver::DidFinishLoad() has already been called.
-     */
-    void onWebContentsSwapped(Tab tab, boolean didStartLoad, boolean didFinishLoad);
-
-    /**
      * Called when a context menu is shown for a {@link WebContents} owned by a {@link Tab}.
      * @param tab  The notifying {@link Tab}.
      */
@@ -216,18 +201,20 @@ public interface TabObserver {
 
     /**
      * Called when the URL of a {@link Tab} changes.
+     *
      * @param tab The notifying {@link Tab}.
      * @param url The new URL.
      */
-    void onUpdateUrl(Tab tab, GURL url);
+    void onUpdateTargetUrl(Tab tab, GURL url);
 
     // WebContentsObserver methods ---------------------------------------------------------
 
     /**
      * Called when a navigation in the primary main frame is started in the WebContents.
+     *
      * @param tab The notifying {@link Tab}.
-     * @param navigationHandle Pointer to a NavigationHandle representing the navigation.
-     *                         Its lifetime end at the end of onDidFinishNavigation().
+     * @param navigationHandle Pointer to a NavigationHandle representing the navigation. Its
+     *     lifetime end at the end of onDidFinishNavigation().
      */
     void onDidStartNavigationInPrimaryMainFrame(Tab tab, NavigationHandle navigationHandle);
 
@@ -360,9 +347,9 @@ public interface TabObserver {
             int bottomControlsMinHeightOffsetY);
 
     /**
-     * @see BrowserControlsStateProvider.onControlsConstraintsChanged
+     * @see BrowserControlsStateProvider.Observer#onControlsConstraintsChanged
      */
-    void onBrowserControlsConstraintsChanged(
+    void onOffsetTagsInfoChanged(
             Tab tab,
             BrowserControlsOffsetTagsInfo oldOffsetTagsInfo,
             BrowserControlsOffsetTagsInfo offsetTagsInfo,
@@ -383,11 +370,23 @@ public interface TabObserver {
      */
     void onContentViewScrollingStateChanged(boolean scrolling);
 
-    /** Called when the gesture begin event is received. */
+    /**
+     * Called when the gesture begin event is received. Seems to correspond to the second through
+     * n-th finger on the screen.
+     */
     void onGestureBegin();
 
-    /** Called when the gesture end event is received. */
+    /**
+     * Called when the gesture end event is received. Seems to correspond to the second through n-th
+     * finger on the screen.
+     */
     void onGestureEnd();
+
+    /** Called at the very start of a touch interaction, when the first finger/click starts. */
+    void onTouchDown();
+
+    /** Called at the very end of a touch interaction, when the last finger leaves the screen. */
+    void onTouchUp();
 
     /** Back press refactor related. Called when navigation state is invalidated. */
     void onNavigationStateChanged();

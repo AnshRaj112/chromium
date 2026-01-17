@@ -114,13 +114,13 @@ TEST_F(SurfaceTest, CopyRequestLifetime) {
 
   bool copy_called = false;
   base::RunLoop copy_runloop;
-  support->RequestCopyOfOutput(PendingCopyOutputRequest{
+  support->RequestCopyOfOutput(std::make_unique<PendingCopyOutputRequest>(
       local_surface_id, SubtreeCaptureId(),
       std::make_unique<CopyOutputRequest>(
           CopyOutputRequest::ResultFormat::RGBA,
           CopyOutputRequest::ResultDestination::kSystemMemory,
           base::BindOnce(&TestCopyResultCallback, &copy_called,
-                         copy_runloop.QuitClosure()))});
+                         copy_runloop.QuitClosure()))));
   surface->TakeCopyOutputRequestsFromClient();
   EXPECT_TRUE(surface_manager->GetSurfaceForId(surface_id));
   EXPECT_FALSE(copy_called);
@@ -306,20 +306,10 @@ TEST_F(SurfaceTest, PendingCopySurfaceIncludedInActiveReferencedSurfaces) {
   ASSERT_TRUE(curr_surface->active_referenced_surfaces().empty());
 }
 
-// Parameterized by whether we should enable kDrawImmediatelyWhenInteractive.
-class ImmediateActivationSurfaceTest
-    : public SurfaceTest,
-      public testing::WithParamInterface<bool> {
+class ImmediateActivationSurfaceTest : public SurfaceTest {
  public:
-  ImmediateActivationSurfaceTest() {
-    if (GetParam()) {
-      scoped_feature_list_.InitAndEnableFeature(
-          features::kDrawImmediatelyWhenInteractive);
-    } else {
-      scoped_feature_list_.InitAndDisableFeature(
-          features::kDrawImmediatelyWhenInteractive);
-    }
-  }
+  ImmediateActivationSurfaceTest() = default;
+  ~ImmediateActivationSurfaceTest() override = default;
 
   void SetUp() override {
     SurfaceTest::SetUp();
@@ -329,16 +319,11 @@ class ImmediateActivationSurfaceTest
   }
 
   base::TimeTicks Now() { return now_src_->NowTicks(); }
-
- protected:
-  base::test::ScopedFeatureList scoped_feature_list_;
 };
-
-INSTANTIATE_TEST_SUITE_P(All, ImmediateActivationSurfaceTest, testing::Bool());
 
 // Checks that submitting a compositor frame with a dependency always results in
 // activation dependencies if we have no interaction.
-TEST_P(ImmediateActivationSurfaceTest, WithNoInteraction) {
+TEST_F(ImmediateActivationSurfaceTest, WithNoInteraction) {
   constexpr gfx::Rect output_rect(100, 100);
   SurfaceManager* surface_manager = frame_sink_manager_.surface_manager();
 
@@ -374,9 +359,9 @@ TEST_P(ImmediateActivationSurfaceTest, WithNoInteraction) {
   EXPECT_FALSE(surface->activation_dependencies().empty());
 }
 
-// Checks that submitting a compositor frame with a dependency only results in
-// activation dependencies if we haven't enabled immediate activation.
-TEST_P(ImmediateActivationSurfaceTest, WithInteraction) {
+// Checks that submitting a compositor frame with a dependency and interaction
+// does not result in activation dependencies.
+TEST_F(ImmediateActivationSurfaceTest, WithInteraction) {
   constexpr gfx::Rect output_rect(100, 100);
   SurfaceManager* surface_manager = frame_sink_manager_.surface_manager();
 
@@ -410,7 +395,7 @@ TEST_P(ImmediateActivationSurfaceTest, WithInteraction) {
   }
 
   Surface* surface = surface_manager->GetSurfaceForId(root_surface_id);
-  EXPECT_EQ(surface->activation_dependencies().empty(), GetParam());
+  EXPECT_TRUE(surface->activation_dependencies().empty());
 }
 
 }  // namespace

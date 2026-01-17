@@ -10,7 +10,6 @@
 #include <utility>
 
 #include "base/check_is_test.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -336,7 +335,7 @@ void RemoteCommandsService::EnqueueCommand(
   }
 
   // If the command is already fetched, ignore it.
-  if (base::Contains(fetched_command_ids_, command.command_id())) {
+  if (std::ranges::contains(fetched_command_ids_, command.command_id())) {
     RecordReceivedRemoteCommand(MetricReceivedRemoteCommand::kDuplicated);
     return;
   }
@@ -447,7 +446,8 @@ void RemoteCommandsService::OnRemoteCommandsFetched(
     std::move(on_command_acked_callback_).Run();
   }
 
-  // TODO(binjin): Add retrying on errors. See http://crbug.com/466572.
+  // No retry is implemented for errors. If you want to change that, please
+  // consider using exponential backoff.
   if (status == DM_STATUS_SUCCESS) {
     for (const auto& command : commands) {
       VerifyAndEnqueueSignedCommand(command);

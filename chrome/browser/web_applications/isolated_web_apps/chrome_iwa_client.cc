@@ -4,30 +4,35 @@
 
 #include "chrome/browser/web_applications/isolated_web_apps/chrome_iwa_client.h"
 
+#include <variant>
+
 #include "base/strings/stringprintf.h"
 #include "base/types/expected_macros.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/web_applications/isolated_web_apps/commands/isolated_web_app_install_command_helper.h"
+#include "chrome/browser/web_applications/isolated_web_apps/install/non_installed_bundle_inspection_context.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_features.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_trust_checker.h"
-#include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_update_manager.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_url_info.h"
-#include "chrome/browser/web_applications/isolated_web_apps/pending_install_info.h"
+#include "chrome/browser/web_applications/isolated_web_apps/runtime_data/chrome_iwa_runtime_data_provider.h"
+#include "chrome/browser/web_applications/isolated_web_apps/update/isolated_web_app_update_manager.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/browser/web_applications/web_app_ui_manager.h"
 #include "chrome/browser/web_applications/web_app_utils.h"
 #include "chrome/common/url_constants.h"
 #include "components/web_package/signed_web_bundles/signed_web_bundle_id.h"
+#include "components/webapps/isolated_web_apps/client.h"
 #include "components/webapps/isolated_web_apps/types/url_loading_types.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/isolated_web_apps_policy.h"
-#include "content/public/browser/storage_partition_config.h"
 #include "content/public/browser/web_contents.h"
+#include "net/base/net_errors.h"
 
 namespace web_app {
 
 namespace {
+
+using SourceRequestError = IwaClient::SourceRequestError;
 
 constexpr char kInstallPagePath[] = "/.well-known/_generated_install_page.html";
 constexpr char kInstallPageContent[] = R"(
@@ -41,27 +46,46 @@ constexpr char kInstallPageContent[] = R"(
     </html>
 )";
 
-base::expected<IwaSourceWithModeOrGeneratedResponse, std::string> GetIwaSource(
-    base::WeakPtr<Profile> profile,
-    const webapps::AppId& iwa_id) {
+base::expected<IwaSourceWithModeOrGeneratedResponse, SourceRequestError>
+GetIwaSourceWithTrustCheck(base::WeakPtr<Profile> profile,
+                           const web_package::SignedWebBundleId& web_bundle_id,
+                           const webapps::AppId& iwa_id) {
   if (!profile) {
-    return base::unexpected("Profile has shut down.");
+    return base::unexpected(
+        SourceRequestError{.net_error = net::ERR_CONTEXT_SHUT_DOWN,
+                           .error_description = "Profile has shut down."});
   }
   WebAppRegistrar& registrar =
       WebAppProvider::GetForWebApps(profile.get())->registrar_unsafe();
   const WebApp* iwa = registrar.GetAppById(iwa_id);
   if (!iwa || !iwa->isolation_data()) {
-    return base::unexpected(
-        base::StringPrintf("There's no matching Isolated Web App installed."));
+    return base::unexpected(SourceRequestError{
+        .net_error = net::ERR_FAILED,
+        .error_description = base::StringPrintf(
+            "There's no matching Isolated Web App installed.")});
   }
   if (iwa->isolation_data()->location().dev_mode() &&
       !IsIwaDevModeEnabled(profile.get())) {
-    return base::unexpected(
-        "Isolated Web App Developer Mode is not enabled or blocked by policy.");
+    return base::unexpected(SourceRequestError{
+        .net_error = net::ERR_FAILED,
+        .error_description =
+            "Isolated Web App Developer Mode is not enabled or "
+            "blocked by policy."});
   }
-
-  return IwaSourceWithMode::FromStorageLocation(
+  auto source = IwaSourceWithMode::FromStorageLocation(
       profile->GetPath(), iwa->isolation_data()->location());
+  if (std::holds_alternative<IwaSourceBundleWithMode>(source.variant())) {
+    // TODO(crbug.com/474076928): Split up IsTrusted() so that
+    // holds_alternative check is not needed.
+    RETURN_IF_ERROR(IsolatedWebAppTrustChecker::IsTrusted(
+                        *profile, web_bundle_id, source.dev_mode())
+                        .transform_error([](const std::string& error) {
+                          return SourceRequestError{
+                              .net_error = net::ERR_INVALID_WEB_BUNDLE,
+                              .error_description = error};
+                        }));
+  }
+  return source;
 }
 
 void GetIwaSourceForRequestImpl(
@@ -70,36 +94,54 @@ void GetIwaSourceForRequestImpl(
     const network::ResourceRequest& request,
     const std::optional<content::FrameTreeNodeId>& frame_tree_node,
     base::OnceCallback<void(base::expected<IwaSourceWithModeOrGeneratedResponse,
-                                           std::string>)> callback) {
+                                           SourceRequestError>)> callback) {
   if (!profile) {
-    std::move(callback).Run(base::unexpected("Profile has shut down."));
+    std::move(callback).Run(base::unexpected(
+        SourceRequestError{.net_error = net::ERR_CONTEXT_SHUT_DOWN,
+                           .error_description = "Profile has shut down."}));
     return;
   }
 
   if (frame_tree_node) {
     auto* web_contents =
         content::WebContents::FromFrameTreeNodeId(*frame_tree_node);
-    if (web_contents == nullptr) {
+    if (!web_contents) {
       // `web_contents` can be `nullptr` in certain edge cases, such as when
       // the browser window closes concurrently with an ongoing request (see
       // crbug.com/1477761). Return an error if that is the case, instead of
-      // silently not querying `IsolatedWebAppPendingInstallInfo`. Should we
+      // silently not querying `NonInstalledBundleInspectionContext`. Should we
       // ever find a case where we _do_ want to continue request processing
       // even though the `WebContents` no longer exists, we can change the
-      // below code to skip checking `IsolatedWebAppPendingInstallInfo`
+      // below code to skip checking `NonInstalledBundleInspectionContext`
       // instead of returning an error.
-      std::move(callback).Run(base::unexpected(
-          "Unable to find WebContents based on frame tree node id."));
+      std::move(callback).Run(base::unexpected(SourceRequestError{
+          .net_error = net::ERR_CONTEXT_SHUT_DOWN,
+          .error_description =
+              "Unable to find WebContents based on frame tree node id."}));
       return;
     }
-    if (const auto& source =
-            IsolatedWebAppPendingInstallInfo::FromWebContents(*web_contents)
-                .source()) {
-      if (request.url.path() == kInstallPagePath) {
+    if (const auto* inspection_context =
+            NonInstalledBundleInspectionContext::FromWebContents(
+                web_contents)) {
+      if (std::holds_alternative<IwaSourceBundleWithMode>(
+              inspection_context->source().variant())) {
+        // TODO(crbug.com/474076928): Split up IsTrusted() so that
+        // holds_alternative check is not needed.
+        RETURN_IF_ERROR(
+            IsolatedWebAppTrustChecker::IsTrusted(
+                *profile, web_bundle_id,
+                inspection_context->source().dev_mode()),
+            [&](const std::string& error) {
+              std::move(callback).Run(base::unexpected(
+                  SourceRequestError{.net_error = net::ERR_INVALID_WEB_BUNDLE,
+                                     .error_description = error}));
+            });
+      }
+      if (request.url.GetPath() == kInstallPagePath) {
         std::move(callback).Run(
             GeneratedResponse{.response_body = kInstallPageContent});
       } else {
-        std::move(callback).Run(*source);
+        std::move(callback).Run(inspection_context->source());
       }
       return;
     }
@@ -109,21 +151,24 @@ void GetIwaSourceForRequestImpl(
       IsolatedWebAppUrlInfo::CreateFromSignedWebBundleId(web_bundle_id)
           .app_id();
   auto* provider = WebAppProvider::GetForWebApps(profile.get());
+
   if (provider->iwa_update_manager().IsUpdateBeingApplied(iwa_id)) {
     // TODO(crbug.com/432676258): How likely is this case?
     provider->iwa_update_manager().PrioritizeUpdateAndWait(
         iwa_id,
-        // We ignore whether or not the update was applied successfully - if it
-        // succeeds, we send the request to the updated version. If it fails, we
-        // send the request to the previous version and rely on the update
-        // system to retry the update at a later point.
-        base::IgnoreArgs<IsolatedWebAppUpdateApplyTask::CompletionStatus>(
-            base::BindOnce(&GetIwaSource, profile, iwa_id)
-                .Then(std::move(callback))));
+        // We ignore whether or not the update was applied successfully - if
+        // it succeeds, we send the request to the updated version. If it
+        // fails, we send the request to the previous version and rely on the
+        // update system to retry the update at a later point.
+        base::IgnoreArgs<IsolatedWebAppApplyUpdateCommandResult>(
+            base::BindOnce(&GetIwaSourceWithTrustCheck, profile, web_bundle_id,
+                           iwa_id))
+            .Then(std::move(callback)));
     return;
   }
 
-  return std::move(callback).Run(GetIwaSource(profile, iwa_id));
+  return std::move(callback).Run(
+      GetIwaSourceWithTrustCheck(profile, web_bundle_id, iwa_id));
 }
 
 }  // namespace
@@ -131,27 +176,6 @@ void GetIwaSourceForRequestImpl(
 void ChromeIwaClient::CreateSingleton() {
   static base::NoDestructor<ChromeIwaClient> instance;
   instance.get();
-}
-
-base::expected<void, std::string> ChromeIwaClient::ValidateTrust(
-    content::BrowserContext* browser_context,
-    const web_package::SignedWebBundleId& web_bundle_id,
-    bool dev_mode) {
-  return IsolatedWebAppTrustChecker::IsTrusted(
-      *Profile::FromBrowserContext(browser_context), web_bundle_id, dev_mode);
-}
-
-base::expected<web_package::SignedWebBundleId, std::string>
-ChromeIwaClient::CreateWebBundleIdFromURL(const GURL& url) {
-  return IsolatedWebAppUrlInfo::Create(url).transform(
-      [](const auto& url_info) { return url_info.web_bundle_id(); });
-}
-
-GURL ChromeIwaClient::CreateBaseURLForWebBundleId(
-    const web_package::SignedWebBundleId& web_bundle_id) {
-  return GURL(
-      base::StrCat({chrome::kIsolatedAppScheme, url::kStandardSchemeSeparator,
-                    web_bundle_id.id()}));
 }
 
 void ChromeIwaClient::RunWhenAppCloses(
@@ -172,7 +196,7 @@ void ChromeIwaClient::GetIwaSourceForRequest(
     const network::ResourceRequest& request,
     const std::optional<content::FrameTreeNodeId>& frame_tree_node,
     base::OnceCallback<void(base::expected<IwaSourceWithModeOrGeneratedResponse,
-                                           std::string>)> callback) {
+                                           SourceRequestError>)> callback) {
   Profile* profile = Profile::FromBrowserContext(browser_context);
   WebAppProvider::GetForWebApps(profile)->on_registry_ready().Post(
       FROM_HERE, base::BindOnce(&GetIwaSourceForRequestImpl,
@@ -180,13 +204,8 @@ void ChromeIwaClient::GetIwaSourceForRequest(
                                 frame_tree_node, std::move(callback)));
 }
 
-content::StoragePartition* ChromeIwaClient::GetStoragePartition(
-    content::BrowserContext* browser_context,
-    const web_package::SignedWebBundleId& web_bundle_id) {
-  return browser_context->GetStoragePartition(
-      IsolatedWebAppUrlInfo::CreateFromSignedWebBundleId(web_bundle_id)
-          .storage_partition_config(browser_context),
-      /*can_create=*/false);
+IwaRuntimeDataProvider* ChromeIwaClient::GetRuntimeDataProvider() {
+  return &ChromeIwaRuntimeDataProvider::GetInstance();
 }
 
 }  // namespace web_app

@@ -20,7 +20,6 @@
 #include "base/message_loop/message_pump_type.h"
 #include "base/process/process_handle.h"
 #include "base/threading/platform_thread_ref.h"
-#include "base/time/time.h"
 #include "base/trace_event/base_tracing_forward.h"
 #include "base/types/strong_alias.h"
 #include "build/build_config.h"
@@ -34,11 +33,17 @@
 #include <unistd.h>
 #endif
 
-#if BUILDFLAG(IS_CHROMEOS)
+#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
 #include "base/feature_list.h"
 #endif
 
 namespace base {
+
+#if BUILDFLAG(IS_ANDROID)
+BASE_EXPORT BASE_DECLARE_FEATURE(kRestrictBigCoreThreadAffinity);
+#endif
+
+class TimeDelta;
 
 // Used for uniquely identifying a thread.
 //
@@ -185,18 +190,6 @@ enum class ThreadType : int {
   kMaxValue = kRealtimeAudio,
 };
 
-// Cross-platform mapping of physical thread priorities. Used by tests to verify
-// the underlying effects of SetCurrentThreadType.
-enum class ThreadPriorityForTest : int {
-  kBackground,
-  kUtility,
-  kNormal,
-  kDisplay,
-  kInteractive,
-  kRealtimeAudio,
-  kMaxValue = kRealtimeAudio,
-};
-
 // A namespace for low-level thread functions.
 class BASE_EXPORT PlatformThreadBase {
  public:
@@ -317,7 +310,13 @@ class BASE_EXPORT PlatformThreadBase {
   // Declares the type of work running on the current thread. This will affect
   // things like thread priority and thread QoS (Quality of Service) to the best
   // of the current platform's abilities.
-  static void SetCurrentThreadType(ThreadType thread_type);
+  //
+  // The `may_change_affinity` parameter determines whether this call can change
+  // the thread CPU affinity on platforms where it is available. It should only
+  // be used in cases where e.g. a temporary thread boost should not change
+  // placement.
+  static void SetCurrentThreadType(ThreadType thread_type,
+                                   bool may_change_affinity = true);
 
   // Get the last `thread_type` set by SetCurrentThreadType, no matter if the
   // underlying priority successfully changed or not.
@@ -333,7 +332,11 @@ class BASE_EXPORT PlatformThreadBase {
   // explicitly set default size then returns 0.
   static size_t GetDefaultThreadStackSize();
 
-  static ThreadPriorityForTest GetCurrentThreadPriorityForTest();
+  // Returns the ThreadType that corresponds to the current OS thread settings.
+  // Note that this returns a canonical ThreadType for the settings and may not
+  // match the exact ThreadType set if multiple ThreadTypes map to the same OS
+  // thread settings.
+  static ThreadType GetCurrentEffectiveThreadTypeForTest();
 
  protected:
   static void SetNameCommon(const std::string& name);
@@ -455,31 +458,34 @@ using PlatformThread = PlatformThreadLinux;
 using PlatformThread = PlatformThreadBase;
 #endif
 
+#if BUILDFLAG(IS_ANDROID)
+BASE_EXPORT void SetMaxFrequencyPerProcessorOverrideForTesting(
+    std::vector<uint64_t>* value);
+
+// Sets whether a thread is allowed to run on the big core cluster, on
+// configurations where this is relevant, i.e. at least 3 distinct
+// clusters. Otherwise this is a no-op.
+BASE_EXPORT void SetCanRunOnBigCore(PlatformThreadId thread_id, bool can_run);
+#endif  // BUILDFLAG(IS_ANDROID)
+
 namespace internal {
 
-void SetCurrentThreadType(ThreadType thread_type,
-                          MessagePumpType pump_type_hint);
+#if BUILDFLAG(IS_APPLE)
+using PlatformPriorityOverride = pthread_override_t;
+#else
+using PlatformPriorityOverride = bool;
+#endif
+PlatformPriorityOverride SetThreadTypeOverride(
+    PlatformThreadHandle thread_handle,
+    ThreadType thread_type);
+void RemoveThreadTypeOverride(
+    PlatformThreadHandle thread_handle,
+    const PlatformPriorityOverride& priority_override_handle,
+    ThreadType initial_thread_type);
 
 void SetCurrentThreadTypeImpl(ThreadType thread_type,
-                              MessagePumpType pump_type_hint);
-
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
-void SetThreadTypeLinux(ProcessId process_id,
-                        PlatformThreadId thread_id,
-                        ThreadType thread_type,
-                        IsViaIPC via_ipc);
-#endif
-#if BUILDFLAG(IS_CHROMEOS)
-void SetThreadTypeChromeOS(ProcessId process_id,
-                           PlatformThreadId thread_id,
-                           ThreadType thread_type,
-                           IsViaIPC via_ipc);
-#endif
-#if BUILDFLAG(IS_CHROMEOS)
-inline constexpr auto SetThreadType = SetThreadTypeChromeOS;
-#elif BUILDFLAG(IS_LINUX)
-inline constexpr auto SetThreadType = SetThreadTypeLinux;
-#endif
+                              MessagePumpType pump_type_hint,
+                              bool may_change_affinity);
 
 }  // namespace internal
 

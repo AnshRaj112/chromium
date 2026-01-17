@@ -12,14 +12,15 @@
 #include "base/apple/bridging.h"
 #include "base/apple/foundation_util.h"
 #include "base/task/bind_post_task.h"
-#import "base/task/single_thread_task_runner.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/threading/thread_checker.h"
 #include "base/timer/timer.h"
 #include "content/browser/media/capture/io_surface_capture_device_base_mac.h"
+#include "content/browser/media/capture/pip_screen_capture_coordinator_proxy.h"
 #include "content/browser/media/capture/screen_capture_kit_fullscreen_module.h"
 #include "content/public/common/content_features.h"
 #include "third_party/webrtc/modules/desktop_capture/desktop_capture_types.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 
 using SampleCallback = base::RepeatingCallback<void(gfx::ScopedInUseIOSurface,
                                                     std::optional<gfx::Size>,
@@ -116,6 +117,33 @@ gfx::Size CreateEvenSize(const gfx::Size& original_size) {
 
   return {width, height};
 }
+
+// Given SCShareableContent, a PipScreenCaptureCoordinatorProxy and a media
+// source, returns an array containing the SCWindow object to be excluded from
+// the capture. Otherwise, returns an empty array.
+API_AVAILABLE(macos(12.3))
+NSArray<SCWindow*>* GetWindowsToExclude(
+    SCShareableContent* content,
+    content::PipScreenCaptureCoordinatorProxy* proxy,
+    const content::DesktopMediaID& source) {
+  if (!proxy) {
+    return @[];
+  }
+
+  std::optional<content::DesktopMediaID::Id> excluded_window_id =
+      proxy->WindowToExclude(source);
+
+  if (!excluded_window_id.has_value()) {
+    return @[];
+  }
+
+  for (SCWindow* window_to_check in content.windows) {
+    if (window_to_check.windowID == *excluded_window_id) {
+      return @[ window_to_check ];
+    }
+  }
+  return @[];
+}
 }  // namespace
 
 API_AVAILABLE(macos(12.3))
@@ -171,6 +199,14 @@ API_AVAILABLE(macos(12.3))
   IOSurfaceRef ioSurface = CVPixelBufferGetIOSurface(pixelBuffer);
   if (!ioSurface)
     return;
+
+  for (size_t plane = 0; plane < IOSurfaceGetPlaneCount(ioSurface); ++plane) {
+    if (!IOSurfaceGetBaseAddressOfPlane(ioSurface, plane)) {
+      // Empty plane data.
+      return;
+    }
+  }
+
   _sampleCallback.Run(
       gfx::ScopedInUseIOSurface(ioSurface, base::scoped_policy::RETAIN),
       contentSize, visibleRect, scaleFactor, isPresenterOverlayLargeActive);
@@ -206,18 +242,28 @@ namespace content {
 namespace {
 
 BASE_FEATURE(kScreenCaptureKitFullDesktopFallback,
-             "ScreenCaptureKitFullDesktopFallback",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 class API_AVAILABLE(macos(12.3)) ScreenCaptureKitDeviceMac
     : public IOSurfaceCaptureDeviceBase,
-      public ScreenCaptureKitResetStreamInterface {
+      public ScreenCaptureKitResetStreamInterface,
+      public content::PipScreenCaptureCoordinatorProxy::Observer {
  public:
-  explicit ScreenCaptureKitDeviceMac(const DesktopMediaID& source,
-                                     SCContentFilter* filter)
+  using StreamCallback =
+      base::OnceCallback<void(content::DesktopMediaID::Id, SCStream*)>;
+
+  explicit ScreenCaptureKitDeviceMac(
+      const DesktopMediaID& source,
+      SCContentFilter* filter,
+      StreamCallback stream_created_callback,
+      std::unique_ptr<content::PipScreenCaptureCoordinatorProxy>
+          pip_screen_capture_coordinator_proxy)
       : source_(source),
         filter_(filter),
-        device_task_runner_(base::SingleThreadTaskRunner::GetCurrentDefault()) {
+        stream_created_callback_(std::move(stream_created_callback)),
+        device_task_runner_(base::SingleThreadTaskRunner::GetCurrentDefault()),
+        pip_screen_capture_coordinator_proxy_(
+            std::move(pip_screen_capture_coordinator_proxy)) {
     SampleCallback sample_callback = base::BindPostTask(
         device_task_runner_,
         base::BindRepeating(&ScreenCaptureKitDeviceMac::OnStreamSample,
@@ -229,11 +275,19 @@ class API_AVAILABLE(macos(12.3)) ScreenCaptureKitDeviceMac
     helper_ = [[ScreenCaptureKitDeviceHelper alloc]
         initWithSampleCallback:sample_callback
                  errorCallback:error_callback];
+    if (pip_screen_capture_coordinator_proxy_) {
+      pip_screen_capture_coordinator_proxy_->AddObserver(this);
+    }
   }
   ScreenCaptureKitDeviceMac(const ScreenCaptureKitDeviceMac&) = delete;
   ScreenCaptureKitDeviceMac& operator=(const ScreenCaptureKitDeviceMac&) =
       delete;
-  ~ScreenCaptureKitDeviceMac() override = default;
+  ~ScreenCaptureKitDeviceMac() override {
+    DCHECK(device_task_runner_->RunsTasksInCurrentSequence());
+    if (pip_screen_capture_coordinator_proxy_) {
+      pip_screen_capture_coordinator_proxy_->RemoveObserver(this);
+    }
+  }
 
   void OnShareableContentCreated(SCShareableContent* content) {
     DCHECK(device_task_runner_->RunsTasksInCurrentSequence());
@@ -254,8 +308,10 @@ class API_AVAILABLE(macos(12.3)) ScreenCaptureKitDeviceMac
           // fallback. See https://crbug.com/325530044.
           if (source_.id == display.displayID ||
               source_.id == webrtc::kFullDesktopScreenId) {
+            NSArray<SCWindow*>* excluded_windows = GetWindowsToExclude(
+                content, pip_screen_capture_coordinator_proxy_.get(), source_);
             filter = [[SCContentFilter alloc] initWithDisplay:display
-                                             excludingWindows:@[]];
+                                             excludingWindows:excluded_windows];
             stream_config_content_size_ =
                 gfx::Size(display.width, display.height);
             break;
@@ -328,6 +384,9 @@ class API_AVAILABLE(macos(12.3)) ScreenCaptureKitDeviceMac
             FROM_HERE, "Failed addStreamOutput");
         return;
       }
+    }
+    if (stream_created_callback_) {
+      std::move(stream_created_callback_).Run(source_.id, stream_);
     }
 
     auto stream_started_callback = base::BindPostTask(
@@ -439,13 +498,12 @@ class API_AVAILABLE(macos(12.3)) ScreenCaptureKitDeviceMac
                   base::BindOnce(
                       &ScreenCaptureKitDeviceMac::OnUpdateConfigurationError,
                       weak_factory_.GetWeakPtr()));
-          [stream_
-              updateConfiguration:config
-                completionHandler:^(NSError* _Nullable error) {
-                  if (error) {
-                    std::move(on_update_configuration_error).Run();
-                  }
-                }];
+          [stream_ updateConfiguration:config
+                     completionHandler:^(NSError* _Nullable error) {
+                       if (error) {
+                         std::move(on_update_configuration_error).Run();
+                       }
+                     }];
         }
       }
     }
@@ -491,6 +549,69 @@ class API_AVAILABLE(macos(12.3)) ScreenCaptureKitDeviceMac
     DCHECK(device_task_runner_->RunsTasksInCurrentSequence());
     client()->OnError(media::VideoCaptureError::kScreenCaptureKitStreamError,
                       FROM_HERE, "Error on updateConfiguration");
+  }
+
+  void OnShareableContentForFilterUpdate(SCShareableContent* content) {
+    DCHECK(device_task_runner_->RunsTasksInCurrentSequence());
+
+    if (!content || !stream_) {
+      return;
+    }
+
+    SCDisplay* display = nullptr;
+    for (SCDisplay* d in content.displays) {
+      if (source_.id == d.displayID ||
+          source_.id == webrtc::kFullDesktopScreenId) {
+        display = d;
+        break;
+      }
+    }
+
+    if (!display) {
+      return;
+    }
+
+    NSArray<SCWindow*>* excluded_windows = GetWindowsToExclude(
+        content, pip_screen_capture_coordinator_proxy_.get(), source_);
+    SCContentFilter* filter =
+        [[SCContentFilter alloc] initWithDisplay:display
+                                excludingWindows:excluded_windows];
+
+    [stream_
+        updateContentFilter:filter
+          completionHandler:^(NSError* _Nullable error) {
+            if (error) {
+              DLOG(ERROR)
+                  << "Failed to update content filter for PiP window change.";
+            }
+          }];
+  }
+
+  // PipScreenCaptureCoordinatorProxy::Observer:
+  void OnStateChanged(
+      const std::optional<DesktopMediaID::Id>& new_pip_window_id,
+      const GlobalRenderFrameHostId& new_pip_owner_render_frame_host_id,
+      const std::vector<PipScreenCaptureCoordinatorProxy::CaptureInfo>&
+          captures) override {
+    DCHECK(device_task_runner_->RunsTasksInCurrentSequence());
+
+    if (!stream_) {
+      return;
+    }
+
+    if (source_.type != DesktopMediaID::TYPE_SCREEN) {
+      return;
+    }
+
+    auto content_callback = base::BindPostTask(
+        device_task_runner_,
+        base::BindRepeating(
+            &ScreenCaptureKitDeviceMac::OnShareableContentForFilterUpdate,
+            weak_factory_.GetWeakPtr()));
+    auto handler = ^(SCShareableContent* content, NSError* error) {
+      content_callback.Run(content);
+    };
+    [SCShareableContent getShareableContentWithCompletionHandler:handler];
   }
 
   // IOSurfaceCaptureDeviceBase:
@@ -570,6 +691,7 @@ class API_AVAILABLE(macos(12.3)) ScreenCaptureKitDeviceMac
  private:
   const DesktopMediaID source_;
   SCContentFilter* const filter_;
+  StreamCallback stream_created_callback_;
   const scoped_refptr<base::SingleThreadTaskRunner> device_task_runner_;
 
   // The actual format of the video frames that are sent to `client`.
@@ -589,6 +711,8 @@ class API_AVAILABLE(macos(12.3)) ScreenCaptureKitDeviceMac
   // If this happens, the module will call the ResetStreamTo function.
   std::unique_ptr<ScreenCaptureKitFullscreenModule> fullscreen_module_;
 
+  std::unique_ptr<PipScreenCaptureCoordinatorProxy>
+      pip_screen_capture_coordinator_proxy_;
   bool is_resetting_ = false;
 
   // The stream that does the capturing.
@@ -604,7 +728,10 @@ class API_AVAILABLE(macos(12.3)) ScreenCaptureKitDeviceMac
 API_AVAILABLE(macos(13.2))
 std::unique_ptr<media::VideoCaptureDevice> CreateScreenCaptureKitDeviceMac(
     const DesktopMediaID& source,
-    SCContentFilter* filter) {
+    SCContentFilter* filter,
+    ScreenCaptureKitDeviceMac::StreamCallback callback,
+    std::unique_ptr<content::PipScreenCaptureCoordinatorProxy>
+        pip_screen_capture_coordinator_proxy) {
   switch (source.type) {
     case DesktopMediaID::TYPE_SCREEN:
       // ScreenCaptureKitDeviceMac only supports a single display at a time.
@@ -633,7 +760,9 @@ std::unique_ptr<media::VideoCaptureDevice> CreateScreenCaptureKitDeviceMac(
                                      ? SCREEN_CAPTURER_CREATED_WITH_AUDIO
                                      : SCREEN_CAPTURER_CREATED_WITHOUT_AUDIO);
 
-  return std::make_unique<ScreenCaptureKitDeviceMac>(source, filter);
+  return std::make_unique<ScreenCaptureKitDeviceMac>(
+      source, filter, std::move(callback),
+      std::move(pip_screen_capture_coordinator_proxy));
 }
 
 }  // namespace content

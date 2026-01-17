@@ -354,6 +354,12 @@ void DisplayLockContext::DidStyleChildren() {
   element_->MarkAncestorsWithChildNeedsReattachLayoutTree();
 }
 
+bool DisplayLockContext::ShouldActivateForScreenReader() const {
+  return document_->GetStyleEngine().SkippedContainerRecalc() &&
+         IsActivatable(DisplayLockActivationReason::kAccessibility) &&
+         IsScreenReaderActive();
+}
+
 void DisplayLockContext::DidLayoutChildren() {
   // Since we did layout on children already, we'll clear this.
   child_layout_was_blocked_ = false;
@@ -511,8 +517,8 @@ void DisplayLockContext::ScheduleStateChangeEventIfNeeded() {
         ->GetTaskRunner(TaskType::kMiscPlatformAPI)
         ->PostTask(
             FROM_HERE,
-            WTF::BindOnce(&DisplayLockContext::DispatchStateChangeEventIfNeeded,
-                          WrapPersistent(this)));
+            BindOnce(&DisplayLockContext::DispatchStateChangeEventIfNeeded,
+                     WrapPersistent(this)));
     state_change_task_pending_ = true;
   }
 }
@@ -698,6 +704,7 @@ bool DisplayLockContext::MarkForLayoutIfNeeded() {
 bool DisplayLockContext::MarkAncestorsForPrePaintIfNeeded() {
   // TODO(vmpstr): We should add a compositing phase for proper bookkeeping.
   bool compositing_dirtied = MarkForCompositingUpdatesIfNeeded();
+  bool visual_overflow_dirtied = MarkForVisualOverflowRecalcIfNeeded();
 
   if (IsElementDirtyForPrePaint()) {
     auto* layout_object = element_->GetLayoutObject();
@@ -731,7 +738,7 @@ bool DisplayLockContext::MarkAncestorsForPrePaintIfNeeded() {
     }
     return true;
   }
-  return compositing_dirtied;
+  return compositing_dirtied || visual_overflow_dirtied;
 }
 
 bool DisplayLockContext::MarkNeedsRepaintAndPaintArtifactCompositorUpdate() {
@@ -766,6 +773,28 @@ bool DisplayLockContext::MarkForCompositingUpdatesIfNeeded() {
     if (needs_compositing_dependent_flag_update_)
       layout_box->Layer()->SetNeedsCompositingInputsUpdate();
     needs_compositing_dependent_flag_update_ = false;
+
+    return true;
+  }
+  return false;
+}
+
+bool DisplayLockContext::MarkForVisualOverflowRecalcIfNeeded() {
+  if (!ConnectedToView() || !needs_visual_overflow_recalc_update_) {
+    return false;
+  }
+
+  auto* layout_object = element_->GetLayoutObject();
+  if (!layout_object) {
+    return false;
+  }
+
+  auto* layout_box = DynamicTo<LayoutBoxModelObject>(layout_object);
+  if (layout_box && layout_box->HasSelfPaintingLayer()) {
+    if (needs_visual_overflow_recalc_update_) {
+      layout_box->Layer()->SetNeedsVisualOverflowRecalc();
+    }
+    needs_visual_overflow_recalc_update_ = false;
 
     return true;
   }
@@ -1288,7 +1317,7 @@ bool DisplayLockContext::DescendantIsAnchorTargetFromOutsideDisplayLock() {
       for (const PhysicalBoxFragment& fragment :
            ancestor_box->PhysicalFragments()) {
         // Early out if there are no anchor targets in the subtree.
-        if (!fragment.HasAnchorQuery()) {
+        if (!fragment.HasChildAnchors()) {
           return false;
         }
         // Early out if there are not OOF children.
@@ -1386,7 +1415,8 @@ void DisplayLockContext::RestoreScrollOffsetIfStashed() {
   // Restore the offset and reset the value.
   if (auto* area = GetScrollableArea(element_)) {
     area->SetScrollOffset(*stashed_scroll_offset_,
-                          mojom::blink::ScrollType::kAnchoring);
+                          mojom::blink::ScrollType::kAnchoring,
+                          cc::ScrollSourceType::kStationaryScroll);
     stashed_scroll_offset_.reset();
   }
 }

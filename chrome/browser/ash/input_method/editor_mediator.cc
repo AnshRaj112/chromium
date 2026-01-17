@@ -10,7 +10,6 @@
 #include "ash/constants/ash_pref_names.h"
 #include "ash/shell.h"
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/strings/utf_offset_string_conversions.h"
 #include "chrome/browser/ash/input_method/editor_consent_enums.h"
@@ -22,7 +21,7 @@
 #include "chrome/browser/ash/input_method/editor_text_query_from_memory.h"
 #include "chrome/browser/ash/input_method/editor_text_query_provider.h"
 #include "chrome/browser/ash/input_method/editor_transition_enums.h"
-#include "chrome/browser/ash/magic_boost/magic_boost_controller_ash.h"
+#include "chrome/browser/ash/magic_boost/magic_boost_controller.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/ui/webui/ash/mako/mako_bubble_coordinator.h"
 #include "chromeos/ash/components/editor_menu/public/cpp/editor_consent_status.h"
@@ -62,14 +61,13 @@ std::optional<orca::mojom::ContextPtr> CreateContext(const std::u16string& text,
   return context;
 }
 
-crosapi::mojom::MagicBoostController::TransitionAction
-ConvertToMagicBoostTransitionAction(EditorNoticeTransitionAction action) {
+magic_boost::TransitionAction ConvertToMagicBoostTransitionAction(
+    EditorNoticeTransitionAction action) {
   switch (action) {
     case EditorNoticeTransitionAction::kDoNothing:
-      return crosapi::mojom::MagicBoostController::TransitionAction::kDoNothing;
+      return magic_boost::TransitionAction::kDoNothing;
     case EditorNoticeTransitionAction::kShowEditorPanel:
-      return crosapi::mojom::MagicBoostController::TransitionAction::
-          kShowEditorPanel;
+      return magic_boost::TransitionAction::kShowEditorPanel;
   }
 }
 
@@ -91,8 +89,7 @@ EditorMediator::EditorMediator(
           std::make_unique<EditorConsentStore>(profile->GetPrefs(),
                                                metrics_recorder_.get())),
       announcer_(kAnnouncementViewName) {
-  editor_context_.OnTabletModeUpdated(
-      display::Screen::GetScreen()->InTabletMode());
+  editor_context_.OnTabletModeUpdated(display::Screen::Get()->InTabletMode());
 }
 
 EditorMediator::~EditorMediator() = default;
@@ -280,12 +277,11 @@ void EditorMediator::HandleTrigger(
 
 void EditorMediator::ShowNotice(
     EditorNoticeTransitionAction transition_action) {
-  if (chromeos::MagicBoostState::Get()->IsMagicBoostAvailable()) {
-    ash::MagicBoostControllerAsh::Get()->ShowDisclaimerUi(
-        /*display_id=*/display::Screen::GetScreen()->GetPrimaryDisplay().id(),
-        /*action=*/
+  if (chromeos::MagicBoostState::Get()->IsUserEligibleForGenAIFeatures()) {
+    ash::MagicBoostController::Get()->ShowDisclaimerUi(
+        display::Screen::Get()->GetPrimaryDisplay().id(),
         ConvertToMagicBoostTransitionAction(transition_action),
-        /*opt_in_features=*/OptInFeatures::kOrcaAndHmr);
+        magic_boost::OptInFeatures::kOrcaAndHmr);
     return;
   }
 

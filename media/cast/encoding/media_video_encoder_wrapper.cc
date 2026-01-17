@@ -13,7 +13,6 @@
 #include "base/functional/callback_helpers.h"
 #include "base/task/bind_post_task.h"
 #include "base/task/thread_pool.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "media/base/async_destroy_video_encoder.h"
 #include "media/base/encoder_status.h"
 #include "media/base/media_util.h"
@@ -69,7 +68,7 @@ std::unique_ptr<media::VideoEncoder> CreateSoftwareEncoder(VideoCodec codec) {
       return std::make_unique<media::Av1VideoEncoder>();
 #endif  // BUILDFLAG(ENABLE_LIBAOM)
     default:
-      NOTREACHED() << "Unhandled codec. value=" << base::to_underlying(codec);
+      NOTREACHED() << "Unhandled codec. value=" << std::to_underlying(codec);
   }
 }
 
@@ -87,7 +86,7 @@ VideoCodecProfile ToProfile(VideoCodec codec) {
     case VideoCodec::kAV1:
       return AV1PROFILE_PROFILE_MAIN;
     default:
-      NOTREACHED() << "Unhandled codec. value=" << base::to_underlying(codec);
+      NOTREACHED() << "Unhandled codec. value=" << std::to_underlying(codec);
   }
 }
 
@@ -219,7 +218,7 @@ bool MediaVideoEncoderWrapper::EncodeVideoFrame(
   // TODO(crbug.com/282984511): consider adding optimization to store frames
   // that are queued for encoding and sending them once updating options is
   // complete.
-  if (is_updating_options_) {
+  if (num_pending_updates_ > 0) {
     return false;
   }
 
@@ -422,8 +421,7 @@ base::TimeDelta MediaVideoEncoderWrapper::GetFrameDuration(
 // ChangeOptions(). This results in this annoying set of nested callbacks.
 void MediaVideoEncoderWrapper::UpdateEncoderOptions() {
   CHECK(cast_environment_->CurrentlyOn(CastEnvironment::ThreadId::kMain));
-  CHECK(!is_updating_options_);
-  is_updating_options_ = true;
+  num_pending_updates_++;
 
   // Once the Flush() call is complete, we can safely call ChangeOptions() on
   // the encoder.
@@ -475,11 +473,7 @@ void MediaVideoEncoderWrapper::OnFrameEncodeDone(base::TimeTicks reference_time,
 
 void MediaVideoEncoderWrapper::OnOptionsUpdated(EncoderStatus status) {
   CHECK(cast_environment_->CurrentlyOn(CastEnvironment::ThreadId::kMain));
-  // Now that we are done updating options we can begin encoding frames
-  // again.
-  is_updating_options_ = false;
-
-  // Call the more generic encode status method as well.
+  --num_pending_updates_;
   OnEncoderStatus(status);
 }
 

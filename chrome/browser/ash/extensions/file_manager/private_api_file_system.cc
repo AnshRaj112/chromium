@@ -36,7 +36,6 @@
 #include "base/system/sys_info.h"
 #include "base/task/thread_pool.h"
 #include "base/threading/platform_thread.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "base/values.h"
 #include "chrome/browser/ash/app_list/search/local_image_search/local_image_search_service.h"
 #include "chrome/browser/ash/app_list/search/local_image_search/local_image_search_service_factory.h"
@@ -143,13 +142,14 @@ const char kRootPath[] = "/";
 void GetSizeStatsAsync(const base::FilePath& mount_path,
                        uint64_t* total_size,
                        uint64_t* remaining_size) {
-  int64_t size = base::SysInfo::AmountOfTotalDiskSpace(mount_path);
-  if (size >= 0) {
-    *total_size = size;
+  std::optional<int64_t> size =
+      base::SysInfo::AmountOfTotalDiskSpace(mount_path);
+  if (size) {
+    *total_size = *size;
   }
   size = base::SysInfo::AmountOfFreeDiskSpace(mount_path);
-  if (size >= 0) {
-    *remaining_size = size;
+  if (size) {
+    *remaining_size = *size;
   }
 }
 
@@ -185,7 +185,7 @@ ash::disks::FormatFileSystemType ApiFormatFileSystemToChromeEnum(
       return ash::disks::FormatFileSystemType::kNtfs;
   }
   NOTREACHED() << "Unknown format filesystem "
-               << base::to_underlying(filesystem);
+               << std::to_underlying(filesystem);
 }
 
 std::optional<file_manager::io_task::OperationType> IoTaskTypeToChromeEnum(
@@ -212,7 +212,7 @@ std::optional<file_manager::io_task::OperationType> IoTaskTypeToChromeEnum(
     case api::file_manager_private::IoTaskType::kNone:
       return {};
   }
-  NOTREACHED() << "Unknown I/O task type " << base::to_underlying(type);
+  NOTREACHED() << "Unknown I/O task type " << std::to_underlying(type);
 }
 
 extensions::api::file_manager_private::DlpLevel DlpRulesManagerLevelToApiEnum(
@@ -266,7 +266,7 @@ policy::FilesDialogType ApiPolicyDialogTypeToChromeEnum(
     case api::file_manager_private::PolicyDialogType::kError:
       return policy::FilesDialogType::kError;
   }
-  NOTREACHED() << "Unknown policy dialog type " << base::to_underlying(type);
+  NOTREACHED() << "Unknown policy dialog type " << std::to_underlying(type);
 }
 
 std::optional<policy::Policy> ApiPolicyErrorTypeToChromeEnum(
@@ -279,9 +279,9 @@ std::optional<policy::Policy> ApiPolicyErrorTypeToChromeEnum(
     case api::file_manager_private::PolicyErrorType::kNone:
       return std::nullopt;
     case api::file_manager_private::PolicyErrorType::kDlpWarningTimeout:
-      NOTREACHED() << "Unexpected policy type " << base::to_underlying(type);
+      NOTREACHED() << "Unexpected policy type " << std::to_underlying(type);
   }
-  NOTREACHED() << "Unknown policy error type " << base::to_underlying(type);
+  NOTREACHED() << "Unknown policy error type " << std::to_underlying(type);
 }
 
 // Handles a callback from the LocalImageSearchService. The job of this function
@@ -1171,7 +1171,7 @@ FileManagerPrivateGetDialogCallerFunction::Run() {
     }
     if (caller->component().has_value()) {
       info.Set("component",
-               base::to_underlying(DlpRulesManagerComponentToApiEnum(
+               std::to_underlying(DlpRulesManagerComponentToApiEnum(
                    caller->component().value())));
     }
   }
@@ -1292,8 +1292,7 @@ FileManagerPrivateInternalSearchFilesFunction::Run() {
     root_path = url.path();
   }
 
-  size_t max_results =
-      base::internal::checked_cast<size_t>(search_params.max_results);
+  size_t max_results = base::checked_cast<size_t>(search_params.max_results);
   base::Time modified_time = base::Time::FromMillisecondsSinceUnixEpoch(
       search_params.modified_timestamp);
 
@@ -1370,7 +1369,7 @@ void FileManagerPrivateInternalSearchFilesFunction::OnSearchByPatternDone(
   std::set<base::FilePath> found;
   for (const auto& results : all_results) {
     for (const auto& [file_path, is_directory] : results) {
-      if (base::Contains(found, file_path)) {
+      if (found.contains(file_path)) {
         continue;
       }
       found.insert(file_path);

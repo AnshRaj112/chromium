@@ -7,8 +7,7 @@
 
 #include "base/component_export.h"
 #include "base/time/time.h"
-#include "components/optimization_guide/core/model_execution/feature_keys.h"
-#include "components/optimization_guide/proto/model_execution.pb.h"
+#include "components/optimization_guide/public/mojom/model_broker.mojom-forward.h"
 #include "components/prefs/prefs_export.h"
 
 class PrefRegistrySimple;
@@ -60,25 +59,22 @@ extern const char kGenAILocalFoundationalModelEnterprisePolicySettings[];
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 bool IsLocalFoundationalModelEnterprisePolicyAllowed();
 
+COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
+extern const char kOnDeviceAiUserSettingsEnabled[];
+
 }  // namespace localstate
 
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 void RegisterLocalStatePrefs(PrefRegistrySimple* registry);
 
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
-void RegisterLegacyUsagePrefsForMigration(PrefRegistrySimple* registry);
-
-COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
-void MigrateLegacyUsagePrefs(PrefService* local_state);
-
-COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 void PruneOldUsagePrefs(PrefService* local_state);
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 void RecordFeatureUsage(PrefService* local_state,
-                        ModelBasedCapabilityKey feature);
+                        mojom::OnDeviceFeature feature);
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 bool WasFeatureRecentlyUsed(const PrefService* local_state,
-                            ModelBasedCapabilityKey feature);
+                            mojom::OnDeviceFeature feature);
 
 }  // namespace optimization_guide::model_execution::prefs
 

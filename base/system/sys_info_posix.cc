@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "base/system/sys_info.h"
 
 #include <errno.h>
@@ -17,18 +12,22 @@
 #include <sys/param.h>
 #include <sys/resource.h>
 #include <sys/utsname.h>
-#include <unistd.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
+#include <type_traits>
 
 #include "base/check.h"
+#include "base/compiler_specific.h"
 #include "base/files/file_util.h"
-#include "base/lazy_instance.h"
+#include "base/memory/page_size.h"
+#include "base/no_destructor.h"
 #include "base/notimplemented.h"
 #include "base/notreached.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/system/sys_info_internal.h"
@@ -53,18 +52,16 @@
 
 namespace {
 
-uint64_t AmountOfVirtualMemory() {
+base::ByteSize AmountOfVirtualMemory() {
   struct rlimit limit;
   int result = getrlimit(RLIMIT_DATA, &limit);
   if (result != 0) {
     NOTREACHED();
   }
-  return limit.rlim_cur == RLIM_INFINITY ? 0 : limit.rlim_cur;
+  return base::ByteSize(limit.rlim_cur == RLIM_INFINITY ? 0 : limit.rlim_cur);
 }
-
-base::LazyInstance<
-    base::internal::LazySysInfoValue<uint64_t, AmountOfVirtualMemory>>::Leaky
-    g_lazy_virtual_memory = LAZY_INSTANCE_INITIALIZER;
+using LazyVirtualMemory =
+    base::internal::LazySysInfoValue<base::ByteSize, AmountOfVirtualMemory>;
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
 bool IsStatsZeroIfUnlimited(const base::FilePath& path) {
@@ -126,8 +123,8 @@ void GetKernelVersionNumbers(int32_t* major_version,
                              int32_t* bugfix_version) {
   struct utsname info;
   CHECK_EQ(uname(&info), 0);
-  int num_read = sscanf(info.release, "%d.%d.%d", major_version, minor_version,
-                        bugfix_version);
+  int num_read = UNSAFE_TODO(sscanf(info.release, "%d.%d.%d", major_version,
+                                    minor_version, bugfix_version));
   if (num_read < 1) {
     *major_version = 0;
   }
@@ -202,31 +199,35 @@ int SysInfo::NumberOfProcessors() {
 #endif  // !BUILDFLAG(IS_OPENBSD)
 
 // static
-uint64_t SysInfo::AmountOfVirtualMemory() {
-  return g_lazy_virtual_memory.Get().value();
+ByteSize SysInfo::AmountOfVirtualMemory() {
+  static_assert(std::is_trivially_destructible<LazyVirtualMemory>::value);
+  static LazyVirtualMemory virtual_memory;
+  return virtual_memory.value();
 }
 
 // static
-int64_t SysInfo::AmountOfFreeDiskSpace(const FilePath& path) {
+std::optional<int64_t> SysInfo::AmountOfFreeDiskSpace(const FilePath& path) {
   base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
                                                 base::BlockingType::MAY_BLOCK);
 
   int64_t available;
   if (!GetDiskSpaceInfo(path, &available, nullptr)) {
-    return -1;
+    return std::nullopt;
   }
+  CHECK(available >= 0, base::NotFatalUntil::M150);
   return available;
 }
 
 // static
-int64_t SysInfo::AmountOfTotalDiskSpace(const FilePath& path) {
+std::optional<int64_t> SysInfo::AmountOfTotalDiskSpace(const FilePath& path) {
   base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
                                                 base::BlockingType::MAY_BLOCK);
 
   int64_t total;
   if (!GetDiskSpaceInfo(path, nullptr, &total)) {
-    return -1;
+    return std::nullopt;
   }
+  CHECK(total >= 0, base::NotFatalUntil::M150);
   return total;
 }
 
@@ -294,8 +295,46 @@ std::string SysInfo::OperatingSystemArchitecture() {
 
 // static
 size_t SysInfo::VMAllocationGranularity() {
-  return checked_cast<size_t>(getpagesize());
+  return GetPageSize();
 }
+
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
+
+namespace {
+std::vector<uint64_t> MaxFrequencyPerProcessorImpl() {
+  int num_cpus = base::SysInfo::NumberOfProcessors();
+  std::vector<uint64_t> max_core_frequencies(static_cast<size_t>(num_cpus), 0);
+
+  for (int core_index = 0; core_index < num_cpus; ++core_index) {
+    std::string content;
+    auto path = StringPrintf(
+        "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", core_index);
+    // The file may not exist, depending on whether there is a cpufreq
+    // driver. For instance, this is not present on virtual machines.
+    if (!ReadFileToStringNonBlocking(base::FilePath(path), &content)) {
+      return {};
+    }
+    uint32_t frequency_khz = 0;
+    if (!StringToUint(base::TrimWhitespaceASCII(content, TRIM_ALL),
+                      &frequency_khz)) {
+      return {};
+    }
+    max_core_frequencies[static_cast<size_t>(core_index)] =
+        static_cast<uint64_t>(frequency_khz) * 1000;
+  }
+
+  return max_core_frequencies;
+}
+}  // namespace
+
+// static
+const std::vector<uint64_t>& SysInfo::MaxFrequencyPerProcessor() {
+  static base::NoDestructor<std::vector<uint64_t>> result(
+      MaxFrequencyPerProcessorImpl());
+  return *result;
+}
+
+#endif
 
 #if !BUILDFLAG(IS_APPLE)
 // static
@@ -303,35 +342,24 @@ int SysInfo::NumberOfEfficientProcessorsImpl() {
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
   // Try to guess the CPU architecture and cores of each cluster by comparing
   // the maximum frequencies of the available (online and offline) cores.
-  int num_cpus = SysInfo::NumberOfProcessors();
-  DCHECK_GE(num_cpus, 0);
-  std::vector<uint32_t> max_core_frequencies_khz(static_cast<size_t>(num_cpus),
-                                                 0);
-  for (int core_index = 0; core_index < num_cpus; ++core_index) {
-    std::string content;
-    auto path = StringPrintf(
-        "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", core_index);
-    if (!ReadFileToStringNonBlocking(FilePath(path), &content)) {
-      return 0;
-    }
-    if (!StringToUint(
-            content,
-            &max_core_frequencies_khz[static_cast<size_t>(core_index)])) {
-      return 0;
-    }
-  }
+  const std::vector<uint64_t>& max_core_frequencies =
+      MaxFrequencyPerProcessor();
 
-  auto [min_max_core_frequencies_khz_it, max_max_core_frequencies_khz_it] =
-      std::minmax_element(max_core_frequencies_khz.begin(),
-                          max_core_frequencies_khz.end());
-
-  if (*min_max_core_frequencies_khz_it == *max_max_core_frequencies_khz_it) {
+  if (max_core_frequencies.empty()) {
     return 0;
   }
 
-  return static_cast<int>(std::count(max_core_frequencies_khz.begin(),
-                                     max_core_frequencies_khz.end(),
-                                     *min_max_core_frequencies_khz_it));
+  auto [min_max_core_frequencies_it, max_max_core_frequencies_it] =
+      std::minmax_element(max_core_frequencies.begin(),
+                          max_core_frequencies.end());
+
+  if (*min_max_core_frequencies_it == *max_max_core_frequencies_it) {
+    return 0;
+  }
+
+  return static_cast<int>(std::count(max_core_frequencies.begin(),
+                                     max_core_frequencies.end(),
+                                     *min_max_core_frequencies_it));
 #else
   NOTIMPLEMENTED();
   return 0;

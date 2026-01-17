@@ -6,6 +6,7 @@
 #define COMPONENTS_PREFS_ANDROID_PREF_SERVICE_ANDROID_H_
 
 #include "base/android/jni_android.h"
+#include "base/component_export.h"
 #include "base/memory/raw_ptr.h"
 #include "components/prefs/prefs_export.h"
 
@@ -27,51 +28,48 @@ class COMPONENTS_PREFS_EXPORT PrefServiceAndroid {
   base::android::ScopedJavaLocalRef<jobject> GetJavaObject();
 
   void ClearPref(JNIEnv* env,
-                 const base::android::JavaParamRef<jstring>& j_preference);
-  jboolean HasPrefPath(
-      JNIEnv* env,
-      const base::android::JavaParamRef<jstring>& j_preference);
-  jboolean GetBoolean(JNIEnv* env,
-                      const base::android::JavaParamRef<jstring>& j_preference);
+                 const base::android::JavaRef<jstring>& j_preference);
+  bool HasPrefPath(JNIEnv* env,
+                   const base::android::JavaRef<jstring>& j_preference);
+  bool GetBoolean(JNIEnv* env,
+                  const base::android::JavaRef<jstring>& j_preference);
   void SetBoolean(JNIEnv* env,
-                  const base::android::JavaParamRef<jstring>& j_preference,
-                  const jboolean j_value);
-  jint GetInteger(JNIEnv* env,
-                  const base::android::JavaParamRef<jstring>& j_preference);
+                  const base::android::JavaRef<jstring>& j_preference,
+                  const bool j_value);
+  int32_t GetInteger(JNIEnv* env,
+                     const base::android::JavaRef<jstring>& j_preference);
   void SetInteger(JNIEnv* env,
-                  const base::android::JavaParamRef<jstring>& j_preference,
-                  const jint j_value);
+                  const base::android::JavaRef<jstring>& j_preference,
+                  const int32_t j_value);
   jdouble GetDouble(JNIEnv* env,
-                    const base::android::JavaParamRef<jstring>& j_preference);
+                    const base::android::JavaRef<jstring>& j_preference);
   void SetDouble(JNIEnv* env,
-                 const base::android::JavaParamRef<jstring>& j_preference,
+                 const base::android::JavaRef<jstring>& j_preference,
                  const jdouble j_value);
   jlong GetLong(JNIEnv* env,
-                const base::android::JavaParamRef<jstring>& j_preference);
+                const base::android::JavaRef<jstring>& j_preference);
   void SetLong(JNIEnv* env,
-               const base::android::JavaParamRef<jstring>& j_preference,
+               const base::android::JavaRef<jstring>& j_preference,
                const jlong j_value);
   base::android::ScopedJavaLocalRef<jstring> GetString(
       JNIEnv* env,
-      const base::android::JavaParamRef<jstring>& j_preference);
+      const base::android::JavaRef<jstring>& j_preference);
   void SetString(JNIEnv* env,
-                 const base::android::JavaParamRef<jstring>& j_preference,
-                 const base::android::JavaParamRef<jstring>& j_value);
-  jboolean IsManagedPreference(
+                 const base::android::JavaRef<jstring>& j_preference,
+                 const base::android::JavaRef<jstring>& j_value);
+  bool IsManagedPreference(JNIEnv* env,
+                           const base::android::JavaRef<jstring>& j_preference);
+  bool HasRecommendation(JNIEnv* env,
+                         const base::android::JavaRef<jstring>& j_preference);
+  bool IsFollowingRecommendation(
       JNIEnv* env,
-      const base::android::JavaParamRef<jstring>& j_preference);
-  jboolean HasRecommendation(
+      const base::android::JavaRef<jstring>& j_preference);
+  bool IsRecommendedPreference(
       JNIEnv* env,
-      const base::android::JavaParamRef<jstring>& j_preference);
-  jboolean IsFollowingRecommendation(
+      const base::android::JavaRef<jstring>& j_preference);
+  bool IsDefaultValuePreference(
       JNIEnv* env,
-      const base::android::JavaParamRef<jstring>& j_preference);
-  jboolean IsRecommendedPreference(
-      JNIEnv* env,
-      const base::android::JavaParamRef<jstring>& j_preference);
-  jboolean IsDefaultValuePreference(
-      JNIEnv* env,
-      const base::android::JavaParamRef<jstring>& j_preference);
+      const base::android::JavaRef<jstring>& j_preference);
 
  private:
   raw_ptr<PrefService> pref_service_;
@@ -84,6 +82,11 @@ inline PrefService* FromJniType<PrefService*>(JNIEnv* env,
                                               const JavaRef<jobject>& obj) {
   return PrefServiceAndroid::FromPrefServiceAndroid(obj);
 }
+
+template <>
+COMPONENTS_PREFS_EXPORT ScopedJavaLocalRef<jobject> ToJniType<PrefService>(
+    JNIEnv* env,
+    PrefService* pref_service);
 }  // namespace jni_zero
 
 #endif  // COMPONENTS_PREFS_ANDROID_PREF_SERVICE_ANDROID_H_

@@ -4,6 +4,7 @@
 
 #include "content/browser/tracing/background_tracing_manager_impl.h"
 
+#include <algorithm>
 #include <optional>
 #include <utility>
 
@@ -24,6 +25,7 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/threading/sequence_bound.h"
 #include "base/time/time.h"
+#include "base/trace_event/trace_event.h"
 #include "base/tracing/trace_time.h"
 #include "base/uuid.h"
 #include "base/values.h"
@@ -632,7 +634,8 @@ BackgroundTracingManagerImpl::GetAllScenarios() const {
     new_scenario->scenario_name = scenario->scenario_name();
     new_scenario->description = scenario->description();
     new_scenario->is_local_scenario = scenario->is_local_scenario();
-    new_scenario->is_enabled = base::Contains(enabled_scenarios_, scenario);
+    new_scenario->is_enabled =
+        std::ranges::contains(enabled_scenarios_, scenario);
     new_scenario->current_state = scenario->current_state();
     return new_scenario;
   };
@@ -1027,7 +1030,7 @@ bool BackgroundTracingManagerImpl::DoEmitNamedTrigger(
   }
   for (BackgroundTracingRule& obs : it->second) {
     if (obs.OnRuleTriggered(value, flow_id)) {
-      TRACE_EVENT_INSTANT("toplevel,latency", "NamedTrigger",
+      TRACE_EVENT_INSTANT("tracing.background", "NamedTrigger",
                           perfetto::Flow::Global(flow_id));
       return true;
     }

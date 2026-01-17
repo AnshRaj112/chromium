@@ -17,17 +17,17 @@ class Profile;
 // biometric authentication requests.
 class ReauthenticatorBridge {
  public:
-  ReauthenticatorBridge(const base::android::JavaParamRef<jobject>& java_bridge,
-                        const base::android::JavaParamRef<jobject>& activity,
+  ReauthenticatorBridge(const base::android::JavaRef<jobject>& java_bridge,
+                        const base::android::JavaRef<jobject>& activity,
                         Profile* profile,
-                        jint requester);
+                        int32_t requester);
   ~ReauthenticatorBridge();
 
   ReauthenticatorBridge(const ReauthenticatorBridge&) = delete;
   ReauthenticatorBridge& operator=(const ReauthenticatorBridge&) = delete;
 
   // Called by Java to check biometric availability status.
-  jint GetBiometricAvailabilityStatus(JNIEnv* env);
+  int32_t GetBiometricAvailabilityStatus(JNIEnv* env);
 
   // Called by Java to start authentication.
   void Reauthenticate(JNIEnv* env);

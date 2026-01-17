@@ -3,10 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/config/apple/mobile_config.gni")
-import("//build/config/features.gni")
 import("//build/config/ui.gni")
 import("//media/media_options.gni")
-import("//services/video_effects/args.gni")
 import("//testing/test.gni")
 import("//third_party/webrtc/webrtc.gni")
 
@@ -123,6 +121,8 @@ component("capture_lib") {
     "video/create_video_capture_device_factory.cc",
     "video/create_video_capture_device_factory.h",
     "video/scoped_buffer_pool_reservation.h",
+    "video/shared_image_buffer_tracker.cc",
+    "video/shared_image_buffer_tracker.h",
     "video/shared_memory_buffer_tracker.cc",
     "video/shared_memory_buffer_tracker.h",
     "video/video_capture_buffer_pool.h",
@@ -161,18 +161,10 @@ component("capture_lib") {
     "//media/mojo/mojom",
     "//services/service_manager/public/cpp",
     "//services/video_capture/public/mojom",
-    "//services/video_effects/buildflags",
     "//third_party/libyuv",
     "//ui/display",
     "//ui/gfx",
   ]
-
-  if (enable_video_effects) {
-    sources += [
-      "video/video_capture_effects_processor.cc",
-      "video/video_capture_effects_processor.h",
-    ]
-  }
 
   if (is_android) {
     public_deps += [ "video/android" ]
@@ -226,6 +218,11 @@ component("capture_lib") {
       "video/mac/video_capture_metrics_mac.mm",
     ]
     deps += [ "//third_party/decklink" ]
+    frameworks += [
+      # Needed for the logging of camera information for
+      # https://crbug.com/461717105; remove when that logging is removed.
+      "CoreMediaIO.framework",
+    ]
   }
 
   if (is_ios) {
@@ -428,6 +425,7 @@ source_set("test_support") {
   deps = [
     ":capture_lib",
     "//base/test:test_support",
+    "//gpu:test_support",
     "//gpu/command_buffer/client",
     "//gpu/command_buffer/common",
     "//media:test_support",
@@ -481,10 +479,6 @@ test("capture_unittests") {
     "video_capture_types_unittest.cc",
   ]
 
-  if (enable_video_effects) {
-    sources += [ "video/video_capture_effects_processor_unittest.cc" ]
-  }
-
   data = [ "//media/test/data/bear.mjpeg" ]
 
   deps = [
@@ -499,19 +493,11 @@ test("capture_unittests") {
     "//media/capture/mojom:image_capture_types",
     "//mojo/core/embedder",
     "//services/video_capture/public/mojom",
-    "//services/video_effects/buildflags",
     "//testing/gmock",
     "//testing/gtest",
     "//third_party/libyuv",
     "//ui/gfx:test_support",
   ]
-
-  if (enable_video_effects) {
-    deps += [
-      "//components/viz/test:test_support",
-      "//services/video_effects/test:test_support",
-    ]
-  }
 
   if (is_linux) {
     sources += [

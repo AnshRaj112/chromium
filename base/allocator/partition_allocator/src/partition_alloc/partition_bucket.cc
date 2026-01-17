@@ -32,6 +32,7 @@
 #include "partition_alloc/partition_page.h"
 #include "partition_alloc/partition_root.h"
 #include "partition_alloc/reservation_offset_table.h"
+#include "partition_alloc/slot_start.h"
 #include "partition_alloc/tagging.h"
 
 namespace partition_alloc::internal {
@@ -234,7 +235,7 @@ SlotSpanMetadata* PartitionDirectMap(PartitionRoot* root,
     // Note that this only affects allocations that are not served out of the
     // thread cache, but as a simple example the buffer partition in blink is
     // frequently used for large allocations (e.g. ArrayBuffer), and frequent,
-    // small ones (e.g. WTF::String), and does not have a thread cache.
+    // small ones (e.g. blink::String), and does not have a thread cache.
     ScopedUnlockGuard scoped_unlock{PartitionRootLock(root)};
 
     const size_t slot_size = PartitionRoot::GetDirectMapSlotSize(raw_size);
@@ -276,8 +277,8 @@ SlotSpanMetadata* PartitionDirectMap(PartitionRoot* root,
         reservation_size, std::memory_order_relaxed);
 
     // Shift by 1 partition page (metadata + guard pages) and alignment padding.
-    const uintptr_t slot_start =
-        reservation_start + PartitionPageSize() + padding_for_alignment;
+    const auto slot_start = UntaggedSlotStart::Unchecked(
+        reservation_start + PartitionPageSize() + padding_for_alignment);
 
     uintptr_t metadata_start = PartitionSuperPageToMetadataPage(
         reservation_start, root->MetadataOffset());
@@ -320,9 +321,9 @@ SlotSpanMetadata* PartitionDirectMap(PartitionRoot* root,
     PA_DCHECK(!super_page_extent->number_of_consecutive_super_pages);
     PA_DCHECK(!super_page_extent->next);
 
-    PartitionPageMetadata* first_page_metadata =
-        reinterpret_cast<PartitionPageMetadata*>(super_page_extent) + 1;
-    page_metadata = PartitionPageMetadata::FromAddr(slot_start, root);
+    PartitionPageMetadata* first_page_metadata = PA_UNSAFE_TODO(
+        reinterpret_cast<PartitionPageMetadata*>(super_page_extent) + 1);
+    page_metadata = PartitionPageMetadata::FromAddr(slot_start.value(), root);
     // |first_page_metadata| and |page_metadata| may be equal, if there is no
     // alignment padding.
     if (page_metadata != first_page_metadata) {
@@ -386,8 +387,8 @@ SlotSpanMetadata* PartitionDirectMap(PartitionRoot* root,
     // Direct map never uses tagging, as size is always >kMaxMemoryTaggingSize.
     PA_DCHECK(raw_size > kMaxMemoryTaggingSize);
     const bool ok = root->TryRecommitSystemPagesForDataWithAcquiringLock(
-        slot_start, slot_size, PageAccessibilityDisposition::kRequireUpdate,
-        false);
+        slot_start.value(), slot_size,
+        PageAccessibilityDisposition::kRequireUpdate, false);
     if (!ok) {
       if (!return_null) {
         PartitionOutOfMemoryCommitFailure(root, slot_size);
@@ -625,7 +626,8 @@ PA_ALWAYS_INLINE SlotSpanMetadata* PartitionBucket::AllocNewSlotSpan(
       PartitionPageMetadata::FromAddr(root->next_partition_page, root);
   auto* gap_end_page =
       PartitionPageMetadata::FromAddr(adjusted_next_partition_page, root);
-  for (auto* page = gap_start_page; page < gap_end_page; ++page) {
+  for (auto* page = gap_start_page; page < gap_end_page;
+       PA_UNSAFE_TODO(++page)) {
     PA_DCHECK(!page->is_valid);
     page->has_valid_span_after_this = true;
   }
@@ -637,7 +639,8 @@ PA_ALWAYS_INLINE SlotSpanMetadata* PartitionBucket::AllocNewSlotSpan(
   InitializeSlotSpan(slot_span);
   // Now that slot span is initialized, it's safe to call FromSlotStart.
   PA_DCHECK(slot_span ==
-            SlotSpanMetadata::FromSlotStart(slot_span_start, root));
+            SlotSpanMetadata::FromSlotStart(
+                UntaggedSlotStart::Unchecked(slot_span_start), root));
 
   // System pages in the super page come in a decommited state. Commit them
   // before vending them back.
@@ -858,7 +861,8 @@ PA_ALWAYS_INLINE void PartitionBucket::InitializeSlotSpan(
 
   uint16_t num_partition_pages = get_pages_per_slot_span();
   auto* page_metadata = reinterpret_cast<PartitionPageMetadata*>(slot_span);
-  for (uint16_t i = 0; i < num_partition_pages; ++i, ++page_metadata) {
+  for (uint16_t i = 0; i < num_partition_pages;
+       ++i, PA_UNSAFE_TODO(++page_metadata)) {
     PA_DCHECK(i <= PartitionPageMetadata::kMaxSlotSpanMetadataOffset);
     page_metadata->slot_span_metadata_offset = i;
     page_metadata->is_valid = true;
@@ -881,12 +885,12 @@ PartitionBucket::ProvisionMoreSlotsAndAllocOne(PartitionRoot* root,
   PA_DCHECK(!slot_span->get_freelist_head());
   PA_DCHECK(!slot_span->is_full());
 
-  uintptr_t slot_span_start =
+  SlotSpanStart slot_span_start =
       SlotSpanMetadata::ToSlotSpanStart(slot_span, root);
   // If we got here, the first unallocated slot is either partially or fully on
   // an uncommitted page. If the latter, it must be at the start of that page.
   uintptr_t return_slot =
-      slot_span_start + (slot_size * slot_span->num_allocated_slots);
+      slot_span_start.value() + (slot_size * slot_span->num_allocated_slots);
   uintptr_t next_slot = return_slot + slot_size;
   uintptr_t commit_start = base::bits::AlignUp(return_slot, SystemPageSize());
   PA_DCHECK(next_slot > commit_start);
@@ -1211,7 +1215,7 @@ void PartitionBucket::SortActiveSlotSpans() {
   for (auto* slot_span = active_slot_spans_head; slot_span;
        slot_span = slot_span->next_slot_span) {
     if (index < kMaxSlotSpansToSort) {
-      active_spans_array[index++] = slot_span;
+      PA_UNSAFE_TODO(active_spans_array[index++]) = slot_span;
     } else {
       // Starting from this one, not sorting the slot spans.
       overflow_spans_start = slot_span;
@@ -1238,19 +1242,22 @@ void PartitionBucket::SortActiveSlotSpans() {
   // it may not throw std::bad_alloc, which constrains the implementation. In
   // addition, this is protected by the reentrancy guard, so we would detect
   // such an allocation.
-  std::sort(active_spans_array, active_spans_array + index, CompareSlotSpans);
+  std::sort(active_spans_array, PA_UNSAFE_TODO(active_spans_array + index),
+            CompareSlotSpans);
 
   active_slot_spans_head = overflow_spans_start;
 
   // Reverse order, since we insert at the head of the list.
   for (int i = index - 1; i >= 0; i--) {
-    if (active_spans_array[i] == SlotSpanMetadata::get_sentinel_slot_span()) {
+    if (PA_UNSAFE_TODO(active_spans_array[i]) ==
+        SlotSpanMetadata::get_sentinel_slot_span()) {
       // The sentinel is const, don't try to write to it.
       PA_DCHECK(active_slot_spans_head == nullptr);
     } else {
-      active_spans_array[i]->next_slot_span = active_slot_spans_head;
+      PA_UNSAFE_TODO(active_spans_array[i]->next_slot_span =
+                         active_slot_spans_head);
     }
-    active_slot_spans_head = active_spans_array[i];
+    active_slot_spans_head = PA_UNSAFE_TODO(active_spans_array[i]);
   }
 }
 
@@ -1351,14 +1358,15 @@ uintptr_t PartitionBucket::SlowPathAlloc(PartitionRoot* root,
         // If lazy commit is enabled, pages will be recommitted when
         // provisioning slots, in ProvisionMoreSlotsAndAllocOne(), not here.
         if (!kUseLazyCommit) {
-          uintptr_t slot_span_start =
+          SlotSpanStart slot_span_start =
               SlotSpanMetadata::ToSlotSpanStart(new_slot_span, root);
           // Since lazy commit isn't used, we have a guarantee that all slot
           // span pages have been previously committed, and then decommitted
           // using PageAccessibilityDisposition::kAllowKeepForPerf, so use the
           // same option as an optimization.
           const bool ok = root->TryRecommitSystemPagesForDataLocked(
-              slot_span_start, new_slot_span->bucket->get_bytes_per_span(),
+              slot_span_start.value(),
+              new_slot_span->bucket->get_bytes_per_span(),
               PageAccessibilityDisposition::kAllowKeepForPerf,
               slot_size <= kMaxMemoryTaggingSize);
           if (!ok) {
@@ -1444,7 +1452,7 @@ void PartitionBucket::InitializeSlotSpanForGwpAsan(
 size_t PartitionBucket::SlotSpanCommittedSize(PartitionRoot* root) const {
   // With lazy commit, we certainly don't want to commit more than
   // necessary. This is not reached, but keep the CHECK() as documentation.
-  PA_CHECK(!kUseLazyCommit);
+  static_assert(!(kUseLazyCommit && kUseFewerMemoryRegions));
 
   // Memory is reserved in units of PartitionPage, but a given slot span may be
   // smaller than the reserved area. For instance (assuming 4k pages), for a
@@ -1468,7 +1476,9 @@ size_t PartitionBucket::SlotSpanCommittedSize(PartitionRoot* root) const {
   // less than 2^16, and Chromium sometimes hits the limit (see
   // /proc/sys/vm/max_map_count for the current limit), largely because of
   // PartitionAlloc contributing thousands of regions. Locally, on a Linux
-  // system, this reduces the number of PartitionAlloc regions by up to ~4x.
+  // system, this reduces the number of PartitionAlloc regions by up to
+  // ~4x. This has been shown to meaningfully reduce crash rate on Linux-based
+  // platforms.
   //
   // Why is it safe?
   // The extra memory is not used by anything, so committing it doesn't make a
@@ -1483,19 +1493,13 @@ size_t PartitionBucket::SlotSpanCommittedSize(PartitionRoot* root) const {
   // the size of the VMA red-black tree in the kernel), it might increase
   // slightly the cases where we bump into the sandbox memory limit.
   //
-  // Is it safe to do while running?
-  // Since this is decided through root settings, the value changes at runtime,
-  // so we may decommit memory that was never committed. This is safe onLinux,
-  // since decommitting is just changing permissions back to PROT_NONE, which
-  // the tail end would already have.
-  //
   // Can we do better?
   // For simplicity, we do not "fix" the regions that were committed before the
   // settings are changed (after feature list initialization). This means that
   // we end up with more regions that we could. The intent is to run a field
   // experiment, then change the default value, at which point we get the full
   // impact, so this is only temporary.
-  return root->settings.fewer_memory_regions
+  return kUseFewerMemoryRegions
              ? (get_pages_per_slot_span() << PartitionPageShift())
              : get_bytes_per_span();
 }

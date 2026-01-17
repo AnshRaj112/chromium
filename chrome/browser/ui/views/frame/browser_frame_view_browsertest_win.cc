@@ -4,7 +4,6 @@
 
 #include <tuple>
 
-#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/bind.h"
@@ -22,6 +21,7 @@
 #include "chrome/browser/ui/views/web_apps/frame_toolbar/web_app_toolbar_button_container.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 #include "chrome/browser/ui/web_applications/test/web_app_browsertest_util.h"
+#include "chrome/browser/web_applications/model/display_override.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom.h"
 #include "chrome/browser/web_applications/test/os_integration_test_override_impl.h"
 #include "chrome/browser/web_applications/test/web_app_install_test_utils.h"
@@ -51,7 +51,7 @@ class BrowserFrameViewWinTest : public InProcessBrowserTest {
  protected:
   BrowserFrameViewWin* GetBrowserFrameViewWin() {
     auto* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
-    views::NonClientFrameView* frame_view =
+    views::FrameView* frame_view =
         browser_view->GetWidget()->non_client_view()->frame_view();
 
     if (!views::IsViewClass<BrowserFrameViewWin>(frame_view)) {
@@ -100,7 +100,7 @@ IN_PROC_BROWSER_TEST_F(BrowserFrameViewWinTest,
     GTEST_SKIP() << "Chrome is not using a custom titlebar";
   }
 
-  frame_view->frame()->Maximize();
+  frame_view->browser_widget()->Maximize();
 
   auto* maximize_button = GetMaximizeButton();
 
@@ -133,7 +133,7 @@ IN_PROC_BROWSER_TEST_F(BrowserFrameViewWinTest,
     GTEST_SKIP() << "Chrome is not using a custom titlebar";
   }
 
-  frame_view->frame()->Maximize();
+  frame_view->browser_widget()->Maximize();
 
   auto* maximize_button = GetMaximizeButton();
   EXPECT_FALSE(maximize_button->GetVisible());
@@ -220,7 +220,7 @@ class WebAppBrowserFrameViewWinTest : public InProcessBrowserTest {
     navigation_observer.WaitForNavigationFinished();
 
     browser_view_ = BrowserView::GetBrowserViewForBrowser(app_browser_);
-    views::NonClientFrameView* frame_view =
+    views::FrameView* frame_view =
         browser_view_->GetWidget()->non_client_view()->frame_view();
 
     frame_view_ = static_cast<BrowserFrameViewWin*>(frame_view);
@@ -231,7 +231,7 @@ class WebAppBrowserFrameViewWinTest : public InProcessBrowserTest {
   }
 
   std::optional<SkColor> theme_color_ = SK_ColorBLUE;
-  std::vector<blink::mojom::DisplayMode> display_override_ = {};
+  std::vector<web_app::DisplayOverride> display_override_;
   raw_ptr<Browser, AcrossTasksDanglingUntriaged> app_browser_ = nullptr;
   raw_ptr<BrowserView, AcrossTasksDanglingUntriaged> browser_view_ = nullptr;
   raw_ptr<BrowserFrameViewWin, AcrossTasksDanglingUntriaged> frame_view_ =
@@ -260,7 +260,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserFrameViewWinTest, NoThemeColor) {
 
 IN_PROC_BROWSER_TEST_F(WebAppBrowserFrameViewWinTest, MaximizedLayout) {
   InstallAndLaunchWebApp();
-  frame_view_->frame()->Maximize();
+  frame_view_->browser_widget()->Maximize();
   RunScheduledLayouts();
 
   views::View* const window_title =
@@ -283,7 +283,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserFrameViewWinTest, RTLTopRightHitTest) {
 
 IN_PROC_BROWSER_TEST_F(WebAppBrowserFrameViewWinTest, Fullscreen) {
   InstallAndLaunchWebApp();
-  frame_view_->frame()->SetFullscreen(true);
+  frame_view_->browser_widget()->SetFullscreen(true);
   browser_view_->GetWidget()->LayoutRootViewIfNecessary();
 
   // Verify that all children except the ClientView are hidden when the window
@@ -304,7 +304,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserFrameViewWinTest, ContainerHeight) {
   EXPECT_EQ(web_app_frame_toolbar_->height(),
             frame_view_->caption_button_container_for_testing()->height());
 
-  frame_view_->frame()->Maximize();
+  frame_view_->browser_widget()->Maximize();
 
   EXPECT_EQ(web_app_frame_toolbar_->height(),
             frame_view_->caption_button_container_for_testing()->height());
@@ -327,7 +327,8 @@ class TabbedWebAppBrowserFrameViewWinTest
 
 IN_PROC_BROWSER_TEST_F(TabbedWebAppBrowserFrameViewWinTest,
                        TabbedWebAppIconInTitlebar) {
-  display_override_ = {blink::mojom::DisplayMode::kTabbed};
+  display_override_ = {
+      web_app::DisplayOverride::Create(blink::mojom::DisplayMode::kTabbed)};
   InstallAndLaunchWebApp();
 
   ASSERT_FALSE(frame_view_->window_icon_for_testing()->GetVisible());
@@ -363,8 +364,9 @@ class WebAppBrowserFrameViewWinWindowControlsOverlayTest
                          .LoadWindowControlsOverlayTestPageWithDataAndGetURL(
                              embedded_test_server(), &temp_dir_);
 
-    std::vector<blink::mojom::DisplayMode> display_overrides = {
-        blink::mojom::DisplayMode::kWindowControlsOverlay};
+    std::vector<web_app::DisplayOverride> display_overrides = {
+        web_app::DisplayOverride::Create(
+            blink::mojom::DisplayMode::kWindowControlsOverlay)};
     auto web_app_info =
         web_app::WebAppInstallInfo::CreateWithStartUrlForTesting(start_url);
     web_app_info->scope = start_url.GetWithoutFilename();
@@ -392,7 +394,7 @@ class WebAppBrowserFrameViewWinWindowControlsOverlayTest
     navigation_observer.WaitForNavigationFinished();
 
     browser_view_ = BrowserView::GetBrowserViewForBrowser(app_browser);
-    views::NonClientFrameView* frame_view =
+    views::FrameView* frame_view =
         browser_view_->GetWidget()->non_client_view()->frame_view();
 
     frame_view_ = static_cast<BrowserFrameViewWin*>(frame_view);
@@ -411,6 +413,7 @@ class WebAppBrowserFrameViewWinWindowControlsOverlayTest
     EXPECT_TRUE(future.Wait());
     content::TitleWatcher title_watcher(web_contents, u"ongeometrychange");
     std::ignore = title_watcher.WaitAndGetTitle();
+    browser_view_->GetWidget()->LayoutRootViewIfNecessary();
   }
 
   raw_ptr<BrowserView, AcrossTasksDanglingUntriaged> browser_view_ = nullptr;
@@ -431,7 +434,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserFrameViewWinWindowControlsOverlayTest,
   EXPECT_EQ(browser_view_->web_app_frame_toolbar_for_testing()->height(),
             frame_view_->caption_button_container_for_testing()->height());
 
-  frame_view_->frame()->Maximize();
+  frame_view_->browser_widget()->Maximize();
 
   EXPECT_EQ(browser_view_->web_app_frame_toolbar_for_testing()->height(),
             frame_view_->caption_button_container_for_testing()->height());
@@ -444,14 +447,14 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserFrameViewWinWindowControlsOverlayTest,
 
   EXPECT_GT(frame_view_->GetBoundsForClientView().y(), 0);
 
-  frame_view_->frame()->SetFullscreen(true);
+  frame_view_->browser_widget()->SetFullscreen(true);
   browser_view_->GetWidget()->LayoutRootViewIfNecessary();
 
   // ClientView should be covering the entire screen.
   EXPECT_EQ(frame_view_->GetBoundsForClientView().y(), 0);
 
   // Exit full screen.
-  frame_view_->frame()->SetFullscreen(false);
+  frame_view_->browser_widget()->SetFullscreen(false);
 }
 
 IN_PROC_BROWSER_TEST_F(WebAppBrowserFrameViewWinWindowControlsOverlayTest,
@@ -495,14 +498,8 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserFrameViewWinWindowControlsOverlayTest,
   EXPECT_EQ(close_button->GetTooltipText(), u"");
 }
 
-// TODO(crbug.com/361780162): This test has been flaky on Windows ASan testers.
-#if BUILDFLAG(IS_WIN) && defined(ADDRESS_SANITIZER)
-#define MAYBE_CaptionButtonHitTest DISABLED_CaptionButtonHitTest
-#else
-#define MAYBE_CaptionButtonHitTest CaptionButtonHitTest
-#endif
 IN_PROC_BROWSER_TEST_F(WebAppBrowserFrameViewWinWindowControlsOverlayTest,
-                       MAYBE_CaptionButtonHitTest) {
+                       CaptionButtonHitTest) {
   InstallAndLaunchWebAppWithWindowControlsOverlay();
   frame_view_->GetWidget()->LayoutRootViewIfNecessary();
 

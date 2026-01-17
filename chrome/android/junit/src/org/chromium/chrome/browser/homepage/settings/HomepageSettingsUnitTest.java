@@ -29,10 +29,8 @@ import org.robolectric.shadows.ShadowLooper;
 
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Feature;
-import org.chromium.base.test.util.Features;
 import org.chromium.base.test.util.UserActionTester;
 import org.chromium.chrome.R;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.homepage.HomepageManager;
 import org.chromium.chrome.browser.homepage.HomepagePolicyManager;
 import org.chromium.chrome.browser.homepage.HomepageTestRule;
@@ -56,10 +54,6 @@ import org.chromium.url.JUnitTestGURLs;
 /** Test for {@link HomepageSettings} to check the UI components and the interactions. */
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(shadows = {ShadowLooper.class})
-@Features.EnableFeatures({
-    ChromeFeatureList.SHOW_HOME_BUTTON_POLICY_ANDROID,
-    ChromeFeatureList.HOMEPAGE_IS_NEW_TAB_PAGE_POLICY_ANDROID
-})
 public class HomepageSettingsUnitTest {
     private static final String ASSERT_MESSAGE_SWITCH_ENABLE = "Switch should be enabled.";
     private static final String ASSERT_MESSAGE_SWITCH_DISABLE = "Switch should be disabled.";
@@ -138,23 +132,19 @@ public class HomepageSettingsUnitTest {
 
     private void launchHomepageSettings() {
         FragmentManager fragmentManager = mActivity.getSupportFragmentManager();
-        HomepageSettings fragment =
+        HomepageSettings settings =
                 (HomepageSettings)
                         fragmentManager
                                 .getFragmentFactory()
                                 .instantiate(
                                         HomepageSettings.class.getClassLoader(),
                                         HomepageSettings.class.getName());
-        fragment.setProfile(mProfile);
-        fragmentManager.beginTransaction().replace(android.R.id.content, fragment).commit();
+        settings.setProfile(mProfile);
+        fragmentManager.beginTransaction().replace(android.R.id.content, settings).commit();
 
         mActivityScenario.moveToState(State.STARTED);
-        mSwitch =
-                (ChromeSwitchPreference)
-                        fragment.findPreference(HomepageSettings.PREF_HOMEPAGE_SWITCH);
-        mRadioGroupPreference =
-                (RadioButtonGroupHomepagePreference)
-                        fragment.findPreference(HomepageSettings.PREF_HOMEPAGE_RADIO_GROUP);
+        mSwitch = settings.getHomepageSwitchForTesting();
+        mRadioGroupPreference = settings.getHomepageRadioGroupForTesting();
 
         Assert.assertTrue(
                 "RadioGroupPreference should be visible when Homepage Conversion is enabled.",
@@ -305,6 +295,13 @@ public class HomepageSettingsUnitTest {
                 View.VISIBLE,
                 mCustomUriRadioButton.getVisibility());
         Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
+        Assert.assertEquals(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageLocationType.POLICY_OTHER,
                 HomepageManager.getInstance().getHomepageLocationType());
@@ -337,6 +334,13 @@ public class HomepageSettingsUnitTest {
                 "Customized Button should not be visible.",
                 View.GONE,
                 mCustomUriRadioButton.getVisibility());
+        Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
         Assert.assertEquals(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageLocationType.POLICY_NTP,
@@ -434,6 +438,13 @@ public class HomepageSettingsUnitTest {
         Assert.assertEquals(
                 ASSERT_MESSAGE_RADIO_BUTTON_GONE, View.GONE, mCustomUriRadioButton.getVisibility());
         Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
+        Assert.assertEquals(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageLocationType.POLICY_NTP,
                 HomepageManager.getInstance().getHomepageLocationType());
@@ -462,6 +473,13 @@ public class HomepageSettingsUnitTest {
         Assert.assertEquals(
                 ASSERT_MESSAGE_RADIO_BUTTON_GONE, View.GONE, mCustomUriRadioButton.getVisibility());
         Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
+        Assert.assertEquals(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageLocationType.POLICY_NTP,
                 HomepageManager.getInstance().getHomepageLocationType());
@@ -489,6 +507,13 @@ public class HomepageSettingsUnitTest {
         Assert.assertTrue(ASSERT_MESSAGE_RADIO_BUTTON_ENABLED, mCustomUriRadioButton.isEnabled());
         Assert.assertTrue(ASSERT_MESSAGE_RADIO_BUTTON_ENABLED, mCustomUriRadioButton.isChecked());
 
+        Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
         Assert.assertTrue(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageManager.getHomepageCharacterizationHelper().isNtp());
@@ -518,6 +543,13 @@ public class HomepageSettingsUnitTest {
                 ASSERT_MESSAGE_EDIT_TEXT,
                 TEST_URL_BAR,
                 mCustomUriRadioButton.getPrimaryText().toString());
+        Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
         Assert.assertEquals(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageLocationType.USER_CUSTOMIZED_OTHER,
@@ -557,6 +589,13 @@ public class HomepageSettingsUnitTest {
                 View.VISIBLE,
                 mCustomUriRadioButton.getVisibility());
         Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
+        Assert.assertEquals(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageLocationType.POLICY_OTHER,
                 HomepageManager.getInstance().getHomepageLocationType());
@@ -595,6 +634,13 @@ public class HomepageSettingsUnitTest {
                 View.VISIBLE,
                 mCustomUriRadioButton.getVisibility());
         Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
+        Assert.assertEquals(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageLocationType.POLICY_OTHER,
                 HomepageManager.getInstance().getHomepageLocationType());
@@ -620,6 +666,13 @@ public class HomepageSettingsUnitTest {
         Assert.assertFalse(ASSERT_MESSAGE_RADIO_BUTTON_DISABLED, mCustomUriRadioButton.isEnabled());
         Assert.assertTrue(ASSERT_MESSAGE_RADIO_BUTTON_ENABLED, mCustomUriRadioButton.isChecked());
 
+        Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
         Assert.assertTrue(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageManager.getHomepageCharacterizationHelper().isNtp());
@@ -645,6 +698,13 @@ public class HomepageSettingsUnitTest {
         Assert.assertTrue(ASSERT_MESSAGE_RADIO_BUTTON_ENABLED, mCustomUriRadioButton.isEnabled());
         Assert.assertTrue(ASSERT_MESSAGE_RADIO_BUTTON_ENABLED, mCustomUriRadioButton.isChecked());
 
+        Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
         Assert.assertTrue(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageManager.getHomepageCharacterizationHelper().isNtp());
@@ -670,6 +730,13 @@ public class HomepageSettingsUnitTest {
         Assert.assertFalse(ASSERT_MESSAGE_RADIO_BUTTON_DISABLED, mCustomUriRadioButton.isEnabled());
         Assert.assertTrue(ASSERT_MESSAGE_RADIO_BUTTON_ENABLED, mCustomUriRadioButton.isChecked());
 
+        Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
         Assert.assertEquals(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageLocationType.POLICY_OTHER,
@@ -699,6 +766,13 @@ public class HomepageSettingsUnitTest {
         Assert.assertEquals(
                 ASSERT_MESSAGE_RADIO_BUTTON_GONE, View.GONE, mCustomUriRadioButton.getVisibility());
 
+        Assert.assertEquals(
+                "Disclaimer should be gone.",
+                View.GONE,
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text)
+                        .getVisibility());
         Assert.assertEquals(
                 ASSERT_HOMEPAGE_LOCATION_TYPE_MISMATCH,
                 HomepageLocationType.POLICY_NTP,
@@ -801,7 +875,7 @@ public class HomepageSettingsUnitTest {
 
         Assert.assertTrue(
                 ASSERT_HOMEPAGE_MANAGER_SETTINGS,
-                HomepageManager.getInstance().getHomepageGurl().isEmpty());
+                HomepageManager.getInstance().getHomepageGurl(/* isIncognito= */ false).isEmpty());
         Assert.assertEquals(
                 ASSERT_HOME_SWITCH_STATUS_MISMATCH,
                 HomeButtonStatus.USER_OFF,
@@ -911,10 +985,10 @@ public class HomepageSettingsUnitTest {
         Assert.assertEquals(
                 ASSERT_HOMEPAGE_MANAGER_SETTINGS,
                 TEST_URL_FOO,
-                homepageManager.getHomepageGurl().getSpec());
+                homepageManager.getHomepageGurl(/* isIncognito= */ false).getSpec());
         assertUserActionRecorded(false);
 
-        // Check radio button to select NTP as homepage. Homepage is not changed yet at this time.
+        // Check radio button to select NTP as homepage.
         checkRadioButtonAndWait(mChromeNtpRadioButton);
 
         Assert.assertFalse(
@@ -923,7 +997,7 @@ public class HomepageSettingsUnitTest {
                 ASSERT_MESSAGE_EDIT_TEXT,
                 TEST_URL_FOO,
                 mCustomUriRadioButton.getPrimaryText().toString());
-        assertUserActionRecorded(false);
+        assertUserActionRecorded(true);
 
         // Check back to customized radio button
         checkRadioButtonAndWait(mCustomUriRadioButton);
@@ -935,14 +1009,117 @@ public class HomepageSettingsUnitTest {
                 TEST_URL_FOO,
                 mCustomUriRadioButton.getPrimaryText().toString());
 
-        // End the activity. The homepage should be the customized url, and the location counter
-        // should stay at 0 as nothing is changed.
+        // End the activity. The homepage should be the customized url.
         finishSettingsActivity();
         Assert.assertEquals(
                 ASSERT_HOMEPAGE_MANAGER_SETTINGS,
                 TEST_URL_FOO,
-                homepageManager.getHomepageGurl().getSpec());
-        assertUserActionRecorded(false);
+                homepageManager.getHomepageGurl(/* isIncognito= */ false).getSpec());
+        assertUserActionRecorded(true);
+    }
+
+    @Test
+    @Feature({"Homepage"})
+    public void testUI_HomepageSelection_Recommended_Following() {
+        setHomepageSelectionRecommendation(true);
+        launchHomepageSettings();
+
+        // The switch and radio buttons should be enabled to allow user to override.
+        Assert.assertTrue(ASSERT_MESSAGE_SWITCH_ENABLE, mSwitch.isEnabled());
+        Assert.assertTrue(ASSERT_MESSAGE_RADIO_BUTTON_ENABLED, mChromeNtpRadioButton.isEnabled());
+        Assert.assertTrue(ASSERT_MESSAGE_RADIO_BUTTON_ENABLED, mCustomUriRadioButton.isEnabled());
+
+        TextView disclaimer =
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text);
+        Assert.assertEquals(
+                "Disclaimer should be visible.", View.VISIBLE, disclaimer.getVisibility());
+        Assert.assertEquals(
+                "Disclaimer should show recommendation text.",
+                mActivity.getString(R.string.recommended_by_your_organization),
+                disclaimer.getText());
+    }
+
+    @Test
+    @Feature({"Homepage"})
+    public void testUI_HomepageSelection_Recommended_NotFollowing() {
+        setHomepageSelectionRecommendation(false);
+        launchHomepageSettings();
+
+        TextView disclaimer =
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text);
+        Assert.assertEquals("Disclaimer should be gone.", View.GONE, disclaimer.getVisibility());
+    }
+
+    @Test
+    @Feature({"Homepage"})
+    public void testUI_HomepageSelection_Unmanaged() {
+        Mockito.doReturn(false)
+                .when(mMockHomepagePolicyManager)
+                .isHomepageSelectionPolicyRecommended();
+        launchHomepageSettings();
+
+        TextView disclaimer =
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text);
+        Assert.assertEquals("Disclaimer should be gone.", View.GONE, disclaimer.getVisibility());
+    }
+
+    /**
+     * Tests that the homepage preference is saved immediately when the user changes the radio
+     * button selection, without waiting for the fragment's onStop() lifecycle event.
+     */
+    @Test
+    @Feature({"Homepage"})
+    public void testHomepageSavedImmediatelyOnChange() throws Exception {
+        // Arrange: Start with a custom homepage.
+        mHomepageTestRule.useCustomizedHomepageForTest(TEST_URL_FOO);
+        launchHomepageSettings();
+
+        // Act: Click the NTP radio button.
+        checkRadioButtonAndWait(mChromeNtpRadioButton);
+        ShadowLooper.idleMainLooper(); // Ensure any pending tasks are run.
+
+        // Assert: The HomepageManager should reflect the change to NTP immediately,
+        // even though finishSettingsActivity() has not been called.
+        Assert.assertTrue(
+                "HomepageManager should be updated to NTP immediately after the radio button"
+                        + " is clicked.",
+                UrlUtilities.isNtpUrl(
+                        HomepageManager.getInstance().getHomepageGurl(/* isIncognito= */ false)));
+    }
+
+    /**
+     * Tests that the "Recommended" disclaimer does not appear for the radio button group when a
+     * higher-priority "Managed" policy is active.
+     */
+    @Test
+    @Feature({"Homepage"})
+    public void testManagedPolicySuppressesRecommendationUI() {
+        // Arrange: Set both a "Managed" policy and a "Recommended" policy.
+        // The managed policy should take precedence.
+        setHomepageIsNtpPolicy(true); // This makes the homepage managed.
+        setHomepageSelectionRecommendation(true); // A recommendation also exists.
+
+        launchHomepageSettings();
+
+        // Assert: The managed policy for the switch should be active.
+        Assert.assertFalse("The main switch should be disabled by policy.", mSwitch.isEnabled());
+
+        // Assert: The "Recommended" disclaimer for the radio buttons should NOT be visible,
+        // because the managed policy overrides it.
+        TextView disclaimer =
+                mRadioGroupPreference
+                        .getViewForTesting()
+                        .findViewById(R.id.managed_disclaimer_text);
+        Assert.assertEquals(
+                "Disclaimer should be GONE when a managed policy overrides a recommendation.",
+                View.GONE,
+                disclaimer.getVisibility());
     }
 
     /** Test if changing uris in EditText will change homepage accordingly. */
@@ -963,7 +1140,7 @@ public class HomepageSettingsUnitTest {
                 ASSERT_MESSAGE_EDIT_TEXT, "", mCustomUriRadioButton.getPrimaryText().toString());
         Assert.assertTrue(
                 ASSERT_HOMEPAGE_MANAGER_SETTINGS,
-                UrlUtilities.isNtpUrl(homepageManager.getHomepageGurl()));
+                UrlUtilities.isNtpUrl(homepageManager.getHomepageGurl(/* isIncognito= */ false)));
         assertUserActionRecorded(false);
 
         // Update the text box. To do this, request focus for customized radio button so that the
@@ -987,7 +1164,7 @@ public class HomepageSettingsUnitTest {
         Assert.assertEquals(
                 ASSERT_HOMEPAGE_MANAGER_SETTINGS,
                 TEST_URL_BAR,
-                homepageManager.getHomepageGurl().getSpec());
+                homepageManager.getHomepageGurl(/* isIncognito= */ false).getSpec());
         assertUserActionRecorded(true);
     }
 
@@ -1043,5 +1220,14 @@ public class HomepageSettingsUnitTest {
                 "User action <Settings.Homepage.LocationChanged_V2> record differently.",
                 recorded,
                 mActionTester.getActions().contains("Settings.Homepage.LocationChanged_V2"));
+    }
+
+    private void setHomepageSelectionRecommendation(boolean isFollowing) {
+        Mockito.doReturn(true)
+                .when(mMockHomepagePolicyManager)
+                .isHomepageSelectionPolicyRecommended();
+        Mockito.doReturn(isFollowing)
+                .when(mMockHomepagePolicyManager)
+                .isFollowingHomepageSelectionPolicyRecommendation();
     }
 }

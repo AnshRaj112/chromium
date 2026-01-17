@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/hash/hash.h"
 #include "base/metrics/histogram_functions.h"
@@ -81,6 +80,8 @@ WatchTimeRecorder::WatchTimeRecorder(
             kRebuffersCountAudioMse, kDiscardedWatchTimeAudioMse},
            {WatchTimeKey::kAudioEme, kMeanTimeBetweenRebuffersAudioEme,
             kRebuffersCountAudioEme, kDiscardedWatchTimeAudioEme},
+           {WatchTimeKey::kAudioHls, kMeanTimeBetweenRebuffersAudioHls,
+            kRebuffersCountAudioHls, kDiscardedWatchTimeAudioHls},
            {WatchTimeKey::kAudioVideoSrc,
             kMeanTimeBetweenRebuffersAudioVideoSrc,
             kRebuffersCountAudioVideoSrc, kDiscardedWatchTimeAudioVideoSrc},
@@ -89,7 +90,10 @@ WatchTimeRecorder::WatchTimeRecorder(
             kRebuffersCountAudioVideoMse, kDiscardedWatchTimeAudioVideoMse},
            {WatchTimeKey::kAudioVideoEme,
             kMeanTimeBetweenRebuffersAudioVideoEme,
-            kRebuffersCountAudioVideoEme, kDiscardedWatchTimeAudioVideoEme}}) {}
+            kRebuffersCountAudioVideoEme, kDiscardedWatchTimeAudioVideoEme},
+           {WatchTimeKey::kAudioVideoHls,
+            kMeanTimeBetweenRebuffersAudioVideoHls,
+            kRebuffersCountAudioVideoHls, kDiscardedWatchTimeAudioVideoHls}}) {}
 
 WatchTimeRecorder::~WatchTimeRecorder() {
   FinalizeWatchTime({});
@@ -112,13 +116,13 @@ void WatchTimeRecorder::FinalizeWatchTime(
   // needed by for UKM and MTBR recording below.
   for (auto& kv : watch_time_info_) {
     if (!should_finalize_everything &&
-        !base::Contains(keys_to_finalize, kv.first)) {
+        !std::ranges::contains(keys_to_finalize, kv.first)) {
       continue;
     }
 
     // Report only certain keys to UMA and only if they have at met the minimum
-    // watch time requirement. Otherwise, for SRC/MSE/EME keys, log them to the
-    // discard metric.
+    // watch time requirement. Otherwise, for SRC/MSE/EME/HLS keys, log them to
+    // the discard metric.
     std::string_view key_str = ConvertWatchTimeKeyToStringForUma(kv.first);
     if (ShouldRecordUma() && !key_str.empty()) {
       if (kv.second >= kMinimumElapsedWatchTime) {
@@ -343,6 +347,7 @@ void WatchTimeRecorder::RecordUkmPlaybackData() {
     builder.SetIsBackground(properties_->is_background);
     builder.SetIsMuted(properties_->is_muted);
     builder.SetPlayerID(player_id_.value());
+    builder.SetRendererType(static_cast<int64_t>(properties_->renderer_type));
     if (clamped_duration_ms.has_value())
       builder.SetDuration(*clamped_duration_ms);
 
@@ -436,7 +441,7 @@ void WatchTimeRecorder::RecordUkmPlaybackData() {
     builder.SetVideoEncryptionScheme(static_cast<int64_t>(
         ukm_record.secondary_properties->video_encryption_scheme));
     builder.SetIsEME(properties_->is_eme);
-    builder.SetIsMSE(properties_->is_mse);
+    builder.SetIsMSE(properties_->demuxer_type == DemuxerType::kChunkDemuxer);
     builder.SetMediaStreamType(
         static_cast<int64_t>(properties_->media_stream_type));
     builder.SetLastPipelineStatus(pipeline_status_);
@@ -485,8 +490,10 @@ void WatchTimeRecorder::MaybeRecordWatchTimeForAutoPipReason(
     current_auto_pip_reason_ = auto_pip_reason_cb_.Run();
   }
 
-  if (current_auto_pip_reason_ !=
-      PictureInPictureEventsInfo::AutoPipReason::kMediaPlayback) {
+  if ((current_auto_pip_reason_ !=
+       PictureInPictureEventsInfo::AutoPipReason::kMediaPlayback) &&
+      (current_auto_pip_reason_ !=
+       PictureInPictureEventsInfo::AutoPipReason::kBrowserInitiated)) {
     return;
   }
 

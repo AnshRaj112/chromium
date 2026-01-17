@@ -124,7 +124,7 @@ class WebBluetoothTest : public InProcessBrowserTest {
     url_loader_interceptor_ =
         std::make_unique<content::URLLoaderInterceptor>(base::BindRepeating(
             [](content::URLLoaderInterceptor::RequestParams* params) {
-              if (params->url_request.url.host() == "example.com") {
+              if (params->url_request.url.GetHost() == "example.com") {
                 content::URLLoaderInterceptor::WriteResponse(
                     "content/test/data/simple_page.html", params->client.get());
                 return true;
@@ -1125,7 +1125,7 @@ IN_PROC_BROWSER_TEST_F(
   // Loads a page in the prerender.
   auto prerender_url = embedded_test_server()->GetURL("/simple.html");
   // The prerendering doesn't affect the current scanning.
-  content::FrameTreeNodeId host_id =
+  content::PrerenderHostId host_id =
       prerender_helper()->AddPrerender(prerender_url);
   content::test::PrerenderHostObserver host_observer(*GetWebContents(),
                                                      host_id);

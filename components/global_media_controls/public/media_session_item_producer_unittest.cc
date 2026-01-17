@@ -7,7 +7,6 @@
 #include <memory>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -55,13 +54,11 @@ class MediaSessionItemProducerTest : public testing::Test {
     testing::Mock::AllowLeak(audio_focus_manager_.get());
 
     EXPECT_CALL(*audio_focus_manager_, GetFocusRequests(_))
-        .WillOnce(
-            testing::Invoke([](media_session::test::MockAudioFocusManager::
-                                   GetFocusRequestsCallback callback) {
-              std::move(callback).Run(
-                  std::vector<
-                      media_session::mojom::AudioFocusRequestStatePtr>());
-            }));
+        .WillOnce([](media_session::test::MockAudioFocusManager::
+                         GetFocusRequestsCallback callback) {
+          std::move(callback).Run(
+              std::vector<media_session::mojom::AudioFocusRequestStatePtr>());
+        });
 
     mojo::Remote<media_session::mojom::AudioFocusManager> audio_focus_remote(
         audio_focus_manager_->GetPendingRemote());
@@ -157,7 +154,7 @@ class MediaSessionItemProducerTest : public testing::Test {
   }
 
   bool IsSessionInactive(const base::UnguessableToken& id) const {
-    return base::Contains(producer_->inactive_session_ids_, id.ToString());
+    return producer_->inactive_session_ids_.contains(id.ToString());
   }
 
   bool HasActiveItems() const {

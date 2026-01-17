@@ -19,6 +19,7 @@
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/autofill/core/common/password_form_fill_data.h"
 #include "components/autofill/core/common/unique_ids.h"
+#include "components/password_manager/core/browser/features/password_features.h"
 #include "components/password_manager/core/browser/mock_webauthn_credentials_delegate.h"
 #include "components/password_manager/core/browser/password_change_service_interface.h"
 #include "components/password_manager/core/browser/password_form.h"
@@ -85,6 +86,10 @@ class MockPasswordManagerClient : public StubPasswordManagerClient {
               GetPasswordChangeService,
               (),
               (const, override));
+  MOCK_METHOD(bool, IsPasswordChangeOngoing, (), (override));
+#if !BUILDFLAG(IS_ANDROID)
+  MOCK_METHOD(bool, IsActorTaskActive, (), (override));
+#endif
 };
 
 class MockPasswordChangeService : public PasswordChangeServiceInterface {
@@ -93,6 +98,10 @@ class MockPasswordChangeService : public PasswordChangeServiceInterface {
   MOCK_METHOD(bool,
               IsPasswordChangeSupported,
               (const GURL&, const autofill::LanguageCode&),
+              (const override));
+  MOCK_METHOD(void,
+              RecordLoginAttemptQuality,
+              (password_manager::LogInWithChangedPasswordOutcome, const GURL&),
               (const override));
 };
 
@@ -509,6 +518,70 @@ TEST_F(PasswordFormFillingTest, NoFillOnPageloadForSingleUsernameForm) {
       1);
 }
 
+TEST_F(PasswordFormFillingTest, NoFillOnPageLoadWhileActorTaskIsActive) {
+  base::test::ScopedFeatureList feature_list{
+      features::kActorActiveDisablesFillingOnPageLoad};
+  base::HistogramTester histogram_tester;
+  std::vector<PasswordForm> best_matches = {saved_match_};
+  const std::vector<PasswordForm> federated_matches = {};
+  EXPECT_CALL(client_, IsActorTaskActive).WillOnce(Return(true));
+  LikelyFormFilling likely_form_filling = SendFillInformationToRenderer(
+      &client_, &driver_, observed_form_, best_matches, federated_matches,
+      &saved_match_, metrics_recorder_.get(),
+      /*webauthn_suggestions_available=*/false,
+      /*suggestion_banned_fields=*/{});
+  EXPECT_EQ(LikelyFormFilling::kFillOnAccountSelect, likely_form_filling);
+  histogram_tester.ExpectUniqueSample(
+      "PasswordManager.FirstWaitForUsernameReason",
+      PasswordFormMetricsRecorder::WaitForUsernameReason::kActorTaskOngoing, 1);
+}
+
+TEST_F(PasswordFormFillingTest, NoFillOnPageLoadWhileChangingPassword) {
+  base::HistogramTester histogram_tester;
+  std::vector<PasswordForm> best_matches = {saved_match_};
+  const std::vector<PasswordForm> federated_matches = {};
+
+  EXPECT_CALL(client_, IsPasswordChangeOngoing).WillOnce(Return(true));
+  LikelyFormFilling likely_form_filling = SendFillInformationToRenderer(
+      &client_, &driver_, observed_form_, best_matches, federated_matches,
+      &saved_match_, metrics_recorder_.get(),
+      /*webauthn_suggestions_available=*/false,
+      /*suggestion_banned_fields=*/{});
+  EXPECT_EQ(LikelyFormFilling::kFillOnAccountSelect, likely_form_filling);
+  histogram_tester.ExpectUniqueSample(
+      "PasswordManager.FirstWaitForUsernameReason",
+      PasswordFormMetricsRecorder::WaitForUsernameReason::
+          kPasswordChangeOngoing,
+      1);
+}
+
+TEST_F(PasswordFormFillingTest, NoFillOnPageLoadForLeakedPassword) {
+  base::test::ScopedFeatureList scoped_feature_list{
+      features::kDisableFillingOnPageLoadForLeakedCredentials};
+  base::HistogramTester histogram_tester;
+  saved_match_.change_password_url =
+      GURL("https://example.com/.well-known/change-password/");
+  saved_match_.password_issues = {{password_manager::InsecureType::kLeaked,
+                                   password_manager::InsecurityMetadata()}};
+
+  std::vector<PasswordForm> best_matches = {saved_match_};
+  const std::vector<PasswordForm> federated_matches = {};
+
+  EXPECT_CALL(client_, IsPasswordChangeOngoing).WillOnce(Return(false));
+  EXPECT_CALL(password_change_service_, IsPasswordChangeAvailable)
+      .WillRepeatedly(testing::Return(true));
+  LikelyFormFilling likely_form_filling = SendFillInformationToRenderer(
+      &client_, &driver_, observed_form_, best_matches, federated_matches,
+      &saved_match_, metrics_recorder_.get(),
+      /*webauthn_suggestions_available=*/false,
+      /*suggestion_banned_fields=*/{});
+  EXPECT_EQ(LikelyFormFilling::kFillOnAccountSelect, likely_form_filling);
+  histogram_tester.ExpectUniqueSample(
+      "PasswordManager.FirstWaitForUsernameReason",
+      PasswordFormMetricsRecorder::WaitForUsernameReason::
+          kPasswordChangeOngoing,
+      1);
+}
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
 // Tests that the when there is a single preferred match, and no extra

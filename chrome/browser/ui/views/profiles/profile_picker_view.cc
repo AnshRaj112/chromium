@@ -4,7 +4,8 @@
 
 #include "chrome/browser/ui/views/profiles/profile_picker_view.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/debug/dump_without_crashing.h"
 #include "base/feature_list.h"
 #include "base/files/file_path.h"
@@ -33,17 +34,17 @@
 #include "chrome/browser/signin/signin_util.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
+#include "chrome/browser/ui/accelerator_table.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
-#include "chrome/browser/ui/views/accelerator_table.h"
-#include "chrome/browser/ui/views/profiles/first_run_flow_controller_dice.h"
+#include "chrome/browser/ui/views/profiles/first_run_flow_controller.h"
 #include "chrome/browser/ui/views/profiles/profile_management_flow_controller.h"
 #include "chrome/browser/ui/views/profiles/profile_management_flow_controller_impl.h"
 #include "chrome/browser/ui/views/profiles/profile_management_types.h"
-#include "chrome/browser/ui/views/profiles/profile_picker_dice_sign_in_toolbar.h"
 #include "chrome/browser/ui/views/profiles/profile_picker_feature_promo_controller.h"
 #include "chrome/browser/ui/views/profiles/profile_picker_flow_controller.h"
 #include "chrome/browser/ui/views/profiles/profile_picker_glic_flow_controller.h"
+#include "chrome/browser/ui/views/profiles/profile_picker_sign_in_toolbar.h"
 #include "chrome/browser/ui/webui/signin/profile_picker_ui.h"
 #include "chrome/browser/ui/webui/signin/signin_url_utils.h"
 #include "chrome/browser/user_education/user_education_service_factory.h"
@@ -65,7 +66,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/views/controls/webview/webview.h"
-#include "ui/views/layout/flex_layout.h"
+#include "ui/views/layout/fill_layout.h"
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
@@ -173,26 +174,22 @@ void ProfilePicker::Show(Params&& params) {
   if (g_profile_picker_view) {
     g_profile_picker_view->UpdateParams(std::move(params));
   } else {
+    if (g_browser_process->IsShuttingDown()) {
+      // The profile picker takes a KeepAlive, which is not possible during
+      // shutdown.
+      return;
+    }
     g_profile_picker_view = new ProfilePickerView(std::move(params));
   }
   g_profile_picker_view->Display();
 }
 
 // static
-base::FilePath ProfilePicker::GetSwitchProfilePath() {
-  if (g_profile_picker_view) {
-    return g_profile_picker_view->GetProfilePickerFlowController()
-        ->GetSwitchProfilePathOrEmpty();
-  }
-  return base::FilePath();
-}
-
-// static
-void ProfilePicker::SwitchToDiceSignIn(
+void ProfilePicker::SwitchToSignIn(
     ProfilePicker::ProfileInfo profile_info,
     base::OnceCallback<void(bool)> switch_finished_callback) {
   if (g_profile_picker_view) {
-    g_profile_picker_view->SwitchToDiceSignIn(
+    g_profile_picker_view->SwitchToSignIn(
         std::move(profile_info),
         StepSwitchFinishedCallback(std::move(switch_finished_callback)));
   }
@@ -231,9 +228,9 @@ void ProfilePicker::PickProfile(
 }
 
 // static
-void ProfilePicker::CancelSignedInFlow() {
+void ProfilePicker::CancelSignInFlow() {
   if (g_profile_picker_view) {
-    g_profile_picker_view->flow_controller_.get()->CancelPostSignInFlow();
+    g_profile_picker_view->flow_controller_.get()->CancelSigninFlow();
   }
 }
 
@@ -421,7 +418,8 @@ void ProfilePickerView::Clear() {
 }
 
 bool ProfilePickerView::ShouldUseDarkColors() const {
-  return GetNativeTheme()->ShouldUseDarkColors();
+  return GetNativeTheme()->preferred_color_scheme() ==
+         ui::NativeTheme::PreferredColorScheme::kDark;
 }
 
 content::WebContents* ProfilePickerView::GetPickerContents() const {
@@ -546,11 +544,9 @@ ProfilePickerView::ProfilePickerView(ProfilePicker::Params&& params)
   // Record creation metrics.
   base::UmaHistogramEnumeration("ProfilePicker.Shown", params_.entry_point());
   if (params_.entry_point() == ProfilePicker::EntryPoint::kOnStartup) {
-    DCHECK(creation_time_on_startup_.is_null());
-    creation_time_on_startup_ = base::TimeTicks::Now();
     base::UmaHistogramTimes(
         "ProfilePicker.StartupTime.BeforeCreation",
-        creation_time_on_startup_ -
+        base::TimeTicks::Now() -
             startup_metric_utils::GetCommon().MainEntryPointTicks());
   }
 }
@@ -659,12 +655,6 @@ void ProfilePickerView::FinishInit() {
     prefs->SetBoolean(prefs::kBrowserProfilePickerShown, true);
   }
 
-  if (params_.entry_point() == ProfilePicker::EntryPoint::kOnStartup) {
-    DCHECK(!creation_time_on_startup_.is_null());
-    base::UmaHistogramTimes("ProfilePicker.StartupTime.WebViewCreated",
-                            base::TimeTicks::Now() - creation_time_on_startup_);
-  }
-
   if (g_profile_picker_opened_callback_for_testing) {
     std::move(*g_profile_picker_opened_callback_for_testing).Run();
     delete g_profile_picker_opened_callback_for_testing;
@@ -681,7 +671,7 @@ ProfilePickerView::CreateFlowController(Profile* picker_profile,
                        // Unretained ok because the controller is owned
                        // by this through `initialized_steps_`.
                        base::Unretained(&params_));
-    return std::make_unique<FirstRunFlowControllerDice>(
+    return std::make_unique<FirstRunFlowController>(
         /*host=*/this, std::move(clear_host_callback), picker_profile,
         std::move(first_run_exited_callback));
   }
@@ -703,10 +693,10 @@ ProfilePickerView::CreateFlowController(Profile* picker_profile,
       params_.on_select_profile_target_url(), params_.initial_email());
 }
 
-void ProfilePickerView::SwitchToDiceSignIn(
+void ProfilePickerView::SwitchToSignIn(
     ProfilePicker::ProfileInfo profile_info,
     StepSwitchFinishedCallback switch_finished_callback) {
-  GetProfilePickerFlowController()->SwitchToDiceSignIn(
+  GetProfilePickerFlowController()->SwitchToSignIn(
       std::move(profile_info), std::move(switch_finished_callback));
 }
 
@@ -837,24 +827,22 @@ bool ProfilePickerView::GetAcceleratorForCommandId(
   return false;
 }
 
-void ProfilePickerView::BuildLayout() {
-  SetLayoutManager(std::make_unique<views::FlexLayout>())
-      ->SetOrientation(views::LayoutOrientation::kVertical)
-      .SetMainAxisAlignment(views::LayoutAlignment::kStart)
-      .SetCrossAxisAlignment(views::LayoutAlignment::kStretch)
-      .SetDefault(
-          views::kFlexBehaviorKey,
-          views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToMinimum,
-                                   views::MaximumFlexSizeRule::kUnbounded));
+void ProfilePickerView::Layout(PassKey) {
+  LayoutSuperclass<views::WidgetDelegateView>(this);
+  CHECK(toolbar_);
+  toolbar_->SetBoundsRect(gfx::Rect(toolbar_->GetPreferredSize()));
+}
 
-  auto toolbar = std::make_unique<ProfilePickerDiceSignInToolbar>();
-  toolbar_ = AddChildView(std::move(toolbar));
-  // Toolbar gets built and set visible once we it's needed for the Dice signin.
-  SetNativeToolbarVisible(false);
+void ProfilePickerView::BuildLayout() {
+  SetLayoutManager(std::make_unique<views::FillLayout>());
 
   auto web_view = std::make_unique<views::WebView>();
   web_view->set_allow_accelerators(true);
   web_view_ = AddChildView(std::move(web_view));
+
+  // Toolbar gets built and set visible once it's needed for the signin.
+  toolbar_ = AddChildView(std::make_unique<ProfilePickerSignInToolbar>());
+  SetNativeToolbarVisible(false);
 
   web_contents_attached_subscription_ =
       web_view_->AddWebContentsAttachedCallback(base::BindRepeating(
@@ -885,7 +873,8 @@ void ProfilePickerView::NavigateBack() {
 void ProfilePickerView::ConfigureAccelerators() {
   const std::vector<AcceleratorMapping> accelerator_list(GetAcceleratorList());
   for (const auto& entry : accelerator_list) {
-    if (!base::Contains(kSupportedAcceleratorCommands, entry.command_id)) {
+    if (!std::ranges::contains(kSupportedAcceleratorCommands,
+                               entry.command_id)) {
       continue;
     }
     ui::Accelerator accelerator(entry.keycode, entry.modifiers);

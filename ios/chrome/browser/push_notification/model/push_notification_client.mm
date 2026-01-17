@@ -4,8 +4,10 @@
 
 #import "ios/chrome/browser/push_notification/model/push_notification_client.h"
 
+#import "base/functional/callback_helpers.h"
 #import "base/metrics/histogram_functions.h"
 #import "base/notreached.h"
+#import "base/strings/strcat.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/task/bind_post_task.h"
 #import "components/prefs/pref_service.h"
@@ -18,8 +20,8 @@
 #import "ios/chrome/browser/shared/model/browser/browser_list_factory.h"
 #import "ios/chrome/browser/shared/model/profile/features.h"
 #import "ios/chrome/browser/shared/model/profile/profile_manager_ios.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/tips_notifications/model/utils.h"
 #import "ios/chrome/browser/url_loading/model/url_loading_browser_agent.h"
 #import "ios/chrome/browser/url_loading/model/url_loading_params.h"
@@ -193,8 +195,8 @@ void PushNotificationClient::OnSceneActiveForegroundBrowserReady() {
   CHECK(browser);
 
   if (feedback_presentation_delayed_) {
-    id<ApplicationCommands> handler =
-        static_cast<id<ApplicationCommands>>(browser->GetCommandDispatcher());
+    id<SceneCommands> handler =
+        static_cast<id<SceneCommands>>(browser->GetCommandDispatcher());
     switch (feedback_presentation_delayed_client_) {
       case PushNotificationClientId::kContent:
       case PushNotificationClientId::kSports:
@@ -211,6 +213,7 @@ void PushNotificationClient::OnSceneActiveForegroundBrowserReady() {
       case PushNotificationClientId::kSendTab:
       case PushNotificationClientId::kSafetyCheck:
       case PushNotificationClientId::kReminders:
+      case PushNotificationClientId::kCrossPlatformPromos:
         // Features do not support feedback.
         NOTREACHED();
     }
@@ -267,8 +270,8 @@ void PushNotificationClient::LoadUrlInNewTab(
     const GURL& url,
     Browser* browser,
     base::OnceCallback<void(Browser*)> callback) {
-  id<ApplicationCommands> handler =
-      static_cast<id<ApplicationCommands>>(browser->GetCommandDispatcher());
+  id<SceneCommands> handler =
+      static_cast<id<SceneCommands>>(browser->GetCommandDispatcher());
   [handler openURLInNewTab:[OpenNewTabCommand commandWithURLFromChrome:url]];
   std::move(callback).Run(browser);
 }

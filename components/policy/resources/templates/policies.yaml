@@ -1285,7 +1285,7 @@ policies:
   1284: SystemShortcutBehavior
   1285: DeletingUndecryptablePasswordsEnabled
   1286: StandardizedBrowserZoomEnabled
-  1287: ReportingEndpoints
+  1287: ''
   1288: PrintingLPACSandboxEnabled
   1289: ShowGeminiIntroScreenEnabled
   1290: DeviceRestrictionSchedule
@@ -1385,6 +1385,43 @@ policies:
   1384: WebRtcPostQuantumKeyAgreement
   1385: DeviceLoginScreenSecurityKeyPermitAttestation
   1386: RestrictCoreSharingOnRenderer
+  1387: OriginKeyedProcessesEnabled
+  1388: NTPShortcuts
+  1389: AutoSignOutEnabled
+  1390: ExtensionInstallCloudPolicyChecksEnabled
+  1391: DevToolsGoogleDeveloperProgramProfileAvailability
+  1392: IncognitoModeUrlBlocklist
+  1393: IncognitoModeUrlAllowlist
+  1394: PreferSlowKexAlgorithms
+  1395: ExtensionForceInstallWithNonMalwareViolationsEnabled
+  1396: CacheEncryptionEnabled
+  1397: SilentPrintingEnabled
+  1398: PreferSlowCiphers
+  1399: DeveloperToolsAvailabilityAllowlist
+  1400: DeveloperToolsAvailabilityBlocklist
+  1401: LocalNetworkAccessRestrictionsTemporaryOptOut
+  1402: GeminiActOnWebSettings
+  1403: LocalAuthFactorsComplexity
+  1404: ProxyOverrideRules
+  1405: LocalAuthFactors
+  1406: EnableProxyOverrideRulesForAllUsers
+  1407: DefaultIdleDetectionSetting
+  1408: IdleDetectionAllowedForUrls
+  1409: IdleDetectionBlockedForUrls
+  1410: PreciseGeolocationAllowedForUrls
+  1411: GeolocationBlockedForUrls
+  1412: PdfXfaFormsEnabled
+  1413: CameraSaveLocation
+  1414: DeviceLoginScreenPreferSlowKexAlgorithms
+  1415: DeviceLoginScreenPreferSlowCiphers
+  1416: SearchContentSharingSettings
+  1417: StaticStorageQuotaEnabled
+  1418: SaasUsageReportingDomainUrlsForBrowsers
+  1419: SaasUsageReportingDomainUrlsForProfiles
+  1420: GeminiActOnWebAllowedForURLs
+  1421: GeminiActOnWebBlockedForURLs
+  1422: WebAppInstallByUserEnabled
+
 atomic_groups:
   1: Homepage
   2: RemoteAccess
@@ -1439,7 +1476,7 @@ atomic_groups:
   51: WebPrintingSettings
   52: DirectSocketsSettings
   53: SkyVaultSettings
-  54: BrowserEventReporting
+  54: ''
   55: SmartCardConnectSettings
   56: WebRtc
   57: ControlledFrameSettings
@@ -1447,3 +1484,4 @@ atomic_groups:
   59: DeviceAttributesSettings
   60: ProtectedContent
   61: LegacyCookieScopeSettings
+  62: GeolocationSettings

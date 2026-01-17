@@ -8,6 +8,7 @@
 
 #include "base/check.h"
 #include "base/functional/bind.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/threading/scoped_blocking_call.h"
 #include "components/device_signals/core/browser/browser_utils.h"
@@ -42,6 +43,11 @@ std::unique_ptr<OsSignalsResponse> AddAsyncOsSignals(
 
     os_signals_response->disk_encryption = device_signals::GetDiskEncrypted();
     os_signals_response->os_firewall = device_signals::GetOSFirewall();
+
+#if BUILDFLAG(IS_LINUX)
+    os_signals_response->distribution_version =
+        device_signals::GetDistributionVersion();
+#endif  // BUILDFLAG(IS_LINUX)
   }
 
   return os_signals_response;

@@ -88,6 +88,10 @@ class PasswordFormManager : public PasswordFormManagerForUI,
   // form.
   static constexpr int kMaxTimesAutofill = 5;
 
+  // Inform of a manual filling event in order to update the password's
+  // |date_last_filled| timestamp.
+  void OnPasswordFilledManually();
+
   // Returns whether the form identified by |form_renderer_id| and |driver|
   // is managed by this password form manager.
   bool DoesManage(autofill::FormRendererId form_renderer_id,
@@ -202,7 +206,6 @@ class PasswordFormManager : public PasswordFormManagerForUI,
   bool IsUpdateAffectingPasswordsStoredInTheGoogleAccount() const override;
   void OnUpdateUsernameFromPrompt(const std::u16string& new_username) override;
   void OnUpdatePasswordFromPrompt(const std::u16string& new_password) override;
-  void OnRemovePasswordBackupNote() override;
 
   void OnNopeUpdateClicked() override;
   void OnNeverClicked() override;
@@ -307,6 +310,10 @@ class PasswordFormManager : public PasswordFormManagerForUI,
 
   void AddObserver(PasswordFormManagerObserver* observer);
   void RemoveObserver(PasswordFormManagerObserver* observer);
+
+  // Informs `password_save_manager_` that it should store actor login
+  // permission when building pending credentials.
+  void SetShouldStoreActorLoginPermission();
 
  protected:
   // Constructor for Credentials API.
@@ -439,7 +446,7 @@ class PasswordFormManager : public PasswordFormManagerForUI,
   std::unique_ptr<FormFetcher> CreateFormFetcher();
 
   // The client which implements embedder-specific PasswordManager operations.
-  const raw_ptr<PasswordManagerClient> client_;
+  const raw_ptr<PasswordManagerClient, DanglingUntriaged> client_;
 
   base::WeakPtr<PasswordManagerDriver> driver_;
 
@@ -478,7 +485,7 @@ class PasswordFormManager : public PasswordFormManagerForUI,
   std::optional<VotesUploader> votes_uploader_;
 
   // |is_submitted_| = true means that |*this| is ready for saving.
-  // TODO(https://crubg.com/875768): Come up with a better name.
+  // TODO(https://crbug.com/875768): Come up with a better name.
   bool is_submitted_ = false;
   autofill::FormData submitted_form_;
   std::unique_ptr<PasswordForm> parsed_submitted_form_;
@@ -514,9 +521,6 @@ class PasswordFormManager : public PasswordFormManagerForUI,
   // Stores if Save() was called when FormFetcher was in WAITING state.
   // In that case we should schedule a Save() call, when FormFecher is ready.
   bool should_schedule_save_for_later_ = false;
-
-  // A password field that is used for generation.
-  autofill::FieldRendererId generation_element_;
 
   // For generating timing metrics on retrieving server-side predictions.
   std::unique_ptr<base::ElapsedTimer> server_side_predictions_timer_;

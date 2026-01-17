@@ -5,69 +5,82 @@
 #include "chrome/browser/web_applications/web_app.h"
 
 #include <array>
-#include <bitset>
+#include <cstdint>
 #include <optional>
 #include <ostream>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "base/check.h"
 #include "base/check_is_test.h"
 #include "base/check_op.h"
-#include "base/containers/flat_tree.h"
+#include "base/containers/flat_set.h"
 #include "base/containers/to_value_list.h"
+#include "base/logging.h"
 #include "base/not_fatal_until.h"
 #include "base/notreached.h"
-#include "base/numerics/clamped_math.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/to_string.h"
-#include "base/types/optional_util.h"
+#include "base/time/time.h"
 #include "base/values.h"
 #include "build/build_config.h"
 #include "chrome/browser/web_applications/generated_icon_fix_util.h"
+#include "chrome/browser/web_applications/isolated_web_apps/isolation_data.h"
+#include "chrome/browser/web_applications/model/display_override.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom-shared.h"
 #include "chrome/browser/web_applications/proto/web_app.equal.h"
 #include "chrome/browser/web_applications/proto/web_app.ostream.h"
 #include "chrome/browser/web_applications/proto/web_app.pb.h"
 #include "chrome/browser/web_applications/proto/web_app.to_value.h"
-#include "chrome/browser/web_applications/proto/web_app_install_state.ostream.h"
 #include "chrome/browser/web_applications/proto/web_app_install_state.pb.h"
 #include "chrome/browser/web_applications/proto/web_app_install_state.to_value.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.equal.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.pb.h"
 #include "chrome/browser/web_applications/proto/web_app_os_integration_state.to_value.h"
-#include "chrome/browser/web_applications/tabbed_mode_scope_matcher.h"
+#include "chrome/browser/web_applications/scope_extension_info.h"
+#include "chrome/browser/web_applications/url_pattern_with_regex_matcher.h"
 #include "chrome/browser/web_applications/user_display_mode.h"
 #include "chrome/browser/web_applications/web_app_chromeos_data.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
+#include "chrome/browser/web_applications/web_app_install_info.h"
 #include "chrome/browser/web_applications/web_app_management_type.h"
 #include "chrome/browser/web_applications/web_app_proto_utils.h"
+#include "chrome/browser/web_applications/web_app_scope.h"
 #include "chrome/browser/web_applications/web_app_utils.h"
-#include "chrome/common/url_constants.h"
-#include "components/sync/base/time.h"
+#include "components/services/app_service/public/cpp/file_handler.h"
+#include "components/services/app_service/public/cpp/protocol_handler_info.h"
+#include "components/services/app_service/public/cpp/share_target.h"
+#include "components/sync/model/string_ordinal.h"
 #include "components/sync/protocol/proto_value_conversions.h"
 #include "components/sync/protocol/web_app_specifics.equal.h"
 #include "components/sync/protocol/web_app_specifics.pb.h"
 #include "components/sync/protocol/web_app_specifics.to_value.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
+#include "components/webapps/common/web_app_id.h"
 #include "components/webapps/isolated_web_apps/types/storage_location.h"
 #include "services/network/public/cpp/permissions_policy/permissions_policy_declaration.h"
+#include "third_party/blink/public/common/manifest/manifest.h"
 #include "third_party/blink/public/common/manifest/manifest_util.h"
 #include "third_party/blink/public/common/permissions_policy/policy_helper_public.h"
 #include "third_party/blink/public/common/safe_url_pattern.h"
-#include "third_party/blink/public/mojom/manifest/manifest.mojom-shared.h"
-#include "third_party/blink/public/mojom/manifest/manifest_launch_handler.mojom-shared.h"
 #include "third_party/liburlpattern/options.h"
 #include "third_party/liburlpattern/pattern.h"
-#include "third_party/protobuf/src/google/protobuf/repeated_field.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/size.h"
 #include "url/origin.h"
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+#include "components/webapps/isolated_web_apps/scheme.h"
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+        // BUILDFLAG(IS_CHROMEOS)
 
 namespace web_app {
 
@@ -175,16 +188,10 @@ base::Value OptTabStripToDebugValue(
       icons_json.Append(ImageResourceDebugDict(icon));
     }
 
-    base::Value::List scope_patterns_json;
-    const std::vector<blink::SafeUrlPattern>& scope_patterns =
-        home_tab_params.scope_patterns;
-
-    for (const auto& scope_pattern : scope_patterns) {
-      scope_patterns_json.Append(UrlPatternDebugValue(scope_pattern));
-    }
-
     home_tab_json.Set("icons", std::move(icons_json));
-    home_tab_json.Set("scope_patterns", std::move(scope_patterns_json));
+    home_tab_json.Set("scope_patterns",
+                      base::ToValueList(home_tab_params.scope_patterns,
+                                        UrlPatternDebugValue));
     result.Set("home_tab", std::move(home_tab_json));
   }
   return base::Value(std::move(result));
@@ -218,14 +225,18 @@ void CheckValidPendingUpdateInfo(
     if (!pending_update_info->trusted_icons().empty() &&
         !pending_update_info->manifest_icons().empty()) {
       for (const auto& icon : pending_update_info->trusted_icons()) {
-        CHECK(icon.has_url() && icon.has_size_in_px() && icon.has_purpose());
+        CHECK(icon.has_url() && icon.has_purpose());
       }
       for (const auto& icon : pending_update_info->manifest_icons()) {
-        CHECK(icon.has_url() && icon.has_size_in_px() && icon.has_purpose());
+        CHECK(icon.has_url() && icon.has_purpose());
       }
+      CHECK(!pending_update_info->downloaded_manifest_icons().empty() &&
+            !pending_update_info->downloaded_trusted_icons().empty());
     }
+    CHECK(pending_update_info->has_was_ignored());
   }
 }
+
 }  // namespace
 
 WebApp::CachedDerivedData::CachedDerivedData() = default;
@@ -239,18 +250,12 @@ WebApp::CachedDerivedData& WebApp::CachedDerivedData::operator=(
   return *this;
 }
 
-WebApp::WebApp(const webapps::AppId& app_id)
-    : app_id_(app_id),
-      chromeos_data_(IsChromeOsDataMandatory()
-                         ? std::make_optional<WebAppChromeOsData>()
-                         : std::nullopt) {}
-
-WebApp::WebApp(const webapps::ManifestId& manifest_id,
+WebApp::WebApp(const webapps::AppId& app_id,
+               const webapps::ManifestId& manifest_id,
                const GURL& start_url,
                const GURL& scope,
-               std::optional<webapps::AppId> parent_app_id,
-               std::optional<webapps::ManifestId> parent_manifest_id)
-    : app_id_(GenerateAppIdFromManifestId(manifest_id, parent_manifest_id)),
+               std::optional<webapps::AppId> parent_app_id)
+    : app_id_(app_id),
       start_url_(start_url),
       scope_(scope),
       chromeos_data_(IsChromeOsDataMandatory()
@@ -270,12 +275,24 @@ WebApp::WebApp(const webapps::ManifestId& manifest_id,
   CHECK(base::StartsWith(start_url_.spec(), scope_.spec(),
                          base::CompareCase::SENSITIVE))
       << "Start URL " << start_url_ << " must be nested in scope " << scope_;
+  // Ensure sync proto is initialized.
+  SetSyncProto(sync_proto_);
+}
+
+WebApp::WebApp(const webapps::ManifestId& manifest_id,
+               const GURL& start_url,
+               const GURL& scope,
+               std::optional<webapps::AppId> parent_app_id,
+               std::optional<webapps::ManifestId> parent_manifest_id)
+    : WebApp(GenerateAppIdFromManifestId(manifest_id, parent_manifest_id),
+             manifest_id,
+             start_url,
+             scope,
+             parent_app_id) {
   if (parent_app_id_.has_value()) {
     CHECK(!parent_app_id_->empty());
   }
   CHECK(!!parent_app_id == !!parent_manifest_id);
-  // Ensure sync proto is initialized.
-  SetSyncProto(sync_proto_);
 }
 
 WebApp::~WebApp() = default;
@@ -295,6 +312,11 @@ const SortedSizesPx& WebApp::downloaded_icon_sizes(IconPurpose purpose) const {
   }
 }
 
+WebAppScope WebApp::GetScope() const {
+  return WebAppScope(app_id_, scope_, validated_scope_extensions_,
+                     base::PassKey<WebApp>());
+}
+
 webapps::ManifestId WebApp::manifest_id() const {
   // Almost all production use-cases should have the manifest_id set, but in
   // some test it is not. If the manifest id is not set, then fall back to the
@@ -309,7 +331,24 @@ webapps::ManifestId WebApp::manifest_id() const {
   return manifest_id_;
 }
 
+const SortedSizesPx& WebApp::stored_trusted_icon_sizes(
+    IconPurpose purpose) const {
+  switch (purpose) {
+    case IconPurpose::ANY:
+      return stored_trusted_icon_sizes_any_;
+    case IconPurpose::MASKABLE:
+      return stored_trusted_icon_sizes_maskable_;
+    case IconPurpose::MONOCHROME:
+      NOTREACHED();
+  }
+}
+
 void WebApp::AddSource(WebAppManagement::Type source) {
+  if (source == WebAppManagement::kSync) {
+    CHECK_NE(proto::SUGGESTED_FROM_MIGRATION, install_state_)
+        << "Synced apps should not have an install state suggested from "
+           "migration";
+  }
   sources_.Put(source);
 }
 
@@ -378,6 +417,19 @@ bool WebApp::WasInstalledByUser() const {
          sources_.Has(WebAppManagement::kWebAppStore) ||
          sources_.Has(WebAppManagement::kOneDriveIntegration) ||
          sources_.Has(WebAppManagement::kIwaUserInstalled);
+}
+
+bool WebApp::WasInstalledByTrustedSources() const {
+  // WebAppChromeOsData::oem_installed is not included here as
+  // we would like to keep WebAppManagement::kOem and
+  // WebAppChromeOsData::oem_installed separate.
+  // WebAppChromeOsData::oem_installed will be migrated to
+  // WebAppManagement::kOem eventually.
+  return sources_.Has(WebAppManagement::kDefault) ||
+         sources_.Has(WebAppManagement::kPolicy) ||
+         sources_.Has(WebAppManagement::kKiosk) ||
+         sources_.Has(WebAppManagement::kOem) ||
+         sources_.Has(WebAppManagement::kApsDefault);
 }
 
 WebAppManagement::Type WebApp::GetHighestPrioritySource() const {
@@ -467,8 +519,13 @@ void WebApp::SetUserDisplayMode(mojom::UserDisplayMode user_display_mode) {
 }
 
 void WebApp::SetDisplayModeOverride(
-    std::vector<DisplayMode> display_mode_override) {
+    std::vector<DisplayOverride> display_mode_override) {
   display_mode_override_ = std::move(display_mode_override);
+}
+
+void WebApp::SetBorderlessUrlPatterns(
+    std::vector<blink::SafeUrlPattern> borderless_url_patterns) {
+  borderless_url_patterns_ = std::move(borderless_url_patterns);
 }
 
 void WebApp::SetWebAppChromeOsData(
@@ -477,6 +534,11 @@ void WebApp::SetWebAppChromeOsData(
 }
 
 void WebApp::SetInstallState(proto::InstallState install_state) {
+  if (install_state == proto::SUGGESTED_FROM_MIGRATION) {
+    CHECK(!IsSynced())
+        << " Attempted to set an install state of suggested from migration "
+           "from an app that has been sync installed";
+  }
   install_state_ = install_state;
 }
 
@@ -635,10 +697,6 @@ void WebApp::SetSyncProto(sync_pb::WebAppSpecifics sync_proto) {
   sync_proto_ = std::move(sync_proto);
 }
 
-void WebApp::SetCaptureLinks(blink::mojom::CaptureLinks capture_links) {
-  capture_links_ = capture_links;
-}
-
 void WebApp::SetLaunchQueryParams(
     std::optional<std::string> launch_query_params) {
   launch_query_params_ = std::move(launch_query_params);
@@ -711,8 +769,13 @@ void WebApp::SetCurrentOsIntegrationStates(
 }
 
 void WebApp::SetIsolationData(IsolationData isolation_data) {
-  CHECK(manifest_id_.is_valid() &&
-        manifest_id_.SchemeIs(chrome::kIsolatedAppScheme));
+  CHECK(manifest_id_.is_valid()
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+        && manifest_id_.SchemeIs(webapps::kIsolatedAppScheme))
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+        // BUILDFLAG(IS_CHROMEOS)
+      ;
   if (isolation_data.pending_update_info().has_value()) {
     DCHECK_EQ(isolation_data.location().dev_mode(),
               isolation_data.pending_update_info()->location.dev_mode())
@@ -792,8 +855,9 @@ void WebApp::AddExternalSourceInformation(WebAppManagement::Type type,
 
 bool WebApp::RemoveInstallUrlForSource(WebAppManagement::Type type,
                                        const GURL& install_url) {
-  if (!management_to_external_config_map_.count(type))
+  if (!management_to_external_config_map_.count(type)) {
     return false;
+  }
 
   bool removed =
       management_to_external_config_map_[type].install_urls.erase(install_url);
@@ -826,6 +890,90 @@ void WebApp::SetPendingUpdateInfo(
 
 void WebApp::SetTrustedIcons(std::vector<apps::IconInfo> trusted_icons) {
   trusted_icons_ = std::move(trusted_icons);
+}
+
+void WebApp::SetStoredTrustedIconSizes(IconPurpose purpose,
+                                       SortedSizesPx sizes) {
+  switch (purpose) {
+    case IconPurpose::ANY:
+      stored_trusted_icon_sizes_any_ = std::move(sizes);
+      break;
+    case IconPurpose::MASKABLE:
+      stored_trusted_icon_sizes_maskable_ = std::move(sizes);
+      break;
+    case IconPurpose::MONOCHROME:
+      NOTREACHED();
+  }
+}
+
+namespace {
+void ValidateMigrationSources(
+    const std::vector<proto::WebAppMigrationSource>& sources) {
+  for (const auto& source : sources) {
+    GURL manifest_id(source.manifest_id());
+    CHECK(manifest_id.is_valid());
+    CHECK(!url::Origin::Create(manifest_id).opaque());
+    if (source.has_install_url()) {
+      GURL install_url(source.install_url());
+      CHECK(install_url.is_valid());
+      CHECK(url::IsSameOriginWith(manifest_id, install_url));
+    }
+  }
+}
+}  // namespace
+
+void WebApp::SetUnvalidatedMigrationSources(
+    std::vector<proto::WebAppMigrationSource> sources) {
+  ValidateMigrationSources(sources);
+  unvalidated_migration_sources_ = std::move(sources);
+}
+
+void WebApp::SetValidatedMigrationSources(
+    std::vector<proto::WebAppMigrationSource> sources) {
+  ValidateMigrationSources(sources);
+  validated_migration_sources_ = std::move(sources);
+}
+
+void WebApp::SetPendingMigrationInfo(
+    std::optional<proto::PendingMigrationInfo> info) {
+  if (info.has_value()) {
+    GURL manifest_id(info->manifest_id());
+    CHECK(manifest_id.is_valid());
+    CHECK(!url::Origin::Create(manifest_id).opaque());
+  }
+  pending_migration_info_ = std::move(info);
+}
+
+void WebApp::SetInstalledBy(InstalledByPassKey,
+                            std::deque<AppInstalledBy> installed_by) {
+  for (const AppInstalledBy& data : installed_by) {
+    CHECK(data.requesting_url().is_valid());
+  }
+  installed_by_ = std::move(installed_by);
+}
+
+constexpr int kMaxInstalledBySize = 10;
+void WebApp::AddInstalledByInfo(AppInstalledBy installed_by_info) {
+  CHECK(installed_by_info.requesting_url().is_valid());
+
+  // Check for duplicates - only compare URLs, not timestamps.
+  // Remove duplicate entry so it can be re-added with updated timestamp.
+  installed_by_.erase(
+      std::remove_if(installed_by_.begin(), installed_by_.end(),
+                     [&installed_by_info](const AppInstalledBy& info) {
+                       return info.requesting_url() ==
+                              installed_by_info.requesting_url();
+                     }),
+      installed_by_.end());
+
+  // Add the new entry.
+  installed_by_.push_back(std::move(installed_by_info));
+
+  // Enforce max 10 entries - remove oldest if exceeding capacity.
+  if (installed_by_.size() > kMaxInstalledBySize) {
+    installed_by_.pop_front();
+  }
+  CHECK(installed_by_.size() <= kMaxInstalledBySize);
 }
 
 WebApp::ClientData::ClientData() = default;
@@ -876,7 +1024,7 @@ base::Value::Dict WebApp::ExternalManagementConfig::AsDebugValue() const {
   return root;
 }
 
-const std::vector<TabbedModeScopeMatcher>& WebApp::GetTabbedModeHomeScope()
+const std::vector<UrlPatternWithRegexMatcher>& WebApp::GetTabbedModeHomeScope()
     const {
   if (!cached_derived_data_.home_tab_scope.has_value()) {
     cached_derived_data_.home_tab_scope.emplace();
@@ -918,6 +1066,7 @@ bool WebApp::operator==(const WebApp& other) const {
         app.dark_mode_background_color_,
         app.display_mode_,
         app.display_mode_override_,
+        app.borderless_url_patterns_,
         app.chromeos_data_,
         app.install_state_,
         app.is_from_sync_and_pending_installation_,
@@ -944,7 +1093,6 @@ bool WebApp::operator==(const WebApp& other) const {
         app.manifest_update_time_,
         app.run_on_os_login_mode_,
         app.sync_proto_,
-        app.capture_links_,
         app.manifest_url_,
         app.manifest_id_,
 #if BUILDFLAG(IS_CHROMEOS)
@@ -973,7 +1121,13 @@ bool WebApp::operator==(const WebApp& other) const {
         app.related_applications_,
         app.diy_app_icons_masked_on_mac_,
         app.pending_update_info_,
-        app.trusted_icons_
+        app.trusted_icons_,
+        app.stored_trusted_icon_sizes_any_,
+        app.stored_trusted_icon_sizes_maskable_,
+        app.installed_by_,
+        app.unvalidated_migration_sources_,
+        app.validated_migration_sources_,
+        app.pending_migration_info_
         // clang-format on
     );
   };
@@ -985,15 +1139,17 @@ base::Value WebApp::AsDebugValueWithOnlyPlatformAgnosticFields() const {
 
   auto ConvertList = [](const auto& list) {
     base::Value::List list_json;
-    for (const auto& item : list)
+    for (const auto& item : list) {
       list_json.Append(item);
+    }
     return list_json;
   };
 
   auto ConvertDebugValueList = [](const auto& list) {
     base::Value::List list_json;
-    for (const auto& item : list)
+    for (const auto& item : list) {
       list_json.Append(item.AsDebugValue());
+    }
     return list_json;
   };
 
@@ -1017,8 +1173,6 @@ base::Value WebApp::AsDebugValueWithOnlyPlatformAgnosticFields() const {
 
   root.Set("background_color", ColorToString(background_color_));
 
-  root.Set("capture_links", base::ToString(capture_links_));
-
   root.Set("data_size_in_bytes", OptionalToStringValue(data_size_in_bytes_));
 
   root.Set("dark_mode_background_color",
@@ -1033,10 +1187,9 @@ base::Value WebApp::AsDebugValueWithOnlyPlatformAgnosticFields() const {
 
   root.Set("display_mode", blink::DisplayModeToString(display_mode_));
 
-  base::Value::List display_override;
-  for (const DisplayMode& mode : display_mode_override_)
-    display_override.Append(blink::DisplayModeToString(mode));
-  root.Set("display_override", std::move(display_override));
+  root.Set("display_override",
+           base::ToValueList(display_mode_override_,
+                             &DisplayOverride::ToDebugValue));
 
   base::Value::Dict downloaded_icon_sizes_json;
   for (IconPurpose purpose : kIconPurposes) {
@@ -1146,8 +1299,6 @@ base::Value WebApp::AsDebugValueWithOnlyPlatformAgnosticFields() const {
 
   root.Set("start_url", base::ToString(start_url_));
 
-  root.Set("sync_proto", syncer::WebAppSpecificsToValue(sync_proto_));
-
   root.Set("theme_color", ColorToString(theme_color_));
 
   root.Set("manifest_id", manifest_id_.spec());
@@ -1165,7 +1316,7 @@ base::Value WebApp::AsDebugValueWithOnlyPlatformAgnosticFields() const {
            always_show_toolbar_in_fullscreen_);
 
   root.Set("current_os_integration_states",
-           proto::os_state::Serialize(current_os_integration_states_));
+           proto::os_state::ToValue(current_os_integration_states_));
 
   root.Set("isolation_data", OptionalAsDebugValue(isolation_data_));
 
@@ -1174,7 +1325,7 @@ base::Value WebApp::AsDebugValueWithOnlyPlatformAgnosticFields() const {
 
   root.Set("latest_install_time", base::ToString(latest_install_time_));
 
-  proto::MaybeSerialize(generated_icon_fix_, "generated_icon_fix", root);
+  proto::MaybeToValue(generated_icon_fix_, "generated_icon_fix", root);
 
   root.Set("supported_links_offer_ignore_count",
            supported_links_offer_ignore_count_);
@@ -1190,9 +1341,43 @@ base::Value WebApp::AsDebugValueWithOnlyPlatformAgnosticFields() const {
   root.Set("related_applications",
            RelatedApplicationsToDebugValue(related_applications_));
 
-  proto::MaybeSerialize(pending_update_info_, "pending_update_info", root);
+  proto::MaybeToValue(pending_update_info_, "pending_update_info", root);
 
   root.Set("trusted_icons", ConvertDebugValueList(trusted_icons_));
+
+  base::Value::List installed_by_list;
+  for (const auto& installed_by_data : installed_by_) {
+    installed_by_list.Append(installed_by_data.InstalledByToDebugValue());
+  }
+  root.Set("installed_by", std::move(installed_by_list));
+
+  root.Set("unvalidated_migration_sources",
+           base::ToValueList(unvalidated_migration_sources_,
+                             [](const proto::WebAppMigrationSource& source) {
+                               return proto::ToValue(source);
+                             }));
+  root.Set("validated_migration_sources",
+           base::ToValueList(validated_migration_sources_,
+                             [](const proto::WebAppMigrationSource& source) {
+                               return proto::ToValue(source);
+                             }));
+  proto::MaybeToValue(pending_migration_info_, "pending_migration_info", root);
+
+  base::Value::Dict stored_trusted_icon_sizes_json;
+  for (IconPurpose purpose : kIconPurposes) {
+    // There can never be trusted monochrome icons.
+    if (purpose == IconPurpose::MONOCHROME) {
+      continue;
+    }
+    stored_trusted_icon_sizes_json.Set(
+        base::ToString(purpose),
+        ConvertList(stored_trusted_icon_sizes(purpose)));
+  }
+  root.Set("stored_trusted_icon_sizes",
+           std::move(stored_trusted_icon_sizes_json));
+
+  root.Set("borderless_url_patterns",
+           base::ToValueList(borderless_url_patterns_, UrlPatternDebugValue));
 
   return base::Value(std::move(root));
 }
@@ -1204,6 +1389,13 @@ base::Value WebApp::AsDebugValue() const {
   root.Set("chromeos_data", OptionalAsDebugValue(chromeos_data_));
 
   root.Set("client_data", client_data_.AsDebugValue());
+
+  root.Set("sync_proto", syncer::WebAppSpecificsToValue(sync_proto_));
+
+  // The user_display_mode getter CHECK fails if sync_proto_ isn't initialized.
+  if (sync_proto_.has_start_url()) {
+    root.Set("user_display_mode", base::ToString(user_display_mode()));
+  }
 
   return value;
 }

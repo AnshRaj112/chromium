@@ -8,9 +8,9 @@
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/callback.h"
 #include "components/metrics/metrics_log_uploader.h"
+#include "components/regional_capabilities/regional_capabilities_country_id.h"
 #include "third_party/metrics_proto/chrome_user_metrics_extension.pb.h"
 
 namespace metrics {
@@ -36,7 +36,7 @@ void TestMetricsServiceClient::SetMetricsClientId(
 }
 
 bool TestMetricsServiceClient::ShouldUploadMetricsForUserId(uint64_t user_id) {
-  return base::Contains(allowed_user_ids_, user_id);
+  return allowed_user_ids_.contains(user_id);
 }
 
 int32_t TestMetricsServiceClient::GetProduct() {
@@ -109,6 +109,11 @@ bool TestMetricsServiceClient::ShouldResetClientIdsOnClonedInstall() {
 MetricsLogStore::StorageLimits TestMetricsServiceClient::GetStorageLimits()
     const {
   return storage_limits_;
+}
+
+std::optional<regional_capabilities::CountryIdHolder>
+TestMetricsServiceClient::GetProfileCountryIdForPrivateMetricsReporting() {
+  return country_id_holder_;
 }
 
 void TestMetricsServiceClient::AllowMetricUploadForUserId(uint64_t user_id) {

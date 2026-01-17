@@ -4,9 +4,7 @@
 
 #include <fuchsia/web/cpp/fidl.h>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/logging.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
@@ -165,8 +163,8 @@ IN_PROC_BROWSER_TEST_F(ClientHintsTest, InvalidClientHint) {
 IN_PROC_BROWSER_TEST_F(ClientHintsTest, LowEntropyClientHintsAreSentByDefault) {
   GetAndVerifyClientHint(
       kUserAgentCH, base::BindRepeating([](std::string& str) {
-        EXPECT_TRUE(base::Contains(str, "Chromium"));
-        EXPECT_TRUE(base::Contains(str, version_info::GetMajorVersionNumber()));
+        EXPECT_TRUE(str.contains("Chromium"));
+        EXPECT_TRUE(str.contains(version_info::GetMajorVersionNumber()));
       }));
 }
 
@@ -175,8 +173,8 @@ IN_PROC_BROWSER_TEST_F(ClientHintsTest,
   SetClientHintsForTestServerToRequest(kUserAgentCH);
   GetAndVerifyClientHint(
       kUserAgentCH, base::BindRepeating([](std::string& str) {
-        EXPECT_TRUE(base::Contains(str, "Chromium"));
-        EXPECT_TRUE(base::Contains(str, version_info::GetMajorVersionNumber()));
+        EXPECT_TRUE(str.contains("Chromium"));
+        EXPECT_TRUE(str.contains(version_info::GetMajorVersionNumber()));
       }));
 }
 
@@ -193,8 +191,8 @@ IN_PROC_BROWSER_TEST_F(ClientHintsTest,
   SetClientHintsForTestServerToRequest(kFullVersionListCH);
   GetAndVerifyClientHint(
       kFullVersionListCH, base::BindRepeating([](std::string& str) {
-        EXPECT_TRUE(base::Contains(str, "Chromium"));
-        EXPECT_TRUE(base::Contains(str, version_info::GetVersionNumber()));
+        EXPECT_TRUE(str.contains("Chromium"));
+        EXPECT_TRUE(str.contains(version_info::GetVersionNumber()));
       }));
 }
 
@@ -302,8 +300,8 @@ IN_PROC_BROWSER_TEST_F(ClientHintsTest, WithUrlRedirectRules) {
   fuchsia::web::UrlRequestRewrite rewrite;
   rewrite.set_append_to_query(std::move(append_to_query));
   fuchsia::web::UrlRequestRewriteRule rule;
-  rule.set_hosts_filter({http2_server.base_url().host()});
-  rule.set_schemes_filter({http2_server.base_url().scheme()});
+  rule.set_hosts_filter({http2_server.base_url().GetHost()});
+  rule.set_schemes_filter({http2_server.base_url().GetScheme()});
   rule.mutable_rewrites()->push_back(std::move(rewrite));
   std::vector<fuchsia::web::UrlRequestRewriteRule> rules;
   rules.push_back(std::move(rule));

@@ -13,7 +13,8 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/values.h"
-#include "chrome/browser/extensions/active_install_data.h"
+#include "build/build_config.h"
+#include "chrome/browser/extensions/api/webstore_private/extension_install_status.h"
 #include "chrome/browser/extensions/extension_install_prompt.h"
 #include "chrome/browser/extensions/webstore_install_helper.h"
 #include "chrome/browser/extensions/webstore_installer.h"
@@ -21,16 +22,25 @@
 #include "chrome/common/buildflags.h"
 #include "chrome/common/extensions/api/webstore_private.h"
 #include "chrome/common/extensions/webstore_install_result.h"
+#include "components/policy/proto/device_management_backend.pb.h"
+#include "extensions/browser/active_install_data.h"
 #include "extensions/browser/extension_function.h"
 #include "extensions/browser/supervised_user_extensions_delegate.h"
+#include "extensions/buildflags/buildflags.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+
+#if !BUILDFLAG(IS_ANDROID)
+#include "components/enterprise/browser/promotion/promotion_eligibility_checker.h"
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 class Profile;
 
 namespace content {
 class GpuFeatureChecker;
 class WebContents;
-}
+}  // namespace content
 
 namespace extensions {
 
@@ -97,11 +107,14 @@ class WebstorePrivateBeginInstallWithManifest3Function
                               InstallHelperResultCode result,
                               const std::string& error_message) override;
 
+  // Handles the result of GetWebstoreExtensionInstallStatus.
+  void OnInstallStatusCheckDone(
+      extensions::ExtensionInstallStatus install_status);
+
   void RequestExtensionApproval(content::WebContents* web_contents);
 
   // Handles the result of the extension approval flow.
-  void OnExtensionApprovalDone(
-      SupervisedUserExtensionsDelegate::ExtensionApprovalResult result);
+  void OnExtensionApprovalDone(SupervisedExtensionApprovalResult result);
 
   void OnExtensionApprovalApproved();
 
@@ -357,6 +370,7 @@ class WebstorePrivateGetExtensionStatusFunction : public ExtensionFunction {
       const ExtensionId& extension_id);
   void OnManifestParsed(const ExtensionId& extension_id,
                         data_decoder::DataDecoder::ValueOrError result);
+  void OnInstallStatusCheckDone(ExtensionInstallStatus status);
 
   // ExtensionFunction:
   ExtensionFunction::ResponseAction Run() override;
@@ -400,6 +414,79 @@ class WebstorePrivateGetMV2DeprecationStatusFunction
   // ExtensionFunction:
   ExtensionFunction::ResponseAction Run() override;
 };
+
+#if !BUILDFLAG(IS_ANDROID)
+class WebstorePrivateShouldShowEnterprisePromotionBannerFunction
+    : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION(
+      "webstorePrivate.shouldShowEnterprisePromotionBanner",
+      WEBSTOREPRIVATE_SHOULDSHOWENTERPRISEPROMOTIONBANNER)
+
+  WebstorePrivateShouldShowEnterprisePromotionBannerFunction();
+
+  WebstorePrivateShouldShowEnterprisePromotionBannerFunction(
+      const WebstorePrivateShouldShowEnterprisePromotionBannerFunction&) =
+      delete;
+  WebstorePrivateShouldShowEnterprisePromotionBannerFunction& operator=(
+      const WebstorePrivateShouldShowEnterprisePromotionBannerFunction&) =
+      delete;
+
+  void SetFakePromotionEligibilityCheckerForTesting(
+      std::unique_ptr<enterprise_promotion::PromotionEligibilityChecker>
+          checker);
+
+ protected:
+  ~WebstorePrivateShouldShowEnterprisePromotionBannerFunction() override;
+
+  ResponseAction Run() override;
+
+  void OnPromotionEligibilityDetermined(
+      enterprise_management::GetUserEligiblePromotionsResponse response);
+
+ private:
+  std::unique_ptr<enterprise_promotion::PromotionEligibilityChecker>
+      promotion_eligibility_checker_;
+};
+
+class WebstorePrivateLogEnterprisePromoShownFunction
+    : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("webstorePrivate.logEnterprisePromoShown",
+                             WEBSTOREPRIVATE_LOGENTERPRISEPROMOSHOWN)
+
+  WebstorePrivateLogEnterprisePromoShownFunction();
+
+  WebstorePrivateLogEnterprisePromoShownFunction(
+      const WebstorePrivateLogEnterprisePromoShownFunction&) = delete;
+  WebstorePrivateLogEnterprisePromoShownFunction& operator=(
+      const WebstorePrivateLogEnterprisePromoShownFunction&) = delete;
+
+ protected:
+  ~WebstorePrivateLogEnterprisePromoShownFunction() override = default;
+
+  ResponseAction Run() override;
+};
+
+class WebstorePrivateOnEnterprisePromoClickFunction : public ExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("webstorePrivate.onEnterprisePromoClick",
+                             WEBSTOREPRIVATE_ONENTERPRISEPROMOCLICK)
+
+  WebstorePrivateOnEnterprisePromoClickFunction();
+
+  WebstorePrivateOnEnterprisePromoClickFunction(
+      const WebstorePrivateOnEnterprisePromoClickFunction&) = delete;
+  WebstorePrivateOnEnterprisePromoClickFunction& operator=(
+      const WebstorePrivateOnEnterprisePromoClickFunction&) = delete;
+
+ protected:
+  ~WebstorePrivateOnEnterprisePromoClickFunction() override = default;
+
+  ResponseAction Run() override;
+};
+
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 }  // namespace extensions
 

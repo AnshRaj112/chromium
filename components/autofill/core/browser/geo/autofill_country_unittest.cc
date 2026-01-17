@@ -7,7 +7,6 @@
 #include <set>
 #include <string>
 
-#include "base/containers/contains.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/autofill/core/browser/country_type.h"
 #include "components/autofill/core/browser/field_types.h"
@@ -17,7 +16,7 @@
 #include "third_party/libaddressinput/src/cpp/include/libaddressinput/address_field.h"
 #include "third_party/libaddressinput/src/cpp/include/libaddressinput/address_metadata.h"
 #if defined(ANDROID)
-#include "base/android/build_info.h"
+#include "base/android/android_info.h"
 #endif
 
 namespace autofill {
@@ -167,8 +166,8 @@ TEST(AutofillCountryTest, TrAddressRequirements) {
 TEST(AutofillCountryTest, AllCountryCodesHaveCountryName) {
   std::set<std::string> expected_failures;
 #if defined(ANDROID)
-  if (base::android::BuildInfo::GetInstance()->sdk_int() <
-      base::android::SDK_VERSION_KITKAT) {
+  if (base::android::android_info::sdk_int() <
+      base::android::android_info::SDK_VERSION_KITKAT) {
     expected_failures.insert("BQ");
     expected_failures.insert("SS");
     expected_failures.insert("XK");
@@ -177,7 +176,7 @@ TEST(AutofillCountryTest, AllCountryCodesHaveCountryName) {
   const std::vector<std::string>& country_codes =
       CountryDataMap::GetInstance()->country_codes();
   for (const std::string& country_code : country_codes) {
-    if (base::Contains(expected_failures, country_code)) {
+    if (expected_failures.contains(country_code)) {
       continue;
     }
     SCOPED_TRACE("Country code '" + country_code + "' should have a name.");

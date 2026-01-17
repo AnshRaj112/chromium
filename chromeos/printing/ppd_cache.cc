@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "chromeos/printing/ppd_cache.h"
 
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "base/containers/span.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/strings/string_view_util.h"
 #include "base/synchronization/lock.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
@@ -73,21 +71,21 @@ PpdCache::FindResult FindImpl(const base::FilePath& cache_dir,
     return result;
   }
 
-  std::vector<char> buf(info.size);
-  if (file.ReadAtCurrentPos(buf.data(), info.size) != info.size)
+  std::vector<uint8_t> buf(static_cast<size_t>(info.size));
+  if (file.ReadAtCurrentPos(buf) != buf.size()) {
     return result;
+  }
 
-  std::string_view contents(buf.data(), info.size - crypto::kSHA256Length);
-  std::string_view checksum(buf.data() + info.size - crypto::kSHA256Length,
-                            crypto::kSHA256Length);
-  if (crypto::SHA256HashString(contents) != checksum) {
+  const auto [contents, checksum] =
+      base::span(buf).split_at(buf.size() - crypto::kSHA256Length);
+  if (crypto::SHA256Hash(contents) != checksum) {
     LOG(ERROR) << "Bad checksum for cache key " << key;
     return result;
   }
 
   result.success = true;
   result.age = base::Time::Now() - info.last_modified;
-  result.contents = std::string(contents);
+  result.contents = std::string(base::as_string_view(contents));
   return result;
 }
 

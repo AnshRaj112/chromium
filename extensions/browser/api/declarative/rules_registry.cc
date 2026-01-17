@@ -7,7 +7,6 @@
 #include <memory>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_macros.h"
@@ -328,8 +327,8 @@ void RulesRegistry::DeserializeAndAddRules(const ExtensionId& extension_id,
 
 void RulesRegistry::ReportInternalError(const ExtensionId& extension_id,
                                         const std::string& error) {
-  std::unique_ptr<ExtensionError> error_instance(new InternalError(
-      extension_id, base::ASCIIToUTF16(error), logging::LOGGING_ERROR));
+  auto error_instance = std::make_unique<InternalError>(
+      extension_id, base::ASCIIToUTF16(error), logging::LOGGING_ERROR);
   ExtensionsBrowserClient::Get()->ReportError(browser_context_,
                                               std::move(error_instance));
 }
@@ -345,7 +344,7 @@ void RulesRegistry::MarkReady() {
 void RulesRegistry::ProcessChangedRules(const ExtensionId& extension_id) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
-  DCHECK(base::Contains(process_changed_rules_requested_, extension_id));
+  DCHECK(process_changed_rules_requested_.contains(extension_id));
   process_changed_rules_requested_[extension_id] = NOT_SCHEDULED_FOR_PROCESSING;
 
   std::vector<const api::events::Rule*> new_rules;

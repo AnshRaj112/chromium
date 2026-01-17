@@ -58,16 +58,14 @@ class GraphBuilderOrt {
   // Factory method that creates a `GraphBuilderOrt`, builds the graph and
   // returns `ModelEditor::ModelInfo` which contains the model itself and the
   // external data (weights).
-  //
-  // Returns unexpected if it fails.
-  [[nodiscard]] static base::expected<std::unique_ptr<ModelEditor::ModelInfo>,
-                                      mojom::ErrorPtr>
+  static base::expected<std::unique_ptr<ModelEditor::ModelInfo>,
+                        mojom::ErrorPtr>
   CreateAndBuild(
       const mojom::GraphInfo& graph_info,
       ContextProperties context_properties,
       base::flat_map<OperandId, std::unique_ptr<WebNNConstantOperand>>
           constant_operands,
-      bool is_external_data_supported);
+      std::optional<uint32_t> batched_matmul_k_dimension_limit);
 
   GraphBuilderOrt(const GraphBuilderOrt&) = delete;
   GraphBuilderOrt& operator=(const GraphBuilderOrt&) = delete;
@@ -80,7 +78,7 @@ class GraphBuilderOrt {
       ContextProperties context_properties,
       base::flat_map<OperandId, std::unique_ptr<WebNNConstantOperand>>
           constant_operands,
-      bool is_external_data_supported);
+      std::optional<uint32_t> batched_matmul_k_dimension_limit);
 
   const mojom::Operand& GetOperand(OperandId operand_id) const;
 
@@ -179,6 +177,17 @@ class GraphBuilderOrt {
   std::string CreateExpandNode(base::cstring_view input,
                                base::span<const uint32_t> shape);
 
+  void AddResizeNode(base::cstring_view node_name,
+                     base::cstring_view input,
+                     base::cstring_view scales,
+                     base::cstring_view sizes,
+                     base::cstring_view mode,
+                     base::cstring_view output);
+  // A helper function used to blockwise expand the dimension of `input`
+  // according to `shape` by using `resize` operator with `nearest` mode.
+  std::string BlockwiseExpand(base::cstring_view input,
+                              base::span<const uint32_t> shape);
+
   void AddReshapeNode(base::cstring_view node_name,
                       base::cstring_view input,
                       base::cstring_view output,
@@ -235,13 +244,13 @@ class GraphBuilderOrt {
   template <typename T>
     requires(std::is_same_v<T, mojom::DequantizeLinear> ||
              std::is_same_v<T, mojom::QuantizeLinear>)
-  [[nodiscard]] base::expected<void, mojom::ErrorPtr>
-  AddDequantizeOrQuantizeLinearOperation(const T& operation,
-                                         base::cstring_view op_type);
+  void AddDequantizeOrQuantizeLinearOperation(const T& operation,
+                                              base::cstring_view op_type);
   void AddEluOperation(const mojom::Elu& elu);
   void AddLogicalBinaryOperation(const mojom::ElementWiseBinary& logical_binary,
                                  base::cstring_view op_type);
-  void AddLogicalNotOperation(const mojom::ElementWiseUnary& logical_not);
+  void AddLogicalUnaryOperation(const mojom::ElementWiseUnary& logical_unary,
+                                base::cstring_view op_type);
   void AddLogicalNotEqualOperation(const mojom::ElementWiseBinary& not_equal);
   void AddElementWiseBinaryOperation(
       const mojom::ElementWiseBinary& element_wise_binary);
@@ -265,7 +274,8 @@ class GraphBuilderOrt {
     requires(std::is_same_v<LstmType, mojom::Lstm> ||
              std::is_same_v<LstmType, mojom::LstmCell>)
   void AddLstmOperation(const LstmType& lstm);
-  void AddMatMulOperation(const mojom::Matmul& matmul);
+  base::expected<void, mojom::ErrorPtr> AddMatMulOperation(
+      const mojom::Matmul& matmul);
   void AddPadOperation(const mojom::Pad& pad);
   void AddPool2dOperation(const mojom::Pool2d& pool2d);
   void AddPreluOperation(const mojom::Prelu& prelu);
@@ -284,8 +294,7 @@ class GraphBuilderOrt {
   void AddTriangularOperation(const mojom::Triangular& triangular);
   void AddWhereOperation(const mojom::Where& where);
 
-  [[nodiscard]] base::expected<std::unique_ptr<ModelEditor::ModelInfo>,
-                               mojom::ErrorPtr>
+  base::expected<std::unique_ptr<ModelEditor::ModelInfo>, mojom::ErrorPtr>
   BuildModel();
 
   // An increasing id starting from 0, used for generating unique names for each
@@ -305,6 +314,8 @@ class GraphBuilderOrt {
       constant_operands_;
 
   const ContextProperties context_properties_;
+
+  std::optional<uint32_t> batched_matmul_k_dimension_limit_;
 
   ModelEditor model_editor_;
 };

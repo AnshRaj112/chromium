@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include <unistd.h>
 
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -17,7 +13,7 @@
 
 #include "base/at_exit.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -57,7 +53,7 @@ std::map<std::string, std::string> ParseCommandLine(int argc,
   std::map<std::string, std::string> result;
   std::string key;
   for (int i = 1; i < argc; ++i) {
-    std::string arg(argv[i]);
+    std::string arg(UNSAFE_TODO(argv[i]));
     if (base::StartsWith(arg, "-")) {
       key = arg.substr(1);
       result[key] = "";
@@ -118,8 +114,8 @@ void KSAgentApp::ChooseServiceForApp(
          base::OnceCallback<void(UpdaterScope)> callback,
          const std::vector<updater::UpdateService::AppState>& states) {
         std::move(callback).Run(
-            base::Contains(states, base::ToLowerASCII(app_id),
-                           &updater::UpdateService::AppState::app_id)
+            std::ranges::contains(states, base::ToLowerASCII(app_id),
+                                  &updater::UpdateService::AppState::app_id)
                 ? UpdaterScope::kSystem
                 : UpdaterScope::kUser);
       },
@@ -230,7 +226,8 @@ int KSAgentAppMain(int argc, const char* argv[]) {
   InitializeThreadPool("keystone");
   const base::ScopedClosureRunner shutdown_thread_pool(
       base::BindOnce([] { base::ThreadPoolInstance::Get()->Shutdown(); }));
-  base::SingleThreadTaskExecutor main_task_executor(base::MessagePumpType::UI);
+  base::SingleThreadTaskExecutor main_task_executor(
+      base::MessagePumpType::DEFAULT, true);
 
   return base::MakeRefCounted<KSAgentApp>(ParseCommandLine(argc, argv))->Run();
 }

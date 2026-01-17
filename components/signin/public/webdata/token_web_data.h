@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "base/memory/ref_counted.h"
+#include "base/memory/scoped_refptr.h"
 #include "components/signin/public/webdata/token_service_table.h"
 #include "components/webdata/common/web_data_results.h"
 #include "components/webdata/common/web_data_service_base.h"
@@ -63,8 +63,15 @@ class TokenWebData : public WebDataServiceBase {
   // Removes a token related to `service` from the web database.
   void RemoveTokenForService(const std::string& service);
 
-  // Null on failure. Success is `WDResult<std::vector<std::string>>`.
+  // Removes all tokens stored in the web database except for those whose
+  // service is present in `services_to_keep`.
+  void RemoveOtherTokens(const std::vector<std::string>& services_to_keep);
+
+  // Null on failure. Success is `WDResult<TokenResult>`.
   virtual Handle GetAllTokens(WebDataServiceConsumer* consumer);
+
+  // Null on failure. Success is `WDResult<std::vector<std::vector<uint8_t>>>`.
+  virtual Handle GetAllWrappedBindingKeys(WebDataServiceConsumer* consumer);
 
  protected:
   ~TokenWebData() override;

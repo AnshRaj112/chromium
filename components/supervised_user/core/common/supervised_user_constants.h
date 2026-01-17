@@ -186,8 +186,6 @@ extern const char* const kCustodianInfoPrefs[10];
 // Filenames.
 extern const base::FilePath::CharType kSupervisedUserSettingsFilename[];
 
-extern const char kSyncGoogleDashboardURL[];
-
 // Histogram name to log FamilyLink user type segmentation.
 extern const char kFamilyLinkUserLogSegmentHistogramName[];
 
@@ -233,9 +231,6 @@ extern const char kClassifiedEarlierThanContentResponseHistogramName[];
 
 // Histogram name to track how much throttle delayed the navigation.
 extern const char kClassifiedLaterThanContentResponseHistogramName[];
-
-// Histogram name to track intermediate throttle states.
-extern const char kClassifyUrlThrottleStatusHistogramName[];
 
 // Histogram name to track the final throttle verdict.
 extern const char kClassifyUrlThrottleFinalStatusHistogramName[];

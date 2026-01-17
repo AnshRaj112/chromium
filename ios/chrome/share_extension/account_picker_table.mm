@@ -16,17 +16,18 @@ CGFloat const kAvatarImageDimension = 30.0;
 }  // namespace
 
 @interface AccountPickerTable () <UITableViewDelegate>
-@property(nonatomic, strong) AccountInfo* selectedAccount;
+@property(nonatomic, strong) ShareExtensionAccountInfo* selectedAccount;
 @end
 
 @implementation AccountPickerTable {
-  NSArray<AccountInfo*>* _accounts;
+  NSArray<ShareExtensionAccountInfo*>* _accounts;
   UITableView* _accountsTable;
-  UITableViewDiffableDataSource<NSString*, AccountInfo*>* _diffableDataSource;
+  UITableViewDiffableDataSource<NSString*, ShareExtensionAccountInfo*>*
+      _diffableDataSource;
 }
 
-- (instancetype)initWithAccounts:(NSArray<AccountInfo*>*)accounts
-                 selectedAccount:(AccountInfo*)selectedAccount {
+- (instancetype)initWithAccounts:(NSArray<ShareExtensionAccountInfo*>*)accounts
+                 selectedAccount:(ShareExtensionAccountInfo*)selectedAccount {
   self = [super initWithNibName:nil bundle:nil];
 
   if (self) {
@@ -74,8 +75,8 @@ CGFloat const kAvatarImageDimension = 30.0;
 }
 
 #pragma mark - UITableViewDelegate
-- (void)setSelectedAccount:(AccountInfo*)selectedAccount {
-  if ([selectedAccount.gaiaID isEqual:_selectedAccount.gaiaID]) {
+- (void)setSelectedAccount:(ShareExtensionAccountInfo*)selectedAccount {
+  if ([selectedAccount.gaiaIDString isEqual:_selectedAccount.gaiaIDString]) {
     return;
   }
   _selectedAccount = selectedAccount;
@@ -101,9 +102,10 @@ CGFloat const kAvatarImageDimension = 30.0;
 #pragma mark - Private
 
 - (UITableViewCell*)configureAccountCell:(UITableViewCell*)cell
-                             accountInfo:(AccountInfo*)accountInfo {
+                             accountInfo:
+                                 (ShareExtensionAccountInfo*)accountInfo {
   UIListContentConfiguration* content = cell.defaultContentConfiguration;
-  if ([accountInfo.gaiaID isEqual:app_group::kNoAccount]) {
+  if ([accountInfo.gaiaIDString isEqual:app_group::kNoAccount]) {
     content.text = NSLocalizedString(
         @"IDS_IOS_SIGNED_OUT_USER_TITLE_SHARE_EXTENSION",
         @"The title of the item representing a signed out user.");
@@ -124,9 +126,10 @@ CGFloat const kAvatarImageDimension = 30.0;
   }
   cell.contentConfiguration = content;
   cell.selectionStyle = UITableViewCellSelectionStyleNone;
-  cell.accessoryType = (_selectedAccount.gaiaID == accountInfo.gaiaID)
-                           ? UITableViewCellAccessoryCheckmark
-                           : UITableViewCellAccessoryNone;
+  cell.accessoryType =
+      (_selectedAccount.gaiaIDString == accountInfo.gaiaIDString)
+          ? UITableViewCellAccessoryCheckmark
+          : UITableViewCellAccessoryNone;
   return cell;
 }
 
@@ -141,7 +144,7 @@ CGFloat const kAvatarImageDimension = 30.0;
 
 - (UITableViewCell*)cellForIndexPath:(NSIndexPath*)indexPath
                            tableView:(UITableView*)tableView
-                         accountInfo:(AccountInfo*)accountInfo {
+                         accountInfo:(ShareExtensionAccountInfo*)accountInfo {
   NSString* identifier = NSStringFromClass([UITableViewCell class]);
   UITableViewCell* cell =
       [tableView dequeueReusableCellWithIdentifier:identifier
@@ -156,7 +159,7 @@ CGFloat const kAvatarImageDimension = 30.0;
 
   auto cellProvider =
       ^UITableViewCell*(UITableView* tableView, NSIndexPath* indexPath,
-                        AccountInfo* accountInfo) {
+                        ShareExtensionAccountInfo* accountInfo) {
         return [weakSelf cellForIndexPath:indexPath
                                 tableView:tableView
                               accountInfo:accountInfo];
@@ -169,8 +172,8 @@ CGFloat const kAvatarImageDimension = 30.0;
 }
 
 - (void)applySnapshot {
-  NSDiffableDataSourceSnapshot<NSString*, AccountInfo*>* snapshot =
-      [[NSDiffableDataSourceSnapshot alloc] init];
+  NSDiffableDataSourceSnapshot<NSString*, ShareExtensionAccountInfo*>*
+      snapshot = [[NSDiffableDataSourceSnapshot alloc] init];
 
   [snapshot appendSectionsWithIdentifiers:@[ kMainSectionIdentifier ]];
   [snapshot appendItemsWithIdentifiers:_accounts

@@ -13,7 +13,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/i18n/rtl.h"
 #include "base/json/values_util.h"
@@ -95,8 +94,8 @@ void MigrateObsoleteAlwaysTranslateLanguagesPref(PrefService* prefs) {
     // If the old pair's source language matches any of the never-translate
     // languages, it probably means that this source language was set to never
     // be translated after the old pref was deprecated, so avoid this conflict.
-    if (base::Contains(prefs->GetList(prefs::kBlockedLanguages),
-                       old_language_pair.first)) {
+    if (prefs->GetList(prefs::kBlockedLanguages)
+            .contains(old_language_pair.first)) {
       continue;
     }
 
@@ -122,12 +121,9 @@ bool IsTranslateLanguage(std::string_view language) {
 // * translate_too_often_denied
 // * translate_language_blacklist
 
-BASE_FEATURE(kTranslateRecentTarget,
-             "TranslateRecentTarget",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kTranslateRecentTarget, base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kMigrateAlwaysTranslateLanguagesFix,
-             "MigrateAlwaysTranslateLanguagesFix",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 TranslateLanguageInfo::TranslateLanguageInfo() = default;
@@ -246,7 +242,7 @@ bool TranslatePrefs::IsBlockedLanguage(std::string_view input_language) const {
   language::ToTranslateLanguageSynonym(&canonical_lang);
   const base::Value::List& blocked =
       prefs_->GetList(translate::prefs::kBlockedLanguages);
-  return base::Contains(blocked, base::Value(std::move(canonical_lang)));
+  return blocked.contains(canonical_lang);
 }
 
 void TranslatePrefs::BlockLanguage(std::string_view input_language) {
@@ -343,7 +339,7 @@ void TranslatePrefs::AddToLanguageList(std::string_view input_language,
   }
 
   // Add the language to the list.
-  if (!base::Contains(languages, chrome_language)) {
+  if (!std::ranges::contains(languages, chrome_language)) {
     user_selected_languages.push_back(chrome_language);
     language_prefs_->SetUserSelectedLanguagesList(user_selected_languages);
   }

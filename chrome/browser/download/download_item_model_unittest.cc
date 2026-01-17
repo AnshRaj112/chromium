@@ -25,6 +25,7 @@
 #include "chrome/browser/download/download_core_service_factory.h"
 #include "chrome/browser/download/download_core_service_impl.h"
 #include "chrome/browser/download/download_ui_model.h"
+#include "chrome/browser/download/status_text_builder_utils.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/test/base/testing_browser_process.h"
@@ -53,6 +54,7 @@
 
 #if BUILDFLAG(SAFE_BROWSING_DOWNLOAD_PROTECTION)
 #include "chrome/browser/safe_browsing/download_protection/download_protection_service.h"
+#include "components/safe_browsing/core/common/proto/csd.pb.h"
 #endif  // BUILDFLAG(SAFE_BROWSING_DOWNLOAD_PROTECTION)
 
 #endif  // !BUILDFLAG(IS_ANDROID)
@@ -68,7 +70,7 @@ using ::testing::ReturnRef;
 using ::testing::ReturnRefOfCopy;
 using ::testing::SetArgPointee;
 
-#if BUILDFLAG(SAFE_BROWSING_DOWNLOAD_PROTECTION)
+#if !BUILDFLAG(IS_ANDROID) && BUILDFLAG(SAFE_BROWSING_DOWNLOAD_PROTECTION)
 using TailoredVerdict = safe_browsing::ClientDownloadResponse::TailoredVerdict;
 #endif
 
@@ -290,6 +292,10 @@ TEST_F(DownloadItemModelTest, InterruptedStatus) {
        u"Failed - File too large", u"File is too big for this device"},
       {download::DOWNLOAD_INTERRUPT_REASON_FILE_VIRUS_INFECTED,
        u"Failed - Virus detected", u"Virus detected"},
+      // TODO(alshawwa): Handle LOCAL_DOWNLOAD_BLOCKED separately
+      {download::DOWNLOAD_INTERRUPT_REASON_LOCAL_DOWNLOAD_BLOCKED,
+       u"Failed - Blocked",
+       u"Your organization blocked the local download of this file."},
       {download::DOWNLOAD_INTERRUPT_REASON_FILE_BLOCKED, u"Failed - Blocked",
        u"Blocked by your organization"},
       {download::DOWNLOAD_INTERRUPT_REASON_FILE_SECURITY_CHECK_FAILED,
@@ -380,6 +386,9 @@ TEST_F(DownloadItemModelTest, InterruptTooltip) {
        "foo.bar\nFile too large"},
       {download::DOWNLOAD_INTERRUPT_REASON_FILE_VIRUS_INFECTED,
        "foo.bar\nVirus detected"},
+      // TODO(alshawwa): Handle LOCAL_DOWNLOAD_BLOCKED separately
+      {download::DOWNLOAD_INTERRUPT_REASON_LOCAL_DOWNLOAD_BLOCKED,
+       "foo.bar\nBlocked"},
       {download::DOWNLOAD_INTERRUPT_REASON_FILE_BLOCKED, "foo.bar\nBlocked"},
       {download::DOWNLOAD_INTERRUPT_REASON_FILE_SECURITY_CHECK_FAILED,
        "foo.bar\nVirus scan failed"},
@@ -740,9 +749,8 @@ TEST_F(DownloadItemModelTest, GetBubbleStatusMessageWithBytes) {
   auto* arabic_bytes = L"5 \x062A";
   auto* arabic_status = L"\x0645";
   std::u16string arabic =
-      DownloadUIModel::BubbleStatusTextBuilder::GetBubbleStatusMessageWithBytes(
-          base::WideToUTF16(arabic_bytes), base::WideToUTF16(arabic_status),
-          false);
+      StatusTextBuilderUtils::GetBubbleStatusMessageWithBytes(
+          base::WideToUTF16(arabic_bytes), base::WideToUTF16(arabic_status));
   std::vector<int> expected_arabic =
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_POSIX)
       {8207, 8235, 53, 32, 1578, 32, 8226, 32, 1605, 8236, 8207};
@@ -753,9 +761,9 @@ TEST_F(DownloadItemModelTest, GetBubbleStatusMessageWithBytes) {
 
   // Hebrew
   auto* hebrew_status = L"\x05D0";
-  std::u16string hebrew = DownloadUIModel::BubbleStatusTextBuilder ::
-      GetBubbleStatusMessageWithBytes(u"5 MB", base::WideToUTF16(hebrew_status),
-                                      false);
+  std::u16string hebrew =
+      StatusTextBuilderUtils::GetBubbleStatusMessageWithBytes(
+          u"5 MB", base::WideToUTF16(hebrew_status));
   std::vector<int> expected_hebrew =
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_POSIX)
       {8207, 8235, 8234, 53, 32, 77, 66, 8236, 32, 8226, 32, 1488, 8236, 8207};
@@ -766,8 +774,8 @@ TEST_F(DownloadItemModelTest, GetBubbleStatusMessageWithBytes) {
 
   // English
   base::i18n::SetRTLForTesting(false);
-  std::u16string english = DownloadUIModel::BubbleStatusTextBuilder ::
-      GetBubbleStatusMessageWithBytes(u"5 MB", u"A", false);
+  std::u16string english =
+      StatusTextBuilderUtils::GetBubbleStatusMessageWithBytes(u"5 MB", u"A");
   std::vector<int> expected_english = {53, 32, 77, 66, 32, 8226, 32, 65};
   compare_results(english, expected_english);
 }

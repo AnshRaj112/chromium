@@ -29,27 +29,44 @@ public class UiAndroidFeatureList {
             newMutableFlagWithSafeDefault(
                     UiAndroidFeatures.REQUIRE_LEADING_IN_TEXT_VIEW_WITH_LEADING, false);
 
+    public static final CachedFlag sAndroidUseDisplayTopology =
+            newCachedFlag(
+                    UiAndroidFeatures.ANDROID_USE_DISPLAY_TOPOLOGY,
+                    /* defaultValue= */ false,
+                    /* defaultValueInTests= */ true);
+
     public static final CachedFlag sAndroidWindowOcclusion =
             newCachedFlag(
                     UiAndroidFeatures.ANDROID_WINDOW_OCCLUSION,
                     /* defaultValue= */ false,
-                    /* defaultValueInTests= */ true);
-
-    public static final CachedFlag sAndroidWindowManagementWebApi =
-            newCachedFlag(
-                    UiAndroidFeatures.ANDROID_WINDOW_MANAGEMENT_WEB_API,
-                    /* defaultValue= */ false,
-                    /* defaultValueInTests= */ true);
-
-    public static final CachedFlag sFormFactorUseMaxWindowMetrics =
-            newCachedFlag(
-                    UiAndroidFeatures.FORM_FACTOR_USE_MAX_WINDOW_METRICS,
-                    /* defaultValue= */ false,
                     /* defaultValueInTests= */ false);
+
+    public static final CachedFlag sRefactorMinWidthContextOverride =
+            newCachedFlag(
+                    UiAndroidFeatures.REFACTOR_MIN_WIDTH_CONTEXT_OVERRIDE,
+                    /* defaultValue= */ true,
+                    /* defaultValueInTests= */ true);
+
+    public static final CachedFlag sReportBottomOverscrolls =
+            newCachedFlag(
+                    UiAndroidFeatures.REPORT_BOTTOM_OVERSCROLLS,
+                    /* defaultValue= */ true,
+                    /* defaultValueInTests= */ true);
+
+    public static final MutableFlagWithSafeDefault sAndroidTouchpadOverscrollHistoryNavigation =
+            // public static final CachedFlag sAndroidTouchpadOverscrollHistoryNavigation =
+            // newCachedFlag(UiAndroidFeatures.ANDROID_TOUCHPAD_OVERSCROLL_HISTORY_NAVIGATION,
+            newMutableFlagWithSafeDefault(
+                    UiAndroidFeatures.ANDROID_TOUCHPAD_OVERSCROLL_HISTORY_NAVIGATION,
+                    /* defaultValue= */ true);
+
+    public static final MutableFlagWithSafeDefault sAndroidHistoryPaneFavicons =
+            newMutableFlagWithSafeDefault(
+                    UiAndroidFeatures.ANDROID_HISTORY_PANE_FAVICONS, /* defaultValue= */ false);
 
     public static final List<CachedFlag> sFlagsCachedUiAndroid =
             List.of(
+                    sAndroidUseDisplayTopology,
                     sAndroidWindowOcclusion,
-                    sAndroidWindowManagementWebApi,
-                    sFormFactorUseMaxWindowMetrics);
+                    sRefactorMinWidthContextOverride);
 }

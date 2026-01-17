@@ -15,6 +15,7 @@
 namespace blink {
 
 class CSSSyntaxDefinition;
+class CSSParserLocalContext;
 enum class SecureContextMode;
 
 class CORE_EXPORT CSSVariableData : public GarbageCollected<CSSVariableData> {
@@ -119,7 +120,8 @@ class CORE_EXPORT CSSVariableData : public GarbageCollected<CSSVariableData> {
   bool HasDashedFunctions() const { return has_dashed_functions_; }
 
   const CSSValue* ParseForSyntax(const CSSSyntaxDefinition&,
-                                 SecureContextMode) const;
+                                 SecureContextMode,
+                                 CSSParserLocalContext&) const;
 
   CSSVariableData(const CSSVariableData&) = delete;
   CSSVariableData& operator=(const CSSVariableData&) = delete;
@@ -138,7 +140,7 @@ class CORE_EXPORT CSSVariableData : public GarbageCollected<CSSVariableData> {
   //
   // If you change this, length_ below may need updates.
   //
-  // https://drafts.csswg.org/css-variables/#long-variables
+  // https://drafts.csswg.org/css-values-5/#long-substitution
   static const size_t kMaxVariableBytes = 2097152;
 
  private:

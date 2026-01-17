@@ -6,11 +6,11 @@
 
 #include "ash/public/cpp/tab_cluster/tab_cluster_ui_controller.h"
 #include "ash/public/cpp/tab_cluster/tab_cluster_ui_item.h"
-#include "base/containers/contains.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ash/browser_delegate/browser_controller.h"
+#include "chrome/browser/ash/browser_delegate/browser_delegate.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "content/public/browser/web_contents.h"
 
 namespace {
@@ -21,8 +21,9 @@ ash::TabClusterUIItem::Info GenerateTabItemInfo(
   ash::TabClusterUIItem::Info info;
   info.title = base::UTF16ToUTF8(web_contents->GetTitle());
   info.source = web_contents->GetVisibleURL().possibly_invalid_spec();
-  info.browser_window =
-      chrome::FindBrowserWithTab(web_contents)->window()->GetNativeWindow();
+  info.browser_window = ash::BrowserController::GetInstance()
+                            ->GetBrowserForTab(web_contents)
+                            ->GetNativeWindow();
   info.is_loading = web_contents->ShouldShowLoadingUI();
   return info;
 }
@@ -55,7 +56,7 @@ void TabClusterUIClient::OnTabStripModelChanged(
       // Remove the items corresponding to the removed web contents.
       for (const auto& contents : change.GetRemove()->contents) {
         content::WebContents* web_contents = contents.contents;
-        DCHECK(base::Contains(contents_item_map_, web_contents));
+        DCHECK(contents_item_map_.contains(web_contents));
         ash::TabClusterUIItem* item = contents_item_map_[web_contents];
         contents_item_map_.erase(web_contents);
         controller_->RemoveTabItem(item);
@@ -65,7 +66,7 @@ void TabClusterUIClient::OnTabStripModelChanged(
       // Update the item whose corresponding contents are replaced.
       {
         auto* replace = change.GetReplace();
-        DCHECK(base::Contains(contents_item_map_, replace->old_contents));
+        DCHECK(contents_item_map_.contains(replace->old_contents));
         auto* item = contents_item_map_[replace->old_contents].get();
 
         item->Init(GenerateTabItemInfo(replace->new_contents));
@@ -82,7 +83,7 @@ void TabClusterUIClient::OnTabStripModelChanged(
   }
   if (selection.active_tab_changed() && !tab_strip_model->empty()) {
     auto* old_active_item =
-        base::Contains(contents_item_map_, selection.old_contents)
+        contents_item_map_.contains(selection.old_contents)
             ? contents_item_map_[selection.old_contents].get()
             : nullptr;
     auto* new_active_item = contents_item_map_[selection.new_contents].get();
@@ -90,12 +91,13 @@ void TabClusterUIClient::OnTabStripModelChanged(
   }
 }
 
-void TabClusterUIClient::TabChangedAt(content::WebContents* contents,
-                                      int index,
-                                      TabChangeType change_type) {
+void TabClusterUIClient::OnTabChangedAt(tabs::TabInterface* tab,
+                                        int index,
+                                        TabChangeType change_type) {
+  content::WebContents* contents = tab->GetContents();
   // Some tests may manually add tabs to browser such that the newly added tabs
   // may start loading before being inserted into the tab strip.
-  if (!base::Contains(contents_item_map_, contents)) {
+  if (!contents_item_map_.contains(contents)) {
     return;
   }
   auto* item = contents_item_map_[contents].get();

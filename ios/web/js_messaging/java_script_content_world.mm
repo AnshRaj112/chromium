@@ -7,7 +7,6 @@
 #import <optional>
 
 #import "base/check_op.h"
-#import "base/containers/contains.h"
 #import "base/debug/crash_logging.h"
 #import "base/notreached.h"
 #import "base/strings/sys_string_conversions.h"
@@ -140,7 +139,7 @@ WKContentWorld* JavaScriptContentWorld::GetWKContentWorld() {
 JavaScriptContentWorld::~JavaScriptContentWorld() {}
 
 bool JavaScriptContentWorld::HasFeature(const JavaScriptFeature* feature) {
-  return base::Contains(features_, feature);
+  return features_.contains(feature);
 }
 
 void JavaScriptContentWorld::AddFeature(const JavaScriptFeature* feature) {
@@ -170,8 +169,7 @@ void JavaScriptContentWorld::AddFeature(const JavaScriptFeature* feature) {
     std::optional<std::string> message_handler_name =
         feature->GetScriptMessageHandlerName();
     if (feature != java_script_features::GetBaseJavaScriptFeature() &&
-        feature != java_script_features::GetCommonJavaScriptFeature() &&
-        feature != java_script_features::GetMessageJavaScriptFeature()) {
+        feature != java_script_features::GetCommonJavaScriptFeature()) {
       if (!message_handler_name) {
         return;
       }

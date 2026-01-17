@@ -48,7 +48,6 @@
 #include "components/vector_icons/vector_icons.h"
 #include "content/public/browser/media_session.h"
 #include "content/public/browser/web_contents.h"
-#include "media/base/media_switches.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "net/base/url_util.h"
 #include "services/media_session/public/mojom/media_session.mojom.h"
@@ -82,10 +81,6 @@ static constexpr int kImageWidthDip = 20;
 static constexpr int kVerticalMarginDip = 10;
 
 std::u16string GetLiveCaptionTitle(PrefService* profile_prefs) {
-  if (!base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
-    return l10n_util::GetStringUTF16(
-        IDS_GLOBAL_MEDIA_CONTROLS_LIVE_CAPTION_ENGLISH_ONLY);
-  }
   // The selected language is only shown when Live Caption is enabled.
   if (profile_prefs->GetBoolean(prefs::kLiveCaptionEnabled)) {
     std::u16string language = speech::GetLanguageDisplayName(
@@ -433,11 +428,7 @@ MediaDialogView::MediaDialogView(
                           base::Unretained(this)));
 
 #if !BUILDFLAG(IS_CHROMEOS)
-  // MediaDialogView can be built on CrOS but the updated UI should only be
-  // enabled for non-CrOS platforms.
-  if (base::FeatureList::IsEnabled(media::kGlobalMediaControlsUpdatedUI)) {
-    media_color_theme_ = GetMediaColorTheme();
-  }
+  media_color_theme_ = GetMediaColorTheme();
 #endif
 }
 
@@ -498,7 +489,7 @@ void MediaDialogView::OnSettingsButtonPressed() {
   NavigateParams navigate_params(profile_,
                                  GURL(captions::GetCaptionSettingsUrl()),
                                  ui::PAGE_TRANSITION_LINK);
-  navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
+  navigate_params.window_action = NavigateParams::WindowAction::kShowWindow;
   navigate_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
   Navigate(&navigate_params);
 }

@@ -171,7 +171,6 @@ class NET_EXPORT_PRIVATE HttpCache::Transaction : public HttpTransaction {
       base::RepeatingCallback<bool()> callback) override;
   ConnectionAttempts GetConnectionAttempts() const override;
   void CloseConnectionOnDestruction() override;
-  bool IsMdlMatchForMetrics() const override;
 
   // Invoked when parallel validation cannot proceed due to response failure
   // and this transaction needs to be restarted.
@@ -214,10 +213,6 @@ class NET_EXPORT_PRIVATE HttpCache::Transaction : public HttpTransaction {
     int64_t received_body_bytes = 0;
     ConnectionAttempts old_connection_attempts;
     IPEndPoint old_remote_endpoint;
-    // For metrics. Can be removed when associated histograms are removed.
-    // Records whether any destroyed network transactions' ProxyInfo determined
-    // the request was to a Masked Domain List-covered domain.
-    bool previous_mdl_match_for_metrics = false;
   };
 
   enum State {
@@ -334,6 +329,33 @@ class NET_EXPORT_PRIVATE HttpCache::Transaction : public HttpTransaction {
     kMaxValue = kBlockedByIpSpace,
   };
   // LINT.ThenChange(//tools/metrics/histograms/metadata/net/enums.xml:HttpCacheNotCoveredReason)
+
+  // The status of the entry that we are considering to doom.
+  //
+  // LINT.IfChange(HttpCacheEntryRejectionStatus)
+  enum class HttpCacheEntryRejectionStatus {
+    // The cache entry was rejected.
+    kRejection = 0,
+    // The cache entry was not rejected because it is usable.
+    kNoRejectionUsable = 1,
+    // The cache entry was not rejected because the request is for a partial
+    // cache entry.
+    kNoRejectionPartial = 2,
+    // The cache entry was not rejected because the transaction is not in
+    // read-write mode.
+    kNoRejectionNonReadWriteMode = 3,
+    // The cache entry was not rejected because cache validation was skipped.
+    kNoRejectionSkipCacheValidation = 4,
+    // The cache entry was not rejected because the request was loaded only from
+    // cache.
+    kNoRejectionLoadOnlyFromCache = 5,
+    // The cache entry should be rejected, but handled as not rejected because
+    // kHttpCacheSkipUnusableEntry feature is disabled. This is intended to
+    // measure the performance impact of the in-memory unusable flag.
+    kNoRejectionHintDisabled = 6,
+    kMaxValue = kNoRejectionHintDisabled,
+  };
+  // LINT.ThenChange(//tools/metrics/histograms/metadata/net/enums.xml:HttpCacheEntryRejectionStatus)
 
   // Runs the state transition loop. Resets and calls |callback_| on exit,
   // unless the return value is ERR_IO_PENDING.
@@ -456,6 +478,9 @@ class NET_EXPORT_PRIVATE HttpCache::Transaction : public HttpTransaction {
   // Returns true if |method_| indicates that we should only try to open an
   // entry and not attempt to create.
   bool ShouldOpenOnlyMethods() const;
+
+  HttpCacheEntryRejectionStatus GetHttpCacheEntryRejectionStatus(
+      uint8_t in_memory_info);
 
   // Returns true if the resource info MemoryEntryDataHints bit flags in
   // |in_memory_info| and the current request & load flags suggest that
@@ -679,7 +704,6 @@ class NET_EXPORT_PRIVATE HttpCache::Transaction : public HttpTransaction {
   std::string method_;
   RequestPriority priority_;
   NetLogWithSource net_log_;
-  HttpRequestHeaders request_headers_copy_;
   // If extra_headers specified a "if-modified-since" or "if-none-match",
   // `external_validation_` contains the value of those headers.
   std::optional<http_cache_util::ValidationHeaders> external_validation_;

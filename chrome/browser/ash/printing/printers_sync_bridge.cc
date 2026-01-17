@@ -7,7 +7,6 @@
 #include <set>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
@@ -232,8 +231,7 @@ std::optional<syncer::ModelError> PrintersSyncBridge::MergeFullSyncData(
       // Clean up invalid ppd references (crbug.com/987869).
       bool resolved = ResolveInvalidPpdReference(entry.second.get());
 
-      if (migrated || resolved ||
-          !base::Contains(sync_entity_ids, local_entity_id)) {
+      if (migrated || resolved || !sync_entity_ids.contains(local_entity_id)) {
         // Only local objects which were not updated are uploaded.  Objects for
         // which there was a remote copy are overwritten.
         change_processor()->Put(local_entity_id,
@@ -314,7 +312,6 @@ PrintersSyncBridge::GetAllDataForDebugging() {
 
 std::string PrintersSyncBridge::GetClientTag(
     const EntityData& entity_data) const {
-  // Printers were never synced prior to USS so this can match GetStorageKey.
   return GetStorageKey(entity_data);
 }
 
@@ -322,6 +319,12 @@ std::string PrintersSyncBridge::GetStorageKey(
     const EntityData& entity_data) const {
   DCHECK(entity_data.specifics.has_printer());
   return entity_data.specifics.printer().id();
+}
+
+bool PrintersSyncBridge::IsEntityDataValid(
+    const syncer::EntityData& entity_data) const {
+  DCHECK(entity_data.specifics.has_printer());
+  return !entity_data.specifics.printer().id().empty();
 }
 
 // Picks the entity with the most recent updated time as the canonical version.

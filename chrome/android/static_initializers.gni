@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/android/config.gni")
 import("//build/config/features.gni")
 import("//build/config/sanitizers/sanitizers.gni")
 import("//components/optimization_guide/features.gni")
@@ -22,11 +23,18 @@ if (proprietary_codecs && !is_debug && !is_component_build) {
 
   # 64bit only:
   # Caused by "outline atomics". https://crbug.com/1272795
+  # https://crbug.com/470438845
   # cpu_model.c: init_have_lse_atomics, init_cpu_features
-  _chrome_64only_count += 2
+  # configure_builtins.rs: RUST_LSE_INIT
+  _chrome_64only_count += 3
 
   # iostream.cpp: _GLOBAL__I_000101
   _chrome_common_count += 1
+
+  # Temporary until AIDL generation for Javaless renderers is fixed.
+  if (enable_javaless_renderers) {
+    _chrome_common_count += 2
+  }
 
   if (use_clang_coverage) {
     # InstrProfilingRuntime.cpp, Only in coverage builds, not production.

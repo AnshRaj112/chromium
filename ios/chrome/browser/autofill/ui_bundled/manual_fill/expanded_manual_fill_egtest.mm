@@ -8,14 +8,13 @@
 #import "components/autofill/core/browser/test_utils/autofill_test_utils.h"
 #import "components/password_manager/core/browser/password_ui_utils.h"
 #import "components/password_manager/core/common/password_manager_features.h"
-#import "components/plus_addresses/features.h"
+#import "components/plus_addresses/core/common/features.h"
 #import "ios/chrome/browser/autofill/ui_bundled/autofill_app_interface.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_constants.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_matchers.h"
-#import "ios/chrome/browser/passwords/ui_bundled/bottom_sheet/password_suggestion_bottom_sheet_app_interface.h"
+#import "ios/chrome/browser/passwords/ui_bundled/bottom_sheet/credential_suggestion_bottom_sheet_app_interface.h"
 #import "ios/chrome/browser/settings/ui_bundled/password/password_manager_ui_features.h"
 #import "ios/chrome/browser/settings/ui_bundled/password/password_settings_app_interface.h"
-#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/common/ui/elements/form_input_accessory_view.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/earl_grey/chrome_actions.h"
@@ -206,7 +205,7 @@ void DismissPaymentBottomSheet() {
 
 // Makes sure that the payment suggestions are appearing in the keyboard
 // accessory.
-void MakeSurePaymentMethodSuggestionsAreVisisble() {
+void MakeSurePaymentMethodSuggestionsAreVisible() {
   // Needed in order to see the payment method suggestions.
   [AutofillAppInterface considerCreditCardFormSecureForTesting];
 
@@ -248,10 +247,6 @@ GREYElementInteraction* SearchAutofillFormButton(id<GREYMatcher> scroll_view) {
 - (AppLaunchConfiguration)appConfigurationForTestCase {
   AppLaunchConfiguration config;
   config.relaunch_policy = ForceRelaunchByCleanShutdown;
-
-  // Enable the Keyboard Accessory Upgrade feature.
-  config.features_enabled.push_back(kIOSKeyboardAccessoryUpgradeForIPad);
-
   config.features_disabled.push_back(
       plus_addresses::features::kPlusAddressesEnabled);
 
@@ -272,8 +267,8 @@ GREYElementInteraction* SearchAutofillFormButton(id<GREYMatcher> scroll_view) {
   [AutofillAppInterface saveLocalCreditCard];
   [AutofillAppInterface saveExampleAccountProfile];
 
-  // Disable the password bottom sheet.
-  [PasswordSuggestionBottomSheetAppInterface disableBottomSheet];
+  // Disable the credential bottom sheet.
+  [CredentialSuggestionBottomSheetAppInterface disableBottomSheet];
 
   // Mock successful reauth for opening the Password Manager.
   [PasswordSettingsAppInterface setUpMockReauthenticationModule];
@@ -299,6 +294,7 @@ GREYElementInteraction* SearchAutofillFormButton(id<GREYMatcher> scroll_view) {
                                              fieldToFill:
                                                  (std::string)fieldToFill {
   LoadForm(self.testServer, dataType);
+  [AutofillAppInterface considerCreditCardFormSecureForTesting];
   [self openExpandedManualFillViewForDataType:dataType fieldToFill:fieldToFill];
 }
 
@@ -312,7 +308,7 @@ GREYElementInteraction* SearchAutofillFormButton(id<GREYMatcher> scroll_view) {
       performAction:chrome_test_util::TapWebElementWithId(fieldToFill)];
 
   if (dataType == ManualFillDataType::kPaymentMethod) {
-    MakeSurePaymentMethodSuggestionsAreVisisble();
+    MakeSurePaymentMethodSuggestionsAreVisible();
   }
 
   // Open the expanded manual fill view.
@@ -354,15 +350,16 @@ GREYElementInteraction* SearchAutofillFormButton(id<GREYMatcher> scroll_view) {
                                                              kPassword
                                              fieldToFill:kPasswordFieldID];
 
-  [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationLandscapeRight
-                                error:nil];
+  [EarlGrey rotateInterfaceToOrientation:UIInterfaceOrientationLandscapeRight
+                                   error:nil];
   CheckHeader(/*is_landscape=*/true);
 
-  [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationLandscapeLeft
-                                error:nil];
+  [EarlGrey rotateInterfaceToOrientation:UIInterfaceOrientationLandscapeLeft
+                                   error:nil];
   CheckHeader(/*is_landscape=*/true);
 
-  [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationPortrait error:nil];
+  [EarlGrey rotateInterfaceToOrientation:UIInterfaceOrientationPortrait
+                                   error:nil];
   CheckHeader(/*is_landscape=*/false);
 }
 

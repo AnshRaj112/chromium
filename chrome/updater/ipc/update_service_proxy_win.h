@@ -10,10 +10,14 @@
 #include <string>
 #include <vector>
 
+#include "base/containers/flat_map.h"
 #include "base/functional/callback_forward.h"
+#include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/sequence_checker.h"
 #include "base/types/expected.h"
+#include "chrome/updater/ipc/update_service_proxy_impl.h"
+#include "chrome/updater/registration_data.h"
 #include "chrome/updater/update_service.h"
 
 namespace base {
@@ -26,34 +30,31 @@ enum class PolicyFetchReason;
 
 namespace updater {
 
-using RpcError = HRESULT;
-
-struct RegistrationRequest;
 enum class UpdaterScope;
 class UpdateServiceProxyImplImpl;
 
 // All functions and callbacks must be called on the same sequence.
-class UpdateServiceProxyImpl
-    : public base::RefCountedThreadSafe<UpdateServiceProxyImpl> {
+class UpdateServiceProxyWinImpl : public UpdateServiceProxyImpl {
  public:
-  explicit UpdateServiceProxyImpl(UpdaterScope updater_scope);
+  explicit UpdateServiceProxyWinImpl(UpdaterScope updater_scope);
 
-  // UpdateServiceProxyImpl will not be destroyed while these calls are
+  // UpdateServiceProxyWinImpl will not be destroyed while these calls are
   // outstanding; the caller need not retain a ref.
   void GetVersion(
       base::OnceCallback<void(base::expected<base::Version, RpcError>)>
-          callback);
-  void FetchPolicies(
-      policy::PolicyFetchReason reason,
-      base::OnceCallback<void(base::expected<int, RpcError>)> callback);
-  void RegisterApp(
-      const RegistrationRequest& request,
-      base::OnceCallback<void(base::expected<int, RpcError>)> callback);
+          callback) override;
+  void FetchPolicies(policy::PolicyFetchReason reason,
+                     base::OnceCallback<void(base::expected<int, RpcError>)>
+                         callback) override;
+  void RegisterApp(const RegistrationRequest& request,
+                   base::OnceCallback<void(base::expected<int, RpcError>)>
+                       callback) override;
   void GetAppStates(
-      base::OnceCallback<void(
-          base::expected<std::vector<UpdateService::AppState>, RpcError>)>);
-  void RunPeriodicTasks(
-      base::OnceCallback<void(base::expected<int, RpcError>)> callback);
+      base::OnceCallback<
+          void(base::expected<std::vector<UpdateService::AppState>, RpcError>)>)
+      override;
+  void RunPeriodicTasks(base::OnceCallback<void(base::expected<int, RpcError>)>
+                            callback) override;
   void CheckForUpdate(
       const std::string& app_id,
       UpdateService::Priority priority,
@@ -62,7 +63,7 @@ class UpdateServiceProxyImpl
       base::RepeatingCallback<void(const UpdateService::UpdateState&)>
           state_update,
       base::OnceCallback<void(base::expected<UpdateService::Result, RpcError>)>
-          callback);
+          callback) override;
   void Update(
       const std::string& app_id,
       const std::string& install_data_index,
@@ -72,12 +73,12 @@ class UpdateServiceProxyImpl
       base::RepeatingCallback<void(const UpdateService::UpdateState&)>
           state_update,
       base::OnceCallback<void(base::expected<UpdateService::Result, RpcError>)>
-          callback);
+          callback) override;
   void UpdateAll(
       base::RepeatingCallback<void(const UpdateService::UpdateState&)>
           state_update,
       base::OnceCallback<void(base::expected<UpdateService::Result, RpcError>)>
-          callback);
+          callback) override;
   void Install(
       const RegistrationRequest& registration,
       const std::string& client_install_data,
@@ -87,8 +88,8 @@ class UpdateServiceProxyImpl
       base::RepeatingCallback<void(const UpdateService::UpdateState&)>
           state_update,
       base::OnceCallback<void(base::expected<UpdateService::Result, RpcError>)>
-          callback);
-  void CancelInstalls(const std::string& app_id);
+          callback) override;
+  void CancelInstalls(const std::string& app_id) override;
   void RunInstaller(
       const std::string& app_id,
       const base::FilePath& installer_path,
@@ -99,11 +100,27 @@ class UpdateServiceProxyImpl
       base::RepeatingCallback<void(const UpdateService::UpdateState&)>
           state_update,
       base::OnceCallback<void(base::expected<UpdateService::Result, RpcError>)>
-          callback);
+          callback) override;
+  void GetUpdaterState(
+      base::OnceCallback<void(
+          base::expected<UpdateService::UpdaterState, RpcError>)>) override;
+  void GetUpdaterPolicies(
+      base::OnceCallback<
+          void(base::expected<
+               base::flat_map<std::string, UpdateService::PolicyValue>,
+               RpcError>)>) override;
+  void GetAppPolicies(
+      base::OnceCallback<
+          void(base::expected<
+               base::flat_map<
+                   std::string,
+                   base::flat_map<std::string, UpdateService::PolicyValue>>,
+               RpcError>)>) override;
+  void GetPoliciesJson(
+      base::OnceCallback<void(base::expected<std::string, RpcError>)>) override;
 
  private:
-  friend class base::RefCountedThreadSafe<UpdateServiceProxyImpl>;
-  ~UpdateServiceProxyImpl();
+  ~UpdateServiceProxyWinImpl() override;
 
   SEQUENCE_CHECKER(sequence_checker_);
   scoped_refptr<UpdateServiceProxyImplImpl> impl_;

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -326,11 +327,17 @@ void PaintOpReader::Read(SkPath* path) {
         return;
 
       auto* scratch = CopyScratchSpace(path_bytes);
-      size_t bytes_read = path->readFromMemory(scratch, path_bytes);
-      if (bytes_read == 0u) {
+      size_t bytes_read = 0;
+      std::optional<SkPath> deserialized_path =
+          SkPath::ReadFromMemory(scratch, path_bytes, &bytes_read);
+
+      if (bytes_read == 0u || !deserialized_path) {
         SetInvalid(DeserializationError::kSkPathReadFromMemoryFailure);
         return;
       }
+
+      *path = *deserialized_path;
+
       if (entry_state == PaintCacheEntryState::kInlined) {
         options_.paint_cache->PutPath(path_id, *path);
       } else {
@@ -351,6 +358,7 @@ void PaintOpReader::Read(PaintFlags* flags) {
   Read(&flags->miter_limit_);
 
   ReadSimple(&flags->bitfields_uint_);
+  ReadSimple(&flags->targeted_hdr_headroom_);
 
   Read(&flags->path_effect_);
   Read(&flags->color_filter_);
@@ -530,9 +538,7 @@ void PaintOpReader::Read(PaintImage* image) {
       builder = std::move(builder).set_gainmap_texture_image(
           entry->gainmap_image(), entry->gainmap_info());
     }
-    if (entry->hdr_metadata().has_value()) {
-      builder = std::move(builder).set_hdr_metadata(entry->hdr_metadata());
-    }
+    builder = std::move(builder).set_hdr_metadata(entry->hdr_metadata());
     *image = builder.TakePaintImage();
   }
 }
@@ -967,15 +973,15 @@ void PaintOpReader::Read(gfx::HDRMetadata* hdr_metadata) {
   DidRead(size);
 }
 
-void PaintOpReader::Read(SkGradientShader::Interpolation* interpolation) {
-  ReadEnum<SkGradientShader::Interpolation::InPremul,
-           SkGradientShader::Interpolation::InPremul::kYes>(
+void PaintOpReader::Read(SkGradient::Interpolation* interpolation) {
+  ReadEnum<SkGradient::Interpolation::InPremul,
+           SkGradient::Interpolation::InPremul::kYes>(
       &interpolation->fInPremul);
-  ReadEnum<SkGradientShader::Interpolation::ColorSpace,
-           SkGradientShader::Interpolation::ColorSpace::kLastColorSpace>(
+  ReadEnum<SkGradient::Interpolation::ColorSpace,
+           SkGradient::Interpolation::ColorSpace::kLastColorSpace>(
       &interpolation->fColorSpace);
-  ReadEnum<SkGradientShader::Interpolation::HueMethod,
-           SkGradientShader::Interpolation::HueMethod::kLastHueMethod>(
+  ReadEnum<SkGradient::Interpolation::HueMethod,
+           SkGradient::Interpolation::HueMethod::kLastHueMethod>(
       &interpolation->fHueMethod);
 }
 

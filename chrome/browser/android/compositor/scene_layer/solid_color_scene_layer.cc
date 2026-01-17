@@ -25,16 +25,18 @@ SkColor SolidColorSceneLayer::GetBackgroundColor() {
 }
 
 void SolidColorSceneLayer::SetBackgroundColor(JNIEnv* env,
-                                              jint background_color) {
+                                              int32_t background_color) {
   background_color_ = static_cast<SkColor>(background_color);
 }
 
 static jlong JNI_SolidColorSceneLayer_Init(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& jobj) {
+    const base::android::JavaRef<jobject>& jobj) {
   // This binds to the Java jobject and gives it ownership.
   SolidColorSceneLayer* scene_layer = new SolidColorSceneLayer(env, jobj);
   return reinterpret_cast<intptr_t>(scene_layer);
 }
 
 }  // namespace android
+
+DEFINE_JNI(SolidColorSceneLayer)

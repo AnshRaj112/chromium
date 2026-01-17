@@ -25,18 +25,18 @@ const std::vector<std::string> kCrossTabCommunicationTypes{
     "WebLock",
 };
 
-constexpr char kRequestStorageAccess[] =
+constexpr std::string_view kRequestAndCheckStorageAccess =
     "document.requestStorageAccess()"
     "  .then(() => document.hasStorageAccess())";
 
-constexpr char kRequestStorageAccessBeyondCookies[] =
-    "document.requestStorageAccess({estimate: true}).then((handle) => "
-    "handle.estimate().then(() => true, () => false), () => false)";
+constexpr std::string_view kRequestStorageAccessBeyondCookies =
+    "document.requestStorageAccess({estimate: true})"
+    ".then((handle) => handle.estimate())";
 
-constexpr char kRequestStorageAccessFor[] =
+constexpr std::string_view kRequestStorageAccessFor =
     "document.requestStorageAccessFor($1)";
 
-constexpr char kHasStorageAccess[] = "document.hasStorageAccess()";
+constexpr std::string_view kHasStorageAccess = "document.hasStorageAccess()";
 
 std::vector<std::string> GetStorageTypesForFrame(bool include_cookies) {
   std::vector<std::string> types(kStorageTypesForFrame);
@@ -160,13 +160,13 @@ bool RequestAndCheckStorageAccessForFrame(content::RenderFrameHost* frame,
   if (omit_user_gesture) {
     options |= content::EXECUTE_SCRIPT_NO_USER_GESTURE;
   }
-  return content::EvalJs(frame, kRequestStorageAccess, options).ExtractBool();
+  return content::EvalJs(frame, kRequestAndCheckStorageAccess, options)
+      .ExtractBool();
 }
 
 bool RequestAndCheckStorageAccessBeyondCookiesForFrame(
     content::RenderFrameHost* frame) {
-  return content::EvalJs(frame, kRequestStorageAccessBeyondCookies)
-      .ExtractBool();
+  return content::ExecJs(frame, kRequestStorageAccessBeyondCookies);
 }
 
 bool RequestStorageAccessForOrigin(content::RenderFrameHost* frame,

@@ -56,6 +56,13 @@ WebAppFilter WebAppFilter::IsCraftedApp() {
 }
 
 // static
+WebAppFilter WebAppFilter::IsCraftedAppAndOpensInDedicatedWindow() {
+  WebAppFilter filter;
+  filter.is_crafted_app_and_opens_in_dedicated_window_ = true;
+  return filter;
+}
+
+// static
 WebAppFilter WebAppFilter::IsSuggestedApp() {
   WebAppFilter filter;
   filter.is_suggested_app_ = true;
@@ -102,6 +109,34 @@ WebAppFilter WebAppFilter::IsDiyWithOsShortcut() {
 WebAppFilter WebAppFilter::LaunchableFromInstallApi() {
   WebAppFilter filter;
   filter.launchable_from_install_api_ = true;
+  return filter;
+}
+
+// static
+WebAppFilter WebAppFilter::IsTrusted() {
+  WebAppFilter filter;
+  filter.is_app_trusted_ = true;
+  return filter;
+}
+
+// static
+WebAppFilter WebAppFilter::IsIsolatedWebAppIncludingUninstalling() {
+  WebAppFilter filter;
+  filter.is_isolated_apps_including_uninstalling_ = true;
+  return filter;
+}
+
+// static
+WebAppFilter WebAppFilter::IsAppSuggestedForMigration() {
+  WebAppFilter filter;
+  filter.is_app_suggested_from_migration_ = true;
+  return filter;
+}
+
+// static
+WebAppFilter WebAppFilter::IsAppSurfaceableToUser() {
+  WebAppFilter filter;
+  filter.is_app_surfaceable_to_user_ = true;
   return filter;
 }
 

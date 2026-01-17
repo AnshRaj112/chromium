@@ -11,6 +11,7 @@
 #import "ios/chrome/browser/omnibox/public/omnibox_ui_features.h"
 #import "ios/chrome/browser/omnibox/ui/popup/carousel/carousel_item.h"
 #import "ios/chrome/browser/omnibox/ui/popup/carousel/omnibox_popup_carousel_control.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ui/base/device_form_factor.h"
@@ -150,16 +151,24 @@ UIStackView* CarouselStackView() {
     [self addContentSubviews];
   }
 
-  // Remove all previous items from carousel.
-  while (self.suggestionsStackView.arrangedSubviews.count != 0) {
-    [self.suggestionsStackView.arrangedSubviews
-            .firstObject removeFromSuperview];
-  }
+  void (^updateItemsBlock)(void) = ^{
+    // Remove all previous items from carousel.
+    while (self.suggestionsStackView.arrangedSubviews.count != 0) {
+      [self.suggestionsStackView.arrangedSubviews
+              .firstObject removeFromSuperview];
+    }
 
-  for (CarouselItem* item in carouselItems) {
-    OmniboxPopupCarouselControl* control = [self newCarouselControl];
-    [self.suggestionsStackView addArrangedSubview:control];
-    [control setCarouselItem:item];
+    for (CarouselItem* item in carouselItems) {
+      OmniboxPopupCarouselControl* control = [self newCarouselControl];
+      [self.suggestionsStackView addArrangedSubview:control];
+      [control setCarouselItem:item];
+    }
+  };
+
+  if (IsMultilineBrowserOmniboxEnabled()) {
+    [UIView performWithoutAnimation:updateItemsBlock];
+  } else {
+    updateItemsBlock();
   }
 
   if (static_cast<NSInteger>(carouselItems.count) > self.visibleTilesCapacity) {

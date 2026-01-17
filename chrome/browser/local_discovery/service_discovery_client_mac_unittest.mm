@@ -7,9 +7,11 @@
 #import <Cocoa/Cocoa.h>
 #include <stdint.h>
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
+#include "base/functional/callback_helpers.h"
 #include "base/run_loop.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/threading/thread.h"
@@ -167,8 +169,8 @@ TEST_F(ServiceDiscoveryClientMacTest, ParseServiceRecord) {
 
   const std::vector<std::string>& metadata = description.metadata;
   EXPECT_EQ(2u, metadata.size());
-  EXPECT_TRUE(base::Contains(metadata, "ab"));
-  EXPECT_TRUE(base::Contains(metadata, "d=e"));
+  EXPECT_TRUE(std::ranges::contains(metadata, "ab"));
+  EXPECT_TRUE(std::ranges::contains(metadata, "d=e"));
 
   EXPECT_EQ(ip_address, description.ip_address);
   EXPECT_EQ(kPort, description.address.port());
@@ -205,8 +207,8 @@ TEST_F(ServiceDiscoveryClientMacTest, ParseInvalidUnicodeRecord) {
 
   const std::vector<std::string>& metadata = description.metadata;
   EXPECT_EQ(2u, metadata.size());
-  EXPECT_TRUE(base::Contains(metadata, "a=b"));
-  EXPECT_TRUE(base::Contains(metadata, "cd=e9"));
+  EXPECT_TRUE(std::ranges::contains(metadata, "a=b"));
+  EXPECT_TRUE(std::ranges::contains(metadata, "cd=e9"));
 
   EXPECT_EQ(ip_address, description.ip_address);
   EXPECT_EQ(kPort, description.address.port());

@@ -21,13 +21,12 @@
 #include "components/signin/internal/identity_manager/profile_oauth2_token_service.h"
 #include "components/signin/internal/identity_manager/profile_oauth2_token_service_observer.h"
 #include "components/signin/public/base/consent_level.h"
+#include "components/signin/public/base/oauth_consumer_id.h"
 #include "components/signin/public/base/signin_client.h"
 #include "components/signin/public/base/signin_metrics.h"
 #include "components/signin/public/identity_manager/access_token_fetcher.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/identity_mutator.h"
-#include "components/signin/public/identity_manager/oauth_consumer_ids.h"
-#include "components/signin/public/identity_manager/scope_set.h"
 #include "google_apis/gaia/oauth2_access_token_manager.h"
 
 #if BUILDFLAG(IS_ANDROID)
@@ -228,25 +227,24 @@ class IdentityManager : public KeyedService,
   bool HasPrimaryAccount(ConsentLevel consent_level) const;
 
   // Creates an AccessTokenFetcher given the passed-in information.
+  //
+  // Only use this method if the feature requires dynamic scopes each time it
+  // requests an access token. Don't use this method if the feature gets it's
+  // scopes from finch. In that case you should add your finch logic in the
+  // OAuthConsumerRegistry subclasses.
+  //
+  // If you create a new OAuthConsumerId for this method then it will also need
+  // to be added in oauth_consumer_registry.cc. Otherwise this method will
+  // crash.
   [[nodiscard]] std::unique_ptr<AccessTokenFetcher>
-  CreateAccessTokenFetcherForAccount(const CoreAccountId& account_id,
-                                     const std::string& oauth_consumer_name,
-                                     const ScopeSet& scopes,
-                                     AccessTokenFetcher::TokenCallback callback,
-                                     AccessTokenFetcher::Mode mode,
-                                     AccessTokenFetcher::Source token_source =
-                                         AccessTokenFetcher::Source::kProfile);
-
-  // Creates an AccessTokenFetcher given the passed-in information, allowing
-  // to specify a custom |url_loader_factory| as well.
-  [[nodiscard]] std::unique_ptr<AccessTokenFetcher>
-  CreateAccessTokenFetcherForAccount(
+  CreateAccessTokenFetcherWithDynamicScopesForAccount(
       const CoreAccountId& account_id,
-      const std::string& oauth_consumer_name,
-      scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
+      OAuthConsumerId oauth_consumer_id,
       const ScopeSet& scopes,
       AccessTokenFetcher::TokenCallback callback,
-      AccessTokenFetcher::Mode mode);
+      AccessTokenFetcher::Mode mode,
+      AccessTokenFetcher::Source token_source =
+          AccessTokenFetcher::Source::kProfile);
 
   // Creates an AccessTokenFetcher for the |oauth_consumer_id| feature.
   [[nodiscard]] std::unique_ptr<AccessTokenFetcher>
@@ -267,26 +265,12 @@ class IdentityManager : public KeyedService,
       AccessTokenFetcher::TokenCallback callback,
       AccessTokenFetcher::Mode mode);
 
-#if BUILDFLAG(IS_IOS)
-  // TODO(crbug.com/425896213): Use OAuthConsumerId instead of ScopeSet.
-  void GetRefreshTokenFromDevice(
-      const CoreAccountId& account_id,
-      const OAuth2AccessTokenManager::ScopeSet& scopes,
-      AccessTokenFetcher::TokenCallback callback);
-#endif
-
-  // If an entry exists in the cache of access tokens corresponding to the
-  // given information, removes that entry; in this case, the next access token
-  // request for |account_id| and |scopes| will fetch a new token from the
-  // network. Otherwise, is a no-op.
-  void RemoveAccessTokenFromCache(const CoreAccountId& account_id,
-                                  const ScopeSet& scopes,
-                                  const std::string& access_token);
-
   // If an entry exists in the cache of access tokens corresponding to the
   // given information, removes that entry; in this case, the next access token
   // request for |account_id| and |oauth_consumer_id| will fetch a new token
   // from the network. Otherwise, is a no-op.
+  //
+  // This method doesn't support `OAuthConsumerId` using dynamic scopes.
   void RemoveAccessTokenFromCache(const CoreAccountId& account_id,
                                   OAuthConsumerId oauth_consumer_id,
                                   const std::string& access_token);
@@ -325,12 +309,24 @@ class IdentityManager : public KeyedService,
       const CoreAccountId& account_id) const;
 
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
-  // Returns the wrapped binding key of a refresh token associated with
-  // `account_id`, if any.
-  // Returns a non-empty vector iff (a) a refresh token exists for `account_id`,
-  // and (b) the refresh token is bound to a device.
-  std::vector<uint8_t> GetWrappedBindingKeyOfRefreshTokenForAccount(
-      const CoreAccountId& account_id) const;
+  // Returns `true` if (a) a refresh token exists for `account_id`, and (b) the
+  // refresh token is bound to a device, it returns `false` otherwise.
+  bool HasAccountWithBoundRefreshToken(const CoreAccountId& account_id) const;
+
+  // Returns whether all bound refresh tokens share the same binding key.
+  //
+  // Unbound tokens are ignored in this check. Returns `true` if there are zero
+  // or one bound tokens, or if all bound tokens use the same key. Returns
+  // `false` only if there are multiple bound tokens with different keys.
+  bool AllBoundTokensShareSameBindingKey() const;
+
+  // Returns the wrapped binding key to reuse if any existing account is already
+  // bound. It returns an empty vector if no existing account is bound.
+  //
+  // NOTE: The refresh tokens must be loaded to correctly check the binding
+  // status of the accounts. If the refresh tokens are not loaded, calling this
+  // function results in a crash.
+  std::vector<uint8_t> GetWrappedBindingKey() const;
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
   // Returns the error state of the refresh token associated with |account_id|.
@@ -538,28 +534,29 @@ class IdentityManager : public KeyedService,
 
   base::android::ScopedJavaLocalRef<jobject> GetPrimaryAccountInfo(
       JNIEnv* env,
-      jint consent_level) const;
+      int32_t consent_level) const;
 
   base::android::ScopedJavaLocalRef<jobject> GetPrimaryAccountId(
       JNIEnv* env) const;
 
+  base::android::ScopedJavaLocalRef<jobject> FindExtendedAccountInfoByAccountId(
+      JNIEnv* env,
+      const base::android::JavaRef<jobject>& j_account_id) const;
+
   base::android::ScopedJavaLocalRef<jobject>
   FindExtendedAccountInfoByEmailAddress(
       JNIEnv* env,
-      const base::android::JavaParamRef<jstring>& j_email) const;
+      const base::android::JavaRef<jstring>& j_email) const;
 
   base::android::ScopedJavaLocalRef<jobjectArray> GetAccountsWithRefreshTokens(
       JNIEnv* env) const;
 
-  // Refreshes account associated with |j_core_account_id| if it's not null.
-  // Else refreshes all accounts with refresh tokens if they are stale. See
+  // Refreshes all accounts with refresh tokens if they are stale. See
   // RefreshAccountInfoIfStale(const CoreAccountId&).
-  // TODO(crbug.com/40284908): Remove |j_core_account_id| from parameters.
-  void RefreshAccountInfoIfStale(JNIEnv* env,
-                                 const CoreAccountId& j_core_account_id);
+  void RefreshAccountInfoIfStale(JNIEnv* env);
 
   // Returns true if the browser allows the primary account to be cleared.
-  jboolean IsClearPrimaryAccountAllowed(JNIEnv* env) const;
+  bool IsClearPrimaryAccountAllowed(JNIEnv* env) const;
 #endif
 
   // Returns a weak pointer of this.
@@ -812,11 +809,6 @@ class IdentityManager : public KeyedService,
 #if BUILDFLAG(IS_ANDROID)
   // Java-side IdentityManager object.
   base::android::ScopedJavaGlobalRef<jobject> java_identity_manager_;
-
-  // CoreAccountId and the corresponding fetch start time, this is only
-  // used to record account information fetch duration.
-  base::flat_map<CoreAccountId, base::TimeTicks>
-      account_info_fetch_start_times_;
 #endif
 #if BUILDFLAG(IS_IOS)
   // `true` if there is an account switching back in progress.

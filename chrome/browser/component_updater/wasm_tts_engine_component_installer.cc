@@ -7,11 +7,15 @@
 #include "base/files/file_util.h"
 #include "base/functional/callback.h"
 #include "base/logging.h"
-#include "chrome/browser/ui/webui/side_panel/read_anything/read_anything_prefs.h"
+#include "chrome/browser/browser_process.h"
+#include "chrome/browser/ui/read_anything/read_anything_prefs.h"
+#include "components/component_updater/component_updater_service.h"
+#include "components/crx_file/id_util.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "content/public/browser/browser_thread.h"
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#include "base/no_destructor.h"
 #include "chrome/browser/accessibility/embedded_a11y_extension_loader.h"
 #include "chrome/common/extensions/extension_constants.h"
 #include "ui/accessibility/accessibility_features.h"
@@ -19,19 +23,15 @@
 
 namespace {
 
-const base::FilePath::CharType kManifestFileName[] =
-    FILE_PATH_LITERAL("wasm_tts_manifest.json");
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 const base::FilePath::CharType kBindingsMainWasmFileName[] =
     FILE_PATH_LITERAL("bindings_main.wasm");
 const base::FilePath::CharType kBindingsMainJsFileName[] =
     FILE_PATH_LITERAL("bindings_main.js");
-const base::FilePath::CharType kTTSEngineJsBinFileName[] =
-    FILE_PATH_LITERAL("googletts_engine_js_bin.js");
 const base::FilePath::CharType kWorkletProcessorJsFileName[] =
     FILE_PATH_LITERAL("streaming_worklet_processor.js");
 const base::FilePath::CharType kVoicesJsonFileName[] =
     FILE_PATH_LITERAL("voices.json");
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 const base::FilePath::CharType kManifestV3FileName[] =
     FILE_PATH_LITERAL("wasm_tts_manifest_v3.json");
 const base::FilePath::CharType kOffscreenHtmlFileName[] =
@@ -72,6 +72,11 @@ class WasmTTSEngineDirectory {
     CHECK(!new_dir.empty());
     dir_ = new_dir;
     FireCallbacks();
+  }
+
+  bool IsSet() const {
+    DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+    return !dir_.empty();
   }
 
  private:
@@ -187,9 +192,7 @@ void WasmTtsEngineComponentInstallerPolicy::MaybeReinstallTtsEngine(
     return;
   }
 
-  const base::FilePath::CharType* manifest_file =
-      features::IsWasmTtsComponentUpdaterV3Enabled() ? kManifestV3FileName
-                                                     : kManifestFileName;
+  const base::FilePath::CharType* manifest_file = kManifestV3FileName;
 
   // If it's been more than 14 days since reading mode was last opened,
   // re-install the engine so that unused voices can be removed.
@@ -223,23 +226,19 @@ bool WasmTtsEngineComponentInstallerPolicy::VerifyInstallation(
     const base::Value::Dict& /* manifest */,
     const base::FilePath& install_dir) const {
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-  if (features::IsWasmTtsComponentUpdaterV3Enabled()) {
-    return base::PathExists(install_dir.Append(kManifestV3FileName)) &&
-           base::PathExists(install_dir.Append(kBindingsMainWasmFileName)) &&
-           base::PathExists(install_dir.Append(kBindingsMainJsFileName)) &&
-           base::PathExists(install_dir.Append(kOffscreenHtmlFileName)) &&
-           base::PathExists(install_dir.Append(kOffscreenCompiledFileName)) &&
-           base::PathExists(install_dir.Append(kBackgroundCompiledFileName)) &&
-           base::PathExists(install_dir.Append(kWorkletProcessorJsFileName)) &&
-           base::PathExists(install_dir.Append(kVoicesJsonFileName));
-  }
-#endif
-  return base::PathExists(install_dir.Append(kManifestFileName)) &&
+  return base::PathExists(install_dir.Append(kManifestV3FileName)) &&
          base::PathExists(install_dir.Append(kBindingsMainWasmFileName)) &&
          base::PathExists(install_dir.Append(kBindingsMainJsFileName)) &&
-         base::PathExists(install_dir.Append(kTTSEngineJsBinFileName)) &&
+         base::PathExists(install_dir.Append(kOffscreenHtmlFileName)) &&
+         base::PathExists(install_dir.Append(kOffscreenCompiledFileName)) &&
+         base::PathExists(install_dir.Append(kBackgroundCompiledFileName)) &&
          base::PathExists(install_dir.Append(kWorkletProcessorJsFileName)) &&
          base::PathExists(install_dir.Append(kVoicesJsonFileName));
+#else
+  // Attempting to install the TTS extension should never be done outside of
+  // Windows, Mac, and Linux. Return false as a fallback just in case.
+  return false;
+#endif
 }
 
 base::FilePath WasmTtsEngineComponentInstallerPolicy::GetRelativeInstallDir()
@@ -262,6 +261,26 @@ WasmTtsEngineComponentInstallerPolicy::GetInstallerAttributes() const {
   return update_client::InstallerAttributes();
 }
 
+const std::string WasmTtsEngineComponentInstallerPolicy::GetExtensionId() {
+  return crx_file::id_util::GenerateIdFromHash(kWasmTtsEnginePublicKeySHA256);
+}
+
+void WasmTtsEngineComponentInstallerPolicy::UpdateWasmComponentOnDemand() {
+  const std::string crx_id = component_updater::
+      WasmTtsEngineComponentInstallerPolicy::GetExtensionId();
+  g_browser_process->component_updater()->GetOnDemandUpdater().OnDemandUpdate(
+      crx_id, component_updater::OnDemandUpdater::Priority::FOREGROUND,
+      base::BindOnce([](update_client::Error error) {
+        if (error != update_client::Error::NONE &&
+            error != update_client::Error::UPDATE_IN_PROGRESS) {
+          DLOG(ERROR)
+              << "On demand update of the Wasm TTS Engine component failed "
+                 "with error: "
+              << static_cast<int>(error);
+        }
+      }));
+}
+
 void RegisterWasmTtsEngineComponent(ComponentUpdateService* cus,
                                     PrefService* prefs) {
   VLOG(1) << "Registering WASM TTS Engine component.";
@@ -275,6 +294,15 @@ void WasmTtsEngineComponentInstallerPolicy::GetWasmTTSEngineDirectory(
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
   WasmTTSEngineDirectory* wasm_directory = WasmTTSEngineDirectory::Get();
   wasm_directory->Get(std::move(callback));
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+}
+
+// static
+bool WasmTtsEngineComponentInstallerPolicy::IsWasmTTSEngineDirectorySet() {
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+  return WasmTTSEngineDirectory::Get()->IsSet();
+#else
+  return false;
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 }
 

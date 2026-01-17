@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/342213636): Remove this and spanify to fix the errors.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "content/browser/indexed_db/indexed_db_leveldb_coding.h"
 
 #include <stddef.h>
@@ -19,7 +14,9 @@
 #include <utility>
 #include <vector>
 
+#include "base/compiler_specific.h"
 #include "base/containers/span.h"
+#include "base/test/insecure_random_generator.h"
 #include "components/services/storage/indexed_db/scopes/varint_coding.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -52,6 +49,8 @@ static std::string WrappedEncodeByte(char value) {
   EncodeByte(value, &buffer);
   return buffer;
 }
+
+}  // namespace
 
 TEST(IndexedDBLevelDBCodingTest, EncodeByte) {
   std::string expected;
@@ -187,9 +186,7 @@ TEST(IndexedDBLevelDBCodingTest, EncodeInt) {
   EXPECT_EQ(1u, WrappedEncodeInt(255).size());
   EXPECT_EQ(2u, WrappedEncodeInt(256).size());
   EXPECT_EQ(4u, WrappedEncodeInt(0xffffffff).size());
-#ifdef NDEBUG
   EXPECT_EQ(8u, WrappedEncodeInt(-1).size());
-#endif
 }
 
 TEST(IndexedDBLevelDBCodingTest, DecodeBool) {
@@ -228,9 +225,7 @@ TEST(IndexedDBLevelDBCodingTest, DecodeInt) {
       655536,
       7711192431755665792ll,
       0x7fffffffffffffffll,
-#ifdef NDEBUG
       -3,
-#endif
   };
 
   for (size_t i = 0; i < test_cases.size(); ++i) {
@@ -810,6 +805,50 @@ TEST(IndexedDBLevelDBCodingTest, ExtractAndCompareIDBKeys) {
   }
 }
 
+// Basic verification that the variable length encoding for strings is working
+// as expected.
+TEST(IndexedDBLevelDBCodingTest, EncodeSortableString) {
+  // Two equal length strings that only use characters < 127 have the same
+  // length when encoded.
+  EXPECT_EQ(EncodeSortableIDBKey(IndexedDBKey(u"Hello world")).size(),
+            EncodeSortableIDBKey(IndexedDBKey(u"Hello w0rld")).size());
+
+  // But when one string uses a character >= 127, that takes up another byte.
+  EXPECT_EQ(EncodeSortableIDBKey(IndexedDBKey(u"Hello world")).size(),
+            EncodeSortableIDBKey(IndexedDBKey(u"H\x82llo world")).size() - 1);
+
+  // A character that doesn't fit in 14 bits uses 3 bytes.
+  EXPECT_EQ(EncodeSortableIDBKey(IndexedDBKey(u"Hello world")).size(),
+            EncodeSortableIDBKey(IndexedDBKey(u"H\xf082llo world")).size() - 2);
+}
+
+TEST(IndexedDBLevelDBCodingTest, EncodeSortableBinary) {
+  static constexpr size_t kBinarySize = 17;
+  std::vector<uint64_t> binary_input;
+  binary_input.reserve(kBinarySize);
+  base::test::InsecureRandomGenerator gen;
+  gen.ReseedForTesting(0xfedcba9876543210);
+  for (size_t i = 0; i < kBinarySize; ++i) {
+    binary_input.push_back(gen.RandUint64());
+  }
+
+  for (std::string_view sv(reinterpret_cast<const char*>(binary_input.data()),
+                           binary_input.size() * sizeof(uint64_t));
+       ; sv.remove_prefix(1)) {
+    std::string encoded = EncodeSortableIDBKey(IndexedDBKey(std::string(sv)));
+    // The binary encoding always takes a multiple of 9 bytes, plus a sentinel
+    // byte, plus a type byte.
+    EXPECT_EQ(encoded.size() % 9, 2U);
+    blink::IndexedDBKey decoded = DecodeSortableIDBKey(encoded);
+    EXPECT_TRUE(decoded.IsValid());
+    EXPECT_TRUE(decoded.Equals(IndexedDBKey(std::string(sv))));
+
+    if (sv.empty()) {
+      break;
+    }
+  }
+}
+
 TEST(IndexedDBLevelDBCodingTest, EncodeAndCompareIDBKeysWithSentinels) {
   const char16_t kJunkString[] = {0xdead, 0xbeef, '\0'};
 
@@ -846,6 +885,10 @@ TEST(IndexedDBLevelDBCodingTest, EncodeAndCompareIDBKeysWithSentinels) {
       IndexedDBKey(std::string("\x02")),
       IndexedDBKey(std::string("\x02\x01")),
       IndexedDBKey(std::string("\x02\x02")),
+      // Same as previous binary, but with added null byte at end.
+      IndexedDBKey(std::string("\x02\x02\x00", 3)),
+      IndexedDBKey(std::string("Lorem ipsum and some bits"
+                               "\x01\x02\x03\x04\x05\x06\x07")),
       IndexedDBKey(std::string("\xff")),
 
       CreateArrayIDBKey(),
@@ -889,8 +932,8 @@ TEST(IndexedDBLevelDBCodingTest, EncodeAndCompareIDBKeysWithSentinels) {
     EXPECT_TRUE(encoded_b.size());
 
     auto sqlite_compare = [](const std::string& a, const std::string& b) {
-      return std::memcmp(a.c_str(), b.c_str(),
-                         std::min(a.length(), b.length()));
+      return UNSAFE_TODO(
+          std::memcmp(a.c_str(), b.c_str(), std::min(a.length(), b.length())));
     };
 
     EXPECT_LT(sqlite_compare(encoded_a, encoded_b), 0);
@@ -974,8 +1017,8 @@ TEST(IndexedDBLevelDBCodingTest, EncodeSortableDoubles) {
       EXPECT_EQ(encoded_a.size(), encoded_b.size());
 
       auto sqlite_compare = [](const std::string& a, const std::string& b) {
-        return std::memcmp(a.c_str(), b.c_str(),
-                           std::min(a.length(), b.length()));
+        return UNSAFE_TODO(std::memcmp(a.c_str(), b.c_str(),
+                                       std::min(a.length(), b.length())));
       };
 
       if (value_a < value_b) {
@@ -1137,5 +1180,8 @@ TEST(IndexedDBLevelDBCodingTest, EncodeVarIntVSEncodeByteTest) {
   }
 }
 
-}  // namespace
+TEST(IndexedDBLevelDBCodingTest, Empty) {
+  EXPECT_EQ(KeyPrefix::EncodeInternal(0, 0, 0), KeyPrefix::EncodeEmpty());
+}
+
 }  // namespace content::indexed_db

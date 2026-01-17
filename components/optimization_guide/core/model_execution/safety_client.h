@@ -6,11 +6,13 @@
 
 #include "base/types/optional_ref.h"
 #include "components/optimization_guide/core/delivery/model_info.h"
+#include "components/optimization_guide/core/model_execution/on_device_capability.h"
 #include "components/optimization_guide/core/model_execution/safety_checker.h"
 #include "components/optimization_guide/core/model_execution/safety_model_info.h"
-#include "components/optimization_guide/core/optimization_guide_model_executor.h"
+#include "components/optimization_guide/public/mojom/model_broker.mojom-forward.h"
 #include "services/on_device_model/public/cpp/service_client.h"
 #include "services/on_device_model/public/cpp/text_safety_assets.h"
+#include "services/on_device_model/public/mojom/on_device_model.mojom.h"
 
 namespace optimization_guide {
 
@@ -29,7 +31,8 @@ class SafetyClient final : public TextSafetyClient {
   void SetLanguageDetectionModel(
       base::optional_ref<const ModelInfo> model_info);
   // Updates the safety model, possibly interrupting ongoing executions.
-  void MaybeUpdateSafetyModel(base::optional_ref<const ModelInfo> model_info);
+  void MaybeUpdateSafetyModel(
+      std::unique_ptr<SafetyModelInfo> safety_model_info);
 
   SafetyModelInfo* safety_model_info() const {
     return safety_model_info_.get();
@@ -40,7 +43,7 @@ class SafetyClient final : public TextSafetyClient {
 
   // Construct a feature-specific safety checker.
   base::expected<std::unique_ptr<SafetyChecker>, OnDeviceModelEligibilityReason>
-  MakeSafetyChecker(ModelBasedCapabilityKey feature, bool can_skip);
+  MakeSafetyChecker(mojom::OnDeviceFeature feature, bool can_skip);
 
   void StartSession(
       mojo::PendingReceiver<on_device_model::mojom::TextSafetySession> session)

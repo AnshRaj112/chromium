@@ -25,6 +25,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/strings/string_util_win.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
@@ -136,10 +137,7 @@ HRESULT CoGetClassObjectAsAdmin(gfx::AcceleratedWidget hwnd,
   const std::wstring elevation_moniker_name =
       L"Elevation:Administrator!clsid:" + base::win::WStringFromGUID(class_id);
 
-  BIND_OPTS3 bind_opts;
-  // An explicit memset is needed rather than relying on value initialization
-  // since BIND_OPTS3 is not an aggregate (it is a derived type).
-  UNSAFE_TODO(memset(&bind_opts, 0, sizeof(bind_opts)));
+  BIND_OPTS3 bind_opts = {};
   bind_opts.cbStruct = sizeof(bind_opts);
   bind_opts.dwClassContext = CLSCTX_LOCAL_SERVER;
   bind_opts.hwnd = hwnd;
@@ -611,8 +609,8 @@ UpdateCheckResult UpdateCheckDriver::BeginUpdateCheckInternal() {
     Microsoft::WRL::ComPtr<IDispatch> dispatch;
     // It is common for this call to fail with APP_USING_EXTERNAL_UPDATER if
     // an auto update is in progress.
-    hresult =
-        app_bundle_->createInstalledApp(base::win::ScopedBstr(app_guid).Get());
+    hresult = app_bundle_->createInstalledApp(
+        base::win::ScopedBstr(base::ToLowerASCII(app_guid)).Get());
     if (FAILED(hresult)) {
       return {error_code, hresult};
     }

@@ -35,6 +35,7 @@
 <translation id="1249250836236328755">ジャンル</translation>
 <translation id="1254593899333212300">インターネットへの直接接続</translation>
 <translation id="1272293450992660632">PIN の値が一致しません。</translation>
+<translation id="1279040297980392566">スキャン待機中、後でもう一度お試しください</translation>
 <translation id="1280820357415527819">モバイル ネットワークを検索しています</translation>
 <translation id="1293556467332435079">ファイル</translation>
 <translation id="1297922636971898492">Google ドライブは現在ご利用いただけません。Google ドライブが利用可能になったときに、自動的にアップロードを再開します。</translation>
@@ -109,7 +110,6 @@
 <translation id="1813278315230285598">サービス</translation>
 <translation id="181434555916624618">現時点では、人物が含まれる結果は表示されません。別のプロンプトをお試しください。</translation>
 <translation id="1829129547161959350">ペンギン</translation>
-<translation id="183183971458492120">情報を読み込んでいます...</translation>
 <translation id="1832073788765803750">半角カタカナ</translation>
 <translation id="1834290891154666894">無効なサブジェクト代替名マッチのエントリ</translation>
 <translation id="1838709767668011582">Google サイト</translation>
@@ -146,13 +146,13 @@
 <translation id="2142680004883808240">ロシア語（表音 YaZHert）キーボード</translation>
 <translation id="2143778271340628265">手動プロキシ設定</translation>
 <translation id="2148716181193084225">今日</translation>
+<translation id="2161573825856688200">Google プロジェクト</translation>
 <translation id="2163152940313951844">「<ph name="CHARACTER_NAME" />」は無効な文字です。</translation>
 <translation id="2178056538281447670">Microsoft 365</translation>
 <translation id="2184934335987813305">ポルトガル語（US インターナショナル PC）キーボード</translation>
 <translation id="2193661397560634290"><ph name="SPACE_USED" /> 使用</translation>
 <translation id="2198315389084035571">中国語（簡体字）</translation>
 <translation id="22085916256174561">韓国語</translation>
-<translation id="2208919847696382164">Linux でのインストール</translation>
 <translation id="2215692307449050019">電池残量が少なくなっています。電源に接続すると、ファイルの同期が再開されます。</translation>
 <translation id="2225536596944493418"><ph name="NUMBER_OF_ITEMS" /> 個のアイテムを削除してもよろしいですか？</translation>
 <translation id="2230062665678605299">フォルダ「<ph name="FOLDER_NAME" />」を作成することができません。<ph name="ERROR_MESSAGE" /></translation>
@@ -213,7 +213,6 @@
 <translation id="2653059201992392941">入力できるのはあと <ph name="RETRIES" /> 回です。</translation>
 <translation id="2663066752008346276">ビルマ語 / ミャンマー語（Myansan）キーボード</translation>
 <translation id="2664412712123763093">ファイルの場所</translation>
-<translation id="2718540689505416944">Linux でアプリをインストール</translation>
 <translation id="2719020180254996569"><ph name="NETWORK_INDEX" /> 番目のネットワーク（全 <ph name="NETWORK_COUNT" /> 件）、<ph name="NETWORK_NAME" />、<ph name="CONNECTION_STATUS" />、詳細</translation>
 <translation id="2724954091494693138">トルコ語（F）キーボード</translation>
 <translation id="2732288874651063549"><ph name="VM_NAME" /> との共有を管理</translation>
@@ -222,7 +221,6 @@
 <translation id="2764206540577097904">個人用の Google Workspace ストレージの空き容量がなくなりました。</translation>
 <translation id="2771816809568414714">チーズ</translation>
 <translation id="2781645665747935084">ベルギー語</translation>
-<translation id="2782104745158847185">Linux アプリケーションのインストール中にエラーが発生しました</translation>
 <translation id="2802583107108007218">これらの制限の詳細</translation>
 <translation id="2803375539583399270">PIN を入力</translation>
 <translation id="2819519502129272135">ファイルの同期がオフになっています</translation>
@@ -345,7 +343,6 @@
 <translation id="3786301125658655746">現在オフラインです</translation>
 <translation id="3789841737615482174">インストール</translation>
 <translation id="3793469551756281394">残り約 <ph name="REMAINING_TIME_HOUR" /> <ph name="REMAINING_TIME_MINUTE" /></translation>
-<translation id="3798449238516105146">バージョン</translation>
 <translation id="3801082500826908679">フェロー語</translation>
 <translation id="3809272675881623365">ウサギ</translation>
 <translation id="3810973564298564668">管理</translation>
@@ -353,14 +350,12 @@
 <translation id="3811494700605067549">1 個のファイルを選択しました</translation>
 <translation id="3817579325494460411">指定されていません</translation>
 <translation id="3819448694985509187">PIN が正しくありません。入力できるのはあと 1 回です。</translation>
-<translation id="3822559385185038546">このプロキシは管理者によって制御されています</translation>
 <translation id="3830674330436234648">再生機能はご利用いただけません</translation>
 <translation id="383652340667548381">セルビア語</translation>
 <translation id="3839045880592694915">携帯通信会社がモデムの接続を許可していません。詳細については、携帯通信会社にお問い合わせください。</translation>
 <translation id="385051799172605136">戻る</translation>
 <translation id="3855472144336161447">ドイツ語（Neo 2）</translation>
 <translation id="3858860766373142691">名前</translation>
-<translation id="3866249974567520381">説明</translation>
 <translation id="3899991606604168269">フランス語（カナダ）（多言語）キーボード</translation>
 <translation id="3901991538546252627"><ph name="NAME" /> に接続しています</translation>
 <translation id="3906232975181435906">モバイル プロファイルのインストール中 - <ph name="NETWORK_INDEX" /> 番目のネットワーク（全 <ph name="NETWORK_COUNT" /> 件）、<ph name="NETWORK_NAME" /></translation>
@@ -438,7 +433,6 @@
 <translation id="4477219268485577442">ブルガリア語（表音）</translation>
 <translation id="4508265954913339219">起動に失敗しました</translation>
 <translation id="4509667233588080747">英語（アメリカ）（Workman インターナショナル）キーボード</translation>
-<translation id="4522570452068850558">詳細</translation>
 <translation id="4527800702232535228">このフォルダは Parallels Desktop と共有されています</translation>
 <translation id="4552678318981539154">追加ストレージを購入</translation>
 <translation id="4552759165874948005"><ph name="NETWORK_TYPE" /> ネットワーク、信号強度 <ph name="SIGNAL_STRENGTH" />%</translation>
@@ -596,13 +590,13 @@
 <translation id="5596627076506792578">その他のオプション</translation>
 <translation id="5602622065581044566">ブルガリア語（表音）キーボード</translation>
 <translation id="5605830556594064952">US Dvorak 配列</translation>
+<translation id="560739212255190568">管理者が次のプロキシの適用に加え、プロキシのオーバーライド ルールを設定しています</translation>
 <translation id="5618330573454123917">このファイルは Macintosh ソフトウェアを使用するパソコン用に作成されています。ご使用のデバイスでは ChromeOS が実行されているため、互換性がありません。ChromeOS でファイルを開く方法については、<ph name="BEGIN_LINK_HELP" />こちら<ph name="END_LINK_HELP" />をご覧ください。</translation>
 <translation id="5625294776298156701">タミル語（Tamil99）キーボード</translation>
 <translation id="5633226425545095130">このアイテムを移動すると、アイテムは共有フォルダ「<ph name="DESTINATION_NAME" />」を閲覧できるすべてのユーザーと共有されます。</translation>
 <translation id="5649768706273821470">聴く</translation>
 <translation id="5650895901941743674">APN 設定を確認してください</translation>
 <translation id="5669691691057771421">新しい PIN を入力</translation>
-<translation id="5678784840044122290">Linux アプリケーションはお使いのデバイスでご利用いただけるようになります。ランチャーにアイコンが追加されている可能性もあります。</translation>
 <translation id="5686799162999241776"><ph name="BEGIN_BOLD" />アーカイブまたは仮想ディスクから切断できません<ph name="END_BOLD" />
    <ph name="LINE_BREAKS" />
    アーカイブまたは仮想ディスク上のすべてのファイルを閉じてから、もう一度お試しください。</translation>
@@ -637,7 +631,6 @@
 <translation id="5861477046012235702">ゲーマー</translation>
 <translation id="5864471791310927901">DHCP を検索できませんでした</translation>
 <translation id="5896749729057314184">ネットワーク <ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" />、<ph name="NETWORK_NAME" />、未有効化、電波強度 <ph name="SIGNAL_STRENGTH" />%、詳細</translation>
-<translation id="5911887972742538906">Linux アプリケーションのインストール中にエラーが発生しました。</translation>
 <translation id="5912396950572065471">形式</translation>
 <translation id="5918480239180455431">新しい検索機能をご利用いただけます</translation>
 <translation id="5926082595146149752">オランダ語（オランダ）（US インターナショナル PC）キーボード</translation>
@@ -787,7 +780,7 @@
 <translation id="7075931588889865715">タイ語（TIS 820-2531）キーボード</translation>
 <translation id="708278670402572152">スキャンを有効にするにはネットワークから切断してください</translation>
 <translation id="7086590977277044826">タミル語（字母）キーボード</translation>
-<translation id="7088615885725309056">古い</translation>
+<translation id="7088615885725309056">次</translation>
 <translation id="7103992300314999525">マケドニア語</translation>
 <translation id="7104338189998813914">OneDrive アカウントへのアクセスで問題が発生しています</translation>
 <translation id="7106346894903675391">追加容量を購入...</translation>
@@ -806,7 +799,6 @@
 <translation id="7238097264433196391">ドライブ名</translation>
 <translation id="7238643356913091553"><ph name="NETWORK_NAME" />、詳細</translation>
 <translation id="7246947237293279874">FTP プロキシ</translation>
-<translation id="7248671827512403053">アプリケーション</translation>
 <translation id="7256405249507348194">不明なエラー: <ph name="DESC" /></translation>
 <translation id="7268659760406822741">利用可能なサービス</translation>
 <translation id="7291818353625820805">キー入力を繰り返す場合は、キーボードの設定でアクセント記号をオフにします</translation>
@@ -933,7 +925,6 @@
 <translation id="8151638057146502721">設定</translation>
 <translation id="8154666764013920974">{NUM_ERROR,plural, =1{1 件のエラーがあります。}other{# 件のエラーがあります。}}</translation>
 <translation id="8154842056504218462">すべての項目を選択しました。</translation>
-<translation id="8157684860301034423">アプリ情報を取得できませんでした。</translation>
 <translation id="8175731104491895765">フランス語（ベルギー）</translation>
 <translation id="8175799081768705361"><ph name="NUMBER_OF_FILES_SYNCING" /> 個のドライブ ファイルを同期しています</translation>
 <translation id="8179976553408161302">Enter</translation>
@@ -989,12 +980,13 @@
 <translation id="8492972329130824181">ホーム ネットワークは使用できません。接続するには、モバイルデータ ローミングを有効にする必要があります。</translation>
 <translation id="8499098729323186194"><ph name="NUMBER_OF_ITEMS" /> 件のアイテムを抽出しています...</translation>
 <translation id="8502913769543567768"><ph name="NETWORK_INDEX" /> 番目のネットワーク（全 <ph name="NETWORK_COUNT" /> 件）、<ph name="NETWORK_NAME" />、<ph name="NETWORK_PROVIDER_NAME" />、デバイスのセットアップ後に有効化、管理者によって管理</translation>
-<translation id="8512483403832814140">常時</translation>
+<translation id="8512483403832814140">全期間</translation>
 <translation id="8521441079177373948">UK</translation>
 <translation id="853494022971700746">フランス語（フランス）</translation>
 <translation id="8540608333167683902"><ph name="NETWORK_INDEX" /> 番目のネットワーク（全 <ph name="NETWORK_COUNT" /> 件）、<ph name="NETWORK_NAME" />、<ph name="CONNECTION_STATUS" />、信号強度 <ph name="SIGNAL_STRENGTH" />%、詳細</translation>
 <translation id="8545476925160229291">英語（アメリカ）</translation>
 <translation id="854655314928502177">ウェブプロキシ自動検出 URL:</translation>
+<translation id="8547747809824590510">管理者がプロキシのオーバーライド ルールを設定しています</translation>
 <translation id="8549186985808798022">イタリア語</translation>
 <translation id="8551494947769799688">ラトビア語</translation>
 <translation id="8560515948038859357">広東語</translation>
@@ -1015,7 +1007,7 @@
 <translation id="8688591111840995413">不正なパスワード</translation>
 <translation id="8698464937041809063">Google 図形描画</translation>
 <translation id="8698877009525468705">このファイルは機密情報であり、管理者ポリシーによる制限が適用されます。</translation>
-<translation id="8712637175834984815">理解した</translation>
+<translation id="8712637175834984815">理解しました</translation>
 <translation id="8713112442029511308">マルタ語</translation>
 <translation id="8714406895390098252">自転車</translation>
 <translation id="8719721339511222681"><ph name="ENTRY_NAME" /> を選択しました。</translation>
@@ -1055,6 +1047,7 @@
 <translation id="9038620279323455325">「<ph name="FILE_NAME" />」という名前のファイルはすでに存在します。別の名前を選択してください。</translation>
 <translation id="9046895021617826162">接続に失敗しました</translation>
 <translation id="9065512565307033593">確認に失敗した場合、ネットワーク アクセスは無効になります。</translation>
+<translation id="9079844694307518094">管理者が次のプロキシを適用しています</translation>
 <translation id="908378762078012445">ロシア語（表音 AATSEEL）キーボード</translation>
 <translation id="9086302186042011942">同期しています</translation>
 <translation id="9099674669267916096">ページ数</translation>
@@ -1075,9 +1068,9 @@
 <translation id="9183302530794969518">Google ドキュメント</translation>
 <translation id="9189836632794948435">カザフ語</translation>
 <translation id="9200427192836333033"><ph name="NUMBER_OF_ITEMS" /> 件のアイテムを抽出しました。</translation>
-<translation id="9213073329713032541">インストールを開始しました。</translation>
 <translation id="9219103736887031265">画像</translation>
 <translation id="9219908252191632183">月面</translation>
+<translation id="931652069802536959">ネットワークはポリシーによってブロックされています</translation>
 <translation id="938470336146445890">ユーザー証明書をインストールしてください。</translation>
 <translation id="939736085109172342">新しいフォルダ</translation>
 <translation id="943972244133411984">更新者</translation>

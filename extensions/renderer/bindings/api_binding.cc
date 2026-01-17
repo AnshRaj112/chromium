@@ -26,6 +26,7 @@
 #include "extensions/renderer/bindings/declarative_event.h"
 #include "gin/arguments.h"
 #include "gin/per_context_data.h"
+#include "gin/public/gin_embedders.h"
 #include "v8/include/cppgc/allocation.h"
 #include "v8/include/v8-cppgc.h"
 
@@ -65,8 +66,7 @@ std::string GetJSEnumEntryName(const std::string& original) {
 }
 
 std::unique_ptr<APISignature> GetAPISignatureFromDictionary(
-    const base::Value::Dict* dict,
-    BindingAccessChecker* access_checker) {
+    const base::Value::Dict* dict) {
   const base::Value* params = dict->Find("parameters");
   if (params && !params->is_list())
     params = nullptr;
@@ -76,7 +76,7 @@ std::unique_ptr<APISignature> GetAPISignatureFromDictionary(
   if (returns_async && !returns_async->is_dict())
     returns_async = nullptr;
 
-  return APISignature::CreateFromValues(*params, returns_async, access_checker);
+  return APISignature::CreateFromValues(*params, returns_async);
 }
 
 void RunAPIBindingHandlerCallback(
@@ -87,7 +87,8 @@ void RunAPIBindingHandlerCallback(
 
   v8::Local<v8::External> external;
   CHECK(args.GetData(&external));
-  auto* callback = static_cast<APIBinding::HandlerCallback*>(external->Value());
+  auto* callback = static_cast<APIBinding::HandlerCallback*>(
+      external->Value(gin::kAPIBindingHandlerCallbackTag));
 
   callback->Run(&args);
 }
@@ -220,7 +221,7 @@ APIBinding::APIBinding(const std::string& api_name,
       std::string full_name =
           base::StringPrintf("%s.%s", api_name_.c_str(), name->c_str());
 
-      auto signature = GetAPISignatureFromDictionary(func_dict, access_checker);
+      auto signature = GetAPISignatureFromDictionary(func_dict);
 
       methods_[*name] =
           std::make_unique<MethodData>(full_name, signature.get());
@@ -262,8 +263,7 @@ APIBinding::APIBinding(const std::string& api_name,
           std::string full_name =
               base::StringPrintf("%s.%s", id->c_str(), function_name->c_str());
 
-          auto signature =
-              GetAPISignatureFromDictionary(func_dict, access_checker);
+          auto signature = GetAPISignatureFromDictionary(func_dict);
 
           type_refs->AddTypeMethodSignature(full_name, std::move(signature));
         }
@@ -343,8 +343,7 @@ APIBinding::APIBinding(const std::string& api_name,
         base::Value empty_params(base::Value::Type::LIST);
         std::unique_ptr<APISignature> event_signature =
             APISignature::CreateFromValues(params ? *params : empty_params,
-                                           nullptr /*returns_async*/,
-                                           access_checker);
+                                           nullptr /*returns_async*/);
         DCHECK(!event_signature->has_async_return());
         type_refs_->AddEventSignature(full_name, std::move(event_signature));
       }
@@ -421,16 +420,18 @@ void APIBinding::InitializeTemplate(v8::Isolate* isolate) {
 
     object_template->Set(
         gin::StringToSymbol(isolate, key_value.first),
-        v8::FunctionTemplate::New(isolate, &RunAPIBindingHandlerCallback,
-                                  v8::External::New(isolate, &method.callback),
-                                  v8::Local<v8::Signature>(), 0,
-                                  v8::ConstructorBehavior::kThrow));
+        v8::FunctionTemplate::New(
+            isolate, &RunAPIBindingHandlerCallback,
+            v8::External::New(isolate, &method.callback,
+                              gin::kAPIBindingHandlerCallbackTag),
+            v8::Local<v8::Signature>(), 0, v8::ConstructorBehavior::kThrow));
   }
 
   for (const auto& event : events_) {
     object_template->SetLazyDataProperty(
         gin::StringToSymbol(isolate, event->exposed_name),
-        &APIBinding::GetEventObject, v8::External::New(isolate, event.get()));
+        &APIBinding::GetEventObject,
+        v8::External::New(isolate, event.get(), gin::kAPIBindingEventDataTag));
   }
 
   for (const auto& entry : enums_) {
@@ -493,7 +494,8 @@ void APIBinding::DecorateTemplateWithProperties(
           *ref, item.first, property_values, create_custom_type_);
       object_template->SetLazyDataProperty(
           v8_key, &APIBinding::GetCustomPropertyObject,
-          v8::External::New(isolate, property_data.get()));
+          v8::External::New(isolate, property_data.get(),
+                            gin::kAPIBindingCustomPropertyDataTag));
       custom_properties_.push_back(std::move(property_data));
       if (is_root)
         root_properties_.insert(item.first);
@@ -547,8 +549,8 @@ void APIBinding::GetEventObject(
   }
 
   CHECK(info.Data()->IsExternal());
-  auto* event_data =
-      static_cast<EventData*>(info.Data().As<v8::External>()->Value());
+  auto* event_data = static_cast<EventData*>(
+      info.Data().As<v8::External>()->Value(gin::kAPIBindingEventDataTag));
   v8::Local<v8::Value> retval;
   if (event_data->binding->binding_hooks_->CreateCustomEvent(
           context, event_data->full_name, &retval)) {
@@ -582,7 +584,8 @@ void APIBinding::GetCustomPropertyObject(
   v8::Context::Scope context_scope(context);
   CHECK(info.Data()->IsExternal());
   auto* property_data =
-      static_cast<CustomPropertyData*>(info.Data().As<v8::External>()->Value());
+      static_cast<CustomPropertyData*>(info.Data().As<v8::External>()->Value(
+          gin::kAPIBindingCustomPropertyDataTag));
 
   v8::Local<v8::Object> property = property_data->create_custom_type.Run(
       isolate, property_data->type_name, property_data->property_name,

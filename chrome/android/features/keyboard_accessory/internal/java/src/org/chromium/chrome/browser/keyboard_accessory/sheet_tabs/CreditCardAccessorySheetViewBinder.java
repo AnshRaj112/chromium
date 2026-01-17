@@ -12,12 +12,14 @@ import androidx.annotation.DrawableRes;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.recyclerview.widget.RecyclerView;
 
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
+import org.chromium.base.ServiceLoaderUtil;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.keyboard_accessory.R;
 import org.chromium.chrome.browser.keyboard_accessory.data.KeyboardAccessoryData;
 import org.chromium.chrome.browser.keyboard_accessory.data.UserInfoField;
 import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.AccessorySheetTabItemsModel.AccessorySheetDataPiece;
 import org.chromium.chrome.browser.keyboard_accessory.sheet_tabs.AccessorySheetTabViewBinder.ElementViewHolder;
+import org.chromium.chrome.browser.touch_to_fill.common.TouchToFillResourceProvider;
 import org.chromium.components.browser_ui.widget.chips.ChipView;
 import org.chromium.ui.modelutil.RecyclerViewAdapter;
 import org.chromium.ui.modelutil.SimpleRecyclerViewMcp;
@@ -58,6 +60,7 @@ class CreditCardAccessorySheetViewBinder {
                 return new LoyaltyCardInfoViewHolder(
                         parent, uiConfiguration.loyaltyCardDrawableFunction);
             case AccessorySheetDataPiece.Type.FOOTER_COMMAND:
+            case AccessorySheetDataPiece.Type.DIVIDER:
                 return AccessorySheetTabViewBinder.create(parent, viewType);
         }
         assert false : "Unhandled type of data piece: " + viewType;
@@ -201,13 +204,19 @@ class CreditCardAccessorySheetViewBinder {
             case "unionPayCC":
                 return R.drawable.unionpay_metadata_card;
             case "verveCC":
-                if (ChromeFeatureList.isEnabled(
-                        ChromeFeatureList.AUTOFILL_ENABLE_VERVE_CARD_SUPPORT)) {
-                    return R.drawable.verve_metadata_card;
-                }
-                break;
+                return R.drawable.verve_metadata_card;
             case "visaCC":
                 return R.drawable.visa_metadata_card;
+            case "affirm":
+            case "klarna":
+            case "zip":
+                @Nullable
+                final TouchToFillResourceProvider resourceProvider =
+                        ServiceLoaderUtil.maybeCreate(TouchToFillResourceProvider.class);
+                return resourceProvider == null
+                        ? R.drawable.bnpl_icon_generic
+                        : resourceProvider.getBnplIssuerDrawableId(
+                                /* issuerId= */ origin, /* isLinked= */ true);
         }
         return R.drawable.infobar_autofill_cc;
     }

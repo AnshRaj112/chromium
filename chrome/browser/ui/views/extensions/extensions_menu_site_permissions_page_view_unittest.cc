@@ -6,15 +6,15 @@
 
 #include "base/feature_list.h"
 #include "chrome/browser/extensions/chrome_test_extension_loader.h"
-#include "chrome/browser/extensions/permissions/scripting_permissions_modifier.h"
-#include "chrome/browser/extensions/permissions/site_permissions_helper.h"
 #include "chrome/browser/ui/views/extensions/extensions_menu_coordinator.h"
+#include "chrome/browser/ui/views/extensions/extensions_menu_delegate_desktop.h"
 #include "chrome/browser/ui/views/extensions/extensions_menu_main_page_view.h"
-#include "chrome/browser/ui/views/extensions/extensions_menu_view_controller.h"
 #include "chrome/browser/ui/views/extensions/extensions_request_access_button.h"
 #include "chrome/browser/ui/views/extensions/extensions_toolbar_button.h"
 #include "chrome/browser/ui/views/extensions/extensions_toolbar_unittest.h"
 #include "content/public/browser/web_contents.h"
+#include "extensions/browser/permissions/scripting_permissions_modifier.h"
+#include "extensions/browser/permissions/site_permissions_helper.h"
 #include "extensions/browser/permissions_manager.h"
 #include "extensions/browser/test_extension_registry_observer.h"
 #include "extensions/common/extension_features.h"
@@ -70,10 +70,11 @@ class ExtensionsSitePermissionsPageViewUnitTest
 
   // ExtensionsToolbarUnitTest:
   void SetUp() override;
+  void TearDown() override;
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
-  raw_ptr<content::WebContentsTester, DanglingUntriaged> web_contents_tester_;
+  raw_ptr<content::WebContentsTester> web_contents_tester_;
 };
 
 ExtensionsSitePermissionsPageViewUnitTest::
@@ -85,7 +86,7 @@ ExtensionsSitePermissionsPageViewUnitTest::
 void ExtensionsSitePermissionsPageViewUnitTest::ShowSitePermissionsPage(
     extensions::ExtensionId extension_id) {
   menu_coordinator()->Show(extensions_button(), extensions_container());
-  menu_coordinator()->GetControllerForTesting()->OpenSitePermissionsPage(
+  menu_coordinator()->GetDelegateForTesting()->OpenSitePermissionsPage(
       extension_id);
 }
 
@@ -120,18 +121,17 @@ void ExtensionsSitePermissionsPageViewUnitTest::LayoutMenuIfNecessary() {
 
 ExtensionsMenuMainPageView*
 ExtensionsSitePermissionsPageViewUnitTest::main_page() {
-  ExtensionsMenuViewController* menu_controller =
-      menu_coordinator()->GetControllerForTesting();
-  return menu_controller ? menu_controller->GetMainPageViewForTesting()
-                         : nullptr;
+  ExtensionsMenuDelegateDesktop* menu_delegate =
+      menu_coordinator()->GetDelegateForTesting();
+  return menu_delegate ? menu_delegate->GetMainPageViewForTesting() : nullptr;
 }
 
 ExtensionsMenuSitePermissionsPageView*
 ExtensionsSitePermissionsPageViewUnitTest::site_permissions_page() {
-  ExtensionsMenuViewController* menu_controller =
-      menu_coordinator()->GetControllerForTesting();
-  return menu_controller ? menu_controller->GetSitePermissionsPageForTesting()
-                         : nullptr;
+  ExtensionsMenuDelegateDesktop* menu_delegate =
+      menu_coordinator()->GetDelegateForTesting();
+  return menu_delegate ? menu_delegate->GetSitePermissionsPageForTesting()
+                       : nullptr;
 }
 
 void ExtensionsSitePermissionsPageViewUnitTest::SetUp() {
@@ -139,6 +139,11 @@ void ExtensionsSitePermissionsPageViewUnitTest::SetUp() {
   // Menu needs web contents at construction, so we need to add them to every
   // test.
   web_contents_tester_ = AddWebContentsAndGetTester();
+}
+
+void ExtensionsSitePermissionsPageViewUnitTest::TearDown() {
+  web_contents_tester_ = nullptr;
+  ExtensionsToolbarUnitTest::TearDown();
 }
 
 TEST_F(ExtensionsSitePermissionsPageViewUnitTest,

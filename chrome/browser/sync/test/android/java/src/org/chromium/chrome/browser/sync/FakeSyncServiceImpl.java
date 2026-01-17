@@ -16,6 +16,7 @@ import org.chromium.components.signin.base.CoreAccountInfo;
 import org.chromium.components.sync.LocalDataDescription;
 import org.chromium.components.sync.SyncService;
 import org.chromium.components.sync.SyncServiceImpl;
+import org.chromium.components.sync.UserActionableError;
 import org.chromium.components.sync.UserSelectableType;
 import org.chromium.google_apis.gaia.GoogleServiceAuthError;
 import org.chromium.google_apis.gaia.GoogleServiceAuthErrorState;
@@ -39,6 +40,8 @@ public class FakeSyncServiceImpl implements SyncService {
     private boolean mEncryptEverythingEnabled;
     private boolean mRequiresClientUpgrade;
     private boolean mHasUnrecoverableError;
+    private boolean mRequiresUpmBackendUpgrade;
+    private boolean mBookmarksLimitExceeded;
     private GoogleServiceAuthError mAuthError =
             new GoogleServiceAuthError(GoogleServiceAuthErrorState.NONE);
     private Set<Integer> mTypesWithUnsyncedData = Set.of();
@@ -75,12 +78,6 @@ public class FakeSyncServiceImpl implements SyncService {
                     mAuthError = authError;
                     notifySyncStateChanged();
                 });
-    }
-
-    @Override
-    public boolean hasUnrecoverableError() {
-        ThreadUtils.assertOnUiThread();
-        return mHasUnrecoverableError;
     }
 
     @AnyThread
@@ -168,12 +165,6 @@ public class FakeSyncServiceImpl implements SyncService {
         return mEncryptEverythingEnabled;
     }
 
-    @Override
-    public boolean requiresClientUpgrade() {
-        ThreadUtils.assertOnUiThread();
-        return mRequiresClientUpgrade;
-    }
-
     @AnyThread
     public void setRequiresClientUpgrade(boolean requiresClientUpgrade) {
         ThreadUtils.runOnUiThreadBlocking(
@@ -188,6 +179,24 @@ public class FakeSyncServiceImpl implements SyncService {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     mEncryptEverythingEnabled = encryptEverythingEnabled;
+                });
+    }
+
+    @AnyThread
+    public void setRequiresUpmBackendUpgrade(boolean requiresUpmBackendUpgrade) {
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    mRequiresUpmBackendUpgrade = requiresUpmBackendUpgrade;
+                    notifySyncStateChanged();
+                });
+    }
+
+    @AnyThread
+    public void setBookmarksLimitExceeded(boolean bookmarksLimitExceeded) {
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    mBookmarksLimitExceeded = bookmarksLimitExceeded;
+                    notifySyncStateChanged();
                 });
     }
 
@@ -317,6 +326,49 @@ public class FakeSyncServiceImpl implements SyncService {
     }
 
     @Override
+    public int getUserActionableError() {
+        // No error for not signed-in users.
+        if (getAccountInfo() == null) {
+            return UserActionableError.NONE;
+        }
+
+        if (hasSyncConsent()) {
+            if (!isInitialSyncFeatureSetupComplete()) {
+                return UserActionableError.NEEDS_SETTINGS_CONFIRMATION;
+            }
+            if (mHasUnrecoverableError) {
+                return UserActionableError.UNRECOVERABLE_ERROR;
+            }
+        }
+        if (mAuthError.getState() != GoogleServiceAuthErrorState.NONE) {
+            return UserActionableError.SIGN_IN_NEEDS_UPDATE;
+        }
+        if (mRequiresClientUpgrade) {
+            return UserActionableError.NEEDS_CLIENT_UPGRADE;
+        }
+        if (mPassphraseRequiredForPreferredDataTypes) {
+            return UserActionableError.NEEDS_PASSPHRASE;
+        }
+        if (mTrustedVaultKeyRequiredForPreferredDataTypes) {
+            return mEncryptEverythingEnabled
+                    ? UserActionableError.NEEDS_TRUSTED_VAULT_KEY_FOR_EVERYTHING
+                    : UserActionableError.NEEDS_TRUSTED_VAULT_KEY_FOR_PASSWORDS;
+        }
+        if (mTrustedVaultRecoverabilityDegraded) {
+            return mEncryptEverythingEnabled
+                    ? UserActionableError.TRUSTED_VAULT_RECOVERABILITY_DEGRADED_FOR_EVERYTHING
+                    : UserActionableError.TRUSTED_VAULT_RECOVERABILITY_DEGRADED_FOR_PASSWORDS;
+        }
+        if (mRequiresUpmBackendUpgrade) {
+            return UserActionableError.NEEDS_UPM_BACKEND_UPGRADE;
+        }
+        if (mBookmarksLimitExceeded) {
+            return UserActionableError.BOOKMARKS_LIMIT_EXCEEDED;
+        }
+        return UserActionableError.NONE;
+    }
+
+    @Override
     public boolean isCustomPassphraseAllowed() {
         return mDelegate.isCustomPassphraseAllowed();
     }
@@ -339,6 +391,20 @@ public class FakeSyncServiceImpl implements SyncService {
     @Override
     public void markPassphrasePromptMutedForCurrentProductVersion() {
         mDelegate.markPassphrasePromptMutedForCurrentProductVersion();
+    }
+
+    @Override
+    public void acknowledgeBookmarksLimitExceededError(int source) {
+        if (mBookmarksLimitExceeded) {
+            mBookmarksLimitExceeded = false;
+            notifySyncStateChanged();
+        }
+    }
+
+    @Override
+    public int getBookmarksLimit() {
+        ThreadUtils.assertOnUiThread();
+        return mDelegate.getBookmarksLimit();
     }
 
     @Override

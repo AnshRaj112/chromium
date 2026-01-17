@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.notifications;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
+
 import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.runner.Description;
@@ -19,10 +21,9 @@ import org.chromium.components.browser_ui.notifications.BaseNotificationManagerP
 import org.chromium.components.browser_ui.notifications.MockNotificationManagerProxy;
 import org.chromium.components.browser_ui.notifications.MockNotificationManagerProxy.NotificationEntry;
 import org.chromium.components.browser_ui.site_settings.PermissionInfo;
-import org.chromium.components.content_settings.ContentSettingValues;
+import org.chromium.components.content_settings.ContentSetting;
 import org.chromium.components.content_settings.ContentSettingsType;
 import org.chromium.components.content_settings.SessionModel;
-import org.chromium.components.embedder_support.util.UrlConstants;
 
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -45,7 +46,7 @@ public class NotificationTestRule extends ChromeTabbedActivityTestRule {
         // The NotificationPlatformBridge must be overriden prior to the browser process starting.
         mMockNotificationManager = new MockNotificationManagerProxy();
         BaseNotificationManagerProxyFactory.setInstanceForTesting(mMockNotificationManager);
-        startMainActivityWithURL(UrlConstants.NTP_URL);
+        startMainActivityWithURL(getOriginalNativeNtpUrl());
         ModalDialogView.disableButtonTapProtectionForTesting();
     }
 
@@ -53,7 +54,7 @@ public class NotificationTestRule extends ChromeTabbedActivityTestRule {
      * Sets the permission to use Web Notifications for the test HTTP server's origin to |setting|.
      */
     public void setNotificationContentSettingForOrigin(
-            final @ContentSettingValues int setting, String origin) throws TimeoutException {
+            final @ContentSetting int setting, String origin) throws TimeoutException {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     // The notification content setting does not consider the embedder origin.
@@ -69,9 +70,9 @@ public class NotificationTestRule extends ChromeTabbedActivityTestRule {
                 });
 
         String permission = runJavaScriptCodeInCurrentTab("Notification.permission");
-        if (setting == ContentSettingValues.ALLOW) {
+        if (setting == ContentSetting.ALLOW) {
             Assert.assertEquals("\"granted\"", permission);
-        } else if (setting == ContentSettingValues.BLOCK) {
+        } else if (setting == ContentSetting.BLOCK) {
             Assert.assertEquals("\"denied\"", permission);
         } else {
             Assert.assertEquals("\"default\"", permission);

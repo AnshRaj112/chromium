@@ -96,9 +96,8 @@ protocol::Preload::SpeculationAction GetProtocolSpeculationAction(
       return protocol::Preload::SpeculationActionEnum::Prerender;
     case mojom::blink::SpeculationAction::kPrefetch:
       return protocol::Preload::SpeculationActionEnum::Prefetch;
-    case mojom::blink::SpeculationAction::kPrefetchWithSubresources:
     case mojom::blink::SpeculationAction::kPrerenderUntilScript:
-      NOTREACHED();
+      return protocol::Preload::SpeculationActionEnum::PrerenderUntilScript;
   }
 }
 
@@ -197,6 +196,10 @@ std::unique_ptr<protocol::Preload::RuleSet> BuildProtocolRuleSet(
     builder->setErrorMessage(GetProtocolRuleSetErrorMessage(rule_set));
   }
 
+  if (!rule_set.tag().IsNull()) {
+    builder->setTag(rule_set.tag());
+  }
+
   return builder;
 }
 
@@ -246,17 +249,6 @@ void InspectorPreloadAgent::SpeculationCandidatesUpdated(
               PreloadingAttemptKeyHashTraits>
       preloading_attempts;
   for (SpeculationCandidate* candidate : candidates) {
-    // We are explicitly not reporting candidates for kPrefetchWithSubresources
-    // and kPrerenderUntilScript to clients, they are currently only interested
-    // in kPrefetch, kPrerender.
-    // TODO(https://crbug.com/428500219): Report kPrerenderUntilScript to
-    // clients.
-    if (candidate->action() ==
-            mojom::blink::SpeculationAction::kPrefetchWithSubresources ||
-        candidate->action() ==
-            mojom::blink::SpeculationAction::kPrerenderUntilScript) {
-      continue;
-    }
     PreloadingAttemptKey key = {candidate->action(), candidate->url(),
                                 candidate->target_hint()};
     auto& value = preloading_attempts

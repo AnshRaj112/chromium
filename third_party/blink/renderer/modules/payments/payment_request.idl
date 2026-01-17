@@ -23,8 +23,8 @@ enum SecurePaymentConfirmationAvailability {
     [CallWith=ExecutionContext, RaisesException] constructor(sequence<PaymentMethodData> methodData, optional PaymentDetailsInit details = {}, optional PaymentOptions options = {});
     [CallWith=ScriptState, RaisesException, NewObject] Promise<PaymentResponse> show(optional Promise<PaymentDetailsUpdate> detailsPromise);
     [CallWith=ScriptState, RaisesException, NewObject] Promise<undefined> abort();
-    [CallWith=ScriptState, RaisesException, HighEntropy, Measure, NewObject] Promise<boolean> canMakePayment();
-    [CallWith=ScriptState, RaisesException, HighEntropy, Measure, NewObject] Promise<boolean> hasEnrolledInstrument();
+    [CallWith=ScriptState, RaisesException, Measure, NewObject] Promise<boolean> canMakePayment();
+    [CallWith=ScriptState, RaisesException, Measure, NewObject] Promise<boolean> hasEnrolledInstrument();
 
     readonly attribute DOMString id;
     [ImplementedAs=getShippingAddress] readonly attribute PaymentAddress? shippingAddress;
@@ -36,5 +36,8 @@ enum SecurePaymentConfirmationAvailability {
     [RuntimeEnabled=PaymentMethodChangeEvent] attribute EventHandler onpaymentmethodchange;
 
     // https://w3c.github.io/secure-payment-confirmation/#sctn-secure-payment-confirmation-available-api
+    //
+    // Note: This API is enabled/exposed on all Blink platforms except WebView
+    // (which does not support Secure Payment Confirmation).
     [RuntimeEnabled=SecurePaymentConfirmationAvailabilityAPI, CallWith=ScriptState] static Promise<SecurePaymentConfirmationAvailability> securePaymentConfirmationAvailability();
 };

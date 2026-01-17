@@ -101,6 +101,18 @@ chrome_internal_verifier(
 )
 
 chrome_internal_verifier(
+    # TODO(https://crbug.com/400712231): Turn on branches for this bot.
+    #branch_selector = branches.selector.ANDROID_BRANCHES,
+    builder = "webview-arm-orderfile",
+)
+
+chrome_internal_verifier(
+    # TODO(https://crbug.com/400712231): Turn on branches for this bot.
+    #branch_selector = branches.selector.ANDROID_BRANCHES,
+    builder = "webview-arm64-orderfile",
+)
+
+chrome_internal_verifier(
     builder = "android-internal-binary-size",
 )
 
@@ -124,6 +136,10 @@ chrome_internal_verifier(
 chrome_internal_verifier(
     branch_selector = branches.selector.ANDROID_BRANCHES,
     builder = "android-x64-rel-ready",
+)
+
+chrome_internal_verifier(
+    builder = "chromeos-arm64-generic-cfi-thin-lto-chrome",
 )
 
 chrome_internal_verifier(
@@ -167,11 +183,24 @@ chrome_internal_verifier(
 )
 
 chrome_internal_verifier(
+    builder = "chromeos-trogdor-chrome",
+)
+
+chrome_internal_verifier(
     builder = "chromeos-volteer-chrome",
 )
 
 chrome_internal_verifier(
     builder = "cronet-arm64-gn2bp-debug",
+    # The limited traffic to the location_filters specified below makes this
+    # use of owner_whitelist acceptable (see
+    # https://crrev.com/c/6429907/4..6/infra/config/subprojects/chrome/try.star#b182).
+    owner_whitelist = ["googlers"],
+    tryjob = try_.job(
+        location_filters = [
+            "components/cronet/gn2bp/.+",
+        ],
+    ),
 )
 
 chrome_internal_verifier(
@@ -248,6 +277,10 @@ chrome_internal_verifier(
 )
 
 chrome_internal_verifier(
+    builder = "ios-simulator",
+)
+
+chrome_internal_verifier(
     builder = "ipad-device",
 )
 
@@ -273,6 +306,14 @@ chrome_internal_verifier(
 )
 
 chrome_internal_verifier(
+    builder = "linux-nearby-chrome-fyi",
+)
+
+chrome_internal_verifier(
+    builder = "linux-password-manager-captured-sites-rel",
+)
+
+chrome_internal_verifier(
     builder = "linux-perf-trigger",
     # The current whitelist includes:
     #  Googlers: internal users are always welcome
@@ -281,33 +322,13 @@ chrome_internal_verifier(
     #       We definitely want to have autoroll bots here because we have no
     #       Perf tests on those sub repos, and we want to catch the regressions
     #       during rollout.
-    #       For stamper, we should add the footer (TBD) to allow ignoring the
-    #       perf result.
     owner_whitelist = ["googlers", "project-chromium-robot-committers"],
     tryjob = try_.job(
-        # In the current setting, we will use static mapping to decide whether
-        # changing a file can has impact on a certain benchmark. Due to the
-        # limitation on resources, we will run Speedometer3 benchmark only.
-        # As a result, only those CLs changing a file(s) listed in the static
-        # map will trigger a perf tests.
-        # As a result, while we have the experiment_percentage as X%, the
-        # actual number of CLs which trigger a Pinpoint try job should be far
-        # less than X% based on the following facts:
-        #  - all CLs will trigger this try job.
-        #  - most of the jobs triggered will not have match in the static map
-        #    and thus will exist in a couple of minutes.
-        #  - so far we only have 166 files listed in the map, which is a tiny
-        #    amount compared to the number of files in the chromium repo.
+        # TODO(b/457822464) Keep it running for now and with new devices in Q1
+        # 2026. By the end of Q1, we will decide whether remove it or promote
+        # it to CQ.
         experiment_percentage = 100,
     ),
-)
-
-chrome_internal_verifier(
-    builder = "linux-nearby-chrome-fyi",
-)
-
-chrome_internal_verifier(
-    builder = "linux-password-manager-captured-sites-rel",
 )
 
 chrome_internal_verifier(
@@ -318,6 +339,10 @@ chrome_internal_verifier(
 chrome_internal_verifier(
     branch_selector = branches.selector.LINUX_BRANCHES,
     builder = "linux64-rel-ready",
+)
+
+chrome_internal_verifier(
+    builder = "mac-arm64-bluebird-rel",
 )
 
 chrome_internal_verifier(
@@ -407,8 +432,11 @@ chrome_internal_verifier(
 )
 
 chrome_internal_verifier(
-    branch_selector = branches.selector.ANDROID_BRANCHES,
-    builder = "webview-arm64-rel-ready",
+    builder = "test-tablet",
+)
+
+chrome_internal_verifier(
+    builder = "win-arm64-bluebird-rel",
 )
 
 chrome_internal_verifier(
@@ -422,12 +450,31 @@ chrome_internal_verifier(
 )
 
 chrome_internal_verifier(
+    builder = "win-bluebird-rel",
+)
+
+chrome_internal_verifier(
     branch_selector = branches.selector.WINDOWS_BRANCHES,
     builder = "win-chrome",
 )
 
 chrome_internal_verifier(
     builder = "win-cft",
+)
+
+chrome_internal_verifier(
+    builder = "win-perf-trigger",
+    # The current whitelist includes:
+    #  Googlers: internal users are always welcome
+    #  project-chromium-robot-committers: this list includes autoroll bots,
+    #       rubber stamper for reverts, etc.
+    #       We definitely want to have autoroll bots here because we have no
+    #       Perf tests on those sub repos, and we want to catch the regressions
+    #       during rollout.
+    owner_whitelist = ["googlers", "project-chromium-robot-committers"],
+    tryjob = try_.job(
+        experiment_percentage = 100,
+    ),
 )
 
 chrome_internal_verifier(

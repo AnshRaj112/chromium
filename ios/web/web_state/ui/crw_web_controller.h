@@ -13,6 +13,7 @@
 
 namespace web {
 
+enum class BackForwardNavigationType;
 enum class NavigationInitiationType;
 enum Permission : NSUInteger;
 enum PermissionState : NSUInteger;
@@ -173,7 +174,8 @@ class WebStateImpl;
 // result in an iframe navigation.
 - (void)goToBackForwardListItem:(WKBackForwardListItem*)item
                  navigationItem:(web::NavigationItem*)item
-       navigationInitiationType:(web::NavigationInitiationType)type
+      backForwardNavigationType:(web::BackForwardNavigationType)navigationType
+       navigationInitiationType:(web::NavigationInitiationType)initiationType
                  hasUserGesture:(BOOL)hasUserGesture;
 
 // Takes snapshot of web view with `rect`. `rect` is converted to the
@@ -193,6 +195,9 @@ class WebStateImpl;
 // Tries to dismiss the presented states of the media (fullscreen or Picture in
 // Picture).
 - (void)closeMediaPresentations;
+
+// Updates the SSL status of the current navigation item.
+- (void)updateSSLStatusForCurrentNavigationItem;
 
 // Creates a web view if it's not yet created. Returns the web view.
 - (WKWebView*)ensureWebViewCreated;

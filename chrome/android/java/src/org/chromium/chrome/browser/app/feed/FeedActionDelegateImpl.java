@@ -20,7 +20,6 @@ import org.chromium.chrome.browser.feed.R;
 import org.chromium.chrome.browser.feed.SingleWebFeedEntryPoint;
 import org.chromium.chrome.browser.feed.webfeed.CreatorIntentConstants;
 import org.chromium.chrome.browser.feed.webfeed.WebFeedBridge;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.native_page.NativePageNavigationDelegate;
 import org.chromium.chrome.browser.ntp.NewTabPageUma;
 import org.chromium.chrome.browser.offlinepages.OfflinePageBridge;
@@ -177,19 +176,19 @@ public class FeedActionDelegateImpl implements FeedActionDelegate {
 
     @Override
     public void startSigninFlow(@SigninAccessPoint int signinAccessPoint) {
-        if (!ChromeFeatureList.isEnabled(ChromeFeatureList.FEED_SHOW_SIGN_IN_COMMAND)) {
-            return;
-        }
         AccountPickerBottomSheetStrings bottomSheetStrings =
                 new AccountPickerBottomSheetStrings.Builder(
-                                R.string.signin_account_picker_bottom_sheet_title)
+                                mActivity.getString(
+                                        R.string.signin_account_picker_bottom_sheet_title))
                         .build();
         BottomSheetSigninAndHistorySyncConfig config =
                 new BottomSheetSigninAndHistorySyncConfig.Builder(
                                 bottomSheetStrings,
                                 NoAccountSigninMode.BOTTOM_SHEET,
                                 WithAccountSigninMode.DEFAULT_ACCOUNT_BOTTOM_SHEET,
-                                HistorySyncConfig.OptInMode.NONE)
+                                HistorySyncConfig.OptInMode.NONE,
+                                mActivity.getString(R.string.history_sync_title),
+                                mActivity.getString(R.string.history_sync_subtitle))
                         .build();
 
         @Nullable Intent intent =
@@ -206,19 +205,23 @@ public class FeedActionDelegateImpl implements FeedActionDelegate {
             @SigninAccessPoint int signinAccessPoint, BottomSheetController bottomSheetController) {
         AccountPickerBottomSheetStrings bottomSheetStrings =
                 new AccountPickerBottomSheetStrings.Builder(
-                                R.string
-                                        .signin_account_picker_bottom_sheet_title_for_back_of_card_menu_signin)
-                        .setSubtitleStringId(
-                                R.string
-                                        .signin_account_picker_bottom_sheet_subtitle_for_back_of_card_menu_signin)
-                        .setDismissButtonStringId(R.string.cancel)
+                                mActivity.getString(
+                                        R.string
+                                                .signin_account_picker_bottom_sheet_title_for_back_of_card_menu_signin))
+                        .setSubtitleString(
+                                mActivity.getString(
+                                        R.string
+                                                .signin_account_picker_bottom_sheet_subtitle_for_back_of_card_menu_signin))
+                        .setDismissButtonString(mActivity.getString(R.string.cancel))
                         .build();
         BottomSheetSigninAndHistorySyncConfig config =
                 new BottomSheetSigninAndHistorySyncConfig.Builder(
                                 bottomSheetStrings,
                                 NoAccountSigninMode.BOTTOM_SHEET,
                                 WithAccountSigninMode.DEFAULT_ACCOUNT_BOTTOM_SHEET,
-                                HistorySyncConfig.OptInMode.NONE)
+                                HistorySyncConfig.OptInMode.NONE,
+                                mActivity.getString(R.string.history_sync_title),
+                                mActivity.getString(R.string.history_sync_subtitle))
                         .build();
 
         @Nullable Intent intent =

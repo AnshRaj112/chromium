@@ -12,7 +12,7 @@
 
 #include "base/dcheck_is_on.h"
 #include "base/files/file_path.h"
-#include "base/memory/memory_pressure_listener.h"
+#include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/sequence_checker.h"
 #include "components/services/storage/public/cpp/buckets/bucket_locator.h"
@@ -178,10 +178,6 @@ class CONTENT_EXPORT CacheStorageManager
 
   bool IsMemoryBacked() const { return profile_path_.empty(); }
 
-  // MemoryPressureListener callback
-  void OnMemoryPressure(
-      base::MemoryPressureListener::MemoryPressureLevel level);
-
 #if DCHECK_IS_ON()
   bool CacheStoragePathIsUnique(const base::FilePath& path);
 #endif
@@ -207,8 +203,6 @@ class CONTENT_EXPORT CacheStorageManager
 
   const base::WeakPtr<CacheStorageDispatcherHost>
       cache_storage_dispatcher_host_;
-
-  std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
 
   SEQUENCE_CHECKER(sequence_checker_);
 

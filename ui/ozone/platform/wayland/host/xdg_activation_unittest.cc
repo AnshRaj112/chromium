@@ -9,6 +9,7 @@
 #include "base/test/bind.h"
 #include "base/test/mock_callback.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/ozone/platform/wayland/host/wayland_seat.h"
 #include "ui/ozone/platform/wayland/test/mock_surface.h"
@@ -33,7 +34,7 @@ using XdgActivationTest = WaylandTestSimple;
 
 // Tests that XdgActivation uses the proper surface to request token.
 TEST_F(XdgActivationTest, RequestNewToken) {
-  MockWaylandPlatformWindowDelegate delegate;
+  MockWaylandPlatformWindowDelegate delegate(connection_.get());
 
   PostToServerAndWait([](wl::TestWaylandServerThread* server) {
     wl_seat_send_capabilities(server->seat()->resource(),
@@ -43,10 +44,12 @@ TEST_F(XdgActivationTest, RequestNewToken) {
 
   window_.reset();
 
-  auto window1 = CreateWaylandWindowWithParams(PlatformWindowType::kWindow,
-                                               kDefaultBounds, &delegate);
-  auto window2 = CreateWaylandWindowWithParams(PlatformWindowType::kWindow,
-                                               kDefaultBounds, &delegate);
+  auto window1 = CreateWaylandWindowWithParams(
+      PlatformWindowType::kWindow, kDefaultBounds, &delegate,
+      gfx::kNullAcceleratedWidget, true /*inactive*/);
+  auto window2 = CreateWaylandWindowWithParams(
+      PlatformWindowType::kWindow, kDefaultBounds, &delegate,
+      gfx::kNullAcceleratedWidget, true /*inactive*/);
 
   // When window is shown, it automatically gets keyboard focus. Reset it
   connection_->window_manager()->SetKeyboardFocusedWindow(nullptr);
@@ -100,6 +103,23 @@ TEST_F(XdgActivationTest, RequestNewToken) {
     connection_->xdg_activation()->RequestNewToken(callback.Get());
     task_environment_.FastForwardBy(base::Milliseconds(600));
   }
+}
+
+// Tests that showing a new window automatically requests a token.
+TEST_F(XdgActivationTest, RequestOnShow) {
+  MockWaylandPlatformWindowDelegate delegate(connection_.get());
+
+  auto window = CreateWaylandWindowWithParams(PlatformWindowType::kWindow,
+                                              kDefaultBounds, &delegate);
+  PostToServerAndWait(
+      [](wl::TestWaylandServerThread* server) {
+        auto* const xdg_activation = server->xdg_activation_v1();
+        ASSERT_TRUE(xdg_activation);
+        ASSERT_TRUE(xdg_activation->get_token());
+        xdg_activation_token_v1_send_done(
+            xdg_activation->get_token()->resource(), kMockStaticTestToken);
+      },
+      true);
 }
 
 // Tests that with too many requests at some point the request queue will be

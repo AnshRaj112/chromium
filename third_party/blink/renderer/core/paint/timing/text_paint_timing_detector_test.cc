@@ -6,10 +6,14 @@
 
 #include "base/test/test_mock_time_task_runner.h"
 #include "base/test/trace_event_analyzer.h"
+#include "base/test/trace_test_utils.h"
 #include "base/time/time.h"
+#include "third_party/blink/renderer/core/dom/element.h"
 #include "third_party/blink/renderer/core/dom/text.h"
 #include "third_party/blink/renderer/core/frame/frame_test_helpers.h"
 #include "third_party/blink/renderer/core/frame/web_local_frame_impl.h"
+#include "third_party/blink/renderer/core/html/html_element.h"
+#include "third_party/blink/renderer/core/paint/timing/paint_timing.h"
 #include "third_party/blink/renderer/core/paint/timing/paint_timing_detector.h"
 #include "third_party/blink/renderer/core/paint/timing/paint_timing_record.h"
 #include "third_party/blink/renderer/core/paint/timing/paint_timing_test_helper.h"
@@ -17,6 +21,7 @@
 #include "third_party/blink/renderer/core/testing/core_unit_test_helper.h"
 #include "third_party/blink/renderer/core/timing/dom_window_performance.h"
 #include "third_party/blink/renderer/platform/testing/task_environment.h"
+#include "third_party/blink/renderer/platform/wtf/casting.h"
 
 namespace blink {
 
@@ -53,21 +58,8 @@ class TextPaintTimingDetectorTest : public testing::Test {
   }
   Document& GetDocument() { return *GetFrame()->GetDocument(); }
 
-  gfx::Rect GetViewportRect(LocalFrameView& view) {
-    ScrollableArea* scrollable_area = view.GetScrollableArea();
-    DCHECK(scrollable_area);
-    return scrollable_area->VisibleContentRect();
-  }
-
   LocalFrameView& GetChildFrameView() {
     return *To<LocalFrame>(GetFrame()->Tree().FirstChild())->View();
-  }
-  Document* GetChildDocument() {
-    return To<LocalFrame>(GetFrame()->Tree().FirstChild())->GetDocument();
-  }
-
-  TextPaintTimingDetector* GetTextPaintTimingDetector() {
-    return &GetPaintTimingDetector().GetTextPaintTimingDetector();
   }
 
   TextPaintTimingDetector& GetChildFrameTextPaintTimingDetector() {
@@ -77,7 +69,25 @@ class TextPaintTimingDetectorTest : public testing::Test {
   }
 
   LargestTextPaintManager& GetLargestTextPaintManager() {
-    return *GetTextPaintTimingDetector()->ltp_manager_;
+    return GetTextPaintTimingDetector()->ltp_manager_;
+  }
+
+  gfx::Rect GetViewportRect(LocalFrameView& view) {
+    ScrollableArea* scrollable_area = view.GetScrollableArea();
+    DCHECK(scrollable_area);
+    return scrollable_area->VisibleContentRect();
+  }
+
+  Document* GetChildDocument() {
+    return To<LocalFrame>(GetFrame()->Tree().FirstChild())->GetDocument();
+  }
+
+  Element* GetElement(const char* name) {
+    return GetDocument().getElementById(AtomicString(name));
+  }
+
+  TextPaintTimingDetector* GetTextPaintTimingDetector() {
+    return &GetPaintTimingDetector().GetTextPaintTimingDetector();
   }
 
   wtf_size_t CountRecordedSize() {
@@ -95,6 +105,10 @@ class TextPaintTimingDetectorTest : public testing::Test {
     return CountRecordedSize() + TextQueuedForPaintTimeSize(GetFrameView());
   }
 
+  bool HasLargestIgnoredText() {
+    return !!GetLargestTextPaintManager().LargestIgnoredText();
+  }
+
   void SimulateInputEvent() {
     GetPaintTimingDetector().NotifyInputEvent(WebInputEvent::Type::kMouseDown);
   }
@@ -110,17 +124,15 @@ class TextPaintTimingDetectorTest : public testing::Test {
   void InvokeCallback() {
     DCHECK_GT(mock_callback_manager_->CountCallbacks(), 0u);
     InvokePresentationTimeCallback(mock_callback_manager_);
-    // Outside the tests, this is invoked by
-    // |PaintTimingCallbackManagerImpl::ReportPaintTime|.
-    GetLargestTextPaintManager().UpdateMetricsCandidate();
+    // Outside the tests, this is invoked by PaintTimingMixin.
+    GetPaintTimingDetector().UpdateLcpCandidate();
   }
 
   void ChildFramePresentationTimeCallBack() {
     DCHECK_GT(child_frame_mock_callback_manager_->CountCallbacks(), 0u);
     InvokePresentationTimeCallback(child_frame_mock_callback_manager_);
-    // Outside the tests, this is invoked by
-    // |PaintTimingCallbackManagerImpl::ReportPaintTime|.
-    GetChildFrameTextPaintTimingDetector().UpdateMetricsCandidate();
+    // Outside the tests, this is invoked by PaintTimingMixin.
+    return GetChildFrameView().GetPaintTimingDetector().UpdateLcpCandidate();
   }
 
   void InvokePresentationTimeCallback(
@@ -154,6 +166,8 @@ class TextPaintTimingDetectorTest : public testing::Test {
     mock_callback_manager_ =
         MakeGarbageCollected<MockPaintTimingCallbackManager>();
     GetTextPaintTimingDetector()->ResetCallbackManager(mock_callback_manager_);
+    main_frame_lcp_calculator_ =
+        GetPaintTimingDetector().GetLargestContentfulPaintCalculator();
     UpdateAllLifecyclePhases();
   }
 
@@ -165,6 +179,9 @@ class TextPaintTimingDetectorTest : public testing::Test {
         MakeGarbageCollected<MockPaintTimingCallbackManager>();
     GetChildFrameTextPaintTimingDetector().ResetCallbackManager(
         child_frame_mock_callback_manager_);
+    child_frame_lcp_calculator_ = GetChildFrameView()
+                                      .GetPaintTimingDetector()
+                                      .GetLargestContentfulPaintCalculator();
     UpdateAllLifecyclePhases();
   }
 
@@ -218,20 +235,17 @@ class TextPaintTimingDetectorTest : public testing::Test {
   }
 
   TextRecord* TextRecordOfLargestTextPaint() {
-    return GetLargestTextPaintManager().LargestText();
+    return main_frame_lcp_calculator_->LargestTextForTest();
   }
 
   TextRecord* ChildFrameTextRecordOfLargestTextPaint() {
-    return GetChildFrameView()
-        .GetPaintTimingDetector()
-        .GetTextPaintTimingDetector()
-        .ltp_manager_->LargestText();
+    return child_frame_lcp_calculator_->LargestTextForTest();
   }
 
   void SetFontSize(Element* font_element, uint16_t font_size) {
     DCHECK_EQ(font_element->nodeName(), "FONT");
     font_element->setAttribute(html_names::kSizeAttr,
-                               AtomicString(WTF::String::Number(font_size)));
+                               AtomicString(String::Number(font_size)));
   }
 
   void SetElementStyle(Element* element, String style) {
@@ -260,6 +274,9 @@ class TextPaintTimingDetectorTest : public testing::Test {
   scoped_refptr<base::TestMockTimeTaskRunner> test_task_runner_;
   Persistent<MockPaintTimingCallbackManager> mock_callback_manager_;
   Persistent<MockPaintTimingCallbackManager> child_frame_mock_callback_manager_;
+  // Cache the LCP calculators so they can still be accessed after input events.
+  Persistent<LargestContentfulPaintCalculator> main_frame_lcp_calculator_;
+  Persistent<LargestContentfulPaintCalculator> child_frame_lcp_calculator_;
 };
 
 constexpr base::TimeDelta TextPaintTimingDetectorTest::kQuantumOfTime;
@@ -301,6 +318,7 @@ TEST_F(TextPaintTimingDetectorTest,
 }
 
 TEST_F(TextPaintTimingDetectorTest, LargestTextPaint_TraceEvent_Candidate) {
+  base::test::TracingEnvironment tracing_environment;
   using trace_analyzer::Query;
   trace_analyzer::Start("loading");
   {
@@ -345,6 +363,7 @@ TEST_F(TextPaintTimingDetectorTest, LargestTextPaint_TraceEvent_Candidate) {
 
 TEST_F(TextPaintTimingDetectorTest,
        LargestTextPaint_TraceEvent_Candidate_Frame) {
+  base::test::TracingEnvironment tracing_environment;
   using trace_analyzer::Query;
   trace_analyzer::Start("loading");
   {
@@ -855,12 +874,14 @@ TEST_F(TextPaintTimingDetectorTest, OpacityZeroHTML) {
     <div>Text</div>
   )HTML");
   CheckSizeOfTextQueuedForPaintTimeAfterUpdateLifecyclePhases(0u);
+  EXPECT_TRUE(HasLargestIgnoredText());
 
   // Change the opacity of documentElement, now the img should be a candidate.
   GetDocument().documentElement()->setAttribute(html_names::kStyleAttr,
                                                 AtomicString("opacity: 1"));
   UpdateAllLifecyclePhasesAndSimulatePresentationTime();
   EXPECT_TRUE(TextRecordOfLargestTextPaint());
+  EXPECT_FALSE(HasLargestIgnoredText());
 }
 
 TEST_F(TextPaintTimingDetectorTest, OpacityZeroHTML2) {
@@ -882,6 +903,116 @@ TEST_F(TextPaintTimingDetectorTest, OpacityZeroHTML2) {
   GetDocument().documentElement()->setAttribute(html_names::kStyleAttr,
                                                 AtomicString("opacity: 1"));
   CheckSizeOfTextQueuedForPaintTimeAfterUpdateLifecyclePhases(0u);
+}
+
+TEST_F(TextPaintTimingDetectorTest, OpacityZeroHTMLTextRecordedOnce) {
+  SetBodyInnerHTML(R"HTML(
+    <style>
+      :root {
+        opacity: 0;
+        will-change: opacity;
+      }
+    </style>
+    <div id="target">Text</div>
+  )HTML");
+  CheckSizeOfTextQueuedForPaintTimeAfterUpdateLifecyclePhases(0u);
+
+  // Change the opacity of documentElement, now the <div> should be a candidate.
+  GetDocument().documentElement()->setAttribute(html_names::kStyleAttr,
+                                                AtomicString("opacity: 1"));
+  UpdateAllLifecyclePhasesAndSimulatePresentationTime();
+  EXPECT_TRUE(TextRecordOfLargestTextPaint());
+
+  // Update the <div>'s text. This should not cause the `target` to be
+  // reconsidered for timing since it was already recorded.
+  Element* target = GetElement("target");
+  To<HTMLElement>(target)->setInnerText("Text Text Text");
+
+  UpdateAllLifecyclePhases();
+  EXPECT_EQ(TextQueuedForPaintTimeSize(GetFrameView()), 0);
+}
+
+TEST_F(TextPaintTimingDetectorTest, OpacityZeroHTMLWithInput) {
+  SetBodyInnerHTML(R"HTML(
+    <style>
+      :root {
+        opacity: 0;
+        will-change: opacity;
+      }
+    </style>
+    <div>Text</div>
+  )HTML");
+  CheckSizeOfTextQueuedForPaintTimeAfterUpdateLifecyclePhases(0u);
+
+  SimulateInputEvent();
+
+  // Change the opacity of documentElement. The div should not be a candidate
+  // because LCP stops on input.
+  GetDocument().documentElement()->setAttribute(html_names::kStyleAttr,
+                                                AtomicString("opacity: 1"));
+  UpdateAllLifecyclePhasesAndSimulatePresentationTime();
+  EXPECT_FALSE(TextRecordOfLargestTextPaint());
+
+  // FCP, however, should be marked, because that does not stop on input.
+  //
+  // Note: `PaintTiming` doesn't support `MockPaintTimingCallbackManager`, so
+  // check the paint time instead of presentation time.
+  base::TimeTicks fcp_timestamp =
+      PaintTiming::From(GetDocument())
+          .FirstContentfulPaintRenderedButNotPresentedAsMonotonicTime();
+  EXPECT_FALSE(fcp_timestamp.is_null());
+}
+
+TEST_F(TextPaintTimingDetectorTest, OpacityZeroHTMLRemoveElement) {
+  SetBodyInnerHTML(R"HTML(
+    <style>
+      :root {
+        opacity: 0;
+        will-change: opacity;
+      }
+    </style>
+    <div id="target">Text</div>
+  )HTML");
+  CheckSizeOfTextQueuedForPaintTimeAfterUpdateLifecyclePhases(0u);
+  EXPECT_TRUE(HasLargestIgnoredText());
+
+  RemoveElement(GetElement("target"));
+  EXPECT_FALSE(HasLargestIgnoredText());
+  GetDocument().documentElement()->setAttribute(html_names::kStyleAttr,
+                                                AtomicString("opacity: 1"));
+  UpdateAllLifecyclePhasesAndSimulatePresentationTime();
+  EXPECT_FALSE(TextRecordOfLargestTextPaint());
+}
+
+TEST_F(TextPaintTimingDetectorTest,
+       QueuedRecordsWaitForCorrectPresentationFeedback) {
+  SetBodyInnerHTML(R"HTML(
+    <div id="target1"></div>
+    <div id="target2"></div>
+  )HTML");
+
+  // Simulate painting one of the two text nodes. This should queue up a
+  // presentation callback for this frame.
+  Element* target1 = GetElement("target1");
+  To<HTMLElement>(target1)->setInnerText("text 1");
+  UpdateAllLifecyclePhases();
+  EXPECT_EQ(TextQueuedForPaintTimeSize(GetFrameView()), 1);
+
+  // Simulate a second text paint, before getting presentation for the first.
+  // This should queue up another presentation callback, for this frame.
+  Element* target2 = GetElement("target2");
+  To<HTMLElement>(target2)->setInnerText("text 2");
+  UpdateAllLifecyclePhases();
+  EXPECT_EQ(TextQueuedForPaintTimeSize(GetFrameView()), 2);
+
+  // Invoking the first presentation callback should only dequeue one text
+  // record, since only `target1` was painted in the first frame.
+  InvokeCallback();
+  EXPECT_EQ(TextQueuedForPaintTimeSize(GetFrameView()), 1);
+  // And this should dequeue the record associated with `target2`, painted in
+  // the second frame.
+  InvokeCallback();
+  EXPECT_EQ(TextQueuedForPaintTimeSize(GetFrameView()), 0);
 }
 
 }  // namespace blink

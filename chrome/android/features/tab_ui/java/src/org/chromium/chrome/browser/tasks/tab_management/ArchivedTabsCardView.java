@@ -16,14 +16,12 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
-import androidx.annotation.PluralsRes;
 import androidx.annotation.Px;
 
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.chrome.R;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.tasks.tab_management.TabListModel.AnimationStatus;
-import org.chromium.chrome.browser.theme.SurfaceColorUpdateUtils;
+import org.chromium.components.browser_ui.styles.SemanticColorUtils;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter.HighlightParams;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter.HighlightShape;
@@ -52,11 +50,12 @@ public class ArchivedTabsCardView extends FrameLayout {
         mCardContainer = findViewById(R.id.card);
         mTitleView = findViewById(R.id.title);
         mSubtitleView = findViewById(R.id.subtitle);
+        setSubtitleText();
         mEndIconView = findViewById(R.id.end_image);
 
         mEndIconView.setScaleX(isLayoutRtl() ? -1 : 1);
         GradientDrawable cardViewBg = (GradientDrawable) mCardContainer.getBackground().mutate();
-        cardViewBg.setColor(SurfaceColorUpdateUtils.getMessageCardBackgroundColor(getContext()));
+        cardViewBg.setColor(SemanticColorUtils.getCardBackgroundColor(getContext()));
     }
 
     public void setIconHighlight(boolean isHighlighted) {
@@ -92,24 +91,6 @@ public class ArchivedTabsCardView extends FrameLayout {
                                 numInactiveTabs,
                                 numInactiveTabs);
         mTitleView.setText(title);
-    }
-
-    /**
-     * Sets the subtitle text based on the archive time delta.
-     *
-     * @param inactiveTimeDeltaDays The number of days after which tabs are archived.
-     */
-    public void setArchiveTimeDeltaDays(int inactiveTimeDeltaDays) {
-        @PluralsRes
-        int tabCardSubtitleRes =
-                ChromeFeatureList.sAndroidTabDeclutterArchiveTabGroups.isEnabled()
-                        ? R.plurals.archived_tab_card_subtitle_with_tab_groups
-                        : R.plurals.archived_tab_card_subtitle;
-        String subtitle =
-                getResources()
-                        .getQuantityString(
-                                tabCardSubtitleRes, inactiveTimeDeltaDays, inactiveTimeDeltaDays);
-        mSubtitleView.setText(subtitle);
     }
 
     /**
@@ -152,5 +133,11 @@ public class ArchivedTabsCardView extends FrameLayout {
         scaleAnimator.playTogether(scaleX, scaleY);
 
         mAnimationHandler.startAnimation(scaleAnimator);
+    }
+
+    /** Sets the subtitle text based on the archive time delta. */
+    private void setSubtitleText() {
+        mSubtitleView.setText(
+                getResources().getString(R.string.archived_tab_card_subtitle_with_tab_groups));
     }
 }

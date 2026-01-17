@@ -9,7 +9,7 @@
 #include <Security/Security.h>
 
 #include "base/apple/scoped_cftyperef.h"
-#include "base/memory/ref_counted.h"
+#include "base/memory/scoped_refptr.h"
 #include "ios/web/public/security/security_style.h"
 
 namespace net {
@@ -21,8 +21,6 @@ namespace web {
 
 // NSErrorPeerCertificateChainKey from NSError's userInfo dict.
 extern NSString* const kNSErrorPeerCertificateChainKey;
-// NSErrorFailingURLKey from NSError's userInfo dict.
-extern NSString* const kNSErrorFailingURLKey;
 
 // Creates a certificate from an array of SecCertificateRef objects.
 // Returns null if `certs` is nil or empty.

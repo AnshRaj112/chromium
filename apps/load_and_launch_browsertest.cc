@@ -6,11 +6,11 @@
 // The two cases are when chrome is running and another process uses the switch
 // and when chrome is started from scratch.
 
+#include <algorithm>
 #include <iterator>
 
 #include "apps/switches.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/process/launch.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/test_switches.h"
@@ -19,7 +19,6 @@
 #include "build/build_config.h"
 #include "chrome/browser/apps/platform_apps/app_browsertest_util.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
-#include "chrome/browser/extensions/load_error_reporter.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/simple_message_box_internal.h"
 #include "chrome/common/chrome_result_codes.h"
@@ -28,6 +27,7 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/test_launcher.h"
 #include "extensions/browser/extension_registry.h"
+#include "extensions/browser/load_error_reporter.h"
 #include "extensions/test/extension_test_message_listener.h"
 #include "sandbox/policy/switches.h"
 
@@ -205,7 +205,7 @@ IN_PROC_BROWSER_TEST_F(LoadAndLaunchExtensionBrowserTest,
 #else
   // Expect |extension_instead_of_app_error|.
   EXPECT_EQ(1u, errors->size());
-  EXPECT_TRUE(base::Contains(
+  EXPECT_TRUE(std::ranges::contains(
       *errors, u"App loading flags cannot be used to load extensions"));
 #endif
 

@@ -1,10 +1,13 @@
 // Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import 'chrome://resources/cr_elements/cr_button/cr_button.js';
+import 'chrome://resources/cr_elements/cr_drawer/cr_drawer.js';
 import 'chrome://resources/cr_elements/cr_page_host_style.css.js';
 import 'chrome://resources/cr_elements/cr_page_selector/cr_page_selector.js';
 import 'chrome://resources/cr_elements/cr_shared_style.css.js';
 import 'chrome://resources/cr_elements/cr_toast/cr_toast.js';
+import 'chrome://resources/cr_elements/cr_scrollable.css.js';
 import '/shared/settings/prefs/prefs.js';
 import './checkup_section.js';
 import './checkup_details_section.js';
@@ -21,7 +24,6 @@ import type {CrToastElement} from '//resources/cr_elements/cr_toast/cr_toast.js'
 import {focusWithoutInk} from '//resources/js/focus_without_ink.js';
 import {loadTimeData} from '//resources/js/load_time_data.js';
 import type {SettingsPrefsElement} from '/shared/settings/prefs/prefs.js';
-import {CrContainerShadowMixin} from 'chrome://resources/cr_elements/cr_container_shadow_mixin.js';
 import type {CrDrawerElement} from 'chrome://resources/cr_elements/cr_drawer/cr_drawer.js';
 import type {CrPageSelectorElement} from 'chrome://resources/cr_elements/cr_page_selector/cr_page_selector.js';
 import {FindShortcutMixin} from 'chrome://resources/cr_elements/find_shortcut_mixin.js';
@@ -72,14 +74,15 @@ export interface PasswordManagerAppElement {
     passwords: PasswordsSectionElement,
     prefs: SettingsPrefsElement,
     toast: CrToastElement,
+    scrollableShadow: HTMLElement,
     settings: SettingsSectionElement,
     sidebar: PasswordManagerSideBarElement,
     toolbar: PasswordManagerToolbarElement,
   };
 }
 
-const PasswordManagerAppElementBase = FindShortcutMixin(
-    I18nMixin(CrContainerShadowMixin(RouteObserverMixin(PolymerElement))));
+const PasswordManagerAppElementBase =
+    FindShortcutMixin(I18nMixin(RouteObserverMixin(PolymerElement)));
 
 export class PasswordManagerAppElement extends PasswordManagerAppElementBase {
   static get is() {
@@ -161,13 +164,13 @@ export class PasswordManagerAppElement extends PasswordManagerAppElementBase {
   override connectedCallback() {
     super.connectedCallback();
 
-    const narrowQuery = window.matchMedia('(max-width: 1036px)');
+    const narrowQuery = window.matchMedia('(max-width: 1300px)');
     this.narrow_ = narrowQuery.matches;
     this.eventTracker_.add(
         narrowQuery, 'change',
         (e: MediaQueryListEvent) => this.narrow_ = e.matches);
 
-    const collapsedQuery = window.matchMedia('(max-width: 1200px)');
+    const collapsedQuery = window.matchMedia('(max-width: 1605px)');
     this.collapsed_ = collapsedQuery.matches;
     this.eventTracker_.add(
         collapsedQuery, 'change',
@@ -232,16 +235,10 @@ export class PasswordManagerAppElement extends PasswordManagerAppElementBase {
 
   override currentRouteChanged(route: Route): void {
     this.selectedPage_ = route.page;
-    setTimeout(() => {  // Async to allow page to load.
-      if (route.page === Page.CHECKUP_DETAILS ||
-          route.page === Page.PASSWORD_CHANGE) {
-        this.enableScrollObservation(false);
-        this.setForceDropShadows(true);
-      } else {
-        this.setForceDropShadows(false);
-        this.enableScrollObservation(true);
-      }
-    }, 0);
+    this.$.scrollableShadow.classList.toggle(
+        'force-on',
+        route.page === Page.CHECKUP_DETAILS ||
+            route.page === Page.PASSWORD_CHANGE);
   }
 
   // Override FindShortcutMixin methods.
@@ -266,7 +263,7 @@ export class PasswordManagerAppElement extends PasswordManagerAppElementBase {
     if (this.$.drawer.open && !this.narrow_) {
       this.$.drawer.close();
     }
-    // Window is greater than 980px but less than 1200px.
+    // Window is greater than 1300px but less than 1605px.
     if (!this.narrow_ && this.collapsed_) {
       this.pageTitle_ = this.i18n('passwordManagerString');
     } else {

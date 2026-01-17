@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/span_printf.h"
@@ -38,13 +37,15 @@ const char* const kChildKinds[] = {"functions", "events"};
 
 base::Value::Dict LoadSchemaDictionary(const std::string& name,
                                        std::string_view schema) {
-  auto result = base::JSONReader::ReadAndReturnValueWithError(schema);
+  auto result = base::JSONReader::ReadAndReturnValueWithError(
+      schema, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
 
   // Tracking down http://crbug.com/121424
   char buf[128];
-  base::SpanPrintf(buf, "%s: (%d) '%s'", name.c_str(),
-                   result.has_value() ? static_cast<int>(result->type()) : -1,
-                   !result.has_value() ? result.error().message.c_str() : "");
+  UNSAFE_TODO(base::SpanPrintf(
+      buf, "%s: (%d) '%s'", name.c_str(),
+      result.has_value() ? static_cast<int>(result->type()) : -1,
+      !result.has_value() ? result.error().message.c_str() : ""));
 
   CHECK(result.has_value())
       << result.error().message << " for schema " << schema;
@@ -107,7 +108,7 @@ ExtensionAPI* ExtensionAPI::CreateWithDefaultConfiguration() {
 }
 
 // static
-void ExtensionAPI::SplitDependencyName(const std::string& full_name,
+void ExtensionAPI::SplitDependencyName(std::string_view full_name,
                                        std::string* feature_type,
                                        std::string* feature_name) {
   size_t colon_index = full_name.find(':');
@@ -208,7 +209,7 @@ bool ExtensionAPI::IsAnyFeatureAvailableToContext(
 }
 
 Feature::Availability ExtensionAPI::IsAvailable(
-    const std::string& full_name,
+    std::string_view full_name,
     const Extension* extension,
     mojom::ContextType context,
     const GURL& url,
@@ -217,8 +218,8 @@ Feature::Availability ExtensionAPI::IsAvailable(
     const ContextData& context_data) {
   const Feature* feature = GetFeatureDependency(full_name);
   if (!feature) {
-    return Feature::Availability(Feature::NOT_PRESENT,
-                                 std::string("Unknown feature: ") + full_name);
+    return Feature::Availability(Feature::AvailabilityResult::kNotPresent,
+                                 "Unknown feature: " + std::string(full_name));
   }
 
   Feature::Availability availability = feature->IsAvailableToContext(
@@ -266,8 +267,7 @@ const base::Value::Dict* ExtensionAPI::GetSchema(const std::string& full_name) {
   return result;
 }
 
-const Feature* ExtensionAPI::GetFeatureDependency(
-    const std::string& full_name) {
+const Feature* ExtensionAPI::GetFeatureDependency(std::string_view full_name) {
   std::string feature_type;
   std::string feature_name;
   SplitDependencyName(full_name, &feature_type, &feature_name);
@@ -287,7 +287,7 @@ const Feature* ExtensionAPI::GetFeatureDependency(
   return feature;
 }
 
-std::string ExtensionAPI::GetAPINameFromFullName(const std::string& full_name,
+std::string ExtensionAPI::GetAPINameFromFullName(std::string_view full_name,
                                                  std::string* child_name) {
   base::AutoLock lock(lock_);
   return GetAPINameFromFullNameUnsafe(full_name, child_name);
@@ -296,11 +296,11 @@ std::string ExtensionAPI::GetAPINameFromFullName(const std::string& full_name,
 bool ExtensionAPI::IsKnownAPI(const std::string& name,
                               ExtensionsClient* client) {
   lock_.AssertAcquired();
-  return base::Contains(schemas_, name) || client->IsAPISchemaGenerated(name);
+  return schemas_.contains(name) || client->IsAPISchemaGenerated(name);
 }
 
 Feature::Availability ExtensionAPI::IsAliasAvailable(
-    const std::string& full_name,
+    std::string_view full_name,
     const Feature& feature,
     const Extension* extension,
     mojom::ContextType context,
@@ -309,7 +309,8 @@ Feature::Availability ExtensionAPI::IsAliasAvailable(
     const ContextData& context_data) {
   const std::string& alias = feature.alias();
   if (alias.empty()) {
-    return Feature::Availability(Feature::NOT_PRESENT, "Alias not defined");
+    return Feature::Availability(Feature::AvailabilityResult::kNotPresent,
+                                 "Alias not defined");
   }
 
   auto provider = dependency_providers_.find("api");
@@ -353,10 +354,10 @@ std::string_view ExtensionAPI::GetSchemaStringPieceUnsafe(
 }
 
 std::string ExtensionAPI::GetAPINameFromFullNameUnsafe(
-    const std::string& full_name,
+    std::string_view full_name,
     std::string* child_name) {
   lock_.AssertAcquired();
-  std::string api_name_candidate = full_name;
+  std::string api_name_candidate(full_name);
   ExtensionsClient* extensions_client = ExtensionsClient::Get();
   DCHECK(extensions_client);
   while (true) {

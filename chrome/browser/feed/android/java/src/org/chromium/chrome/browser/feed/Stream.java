@@ -7,7 +7,7 @@ package org.chromium.chrome.browser.feed;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.chromium.base.Callback;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -23,9 +23,10 @@ import java.util.List;
 @NullMarked
 public interface Stream {
     /** The mediator of multiple Streams. */
-    public interface StreamsMediator {
+    interface StreamsMediator {
         /**
          * Allows the switching to another Stream.
+         *
          * @param streamKind The {@link StreamKind} of the stream to switch to.
          */
         default void switchToStreamKind(@StreamKind int streamKind) {}
@@ -82,7 +83,7 @@ public interface Stream {
     }
 
     /** Whether the stream has unread content */
-    default ObservableSupplier<Boolean> hasUnreadContent() {
+    default MonotonicObservableSupplier<Boolean> hasUnreadContent() {
         ObservableSupplierImpl<Boolean> result = new ObservableSupplierImpl<>();
         result.set(false);
         return result;

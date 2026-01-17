@@ -10,7 +10,6 @@
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/string_util.h"
@@ -40,7 +39,7 @@ void EnableMethodManifestUrlForSupportedApps(
     std::map<GURL, std::set<GURL>>* prohibited_payment_methods) {
   for (auto app_id : app_ids) {
     auto* app = (*apps)[app_id].get();
-    app->has_explicitly_verified_methods = base::Contains(
+    app->has_explicitly_verified_methods = std::ranges::contains(
         supported_origin_strings,
         url::Origin::Create(app->scope.DeprecatedGetOriginAsURL()).Serialize());
     if (app->has_explicitly_verified_methods) {
@@ -67,7 +66,7 @@ ManifestVerifier::ManifestVerifier(const url::Origin& merchant_origin,
 
 ManifestVerifier::~ManifestVerifier() {
   for (const auto& handle : cache_request_handles_) {
-    cache_->CancelRequest(handle.first);
+    cache_->CancelRequest(handle);
   }
 }
 
@@ -133,14 +132,17 @@ void ManifestVerifier::Verify(
   }
 
   for (const auto& method_manifest_url : manifests_to_download) {
-    WebDataServiceBase::Handle handle =
-        cache_->GetPaymentMethodManifest(method_manifest_url.spec(), this);
-    cache_request_handles_[handle] = method_manifest_url;
+    WebDataServiceBase::Handle handle = cache_->GetPaymentMethodManifest(
+        method_manifest_url.spec(),
+        base::BindOnce(&ManifestVerifier::OnGetPaymentMethodManifest,
+                       weak_ptr_factory_.GetWeakPtr(), method_manifest_url));
+    cache_request_handles_.insert(handle);
   }
 }
 
-void ManifestVerifier::OnWebDataServiceRequestDone(
-    WebDataServiceBase::Handle h,
+void ManifestVerifier::OnGetPaymentMethodManifest(
+    const GURL& method_manifest_url,
+    WebDataServiceBase::Handle handle,
     std::unique_ptr<WDTypedResult> result) {
   DCHECK_LT(0U, number_of_manifests_to_verify_);
 
@@ -148,13 +150,7 @@ void ManifestVerifier::OnWebDataServiceRequestDone(
     return;
   }
 
-  auto it = cache_request_handles_.find(h);
-  if (it == cache_request_handles_.end()) {
-    return;
-  }
-
-  GURL method_manifest_url = it->second;
-  cache_request_handles_.erase(it);
+  cache_request_handles_.erase(handle);
 
   const std::vector<std::string>& cached_strings =
       (static_cast<const WDResult<std::vector<std::string>>*>(result.get()))

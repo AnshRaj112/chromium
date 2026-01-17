@@ -65,9 +65,7 @@ namespace {
 
 // The feature flag allows us to disable the graph fusion if it causes
 // something wrong.
-BASE_FEATURE(kApplyGraphFusion,
-             "ApplyGraphFusion",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kApplyGraphFusion, base::FEATURE_ENABLED_BY_DEFAULT);
 
 using Microsoft::WRL::ComPtr;
 using mojom::Operand;
@@ -2512,7 +2510,7 @@ void CreateOperatorNodeForPad(const ContextProperties& context_properties,
   switch (pad->mode->which()) {
     case mojom::PaddingMode::Tag::kConstant:
       padding_mode = DML_PADDING_MODE::DML_PADDING_MODE_CONSTANT;
-      padding_value = pad->mode->get_constant()->value;
+      padding_value = pad->mode->get_constant()->value.AsFloat32();
       break;
     case mojom::PaddingMode::Tag::kEdge:
       padding_mode = DML_PADDING_MODE::DML_PADDING_MODE_EDGE;
@@ -2951,6 +2949,34 @@ void CreateOperatorNodeForNeg(const std::vector<OperandPtr>& operands,
   CHECK(id_to_node_output_map.try_emplace(output_id, output).second);
 }
 
+void CreateOperatorNodeForRoundEven(const std::vector<OperandPtr>& operands,
+                                    const mojom::ElementWiseUnaryPtr& operation,
+                                    GraphBuilderDml& graph_builder,
+                                    IdToNodeOutputMap& id_to_node_output_map) {
+  const NodeOutput* input = GetNodeOutputForOperand(
+      id_to_node_output_map, operation->input_operand_id);
+  const TensorDesc& input_tensor_desc = input->GetTensorDesc();
+
+  const OperandId output_id = operation->output_operand_id;
+  const auto output_tensor_desc = CreateOutputTensorDesc(operands, output_id);
+
+  DML_ELEMENT_WISE_ROUND_OPERATOR_DESC round_even_operator_desc{
+      .InputTensor = &input_tensor_desc.GetDMLTensorDesc(),
+      .OutputTensor = &output_tensor_desc.GetDMLTensorDesc(),
+      .RoundingMode =
+          DML_ROUNDING_MODE::DML_ROUNDING_MODE_HALVES_TO_NEAREST_EVEN};
+
+  std::array<const NodeOutput*, 1> inputs = {input};
+  const GraphNode* round_even_node = graph_builder.CreateOperatorNode(
+      DML_OPERATOR_ELEMENT_WISE_ROUND, &round_even_operator_desc, inputs,
+      operation->label);
+
+  const NodeOutput* output = graph_builder.CreateNodeOutput(
+      round_even_node, std::move(output_tensor_desc), 0);
+  // The output id must be unique in the map.
+  CHECK(id_to_node_output_map.try_emplace(output_id, output).second);
+}
+
 void CreateOperatorNodeForElementWiseUnary(
     const ContextProperties& context_properties,
     const std::vector<OperandPtr>& operands,
@@ -3026,6 +3052,22 @@ void CreateOperatorNodeForElementWiseUnary(
                                         DML_OPERATOR_ELEMENT_WISE_LOG>(
           operands, operation, graph_builder, id_to_node_output_map);
     }
+    case mojom::ElementWiseUnary::Kind::kIsNaN: {
+      CHECK(context_properties.data_type_limits.is_nan_input.data_types.Has(
+          input_data_type));
+      return CreateOperatorNodeForUnary<DML_ELEMENT_WISE_IS_NAN_OPERATOR_DESC,
+                                        DML_OPERATOR_ELEMENT_WISE_IS_NAN>(
+          operands, operation, graph_builder, id_to_node_output_map);
+    }
+    case mojom::ElementWiseUnary::Kind::kIsInfinite: {
+      CHECK(
+          context_properties.data_type_limits.is_infinite_input.data_types.Has(
+              input_data_type));
+      return CreateOperatorNodeForUnary<
+          DML_ELEMENT_WISE_IS_INFINITY_OPERATOR_DESC,
+          DML_OPERATOR_ELEMENT_WISE_IS_INFINITY>(
+          operands, operation, graph_builder, id_to_node_output_map);
+    }
     case mojom::ElementWiseUnary::Kind::kLogicalNot: {
       CHECK(
           context_properties.data_type_limits.logical_not_input.data_types.Has(
@@ -3051,6 +3093,12 @@ void CreateOperatorNodeForElementWiseUnary(
       return CreateOperatorNodeForUnary<DML_ELEMENT_WISE_RECIP_OPERATOR_DESC,
                                         DML_OPERATOR_ELEMENT_WISE_RECIP>(
           operands, operation, graph_builder, id_to_node_output_map);
+    }
+    case mojom::ElementWiseUnary::Kind::kRoundEven: {
+      CHECK(context_properties.data_type_limits.round_even_input.data_types.Has(
+          input_data_type));
+      return CreateOperatorNodeForRoundEven(operands, operation, graph_builder,
+                                            id_to_node_output_map);
     }
     case mojom::ElementWiseUnary::Kind::kSign: {
       CHECK(context_properties.data_type_limits.sign_input.data_types.Has(
@@ -3362,7 +3410,7 @@ base::expected<void, mojom::ErrorPtr> CreateOperatorNodeForGather(
                                     std::move(output_dimensions));
   }
 
-  auto expanded_axis = base::MakeCheckedNum(expanded_rank) - input_rank +
+  auto expanded_axis = base::CheckedNumeric(expanded_rank) - input_rank +
                        base::checked_cast<size_t>(axis);
   const std::string& label = gather->label;
   if (!expanded_axis.AssignIfValid<uint32_t>(&axis)) {
@@ -3897,7 +3945,7 @@ base::expected<void, mojom::ErrorPtr> CreateOperatorNodeForGru(
     uint32_t hidden_size = gru->hidden_size;
     // 3 * hidden_size has been verified.
     auto checked_three_times_hidden_size =
-        base::MakeCheckedNum(hidden_size) * 3;
+        base::CheckedNumeric(hidden_size) * 3;
     CHECK(checked_three_times_hidden_size.IsValid());
     // The half bias dimensions is [1, 1, num_directions, 3 * hidden_size] for
     // gru and [1, 1, 1, 3 * hidden_size] for gruCell.
@@ -3918,7 +3966,7 @@ base::expected<void, mojom::ErrorPtr> CreateOperatorNodeForGru(
     // hidden_size]. Ideally, 6 * hidden_size validation should be part of the
     // spec and validated for all backends. Spec issue tracked on
     // https://github.com/webmachinelearning/webnn/issues/625.
-    auto checked_six_times_hidden_size = base::MakeCheckedNum(hidden_size) * 6;
+    auto checked_six_times_hidden_size = base::CheckedNumeric(hidden_size) * 6;
     if (!checked_six_times_hidden_size.IsValid()) {
       return CreateUnexpectedError(
           mojom::Error::Code::kUnknownError,
@@ -4258,7 +4306,7 @@ CreateOperatorNodeForMeanVarianceNormalization(
   }
 
   std::string label = normalization->label;
-  if (!base::MakeCheckedNum(mean_variance_axes.size()).IsValid<uint32_t>()) {
+  if (!base::CheckedNumeric(mean_variance_axes.size()).IsValid<uint32_t>()) {
     return base::unexpected(CreateError(
         mojom::Error::Code::kUnknownError,
         OpTagToString(op) + ": The axes rank is too large.", label));
@@ -4646,7 +4694,7 @@ base::expected<void, mojom::ErrorPtr> CreateOperatorNodeForLstm(
   std::optional<TensorDesc> concatenated_bias_tensor_desc;
   if (bias && recurrent_bias) {
     auto checked_four_times_hidden_size =
-        base::MakeCheckedNum(lstm.hidden_size) * 4;
+        base::CheckedNumeric(lstm.hidden_size) * 4;
     // Four times hidden size should have already been validated.
     CHECK(checked_four_times_hidden_size.IsValid());
     const std::array<uint32_t, 4> bias_dimensions = {
@@ -5179,7 +5227,7 @@ base::expected<void, mojom::ErrorPtr> CreateOperatorNodeForSoftmax(
     } else {
       const std::vector<uint32_t>& axis_transposed_to_last_output_dims =
           axis_transposed_to_last_output->GetTensorDesc().GetDimensions();
-      auto reshaped_2d_dim_0 = base::MakeCheckedNum<uint32_t>(1);
+      auto reshaped_2d_dim_0 = base::CheckedNumeric<uint32_t>(1);
       for (uint32_t i = 0; i < axis_transposed_to_last_output_dims.size() - 1;
            i++) {
         reshaped_2d_dim_0 *= axis_transposed_to_last_output_dims[i];
@@ -5585,7 +5633,7 @@ base::expected<void, mojom::ErrorPtr> CreateOperatorNodeForTriangular(
 
   const auto mask_height = height;
   const auto checked_mask_width =
-      (base::MakeCheckedNum<uint32_t>(longest_dimension_length) +
+      (base::CheckedNumeric<uint32_t>(longest_dimension_length) +
        std::min(base::checked_cast<uint32_t>(std::abs(diagonal)),
                 longest_dimension_length)) *
       2;
@@ -5628,7 +5676,7 @@ base::expected<void, mojom::ErrorPtr> CreateOperatorNodeForTriangular(
   //   1, 1, 0, 0  =>     1, 1, 0, 0
   //   1, 1, 0, 0]          1, 1, 0, 0]
   const auto checked_slice_input_width =
-      base::MakeCheckedNum<uint32_t>(mask_width) * 2;
+      base::CheckedNumeric<uint32_t>(mask_width) * 2;
   if (!checked_slice_input_width.IsValid<uint32_t>()) {
     return base::unexpected(CreateError(
         mojom::Error::Code::kUnknownError,

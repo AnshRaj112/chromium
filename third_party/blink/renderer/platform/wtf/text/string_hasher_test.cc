@@ -26,6 +26,7 @@
 #include "third_party/blink/renderer/platform/wtf/text/string_hasher.h"
 
 #include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/renderer/platform/wtf/text/atomic_string.h"
 #include "third_party/blink/renderer/platform/wtf/text/case_folding_hash.h"
@@ -47,6 +48,14 @@ const UChar kTestBUChars[5] = {0x41, 0x95, 0xFFFF, 0x1080, 0x01};
 
 const uint64_t kTestAHash = 0xE9422771E0A5DDE6;
 const uint64_t kTestBHash = 0x4A2DA770EEA75C1E;
+
+bool EqualCaseFoldingHash(StringView a, StringView b) {
+  unsigned hash_a = a.Is8Bit() ? CaseFoldingHash::GetHash(a.Span8())
+                               : CaseFoldingHash::GetHash(a.Span16());
+  unsigned hash_b = b.Is8Bit() ? CaseFoldingHash::GetHash(b.Span8())
+                               : CaseFoldingHash::GetHash(b.Span16());
+  return hash_a == hash_b;
+}
 
 }  // anonymous namespace
 
@@ -78,24 +87,28 @@ TEST(StringHasherTest, StringHasher_ComputeHashAndMaskTop8Bits) {
 
   // Test a slightly longer case (including characters that fit in Latin1
   // but not in ASCII).
-  const char kStr[] = "A quick browñ föx jumps over thé lazy dog";
-  UChar kWideStr[sizeof(kStr)];
-  for (unsigned i = 0; i < sizeof(kStr); ++i) {
-    UNSAFE_TODO(kWideStr[i]) = static_cast<uint8_t>(UNSAFE_TODO(kStr[i]));
-  }
-  EXPECT_EQ(StringHasher::ComputeHashAndMaskTop8Bits(kStr, strlen(kStr)),
-            StringHasher::ComputeHashAndMaskTop8Bits<ConvertTo8BitHashReader>(
-                (const char*)kWideStr, strlen(kStr)));
-  EXPECT_NE(StringHasher::ComputeHashAndMaskTop8Bits(kStr, strlen(kStr)),
-            StringHasher::ComputeHashAndMaskTop8Bits((const char*)kWideStr,
-                                                     strlen(kStr)));
-  EXPECT_NE(StringHasher::ComputeHashAndMaskTop8Bits(kStr, strlen(kStr)),
-            StringHasher::ComputeHashAndMaskTop8Bits((const char*)kWideStr,
-                                                     strlen(kStr) * 2));
+  constexpr base::span<const char> kStr =
+      base::span_from_cstring("A quick browñ föx jumps over thé lazy dog");
+  std::array<UChar, kStr.size()> wide_str;
+  std::ranges::copy(base::as_bytes(kStr), wide_str.begin());
+  auto wide_bytes = base::as_chars(base::as_byte_span(wide_str));
+  unsigned expected_hash =
+      StringHasher::ComputeHashAndMaskTop8Bits(kStr.data(), kStr.size());
+  using Reader = ConvertTo8BitHashReader;
+  EXPECT_EQ(expected_hash, StringHasher::ComputeHashAndMaskTop8Bits<Reader>(
+                               wide_bytes.data(),
+                               wide_bytes.size() / Reader::kCompressionFactor));
+  EXPECT_NE(expected_hash, StringHasher::ComputeHashAndMaskTop8Bits(
+                               wide_bytes.data(), wide_bytes.size() / 2));
+  EXPECT_NE(expected_hash, StringHasher::ComputeHashAndMaskTop8Bits(
+                               wide_bytes.data(), wide_bytes.size()));
 }
 
 TEST(StringHasherTest, StringHasher_HashMemory) {
-  EXPECT_EQ(kEmptyStringHash, StringHasher::HashMemory({}));
+  EXPECT_EQ(kEmptyStringHash,
+            StringHasher::HashMemory(base::span<const uint8_t>()));
+  EXPECT_EQ(kEmptyStringHash,
+            StringHasher::HashMemory(base::span<const uint8_t, 0>()));
   EXPECT_EQ(kEmptyStringHash, StringHasher::HashMemory(
                                   base::as_byte_span(kNullUChars).first(0u)));
 
@@ -109,13 +122,12 @@ TEST(StringHasherTest, StringHasher_HashMemory) {
 }
 
 TEST(StringHasherTest, CaseFoldingHash) {
-  EXPECT_NE(CaseFoldingHash::GetHash("foo"), CaseFoldingHash::GetHash("bar"));
-  EXPECT_EQ(CaseFoldingHash::GetHash("foo"), CaseFoldingHash::GetHash("FOO"));
-  EXPECT_EQ(CaseFoldingHash::GetHash("foo"), CaseFoldingHash::GetHash("Foo"));
-  EXPECT_EQ(CaseFoldingHash::GetHash("Longer string 123"),
-            CaseFoldingHash::GetHash("longEr String 123"));
-  EXPECT_EQ(CaseFoldingHash::GetHash(String::FromUTF8("Ünicode")),
-            CaseFoldingHash::GetHash(String::FromUTF8("ünicode")));
+  EXPECT_FALSE(EqualCaseFoldingHash("foo", "bar"));
+  EXPECT_TRUE(EqualCaseFoldingHash("foo", "FOO"));
+  EXPECT_TRUE(EqualCaseFoldingHash("foo", "Foo"));
+  EXPECT_TRUE(EqualCaseFoldingHash("Longer string 123", "longEr String 123"));
+  EXPECT_TRUE(EqualCaseFoldingHash(String::FromUTF8("Ünicode"),
+                                   String::FromUTF8("ünicode")));
 }
 
 TEST(StringHasherTest, ContractionAndExpansion) {

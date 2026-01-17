@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/notreached.h"
@@ -530,10 +529,10 @@ ParseResult ValidateHeadersForModification(
 
     if (are_request_headers &&
         header_info.operation == dnr_api::HeaderOperation::kAppend) {
-      DCHECK(
-          std::ranges::none_of(header_info.header, base::IsAsciiUpper<char>));
-      if (!base::Contains(kDNRRequestHeaderAppendAllowList,
-                          header_info.header)) {
+      // Check against the allowlist in lowercase since header names will be
+      // stored in lowercase in flatbuffers later on.
+      if (!kDNRRequestHeaderAppendAllowList.contains(
+              base::ToLowerASCII(header_info.header))) {
         return ParseResult::ERROR_APPEND_INVALID_REQUEST_HEADER;
       }
     }
@@ -631,7 +630,7 @@ ParseResult ValidateResponseHeadersForMatching(
     // non-existence of a header.
     if (!header_info.values.has_value() &&
         !header_info.excluded_values.has_value() &&
-        base::Contains(response_header_names, header_info.header)) {
+        response_header_names.contains(header_info.header)) {
       return ParseResult::ERROR_MATCHING_RESPONSE_HEADER_DUPLICATED;
     }
   }
@@ -701,6 +700,11 @@ ParseResult IndexedRule::CreateIndexedRule(dnr_api::Rule parsed_rule,
   if (parsed_rule.condition.request_domains &&
       parsed_rule.condition.request_domains->empty()) {
     return ParseResult::ERROR_EMPTY_REQUEST_DOMAINS_LIST;
+  }
+
+  if (parsed_rule.condition.top_domains &&
+      parsed_rule.condition.top_domains->empty()) {
+    return ParseResult::ERROR_EMPTY_TOP_DOMAINS_LIST;
   }
 
   if (parsed_rule.condition.resource_types &&
@@ -819,6 +823,17 @@ ParseResult IndexedRule::CreateIndexedRule(dnr_api::Rule parsed_rule,
     return ParseResult::ERROR_NON_ASCII_EXCLUDED_REQUEST_DOMAIN;
   }
 
+  if (!CanonicalizeDomains(std::move(parsed_rule.condition.top_domains),
+                           &indexed_rule->top_domains)) {
+    return ParseResult::ERROR_NON_ASCII_TOP_DOMAIN;
+  }
+
+  if (!CanonicalizeDomains(
+          std::move(parsed_rule.condition.excluded_top_domains),
+          &indexed_rule->excluded_top_domains)) {
+    return ParseResult::ERROR_NON_ASCII_EXCLUDED_TOP_DOMAIN;
+  }
+
   {
     ParseTabIds(base::OptionalToPtr(parsed_rule.condition.tab_ids),
                 indexed_rule->tab_ids);
@@ -826,8 +841,7 @@ ParseResult IndexedRule::CreateIndexedRule(dnr_api::Rule parsed_rule,
                 indexed_rule->excluded_tab_ids);
     if (std::ranges::any_of(
             indexed_rule->tab_ids, [indexed_rule](int included_tab_id) {
-              return base::Contains(indexed_rule->excluded_tab_ids,
-                                    included_tab_id);
+              return indexed_rule->excluded_tab_ids.contains(included_tab_id);
             })) {
       return ParseResult::ERROR_TAB_ID_DUPLICATED;
     }

@@ -62,7 +62,7 @@ DigitalIdentitySafetyInterstitialBridgeAndroid::ShowInterstitial(
 
 void DigitalIdentitySafetyInterstitialBridgeAndroid::OnInterstitialDone(
     JNIEnv* env,
-    jint status_for_metrics) {
+    int32_t status_for_metrics) {
   std::move(callback_).Run(
       static_cast<content::DigitalIdentityProvider::RequestStatusForMetrics>(
           status_for_metrics));
@@ -72,3 +72,5 @@ void DigitalIdentitySafetyInterstitialBridgeAndroid::Abort() {
   JNIEnv* env = AttachCurrentThread();
   Java_DigitalIdentitySafetyInterstitialBridge_abort(env, j_bridge_);
 }
+
+DEFINE_JNI(DigitalIdentitySafetyInterstitialBridge)

@@ -245,8 +245,7 @@ void BrowserPolicyConnectorAsh::Init(
         PolicyInvalidationScope::kDevice, policy_invalidation_listener,
         device_cloud_policy_manager_->core(),
         base::SingleThreadTaskRunner::GetCurrentDefault(),
-        base::DefaultClock::GetInstance(),
-        /*highest_handled_invalidation_version=*/0);
+        base::DefaultClock::GetInstance());
 
     invalidation::InvalidationListener* remote_commands_invalidation_listener =
         invalidation_listener_per_project_
@@ -286,8 +285,8 @@ void BrowserPolicyConnectorAsh::Init(
   bluetooth_policy_handler_ =
       std::make_unique<BluetoothPolicyHandler>(ash::CrosSettings::Get());
 
-  device_name_policy_handler_ =
-      std::make_unique<DeviceNamePolicyHandlerImpl>(ash::CrosSettings::Get());
+  device_name_policy_handler_ = std::make_unique<DeviceNamePolicyHandlerImpl>(
+      this, ash::CrosSettings::Get());
 
   minimum_version_policy_handler_delegate_ =
       std::make_unique<MinimumVersionPolicyHandlerDelegateImpl>();
@@ -628,7 +627,7 @@ void BrowserPolicyConnectorAsh::OnDeviceCloudPolicyManagerConnected() {
 
     device_cert_provisioning_scheduler_ = ash::cert_provisioning::
         CertProvisioningSchedulerImpl::CreateDeviceCertProvisioningScheduler(
-            cloud_policy_client,
+            local_state_.get(), cloud_policy_client,
             invalidation_listener_per_project_
                 [ash::cert_provisioning::
                      kCertProvisioningInvalidationProjectNumber]

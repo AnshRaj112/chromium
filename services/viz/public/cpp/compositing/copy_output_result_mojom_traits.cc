@@ -58,6 +58,7 @@ EnumTraits<viz::mojom::CopyOutputResultFormat, viz::CopyOutputResult::Format>::
   switch (format) {
     case viz::CopyOutputResult::Format::RGBA:
       return viz::mojom::CopyOutputResultFormat::RGBA;
+    case viz::CopyOutputResult::Format::RGBAF16:
     case viz::CopyOutputResult::Format::I420_PLANES:
     case viz::CopyOutputResult::Format::NV12:
       break;  // Not intended for transport across service boundaries.
@@ -108,6 +109,44 @@ bool EnumTraits<viz::mojom::CopyOutputResultDestination,
 }
 
 // static
+viz::mojom::CopyOutputResultError EnumTraits<
+    viz::mojom::CopyOutputResultError,
+    viz::CopyOutputResult::Error>::ToMojom(viz::CopyOutputResult::Error error) {
+  switch (error) {
+    case viz::CopyOutputResult::Error::kNone:
+      return viz::mojom::CopyOutputResultError::kNone;
+    case viz::CopyOutputResult::Error::kUnknown:
+      return viz::mojom::CopyOutputResultError::kUnknown;
+    case viz::CopyOutputResult::Error::kTimeout:
+      return viz::mojom::CopyOutputResultError::kTimeout;
+    case viz::CopyOutputResult::Error::kEmbeddingTokenChanged:
+      return viz::mojom::CopyOutputResultError::kEmbeddingTokenChanged;
+  }
+}
+
+// static
+bool EnumTraits<viz::mojom::CopyOutputResultError,
+                viz::CopyOutputResult::Error>::
+    FromMojom(viz::mojom::CopyOutputResultError input,
+              viz::CopyOutputResult::Error* out) {
+  switch (input) {
+    case viz::mojom::CopyOutputResultError::kNone:
+      *out = viz::CopyOutputResult::Error::kNone;
+      return true;
+    case viz::mojom::CopyOutputResultError::kUnknown:
+      *out = viz::CopyOutputResult::Error::kUnknown;
+      return true;
+    case viz::mojom::CopyOutputResultError::kTimeout:
+      *out = viz::CopyOutputResult::Error::kTimeout;
+      return true;
+    case viz::mojom::CopyOutputResultError::kEmbeddingTokenChanged:
+      *out = viz::CopyOutputResult::Error::kEmbeddingTokenChanged;
+      return true;
+  }
+  return false;
+}
+
+// static
 viz::CopyOutputResult::Format
 StructTraits<viz::mojom::CopyOutputResultDataView,
              std::unique_ptr<viz::CopyOutputResult>>::
@@ -128,6 +167,14 @@ const gfx::Rect& StructTraits<viz::mojom::CopyOutputResultDataView,
                               std::unique_ptr<viz::CopyOutputResult>>::
     rect(const std::unique_ptr<viz::CopyOutputResult>& result) {
   return result->rect();
+}
+
+// static
+viz::CopyOutputResult::Error
+StructTraits<viz::mojom::CopyOutputResultDataView,
+             std::unique_ptr<viz::CopyOutputResult>>::
+    error(const std::unique_ptr<viz::CopyOutputResult>& result) {
+  return result->error();
 }
 
 // static
@@ -190,17 +237,14 @@ StructTraits<viz::mojom::CopyOutputResultDataView,
   // Only RGBA can travel across process boundaries, in which case there will be
   // at most one release callback set in the |result|:
   DCHECK_EQ(result->format(), viz::CopyOutputResult::Format::RGBA);
-  viz::CopyOutputResult::ReleaseCallbacks release_callbacks =
-      result->TakeSharedImageOwnership();
-  // Callbacks can be empty (in case the result is empty), or have exactly 1
-  // element (because a result with RGBA format can carry 1 texture).
-  DCHECK(release_callbacks.empty() || release_callbacks.size() == 1);
+  viz::ReleaseCallback release_callback = result->TakeSharedImageOwnership();
+  if (release_callback.is_null()) {
+    return mojo::NullRemote();
+  }
 
   mojo::PendingRemote<viz::mojom::TextureReleaser> releaser;
   MakeSelfOwnedReceiver(
-      std::make_unique<TextureReleaserImpl>(
-          release_callbacks.empty() ? viz::ReleaseCallback{}
-                                    : std::move(release_callbacks[0])),
+      std::make_unique<TextureReleaserImpl>(std::move(release_callback)),
       releaser.InitWithNewPipeAndPassReceiver());
   return releaser;
 }
@@ -214,18 +258,22 @@ bool StructTraits<viz::mojom::CopyOutputResultDataView,
   // implementation of viz::CopyOutputResult.
   viz::CopyOutputResult::Format format;
   viz::CopyOutputResult::Destination destination;
+  viz::CopyOutputResult::Error error;
   gfx::Rect rect;
 
   if (!data.ReadFormat(&format) || !data.ReadDestination(&destination) ||
-      !data.ReadRect(&rect)) {
+      !data.ReadRect(&rect) || !data.ReadError(&error)) {
     return false;
   }
 
   if (rect.IsEmpty()) {
     // An empty rect implies an empty result.
-    *out_p = std::make_unique<viz::CopyOutputResult>(format, destination,
-                                                     gfx::Rect(), false);
+    *out_p =
+        std::make_unique<viz::CopyOutputResult>(format, destination, error);
     return true;
+  } else if (error != viz::CopyOutputResult::Error::kNone) {
+    // If we have an error code that isn't kNone, the rect should be empty.
+    return false;
   }
 
   switch (format) {
@@ -241,7 +289,7 @@ bool StructTraits<viz::mojom::CopyOutputResultDataView,
             // is used in SkBitmap, in that case, the sender will send a null
             // bitmap. So we should consider the copy output result is empty.
             *out_p = std::make_unique<viz::CopyOutputResult>(
-                format, destination, gfx::Rect(), false);
+                format, destination, error);
             return true;
           }
           if (!bitmap_opt->readyToDraw())
@@ -263,29 +311,29 @@ bool StructTraits<viz::mojom::CopyOutputResultDataView,
           if (mailbox->IsZero()) {
             // Returns an empty result.
             *out_p = std::make_unique<viz::CopyOutputResult>(
-                format, destination, gfx::Rect(), false);
+                format, destination, error);
             return true;
           }
 
+          viz::ReleaseCallback release_callback;
           auto releaser = data.TakeReleaser<
               mojo::PendingRemote<viz::mojom::TextureReleaser>>();
-          if (!releaser)
-            return false;  // Illegal to provide texture without Releaser.
-
-          // Returns a result with a ReleaseCallback that will return here and
-          // proxy the callback over mojo to the CopyOutputResult's origin via a
-          // mojo::Remote<viz::mojom::TextureReleaser> remote.
-          viz::CopyOutputResult::ReleaseCallbacks release_callbacks;
-          release_callbacks.emplace_back(
-              base::BindOnce(&Release, std::move(releaser)));
+          // The releaser might be empty if the request included a blit request.
+          if (releaser) {
+            // Returns a result with a ReleaseCallback that will return here and
+            // proxy the callback over mojo to the CopyOutputResult's origin via
+            // a mojo::Remote<viz::mojom::TextureReleaser> remote.
+            release_callback = base::BindOnce(&Release, std::move(releaser));
+          }
 
           *out_p = std::make_unique<viz::CopyOutputSharedImageResult>(
               viz::CopyOutputResult::Format::RGBA, rect, *mailbox, *color_space,
-              "ReadStructTraits", std::move(release_callbacks));
+              "ReadStructTraits", std::move(release_callback));
           return true;
         }
       }
 
+    case viz::CopyOutputResult::Format::RGBAF16:
     case viz::CopyOutputResult::Format::I420_PLANES:
     case viz::CopyOutputResult::Format::NV12:
       break;  // Not intended for transport across service boundaries.

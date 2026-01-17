@@ -19,6 +19,8 @@
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/primary_account_change_event.h"
+#include "components/sync/base/features.h"
+#include "components/sync/base/pref_names.h"
 #include "components/sync/base/user_selectable_type.h"
 #include "components/sync/service/sync_service.h"
 #include "components/sync/service/sync_user_settings.h"
@@ -28,6 +30,9 @@
 #include "extensions/browser/extension_registrar.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_registry_factory.h"
+#include "extensions/buildflags/buildflags.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -264,6 +269,32 @@ AccountExtensionTracker::GetUploadableLocalExtensions() const {
 }
 
 void AccountExtensionTracker::OnInitialExtensionsSyncDataReceived() {
+  // As part of sync-to-signin migration, de-duplicate the extensions that exist
+  // both locally and in the account.
+  PrefService* prefs = profile_->GetPrefs();
+  if (prefs->GetBoolean(
+          syncer::prefs::internal::kMigrateExtensionsFromLocalToAccount)) {
+    ExtensionRegistry* extension_registry = ExtensionRegistry::Get(profile_);
+    const ExtensionSet extensions =
+        extension_registry->GenerateInstalledExtensionsSet();
+    for (const auto& extension : extensions) {
+      if (
+          // Only de-duplicate extensions, not Chrome Apps/hosted apps.
+          !extension->is_extension() ||
+          // Only de-duplicate account extensions that are also installed
+          // locally.
+          GetAccountExtensionType(extension->id()) !=
+              AccountExtensionType::kAccountInstalledLocally) {
+        // The extension is either only locally installed, or only installed in
+        // the account.
+        continue;
+      }
+      SetAccountExtensionType(extension->id(),
+                              AccountExtensionType::kAccountInstalledSignedIn);
+    }
+    prefs->ClearPref(
+        syncer::prefs::internal::kMigrateExtensionsFromLocalToAccount);
+  }
   NotifyOnExtensionsUploadabilityChanged();
 }
 
@@ -287,8 +318,11 @@ AccountExtensionTracker::GetAccountExtensionType(
   return static_cast<AccountExtensionType>(type_int);
 }
 
+#if !BUILDFLAG(IS_CHROMEOS)
 void AccountExtensionTracker::OnSignInInitiatedFromExtensionPromo(
     const ExtensionId& extension_id) {
+  CHECK(!base::FeatureList::IsEnabled(syncer::kUnoPhase2FollowUp));
+
   bool already_has_primary_account =
       IdentityManagerFactory::GetForProfile(profile_)->HasPrimaryAccount(
           signin::ConsentLevel::kSignin);
@@ -313,6 +347,7 @@ void AccountExtensionTracker::OnSignInInitiatedFromExtensionPromo(
                      weak_factory_.GetWeakPtr(), extension_id),
       kMaxSigninFromExtensionBubbleDelay);
 }
+#endif  // !BUILDFLAG(IS_CHROMEOS)
 
 bool AccountExtensionTracker::CanUploadAsAccountExtension(
     const Extension& extension) const {

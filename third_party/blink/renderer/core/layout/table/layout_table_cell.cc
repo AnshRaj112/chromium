@@ -37,11 +37,9 @@ LayoutTableCell* LayoutTableCell::CreateAnonymousWithParent(
 
 void LayoutTableCell::InvalidateLayoutResultCacheAfterMeasure() const {
   NOT_DESTROYED();
-  if (LayoutBox* row = ParentBox()) {
-    DCHECK(row->IsTableRow());
+  if (LayoutTableRow* row = Row()) {
     row->SetShouldSkipLayoutCache(true);
-    if (LayoutBox* section = row->ParentBox()) {
-      DCHECK(section->IsTableSection());
+    if (LayoutTableSection* section = row->Section()) {
       section->SetShouldSkipLayoutCache(true);
     }
   }
@@ -117,8 +115,10 @@ LayoutTable* LayoutTableCell::Table() const {
   return nullptr;
 }
 
-void LayoutTableCell::StyleDidChange(StyleDifference diff,
-                                     const ComputedStyle* old_style) {
+void LayoutTableCell::StyleDidChange(
+    StyleDifference diff,
+    const ComputedStyle* old_style,
+    const StyleChangeContext& style_change_context) {
   NOT_DESTROYED();
   if (LayoutTable* table = Table()) {
     if ((old_style && !old_style->BorderVisuallyEqual(StyleRef())) ||
@@ -127,7 +127,7 @@ void LayoutTableCell::StyleDidChange(StyleDifference diff,
       table->GridBordersChanged();
     }
   }
-  LayoutBlockFlow::StyleDidChange(diff, old_style);
+  LayoutBlockFlow::StyleDidChange(diff, old_style, style_change_context);
 }
 
 void LayoutTableCell::WillBeRemovedFromTree() {

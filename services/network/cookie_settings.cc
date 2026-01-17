@@ -9,7 +9,6 @@
 #include <iterator>
 #include <memory>
 
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
@@ -50,7 +49,6 @@ bool ShouldApply3pcdRelatedReasons(const net::CanonicalCookie& cookie) {
          !cookie.IsPartitioned();
 }
 
-
 bool IsValidType(ContentSettingsType type) {
   // ContentSettingsType::TPCD_METADATA_GRANTS settings are managed by the
   // `network::tpcd::metadata::Manager` and are considered valid ContentSettings
@@ -63,8 +61,11 @@ bool IsValidType(ContentSettingsType type) {
 
 void RecordAllowedByStorageAccessType(
     CookieSettings::AllowedByStorageAccessType value) {
-  base::UmaHistogramEnumeration(
-      "API.EffectiveStorageAccess.AllowedByStorageAccessType", value);
+  if (base::ShouldRecordSubsampledMetric(0.01)) {
+    UMA_HISTOGRAM_ENUMERATION(
+        "API.EffectiveStorageAccess.AllowedByStorageAccessType.Subsampled",
+        value);
+  }
 }
 
 net::CookieInclusionStatus::ExemptionReason GetExemptionReason(
@@ -73,7 +74,6 @@ net::CookieInclusionStatus::ExemptionReason GetExemptionReason(
   using ExemptionReason = net::CookieInclusionStatus::ExemptionReason;
   switch (allow_mechanism) {
     case AllowMechanism::kAllowByExplicitSetting:
-    case AllowMechanism::kAllowByTrackingProtectionException:
       return ExemptionReason::kUserSetting;
     case AllowMechanism::kAllowBy3PCDHeuristics:
       return ExemptionReason::k3PCDHeuristics;
@@ -162,10 +162,9 @@ void CookieSettings::set_content_settings(
   content_settings_[type] =
       content_settings::HostIndexedContentSettings::Create(settings);
 
-  if (type == ContentSettingsType::COOKIES ||
-      type == ContentSettingsType::TOP_LEVEL_TPCD_ORIGIN_TRIAL) {
-    // Cookies and the top-level origin trial for 3PCD use allow-by-default
-    // settings, so ensure their default is set appropriately.
+  if (type == ContentSettingsType::COOKIES) {
+    // Cookies use allow-by-default settings, so ensure the default is set
+    // appropriately.
     if (settings.empty() ||
         settings.back().primary_pattern != ContentSettingsPattern::Wildcard() ||
         settings.back().secondary_pattern !=
@@ -205,8 +204,8 @@ DeleteCookiePredicate CookieSettings::CreateDeleteCookieOnExitPredicate()
 bool CookieSettings::ShouldIgnoreSameSiteRestrictions(
     const GURL& url,
     const net::SiteForCookies& site_for_cookies) const {
-  return base::Contains(secure_origin_cookies_allowed_schemes_,
-                        site_for_cookies.scheme()) &&
+  return secure_origin_cookies_allowed_schemes_.contains(
+             site_for_cookies.scheme()) &&
          url.SchemeIsCryptographic();
 }
 
@@ -245,12 +244,11 @@ bool CookieSettings::IsCookieAccessible(
 bool CookieSettings::ShouldAlwaysAllowCookies(
     const GURL& url,
     const GURL& first_party_url) const {
-  return (base::Contains(secure_origin_cookies_allowed_schemes_,
-                         first_party_url.scheme()) &&
+  return (secure_origin_cookies_allowed_schemes_.contains(
+              first_party_url.scheme()) &&
           url.SchemeIsCryptographic()) ||
-         (base::Contains(matching_scheme_cookies_allowed_schemes_,
-                         url.scheme()) &&
-          url.SchemeIs(first_party_url.scheme_piece()));
+         (matching_scheme_cookies_allowed_schemes_.contains(url.scheme()) &&
+          url.SchemeIs(first_party_url.scheme()));
 }
 
 net::NetworkDelegate::PrivacySetting CookieSettings::IsPrivacyModeEnabled(
@@ -383,8 +381,8 @@ ContentSetting CookieSettings::GetContentSetting(
 }
 
 bool CookieSettings::IsThirdPartyCookiesAllowedScheme(
-    const std::string& scheme) const {
-  return base::Contains(third_party_cookies_allowed_schemes_, scheme);
+    std::string_view scheme) const {
+  return third_party_cookies_allowed_schemes_.contains(scheme);
 }
 
 bool CookieSettings::ShouldBlockThirdPartyCookies(

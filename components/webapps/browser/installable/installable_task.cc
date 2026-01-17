@@ -4,7 +4,8 @@
 
 #include "components/webapps/browser/installable/installable_task.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "components/webapps/browser/installable/installable_manager.h"
 #include "content/public/browser/web_contents.h"
 #include "third_party/blink/public/common/manifest/manifest_util.h"
@@ -62,9 +63,13 @@ void InstallableTask::ResetWithError(InstallableStatusCode code) {
   if (callback_) {
     blink::mojom::Manifest manifest;
     mojom::WebPageMetadata metadata;
-    std::move(callback_).Run(InstallableData({code}, GURL(), manifest, metadata,
-                                             GURL(), nullptr, false,
-                                             std::vector<Screenshot>(), false));
+    std::move(callback_).Run(InstallableData(
+        /*errors=*/{code}, /*manifest_url=*/GURL(), /*manifest=*/manifest,
+        /*metadata=*/metadata, /*primary_icon_url=*/GURL(),
+        /*primary_icon=*/nullptr,
+        /*has_maskable_primary_icon=*/false,
+        /*screenshots=*/std::vector<Screenshot>(),
+        /*installable_check_passed=*/false));
   }
 }
 
@@ -135,18 +140,16 @@ void InstallableTask::CheckEligibility() {
 }
 
 void InstallableTask::CheckInstallability() {
-  auto installable_errors = evaluator_->CheckInstallability();
-  if (installable_errors.has_value()) {
-    for (auto new_error : installable_errors.value()) {
-      if (base::Contains(errors_, new_error)) {
-        // Don't add duplicated errors.
-        continue;
-      }
-      errors_.push_back(new_error);
+  std::vector<InstallableStatusCode> installable_errors =
+      evaluator_->CheckInstallability();
+  for (auto new_error : installable_errors) {
+    if (std::ranges::contains(errors_, new_error)) {
+      // Don't add duplicated errors.
+      continue;
     }
+    errors_.push_back(new_error);
   }
-  installability_check_passed_ =
-      installable_errors.has_value() && installable_errors->empty();
+  installability_check_passed_ = installable_errors.empty();
   IncrementStateAndWorkOnNextTask();
 }
 

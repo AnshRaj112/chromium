@@ -23,9 +23,7 @@ class ViewTransitionTypeIterationSource
     ViewTransitionTypeSet::IterationSource::Trace(visitor);
   }
 
-  bool FetchNextItem(ScriptState*,
-                     String& out_value,
-                     ExceptionState&) override {
+  bool FetchNextItem(ScriptState*, String& out_value) override {
     if (index_ >= types_->size()) {
       return false;
     }
@@ -92,8 +90,7 @@ void ViewTransitionTypeSet::InvalidateStyle() {
   }
 
   Document* document = view_transition_->DomWindow()->document();
-  if (ViewTransitionSupplement::From(*document)->GetTransition() !=
-      view_transition_) {
+  if (document->GetViewTransitions().GetTransition() != view_transition_) {
     return;
   }
 
@@ -126,7 +123,7 @@ bool ViewTransitionTypeSet::deleteForBinding(ScriptState*,
 }
 
 ViewTransitionTypeSet::IterationSource*
-ViewTransitionTypeSet::CreateIterationSource(ScriptState*, ExceptionState&) {
+ViewTransitionTypeSet::CreateIterationSource(ScriptState*) {
   auto* iterator =
       MakeGarbageCollected<ViewTransitionTypeIterationSource>(*this);
   iterators_.insert(iterator);

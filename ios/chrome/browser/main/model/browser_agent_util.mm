@@ -7,25 +7,30 @@
 #import "base/check_op.h"
 #import "base/feature_list.h"
 #import "components/breadcrumbs/core/breadcrumbs_status.h"
+#import "components/data_sharing/public/features.h"
 #import "ios/chrome/browser/app_launcher/model/app_launcher_browser_agent.h"
+#import "ios/chrome/browser/autocomplete/model/autocomplete_browser_agent.h"
 #import "ios/chrome/browser/browser_view/model/browser_view_visibility_notifier_browser_agent.h"
 #import "ios/chrome/browser/bubble/model/tab_based_iph_browser_agent.h"
+#import "ios/chrome/browser/collaboration/model/collaboration_service_factory.h"
+#import "ios/chrome/browser/collaboration/model/data_sharing_browser_agent.h"
 #import "ios/chrome/browser/crash_report/model/breadcrumbs/breadcrumb_manager_browser_agent.h"
 #import "ios/chrome/browser/credential_provider/model/credential_provider_buildflags.h"
 #import "ios/chrome/browser/device_sharing/model/device_sharing_browser_agent.h"
+#import "ios/chrome/browser/device_sharing/model/device_sharing_manager_factory.h"
 #import "ios/chrome/browser/discover_feed/model/discover_feed_visibility_browser_agent.h"
 #import "ios/chrome/browser/favicon/model/favicon_browser_agent.h"
-#import "ios/chrome/browser/follow/model/follow_browser_agent.h"
 #import "ios/chrome/browser/fullscreen/ui_bundled/fullscreen_controller.h"
 #import "ios/chrome/browser/infobars/model/overlays/browser_agent/infobar_overlay_browser_agent_util.h"
 #import "ios/chrome/browser/intelligence/bwg/model/bwg_browser_agent.h"
 #import "ios/chrome/browser/intelligence/features/features.h"
+#import "ios/chrome/browser/intelligence/persist_tab_context/model/persist_tab_context_browser_agent.h"
 #import "ios/chrome/browser/intents/model/user_activity_browser_agent.h"
 #import "ios/chrome/browser/lens/model/lens_browser_agent.h"
 #import "ios/chrome/browser/metrics/model/tab_usage_recorder_browser_agent.h"
-#import "ios/chrome/browser/metrics/model/web_state_list_metrics_browser_agent.h"
 #import "ios/chrome/browser/omnibox/model/omnibox_position/omnibox_position_browser_agent.h"
 #import "ios/chrome/browser/policy/model/policy_watcher_browser_agent.h"
+#import "ios/chrome/browser/prerender/model/prerender_browser_agent.h"
 #import "ios/chrome/browser/reader_mode/model/features.h"
 #import "ios/chrome/browser/reader_mode/model/reader_mode_browser_agent.h"
 #import "ios/chrome/browser/reading_list/model/reading_list_browser_agent.h"
@@ -42,6 +47,8 @@
 #import "ios/chrome/browser/sync/model/sync_error_browser_agent.h"
 #import "ios/chrome/browser/tab_insertion/model/tab_insertion_browser_agent.h"
 #import "ios/chrome/browser/tabs/model/synced_window_delegate_browser_agent.h"
+#import "ios/chrome/browser/tabs/model/tabs_dependency_installer_manager.h"
+#import "ios/chrome/browser/toolbar/legacy/ui_bundled/fullscreen/toolbars_size_browser_agent.h"
 #import "ios/chrome/browser/url_loading/model/url_loading_browser_agent.h"
 #import "ios/chrome/browser/url_loading/model/url_loading_notifier_browser_agent.h"
 #import "ios/chrome/browser/view_source/model/view_source_browser_agent.h"
@@ -49,7 +56,6 @@
 #import "ios/chrome/browser/web/model/web_navigation_browser_agent.h"
 #import "ios/chrome/browser/web/model/web_state_delegate_browser_agent.h"
 #import "ios/chrome/browser/web/model/web_state_update_browser_agent.h"
-#import "ios/chrome/browser/web_state_list/model/session_metrics.h"
 #import "ios/chrome/browser/web_state_list/model/web_usage_enabler/web_usage_enabler_browser_agent.h"
 #import "ios/public/provider/chrome/browser/app_utils/app_utils_api.h"
 
@@ -61,7 +67,6 @@ namespace {
 
 // Feature controlling for which Browser to create agents.
 BASE_FEATURE(kLimitBrowserAgentsForInactiveBrowser,
-             "LimitBrowserAgentsForInactiveBrowser",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Attach agents for a regular, incognito or inactive Browser.
@@ -73,6 +78,10 @@ void AttachBrowserAgentsForInactiveBrowser(Browser* browser) {
   // DO NOT ADD NEW BROWSER AGENTS HERE.
   //
   // Add new agents to AttachBrowserAgentsForActiveBrowser(...) instead.
+
+  // The tabs dependency installation management must be created before all
+  // browser agents to correctly monitor the registration of web state changes.
+  TabsDependencyInstallerManager::CreateForBrowser(browser);
 
   SnapshotBrowserAgent::CreateForBrowser(browser);
   SyncedWindowDelegateBrowserAgent::CreateForBrowser(browser);
@@ -89,22 +98,29 @@ void AttachBrowserAgentsForActiveBrowser(Browser* browser) {
     CHECK_NE(Browser::Type::kInactive, browser->type());
   }
 
+  // Some BrowserAgent needs to be injected KeyedService, so grab the profile.
+  ProfileIOS* profile = browser->GetProfile();
+  CHECK(profile);
+
   // TODO(crbug.com/433229469): Once kLimitBrowserAgentsForInactiveBrowser is
   // fully launched the variables browser_is_inactive and browser_is_temporary
   // can be removed as they will always be false. Cleanup the variables and
   // their use when the feature launch.
-  const bool browser_is_off_record = browser->GetProfile()->IsOffTheRecord();
-  const bool browser_is_inactive = browser->IsInactive();
-  const bool browser_is_temporary =
-      browser->type() == Browser::Type::kTemporary;
+  const Browser::Type browser_type = browser->type();
+  const bool browser_is_off_record = browser_type == Browser::Type::kIncognito;
+  const bool browser_is_inactive = browser_type == Browser::Type::kInactive;
+  const bool browser_is_temporary = browser_type == Browser::Type::kTemporary;
 
   LiveTabContextBrowserAgent::CreateForBrowser(browser);
   TabInsertionBrowserAgent::CreateForBrowser(browser);
   AttachInfobarOverlayBrowserAgent(browser);
-  DeviceSharingBrowserAgent::CreateForBrowser(browser);
+  DeviceSharingBrowserAgent::CreateForBrowser(
+      browser, DeviceSharingManagerFactory::GetForProfile(profile));
   UrlLoadingNotifierBrowserAgent::CreateForBrowser(browser);
   AppLauncherBrowserAgent::CreateForBrowser(browser);
   OmniboxPositionBrowserAgent::CreateForBrowser(browser);
+  AutocompleteBrowserAgent::CreateForBrowser(browser);
+  ToolbarsSizeBrowserAgent::CreateForBrowser(browser);
 
   // Only create the FullscreenBrowserAgent and ReaderModeBrowserAgent for
   // regular and incognito Browser (since the other Browser do not present the
@@ -124,10 +140,6 @@ void AttachBrowserAgentsForActiveBrowser(Browser* browser) {
     IOSChromeTabRestoreBrowserAgent::CreateForBrowser(browser);
   }
 
-  if (IsWebChannelsEnabled() && !browser_is_off_record) {
-    FollowBrowserAgent::CreateForBrowser(browser);
-  }
-
   // PolicyWatcher is non-OTR only.
   if (!browser_is_off_record) {
     PolicyWatcherBrowserAgent::CreateForBrowser(browser);
@@ -138,8 +150,7 @@ void AttachBrowserAgentsForActiveBrowser(Browser* browser) {
     SendTabToSelfBrowserAgent::CreateForBrowser(browser);
   }
 
-  WebStateDelegateBrowserAgent::CreateForBrowser(
-      browser, TabInsertionBrowserAgent::FromBrowser(browser));
+  WebStateDelegateBrowserAgent::CreateForBrowser(browser);
 
   // ViewSourceBrowserAgent requires TabInsertionBrowserAgent, and is only used
   // in debug builds.
@@ -149,9 +160,6 @@ void AttachBrowserAgentsForActiveBrowser(Browser* browser) {
 
   // UrlLoadingBrowserAgent requires UrlLoadingNotifierBrowserAgent.
   UrlLoadingBrowserAgent::CreateForBrowser(browser);
-
-  WebStateListMetricsBrowserAgent::CreateForBrowser(
-      browser, SessionMetrics::FromProfile(browser->GetProfile()));
 
   // Normal profiles are the only ones to get tab usage recorder.
   if (!browser_is_off_record) {
@@ -187,8 +195,29 @@ void AttachBrowserAgentsForActiveBrowser(Browser* browser) {
   CredentialProviderBrowserAgent::CreateForBrowser(browser);
 #endif
 
-  if (!browser_is_off_record && IsPageActionMenuEnabled()) {
+  if (!browser_is_inactive && !browser_is_temporary && !browser_is_off_record &&
+      IsPageActionMenuEnabled()) {
     BwgBrowserAgent::CreateForBrowser(browser);
+  }
+
+  if (!browser_is_inactive && !browser_is_temporary && !browser_is_off_record) {
+    if (data_sharing::features::ShouldInterceptUrlForVersioning()) {
+      if (collaboration::CollaborationService* collaboration_service =
+              collaboration::CollaborationServiceFactory::GetForProfile(
+                  profile)) {
+        DataSharingBrowserAgent::CreateForBrowser(browser,
+                                                  collaboration_service);
+      }
+    }
+  }
+
+  if (!browser_is_inactive && !browser_is_temporary && !browser_is_off_record) {
+    PrerenderBrowserAgent::CreateForBrowser(browser);
+  }
+
+  if (IsCleanupPersistedTabContextsEnabled() && !browser_is_off_record &&
+      !browser_is_inactive && !browser_is_temporary) {
+    PersistTabContextBrowserAgent::CreateForBrowser(browser);
   }
 
   // This needs to be called last in case any downstream browser agents need to

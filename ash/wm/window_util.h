@@ -13,6 +13,7 @@
 #include "ash/wm/window_transient_descendant_iterator.h"
 #include "ash/wm/wm_metrics.h"
 #include "base/memory/raw_ptr.h"
+#include "chromeos/ui/base/window_properties.h"
 #include "chromeos/ui/base/window_state_type.h"
 #include "ui/aura/window.h"
 #include "ui/gfx/geometry/rounded_corners_f.h"
@@ -20,6 +21,10 @@
 #include "ui/wm/core/window_util.h"
 
 class PrefRegistrySimple;
+
+namespace ash {
+class WindowState;
+}
 
 namespace gfx {
 class Point;
@@ -88,6 +93,7 @@ ASH_EXPORT void GetBlockingContainersForRoot(
 ASH_EXPORT bool IsWindowUserPositionable(aura::Window* window);
 
 // Pins the window on top of other windows.
+// TODO(crbug.com/429215055): Rename 'trusted' to a more appropriate name.
 ASH_EXPORT void PinWindow(aura::Window* window, bool trusted);
 
 // Indicates that the window should autohide the shelf when it is the active
@@ -114,10 +120,17 @@ ASH_EXPORT void CloseWidgetForWindow(aura::Window* window);
 // Installs a resize handler on the window that makes it easier to resize
 // the window.
 ASH_EXPORT void InstallResizeHandleWindowTargeterForWindow(
-    aura::Window* window);
+    aura::Window* window,
+    chromeos::ResizeBorderInsets border_insets =
+        chromeos::ResizeBorderInsets());
 
 // Returns true if `window` is currently in tab-dragging process.
 ASH_EXPORT bool IsDraggingTabs(const aura::Window* window);
+
+// For a tab drag window (see `IsDraggingTabs`) returns the state of the source
+// window if any. Otherwise returns nullptr.
+ASH_EXPORT const WindowState* GetTabDraggingSourceWindowState(
+    const aura::Window* drag_window);
 
 // Returns true if `window` should be excluded from the cycle list and/or
 // overview.

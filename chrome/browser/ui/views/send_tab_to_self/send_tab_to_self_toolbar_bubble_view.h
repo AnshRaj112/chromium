@@ -10,7 +10,7 @@
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 
-class Browser;
+class BrowserWindowInterface;
 struct NavigateParams;
 
 namespace send_tab_to_self {
@@ -23,8 +23,8 @@ class SendTabToSelfToolbarBubbleView : public views::BubbleDialogDelegateView {
 
  public:
   SendTabToSelfToolbarBubbleView(
-      const Browser* browser,
-      View* parent,
+      BrowserWindowInterface& browser,
+      views::BubbleAnchor anchor,
       const SendTabToSelfEntry& entry,
       base::OnceCallback<void(NavigateParams*)> navigate_callback);
 
@@ -32,8 +32,8 @@ class SendTabToSelfToolbarBubbleView : public views::BubbleDialogDelegateView {
 
   // Creates and shows the bubble.
   static SendTabToSelfToolbarBubbleView* CreateBubble(
-      const Browser* browser,
-      View* parent,
+      BrowserWindowInterface& browser,
+      views::BubbleAnchor anchor,
       const SendTabToSelfEntry& entry,
       base::OnceCallback<void(NavigateParams*)> navigate_callback);
 
@@ -56,7 +56,7 @@ class SendTabToSelfToolbarBubbleView : public views::BubbleDialogDelegateView {
 
   bool opened_ = false;
 
-  raw_ptr<const Browser> browser_;
+  const raw_ref<BrowserWindowInterface> browser_;
 
   raw_ptr<views::Label> title_label_;
   raw_ptr<views::Label> url_label_;

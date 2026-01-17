@@ -9,7 +9,7 @@
 #include <string>
 
 #include "base/memory/raw_ptr.h"
-#include "base/memory/ref_counted.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/run_loop.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/scoped_feature_list.h"
@@ -133,8 +133,8 @@ class LayerTreeTest : public testing::Test, public TestHooks {
   }
 
  protected:
-  explicit LayerTreeTest(
-      viz::RendererType renderer_type = kDefaultRendererType);
+  LayerTreeTest(viz::RendererType renderer_type = kDefaultRendererType,
+                bool disable_trees_in_viz = false);
 
   void SkipAllocateInitialLocalSurfaceId();
   const viz::LocalSurfaceId& GetCurrentLocalSurfaceId() const;
@@ -315,7 +315,7 @@ class LayerTreeTest : public testing::Test, public TestHooks {
 // the unit test suite. Instead, comment out the usage of this macro for
 // a specific test name. eg.
 // // TODO(crbug.com/abcd): Disabled for some reasons stated here.
-// // SINGLE_AND_MULTI_THREAD_TEST_F(SomeRandomTest)
+// // SINGLE_THREAD_TEST_F(SomeRandomTest)
 #define SINGLE_THREAD_TEST_F(TEST_FIXTURE_NAME)                   \
   TEST_F(TEST_FIXTURE_NAME, RunSingleThread_DelegatingRenderer) { \
     RunTest(CompositorMode::SINGLE_THREADED);                     \
@@ -326,7 +326,7 @@ class LayerTreeTest : public testing::Test, public TestHooks {
 // the unit test suite. Instead, comment out the usage of this macro for
 // a specific test name. eg.
 // // TODO(crbug.com/abcd): Disabled for some reasons stated here.
-// // SINGLE_AND_MULTI_THREAD_TEST_F(SomeRandomTest)
+// // MULTI_THREAD_TEST_F(SomeRandomTest)
 #define MULTI_THREAD_TEST_F(TEST_FIXTURE_NAME)                   \
   TEST_F(TEST_FIXTURE_NAME, RunMultiThread_DelegatingRenderer) { \
     RunTest(CompositorMode::THREADED);                           \

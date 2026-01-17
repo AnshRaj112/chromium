@@ -13,12 +13,12 @@
 #include "ash/constants/ash_paths.h"
 #include "base/check_is_test.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/notreached.h"
 #include "base/path_service.h"
 #include "base/syslog_logging.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/time/default_clock.h"
 #include "base/values.h"
 #include "chrome/browser/ash/policy/core/device_local_account.h"
@@ -139,6 +139,7 @@ DeviceLocalAccountPolicyBroker::DeviceLocalAccountPolicyBroker(
       core_(dm_protocol::kChromePublicAccountPolicyType,
             store_->account_id(),
             store_.get(),
+            /*extension_install_store=*/nullptr,
             task_runner,
             base::BindRepeating(&content::GetNetworkConnectionTracker)),
       policy_update_callback_(policy_update_callback),
@@ -209,8 +210,7 @@ void DeviceLocalAccountPolicyBroker::ConnectIfPossible(
   invalidator_ = std::make_unique<CloudPolicyInvalidator>(
       PolicyInvalidationScope::kDeviceLocalAccount, invalidation_listener_,
       &core_, base::SingleThreadTaskRunner::GetCurrentDefault(),
-      base::DefaultClock::GetInstance(),
-      /*highest_handled_invalidation_version=*/0, account_id_);
+      base::DefaultClock::GetInstance(), account_id_);
 }
 
 void DeviceLocalAccountPolicyBroker::UpdateRefreshDelay() {

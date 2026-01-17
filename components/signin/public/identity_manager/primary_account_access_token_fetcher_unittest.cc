@@ -12,9 +12,9 @@
 #include "base/test/task_environment.h"
 #include "build/build_config.h"
 #include "components/signin/public/base/consent_level.h"
+#include "components/signin/public/base/oauth_consumer_id.h"
 #include "components/signin/public/identity_manager/access_token_info.h"
 #include "components/signin/public/identity_manager/identity_test_environment.h"
-#include "components/signin/public/identity_manager/oauth_consumer_ids.h"
 #include "google_apis/gaia/gaia_constants.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -231,7 +231,7 @@ TEST_P(PrimaryAccountAccessTokenFetcherTest, OneShotCallsBackWhenSignedOut) {
   auto fetcher = CreateFetcher(
       base::BindOnce(&OnAccessTokenFetchComplete, run_loop.QuitClosure(),
                      GoogleServiceAuthError(
-                         GoogleServiceAuthError::State::USER_NOT_SIGNED_UP),
+                         GoogleServiceAuthError::State::ACCOUNT_NOT_FOUND),
                      AccessTokenInfo()),
       PrimaryAccountAccessTokenFetcher::Mode::kImmediate);
 
@@ -249,7 +249,7 @@ TEST_P(PrimaryAccountAccessTokenFetcherTest,
   auto fetcher = CreateFetcher(
       base::BindOnce(&OnAccessTokenFetchComplete, run_loop.QuitClosure(),
                      GoogleServiceAuthError(
-                         GoogleServiceAuthError::State::USER_NOT_SIGNED_UP),
+                         GoogleServiceAuthError::State::ACCOUNT_NOT_FOUND),
                      AccessTokenInfo()),
       PrimaryAccountAccessTokenFetcher::Mode::kImmediate);
 
@@ -468,7 +468,7 @@ TEST_P(PrimaryAccountAccessTokenFetcherTest,
   // *not* retry.
   EXPECT_CALL(
       callback,
-      Run(GoogleServiceAuthError(GoogleServiceAuthError::USER_NOT_SIGNED_UP),
+      Run(GoogleServiceAuthError(GoogleServiceAuthError::ACCOUNT_NOT_FOUND),
           AccessTokenInfo()));
 
   identity_test_env()->ClearPrimaryAccount();
@@ -492,7 +492,7 @@ TEST_P(PrimaryAccountAccessTokenFetcherTest,
   // access token requests get canceled, and the fetcher should *not* retry.
   EXPECT_CALL(
       callback,
-      Run(GoogleServiceAuthError(GoogleServiceAuthError::USER_NOT_SIGNED_UP),
+      Run(GoogleServiceAuthError(GoogleServiceAuthError::ACCOUNT_NOT_FOUND),
           AccessTokenInfo()));
   identity_test_env()->RemoveRefreshTokenForPrimaryAccount();
 }

@@ -72,12 +72,6 @@ void LogAuthSource(device_reauth::DeviceAuthSource source) {
                                 source);
 }
 
-void LogCanAuthenticate(BiometricsAvailability availability) {
-  base::UmaHistogramEnumeration(
-      "Android.DeviceAuthenticator.CanAuthenticateWithBiometrics",
-      availability);
-}
-
 }  // namespace
 
 DeviceAuthenticatorAndroid::DeviceAuthenticatorAndroid(
@@ -94,7 +88,6 @@ DeviceAuthenticatorAndroid::~DeviceAuthenticatorAndroid() = default;
 
 bool DeviceAuthenticatorAndroid::CanAuthenticateWithBiometrics() {
   BiometricsAvailability availability = bridge_->CanAuthenticateWithBiometric();
-  LogCanAuthenticate(availability);
   return availability == BiometricsAvailability::kAvailable;
 }
 
@@ -134,9 +127,6 @@ device_reauth::BiometricStatus
 DeviceAuthenticatorAndroid::GetBiometricAvailabilityStatus() {
   BiometricsAvailability availability = bridge_->CanAuthenticateWithBiometric();
   switch (availability) {
-    case device_reauth::BiometricsAvailability::kRequired:
-    case device_reauth::BiometricsAvailability::kRequiredButHasError:
-      return device_reauth::BiometricStatus::kRequired;
     case device_reauth::BiometricsAvailability::kAvailable:
       return device_reauth::BiometricStatus::kBiometricsAvailable;
     // TODO (crbug.com/369057610): Probably return status `kAvailable` for

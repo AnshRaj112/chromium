@@ -4,10 +4,11 @@
 
 #include "services/webnn/webnn_graph_impl.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
+#include <memory>
 
-#include "base/containers/contains.h"
 #include "base/memory/weak_ptr.h"
 #include "base/notreached.h"
 #include "base/strings/strcat.h"
@@ -16,7 +17,6 @@
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/test/scoped_feature_list.h"
-#include "base/test/task_environment.h"
 #include "base/test/test_future.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
 #include "mojo/public/cpp/bindings/remote.h"
@@ -30,14 +30,16 @@
 #include "services/webnn/public/cpp/webnn_types.h"
 #include "services/webnn/public/mojom/features.mojom-features.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
-#include "services/webnn/public/mojom/webnn_device.mojom-data-view.h"
+#include "services/webnn/public/mojom/webnn_device.mojom-shared.h"
 #include "services/webnn/public/mojom/webnn_graph.mojom.h"
 #include "services/webnn/public/mojom/webnn_graph_builder.mojom.h"
 #include "services/webnn/public/mojom/webnn_tensor.mojom.h"
+#include "services/webnn/scoped_gpu_sequence.h"
 #include "services/webnn/webnn_constant_operand.h"
 #include "services/webnn/webnn_context_impl.h"
 #include "services/webnn/webnn_context_provider_impl.h"
 #include "services/webnn/webnn_tensor_impl.h"
+#include "services/webnn/webnn_test_environment.h"
 #include "services/webnn/webnn_test_utils.h"
 #include "services/webnn/webnn_utils.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -100,27 +102,45 @@ class FakeWebNNTensorImpl final : public WebNNTensorImpl {
   // `WebNNGraphImpl::Dispatch()` function.
   void ReadTensorImpl(ReadTensorCallback callback) override {}
   void WriteTensorImpl(mojo_base::BigBuffer src_buffer) override {}
+  // Interop is not required by tests.
+  bool ImportTensorImpl(ScopedAccessPtr access) override { return false; }
+  void ExportTensorImpl(ScopedAccessPtr access,
+                        ExportTensorCallback callback) override {}
 };
 
 // A fake WebNNContext Mojo interface implementation that binds a pipe for
 // creating graph message.
 class FakeWebNNContextImpl final : public WebNNContextImpl {
  public:
-  FakeWebNNContextImpl(mojo::PendingReceiver<mojom::WebNNContext> receiver,
-                       WebNNContextProviderImpl* context_provider)
+  FakeWebNNContextImpl(
+      mojo::PendingReceiver<mojom::WebNNContext> receiver,
+      base::WeakPtr<WebNNContextProviderImpl> context_provider,
+      std::unique_ptr<ScopedGpuSequence> gpu_sequence,
+      scoped_refptr<gpu::MemoryTracker> memory_tracker,
+      scoped_refptr<base::SingleThreadTaskRunner> owning_task_runner,
+      gpu::SharedImageManager* shared_image_manager,
+      scoped_refptr<base::SingleThreadTaskRunner> main_task_runner)
       : WebNNContextImpl(std::move(receiver),
-                         context_provider,
+                         std::move(context_provider),
                          GetContextPropertiesForTesting(),
-                         mojom::CreateContextOptions::New()) {}
-  ~FakeWebNNContextImpl() override = default;
+                         mojom::CreateContextOptions::New(),
+                         mojo::ScopedDataPipeConsumerHandle(),
+                         mojo::ScopedDataPipeProducerHandle(),
+                         std::move(gpu_sequence),
+                         std::move(memory_tracker),
+                         std::move(owning_task_runner),
+                         shared_image_manager,
+                         std::move(main_task_runner)) {}
 
   // WebNNContextImpl:
   base::WeakPtr<WebNNContextImpl> AsWeakPtr() override {
-    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+    DCHECK_CALLED_ON_VALID_SEQUENCE(gpu_sequence_checker_);
     return weak_factory_.GetWeakPtr();
   }
 
  private:
+  ~FakeWebNNContextImpl() override = default;
+
   void CreateGraphImpl(
       mojo::PendingAssociatedReceiver<mojom::WebNNGraph> receiver,
       mojom::GraphInfoPtr graph_info,
@@ -135,19 +155,21 @@ class FakeWebNNContextImpl final : public WebNNContextImpl {
         std::move(compute_resource_info), std::move(callback));
   }
 
-  void CreateTensorImpl(
-      mojo::PendingAssociatedReceiver<mojom::WebNNTensor> receiver,
-      mojom::TensorInfoPtr tensor_info,
-      CreateTensorImplCallback callback) override {
-    std::move(callback).Run(base::MakeRefCounted<FakeWebNNTensorImpl>(
-        std::move(receiver), AsWeakPtr(), std::move(tensor_info)));
+  base::expected<scoped_refptr<WebNNTensorImpl>, mojom::ErrorPtr>
+  CreateTensorImpl(mojo::PendingAssociatedReceiver<mojom::WebNNTensor> receiver,
+                   mojom::TensorInfoPtr tensor_info) override {
+    return base::MakeRefCounted<FakeWebNNTensorImpl>(
+        std::move(receiver), AsWeakPtr(), std::move(tensor_info));
   }
 
-  void CreateTensorFromMailboxImpl(
+  base::expected<scoped_refptr<WebNNTensorImpl>, mojom::ErrorPtr>
+  CreateTensorFromSharedImageImpl(
       mojo::PendingAssociatedReceiver<mojom::WebNNTensor> receiver,
       mojom::TensorInfoPtr tensor_info,
-      gpu::Mailbox mailbox,
-      CreateTensorImplCallback callback) override {}
+      WebNNTensorImpl::RepresentationPtr representation) override {
+    return base::unexpected(mojom::Error::New(
+        mojom::Error::Code::kNotSupportedError, "Not implemented"));
+  }
 
   base::WeakPtrFactory<FakeWebNNContextImpl> weak_factory_{this};
 };
@@ -156,19 +178,31 @@ class FakeWebNNContextImpl final : public WebNNContextImpl {
 // the graph validation steps and computation resources.
 class FakeWebNNBackend : public WebNNContextProviderImpl::BackendForTesting {
  public:
-  std::unique_ptr<WebNNContextImpl> CreateWebNNContext(
-      WebNNContextProviderImpl* context_provider_impl,
+  std::unique_ptr<WebNNContextImpl, OnTaskRunnerDeleter> CreateWebNNContext(
+      base::WeakPtr<WebNNContextProviderImpl> context_provider_impl,
       mojom::CreateContextOptionsPtr options,
+      std::unique_ptr<ScopedGpuSequence> gpu_sequence,
+      scoped_refptr<gpu::MemoryTracker> memory_tracker,
+      scoped_refptr<base::SingleThreadTaskRunner> owning_task_runner,
+      gpu::SharedImageManager* shared_image_manager,
+      scoped_refptr<base::SingleThreadTaskRunner> main_task_runner,
       mojom::WebNNContextProvider::CreateWebNNContextCallback callback)
       override {
     mojo::PendingRemote<mojom::WebNNContext> remote;
-    auto context_impl = std::make_unique<FakeWebNNContextImpl>(
-        remote.InitWithNewPipeAndPassReceiver(), context_provider_impl);
+    auto task_runner = owning_task_runner;
+    std::unique_ptr<WebNNContextImpl, OnTaskRunnerDeleter> context_impl(
+        new FakeWebNNContextImpl(
+            remote.InitWithNewPipeAndPassReceiver(),
+            std::move(context_provider_impl), std::move(gpu_sequence),
+            std::move(memory_tracker), std::move(owning_task_runner),
+            shared_image_manager, std::move(main_task_runner)),
+        OnTaskRunnerDeleter(std::move(task_runner)));
     ContextProperties context_properties = context_impl->properties();
     // The receiver bound to FakeWebNNContext.
     auto success = mojom::CreateContextSuccess::New(
         std::move(remote), std::move(context_properties),
-        context_impl->handle());
+        context_impl->handle(), mojo::ScopedDataPipeProducerHandle(),
+        mojo::ScopedDataPipeConsumerHandle());
     std::move(callback).Run(
         mojom::CreateContextResult::NewSuccess(std::move(success)));
     return context_impl;
@@ -284,7 +318,7 @@ class WebNNGraphImplTest : public testing::Test {
   void SetUp() override {
     WebNNContextProviderImpl::SetBackendForTesting(&backend_for_testing_);
 
-    WebNNContextProviderImpl::CreateForTesting(
+    webnn_test_environment_.BindWebNNContextProvider(
         provider_remote_.BindNewPipeAndPassReceiver());
 
     base::test::TestFuture<mojom::CreateContextResultPtr> create_context_future;
@@ -306,6 +340,10 @@ class WebNNGraphImplTest : public testing::Test {
     return remote;
   }
 
+  mojo::Remote<mojom::WebNNContextProvider>& provider_remote() {
+    return provider_remote_;
+  }
+
  protected:
   WebNNGraphImplTest()
       : scoped_feature_list_(
@@ -314,10 +352,10 @@ class WebNNGraphImplTest : public testing::Test {
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_;
-  base::test::TaskEnvironment task_environment_;
 
   FakeWebNNBackend backend_for_testing_;
 
+  test::WebNNTestEnvironment webnn_test_environment_;
   mojo::Remote<mojom::WebNNContextProvider> provider_remote_;
   mojo::Remote<mojom::WebNNContext> webnn_context_;
 };
@@ -506,7 +544,7 @@ TEST_F(WebNNGraphImplTest, ClampTest) {
         .input = {.type = OperandDataType::kInt32, .dimensions = {2, 3, 4}},
         .attributes = {.min_value = NAN, .max_value = 3.0},
         .output = {.type = OperandDataType::kInt32, .dimensions = {2, 3, 4}},
-        .expected = true}
+        .expected = false}
         .Test(*this);
   }
   {
@@ -515,7 +553,7 @@ TEST_F(WebNNGraphImplTest, ClampTest) {
         .input = {.type = OperandDataType::kInt32, .dimensions = {2, 3, 4}},
         .attributes = {.min_value = -3.0, .max_value = NAN},
         .output = {.type = OperandDataType::kInt32, .dimensions = {2, 3, 4}},
-        .expected = true}
+        .expected = false}
         .Test(*this);
   }
   {
@@ -2065,7 +2103,7 @@ class ElementWiseUnaryDataTypeFixture
     const bool expected =
         (inputDataType == outputDataType ||
          kOperatorsWithDissimilarDatatypeSupport.contains(kind)) &&
-        base::Contains(operator_trait.second, inputDataType);
+        std::ranges::contains(operator_trait.second, inputDataType);
 
     ElementWiseUnaryTester{
         .kind = kind,
@@ -2487,6 +2525,22 @@ TEST_F(WebNNGraphImplTest, ExpandTest) {
     OperandId input_operand_id =
         builder.BuildInput("input", {2}, OperandDataType::kFloat32);
     builder.BuildExpand(input_operand_id, input_operand_id);
+    EXPECT_FALSE(builder.IsValidGraphForTesting(context_properties));
+  }
+  {
+    // Test the invalid graph that output rank exceeds limits.
+    auto context_properties = GetContextPropertiesForTesting();
+    static constexpr SupportedRanks kRankLimit = SupportedRanks::UpTo(4);
+    context_properties.data_type_limits.expand_input.ranks.IntersectWith(
+        kRankLimit);
+    mojo::AssociatedRemote<mojom::WebNNGraphBuilder> remote =
+        BindNewGraphBuilderRemote();
+    GraphInfoBuilder builder(remote);
+    OperandId input_operand_id =
+        builder.BuildInput("input", {2}, OperandDataType::kFloat32);
+    OperandId output_operand_id = builder.BuildOutput(
+        "output", {1, 1, 1, 1, 2}, OperandDataType::kFloat32);
+    builder.BuildExpand(input_operand_id, output_operand_id);
     EXPECT_FALSE(builder.IsValidGraphForTesting(context_properties));
   }
 }
@@ -4844,6 +4898,18 @@ TEST_F(WebNNGraphImplTest, PadTest) {
         .Test(*this);
   }
   {
+    // Test pad with value = NAN, beginningPadding = {1, 2} and
+    // endingPadding = {1, 2}.
+    PadTester{
+        .input = {.type = OperandDataType::kFloat32, .dimensions = {2, 3}},
+        .beginning_padding = {1, 2},
+        .ending_padding = {1, 2},
+        .value = NAN,
+        .output = {.type = OperandDataType::kFloat32, .dimensions = {4, 7}},
+        .expected = true}
+        .Test(*this);
+  }
+  {
     // Test the invalid graph when the length of beginningPadding is not
     // equal to the input rank.
     PadTester{
@@ -6012,6 +6078,22 @@ TEST_F(WebNNGraphImplTest, ReshapeTest) {
         .output = {.type = OperandDataType::kInt32, .dimensions = {2}},
         .expected = false}
         .Test(*this);
+  }
+  {
+    // Test the invalid graph that output rank exceeds limits.
+    auto context_properties = GetContextPropertiesForTesting();
+    static constexpr SupportedRanks kRankLimit = SupportedRanks::UpTo(4);
+    context_properties.data_type_limits.reshape_input.ranks.IntersectWith(
+        kRankLimit);
+    mojo::AssociatedRemote<mojom::WebNNGraphBuilder> remote =
+        BindNewGraphBuilderRemote();
+    GraphInfoBuilder builder(remote);
+    OperandId input_operand_id =
+        builder.BuildInput("input", {2}, OperandDataType::kFloat32);
+    OperandId output_operand_id = builder.BuildOutput(
+        "output", {2, 1, 1, 1, 1}, OperandDataType::kFloat32);
+    builder.BuildReshape(input_operand_id, output_operand_id);
+    EXPECT_FALSE(builder.IsValidGraphForTesting(context_properties));
   }
 }
 
@@ -7511,14 +7593,10 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
                                  output_2_operand_id);
   EXPECT_TRUE(builder.IsValidGraphForTesting(context_properties));
 
-  mojo::Remote<mojom::WebNNContextProvider> provider_remote;
-  WebNNContextProviderImpl::CreateForTesting(
-      provider_remote.BindNewPipeAndPassReceiver());
-
   {
     // Validate the inputs match the expected.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     inputs["rhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
@@ -7531,7 +7609,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the invalid inputs for invalid input size.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     base::flat_map<std::string, CreateTensorSuccess> outputs;
@@ -7543,7 +7621,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the invalid outputs for invalid output size.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     inputs["rhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
@@ -7558,7 +7636,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the invalid inputs for invalid input name.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["a_different_input_name"] =
         CreateWebNNTensor(webnn_context, kDataType, kShape);
@@ -7572,7 +7650,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the invalid outputs for invalid input name.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     inputs["rhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
@@ -7586,7 +7664,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the invalid inputs for invalid first input shape.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, {2, 5});
     inputs["rhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
@@ -7599,7 +7677,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the invalid inputs for invalid first input data type.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] =
         CreateWebNNTensor(webnn_context, OperandDataType::kInt8, kShape);
@@ -7613,7 +7691,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the invalid outputs for invalid first output shape.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     inputs["rhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
@@ -7626,7 +7704,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the invalid inputs for invalid second input data type.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     inputs["rhs"] =
@@ -7640,7 +7718,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the invalid outputs for invalid second output shape.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     inputs["rhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
@@ -7653,7 +7731,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the inputs using the same tensor more than once.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     inputs["rhs"] = {/*webnn_tensor=*/std::nullopt, inputs["lhs"].webnn_handle};
@@ -7666,7 +7744,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the invalid outputs when using the same tensor more than once.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     inputs["rhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
@@ -7680,7 +7758,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the inputs and outputs are invalid when using the same tensor.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     inputs["rhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
@@ -7694,7 +7772,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the inputs are invalid when using a invalid tensor.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = {/*webnn_tensor=*/std::nullopt};
     inputs["rhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
@@ -7707,7 +7785,7 @@ TEST_F(WebNNGraphImplTest, ValidateDispatchTest) {
   {
     // Test the outputs are invalid when using a invalid tensor.
     mojo::Remote<mojom::WebNNContext> webnn_context =
-        CreateWebNNContext(provider_remote);
+        CreateWebNNContext(provider_remote());
     base::flat_map<std::string, CreateTensorSuccess> inputs;
     inputs["lhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);
     inputs["rhs"] = CreateWebNNTensor(webnn_context, kDataType, kShape);

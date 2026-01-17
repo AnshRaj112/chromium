@@ -14,7 +14,6 @@ import org.chromium.components.tab_groups.TabGroupColorId;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.util.List;
 
 // TODO(crbug.com/434015906): Remove all references to RootId after TabCollections is launched.
 /** An interface to be notified about changes to a {@link TabGroupModelFilter}. */
@@ -27,7 +26,7 @@ public interface TabGroupModelFilterObserver {
         DidRemoveTabGroupReason.CLOSE
     })
     @Retention(RetentionPolicy.SOURCE)
-    public @interface DidRemoveTabGroupReason {
+    @interface DidRemoveTabGroupReason {
         /** Groups are merged together. */
         int MERGE = 0;
 
@@ -81,7 +80,8 @@ public interface TabGroupModelFilterObserver {
      */
     default void didMergeTabToGroup(Tab movedTab, boolean isDestinationTab) {}
 
-    // TODO(crbug.com/434015906): Passing the last tab here is a limitation of the current TabGroupModelFilterImpl, we should fix this once tab collections is launched.
+    // TODO(crbug.com/434015906): Passing the last tab here is a limitation of the current
+    // TabGroupModelFilterImpl, we should fix this once tab collections is launched.
     /**
      * This method is called after a group is moved.
      *
@@ -109,27 +109,12 @@ public interface TabGroupModelFilterObserver {
      */
     default void didMoveTabOutOfGroup(Tab movedTab, int prevFilterIndex) {}
 
-    // TODO(crbug.com/432794806): Refactor this to either not exist or pass a single metadata object.
     /**
-     * This method is called after a group is created manually by user. Either using the
-     * TabListEditor (Group tab menu item) or using drag and drop.
+     * This method is called after a group is created and an undo group snackbar should be shown.
      *
-     * @param tabs The list of modified {@link Tab}s.
-     * @param tabOriginalIndex The original tab index for each modified tab.
-     * @param tabOriginalRootId The original root id for each modified tab.
-     * @param tabOriginalTabGroupId The original tab group id for each modified tab.
-     * @param destinationGroupTitle The original destination group title.
-     * @param destinationGroupColorId The original destination group color id.
-     * @param destinationGroupTitleCollapsed Whether the destination group was originally collapsed.
+     * @param undoGroupMetadata Metadata to undo the group operation.
      */
-    default void showUndoGroupSnackbar(
-            List<Tab> tabs,
-            List<Integer> tabOriginalIndex,
-            List<Integer> tabOriginalRootId,
-            List<Token> tabOriginalTabGroupId,
-            @Nullable String destinationGroupTitle,
-            int destinationGroupColorId,
-            boolean destinationGroupTitleCollapsed) {}
+    default void showUndoGroupSnackbar(UndoGroupMetadata undoGroupMetadata) {}
 
     /**
      * This method is called after a new tab group is created, either through drag and drop, the tab

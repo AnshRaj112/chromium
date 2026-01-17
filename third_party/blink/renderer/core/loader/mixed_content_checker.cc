@@ -28,9 +28,9 @@
 
 #include "third_party/blink/renderer/core/loader/mixed_content_checker.h"
 
+#include <algorithm>
 #include <optional>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
 #include "build/build_config.h"
@@ -236,6 +236,15 @@ bool IsUrlPotentiallyTrustworthy(const KURL& url) {
   return network::IsUrlPotentiallyTrustworthy(GURL(url));
 }
 
+// Check to see if URL is possibly an LNA request based solely on the URL.
+bool IsUrlLNARequest(const KURL& url) {
+  std::optional<network::mojom::IPAddressSpace> ip_address_space =
+      network::GetAddressSpaceFromUrl(GURL(url));
+  return ip_address_space &&
+         (ip_address_space == network::mojom::IPAddressSpace::kLocal ||
+          ip_address_space == network::mojom::IPAddressSpace::kLoopback);
+}
+
 }  // namespace
 
 static bool IsInsecureUrl(const KURL& url) {
@@ -275,8 +284,8 @@ static void MeasureStricterVersionOfIsMixedContent(Frame& frame,
           WebFeature::kMixedContentInNonHTTPSFrameThatRestrictsMixedContent);
     }
   } else if (!IsUrlPotentiallyTrustworthy(url) &&
-             base::Contains(url::GetSecureSchemes(),
-                            origin->Protocol().Ascii())) {
+             std::ranges::contains(url::GetSecureSchemes(),
+                                   origin->Protocol().Ascii())) {
     UseCounter::Count(
         source->GetDocument(),
         WebFeature::kMixedContentInSecureFrameThatDoesNotRestrictMixedContent);
@@ -510,19 +519,14 @@ bool MixedContentChecker::ShouldBlockFetch(
   switch (context_type) {
     case mojom::blink::MixedContentContextType::kOptionallyBlockable:
 
-#if (BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(IS_LINUX)) && \
-    BUILDFLAG(ENABLE_CAST_RECEIVER)
-      // Fuchsia WebEngine can be configured to allow loading Mixed Content from
-      // an insecure IP address. This is a workaround to revert Fuchsia Cast
+#if BUILDFLAG(ENABLE_CAST_RECEIVER)
+      // Cast receivers can be configured to allow loading Mixed Content from
+      // an insecure IP address. This is a workaround to revert Cast
       // Receivers to the behavior before crrev.com/c/4032146.
-      // TODO(crbug.com/1434440): Remove this workaround when there is a better
-      // way to disable blocking Mixed Content with an IP address.
       allowed = !strict_mode;
 #else
       allowed = !strict_mode && !GURL(url).HostIsIPAddress();
-#endif  // (BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(IS_LINUX)) &&
-        // BUILDFLAG(ENABLE_CAST_RECEIVER)
-
+#endif  // BUILDFLAG(ENABLE_CAST_RECEIVER)
       if (allowed) {
         if (content_settings_client)
           content_settings_client->PassiveInsecureContentFound(url);
@@ -584,9 +588,9 @@ bool MixedContentChecker::ShouldBlockFetch(
       NOTREACHED();
   };
 
-  // Skip mixed content check for local and loopback targets if the request is a
-  // Local Network Access (LNA) request. LNA checks later on will ensure that
-  // (a) the request is actually an LNA request, and (b) the user has given
+  // Skip mixed content check for URLs where we can determine that the request
+  // is a Local Network Access (LNA) request. LNA checks later on will ensure
+  // that (a) the request is actually an LNA request, and (b) the user has given
   // permission for the LNA request to go through.
   //
   // Reference:
@@ -602,19 +606,18 @@ bool MixedContentChecker::ShouldBlockFetch(
     // (1) The `targetAddressSpace` fetch option was set.
     //     `target_address_space` here is private/local only when resource
     //     request has explicitly set `targetAddressSpace` fetch option.
-    // (2) The host is a private IP address literal
-    // (3) The hostname is a .local domain (per RFC 6762).
+    // (2) The url can be determined to be hosted in the local or loopback
+    //      address spaces.
     //
-    // There is no check for loopback addresses because loopback addresses are
-    // considered secure and not mixed content.
+    // Loopback addresses shouldn't need to be checked as they are considered
+    // secure and not mixed content, but it can't hurt.
     //
     // TODO(crbug.com/395895368): check the IP address space for initiator, only
     // skip when the initiator is more public.
     if (target_address_space == network::mojom::blink::IPAddressSpace::kLocal ||
         target_address_space ==
             network::mojom::blink::IPAddressSpace::kLoopback ||
-        network::ParsePrivateIpFromUrl(GURL(url)) ||
-        network::IsRFC6762LocalDomain(GURL(url))) {
+        IsUrlLNARequest(url)) {
       allowed = true;
     }
   }
@@ -753,6 +756,23 @@ bool MixedContentChecker::IsWebSocketAllowed(
         content_settings_client->AllowRunningInsecureContent(allowed, url);
   }
 
+  // Skip mixed content check when we can determine that the request is a Local
+  // Network Access (LNA) request. LNA checks later on will ensure that (a) the
+  // request is actually an LNA request, and (b) the user has given permission
+  // for the LNA request to go through.
+  //
+  // Reference:
+  // https://wicg.github.io/local-network-access/
+  if (!allowed &&
+      base::FeatureList::IsEnabled(
+          network::features::kLocalNetworkAccessChecks) &&
+      base::FeatureList::IsEnabled(
+          network::features::kLocalNetworkAccessChecksWebSockets)) {
+    if (IsUrlLNARequest(url)) {
+      allowed = true;
+    }
+  }
+
   if (allowed) {
     frame_fetch_context.GetContentSecurityNotifier().NotifyInsecureContentRan(
         KURL(security_origin->ToString()), url);
@@ -788,6 +808,23 @@ bool MixedContentChecker::IsWebSocketAllowed(
   bool allowed =
       IsWebSocketAllowedInWorker(worker_fetch_context, settings, url);
   allowed = worker_fetch_context.AllowRunningInsecureContent(allowed, url);
+
+  // Skip mixed content check when we can determine that the request is a Local
+  // Network Access (LNA) request. LNA checks later on will ensure that (a) the
+  // request is actually an LNA request, and (b) the user has given permission
+  // for the LNA request to go through.
+  //
+  // Reference:
+  // https://wicg.github.io/local-network-access/
+  if (!allowed &&
+      base::FeatureList::IsEnabled(
+          network::features::kLocalNetworkAccessChecks) &&
+      base::FeatureList::IsEnabled(
+          network::features::kLocalNetworkAccessChecksWebSockets)) {
+    if (IsUrlLNARequest(url)) {
+      allowed = true;
+    }
+  }
 
   if (allowed) {
     worker_fetch_context.GetContentSecurityNotifier().NotifyInsecureContentRan(
@@ -912,14 +949,11 @@ bool MixedContentChecker::ShouldAutoupgrade(
   // (1) The `targetAddressSpace` fetch option was set.
   //     `target_address_space` here is local/loopback only when resource
   //     request has explicitly set `targetAddressSpace` fetch option.
-  // (2) The host is a private IP address literal (already exempted above)
-  // (3) The hostname is a .local domain (per RFC 6762).
+  // (2) The url can be determined to be hosted in the local or loopback
+  //      address spaces.
   //
-  // Private IP address literals (2) are already included in the exemption
-  // above.
-  //
-  // There is no check for loopback addresses because loopback addresses are
-  // considered secure and not mixed content.
+  // Loopback addresses shouldn't need to be checked as they are considered
+  // secure and not mixed content, but it can't hurt.
   //
   // Reference:
   // https://wicg.github.io/local-network-access/
@@ -932,7 +966,7 @@ bool MixedContentChecker::ShouldAutoupgrade(
             network::mojom::blink::IPAddressSpace::kLocal ||
         resource_request.GetTargetAddressSpace() ==
             network::mojom::blink::IPAddressSpace::kLoopback ||
-        network::IsRFC6762LocalDomain(GURL(request_url))) {
+        IsUrlLNARequest(request_url)) {
       if (!request_url.ProtocolIs("https")) {
         if (auto* window =
                 DynamicTo<LocalDOMWindow>(execution_context_for_logging)) {

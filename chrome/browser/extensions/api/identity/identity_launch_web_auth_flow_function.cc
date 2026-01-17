@@ -17,10 +17,13 @@
 #include "chrome/common/extensions/api/identity.h"
 #include "components/prefs/pref_service.h"
 #include "extensions/browser/pref_names.h"
+#include "extensions/buildflags/buildflags.h"
 
 #if BUILDFLAG(IS_CHROMEOS)
 #include "chrome/browser/extensions/api/identity/launch_web_auth_flow_delegate_ash.h"
 #endif
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -167,9 +170,13 @@ void IdentityLaunchWebAuthFlowFunction::StartAuthFlow(
       this, profile, auth_url, mode, user_gesture(),
       abort_on_load_for_non_interactive, timeout_for_non_interactive,
       popup_bounds);
+
+  // TODO(crbug.com/434156398): Add support for the infobar on desktop Android.
+#if BUILDFLAG(ENABLE_EXTENSIONS)
   // An extension might call `launchWebAuthFlow()` with any URL. Add an infobar
   // to attribute displayed URL to the extension.
   auth_flow_->SetShouldShowInfoBar(extension()->name());
+#endif
 
   auth_flow_->Start();
 }
@@ -234,7 +241,7 @@ void IdentityLaunchWebAuthFlowFunction::OnAuthFlowFailure(
 
 void IdentityLaunchWebAuthFlowFunction::OnAuthFlowURLChange(
     const GURL& redirect_url) {
-  if (!base::Contains(final_url_domains_, redirect_url.Resolve("/"))) {
+  if (!std::ranges::contains(final_url_domains_, redirect_url.Resolve("/"))) {
     return;
   }
   RecordHistogramFunctionResult(

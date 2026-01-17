@@ -5,7 +5,6 @@
 #include "chrome/services/speech/soda_speech_recognizer_impl.h"
 
 #include <memory>
-#include <optional>
 #include <vector>
 
 #include "base/functional/bind.h"
@@ -13,6 +12,7 @@
 #include "base/task/bind_post_task.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "components/speech/audio_buffer.h"
 #include "components/speech/endpointer/endpointer.h"
 #include "media/base/audio_timestamp_helper.h"
@@ -22,6 +22,8 @@
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 
 namespace speech {
+
+constexpr base::TimeDelta kFinalResultTimerDuration = base::Seconds(1);
 
 SodaSpeechRecognizerImpl::SodaSpeechRecognizerImpl(
     bool continuous,
@@ -115,6 +117,14 @@ void SodaSpeechRecognizerImpl::OnSpeechRecognitionRecognitionEvent(
 
   waiting_for_final_result_ = !recognition_result.is_final;
 
+  if (state_ == STATE_WAITING_FINAL_RESULT && !recognition_result.is_final) {
+    // Extend the timer by another second if we are still waiting for a final
+    // result and just received a partial one.
+    final_result_timer_.Start(
+        FROM_HERE, kFinalResultTimerDuration,
+        base::BindOnce(&SodaSpeechRecognizerImpl::OnFinalResultTimeout,
+                       weak_ptr_factory_.GetWeakPtr()));
+  }
   // Map recognition results.
   std::vector<media::mojom::WebSpeechRecognitionResultPtr> results;
   results.push_back(media::mojom::WebSpeechRecognitionResult::New());
@@ -179,6 +189,15 @@ void SodaSpeechRecognizerImpl::SendAudioToSpeechRecognitionService(
       std::move(audio_data), std::nullopt);
 }
 
+void SodaSpeechRecognizerImpl::OnFinalResultTimeout() {
+  if (state_ != STATE_WAITING_FINAL_RESULT) {
+    return;
+  }
+
+  session_client_->Ended();
+  state_ = STATE_ENDED;
+}
+
 void SodaSpeechRecognizerImpl::DispatchEvent(const FSMEventArgs& event_args) {
   DCHECK_LE(event_args.event, EVENT_MAX_VALUE);
   DCHECK_LE(state_, STATE_MAX_VALUE);
@@ -207,8 +226,10 @@ void SodaSpeechRecognizerImpl::ProcessAudioPipeline(
   num_samples_recorded_ += event_args.audio_data->frame_count;
   if (state_ >= STATE_ESTIMATING_ENVIRONMENT && state_ <= STATE_RECOGNIZING) {
     float rms = 0.0f;
-    endpointer_.ProcessAudio(event_args.audio_data->data.data(),
-                             event_args.audio_data->frame_count, &rms);
+    base::span<const int16_t> audio_data_span(event_args.audio_data->data);
+    endpointer_.ProcessAudio(audio_data_span.first(static_cast<size_t>(
+                                 event_args.audio_data->frame_count)),
+                             &rms);
   }
 }
 
@@ -308,6 +329,11 @@ SodaSpeechRecognizerImpl::StopCaptureAndWaitForResult(const FSMEventArgs&) {
   session_client_->AudioEnded();
 
   if (waiting_for_final_result_) {
+    // If a final result is not received in 1 second, end the session.
+    final_result_timer_.Start(
+        FROM_HERE, kFinalResultTimerDuration,
+        base::BindOnce(&SodaSpeechRecognizerImpl::OnFinalResultTimeout,
+                       weak_ptr_factory_.GetWeakPtr()));
     return STATE_WAITING_FINAL_RESULT;
   }
 

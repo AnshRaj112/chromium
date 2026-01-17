@@ -1,11 +1,9 @@
 This is a testharness.js-based test.
-Found 42 FAIL, 0 TIMEOUT, 0 NOTRUN.
+Found 36 FAIL, 0 TIMEOUT, 0 NOTRUN.
 [FAIL] In <textarea>, execCommand("cut", false, null), ab[]c): execCommand() should return false
   assert_equals: expected false but got true
 [FAIL] In <textarea>, execCommand("copy", false, null), abc[]d): execCommand() should return false
   assert_equals: expected false but got true
-[FAIL] In <textarea>, execCommand("paste", false, null), a[]c): <textarea>.value should be "a[bc]c"
-  assert_equals: expected "a[bc]c" but got "abc[]c"
 [FAIL] In <textarea>, execCommand("undo", false, null), [a]bc): The command should not be enabled
   assert_equals: expected false but got true
 [FAIL] In <textarea>, execCommand("undo", false, null), [a]bc): execCommand() should return false
@@ -26,10 +24,6 @@ Found 42 FAIL, 0 TIMEOUT, 0 NOTRUN.
   assert_equals: expected true but got false
 [FAIL] In <textarea>, execCommand("inserthtml", false, <b>inserted</b>), a[b]c): input.inputType should be insertText
   assert_equals: expected "insertText" but got ""
-[FAIL] In <textarea>, execCommand("removeformat", false, null), a[b]c): The command should not be enabled
-  assert_equals: expected false but got true
-[FAIL] In <textarea>, execCommand("removeformat", false, null), a[b]c): execCommand() should return false
-  assert_equals: expected false but got true
 [FAIL] In <textarea>, execCommand("styleWithCSS", false, true), a[b]c): The command should not be enabled
   assert_equals: expected false but got true
 [FAIL] In <textarea>, execCommand("styleWithCSS", false, true), a[b]c): execCommand() should return false
@@ -58,8 +52,6 @@ Found 42 FAIL, 0 TIMEOUT, 0 NOTRUN.
   assert_equals: expected false but got true
 [FAIL] In <textarea> in contenteditable, execCommand("copy", false, null), abc[]d): execCommand() should return false
   assert_equals: expected false but got true
-[FAIL] In <textarea> in contenteditable, execCommand("paste", false, null), a[]c): <textarea>.value should be "a[bc]c"
-  assert_equals: expected "a[bc]c" but got "abc[]c"
 [FAIL] In <textarea> in contenteditable, execCommand("undo", false, null), [a]bc): The command should not be enabled
   assert_equals: expected false but got true
 [FAIL] In <textarea> in contenteditable, execCommand("undo", false, null), [a]bc): execCommand() should return false
@@ -80,9 +72,5 @@ Found 42 FAIL, 0 TIMEOUT, 0 NOTRUN.
   assert_equals: expected true but got false
 [FAIL] In <textarea> in contenteditable, execCommand("inserthtml", false, <b>inserted</b>), a[b]c): input.inputType should be insertText
   assert_equals: expected "insertText" but got ""
-[FAIL] In <textarea> in contenteditable, execCommand("removeformat", false, null), a[b]c): The command should not be enabled
-  assert_equals: expected false but got true
-[FAIL] In <textarea> in contenteditable, execCommand("removeformat", false, null), a[b]c): execCommand() should return false
-  assert_equals: expected false but got true
 Harness: the test ran to completion.
 

@@ -64,8 +64,9 @@ bool HasFormFactor(const FieldTrialTestingExperiment& experiment,
 // Returns true if the experiment config has a missing |min_os_version| or
 // GetOSVersion() >= |min_os_version|.
 bool HasMinOSVersion(const FieldTrialTestingExperiment& experiment) {
-  if (!experiment.min_os_version)
+  if (!experiment.min_os_version) {
     return true;
+  }
   return base::Version(experiment.min_os_version) <=
          ClientFilterableState::GetOSVersion();
 }
@@ -76,16 +77,6 @@ bool IsEnabledForBenchmarking(const FieldTrialTestingExperiment& experiment,
                               const bool is_benchmarking_enabled) {
   return !is_benchmarking_enabled ||
          !experiment.disable_benchmarking.value_or(false);
-}
-
-// Records the override ui string config. Mainly used for testing.
-void ApplyUIStringOverrides(
-    const FieldTrialTestingExperiment& experiment,
-    const VariationsSeedProcessor::UIStringOverrideCallback& callback) {
-  for (const auto& override_ui_string : experiment.override_ui_string) {
-    callback.Run(override_ui_string.name_hash,
-                 base::UTF8ToUTF16(override_ui_string.value));
-  }
 }
 
 // Determines whether an experiment should be skipped or not. An experiment
@@ -109,7 +100,6 @@ bool ShouldSkipExperiment(const FieldTrialTestingExperiment& experiment,
 void AssociateParamsFromExperiment(
     const std::string& study_name,
     const FieldTrialTestingExperiment& experiment,
-    const VariationsSeedProcessor::UIStringOverrideCallback& callback,
     base::FeatureList* feature_list) {
   if (ShouldSkipExperiment(experiment, feature_list)) {
     return;
@@ -136,8 +126,6 @@ void AssociateParamsFromExperiment(
     feature_list->RegisterFieldTrialOverride(
         disabled_feature, base::FeatureList::OVERRIDE_DISABLE_FEATURE, trial);
   }
-
-  ApplyUIStringOverrides(experiment, callback);
 }
 
 Study::Filter CreateFilter(const FieldTrialTestingExperiment& experiment) {
@@ -167,7 +155,6 @@ Study::Filter CreateFilter(const FieldTrialTestingExperiment& experiment) {
 // - If no experiments match this platform, do not associate any of them.
 void ChooseExperiment(
     const FieldTrialTestingStudy& study,
-    const VariationsSeedProcessor::UIStringOverrideCallback& callback,
     Study::Platform platform,
     Study::FormFactor current_form_factor,
     base::FeatureList* feature_list) {
@@ -198,8 +185,7 @@ void ChooseExperiment(
     }
   }
   if (chosen_experiment) {
-    AssociateParamsFromExperiment(study.name, *chosen_experiment, callback,
-                                  feature_list);
+    AssociateParamsFromExperiment(study.name, *chosen_experiment, feature_list);
   }
 }
 
@@ -216,12 +202,13 @@ std::string EscapeValue(const std::string& value) {
   std::string escaped_str;
   escaped_str.reserve(net_escaped_str.length());
   for (const char ch : net_escaped_str) {
-    if (ch == '.')
+    if (ch == '.') {
       escaped_str.append("%2E");
-    else if (ch == '*')
+    } else if (ch == '*') {
       escaped_str.append("%2A");
-    else
+    } else {
       escaped_str.push_back(ch);
+    }
   }
   return escaped_str;
 }
@@ -233,23 +220,20 @@ bool AssociateParamsFromString(const std::string& varations_string) {
 
 void AssociateParamsFromFieldTrialConfig(
     const FieldTrialTestingConfig& config,
-    const VariationsSeedProcessor::UIStringOverrideCallback& callback,
     Study::Platform platform,
     Study::FormFactor current_form_factor,
     base::FeatureList* feature_list) {
   for (const FieldTrialTestingStudy& study : config.studies) {
     CHECK(!study.experiments.empty());
-    ChooseExperiment(study, callback, platform, current_form_factor,
-                     feature_list);
+    ChooseExperiment(study, platform, current_form_factor, feature_list);
   }
 }
 
 void AssociateDefaultFieldTrialConfig(
-    const VariationsSeedProcessor::UIStringOverrideCallback& callback,
     Study::Platform platform,
     Study::FormFactor current_form_factor,
     base::FeatureList* feature_list) {
-  AssociateParamsFromFieldTrialConfig(kFieldTrialConfig, callback, platform,
+  AssociateParamsFromFieldTrialConfig(kFieldTrialConfig, platform,
                                       current_form_factor, feature_list);
 }
 

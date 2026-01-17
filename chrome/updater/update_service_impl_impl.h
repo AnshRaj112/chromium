@@ -5,6 +5,7 @@
 #ifndef CHROME_UPDATER_UPDATE_SERVICE_IMPL_IMPL_H_
 #define CHROME_UPDATER_UPDATE_SERVICE_IMPL_IMPL_H_
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>
@@ -16,6 +17,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/sequence_checker.h"
 #include "base/values.h"
+#include "chrome/updater/registration_data.h"
 #include "chrome/updater/update_service.h"
 
 namespace base {
@@ -36,7 +38,6 @@ namespace updater {
 class Configurator;
 class PersistedData;
 class PolicyService;
-struct RegistrationRequest;
 
 // All functions and callbacks must be called on the same sequence.
 class UpdateServiceImplImpl : public UpdateService {
@@ -86,6 +87,18 @@ class UpdateServiceImplImpl : public UpdateService {
       const std::string& language,
       base::RepeatingCallback<void(const UpdateState&)> state_update,
       base::OnceCallback<void(Result)> callback) override;
+  void GetUpdaterState(
+      base::OnceCallback<void(const UpdaterState&)> callback) override;
+  void GetUpdaterPolicies(
+      base::OnceCallback<void(const base::flat_map<std::string, PolicyValue>&)>
+          callback) override;
+  void GetAppPolicies(
+      base::OnceCallback<
+          void(const base::flat_map<std::string,
+                                    base::flat_map<std::string, PolicyValue>>&)>
+          callback) override;
+  void GetPoliciesJson(
+      base::OnceCallback<void(const std::string&)> callback) override;
 
  private:
   ~UpdateServiceImplImpl() override;
@@ -203,6 +216,7 @@ UpdateService::Result ToResult(update_client::Error error);
 void GetComponents(
     scoped_refptr<PolicyService> policy_service,
     crx_file::VerifierFormat verifier_format,
+    std::optional<std::vector<uint8_t>> crx_public_key_hash,
     scoped_refptr<PersistedData> persisted_data,
     const base::flat_map<std::string, std::string>& app_client_install_data,
     const base::flat_map<std::string, std::string>& app_install_data_index,

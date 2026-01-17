@@ -13,11 +13,10 @@
 #include <string>
 #include <vector>
 
-#include "base/functional/callback.h"
-#include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
+#include "base/time/time.h"
 #include "components/policy/core/common/cloud/cloud_policy_constants.h"
 #include "components/policy/core/common/cloud/dm_auth.h"
 #include "components/policy/policy_export.h"

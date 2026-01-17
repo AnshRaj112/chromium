@@ -10,6 +10,7 @@ import org.chromium.build.annotations.Initializer;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.customtabs.CustomTabDelegateFactory;
+import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabBuilder;
 import org.chromium.chrome.browser.tab.TabCreationState;
@@ -21,11 +22,13 @@ import org.chromium.content_public.browser.WebContents;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.url.GURL;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Creates tabs for the archived tab model selector during restore. This only creates frozen tabs.
  */
 @NullMarked
-public class ArchivedTabCreator extends TabCreator implements NeedsTabModel {
+public class ArchivedTabCreator implements TabCreator, NeedsTabModel {
     private final WindowAndroid mWindow;
     private TabModel mTabModel;
 
@@ -72,6 +75,7 @@ public class ArchivedTabCreator extends TabCreator implements NeedsTabModel {
                         .setTabResolver(mTabModel::getTabById)
                         .setInitiallyHidden(true)
                         .setDelegateFactory(CustomTabDelegateFactory.createEmpty())
+                        .setArchived(true)
                         .build();
         mTabModel.addTab(
                 tab, index, TabLaunchType.FROM_RESTORE, TabCreationState.FROZEN_FOR_LAZY_LOAD);
@@ -79,7 +83,7 @@ public class ArchivedTabCreator extends TabCreator implements NeedsTabModel {
     }
 
     @Override
-    public Tab createFrozenTab(TabState state, int id, int index) {
+    public @Nullable Tab createFrozenTab(TabState state, int id, int index) {
         assert mTabModel != null : "Creating frozen tab before native library initialized.";
         Tab tab =
                 TabBuilder.createFromFrozenState(assumeNonNull(mTabModel.getProfile()))
@@ -90,6 +94,7 @@ public class ArchivedTabCreator extends TabCreator implements NeedsTabModel {
                         .setInitiallyHidden(true)
                         .setTabState(state)
                         .setDelegateFactory(CustomTabDelegateFactory.createEmpty())
+                        .setArchived(true)
                         .build();
         mTabModel.addTab(
                 tab, index, TabLaunchType.FROM_RESTORE, TabCreationState.FROZEN_FOR_LAZY_LOAD);
@@ -103,20 +108,30 @@ public class ArchivedTabCreator extends TabCreator implements NeedsTabModel {
     }
 
     @Override
-    public Tab createTabWithWebContents(
+    public @Nullable Tab createTabWithWebContents(
             @Nullable Tab parent,
             boolean shouldPin,
             WebContents webContents,
             @TabLaunchType int type,
             GURL url,
-            boolean addTabToModel) {
+            int index,
+            CompletableFuture<Boolean> addTabToModel) {
         assert false : "Not reached.";
-        return assumeNonNull(null);
+        return null;
     }
 
     @Override
     public Tab createTabWithHistory(@Nullable Tab parent, int type) {
         assert false : "Not reached.";
         return assumeNonNull(null);
+    }
+
+    @Override
+    public void launchNtp(@TabLaunchType int type) {
+        TabCreatorUtil.launchNtp(this, getProfile(), type);
+    }
+
+    private Profile getProfile() {
+        return assumeNonNull(mTabModel.getProfile());
     }
 }

@@ -50,10 +50,13 @@
 #include "ui/events/blink/did_overscroll_params.h"
 #include "ui/events/event_constants.h"
 #include "ui/gfx/geometry/rect.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/gfx/range/range.h"
-#include "ui/surface/transport_dib.h"
 #include "url/origin.h"
+
+namespace ui {
+class FilteredGestureProvider;
+}
 
 namespace blink {
 class WebMouseEvent;
@@ -129,7 +132,9 @@ class CONTENT_EXPORT RenderWidgetHostViewBase
   void CopyFromSurface(
       const gfx::Rect& src_rect,
       const gfx::Size& output_size,
-      base::OnceCallback<void(const SkBitmap&)> callback) override;
+      base::TimeDelta timeout,
+      base::OnceCallback<void(const content::CopyFromSurfaceResult&)> callback)
+      override;
   std::unique_ptr<viz::ClientFrameSinkVideoCapturer> CreateVideoCapturer()
       override;
   display::ScreenInfo GetScreenInfo() const override;
@@ -169,13 +174,16 @@ class CONTENT_EXPORT RenderWidgetHostViewBase
   virtual void CopyFromExactSurface(
       const gfx::Rect& src_rect,
       const gfx::Size& output_size,
-      base::OnceCallback<void(const SkBitmap&)> callback);
+      base::OnceCallback<void(const content::CopyFromSurfaceResult&)> callback);
+
+  // For testing only.
+  virtual ui::FilteredGestureProvider* GetFilteredGestureProviderForTesting();
 
 #if BUILDFLAG(IS_ANDROID)
   virtual void CopyFromExactSurfaceWithIpcDelay(
       const gfx::Rect& src_rect,
       const gfx::Size& output_size,
-      base::OnceCallback<void(const SkBitmap&)> callback,
+      base::OnceCallback<void(const content::CopyFromSurfaceResult&)> callback,
       base::TimeDelta ipc_delay);
 
   // Returns whethere there's a touch sequence active on Viz.
@@ -192,6 +200,8 @@ class CONTENT_EXPORT RenderWidgetHostViewBase
       gfx::Vector2d cursor_offset_in_dip,
       gfx::Rect drag_obj_rect_in_dip,
       blink::mojom::DragEventSourceInfoPtr event_info) = 0;
+
+  virtual void SetTouchpadOverscrollHistoryNavigation(bool enabled) {}
 #endif
 
   // For HiDPI capture mode, allow applying a render scale multiplier
@@ -216,6 +226,11 @@ class CONTENT_EXPORT RenderWidgetHostViewBase
   gfx::PointF TransformPointToRootCoordSpaceF(
       const gfx::PointF& point) const override;
 
+  // This only needs to be overridden by RenderWidgetHostViewBase subclasses
+  // that handle content embedded within other RenderWidgetHostViews.
+  gfx::PointF TransformRootPointToViewCoordSpace(
+      const gfx::PointF& point) override;
+
   // Returns the value for whether the auto-resize has been enabled or not.
   bool IsAutoResizeEnabled();
 
@@ -230,7 +245,8 @@ class CONTENT_EXPORT RenderWidgetHostViewBase
       const gfx::Rect& src_subrect,
       const gfx::Size& dst_size,
       float scale_factor,
-      base::OnceCallback<void(const SkBitmap&)> callback);
+      base::TimeDelta timeout,
+      base::OnceCallback<void(const content::CopyFromSurfaceResult&)> callback);
 
   void SetWidgetType(WidgetType widget_type);
 
@@ -298,6 +314,8 @@ class CONTENT_EXPORT RenderWidgetHostViewBase
   virtual void ClearFallbackSurfaceForCommitPending() {}
   // This method will reset the fallback to the first surface after navigation.
   virtual void ResetFallbackToFirstNavigationSurface() = 0;
+
+  virtual void OnUnconfirmedTapConvertedToTap() = 0;
 
   // Requests a new CompositorFrame from the renderer. This is done by
   // allocating a new viz::LocalSurfaceId which forces a commit and draw.
@@ -608,6 +626,10 @@ class CONTENT_EXPORT RenderWidgetHostViewBase
   display::ScreenInfos screen_infos_;
 
   float scale_override_for_capture_ = 1.0f;
+
+  // The area around an editable region where handwriting should still be
+  // possible.
+  int handwriting_radius_ = 0;
 
   // Indicates whether keyboard lock is active for this view.
   bool keyboard_locked_ = false;

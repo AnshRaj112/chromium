@@ -6,7 +6,6 @@
 
 #include <optional>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/string_util.h"
@@ -33,7 +32,7 @@
 #include "services/network/public/mojom/url_response_head.mojom.h"
 
 #if BUILDFLAG(IS_ANDROID)
-#include "base/android/build_info.h"
+#include "base/android/android_info.h"
 #include "components/download/internal/common/android/download_collection_bridge.h"
 #include "components/download/public/common/download_path_reservation_tracker.h"
 #endif
@@ -573,7 +572,7 @@ void InProgressDownloadManager::StartDownloadWithItem(
   if (info->is_new_download && !should_persist_new_download)
     non_persistent_download_guids_.insert(download->GetGuid());
   // If the download is not persisted, don't notify |download_db_cache_|.
-  if (!base::Contains(non_persistent_download_guids_, download->GetGuid())) {
+  if (!non_persistent_download_guids_.contains(download->GetGuid())) {
     download_db_cache_->AddOrReplaceEntry(
         CreateDownloadDBEntryFromItem(*download));
     download->RemoveObserver(download_db_cache_.get());
@@ -598,7 +597,7 @@ void InProgressDownloadManager::StartDownloadWithItem(
   if (download_start_observer_)
     download_start_observer_->OnDownloadStarted(download);
 #if BUILDFLAG(IS_ANDROID)
-  if (info->transient && !info->is_must_download &&
+  if (info->transient && info->allow_auto_open_after_completion &&
       base::EqualsCaseInsensitiveASCII(info->mime_type, kPdfMimeType)) {
     base::UmaHistogramBoolean("Download.Android.OpenPdfFromDuplicates",
                               !duplicate_download_file_path.empty());
@@ -611,8 +610,8 @@ void InProgressDownloadManager::OnDBInitialized(
     std::unique_ptr<std::vector<DownloadDBEntry>> entries) {
 #if BUILDFLAG(IS_ANDROID)
   // Retrieve display names for all downloads from media store if needed.
-  if (base::android::BuildInfo::GetInstance()->sdk_int() >=
-      base::android::SDK_VERSION_Q) {
+  if (base::android::android_info::sdk_int() >=
+      base::android::android_info::SDK_VERSION_Q) {
     DownloadCollectionBridge::GetDisplayNamesCallback callback =
         base::BindOnce(&InProgressDownloadManager::OnDownloadNamesRetrieved,
                        weak_factory_.GetWeakPtr(), std::move(entries));
@@ -641,7 +640,7 @@ void InProgressDownloadManager::OnDownloadNamesRetrieved(
     uint32_t download_id = item->GetId();
     // Remove entries with duplicate ids.
     if (download_id != DownloadItem::kInvalidId &&
-        base::Contains(download_ids, download_id)) {
+        download_ids.contains(download_id)) {
       RemoveInProgressDownload(item->GetGuid());
       continue;
     }

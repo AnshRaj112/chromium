@@ -26,7 +26,7 @@ namespace enterprise::test {
 // static
 std::unique_ptr<ManagementContextMixin> ManagementContextMixin::Create(
     InProcessBrowserTestMixinHost* host,
-    InProcessBrowserTest* test_base,
+    PlatformBrowserTest* test_base,
     ManagementContext management_context) {
 #if BUILDFLAG(IS_CHROMEOS)
   return std::make_unique<ManagementContextMixinAsh>(
@@ -39,7 +39,7 @@ std::unique_ptr<ManagementContextMixin> ManagementContextMixin::Create(
 
 ManagementContextMixin::ManagementContextMixin(
     InProcessBrowserTestMixinHost* host,
-    InProcessBrowserTest* test_base,
+    PlatformBrowserTest* test_base,
     ManagementContext management_context)
     : InProcessBrowserTestMixin(host),
       test_base_(test_base),
@@ -62,6 +62,14 @@ void ManagementContextMixin::SetCloudUserPolicies(
     base::flat_map<std::string, std::optional<base::Value>> policy_entries) {
   CHECK(management_context_.is_cloud_user_managed);
   policy::PolicyMap policy_map;
+  if (management_context_.affiliated) {
+    policy_map.SetUserAffiliationIds({kFakeCustomerId});
+  } else {
+    policy_map.SetUserAffiliationIds({kDifferentCustomerId});
+  }
+  if (management_context_.is_cloud_machine_managed) {
+    policy_map.SetDeviceAffiliationIds({kFakeCustomerId});
+  }
 
   for (auto& policy_entry : policy_entries) {
     policy_map.Set(policy_entry.first, policy::POLICY_LEVEL_MANDATORY,

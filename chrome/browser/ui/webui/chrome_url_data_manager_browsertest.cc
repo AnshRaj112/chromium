@@ -7,7 +7,6 @@
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/scoped_run_loop_timeout.h"
 #include "base/test/test_timeouts.h"
@@ -30,6 +29,7 @@
 #include "components/regional_capabilities/regional_capabilities_switches.h"
 #include "components/search/ntp_features.h"
 #include "components/search_engines/search_engines_switches.h"
+#include "components/variations/variations_switches.h"
 #include "content/public/browser/navigation_details.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/url_data_source.h"
@@ -186,7 +186,8 @@ static constexpr const char* const kSlowChromeUrls[] = {
     "chrome://prefs-internals",
 #else
     // Placeholder entry to prevent zero-sized array which causes template
-    // instantiation failures with std::ranges algorithms in base::Contains.
+    // instantiation failures with std::ranges algorithms in
+    // std::ranges::contains.
     "",
 #endif
 };
@@ -215,13 +216,14 @@ class ChromeURLDataManagerWebUITrustedTypesTest
 
   void CheckNoTrustedTypesViolation(std::string_view url) {
     std::unique_ptr<base::test::ScopedRunLoopTimeout> timeout;
-    if (base::Contains(kSlowChromeUrls, url)) {
+    if (std::ranges::contains(kSlowChromeUrls, url)) {
       timeout = std::make_unique<base::test::ScopedRunLoopTimeout>(
           FROM_HERE, GetSlowTestTimeout());
     }
 
     const std::string kMessageFilter =
-        "*Refused to create a TrustedTypePolicy*";
+        "*Creating a TrustedTypePolicy * violates the following Content "
+        "Security Policy directive *";
     content::WebContents* content =
         browser()->tab_strip_model()->GetActiveWebContents();
     content::WebContentsConsoleObserver console_observer(content);
@@ -235,7 +237,7 @@ class ChromeURLDataManagerWebUITrustedTypesTest
 
   void CheckTrustedTypesEnabled(std::string_view url) {
     std::unique_ptr<base::test::ScopedRunLoopTimeout> timeout;
-    if (base::Contains(kSlowChromeUrls, url)) {
+    if (std::ranges::contains(kSlowChromeUrls, url)) {
       timeout = std::make_unique<base::test::ScopedRunLoopTimeout>(
           FROM_HERE, GetSlowTestTimeout());
     }
@@ -278,6 +280,8 @@ class ChromeURLDataManagerWebUITrustedTypesTest
       // Command line arguments needed to render chrome://search-engine-choice.
       command_line->AppendSwitchASCII(switches::kSearchEngineChoiceCountry,
                                       "BE");
+      command_line->AppendSwitchASCII(
+          variations::switches::kVariationsOverrideCountry, "BE");
       command_line->AppendSwitch(switches::kForceSearchEngineChoiceScreen);
       command_line->AppendSwitch(
           switches::kIgnoreNoFirstRunForSearchEngineChoiceScreen);
@@ -456,7 +460,6 @@ static constexpr const char* const kChromeUrls[] = {
     "chrome://add-supervision/",
     "chrome://app-disabled",
     "chrome://camera-app/views/main.html",
-    "chrome://assistant-optin/",
     "chrome://bluetooth-pairing",
     "chrome://certificate-manager/",
 
@@ -472,7 +475,6 @@ static constexpr const char* const kChromeUrls[] = {
     "chrome://connectors-internals",
     "chrome://crashes",
     "chrome://crostini-installer",
-    "chrome://crostini-upgrader",
     "chrome://cryptohome",
     "chrome://diagnostics",
     "chrome://drive-internals",

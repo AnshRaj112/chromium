@@ -89,6 +89,7 @@ declare global {
         NEED_PASSWORD = 'need_password',
         CANCELLED = 'cancelled',
         BUSY = 'busy',
+        CORRUPTED = 'corrupted',
       }
 
       export enum FormatFileSystemType {
@@ -987,14 +988,6 @@ declare global {
       export function getCrostiniSharedPaths(
           observeFirstForSession: boolean, vmName: string,
           callback: (response: CrostiniSharedPathResponse) => void): void;
-
-      export function getLinuxPackageInfo(
-          entry: Entry,
-          callback: (linux_package_info: LinuxPackageInfo) => void): void;
-
-      export function installLinuxPackage(
-          entry: Entry,
-          callback: (status: InstallLinuxPackageStatus) => void): void;
 
       export function importCrostiniImage(entry: Entry): void;
 

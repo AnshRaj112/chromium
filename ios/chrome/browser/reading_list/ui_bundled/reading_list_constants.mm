@@ -6,16 +6,29 @@
 
 NSString* const kReadingListViewID = @"ReadingListTableView";
 
-NSString* const kReadingListToolbarEditButtonID =
-    @"ReadingListToolbarEditButtonID";
+// Navigation Bar Buttons
+NSString* const kReadingListNavigationBarSelectButtonID =
+    @"ReadingListNavigationBarSelectButtonID";
+NSString* const kReadingListNavigationBarSelectAllButtonID =
+    @"ReadingListNavigationBarSelectAllButtonID";
+NSString* const kReadingListNavigationBarDeselectAllButtonID =
+    @"ReadingListNavigationBarDeselectAllButtonID";
+NSString* const kReadingListNavigationBarExitEditButtonID =
+    @"ReadingListNavigationBarExitEditButtonID";
+NSString* const kReadingListNavigationBarCloseButtonID =
+    @"ReadingListNavigationBarCloseButtonID";
+
+// Toolbar Buttons
 NSString* const kReadingListToolbarDeleteButtonID =
     @"ReadingListToolbarDeleteButtonID";
 NSString* const kReadingListToolbarDeleteAllReadButtonID =
     @"ReadingListToolbarDeleteAllReadButton";
-NSString* const kReadingListToolbarCancelButtonID =
-    @"ReadingListToolbarCancelButton";
 NSString* const kReadingListToolbarMarkButtonID =
     @"ReadingListToolbarMarkButton";
+
+NSString* const kReadingListLocalImageID = @"ReadingListLocalImageID";
+
+NSString* const kReadingListItemBadgeID = @"ReadingListItemBadgeID";
 
 NSString* const kLastReadingListEntryAddedFromMessages =
     @"LastReadingListEntryAddedFromMessages";

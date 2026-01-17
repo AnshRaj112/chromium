@@ -37,7 +37,9 @@ FakeLocalDeviceInfoProvider::FakeLocalDeviceInfoProvider()
           /*paask_info=*/std::nullopt,
           /*fcm_registration_token=*/std::string(),
           /*interested_data_types=*/DataTypeSet(),
-          /*floating_workspace_last_signin_timestamp=*/std::nullopt) {}
+          /*auto_sign_out_last_signin_timestamp=*/
+          std::nullopt, /*desktop_to_ios_promo_receiving_enabled=*/
+          false) {}
 
 FakeLocalDeviceInfoProvider::~FakeLocalDeviceInfoProvider() = default;
 
@@ -72,7 +74,7 @@ void FakeLocalDeviceInfoProvider::UpdateClientName(
 }
 
 void FakeLocalDeviceInfoProvider::UpdateRecentSignInTime(base::Time time) {
-  device_info_.set_floating_workspace_last_signin_timestamp(time);
+  device_info_.set_auto_sign_out_last_signin_timestamp(time);
 }
 
 void FakeLocalDeviceInfoProvider::SetReady(bool ready) {

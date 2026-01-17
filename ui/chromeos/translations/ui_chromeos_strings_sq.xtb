@@ -35,6 +35,7 @@
 <translation id="1249250836236328755">Zhanri</translation>
 <translation id="1254593899333212300">Lidhje direkte e internetit</translation>
 <translation id="1272293450992660632">Vlerat e kodit PIN nuk përputhen.</translation>
+<translation id="1279040297980392566">Po pret që të përfundojë skanimi. Riprovo më vonë</translation>
 <translation id="1280820357415527819">Po kërkon për rrjete celulare</translation>
 <translation id="1293556467332435079">Skedarët</translation>
 <translation id="1297922636971898492">"Disku i Google" nuk ofrohet tani. Ngarkimi do të rifillojë automatikisht pasi të kthehet "Disku i Google".</translation>
@@ -109,7 +110,6 @@
 <translation id="1813278315230285598">Shërbimet</translation>
 <translation id="181434555916624618">Për momentin, rezultatet me personat nuk do të shfaqen. Provo një kërkesë tjetër.</translation>
 <translation id="1829129547161959350">Pinguini</translation>
-<translation id="183183971458492120">Informacionet po ngarkohen...</translation>
 <translation id="1832073788765803750">Katakana me gjysmë gjerësi</translation>
 <translation id="1834290891154666894">Hyrje e pavlefshme për përputhjen e emrit alternativ të subjektit</translation>
 <translation id="1838709767668011582">Sajti i Google</translation>
@@ -146,13 +146,13 @@
 <translation id="2142680004883808240">Rusisht me tastierë fonetike YaZHert</translation>
 <translation id="2143778271340628265">Konfigurimi manual i përfaqësuesit</translation>
 <translation id="2148716181193084225">Sot</translation>
+<translation id="2161573825856688200">Projekti i Google</translation>
 <translation id="2163152940313951844">Karakter i pavlefshëm: <ph name="CHARACTER_NAME" /></translation>
 <translation id="2178056538281447670">Microsoft 365</translation>
 <translation id="2184934335987813305">Portugalisht me tastierë amerikane ndërkombëtare për PC</translation>
 <translation id="2193661397560634290">Të përdorura: <ph name="SPACE_USED" /></translation>
 <translation id="2198315389084035571">Kinezishte e thjeshtuar</translation>
 <translation id="22085916256174561">Koreanisht</translation>
-<translation id="2208919847696382164">Instalo me Linux</translation>
 <translation id="2215692307449050019">Niveli i baterisë është i ulët. Sinkronizimi i skedarëve do të vazhdojë kur pajisja jote të lidhet me energjinë elektrike.</translation>
 <translation id="2225536596944493418">Je i sigurt që dëshiron të fshish <ph name="NUMBER_OF_ITEMS" /> artikuj?</translation>
 <translation id="2230062665678605299">Nuk mundi ta krijonte dosjen "<ph name="FOLDER_NAME" />". <ph name="ERROR_MESSAGE" /></translation>
@@ -213,7 +213,6 @@
 <translation id="2653059201992392941">Ke <ph name="RETRIES" /> përpjekje të mbetura.</translation>
 <translation id="2663066752008346276">Birmanisht/Mianmar me tastierë Myansan</translation>
 <translation id="2664412712123763093">Vendndodhja e skedarit</translation>
-<translation id="2718540689505416944">Instalo aplikacionin me Linux</translation>
 <translation id="2719020180254996569">Rrjeti <ph name="NETWORK_INDEX" /> nga <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, detaje</translation>
 <translation id="2724954091494693138">Turqisht me tastierën F</translation>
 <translation id="2732288874651063549">Menaxho ndarjen me <ph name="VM_NAME" /></translation>
@@ -222,7 +221,6 @@
 <translation id="2764206540577097904">E ke përdorur të gjithë hapësirën tënde ruajtëse individuale të Google Workspace.</translation>
 <translation id="2771816809568414714">Djathë</translation>
 <translation id="2781645665747935084">belge</translation>
-<translation id="2782104745158847185">Gabim në instalimin e aplikacionit Linux</translation>
 <translation id="2802583107108007218">Mëso më shumë rreth këtyre kufizimeve</translation>
 <translation id="2803375539583399270">Fut kodin PIN</translation>
 <translation id="2819519502129272135">Sinkronizimi i skedarëve është çaktivizuar</translation>
@@ -345,7 +343,6 @@
 <translation id="3786301125658655746">Je offline</translation>
 <translation id="3789841737615482174">Instalo</translation>
 <translation id="3793469551756281394">Koha e mbetur: <ph name="REMAINING_TIME_HOUR" /> e <ph name="REMAINING_TIME_MINUTE" /></translation>
-<translation id="3798449238516105146">Versioni</translation>
 <translation id="3801082500826908679">Faroisht</translation>
 <translation id="3809272675881623365">Lepur</translation>
 <translation id="3810973564298564668">Menaxho</translation>
@@ -353,14 +350,12 @@
 <translation id="3811494700605067549">1 skedar i zgjedhur</translation>
 <translation id="3817579325494460411">Nuk jepet</translation>
 <translation id="3819448694985509187">Kodi PIN është i pasaktë. Ke 1 përpjekje të mbetur.</translation>
-<translation id="3822559385185038546">Ky përfaqësues zbatohet nga administratori yt</translation>
 <translation id="3830674330436234648">Luajtja e padisponueshme</translation>
 <translation id="383652340667548381">Serbisht</translation>
 <translation id="3839045880592694915">Modemi yt nuk lejohet që të lidhet nga operatori celular. Kontakto me operatorin celular për më shumë detaje.</translation>
 <translation id="385051799172605136">Prapa</translation>
 <translation id="3855472144336161447">Gjermanisht Neo 2</translation>
 <translation id="3858860766373142691">Emri</translation>
-<translation id="3866249974567520381">Përshkrimi</translation>
 <translation id="3899991606604168269">Frëngjisht (Kanada) me tastierë shumëgjuhëshe</translation>
 <translation id="3901991538546252627">Po lidhet me <ph name="NAME" /></translation>
 <translation id="3906232975181435906">Po instalon profilin e celularit, rrjeti <ph name="NETWORK_INDEX" /> nga <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" /></translation>
@@ -438,7 +433,6 @@
 <translation id="4477219268485577442">Tastierë fonetike bullgare</translation>
 <translation id="4508265954913339219">Aktivizimi dështoi</translation>
 <translation id="4509667233588080747">Anglisht (SHBA) me tastierën Workman International</translation>
-<translation id="4522570452068850558">Detajet</translation>
 <translation id="4527800702232535228">Kjo dosje është ndarë me Parallels Desktop</translation>
 <translation id="4552678318981539154">Bli më shumë hapësirë ruajtëse</translation>
 <translation id="4552759165874948005">Rrjeti <ph name="NETWORK_TYPE" />, fuqia e sinjalit <ph name="SIGNAL_STRENGTH" />%</translation>
@@ -596,13 +590,13 @@
 <translation id="5596627076506792578">Më shumë opsione</translation>
 <translation id="5602622065581044566">Bullgarisht me tastierë fonetike</translation>
 <translation id="5605830556594064952">Amerikane Dvorak</translation>
+<translation id="560739212255190568">Administratori yt ka caktuar rregullat e anulimit për procy-in përveç zbatimit të proxy-it të mëposhtëm</translation>
 <translation id="5618330573454123917">Ky skedar është i projektuar për kompjuterë që përdorin softuerë të Macintosh. Kjo nuk përputhet me pajisjen tënde e cila punon me ChromeOS. <ph name="BEGIN_LINK_HELP" />Mëso më shumë<ph name="END_LINK_HELP" /> në lidhje me hapjen e skedarëve në ChromeOS.</translation>
 <translation id="5625294776298156701">Tamilisht me tastierë Tamil99</translation>
 <translation id="5633226425545095130">Zhvendosja e këtij artikulli do ta ndajë atë me të gjithë ata që mund ta shikojnë dosjen e ndarë "<ph name="DESTINATION_NAME" />".</translation>
 <translation id="5649768706273821470">Dëgjo</translation>
 <translation id="5650895901941743674">Kontrollo konfigurimin e APN-së</translation>
 <translation id="5669691691057771421">Fut kodin e ri PIN</translation>
-<translation id="5678784840044122290">Aplikacioni për Linux do të ofrohet në "Terminalin" tënd dhe mund dhe të shfaqë një ikonë te "Nisësi" yt.</translation>
 <translation id="5686799162999241776"><ph name="BEGIN_BOLD" />Nuk mund të shkëputet nga një arkiv ose disk virtual<ph name="END_BOLD" />
    <ph name="LINE_BREAKS" />
    Mbyll të gjithë skedarët në arkiv ose disk virtual, më pas provo sërish.</translation>
@@ -637,7 +631,6 @@
 <translation id="5861477046012235702">Lojtar</translation>
 <translation id="5864471791310927901">Kërkimi i DHCP-së dështoi</translation>
 <translation id="5896749729057314184">Rrjeti <ph name="NETWORK_INDEX" /> nga <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, i paaktivizuar, fuqia e sinjalit <ph name="SIGNAL_STRENGTH" />%, detajet</translation>
-<translation id="5911887972742538906">Ndodhi një gabim gjatë instalimit të aplikacionit tënd për Linux.</translation>
 <translation id="5912396950572065471">Formati</translation>
 <translation id="5918480239180455431">Ofrohet një veçori e re për kërkimin</translation>
 <translation id="5926082595146149752">Holandisht (Holandë) me tastierë amerikane ndërkombëtare për PC</translation>
@@ -806,7 +799,6 @@
 <translation id="7238097264433196391">Emri i diskut</translation>
 <translation id="7238643356913091553"><ph name="NETWORK_NAME" />, detaje</translation>
 <translation id="7246947237293279874">Përfaqësuesi i FTP-së</translation>
-<translation id="7248671827512403053">Aplikacion</translation>
 <translation id="7256405249507348194">Gabim i panjohur: <ph name="DESC" /></translation>
 <translation id="7268659760406822741">Shërbimet që ofrohen</translation>
 <translation id="7291818353625820805">Dëshiron që tastet të përsëriten? Çaktivizo shenjat e theksimit te "Cilësimet e tastierës"</translation>
@@ -933,7 +925,6 @@
 <translation id="8151638057146502721">Konfiguro</translation>
 <translation id="8154666764013920974">{NUM_ERROR,plural, =1{1 gabim.}other{# gabime.}}</translation>
 <translation id="8154842056504218462">U zgjodhën të gjitha regjistrimet.</translation>
-<translation id="8157684860301034423">Marrja e informacioneve të aplikacionit dështoi.</translation>
 <translation id="8175731104491895765">Frëngjisht (Belgjikë)</translation>
 <translation id="8175799081768705361">Po sinkronizohen <ph name="NUMBER_OF_FILES_SYNCING" /> skedarë të "Diskut"</translation>
 <translation id="8179976553408161302">Enter</translation>
@@ -995,6 +986,7 @@
 <translation id="8540608333167683902">Rrjeti <ph name="NETWORK_INDEX" /> nga <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, fuqia e sinjalit <ph name="SIGNAL_STRENGTH" />%, detaje</translation>
 <translation id="8545476925160229291">Anglisht (SHBA)</translation>
 <translation id="854655314928502177">URL-ja me zbulim automatik të përfaqësuesit të uebit:</translation>
+<translation id="8547747809824590510">Administratori yt ka caktuar rregullat e anulimit për proxy-in</translation>
 <translation id="8549186985808798022">Italisht</translation>
 <translation id="8551494947769799688">Letonisht</translation>
 <translation id="8560515948038859357">Kantonisht</translation>
@@ -1055,6 +1047,7 @@
 <translation id="9038620279323455325">Skedari me emrin "<ph name="FILE_NAME" />" ekziston tashmë. Zgjidh një emër tjetër.</translation>
 <translation id="9046895021617826162">Lidhja dështoi</translation>
 <translation id="9065512565307033593">Nëse nuk e verifikon, qasja jote në rrjet do të çaktivizohet.</translation>
+<translation id="9079844694307518094">Administratori yt po zbaton proxy-in e mëposhtëm</translation>
 <translation id="908378762078012445">Rusisht me tastierë fonetike AATSEEL</translation>
 <translation id="9086302186042011942">Po sinkronizon</translation>
 <translation id="9099674669267916096">Numri i faqeve</translation>
@@ -1075,9 +1068,9 @@
 <translation id="9183302530794969518">Dokumentet e Google</translation>
 <translation id="9189836632794948435">Kazakisht</translation>
 <translation id="9200427192836333033"><ph name="NUMBER_OF_ITEMS" /> artikuj të nxjerrë.</translation>
-<translation id="9213073329713032541">Instalimi filloi me sukses.</translation>
 <translation id="9219103736887031265">Imazhet</translation>
 <translation id="9219908252191632183">Hënor</translation>
+<translation id="931652069802536959">Rrjeti është i bllokuar nga politika</translation>
 <translation id="938470336146445890">Instalo një certifikatë përdoruesi.</translation>
 <translation id="939736085109172342">Dosje e re</translation>
 <translation id="943972244133411984">Modifikuar nga</translation>

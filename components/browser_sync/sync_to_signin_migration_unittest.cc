@@ -26,6 +26,7 @@
 #include "components/sync/service/sync_feature_status_for_migrations_recorder.h"
 #include "components/sync/service/sync_prefs.h"
 #include "components/sync/test/test_sync_service.h"
+#include "extensions/buildflags/buildflags.h"
 #include "google_apis/gaia/gaia_id.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -512,8 +513,14 @@ TEST_P(SyncToSigninMigrationTest, UndoFeaturePreventsMigration) {
   ASSERT_EQ(sync_service_.GetTransportState(),
             syncer::SyncService::TransportState::ACTIVE);
   ASSERT_TRUE(sync_service_.HasSyncConsent());
-  ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll(
-      {syncer::BOOKMARKS, syncer::PASSWORDS, syncer::READING_LIST}));
+  ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll({
+      syncer::BOOKMARKS,
+      syncer::PASSWORDS,
+      syncer::READING_LIST,
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+      syncer::EXTENSIONS,
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+  }));
 
   // Save the above state to prefs.
   RecordStateToPrefs();
@@ -603,8 +610,14 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncAndAllDataTypesActive) {
   ASSERT_EQ(sync_service_.GetTransportState(),
             syncer::SyncService::TransportState::ACTIVE);
   ASSERT_TRUE(sync_service_.HasSyncConsent());
-  ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll(
-      {syncer::BOOKMARKS, syncer::PASSWORDS, syncer::READING_LIST}));
+  ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll({
+      syncer::BOOKMARKS,
+      syncer::PASSWORDS,
+      syncer::READING_LIST,
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+      syncer::EXTENSIONS,
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+  }));
 
   // Save the above state to prefs.
   RecordStateToPrefs();
@@ -646,6 +659,11 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncAndAllDataTypesActive) {
   histograms.ExpectUniqueSample(
       "Sync.SyncToSigninMigrationDecision." + infix + ".READING_LIST",
       /*SyncToSigninMigrationDataTypeDecision::kMigrate*/ 0, 1);
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  histograms.ExpectUniqueSample(
+      "Sync.SyncToSigninMigrationDecision." + infix + ".EXTENSION",
+      /*SyncToSigninMigrationDataTypeDecision::kMigrate*/ 0, 1);
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 }
 
 TEST_P(SyncToSigninMigrationMetricsTest, SyncActiveButNotDataTypes) {
@@ -716,8 +734,14 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncStatusPrefsUnset) {
   ASSERT_EQ(sync_service_.GetTransportState(),
             syncer::SyncService::TransportState::ACTIVE);
   ASSERT_TRUE(sync_service_.HasSyncConsent());
-  ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll(
-      {syncer::BOOKMARKS, syncer::PASSWORDS, syncer::READING_LIST}));
+  ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll({
+      syncer::BOOKMARKS,
+      syncer::PASSWORDS,
+      syncer::READING_LIST,
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+      syncer::EXTENSIONS,
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+  }));
 
   // Save the Sync configuration (enabled data types etc) to prefs, but not the
   // migration-specific status prefs. This simulates the case of an old client
@@ -749,6 +773,8 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncStatusPrefsUnset) {
       "Sync.SyncToSigninMigrationDecision.DryRun.PASSWORD", 0);
   histograms.ExpectTotalCount(
       "Sync.SyncToSigninMigrationDecision.DryRun.READING_LIST", 0);
+  histograms.ExpectTotalCount(
+      "Sync.SyncToSigninMigrationDecision.DryRun.EXTENSION", 0);
   if (IsForceMigrationEnabled()) {
     // The individual data types were not active and so should not be migrated.
     histograms.ExpectUniqueSample(
@@ -765,6 +791,12 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncStatusPrefsUnset) {
         "Sync.SyncToSigninMigrationDecision.Migration.READING_LIST",
         /*SyncToSigninMigrationDataTypeDecision::kDontMigrateTypeNotActive*/ 2,
         1);
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+    histograms.ExpectUniqueSample(
+        "Sync.SyncToSigninMigrationDecision.Migration.EXTENSION",
+        /*SyncToSigninMigrationDataTypeDecision::kDontMigrateTypeNotActive*/ 2,
+        1);
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
   } else {
     // The overall migration didn't run.
     histograms.ExpectTotalCount(
@@ -773,6 +805,8 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncStatusPrefsUnset) {
         "Sync.SyncToSigninMigrationDecision.Migration.PASSWORD", 0);
     histograms.ExpectTotalCount(
         "Sync.SyncToSigninMigrationDecision.Migration.READING_LIST", 0);
+    histograms.ExpectTotalCount(
+        "Sync.SyncToSigninMigrationDecision.Migration.EXTENSION", 0);
   }
 }
 
@@ -802,11 +836,15 @@ TEST_P(SyncToSigninMigrationMetricsTest, NotSignedIn) {
   histograms.ExpectTotalCount(
       "Sync.SyncToSigninMigrationDecision.DryRun.READING_LIST", 0);
   histograms.ExpectTotalCount(
+      "Sync.SyncToSigninMigrationDecision.DryRun.EXTENSION", 0);
+  histograms.ExpectTotalCount(
       "Sync.SyncToSigninMigrationDecision.Migration.BOOKMARK", 0);
   histograms.ExpectTotalCount(
       "Sync.SyncToSigninMigrationDecision.Migration.PASSWORD", 0);
   histograms.ExpectTotalCount(
       "Sync.SyncToSigninMigrationDecision.Migration.READING_LIST", 0);
+  histograms.ExpectTotalCount(
+      "Sync.SyncToSigninMigrationDecision.Migration.EXTENSION", 0);
 }
 
 TEST_P(SyncToSigninMigrationMetricsTest, SyncTransport) {
@@ -815,8 +853,14 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncTransport) {
   sync_service_.SetSignedIn(signin::ConsentLevel::kSignin);
   ASSERT_EQ(sync_service_.GetTransportState(),
             syncer::SyncService::TransportState::ACTIVE);
-  ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll(
-      {syncer::BOOKMARKS, syncer::PASSWORDS, syncer::READING_LIST}));
+  ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll({
+      syncer::BOOKMARKS,
+      syncer::PASSWORDS,
+      syncer::READING_LIST,
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+      syncer::EXTENSIONS,
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+  }));
 
   // Save the above state to prefs.
   RecordStateToPrefs();
@@ -839,11 +883,15 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncTransport) {
   histograms.ExpectTotalCount(
       "Sync.SyncToSigninMigrationDecision.DryRun.READING_LIST", 0);
   histograms.ExpectTotalCount(
+      "Sync.SyncToSigninMigrationDecision.DryRun.EXTENSION", 0);
+  histograms.ExpectTotalCount(
       "Sync.SyncToSigninMigrationDecision.Migration.BOOKMARK", 0);
   histograms.ExpectTotalCount(
       "Sync.SyncToSigninMigrationDecision.Migration.PASSWORD", 0);
   histograms.ExpectTotalCount(
       "Sync.SyncToSigninMigrationDecision.Migration.READING_LIST", 0);
+  histograms.ExpectTotalCount(
+      "Sync.SyncToSigninMigrationDecision.Migration.EXTENSION", 0);
 }
 
 TEST_P(SyncToSigninMigrationMetricsTest, SyncPaused_MinDelayNotPassed) {
@@ -885,6 +933,12 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncPaused_MinDelayNotPassed) {
         "Sync.SyncToSigninMigrationDecision." + infix + ".READING_LIST",
         /*SyncToSigninMigrationDataTypeDecision::kDontMigrateTypeNotActive*/ 2,
         1);
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+    histograms.ExpectUniqueSample(
+        "Sync.SyncToSigninMigrationDecision." + infix + ".EXTENSION",
+        /*SyncToSigninMigrationDataTypeDecision::kDontMigrateTypeNotActive*/ 2,
+        1);
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
   } else if (IsMigrationEnabled()) {
     // The migration should not run because not enough time passed since the
     // auth error was detected. There's still a chance the user will resolve it.
@@ -898,6 +952,8 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncPaused_MinDelayNotPassed) {
         "Sync.SyncToSigninMigrationDecision." + infix + ".PASSWORD", 0);
     histograms.ExpectTotalCount(
         "Sync.SyncToSigninMigrationDecision." + infix + ".READING_LIST", 0);
+    histograms.ExpectTotalCount(
+        "Sync.SyncToSigninMigrationDecision." + infix + ".EXTENSION", 0);
   } else {
     // The migration should not run because the flag is disabled. The per type
     // metrics are still recorded for historical reasons.
@@ -923,6 +979,12 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncPaused_MinDelayNotPassed) {
         "Sync.SyncToSigninMigrationDecision." + infix + ".READING_LIST",
         /*SyncToSigninMigrationDataTypeDecision::kDontMigrateTypeNotActive*/ 2,
         1);
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+    histograms.ExpectUniqueSample(
+        "Sync.SyncToSigninMigrationDecision." + infix + ".EXTENSION",
+        /*SyncToSigninMigrationDataTypeDecision::kDontMigrateTypeNotActive*/ 2,
+        1);
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
   }
 }
 
@@ -990,6 +1052,12 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncPaused_MinDelayPassed) {
       "Sync.SyncToSigninMigrationDecision." + infix + ".READING_LIST",
       /*SyncToSigninMigrationDataTypeDecision::kDontMigrateTypeNotActive*/ 2,
       1);
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  histograms.ExpectUniqueSample(
+      "Sync.SyncToSigninMigrationDecision." + infix + ".EXTENSION",
+      /*SyncToSigninMigrationDataTypeDecision::kDontMigrateTypeNotActive*/ 2,
+      1);
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 }
 
 TEST_P(SyncToSigninMigrationMetricsTest, SyncPaused_AuthErrorResolved) {
@@ -1042,6 +1110,11 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncPaused_AuthErrorResolved) {
   histograms.ExpectUniqueSample(
       "Sync.SyncToSigninMigrationDecision." + infix + ".READING_LIST",
       /*SyncToSigninMigrationDataTypeDecision::kMigrate*/ 0, 1);
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+  histograms.ExpectUniqueSample(
+      "Sync.SyncToSigninMigrationDecision." + infix + ".EXTENSION",
+      /*SyncToSigninMigrationDataTypeDecision::kMigrate*/ 0, 1);
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 }
 
 TEST_P(SyncToSigninMigrationMetricsTest, SyncInitializing) {
@@ -1078,6 +1151,8 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncInitializing) {
       "Sync.SyncToSigninMigrationDecision.DryRun.PASSWORD", 0);
   histograms.ExpectTotalCount(
       "Sync.SyncToSigninMigrationDecision.DryRun.READING_LIST", 0);
+  histograms.ExpectTotalCount(
+      "Sync.SyncToSigninMigrationDecision.DryRun.EXTENSION", 0);
   if (IsForceMigrationEnabled()) {
     // The individual data types were not active and so should not be migrated.
     histograms.ExpectUniqueSample(
@@ -1094,6 +1169,12 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncInitializing) {
         "Sync.SyncToSigninMigrationDecision.Migration.READING_LIST",
         /*SyncToSigninMigrationDataTypeDecision::kDontMigrateTypeNotActive*/ 2,
         1);
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+    histograms.ExpectUniqueSample(
+        "Sync.SyncToSigninMigrationDecision.Migration.EXTENSION",
+        /*SyncToSigninMigrationDataTypeDecision::kDontMigrateTypeNotActive*/ 2,
+        1);
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
   } else {
     // The overall migration didn't run.
     histograms.ExpectTotalCount(
@@ -1102,6 +1183,8 @@ TEST_P(SyncToSigninMigrationMetricsTest, SyncInitializing) {
         "Sync.SyncToSigninMigrationDecision.Migration.PASSWORD", 0);
     histograms.ExpectTotalCount(
         "Sync.SyncToSigninMigrationDecision.Migration.READING_LIST", 0);
+    histograms.ExpectTotalCount(
+        "Sync.SyncToSigninMigrationDecision.Migration.EXTENSION", 0);
   }
 }
 
@@ -1143,8 +1226,14 @@ class SyncToSigninMigrationDataTypesTest
     ASSERT_EQ(sync_service_.GetTransportState(),
               syncer::SyncService::TransportState::ACTIVE);
     ASSERT_TRUE(sync_service_.HasSyncConsent());
-    ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll(
-        {syncer::BOOKMARKS, syncer::PASSWORDS, syncer::READING_LIST}));
+    ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll({
+        syncer::BOOKMARKS,
+        syncer::PASSWORDS,
+        syncer::READING_LIST,
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+        syncer::EXTENSIONS,
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+    }));
 
     // Save the above state to prefs.
     RecordStateToPrefs();
@@ -1462,6 +1551,21 @@ TEST_P(SyncToSigninMigrationDataTypesTest, MovePasswords_FolderNotWritable) {
 #endif  // BUILDFLAG(IS_POSIX)
 #endif  // BUILDFLAG(IS_ANDROID)
 
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+TEST_P(SyncToSigninMigrationDataTypesTest, MarkExtensionsToBeMigrated) {
+  ASSERT_FALSE(pref_service_.GetBoolean(
+      syncer::prefs::internal::kMigrateExtensionsFromLocalToAccount));
+
+  MaybeMigrateSyncingUserToSignedInWrapper(
+      IsBlockingAllowed(), fake_profile_dir_.GetPath(), &pref_service_);
+
+  // The migration does not happen right away, but rather the extensions are
+  // marked to be migrated.
+  EXPECT_TRUE(pref_service_.GetBoolean(
+      syncer::prefs::internal::kMigrateExtensionsFromLocalToAccount));
+}
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+
 INSTANTIATE_TEST_SUITE_P(
     ,
     SyncToSigninMigrationDataTypesTest,
@@ -1495,8 +1599,14 @@ class SyncToSigninMigrationUndoTest
     ASSERT_EQ(sync_service_.GetTransportState(),
               syncer::SyncService::TransportState::ACTIVE);
     ASSERT_TRUE(sync_service_.HasSyncConsent());
-    ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll(
-        {syncer::BOOKMARKS, syncer::PASSWORDS, syncer::READING_LIST}));
+    ASSERT_TRUE(sync_service_.GetActiveDataTypes().HasAll({
+        syncer::BOOKMARKS,
+        syncer::PASSWORDS,
+        syncer::READING_LIST,
+#if BUILDFLAG(ENABLE_EXTENSIONS)
+        syncer::EXTENSIONS,
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+    }));
 
     // Save the above state to prefs.
     RecordStateToPrefs();
@@ -1653,6 +1763,263 @@ INSTANTIATE_TEST_SUITE_P(
                                      : "ForceMigrationDisabled";
       });
     });
+
+#if !BUILDFLAG(IS_CHROMEOS)
+class SyncSetupIncompleteMigrationTest : public SyncToSigninMigrationTestBase,
+                                         public testing::Test {
+ public:
+  SyncSetupIncompleteMigrationTest()
+      : SyncToSigninMigrationTestBase(
+            /*migration_feature_enabled=*/false,
+            /*force_migration_feature_enabled=*/false) {
+    feature_list_.InitWithFeatures(
+        {syncer::kUnoPhase2FollowUp,
+         switches::kMigrateOutOfSyncSetupIncompleteState},
+        {});
+  }
+
+ private:
+  base::test::ScopedFeatureList feature_list_;
+};
+
+TEST_F(SyncSetupIncompleteMigrationTest, Migrate) {
+  ASSERT_TRUE(sync_service_.HasSyncConsent());
+
+  const GaiaId gaia_id = sync_service_.GetAccountInfo().gaia;
+  const std::string email = sync_service_.GetAccountInfo().email;
+
+  // Save the above state to prefs.
+  RecordStateToPrefs();
+  // Mark sync setup incomplete.
+  sync_prefs_->ClearInitialSyncFeatureSetupComplete();
+
+  ASSERT_EQ(pref_service_.GetString(prefs::kGoogleServicesAccountId),
+            gaia_id.ToString());
+  ASSERT_TRUE(pref_service_.GetBoolean(prefs::kGoogleServicesConsentedToSync));
+  ASSERT_EQ(pref_service_.GetString(prefs::kGoogleServicesLastSyncingGaiaId),
+            gaia_id.ToString());
+  ASSERT_EQ(pref_service_.GetString(prefs::kGoogleServicesLastSyncingUsername),
+            email);
+  ASSERT_FALSE(sync_prefs_->IsInitialSyncFeatureSetupComplete());
+
+  base::HistogramTester histogram_tester;
+  MaybeMigrateSyncingUserToSignedIn(fake_profile_dir_.GetPath(),
+                                    &pref_service_);
+
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SyncSetupIncompleteMigrationDecision",
+      /*kMigrate*/ 0, 1);
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SyncToSigninMigrationDecision",
+      /*SyncToSigninMigrationDecision::kDontMigrateNotSyncing*/ 2, 1);
+
+  // Note that TestSyncService doesn't consume the prefs, so verify the prefs
+  // directly here.
+  // The user should still be signed in.
+  EXPECT_EQ(pref_service_.GetString(prefs::kGoogleServicesAccountId),
+            gaia_id.ToString());
+  // But not syncing anymore.
+  EXPECT_FALSE(pref_service_.GetBoolean(prefs::kGoogleServicesConsentedToSync));
+  EXPECT_FALSE(
+      pref_service_.GetUserPrefValue(prefs::kGoogleServicesLastSyncingGaiaId));
+  EXPECT_FALSE(pref_service_.GetUserPrefValue(
+      prefs::kGoogleServicesLastSyncingUsername));
+  EXPECT_FALSE(pref_service_.GetUserPrefValue(
+      syncer::prefs::internal::kSyncInitialSyncFeatureSetupComplete));
+}
+
+TEST_F(SyncSetupIncompleteMigrationTest, ShouldNotMigrateIfNotSignedIn) {
+  // Signed-out user.
+  sync_service_.SetSignedOut();
+  // Save the above state to prefs.
+  RecordStateToPrefs();
+
+  base::HistogramTester histogram_tester;
+  MaybeMigrateSyncingUserToSignedIn(fake_profile_dir_.GetPath(),
+                                    &pref_service_);
+
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SyncSetupIncompleteMigrationDecision",
+      /*kDontMigrateNotSignedIn*/ 1, 1);
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SyncToSigninMigrationDecision",
+      /*SyncToSigninMigrationDecision::kDontMigrateNotSignedIn*/ 1, 1);
+}
+
+TEST_F(SyncSetupIncompleteMigrationTest, ShouldNotMigrateIfNotSyncing) {
+  // Signed-in non-syncing user.
+  sync_service_.SetSignedIn(signin::ConsentLevel::kSignin);
+  // Save the above state to prefs.
+  RecordStateToPrefs();
+
+  base::HistogramTester histogram_tester;
+  MaybeMigrateSyncingUserToSignedIn(fake_profile_dir_.GetPath(),
+                                    &pref_service_);
+
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SyncSetupIncompleteMigrationDecision",
+      /*kDontMigrateNotSyncing*/ 2, 1);
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SyncToSigninMigrationDecision",
+      /*SyncToSigninMigrationDecision::kDontMigrateNotSyncing*/ 2, 1);
+}
+
+TEST_F(SyncSetupIncompleteMigrationTest, ShouldNotMigrateIfSyncSetupComplete) {
+  ASSERT_TRUE(sync_service_.HasSyncConsent());
+
+  const GaiaId gaia_id = sync_service_.GetAccountInfo().gaia;
+  const std::string email = sync_service_.GetAccountInfo().email;
+
+  // Save the above state to prefs.
+  RecordStateToPrefs();
+
+  ASSERT_EQ(pref_service_.GetString(prefs::kGoogleServicesAccountId),
+            gaia_id.ToString());
+  ASSERT_TRUE(pref_service_.GetBoolean(prefs::kGoogleServicesConsentedToSync));
+  ASSERT_EQ(pref_service_.GetString(prefs::kGoogleServicesLastSyncingGaiaId),
+            gaia_id.ToString());
+  ASSERT_EQ(pref_service_.GetString(prefs::kGoogleServicesLastSyncingUsername),
+            email);
+  ASSERT_TRUE(sync_prefs_->IsInitialSyncFeatureSetupComplete());
+
+  base::HistogramTester histogram_tester;
+  MaybeMigrateSyncingUserToSignedIn(fake_profile_dir_.GetPath(),
+                                    &pref_service_);
+
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SyncSetupIncompleteMigrationDecision",
+      /*kDontMigrateSyncSetupComplete*/ 3, 1);
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SyncToSigninMigrationDecision",
+      /*SyncToSigninMigrationDecision::kDontMigrateFlagDisabled*/ 5, 1);
+
+  // Note that TestSyncService doesn't consume the prefs, so verify the prefs
+  // directly here.
+  EXPECT_EQ(pref_service_.GetString(prefs::kGoogleServicesAccountId),
+            gaia_id.ToString());
+  EXPECT_TRUE(pref_service_.GetBoolean(prefs::kGoogleServicesConsentedToSync));
+  EXPECT_EQ(pref_service_.GetString(prefs::kGoogleServicesLastSyncingGaiaId),
+            gaia_id.ToString());
+  EXPECT_EQ(pref_service_.GetString(prefs::kGoogleServicesLastSyncingUsername),
+            email);
+  EXPECT_TRUE(sync_prefs_->IsInitialSyncFeatureSetupComplete());
+}
+
+TEST_F(SyncSetupIncompleteMigrationTest, ShouldNotMigrateIfFlagDisabled) {
+  ASSERT_TRUE(sync_service_.HasSyncConsent());
+
+  const GaiaId gaia_id = sync_service_.GetAccountInfo().gaia;
+  const std::string email = sync_service_.GetAccountInfo().email;
+
+  // Save the above state to prefs.
+  RecordStateToPrefs();
+  // Mark sync setup incomplete.
+  sync_prefs_->ClearInitialSyncFeatureSetupComplete();
+
+  ASSERT_EQ(pref_service_.GetString(prefs::kGoogleServicesAccountId),
+            gaia_id.ToString());
+  ASSERT_TRUE(pref_service_.GetBoolean(prefs::kGoogleServicesConsentedToSync));
+  ASSERT_EQ(pref_service_.GetString(prefs::kGoogleServicesLastSyncingGaiaId),
+            gaia_id.ToString());
+  ASSERT_EQ(pref_service_.GetString(prefs::kGoogleServicesLastSyncingUsername),
+            email);
+  ASSERT_FALSE(sync_prefs_->IsInitialSyncFeatureSetupComplete());
+
+  // Kill-switch active.
+  {
+    base::test::ScopedFeatureList feature_list;
+    feature_list.InitWithFeatures(
+        /*enabled_features=*/{syncer::kUnoPhase2FollowUp},
+        /*disabled_features=*/
+        {switches::kMigrateOutOfSyncSetupIncompleteState});
+
+    base::HistogramTester histogram_tester;
+    MaybeMigrateSyncingUserToSignedIn(fake_profile_dir_.GetPath(),
+                                      &pref_service_);
+
+    histogram_tester.ExpectUniqueSample(
+        "Sync.SyncSetupIncompleteMigrationDecision",
+        /*kDontMigrateFlagDisabled*/ 4, 1);
+    histogram_tester.ExpectUniqueSample(
+        "Sync.SyncToSigninMigrationDecision",
+        /*SyncToSigninMigrationDecision::kDontMigrateFlagDisabled*/ 5, 1);
+
+    // Note that TestSyncService doesn't consume the prefs, so verify the prefs
+    // directly here.
+    EXPECT_EQ(pref_service_.GetString(prefs::kGoogleServicesAccountId),
+              gaia_id.ToString());
+    EXPECT_TRUE(
+        pref_service_.GetBoolean(prefs::kGoogleServicesConsentedToSync));
+    EXPECT_EQ(pref_service_.GetString(prefs::kGoogleServicesLastSyncingGaiaId),
+              gaia_id.ToString());
+    EXPECT_EQ(
+        pref_service_.GetString(prefs::kGoogleServicesLastSyncingUsername),
+        email);
+  }
+  // Fast-follows flag disabled.
+  {
+    base::test::ScopedFeatureList feature_list;
+    feature_list.InitWithFeatures(
+        /*enabled_features=*/{switches::kMigrateOutOfSyncSetupIncompleteState},
+        /*disabled_features=*/{syncer::kUnoPhase2FollowUp});
+
+    base::HistogramTester histogram_tester;
+    MaybeMigrateSyncingUserToSignedIn(fake_profile_dir_.GetPath(),
+                                      &pref_service_);
+
+    histogram_tester.ExpectUniqueSample(
+        "Sync.SyncSetupIncompleteMigrationDecision",
+        /*kDontMigrateFlagDisabled*/ 4, 1);
+    histogram_tester.ExpectUniqueSample(
+        "Sync.SyncToSigninMigrationDecision",
+        /*SyncToSigninMigrationDecision::kDontMigrateFlagDisabled*/ 5, 1);
+
+    // Note that TestSyncService doesn't consume the prefs, so verify the prefs
+    // directly here.
+    EXPECT_EQ(pref_service_.GetString(prefs::kGoogleServicesAccountId),
+              gaia_id.ToString());
+    EXPECT_TRUE(
+        pref_service_.GetBoolean(prefs::kGoogleServicesConsentedToSync));
+    EXPECT_EQ(pref_service_.GetString(prefs::kGoogleServicesLastSyncingGaiaId),
+              gaia_id.ToString());
+    EXPECT_EQ(
+        pref_service_.GetString(prefs::kGoogleServicesLastSyncingUsername),
+        email);
+  }
+  // Both flags enabled.
+  {
+    base::test::ScopedFeatureList feature_list;
+    feature_list.InitWithFeatures(
+        /*enabled_features=*/{syncer::kUnoPhase2FollowUp,
+                              switches::kMigrateOutOfSyncSetupIncompleteState},
+        /*disabled_features=*/{});
+
+    base::HistogramTester histogram_tester;
+    MaybeMigrateSyncingUserToSignedIn(fake_profile_dir_.GetPath(),
+                                      &pref_service_);
+
+    histogram_tester.ExpectUniqueSample(
+        "Sync.SyncSetupIncompleteMigrationDecision",
+        /*kMigrate*/ 0, 1);
+    histogram_tester.ExpectUniqueSample(
+        "Sync.SyncToSigninMigrationDecision",
+        /*SyncToSigninMigrationDecision::kDontMigrateNotSyncing*/ 2, 1);
+
+    // Note that TestSyncService doesn't consume the prefs, so verify the prefs
+    // directly here.
+    EXPECT_EQ(pref_service_.GetString(prefs::kGoogleServicesAccountId),
+              gaia_id.ToString());
+    EXPECT_FALSE(
+        pref_service_.GetBoolean(prefs::kGoogleServicesConsentedToSync));
+    EXPECT_FALSE(pref_service_.GetUserPrefValue(
+        prefs::kGoogleServicesLastSyncingGaiaId));
+    EXPECT_FALSE(pref_service_.GetUserPrefValue(
+        prefs::kGoogleServicesLastSyncingUsername));
+    EXPECT_FALSE(pref_service_.GetUserPrefValue(
+        syncer::prefs::internal::kSyncInitialSyncFeatureSetupComplete));
+  }
+}
+#endif  // !BUILDFLAG(IS_CHROMEOS)
 
 }  // namespace
 }  // namespace browser_sync

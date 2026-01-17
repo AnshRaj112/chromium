@@ -10,7 +10,6 @@
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/metrics/bucket_ranges.h"
 #include "base/metrics/histogram.h"
 #include "base/metrics/histogram_base.h"
@@ -456,7 +455,8 @@ size_t ResolveContext::FirstServerIndex(bool doh_server,
   if (doh_server)
     return 0u;
 
-  size_t index = classic_server_index_;
+  size_t index =
+      classic_server_index_ % current_session_->config().nameservers.size();
   if (current_session_->config().rotate) {
     classic_server_index_ = (classic_server_index_ + 1) %
                             current_session_->config().nameservers.size();
@@ -628,9 +628,9 @@ bool ResolveContext::GetProviderUseExtraLogging(size_t server_index,
 
   // Use extra logging if any matching provider entries have
   // `LoggingLevel::kExtra` set.
-  return base::Contains(matching_entries,
-                        DohProviderEntry::LoggingLevel::kExtra,
-                        &DohProviderEntry::logging_level);
+  return std::ranges::contains(matching_entries,
+                               DohProviderEntry::LoggingLevel::kExtra,
+                               &DohProviderEntry::logging_level);
 }
 
 void ResolveContext::NotifyDohStatusObserversOfSessionChanged() {

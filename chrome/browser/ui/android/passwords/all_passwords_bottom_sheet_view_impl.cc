@@ -20,15 +20,15 @@
 #include "ui/base/l10n/l10n_util.h"
 
 // Must come after all headers that specialize FromJniType() / ToJniType().
-#include "chrome/android/features/keyboard_accessory/internal/jni/AllPasswordsBottomSheetBridge_jni.h"
-#include "chrome/android/features/keyboard_accessory/internal/jni/Credential_jni.h"
+#include "chrome/browser/keyboard_accessory/android/internal/jni/AllPasswordsBottomSheetBridge_jni.h"
+#include "chrome/browser/keyboard_accessory/android/internal/jni/Credential_jni.h"
 
 using autofill::mojom::FocusedFieldType;
 using base::android::AttachCurrentThread;
 using base::android::ConvertJavaStringToUTF16;
 using base::android::ConvertUTF16ToJavaString;
 using base::android::ConvertUTF8ToJavaString;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 AllPasswordsBottomSheetViewImpl::AllPasswordsBottomSheetViewImpl(
     AllPasswordsBottomSheetController* controller)
@@ -83,7 +83,7 @@ void AllPasswordsBottomSheetViewImpl::OnCredentialSelected(
     JNIEnv* env,
     std::u16string& username,
     std::u16string& password,
-    jboolean requests_to_fill_password) {
+    bool requests_to_fill_password) {
   controller_->OnCredentialSelected(
       username, password,
       AllPasswordsBottomSheetController::RequestsToFillPassword(
@@ -109,3 +109,6 @@ AllPasswordsBottomSheetViewImpl::GetOrCreateJavaObject() {
              controller_->GetNativeView()->GetWindowAndroid()->GetJavaObject(),
              controller_->GetFrameUrl().spec());
 }
+
+DEFINE_JNI(AllPasswordsBottomSheetBridge)
+DEFINE_JNI(Credential)

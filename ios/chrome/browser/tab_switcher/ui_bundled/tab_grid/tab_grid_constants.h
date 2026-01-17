@@ -42,6 +42,7 @@ extern NSString* const kTabGridEditShareButtonIdentifier;
 extern NSString* const kTabGridSearchBarIdentifier;
 extern NSString* const kTabGridSearchTextFieldIdentifierPrefix;
 extern NSString* const kTabGridScrimIdentifier;
+extern NSString* const kTabGridOverflowMenuButtonIdentifier;
 
 // Accessibility identifier for the activity label on a tab cell.
 extern NSString* const kTabCellActivityLabelIdentifier;
@@ -77,6 +78,9 @@ extern const CGFloat kTabGridSearchBarWidthRatio;
 extern const CGFloat kTabGridSearchBarHeight;
 // The Search bar width ratio modifier for non-compact orientation.
 extern const CGFloat kTabGridSearchBarNonCompactWidthRatioModifier;
+
+// The accessibility identifier of the history search result item.
+extern NSString* const kTabGridSearchSuggestedHistoryItemId;
 
 // Alpha of the background color of the toolbar.
 extern const CGFloat kToolbarBackgroundAlpha;

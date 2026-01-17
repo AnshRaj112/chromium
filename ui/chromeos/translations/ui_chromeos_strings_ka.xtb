@@ -35,6 +35,7 @@
 <translation id="1249250836236328755">ჟანრი</translation>
 <translation id="1254593899333212300">პირდაპირი ინტერნეტ კავშირი</translation>
 <translation id="1272293450992660632">PIN-კოდების მნიშვნელობები არ ემთხვევა.</translation>
+<translation id="1279040297980392566">ელოდება სკანირების დასრულებას, ცადეთ მოგვიანებით</translation>
 <translation id="1280820357415527819">მიმდინარეობს მობილური ქსელების ძიება</translation>
 <translation id="1293556467332435079">ფაილები</translation>
 <translation id="1297922636971898492">Google Drive ამჟამად მიუწვდომელია. ატვირთვა ავტომატურად განახლდება Google Drive-ის დაბრუნების შემდეგ.</translation>
@@ -109,7 +110,6 @@
 <translation id="1813278315230285598">სერვისები</translation>
 <translation id="181434555916624618">ამ ეტაპზე არ გაჩვენებთ ადამიანების შემცველ შედეგებს. ცადეთ სხვა მოთხოვნა.</translation>
 <translation id="1829129547161959350">პინგვინი</translation>
-<translation id="183183971458492120">მიმდინარეობს ინფორმაციის ჩატვირთვა…</translation>
 <translation id="1832073788765803750">ნახევარი სიგანის კატაკანა</translation>
 <translation id="1834290891154666894">სუბიექტის ალტერნატიული სახელის დამთხვევის მნიშვნელობა არასწორია</translation>
 <translation id="1838709767668011582">Google-ის საიტი</translation>
@@ -146,13 +146,13 @@
 <translation id="2142680004883808240">რუსული ფონეტიკური YaZHert კლავიატურით</translation>
 <translation id="2143778271340628265">მექანიკური პროქსის კონფიგურაცია</translation>
 <translation id="2148716181193084225">დღეს</translation>
+<translation id="2161573825856688200">Google პროექტი</translation>
 <translation id="2163152940313951844">არასწორი სიმბოლო: <ph name="CHARACTER_NAME" /></translation>
 <translation id="2178056538281447670">Microsoft 365</translation>
 <translation id="2184934335987813305">პორტუგალიური აშშ-ის საერთაშორისო (PC) კლავიატურით</translation>
 <translation id="2193661397560634290">გამოყენებულია <ph name="SPACE_USED" /></translation>
 <translation id="2198315389084035571">გამარტივებული ჩინური</translation>
 <translation id="22085916256174561">კორეული</translation>
-<translation id="2208919847696382164">დააინსტალირეთ Linux-ის მეშვეობით</translation>
 <translation id="2215692307449050019">ბატარეა ჯდება. ფაილების სინქრონიზაცია გაგრძელდება, როცა ელკვების წყაროს დაუკავშირდებით.</translation>
 <translation id="2225536596944493418">ნამდვილად გსურთ, წაშალოთ <ph name="NUMBER_OF_ITEMS" /> ერთეული?</translation>
 <translation id="2230062665678605299">ვერ შეიქმნა საქაღალდე „<ph name="FOLDER_NAME" />“. <ph name="ERROR_MESSAGE" /></translation>
@@ -213,7 +213,6 @@
 <translation id="2653059201992392941"><ph name="RETRIES" /> მცდელობა დაგრჩათ.</translation>
 <translation id="2663066752008346276">ბირმული/მიანმარული Myansan კლავიატურით</translation>
 <translation id="2664412712123763093">ფაილის მდებარეობა</translation>
-<translation id="2718540689505416944">დააინსტალირეთ აპი Linux-ის მეშვეობით</translation>
 <translation id="2719020180254996569">ქსელი <ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" />-დან, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, დეტალები</translation>
 <translation id="2724954091494693138">თურქული F-კლავიატურით</translation>
 <translation id="2732288874651063549"><ph name="VM_NAME" />-თან გაზიარების მართვა</translation>
@@ -222,7 +221,6 @@
 <translation id="2764206540577097904">თქვენ გამოყენებული გაქვთ თქვენი მთელი Google Workspace მეხსიერება.</translation>
 <translation id="2771816809568414714">ყველი</translation>
 <translation id="2781645665747935084">ბელგიური</translation>
-<translation id="2782104745158847185">შეცდომა Linux აპლიკაციის ინსტალაციისას</translation>
 <translation id="2802583107108007218">შეიტყვეთ მეტი ამ შეზღუდვების შესახებ</translation>
 <translation id="2803375539583399270">შეიყვანეთ PIN-კოდი</translation>
 <translation id="2819519502129272135">ფაილების სინქრონიზაცია გამორთულია</translation>
@@ -345,7 +343,6 @@
 <translation id="3786301125658655746">თქვენ ოფლაინში ხართ</translation>
 <translation id="3789841737615482174">ინსტალაცია</translation>
 <translation id="3793469551756281394">დარჩა დაახლოებით <ph name="REMAINING_TIME_HOUR" /> <ph name="REMAINING_TIME_MINUTE" /></translation>
-<translation id="3798449238516105146">ვერსია</translation>
 <translation id="3801082500826908679">ფარერული</translation>
 <translation id="3809272675881623365">კურდღელი</translation>
 <translation id="3810973564298564668">მართვა</translation>
@@ -353,14 +350,12 @@
 <translation id="3811494700605067549">არჩეულია 1 ფაილი</translation>
 <translation id="3817579325494460411">მიუთითებელი</translation>
 <translation id="3819448694985509187">PIN-კოდი არასწორია. 1 მცდელობა დაგრჩათ.</translation>
-<translation id="3822559385185038546">ეს პროქსი-სერვერი იძულებითაა დაყენებული თქვენი ადმინისტრატორის მიერ</translation>
 <translation id="3830674330436234648">დაკვრის ფუნქცია მიუწვდომელია</translation>
 <translation id="383652340667548381">სერბული</translation>
 <translation id="3839045880592694915">თქვენი ოპერატორი კრძალავს თქვენი მოდემის დაკავშირებას. დამატებითი ინფორმაციის მისაღებად დაუკავშირდით თქვენს ოპერატორს.</translation>
 <translation id="385051799172605136">უკან</translation>
 <translation id="3855472144336161447">გერმანული Neo 2</translation>
 <translation id="3858860766373142691">სახელი</translation>
-<translation id="3866249974567520381">აღწერა</translation>
 <translation id="3899991606604168269">ფრანგული (კანადა) მრავალენოვანი კლავიატურით</translation>
 <translation id="3901991538546252627"><ph name="NAME" />-თან დაკავშირება</translation>
 <translation id="3906232975181435906">მიმდინარეობს მობილური პროფილის ინსტალაცია, ქსელი <ph name="NETWORK_INDEX" /> / <ph name="NETWORK_COUNT" />-დან, <ph name="NETWORK_NAME" /></translation>
@@ -438,7 +433,6 @@
 <translation id="4477219268485577442">ბულგარული ფონეტიკური</translation>
 <translation id="4508265954913339219">აქტივაცია ვერ მოხერხდა</translation>
 <translation id="4509667233588080747">ინგლისური (აშშ) Workman საერთაშორისო კლავიატურით</translation>
-<translation id="4522570452068850558">დეტალები</translation>
 <translation id="4527800702232535228">ეს საქაღალდე გაზიარებულია Parallels Desktop-თან</translation>
 <translation id="4552678318981539154">მეტი მეხსიერების ყიდვა</translation>
 <translation id="4552759165874948005"><ph name="NETWORK_TYPE" /> ქსელი, სიგნალის სიძლიერე: <ph name="SIGNAL_STRENGTH" />%</translation>
@@ -596,13 +590,13 @@
 <translation id="5596627076506792578">დამატებითი ვარიანტები</translation>
 <translation id="5602622065581044566">ბულგარული ფონეტიკური კლავიატურით</translation>
 <translation id="5605830556594064952">US Dvorak</translation>
+<translation id="560739212255190568">თქვენმა ადმინისტრატორმა დააყენა პროქსის უგულებელყოფის წესები, გარდა შემდეგი პროქსი-სერვერის სავალდებულო გამოყენებისა</translation>
 <translation id="5618330573454123917">ეს ფაილი განკუთვნილია კომპიუტერისთვის, რომელიც იყენებს Macintosh პროგრამულ უზრუნველყოფას. ის არ არის თავსებადი თქვენს მოწყობილობასთან, რომელზეც გაშვებულია ChromeOS. <ph name="BEGIN_LINK_HELP" />შეიტყვეთ მეტი<ph name="END_LINK_HELP" /> ChromeOS-ზე ფაილების გახსნის შესახებ.</translation>
 <translation id="5625294776298156701">ტამილური Tamil99 კლავიატურით</translation>
 <translation id="5633226425545095130">ამ ერთეულის გადატანის შემთხვევაში ის გაზიარდება ყველასთან, ვისაც შეუძლია საზიარო საქაღალდის „<ph name="DESTINATION_NAME" />“ ნახვა.</translation>
 <translation id="5649768706273821470">მოსმენა</translation>
 <translation id="5650895901941743674">შეამოწმეთ APN-ის კონფიგურაცია</translation>
 <translation id="5669691691057771421">შეიყვანეთ ახალი PIN-კოდი</translation>
-<translation id="5678784840044122290">Linux აპლიკაცია ხელმისაწვდომი იქნება თქვენს ტერმინალში, ხოლო გამშვებში შეიძლება ხატულაც გამოჩნდეს.</translation>
 <translation id="5686799162999241776"><ph name="BEGIN_BOLD" />არქივთან ან ვირტუალურ დისკთან კავშირის გაწყვეტა ვერ ხერხდება<ph name="END_BOLD" />
    <ph name="LINE_BREAKS" />
    დახურეთ ყველა ფაილი არიქვში ან ვირტუალურ დისკში და ცადეთ ხელახლა.</translation>
@@ -637,7 +631,6 @@
 <translation id="5861477046012235702">მოთამაშე</translation>
 <translation id="5864471791310927901">DHCP ძებნა ვერ განხორციელდა</translation>
 <translation id="5896749729057314184">ქსელი <ph name="NETWORK_INDEX" /> / <ph name="NETWORK_COUNT" />-დან, <ph name="NETWORK_NAME" />, არააქტიური, სიგნალის სიძლიერეა <ph name="SIGNAL_STRENGTH" />%, დეტალები</translation>
-<translation id="5911887972742538906">თქვენი Linux აპლიკაციის ინსტალაციისას მოხდა შეცდომა.</translation>
 <translation id="5912396950572065471">ფორმატი</translation>
 <translation id="5918480239180455431">ხელმისაწვდომია ახალი საძიებო ფუნქციები</translation>
 <translation id="5926082595146149752">ნიდერლანდური (ნიდერლანდები) აშშ-ის საერთაშორისო (PC) კლავიატურით</translation>
@@ -806,7 +799,6 @@
 <translation id="7238097264433196391">დისკის სახელი</translation>
 <translation id="7238643356913091553"><ph name="NETWORK_NAME" />, დეტალები</translation>
 <translation id="7246947237293279874">FTP პროქსი-სერვერი</translation>
-<translation id="7248671827512403053">პროგრამა</translation>
 <translation id="7256405249507348194">ამოუცნობი შეცდომა: <ph name="DESC" /></translation>
 <translation id="7268659760406822741">ხელმისაწვდომი მომსახურებები</translation>
 <translation id="7291818353625820805">გსურთ, კლავიშები გამეორდეს? გამორთეთ მახვილის ნიშნები კლავიატურის პარამეტრებიდან</translation>
@@ -933,7 +925,6 @@
 <translation id="8151638057146502721">კონფიგურირება</translation>
 <translation id="8154666764013920974">{NUM_ERROR,plural, =1{1 შეცდომა.}other{# შეცდომა.}}</translation>
 <translation id="8154842056504218462">არჩეულია ყველა ჩანაწერი.</translation>
-<translation id="8157684860301034423">აპის ინფორმაციის მოძიება ვერ მოხერხდა.</translation>
 <translation id="8175731104491895765">ფრანგული (ბელგია)</translation>
 <translation id="8175799081768705361">მიმდინარეობს Drive-ის <ph name="NUMBER_OF_FILES_SYNCING" /> ფაილის სინქრონიზაცია</translation>
 <translation id="8179976553408161302">Enter</translation>
@@ -995,6 +986,7 @@
 <translation id="8540608333167683902">ქსელი <ph name="NETWORK_INDEX" />/<ph name="NETWORK_COUNT" />-დან, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, სიგნალის სიძლიერე: <ph name="SIGNAL_STRENGTH" />%, დეტალები</translation>
 <translation id="8545476925160229291">ინგლისური (აშშ)</translation>
 <translation id="854655314928502177">ვებ პროქსი-სერვერის ავტომატური აღმოჩენის URL:</translation>
+<translation id="8547747809824590510">თქვენმა ადმინისტრატორმა დააყენა პროქსი-სერვერის უგულებელყოფის წესები</translation>
 <translation id="8549186985808798022">იტალიური</translation>
 <translation id="8551494947769799688">ლატვიური</translation>
 <translation id="8560515948038859357">კანტონური</translation>
@@ -1055,6 +1047,7 @@
 <translation id="9038620279323455325">ფაილი სახელად „<ph name="FILE_NAME" />“ უკვე არსებობს. გთხოვთ, აირჩიოთ სხვა სახელი.</translation>
 <translation id="9046895021617826162">დაკავშირება ვერ მოხერხდა</translation>
 <translation id="9065512565307033593">თუ დადასტურებას ვერ მოახერხებთ, ქსელზე წვდომა გაითიშება.</translation>
+<translation id="9079844694307518094">თქვენი ადმინისტრატორის მიერ სავალდებულოდ დაყენებულია შემდეგი პროქსი-სერვერი</translation>
 <translation id="908378762078012445">რუსული ფონეტიკური AATSEEL კლავიატურით</translation>
 <translation id="9086302186042011942">სინქრონიზაცია</translation>
 <translation id="9099674669267916096">გვერდების რაოდენობა</translation>
@@ -1075,9 +1068,9 @@
 <translation id="9183302530794969518">Google Docs</translation>
 <translation id="9189836632794948435">ყაზახური</translation>
 <translation id="9200427192836333033"><ph name="NUMBER_OF_ITEMS" /> ერთეული ამოღებულია.</translation>
-<translation id="9213073329713032541">ინსტალაცია წარმატებით დაიწყო.</translation>
 <translation id="9219103736887031265">გამოსახულებები</translation>
 <translation id="9219908252191632183">მთვარისმიერი</translation>
+<translation id="931652069802536959">ქსელი დაბლოკილია წესების საფუძველზე</translation>
 <translation id="938470336146445890">გთხოვთ დააინსტალირეთ მომხმარებლის სერთიფიკატი.</translation>
 <translation id="939736085109172342">ახალი საქაღალდე</translation>
 <translation id="943972244133411984">შემცვლელი</translation>

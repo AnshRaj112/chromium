@@ -5,13 +5,13 @@
 #ifndef CHROME_BROWSER_EXTENSIONS_API_PASSWORDS_PRIVATE_PASSWORDS_PRIVATE_DELEGATE_H_
 #define CHROME_BROWSER_EXTENSIONS_API_PASSWORDS_PRIVATE_PASSWORDS_PRIVATE_DELEGATE_H_
 
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "base/functional/callback.h"
+#include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/common/extensions/api/passwords_private.h"
@@ -19,10 +19,15 @@
 #include "components/password_manager/core/browser/import/import_results.h"
 #include "components/password_manager/core/browser/leak_detection/bulk_leak_check_service.h"
 #include "components/password_manager/core/browser/ui/insecure_credentials_manager.h"
+#include "components/password_manager/core/browser/ui/saved_passwords_presenter.h"
 #include "extensions/browser/extension_function.h"
 
 namespace content {
 class WebContents;
+}
+
+namespace password_manager {
+class PasswordsProvider;
 }
 
 namespace extensions {
@@ -48,6 +53,9 @@ class PasswordsPrivateDelegate
       base::OnceCallback<void(password_manager::BulkLeakCheckService::State)>;
 
   using AuthenticationCallback = base::OnceCallback<void(bool)>;
+
+  virtual password_manager::SavedPasswordsPresenter*
+  GetSavedPasswordsPresenter() = 0;
 
   // Gets the saved passwords list.
   using UiEntries = std::vector<api::passwords_private::PasswordUiEntry>;

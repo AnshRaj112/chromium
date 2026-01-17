@@ -4,6 +4,8 @@
 
 #include "ash/wm/window_restore/window_restore_controller.h"
 
+#include <algorithm>
+
 #include "ash/accelerators/accelerator_controller_impl.h"
 #include "ash/app_list/app_list_controller_impl.h"
 #include "ash/screen_util.h"
@@ -12,7 +14,7 @@
 #include "ash/shelf/shelf.h"
 #include "ash/shell.h"
 #include "ash/test/ash_test_base.h"
-#include "ash/test/test_widget_builder.h"
+#include "ash/test/test_widget_delegates.h"
 #include "ash/wm/desks/desks_controller.h"
 #include "ash/wm/desks/desks_util.h"
 #include "ash/wm/float/float_controller.h"
@@ -23,7 +25,6 @@
 #include "ash/wm/window_positioning_utils.h"
 #include "ash/wm/window_state.h"
 #include "base/cancelable_callback.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
@@ -39,6 +40,7 @@
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/env.h"
 #include "ui/aura/env_observer.h"
+#include "ui/views/test/test_widget_builder.h"
 #include "ui/wm/core/window_util.h"
 
 namespace ash {
@@ -82,7 +84,7 @@ class WindowRestoreControllerTest : public AshTestBase,
   int GetSaveWindowsCount(aura::Window* window) const {
     const int32_t restore_window_id =
         window->GetProperty(app_restore::kRestoreWindowIdKey);
-    if (!base::Contains(fake_window_restore_file_, restore_window_id))
+    if (!fake_window_restore_file_.contains(restore_window_id))
       return 0;
     return fake_window_restore_file_.at(restore_window_id).call_count;
   }
@@ -108,7 +110,7 @@ class WindowRestoreControllerTest : public AshTestBase,
       aura::Window* window) const {
     const int32_t restore_window_id =
         window->GetProperty(app_restore::kRestoreWindowIdKey);
-    if (!base::Contains(fake_window_restore_file_, restore_window_id)) {
+    if (!fake_window_restore_file_.contains(restore_window_id)) {
       return std::nullopt;
     }
     return fake_window_restore_file_.at(restore_window_id).info;
@@ -171,7 +173,7 @@ class WindowRestoreControllerTest : public AshTestBase,
     // Window restore widgets are inactive when created as we do not want to
     // take activation from a possible activated window, and we want to stack
     // them in a certain order.
-    TestWidgetBuilder widget_builder;
+    views::test::TestWidgetBuilder widget_builder;
     widget_builder.SetWidgetType(views::Widget::InitParams::TYPE_WINDOW)
         .SetBounds(*info.current_bounds)
         .SetShow(false)
@@ -275,8 +277,8 @@ class WindowRestoreControllerTest : public AshTestBase,
     std::vector<chromeos::AppType> kSupportedAppTypes = {
         chromeos::AppType::BROWSER, chromeos::AppType::CHROME_APP,
         chromeos::AppType::ARC_APP};
-    if (!base::Contains(kSupportedAppTypes,
-                        window->GetProperty(chromeos::kAppTypeKey))) {
+    if (!std::ranges::contains(kSupportedAppTypes,
+                               window->GetProperty(chromeos::kAppTypeKey))) {
       return;
     }
 
@@ -977,11 +979,10 @@ TEST_F(WindowRestoreControllerTest, TabletToClamshell) {
 
   // The tablet mode window manager watches windows when they are added, then
   // tracks them when the window is shown. They must be resizable when tracked,
-  // so we use a TestWidgetBuilder instead of `CreateTestWindow()`, which would
-  // show the window before we can make it resizable.
+  // so we use a views::test::TestWidgetBuilder instead of `CreateTestWindow()`,
+  // which would show the window before we can make it resizable.
   const gfx::Rect expected_bounds(300, 300);
-  TestWidgetBuilder builder;
-  views::Widget* widget = builder.SetTestWidgetDelegate()
+  views::Widget* widget = CreateWidgetBuilderWithDelegate()
                               .SetBounds(expected_bounds)
                               .SetContext(Shell::GetPrimaryRootWindow())
                               .SetShow(false)

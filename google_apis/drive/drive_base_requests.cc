@@ -10,7 +10,6 @@
 #include <memory>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
@@ -28,6 +27,7 @@
 #include "google_apis/drive/request_util.h"
 #include "net/base/load_flags.h"
 #include "net/base/mime_util.h"
+#include "net/http/http_response_headers.h"
 #include "net/http/http_util.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
@@ -128,7 +128,7 @@ void GenerateMultipartBody(MultipartType multipart_type,
       boundary = net::GenerateMimeMultipartBoundary();
       bool conflict_with_content = false;
       for (const auto& part : parts) {
-        if (base::Contains(part.data, boundary)) {
+        if (part.data.contains(boundary)) {
           conflict_with_content = true;
           break;
         }

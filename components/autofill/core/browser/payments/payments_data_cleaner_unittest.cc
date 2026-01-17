@@ -14,7 +14,7 @@
 #include "components/autofill/core/browser/data_manager/payments/payments_data_manager_test_base.h"
 #include "components/autofill/core/browser/data_manager/personal_data_manager.h"
 #include "components/autofill/core/browser/data_manager/personal_data_manager_test_utils.h"
-#include "components/autofill/core/browser/suggestions/payments/payments_suggestion_generator.h"
+#include "components/autofill/core/browser/suggestions/payments/payments_suggestion_generator_util.h"
 #include "components/autofill/core/browser/test_utils/autofill_test_utils.h"
 #include "components/autofill/core/common/autofill_constants.h"
 #include "components/autofill/core/common/credit_card_network_identifiers.h"
@@ -39,7 +39,7 @@ class PaymentsDataCleanerTest : public PaymentsDataManagerTestBase,
         /*history_service=*/nullptr, &sync_service_,
         /*strike_database=*/nullptr,
         /*image_fetcher=*/nullptr, /*shared_storage_handler=*/nullptr, "en-US",
-        "US");
+        "US", /*autofill_optimization_guide=*/nullptr);
     PersonalDataChangedWaiter(*personal_data_).Wait();
     payments_data_cleaner_ = std::make_unique<PaymentsDataCleaner>(
         &personal_data_->payments_data_manager());
@@ -159,11 +159,11 @@ TEST_F(PaymentsDataCleanerTest,
 
   EXPECT_EQ(4U,
             personal_data().payments_data_manager().GetCreditCards().size());
-  std::unordered_set<std::u16string> expectedToRemain = {u"Alice", u"Bob",
-                                                         u"Clyde", u"Frank"};
+  std::unordered_set<std::u16string> expected_to_remain = {u"Alice", u"Bob",
+                                                           u"Clyde", u"Frank"};
   for (auto* card : personal_data().payments_data_manager().GetCreditCards()) {
-    EXPECT_NE(expectedToRemain.end(),
-              expectedToRemain.find(card->GetRawInfo(CREDIT_CARD_NAME_FULL)));
+    EXPECT_NE(expected_to_remain.end(),
+              expected_to_remain.find(card->GetRawInfo(CREDIT_CARD_NAME_FULL)));
   }
 
   // Verify histograms are logged.

@@ -8,6 +8,11 @@
 //    clang-format -i -style=chromium filename
 // DO NOT EDIT!
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include <string.h>
 
 #include "base/notreached.h"
@@ -506,6 +511,14 @@ MockEGLInterface::Mock_eglPostSubBufferNV(EGLDisplay dpy,
   return interface_->PostSubBufferNV(dpy, surface, x, y, width, height);
 }
 
+EGLBoolean GL_BINDING_CALL
+MockEGLInterface::Mock_eglPresentationTimeANDROID(EGLDisplay dpy,
+                                                  EGLSurface surface,
+                                                  EGLnsecsANDROID time) {
+  MakeEglMockFunctionUnique("eglPresentationTimeANDROID");
+  return interface_->PresentationTimeANDROID(dpy, surface, time);
+}
+
 EGLenum GL_BINDING_CALL MockEGLInterface::Mock_eglQueryAPI(void) {
   MakeEglMockFunctionUnique("eglQueryAPI");
   return interface_->QueryAPI();
@@ -949,14 +962,16 @@ MockEGLInterface::GetGLProcAddress(const char* name) {
     return reinterpret_cast<GLFunctionPointerType>(Mock_eglInitialize);
   if (strcmp(name, "eglLabelObjectKHR") == 0)
     return reinterpret_cast<GLFunctionPointerType>(Mock_eglLabelObjectKHR);
-  if (strcmp(name, "eglLockVulkanQueueANGLE") == 0) {
+  if (strcmp(name, "eglLockVulkanQueueANGLE") == 0)
     return reinterpret_cast<GLFunctionPointerType>(
         Mock_eglLockVulkanQueueANGLE);
-  }
   if (strcmp(name, "eglMakeCurrent") == 0)
     return reinterpret_cast<GLFunctionPointerType>(Mock_eglMakeCurrent);
   if (strcmp(name, "eglPostSubBufferNV") == 0)
     return reinterpret_cast<GLFunctionPointerType>(Mock_eglPostSubBufferNV);
+  if (strcmp(name, "eglPresentationTimeANDROID") == 0)
+    return reinterpret_cast<GLFunctionPointerType>(
+        Mock_eglPresentationTimeANDROID);
   if (strcmp(name, "eglQueryAPI") == 0)
     return reinterpret_cast<GLFunctionPointerType>(Mock_eglQueryAPI);
   if (strcmp(name, "eglQueryContext") == 0)
@@ -1043,10 +1058,9 @@ MockEGLInterface::GetGLProcAddress(const char* name) {
     return reinterpret_cast<GLFunctionPointerType>(Mock_eglSwapInterval);
   if (strcmp(name, "eglTerminate") == 0)
     return reinterpret_cast<GLFunctionPointerType>(Mock_eglTerminate);
-  if (strcmp(name, "eglUnlockVulkanQueueANGLE") == 0) {
+  if (strcmp(name, "eglUnlockVulkanQueueANGLE") == 0)
     return reinterpret_cast<GLFunctionPointerType>(
         Mock_eglUnlockVulkanQueueANGLE);
-  }
   if (strcmp(name, "eglWaitClient") == 0)
     return reinterpret_cast<GLFunctionPointerType>(Mock_eglWaitClient);
   if (strcmp(name, "eglWaitGL") == 0)

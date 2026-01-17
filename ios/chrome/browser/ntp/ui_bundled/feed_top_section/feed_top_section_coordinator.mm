@@ -20,18 +20,18 @@
 #import "ios/chrome/browser/ntp/ui_bundled/feed_top_section/notifications_promo_view_constants.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_delegate.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_utils.h"
+#import "ios/chrome/browser/push_notification/coordinator/notifications_opt_in_alert_coordinator.h"
 #import "ios/chrome/browser/push_notification/model/constants.h"
 #import "ios/chrome/browser/push_notification/model/provisional_push_notification_service_factory.h"
 #import "ios/chrome/browser/push_notification/model/push_notification_client_id.h"
 #import "ios/chrome/browser/push_notification/model/push_notification_service.h"
 #import "ios/chrome/browser/push_notification/model/push_notification_util.h"
-#import "ios/chrome/browser/push_notification/ui_bundled/notifications_opt_in_alert_coordinator.h"
 #import "ios/chrome/browser/search_engines/model/template_url_service_factory.h"
 #import "ios/chrome/browser/shared/coordinator/alert/alert_coordinator.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/signin/model/authentication_service.h"
@@ -100,7 +100,7 @@ using base::UserMetricsAction;
   self.isSignInPromoEnabled =
       ShouldShowTopOfFeedSyncPromo() && authenticationService &&
       [self.NTPDelegate isSignInAllowed] &&
-      !authenticationService->HasPrimaryIdentity(signin::ConsentLevel::kSignin);
+      !identityManager->HasPrimaryAccount(signin::ConsentLevel::kSignin);
 
   // If the user is signed out and signin is allowed, then start the top-of-feed
   // signin promo components.
@@ -182,7 +182,8 @@ using base::UserMetricsAction;
 - (void)showSignin:(SigninPromoViewMediator*)mediator
            command:(ShowSigninCommand*)command {
   __weak __typeof(self) weakSelf = self;
-  [command addSigninCompletion:^(SigninCoordinatorResult result,
+  [command addSigninCompletion:^(SigninCoordinator* coordinator,
+                                 SigninCoordinatorResult result,
                                  id<SystemIdentity>) {
     [weakSelf.signinPromoMediator signinDidCompleteWithResult:result];
   }];

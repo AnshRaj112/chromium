@@ -22,6 +22,7 @@
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_icon_manager.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
 #include "chrome/browser/web_applications/web_app_install_params.h"
@@ -44,11 +45,11 @@ class InstallFromInfoCommandTest : public WebAppBrowserTestBase {
                                              const SortedSizesPx& sizes_px) {
     std::map<SquareSizePx, SkBitmap> result;
     base::RunLoop run_loop;
-    provider().icon_manager().ReadIcons(
-        app_id, purpose, sizes_px,
+    provider().icon_manager().ReadTrustedIconsWithFallbackToManifestIcons(
+        app_id, sizes_px, purpose,
         base::BindLambdaForTesting(
-            [&](std::map<SquareSizePx, SkBitmap> icon_bitmaps) {
-              result = std::move(icon_bitmaps);
+            [&](IconMetadataFromDisk icon_metadata_from_disk) {
+              result = std::move(icon_metadata_from_disk.icons_map);
               run_loop.Quit();
             }));
     run_loop.Run();
@@ -83,8 +84,8 @@ IN_PROC_BROWSER_TEST_F(InstallFromInfoCommandTest, SuccessInstall) {
       WebAppInstallParams());
   loop.Run();
 
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider().registrar_unsafe().GetInstallState(result_app_id));
+  EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+      result_app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   // Ensure histogram is only measured once.
 
@@ -123,8 +124,8 @@ IN_PROC_BROWSER_TEST_F(InstallFromInfoCommandTest, InstallWithParams) {
       base::BindLambdaForTesting(
           [&](const webapps::AppId& app_id, webapps::InstallResultCode code) {
             EXPECT_EQ(code, webapps::InstallResultCode::kSuccessNewInstall);
-            EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-                      provider().registrar_unsafe().GetInstallState(app_id));
+            EXPECT_TRUE(provider().registrar_unsafe().AppMatches(
+                app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
             result_app_id = app_id;
             loop.Quit();
           }),

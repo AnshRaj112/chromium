@@ -20,18 +20,23 @@ namespace {
 // Array of features exposed through the Java SigninFeatures API.
 const base::Feature* const kFeaturesExposedToJava[] = {
     &switches::kCctSignInPrompt,
+    &switches::kEnableAddSessionRedirect,
+    &switches::kEnableSeamlessSignin,
     &switches::kForceStartupSigninPromo,
     &switches::kForceHistoryOptInScreen,
-    &switches::kHistoryPageHistorySyncPromo,
-    &switches::kHistoryPagePromoCtaStringVariation,
     &switches::kSkipCheckForAccountManagementOnSignin,
-    &switches::kUnoForAuto,
-    &switches::kUseHostedDomainForManagementCheckOnSignin,
     &switches::kSyncEnableBookmarksInTransportMode,
-    &switches::kHistoryOptInEducationalTip,
-    &switches::kMakeAccountsAvailableInIdentityManager,
+    &switches::kMigrateAccountManagerDelegate,
     &switches::kFullscreenSignInPromoUseDate,
     &switches::kSmartEmailLineBreaking,
+    &switches::kSupportWebSigninAddSession,
+    &switches::kSkipRefreshTokenCheckInIdentityManager,
+    &switches::kFRESignInAlternativeSecondaryButtonText,
+    &switches::kChromeAndroidIdentitySurveyFirstRun,
+    &switches::kChromeAndroidIdentitySurveyWeb,
+    &switches::kChromeAndroidIdentitySurveyNtpAvatar,
+    &switches::kChromeAndroidIdentitySurveyNtpPromo,
+    &switches::kChromeAndroidIdentitySurveyBookmarkPromo,
 };
 
 // static
@@ -48,3 +53,5 @@ static jlong JNI_SigninFeatureMap_GetNativeMap(JNIEnv* env) {
 }
 
 }  // namespace signin
+
+DEFINE_JNI(SigninFeatureMap)

@@ -207,9 +207,13 @@ ConvertToJavaPrimaryAccountChangeEvent(
   DCHECK(event_type_not_required != PrimaryAccountChangeEvent::Type::kNone ||
          event_type_sync != PrimaryAccountChangeEvent::Type::kNone);
   return Java_PrimaryAccountChangeEvent_Constructor(
-      env, jint(event_type_not_required), jint(event_type_sync));
+      env, int32_t(event_type_not_required), int32_t(event_type_sync));
 }
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
 }  // namespace signin
+
+#if BUILDFLAG(IS_ANDROID)
+DEFINE_JNI(PrimaryAccountChangeEvent)
+#endif

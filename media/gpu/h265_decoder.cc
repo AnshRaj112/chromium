@@ -1,12 +1,6 @@
 // Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "media/gpu/h265_decoder.h"
 
 #include <algorithm>
@@ -162,11 +156,10 @@ void H265Decoder::SetStream(int32_t id,
   stream_id_ = id;
   decoder_buffer_has_been_changed_ = true;
   if (decrypt_config) {
-    parser_.SetEncryptedStream(decoder_buffer_->data(), decoder_buffer_->size(),
-                               decrypt_config->subsamples());
+    parser_.SetEncryptedStream(*decoder_buffer_, decrypt_config->subsamples());
     current_decrypt_config_ = decrypt_config->Clone();
   } else {
-    parser_.SetStream(decoder_buffer_->data(), decoder_buffer_->size());
+    parser_.SetStream(*decoder_buffer_);
     current_decrypt_config_ = nullptr;
   }
   if (decoder_buffer_->side_data() &&
@@ -311,11 +304,7 @@ H265Decoder::DecodeResult H265Decoder::Decode() {
             if (par_res != H265Parser::kOk) {
               SET_ERROR_AND_RETURN();
             }
-            accelerator_->ProcessSPS(
-                parser_.GetSPS(sps_id),
-                base::span<const uint8_t>(
-                    curr_nalu_->data.get(),
-                    base::checked_cast<size_t>(curr_nalu_->size)));
+            accelerator_->ProcessSPS(parser_.GetSPS(sps_id), curr_nalu_->data);
             break;
           }
           case H265NALU::PPS_NUT: {
@@ -324,11 +313,7 @@ H265Decoder::DecodeResult H265Decoder::Decode() {
             if (par_res != H265Parser::kOk) {
               SET_ERROR_AND_RETURN();
             }
-            accelerator_->ProcessPPS(
-                parser_.GetPPS(pps_id),
-                base::span<const uint8_t>(
-                    curr_nalu_->data.get(),
-                    base::checked_cast<size_t>(curr_nalu_->size)));
+            accelerator_->ProcessPPS(parser_.GetPPS(pps_id), curr_nalu_->data);
             break;
           }
           default:
@@ -416,8 +401,9 @@ H265Decoder::DecodeResult H265Decoder::Decode() {
               return kRanOutOfSurfaces;
             if (current_decrypt_config_)
               curr_pic_->set_decrypt_config(current_decrypt_config_->Clone());
-            if (hdr_metadata_.has_value())
+            if (!hdr_metadata_.IsEmpty()) {
               curr_pic_->set_hdr_metadata(hdr_metadata_);
+            }
 
             curr_pic_->first_picture_ = first_picture_;
             first_picture_ = false;
@@ -447,11 +433,7 @@ H265Decoder::DecodeResult H265Decoder::Decode() {
         // vps_id to aux_alpha_layer_id, and look up the aux_alpha_layer_id for
         // each NALU.
         aux_alpha_layer_id_ = parser_.GetVPS(vps_id)->aux_alpha_layer_id;
-        accelerator_->ProcessVPS(
-            parser_.GetVPS(vps_id),
-            base::span<const uint8_t>(
-                curr_nalu_->data.get(),
-                base::checked_cast<size_t>(curr_nalu_->size)));
+        accelerator_->ProcessVPS(parser_.GetVPS(vps_id), curr_nalu_->data);
         break;
       case H265NALU::SPS_NUT:
         CHECK_ACCELERATOR_RESULT(FinishPrevFrameIfPresent());
@@ -459,11 +441,7 @@ H265Decoder::DecodeResult H265Decoder::Decode() {
         par_res = parser_.ParseSPS(&sps_id);
         if (par_res != H265Parser::kOk)
           SET_ERROR_AND_RETURN();
-        accelerator_->ProcessSPS(
-            parser_.GetSPS(sps_id),
-            base::span<const uint8_t>(
-                curr_nalu_->data.get(),
-                base::checked_cast<size_t>(curr_nalu_->size)));
+        accelerator_->ProcessSPS(parser_.GetSPS(sps_id), curr_nalu_->data);
         break;
       case H265NALU::PPS_NUT:
         CHECK_ACCELERATOR_RESULT(FinishPrevFrameIfPresent());
@@ -471,11 +449,7 @@ H265Decoder::DecodeResult H265Decoder::Decode() {
         par_res = parser_.ParsePPS(*curr_nalu_, &pps_id);
         if (par_res != H265Parser::kOk)
           SET_ERROR_AND_RETURN();
-        accelerator_->ProcessPPS(
-            parser_.GetPPS(pps_id),
-            base::span<const uint8_t>(
-                curr_nalu_->data.get(),
-                base::checked_cast<size_t>(curr_nalu_->size)));
+        accelerator_->ProcessPPS(parser_.GetPPS(pps_id), curr_nalu_->data);
 
         // For ARC CTS tests they expect us to request the buffers after only
         // processing the SPS/PPS, we can't wait until we get the first IDR. To
@@ -529,16 +503,10 @@ H265Decoder::DecodeResult H265Decoder::Decode() {
                            // 3. Both container and bitstream.
                            // Thus we should also extract HDR metadata here in
                            // case we miss the information.
-                           if (!hdr_metadata_.has_value()) {
-                             hdr_metadata_.emplace();
-                           }
-                           hdr_metadata_->cta_861_3 = info.ToGfx();
+                           hdr_metadata_.cta_861_3 = info.ToGfx();
                          },
                          [this](const H265SEIMasteringDisplayInfo& info) {
-                           if (!hdr_metadata_.has_value()) {
-                             hdr_metadata_.emplace();
-                           }
-                           hdr_metadata_->smpte_st_2086 = info.ToGfx();
+                           hdr_metadata_.smpte_st_2086 = info.ToGfx();
                          },
                          [](std::monostate) {},
                      },
@@ -579,7 +547,7 @@ VideoChromaSampling H265Decoder::GetChromaSampling() const {
 VideoColorSpace H265Decoder::GetVideoColorSpace() const {
   return picture_color_space_;
 }
-std::optional<gfx::HDRMetadata> H265Decoder::GetHDRMetadata() const {
+gfx::HDRMetadata H265Decoder::GetHDRMetadata() const {
   return hdr_metadata_;
 }
 

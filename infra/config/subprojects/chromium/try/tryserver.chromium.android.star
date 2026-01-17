@@ -23,8 +23,12 @@ try_.defaults.set(
     os = os.LINUX_DEFAULT,
     compilator_cores = 32,
     execution_timeout = try_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     orchestrator_cores = 4,
     service_account = try_constants.DEFAULT_SERVICE_ACCOUNT,
+    siso_keep_going = siso.KEEP_GOING,
     # crbug.com/372192123 - downloading with "minimum" strategy doesn't work
     # well for Android builds because some steps have additional inputs/outputs
     # they are not configured in the build graph.
@@ -82,6 +86,7 @@ try_.builder(
 
 try_.builder(
     name = "android-10-x86-rel",
+    branch_selector = branches.selector.ANDROID_BRANCHES,
     mirrors = [
         "ci/android-10-x86-rel",
     ],
@@ -103,6 +108,21 @@ try_.builder(
     gn_args = gn_args.config(
         configs = [
             "ci/android-10-x86-fyi-rel",
+            "release_try_builder",
+        ],
+    ),
+    contact_team_email = "clank-engprod@google.com",
+    siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
+)
+
+try_.builder(
+    name = "android-10-x86-nofieldtrial-rel",
+    mirrors = [
+        "ci/android-10-x86-nofieldtrial-rel",
+    ],
+    gn_args = gn_args.config(
+        configs = [
+            "ci/android-10-x86-nofieldtrial-rel",
             "release_try_builder",
         ],
     ),
@@ -565,7 +585,7 @@ try_.builder(
         ],
     ),
     builderless = not settings.is_main,
-    cores = "16|32",
+    cores = 32,
     ssd = True,
     main_list_view = "try",
     properties = {
@@ -595,6 +615,21 @@ try_.builder(
 )
 
 try_.builder(
+    name = "android-canary-x64-fyi-rel",
+    mirrors = [
+        "ci/android-canary-x64-fyi-rel",
+    ],
+    gn_args = gn_args.config(
+        configs = [
+            "ci/android-canary-x64-fyi-rel",
+            "release_try_builder",
+        ],
+    ),
+    contact_team_email = "clank-engprod@google.com",
+    siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
+)
+
+try_.builder(
     name = "android-clobber-rel",
     mirrors = [
         "ci/android-archive-rel",
@@ -619,10 +654,10 @@ try_.builder(
         configs = [
             "android_builder_without_codecs",
             "android_with_static_analysis",
+            "arm",
             "cronet_android",
             "debug_static_builder",
             "remoteexec",
-            "arm_no_neon",
             "release_java",
         ],
     ),
@@ -654,10 +689,10 @@ try_.builder(
         configs = [
             "android_builder_without_codecs",
             "android_with_static_analysis",
+            "arm",
             "cronet_android",
             "release_try_builder",
             "remoteexec",
-            "arm_no_neon",
         ],
     ),
     builderless = not settings.is_main,
@@ -684,14 +719,6 @@ try_.builder(
     # TODO(crbug.com/40462241): Switch this back to debug try builder when cronet's
     # shared library loading is fixed.
     gn_args = "ci/android-cronet-arm64-rel",
-    contact_team_email = "cronet-team@google.com",
-    siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
-)
-
-try_.builder(
-    name = "android-cronet-asan-arm-rel",
-    mirrors = ["ci/android-cronet-asan-arm-rel"],
-    gn_args = "ci/android-cronet-asan-arm-rel",
     contact_team_email = "cronet-team@google.com",
     siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
 )
@@ -1032,6 +1059,25 @@ try_.builder(
     siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
 )
 
+# Temporary builder for checking structured test ids.
+try_.builder(
+    name = "android-structured-test-ids-16-x64-rel-fyi",
+    mirrors = [
+        "ci/android-structured-test-ids-16-x64-rel-fyi",
+    ],
+    gn_args = gn_args.config(
+        configs = [
+            "ci/android-structured-test-ids-16-x64-rel-fyi",
+            "release_try_builder",
+        ],
+    ),
+    contact_team_email = "chrome-browser-infra-team@google.com",
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
+    siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
+)
+
 try_.builder(
     name = "android-webview-12-x64-dbg",
     mirrors = [
@@ -1125,11 +1171,11 @@ try_.orchestrator_builder(
     name = "android-x86-rel",
     branch_selector = branches.selector.ANDROID_BRANCHES,
     mirrors = [
-        "ci/android-10-x86-rel",
+        "ci/android-10-x86-nofieldtrial-rel",
     ],
     gn_args = gn_args.config(
         configs = [
-            "ci/android-10-x86-rel",
+            "ci/android-10-x86-nofieldtrial-rel",
             "release_try_builder",
             "use_clang_coverage",
             "use_java_coverage",
@@ -1448,7 +1494,6 @@ gpu.try_.optional_tests_builder(
         android_config = builder_config.android_config(
             config = "base_config",
         ),
-        build_gs_bucket = "chromium-gpu-fyi-archive",
     ),
     builder_config_settings = builder_config.try_settings(
         retry_failed_shards = False,
@@ -1468,7 +1513,7 @@ gpu.try_.optional_tests_builder(
     ),
     targets = targets.bundle(
         targets = [
-            "gpu_pixel_4_telemetry_tests",
+            "gpu_pixel_04_telemetry_tests",
             "android_webview_gpu_telemetry_tests",
         ],
         mixins = [
@@ -1523,41 +1568,12 @@ gpu.try_.optional_tests_builder(
     builderless = True,
     ssd = None,
     free_space = None,
+    alerts_enabled = False,
     contact_team_email = "chrome-gpu-infra@google.com",
     main_list_view = "try",
     max_concurrent_builds = 10,
     tryjob = try_.job(
-        location_filters = [
-            # Inclusion filters.
-            cq.location_filter(path_regexp = "cc/.+"),
-            cq.location_filter(path_regexp = "chrome/browser/vr/.+"),
-            cq.location_filter(path_regexp = "content/browser/xr/.+"),
-            cq.location_filter(path_regexp = "components/viz/.+"),
-            cq.location_filter(path_regexp = "content/test/data/gpu/.+"),
-            cq.location_filter(path_regexp = "content/test/gpu/.+"),
-            cq.location_filter(path_regexp = "gpu/.+"),
-            cq.location_filter(path_regexp = "media/audio/.+"),
-            cq.location_filter(path_regexp = "media/base/.+"),
-            cq.location_filter(path_regexp = "media/capture/.+"),
-            cq.location_filter(path_regexp = "media/filters/.+"),
-            cq.location_filter(path_regexp = "media/gpu/.+"),
-            cq.location_filter(path_regexp = "media/mojo/.+"),
-            cq.location_filter(path_regexp = "media/renderers/.+"),
-            cq.location_filter(path_regexp = "media/video/.+"),
-            cq.location_filter(path_regexp = "services/viz/.+"),
-            cq.location_filter(path_regexp = "testing/buildbot/tryserver.chromium.android.json"),
-            cq.location_filter(path_regexp = "testing/trigger_scripts/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/modules/mediastream/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/modules/webcodecs/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/modules/webgl/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/modules/webgpu/.+"),
-            cq.location_filter(path_regexp = "third_party/blink/renderer/platform/graphics/gpu/.+"),
-            cq.location_filter(path_regexp = "tools/clang/scripts/update.py"),
-            cq.location_filter(path_regexp = "ui/gl/.+"),
-
-            # Exclusion filters.
-            cq.location_filter(exclude = True, path_regexp = ".*\\.md"),
-        ],
+        location_filters = gpu.try_.optional_trybot_location_filters.ANDROID,
     ),
 )
 
@@ -1577,44 +1593,14 @@ gpu.try_.optional_tests_builder(
     builderless = True,
     ssd = None,
     free_space = None,
+    # Exclude gpu fyi builders.
+    alerts_enabled = False,
     contact_team_email = "chrome-gpu-infra@google.com",
     main_list_view = "try",
     max_concurrent_builds = 10,
-    # TODO(crbug.com/433899671): Re-enable once the culprit CL has been
-    # reverted and the builder is healthy enough to block CL submission.
-    #tryjob = try_.job(
-    #    location_filters = [
-    #
-    #        # Inclusion filters.
-    #        cq.location_filter(path_regexp = "cc/.+"),
-    #        cq.location_filter(path_regexp = "chrome/browser/vr/.+"),
-    #        cq.location_filter(path_regexp = "content/browser/xr/.+"),
-    #        cq.location_filter(path_regexp = "components/viz/.+"),
-    #        cq.location_filter(path_regexp = "content/test/data/gpu/.+"),
-    #        cq.location_filter(path_regexp = "content/test/gpu/.+"),
-    #        cq.location_filter(path_regexp = "gpu/.+"),
-    #        cq.location_filter(path_regexp = "media/audio/.+"),
-    #        cq.location_filter(path_regexp = "media/base/.+"),
-    #        cq.location_filter(path_regexp = "media/capture/.+"),
-    #        cq.location_filter(path_regexp = "media/filters/.+"),
-    #        cq.location_filter(path_regexp = "media/gpu/.+"),
-    #        cq.location_filter(path_regexp = "media/mojo/.+"),
-    #        cq.location_filter(path_regexp = "media/renderers/.+"),
-    #        cq.location_filter(path_regexp = "media/video/.+"),
-    #        cq.location_filter(path_regexp = "services/viz/.+"),
-    #        cq.location_filter(path_regexp = "testing/trigger_scripts/.+"),
-    #        cq.location_filter(path_regexp = "third_party/blink/renderer/modules/mediastream/.+"),
-    #        cq.location_filter(path_regexp = "third_party/blink/renderer/modules/webcodecs/.+"),
-    #        cq.location_filter(path_regexp = "third_party/blink/renderer/modules/webgl/.+"),
-    #        cq.location_filter(path_regexp = "third_party/blink/renderer/modules/webgpu/.+"),
-    #        cq.location_filter(path_regexp = "third_party/blink/renderer/platform/graphics/gpu/.+"),
-    #        cq.location_filter(path_regexp = "tools/clang/scripts/update.py"),
-    #        cq.location_filter(path_regexp = "ui/gl/.+"),
-    #
-    #        # Exclusion filters.
-    #        cq.location_filter(exclude = True, path_regexp = ".*\\.md"),
-    #    ],
-    #),
+    tryjob = try_.job(
+        location_filters = gpu.try_.optional_trybot_location_filters.ANDROID,
+    ),
 )
 
 try_.builder(

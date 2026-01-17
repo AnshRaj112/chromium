@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 package org.chromium.chrome.browser.privacy_sandbox;
 
+import static org.chromium.build.NullUtil.assumeNonNull;
+
 import android.content.Context;
 import android.os.Bundle;
 import android.view.Menu;
@@ -49,7 +51,12 @@ public abstract class PrivacySandboxSettingsBaseFragment extends ChromeBaseSetti
         Bundle fragmentArgs = new Bundle();
         fragmentArgs.putInt(PRIVACY_SANDBOX_REFERRER, referrer);
         SettingsNavigationFactory.createSettingsNavigation()
-                .startSettings(context, PrivacySandboxSettingsFragment.class, fragmentArgs);
+                .startSettings(
+                        context,
+                        PrivacySandboxSettingsFragment.class,
+                        fragmentArgs,
+                        // If this comes from "Privacy and security" page, open it as a child of it.
+                        /* addToBackStack= */ referrer == PrivacySandboxReferrer.PRIVACY_SETTINGS);
     }
 
     @Override
@@ -66,7 +73,7 @@ public abstract class PrivacySandboxSettingsBaseFragment extends ChromeBaseSetti
                 menu.add(Menu.NONE, R.id.menu_id_targeted_help, Menu.NONE, R.string.menu_help);
         help.setIcon(
                 TraceEventVectorDrawableCompat.create(
-                        getResources(), R.drawable.ic_help_and_feedback, getActivity().getTheme()));
+                        getResources(), R.drawable.ic_help_24dp, getActivity().getTheme()));
     }
 
     @Override
@@ -106,8 +113,9 @@ public abstract class PrivacySandboxSettingsBaseFragment extends ChromeBaseSetti
         if (actionStringResId != 0) {
             snackbar.setAction(getResources().getString(actionStringResId), null);
         }
-        if (multiLine) snackbar.setSingleLine(false);
-        mSnackbarManagerSupplier.get().showSnackbar(snackbar);
+        if (multiLine) snackbar.setDefaultLines(false);
+        SnackbarManager snackbarManager = assumeNonNull(mSnackbarManagerSupplier.get());
+        snackbarManager.showSnackbar(snackbar);
     }
 
     protected void parseAndRecordReferrer() {
@@ -131,7 +139,12 @@ public abstract class PrivacySandboxSettingsBaseFragment extends ChromeBaseSetti
     }
 
     protected void startSettings(Class<? extends Fragment> fragment) {
-        SettingsNavigationFactory.createSettingsNavigation().startSettings(getContext(), fragment);
+        SettingsNavigationFactory.createSettingsNavigation()
+                .startSettings(
+                        getContext(),
+                        fragment,
+                        /* fragmentArgs= */ null,
+                        /* addToBackStack= */ true);
     }
 
     @Override

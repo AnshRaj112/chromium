@@ -25,16 +25,16 @@
 #include "ui/views/controls/styled_label.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/layout/flex_layout_types.h"
+#include "ui/views/metadata/view_factory.h"
 #include "ui/views/view_class_properties.h"
 
 namespace autofill {
 
 MandatoryReauthConfirmationBubbleView::MandatoryReauthConfirmationBubbleView(
-    views::View* anchor_view,
+    views::BubbleAnchor anchor,
     content::WebContents* web_contents,
     MandatoryReauthBubbleController* controller)
-    : AutofillLocationBarBubble(anchor_view, web_contents),
-      controller_(controller) {
+    : AutofillLocationBarBubble(anchor, web_contents), controller_(controller) {
   SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
   SetShowCloseButton(true);
   set_fixed_width(views::LayoutProvider::Get()->GetDistanceMetric(

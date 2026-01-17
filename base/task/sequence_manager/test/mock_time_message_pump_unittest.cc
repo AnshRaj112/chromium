@@ -14,20 +14,19 @@ namespace {
 
 using ::testing::DoAll;
 using ::testing::Eq;
-using ::testing::Invoke;
 using ::testing::Return;
 using ::testing::SetArgPointee;
 using ::testing::StrictMock;
 
 class MockMessagePumpDelegate : public MessagePump::Delegate {
  public:
-  MOCK_METHOD0(OnBeginWorkItem, void());
-  MOCK_METHOD1(OnEndWorkItem, void(int));
-  MOCK_METHOD0(BeforeWait, void());
-  MOCK_METHOD0(BeginNativeWorkBeforeDoWork, void());
-  MOCK_METHOD0(DoWork, NextWorkInfo());
-  MOCK_METHOD0(DoIdleWork, void());
-  MOCK_METHOD0(RunDepth, int());
+  MOCK_METHOD(void, OnBeginWorkItem, (), (override));
+  MOCK_METHOD(void, OnEndWorkItem, (int), (override));
+  MOCK_METHOD(void, BeforeWait, (), (override));
+  MOCK_METHOD(void, BeginNativeWorkBeforeDoWork, (), (override));
+  MOCK_METHOD(NextWorkInfo, DoWork, (), (override));
+  MOCK_METHOD(void, DoIdleWork, (), (override));
+  MOCK_METHOD(int, RunDepth, (), (override));
 };
 
 MessagePump::Delegate::NextWorkInfo NextWorkInfo(TimeTicks delayed_run_time) {
@@ -48,7 +47,7 @@ TEST(MockMessagePumpTest, KeepsRunningIfNotAllowedToAdvanceTime) {
       .WillOnce(Return(NextWorkInfo(TimeTicks())))
       .WillOnce(Return(NextWorkInfo(TimeTicks())))
       .WillOnce(Return(NextWorkInfo(kFutureTime)));
-  EXPECT_CALL(delegate, DoIdleWork).WillOnce(Invoke([&] { pump.Quit(); }));
+  EXPECT_CALL(delegate, DoIdleWork).WillOnce([&] { pump.Quit(); });
 
   pump.Run(&delegate);
 
@@ -65,9 +64,9 @@ TEST(MockMessagePumpTest, AdvancesTimeAsAllowed) {
 
   pump.SetAllowTimeToAutoAdvanceUntil(kEndTime);
   pump.SetStopWhenMessagePumpIsIdle(true);
-  EXPECT_CALL(delegate, DoWork).Times(3).WillRepeatedly(Invoke([&] {
+  EXPECT_CALL(delegate, DoWork).Times(3).WillRepeatedly([&] {
     return NextWorkInfo(mock_clock.NowTicks() + Seconds(1));
-  }));
+  });
   EXPECT_CALL(delegate, DoIdleWork).Times(3);
 
   pump.Run(&delegate);

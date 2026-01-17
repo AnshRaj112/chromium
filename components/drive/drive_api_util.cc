@@ -45,6 +45,7 @@ constexpr auto kHostedDocumentKinds = std::to_array<HostedDocumentKind>({
     {kGoogleMapMimeType, ".gmaps"},
     {kGoogleSiteMimeType, ".gsite"},
     {kEmailLayoutsMimeType, ".gmaillayout"},
+    {kDriveProjectMimeType, ".gprj"},
 });
 
 const char kUnknownHostedDocumentExtension[] = ".glink";
@@ -160,7 +161,7 @@ std::string GetMd5Digest(const base::FilePath& file_path) {
     return std::string();
   }
 
-  return base::ToLowerASCII(base::HexEncode(md5.Finish()));
+  return base::HexEncodeLower(md5.Finish());
 }
 
 bool IsKnownHostedDocumentMimeType(const std::string& mime_type) {

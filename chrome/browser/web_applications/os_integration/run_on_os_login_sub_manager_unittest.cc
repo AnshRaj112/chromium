@@ -6,7 +6,6 @@
 #include <string_view>
 #include <utility>
 
-#include "base/files/file_util.h"
 #include "base/json/json_reader.h"
 #include "base/memory/raw_ptr.h"
 #include "base/test/gmock_expected_support.h"
@@ -442,7 +441,8 @@ TEST_F(RunOnOsLoginSubManagerExecuteTest, ForceUnregisterAppNotInRegistry) {
     EXPECT_FALSE(OsIntegrationTestOverrideImpl::Get()->IsRunOnOsLoginEnabled(
         profile(), app_id, app_name));
   }
-  EXPECT_FALSE(provider().registrar_unsafe().IsInRegistrar(app_id));
+  EXPECT_FALSE(
+      provider().registrar_unsafe().GetInstallState(app_id).has_value());
 
   // This should have no affect.
   SynchronizeOsOptions options;

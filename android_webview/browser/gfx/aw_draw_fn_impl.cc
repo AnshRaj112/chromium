@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "android_webview/browser/gfx/aw_vulkan_context_provider.h"
-#include "base/android/build_info.h"
+#include "base/android/android_info.h"
 #include "base/compiler_specific.h"
 #include "base/trace_event/trace_event.h"
 #include "content/public/browser/browser_task_traits.h"
@@ -21,7 +21,7 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "android_webview/browser_jni_headers/AwDrawFnImpl_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using content::BrowserThread;
 
 namespace android_webview {
@@ -235,7 +235,7 @@ void AwDrawFnImpl::ReleaseHandle(JNIEnv* env) {
   g_draw_fn_function_table->release_functor(functor_handle_);
 }
 
-jint AwDrawFnImpl::GetFunctorHandle(JNIEnv* env) {
+int32_t AwDrawFnImpl::GetFunctorHandle(JNIEnv* env) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   return functor_handle_;
 }
@@ -297,8 +297,8 @@ void AwDrawFnImpl::DrawVk(AwDrawFn_DrawVkParams* params) {
   // GrVkSecondaryCBDrawContext currently does not expect or support R8 format
   // so just skip these draw calls before Android side is fixed.
   if (params->format == VK_FORMAT_R8_UNORM &&
-      base::android::BuildInfo::GetInstance()->sdk_int() ==
-          base::android::SDK_VERSION_S) {
+      base::android::android_info::sdk_int() ==
+          base::android::android_info::SDK_VERSION_S) {
     skip_next_post_draw_vk_ = true;
     return;
   }
@@ -344,9 +344,11 @@ void AwDrawFnImpl::RemoveOverlays(AwDrawFn_RemoveOverlaysParams* params) {
   render_thread_manager_.RemoveOverlaysOnRT(params->merge_transaction);
 }
 
-static jint JNI_AwDrawFnImpl_GetReferenceInstanceCount(JNIEnv* env) {
+static int32_t JNI_AwDrawFnImpl_GetReferenceInstanceCount(JNIEnv* env) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   return g_instance_count;
 }
 
 }  // namespace android_webview
+
+DEFINE_JNI(AwDrawFnImpl)

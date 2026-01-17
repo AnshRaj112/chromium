@@ -32,6 +32,7 @@ component("views") {
     "//build:branding_buildflags",
     "//chrome/app:command_ids",
     "//chrome/app:generated_resources",
+    "//chrome/browser/ui:layout_constants",
     "//components/keep_alive_registry",
     "//components/lens",
     "//components/lens:buildflags",
@@ -75,5 +76,17 @@ source_set("test_support") {
     "//ui/base:test_support",
     "//ui/views",
     "//ui/views:test_support",
+  ]
+}
+
+source_set("file_system_access_test_support") {
+  testonly = true
+  sources = [
+    "file_system_access/file_system_access_test_utils.cc",
+    "file_system_access/file_system_access_test_utils.h",
+  ]
+  deps = [
+    "//ui/shell_dialogs",
+    "//url",
   ]
 }

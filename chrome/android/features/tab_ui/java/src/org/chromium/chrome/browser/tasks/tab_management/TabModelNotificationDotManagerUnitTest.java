@@ -39,7 +39,6 @@ import org.chromium.chrome.browser.tab_ui.TabModelDotInfo;
 import org.chromium.chrome.browser.tabmodel.TabClosingSource;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilterObserver;
-import org.chromium.chrome.browser.tabmodel.TabGroupModelFilterProvider;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
@@ -55,15 +54,12 @@ import org.chromium.components.collaboration.messaging.TabMessageMetadata;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /** Unit tests for {@link TabModelNotificationDotManager}. */
 @RunWith(BaseRobolectricTestRunner.class)
 public class TabModelNotificationDotManagerUnitTest {
     private static final int EXISTING_TAB_ID = 5;
-    private static final int ROOT_ID = 6;
     private static final int NON_EXISTANT_TAB_ID = 7;
-    private static final int TAB_COUNT = 3;
     private static final Token TAB_GROUP_ID = new Token(378L, 4378L);
     private static final String TITLE = "Vacation";
 
@@ -71,7 +67,6 @@ public class TabModelNotificationDotManagerUnitTest {
 
     @Mock private Profile mProfile;
     @Mock private TabModelSelector mTabModelSelector;
-    @Mock private TabGroupModelFilterProvider mTabGroupModelFilterProvider;
     @Mock private TabGroupModelFilter mTabGroupModelFilter;
     @Mock private TabModel mTabModel;
     @Mock private Tab mTab;
@@ -100,17 +95,13 @@ public class TabModelNotificationDotManagerUnitTest {
         MessagingBackendServiceFactory.setForTesting(mMessagingBackendService);
 
         when(mTabModelSelector.isTabStateInitialized()).thenReturn(false);
-        when(mTabModelSelector.getTabGroupModelFilterProvider())
-                .thenReturn(mTabGroupModelFilterProvider);
-        when(mTabGroupModelFilterProvider.getTabGroupModelFilter(false))
-                .thenReturn(mTabGroupModelFilter);
+        when(mTabModelSelector.getTabGroupModelFilter(false)).thenReturn(mTabGroupModelFilter);
         when(mTabGroupModelFilter.getTabModel()).thenReturn(mTabModel);
-        when(mTabGroupModelFilter.getTabCountForGroup(TAB_GROUP_ID)).thenReturn(TAB_COUNT);
+        when(mTabGroupModelFilter.getTabsInGroup(TAB_GROUP_ID)).thenReturn(List.of(mTab));
         when(mTabGroupModelFilter.getTabGroupTitle(TAB_GROUP_ID)).thenReturn(TITLE);
         when(mTabGroupModelFilter.tabGroupExists(TAB_GROUP_ID)).thenReturn(true);
         when(mTabModel.getProfile()).thenReturn(mProfile);
         when(mTabModel.getTabById(EXISTING_TAB_ID)).thenReturn(mTab);
-        when(mTab.getRootId()).thenReturn(ROOT_ID);
         when(mTab.getTabGroupId()).thenReturn(TAB_GROUP_ID);
 
         Context context = ApplicationProvider.getApplicationContext();
@@ -292,7 +283,7 @@ public class TabModelNotificationDotManagerUnitTest {
         // Set to visible.
         mPersistentMessageObserverCaptor.getValue().displayPersistentMessage(mDirtyTabMessage);
 
-        verifyShown("3 tabs");
+        verifyShown("1 tab");
     }
 
     private void initializeBothBackends() {
@@ -318,8 +309,7 @@ public class TabModelNotificationDotManagerUnitTest {
             messages.add(message);
         }
 
-        when(mMessagingBackendService.getMessages(
-                        Optional.of(PersistentNotificationType.DIRTY_TAB)))
+        when(mMessagingBackendService.getMessages(PersistentNotificationType.DIRTY_TAB))
                 .thenReturn(messages);
     }
 

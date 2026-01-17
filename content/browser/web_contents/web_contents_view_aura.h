@@ -18,11 +18,12 @@
 #include "content/browser/renderer_host/render_view_host_delegate_view.h"
 #include "content/browser/web_contents/web_contents_view.h"
 #include "content/browser/web_contents/web_contents_view_drag_security_info.h"
-#include "content/common/buildflags.h"
 #include "content/common/content_export.h"
+#include "content/public/browser/clipboard_types.h"
 #include "content/public/browser/global_routing_id.h"
 #include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents_view_delegate.h"
+#include "content/public/common/buildflags.h"
 #include "content/public/common/drop_data.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "third_party/blink/public/mojom/choosers/popup_menu.mojom.h"
@@ -135,8 +136,6 @@ class CONTENT_EXPORT WebContentsViewAura
   FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest, DragDropVirtualFiles);
   FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest,
                            DragDropVirtualFilesOriginateFromRenderer);
-  FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest,
-                           DragDropVirtualFileGetsNonEmptyContents);
   FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest, DragDropUrlData);
   FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest, DragDropOnOopif);
   FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest,
@@ -171,9 +170,14 @@ class CONTENT_EXPORT WebContentsViewAura
       WebContentsViewAuraTest,
       EmptyTextWithUrlInDropDataIsEmptyInOSExchangeDataGetString);
   FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest,
+                           RejectDragFromHiddenWebContents);
+  FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest, RejectDragFromOutsideView);
+  FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest,
                            UrlInDropDataReturnsUrlInOSExchangeDataGetString);
   FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest,
                            IgnoreInputs_OngoingDropGetsCleared);
+  FRIEND_TEST_ALL_PREFIXES(WebContentsViewAuraTest,
+                           EndDragIsCalledAfterAsyncDrop);
 
   class WindowObserver;
 
@@ -181,8 +185,12 @@ class CONTENT_EXPORT WebContentsViewAura
   void PrepareDropData(DropData* drop_data,
                        const ui::OSExchangeData& data) const;
 
-  void EndDrag(base::WeakPtr<RenderWidgetHostImpl> source_rwh_weak_ptr,
-               ui::mojom::DragOperation op);
+  // Virtual for testing.
+  virtual bool IsDragAllowedByDataControlPolicy(const ClipboardEndpoint& source,
+                                                const DropData& drop_data);
+
+  virtual void EndDrag(base::WeakPtr<RenderWidgetHostImpl> source_rwh_weak_ptr,
+                       ui::mojom::DragOperation op);
 
   void InstallOverscrollControllerDelegate(RenderWidgetHostViewAura* view);
 
@@ -213,6 +221,8 @@ class CONTENT_EXPORT WebContentsViewAura
   void FocusThroughTabTraversal(bool reverse) override;
   DropData* GetDropData() const override;
   gfx::Rect GetViewBounds() const override;
+  void Resize(const gfx::Rect& new_bounds) override;
+  gfx::Size GetSize() const override;
   void CreateView(gfx::NativeView context) override;
   RenderWidgetHostViewBase* CreateViewForWidget(
       RenderWidgetHost* render_widget_host) override;
@@ -333,7 +343,7 @@ class CONTENT_EXPORT WebContentsViewAura
 
   // Run when drop callback completes to ensure |drag_in_progess_| is
   // flipped to false before EndDrag runs.
-  void OnDropExit(base::ScopedClosureRunner end_drag_runner);
+  void OnDropExit();
 
   // For unit testing, registers a callback for when a drop operation
   // completes.
@@ -409,6 +419,10 @@ class CONTENT_EXPORT WebContentsViewAura
   // class. It means it gets true when drag enters and gets reset when either
   // drop happens or drag exits.
   bool drag_in_progress_;
+
+  // Used to determine which enum value to fire for the "Event.DragDrop.Surface"
+  // histogram.
+  bool dropped_in_this_web_contents_ = false;
 
   bool init_rwhv_with_null_parent_for_testing_;
 

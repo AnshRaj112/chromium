@@ -121,8 +121,8 @@ class WebAppProfileDeletionBrowserTest : public WebAppBrowserTestBase {
 
     ProfileDestructionWaiter destruction_waiter(&profile_to_delete);
     profile_manager->GetDeleteProfileHelper().MaybeScheduleProfileForDeletion(
-        profile_to_delete.GetPath(), base::DoNothing(),
-        ProfileMetrics::DELETE_PROFILE_SETTINGS);
+        profile_path_to_delete, base::DoNothing(),
+        ProfileMetrics::DELETE_PROFILE_USER_MANAGER);
     destruction_waiter.Wait();
 
     return deleting_web_contents;

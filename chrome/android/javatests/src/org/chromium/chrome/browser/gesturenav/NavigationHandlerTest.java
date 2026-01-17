@@ -4,6 +4,7 @@
 
 package org.chromium.chrome.browser.gesturenav;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
 import static org.chromium.ui.base.LocalizationUtils.setRtlForTesting;
 
 import android.os.Build;
@@ -31,12 +32,9 @@ import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisableIf;
 import org.chromium.base.test.util.DisabledTest;
-import org.chromium.base.test.util.Features.DisableFeatures;
-import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.base.test.util.TestAnimations;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.init.AsyncInitializationActivity;
 import org.chromium.chrome.browser.layouts.LayoutManager;
@@ -58,7 +56,6 @@ import org.chromium.net.test.EmbeddedTestServer;
 import org.chromium.ui.base.BackGestureEventSwipeEdge;
 import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.PageTransition;
-import org.chromium.ui.base.UiAndroidFeatures;
 
 import java.util.concurrent.TimeoutException;
 
@@ -67,7 +64,7 @@ import java.util.concurrent.TimeoutException;
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 @DisableIf.Build(
         sdk_is_greater_than = Build.VERSION_CODES.Q,
-        message = "crbug.com/1276402 crbug.com/345352689")
+        message = "crbug.com/1276402 crbug.com/345352689 crbug.com/40899221")
 @Batch(Batch.PER_CLASS)
 public class NavigationHandlerTest {
     private static final String RENDERED_PAGE = "/chrome/test/data/android/navigate/simple.html";
@@ -151,14 +148,14 @@ public class NavigationHandlerTest {
     @Test
     @SmallTest
     public void testShortSwipeDoesNotTriggerNavigation() {
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
         mNavUtils.shortSwipeFromEdge(LEFT_EDGE);
         CriteriaHelper.pollUiThread(
                 mNavigationLayout::isLayoutDetached,
                 "Navigation Layout should be detached after use");
         Assert.assertEquals(
                 "Current page should not change",
-                UrlConstants.NTP_URL,
+                getOriginalNativeNtpUrl(),
                 ChromeTabUtils.getUrlStringOnUiThread(currentTab()));
         Assert.assertTrue(
                 "The gesture should start from the left side.",
@@ -179,7 +176,7 @@ public class NavigationHandlerTest {
     @Test
     @SmallTest
     public void testLayoutGetsDetachedAfterUse() {
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
         mActivityTestRule.loadUrl(UrlConstants.RECENT_TABS_URL);
         mNavUtils.swipeFromLeftEdge();
         CriteriaHelper.pollUiThread(
@@ -223,8 +220,8 @@ public class NavigationHandlerTest {
                         .expectIntRecord(INCORRECT_EDGE_SWIPE_COUNT_CHAINED_HISTOGRAM, 3)
                         .build();
 
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
-        ChromeTabUtils.waitForTabPageLoaded(currentTab(), UrlConstants.NTP_URL);
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
+        ChromeTabUtils.waitForTabPageLoaded(currentTab(), getOriginalNativeNtpUrl());
         mNavUtils.swipeFromEdge(RIGHT_EDGE);
         mNavUtils.swipeFromEdge(RIGHT_EDGE);
         mNavUtils.swipeFromEdge(RIGHT_EDGE);
@@ -243,8 +240,8 @@ public class NavigationHandlerTest {
                         .expectNoRecords(INCORRECT_EDGE_SWIPE_COUNT_CHAINED_HISTOGRAM)
                         .build();
 
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
-        ChromeTabUtils.waitForTabPageLoaded(currentTab(), UrlConstants.NTP_URL);
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
+        ChromeTabUtils.waitForTabPageLoaded(currentTab(), getOriginalNativeNtpUrl());
         mActivityTestRule.loadUrl(UrlConstants.RECENT_TABS_URL);
         ChromeTabUtils.waitForTabPageLoaded(currentTab(), UrlConstants.RECENT_TABS_URL);
         mNavUtils.swipeFromEdge(LEFT_EDGE);
@@ -269,9 +266,9 @@ public class NavigationHandlerTest {
                                 false,
                                 2)
                         .build();
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
         mActivityTestRule.loadUrl(UrlConstants.RECENT_TABS_URL);
-        assertNavigateOnSwipeFrom(LEFT_EDGE, UrlConstants.NTP_URL);
+        assertNavigateOnSwipeFrom(LEFT_EDGE, getOriginalNativeNtpUrl());
         assertNavigateOnSwipeFrom(RIGHT_EDGE, UrlConstants.RECENT_TABS_URL);
         histogramWatcher.assertExpected("Wrong histogram recording");
 
@@ -283,7 +280,7 @@ public class NavigationHandlerTest {
                         .expectNoRecords(
                                 "Navigation.OnGestureStart.NavigationInProgress.3ButtonMode")
                         .build();
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
         mActivityTestRule.loadUrl(UrlConstants.RECENT_TABS_URL);
         ThreadUtils.runOnUiThreadBlocking(
                 mActivityTestRule.getActivity().getOnBackPressedDispatcher()::onBackPressed);
@@ -295,8 +292,6 @@ public class NavigationHandlerTest {
     @Test
     @SmallTest
     public void testSwipeNavigateOnRenderedPage() {
-        // TODO(crbug.com/40899221): Write a test variation running with
-        //     ChromeFeatureList.BACK_FORWARD_TRANSITIONS enabled when the feature is completed.
         mActivityTestRule.loadUrl(mTestServer.getURL(RENDERED_PAGE));
         mActivityTestRule.loadUrl(ContentUrlConstants.ABOUT_BLANK_DISPLAY_URL);
 
@@ -306,20 +301,8 @@ public class NavigationHandlerTest {
 
     @Test
     @SmallTest
-    @DisableFeatures(ChromeFeatureList.BACK_FORWARD_TRANSITIONS)
-    public void testLeftEdgeSwipeClosesTabLaunchedFromLink() {
-        testLeftEdgeSwipeClosesTabLaunchedFromLinkInternal();
-    }
-
-    @Test
-    @SmallTest
-    @EnableFeatures(ChromeFeatureList.BACK_FORWARD_TRANSITIONS)
     @DisabledTest(message = "crbug.com/1426201")
-    public void testLeftEdgeSwipeClosesTabLaunchedFromLink_withBackForwardTransition() {
-        testLeftEdgeSwipeClosesTabLaunchedFromLinkInternal();
-    }
-
-    private void testLeftEdgeSwipeClosesTabLaunchedFromLinkInternal() {
+    public void testLeftEdgeSwipeClosesTabLaunchedFromLink() {
         Tab oldTab = currentTab();
         TabCreator tabCreator =
                 ThreadUtils.runOnUiThreadBlocking(
@@ -389,7 +372,7 @@ public class NavigationHandlerTest {
     @Test
     @SmallTest
     public void testSwipeAfterDestroyActivity_NativePage() {
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
         ThreadUtils.runOnUiThreadBlocking(mActivityTestRule.getActivity()::finish);
 
         // CompositorViewHolder dispatches motion events and invoke the handler's
@@ -416,7 +399,7 @@ public class NavigationHandlerTest {
     @SmallTest
     @Restriction(DeviceFormFactor.PHONE)
     public void testEdgeSwipeIsNoopInTabSwitcher() throws TimeoutException {
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
         mActivityTestRule.loadUrl(UrlConstants.RECENT_TABS_URL);
         setTabSwitcherModeAndWait(true);
         mNavUtils.swipeFromLeftEdge();
@@ -436,7 +419,7 @@ public class NavigationHandlerTest {
     public void testSwipeAndHoldOnNtp_EnterTabSwitcher() throws TimeoutException {
         // Clicking tab switcher button while swiping and holding the gesture navigation
         // bubble should reset the state and dismiss the UI.
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
         mNavUtils.swipeFromEdgeAndHold(/* leftEdge= */ true);
         setTabSwitcherModeAndWait(true);
         Assert.assertFalse(
@@ -446,7 +429,6 @@ public class NavigationHandlerTest {
 
     @Test
     @SmallTest
-    @EnableFeatures({UiAndroidFeatures.MIRROR_BACK_FORWARD_GESTURES_IN_RTL})
     public void testRtlUiMirrorsDirectionsWithFlagEnabled() {
         mActivityTestRule.loadUrl(mTestServer.getURL(RENDERED_PAGE));
         mActivityTestRule.loadUrl(ContentUrlConstants.ABOUT_BLANK_DISPLAY_URL);
@@ -454,17 +436,5 @@ public class NavigationHandlerTest {
         setRtlForTesting(true);
         assertNavigateOnSwipeFrom(RIGHT_EDGE, mTestServer.getURL(RENDERED_PAGE));
         assertNavigateOnSwipeFrom(LEFT_EDGE, ContentUrlConstants.ABOUT_BLANK_DISPLAY_URL);
-    }
-
-    @Test
-    @SmallTest
-    @DisableFeatures({UiAndroidFeatures.MIRROR_BACK_FORWARD_GESTURES_IN_RTL})
-    public void testRtlUiMirrorsDirectionsWithFlagDisabled() {
-        mActivityTestRule.loadUrl(mTestServer.getURL(RENDERED_PAGE));
-        mActivityTestRule.loadUrl(ContentUrlConstants.ABOUT_BLANK_DISPLAY_URL);
-
-        setRtlForTesting(true);
-        assertNavigateOnSwipeFrom(LEFT_EDGE, mTestServer.getURL(RENDERED_PAGE));
-        assertNavigateOnSwipeFrom(RIGHT_EDGE, ContentUrlConstants.ABOUT_BLANK_DISPLAY_URL);
     }
 }

@@ -143,7 +143,7 @@ void TouchCalibratorController::StartCalibration(
     touch_point_quad_.fill(std::make_pair(gfx::Point(0, 0), gfx::Point(0, 0)));
 
     std::vector<display::Display> displays =
-        display::Screen::GetScreen()->GetAllDisplays();
+        display::Screen::Get()->GetAllDisplays();
 
     for (const display::Display& display : displays) {
       bool is_primary_view = display.id() == target_display_.id();
@@ -176,7 +176,7 @@ void TouchCalibratorController::CalibrateNextDisplay() {
   const display::Display* next_display_to_map = nullptr;
   for (const auto& display : active_displays) {
     if (display.IsInternal() ||
-        base::Contains(already_mapped_display_ids_, display.id())) {
+        already_mapped_display_ids_.contains(display.id())) {
       continue;
     }
 

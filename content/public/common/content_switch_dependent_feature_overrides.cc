@@ -52,28 +52,16 @@ GetSwitchDependentFeatureOverrides(const base::CommandLine& command_line) {
        std::cref(features::kCriticalClientHint),
        base::FeatureList::OVERRIDE_ENABLE_FEATURE},
       {switches::kEnableExperimentalWebPlatformFeatures,
-       std::cref(features::kBlockInsecurePrivateNetworkRequests),
-       base::FeatureList::OVERRIDE_ENABLE_FEATURE},
-      {switches::kEnableExperimentalWebPlatformFeatures,
-       std::cref(features::kBlockInsecurePrivateNetworkRequestsFromPrivate),
-       base::FeatureList::OVERRIDE_ENABLE_FEATURE},
-      {switches::kEnableExperimentalWebPlatformFeatures,
-       std::cref(features::kBlockInsecurePrivateNetworkRequestsFromUnknown),
-       base::FeatureList::OVERRIDE_ENABLE_FEATURE},
-      {switches::kEnableExperimentalWebPlatformFeatures,
-       std::cref(features::kPrivateNetworkAccessRespectPreflightResults),
-       base::FeatureList::OVERRIDE_ENABLE_FEATURE},
-      {switches::kEnableExperimentalWebPlatformFeatures,
        std::cref(net::features::kThirdPartyStoragePartitioning),
-       base::FeatureList::OVERRIDE_ENABLE_FEATURE},
-      {switches::kEnableExperimentalWebPlatformFeatures,
-       std::cref(blink::features::kPartitionedPopins),
        base::FeatureList::OVERRIDE_ENABLE_FEATURE},
       {switches::kEnableExperimentalWebPlatformFeatures,
        std::cref(network::features::kCookieIndicesHeader),
        base::FeatureList::OVERRIDE_ENABLE_FEATURE},
       {switches::kEnableExperimentalWebPlatformFeatures,
        std::cref(features::kPrefetchCookieIndices),
+       base::FeatureList::OVERRIDE_ENABLE_FEATURE},
+      {switches::kEnableExperimentalWebPlatformFeatures,
+       std::cref(net::features::kHstsTopLevelNavigationsOnly),
        base::FeatureList::OVERRIDE_ENABLE_FEATURE},
 
       // Overrides for --enable-experimental-cookie-features.
@@ -101,14 +89,6 @@ GetSwitchDependentFeatureOverrides(const base::CommandLine& command_line) {
        std::cref(net::features::kThirdPartyStoragePartitioning),
        base::FeatureList::OVERRIDE_ENABLE_FEATURE},
 
-      // Overrides for --isolation-by-default.
-      {switches::kIsolationByDefault,
-       std::cref(features::kEmbeddingRequiresOptIn),
-       base::FeatureList::OVERRIDE_ENABLE_FEATURE},
-      {switches::kIsolationByDefault,
-       std::cref(network::features::kCrossOriginOpenerPolicyByDefault),
-       base::FeatureList::OVERRIDE_ENABLE_FEATURE},
-
       // Overrides for headless
       {::switches::kHeadless, std::cref(blink::features::kPaintHolding),
        base::FeatureList::OVERRIDE_DISABLE_FEATURE},
@@ -121,11 +101,6 @@ GetSwitchDependentFeatureOverrides(const base::CommandLine& command_line) {
       // Override for --reduce-user-agent-minor-version.
       {switches::kReduceUserAgentMinorVersion,
        std::cref(blink::features::kReduceUserAgentMinorVersion),
-       base::FeatureList::OVERRIDE_ENABLE_FEATURE},
-
-      // Override for --reduce-user-agent-platform-oscpu.
-      {switches::kReduceUserAgentPlatformOsCpu,
-       std::cref(blink::features::kReduceUserAgentPlatformOsCpu),
        base::FeatureList::OVERRIDE_ENABLE_FEATURE},
 
       // Override for --reduce-accept-language.

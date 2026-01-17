@@ -512,7 +512,7 @@ IN_PROC_BROWSER_TEST_F(SnapshotAXTreeBrowserTest,
   auto total_attribute_count = [](const ui::AXNodeData& node_data) {
     return node_data.string_attributes.size() +
            node_data.int_attributes.size() + node_data.float_attributes.size() +
-           node_data.bool_attributes->Size() +
+           node_data.bool_attributes.Size() +
            node_data.intlist_attributes.size() +
            node_data.stringlist_attributes.size() +
            node_data.html_attributes.size();
@@ -762,8 +762,9 @@ IN_PROC_BROWSER_TEST_F(SnapshotAXTreeBrowserTest, Metadata) {
       /* timeout= */ {}, WebContents::AXTreeSnapshotPolicy::kAll);
   waiter.Wait();
 
+  ASSERT_TRUE(waiter.snapshot().tree_data.metadata.has_value());
   EXPECT_THAT(
-      waiter.snapshot().tree_data.metadata,
+      *waiter.snapshot().tree_data.metadata,
       testing::ElementsAre(
           "<title>Hello World</title>", "<meta charset=\"utf-8\"></meta>",
           "<link ref=\"canonical\" href=\"https://abc.com\"></link>",

@@ -9,7 +9,6 @@
 
 #include <vector>
 
-#include "base/containers/flat_set.h"
 #include "base/functional/callback_forward.h"
 #include "base/functional/function_ref.h"
 #include "base/lazy_instance.h"
@@ -24,9 +23,8 @@
 #error This file should only be included on desktop.
 #endif
 
-enum class BrowserClosingStatus;
-
 class Browser;
+class BrowserWindowInterface;
 class Profile;
 
 namespace base {
@@ -38,73 +36,17 @@ class BrowserListObserver;
 // Maintains a list of Browser objects.
 class BrowserList {
  public:
-  using BrowserSet = base::flat_set<raw_ptr<Browser, CtnExperimental>>;
   using BrowserVector = std::vector<raw_ptr<Browser, VectorExperimental>>;
   using BrowserWeakVector = std::vector<base::WeakPtr<Browser>>;
   using CloseCallback = base::RepeatingCallback<void(const base::FilePath&)>;
   using const_iterator = BrowserVector::const_iterator;
   using const_reverse_iterator = BrowserVector::const_reverse_iterator;
 
-  struct BrowsersOrderedByActivationRange {
-    const raw_ref<const BrowserList> browser_list;
-
-    const_reverse_iterator begin() const {
-      return browser_list->begin_browsers_ordered_by_activation();
-    }
-    const_reverse_iterator end() const {
-      return browser_list->end_browsers_ordered_by_activation();
-    }
-
-   private:
-    // Stack allocated only to reduce risk of out of bounds lifetime with
-    // |browser_list|.
-    STACK_ALLOCATED();
-  };
-
   BrowserList(const BrowserList&) = delete;
   BrowserList& operator=(const BrowserList&) = delete;
 
-  // TODO(crbug.com/431671448): Prefer `GetLastActiveBrowserWindowInterface()`,
-  // this method is being deprecated.
-  Browser* GetLastActive() const;
-
   const_iterator begin() const { return browsers_.begin(); }
   const_iterator end() const { return browsers_.end(); }
-
-  bool empty() const { return browsers_.empty(); }
-  size_t size() const { return browsers_.size(); }
-
-  Browser* get(size_t index) const { return browsers_[index]; }
-
-  // Enumerate the current browser and the new browser in-order.
-  void ForEachCurrentAndNewBrowser(
-      base::FunctionRef<void(Browser*)> on_browser);
-
-  // Enumerate the current browser in-order.
-  void ForEachCurrentBrowser(base::FunctionRef<void(Browser*)> on_browser);
-
-  // Returns iterated access to list of open browsers ordered by activation. The
-  // underlying data structure is a vector and we push_back on recent access so
-  // a reverse iterator gives the latest accessed browser first.
-  const_reverse_iterator begin_browsers_ordered_by_activation() const {
-    return browsers_ordered_by_activation_.rbegin();
-  }
-  const_reverse_iterator end_browsers_ordered_by_activation() const {
-    return browsers_ordered_by_activation_.rend();
-  }
-
-  // Convenience method for iterating over browsers in activation order. I.e.
-  // the most recently used browser will be at the front of the list.
-  // Example:
-  // for (Browser* browser : BrowserList::GetInstance()->OrderedByActivation())
-  BrowsersOrderedByActivationRange OrderedByActivation() const {
-    return {raw_ref(*this)};
-  }
-
-  // Returns the set of browsers that are currently in the closing state.
-  const BrowserSet& currently_closing_browsers() const {
-    return currently_closing_browsers_;
-  }
 
   static BrowserList* GetInstance();
 
@@ -124,25 +66,12 @@ class BrowserList {
   static void AddObserver(BrowserListObserver* observer);
   static void RemoveObserver(BrowserListObserver* observer);
 
-  // Moves all the browsers that show on workspace |new_workspace| to the end of
-  // the browser list (i.e. the browsers that were "activated" most recently).
-  static void MoveBrowsersInWorkspaceToFront(const std::string& new_workspace);
-
   // Called by Browser objects when their window is activated (focused).  This
   // allows us to determine what the last active Browser was on each desktop.
   static void SetLastActive(Browser* browser);
 
   // Notifies the observers when the current active browser becomes not active.
   static void NotifyBrowserNoLongerActive(Browser* browser);
-
-  // Notifies the observers that the attempted closure of `browser` was
-  // cancelled for a certain `reason`.
-  static void NotifyBrowserCloseCancelled(Browser* browser,
-                                          BrowserClosingStatus reason);
-
-  // Notifies the observers when browser close was started. This may be called
-  // more than once for a particular browser.
-  static void NotifyBrowserCloseStarted(Browser* browser);
 
   // Closes all browsers for |profile| across all desktops.
   // TODO(mlerman): Move the Profile Deletion flow to use the overloaded
@@ -171,31 +100,25 @@ class BrowserList {
       const CloseCallback& on_close_aborted,
       bool skip_beforeunload);
 
-  // Returns true if at least one off-the-record browser is active across all
-  // desktops.
-  static bool IsOffTheRecordBrowserActive();
-
-  // Returns the number of active off-the-record browsers for |profile| across
-  // all desktops. Note that this function does not count devtools windows
-  // opened for off-the-record windows.
-  static int GetOffTheRecordBrowsersActiveForProfile(Profile* profile);
-
-  // Returns the number of active incognito browsers except devtools windows
-  // across all desktops.
-  static size_t GetIncognitoBrowserCount();
-
-  // Returns the number of active guest browsers except devtools windows
-  // across all desktops.
-  static size_t GetGuestBrowserCount();
-
-  // Returns true if the off-the-record browser for |profile| is in use in any
-  // window across all desktops. This function considers devtools windows as
-  // well.
-  static bool IsOffTheRecordBrowserInUse(Profile* profile);
-
  private:
   BrowserList();
   ~BrowserList();
+
+  // Returns iterated access to list of open browsers ordered by activation. The
+  // underlying data structure is a vector and we push_back on recent access so
+  // a reverse iterator gives the latest accessed browser first.
+  //
+  // These functions are deprecated and should only be used by
+  // browser_window_interface_iterator_non_android.cc's
+  // ForEachCurrentBrowserWindowInterfaceOrderedByActivation() and
+  // ForEachCurrentAndNewBrowserWindowInterfaceOrderedByActivation()
+  const_reverse_iterator deprecated_begin_browsers_ordered_by_activation()
+      const {
+    return browsers_ordered_by_activation_.rbegin();
+  }
+  const_reverse_iterator deprecated_end_browsers_ordered_by_activation() const {
+    return browsers_ordered_by_activation_.rend();
+  }
 
   // Helper method to remove a browser instance from a list of browsers
   static void RemoveBrowserFrom(Browser* browser, BrowserVector* browser_list);
@@ -235,8 +158,6 @@ class BrowserList {
   // windows, (e.g., created by session restore) are inserted at the front of
   // the list.
   BrowserVector browsers_ordered_by_activation_;
-  // A vector of the browsers that are currently in the closing state.
-  BrowserSet currently_closing_browsers_;
 
   // If an observer is added while iterating over them and notifying, it should
   // not be notified as it probably already saw the Browser* being added/removed
@@ -256,6 +177,14 @@ class BrowserList {
       observers_;
 
   static BrowserList* instance_;
+
+  // These browser_window_interface_iterator_non_android.cc functions need
+  // access to deprecated_begin_browsers_ordered_by_activation() and
+  // deprecated_end_browsers_ordered_by_activation().
+  friend void ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+      base::FunctionRef<bool(BrowserWindowInterface*)> on_browser);
+  friend void ForEachCurrentAndNewBrowserWindowInterfaceOrderedByActivation(
+      base::FunctionRef<bool(BrowserWindowInterface*)> on_browser);
 };
 
 #endif  // CHROME_BROWSER_UI_BROWSER_LIST_H_

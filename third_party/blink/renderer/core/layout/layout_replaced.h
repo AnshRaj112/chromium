@@ -89,6 +89,11 @@ class CORE_EXPORT LayoutReplaced : public LayoutBox {
            ComputedStyleInitialValues::InitialObjectFit();
   }
 
+  bool NodeAtPoint(HitTestResult&,
+                   const HitTestLocation&,
+                   const PhysicalOffset& accumulated_offset,
+                   HitTestPhase) override;
+
   void Paint(const PaintInfo&) const override;
 
   // Compute the natural dimensions of the replaced content. Should not apply
@@ -124,6 +129,11 @@ class CORE_EXPORT LayoutReplaced : public LayoutBox {
     return true;
   }
 
+  virtual bool HitTestChildren(HitTestResult&,
+                               const HitTestLocation&,
+                               const PhysicalOffset& accumulated_offset,
+                               HitTestPhase) const;
+
   bool IsInSelfHitTestingPhase(HitTestPhase phase) const override {
     NOT_DESTROYED();
     if (LayoutBox::IsInSelfHitTestingPhase(phase))
@@ -143,7 +153,9 @@ class CORE_EXPORT LayoutReplaced : public LayoutBox {
       const PhysicalRect& base_content_rect,
       const PhysicalNaturalSizingInfo& sizing_info) const;
 
-  void StyleDidChange(StyleDifference, const ComputedStyle* old_style) override;
+  void StyleDidChange(StyleDifference,
+                      const ComputedStyle* old_style,
+                      const StyleChangeContext&) override;
 
   PositionWithAffinity PositionForPoint(const PhysicalOffset&) const override;
 

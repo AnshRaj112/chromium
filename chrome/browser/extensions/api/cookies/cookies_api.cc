@@ -12,7 +12,6 @@
 
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
-#include "base/json/json_writer.h"
 #include "base/lazy_instance.h"
 #include "base/time/time.h"
 #include "chrome/browser/extensions/api/cookies/cookies_helpers.h"
@@ -156,10 +155,12 @@ void CookiesEventRouter::OnCookieChange(bool otr,
   }
   base::Value::List args;
   base::Value::Dict dict;
-  dict.Set(
-      kRemovedKey,
-      change.cause != net::CookieChangeCause::INSERTED &&
-          change.cause != net::CookieChangeCause::INSERTED_NO_CHANGE_OVERWRITE);
+  dict.Set(kRemovedKey,
+           change.cause != net::CookieChangeCause::INSERTED &&
+               change.cause !=
+                   net::CookieChangeCause::INSERTED_NO_CHANGE_OVERWRITE &&
+               change.cause !=
+                   net::CookieChangeCause::INSERTED_NO_VALUE_CHANGE_OVERWRITE);
 
   Profile* profile =
       otr ? profile_->GetPrimaryOTRProfile(/*create_if_needed=*/false)
@@ -180,6 +181,7 @@ void CookiesEventRouter::OnCookieChange(bool otr,
     case net::CookieChangeCause::INSERTED:
     case net::CookieChangeCause::EXPLICIT:
     case net::CookieChangeCause::INSERTED_NO_CHANGE_OVERWRITE:
+    case net::CookieChangeCause::INSERTED_NO_VALUE_CHANGE_OVERWRITE:
       cause_dict_entry = kExplicitChangeCause;
       break;
 
@@ -254,8 +256,16 @@ void CookiesEventRouter::MaybeStartListening() {
     BindToCookieManager(&receiver_, original_profile);
   }
 
-  if (!otr_receiver_.is_bound() && otr_profile) {
+  // Start observing the OTR profile iff we are not already doing so. In most
+  // cases, we should already be observing because
+  // `OnOffTheRecordProfileCreated()` starts the observation. However, in the
+  // case where the OTR profile already exists when this CookiesEventRouter is
+  // created, we need to start observing it here.
+  if (otr_profile && !otr_profile_observation_.IsObserving()) {
     otr_profile_observation_.Observe(otr_profile);
+  }
+
+  if (!otr_receiver_.is_bound() && otr_profile) {
     BindToCookieManager(&otr_receiver_, otr_profile);
   }
 }

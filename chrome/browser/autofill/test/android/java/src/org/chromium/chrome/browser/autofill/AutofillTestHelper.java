@@ -501,8 +501,6 @@ public class AutofillTestHelper {
      * @param applyDeactivatedStyle Whether to apply deactivated style to the suggestion.
      * @param shouldDisplayTermsAvailable Whether to display terms message with the suggestion.
      * @param guid The payment method identifier associated with the suggestion.
-     * @param isLocalPaymentsMethod Whether the payment method associated with the suggestion is
-     *     local.
      * @return A newly created, {@code AutofillSuggestion} object.
      */
     public static AutofillSuggestion createCreditCardSuggestion(
@@ -516,14 +514,9 @@ public class AutofillTestHelper {
             int iconId,
             boolean applyDeactivatedStyle,
             boolean shouldDisplayTermsAvailable,
-            String guid,
-            boolean isLocalPaymentsMethod) {
+            String guid) {
         PaymentsPayload payload =
-                new PaymentsPayload(
-                        labelContentDescription,
-                        shouldDisplayTermsAvailable,
-                        guid,
-                        isLocalPaymentsMethod);
+                new PaymentsPayload(labelContentDescription, shouldDisplayTermsAvailable, guid);
         return new AutofillSuggestion.Builder()
                 .setLabel(label)
                 .setSecondaryLabel(secondaryLabel)
@@ -562,9 +555,8 @@ public class AutofillTestHelper {
         }
     }
 
-    // Creates an action which dispatches 2 motion events to the target view:
-    // MotionEvent.ACTION_DOWN and MotionEvent.ACTION_UP.
-    public static ViewAction createClickActionWithFlags(int flags) {
+    // Sends click event at the center of the `view` with the provided `flags`.
+    public static ViewAction createClickActionWithFlags(int flags, boolean expectClickToSucceed) {
         return new ViewAction() {
             @Override
             public Matcher<View> getConstraints() {
@@ -578,7 +570,7 @@ public class AutofillTestHelper {
 
             @Override
             public void perform(UiController uiController, View view) {
-                if (!singleTouchView(view, flags)) {
+                if (!singleTouchView(view, flags) && expectClickToSucceed) {
                     throw new PerformException.Builder()
                             .withActionDescription(this.getDescription())
                             .withViewDescription(HumanReadables.describe(view))
@@ -588,6 +580,10 @@ public class AutofillTestHelper {
                 uiController.loopMainThreadUntilIdle();
             }
         };
+    }
+
+    public static ViewAction createClickActionWithFlags(int flags) {
+        return createClickActionWithFlags(flags, true);
     }
 
     // Sends click event at the center of the `view` with the provided `flags`.
@@ -629,25 +625,19 @@ public class AutofillTestHelper {
         windowXY[0] += view.getWidth() / 2;
         windowXY[1] += view.getHeight() / 2;
 
-        final long initiationTime = SystemClock.uptimeMillis();
-        return dispatchMotionEvent(
-                        view,
-                        getMotionEvent(
-                                initiationTime,
-                                MotionEvent.ACTION_POINTER_DOWN,
-                                windowXY,
-                                InputDevice.SOURCE_MOUSE))
-                && dispatchMotionEvent(
-                        view,
-                        getMotionEvent(
-                                initiationTime,
-                                MotionEvent.ACTION_POINTER_UP,
-                                windowXY,
-                                InputDevice.SOURCE_MOUSE));
-    }
+        long downTime = SystemClock.uptimeMillis();
+        View rootView = view.getRootView();
+        if (!TouchCommon.dispatchTouchEvent(
+                rootView,
+                getMotionEvent(
+                        downTime, MotionEvent.ACTION_DOWN, windowXY, InputDevice.SOURCE_MOUSE))) {
+            return false;
+        }
 
-    private static boolean dispatchMotionEvent(View view, MotionEvent event) {
-        return runOnUiThreadBlocking(() -> view.getRootView().dispatchGenericMotionEvent(event));
+        return TouchCommon.dispatchTouchEvent(
+                rootView,
+                getMotionEvent(
+                        downTime, MotionEvent.ACTION_UP, windowXY, InputDevice.SOURCE_MOUSE));
     }
 
     private static MotionEvent getMotionEvent(
@@ -712,6 +702,6 @@ public class AutofillTestHelper {
 
         void addMaskedBankAccount(BankAccount bankAccount);
 
-        void addEwallet(Ewallet ewallet);
+        void addEwallet(@JniType("autofill::Ewallet") Ewallet ewallet);
     }
 }

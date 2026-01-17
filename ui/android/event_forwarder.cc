@@ -27,7 +27,7 @@ namespace ui {
 namespace {
 static constexpr float kEpsilon = 1e-5f;
 using base::android::AppendJavaStringArrayToStringVector;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 }  // namespace
 
@@ -53,24 +53,24 @@ ScopedJavaLocalRef<jobject> EventForwarder::GetJavaObject() {
   return ScopedJavaLocalRef<jobject>(java_obj_);
 }
 
-jboolean EventForwarder::OnTouchEvent(JNIEnv* env,
-                                      const JavaParamRef<jobject>& motion_event,
-                                      jlong oldest_event_time_ns,
-                                      jlong latest_event_time_ns,
-                                      jint android_action,
-                                      jfloat touch_major_0,
-                                      jfloat touch_major_1,
-                                      jfloat touch_minor_0,
-                                      jfloat touch_minor_1,
-                                      jint android_gesture_classification,
-                                      jboolean for_touch_handle,
-                                      jboolean is_latest_event_resampled) {
+bool EventForwarder::OnTouchEvent(JNIEnv* env,
+                                  const JavaRef<jobject>& motion_event,
+                                  jlong oldest_event_time_ns,
+                                  jlong latest_event_time_ns,
+                                  int32_t android_action,
+                                  jfloat touch_major_0,
+                                  jfloat touch_major_1,
+                                  jfloat touch_minor_0,
+                                  jfloat touch_minor_1,
+                                  int32_t android_gesture_classification,
+                                  bool for_touch_handle,
+                                  bool is_latest_event_resampled) {
   std::unique_ptr<MotionEventAndroidSource> source =
       MotionEventAndroidSourceJava::Create(motion_event,
                                            is_latest_event_resampled);
-  jint pointer_count =
+  int32_t pointer_count =
       JNI_MotionEvent::Java_MotionEvent_getPointerCount(env, motion_event);
-  jint history_size =
+  int32_t history_size =
       JNI_MotionEvent::Java_MotionEvent_getHistorySize(env, motion_event);
   TRACE_EVENT(
       "input", "EventForwarder::OnTouchEvent", [&](perfetto::EventContext ctx) {
@@ -170,11 +170,11 @@ jboolean EventForwarder::OnTouchEvent(JNIEnv* env,
 
 void EventForwarder::OnMouseEvent(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& motion_event,
+    const base::android::JavaRef<jobject>& motion_event,
     jlong time_ns,
-    jint android_action,
-    jint android_action_button,
-    jint android_tool_type) {
+    int32_t android_action,
+    int32_t android_action_button,
+    int32_t android_tool_type) {
   std::unique_ptr<MotionEventAndroidSource> source =
       MotionEventAndroidSourceJava::Create(
           motion_event, /*is_latest_event_time_resampled=*/false);
@@ -214,17 +214,17 @@ void EventForwarder::OnMouseEvent(
 }
 
 void EventForwarder::OnDragEvent(JNIEnv* env,
-                                 jint action,
+                                 int32_t action,
                                  jfloat x,
                                  jfloat y,
                                  jfloat screen_x,
                                  jfloat screen_y,
-                                 const JavaParamRef<jobjectArray>& j_mimeTypes,
-                                 const JavaParamRef<jstring>& j_content,
-                                 const JavaParamRef<jobjectArray>& j_filenames,
-                                 const JavaParamRef<jstring>& j_text,
-                                 const JavaParamRef<jstring>& j_html,
-                                 const JavaParamRef<jstring>& j_url) {
+                                 const JavaRef<jobjectArray>& j_mimeTypes,
+                                 const JavaRef<jstring>& j_content,
+                                 const JavaRef<jobjectArray>& j_filenames,
+                                 const JavaRef<jstring>& j_text,
+                                 const JavaRef<jstring>& j_html,
+                                 const JavaRef<jstring>& j_url) {
   float dip_scale = view_->GetDipScale();
   gfx::PointF location(x / dip_scale, y / dip_scale);
   gfx::PointF root_location(screen_x / dip_scale, screen_y / dip_scale);
@@ -236,10 +236,10 @@ void EventForwarder::OnDragEvent(JNIEnv* env,
   view_->OnDragEvent(event);
 }
 
-jboolean EventForwarder::OnGestureEvent(JNIEnv* env,
-                                        jint type,
-                                        jlong time_ms,
-                                        jfloat scale) {
+bool EventForwarder::OnGestureEvent(JNIEnv* env,
+                                    int32_t type,
+                                    jlong time_ms,
+                                    jfloat scale) {
   float dip_scale = view_->GetDipScale();
   auto size = view_->GetSizeDIPs();
   float x = size.width() / 2;
@@ -248,15 +248,15 @@ jboolean EventForwarder::OnGestureEvent(JNIEnv* env,
       ScalePoint(view_->GetLocationOnScreen(x, y), 1.f / dip_scale);
   return view_->OnGestureEvent(GestureEventAndroid(
       type, gfx::PointF(x / dip_scale, y / dip_scale), root_location, time_ms,
-      scale, 0, 0, 0, 0, /*target_viewport*/ false, /*synthetic_scroll*/ false,
+      ui::GestureDeviceType::DEVICE_TOUCHSCREEN, scale, 0, 0, 0, 0,
+      /*target_viewport*/ false, /*synthetic_scroll*/ false,
       /*prevent_boosting*/ false));
 }
 
-jboolean EventForwarder::OnGenericMotionEvent(
-    JNIEnv* env,
-    const JavaParamRef<jobject>& motion_event,
-    jlong event_time_ns,
-    jlong down_time_ms) {
+bool EventForwarder::OnGenericMotionEvent(JNIEnv* env,
+                                          const JavaRef<jobject>& motion_event,
+                                          jlong event_time_ns,
+                                          jlong down_time_ms) {
   auto size = view_->GetSizeDIPs();
   float x = size.width() / 2;
   float y = size.height() / 2;
@@ -296,14 +296,48 @@ jboolean EventForwarder::OnGenericMotionEvent(
   return view_->OnGenericMotionEvent(*event);
 }
 
-jboolean EventForwarder::OnKeyUp(JNIEnv* env,
-                                 const ui::KeyEventAndroid& key_event) {
+void EventForwarder::OnMouseWheelEvent(JNIEnv* env,
+                                       const JavaRef<jobject>& motion_event,
+                                       jlong time_ns,
+                                       jfloat x,
+                                       jfloat y,
+                                       jfloat raw_x,
+                                       jfloat raw_y,
+                                       jfloat delta_x,
+                                       jfloat delta_y) {
+  ui::MotionEventAndroid::Pointer pointer(
+      /*id=*/0, x, y, /*touch_major_pixels=*/0.0f, /*touch_minor_pixels=*/0.0f,
+      /*pressure=*/0,
+      /*orientation_rad=*/0.0f, /*tilt_rad=*/0.0f, /*tool_type=*/0);
+
+  auto* window = view_->GetWindowAndroid();
+  float pixels_per_tick =
+      window ? window->mouse_wheel_scroll_factor()
+             : ui::kDefaultMouseWheelTickMultiplier * view_->GetDipScale();
+  auto event = ui::MotionEventAndroidFactory::CreateFromJava(
+      env, motion_event,
+      /*pix_to_dip=*/1.f / view_->GetDipScale(),
+      /*ticks_x=*/delta_x / pixels_per_tick,
+      /*ticks_y=*/delta_y / pixels_per_tick,
+      /*tick_multiplier=*/pixels_per_tick,
+      /*oldest_event_time=*/base::TimeTicks::FromJavaNanoTime(time_ns),
+      /*android_action=*/0,
+      /*pointer_count=*/1, /*history_size=*/0, /*action_index=*/0,
+      /*android_action_button=*/0, /*android_gesture_classification=*/0,
+      /*android_button_state=*/0,
+      /*raw_offset_x_pixels=*/raw_x - x,
+      /*raw_offset_y_pixels=*/raw_y - y, /*for_touch_handle=*/false, &pointer,
+      nullptr);
+  view_->OnMouseWheelEvent(*event);
+}
+
+bool EventForwarder::OnKeyUp(JNIEnv* env,
+                             const ui::KeyEventAndroid& key_event) {
   return view_->OnKeyUp(key_event);
 }
 
-jboolean EventForwarder::DispatchKeyEvent(
-    JNIEnv* env,
-    const ui::KeyEventAndroid& key_event) {
+bool EventForwarder::DispatchKeyEvent(JNIEnv* env,
+                                      const ui::KeyEventAndroid& key_event) {
   return view_->DispatchKeyEvent(key_event);
 }
 
@@ -321,12 +355,13 @@ void EventForwarder::ScrollTo(JNIEnv* env,
 
 void EventForwarder::DoubleTap(JNIEnv* env,
                                jlong time_ms,
-                               jint x,
-                               jint y) {
+                               int32_t x,
+                               int32_t y) {
   float dip_scale = view_->GetDipScale();
   view_->OnGestureEvent(GestureEventAndroid(
       GESTURE_EVENT_TYPE_DOUBLE_TAP, gfx::PointF(x / dip_scale, y / dip_scale),
-      gfx::PointF(), time_ms, 0, 0, 0, 0, 0, /*target_viewport*/ true,
+      gfx::PointF(), time_ms, ui::GestureDeviceType::DEVICE_TOUCHSCREEN, 0, 0,
+      0, 0, 0, /*target_viewport*/ true,
       /*synthetic_scroll*/ false, /*prevent_boosting*/ false));
 }
 
@@ -334,32 +369,46 @@ void EventForwarder::StartFling(JNIEnv* env,
                                 jlong time_ms,
                                 jfloat velocity_x,
                                 jfloat velocity_y,
-                                jboolean synthetic_scroll,
-                                jboolean prevent_boosting) {
-  CancelFling(env, time_ms, prevent_boosting);
+                                bool synthetic_scroll,
+                                bool prevent_boosting,
+                                bool is_touchpad_event) {
+  CancelFling(env, time_ms, prevent_boosting, is_touchpad_event);
 
   if (velocity_x == 0 && velocity_y == 0)
     return;
   float dip_scale = view_->GetDipScale();
-  // Use velocity as delta in scroll event.
+  ui::GestureDeviceType source =
+      is_touchpad_event ? ui::GestureDeviceType::DEVICE_TOUCHPAD
+                        : ui::GestureDeviceType::DEVICE_TOUCHSCREEN;
+  // Fling start event is expected to always be following a scroll start event.
+  // Flings from e.g. joystick start from stopped state; send a synthetic scroll
+  // start first. This is not required by touchpad flings which happen at the
+  // end of a scroll.
+  if (!is_touchpad_event) {
+    // Use velocity as delta in scroll event.
+    view_->OnGestureEvent(GestureEventAndroid(
+        GESTURE_EVENT_TYPE_SCROLL_START, gfx::PointF(), gfx::PointF(), time_ms,
+        source, 0, velocity_x / dip_scale, velocity_y / dip_scale, 0, 0,
+        /*target_viewport*/ true, synthetic_scroll,
+        /*prevent_boosting*/ false));
+  }
   view_->OnGestureEvent(GestureEventAndroid(
-      GESTURE_EVENT_TYPE_SCROLL_START, gfx::PointF(), gfx::PointF(), time_ms, 0,
-      velocity_x / dip_scale, velocity_y / dip_scale, 0, 0,
-      /*target_viewport*/ true, synthetic_scroll,
-      /*prevent_boosting*/ false));
-  view_->OnGestureEvent(GestureEventAndroid(
-      GESTURE_EVENT_TYPE_FLING_START, gfx::PointF(), gfx::PointF(), time_ms, 0,
-      0, 0, velocity_x / dip_scale, velocity_y / dip_scale,
+      GESTURE_EVENT_TYPE_FLING_START, gfx::PointF(), gfx::PointF(), time_ms,
+      source, 0, 0, 0, velocity_x / dip_scale, velocity_y / dip_scale,
       /*target_viewport*/ true, synthetic_scroll,
       /*prevent_boosting*/ false));
 }
 
 void EventForwarder::CancelFling(JNIEnv* env,
                                  jlong time_ms,
-                                 jboolean prevent_boosting) {
+                                 bool prevent_boosting,
+                                 bool is_touchpad_event) {
+  ui::GestureDeviceType source =
+      is_touchpad_event ? ui::GestureDeviceType::DEVICE_TOUCHPAD
+                        : ui::GestureDeviceType::DEVICE_TOUCHSCREEN;
   view_->OnGestureEvent(GestureEventAndroid(
-      GESTURE_EVENT_TYPE_FLING_CANCEL, gfx::PointF(), gfx::PointF(), time_ms, 0,
-      0, 0, 0, 0,
+      GESTURE_EVENT_TYPE_FLING_CANCEL, gfx::PointF(), gfx::PointF(), time_ms,
+      source, 0, 0, 0, 0, 0,
       /*target_viewport*/ false, /*synthetic_scroll*/ false, prevent_boosting));
 }
 
@@ -378,3 +427,5 @@ float EventForwarder::GetCurrentTouchSequenceYOffset() {
 }
 
 }  // namespace ui
+
+DEFINE_JNI(EventForwarder)

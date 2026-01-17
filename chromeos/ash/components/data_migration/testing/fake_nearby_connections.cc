@@ -4,12 +4,12 @@
 
 #include "chromeos/ash/components/data_migration/testing/fake_nearby_connections.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/containers/extend.h"
-#include "base/files/file_util.h"
+#include "base/functional/callback_helpers.h"
 #include "base/notimplemented.h"
 #include "base/rand_util.h"
 #include "chromeos/ash/components/data_migration/constants.h"
@@ -301,7 +301,7 @@ void FakeNearbyConnections::SendPayload(
     GTEST_FAIL() << "Sending payload to unexpected service_id " << service_id;
   }
 
-  if (!base::Contains(endpoint_ids, remote_endpoint_id_)) {
+  if (!std::ranges::contains(endpoint_ids, remote_endpoint_id_)) {
     std::move(callback).Run(Status::kEndpointUnknown);
     return;
   }

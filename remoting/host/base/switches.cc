@@ -17,7 +17,8 @@ const char kVersionSwitchName[] = "version";
 const char kProcessTypeController[] = "controller";
 const char kProcessTypeDaemon[] = "daemon";
 const char kProcessTypeDesktop[] = "desktop";
-const char kProcessTypeHost[] = "host";
+const char kProcessTypeNetwork[] = "network";
+const char kProcessTypeSingleProcessHost[] = "single_process_host";
 const char kProcessTypeRdpDesktopSession[] = "rdp_desktop_session";
 const char kProcessTypeEvaluateCapability[] = "evaluate_capability";
 const char kProcessTypeFileChooser[] = "file_chooser";
@@ -32,6 +33,8 @@ const char kEvaluateCapabilitySwitchName[] = "evaluate-type";
 #if BUILDFLAG(IS_LINUX)
 const char kEnableWtmpdb[] = "enable-wtmpdb";
 #endif
+
+const char kEnableCorpMessaging[] = "enable-corp-messaging";
 
 #if BUILDFLAG(IS_WIN)
 const char kEvaluateD3D[] = "d3d-support";

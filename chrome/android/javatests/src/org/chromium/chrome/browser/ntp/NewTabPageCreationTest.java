@@ -11,6 +11,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
+
 import androidx.test.filters.MediumTest;
 
 import org.junit.Before;
@@ -26,13 +28,14 @@ import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.tab.TabLaunchType;
+import org.chromium.chrome.browser.tabmodel.TabCreatorUtil;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.transit.AutoResetCtaTransitTestRule;
 import org.chromium.chrome.test.transit.ChromeTransitTestRules;
 import org.chromium.chrome.test.util.NewTabPageTestUtils;
 import org.chromium.chrome.test.util.OmniboxTestUtils;
 import org.chromium.chrome.test.util.browser.TabLoadObserver;
-import org.chromium.components.embedder_support.util.UrlConstants;
 
 /** Tests for creating a tab with NewTabPage. */
 @RunWith(ChromeJUnit4ClassRunner.class)
@@ -60,19 +63,20 @@ public class NewTabPageCreationTest {
     @MediumTest
     @EnableFeatures(ChromeFeatureList.ANDROID_OMNIBOX_FOCUSED_NEW_TAB_PAGE)
     public void testCreateNTPInNewTab() {
+        @TabLaunchType int expectedType = TabLaunchType.FROM_CHROME_UI;
         var histogramWatcher =
                 HistogramWatcher.newBuilder()
-                        .expectIntRecord("NewTabPage.OpenedInNewTab", 2 /* FROM_CHROME_UI */)
+                        .expectIntRecord("NewTabPage.OpenedInNewTab", expectedType)
                         .build();
 
         ThreadUtils.runOnUiThreadBlocking(
-                () -> {
-                    mActivityTestRule.getActivity().getCurrentTabCreator().launchNtp();
-                });
+                () ->
+                        TabCreatorUtil.launchNtp(
+                                mActivityTestRule.getActivity().getCurrentTabCreator()));
 
         histogramWatcher.pollInstrumentationThreadUntilSatisfied();
 
-        Tab tab = mActivityTestRule.getActivity().getActivityTab();
+        Tab tab = mActivityTestRule.getActivityTab();
         NewTabPageTestUtils.waitForNtpLoaded(tab);
 
         verify(mTestState).onNewTabCreated();
@@ -88,11 +92,11 @@ public class NewTabPageCreationTest {
         String testUrl = mActivityTestRule.getTestServer().getURL(TEST_URL);
         mActivityTestRule.loadUrlInNewTab(testUrl);
 
-        Tab tab = mActivityTestRule.getActivity().getActivityTab();
+        Tab tab = mActivityTestRule.getActivityTab();
         assertNull(tab.getNativePage());
         assertEquals(tab.getUrl().getSpec(), testUrl);
 
-        new TabLoadObserver(tab).fullyLoadUrl(UrlConstants.NTP_URL);
+        new TabLoadObserver(tab).fullyLoadUrl(getOriginalNativeNtpUrl());
         NewTabPageTestUtils.waitForNtpLoaded(tab);
 
         verify(mTestState, never()).onNewTabCreated();

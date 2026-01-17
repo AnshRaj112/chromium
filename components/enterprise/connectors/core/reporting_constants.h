@@ -175,9 +175,28 @@ inline constexpr auto kEventCaseToUmaMetricNameMap =
          {EventCase::kExtensionTelemetryEvent,
           kExtensionTelemetryUmaMetricName}});
 
+// Mapping from event case to UMA metric name.
+inline constexpr auto kEventCaseToEventNameMap =
+    base::MakeFixedFlatMap<EventCase, std::string_view>(
+        {{EventCase::kPasswordReuseEvent, kKeyPasswordReuseEvent},
+         {EventCase::kPasswordChangedEvent, kKeyPasswordChangedEvent},
+         {EventCase::kDangerousDownloadEvent, kKeyDangerousDownloadEvent},
+         {EventCase::kInterstitialEvent, kKeyInterstitialEvent},
+         {EventCase::kSensitiveDataEvent, kKeySensitiveDataEvent},
+         {EventCase::kUnscannedFileEvent, kKeyUnscannedFileEvent},
+         {EventCase::kLoginEvent, kKeyLoginEvent},
+         {EventCase::kPasswordBreachEvent, kKeyPasswordBreachEvent},
+         {EventCase::kUrlFilteringInterstitialEvent,
+          kKeyUrlFilteringInterstitialEvent},
+         {EventCase::kBrowserExtensionInstallEvent, kExtensionInstallEvent},
+         {EventCase::kBrowserCrashEvent, kBrowserCrashEvent},
+         {EventCase::kExtensionTelemetryEvent, kExtensionTelemetryEvent}});
+
 std::string GetPayloadSizeUmaMetricName(std::string_view event_name);
 
 std::string GetPayloadSizeUmaMetricName(EventCase event_case);
+
+std::string GetEventName(EventCase event_case);
 
 // Key names used with when building the dictionary to pass to the real-time
 // reporting API. Should be removed once the proto synced migration is complete.
@@ -211,13 +230,15 @@ inline constexpr char kKeyReason[] = "reason";
 inline constexpr char kKeyScanId[] = "scanId";
 inline constexpr char kKeyNetErrorCode[] = "netErrorCode";
 inline constexpr char kKeyUserName[] = "userName";
+inline constexpr char kKeyIframeUrls[] = "iframeUrls";
 inline constexpr char kKeyIsPhishingUrl[] = "isPhishingUrl";
 inline constexpr char kKeyReferrers[] = "referrers";
 inline constexpr char kKeySourceWebAppSignedInAccount[] =
     "sourceWebAppSignedInAccount";
 inline constexpr char kKeyWebAppSignedInAccount[] = "webAppSignedInAccount";
+inline constexpr char kKeyUserJustification[] = "userJustification";
 
-enum EnterpriseRealTimeUrlCheckMode {
+enum EnterpriseRealTimeUrlCheckMode : int {
   REAL_TIME_CHECK_DISABLED = 0,
   REAL_TIME_CHECK_FOR_MAINFRAME_ENABLED = 1,
 };

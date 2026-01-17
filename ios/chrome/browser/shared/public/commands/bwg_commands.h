@@ -5,24 +5,41 @@
 #ifndef IOS_CHROME_BROWSER_SHARED_PUBLIC_COMMANDS_BWG_COMMANDS_H_
 #define IOS_CHROME_BROWSER_SHARED_PUBLIC_COMMANDS_BWG_COMMANDS_H_
 
+#import <UIKit/UIKit.h>
+
 #import "base/ios/block_types.h"
 
-namespace bwg {
+namespace gemini {
 enum class EntryPoint;
 }
 
 // Commands relating to the BWG flow.
-@protocol BWGCommands
+@protocol BWGCommands <NSObject>
 
-// Starts the BWG flow.
-- (void)startBWGFlowWithEntryPoint:(bwg::EntryPoint)entryPoint;
+// Starts the Gemini flow with an entry point.
+- (void)startGeminiFlowWithEntryPoint:(gemini::EntryPoint)entryPoint;
 
-// Dismiss the BWG flow with a completion block.
-- (void)dismissBWGFlowWithCompletion:(ProceduralBlock)completion;
+// Starts the Gemini flow with a provided image as attachment.
+- (void)startGeminiFlowWithImageAttachment:(UIImage*)image
+                                entryPoint:(gemini::EntryPoint)entryPoint;
+
+// Dismiss the Gemini flow with a completion block.
+- (void)dismissGeminiFlowWithCompletion:(ProceduralBlock)completion;
 
 // Attempts to display the automatic BWG promo depending on whether the active
 // web state is eligible. If the page is ineligible, does nothing.
 - (void)showBWGPromoIfPageIsEligible;
+
+// Hide Gemini floaty. When in a hidden state, the floaty still persists in
+// memory and needs to be properly cleaned up.
+- (void)hideFloatyIfInvoked;
+
+// Show Gemini floaty. Used to re-show an invoked Gemini floaty.
+- (void)showFloatyIfInvoked;
+
+// Starts the FRE flow with a completion block.
+- (void)startGeminiFREWithCompletion:(void (^)(BOOL success))completion
+                      fromEntryPoint:(gemini::EntryPoint)entryPoint;
 
 @end
 

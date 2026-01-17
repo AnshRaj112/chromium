@@ -25,6 +25,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::Eq;
+using ::testing::Ne;
 
 constexpr char kWebFilterTypeHistogramName[] = "FamilyUser.WebFilterType";
 constexpr char kWebFilterTypeForFamilyUserHistogramName[] =
@@ -177,21 +178,22 @@ class SupervisedUserMetricsServiceFieldTrialTest
         << "Create test environment first with CreateTestEnvironment().";
 
     if (GetFieldTrialName() == "AndroidDeviceSearchContentFilters") {
-      test_environment_->search_content_filters_observer()->SetEnabled(enabled);
+      test_environment_->device_parental_controls()
+          .SetSearchContentFiltersEnabledForTesting(enabled);
       return;
     } else if (GetFieldTrialName() == "AndroidDeviceBrowserContentFilters") {
-      test_environment_->browser_content_filters_observer()->SetEnabled(
-          enabled);
+      test_environment_->device_parental_controls()
+          .SetBrowserContentFiltersEnabledForTesting(enabled);
       return;
     }
 
     NOTREACHED() << "Unsupported field trial name: " << GetFieldTrialName();
   }
 
-  void CreateTestEnvironment(std::unique_ptr<MetricsServiceAccessorDelegateMock>
-                                 metrics_service_accessor_delegate) {
+  void CreateTestEnvironment(std::unique_ptr<SynteticFieldTrialDelegateMock>
+                                 synthetic_field_trial_delegate) {
     test_environment_ = std::make_unique<SupervisedUserTestEnvironment>(
-        std::move(metrics_service_accessor_delegate));
+        std::move(synthetic_field_trial_delegate));
   }
 
   static FieldTrialName GetFieldTrialName() { return GetParam(); }
@@ -207,13 +209,17 @@ TEST_P(SupervisedUserMetricsServiceFieldTrialTest,
        SyntheticFieldTrialRegistered) {
   // Register calls before environment's created, because the metrics service
   // calls field trial registration on creation.
-  auto mock = std::make_unique<MetricsServiceAccessorDelegateMock>();
-  EXPECT_CALL(*mock, RegisterSyntheticFieldTrial(_, "Disabled")).Times(1);
+  auto mock = std::make_unique<SynteticFieldTrialDelegateMock>();
+  // Current filter it disabled on mock registration (when the environment is
+  // created), and then once for each toggle.
   EXPECT_CALL(*mock, RegisterSyntheticFieldTrial(Eq(GetParam()), "Disabled"))
       .Times(2);
+  // Tested filter is registered as enabled when it's toggled on.
   EXPECT_CALL(*mock, RegisterSyntheticFieldTrial(Eq(GetParam()), "Enabled"))
       .Times(1);
 
+  // Other filter is interacted similarly: subscribe, enable, disable.
+  EXPECT_CALL(*mock, RegisterSyntheticFieldTrial(Ne(GetParam()), _)).Times(3);
   CreateTestEnvironment(std::move(mock));
 
   // This cycles all possible combinations of states for each filter:
@@ -286,7 +292,6 @@ TEST_P(SupervisedUserMetricsServiceWebFilterTypePeriodicalTest,
         histogram_name, WebFilterType::kTryToBlockMatureSites, expected_count);
   }
 }
-
 
 const PeriodicalWebFilterTypeTestParams kPeriodicalWebFilterTypeTestParams[] = {
     {"Unsupervised",

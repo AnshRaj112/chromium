@@ -7,7 +7,6 @@
 #include <optional>
 #include <string>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/strings/strcat.h"
@@ -146,7 +145,7 @@ class PageTextObserverBrowserTest : public InProcessBrowserTest {
     // This script is render blocking in the HTML, but is intentionally slow.
     // This provides important time between commit and first layout for any text
     // dump requests to make it to the renderer, reducing flakes.
-    if (request.GetURL().path() == "/slow-first-layout.js") {
+    if (request.GetURL().GetPath() == "/slow-first-layout.js") {
       std::unique_ptr<net::test_server::DelayedHttpResponse> resp =
           std::make_unique<net::test_server::DelayedHttpResponse>(
               base::Milliseconds(1500));
@@ -159,7 +158,7 @@ class PageTextObserverBrowserTest : public InProcessBrowserTest {
     // This script is onLoad-blocking in the HTML, but is intentionally slow.
     // This provides important time between first layout and finish load for
     // tests that need it.
-    if (request.GetURL().path() == "/slow-add-world-text.js") {
+    if (request.GetURL().GetPath() == "/slow-add-world-text.js") {
       std::unique_ptr<net::test_server::DelayedHttpResponse> resp =
           std::make_unique<net::test_server::DelayedHttpResponse>(
               base::Milliseconds(500));
@@ -171,7 +170,7 @@ class PageTextObserverBrowserTest : public InProcessBrowserTest {
       return resp;
     }
 
-    if (request.GetURL().path() == "/dynamic.html") {
+    if (request.GetURL().GetPath() == "/dynamic.html") {
       std::unique_ptr<net::test_server::BasicHttpResponse> resp =
           std::make_unique<net::test_server::BasicHttpResponse>();
       resp->set_code(net::HTTP_OK);
@@ -273,7 +272,7 @@ IN_PROC_BROWSER_TEST_F(PageTextObserverBrowserTest, FirstLayoutAndOnLoad) {
       // for text equality is inherently flaky, and this determinism is not a
       // guarantee that we make to callers.
       if (result.event() == mojom::TextDumpEvent::kFirstLayout) {
-        EXPECT_TRUE(base::Contains(*result.contents(), u"hello"));
+        EXPECT_TRUE(result.contents()->contains(u"hello"));
         has_first_layout_event = true;
       }
 

@@ -16,6 +16,7 @@
 #import "base/test/ios/wait_util.h"
 #import "base/test/scoped_feature_list.h"
 #import "base/test/test_timeouts.h"
+#import "components/test/ios/test_utils.h"
 #import "ios/testing/ocmock_complex_type_helper.h"
 #import "ios/web/common/crw_content_view.h"
 #import "ios/web/common/crw_web_view_content_view.h"
@@ -31,8 +32,6 @@
 #import "ios/web/public/download/download_controller.h"
 #import "ios/web/public/download/download_task.h"
 #import "ios/web/public/navigation/referrer.h"
-#import "ios/web/public/session/crw_navigation_item_storage.h"
-#import "ios/web/public/session/crw_session_storage.h"
 #import "ios/web/public/test/fakes/crw_fake_web_view_content_view.h"
 #import "ios/web/public/test/fakes/fake_browser_state.h"
 #import "ios/web/public/test/fakes/fake_download_controller_delegate.h"
@@ -44,7 +43,6 @@
 #import "ios/web/public/web_state_observer.h"
 #import "ios/web/security/wk_web_view_security_util.h"
 #import "ios/web/test/fakes/crw_fake_back_forward_list.h"
-#import "ios/web/test/fakes/crw_fake_wk_frame_info.h"
 #import "ios/web/test/fakes/crw_fake_wk_navigation_action.h"
 #import "ios/web/test/test_url_constants.h"
 #import "ios/web/test/web_test_with_web_controller.h"
@@ -184,11 +182,8 @@ class CRWWebControllerTest : public WebTestWithWebController {
     OCMStub([result URL]).andDo(^(NSInvocation* invocation) {
       [invocation setReturnValue:&test_url_];
     });
-    OCMStub(
-        [result setNavigationDelegate:[OCMArg checkWithBlock:^(id delegate) {
-                  navigation_delegate_ = delegate;
-                  return YES;
-                }]]);
+    OCMStub([result
+        setNavigationDelegate:AssignValueToVariable(navigation_delegate_)]);
     OCMStub([result serverTrust]);
     OCMStub([result setUIDelegate:OCMOCK_ANY]);
     OCMStub([result frame]).andReturn(UIScreen.mainScreen.bounds);
@@ -595,6 +590,11 @@ class CRWWebControllerResponseTest : public CRWWebControllerTest {
         std::make_unique<FakeDownloadControllerDelegate>(download_controller());
   }
 
+  void TearDown() override {
+    download_delegate_.reset();
+    CRWWebControllerTest::TearDown();
+  }
+
   // Calls webView:decidePolicyForNavigationResponse:decisionHandler: callback
   // and waits for decision handler call. Returns false if decision handler call
   // times out.
@@ -647,24 +647,16 @@ class CRWWebControllerResponseTest : public CRWWebControllerTest {
     if (*out_policy == WKNavigationResponsePolicyDownload) {
       id mock_download = [OCMockObject mockForClass:[WKDownload class]];
 
-      __block bool delegate_set = false;
-      __block id download_delegate = nil;
-      OCMStub([mock_download setDelegate:[OCMArg any]])
-          .andDo(^(NSInvocation* invocation) {
-            // Using __unsafe_unretained is required to extract the parameter
-            // from the NSInvocation otherwise ARC will over-release.
-            __unsafe_unretained id argument = nil;
-            [invocation getArgument:&argument atIndex:2];
-            download_delegate = argument;
-            delegate_set = true;
-          });
+      __block id<WKDownloadDelegate> download_delegate = nil;
+      OCMStub(
+          [mock_download setDelegate:AssignValueToVariable(download_delegate)]);
 
       [navigation_delegate_ webView:mock_web_view_
                  navigationResponse:navigation_response
                   didBecomeDownload:mock_download];
 
       if (!WaitUntilConditionOrTimeout(kWaitForPageLoadTimeout, ^{
-            return delegate_set;
+            return download_delegate != nil;
           })) {
         return false;
       }
@@ -676,24 +668,19 @@ class CRWWebControllerResponseTest : public CRWWebControllerTest {
       }
       OCMStub([mock_download originalRequest]).andReturn(request);
 
-#if defined(__IPHONE_18_2) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_18_2
       if (@available(iOS 18.2, *)) {
-        CRWFakeWKFrameInfo* frame_info = [[CRWFakeWKFrameInfo alloc] init];
-        frame_info.mainFrame = YES;
-        frame_info.request = request;
-        frame_info.webView = mock_web_view_;
-        OCMStub([mock_download originatingFrame]).andReturn(frame_info);
+        WKFrameInfo* mock_frame_info = OCMClassMock([WKFrameInfo class]);
+        OCMStub([mock_frame_info isMainFrame]).andReturn(YES);
+        OCMStub([mock_frame_info request]).andReturn(request);
+        OCMStub([mock_frame_info webView]).andReturn(mock_web_view_);
+        OCMStub([mock_download originatingFrame]).andReturn(mock_frame_info);
       }
-#endif
 
-      OCMStub([mock_download cancel:[OCMArg any]])
-          .andDo(^(NSInvocation* invocation) {
-            // Using __unsafe_unretained is required to extract the parameter
-            // from the NSInvocation otherwise ARC will over-release.
-            __unsafe_unretained void (^block)(NSData* data);
-            [invocation getArgument:&block atIndex:2];
-            block(nil);
-          });
+      OCMStub([mock_download cancel:[OCMArg checkWithBlock:^BOOL(id obj) {
+                               void (^block)(NSData* data) = obj;
+                               block(nil);
+                               return YES;
+                             }]]);
 
       [download_delegate download:mock_download
           decideDestinationUsingResponse:response
@@ -964,9 +951,9 @@ class CRWWebControllerPolicyDeciderTest : public CRWWebControllerTest {
         [[CRWFakeWKNavigationAction alloc] init];
     navigation_action.request = request;
 
-    CRWFakeWKFrameInfo* frame_info = [[CRWFakeWKFrameInfo alloc] init];
-    frame_info.mainFrame = YES;
-    navigation_action.targetFrame = frame_info;
+    WKFrameInfo* mock_frame_info = OCMClassMock([WKFrameInfo class]);
+    OCMStub([mock_frame_info isMainFrame]).andReturn(YES);
+    navigation_action.targetFrame = mock_frame_info;
 
     WKWebpagePreferences* preferences = [[WKWebpagePreferences alloc] init];
 

@@ -14,7 +14,6 @@
 #include "ash/public/cpp/wallpaper/sea_pen_image.h"
 #include "ash/wallpaper/wallpaper_utils/sea_pen_metadata_utils.h"
 #include "ash/wallpaper/wallpaper_utils/wallpaper_resizer.h"
-#include "ash/webui/common/mojom/sea_pen.mojom-forward.h"
 #include "ash/webui/common/mojom/sea_pen.mojom.h"
 #include "base/functional/bind.h"
 #include "base/json/json_writer.h"
@@ -31,6 +30,7 @@
 #include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/ash/wallpaper/wallpaper_controller_client_impl.h"
+#include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chromeos/ash/components/demo_mode/utils/demo_session_utils.h"
@@ -426,7 +426,7 @@ void PersonalizationAppSeaPenProviderBase::
 
 void PersonalizationAppSeaPenProviderBase::IsInTabletMode(
     IsInTabletModeCallback callback) {
-  std::move(callback).Run(display::Screen::GetScreen()->InTabletMode());
+  std::move(callback).Run(display::Screen::Get()->InTabletMode());
 }
 
 void PersonalizationAppSeaPenProviderBase::MakeTransparent() {

@@ -13,13 +13,11 @@
 #include "chromeos/ash/components/phonehub/proto/phonehub_api.pb.h"
 #include "chromeos/ash/services/secure_channel/public/cpp/client/secure_channel_structured_metrics_logger.h"
 #include "chromeos/ash/services/secure_channel/public/mojom/nearby_connector.mojom-shared.h"
-#include "chromeos/ash/services/secure_channel/public/mojom/secure_channel.mojom-shared.h"
 #include "chromeos/ash/services/secure_channel/public/mojom/secure_channel.mojom.h"
 #include "chromeos/services/network_config/public/mojom/cros_network_config.mojom.h"
 #include "components/metrics/structured/event.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
-#include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
 
 namespace {

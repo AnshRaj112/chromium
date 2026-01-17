@@ -29,7 +29,7 @@ namespace {
 // the closure.
 void ChangeProfileSignoutCompletion(
     base::WeakPtr<Browser> weak_browser,
-    MDCSnackbarMessage* snackbar_message,
+    SnackbarMessage* snackbar_message,
     bool force_snackbar_over_toolbar,
     SignoutCompletionCallback signout_completion,
     base::OnceClosure closure) {
@@ -60,7 +60,7 @@ void ChangeProfileSignoutContinuation(
     signin_metrics::ProfileSignout signout_source_metric,
     BOOL force_snackbar_over_toolbar,
     BOOL should_record_metrics,
-    MDCSnackbarMessage* snackbar_message,
+    SnackbarMessage* snackbar_message,
     SignoutCompletionCallback signout_completion,
     SceneState* scene_state,
     base::OnceClosure closure) {
@@ -102,7 +102,7 @@ void ChangeProfileForceSignoutContinuation(SceneState* scene_state,
     CHECK(browser);
     // TODO(crbug.com/364574533):Dismiss in-progress signin here and show the
     // prompt in the callback of its completion. This requires a new
-    // ApplicationCommands handler method to call
+    // SceneCommands handler method to call
     // SceneController::interruptSigninCoordinatorAnimated or directly show the
     // force sign out prompt.
     id<PolicyChangeCommands> policy_change_handler = HandlerForProtocol(
@@ -121,7 +121,7 @@ ChangeProfileContinuation CreateChangeProfileSignoutContinuation(
     signin_metrics::ProfileSignout signout_source_metric,
     BOOL force_snackbar_over_toolbar,
     BOOL should_record_metrics,
-    MDCSnackbarMessage* snackbar_message,
+    SnackbarMessage* snackbar_message,
     SignoutCompletionCallback signout_completion) {
   CHECK(!signout_completion.is_null());
   return base::BindOnce(&ChangeProfileSignoutContinuation,

@@ -12,6 +12,8 @@ static_library("core") {
     "common_string_util.h",
     "controller_client.cc",
     "controller_client.h",
+    "features.cc",
+    "features.h",
     "https_only_mode_allowlist.cc",
     "https_only_mode_allowlist.h",
     "https_only_mode_enforcelist.cc",
@@ -87,8 +89,8 @@ static_library("unsafe_resource") {
 
   deps = [
     "//base",
-    "//components/safe_browsing/core/browser/db:hit_report",
     "//components/safe_browsing/core/browser/db:util",
+    "//components/safe_browsing/core/common:threat_enums",
     "//components/safe_browsing/core/common/proto:realtimeapi_proto",
     "//net",
     "//services/network/public/mojom",

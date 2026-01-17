@@ -66,6 +66,7 @@ suite('BackupPasswordDetailsCardTest', function() {
                 'passwordDetailsCardBackupPasswordNoteDetails',
                 password.backupPassword!.creationDate,
                 card.i18n('localPasswordManager'))}`);
+    assertTrue(card.$.noteValue.alwaysExpanded);
     assertTrue(isVisible(card.$.showPasswordButton));
     assertTrue(isVisible(card.$.copyPasswordButton));
     assertTrue(isVisible(card.$.deleteButton));
@@ -135,7 +136,7 @@ suite('BackupPasswordDetailsCardTest', function() {
       const listItemElement = listItemElements[i];
 
       assertTrue(!!listItemElement);
-      assertEquals(expectedDomain.name, listItemElement.textContent!.trim());
+      assertEquals(expectedDomain.name, listItemElement.textContent.trim());
       assertEquals(expectedDomain.url, listItemElement.href);
     });
   });
@@ -189,7 +190,7 @@ suite('BackupPasswordDetailsCardTest', function() {
     const card = await createCardElement(password);
 
     assertEquals(
-        card.$.domainLabel.textContent!.trim(),
+        card.$.domainLabel.textContent.trim(),
         loadTimeData.getString('sitesLabel'));
   });
 
@@ -210,7 +211,7 @@ suite('BackupPasswordDetailsCardTest', function() {
     const card = await createCardElement(password);
 
     assertEquals(
-        card.$.domainLabel.textContent!.trim(),
+        card.$.domainLabel.textContent.trim(),
         loadTimeData.getString('appsLabel'));
   });
 
@@ -236,7 +237,7 @@ suite('BackupPasswordDetailsCardTest', function() {
     const card = await createCardElement(password);
 
     assertEquals(
-        card.$.domainLabel.textContent!.trim(),
+        card.$.domainLabel.textContent.trim(),
         loadTimeData.getString('sitesAndAppsLabel'));
   });
 

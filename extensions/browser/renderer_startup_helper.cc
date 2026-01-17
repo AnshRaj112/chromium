@@ -10,8 +10,9 @@
 
 #include "base/check_is_test.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
+#include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
+#include "base/feature_list.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
@@ -50,6 +51,7 @@
 #include "extensions/common/mojom/renderer.mojom.h"
 #include "extensions/common/permissions/permissions_data.h"
 #include "ipc/ipc_channel_proxy.h"
+#include "third_party/blink/public/common/features.h"
 #include "ui/base/webui/web_ui_util.h"
 #include "url/origin.h"
 
@@ -61,6 +63,41 @@
 namespace extensions {
 
 namespace {
+
+#if BUILDFLAG(IS_CHROMEOS)
+std::string GetFeatureSessionTypeAsString() {
+  switch (GetCurrentFeatureSessionType()) {
+    case mojom::FeatureSessionType::kInitial:
+      return "Initial";
+    case mojom::FeatureSessionType::kUnknown:
+      return "Unknown";
+    case mojom::FeatureSessionType::kRegular:
+      return "Regular";
+    case mojom::FeatureSessionType::kKiosk:
+      return "Kiosk";
+    case mojom::FeatureSessionType::kAutolaunchedKiosk:
+      return "Auto-launched kiosk";
+  }
+}
+
+void ReportActivationTokenError(content::BrowserContext* browser_context,
+                                const Extension& extension,
+                                const char* error_message) {
+  std::ostringstream error_stream;
+  error_stream << error_message << " "
+               << "Extension ID: " << extension.id()
+               << ". Session type: " << GetFeatureSessionTypeAsString()
+               << ". Is guest session: "
+               << ExtensionsBrowserClient::Get()->IsGuestSession(
+                      browser_context);
+  LOG(ERROR) << error_stream.str();
+  static auto* const crash_key = base::debug::AllocateCrashKeyString(
+      "GetActivationTokenForWorkerBasedExtension",
+      base::debug::CrashKeySize::Size1024);
+  base::debug::SetCrashKeyString(crash_key, error_stream.str());
+  base::debug::DumpWithoutCrashing();
+}
+#endif
 
 // Gets the current activation token for `extension`.
 std::optional<base::UnguessableToken> GetActivationTokenForWorkerBasedExtension(
@@ -80,13 +117,35 @@ std::optional<base::UnguessableToken> GetActivationTokenForWorkerBasedExtension(
   // For the off the record profile...
   if (browser_context->IsOffTheRecord()) {
     if (IncognitoInfo::IsSplitMode(&extension)) {
+#if BUILDFLAG(IS_CHROMEOS)
+      if (!activation_token.has_value()) {
+        // TODO(crbug.com/442902361): Remove crash logging once activation
+        // token issue has been fixed.
+        ReportActivationTokenError(
+            browser_context, extension,
+            "Off-the-record extension running in split mode is "
+            "missing an activation token.");
+      }
+#else
       // Split mode extensions will have a separate activation token.
       CHECK(activation_token.has_value());
       // TODO(crbug.com/357889496): Add a test that confirms that split mode
       // tokens are different across the OnTR and OffTR extension processes.
+#endif
     } else if (IncognitoInfo::IsSpanningMode(&extension)) {
+#if BUILDFLAG(IS_CHROMEOS)
+      if (activation_token.has_value()) {
+        // TODO(crbug.com/442902361): Remove crash logging once activation
+        // token issue has been fixed.
+        ReportActivationTokenError(
+            browser_context, extension,
+            "Off-the-record extension running in spanning mode "
+            "incorrectly has an activation token.");
+      }
+#else
       // Spanning mode extensions will not have a separate activation token.
       CHECK(!activation_token.has_value());
+#endif
     }
   }
 
@@ -156,6 +215,17 @@ base::flat_map<std::string, std::string> ToFlatMap(
   return {map.begin(), map.end()};
 }
 
+bool ShouldDisableExtensionsForInitialWebUI(
+    content::RenderProcessHost* process) {
+#if BUILDFLAG(IS_ANDROID)
+  return false;
+#else
+  return base::FeatureList::IsEnabled(
+             blink::features::kInitialWebUIWithoutExtensions) &&
+         process->IsForInitialWebUI();
+#endif  // BUILDFLAG(IS_ANDROID)
+}
+
 }  // namespace
 
 RendererStartupHelper::RendererStartupHelper(BrowserContext* browser_context)
@@ -170,6 +240,45 @@ RendererStartupHelper::~RendererStartupHelper() {
 
 void RendererStartupHelper::OnRenderProcessHostCreated(
     content::RenderProcessHost* host) {
+  if (host->IsForGuestsOnly()) {
+    // GuestView initialization is done in OnRenderProcessLaunched()
+    // instead, because WebViewRendererState set up is not yet done at this
+    // point.
+    return;
+  }
+  InitializeProcess(host);
+}
+
+void RendererStartupHelper::OnRenderProcessLaunched(
+    content::RenderProcessHost* host) {
+  if (!host->IsForGuestsOnly() &&
+      !ShouldDisableExtensionsForInitialWebUI(host)) {
+    // Any process that *isn't* for guests or an initial WebUI with disabled
+    // extensions should have already been initialized in
+    // OnRenderProcessHostCreated(), if it corresponds to the same context.
+    ExtensionsBrowserClient* client = ExtensionsBrowserClient::Get();
+#if BUILDFLAG(IS_ANDROID)
+    // On Android, handle race condition during process restart:
+    // 1. OnRenderProcessHostCreated() initializes extensions and populates
+    // process_mojo_map_.
+    // 2. Process startup fails in some cases.
+    // 3. RenderProcessExited() clears process_mojo_map_ via UntrackProcess().
+    // 4. The process is reused and OnRenderProcessLaunched() is still called.
+    //
+    // Re-register the process to restore Mojo communication without
+    // re-initializing extensions to avoid duplicate loading.
+    if (GetRenderer(host) == nullptr &&
+        client->IsSameContext(browser_context_, host->GetBrowserContext())) {
+      RegisterProcess(host);
+    }
+#else
+    CHECK(GetRenderer(host) != nullptr ||
+          !client->IsSameContext(browser_context_, host->GetBrowserContext()));
+#endif  // BUILDFLAG(IS_ANDROID)
+    return;
+  }
+  // Otherwise, we should *not* have initialized the host yet.
+  CHECK_EQ(nullptr, GetRenderer(host));
   InitializeProcess(host);
 }
 
@@ -184,17 +293,27 @@ void RendererStartupHelper::RenderProcessHostDestroyed(
   UntrackProcess(host);
 }
 
+void RendererStartupHelper::RegisterProcess(
+    content::RenderProcessHost* process) {
+  process_mojo_map_.emplace(process, BindNewRendererRemote(process));
+  process->AddObserver(this);
+}
+
 void RendererStartupHelper::InitializeProcess(
     content::RenderProcessHost* process) {
+  // If the process is for an initial WebUI, we don't need to initialize
+  // support for Extensions.
+  if (ShouldDisableExtensionsForInitialWebUI(process)) {
+    return;
+  }
+
   ExtensionsBrowserClient* client = ExtensionsBrowserClient::Get();
   if (!client->IsSameContext(browser_context_, process->GetBrowserContext())) {
     return;
   }
 
-  mojom::Renderer* renderer =
-      process_mojo_map_.emplace(process, BindNewRendererRemote(process))
-          .first->second.get();
-  process->AddObserver(this);
+  RegisterProcess(process);
+  mojom::Renderer* renderer = GetRenderer(process);
 
   bool activity_logging_enabled =
       client->IsActivityLoggingEnabled(process->GetBrowserContext());
@@ -251,8 +370,8 @@ void RendererStartupHelper::InitializeProcess(
       ExtensionRegistry::Get(browser_context_)->enabled_extensions();
   for (const auto& ext : extensions) {
     // OnExtensionLoaded should have already been called for the extension.
-    DCHECK(base::Contains(extension_process_map_, ext->id()));
-    DCHECK(!base::Contains(extension_process_map_[ext->id()], process));
+    DCHECK(extension_process_map_.contains(ext->id()));
+    DCHECK(!extension_process_map_[ext->id()].contains(process));
 
     if (!util::IsExtensionVisibleToContext(*ext, renderer_context)) {
       continue;
@@ -280,8 +399,8 @@ void RendererStartupHelper::InitializeProcess(
     for (const ExtensionId& id : iter->second) {
       // The extension should be loaded in the process.
       DCHECK(extensions.Contains(id));
-      DCHECK(base::Contains(extension_process_map_, id));
-      DCHECK(base::Contains(extension_process_map_[id], process));
+      DCHECK(extension_process_map_.contains(id));
+      DCHECK(extension_process_map_[id].contains(process));
       renderer->ActivateExtension(id);
     }
   }
@@ -308,7 +427,7 @@ void RendererStartupHelper::ActivateExtensionInProcess(
     content::RenderProcessHost* process) {
   // The extension should have been loaded already. Dump without crashing to
   // debug crbug.com/528026.
-  if (!base::Contains(extension_process_map_, extension.id())) {
+  if (!extension_process_map_.contains(extension.id())) {
     DUMP_WILL_BE_NOTREACHED()
         << "Extension " << extension.id() << " activated before loading";
     return;
@@ -339,7 +458,7 @@ void RendererStartupHelper::ActivateExtensionInProcess(
 
   auto remote = process_mojo_map_.find(process);
   if (remote != process_mojo_map_.end()) {
-    DCHECK(base::Contains(extension_process_map_[extension.id()], process));
+    DCHECK(extension_process_map_[extension.id()].contains(process));
     remote->second->ActivateExtension(extension.id());
   } else {
     pending_active_extensions_[process].insert(extension.id());
@@ -347,7 +466,7 @@ void RendererStartupHelper::ActivateExtensionInProcess(
 }
 
 void RendererStartupHelper::OnExtensionLoaded(const Extension& extension) {
-  DCHECK(!base::Contains(extension_process_map_, extension.id()));
+  DCHECK(!extension_process_map_.contains(extension.id()));
 
   // Mark the extension as loaded.
   std::set<raw_ptr<content::RenderProcessHost, SetExperimental>>&
@@ -383,7 +502,7 @@ void RendererStartupHelper::OnExtensionLoaded(const Extension& extension) {
 }
 
 void RendererStartupHelper::OnExtensionUnloaded(const Extension& extension) {
-  DCHECK(base::Contains(extension_process_map_, extension.id()));
+  DCHECK(extension_process_map_.contains(extension.id()));
 
   const std::set<raw_ptr<content::RenderProcessHost, SetExperimental>>&
       loaded_process_set = extension_process_map_[extension.id()];
@@ -481,6 +600,10 @@ mojom::Renderer* RendererStartupHelper::GetRenderer(
   if (it == process_mojo_map_.end()) {
     return nullptr;
   }
+
+  // The renderer for the initial WebUI process is not created.
+  CHECK(!ShouldDisableExtensionsForInitialWebUI(process));
+
   return it->second.get();
 }
 

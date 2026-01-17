@@ -12,25 +12,26 @@
 #import "ios/chrome/browser/orchestrator/ui_bundled/location_bar_animatee.h"
 #import "ios/chrome/browser/shared/public/commands/omnibox_commands.h"
 
-@class LayoutGuideCenter;
 @protocol ActivityServiceCommands;
-@protocol ApplicationCommands;
 @protocol BadgeViewVisibilityDelegate;
-@protocol IncognitoBadgeViewVisibilityDelegate;
 @protocol BrowserCoordinatorCommands;
 @protocol BWGCommands;
 @protocol ContextualPanelEntrypointVisibilityDelegate;
 @protocol FakeboxButtonsSnapshotProvider;
 @protocol HelpCommands;
+@protocol IncognitoBadgeViewVisibilityDelegate;
+@class LayoutGuideCenter;
 @protocol LensCommands;
 @protocol LensOverlayCommands;
-@protocol LocationBarOffsetProvider;
 @protocol LoadQueryCommands;
+@protocol LocationBarOffsetProvider;
+@class LocationBarViewController;
 @protocol PageActionMenuCommands;
 @protocol PageActionMenuEntryPointCommands;
-@protocol ReaderModeChipVisibilityDelegate;
-@protocol TextFieldViewContaining;
 class PrefService;
+@protocol ReaderModeChipVisibilityDelegate;
+@protocol SceneCommands;
+@protocol TextFieldViewContaining;
 namespace feature_engagement {
 class Tracker;
 }
@@ -71,6 +72,16 @@ class Tracker;
 // if it should currently be displayed.
 - (void)displayContextualPanelEntrypointView:(BOOL)display;
 
+// Handles AI Hub "New" badge being tapped in the location bar.
+- (void)locationBarDidTapAIHubNewBadge;
+
+// Decides if AI Hub new badge should show.
+- (BOOL)shouldShowAIHubNewFeatureBadge;
+
+// Edit state required `height` changed.
+- (void)locationBarViewController:(LocationBarViewController*)controller
+         didChangeEditStateHeight:(CGFloat)height;
+
 @end
 
 // The view controller displaying the location bar. Manages the two states of
@@ -90,12 +101,12 @@ class Tracker;
 
 // The dispatcher for the share button, voice search, and long press actions.
 @property(nonatomic, weak) id<ActivityServiceCommands,
-                              ApplicationCommands,
                               BrowserCoordinatorCommands,
                               LoadQueryCommands,
                               LensCommands,
                               LensOverlayCommands,
-                              OmniboxCommands>
+                              OmniboxCommands,
+                              SceneCommands>
     dispatcher;
 
 // Delegate for this location bar view controller.
@@ -210,6 +221,9 @@ class Tracker;
 
 // Moves the focus of VoiceOver to the steady view.
 - (void)focusSteadyViewForVoiceOver;
+
+// Creates a visual copy of the location bar steady view.
+- (UIView*)locationBarSteadyViewVisualCopy;
 
 @end
 

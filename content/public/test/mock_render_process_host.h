@@ -7,6 +7,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+
 #include <map>
 #include <memory>
 #include <set>
@@ -91,6 +92,9 @@ class MockRenderProcessHost : public RenderProcessHost {
   int VisibleClientCount() override;
   unsigned int GetFrameDepth() override;
   bool GetIntersectsViewport() override;
+#if !BUILDFLAG(IS_ANDROID)
+  bool IsForInitialWebUI() const override;
+#endif  // !BUILDFLAG(IS_ANDROID)
   bool IsForGuestsOnly() override;
   bool IsJitDisabled() override;
   bool AreV8OptimizationsDisabled() override;
@@ -136,14 +140,14 @@ class MockRenderProcessHost : public RenderProcessHost {
   bool HasPriorityOverride() override;
   void ClearPriorityOverride() override;
 #endif
-  void SetHasSpareRendererPriority(bool) override;
 #if BUILDFLAG(IS_ANDROID)
+  void GraduateSpareToNormalRendererPriority() override;
+  bool ShouldThrottleNavigationForSpareRendererGraduation() override;
   ChildProcessImportance GetEffectiveImportance() override;
   base::android::ChildBindingState GetEffectiveChildBindingState() override;
   void DumpProcessStack() override;
 #endif
   void SetSuddenTerminationAllowed(bool allowed) override;
-  bool SuddenTerminationAllowed() override;
   BrowserContext* GetBrowserContext() override;
   bool InSameStoragePartition(StoragePartition* partition) override;
   IPC::ChannelProxy* GetChannel() override;
@@ -191,10 +195,11 @@ class MockRenderProcessHost : public RenderProcessHost {
                       const ProcessLock& process_lock) override;
   ProcessLock GetProcessLock() const override;
   bool IsProcessLockedToSiteForTesting() override;
-  void DelayProcessShutdown(const base::TimeDelta& subframe_shutdown_timeout,
-                            const base::TimeDelta& unload_handler_timeout,
-                            const SiteInfo& site_info) override {}
-  void StopTrackingProcessForShutdownDelay() override {}
+  base::ScopedClosureRunner DelayProcessShutdown(
+      const base::TimeDelta& subframe_shutdown_timeout,
+      const base::TimeDelta& unload_handler_timeout,
+      const SiteInfo& site_info) override;
+  void StopTrackingProcessForShutdownDelay() override;
   void BindCacheStorage(
       const network::CrossOriginEmbedderPolicy&,
       mojo::PendingRemote<network::mojom::CrossOriginEmbedderPolicyReporter>,
@@ -264,10 +269,6 @@ class MockRenderProcessHost : public RenderProcessHost {
       const blink::StorageKey& storage_key,
       mojo::PendingReceiver<blink::mojom::NotificationService> receiver)
       override {}
-  void CreateWebSocketConnector(
-      const blink::StorageKey& storage_key,
-      mojo::PendingReceiver<blink::mojom::WebSocketConnector> receiver)
-      override {}
 #if BUILDFLAG(ALLOW_OOP_VIDEO_DECODER)
   void CreateOOPVideoDecoder(
       mojo::PendingReceiver<media::mojom::VideoDecoder> receiver) override {}
@@ -289,11 +290,9 @@ class MockRenderProcessHost : public RenderProcessHost {
   void ResumeSocketManagerForRenderFrameHost(
       const GlobalRenderFrameHostId& render_frame_host_id) override {}
 
-  // IPC::Sender via RenderProcessHost.
-  bool Send(IPC::Message* msg) override;
+  bool IsOnlyHostingPrerenderedFramesOrEmpty() override;
 
   // IPC::Listener via RenderProcessHost.
-  bool OnMessageReceived(const IPC::Message& msg) override;
   void OnChannelConnected(int32_t peer_pid) override;
 
   void set_priority(base::Process::Priority priority) { priority_ = priority; }
@@ -363,9 +362,9 @@ class MockRenderProcessHostFactory : public RenderProcessHostFactory {
 
   ~MockRenderProcessHostFactory() override;
 
-  RenderProcessHost* CreateRenderProcessHost(
-      BrowserContext* browser_context,
-      SiteInstance* site_instance) override;
+  // Builds MockRenderProcessHost and stores it in `processes_`.
+  RenderProcessHost* CreateRenderProcessHost(BrowserContext* browser_context,
+                                             SiteInstance* site_instance) final;
 
   // Removes the given MockRenderProcessHost from the MockRenderProcessHost
   // list.
@@ -376,7 +375,12 @@ class MockRenderProcessHostFactory : public RenderProcessHostFactory {
     return &processes_;
   }
 
- private:
+ protected:
+  // Builds MockRenderProcessHost.
+  virtual std::unique_ptr<MockRenderProcessHost> BuildRenderProcessHost(
+      BrowserContext* browser_context,
+      SiteInstance* site_instance);
+
   // A list of MockRenderProcessHosts created by this object. This list is used
   // for deleting all MockRenderProcessHosts that have not deleted by a test in
   // the destructor and prevent them from being leaked.

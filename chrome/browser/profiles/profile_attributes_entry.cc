@@ -13,7 +13,6 @@
 #include "base/notreached.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/app/vector_icons/vector_icons.h"
@@ -33,6 +32,7 @@
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/signin_constants.h"
 #include "components/signin/public/identity_manager/tribool.h"
+#include "components/sync/base/features.h"
 #include "google_apis/gaia/gaia_id.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/gfx/canvas.h"
@@ -213,8 +213,12 @@ void ProfileAttributesEntry::Initialize(ProfileAttributesStorage* storage,
   }
 
   if (signin_util::IsForceSigninEnabled()) {
-    if (!CanBeManaged())
+    if ((!base::FeatureList::IsEnabled(
+             syncer::kReplaceSyncPromosWithSignInPromos) ||
+         GetSigninState() == SigninState::kNotSignedIn) &&
+        !CanBeManaged()) {
       SetBool(kForceSigninProfileLockedKey, true);
+    }
   } else {
     // Reset the locked state to avoid a profile being locked after the force
     // signin policy has been disabled.
@@ -593,9 +597,9 @@ std::string ProfileAttributesEntry::GetHostedDomain() const {
 
 signin::Tribool ProfileAttributesEntry::GetIsManaged() const {
   static_assert(kIntegerNotSet ==
-                base::to_underlying(signin::Tribool::kUnknown));
-  static_assert(base::to_underlying(signin::Tribool::kFalse) == 0);
-  static_assert(base::to_underlying(signin::Tribool::kTrue) == 1);
+                std::to_underlying(signin::Tribool::kUnknown));
+  static_assert(std::to_underlying(signin::Tribool::kFalse) == 0);
+  static_assert(std::to_underlying(signin::Tribool::kTrue) == 1);
 
   int value = GetInteger(kIsManaged);
 
@@ -611,7 +615,7 @@ signin::Tribool ProfileAttributesEntry::GetIsManaged() const {
 
   // If the value is invalid, or is not a valid Tribool value, return unknown.
   if (value < kIntegerNotSet ||
-      value > base::to_underlying(signin::Tribool::kTrue)) {
+      value > std::to_underlying(signin::Tribool::kTrue)) {
     return signin::Tribool::kUnknown;
   }
   return static_cast<signin::Tribool>(value);
@@ -855,7 +859,7 @@ void ProfileAttributesEntry::SetHostedDomain(std::string hosted_domain) {
 }
 
 void ProfileAttributesEntry::SetIsManaged(signin::Tribool value) {
-  if (SetInteger(kIsManaged, base::to_underlying(value))) {
+  if (SetInteger(kIsManaged, std::to_underlying(value))) {
     profile_attributes_storage_->NotifyProfileIsManagedChanged(GetPath());
   }
 }

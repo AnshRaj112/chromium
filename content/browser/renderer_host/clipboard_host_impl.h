@@ -5,7 +5,6 @@
 #ifndef CONTENT_BROWSER_RENDERER_HOST_CLIPBOARD_HOST_IMPL_H_
 #define CONTENT_BROWSER_RENDERER_HOST_CLIPBOARD_HOST_IMPL_H_
 
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -21,7 +20,6 @@
 #include "content/public/browser/clipboard_types.h"
 #include "content/public/browser/document_service.h"
 #include "mojo/public/cpp/base/big_buffer.h"
-#include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "third_party/blink/public/mojom/clipboard/clipboard.mojom.h"
 #include "ui/base/clipboard/clipboard.h"
@@ -36,19 +34,6 @@ class ScopedClipboardWriter;
 namespace content {
 
 class ClipboardHostImplTest;
-
-// Returns a representation of the last source ClipboardEndpoint. This will
-// either match the last clipboard write if there is an RFH token in the
-// clipboard, or an endpoint built from `Clipboard::GetSource()` called with
-// `clipboard_buffer` otherwise.
-//
-// //content maintains additional metadata on top of what the //ui layer already
-// tracks about clipboard data's source, e.g. the WebContents that provided the
-// data. This function allows retrieving both the //ui metadata and the
-// //content metadata in a single call.
-CONTENT_EXPORT ClipboardEndpoint
-GetSourceClipboardEndpoint(const ui::DataTransferEndpoint* data_dst,
-                           ui::ClipboardBuffer clipboard_buffer);
 
 class CONTENT_EXPORT ClipboardHostImpl
     : public DocumentService<blink::mojom::ClipboardHost>,
@@ -163,6 +148,11 @@ class CONTENT_EXPORT ClipboardHostImpl
       GetPlatformPermissionStateCallback callback) override;
 #endif
 
+  std::vector<std::u16string> ReadAvailableTypesImpl(
+      ui::ClipboardBuffer clipboard_buffer);
+
+  absl::uint128 GetSequenceNumberImpl(ui::ClipboardBuffer clipboard_buffer);
+
   // Checks if the renderer allows pasting.  This check is skipped if called
   // soon after a successful content allowed request.
   bool IsRendererPasteAllowed(ui::ClipboardBuffer clipboard_buffer,
@@ -231,6 +221,8 @@ class CONTENT_EXPORT ClipboardHostImpl
 
   // Tracks whether this instance is currently observing clipboard changes.
   bool listening_to_clipboard_ = false;
+
+  std::optional<absl::uint128> last_change_id_;
 
   // Single clipboard listener that will be notified on clipboard changes
   mojo::Remote<blink::mojom::ClipboardListener> clipboard_listener_;

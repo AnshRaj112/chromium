@@ -11,15 +11,6 @@
 
 namespace media {
 
-namespace {
-
-bool KeyIsValidSize(const std::vector<uint8_t>& key) {
-  // HLS allows 128- and 256-bit keys, but not 192-bit.
-  return key.size() == 16 || key.size() == 32;
-}
-
-}  // namespace
-
 constexpr base::TimeDelta kBufferDuration = base::Seconds(10);
 
 HlsRenditionImpl::~HlsRenditionImpl() {
@@ -100,14 +91,9 @@ void HlsRenditionImpl::CheckState(
       return;
     }
 
-    // This will require a new manifest fetch. Clear the queue first, and tell
-    // it what the new start timestamp should be. Then we request a seek to
-    // the new start timestamp, which will take place after we fetch the
-    // updated manifest.
-    segments_->ResetExpectingFutureManifest(pause_duration + media_time);
-    engine_host_->RequestSeek(pause_duration + media_time +
-                              segments_->GetMaxDuration());
-    FetchManifestUpdates(std::move(time_remaining_cb), base::Seconds(0));
+    ResumeLivePlayback(
+        pause_duration + media_time + segments_->GetMaxDuration(),
+        base::BindOnce(std::move(time_remaining_cb), kNoTimestamp));
     return;
   }
 
@@ -144,53 +130,108 @@ void HlsRenditionImpl::CheckState(
     return;
   }
 
-  // If media time comes before the last loaded range, then a seek probably
-  // failed, and we should raise an error.
-  if (std::get<0>(ranges.back()) > media_time) {
-    HlsDemuxerStatus error = HlsDemuxerStatus::Codes::kInvalidLoadedRanges;
-    rendition_host_->Quit(std::move(error)
-                              .WithData("timestamp", media_time)
-                              .WithData("range_start", ranges.back().first)
-                              .WithData("range_end", ranges.back().second));
+  if (ranges.contains(0, media_time)) {
+    auto end_of_range_ts = ranges.end(0);
+    auto end_of_buffer_ts = std::get<1>(ranges.back());
+    auto ideal_buffer_duration = GetIdealBufferSize();
+    auto denominator_rate = playback_rate ? playback_rate : 1.0;
+    auto range_duration = (end_of_range_ts - media_time) / denominator_rate;
+    auto buffer_duration = (end_of_buffer_ts - media_time) / denominator_rate;
+
+    // Regardless of the gaps ahead, we just don't have enough data at all, and
+    // we need more.
+    if (buffer_duration < ideal_buffer_duration) {
+      TryFillingBuffers(std::move(time_remaining_cb), media_time);
+      return;
+    }
+
+    // If there are gaps in the loaded content, we might have to issue a seek
+    // really soon to skip them. We want to do this after `media_time` has
+    // run into that gap in order to calculate the best seek offset, so we issue
+    // a delay here for as much time as is needed to hit the end of this
+    // particular range.
+    if (range_duration < ideal_buffer_duration) {
+      // wait to check state again when `media_time` is at the gap coming up.
+      std::move(time_remaining_cb).Run(range_duration);
+      return;
+    }
+
+    // Why do today what can be put off until tomorrow? Handle the gap later.
+    // Our buffers are in good shape. This is a good chance to clear out old
+    // data and then, for live content, see if the manifest is in need of an
+    // update. We then want to delay until the buffer is ~halfway full.
+    ClearOldSegments(media_time);
+    auto delay_time = range_duration - (ideal_buffer_duration / 2);
+
+    if (IsLive()) {
+      MaybeFetchManifestUpdates(std::move(time_remaining_cb), delay_time);
+      return;
+    }
+    std::move(time_remaining_cb).Run(delay_time);
     return;
   }
 
-  auto end_of_buffer_ts = std::get<1>(ranges.back());
+  constexpr base::TimeDelta kMinimumSpottyBufferSeek = base::Milliseconds(17);
+  constexpr base::TimeDelta kMaximumGapSkipDistance = base::Seconds(2);
+  // When `media_time` is after the first buffer, it's because of a gap in
+  // playback. The criteria for finding a seek spot are as follows:
+  // 1) it must be within `kMaximumGapSkipDistance` of the end of buffer #1.
+  // 2) it must be in a range having a duration >= kMinimumSpottyBufferSeek
+  // 3) it must be the first range meeting these criteria
+  if (media_time > ranges.end(0)) {
+    for (size_t i = 1; i < ranges.size(); i++) {
+      auto distance = ranges.start(i) - ranges.end(0);
+      if (distance > kMaximumGapSkipDistance) {
+        HlsDemuxerStatus error = {
+            HlsDemuxerStatus::Codes::kInvalidLoadedRanges,
+            "Unable to seek past gap in buffered ranges - gap too large"};
+        rendition_host_->Quit(std::move(error)
+                                  .WithData("media_time", media_time)
+                                  .WithData("ranges", ranges));
+        return;
+      }
 
-  // We need data ASAP, because the media time is outside the loaded ranges
-  // due to a seek.
-  if (media_time > end_of_buffer_ts) {
+      auto duration = ranges.end(i) - ranges.start(i);
+      if (duration > kMinimumSpottyBufferSeek) {
+        // Respond with a notice to not keep checking state. We will clear data
+        // and request a seek to the start of the new range found.
+        engine_host_->Remove(role_, base::TimeDelta(), ranges.end(i - 1));
+        ranges = engine_host_->GetBufferedRanges(role_);
+        if (ranges.empty()) {
+          rendition_host_->Quit({HlsDemuxerStatus::Codes::kInvalidLoadedRanges,
+                                 "Unloading disjoint buffered ranges failed"});
+          return;
+        }
+
+        engine_host_->RequestSeek(ranges.start(0));
+        std::move(time_remaining_cb).Run(kNoTimestamp);
+        return;
+      }
+    }
+
+    // There was no loaded range that starts more than `kMaximumGapSkipDistance`
+    // into the future, which means we're simultaneously in a state where there
+    // is a gap but also where we desperately need more data. If we fill the
+    // buffers more, the engine will re-check state immediately and we can
+    // hopefully find a buffer to seek into.
     TryFillingBuffers(std::move(time_remaining_cb), media_time);
     return;
   }
 
-  // Paused content should just pretend that it will be resumed at 1x playback
-  // speed, because that is by far the most common.
-  auto denominator_rate = playback_rate ? playback_rate : 1.0;
-  auto buffer_duration = (end_of_buffer_ts - media_time) / denominator_rate;
-  auto ideal_buffer_duration = GetIdealBufferSize();
-
-  if (buffer_duration < ideal_buffer_duration) {
-    // There is a buffer, but it's not as big as we would like it to be.
-    TryFillingBuffers(std::move(time_remaining_cb), media_time);
+  // If media time is before the first range, we might be able to seek to it
+  // if it's close enough.
+  if (ranges.start(0) - media_time < kMaximumGapSkipDistance) {
+    engine_host_->RequestSeek(ranges.start(0));
+    std::move(time_remaining_cb).Run(kNoTimestamp);
     return;
   }
 
-  // Our buffers are in good shape. This is a good chance to clear out old
-  // data and then, for live content, see if the manifest is in need of an
-  // update.
-  ClearOldSegments(media_time);
-
-  // We want to delay until the buffer is ~halfway full.
-  auto delay_time = buffer_duration - (ideal_buffer_duration / 2);
-
-  if (IsLive()) {
-    // Use this time to consider updating the manifest.
-    MaybeFetchManifestUpdates(std::move(time_remaining_cb), delay_time);
-    return;
-  }
-
-  std::move(time_remaining_cb).Run(delay_time);
+  // The only loaded range is far into the future, which is a weird place to
+  // be, and we don't have any way to recover from it.
+  HlsDemuxerStatus error = HlsDemuxerStatus::Codes::kInvalidLoadedRanges;
+  rendition_host_->Quit(std::move(error)
+                            .WithData("media_time", media_time)
+                            .WithData("ranges", ranges));
 }
 
 void HlsRenditionImpl::TryFillingBuffers(ManifestDemuxer::DelayCallback delay,
@@ -217,8 +258,6 @@ void HlsRenditionImpl::FetchManifestUpdates(ManifestDemuxer::DelayCallback cb,
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   CHECK(!is_stopped_for_shutdown_);
   last_download_time_ = base::TimeTicks::Now();
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN1("media", "HLS::FetchManifestUpdates", this,
-                                    "uri", media_playlist_uri_);
   rendition_host_->UpdateRenditionManifestUri(
       role_, media_playlist_uri_,
       base::BindOnce(&HlsRenditionImpl::OnManifestUpdate,
@@ -228,7 +267,6 @@ void HlsRenditionImpl::FetchManifestUpdates(ManifestDemuxer::DelayCallback cb,
 void HlsRenditionImpl::OnManifestUpdate(ManifestDemuxer::DelayCallback cb,
                                         base::TimeDelta delay,
                                         HlsDemuxerStatus success) {
-  TRACE_EVENT_NESTABLE_ASYNC_END0("media", "HLS::FetchManifestUpdates", this);
   auto update_duration = base::TimeTicks::Now() - last_download_time_;
   if (update_duration > delay) {
     std::move(cb).Run(base::Seconds(0));
@@ -312,6 +350,47 @@ ManifestDemuxer::SeekResponse HlsRenditionImpl::Seek(
   return ManifestDemuxer::SeekState::kNeedsData;
 }
 
+void HlsRenditionImpl::ResumeLivePlayback(base::TimeDelta estimated_resume,
+                                          base::OnceClosure done) {
+  // The estimated resume might not be totally correct, because live content
+  // doesn't always sync up with real-time (drops and speedups). So we want to
+  // clear the old manifest, grab a new one, fetch the first segment, and then
+  // seek to the start of the loaded ranges that we have.
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  segments_->ResetExpectingFutureManifest(estimated_resume);
+  engine_host_->Remove(role_, base::TimeDelta(), estimated_resume);
+  FetchManifestUpdates(
+      base::BindOnce(&HlsRenditionImpl::ManifestUpdateForLiveResume,
+                     weak_factory_.GetWeakPtr(), std::move(done)),
+      base::Seconds(0));
+}
+
+void HlsRenditionImpl::ManifestUpdateForLiveResume(base::OnceClosure done,
+                                                   base::TimeDelta) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (segments_->Exhausted()) {
+    rendition_host_->Quit(HlsDemuxerStatus::Codes::kNoDataEverAppended);
+    std::move(done).Run();
+    return;
+  }
+  FetchNext(base::BindOnce(&HlsRenditionImpl::FirstSegmentFetchedForLiveResume,
+                           weak_factory_.GetWeakPtr(), std::move(done)),
+            std::nullopt);
+}
+
+void HlsRenditionImpl::FirstSegmentFetchedForLiveResume(
+    base::OnceClosure done) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  auto ranges = engine_host_->GetBufferedRanges(role_);
+  if (ranges.size() == 0) {
+    rendition_host_->Quit(HlsDemuxerStatus::Codes::kNoDataEverAppended);
+    std::move(done).Run();
+    return;
+  }
+  engine_host_->RequestSeek(ranges.start(0));
+  std::move(done).Run();
+}
+
 void HlsRenditionImpl::StartWaitingForSeek() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 }
@@ -356,7 +435,8 @@ base::TimeDelta HlsRenditionImpl::ClearOldSegments(base::TimeDelta media_time) {
   return base::TimeTicks::Now() - removal_start;
 }
 
-void HlsRenditionImpl::FetchNext(base::OnceClosure cb, base::TimeDelta time) {
+void HlsRenditionImpl::FetchNext(base::OnceClosure cb,
+                                 std::optional<base::TimeDelta> time) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   CHECK(!is_stopped_for_shutdown_);
   CHECK(!segments_->Exhausted());
@@ -364,17 +444,24 @@ void HlsRenditionImpl::FetchNext(base::OnceClosure cb, base::TimeDelta time) {
   scoped_refptr<hls::MediaSegment> segment;
   base::TimeDelta segment_start;
   base::TimeDelta segment_end;
-  std::tie(segment, segment_start, segment_end) = segments_->GetNextSegment();
+  bool needs_init = false;
+  std::tie(segment, segment_start, segment_end, needs_init) =
+      segments_->GetNextSegment();
+
+  if (segment->IsGap()) {
+    TryFillingBuffers(
+        base::BindOnce(
+            [](base::OnceClosure cb, base::TimeDelta) { std::move(cb).Run(); },
+            std::move(cb)),
+        time.value_or(base::Seconds(0)));
+    return;
+  }
 
   // If this segment has a different init segment than the segment before it,
   // we need to include the init segment before we fetch. Alternatively, if
   // we've seeked somewhere and flushed old data, we'll need the init segment
   // again.
-  bool include_init = requires_init_segment_ || segment->HasNewInitSegment();
-
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN2("media", "HLS::FetchSegment", this, "start",
-                                    segment_start, "include init",
-                                    include_init);
+  bool include_init = requires_init_segment_ || needs_init;
 
   bool is_fetching_new_key = false;
   if (auto enc = segment->GetEncryptionData()) {
@@ -389,15 +476,15 @@ void HlsRenditionImpl::FetchNext(base::OnceClosure cb, base::TimeDelta time) {
                      segment_end, base::TimeTicks::Now(), is_fetching_new_key));
 }
 
-void HlsRenditionImpl::OnSegmentData(scoped_refptr<hls::MediaSegment> segment,
-                                     base::OnceClosure cb,
-                                     base::TimeDelta required_time,
-                                     base::TimeDelta parse_end,
-                                     base::TimeTicks net_req_start,
-                                     bool fetched_new_key,
-                                     HlsDataSourceProvider::ReadResult result) {
+void HlsRenditionImpl::OnSegmentData(
+    scoped_refptr<hls::MediaSegment> segment,
+    base::OnceClosure cb,
+    std::optional<base::TimeDelta> required_time,
+    base::TimeDelta parse_end,
+    base::TimeTicks net_req_start,
+    bool fetched_new_key,
+    HlsDataSourceProvider::ReadResult result) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  TRACE_EVENT_NESTABLE_ASYNC_END0("media", "HLS::FetchSegment", this);
   if (is_stopped_for_shutdown_) {
     std::move(cb).Run();
     return;
@@ -415,75 +502,24 @@ void HlsRenditionImpl::OnSegmentData(scoped_refptr<hls::MediaSegment> segment,
   std::unique_ptr<HlsDataSourceStream> stream = std::move(result).value();
   DCHECK(!stream->CanReadMore());
 
-  // This plaintext vector needs to be declared in the same scope as the
-  // `AppendAndParseData` call, as it will be the memory backing for the span
-  // which that function consumes. Declaring it elsewhere would lead to a
-  // potential use-after-free or stack smash.
-  std::vector<uint8_t> plaintext;
-  base::span<const uint8_t> stream_data = stream->data();
-
-  if (auto enc_data = segment->GetEncryptionData()) {
-    switch (enc_data->GetMethod()) {
-      case hls::XKeyTagMethod::kAES128:
-      case hls::XKeyTagMethod::kAES256: {
-        if (key_.empty() || !segment->HasNewEncryptionData() ||
-            fetched_new_key) {
-          // Hold on to the segment - this is likely the last reference to it,
-          // and it contains our aes key.
-          segment_with_key_ = segment;
-
-          auto maybe_iv = enc_data->GetIVStr(segment->GetMediaSequenceNumber());
-          if (!maybe_iv.has_value()) {
-            // TODO: if no key is present in enc_data, it seems like
-            // kInsufficientCryptoMetadata is a better error code than
-            // kFailedToDecryptSegment. Maybe the check for maybe_key below
-            // should be moved to this block?
-            rendition_host_->Quit(
-                HlsDemuxerStatus::Codes::kInsufficientCryptoMetadata);
-            return;
-          }
-
-          auto key = enc_data->GetKey();
-          if (maybe_iv->size() != std::size(iv_) || !KeyIsValidSize(key)) {
-            rendition_host_->Quit(
-                HlsDemuxerStatus::Codes::kFailedToDecryptSegment);
-            return;
-          }
-
-          base::span(iv_).copy_from(base::as_byte_span(*maybe_iv));
-          key_ = key;
-        }
-
-        // Decrypt the ciphertext, and re-assign the data span to point to the
-        // cleartext memory in `plaintext`.
-        auto maybe_plaintext = crypto::aes_cbc::Decrypt(key_, iv_, stream_data);
-        if (!maybe_plaintext) {
-          rendition_host_->Quit(
-              HlsDemuxerStatus::Codes::kFailedToDecryptSegment);
-          return;
-        }
-
-        plaintext = std::move(maybe_plaintext).value();
-        stream_data = plaintext;
-        if (plaintext.size() == 0) {
-          FetchNext(std::move(cb), required_time);
-          return;
-        }
-        break;
-      }
-      default:
-        break;
-    }
+  std::vector<uint8_t> mem;
+  base::span<const uint8_t> stream_data;
+  if (!segment->GetPlaintextStreamSource(stream->data(), &stream_data, &mem)) {
+    rendition_host_->Quit(HlsDemuxerStatus::Codes::kFailedToDecryptSegment);
+    return;
+  }
+  if (!stream_data.size() && stream->data().size()) {
+    FetchNext(std::move(cb), required_time);
+    return;
   }
 
   if (last_discontinuity_sequence_num_.value_or(
           segment->GetDiscontinuitySequenceNumber()) !=
       segment->GetDiscontinuitySequenceNumber()) {
-    engine_host_->ResetParserState(role_, parse_end + base::Seconds(1),
-                                   &parse_offset_);
+    engine_host_->ResetParserState(role_, kInfiniteDuration, &parse_offset_);
   }
 
-  if (!engine_host_->AppendAndParseData(role_, parse_end + base::Seconds(1),
+  if (!engine_host_->AppendAndParseData(role_, kInfiniteDuration,
                                         &parse_offset_, stream_data)) {
     rendition_host_->Quit(HlsDemuxerStatus::Codes::kCouldNotAppendData);
     return;
@@ -507,9 +543,13 @@ void HlsRenditionImpl::OnSegmentData(scoped_refptr<hls::MediaSegment> segment,
   auto ranges = engine_host_->GetBufferedRanges(role_);
   media_log_->SetProperty<MediaLogProperty::kHlsBufferedRanges>(ranges);
 
-  if (ranges.size() && ranges.contains(ranges.size() - 1, required_time)) {
-    std::move(cb).Run();
-    return;
+  if (ranges.size()) {
+    if (!required_time.has_value() ||
+        (*required_time >= ranges.start(0) &&
+         *required_time <= std::get<1>(ranges.back()))) {
+      std::move(cb).Run();
+      return;
+    }
   }
 
   // If the last range doesn't contain the timestamp, keep parsing until it

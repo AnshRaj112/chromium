@@ -6,14 +6,15 @@ package org.chromium.chrome.browser.multiwindow;
 
 import android.app.Activity;
 
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.chrome.browser.app.tabmodel.TabModelOrchestrator;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.components.browser_ui.desktop_windowing.DesktopWindowStateManager;
 import org.chromium.components.browser_ui.widget.MenuOrKeyboardActionController;
 import org.chromium.ui.modaldialog.ModalDialogManager;
+
+import java.util.function.Supplier;
 
 /** Creates {@link MultiInstanceManager}. */
 @NullMarked
@@ -38,10 +39,10 @@ public class MultiInstanceManagerFactory {
      */
     public static MultiInstanceManager create(
             Activity activity,
-            ObservableSupplier<TabModelOrchestrator> tabModelOrchestratorSupplier,
+            MonotonicObservableSupplier<TabModelOrchestrator> tabModelOrchestratorSupplier,
             MultiWindowModeStateDispatcher multiWindowModeStateDispatcher,
             ActivityLifecycleDispatcher activityLifecycleDispatcher,
-            ObservableSupplier<ModalDialogManager> modalDialogManagerSupplier,
+            MonotonicObservableSupplier<ModalDialogManager> modalDialogManagerSupplier,
             MenuOrKeyboardActionController menuOrKeyboardActionController,
             Supplier<DesktopWindowStateManager> desktopWindowStateManagerSupplier) {
         if (MultiWindowUtils.isMultiInstanceApi31Enabled()) {

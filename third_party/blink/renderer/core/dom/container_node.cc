@@ -66,6 +66,7 @@
 #include "third_party/blink/renderer/core/html/html_dialog_element.h"
 #include "third_party/blink/renderer/core/html/html_document.h"
 #include "third_party/blink/renderer/core/html/html_frame_owner_element.h"
+#include "third_party/blink/renderer/core/html/html_stream.h"
 #include "third_party/blink/renderer/core/html/html_tag_collection.h"
 #include "third_party/blink/renderer/core/html/html_template_element.h"
 #include "third_party/blink/renderer/core/inspector/console_message.h"
@@ -74,7 +75,6 @@
 #include "third_party/blink/renderer/core/layout/layout_inline.h"
 #include "third_party/blink/renderer/core/layout/layout_text.h"
 #include "third_party/blink/renderer/core/layout/layout_text_combine.h"
-#include "third_party/blink/renderer/core/patching/patch_supplement.h"
 #include "third_party/blink/renderer/core/probe/core_probes.h"
 #include "third_party/blink/renderer/core/timing/soft_navigation_heuristics.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
@@ -184,6 +184,17 @@ void ContainerNode::ParserTakeAllChildrenFrom(ContainerNode& old_parent) {
     // infinite.
     old_parent.ParserRemoveChild(*child);
     ParserAppendChild(child);
+  }
+}
+
+void ContainerNode::ParserReplaceChild(Node& new_child, Node& old_child) {
+  CHECK_EQ(old_child.parentNode(), this);
+  Node* next = old_child.nextSibling();
+  ParserRemoveChild(old_child);
+  if (next) {
+    ParserInsertBefore(&new_child, *next);
+  } else {
+    ParserAppendChild(&new_child);
   }
 }
 
@@ -370,10 +381,20 @@ void ContainerNode::InsertNodeVector(
       Node& child = *target_node;
       mutator(*this, child, next);
       ChildListMutationScope(*this).ChildAdded(child);
-      if (GetDocument().MayContainShadowRoots())
-        child.CheckSlotChangeAfterInserted();
-      probe::DidInsertDOMNode(&child);
-      NotifyNodeInsertedInternal(child, post_insertion_notification_targets);
+      if (RuntimeEnabledFeatures::
+              SendSlotChangeSignalAfterNodeInsertedEnabled()) {
+        probe::DidInsertDOMNode(&child);
+        NotifyNodeInsertedInternal(child, post_insertion_notification_targets);
+        if (GetDocument().MayContainShadowRoots()) {
+          child.CheckSlotChangeAfterInserted();
+        }
+      } else {
+        if (GetDocument().MayContainShadowRoots()) {
+          child.CheckSlotChangeAfterInserted();
+        }
+        probe::DidInsertDOMNode(&child);
+        NotifyNodeInsertedInternal(child, post_insertion_notification_targets);
+      }
     }
   }
 }
@@ -537,19 +558,26 @@ void ContainerNode::InsertBeforeCommon(Node& next_child, Node& new_child) {
   DCHECK(!new_child.HasPreviousSibling());
   DCHECK(!new_child.IsShadowRoot());
 
+  Node* last_child = lastChild();
+
   Node* prev = next_child.previousSibling();
-  DCHECK_NE(last_child_, prev);
+  DCHECK_NE(lastChild(), prev);
   next_child.SetPreviousSibling(&new_child);
   if (prev) {
     DCHECK_NE(firstChild(), next_child);
     DCHECK_EQ(prev->nextSibling(), next_child);
     prev->SetNextSibling(&new_child);
+    new_child.SetPreviousSibling(prev);
   } else {
     DCHECK(firstChild() == next_child);
     SetFirstChild(&new_child);
+
+    // lastChild() is always stored in the firstChild()'s previous pointer,
+    // and now firstChild() has changed, so update the storage.
+    SetLastChild(last_child);
+    new_child.SetPreviousSibling(last_child);
   }
   new_child.SetParentNode(this);
-  new_child.SetPreviousSibling(prev);
   new_child.SetNextSibling(&next_child);
 }
 
@@ -560,9 +588,9 @@ void ContainerNode::AppendChildCommon(Node& child) {
   DCHECK(ScriptForbiddenScope::IsScriptForbidden());
 
   child.SetParentNode(this);
-  if (last_child_) {
-    child.SetPreviousSibling(last_child_);
-    last_child_->SetNextSibling(&child);
+  if (lastChild()) {
+    child.SetPreviousSibling(lastChild());
+    lastChild()->SetNextSibling(&child);
   } else {
     SetFirstChild(&child);
   }
@@ -879,7 +907,6 @@ bool ContainerNode::IsReadingFlowContainer() const {
 
 void ContainerNode::Trace(Visitor* visitor) const {
   visitor->Trace(first_child_);
-  visitor->Trace(last_child_);
   Node::Trace(visitor);
 }
 
@@ -1010,8 +1037,9 @@ void ContainerNode::RemoveBetween(Node* previous_child,
     previous_child->SetNextSibling(next_child);
   if (first_child_ == &old_child)
     SetFirstChild(next_child);
-  if (last_child_ == &old_child)
+  if (lastChild() == &old_child) {
     SetLastChild(previous_child);
+  }
 
   old_child.SetPreviousSibling(nullptr);
   old_child.SetNextSibling(nullptr);
@@ -1454,10 +1482,11 @@ bool ContainerNode::ChildrenChangedAllChildrenRemovedNeedsList() const {
 }
 
 void ContainerNode::CloneChildNodesFrom(const ContainerNode& node,
-                                        NodeCloningData& data) {
+                                        NodeCloningData& data,
+                                        CustomElementRegistry* registry) {
   CHECK(data.Has(CloneOption::kIncludeDescendants));
   for (const Node& child : NodeTraversal::ChildrenOf(node)) {
-    child.Clone(GetDocument(), data, this);
+    child.Clone(GetDocument(), data, this, registry);
   }
 }
 
@@ -1889,14 +1918,21 @@ String ContainerNode::getHTML(const GetHTMLOptions* options,
                       shadow_root_inclusion);
 }
 
-WritableStream* ContainerNode::patchSelf(ScriptState* script_state) {
-  return PatchSupplement::From(GetDocument())
-      ->CreateSinglePatchStream(script_state, *this);
+WritableStream* ContainerNode::streamAppendHTMLUnsafe(
+    ScriptState* script_state,
+    ExceptionState& exception_state) {
+  return HTMLStream::Create(script_state, this, exception_state);
 }
 
-WritableStream* ContainerNode::patchAll(ScriptState* script_state) {
-  return PatchSupplement::From(GetDocument())
-      ->CreateSubtreePatchStream(script_state, *this);
+WritableStream* ContainerNode::streamHTMLUnsafe(
+    ScriptState* script_state,
+    ExceptionState& exception_state) {
+  WritableStream* stream =
+      HTMLStream::Create(script_state, this, exception_state);
+  if (!exception_state.HadException()) {
+    RemoveChildren();
+  }
+  return stream;
 }
 
 }  // namespace blink

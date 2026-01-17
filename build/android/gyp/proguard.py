@@ -49,7 +49,9 @@ _IGNORE_WARNINGS = (
         # https://crbug.com/1441226
         r'PaymentRequest[BH]',
         # This service is defined in Native not Java.
-        r'NativeServiceSandboxedProcessService',
+        r'NativeOnlySandboxedProcessService',
+        # TODO(450243304): Temporary.
+        r'DnsNameResolverProvider',
     ]) + ')',
     # We enforce that this class is removed via -checkdiscard.
     r'FastServiceLoader\.class:.*Could not inline ServiceLoader\.load',
@@ -61,6 +63,9 @@ _IGNORE_WARNINGS = (
     # TODO(b/404818708): androidx.appsearch code is referencing classes in the
     # Android B sdk thus we must ignore these warnings until after the sdk roll.
     r'Missing class .* androidx.appsearch.platformstorage.converter.*\$ApiHelperForB',
+    # This class is only in SDK 36.1. Until we are updated to or past that
+    # version, R8 will complain of AndroidX's usage of this.
+    r'Missing class android.graphics.pdf.component.*',
     # Ignore MethodParameter attribute count isn't matching in espresso.
     # This is a banner warning and each individual file affected will have
     # its own warning.
@@ -80,6 +85,8 @@ _IGNORE_WARNINGS = (
     # so safe to ignore. b/431248021
     r'.*AndroidComposeUiTestEnvironment.*',
     r'.*ComposeUiTest.*',
+    # We don't use this, so safe to ignore. crbug.com/453685303
+    r'.*AndroidComposeTestRule.*',
 )
 
 _BLOCKLISTED_EXPECTATION_PATHS = [
@@ -104,17 +111,15 @@ def _ParseOptions():
                       ' those --feature-jars.')
   parser.add_argument('--output-path', help='Path to the generated .jar file.')
   parser.add_argument('--tracerefs-json-out')
-  parser.add_argument(
-      '--proguard-configs',
-      action='append',
-      required=True,
-      help='GN-list of configuration files.')
-  parser.add_argument(
-      '--apply-mapping', help='Path to ProGuard mapping to apply.')
-  parser.add_argument(
-      '--mapping-output',
-      required=True,
-      help='Path for ProGuard to output mapping file to.')
+  parser.add_argument('--proguard-configs',
+                      action='append',
+                      required=True,
+                      help='GN-list of configuration files.')
+  parser.add_argument('--apply-mapping',
+                      help='Path to ProGuard mapping to apply.')
+  parser.add_argument('--mapping-output',
+                      required=True,
+                      help='Path for ProGuard to output mapping file to.')
   parser.add_argument(
       '--extra-mapping-output-paths',
       help='GN-list of additional paths to copy output mapping file to.')
@@ -129,13 +134,15 @@ def _ParseOptions():
   parser.add_argument('--main-dex-rules-path',
                       action='append',
                       help='Path to main dex rules for multidex.')
-  parser.add_argument(
-      '--min-api', help='Minimum Android API level compatibility.')
+  parser.add_argument('--min-api',
+                      help='Minimum Android API level compatibility.')
   parser.add_argument('--enable-obfuscation',
                       action='store_true',
                       help='Minify symbol names')
-  parser.add_argument(
-      '--verbose', '-v', action='store_true', help='Print all ProGuard output')
+  parser.add_argument('--verbose',
+                      '-v',
+                      action='store_true',
+                      help='Print all ProGuard output')
   parser.add_argument('--repackage-classes',
                       default='',
                       help='Value for -repackageclasses.')
@@ -145,10 +152,9 @@ def _ParseOptions():
   parser.add_argument('--source-file', help='Value for source file attribute.')
   parser.add_argument('--package-name',
                       help='Goes into a comment in the mapping file.')
-  parser.add_argument(
-      '--force-enable-assertions',
-      action='store_true',
-      help='Forcefully enable javac generated assertion code.')
+  parser.add_argument('--force-enable-assertions',
+                      action='store_true',
+                      help='Forcefully enable javac generated assertion code.')
   parser.add_argument('--assertion-handler',
                       help='The class name of the assertion handler class.')
   parser.add_argument(
@@ -160,11 +166,10 @@ def _ParseOptions():
       action='append',
       dest='dex_dests',
       help='Destination for dex file of the corresponding feature.')
-  parser.add_argument(
-      '--feature-name',
-      action='append',
-      dest='feature_names',
-      help='The name of the feature module.')
+  parser.add_argument('--feature-name',
+                      action='append',
+                      dest='feature_names',
+                      help='The name of the feature module.')
   parser.add_argument(
       '--uses-split',
       action='append',
@@ -274,6 +279,7 @@ def _ParseOptions():
 
 
 class _SplitContext:
+
   def __init__(self, name, output_path, input_jars, work_dir, parent_name=None):
     self.name = name
     self.parent_name = parent_name
@@ -393,6 +399,7 @@ def _OptimizeWithR8(options, config_paths, libraries, dynamic_config_data):
 
     if options.disable_checks:
       cmd += ['--map-diagnostics:CheckDiscardDiagnostic', 'error', 'none']
+      cmd += ['--map-diagnostics:CheckEnumUnboxedDiagnostic', 'error', 'none']
     # Triggered by rules from deps we cannot control.
     cmd += [('--map-diagnostics:EmptyMemberRulesToDefaultInitRuleConversion'
              'Diagnostic'), 'warning', 'none']
@@ -532,7 +539,6 @@ def _CombineConfigs(configs,
 
   for path, contents in sorted(embedded_configs.items()):
     ret.extend(format_config_contents(path, contents))
-
 
   if dynamic_config_data:
     ret.append('# File: //build/android/gyp/proguard.py (generated rules)')

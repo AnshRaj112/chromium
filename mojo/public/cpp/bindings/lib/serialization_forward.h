@@ -32,13 +32,15 @@ struct Serializer;
 
 template <typename MojomType, typename InputUserType, typename... Args>
 void Serialize(InputUserType&& input, Args&&... args) {
-  if constexpr (IsAbslOptional<InputUserType>::value) {
-    if (!input)
+  if constexpr (IsStdOptional<InputUserType>::value) {
+    if (!input) {
       return;
+    }
     Serialize<MojomType>(*input, std::forward<Args>(args)...);
   } else if constexpr (IsOptionalAsPointer<InputUserType>::value) {
-    if (!input.has_value())
+    if (!input.has_value()) {
       return;
+    }
     Serialize<MojomType>(input.value(), std::forward<Args>(args)...);
   } else {
     Serializer<MojomType, std::remove_reference_t<InputUserType>>::Serialize(
@@ -51,7 +53,7 @@ template <typename MojomType,
           typename InputUserType,
           typename... Args>
 bool Deserialize(DataType&& input, InputUserType* output, Args&&... args) {
-  if constexpr (IsAbslOptional<InputUserType>::value) {
+  if constexpr (IsStdOptional<InputUserType>::value) {
     if (!input) {
       *output = std::nullopt;
       return true;

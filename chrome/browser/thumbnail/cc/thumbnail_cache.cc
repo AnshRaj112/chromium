@@ -13,12 +13,10 @@
 #include "base/android/path_utils.h"
 #include "base/big_endian.h"
 #include "base/containers/adapters.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/feature_list.h"
 #include "base/files/file.h"
 #include "base/files/file_path.h"
-#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/metrics/field_trial_params.h"
 #include "base/metrics/histogram_functions.h"
@@ -91,9 +89,6 @@ ThumbnailCache::ThumbnailCache(size_t default_cache_size,
       cache_(default_cache_size),
       ui_resource_provider_(nullptr) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  memory_pressure_ = std::make_unique<base::MemoryPressureListener>(
-      FROM_HERE, base::BindRepeating(&ThumbnailCache::OnMemoryPressure,
-                                     base::Unretained(this)));
   ScheduleRecordCacheMetrics(base::Minutes(1));
 }
 
@@ -148,7 +143,7 @@ void ThumbnailCache::Put(
   thumbnail->SetBitmap(bitmap);
 
   RemoveFromReadQueue(tab_id);
-  if (base::Contains(visible_ids_, tab_id)) {
+  if (std::ranges::contains(visible_ids_, tab_id)) {
     MakeSpaceForNewItemIfNecessary(tab_id);
     cache_.Put(tab_id, std::move(thumbnail));
     NotifyObserversOfThumbnailAddedToCache(tab_id);
@@ -173,8 +168,8 @@ Thumbnail* ThumbnailCache::Get(TabId tab_id, bool force_disk_read) {
   }
 
   if (force_disk_read && primary_tab_id_ != tab_id &&
-      base::Contains(visible_ids_, tab_id) &&
-      !base::Contains(read_queue_, tab_id)) {
+      std::ranges::contains(visible_ids_, tab_id) &&
+      !std::ranges::contains(read_queue_, tab_id)) {
     read_queue_.push_back(tab_id);
     ReadNextThumbnail();
   }
@@ -218,7 +213,8 @@ bool ThumbnailCache::CheckAndUpdateThumbnailMetaData(TabId tab_id,
 }
 
 bool ThumbnailCache::IsInVisibleIds(TabId tab_id) {
-  return primary_tab_id_ == tab_id || base::Contains(visible_ids_, tab_id);
+  return primary_tab_id_ == tab_id ||
+         std::ranges::contains(visible_ids_, tab_id);
 }
 
 void ThumbnailCache::UpdateVisibleIds(const std::vector<TabId>& priority,
@@ -264,7 +260,7 @@ void ThumbnailCache::UpdateVisibleIds(const std::vector<TabId>& priority,
     TabId tab_id = *iter;
     visible_ids_.push_back(tab_id);
     if (!cache_.Get(tab_id) && primary_tab_id_ != tab_id &&
-        !base::Contains(read_queue_, tab_id)) {
+        !std::ranges::contains(read_queue_, tab_id)) {
       read_queue_.push_back(tab_id);
     }
     iter++;
@@ -285,7 +281,7 @@ void ThumbnailCache::PruneCache() {
   std::vector<TabId> ids_to_remove;
 
   for (const auto& entry : cache_) {
-    if (!base::Contains(ids_to_keep, entry.first)) {
+    if (!ids_to_keep.contains(entry.first)) {
       ids_to_remove.push_back(entry.first);
     }
   }
@@ -431,7 +427,7 @@ void ThumbnailCache::ReadNextThumbnail() {
 }
 
 void ThumbnailCache::MakeSpaceForNewItemIfNecessary(TabId tab_id) {
-  if (cache_.Get(tab_id) || !base::Contains(visible_ids_, tab_id) ||
+  if (cache_.Get(tab_id) || !std::ranges::contains(visible_ids_, tab_id) ||
       cache_.size() < cache_.MaximumCacheSize()) {
     return;
   }
@@ -441,7 +437,7 @@ void ThumbnailCache::MakeSpaceForNewItemIfNecessary(TabId tab_id) {
 
   // 1. Find a cached item not in this list
   for (auto& item : cache_) {
-    if (!base::Contains(visible_ids_, item.first)) {
+    if (!std::ranges::contains(visible_ids_, item.first)) {
       key_to_remove = item.first;
       found_key_to_remove = true;
       break;
@@ -573,7 +569,7 @@ void ThumbnailCache::PostEtc1ReadTask(TabId tab_id,
       time_stamp = meta_iter->second.capture_time();
     }
 
-    if (base::Contains(visible_ids_, tab_id)) {
+    if (std::ranges::contains(visible_ids_, tab_id)) {
       MakeSpaceForNewItemIfNecessary(tab_id);
       std::unique_ptr<Thumbnail> thumbnail = Thumbnail::Create(
           tab_id, time_stamp, scale, ui_resource_provider_, this);
@@ -616,12 +612,5 @@ ThumbnailCache::ThumbnailMetaData::ThumbnailMetaData(
     const base::Time& current_time,
     GURL url)
     : capture_time_(current_time), url_(std::move(url)) {}
-
-void ThumbnailCache::OnMemoryPressure(
-    base::MemoryPressureListener::MemoryPressureLevel level) {
-  if (level == base::MemoryPressureListener::MEMORY_PRESSURE_LEVEL_CRITICAL) {
-    cache_.Clear();
-  }
-}
 
 }  // namespace thumbnail

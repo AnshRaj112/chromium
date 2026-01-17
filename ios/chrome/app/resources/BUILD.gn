@@ -63,6 +63,7 @@ repack("repack_unscaled_resources") {
     "$root_gen_dir/components/chrome_urls_resources.pak",
     "$root_gen_dir/components/commerce_internals_resources.pak",
     "$root_gen_dir/components/components_resources.pak",
+    "$root_gen_dir/components/connectors_internals_resources.pak",
     "$root_gen_dir/components/crashes_resources.pak",
     "$root_gen_dir/components/data_sharing_internals_resources.pak",
     "$root_gen_dir/components/dev_ui_components_resources.pak",
@@ -75,8 +76,10 @@ repack("repack_unscaled_resources") {
     "$root_gen_dir/components/ntp_tiles_internals_resources.pak",
     "$root_gen_dir/components/optimization_guide_internals_resources.pak",
     "$root_gen_dir/components/policy_resources.pak",
+    "$root_gen_dir/components/regional_capabilities_internals_resources.pak",
     "$root_gen_dir/components/signin_internals_resources.pak",
     "$root_gen_dir/components/sync_service_sync_internals_resources.pak",
+    "$root_gen_dir/components/translate_internals_resources.pak",
     "$root_gen_dir/components/ukm_resources.pak",
     "$root_gen_dir/components/user_actions_ui_resources.pak",
     "$root_gen_dir/components/version_ui_resources.pak",
@@ -92,12 +95,14 @@ repack("repack_unscaled_resources") {
     "//components/commerce/core/internals/resources",
     "//components/data_sharing/data_sharing_internals/resources",
     "//components/download/resources/download_internals:resources",
+    "//components/enterprise/connectors/resources",
     "//components/metrics:server_urls_grd",
     "//components/ntp_tiles/webui/resources",
     "//components/optimization_guide/optimization_guide_internals/resources",
     "//components/policy/resources/webui:resources",
     "//components/resources",
     "//components/sync/service/resources",
+    "//components/translate/translate_internals:resources",
     "//components/ukm/debug:resources",
     "//components/webui/chrome_urls/resources",
     "//ios/chrome/app/resources/profile_internals:resources",
@@ -148,6 +153,21 @@ bundle_data_xcassets("chromium_icons_legacy") {
     "ChromiumIconsLegacy.xcassets/AppIcon.appiconset/Icon-1024.png",
     "ChromiumIconsLegacy.xcassets/AppIcon.appiconset/Icon-1024Dark.png",
     "ChromiumIconsLegacy.xcassets/AppIcon.appiconset/Icon-1024Tinted.png",
+  ]
+}
+
+bundle_data_xcassets("chromium_icons") {
+  catalog = "ChromiumIcons.xcassets"
+  sources = [
+    "ChromiumIcons.xcassets/AppIcon.icon/Assets/2.svg",
+    "ChromiumIcons.xcassets/AppIcon.icon/Assets/3.svg",
+    "ChromiumIcons.xcassets/AppIcon.icon/Assets/5.svg",
+    "ChromiumIcons.xcassets/AppIcon.icon/Assets/blue.svg",
+    "ChromiumIcons.xcassets/AppIcon.icon/Assets/cr.svg",
+    "ChromiumIcons.xcassets/AppIcon.icon/Assets/donut.svg",
+    "ChromiumIcons.xcassets/AppIcon.icon/Assets/pill.svg",
+    "ChromiumIcons.xcassets/AppIcon.icon/Assets/ring.png",
+    "ChromiumIcons.xcassets/AppIcon.icon/icon.json",
   ]
 }
 

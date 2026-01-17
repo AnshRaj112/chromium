@@ -18,11 +18,9 @@
 #include "base/barrier_closure.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/functional/concurrent_callbacks.h"
 #include "base/functional/concurrent_closures.h"
@@ -62,7 +60,6 @@
 #include "storage/browser/quota/quota_client_type.h"
 #include "storage/browser/quota/quota_features.h"
 #include "storage/browser/quota/quota_macros.h"
-#include "storage/browser/quota/quota_manager_observer.mojom-forward.h"
 #include "storage/browser/quota/quota_manager_observer.mojom.h"
 #include "storage/browser/quota/quota_manager_proxy.h"
 #include "storage/browser/quota/quota_override_handle.h"
@@ -72,6 +69,8 @@
 #include "third_party/blink/public/common/storage_key/storage_key.h"
 #include "third_party/blink/public/mojom/quota/quota_types.mojom-shared.h"
 #include "third_party/blink/public/mojom/storage_key/storage_key.mojom.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
+#include "url/gurl.h"
 #include "url/origin.h"
 
 using ::blink::StorageKey;
@@ -648,9 +647,10 @@ class QuotaManagerImpl::BucketDataDeleter {
             {"storage_key: ", bucket_.storage_key.Serialize(),
              ", is_default: ", bucket_.is_default ? "true" : "false",
              ", id: ", base::NumberToString(bucket_.id.value())});
-        TRACE_EVENT_NESTABLE_ASYNC_BEGIN2(
-            "browsing_data", "QuotaManagerImpl::BucketDataDeleter",
-            ++tracing_id, "client_type", client_type, "bucket", bucket_params);
+        TRACE_EVENT_BEGIN("browsing_data",
+                          "QuotaManagerImpl::BucketDataDeleter",
+                          perfetto::Track(++tracing_id), "client_type",
+                          client_type, "bucket", bucket_params);
         client->DeleteBucketData(
             bucket_, base::BindOnce(&BucketDataDeleter::DidDeleteBucketData,
                                     weak_factory_.GetWeakPtr(), tracing_id));
@@ -675,8 +675,9 @@ class QuotaManagerImpl::BucketDataDeleter {
                            blink::mojom::QuotaStatusCode status) {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
     DCHECK_GT(remaining_clients_, 0u);
-    TRACE_EVENT_NESTABLE_ASYNC_END0(
-        "browsing_data", "QuotaManagerImpl::BucketDataDeleter", tracing_id);
+    TRACE_EVENT_END("browsing_data",
+                    /*"QuotaManagerImpl::BucketDataDeleter"*/
+                    perfetto::Track(tracing_id));
 
     if (status != blink::mojom::QuotaStatusCode::kOk) {
       ++error_count_;
@@ -826,7 +827,7 @@ class QuotaManagerImpl::BucketSetDataDeleter {
     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
     DCHECK(deleter->completed());
 
-    DCHECK(base::Contains(bucket_deleters_, deleter));
+    DCHECK(bucket_deleters_.contains(deleter));
     bucket_deleters_.erase(deleter);
 
     if (!entry.has_value()) {
@@ -957,7 +958,8 @@ QuotaManagerImpl::QuotaManagerImpl(
     const base::FilePath& profile_path,
     scoped_refptr<base::SingleThreadTaskRunner> io_thread,
     scoped_refptr<SpecialStoragePolicy> special_storage_policy,
-    const GetQuotaSettingsFunc& get_settings_function)
+    const GetQuotaSettingsFunc& get_settings_function,
+    bool report_static_storage_quota)
     : RefCountedDeleteOnSequence<QuotaManagerImpl>(io_thread),
       is_incognito_(is_incognito),
       profile_path_(profile_path),
@@ -965,12 +967,10 @@ QuotaManagerImpl::QuotaManagerImpl(
                                                      io_thread,
                                                      profile_path)),
       io_thread_(std::move(io_thread)),
-      db_runner_(base::ThreadPool::CreateSequencedTaskRunner(
-          {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
-           base::TaskShutdownBehavior::BLOCK_SHUTDOWN})),
       get_settings_function_(get_settings_function),
       special_storage_policy_(std::move(special_storage_policy)),
-      get_volume_info_fn_(&QuotaManagerImpl::GetVolumeInfo) {
+      get_volume_info_fn_(&QuotaManagerImpl::GetVolumeInfo),
+      report_static_storage_quota_(report_static_storage_quota) {
   DCHECK_EQ(settings_.refresh_interval, base::TimeDelta::Max());
   if (!get_settings_function.is_null()) {
     // Reset the interval to ensure we use the get_settings_function
@@ -980,6 +980,17 @@ QuotaManagerImpl::QuotaManagerImpl(
         base::SingleThreadTaskRunner::GetCurrentDefault();
   }
   DETACH_FROM_SEQUENCE(sequence_checker_);
+
+  base::TaskTraits traits{base::MayBlock(), base::TaskPriority::USER_VISIBLE,
+                          base::TaskShutdownBehavior::BLOCK_SHUTDOWN};
+  if (profile_path_.empty()) {
+    db_runner_ = base::ThreadPool::CreateSequencedTaskRunner(traits);
+  } else {
+    // Note that this path is not quite what's actually used by the database,
+    // but all it needs is to be unique relative to all other Chromium features.
+    db_runner_ = base::ThreadPool::CreateSequencedTaskRunnerForResource(
+        traits, profile_path_.AppendASCII(QuotaDatabase::kDatabaseName));
+  }
 }
 
 void QuotaManagerImpl::SetQuotaSettings(const QuotaSettings& settings) {
@@ -1233,8 +1244,7 @@ void QuotaManagerImpl::GetUsageAndReportedQuotaWithBreakdown(
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(callback);
 
-  if (base::FeatureList::IsEnabled(storage::features::kStaticStorageQuota) &&
-      !IsStorageUnlimited(storage_key)) {
+  if (report_static_storage_quota_ && !IsStorageUnlimited(storage_key)) {
     HandleGetUsageAndQuotaRequest(
         storage_key,
         base::BindOnce(
@@ -1329,7 +1339,7 @@ void QuotaManagerImpl::GetBucketUsageAndReportedQuota(
     UsageAndQuotaCallback callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  if (base::FeatureList::IsEnabled(storage::features::kStaticStorageQuota)) {
+  if (report_static_storage_quota_) {
     GetBucketById(
         id,
         base::BindOnce(
@@ -2508,7 +2518,7 @@ void QuotaManagerImpl::WithdrawOverridesForHandle(int handle_id) {
 std::optional<int64_t> QuotaManagerImpl::GetQuotaOverrideForStorageKey(
     const StorageKey& storage_key) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!base::Contains(devtools_overrides_, storage_key)) {
+  if (!devtools_overrides_.contains(storage_key)) {
     return std::nullopt;
   }
   return devtools_overrides_[storage_key].quota_size;
@@ -3160,8 +3170,9 @@ QuotaAvailability QuotaManagerImpl::CallGetVolumeInfo(
 
 // static
 QuotaAvailability QuotaManagerImpl::GetVolumeInfo(const base::FilePath& path) {
-  return QuotaAvailability(base::SysInfo::AmountOfTotalDiskSpace(path),
-                           base::SysInfo::AmountOfFreeDiskSpace(path));
+  return QuotaAvailability(
+      base::SysInfo::AmountOfTotalDiskSpace(path).value_or(-1),
+      base::SysInfo::AmountOfFreeDiskSpace(path).value_or(-1));
 }
 
 void QuotaManagerImpl::AddObserver(

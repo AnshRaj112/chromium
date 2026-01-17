@@ -9,6 +9,7 @@
 
 #import "base/check.h"
 #import "base/check_op.h"
+#import "base/debug/dump_without_crashing.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/browser/browser_list.h"
 #import "ios/chrome/browser/shared/model/browser/browser_list_factory.h"
@@ -58,8 +59,8 @@ void MoveTabFromBrowserToBrowser(Browser* source_browser,
   const SnapshotID snapshot_identifier(web_state->GetUniqueIdentifier());
   MoveSnapshot(snapshot_identifier, source_browser, destination_browser);
 
-  // TODO(crbug.com/40203375): Remove this workaround when it will no longer be
-  // required to have an active WebState in the WebStateList.
+  // TODO(crbug.com/451581543): Remove this workaround when it will no longer
+  // be required to have an active WebState in the WebStateList.
   if (destination_browser->GetWebStateList()->empty()) {
     params.Activate();
   }
@@ -91,6 +92,7 @@ void MoveTabToBrowser(web::WebStateID tab_id,
   BrowserAndIndex tab_info = FindBrowserAndIndex(tab_id, browsers);
 
   if (!tab_info.browser) {
+    base::debug::DumpWithoutCrashing();
     return;
   }
   MoveTabFromBrowserToBrowser(tab_info.browser, tab_info.tab_index,

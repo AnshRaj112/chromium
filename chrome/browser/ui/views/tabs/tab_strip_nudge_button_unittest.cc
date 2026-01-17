@@ -4,24 +4,26 @@
 
 #include "chrome/browser/ui/views/tabs/tab_strip_nudge_button.h"
 
+#include <memory>
+
 #include "base/time/time.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
+#include "chrome/browser/ui/browser_window/test/mock_browser_window_interface.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/tabs/fake_base_tab_strip_controller.h"
-#include "chrome/browser/ui/views/tabs/tab_strip.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/views/chrome_views_test_base.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/gfx/vector_icon_types.h"
 
 class TabStripNudgeButtonTest : public ChromeViewsTestBase {
  public:
   void SetUp() override {
     ChromeViewsTestBase::SetUp();
-
-    tab_strip_controller_ = std::make_unique<FakeBaseTabStripController>();
+    browser_window_interface_ = std::make_unique<MockBrowserWindowInterface>();
     button_ = std::make_unique<TabStripNudgeButton>(
-        tab_strip_controller_.get(),
+        browser_window_interface_.get(),
         base::BindRepeating(&TabStripNudgeButtonTest::MockButtonCallback,
                             base::Unretained(this)),
         base::BindRepeating(&TabStripNudgeButtonTest::MockButtonCallback,
@@ -34,7 +36,7 @@ class TabStripNudgeButtonTest : public ChromeViewsTestBase {
   void MockButtonCallback() { button_callback_count_++; }
 
  protected:
-  std::unique_ptr<TabStripController> tab_strip_controller_;
+  std::unique_ptr<MockBrowserWindowInterface> browser_window_interface_;
   std::unique_ptr<TabStripNudgeButton> button_;
   int button_callback_count_ = 0;
 };

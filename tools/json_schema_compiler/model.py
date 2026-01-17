@@ -36,8 +36,7 @@ class Model(object):
   - |namespaces| a map of a namespace name to its model.Namespace
   """
 
-  def __init__(self, allow_inline_enums=True):
-    self._allow_inline_enums = allow_inline_enums
+  def __init__(self):
     self.namespaces = {}
 
   def AddNamespace(self,
@@ -50,8 +49,7 @@ class Model(object):
     namespace = Namespace(json,
                           source_file,
                           include_compiler_options=include_compiler_options,
-                          environment=environment,
-                          allow_inline_enums=self._allow_inline_enums)
+                          environment=environment)
     self.namespaces[namespace.name] = namespace
     return namespace
 
@@ -123,8 +121,7 @@ class Namespace(object):
                json,
                source_file,
                include_compiler_options=False,
-               environment=None,
-               allow_inline_enums=True):
+               environment=None):
     self.name = json['namespace']
     if 'description' not in json:
       # TODO(kalman): Go back to throwing an error here.
@@ -132,14 +129,13 @@ class Namespace(object):
             'on the API summary page.' % self.name)
       json['description'] = ''
     self.description = json['description']
-    self.nodoc = json.get('nodoc', False)
+    self.nodoc = _GetTypedProperty(self, json, 'nodoc', bool, False)
     self.deprecated = json.get('deprecated', None)
     self.unix_name = UnixName(self.name)
     self.source_file = source_file
     self.source_file_dir, self.source_file_filename = os.path.split(source_file)
     self.short_filename = os.path.basename(source_file).split('.')[0]
     self.parent = None
-    self.allow_inline_enums = allow_inline_enums
     self.platforms = _GetPlatforms(json)
     toplevel_origin = Origin(from_client=True, from_json=True)
 
@@ -217,7 +213,7 @@ class Type(object):
     self.simple_name = _StripNamespace(self.name, namespace)
     self.unix_name = UnixName(self.name)
     self.description = json.get('description', None)
-    self.nodoc = json.get('nodoc', False)
+    self.nodoc = _GetTypedProperty(self, json, 'nodoc', bool, False)
 
     # Copy the Origin and override the |from_manifest_keys| value as necessary.
     # We need to do this to ensure types reference by manifest types have the
@@ -251,7 +247,7 @@ class Type(object):
         namespace._manifest_referenced_types.add(self.ref_type)
 
     elif 'enum' in json and json_type == 'string':
-      if not namespace.allow_inline_enums and not isinstance(parent, Namespace):
+      if not isinstance(parent, Namespace):
         raise ParseException(
             self,
             'Inline enum "%s" found in namespace "%s". These are not allowed. '
@@ -355,7 +351,7 @@ class Function(object):
     self.supports_listeners = options.get('supportsListeners', True)
     self.supports_rules = options.get('supportsRules', False)
     self.supports_dom = options.get('supportsDom', False)
-    self.nodoc = json.get('nodoc', False)
+    self.nodoc = _GetTypedProperty(self, json, 'nodoc', bool, False)
 
     def GeneratePropertyFromParam(p):
       return Property(self, p['name'], p, namespace, origin)
@@ -475,7 +471,7 @@ class Property(object):
     self.optional = json.get('optional', None)
     self.instance_of = json.get('isInstanceOf', None)
     self.deprecated = json.get('deprecated')
-    self.nodoc = json.get('nodoc', False)
+    self.nodoc = _GetTypedProperty(self, json, 'nodoc', bool, False)
 
     # HACK: only support very specific value types.
     is_allowed_value = ('$ref' not in json
@@ -493,7 +489,7 @@ class Property(object):
           json['type'] = 'integer'
         elif isinstance(self.value, float):
           json['type'] = 'double'
-        elif isinstance(self.value, basestring):
+        elif isinstance(self.value, str):
           json['type'] = 'string'
         else:
           # TODO(kalman): support more types as necessary.
@@ -843,8 +839,17 @@ def _GetManifestKeysType(self, json):
       'type': 'object',
       'properties': json['manifest_keys'],
   }
-  return Type(self, 'ManifestKeys', manifest_keys_type, self,
-              Origin(from_manifest_keys=True))
+
+  # Create a Type instance for the manifest keys object.
+  manifest_type = Type(self, 'ManifestKeys', manifest_keys_type, self,
+                       Origin(from_manifest_keys=True))
+
+  # Enforce that all the top-level manifest keys are optional.
+  for name, item in manifest_type.properties.items():
+    if not item.optional:
+      raise ParseException(self, 'Manifest key "%s" must be optional.' % name)
+
+  return manifest_type
 
 
 def _GetWithDefaultChecked(self, json, key, default):
@@ -889,3 +894,12 @@ def _GetPlatforms(json):
       raise ValueError('Invalid platform specified: ' + platform_name)
     platforms.append(platform_enum)
   return platforms
+
+
+def _GetTypedProperty(parent, json, name, expected_type, default):
+  value = json.get(name, default)
+  if not isinstance(value, expected_type):
+    raise ParseException(
+        parent, 'The attribute "%s" must be specified as %s, but was '
+        'speficied as %s.' % (name, type(expected_type()), type(value)))
+  return value

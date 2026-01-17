@@ -5,17 +5,21 @@
 package org.chromium.chrome.browser.magic_stack;
 
 import static org.chromium.build.NullUtil.assumeNonNull;
+import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.ADDRESS_BAR_PLACEMENT_PROMO;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.AUXILIARY_SEARCH;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.DEFAULT_BROWSER_PROMO;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.DEPRECATED_EDUCATIONAL_TIP;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.DEPRECATED_TAB_RESUMPTION;
+import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.ENHANCED_SAFE_BROWSING_PROMO;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.HISTORY_SYNC_PROMO;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.PRICE_CHANGE;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.QUICK_DELETE_PROMO;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.SAFETY_HUB;
+import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.SETUP_LIST_TWO_CELL_CONTAINER;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.SINGLE_TAB;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.TAB_GROUP_PROMO;
 import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.TAB_GROUP_SYNC_PROMO;
+import static org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType.TIPS_NOTIFICATIONS_PROMO;
 
 import androidx.annotation.VisibleForTesting;
 
@@ -130,6 +134,14 @@ public class HomeModulesMetricsUtils {
                 return "QuickDeletePromo";
             case HISTORY_SYNC_PROMO:
                 return "HistorySyncPromo";
+            case TIPS_NOTIFICATIONS_PROMO:
+                return "TipsNotificationsPromo";
+            case ENHANCED_SAFE_BROWSING_PROMO:
+                return "EnhancedSafeBrowsingPromo";
+            case ADDRESS_BAR_PLACEMENT_PROMO:
+                return "AddressBarPlacementPromo";
+            case SETUP_LIST_TWO_CELL_CONTAINER:
+                return "SetupListContainer";
             default:
                 assert false : "Module type not supported!";
                 return assumeNonNull(null);
@@ -156,6 +168,14 @@ public class HomeModulesMetricsUtils {
                 return QUICK_DELETE_PROMO;
             case "HistorySyncPromo":
                 return HISTORY_SYNC_PROMO;
+            case "TipsNotificationsPromo":
+                return TIPS_NOTIFICATIONS_PROMO;
+            case "EnhancedSafeBrowsingPromo":
+                return ENHANCED_SAFE_BROWSING_PROMO;
+            case "AddressBarPlacementPromo":
+                return ADDRESS_BAR_PLACEMENT_PROMO;
+            case "SetupListContainer":
+                return SETUP_LIST_TWO_CELL_CONTAINER;
             default:
                 Log.i(TAG, "Module type %s not supported!", label);
                 return ModuleType.NUM_ENTRIES;

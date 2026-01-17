@@ -16,7 +16,7 @@
 
 struct CoreAccountInfo;
 class Profile;
-class ProfilePickerSignedInFlowController;
+class ProfilePickerPostSignInAdapter;
 class ForceSigninUIError;
 
 class ProfilePickerFlowController : public ProfileManagementFlowControllerImpl {
@@ -30,19 +30,17 @@ class ProfilePickerFlowController : public ProfileManagementFlowControllerImpl {
 
   void Init() override;
 
-  void SwitchToDiceSignIn(ProfilePicker::ProfileInfo profile_info,
-                          StepSwitchFinishedCallback switch_finished_callback);
+  void SwitchToSignIn(ProfilePicker::ProfileInfo profile_info,
+                      StepSwitchFinishedCallback switch_finished_callback);
 
   void SwitchToReauth(
       Profile* profile,
       StepSwitchFinishedCallback switch_finished_callback,
       base::OnceCallback<void(const ForceSigninUIError&)> on_error_callback);
 
-  void CancelPostSignInFlow() override;
+  void CancelSigninFlow() override;
 
   std::u16string GetFallbackAccessibleWindowTitle() const override;
-
-  base::FilePath GetSwitchProfilePathOrEmpty() const;
 
   // Switch to the flow that is shown when the user decides to create a profile
   // without signing in.
@@ -71,8 +69,7 @@ class ProfilePickerFlowController : public ProfileManagementFlowControllerImpl {
       const ForceSigninUIError& error,
       bool switch_step_success);
 
-  std::unique_ptr<ProfilePickerSignedInFlowController>
-  CreateSignedInFlowController(
+  std::unique_ptr<ProfilePickerPostSignInAdapter> CreatePostSignInAdapter(
       Profile* signed_in_profile,
       const CoreAccountInfo& account_info,
       std::unique_ptr<content::WebContents> contents) override;
@@ -80,6 +77,7 @@ class ProfilePickerFlowController : public ProfileManagementFlowControllerImpl {
   // Callback after loading a profile and opening a browser.
   void OnSwitchToProfileComplete(
       bool open_settings,
+      bool exit_flow_after_profile_picked,
       base::OnceCallback<void(bool)> pick_profile_complete_callback,
       Browser* browser);
 
@@ -93,12 +91,9 @@ class ProfilePickerFlowController : public ProfileManagementFlowControllerImpl {
   // color choice that the user would be able to override.
   std::optional<SkColor> suggested_profile_color_;
 
-  // TODO(crbug.com/40237338): To be refactored out.
-  // This is used for `ProfilePicker::GetSwitchProfilePath()`. The information
-  // should ideally be provided to the handler of the profile switch page once
-  // its controller is created instead of relying on static calls.
-  base::WeakPtr<ProfilePickerSignedInFlowController>
-      weak_signed_in_flow_controller_;
+  // TODO(crbug.com/40942098): To be refactored out.
+  // This is used to get the web contents that is used in this structure.
+  base::WeakPtr<ProfilePickerPostSignInAdapter> weak_post_sign_in_adapter_;
 
   base::WeakPtr<Profile> created_profile_;
 

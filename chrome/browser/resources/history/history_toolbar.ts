@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import './shared_style_lit.css.js';
 import '/strings.m.js';
 import 'chrome://resources/cr_components/history_embeddings/icons.html.js';
+import 'chrome://resources/cr_elements/cr_button/cr_button.js';
 import 'chrome://resources/cr_elements/cr_toolbar/cr_toolbar.js';
 import 'chrome://resources/cr_elements/cr_toolbar/cr_toolbar_selection_overlay.js';
 
@@ -144,10 +144,6 @@ export class HistoryToolbarElement extends CrLitElement {
     }
   }
 
-  private canShowMenuPromo_(): boolean {
-    return this.showMenuPromo && !loadTimeData.getBoolean('isGuestSession');
-  }
-
   protected onSearchChanged_(event: CustomEvent<string>) {
     this.fire(
         'change-query',
@@ -188,7 +184,7 @@ export class HistoryToolbarElement extends CrLitElement {
           'historyEmbeddingsAnswersSearchAlternativePrompt4',
         ];
         const randomIndex = Math.floor(Math.random() * possiblePrompts.length);
-        return loadTimeData.getString(possiblePrompts[randomIndex]);
+        return loadTimeData.getString(possiblePrompts[randomIndex]!);
       }
 
       return loadTimeData.getString('historyEmbeddingsSearchPrompt');

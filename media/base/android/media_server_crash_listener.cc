@@ -42,9 +42,11 @@ void MediaServerCrashListener::EnsureListening() {
 
 void MediaServerCrashListener::OnMediaServerCrashDetected(
     JNIEnv* env,
-    jboolean watchdog_needs_release) {
+    bool watchdog_needs_release) {
   callback_task_runner_->PostTask(
       FROM_HERE, base::BindOnce(on_server_crash_cb_, watchdog_needs_release));
 }
 
 }  // namespace media
+
+DEFINE_JNI(MediaServerCrashListener)

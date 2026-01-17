@@ -27,6 +27,7 @@ suite('SettingsMain', function() {
 
     loadTimeData.overrideValues(Object.assign(
         {
+          enableYourSavedInfoSettingsPage: false,
           isGuest: false,
           showAiPage: false,
           showResetProfileBanner: false,
@@ -47,6 +48,7 @@ suite('SettingsMain', function() {
 
   setup(function() {
     createSettingsMain();
+    return settingsMain.whenViewSwitchingDone();
   });
 
   test('UpdatesActiveViewWhenRouteChanges', async function() {
@@ -62,7 +64,7 @@ suite('SettingsMain', function() {
     const routesToVisit: Array<{route: Route, pluginTag: string}> = [
       {route: routes.PEOPLE, pluginTag: 'settings-people-page-index'},
       {route: routes.BASIC, pluginTag: 'settings-people-page-index'},
-      {route: routes.PRIVACY, pluginTag: 'settings-basic-page'},
+      {route: routes.PRIVACY, pluginTag: 'settings-privacy-page-index'},
       {route: routes.AUTOFILL, pluginTag: 'settings-autofill-page-index'},
       {route: routes.PERFORMANCE, pluginTag: 'settings-performance-page-index'},
       {route: routes.APPEARANCE, pluginTag: 'settings-appearance-page-index'},
@@ -74,7 +76,12 @@ suite('SettingsMain', function() {
       },
       // </if>
       {route: routes.ON_STARTUP, pluginTag: 'settings-on-startup-page'},
+      // <if expr="is_chromeos">
+      {route: routes.LANGUAGES, pluginTag: 'settings-languages-page-index-cros'},
+      // </if>
+      // <if expr="not is_chromeos">
       {route: routes.LANGUAGES, pluginTag: 'settings-languages-page-index'},
+      // </if>
       {route: routes.DOWNLOADS, pluginTag: 'settings-downloads-page'},
       {route: routes.ACCESSIBILITY, pluginTag: 'settings-a11y-page-index'},
       // <if expr="not is_chromeos">
@@ -86,7 +93,7 @@ suite('SettingsMain', function() {
 
     for (const {route, pluginTag} of routesToVisit) {
       Router.getInstance().navigateTo(route);
-      await flushTasks();
+      await settingsMain.whenViewSwitchingDone();
       assertActive(pluginTag, route.path);
     }
   });
@@ -174,7 +181,7 @@ suite('SettingsMain', function() {
 
     // Case2: Guest mode.
     createSettingsMain({isGuest: true});
-    await flushTasks();
+    await settingsMain.whenViewSwitchingDone();
     active = settingsMain.$.switcher.querySelector<HTMLElement>(
         '.active[slot=view]');
     assertTrue(!!active);
@@ -192,5 +199,21 @@ suite('SettingsMain', function() {
     createSettingsMain({showResetProfileBanner: true});
     assertTrue(!!settingsMain.shadowRoot!.querySelector(
         'settings-reset-profile-banner'));
+  });
+
+    test('shows either autofill or yourSavedInfo page', function() {
+    // Reset tested element and set yourSavedInfo experiment to false
+    createSettingsMain();
+
+    // Only autofill page should be visible
+    assertTrue(!!settingsMain.shadowRoot!.querySelector(`#autofill`));
+    assertFalse(!!settingsMain.shadowRoot!.querySelector(`#yourSavedInfo`));
+
+    // Reset tested element and set yourSavedInfo experiment to true
+    createSettingsMain({enableYourSavedInfoSettingsPage: true});
+
+    // Only yourSavedInfo page should be visible
+    assertFalse(!!settingsMain.shadowRoot!.querySelector(`#autofill`));
+    assertTrue(!!settingsMain.shadowRoot!.querySelector(`#yourSavedInfo`));
   });
 });

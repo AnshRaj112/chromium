@@ -4,7 +4,8 @@
 
 #include "services/network/accept_ch_frame_interceptor.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/feature_list.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/time/time.h"
@@ -14,6 +15,7 @@
 #include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/mojom/web_client_hints_types.mojom-shared.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
 
 namespace network {
 
@@ -101,10 +103,11 @@ net::Error AcceptCHFrameInterceptor::OnConnected(
     return net::OK;
   }
 
-  const bool needs_check = NeedsObserverCheck(url::Origin::Create(url), hints);
-  base::UmaHistogramBoolean("Net.URLLoader.AcceptCH.NeedsObserverCheck",
-                            needs_check);
-  if (!needs_check) {
+  const NeedsObserverCheckReason reason =
+      NeedsObserverCheck(url::Origin::Create(url), hints);
+  base::UmaHistogramEnumeration(
+      "Net.AcceptCHFrameInterceptor.NeedsObserverCheckReason", reason);
+  if (reason == NeedsObserverCheckReason::kNotNeeded) {
     return net::OK;
   }
 
@@ -114,18 +117,16 @@ net::Error AcceptCHFrameInterceptor::OnConnected(
   // started. Otherwise, the callback to continue the network transaction will
   // be called and the URLLoader will continue as normal.
   auto record = [](net::CompletionOnceCallback callback,
-                   base::TimeTicks call_time, uint64_t trace_id, int status) {
+                   base::TimeTicks call_time, perfetto::Track track,
+                   int status) {
     base::UmaHistogramMicrosecondsTimes("Net.URLLoader.AcceptCH.RoundTripTime",
                                         base::TimeTicks::Now() - call_time);
     base::UmaHistogramSparse("Net.URLLoader.AcceptCH.Status", -status);
-    TRACE_EVENT_NESTABLE_ASYNC_END1(
-        "loading", "AcceptCHObserver::OnAcceptCHFrameReceived call",
-        TRACE_ID_LOCAL(trace_id), "status", status);
+    TRACE_EVENT_END("loading", track, "status", status);
     std::move(callback).Run(status);
   };
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN1(
-      "loading", "AcceptCHObserver::OnAcceptCHFrameReceived call",
-      TRACE_ID_LOCAL(this), "url", url);
+  TRACE_EVENT_BEGIN("loading", "AcceptCHObserver::OnAcceptCHFrameReceived call",
+                    perfetto::Track::FromPointer(this), "url", url);
 
   // Explanation of callback lifetime safety:
   // The `callback` originates from a net/ layer object (e.g.,
@@ -136,28 +137,66 @@ net::Error AcceptCHFrameInterceptor::OnConnected(
   accept_ch_frame_observer_->OnAcceptCHFrameReceived(
       url::Origin::Create(url), hints,
       base::BindOnce(record, std::move(callback), base::TimeTicks::Now(),
-                     TRACE_ID_LOCAL(this).raw_id()));
+                     perfetto::Track::FromPointer(this)));
   return net::ERR_IO_PENDING;
 }
 
-bool AcceptCHFrameInterceptor::NeedsObserverCheckForTesting(
+AcceptCHFrameInterceptor::NeedsObserverCheckReason
+AcceptCHFrameInterceptor::NeedsObserverCheckForTesting(
     const url::Origin& origin,
     const std::vector<mojom::WebClientHintsType>& hints) {
   return NeedsObserverCheck(origin, hints);
 }
 
-bool AcceptCHFrameInterceptor::NeedsObserverCheck(
+AcceptCHFrameInterceptor::NeedsObserverCheckReason
+AcceptCHFrameInterceptor::NeedsObserverCheck(
     const url::Origin& origin,
     const std::vector<mojom::WebClientHintsType>& hints) {
-  if (!enabled_client_hints_.has_value() ||
-      !enabled_client_hints_->is_outermost_main_frame ||
-      !enabled_client_hints_->origin.IsSameOriginWith(origin)) {
-    return true;
+  if (!enabled_client_hints_.has_value()) {
+    return NeedsObserverCheckReason::kNoEnabledClientHints;
   }
+
+  // For main frames, the origin must match to use the cached hints.
+  if (enabled_client_hints_->is_outermost_main_frame &&
+      !enabled_client_hints_->origin.IsSameOriginWith(origin)) {
+    return NeedsObserverCheckReason::kMainFrameOriginMismatch;
+  }
+  // For subframes, the optimization is only allowed if the feature is enabled.
+  if (!enabled_client_hints_->is_outermost_main_frame &&
+      !features::kAcceptCHOffloadForSubframe.Get()) {
+    return NeedsObserverCheckReason::kSubframeFeatureDisabled;
+  }
+
   CHECK(base::FeatureList::IsEnabled(features::kOffloadAcceptCHFrameCheck));
-  return !std::all_of(hints.cbegin(), hints.cend(), [&](const auto& h) {
-    return base::Contains(enabled_client_hints_->hints, h);
-  });
+  // The Accept-CH frame can be offloaded (i.e., handled in the network
+  // service without an IPC to the browser process) if all hints in the frame
+  // are present in either the `hints` list (enabled and allowed) or the
+  // `not_allowed_hints` list (persisted but currently disallowed). If any hint
+  // is not in either list, we must fall back to the browser process to check.
+  bool needs_observer_check = false;
+  for (const auto& h : hints) {
+    const bool is_in_hints =
+        std::ranges::contains(enabled_client_hints_->hints, h);
+    const bool is_in_not_allowed_hints =
+        features::kAcceptCHFrameOffloadNotAllowedHints.Get() &&
+        std::ranges::contains(enabled_client_hints_->not_allowed_hints, h);
+    const bool is_valid_for_offload = is_in_hints || is_in_not_allowed_hints;
+    if (is_in_not_allowed_hints && !is_in_hints) {
+      base::UmaHistogramEnumeration(
+          "Net.AcceptCHFrameInterceptor.OffloadSuccessForNotAllowedHint", h);
+    }
+    if (!is_valid_for_offload) {
+      needs_observer_check = true;
+      base::UmaHistogramEnumeration(
+          "Net.AcceptCHFrameInterceptor.MismatchClientHint2", h);
+    }
+  }
+
+  if (needs_observer_check) {
+    return NeedsObserverCheckReason::kHintNotEnabled;
+  }
+
+  return NeedsObserverCheckReason::kNotNeeded;
 }
 
 }  // namespace network

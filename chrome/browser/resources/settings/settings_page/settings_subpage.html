@@ -80,7 +80,7 @@
     </style>
     <div class="cr-row first" id="headerLine">
       <cr-icon-button class="icon-arrow-back" id="closeButton"
-          hidden="[[hideCloseButton]]" on-click="onBackClick_"
+          on-click="onBackClick_"
           aria-label$="[[getBackButtonAriaLabel_(pageTitle)]]"
           aria-roledescription$=
               "[[getBackButtonAriaRoleDescription_(pageTitle)]]">
@@ -102,6 +102,7 @@
       </template>
       <template is="dom-if" if="[[searchLabel]]">
         <cr-search-field label="[[searchLabel]]"
+            icon-override="[[searchIcon]]"
             on-search-changed="onSearchChanged_"
             clear-label="$i18n{clearSearch}">
         </cr-search-field>

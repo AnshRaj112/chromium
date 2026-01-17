@@ -7,10 +7,11 @@
 #include <utility>
 
 #include "base/functional/bind.h"
-#include "base/metrics/histogram_macros.h"
+#include "base/task/sequenced_task_runner.h"
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/typed_macros.h"
 #include "components/input/passthrough_touch_event_queue.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/gfx/geometry/point_f.h"
 
@@ -44,15 +45,11 @@ TouchTimeoutHandler::TouchTimeoutHandler(
                                            base::Unretained(this)),
                        task_runner),
       enabled_(true),
-      enabled_for_current_sequence_(false),
-      sequence_awaiting_uma_update_(false),
-      sequence_using_mobile_timeout_(false) {
+      enabled_for_current_sequence_(false) {
   SetUseMobileTimeout(false);
 }
 
-TouchTimeoutHandler::~TouchTimeoutHandler() {
-  LogSequenceEndForUMAIfNecessary(false);
-}
+TouchTimeoutHandler::~TouchTimeoutHandler() = default;
 
 void TouchTimeoutHandler::StartIfNecessary(
     const TouchEventWithLatencyInfo& event) {
@@ -70,7 +67,6 @@ void TouchTimeoutHandler::StartIfNecessary(
     return;
 
   if (event.event.IsTouchSequenceStart()) {
-    LogSequenceStartForUMA();
     enabled_for_current_sequence_ = true;
   }
 
@@ -122,8 +118,6 @@ bool TouchTimeoutHandler::FilterEvent(const WebTouchEvent& event) {
   if (event.IsTouchSequenceStart()) {
     // If a new sequence is observed while we're still waiting on the
     // timed-out sequence response, also count the new sequence as timed-out.
-    LogSequenceStartForUMA();
-    LogSequenceEndForUMAIfNecessary(true);
   }
 
   return true;
@@ -157,7 +151,6 @@ void TouchTimeoutHandler::SetUseMobileTimeout(bool use_mobile_timeout) {
 }
 
 void TouchTimeoutHandler::OnTimeOut() {
-  LogSequenceEndForUMAIfNecessary(true);
   SetPendingAckState(PENDING_ACK_ORIGINAL_EVENT);
   touch_queue_->FlushQueue();
 }
@@ -178,42 +171,24 @@ void TouchTimeoutHandler::SetPendingAckState(
   switch (new_pending_ack_state) {
     case PENDING_ACK_ORIGINAL_EVENT:
       DCHECK_EQ(pending_ack_state_, PENDING_ACK_NONE);
-      TRACE_EVENT_ASYNC_BEGIN0("input", "TouchEventTimeout", this);
+      TRACE_EVENT_BEGIN("input", "TouchEventTimeout",
+                        perfetto::Track::FromPointer(this));
       break;
     case PENDING_ACK_CANCEL_EVENT:
       DCHECK_EQ(pending_ack_state_, PENDING_ACK_ORIGINAL_EVENT);
       DCHECK(!timeout_monitor_.IsRunning());
       DCHECK(touch_queue_->Empty());
-      TRACE_EVENT_ASYNC_STEP_INTO0("input", "TouchEventTimeout", this,
-                                   "CancelEvent");
+      TRACE_EVENT_END("input", perfetto::Track::FromPointer(this));
+      TRACE_EVENT_BEGIN("input", "CancelEvent",
+                        perfetto::Track::FromPointer(this));
       break;
     case PENDING_ACK_NONE:
       DCHECK(!timeout_monitor_.IsRunning());
       DCHECK(touch_queue_->Empty());
-      TRACE_EVENT_ASYNC_END0("input", "TouchEventTimeout", this);
+      TRACE_EVENT_END("input", perfetto::Track::FromPointer(this));
       break;
   }
   pending_ack_state_ = new_pending_ack_state;
-}
-
-void TouchTimeoutHandler::LogSequenceStartForUMA() {
-  // Always flush any unlogged entries before starting a new one.
-  LogSequenceEndForUMAIfNecessary(false);
-  sequence_awaiting_uma_update_ = true;
-  sequence_using_mobile_timeout_ = use_mobile_timeout_;
-}
-
-void TouchTimeoutHandler::LogSequenceEndForUMAIfNecessary(bool timed_out) {
-  if (!sequence_awaiting_uma_update_)
-    return;
-
-  sequence_awaiting_uma_update_ = false;
-
-  if (sequence_using_mobile_timeout_) {
-    UMA_HISTOGRAM_BOOLEAN("Event.Touch.TimedOutOnMobileSite", timed_out);
-  } else {
-    UMA_HISTOGRAM_BOOLEAN("Event.Touch.TimedOutOnDesktopSite", timed_out);
-  }
 }
 
 base::TimeDelta TouchTimeoutHandler::GetTimeoutDelay() const {

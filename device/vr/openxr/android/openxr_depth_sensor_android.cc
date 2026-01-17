@@ -4,12 +4,12 @@
 
 #include "device/vr/openxr/android/openxr_depth_sensor_android.h"
 
+#include <algorithm>
 #include <array>
 #include <concepts>
 #include <memory>
 #include <set>
 
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/containers/flat_set.h"
 #include "base/feature_list.h"
@@ -299,7 +299,8 @@ OpenXrDepthSensorAndroid::OpenXrDepthSensorAndroid(
   const auto& usage_preferences = depth_options.usage_preferences;
   const bool can_support_depth =
       usage_preferences.empty() ||
-      base::Contains(usage_preferences, mojom::XRDepthUsage::kCPUOptimized);
+      std::ranges::contains(usage_preferences,
+                            mojom::XRDepthUsage::kCPUOptimized);
 
   if (can_support_depth) {
     depth_config_ = mojom::XRDepthConfig::New();
@@ -464,7 +465,7 @@ XrResult OpenXrDepthSensorAndroid::Initialize() {
       kResolutionPreferences.begin(), kResolutionPreferences.end(),
       [&supported_resolutions](
           const XrDepthCameraResolutionANDROID& resolution) {
-        return base::Contains(supported_resolutions, resolution);
+        return std::ranges::contains(supported_resolutions, resolution);
       });
 
   if (it == kResolutionPreferences.end()) {
@@ -660,19 +661,23 @@ OpenXrDepthSensorAndroidFactory::GetRequestedExtensions() const {
 }
 
 std::set<device::mojom::XRSessionFeature>
-OpenXrDepthSensorAndroidFactory::GetSupportedFeatures(
-    const OpenXrExtensionEnumeration* extension_enum) const {
-  if (!IsEnabled(extension_enum)) {
+OpenXrDepthSensorAndroidFactory::GetSupportedFeatures() const {
+  if (!IsEnabled()) {
     return {};
   }
 
   return {device::mojom::XRSessionFeature::DEPTH};
 }
 
-void OpenXrDepthSensorAndroidFactory::ProcessSystemProperties(
+void OpenXrDepthSensorAndroidFactory::CheckAndUpdateEnabledState(
     const OpenXrExtensionEnumeration* extension_enum,
     XrInstance instance,
     XrSystemId system) {
+  if (!AreAllRequestedExtensionsSupported(extension_enum)) {
+    SetEnabled(false);
+    return;
+  }
+
   XrSystemDepthTrackingPropertiesANDROID depth_properties{
       XR_TYPE_SYSTEM_DEPTH_TRACKING_PROPERTIES_ANDROID};
 
@@ -685,7 +690,7 @@ void OpenXrDepthSensorAndroidFactory::ProcessSystemProperties(
     depth_supported = depth_properties.supportsDepthTracking;
   }
 
-  SetSystemPropertiesSupport(depth_supported);
+  SetEnabled(depth_supported);
 }
 
 std::unique_ptr<OpenXrDepthSensor>
@@ -694,7 +699,7 @@ OpenXrDepthSensorAndroidFactory::CreateDepthSensor(
     XrSession session,
     XrSpace mojo_space,
     const mojom::XRDepthOptions& depth_options) const {
-  bool is_supported = IsEnabled(extension_helper.ExtensionEnumeration());
+  bool is_supported = IsEnabled();
   DVLOG(2) << __func__ << " is_supported=" << is_supported;
   if (is_supported) {
     return std::make_unique<OpenXrDepthSensorAndroid>(

@@ -14,19 +14,20 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/web_applications/test/isolated_web_app_test_utils.h"
-#include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_installation_manager.h"
+#include "chrome/browser/web_applications/isolated_web_apps/install/isolated_web_app_installation_manager.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_url_info.h"
 #include "chrome/browser/web_applications/isolated_web_apps/test/integrity_block_data_matcher.h"
 #include "chrome/browser/web_applications/isolated_web_apps/test/isolated_web_app_builder.h"
-#include "chrome/browser/web_applications/isolated_web_apps/test/test_signed_web_bundle_builder.h"
 #include "chrome/browser/web_applications/test/web_app_test_observers.h"
 #include "chrome/browser/web_applications/web_app.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "components/web_package/signed_web_bundles/signed_web_bundle_id.h"
 #include "components/webapps/common/web_app_id.h"
+#include "components/webapps/isolated_web_apps/test_support/signing_keys.h"
 #include "components/webapps/isolated_web_apps/types/storage_location.h"
 #include "content/public/common/content_features.h"
 #include "content/public/test/browser_test.h"
@@ -93,8 +94,8 @@ IN_PROC_BROWSER_TEST_F(InstallIsolatedWebAppFromCommandLineFromUrlBrowserTest,
   WebAppTestInstallObserver observer(browser()->profile());
   webapps::AppId id = observer.BeginListeningAndWait();
 
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            GetWebAppRegistrar().GetInstallState(id));
+  EXPECT_TRUE(
+      GetWebAppRegistrar().AppMatches(id, WebAppFilter::IsIsolatedApp()));
   EXPECT_THAT(
       GetWebAppRegistrar().GetAppById(id),
       test::IwaIs(
@@ -104,7 +105,7 @@ IN_PROC_BROWSER_TEST_F(InstallIsolatedWebAppFromCommandLineFromUrlBrowserTest,
                        VariantWith<IwaStorageProxy>(
                            Property(&IwaStorageProxy::proxy_url,
                                     Eq(url::Origin::Create(GetAppUrl()))))),
-              Eq(base::Version("1.0.0")),
+              Eq(*IwaVersion::Create("1.0.0")),
               /*controlled_frame_partitions=*/_,
               /*pending_update_info=*/Eq(std::nullopt),
               /*integrity_block_data=*/_)));
@@ -154,8 +155,8 @@ IN_PROC_BROWSER_TEST_F(InstallIsolatedWebAppFromCommandLineFromFileBrowserTest,
   ASSERT_EQ(
       id,
       IsolatedWebAppUrlInfo::CreateFromSignedWebBundleId(*bundle_id_).app_id());
-  ASSERT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            GetWebAppRegistrar().GetInstallState(id));
+  ASSERT_TRUE(
+      GetWebAppRegistrar().AppMatches(id, WebAppFilter::IsIsolatedApp()));
 
   // Check that the bundle was copied, not moved.
   base::ScopedAllowBlockingForTesting allow_blocking;
@@ -168,7 +169,7 @@ IN_PROC_BROWSER_TEST_F(InstallIsolatedWebAppFromCommandLineFromFileBrowserTest,
               Property("variant", &IsolatedWebAppStorageLocation::variant,
                        VariantWith<IwaStorageOwnedBundle>(Property(
                            &IwaStorageOwnedBundle::dev_mode, IsTrue()))),
-              Eq(base::Version("1.0.0")),
+              Eq(*IwaVersion::Create("1.0.0")),
               /*controlled_frame_partitions=*/_,
               /*pending_update_info=*/Eq(std::nullopt),
               test::IntegrityBlockDataPublicKeysAre(

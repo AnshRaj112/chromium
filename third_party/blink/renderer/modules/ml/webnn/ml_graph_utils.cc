@@ -146,8 +146,8 @@ base::expected<void, String> ValidateFilterLayout(
     // TODO(crbug.com/1273291): support other layouts by transposing the
     // filter operand.
     if (filter_layout.AsEnum() != V8MLConv2dFilterOperandLayout::Enum::kOhwi) {
-      return base::unexpected(String::Format(
-          "The filter layout %s is not supported.", filter_layout.AsCStr()));
+      return base::unexpected(UNSAFE_TODO(String::Format(
+          "The filter layout %s is not supported.", filter_layout.AsCStr())));
     }
   } else {
     // For depthwise conv2d, NHWC input layout expects weights layout in ihwo
@@ -157,8 +157,8 @@ base::expected<void, String> ValidateFilterLayout(
     // TODO(crbug.com/1273291): support other layouts by transposing the
     // filter operand.
     if (filter_layout.AsEnum() != V8MLConv2dFilterOperandLayout::Enum::kIhwo) {
-      return base::unexpected(String::Format(
-          "The filter layout %s is not supported.", filter_layout.AsCStr()));
+      return base::unexpected(UNSAFE_TODO(String::Format(
+          "The filter layout %s is not supported.", filter_layout.AsCStr())));
     }
   }
 
@@ -273,6 +273,17 @@ bool IsLogicalBinaryOperator(
     case webnn::mojom::blink::ElementWiseBinary::Kind::kLogicalOr:
     case webnn::mojom::blink::ElementWiseBinary::Kind::kLogicalXor:
       return true;
+  }
+}
+
+bool IsLogicalUnaryOperator(webnn::mojom::blink::ElementWiseUnary::Kind kind) {
+  switch (kind) {
+    case webnn::mojom::blink::ElementWiseUnary::Kind::kIsNaN:
+    case webnn::mojom::blink::ElementWiseUnary::Kind::kIsInfinite:
+    case webnn::mojom::blink::ElementWiseUnary::Kind::kLogicalNot:
+      return true;
+    default:
+      return false;
   }
 }
 

@@ -47,6 +47,12 @@ COMPONENT_EXPORT(SIGNIN_SWITCHES)
 extern const char kHistorySyncLastDeclinedTimestamp[];
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 extern const char kHistorySyncSuccessiveDeclineCount[];
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+extern const char kHistoryPageHistorySyncPromoLastDismissedTimestamp[];
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+extern const char kHistoryPageHistorySyncPromoShownAfterDismissal[];
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+extern const char kHistoryPageHistorySyncPromoShownCount[];
 #if BUILDFLAG(IS_IOS)
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 extern const char kRestrictAccountsToPatterns[];
@@ -60,13 +66,17 @@ extern const char kSignedInWithCredentialProvider[];
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 extern const char kSigninAllowed[];
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
-extern const char kGaiaCookieLastListAccountsData[];
-COMPONENT_EXPORT(SIGNIN_SWITCHES)
 extern const char kGaiaCookieLastListAccountsBinaryData[];
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 extern const char kSigninAllowedOnNextStartup[];
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 extern const char kSigninInterceptionIDPCookiesUrl[];
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+extern const char kAddressSignInPromoShownCountPerProfileForLimitsExperiment[];
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+extern const char kBookmarkSignInPromoShownCountPerProfileForLimitsExperiment[];
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+extern const char kPasswordSignInPromoShownCountPerProfileForLimitsExperiment[];
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 extern const char kProfileSeparationSettings[];
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
@@ -81,7 +91,8 @@ COMPONENT_EXPORT(SIGNIN_SWITCHES)
 extern const char kPrefsThemesSearchEnginesAccountStorageEnabled[];
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 extern const char kBoundSessionCredentialsEnabled[];
-
+COMPONENT_EXPORT(SIGNIN_SWITCHES)
+extern const char kPrimaryAccountSetAfterSigninMigration[];
 }  // namespace prefs
 
 #endif  // COMPONENTS_SIGNIN_PUBLIC_BASE_SIGNIN_PREF_NAMES_H_

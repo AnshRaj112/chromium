@@ -123,15 +123,12 @@ class InstallableEvaluatorUnitTest : public content::RenderViewHostTestHarness {
     return page_data_->web_page_metadata_->metadata.get();
   }
 
-  std::optional<InstallableStatusCode> GetCheckInstallabilityErrorCode(
+  InstallableStatusCode GetCheckInstallabilityErrorCode(
       InstallableCriteria criteria) {
     InstallableEvaluator evaluator(web_contents(), *page_data_, criteria);
     auto errors = evaluator.CheckInstallability();
-    if (!errors.has_value()) {
-      return std::nullopt;
-    }
-    return errors->empty() ? InstallableStatusCode::NO_ERROR_DETECTED
-                           : errors.value()[0];
+    return errors.empty() ? InstallableStatusCode::NO_ERROR_DETECTED
+                          : errors[0];
   }
 
  private:
@@ -139,7 +136,7 @@ class InstallableEvaluatorUnitTest : public content::RenderViewHostTestHarness {
 };
 
 TEST_F(InstallableEvaluatorUnitTest, DoNotCheck) {
-  EXPECT_EQ(std::nullopt,
+  EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
             GetCheckInstallabilityErrorCode(InstallableCriteria::kDoNotCheck));
 }
 
@@ -519,7 +516,9 @@ TEST_F(InstallableEvaluatorUnitTest, ManifestDisplayModes) {
 TEST_F(InstallableEvaluatorUnitTest, ManifestDisplayOverride) {
   SetManifest(GetValidManifest());
 
-  manifest()->display_override.push_back(blink::mojom::DisplayMode::kMinimalUi);
+  manifest()->display_override.push_back(
+      blink::Manifest::DisplayOverride::Create(
+          blink::mojom::DisplayMode::kMinimalUi));
   EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
             GetCheckInstallabilityErrorCode(
                 InstallableCriteria::kValidManifestWithIcons));
@@ -527,7 +526,31 @@ TEST_F(InstallableEvaluatorUnitTest, ManifestDisplayOverride) {
             GetCheckInstallabilityErrorCode(
                 InstallableCriteria::kImplicitManifestFieldsHTML));
 
-  manifest()->display_override.push_back(blink::mojom::DisplayMode::kBrowser);
+  manifest()->display_override.push_back(
+      blink::Manifest::DisplayOverride::Create(
+          blink::mojom::DisplayMode::kBrowser));
+  EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
+            GetCheckInstallabilityErrorCode(
+                InstallableCriteria::kValidManifestWithIcons));
+  EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
+            GetCheckInstallabilityErrorCode(
+                InstallableCriteria::kImplicitManifestFieldsHTML));
+
+  manifest()->display_override.insert(
+      manifest()->display_override.begin(),
+      blink::Manifest::DisplayOverride::Create(
+          blink::mojom::DisplayMode::kStandalone));
+  EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
+            GetCheckInstallabilityErrorCode(
+                InstallableCriteria::kValidManifestWithIcons));
+  EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
+            GetCheckInstallabilityErrorCode(
+                InstallableCriteria::kImplicitManifestFieldsHTML));
+
+  manifest()->display_override.insert(
+      manifest()->display_override.begin(),
+      blink::Manifest::DisplayOverride::Create(
+          blink::mojom::DisplayMode::kStandalone));
   EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
             GetCheckInstallabilityErrorCode(
                 InstallableCriteria::kValidManifestWithIcons));
@@ -536,25 +559,8 @@ TEST_F(InstallableEvaluatorUnitTest, ManifestDisplayOverride) {
                 InstallableCriteria::kImplicitManifestFieldsHTML));
 
   manifest()->display_override.insert(manifest()->display_override.begin(),
-                                      blink::mojom::DisplayMode::kStandalone);
-  EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
-            GetCheckInstallabilityErrorCode(
-                InstallableCriteria::kValidManifestWithIcons));
-  EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
-            GetCheckInstallabilityErrorCode(
-                InstallableCriteria::kImplicitManifestFieldsHTML));
-
-  manifest()->display_override.insert(manifest()->display_override.begin(),
-                                      blink::mojom::DisplayMode::kStandalone);
-  EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
-            GetCheckInstallabilityErrorCode(
-                InstallableCriteria::kValidManifestWithIcons));
-  EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
-            GetCheckInstallabilityErrorCode(
-                InstallableCriteria::kImplicitManifestFieldsHTML));
-
-  manifest()->display_override.insert(manifest()->display_override.begin(),
-                                      blink::mojom::DisplayMode::kBrowser);
+                                      blink::Manifest::DisplayOverride::Create(
+                                          blink::mojom::DisplayMode::kBrowser));
   EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
             GetCheckInstallabilityErrorCode(
                 InstallableCriteria::kValidManifestIgnoreDisplay));
@@ -567,7 +573,8 @@ TEST_F(InstallableEvaluatorUnitTest, ManifestDisplayOverride) {
 
   manifest()->display_override.insert(
       manifest()->display_override.begin(),
-      blink::mojom::DisplayMode::kWindowControlsOverlay);
+      blink::Manifest::DisplayOverride::Create(
+          blink::mojom::DisplayMode::kWindowControlsOverlay));
   EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
             GetCheckInstallabilityErrorCode(
                 InstallableCriteria::kValidManifestIgnoreDisplay));
@@ -579,7 +586,8 @@ TEST_F(InstallableEvaluatorUnitTest, ManifestDisplayOverride) {
                 InstallableCriteria::kImplicitManifestFieldsHTML));
 
   manifest()->display_override.insert(manifest()->display_override.begin(),
-                                      blink::mojom::DisplayMode::kTabbed);
+                                      blink::Manifest::DisplayOverride::Create(
+                                          blink::mojom::DisplayMode::kTabbed));
   EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
             GetCheckInstallabilityErrorCode(
                 InstallableCriteria::kValidManifestIgnoreDisplay));
@@ -595,7 +603,9 @@ TEST_F(InstallableEvaluatorUnitTest, FallbackToBrowser) {
   SetManifest(GetValidManifest());
 
   manifest()->display = blink::mojom::DisplayMode::kBrowser;
-  manifest()->display_override.push_back(blink::mojom::DisplayMode::kMinimalUi);
+  manifest()->display_override.push_back(
+      blink::Manifest::DisplayOverride::Create(
+          blink::mojom::DisplayMode::kMinimalUi));
   EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
             GetCheckInstallabilityErrorCode(
                 InstallableCriteria::kValidManifestWithIcons));
@@ -605,7 +615,8 @@ TEST_F(InstallableEvaluatorUnitTest, SupportWindowControlsOverlay) {
   SetManifest(GetValidManifest());
 
   manifest()->display_override.push_back(
-      blink::mojom::DisplayMode::kWindowControlsOverlay);
+      blink::Manifest::DisplayOverride::Create(
+          blink::mojom::DisplayMode::kWindowControlsOverlay));
   EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
             GetCheckInstallabilityErrorCode(
                 InstallableCriteria::kValidManifestWithIcons));
@@ -624,7 +635,9 @@ class InstallableEvaluatorUnitTest_Tabbed
 TEST_F(InstallableEvaluatorUnitTest_Tabbed, SupportTabbed) {
   SetManifest(GetValidManifest());
 
-  manifest()->display_override.push_back(blink::mojom::DisplayMode::kTabbed);
+  manifest()->display_override.push_back(
+      blink::Manifest::DisplayOverride::Create(
+          blink::mojom::DisplayMode::kTabbed));
   EXPECT_EQ(InstallableStatusCode::NO_ERROR_DETECTED,
             GetCheckInstallabilityErrorCode(
                 InstallableCriteria::kValidManifestWithIcons));

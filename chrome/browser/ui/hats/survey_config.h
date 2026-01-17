@@ -13,17 +13,26 @@
 #include "base/time/time.h"
 #include "build/branding_buildflags.h"
 #include "components/compose/buildflags.h"
+#include "pdf/buildflags.h"
 
 #if !BUILDFLAG(IS_ANDROID)
 // Trigger identifiers currently used; duplicates not allowed.
 extern const char kHatsSurveyTriggerAutofillAddress[];
 extern const char kHatsSurveyTriggerAutofillAddressUserPerception[];
+extern const char kHatsSurveyTriggerAutofillAiFilling[];
+extern const char kHatsSurveyTriggerAutofillAiSavePrompt[];
 extern const char kHatsSurveyTriggerAutofillAddressUserDeclinedSuggestion[];
 extern const char kHatsSurveyTriggerAutofillAddressUserDeclinedSave[];
 extern const char kHatsSurveyTriggerAutofillCreditCardUserPerception[];
 extern const char kHatsSurveyTriggerAutofillPasswordUserPerception[];
 extern const char kHatsSurveyTriggerAutofillCard[];
 extern const char kHatsSurveyTriggerAutofillPassword[];
+extern const char kHatsSurveyTriggerManageYourSavedInfoPerception[];
+extern const char kHatsSurveyTriggerManagePasswordsPerception[];
+extern const char kHatsSurveyTriggerManagePaymentsPerception[];
+extern const char kHatsSurveyTriggerManageContactInfoPerception[];
+extern const char kHatsSurveyTriggerManageIdentityDocsPerception[];
+extern const char kHatsSurveyTriggerManageTravelPerception[];
 extern const char kHatsSurveyTriggerDownloadWarningBubbleBypass[];
 extern const char kHatsSurveyTriggerDownloadWarningBubbleHeed[];
 extern const char kHatsSurveyTriggerDownloadWarningBubbleIgnore[];
@@ -45,6 +54,7 @@ extern const char kHatsSurveyTriggerIdentitySwitchProfileFromProfileMenu[];
 extern const char kHatsSurveyTriggerIdentitySwitchProfileFromProfilePicker[];
 extern const char kHatsSurveyTriggerLensOverlayResults[];
 extern const char kHatsSurveyTriggerNtpModules[];
+extern const char kHatsSurveyTriggerNextPanel[];
 extern const char kHatsSurveyTriggerNtpPhotosModuleOptOut[];
 extern const char kHatsSurveyTriggerPasswordChangeCanceled[];
 extern const char kHatsSurveyTriggerPasswordChangeDelayed[];
@@ -78,14 +88,15 @@ extern const char kHatsSurveyTriggerWallpaperSearch[];
 extern const char kHatsSurveyTriggerComposeAcceptance[];
 extern const char kHatsSurveyTriggerComposeClose[];
 extern const char kHatsSurveyTriggerComposeNudgeClose[];
-#endif  // BUILDFLAG(ENABLE_COMPOSE)
+#endif  // #if BUILDFLAG(ENABLE_COMPOSE)
 extern const char kHatsSurveyTriggerWhatsNew[];
-#else
+#else   // BUILDFLAG(IS_ANDROID)
 extern const char kHatsSurveyTriggerAndroidStartupSurvey[];
-extern const char kHatsSurveyTriggerQuickDelete[];
-extern const char kHatsSurveyTriggerClearBrowsingData[];
-extern const char kHatsSurveyTriggerSafetyHubAndroid[];
-extern const char kHatsSurveyOrganicTriggerSafetyHubAndroid[];
+extern const char kHatsSurveyTriggerSigninFirstRun[];
+extern const char kHatsSurveyTriggerSigninWeb[];
+extern const char kHatsSurveyTriggerSigninNtpAvatar[];
+extern const char kHatsSurveyTriggerSigninNtpPromo[];
+extern const char kHatsSurveyTriggerSigninBookmarkPromo[];
 #endif  // #if !BUILDFLAG(IS_ANDROID)
 
 extern const char kHatsSurveyTriggerPermissionsPrompt[];
@@ -102,11 +113,13 @@ extern const char
     kHatsSurveyTriggerPlusAddressFilledPlusAddressViaManualFallback[];
 extern const char kHatsSurveyTriggerPrivacySandboxSentimentSurvey[];
 extern const char kHatsSurveyTriggerPrivacySandboxActSurvey[];
-extern const char kHatsSurveyTriggerMerchantTrustEvaluationControlSurvey[];
-extern const char kHatsSurveyTriggerMerchantTrustEvaluationExperimentSurvey[];
-extern const char kHatsSurveyTriggerMerchantTrustLearnSurvey[];
 extern const char kHatsSurveyTriggerOnFocusZpsSuggestionsHappiness[];
 extern const char kHatsSurveyTriggerOnFocusZpsSuggestionsUtility[];
+
+#if BUILDFLAG(ENABLE_PDF_SAVE_TO_DRIVE)
+extern const char kHatsSurveyConsumerTriggerPdfSaveToDrive[];
+extern const char kHatsSurveyEnterpriseTriggerPdfSaveToDrive[];
+#endif  // BUILDFLAG(ENABLE_PDF_SAVE_TO_DRIVE)
 
 extern const char kHatsSurveyTriggerTesting[];
 // The Trigger ID for a test HaTS Next survey which is available for testing
@@ -126,6 +139,24 @@ struct SurveyConfig {
   };
   // LINT.ThenChange(//chrome/browser/ui/android/hats/java/src/org/chromium/chrome/browser/ui/hats/SurveyConfig.java:RequestedBrowserType)
 
+  // Enum to control the minimum profile age check before showing a survey.
+  // The profile age is determined by the creation time of the profile
+  // directory, and is NOT related to the age of the user.
+  enum class ProfileAgeRequirement {
+    // Default requirement: Only show the survey if the current profile was
+    // created at least 30 days ago. This helps filter out transient or
+    // very new profiles, aiming for feedback from more established users.
+    kOneMonthOrOlder,
+
+    // Allow the survey to be shown regardless of how recently the profile
+    // was created. Use this option with caution, as it can introduce bias.
+    // For example, on shared computers where profiles are frequently reset,
+    // this could lead to overrepresentation of these environments in survey
+    // results, and bypass "at most 1 survey per user" throttling if not
+    // combined with other constraints.
+    kAnyAge
+  };
+
   // Constructs a SurveyConfig by inspecting |feature|. This includes checking
   // if the feature is enabled, as well as inspecting the feature parameters
   // for the survey probability, and if |presupplied_trigger_id| is not
@@ -143,6 +174,8 @@ struct SurveyConfig {
       const std::vector<std::string>& product_specific_string_data_fields = {},
       bool log_responses_to_uma = false,
       bool log_responses_to_ukm = false,
+      ProfileAgeRequirement profile_age_requirement =
+          ProfileAgeRequirement::kOneMonthOrOlder,
       RequestedBrowserType requested_browser_type =
           RequestedBrowserType::kRegular);
 
@@ -181,6 +214,10 @@ struct SurveyConfig {
   // Product Specific String Data fields which are sent with the survey
   // response.
   std::vector<std::string> product_specific_string_data_fields;
+
+  // Specifies the profile age requirement.
+  ProfileAgeRequirement profile_age_requirement =
+      ProfileAgeRequirement::kOneMonthOrOlder;
 
   // Requested browser type decides where the survey can be shown.
   RequestedBrowserType requested_browser_type = RequestedBrowserType::kRegular;

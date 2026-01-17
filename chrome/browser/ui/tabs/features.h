@@ -13,28 +13,18 @@ namespace tabs {
 
 BASE_DECLARE_FEATURE(kDebugUITabStrip);
 
-BASE_DECLARE_FEATURE(kSplitTabStrip);
-
-BASE_DECLARE_FEATURE(kScrollableTabStrip);
-extern const char kMinimumTabWidthFeatureParameterName[];
-
-BASE_DECLARE_FEATURE(kScrollableTabStripWithDragging);
-extern const char kTabScrollingWithDraggingModeName[];
-
 BASE_DECLARE_FEATURE(kTabGroupHome);
-
-BASE_DECLARE_FEATURE(kScrollableTabStripOverflow);
-extern const char kScrollableTabStripOverflowModeName[];
-
-BASE_DECLARE_FEATURE(kTabSearchPositionSetting);
-
-BASE_DECLARE_FEATURE(kTabGroupShortcuts);
 
 BASE_DECLARE_FEATURE(kVerticalTabs);
 
-extern bool CanShowTabSearchPositionSetting();
-extern bool AreTabGroupShortcutsEnabled();
-extern bool AreVerticalTabsEnabled();
+BASE_DECLARE_FEATURE(kTabSelectionByPointer);
+
+BASE_DECLARE_FEATURE(kBackToOpener);
+
+BASE_DECLARE_FEATURE(kProjectsPanel);
+
+bool IsVerticalTabsFeatureEnabled();
+bool IsProjectsPanelFeatureEnabled();
 
 }  // namespace tabs
 

@@ -62,14 +62,8 @@ class ReadableStream::PullAlgorithm final : public StreamAlgorithm {
 
   ScriptPromise<IDLUndefined> Run(
       ScriptState* script_state,
-      int spanification_suspected_redundant_argc,
       base::span<v8::Local<v8::Value>> argv) override {
-    // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-    // redundant in M143.
-    CHECK(
-        spanification_suspected_redundant_argc == static_cast<int>(argv.size()),
-        base::NotFatalUntil::M143);
-    DCHECK_EQ(spanification_suspected_redundant_argc, 0);
+    DCHECK_EQ(argv.size(), 0u);
     DCHECK(controller_);
     ScriptPromise<IDLUndefined> promise;
     if (script_state->ContextIsValid()) {
@@ -118,14 +112,8 @@ class ReadableStream::CancelAlgorithm final : public StreamAlgorithm {
 
   ScriptPromise<IDLUndefined> Run(
       ScriptState* script_state,
-      int spanification_suspected_redundant_argc,
       base::span<v8::Local<v8::Value>> argv) override {
-    // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-    // redundant in M143.
-    CHECK(
-        spanification_suspected_redundant_argc == static_cast<int>(argv.size()),
-        base::NotFatalUntil::M143);
-    DCHECK_EQ(spanification_suspected_redundant_argc, 1);
+    DCHECK_EQ(argv.size(), 1u);
     ScriptPromise<IDLUndefined> promise;
     if (script_state->ContextIsValid()) {
       v8::TryCatch try_catch(script_state->GetIsolate());
@@ -544,7 +532,7 @@ V8ReadableStreamReader* ReadableStream::getReader(
     ExceptionState& exception_state) {
   // https://streams.spec.whatwg.org/#rs-get-reader
   if (options->hasMode()) {
-    DCHECK_EQ(options->mode(), "byob");
+    DCHECK_EQ(options->mode(), V8ReadableStreamReaderMode::Enum::kByob);
 
     UseCounter::Count(ExecutionContext::From(script_state),
                       WebFeature::kReadableStreamBYOBReader);
@@ -572,7 +560,7 @@ ReadableStreamBYOBReader* ReadableStream::GetBYOBReaderForTesting(
     ScriptState* script_state,
     ExceptionState& exception_state) {
   auto* options = ReadableStreamGetReaderOptions::Create();
-  options->setMode("byob");
+  options->setMode(V8ReadableStreamReaderMode::Enum::kByob);
   auto* result = getReader(script_state, options, exception_state);
   if (!result)
     return nullptr;

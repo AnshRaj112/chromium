@@ -9,6 +9,7 @@
 #include "base/functional/callback.h"
 #include "base/memory/raw_ref.h"
 #include "base/notimplemented.h"
+#include "base/time/time.h"
 #include "ui/events/devices/stylus_state.h"
 
 namespace ui {
@@ -60,8 +61,8 @@ bool StubInputController::IsSlowKeysEnabled() const {
 void StubInputController::SetSlowKeysDelay(base::TimeDelta delay) {}
 void StubInputController::SetCurrentLayoutByName(
     const std::string& layout_name,
-    base::OnceCallback<void(bool)> callback) {
-  std::move(callback).Run(false);
+    base::OnceCallback<void(bool success)> callback) {
+  std::move(callback).Run(/*success=*/false);
 }
 void StubInputController::SetKeyboardKeyBitsMapping(
     base::flat_map<int, std::vector<uint64_t>> key_bits_mapping) {}

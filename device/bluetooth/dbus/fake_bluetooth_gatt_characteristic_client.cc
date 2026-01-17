@@ -2,16 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "device/bluetooth/dbus/fake_bluetooth_gatt_characteristic_client.h"
 
 #include <memory>
 
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/logging.h"
@@ -176,7 +171,7 @@ void FakeBluetoothGattCharacteristicClient::ReadValue(
     return;
   }
 
-  if (base::Contains(action_extra_requests_, "ReadValue")) {
+  if (action_extra_requests_.contains("ReadValue")) {
     DelayedCallback* delayed = action_extra_requests_["ReadValue"];
     delayed->delay_--;
     std::move(error_callback)
@@ -249,7 +244,7 @@ void FakeBluetoothGattCharacteristicClient::WriteValue(
   }
 
   DCHECK(heart_rate_control_point_properties_.get());
-  if (base::Contains(action_extra_requests_, "WriteValue")) {
+  if (action_extra_requests_.contains("WriteValue")) {
     DelayedCallback* delayed = action_extra_requests_["WriteValue"];
     delayed->delay_--;
     std::move(error_callback)
@@ -618,7 +613,7 @@ FakeBluetoothGattCharacteristicClient::GetHeartRateMeasurementValue() {
   // Return the bytes in an array.
   uint8_t* bytes = reinterpret_cast<uint8_t*>(&value);
   std::vector<uint8_t> return_value;
-  return_value.assign(bytes, bytes + sizeof(value));
+  return_value.assign(bytes, UNSAFE_TODO(bytes + sizeof(value)));
   return return_value;
 }
 

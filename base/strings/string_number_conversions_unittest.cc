@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40284755): Remove this and spanify to fix the errors.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "base/strings/string_number_conversions.h"
 
 #include <errno.h>
@@ -21,6 +16,7 @@
 #include <string_view>
 
 #include "base/bit_cast.h"
+#include "base/compiler_specific.h"
 #include "base/format_macros.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
@@ -763,7 +759,7 @@ TEST(StringNumberConversionsTest, HexStringToBytesStringSpan) {
       // On failure the output will only have been partially written (with
       // everything after the failure being 0).
       for (size_t i = 0; i < test.output_len; ++i) {
-        EXPECT_EQ(test.output[i], static_cast<char>(output[i]))
+        EXPECT_EQ(UNSAFE_TODO(test.output[i]), static_cast<char>(output[i]))
             << test_i << ": " << test.input;
       }
       for (size_t i = test.output_len; i < output.size(); ++i) {
@@ -923,13 +919,30 @@ TEST(StringNumberConversionsTest, DoubleToString) {
   // The following two values were seen in crashes in the wild.
   const char input_bytes[8] = {0, 0, 0, 0, '\xee', '\x6d', '\x73', '\x42'};
   double input = 0;
-  memcpy(&input, input_bytes, std::size(input_bytes));
+  UNSAFE_TODO(memcpy(&input, input_bytes, std::size(input_bytes)));
   EXPECT_EQ("1.335179083776e+12", NumberToString(input));
   const char input_bytes2[8] = {0,      0,      0,      '\xa0',
                                 '\xda', '\x6c', '\x73', '\x42'};
   input = 0;
-  memcpy(&input, input_bytes2, std::size(input_bytes2));
+  UNSAFE_TODO(memcpy(&input, input_bytes2, std::size(input_bytes2)));
   EXPECT_EQ("1.33489033216e+12", NumberToString(input));
+}
+
+TEST(StringNumberConversionsTest, DoubleToStringFixedPrecision) {
+  static const struct {
+    double input;
+    int digits;
+    const char* expected;
+  } cases[] = {
+      {0.0, 0, "0"},      {0.0, 3, "0.000"},     {0.5, 3, "0.500"},
+      {1.25, 3, "1.250"}, {1.33518, 3, "1.335"}, {1.33578, 3, "1.336"},
+  };
+
+  for (const auto& i : cases) {
+    EXPECT_EQ(i.expected, NumberToStringWithFixedPrecision(i.input, i.digits));
+    EXPECT_EQ(i.expected, UTF16ToUTF8(NumberToString16WithFixedPrecision(
+                              i.input, i.digits)));
+  }
 }
 
 TEST(StringNumberConversionsTest, AppendHexEncodedByte) {
@@ -953,6 +966,8 @@ TEST(StringNumberConversionsTest, HexEncode) {
   EXPECT_EQ(HexEncode(nullptr, 0), "");
   EXPECT_EQ(HexEncode(base::span<uint8_t>()), "");
   EXPECT_EQ(HexEncode(std::string()), "");
+  EXPECT_EQ(HexEncodeLower(base::span<uint8_t>()), "");
+  EXPECT_EQ(HexEncodeLower(std::string()), "");
 
   const auto kBytes = std::to_array<uint8_t>({
       0x01,
@@ -964,12 +979,15 @@ TEST(StringNumberConversionsTest, HexEncode) {
       0x81,
   });
   EXPECT_EQ(HexEncode(kBytes.data(), sizeof(kBytes)), "01FF02FE038081");
-  EXPECT_EQ(HexEncode(kBytes), "01FF02FE038081");  // Implicit span conversion.
+  // Implicit span conversion:
+  EXPECT_EQ(HexEncode(kBytes), "01FF02FE038081");
+  EXPECT_EQ(HexEncodeLower(kBytes), "01ff02fe038081");
 
   const std::string kString = "\x01\xff";
   EXPECT_EQ(HexEncode(kString.c_str(), kString.size()), "01FF");
-  EXPECT_EQ(HexEncode(kString),
-            "01FF");  // Implicit std::string_view conversion.
+  // Implicit std::string_view conversion:
+  EXPECT_EQ(HexEncode(kString), "01FF");
+  EXPECT_EQ(HexEncodeLower(kString), "01ff");
 }
 
 // Test cases of known-bad strtod conversions that motivated the use of dmg_fp.

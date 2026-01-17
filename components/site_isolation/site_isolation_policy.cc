@@ -4,7 +4,6 @@
 
 #include "components/site_isolation/site_isolation_policy.h"
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/json/values_util.h"
 #include "base/metrics/field_trial_params.h"
@@ -69,10 +68,11 @@ bool ShouldDisableSiteIsolationDueToMemorySlow(
     int memory_threshold_mb = base::GetFieldTrialParamByFeatureAsInt(
         features::kSiteIsolationMemoryThresholdsAndroid, param_name,
         default_memory_threshold_mb);
-    return base::SysInfo::AmountOfPhysicalMemoryMB() <= memory_threshold_mb;
+    return base::SysInfo::AmountOfPhysicalMemory().InMiB() <=
+           memory_threshold_mb;
   }
 
-  if (base::SysInfo::AmountOfPhysicalMemoryMB() <=
+  if (base::SysInfo::AmountOfPhysicalMemory().InMiB() <=
       default_memory_threshold_mb) {
     return true;
   }
@@ -106,16 +106,15 @@ bool ShouldDisableOriginIsolationDueToMemorySlow() {
   // restrictions in that case.
   return false;
 #else
-  // TODO(crbug.com/40259221): This value currently matches the default
-  // threshold for site isolation, but once more trial data is available it
-  // should be adjusted.
-  int default_memory_threshold_mb = 1077;
+  // This value matches the threshold in the origin isolation study.
+  int default_memory_threshold_mb = 4096;
   if (base::FeatureList::IsEnabled(features::kOriginIsolationMemoryThreshold)) {
     int memory_threshold_mb = base::GetFieldTrialParamByFeatureAsInt(
         features::kOriginIsolationMemoryThreshold,
         features::kOriginIsolationMemoryThresholdParamName,
         default_memory_threshold_mb);
-    return base::SysInfo::AmountOfPhysicalMemoryMB() <= memory_threshold_mb;
+    return base::SysInfo::AmountOfPhysicalMemory().InMiB() <=
+           memory_threshold_mb;
   }
   return false;
 #endif
@@ -214,7 +213,8 @@ bool SiteIsolationPolicy::IsEnterprisePolicyApplicable() {
   // Using 1077 rather than 1024 because it helps ensure that devices with
   // exactly 1GB of RAM won't get included because of inaccuracies or off-by-one
   // errors.
-  bool have_enough_memory = base::SysInfo::AmountOfPhysicalMemoryMB() > 1077;
+  bool have_enough_memory =
+      base::SysInfo::AmountOfPhysicalMemory().InMiB() > 1077;
   return have_enough_memory;
 #else
   return true;
@@ -270,9 +270,9 @@ void SiteIsolationPolicy::PersistUserTriggeredIsolatedOrigin(
       user_prefs::UserPrefs::Get(context),
       site_isolation::prefs::kUserTriggeredIsolatedOrigins);
   base::Value::List& list = update.Get();
-  base::Value value(origin.Serialize());
-  if (!base::Contains(list, value)) {
-    list.Append(std::move(value));
+  std::string value(origin.Serialize());
+  if (!list.contains(value)) {
+    list.Append(value);
   }
 }
 

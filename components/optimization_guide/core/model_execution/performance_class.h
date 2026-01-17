@@ -24,6 +24,13 @@ void UpdatePerformanceClassPref(
     PrefService* local_state,
     OnDeviceModelPerformanceClass performance_class);
 
+// Stores the device info in the preferences file.
+void UpdateDeviceInfoPrefs(PrefService* local_state,
+                           uint32_t vendor_id,
+                           uint32_t device_id,
+                           std::string driver_version,
+                           bool supports_fp16);
+
 // Loads the performance class from the preferences file.
 OnDeviceModelPerformanceClass PerformanceClassFromPref(
     const PrefService& local_state);
@@ -37,6 +44,10 @@ bool IsPerformanceClassCompatible(
 std::string SyntheticTrialGroupForPerformanceClass(
     OnDeviceModelPerformanceClass performance_class);
 
+// Get the name of the synthetic trial group for this performance hint.
+std::string SyntheticTrialGroupForPerformanceHint(
+    proto::OnDeviceModelPerformanceHint performance_hint);
+
 // Computes performance class at most once, and allows observation of it's
 // availability.
 class PerformanceClassifier final {
@@ -49,9 +60,6 @@ class PerformanceClassifier final {
   base::SafeRef<PerformanceClassifier> GetSafeRef() {
     return weak_ptr_factory_.GetSafeRef();
   }
-
-  // Do deferred initialization, like reading prefs / checking features.
-  void Init();
 
   // Ensures the performance class will be up to date and available when
   // `complete` runs.
@@ -93,7 +101,9 @@ class PerformanceClassifier final {
 
  private:
   // Called when performance class has finished evaluating.
-  void PerformanceClassEvaluated(OnDeviceModelPerformanceClass perf_class);
+  void OnDeviceAndPerformanceInfo(
+      on_device_model::mojom::DevicePerformanceInfoPtr perf_info,
+      on_device_model::mojom::DeviceInfoPtr device_info);
 
   raw_ptr<PrefService> local_state_;
 

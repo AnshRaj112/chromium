@@ -13,7 +13,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/containers/span.h"
 #include "base/functional/callback_helpers.h"
@@ -75,7 +74,7 @@ bool IsGenericUsbDescription(const std::string& make_and_model) {
           "seiko epson usb mfp",
           "oki data corp usb device",
       });
-  return base::Contains(kGenericUsbModels, make_and_model);
+  return kGenericUsbModels.contains(make_and_model);
 }
 
 // Callback for device.mojom.UsbDevice.ControlTransferIn.
@@ -227,8 +226,7 @@ std::string CreateUsbPrinterId(const UsbDeviceInfo& device_info) {
   md5.Update(GetManufacturerName(device_info));
   md5.Update(GetProductName(device_info));
   Md5UpdateString16(md5, GetSerialNumber(device_info));
-  return base::StringPrintf("usb-%s",
-                            base::ToLowerASCII(base::HexEncode(md5.Finish())));
+  return base::StringPrintf("usb-%s", base::HexEncodeLower(md5.Finish()));
 }
 
 // Creates a mojom filter which can be used to identify a basic USB printer.
@@ -412,6 +410,9 @@ bool UsbDeviceToPrinter(const UsbDeviceInfo& device_info,
   entry->printer.SetUri(UsbPrinterUri(device_info));
   entry->printer.set_id(CreateUsbPrinterId(device_info));
   entry->printer.set_supports_ippusb(UsbDeviceSupportsIppusb(device_info));
+  entry->printer.set_usb_device_id(chromeos::Printer::UsbDeviceId(
+      device_info.vendor_id, device_info.product_id));
+
   return true;
 }
 

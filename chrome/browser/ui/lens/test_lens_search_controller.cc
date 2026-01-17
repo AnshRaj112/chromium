@@ -9,6 +9,7 @@
 #include "chrome/browser/ui/lens/lens_overlay_query_controller.h"
 #include "chrome/browser/ui/lens/test_lens_overlay_controller.h"
 #include "chrome/browser/ui/lens/test_lens_overlay_query_controller.h"
+#include "chrome/browser/ui/lens/test_lens_search_contextualization_controller.h"
 #include "components/prefs/pref_service.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/sync/service/sync_service.h"
@@ -53,6 +54,11 @@ lens::Text CreateTestText(const std::vector<std::string>& words) {
 
 }  // namespace
 
+MockLensSearchController::MockLensSearchController(tabs::TabInterface* tab)
+    : LensSearchController(tab) {}
+
+MockLensSearchController::~MockLensSearchController() = default;
+
 std::unique_ptr<LensOverlayController>
 TestLensSearchController::CreateLensOverlayController(
     tabs::TabInterface* tab,
@@ -76,7 +82,6 @@ TestLensSearchController::CreateLensQueryController(
     lens::LensOverlayFullImageResponseCallback full_image_callback,
     lens::LensOverlayUrlResponseCallback url_callback,
     lens::LensOverlayInteractionResponseCallback interaction_callback,
-    lens::LensOverlaySuggestInputsCallback suggest_inputs_callback,
     lens::LensOverlayThumbnailCreatedCallback thumbnail_created_callback,
     lens::UploadProgressCallback upload_progress_callback,
     variations::VariationsClient* variations_client,
@@ -88,9 +93,9 @@ TestLensSearchController::CreateLensQueryController(
   auto fake_query_controller =
       std::make_unique<lens::TestLensOverlayQueryController>(
           full_image_callback, url_callback, interaction_callback,
-          suggest_inputs_callback, thumbnail_created_callback,
-          upload_progress_callback, variations_client, identity_manager,
-          profile, invocation_source, use_dark_mode, gen204_controller);
+          thumbnail_created_callback, upload_progress_callback,
+          variations_client, identity_manager, profile, invocation_source,
+          use_dark_mode, gen204_controller);
 
   // Set up the fake responses for the query controller.
   lens::LensOverlayServerClusterInfoResponse cluster_info_response;
@@ -111,6 +116,12 @@ TestLensSearchController::CreateLensQueryController(
   interaction_response.set_encoded_response(kTestSuggestSignals);
   fake_query_controller->set_fake_interaction_response(interaction_response);
   return fake_query_controller;
+}
+
+std::unique_ptr<lens::LensSearchContextualizationController>
+TestLensSearchController::CreateLensSearchContextualizationController() {
+  return std::make_unique<lens::TestLensSearchContextualizationController>(
+      this);
 }
 
 }  // namespace lens

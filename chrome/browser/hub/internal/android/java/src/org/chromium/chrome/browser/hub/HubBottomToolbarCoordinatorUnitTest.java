@@ -20,13 +20,18 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
+import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.R;
+import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeController;
 import org.chromium.ui.base.TestActivity;
+import org.chromium.ui.edge_to_edge.EdgeToEdgePadAdjuster;
 
 /** Tests for {@link HubBottomToolbarCoordinator}. */
 @RunWith(BaseRobolectricTestRunner.class)
@@ -39,6 +44,11 @@ public class HubBottomToolbarCoordinatorUnitTest {
 
     @Mock private PaneManager mPaneManager;
     @Mock private HubColorMixer mHubColorMixer;
+    @Mock private EdgeToEdgeController mEdgeToEdgeController;
+    @Captor private ArgumentCaptor<EdgeToEdgePadAdjuster> mPadAdjusterCaptor;
+
+    private final ObservableSupplierImpl<EdgeToEdgeController> mEdgeToEdgeSupplier =
+            new ObservableSupplierImpl<>();
 
     private Activity mActivity;
     private FrameLayout mContainer;
@@ -60,7 +70,12 @@ public class HubBottomToolbarCoordinatorUnitTest {
         HubBottomToolbarDelegate emptyDelegate = spy(new EmptyHubBottomToolbarDelegate());
         HubBottomToolbarCoordinator coordinator =
                 new HubBottomToolbarCoordinator(
-                        mActivity, mContainer, mPaneManager, mHubColorMixer, emptyDelegate);
+                        mActivity,
+                        mContainer,
+                        mPaneManager,
+                        mHubColorMixer,
+                        emptyDelegate,
+                        mEdgeToEdgeSupplier);
         coordinator.destroy();
         verify(emptyDelegate).destroy();
     }
@@ -71,7 +86,12 @@ public class HubBottomToolbarCoordinatorUnitTest {
         HubBottomToolbarDelegate emptyDelegate = spy(new EmptyHubBottomToolbarDelegate());
         HubBottomToolbarCoordinator coordinator =
                 new HubBottomToolbarCoordinator(
-                        mActivity, mContainer, mPaneManager, mHubColorMixer, emptyDelegate);
+                        mActivity,
+                        mContainer,
+                        mPaneManager,
+                        mHubColorMixer,
+                        emptyDelegate,
+                        mEdgeToEdgeSupplier);
 
         // Verify initializeBottomToolbarView was called
         verify(emptyDelegate)
@@ -84,6 +104,27 @@ public class HubBottomToolbarCoordinatorUnitTest {
         View addedView = mContainer.getChildAt(0);
         HubBottomToolbarView bottomToolbarView = addedView.findViewById(R.id.hub_bottom_toolbar);
         assertNotNull(bottomToolbarView);
+
+        coordinator.destroy();
+    }
+
+    @Test
+    public void testPadAdjuster() {
+        HubBottomToolbarDelegate emptyDelegate = spy(new EmptyHubBottomToolbarDelegate());
+        HubBottomToolbarCoordinator coordinator =
+                new HubBottomToolbarCoordinator(
+                        mActivity,
+                        mContainer,
+                        mPaneManager,
+                        mHubColorMixer,
+                        emptyDelegate,
+                        mEdgeToEdgeSupplier);
+
+        assertTrue(mEdgeToEdgeSupplier.hasObservers());
+
+        mEdgeToEdgeSupplier.set(mEdgeToEdgeController);
+        verify(mEdgeToEdgeController).registerAdjuster(mPadAdjusterCaptor.capture());
+        assertNotNull(mPadAdjusterCaptor.getValue());
 
         coordinator.destroy();
     }

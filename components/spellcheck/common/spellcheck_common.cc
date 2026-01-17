@@ -4,11 +4,11 @@
 
 #include "components/spellcheck/common/spellcheck_common.h"
 
+#include <algorithm>
 #include <string_view>
 
 #include "base/check.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/metrics/field_trial.h"
 #include "base/strings/string_util.h"
@@ -17,6 +17,8 @@
 #include "third_party/icu/source/common/unicode/utypes.h"
 
 namespace spellcheck {
+
+namespace {
 
 struct LanguageRegion {
   const char* language;         // The language.
@@ -58,6 +60,7 @@ static constexpr LanguageRegion kSupportedSpellCheckerLanguages[] = {
     {"fo", "fo-FO"},
     {"fr", "fr-FR"},
     {"fr-FR", "fr-FR"},
+    {"gl", "gl"},
     {"he", "he-IL"},
     {"hi", "hi-IN"},
     {"hr", "hr-HR"},
@@ -91,14 +94,6 @@ static constexpr LanguageRegion kSupportedSpellCheckerLanguages[] = {
     // clang-format on
 };
 
-bool IsValidRegion(const std::string& region) {
-  for (const auto& lang_region : kSupportedSpellCheckerLanguages) {
-    if (lang_region.language_region == region)
-      return true;
-  }
-  return false;
-}
-
 // This function returns the language-region version of language name.
 // e.g. returns hi-IN for hi.
 std::string GetSpellCheckLanguageRegion(std::string_view input_language) {
@@ -109,6 +104,8 @@ std::string GetSpellCheckLanguageRegion(std::string_view input_language) {
 
   return std::string(input_language);
 }
+
+}  // namespace
 
 base::FilePath GetVersionedFileName(std::string_view input_language,
                                     const base::FilePath& dict_dir) {
@@ -150,6 +147,9 @@ base::FilePath GetVersionedFileName(std::string_view input_language,
 
       // March 2022: Update uk-UA dictionary from upstream.
       {"uk-UA", "-5-0"},
+
+      // Nov 2025: Initial check-in of Galician
+      {"gl", "-1-0"},
   };
 
   // Generate the bdict file name using default version string or special
@@ -231,7 +231,7 @@ void FillSuggestions(
 
     const std::u16string& suggestion = suggestions_list[language][index];
     // Only add the suggestion if it's unique.
-    if (!base::Contains(*optional_suggestions, suggestion)) {
+    if (!std::ranges::contains(*optional_suggestions, suggestion)) {
       optional_suggestions->push_back(suggestion);
     }
     if (optional_suggestions->size() >= kMaxSuggestions) {

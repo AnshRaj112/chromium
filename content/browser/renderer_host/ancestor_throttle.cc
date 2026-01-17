@@ -30,7 +30,6 @@
 #include "net/http/http_response_headers.h"
 #include "services/network/public/cpp/content_security_policy/content_security_policy.h"
 #include "services/network/public/cpp/content_security_policy/csp_context.h"
-#include "third_party/blink/public/mojom/devtools/console_message.mojom-shared.h"
 #include "third_party/blink/public/mojom/devtools/console_message.mojom.h"
 #include "third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom.h"
 
@@ -369,7 +368,7 @@ AncestorThrottle::CheckResult AncestorThrottle::EvaluateFrameAncestors(
             GURL(),  // url_before_redirects is ignored for frame-ancestors
             navigation_handle()->WasServerRedirect(), empty_source_location,
             network::CSPContext::CheckCSPDisposition::CHECK_ALL_CSP,
-            navigation_handle()->IsFormSubmission());
+            /*is_opaque_fenced_frame=*/false);
     if (result.WouldBlockIfWildcardDoesNotMatchWs()) {
       GetContentClient()->browser()->LogWebFeatureForCurrentPage(
           parent,

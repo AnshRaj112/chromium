@@ -4,6 +4,9 @@
 
 package org.chromium.chrome.browser.sync.settings;
 
+import static org.chromium.build.NullUtil.assertNonNull;
+import static org.chromium.build.NullUtil.assumeNonNull;
+
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
@@ -12,7 +15,6 @@ import android.os.Bundle;
 import android.os.UserManager;
 
 import androidx.annotation.LayoutRes;
-import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentManager;
@@ -23,21 +25,24 @@ import androidx.preference.PreferenceScreen;
 
 import org.chromium.base.CallbackUtils;
 import org.chromium.base.ContextUtils;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneshotSupplier;
+import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.settings.ChromeBaseSettingsFragment;
 import org.chromium.chrome.browser.settings.ChromeManagedPreferenceDelegate;
 import org.chromium.chrome.browser.settings.SettingsNavigationFactory;
+import org.chromium.chrome.browser.settings.search.ChromeBaseSearchIndexProvider;
 import org.chromium.chrome.browser.signin.services.DisplayableProfileData;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.signin.services.ProfileDataCache;
+import org.chromium.chrome.browser.signin.services.SigninManager;
 import org.chromium.chrome.browser.signin.services.SigninManager.SignInStateObserver;
 import org.chromium.chrome.browser.sync.SyncServiceFactory;
 import org.chromium.chrome.browser.sync.TrustedVaultClient;
-import org.chromium.chrome.browser.sync.settings.SyncSettingsUtils.SyncError;
 import org.chromium.chrome.browser.sync.ui.PassphraseDialogFragment;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.ui.signin.SignOutCoordinator;
@@ -53,8 +58,11 @@ import org.chromium.components.signin.GAIAServiceType;
 import org.chromium.components.signin.base.AccountInfo;
 import org.chromium.components.signin.base.CoreAccountInfo;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
+import org.chromium.components.signin.identitymanager.IdentityManager;
 import org.chromium.components.signin.metrics.SignoutReason;
 import org.chromium.components.sync.SyncService;
+import org.chromium.components.sync.UserActionableError;
+import org.chromium.components.trusted_vault.TrustedVaultUserActionTriggerForUMA;
 import org.chromium.components.user_prefs.UserPrefs;
 import org.chromium.ui.UiUtils;
 import org.chromium.ui.modaldialog.ModalDialogManagerHolder;
@@ -70,6 +78,7 @@ import java.util.List;
  *
  * <p>Note: This can be triggered from a web page, e.g. a GAIA sign-in page.
  */
+@NullMarked
 public class AccountManagementFragment extends ChromeBaseSettingsFragment
         implements SignInStateObserver,
                 ProfileDataCache.Observer,
@@ -95,20 +104,18 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
 
     private @GAIAServiceType int mGaiaServiceType = GAIAServiceType.GAIA_SERVICE_TYPE_NONE;
 
-    private CoreAccountInfo mSignedInCoreAccountInfo;
+    private @Nullable CoreAccountInfo mSignedInCoreAccountInfo;
     private ProfileDataCache mProfileDataCache;
     private SyncService mSyncService;
-    private @Nullable SyncService.SyncSetupInProgressHandle mSyncSetupInProgressHandle;
-    private OneshotSupplier<SnackbarManager> mSnackbarManagerSupplier;
+    private SyncService.@Nullable SyncSetupInProgressHandle mSyncSetupInProgressHandle;
+    private @Nullable OneshotSupplier<SnackbarManager> mSnackbarManagerSupplier;
     private final ObservableSupplierImpl<String> mPageTitle = new ObservableSupplierImpl<>();
 
     @Override
-    public void onCreatePreferences(Bundle savedState, String rootKey) {
-        mSyncService = SyncServiceFactory.getForProfile(getProfile());
-        if (mSyncService != null) {
-            // Prevent sync settings changes from taking effect until the user leaves this screen.
-            mSyncSetupInProgressHandle = mSyncService.getSetupInProgressHandle();
-        }
+    public void onCreatePreferences(@Nullable Bundle savedState, @Nullable String rootKey) {
+        mSyncService = assumeNonNull(SyncServiceFactory.getForProfile(getProfile()));
+        // Prevent sync settings changes from taking effect until the user leaves this screen.
+        mSyncSetupInProgressHandle = mSyncService.getSetupInProgressHandle();
 
         if (getArguments() != null) {
             mGaiaServiceType =
@@ -117,12 +124,11 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
 
         mProfileDataCache =
                 ProfileDataCache.createWithDefaultImageSizeAndNoBadge(
-                        requireContext(),
-                        IdentityServicesProvider.get().getIdentityManager(getProfile()));
+                        requireContext(), getIdentityManager());
     }
 
     @Override
-    public ObservableSupplier<String> getPageTitle() {
+    public MonotonicObservableSupplier<String> getPageTitle() {
         return mPageTitle;
     }
 
@@ -156,7 +162,7 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
     @Override
     public void onResume() {
         super.onResume();
-        IdentityServicesProvider.get().getSigninManager(getProfile()).addSignInStateObserver(this);
+        getSigninManager().addSignInStateObserver(this);
         mProfileDataCache.addObserver(this);
     }
 
@@ -164,9 +170,7 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
     public void onPause() {
         super.onPause();
         mProfileDataCache.removeObserver(this);
-        IdentityServicesProvider.get()
-                .getSigninManager(getProfile())
-                .removeSignInStateObserver(this);
+        getSigninManager().removeSignInStateObserver(this);
     }
 
     public void update() {
@@ -175,10 +179,7 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
 
         if (getPreferenceScreen() != null) getPreferenceScreen().removeAll();
 
-        mSignedInCoreAccountInfo =
-                IdentityServicesProvider.get()
-                        .getIdentityManager(getProfile())
-                        .getPrimaryAccountInfo(ConsentLevel.SIGNIN);
+        mSignedInCoreAccountInfo = getIdentityManager().getPrimaryAccountInfo(ConsentLevel.SIGNIN);
         List<AccountInfo> accounts =
                 AccountUtils.getAccountsIfFulfilledOrEmpty(
                         AccountManagerFacadeProvider.getInstance().getAccounts());
@@ -192,8 +193,11 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
         DisplayableProfileData profileData =
                 mProfileDataCache.getProfileDataOrDefault(mSignedInCoreAccountInfo.getEmail());
         mPageTitle.set(
-                SyncSettingsUtils.getDisplayableFullNameOrEmailWithPreference(
-                        profileData, getContext(), SyncSettingsUtils.TitlePreference.FULL_NAME));
+                assumeNonNull(
+                        SyncSettingsUtils.getDisplayableFullNameOrEmailWithPreference(
+                                profileData,
+                                getContext(),
+                                SyncSettingsUtils.TitlePreference.FULL_NAME)));
         addPreferencesFromResource(R.xml.account_management_preferences);
         configureSignOutSwitch();
         configureChildAccountPreferences();
@@ -228,14 +232,16 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
             signOutPreference.setLayoutResource(R.layout.account_management_account_row);
             signOutPreference.setIcon(R.drawable.ic_signout_40dp);
             signOutPreference.setTitle(
-                    IdentityServicesProvider.get()
-                                    .getIdentityManager(getProfile())
-                                    .hasPrimaryAccount(ConsentLevel.SYNC)
+                    getIdentityManager().hasPrimaryAccount(ConsentLevel.SYNC)
                             ? R.string.sign_out_and_turn_off_sync
                             : R.string.sign_out);
             signOutPreference.setOnPreferenceClickListener(
                     preference -> {
-                        if (!isVisible() || !isResumed() || mSignedInCoreAccountInfo == null) {
+                        if (!isVisible() || !isResumed()) {
+                            return false;
+                        }
+                        if (!getIdentityManager().hasPrimaryAccount(ConsentLevel.SIGNIN)) {
+                            // Primary account might have been signed-out asynchronously already.
                             return false;
                         }
                         SignOutCoordinator.startSignOutFlow(
@@ -243,7 +249,7 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
                                 getProfile(),
                                 getActivity().getSupportFragmentManager(),
                                 ((ModalDialogManagerHolder) getActivity()).getModalDialogManager(),
-                                mSnackbarManagerSupplier.get(),
+                                assertNonNull(assumeNonNull(mSnackbarManagerSupplier).get()),
                                 SignoutReason.USER_CLICKED_SIGNOUT_SETTINGS,
                                 /* showConfirmDialog= */ false,
                                 CallbackUtils.emptyRunnable());
@@ -296,14 +302,15 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
         }
         accountsCategory.removeAll();
 
-        accountsCategory.addPreference(createAccountPreference(mSignedInCoreAccountInfo));
+        accountsCategory.addPreference(
+                createAccountPreference(assumeNonNull(mSignedInCoreAccountInfo)));
         accountsCategory.addPreference(
                 createDividerPreference(R.layout.account_divider_preference));
         accountsCategory.addPreference(createManageYourGoogleAccountPreference());
         accountsCategory.addPreference(createDividerPreference(R.layout.horizontal_divider));
 
         for (CoreAccountInfo account : accounts) {
-            if (!mSignedInCoreAccountInfo.equals(account)) {
+            if (!account.equals(mSignedInCoreAccountInfo)) {
                 accountsCategory.addPreference(createAccountPreference(account));
             }
         }
@@ -346,8 +353,9 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
                 SyncSettingsUtils.toOnClickListener(
                         this,
                         () -> {
-                            assert IdentityServicesProvider.get()
-                                    .getIdentityManager(getProfile())
+                            assert assertNonNull(
+                                            IdentityServicesProvider.get()
+                                                    .getIdentityManager(getProfile()))
                                     .hasPrimaryAccount(ConsentLevel.SIGNIN);
                             SyncSettingsUtils.openGoogleMyAccount(getActivity());
                         }));
@@ -374,6 +382,7 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
                     AccountManagerFacade accountManagerFacade =
                             AccountManagerFacadeProvider.getInstance();
                     accountManagerFacade.createAddAccountIntent(
+                            null,
                             (@Nullable Intent intent) -> {
                                 if (!isVisible() || !isResumed()) return;
 
@@ -416,7 +425,7 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
                                 Context context = getContext();
                                 if (isChild && context != null) {
                                     mProfileDataCache.setBadge(
-                                            childAccount.getEmail(),
+                                            assumeNonNull(childAccount).getEmail(),
                                             ProfileDataCache
                                                     .createDefaultSizeChildAccountBadgeConfig(
                                                             context,
@@ -445,17 +454,17 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
 
     // IdentityErrorCardPreference.Listener implementation.
     @Override
-    public void onIdentityErrorCardButtonClicked(@SyncError int error) {
+    public void onIdentityErrorCardButtonClicked(@UserActionableError int error) {
         assert mSignedInCoreAccountInfo != null;
         switch (error) {
-            case SyncError.AUTH_ERROR:
+            case UserActionableError.SIGN_IN_NEEDS_UPDATE:
                 AccountManagerFacadeProvider.getInstance()
                         .updateCredentials(
                                 CoreAccountInfo.getAndroidAccountFrom(mSignedInCoreAccountInfo),
                                 getActivity(),
                                 null);
                 return;
-            case SyncError.CLIENT_OUT_OF_DATE:
+            case UserActionableError.NEEDS_CLIENT_UPGRADE:
                 // Opens the client in play store for update.
                 Intent intent = new Intent(Intent.ACTION_VIEW);
                 intent.setData(
@@ -464,29 +473,29 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
                                         + ContextUtils.getApplicationContext().getPackageName()));
                 startActivity(intent);
                 return;
-            case SyncError.PASSPHRASE_REQUIRED:
+            case UserActionableError.NEEDS_PASSPHRASE:
                 displayPassphraseDialog();
                 return;
-            case SyncError.TRUSTED_VAULT_KEY_REQUIRED_FOR_EVERYTHING:
-            case SyncError.TRUSTED_VAULT_KEY_REQUIRED_FOR_PASSWORDS:
+            case UserActionableError.NEEDS_TRUSTED_VAULT_KEY_FOR_EVERYTHING:
+            case UserActionableError.NEEDS_TRUSTED_VAULT_KEY_FOR_PASSWORDS:
                 SyncSettingsUtils.openTrustedVaultKeyRetrievalDialog(
                         this, mSignedInCoreAccountInfo, REQUEST_CODE_TRUSTED_VAULT_KEY_RETRIEVAL);
                 return;
-            case SyncError.TRUSTED_VAULT_RECOVERABILITY_DEGRADED_FOR_EVERYTHING:
-            case SyncError.TRUSTED_VAULT_RECOVERABILITY_DEGRADED_FOR_PASSWORDS:
+            case UserActionableError.TRUSTED_VAULT_RECOVERABILITY_DEGRADED_FOR_EVERYTHING:
+            case UserActionableError.TRUSTED_VAULT_RECOVERABILITY_DEGRADED_FOR_PASSWORDS:
                 SyncSettingsUtils.openTrustedVaultRecoverabilityDegradedDialog(
                         this,
                         mSignedInCoreAccountInfo,
                         REQUEST_CODE_TRUSTED_VAULT_RECOVERABILITY_DEGRADED);
                 return;
-            case SyncError.OTHER_ERRORS:
-            case SyncError.SYNC_SETUP_INCOMPLETE:
+            case UserActionableError.UNRECOVERABLE_ERROR:
+            case UserActionableError.NEEDS_SETTINGS_CONFIRMATION:
                 // Identity error card is not shown for unrecoverable errors nor for sync setup
                 // incomplete error (the latter is shown as part of sync error in the manage sync
                 // settings page).
                 assert false; // NOTREACHED()
                 // fall through
-            case SyncError.NO_ERROR:
+            case UserActionableError.NONE:
             default:
                 return;
         }
@@ -502,12 +511,13 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
      * @param data The data returned by the intent.
      */
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         // Upon key retrieval completion, the keys in TrustedVaultClient could have changed. This is
         // done even if the user cancelled the flow (i.e. resultCode != RESULT_OK) because it's
         // harmless to issue a redundant notifyKeysChanged().
         if (requestCode == REQUEST_CODE_TRUSTED_VAULT_KEY_RETRIEVAL) {
-            TrustedVaultClient.get().notifyKeysChanged();
+            TrustedVaultClient.get()
+                    .notifyKeysChanged(TrustedVaultUserActionTriggerForUMA.SETTINGS);
         }
         if (requestCode == REQUEST_CODE_TRUSTED_VAULT_RECOVERABILITY_DEGRADED) {
             TrustedVaultClient.get().notifyRecoverabilityChanged();
@@ -515,7 +525,7 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
     }
 
     private void displayPassphraseDialog() {
-        FragmentTransaction ft = getFragmentManager().beginTransaction();
+        FragmentTransaction ft = assumeNonNull(getFragmentManager()).beginTransaction();
         PassphraseDialogFragment.newInstance(this).show(ft, FRAGMENT_ENTER_PASSPHRASE);
     }
 
@@ -559,7 +569,8 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
         arguments.putInt(SHOW_GAIA_SERVICE_TYPE_EXTRA, serviceType);
         SettingsNavigation settingsNavigation =
                 SettingsNavigationFactory.createSettingsNavigation();
-        settingsNavigation.startSettings(context, AccountManagementFragment.class, arguments);
+        settingsNavigation.startSettings(
+                context, AccountManagementFragment.class, arguments, /* addToBackStack= */ true);
     }
 
     private void closeDialogIfOpen(String tag) {
@@ -578,4 +589,18 @@ public class AccountManagementFragment extends ChromeBaseSettingsFragment
     public @AnimationType int getAnimationType() {
         return AnimationType.PROPERTY;
     }
+
+    IdentityManager getIdentityManager() {
+        return assumeNonNull(IdentityServicesProvider.get().getIdentityManager(getProfile()));
+    }
+
+    SigninManager getSigninManager() {
+        return assumeNonNull(IdentityServicesProvider.get().getSigninManager(getProfile()));
+    }
+
+    // TODO(crbug.com/444470792): Determine what pieces of logic are dynamic and need handling.
+    public static final ChromeBaseSearchIndexProvider SEARCH_INDEX_DATA_PROVIDER =
+            new ChromeBaseSearchIndexProvider(
+                    AccountManagementFragment.class.getName(),
+                    R.xml.account_management_preferences);
 }

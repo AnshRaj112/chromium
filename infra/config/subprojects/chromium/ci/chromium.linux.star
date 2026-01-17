@@ -31,6 +31,9 @@ ci.defaults.set(
     tree_closing_notifiers = ci_constants.DEFAULT_TREE_CLOSING_NOTIFIERS,
     main_console_view = "main",
     execution_timeout = ci_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     health_spec = health_spec.default(),
     notifies = ["chromium.linux"],
     service_account = ci_constants.DEFAULT_SERVICE_ACCOUNT,
@@ -74,7 +77,6 @@ ci.builder(
             target_bits = 32,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -119,7 +121,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -162,7 +163,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -206,7 +206,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -265,7 +264,7 @@ ci.builder(
         "local": gn_args.config(
             configs = ["debug_builder", "linux", "x64"],
         ),
-        "reclient": gn_args.config(
+        "remoteexec": gn_args.config(
             configs = ["debug_builder", "remoteexec", "linux", "x64"],
         ),
     },
@@ -290,7 +289,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -342,7 +340,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -393,7 +390,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -438,7 +434,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -483,7 +478,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -494,6 +488,7 @@ ci.thin_tester(
         mixins = [
             "isolate_profile_data",
             "linux-jammy",
+            "retry_only_failed_tests",
         ],
         per_test_modifications = {
             "blink_web_tests": targets.mixin(
@@ -510,19 +505,9 @@ ci.thin_tester(
                 ],
             ),
             "browser_tests": targets.mixin(
-                # Only retry the individual failed tests instead of rerunning
-                # entire shards.
-                # crbug.com/1473501
-                retry_only_failed_tests = True,
                 swarming = targets.swarming(
                     shards = 20,
                 ),
-            ),
-            "content_browsertests": targets.mixin(
-                # Only retry the individual failed tests instead of rerunning
-                # entire shards.
-                # crbug.com/1473501
-                retry_only_failed_tests = True,
             ),
             "not_site_per_process_blink_web_tests": targets.mixin(
                 args = [
@@ -534,12 +519,6 @@ ci.thin_tester(
                     "--xvfb",
                     "--jobs=1",
                 ],
-            ),
-            "unit_tests": targets.mixin(
-                # Only retry the individual failed tests instead of rerunning
-                # entire shards.
-                # crbug.com/1473501
-                retry_only_failed_tests = True,
             ),
             "webdriver_wpt_tests": targets.mixin(
                 ci_only = True,
@@ -581,7 +560,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -603,7 +581,7 @@ ci.thin_tester(
                 # crbug.com/1508286
                 # crbug.com/404871436
                 swarming = targets.swarming(
-                    shards = 48,
+                    shards = 60,
                 ),
             ),
             "content_browsertests": targets.mixin(
@@ -613,12 +591,22 @@ ci.thin_tester(
                     shards = 12,
                 ),
             ),
+            "content_unittests": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 4,
+                ),
+            ),
+            "headless_shell_wpt_tests": targets.mixin(
+                swarming = targets.swarming(
+                    shards = 26,
+                ),
+            ),
             "interactive_ui_tests": targets.mixin(
                 args = [
                     "--test-launcher-filter-file=../../testing/buildbot/filters/ozone-linux.interactive_ui_tests.filter",
                 ],
                 swarming = targets.swarming(
-                    shards = 10,
+                    shards = 20,
                 ),
             ),
             "leveldb_unittests": targets.mixin(
@@ -652,6 +640,9 @@ ci.thin_tester(
                 args = [
                     "--debug",
                 ],
+                swarming = targets.swarming(
+                    shards = 4,
+                ),
             ),
         },
     ),
@@ -691,7 +682,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -728,6 +718,11 @@ ci.thin_tester(
                 # crbug.com/1473501
                 retry_only_failed_tests = True,
             ),
+            "content_unittests": targets.mixin(
+                args = [
+                    "--test-launcher-filter-file=../../testing/buildbot/filters/ozone-linux.content_unittests_weston.filter",
+                ],
+            ),
             "headless_browsertests": targets.remove(
                 reason = "Wayland bot doesn't support headless mode",
             ),
@@ -740,6 +735,9 @@ ci.thin_tester(
                     # running tests there.
                     "--disable-accelerated-subwindows-for-testing",
                 ],
+                swarming = targets.swarming(
+                    shards = 10,
+                ),
             ),
             "ozone_x11_unittests": targets.remove(
                 reason = "x11 tests don't make sense for wayland",
@@ -796,7 +794,6 @@ ci.thin_tester(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     targets = targets.bundle(
         targets = [
@@ -829,7 +826,7 @@ ci.thin_tester(
                 swarming = targets.swarming(
                     expiration_sec = 18000,
                     hard_timeout_sec = 14400,
-                    shards = 20,
+                    shards = 46,
                 ),
             ),
             "content_browsertests": targets.mixin(
@@ -840,7 +837,7 @@ ci.thin_tester(
                 swarming = targets.swarming(
                     expiration_sec = 18000,
                     hard_timeout_sec = 14400,
-                    shards = 10,
+                    shards = 8,
                 ),
             ),
             "interactive_ui_tests": targets.mixin(
@@ -851,7 +848,7 @@ ci.thin_tester(
                 swarming = targets.swarming(
                     expiration_sec = 18000,
                     hard_timeout_sec = 14400,
-                    shards = 5,
+                    shards = 12,
                 ),
             ),
         },
@@ -882,7 +879,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -929,7 +925,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     targets = targets.bundle(
         name = "linux_oi_tests",
@@ -1023,7 +1018,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1075,7 +1069,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1117,7 +1110,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
@@ -1133,8 +1125,6 @@ ci.builder(
             "empty_main",
         ],
     ),
-    # Focal is needed for better C++20 support. See crbug.com/1284275.
-    os = os.LINUX_FOCAL,
     console_view_entry = consoles.console_view_entry(
         category = "release",
         short_name = "gcc",
@@ -1143,9 +1133,9 @@ ci.builder(
 )
 
 ci.builder(
-    name = "linux-modules-compile-fyi-rel",
+    name = "linux-no-modules-compile-rel",
     branch_selector = branches.selector.MAIN,
-    description_html = "Experimental compile with use_clang_modules=true.",
+    description_html = "Experimental compile with use_clang_modules=false.",
     builder_spec = builder_config.builder_spec(
         gclient_config = builder_config.gclient_config(config = "chromium"),
         chromium_config = builder_config.chromium_config(
@@ -1155,12 +1145,11 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [
             "ci/Linux Builder",
-            "clang_modules",
+            "no_clang_modules",
         ],
     ),
     targets = targets.bundle(
@@ -1179,7 +1168,7 @@ ci.builder(
     contact_team_email = "chrome-build-team@google.com",
     execution_timeout = 6 * time.hour,
     notifies = args.ignore_default([]),
-    siso_keep_going = True,
+    siso_keep_going = 0,
     siso_remote_linking = True,
 )
 
@@ -1201,7 +1190,6 @@ ci.builder(
             target_bits = 64,
             target_platform = builder_config.target_platform.LINUX,
         ),
-        build_gs_bucket = "chromium-linux-archive",
     ),
     gn_args = gn_args.config(
         configs = [

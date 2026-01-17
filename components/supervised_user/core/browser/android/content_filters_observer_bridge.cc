@@ -22,8 +22,7 @@ namespace {
 // Each of the content filters have their own kill switch. This function
 // returns true if the feature is enabled for the given setting.
 bool IsFeatureEnabledForSetting(std::string_view setting_name) {
-  if (!base::FeatureList::IsEnabled(
-          kPropagateDeviceContentFiltersToSupervisedUser)) {
+  if (!UseLocalSupervision()) {
     return false;
   }
 
@@ -39,22 +38,9 @@ bool IsFeatureEnabledForSetting(std::string_view setting_name) {
 }
 }  // namespace
 
-std::unique_ptr<ContentFiltersObserverBridge>
-ContentFiltersObserverBridge::Create(std::string_view setting_name,
-                                     base::RepeatingClosure on_enabled,
-                                     base::RepeatingClosure on_disabled) {
-  return std::make_unique<ContentFiltersObserverBridge>(
-      setting_name, on_enabled, on_disabled);
-}
-
 ContentFiltersObserverBridge::ContentFiltersObserverBridge(
-    std::string_view setting_name,
-    base::RepeatingClosure on_enabled,
-    base::RepeatingClosure on_disabled)
-    : setting_name_(setting_name),
-      on_enabled_(on_enabled),
-      on_disabled_(on_disabled) {
-}
+    std::string_view setting_name)
+    : setting_name_(setting_name) {}
 
 ContentFiltersObserverBridge::~ContentFiltersObserverBridge() {
   if (bridge_) {
@@ -64,27 +50,34 @@ ContentFiltersObserverBridge::~ContentFiltersObserverBridge() {
   }
 }
 
+void ContentFiltersObserverBridge::SetEnabledForTesting(bool enabled) {
+  SetEnabled(enabled);
+}
+
 void ContentFiltersObserverBridge::OnChange(JNIEnv* env, bool enabled) {
-  LOG(INFO) << "ContentFiltersObserverBridge received onChange for setting "
-            << setting_name_ << " with value "
-            << (enabled ? "enabled" : "disabled");
+  DVLOG(1) << "ContentFiltersObserverBridge received onChange for setting "
+           << setting_name_ << " with value "
+           << (enabled ? "enabled" : "disabled");
+  SetEnabled(enabled);
+}
+
+void ContentFiltersObserverBridge::SetEnabled(bool enabled) {
   if (!IsFeatureEnabledForSetting(setting_name_)) {
-    LOG(INFO)
-        << "ContentFiltersObserverBridge change ignored: feature disabled";
+    DVLOG(1) << "ContentFiltersObserverBridge change ignored: feature disabled";
     return;
   }
 
   enabled_ = enabled;
-  if (enabled) {
-    on_enabled_.Run();
-  } else {
-    on_disabled_.Run();
-  }
+  NotifyObservers();
+}
+
+void ContentFiltersObserverBridge::NotifyObservers() {
+  observer_list_.Notify(&Observer::OnContentFiltersObserverChanged);
 }
 
 void ContentFiltersObserverBridge::Init() {
   if (!IsFeatureEnabledForSetting(setting_name_)) {
-    LOG(INFO)
+    DVLOG(1)
         << "ContentFiltersObserverBridge not initialized: feature disabled";
     return;
   }
@@ -97,7 +90,7 @@ void ContentFiltersObserverBridge::Init() {
 
 void ContentFiltersObserverBridge::Shutdown() {
   if (!IsFeatureEnabledForSetting(setting_name_)) {
-    LOG(INFO) << "ContentFiltersObserverBridge not shutdown: feature disabled";
+    DVLOG(1) << "ContentFiltersObserverBridge not shutdown: feature disabled";
     return;
   }
 
@@ -110,8 +103,13 @@ bool ContentFiltersObserverBridge::IsEnabled() const {
   return enabled_;
 }
 
-void ContentFiltersObserverBridge::SetEnabled(bool enabled) {
-  enabled_ = enabled;
+void ContentFiltersObserverBridge::AddObserver(Observer* observer) {
+  observer_list_.AddObserver(observer);
 }
 
+void ContentFiltersObserverBridge::RemoveObserver(Observer* observer) {
+  observer_list_.RemoveObserver(observer);
+}
 }  // namespace supervised_user
+
+DEFINE_JNI(ContentFiltersObserverBridge)

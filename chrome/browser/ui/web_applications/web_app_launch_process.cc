@@ -5,10 +5,9 @@
 #include "chrome/browser/ui/web_applications/web_app_launch_process.h"
 
 #include "base/debug/crash_logging.h"
-#include "base/debug/dump_without_crashing.h"
 #include "base/files/file_path.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/values_equivalent.h"
+#include "base/metrics/histogram_functions.h"
 #include "build/build_config.h"
 #include "chrome/browser/apps/app_service/app_launch_params.h"
 #include "chrome/browser/apps/app_service/launch_utils.h"
@@ -17,6 +16,7 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 #include "chrome/browser/ui/web_applications/share_target_utils.h"
@@ -62,6 +62,17 @@ std::optional<GURL> GetProtocolHandlingTranslatedUrl(
   return translated_url;
 }
 
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+// LINT.IfChange
+enum class LaunchUrlInScopeResult {
+  kInScope = 0,
+  kNotInScope = 1,
+  kInScopeMissingTrainingSlash = 2,
+  kMaxValue = kInScopeMissingTrainingSlash
+};
+// LINT.ThenChange(tools/metrics/histograms/metadata/webapps/enums.xml)
+
 }  // namespace
 
 // static
@@ -102,7 +113,8 @@ WebAppLaunchProcess::WebAppLaunchProcess(
 content::WebContents* WebAppLaunchProcess::Run() {
   if (Browser::GetCreationStatusForProfile(&profile_.get()) !=
           Browser::CreationStatus::kOk ||
-      !registrar_->IsInRegistrar(params_->app_id)) {
+      !registrar_->AppMatches(params_->app_id,
+                              WebAppFilter::IsAppSurfaceableToUser())) {
     return nullptr;
   }
 
@@ -115,6 +127,12 @@ content::WebContents* WebAppLaunchProcess::Run() {
   const apps::ShareTarget* share_target = MaybeGetShareTarget();
   auto [launch_url, is_file_handling] = GetLaunchUrl(share_target);
 
+  auto web_app_scope = registrar_->GetEffectiveScope(params_->app_id);
+  CHECK(web_app_scope);
+  LaunchUrlInScopeResult in_scope_result =
+      web_app_scope->GetScopeScore(launch_url) > 0
+          ? LaunchUrlInScopeResult::kInScope
+          : LaunchUrlInScopeResult::kNotInScope;
 #if BUILDFLAG(IS_CHROMEOS)
   bool is_url_in_system_web_app_scope =
       ash::GetSystemWebAppTypeForAppId(&*profile_, params_->app_id) &&
@@ -125,30 +143,30 @@ content::WebContents* WebAppLaunchProcess::Run() {
           ->GetSystemApp(
               *ash::GetSystemWebAppTypeForAppId(&*profile_, params_->app_id))
           ->IsUrlInSystemAppScope(launch_url);
-
-  // TODO(crbug.com/40071115): Figure out why this is getting hit.
-  if (!registrar_->IsUrlInAppExtendedScope(launch_url, params_->app_id) &&
-      !is_url_in_system_web_app_scope) {
-    SCOPED_CRASH_KEY_STRING256("crbug1477991", "launch_url", launch_url.spec());
-    SCOPED_CRASH_KEY_STRING256("crbug1477991", "app_scope",
-                               web_app_->scope().spec());
-    base::debug::DumpWithoutCrashing();
-    DCHECK(false) << "Url " << launch_url.spec() << " not in scope for app "
-                  << params_->app_id;
-  }
-#else
-  // TODO(crbug.com/338406726): Figure out why this is failing. If no longer
-  // failing, then we can reject the launch by returning a nullptr.
-  if (!registrar_->IsUrlInAppExtendedScope(launch_url, params_->app_id)) {
-    SCOPED_CRASH_KEY_STRING256("crbug338406726", "launch_url",
-                               launch_url.spec());
-    SCOPED_CRASH_KEY_STRING256("crbug338406726", "app_scope",
-                               web_app_->scope().spec());
-    base::debug::DumpWithoutCrashing();
-    DCHECK(false) << "Url " << launch_url.spec() << " not in scope for app "
-                  << params_->app_id;
+  if (is_url_in_system_web_app_scope) {
+    in_scope_result = LaunchUrlInScopeResult::kInScope;
   }
 #endif
+
+  if (in_scope_result == LaunchUrlInScopeResult::kNotInScope) {
+    if (web_app_scope->scope().spec().back() == '/') {
+      // Special case to allow urls at the root of the scope to match even if
+      // they are missing the trailing slash. This allows
+      // http://example.com/scope/ to contain http://example.com/scope?query
+      // even though it doesn't pass a StartsWith() check.
+      GURL::Replacements replacements;
+      replacements.ClearQuery();
+      replacements.ClearRef();
+      auto launch_url_without_params_and_query =
+          launch_url.ReplaceComponents(replacements).spec();
+      launch_url_without_params_and_query.push_back('/');
+      if (web_app_scope->scope().spec() ==
+          launch_url_without_params_and_query) {
+        in_scope_result = LaunchUrlInScopeResult::kInScopeMissingTrainingSlash;
+      }
+    }
+  }
+  base::UmaHistogramEnumeration("WebApp.LaunchUrlIsInScope", in_scope_result);
 
 #if BUILDFLAG(IS_CHROMEOS)
   // System Web Apps have their own launch code path.
@@ -272,21 +290,21 @@ LaunchHandler::ClientMode WebAppLaunchProcess::GetLaunchClientMode() const {
   return launch_handler.parsed_client_mode();
 }
 
-std::tuple<Browser*, bool /*is_new_browser*/>
+std::tuple<BrowserWindowInterface*, bool /*is_new_browser*/>
 WebAppLaunchProcess::EnsureBrowser() {
-  Browser* browser = MaybeFindBrowserForLaunch();
+  BrowserWindowInterface* browser = MaybeFindBrowserForLaunch();
   bool is_new_browser = false;
   if (browser) {
-    browser->window()->Activate();
+    browser->GetWindow()->Activate();
   } else {
     browser = CreateBrowserForLaunch();
     is_new_browser = true;
   }
-  browser->window()->Show();
+  browser->GetWindow()->Show();
   return {browser, is_new_browser};
 }
 
-Browser* WebAppLaunchProcess::MaybeFindBrowserForLaunch() const {
+BrowserWindowInterface* WebAppLaunchProcess::MaybeFindBrowserForLaunch() const {
   if (params_->container == apps::LaunchContainer::kLaunchContainerTab) {
     // In general, when opening a web application in a tab, we want to open the
     // application in a tab in the most recently used browser window.
@@ -298,12 +316,11 @@ Browser* WebAppLaunchProcess::MaybeFindBrowserForLaunch() const {
     int64_t display_id = display::kInvalidDisplayId;
 #if BUILDFLAG(IS_CHROMEOS)
     if (params_->disposition != WindowOpenDisposition::CURRENT_TAB) {
-      display_id = display::Screen::GetScreen()->GetDisplayForNewWindows().id();
+      display_id = display::Screen::Get()->GetDisplayForNewWindows().id();
     }
 #endif
     return chrome::FindTabbedBrowser(
-        &profile_.get(), /*match_original_profiles=*/false, display_id,
-        /*ignore_closing_browsers=*/true);
+        &profile_.get(), /*match_original_profiles=*/false, display_id);
   }
 
   if (params_->disposition == WindowOpenDisposition::NEW_WINDOW) {
@@ -341,7 +358,7 @@ Browser* WebAppLaunchProcess::CreateBrowserForLaunch() {
 }
 
 WebAppLaunchProcess::NavigateResult WebAppLaunchProcess::MaybeNavigateBrowser(
-    Browser* browser,
+    BrowserWindowInterface* browser,
     bool is_new_browser,
     const GURL& launch_url,
     const apps::ShareTarget* share_target) {
@@ -352,16 +369,17 @@ WebAppLaunchProcess::NavigateResult WebAppLaunchProcess::MaybeNavigateBrowser(
     // TODO(crbug.com/40768956): Expose share target in the LaunchParams and
     // don't navigate if navigate_existing_client: never is in effect.
     NavigateParams nav_params = NavigateParamsForShareTarget(
-        browser, *share_target, *params_->intent, params_->launch_files);
+        browser->GetBrowserForMigrationOnly(), *share_target, *params_->intent,
+        params_->launch_files);
     nav_params.disposition = navigation_disposition;
     return {.web_contents = NavigateWebAppUsingParams(nav_params),
             .did_navigate = true};
   }
 
-  TabStripModel* const tab_strip = browser->tab_strip_model();
+  TabStripModel* const tab_strip = browser->GetFeatures().tab_strip_model();
   if (tab_strip->empty() ||
       navigation_disposition != WindowOpenDisposition::CURRENT_TAB) {
-    NavigateParams nav_params(browser, launch_url,
+    NavigateParams nav_params(browser->GetBrowserForMigrationOnly(), launch_url,
                               ui::PAGE_TRANSITION_AUTO_BOOKMARK);
     nav_params.disposition = navigation_disposition;
     return {.web_contents = NavigateWebAppUsingParams(nav_params),

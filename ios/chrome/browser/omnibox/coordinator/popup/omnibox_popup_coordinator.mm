@@ -28,7 +28,6 @@
 #import "ios/chrome/browser/omnibox/public/omnibox_ui_features.h"
 #import "ios/chrome/browser/omnibox/ui/popup/carousel/carousel_item.h"
 #import "ios/chrome/browser/omnibox/ui/popup/carousel/carousel_item_menu_provider.h"
-#import "ios/chrome/browser/omnibox/ui/popup/content_providing.h"
 #import "ios/chrome/browser/omnibox/ui/popup/omnibox_popup_presenter.h"
 #import "ios/chrome/browser/omnibox/ui/popup/omnibox_popup_view_controller.h"
 #import "ios/chrome/browser/policy/model/policy_util.h"
@@ -37,10 +36,10 @@
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/omnibox_commands.h"
 #import "ios/chrome/browser/shared/public/commands/quick_delete_commands.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
@@ -69,8 +68,8 @@
   OmniboxDebuggerMediator* _omniboxDebuggerMediator;
   /// The omnibox image fetcher.
   OmniboxImageFetcher* _omniboxImageFetcher;
-  // Whether it's the lens overlay managing this popup.
-  BOOL _isLensOverlay;
+  /// The context in which the omnibox is presented.
+  OmniboxPresentationContext _presentationContext;
 }
 
 #pragma mark - Public
@@ -81,15 +80,17 @@
                         (AutocompleteController*)autocompleteController
              omniboxAutocompleteController:
                  (OmniboxAutocompleteController*)omniboxAutocompleteController
-                             isLensOverlay:(BOOL)isLensOverlay {
+                       presentationContext:
+                           (OmniboxPresentationContext)presentationContext {
   self = [super initWithBaseViewController:nil browser:browser];
   if (self) {
     DCHECK(autocompleteController);
     _autocompleteController = autocompleteController;
-    _popupViewController = [[OmniboxPopupViewController alloc] init];
+    _popupViewController = [[OmniboxPopupViewController alloc]
+        initWithPresentationContext:presentationContext];
     _KeyboardDelegate = _popupViewController;
     _omniboxAutocompleteController = omniboxAutocompleteController;
-    _isLensOverlay = isLensOverlay;
+    _presentationContext = presentationContext;
   }
   return self;
 }
@@ -146,8 +147,10 @@
 
   _omniboxAutocompleteController.delegate = self.mediator;
 
-  self.mediator.applicationCommandsHandler = HandlerForProtocol(
-      self.browser->GetCommandDispatcher(), ApplicationCommands);
+  self.mediator.sceneHandler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), SceneCommands);
+  self.mediator.omniboxCommandsHandler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), OmniboxCommands);
   self.mediator.incognito = isIncognito;
   self.mediator.sceneState = self.browser->GetSceneState();
   self.mediator.presenter = [[OmniboxPopupPresenter alloc]
@@ -155,7 +158,7 @@
                  popupViewController:self.popupViewController
                    layoutGuideCenter:LayoutGuideCenterForBrowser(self.browser)
                            incognito:isIncognito
-                       isLensOverlay:_isLensOverlay];
+                 presentationContext:_presentationContext];
 
   if (experimental_flags::IsOmniboxDebuggingEnabled()) {
     [self setupDebug];
@@ -164,9 +167,15 @@
 
 - (void)stop {
   [_omniboxDebuggerMediator disconnect];
+  _omniboxDebuggerMediator = nil;
 
   [self.sharingCoordinator stop];
   self.sharingCoordinator = nil;
+
+  self.popupViewController = nil;
+  self.mediator = nil;
+  self.autocompleteController = nullptr;
+  _omniboxImageFetcher = nil;
 }
 
 - (BOOL)isOpen {

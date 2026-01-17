@@ -13,7 +13,6 @@
 #include "net/url_request/referrer_policy.h"
 #include "services/network/public/cpp/devtools_observer_util.h"
 #include "services/network/public/cpp/resource_request.h"
-#include "services/network/public/mojom/service_worker_router_info.mojom-shared.h"
 #include "services/network/public/mojom/service_worker_router_info.mojom.h"
 #include "services/network/public/mojom/trust_tokens.mojom.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
@@ -45,7 +44,6 @@ TEST(DevToolsObserverUtilTest, ExtractURLResponseHead) {
       base::TimeDelta::Min(), mojom::ServiceWorkerStatus::kRunning);
   head.ssl_info = net::SSLInfo();
   head.remote_endpoint = net::IPEndPoint(net::IPAddress(1, 2, 3, 4), 99);
-  head.proxy_chain = net::ProxyChain();
 
   mojom::URLResponseHeadDevToolsInfoPtr head_info = ExtractDevToolsInfo(head);
 
@@ -69,8 +67,6 @@ TEST(DevToolsObserverUtilTest, ExtractURLResponseHead) {
             *head.service_worker_router_info);
   EXPECT_EQ(head_info->ssl_info.has_value(), head.ssl_info.has_value());
   EXPECT_EQ(head_info->remote_endpoint, head.remote_endpoint);
-  EXPECT_EQ(head_info->is_for_ip_protection,
-            head.proxy_chain.is_for_ip_protection());
 }
 
 TEST(DevToolsObserverUtilTest, ExtractResourceRequest) {

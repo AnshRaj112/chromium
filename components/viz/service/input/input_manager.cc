@@ -14,12 +14,14 @@
 
 #include "base/memory/scoped_refptr.h"
 #include "base/metrics/histogram_macros.h"
+#include "base/task/common/task_annotator.h"
 #include "components/viz/service/input/render_input_router_delegate_impl.h"
 #include "components/viz/service/input/render_input_router_iterator_impl.h"
 #include "components/viz/service/input/render_input_router_support_child_frame.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/android/android_input_receiver_compat.h"
+#include "base/task/thread_pool.h"
 #include "components/input/android/android_input_callback.h"
 #include "components/input/android/input_token_forwarder.h"
 #include "components/input/android/scoped_input_receiver.h"
@@ -27,6 +29,7 @@
 #include "components/input/android/scoped_input_transfer_token.h"
 #include "components/input/features.h"
 #include "components/viz/service/input/fling_scheduler_android.h"
+#include "components/viz/service/input/input_on_viz_state_processing_result.h"
 #include "components/viz/service/input/render_input_router_support_android.h"
 #include "gpu/ipc/common/gpu_surface_lookup.h"
 #include "ui/gfx/android/achoreographer_compat.h"
@@ -43,15 +46,18 @@ namespace {
 
 #if BUILDFLAG(IS_ANDROID)
 
+// Threshold being used to call `System.gc()` to cleanup lingering around
+// surface controls.
+constexpr const int kPendingSurfaceControlsThreshold = 100;
+
 void ForwardVizInputTransferToken(
     const input::ScopedInputTransferToken& viz_input_token,
     const gpu::SurfaceHandle& surface_handle) {
   JNIEnv* env = jni_zero::AttachCurrentThread();
-  base::android::ScopedJavaGlobalRef<jobject> viz_input_token_java(
-      base::android::ScopedJavaLocalRef<jobject>(
-          env, base::AndroidInputReceiverCompat::GetInstance()
-                   .AInputTransferToken_toJavaFn(
-                       env, viz_input_token.a_input_transfer_token())));
+  auto viz_input_token_java = base::android::ScopedJavaLocalRef<>::Adopt(
+      env, base::AndroidInputReceiverCompat::GetInstance()
+               .AInputTransferToken_toJavaFn(
+                   env, viz_input_token.a_input_transfer_token()));
 
   input::InputTokenForwarder::GetInstance()->ForwardVizInputTransferToken(
       surface_handle, viz_input_token_java);
@@ -88,8 +94,6 @@ constexpr char kParentInputSCName[] = "ChromeParentInputSurfaceControl";
 
 constexpr char kInputReceiverCreationResultHistogram[] =
     "Android.InputOnViz.InputReceiverCreationResult";
-constexpr char kStateProcessingResultHistogram[] =
-    "Android.InputOnViz.Viz.StateProcessingResult";
 
 // These values are persisted to logs. Entries should not be renumbered and
 // numeric values should never be reused.
@@ -114,15 +118,6 @@ enum class CreateAndroidInputReceiverResult {
 };
 // LINT.ThenChange(//tools/metrics/histograms/metadata/android/enums.xml:CreateAndroidInputReceiverResult)
 
-// These values are persisted to logs. Entries should not be renumbered and
-// numeric values should never be reused.
-enum class InputOnVizStateProcessingResult {
-  kProcessedSuccessfully = 0,
-  kCouldNotFindViewForFrameSinkId = 1,
-  kFrameSinkIdCorrespondsToChildView = 2,
-  kFrameSinkIdNotAttachedToRootCFS = 3,
-  kMaxValue = kFrameSinkIdNotAttachedToRootCFS,
-};
 #endif  // BUILDFLAG(IS_ANDROID)
 
 }  // namespace
@@ -134,7 +129,7 @@ InputManager::~InputManager() {
 InputManager::InputManager(FrameSinkManagerImpl* frame_sink_manager)
     :
 #if BUILDFLAG(IS_ANDROID)
-      android_state_transfer_handler_(*this),
+      android_state_transfer_handler_(*this, &viz_touch_state_handler_),
 #endif
       frame_sink_manager_(frame_sink_manager) {
   TRACE_EVENT("viz", "InputManager::InputManager");
@@ -272,6 +267,19 @@ void InputManager::OnDestroyedCompositorFrameSink(
   if (receiver_data_ && receiver_data_->root_frame_sink_id() == frame_sink_id) {
     if (base::android::android_info::sdk_int() >=
         base::android::android_info::SdkVersion::SDK_VERSION_BAKLAVA) {
+      if (base::android::android_info::sdk_int() ==
+          base::android::android_info::SdkVersion::SDK_VERSION_BAKLAVA) {
+        // This is only needed on Android 16, since the newer versions will
+        // have the platform side fix after which we don't need to do manual
+        // `System.gc()`.
+        pending_surface_controls_++;
+        if (pending_surface_controls_ > kPendingSurfaceControlsThreshold) {
+          base::ThreadPool::PostTask(
+              FROM_HERE,
+              base::BindOnce(&input::InputUtils::RunGarbageCollection));
+          pending_surface_controls_ = 0;
+        }
+      }
       input::InputReceiverData* receiver = receiver_data_.get();
       receiver->OnDestroyedCompositorFrameSink(std::move(receiver_data_));
     } else {
@@ -505,8 +513,7 @@ void InputManager::StateOnTouchTransfer(
 #if BUILDFLAG(IS_ANDROID)
   auto iter = frame_sink_metadata_map_.find(state->root_widget_frame_sink_id);
   if (iter == frame_sink_metadata_map_.end()) {
-    UMA_HISTOGRAM_ENUMERATION(
-        kStateProcessingResultHistogram,
+    EmitStateProcessingResultHistogram(
         InputOnVizStateProcessingResult::kCouldNotFindViewForFrameSinkId);
     android_state_transfer_handler_.StateOnTouchTransfer(
         std::move(state), /* rir_support= */ nullptr);
@@ -515,8 +522,7 @@ void InputManager::StateOnTouchTransfer(
 
   if (!GetRootCompositorFrameSinkId(state->root_widget_frame_sink_id)
            .is_valid()) {
-    UMA_HISTOGRAM_ENUMERATION(
-        kStateProcessingResultHistogram,
+    EmitStateProcessingResultHistogram(
         InputOnVizStateProcessingResult::kFrameSinkIdNotAttachedToRootCFS);
     android_state_transfer_handler_.StateOnTouchTransfer(
         std::move(state), /* rir_support= */ nullptr);
@@ -528,8 +534,7 @@ void InputManager::StateOnTouchTransfer(
   // TODO(crbug.com/404741207): Convert this to CHECK once the underlying
   // reason for crash is fixed.
   if (support_base->IsRenderInputRouterSupportChildFrame()) {
-    UMA_HISTOGRAM_ENUMERATION(
-        kStateProcessingResultHistogram,
+    EmitStateProcessingResultHistogram(
         InputOnVizStateProcessingResult::kFrameSinkIdCorrespondsToChildView);
     android_state_transfer_handler_.StateOnTouchTransfer(
         std::move(state), /* rir_support= */ nullptr);
@@ -538,12 +543,9 @@ void InputManager::StateOnTouchTransfer(
 
   auto* support_android = static_cast<RenderInputRouterSupportAndroid*>(
       iter->second.rir_support.get());
-  UMA_HISTOGRAM_ENUMERATION(
-      kStateProcessingResultHistogram,
-      InputOnVizStateProcessingResult::kProcessedSuccessfully);
   android_state_transfer_handler_.StateOnTouchTransfer(
       std::move(state), support_android->GetWeakPtr());
-#endif
+#endif  // BUILDFLAG(IS_ANDROID)
 }
 
 void InputManager::ForceEnableZoomStateChanged(
@@ -656,19 +658,18 @@ bool InputManager::ReturnInputBackToBrowser() {
     return false;
   }
   JNIEnv* env = jni_zero::AttachCurrentThread();
-  base::android::ScopedJavaGlobalRef<jobject> viz_input_token_java(
-      base::android::ScopedJavaLocalRef<jobject>(
-          env,
-          base::AndroidInputReceiverCompat::GetInstance()
-              .AInputTransferToken_toJavaFn(
-                  env,
-                  receiver_data_->viz_input_token().a_input_transfer_token())));
-  base::android::ScopedJavaGlobalRef<jobject> browser_input_token_java(
-      base::android::ScopedJavaLocalRef<jobject>(
-          env, base::AndroidInputReceiverCompat::GetInstance()
-                   .AInputTransferToken_toJavaFn(
-                       env, receiver_data_->browser_input_token()
-                                .a_input_transfer_token())));
+  auto viz_input_token_java(base::android::ScopedJavaLocalRef<>::Adopt(
+      env,
+      base::AndroidInputReceiverCompat::GetInstance()
+          .AInputTransferToken_toJavaFn(
+              env,
+              receiver_data_->viz_input_token().a_input_transfer_token())));
+  auto browser_input_token_java(base::android::ScopedJavaLocalRef<>::Adopt(
+      env,
+      base::AndroidInputReceiverCompat::GetInstance()
+          .AInputTransferToken_toJavaFn(
+              env,
+              receiver_data_->browser_input_token().a_input_transfer_token())));
 
   return static_cast<bool>(Java_InputTransferHandlerViz_transferInput(
       env, viz_input_token_java, browser_input_token_java));
@@ -691,6 +692,16 @@ void InputManager::SetBeginFrameSource(const FrameSinkId& frame_sink_id,
   }
   CHECK(itr->second.get());
   itr->second->SetBeginFrameSourceForFlingScheduler(begin_frame_source);
+}
+
+base::ReadOnlySharedMemoryRegion InputManager::DuplicateVizTouchStateRegion()
+    const {
+#if BUILDFLAG(IS_ANDROID)
+  return viz_touch_state_handler_.DuplicateVizTouchStateRegion();
+#else
+  // Return invalid region if not available.
+  return base::ReadOnlySharedMemoryRegion();
+#endif
 }
 
 void InputManager::MaybeRecreateRootRenderInputRouterSupports(
@@ -850,6 +861,7 @@ void InputManager::CreateOrReuseAndroidInputReceiver(
   std::unique_ptr<input::AndroidInputCallback> android_input_callback =
       std::make_unique<input::AndroidInputCallback>(
           frame_sink_id, &android_state_transfer_handler_);
+  android_input_callback->AddObserver(&viz_touch_state_handler_);
   // Destructor of |ScopedInputReceiverCallbacks| will call
   // |AInputReceiverCallbacks_release|, so we don't have to explicitly unset the
   // motion event callback we set below using
@@ -866,6 +878,10 @@ void InputManager::CreateOrReuseAndroidInputReceiver(
       .AInputReceiverCallbacks_setMotionEventCallbackFn(
           callbacks.a_input_receiver_callbacks(),
           input::AndroidInputCallback::OnMotionEventThunk);
+  base::AndroidInputReceiverCompat::GetInstance()
+      .AInputReceiverCallbacks_setKeyEventCallbackFn(
+          callbacks.a_input_receiver_callbacks(),
+          input::AndroidInputCallback::OnKeyEventThunk);
 
   AInputReceiver* a_input_receiver;
   bool batched = base::FeatureList::IsEnabled(
@@ -941,3 +957,7 @@ bool InputManager::TransferInputBackToBrowser() {
 #endif  // BUILDFLAG(IS_ANDROID)
 
 }  // namespace viz
+
+#if BUILDFLAG(IS_ANDROID)
+DEFINE_JNI(InputTransferHandlerViz)
+#endif

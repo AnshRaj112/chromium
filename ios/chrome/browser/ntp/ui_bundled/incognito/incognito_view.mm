@@ -11,7 +11,7 @@
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_url_loader_delegate.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
-#import "ios/chrome/browser/toolbar/ui_bundled/public/toolbar_constants.h"
+#import "ios/chrome/browser/toolbar/legacy/ui_bundled/public/toolbar_constants.h"
 #import "ios/chrome/common/string_util.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
@@ -28,7 +28,7 @@ const CGFloat kLayoutGuideVerticalMargin = 8.0;
 const CGFloat kLayoutGuideMinHeight = 12.0;
 
 // The size of the incognito symbol image.
-NSInteger kIncognitoSymbolImagePointSize = 72;
+constexpr NSInteger kIncognitoSymbolImagePointSize = 72;
 
 // Returns a font, scaled to the current dynamic type settings, that is suitable
 // for the title of the incognito page.
@@ -268,15 +268,22 @@ NSAttributedString* FormatHTMLListForUILabel(NSString* listString) {
     ];
     ApplyVisualConstraints(constraints, viewsDictionary);
 
-    if (@available(iOS 17, *)) {
-      NSArray<UITrait>* traits = TraitCollectionSetForTraits(@[
-        UITraitVerticalSizeClass.class, UITraitHorizontalSizeClass.class
-      ]);
-      [self registerForTraitChanges:traits
-                         withAction:@selector(updateToolbarMargins)];
-    }
+    NSArray<UITrait>* traits = TraitCollectionSetForTraits(
+        @[ UITraitVerticalSizeClass.class, UITraitHorizontalSizeClass.class ]);
+    [self registerForTraitChanges:traits
+                       withAction:@selector(updateToolbarMargins)];
   }
   return self;
+}
+
+- (UIEdgeInsets)intrinsicContentVisualInsets {
+  [self layoutIfNeeded];
+  [_containerView layoutIfNeeded];
+  [_stackView layoutIfNeeded];
+  CGFloat topInset = _stackView.frame.origin.y;
+  CGFloat botInset = _containerView.frame.size.height -
+                     _stackView.frame.origin.y - _stackView.frame.size.height;
+  return UIEdgeInsetsMake(topInset, 0, botInset, 0);
 }
 
 #pragma mark - UIView overrides
@@ -313,17 +320,6 @@ NSAttributedString* FormatHTMLListForUILabel(NSString* listString) {
   [self.superview removeLayoutGuide:_bottomUnsafeAreaGuideInSuperview];
   [super willMoveToSuperview:newSuperview];
 }
-
-#if !defined(__IPHONE_17_0) || __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_17_0
-- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
-  [super traitCollectionDidChange:previousTraitCollection];
-  if (@available(iOS 17, *)) {
-    return;
-  }
-
-  [self updateToolbarMargins];
-}
-#endif
 
 - (void)safeAreaInsetsDidChange {
   [super safeAreaInsetsDidChange];

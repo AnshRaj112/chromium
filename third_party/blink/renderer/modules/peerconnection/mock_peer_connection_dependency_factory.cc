@@ -6,7 +6,6 @@
 
 #include <stddef.h>
 
-#include "base/containers/contains.h"
 #include "base/task/single_thread_task_runner.h"
 #include "third_party/blink/renderer/modules/peerconnection/mock_peer_connection_impl.h"
 #include "third_party/blink/renderer/modules/peerconnection/mock_rtc_peer_connection_handler_platform.h"
@@ -18,8 +17,8 @@
 using webrtc::AudioSourceInterface;
 using webrtc::AudioTrackInterface;
 using webrtc::AudioTrackVector;
+using webrtc::IceCandidate;
 using webrtc::IceCandidateCollection;
-using webrtc::IceCandidateInterface;
 using webrtc::MediaStreamInterface;
 using webrtc::ObserverInterface;
 using webrtc::SessionDescriptionInterface;
@@ -131,7 +130,7 @@ webrtc::scoped_refptr<VideoTrackInterface> MockMediaStream::FindVideoTrack(
 }
 
 void MockMediaStream::RegisterObserver(ObserverInterface* observer) {
-  DCHECK(!base::Contains(observers_, observer));
+  DCHECK(!observers_.Contains(observer));
   observers_.insert(observer);
 }
 
@@ -188,12 +187,12 @@ bool MockWebRtcAudioTrack::set_enabled(bool enable) {
 }
 
 void MockWebRtcAudioTrack::RegisterObserver(ObserverInterface* observer) {
-  DCHECK(!base::Contains(observers_, observer));
+  DCHECK(!observers_.Contains(observer));
   observers_.insert(observer);
 }
 
 void MockWebRtcAudioTrack::UnregisterObserver(ObserverInterface* observer) {
-  DCHECK(base::Contains(observers_, observer));
+  DCHECK(observers_.Contains(observer));
   observers_.erase(observer);
 }
 
@@ -261,12 +260,12 @@ bool MockWebRtcVideoTrack::set_enabled(bool enable) {
 }
 
 void MockWebRtcVideoTrack::RegisterObserver(ObserverInterface* observer) {
-  DCHECK(!base::Contains(observers_, observer));
+  DCHECK(!observers_.Contains(observer));
   observers_.insert(observer);
 }
 
 void MockWebRtcVideoTrack::UnregisterObserver(ObserverInterface* observer) {
-  DCHECK(base::Contains(observers_, observer));
+  DCHECK(observers_.Contains(observer));
   observers_.erase(observer);
 }
 
@@ -347,8 +346,7 @@ MockPeerConnectionDependencyFactory::CreatePeerConnection(
     const webrtc::PeerConnectionInterface::RTCConfiguration& config,
     blink::WebLocalFrame* frame,
     webrtc::PeerConnectionObserver* observer,
-    ExceptionState& exception_state,
-    RTCRtpTransport*) {
+    ExceptionState& exception_state) {
   return webrtc::make_ref_counted<MockPeerConnectionImpl>(this, observer);
 }
 
@@ -373,10 +371,10 @@ MockPeerConnectionDependencyFactory::CreateLocalVideoTrack(
   return track;
 }
 
-webrtc::IceCandidateInterface*
-MockPeerConnectionDependencyFactory::CreateIceCandidate(const String& sdp_mid,
-                                                        int sdp_mline_index,
-                                                        const String& sdp) {
+webrtc::IceCandidate* MockPeerConnectionDependencyFactory::CreateIceCandidate(
+    const String& sdp_mid,
+    int sdp_mline_index,
+    const String& sdp) {
   std::string sdp_mid_str = sdp_mid.Utf8();
   std::string sdp_str = sdp.Utf8();
   return webrtc::CreateIceCandidate(sdp_mid_str, sdp_mline_index, sdp_str,

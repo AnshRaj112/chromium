@@ -7,6 +7,7 @@
 #import "base/check_deref.h"
 #import "base/no_destructor.h"
 #import "components/prefs/pref_service.h"
+#import "components/supervised_user/core/browser/device_parental_controls.h"
 #import "components/supervised_user/core/browser/kids_chrome_management_url_checker_client.h"
 #import "components/supervised_user/core/browser/supervised_user_settings_service.h"
 #import "components/supervised_user/core/browser/supervised_user_url_filter.h"
@@ -55,9 +56,7 @@ SupervisedUserServiceFactory::SupervisedUserServiceFactory()
 
 std::unique_ptr<KeyedService>
 SupervisedUserServiceFactory::BuildServiceInstanceFor(
-    web::BrowserState* context) const {
-  ProfileIOS* profile = ProfileIOS::FromBrowserState(context);
-
+    ProfileIOS* profile) const {
   std::unique_ptr<SupervisedUserServicePlatformDelegate> platform_delegate =
       std::make_unique<SupervisedUserServicePlatformDelegate>(profile);
   signin::IdentityManager* identity_manager =
@@ -67,7 +66,6 @@ SupervisedUserServiceFactory::BuildServiceInstanceFor(
   return std::make_unique<supervised_user::SupervisedUserService>(
       identity_manager, url_loader_factory, CHECK_DEREF(profile->GetPrefs()),
       CHECK_DEREF(SupervisedUserSettingsServiceFactory::GetForProfile(profile)),
-      /*content_settings_service=*/nullptr,
       &CHECK_DEREF(SyncServiceFactory::GetForProfile(profile)),
       std::make_unique<supervised_user::SupervisedUserURLFilter>(
           CHECK_DEREF(profile->GetPrefs()),
@@ -78,5 +76,6 @@ SupervisedUserServiceFactory::BuildServiceInstanceFor(
               CHECK_DEREF(profile->GetPrefs()),
               platform_delegate->GetCountryCode(),
               platform_delegate->GetChannel())),
-      std::move(platform_delegate));
+      std::move(platform_delegate),
+      GetApplicationContext()->GetDeviceParentalControls());
 }

@@ -23,6 +23,7 @@
 #include "ui/views/controls/button/image_button_factory.h"
 #include "ui/views/controls/combobox/combobox_util.h"
 #include "ui/views/controls/editable_combobox/editable_combobox.h"
+#include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/layout/box_layout_view.h"
 #include "ui/views/layout/layout_provider.h"
@@ -49,10 +50,10 @@ std::unique_ptr<ToggleImageButton> CreateEye(
   // Add the outset for the focus ring to match the behavior of the `Arrow`
   // element in `EditableCombobox`.
   views::FocusRing::Get(button.get())->SetOutsetFocusRingDisabled(false);
-  SetImageFromVectorIconWithColorId(button.get(), kEyeIcon, ui::kColorIcon,
-                                    ui::kColorIconDisabled);
-  SetToggledImageFromVectorIconWithColorId(
-      button.get(), kEyeCrossedIcon, ui::kColorIcon, ui::kColorIconDisabled);
+  SetImageFromVectorIconWithColor(button.get(), kEyeIcon,
+                                  {ui::kColorIcon, ui::kColorIconDisabled});
+  SetToggledImageFromVectorIconWithColor(
+      button.get(), kEyeCrossedIcon, {ui::kColorIcon, ui::kColorIconDisabled});
 
   ConfigureComboboxButtonInkDrop(button.get());
   // We need this so the eye icon is not covered when the combo box view is

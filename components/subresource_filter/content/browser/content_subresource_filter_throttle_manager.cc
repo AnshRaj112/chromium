@@ -8,7 +8,6 @@
 
 #include "base/check.h"
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/debug/crash_logging.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
@@ -18,16 +17,16 @@
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/traced_value.h"
 #include "base/tracing/protos/chrome_track_event.pbzero.h"
+#include "components/subresource_filter/content/browser/activation_state_computing_navigation_throttle.h"
 #include "components/subresource_filter/content/browser/ad_tagging_utils.h"
 #include "components/subresource_filter/content/browser/content_subresource_filter_web_contents_helper.h"
+#include "components/subresource_filter/content/browser/page_load_statistics.h"
 #include "components/subresource_filter/content/browser/profile_interaction_manager.h"
 #include "components/subresource_filter/content/browser/safe_browsing_child_navigation_throttle.h"
 #include "components/subresource_filter/content/browser/safe_browsing_page_activation_throttle.h"
+#include "components/subresource_filter/content/browser/utils.h"
+#include "components/subresource_filter/content/common/utils.h"
 #include "components/subresource_filter/content/mojom/subresource_filter.mojom.h"
-#include "components/subresource_filter/content/shared/browser/activation_state_computing_navigation_throttle.h"
-#include "components/subresource_filter/content/shared/browser/page_load_statistics.h"
-#include "components/subresource_filter/content/shared/browser/utils.h"
-#include "components/subresource_filter/content/shared/common/utils.h"
 #include "components/subresource_filter/core/browser/async_document_subresource_filter.h"
 #include "components/subresource_filter/core/browser/subresource_filter_constants.h"
 #include "components/subresource_filter/core/browser/subresource_filter_features.h"
@@ -157,8 +156,7 @@ void ContentSubresourceFilterThrottleManager::ReadyToCommitInFrameNavigation(
     // CHECK.
     DCHECK_EQ(
         ad_evidence.parent_is_ad(),
-        base::Contains(
-            ad_frames_,
+        ad_frames_.contains(
             frame_host->GetParentOrOuterDocument()->GetFrameTreeNodeId()));
     ad_evidence.set_is_complete();
     ad_evidence_for_navigation = ad_evidence;
@@ -189,12 +187,26 @@ mojom::ActivationState
 ContentSubresourceFilterThrottleManager::ActivationStateForNextCommittedLoad(
     content::NavigationHandle* navigation_handle) {
   if (navigation_handle->GetNetErrorCode() != net::OK) {
+    if (IsInSubresourceFilterRoot(navigation_handle)) {
+      root_navigation_disabled_reason_ =
+          mojom::SubresourceFilterDisabledReason::kNavigationError;
+    }
     return mojom::ActivationState();
   }
 
   auto it =
       ongoing_activation_throttles_.find(navigation_handle->GetNavigationId());
   if (it == ongoing_activation_throttles_.end()) {
+    if (IsInSubresourceFilterRoot(navigation_handle)) {
+      // Navigation throttles are never created for URLs that aren't handled by
+      // the network stack (e.g., about:blank). Since plumbing the reason
+      // earlier would be complex/invasive, we retroactively assign the reason
+      // here to ensure our metrics cover this potentially common case.
+      if (!content::IsURLHandledByNetworkStack(navigation_handle->GetURL())) {
+        root_navigation_disabled_reason_ = mojom::
+            SubresourceFilterDisabledReason::kUrlNotHandledByNetworkStack;
+      }
+    }
     return mojom::ActivationState();
   }
 
@@ -203,12 +215,20 @@ ContentSubresourceFilterThrottleManager::ActivationStateForNextCommittedLoad(
   ActivationStateComputingNavigationThrottle* throttle = it->second;
   AsyncDocumentSubresourceFilter* filter = throttle->filter();
   if (!filter) {
+    if (IsInSubresourceFilterRoot(navigation_handle)) {
+      root_navigation_disabled_reason_ =
+          mojom::SubresourceFilterDisabledReason::kFilterNeverCreated;
+    }
     return mojom::ActivationState();
   }
 
   // A filter with DISABLED activation indicates a corrupted ruleset.
   if (filter->activation_state().activation_level ==
       mojom::ActivationLevel::kDisabled) {
+    if (IsInSubresourceFilterRoot(navigation_handle)) {
+      root_navigation_disabled_reason_ =
+          mojom::SubresourceFilterDisabledReason::kRulesetUnavailableOrCorrupt;
+    }
     return mojom::ActivationState();
   }
 
@@ -271,7 +291,7 @@ void ContentSubresourceFilterThrottleManager::DidFinishInFrameNavigation(
       !(navigation_handle->HasCommitted() &&
         !navigation_handle->GetURL().IsAboutBlank()) &&
       !navigation_handle->IsWaitingToCommit() &&
-      !base::Contains(ad_frames_, frame_tree_node_id)) {
+      !ad_frames_.contains(frame_tree_node_id)) {
     EnsureFrameAdEvidence(navigation_handle).set_is_complete();
 
     // TODO(crbug.com/342351452): Remove these temporary crash keys once rare
@@ -339,7 +359,7 @@ void ContentSubresourceFilterThrottleManager::DidFinishInFrameNavigation(
         navigation_handle,
         filter ? filter->activation_state().activation_level
                : mojom::ActivationLevel::kDisabled,
-        did_inherit_opener_activation);
+        root_navigation_disabled_reason_, did_inherit_opener_activation);
   }
 
   DestroyRulesetHandleIfNoLongerUsed();
@@ -423,11 +443,19 @@ void ContentSubresourceFilterThrottleManager::
     RecordUmaHistogramsForRootNavigation(
         content::NavigationHandle* navigation_handle,
         const mojom::ActivationLevel& activation_level,
+        const mojom::SubresourceFilterDisabledReason& disabled_reason,
         bool did_inherit_opener_activation) {
   CHECK(IsInSubresourceFilterRoot(navigation_handle));
 
   UMA_HISTOGRAM_ENUMERATION("SubresourceFilter.PageLoad.ActivationState",
                             activation_level);
+
+  if (activation_level == mojom::ActivationLevel::kDisabled) {
+    UMA_HISTOGRAM_ENUMERATION(
+        "SubresourceFilter.PageLoad.ActivationState.DisabledReason",
+        disabled_reason);
+  }
+
   if (did_inherit_opener_activation) {
     UMA_HISTOGRAM_ENUMERATION(
         "SubresourceFilter.PageLoad.ActivationState.DidInherit",
@@ -488,6 +516,9 @@ void ContentSubresourceFilterThrottleManager::OnPageActivationComputed(
   // intentionally disables AdTagging and all dependent features for this
   // navigation/frame.
   if (activation_state.activation_level == mojom::ActivationLevel::kDisabled) {
+    // Cache the reason for metrics recording on navigation finish.
+    root_navigation_disabled_reason_ = activation_state.disabled_reason;
+
     ongoing_activation_throttles_.erase(it);
     return;
   }
@@ -513,10 +544,10 @@ void ContentSubresourceFilterThrottleManager::OnChildFrameNavigationEvaluated(
 
   // TODO(crbug.com/347625215): This is rarely hit. After fixing, upgrade to a
   // CHECK.
-  DCHECK_EQ(ad_evidence.parent_is_ad(),
-            base::Contains(ad_frames_,
-                           navigation_handle->GetParentFrameOrOuterDocument()
-                               ->GetFrameTreeNodeId()));
+  DCHECK_EQ(
+      ad_evidence.parent_is_ad(),
+      ad_frames_.contains(navigation_handle->GetParentFrameOrOuterDocument()
+                              ->GetFrameTreeNodeId()));
 
   ad_evidence.UpdateFilterListResult(
       InterpretLoadPolicyAsEvidence(load_policy));
@@ -539,8 +570,8 @@ void ContentSubresourceFilterThrottleManager::
   }
   MaybeCreateAndAddChildNavigationThrottle(registry);
 
-  CHECK(!base::Contains(ongoing_activation_throttles_,
-                        navigation_handle.GetNavigationId()));
+  CHECK(!ongoing_activation_throttles_.contains(
+      navigation_handle.GetNavigationId()));
   if (auto activation_throttle =
           MaybeCreateActivationStateComputingThrottle(registry)) {
     ongoing_activation_throttles_[navigation_handle.GetNavigationId()] =
@@ -551,7 +582,7 @@ void ContentSubresourceFilterThrottleManager::
 
 bool ContentSubresourceFilterThrottleManager::IsFrameTaggedAsAd(
     content::FrameTreeNodeId frame_tree_node_id) const {
-  return base::Contains(ad_frames_, frame_tree_node_id);
+  return ad_frames_.contains(frame_tree_node_id);
 }
 
 bool ContentSubresourceFilterThrottleManager::IsRenderFrameHostTaggedAsAd(
@@ -730,7 +761,7 @@ void ContentSubresourceFilterThrottleManager::SetIsAdFrame(
     bool is_ad_frame) {
   content::FrameTreeNodeId frame_tree_node_id =
       render_frame_host->GetFrameTreeNodeId();
-  CHECK(base::Contains(tracked_ad_evidence_, frame_tree_node_id));
+  CHECK(tracked_ad_evidence_.contains(frame_tree_node_id));
 
   // TODO(crbug.com/373985560): This is rarely hit. After fixing, upgrade to a
   // CHECK.
@@ -739,7 +770,7 @@ void ContentSubresourceFilterThrottleManager::SetIsAdFrame(
   CHECK(render_frame_host->GetParentOrOuterDocument());
 
   // `ad_frames_` does not need updating.
-  if (is_ad_frame == base::Contains(ad_frames_, frame_tree_node_id)) {
+  if (is_ad_frame == ad_frames_.contains(frame_tree_node_id)) {
     return;
   }
 
@@ -763,7 +794,7 @@ void ContentSubresourceFilterThrottleManager::SetIsAdFrameForTesting(
     bool is_ad_frame) {
   CHECK(render_frame_host->GetParentOrOuterDocument());
   if (is_ad_frame ==
-      base::Contains(ad_frames_, render_frame_host->GetFrameTreeNodeId())) {
+      ad_frames_.contains(render_frame_host->GetFrameTreeNodeId())) {
     return;
   }
 
@@ -879,8 +910,8 @@ void ContentSubresourceFilterThrottleManager::AdScriptDidCreateFencedFrame(
     return;
   }
 
-  CHECK(!base::Contains(tracked_ad_evidence_,
-                        fenced_frame_root->GetFrameTreeNodeId()));
+  CHECK(
+      !tracked_ad_evidence_.contains(fenced_frame_root->GetFrameTreeNodeId()));
   OnChildFrameWasCreatedByAdScript(fenced_frame_root);
 }
 
@@ -922,8 +953,7 @@ ContentSubresourceFilterThrottleManager::EnsureFrameAdEvidence(
   CHECK(parent_frame_tree_node_id);
   return tracked_ad_evidence_
       .emplace(frame_tree_node_id,
-               /*parent_is_ad=*/base::Contains(ad_frames_,
-                                               parent_frame_tree_node_id))
+               /*parent_is_ad=*/ad_frames_.contains(parent_frame_tree_node_id))
       .first->second;
 }
 

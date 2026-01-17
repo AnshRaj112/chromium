@@ -4,19 +4,20 @@
 
 #include "device/fido/hid/fido_hid_device.h"
 
+#include <algorithm>
 #include <limits>
 #include <string_view>
 #include <vector>
 
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/strings/stringprintf.h"
 #include "base/task/single_thread_task_runner.h"
 #include "components/device_event_log/device_event_log.h"
 #include "crypto/random.h"
@@ -450,7 +451,7 @@ void FidoHidDevice::MessageReceived(FidoHidMessage message) {
   constexpr FidoHidDeviceCommand kValidCommands[] = {
       FidoHidDeviceCommand::kMsg, FidoHidDeviceCommand::kCbor,
       FidoHidDeviceCommand::kWink, FidoHidDeviceCommand::kError};
-  if (!base::Contains(kValidCommands, cmd)) {
+  if (!std::ranges::contains(kValidCommands, cmd)) {
     FIDO_LOG(ERROR) << "Unknown CTAPHID command: " << static_cast<int>(cmd)
                     << " " << base::HexEncode(response);
     Transition(State::kDeviceError);
@@ -595,12 +596,8 @@ static std::string VidPidToString(const mojom::HidDeviceInfoPtr& device_info) {
                 "vendor_id must be uint16_t");
   static_assert(sizeof(device_info->product_id) == 2,
                 "product_id must be uint16_t");
-  uint16_t vendor_id = ((device_info->vendor_id & 0xff) << 8) |
-                       ((device_info->vendor_id & 0xff00) >> 8);
-  uint16_t product_id = ((device_info->product_id & 0xff) << 8) |
-                        ((device_info->product_id & 0xff00) >> 8);
-  return base::ToLowerASCII(base::HexEncode(&vendor_id, 2) + ":" +
-                            base::HexEncode(&product_id, 2));
+  return base::StringPrintf("%02x:%02x", device_info->vendor_id,
+                            device_info->product_id);
 }
 
 std::string FidoHidDevice::GetDisplayName() const {
@@ -624,7 +621,7 @@ void FidoHidDevice::DiscoverSupportedProtocolAndDeviceInfo(
           "20a0:4287",  // Nitrokey FIDO U2F
       });
 
-  if (base::Contains(kForceU2fCompatibilitySet, VidPidToString(device_info_))) {
+  if (kForceU2fCompatibilitySet.contains(VidPidToString(device_info_))) {
     supported_protocol_ = ProtocolVersion::kU2f;
     DCHECK(SupportedProtocolIsInitialized());
     std::move(done).Run();

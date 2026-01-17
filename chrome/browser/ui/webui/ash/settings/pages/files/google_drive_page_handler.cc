@@ -6,6 +6,7 @@
 
 #include <optional>
 
+#include "base/byte_count.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
@@ -30,11 +31,13 @@ StatusPtr CreateStatusPtr(const Progress& progress) {
   StatusPtr status = Status::New();
   status->required_space =
       (progress.required_space >= 0)
-          ? base::UTF16ToUTF8(ui::FormatBytes(progress.required_space))
+          ? base::UTF16ToUTF8(ui::FormatBytes(base::ByteSize(
+                base::checked_cast<uint64_t>(progress.required_space))))
           : "";
   status->free_space =
       (progress.free_space >= 0)
-          ? base::UTF16ToUTF8(ui::FormatBytes(progress.free_space))
+          ? base::UTF16ToUTF8(ui::FormatBytes(base::ByteSize(
+                base::checked_cast<uint64_t>(progress.free_space))))
           : "";
   status->stage = progress.stage;
   status->listed_files = progress.listed_files;
@@ -122,7 +125,8 @@ void GoogleDrivePageHandler::OnGetContentCacheSize(
     std::move(callback).Run(std::nullopt);
     return;
   }
-  std::move(callback).Run(base::UTF16ToUTF8(ui::FormatBytes(size)));
+  std::move(callback).Run(base::UTF16ToUTF8(
+      ui::FormatBytes(base::ByteSize(base::checked_cast<uint64_t>(size)))));
 }
 
 void GoogleDrivePageHandler::ClearPinnedFiles(

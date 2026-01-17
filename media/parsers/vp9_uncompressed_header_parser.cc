@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "media/parsers/vp9_uncompressed_header_parser.h"
 
 #include <array>
 #include <type_traits>
 
+#include "base/compiler_specific.h"
+#include "base/containers/span.h"
 #include "base/logging.h"
 #include "base/numerics/safe_conversions.h"
 
@@ -778,8 +775,8 @@ Vp9InterpolationFilter Vp9UncompressedHeaderParser::ReadInterpolationFilter() {
 }
 
 void Vp9UncompressedHeaderParser::SetupPastIndependence(Vp9FrameHeader* fhdr) {
-  memset(&context_->segmentation_, 0, sizeof(context_->segmentation_));
-  memset(fhdr->ref_frame_sign_bias, 0, sizeof(fhdr->ref_frame_sign_bias));
+  context_->segmentation_ = {};
+  fhdr->ref_frame_sign_bias.fill(false);
 
   ResetLoopfilter();
   fhdr->frame_context = kVp9DefaultFrameContext;
@@ -800,14 +797,16 @@ void Vp9UncompressedHeaderParser::ReadLoopFilterParams() {
     if (loop_filter.delta_update) {
       for (size_t i = 0; i < Vp9RefType::VP9_FRAME_MAX; i++) {
         loop_filter.update_ref_deltas[i] = reader_.ReadBool();
-        if (loop_filter.update_ref_deltas[i])
+        if (loop_filter.update_ref_deltas[i]) {
           loop_filter.ref_deltas[i] = reader_.ReadSignedLiteral(6);
+        }
       }
 
       for (size_t i = 0; i < Vp9LoopFilterParams::kNumModeDeltas; i++) {
         loop_filter.update_mode_deltas[i] = reader_.ReadBool();
-        if (loop_filter.update_mode_deltas[i])
+        if (loop_filter.update_mode_deltas[i]) {
           loop_filter.mode_deltas[i] = reader_.ReadSignedLiteral(6);
+        }
       }
     }
   }
@@ -925,18 +924,16 @@ void Vp9UncompressedHeaderParser::ResetLoopfilter() {
   loop_filter.ref_deltas[VP9_FRAME_GOLDEN] = -1;
   loop_filter.ref_deltas[VP9_FRAME_ALTREF] = -1;
 
-  memset(loop_filter.mode_deltas, 0, sizeof(loop_filter.mode_deltas));
+  loop_filter.mode_deltas.fill(0);
 }
 
 // 6.2 Uncompressed header syntax
-bool Vp9UncompressedHeaderParser::Parse(const uint8_t* stream,
-                                        off_t frame_size,
+bool Vp9UncompressedHeaderParser::Parse(base::span<const uint8_t> stream,
                                         Vp9FrameHeader* fhdr) {
   DVLOG(2) << "Vp9UncompressedHeaderParser::Parse";
-  reader_.Initialize(stream, frame_size);
+  reader_.Initialize(stream);
 
-  fhdr->data = base::span(stream, base::checked_cast<size_t>(frame_size));
-
+  fhdr->data = stream;
   // frame marker
   if (reader_.ReadLiteral(2) != 0x2) {
     DVLOG(1) << "frame marker shall be equal to 2";
@@ -1008,7 +1005,7 @@ bool Vp9UncompressedHeaderParser::Parse(const uint8_t* stream,
     } else {
       fhdr->refresh_frame_flags = reader_.ReadLiteral(8);
 
-      static_assert(std::extent<decltype(fhdr->ref_frame_sign_bias)>() >=
+      static_assert(std::tuple_size_v<decltype(fhdr->ref_frame_sign_bias)> >=
                         Vp9RefType::VP9_FRAME_LAST + kVp9NumRefsPerFrame,
                     "ref_frame_sign_bias is not big enough");
       for (size_t i = 0; i < kVp9NumRefsPerFrame; i++) {

@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <memory>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_functions.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
@@ -113,30 +112,8 @@ void PermissionPromptChip::ModulatePermissionPromiseLifetime() {
   // enabled only for `NOTIFICATIONS` and `GEOLOCATION`.
   DCHECK(delegate()->ShouldCurrentRequestUseQuietUI());
 
-#if !BUILDFLAG(IS_ANDROID)
-  // TODO(crbug.com/412616723): Support Android
   if (base::FeatureList::IsEnabled(
           permissions::features::kPermissionPromiseLifetimeModulation)) {
     delegate()->PreIgnoreQuietPrompt();
-    return;
   }
-#endif
-  content::PermissionController* permission_controller =
-      web_contents()->GetBrowserContext()->GetPermissionController();
-
-  // If at least one RFH is not subscribed to the PermissionChange event, we
-  // should not preemptively resolve a prompt.
-  for (const auto& request : delegate()->Requests()) {
-    DCHECK(request->request_type() ==
-               permissions::RequestType::kNotifications ||
-           request->request_type() == permissions::RequestType::kGeolocation);
-
-    if (!request->IsSourceSubscribedToPermissionChangeEvent(
-            permission_controller)) {
-      return;
-    }
-  }
-  // This will resolve a promise so an origin is not waiting for the user's
-  // decision.
-  delegate()->PreIgnoreQuietPrompt();
 }

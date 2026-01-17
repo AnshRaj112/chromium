@@ -5,11 +5,9 @@
 #ifndef COMPONENTS_AUTOFILL_CORE_BROWSER_SINGLE_FIELD_FILLERS_AUTOCOMPLETE_AUTOCOMPLETE_HISTORY_MANAGER_H_
 #define COMPONENTS_AUTOFILL_CORE_BROWSER_SINGLE_FIELD_FILLERS_AUTOCOMPLETE_AUTOCOMPLETE_HISTORY_MANAGER_H_
 
-#include <map>
 #include <vector>
 
 #include "base/functional/callback.h"
-#include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "components/autofill/core/browser/single_field_fillers/single_field_fill_router.h"
@@ -38,17 +36,20 @@ class AutocompleteHistoryManager : public KeyedService {
 
   ~AutocompleteHistoryManager() override;
 
-  // Generates autocomplete suggestions for the given `field` in `form`. This is
-  // achieved through an async DB query. `client` checks if the requirements for
-  // generating autocomplete suggestions are met (e.g. autocomplete is
-  // enabled). Since autocomplete suggestions are always generated last, the
-  // `on_suggestions_returned` callback may be called with the suggestions for
-  // `field` or with an empty vector if no suggestions are available.
+  // Generates autocomplete suggestions for the given `trigger_field` in `form`.
+  // This is achieved through an async DB query. `client` checks if the
+  // requirements for generating autocomplete suggestions are met (e.g.
+  // autocomplete is enabled). Since autocomplete suggestions are always
+  // generated last, the `on_suggestions_returned` callback may be called with
+  // the suggestions for `field` or with an empty vector if no suggestions are
+  // available.
   // TODO(crbug.com/409962888): Remove this method once the new suggestion
   // generation flow is launched.
   virtual void OnGetSingleFieldSuggestions(
       const FormData& form,
-      const FormFieldData& field,
+      const FormStructure* form_structure,
+      const FormFieldData& trigger_field,
+      const AutofillField* trigger_autofill_field,
       const AutofillClient& client,
       SingleFieldFillRouter::OnSuggestionsReturnedCallback
           on_suggestions_returned);

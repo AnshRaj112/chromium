@@ -14,6 +14,7 @@
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
+#include "chrome/browser/ui/browser_navigator_params_utils.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/web_applications/test/web_app_browsertest_util.h"
@@ -51,43 +52,9 @@ constexpr char kFocusExistingUrl[] =
 constexpr char kFocusExistingSecondUrl[] =
     "/web_apps/simple_focus_existing/index2.html";
 constexpr char kLaunchParamsEnqueueMetricWithNavigation[] =
-    "WebApp.NavigationCapturing.LaunchParamsConsumedTime.WithNavigation";
+    "Webapp.NavigationCapturing.LaunchParamsConsumedTime.WithNavigation";
 constexpr char kLaunchParamsEnqueueMetricWithoutNavigation[] =
-    "WebApp.NavigationCapturing.LaunchParamsConsumedTime.WithoutNavigation";
-
-// Actually start a navigation in an existing web contents for the
-// `navigate-existing` use-case.
-// This is copied from `LoadURLInContents` in browser_navigator.cc.
-void LoadURLInContents(content::WebContents* target_contents,
-                       const GURL& url,
-                       const NavigateParams& params) {
-  content::NavigationController::LoadURLParams load_url_params(url);
-  load_url_params.initiator_frame_token = params.initiator_frame_token;
-  load_url_params.initiator_process_id = params.initiator_process_id;
-  load_url_params.initiator_origin = params.initiator_origin;
-  load_url_params.initiator_base_url = params.initiator_base_url;
-  load_url_params.source_site_instance = params.source_site_instance;
-  load_url_params.referrer = params.referrer;
-  load_url_params.frame_name = params.frame_name;
-  load_url_params.frame_tree_node_id = params.frame_tree_node_id;
-  load_url_params.redirect_chain = params.redirect_chain;
-  load_url_params.transition_type = params.transition;
-  load_url_params.extra_headers = params.extra_headers;
-  load_url_params.should_replace_current_entry =
-      params.should_replace_current_entry;
-  load_url_params.is_renderer_initiated = params.is_renderer_initiated;
-  load_url_params.started_from_context_menu = params.started_from_context_menu;
-  load_url_params.has_user_gesture = params.user_gesture;
-  load_url_params.blob_url_loader_factory = params.blob_url_loader_factory;
-  load_url_params.input_start = params.input_start;
-  load_url_params.was_activated = params.was_activated;
-  load_url_params.href_translate = params.href_translate;
-  load_url_params.reload_type = params.reload_type;
-  load_url_params.impression = params.impression;
-  load_url_params.suggested_system_entropy = params.suggested_system_entropy;
-
-  target_contents->GetController().LoadURLWithParams(load_url_params);
-}
+    "Webapp.NavigationCapturing.LaunchParamsConsumedTime.WithoutNavigation";
 
 class NavigationCapturingBrowserNavigatorBrowserTest
     : public WebAppBrowserTestBase {
@@ -182,7 +149,7 @@ class NavigationCapturingBrowserNavigatorBrowserTest
                             ui::PAGE_TRANSITION_LINK);
       params.disposition = WindowOpenDisposition::NEW_WINDOW;
       Navigate(&params);
-      second_app_browser = params.browser;
+      second_app_browser = params.browser->GetBrowserForMigrationOnly();
     }
     EXPECT_NE(nullptr, second_app_browser);
     EXPECT_NE(second_app_browser, app_browser_to_use);
@@ -288,8 +255,10 @@ IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
     params.source_contents =
         browser()->tab_strip_model()->GetActiveWebContents();
     Navigate(&params);
-    LoadURLInContents(params.navigated_or_inserted_contents,
-                      GetNavigateExistingSecondUrl(), params);
+    content::NavigationController::LoadURLParams load_url_params =
+        LoadURLParamsFromNavigateParams(&params);
+    (void)params.navigated_or_inserted_contents->GetController()
+        .LoadURLWithParams(load_url_params);
   }
 
   url_observer.Wait();
@@ -386,6 +355,56 @@ IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
+                       FocusExistingUsesLatestActivatedAppWindow) {
+  const webapps::AppId& app_id =
+      InstallWebAppFromPageAndCloseAppBrowser(browser(), GetFocusExistingUrl());
+#if BUILDFLAG(IS_CHROMEOS)
+  EXPECT_EQ(apps::test::EnableLinkCapturingByUser(profile(), app_id),
+            base::ok());
+#endif
+
+  // Launch 2 distinct app_browsers for the same app_id. Since `app_browser_2`
+  // is created last, ensure that is activated, and will be used for launching
+  // a web app.
+  Browser* app_browser_1 = nullptr;
+  Browser* app_browser_2 = nullptr;
+  std::tie(app_browser_1, app_browser_2) =
+      GetTwoDistinctBrowsersForSameApp(app_id, GetFocusExistingUrl());
+  EXPECT_TRUE(WebAppBrowserController::IsForWebApp(app_browser_1, app_id));
+  EXPECT_TRUE(WebAppBrowserController::IsForWebApp(app_browser_2, app_id));
+
+  // Since the web_app has a client_mode of `focus-existing`, `app_browser_2`
+  // should be activated with no navigations happening.
+  {
+    NavigateParams params(browser()->profile(), GetFocusExistingSecondUrl(),
+                          ui::PAGE_TRANSITION_LINK);
+    params.source_contents =
+        browser()->tab_strip_model()->GetActiveWebContents();
+    params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+    Navigate(&params);
+  }
+
+  test::CompletePageLoadForAllWebContents();
+  apps::test::FlushLaunchQueuesForAllBrowserTabs();
+
+  content::WebContents* contents_to_finish =
+      app_browser_2->tab_strip_model()->GetActiveWebContents();
+
+  // `kFocusExistingUrl` should be obtained first when the browser is launched,
+  // and `kFocusExistingSecondUrl` is added later when navigation capturing
+  // happens.
+  EXPECT_THAT(
+      apps::test::GetLaunchParamUrlsInContents(contents_to_finish,
+                                               "launchParamsTargetUrls"),
+      testing::ElementsAre(GetFocusExistingUrl(), GetFocusExistingSecondUrl()));
+
+  // `app_browser_2` should still be at the starting page.
+  EXPECT_EQ(GetFocusExistingUrl(), app_browser_2->tab_strip_model()
+                                       ->GetActiveWebContents()
+                                       ->GetLastCommittedURL());
+}
+
+IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
                        FocusExistingWithBrowserAvoidsOutOfScope) {
   const webapps::AppId& app_id = InstallTestWebApp(
       GetLandingPage(), mojom::UserDisplayMode::kStandalone,
@@ -404,9 +423,7 @@ IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
   // it because the current web contents is not in-scope of the app. And thus
   // create a new window.
   base::HistogramTester histograms;
-  ui_test_utils::BrowserChangeObserver added(
-      /*browser=*/nullptr,
-      ui_test_utils::BrowserChangeObserver::ChangeType::kAdded);
+  ui_test_utils::BrowserCreatedObserver browser_created_observer;
   {
     NavigateParams params(app_browser, GetLandingPage(),
                           ui::PAGE_TRANSITION_LINK);
@@ -415,7 +432,7 @@ IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
     params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
     Navigate(&params);
   }
-  Browser* new_app_browser = added.Wait();
+  Browser* new_app_browser = browser_created_observer.Wait();
 
   test::CompletePageLoadForAllWebContents();
   apps::test::FlushLaunchQueuesForAllBrowserTabs();
@@ -455,9 +472,7 @@ IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
   // Do a capturable navigation to the landing page, and ensure that it opens in
   // a new browser;
   base::HistogramTester histograms;
-  ui_test_utils::BrowserChangeObserver added(
-      /*browser=*/nullptr,
-      ui_test_utils::BrowserChangeObserver::ChangeType::kAdded);
+  ui_test_utils::BrowserCreatedObserver browser_created_observer;
   {
     NavigateParams params(browser(), GetLandingPage(),
                           ui::PAGE_TRANSITION_LINK);
@@ -466,7 +481,7 @@ IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
     params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
     Navigate(&params);
   }
-  Browser* new_app_browser = added.Wait();
+  Browser* new_app_browser = browser_created_observer.Wait();
   test::CompletePageLoadForAllWebContents();
   apps::test::FlushLaunchQueuesForAllBrowserTabs();
   AwaitMetricsAvailableFromRenderer();
@@ -487,8 +502,18 @@ IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
           NavigationCapturingDisplayModeResult::kAppStandaloneFinalStandalone));
 }
 
-IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
-                       NavigateBrowserUsedForNavigateExistingToBrowserTab) {
+// This test is flaky on the Mac 13 bot.
+// TODO(crbug.com/447403523): Enable the test on Mac bots.
+#if BUILDFLAG(IS_MAC)
+#define MAYBE_NavigateBrowserUsedForNavigateExistingToBrowserTab \
+  DISABLED_NavigateBrowserUsedForNavigateExistingToBrowserTab
+#else
+#define MAYBE_NavigateBrowserUsedForNavigateExistingToBrowserTab \
+  NavigateBrowserUsedForNavigateExistingToBrowserTab
+#endif
+IN_PROC_BROWSER_TEST_F(
+    NavigationCapturingBrowserNavigatorBrowserTest,
+    MAYBE_NavigateBrowserUsedForNavigateExistingToBrowserTab) {
   // Test that the browser provided in NavigateParams is used when using a
   // browser to open a browser tab, instead of the most recently active browser.
   const webapps::AppId& app_id = InstallTestWebApp(
@@ -521,8 +546,10 @@ IN_PROC_BROWSER_TEST_F(NavigationCapturingBrowserNavigatorBrowserTest,
         new_browser->tab_strip_model()->GetActiveWebContents();
     params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
     Navigate(&params);
-    LoadURLInContents(params.navigated_or_inserted_contents, GetFinalPage(),
-                      params);
+    content::NavigationController::LoadURLParams load_url_params =
+        LoadURLParamsFromNavigateParams(&params);
+    (void)params.navigated_or_inserted_contents->GetController()
+        .LoadURLWithParams(load_url_params);
   }
 
   test::CompletePageLoadForAllWebContents();
@@ -650,8 +677,10 @@ IN_PROC_BROWSER_TEST_F(
     params.source_contents = blank_new_tab;
     params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
     Navigate(&params);
-    LoadURLInContents(params.navigated_or_inserted_contents,
-                      GetNavigateExistingSecondUrl(), params);
+    content::NavigationController::LoadURLParams load_url_params =
+        LoadURLParamsFromNavigateParams(&params);
+    (void)params.navigated_or_inserted_contents->GetController()
+        .LoadURLWithParams(load_url_params);
   }
 
   test::CompletePageLoadForAllWebContents();
@@ -826,7 +855,10 @@ IN_PROC_BROWSER_TEST_F(LaunchContainerMetricMeasurementTest,
         browser()->tab_strip_model()->GetActiveWebContents();
     params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
     Navigate(&params);
-    LoadURLInContents(target_contents, GetNavigateExistingUrl(), params);
+    content::NavigationController::LoadURLParams load_url_params =
+        LoadURLParamsFromNavigateParams(&params);
+    (void)params.navigated_or_inserted_contents->GetController()
+        .LoadURLWithParams(load_url_params);
   }
 
   content::WaitForLoadStop(target_contents);

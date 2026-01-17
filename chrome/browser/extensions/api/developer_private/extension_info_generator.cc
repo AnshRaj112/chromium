@@ -27,7 +27,6 @@
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/manifest_v2_experiment_manager.h"
 #include "chrome/browser/extensions/mv2_experiment_stage.h"
-#include "chrome/browser/extensions/permissions/site_permissions_helper.h"
 #include "chrome/browser/extensions/shared_module_service.h"
 #include "chrome/browser/extensions/sync/account_extension_tracker.h"
 #include "chrome/browser/profiles/profile.h"
@@ -50,9 +49,11 @@
 #include "extensions/browser/icon_util.h"
 #include "extensions/browser/image_loader.h"
 #include "extensions/browser/path_util.h"
+#include "extensions/browser/permissions/site_permissions_helper.h"
 #include "extensions/browser/ui_util.h"
 #include "extensions/browser/user_script_manager.h"
 #include "extensions/browser/warning_service.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/command.h"
 #include "extensions/common/extension_features.h"
 #include "extensions/common/extension_set.h"
@@ -80,6 +81,8 @@
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "ui/base/accelerators/global_accelerator_listener/global_accelerator_listener.h"  // nogncheck
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -171,9 +174,12 @@ developer::RuntimeError ConstructRuntimeError(const RuntimeError& error) {
   // reasons, but it's not a high priority to change.
   result.render_view_id = error.render_frame_id();
   result.render_process_id = error.render_process_id();
-  result.can_inspect =
+  result.is_service_worker = error.is_from_service_worker();
+  bool can_inspect_frame =
       content::RenderFrameHost::FromID(error.render_process_id(),
                                        error.render_frame_id()) != nullptr;
+  result.can_inspect = can_inspect_frame || result.is_service_worker;
+
   for (const StackFrame& f : error.stack_trace()) {
     developer::StackFrame frame;
     frame.line_number = f.line_number;
@@ -363,6 +369,14 @@ void AddPermissionsInfo(content::BrowserContext* browser_context,
   ExtensionPrefs* extension_prefs = ExtensionPrefs::Get(browser_context);
   std::unique_ptr<const PermissionSet> granted_permissions =
       extension_prefs->GetGrantedPermissions(extension.id());
+
+  // GetGrantedPermissions() can return nullptr if no extension prefs exist
+  // for this extension (e.g., during installation/uninstallation race
+  // conditions or corrupted profile data). Use an empty PermissionSet in
+  // this case to avoid null pointer dereference.
+  if (!granted_permissions) {
+    granted_permissions = std::make_unique<PermissionSet>();
+  }
 
   const PermissionMessageProvider* message_provider =
       PermissionMessageProvider::Get();

@@ -46,7 +46,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </variants>
 
 <histogram name="AddSupervisionDialog.Enrollment"
-    enum="AddSupervisionEnrollment" expires_after="2026-01-04">
+    enum="AddSupervisionEnrollment" expires_after="2026-07-12">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -64,7 +64,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="AddSupervisionDialog.EnrollmentCompletedUserTime" units="ms"
-    expires_after="2026-01-04">
+    expires_after="2026-03-08">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -76,7 +76,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="AddSupervisionDialog.EnrollmentNotCompletedUserTime"
-    units="ms" expires_after="2026-01-04">
+    units="ms" expires_after="2026-03-08">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -89,7 +89,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="AddSupervisionDialog.SignoutCompletedUserTime" units="ms"
-    expires_after="2026-01-04">
+    expires_after="2026-03-08">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -101,7 +101,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChildAccountReconcilor.ForcedUserExitOnReconcileError"
-    enum="BooleanHit" expires_after="2025-11-01">
+    enum="BooleanHit" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -112,7 +112,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.FamilyLink.ChildStatusReportRequest.Size" units="KB"
-    expires_after="2026-01-04">
+    expires_after="2026-05-10">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -125,7 +125,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 
 <histogram
     name="ChromeOS.FamilyLink.ChildStatusReportRequest.TimeSinceLastReport"
-    units="minutes" expires_after="2026-01-04">
+    units="minutes" expires_after="2026-05-10">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -138,7 +138,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.FamilyLinkUser.FaviconAvailability"
-    enum="SupervisedUserFaviconAvailability" expires_after="2025-11-01">
+    enum="SupervisedUserFaviconAvailability" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -166,7 +166,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.FamilyLinkUser.ParentAccess.FlowResult.{FlowType}"
-    enum="ParentAccessFlowResult" expires_after="2025-11-01">
+    enum="ParentAccessFlowResult" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -185,7 +185,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.FamilyLinkUser.ParentAccessWidgetError.{FlowType}"
-    enum="FamilyLinkUserParentAccessWidgetError" expires_after="2025-11-01">
+    enum="FamilyLinkUserParentAccessWidgetError" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -204,7 +204,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 <histogram
     name="ChromeOS.FamilyLinkUser.ParentAccessWidgetShowDialogError.{FlowType}"
     enum="FamilyLinkUserParentAccessWidgetShowDialogError"
-    expires_after="2025-11-01">
+    expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -243,7 +243,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.FamilyUser.NumSecondaryAccounts" units="accounts"
-    expires_after="2025-11-01">
+    expires_after="2026-07-05">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -256,7 +256,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.LegacySupervisedUsers.HiddenFromLoginScreen"
-    enum="LegacySupervisedUserStatus" expires_after="2025-11-01">
+    enum="LegacySupervisedUserStatus" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -269,7 +269,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.OnDeviceControls.AppRemoval"
-    enum="OnDeviceControlsAppRemoval" expires_after="2025-11-01">
+    enum="OnDeviceControlsAppRemoval" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -281,7 +281,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.OnDeviceControls.BlockAppAction"
-    enum="OnDeviceControlsBlockAppAction" expires_after="2025-11-01">
+    enum="OnDeviceControlsBlockAppAction" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -294,7 +294,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.OnDeviceControls.BlockedAppDialogShown"
-    enum="OnDeviceControlsBlockedAppDialog" expires_after="2025-11-01">
+    enum="OnDeviceControlsBlockedAppDialog" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -305,7 +305,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.OnDeviceControls.BlockedAppsCount" units="Apps"
-    expires_after="2025-11-01">
+    expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -316,7 +316,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.OnDeviceControls.BlockedAppsEngagement" units="Apps"
-    expires_after="2025-11-01">
+    expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -327,7 +327,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.OnDeviceControls.DialogAction.{DialogType}"
-    enum="OnDeviceControlsDialogAction" expires_after="2025-11-01">
+    enum="OnDeviceControlsDialogAction" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -344,7 +344,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.OnDeviceControls.PinDialogError"
-    enum="OnDeviceControlsPinDialogError" expires_after="2025-11-01">
+    enum="OnDeviceControlsPinDialogError" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -355,7 +355,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ChromeOS.OnDeviceControls.PinSetupCompleted" enum="Boolean"
-    expires_after="2025-11-01">
+    expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -365,24 +365,12 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
   </summary>
 </histogram>
 
-<histogram name="FamilyLinkUser.BlockedSiteVerifyItsYouInterstitialState"
-    enum="FamilyLinkUserReauthenticationInterstitialState"
-    expires_after="2025-10-19">
-  <owner>anthie@google.com</owner>
-  <owner>ljjlee@google.com</owner>
-  <owner>chrome-kids-eng@google.com</owner>
-  <summary>
-    Recorded when an unauthenticated Family Link user tries to navigate to a
-    blocked website in the main frame, prompting a re-authentication
-    interstitial. It records the different sign-in states of the user provided
-    by the interstitial.
-  </summary>
-</histogram>
-
 <histogram name="FamilyLinkUser.FamilyInfoLogSource.FetchLatency" units="ms"
-    expires_after="2025-08-24">
+    expires_after="2026-06-21">
+<!-- TODO: crbug.com/431773019 - replace with Signin.ListFamilyMembersRequest.* -->
+
   <owner>ljjlee@google.com</owner>
-  <owner>fernandex@google.com</owner>
+  <owner>tju@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
     The time spent waiting for the Kids Management API::ListMembers fetch done
@@ -393,9 +381,11 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyLinkUser.FamilyInfoLogSource.FetchStatus"
-    enum="FamilyInfoLogSourceFetchStatus" expires_after="2025-08-24">
+    enum="FamilyInfoLogSourceFetchStatus" expires_after="2026-06-21">
+<!-- TODO: crbug.com/431773019 - replace with Signin.ListFamilyMembersRequest.* -->
+
   <owner>ljjlee@google.com</owner>
-  <owner>fernandex@google.com</owner>
+  <owner>tju@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
     The result of the Kids Management API::ListMembers fetch done as part of
@@ -405,8 +395,10 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyLinkUser.FamilyInfoLogSource.ImmediatelyAvailable"
-    enum="Boolean" expires_after="2025-08-24">
-  <owner>fernandex@google.com</owner>
+    enum="Boolean" expires_after="2026-06-21">
+<!-- TODO: crbug.com/431773019 - replace with Signin.ListFamilyMembersRequest.* -->
+
+  <owner>tju@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
     Whether a fetch to the Kids Management API::ListMembers was necessary as a
@@ -415,7 +407,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyLinkUser.LocalWebApprovalCompleteRequestTotalDuration"
-    units="ms" expires_after="2026-01-18">
+    units="ms" expires_after="2026-05-24">
   <owner>anthie@google.com</owner>
   <owner>ljjlee@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
@@ -429,7 +421,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyLinkUser.LocalWebApprovalErrorType"
-    enum="LocalWebApprovalErrorType" expires_after="2025-11-16">
+    enum="LocalWebApprovalErrorType" expires_after="2026-03-22">
   <owner>anthie@google.com</owner>
   <owner>ddac@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
@@ -440,7 +432,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyLinkUser.LocalWebApprovalOutcome"
-    enum="FamilyLinkUserLocalWebApprovalOutcome" expires_after="2026-01-18">
+    enum="FamilyLinkUserLocalWebApprovalOutcome" expires_after="2026-05-24">
   <owner>anthie@google.com</owner>
   <owner>ljjlee@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
@@ -452,7 +444,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyLinkUser.LocalWebApprovalResult"
-    enum="FamilyLinkUserLocalWebApprovalResult" expires_after="2026-01-18">
+    enum="FamilyLinkUserLocalWebApprovalResult" expires_after="2026-05-24">
   <owner>agawronska@chromium.org</owner>
   <owner>cros-families-eng@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
@@ -476,22 +468,8 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
   </summary>
 </histogram>
 
-<histogram name="FamilyLinkUser.SubframeYoutubeReauthenticationInterstitial"
-    enum="FamilyLinkUserReauthenticationInterstitialState"
-    expires_after="2026-01-04">
-  <owner>anthie@google.com</owner>
-  <owner>ljjlee@google.com</owner>
-  <owner>chrome-kids-eng@google.com</owner>
-  <summary>
-    Recorded when an unauthenticated Family Link user is shown the
-    re-authentication interstitial for a subframe with YouTube content. It
-    records the different sign-in states of the user provided by the
-    interestitial.
-  </summary>
-</histogram>
-
 <histogram name="FamilyUser.ChromeBrowserEngagement.Duration2" units="ms"
-    expires_after="2025-11-01">
+    expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -507,7 +485,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.DeviceOwner" enum="Boolean"
-    expires_after="2026-01-04">
+    expires_after="2026-05-10">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -518,7 +496,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.FamilyLinkUsersCount" units="Number of Users"
-    expires_after="2025-11-01">
+    expires_after="2026-06-28">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -529,7 +507,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.GaiaUsersCount" units="Number of Users"
-    expires_after="2025-11-01">
+    expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -541,7 +519,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.ManagedSiteList" enum="FamilyLinkManagedSiteList"
-    expires_after="2026-01-04">
+    expires_after="2026-07-12">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -558,7 +536,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.ManagedSiteList.Conflict" enum="BooleanHasConflict"
-    expires_after="2025-11-30">
+    expires_after="2026-05-10">
   <owner>anthie@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -570,7 +548,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.ManagedSiteList.SubdomainConflictType"
-    enum="FamilyLinkFilteringSubdomainConflictType" expires_after="2025-11-30">
+    enum="FamilyLinkFilteringSubdomainConflictType" expires_after="2026-05-10">
   <owner>anthie@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -581,7 +559,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.ManagedSiteListCount{ListType}"
-    units="Number of sites" expires_after="2026-01-04">
+    units="Number of sites" expires_after="2026-07-12">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -602,7 +580,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.NewUserAdded" enum="NewUserAdded"
-    expires_after="2026-01-04">
+    expires_after="2026-03-08">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -614,7 +592,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.SessionEngagement.Duration" units="ms"
-    expires_after="2025-11-01">
+    expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -626,7 +604,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.SessionEngagement.Total" units="Hour of day"
-    expires_after="2025-11-01">
+    expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -639,7 +617,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.SessionEngagement.Weekday" units="Hour of day"
-    expires_after="2026-01-04">
+    expires_after="2026-07-12">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -651,7 +629,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.SessionEngagement.Weekend" units="Hour of day"
-    expires_after="2026-01-04">
+    expires_after="2026-05-10">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -663,7 +641,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.TimeLimitPolicyTypes" enum="TimeLimitPolicyType"
-    expires_after="2026-01-04">
+    expires_after="2026-05-10">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -678,7 +656,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.WebFilterType" enum="SupervisedUserWebFilterType"
-    expires_after="2026-01-04">
+    expires_after="2026-07-12">
 <!-- Do not extend once expires, migrate to SupervisedUsers.WebFilterType.FamilyLink-->
 
   <owner>zhangwenyu@google.com</owner>
@@ -701,7 +679,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.WebFilterType.PerRecord"
-    enum="SupervisedUserWebFilterType" expires_after="2025-12-21">
+    enum="SupervisedUserWebFilterType" expires_after="2026-06-28">
   <owner>fernandex@chromium.org</owner>
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
@@ -720,7 +698,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.{AppType}AppsCount2" units="Number of Apps"
-    expires_after="2025-11-01">
+    expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -744,7 +722,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="FamilyUser.{ExtensionStatus}ExtensionsCount2"
-    units="Number of Extensions" expires_after="2025-12-28">
+    units="Number of Extensions" expires_after="2026-05-03">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -764,7 +742,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ManagedMode.BlockingInterstitialCommand"
-    enum="ManagedModeBlockingCommand" expires_after="2026-01-04">
+    enum="ManagedModeBlockingCommand" expires_after="2026-07-12">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -772,7 +750,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ManagedUsers.BlockedIframeCount" units="iframes"
-    expires_after="2025-11-01">
+    expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -783,7 +761,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ManagedUsers.FilteringResult"
-    enum="SupervisedUserSafetyFilterResult" expires_after="2026-01-04">
+    enum="SupervisedUserSafetyFilterResult" expires_after="2026-07-12">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -796,7 +774,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ManagedUsers.RequestPermissionSource"
-    enum="ManagedUserURLRequestPermissionSource" expires_after="2026-01-04">
+    enum="ManagedUserURLRequestPermissionSource" expires_after="2026-07-12">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -806,7 +784,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ManagedUsers.TopLevelFilteringResult"
-    enum="SupervisedUserFilterTopLevelResult" expires_after="2026-01-04">
+    enum="SupervisedUserFilterTopLevelResult" expires_after="2026-07-12">
   <owner>fernandex@chromium.org</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
@@ -823,7 +801,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="ManagedUsers.TopLevelFilteringResult2{Context}"
-    enum="SupervisedUserFilterTopLevelResult" expires_after="2026-01-04">
+    enum="SupervisedUserFilterTopLevelResult" expires_after="2026-07-12">
   <owner>tju@chromium.org</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
@@ -857,7 +835,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 
 <histogram
     name="SupervisedUsers.ClassifyUrlThrottle.EarlierThanContentResponse"
-    units="ms" expires_after="2026-01-11">
+    units="ms" expires_after="2026-05-17">
   <owner>tju@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
@@ -876,7 +854,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="SupervisedUsers.ClassifyUrlThrottle.FinalStatus"
-    enum="ClassifyUrlThrottleFinalStatus" expires_after="2025-11-30">
+    enum="ClassifyUrlThrottleFinalStatus" expires_after="2026-06-07">
   <owner>tju@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
@@ -893,7 +871,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="SupervisedUsers.ClassifyUrlThrottle.LaterThanContentResponse"
-    units="ms" expires_after="2026-01-11">
+    units="ms" expires_after="2026-03-15">
   <owner>tju@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
@@ -911,46 +889,8 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
   </summary>
 </histogram>
 
-<histogram name="SupervisedUsers.ClassifyUrlThrottle.Status"
-    enum="ClassifyUrlThrottleStatus" expires_after="2025-09-14">
-  <owner>tju@google.com</owner>
-  <owner>chrome-kids-eng@google.com</owner>
-  <summary>
-    Tracks the throttle interaction with the navigation flow.
-
-    Typically, unblocked navigation with a single request records one Continue
-    status, followed by either Proceed or Defer and then Resume. If there are
-    redirects, then more Continue statuses are recorded.
-
-    Blocked navigation records at least one Continue followed by Defer and
-    CancelDeferredNavigation when the check was asynchronous, or an immediate
-    DeferAndScheduleInterstitial status if the check is synchronouns. When the
-    user navigates to a redirect chain, there might be more continue events
-    recorded.
-
-    The scenarios above mean that the number of Defer statuses should match the
-    number of Resume and CancelDeferredNavigation statuses.
-
-    Cancel is a definitive termination of the navigation without classification,
-    due to eg. unsupported type of request.
-  </summary>
-</histogram>
-
-<histogram name="SupervisedUsers.ExtensionApprovalsCountOnExtensionToggle"
-    units="Extensions" expires_after="2025-10-26">
-  <owner>anthie@google.com</owner>
-  <owner>cros-families-eng@google.com</owner>
-  <owner>chrome-kids-eng@google.com</owner>
-  <summary>
-    Records the number of extensions that will be granted parental approval at
-    the time of flipping the Family Link &quot;Extensions&quot; toggle to
-    Enabled. When this action happens, all the extensions missing parental
-    approval are granted it.
-  </summary>
-</histogram>
-
 <histogram name="SupervisedUsers.ExtensionEnablement"
-    enum="SupervisedUserExtensionEnablement" expires_after="2025-11-01">
+    enum="SupervisedUserExtensionEnablement" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -966,7 +906,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="SupervisedUsers.ExtensionInstallDialog"
-    enum="SupervisedUserExtensionInstallDialog" expires_after="2025-11-01">
+    enum="SupervisedUserExtensionInstallDialog" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -977,17 +917,6 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
     Dialog. Asked Parent count increments when the supervised user clicks
     &quot;Ask a parent&quot;. Child Canceled count increments when the
     supervised user clicks &quot;Cancel&quot;.
-  </summary>
-</histogram>
-
-<histogram name="SupervisedUsers.ExtensionParentApprovalEntryPoint"
-    enum="SupervisedUserExtensionParentApprovalEntryPoint"
-    expires_after="2025-08-24">
-  <owner>anthie@google.com</owner>
-  <owner>chrome-kids-eng@google.com</owner>
-  <summary>
-    Records the different flows that lead to displaying the Extensions parent
-    approval dialog on Windows/Linux/Mac platrforms.
   </summary>
 </histogram>
 
@@ -1003,33 +932,20 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
   </summary>
 </histogram>
 
-<histogram name="SupervisedUsers.ImplicitParentApprovalGrantEntryPoint"
-    enum="SupervisedUserImplicitParentApprovalGrantEntryPoint"
-    expires_after="2025-08-24">
-  <owner>anthie@google.com</owner>
-  <owner>chrome-kids-eng@google.com</owner>
+<histogram name="SupervisedUsers.FamilyLinkSupervisionConflict"
+    enum="BooleanHasConflict" expires_after="2026-05-17">
+  <owner>tju@google.com</owner>
+  <owner>chrome-signin-team@google.com</owner>
   <summary>
-    Records the different flows that lead to granting an automatic parent
-    approval on an extension (without having to explicitely request the
-    approval).
-  </summary>
-</histogram>
+    Recorded each time when Family Link supervision is detected for a user that
+    already has local supervision enabled.
 
-<histogram
-    name="SupervisedUsers.InitialLocallyApprovedExtensionsCountOnWinLinuxMac"
-    units="Extensions" expires_after="2025-08-24">
-  <owner>anthie@google.com</owner>
-  <owner>chrome-kids-eng@google.com</owner>
-  <summary>
-    Records the number of extensions that will be granted local parental
-    approval at the release time the feature that introduces the Skip Parent
-    Approval mode for extension installations. Applies to Win/Linux/Mac only, so
-    on ChromeOS it is always zero.
+    Recorded only for Android clients.
   </summary>
 </histogram>
 
 <histogram name="SupervisedUsers.ParentPermissionDialog"
-    enum="SupervisedUserParentPermissionDialog" expires_after="2025-11-01">
+    enum="SupervisedUserParentPermissionDialog" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1047,7 +963,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="SupervisedUsers.PerAppTimeLimits.AppsWithTimeLimit"
-    units="Apps" expires_after="2025-11-01">
+    units="Apps" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1069,7 +985,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="SupervisedUsers.PerAppTimeLimits.Engagement" units="Apps"
-    expires_after="2026-01-04">
+    expires_after="2026-03-08">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1081,7 +997,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="SupervisedUsers.PerAppTimeLimits.PolicyChangeCount"
-    units="Changes" expires_after="2025-11-01">
+    units="Changes" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1092,7 +1008,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="SupervisedUsers.SitesMayRequestCameraMicLocation.PerRecord"
-    enum="SupervisedUserToggleState" expires_after="2025-11-01">
+    enum="SupervisedUserToggleState" expires_after="2026-11-01">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1109,7 +1025,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 
 <histogram
     name="SupervisedUsers.SkipParentApprovalToInstallExtensions.PerRecord"
-    enum="SupervisedUserToggleState" expires_after="2026-01-11">
+    enum="SupervisedUserToggleState" expires_after="2026-05-24">
   <owner>anthie@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1152,7 +1068,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="Supervision.ParentAccessCode.Action"
-    enum="ParentAccessCodeAction" expires_after="2026-01-04">
+    enum="ParentAccessCodeAction" expires_after="2026-07-12">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1163,7 +1079,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="Supervision.ParentAccessCode.Usage"
-    enum="ParentAccessCodeUsage" expires_after="2026-01-04">
+    enum="ParentAccessCodeUsage" expires_after="2026-05-10">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1174,7 +1090,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="Supervision.ParentAccessCode.ValidationResult.{Action}"
-    enum="ParentAccessCodeValidationResult" expires_after="2026-01-04">
+    enum="ParentAccessCodeValidationResult" expires_after="2026-05-10">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1193,7 +1109,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="Supervision.StatusReport.Event"
-    enum="SupervisionStatusReportEvent" expires_after="2026-01-04">
+    enum="SupervisionStatusReportEvent" expires_after="2026-05-10">
   <owner>zhangwenyu@google.com</owner>
   <owner>longbowei@google.com</owner>
   <owner>cros-families-eng@google.com</owner>
@@ -1203,7 +1119,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="{RequestType}.AuthError" enum="GoogleServiceAuthError"
-    expires_after="2026-01-18">
+    expires_after="2026-03-22">
   <owner>ljjlee@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
@@ -1215,7 +1131,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="{RequestType}.HttpStatusOrNetError"
-    enum="CombinedHttpResponseAndNetErrorCode" expires_after="2026-01-18">
+    enum="CombinedHttpResponseAndNetErrorCode" expires_after="2026-05-24">
   <owner>tju@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
@@ -1225,7 +1141,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
   <token key="RequestType" variants="ProtoFetcherRequestType"/>
 </histogram>
 
-<histogram name="{RequestType}.Latency" units="ms" expires_after="2025-12-14">
+<histogram name="{RequestType}.Latency" units="ms" expires_after="2026-04-26">
   <owner>tju@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>
@@ -1239,7 +1155,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="{RequestType}.Status" enum="SupervisedUserProtoFetcherStatus"
-    expires_after="2025-12-14">
+    expires_after="2026-06-21">
   <owner>tju@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>The status of the fetch in calls to {RequestType}.</summary>
@@ -1247,7 +1163,7 @@ Current expiration date for histograms owned by cros-families-eng@google.com:
 </histogram>
 
 <histogram name="{RequestType}.{Status}.Latency" units="ms"
-    expires_after="2025-12-28">
+    expires_after="2026-07-12">
   <owner>tju@google.com</owner>
   <owner>chrome-kids-eng@google.com</owner>
   <summary>

@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 #include "third_party/blink/renderer/core/animation/css/css_animation.h"
+
 #include "third_party/blink/renderer/core/animation/animation.h"
 #include "third_party/blink/renderer/core/animation/css/css_animations.h"
 #include "third_party/blink/renderer/core/animation/keyframe_effect.h"
 #include "third_party/blink/renderer/core/dom/document.h"
+#include "third_party/blink/renderer/core/dom/trigger_scoped_name.h"
 
 namespace blink {
 
@@ -123,9 +125,17 @@ CSSAnimation::PlayStateTransitionScope::~PlayStateTransitionScope() {
     animation_.ignore_css_play_state_ = true;
 }
 
+void CSSAnimation::SetNamedTriggerAttachment(
+    Member<const TriggerScopedName> scope,
+    AnimationTrigger* trigger) {
+  named_trigger_attachments_.Set(scope, trigger);
+}
+
 void CSSAnimation::Trace(blink::Visitor* visitor) const {
   Animation::Trace(visitor);
   visitor->Trace(owning_element_);
+  visitor->Trace(trigger_attachments_);
+  visitor->Trace(named_trigger_attachments_);
 }
 
 }  // namespace blink

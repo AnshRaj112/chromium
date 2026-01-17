@@ -134,8 +134,8 @@ void ApplyInit(const URLPatternInit* init,
   if (init->hasBaseURL()) {
     base_url = KURL(init->baseURL());
     if (!base_url.IsValid() || base_url.IsEmpty()) {
-      exception_state.ThrowTypeError("Invalid baseURL '" + init->baseURL() +
-                                     "'.");
+      exception_state.ThrowTypeError(
+          StrCat({"Invalid baseURL '", init->baseURL(), "'."}));
       return;
     }
 
@@ -235,7 +235,8 @@ void ApplyInit(const URLPatternInit* init,
       if (slash_index != kNotFound) {
         // Extract the baseURL path up to and including the first slash.  Append
         // the relative init pathname to it.
-        pathname = base_path.Substring(0, slash_index + 1) + pathname;
+        pathname =
+            StrCat({StringView(base_path, 0, slash_index + 1), pathname});
       }
     }
     pathname = url_pattern::CanonicalizePathname(protocol, pathname, type,
@@ -257,13 +258,13 @@ void ApplyInit(const URLPatternInit* init,
 }
 
 URLPatternComponentResult* MakeURLPatternComponentResult(
-    ScriptState* script_state,
+    v8::Isolate* isolate,
     const String& input,
     const Vector<std::pair<String, String>>& group_values) {
   auto* result = URLPatternComponentResult::Create();
   result->setInput(input);
 
-  // Convert null WTF::String values to v8::Undefined.  We have to do this
+  // Convert null blink::String values to v8::Undefined.  We have to do this
   // manually because the webidl compiler compiler does not currently
   // support `(USVString or undefined)` in a record value.
   // TODO(crbug.com/1293259): Use webidl `(USVString or undefined)` when
@@ -273,13 +274,12 @@ URLPatternComponentResult* MakeURLPatternComponentResult(
   for (const auto& pair : group_values) {
     v8::Local<v8::Value> v8_value;
     if (pair.second.IsNull()) {
-      v8_value = v8::Undefined(script_state->GetIsolate());
+      v8_value = v8::Undefined(isolate);
     } else {
-      v8_value = ToV8Traits<IDLUSVString>::ToV8(script_state, pair.second);
+      v8_value = V8String(isolate, pair.second);
     }
-    v8_group_values.emplace_back(
-        pair.first,
-        ScriptValue(script_state->GetIsolate(), std::move(v8_value)));
+    v8_group_values.emplace_back(pair.first,
+                                 ScriptValue(isolate, std::move(v8_value)));
   }
 
   result->setGroups(std::move(v8_group_values));
@@ -378,9 +378,9 @@ URLPattern* URLPattern::Create(v8::Isolate* isolate,
   if (input->GetContentType() ==
       V8URLPatternInput::ContentType::kURLPatternInit) {
     exception_state.ThrowTypeError(
-        "Invalid second argument baseURL '" + base_url +
-        "' provided with a URLPatternInit input. Use the "
-        "URLPatternInit.baseURL property instead.");
+        StrCat({"Invalid second argument baseURL '", base_url,
+                "' provided with a URLPatternInit input. Use the "
+                "URLPatternInit.baseURL property instead."}));
     return nullptr;
   }
 
@@ -410,8 +410,9 @@ URLPattern* URLPattern::Create(v8::Isolate* isolate,
     return nullptr;
   }
   if (!status.ok()) {
-    exception_state.ThrowTypeError("Invalid input string '" + input_string +
-                                   "'. It unexpectedly fails to tokenize.");
+    exception_state.ThrowTypeError(
+        StrCat({"Invalid input string '", input_string,
+                "'. It unexpectedly fails to tokenize."}));
     return nullptr;
   }
   URLPatternInit* init =
@@ -419,8 +420,8 @@ URLPattern* URLPattern::Create(v8::Isolate* isolate,
 
   if (!base_url && !init->hasProtocol()) {
     exception_state.ThrowTypeError(
-        "Relative constructor string '" + input_string +
-        "' must have a base URL passed as the second argument.");
+        StrCat({"Relative constructor string '", input_string,
+                "' must have a base URL passed as the second argument."}));
     return nullptr;
   }
 
@@ -576,41 +577,41 @@ URLPattern::URLPattern(Component* protocol,
       hash_(hash),
       options_(options) {}
 
-bool URLPattern::test(ScriptState* script_state,
+bool URLPattern::test(v8::Isolate* isolate,
                       const V8URLPatternInput* input,
                       const String& base_url,
                       ExceptionState& exception_state) const {
-  return Match(script_state, input, base_url, /*result=*/nullptr,
-               exception_state);
+  return Match(isolate, input, base_url, /*result=*/nullptr, exception_state);
 }
 
-bool URLPattern::test(ScriptState* script_state,
+bool URLPattern::test(v8::Isolate* isolate,
                       const V8URLPatternInput* input,
                       ExceptionState& exception_state) const {
-  return test(script_state, input, /*base_url=*/String(), exception_state);
+  return test(isolate, input, /*base_url=*/String(), exception_state);
 }
 
-URLPatternResult* URLPattern::exec(ScriptState* script_state,
+URLPatternResult* URLPattern::exec(v8::Isolate* isolate,
                                    const V8URLPatternInput* input,
                                    const String& base_url,
                                    ExceptionState& exception_state) const {
   URLPatternResult* result = URLPatternResult::Create();
-  if (!Match(script_state, input, base_url, result, exception_state))
+  if (!Match(isolate, input, base_url, result, exception_state)) {
     return nullptr;
+  }
   return result;
 }
 
-URLPatternResult* URLPattern::exec(ScriptState* script_state,
+URLPatternResult* URLPattern::exec(v8::Isolate* isolate,
                                    const V8URLPatternInput* input,
                                    ExceptionState& exception_state) const {
-  return exec(script_state, input, /*base_url=*/String(), exception_state);
+  return exec(isolate, input, /*base_url=*/String(), exception_state);
 }
 
 String URLPattern::generate(const V8URLPatternComponent& component,
                             const VectorOfPairs<String, String>& groups,
                             ExceptionState& exception_state) const {
   for (auto&& [value, name] : ComponentsWithNames()) {
-    if (component == name) {
+    if (component.AsStringView() == name) {
       std::optional<String> result =
           value->Generate(groups, ShouldTreatAsStandardURL(), exception_state);
       if (!result) {
@@ -693,22 +694,31 @@ int URLPattern::compareComponent(const V8URLPatternComponent& component,
   NOTREACHED();
 }
 
+bool URLPattern::Match(const KURL& url, MatchResult* result) const {
+  if (!url.IsValid() || url.IsEmpty()) {
+    return false;
+  }
+  MatchInput input;
+  URLToMatchInput(url, input);
+  return Match(input, result);
+}
+
 std::optional<SafeUrlPattern> URLPattern::ToSafeUrlPattern(
     ExceptionState& exception_state) const {
   String components_with_regexp;
   for (auto&& [component, name] : ComponentsWithNames()) {
     if (component->HasRegExpGroups()) {
-      components_with_regexp = components_with_regexp +
-                               (components_with_regexp.IsNull() ? "" : ", ") +
-                               name + " (" +
-                               component->GeneratePatternString() + ")";
+      components_with_regexp =
+          StrCat({components_with_regexp,
+                  (components_with_regexp.IsNull() ? "" : ", "), name, " (",
+                  component->GeneratePatternString(), ")"});
     }
   }
   if (!components_with_regexp.IsNull()) {
     exception_state.ThrowTypeError(
-        "The pattern cannot contain regexp groups, but did in the following "
-        "components: " +
-        components_with_regexp);
+        StrCat({"The pattern cannot contain regexp groups, but did in the "
+                "following components: ",
+                components_with_regexp}));
     return std::nullopt;
   }
   CHECK(!hasRegExpGroups());
@@ -732,11 +742,9 @@ String URLPattern::ToString() const {
   builder.Append("(");
   Vector<String> components = {protocol(), username(), password(), hostname(),
                                port(),     pathname(), search(),   hash()};
-  for (wtf_size_t i = 0; i < components.size(); i++) {
-    builder.Append(components[i] == g_empty_string ? " " : components[i]);
-    if (i != components.size() - 1)
-      builder.Append(",");
-  }
+  builder.AppendRange(components, ",", [](const auto& component) {
+    return component == g_empty_string ? " " : component;
+  });
   builder.Append(")");
   return builder.ReleaseString();
 }
@@ -753,21 +761,14 @@ void URLPattern::Trace(Visitor* visitor) const {
   ScriptWrappable::Trace(visitor);
 }
 
-bool URLPattern::Match(ScriptState* script_state,
+bool URLPattern::Match(v8::Isolate* isolate,
                        const V8URLPatternInput* input,
                        const String& base_url,
                        URLPatternResult* result,
                        ExceptionState& exception_state) const {
   // By default each URL component value starts with an empty string.  The
   // given input is then layered on top of these defaults.
-  String protocol(g_empty_string);
-  String username(g_empty_string);
-  String password(g_empty_string);
-  String hostname(g_empty_string);
-  String port(g_empty_string);
-  String pathname(g_empty_string);
-  String search(g_empty_string);
-  String hash(g_empty_string);
+  MatchInput match_input;
 
   HeapVector<Member<V8URLPatternInput>> inputs;
 
@@ -775,9 +776,9 @@ bool URLPattern::Match(ScriptState* script_state,
     case V8URLPatternInput::ContentType::kURLPatternInit: {
       if (base_url) {
         exception_state.ThrowTypeError(
-            "Invalid second argument baseURL '" + base_url +
-            "' provided with a URLPatternInit input. Use the "
-            "URLPatternInit.baseURL property instead.");
+            StrCat({"Invalid second argument baseURL '", base_url,
+                    "' provided with a URLPatternInit input. Use the "
+                    "URLPatternInit.baseURL property instead."}));
         return false;
       }
 
@@ -785,11 +786,13 @@ bool URLPattern::Match(ScriptState* script_state,
 
       inputs.push_back(MakeGarbageCollected<V8URLPatternInput>(init));
 
-      v8::TryCatch try_catch(script_state->GetIsolate());
+      v8::TryCatch try_catch(isolate);
       // Layer the URLPatternInit values on top of the default empty strings.
-      ApplyInit(init, ValueType::kURL, protocol, username, password, hostname,
-                port, pathname, search, hash,
-                PassThroughException(script_state->GetIsolate()));
+      ApplyInit(init, ValueType::kURL, match_input.protocol,
+                match_input.username, match_input.password,
+                match_input.hostname, match_input.port, match_input.pathname,
+                match_input.search, match_input.hash,
+                PassThroughException(isolate));
       if (try_catch.HasCaught()) {
         // Treat exceptions simply as a failure to match.
         return false;
@@ -817,55 +820,72 @@ bool URLPattern::Match(ScriptState* script_state,
       }
 
       // Apply the parsed URL components on top of our defaults.
-      if (url.Protocol())
-        protocol = url.Protocol();
-      if (!url.User().empty()) {
-        username = url.User().ToString();
-      }
-      if (!url.Pass().empty()) {
-        password = url.Pass().ToString();
-      }
-      if (!url.Host().empty()) {
-        hostname = url.Host().ToString();
-      }
-      if (url.Port() > 0) {
-        port = String::Number(url.Port());
-      }
-      if (!url.GetPath().empty()) {
-        pathname = url.GetPath().ToString();
-      }
-      if (!url.Query().empty()) {
-        search = url.Query().ToString();
-      }
-      if (url.HasFragmentIdentifier()) {
-        hash = url.FragmentIdentifier().ToString();
-      }
+      URLToMatchInput(url, match_input);
       break;
     }
   }
 
-  // Declare vectors to hold matched group name/value pairs produced by the
-  // matching algorithm.
-  Vector<std::pair<String, String>> protocol_group_list;
-  Vector<std::pair<String, String>> username_group_list;
-  Vector<std::pair<String, String>> password_group_list;
-  Vector<std::pair<String, String>> hostname_group_list;
-  Vector<std::pair<String, String>> port_group_list;
-  Vector<std::pair<String, String>> pathname_group_list;
-  Vector<std::pair<String, String>> search_group_list;
-  Vector<std::pair<String, String>> hash_group_list;
+  if (!result) {
+    // If we are not generating a full result then we don't need to populate
+    // group lists.
+    return Match(match_input);
+  }
 
-  // If we are not generating a full result then we don't need to populate
-  // group lists.
-  auto* protocol_group_list_ref = result ? &protocol_group_list : nullptr;
-  auto* username_group_list_ref = result ? &username_group_list : nullptr;
-  auto* password_group_list_ref = result ? &password_group_list : nullptr;
-  auto* hostname_group_list_ref = result ? &hostname_group_list : nullptr;
-  auto* port_group_list_ref = result ? &port_group_list : nullptr;
-  auto* pathname_group_list_ref = result ? &pathname_group_list : nullptr;
-  auto* search_group_list_ref = result ? &search_group_list : nullptr;
-  auto* hash_group_list_ref = result ? &hash_group_list : nullptr;
+  MatchResult match_result;
+  if (!Match(match_input, &match_result)) {
+    return false;
+  }
 
+  result->setInputs(std::move(inputs));
+
+  result->setProtocol(MakeURLPatternComponentResult(
+      isolate, match_input.protocol, match_result.protocol));
+  result->setUsername(MakeURLPatternComponentResult(
+      isolate, match_input.username, match_result.username));
+  result->setPassword(MakeURLPatternComponentResult(
+      isolate, match_input.password, match_result.password));
+  result->setHostname(MakeURLPatternComponentResult(
+      isolate, match_input.hostname, match_result.hostname));
+  result->setPort(MakeURLPatternComponentResult(isolate, match_input.port,
+                                                match_result.port));
+  result->setPathname(MakeURLPatternComponentResult(
+      isolate, match_input.pathname, match_result.pathname));
+  result->setSearch(MakeURLPatternComponentResult(isolate, match_input.search,
+                                                  match_result.search));
+  result->setHash(MakeURLPatternComponentResult(isolate, match_input.hash,
+                                                match_result.hash));
+
+  return true;
+}
+
+void URLPattern::URLToMatchInput(const KURL& url, MatchInput& input) {
+  if (url.Protocol()) {
+    input.protocol = url.Protocol();
+  }
+  if (!url.User().empty()) {
+    input.username = url.User().ToString();
+  }
+  if (!url.Pass().empty()) {
+    input.password = url.Pass().ToString();
+  }
+  if (!url.Host().empty()) {
+    input.hostname = url.Host().ToString();
+  }
+  if (url.Port() > 0) {
+    input.port = String::Number(url.Port());
+  }
+  if (!url.GetPath().empty()) {
+    input.pathname = url.GetPath().ToString();
+  }
+  if (!url.Query().empty()) {
+    input.search = url.Query().ToString();
+  }
+  if (url.HasFragmentIdentifier()) {
+    input.hash = url.FragmentIdentifier().ToString();
+  }
+}
+
+bool URLPattern::Match(const MatchInput& input, MatchResult* result) const {
   CHECK(protocol_);
   CHECK(username_);
   CHECK(password_);
@@ -875,42 +895,25 @@ bool URLPattern::Match(ScriptState* script_state,
   CHECK(search_);
   CHECK(hash_);
 
-  // Each component of the pattern must match the corresponding component of
-  // the input.
-  bool matched = protocol_->Match(protocol, protocol_group_list_ref) &&
-                 username_->Match(username, username_group_list_ref) &&
-                 password_->Match(password, password_group_list_ref) &&
-                 hostname_->Match(hostname, hostname_group_list_ref) &&
-                 port_->Match(port, port_group_list_ref) &&
-                 pathname_->Match(pathname, pathname_group_list_ref) &&
-                 search_->Match(search, search_group_list_ref) &&
-                 hash_->Match(hash, hash_group_list_ref);
-
-  if (!matched || !result)
-    return matched;
-
-  result->setInputs(std::move(inputs));
-
-  result->setProtocol(MakeURLPatternComponentResult(script_state, protocol,
-                                                    protocol_group_list));
-  result->setUsername(MakeURLPatternComponentResult(script_state, username,
-                                                    username_group_list));
-  result->setPassword(MakeURLPatternComponentResult(script_state, password,
-                                                    password_group_list));
-  result->setHostname(MakeURLPatternComponentResult(script_state, hostname,
-                                                    hostname_group_list));
-  result->setPort(
-      MakeURLPatternComponentResult(script_state, port, port_group_list));
-  result->setPathname(MakeURLPatternComponentResult(script_state, pathname,
-                                                    pathname_group_list));
-  result->setSearch(
-      MakeURLPatternComponentResult(script_state, search, search_group_list));
-  result->setHash(
-      MakeURLPatternComponentResult(script_state, hash, hash_group_list));
-
-  return true;
+  // Each component of the pattern must match the corresponding component of the
+  // input. If we are not generating a full result, we don't need to populate
+  // group lists. Then just pass nullptr.
+  auto* protocol_result = result ? &result->protocol : nullptr;
+  auto* username_result = result ? &result->username : nullptr;
+  auto* password_result = result ? &result->password : nullptr;
+  auto* hostname_result = result ? &result->hostname : nullptr;
+  auto* port_result = result ? &result->port : nullptr;
+  auto* pathname_result = result ? &result->pathname : nullptr;
+  auto* search_result = result ? &result->search : nullptr;
+  auto* hash_result = result ? &result->hash : nullptr;
+  return protocol_->Match(input.protocol, protocol_result) &&
+         username_->Match(input.username, username_result) &&
+         password_->Match(input.password, password_result) &&
+         hostname_->Match(input.hostname, hostname_result) &&
+         port_->Match(input.port, port_result) &&
+         pathname_->Match(input.pathname, pathname_result) &&
+         search_->Match(input.search, search_result) &&
+         hash_->Match(input.hash, hash_result);
 }
-
-// static
 
 }  // namespace blink

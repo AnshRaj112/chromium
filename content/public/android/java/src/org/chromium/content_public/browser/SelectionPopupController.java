@@ -7,7 +7,9 @@ package org.chromium.content_public.browser;
 import android.view.ActionMode;
 import android.view.textclassifier.TextClassifier;
 
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.NonNullObservableSupplier;
+import org.chromium.base.supplier.ObservableSuppliers;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.content.browser.selection.SelectionPopupControllerImpl;
@@ -16,18 +18,18 @@ import org.chromium.content_public.browser.selection.SelectionDropdownMenuDelega
 import org.chromium.ui.base.WindowAndroid;
 
 /**
- * An interface that handles input-related web content selection UI like action mode
- * and paste popup view. It wraps an {@link ActionMode} created by the associated view,
- * providing modified interaction with it.
+ * An interface that handles input-related web content selection UI like action mode and paste popup
+ * view. It wraps an {@link ActionMode} created by the associated view, providing modified
+ * interaction with it.
  *
- * Embedders can use {@link ActionModeCallbackHelper} provided by the implementation of
- * this interface to create {@link ActionMode.Callback} instance and configure the selection
- * action mode tasks to their requirements.
+ * <p>Embedders can use {@link ActionModeCallbackHelper} provided by the implementation of this
+ * interface to create {@link ActionMode.Callback} instance and configure the selection action mode
+ * tasks to their requirements.
  */
 @NullMarked
 public interface SelectionPopupController {
     // User action of clicking on the Share option within the selection UI.
-    static final String UMA_MOBILE_ACTION_MODE_SHARE = "MobileActionMode.Share";
+    String UMA_MOBILE_ACTION_MODE_SHARE = "MobileActionMode.Share";
 
     /**
      * @param webContents A non-destroyed {@link WebContents} object.
@@ -94,10 +96,12 @@ public interface SelectionPopupController {
     boolean isSelectActionBarShowing();
 
     /**
-     * @return An {@link ObservableSupplier<Boolean>} which holds true when a selection action bar
-     *         is showing; otherwise, it holds false.
+     * @return An {@link MonotonicObservableSupplier <Boolean>} which holds true when a selection action bar
+     *     is showing; otherwise, it holds false.
      */
-    ObservableSupplier<Boolean> isSelectActionBarShowingSupplier();
+    default NonNullObservableSupplier<Boolean> isSelectActionBarShowingSupplier() {
+        return ObservableSuppliers.alwaysFalse();
+    }
 
     /**
      * @return {@link ActionModeCallbackHelper} object.
@@ -120,7 +124,7 @@ public interface SelectionPopupController {
     void setSelectionClient(@Nullable SelectionClient selectionClient);
 
     /** Returns the {@link SelectionClient} in the selection popup controller. */
-    public @Nullable SelectionClient getSelectionClient();
+    @Nullable SelectionClient getSelectionClient();
 
     /** Sets TextClassifier for Smart Text selection. */
     void setTextClassifier(TextClassifier textClassifier);

@@ -71,7 +71,7 @@ class MimeUtil : public PlatformMimeUtil {
 
   bool MatchesMimeType(std::string_view mime_type_pattern,
                        std::string_view mime_type,
-                       bool validate_mime_type) const;
+                       MimeTypeValidationLevel level) const;
 
   bool ParseMimeTypeWithoutParameter(std::string_view type_string,
                                      std::string* top_level_type,
@@ -176,6 +176,7 @@ static const MimeInfo kPrimaryMappings[] = {
     {"application/x-chrome-extension", "crx"},
     {"application/xhtml+xml", "xhtml,xht,xhtm"},
     {"audio/flac", "flac"},
+    {"audio/matroska", "mka"},
     {"audio/mp3", "mp3"},
     {"audio/ogg", "ogg,oga,opus"},
     {"audio/wav", "wav"},
@@ -183,7 +184,8 @@ static const MimeInfo kPrimaryMappings[] = {
     {"audio/x-m4a", "m4a"},
     {"image/avif", "avif"},
     {"image/gif", "gif"},
-    {"image/jpeg", "jpeg,jpg"},
+    {"image/jpeg", "jpeg,jpg,jpe"},
+    {"image/jxl", "jxl"},
     {"image/png", "png"},
     {"image/apng", "png,apng"},
     {"image/svg+xml", "svg,svgz"},
@@ -193,6 +195,7 @@ static const MimeInfo kPrimaryMappings[] = {
     {"text/html", "html,htm,shtml,shtm"},
     {"text/javascript", "js,mjs"},
     {"text/xml", "xml"},
+    {"video/matroska", "mkv"},
     {"video/mp4", "mp4,m4v"},
     {"video/ogg", "ogv,ogm"},
 
@@ -254,7 +257,7 @@ static const MimeInfo kSecondaryMappings[] = {
     {"text/vtt", "vtt"},
     {"text/x-sh", "sh"},
     {"text/xml", "xsl,xbl,xslt"},
-    {"video/mpeg", "mpeg,mpg"},
+    {"video/mpeg", "mpeg,mpg,mpe"},
 };
 
 // Finds mime type of |ext| from |mappings|.
@@ -457,7 +460,7 @@ bool MatchesMimeTypeParameters(std::string_view mime_type_pattern,
 // in the tested type for a match to succeed.
 bool MimeUtil::MatchesMimeType(std::string_view mime_type_pattern,
                                std::string_view mime_type,
-                               bool validate_mime_type) const {
+                               MimeTypeValidationLevel level) const {
   if (mime_type_pattern.empty())
     return false;
 
@@ -466,12 +469,18 @@ bool MimeUtil::MatchesMimeType(std::string_view mime_type_pattern,
   semicolon = mime_type.find(';');
   const std::string_view base_type = mime_type.substr(0, semicolon);
 
-  // If validation is enabled and pattern contains wildcards, validate that
-  // the MIME type being matched has exactly one slash in the type/subtype
-  // portion.
-  if (validate_mime_type && base_pattern.find('*') != std::string::npos) {
-    if (std::ranges::count(base_type, '/') != 1u) {
-      return false;
+  if (level != MimeTypeValidationLevel::kNone &&
+      base_pattern.find('*') != std::string::npos) {
+    if (level == MimeTypeValidationLevel::kWildcardSlashAndTokens) {
+      auto parts = base::SplitStringOnce(base_type, '/');
+      if (!parts || !HttpUtil::IsToken(parts->first) ||
+          !HttpUtil::IsToken(parts->second)) {
+        return false;
+      }
+    } else {  // kWildcardSlashOnly
+      if (std::ranges::count(base_type, '/') != 1u) {
+        return false;
+      }
     }
   }
 
@@ -686,9 +695,9 @@ bool GetPreferredExtensionForMimeType(std::string_view mime_type,
 
 bool MatchesMimeType(std::string_view mime_type_pattern,
                      std::string_view mime_type,
-                     bool validate_mime_type) {
+                     MimeTypeValidationLevel validation_level) {
   return MimeUtil::Get().MatchesMimeType(mime_type_pattern, mime_type,
-                                         validate_mime_type);
+                                         validation_level);
 }
 
 bool ParseMimeTypeWithoutParameter(std::string_view type_string,
@@ -714,6 +723,7 @@ static const char* const kStandardImageTypes[] = {"image/avif",
                                                   "image/heif",
                                                   "image/ief",
                                                   "image/jpeg",
+                                                  "image/jxl",
                                                   "image/webp",
                                                   "image/pict",
                                                   "image/pipeg",
@@ -738,6 +748,7 @@ static const char* const kStandardAudioTypes[] = {
   "audio/amr",
   "audio/basic",
   "audio/flac",
+  "audio/matroska",
   "audio/midi",
   "audio/mp3",
   "audio/mp4",
@@ -761,6 +772,7 @@ static const char* const kStandardVideoTypes[] = {
   "video/avi",
   "video/divx",
   "video/flc",
+  "video/matroska",
   "video/mp4",
   "video/mpeg",
   "video/ogg",
@@ -844,19 +856,6 @@ void UnorderedSetToVector(std::unordered_set<T>* source,
     (*target)[old_target_size + i] = *iter;
 }
 
-// Characters to be used for mime multipart boundary.
-//
-// TODO(rsleevi): crbug.com/575779: Follow the spec or fix the spec.
-// The RFC 2046 spec says the alphanumeric characters plus the
-// following characters are legal for boundaries:  '()+_,-./:=?
-// However the following characters, though legal, cause some sites
-// to fail: (),./:=+
-constexpr std::string_view kMimeBoundaryCharacters(
-    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-
-// Size of mime multipart boundary.
-const size_t kMimeBoundarySize = 69;
-
 }  // namespace
 
 void GetExtensionsForMimeType(
@@ -919,13 +918,25 @@ NET_EXPORT std::string GenerateMimeMultipartBoundary() {
   //   bcharsnospace := DIGIT / ALPHA / "'" / "(" / ")" / "+" /
   //            "_" / "," / "-" / "." / "/" / ":" / "=" / "?"
 
+  // Note: this diverges from all the relevant specs. See
+  // https://github.com/whatwg/html/issues/6424 for discussion and
+  // https://issues.chromium.org/issues/40451606 for historical context.
+  //
+  // RFC 2046 and later specs say the alphanumeric characters plus the
+  // following characters are legal for boundaries:  '()+_,-./:=?
+  // However the following characters, though legal, cause some sites
+  // to fail: (),./:=+
+  constexpr std::string_view kMimeBoundaryCharacters(
+      "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+
+  // Size of mime multipart boundary.
+  const size_t kMimeBoundarySize = 69;
+
   std::string result;
   result.reserve(kMimeBoundarySize);
   result.append("----MultipartBoundary--");
   while (result.size() < (kMimeBoundarySize - 4)) {
-    char c = kMimeBoundaryCharacters[base::RandInt(
-        0, kMimeBoundaryCharacters.size() - 1)];
-    result.push_back(c);
+    result.push_back(base::RandomChoice(kMimeBoundaryCharacters));
   }
   result.append("----");
 

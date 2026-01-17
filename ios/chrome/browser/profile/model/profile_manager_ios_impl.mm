@@ -14,9 +14,9 @@
 #import "base/feature_list.h"
 #import "base/files/file_enumerator.h"
 #import "base/files/file_path.h"
-#import "base/files/file_util.h"
 #import "base/functional/bind.h"
 #import "base/functional/callback.h"
+#import "base/functional/callback_helpers.h"
 #import "base/metrics/histogram_functions.h"
 #import "base/strings/utf_string_conversions.h"
 #import "base/task/thread_pool.h"
@@ -372,6 +372,12 @@ ProfileManagerIOSImpl::GetProfileAttributesStorage() {
   return &profile_attributes_storage_;
 }
 
+base::FilePath ProfileManagerIOSImpl::GetProfilePath(std::string_view name) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  CHECK(profile_attributes_storage_.HasProfileWithName(name));
+  return profile_data_dir_.Append(name);
+}
+
 void ProfileManagerIOSImpl::OnProfileCreationStarted(
     ProfileIOS* profile,
     CreationMode creation_mode) {
@@ -438,7 +444,7 @@ void ProfileManagerIOSImpl::OnProfileCreationFinished(
   // The profile is fully loaded, so drop the ScopedProfileKeepAliveIOS
   // owned by this instance. If no other code keeps the profile alive,
   // it will be unloaded at this point.
-  CHECK(base::Contains(loading_profiles_map_, name));
+  CHECK(loading_profiles_map_.contains(name));
   loading_profiles_map_.erase(name);
 }
 
@@ -512,7 +518,7 @@ bool ProfileManagerIOSImpl::CreateOrLoadProfile(
   // Ensure the profile is kept alive until it is fully loaded or
   // the current instance is destroyed.
   if (inserted) {
-    CHECK(!base::Contains(loading_profiles_map_, name));
+    CHECK(!loading_profiles_map_.contains(name));
     loading_profiles_map_.emplace(name,
                                   CreateScopedProfileKeepAlive(&profile_info));
   }

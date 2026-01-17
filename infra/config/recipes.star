@@ -63,7 +63,6 @@ def _recipe_for_package(cipd_package):
             cipd_version = cipd_version,
             recipe = recipe,
             use_bbagent = True,
-            use_python3 = True,
         )
 
         register_recipe_bootstrappability(name, bootstrappable)
@@ -108,6 +107,9 @@ build_recipe(
 
 build_recipe(
     name = "recipe:binary_size_trybot",
+    # Can't be bootstrapped since it interferes with the recipe's custom
+    # bot_update sync'ing behavior.
+    bootstrappable = False,
 )
 
 build_recipe(
@@ -211,6 +213,11 @@ build_recipe(
 )
 
 build_recipe(
+    name = "recipe:chromium/eval_prompts",
+    bootstrappable = True,
+)
+
+build_recipe(
     name = "recipe:chromium/fuzz",
     bootstrappable = True,
 )
@@ -306,6 +313,10 @@ build_recipe(
 build_recipe(
     name = "recipe:reviver/chromium/runner",
     bootstrappable = POLYMORPHIC,
+)
+
+build_recipe(
+    name = "recipe:security/metadata_validator",
 )
 
 build_recipe(

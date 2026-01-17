@@ -4,16 +4,17 @@
 
 #include "chrome/browser/extensions/api/language_settings_private/language_settings_private_api.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "base/check_deref.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/values.h"
 #include "build/build_config.h"
@@ -116,8 +117,6 @@ class LanguageSettingsPrivateApiTest : public ExtensionServiceTestBase {
  protected:
   void RunGetLanguageListTest();
 
-  virtual void InitFeatures() {}
-
 #if BUILDFLAG(IS_WIN)
   virtual void AddSpellcheckLanguagesForTesting(
       const std::vector<std::string>& spellcheck_languages_for_testing) {
@@ -135,8 +134,6 @@ class LanguageSettingsPrivateApiTest : public ExtensionServiceTestBase {
     ExtensionServiceTestBase::InitializeEmptyExtensionService();
     EventRouterFactory::GetInstance()->SetTestingFactory(
         profile(), base::BindRepeating(&BuildEventRouter));
-
-    InitFeatures();
 
     LanguageSettingsPrivateDelegateFactory::GetInstance()->SetTestingFactory(
         profile(), base::BindRepeating(&BuildLanguageSettingsPrivateDelegate));
@@ -295,28 +292,6 @@ TEST_F(LanguageSettingsPrivateApiTest, GetNeverTranslateLanguagesListTest) {
   }
 }
 
-class LanguageSettingsPrivateApiGetLanguageListTest
-    : public LanguageSettingsPrivateApiTest {
- public:
-  LanguageSettingsPrivateApiGetLanguageListTest() = default;
-  ~LanguageSettingsPrivateApiGetLanguageListTest() override = default;
-
- protected:
-  void InitFeatures() override {
-#if BUILDFLAG(IS_WIN)
-    // Disable the delayed init feature since that case is tested in
-    // LanguageSettingsPrivateApiTestDelayInit below.
-    feature_list_.InitAndDisableFeature(
-        spellcheck::kWinDelaySpellcheckServiceInit);
-#endif  // BUILDFLAG(IS_WIN)
-  }
-};
-
-TEST_F(LanguageSettingsPrivateApiGetLanguageListTest, GetLanguageList) {
-  translate::TranslateDownloadManager::GetInstance()->ResetForTesting();
-  RunGetLanguageListTest();
-}
-
 void LanguageSettingsPrivateApiTest::RunGetLanguageListTest() {
   struct LanguageToTest {
     std::string accept_language;
@@ -335,7 +310,7 @@ void LanguageSettingsPrivateApiTest::RunGetLanguageListTest() {
       {"de", "de-DE", false, true},
       {"es-MX", "", true, true},
       {"fa", "", false, true},
-      {"gl", "", true, false},
+      {"gl", "", true, true},
       {"zu", "", false, false},
       // Finnish with Filipino language pack (string in string).
       {"fi", "fil", true, false},
@@ -564,7 +539,8 @@ TEST_F(LanguageSettingsPrivateApiTest, GetInputMethodListsTest) {
 
     // Check tags contain input method's display name
     const base::Value* ime_name_ptr = input_method.Find("displayName");
-    EXPECT_TRUE(base::Contains(*ime_tags_ptr, CHECK_DEREF(ime_name_ptr)));
+    EXPECT_TRUE(
+        std::ranges::contains(*ime_tags_ptr, CHECK_DEREF(ime_name_ptr)));
 
     // Check tags contain input method's language codes' display names
     const base::Value::List* ime_language_codes_ptr =
@@ -575,7 +551,7 @@ TEST_F(LanguageSettingsPrivateApiTest, GetInputMethodListsTest) {
           language_code.GetString(), "en", true);
       if (!language_display_name.empty()) {
         EXPECT_TRUE(
-            base::Contains(*ime_tags_ptr, base::Value(language_display_name)));
+            ime_tags_ptr->contains(base::UTF16ToUTF8(language_display_name)));
       }
     }
   }
@@ -726,13 +702,6 @@ class LanguageSettingsPrivateApiTestDelayInit
   LanguageSettingsPrivateApiTestDelayInit() = default;
 
  protected:
-  void InitFeatures() override {
-    // Force Windows hybrid spellcheck and delayed initialization of the
-    // spellcheck service to be enabled.
-    feature_list_.InitAndEnableFeature(
-        spellcheck::kWinDelaySpellcheckServiceInit);
-  }
-
   void AddSpellcheckLanguagesForTesting(
       const std::vector<std::string>& spellcheck_languages_for_testing)
       override {

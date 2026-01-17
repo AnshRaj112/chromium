@@ -15,9 +15,8 @@
 #include <sys/eventfd.h>
 #include <sys/ioctl.h>
 
-#include "base/containers/contains.h"
 #include "base/containers/heap_array.h"
-#include "base/files/file_util.h"
+#include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/memory/ptr_util.h"
 #include "base/metrics/histogram_macros.h"
@@ -236,7 +235,7 @@ class H264FrameReassembler {
     // whole frame.
     bool is_start_of_new_frame;
     // Size in bytes of the NALU under analysis.
-    off_t nalu_size;
+    size_t nalu_size;
   };
   // Parses |data| and returns either std::nullopt, if parsing |data| fails, or
   // a FrameBoundaryInfo describing the first |nalu_size| bytes of |data|.
@@ -335,8 +334,8 @@ void V4L2StatefulVideoDecoder::Initialize(const VideoDecoderConfig& config,
       return;
     }
 
-    is_mtk8173_ = base::Contains(
-        std::string(reinterpret_cast<const char*>(caps.card)), "8173");
+    is_mtk8173_ =
+        std::string(reinterpret_cast<const char*>(caps.card)).contains("8173");
     DVLOGF_IF(1, is_mtk8173_) << "This is an MTK8173 device (Hana, Oak)";
   }
 
@@ -561,6 +560,12 @@ void V4L2StatefulVideoDecoder::Reset(base::OnceClosure closure) {
   weak_ptr_factory_for_events_.InvalidateWeakPtrs();
   weak_ptr_factory_for_CAPTURE_availability_.InvalidateWeakPtrs();
   cancelable_task_tracker_.TryCancelAll();
+
+  if (wake_event_.is_valid()) {
+    const uint64_t buf = 1;
+    const auto res = HANDLE_EINTR(write(wake_event_.get(), &buf, sizeof(buf)));
+    PLOG_IF(ERROR, res < 0) << "Error writing to |wake_event_|";
+  }
 
   if (h264_frame_reassembler_) {
     h264_frame_reassembler_ = std::make_unique<H264FrameReassembler>();
@@ -923,7 +928,7 @@ void V4L2StatefulVideoDecoder::TryAndDequeueCAPTUREQueueBuffers() {
 
     const int64_t flat_timespec =
         TimeValToTimeDelta(dequeued_buffer->GetTimeStamp()).InMilliseconds();
-    if (base::Contains(encoding_timestamps_, flat_timespec)) {
+    if (encoding_timestamps_.contains(flat_timespec)) {
       UMA_HISTOGRAM_TIMES(
           "Media.PlatformVideoDecoding.Decode",
           base::TimeTicks::Now() - encoding_timestamps_[flat_timespec]);
@@ -1204,8 +1209,8 @@ int V4L2StatefulVideoDecoder::GetMaxNumDecoderInstances() {
     PLOG(ERROR) << "Failed querying caps";
     return std::numeric_limits<int>::max();
   }
-  const bool is_mtk8173 = base::Contains(
-      std::string(reinterpret_cast<const char*>(caps.card)), "8173");
+  const bool is_mtk8173 =
+      std::string(reinterpret_cast<const char*>(caps.card)).contains("8173");
   // Experimentally MTK8173 (e.g. Hana) can initialize the driver  up to 30
   // times simultaneously, however legacy code limits this to 10 [1] . All other
   // drivers used to limit this to 32 [2] but in practice I could only open up
@@ -1288,7 +1293,7 @@ H264FrameReassembler::FindH264FrameBoundary(const uint8_t* const data,
       // found a new NALU boundary. Pretend it's a frame boundary and move on.
       return FrameBoundaryInfo{.is_whole_frame = true,
                                .is_start_of_new_frame = true,
-                               .nalu_size = nalu.size};
+                               .nalu_size = nalu.data.size()};
     }
     DCHECK_EQ(result, H264Parser::kOk);
 
@@ -1307,12 +1312,12 @@ H264FrameReassembler::FindH264FrameBoundary(const uint8_t* const data,
       return std::nullopt;
     }
 
-    CHECK_GE(nalu.data, data);
-    CHECK_LE(nalu.data, data + data_size);
-    const auto nalu_size = nalu.data - data + nalu.size;
+    CHECK_GE(nalu.data.data(), data);
+    CHECK_LE(nalu.data.data(), data + data_size);
+    const auto nalu_size = nalu.data.data() - data + nalu.data.size();
     VLOGF(4) << "H264NALU type " << kKnownNALUNames[nalu.nal_unit_type]
              << ", NALU size=" << nalu_size
-             << " bytes, payload size=" << nalu.size << " bytes";
+             << " bytes, payload size=" << nalu.data.size() << " bytes";
 
     switch (nalu.nal_unit_type) {
       case H264NALU::kSPS:

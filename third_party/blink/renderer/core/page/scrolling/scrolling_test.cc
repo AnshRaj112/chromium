@@ -1419,6 +1419,74 @@ TEST_P(ScrollingTest, NonCompositedMainThreadRepaintWithCaptureRegion) {
       cc::MainThreadScrollingReason::kNotOpaqueForTextAndLCDText);
 }
 
+TEST_P(ScrollingTest, NonCompositedMainThreadRepaintWithTrackedElement) {
+  SetPreferCompositingToLCDText(false);
+  LoadHTML(R"HTML(
+    <!DOCTYPE html>
+    <div id="composited" style="width: 200px; height: 200px; overflow: scroll;
+                                background: white">
+      <div id="middle" style="width: 150px; height: 300px; overflow: scroll">
+        <div id="inner" style="width: 100px; height: 400px; overflow: scroll">
+          <div id="highlight" style="width: 50px; height: 500px"></div>
+          <div style="height: 1000px"></div>
+        </div>
+        <div style="height: 1000px"></div>
+      </div>
+    </div>
+  )HTML");
+
+  auto highlight_id = base::Token(1, 2);
+  auto highlight =
+      TrackedElementRect::CreateFull(TrackedElementId(highlight_id));
+  Document& document = *GetFrame()->GetDocument();
+  document.getElementById(AtomicString("highlight"))
+      ->SetTrackedElementRect(std::move(highlight));
+
+  ForceFullCompositingUpdate();
+
+  const cc::Layer* cc_layer =
+      ScrollingContentsLayerByDOMElementId("composited");
+  EXPECT_EQ(1, cc_layer->tracked_element_bounds().size());
+  EXPECT_EQ(gfx::Rect(0, 0, 50, 300),
+            cc_layer->tracked_element_bounds().at(highlight_id).visible_bounds);
+
+  ASSERT_COMPOSITED(ScrollNodeByDOMElementId("composited"));
+  ASSERT_NOT_COMPOSITED(
+      ScrollNodeByDOMElementId("middle"),
+      cc::MainThreadScrollingReason::kNotOpaqueForTextAndLCDText);
+  ASSERT_NOT_COMPOSITED(
+      ScrollNodeByDOMElementId("inner"),
+      cc::MainThreadScrollingReason::kNotOpaqueForTextAndLCDText);
+
+  document.getElementById(AtomicString("middle"))->setScrollTop(200);
+  ForceFullCompositingUpdate();
+  EXPECT_EQ(gfx::Rect(0, 0, 50, 200),
+            cc_layer->tracked_element_bounds().at(highlight_id).visible_bounds);
+  ASSERT_COMPOSITED(ScrollNodeByDOMElementId("composited"));
+  ASSERT_NOT_COMPOSITED(
+      ScrollNodeByDOMElementId("middle"),
+      cc::MainThreadScrollingReason::kNotOpaqueForTextAndLCDText);
+  ASSERT_NOT_COMPOSITED(
+      ScrollNodeByDOMElementId("inner"),
+      cc::MainThreadScrollingReason::kNotOpaqueForTextAndLCDText);
+
+  document.getElementById(AtomicString("inner"))->setScrollTop(200);
+  ForceFullCompositingUpdate();
+  EXPECT_EQ(gfx::Rect(0, 0, 50, 100),
+            cc_layer->tracked_element_bounds().at(highlight_id).visible_bounds);
+  ASSERT_COMPOSITED(ScrollNodeByDOMElementId("composited"));
+  ASSERT_NOT_COMPOSITED(
+      ScrollNodeByDOMElementId("middle"),
+      cc::MainThreadScrollingReason::kNotOpaqueForTextAndLCDText);
+  ASSERT_NOT_COMPOSITED(
+      ScrollNodeByDOMElementId("inner"),
+      cc::MainThreadScrollingReason::kNotOpaqueForTextAndLCDText);
+
+  document.getElementById(AtomicString("highlight"))->ClearTrackedElementRect();
+  ForceFullCompositingUpdate();
+  EXPECT_EQ(0, cc_layer->tracked_element_bounds().size());
+}
+
 TEST_P(ScrollingTest, NonCompositedMainThreadRepaintWithLayerSelection) {
   SetPreferCompositingToLCDText(false);
   LoadHTML(R"HTML(
@@ -2082,7 +2150,8 @@ TEST_P(ScrollingTest, NestedIFramesMainThreadScrollingRegion) {
 
   // Scroll the frame to ensure the rect is in the correct coordinate space.
   GetFrame()->GetDocument()->View()->GetScrollableArea()->SetScrollOffset(
-      ScrollOffset(0, 1000), mojom::blink::ScrollType::kProgrammatic);
+      ScrollOffset(0, 1000), mojom::blink::ScrollType::kProgrammatic,
+      cc::ScrollSourceType::kNone);
 
   ForceFullCompositingUpdate();
 
@@ -2149,7 +2218,8 @@ TEST_P(ScrollingTest, NestedFixedIFramesMainThreadScrollingRegion) {
 
   // Scroll the frame to ensure the rect is in the correct coordinate space.
   GetFrame()->GetDocument()->View()->GetScrollableArea()->SetScrollOffset(
-      ScrollOffset(0, 1000), mojom::blink::ScrollType::kProgrammatic);
+      ScrollOffset(0, 1000), mojom::blink::ScrollType::kProgrammatic,
+      cc::ScrollSourceType::kNone);
 
   ForceFullCompositingUpdate();
   auto* non_fast_layer = LayerByDOMElementId("iframe");
@@ -2622,7 +2692,8 @@ TEST_P(ScrollingTest, ScrollOffsetClobberedBeforeCompositingUpdate) {
   // Before updating the lifecycle, set the scroll offset back to what it was
   // before the commit from the main thread.
   scrollable_area->SetScrollOffset(ScrollOffset(0, 0),
-                                   mojom::blink::ScrollType::kProgrammatic);
+                                   mojom::blink::ScrollType::kProgrammatic,
+                                   cc::ScrollSourceType::kNone);
 
   // Ensure the offset is up-to-date on the cc::Layer even though, as far as
   // the main thread is concerned, it was unchanged since the last time we
@@ -2795,7 +2866,8 @@ TEST_P(ScrollingTest, TouchActionUpdatesOutsideInterestRect) {
 
   ScrollableAreaByDOMElementId("scroller")
       ->SetScrollOffset(ScrollOffset(0, 5100),
-                        mojom::blink::ScrollType::kProgrammatic);
+                        mojom::blink::ScrollType::kProgrammatic,
+                        cc::ScrollSourceType::kNone);
 
   ForceFullCompositingUpdate();
 
@@ -3587,7 +3659,7 @@ TEST_F(ScrollingSimTest, CompositedStickyTracksMainRepaintScroll) {
                               base::Seconds(0.016));
 
   // Update draw properties.
-  cc::LayerTreeHostImpl::FrameData frame;
+  cc::FrameData frame;
   auto* lthi = GetLayerTreeHostImpl();
   lthi->PrepareToDraw(&frame);
 
@@ -3810,7 +3882,7 @@ class ScrollingTestWithAcceleratedContext : public ScrollingTest {
       return std::make_unique<FakeWebGraphicsContext3DProvider>(gl);
     };
     SharedGpuContext::SetContextProviderFactoryForTesting(
-        WTF::BindRepeating(factory, WTF::Unretained(&gl_)));
+        BindRepeating(factory, Unretained(&gl_)));
     ScrollingTest::SetUp();
   }
 

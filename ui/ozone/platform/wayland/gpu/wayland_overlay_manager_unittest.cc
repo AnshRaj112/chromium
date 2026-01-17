@@ -10,6 +10,7 @@
 #include "base/containers/flat_map.h"
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
+#include "components/viz/common/resources/shared_image_format.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/ozone/platform/wayland/gpu/wayland_buffer_manager_gpu.h"
@@ -26,7 +27,7 @@ OverlaySurfaceCandidate CreateCandidate(const gfx::Rect& rect,
                                         int plane_z_order) {
   ui::OverlaySurfaceCandidate candidate;
   candidate.transform = gfx::OVERLAY_TRANSFORM_NONE;
-  candidate.format = gfx::BufferFormat::YUV_420_BIPLANAR;
+  candidate.format = viz::MultiPlaneFormat::kNV12;
   candidate.plane_z_order = plane_z_order;
   candidate.buffer_size = rect.size();
   candidate.display_rect = gfx::RectF(rect);
@@ -47,9 +48,9 @@ class WaylandOverlayManagerTest : public WaylandTest {
   ~WaylandOverlayManagerTest() override = default;
 
   void SetUp() override {
-    const base::flat_map<gfx::BufferFormat, std::vector<uint64_t>>
+    const base::flat_map<viz::SharedImageFormat, std::vector<uint64_t>>
         kSupportedFormatsWithModifiers{
-            {gfx::BufferFormat::YUV_420_BIPLANAR, {DRM_FORMAT_MOD_LINEAR}}};
+            {viz::MultiPlaneFormat::kNV12, {DRM_FORMAT_MOD_LINEAR}}};
 
     WaylandTest::SetUp();
 
@@ -94,7 +95,7 @@ TEST_P(WaylandOverlayManagerTest, FormatSupportTest) {
   std::vector<OverlaySurfaceCandidate> candidates = {
       CreateCandidate(gfx::Rect(0, 0, 100, 100), 0),
       CreateCandidate(gfx::Rect(10, 10, 20, 20), 1)};
-  candidates[1].format = gfx::BufferFormat::RGBX_8888;
+  candidates[1].format = viz::SinglePlaneFormat::kRGBX_8888;
   manager.CheckOverlaySupport(&candidates, kPrimaryWidget);
   EXPECT_TRUE(candidates[0].overlay_handled);
   EXPECT_FALSE(candidates[1].overlay_handled);

@@ -10,13 +10,11 @@
 
 #include "base/check_op.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_map.h"
 #include "base/containers/span.h"
 #include "base/feature_list.h"
 #include "base/files/file.h"
 #include "base/files/file_enumerator.h"
-#include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
@@ -707,8 +705,8 @@ void V4LocalDatabaseManager::GetArtificialPrefixMatches(
           artificial_store_and_hash_prefix.hash_prefix;
       DCHECK_EQ(crypto::kSHA256Length, artificial_full_hash.size());
       if (artificial_full_hash == full_hash &&
-          base::Contains(check->stores_to_check,
-                         artificial_store_and_hash_prefix.list_id)) {
+          check->stores_to_check.contains(
+              artificial_store_and_hash_prefix.list_id)) {
         (check->artificial_full_hash_to_store_and_hash_prefixes)[full_hash] = {
             artificial_store_and_hash_prefix};
       }

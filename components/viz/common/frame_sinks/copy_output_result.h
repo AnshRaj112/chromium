@@ -6,6 +6,7 @@
 #define COMPONENTS_VIZ_COMMON_FRAME_SINKS_COPY_OUTPUT_RESULT_H_
 
 #include <array>
+#include <string>
 #include <vector>
 
 #include "base/containers/span.h"
@@ -17,7 +18,6 @@
 #include "gpu/command_buffer/client/client_shared_image.h"
 #include "gpu/command_buffer/client/shared_image_interface.h"
 #include "gpu/command_buffer/common/mailbox.h"
-#include "gpu/command_buffer/common/mailbox_holder.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/gfx/color_space.h"
 #include "ui/gfx/geometry/rect.h"
@@ -51,6 +51,9 @@ class VIZ_COMMON_EXPORT CopyOutputResult {
     // can only be delivered on the same task runner sequence that runs the
     // DirectRenderer implementation.
     NV12,
+    // A RGBAF16 shared texture. Results should be returned in a texture, will
+    // be a SharedImageFormat::kRGBA_F16.
+    RGBAF16,
   };
 
   // Specifies how the results are delivered to the issuer of the request.
@@ -67,13 +70,35 @@ class VIZ_COMMON_EXPORT CopyOutputResult {
     kSharedImage,
   };
 
+  // A CopyOutputResult may be empty and this enum can provide some reasoning
+  // why the result might be empty.
+  enum class Error : uint8_t {
+    kNone,
+    kUnknown,
+    kTimeout,
+    kEmbeddingTokenChanged,
+  };
+
   // Maximum number of planes allowed when returning software NV12 results.
   static constexpr size_t kNV12MaxPlanes = 2;
+
+  // Defines the default usage for shared images which are the destination of a
+  // `CopyOutputRequest`. Since these shared images will eventually make it back
+  // to the client that issued that request, the usage here needs to capture the
+  // variety of clients' eventual allowed usages. Note that CopyOutputRequests
+  // are not writable via raster (by contract).
+  static constexpr gpu::SharedImageUsageSet kDefaultSharedImageUsage =
+      gpu::SHARED_IMAGE_USAGE_RASTER_READ |
+      gpu::SHARED_IMAGE_USAGE_DISPLAY_READ |
+      gpu::SHARED_IMAGE_USAGE_DISPLAY_WRITE;
 
   CopyOutputResult(Format format,
                    Destination destination,
                    const gfx::Rect& rect,
                    bool needs_lock_for_bitmap);
+
+  // Constructor for when we have an error.
+  CopyOutputResult(Format format, Destination destination, Error error);
 
   CopyOutputResult(const CopyOutputResult&) = delete;
   CopyOutputResult& operator=(const CopyOutputResult&) = delete;
@@ -88,6 +113,8 @@ class VIZ_COMMON_EXPORT CopyOutputResult {
   Format format() const { return format_; }
   // Returns the destination of this result.
   Destination destination() const { return destination_; }
+  // Returns the error code of this result.
+  Error error() const { return error_; }
 
   // Returns the result Rect, which is the position and size of the image data
   // within the surface/layer (see CopyOutputRequest::set_area()). If a scale
@@ -112,11 +139,9 @@ class VIZ_COMMON_EXPORT CopyOutputResult {
   //      client must guarantee that all release callbacks will be run.
   virtual scoped_refptr<gpu::ClientSharedImage> GetSharedImage();
 
-  using ReleaseCallbacks = std::vector<ReleaseCallback>;
-
-  // Returns a vector of release callbacks for the contained shared image. The
-  // vector will be empty iff the CopyOutputResult `IsEmpty()` is true.
-  virtual ReleaseCallbacks TakeSharedImageOwnership();
+  // Returns a release callback for the contained shared image. The callback
+  // will be empty iff the CopyOutputResult `IsEmpty()` is true.
+  virtual ReleaseCallback TakeSharedImageOwnership();
 
   //
   // Subsampled YUV format result description
@@ -202,10 +227,17 @@ class VIZ_COMMON_EXPORT CopyOutputResult {
   SkBitmap* cached_bitmap() const { return &cached_bitmap_; }
 
  private:
+  CopyOutputResult(Format format,
+                   Destination destination,
+                   const gfx::Rect& rect,
+                   bool needs_lock_for_bitmap,
+                   Error error);
+
   const Format format_;
   const Destination destination_;
   const gfx::Rect rect_;
   const bool needs_lock_for_bitmap_;
+  const Error error_;
 
   // Cached bitmap returned by the default implementation of AsSkBitmap().
   mutable SkBitmap cached_bitmap_;
@@ -230,10 +262,10 @@ class VIZ_COMMON_EXPORT CopyOutputSkBitmapResult : public CopyOutputResult {
 };
 
 // Subclass of `CopyOutputResult` that holds `ClientSharedImage`. The owner of
-// the result must take ownership of the shared images if it wants to use them
-// by calling `TakeSharedImageOwnership()`, and then call the `ReleaseCallbacks`
-// when the shared images will no longer be used to release ownership and allow
-// the shared images to be reused or destroyed. If ownership is not claimed, it
+// the result must take ownership of the shared image if it wants to use them
+// by calling `TakeSharedImageOwnership()`, and then call the `ReleaseCallback`
+// when the shared image will no longer be used to release ownership and allow
+// the shared image to be reused or destroyed. If ownership is not claimed, it
 // will be released when this class is destroyed.
 class VIZ_COMMON_EXPORT CopyOutputSharedImageResult : public CopyOutputResult {
  public:
@@ -244,14 +276,14 @@ class VIZ_COMMON_EXPORT CopyOutputSharedImageResult : public CopyOutputResult {
                               const gpu::Mailbox& mailbox,
                               const gfx::ColorSpace& color_space,
                               std::string_view debug_label,
-                              ReleaseCallbacks release_callbacks);
+                              ReleaseCallback release_callback);
 
   // Construct a non-empty shared-image result; `shared_image` must be non-null.
   CopyOutputSharedImageResult(
       Format format,
       const gfx::Rect& rect,
       scoped_refptr<gpu::ClientSharedImage> shared_image,
-      ReleaseCallbacks release_callbacks);
+      ReleaseCallback release_callback);
 
   CopyOutputSharedImageResult(const CopyOutputSharedImageResult&) = delete;
   CopyOutputSharedImageResult& operator=(const CopyOutputSharedImageResult&) =
@@ -261,11 +293,16 @@ class VIZ_COMMON_EXPORT CopyOutputSharedImageResult : public CopyOutputResult {
 
   scoped_refptr<gpu::ClientSharedImage> GetSharedImage() override;
 
-  ReleaseCallbacks TakeSharedImageOwnership() override;
+  ReleaseCallback TakeSharedImageOwnership() override;
 
  private:
   scoped_refptr<gpu::ClientSharedImage> shared_image_;
-  ReleaseCallbacks release_callbacks_;
+  ReleaseCallback release_callback_;
+};
+
+// Output bitmap and metadata.
+struct VIZ_COMMON_EXPORT CopyOutputBitmapWithMetadata {
+  SkBitmap bitmap;
 };
 
 // Scoped class for accessing SkBitmap in CopyOutputRequest.
@@ -289,6 +326,15 @@ class VIZ_COMMON_EXPORT CopyOutputResult::ScopedSkBitmap {
   // It makes a copy of the content in CopyOutputResult if it is needed.
   SkBitmap GetOutScopedBitmap() const;
 
+  // Returns a base::expected<CopyOutputBitmapWithMetadata,
+  // CopyOutputResult::Error>. On success, the expected value contains a
+  // CopyOutputBitmapWithMetadata, where the encapsulated SkBitmap is guaranteed
+  // to be non-empty. On failure, the expected value contains an enum describing
+  // the error. This function makes a copy of the content in CopyOutputResult if
+  // needed.
+  base::expected<CopyOutputBitmapWithMetadata, CopyOutputResult::Error>
+  GetOutScopedBitmapAndMetadata() const;
+
  private:
   friend class CopyOutputResult;
   explicit ScopedSkBitmap(const CopyOutputResult* result);
@@ -297,6 +343,10 @@ class VIZ_COMMON_EXPORT CopyOutputResult::ScopedSkBitmap {
 
   THREAD_CHECKER(thread_checker_);
 };
+
+// Translate `CopyOutputResult::Format` to `SharedImageFormat`
+VIZ_COMMON_EXPORT SharedImageFormat
+GetSharedImageFormatFor(CopyOutputResult::Format format);
 
 }  // namespace viz
 

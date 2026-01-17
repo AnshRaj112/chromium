@@ -22,9 +22,13 @@ try_.defaults.set(
     os = os.LINUX_DEFAULT,
     compilator_cores = 8,
     execution_timeout = try_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     orchestrator_cores = 2,
     orchestrator_siso_remote_jobs = siso.remote_jobs.HIGH_JOBS_FOR_CQ,
     service_account = try_constants.DEFAULT_SERVICE_ACCOUNT,
+    siso_keep_going = siso.KEEP_GOING,
     # crbug.com/372192123 - downloading with "minimum" strategy doesn't work
     # well for Fuchsia builds because some packaging steps require executables.
     siso_output_local_strategy = "greedy",

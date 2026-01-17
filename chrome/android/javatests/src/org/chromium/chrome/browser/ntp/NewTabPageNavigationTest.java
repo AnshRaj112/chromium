@@ -4,6 +4,7 @@
 
 package org.chromium.chrome.browser.ntp;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
 
 import androidx.test.filters.LargeTest;
 import androidx.test.filters.MediumTest;
@@ -23,11 +24,9 @@ import org.chromium.chrome.browser.util.BrowserUiUtils.ModuleTypeOnStartAndNtp;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.transit.ChromeTransitTestRules;
 import org.chromium.chrome.test.transit.FreshCtaTransitTestRule;
-import org.chromium.chrome.test.transit.hub.IncognitoTabSwitcherStation;
 import org.chromium.chrome.test.transit.hub.RegularTabSwitcherStation;
 import org.chromium.chrome.test.transit.ntp.RegularNewTabPageStation;
 import org.chromium.chrome.test.transit.page.WebPageStation;
-import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.net.test.EmbeddedTestServer;
 
 /** Tests loading the NTP and navigating between it and other pages. */
@@ -69,7 +68,8 @@ public class NewTabPageNavigationTest {
     public void testNavigateBackToNtpViaUrl() {
         String url = mTestServer.getURL("/chrome/test/data/android/google.html");
         WebPageStation page = mNtp.loadWebPageProgrammatically(url);
-        page.loadPageProgrammatically(UrlConstants.NTP_URL, RegularNewTabPageStation.newBuilder());
+        page.loadPageProgrammatically(
+                getOriginalNativeNtpUrl(), RegularNewTabPageStation.newBuilder());
     }
 
     /** Tests navigating to the tab switcher from the NTP. */
@@ -91,17 +91,21 @@ public class NewTabPageNavigationTest {
     @Test
     @MediumTest
     public void testNavigateToTabSwitcherFromIncognitoNtp() {
-        var histogram =
+        try (var histogram =
                 HistogramWatcher.newBuilder()
                         .expectNoRecords(HISTOGRAM_NTP_MODULE_CLICK)
                         .expectNoRecords(HISTOGRAM_START_SURFACE_MODULE_CLICK)
-                        .build();
+                        .build()) {
+            var incognitoNewTabPageStation = mNtp.openNewIncognitoTabOrWindowFast();
+            var chromeTabbedActivity = incognitoNewTabPageStation.getActivity();
 
-        IncognitoTabSwitcherStation tabSwitcher =
-                mNtp.openNewIncognitoTabFast().openIncognitoTabSwitcher();
+            var incognitoTabSwitcherStation = incognitoNewTabPageStation.openIncognitoTabSwitcher();
 
-        tabSwitcher.verifyTabSwitcherCardCount(1);
-        TabUiTestHelper.verifyTabModelTabCount(mActivityTestRule.getActivity(), 1, 1);
-        histogram.assertExpected();
+            incognitoTabSwitcherStation.verifyTabSwitcherCardCount(1);
+            TabUiTestHelper.verifyTabModelTabCount(
+                    chromeTabbedActivity,
+                    /* normalTabs= */ chromeTabbedActivity.isIncognitoWindow() ? 0 : 1,
+                    /* incognitoTabs= */ 1);
+        }
     }
 }

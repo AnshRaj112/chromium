@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "base/auto_reset.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/numerics/safe_conversions.h"
@@ -28,6 +27,7 @@
 #include "ui/views/layout/proposed_layout.h"
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/widget/widget.h"
 
 namespace views {
 
@@ -38,7 +38,6 @@ namespace {
 // (go/chrome-performance-work-should-be-finched).
 // TODO(crbug.com/40897031): Clean up when experiment is complete.
 BASE_FEATURE(kAvoidUnnecessaryShouldRenderRichAnimation,
-             "AvoidUnnecessaryShouldRenderRichAnimation",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Returns the ChildLayout data for the child view in the proposed layout, or
@@ -596,7 +595,7 @@ AnimatingLayoutManager::GetChildViewsInPaintOrder(const View* host) const {
 
   // Add the result of the views.
   for (View* child : host->children()) {
-    if (!base::Contains(fading, child)) {
+    if (!fading.contains(child)) {
       result.push_back(child);
     }
   }
@@ -693,6 +692,14 @@ void AnimatingLayoutManager::OnLayoutChanged() {
 }
 
 void AnimatingLayoutManager::LayoutImpl() {
+  // Layouts can be invalidated when views are removed prior to deletion when
+  // a view or widget is being destroyed. This is not a good time to recalculate
+  // the layout.
+  if (check_widget_ &&
+      (!host_view()->GetWidget() || host_view()->GetWidget()->IsClosed())) {
+    return;
+  }
+
   // Changing the size of a view directly will lead to a layout call rather
   // than an invalidation. This should reset the layout (but see the note in
   // RecalculateTarget() below).
@@ -1048,7 +1055,7 @@ void AnimatingLayoutManager::CalculateFadeInfos() {
   for (View* child : host_view()->children()) {
     const auto& index = child_to_info[child];
     if (index.start_visible && index.target_visible &&
-        !base::Contains(previously_fading, child)) {
+        !previously_fading.contains(child)) {
       start_leading_edges.emplace(index.start_bounds.origin_main(), child);
       target_leading_edges.emplace(index.target_bounds.origin_main(), child);
     }
@@ -1119,7 +1126,7 @@ void AnimatingLayoutManager::CalculateFadeInfos() {
                                       prev_info.target_bounds.max_main());
       }
       fade_infos_.push_back(fade_info);
-    } else if (base::Contains(previously_fading, child)) {
+    } else if (previously_fading.contains(child)) {
       // Capture the fact that this view was fading as part of an animation that
       // was interrupted. (It is therefore technically still fading.) This
       // status goes away when the animation ends.

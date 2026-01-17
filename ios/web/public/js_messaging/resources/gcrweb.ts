@@ -25,21 +25,26 @@ class CrWeb {
     this.registerApi('crweb', crweb);
   }
 
+  hasRegisteredApi(apiIdentifier: string): boolean {
+    return apiIdentifier in this.registeredApis;
+  }
+
   /*
    * Register a Javascript API into the CrWeb object. In case
    * of any collision, do not override a pre-registered API.
    */
   registerApi(apiIdentifier: string, api: CrWebApi): void {
-    if (this.registeredApis[apiIdentifier] !== undefined) {
+    if (this.hasRegisteredApi(apiIdentifier)) {
       throw new CrWebError(`API ${apiIdentifier} already registered.`);
     }
     this.registeredApis[apiIdentifier] = api;
   }
 
-  // TODO(crbug.com/399666983): Throw an exception when deprecating legacy
-  // version.
-  getRegisteredApi(apiIdentifier: string): CrWebApi|undefined {
-    return this.registeredApis[apiIdentifier];
+  getRegisteredApi(apiIdentifier: string): CrWebApi {
+    if (!this.hasRegisteredApi(apiIdentifier)) {
+      throw new CrWebError(`API ${apiIdentifier} is not registered in CrWeb.`);
+    }
+    return this.registeredApis[apiIdentifier]!;
   }
 
   /**
@@ -69,6 +74,31 @@ class CrWeb {
       'FrameBecameAvailable', {'crwFrameId': this.getFrameId()});
   }
 
+  /**
+   * Registers this frame with the native code and forwards the message to any
+   * child frames.
+   * This needs to be called by the native application on each navigation
+   * because no JavaScript events are fired reliably when a page is displayed
+   * and hidden. This is especially important when a page remains alive and is
+   * reused from the WebKit page cache.
+   * TODO(crbug.com/41406778): In iOS 12, the JavaScript pageshow and pagehide
+   *                         events seem reliable, so replace this exposed
+   *                         function with a pageshow event listener.
+   */
+  getExistingFrames(): void {
+    this.registerFrame();
+
+    const framecount = window.frames.length;
+    for (let i = 0; i < framecount; i++) {
+      const frame = window.frames[i];
+      if (!frame) {
+        continue;
+      }
+
+      frame.postMessage({type: 'org.chromium.registerForFrameMessaging'}, '*');
+    }
+  }
+
   // TODO(crbug.com/399666983): Remove legacy API handling
   /**
    * Interface to convert actual calls from the native side into
@@ -78,8 +108,8 @@ class CrWeb {
   callFunctionInGcrWeb(
       apiName: string, funcOrPropName: string, args: unknown[]): unknown {
     try {
-      const registeredApi = gCrWeb.getRegisteredApi(apiName);
-      if (registeredApi) {
+      if (this.hasRegisteredApi(apiName)) {
+        const registeredApi = gCrWeb.getRegisteredApi(apiName);
         if (registeredApi.hasFunction(funcOrPropName)) {
           const func = registeredApi.getFunction(funcOrPropName);
           return func(...args);

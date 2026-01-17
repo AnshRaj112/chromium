@@ -72,6 +72,10 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
+#include "chrome/browser/ui/browser_window/public/browser_collection_observer.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"  // nogncheck crbug.com/40147906
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #endif
 
 namespace policy {
@@ -157,7 +161,7 @@ class LocalTestInfoBarVisibilityManager :
 #if BUILDFLAG(IS_ANDROID)
     public TabModelObserver
 #else
-    public BrowserListObserver,
+    public BrowserCollectionObserver,
     public TabStripModelObserver
 #endif  // BUILDFLAG(IS_ANDROID)
 {
@@ -183,21 +187,21 @@ class LocalTestInfoBarVisibilityManager :
     }
   }
 #else
-  void OnBrowserAdded(Browser* browser) override {
+  void OnBrowserCreated(BrowserWindowInterface* browser) override {
     DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
     CHECK(browser);
 
-    browser->tab_strip_model()->AddObserver(this);
+    // TODO(crbug.com/452120900): TabStripModel auto-unregistered by dtor
+    browser->GetTabStripModel()->AddObserver(this);
   }
 
-  void OnBrowserRemoved(Browser* browser) override {
+  void OnBrowserClosed(BrowserWindowInterface* browser) override {
     DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
     CHECK(browser);
 
-    if (BrowserList::GetInstance()->empty()) {
-      BrowserList::GetInstance()->RemoveObserver(this);
+    if (GlobalBrowserCollection::GetInstance()->IsEmpty()) {
+      browser_collection_observation_.Reset();
     }
-    browser->tab_strip_model()->RemoveObserver(this);
   }
 
   void OnTabStripModelChanged(
@@ -229,18 +233,21 @@ class LocalTestInfoBarVisibilityManager :
       model->AddObserver(this);
     }
 #else
-    for (Browser* browser : *BrowserList::GetInstance()) {
-      CHECK(browser);
+    ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+        [this](BrowserWindowInterface* browser) {
+          CHECK(browser);
 
-      OnBrowserAdded(browser);
+          OnBrowserCreated(browser);
 
-      TabStripModel* tab_strip_model = browser->tab_strip_model();
-      for (int i = 0; i < tab_strip_model->count(); i++) {
-        AddInfobarForActiveLocalTestPolicies(
-            tab_strip_model->GetWebContentsAt(i));
-      }
-    }
-    BrowserList::GetInstance()->AddObserver(this);
+          TabStripModel* const tab_strip_model = browser->GetTabStripModel();
+          for (int i = 0; i < tab_strip_model->count(); i++) {
+            AddInfobarForActiveLocalTestPolicies(
+                tab_strip_model->GetWebContentsAt(i));
+          }
+          return true;
+        });
+    browser_collection_observation_.Observe(
+        GlobalBrowserCollection::GetInstance());
 #endif  // BUILDFLAG(IS_ANDROID)
     infobar_active_ = true;
   }
@@ -252,7 +259,9 @@ class LocalTestInfoBarVisibilityManager :
         infobars::ContentInfoBarManager::FromWebContents(web_contents),
         infobars::InfoBarDelegate::LOCAL_TEST_POLICIES_APPLIED_INFOBAR, nullptr,
         l10n_util::GetStringUTF16(IDS_LOCAL_TEST_POLICIES_ENABLED),
-        /*auto_expire=*/false, /*should_animate=*/false, /*closeable=*/false);
+        /*auto_expire=*/false, /*should_animate=*/false, /*closeable=*/false,
+        /*infobar_priority=*/
+        infobars::InfoBarDelegate::InfobarPriority::kLow);
   }
 
   void DismissInfobarsForActiveLocalTestPoliciesAllTabs() {
@@ -268,18 +277,20 @@ class LocalTestInfoBarVisibilityManager :
       model->RemoveObserver(this);
     }
 #else
-    for (Browser* browser : *BrowserList::GetInstance()) {
-      CHECK(browser);
+    ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+        [this](BrowserWindowInterface* browser) {
+          CHECK(browser);
 
-      browser->tab_strip_model()->RemoveObserver(this);
+          browser->GetTabStripModel()->RemoveObserver(this);
 
-      TabStripModel* tab_strip_model = browser->tab_strip_model();
-      for (int i = 0; i < tab_strip_model->count(); i++) {
-        DismissInfobarForActiveLocalTestPolicies(
-            tab_strip_model->GetWebContentsAt(i));
-      }
-    }
-    BrowserList::GetInstance()->RemoveObserver(this);
+          TabStripModel* const tab_strip_model = browser->GetTabStripModel();
+          for (int i = 0; i < tab_strip_model->count(); i++) {
+            DismissInfobarForActiveLocalTestPolicies(
+                tab_strip_model->GetWebContentsAt(i));
+          }
+          return true;
+        });
+    browser_collection_observation_.Reset();
 #endif  // BUILDFLAG(IS_ANDROID)
     infobar_active_ = false;
   }
@@ -302,6 +313,10 @@ class LocalTestInfoBarVisibilityManager :
 
  private:
   bool infobar_active_ = false;
+#if !BUILDFLAG(IS_ANDROID)
+  base::ScopedObservation<GlobalBrowserCollection, BrowserCollectionObserver>
+      browser_collection_observation_{this};
+#endif  // !BUILDFLAG(IS_ANDROID)
 };
 }  // namespace internal
 
@@ -404,7 +419,6 @@ void ProfilePolicyConnector::Init(
     // the user supplied is not a device-local account user or not in demo mode.
     std::string user_id = user->GetAccountId().GetUserEmail();
     if (ash::demo_mode::IsDemoAccountSignInEnabled()) {
-      // TODO(crbug.com/355043200): Figure out if it is safe to do so.
       std::vector<DeviceLocalAccount> device_local_accounts =
           GetDeviceLocalAccounts(ash::CrosSettings::Get());
       CHECK_EQ(device_local_accounts.size(), 1u);

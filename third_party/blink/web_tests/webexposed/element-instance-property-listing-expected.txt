@@ -24,6 +24,8 @@ namespace http://www.w3.org/1999/xhtml
     property PROCESSING_INSTRUCTION_NODE
     property TEXT_NODE
     property accessKey
+    property accessKeyLabel
+    property activeViewTransition
     property addEventListener
     property after
     property anchorElement
@@ -115,7 +117,6 @@ namespace http://www.w3.org/1999/xhtml
     property contains
     property contentEditable
     property currentCSSZoom
-    property currentPatch
     property dataset
     property dir
     property dispatchEvent
@@ -185,6 +186,7 @@ namespace http://www.w3.org/1999/xhtml
     property offsetTop
     property offsetWidth
     property onabort
+    property onanimationcancel
     property onanimationend
     property onanimationiteration
     property onanimationstart
@@ -304,8 +306,6 @@ namespace http://www.w3.org/1999/xhtml
     property parentElement
     property parentNode
     property part
-    property patchAll
-    property patchSelf
     property popover
     property prefix
     property prepend
@@ -349,6 +349,8 @@ namespace http://www.w3.org/1999/xhtml
     property slot
     property spellcheck
     property startViewTransition
+    property streamAppendHTMLUnsafe
+    property streamHTMLUnsafe
     property style
     property tabIndex
     property tagName
@@ -496,6 +498,9 @@ html element body
     property onafterprint
     property onbeforeprint
     property onbeforeunload
+    property ongamepadconnected
+    property ongamepaddisconnected
+    property ongamepadrawinputchanged
     property onhashchange
     property onlanguagechange
     property onmessage
@@ -542,6 +547,7 @@ html element canvas
     property captureStream
     property configureHighDynamicRange
     property getContext
+    property getElementTransform
     property height
     property layoutSubtree
     property toBlob
@@ -663,6 +669,9 @@ html element frameset
     property onafterprint
     property onbeforeprint
     property onbeforeunload
+    property ongamepadconnected
+    property ongamepaddisconnected
+    property ongamepadrawinputchanged
     property onhashchange
     property onlanguagechange
     property onmessage
@@ -680,17 +689,19 @@ html element frameset
     property onunload
     property rows
 html element geolocation
+    property accuracymode
+    property autolocate
+    property error
     property initialPermissionStatus
     property invalidReason
     property isValid
-    property ondismiss
     property onlocation
     property onpromptaction
     property onpromptdismiss
-    property onresolve
     property onvalidationstatuschange
     property permissionStatus
-    property type
+    property position
+    property watch
 html element h1
     property align
 html element h2
@@ -838,6 +849,17 @@ html element input
 html element ins
     property cite
     property dateTime
+html element install
+    property initialPermissionStatus
+    property installURL
+    property invalidReason
+    property isValid
+    property manifestId
+    property onpromptaction
+    property onpromptdismiss
+    property onvalidationstatuschange
+    property permissionStatus
+    property type
 html element kbd
 html element label
     property control
@@ -899,7 +921,9 @@ html element menuitem
     property checked
     property command
     property commandForElement
+    property defaultChecked
     property disabled
+    property interestForElement
 html element menulist
 html element meta
     property content
@@ -990,10 +1014,8 @@ html element permission
     property initialPermissionStatus
     property invalidReason
     property isValid
-    property ondismiss
     property onpromptaction
     property onpromptdismiss
-    property onresolve
     property onvalidationstatuschange
     property permissionStatus
     property type
@@ -1237,6 +1259,15 @@ html element u
 html element ul
     property compact
     property type
+html element usermedia
+    property initialPermissionStatus
+    property invalidReason
+    property isValid
+    property onpromptaction
+    property onpromptdismiss
+    property onvalidationstatuschange
+    property permissionStatus
+    property type
 html element var
 html element video
     property HAVE_CURRENT_DATA
@@ -1333,6 +1364,7 @@ namespace http://www.w3.org/2000/svg
     property NOTATION_NODE
     property PROCESSING_INSTRUCTION_NODE
     property TEXT_NODE
+    property activeViewTransition
     property addEventListener
     property after
     property anchorElement
@@ -1420,7 +1452,6 @@ namespace http://www.w3.org/2000/svg
     property containerTimingIgnore
     property contains
     property currentCSSZoom
-    property currentPatch
     property dataset
     property dispatchEvent
     property elementTiming
@@ -1474,6 +1505,7 @@ namespace http://www.w3.org/2000/svg
     property nonce
     property normalize
     property onabort
+    property onanimationcancel
     property onanimationend
     property onanimationiteration
     property onanimationstart
@@ -1593,8 +1625,6 @@ namespace http://www.w3.org/2000/svg
     property parentElement
     property parentNode
     property part
-    property patchAll
-    property patchSelf
     property prefix
     property prepend
     property previousElementSibling
@@ -1634,6 +1664,8 @@ namespace http://www.w3.org/2000/svg
     property shadowRoot
     property slot
     property startViewTransition
+    property streamAppendHTMLUnsafe
+    property streamHTMLUnsafe
     property style
     property tabIndex
     property tagName
@@ -1645,19 +1677,24 @@ namespace http://www.w3.org/2000/svg
     property webkitRequestFullscreen
     property when
 svg element a
+    property download
     property farthestViewportElement
     property getBBox
     property getCTM
     property getScreenCTM
     property href
+    property hreflang
     property interestForElement
     property nearestViewportElement
+    property ping
+    property referrerPolicy
     property rel
     property relList
     property requiredExtensions
     property systemLanguage
     property target
     property transform
+    property type
 svg element animate
     property beginElement
     property beginElementAt
@@ -2323,7 +2360,15 @@ svg element switch
     property systemLanguage
     property transform
 svg element symbol
+    property farthestViewportElement
+    property getBBox
+    property getCTM
+    property getScreenCTM
+    property nearestViewportElement
     property preserveAspectRatio
+    property requiredExtensions
+    property systemLanguage
+    property transform
     property viewBox
 svg element text
     property LENGTHADJUST_SPACING

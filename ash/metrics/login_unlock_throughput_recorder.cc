@@ -43,7 +43,7 @@ namespace {
 // A class used to wait for animations.
 class ShelfAnimationObserver : public views::BoundsAnimatorObserver {
  public:
-  ShelfAnimationObserver(base::OnceClosure& on_shelf_animation_end)
+  explicit ShelfAnimationObserver(base::OnceClosure& on_shelf_animation_end)
       : on_shelf_animation_end_(std::move(on_shelf_animation_end)) {}
 
   ShelfAnimationObserver(const ShelfAnimationObserver&) = delete;
@@ -150,8 +150,7 @@ void WindowRestoreTracker::OnShown(int window_id, ui::Compositor* compositor) {
     std::move(on_shown_).Run(base::TimeTicks::Now());
   }
 
-  if (compositor &&
-      display::Screen::GetScreen()->GetPrimaryDisplay().detected()) {
+  if (compositor && display::Screen::Get()->GetPrimaryDisplay().detected()) {
     compositor->RequestSuccessfulPresentationTimeForNextFrame(
         base::BindOnce(&WindowRestoreTracker::OnCompositorFramePresented,
                        weak_ptr_factory_.GetWeakPtr(), window_id));
@@ -236,10 +235,8 @@ void ShelfTracker::MaybeRunClosure() {
 LoginUnlockThroughputRecorder::LoginUnlockThroughputRecorder()
     : post_login_deferred_task_runner_(
           base::MakeRefCounted<base::DeferredSequencedTaskRunner>(
-              base::SequencedTaskRunner::GetCurrentDefault())),
-      post_login_metrics_recorder_(this) {
-  LoginState::Get()->AddObserver(this);
-
+              base::SequencedTaskRunner::GetCurrentDefault())) {
+  login_state_observer_.Observe(LoginState::Get());
   window_restore_tracker_.Init(
       base::BindOnce(&LoginUnlockThroughputRecorder::OnAllWindowsCreated,
                      weak_ptr_factory_.GetWeakPtr()),
@@ -253,9 +250,7 @@ LoginUnlockThroughputRecorder::LoginUnlockThroughputRecorder()
       weak_ptr_factory_.GetWeakPtr()));
 }
 
-LoginUnlockThroughputRecorder::~LoginUnlockThroughputRecorder() {
-  LoginState::Get()->RemoveObserver(this);
-}
+LoginUnlockThroughputRecorder::~LoginUnlockThroughputRecorder() = default;
 
 void LoginUnlockThroughputRecorder::AddObserver(PostLoginEventObserver* obs) {
   observers_.AddObserver(obs);

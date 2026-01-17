@@ -6,6 +6,7 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <set>
@@ -32,9 +33,6 @@
 #include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/apps/app_service/app_launch_params.h"
-#include "chrome/browser/apps/app_service/app_service_proxy.h"
-#include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
-#include "chrome/browser/apps/app_service/browser_app_launcher.h"
 #include "chrome/browser/banners/app_banner_manager_desktop.h"
 #include "chrome/browser/browser_features.h"
 #include "chrome/browser/devtools/protocol/browser_handler.h"
@@ -51,6 +49,9 @@
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/page_info/page_info_dialog.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/toolbar/app_menu_model.h"
@@ -63,6 +64,7 @@
 #include "chrome/browser/ui/web_applications/web_app_ui_utils.h"
 #include "chrome/browser/ui/window_sizer/window_sizer.h"
 #include "chrome/browser/web_applications/external_install_options.h"
+#include "chrome/browser/web_applications/model/display_override.h"
 #include "chrome/browser/web_applications/mojom/user_display_mode.mojom-shared.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_manager.h"
 #include "chrome/browser/web_applications/os_integration/web_app_shortcut.h"
@@ -73,6 +75,7 @@
 #include "chrome/browser/web_applications/web_app_command_manager.h"
 #include "chrome/browser/web_applications/web_app_command_scheduler.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/browser/web_applications/web_app_install_finalizer.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
@@ -188,53 +191,6 @@ std::vector<std::wstring> GetFileExtensionsForProgId(
 
 #endif  // BUILDFLAG(IS_WIN)
 
-// Waits for a Browser to be set to last active.
-class BrowserActivationWaiter : public BrowserListObserver {
- public:
-  explicit BrowserActivationWaiter(const Browser* browser) : browser_(browser) {
-    BrowserList::AddObserver(this);
-    // When the active browser closes, the next "last active browser" in the
-    // BrowserList might not be immediately activated. So we need to wait for
-    // the "last active browser" to actually be active.
-    if (chrome::FindLastActive() == browser_ &&
-        browser_->window()->IsActive()) {
-      observed_ = true;
-    }
-  }
-
-  BrowserActivationWaiter(const BrowserActivationWaiter&) = delete;
-  BrowserActivationWaiter& operator=(const BrowserActivationWaiter&) = delete;
-
-  ~BrowserActivationWaiter() override { BrowserList::RemoveObserver(this); }
-
-  // Runs a message loop until the `browser_` supplied to the constructor is
-  // activated, or returns immediately if `browser_` has already become active.
-  // Should only be called once.
-  void WaitForActivation() {
-    if (observed_) {
-      return;
-    }
-    run_loop_.Run();
-  }
-
- private:
-  // BrowserListObserver:
-  void OnBrowserSetLastActive(Browser* browser) override {
-    if (browser != browser_) {
-      return;
-    }
-
-    observed_ = true;
-    if (run_loop_.running()) {
-      run_loop_.Quit();
-    }
-  }
-
-  const raw_ptr<const Browser> browser_;
-  bool observed_ = false;
-  base::RunLoop run_loop_;
-};
-
 // Returns whether `window` roughly matches expected `bounds`.
 bool CheckForBounds(ui::BaseWindow* window, const gfx::Rect& bounds) {
   const gfx::Rect& actual = window->GetBounds();
@@ -281,13 +237,20 @@ class WebAppBrowserTest : public WebAppBrowserTestBase {
         base::StringPrintf("/web_apps/basic.html?index=%d", index++));
     auto web_app_info =
         WebAppInstallInfo::CreateWithStartUrlForTesting(app_url);
-    web_app_info->scope = app_url;
+    {
+      // Remove the query argument and filename for the scope.
+      GURL::Replacements replacements;
+      replacements.ClearQuery();
+      web_app_info->scope =
+          app_url.ReplaceComponents(replacements).GetWithoutFilename();
+    }
     web_app_info->display_mode = install_display_mode;
     web_app_info->user_display_mode = open_as_window
                                           ? mojom::UserDisplayMode::kStandalone
                                           : mojom::UserDisplayMode::kBrowser;
-    if (display_override_mode) {
-      web_app_info->display_override.push_back(*display_override_mode);
+    if (display_override_mode.has_value()) {
+      web_app_info->display_override.push_back(
+          DisplayOverride::Create(*display_override_mode));
     }
 
     webapps::AppId app_id = InstallWebApp(std::move(web_app_info));
@@ -777,9 +740,8 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, OpenInChrome) {
     EXPECT_EQ(1, browser()->tab_strip_model()->count());
     ASSERT_EQ(2u, chrome::GetBrowserCount(browser()->profile()));
 
-    ui_test_utils::BrowserChangeObserver on_close(
-        app_browser,
-        ui_test_utils::BrowserChangeObserver::ChangeType::kRemoved);
+    ui_test_utils::BrowserDestroyedObserver browser_destroyed_observer(
+        app_browser);
     chrome::ExecuteCommand(app_browser, IDC_OPEN_IN_CHROME);
 
     // The browser frame is closed next event loop so it's still safe to access
@@ -788,7 +750,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, OpenInChrome) {
 
     // Wait until the browser actually gets closed. This invalidates
     // |app_browser|.
-    on_close.Wait();
+    browser_destroyed_observer.Wait();
     EXPECT_EQ(2, browser()->tab_strip_model()->count());
     EXPECT_EQ(1, browser()->tab_strip_model()->active_index());
     EXPECT_EQ(
@@ -842,7 +804,20 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, AppLastLaunchTime) {
               before_launch);
 }
 
-IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, WithMinimalUiButtons_ManifsetBrowser) {
+IN_PROC_BROWSER_TEST_F(WebAppBrowserTest,
+                       FullScreenDisplayModeOpensInWindowedContainer) {
+  auto web_app_info =
+      WebAppInstallInfo::CreateWithStartUrlForTesting(GURL(kExampleURL));
+  web_app_info->display_mode = DisplayMode::kFullscreen;
+  webapps::AppId app_id = InstallWebApp(std::move(web_app_info));
+
+  Browser* app_browser = LaunchWebAppBrowserAndWait(app_id);
+  EXPECT_NE(app_browser, nullptr);
+  EXPECT_TRUE(app_browser->app_controller());
+}
+
+IN_PROC_BROWSER_TEST_F(WebAppBrowserTest,
+                       WithMinimalUiButtons_ManifestBrowser) {
   EXPECT_TRUE(
       HasMinimalUiButtons(/*install_display_mode=*/DisplayMode::kBrowser,
                           /*app_display_mode_override=*/std::nullopt,
@@ -896,9 +871,8 @@ IN_PROC_BROWSER_TEST_F(
                           /*expected_launch_display=*/DisplayMode::kBrowser));
 }
 
-IN_PROC_BROWSER_TEST_F(
-    WebAppBrowserTest,
-    WithoutMinimalUiButtons_ManifestBrowser_OpenInBrowser) {
+IN_PROC_BROWSER_TEST_F(WebAppBrowserTest,
+                       WithoutMinimalUiButtons_ManifestBrowser_OpenInBrowser) {
   EXPECT_FALSE(
       HasMinimalUiButtons(/*install_display_mode=*/DisplayMode::kBrowser,
                           /*app_display_mode_override=*/std::nullopt,
@@ -940,8 +914,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(WebAppBrowserTest,
-                     WithoutMinimalUiButtons_DisplayOverride_Standalone) {
-
+                       WithoutMinimalUiButtons_DisplayOverride_Standalone) {
   EXPECT_FALSE(HasMinimalUiButtons(
       DisplayMode::kMinimalUi, DisplayMode::kStandalone,
       /*open_as_window=*/true,
@@ -1033,7 +1006,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, DesktopPWAsOpenLinksInNewTab) {
 
   NavigateParams param(app_browser, GURL("http://www.google.com/"),
                        ui::PAGE_TRANSITION_LINK);
-  param.window_action = NavigateParams::SHOW_WINDOW;
+  param.window_action = NavigateParams::WindowAction::kShowWindow;
   param.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
 
   ui_test_utils::NavigateToURL(&param);
@@ -1685,8 +1658,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, WindowOffsetsClampedToScreen) {
   const webapps::AppId app_id = InstallPWA(GURL(kExampleURL));
   Browser* browser = LaunchWebAppBrowserAndWait(app_id);
   ui::BaseWindow* window = browser->window();
-  gfx::Rect bounds =
-      display::Screen::GetScreen()->GetPrimaryDisplay().work_area();
+  gfx::Rect bounds = display::Screen::Get()->GetPrimaryDisplay().work_area();
   // Make the window fill the display, so subsequent new windows quickly hit the
   // edge of the screen when offset.
   ui_test_utils::SetAndWaitForBounds(*browser, bounds);
@@ -1732,7 +1704,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest,
   // install source.
   EXPECT_FALSE(provider->registrar_unsafe().CanUserUninstallWebApp(app_id));
   const WebApp& web_app = *provider->registrar_unsafe().GetAppById(app_id);
-    EXPECT_TRUE(web_app.GetSources().Has(WebAppManagement::kUserInstalled));
+  EXPECT_TRUE(web_app.GetSources().Has(WebAppManagement::kUserInstalled));
   EXPECT_TRUE(web_app.IsPolicyInstalledApp());
 }
 
@@ -1962,8 +1934,8 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, WebAppCreateAndDeleteShortcut) {
   run_loop_install.Run();
   app_loaded_observer.Wait();
 
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider->registrar_unsafe().GetInstallState(app_id));
+  EXPECT_TRUE(provider->registrar_unsafe().AppMatches(
+      app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
   EXPECT_EQ(provider->registrar_unsafe().GetAppShortName(app_id),
             GetInstallableAppName());
 
@@ -2009,8 +1981,8 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, RunOnOsLoginMetrics) {
   auto* provider = WebAppProvider::GetForTest(profile());
   const webapps::AppId& app_id = InstallPWA(pwa_url);
 
-  ASSERT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider->registrar_unsafe().GetInstallState(app_id));
+  EXPECT_TRUE(provider->registrar_unsafe().AppMatches(
+      app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
 
   base::HistogramTester tester;
   base::RunLoop run_loop;
@@ -2043,8 +2015,9 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, ReparentLastBrowserTab) {
   const webapps::AppId app_id = InstallPWA(app_url);
   EXPECT_TRUE(ui_test_utils::NavigateToURL(browser(), app_url));
 
-  Browser* const app_browser = ReparentWebAppForActiveTab(browser());
-  ASSERT_EQ(app_browser->app_controller()->app_id(), app_id);
+  BrowserWindowInterface* const app_browser =
+      ReparentWebAppForActiveTab(browser());
+  ASSERT_EQ(AppBrowserController::From(app_browser)->app_id(), app_id);
 
   ASSERT_TRUE(IsBrowserOpen(browser()));
   EXPECT_EQ(browser()->tab_strip_model()->count(), 1);
@@ -2090,7 +2063,8 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTestUpdateShortcutResult, UpdateShortcut) {
   EXPECT_EQ(shortcut_info->title, u"test_app_2");
 
   test::UninstallAllWebApps(profile());
-  EXPECT_FALSE(provider->registrar_unsafe().IsInRegistrar(app_id));
+  EXPECT_FALSE(
+      provider->registrar_unsafe().GetInstallState(app_id).has_value());
 }
 
 // Tests that reparenting a display: browser app tab results in a minimal-ui
@@ -2110,16 +2084,16 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, ReparentDisplayBrowserApp) {
       browser()->tab_strip_model()->GetActiveWebContents();
   ASSERT_EQ(tab_contents->GetLastCommittedURL(), app_url);
 
-  ui_test_utils::BrowserChangeObserver new_app_browser_observer(
-      nullptr, ui_test_utils::BrowserChangeObserver::ChangeType::kAdded);
+  ui_test_utils::BrowserCreatedObserver browser_created_observer;
   EXPECT_EQ(GetAppMenuCommandState(IDC_OPEN_IN_PWA_WINDOW, browser()),
             kEnabled);
   EXPECT_TRUE(chrome::ExecuteCommand(browser(), IDC_OPEN_IN_PWA_WINDOW));
-  ui_test_utils::WaitForBrowserSetLastActive(new_app_browser_observer.Wait());
+  ui_test_utils::WaitForBrowserSetLastActive(browser_created_observer.Wait());
 
-  Browser* const app_browser = BrowserList::GetInstance()->GetLastActive();
-  ASSERT_EQ(app_browser->app_controller()->app_id(), app_id);
-  EXPECT_TRUE(app_browser->app_controller()->HasMinimalUiButtons());
+  BrowserWindowInterface* const app_browser =
+      GetLastActiveBrowserWindowInterfaceWithAnyProfile();
+  ASSERT_EQ(AppBrowserController::From(app_browser)->app_id(), app_id);
+  EXPECT_TRUE(AppBrowserController::From(app_browser)->HasMinimalUiButtons());
 
   auto* provider = WebAppProvider::GetForTest(profile());
   EXPECT_EQ(provider->registrar_unsafe().GetAppUserDisplayMode(app_id),
@@ -2312,24 +2286,23 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, SubframeRedirectsToWebApp) {
 #if BUILDFLAG(IS_MAC)
 // TODO(crbug.com/402249843): Flaky on Mac. Debug and re-enable.
 IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, DISABLED_NewAppWindow) {
-  BrowserList* const browser_list = BrowserList::GetInstance();
   const GURL app_url = GetSecureAppURL();
   const webapps::AppId app_id = InstallPWA(app_url);
-  Browser* const app_browser = LaunchWebAppBrowserAndWait(app_id);
+  BrowserWindowInterface* const app_browser =
+      LaunchWebAppBrowserAndWait(app_id);
 
-  EXPECT_EQ(browser_list->size(), 2U);
+  EXPECT_EQ(chrome::GetTotalBrowserCount(), 2U);
 
-  ui_test_utils::BrowserChangeObserver browser_change_observer(
-      nullptr, ui_test_utils::BrowserChangeObserver::ChangeType::kAdded);
+  ui_test_utils::BrowserCreatedObserver browser_created_observer;
   EXPECT_TRUE(chrome::ExecuteCommand(app_browser, IDC_NEW_WINDOW));
-  Browser* const new_browser = browser_change_observer.Wait();
+  BrowserWindowInterface* const new_browser = browser_created_observer.Wait();
 
-  EXPECT_EQ(new_browser, browser_list->GetLastActive());
-  EXPECT_EQ(browser_list->size(), 3U);
+  EXPECT_EQ(new_browser, GetLastActiveBrowserWindowInterfaceWithAnyProfile());
+  EXPECT_EQ(chrome::GetTotalBrowserCount(), 3U);
   EXPECT_NE(new_browser, browser());
   EXPECT_NE(new_browser, app_browser);
-  EXPECT_TRUE(new_browser->is_type_app());
-  EXPECT_EQ(new_browser->app_controller()->app_id(), app_id);
+  EXPECT_EQ(new_browser->GetType(), BrowserWindowInterface::Type::TYPE_APP);
+  EXPECT_EQ(AppBrowserController::From(new_browser)->app_id(), app_id);
 
   WebAppProvider::GetForTest(profile())
       ->sync_bridge_unsafe()
@@ -2342,7 +2315,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, DISABLED_NewAppWindow) {
   content::WebContents* new_tab = tab_waiter.Wait();
 
   ASSERT_TRUE(new_tab);
-  EXPECT_EQ(browser_list->GetLastActive(), browser());
+  EXPECT_EQ(GetLastActiveBrowserWindowInterfaceWithAnyProfile(), browser());
   EXPECT_EQ(browser()->tab_strip_model()->count(), 2);
   EXPECT_EQ(new_tab, browser()->tab_strip_model()->GetActiveWebContents());
   EXPECT_EQ(new_tab->GetVisibleURL(), app_url);
@@ -2366,19 +2339,18 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, PopupLocationBar) {
       /*user_gesture=*/true);
   Browser* popup_browser =
       web_app::CreateWebAppWindowMaybeWithHomeTab(app_id, params);
-  BrowserActivationWaiter activation_waiter(popup_browser);
   popup_browser->window()->Show();
-  activation_waiter.WaitForActivation();
+  ui_test_utils::WaitUntilBrowserBecomeActive(popup_browser);
 
-  EXPECT_TRUE(
-      popup_browser->CanSupportWindowFeature(Browser::FEATURE_LOCATIONBAR));
-  EXPECT_TRUE(
-      popup_browser->SupportsWindowFeature(Browser::FEATURE_LOCATIONBAR));
+  EXPECT_TRUE(popup_browser->CanSupportWindowFeature(
+      Browser::WindowFeature::kFeatureLocationBar));
+  EXPECT_TRUE(popup_browser->SupportsWindowFeature(
+      Browser::WindowFeature::kFeatureLocationBar));
 
   ui_test_utils::ToggleFullscreenModeAndWait(popup_browser);
 
-  EXPECT_TRUE(
-      popup_browser->CanSupportWindowFeature(Browser::FEATURE_LOCATIONBAR));
+  EXPECT_TRUE(popup_browser->CanSupportWindowFeature(
+      Browser::WindowFeature::kFeatureLocationBar));
 }
 
 // Make sure chrome://web-app-internals page loads fine.
@@ -2682,11 +2654,15 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest_NoDestroyProfile, Shutdown) {
   handler.Close();
   ui_test_utils::WaitForBrowserToClose();
 
-  content::WebContents* const web_contents =
-      apps::AppServiceProxyFactory::GetForProfile(profile)
-          ->BrowserAppLauncher()
-          ->LaunchAppWithParamsForTesting(std::move(params));
-  EXPECT_EQ(web_contents, nullptr);
+  web_app::WebAppProvider* provider =
+      web_app::WebAppProvider::GetForLocalAppsUnchecked(profile);
+  base::test::TestFuture<base::WeakPtr<Browser>,
+                         base::WeakPtr<content::WebContents>,
+                         apps::LaunchContainer>
+      future;
+  provider->scheduler().LaunchAppWithCustomParams(std::move(params),
+                                                  future.GetCallback());
+  EXPECT_FALSE(future.template Get<1>().get());
 }
 
 using WebAppBrowserTest_ManifestId = WebAppBrowserTest;
@@ -2771,7 +2747,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest_FileHandler, FileAssociation) {
         GetFileExtensionsForProgId(file_handler_prog_id);
     for (const auto& file_extension : file_extensions) {
       const std::string extension = base::WideToUTF8(file_extension.substr(1));
-      EXPECT_TRUE(base::Contains(expected_extensions, extension))
+      EXPECT_TRUE(std::ranges::contains(expected_extensions, extension))
           << "Missing file extension: " << extension;
       const std::wstring reg_key =
           L"Software\\Classes\\" + file_extension + L"\\OpenWithProgids";
@@ -2874,8 +2850,8 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, PRE_UninstallIncompleteUninstall) {
   const webapps::AppId app_id = test::InstallPwaForCurrentUrl(browser());
   run_loop_install.Run();
 
-  EXPECT_EQ(proto::InstallState::INSTALLED_WITH_OS_INTEGRATION,
-            provider->registrar_unsafe().GetInstallState(app_id));
+  EXPECT_TRUE(provider->registrar_unsafe().AppMatches(
+      app_id, WebAppFilter::InstalledInOperatingSystemForTesting()));
   EXPECT_EQ(provider->registrar_unsafe().GetAppShortName(app_id),
             GetInstallableAppName());
   // This does NOT uninstall the web app, it just flags it for uninstall on
@@ -2921,11 +2897,11 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, UninstallIncompleteUninstall) {
 // Verifies the behavior of the App/site settings link in the page info bubble.
 class WebAppBrowserTest_PageInfoManagementLink : public WebAppBrowserTest {
  public:
-  bool ShowingAppManagementLink(Browser* browser) {
+  bool ShowingAppManagementLink(BrowserWindowInterface* browser) {
     int unused_id, unused_id2;
     return GetLabelIdsForAppManagementLinkInPageInfo(
-        browser->tab_strip_model()->GetActiveWebContents(), &unused_id,
-        &unused_id2);
+        browser->GetFeatures().tab_strip_model()->GetActiveWebContents(),
+        &unused_id, &unused_id2);
   }
 };
 
@@ -2942,14 +2918,16 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest_PageInfoManagementLink, Reparenting) {
   // link.
   EXPECT_TRUE(ShowingAppManagementLink(browser()));
   // Reparent into app browser window.
-  Browser* const app_browser = ReparentWebAppForActiveTab(browser());
+  BrowserWindowInterface* const app_browser =
+      ReparentWebAppForActiveTab(browser());
   // The leftover tab in the tabbed browser window should not be appy.
   EXPECT_FALSE(ShowingAppManagementLink(browser()));
   // After reparenting into an app browser, should show the app settings link.
   EXPECT_TRUE(ShowingAppManagementLink(app_browser));
 
   // Move back into tabbed browser: should keep showing the app settings link.
-  Browser* tabbed_browser = chrome::OpenInChrome(app_browser);
+  Browser* tabbed_browser =
+      chrome::OpenInChrome(app_browser->GetBrowserForMigrationOnly());
   EXPECT_TRUE(ShowingAppManagementLink(tabbed_browser));
 }
 

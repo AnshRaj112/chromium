@@ -40,8 +40,7 @@ class WTF_EXPORT TextEncoding final {
 
  public:
   TextEncoding() = default;
-  explicit TextEncoding(const char* name);
-  explicit TextEncoding(const String& name);
+  explicit TextEncoding(StringView name);
 
   bool IsValid() const { return !name_.IsNull(); }
   const AtomicString& GetName() const { return name_; }
@@ -62,14 +61,12 @@ class WTF_EXPORT TextEncoding final {
   bool IsNonByteBasedEncoding() const;
 
  private:
+  // A canonical encoding name, or a null AtomicString.
   AtomicString name_;
 };
 
 inline bool operator==(const TextEncoding& a, const TextEncoding& b) {
   return a.GetName() == b.GetName();
-}
-inline bool operator!=(const TextEncoding& a, const TextEncoding& b) {
-  return a.GetName() != b.GetName();
 }
 
 WTF_EXPORT const TextEncoding& AsciiEncoding();

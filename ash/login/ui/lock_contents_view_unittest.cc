@@ -66,11 +66,11 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/l10n/l10n_util.h"
-#include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/display/manager/display_manager.h"
 #include "ui/display/test/display_manager_test_api.h"
 #include "ui/events/test/event_generator.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/test/views_test_utils.h"
@@ -351,7 +351,7 @@ TEST_F(LockContentsViewUnitTest, AutoLayoutAfterRotation) {
   };
 
   const display::Display& display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(
+      display::Screen::Get()->GetDisplayNearestWindow(
           widget->GetNativeWindow());
   for (int i = 2; i < 10; ++i) {
     SetUserCount(i);
@@ -398,7 +398,7 @@ TEST_F(LockContentsViewUnitTest, AutoLayoutExtraSmallUsersListAfterRotation) {
   EXPECT_EQ(contents->height(), users_list->height());
 
   const display::Display& display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(
+      display::Screen::Get()->GetDisplayNearestWindow(
           widget->GetNativeWindow());
 
   // Start at 0 degrees (landscape).
@@ -448,7 +448,7 @@ TEST_F(LockContentsViewUnitTest, AutoLayoutSmallUsersListAfterRotation) {
   EXPECT_EQ(users_list->height(), users_list->contents()->height());
 
   const display::Display& display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(
+      display::Screen::Get()->GetDisplayNearestWindow(
           widget->GetNativeWindow());
 
   // Start at 0 degrees (landscape).
@@ -1445,7 +1445,7 @@ TEST_F(LockContentsViewKeyboardUnitTest,
   ASSERT_NE(nullptr, contents);
 
   const display::Display& display =
-      display::Screen::GetScreen()->GetDisplayNearestWindow(
+      display::Screen::Get()->GetDisplayNearestWindow(
           contents->GetWidget()->GetNativeWindow());
 
   for (int user_count = 1; user_count < 10; user_count++) {
@@ -2848,8 +2848,8 @@ TEST_F(LockContentsViewUnitTest, ToggleGaiaOnUsersChanged) {
 
 TEST_F(LockContentsViewUnitTest, UpdatingSmartLockStateSetsAuthMethod) {
   // Build login screen with 1 user.
-  ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
   auto* contents = new LockContentsView(
       LockScreen::ScreenType::kLogin, DataDispatcher(),
       std::make_unique<FakeLoginDetachableBaseModel>(DataDispatcher()));
@@ -2880,8 +2880,8 @@ TEST_F(LockContentsViewUnitTest, UpdatingSmartLockStateSetsAuthMethod) {
 }
 
 TEST_F(LockContentsViewUnitTest, SmartLockStateHidesPasswordView) {
-  ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
-      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  gfx::ScopedAnimationDurationScaleMode non_zero_duration_mode(
+      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
 
   // Build login screen with 1 user.
   auto* contents = new LockContentsView(
@@ -2913,8 +2913,8 @@ TEST_F(LockContentsViewUnitTest, SmartLockStateHidesPasswordView) {
 }
 
 TEST_F(LockContentsViewUnitTest, SmartLockStateHidesAuthErrorMessage) {
-  ui::ScopedAnimationDurationScaleMode scoped_animation_duration_scale_mode(
-      ui::ScopedAnimationDurationScaleMode::ZERO_DURATION);
+  gfx::ScopedAnimationDurationScaleMode scoped_animation_duration_scale_mode(
+      gfx::ScopedAnimationDurationScaleMode::ZERO_DURATION);
 
   ASSERT_NO_FATAL_FAILURE(ShowLockScreen());
   LockContentsView* contents =

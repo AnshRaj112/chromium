@@ -9,7 +9,7 @@
 #include <optional>
 
 #include "ash/display/screen_orientation_controller.h"
-#include "ash/frame/non_client_frame_view_ash.h"
+#include "ash/frame/frame_view_ash.h"
 #include "ash/metrics/login_unlock_throughput_recorder.h"
 #include "ash/public/cpp/window_properties.h"
 #include "ash/shell.h"
@@ -21,7 +21,6 @@
 #include "ash/wm/window_util.h"
 #include "base/check.h"
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
@@ -113,17 +112,17 @@ class ShellSurfaceWidget : public views::Widget {
   }
 };
 
-class CustomFrameView : public ash::NonClientFrameViewAsh {
+class CustomFrameView : public ash::FrameViewAsh {
  public:
   using ShapeRects = std::vector<gfx::Rect>;
 
   CustomFrameView(views::Widget* widget,
                   ShellSurfaceBase* shell_surface,
                   bool enabled)
-      : NonClientFrameViewAsh(widget), shell_surface_(shell_surface) {
+      : FrameViewAsh(widget), shell_surface_(shell_surface) {
     SetFrameEnabled(enabled);
     if (!enabled)
-      NonClientFrameViewAsh::SetShouldPaintHeader(false);
+      FrameViewAsh::SetShouldPaintHeader(false);
   }
 
   CustomFrameView(const CustomFrameView&) = delete;
@@ -131,22 +130,22 @@ class CustomFrameView : public ash::NonClientFrameViewAsh {
 
   ~CustomFrameView() override = default;
 
-  // Overridden from ash::NonClientFrameViewAsh:
+  // Overridden from ash::FrameViewAsh:
   void SetShouldPaintHeader(bool paint) override {
     if (GetFrameEnabled()) {
-      NonClientFrameViewAsh::SetShouldPaintHeader(paint);
+      FrameViewAsh::SetShouldPaintHeader(paint);
       return;
     }
   }
 
-  // Overridden from views::NonClientFrameView:
+  // Overridden from views::FrameView:
   gfx::Rect GetBoundsForClientView() const override {
     if (GetFrameEnabled())
-      return ash::NonClientFrameViewAsh::GetBoundsForClientView();
+      return ash::FrameViewAsh::GetBoundsForClientView();
     return bounds();
   }
 
-  // Overridden from views::NonClientFrameView:
+  // Overridden from views::FrameView:
   void UpdateWindowRoundedCorners() override {
     if (!GetWidget()) {
       return;
@@ -203,41 +202,40 @@ class CustomFrameView : public ash::NonClientFrameViewAsh {
   gfx::Rect GetWindowBoundsForClientBounds(
       const gfx::Rect& client_bounds) const override {
     if (GetFrameEnabled()) {
-      return ash::NonClientFrameViewAsh::GetWindowBoundsForClientBounds(
-          client_bounds);
+      return ash::FrameViewAsh::GetWindowBoundsForClientBounds(client_bounds);
     }
     return client_bounds;
   }
   int NonClientHitTest(const gfx::Point& point) override {
     if (GetFrameEnabled() || shell_surface_->server_side_resize()) {
-      return ash::NonClientFrameViewAsh::NonClientHitTest(point);
+      return ash::FrameViewAsh::NonClientHitTest(point);
     }
     return GetWidget()->client_view()->NonClientHitTest(point);
   }
   void GetWindowMask(const gfx::Size& size, SkPath* window_mask) override {
     if (GetFrameEnabled())
-      return ash::NonClientFrameViewAsh::GetWindowMask(size, window_mask);
+      return ash::FrameViewAsh::GetWindowMask(size, window_mask);
   }
   void ResetWindowControls() override {
     if (GetFrameEnabled())
-      return ash::NonClientFrameViewAsh::ResetWindowControls();
+      return ash::FrameViewAsh::ResetWindowControls();
   }
   void UpdateWindowIcon() override {
     if (GetFrameEnabled())
-      return ash::NonClientFrameViewAsh::ResetWindowControls();
+      return ash::FrameViewAsh::ResetWindowControls();
   }
   void UpdateWindowTitle() override {
     if (GetFrameEnabled())
-      return ash::NonClientFrameViewAsh::UpdateWindowTitle();
+      return ash::FrameViewAsh::UpdateWindowTitle();
   }
   void SizeConstraintsChanged() override {
     if (GetFrameEnabled())
-      return ash::NonClientFrameViewAsh::SizeConstraintsChanged();
+      return ash::FrameViewAsh::SizeConstraintsChanged();
   }
   gfx::Size GetMinimumSize() const override {
     gfx::Size minimum_size = shell_surface_->GetMinimumSize();
     if (GetFrameEnabled()) {
-      return ash::NonClientFrameViewAsh::GetWindowBoundsForClientBounds(
+      return ash::FrameViewAsh::GetWindowBoundsForClientBounds(
                  gfx::Rect(minimum_size))
           .size();
     }
@@ -246,7 +244,7 @@ class CustomFrameView : public ash::NonClientFrameViewAsh {
   gfx::Size GetMaximumSize() const override {
     gfx::Size maximum_size = shell_surface_->GetMaximumSize();
     if (GetFrameEnabled() && !maximum_size.IsEmpty()) {
-      return ash::NonClientFrameViewAsh::GetWindowBoundsForClientBounds(
+      return ash::FrameViewAsh::GetWindowBoundsForClientBounds(
                  gfx::Rect(maximum_size))
           .size();
     }
@@ -453,7 +451,7 @@ ShellSurfaceBase::~ShellSurfaceBase() {
 
   // If the surface was TrustedPinned, we have to unpin first as this might have
   // locked down some system functions.
-  if (current_pinned_state_ == chromeos::WindowPinType::kTrustedPinned) {
+  if (current_pinned_state_ == chromeos::WindowPinType::kLockedFullscreen) {
     pending_pinned_state_ = chromeos::WindowPinType::kNone;
     UpdatePinned();
   }
@@ -735,7 +733,7 @@ void ShellSurfaceBase::SetPip() {
   // If no initial bounds is specified, pip windows should start in the bottom
   // right corner of the screen so move |window| to the bottom right of the
   // work area and let the pip positioner move it within the work area.
-  auto display = display::Screen::GetScreen()->GetDisplayNearestWindow(window);
+  auto display = display::Screen::Get()->GetDisplayNearestWindow(window);
   gfx::Size window_size = window->bounds().size();
   window->SetBoundsInScreen(
       gfx::Rect(display.work_area().bottom_right(), window_size), display);
@@ -777,7 +775,7 @@ void ShellSurfaceBase::SetInitialWorkspace(const char* initial_workspace) {
 }
 
 void ShellSurfaceBase::Pin(bool trusted) {
-  pending_pinned_state_ = trusted ? chromeos::WindowPinType::kTrustedPinned
+  pending_pinned_state_ = trusted ? chromeos::WindowPinType::kLockedFullscreen
                                   : chromeos::WindowPinType::kPinned;
   UpdatePinned();
 }
@@ -804,7 +802,7 @@ void ShellSurfaceBase::UpdatePinned() {
       ash::WindowState::Get(window)->Restore();
     } else {
       bool trusted_pinned =
-          pending_pinned_state_ == chromeos::WindowPinType::kTrustedPinned;
+          pending_pinned_state_ == chromeos::WindowPinType::kLockedFullscreen;
       ash::window_util::PinWindow(window,
                                   /*trusted=*/trusted_pinned);
     }
@@ -875,9 +873,8 @@ void ShellSurfaceBase::SetWindowBounds(const gfx::Rect& bounds) {
 
         // If this expansion pushes the title bar offscreen, push it back
         // onscreen while preserving requested X coordinate, width, and height.
-        gfx::Rect work_area = display::Screen::GetScreen()
-                                  ->GetDisplayMatching(bounds)
-                                  .work_area();
+        gfx::Rect work_area =
+            display::Screen::Get()->GetDisplayMatching(bounds).work_area();
         if (!work_area.IsEmpty() && expanded_bounds.y() < work_area.y()) {
           expanded_bounds.Offset(0, work_area.y() - expanded_bounds.y());
         }
@@ -1027,14 +1024,14 @@ void ShellSurfaceBase::RebindRootSurface(Surface* root_surface,
     // Int properties.
     for (auto* const key :
          {aura::client::kSkipImeProcessing, chromeos::kFrameRestoreLookKey}) {
-      if (base::Contains(window->GetAllPropertyKeys(), key)) {
+      if (window->GetAllPropertyKeys().contains(key)) {
         OnWindowPropertyChanged(window, key,
                                 /*old_value(unused)=*/0);
       }
     }
     // Boolean property.
-    if (base::Contains(window->GetAllPropertyKeys(),
-                       aura::client::kWindowWorkspaceKey)) {
+    if (window->GetAllPropertyKeys().contains(
+            aura::client::kWindowWorkspaceKey)) {
       OnWindowPropertyChanged(window, aura::client::kWindowWorkspaceKey,
                               /*old_value(unused)=*/0);
     }
@@ -1372,9 +1369,9 @@ views::ClientView* ShellSurfaceBase::CreateClientView(views::Widget* widget) {
   return new CustomClientView(widget, this);
 }
 
-std::unique_ptr<views::NonClientFrameView>
-ShellSurfaceBase::CreateNonClientFrameView(views::Widget* widget) {
-  return CreateNonClientFrameViewInternal(widget);
+std::unique_ptr<views::FrameView> ShellSurfaceBase::CreateFrameView(
+    views::Widget* widget) {
+  return CreateFrameViewInternal(widget);
 }
 
 bool ShellSurfaceBase::ShouldSaveWindowPlacement() const {
@@ -1412,7 +1409,7 @@ void ShellSurfaceBase::GetWidgetHitTestMask(SkPath* mask) const {
   matrix.setScaleTranslate(
       SkFloatToScalar(1.0f / scale), SkFloatToScalar(1.0f / scale),
       SkIntToScalar(offset.x()), SkIntToScalar(offset.y()));
-  mask->transform(matrix);
+  *mask = mask->makeTransform(matrix);
 }
 
 void ShellSurfaceBase::OnCaptureChanged(aura::Window* lost_capture,
@@ -1489,7 +1486,7 @@ void ShellSurfaceBase::OnCaptureChanged(aura::Window* lost_capture,
   auto is_close_candidate_with_popup_grab =
       [&gained_capture_ancestors](aura::Window* window) {
         return IsPopupWithGrab(window) &&
-               !base::Contains(gained_capture_ancestors, window);
+               !gained_capture_ancestors.contains(window);
       };
 
   aura::Window* root = wm::GetTransientRoot(lost_capture);
@@ -1709,8 +1706,8 @@ float ShellSurfaceBase::GetPendingScaleFactor() const {
     // the root window yet so we need to fetch the scale factor directly from
     // the pending target display.
     display::Display display;
-    if (display::Screen::GetScreen()->GetDisplayWithDisplayId(
-            pending_display_id_, &display)) {
+    if (display::Screen::Get()->GetDisplayWithDisplayId(pending_display_id_,
+                                                        &display)) {
       return display.device_scale_factor();
     }
   }
@@ -1972,7 +1969,7 @@ void ShellSurfaceBase::UpdateWidgetBounds() {
     gfx::Rect content_bounds(adjusted_bounds.size());
     int height = 0;
     if (!overlay_overlaps_frame_ && frame_enabled()) {
-      auto* frame_view = static_cast<const ash::NonClientFrameViewAsh*>(
+      auto* frame_view = static_cast<const ash::FrameViewAsh*>(
           widget_->non_client_view()->frame_view());
       height = frame_view->NonClientTopBorderHeight();
     }
@@ -2240,8 +2237,8 @@ void ShellSurfaceBase::InstallCustomWindowTargeter() {
   window->SetEventTargeter(std::make_unique<CustomWindowTargeter>(this));
 }
 
-std::unique_ptr<views::NonClientFrameView>
-ShellSurfaceBase::CreateNonClientFrameViewInternal(views::Widget* widget) {
+std::unique_ptr<views::FrameView> ShellSurfaceBase::CreateFrameViewInternal(
+    views::Widget* widget) {
   aura::Window* window = widget_->GetNativeWindow();
   // ShellSurfaces always use immersive mode.
   window->SetProperty(chromeos::kImmersiveIsActive, true);
@@ -2421,9 +2418,8 @@ void ShellSurfaceBase::CommitWidget() {
     if (window_state && window_state->IsMaximizedOrFullscreenOrPinned() &&
         (!initial_bounds_ || initial_bounds_->IsEmpty())) {
       gfx::Size current_content_size = CalculatePreferredSize({});
-      gfx::Rect restore_bounds = display::Screen::GetScreen()
-                                     ->GetDisplayNearestWindow(window)
-                                     .work_area();
+      gfx::Rect restore_bounds =
+          display::Screen::Get()->GetDisplayNearestWindow(window).work_area();
       if (!current_content_size.IsEmpty())
         restore_bounds.ClampToCenteredSize(current_content_size);
 

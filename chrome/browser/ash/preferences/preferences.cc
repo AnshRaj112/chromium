@@ -7,6 +7,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "ash/birch/coral_util.h"
@@ -32,7 +33,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/system/sys_info.h"
 #include "base/time/time.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "chrome/browser/ash/accessibility/magnification_manager.h"
 #include "chrome/browser/ash/base/locale_util.h"
 #include "chrome/browser/ash/child_accounts/parent_access_code/parent_access_service.h"
@@ -51,6 +51,7 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browser_process_platform_part.h"
 #include "chrome/browser/download/download_prefs.h"
+#include "chrome/browser/global_features.h"
 #include "chrome/browser/prefs/pref_service_syncable_util.h"
 #include "chrome/browser/ui/ash/system/system_tray_client_impl.h"
 #include "chrome/common/chrome_features.h"
@@ -60,7 +61,7 @@
 #include "chromeos/ash/components/dbus/update_engine/update_engine_client.h"
 #include "chromeos/ash/components/editor_menu/public/cpp/editor_consent_status.h"
 #include "chromeos/ash/components/editor_menu/public/cpp/editor_enterprise_policy_enums.h"
-#include "chromeos/ash/components/geolocation/simple_geolocation_provider.h"
+#include "chromeos/ash/components/geolocation/system_location_provider.h"
 #include "chromeos/ash/components/peripheral_notification/peripheral_notification_manager.h"
 #include "chromeos/ash/components/settings/cros_settings.h"
 #include "chromeos/ash/components/settings/cros_settings_names.h"
@@ -69,6 +70,7 @@
 #include "chromeos/components/disks/disks_prefs.h"
 #include "chromeos/components/magic_boost/public/cpp/magic_boost_state.h"
 #include "chromeos/constants/pref_names.h"
+#include "components/application_locale_storage/application_locale_storage.h"
 #include "components/feedback/content/content_tracing_manager.h"
 #include "components/language/core/browser/pref_names.h"
 #include "components/policy/proto/chrome_device_policy.pb.h"
@@ -87,7 +89,6 @@
 #include "ui/base/ime/ash/extension_ime_util.h"
 #include "ui/base/ime/ash/ime_keyboard.h"
 #include "ui/base/ime/ash/input_method_manager.h"
-#include "ui/events/ash/mojom/extended_fkeys_modifier.mojom-shared.h"
 #include "ui/events/ash/mojom/extended_fkeys_modifier.mojom.h"
 #include "ui/events/ash/mojom/modifier_key.mojom.h"
 #include "ui/events/ash/pref_names.h"
@@ -284,15 +285,15 @@ void Preferences::RegisterProfilePrefs(
   registry->RegisterBooleanPref(prefs::kEmojiSuggestionEnterpriseAllowed, true);
   registry->RegisterIntegerPref(
       prefs::kHmwManagedSettings,
-      base::to_underlying(chromeos::editor_menu::EditorEnterprisePolicy::
-                              kAllowedWithModelImprovement));
+      std::to_underlying(chromeos::editor_menu::EditorEnterprisePolicy::
+                             kAllowedWithModelImprovement));
   registry->RegisterBooleanPref(prefs::kOrcaEnabled, true);
   registry->RegisterBooleanPref(prefs::kOrcaFeedbackEnabled, true);
   registry->RegisterBooleanPref(prefs::kManagedOrcaEnabled, true);
   registry->RegisterBooleanPref(prefs::kLobsterEnabled, true);
   registry->RegisterIntegerPref(
       prefs::kLobsterEnterprisePolicySettings,
-      base::to_underlying(
+      std::to_underlying(
           ash::LobsterEnterprisePolicyValue::kAllowedWithModelImprovement));
   registry->RegisterBooleanPref(
       prefs::kManagedPhysicalKeyboardAutocorrectAllowed, true);
@@ -300,7 +301,7 @@ void Preferences::RegisterProfilePrefs(
       prefs::kManagedPhysicalKeyboardPredictiveWritingAllowed, true);
   registry->RegisterIntegerPref(
       prefs::kOrcaConsentStatus,
-      base::to_underlying(chromeos::editor_menu::EditorConsentStatus::kUnset));
+      std::to_underlying(chromeos::editor_menu::EditorConsentStatus::kUnset));
   registry->RegisterIntegerPref(prefs::kOrcaConsentWindowDismissCount, 0);
   registry->RegisterBooleanPref(prefs::kEmojiPickerGifSupportEnabled, true);
   registry->RegisterDictionaryPref(prefs::kEmojiPickerHistory);
@@ -396,6 +397,8 @@ void Preferences::RegisterProfilePrefs(
 
   registry->RegisterStringPref(prefs::kCaptureModePolicySavePath,
                                std::string());
+
+  registry->RegisterStringPref(prefs::kCameraSaveLocation, std::string());
 
   std::string current_timezone_id;
   if (CrosSettings::IsInitialized()) {
@@ -595,7 +598,7 @@ void Preferences::RegisterProfilePrefs(
 
   registry->RegisterIntegerPref(
       prefs::kHMRConsentStatus,
-      base::to_underlying(chromeos::HMRConsentStatus::kUnset));
+      std::to_underlying(chromeos::HMRConsentStatus::kUnset));
 
   registry->RegisterIntegerPref(prefs::kHMRConsentWindowDismissCount, 0);
 
@@ -603,7 +606,7 @@ void Preferences::RegisterProfilePrefs(
 
   registry->RegisterIntegerPref(
       prefs::kGenAISmartGroupingSettings,
-      base::to_underlying(coral_util::GenAISmartGroupingSettings::kAllowed));
+      std::to_underlying(coral_util::GenAISmartGroupingSettings::kAllowed));
 
   registry->RegisterBooleanPref(
       prefs::kLauncherResultEverLaunched, false,
@@ -812,9 +815,8 @@ void Preferences::Init(Profile* profile, const user_manager::User* user) {
   if (user_is_primary_ && !login_input_method_id_used.empty()) {
     // Persist input method when transitioning from Login screen into the
     // session.
-    input_method::InputMethodPersistence::SetUserLastLoginInputMethodId(
-        login_input_method_id_used, input_method::InputMethodManager::Get(),
-        profile);
+    input_method::InputMethodPersistence::GetInstance()
+        ->SetUserLastLoginInputMethodId(login_input_method_id_used, profile);
   }
 
   // Note that |ime_state_| was modified by ApplyPreferences(), and
@@ -828,8 +830,11 @@ void Preferences::Init(Profile* profile, const user_manager::User* user) {
     input_method_manager_->SetState(ime_state_);
   }
 
-  input_method_syncer_ =
-      std::make_unique<input_method::InputMethodSyncer>(prefs, ime_state_);
+  ApplicationLocaleStorage* application_locale_storage =
+      g_browser_process->GetFeatures()->application_locale_storage();
+
+  input_method_syncer_ = std::make_unique<input_method::InputMethodSyncer>(
+      application_locale_storage, prefs, ime_state_);
   input_method_syncer_->Initialize();
 
   // If a guest is logged in, initialize the prefs as if this is the first
@@ -856,8 +861,11 @@ void Preferences::InitUserPrefsForTesting(
 
   UpdateEngineClient::Get()->AddObserver(this);
 
-  input_method_syncer_ =
-      std::make_unique<input_method::InputMethodSyncer>(prefs, ime_state_);
+  ApplicationLocaleStorage* application_locale_storage =
+      g_browser_process->GetFeatures()->application_locale_storage();
+
+  input_method_syncer_ = std::make_unique<input_method::InputMethodSyncer>(
+      application_locale_storage, prefs, ime_state_);
   input_method_syncer_->Initialize();
 }
 
@@ -1262,14 +1270,14 @@ void Preferences::ApplyPreferences(ApplyReason reason,
 
     // System Geolocation setting is controlled by the primary user only.
     if (user_is_primary_) {
-      SimpleGeolocationProvider::GetInstance()->SetGeolocationAccessLevel(
+      SystemLocationProvider::GetInstance()->SetGeolocationAccessLevel(
           geo_access_level);
     }
 
     // Log-in screen follows the owner's geolocation setting.
     if (user_is_owner) {
       GeolocationAccessLevel login_geo_access_level;
-      if (SimpleGeolocationProvider::GetInstance()
+      if (SystemLocationProvider::GetInstance()
               ->IsGeolocationUsageAllowedForSystem()) {
         login_geo_access_level = GeolocationAccessLevel::kAllowed;
       } else {
@@ -1326,13 +1334,12 @@ void Preferences::ApplyPreferences(ApplyReason reason,
         user_->IsChild()) {
       const base::Value::Dict& value =
           prefs_->GetDict(::prefs::kParentAccessCodeConfig);
-      known_user.SetPath(user_->GetAccountId(),
-                         ::prefs::kKnownUserParentAccessCodeConfig,
-                         base::Value(value.Clone()));
-      parent_access::ParentAccessService::Get().LoadConfigForUser(user_);
+      parent_access::ParentAccessService::Get().UpdateConfigForUser(
+          user_->GetAccountId(), value.Clone());
     } else {
-      known_user.RemovePref(user_->GetAccountId(),
-                            ::prefs::kKnownUserParentAccessCodeConfig);
+      // Remove the config.
+      parent_access::ParentAccessService::Get().UpdateConfigForUser(
+          user_->GetAccountId(), std::nullopt);
     }
   }
 

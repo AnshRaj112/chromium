@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
+#include "base/check_deref.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
@@ -252,7 +252,7 @@ bool GenerateTouchPoints(
                                   ? blink::WebTouchPoint::State::kStateCancelled
                                   : blink::WebTouchPoint::State::kStateReleased;
     event->SetType(type);
-  } else if (!base::Contains(points, changing.id)) {
+  } else if (!points.contains(changing.id)) {
     event->touches[0].state = blink::WebTouchPoint::State::kStatePressed;
     event->SetType(blink::WebInputEvent::Type::kTouchStart);
   } else {
@@ -535,7 +535,7 @@ CreateWebTouchEvents(
   std::vector<blink::WebTouchEvent> events;
   bool ok = true;
   for (auto& id_point : points) {
-    if (base::Contains(touched_points, id_point.first) &&
+    if (touched_points.contains(id_point.first) &&
         type == blink::WebInputEvent::Type::kTouchMove &&
         touched_points[id_point.first].PositionInWidget() ==
             id_point.second.PositionInWidget()) {
@@ -575,6 +575,15 @@ CreateWebTouchEvents(
   }
 
   return events;
+}
+
+// Converts a point from the coordinate space of a given RenderWidgetHostView
+// to the absolute screen coordinate space.
+gfx::PointF ConvertWidgetPointToScreenPoint(
+    RenderWidgetHostViewBase& view,
+    const gfx::PointF& point_in_widget) {
+  gfx::Rect view_bounds_in_screen = view.GetViewBounds();
+  return point_in_widget + view_bounds_in_screen.OffsetFromOrigin();
 }
 
 }  // namespace
@@ -773,7 +782,8 @@ class InputHandler::InputInjector
 
  private:
   void OnInputEvent(const RenderWidgetHost& widget,
-                    const blink::WebInputEvent& event) override {
+                    const blink::WebInputEvent& event,
+                    InputEventSource source) override {
     input_queued_ = true;
   }
 
@@ -1299,7 +1309,8 @@ void InputHandler::ImeSetComposition(
 
   widget_host->GetWidgetInputHandler()->ImeSetComposition(
       text16, std::vector<ui::ImeTextSpan>(), replacement_range,
-      selection_start, selection_end, std::move(closure));
+      selection_start, selection_end, blink::mojom::ImeState::kNone,
+      std::move(closure));
 }
 
 void InputHandler::DispatchMouseEvent(
@@ -1582,7 +1593,8 @@ void InputHandler::OnWidgetForDispatchMouseEvent(
     return;
   }
   event->SetPositionInWidget(*point);
-  event->SetPositionInScreen(event->PositionInWidget());
+  event->SetPositionInScreen(
+      ConvertWidgetPointToScreenPoint(CHECK_DEREF(target.get()), *point));
 
   RenderWidgetHostImpl* widget_host =
       RenderWidgetHostImpl::From(target->GetRenderWidgetHost());
@@ -1699,11 +1711,11 @@ void InputHandler::OnWidgetForDispatchWebTouchEvent(
     event.unique_touch_event_id = ui::GetNextTouchEventId();
     for (unsigned j = 0; j < event.touches_length; j++) {
       gfx::PointF point = event.touches[j].PositionInWidget();
-      event.touches[j].SetPositionInWidget(point.x() + delta.x(),
-                                           point.y() + delta.y());
-      point = event.touches[j].PositionInScreen();
-      event.touches[j].SetPositionInScreen(point.x() + delta.x(),
-                                           point.y() + delta.y());
+      gfx::PointF position_in_widget(point.x() + delta.x(),
+                                     point.y() + delta.y());
+      event.touches[j].SetPositionInWidget(position_in_widget);
+      event.touches[j].SetPositionInScreen(ConvertWidgetPointToScreenPoint(
+          CHECK_DEREF(target.get()), position_in_widget));
     }
   }
   EnsureInjector(widget_host)->InjectTouchEvents(events, std::move(callback));
@@ -1795,7 +1807,7 @@ void InputHandler::DispatchSyntheticPointerActionTouch(
 
     SyntheticPointerActionParams::PointerActionType action_type =
         SyntheticPointerActionParams::PointerActionType::MOVE;
-    if (!base::Contains(pointer_ids_, id)) {
+    if (!pointer_ids_.contains(id)) {
       pointer_ids_.insert(id);
       action_type = SyntheticPointerActionParams::PointerActionType::PRESS;
     }
@@ -1818,7 +1830,7 @@ void InputHandler::DispatchSyntheticPointerActionTouch(
           SyntheticPointerActionParams::PointerActionType::MOVE &&
       current_pointer_ids.size() < pointer_ids_.size()) {
     for (auto it = pointer_ids_.begin(); it != pointer_ids_.end();) {
-      if (base::Contains(current_pointer_ids, *it)) {
+      if (current_pointer_ids.contains(*it)) {
         it++;
         continue;
       }
@@ -1957,14 +1969,17 @@ Response InputHandler::EmulateTouchFromMouseEvent(
     event.reset(mouse_event);
   }
 
-  mouse_event->SetPositionInWidget(x, y);
+  if (!host_ || !host_->GetRenderWidgetHost() || !host_->GetView()) {
+    return Response::InternalError();
+  }
+
+  gfx::PointF position_in_widget(x, y);
+  mouse_event->SetPositionInWidget(position_in_widget);
   mouse_event->button = event_button;
-  mouse_event->SetPositionInScreen(x, y);
+  mouse_event->SetPositionInScreen(ConvertWidgetPointToScreenPoint(
+      CHECK_DEREF(host_->GetView()), position_in_widget));
   mouse_event->click_count = click_count.value_or(0);
   mouse_event->pointer_type = blink::WebPointerProperties::PointerType::kTouch;
-
-  if (!host_ || !host_->GetRenderWidgetHost())
-    return Response::InternalError();
 
   base::OnceCallback<void(bool)> forward_event_func;
 
@@ -2138,9 +2153,10 @@ void InputHandler::SynthesizeRepeatingScroll(
 
   if (!interaction_marker_name.empty()) {
     // TODO(alexclarke): Can we move this elsewhere? It doesn't really fit here.
-    TRACE_EVENT_COPY_NESTABLE_ASYNC_BEGIN0(
-        "benchmark", interaction_marker_name.c_str(),
-        TRACE_ID_WITH_SCOPE(interaction_marker_name.c_str(), id));
+    TRACE_EVENT_BEGIN(
+        "benchmark", perfetto::DynamicString(interaction_marker_name),
+        perfetto::NamedTrack(perfetto::DynamicString(interaction_marker_name),
+                             id));
   }
 
   root_view->host()->QueueSyntheticGesture(
@@ -2160,9 +2176,9 @@ void InputHandler::OnScrollFinished(
     std::unique_ptr<SynthesizeScrollGestureCallback> callback,
     SyntheticGesture::Result result) {
   if (!interaction_marker_name.empty()) {
-    TRACE_EVENT_COPY_NESTABLE_ASYNC_END0(
-        "benchmark", interaction_marker_name.c_str(),
-        TRACE_ID_WITH_SCOPE(interaction_marker_name.c_str(), id));
+    TRACE_EVENT_END("benchmark",
+                    perfetto::NamedTrack(
+                        perfetto::DynamicString(interaction_marker_name), id));
   }
 
   if (repeat_count > 0) {

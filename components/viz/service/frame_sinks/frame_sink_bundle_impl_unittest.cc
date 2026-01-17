@@ -39,7 +39,6 @@
 #include "mojo/public/cpp/bindings/remote.h"
 #include "services/viz/public/mojom/compositing/compositor_frame_sink.mojom-params-data.h"
 #include "services/viz/public/mojom/compositing/compositor_frame_sink.mojom.h"
-#include "services/viz/public/mojom/compositing/frame_sink_bundle.mojom-forward.h"
 #include "services/viz/public/mojom/compositing/frame_sink_bundle.mojom.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -112,7 +111,7 @@ struct TestRootFrameSink {
     manager_->CreateRootCompositorFrameSink(std::move(params));
   }
 
-  ~TestRootFrameSink() { manager_->InvalidateFrameSinkId(kRootFrame); }
+  ~TestRootFrameSink() { manager_->InvalidateFrameSinkId(kRootFrame, {}); }
 
   const raw_ref<FrameSinkManagerImpl> manager_;
   mojo::AssociatedRemote<mojom::CompositorFrameSink> compositor_frame_sink;
@@ -247,10 +246,10 @@ class FrameSinkBundleImplTest : public testing::Test {
       std::vector<ResourceId> resource_ids = {}) {
     auto frame = MakeDefaultCompositorFrame(kBeginFrameSourceId);
     for (const auto& id : resource_ids) {
-      TransferableResource resource;
+      TransferableResource resource = TransferableResource::Make(
+          gpu::ClientSharedImage::CreateForTesting(),
+          TransferableResource::ResourceSource::kTest, frame_sync_token_);
       resource.id = id;
-      resource.set_texture_target(GL_TEXTURE_2D);
-      resource.set_sync_token(frame_sync_token_);
       frame.resource_list.push_back(resource);
     }
 

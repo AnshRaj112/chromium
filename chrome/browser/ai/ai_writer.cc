@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ai/ai_writer.h"
 
+#include "base/containers/fixed_flat_set.h"
 #include "base/functional/bind.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
@@ -62,12 +63,10 @@ optimization_guide::proto::WritingAssistanceApiOutputLength ToProtoLength(
 
 }  // namespace
 
-AIWriter::AIWriter(
-    AIContextBoundObjectSet& context_bound_object_set,
-    std::unique_ptr<optimization_guide::OptimizationGuideModelExecutor::Session>
-        session,
-    blink::mojom::AIWriterCreateOptionsPtr options,
-    mojo::PendingReceiver<blink::mojom::AIWriter> receiver)
+AIWriter::AIWriter(AIContextBoundObjectSet& context_bound_object_set,
+                   std::unique_ptr<optimization_guide::OnDeviceSession> session,
+                   blink::mojom::AIWriterCreateOptionsPtr options,
+                   mojo::PendingReceiver<blink::mojom::AIWriter> receiver)
     : AIContextBoundObject(context_bound_object_set),
       session_wrapper_(std::move(session)),
       options_(std::move(options)),
@@ -106,7 +105,7 @@ AIWriter::ToProtoOptions(
 base::flat_set<std::string_view> AIWriter::GetSupportedLanguageBaseCodes() {
   // Comma-separated language codes to enable; or "*" enables all supported.
   const base::FeatureParam<std::string> kAIWriterAPILanguagesEnabled{
-      &blink::features::kAIWriterAPI, "langs", /*default_value=*/"en"};
+      &blink::features::kAIWriterAPI, "langs", /*default=*/"en,es,ja"};
   // TODO(crbug.com/394841624): Get supported languages from the model config.
   auto kSupportedBaseLanguages =
       base::MakeFixedFlatSet<std::string_view>({"en", "ja", "es"});
@@ -180,8 +179,7 @@ void AIWriter::ModelExecutionCallback(
   }
   if (!result.response.has_value()) {
     AIUtils::SendStreamingStatus(
-        responder,
-        AIUtils::ConvertModelExecutionError(result.response.error().error()));
+        responder, AIUtils::ConvertOnDeviceError(result.response.error()));
     return;
   }
 

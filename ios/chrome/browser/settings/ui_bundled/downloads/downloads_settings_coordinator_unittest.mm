@@ -6,8 +6,9 @@
 
 #import "base/apple/foundation_util.h"
 #import "components/signin/public/identity_manager/identity_test_environment.h"
+#import "components/test/ios/test_utils.h"
+#import "ios/chrome/browser/authentication/add_account_signin/coordinator/add_account_signin_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/continuation.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin/add_account_signin/add_account_signin_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator.h"
 #import "ios/chrome/browser/photos/model/photos_service_factory.h"
@@ -20,8 +21,8 @@
 #import "ios/chrome/browser/settings/ui_bundled/downloads/save_to_photos/save_to_photos_settings_mediator.h"
 #import "ios/chrome/browser/shared/model/browser/test/test_browser.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_ios.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/shared/public/commands/show_signin_command.h"
 #import "ios/chrome/browser/signin/model/chrome_account_manager_service_factory.h"
@@ -321,6 +322,7 @@ TEST_F(DownloadsSettingsCoordinatorTest,
                                promoAction:signin_metrics::PromoAction::
                                                PROMO_ACTION_NO_SIGNIN_PROMO
                               signinIntent:AddAccountSigninIntent::kAddAccount
+                            prefilledEmail:nil
                       continuationProvider:DoNothingContinuationProvider()])
       .ignoringNonObjectArgs()
       .andReturn(signin_coordinator_mock);
@@ -331,10 +333,7 @@ TEST_F(DownloadsSettingsCoordinatorTest,
   __block SigninCoordinatorCompletionCallback show_signin_callback = nil;
 
   OCMExpect([signin_coordinator_mock
-      setSigninCompletion:[OCMArg checkWithBlock:^BOOL(id value) {
-        show_signin_callback = value;
-        return YES;
-      }]]);
+      setSigninCompletion:AssignValueToVariable(show_signin_callback)]);
 
   // Call the coordinator through the action delegate protocol and verify the
   // ShowSigninCommand was dispatched.
@@ -352,8 +351,10 @@ TEST_F(DownloadsSettingsCoordinatorTest,
   id<SystemIdentity> added_identity = [FakeSystemIdentity fakeIdentity1];
   ASSERT_TRUE(show_signin_callback);
   OCMExpect([mock_save_to_photos_settings_mediator_
-      setSelectedIdentityGaiaID:added_identity.gaiaID]);
-  show_signin_callback(SigninCoordinatorResultSuccess, added_identity);
+                setSelectedIdentityGaiaID:ios::OCM::AnyPointer<const GaiaId>()])
+      .andCompareObjectAtIndex(added_identity.gaiaId, 0);
+  show_signin_callback(signin_coordinator_mock, SigninCoordinatorResultSuccess,
+                       added_identity);
   EXPECT_OCMOCK_VERIFY(mock_save_to_photos_settings_mediator_);
 
   [coordinator stop];

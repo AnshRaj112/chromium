@@ -8,14 +8,15 @@
 #include "base/files/file_path.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/test/scoped_path_override.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/extensions/extension_browser_test_util.h"
 #include "chrome/browser/extensions/extension_browsertest_platform_delegate.h"
-#include "chrome/browser/extensions/install_verifier.h"
 #include "chrome/browser/extensions/scoped_test_mv2_enabler.h"
 #include "chrome/browser/extensions/updater/extension_updater.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/test/base/platform_browser_test.h"
 #include "extensions/browser/browsertest_util.h"
 #include "extensions/browser/disable_reason.h"
@@ -23,11 +24,14 @@
 #include "extensions/browser/extension_protocols.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_registry_observer.h"
+#include "extensions/browser/install_verifier.h"
 #include "extensions/browser/sandboxed_unpacker.h"
 #include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension_id.h"
 #include "extensions/common/feature_switch.h"
 #include "extensions/common/features/feature_channel.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 class OwningTestTabModel;
 class Profile;
@@ -212,7 +216,11 @@ class ExtensionBrowserTest : public PlatformBrowserTest,
   // default tab's web_contents(). However, if the test creates new tabs and
   // switches the active tab, this will return the WebContents of the new active
   // tab.
-  content::WebContents* GetActiveWebContents() const;
+  content::WebContents* GetActiveWebContents();
+
+  // Returns the WebContents at the specified index, or nullptr if there is
+  // none.
+  content::WebContents* GetWebContentsAt(int index);
 
   // Pack the extension in `dir_path` into a crx file and return its path.
   // Return an empty FilePath if there were errors.
@@ -231,9 +239,17 @@ class ExtensionBrowserTest : public PlatformBrowserTest,
       const base::FilePath& pem_out_path,
       int extra_run_flags = ExtensionCreator::kNoRunFlags);
 
-  // Navigates to a `url` in the active web contents and waits until the
-  // navigation finishes. Returns true on success.
-  [[nodiscard]] bool NavigateToURL(const GURL& url);
+  // Navigates `web_contents` to a `url` in and waits until the load stops.
+  // Returns true on success.
+  [[nodiscard]] bool NavigateToURL(content::WebContents* web_contents,
+                                   const GURL& url);
+
+  // Navigates the active tab in `browser_window` to a `url` in and waits until
+  // the load stops. Returns true on success.
+  // NOTE: Only supported on Win/Mac/Linux/ChromeOS. Intentionally fails on
+  // Android.
+  [[nodiscard]] bool NavigateToURL(BrowserWindowInterface* browser_window,
+                                   const GURL& url);
 
   // Puts the current tab title in |title|. Returns true on success.
   bool GetCurrentTabTitle(std::u16string* title);
@@ -243,6 +259,15 @@ class ExtensionBrowserTest : public PlatformBrowserTest,
   // for `url`.
   content::WebContents* PlatformOpenURLOffTheRecord(Profile* profile,
                                                     const GURL& url);
+
+  // Creates a browser window of `type` using the test's profile from
+  // GetProfile().
+  BrowserWindowInterface* CreateBrowserWindowWithType(
+      BrowserWindowInterface::Type type);
+
+  // Creates a new incognito browser window using the incognito profile owned
+  // by the test's profile from GetProfile().
+  BrowserWindowInterface* CreateIncognitoBrowserWindow();
 
   // Opens `url` in a new tab, blocking until the navigation finishes.
   content::RenderFrameHost* NavigateToURLInNewTab(const GURL& url);
@@ -346,6 +371,11 @@ class ExtensionBrowserTest : public PlatformBrowserTest,
   // WebContents* of the default tab or nullptr if the default tab is destroyed.
   content::WebContents* web_contents();
 
+  // Returns the BrowserWindowInterface for the initially-created browser.
+  // TODO(crbug.com/465157755): Convert callers of NavigateToURL() to use this
+  // method.
+  BrowserWindowInterface* browser_window_interface();
+
   const ExtensionId& last_loaded_extension_id() {
     return last_loaded_extension_id_;
   }
@@ -367,7 +397,9 @@ class ExtensionBrowserTest : public PlatformBrowserTest,
   // HTTP embedded_test_server defined in BrowserTestBase. The new test server
   // can then be retrieved using the same embedded_test_server() method used
   // to get the BrowserTestBase HTTP server.
-  void UseHttpsTestServer();
+  void UseHttpsTestServer(
+      net::EmbeddedTestServer::ServerCertificate server_certificate =
+          net::EmbeddedTestServer::ServerCertificate::CERT_TEST_NAMES);
 
   // This will return either the https test server or the
   // default one specified in BrowserTestBase, depending on if an https test
@@ -423,6 +455,9 @@ class ExtensionBrowserTest : public PlatformBrowserTest,
 #if BUILDFLAG(IS_ANDROID)
   // Tab model used for incognito tab support.
   std::unique_ptr<OwningTestTabModel> incognito_tab_model_;
+
+  // Feature flags overrides are only used on Android.
+  base::test::ScopedFeatureList feature_list_;
 #endif
 
   // Used for setting the default scoped current channel for extension browser

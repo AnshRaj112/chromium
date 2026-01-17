@@ -54,6 +54,10 @@ public class BaseCtaTransitTestRule {
         return mActivityTestRule.getTestServer();
     }
 
+    public Tab getActivityTab() {
+        return mActivityTestRule.getActivityTab();
+    }
+
     // TODO(crbug.com/406324209): Create WebPageStation#getWebContents() and replace these calls.
     public WebContents getWebContents() {
         return mActivityTestRule.getWebContents();
@@ -174,11 +178,6 @@ public class BaseCtaTransitTestRule {
 
     public EmbeddedTestServerRule getEmbeddedTestServerRule() {
         return mActivityTestRule.getEmbeddedTestServerRule();
-    }
-
-    // TODO(crbug.com/406324209): Use OmniboxFacility#typeText().
-    public void typeInOmnibox(String text, boolean oneCharAtATime) throws InterruptedException {
-        mActivityTestRule.typeInOmnibox(text, oneCharAtATime);
     }
 
     /** Pause the Activity going to home screen, then resume it. */

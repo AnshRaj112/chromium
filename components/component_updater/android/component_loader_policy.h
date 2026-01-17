@@ -55,7 +55,7 @@ inline constexpr char kCohortHashCrashKeyName[] =
 // Components should use `AndroidComponentLoaderPolicy` by defining a class that
 // implements the members of `ComponentLoaderPolicy`, and then registering a
 // `AndroidComponentLoaderPolicy` that has been constructed with an instance of
-// that class in an instance of embedded WebView or WebLayer with the Java
+// that class in an instance of embedded WebView with the Java
 // AndroidComponentLoaderPolicy. The `AndroidComponentLoaderPolicy` will fetch
 // the components files from the Android `ComponentsProviderService` and invoke
 // the callbacks defined in this class.
@@ -136,7 +136,7 @@ class AndroidComponentLoaderPolicy {
   void ComponentLoaded(JNIEnv* env,
                        const base::android::JavaRef<jobjectArray>& jfile_names,
                        const base::android::JavaRef<jintArray>& jfds);
-  void ComponentLoadFailed(JNIEnv* env, jint error_code);
+  void ComponentLoadFailed(JNIEnv* env, int32_t error_code);
   base::android::ScopedJavaLocalRef<jstring> GetComponentId(JNIEnv* env);
 
  private:

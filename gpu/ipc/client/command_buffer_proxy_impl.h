@@ -19,7 +19,7 @@
 #include "base/containers/flat_map.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
-#include "base/memory/ref_counted.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/memory/shared_memory_mapping.h"
 #include "base/memory/unsafe_shared_memory_region.h"
 #include "base/memory/weak_ptr.h"
@@ -55,13 +55,12 @@ struct GpuFenceHandle;
 }
 
 namespace gpu {
-struct ContextCreationAttribs;
 struct SyncToken;
 }
 
 namespace gpu {
+class CommandBufferClientMessageFilter;
 class GpuChannelHost;
-class GpuMemoryBufferManager;
 
 // Client side proxy that forwards messages synchronously to a
 // CommandBufferStub.
@@ -82,7 +81,8 @@ class GPU_IPC_CLIENT_EXPORT CommandBufferProxyImpl
   CommandBufferProxyImpl(
       scoped_refptr<GpuChannelHost> channel,
       int32_t stream_id,
-      scoped_refptr<base::SequencedTaskRunner> task_runner,
+      scoped_refptr<base::SequencedTaskRunner> default_task_runner,
+      scoped_refptr<base::SequencedTaskRunner> client_task_runner = nullptr,
       base::SharedMemoryMapper* transfer_buffer_mapper = nullptr);
 
   CommandBufferProxyImpl(const CommandBufferProxyImpl&) = delete;
@@ -90,10 +90,11 @@ class GPU_IPC_CLIENT_EXPORT CommandBufferProxyImpl
 
   ~CommandBufferProxyImpl() override;
 
+  base::WeakPtr<CommandBufferProxyImpl> AsWeakPtr();
+
   // Connect to a command buffer in the GPU process.
-  ContextResult Initialize(CommandBufferProxyImpl* share_group,
-                           gpu::SchedulingPriority stream_priority,
-                           const gpu::ContextCreationAttribs& attribs,
+  ContextResult Initialize(gpu::SchedulingPriority stream_priority,
+                           mojom::ContextCreationAttribsPtr attribs,
                            const GURL& active_url = GURL(),
                            const std::string_view label = "");
 
@@ -178,7 +179,7 @@ class GPU_IPC_CLIENT_EXPORT CommandBufferProxyImpl
 
   // mojom::CommandBufferClient:
   void OnConsoleMessage(const std::string& message) override;
-  void OnGpuSwitched(gl::GpuPreference active_gpu_heuristic) override;
+  void OnGpuSwitched() override;
   void OnDestroyed(gpu::error::ContextLostReason reason,
                    gpu::error::Error error) override;
   void OnReturnData(const std::vector<uint8_t>& data) override;
@@ -268,7 +269,11 @@ class GPU_IPC_CLIENT_EXPORT CommandBufferProxyImpl
   int32_t last_put_offset_ = -1;
   bool has_buffer_ = false;
 
+  scoped_refptr<base::SequencedTaskRunner> default_task_runner_;
   mojo::SharedAssociatedRemote<mojom::CommandBuffer> command_buffer_;
+
+  friend class CommandBufferClientMessageFilter;
+  scoped_refptr<CommandBufferClientMessageFilter> client_filter_;
   mojo::AssociatedReceiver<mojom::CommandBufferClient> client_receiver_{this};
 
   // Last generated fence sync.
@@ -287,8 +292,6 @@ class GPU_IPC_CLIENT_EXPORT CommandBufferProxyImpl
   // Cache pointer to EnsureWorkVisibleDuration custom UMA histogram.
   raw_ptr<base::HistogramBase> uma_histogram_ensure_work_visible_duration_ =
       nullptr;
-
-  scoped_refptr<base::SequencedTaskRunner> callback_thread_;
 
   // Optional shared memory mapper to use when creating transfer buffers.
   // TODO(crbug.com/40837434) remove this member and instead let callers of

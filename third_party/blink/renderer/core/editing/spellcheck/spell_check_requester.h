@@ -26,7 +26,6 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_EDITING_SPELLCHECK_SPELL_CHECK_REQUESTER_H_
 #define THIRD_PARTY_BLINK_RENDERER_CORE_EDITING_SPELLCHECK_SPELL_CHECK_REQUESTER_H_
 
-#include "base/memory/scoped_refptr.h"
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/dom/element.h"
 #include "third_party/blink/renderer/core/dom/range.h"
@@ -37,6 +36,7 @@
 #include "third_party/blink/renderer/platform/wtf/deque.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
 #include "third_party/blink/renderer/platform/wtf/vector.h"
+#include "ui/gfx/range/range.h"
 
 namespace blink {
 
@@ -49,10 +49,17 @@ class CORE_EXPORT SpellCheckRequest final
  public:
   static const int kUnrequestedTextCheckingSequence = -1;
 
-  static SpellCheckRequest* Create(const EphemeralRange& checking_range,
-                                   int request_number);
+  static SpellCheckRequest* Create(
+      const EphemeralRange& checking_range,
+      const std::vector<gfx::Range>& spelling_markers,
+      int request_number,
+      bool should_force_refresh);
 
-  SpellCheckRequest(Range* checking_range, const String&, int request_number);
+  SpellCheckRequest(Range* checking_range,
+                    const String&,
+                    const Vector<gfx::Range>& spelling_markers,
+                    int request_number,
+                    bool should_force_refresh);
   ~SpellCheckRequest();
   void Dispose();
 
@@ -62,6 +69,8 @@ class CORE_EXPORT SpellCheckRequest final
   void SetCheckerAndSequence(SpellCheckRequester*, int sequence);
   int Sequence() const { return sequence_; }
   String GetText() const { return text_; }
+  std::vector<gfx::Range> GetSpellingMarkers();
+  bool ShouldForceRefresh() const { return should_force_refresh_; }
 
   bool IsValid() const;
   void DidSucceed(const Vector<TextCheckingResult>&);
@@ -77,7 +86,9 @@ class CORE_EXPORT SpellCheckRequest final
   Member<Element> root_editable_element_;
   int sequence_ = kUnrequestedTextCheckingSequence;
   String text_;
+  Vector<gfx::Range> spelling_markers_;
   int request_number_;
+  bool should_force_refresh_;
 };
 
 class CORE_EXPORT SpellCheckRequester final
@@ -91,7 +102,10 @@ class CORE_EXPORT SpellCheckRequester final
 
   // Returns true if a request is initiated. Returns false otherwise.
   bool RequestCheckingFor(const EphemeralRange&);
-  bool RequestCheckingFor(const EphemeralRange&, int request_num);
+  bool RequestCheckingFor(const EphemeralRange&,
+                          const std::vector<gfx::Range>& spelling_markers,
+                          int request_num,
+                          bool should_force_refresh);
   void CancelCheck();
 
   int LastRequestSequence() const { return last_request_sequence_; }

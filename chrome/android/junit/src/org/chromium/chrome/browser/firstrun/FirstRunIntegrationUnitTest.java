@@ -14,7 +14,6 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.UserManager;
 
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.test.core.app.ApplicationProvider;
@@ -26,7 +25,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.robolectric.Robolectric;
@@ -71,9 +69,6 @@ public final class FirstRunIntegrationUnitTest {
         mContext = ApplicationProvider.getApplicationContext();
         mShadowApplication = shadowOf((Application) ApplicationProvider.getApplicationContext());
 
-        UserManager userManager = Mockito.mock(UserManager.class);
-        Mockito.when(userManager.isDemoUser()).thenReturn(false);
-        mShadowApplication.setSystemService(Context.USER_SERVICE, userManager);
         ChromeBrowserInitializer.setForTesting(mChromeBrowserInitializer);
 
         FirstRunStatus.setFirstRunFlowComplete(false);
@@ -171,6 +166,8 @@ public final class FirstRunIntegrationUnitTest {
         Assert.assertTrue(tabbedActivity.isFinishing());
     }
 
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void testRedirectSearchActivityToFirstRun() {
         Intent intent = new Intent();
@@ -216,6 +213,8 @@ public final class FirstRunIntegrationUnitTest {
      * Test that if a WebAPK only requires the lightweight FRE and a user has gone through the
      * lightweight FRE that the WebAPK launches and no FRE is shown to the user.
      */
+    // TODO(crbug.com/450954710): This test fails on SDK 36.
+    @Config(sdk = 29)
     @Test
     public void testUserAcceptedLightweightFreLaunch() {
         FirstRunStatus.setLightweightFirstRunFlowComplete(true);

@@ -8,11 +8,13 @@
 
 #include "base/files/file_path.h"
 #include "base/memory/raw_ptr.h"
-#include "chrome/browser/ash/growth/campaigns_manager_client_impl.h"
+#include "base/memory/scoped_refptr.h"
+#include "chrome/browser/ash/growth/campaigns_manager_test_helper.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
 #include "chrome/browser/ash/ownership/fake_owner_settings_service.h"
 #include "chrome/browser/ash/ownership/owner_settings_service_ash.h"
 #include "chrome/browser/ash/ownership/owner_settings_service_ash_factory.h"
+#include "chrome/browser/global_features.h"
 #include "chrome/browser/prefs/browser_prefs.h"
 #include "chrome/test/base/browser_process_platform_part_test_api_chromeos.h"
 #include "chrome/test/base/testing_browser_process.h"
@@ -20,6 +22,7 @@
 #include "chrome/test/base/testing_profile_manager.h"
 #include "chromeos/ash/components/dbus/concierge/concierge_client.h"
 #include "components/component_updater/ash/fake_component_manager_ash.h"
+#include "components/session_manager/core/fake_session_manager_delegate.h"
 #include "components/session_manager/core/session_manager.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "components/user_manager/scoped_user_manager.h"
@@ -39,9 +42,7 @@ class CampaignsManagerSessionTest : public testing::Test {
   CampaignsManagerSessionTest()
       : fake_user_manager_(std::make_unique<ash::FakeChromeUserManager>()),
         profile_manager_(std::make_unique<TestingProfileManager>(
-            TestingBrowserProcess::GetGlobal())),
-        browser_process_platform_part_test_api_(
-            g_browser_process->platform_part()) {}
+            TestingBrowserProcess::GetGlobal())) {}
 
   CampaignsManagerSessionTest(const CampaignsManagerSessionTest&) = delete;
   CampaignsManagerSessionTest& operator=(const CampaignsManagerSessionTest&) =
@@ -52,16 +53,25 @@ class CampaignsManagerSessionTest : public testing::Test {
   void SetUp() override {
     ASSERT_TRUE(profile_manager_->SetUp());
     ash::ConciergeClient::InitializeFake(/*fake_cicerone_client=*/nullptr);
-    InitializeComponentManager();
-    session_manager_ = std::make_unique<session_manager::SessionManager>();
+
+    session_manager_ = std::make_unique<session_manager::SessionManager>(
+        std::make_unique<session_manager::FakeSessionManagerDelegate>());
+
+    component_manager_ash_ =
+        base::MakeRefCounted<component_updater::FakeComponentManagerAsh>();
+    component_manager_ash_->set_queue_load_requests(true);
+    component_manager_ash_->set_supported_components({kCampaignsComponent});
+    test_helper_.InitializeCampaignsManager(component_manager_ash_);
   }
 
   void TearDown() override {
-    ash::ConciergeClient::Shutdown();
-
-    component_manager_ash_ = nullptr;
     owner_settings_service_ash_ = nullptr;
-    browser_process_platform_part_test_api_.ShutdownComponentManager();
+
+    test_helper_.ShutdownCampaignsManager();
+    component_manager_ash_ = nullptr;
+
+    session_manager_.reset();
+    ash::ConciergeClient::Shutdown();
     profile_manager_->DeleteAllTestingProfiles();
   }
 
@@ -75,17 +85,6 @@ class CampaignsManagerSessionTest : public testing::Test {
         component_updater::FakeComponentManagerAsh::ComponentInfo(
             component_updater::ComponentManagerAsh::Error::NONE,
             base::FilePath("/dev/null"), mount_path));
-  }
-
-  void InitializeComponentManager() {
-    auto fake_component_manager_ash =
-        base::MakeRefCounted<component_updater::FakeComponentManagerAsh>();
-    fake_component_manager_ash->set_queue_load_requests(true);
-    fake_component_manager_ash->set_supported_components({kCampaignsComponent});
-    component_manager_ash_ = fake_component_manager_ash.get();
-
-    browser_process_platform_part_test_api_.InitializeComponentManager(
-        std::move(fake_component_manager_ash));
   }
 
   void FlushActiveProfileCallbacks(bool is_owner) {
@@ -119,8 +118,9 @@ class CampaignsManagerSessionTest : public testing::Test {
     return profile;
   }
 
-  raw_ptr<component_updater::FakeComponentManagerAsh> component_manager_ash_ =
-      nullptr;
+  scoped_refptr<component_updater::FakeComponentManagerAsh>
+      component_manager_ash_ = nullptr;
+
   content::BrowserTaskEnvironment task_environment_;
   std::unique_ptr<session_manager::SessionManager> session_manager_;
   user_manager::TypedScopedUserManager<ash::FakeChromeUserManager>
@@ -134,10 +134,10 @@ class CampaignsManagerSessionTest : public testing::Test {
         Profile::FromBrowserContext(context));
   }
 
-  BrowserProcessPlatformPartTestApi browser_process_platform_part_test_api_;
   ash::ScopedCrosSettingsTestHelper scoped_cros_settings_test_helper_;
   raw_ptr<ash::OwnerSettingsServiceAsh> owner_settings_service_ash_;
-  CampaignsManagerClientImpl client_;
+
+  CampaignsManagerTestHelper test_helper_;
 };
 
 TEST_F(CampaignsManagerSessionTest, LoadCampaignsComponent) {

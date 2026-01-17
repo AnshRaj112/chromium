@@ -45,8 +45,17 @@ enum class NudgeDecision {
   kNotEnoughTimeSinceLastNudgeShown = 12,
   // User closes the tab/window as a nudge decision is being computed.
   kNudgeNotShownWindowCallToActionUI = 13,
+  // The page was eligible for the nudge, but the user already has the feature
+  // side panel open in the tab.
+  kNudgeNotShownSidePanelForTabShowing = 14,
+  // The page was eligible for the nudge, but the browser actor is active on the
+  // tab.
+  kNudgeNotShownActorActiveOnTab = 15,
+  // The page was eligible for the nudge, but the contextual tasks side panel is
+  // open for the tab.
+  kNudgeNotShownContextualTasksSidePanelForTabShowing = 16,
   // New values above this line.
-  kMaxValue = kNudgeNotShownWindowCallToActionUI,
+  kMaxValue = kNudgeNotShownContextualTasksSidePanelForTabShowing,
 };
 // LINT.ThenChange(/tools/metrics/histograms/metadata/contextual_cueing/enums.xml:NudgeDecision)
 
@@ -68,8 +77,13 @@ enum class NudgeInteraction {
   // The server sent data, but another call to action was present in the
   // browser.
   kNudgeNotShownWindowCallToActionUI = 7,
+  // The nudge was dismissed by the contextual tasks side panel being opened.
+  kIgnoredOpenedContextualTasksSidePanel = 8,
+  // The nudge was dismissed by an interaction with the context menu in the
+  // omnibox.
+  kIgnoredOmniboxContextMenuInteraction = 9,
   // New values above this line.
-  kMaxValue = kNudgeNotShownWindowCallToActionUI,
+  kMaxValue = kIgnoredOmniboxContextMenuInteraction,
 };
 // LINT.ThenChange(/tools/metrics/histograms/metadata/contextual_cueing/enums.xml:NudgeInteraction)
 

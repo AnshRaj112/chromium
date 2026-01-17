@@ -34,12 +34,12 @@ class EnclaveManager;
 // │ StartChangePin ─────────────────┼─────────────┼───────────┐             │
 // │                                 │             │           │             │
 // │                                 │ Cancelled   │           ▼             │
-// │ OnRecoverSecurityDomainClosed ◄─┼─────────────┼── kGpmReauthForPinReset │
+// │ OnGPMRecoverSecurityDomainClosed ◄────────────┼── kGpmReauthForPinReset │
 // │                                 │             │           │             │
 // │        ┌────────────────────────┼─────────────┼───────────┘             │
 // │        │                        │ Success     │                         │
 // │        ▼                        │             │                         │
-// │ OnReauthComplete ───────────────┼─────────────┼───────────┐             │
+// │ OnGPMReauthComplete ────────────┼─────────────┼───────────┐             │
 // │                                 │             │           │             │
 // │                                 │ Cancelled   │           ▼             │
 // │ CancelAuthenticatorRequest ◄────┼─────────────┼── kGPMChangePin*        │
@@ -91,12 +91,14 @@ class ChangePinControllerImpl
 
   // AuthenticatorRequestDialogModel::Observer
   void CancelAuthenticatorRequest() override;
-  void OnReauthComplete(std::string rapt) override;
-  void OnRecoverSecurityDomainClosed() override;
+  void OnGPMReauthComplete(std::string rapt) override;
+  void OnGPMRecoverSecurityDomainClosed() override;
   void OnGPMPinEntered(const std::u16string& pin) override;
   void OnGPMPinOptionChanged(bool is_arbitrary) override;
 
   static void RecordHistogram(ChangePinEvent event);
+
+  AuthenticatorRequestDialogModel* model_for_testing() { return model_.get(); }
 
  private:
   explicit ChangePinControllerImpl(content::RenderFrameHost* render_frame_host);

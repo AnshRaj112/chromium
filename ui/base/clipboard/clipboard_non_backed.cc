@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
@@ -85,7 +84,7 @@ void UnregisterInstance(const ClipboardNonBacked* clipboard) {
 // ClipboardNonBacked*.
 bool IsRegisteredInstance(const Clipboard* clipboard) {
   base::AutoLock lock(GetInstanceRegistryLock());
-  return base::Contains(*GetInstanceRegistry(), clipboard);
+  return GetInstanceRegistry()->contains(clipboard);
 }
 
 }  // namespace
@@ -961,18 +960,6 @@ void ClipboardNonBacked::WriteBitmap(const SkBitmap& bitmap) {
 void ClipboardNonBacked::WriteData(const ClipboardFormatType& format,
                                    base::span<const uint8_t> data) {
   ClipboardDataBuilder::WriteData(format, data);
-}
-
-void ClipboardNonBacked::WriteClipboardHistory() {
-  // TODO(crbug.com/40945200): Add support for this.
-}
-
-void ClipboardNonBacked::WriteUploadCloudClipboard() {
-  // TODO(crbug.com/40945200): Add support for this.
-}
-
-void ClipboardNonBacked::WriteConfidentialDataForPassword() {
-  // TODO(crbug.com/40945200): Add support for this.
 }
 
 const ClipboardInternal& ClipboardNonBacked::GetInternalClipboard(

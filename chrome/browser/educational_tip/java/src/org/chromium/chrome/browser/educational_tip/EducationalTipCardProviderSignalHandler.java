@@ -12,12 +12,13 @@ import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.magic_stack.ModuleDelegate.ModuleType;
+import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncFeatures;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
-import org.chromium.chrome.browser.tabmodel.TabGroupModelFilterProvider;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.ui.default_browser_promo.DefaultBrowserPromoUtils;
@@ -73,6 +74,11 @@ public class EducationalTipCardProviderSignalHandler {
                         "is_eligible_to_history_opt_in",
                         ProcessedValue.fromFloat(isEligibleToHistoryOptIn(profile)));
                 return inputContext;
+            case ModuleType.TIPS_NOTIFICATIONS_PROMO:
+                inputContext.addEntry(
+                        "is_eligible_to_tips_opt_in",
+                        ProcessedValue.fromFloat(isEligibleToTipsOptIn()));
+                return inputContext;
             default:
                 assert false : "Card type not supported!";
                 return inputContext;
@@ -101,9 +107,13 @@ public class EducationalTipCardProviderSignalHandler {
      * function returns 0.0f.
      */
     private static float hasDefaultBrowserPromoShownInOtherSurface(Tracker tracker) {
-        return tracker.wouldTriggerHelpUi(FeatureConstants.DEFAULT_BROWSER_PROMO_MAGIC_STACK)
-                ? 0.0f
-                : 1.0f;
+        if (tracker.isInitialized()) {
+            return tracker.wouldTriggerHelpUi(FeatureConstants.DEFAULT_BROWSER_PROMO_MAGIC_STACK)
+                    ? 0.0f
+                    : 1.0f;
+        }
+
+        return DefaultBrowserPromoUtils.hasPromoShownRecently() ? 1.0f : 0.0f;
     }
 
     /**
@@ -111,14 +121,23 @@ public class EducationalTipCardProviderSignalHandler {
      * Otherwise, it returns 0.0f.
      */
     private static float tabGroupExists(EducationTipModuleActionDelegate actionDelegate) {
-        TabGroupModelFilterProvider provider =
-                actionDelegate.getTabModelSelector().getTabGroupModelFilterProvider();
+        TabModelSelector tabModelSelector = actionDelegate.getTabModelSelector();
+        if (!tabModelSelector.isTabStateInitialized()
+                || tabModelSelector.isReparentingInProgress()) {
+            return 0.0f;
+        }
+
+        if (tabModelSelector.getCurrentModel().getTabById(tabModelSelector.getCurrentTabId())
+                == null) {
+            return 0.0f;
+        }
+
         TabGroupModelFilter normalFilter =
-                provider.getTabGroupModelFilter(/* isIncognito= */ false);
+                tabModelSelector.getTabGroupModelFilter(/* isIncognito= */ false);
         assumeNonNull(normalFilter);
 
         TabGroupModelFilter incognitoFilter =
-                provider.getTabGroupModelFilter(/* isIncognito= */ true);
+                tabModelSelector.getTabGroupModelFilter(/* isIncognito= */ true);
         assumeNonNull(incognitoFilter);
 
         int groupCount = normalFilter.getTabGroupCount() + incognitoFilter.getTabGroupCount();
@@ -135,7 +154,7 @@ public class EducationalTipCardProviderSignalHandler {
             return normalModel.getCount() + incognitoModel.getCount();
         }
 
-        return actionDelegate.getTabCountForRelaunchFromSharedPrefs();
+        return actionDelegate.getTabCountForRelaunchFromPersistentStore();
     }
 
     /** Returns a value of 1.0f if a synced tab group exists. Otherwise, it returns 0.0f. */
@@ -160,7 +179,7 @@ public class EducationalTipCardProviderSignalHandler {
         if (assumeNonNull(IdentityServicesProvider.get().getIdentityManager(profile))
                 .hasPrimaryAccount(ConsentLevel.SIGNIN)) {
             HistorySyncHelper helper = HistorySyncHelper.getForProfile(profile);
-            return helper.shouldSuppressHistorySync() || helper.isDeclinedOften() ? 0.0f : 1.0f;
+            return !helper.shouldDisplayHistorySync() || helper.isDeclinedOften() ? 0.0f : 1.0f;
         }
 
         return 0.0f;
@@ -174,5 +193,17 @@ public class EducationalTipCardProviderSignalHandler {
         }
 
         return 0.0f;
+    }
+
+    /**
+     * Returns a value of 1.0f if the notifications channel is enabled (not eligible). Otherwise, it
+     * returns 0.0f.
+     */
+    private static float isEligibleToTipsOptIn() {
+        boolean enabled =
+                ChromeSharedPreferences.getInstance()
+                        .readBoolean(
+                                ChromePreferenceKeys.TIPS_NOTIFICATIONS_CHANNEL_ENABLED, false);
+        return enabled ? 1.0f : 0.0f;
     }
 }

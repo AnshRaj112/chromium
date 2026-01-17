@@ -4,12 +4,13 @@
 
 #include "ash/webui/diagnostics_ui/backend/system/system_routine_controller.h"
 
+#include <algorithm>
+
 #include "ash/system/diagnostics/diagnostics_log_controller.h"
 #include "ash/system/diagnostics/fake_diagnostics_browser_delegate.h"
 #include "ash/system/diagnostics/routine_log.h"
 #include "ash/test/ash_test_base.h"
 #include "ash/webui/diagnostics_ui/mojom/system_routine_controller.mojom.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_file.h"
@@ -27,7 +28,6 @@
 #include "chromeos/ash/services/cros_healthd/public/mojom/cros_healthd_diagnostics.mojom.h"
 #include "content/public/test/browser_task_environment.h"
 #include "mojo/public/cpp/system/platform_handle.h"
-#include "services/data_decoder/public/cpp/test_support/in_process_data_decoder.h"
 #include "services/device/public/cpp/test/test_wake_lock_provider.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -247,7 +247,6 @@ class SystemRoutineControllerTest : public AshTestBase {
   }
 
   base::ScopedTempDir temp_dir_;
-  data_decoder::test::InProcessDataDecoder in_process_data_decoder_;
   std::unique_ptr<device::TestWakeLockProvider> wake_lock_provider_;
 };
 
@@ -574,48 +573,48 @@ TEST_F(SystemRoutineControllerTest, AvailableRoutines) {
   system_routine_controller_->GetSupportedRoutines(base::BindLambdaForTesting(
       [&](const std::vector<mojom::RoutineType>& supported_routines) {
         EXPECT_EQ(17u, supported_routines.size());
-        EXPECT_FALSE(base::Contains(supported_routines,
-                                    mojom::RoutineType::kBatteryCharge));
-        EXPECT_FALSE(base::Contains(supported_routines,
-                                    mojom::RoutineType::kBatteryDischarge));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kCaptivePortal));
-        EXPECT_FALSE(
-            base::Contains(supported_routines, mojom::RoutineType::kCpuCache));
-        EXPECT_FALSE(
-            base::Contains(supported_routines, mojom::RoutineType::kCpuStress));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kCpuFloatingPoint));
-        EXPECT_TRUE(
-            base::Contains(supported_routines, mojom::RoutineType::kCpuPrime));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kDnsLatency));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kDnsResolution));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kDnsResolverPresent));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kGatewayCanBePinged));
-        EXPECT_TRUE(base::Contains(
+        EXPECT_FALSE(std::ranges::contains(supported_routines,
+                                           mojom::RoutineType::kBatteryCharge));
+        EXPECT_FALSE(std::ranges::contains(
+            supported_routines, mojom::RoutineType::kBatteryDischarge));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kCaptivePortal));
+        EXPECT_FALSE(std::ranges::contains(supported_routines,
+                                           mojom::RoutineType::kCpuCache));
+        EXPECT_FALSE(std::ranges::contains(supported_routines,
+                                           mojom::RoutineType::kCpuStress));
+        EXPECT_TRUE(std::ranges::contains(
+            supported_routines, mojom::RoutineType::kCpuFloatingPoint));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kCpuPrime));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kDnsLatency));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kDnsResolution));
+        EXPECT_TRUE(std::ranges::contains(
+            supported_routines, mojom::RoutineType::kDnsResolverPresent));
+        EXPECT_TRUE(std::ranges::contains(
+            supported_routines, mojom::RoutineType::kGatewayCanBePinged));
+        EXPECT_TRUE(std::ranges::contains(
             supported_routines, mojom::RoutineType::kHasSecureWiFiConnection));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kHttpFirewall));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kHttpsFirewall));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kHttpsLatency));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kLanConnectivity));
-        EXPECT_TRUE(
-            base::Contains(supported_routines, mojom::RoutineType::kMemory));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kSignalStrength));
-        EXPECT_TRUE(
-            base::Contains(supported_routines, mojom::RoutineType::kArcHttp));
-        EXPECT_TRUE(
-            base::Contains(supported_routines, mojom::RoutineType::kArcPing));
-        EXPECT_TRUE(base::Contains(supported_routines,
-                                   mojom::RoutineType::kArcDnsResolution));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kHttpFirewall));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kHttpsFirewall));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kHttpsLatency));
+        EXPECT_TRUE(std::ranges::contains(
+            supported_routines, mojom::RoutineType::kLanConnectivity));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kMemory));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kSignalStrength));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kArcHttp));
+        EXPECT_TRUE(std::ranges::contains(supported_routines,
+                                          mojom::RoutineType::kArcPing));
+        EXPECT_TRUE(std::ranges::contains(
+            supported_routines, mojom::RoutineType::kArcDnsResolution));
         run_loop.Quit();
       }));
   run_loop.Run();

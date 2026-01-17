@@ -9,6 +9,7 @@
 #include "base/compiler_specific.h"
 #include "third_party/blink/renderer/core/css/css_syntax_definition.h"
 #include "third_party/blink/renderer/core/css/parser/css_parser_context.h"
+#include "third_party/blink/renderer/core/css/parser/css_parser_local_context.h"
 #include "third_party/blink/renderer/core/css/parser/css_parser_token_stream.h"
 #include "third_party/blink/renderer/core/css/parser/css_tokenizer.h"
 #include "third_party/blink/renderer/core/css/properties/css_parsing_utils.h"
@@ -157,24 +158,28 @@ CSSVariableData::CSSVariableData(PassKey,
       has_root_font_units_(has_root_font_units),
       has_line_height_units_(has_line_height_units),
       has_dashed_functions_(has_dashed_functions) {
+  // SAFETY: This constructor is only reachable from CSSVariableData::Create()
+  // (because it requires a PassKey), which allocates enough memory in
+  // AdditionalBytes to hold the string.
   if (is_8bit_) {
     std::ranges::copy(original_text.Span8(),
-                      UNSAFE_TODO(reinterpret_cast<LChar*>(this + 1)));
+                      UNSAFE_BUFFERS(reinterpret_cast<LChar*>(this + 1)));
   } else {
     std::ranges::copy(original_text.Span16(),
-                      UNSAFE_TODO(reinterpret_cast<UChar*>(this + 1)));
+                      UNSAFE_BUFFERS(reinterpret_cast<UChar*>(this + 1)));
   }
 }
 
 const CSSValue* CSSVariableData::ParseForSyntax(
     const CSSSyntaxDefinition& syntax,
-    SecureContextMode secure_context_mode) const {
+    SecureContextMode secure_context_mode,
+    CSSParserLocalContext& local_context) const {
   DCHECK(!NeedsVariableResolution());
   // TODO(timloh): This probably needs a proper parser context for
   // relative URL resolution.
   return syntax.Parse(OriginalText(),
                       *StrictCSSParserContext(secure_context_mode),
-                      is_animation_tainted_, is_attr_tainted_);
+                      local_context, is_animation_tainted_, is_attr_tainted_);
 }
 
 }  // namespace blink

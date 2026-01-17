@@ -9,14 +9,14 @@
 #include "base/feature_list.h"
 #include "components/optimization_guide/core/delivery/optimization_guide_model_provider.h"
 #include "components/permissions/features.h"
-#include "components/permissions/prediction_service/permissions_aiv3_encoder.h"
+#include "components/permissions/prediction_service/permissions_aiv3_executor.h"
 #include "components/version_info/version_info.h"
 
 namespace permissions {
 
 namespace {
-using ModelInput = PermissionsAiv3Encoder::ModelInput;
-using ModelOutput = PermissionsAiv3Encoder::ModelOutput;
+using ModelInput = PermissionsAiv3Executor::ModelInput;
+using ModelOutput = PermissionsAiv3Executor::ModelOutput;
 
 // This is the timeout for the model execution. If the model execution takes
 // longer than this timeout, the callback will be called with a nullopt result.
@@ -28,7 +28,7 @@ PermissionsAiv3Handler::PermissionsAiv3Handler(
     optimization_guide::OptimizationGuideModelProvider* model_provider,
     optimization_guide::proto::OptimizationTarget optimization_target,
     RequestType request_type,
-    std::unique_ptr<PermissionsAiv3Encoder> model_executor,
+    std::unique_ptr<PermissionsAiv3Executor> model_executor,
     scoped_refptr<base::SequencedTaskRunner> model_executor_task_runner,
     scoped_refptr<base::SequencedTaskRunner> reply_task_runner)
     : ModelHandler<ModelOutput, const ModelInput&>(
@@ -38,6 +38,7 @@ PermissionsAiv3Handler::PermissionsAiv3Handler(
           /*model_inference_timeout=*/std::nullopt,
           optimization_target,
           /*model_metadata=*/std::nullopt,
+          /*model_loading_task_runner=*/nullptr,
           reply_task_runner) {}
 
 PermissionsAiv3Handler::PermissionsAiv3Handler(
@@ -49,7 +50,7 @@ PermissionsAiv3Handler::PermissionsAiv3Handler(
           optimization_target,
           request_type,
           /*model_executor=*/
-          std::make_unique<PermissionsAiv3Encoder>(request_type)) {}
+          std::make_unique<PermissionsAiv3Executor>(request_type)) {}
 
 PermissionsAiv3Handler::~PermissionsAiv3Handler() = default;
 
@@ -70,53 +71,45 @@ void PermissionsAiv3Handler::OnModelUpdated(
 }
 
 void PermissionsAiv3Handler::ExecuteModel(ExecutionCallback callback,
-                                          std::unique_ptr<SkBitmap> snapshot) {
+                                          ModelInput model_input) {
+  DCHECK(!model_input.snapshot.drawsNothing());
   VLOG(1) << "PermissionsAiv3Handler::ExecuteModel";
-  if (snapshot.get()) {
-    VLOG(1) << "[PermissionsAIv3] ExecuteModel: Snapshot exists";
-    base::UmaHistogramBoolean(
-        "Permissions.AIv3.ModelExecutionAlreadyInProgress",
-        is_execution_in_progress_);
-    // If an execution is already in progress, there is no way to cancel it and
-    // we cannot wait until it is done because this will add extra latency, so
-    // we will return an empty response to the callback.
-    if (is_execution_in_progress_) {
-      VLOG(1) << "[PermissionsAIv3] ExecuteModel: Execution already in "
-                 "progress. Returning empty response.";
-      // The callback is no longer valid because a new execution was requested
-      // while the previous one was still in progress.
-      is_callback_valid_ = false;
-      std::move(callback).Run(std::nullopt);
-      return;
-    } else {
-      VLOG(1) << "[PermissionsAIv3] ExecuteModel: Execution not in "
-                 "progress. Starting execution.";
-    }
-    is_execution_in_progress_ = true;
-    is_callback_valid_ = true;
-
-    ModelInput input;
-    input.snapshot = *snapshot;
-    input.metadata = model_metadata_;
-
-    current_callback_ = std::move(callback);
-    ExecutionCallback on_complete_callback =
-        base::BindOnce(&PermissionsAiv3Handler::OnModelExecutionComplete,
-                       weak_factory_.GetWeakPtr());
-
-    ExecuteModelWithInput(std::move(on_complete_callback), input);
-
-    // In parallel with the model execution, we will start a timer that will
-    // call `OnModelExecutionTimeout` with a nullopt result if the model
-    // execution takes longer than the timeout.
-    timeout_timer_.Start(
-        FROM_HERE, kModelExecutionTimeoutSeconds,
-        base::BindOnce(&PermissionsAiv3Handler::OnModelExecutionTimeout,
-                       weak_factory_.GetWeakPtr(), std::nullopt));
-  } else {
-    VLOG(1) << "[PermissionsAIv3] ExecuteModel: Snapshot is empty";
+  base::UmaHistogramBoolean("Permissions.AIv3.ModelExecutionAlreadyInProgress",
+                            is_execution_in_progress_);
+  // If an execution is already in progress, there is no way to cancel it and
+  // we cannot wait until it is done because this will add extra latency, so
+  // we will return an empty response to the callback.
+  if (is_execution_in_progress_) {
+    VLOG(1) << "[PermissionsAIv3] ExecuteModel: Execution already in "
+               "progress. Returning empty response.";
+    // The callback is no longer valid because a new execution was requested
+    // while the previous one was still in progress.
+    is_callback_valid_ = false;
     std::move(callback).Run(std::nullopt);
+    return;
+  } else {
+    VLOG(1) << "[PermissionsAIv3] ExecuteModel: Execution not in "
+               "progress. Starting execution.";
   }
+  is_execution_in_progress_ = true;
+  is_callback_valid_ = true;
+
+  model_input.metadata = model_metadata_;
+
+  current_callback_ = std::move(callback);
+  ExecutionCallback on_complete_callback =
+      base::BindOnce(&PermissionsAiv3Handler::OnModelExecutionComplete,
+                     weak_factory_.GetWeakPtr());
+
+  ExecuteModelWithInput(std::move(on_complete_callback), model_input);
+
+  // In parallel with the model execution, we will start a timer that will
+  // call `OnModelExecutionTimeout` with a nullopt result if the model
+  // execution takes longer than the timeout.
+  timeout_timer_.Start(
+      FROM_HERE, kModelExecutionTimeoutSeconds,
+      base::BindOnce(&PermissionsAiv3Handler::OnModelExecutionTimeout,
+                     weak_factory_.GetWeakPtr(), std::nullopt));
 }
 
 void PermissionsAiv3Handler::OnModelExecutionTimeout(

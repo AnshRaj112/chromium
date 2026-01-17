@@ -692,9 +692,7 @@ String ParkableStringImpl::UnparkInternal() {
   }
 
   TRACE_EVENT("blink", "ParkableStringImpl::Decompress");
-  std::string_view compressed_string_piece(
-      reinterpret_cast<const char*>(metadata_->compressed_->data()),
-      metadata_->compressed_->size() * sizeof(uint8_t));
+  auto compressed_string_piece = base::as_string_view(*metadata_->compressed_);
   String uncompressed;
   base::span<char> chars;
   if (is_8bit()) {
@@ -838,7 +836,7 @@ void ParkableStringImpl::CompressInBackground(
     // This is not using:
     // - malloc() or any STL container: this is discouraged in blink, and there
     //   is a suspected memory regression caused by using it (crbug.com/920194).
-    // - WTF::Vector<> as allocation failures result in an OOM crash, whereas
+    // - Vector<> as allocation failures result in an OOM crash, whereas
     //   we can fail gracefully. See crbug.com/905777 for an example of OOM
     //   triggered from there.
 
@@ -895,7 +893,7 @@ void ParkableStringImpl::CompressInBackground(
     if (ok) {
       compressed = std::make_unique<Vector<uint8_t>>();
       // Not using realloc() as we want the compressed data to be a regular
-      // WTF::Vector.
+      // blink::Vector.
       compressed->AppendSpan(base::as_byte_span(buffer).first(compressed_size));
     }
   }
@@ -977,7 +975,7 @@ void ParkableStringImpl::PostBackgroundWritingTask(
         FROM_HERE, {base::MayBlock()},
         CrossThreadBindOnce(&ParkableStringImpl::WriteToDiskInBackground,
                             std::move(params),
-                            WTF::CrossThreadUnretained(&data_allocator)));
+                            CrossThreadUnretained(&data_allocator)));
   }
 }
 

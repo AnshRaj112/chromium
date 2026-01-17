@@ -4,14 +4,16 @@
 
 #include "components/signin/internal/identity_manager/profile_oauth2_token_service_delegate_chromeos.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
+#include "base/check_deref.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "build/build_config.h"
+#include "chromeos/ash/components/account_manager/account_manager_factory.h"
 #include "components/account_manager_core/account.h"
 #include "components/signin/internal/identity_manager/account_tracker_service.h"
 #include "components/signin/public/base/signin_client.h"
@@ -138,6 +140,23 @@ ProfileOAuth2TokenServiceDelegateChromeOS::
       is_regular_profile_(is_regular_profile),
       weak_factory_(this) {
   network_connection_tracker_->AddNetworkConnectionObserver(this);
+
+  // In production, AccountManagerFactory should always outlive `this`, but in
+  // tests, it may be destroyed before `this` and `account_manager_facade_` may
+  // dangle. So, observe AccountManagerFactory and reset the raw_ptr on its
+  // destruction.
+  // TODO(crbug.com/421058020): Fix tests to properly mimic the production
+  // construction/destruction order, and remove the observer.
+  account_manager_factory_cb_subscription_ =
+      CHECK_DEREF(ash::AccountManagerFactory::Get())
+          .AddOnDestructionCallback(base::BindOnce(
+              [](base::WeakPtr<ProfileOAuth2TokenServiceDelegateChromeOS>
+                     self) {
+                if (self) {
+                  self->account_manager_facade_ = nullptr;
+                }
+              },
+              weak_factory_.GetWeakPtr()));
 }
 
 ProfileOAuth2TokenServiceDelegateChromeOS::
@@ -201,9 +220,9 @@ bool ProfileOAuth2TokenServiceDelegateChromeOS::RefreshTokenIsAvailable(
 
   // We intentionally do NOT check if the refresh token associated with
   // |account_id| is valid or not. See crbug.com/919793 for details.
-  return base::Contains(GetOAuthAccountIdsFromAccountKeys(
-                            account_keys_, account_tracker_service_),
-                        account_id);
+  return std::ranges::contains(GetOAuthAccountIdsFromAccountKeys(
+                                   account_keys_, account_tracker_service_),
+                               account_id);
 }
 
 // Note: This method should use the same logic for filtering accounts as
@@ -479,7 +498,7 @@ void ProfileOAuth2TokenServiceDelegateChromeOS::UpdateAuthError(
   if (!RefreshTokenIsAvailable(account_id)) {
     // Account has been removed.
     DCHECK_EQ(error, GoogleServiceAuthError(
-                         GoogleServiceAuthError::USER_NOT_SIGNED_UP));
+                         GoogleServiceAuthError::ACCOUNT_NOT_FOUND));
     return;
   }
 

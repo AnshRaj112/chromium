@@ -29,6 +29,7 @@
 #include "net/dns/mock_host_resolver.h"
 #include "net/http/http_status_code.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/navigation/preloading_headers.h"
 #include "url/gurl.h"
 #include "url/origin.h"
@@ -282,10 +283,6 @@ SearchPrefetchBaseBrowserTest::HandleSearchRequest(
     return nullptr;
 
   bool is_prefetch =
-      request.headers.find(blink::kPurposeHeaderName) !=
-          request.headers.end() &&
-      request.headers.find(blink::kPurposeHeaderName)->second ==
-          blink::kSecPurposePrefetchHeaderValue &&
       request.headers.find(blink::kSecPurposeHeaderName) !=
           request.headers.end() &&
       request.headers.find(blink::kSecPurposeHeaderName)->second ==
@@ -301,7 +298,7 @@ SearchPrefetchBaseBrowserTest::HandleSearchRequest(
                                     MonitorSearchResourceRequestOnUIThread,
                                 base::Unretained(this), request, is_prefetch));
 
-  if (base::Contains(static_files_, request.relative_url)) {
+  if (static_files_.contains(request.relative_url)) {
     response_headers.emplace_back("content-type",
                                   static_files_[request.relative_url].second);
     return CreateDeferrableResponse(net::HTTP_OK, response_headers,

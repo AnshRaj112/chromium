@@ -38,6 +38,7 @@ class SuggestionLayout extends ViewGroup {
     private final @Px int mActionButtonWidthPx;
     private final @Px int mContentPaddingPx;
     private final @Px int mMinimumContentPadding;
+    private final @Px int mSuggestionEndPaddingNoActionButtonPx;
     private boolean mUseLargeDecoration;
     private boolean mShowDecoration;
 
@@ -169,7 +170,10 @@ class SuggestionLayout extends ViewGroup {
         mContentHeightPx = res.getDimensionPixelSize(R.dimen.omnibox_suggestion_content_height);
 
         mContentPaddingPx = res.getDimensionPixelSize(R.dimen.omnibox_suggestion_content_padding);
-        mMinimumContentPadding = res.getDimensionPixelSize(R.dimen.omnibox_simple_card_leadin);
+        mMinimumContentPadding = res.getDimensionPixelSize(R.dimen.omnibox_simple_card_lead_in);
+
+        mSuggestionEndPaddingNoActionButtonPx =
+                res.getDimensionPixelSize(R.dimen.omnibox_suggestion_end_padding_no_action_button);
 
         mOutlineProvider =
                 new RoundedCornerOutlineProvider(
@@ -331,6 +335,7 @@ class SuggestionLayout extends ViewGroup {
         // Reserve space for the decoration view if it's present. Otherwise, ensure a minimal
         // padding.
         var contentWidthPx = suggestionWidthPx - getContentStart();
+        int additionalPaddingEnd = mSuggestionEndPaddingNoActionButtonPx;
 
         // Measure all other views surrounding the CONTENT area. Currently these are only
         // ACTION_BUTTONs.
@@ -341,9 +346,10 @@ class SuggestionLayout extends ViewGroup {
             var params = (LayoutParams) view.getLayoutParams();
             if (params.getViewType() == LayoutParams.SuggestionViewType.ACTION_BUTTON) {
                 contentWidthPx -= mActionButtonWidthPx;
+                additionalPaddingEnd = 0;
             }
         }
-        return contentWidthPx;
+        return contentWidthPx - additionalPaddingEnd;
     }
 
     /**

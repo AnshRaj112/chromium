@@ -10,7 +10,7 @@
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "components/dom_distiller/core/android/jni_headers/DistilledPagePrefs_jni.h"
 
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 
 namespace dom_distiller {
 
@@ -25,39 +25,44 @@ DistilledPagePrefsAndroid::DistilledPagePrefsAndroid(
 DistilledPagePrefsAndroid::~DistilledPagePrefsAndroid() = default;
 
 void DistilledPagePrefsAndroid::SetFontFamily(JNIEnv* env,
-                                              jint font_family) {
+                                              int32_t font_family) {
   distilled_page_prefs_->SetFontFamily(
       static_cast<mojom::FontFamily>(font_family));
 }
 
-jint DistilledPagePrefsAndroid::GetFontFamily(JNIEnv* env) {
+int32_t DistilledPagePrefsAndroid::GetFontFamily(JNIEnv* env) {
   return (int)distilled_page_prefs_->GetFontFamily();
 }
 
-void DistilledPagePrefsAndroid::SetUserPrefTheme(JNIEnv* env, jint theme) {
+void DistilledPagePrefsAndroid::SetUserPrefTheme(JNIEnv* env, int32_t theme) {
   distilled_page_prefs_->SetUserPrefTheme(static_cast<mojom::Theme>(theme));
 }
 
-void DistilledPagePrefsAndroid::SetDefaultTheme(JNIEnv* env, jint theme) {
+void DistilledPagePrefsAndroid::SetDefaultTheme(JNIEnv* env, int32_t theme) {
   distilled_page_prefs_->SetDefaultTheme(static_cast<mojom::Theme>(theme));
 }
 
-jint DistilledPagePrefsAndroid::GetTheme(JNIEnv* env) {
+int32_t DistilledPagePrefsAndroid::GetTheme(JNIEnv* env) {
   return (int)distilled_page_prefs_->GetTheme();
 }
 
-void DistilledPagePrefsAndroid::SetFontScaling(JNIEnv* env,
-                                               jfloat scaling) {
-  distilled_page_prefs_->SetFontScaling(static_cast<float>(scaling));
+void DistilledPagePrefsAndroid::SetUserPrefFontScaling(JNIEnv* env,
+                                                       jfloat scaling) {
+  distilled_page_prefs_->SetUserPrefFontScaling(static_cast<float>(scaling));
+}
+
+void DistilledPagePrefsAndroid::SetDefaultFontScaling(JNIEnv* env,
+                                                      jfloat scaling) {
+  distilled_page_prefs_->SetDefaultFontScaling(static_cast<float>(scaling));
 }
 
 jfloat DistilledPagePrefsAndroid::GetFontScaling(JNIEnv* env) {
   return distilled_page_prefs_->GetFontScaling();
 }
 
-jlong JNI_DistilledPagePrefs_Init(JNIEnv* env,
-                                  const JavaParamRef<jobject>& obj,
-                                  jlong distilled_page_prefs_ptr) {
+static jlong JNI_DistilledPagePrefs_Init(JNIEnv* env,
+                                         const JavaRef<jobject>& obj,
+                                         jlong distilled_page_prefs_ptr) {
   DistilledPagePrefs* distilled_page_prefs =
       reinterpret_cast<DistilledPagePrefs*>(distilled_page_prefs_ptr);
   DistilledPagePrefsAndroid* distilled_page_prefs_android =
@@ -99,7 +104,9 @@ void DistilledPagePrefsObserverAndroid::OnChangeFontFamily(
       env, java_ref_, (int)new_font_family);
 }
 
-void DistilledPagePrefsObserverAndroid::OnChangeTheme(mojom::Theme new_theme) {
+void DistilledPagePrefsObserverAndroid::OnChangeTheme(
+    mojom::Theme new_theme,
+    ThemeSettingsUpdateSource source) {
   JNIEnv* env = jni_zero::AttachCurrentThread();
   Java_DistilledPagePrefsObserverWrapper_onChangeTheme(env, java_ref_,
                                                        (int)new_theme);
@@ -111,9 +118,9 @@ void DistilledPagePrefsObserverAndroid::OnChangeFontScaling(float scaling) {
                                                              scaling);
 }
 
-jlong JNI_DistilledPagePrefs_InitObserverAndroid(
+static jlong JNI_DistilledPagePrefs_InitObserverAndroid(
     JNIEnv* env,
-    const JavaParamRef<jobject>& obj) {
+    const JavaRef<jobject>& obj) {
   DistilledPagePrefsObserverAndroid* observer_android =
       new DistilledPagePrefsObserverAndroid(env, obj);
   return reinterpret_cast<intptr_t>(observer_android);
@@ -122,3 +129,5 @@ jlong JNI_DistilledPagePrefs_InitObserverAndroid(
 }  // namespace android
 
 }  // namespace dom_distiller
+
+DEFINE_JNI(DistilledPagePrefs)

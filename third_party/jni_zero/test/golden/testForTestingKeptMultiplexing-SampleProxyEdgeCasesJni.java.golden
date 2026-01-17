@@ -4,6 +4,7 @@
 package org.jni_zero;
 
 import java.util.Map;
+import javax.annotation.processing.Generated;
 import org.jni_zero.CheckDiscard;
 import org.jni_zero.GEN_JNI;
 import org.jni_zero.JniTestInstanceHolder;
@@ -14,6 +15,7 @@ import org.jni_zero.internal.NullUnmarked;
 import org.jni_zero.internal.Nullable;
 
 @CheckDiscard("crbug.com/993421")
+@Generated("JNI Zero")
 @NullUnmarked
 class SampleProxyEdgeCasesJni implements SampleProxyEdgeCases.Natives {
   private static @Nullable JniTestInstanceHolder sOverride;
@@ -50,21 +52,6 @@ class SampleProxyEdgeCasesJni implements SampleProxyEdgeCases.Natives {
   }
 
   @Override
-  public void fooForTest() {
-    GEN_JNI.org_jni_1zero_SampleProxyEdgeCases_fooForTest();
-  }
-
-  @Override
-  public void fooForTesting() {
-    GEN_JNI.org_jni_1zero_SampleProxyEdgeCases_fooForTesting();
-  }
-
-  @Override
-  public void fooForTests() {
-    GEN_JNI.org_jni_1zero_SampleProxyEdgeCases_fooForTests();
-  }
-
-  @Override
   public void foo__weirdly__escaped_name1() {
     GEN_JNI.org_jni_1zero_SampleProxyEdgeCases_foo__weirdly__escaped_name1();
   }
@@ -87,5 +74,20 @@ class SampleProxyEdgeCasesJni implements SampleProxyEdgeCases.Natives {
   @Override
   public int setStringBuilder(int sb) {
     return (int) GEN_JNI.org_jni_1zero_SampleProxyEdgeCases_setStringBuilder(sb);
+  }
+
+  @Override
+  public void fooForTest() {
+    GEN_JNI.org_jni_1zero_SampleProxyEdgeCases_fooForTest();
+  }
+
+  @Override
+  public void fooForTesting() {
+    GEN_JNI.org_jni_1zero_SampleProxyEdgeCases_fooForTesting();
+  }
+
+  @Override
+  public void fooForTests() {
+    GEN_JNI.org_jni_1zero_SampleProxyEdgeCases_fooForTests();
   }
 }

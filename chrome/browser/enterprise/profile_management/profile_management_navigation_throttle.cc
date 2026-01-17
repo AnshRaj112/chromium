@@ -8,7 +8,6 @@
 #include <string>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/feature_list.h"
 #include "base/json/json_reader.h"
@@ -78,7 +77,8 @@ base::flat_map<std::string, SAMLProfileAttributes>& GetAttributeMap() {
   }
 
   std::optional<base::Value> switch_value = base::JSONReader::Read(
-      command_line.GetSwitchValueASCII(switches::kProfileManagementAttributes));
+      command_line.GetSwitchValueASCII(switches::kProfileManagementAttributes),
+      base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!switch_value || !switch_value->is_dict()) {
     VLOG(1) << "[Profile management] Failed to parse attributes JSON.";
     return *profile_attributes;
@@ -192,8 +192,7 @@ ProfileManagementNavigationThrottle::~ProfileManagementNavigationThrottle() =
 
 content::NavigationThrottle::ThrottleCheckResult
 ProfileManagementNavigationThrottle::WillProcessResponse() {
-  if (!base::Contains(GetAttributeMap(),
-                      navigation_handle()->GetURL().host())) {
+  if (!GetAttributeMap().contains(navigation_handle()->GetURL().GetHost())) {
     return PROCEED;
   }
 
@@ -223,7 +222,7 @@ void ProfileManagementNavigationThrottle::OnResponseBodyReady(
   // TODO(crbug.com/40267996): As a fallback, check more attributes that may
   // contain the user's email address.
   const auto profile_attributes =
-      GetAttributeMap().at(navigation_handle()->GetURL().host());
+      GetAttributeMap().at(navigation_handle()->GetURL().GetHost());
   saml_response_parser_ = std::make_unique<SAMLResponseParser>(
       std::vector<std::string>{profile_attributes.name,
                                profile_attributes.domain,
@@ -236,12 +235,12 @@ void ProfileManagementNavigationThrottle::OnResponseBodyReady(
 
 void ProfileManagementNavigationThrottle::OnManagementDataReceived(
     const base::flat_map<std::string, std::string>& attributes) {
-  const std::string navigation_host = navigation_handle()->GetURL().host();
-  DCHECK(base::Contains(GetAttributeMap(), navigation_host));
+  const std::string navigation_host = navigation_handle()->GetURL().GetHost();
+  DCHECK(GetAttributeMap().contains(navigation_host));
   const auto profile_attributes = GetAttributeMap().at(navigation_host);
 
   if (base::FeatureList::IsEnabled(features::kThirdPartyProfileManagement) &&
-      base::Contains(attributes, profile_attributes.domain)) {
+      attributes.contains(profile_attributes.domain)) {
     RegisterWithDomain(attributes.at(profile_attributes.domain));
     // DO NOT ADD CODE AFTER THIS, as the NavigationThrottle might have been
     // deleted by the previous call.
@@ -251,8 +250,8 @@ void ProfileManagementNavigationThrottle::OnManagementDataReceived(
   // If the third-party domain-based profile management feature is disabled, or
   // no domain is found in the response, fall back to token-based management.
   if (base::FeatureList::IsEnabled(features::kEnableProfileTokenManagement) &&
-      base::Contains(attributes, profile_attributes.token)) {
-    RegisterWithToken(base::Contains(attributes, profile_attributes.name)
+      attributes.contains(profile_attributes.token)) {
+    RegisterWithToken(attributes.contains(profile_attributes.name)
                           ? attributes.at(profile_attributes.name)
                           : std::string(),
                       attributes.at(profile_attributes.token));

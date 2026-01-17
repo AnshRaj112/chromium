@@ -8,7 +8,6 @@
 #include <memory>
 
 #include "base/memory/scoped_refptr.h"
-#include "base/task/single_thread_task_runner.h"
 #include "base/unguessable_token.h"
 #include "third_party/blink/public/mojom/loader/pause_subresource_loading_handle.mojom-blink.h"
 #include "third_party/blink/public/platform/task_type.h"
@@ -16,6 +15,10 @@
 #include "third_party/blink/renderer/platform/scheduler/public/frame_or_worker_scheduler.h"
 #include "third_party/blink/renderer/platform/wtf/hash_set.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
+
+namespace base {
+class SingleThreadTaskRunner;
+}
 
 namespace blink {
 
@@ -158,10 +161,7 @@ class FrameScheduler : public FrameOrWorkerScheduler {
 
   // Tells the scheduler that the first meaningful paint has occurred for this
   // frame.
-  virtual void OnFirstMeaningfulPaint(base::TimeTicks timestamp) = 0;
-
-  // Tells the scheduler that the load event has been dispatched for this frame.
-  virtual void OnDispatchLoadEvent() = 0;
+  virtual void OnFirstMeaningfulPaint() = 0;
 
   // Tells the scheduler that a new document has been installed for this frame.
   virtual void OnDidInstallNewDocument() = 0;
@@ -182,7 +182,7 @@ class FrameScheduler : public FrameOrWorkerScheduler {
 
   // Returns the list of active features which currently tracked by the
   // scheduler for back-forward cache metrics.
-  virtual WTF::HashSet<SchedulingPolicy::Feature>
+  virtual HashSet<SchedulingPolicy::Feature>
   GetActiveFeaturesTrackedForBackForwardCacheMetrics() = 0;
 
   // TODO(altimin): Move FrameScheduler object to oilpan.

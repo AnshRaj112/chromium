@@ -80,7 +80,6 @@ enum ExternalLaunch {
 
 // The different stages of the first run experience. This is mapped to the
 // FirstRunStageResult enum in enums.xml for metrics.
-// TODO(crbug.com/40755663): Add welcome stage and record metrics.
 enum FirstRunStage {
   // The first run experience has started.
   kStart = 0,
@@ -142,9 +141,15 @@ enum FirstRunStage {
   kBestFeaturesExperienceCompletionThroughMainScreen = 26,
   // The Best Features screens are completed by exiting through a detail screen.
   kBestFeaturesExperienceCompletionThroughDetailScreen = 27,
+  // Interactive Lens screen shown.
+  kInteractiveLensStart = 28,
+  // Interactive Lens screen completed after interaction with Lens.
+  kInteractiveLensCompletionWithInteraction = 29,
+  // Interactive Lens screen completed without interaction with Lens.
+  kInteractiveLensCompletionWithoutInteraction = 30,
   // Max value of the first run experience stages.
   // kMaxValue should share the value of the highest enumerator.
-  kMaxValue = kBestFeaturesExperienceCompletionThroughDetailScreen,
+  kMaxValue = kInteractiveLensCompletionWithoutInteraction,
 };
 
 }  // namespace first_run

@@ -8,7 +8,6 @@
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/run_loop.h"
 #include "components/crx_file/id_util.h"
 #include "components/policy/core/common/configuration_policy_provider.h"
@@ -110,6 +109,14 @@ void ExtensionManagementPrefUpdaterBase::SetIndividualExtensionAutoInstalled(
       make_path(id, schema::kInstallationMode),
       forced ? schema::kForceInstalled : schema::kNormalInstalled);
   pref_.SetByDottedPath(make_path(id, schema::kUpdateUrl), update_url);
+}
+
+void ExtensionManagementPrefUpdaterBase::SetIndividualExtensionRemoved(
+    const ExtensionId& id) {
+  DCHECK(crx_file::id_util::IdIsValid(id));
+  pref_.SetByDottedPath(make_path(id, schema::kInstallationMode),
+                        schema::kRemoved);
+  RemoveDictionaryPath(pref_, make_path(id, schema::kUpdateUrl));
 }
 
 // Helper functions for 'install_sources' manipulation -------------------------
@@ -319,7 +326,7 @@ void ExtensionManagementPrefUpdaterBase::AddStringToList(
     list_value_weak =
         &pref_.SetByDottedPath(path, base::Value::List())->GetList();
   }
-  CHECK(!base::Contains(*list_value_weak, base::Value(str)));
+  CHECK(!list_value_weak->contains(str));
   list_value_weak->Append(str);
 }
 

@@ -4,7 +4,6 @@
 
 #include "content/browser/devtools/worker_devtools_manager.h"
 
-#include "base/containers/contains.h"
 #include "base/metrics/histogram_functions.h"
 #include "content/browser/devtools/dedicated_worker_devtools_agent_host.h"
 #include "content/browser/devtools/devtools_instrumentation.h"
@@ -50,7 +49,7 @@ void WorkerDevToolsManager::WorkerCreated(
     const GlobalRenderFrameHostId& ancestor_render_frame_host_id,
     scoped_refptr<DevToolsThrottleHandle> throttle_handle) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  DCHECK(!base::Contains(hosts_, host));
+  DCHECK(!hosts_.contains(host));
 
   hosts_[host] = base::MakeRefCounted<DedicatedWorkerDevToolsAgentHost>(
       process_id,
@@ -69,11 +68,12 @@ void WorkerDevToolsManager::WorkerDestroyed(const DedicatedWorkerHost* host) {
   // connection to the DedicatedWorkerDevToolsAgentHost we need to
   // explicitly run disconnect.
   // Generally, the host should be there except for unit tests.
-  if (!hosts_.contains(host)) {
+  auto it = hosts_.find(host);
+  if (it == hosts_.end()) {
     return;
   }
-  hosts_[host]->DisconnectIfNotCreated();
-  hosts_.erase(host);
+  it->second->DisconnectIfNotCreated();
+  hosts_.erase(it);
 }
 
 void WorkerDevToolsManager::AddAllAgentHosts(DevToolsAgentHost::List* result) {

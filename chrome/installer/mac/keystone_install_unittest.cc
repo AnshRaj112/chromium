@@ -4,6 +4,7 @@
 
 #include <poll.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <string>
 
@@ -19,6 +20,8 @@
 #include "base/process/launch.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
+#include "base/time/time.h"
+#include "chrome/installer/mac/install_test_util.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace {
@@ -83,65 +86,21 @@ class KeystoneInstallTest : public testing::Test {
             base::FILE_PERMISSION_EXECUTE_BY_USER));
   }
 
+  void TearDown() override {
+    base::DeleteFile(base::FilePath(getenv("HOME"))
+                         .AppendUTF8("Library")
+                         .AppendUTF8("Google")
+                         .AppendUTF8("Google Chrome Brand"));
+  }
+
   // There is no simple API in base/launch.h for providing environment
   // variables and capturing all of stdout, stderr, and the exit code.
   void RunExecutable(const base::CommandLine& cmd,
                      const base::EnvironmentMap& env,
                      std::string* output,
                      int* exit_code) {
-    base::ScopedFD read_fd, write_fd;
-    {
-      int pipefds[2] = {};
-      ASSERT_EQ(pipe(pipefds), 0);
-      read_fd.reset(pipefds[0]);
-      write_fd.reset(pipefds[1]);
-    }
-
-    base::LaunchOptions options;
-    options.fds_to_remap.emplace_back(write_fd.get(), STDOUT_FILENO);
-    options.fds_to_remap.emplace_back(write_fd.get(), STDERR_FILENO);
-    options.current_directory = mount_dir_;
-    options.clear_environment = true;
-    options.environment = env;
-    const base::Process proc = base::LaunchProcess(cmd, options);
-    ASSERT_TRUE(proc.IsValid());
-    write_fd.reset();
-
-    base::Time deadline = base::Time::Now() + base::Seconds(60);
-
-    static constexpr size_t kBufferSize = 1024;
-    base::CheckedNumeric<size_t> total_bytes_read = 0;
-    ssize_t read_this_pass = 0;
-    do {
-      struct pollfd fds[1] = {{.fd = read_fd.get(), .events = POLLIN}};
-      int timeout_remaining_ms =
-          static_cast<int>((deadline - base::Time::Now()).InMilliseconds());
-      if (timeout_remaining_ms < 0 || poll(fds, 1, timeout_remaining_ms) != 1) {
-        break;
-      }
-      base::CheckedNumeric<size_t> new_size =
-          base::CheckedNumeric<size_t>(output->size()) +
-          base::CheckedNumeric<size_t>(kBufferSize);
-      if (!new_size.IsValid() || !total_bytes_read.IsValid()) {
-        // Ignore the rest of the output.
-        break;
-      }
-      output->resize(new_size.ValueOrDie());
-      read_this_pass = HANDLE_EINTR(
-          read(read_fd.get(), &(*output)[total_bytes_read.ValueOrDie()],
-               kBufferSize));
-      if (read_this_pass >= 0) {
-        total_bytes_read += base::CheckedNumeric<size_t>(read_this_pass);
-        if (!total_bytes_read.IsValid()) {
-          // Ignore the rest of the output.
-          break;
-        }
-        output->resize(total_bytes_read.ValueOrDie());
-      }
-    } while (read_this_pass > 0);
-
-    ASSERT_TRUE(proc.WaitForExitWithTimeout(
-        std::max(deadline - base::Time::Now(), base::TimeDelta()), exit_code));
+    installer::mac::test::AssertExecutableCompletes(
+        cmd, env, mount_dir_, base::Seconds(60), output, exit_code);
   }
 
   void RunInstallScript(int exit_code) {
@@ -261,9 +220,9 @@ TEST_F(KeystoneInstallTest, CBCMBrandSubstitution) {
   ASSERT_NO_FATAL_FAILURE(RunInstallScript(0));
   ASSERT_EQ(ReadLibraryBrand(), "GCCA\n");
 
-  ASSERT_NO_FATAL_FAILURE(SetLibraryBrand("FPAF"));
+  ASSERT_NO_FATAL_FAILURE(SetLibraryBrand("FPAZ"));
   ASSERT_NO_FATAL_FAILURE(RunInstallScript(0));
-  ASSERT_EQ(ReadLibraryBrand(), "FPJF\n");
+  ASSERT_EQ(ReadLibraryBrand(), "FPJZ\n");
 }
 
 TEST_F(KeystoneInstallTest, CBCMReverseBrandSubstitution) {
@@ -273,9 +232,9 @@ TEST_F(KeystoneInstallTest, CBCMReverseBrandSubstitution) {
   ASSERT_NO_FATAL_FAILURE(RunInstallScript(0));
   ASSERT_EQ(ReadLibraryBrand(), "GCEA\n");
 
-  ASSERT_NO_FATAL_FAILURE(SetLibraryBrand("FPJF"));
+  ASSERT_NO_FATAL_FAILURE(SetLibraryBrand("FPJZ"));
   ASSERT_NO_FATAL_FAILURE(RunInstallScript(0));
-  ASSERT_EQ(ReadLibraryBrand(), "FPAF\n");
+  ASSERT_EQ(ReadLibraryBrand(), "FPAZ\n");
 }
 
 TEST_F(KeystoneInstallTest, CBCMBrandSubstitutionNoOpUnenrolled) {
@@ -285,9 +244,9 @@ TEST_F(KeystoneInstallTest, CBCMBrandSubstitutionNoOpUnenrolled) {
   ASSERT_NO_FATAL_FAILURE(RunInstallScript(0));
   ASSERT_EQ(ReadLibraryBrand(), "GCEA\n");
 
-  ASSERT_NO_FATAL_FAILURE(SetLibraryBrand("FPAF"));
+  ASSERT_NO_FATAL_FAILURE(SetLibraryBrand("FPAZ"));
   ASSERT_NO_FATAL_FAILURE(RunInstallScript(0));
-  ASSERT_EQ(ReadLibraryBrand(), "FPAF\n");
+  ASSERT_EQ(ReadLibraryBrand(), "FPAZ\n");
 }
 
 TEST_F(KeystoneInstallTest, CBCMBrandSubstitutionNoOpEnrolled) {
@@ -297,9 +256,9 @@ TEST_F(KeystoneInstallTest, CBCMBrandSubstitutionNoOpEnrolled) {
   ASSERT_NO_FATAL_FAILURE(RunInstallScript(0));
   ASSERT_EQ(ReadLibraryBrand(), "GCCA\n");
 
-  ASSERT_NO_FATAL_FAILURE(SetLibraryBrand("FPJF"));
+  ASSERT_NO_FATAL_FAILURE(SetLibraryBrand("FPJZ"));
   ASSERT_NO_FATAL_FAILURE(RunInstallScript(0));
-  ASSERT_EQ(ReadLibraryBrand(), "FPJF\n");
+  ASSERT_EQ(ReadLibraryBrand(), "FPJZ\n");
 
   ASSERT_NO_FATAL_FAILURE(SetLibraryBrand("GGLS"));
   ASSERT_NO_FATAL_FAILURE(RunInstallScript(0));

@@ -9,6 +9,7 @@ import static org.chromium.build.NullUtil.assumeNonNull;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.text.TextUtils;
+import android.view.KeyEvent;
 
 import org.chromium.base.IntentUtils;
 import org.chromium.build.annotations.NullMarked;
@@ -16,6 +17,7 @@ import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.SnackbarActivity;
 import org.chromium.chrome.browser.back_press.BackPressHelper;
+import org.chromium.chrome.browser.back_press.BackPressHelper.OnKeyDownHandler;
 import org.chromium.chrome.browser.bookmarks.BookmarkManagerCoordinator;
 import org.chromium.chrome.browser.bookmarks.BookmarkManagerOpenerImpl;
 import org.chromium.chrome.browser.bookmarks.BookmarkModel;
@@ -26,9 +28,13 @@ import org.chromium.chrome.browser.bookmarks.BookmarkUiPrefs;
 import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
 import org.chromium.chrome.browser.price_tracking.PriceDropNotificationManagerFactory;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeControllerFactory;
+import org.chromium.chrome.browser.url_constants.UrlConstantResolver;
+import org.chromium.chrome.browser.url_constants.UrlConstantResolverFactory;
 import org.chromium.components.bookmarks.BookmarkId;
 import org.chromium.components.browser_ui.modaldialog.AppModalPresenter;
-import org.chromium.components.embedder_support.util.UrlConstants;
+import org.chromium.ui.base.ActivityWindowAndroid;
+import org.chromium.ui.base.IntentRequestTracker;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modaldialog.ModalDialogManager.ModalDialogType;
 
@@ -45,6 +51,8 @@ public class BookmarkActivity extends SnackbarActivity {
 
     private @Nullable BookmarkManagerCoordinator mBookmarkManagerCoordinator;
     private @Nullable BookmarkOpener mBookmarkOpener;
+    private @Nullable OnKeyDownHandler mOnKeyDownHandler;
+    private @Nullable ActivityWindowAndroid mWindowAndroid;
 
     @Override
     protected void onProfileAvailable(Profile profile) {
@@ -57,6 +65,13 @@ public class BookmarkActivity extends SnackbarActivity {
                         () -> BookmarkModel.getForProfile(profile),
                         /* context= */ this,
                         /* componentName= */ parentComponent);
+        mWindowAndroid =
+                new ActivityWindowAndroid(
+                        this,
+                        /* listenToActivityState= */ true,
+                        IntentRequestTracker.createFromActivity(this),
+                        getInsetObserver(),
+                        /* trackOcclusion= */ true);
         mBookmarkManagerCoordinator =
                 new BookmarkManagerCoordinator(
                         this,
@@ -67,12 +82,27 @@ public class BookmarkActivity extends SnackbarActivity {
                         mBookmarkOpener,
                         new BookmarkManagerOpenerImpl(),
                         PriceDropNotificationManagerFactory.create(profile),
-                        /* edgeToEdgePadAdjusterGenerator= */ null);
+                        /* edgeToEdgePadAdjusterGenerator= */ view ->
+                                EdgeToEdgeControllerFactory.createForViewAndObserveSupplier(
+                                        view, getEdgeToEdgeSupplier()),
+                        /* backPressManager= */ null);
         String url = getIntent().getDataString();
-        if (TextUtils.isEmpty(url)) url = UrlConstants.BOOKMARKS_URL;
+        UrlConstantResolver resolver = UrlConstantResolverFactory.getForProfile(profile);
+        if (TextUtils.isEmpty(url)) url = resolver.getBookmarksPageUrl();
         mBookmarkManagerCoordinator.updateForUrl(url);
         setContentView(mBookmarkManagerCoordinator.getView());
-        BackPressHelper.create(this, getOnBackPressedDispatcher(), mBookmarkManagerCoordinator);
+        mOnKeyDownHandler =
+                BackPressHelper.create(
+                        this, getOnBackPressedDispatcher(), mBookmarkManagerCoordinator);
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (mOnKeyDownHandler != null && mOnKeyDownHandler.onKeyDown(keyCode, event)) {
+            return true;
+        }
+
+        return super.onKeyDown(keyCode, event);
     }
 
     @Override
@@ -85,6 +115,11 @@ public class BookmarkActivity extends SnackbarActivity {
 
         if (mBookmarkOpener != null) {
             mBookmarkOpener = null;
+        }
+
+        if (mWindowAndroid != null) {
+            mWindowAndroid.destroy();
+            mWindowAndroid = null;
         }
     }
 

@@ -8,15 +8,15 @@ import static org.chromium.build.NullUtil.assumeNonNull;
 
 import org.chromium.base.CallbackController;
 import org.chromium.base.metrics.RecordHistogram;
-import org.chromium.base.supplier.Supplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.lifecycle.DestroyObserver;
 import org.chromium.chrome.browser.lifecycle.PauseResumeWithNativeObserver;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
-import org.chromium.chrome.browser.tabmodel.TabGroupModelFilterProvider;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
+
+import java.util.function.Supplier;
 
 /** Tracks TabGroup usages related statistics. */
 @NullMarked
@@ -75,9 +75,8 @@ public class TabGroupUsageTracker implements PauseResumeWithNativeObserver, Dest
     public void onPauseWithNative() {}
 
     private void recordTabGroupCount() {
-        TabGroupModelFilterProvider provider = mTabModelSelector.getTabGroupModelFilterProvider();
-        TabGroupModelFilter normalFilter = provider.getTabGroupModelFilter(false);
-        TabGroupModelFilter incognitoFilter = provider.getTabGroupModelFilter(true);
+        TabGroupModelFilter normalFilter = mTabModelSelector.getTabGroupModelFilter(false);
+        TabGroupModelFilter incognitoFilter = mTabModelSelector.getTabGroupModelFilter(true);
         assumeNonNull(normalFilter);
         assumeNonNull(incognitoFilter);
         int groupCount = normalFilter.getTabGroupCount() + incognitoFilter.getTabGroupCount();

@@ -12,7 +12,6 @@
 #include "chrome/grit/generated_resources.h"
 #include "services/accessibility/android/android_accessibility_util.h"
 #include "services/accessibility/android/ax_tree_source_android.h"
-#include "ui/accessibility/ax_enums.mojom-shared.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_node.h"
 #include "ui/accessibility/ax_role_properties.h"
@@ -315,7 +314,6 @@ void AccessibilityNodeInfoDataWrapper::PopulateAXRole(
   MAP_ROLE(ui::kAXCheckBoxClassname, ax::mojom::Role::kCheckBox);
   MAP_ROLE(ui::kAXCheckedTextViewClassname, ax::mojom::Role::kStaticText);
   MAP_ROLE(ui::kAXCompoundButtonClassname, ax::mojom::Role::kCheckBox);
-  MAP_ROLE(ui::kAXDialogClassname, ax::mojom::Role::kDialog);
   MAP_ROLE(ui::kAXGridViewClassname, ax::mojom::Role::kTable);
   MAP_ROLE(ui::kAXHorizontalScrollViewClassname, ax::mojom::Role::kScrollView);
   MAP_ROLE(ui::kAXImageClassname, ax::mojom::Role::kImage);

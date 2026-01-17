@@ -11,9 +11,7 @@
 
 #include "base/callback_list.h"
 #include "base/containers/flat_set.h"
-#include "base/feature_list.h"
 #include "base/functional/callback_forward.h"
-#include "base/gtest_prod_util.h"
 #include "base/memory/raw_ptr.h"
 #include "build/build_config.h"
 #include "build/buildflag.h"
@@ -26,6 +24,7 @@
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "extensions/browser/browser_context_keyed_api_factory.h"
 #include "extensions/browser/event_router.h"
+#include "extensions/buildflags/buildflags.h"
 #include "google_apis/gaia/gaia_id.h"
 
 #if BUILDFLAG(IS_ANDROID)
@@ -35,6 +34,8 @@
 #include "chrome/browser/extensions/api/identity/identity_get_auth_token_function.h"
 #include "chrome/browser/extensions/api/identity/identity_remove_cached_auth_token_function.h"
 #endif
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace content {
 class BrowserContext;

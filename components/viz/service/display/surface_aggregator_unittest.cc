@@ -37,6 +37,7 @@
 #include "components/viz/common/quads/surface_draw_quad.h"
 #include "components/viz/common/quads/texture_draw_quad.h"
 #include "components/viz/common/resources/resource_id.h"
+#include "components/viz/common/resources/shared_image_format.h"
 #include "components/viz/common/surfaces/parent_local_surface_id_allocator.h"
 #include "components/viz/common/surfaces/subtree_capture_id.h"
 #include "components/viz/service/display/aggregated_frame.h"
@@ -464,11 +465,16 @@ class SurfaceAggregatorTest : public testing::Test, public DisplayTimeSource {
     auto* quad = pass->CreateAndAppendDrawQuad<TextureDrawQuad>();
     const gfx::PointF kUVTopLeft(0.1f, 0.2f);
     const gfx::PointF kUVBottomRight(1.0f, 1.0f);
+
+    gfx::RectF tex_coord_rect = gfx::BoundingRect(kUVTopLeft, kUVBottomRight);
+    tex_coord_rect.Scale(output_rect.width(), output_rect.height());
+
     quad->SetNew(shared_state, output_rect, output_rect,
-                 false /*needs_blending*/, ResourceId(1), kUVTopLeft,
-                 kUVBottomRight, SkColors::kTransparent,
-                 false /*nearest_neighbor*/, false /*secure_output_only*/,
-                 gfx::ProtectedVideoType::kClear);
+                 false /*needs_blending*/, ResourceId(1),
+                 tex_coord_rect.origin(), tex_coord_rect.bottom_right(),
+                 SkColors::kTransparent, false /*nearest_neighbor*/,
+                 false /*secure_output_only*/, gfx::ProtectedVideoType::kClear,
+                 /*is_tex_coords_normalized=*/false);
 
     if (per_quad_damage_output) {
       quad->damage_rect = output_rect;
@@ -1210,8 +1216,8 @@ class TestVizClient {
   CopyOutputRequest* RequestCopyOfOutput() {
     auto copy_request = CopyOutputRequest::CreateStubForTesting();
     auto* copy_request_ptr = copy_request.get();
-    root_sink_->RequestCopyOfOutput(PendingCopyOutputRequest{
-        local_surface_id(), SubtreeCaptureId(), std::move(copy_request)});
+    root_sink_->RequestCopyOfOutput(std::make_unique<PendingCopyOutputRequest>(
+        local_surface_id(), SubtreeCaptureId(), std::move(copy_request)));
     return copy_request_ptr;
   }
 
@@ -2008,9 +2014,10 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, CopyRequest) {
 
   auto copy_request = CopyOutputRequest::CreateStubForTesting();
   auto* copy_request_ptr = copy_request.get();
-  embedded_support->RequestCopyOfOutput({embedded_surface_id.local_surface_id(),
-                                         SubtreeCaptureId(),
-                                         std::move(copy_request)});
+  embedded_support->RequestCopyOfOutput(
+      std::make_unique<PendingCopyOutputRequest>(
+          embedded_surface_id.local_surface_id(), SubtreeCaptureId(),
+          std::move(copy_request)));
 
   CompositorFrame root_frame =
       CompositorFrameBuilder()
@@ -2065,9 +2072,10 @@ TEST_F(SurfaceAggregatorValidSurfaceTest,
       embedded_surface_id.local_surface_id(), std::move(embedded_frame));
 
   auto copy_request = CopyOutputRequest::CreateStubForTesting();
-  embedded_support->RequestCopyOfOutput({embedded_surface_id.local_surface_id(),
-                                         SubtreeCaptureId(),
-                                         std::move(copy_request)});
+  embedded_support->RequestCopyOfOutput(
+      std::make_unique<PendingCopyOutputRequest>(
+          embedded_surface_id.local_surface_id(), SubtreeCaptureId(),
+          std::move(copy_request)));
 
   CompositorFrame root_frame =
       CompositorFrameBuilder()
@@ -2118,8 +2126,9 @@ TEST_F(SurfaceAggregatorValidSurfaceTest,
 
     auto copy_request = CopyOutputRequest::CreateStubForTesting();
     embedded_support->RequestCopyOfOutput(
-        {embedded_surface_id.local_surface_id(), SubtreeCaptureId(),
-         std::move(copy_request)});
+        std::make_unique<PendingCopyOutputRequest>(
+            embedded_surface_id.local_surface_id(), SubtreeCaptureId(),
+            std::move(copy_request)));
   }
 
   {
@@ -2216,8 +2225,9 @@ TEST_F(SurfaceAggregatorValidSurfaceTest,
 
     auto copy_request = CopyOutputRequest::CreateStubForTesting();
     embedded_support->RequestCopyOfOutput(
-        {embedded_surface_id.local_surface_id(), SubtreeCaptureId(),
-         std::move(copy_request)});
+        std::make_unique<PendingCopyOutputRequest>(
+            embedded_surface_id.local_surface_id(), SubtreeCaptureId(),
+            std::move(copy_request)));
   }
 
   {
@@ -2360,9 +2370,9 @@ TEST_F(SurfaceAggregatorValidSurfaceTest,
 
   auto copy_request = CopyOutputRequest::CreateStubForTesting();
   auto* copy_request_ptr = copy_request.get();
-  root_sink_->RequestCopyOfOutput({root_surface_id_.local_surface_id(),
-                                   SubtreeCaptureId(),
-                                   std::move(copy_request)});
+  root_sink_->RequestCopyOfOutput(std::make_unique<PendingCopyOutputRequest>(
+      root_surface_id_.local_surface_id(), SubtreeCaptureId(),
+      std::move(copy_request)));
 
   aggregator_.set_take_copy_requests(false);
   auto aggregated_frame = AggregateFrame(root_surface_id_);
@@ -2416,8 +2426,9 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, VideoCapturePreventsMerge) {
     auto copy_request = CopyOutputRequest::CreateStubForTesting();
     auto* copy_request_ptr = copy_request.get();
     embedded_support->RequestCopyOfOutput(
-        {embedded_surface_id.local_surface_id(), SubtreeCaptureId(),
-         std::move(copy_request)});
+        std::make_unique<PendingCopyOutputRequest>(
+            embedded_surface_id.local_surface_id(), SubtreeCaptureId(),
+            std::move(copy_request)));
 
     auto aggregated_frame = AggregateFrame(root_surface_id_);
 
@@ -2481,9 +2492,10 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, UnreferencedSurface) {
                         device_scale_factor);
   auto copy_request(CopyOutputRequest::CreateStubForTesting());
   auto* copy_request_ptr = copy_request.get();
-  embedded_support->RequestCopyOfOutput({embedded_surface_id.local_surface_id(),
-                                         SubtreeCaptureId(),
-                                         std::move(copy_request)});
+  embedded_support->RequestCopyOfOutput(
+      std::make_unique<PendingCopyOutputRequest>(
+          embedded_surface_id.local_surface_id(), SubtreeCaptureId(),
+          std::move(copy_request)));
 
   TestSurfaceIdAllocator parent_surface_id(parent_support->frame_sink_id());
 
@@ -5853,21 +5865,26 @@ CompositorFrame BuildCompositorFrameWithResources(
   }
 
   for (ResourceId resource_id : resource_ids) {
-    auto shared_image =
-        shared_image_interface->CreateSharedImageForSoftwareCompositor(
-            {SinglePlaneFormat::kBGRA_8888, gfx::Size(1, 1), gfx::ColorSpace(),
-             gpu::SHARED_IMAGE_USAGE_CPU_WRITE_ONLY,
-             "SurfaceAggregatorWithResourcesTest"});
+    gpu::SharedImageInfo si_info{SinglePlaneFormat::kBGRA_8888, gfx::Size(1, 1),
+                                 gfx::ColorSpace(),
+                                 gpu::SHARED_IMAGE_USAGE_CPU_WRITE_ONLY,
+                                 "SurfaceAggregatorWithResourcesTest"};
+    scoped_refptr<gpu::ClientSharedImage> shared_image;
+    if (valid) {
+      shared_image =
+          shared_image_interface->CreateSharedImageForSoftwareCompositor(
+              si_info);
+    } else {
+      // ResourceProvider is software, so only software resources are valid. Do
+      // this to cause the resource to be rejected.
+      shared_image = shared_image_interface->CreateSharedImage(
+          si_info, gpu::SurfaceHandle());
+    }
     auto resource = TransferableResource::Make(
         shared_image, TransferableResource::ResourceSource::kTileRasterTask,
         shared_image->creation_sync_token());
 
     resource.id = resource_id;
-    if (!valid) {
-      // ResourceProvider is software, so only software resources are valid. Do
-      // this to cause the resource to be rejected.
-      resource.is_software = false;
-    }
     frame.resource_list.push_back(resource);
     auto* quad = pass->CreateAndAppendDrawQuad<TextureDrawQuad>();
     const gfx::Rect rect;
@@ -5882,7 +5899,8 @@ CompositorFrame BuildCompositorFrameWithResources(
         gfx::ProtectedVideoType::kClear;
     quad->SetAll(sqs, rect, visible_rect, needs_blending, resource_id,
                  uv_top_left, uv_bottom_right, background_color,
-                 nearest_neighbor, secure_output_only, protected_video_type);
+                 nearest_neighbor, secure_output_only, protected_video_type,
+                 /*is_tex_coords_normalized=*/false);
   }
   frame.render_pass_list.push_back(std::move(pass));
   return frame;
@@ -5969,11 +5987,12 @@ TEST_F(SurfaceAggregatorWithResourcesTest, TakeInvalidResources) {
   LocalSurfaceId local_surface_id(7u, base::UnguessableToken::Create());
   SurfaceId surface_id(root_sink_->frame_sink_id(), local_surface_id);
 
-  TransferableResource resource;
-  resource.id = ResourceId(11);
   // ResourceProvider is software but resource is not, so it should be
   // ignored.
-  resource.is_software = false;
+  TransferableResource resource = TransferableResource::Make(
+      gpu::ClientSharedImage::CreateForTesting(),
+      TransferableResource::ResourceSource::kTest, gpu::SyncToken());
+  resource.id = ResourceId(11);
 
   CompositorFrame frame = CompositorFrameBuilder()
                               .AddDefaultRenderPass()
@@ -6244,20 +6263,20 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, ColorSpaceTestWin) {
                                         0.5)}}};
 
   gfx::DisplayColorSpaces display_color_spaces(gfx::ColorSpace::CreateSRGB());
-  display_color_spaces.SetOutputColorSpaceAndBufferFormat(
+  display_color_spaces.SetOutputColorSpaceAndFormat(
       gfx::ContentColorUsage::kWideColorGamut, false /* needs_alpha */,
       gfx::ColorSpace(gfx::ColorSpace::PrimaryID::BT2020,
                       gfx::ColorSpace::TransferID::SRGB),
-      gfx::BufferFormat::RGBA_8888);
-  display_color_spaces.SetOutputColorSpaceAndBufferFormat(
+      SinglePlaneFormat::kRGBA_8888);
+  display_color_spaces.SetOutputColorSpaceAndFormat(
       gfx::ContentColorUsage::kWideColorGamut, true /* needs_alpha */,
-      gfx::ColorSpace::CreateSRGBLinear(), gfx::BufferFormat::RGBA_8888);
-  display_color_spaces.SetOutputColorSpaceAndBufferFormat(
+      gfx::ColorSpace::CreateSRGBLinear(), SinglePlaneFormat::kRGBA_8888);
+  display_color_spaces.SetOutputColorSpaceAndFormat(
       gfx::ContentColorUsage::kHDR, false /* needs_alpha */,
-      gfx::ColorSpace::CreateHDR10(), gfx::BufferFormat::BGRA_1010102);
-  display_color_spaces.SetOutputColorSpaceAndBufferFormat(
+      gfx::ColorSpace::CreateHDR10(), SinglePlaneFormat::kBGRA_1010102);
+  display_color_spaces.SetOutputColorSpaceAndFormat(
       gfx::ContentColorUsage::kHDR, true /* needs_alpha */,
-      gfx::ColorSpace::CreateSRGBLinear(), gfx::BufferFormat::RGBA_F16);
+      gfx::ColorSpace::CreateSRGBLinear(), SinglePlaneFormat::kRGBA_F16);
 
   std::vector<Pass> passes = {
       Pass(quads[0], CompositorRenderPassId{2}, kSurfaceSize),
@@ -6346,14 +6365,14 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, ColorSpaceTestWin) {
   // content can be drawn into a BT2020 buffer as 10-10-10-2, but transparent
   // content needs to bump up to 16-bit, and therefore (until we find a way
   // around this) linear color space.
-  display_color_spaces.SetOutputColorSpaceAndBufferFormat(
+  display_color_spaces.SetOutputColorSpaceAndFormat(
       gfx::ContentColorUsage::kHDR, false /* needs_alpha */,
       gfx::ColorSpace(gfx::ColorSpace::PrimaryID::BT2020,
                       gfx::ColorSpace::TransferID::SRGB),
-      gfx::BufferFormat::BGRA_1010102);
-  display_color_spaces.SetOutputColorSpaceAndBufferFormat(
+      SinglePlaneFormat::kBGRA_1010102);
+  display_color_spaces.SetOutputColorSpaceAndFormat(
       gfx::ContentColorUsage::kHDR, true /* needs_alpha */,
-      gfx::ColorSpace::CreateSRGBLinear(), gfx::BufferFormat::RGBA_F16);
+      gfx::ColorSpace::CreateSRGBLinear(), SinglePlaneFormat::kRGBA_F16);
 
   // Opaque content renders to the appropriate space directly.
   passes[1].has_transparent_background = false;
@@ -7845,11 +7864,17 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, PerQuadDamageSameSharedQuadState) {
 
     const gfx::PointF kUVTopLeft(0.1f, 0.2f);
     const gfx::PointF kUVBottomRight(1.0f, 1.0f);
+
+    gfx::RectF tex_coord_rect = gfx::BoundingRect(kUVTopLeft, kUVBottomRight);
+    tex_coord_rect.Scale(quad_rects[i].size().width(),
+                         quad_rects[i].size().height());
+
     texure_quad->SetNew(
         sqs, quad_rects[i], quad_rects[i], false /*needs_blending*/,
-        ResourceId(1), kUVTopLeft, kUVBottomRight, SkColors::kTransparent,
-        false /*nearest_neighbor*/, false /*secure_output_only*/,
-        gfx::ProtectedVideoType::kClear);
+        ResourceId(1), tex_coord_rect.origin(), tex_coord_rect.bottom_right(),
+        SkColors::kTransparent, false /*nearest_neighbor*/,
+        false /*secure_output_only*/, gfx::ProtectedVideoType::kClear,
+        /*is_tex_coords_normalized=*/false);
 
     texure_quad->damage_rect = damage_rects[i];
   }
@@ -9745,9 +9770,9 @@ TEST_F(SurfaceAggregatorValidSurfaceTest,
   // Now add a CopyOutputRequest on the child surface, so that the delegated
   // ink metadata does get populated on the aggregated frame.
   auto copy_request = CopyOutputRequest::CreateStubForTesting();
-  child_sink_->RequestCopyOfOutput({child_surface_id.local_surface_id(),
-                                    SubtreeCaptureId(),
-                                    std::move(copy_request)});
+  child_sink_->RequestCopyOfOutput(std::make_unique<PendingCopyOutputRequest>(
+      child_surface_id.local_surface_id(), SubtreeCaptureId(),
+      std::move(copy_request)));
 
   aggregated_frame = AggregateFrame(root_surface_id_);
 
@@ -10281,8 +10306,13 @@ class OnScreenshotCapturedWaiter : public mojom::FrameSinkManagerClient {
     observed_token_ = destination_token;
     run_loop_.Quit();
   }
+  void OnVizTouchStateAvailable(
+      base::ReadOnlySharedMemoryRegion region) override {}
 
   void Wait() { run_loop_.Run(); }
+
+  void OnViewTransitionResourcesCaptured(
+      const blink::ViewTransitionToken& transition_token) override {}
 
   const blink::SameDocNavigationScreenshotDestinationToken& observed_token() {
     return observed_token_;

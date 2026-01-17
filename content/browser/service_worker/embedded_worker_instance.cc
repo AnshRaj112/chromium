@@ -4,10 +4,10 @@
 
 #include "content/browser/service_worker/embedded_worker_instance.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "base/check_is_test.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -26,6 +26,7 @@
 #include "content/browser/network/cross_origin_embedder_policy_reporter.h"
 #include "content/browser/process_lock.h"
 #include "content/browser/renderer_host/render_process_host_impl.h"
+#include "content/browser/security/dip/document_isolation_policy_reporter.h"
 #include "content/browser/service_worker/service_worker_consts.h"
 #include "content/browser/service_worker/service_worker_content_settings_proxy_impl.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
@@ -44,6 +45,7 @@
 #include "content/public/browser/usb_delegate.h"
 #include "content/public/browser/web_ui_url_loader_factory.h"
 #include "content/public/common/content_client.h"
+#include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/url_constants.h"
 #include "ipc/constants.mojom.h"
@@ -394,7 +396,7 @@ void EmbeddedWorkerInstance::Start(
   //
   // WebUI schemes are process isolated already. To isolate other sites, the
   // embedder can override ContentBrowserClient::ShouldLockProcessToSite().
-  if (rph->GetProcessLock().is_locked_to_site()) {
+  if (rph->GetProcessLock().IsLockedToSite()) {
     GetContentClient()
         ->browser()
         ->UpdateEnabledBlinkRuntimeFeaturesInIsolatedWorker(
@@ -402,7 +404,7 @@ void EmbeddedWorkerInstance::Start(
             params->forced_enabled_runtime_features);
   }
   CHECK(params->forced_enabled_runtime_features.empty() ||
-        rph->GetProcessLock().is_locked_to_site());
+        rph->GetProcessLock().IsLockedToSite());
 
   // TODO(crbug.com/40584626): Support changes to blink::RendererPreferences
   // while the worker is running.
@@ -877,7 +879,7 @@ EmbeddedWorkerInstance::CreateFactoryBundle(
           rph, origin, isolation_info, std::move(coep_reporter),
           std::move(dip_reporter),
           static_cast<StoragePartitionImpl*>(rph->GetStoragePartition())
-              ->CreateURLLoaderNetworkObserverForServiceWorker(
+              ->CreateURLLoaderNetworkObserverForServiceOrSharedWorker(
                   rph->GetDeprecatedID(), origin),
           NetworkServiceDevToolsObserver::MakeSelfOwned(devtools_worker_token),
           std::move(client_security_state),
@@ -943,7 +945,7 @@ EmbeddedWorkerInstance::CreateFactoryBundle(
     // redirects to data: URLs in ServiceWorkerGlobalScope
     // (https://crbug.com/1334249).
     if (scheme != url::kDataScheme &&
-        !base::Contains(GetServiceWorkerSchemes(), scheme)) {
+        !std::ranges::contains(GetServiceWorkerSchemes(), scheme)) {
       continue;
     }
 

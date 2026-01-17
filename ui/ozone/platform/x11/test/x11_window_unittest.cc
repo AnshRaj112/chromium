@@ -7,7 +7,6 @@
 #include <algorithm>
 
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/test/task_environment.h"
@@ -24,7 +23,7 @@
 #include "ui/events/platform/x11/x11_event_source.h"
 #include "ui/events/test/events_test_utils_x11.h"
 #include "ui/gfx/geometry/transform.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/gfx/x/atom_cache.h"
 #include "ui/gfx/x/connection.h"
 #include "ui/gfx/x/xproto.h"
@@ -85,20 +84,21 @@ class TestPlatformWindowDelegate : public PlatformWindowDelegate {
     widget_ = gfx::kNullAcceleratedWidget;
   }
   void OnActivationChanged(bool active) override {}
-  void OnMouseEnter() override {}
+  void OnCursorUpdate() override {}
   SkPath GetWindowMaskForWindowShapeInPixels() override {
-    SkPath window_mask;
     int right = size_px_.width();
     int bottom = size_px_.height();
 
-    window_mask.moveTo(0, 0);
-    window_mask.lineTo(0, bottom);
-    window_mask.lineTo(right, bottom);
-    window_mask.lineTo(right, 10);
-    window_mask.lineTo(right - 10, 10);
-    window_mask.lineTo(right - 10, 0);
-    window_mask.close();
-    return window_mask;
+    return SkPath::Polygon(
+        {
+            SkPoint(0, 0),
+            SkPoint(0, bottom),
+            SkPoint(right, bottom),
+            SkPoint(right, 10),
+            SkPoint(right - 10, 10),
+            SkPoint(right - 10, 0),
+        },
+        /*isClosed=*/true);
   }
 
   void set_window(X11Window* window) { window_ = window; }
@@ -159,7 +159,8 @@ class WMStateWaiter : public X11PropertyChangeWaiter {
     std::vector<x11::Atom> hints;
     if (x11::Connection::Get()->GetArrayProperty(
             xwindow(), x11::GetAtom("_NET_WM_STATE"), &hints)) {
-      return base::Contains(hints, x11::GetAtom(hint_)) != wait_till_set_;
+      return std::ranges::contains(hints, x11::GetAtom(hint_)) !=
+             wait_till_set_;
     }
     return true;
   }

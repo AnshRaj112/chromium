@@ -10,7 +10,7 @@ import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.UserData;
 import org.chromium.base.UserDataHost;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.blink.mojom.DisplayMode;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -19,7 +19,6 @@ import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabObserver;
 import org.chromium.chrome.browser.tab.TabSelectionType;
-import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils;
 import org.chromium.components.browser_ui.display_cutout.DisplayCutoutController;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
@@ -104,7 +103,8 @@ public class DisplayCutoutTabHelper implements UserData {
         }
 
         @Override
-        public @Nullable ObservableSupplier<Integer> getBrowserDisplayCutoutModeSupplier() {
+        public @Nullable MonotonicObservableSupplier<Integer>
+                getBrowserDisplayCutoutModeSupplier() {
             WindowAndroid window = mTab.getWindowAndroid();
             return window == null ? null : ActivityDisplayCutoutModeSupplier.from(window);
         }
@@ -128,7 +128,7 @@ public class DisplayCutoutTabHelper implements UserData {
 
         @Override
         public boolean isDrawEdgeToEdgeEnabled() {
-            return EdgeToEdgeUtils.isChromeEdgeToEdgeFeatureEnabled();
+            return true;
         }
     }
 

@@ -11,10 +11,11 @@
 #include "base/check_deref.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "build/build_config.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/signin/signin_ui_util.h"
 #include "chrome/browser/ui/browser.h"
@@ -28,6 +29,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
 #include "chrome/browser/ui/webui/signin/signin_url_utils.h"
 #include "chrome/browser/ui/webui/signin/signin_utils.h"
+#include "chrome/common/pref_names.h"
 #include "components/prefs/pref_service.h"
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/base/signin_buildflags.h"
@@ -41,6 +43,7 @@
 #include "components/signin/public/identity_manager/tribool.h"
 #include "components/supervised_user/core/common/features.h"
 #include "components/sync/base/data_type_histogram.h"
+#include "components/sync/base/features.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/buildflags/buildflags.h"
@@ -129,7 +132,7 @@ void ShowTabOverwritingNTP(BrowserWindowInterface* browser,
   NavigateParams params(browser->GetBrowserForMigrationOnly(), url,
                         ui::PAGE_TRANSITION_AUTO_BOOKMARK);
   params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-  params.window_action = NavigateParams::SHOW_WINDOW;
+  params.window_action = NavigateParams::WindowAction::kShowWindow;
   params.user_gesture = false;
   params.tabstrip_add_types |= AddTabTypes::ADD_INHERIT_OPENER;
 
@@ -174,9 +177,8 @@ signin_metrics::PromoAction GetPromoActionForNewAccount(
 bool ShowAccountExtensionsOnSignout(Profile* profile) {
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   // Do not sign out immediately if the user has account extensions.
-  if (extensions::sync_util::IsSyncingExtensionsInTransportMode(profile)) {
-    extensions::AccountExtensionTracker* tracker =
-        extensions::AccountExtensionTracker::Get(profile);
+  if (extensions::AccountExtensionTracker* tracker =
+          extensions::AccountExtensionTracker::Get(profile)) {
     return !tracker->GetSignedInAccountExtensions().empty();
   }
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
@@ -248,11 +250,7 @@ GURL GetSigninUrlForDiceSigninTab(
         {.email = email_hint, .continue_url = continue_url});
   }
 
-  bool use_chrome_sync_url =
-      base::FeatureList::IsEnabled(
-          switches::kBrowserSigninInSyncHeaderOnGaiaIntegration) ||
-      access_point == signin_metrics::AccessPoint::kExtensions;
-
+  bool use_chrome_sync_url = true;
   // A reauth is requested, or the account is already signed in (which is
   // effectively a reauth).
   if (signin_reason == signin_metrics::Reason::kReauthentication ||
@@ -276,6 +274,46 @@ GURL GetSigninUrlForDiceSigninTab(
 
   return signin::GetAddAccountURLForDice(email_hint, continue_url);
 }
+
+void FinishProfileCreationWhenNoCustomizeProfileIsShown(
+    const raw_ref<Profile> profile,
+    bool is_local_profile_creation) {
+  ProfileAttributesEntry* entry =
+      g_browser_process->profile_manager()
+          ->GetProfileAttributesStorage()
+          .GetProfileAttributesWithPath(profile->GetPath());
+  if (!is_local_profile_creation || !entry->IsOmitted()) {
+    return;
+  }
+
+  entry->SetIsOmitted(false);
+
+  if (!profile->GetPrefs()->GetBoolean(prefs::kForceEphemeralProfiles)) {
+    entry->SetIsEphemeral(false);
+  }
+}
+
+ChromeSignoutConfirmationPromptVariant GetSignoutConfirmationPromptVariant(
+    size_t unsynced_data_count,
+    bool is_bookmarks_limit_exceeded,
+    bool needs_reauth) {
+  if (unsynced_data_count == 0 && !is_bookmarks_limit_exceeded) {
+    return ChromeSignoutConfirmationPromptVariant::kNoUnsyncedData;
+  }
+
+  if (needs_reauth) {
+    return ChromeSignoutConfirmationPromptVariant::
+        kUnsyncedDataWithReauthButton;
+  }
+
+  if (unsynced_data_count > 0) {
+    return ChromeSignoutConfirmationPromptVariant::kUnsyncedData;
+  }
+
+  CHECK(is_bookmarks_limit_exceeded);
+  return ChromeSignoutConfirmationPromptVariant::kTooManyBookmarks;
+}
+
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
 }  // namespace
@@ -422,7 +460,7 @@ void SigninViewController::MaybeShowChromeSigninDialogForExtensions(
                         GURL(chrome::kChromeUINewTabURL),
                         ui::PAGE_TRANSITION_AUTO_BOOKMARK);
   params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-  params.window_action = NavigateParams::SHOW_WINDOW;
+  params.window_action = NavigateParams::WindowAction::kShowWindow;
   params.user_gesture = false;
   params.tabstrip_add_types |= AddTabTypes::ADD_INHERIT_OPENER;
 
@@ -441,6 +479,14 @@ void SigninViewController::MaybeShowChromeSigninDialogForExtensions(
 void SigninViewController::ShowModalProfileCustomizationDialog(
     bool is_local_profile_creation) {
   CloseModalSignin();
+  if (base::FeatureList::IsEnabled(
+          switches::
+              kProfileCreationFrictionReductionExperimentSkipCustomizeProfile)) {
+    FinishProfileCreationWhenNoCustomizeProfileIsShown(
+        profile_, is_local_profile_creation);
+    return;
+  }
+
   dialog_ = std::make_unique<SigninModalDialogImpl>(
       SigninViewControllerDelegate::CreateProfileCustomizationDelegate(
           browser_->GetBrowserForMigrationOnly(), is_local_profile_creation,
@@ -477,13 +523,16 @@ void SigninViewController::ShowModalSyncConfirmationDialog(
 }
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-void SigninViewController::ShowModalHistorySyncOptInDialog() {
-  CHECK(base::FeatureList::IsEnabled(switches::kEnableHistorySyncOptin));
+void SigninViewController::ShowModalHistorySyncOptInDialog(
+    bool should_close_modal_dialog,
+    HistorySyncOptinHelper::FlowCompletedCallback callback) {
+  CHECK(
+      base::FeatureList::IsEnabled(syncer::kReplaceSyncPromosWithSignInPromos));
   CloseModalSignin();
   dialog_ = std::make_unique<SigninModalDialogImpl>(
       SigninViewControllerDelegate::CreateSyncHistoryOptInDelegate(
-          browser_->GetBrowserForMigrationOnly(),
-          HistorySyncOptinLaunchContext::kModal),
+          browser_->GetBrowserForMigrationOnly(), should_close_modal_dialog,
+          HistorySyncOptinLaunchContext::kModal, std::move(callback)),
       GetOnModalDialogClosedCallback());
 }
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
@@ -719,11 +768,24 @@ void SigninViewController::SignoutOrReauthWithPromptWithUnsyncedDataTypes(
     return;
   }
 
+  syncer::SyncService* sync_service =
+      SyncServiceFactory::GetForProfile(GetProfile());
+  const bool is_bookmarks_limit_exceeded =
+      sync_service &&
+      sync_service->GetUserActionableError() ==
+          syncer::SyncService::UserActionableError::kBookmarksLimitExceeded;
+
   const bool needs_reauth =
       !identity_manager->HasAccountWithRefreshToken(primary_account_id) ||
       identity_manager->HasAccountWithRefreshTokenInPersistentErrorState(
           primary_account_id);
-  bool sign_out_immediately = unsynced_datatypes.empty() && needs_reauth;
+  bool sign_out_immediately = unsynced_datatypes.empty() && needs_reauth &&
+                              !is_bookmarks_limit_exceeded;
+  const size_t unsynced_data_count =
+      std::accumulate(unsynced_datatypes.begin(), unsynced_datatypes.end(), 0,
+                      [](size_t current_sum, const auto& pair) {
+                        return current_sum + pair.second;
+                      });
 
   // Do not show the dialog to users with implicit signin.
   if (!profile_->GetPrefs()->GetBoolean(prefs::kExplicitBrowserSignin)) {
@@ -745,13 +807,8 @@ void SigninViewController::SignoutOrReauthWithPromptWithUnsyncedDataTypes(
   }
 
   ChromeSignoutConfirmationPromptVariant prompt_variant =
-      ChromeSignoutConfirmationPromptVariant::kNoUnsyncedData;
-  if (!unsynced_datatypes.empty()) {
-    prompt_variant =
-        needs_reauth ? ChromeSignoutConfirmationPromptVariant::
-                           kUnsyncedDataWithReauthButton
-                     : ChromeSignoutConfirmationPromptVariant::kUnsyncedData;
-  }
+      GetSignoutConfirmationPromptVariant(
+          unsynced_data_count, is_bookmarks_limit_exceeded, needs_reauth);
   auto extended_account_info =
       identity_manager->FindExtendedAccountInfoByAccountId(primary_account_id);
   if (base::FeatureList::IsEnabled(
@@ -765,6 +822,7 @@ void SigninViewController::SignoutOrReauthWithPromptWithUnsyncedDataTypes(
   switch (prompt_variant) {
     case ChromeSignoutConfirmationPromptVariant::kNoUnsyncedData:
     case ChromeSignoutConfirmationPromptVariant::kProfileWithParentalControls:
+    case ChromeSignoutConfirmationPromptVariant::kTooManyBookmarks:
       break;
     case ChromeSignoutConfirmationPromptVariant::kUnsyncedData:
       syncer::SyncRecordDataTypeNumUnsyncedEntitiesFromDataCounts(
@@ -779,7 +837,8 @@ void SigninViewController::SignoutOrReauthWithPromptWithUnsyncedDataTypes(
       break;
   }
 
-  ShowSignoutConfirmationPrompt(prompt_variant, std::move(callback));
+  ShowSignoutConfirmationPrompt(prompt_variant, unsynced_data_count,
+                                std::move(callback));
 }
 
 void SigninViewController::ShowChromeSigninDialogForExtensions(
@@ -845,12 +904,13 @@ void SigninViewController::ShowChromeSigninDialogForExtensions(
 
 void SigninViewController::ShowSignoutConfirmationPrompt(
     ChromeSignoutConfirmationPromptVariant prompt_variant,
+    size_t unsynced_data_count,
     SignoutConfirmationCallback callback) {
   CloseModalSignin();
   dialog_ = std::make_unique<SigninModalDialogImpl>(
       SigninViewControllerDelegate::CreateSignoutConfirmationDelegate(
           browser_->GetBrowserForMigrationOnly(), prompt_variant,
-          std::move(callback)),
+          unsynced_data_count, std::move(callback)),
       GetOnModalDialogClosedCallback());
 }
 

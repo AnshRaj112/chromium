@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "base/command_line.h"
+#include "base/compiler_specific.h"
 #include "base/path_service.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
@@ -94,10 +95,6 @@ const char kDefaultMseOnlyEmePlayer[] = "mse_different_containers.html";
 
 #if BUILDFLAG(IS_WIN) && BUILDFLAG(USE_PROPRIETARY_CODECS) && \
     BUILDFLAG(ENABLE_PLATFORM_ENCRYPTED_DOLBY_VISION)
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
 static constexpr wchar_t kDolbyVisionProfile5[] = L"dvhe.05";
 static constexpr wchar_t kDolbyVisionProfile8[] = L"dvhe.08";
 #endif
@@ -522,6 +519,9 @@ class ECKEncryptedMediaReportMetricsTest : public EncryptedMediaTestBase,
         {
             Media_EME_CdmMetrics::kCertificateSerialNumberName,
             Media_EME_CdmMetrics::kDecoderBypassBlockCountName,
+            Media_EME_CdmMetrics::kDecoderCheck1SuccessCountName,
+            Media_EME_CdmMetrics::kDecoderCheck1WarningCountName,
+            Media_EME_CdmMetrics::kDecoderCheck1ErrorCountName,
             Media_EME_CdmMetrics::kLicenseSdkVersionName,
             Media_EME_CdmMetrics::kNumberOfOnMessageEventsName,
             Media_EME_CdmMetrics::kNumberOfUpdateCallsName,
@@ -543,7 +543,8 @@ class ECKEncryptedMediaReportMetricsTest : public EncryptedMediaTestBase,
           UnorderedElementsAre(
               Pair(Media_EME_CdmMetrics::kLicenseSdkVersionName, 12345),
               Pair(Media_EME_CdmMetrics::kNumberOfOnMessageEventsName, 1),
-              Pair(Media_EME_CdmMetrics::kNumberOfUpdateCallsName, 1)));
+              Pair(Media_EME_CdmMetrics::kNumberOfUpdateCallsName, 1),
+              Pair(Media_EME_CdmMetrics::kDecoderCheck1SuccessCountName, 1)));
     } else {
       EXPECT_EQ(report_metric_entries.size(), 0u);
     }
@@ -1089,15 +1090,24 @@ IN_PROC_BROWSER_TEST_P(MseEncryptedMediaTest, Playback_Check_Ukm) {
   }
 
   // Check Media_EME_Usage UKM. It is recorded for all key systems. Currently
-  // only update() will be called during playback.
+  // only setServerCertificate(), generateRequest() and update() will be called
+  // during playback.
   auto usage_entries = ukm_recorder.GetEntries(
       Media_EME_Usage::kEntryName,
       {Media_EME_Usage::kApiName, Media_EME_Usage::kIsPersistentSessionName,
        Media_EME_Usage::kKeySystemName,
        Media_EME_Usage::kUseHardwareSecureCodecsName});
-  EXPECT_EQ(usage_entries.size(), 2u);
+  EXPECT_EQ(usage_entries.size(), 3u);
+  EXPECT_THAT(usage_entries[0].metrics,
+              UnorderedElementsAre(
+                  Pair(Media_EME_Usage::kApiName,
+                       /*blink::EmeApiType::kSetServerCertificate=*/2),
+                  Pair(Media_EME_Usage::kIsPersistentSessionName, 0),
+                  Pair(Media_EME_Usage::kKeySystemName,
+                       media::GetKeySystemIntForUKM(CurrentKeySystem())),
+                  Pair(Media_EME_Usage::kUseHardwareSecureCodecsName, 0)));
   EXPECT_THAT(
-      usage_entries[0].metrics,
+      usage_entries[1].metrics,
       UnorderedElementsAre(
           Pair(Media_EME_Usage::kApiName,
                /*blink::EmeApiType::kGenerateRequest=*/4),
@@ -1106,7 +1116,7 @@ IN_PROC_BROWSER_TEST_P(MseEncryptedMediaTest, Playback_Check_Ukm) {
                media::GetKeySystemIntForUKM(CurrentKeySystem())),
           Pair(Media_EME_Usage::kUseHardwareSecureCodecsName, /*false=*/0)));
   EXPECT_THAT(
-      usage_entries[1].metrics,
+      usage_entries[2].metrics,
       UnorderedElementsAre(
           Pair(Media_EME_Usage::kApiName, /*blink::EmeApiType::kUpdate=*/6),
           Pair(Media_EME_Usage::kIsPersistentSessionName, /*false=*/0),
@@ -1300,10 +1310,10 @@ IN_PROC_BROWSER_TEST_P(ECKEncryptedMediaTest, DecryptOnly_VideoOnly_MP4_VP9) {
 #if BUILDFLAG(USE_PROPRIETARY_CODECS)
 
 IN_PROC_BROWSER_TEST_P(ECKEncryptedMediaTest, DecryptOnly_VideoOnly_MP4_CBCS) {
-  // 'cbcs' decryption is only supported on CDM 10 or later as long as
-  // the appropriate buildflag is enabled.
-  std::string expected_result =
-      GetCdmInterfaceVersion() >= 10 ? media::kEndedTitle : media::kErrorTitle;
+  // 'cbcs' decryption is supported on CDM 10 or later as long as the
+  // appropriate buildflag is enabled.
+  std::string expected_result = media::kEndedTitle;
+
   RunEncryptedMediaTest(kDefaultEmePlayer, "bear-640x360-v_frag-cbcs.mp4",
                         media::kExternalClearKeyDecryptOnlyKeySystem,
                         SrcType::MSE, kNoSessionToLoad, false, PlayCount::ONCE,
@@ -1331,10 +1341,10 @@ IN_PROC_BROWSER_TEST_P(ECKEncryptedMediaTest, Playback_Encryption_CENS) {
 }
 
 IN_PROC_BROWSER_TEST_P(ECKEncryptedMediaTest, Playback_Encryption_CBCS) {
-  // 'cbcs' decryption is only supported on CDM 10 or later as long as
-  // the appropriate buildflag is enabled.
-  std::string expected_result =
-      GetCdmInterfaceVersion() >= 10 ? media::kEndedTitle : media::kErrorTitle;
+  // 'cbcs' decryption is supported on CDM 10 or later as long as the
+  // appropriate buildflag is enabled.
+  std::string expected_result = media::kEndedTitle;
+
   RunEncryptedMediaMultipleFileTest(
       media::kExternalClearKeyKeySystem, "bear-640x360-v_frag-cbcs.mp4",
       "bear-640x360-a_frag-cbcs.mp4", expected_result);
@@ -1568,7 +1578,7 @@ class MediaFoundationEncryptedMediaTest : public EncryptedMediaTestBase {
 
     // Clean up the activates
     for (unsigned int i = 0; i < numActivates; ++i) {
-      activates[i]->Release();
+      UNSAFE_TODO(activates[i]->Release());
     }
 
     return true;
@@ -1589,11 +1599,11 @@ class MediaFoundationEncryptedMediaTest : public EncryptedMediaTestBase {
     for (unsigned int i = 0; i < numActivates && !supported; i++) {
       PROPVARIANT var;
       PropVariantInit(&var);
-      auto hr = activates[i]->GetItem(MFT_ENUM_VIDEO_RENDERER_EXTENSION_PROFILE,
-                                      &var);
+      auto hr = UNSAFE_TODO(activates[i]->GetItem(
+          MFT_ENUM_VIDEO_RENDERER_EXTENSION_PROFILE, &var));
       if (hr == S_OK && var.vt == VARTYPE(VT_VECTOR | VT_LPWSTR)) {
         for (unsigned long j = 0; j < var.calpwstr.cElems; j++) {
-          auto elem = *(var.calpwstr.pElems + j);
+          auto elem = *(UNSAFE_TODO(var.calpwstr.pElems + j));
           if (_wcsicmp(elem, profile) == 0) {
             supported = true;
             break;
@@ -1606,7 +1616,7 @@ class MediaFoundationEncryptedMediaTest : public EncryptedMediaTestBase {
 
     // Clean up the activates
     for (unsigned int i = 0; i < numActivates; ++i) {
-      activates[i]->Release();
+      UNSAFE_TODO(activates[i]->Release());
     }
 
     return supported;

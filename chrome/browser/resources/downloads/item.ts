@@ -26,7 +26,6 @@ import {FocusRowMixinLit} from 'chrome://resources/cr_elements/focus_row_mixin_l
 import {I18nMixinLit} from 'chrome://resources/cr_elements/i18n_mixin_lit.js';
 import {assert, assertNotReached} from 'chrome://resources/js/assert.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
-import {mojoString16ToString} from 'chrome://resources/js/mojo_type_util.js';
 import {sanitizeInnerHtml} from 'chrome://resources/js/parse_html_subset.js';
 import {htmlEscape} from 'chrome://resources/js/util.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
@@ -45,7 +44,6 @@ export interface DownloadsItemElement {
     'controlled-by': HTMLElement,
     'file-icon': HTMLImageElement,
     'file-link': HTMLAnchorElement,
-    'url': HTMLAnchorElement,
   };
 }
 
@@ -99,7 +97,6 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
       // </if>
 
       useFileIcon_: {type: Boolean},
-      showInitiatorOrigin_: {type: Boolean},
     };
   }
 
@@ -116,8 +113,6 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
   protected accessor showDeepScan_: boolean = false;
   protected accessor showOpenAnyway_: boolean = false;
   protected accessor useFileIcon_: boolean = false;
-  protected accessor showInitiatorOrigin_: boolean =
-      loadTimeData.getBoolean('showInitiatorOrigin');
   private restoreFocusAfterCancel_: boolean = false;
   private accessor displayType_: DisplayType = DisplayType.NORMAL;
   private accessor completelyOnDisk_: boolean = true;
@@ -186,13 +181,6 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
         '#more-actions-menu');
     assert(!!menu);
     return menu;
-  }
-
-  /**
-   * @return A JS string of the display URL.
-   */
-  protected getDisplayUrlStr_(): string {
-    return this.data ? mojoString16ToString(this.data.displayUrl) : '';
   }
 
   protected computeClass_(): string {
@@ -268,6 +256,8 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
       case DangerType.kDeepScannedSafe:
       case DangerType.kDeepScannedOpenedDangerous:
       case DangerType.kBlockedScanFailed:
+      case DangerType.kForcedSaveToGdrive:
+      case DangerType.kForcedSaveToOnedrive:
         return true;
       default:
         assertNotReached('Unhandled DangerType encountered');
@@ -303,6 +293,8 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
       case DangerType.kDeepScannedSafe:
       case DangerType.kDeepScannedOpenedDangerous:
       case DangerType.kBlockedScanFailed:
+      case DangerType.kForcedSaveToGdrive:
+      case DangerType.kForcedSaveToOnedrive:
         return true;
       default:
         assertNotReached('Unhandled DangerType encountered');
@@ -380,6 +372,8 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
       case DangerType.kDeepScannedSafe:
       case DangerType.kDeepScannedOpenedDangerous:
       case DangerType.kBlockedScanFailed:
+      case DangerType.kForcedSaveToGdrive:
+      case DangerType.kForcedSaveToOnedrive:
         return false;
       default:
         assertNotReached('Unhandled DangerType encountered');
@@ -447,6 +441,8 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
       case DangerType.kBlockedPasswordProtected:
       case DangerType.kBlockedTooLarge:
       case DangerType.kSensitiveContentBlock:
+      case DangerType.kForcedSaveToGdrive:
+      case DangerType.kForcedSaveToOnedrive:
         return DisplayType.ERROR;
       default:
         assertNotReached('Unhandled DangerType encountered');
@@ -525,6 +521,8 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
           case DangerType.kSensitiveContentBlock:
           case DangerType.kDeepScannedSafe:
           case DangerType.kBlockedScanFailed:
+          case DangerType.kForcedSaveToGdrive:
+          case DangerType.kForcedSaveToOnedrive:
             return '';
           default:
             assertNotReached('Unhandled DangerType encountered');
@@ -579,6 +577,8 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
           case DangerType.kDeepScannedSafe:
           case DangerType.kDeepScannedOpenedDangerous:
           case DangerType.kBlockedScanFailed:
+          case DangerType.kForcedSaveToGdrive:
+          case DangerType.kForcedSaveToOnedrive:
             return '';
           default:
             assertNotReached('Unhandled DangerType encountered');
@@ -613,6 +613,9 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
             return '';
           case DangerType.kSensitiveContentBlock:
             return loadTimeData.getString('sensitiveContentBlockedDesc');
+          case DangerType.kForcedSaveToOnedrive:
+          case DangerType.kForcedSaveToGdrive:
+            return loadTimeData.getString('forcedSaveToCloudDesc');
           case DangerType.kDeepScannedFailed:
           case DangerType.kDeepScannedSafe:
           case DangerType.kDeepScannedOpenedDangerous:
@@ -699,6 +702,8 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
         case DangerType.kSensitiveContentBlock:
         case DangerType.kBlockedTooLarge:
         case DangerType.kBlockedPasswordProtected:
+        case DangerType.kForcedSaveToGdrive:
+        case DangerType.kForcedSaveToOnedrive:
           return 'cr:error';
         case DangerType.kNoApplicableDangerType:
         case DangerType.kDangerousFile:
@@ -928,6 +933,8 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
       case DangerType.kDeepScannedSafe:
       case DangerType.kDeepScannedOpenedDangerous:
       case DangerType.kBlockedScanFailed:
+      case DangerType.kForcedSaveToGdrive:
+      case DangerType.kForcedSaveToOnedrive:
         return false;
       default:
         assertNotReached('Unhandled DangerType encountered');
@@ -1025,17 +1032,15 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
   }
 
   protected computeInitiatorOriginText_(): string {
-    if (!this.data || this.data.displayInitiatorOrigin.data.length === 0) {
+    if (!this.data || this.data.displayInitiatorOrigin.length === 0) {
       return '';
     }
     return loadTimeData.getStringF(
-        'initiatorLine',
-        mojoString16ToString(this.data.displayInitiatorOrigin));
+        'initiatorLine', this.data.displayInitiatorOrigin);
   }
 
   private updateUiForStateChange_() {
     const removeFileUrlLinks = () => {
-      this.$.url.removeAttribute('href');
       this.$['file-link'].removeAttribute('href');
     };
 
@@ -1058,10 +1063,8 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
       return;
     }
 
-    // The file is not dangerous. Link the url if supplied.
-    if (this.data.url) {
-      this.$.url.href = this.data.url.url;
-    } else {
+    // Remove file url links if a url was not supplied.
+    if (!this.data.url) {
       removeFileUrlLinks();
     }
 

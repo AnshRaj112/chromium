@@ -15,7 +15,6 @@
 
 #include "base/barrier_closure.h"
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/strings/string_util.h"
@@ -33,15 +32,19 @@
 #include "components/payments/core/secure_payment_confirmation_credential.h"
 #include "components/payments/core/sizes.h"
 #include "components/webauthn/core/browser/internal_authenticator.h"
+#include "components/webauthn/core/browser/webauthn_security_utils.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
-#include "content/public/browser/webauthn_security_utils.h"
 #include "content/public/common/content_features.h"
 #include "services/data_decoder/public/cpp/decode_image.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/mojom/payments/payment_request.mojom.h"
 #include "url/gurl.h"
 #include "url/origin.h"
+
+#if BUILDFLAG(IS_MAC)
+#include "components/payments/content/content_payment_request_delegate.h"
+#endif
 
 namespace payments {
 namespace {
@@ -63,7 +66,7 @@ bool IsValidDomain(const std::string& rp_id) {
   // A valid domain, such as 'site.example', should be a URL host (and nothing
   // more of the URL!) that is not an IP address.
   GURL url("https://" + rp_id);
-  return url.is_valid() && url.host() == rp_id && !url.HostIsIPAddress();
+  return url.is_valid() && url.GetHost() == rp_id && !url.HostIsIPAddress();
 }
 
 bool IsValid(const mojom::SecurePaymentConfirmationRequestPtr& request,
@@ -249,7 +252,6 @@ void SecurePaymentConfirmationAppFactory::
   if (!request->authenticator ||
       (!is_available && !base::FeatureList::IsEnabled(
                             ::features::kSecurePaymentConfirmationDebug))) {
-#if BUILDFLAG(IS_ANDROID)
     if (base::FeatureList::IsEnabled(
             blink::features::kSecurePaymentConfirmationUxRefresh)) {
       // Skip getting matching credential IDs since the authenticator is not
@@ -259,7 +261,6 @@ void SecurePaymentConfirmationAppFactory::
           std::vector<std::unique_ptr<SecurePaymentConfirmationCredential>>());
       return;
     }
-#endif  // BUILDFLAG(IS_ANDROID)
 
     request->delegate->OnDoneCreatingPaymentApps();
     return;
@@ -288,8 +289,8 @@ void SecurePaymentConfirmationAppFactory::Create(
   DCHECK(delegate);
 
   base::WeakPtr<PaymentRequestSpec> spec = delegate->GetSpec();
-  if (!spec || !base::Contains(spec->payment_method_identifiers_set(),
-                               methods::kSecurePaymentConfirmation)) {
+  if (!spec || !spec->payment_method_identifiers_set().contains(
+                   methods::kSecurePaymentConfirmation)) {
     delegate->OnDoneCreatingPaymentApps();
     return;
   }
@@ -350,12 +351,10 @@ void SecurePaymentConfirmationAppFactory::Create(
   delegate->OnDoneCreatingPaymentApps();
 }
 
-#if BUILDFLAG(IS_ANDROID)
 void SecurePaymentConfirmationAppFactory::SetBrowserBoundKeyStoreForTesting(
     scoped_refptr<BrowserBoundKeyStore> key_store) {
   browser_bound_key_store_for_testing_ = std::move(key_store);
 }
-#endif  // BUILDFLAG(IS_ANDROID)
 
 void SecurePaymentConfirmationAppFactory::SetCredentialFinderForTesting(
     std::unique_ptr<SecurePaymentConfirmationCredentialFinder>
@@ -469,17 +468,17 @@ void SecurePaymentConfirmationAppFactory::DidDownloadAllIcons(
     request->mojo_request->instrument->icon = GURL();
   }
 
-  bool skipSpcAppCreation = !request->delegate->GetSpec() ||
-                            !request->authenticator || !request->credential;
-#if BUILDFLAG(IS_ANDROID)
-  skipSpcAppCreation =
-      skipSpcAppCreation &&
-      !PaymentsExperimentalFeatures::IsEnabled(
-          features::kSecurePaymentConfirmationFallback) &&
-      !base::FeatureList::IsEnabled(
-          blink::features::kSecurePaymentConfirmationUxRefresh);
-#endif  // BUILDFLAG(IS_ANDROID)
-  if (skipSpcAppCreation) {
+  bool skip_spc_app_creation = !request->delegate->GetSpec();
+  bool has_authenticator_and_credential =
+      request->authenticator && request->credential;
+  skip_spc_app_creation =
+      skip_spc_app_creation ||
+      (!has_authenticator_and_credential &&
+       !PaymentsExperimentalFeatures::IsEnabled(
+           features::kSecurePaymentConfirmationFallback) &&
+       !base::FeatureList::IsEnabled(
+           blink::features::kSecurePaymentConfirmationUxRefresh));
+  if (skip_spc_app_creation) {
     request->delegate->OnDoneCreatingPaymentApps();
     return;
   }
@@ -522,26 +521,33 @@ void SecurePaymentConfirmationAppFactory::DidDownloadAllIcons(
             url::Origin::Create(request->delegate->GetTopOrigin()),
             request->delegate->GetSpec()->AsWeakPtr(),
             std::move(request->mojo_request), /*authenticator=*/nullptr,
-            std::move(payment_entities_logos)));
+            std::move(payment_entities_logos),
+            /*is_error_dialog=*/true));
     request->delegate->OnDoneCreatingPaymentApps();
     return;
   }
 
   std::unique_ptr<PasskeyBrowserBinder> passkey_browser_binder;
   bool device_supports_browser_bound_keys_in_hardware = false;
-#if BUILDFLAG(IS_ANDROID)
+#if !BUILDFLAG(IS_IOS)
   if (base::FeatureList::IsEnabled(
           blink::features::kSecurePaymentConfirmationBrowserBoundKeys)) {
     scoped_refptr key_store =
         browser_bound_key_store_for_testing_
             ? std::move(browser_bound_key_store_for_testing_)
-            : GetBrowserBoundKeyStoreInstance();
+            : GetBrowserBoundKeyStoreInstance(BrowserBoundKeyStore::Config{
+#if BUILDFLAG(IS_MAC)
+                  .keychain_access_group =
+                      request->delegate->GetPaymentRequestDelegate()
+                          ->GetSecurePaymentConfirmationKeychainAccessGroup()
+#endif  // BUILDFLAG(IS_MAC)
+              });
     device_supports_browser_bound_keys_in_hardware =
         key_store->GetDeviceSupportsHardwareKeys();
     passkey_browser_binder = std::make_unique<PasskeyBrowserBinder>(
         std::move(key_store), request->web_data_service);
   }
-#endif  // BUILDFLAG(IS_ANDROID)
+#endif  // !BUILDFLAG(IS_IOS)
 
   request->delegate->OnPaymentAppCreated(
       std::make_unique<SecurePaymentConfirmationApp>(
@@ -554,7 +560,8 @@ void SecurePaymentConfirmationAppFactory::DidDownloadAllIcons(
           url::Origin::Create(request->delegate->GetTopOrigin()),
           request->delegate->GetSpec()->AsWeakPtr(),
           std::move(request->mojo_request), std::move(request->authenticator),
-          std::move(payment_entities_logos)));
+          std::move(payment_entities_logos),
+          /*is_error_dialog=*/false));
 
   request->delegate->OnDoneCreatingPaymentApps();
 }

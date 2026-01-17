@@ -4,15 +4,16 @@
 
 #include "chrome/browser/apps/app_service/app_icon/web_app_icon_test_helper.h"
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/test/test_future.h"
 #include "chrome/browser/apps/app_service/app_icon/app_icon_test_util.h"
 #include "chrome/browser/apps/icon_standardizer.h"
 #include "chrome/browser/extensions/chrome_app_icon.h"
 #include "chrome/browser/web_applications/test/web_app_icon_test_utils.h"
+#include "chrome/browser/web_applications/web_app_icon_generator.h"
 #include "chrome/browser/web_applications/web_app_icon_manager.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registry_update.h"
@@ -43,10 +44,10 @@ void WebAppIconTestHelper::WriteIcons(const std::string& app_id,
 
   web_app::IconBitmaps icon_bitmaps;
   for (size_t i = 0; i < sizes_px.size(); ++i) {
-    if (base::Contains(purposes, IconPurpose::ANY)) {
+    if (std::ranges::contains(purposes, IconPurpose::ANY)) {
       web_app::AddGeneratedIcon(&icon_bitmaps.any, sizes_px[i], colors[i]);
     }
-    if (base::Contains(purposes, IconPurpose::MASKABLE)) {
+    if (std::ranges::contains(purposes, IconPurpose::MASKABLE)) {
       web_app::AddGeneratedIcon(&icon_bitmaps.maskable, sizes_px[i], colors[i]);
     }
   }
@@ -64,9 +65,10 @@ gfx::ImageSkia WebAppIconTestHelper::GenerateWebAppIcon(
     const std::vector<int>& sizes_px,
     apps::ScaleToSize scale_to_size_in_px,
     bool skip_icon_effects) {
-  base::test::TestFuture<std::map<web_app::SquareSizePx, SkBitmap>> future;
-  icon_manager().ReadIcons(app_id, purpose, sizes_px, future.GetCallback());
-  auto icon_bitmaps = future.Take();
+  base::test::TestFuture<web_app::IconMetadataFromDisk> future;
+  icon_manager().ReadTrustedIconsWithFallbackToManifestIcons(
+      app_id, sizes_px, purpose, future.GetCallback());
+  web_app::SizeToBitmap icon_bitmaps = std::move(future.Take().icons_map);
 
   gfx::ImageSkia output_image_skia;
 

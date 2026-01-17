@@ -4,13 +4,15 @@
 
 #include "components/optimization_guide/core/model_execution/performance_class.h"
 
-#include "base/containers/contains.h"
-#include "base/functional/callback_forward.h"
+#include <algorithm>
+#include <utility>
+
 #include "base/functional/callback_helpers.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
-#include "base/types/cxx23_to_underlying.h"
+#include "base/strings/to_string.h"
+#include "base/trace_event/trace_event.h"
 #include "base/version_info/version_info.h"
 #include "components/optimization_guide/core/model_execution/model_execution_prefs.h"
 #include "components/optimization_guide/core/optimization_guide_enums.h"
@@ -20,10 +22,17 @@
 #include "components/variations/synthetic_trials.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "services/on_device_model/public/cpp/cpu.h"
+#include "services/on_device_model/public/cpp/features.h"
 
 namespace optimization_guide {
 
 namespace {
+
+// Whether image input is enabled for CPU backend.
+BASE_FEATURE(kOnDeviceModelCpuImageInput, base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Whether audio input is enabled for CPU backend.
+BASE_FEATURE(kOnDeviceModelCpuAudioInput, base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Commandline switch to force a particular performance class.
 const char kOverridePerformanceClassSwitch[] =
@@ -115,6 +124,20 @@ std::string SyntheticTrialGroupForPerformanceClass(
   }
 }
 
+std::string SyntheticTrialGroupForPerformanceHint(
+    proto::OnDeviceModelPerformanceHint performance_hint) {
+  switch (performance_hint) {
+    case proto::ON_DEVICE_MODEL_PERFORMANCE_HINT_UNSPECIFIED:
+      return "Unspecified";
+    case proto::ON_DEVICE_MODEL_PERFORMANCE_HINT_HIGHEST_QUALITY:
+      return "HighestQuality";
+    case proto::ON_DEVICE_MODEL_PERFORMANCE_HINT_FASTEST_INFERENCE:
+      return "FastestInference";
+    case proto::ON_DEVICE_MODEL_PERFORMANCE_HINT_CPU:
+      return "Cpu";
+  }
+}
+
 bool IsPerformanceClassCompatible(
     std::string perf_classes_string,
     OnDeviceModelPerformanceClass performance_class) {
@@ -124,8 +147,8 @@ bool IsPerformanceClassCompatible(
   std::vector<std::string_view> perf_classes_list = base::SplitStringPiece(
       perf_classes_string, ",", base::WhitespaceHandling::TRIM_WHITESPACE,
       base::SplitResult::SPLIT_WANT_NONEMPTY);
-  return base::Contains(perf_classes_list,
-                        base::ToString(static_cast<int>(performance_class)));
+  return std::ranges::contains(
+      perf_classes_list, base::ToString(static_cast<int>(performance_class)));
 }
 
 OnDeviceModelPerformanceClass PerformanceClassFromPref(
@@ -142,29 +165,29 @@ OnDeviceModelPerformanceClass PerformanceClassFromPref(
 void UpdatePerformanceClassPref(
     PrefService* local_state,
     OnDeviceModelPerformanceClass performance_class) {
+  // TODO(crbug.com/437807121): Check performance info before setting prefs.
   local_state->SetInteger(
       model_execution::prefs::localstate::kOnDevicePerformanceClass,
-      base::to_underlying(performance_class));
+      std::to_underlying(performance_class));
   local_state->SetString(
       model_execution::prefs::localstate::kOnDevicePerformanceClassVersion,
       version_info::GetVersionNumber());
 }
 
+void UpdateDeviceInfoPrefs(PrefService* local_state,
+                           uint32_t vendor_id,
+                           uint32_t device_id,
+                           std::string driver_version,
+                           bool supports_fp16) {
+  // TODO(crbug.com/437807121): Implement prefs for device info.
+}
+
 PerformanceClassifier::PerformanceClassifier(
     PrefService* local_state,
     base::SafeRef<on_device_model::ServiceClient> service_client)
-    : local_state_(local_state), service_client_(std::move(service_client)) {}
-PerformanceClassifier::~PerformanceClassifier() = default;
-
-void PerformanceClassifier::Init() {
-  CHECK_EQ(performance_class_state_, PerformanceClassState::kNotStarted);
-  CHECK(performance_class_callbacks_.empty());
-  // TODO: crbug.com/432041523 - Update integration tests to force performance
-  // class explicitly.
-  if (switches::GetOnDeviceValidationWriteToFile()) {
-    UpdatePerformanceClassPref(local_state_,
-                               OnDeviceModelPerformanceClass::kVeryHigh);
-  }
+    : local_state_(local_state), service_client_(std::move(service_client)) {
+  TRACE_EVENT("optimization_guide",
+              "PerformanceClassifier::PerformanceClassifier");
   OnDeviceModelPerformanceClass override_class = GetPerformanceClassSwitch();
   if (override_class != OnDeviceModelPerformanceClass::kUnknown) {
     UpdatePerformanceClassPref(local_state_, override_class);
@@ -175,8 +198,11 @@ void PerformanceClassifier::Init() {
     performance_class_state_ = PerformanceClassState::kComplete;
   }
 }
+PerformanceClassifier::~PerformanceClassifier() = default;
 
 void PerformanceClassifier::ScheduleEvaluation() {
+  TRACE_EVENT("optimization_guide",
+              "PerformanceClassifier::ScheduleEvaluation");
   base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
       FROM_HERE,
       base::BindOnce(&PerformanceClassifier::EnsurePerformanceClassAvailable,
@@ -186,6 +212,8 @@ void PerformanceClassifier::ScheduleEvaluation() {
 
 void PerformanceClassifier::EnsurePerformanceClassAvailable(
     base::OnceClosure complete) {
+  TRACE_EVENT("optimization_guide",
+              "PerformanceClassifier::EnsurePerformanceClassAvailable");
   if (ListenForPerformanceClassAvailable(std::move(complete))) {
     return;
   }
@@ -197,20 +225,17 @@ void PerformanceClassifier::EnsurePerformanceClassAvailable(
   CHECK(features::CanLaunchOnDeviceModelService());
 
   performance_class_state_ = PerformanceClassState::kComputing;
-  service_client_->Get()->GetDevicePerformanceInfo(
-      base::BindOnce([](on_device_model::mojom::DevicePerformanceInfoPtr info) {
-        return info->performance_class;
-      })
-          .Then(base::BindOnce(&ConvertToOnDeviceModelPerformanceClass)
-                    .Then(mojo::WrapCallbackWithDefaultInvokeIfNotRun(
-                        base::BindOnce(
-                            &PerformanceClassifier::PerformanceClassEvaluated,
-                            weak_ptr_factory_.GetWeakPtr()),
-                        OnDeviceModelPerformanceClass::kServiceCrash))));
+  service_client_->Get()->GetDeviceAndPerformanceInfo(
+      mojo::WrapCallbackWithDefaultInvokeIfNotRun(
+          base::BindOnce(&PerformanceClassifier::OnDeviceAndPerformanceInfo,
+                         weak_ptr_factory_.GetWeakPtr()),
+          nullptr, nullptr));
 }
 
 bool PerformanceClassifier::ListenForPerformanceClassAvailable(
     base::OnceClosure available) {
+  TRACE_EVENT("optimization_guide",
+              "PerformanceClassifier::ListenForPerformanceClassAvailable");
   if (IsPerformanceClassAvailable()) {
     std::move(available).Run();
     return true;
@@ -244,21 +269,29 @@ bool PerformanceClassifier::IsLowTierDevice() const {
 }
 
 bool PerformanceClassifier::SupportsImageInput() const {
-  return IsPerformanceClassCompatible(
-      features::kPerformanceClassListForImageInput.Get(),
-      GetPerformanceClass());
+  return (IsDeviceGPUCapable() &&
+          IsPerformanceClassCompatible(
+              features::kPerformanceClassListForImageInput.Get(),
+              GetPerformanceClass())) ||
+         (IsDeviceCapable() &&
+          base::FeatureList::IsEnabled(kOnDeviceModelCpuImageInput));
 }
 
 bool PerformanceClassifier::SupportsAudioInput() const {
-  return IsPerformanceClassCompatible(
-      features::kPerformanceClassListForAudioInput.Get(),
-      GetPerformanceClass());
+  return (IsDeviceGPUCapable() &&
+          IsPerformanceClassCompatible(
+              features::kPerformanceClassListForAudioInput.Get(),
+              GetPerformanceClass())) ||
+         (IsDeviceCapable() &&
+          base::FeatureList::IsEnabled(kOnDeviceModelCpuAudioInput));
 }
 
 std::vector<proto::OnDeviceModelPerformanceHint>
 PerformanceClassifier::GetPossibleHints() const {
+  bool force_cpu_backend = base::FeatureList::IsEnabled(
+      on_device_model::features::kOnDeviceModelForceCpuBackend);
   std::vector<proto::OnDeviceModelPerformanceHint> hints;
-  if (IsDeviceGPUCapable()) {
+  if (IsDeviceGPUCapable() && !force_cpu_backend) {
     // Best option is highest quality for GPU device that is not low tier.
     if (!IsLowTierDevice()) {
       hints.push_back(proto::ON_DEVICE_MODEL_PERFORMANCE_HINT_HIGHEST_QUALITY);
@@ -285,12 +318,29 @@ PerformanceClassifier::GetPossibleOnDeviceCapabilities() const {
   return capabilities;
 }
 
-void PerformanceClassifier::PerformanceClassEvaluated(
-    OnDeviceModelPerformanceClass perf_class) {
-  base::UmaHistogramEnumeration(
-      "OptimizationGuide.ModelExecution.OnDeviceModelPerformanceClass",
-      perf_class);
-  UpdatePerformanceClassPref(local_state_, perf_class);
+void PerformanceClassifier::OnDeviceAndPerformanceInfo(
+    on_device_model::mojom::DevicePerformanceInfoPtr perf_info,
+    on_device_model::mojom::DeviceInfoPtr device_info) {
+  TRACE_EVENT("optimization_guide",
+              "PerformanceClassifier::OnDeviceAndPerformanceInfo");
+  if (!perf_info || !device_info) {
+    // Must be a DefaultInvoke due to service crash
+    base::UmaHistogramEnumeration(
+        "OptimizationGuide.ModelExecution.OnDeviceModelPerformanceClass",
+        OnDeviceModelPerformanceClass::kServiceCrash);
+    UpdatePerformanceClassPref(local_state_,
+                               OnDeviceModelPerformanceClass::kServiceCrash);
+  } else {
+    OnDeviceModelPerformanceClass performance_class =
+        ConvertToOnDeviceModelPerformanceClass(perf_info->performance_class);
+    base::UmaHistogramEnumeration(
+        "OptimizationGuide.ModelExecution.OnDeviceModelPerformanceClass",
+        performance_class);
+    UpdatePerformanceClassPref(local_state_, performance_class);
+    UpdateDeviceInfoPrefs(local_state_, device_info->vendor_id,
+                          device_info->device_id, device_info->driver_version,
+                          device_info->supports_fp16);
+  }
   performance_class_state_ = PerformanceClassState::kComplete;
   performance_class_callbacks_.Notify();
 }

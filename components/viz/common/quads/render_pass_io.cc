@@ -357,7 +357,11 @@ base::Value::BlobStorage SkPathToBlob(const SkPath& path) {
 }
 
 bool SkPathFromBlob(const base::Value::BlobStorage& blob, SkPath* out) {
-  return out->readFromMemory(blob.data(), blob.size());
+  if (auto path = SkPath::ReadFromMemory(blob.data(), blob.size())) {
+    *out = std::move(*path);
+    return true;
+  }
+  return false;
 }
 
 base::Value::Dict LinearGradientToDict(
@@ -1238,6 +1242,11 @@ void SurfaceDrawQuadToDict(const SurfaceDrawQuad* draw_quad,
   dict->Set("allow_merge", draw_quad->allow_merge);
 }
 
+}  // namespace
+
+// TODO(crbug.com/451876192): Move this function back into an anonymous
+// namespace after the refactor to to make TextureDrawQuad use unnormalized
+// coordinates is complete
 void TextureDrawQuadToDict(const TextureDrawQuad* draw_quad,
                            base::Value::Dict* dict) {
   DCHECK(draw_quad);
@@ -1245,8 +1254,8 @@ void TextureDrawQuadToDict(const TextureDrawQuad* draw_quad,
   // Set premultiplied_alpha to not break backwards-compatibility with unit test
   // data.
   dict->Set("premultiplied_alpha", true);
-  dict->Set("uv_top_left", PointFToDict(draw_quad->uv_top_left));
-  dict->Set("uv_bottom_right", PointFToDict(draw_quad->uv_bottom_right));
+  dict->Set("tex_coord_rect", RectFToDict(draw_quad->tex_coord_rect_));
+  dict->Set("is_normalized_coords", draw_quad->is_normalized_coords);
   dict->Set("background_color", SkColor4fToDict(draw_quad->background_color));
   // TODO(crbug.com/40942150): Update
   // "components/test/data/viz/render_pass_data/" to reflect the deprecation of
@@ -1261,6 +1270,8 @@ void TextureDrawQuadToDict(const TextureDrawQuad* draw_quad,
     dict->Set("damage_rect", RectToDict(draw_quad->damage_rect.value()));
   }
 }
+
+namespace {
 
 void TileDrawQuadToDict(const TileDrawQuad* draw_quad,
                         base::Value::Dict* dict) {
@@ -1373,7 +1384,7 @@ bool CompositorRenderPassDrawQuadFromDict(
       common.needs_blending, t_render_pass_id, mask_resource_id, t_mask_uv_rect,
       t_mask_texture_size, t_filters_scale, t_filters_origin, t_tex_coord_rect,
       force_anti_aliasing_off.value(), backdrop_filter_quality.value(),
-      intersects_damage_under ? intersects_damage_under.value() : false);
+      intersects_damage_under && intersects_damage_under.value());
   return true;
 }
 
@@ -1430,8 +1441,7 @@ bool TextureDrawQuadFromDict(const base::Value::Dict& dict,
                              TextureDrawQuad* draw_quad) {
   DCHECK(draw_quad);
 
-  const base::Value::Dict* uv_top_left = dict.FindDict("uv_top_left");
-  const base::Value::Dict* uv_bottom_right = dict.FindDict("uv_bottom_right");
+  const base::Value::Dict* tex_coord_rect = dict.FindDict("tex_coord_rect");
   // TODO(crbug.com/40942150): Update
   // "components/test/data/viz/render_pass_data/" to reflect the deprecation of
   // vertex opacity.
@@ -1439,21 +1449,22 @@ bool TextureDrawQuadFromDict(const base::Value::Dict& dict,
   const base::Value::Dict* damage_rect = dict.FindDict("damage_rect");
   std::optional<bool> nearest_neighbor = dict.FindBool("nearest_neighbor");
   std::optional<bool> secure_output_only = dict.FindBool("secure_output_only");
+  std::optional<bool> is_normalized_coords =
+      dict.FindBool("is_normalized_coords");
   const std::string* protected_video_type =
       dict.FindString("protected_video_type");
 
-  if (!uv_top_left || !uv_bottom_right || !vertex_opacity ||
-      !nearest_neighbor || !secure_output_only || !protected_video_type) {
+  if (!tex_coord_rect || !vertex_opacity || !nearest_neighbor ||
+      !secure_output_only || !protected_video_type) {
     return false;
   }
   int protected_video_type_index =
       StringToProtectedVideoType(*protected_video_type);
   if (protected_video_type_index < 0)
     return false;
-  gfx::PointF t_uv_top_left, t_uv_bottom_right;
+  gfx::RectF t_tex_coord_rect;
   SkColor4f t_background_color;
-  if (!PointFFromDict(*uv_top_left, &t_uv_top_left) ||
-      !PointFFromDict(*uv_bottom_right, &t_uv_bottom_right) ||
+  if (!RectFFromDict(*tex_coord_rect, &t_tex_coord_rect) ||
       !ColorFromDict(dict, "background_color", &t_background_color)) {
     return false;
   }
@@ -1461,9 +1472,11 @@ bool TextureDrawQuadFromDict(const base::Value::Dict& dict,
   ResourceId resource_id = common.resource_id;
   draw_quad->SetAll(
       common.shared_quad_state, common.rect, common.visible_rect,
-      common.needs_blending, resource_id, t_uv_top_left, t_uv_bottom_right,
-      t_background_color, nearest_neighbor.value(), secure_output_only.value(),
-      static_cast<gfx::ProtectedVideoType>(protected_video_type_index));
+      common.needs_blending, resource_id, t_tex_coord_rect.origin(),
+      t_tex_coord_rect.bottom_right(), t_background_color,
+      nearest_neighbor.value(), secure_output_only.value(),
+      static_cast<gfx::ProtectedVideoType>(protected_video_type_index),
+      is_normalized_coords.value_or(true));
 
   gfx::Rect t_damage_rect;
   if (damage_rect && RectFromDict(*damage_rect, &t_damage_rect)) {

@@ -11,16 +11,23 @@ import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
-import static org.chromium.ui.test.util.ViewUtils.VIEW_NULL;
+import static org.chromium.base.test.transit.ViewFinder.waitForNoView;
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeHistoryUrl;
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNonNativeHistoryUrl;
 import static org.chromium.ui.test.util.ViewUtils.onViewWaiting;
-import static org.chromium.ui.test.util.ViewUtils.waitForViewCheckingState;
 
 import android.graphics.Bitmap;
 
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -31,20 +38,23 @@ import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CommandLineFlags;
-import org.chromium.base.test.util.Features.EnableFeatures;
+import org.chromium.base.test.util.DisabledTest;
+import org.chromium.base.test.util.Features;
 import org.chromium.base.test.util.Restriction;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.init.ChromeBrowserInitializer;
 import org.chromium.chrome.browser.profiles.ProfileManager;
+import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeController;
 import org.chromium.chrome.browser.ui.favicon.FaviconHelper;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.transit.ChromeTransitTestRules;
 import org.chromium.chrome.test.transit.FreshCtaTransitTestRule;
+import org.chromium.chrome.test.util.ActivityTestUtils;
+import org.chromium.chrome.test.util.MenuUtils;
 import org.chromium.chrome.test.util.browser.signin.SigninTestRule;
 import org.chromium.chrome.test.util.browser.sync.SyncTestUtil;
-import org.chromium.components.embedder_support.util.UrlConstants;
-import org.chromium.components.signin.SigninFeatures;
 import org.chromium.components.signin.test.util.TestAccounts;
 import org.chromium.components.sync.SyncService;
 import org.chromium.components.sync.UserSelectableType;
@@ -91,8 +101,8 @@ public class HistoryTest {
     }
 
     /**
-     * Check that the favicons for {@link UrlConstants#HISTORY_URL} and for {@link
-     * UrlConstants#NATIVE_HISTORY_URL} are identical.
+     * Check that the favicons for {@link getOriginalNonNativeHistoryUrl()} and for {@link
+     * getOriginalNativeHistoryUrl()} are identical.
      */
     @Test
     @SmallTest
@@ -101,8 +111,8 @@ public class HistoryTest {
 
         FaviconHelper helper = ThreadUtils.runOnUiThreadBlocking(FaviconHelper::new);
         // If the returned favicons are non-null Bitmap#sameAs() should be used.
-        assertNull(getFavicon(helper, new GURL(UrlConstants.HISTORY_URL)));
-        assertNull(getFavicon(helper, new GURL(UrlConstants.NATIVE_HISTORY_URL)));
+        assertNull(getFavicon(helper, new GURL(getOriginalNonNativeHistoryUrl())));
+        assertNull(getFavicon(helper, new GURL(getOriginalNativeHistoryUrl())));
     }
 
     public Bitmap getFavicon(FaviconHelper helper, GURL pageUrl) throws TimeoutException {
@@ -117,7 +127,7 @@ public class HistoryTest {
 
     @Test
     @MediumTest
-    @EnableFeatures(SigninFeatures.HISTORY_PAGE_HISTORY_SYNC_PROMO)
+    @DisabledTest(message = "Flaky test, see crbug.com/441282177")
     // Tests that the history sync opt-in promo is shown correctly when display conditions are met,
     // and the history sync opt-in flow works correctly when the CTA is clicked.
     public void testHistorySyncPromoHeader_withHistoryRecord() throws Exception {
@@ -134,7 +144,7 @@ public class HistoryTest {
         String testUrl = "/chrome/test/data/android/google.html";
         mActivityTestRule.loadUrl(mActivityTestRule.getTestServer().getURL(testUrl));
 
-        mActivityTestRule.loadUrlInNewTab(UrlConstants.HISTORY_URL);
+        mActivityTestRule.loadUrlInNewTab(getOriginalNonNativeHistoryUrl());
 
         // Verify that the promo is shown.
         onViewWaiting(withId(R.id.signin_promo_view_container));
@@ -150,15 +160,15 @@ public class HistoryTest {
         SyncTestUtil.waitForHistorySyncEnabled();
 
         // Verify that the content is still shown and the promo is dismissed.
-        waitForViewCheckingState(withId(R.id.signin_promo_view_container), VIEW_NULL);
+        waitForNoView(withId(R.id.signin_promo_view_container));
         onView(withId(R.id.history_page_recycler_view)).check(matches(isDisplayed()));
         onView(withId(R.id.empty_state_container)).check(matches(not(isDisplayed())));
     }
 
     @Test
     @MediumTest
-    @EnableFeatures(SigninFeatures.HISTORY_PAGE_HISTORY_SYNC_PROMO)
     @Restriction({DeviceFormFactor.PHONE, DeviceRestriction.RESTRICTION_TYPE_NON_AUTO})
+    @DisabledTest(message = "Flaky test, see crbug.com/441282177")
     // Tests that the history sync opt-in promo when there's no history record, to verify
     // interactions with the history page empty state.
     //
@@ -175,7 +185,7 @@ public class HistoryTest {
                 });
         mActivityTestRule.startOnBlankPage();
 
-        mActivityTestRule.loadUrlInNewTab(UrlConstants.HISTORY_URL);
+        mActivityTestRule.loadUrlInNewTab(getOriginalNonNativeHistoryUrl());
 
         // Verify that the promo is shown.
         onViewWaiting(withId(R.id.signin_promo_view_container));
@@ -193,5 +203,52 @@ public class HistoryTest {
         // Verify that the empty state is shown when the promo is dismissed.
         onViewWaiting(withId(R.id.empty_state_container)).check(matches(isDisplayed()));
         onView(withId(R.id.history_page_recycler_view)).check(matches(not(isDisplayed())));
+    }
+
+    @MediumTest
+    @Test
+    @Features.EnableFeatures({
+        ChromeFeatureList.DRAW_CHROME_PAGES_EDGE_TO_EDGE,
+        ChromeFeatureList.EDGE_TO_EDGE_MONITOR_CONFIGURATIONS
+    })
+    @Restriction({DeviceFormFactor.PHONE, DeviceRestriction.RESTRICTION_TYPE_NON_AUTO})
+    public void testDrawsEdgeToEdge() {
+        mActivityTestRule.startOnBlankPage();
+        HistoryActivity historyActivity =
+                ActivityTestUtils.waitForActivity(
+                        InstrumentationRegistry.getInstrumentation(),
+                        HistoryActivity.class,
+                        new MenuUtils.MenuActivityTrigger(
+                                InstrumentationRegistry.getInstrumentation(),
+                                mActivityTestRule.getActivity(),
+                                R.id.open_history_menu_id));
+        assertNotNull(historyActivity);
+        RecyclerView recyclerView =
+                historyActivity
+                        .getHistoryManagerForTests()
+                        .getSelectableListLayout()
+                        .getRecyclerViewForTesting();
+        assertNotNull(recyclerView);
+
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    EdgeToEdgeController edgeToEdgeController =
+                            historyActivity.getEdgeToEdgeSupplier().get();
+                    int bottomInset =
+                            edgeToEdgeController != null && edgeToEdgeController.isDrawingToEdge()
+                                    ? edgeToEdgeController.getBottomInsetPx()
+                                    : 0;
+                    assertEquals(bottomInset, recyclerView.getPaddingBottom());
+                    if (bottomInset > 0) {
+                        // Clip to padding should be false when padding for the bottom inset.
+                        assertFalse(recyclerView.getClipToPadding());
+                    } else {
+                        // Clip to padding should be true when there is no padding for the bottom
+                        // inset.
+                        assertTrue(recyclerView.getClipToPadding());
+                    }
+                });
+
+        historyActivity.finish();
     }
 }

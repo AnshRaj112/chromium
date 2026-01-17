@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "media/capture/video/android/video_capture_device_android.h"
 
+#include <android/hardware_buffer.h>
+#include <android/hardware_buffer_jni.h>
 #include <stdint.h>
 
 #include <algorithm>
@@ -17,26 +14,28 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_array.h"
 #include "base/android/jni_string.h"
+#include "base/android/scoped_hardware_buffer_handle.h"
+#include "base/containers/heap_array.h"
 #include "base/functional/bind.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/system/system_monitor.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/trace_event/trace_event.h"
+#include "media/base/media_switches.h"
 #include "media/capture/mojom/image_capture_types.h"
 #include "media/capture/video/android/photo_capabilities.h"
 #include "media/capture/video/android/video_capture_device_factory_android.h"
+#include "media/capture/video/video_capture_gpu_channel_host.h"
 #include "third_party/libyuv/include/libyuv.h"
+#include "ui/gfx/color_space.h"
 #include "ui/gfx/geometry/point_f.h"
+#include "ui/gfx/geometry/size.h"
 
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "media/capture/video/android/capture_jni_headers/VideoCapture_jni.h"
 
 using base::android::AttachCurrentThread;
-using base::android::CheckException;
-using base::android::GetClass;
-using base::android::JavaParamRef;
-using base::android::MethodID;
 using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 
@@ -148,12 +147,15 @@ void VideoCaptureDeviceAndroid::AllocateAndStart(
     got_first_frame_ = false;
   }
 
-  JNIEnv* env = AttachCurrentThread();
+  bool enable_hardware_buffer_capture =
+      base::FeatureList::IsEnabled(media::kAndroidZeroCopyVideoCapture);
 
-  jboolean ret = Java_VideoCapture_allocate(
+  JNIEnv* env = AttachCurrentThread();
+  bool ret = Java_VideoCapture_allocate(
       env, j_capture_, params.requested_format.frame_size.width(),
       params.requested_format.frame_size.height(),
-      params.requested_format.frame_rate, params.enable_face_detection);
+      params.requested_format.frame_rate, params.enable_face_detection,
+      enable_hardware_buffer_capture);
   if (!ret) {
     SetErrorState(media::VideoCaptureError::kAndroidFailedToAllocate, FROM_HERE,
                   "failed to allocate");
@@ -209,7 +211,7 @@ void VideoCaptureDeviceAndroid::StopAndDeAllocate() {
 
   JNIEnv* env = AttachCurrentThread();
 
-  const jboolean ret =
+  const bool ret =
       Java_VideoCapture_stopCaptureAndBlockUntilStopped(env, j_capture_);
   if (!ret) {
     SetErrorState(media::VideoCaptureError::kAndroidFailedToStopCapture,
@@ -287,8 +289,8 @@ void VideoCaptureDeviceAndroid::SetPhotoOptions(
 void VideoCaptureDeviceAndroid::OnFrameAvailable(
     JNIEnv* env,
     const base::android::JavaRef<jbyteArray>& data,
-    jint length,
-    jint rotation) {
+    int32_t length,
+    int32_t rotation) {
   if (!IsClientConfigured())
     return;
 
@@ -327,20 +329,18 @@ void VideoCaptureDeviceAndroid::OnFrameAvailable(
 void VideoCaptureDeviceAndroid::OnI420FrameAvailable(
     JNIEnv* env,
     const base::android::JavaRef<jobject>& y_buffer,
-    jint y_stride,
+    int32_t y_stride,
     const base::android::JavaRef<jobject>& u_buffer,
     const base::android::JavaRef<jobject>& v_buffer,
-    jint uv_row_stride,
-    jint uv_pixel_stride,
-    jint width,
-    jint height,
-    jint rotation,
+    int32_t uv_row_stride,
+    int32_t uv_pixel_stride,
+    int32_t width,
+    int32_t height,
+    int32_t rotation,
     jlong timestamp) {
   if (!IsClientConfigured())
     return;
-  const int64_t absolute_micro =
-      timestamp / base::Time::kNanosecondsPerMicrosecond;
-  const base::TimeDelta capture_time = base::Microseconds(absolute_micro);
+  const base::TimeDelta capture_time = base::Nanoseconds(timestamp);
 
   const base::TimeTicks current_time = base::TimeTicks::Now();
   ProcessFirstFrameAvailable(current_time);
@@ -364,16 +364,133 @@ void VideoCaptureDeviceAndroid::OnI420FrameAvailable(
   const int y_plane_length = width * height;
   const int uv_plane_length = y_plane_length / 4;
   const int buffer_length = y_plane_length + uv_plane_length * 2;
-  auto buffer = std::make_unique<uint8_t[]>(buffer_length);
+  auto buffer = base::HeapArray<uint8_t>::Uninit(
+      base::checked_cast<size_t>(buffer_length));
+
+  auto dst_y_span = buffer.subspan(0, y_plane_length);
+  auto dst_u_span = buffer.subspan(y_plane_length, uv_plane_length);
+  auto dst_v_span =
+      buffer.subspan(y_plane_length + uv_plane_length, uv_plane_length);
 
   libyuv::Android420ToI420(y_src, y_stride, u_src, uv_row_stride, v_src,
-                           uv_row_stride, uv_pixel_stride, buffer.get(), width,
-                           buffer.get() + y_plane_length, width / 2,
-                           buffer.get() + y_plane_length + uv_plane_length,
-                           width / 2, width, height);
+                           uv_row_stride, uv_pixel_stride, dst_y_span.data(),
+                           width, dst_u_span.data(), width / 2,
+                           dst_v_span.data(), width / 2, width, height);
 
-  SendIncomingDataToClient(buffer.get(), buffer_length, rotation, current_time,
+  SendIncomingDataToClient(buffer.data(), buffer_length, rotation, current_time,
                            capture_time);
+}
+
+void VideoCaptureDeviceAndroid::OnHardwareBufferAvailableOnMainThread(
+    base::android::ScopedHardwareBufferHandle ahb_handle,
+    int32_t rotation,
+    jlong timestamp) {
+  DCHECK(main_task_runner_->BelongsToCurrentThread());
+
+  const base::TimeTicks current_time = base::TimeTicks::Now();
+  ProcessFirstFrameAvailable(current_time);
+
+  // Deliver the frame when it doesn't arrive too early.
+  if (ThrottleFrame(current_time)) {
+    client_->OnFrameDropped(VideoCaptureFrameDropReason::kAndroidThrottling);
+    return;
+  }
+
+  AHardwareBuffer_Desc desc;
+  AHardwareBuffer_describe(ahb_handle.get(), &desc);
+
+  VideoPixelFormat video_pixel_format;
+  viz::SharedImageFormat shared_image_format;
+  switch (desc.format) {
+    case AndroidImageFormat::ANDROID_IMAGE_FORMAT_YUV_420_888:
+      // Even though the AHB has an NV12 internal format, its pixel layout
+      // is never directly exposed anywhere, we only access it via
+      // the external texture sampler.
+      // Shared image readback will produce RGB output, that's why it makes
+      // sense to use PIXEL_FORMAT_XBGR VideoFrame format.
+      video_pixel_format = PIXEL_FORMAT_XBGR;
+      shared_image_format = viz::MultiPlaneFormat::kNV12;
+      shared_image_format.SetPrefersExternalSampler();
+      break;
+    default:
+      LOG(ERROR) << "Unsupported AHardwareBuffer format: " << desc.format;
+      return;
+  }
+
+  // TODO(crbug.com/467351937): Determine the correct color space.
+  gfx::ColorSpace color_space = gfx::ColorSpace::CreateREC601();
+  VideoCaptureFormat format(gfx::Size(desc.width, desc.height),
+                            capture_format_.frame_rate, video_pixel_format);
+
+  auto sii =
+      VideoCaptureGpuChannelHost::GetInstance().GetSharedImageInterface();
+  if (!sii) {
+    LOG(ERROR) << "Failed to get SharedImageInterface.";
+    SetErrorState(media::VideoCaptureError::kAndroidFailedToStartCapture,
+                  FROM_HERE, "Failed to get SharedImageInterface.");
+    return;
+  }
+
+  gfx::GpuMemoryBufferHandle gmb_handle;
+  gmb_handle.type = gfx::ANDROID_HARDWARE_BUFFER;
+  gmb_handle.android_hardware_buffer = ahb_handle.Clone();
+
+  constexpr auto kSharedImageUsage = gpu::SHARED_IMAGE_USAGE_GLES2_READ |
+                                     gpu::SHARED_IMAGE_USAGE_DISPLAY_READ |
+                                     gpu::SHARED_IMAGE_USAGE_RASTER_READ;
+  auto shared_image = sii->CreateSharedImage(
+      {shared_image_format, gfx::Size(desc.width, desc.height), color_space,
+       kSharedImageUsage, "AndroidCaptureDevice"},
+      std::move(gmb_handle));
+
+  if (!shared_image) {
+    DLOG(ERROR) << "Failed to create a shared image.";
+    SetErrorState(media::VideoCaptureError::kAndroidFailedToStartCapture,
+                  FROM_HERE, "Failed to create a shared image.");
+    return;
+  }
+
+  const base::TimeDelta capture_time = base::Nanoseconds(timestamp);
+  base::AutoLock lock(lock_);
+  if (!client_) {
+    return;
+  }
+
+  client_->OnIncomingCapturedImage(std::move(shared_image), format, rotation,
+                                   current_time, capture_time,
+                                   /*capture_begin_timestamp=*/{},
+                                   /*metadata=*/{});
+}
+
+void VideoCaptureDeviceAndroid::OnHardwareBufferAvailable(
+    JNIEnv* env,
+    const base::android::JavaRef<jobject>& hardware_buffer,
+    int32_t rotation,
+    jlong timestamp) {
+  if (!IsClientConfigured()) {
+    return;
+  }
+
+  auto ahb_handle = base::android::ScopedHardwareBufferHandle::Create(
+      AHardwareBuffer_fromHardwareBuffer(env, hardware_buffer.obj()));
+
+  if (!ahb_handle.is_valid()) {
+    SetErrorState(media::VideoCaptureError::kAndroidFailedToStartCapture,
+                  FROM_HERE, "Failed to get AHardwareBuffer from Java");
+    return;
+  }
+
+  if (!main_task_runner_->BelongsToCurrentThread()) {
+    main_task_runner_->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            &VideoCaptureDeviceAndroid::OnHardwareBufferAvailableOnMainThread,
+            weak_ptr_factory_.GetWeakPtr(), std::move(ahb_handle), rotation,
+            timestamp));
+    return;
+  }
+  OnHardwareBufferAvailableOnMainThread(std::move(ahb_handle), rotation,
+                                        timestamp);
 }
 
 void VideoCaptureDeviceAndroid::OnError(
@@ -788,3 +905,5 @@ void VideoCaptureDeviceAndroid::DoSetPhotoOptions(
 }
 
 }  // namespace media
+
+DEFINE_JNI(VideoCapture)

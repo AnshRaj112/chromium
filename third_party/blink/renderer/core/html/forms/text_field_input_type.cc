@@ -42,9 +42,8 @@
 #include "third_party/blink/renderer/core/events/mouse_event.h"
 #include "third_party/blink/renderer/core/events/text_event.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
+#include "third_party/blink/renderer/core/html/forms/html_data_list_element.h"
 #include "third_party/blink/renderer/core/html/forms/html_input_element.h"
-#include "third_party/blink/renderer/core/html/forms/html_option_element.h"
-#include "third_party/blink/renderer/core/html/forms/html_select_element.h"
 #include "third_party/blink/renderer/core/html/forms/text_control_inner_elements.h"
 #include "third_party/blink/renderer/core/html/shadow/shadow_element_names.h"
 #include "third_party/blink/renderer/core/html_names.h"
@@ -56,6 +55,7 @@
 #include "third_party/blink/renderer/core/paint/paint_layer_scrollable_area.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
+#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
 
 namespace blink {
@@ -66,22 +66,13 @@ class DataListIndicatorElement final : public HTMLDivElement {
     return To<HTMLInputElement>(OwnerShadowHost());
   }
 
-  EventDispatchHandlingState* PreDispatchEventHandler(Event& event) override {
-    // Chromium opens autofill popup in a mousedown event listener
-    // associated to the document. We don't want to open it in this case
-    // because we opens a datalist chooser later.
-    // FIXME: We should dispatch mousedown events even in such case.
-    if (event.type() == event_type_names::kMousedown)
-      event.stopPropagation();
-    return nullptr;
-  }
-
   void DefaultEventHandler(Event& event) override {
     DCHECK(GetDocument().IsActive());
     if (event.type() != event_type_names::kClick)
       return;
     HTMLInputElement* host = HostInput();
-    if (host && !host->IsDisabledOrReadOnly()) {
+    if (host && !host->IsDisabledOrReadOnly() &&
+        !host->IsBaseAppearanceCombobox()) {
       GetDocument().GetPage()->GetChromeClient().OpenTextDataListChooser(*host);
       event.SetDefaultHandled();
     }
@@ -161,6 +152,7 @@ void TextFieldInputType::SetValue(const String& sanitized_value,
                                   TextControlSetValueSelection selection) {
   // We don't use InputType::setValue.  TextFieldInputType dispatches events
   // different way from InputType::setValue.
+  const String old_value = GetElement().Value();
   if (event_behavior == TextFieldEventBehavior::kDispatchNoEvent)
     GetElement().SetNonAttributeValue(sanitized_value);
   else
@@ -184,6 +176,16 @@ void TextFieldInputType::SetValue(const String& sanitized_value,
   // string and update validity.
   if (!value_changed)
     return;
+
+  // Handles programmatic value changes by updating FormControlRanges as a
+  // full-value replace. If the skip flag is set (e.g. by setRangeText), this
+  // automatic update is skipped since the caller issues its own targeted range
+  // update.
+  if (value_changed && RuntimeEnabledFeatures::FormControlRangeEnabled() &&
+      !GetElement().ShouldSkipNextSetValueAutoDiff()) {
+    GetElement().CommitProgrammaticFormControlRangeEdit(
+        old_value, /*old_sel_start=*/0u, /*old_sel_end=*/old_value.length());
+  }
 
   if (selection == TextControlSetValueSelection::kSetSelectionToEnd) {
     unsigned max = VisibleValue().length();
@@ -218,21 +220,6 @@ void TextFieldInputType::SetValue(const String& sanitized_value,
 void TextFieldInputType::HandleKeydownEvent(KeyboardEvent& event) {
   if (!GetElement().IsFocused())
     return;
-
-  if (RuntimeEnabledFeatures::SelectAccessibilityReparentInputEnabled() ||
-      RuntimeEnabledFeatures::SelectAccessibilityNestedInputEnabled()) {
-    if (auto* select = GetElement().FirstAncestorSelectElement()) {
-      if (AtomicString(event.key()) == keywords::kArrowDown) {
-        if (auto* option =
-                select->GetOptionList().FirstKeyboardFocusableOption()) {
-          option->Focus();
-          event.SetDefaultHandled();
-          return;
-        }
-      }
-    }
-  }
-
   if (ChromeClient* chrome_client = GetChromeClient()) {
     chrome_client->HandleKeyboardEventOnTextField(GetElement(), event);
     return;
@@ -291,7 +278,8 @@ void TextFieldInputType::ForwardEvent(Event& event) {
           if (PaintLayerScrollableArea* inner_scrollable_area =
                   inner_layer->GetScrollableArea()) {
             inner_scrollable_area->SetScrollOffset(
-                ScrollOffset(0, 0), mojom::blink::ScrollType::kProgrammatic);
+                ScrollOffset(0, 0), mojom::blink::ScrollType::kProgrammatic,
+                cc::ScrollSourceType::kAbsoluteScroll);
           }
         }
       }
@@ -526,12 +514,17 @@ void TextFieldInputType::HandleBeforeTextInsertedEvent(
     GetElement().GetDocument().UpdateStyleAndLayout(
         DocumentUpdateReason::kEditing);
 
-    selection_length = GetElement()
-                           .GetDocument()
-                           .GetFrame()
-                           ->Selection()
-                           .SelectedText()
-                           .length();
+    FrameSelection& selection =
+        GetElement().GetDocument().GetFrame()->Selection();
+    Element* editable_element =
+        selection.RootEditableElementOrDocumentElement();
+    // If the root editable element of the selection is not a descendant of the
+    // focused element, we don't need to take account of the selection length.
+    if (!RuntimeEnabledFeatures::DelegatesFocusTextControlInputFixEnabled() ||
+        (editable_element &&
+         editable_element->IsDescendantOrShadowDescendantOf(&GetElement()))) {
+      selection_length = selection.SelectedText().length();
+    }
   }
   DCHECK_GE(old_length, selection_length);
 
@@ -630,12 +623,18 @@ void TextFieldInputType::SubtreeHasChanged() {
   GetElement().PseudoStateChanged(CSSSelector::kPseudoInRange);
   GetElement().PseudoStateChanged(CSSSelector::kPseudoOutOfRange);
 
+  if (RuntimeEnabledFeatures::FormControlRangeEnabled()) {
+    GetElement().CommitFormControlRangeEdit();
+  }
+
   DidSetValueByUserEdit();
 }
 
 void TextFieldInputType::OpenPopupView() {
-  if (GetElement().IsDisabledOrReadOnly())
+  if (GetElement().IsDisabledOrReadOnly() ||
+      GetElement().IsBaseAppearanceCombobox()) {
     return;
+  }
   if (ChromeClient* chrome_client = GetChromeClient())
     chrome_client->OpenTextDataListChooser(GetElement());
 }
@@ -690,6 +689,17 @@ void TextFieldInputType::SpinButtonDidReleaseMouseCapture(
     SpinButtonElement::EventDispatch event_dispatch) {
   if (event_dispatch == SpinButtonElement::kEventDispatchAllowed)
     GetElement().DispatchFormControlChangeEvent();
+}
+
+void TextFieldInputType::HandleFocusInEvent(
+    Element* old_focused_element,
+    mojom::blink::FocusType focus_type) {
+  HTMLInputElement& input = GetElement();
+  if (input.IsBaseAppearanceCombobox()) {
+    if (auto* datalist = input.DataList()) {
+      datalist->ShowPopoverInternal(&input, /*exception_state=*/nullptr);
+    }
+  }
 }
 
 }  // namespace blink

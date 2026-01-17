@@ -1692,7 +1692,7 @@ pub trait Formatter {
     where
         W: ?Sized + io::Write,
     {
-        let mut buffer = ryu::Buffer::new();
+        let mut buffer = zmij::Buffer::new();
         let s = buffer.format_finite(value);
         writer.write_all(s.as_bytes())
     }
@@ -1717,7 +1717,7 @@ pub trait Formatter {
     where
         W: ?Sized + io::Write,
     {
-        let mut buffer = ryu::Buffer::new();
+        let mut buffer = zmij::Buffer::new();
         let s = buffer.format_finite(value);
         writer.write_all(s.as_bytes())
     }
@@ -1935,7 +1935,7 @@ pub trait Formatter {
 }
 
 /// This structure compacts a JSON value with no extra whitespace.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct CompactFormatter;
 
 impl Formatter for CompactFormatter {}

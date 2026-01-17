@@ -28,29 +28,28 @@
 #import "ui/base/l10n/l10n_util.h"
 
 namespace {
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+
 // Minimal width for text buttons.
 const CGFloat kButtonMinWidth = 44;
-#endif
+
 // Height for text buttons.
 const CGFloat kButtonHeight = 44;
 // Button font size.
 const CGFloat kButtonFontSize = 17;
 // Horizontal padding for buttons in compact mode.
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+
 const CGFloat kCompactButtonHorizontalPadding = 16;
-#endif
+
 const CGFloat kCompactButtonHorizontalPaddingPreiOS26 = 12;
 // Minimum spacing between buttons.
 const CGFloat kCompactMinButtonSpacing = 8;
 
 // Returns the padding depending on the OS version.
 CGFloat CompactButtonHorizontalPadding() {
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   if (@available(iOS 26, *)) {
     return kCompactButtonHorizontalPadding;
   }
-#endif
+
   return kCompactButtonHorizontalPaddingPreiOS26;
 }
 
@@ -78,9 +77,6 @@ CGFloat CompactButtonHorizontalPadding() {
 - (instancetype)initWithFrame:(CGRect)frame {
   self = [super initWithFrame:frame];
   if (self) {
-    if (IsDiamondPrototypeEnabled()) {
-      return self;
-    }
     [self setupViews];
     [self updateLayout];
     NSArray<UITrait>* traits = TraitCollectionSetForTraits(
@@ -246,7 +242,7 @@ CGFloat CompactButtonHorizontalPadding() {
                              image:(UIImage*)image
                     targetSelector:(SEL)targetSelector {
   UIButton* button;
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+
   if (@available(iOS 26, *)) {
     UIButtonConfiguration* buttonConfiguration;
     if ([UIButtonConfiguration
@@ -262,24 +258,20 @@ CGFloat CompactButtonHorizontalPadding() {
                                  primaryAction:nil];
     button.tintColor = TabGridGlassButtonTintColor();
   } else {
-#endif
     button = [UIButton systemButtonWithPrimaryAction:nil];
     button.tintColor = UIColor.whiteColor;
     [button setTitle:title forState:UIControlStateNormal];
     [button setImage:image forState:UIControlStateNormal];
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
   }
-#endif
 
   button.titleLabel.font = [UIFont systemFontOfSize:kButtonFontSize];
   button.translatesAutoresizingMaskIntoConstraints = NO;
   [button.heightAnchor constraintEqualToConstant:kButtonHeight].active = YES;
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+
   if (@available(iOS 26, *)) {
     [button.widthAnchor constraintGreaterThanOrEqualToConstant:kButtonMinWidth]
         .active = YES;
   }
-#endif
 
   if (targetSelector) {
     [button addTarget:self
@@ -510,17 +502,18 @@ CGFloat CompactButtonHorizontalPadding() {
 
 // Updates the bottom toolbar layout.
 - (void)updateLayout {
-  if (IsDiamondPrototypeEnabled()) {
-    return;
-  }
-
   // Search mode doesn't have bottom toolbar or floating buttons, Handle it and
   // return early in that case.
   [self hideAllButtons];
 
   BOOL useCompactLayout = [self shouldUseCompactLayout];
-  BOOL hideToolbar = self.mode == TabGridMode::kSearch ||
-                     (!useCompactLayout && (self.page == TabGridPageTabGroups));
+  BOOL hideToolbar;
+  if (base::FeatureList::IsEnabled(kTabRecallNewTabGroupButton)) {
+    hideToolbar = self.mode == TabGridMode::kSearch;
+  } else {
+    hideToolbar = self.mode == TabGridMode::kSearch ||
+                  (!useCompactLayout && (self.page == TabGridPageTabGroups));
+  }
   if (hideToolbar) {
     self.hidden = YES;
     [self updateBackgroundVisibility];
@@ -545,13 +538,19 @@ CGFloat CompactButtonHorizontalPadding() {
   if (useCompactLayout) {
     if (self.page == TabGridPageTabGroups) {
       _doneButton.hidden = NO;
+
+      if (base::FeatureList::IsEnabled(kTabRecallNewTabGroupButton)) {
+        _smallNewTabButton.hidden = NO;
+      }
     } else if (self.isInTabGroupView) {
       _smallNewTabButton.hidden = NO;
     } else {
       if (_undoActive) {
         _undoButton.hidden = NO;
       } else {
-        _editButton.hidden = NO;
+        BOOL overflowEnabled =
+            base::FeatureList::IsEnabled(kTabSwitcherOverflowMenu);
+        _editButton.hidden = overflowEnabled;
       }
       _smallNewTabButton.hidden = NO;
       _doneButton.hidden = NO;
@@ -589,11 +588,11 @@ CGFloat CompactButtonHorizontalPadding() {
 // middle/scrolled to the top states.
 - (void)createScrolledBackgrounds {
   _scrolledToEdge = YES;
-#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+
   if (@available(iOS 26, *)) {
     return;
   }
-#endif
+
   if (IsIOSSoftLockEnabled()) {
     _scrollBackgroundView = [[TabGridToolbarScrollingBackground alloc] init];
     _scrollBackgroundView.translatesAutoresizingMaskIntoConstraints = NO;

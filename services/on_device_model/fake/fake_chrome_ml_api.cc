@@ -34,6 +34,10 @@ std::string PieceToString(const ml::InputPiece& piece) {
         return "User: ";
       case ml::Token::kEnd:
         return " End.";
+      case ml::Token::kToolCall:
+        return "ToolCall: ";
+      case ml::Token::kToolResponse:
+        return "ToolResponse: ";
     }
   }
   if (std::holds_alternative<SkBitmap>(piece)) {
@@ -403,6 +407,12 @@ bool GetTokenizerParams(ChromeMLModel model,
   return true;
 }
 
+bool GetTokenizerParamsV2(ChromeMLModel model,
+                          ChromeMLSession session,
+                          const ChromeMLGetTokenizerParamsFn& fn) {
+  return GetTokenizerParams(model, fn);
+}
+
 ChromeMLTSModel CreateTSModel(const ChromeMLTSModelDescriptor* descriptor) {
   auto* instance = new FakeTsModelInstance{};
   return reinterpret_cast<ChromeMLTSModel>(instance);
@@ -456,6 +466,7 @@ const ChromeMLAPI g_api = {
     .CancelExecuteModel = &CancelExecuteModel,
     .SetConstraintFns = &SetConstraintFns,
     .GetTokenizerParams = &GetTokenizerParams,
+    .GetTokenizerParamsV2 = &GetTokenizerParamsV2,
     .ts_api =
         {
             .CreateModel = &CreateTSModel,

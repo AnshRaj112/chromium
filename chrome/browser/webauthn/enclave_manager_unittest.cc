@@ -30,24 +30,30 @@
 #include "base/notreached.h"
 #include "base/process/process.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_view_util.h"
 #include "base/task/current_thread.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "base/test/test_future.h"
 #include "base/threading/platform_thread.h"
 #include "base/time/time.h"
 #include "base/types/expected.h"
 #include "build/build_config.h"
+#include "chrome/browser/webauthn/enclave_keys_waiter.h"
 #include "chrome/browser/webauthn/fake_magic_arch.h"
 #include "chrome/browser/webauthn/fake_recovery_key_store.h"
 #include "chrome/browser/webauthn/fake_security_domain_service.h"
 #include "chrome/browser/webauthn/proto/enclave_local_state.pb.h"
 #include "chrome/browser/webauthn/test_util.h"
 #include "chrome/browser/webauthn/unexportable_key_utils.h"
+#include "chrome/browser/webauthn/webauthn_metrics_util.h"
 #include "components/cbor/reader.h"
+#include "components/cbor/writer.h"
 #include "components/os_crypt/sync/os_crypt_mocker.h"
 #include "components/signin/public/base/consent_level.h"
+#include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/identity_test_environment.h"
 #include "components/sync/protocol/webauthn_credential_specifics.pb.h"
 #include "components/trusted_vault/command_line_switches.h"
@@ -55,6 +61,7 @@
 #include "components/trusted_vault/trusted_vault_connection.h"
 #include "crypto/aead.h"
 #include "crypto/hkdf.h"
+#include "crypto/hmac.h"
 #include "crypto/scoped_fake_unexportable_key_provider.h"
 #include "crypto/scoped_fake_user_verifying_key_provider.h"
 #include "crypto/user_verifying_key.h"
@@ -66,11 +73,12 @@
 #include "device/fido/enclave/enclave_authenticator.h"
 #include "device/fido/enclave/types.h"
 #include "device/fido/fido_authenticator.h"
-#include "device/fido/fido_constants.h"
-#include "device/fido/fido_types.h"
 #include "device/fido/json_request.h"
-#include "device/fido/public_key_credential_descriptor.h"
-#include "device/fido/public_key_credential_params.h"
+#include "device/fido/public/features.h"
+#include "device/fido/public/fido_constants.h"
+#include "device/fido/public/fido_types.h"
+#include "device/fido/public/public_key_credential_descriptor.h"
+#include "device/fido/public/public_key_credential_params.h"
 #include "google_apis/gaia/gaia_id.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "net/http/http_status_code.h"
@@ -201,7 +209,9 @@ std::unique_ptr<network::NetworkService> CreateNetwork(
 }
 
 scoped_refptr<device::JSONRequest> JSONFromString(std::string_view json_str) {
-  base::Value json_request = base::JSONReader::Read(json_str).value();
+  base::Value json_request =
+      base::JSONReader::Read(json_str, base::JSON_PARSE_CHROMIUM_EXTENSIONS)
+          .value();
   return base::MakeRefCounted<device::JSONRequest>(std::move(json_request));
 }
 
@@ -307,6 +317,9 @@ class EnclaveManagerTest : public testing::Test, EnclaveManager::Observer {
   }
 
   void OnKeysStored() override { stored_count_++; }
+  void OnStateUpdated() override { notified_about_state_update_count_++; }
+  void OnOutOfContextRecoveryCompletion(
+      EnclaveManager::OutOfContextRecoveryOutcome outcome) override {}
 
   void DoCreate(
       std::unique_ptr<enclave::ClaimedPIN> claimed_pin,
@@ -491,8 +504,22 @@ class EnclaveManagerTest : public testing::Test, EnclaveManager::Observer {
     state.mutable_users()->begin()->second.set_device_id("corrupted value");
   }
 
+  void AcquireLockAndStoreKey(EnclaveManager* manager,
+                              std::vector<uint8_t> key,
+                              int last_key_version) {
+    auto store_keys_lock = manager->GetStoreKeysLock();
+    base::HistogramTester histogram_tester;
+    manager->StoreKeys(gaia_id_, {std::move(key)}, last_key_version);
+    histogram_tester.ExpectBucketCount(
+        "WebAuthentication.GPM.RecoveryEvent",
+        webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+            kStoreKeysFromExplicitFlowStarted,
+        1);
+  }
+
   base::test::TaskEnvironment task_env_;
   unsigned stored_count_ = 0;
+  unsigned notified_about_state_update_count_ = 0;
   const TempDir temp_dir_;
   const std::pair<base::Process, uint16_t> process_and_port_;
   const enclave::ScopedEnclaveOverride enclave_override_;
@@ -514,17 +541,17 @@ TEST_F(EnclaveManagerTest, TestInfrastructure) {
 TEST_F(EnclaveManagerTest, Basic) {
   security_domain_service_->pretend_there_are_members();
 
-  ASSERT_FALSE(manager_.is_loaded());
-  ASSERT_FALSE(manager_.is_registered());
-  ASSERT_FALSE(manager_.is_ready());
+  ASSERT_FALSE(manager_.IsLoaded());
+  ASSERT_FALSE(manager_.IsRegistered());
+  ASSERT_FALSE(manager_.IsReady());
 
   NoArgFuture loaded_future;
   manager_.Load(loaded_future.GetCallback());
   EXPECT_TRUE(loaded_future.Wait());
   ASSERT_TRUE(manager_.is_idle());
-  ASSERT_TRUE(manager_.is_loaded());
-  ASSERT_FALSE(manager_.is_registered());
-  ASSERT_FALSE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsLoaded());
+  ASSERT_FALSE(manager_.IsRegistered());
+  ASSERT_FALSE(manager_.IsReady());
 
   BoolFuture register_future;
   manager_.RegisterIfNeeded(register_future.GetCallback());
@@ -532,9 +559,9 @@ TEST_F(EnclaveManagerTest, Basic) {
   EXPECT_TRUE(register_future.Wait());
   ASSERT_TRUE(register_future.Get());
   ASSERT_TRUE(manager_.is_idle());
-  ASSERT_TRUE(manager_.is_loaded());
-  ASSERT_TRUE(manager_.is_registered());
-  ASSERT_FALSE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsLoaded());
+  ASSERT_TRUE(manager_.IsRegistered());
+  ASSERT_FALSE(manager_.IsReady());
   EXPECT_TRUE(manager_.local_state_for_testing()
                   .users()
                   .find(gaia_id_.ToString())
@@ -542,8 +569,7 @@ TEST_F(EnclaveManagerTest, Basic) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)}, kSecretVersion);
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_TRUE(manager_.has_pending_keys());
   EXPECT_EQ(stored_count_, 1u);
@@ -556,9 +582,9 @@ TEST_F(EnclaveManagerTest, Basic) {
   ASSERT_TRUE(add_future.Get());
 
   ASSERT_TRUE(manager_.is_idle());
-  ASSERT_TRUE(manager_.is_loaded());
-  ASSERT_TRUE(manager_.is_registered());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsLoaded());
+  ASSERT_TRUE(manager_.IsRegistered());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_FALSE(manager_.has_pending_keys());
   ASSERT_TRUE(manager_.TakeSecret());
   ASSERT_FALSE(manager_.TakeSecret());
@@ -574,24 +600,45 @@ TEST_F(EnclaveManagerTest, Basic) {
       device::enclave::EnclaveTransactionResult::kSuccess, 2);
 }
 
+TEST_F(EnclaveManagerTest,
+       NotifiedAboutStateUpdateAfterStoringKeyAndAddingDeviceToAccount) {
+  security_domain_service_->pretend_there_are_members();
+  ASSERT_EQ(notified_about_state_update_count_, 0u);
+  ASSERT_FALSE(manager_.IsReady());
+
+  // Storing keys and adding device to account is supposed to notify observers
+  // about enclave state update:
+  std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
+  AcquireLockAndStoreKey(&manager_, {std::move(key)}, kSecretVersion);
+  BoolFuture add_future;
+  ASSERT_TRUE(manager_.AddDeviceToAccount(
+      /*pin_metadata=*/std::nullopt, add_future.GetCallback()));
+  EXPECT_TRUE(add_future.Wait());
+
+  // `notified_about_state_update_count_` is being incremented whenever
+  // `OnStateUpdated()` is called:
+  EXPECT_EQ(notified_about_state_update_count_, 1u);
+  ASSERT_TRUE(manager_.IsReady());
+}
+
 TEST_F(EnclaveManagerTest, SecretsArriveBeforeRegistrationRequested) {
   security_domain_service_->pretend_there_are_members();
-  ASSERT_FALSE(manager_.is_registered());
+  ASSERT_FALSE(manager_.IsRegistered());
 
   // If secrets are provided before `RegisterIfNeeded` is called, the state
   // machine should still trigger registration.
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/417);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/417);
   BoolFuture add_future;
   ASSERT_TRUE(manager_.AddDeviceToAccount(
       /*pin_metadata=*/std::nullopt, add_future.GetCallback()));
   EXPECT_TRUE(add_future.Wait());
 
   ASSERT_TRUE(manager_.is_idle());
-  ASSERT_TRUE(manager_.is_loaded());
-  ASSERT_TRUE(manager_.is_registered());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsLoaded());
+  ASSERT_TRUE(manager_.IsRegistered());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.TakeSecret());
 }
 
@@ -599,13 +646,13 @@ TEST_F(EnclaveManagerTest, SecretsArriveBeforeRegistrationCompleted) {
   security_domain_service_->pretend_there_are_members();
   BoolFuture register_future;
   manager_.RegisterIfNeeded(register_future.GetCallback());
-  ASSERT_FALSE(manager_.is_registered());
+  ASSERT_FALSE(manager_.IsRegistered());
 
   // Provide the domain secrets before the registration has completed. The
   // system should still end up in the correct state.
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/417);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/417);
   BoolFuture add_future;
   ASSERT_TRUE(manager_.AddDeviceToAccount(
       /*pin_metadata=*/std::nullopt, add_future.GetCallback()));
@@ -613,9 +660,9 @@ TEST_F(EnclaveManagerTest, SecretsArriveBeforeRegistrationCompleted) {
   EXPECT_TRUE(register_future.Wait());
 
   ASSERT_TRUE(manager_.is_idle());
-  ASSERT_TRUE(manager_.is_loaded());
-  ASSERT_TRUE(manager_.is_registered());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsLoaded());
+  ASSERT_TRUE(manager_.IsRegistered());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.TakeSecret());
 }
 
@@ -634,7 +681,7 @@ TEST_F(EnclaveManagerTest, RegistrationFailureAndRetry) {
     EXPECT_TRUE(register_future.Wait());
     ASSERT_FALSE(register_future.Get());
   }
-  ASSERT_FALSE(manager_.is_registered());
+  ASSERT_FALSE(manager_.IsRegistered());
   const std::string public_key = manager_.local_state_for_testing()
                                      .users()
                                      .find(gaia)
@@ -644,7 +691,7 @@ TEST_F(EnclaveManagerTest, RegistrationFailureAndRetry) {
   BoolFuture register_future;
   manager_.RegisterIfNeeded(register_future.GetCallback());
   EXPECT_TRUE(register_future.Wait());
-  ASSERT_TRUE(manager_.is_registered());
+  ASSERT_TRUE(manager_.IsRegistered());
   ASSERT_TRUE(register_future.Get());
 
   // The public key should not have changed because re-registration attempts
@@ -667,7 +714,7 @@ TEST_F(EnclaveManagerTest, PrimaryUserChange) {
     manager_.RegisterIfNeeded(register_future.GetCallback());
     EXPECT_TRUE(register_future.Wait());
   }
-  ASSERT_TRUE(manager_.is_registered());
+  ASSERT_TRUE(manager_.IsRegistered());
   EXPECT_THAT(GaiaAccountsInState(), testing::UnorderedElementsAre(gaia1));
 
   identity_test_env_.MakePrimaryAccountAvailable("test2@gmail.com",
@@ -676,13 +723,13 @@ TEST_F(EnclaveManagerTest, PrimaryUserChange) {
       identity_test_env_.identity_manager()
           ->GetPrimaryAccountInfo(signin::ConsentLevel::kSignin)
           .gaia.ToString();
-  ASSERT_FALSE(manager_.is_registered());
+  ASSERT_FALSE(manager_.IsRegistered());
   {
     BoolFuture register_future;
     manager_.RegisterIfNeeded(register_future.GetCallback());
     EXPECT_TRUE(register_future.Wait());
   }
-  ASSERT_TRUE(manager_.is_registered());
+  ASSERT_TRUE(manager_.IsRegistered());
   EXPECT_THAT(GaiaAccountsInState(),
               testing::UnorderedElementsAre(gaia1, gaia2));
 
@@ -723,8 +770,8 @@ TEST_F(EnclaveManagerTest, PrimaryUserChangeDiscardsActions) {
   // `MakePrimaryAccountAvailable` should have canceled any actions.
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_FALSE(manager_.has_pending_keys());
-  ASSERT_FALSE(manager_.is_registered());
-  ASSERT_FALSE(manager_.is_ready());
+  ASSERT_FALSE(manager_.IsRegistered());
+  ASSERT_FALSE(manager_.IsReady());
 
   EXPECT_TRUE(register_future1.Wait());
   ASSERT_FALSE(register_future1.Get());
@@ -736,8 +783,8 @@ TEST_F(EnclaveManagerTest, AddWithExistingPIN) {
   security_domain_service_->pretend_there_are_members();
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/417);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/417);
   BoolFuture add_future;
   ASSERT_TRUE(manager_.AddDeviceToAccount(
       trusted_vault::GpmPinMetadata(std::string(kTestPINPublicKey),
@@ -748,9 +795,9 @@ TEST_F(EnclaveManagerTest, AddWithExistingPIN) {
   EXPECT_TRUE(add_future.Wait());
 
   ASSERT_TRUE(manager_.is_idle());
-  ASSERT_TRUE(manager_.is_loaded());
-  ASSERT_TRUE(manager_.is_registered());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsLoaded());
+  ASSERT_TRUE(manager_.IsRegistered());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.TakeSecret());
 
   EXPECT_EQ(security_domain_service_->num_physical_members(), 1u);
@@ -762,8 +809,8 @@ TEST_F(EnclaveManagerTest, AddWithExistingPIN) {
 
 TEST_F(EnclaveManagerTest, InvalidWrappedPIN) {
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/417);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/417);
 
   BoolFuture add_future;
   // A wrapped PIN that isn't a valid protobuf should be rejected.
@@ -791,7 +838,7 @@ TEST_F(EnclaveManagerTest, SetupWithPIN) {
   BoolFuture setup_future;
   manager_.SetupWithPIN(pin, setup_future.GetCallback());
   EXPECT_TRUE(setup_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.has_wrapped_pin());
   EXPECT_FALSE(manager_.wrapped_pin_is_arbitrary());
   EXPECT_TRUE(LastPINRenewalTime().has_value());
@@ -812,11 +859,12 @@ TEST_F(EnclaveManagerTest, SetupWithPIN) {
   const cbor::Value::MapValue& wrapped_pin_cbor = cbor->GetMap();
   int cert_xml_serial_number =
       wrapped_pin_cbor.find(cbor::Value(6))->second.GetInteger();
-  EXPECT_EQ(cert_xml_serial_number, FakeRecoveryKeyStore::kTestSerialNumber);
+  EXPECT_EQ(cert_xml_serial_number,
+            recovery_key_store_->recovery_key_store_serial_number());
   const std::vector<uint8_t> cohort_public_key =
       wrapped_pin_cbor.find(cbor::Value(7))->second.GetBytestring();
   EXPECT_EQ(cohort_public_key,
-            recovery_key_store_->endpoint_public_key_bytes());
+            recovery_key_store_->CurrentEndpointPublicKeyBytes());
 
   // Verify we can use the PIN to create a passkey and assert it.
   std::unique_ptr<device::enclave::ClaimedPIN> claimed_pin =
@@ -834,7 +882,7 @@ TEST_F(EnclaveManagerTest, SetupWithPIN_SecurityDomainFailure) {
   manager_.SetupWithPIN("123456", setup_future.GetCallback());
   EXPECT_TRUE(setup_future.Wait());
   ASSERT_FALSE(setup_future.Get());
-  ASSERT_FALSE(manager_.is_ready());
+  ASSERT_FALSE(manager_.IsReady());
 }
 
 TEST_F(EnclaveManagerTest, SetupWithPIN_CertXMLFailure) {
@@ -845,7 +893,7 @@ TEST_F(EnclaveManagerTest, SetupWithPIN_CertXMLFailure) {
   // This test primarily shouldn't crash or hang.
   EXPECT_TRUE(setup_future.Wait());
   ASSERT_FALSE(setup_future.Get());
-  ASSERT_FALSE(manager_.is_ready());
+  ASSERT_FALSE(manager_.IsReady());
 }
 
 TEST_F(EnclaveManagerTest, SetupWithPIN_SigXMLFailure) {
@@ -856,7 +904,49 @@ TEST_F(EnclaveManagerTest, SetupWithPIN_SigXMLFailure) {
   // This test primarily shouldn't crash or hang.
   EXPECT_TRUE(setup_future.Wait());
   ASSERT_FALSE(setup_future.Get());
-  ASSERT_FALSE(manager_.is_ready());
+  ASSERT_FALSE(manager_.IsReady());
+}
+
+TEST_F(EnclaveManagerTest, SetupWithPIN_CustomCohortFromFinch) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  const char kCustomCertXmlUrl[] = "https://valid.example.com/cert.xml";
+  const char kCustomSigXmlUrl[] = "https://valid.example.com/sig.xml";
+  scoped_feature_list.InitAndEnableFeatureWithParameters(
+      device::enclave::kEnclaveTrustedVaultCohort,
+      {{"cert_xml", kCustomCertXmlUrl}, {"sig_xml", kCustomSigXmlUrl}});
+
+  recovery_key_store_->set_cert_xml_url(kCustomCertXmlUrl);
+  recovery_key_store_->set_sig_xml_url(kCustomSigXmlUrl);
+
+  BoolFuture setup_future;
+  manager_.SetupWithPIN("123456", setup_future.GetCallback());
+  EXPECT_TRUE(setup_future.Wait());
+  EXPECT_TRUE(setup_future.Get());
+  EXPECT_TRUE(manager_.IsReady());
+}
+
+TEST_F(EnclaveManagerTest, SetupWithPIN_InvalidSigXmlIsIgnored) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeatureWithParameters(
+      device::enclave::kEnclaveTrustedVaultCohort, {{"sig_xml", "invalid"}});
+
+  BoolFuture setup_future;
+  manager_.SetupWithPIN("123456", setup_future.GetCallback());
+  EXPECT_TRUE(setup_future.Wait());
+  EXPECT_TRUE(setup_future.Get());
+  EXPECT_TRUE(manager_.IsReady());
+}
+
+TEST_F(EnclaveManagerTest, SetupWithPIN_InvalidCertXmlIsIgnored) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeatureWithParameters(
+      device::enclave::kEnclaveTrustedVaultCohort, {{"sig_xml", "invalid"}});
+
+  BoolFuture setup_future;
+  manager_.SetupWithPIN("123456", setup_future.GetCallback());
+  EXPECT_TRUE(setup_future.Wait());
+  EXPECT_TRUE(setup_future.Get());
+  EXPECT_TRUE(manager_.IsReady());
 }
 
 TEST_F(EnclaveManagerTest, AddDeviceAndPINToAccount) {
@@ -865,15 +955,15 @@ TEST_F(EnclaveManagerTest, AddDeviceAndPINToAccount) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.has_pending_keys());
 
   BoolFuture add_future;
   manager_.AddDeviceAndPINToAccount(
       pin, /*previous_pin_public_key=*/std::nullopt, add_future.GetCallback());
   EXPECT_TRUE(add_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.has_wrapped_pin());
   EXPECT_TRUE(manager_.wrapped_pin_is_arbitrary());
 
@@ -894,11 +984,12 @@ TEST_F(EnclaveManagerTest, AddDeviceAndPINToAccount) {
   const cbor::Value::MapValue& wrapped_pin_cbor = cbor->GetMap();
   int cert_xml_serial_number =
       wrapped_pin_cbor.find(cbor::Value(6))->second.GetInteger();
-  EXPECT_EQ(cert_xml_serial_number, FakeRecoveryKeyStore::kTestSerialNumber);
+  EXPECT_EQ(cert_xml_serial_number,
+            recovery_key_store_->recovery_key_store_serial_number());
   const std::vector<uint8_t> cohort_public_key =
       wrapped_pin_cbor.find(cbor::Value(7))->second.GetBytestring();
   EXPECT_EQ(cohort_public_key,
-            recovery_key_store_->endpoint_public_key_bytes());
+            recovery_key_store_->CurrentEndpointPublicKeyBytes());
 
   std::unique_ptr<device::enclave::ClaimedPIN> claimed_pin =
       EnclaveManager::MakeClaimedPINSlowly(pin, manager_.GetWrappedPIN());
@@ -914,8 +1005,9 @@ TEST_F(EnclaveManagerTest, AddDeviceAndPINToAccountWithPreviouslyInvalidPIN) {
   const std::string pin = "pin";
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
-  manager_.StoreKeys(gaia_id_, {key},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {key},
+                         /*last_key_version=*/kSecretVersion);
+
   {
     BoolFuture add_future;
     manager_.AddDeviceAndPINToAccount(pin,
@@ -927,8 +1019,8 @@ TEST_F(EnclaveManagerTest, AddDeviceAndPINToAccountWithPreviouslyInvalidPIN) {
   // Then, make the PIN unusable and reset the registration.
   security_domain_service_->MakePinMemberUnusable();
   manager_.ClearRegistrationForTesting();
-  manager_.StoreKeys(gaia_id_, {key},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {key},
+                         /*last_key_version=*/kSecretVersion);
   {
     // Verify that attempting to register with a PIN succeeds when the public
     // key of the obsolete PIN is set.
@@ -948,15 +1040,15 @@ TEST_F(EnclaveManagerTest, ChangePIN) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.has_pending_keys());
 
   BoolFuture add_future;
   manager_.AddDeviceAndPINToAccount(
       pin, /*previous_pin_public_key=*/std::nullopt, add_future.GetCallback());
   EXPECT_TRUE(add_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.has_wrapped_pin());
   EXPECT_TRUE(manager_.wrapped_pin_is_arbitrary());
   const std::vector<uint8_t> security_domain_secret =
@@ -990,14 +1082,14 @@ TEST_F(EnclaveManagerTest, AddPINToExistingAccount) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.has_pending_keys());
 
   BoolFuture add_future;
   manager_.AddDeviceToAccount(std::nullopt, add_future.GetCallback());
   EXPECT_TRUE(add_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   const std::vector<uint8_t> security_domain_secret =
       std::move(manager_.TakeSecret()->second);
 
@@ -1030,15 +1122,15 @@ TEST_F(EnclaveManagerTest, AddPINToExistingAccountButTheresAlreadyOne) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.has_pending_keys());
 
   BoolFuture add_future;
   manager_.AddDeviceAndPINToAccount(
       pin, /*previous_pin_public_key=*/std::nullopt, add_future.GetCallback());
   EXPECT_TRUE(add_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   const std::vector<uint8_t> security_domain_secret =
       std::move(manager_.TakeSecret()->second);
 
@@ -1065,12 +1157,11 @@ TEST_F(EnclaveManagerTest, ChangePINWithTwoDevices) {
       url_loader_factory_.GetSafeWeakWrapper());
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
-  manager_.StoreKeys(gaia_id_, {key},
-                     /*last_key_version=*/kSecretVersion);
-  second_manager.StoreKeys(gaia_id_, {key},
-                           /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {key},
+                         /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&second_manager, {key},
+                         /*last_key_version=*/kSecretVersion);
 
-  LOG(INFO) << "Adding first manager";
   {
     BoolFuture add_future;
     manager_.AddDeviceAndPINToAccount(pin,
@@ -1082,14 +1173,12 @@ TEST_F(EnclaveManagerTest, ChangePINWithTwoDevices) {
   const std::vector<uint8_t> security_domain_secret =
       std::move(manager_.TakeSecret()->second);
 
-  LOG(INFO) << "Adding second manager";
   {
     BoolFuture add_future;
     second_manager.AddDeviceToAccount(std::nullopt, add_future.GetCallback());
     EXPECT_TRUE(add_future.Wait());
   }
 
-  LOG(INFO) << "First PIN change";
   {
     BoolFuture change_future;
     // `second_manager` must fetch PIN information from the security domain in
@@ -1100,7 +1189,6 @@ TEST_F(EnclaveManagerTest, ChangePINWithTwoDevices) {
     ASSERT_TRUE(change_future.Get());
   }
 
-  LOG(INFO) << "Second PIN change";
   {
     BoolFuture change_future;
     manager_.ChangePIN(new_pin, "rapt", change_future.GetCallback());
@@ -1141,8 +1229,8 @@ TEST_F(EnclaveManagerTest, EnclaveForgetsClient_AddDeviceToAccount) {
   security_domain_service_->pretend_there_are_members();
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/417);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/417);
   BoolFuture add_future;
   ASSERT_TRUE(manager_.AddDeviceToAccount(
       trusted_vault::GpmPinMetadata(std::string(kTestPINPublicKey),
@@ -1161,8 +1249,8 @@ TEST_F(EnclaveManagerTest, EnclaveForgetsClient_AddDeviceAndPINToAccount) {
   security_domain_service_->pretend_there_are_members();
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/417);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/417);
   BoolFuture add_future;
   manager_.AddDeviceAndPINToAccount("1234",
                                     /*previous_pin_public_key=*/std::nullopt,
@@ -1171,7 +1259,25 @@ TEST_F(EnclaveManagerTest, EnclaveForgetsClient_AddDeviceAndPINToAccount) {
   EXPECT_FALSE(add_future.Get());
 }
 
-TEST_F(EnclaveManagerTest, RenewPIN) {
+enum class PINRefreshFlow { kNewFlow, kOldFlow };
+
+class EnclaveManagerRenewPINTest
+    : public testing::WithParamInterface<PINRefreshFlow>,
+      public EnclaveManagerTest {
+ public:
+  EnclaveManagerRenewPINTest() {
+    scoped_feature_list_.InitWithFeatureState(
+        device::kWebAuthnNewRefreshFlow,
+        GetParam() == PINRefreshFlow::kNewFlow);
+  }
+
+  void SetUp() override { EnclaveManagerTest::SetUp(); }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+TEST_P(EnclaveManagerRenewPINTest, RenewPIN) {
   ASSERT_TRUE(Register());
 
   const std::string pin = "123456";
@@ -1179,24 +1285,37 @@ TEST_F(EnclaveManagerTest, RenewPIN) {
   BoolFuture setup_future;
   manager_.SetupWithPIN(pin, setup_future.GetCallback());
   EXPECT_TRUE(setup_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.has_wrapped_pin());
 
-  EXPECT_EQ(security_domain_service_->num_physical_members(), 1u);
-  EXPECT_EQ(security_domain_service_->num_pin_members(), 1u);
+  ASSERT_EQ(security_domain_service_->num_physical_members(), 1u);
+  ASSERT_EQ(security_domain_service_->num_pin_members(), 1u);
+  ASSERT_EQ(recovery_key_store_->vaults().size(), 1u);
 
   const std::optional<base::Time> initial_time = LastPINRenewalTime();
   ASSERT_TRUE(initial_time.has_value());
 
+  recovery_key_store_->UpgradeCohort();
   BoolFuture renew_future;
   manager_.RenewPIN(renew_future.GetCallback());
   EXPECT_TRUE(renew_future.Wait());
   EXPECT_TRUE(renew_future.Get());
 
-  // The number of PIN members must not have increased because the upload should
-  // have reused the vault handle etc of the original.
+  // The number of PIN members must not have increased because the upload
+  // should have replaced the original.
   EXPECT_EQ(security_domain_service_->num_physical_members(), 1u);
   EXPECT_EQ(security_domain_service_->num_pin_members(), 1u);
+
+  switch (GetParam()) {
+    case PINRefreshFlow::kNewFlow:
+      // We expect to create a new Vault.
+      EXPECT_EQ(recovery_key_store_->vaults().size(), 2u);
+      break;
+    case PINRefreshFlow::kOldFlow:
+      // We expect to replace the old Vault.
+      EXPECT_EQ(recovery_key_store_->vaults().size(), 1u);
+      break;
+  }
 
   const std::optional<std::vector<uint8_t>> security_domain_secret =
       FakeMagicArch::RecoverWithPIN(pin, *security_domain_service_,
@@ -1206,13 +1325,86 @@ TEST_F(EnclaveManagerTest, RenewPIN) {
   EXPECT_TRUE(*LastPINRenewalTime() > *initial_time);
 }
 
+// Tests that renewing a PIN that didn't have cohort details (because it was
+// wrapped on an older version of Chrome) results in the enclave re-wrapping it
+// with the details.
+TEST_P(EnclaveManagerRenewPINTest, RenewPINAddsCohortDetails) {
+  // Set up with a PIN.
+  ASSERT_TRUE(Register());
+  const std::string pin = "123456";
+  BoolFuture setup_future;
+  manager_.SetupWithPIN(pin, setup_future.GetCallback());
+  EXPECT_TRUE(setup_future.Wait());
+  ASSERT_TRUE(manager_.IsReady());
+  ASSERT_TRUE(manager_.has_wrapped_pin());
+
+  const std::vector<uint8_t> security_domain_secret =
+      manager_.TakeSecret()->second;
+  {
+    // Delete the wrapped PIN cohort details from the enclave manager and
+    // security domain service, simulating an older version of Chrome.
+    std::unique_ptr<webauthn_pb::EnclaveLocalState_WrappedPIN>
+        wrapped_pin_proto = manager_.GetWrappedPIN();
+    std::vector<uint8_t> wrapped_pin =
+        DecryptWrappedPin(security_domain_secret,
+                          base::as_byte_span(wrapped_pin_proto->wrapped_pin()));
+    std::optional<cbor::Value> cbor = cbor::Reader::Read(wrapped_pin);
+    cbor::Value::MapValue& wrapped_pin_cbor =
+        const_cast<cbor::Value::MapValue&>(cbor->GetMap());
+    wrapped_pin_cbor.erase(wrapped_pin_cbor.find(cbor::Value(6)));
+    wrapped_pin_cbor.erase(wrapped_pin_cbor.find(cbor::Value(7)));
+    std::vector<uint8_t> encrypted_pin = EnclaveManager::EncryptWrappedPIN(
+        security_domain_secret,
+        *cbor::Writer::Write(cbor::Value(wrapped_pin_cbor)));
+    wrapped_pin_proto->set_wrapped_pin(
+        std::string(base::as_string_view(encrypted_pin)));
+    security_domain_service_->SetPinMemberWrappedPin(
+        wrapped_pin_proto->SerializeAsString());
+    manager_.SetWrappedPINDataForTesting(std::move(encrypted_pin));
+  }
+
+  // Renew the PIN.
+  recovery_key_store_->UpgradeCohort();
+  BoolFuture renew_future;
+  manager_.RenewPIN(renew_future.GetCallback());
+  EXPECT_TRUE(renew_future.Wait());
+  EXPECT_TRUE(renew_future.Get());
+
+  // Verify that the wrapped PIN that is now present in the security domain
+  // service contains the cohort details.
+  webauthn_pb::EnclaveLocalState_WrappedPIN wrapped_pin_proto;
+  wrapped_pin_proto.ParseFromString(security_domain_service_->GetPinMetadata()
+                                        .usable_pin_metadata->wrapped_pin);
+  std::vector<uint8_t> wrapped_pin =
+      DecryptWrappedPin(security_domain_secret,
+                        base::as_byte_span(wrapped_pin_proto.wrapped_pin()));
+
+  std::optional<cbor::Value> cbor = cbor::Reader::Read(wrapped_pin);
+  const cbor::Value::MapValue& wrapped_pin_cbor = cbor->GetMap();
+
+  auto cert_xml_serial_number_it = wrapped_pin_cbor.find(cbor::Value(6));
+  ASSERT_NE(cert_xml_serial_number_it, wrapped_pin_cbor.end());
+  ASSERT_TRUE(cert_xml_serial_number_it->second.is_integer());
+  int cert_xml_serial_number = cert_xml_serial_number_it->second.GetInteger();
+  EXPECT_EQ(cert_xml_serial_number,
+            recovery_key_store_->recovery_key_store_serial_number());
+
+  auto cohort_public_key_it = wrapped_pin_cbor.find(cbor::Value(7));
+  ASSERT_NE(cohort_public_key_it, wrapped_pin_cbor.end());
+  ASSERT_TRUE(cohort_public_key_it->second.is_bytestring());
+  const std::vector<uint8_t> cohort_public_key =
+      cohort_public_key_it->second.GetBytestring();
+  EXPECT_EQ(cohort_public_key,
+            recovery_key_store_->CurrentEndpointPublicKeyBytes());
+}
+
 // Regression test for crbug.com/403218779.
 // Simulates two chrome clients by standing up a second Enclave Manager. The
 // second Enclave Manager will renew a PIN. This invalidates the data from the
 // first manager. Then, the first manager will attempt renewing the PIN. This
 // used to be broken because the first manager would not download the updated
 // PIN data, causing a public key mismatch on the join security domain query.
-TEST_F(EnclaveManagerTest, RenewPINWithStaleDataFromAnotherClient) {
+TEST_P(EnclaveManagerRenewPINTest, RenewPINWithStaleDataFromAnotherClient) {
   const std::string kPin = "123456";
 
   // Set up the first manager with the PIN.
@@ -1220,7 +1412,7 @@ TEST_F(EnclaveManagerTest, RenewPINWithStaleDataFromAnotherClient) {
   BoolFuture setup_future;
   manager_.SetupWithPIN(kPin, setup_future.GetCallback());
   ASSERT_TRUE(setup_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.has_wrapped_pin());
   ASSERT_EQ(security_domain_service_->num_physical_members(), 1u);
   ASSERT_EQ(security_domain_service_->num_pin_members(), 1u);
@@ -1238,7 +1430,8 @@ TEST_F(EnclaveManagerTest, RenewPINWithStaleDataFromAnotherClient) {
         return network_context_.get();
       }),
       url_loader_factory_.GetSafeWeakWrapper());
-  second_manager.StoreKeys(gaia_id_, {secret->second}, secret->first);
+  AcquireLockAndStoreKey(&second_manager, {secret->second},
+                         /*last_key_version=*/secret->first);
   BoolFuture add_future;
   second_manager.AddDeviceToAccount(security_domain_service_->GetPinMetadata(),
                                     add_future.GetCallback());
@@ -1249,6 +1442,7 @@ TEST_F(EnclaveManagerTest, RenewPINWithStaleDataFromAnotherClient) {
 
   // Renew the PIN with the second manager.
   {
+    recovery_key_store_->UpgradeCohort();
     BoolFuture renew_future;
     second_manager.RenewPIN(renew_future.GetCallback());
     ASSERT_TRUE(renew_future.Wait());
@@ -1260,6 +1454,7 @@ TEST_F(EnclaveManagerTest, RenewPINWithStaleDataFromAnotherClient) {
 
   // Attempt renewing the PIN with the first enclave.
   {
+    recovery_key_store_->UpgradeCohort();
     BoolFuture renew_future;
     manager_.RenewPIN(renew_future.GetCallback());
     ASSERT_TRUE(renew_future.Wait());
@@ -1273,7 +1468,7 @@ TEST_F(EnclaveManagerTest, RenewPINWithStaleDataFromAnotherClient) {
 // Regression test for crbug.com/402425846.
 // Attempts renewing a PIN from local data when the security domain indicates
 // that the current PIN changed, and is also not usable for recovery.
-TEST_F(EnclaveManagerTest, RenewUnusablePINFromLocalData) {
+TEST_P(EnclaveManagerRenewPINTest, RenewUnusablePINFromLocalData) {
   const std::string kPin = "123456";
 
   // Set up the manager with the PIN.
@@ -1281,7 +1476,7 @@ TEST_F(EnclaveManagerTest, RenewUnusablePINFromLocalData) {
   BoolFuture setup_future;
   manager_.SetupWithPIN(kPin, setup_future.GetCallback());
   ASSERT_TRUE(setup_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.has_wrapped_pin());
   ASSERT_EQ(security_domain_service_->num_physical_members(), 1u);
   ASSERT_EQ(security_domain_service_->num_pin_members(), 1u);
@@ -1294,6 +1489,7 @@ TEST_F(EnclaveManagerTest, RenewUnusablePINFromLocalData) {
   security_domain_service_->SetPinMemberPublicKey("Bad PK");
 
   // Renew the PIN.
+  recovery_key_store_->UpgradeCohort();
   BoolFuture renew_future;
   manager_.RenewPIN(renew_future.GetCallback());
   ASSERT_TRUE(renew_future.Wait());
@@ -1303,7 +1499,7 @@ TEST_F(EnclaveManagerTest, RenewUnusablePINFromLocalData) {
 
 // Regression test for crbug.com/407171373.
 // Attempts renewing a PIN after the security domain has been reset.
-TEST_F(EnclaveManagerTest, RenewPINAfterSecurityDomainReset) {
+TEST_P(EnclaveManagerRenewPINTest, RenewPINAfterSecurityDomainReset) {
   base::HistogramTester histogram_tester;
   const std::string kPin = "123456";
 
@@ -1312,9 +1508,9 @@ TEST_F(EnclaveManagerTest, RenewPINAfterSecurityDomainReset) {
   BoolFuture setup_future;
   manager_.SetupWithPIN(kPin, setup_future.GetCallback());
   ASSERT_TRUE(setup_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.has_wrapped_pin());
-  ASSERT_TRUE(manager_.is_registered());
+  ASSERT_TRUE(manager_.IsRegistered());
   ASSERT_EQ(security_domain_service_->num_physical_members(), 1u);
   ASSERT_EQ(security_domain_service_->num_pin_members(), 1u);
   const std::string initial_pin_key =
@@ -1324,12 +1520,13 @@ TEST_F(EnclaveManagerTest, RenewPINAfterSecurityDomainReset) {
   security_domain_service_->ResetSecurityDomain();
 
   // Attempt to renew the PIN. This should clear the registration data.
+  recovery_key_store_->UpgradeCohort();
   BoolFuture renew_future;
   manager_.RenewPIN(renew_future.GetCallback());
   ASSERT_TRUE(renew_future.Wait());
   EXPECT_FALSE(renew_future.Get());
   EXPECT_EQ(security_domain_service_->num_pin_members(), 0u);
-  EXPECT_FALSE(manager_.is_registered());
+  EXPECT_FALSE(manager_.IsRegistered());
   histogram_tester.ExpectUniqueSample(
       "WebAuthentication.PinRenewalFailureCause",
       EnclaveManager::PinRenewalFailureCause::kSecurityDomainReset, 1);
@@ -1338,7 +1535,7 @@ TEST_F(EnclaveManagerTest, RenewPINAfterSecurityDomainReset) {
 // Regression test for crbug.com/407171373.
 // Attempts renewing a PIN when the security domain reports that the user
 // doesn't have a GPM PIN at all.
-TEST_F(EnclaveManagerTest, RenewPINAfterSecurityDomainReportsNoPin) {
+TEST_P(EnclaveManagerRenewPINTest, RenewPINAfterSecurityDomainReportsNoPin) {
   base::HistogramTester histogram_tester;
   const std::string kPin = "123456";
 
@@ -1347,7 +1544,7 @@ TEST_F(EnclaveManagerTest, RenewPINAfterSecurityDomainReportsNoPin) {
   BoolFuture setup_future;
   manager_.SetupWithPIN(kPin, setup_future.GetCallback());
   ASSERT_TRUE(setup_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.has_wrapped_pin());
   ASSERT_EQ(security_domain_service_->num_physical_members(), 1u);
   ASSERT_EQ(security_domain_service_->num_pin_members(), 1u);
@@ -1358,6 +1555,7 @@ TEST_F(EnclaveManagerTest, RenewPINAfterSecurityDomainReportsNoPin) {
   security_domain_service_->RemovePinMember();
 
   // Try to renew the PIN. This shouldn't do anything.
+  recovery_key_store_->UpgradeCohort();
   BoolFuture renew_future;
   manager_.RenewPIN(renew_future.GetCallback());
   ASSERT_TRUE(renew_future.Wait());
@@ -1368,13 +1566,139 @@ TEST_F(EnclaveManagerTest, RenewPINAfterSecurityDomainReportsNoPin) {
       EnclaveManager::PinRenewalFailureCause::kSecurityDomainReportsNoPin, 1);
 }
 
+// Tests attempting to renew a PIN that's stored in a Vault cohort that hasn't
+// been deprecated yet.
+TEST_P(EnclaveManagerRenewPINTest, NotYetDeprecated) {
+  if (GetParam() != PINRefreshFlow::kNewFlow) {
+    GTEST_SKIP() << "Test is not applicable to old flow";
+  }
+  ASSERT_TRUE(Register());
+  base::HistogramTester histogram_tester;
+
+  const std::string pin = "123456";
+
+  // Set up a new PIN.
+  BoolFuture setup_future;
+  manager_.SetupWithPIN(pin, setup_future.GetCallback());
+  EXPECT_TRUE(setup_future.Wait());
+  ASSERT_TRUE(manager_.IsReady());
+  ASSERT_TRUE(manager_.has_wrapped_pin());
+  EXPECT_EQ(security_domain_service_->num_physical_members(), 1u);
+  EXPECT_EQ(security_domain_service_->num_pin_members(), 1u);
+  const std::optional<base::Time> initial_time = LastPINRenewalTime();
+  ASSERT_TRUE(initial_time.has_value());
+
+  // Attempt to renew without first upgrading the recovery key store.
+  BoolFuture renew_future;
+  manager_.RenewPIN(renew_future.GetCallback());
+  EXPECT_TRUE(renew_future.Wait());
+  EXPECT_FALSE(renew_future.Get());
+  EXPECT_GT(*LastPINRenewalTime(), *initial_time);
+  EXPECT_EQ(security_domain_service_->num_physical_members(), 1u);
+  EXPECT_EQ(security_domain_service_->num_pin_members(), 1u);
+  histogram_tester.ExpectUniqueSample(
+      "WebAuthentication.PinRenewalFailureCause",
+      EnclaveManager::PinRenewalFailureCause::kCohortNotYetDeprecated, 1);
+}
+
+// Tests attempting to renew a PIN with a cert.xml version that's older than the
+// last one used to wrap the PIN.
+TEST_P(EnclaveManagerRenewPINTest, NoKeyStoreDowngrade) {
+  if (GetParam() != PINRefreshFlow::kNewFlow) {
+    GTEST_SKIP() << "Test is not applicable to old flow";
+  }
+  ASSERT_TRUE(Register());
+  base::HistogramTester histogram_tester;
+
+  const std::string pin = "123456";
+
+  // Set up a new PIN.
+  BoolFuture setup_future;
+  manager_.SetupWithPIN(pin, setup_future.GetCallback());
+  EXPECT_TRUE(setup_future.Wait());
+  ASSERT_TRUE(manager_.IsReady());
+  ASSERT_TRUE(manager_.has_wrapped_pin());
+  EXPECT_EQ(security_domain_service_->num_physical_members(), 1u);
+  EXPECT_EQ(security_domain_service_->num_pin_members(), 1u);
+  const std::optional<base::Time> initial_time = LastPINRenewalTime();
+  ASSERT_TRUE(initial_time.has_value());
+
+  // Downgrade the recovery key store.
+  recovery_key_store_->DowngradeCohort();
+
+  // Attempting to renew the PIN should result in an error.
+  BoolFuture renew_future;
+  manager_.RenewPIN(renew_future.GetCallback());
+  EXPECT_TRUE(renew_future.Wait());
+  EXPECT_FALSE(renew_future.Get());
+  EXPECT_EQ(LastPINRenewalTime(), initial_time);
+  EXPECT_EQ(security_domain_service_->num_physical_members(), 1u);
+  EXPECT_EQ(security_domain_service_->num_pin_members(), 1u);
+  histogram_tester.ExpectUniqueSample(
+      "WebAuthentication.PinRenewalFailureCause",
+      EnclaveManager::PinRenewalFailureCause::kRecoveryKeyStoreDowngrade, 1);
+}
+
+// Tests that a PIN is still usable for recovery if updating the security domain
+// service failed e.g. due to a network issue.
+// Regression test for crbug.com/399818721.
+TEST_P(EnclaveManagerRenewPINTest, RenewPINInterruptSecurityDomainUpdate) {
+  ASSERT_TRUE(Register());
+
+  const std::string pin = "123456";
+
+  // Set up a PIN.
+  BoolFuture setup_future;
+  manager_.SetupWithPIN(pin, setup_future.GetCallback());
+  EXPECT_TRUE(setup_future.Wait());
+  ASSERT_TRUE(manager_.IsReady());
+  ASSERT_TRUE(manager_.has_wrapped_pin());
+
+  // Fail all *join* requests (but not *all* requests: we need downloading the
+  // keys from the security domain service to succeed to get to the point we
+  // create a new Vault).
+  security_domain_service_->fail_join_requests_matching(base::BindRepeating(
+      [](const trusted_vault_pb::JoinSecurityDomainsRequest& request) {
+        return true;
+      }));
+
+  // Renewing should fail.
+  recovery_key_store_->UpgradeCohort();
+  BoolFuture renew_future;
+  manager_.RenewPIN(renew_future.GetCallback());
+  EXPECT_TRUE(renew_future.Wait());
+  EXPECT_FALSE(renew_future.Get());
+
+  // Attempt recovery.
+  const std::optional<std::vector<uint8_t>> security_domain_secret =
+      FakeMagicArch::RecoverWithPIN(pin, *security_domain_service_,
+                                    *recovery_key_store_);
+  switch (GetParam()) {
+    case PINRefreshFlow::kNewFlow:
+      // With the new flow, recovering should succeed.
+      ASSERT_TRUE(security_domain_secret.has_value());
+      EXPECT_EQ(manager_.TakeSecret()->second, *security_domain_secret);
+      break;
+    case PINRefreshFlow::kOldFlow:
+      // Sanity test that the old flow does not support recovering from this
+      // state.
+      EXPECT_FALSE(security_domain_secret.has_value());
+      break;
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(,
+                         EnclaveManagerRenewPINTest,
+                         testing::Values(PINRefreshFlow::kOldFlow,
+                                         PINRefreshFlow::kNewFlow));
+
 TEST_F(EnclaveManagerTest, EpochChanged) {
   ASSERT_TRUE(Register());
 
   BoolFuture setup_future;
   manager_.SetupWithPIN("123456", setup_future.GetCallback());
   EXPECT_TRUE(setup_future.Wait());
-  EXPECT_TRUE(manager_.is_ready());
+  EXPECT_TRUE(manager_.IsReady());
 
   trusted_vault::DownloadAuthenticationFactorsRegistrationStateResult state;
   state.state = trusted_vault::
@@ -1389,7 +1713,7 @@ TEST_F(EnclaveManagerTest, EpochChanged) {
   EXPECT_FALSE(
       manager_.ConsiderSecurityDomainState(state, update_future.GetCallback()));
   EXPECT_TRUE(update_future.Wait());
-  EXPECT_FALSE(manager_.is_ready());
+  EXPECT_FALSE(manager_.IsReady());
 }
 
 TEST_F(EnclaveManagerTest, PINChanged) {
@@ -1399,7 +1723,7 @@ TEST_F(EnclaveManagerTest, PINChanged) {
   BoolFuture setup_future;
   manager_.SetupWithPIN("123456", setup_future.GetCallback());
   EXPECT_TRUE(setup_future.Wait());
-  EXPECT_TRUE(manager_.is_ready());
+  EXPECT_TRUE(manager_.IsReady());
 
   const webauthn_pb::EnclaveLocalState::User& user =
       manager_.local_state_for_testing().users().begin()->second;
@@ -1419,7 +1743,7 @@ TEST_F(EnclaveManagerTest, PINChanged) {
   EXPECT_TRUE(
       manager_.ConsiderSecurityDomainState(state, update_future.GetCallback()));
   EXPECT_TRUE(update_future.Wait());
-  EXPECT_TRUE(manager_.is_ready());
+  EXPECT_TRUE(manager_.IsReady());
   const webauthn_pb::EnclaveLocalState::User& updated_user =
       manager_.local_state_for_testing().users().begin()->second;
   EXPECT_EQ(updated_user.wrapped_pin().wrapped_pin(), kNewWrappedPin);
@@ -1480,7 +1804,7 @@ TEST_F(EnclaveManagerTest, AddICloudRecoveryKey) {
   BoolFuture setup_future;
   manager_.SetupWithPIN("123456", setup_future.GetCallback());
   EXPECT_TRUE(setup_future.Wait());
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
 
   std::unique_ptr<trusted_vault::ICloudRecoveryKey> icloud_key =
       trusted_vault::ICloudRecoveryKey::CreateForTest();
@@ -1518,32 +1842,27 @@ TEST_F(EnclaveManagerTest, AddICloudRecoveryKey) {
   ASSERT_TRUE(security_domain_secret);
   EXPECT_EQ(manager_.TakeSecret()->second, *security_domain_secret);
 
-  std::array<uint8_t, SHA256_DIGEST_LENGTH> expected_proof;
-  unsigned expected_proof_len;
-  HMAC(EVP_sha256(), security_domain_secret->data(),
-       security_domain_secret->size(),
-       reinterpret_cast<const uint8_t*>(icloud_member->public_key().data()),
-       icloud_member->public_key().size(), expected_proof.data(),
-       &expected_proof_len);
-  ASSERT_EQ(expected_proof_len, expected_proof.size());
-  EXPECT_EQ(base::span<const uint8_t>(expected_proof),
-            base::as_byte_span(shared_member_key.member_proof()));
+  const auto proof = base::span<const uint8_t, crypto::hash::kSha256Size>(
+      base::as_byte_span(shared_member_key.member_proof()));
+  EXPECT_TRUE(crypto::hmac::VerifySha256(
+      *security_domain_secret, base::as_byte_span(icloud_member->public_key()),
+      proof));
 }
 #endif  // BUILDFLAG(IS_MAC)
 
 TEST_F(EnclaveManagerTest, Unenroll) {
   ASSERT_TRUE(Register());
 
-  ASSERT_TRUE(manager_.is_registered());
+  ASSERT_TRUE(manager_.IsRegistered());
   BoolFuture unenroll_future;
   manager_.Unenroll(unenroll_future.GetCallback());
   EXPECT_TRUE(unenroll_future.Wait());
   EXPECT_TRUE(unenroll_future.Get());
-  ASSERT_FALSE(manager_.is_registered());
+  ASSERT_FALSE(manager_.IsRegistered());
 
   // Things should be in a good state such that we can register again.
   ASSERT_TRUE(Register());
-  ASSERT_TRUE(manager_.is_registered());
+  ASSERT_TRUE(manager_.IsRegistered());
 }
 
 TEST_F(EnclaveManagerTest, UnenrollRace) {
@@ -1551,7 +1870,7 @@ TEST_F(EnclaveManagerTest, UnenrollRace) {
 
   // Should be safe to race multiple unenroll requests. The ones after the first
   // will fail when pending requests are cancelled.
-  ASSERT_TRUE(manager_.is_registered());
+  ASSERT_TRUE(manager_.IsRegistered());
   BoolFuture unenroll_future1;
   BoolFuture unenroll_future2;
   BoolFuture unenroll_future3;
@@ -1564,16 +1883,16 @@ TEST_F(EnclaveManagerTest, UnenrollRace) {
   EXPECT_TRUE(unenroll_future1.Get());
   EXPECT_FALSE(unenroll_future2.Get());
   EXPECT_FALSE(unenroll_future3.Get());
-  ASSERT_FALSE(manager_.is_registered());
+  ASSERT_FALSE(manager_.IsRegistered());
 }
 
 TEST_F(EnclaveManagerTest, UnenrollWithoutRegistering) {
-  ASSERT_FALSE(manager_.is_registered());
+  ASSERT_FALSE(manager_.IsRegistered());
   BoolFuture unenroll_future;
   manager_.Unenroll(unenroll_future.GetCallback());
   EXPECT_TRUE(unenroll_future.Wait());
   EXPECT_TRUE(unenroll_future.Get());
-  ASSERT_FALSE(manager_.is_registered());
+  ASSERT_FALSE(manager_.IsRegistered());
 }
 
 TEST_F(EnclaveManagerTest, LockPINThenChange) {
@@ -1644,8 +1963,8 @@ TEST_F(EnclaveManagerTest, MAYBE_HardwareKeyLost) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_TRUE(manager_.has_pending_keys());
 
@@ -1706,7 +2025,7 @@ TEST_F(EnclaveManagerTest, MAYBE_HardwareKeyLost) {
                  quit_closure.Run();
                }));
   task_env_.RunUntilQuit();
-  EXPECT_FALSE(manager_.is_registered());
+  EXPECT_FALSE(manager_.IsRegistered());
 
   // Verify that the UV key was deleted when the HW key was lost.
   base::test::TestFuture<
@@ -1820,12 +2139,236 @@ TEST_F(EnclaveManagerTest, RenewPinWithoutWrappedSecurityDomainSecret) {
             0);
 }
 
+TEST_F(EnclaveManagerTest, CheckGpmPinAvailabilityWhenPinIsAvailable) {
+  const std::string pin = "123456";
+  ASSERT_TRUE(Register());
+
+  BoolFuture setup_future;
+  manager_.SetupWithPIN(pin, setup_future.GetCallback());
+  EXPECT_TRUE(setup_future.Wait());
+  ASSERT_TRUE(manager_.IsReady());
+  ASSERT_TRUE(manager_.has_wrapped_pin());
+
+  base::test::TestFuture<EnclaveManager::GpmPinAvailability> future;
+  manager_.CheckGpmPinAvailability(future.GetCallback());
+  EXPECT_TRUE(future.Wait());
+  EXPECT_EQ(future.Get(),
+            EnclaveManager::GpmPinAvailability::kGpmPinSetAndUsable);
+}
+
+#if !BUILDFLAG(IS_CHROMEOS)
+// This test verifies the following scenario:
+// - The system UV is not available.
+// - Imagine that there is an account "Account 1".
+// - "Account 1" has a GPM PIN knowledge factor.
+// - Imagine that the currently signed-in primary account is "Account 2".
+// - We opportunistically retrieved a passkey secret of "Account 1" and
+//   we are trying to store it in Enclave Manager.
+// - Since the primary account is "Account 2", we can't store the passkey
+//   secret at this point (we need to wait until "Account 1" becomes a
+//   primary account). Because of this, Enclave Manager will temporarily
+//   cache the opportunistically retrieved a passkey secret of "Account 1".
+// - After "Account 1" becomes a primary account Enclave Manager will try
+//   to store the cached opportunistically retrieved passkey secret of
+//   "Account 1".
+//  - Since "Account 1" has a GPM PIN knowledge factor, the opportunistically
+//    retrieved passkey secret will be successfully stored.
+TEST_F(EnclaveManagerTest,
+       StoringOpportunisticallyRetrievedKeyAfterSignInOfMatchingAccount) {
+  // Simulating the absence of system UV.
+  auto disabled_uv = crypto::ScopedNullUserVerifyingKeyProvider();
+  // Currently we are signed-in with some account (let's call it "Account 1").
+  const CoreAccountInfo account_1 =
+      identity_test_env_.identity_manager()->GetPrimaryAccountInfo(
+          signin::ConsentLevel::kSignin);
+  // Registering a GPM PIN knowledge factor for the account "Account 1".
+  ASSERT_TRUE(Register());
+  BoolFuture setup_future;
+  manager_.SetupWithPIN(/*pin=*/"123456", setup_future.GetCallback());
+  EXPECT_TRUE(setup_future.Wait());
+  // Enforce enclave manager to be unregistered (for being able to test the
+  // logic of storing the opportunistically retrieved key). After clearing
+  // registration, the GPM PIN knowledge factor remains available.
+  // The GPM PIN will be needed for storing opportunistically retrieved keys.
+  manager_.ClearRegistrationForTesting();
+  ASSERT_FALSE(manager_.IsRegistered());
+  // "Account 1" should have no keys.
+  EXPECT_EQ(manager_.store_keys_count(), 0u);
+
+  // Signing-in with another primary account (let's call it "Account 2").
+  identity_test_env_.MakePrimaryAccountAvailable("test2@gmail.com",
+                                                 signin::ConsentLevel::kSignin);
+  const CoreAccountInfo account_2 =
+      identity_test_env_.identity_manager()->GetPrimaryAccountInfo(
+          signin::ConsentLevel::kSignin);
+  identity_test_env_.SetCookieAccounts({});
+  EXPECT_THAT(GaiaAccountsInState(),
+              testing::UnorderedElementsAre(account_2.gaia.ToString()));
+
+  // While the primary account is "Account 2", we are trying to store the
+  // opportunistically retrieved key for the other account ("Account 1").
+  std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
+  base::HistogramTester histogram_tester;
+  EnclaveKeysWaiter enclave_keys_waiter(&manager_);
+  manager_.StoreKeys(account_1.gaia, {std::move(key)},
+                     /*last_key_version=*/kSecretVersion);
+  // Since the account "Account 1" is not signed-in, the opportunistically
+  // retrieved key can't be stored immediately (it will be cached for some
+  // time). The corresponding metric is expected to be published in this case.
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowCachedKeysBecauseAccountDoesNotMatch,
+      1);
+
+  // Signing-in with the "Account 1" account again.
+  identity_test_env_.MakePrimaryAccountAvailable(account_1.email,
+                                                 signin::ConsentLevel::kSignin);
+  identity_test_env_.SetCookieAccounts({});
+  EXPECT_THAT(GaiaAccountsInState(),
+              testing::UnorderedElementsAre(account_1.gaia.ToString()));
+
+  // Since the "Account 1" account is signed-in now, the cached
+  // opportunistically retrieved key should be stored now.
+  EXPECT_EQ(enclave_keys_waiter.Wait(),
+            EnclaveManager::OutOfContextRecoveryOutcome::
+                kStoreKeysFromOpportunisticFlowSucceeded);
+  EXPECT_EQ(manager_.store_keys_count(), 1u);
+
+  // The metrics indicating what happened with the cached key.
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.CachedOpportunisticallyRetrievedKeyEvent",
+      webauthn::metrics::
+          WebAuthenticationGPMCachedOpportunisticallyRetrievedKeyEvent::
+              kStoreKeysFromOpportunisticFlowCachedKeysStoringAfterSignIn,
+      1);
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowStarted,
+      1);
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowSucceeded,
+      1);
+}
+#endif
+
+TEST_F(EnclaveManagerTest, CheckGpmPinAvailabilityWhenPinIsNotAvailable) {
+  ASSERT_TRUE(Register());
+
+  base::test::TestFuture<EnclaveManager::GpmPinAvailability> future;
+  manager_.CheckGpmPinAvailability(future.GetCallback());
+  EXPECT_TRUE(future.Wait());
+  EXPECT_EQ(future.Get(), EnclaveManager::GpmPinAvailability::kGpmPinUnset);
+}
+
 class EnclaveManagerMockTimeTest : public EnclaveManagerTest {
  public:
   EnclaveManagerMockTimeTest()
       : EnclaveManagerTest(base::test::TaskEnvironment::TimeSource::MOCK_TIME) {
   }
 };
+
+#if !BUILDFLAG(IS_CHROMEOS)
+TEST_F(EnclaveManagerMockTimeTest,
+       DiscardingOpportunisticallyRetrievedKeyAfterTimeout) {
+  // Trying to store the opportunistically retrieved key of some other account.
+  std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
+  base::HistogramTester histogram_tester;
+  manager_.StoreKeys(GaiaId("some_other_account_id"), {std::move(key)},
+                     /*last_key_version=*/kSecretVersion);
+  // Since the other account is not signed-in, the opportunistically
+  // retrieved key can't be stored immediately (it will be cached for some
+  // time). The corresponding metric is expected to be published in this case.
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowCachedKeysBecauseAccountDoesNotMatch,
+      1);
+
+  int ttl_seconds =
+      device::kWebAuthnOpportunisticRetrievalTimeToKeepCachedKeySeconds.Get();
+
+  // Move to the point in time before the timeout. The cached key should not be
+  // discarded before the timeout.
+  task_env_.FastForwardBy(base::Seconds(ttl_seconds - 1));
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.CachedOpportunisticallyRetrievedKeyEvent",
+      webauthn::metrics::
+          WebAuthenticationGPMCachedOpportunisticallyRetrievedKeyEvent::
+              kStoreKeysFromOpportunisticFlowCachedKeysRemovedAfterTimeout,
+      0);
+
+  // Move a bit beyond the timeout. The cached key should be discarded.
+  task_env_.FastForwardBy(base::Seconds(2));
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.CachedOpportunisticallyRetrievedKeyEvent",
+      webauthn::metrics::
+          WebAuthenticationGPMCachedOpportunisticallyRetrievedKeyEvent::
+              kStoreKeysFromOpportunisticFlowCachedKeysRemovedAfterTimeout,
+      1);
+}
+
+TEST_F(EnclaveManagerMockTimeTest,
+       OverwritingAndDiscardingOpportunisticallyRetrievedKey) {
+  // Trying to store the opportunistically retrieved key of some other account.
+  std::vector<uint8_t> key_1(kTestKey.begin(), kTestKey.end());
+  base::HistogramTester histogram_tester;
+  manager_.StoreKeys(GaiaId("some_other_account_id_1"), {std::move(key_1)},
+                     /*last_key_version=*/kSecretVersion);
+  // Since the other account is not signed-in, the opportunistically
+  // retrieved key will be cached.
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowCachedKeysBecauseAccountDoesNotMatch,
+      1);
+
+  int ttl_seconds =
+      device::kWebAuthnOpportunisticRetrievalTimeToKeepCachedKeySeconds.Get();
+
+  // Move to the point in time before the timeout, and overwrite the cached key
+  // with another opportunistically retrieved key.
+  task_env_.FastForwardBy(base::Seconds(ttl_seconds - 1));
+  std::vector<uint8_t> key_2(kTestKey.begin(), kTestKey.end());
+  manager_.StoreKeys(GaiaId("some_other_account_id_2"), {std::move(key_2)},
+                     /*last_key_version=*/kSecretVersion);
+  // This metric is being published when the previous key is being overwritten.
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.CachedOpportunisticallyRetrievedKeyEvent",
+      webauthn::metrics::
+          WebAuthenticationGPMCachedOpportunisticallyRetrievedKeyEvent::
+              kStoreKeysFromOpportunisticFlowCachedKeysHaveBeenOverwritten,
+      1);
+  // This metric is being incremented when the new key is being cached.
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowCachedKeysBecauseAccountDoesNotMatch,
+      2);
+
+  // Move to the point in time before the timeout of the newly cached key. This
+  // key should not be discarded before its TTL timeout.
+  task_env_.FastForwardBy(base::Seconds(ttl_seconds - 1));
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.CachedOpportunisticallyRetrievedKeyEvent",
+      webauthn::metrics::
+          WebAuthenticationGPMCachedOpportunisticallyRetrievedKeyEvent::
+              kStoreKeysFromOpportunisticFlowCachedKeysRemovedAfterTimeout,
+      0);
+
+  // The new cached key will be discarded after its TTL timeout.
+  task_env_.FastForwardBy(base::Seconds(2));
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.CachedOpportunisticallyRetrievedKeyEvent",
+      webauthn::metrics::
+          WebAuthenticationGPMCachedOpportunisticallyRetrievedKeyEvent::
+              kStoreKeysFromOpportunisticFlowCachedKeysRemovedAfterTimeout,
+      1);
+}
+#endif
 
 TEST_F(EnclaveManagerMockTimeTest, AutomaticRenewal) {
   const std::string pin = "123456";
@@ -1843,7 +2386,7 @@ TEST_F(EnclaveManagerMockTimeTest, AutomaticRenewal) {
     base::PlatformThread::Sleep(time_step);
     task_env_.FastForwardBy(time_step);
   }
-  ASSERT_TRUE(manager_.is_ready());
+  ASSERT_TRUE(manager_.IsReady());
   ASSERT_TRUE(manager_.has_wrapped_pin());
 
   // When using MOCK_TIME, requests to the enclave will likely timeout as noted
@@ -1943,8 +2486,8 @@ TEST_F(EnclaveUVTest, UserVerifyingKeyAvailable) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_TRUE(manager_.has_pending_keys());
 
@@ -1977,8 +2520,8 @@ TEST_F(EnclaveUVTest, UserVerifyingKeyUnavailable) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_TRUE(manager_.has_pending_keys());
 
@@ -1987,7 +2530,7 @@ TEST_F(EnclaveUVTest, UserVerifyingKeyUnavailable) {
       /*pin_metadata=*/std::nullopt, add_future.GetCallback()));
   ASSERT_FALSE(manager_.is_idle());
   EXPECT_TRUE(add_future.Wait());
-  ASSERT_TRUE(manager_.is_registered());
+  ASSERT_TRUE(manager_.IsRegistered());
   EXPECT_EQ(manager_.uv_key_state(/*platform_has_biometrics=*/false),
             EnclaveManager::UvKeyState::kNone);
 }
@@ -2005,8 +2548,8 @@ TEST_F(EnclaveUVTest, UserVerifyingKeyLost) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_TRUE(manager_.has_pending_keys());
 
@@ -2052,7 +2595,7 @@ TEST_F(EnclaveUVTest, UserVerifyingKeyLost) {
                  quit_closure.Run();
                }));
   task_env_.RunUntilQuit();
-  EXPECT_FALSE(manager_.is_registered());
+  EXPECT_FALSE(manager_.IsRegistered());
 }
 
 TEST_F(EnclaveUVTest, UserVerifyingKeyUseExisting) {
@@ -2089,8 +2632,8 @@ TEST_F(EnclaveUVTest, UserVerifyingKeyUseExisting) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_TRUE(manager_.has_pending_keys());
 
@@ -2103,6 +2646,170 @@ TEST_F(EnclaveUVTest, UserVerifyingKeyUseExisting) {
   ASSERT_EQ(manager_.uv_key_state(/*platform_has_biometrics=*/false),
             EnclaveManager::UvKeyState::kUsesSystemUI);
 }
+
+TEST_F(EnclaveUVTest, OpportunisticStoreKeys) {
+  security_domain_service_->pretend_there_are_members();
+  ASSERT_FALSE(manager_.IsRegistered());
+  EXPECT_EQ(manager_.store_keys_count(), 0u);
+
+  std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
+  base::HistogramTester histogram_tester;
+  EnclaveKeysWaiter enclave_keys_waiter(&manager_);
+  manager_.StoreKeys(gaia_id_, {std::move(key)},
+                     /*last_key_version=*/kSecretVersion);
+  EXPECT_EQ(enclave_keys_waiter.Wait(),
+            EnclaveManager::OutOfContextRecoveryOutcome::
+                kStoreKeysFromOpportunisticFlowSucceeded);
+
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowStarted,
+      1);
+  EXPECT_EQ(manager_.store_keys_count(), 1u);
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowSucceeded,
+      1);
+}
+
+TEST_F(EnclaveUVTest, OpportunisticStoreKeysAreIgnoredWhenFeatureIsDisabled) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndDisableFeature(
+      device::kWebAuthnOpportunisticRetrieval);
+  security_domain_service_->pretend_there_are_members();
+  ASSERT_FALSE(manager_.IsRegistered());
+  EXPECT_EQ(manager_.store_keys_count(), 0u);
+
+  std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
+  base::HistogramTester histogram_tester;
+  manager_.StoreKeys(gaia_id_, {std::move(key)},
+                     /*last_key_version=*/kSecretVersion);
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowStarted,
+      0);
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowSucceeded,
+      0);
+  EXPECT_EQ(manager_.store_keys_count(), 1u);
+  EXPECT_FALSE(manager_.IsRegistered());
+}
+
+TEST_F(EnclaveUVTest, OpportunisticStoreKeysRedundant) {
+  ASSERT_FALSE(manager_.IsRegistered());
+  EXPECT_EQ(manager_.store_keys_count(), 0u);
+
+  BoolFuture register_future;
+  manager_.RegisterIfNeeded(register_future.GetCallback());
+  EXPECT_TRUE(register_future.Wait());
+
+  std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
+  base::HistogramTester histogram_tester;
+  EnclaveKeysWaiter enclave_keys_waiter(&manager_);
+  manager_.StoreKeys(gaia_id_, {std::move(key)},
+                     /*last_key_version=*/kSecretVersion);
+  EXPECT_EQ(enclave_keys_waiter.Wait(),
+            EnclaveManager::OutOfContextRecoveryOutcome::
+                kStoreKeysFromOpportunisticFlowIgnoredRedundant);
+
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowStarted,
+      1);
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowIgnoredRedundant,
+      1);
+  EXPECT_EQ(manager_.store_keys_count(), 0u);
+
+  // If the existing registration doesn't cause the keys to be discarded then
+  // several things will go wrong. If nothing else, `pretend_there_are_members`
+  // isn't called so the fake security domain service will CHECK since the
+  // version is non-zero.
+}
+
+#if !BUILDFLAG(IS_CHROMEOS)
+// On Chrome OS, `AreUserVerifyingKeysSupported` always returns true, thus this
+// test cannot establish its preconditions.
+
+TEST_F(EnclaveUVTest, OpportunisticStoreKeysNoUVButHasUsableGpmPin) {
+  const std::string pin = "123456";
+  BoolFuture setup_future;
+  manager_.SetupWithPIN(pin, setup_future.GetCallback());
+  EXPECT_TRUE(setup_future.Wait());
+  ASSERT_TRUE(manager_.IsReady());
+  ASSERT_TRUE(manager_.has_wrapped_pin());
+  EXPECT_EQ(manager_.store_keys_count(), 0u);
+
+  // Clear the local registration so that we can test the opportunistic flow.
+  // The fake security domain service will still have the PIN available.
+  manager_.ClearRegistrationForTesting();
+  ASSERT_FALSE(manager_.IsRegistered());
+
+  DisableUVKeySupport();
+
+  std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
+  base::HistogramTester histogram_tester;
+  EnclaveKeysWaiter enclave_keys_waiter(&manager_);
+  manager_.StoreKeys(gaia_id_, {std::move(key)},
+                     /*last_key_version=*/kSecretVersion);
+  EXPECT_EQ(enclave_keys_waiter.Wait(),
+            EnclaveManager::OutOfContextRecoveryOutcome::
+                kStoreKeysFromOpportunisticFlowSucceeded);
+
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowStarted,
+      1);
+  EXPECT_EQ(manager_.store_keys_count(), 1u);
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowSucceeded,
+      1);
+}
+
+TEST_F(EnclaveUVTest, OpportunisticStoreKeysNoUVNoGpmPin) {
+  ASSERT_FALSE(manager_.IsRegistered());
+  EXPECT_EQ(manager_.store_keys_count(), 0u);
+  DisableUVKeySupport();
+
+  std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
+  base::HistogramTester histogram_tester;
+  EnclaveKeysWaiter enclave_keys_waiter(&manager_);
+  manager_.StoreKeys(gaia_id_, {std::move(key)},
+                     /*last_key_version=*/kSecretVersion);
+  EXPECT_EQ(enclave_keys_waiter.Wait(),
+            EnclaveManager::OutOfContextRecoveryOutcome::
+                kStoreKeysFromOpportunisticFlowIgnoredNoUV);
+
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowStarted,
+      1);
+  histogram_tester.ExpectBucketCount(
+      "WebAuthentication.GPM.RecoveryEvent",
+      webauthn::metrics::WebAuthenticationGPMRecoveryEvent::
+          kStoreKeysFromOpportunisticFlowIgnoredNoUV,
+      1);
+  EXPECT_EQ(manager_.store_keys_count(), 0u);
+
+  // If the lack of UV doesn't cause the keys to be discarded then several
+  // things will go wrong. If nothing else, `pretend_there_are_members` isn't
+  // called so the fake security domain service will CHECK since the version is
+  // non-zero.
+  EXPECT_FALSE(manager_.IsRegistered());
+}
+#endif
 
 #if BUILDFLAG(IS_MAC)
 // Tests that if biometrics are available on macOS, Chrome will handle prompting
@@ -2120,8 +2827,8 @@ TEST_F(EnclaveUVTest, ChromeHandlesBiometrics) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_TRUE(manager_.has_pending_keys());
 
@@ -2157,8 +2864,8 @@ TEST_F(EnclaveUVTest, DeferredUVKeyCreation) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_TRUE(manager_.has_pending_keys());
 
@@ -2208,8 +2915,8 @@ TEST_F(EnclaveUVTest, UnregisterOnFailedDeferredUVKeyCreation) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_TRUE(manager_.has_pending_keys());
 
@@ -2257,7 +2964,7 @@ TEST_F(EnclaveUVTest, UnregisterOnFailedDeferredUVKeyCreation) {
               std::move(ui_request));
   run_loop.Run();
 
-  EXPECT_FALSE(manager_.is_registered());
+  EXPECT_FALSE(manager_.IsRegistered());
 }
 
 // Test that signing with a key that is unknown to the service unregisters
@@ -2276,8 +2983,8 @@ TEST_F(EnclaveUVTest, UnregisterOnMissingUserVerifyingKey) {
 
   std::vector<uint8_t> key(kTestKey.begin(), kTestKey.end());
   ASSERT_FALSE(manager_.has_pending_keys());
-  manager_.StoreKeys(gaia_id_, {std::move(key)},
-                     /*last_key_version=*/kSecretVersion);
+  AcquireLockAndStoreKey(&manager_, {std::move(key)},
+                         /*last_key_version=*/kSecretVersion);
   ASSERT_TRUE(manager_.is_idle());
   ASSERT_TRUE(manager_.has_pending_keys());
 
@@ -2348,7 +3055,7 @@ TEST_F(EnclaveUVTest, UnregisterOnMissingUserVerifyingKey) {
               std::move(ui_request));
   run_loop.Run();
 
-  EXPECT_FALSE(manager_.is_registered());
+  EXPECT_FALSE(manager_.IsRegistered());
   histogram_tester.ExpectBucketCount(
       "WebAuthentication.EnclaveTransactionResult",
       device::enclave::EnclaveTransactionResult::kMissingKey, 1);

@@ -8,7 +8,6 @@
 #include <optional>
 #include <variant>
 
-#include "base/containers/contains.h"
 #include "base/containers/map_util.h"
 #include "base/run_loop.h"
 #include "base/task/single_thread_task_runner.h"
@@ -50,17 +49,19 @@ std::optional<base::Time> CalculateNewTime(
 
 }  // namespace
 
+DEFINE_FRAMEWORK_SPECIFIC_METADATA(InteractiveFeaturePromoTestPrivate)
+
 InteractiveFeaturePromoTestPrivate::ProfileData::ProfileData() = default;
 InteractiveFeaturePromoTestPrivate::ProfileData::ProfileData(
     ProfileData&&) noexcept = default;
 InteractiveFeaturePromoTestPrivate::ProfileData::~ProfileData() = default;
 
 InteractiveFeaturePromoTestPrivate::InteractiveFeaturePromoTestPrivate(
-    std::unique_ptr<InteractionTestUtilBrowser> test_util,
+    ui::test::internal::InteractiveTestPrivate& test_impl,
     TrackerMode tracker_mode,
     ClockMode clock_mode,
     InitialSessionState initial_session_state)
-    : InteractiveBrowserTestPrivate(std::move(test_util)),
+    : InteractiveTestPrivateFrameworkBase(test_impl),
       tracker_mode_(std::move(tracker_mode)),
       clock_mode_(clock_mode),
       initial_session_state_(initial_session_state) {
@@ -115,7 +116,11 @@ void InteractiveFeaturePromoTestPrivate::CommitControllerMode() {
             user_education::features::kUserEducationExperienceVersion2Point5,
             {{"low_priority_timeout", "3s"},
              {"medium_priority_timeout", "2s"},
-             {"high_priority_timeout", "1s"}}));
+             {"high_priority_timeout", "1s"},
+             // Idle timeout must be larger than low priority timeout for
+             // timeout tests to work, otherwise it's not possible for the test
+             // to time out due to user input.
+             {"idle_before_heavyweight", "5s"}}));
       } else {
         enable.push_back(base::test::FeatureRefAndParams(
             user_education::features::kUserEducationExperienceVersion2Point5,
@@ -135,7 +140,6 @@ void InteractiveFeaturePromoTestPrivate::ResetControllerMode() {
 }
 
 void InteractiveFeaturePromoTestPrivate::DoTestSetUp() {
-  InteractiveBrowserTestPrivate::DoTestSetUp();
   CHECK(controller_mode_.has_value());
   CHECK_NE(controller_mode_ == ControllerMode::kUserEd20,
            user_education::features::IsUserEducationV25());
@@ -145,7 +149,6 @@ void InteractiveFeaturePromoTestPrivate::DoTestTearDown() {
   profile_observations_.RemoveAllObservations();
   profile_data_.clear();
   activation_lock_.reset();
-  InteractiveBrowserTestPrivate::DoTestTearDown();
 }
 
 InteractiveFeaturePromoTestPrivate::MockTracker*
@@ -207,7 +210,7 @@ void InteractiveFeaturePromoTestPrivate::MaybeWaitForTrackerInitialization(
 void InteractiveFeaturePromoTestPrivate::CreateServicesCallback(
     content::BrowserContext* context) {
   auto* const profile = Profile::FromBrowserContext(context);
-  if (base::Contains(profile_data_, profile)) {
+  if (profile_data_.contains(profile)) {
     return;
   }
   profile_data_.emplace(profile, ProfileData());

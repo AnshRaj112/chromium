@@ -36,7 +36,7 @@ class CONTENT_EXPORT GestureListenerManager
       public WebContentsObserver {
  public:
   GestureListenerManager(JNIEnv* env,
-                         const base::android::JavaParamRef<jobject>& obj,
+                         const base::android::JavaRef<jobject>& obj,
                          WebContentsImpl* web_contents);
 
   GestureListenerManager(const GestureListenerManager&) = delete;
@@ -45,14 +45,14 @@ class CONTENT_EXPORT GestureListenerManager
   ~GestureListenerManager() override;
 
   void ResetGestureDetection(JNIEnv* env);
-  void SetDoubleTapSupportEnabled(JNIEnv* env, jboolean enabled);
-  void SetMultiTouchZoomSupportEnabled(JNIEnv* env, jboolean enabled);
+  void SetDoubleTapSupportEnabled(JNIEnv* env, bool enabled);
+  void SetMultiTouchZoomSupportEnabled(JNIEnv* env, bool enabled);
   cc::mojom::RootScrollOffsetUpdateFrequency
   root_scroll_offset_update_frequency() const {
     return root_scroll_offset_update_frequency_.value_or(
         cc::mojom::RootScrollOffsetUpdateFrequency::kNone);
   }
-  void SetRootScrollOffsetUpdateFrequency(JNIEnv* env, jint frequency);
+  void SetRootScrollOffsetUpdateFrequency(JNIEnv* env, int32_t frequency);
   void GestureEventAck(const blink::WebGestureEvent& event,
                        blink::mojom::InputEventResultState ack_result);
   void DidStopFlinging();
@@ -70,6 +70,7 @@ class CONTENT_EXPORT GestureListenerManager
                         const float top_shown_pix,
                         bool top_changed);
   void UpdateOnTouchDown();
+  void UpdateOnTouchUp();
   void OnRootScrollOffsetChanged(const gfx::PointF& root_scroll_offset);
 
   // RenderWidgetHostConnector implementation.
@@ -85,7 +86,8 @@ class CONTENT_EXPORT GestureListenerManager
 
   // Start RenderWidgetHost::InputEventObserver overrides
   void OnInputEvent(const RenderWidgetHost& widget,
-                    const blink::WebInputEvent&) override;
+                    const blink::WebInputEvent& event,
+                    InputEventSource source) override;
   void OnInputEventAck(const RenderWidgetHost& widget,
                        blink::mojom::InputEventResultSource source,
                        blink::mojom::InputEventResultState state,

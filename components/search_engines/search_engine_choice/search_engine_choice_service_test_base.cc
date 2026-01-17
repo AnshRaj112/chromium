@@ -86,6 +86,14 @@ TemplateURLPrepopulateData::Resolver&
 SearchEngineChoiceServiceTestBase::prepopulate_data_resolver() {
   return GetOrInitEnvironment().prepopulate_data_resolver();
 }
+regional_capabilities::RegionalCapabilitiesService&
+SearchEngineChoiceServiceTestBase::regional_capabilities_service() {
+  return GetOrInitEnvironment().regional_capabilities_service();
+}
+policy::ManagementService&
+SearchEngineChoiceServiceTestBase::management_service() {
+  return GetOrInitEnvironment().management_service();
+}
 
 SearchEnginesTestEnvironment&
 SearchEngineChoiceServiceTestBase::GetOrInitEnvironment(InitServiceArgs args) {
@@ -115,7 +123,8 @@ void SearchEngineChoiceServiceTestBase::PopulateLazyFactories(
       base::BindLambdaForTesting(
           [args](SearchEnginesTestEnvironment& environment) {
             return regional_capabilities::CreateServiceWithFakeClient(
-                environment.pref_service(), args.client_country_id);
+                environment.pref_service(), args.variation_country_id,
+                args.client_country_id, CountryId());
           });
   lazy_factories.search_engine_choice_service_factory =
       SearchEnginesTestEnvironment::GetSearchEngineChoiceServiceFactory(

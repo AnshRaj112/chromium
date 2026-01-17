@@ -26,6 +26,7 @@ import static org.chromium.chrome.browser.tasks.tab_management.TabListModel.Card
 import static org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.CARD_ANIMATION_STATUS;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.CARD_TYPE;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.ModelType.TAB;
+import static org.chromium.chrome.browser.tasks.tab_management.TabProperties.IS_PINNED;
 import static org.chromium.ui.test.util.MockitoHelper.doCallback;
 
 import android.graphics.Canvas;
@@ -42,31 +43,29 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowLooper;
 
+import org.chromium.base.CallbackUtils;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.Token;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.test.BaseRobolectricTestRunner;
-import org.chromium.base.test.util.Features.DisableFeatures;
-import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabUngrouper;
-import org.chromium.chrome.browser.tasks.tab_management.MessageService.MessageType;
-import org.chromium.chrome.browser.tasks.tab_management.TabGridItemLongPressOrchestrator.OnLongPressTabItemEventListener;
 import org.chromium.chrome.browser.tasks.tab_management.TabListCoordinator.TabListMode;
 import org.chromium.chrome.browser.tasks.tab_management.TabListModel.AnimationStatus;
 import org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties;
 import org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.ModelType;
 import org.chromium.chrome.browser.tasks.tab_management.TabProperties.UiType;
+import org.chromium.chrome.browser.tasks.tab_management.TabSwitcherMessageManager.MessageType;
 import org.chromium.components.feature_engagement.EventConstants;
 import org.chromium.components.feature_engagement.Tracker;
 import org.chromium.ui.modelutil.MVCListAdapter;
@@ -78,14 +77,13 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** Tests for {@link TabGridItemTouchHelperCallback}. */
-@SuppressWarnings("ResultOfMethodCallIgnored")
+@SuppressWarnings({"ResultOfMethodCallIgnored", "DirectInvocationOnMock"})
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(
         manifest = Config.NONE,
         instrumentedPackages = {
             "androidx.recyclerview.widget.RecyclerView" // required to mock final
         })
-@DisableFeatures(ChromeFeatureList.TAB_ARCHIVAL_DRAG_DROP_ANDROID)
 public class TabGridItemTouchHelperCallbackUnitTest {
 
     private static final String TAB1_TITLE = "Tab1";
@@ -109,8 +107,8 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     @Mock private Canvas mCanvas;
     @Mock private RecyclerView mRecyclerView;
     @Mock private RecyclerView.Adapter mAdapter;
-    @Mock private TabModel mTabModel;
-    @Mock private TabListMediator.TabActionListener mTabClosedListener;
+    @Spy private TabModel mTabModel;
+    @Mock private TabActionListener mTabClosedListener;
     @Mock private TabGroupModelFilter mTabGroupModelFilter;
     @Mock private TabUngrouper mTabUngrouper;
     @Mock private TabListMediator.TabGridDialogHandler mTabGridDialogHandler;
@@ -120,7 +118,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     @Mock private TabGroupCreationDialogManager mTabGroupCreationDialogManager;
     @Mock private TabGroupColorViewProvider mTabGroupColorViewProvider;
 
-    @Mock private OnLongPressTabItemEventListener mOnLongPressTabItemEventListener;
     @Mock private TabGridItemLongPressOrchestrator mTabGridItemLongPressOrchestrator;
 
     private final ObservableSupplierImpl<TabGroupModelFilter> mTabGroupModelFilterSupplier =
@@ -186,10 +183,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
         doReturn(mTab2).when(mTabGroupModelFilter).getRepresentativeTabAt(POSITION2);
         doReturn(mTab3).when(mTabGroupModelFilter).getRepresentativeTabAt(POSITION3);
         doReturn(mTab4).when(mTabGroupModelFilter).getRepresentativeTabAt(POSITION4);
-        doReturn(TAB1_ID).when(mTab1).getRootId();
-        doReturn(TAB2_ID).when(mTab2).getRootId();
-        doReturn(TAB3_ID).when(mTab3).getRootId();
-        doReturn(TAB4_ID).when(mTab4).getRootId();
         initAndAssertAllProperties();
 
         setupRecyclerView();
@@ -233,7 +226,8 @@ public class TabGridItemTouchHelperCallbackUnitTest {
                         isDialog ? mTabGridDialogHandler : null,
                         "",
                         !isDialog,
-                        TabListMode.GRID);
+                        TabListMode.GRID,
+                        CallbackUtils.emptyRunnable());
         mItemTouchHelperCallback.setupCallback(THRESHOLD, MERGE_AREA_THRESHOLD, THRESHOLD);
         mItemTouchHelperCallback.getMovementFlags(mRecyclerView, mMockViewHolder1);
     }
@@ -330,6 +324,34 @@ public class TabGridItemTouchHelperCallbackUnitTest {
 
         verify(mTabGroupModelFilter).mergeTabsToGroup(TAB1_ID, TAB2_ID);
         verify(mGridLayoutManager).removeView(mItemView1);
+        verify(mTracker).notifyEvent(eq(EventConstants.TAB_DRAG_AND_DROP_TO_GROUP));
+        assertThat(
+                mModel.get(0).model.get(CardProperties.CARD_ANIMATION_STATUS),
+                equalTo(AnimationStatus.HOVERED_CARD_ZOOM_OUT));
+    }
+
+    @Test
+    public void onReleaseTab_Merge_NotAttachedToWindow() {
+        // Simulate the selection of card#1 in TabListModel.
+        mModel.get(0)
+                .model
+                .set(CardProperties.CARD_ANIMATION_STATUS, AnimationStatus.SELECTED_CARD_ZOOM_IN);
+        mModel.get(0).model.set(CARD_ALPHA, 0.8f);
+        mItemTouchHelperCallback.setSelectedTabIndexForTesting(POSITION1);
+
+        // Simulate hovering on card#2.
+        mModel.get(1)
+                .model
+                .set(CardProperties.CARD_ANIMATION_STATUS, AnimationStatus.HOVERED_CARD_ZOOM_IN);
+        mItemTouchHelperCallback.setHoveredTabIndexForTesting(POSITION2);
+
+        when(mItemView1.isAttachedToWindow()).thenReturn(false);
+
+        mItemTouchHelperCallback.onSelectedChanged(
+                mMockViewHolder1, ItemTouchHelper.ACTION_STATE_IDLE);
+
+        verify(mTabGroupModelFilter).mergeTabsToGroup(TAB1_ID, TAB2_ID);
+        verify(mGridLayoutManager, never()).removeView(mItemView1);
         verify(mTracker).notifyEvent(eq(EventConstants.TAB_DRAG_AND_DROP_TO_GROUP));
         assertThat(
                 mModel.get(0).model.get(CardProperties.CARD_ANIMATION_STATUS),
@@ -789,11 +811,19 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test
-    public void messageItemSwipeable_archivedTabsMessageNotSwipable() {
+    public void messageItemSwipeable_archivedTabsMessageNotSwipeable() {
         PropertyModel model = mock(PropertyModel.class);
         when(model.get(MESSAGE_TYPE)).thenReturn(MessageType.ARCHIVED_TABS_MESSAGE);
         when(mMockViewHolder1.getItemViewType()).thenReturn(UiType.ARCHIVED_TABS_MESSAGE);
         mMockViewHolder1.model = model;
+
+        setupItemTouchHelperCallback(false);
+        assertFalse(mItemTouchHelperCallback.hasSwipeFlag(mRecyclerView, mMockViewHolder1));
+    }
+
+    @Test
+    public void messageItemSwipeable_pinnedTabNotSwipeable() {
+        mMockViewHolder1.model.set(IS_PINNED, true);
 
         setupItemTouchHelperCallback(false);
         assertFalse(mItemTouchHelperCallback.hasSwipeFlag(mRecyclerView, mMockViewHolder1));
@@ -902,7 +932,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test
-    @EnableFeatures(ChromeFeatureList.TAB_ARCHIVAL_DRAG_DROP_ANDROID)
     public void onDropOverArchivalCard() {
         setupItemTouchHelperCallback(false);
         addArchivedMessageCard();
@@ -937,7 +966,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test
-    @EnableFeatures(ChromeFeatureList.TAB_ARCHIVAL_DRAG_DROP_ANDROID)
     public void onDropOverArchivalCard_withoutHovering() {
         setupItemTouchHelperCallback(false);
         addArchivedMessageCard();
@@ -962,7 +990,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test
-    @EnableFeatures(ChromeFeatureList.TAB_ARCHIVAL_DRAG_DROP_ANDROID)
     public void onHoverOverArchivalCard() {
         setupItemTouchHelperCallback(false);
         addArchivedMessageCard();
@@ -1001,11 +1028,14 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test
-    @DisableFeatures(ChromeFeatureList.TAB_ARCHIVAL_DRAG_DROP_ANDROID)
-    public void onHoverOverArchivalCard_archivalDropDisabled() {
+    public void onHoverAndDropPinnedTabOverArchivalCard() {
         setupItemTouchHelperCallback(false);
         addArchivedMessageCard();
+        mModel.get(POSITION1).model.set(IS_PINNED, true);
 
+        AtomicInteger recordedTabId = new AtomicInteger(TabModel.INVALID_TAB_INDEX);
+
+        mItemTouchHelperCallback.setOnDropOnArchivalMessageCardEventListener(recordedTabId::set);
         mItemTouchHelperCallback.setActionsOnAllRelatedTabsForTesting(true);
 
         // Simulate the selection of card#1 in TabListModel.
@@ -1039,7 +1069,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test
-    @EnableFeatures(ChromeFeatureList.TAB_ARCHIVAL_DRAG_DROP_ANDROID)
     public void onHoverOverArchivalCard_sharedTabGroup() {
         when(mTabGroupColorViewProvider.hasCollaborationId()).thenReturn(true);
         when(mTab1.getTabGroupId()).thenReturn(Token.createRandom());
@@ -1101,7 +1130,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test
-    @EnableFeatures(ChromeFeatureList.TAB_GROUP_PARITY_BOTTOM_SHEET_ANDROID)
     public void orchestratorCreatedOnParityEnabled() {
         mItemTouchHelperCallback = spy(mItemTouchHelperCallback);
         mItemTouchHelperCallback.setOnLongPressTabItemEventListener((a, b) -> () -> {});
@@ -1110,7 +1138,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test(expected = AssertionError.class)
-    @EnableFeatures(ChromeFeatureList.TAB_GROUP_PARITY_BOTTOM_SHEET_ANDROID)
     public void orchestratorNotCreatedTwice() {
         mItemTouchHelperCallback = spy(mItemTouchHelperCallback);
         mItemTouchHelperCallback.setOnLongPressTabItemEventListener((a, b) -> () -> {});
@@ -1120,16 +1147,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test
-    @DisableFeatures(ChromeFeatureList.TAB_GROUP_PARITY_BOTTOM_SHEET_ANDROID)
-    public void orchestratorNotCreatedOnParityDisabled() {
-        mItemTouchHelperCallback = spy(mItemTouchHelperCallback);
-        mItemTouchHelperCallback.setOnLongPressTabItemEventListener((a, b) -> () -> {});
-        verify(mItemTouchHelperCallback, never())
-                .setTabGridItemLongPressOrchestrator(any(TabGridItemLongPressOrchestrator.class));
-    }
-
-    @Test
-    @EnableFeatures(ChromeFeatureList.TAB_GROUP_PARITY_BOTTOM_SHEET_ANDROID)
     public void orchestratorTriggeredOnSelectedChanged() {
         mItemTouchHelperCallback.setTabGridItemLongPressOrchestrator(
                 mTabGridItemLongPressOrchestrator);
@@ -1142,7 +1159,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test
-    @EnableFeatures(ChromeFeatureList.TAB_GROUP_PARITY_BOTTOM_SHEET_ANDROID)
     public void orchestratorTriggeredOnChildDraw() {
         mItemTouchHelperCallback.setTabGridItemLongPressOrchestrator(
                 mTabGridItemLongPressOrchestrator);
@@ -1161,7 +1177,6 @@ public class TabGridItemTouchHelperCallbackUnitTest {
     }
 
     @Test
-    @EnableFeatures(ChromeFeatureList.TAB_GROUP_PARITY_BOTTOM_SHEET_ANDROID)
     public void orchestratorCancelledOnClearView() {
         mItemTouchHelperCallback.setTabGridItemLongPressOrchestrator(
                 mTabGridItemLongPressOrchestrator);
@@ -1184,6 +1199,251 @@ public class TabGridItemTouchHelperCallbackUnitTest {
                 0,
                 mItemTouchHelperCallback.interpolateOutOfBoundsScroll(
                         mRecyclerView, 100, 10, 1000, 100));
+    }
+
+    @Test
+    public void testOnMove_PinnedTab_WithinPinnedTabs() {
+        // Setup: 2 pinned tabs and 2 unpinned tabs.
+        when(mTab1.getIsPinned()).thenReturn(true);
+        when(mTab2.getIsPinned()).thenReturn(true);
+        when(mTab3.getIsPinned()).thenReturn(false);
+        when(mTab4.getIsPinned()).thenReturn(false);
+        when(mTabGroupModelFilter.getRelatedTabList(TAB1_ID)).thenReturn(List.of(mTab1));
+        when(mTabGroupModelFilter.getRelatedTabList(TAB2_ID)).thenReturn(List.of(mTab2));
+        when(mTabModel.indexOf(mTab1)).thenReturn(0);
+        when(mTabModel.indexOf(mTab2)).thenReturn(1);
+        when(mTabModel.findFirstNonPinnedTabIndex()).thenReturn(2);
+
+        // Drag pinned tab1 to pinned tab2's position.
+        mItemTouchHelperCallback.onMove(mRecyclerView, mMockViewHolder1, mMockViewHolder2);
+        // Verify that tab1 is moved to index 1.
+        verify(mTabGroupModelFilter).moveRelatedTabs(TAB1_ID, 1);
+    }
+
+    @Test
+    public void testOnMove_UnpinnedTab_WithinUnpinnedTabs() {
+        // Setup: 2 pinned tabs and 2 unpinned tabs.
+        when(mTab1.getIsPinned()).thenReturn(true);
+        when(mTab2.getIsPinned()).thenReturn(true);
+        when(mTab3.getIsPinned()).thenReturn(false);
+        when(mTab4.getIsPinned()).thenReturn(false);
+        when(mTabGroupModelFilter.getRelatedTabList(TAB3_ID)).thenReturn(List.of(mTab3));
+        when(mTabGroupModelFilter.getRelatedTabList(TAB4_ID)).thenReturn(List.of(mTab4));
+        when(mTabModel.indexOf(mTab1)).thenReturn(0);
+        when(mTabModel.indexOf(mTab2)).thenReturn(1);
+        when(mTabModel.indexOf(mTab3)).thenReturn(2);
+        when(mTabModel.indexOf(mTab4)).thenReturn(3);
+        when(mTabModel.findFirstNonPinnedTabIndex()).thenReturn(2);
+
+        // Drag unpinned tab3 to unpinned tab4's position.
+        mItemTouchHelperCallback.onMove(mRecyclerView, mMockViewHolder3, mMockViewHolder4);
+
+        // Verify that tab3 is moved to index 3.
+        verify(mTabGroupModelFilter).moveRelatedTabs(TAB3_ID, 3);
+    }
+
+    @Test
+    public void testOnMove_GroupedTab_pinnedTabTriedToMoveBeyondLimit() {
+        // Setup: 2 pinned tabs, 2 grouped tabs.
+        when(mTab1.getIsPinned()).thenReturn(true);
+        when(mTab2.getIsPinned()).thenReturn(true);
+        when(mTab3.getIsPinned()).thenReturn(false);
+        when(mTab4.getIsPinned()).thenReturn(false);
+        Token groupId = Token.createRandom();
+        when(mTab3.getTabGroupId()).thenReturn(groupId);
+        when(mTab4.getTabGroupId()).thenReturn(groupId);
+
+        when(mTabGroupModelFilter.getRelatedTabList(TAB1_ID)).thenReturn(List.of(mTab1));
+        when(mTabGroupModelFilter.getRelatedTabList(TAB2_ID)).thenReturn(List.of(mTab2));
+        when(mTabGroupModelFilter.getRelatedTabList(TAB3_ID)).thenReturn(List.of(mTab3, mTab4));
+        when(mTabGroupModelFilter.getRelatedTabList(TAB4_ID)).thenReturn(List.of(mTab3, mTab4));
+
+        when(mTabModel.indexOf(mTab1)).thenReturn(0);
+        when(mTabModel.indexOf(mTab2)).thenReturn(1);
+        when(mTabModel.indexOf(mTab3)).thenReturn(2);
+        when(mTabModel.indexOf(mTab4)).thenReturn(3);
+        when(mTabModel.findFirstNonPinnedTabIndex()).thenReturn(2);
+
+        // Try drag a pinned tab to an unpinned tab's position.
+        mItemTouchHelperCallback.onMove(mRecyclerView, mMockViewHolder1, mMockViewHolder4);
+
+        // Verify that the tab is moved to index 1, the last possible position for a pinned tab.
+        verify(mTabGroupModelFilter).moveRelatedTabs(TAB1_ID, 1);
+    }
+
+    @Test
+    public void testOnMove_GroupedTab_unpinnedTabTriedToMoveIntoPinnedArea() {
+        // Setup: 2 pinned tabs, 2 grouped tabs.
+        when(mTab1.getIsPinned()).thenReturn(true);
+        when(mTab2.getIsPinned()).thenReturn(true);
+        when(mTab3.getIsPinned()).thenReturn(false);
+        when(mTab4.getIsPinned()).thenReturn(false);
+        Token groupId = Token.createRandom();
+        when(mTab3.getTabGroupId()).thenReturn(groupId);
+        when(mTab4.getTabGroupId()).thenReturn(groupId);
+
+        when(mTabGroupModelFilter.getRelatedTabList(TAB1_ID)).thenReturn(List.of(mTab1));
+        when(mTabGroupModelFilter.getRelatedTabList(TAB2_ID)).thenReturn(List.of(mTab2));
+        when(mTabGroupModelFilter.getRelatedTabList(TAB3_ID)).thenReturn(List.of(mTab3, mTab4));
+        when(mTabGroupModelFilter.getRelatedTabList(TAB4_ID)).thenReturn(List.of(mTab3, mTab4));
+
+        when(mTabModel.indexOf(mTab1)).thenReturn(0);
+        when(mTabModel.indexOf(mTab2)).thenReturn(1);
+        when(mTabModel.indexOf(mTab3)).thenReturn(2);
+        when(mTabModel.indexOf(mTab4)).thenReturn(3);
+        when(mTabModel.findFirstNonPinnedTabIndex()).thenReturn(2);
+
+        // Try drag an unpinned tab to a pinned tab's position.
+        mItemTouchHelperCallback.onMove(mRecyclerView, mMockViewHolder3, mMockViewHolder1);
+
+        // Verify that the tab is moved to index 2, the first possible position for an unpinned
+        // tab.
+        verify(mTabGroupModelFilter).moveRelatedTabs(TAB3_ID, 2);
+    }
+
+    @Test
+    public void testOnMove_AllUnpinnedTabs_MovedAround() {
+        // Setup: all tabs are unpinned.
+        when(mTab1.getIsPinned()).thenReturn(false);
+        when(mTab2.getIsPinned()).thenReturn(false);
+        when(mTab3.getIsPinned()).thenReturn(false);
+        when(mTab4.getIsPinned()).thenReturn(false);
+        when(mTabGroupModelFilter.getRelatedTabList(TAB1_ID)).thenReturn(List.of(mTab1));
+        when(mTabGroupModelFilter.getRelatedTabList(TAB4_ID)).thenReturn(List.of(mTab4));
+        when(mTabModel.indexOf(mTab1)).thenReturn(0);
+        when(mTabModel.indexOf(mTab4)).thenReturn(3);
+        when(mTabModel.findFirstNonPinnedTabIndex()).thenReturn(0);
+
+        // Drag tab1 to tab4's position.
+        mItemTouchHelperCallback.onMove(mRecyclerView, mMockViewHolder1, mMockViewHolder4);
+
+        // Verify that tab1 is moved to index 3.
+        verify(mTabGroupModelFilter).moveRelatedTabs(TAB1_ID, 3);
+    }
+
+    @Test
+    public void testOnMove_AllPinnedTabs_MovedAround() {
+        // Setup: all tabs are pinned.
+        when(mTab1.getIsPinned()).thenReturn(true);
+        when(mTab2.getIsPinned()).thenReturn(true);
+        when(mTab3.getIsPinned()).thenReturn(true);
+        when(mTab4.getIsPinned()).thenReturn(true);
+        when(mTabGroupModelFilter.getRelatedTabList(TAB1_ID)).thenReturn(List.of(mTab1));
+        when(mTabGroupModelFilter.getRelatedTabList(TAB4_ID)).thenReturn(List.of(mTab4));
+        when(mTabModel.indexOf(mTab1)).thenReturn(0);
+        when(mTabModel.indexOf(mTab4)).thenReturn(3);
+        // All tabs are pinned, so the first non-pinned tab is at the end of the list.
+        when(mTabModel.findFirstNonPinnedTabIndex()).thenReturn(4);
+
+        // Drag tab1 to tab4's position.
+        mItemTouchHelperCallback.onMove(mRecyclerView, mMockViewHolder1, mMockViewHolder4);
+
+        // Verify that tab1 is moved to index 3.
+        verify(mTabGroupModelFilter).moveRelatedTabs(TAB1_ID, 3);
+    }
+
+    @Test
+    public void canDropOver_pinnedAndUnpinned() {
+        setupItemTouchHelperCallback(false);
+
+        // A pinned tab cannot be dropped on an unpinned tab.
+        mMockViewHolder1.model.set(IS_PINNED, true);
+        mMockViewHolder2.model.set(IS_PINNED, false);
+        assertFalse(
+                mItemTouchHelperCallback.canDropOver(
+                        mRecyclerView, mMockViewHolder1, mMockViewHolder2));
+
+        // An unpinned tab cannot be dropped on a pinned tab.
+        assertFalse(
+                mItemTouchHelperCallback.canDropOver(
+                        mRecyclerView, mMockViewHolder2, mMockViewHolder1));
+
+        // A pinned tab can be dropped on another pinned tab.
+        mMockViewHolder2.model.set(IS_PINNED, true);
+        assertTrue(
+                mItemTouchHelperCallback.canDropOver(
+                        mRecyclerView, mMockViewHolder1, mMockViewHolder2));
+
+        // An unpinned tab can be dropped on another unpinned tab.
+        mMockViewHolder1.model.set(IS_PINNED, false);
+        mMockViewHolder2.model.set(IS_PINNED, false);
+        assertTrue(
+                mItemTouchHelperCallback.canDropOver(
+                        mRecyclerView, mMockViewHolder1, mMockViewHolder2));
+    }
+
+    @Test
+    public void onDragTab_Hovered_pinnedTab() {
+        // Setup: tab1 is pinned, tab2 is not.
+        mMockViewHolder1.model.set(IS_PINNED, true);
+        mMockViewHolder2.model.set(IS_PINNED, false);
+
+        // Drag pinned card#1 rightwards to hover on unpinned card#2.
+        verifyDrag(mMockViewHolder1, 5, 0, POSITION2, AnimationStatus.CARD_RESTORE);
+
+        // Drag unpinned card#2 leftwards to hover on pinned card#1.
+        verifyDrag(mMockViewHolder2, -5, 0, POSITION1, AnimationStatus.CARD_RESTORE);
+
+        // Setup: tab1 and tab2 are pinned.
+        mMockViewHolder1.model.set(IS_PINNED, true);
+        mMockViewHolder2.model.set(IS_PINNED, true);
+
+        // Drag pinned card#1 rightwards to hover on pinned card#2.
+        verifyDrag(mMockViewHolder1, 5, 0, POSITION2, AnimationStatus.CARD_RESTORE);
+    }
+
+    @Test
+    public void testClearCardState() {
+        mItemTouchHelperCallback.onSelectedChanged(
+                mMockViewHolder1, ItemTouchHelper.ACTION_STATE_DRAG);
+        assertThat(
+                mModel.get(POSITION1).model.get(CardProperties.CARD_ANIMATION_STATUS),
+                equalTo(AnimationStatus.SELECTED_CARD_ZOOM_IN));
+        assertThat(mModel.get(POSITION1).model.get(CARD_ALPHA), equalTo(0.8f));
+
+        mItemTouchHelperCallback.setHoveredTabIndexForTesting(POSITION2);
+        mModel.updateHoveredCardForHover(POSITION2, true);
+        assertThat(
+                mModel.get(POSITION2).model.get(CardProperties.CARD_ANIMATION_STATUS),
+                equalTo(AnimationStatus.HOVERED_CARD_ZOOM_IN));
+
+        mItemTouchHelperCallback.clearCardState();
+
+        assertThat(
+                mModel.get(POSITION1).model.get(CardProperties.CARD_ANIMATION_STATUS),
+                equalTo(AnimationStatus.SELECTED_CARD_ZOOM_OUT));
+        assertThat(mModel.get(POSITION1).model.get(CARD_ALPHA), equalTo(1f));
+        assertThat(
+                mModel.get(POSITION2).model.get(CardProperties.CARD_ANIMATION_STATUS),
+                equalTo(AnimationStatus.HOVERED_CARD_ZOOM_OUT));
+    }
+
+    @Test
+    public void testClearCardState_ArchivedMessage() {
+        setupItemTouchHelperCallback(false);
+        addArchivedMessageCard();
+        mItemTouchHelperCallback.setActionsOnAllRelatedTabsForTesting(true);
+        mItemTouchHelperCallback.setSelectedTabIndexForTesting(POSITION1);
+
+        // Pretend a drag over the archived message card has started.
+        mItemTouchHelperCallback.onChildDraw(
+                mCanvas,
+                mRecyclerView,
+                mMockViewHolder1,
+                4,
+                8,
+                ItemTouchHelper.ACTION_STATE_DRAG,
+                true);
+
+        assertEquals(
+                AnimationStatus.HOVERED_CARD_ZOOM_IN,
+                mModel.get(ARCHIVED_MSG_CARD_POSITION).model.get(CARD_ANIMATION_STATUS));
+
+        mItemTouchHelperCallback.clearCardState();
+
+        assertEquals(
+                AnimationStatus.HOVERED_CARD_ZOOM_OUT,
+                mModel.get(ARCHIVED_MSG_CARD_POSITION).model.get(CARD_ANIMATION_STATUS));
     }
 
     private void verifyDrag(
@@ -1313,6 +1573,7 @@ public class TabGridItemTouchHelperCallbackUnitTest {
         doReturn(bottom).when(view).getBottom();
         doReturn(right - left).when(view).getWidth();
         doReturn(bottom - top).when(view).getHeight();
+        when(view.isAttachedToWindow()).thenReturn(true);
         return view;
     }
 }

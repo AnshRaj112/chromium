@@ -36,34 +36,28 @@ namespace blink {
 ASSERT_SIZE(AtomicString, String);
 
 AtomicString::AtomicString(base::span<const LChar> chars)
-    : string_(AtomicStringTable::Instance().Add(
-          chars.data(),
-          base::checked_cast<wtf_size_t>(chars.size()))) {}
+    : string_(AtomicStringTable::Instance().Add(chars)) {}
 
 AtomicString::AtomicString(base::span<const UChar> chars,
                            AtomicStringUCharEncoding encoding)
-    : string_(AtomicStringTable::Instance().Add(
-          chars.data(),
-          base::checked_cast<wtf_size_t>(chars.size()),
-          encoding)) {}
+    : string_(AtomicStringTable::Instance().Add(chars, encoding)) {}
 
 AtomicString::AtomicString(const UChar* chars)
     : string_(AtomicStringTable::Instance().Add(
-          chars,
           // SAFETY: safe when `chars` points to a null-terminated cstring.
-          chars ? UNSAFE_BUFFERS(LengthOfNullTerminatedString(chars)) : 0,
+          UNSAFE_BUFFERS(
+              {chars, chars ? LengthOfNullTerminatedString(chars) : 0}),
           AtomicStringUCharEncoding::kUnknown)) {}
 
 AtomicString::AtomicString(const StringView& string_view)
     : string_(AtomicStringTable::Instance().Add(string_view)) {}
 
-scoped_refptr<StringImpl> AtomicString::AddSlowCase(
-    scoped_refptr<StringImpl>&& string) {
-  DCHECK(!string->IsAtomic());
+String AtomicString::AddSlowCase(String&& string) {
+  DCHECK(!string.Impl()->IsAtomic());
   return AtomicStringTable::Instance().Add(std::move(string));
 }
 
-scoped_refptr<StringImpl> AtomicString::AddSlowCase(StringImpl* string) {
+String AtomicString::AddSlowCase(StringImpl* string) {
   DCHECK(!string->IsAtomic());
   return AtomicStringTable::Instance().Add(string);
 }
@@ -98,7 +92,7 @@ AtomicString AtomicString::LowerASCII(AtomicString source) {
   StringImpl* impl = source.Impl();
   // if impl is null, then IsLowerASCII() should have returned true.
   DCHECK(impl);
-  scoped_refptr<StringImpl> new_impl = impl->LowerASCII();
+  String new_impl = impl->LowerASCII();
   return AtomicString(String(std::move(new_impl)));
 }
 
@@ -115,8 +109,8 @@ AtomicString AtomicString::UpperASCII() const {
 }
 
 AtomicString AtomicString::Number(double number, unsigned precision) {
-  NumberToStringBuffer buffer;
-  return AtomicString(NumberToFixedPrecisionString(number, precision, buffer));
+  DoubleToStringConverter converter;
+  return AtomicString(converter.ToStringWithFixedPrecision(number, precision));
 }
 
 std::ostream& operator<<(std::ostream& out, const AtomicString& s) {

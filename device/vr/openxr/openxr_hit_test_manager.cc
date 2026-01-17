@@ -4,15 +4,16 @@
 
 #include "device/vr/openxr/openxr_hit_test_manager.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/trace_event/trace_event.h"
 #include "device/vr/openxr/openxr_util.h"
+#include "device/vr/public/mojom/hit_test_subscription_id.h"
 #include "third_party/openxr/src/include/openxr/openxr.h"
 
 namespace device {
@@ -73,7 +74,7 @@ OpenXrHitTestManager::GetHitTestSubscriptionResult(
       mojo_from_native_origin.MapVector(native_origin_ray.direction);
 
   return mojom::XRHitTestSubscriptionResultData::New(
-      id.GetUnsafeValue(), RequestHitTest(origin, direction));
+      id, RequestHitTest(origin, direction));
 }
 
 device::mojom::XRHitTestTransientInputSubscriptionResultDataPtr
@@ -85,7 +86,7 @@ OpenXrHitTestManager::GetTransientHitTestSubscriptionResult(
   auto result =
       device::mojom::XRHitTestTransientInputSubscriptionResultData::New();
 
-  result->subscription_id = id.GetUnsafeValue();
+  result->subscription_id = id;
 
   for (const auto& input_source_id_and_mojo_from_input_source :
        input_source_ids_and_mojo_from_input_sources) {
@@ -109,7 +110,8 @@ mojom::XRHitTestSubscriptionResultsDataPtr
 OpenXrHitTestManager::GetHitTestResults(
     XrTime predicted_display_time,
     const gfx::Transform& mojo_from_viewer,
-    const std::vector<mojom::XRInputSourceStatePtr>& input_state) {
+    const std::optional<std::vector<mojom::XRInputSourceStatePtr>>&
+        input_state) {
   TRACE_EVENT2("xr", "GetHitTestResults", "subscription_count",
                hit_test_subscription_id_to_data_.size(),
                "transient_subscription_count",
@@ -136,8 +138,8 @@ OpenXrHitTestManager::GetHitTestResults(
 
     // Since we have a transform, let's use it to obtain hit test results.
     result->results.push_back(GetHitTestSubscriptionResult(
-        HitTestSubscriptionId(subscription_id_and_data.first),
-        *subscription_id_and_data.second.ray, *maybe_mojo_from_native_origin));
+        subscription_id_and_data.first, *subscription_id_and_data.second.ray,
+        *maybe_mojo_from_native_origin));
   }
 
   // Calculate results for transient input sources
@@ -154,7 +156,7 @@ OpenXrHitTestManager::GetHitTestResults(
 
     result->transient_input_results.push_back(
         GetTransientHitTestSubscriptionResult(
-            HitTestSubscriptionId(subscription_id_and_data.first),
+            subscription_id_and_data.first,
             *subscription_id_and_data.second.ray,
             input_source_ids_and_transforms));
   }
@@ -167,10 +169,8 @@ void OpenXrHitTestManager::UnsubscribeFromHitTest(
   // Hit test subscription ID space is the same for transient and non-transient
   // hit test sources, so we can attempt to remove it from both collections (it
   // will succeed only for one of them anyway).
-  hit_test_subscription_id_to_data_.erase(
-      HitTestSubscriptionId(subscription_id));
-  hit_test_subscription_id_to_transient_hit_test_data_.erase(
-      HitTestSubscriptionId(subscription_id));
+  hit_test_subscription_id_to_data_.erase(subscription_id);
+  hit_test_subscription_id_to_transient_hit_test_data_.erase(subscription_id);
   if (hit_test_subscription_id_to_data_.empty() &&
       hit_test_subscription_id_to_transient_hit_test_data_.empty()) {
     OnAllHitTestSubscriptionsRemoved();
@@ -180,10 +180,14 @@ void OpenXrHitTestManager::UnsubscribeFromHitTest(
 std::optional<gfx::Transform> OpenXrHitTestManager::GetMojoFromNativeOrigin(
     const mojom::XRNativeOriginInformation& native_origin_information,
     const gfx::Transform& mojo_from_viewer,
-    const std::vector<mojom::XRInputSourceStatePtr>& input_state) {
+    const std::optional<std::vector<mojom::XRInputSourceStatePtr>>&
+        input_state) {
   switch (native_origin_information.which()) {
     case mojom::XRNativeOriginInformation::Tag::kInputSourceSpaceInfo:
-      for (auto& input_source_state : input_state) {
+      if (!input_state) {
+        return std::nullopt;
+      }
+      for (auto& input_source_state : input_state.value()) {
         mojom::XRInputSourceSpaceInfo* input_source_space_info =
             native_origin_information.get_input_source_space_info().get();
         if (input_source_state->source_id ==
@@ -229,13 +233,16 @@ std::optional<gfx::Transform> OpenXrHitTestManager::GetMojoFromReferenceSpace(
 std::vector<std::pair<uint32_t, gfx::Transform>>
 OpenXrHitTestManager::GetMojoFromInputSources(
     const std::string& profile_name,
-    const std::vector<mojom::XRInputSourceStatePtr>& input_state) {
+    const std::optional<std::vector<mojom::XRInputSourceStatePtr>>&
+        input_state) {
   std::vector<std::pair<uint32_t, gfx::Transform>> result;
-
-  for (const auto& input_source_state : input_state) {
+  if (!input_state) {
+    return result;
+  }
+  for (const auto& input_source_state : input_state.value()) {
     if (input_source_state && input_source_state->description) {
-      if (base::Contains(input_source_state->description->profiles,
-                         profile_name)) {
+      if (std::ranges::contains(input_source_state->description->profiles,
+                                profile_name)) {
         // Input source represented by input_state matches the profile, find
         // the transform and grab input source id.
         std::optional<gfx::Transform> maybe_mojo_from_input_source =
@@ -245,8 +252,8 @@ OpenXrHitTestManager::GetMojoFromInputSources(
           continue;
         }
 
-        result.push_back(
-            {input_source_state->source_id, *maybe_mojo_from_input_source});
+        result.emplace_back(input_source_state->source_id,
+                            *maybe_mojo_from_input_source);
       }
     }
   }

@@ -10,8 +10,10 @@
 #include <limits>
 #include <memory>
 
+#include "base/compiler_specific.h"
 #include "base/logging.h"
 #include "base/memory/page_size.h"
+#include "base/task/single_thread_task_runner.h"
 #include "base/trace_event/memory_dump_manager.h"
 #include "base/trace_event/memory_dump_provider.h"
 #include "base/trace_event/memory_dump_request_args.h"
@@ -262,9 +264,9 @@ void CommandBufferService::Flush(int32_t put_offset,
   while (put_offset_ != state_.get_offset) {
     int num_entries = end - state_.get_offset;
     int entries_processed = 0;
-    error::Error error = handler->DoCommands(GetCommandBufferSliceSize(),
-                                             buffer_ + state_.get_offset,
-                                             num_entries, &entries_processed);
+    error::Error error = handler->DoCommands(
+        GetCommandBufferSliceSize(), UNSAFE_TODO(buffer_ + state_.get_offset),
+        num_entries, &entries_processed);
 
     state_.get_offset += entries_processed;
     DCHECK_LE(state_.get_offset, num_entries_);

@@ -7,7 +7,6 @@
 #include <memory>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
@@ -46,7 +45,6 @@ using storage::FileSystemURL;
 using ::testing::_;
 using ::testing::AtLeast;
 using ::testing::DoAll;
-using ::testing::Invoke;
 using ::testing::InvokeWithoutArgs;
 using ::testing::StrictMock;
 using ::testing::WithArg;
@@ -391,7 +389,7 @@ TEST_F(LocalFileSyncServiceTest, ProcessLocalChange_CreateFile) {
   PostStatusFunctor post_ok_status(SYNC_STATUS_OK);
   EXPECT_CALL(local_change_processor,
               ApplyLocalChange(change, _, metadata, kFile, _))
-      .WillOnce(WithArg<4>(Invoke(post_ok_status)));
+      .WillOnce(WithArg<4>(post_ok_status));
 
   local_service_->SetLocalChangeProcessor(&local_change_processor);
   local_service_->ProcessLocalChange(base::BindOnce(&OnSyncCompleted, FROM_HERE,
@@ -429,7 +427,7 @@ TEST_F(LocalFileSyncServiceTest, ProcessLocalChange_CreateAndRemoveFile) {
   StrictMock<MockLocalChangeProcessor> local_change_processor;
   const FileChange change(FileChange::FILE_CHANGE_DELETE, SYNC_FILE_TYPE_FILE);
   EXPECT_CALL(local_change_processor, ApplyLocalChange(change, _, _, kFile, _))
-      .WillOnce(WithArg<4>(Invoke(post_not_found_status)));
+      .WillOnce(WithArg<4>(post_not_found_status));
 
   // The sync should succeed anyway.
   local_service_->SetLocalChangeProcessor(&local_change_processor);
@@ -502,11 +500,11 @@ TEST_F(LocalFileSyncServiceTest, ProcessLocalChange_MultipleChanges) {
   PostStatusAndRecordChangeFunctor post_ok_and_record_change(SYNC_STATUS_OK,
                                                              &changes);
   // auto post_ok_and_record_change =
-  //     DoAll(WithArg<4>(Invoke(post_ok_status)), RecordChange(&changes));
+  //     DoAll(WithArg<4>(post_ok_status)), RecordChange(&changes));
   EXPECT_CALL(local_change_processor, ApplyLocalChange(_, _, _, kPath, _))
       .Times(2)
-      .WillOnce(WithArgs<0, 4>(Invoke(post_ok_and_record_change)))
-      .WillOnce(WithArgs<0, 4>(Invoke(post_ok_and_record_change)));
+      .WillOnce(WithArgs<0, 4>(post_ok_and_record_change))
+      .WillOnce(WithArgs<0, 4>(post_ok_and_record_change));
   local_service_->SetLocalChangeProcessor(&local_change_processor);
 
   // OnWriteEnabled will be notified on kPath (in multi-threaded this
@@ -595,7 +593,7 @@ TEST_F(LocalFileSyncServiceTest, RecordFakeChange) {
   PostStatusAndRecordChangeFunctor post_ok_and_record_change(SYNC_STATUS_OK,
                                                              &changes);
   EXPECT_CALL(local_change_processor, ApplyLocalChange(_, _, _, kURL, _))
-      .WillOnce(WithArgs<0, 4>(Invoke(post_ok_and_record_change)));
+      .WillOnce(WithArgs<0, 4>(post_ok_and_record_change));
   {
     base::RunLoop run_loop;
     local_service_->SetLocalChangeProcessor(&local_change_processor);
@@ -658,7 +656,7 @@ TEST_F(OriginChangeMapTest, Basic) {
   GURL origin;
   while (!all_origins.empty()) {
     ASSERT_TRUE(NextOriginToProcess(&origin));
-    ASSERT_TRUE(base::Contains(all_origins, origin));
+    ASSERT_TRUE(all_origins.contains(origin));
     all_origins.erase(origin);
   }
 
@@ -671,7 +669,7 @@ TEST_F(OriginChangeMapTest, Basic) {
   all_origins.insert(kOrigin3);
   while (!all_origins.empty()) {
     ASSERT_TRUE(NextOriginToProcess(&origin));
-    ASSERT_TRUE(base::Contains(all_origins, origin));
+    ASSERT_TRUE(all_origins.contains(origin));
     all_origins.erase(origin);
   }
 
@@ -682,7 +680,7 @@ TEST_F(OriginChangeMapTest, Basic) {
   all_origins.insert(kOrigin3);
   while (!all_origins.empty()) {
     ASSERT_TRUE(NextOriginToProcess(&origin));
-    ASSERT_TRUE(base::Contains(all_origins, origin));
+    ASSERT_TRUE(all_origins.contains(origin));
     all_origins.erase(origin);
   }
 
@@ -693,7 +691,7 @@ TEST_F(OriginChangeMapTest, Basic) {
   all_origins.insert(std::begin(kOrigins), std::end(kOrigins));
   while (!all_origins.empty()) {
     ASSERT_TRUE(NextOriginToProcess(&origin));
-    ASSERT_TRUE(base::Contains(all_origins, origin));
+    ASSERT_TRUE(all_origins.contains(origin));
     all_origins.erase(origin);
   }
 }
@@ -717,7 +715,7 @@ TEST_F(OriginChangeMapTest, WithDisabled) {
   GURL origin;
   while (!all_origins.empty()) {
     ASSERT_TRUE(NextOriginToProcess(&origin));
-    ASSERT_TRUE(base::Contains(all_origins, origin));
+    ASSERT_TRUE(all_origins.contains(origin));
     all_origins.erase(origin);
   }
 
@@ -729,7 +727,7 @@ TEST_F(OriginChangeMapTest, WithDisabled) {
   all_origins.insert(kOrigin3);
   while (!all_origins.empty()) {
     ASSERT_TRUE(NextOriginToProcess(&origin));
-    ASSERT_TRUE(base::Contains(all_origins, origin));
+    ASSERT_TRUE(all_origins.contains(origin));
     all_origins.erase(origin);
   }
 
@@ -749,7 +747,7 @@ TEST_F(OriginChangeMapTest, WithDisabled) {
   all_origins.insert(kOrigin3);
   while (!all_origins.empty()) {
     ASSERT_TRUE(NextOriginToProcess(&origin));
-    ASSERT_TRUE(base::Contains(all_origins, origin));
+    ASSERT_TRUE(all_origins.contains(origin));
     all_origins.erase(origin);
   }
 }

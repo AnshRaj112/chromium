@@ -33,7 +33,6 @@
 #include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
-#include "components/content_settings/core/common/features.h"
 #include "components/google/core/common/google_switches.h"
 #include "components/google/core/common/google_util.h"
 #include "components/metrics/content/subprocess_metrics_provider.h"
@@ -88,8 +87,8 @@ GURL GetURLWithGoogleHost(net::EmbeddedTestServer* server,
                           const std::string& relative_url) {
   GURL server_base_url = server->base_url();
   GURL base_url =
-      GURL(base::StrCat({server_base_url.scheme(), "://", kGoogleHost, ":",
-                         server_base_url.port()}));
+      GURL(base::StrCat({server_base_url.GetScheme(), "://", kGoogleHost, ":",
+                         server_base_url.GetPort()}));
   EXPECT_TRUE(base_url.is_valid()) << base_url.possibly_invalid_spec();
   return base_url.Resolve(relative_url);
 }
@@ -171,7 +170,7 @@ class HintsFetcherDisabledBrowserTest : public InProcessBrowserTest {
     net::EmbeddedTestServer::ServerCertificateConfig hints_server_cert_config;
     hints_server_cert_config.dns_names = {
         GURL(optimization_guide::kOptimizationGuideServiceGetHintsDefaultURL)
-            .host()};
+            .GetHost()};
     hints_server_->SetSSLConfig(hints_server_cert_config);
     hints_server_->ServeFilesFromSourceDirectory("chrome/test/data/previews");
     hints_server_->RegisterRequestHandler(base::BindRepeating(
@@ -202,7 +201,7 @@ class HintsFetcherDisabledBrowserTest : public InProcessBrowserTest {
         hints_server_
             ->GetURL(GURL(optimization_guide::
                               kOptimizationGuideServiceGetHintsDefaultURL)
-                         .host(),
+                         .GetHost(),
                      "/")
             .spec());
     cmd->AppendSwitchASCII("force-variation-ids", "4");
@@ -225,7 +224,8 @@ class HintsFetcherDisabledBrowserTest : public InProcessBrowserTest {
 
     const optimization_guide::HintsComponentInfo& component_info =
         test_hints_component_creator_.CreateHintsComponentInfoWithPageHints(
-            optimization_guide::proto::NOSCRIPT, {hint_setup_url.host()}, "*");
+            optimization_guide::proto::NOSCRIPT, {hint_setup_url.GetHost()},
+            "*");
 
     base::HistogramTester histogram_tester;
 
@@ -335,22 +335,15 @@ class HintsFetcherDisabledBrowserTest : public InProcessBrowserTest {
     no_state_prefetch_manager->SetNoStatePrefetchContentsFactoryForTest(
         no_state_prefetch_contents_factory);
 
-    content::SessionStorageNamespace* storage_namespace =
-        browser()
-            ->tab_strip_model()
-            ->GetActiveWebContents()
-            ->GetController()
-            .GetDefaultSessionStorageNamespace();
-    ASSERT_TRUE(storage_namespace);
-
     std::unique_ptr<prerender::test_utils::TestPrerender> test_prerender =
         no_state_prefetch_contents_factory->ExpectNoStatePrefetchContents(
             prerender::FINAL_STATUS_NOSTATE_PREFETCH_FINISHED);
 
     std::unique_ptr<prerender::NoStatePrefetchHandle> no_state_prefetch_handle =
-        no_state_prefetch_manager->AddSameOriginSpeculation(
-            url, storage_namespace, gfx::Size(640, 480),
-            url::Origin::Create(url));
+        no_state_prefetch_manager->StartPrefetchingFromLinkRelPrerender(
+            /*process_id=*/-1, /*route_id=*/-1, url,
+            blink::mojom::PrerenderTriggerType::kLinkRelPrerender,
+            content::Referrer(), url::Origin::Create(url), gfx::Size(640, 480));
     ASSERT_EQ(no_state_prefetch_handle->contents(), test_prerender->contents());
 
     // The final status may be either  FINAL_STATUS_NOSTATE_PREFETCH_FINISHED or
@@ -384,16 +377,16 @@ class HintsFetcherDisabledBrowserTest : public InProcessBrowserTest {
     EXPECT_EQ(request.method, net::test_server::METHOD_POST);
     EXPECT_NE(request.headers.end(), request.headers.find("X-Client-Data"));
 
-    EXPECT_EQ(expected_bearer_access_token_.empty(),
-              !base::Contains(request.headers,
-                              net::HttpRequestHeaders::kAuthorization));
+    EXPECT_EQ(
+        expected_bearer_access_token_.empty(),
+        !request.headers.contains(net::HttpRequestHeaders::kAuthorization));
     if (!expected_bearer_access_token_.empty()) {
       EXPECT_EQ(expected_bearer_access_token_,
                 request.headers.at(net::HttpRequestHeaders::kAuthorization));
     }
 
     // Make sure only one of API key or access token is sent.
-    EXPECT_EQ(base::Contains(request.headers, "X-Goog-Api-Key"),
+    EXPECT_EQ(request.headers.contains("X-Goog-Api-Key"),
               expected_bearer_access_token_.empty());
 
     optimization_guide::proto::GetHintsRequest hints_request;
@@ -415,7 +408,7 @@ class HintsFetcherDisabledBrowserTest : public InProcessBrowserTest {
 
       optimization_guide::proto::Hint* hint = get_hints_response.add_hints();
       hint->set_key_representation(optimization_guide::proto::HOST);
-      hint->set_key(search_results_page_url_.host());
+      hint->set_key(search_results_page_url_.GetHost());
       hint->add_allowlisted_optimizations()->set_optimization_type(
           optimization_guide::proto::OptimizationType::NOSCRIPT);
       optimization_guide::proto::PageHint* page_hint = hint->add_page_hints();
@@ -540,8 +533,7 @@ class HintsFetcherBrowserTest : public HintsFetcherDisabledBrowserTest {
         {optimization_guide::kHintsBatchUpdateForActiveTabsAndTopHosts, {}},
     };
     PopulateEnabledFeatures(&enabled_features);
-    scoped_feature_list_.InitWithFeaturesAndParameters(enabled_features,
-                                                       disabled_features_);
+    scoped_feature_list_.InitWithFeaturesAndParameters(enabled_features, {});
     // Call to inherited class to match same set up with feature flags added.
     HintsFetcherDisabledBrowserTest::SetUp();
   }
@@ -577,9 +569,6 @@ class HintsFetcherBrowserTest : public HintsFetcherDisabledBrowserTest {
             urls, optimization_types,
             optimization_guide::proto::CONTEXT_BOOKMARKS, callback);
   }
-
- protected:
-  std::vector<base::test::FeatureRef> disabled_features_;
 };
 
 // This test creates new browser with no profile and loads a random page with
@@ -598,7 +587,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest, HintsFetcherEnabled) {
   // in each of the following histograms as One Platform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
@@ -627,7 +618,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest,
   // in each of the following histograms as One Platform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
@@ -663,7 +656,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest,
   // in each of the following histograms as One Platform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   // Wait until histograms have been updated before performing checks for
@@ -695,7 +690,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest,
   // in each of the following histograms as One Platform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   // Wait until histograms have been updated before performing checks for
@@ -726,7 +723,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest,
   // in each of the following histograms as One Platform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   // Wait until histograms have been updated before performing checks for
@@ -761,7 +760,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest,
   // We expect that we requested hints for 1 URL.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount."
+                "PageNavigation",
+                1),
             1);
 }
 
@@ -802,7 +803,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest,
   // in each of the following histograms as OnePlatform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "PageNavigation",
+                1),
             1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
@@ -857,12 +860,16 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest, HintsFetcherOverrideTimer) {
   // in each of the following histograms as OnePlatform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   // There should be 2 sites in the engagement service.
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 2, 1);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+      "BatchUpdateActiveTabs",
+      2, 1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
@@ -891,7 +898,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest, HintsFetcherFetches) {
   // in each of the following histograms as hints fetching is enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
@@ -1003,7 +1012,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest,
   // in each of the following histograms as One Platform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
@@ -1027,7 +1038,7 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest,
     // Navigate to a host not in the seeded site engagement service; it
     // should be recorded as a race for both the host and the URL.
     base::flat_set<std::string> expected_request;
-    expected_request.insert(GURL(full_url).host());
+    expected_request.insert(GURL(full_url).GetHost());
     expected_request.insert(GURL(full_url).spec());
     SetExpectedHintsRequestForHostsAndUrls(expected_request);
     ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(full_url)));
@@ -1106,7 +1117,9 @@ IN_PROC_BROWSER_TEST_F(
   // in each of the following histograms as One Platform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
@@ -1131,7 +1144,7 @@ IN_PROC_BROWSER_TEST_F(
     // Navigate to a host not in the seeded site engagement service; it
     // should be recorded as a race for both the host and the URL.
     base::flat_set<std::string> expected_request;
-    expected_request.insert(GURL(full_url).host());
+    expected_request.insert(GURL(full_url).GetHost());
     expected_request.insert(GURL(full_url).spec());
     SetExpectedHintsRequestForHostsAndUrls(expected_request);
     ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(full_url)));
@@ -1161,7 +1174,7 @@ IN_PROC_BROWSER_TEST_F(
     // Navigate to a host that was recently fetched. It
     // should be recorded as covered by the hints fetcher.
     base::flat_set<std::string> expected_request;
-    expected_request.insert(GURL(full_url).host());
+    expected_request.insert(GURL(full_url).GetHost());
     SetExpectedHintsRequestForHostsAndUrls(expected_request);
     ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(full_url)));
 
@@ -1197,7 +1210,9 @@ IN_PROC_BROWSER_TEST_F(
   // in each of the following histograms as One Platform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
@@ -1221,7 +1236,7 @@ IN_PROC_BROWSER_TEST_F(
     // Navigate to a host not in the seeded site engagement service; it
     // should be recorded as a race for both the host and the URL.
     base::flat_set<std::string> expected_request;
-    expected_request.insert(GURL(full_url).host());
+    expected_request.insert(GURL(full_url).GetHost());
     expected_request.insert(GURL(full_url).spec());
     SetExpectedHintsRequestForHostsAndUrls(expected_request);
     ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(full_url)));
@@ -1270,16 +1285,7 @@ IN_PROC_BROWSER_TEST_F(
   }
 }
 
-class HintsFetcherPre3pcdBrowserTest : public HintsFetcherBrowserTest {
- public:
-  HintsFetcherPre3pcdBrowserTest() {
-    disabled_features_.push_back(
-        content_settings::features::kTrackingProtection3pcd);
-  }
-};
-
-IN_PROC_BROWSER_TEST_F(HintsFetcherPre3pcdBrowserTest,
-                       HintsFetcherDoesntFetchOnNSP) {
+IN_PROC_BROWSER_TEST_F(HintsFetcherBrowserTest, HintsFetcherDoesntFetchOnNSP) {
   const base::HistogramTester* histogram_tester = GetHistogramTester();
 
   // Allowlist NoScript for https_url()'s' host.
@@ -1289,7 +1295,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherPre3pcdBrowserTest,
   // in each of the following histograms as hints fetching is enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
@@ -1344,7 +1352,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherSearchPageBrowserTest,
   // in each of the following histograms as One Platform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
@@ -1366,9 +1376,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherSearchPageBrowserTest,
   // were pushed via kFetchHintsOverride switch above.
   base::flat_set<std::string> expected_hosts_and_urls;
   // Unique hosts.
-  expected_hosts_and_urls.insert(GURL("https://foo.com").host());
-  expected_hosts_and_urls.insert(GURL("https://example.com").host());
-  expected_hosts_and_urls.insert(GURL("https://example3.com").host());
+  expected_hosts_and_urls.insert(GURL("https://foo.com").GetHost());
+  expected_hosts_and_urls.insert(GURL("https://example.com").GetHost());
+  expected_hosts_and_urls.insert(GURL("https://example3.com").GetHost());
   // Unique URLs.
   expected_hosts_and_urls.insert("https://foo.com/");
   expected_hosts_and_urls.insert(
@@ -1392,9 +1402,13 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherSearchPageBrowserTest,
   WaitUntilHintsFetcherRequestReceived();
   EXPECT_EQ(1u, count_hints_requests_received());
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 3, 1);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+      "BatchUpdateGoogleSRP",
+      3, 1);
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount", 7, 1);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount."
+      "BatchUpdateGoogleSRP",
+      7, 1);
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
                 "OptimizationGuide.HintsFetcher.GetHintsRequest.RequestStatus."
@@ -1447,7 +1461,9 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherSearchPagePrerenderingBrowserTest,
   // in each of the following histograms as One Platform Hints are enabled.
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
                 histogram_tester,
-                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1),
+                "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+                "BatchUpdateActiveTabs",
+                1),
             1);
 
   EXPECT_GE(optimization_guide::RetryForHistogramUntilCountReached(
@@ -1474,11 +1490,13 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherSearchPagePrerenderingBrowserTest,
   // Load a page in the prerender.
   GURL prerender_url = search_results_page_url();
   ResetCountHintsRequestsReceived();
-  content::FrameTreeNodeId host_id =
+  content::PrerenderHostId host_id =
       prerender_helper()->AddPrerender(prerender_url);
   EXPECT_EQ(0u, count_hints_requests_received());
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 0, 0);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+      "BatchUpdateGoogleSRP",
+      0, 0);
   histogram_tester->ExpectTotalCount(
       optimization_guide::kLoadedHintLocalHistogramString, 1);
 
@@ -1492,9 +1510,13 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherSearchPagePrerenderingBrowserTest,
       histogram_tester, optimization_guide::kLoadedHintLocalHistogramString, 2);
 
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 3, 1);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+      "BatchUpdateGoogleSRP",
+      3, 1);
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount", 7, 1);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount."
+      "BatchUpdateGoogleSRP",
+      7, 1);
 }
 
 class HintsFetcherSearchPageDisabledBrowserTest
@@ -1545,14 +1567,18 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherSearchPageDisabledBrowserTest,
 
   // Technically the results page counts as a navigation URL.
   base::flat_set<std::string> srp_request;
-  srp_request.insert(GURL(search_results_page_url()).host());
+  srp_request.insert(GURL(search_results_page_url()).GetHost());
   srp_request.insert(GURL(search_results_page_url()).spec());
   SetExpectedHintsRequestForHostsAndUrls(srp_request);
   EXPECT_EQ(1u, count_hints_requests_received());
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1, 1);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+      "PageNavigation",
+      1, 1);
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount", 1, 1);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount."
+      "PageNavigation",
+      1, 1);
   histogram_tester->ExpectTotalCount(
       "OptimizationGuide.HintsFetcher.GetHintsRequest.RequestStatus."
       "PageNavigation",
@@ -1566,7 +1592,7 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherSearchPageDisabledBrowserTest,
   ResetCountHintsRequestsReceived();
   std::string full_url = "https://foo.com/test/";
   base::flat_set<std::string> expected_request;
-  expected_request.insert(GURL(full_url).host());
+  expected_request.insert(GURL(full_url).GetHost());
   expected_request.insert(GURL(full_url).spec());
   SetExpectedHintsRequestForHostsAndUrls(expected_request);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL(full_url)));
@@ -1579,9 +1605,13 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherSearchPageDisabledBrowserTest,
       2);
   EXPECT_EQ(1u, count_hints_requests_received());
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1, 2);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+      "PageNavigation",
+      1, 2);
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount", 1, 2);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount."
+      "PageNavigation",
+      1, 2);
   histogram_tester->ExpectTotalCount(
       "OptimizationGuide.HintsFetcher.GetHintsRequest.RequestStatus."
       "PageNavigation",
@@ -1677,9 +1707,13 @@ IN_PROC_BROWSER_TEST_F(HintsFetcherSearchPageLimitedURLsBrowserTest,
             1);
   EXPECT_EQ(1u, count_hints_requests_received());
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount", 1, 1);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.HostCount."
+      "BatchUpdateGoogleSRP",
+      1, 1);
   histogram_tester->ExpectBucketCount(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount", 1, 1);
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount."
+      "BatchUpdateGoogleSRP",
+      1, 1);
   histogram_tester->ExpectTotalCount(
       "OptimizationGuide.HintsFetcher.GetHintsRequest.RequestStatus."
       "BatchUpdateGoogleSRP",
@@ -1709,16 +1743,6 @@ class PersonalizedHintsFetcherBrowserTest : public HintsFetcherBrowserTest {
     identity_test_env_adaptor_ =
         std::make_unique<IdentityTestEnvironmentProfileAdaptor>(
             browser()->profile());
-  }
-
-  void PopulateEnabledFeatures(
-      std::vector<base::test::FeatureRefAndParams>* enabled_features) override {
-    base::FieldTrialParams personalized_fetching_params = {
-        {"allowed_contexts", "CONTEXT_BOOKMARKS"},
-    };
-    enabled_features->emplace_back(
-        optimization_guide::features::kOptimizationGuidePersonalizedFetching,
-        personalized_fetching_params);
   }
 
   void EnableSignin() {
@@ -1773,9 +1797,10 @@ IN_PROC_BROWSER_TEST_F(PersonalizedHintsFetcherBrowserTest, NoUserSignIn) {
   SetExpectedBearerAccessToken(std::string());
   CanApplyOptimizationOnDemand(
       optimization_guide::proto::OptimizationType::NOSCRIPT,
-      optimization_guide::proto::CONTEXT_BOOKMARKS);
+      optimization_guide::proto::CONTEXT_PAGE_INSIGHTS_HUB);
   histogram_tester.ExpectUniqueSample(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.RequestStatus.Bookmarks",
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.RequestStatus."
+      "PageInsightsHub",
       optimization_guide::FetcherRequestStatus::kSuccess, 1);
 }
 
@@ -1788,9 +1813,10 @@ IN_PROC_BROWSER_TEST_F(PersonalizedHintsFetcherBrowserTest, UserSignedIn) {
   SetExpectedBearerAccessToken("Bearer access_token");
   CanApplyOptimizationOnDemand(
       optimization_guide::proto::OptimizationType::NOSCRIPT,
-      optimization_guide::proto::CONTEXT_BOOKMARKS);
+      optimization_guide::proto::CONTEXT_PAGE_INSIGHTS_HUB);
   histogram_tester.ExpectUniqueSample(
-      "OptimizationGuide.HintsFetcher.GetHintsRequest.RequestStatus.Bookmarks",
+      "OptimizationGuide.HintsFetcher.GetHintsRequest.RequestStatus."
+      "PageInsightsHub",
       optimization_guide::FetcherRequestStatus::kSuccess, 1);
 
   // Only the enabled RequestContext will have access token enabled.
@@ -1875,7 +1901,7 @@ IN_PROC_BROWSER_TEST_F(ProactivePersonalizationHintsFetcherBrowserTest,
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), full_url));
 
   base::flat_set<std::string> expected_request;
-  expected_request.insert(full_url.host());
+  expected_request.insert(full_url.GetHost());
   expected_request.insert(full_url.spec());
   SetExpectedHintsRequestForHostsAndUrls(expected_request);
   EXPECT_EQ(1u, count_hints_requests_received());
@@ -1956,7 +1982,7 @@ IN_PROC_BROWSER_TEST_F(
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), full_url));
 
   base::flat_set<std::string> expected_request;
-  expected_request.insert(full_url.host());
+  expected_request.insert(full_url.GetHost());
   expected_request.insert(full_url.spec());
   SetExpectedHintsRequestForHostsAndUrls(expected_request);
   EXPECT_EQ(1u, count_hints_requests_received());

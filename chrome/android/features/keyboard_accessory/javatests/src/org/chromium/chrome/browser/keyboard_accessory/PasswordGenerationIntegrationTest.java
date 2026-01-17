@@ -11,6 +11,7 @@ import static org.chromium.chrome.browser.touch_to_fill.password_generation.Touc
 
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -28,10 +29,12 @@ import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.DoNotBatch;
+import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.IntegrationTest;
 import org.chromium.base.test.util.Matchers;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.infobar.InfoBarContainer;
 import org.chromium.chrome.browser.keyboard_accessory.button_group_component.KeyboardAccessoryButtonGroupView;
@@ -56,7 +59,6 @@ import org.chromium.net.test.ServerCertificate;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.test.util.DeviceRestriction;
 import org.chromium.ui.test.util.GmsCoreVersionRestriction;
-import org.chromium.ui.widget.ChromeImageButton;
 
 import java.util.ArrayList;
 import java.util.concurrent.TimeoutException;
@@ -68,6 +70,8 @@ import java.util.concurrent.TimeoutException;
                 "TODO(crbug.com/40232561): add resetting logic for"
                         + "FakePasswordStoreAndroidBackend to allow batching")
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE, "show-autofill-signatures"})
+// TODO(crbug.com/473893732): Fix the clickNode.
+@DisableFeatures(ChromeFeatureList.LOCK_TOP_CONTROLS_ON_LARGE_TABLETS_V2)
 public class PasswordGenerationIntegrationTest {
     /**
      * The number of buttons currently available in the keyboard accessory bar. The offered options
@@ -206,7 +210,7 @@ public class PasswordGenerationIntegrationTest {
         assertPasswordText(PASSWORD_NODE_ID, generatedPassword);
         clickNode(SUBMIT_NODE_ID);
         ChromeTabUtils.waitForTabPageLoaded(
-                mActivityTestRule.getActivity().getActivityTab(), mTestServer.getURL(DONE_URL));
+                mActivityTestRule.getActivityTab(), mTestServer.getURL(DONE_URL));
         waitForMessageShown();
         CriteriaHelper.pollUiThread(
                 () -> {
@@ -239,7 +243,7 @@ public class PasswordGenerationIntegrationTest {
         assertPasswordText(PASSWORD_NODE_ID_MANUAL, generatedPassword);
         clickNode(SUBMIT_NODE_ID_MANUAL);
         ChromeTabUtils.waitForTabPageLoaded(
-                mActivityTestRule.getActivity().getActivityTab(), mTestServer.getURL(DONE_URL));
+                mActivityTestRule.getActivityTab(), mTestServer.getURL(DONE_URL));
         waitForMessageShown();
         CriteriaHelper.pollUiThread(
                 () -> {
@@ -285,8 +289,8 @@ public class PasswordGenerationIntegrationTest {
                     return keyboardAccessoryView.getButtons().size()
                             == KEYBOARD_ACCESSORY_BAR_ITEM_COUNT;
                 });
-        ArrayList<ChromeImageButton> buttons = keyboardAccessoryView.getButtons();
-        ChromeImageButton keyButton = buttons.get(0);
+        ArrayList<ImageButton> buttons = keyboardAccessoryView.getButtons();
+        ImageButton keyButton = buttons.get(0);
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
         runOnUiThreadBlocking(
                 () -> {
@@ -340,7 +344,7 @@ public class PasswordGenerationIntegrationTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     Assert.assertFalse(
-                            InfoBarContainer.from(mActivityTestRule.getActivity().getActivityTab())
+                            InfoBarContainer.from(mActivityTestRule.getActivityTab())
                                     .hasInfoBars());
                 });
     }

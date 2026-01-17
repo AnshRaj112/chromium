@@ -17,11 +17,9 @@
 #include <utility>
 
 #include "base/callback_list.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
-#include "base/lazy_instance.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
@@ -152,6 +150,13 @@ class ChromeOSTokenManager {
     ScopedPK11Slot tpm_slot;
   };
 
+  static ChromeOSTokenManager& Get() {
+    static base::NoDestructor<ChromeOSTokenManager> instance;
+    return *instance;
+  }
+
+  static bool IsCreated() { return instance_created_; }
+
   ScopedPK11Slot OpenPersistentNSSDBForPath(const std::string& db_name,
                                             const base::FilePath& path) {
     DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
@@ -280,7 +285,7 @@ class ChromeOSTokenManager {
   bool InitializeNSSForChromeOSUser(const std::string& username_hash,
                                     const base::FilePath& path) {
     DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
-    if (base::Contains(chromeos_user_map_, username_hash)) {
+    if (chromeos_user_map_.contains(username_hash)) {
       // This user already exists in our mapping.
       DVLOG(2) << username_hash << " already initialized.";
       return false;
@@ -298,7 +303,7 @@ class ChromeOSTokenManager {
   bool InitializeNSSForChromeOSUserWithSlot(const std::string& username_hash,
                                             ScopedPK11Slot public_slot) {
     DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
-    if (base::Contains(chromeos_user_map_, username_hash)) {
+    if (chromeos_user_map_.contains(username_hash)) {
       // This user already exists in our mapping.
       DVLOG(2) << username_hash << " already initialized.";
       return false;
@@ -311,7 +316,7 @@ class ChromeOSTokenManager {
 
   bool ShouldInitializeTPMForChromeOSUser(const std::string& username_hash) {
     DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
-    DCHECK(base::Contains(chromeos_user_map_, username_hash));
+    DCHECK(chromeos_user_map_.contains(username_hash));
 
     return !chromeos_user_map_[username_hash]
                 ->private_slot_initialization_started();
@@ -319,7 +324,7 @@ class ChromeOSTokenManager {
 
   void WillInitializeTPMForChromeOSUser(const std::string& username_hash) {
     DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
-    DCHECK(base::Contains(chromeos_user_map_, username_hash));
+    DCHECK(chromeos_user_map_.contains(username_hash));
 
     chromeos_user_map_[username_hash]
         ->set_private_slot_initialization_started();
@@ -328,7 +333,7 @@ class ChromeOSTokenManager {
   void InitializeTPMForChromeOSUser(const std::string& username_hash,
                                     CK_SLOT_ID slot_id) {
     DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
-    DCHECK(base::Contains(chromeos_user_map_, username_hash));
+    DCHECK(chromeos_user_map_.contains(username_hash));
     DCHECK(chromeos_user_map_[username_hash]
                ->private_slot_initialization_started());
 
@@ -365,7 +370,7 @@ class ChromeOSTokenManager {
       const std::string& username_hash) {
     DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
     VLOG(1) << "using software private slot for " << username_hash;
-    DCHECK(base::Contains(chromeos_user_map_, username_hash));
+    DCHECK(chromeos_user_map_.contains(username_hash));
     DCHECK(chromeos_user_map_[username_hash]
                ->private_slot_initialization_started());
 
@@ -388,7 +393,7 @@ class ChromeOSTokenManager {
       return ScopedPK11Slot();
     }
 
-    if (!base::Contains(chromeos_user_map_, username_hash)) {
+    if (!chromeos_user_map_.contains(username_hash)) {
       LOG(ERROR) << username_hash << " not initialized.";
       return ScopedPK11Slot();
     }
@@ -409,7 +414,7 @@ class ChromeOSTokenManager {
       return ScopedPK11Slot();
     }
 
-    DCHECK(base::Contains(chromeos_user_map_, username_hash));
+    DCHECK(chromeos_user_map_.contains(username_hash));
 
     return chromeos_user_map_[username_hash]->GetPrivateSlot(
         std::move(callback));
@@ -476,9 +481,14 @@ class ChromeOSTokenManager {
   }
 
  private:
-  friend struct base::LazyInstanceTraitsBase<ChromeOSTokenManager>;
+  friend class base::NoDestructor<ChromeOSTokenManager>;
 
-  ChromeOSTokenManager() { EnsureNSSInit(); }
+  static bool instance_created_;
+
+  ChromeOSTokenManager() {
+    EnsureNSSInit();
+    instance_created_ = true;
+  }
 
   // NOTE(willchan): We don't actually cleanup on destruction since we leak NSS
   // to prevent non-joinable threads from using NSS after it's already been
@@ -509,8 +519,8 @@ class ChromeOSTokenManager {
   THREAD_CHECKER(thread_checker_);
 };
 
-base::LazyInstance<ChromeOSTokenManager>::Leaky g_token_manager =
-    LAZY_INSTANCE_INITIALIZER;
+bool ChromeOSTokenManager::instance_created_ = false;
+
 }  // namespace
 
 base::FilePath GetSoftwareNSSDBPath(
@@ -519,13 +529,13 @@ base::FilePath GetSoftwareNSSDBPath(
 }
 
 void GetSystemNSSKeySlot(base::OnceCallback<void(ScopedPK11Slot)> callback) {
-  g_token_manager.Get().GetSystemNSSKeySlot(std::move(callback));
+  ChromeOSTokenManager::Get().GetSystemNSSKeySlot(std::move(callback));
 }
 
 void PrepareSystemSlotForTesting(ScopedPK11Slot slot) {
   DCHECK(!ChromeOSTokenManagerDataForTesting::GetInstance().test_system_slot);
-  DCHECK(!g_token_manager.IsCreated() ||
-         !g_token_manager.Get().IsInitializationStarted())
+  DCHECK(!ChromeOSTokenManager::IsCreated() ||
+         !ChromeOSTokenManager::Get().IsInitializationStarted())
       << "PrepareSystemSlotForTesting is called after initialization started";
 
   ChromeOSTokenManagerDataForTesting::GetInstance().test_system_slot =
@@ -533,83 +543,87 @@ void PrepareSystemSlotForTesting(ScopedPK11Slot slot) {
 }
 
 void ResetSystemSlotForTesting() {
-  if (g_token_manager.IsCreated()) {
-    g_token_manager.Get().ResetSystemSlotForTesting();  // IN-TEST
+  if (ChromeOSTokenManager::IsCreated()) {
+    ChromeOSTokenManager::Get().ResetSystemSlotForTesting();  // IN-TEST
   }
   ChromeOSTokenManagerDataForTesting::GetInstance().test_system_slot.reset();
 }
 
 void ResetTokenManagerForTesting() {
-  if (g_token_manager.IsCreated()) {
-    g_token_manager.Get().ResetTokenManagerForTesting();  // IN-TEST
+  if (ChromeOSTokenManager::IsCreated()) {
+    ChromeOSTokenManager::Get().ResetTokenManagerForTesting();  // IN-TEST
   }
   ResetSystemSlotForTesting();  // IN-TEST
 }
 
 void IsTPMTokenEnabled(base::OnceCallback<void(bool)> callback) {
-  g_token_manager.Get().IsTPMTokenEnabled(std::move(callback));
+  ChromeOSTokenManager::Get().IsTPMTokenEnabled(std::move(callback));
 }
 
 void InitializeTPMTokenAndSystemSlot(int token_slot_id,
                                      base::OnceCallback<void(bool)> callback) {
-  g_token_manager.Get().InitializeTPMTokenAndSystemSlot(token_slot_id,
-                                                        std::move(callback));
+  ChromeOSTokenManager::Get().InitializeTPMTokenAndSystemSlot(
+      token_slot_id, std::move(callback));
 }
 
 void FinishInitializingTPMTokenAndSystemSlot() {
-  g_token_manager.Get().FinishInitializingTPMTokenAndSystemSlot();
+  ChromeOSTokenManager::Get().FinishInitializingTPMTokenAndSystemSlot();
 }
 
 bool InitializeNSSForChromeOSUser(const std::string& username_hash,
                                   const base::FilePath& path) {
-  return g_token_manager.Get().InitializeNSSForChromeOSUser(username_hash,
-                                                            path);
+  return ChromeOSTokenManager::Get().InitializeNSSForChromeOSUser(username_hash,
+                                                                  path);
 }
 
 bool InitializeNSSForChromeOSUserWithSlot(const std::string& username_hash,
                                           ScopedPK11Slot public_slot) {
-  return g_token_manager.Get().InitializeNSSForChromeOSUserWithSlot(
+  return ChromeOSTokenManager::Get().InitializeNSSForChromeOSUserWithSlot(
       username_hash, std::move(public_slot));
 }
 
 bool ShouldInitializeTPMForChromeOSUser(const std::string& username_hash) {
-  return g_token_manager.Get().ShouldInitializeTPMForChromeOSUser(
+  return ChromeOSTokenManager::Get().ShouldInitializeTPMForChromeOSUser(
       username_hash);
 }
 
 void WillInitializeTPMForChromeOSUser(const std::string& username_hash) {
-  g_token_manager.Get().WillInitializeTPMForChromeOSUser(username_hash);
+  ChromeOSTokenManager::Get().WillInitializeTPMForChromeOSUser(username_hash);
 }
 
 void InitializeTPMForChromeOSUser(const std::string& username_hash,
                                   CK_SLOT_ID slot_id) {
-  g_token_manager.Get().InitializeTPMForChromeOSUser(username_hash, slot_id);
+  ChromeOSTokenManager::Get().InitializeTPMForChromeOSUser(username_hash,
+                                                           slot_id);
 }
 
 void InitializePrivateSoftwareSlotForChromeOSUser(
     const std::string& username_hash) {
-  g_token_manager.Get().InitializePrivateSoftwareSlotForChromeOSUser(
+  ChromeOSTokenManager::Get().InitializePrivateSoftwareSlotForChromeOSUser(
       username_hash);
 }
 
 ScopedPK11Slot GetPublicSlotForChromeOSUser(const std::string& username_hash) {
-  return g_token_manager.Get().GetPublicSlotForChromeOSUser(username_hash);
+  return ChromeOSTokenManager::Get().GetPublicSlotForChromeOSUser(
+      username_hash);
 }
 
 ScopedPK11Slot GetPrivateSlotForChromeOSUser(
     const std::string& username_hash,
     base::OnceCallback<void(ScopedPK11Slot)> callback) {
-  return g_token_manager.Get().GetPrivateSlotForChromeOSUser(
+  return ChromeOSTokenManager::Get().GetPrivateSlotForChromeOSUser(
       username_hash, std::move(callback));
 }
 
 void CloseChromeOSUserForTesting(const std::string& username_hash) {
-  g_token_manager.Get().CloseChromeOSUserForTesting(username_hash);
+  ChromeOSTokenManager::Get().CloseChromeOSUserForTesting(  // IN-TEST
+      username_hash);
 }
 
 void SetPrivateSoftwareSlotForChromeOSUserForTesting(ScopedPK11Slot slot) {
-  g_token_manager.Get().SetPrivateSoftwareSlotForChromeOSUserForTesting(
-      std::move(slot));
+  ChromeOSTokenManager::Get()
+      .SetPrivateSoftwareSlotForChromeOSUserForTesting(  // IN-TEST
+          std::move(slot));
 }
 
 }  // namespace crypto

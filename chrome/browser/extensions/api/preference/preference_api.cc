@@ -11,7 +11,6 @@
 #include <optional>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/lazy_instance.h"
@@ -400,12 +399,10 @@ ExtensionFunction::ResponseAction SetPreferenceFunction::Run() {
   if (!extension()->permissions_data()->HasAPIPermission(write_permission))
     return RespondNow(Error(kPermissionErrorMessage, pref_key));
 
-  // If 3PCs are globally blocked in incognito re-allowing them is not
+  // As 3PCs are globally blocked in incognito re-allowing them is not
   // supported, so error out.
   if (incognito && browser_pref == prefs::kCookieControlsMode &&
-      value->GetBool() &&
-      base::FeatureList::IsEnabled(
-          privacy_sandbox::kAlwaysBlock3pcsIncognito)) {
+      value->GetBool()) {
     return RespondNow(
         Error(extension_misc::kCookiesAllowedIncognitoErrorMessage));
   }

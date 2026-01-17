@@ -5,7 +5,8 @@
 package org.chromium.chrome.browser.tabmodel;
 
 import org.chromium.base.ObserverList;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
+import org.chromium.base.supplier.NullableObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -16,27 +17,27 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Common utility class for {@link TabModelImpl} and {@link TabCollectionTabModelImpl}. Allows
- * extracting common logic out of the two models.
+ * Utility class for {@link TabCollectionTabModelImpl}. Permits easier testing of some static
+ * helpers.
  */
 @NullMarked
-public class TabModelImplUtil {
+class TabModelImplUtil {
     /**
      * Returns the next tab to select after closing the given tabs.
      *
      * @param model The {@link TabModel} to act on.
      * @param modelDelegate The {@link TabModelDelegate} to get the current tab from.
-     * @param currentTabSupplier The {@link ObservableSupplier} that supplies the current tab.
+     * @param currentTabSupplier The {@link MonotonicObservableSupplier} that supplies the current tab.
      * @param nextTabPolicySupplier The {@link NextTabPolicySupplier} to get the next tab policy.
      * @param closingTabs The list of tabs that are closing.
      * @param uponExit Whether the app is closing as a result of this tab closure.
      * @param tabCloseType The type of tab closure.
      * @return The next tab to select after closing the given tabs or null if no tab could be found.
      */
-    static @Nullable Tab getNextTabIfClosed(
+    /* package */ static @Nullable Tab getNextTabIfClosed(
             TabModel model,
             TabModelDelegate modelDelegate,
-            ObservableSupplier<@Nullable Tab> currentTabSupplier,
+            NullableObservableSupplier<Tab> currentTabSupplier,
             NextTabPolicySupplier nextTabPolicySupplier,
             List<Tab> closingTabs,
             boolean uponExit,
@@ -121,7 +122,7 @@ public class TabModelImplUtil {
      *     that is closing.
      * @return The closest tab or null if no tab could be found.
      */
-    public static @Nullable Tab findNearbyNotClosingTab(
+    /* package */ static @Nullable Tab findNearbyNotClosingTab(
             Iterable<Tab> tabIterable, int closingIndex, List<Tab> closingTabs) {
         Tab nearestTab = null;
         int i = -1;
@@ -147,7 +148,7 @@ public class TabModelImplUtil {
      * @param multiSelectedTabs The Set of selected tab IDs to modify.
      * @param observers The observer list to notify of the change.
      */
-    public static void setTabsMultiSelected(
+    /* package */ static void setTabsMultiSelected(
             Set<Integer> tabIds,
             boolean isSelected,
             Set<Integer> multiSelectedTabs,
@@ -159,7 +160,7 @@ public class TabModelImplUtil {
             multiSelectedTabs.removeAll(tabIds);
         }
         for (TabModelObserver obs : observers) {
-            obs.onTabSelectionChanged();
+            obs.onTabsSelectionChanged();
         }
     }
 
@@ -170,7 +171,7 @@ public class TabModelImplUtil {
      * @param multiSelectedTabs The Set of selected tab IDs to clear.
      * @param observers The observer list to notify of the change.
      */
-    public static void clearMultiSelection(
+    /* package */ static void clearMultiSelection(
             boolean notifyObservers,
             Set<Integer> multiSelectedTabs,
             ObserverList<TabModelObserver> observers) {
@@ -179,7 +180,7 @@ public class TabModelImplUtil {
         multiSelectedTabs.clear();
         if (notifyObservers) {
             for (TabModelObserver obs : observers) {
-                obs.onTabSelectionChanged();
+                obs.onTabsSelectionChanged();
             }
         }
     }
@@ -193,7 +194,7 @@ public class TabModelImplUtil {
      * @param model The TabModel, used to get the currently active tab.
      * @return true if the tab is selected, false otherwise.
      */
-    public static boolean isTabMultiSelected(
+    /* package */  static boolean isTabMultiSelected(
             int tabId, Set<Integer> multiSelectedTabs, TabModel model) {
         if (!ChromeFeatureList.sAndroidTabHighlighting.isEnabled()) return false;
         return multiSelectedTabs.contains(tabId) || tabId == TabModelUtils.getCurrentTabId(model);

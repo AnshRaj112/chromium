@@ -26,9 +26,11 @@ import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.CriteriaNotSatisfiedException;
 import org.chromium.base.test.util.UrlUtils;
 import org.chromium.chrome.R;
+import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.autofill.CardUnmaskPrompt;
 import org.chromium.chrome.browser.autofill.CardUnmaskPrompt.CardUnmaskObserverForTest;
 import org.chromium.chrome.browser.autofill.editors.EditorObserverForTest;
+import org.chromium.chrome.browser.browser_controls.BrowserControlsUtils;
 import org.chromium.chrome.browser.payments.ChromePaymentRequestFactory.ChromePaymentRequestDelegateImpl;
 import org.chromium.chrome.browser.payments.ChromePaymentRequestFactory.ChromePaymentRequestDelegateImplObserverForTest;
 import org.chromium.chrome.browser.payments.ui.PaymentRequestSection.OptionSection;
@@ -80,30 +82,30 @@ import java.util.concurrent.atomic.AtomicReference;
     @Retention(RetentionPolicy.SOURCE)
     /* package */ @interface AppPresence {
         /** Flag for a factory without payment apps. */
-        static final int NO_APPS = 0;
+        int NO_APPS = 0;
 
         /** Flag for a factory with payment apps. */
-        static final int HAVE_APPS = 1;
+        int HAVE_APPS = 1;
     }
 
     @IntDef({AppSpeed.FAST_APP, AppSpeed.SLOW_APP})
     @Retention(RetentionPolicy.SOURCE)
     /* package */ @interface AppSpeed {
         /** Flag for installing a payment app that responds to its invocation fast. */
-        static final int FAST_APP = 0;
+        int FAST_APP = 0;
 
         /** Flag for installing a payment app that responds to its invocation slowly. */
-        static final int SLOW_APP = 1;
+        int SLOW_APP = 1;
     }
 
     @IntDef({FactorySpeed.FAST_FACTORY, FactorySpeed.SLOW_FACTORY})
     @Retention(RetentionPolicy.SOURCE)
     /* package */ @interface FactorySpeed {
         /** Flag for a factory that immediately creates a payment app. */
-        static final int FAST_FACTORY = 0;
+        int FAST_FACTORY = 0;
 
         /** Flag for a factory that creates a payment app with a delay. */
-        static final int SLOW_FACTORY = 1;
+        int SLOW_FACTORY = 1;
     }
 
     /** The expiration month dropdown index for December. */
@@ -157,6 +159,8 @@ import java.util.concurrent.atomic.AtomicReference;
     private final String mTestFilePath;
 
     private CardUnmaskPrompt mCardUnmaskPrompt;
+
+    private int mFactoryCount;
 
     /**
      * Creates an instance of PaymentRequestTestRule.
@@ -228,16 +232,19 @@ import java.util.concurrent.atomic.AtomicReference;
         mInputProtector = new InputProtector(mClock);
     }
 
-    /* package */ void setObserversAndWaitForInitialPageLoad() throws TimeoutException {
-        try {
-            // TODO(crbug.com/40728764): Figure out what these tests need to wait on to not be flaky
-            // instead of sleeping.
-            Thread.sleep(2000);
-        } catch (Exception ex) {
-        }
+    /* package */ void setObserversAndWaitForInitialPageLoad() throws InterruptedException {
+        setObserversAndWaitForInitialPageLoad(getActivity());
+    }
+
+    /* package */ void setObserversAndWaitForInitialPageLoad(ChromeActivity activity)
+            throws InterruptedException {
+        // TODO(crbug.com/40728764): Figure out what these tests need to wait on to not be flaky
+        // instead of sleeping.
+        Thread.sleep(2000);
+
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
-                    mWebContentsRef.set(getActivity().getCurrentWebContents());
+                    mWebContentsRef.set(activity.getCurrentWebContents());
                     PaymentRequestUi.setEditorObserverForTest(PaymentRequestTestRule.this);
                     PaymentRequestUi.setPaymentRequestObserverForTest(PaymentRequestTestRule.this);
                     PaymentRequestService.setObserverForTest(PaymentRequestTestRule.this);
@@ -1182,7 +1189,8 @@ import java.util.concurrent.atomic.AtomicReference;
             @FactorySpeed int factorySpeed,
             @AppSpeed int appSpeed) {
         TestFactory factory = new TestFactory(appMethodName, appPresence, factorySpeed, appSpeed);
-        PaymentAppService.getInstance().addFactory(factory);
+        String factoryId = "testFactoryId_" + mFactoryCount++;
+        PaymentAppService.getInstance().addUniqueFactory(factory, factoryId);
         return factory;
     }
 
@@ -1295,6 +1303,8 @@ import java.util.concurrent.atomic.AtomicReference;
     @Override
     protected void before() throws Throwable {
         super.before();
+        // TODO(crbug.com/473893732): Fix the clickNode.
+        BrowserControlsUtils.setsSyncMinHeightWithTotalHeightForTesting(false);
         if (!mDelayStartActivity) {
             startMainActivityWithURL(mTestFilePath);
             setObserversAndWaitForInitialPageLoad();

@@ -18,7 +18,7 @@
 #import "ios/chrome/app/application_delegate/startup_information.h"
 #import "ios/chrome/app/launch_screen_view_controller.h"
 #import "ios/chrome/app/variations_app_state_agent+testing.h"
-#import "ios/chrome/browser/first_run/ui_bundled/first_run_util.h"
+#import "ios/chrome/browser/first_run/public/first_run_util.h"
 #import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/variations/model/ios_chrome_variations_seed_fetcher.h"
@@ -37,7 +37,8 @@ using ::variations::SeedApplicationStage;
 using ::variations::VariationsSeedStore;
 
 // The NSUserDefault key to store the time the last seed is fetched.
-NSString* kLastVariationsSeedFetchTimeKey = @"kLastVariationsSeedFetchTime";
+NSString* const kLastVariationsSeedFetchTimeKey =
+    @"kLastVariationsSeedFetchTime";
 
 // Local state key of experiment group assigned, persisted for subsequent runs.
 const char kFirstRunSeedFetchExperimentGroupPref[] = "ios.variations.first_run";

@@ -14,6 +14,7 @@
 #include "base/compiler_specific.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/synchronization/lock.h"
 
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "base/build_info_jni/ApkInfo_jni.h"
@@ -59,8 +60,13 @@ const IApkInfo& get_apk_info() {
 }  // namespace
 
 void Set(const IApkInfo& info) {
+  static base::NoDestructor<base::Lock> lock;
+  base::AutoLock l(*lock);
+
   std::optional<IApkInfo>& holder = get_holder();
-  DCHECK(!holder.has_value());
+  if (holder.has_value()) {
+    return;
+  }
   holder.emplace(info);
 }
 
@@ -73,13 +79,13 @@ static void JNI_ApkInfo_FillFields(JNIEnv* env,
                                    std::string& packageName,
                                    std::string& resourcesVersion,
                                    std::string& installerPackageName,
-                                   jboolean isDebugApp,
-                                   jint targetSdkVersion) {
+                                   bool isDebugApp,
+                                   int32_t targetSdkVersion) {
   Set(IApkInfo{.hostPackageLabel = hostPackageLabel,
                .hostPackageName = hostPackageName,
                .hostVersionCode = hostVersionCode,
                .installerPackageName = installerPackageName,
-               .isDebugApp = static_cast<bool>(isDebugApp),
+               .isDebugApp = isDebugApp,
                .packageName = packageName,
                .packageVersionCode = packageVersionCode,
                .packageVersionName = packageVersionName,
@@ -127,4 +133,10 @@ int target_sdk_version() {
   return get_apk_info().targetSdkVersion;
 }
 
+std::string host_signing_cert_sha256() {
+  JNIEnv* env = AttachCurrentThread();
+  return Java_ApkInfo_getHostSigningCertSha256(env);
+}
 }  // namespace base::android::apk_info
+
+DEFINE_JNI(ApkInfo)

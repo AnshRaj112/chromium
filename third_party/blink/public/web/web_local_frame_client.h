@@ -174,6 +174,12 @@ enum class DetachReason {
   kNavigation,
 };
 
+enum class BFCacheStateChange {
+  kStoredToBFCache,
+  kRestoredFromBFCache,
+  kNoChange,
+};
+
 class BLINK_EXPORT WebLocalFrameClient {
  public:
   virtual ~WebLocalFrameClient() = default;
@@ -458,7 +464,8 @@ class BLINK_EXPORT WebLocalFrameClient {
       mojom::SameDocumentNavigationType,
       bool is_client_redirect,
       const std::optional<blink::SameDocNavigationScreenshotDestinationToken>&
-          screenshot_destination) {}
+          screenshot_destination,
+      base::UnguessableToken same_document_metrics_token) {}
 
   // Called when an async same-document navigation fails before commit. This is
   // used in the case where a same-document navigation was instructed to commit
@@ -473,7 +480,7 @@ class BLINK_EXPORT WebLocalFrameClient {
   virtual void DidOpenDocumentInputStream(const WebURL&) {}
 
   // Called when a frame's page lifecycle state gets updated.
-  virtual void DidSetPageLifecycleState(bool restoring_from_bfcache) {}
+  virtual void DidSetPageLifecycleState(BFCacheStateChange bfcache_change) {}
 
   // Immediately notifies the browser of a change in the current HistoryItem.
   // Prefer DidUpdateCurrentHistoryItem().
@@ -554,11 +561,10 @@ class BLINK_EXPORT WebLocalFrameClient {
   virtual void OnMainFrameViewportRectangleChanged(
       const gfx::Rect& main_frame_viewport_rect) {}
 
-  // Called when an image ad rectangle changed. An empty `image_ad_rect` is used
-  // to signal the removal of the rectangle. Only invoked on the main frame.
-  virtual void OnMainFrameImageAdRectangleChanged(
-      int element_id,
-      const gfx::Rect& image_ad_rect) {}
+  // Called when an ad element's geometry changed. An empty `ad_rect` is used to
+  // signal the removal of the element. Only invoked on the main frame.
+  virtual void OnMainFrameAdRectangleChanged(int element_id,
+                                             const gfx::Rect& ad_rect) {}
 
   // Called when an overlay interstitial pop up ad is detected.
   virtual void OnOverlayPopupAdDetected() {}
@@ -648,7 +654,12 @@ class BLINK_EXPORT WebLocalFrameClient {
 
   // A new soft navigation was observed.
   virtual void DidObserveSoftNavigation(
-      blink::SoftNavigationMetricsForReporting metrics) {}
+      SoftNavigationMetricsForReporting metrics) {}
+
+  // A new largest contentful paint candidate relating to the most recent
+  // soft navigation was observed. Also see DidObserveSoftNavigation().
+  virtual void DidObserveSoftLargestContentfulPaint(
+      const LargestContentfulPaintDetailsForReporting& lcp) {}
 
   // Reports that visible elements in the frame shifted (bit.ly/lsm-explainer).
   virtual void DidObserveLayoutShift(double score, bool after_input_or_scroll) {
@@ -885,6 +896,9 @@ class BLINK_EXPORT WebLocalFrameClient {
   virtual base::ScopedClosureRunner CreateScopedClientNavigationThrottler() {
     return {};
   }
+
+  // Returns true if this frame is for the initial WebUI.
+  virtual bool IsForInitialWebUI() const { return false; }
 };
 
 }  // namespace blink

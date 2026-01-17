@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_macros.h"
@@ -21,7 +20,6 @@
 #include "base/task/sequenced_task_runner.h"
 #include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/resource_coordinator/tab_manager_features.h"
 #include "chrome/common/url_constants.h"
 #include "components/performance_manager/public/decorators/site_data_recorder.h"
 #include "components/performance_manager/public/graph/graph.h"
@@ -38,8 +36,9 @@
 #include "third_party/blink/public/common/permissions/permission_utils.h"
 
 #if !BUILDFLAG(IS_ANDROID)
-#include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/browser_list.h"
+// TODO(crbug.com/407105162): Remove nogncheck when crbug.com/40147906 is fixed.
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"  // nogncheck
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"  // nogncheck
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #endif
 
@@ -67,8 +66,7 @@ class SysInfoDelegate : public SessionRestorePolicy::Delegate {
   }
 
   size_t GetFreeMemoryMiB() const override {
-    constexpr uint64_t kMibibytesInBytes = 1 << 20;
-    return base::SysInfo::AmountOfAvailablePhysicalMemory() / kMibibytesInBytes;
+    return base::SysInfo::AmountOfAvailablePhysicalMemory().InMiB();
   }
 
   base::TimeTicks NowTicks() const override { return base::TimeTicks::Now(); }
@@ -105,7 +103,7 @@ SessionRestorePolicy::SessionRestorePolicy()
 SessionRestorePolicy::~SessionRestorePolicy() = default;
 
 float SessionRestorePolicy::AddTabForScoring(content::WebContents* contents) {
-  DCHECK(!base::Contains(tab_data_, contents));
+  DCHECK(!tab_data_.contains(contents));
 
   // When the first tab is added keep track of a 'now' time. This ensures that
   // the scoring function returns consistent values over the lifetime of the
@@ -125,16 +123,16 @@ float SessionRestorePolicy::AddTabForScoring(content::WebContents* contents) {
   // this!
   // In theory all tabs should belong to a tab-strip, but in tests this isn't
   // necessarily true.
-  auto* browser_list = BrowserList::GetInstance();
-  for (size_t i = 0; i < browser_list->size(); ++i) {
-    auto* browser = browser_list->get(i);
-    auto* tab_strip = browser->tab_strip_model();
-    int tab_index = tab_strip->GetIndexOfWebContents(contents);
-    if (tab_index == TabStripModel::kNoTab)
-      continue;
-    tab_data->is_pinned = tab_strip->IsTabPinned(tab_index);
-    break;
-  }
+  ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+      [&](BrowserWindowInterface* browser) {
+        auto* const tab_strip = browser->GetTabStripModel();
+        const int tab_index = tab_strip->GetIndexOfWebContents(contents);
+        if (tab_index == TabStripModel::kNoTab) {
+          return true;  // continue iteration.
+        }
+        tab_data->is_pinned = tab_strip->IsTabPinned(tab_index);
+        return false;  // end iteration.
+      });
 #endif  // !BUILDFLAG(IS_ANDROID)
 
   // Cache a handful of other properties.

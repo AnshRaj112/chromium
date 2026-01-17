@@ -15,7 +15,6 @@ import org.junit.runner.RunWith;
 
 import org.chromium.base.CallbackUtils;
 import org.chromium.base.ThreadUtils;
-import org.chromium.base.jank_tracker.PlaceholderJankTracker;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneshotSupplierImpl;
@@ -24,7 +23,6 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.HistogramWatcher;
-import org.chromium.cc.input.BrowserControlsState;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.TabbedModeTabDelegateFactory;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
@@ -67,14 +65,14 @@ public class TabUmaTest {
 
     private TabbedModeTabDelegateFactory createTabDelegateFactory() {
         BrowserControlsVisibilityDelegate visibilityDelegate =
-                new BrowserControlsVisibilityDelegate(BrowserControlsState.BOTH) {};
+                new BrowserControlsVisibilityDelegate();
         ChromeTabbedActivity cta = mActivityTestRule.getActivity();
         RootUiCoordinator rootUiCoordinator = cta.getRootUiCoordinatorForTesting();
         return new TabbedModeTabDelegateFactory(
                 mActivityTestRule.getActivity(),
                 visibilityDelegate,
                 new ObservableSupplierImpl<>(),
-                null,
+                /* ephemeralTabCoordinatorSupplier= */ null,
                 CallbackUtils.emptyRunnable(),
                 rootUiCoordinator.getBottomSheetController(),
                 /* chromeActivityNativeDelegate= */ cta,
@@ -85,20 +83,23 @@ public class TabUmaTest {
                 cta.getCompositorViewHolderSupplier(),
                 cta.getModalDialogManagerSupplier(),
                 cta::getSnackbarManager,
+                cta.getActivityResultTracker(),
                 cta.getBrowserControlsManager(),
                 cta.getActivityTabProvider(),
                 cta.getLifecycleDispatcher(),
                 cta.getWindowAndroid(),
-                new PlaceholderJankTracker(),
                 rootUiCoordinator.getToolbarManager()::getToolbar,
-                null,
-                null,
+                /* homeSurfaceTracker= */ null,
+                /* tabContentManagerSupplier= */ null,
                 rootUiCoordinator.getToolbarManager().getTabStripHeightSupplier(),
                 new OneshotSupplierImpl<>(),
                 new ObservableSupplierImpl<>(),
                 new ObservableSupplierImpl<>(),
                 cta.getStartupMetricsTracker(),
-                null);
+                /* exclusiveAccessManager= */ null,
+                /* backPressManager= */ null,
+                /* multiInstanceManager= */ null,
+                /* recentlyClosedEntriesManager= */ null);
     }
 
     private Tab createLazilyLoadedTab(boolean show) throws ExecutionException {
@@ -198,8 +199,8 @@ public class TabUmaTest {
                                     .map(
                                             FileChannel.MapMode.READ_ONLY,
                                             fileInputStream.getChannel().position(),
-                                            file.length()));
-            state.contentsState.setVersion(2);
+                                            file.length()),
+                            WebContentsState.CONTENTS_STATE_CURRENT_VERSION);
             state.timestampMillis = 10L;
             state.parentId = 1;
             state.themeColor = 4;

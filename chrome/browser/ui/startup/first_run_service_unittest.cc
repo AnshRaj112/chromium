@@ -13,9 +13,9 @@
 #include "chrome/browser/profiles/profile_attributes_storage.h"
 #include "chrome/browser/ui/startup/first_run_test_util.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile_manager.h"
+#include "components/prefs/pref_service.h"
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/identity_manager/identity_test_environment.h"
 #include "content/public/test/browser_task_environment.h"
@@ -101,7 +101,7 @@ TEST_F(FirstRunServiceTest, ShouldPopulateProfileNameFromPrimaryAccount) {
 
   AccountInfo primary_account_info = identity_test_env.MakeAccountAvailable(
       "primary@gmail.com",
-      {.primary_account_consent_level = signin::ConsentLevel::kSync});
+      {.primary_account_consent_level = signin::ConsentLevel::kSignin});
   AccountInfo secondary_account_info =
       identity_test_env.MakeAccountAvailable("secondary@gmail.com");
 

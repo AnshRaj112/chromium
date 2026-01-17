@@ -64,7 +64,8 @@ class SecurePaymentConfirmationApp : public PaymentApp,
       base::WeakPtr<PaymentRequestSpec> spec,
       mojom::SecurePaymentConfirmationRequestPtr request,
       std::unique_ptr<webauthn::InternalAuthenticator> authenticator,
-      std::vector<PaymentApp::PaymentEntityLogo> payment_entities_logos);
+      std::vector<PaymentApp::PaymentEntityLogo> payment_entities_logos,
+      bool is_error_dialog);
   ~SecurePaymentConfirmationApp() override;
 
   SecurePaymentConfirmationApp(const SecurePaymentConfirmationApp& other) =
@@ -101,7 +102,14 @@ class SecurePaymentConfirmationApp : public PaymentApp,
   // WebContentsObserver implementation.
   void RenderFrameDeleted(content::RenderFrameHost* render_frame_host) override;
 
+  // Returns whether the SPC App should show an error dialog.
+  bool IsErrorDialog() const { return is_error_dialog_; }
+
   PasskeyBrowserBinder* GetPasskeyBrowserBinderForTesting();
+  void SetWaitForGetBrowserBoundKeyForTesting(
+      base::OnceClosure wait_for_get_bbk) {
+    wait_for_get_bbk_for_tests_ = std::move(wait_for_get_bbk);
+  }
 
  private:
   void OnGetBrowserBoundKey(
@@ -132,13 +140,17 @@ class SecurePaymentConfirmationApp : public PaymentApp,
   // `device_supports_browser_bound_keys_in_hardware` is not set if
   // passkey_browser_binder was not provided.
   const bool device_supports_browser_bound_keys_in_hardware_ = false;
+  // This contains the logos of the entities facilitating the transaction. There
+  // may be up to 2 logos.
+  std::vector<PaymentEntityLogo> payment_entities_logos_;
+  const bool is_error_dialog_;
+
   std::unique_ptr<BrowserBoundKey> browser_bound_key_;
   std::string challenge_;
   blink::mojom::GetAssertionAuthenticatorResponsePtr response_;
 
-  // This contains the logos of the entities facilitating the transaction. There
-  // may be up to 2 logos.
-  std::vector<PaymentEntityLogo> payment_entities_logos_;
+  // Used to block test completion until OnGetBrowserBoundKey is run.
+  base::OnceClosure wait_for_get_bbk_for_tests_;
 
   base::WeakPtrFactory<SecurePaymentConfirmationApp> weak_ptr_factory_{this};
 };

@@ -10,6 +10,7 @@
 #import "base/time/time.h"
 #import "ios/chrome/app/application_delegate/app_state.h"
 #import "ios/chrome/app/application_delegate/app_state_observer.h"
+#import "ios/chrome/browser/shared/public/features/system_flags.h"
 #import "ios/chrome/browser/start_surface/ui_bundled/start_surface_features.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util.h"
@@ -17,10 +18,21 @@
 namespace {
 
 // The key to store the timestamp when the scene enters into background.
-NSString* kStartSurfaceSceneEnterIntoBackgroundTime =
+NSString* const kStartSurfaceSceneEnterIntoBackgroundTime =
     @"StartSurfaceSceneEnterIntoBackgroundTime";
 
 }  // namespace
+
+namespace test {
+
+void SetStartSurfaceSessionObjectForSceneStateForTesting(  // IN-TEST
+    SceneState* scene_state,
+    base::Time timestamp) {
+  [scene_state setSessionObject:timestamp.ToNSDate()
+                         forKey:kStartSurfaceSceneEnterIntoBackgroundTime];
+}
+
+}  // namespace test
 
 std::optional<base::Time> GetTimeMostRecentTabWasOpenForSceneState(
     SceneState* scene_state) {
@@ -40,20 +52,40 @@ std::optional<base::TimeDelta> GetTimeSinceMostRecentTabWasOpenForSceneState(
   return std::nullopt;
 }
 
+bool ShouldShowTabGroupInGridForSceneState(SceneState* scene_state) {
+  const std::optional<base::TimeDelta> elapsed =
+      GetTimeSinceMostRecentTabWasOpenForSceneState(scene_state);
+  if (!elapsed.has_value()) {
+    return false;
+  }
+
+  const base::TimeDelta min_duration = GetReturnToTabGroupInGridDuration();
+  const base::TimeDelta max_duration =
+      experimental_flags::GetReturnToHomeSurfaceDuration();
+
+  if (*elapsed <= min_duration || *elapsed >= max_duration) {
+    return false;
+  }
+  if (scene_state.presentingModalOverlay ||
+      scene_state.startupHadExternalIntent || scene_state.pendingUserActivity) {
+    return false;
+  }
+  return true;
+}
+
 bool ShouldShowStartSurfaceForSceneState(SceneState* scene_state) {
   const std::optional<base::TimeDelta> elapsed =
       GetTimeSinceMostRecentTabWasOpenForSceneState(scene_state);
-  if (!elapsed.has_value() || *elapsed < GetReturnToStartSurfaceDuration()) {
-    return NO;
+  if (!elapsed.has_value() ||
+      *elapsed < experimental_flags::GetReturnToHomeSurfaceDuration()) {
+    return false;
   }
-
   if (scene_state.presentingModalOverlay ||
       scene_state.startupHadExternalIntent || scene_state.pendingUserActivity ||
       scene_state.incognitoContentVisible) {
-    return NO;
+    return false;
   }
-
-  return YES;
+  return true;
 }
 
 NSString* GetRecentTabTileTimeLabelForSceneState(SceneState* scene_state) {

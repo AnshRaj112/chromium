@@ -6,10 +6,12 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -24,13 +26,11 @@
 #include "base/check_deref.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
-#include "base/containers/contains.h"
 #include "base/debug/alias.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
-#include "base/hash/sha1.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
@@ -127,14 +127,12 @@
 #include "chrome/browser/ui/ash/login/login_display_host.h"
 #include "chrome/browser/ui/ash/system/system_tray_client_impl.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
-#include "chrome/common/channel_info.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/logging_chrome.h"
 #include "chrome/common/pref_names.h"
 #include "chromeos/ash/components/account_manager/account_manager_factory.h"
-#include "chromeos/ash/components/assistant/buildflags.h"
 #include "chromeos/ash/components/browser_context_helper/browser_context_flusher.h"
 #include "chromeos/ash/components/browser_context_helper/browser_context_helper.h"
 #include "chromeos/ash/components/cryptohome/cryptohome_parameters.h"
@@ -148,7 +146,6 @@
 #include "chromeos/ash/components/login/auth/public/user_context.h"
 #include "chromeos/ash/components/login/auth/stub_authenticator_builder.h"
 #include "chromeos/ash/components/login/session/session_termination_manager.h"
-#include "chromeos/ash/components/network/portal_detector/network_portal_detector.h"
 #include "chromeos/ash/components/settings/cros_settings.h"
 #include "chromeos/ash/components/settings/cros_settings_names.h"
 #include "chromeos/ash/components/tpm/prepare_tpm.h"
@@ -196,9 +193,11 @@
 #include "content/public/browser/network_service_instance.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/content_switches.h"
+#include "crypto/obsolete/sha1.h"
 #include "google_apis/gaia/gaia_id.h"
 #include "rlz/buildflags/buildflags.h"
 #include "third_party/cros_system_api/switches/chrome_switches.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
 #include "ui/aura/window.h"
 #include "ui/base/ime/ash/input_method_descriptor.h"
 #include "ui/base/ime/ash/input_method_manager.h"
@@ -209,6 +208,15 @@
 #define ENABLED_VLOG_LEVEL 1
 
 namespace ash {
+
+namespace login {
+// Returns a Base16 encoded SHA1 digest of `data`.
+std::string Sha1AsHexForRefreshToken(
+    const std::string_view data) {
+  return base::HexEncode(
+      crypto::obsolete::Sha1::Hash(base::as_byte_span(data)));
+}
+}  // namespace login
 
 namespace {
 
@@ -362,7 +370,7 @@ void InitLocaleAndInputMethodsForNewUser(
   for (size_t i = 0; i < candidates.size(); ++i) {
     const std::string& candidate = candidates[i];
     // Add a candidate if it's not yet in language_codes and is allowed.
-    if (!base::Contains(language_codes, candidate) &&
+    if (!std::ranges::contains(language_codes, candidate) &&
         locale_util::IsAllowedLanguage(candidate, prefs)) {
       language_codes.push_back(candidate);
     }
@@ -481,7 +489,8 @@ void SaveSyncTrustedVaultKeysToProfile(
     trusted_vault_service
         ->GetTrustedVaultClient(trusted_vault::SecurityDomainId::kChromeSync)
         ->StoreKeys(gaia_id, trusted_vault_keys.encryption_keys(),
-                    trusted_vault_keys.last_encryption_key_version());
+                    trusted_vault_keys.last_encryption_key_version(),
+                    std::nullopt);
   }
 
   for (const SyncTrustedVaultKeys::TrustedRecoveryMethod& method :
@@ -536,7 +545,6 @@ bool MaybeShowNewTermsAfterUpdateToFlex(Profile* profile) {
   // mark it here.
   if (ash::InstallAttributes::Get()->IsEnterpriseManaged()) {
     StartupUtils::MarkEulaAccepted();
-    network_portal_detector::GetInstance()->Enable();
     return false;
   }
   if (!IsRevenUpdatedToFlex()) {
@@ -601,18 +609,7 @@ void MaybeSaveSessionStartedTimeBeforeRestart(Profile* profile) {
   }
 }
 
-// Returns a Base16 encoded SHA1 digest of `data`.
-std::string Sha1Digest(const std::string& data) {
-  return base::HexEncode(base::SHA1Hash(base::as_byte_span(data)));
-}
-
 }  // namespace
-
-UserSessionManagerDelegate::~UserSessionManagerDelegate() = default;
-
-void UserSessionStateObserver::PendingUserSessionsRestoreFinished() {}
-
-UserSessionStateObserver::~UserSessionStateObserver() = default;
 
 // static
 UserSessionManager* UserSessionManager::GetInstance() {
@@ -788,8 +785,8 @@ void UserSessionManager::StartSession(
     bool has_auth_cookies,
     bool has_active_session,
     base::WeakPtr<UserSessionManagerDelegate> delegate) {
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN0(kEventCategoryChromeOS, kEventStartSession,
-                                    TRACE_ID_LOCAL(this));
+  TRACE_EVENT_BEGIN(kEventCategoryChromeOS, kEventStartSession,
+                    perfetto::Track::FromPointer(this));
 
   delegate_ = std::move(delegate);
   start_session_type_ = start_session_type;
@@ -809,8 +806,8 @@ void UserSessionManager::StartSession(
                          user_context_.GetAccountId()),
                      user_context_, known_user);
 
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN0(
-      kEventCategoryChromeOS, kEventPrePrepareProfile, TRACE_ID_LOCAL(this));
+  TRACE_EVENT_BEGIN(kEventCategoryChromeOS, kEventPrePrepareProfile,
+                    perfetto::Track::FromPointer(this));
   InitDemoSessionIfNeeded(base::BindOnce(
       &UserSessionManager::UpdateArcFileSystemCompatibilityAndPrepareProfile,
       GetUserSessionManagerAsWeakPtr()));
@@ -851,6 +848,35 @@ void UserSessionManager::RestoreAuthenticationSession(Profile* user_profile) {
     // end up canceling all request when initial network connection type is
     // processed. See http://crbug.com/121643.
     pending_signin_restore_sessions_.insert(user->GetAccountId());
+  }
+}
+
+void UserSessionManager::EnsureTrackingOfOnlineSignInConditions(
+    Profile* profile,
+    UserContext::AuthFlow auth_flow) {
+  PasswordSyncTokenVerifier* password_sync_token_verifier =
+      PasswordSyncTokenVerifierFactory::GetForProfile(profile);
+  // PasswordSyncTokenVerifier can be created only for SAML users.
+  if (password_sync_token_verifier) {
+    CHECK(ProfileHelper::Get()->GetUserByProfile(profile)->using_saml());
+    if (auth_flow == UserContext::AUTH_FLOW_GAIA_WITH_SAML) {
+      // Update local sync token after online SAML login.
+      password_sync_token_verifier->FetchSyncTokenOnReauth();
+    } else if (auth_flow == UserContext::AUTH_FLOW_OFFLINE) {
+      // Verify local sync token to check whether the local password is out
+      // of sync.
+      password_sync_token_verifier->RecordTokenPollingStart();
+      password_sync_token_verifier->CheckForPasswordNotInSync();
+    } else {
+      // SAML user is not expected to go through other authentication flows.
+      NOTREACHED();
+    }
+  }
+
+  OfflineSigninLimiter* offline_signin_limiter =
+      OfflineSigninLimiterFactory::GetForProfile(profile);
+  if (offline_signin_limiter) {
+    offline_signin_limiter->SignedIn(auth_flow);
   }
 }
 
@@ -1340,12 +1366,6 @@ void UserSessionManager::UpdateArcFileSystemCompatibilityAndPrepareProfile() {
   arc::UpdateArcFileSystemCompatibilityPrefIfNeeded(
       user_context_.GetAccountId(),
       ProfileHelper::GetProfilePathByUserIdHash(user_context_.GetUserIDHash()),
-      base::BindOnce(&UserSessionManager::CheckArcVmDlcImageExist,
-                     GetUserSessionManagerAsWeakPtr()));
-}
-
-void UserSessionManager::CheckArcVmDlcImageExist() {
-  arc::CheckArcVmDlcImageExist(
       base::BindOnce(&UserSessionManager::InitializeAccountManager,
                      GetUserSessionManagerAsWeakPtr()));
 }
@@ -1370,11 +1390,10 @@ void UserSessionManager::InitializeAccountManager() {
 }
 
 void UserSessionManager::PrepareProfile(const base::FilePath& profile_path) {
-  TRACE_EVENT_NESTABLE_ASYNC_END0(
-      kEventCategoryChromeOS, kEventPrePrepareProfile, TRACE_ID_LOCAL(this));
-
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN0(kEventCategoryChromeOS,
-                                    kEventPrepareProfile, TRACE_ID_LOCAL(this));
+  // End previous kEventPrePrepareProfile event.
+  TRACE_EVENT_END(kEventCategoryChromeOS, perfetto::Track::FromPointer(this));
+  TRACE_EVENT_BEGIN(kEventCategoryChromeOS, kEventPrepareProfile,
+                    perfetto::Track::FromPointer(this));
 
   g_browser_process->profile_manager()->CreateProfileAsync(
       profile_path,
@@ -1638,7 +1657,7 @@ void UserSessionManager::InitializeDeviceId(
     return;
   }
 
-  if (!base::FeatureList::IsEnabled(kStableDeviceId)) {
+  if (!base::FeatureList::IsEnabled(::switches::kStableDeviceId)) {
     // Do not generate and store new device identifiers if the feature is not
     // enabled yet.
     return;
@@ -1757,35 +1776,13 @@ void UserSessionManager::FinalizePrepareProfile(Profile* profile) {
           /*using_saml=*/auth_flow == UserContext::AUTH_FLOW_GAIA_WITH_SAML,
           user_context_.IsUsingSamlPrincipalsApi());
     }
-    PasswordSyncTokenVerifier* password_sync_token_verifier =
-        PasswordSyncTokenVerifierFactory::GetForProfile(profile);
-    // PasswordSyncTokenVerifier can be created only for SAML users.
-    if (password_sync_token_verifier) {
-      CHECK(user->using_saml());
-      if (auth_flow == UserContext::AUTH_FLOW_GAIA_WITH_SAML) {
-        // Update local sync token after online SAML login.
-        password_sync_token_verifier->FetchSyncTokenOnReauth();
-      } else if (auth_flow == UserContext::AUTH_FLOW_OFFLINE) {
-        // Verify local sync token to check whether the local password is out
-        // of sync.
-        password_sync_token_verifier->RecordTokenPollingStart();
-        password_sync_token_verifier->CheckForPasswordNotInSync();
-      } else {
-        // SAML user is not expected to go through other authentication flows.
-        NOTREACHED();
-      }
-    }
-
-    OfflineSigninLimiter* offline_signin_limiter =
-        OfflineSigninLimiterFactory::GetForProfile(profile);
-    if (offline_signin_limiter)
-      offline_signin_limiter->SignedIn(auth_flow);
+    EnsureTrackingOfOnlineSignInConditions(profile, auth_flow);
   }
 
   profile->OnLogin();
 
-  TRACE_EVENT_NESTABLE_ASYNC_END0(kEventCategoryChromeOS, kEventPrepareProfile,
-                                  TRACE_ID_LOCAL(this));
+  // End kEventPrepareProfile event.
+  TRACE_EVENT_END(kEventCategoryChromeOS, perfetto::Track::FromPointer(this));
 
   {
     TRACE_EVENT0(kEventCategoryChromeOS, kEventHandleProfileLoad);
@@ -2160,7 +2157,7 @@ void UserSessionManager::FetchTokenHandleLegacy(
           profile, token_handle_store_.get(), user_context_.GetAccountId());
       token_handle_fetcher_->FillForNewUser(
           user_context_.GetAccessToken(),
-          Sha1Digest(user_context_.GetRefreshToken()),
+          login::Sha1AsHexForRefreshToken(user_context_.GetRefreshToken()),
           base::BindOnce(&UserSessionManager::OnTokenHandleObtained,
                          GetUserSessionManagerAsWeakPtr()));
     } else {
@@ -2188,7 +2185,7 @@ void UserSessionManager::FetchTokenHandle(Profile* profile,
     // New user.
     token_handle_service->MaybeFetchForNewUser(
         user_context_.GetAccountId(), user_context_.GetAccessToken(),
-        Sha1Digest(user_context_.GetRefreshToken()));
+        login::Sha1AsHexForRefreshToken(user_context_.GetRefreshToken()));
   } else {
     VLOG(1) << "UserSessionManager::OnUserProfileLoaded: existing user";
     // Existing user.
@@ -2306,9 +2303,9 @@ void UserSessionManager::RestorePendingUserSessions() {
   // session restore to existing users only. Currently this breakes some tests
   // (namely CrashRestoreComplexTest.RestoreSessionForThreeUsers), but
   // it may be test-specific and could probably be changed.
-  const bool user_already_logged_in =
-      base::Contains(user_manager::UserManager::Get()->GetLoggedInUsers(),
-                     account_id, &user_manager::User::GetAccountId);
+  const bool user_already_logged_in = std::ranges::contains(
+      user_manager::UserManager::Get()->GetLoggedInUsers(), account_id,
+      &user_manager::User::GetAccountId);
   DCHECK(!user_already_logged_in);
 
   if (!user_already_logged_in) {
@@ -2490,13 +2487,12 @@ void UserSessionManager::DoBrowserLaunchInternal(Profile* profile,
   }
 
   base::OnceClosure login_host_finalized_callback = base::BindOnce(
-      [](uint64_t trace_id) {
+      [](perfetto::Track track) {
         session_manager::SessionManager::Get()->SessionStarted();
-        TRACE_EVENT_NESTABLE_ASYNC_END0(kEventCategoryChromeOS,
-                                        kEventStartSession,
-                                        TRACE_ID_LOCAL(trace_id));
+        // End kEventStartSession event.
+        TRACE_EVENT_END(kEventCategoryChromeOS, track);
       },
-      static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this)));
+      perfetto::Track::FromPointer(this));
 
   // Mark login host for deletion after browser starts.  This
   // guarantees that the message loop will be referenced by the

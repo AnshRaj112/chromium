@@ -37,7 +37,8 @@ namespace {
 // Usually we want to only capture navigations from clicking a link. For a
 // subset of apps, we want to capture typing into the omnibox as well.
 bool ShouldOnlyCaptureLinks(const std::vector<std::string>& app_ids) {
-  return !base::Contains(app_ids, ash::kChromeUIUntrustedProjectorSwaAppId);
+  return !std::ranges::contains(app_ids,
+                                ash::kChromeUIUntrustedProjectorSwaAppId);
 }
 
 bool IsSystemWebApp(Profile* profile, const std::string& app_id) {
@@ -66,8 +67,8 @@ GURL RedirectUrlIfSwa(Profile* profile,
   if (app_id == ash::kChromeUIUntrustedProjectorSwaAppId &&
       url.GetWithEmptyPath() == GURL(ash::kChromeUIUntrustedProjectorPwaUrl)) {
     std::string override_url = ash::kChromeUIUntrustedProjectorUrl;
-    if (url.path().length() > 1) {
-      override_url += url.path().substr(1);
+    if (url.GetPath().length() > 1) {
+      override_url += url.GetPath().substr(1);
     }
     std::stringstream ss;
     // Since ChromeOS doesn't reload an app if the URL doesn't change, the line
@@ -77,7 +78,7 @@ GURL RedirectUrlIfSwa(Profile* profile,
     ss << override_url << "?timestamp=" << clock->NowTicks();
 
     if (url.has_query()) {
-      ss << '&' << url.query();
+      ss << '&' << url.GetQuery();
     }
 
     GURL result(ss.str());

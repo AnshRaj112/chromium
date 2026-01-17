@@ -18,6 +18,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import static org.chromium.chrome.browser.url_constants.UrlConstantResolver.getOriginalNativeNtpUrl;
 import static org.chromium.ui.test.util.ViewUtils.waitForView;
 
 import android.content.ComponentCallbacks2;
@@ -61,10 +62,12 @@ import org.chromium.base.test.util.DisableIf;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Features.DisableFeatures;
+import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.base.test.util.UrlUtils;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
+import org.chromium.chrome.browser.composeplate.ComposeplateUtils;
 import org.chromium.chrome.browser.feed.FeedActionDelegate;
 import org.chromium.chrome.browser.feed.FeedReliabilityLogger;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
@@ -97,6 +100,8 @@ import org.chromium.chrome.test.util.browser.suggestions.mostvisited.FakeMostVis
 import org.chromium.components.browser_ui.widget.scrim.ScrimManager;
 import org.chromium.components.browser_ui.widget.tile.TileView;
 import org.chromium.components.embedder_support.util.UrlConstants;
+import org.chromium.components.omnibox.AutocompleteRequestType;
+import org.chromium.components.omnibox.OmniboxFeatureList;
 import org.chromium.components.policy.test.annotations.Policies;
 import org.chromium.components.search_engines.TemplateUrlService;
 import org.chromium.components.signin.test.util.TestAccounts;
@@ -181,6 +186,7 @@ public class NewTabPageTest {
 
     @Before
     public void setUp() throws Exception {
+        ComposeplateUtils.setIsEnabledForTesting(true);
         mActivityTestRule.startOnBlankPage();
         TemplateUrlService originalService =
                 ThreadUtils.runOnUiThreadBlocking(
@@ -201,8 +207,8 @@ public class NewTabPageTest {
         mMostVisitedSites.setTileSuggestions(mSiteSuggestions);
         mSuggestionsDeps.getFactory().mostVisitedSites = mMostVisitedSites;
 
-        mActivityTestRule.loadUrl(UrlConstants.NTP_URL);
-        mTab = mActivityTestRule.getActivity().getActivityTab();
+        mActivityTestRule.loadUrl(getOriginalNativeNtpUrl());
+        mTab = mActivityTestRule.getActivityTab();
         NewTabPageTestUtils.waitForNtpLoaded(mTab);
 
         Assert.assertTrue(mTab.getNativePage() instanceof NewTabPage);
@@ -243,6 +249,7 @@ public class NewTabPageTest {
                 new int[] {
                     R.id.home_button,
                     R.id.home_page_buttons_stub,
+                    R.id.location_bar_background_view,
                     R.id.location_bar,
                     R.id.toolbar_buttons
                 };
@@ -580,14 +587,17 @@ public class NewTabPageTest {
     @Test
     @SmallTest
     @Feature({"NewTabPage", "FeedNewTabPage"})
+    @DisabledTest(message = "crbug.com/475323609")
     public void testFeedReliabilityLoggingFocusOmnibox() throws IOException {
         mNtp.getCoordinatorForTesting().setReliabilityLoggerForTesting(mFeedReliabilityLogger);
 
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     mNtp.getNewTabPageManagerForTesting()
-                            .focusSearchBox(/* beginVoiceSearch= */ false, /* pastedText= */ "");
-                    verify(mFeedReliabilityLogger).onOmniboxFocused();
+                            .focusSearchBox(
+                                    /* beginVoiceSearch= */ false,
+                                    AutocompleteRequestType.SEARCH,
+                                    /* pastedText= */ "");
                 });
     }
 
@@ -600,8 +610,10 @@ public class NewTabPageTest {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     mNtp.getNewTabPageManagerForTesting()
-                            .focusSearchBox(/* beginVoiceSearch= */ true, /* pastedText= */ "");
-                    verify(mFeedReliabilityLogger).onVoiceSearch();
+                            .focusSearchBox(
+                                    /* beginVoiceSearch= */ true,
+                                    AutocompleteRequestType.SEARCH,
+                                    /* pastedText= */ "");
                 });
     }
 
@@ -855,11 +867,11 @@ public class NewTabPageTest {
         int expectedTitleTopMargin =
                 res.getDimensionPixelSize(R.dimen.tile_view_title_margin_top_modern);
         TileView suggestionsTileElement = mvTilesLayout.getTileAt(0);
+        View tileTextContainer = suggestionsTileElement.findViewById(R.id.tile_text_container);
         Assert.assertEquals(
-                "The top margin of the tile element's title is wrong.",
+                "The top margin of the tile element's title container is wrong.",
                 expectedTitleTopMargin,
-                ((MarginLayoutParams) suggestionsTileElement.getTitleView().getLayoutParams())
-                        .topMargin);
+                ((MarginLayoutParams) tileTextContainer.getLayoutParams()).topMargin);
     }
 
     /**
@@ -881,6 +893,36 @@ public class NewTabPageTest {
 
         TouchCommon.longPressView(mvTile, 0, 0);
         Assert.assertNotEquals(defaultPoint, ntpPoint);
+    }
+
+    @Test
+    @SmallTest
+    @Feature({"NewTabPage"})
+    public void testAiModeButton() {
+        NewTabPageLayout ntpLayout = mNtp.getNewTabPageLayout();
+        TouchCommon.singleClickView(
+                ntpLayout
+                        .findViewById(
+                                org.chromium.chrome.browser.composeplate.R.id.composeplate_view)
+                        .findViewById(R.id.composeplate_button));
+    }
+
+    @Test
+    @SmallTest
+    @Feature({"NewTabPage"})
+    @EnableFeatures({OmniboxFeatureList.OMNIBOX_MULTIMODAL_INPUT})
+    public void testAiModeButton_fusebox() {
+        if (mActivityTestRule.getActivity().isTablet()) return;
+
+        mActivityTestRule.skipWindowAndTabStateCleanup();
+
+        NewTabPageLayout ntpLayout = mNtp.getNewTabPageLayout();
+        TouchCommon.singleClickView(
+                ntpLayout
+                        .findViewById(
+                                org.chromium.chrome.browser.composeplate.R.id.composeplate_view)
+                        .findViewById(R.id.composeplate_button));
+        mOmnibox.checkFocus(true);
     }
 
     private void verifyMostVisitedTileMargin() {

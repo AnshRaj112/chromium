@@ -34,8 +34,6 @@
 #include "chromeos/ash/components/quick_start/quick_start_requests.h"
 #include "chromeos/ash/components/quick_start/types.h"
 #include "chromeos/ash/services/nearby/public/mojom/quick_start_decoder.mojom.h"
-#include "chromeos/ash/services/nearby/public/mojom/quick_start_decoder_types.mojom-forward.h"
-#include "chromeos/ash/services/nearby/public/mojom/quick_start_decoder_types.mojom-shared.h"
 #include "chromeos/ash/services/nearby/public/mojom/quick_start_decoder_types.mojom.h"
 #include "chromeos/constants/devicetype.h"
 #include "components/cbor/reader.h"
@@ -424,8 +422,8 @@ TEST_F(ConnectionTest, RequestWifiCredentials) {
   fake_nearby_connection_->AppendReadableData({0x00, 0x01, 0x02});
   std::vector<uint8_t> wifi_request = fake_nearby_connection_->GetWrittenData();
   std::string wifi_request_string(wifi_request.begin(), wifi_request.end());
-  std::optional<base::Value> parsed_wifi_request_json =
-      base::JSONReader::Read(wifi_request_string);
+  std::optional<base::Value> parsed_wifi_request_json = base::JSONReader::Read(
+      wifi_request_string, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ASSERT_TRUE(parsed_wifi_request_json);
   ASSERT_TRUE(parsed_wifi_request_json->is_dict());
   base::Value::Dict& written_wifi_credentials_request =
@@ -443,7 +441,8 @@ TEST_F(ConnectionTest, RequestWifiCredentials) {
                                     parsed_payload->end());
 
   std::optional<base::Value> parsed_wifi_request_payload_json =
-      base::JSONReader::Read(parsed_payload_string);
+      base::JSONReader::Read(parsed_payload_string,
+                             base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   ASSERT_TRUE(parsed_wifi_request_payload_json);
   ASSERT_TRUE(parsed_wifi_request_payload_json->is_dict());
   base::Value::Dict& wifi_request_payload =

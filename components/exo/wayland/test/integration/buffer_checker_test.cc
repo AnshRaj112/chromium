@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include <drm_fourcc.h>
 #include <gbm.h>
 #include <sys/mman.h>
@@ -16,7 +11,7 @@
 #include <iterator>
 #include <vector>
 
-#include "base/containers/contains.h"
+#include "base/compiler_specific.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/queue.h"
 #include "base/logging.h"
@@ -25,7 +20,6 @@
 #include "components/exo/wayland/clients/client_base.h"
 #include "components/exo/wayland/clients/client_helper.h"
 #include "testing/gtest/include/gtest/gtest.h"
-#include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/buffer_types.h"
 #include "ui/gfx/buffer_usage_util.h"
 #include "ui/gfx/linux/drm_util_linux.h"
@@ -40,9 +34,8 @@ std::string DrmCodeToString(uint32_t drm_format) {
                      static_cast<char>(drm_format >> 24), 0};
 }
 
-std::string DrmCodeToBufferFormatString(int32_t drm_format) {
-  return gfx::BufferFormatToString(
-      ui::GetBufferFormatFromFourCCFormat(drm_format));
+std::string DrmCodeToSharedImageFormatString(int32_t drm_format) {
+  return ui::GetSharedImageFormatFromFourCCFormat(drm_format).ToString();
 }
 
 std::string DrmModifiersToString(std::vector<uint64_t> drm_modifiers) {
@@ -108,8 +101,8 @@ class BufferCheckerTestClient : public ::exo::wayland::clients::ClientBase {
                                  std::back_inserter(supported_usage_strings),
                                  gfx::BufferUsageToString);
           LOG(INFO) << "Successfully used buffer with format drm: "
-                    << DrmCodeToString(format) << " gfx::BufferFormat: "
-                    << DrmCodeToBufferFormatString(format)
+                    << DrmCodeToString(format) << " viz::SharedImageFormat: "
+                    << DrmCodeToSharedImageFormatString(format)
                     << " gfx::BufferUsages: ["
                     << base::JoinString(supported_usage_strings, ", ") << "]";
           return supported_usages.size();
@@ -124,16 +117,16 @@ class BufferCheckerTestClient : public ::exo::wayland::clients::ClientBase {
             /*y_invert=*/false);
         if (!current_buffer) {
           LOG(ERROR) << "Unable to create buffer for drm: "
-                     << DrmCodeToString(format) << " gfx::BufferFormat: "
-                     << DrmCodeToBufferFormatString(format)
+                     << DrmCodeToString(format) << " viz::SharedImageFormat: "
+                     << DrmCodeToSharedImageFormatString(format)
                      << " gfx::BufferUsage "
                      << gfx::BufferUsageToString(current_usage);
         }
       } while (current_buffer == nullptr);
 
       LOG(INFO) << "Attempting to use buffer with format drm: "
-                << DrmCodeToString(format)
-                << " gfx::BufferFormat: " << DrmCodeToBufferFormatString(format)
+                << DrmCodeToString(format) << " viz::SharedImageFormat: "
+                << DrmCodeToSharedImageFormatString(format)
                 << " gfx::BufferUsage "
                 << gfx::BufferUsageToString(current_usage);
 
@@ -174,8 +167,8 @@ class BufferCheckerTestClient : public ::exo::wayland::clients::ClientBase {
         LOG(INFO) << "Successfully used buffer with drm format: "
                   << DrmCodeToString(format)
                   << " drm modifiers: " << DrmModifiersToString(modifiers)
-                  << " gfx::BufferFormat: "
-                  << DrmCodeToBufferFormatString(format);
+                  << " viz::SharedImageFormat: "
+                  << DrmCodeToSharedImageFormatString(format);
         return 1;
       }
 
@@ -200,16 +193,16 @@ class BufferCheckerTestClient : public ::exo::wayland::clients::ClientBase {
         LOG(ERROR) << "Unable to create buffer for drm format: "
                    << DrmCodeToString(format)
                    << " drm modifiers: " << DrmModifiersToString(modifiers)
-                   << " gfx::BufferFormat: "
-                   << DrmCodeToBufferFormatString(format);
+                   << " viz::SharedImageFormat: "
+                   << DrmCodeToSharedImageFormatString(format);
         return 0;
       }
 
       LOG(INFO) << "Attempting to use buffer with format drm format: "
                 << DrmCodeToString(format)
                 << " drm modifiers: " << DrmModifiersToString(modifiers)
-                << " gfx::BufferFormat: "
-                << DrmCodeToBufferFormatString(format);
+                << " viz::SharedImageFormat: "
+                << DrmCodeToSharedImageFormatString(format);
 
       wl_surface_damage(surface_.get(), 0, 0, surface_size_.width(),
                         surface_size_.height());
@@ -262,7 +255,7 @@ class BufferCheckerTestClient : public ::exo::wayland::clients::ClientBase {
     reported_format_modifier_map.clear();
     for (DmabufFeedbackTranche tranche : current_feedback_.tranches) {
       for (const auto& [format, modifiers] : tranche.format_modifier_map) {
-        if (!base::Contains(reported_formats, format)) {
+        if (!std::ranges::contains(reported_formats, format)) {
           reported_formats.push_back(format);
         }
         if (!reported_format_modifier_map.contains(format)) {
@@ -270,7 +263,8 @@ class BufferCheckerTestClient : public ::exo::wayland::clients::ClientBase {
         }
 
         for (uint64_t modifier : modifiers) {
-          if (!base::Contains(reported_format_modifier_map[format], modifier)) {
+          if (!std::ranges::contains(reported_format_modifier_map[format],
+                                     modifier)) {
             reported_format_modifier_map[format].push_back(modifier);
           }
         }
@@ -289,7 +283,7 @@ class BufferCheckerTestClient : public ::exo::wayland::clients::ClientBase {
             mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0));
     uint32_t table_size = size / sizeof(WaylandDmabufFeedbackFormat);
     for (uint32_t i = 0; i < table_size; i++) {
-      pending_feedback_.format_table.push_back(format_table[i]);
+      pending_feedback_.format_table.push_back(UNSAFE_TODO(format_table[i]));
     }
     munmap(format_table, size);
     close(fd);
@@ -297,7 +291,7 @@ class BufferCheckerTestClient : public ::exo::wayland::clients::ClientBase {
 
   void HandleFeedbackMainDevice(zwp_linux_dmabuf_feedback_v1* dmabuf_feedback,
                                 wl_array* dev) {
-    memcpy(&pending_feedback_.main_device, dev->data, sizeof(dev));
+    UNSAFE_TODO(memcpy(&pending_feedback_.main_device, dev->data, sizeof(dev)));
   }
 
   void HandleFeedbackTrancheDone(
@@ -309,8 +303,8 @@ class BufferCheckerTestClient : public ::exo::wayland::clients::ClientBase {
   void HandleFeedbackTrancheTargetDevice(
       zwp_linux_dmabuf_feedback_v1* dmabuf_feedback,
       wl_array* dev) {
-    memcpy(&pending_feedback_.pending_tranche.target_device, dev->data,
-           sizeof(dev));
+    UNSAFE_TODO(memcpy(&pending_feedback_.pending_tranche.target_device,
+                       dev->data, sizeof(dev)));
   }
 
   void HandleFeedbackTrancheFormats(
@@ -323,7 +317,7 @@ class BufferCheckerTestClient : public ::exo::wayland::clients::ClientBase {
     ASSERT_TRUE(format_table != nullptr);
 
     uint16_t* index;
-    WL_ARRAY_FOR_EACH(index, indices, uint16_t*) {
+    UNSAFE_TODO(WL_ARRAY_FOR_EACH(index, indices, uint16_t*)) {
       uint32_t format = format_table->at(*index).format;
       uint64_t modifier = format_table->at(*index).modifier;
 
@@ -459,12 +453,12 @@ void PrintReportedFormats(std::vector<uint32_t>& formats) {
   std::vector<std::string> buffer_names;
   for (auto format : formats) {
     drm_names.push_back(DrmCodeToString(format));
-    buffer_names.push_back(DrmCodeToBufferFormatString(format));
+    buffer_names.push_back(DrmCodeToSharedImageFormatString(format));
   }
   LOG(INFO) << "zwp_linux_dmabuf_v1 reported supported DRM formats: "
              << base::JoinString(drm_names, ", ");
-  LOG(INFO) << "zwp_linux_dmabuf_v1 reported supported gfx::BufferFormats: "
-             << base::JoinString(buffer_names, ", ");
+  LOG(INFO) << "zwp_linux_dmabuf_v1 reported supported SharedImageFormats: "
+            << base::JoinString(buffer_names, ", ");
 }
 
 TEST_F(BufferCheckerClientTest, CanUseAnyReportedBufferFormatsLegacy) {
@@ -515,7 +509,7 @@ TEST_F(BufferCheckerClientTest, CanUseAnyReportedBufferModifiersLegacy) {
       }
     }
 
-    if (base::Contains(modifiers, DRM_FORMAT_MOD_INVALID)) {
+    if (std::ranges::contains(modifiers, DRM_FORMAT_MOD_INVALID)) {
       int res = client.GetNumSupportedFormatsAndModifier(
           format, std::vector<uint64_t>({DRM_FORMAT_MOD_INVALID}));
       EXPECT_TRUE(res != -1);
@@ -583,7 +577,7 @@ TEST_F(BufferCheckerClientTest,
       }
     }
 
-    if (base::Contains(modifiers, DRM_FORMAT_MOD_INVALID)) {
+    if (std::ranges::contains(modifiers, DRM_FORMAT_MOD_INVALID)) {
       int res = client.GetNumSupportedFormatsAndModifier(
           format, std::vector<uint64_t>({DRM_FORMAT_MOD_INVALID}));
       EXPECT_TRUE(res != -1);
@@ -651,7 +645,7 @@ TEST_F(BufferCheckerClientTest,
       }
     }
 
-    if (base::Contains(modifiers, DRM_FORMAT_MOD_INVALID)) {
+    if (std::ranges::contains(modifiers, DRM_FORMAT_MOD_INVALID)) {
       int res = client.GetNumSupportedFormatsAndModifier(
           format, std::vector<uint64_t>({DRM_FORMAT_MOD_INVALID}));
       EXPECT_TRUE(res != -1);

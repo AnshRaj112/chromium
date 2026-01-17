@@ -19,6 +19,7 @@
 #include "content/browser/renderer_host/navigation_request.h"
 #include "content/browser/renderer_host/render_widget_host_impl.h"
 #include "content/browser/web_contents/web_contents_impl.h"
+#include "content/public/browser/media_player_id.h"
 #include "content/public/browser/navigation_details.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
@@ -29,10 +30,10 @@
 #include "content/public/android/content_jni_headers/WebContentsObserverProxy_jni.h"
 
 using base::android::AttachCurrentThread;
-using base::android::JavaParamRef;
-using base::android::ScopedJavaLocalRef;
-using base::android::ConvertUTF8ToJavaString;
 using base::android::ConvertUTF16ToJavaString;
+using base::android::ConvertUTF8ToJavaString;
+using base::android::JavaRef;
+using base::android::ScopedJavaLocalRef;
 
 namespace content {
 
@@ -48,13 +49,12 @@ WebContentsObserverProxy::WebContentsObserverProxy(
   java_observer_.Reset(env, obj);
 }
 
-WebContentsObserverProxy::~WebContentsObserverProxy() {
-}
+WebContentsObserverProxy::~WebContentsObserverProxy() {}
 
-jlong JNI_WebContentsObserverProxy_Init(
+static jlong JNI_WebContentsObserverProxy_Init(
     JNIEnv* env,
-    const JavaParamRef<jobject>& obj,
-    const JavaParamRef<jobject>& java_web_contents) {
+    const JavaRef<jobject>& obj,
+    const JavaRef<jobject>& java_web_contents) {
   WebContents* web_contents =
       WebContents::FromJavaWebContents(java_web_contents);
   CHECK(web_contents);
@@ -137,7 +137,7 @@ void WebContentsObserverProxy::DidFailLoad(RenderFrameHost* render_frame_host,
   Java_WebContentsObserverProxy_didFailLoad(
       env, java_observer_, render_frame_host->IsInPrimaryMainFrame(),
       error_code, url::GURLAndroid::FromNativeGURL(env, validated_url),
-      static_cast<jint>(render_frame_host->GetLifecycleState()));
+      static_cast<int32_t>(render_frame_host->GetLifecycleState()));
 }
 
 void WebContentsObserverProxy::DidChangeVisibleSecurityState() {
@@ -194,7 +194,7 @@ void WebContentsObserverProxy::DidFinishLoad(RenderFrameHost* render_frame_host,
         render_frame_host->GetProcess()->GetDeprecatedID(),
         render_frame_host->GetRoutingID(),
         url::GURLAndroid::FromNativeGURL(env, url), assume_valid,
-        static_cast<jint>(render_frame_host->GetLifecycleState()));
+        static_cast<int32_t>(render_frame_host->GetLifecycleState()));
   }
 }
 
@@ -206,14 +206,8 @@ void WebContentsObserverProxy::DOMContentLoaded(
         render_frame_host->GetPage().GetJavaPage(),
         render_frame_host->GetProcess()->GetDeprecatedID(),
         render_frame_host->GetRoutingID(),
-        static_cast<jint>(render_frame_host->GetLifecycleState()));
+        static_cast<int32_t>(render_frame_host->GetLifecycleState()));
   }
-}
-
-void WebContentsObserverProxy::OnFirstContentfulPaintInPrimaryMainFrame() {
-  Java_WebContentsObserverProxy_firstContentfulPaintInPrimaryMainFrame(
-      AttachCurrentThread(), java_observer_,
-      web_contents()->GetPrimaryPage().GetJavaPage());
 }
 
 void WebContentsObserverProxy::NavigationEntryCommitted(
@@ -261,7 +255,9 @@ void WebContentsObserverProxy::MediaStartedPlaying(
     const MediaPlayerInfo& video_type,
     const MediaPlayerId& id) {
   JNIEnv* env = AttachCurrentThread();
-  Java_WebContentsObserverProxy_mediaStartedPlaying(env, java_observer_);
+  Java_WebContentsObserverProxy_mediaStartedPlaying(
+      env, java_observer_, id.player_id, video_type.has_audio,
+      video_type.has_video);
 }
 
 void WebContentsObserverProxy::MediaStoppedPlaying(
@@ -269,7 +265,8 @@ void WebContentsObserverProxy::MediaStoppedPlaying(
     const MediaPlayerId& id,
     WebContentsObserver::MediaStoppedReason reason) {
   JNIEnv* env = AttachCurrentThread();
-  Java_WebContentsObserverProxy_mediaStoppedPlaying(env, java_observer_);
+  Java_WebContentsObserverProxy_mediaStoppedPlaying(env, java_observer_,
+                                                    id.player_id);
 }
 
 void WebContentsObserverProxy::MediaEffectivelyFullscreenChanged(
@@ -297,14 +294,13 @@ void WebContentsObserverProxy::OnVisibilityChanged(
     content::Visibility visibility) {
   JNIEnv* env = AttachCurrentThread();
   Java_WebContentsObserverProxy_onVisibilityChanged(
-      env, java_observer_, static_cast<jint>(visibility));
+      env, java_observer_, static_cast<int32_t>(visibility));
 }
 
 void WebContentsObserverProxy::TitleWasSet(NavigationEntry* entry) {
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jstring> jstring_title = ConvertUTF8ToJavaString(
-      env,
-      base::UTF16ToUTF8(web_contents()->GetTitle()));
+      env, base::UTF16ToUTF8(web_contents()->GetTitle()));
   Java_WebContentsObserverProxy_titleWasSet(env, java_observer_, jstring_title);
 }
 
@@ -366,4 +362,12 @@ void WebContentsObserverProxy::MediaSessionCreated(MediaSession* session) {
           ->GetJavaObject());
 }
 
+void WebContentsObserverProxy::WasDiscarded() {
+  JNIEnv* env = AttachCurrentThread();
+  Java_WebContentsObserverProxy_wasDiscarded(env, java_observer_);
+}
+
 }  // namespace content
+
+DEFINE_JNI(LoadCommittedDetails)
+DEFINE_JNI(WebContentsObserverProxy)

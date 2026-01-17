@@ -9,12 +9,12 @@
 #include <string>
 
 #include "base/memory/weak_ptr.h"
+#include "content/common/content_export.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/speech_recognition_event_listener.h"
 #include "media/mojo/mojom/speech_recognizer.mojom.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
-#include "mojo/public/cpp/bindings/remote.h"
 
 namespace network {
 class PendingSharedURLLoaderFactory;
@@ -53,6 +53,11 @@ class SpeechRecognitionDispatcherHost : public media::mojom::SpeechRecognizer {
   void Start(
       media::mojom::StartSpeechRecognitionRequestParamsPtr params) override;
 
+  // Visible for testing.
+  static CONTENT_EXPORT std::string GetAcceptedLanguages(
+      const std::string& language,
+      const std::string& accept_language);
+
  private:
   static void StartRequestOnUI(
       base::WeakPtr<SpeechRecognitionDispatcherHost>
@@ -67,8 +72,9 @@ class SpeechRecognitionDispatcherHost : public media::mojom::SpeechRecognizer {
       const url::Origin& origin,
       std::unique_ptr<network::PendingSharedURLLoaderFactory>
           pending_shared_url_loader_factory,
-      const std::string& accept_language,
-      bool can_render_frame_use_on_device);
+      const std::string& language,
+      bool can_render_frame_use_on_device,
+      bool on_device_available);
 
   int CreateSession(
       const SpeechRecognitionSessionConfig& config,

@@ -8,7 +8,6 @@
 #include "base/functional/callback.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
-#include "base/task/single_thread_task_runner.h"
 #include "base/types/strong_alias.h"
 #include "third_party/blink/public/platform/scheduler/web_scoped_virtual_time_pauser.h"
 #include "third_party/blink/renderer/platform/platform_export.h"
@@ -28,6 +27,10 @@ namespace {
 constexpr size_t kMaxNumberOfBackForwardCacheBlockingDetails = 10;
 
 }  // namespace
+
+namespace base {
+class SingleThreadTaskRunner;
+}
 
 namespace blink {
 class FrameScheduler;
@@ -122,11 +125,11 @@ class PLATFORM_EXPORT FrameOrWorkerScheduler {
       }
     }
     void Clear() { details_list.clear(); }
-    bool operator==(BFCacheBlockingFeatureAndLocations& other) {
+    bool operator==(const BFCacheBlockingFeatureAndLocations& other) const {
       return details_list == other.details_list;
     }
 
-    WTF::Vector<FeatureAndJSLocationBlockingBFCache> details_list;
+    Vector<FeatureAndJSLocationBlockingBFCache> details_list;
   };
 
   class PLATFORM_EXPORT Delegate {

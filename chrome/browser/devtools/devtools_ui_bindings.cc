@@ -33,17 +33,19 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
+#include "base/unguessable_token.h"
 #include "base/uuid.h"
 #include "base/values.h"
 #include "base/version_info/channel.h"
 #include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/devtools/aida_service_handler.h"
 #include "chrome/browser/devtools/devtools_file_watcher.h"
+#include "chrome/browser/devtools/devtools_http_service_registry.h"
 #include "chrome/browser/devtools/devtools_select_file_dialog.h"
 #include "chrome/browser/devtools/features.h"
 #include "chrome/browser/devtools/url_constants.h"
 #include "chrome/browser/policy/profile_policy_connector.h"
-#include "chrome/browser/privacy_sandbox/tracking_protection_settings_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_avatar_icon_util.h"
 #include "chrome/browser/search/search.h"
@@ -51,6 +53,7 @@
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/sync/sync_service_factory.h"
 #include "chrome/browser/ui/browser_dialogs.h"
+#include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/hats/hats_service.h"
 #include "chrome/browser/ui/hats/hats_service_factory.h"
 #include "chrome/common/channel_info.h"
@@ -62,17 +65,19 @@
 #include "components/infobars/content/content_infobar_manager.h"
 #include "components/metrics/structured/structured_events.h"
 #include "components/metrics/structured/structured_metrics_client.h"
+#include "components/permissions/permission_util.h"
 #include "components/policy/core/common/policy_map.h"
 #include "components/policy/core/common/policy_service.h"
 #include "components/policy/policy_constants.h"
 #include "components/prefs/scoped_user_pref_update.h"
-#include "components/privacy_sandbox/tracking_protection_settings.h"
 #include "components/search_engines/util.h"
+#include "components/signin/public/base/signin_switches.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/sync/service/sync_service.h"
 #include "components/sync_preferences/pref_service_syncable.h"
 #include "components/zoom/page_zoom.h"
+#include "content/common/features.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/child_process_security_policy.h"
@@ -104,6 +109,7 @@
 #include "net/http/http_response_headers.h"
 #include "net/http/http_status_code.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
+#include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/simple_url_loader.h"
 #include "services/network/public/cpp/simple_url_loader_stream_consumer.h"
@@ -118,17 +124,22 @@
 #include "ui/shell_dialogs/select_file_dialog.h"
 
 #if !BUILDFLAG(IS_ANDROID)
+#include "chrome/browser/themes/theme_service.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
+#include "chrome/browser/ui/user_education/browser_user_education_interface.h"
+#include "chrome/browser/user_education/user_education_service.h"
+#include "chrome/browser/user_education/user_education_service_factory.h"
 #endif
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/extensions/extension_management.h"
-#include "chrome/common/extensions/chrome_manifest_url_handlers.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/extension_util.h"
 #include "extensions/common/constants.h"
+#include "extensions/common/manifest_handlers/devtools_page_handler.h"
 #include "extensions/common/permissions/permissions_data.h"
 #endif
 
@@ -341,7 +352,7 @@ std::string SanitizeEndpoint(const std::string& value) {
 
 std::string SanitizeRemoteBase(const std::string& value) {
   GURL url(value);
-  std::string path = url.path();
+  std::string path = url.GetPath();
   std::vector<std::string> parts =
       base::SplitString(path, "/", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
   std::string revision = parts.size() > 2 ? parts[2] : "";
@@ -355,7 +366,7 @@ std::string SanitizeRemoteBase(const std::string& value) {
 std::string SanitizeRemoteFrontendURL(const std::string& value) {
   GURL url(base::UnescapeBinaryURLComponent(
       value, base::UnescapeRule::REPLACE_PLUS_WITH_SPACE));
-  std::string path = url.path();
+  std::string path = url.GetPath();
   std::vector<std::string> parts =
       base::SplitString(path, "/", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
   std::string revision = parts.size() > 2 ? parts[2] : "";
@@ -380,6 +391,15 @@ std::string SanitizeEnabledExperiments(const std::string& value) {
   return std::ranges::all_of(value, is_legal) ? value : std::string();
 }
 
+std::string SanitizeTraceURL(const std::string& value) {
+  if (base::StartsWith(value, "http") &&
+      (base::EndsWith(value, ".json") || base::EndsWith(value, ".json.gz"))) {
+    return value;
+  }
+
+  return std::string();
+}
+
 std::string SanitizeFrontendQueryParam(const std::string& key,
                                        const std::string& value) {
   // Convert boolean flags to true.
@@ -396,7 +416,8 @@ std::string SanitizeFrontendQueryParam(const std::string& key,
   }
 
   if (key == "panel" &&
-      (value == "elements" || value == "console" || value == "sources")) {
+      (value == "elements" || value == "console" || value == "sources" ||
+       value == "network" || value == "resources" || value == "performance")) {
     return value;
   }
 
@@ -414,6 +435,10 @@ std::string SanitizeFrontendQueryParam(const std::string& key,
 
   if (key == "enabledExperiments") {
     return SanitizeEnabledExperiments(value);
+  }
+
+  if (key == "traceURL") {
+    return SanitizeTraceURL(value);
   }
 
   if (key == "targetType" && value == "tab") {
@@ -456,8 +481,8 @@ GURL SanitizeFrontendURL(const GURL& url,
             base::StringPrintf("%s=%s", key.c_str(), value.c_str()));
       }
     }
-    if (url.has_ref() && url.ref_piece().find('\'') == std::string_view::npos) {
-      fragment = '#' + url.ref();
+    if (url.has_ref() && url.ref().find('\'') == std::string_view::npos) {
+      fragment = '#' + url.GetRef();
     }
   }
   std::string query =
@@ -474,6 +499,30 @@ GURL SanitizeFrontendURL(const GURL& url,
 
 constexpr base::TimeDelta kInitialBackoffDelay = base::Milliseconds(250);
 constexpr base::TimeDelta kMaxBackoffDelay = base::Seconds(10);
+
+void StreamWrite(DevToolsUIBindings* bindings,
+                 int stream_id,
+                 std::string_view chunk) {
+  base::Value chunkValue;
+  // Chunks are individually inspected for UTF-8 validity. The DevTools
+  // protocol requires all string data to be valid UTF-8 for transport.
+  // Non-UTF-8 chunks are Base64-encoded to prevent data corruption or
+  // serialization errors. The frontend compatibility layer
+  // (devtools_compatibility.js) uses the `encoded` flag to transparently
+  // decode these chunks. This ensures downstream consumers receive the
+  // original byte stream as a string, allowing handling of mixed
+  // content (e.g. binary resources) even within a single response.
+  bool encoded = !base::IsStringUTF8AllowingNoncharacters(chunk);
+  if (encoded) {
+    chunkValue = base::Value(base::Base64Encode(chunk));
+  } else {
+    chunkValue = base::Value(chunk);
+  }
+
+  bindings->CallClientMethod("DevToolsAPI", "streamWrite",
+                             base::Value(stream_id), std::move(chunkValue),
+                             base::Value(encoded));
+}
 
 }  // namespace
 
@@ -571,18 +620,7 @@ class DevToolsUIBindings::NetworkResourceLoader
 
   void OnDataReceived(std::string_view chunk,
                       base::OnceClosure resume) override {
-    base::Value chunkValue;
-
-    bool encoded = !base::IsStringUTF8AllowingNoncharacters(chunk);
-    if (encoded) {
-      chunkValue = base::Value(base::Base64Encode(chunk));
-    } else {
-      chunkValue = base::Value(chunk);
-    }
-
-    bindings_->CallClientMethod("DevToolsAPI", "streamWrite",
-                                base::Value(stream_id_), std::move(chunkValue),
-                                base::Value(encoded));
+    StreamWrite(bindings_, stream_id_, chunk);
     std::move(resume).Run();
   }
 
@@ -657,13 +695,13 @@ DevToolsUIBindings::FrontendWebContentsObserver::
 GURL DevToolsUIBindings::SanitizeFrontendURL(const GURL& url) {
   return ::SanitizeFrontendURL(url, content::kChromeDevToolsScheme,
                                chrome::kChromeUIDevToolsHost,
-                               SanitizeFrontendPath(url.path()), true);
+                               SanitizeFrontendPath(url.GetPath()), true);
 }
 
 // static
 bool DevToolsUIBindings::IsValidFrontendURL(const GURL& url) {
   if (url.SchemeIs(content::kChromeUIScheme) &&
-      url.host() == content::kChromeUITracingHost && !url.has_query() &&
+      url.GetHost() == content::kChromeUITracingHost && !url.has_query() &&
       !url.has_ref()) {
     return true;
   }
@@ -673,7 +711,7 @@ bool DevToolsUIBindings::IsValidFrontendURL(const GURL& url) {
 
 bool DevToolsUIBindings::IsValidRemoteFrontendURL(const GURL& url) {
   return ::SanitizeFrontendURL(url, url::kHttpsScheme, kRemoteFrontendDomain,
-                               url.path(), true)
+                               url.GetPath(), true)
              .spec() == url.spec();
 }
 
@@ -689,6 +727,7 @@ void DevToolsUIBindings::FrontendWebContentsObserver::
     case base::TERMINATION_STATUS_PROCESS_CRASHED:
     case base::TERMINATION_STATUS_LAUNCH_FAILED:
     case base::TERMINATION_STATUS_OOM:
+    case base::TERMINATION_STATUS_EVICTED_FOR_MEMORY:
 #if BUILDFLAG(IS_WIN)
     case base::TERMINATION_STATUS_INTEGRITY_FAILURE:
 #endif
@@ -749,7 +788,9 @@ bool IsAnyAidaPoweredFeatureEnabled() {
              ::features::kDevToolsAiAssistanceNetworkAgent) ||
          base::FeatureList::IsEnabled(
              ::features::kDevToolsAiAssistancePerformanceAgent) ||
-         base::FeatureList::IsEnabled(::features::kDevToolsAiCodeCompletion);
+         base::FeatureList::IsEnabled(
+             ::features::kDevToolsAiCodeCompletion) ||
+         base::FeatureList::IsEnabled(::features::kDevToolsAiCodeGeneration);
 }
 }  // namespace
 
@@ -761,7 +802,8 @@ DevToolsUIBindings::DevToolsUIBindings(content::WebContents* web_contents)
       file_helper_(profile_, this, &file_storage_),
       devices_updates_enabled_(false),
       frontend_loaded_(false),
-      settings_(profile_) {
+      settings_(profile_),
+      http_service_registry_(std::make_unique<DevToolsHttpServiceRegistry>()) {
   DevToolsUIBindings::GetDevToolsUIBindings().push_back(this);
   frontend_contents_observer_ =
       std::make_unique<FrontendWebContentsObserver>(this);
@@ -776,7 +818,6 @@ DevToolsUIBindings::DevToolsUIBindings(content::WebContents* web_contents)
       ->AddObserver(this);
 #endif
   can_access_aida_ = IsAnyAidaPoweredFeatureEnabled();
-  MaybeStartLogging();
 }
 
 DevToolsUIBindings::~DevToolsUIBindings() {
@@ -934,46 +975,6 @@ void DevToolsUIBindings::SetIsDocked(DispatchCallback callback,
   std::move(callback).Run(nullptr);
 }
 
-namespace {
-constexpr net::NetworkTrafficAnnotationTag kAidaTrafficAnnotation =
-    net::DefineNetworkTrafficAnnotation("devtools_cdp_console_insights", R"(
-        semantics {
-          sender: "Developer Tools via CDP"
-          description:
-            "In Chrome DevTools, the user can ask for additional insights "
-            "regarding an error message. A prompt message for AIDA containing "
-            "the error message and sometimes more context such as stack trace, "
-            "surrounding code, or network headers is sent to the Chrome "
-            "backend via DevTools UI bindings, which in turn queries an AIDA "
-            "endpoint."
-          trigger: "User asks for more insights on a DevTools error message."
-          data: "Prompt for AIDA endpoint, containing instructions, error and "
-            "sometimes some additional context information."
-          destination: GOOGLE_OWNED_SERVICE
-          internal {
-            contacts {
-              email: "chrome-devtools@google.com"
-            }
-          }
-          user_data {
-            type: WEB_CONTENT
-          }
-          last_reviewed: "2023-11-09"
-        }
-        policy {
-          cookies_allowed: YES
-          cookies_store: "user"
-          setting:
-            "It's not possible to disable this feature from settings."
-          chrome_policy {
-            DeveloperToolsAvailability {
-              policy_options {mode: MANDATORY}
-              DeveloperToolsAvailability: 2
-            }
-          }
-        })");
-}  // namespace
-
 void DevToolsUIBindings::HandleAidaRequestError(
     DispatchCallback callback,
     std::variant<network::ResourceRequest, std::string>
@@ -1012,9 +1013,9 @@ void DevToolsUIBindings::OnAidaConversationRequest(
                      base::Unretained(this), std::move(callback), stream_id,
                      request, delay, resource_request, base::TimeTicks::Now());
   NetworkResourceLoader::Create(
-      stream_id, this, resource_request, kAidaTrafficAnnotation,
-      std::move(url_loader_factory), std::move(response_handler_callback),
-      delay, std::move(request), timeout);
+      stream_id, this, resource_request,
+      AidaServiceHandler::TrafficAnnotation(), std::move(url_loader_factory),
+      std::move(response_handler_callback), delay, std::move(request), timeout);
 }
 
 void DevToolsUIBindings::OnAidaRequest(
@@ -1035,7 +1036,7 @@ void DevToolsUIBindings::OnAidaRequest(
       std::get<network::ResourceRequest>(resource_request_or_error));
   resource_request->url = url;
   auto simple_url_loader = network::SimpleURLLoader::Create(
-      std::move(resource_request), kAidaTrafficAnnotation);
+      std::move(resource_request), AidaServiceHandler::TrafficAnnotation());
   simple_url_loader->AttachStringForUpload(request);
 
   network::SimpleURLLoader* simple_url_loader_ptr = simple_url_loader.get();
@@ -1104,6 +1105,70 @@ void DevToolsUIBindings::OnAidaResponse(
   response_dict.Set("response", response_body.value_or(""));
   auto response = base::Value(std::move(response_dict));
   base::UmaHistogramTimes(histogram_name, base::TimeTicks::Now() - start_time);
+  std::move(callback).Run(&response);
+}
+
+void DevToolsUIBindings::DispatchHttpRequest(
+    DispatchCallback callback,
+    const DevToolsDispatchHttpRequestParams& params) {
+  if (params.stream_id.has_value()) {
+    int stream_id = *params.stream_id;
+    auto stream_writer = base::BindRepeating(
+        [](base::WeakPtr<DevToolsUIBindings> bindings, int stream_id,
+           std::string_view chunk) {
+          if (!bindings) {
+            return;
+          }
+          StreamWrite(bindings.get(), stream_id, chunk);
+        },
+        weak_factory_.GetWeakPtr(), stream_id);
+
+    http_service_registry_->RequestAsStream(
+        profile_, params, std::move(stream_writer),
+        base::BindOnce(&DevToolsUIBindings::OnHttpRequestPerformed,
+                       weak_factory_.GetWeakPtr(), std::move(callback)));
+    return;
+  }
+
+  http_service_registry_->Request(
+      profile_, params,
+      base::BindOnce(&DevToolsUIBindings::OnHttpRequestPerformed,
+                     weak_factory_.GetWeakPtr(), std::move(callback)));
+}
+
+void DevToolsUIBindings::OnHttpRequestPerformed(
+    DispatchCallback callback,
+    std::unique_ptr<DevToolsHttpServiceHandler::Result> result) {
+  base::Value::Dict response_dict;
+  using Error = DevToolsHttpServiceHandler::Result::Error;
+  switch (result->error) {
+    case Error::kNone:
+      response_dict.Set("response", result->response_body.value_or(""));
+      response_dict.Set("statusCode", result->http_status);
+      break;
+    case Error::kServiceNotFound:
+      response_dict.Set("error", "Service not found");
+      break;
+    case Error::kAccessDenied:
+      response_dict.Set("error", "Disallowed path or method");
+      break;
+    case Error::kValidationFailed:
+      response_dict.Set("error", "Request validation failed");
+      break;
+    case Error::kTokenFetchFailed:
+      response_dict.Set("error", "Token fetch error");
+      response_dict.Set("detail", result->error_detail);
+      break;
+    case Error::kNetworkError:
+    case Error::kHttpError:
+      response_dict.Set("error", "Request failed");
+      response_dict.Set("detail", result->response_body.value_or(""));
+      response_dict.Set("netError", result->net_error);
+      response_dict.Set("netErrorName", net::ErrorToString(result->net_error));
+      response_dict.Set("statusCode", result->http_status);
+      break;
+  }
+  auto response = base::Value(std::move(response_dict));
   std::move(callback).Run(&response);
 }
 
@@ -1212,14 +1277,14 @@ void DevToolsUIBindings::LoadNetworkResource(DispatchCallback callback,
     // committed URL of that frame, and use the loader associated with that
     // frame to allow nested frames with different schemes to load files.
     if (allow_web_ui_scheme && target_tab &&
-        target_tab->GetLastCommittedURL().scheme() == gurl.scheme()) {
+        target_tab->GetLastCommittedURL().GetScheme() == gurl.GetScheme()) {
       std::vector<std::string> allowed_webui_hosts;
       content::RenderFrameHost* frame_host =
           web_contents()->GetPrimaryMainFrame();
 
       mojo::PendingRemote<network::mojom::URLLoaderFactory> pending_remote =
           content::CreateWebUIURLLoaderFactory(
-              frame_host, target_tab->GetLastCommittedURL().scheme(),
+              frame_host, target_tab->GetLastCommittedURL().GetScheme(),
               std::move(allowed_webui_hosts));
       url_loader_factory = network::SharedURLLoaderFactory::Create(
           std::make_unique<network::WrapperPendingSharedURLLoaderFactory>(
@@ -1382,8 +1447,8 @@ void DevToolsUIBindings::IndexPath(
     return;
   }
   std::vector<std::string> excluded_folders;
-  std::optional<base::Value> parsed_excluded_folders =
-      base::JSONReader::Read(excluded_folders_message);
+  std::optional<base::Value> parsed_excluded_folders = base::JSONReader::Read(
+      excluded_folders_message, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (parsed_excluded_folders && parsed_excluded_folders->is_list()) {
     for (const base::Value& folder_path : parsed_excluded_folders->GetList()) {
       if (folder_path.is_string()) {
@@ -1465,12 +1530,13 @@ void DevToolsUIBindings::SetDevicesDiscoveryConfig(
     bool network_discovery_enabled,
     const std::string& network_discovery_config) {
   std::optional<base::Value::Dict> parsed_port_forwarding =
-      base::JSONReader::ReadDict(port_forwarding_config);
+      base::JSONReader::ReadDict(port_forwarding_config,
+                                 base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!parsed_port_forwarding) {
     return;
   }
-  std::optional<base::Value> parsed_network =
-      base::JSONReader::Read(network_discovery_config);
+  std::optional<base::Value> parsed_network = base::JSONReader::Read(
+      network_discovery_config, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!parsed_network || !parsed_network->is_list()) {
     return;
   }
@@ -1627,7 +1693,9 @@ base::Value::Dict DevToolsUIBindings::GetSyncInformationForProfile(
     return result;
   }
 
-  result.Set("isSyncActive", sync_service->IsSyncFeatureActive());
+  result.Set("isSyncActive", base::FeatureList::IsEnabled(
+                                 switches::kEnablePreferencesAccountStorage) ||
+                                 sync_service->IsSyncFeatureActive());
   result.Set("arePreferencesSynced", sync_service->GetActiveDataTypes().Has(
                                          syncer::DataType::PREFERENCES));
   result.Set("isSyncPaused", sync_service->GetTransportState() ==
@@ -1700,7 +1768,6 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
     base::Value::Dict freestyler_dict;
     freestyler_dict.Set("enabled", base::FeatureList::IsEnabled(
                                        ::features::kDevToolsFreestyler));
-    freestyler_dict.Set("featureName", ::features::kDevToolsFreestyler.name);
     freestyler_dict.Set("modelId", features::kDevToolsFreestylerModelId.Get());
     freestyler_dict.Set("temperature",
                         features::kDevToolsFreestylerTemperature.Get());
@@ -1728,8 +1795,6 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
     network_agent_dict.Set("enabled",
                            base::FeatureList::IsEnabled(
                                ::features::kDevToolsAiAssistanceNetworkAgent));
-    network_agent_dict.Set("featureName",
-                           ::features::kDevToolsAiAssistanceNetworkAgent.name);
     network_agent_dict.Set(
         "modelId", features::kDevToolsAiAssistanceNetworkAgentModelId.Get());
     network_agent_dict.Set(
@@ -1749,8 +1814,6 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
     ai_assistance_performance_agent_dict.Set(
         "enabled", base::FeatureList::IsEnabled(
                        ::features::kDevToolsAiAssistancePerformanceAgent));
-    ai_assistance_performance_agent_dict.Set(
-        "featureName", ::features::kDevToolsAiAssistancePerformanceAgent.name);
     ai_assistance_performance_agent_dict.Set(
         "modelId",
         features::kDevToolsAiAssistancePerformanceAgentModelId.Get());
@@ -1774,8 +1837,6 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
     ai_assistance_file_agent_dict.Set(
         "enabled", base::FeatureList::IsEnabled(
                        ::features::kDevToolsAiAssistanceFileAgent));
-    ai_assistance_file_agent_dict.Set("featureName",
-                                       ::features::kDevToolsAiAssistanceFileAgent.name);
     ai_assistance_file_agent_dict.Set(
         "modelId", features::kDevToolsAiAssistanceFileAgentModelId.Get());
     ai_assistance_file_agent_dict.Set(
@@ -1806,6 +1867,33 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
                       std::move(ai_code_completion_dict));
   }
 
+  if (base::FeatureList::IsEnabled(::features::kDevToolsAiCodeGeneration)) {
+    base::Value::Dict ai_code_generation_dict;
+    ai_code_generation_dict.Set(
+        "enabled",
+        base::FeatureList::IsEnabled(::features::kDevToolsAiCodeGeneration));
+    ai_code_generation_dict.Set(
+        "modelId", features::kDevToolsAiCodeGenerationModelId.Get());
+    ai_code_generation_dict.Set(
+        "temperature", features::kDevToolsAiCodeGenerationTemperature.Get());
+    ai_code_generation_dict.Set(
+        "userTier",
+        features::kDevToolsAiCodeGenerationUserTier.GetName(
+            features::kDevToolsAiCodeGenerationUserTier.Get()));
+    response_dict.Set("devToolsAiCodeGeneration",
+                      std::move(ai_code_generation_dict));
+  }
+
+  if (base::FeatureList::IsEnabled(
+          ::features::kDevToolsEnableDurableMessages)) {
+    base::Value::Dict devtools_durable_message_dict;
+    devtools_durable_message_dict.Set(
+        "enabled",
+        base::FeatureList::IsEnabled(features::kDevToolsEnableDurableMessages));
+    response_dict.Set("devToolsEnableDurableMessages",
+                      std::move(devtools_durable_message_dict));
+  }
+
   base::Value::Dict devtools_well_known_dict;
   devtools_well_known_dict.Set(
       "enabled", base::FeatureList::IsEnabled(::features::kDevToolsWellKnown));
@@ -1827,8 +1915,8 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
     base::Value::Dict third_party_cookie_controls_dict;
     third_party_cookie_controls_dict.Set(
         "thirdPartyCookieRestrictionEnabled",
-        TrackingProtectionSettingsFactory::GetForProfile(profile())
-            ->IsTrackingProtection3pcdEnabled());
+        base::FeatureList::IsEnabled(
+            content_settings::features::kTrackingProtection3pcd));
 
     third_party_cookie_controls_dict.Set(
         "thirdPartyCookieMetadataEnabled",
@@ -1868,6 +1956,11 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
   response_dict.Set("devToolsEnableOriginBoundCookies",
                     std::move(origin_bound_cookies_dict));
 
+  if (base::FeatureList::IsEnabled(features::kDevToolsGreenDevUi)) {
+    response_dict.Set("devToolsGreenDevUi",
+                      base::Value::Dict().Set("enabled", true));
+  }
+
   if (base::FeatureList::IsEnabled(
           ::features::kDevToolsAnimationStylesInStylesTab)) {
     base::Value::Dict devtools_animation_styles_in_styles_tab_dict;
@@ -1876,22 +1969,6 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
                        ::features::kDevToolsAnimationStylesInStylesTab));
     response_dict.Set("devToolsAnimationStylesInStylesTab",
                       std::move(devtools_animation_styles_in_styles_tab_dict));
-  }
-
-  if (net::features::kIpPrivacyEnableIppInDevTools.Get()) {
-    base::Value::Dict devtools_ip_protection_dict;
-    devtools_ip_protection_dict.Set(
-        "enabled", net::features::kIpPrivacyEnableIppInDevTools.Get());
-    response_dict.Set("devToolsIpProtectionInDevTools",
-                      std::move(devtools_ip_protection_dict));
-  }
-
-  if (net::features::kIpPrivacyEnableIppPanelInDevTools.Get()) {
-    base::Value::Dict devtools_ip_protection_panel_dict;
-    devtools_ip_protection_panel_dict.Set(
-        "enabled", net::features::kIpPrivacyEnableIppPanelInDevTools.Get());
-    response_dict.Set("devToolsIpProtectionPanelInDevTools",
-                      std::move(devtools_ip_protection_panel_dict));
   }
 
   base::Value::Dict deep_links_via_extensibility_api_dict;
@@ -1922,12 +1999,89 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
       base::FeatureList::IsEnabled(::features::kDevToolsVerticalDrawer));
   response_dict.Set("devToolsFlexibleLayout", std::move(flexible_layout_dict));
 
-  base::Value::Dict ai_submenu_prompts_dict;
-  ai_submenu_prompts_dict.Set(
+  if (base::FeatureList::IsEnabled(::features::kDevToolsGlobalAiButton)) {
+    base::Value::Dict global_ai_button_dict;
+    global_ai_button_dict.Set(
+        "enabled",
+        base::FeatureList::IsEnabled(::features::kDevToolsGlobalAiButton));
+    global_ai_button_dict.Set(
+        "promotionEnabled",
+        features::kDevToolsGlobalAiButtonPromotionEnabled.Get());
+    response_dict.Set("devToolsGlobalAiButton",
+                      std::move(global_ai_button_dict));
+  }
+
+  // Once the feature is fully launched and the base::Features are enabled by
+  // default, this dict can be removed.
+  if (base::FeatureList::IsEnabled(::features::kDevToolsGdpProfiles)) {
+    base::Value::Dict gdp_profiles_dict;
+    gdp_profiles_dict.Set("enabled", base::FeatureList::IsEnabled(
+                                         ::features::kDevToolsGdpProfiles));
+    gdp_profiles_dict.Set("badgesEnabled",
+                          features::kDevToolsGdpProfilesBadgesEnabled.Get());
+    gdp_profiles_dict.Set(
+        "starterBadgeEnabled",
+        features::kDevToolsGdpProfilesStarterBadgeEnabled.Get());
+    response_dict.Set("devToolsGdpProfiles", std::move(gdp_profiles_dict));
+  }
+
+  base::Value::Dict gdp_profiles_availability_dict;
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+  gdp_profiles_availability_dict.Set("enabled", true);
+#else
+  gdp_profiles_availability_dict.Set("enabled", false);
+#endif
+  gdp_profiles_availability_dict.Set(
+      "enterprisePolicyValue",
+      profile_->GetPrefs()->GetInteger(
+          prefs::kDevToolsGoogleDeveloperProgramProfileAvailability));
+  response_dict.Set("devToolsGdpProfilesAvailability",
+                    std::move(gdp_profiles_availability_dict));
+
+  response_dict.Set(
+      "devToolsLiveEdit",
+      base::Value::Dict().Set("enabled", base::FeatureList::IsEnabled(
+                                             ::features::kDevToolsLiveEdit)));
+
+  response_dict.Set(
+      "devToolsIndividualRequestThrottling",
+      base::Value::Dict().Set(
+          "enabled", base::FeatureList::IsEnabled(
+                         ::features::kDevToolsIndividualRequestThrottling)));
+
+  base::Value::Dict device_bound_sessions_debugging;
+  device_bound_sessions_debugging.Set(
+      "enabled",
+      base::FeatureList::IsEnabled(features::kDeviceBoundSessionsDevTools));
+  response_dict.Set("deviceBoundSessionsDebugging",
+                    std::move(device_bound_sessions_debugging));
+
+  base::Value::Dict prompt_api_dict;
+  prompt_api_dict.Set("enabled", base::FeatureList::IsEnabled(
+                                     ::features::kDevToolsAiPromptApi));
+  prompt_api_dict.Set("allowWithoutGpu",
+                      features::kDevToolsAiPromptApiAllowWithoutGpu.Get());
+  response_dict.Set("devToolsAiPromptApi", std::move(prompt_api_dict));
+
+  if (base::FeatureList::IsEnabled(
+          ::features::kDevToolsAiAssistanceContextSelectionAgent)) {
+    base::Value::Dict devtools_context_selection_agent;
+    devtools_context_selection_agent.Set(
+        "enabled", base::FeatureList::IsEnabled(
+                       ::features::kDevToolsAiAssistanceContextSelectionAgent));
+    response_dict.Set("devToolsAiAssistanceContextSelectionAgent",
+                      std::move(devtools_context_selection_agent));
+  }
+
+  base::Value::Dict console_insights_teasers_dict;
+  console_insights_teasers_dict.Set(
       "enabled", base::FeatureList::IsEnabled(
-                     ::features::kDevToolsAiSubmenuPrompts));
-  response_dict.Set("devToolsAiSubmenuPrompts",
-                    std::move(ai_submenu_prompts_dict));
+                     ::features::kDevToolsConsoleInsightsTeasers));
+  console_insights_teasers_dict.Set(
+      "allowWithoutGpu",
+      features::kDevToolsConsoleInsightsTeasersAllowWithoutGpu.Get());
+  response_dict.Set("devToolsConsoleInsightsTeasers",
+                    std::move(console_insights_teasers_dict));
 
   base::Value response = base::Value(std::move(response_dict));
   std::move(callback).Run(&response);
@@ -1959,6 +2113,11 @@ void DevToolsUIBindings::DispatchProtocolMessageFromDevToolsFrontend(
     return;
   }
   agent_host_->DispatchProtocolMessage(this, base::as_byte_span(message));
+}
+
+void DevToolsUIBindings::SetHttpServiceRegistryForTesting(
+    std::unique_ptr<DevToolsHttpServiceRegistry> service_registry) {
+  http_service_registry_ = std::move(service_registry);
 }
 
 void DevToolsUIBindings::RecordCountHistogram(const std::string& name,
@@ -2049,13 +2208,41 @@ void DevToolsUIBindings::RecordUserMetricsAction(const std::string& name) {
   base::RecordComputedAction(name);
 }
 
+void DevToolsUIBindings::RecordNewBadgeUsage(const std::string& feature_name) {
+#if BUILDFLAG(IS_ANDROID)
+  NOTIMPLEMENTED();
+#else
+
+  auto* user_education_service =
+      UserEducationServiceFactory::GetForBrowserContext(profile_);
+  if (!user_education_service ||
+      !user_education_service->new_badge_registry()) {
+    return;
+  }
+
+  const base::Feature* feature_to_register = nullptr;
+  for (const auto& [feature, spec] :
+       user_education_service->new_badge_registry()->feature_data()) {
+    if (feature_name == feature->name) {
+      feature_to_register = feature;
+      break;
+    }
+  }
+
+  if (feature_to_register) {
+    UserEducationService::MaybeNotifyNewBadgeFeatureUsed(
+        web_contents()->GetBrowserContext(), *feature_to_register);
+  }
+#endif
+}
+
 void DevToolsUIBindings::MaybeStartLogging() {
   if (session_id_for_logging_.is_empty()) {
     session_id_for_logging_ = base::UnguessableToken::Create();
     session_start_time_ = base::TimeTicks::Now();
     base::Value::Dict sync_info = GetSyncInformationForProfile(profile_);
     int64_t session_tags = 0;
-    bool is_signed_in = sync_info.FindBool("isSyncActive").value_or(false) &&
+    bool is_signed_in = sync_info.FindBool("accountEmail").has_value() &&
                         !sync_info.FindBool("isSyncPaused").value_or(false);
     if (is_signed_in) {
       session_tags |= SessionTags::kUserSignedIn;
@@ -2093,6 +2280,7 @@ base::TimeDelta DevToolsUIBindings::GetTimeSinceSessionStart() {
 }
 
 void DevToolsUIBindings::RecordImpression(const ImpressionEvent& event) {
+  MaybeStartLogging();
   for (const auto& ve : event.impressions) {
     metrics::structured::StructuredMetricsClient::Record(
         metrics::structured::events::v2::dev_tools::Impression()
@@ -2109,6 +2297,7 @@ void DevToolsUIBindings::RecordImpression(const ImpressionEvent& event) {
 }
 
 void DevToolsUIBindings::RecordResize(const ResizeEvent& event) {
+  MaybeStartLogging();
   metrics::structured::StructuredMetricsClient::Record(
       metrics::structured::events::v2::dev_tools::Resize()
           .SetVeId(event.veid)
@@ -2119,6 +2308,7 @@ void DevToolsUIBindings::RecordResize(const ResizeEvent& event) {
 }
 
 void DevToolsUIBindings::RecordClick(const ClickEvent& event) {
+  MaybeStartLogging();
   metrics::structured::StructuredMetricsClient::Record(
       metrics::structured::events::v2::dev_tools::Click()
           .SetVeId(event.veid)
@@ -2130,6 +2320,7 @@ void DevToolsUIBindings::RecordClick(const ClickEvent& event) {
 }
 
 void DevToolsUIBindings::RecordHover(const HoverEvent& event) {
+  MaybeStartLogging();
   metrics::structured::StructuredMetricsClient::Record(
       metrics::structured::events::v2::dev_tools::Hover()
           .SetVeId(event.veid)
@@ -2140,6 +2331,7 @@ void DevToolsUIBindings::RecordHover(const HoverEvent& event) {
 }
 
 void DevToolsUIBindings::RecordDrag(const DragEvent& event) {
+  MaybeStartLogging();
   metrics::structured::StructuredMetricsClient::Record(
       metrics::structured::events::v2::dev_tools::Drag()
           .SetVeId(event.veid)
@@ -2150,6 +2342,7 @@ void DevToolsUIBindings::RecordDrag(const DragEvent& event) {
 }
 
 void DevToolsUIBindings::RecordChange(const ChangeEvent& event) {
+  MaybeStartLogging();
   metrics::structured::StructuredMetricsClient::Record(
       metrics::structured::events::v2::dev_tools::Change()
           .SetVeId(event.veid)
@@ -2159,6 +2352,7 @@ void DevToolsUIBindings::RecordChange(const ChangeEvent& event) {
 }
 
 void DevToolsUIBindings::RecordKeyDown(const KeyDownEvent& event) {
+  MaybeStartLogging();
   metrics::structured::StructuredMetricsClient::Record(
       metrics::structured::events::v2::dev_tools::KeyDown()
           .SetVeId(event.veid)
@@ -2168,6 +2362,7 @@ void DevToolsUIBindings::RecordKeyDown(const KeyDownEvent& event) {
 }
 
 void DevToolsUIBindings::RecordSettingAccess(const SettingAccessEvent& event) {
+  MaybeStartLogging();
   metrics::structured::StructuredMetricsClient::Record(
       metrics::structured::events::v2::dev_tools::SettingAccess()
           .SetName(event.name)
@@ -2178,6 +2373,7 @@ void DevToolsUIBindings::RecordSettingAccess(const SettingAccessEvent& event) {
 }
 
 void DevToolsUIBindings::RecordFunctionCall(const FunctionCallEvent& event) {
+  MaybeStartLogging();
   metrics::structured::StructuredMetricsClient::Record(
       metrics::structured::events::v2::dev_tools::FunctionCall()
           .SetName(event.name)
@@ -2394,7 +2590,7 @@ void DevToolsUIBindings::AddDevToolsExtensionsToClient() {
     GURL url =
         extensions::chrome_manifest_urls::GetDevToolsPage(extension.get());
     const bool is_extension_url = url.SchemeIs(extensions::kExtensionScheme) &&
-                                  url.host_piece() == extension->id();
+                                  url.host() == extension->id();
     CHECK(is_extension_url || url.SchemeIsHTTPOrHTTPS());
 
     // Each devtools extension will need to be able to run in the devtools
@@ -2553,6 +2749,7 @@ void DevToolsUIBindings::RegisterAidaClientEvent(DispatchCallback callback,
 
 void DevToolsUIBindings::SetDelegate(Delegate* delegate) {
   delegate_.reset(delegate);
+  MaybeStartLogging();
 }
 
 void DevToolsUIBindings::TransferDelegate(DevToolsUIBindings& other) {
@@ -2605,6 +2802,18 @@ void DevToolsUIBindings::OnThemeChanged() {
 #endif
 
 void DevToolsUIBindings::CallClientMethod(
+    const std::string& object_name,
+    const std::string& method_name,
+    base::Value arg1,
+    base::Value arg2,
+    base::Value arg3,
+    base::OnceCallback<void(base::Value)> completion_callback) {
+  CallClientMethodImpl(object_name, method_name, std::move(arg1),
+                       std::move(arg2), std::move(arg3),
+                       std::move(completion_callback));
+}
+
+void DevToolsUIBindings::CallClientMethodImpl(
     const std::string& object_name,
     const std::string& method_name,
     base::Value arg1,

@@ -11,7 +11,6 @@
 #include <utility>
 
 #include "base/check_op.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ref.h"
@@ -675,7 +674,7 @@ const flat::UrlRule* FindMatchAmongCandidates(
     if (!DoesURLMatchRequestDomainList(url, *rule))
       continue;
 
-    if (base::Contains(disabled_rule_ids, rule->id()))
+    if (disabled_rule_ids.contains(rule->id()))
       continue;
 
     if (matched_rules)
@@ -790,13 +789,6 @@ bool IsRuleGeneric(const flat::UrlRule& rule) {
   return !rule.initiator_domains_included();
 }
 
-// Returns whether the `host` matches the domain conditions. It's considered a
-// match if both:
-//  1. An included domain matches the `host`, or `domains_included` is omitted
-//     entirely (since rules match all domains by default).
-//  2. No excluded domain match the `host`, or the longest matching excluded
-//     domain is shorter than the longest matching included domain (since
-//     longer, more specific domain matches take precedence).
 bool DoesHostMatchDomainLists(
     std::string_view host,
     const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>*

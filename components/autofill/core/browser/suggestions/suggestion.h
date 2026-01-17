@@ -15,10 +15,9 @@
 #include "base/feature_list.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
-#include "base/types/cxx23_to_underlying.h"
 #include "base/types/strong_alias.h"
-#include "base/uuid.h"
 #include "build/build_config.h"
+#include "components/autofill/core/browser/data_model/autofill_ai/entity_instance.h"
 #include "components/autofill/core/browser/field_types.h"
 #include "components/autofill/core/browser/suggestions/suggestion_type.h"
 #include "components/autofill/core/browser/webdata/autocomplete/autocomplete_entry.h"
@@ -94,7 +93,7 @@ struct Suggestion {
 
   struct AutofillAiPayload final {
     AutofillAiPayload();
-    explicit AutofillAiPayload(base::Uuid guid);
+    explicit AutofillAiPayload(EntityInstance::EntityId guid);
     AutofillAiPayload(const AutofillAiPayload&);
     AutofillAiPayload(AutofillAiPayload&&);
     AutofillAiPayload& operator=(const AutofillAiPayload&);
@@ -104,7 +103,7 @@ struct Suggestion {
     friend bool operator==(const AutofillAiPayload&,
                            const AutofillAiPayload&) = default;
 
-    base::Uuid guid;
+    EntityInstance::EntityId guid;
   };
 
   using Guid = base::StrongAlias<class GuidTag, std::string>;
@@ -113,8 +112,7 @@ struct Suggestion {
     PaymentsPayload();
     PaymentsPayload(std::u16string main_text_content_description,
                     bool should_display_terms_available,
-                    Guid guid,
-                    bool is_local_payments_method);
+                    Guid guid);
     PaymentsPayload(const PaymentsPayload&);
     PaymentsPayload(PaymentsPayload&&);
     PaymentsPayload& operator=(const PaymentsPayload&);
@@ -137,9 +135,6 @@ struct Suggestion {
 
     // Payments method identifier associated with suggestion.
     Guid guid;
-
-    // If true, the payments method associated with the suggestion is local.
-    bool is_local_payments_method = false;
 
     // The amount of the payment as extracted from the page. For example, used
     // for BNPL suggestions to confirm the amount is in the supported range for
@@ -173,7 +168,10 @@ struct Suggestion {
 
   struct IdentityCredentialPayload final {
     IdentityCredentialPayload();
-    IdentityCredentialPayload(GURL configURL, std::string account_id);
+    IdentityCredentialPayload(
+        GURL config_url,
+        std::string account_id,
+        const std::map<FieldType, std::u16string>& fields);
     IdentityCredentialPayload(const IdentityCredentialPayload&);
     IdentityCredentialPayload(IdentityCredentialPayload&&);
     IdentityCredentialPayload& operator=(const IdentityCredentialPayload&);
@@ -193,22 +191,6 @@ struct Suggestion {
     std::map<FieldType, std::u16string> fields;
   };
 
-  struct OneTimePasswordPayload final {
-    OneTimePasswordPayload();
-    explicit OneTimePasswordPayload(
-        std::map<FieldGlobalId, std::u16string> filling_data);
-    OneTimePasswordPayload(const OneTimePasswordPayload&);
-    OneTimePasswordPayload(OneTimePasswordPayload&&);
-    OneTimePasswordPayload& operator=(const OneTimePasswordPayload&);
-    OneTimePasswordPayload& operator=(OneTimePasswordPayload&&);
-    ~OneTimePasswordPayload();
-
-    friend bool operator==(const OneTimePasswordPayload&,
-                           const OneTimePasswordPayload&) = default;
-
-    std::map<FieldGlobalId, std::u16string> filling_data;
-  };
-
   using IsLoading = base::StrongAlias<class IsLoadingTag, bool>;
   using InstrumentId = base::StrongAlias<class InstrumentIdTag, uint64_t>;
   using Payload = std::variant<Guid,
@@ -220,8 +202,7 @@ struct Suggestion {
                                AutofillAiPayload,
                                PaymentsPayload,
                                IdentityCredentialPayload,
-                               AutocompleteEntry,
-                               OneTimePasswordPayload>;
+                               AutocompleteEntry>;
 
   // This struct is used to provide password suggestions with custom icons,
   // using the favicon of the website associated with the credentials. While
@@ -316,13 +297,13 @@ struct Suggestion {
     kAccount,
     // TODO(crbug.com/40266549): Rename to Undo.
     kClear,
-    kCreate,
     kCode,
     kDelete,
     kDevice,
     kEdit,
     kEmail,
     kError,
+    kFlight,
     kGlobe,
     kGoogle,
     kGoogleMonochrome,
@@ -331,8 +312,6 @@ struct Suggestion {
     kGoogleWallet,
     kGoogleWalletMonochrome,
     kHome,
-    kHttpWarning,
-    kHttpsInvalid,
     kIdCard,
     kKey,
     kLocation,
@@ -340,12 +319,12 @@ struct Suggestion {
     kMagic,
     kOfferTag,
     kPenSpark,
+    kPersonCheck,
     kPlusAddress,
     kQuestionMark,
     kRecoveryPassword,
     kScanCreditCard,
     kSettings,
-    kSettingsAndroid,
     kUndo,
     kVehicle,
     kWork,
@@ -438,9 +417,6 @@ struct Suggestion {
 #if DCHECK_IS_ON()
   bool Invariant() const {
     switch (type) {
-      case SuggestionType::kCreateNewPlusAddressInline:
-      case SuggestionType::kPlusAddressError:
-        return std::holds_alternative<PlusAddressPayload>(payload);
       case SuggestionType::kIdentityCredential:
         return std::holds_alternative<IdentityCredentialPayload>(payload);
       case SuggestionType::kPasswordEntry:
@@ -471,8 +447,6 @@ struct Suggestion {
                std::holds_alternative<PaymentsPayload>(payload);
       case SuggestionType::kBnplEntry:
         return std::holds_alternative<PaymentsPayload>(payload);
-      case SuggestionType::kOneTimePasswordEntry:
-        return std::holds_alternative<OneTimePasswordPayload>(payload);
       case SuggestionType::kDevtoolsTestAddressEntry:
       default:
         return std::holds_alternative<Guid>(payload) ||
@@ -539,6 +513,11 @@ struct Suggestion {
   // If |custom_icon| is empty, the fallback built-in icon.
   Icon icon = Icon::kNoIcon;
 
+#if BUILDFLAG(IS_IOS)
+  // Indicates whether the suggestion has a custom card art image.
+  bool has_custom_card_art_image = false;
+#endif  // BUILDFLAG(IS_IOS)
+
   // An icon that appears after the suggestion in the suggestion view. For
   // passwords, this icon string shows whether the suggestion originates from
   // local or account store. It is also used on the settings entry for the
@@ -562,12 +541,17 @@ struct Suggestion {
   std::optional<std::u16string> voice_over;
 
   // If specified, this text will be played back if the user accepts this
-  // suggestion.
+  // suggestion. Announcing messages in response to user actions is discouraged
+  // on Android, this message has no effect on that platform.
+  // TODO: crbug.com/467577615 - Redesign accessibility labels on Android so
+  // that they better reflect the information that's going to be filled in the
+  // form.
   std::optional<std::u16string> acceptance_a11y_announcement;
 
   // When `type` is
-  // `SuggestionType::k(Address|CreditCard)FieldByFieldFilling`, specifies the
-  // `FieldType` used to build the suggestion's `main_text`.
+  // `SuggestionType::k(Address|CreditCard)FieldByFieldFilling` or
+  // `SuggestionType::kAddressEntryOnTyping`, specifies the `FieldType` used to
+  // build the suggestion's `main_text`.
   std::optional<FieldType> field_by_field_filling_type_used;
 
   // How the suggestion should be handled by the filtration logic, see the enum

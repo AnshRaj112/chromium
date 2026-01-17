@@ -31,13 +31,14 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/unguessable_token.h"
 #include "base/values.h"
-#include "chrome/browser/ash/magic_boost/magic_boost_controller_ash.h"
+#include "chrome/browser/ash/magic_boost/magic_boost_controller.h"
 #include "chrome/browser/ash/mahi/mahi_availability.h"
 #include "chrome/browser/ash/mahi/mahi_cache_manager.h"
 #include "chrome/browser/feedback/show_feedback_page.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/manta/manta_service_factory.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/settings_window_manager_chromeos.h"
 #include "chromeos/components/magic_boost/public/cpp/magic_boost_state.h"
@@ -45,7 +46,6 @@
 #include "chromeos/components/mahi/public/cpp/mahi_media_app_content_manager.h"
 #include "chromeos/components/mahi/public/cpp/mahi_web_contents_manager.h"
 #include "chromeos/constants/chromeos_features.h"
-#include "chromeos/crosapi/mojom/magic_boost.mojom.h"
 #include "chromeos/crosapi/mojom/mahi.mojom.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
 #include "components/feedback/feedback_constants.h"
@@ -116,7 +116,7 @@ class OnConsentStateUpdateClosureRunner
                                     base::OnceClosure on_declined_closure)
       : on_approved_closure_(std::move(on_approved_closure)),
         on_declined_closure_(std::move(on_declined_closure)) {
-    CHECK(chromeos::MagicBoostState::Get()->IsMagicBoostAvailable());
+    CHECK(chromeos::MagicBoostState::Get()->IsUserEligibleForGenAIFeatures());
     magic_boost_state_observation_.Observe(chromeos::MagicBoostState::Get());
   }
 
@@ -210,7 +210,7 @@ std::unique_ptr<manta::MahiProvider> CreateProvider() {
 // Returns true if the Mahi feature has been approved to be used.
 bool IsMahiApproved() {
   auto* magic_boost_state = chromeos::MagicBoostState::Get();
-  CHECK(magic_boost_state->IsMagicBoostAvailable())
+  CHECK(magic_boost_state->IsUserEligibleForGenAIFeatures())
       << "GenAI feature surfaced to non-eligible user.";
   return magic_boost_state->hmr_consent_status() ==
          chromeos::HMRConsentStatus::kApproved;
@@ -633,7 +633,8 @@ void MahiManagerImpl::OpenMahiPanelForElucidation(
 }
 
 bool MahiManagerImpl::IsEnabled() {
-  return mahi_availability::IsMahiAvailable() &&
+  return (mahi_availability::IsMahiAvailable().has_value() &&
+          mahi_availability::IsMahiAvailable().value()) &&
          chromeos::MagicBoostState::Get()->hmr_enabled().value_or(false);
 }
 
@@ -777,7 +778,7 @@ void MahiManagerImpl::MaybeObserveHistoryService() {
 
 void MahiManagerImpl::InterrputRequestHandlingWithDisclaimerView(
     crosapi::mojom::MahiContextMenuRequestPtr context_menu_request) {
-  CHECK(chromeos::MagicBoostState::Get()->IsMagicBoostAvailable());
+  CHECK(chromeos::MagicBoostState::Get()->IsUserEligibleForGenAIFeatures());
 
   // Cache the display id before moving `context_menu_request`.
   const int64_t display_id = context_menu_request->display_id;
@@ -803,12 +804,11 @@ void MahiManagerImpl::InterrputRequestHandlingWithDisclaimerView(
               .Then(reset_observer_closure),
           /*on_declined_closure=*/reset_observer_closure);
 
-  ash::MagicBoostControllerAsh::Get()->ShowDisclaimerUi(
-      display_id,
-      crosapi::mojom::MagicBoostController::TransitionAction::kDoNothing,
+  ash::MagicBoostController::Get()->ShowDisclaimerUi(
+      display_id, magic_boost::TransitionAction::kDoNothing,
       chromeos::MagicBoostState::Get()->ShouldIncludeOrcaInOptInSync()
-          ? OptInFeatures::kOrcaAndHmr
-          : OptInFeatures::kHmrOnly);
+          ? magic_boost::OptInFeatures::kOrcaAndHmr
+          : magic_boost::OptInFeatures::kHmrOnly);
 }
 
 void MahiManagerImpl::OnGetPageContent(

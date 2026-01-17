@@ -34,7 +34,7 @@ namespace {
 class InternalRefCountedPool;
 
 // The VideoFrame-backing resources that are reused by the pool, namely, a
-// GpuMemoryBuffer and a SharedImage. This retains a reference to the
+// mappable SharedImage. This retains a reference to the
 // InternalRefCountedPool that created it. Not safe for concurrent use.
 class FrameResources {
  public:
@@ -44,9 +44,13 @@ class FrameResources {
   FrameResources(const FrameResources& other) = delete;
   FrameResources& operator=(const FrameResources& other) = delete;
 
-  // Allocate GpuMemoryBuffer and create SharedImage. Returns false on failure
-  // to do so.
-  bool Initialize(VideoPixelFormat format, const gfx::ColorSpace& color_space);
+  // Attempts to create a mappable SharedImage. Returns false on failure
+  // to do so. The |requires_cpu_access| parameter indicates whether CPU access
+  // to the video frames is needed. If true, linear buffers that are mappable by
+  // CPU will be used; otherwise, GPU optimized buffers may be preferred.
+  bool Initialize(VideoPixelFormat format,
+                  const gfx::ColorSpace& color_space,
+                  bool requires_cpu_access);
 
   // Return true if these resources can be reused for a frame with the specified
   // parameters.
@@ -86,7 +90,8 @@ class InternalRefCountedPool
 
   explicit InternalRefCountedPool(
       std::unique_ptr<RenderableGpuMemoryBufferVideoFramePool::Context> context,
-      VideoPixelFormat format);
+      VideoPixelFormat format,
+      bool requires_cpu_access);
 
   // Create a VideoFrame with the specified parameters, reusing the resources
   // of a previous frame, if possible.
@@ -100,8 +105,8 @@ class InternalRefCountedPool
   // are destroyed).
   void Shutdown();
 
-  // Return the Context for accessing the GpuMemoryBufferManager and
-  // SharedImageInterface. Never returns nullptr.
+  // Return the Context for accessing the SharedImageInterface. Never returns
+  // nullptr.
   RenderableGpuMemoryBufferVideoFramePool::Context* GetContext() const;
 
  private:
@@ -118,6 +123,9 @@ class InternalRefCountedPool
       context_;
   std::list<std::unique_ptr<FrameResources>> available_frame_resources_;
   bool shutting_down_ = false;
+  // Indicates whether the capture pipeline requires CPU mapping of captured
+  // frames. If true, linear CPU mappable buffers will be used.
+  bool requires_cpu_access_ = true;
 };
 
 // Implementation of the RenderableGpuMemoryBufferVideoFramePool abstract
@@ -127,7 +135,8 @@ class RenderableGpuMemoryBufferVideoFramePoolImpl
  public:
   explicit RenderableGpuMemoryBufferVideoFramePoolImpl(
       std::unique_ptr<RenderableGpuMemoryBufferVideoFramePool::Context> context,
-      VideoPixelFormat format);
+      VideoPixelFormat format,
+      bool requires_cpu_access);
 
   scoped_refptr<VideoFrame> MaybeCreateVideoFrame(
       const gfx::Size& visible_size,
@@ -158,6 +167,7 @@ gfx::Size GetCodedSizeForVideoPixelFormat(VideoPixelFormat format,
   switch (format) {
     case PIXEL_FORMAT_ARGB:
     case PIXEL_FORMAT_ABGR:
+    case PIXEL_FORMAT_RGBAF16:
       return visible_size;
     case PIXEL_FORMAT_NV12:
       // Align number of rows to 2, because it's required by YUV_420_BIPLANAR
@@ -173,21 +183,28 @@ gfx::Size GetCodedSizeForVideoPixelFormat(VideoPixelFormat format,
 }
 
 bool FrameResources::Initialize(VideoPixelFormat format,
-                                const gfx::ColorSpace& color_space) {
+                                const gfx::ColorSpace& color_space,
+                                bool requires_cpu_access) {
   // Currently only support ARGB, ABGR and NV12.
   CHECK(format == PIXEL_FORMAT_ARGB || format == PIXEL_FORMAT_ABGR ||
-        format == PIXEL_FORMAT_NV12)
+        format == PIXEL_FORMAT_NV12 || format == PIXEL_FORMAT_RGBAF16)
       << format;
 
   auto* context = pool_->GetContext();
 
-  constexpr gfx::BufferUsage kBufferUsage =
+  gfx::BufferUsage buffer_usage = gfx::BufferUsage::SCANOUT_CPU_READ_WRITE;
+
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_CHROMEOS)
-      gfx::BufferUsage::SCANOUT_VEA_CPU_READ
-#else
-      gfx::BufferUsage::SCANOUT_CPU_READ_WRITE
+  buffer_usage = gfx::BufferUsage::SCANOUT_VEA_CPU_READ;
+#elif BUILDFLAG(IS_LINUX)
+  // On Linux, GBM_BO_USE_LINEAR (implied by SCANOUT_CPU_READ_WRITE) can
+  // prevent GPU rendering on some drivers, notably NVIDIA's GBM driver,
+  // because it disables GBM_BO_USE_RENDERING. Use SCANOUT instead if
+  // linear buffers are not supported to ensure GPU rendering compatibility.
+  if (!requires_cpu_access) {
+    buffer_usage = gfx::BufferUsage::SCANOUT;
+  }
 #endif
-      ;
 
   const gfx::Size coded_size =
       GetCodedSizeForVideoPixelFormat(format, visible_size_);
@@ -202,10 +219,8 @@ bool FrameResources::Initialize(VideoPixelFormat format,
       // 1-copy import into WebGL.
       // Unusually for such SharedImages, they are also *written* via raster for
       // WebGL and WebRTC use cases in which RGBA textures are imported into the
-      // VideoFrames (this is what "renderable" means in this context). Hence,
-      // GLES2_WRITE is required for raster-over-GLES.
-      gpu::SHARED_IMAGE_USAGE_GLES2_READ | gpu::SHARED_IMAGE_USAGE_GLES2_WRITE |
-      gpu::SHARED_IMAGE_USAGE_RASTER_READ |
+      // VideoFrames (this is what "renderable" means in this context).
+      gpu::SHARED_IMAGE_USAGE_GLES2_READ | gpu::SHARED_IMAGE_USAGE_RASTER_READ |
       gpu::SHARED_IMAGE_USAGE_RASTER_WRITE |
       gpu::SHARED_IMAGE_USAGE_DISPLAY_READ;
 
@@ -229,7 +244,7 @@ bool FrameResources::Initialize(VideoPixelFormat format,
       VideoPixelFormatToSharedImageFormat(format).value();
 
   shared_image_ = context->CreateSharedImage(
-      coded_size, kBufferUsage, si_format, color_space, usage, sync_token_);
+      coded_size, buffer_usage, si_format, color_space, usage, sync_token_);
   if (!shared_image_) {
     DLOG(ERROR) << "Failed to allocate shared image for frame: visible_size="
                 << visible_size_.ToString()
@@ -262,10 +277,10 @@ scoped_refptr<VideoFrame> FrameResources::CreateVideoFrame() {
   video_frame->metadata().allow_overlay =
       shared_image_->usage().Has(gpu::SHARED_IMAGE_USAGE_SCANOUT);
 
-  // Only native (non shared memory) GMBs require waiting on GPU fences.
-  const bool has_native_gmb = video_frame->HasNativeGpuMemoryBuffer();
-  video_frame->metadata().read_lock_fences_enabled = has_native_gmb;
-
+  // Waiting on GPU fences is necessary for native mappable SIs, but is not
+  // necessary for mappable SIs backed by shared memory.
+  video_frame->metadata().read_lock_fences_enabled =
+      video_frame->HasNativeMappableSharedImage();
   return video_frame;
 }
 
@@ -279,8 +294,11 @@ void FrameResources::SetSharedImageReleaseSyncToken(
 
 InternalRefCountedPool::InternalRefCountedPool(
     std::unique_ptr<RenderableGpuMemoryBufferVideoFramePool::Context> context,
-    const VideoPixelFormat format)
-    : format_(format), context_(std::move(context)) {}
+    const VideoPixelFormat format,
+    bool requires_cpu_access)
+    : format_(format),
+      context_(std::move(context)),
+      requires_cpu_access_(requires_cpu_access) {}
 
 scoped_refptr<VideoFrame> InternalRefCountedPool::MaybeCreateVideoFrame(
     const gfx::Size& visible_size,
@@ -294,10 +312,12 @@ scoped_refptr<VideoFrame> InternalRefCountedPool::MaybeCreateVideoFrame(
       frame_resources = nullptr;
       continue;
     }
+    break;
   }
   if (!frame_resources) {
     frame_resources = std::make_unique<FrameResources>(this, visible_size);
-    if (!frame_resources->Initialize(format_, color_space)) {
+    if (!frame_resources->Initialize(format_, color_space,
+                                     requires_cpu_access_)) {
       DLOG(ERROR) << "Failed to initialize frame resources.";
       return nullptr;
     }
@@ -360,11 +380,13 @@ RenderableGpuMemoryBufferVideoFramePoolImpl::
     RenderableGpuMemoryBufferVideoFramePoolImpl(
         std::unique_ptr<RenderableGpuMemoryBufferVideoFramePool::Context>
             context,
-        const VideoPixelFormat format)
+        const VideoPixelFormat format,
+        bool requires_cpu_access)
     : format_(format),
       pool_internal_(
           base::MakeRefCounted<InternalRefCountedPool>(std::move(context),
-                                                       format)) {}
+                                                       format,
+                                                       requires_cpu_access)) {}
 
 scoped_refptr<VideoFrame>
 RenderableGpuMemoryBufferVideoFramePoolImpl::MaybeCreateVideoFrame(
@@ -387,9 +409,10 @@ RenderableGpuMemoryBufferVideoFramePoolImpl::
 std::unique_ptr<RenderableGpuMemoryBufferVideoFramePool>
 RenderableGpuMemoryBufferVideoFramePool::Create(
     std::unique_ptr<Context> context,
-    VideoPixelFormat format) {
+    VideoPixelFormat format,
+    bool requires_cpu_access) {
   return std::make_unique<RenderableGpuMemoryBufferVideoFramePoolImpl>(
-      std::move(context), format);
+      std::move(context), format, requires_cpu_access);
 }
 
 }  // namespace media

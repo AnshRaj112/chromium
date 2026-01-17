@@ -8,7 +8,8 @@
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
-#include "base/trace_event/trace_event_impl.h"
+#include "base/task/common/task_annotator.h"
+#include "base/trace_event/trace_event.h"
 #include "components/viz/common/gpu/raster_context_provider.h"
 #include "components/viz/common/resources/shared_image_format.h"
 #include "gpu/GLES2/gl2extchromium.h"
@@ -34,15 +35,6 @@
 namespace blink {
 
 namespace {
-
-BASE_FEATURE(kUseCopyToGpuMemoryBufferAsync,
-             "UseCopyToGpuMemoryBufferAsync",
-#if BUILDFLAG(IS_WIN)
-             base::FEATURE_ENABLED_BY_DEFAULT
-#else
-             base::FEATURE_DISABLED_BY_DEFAULT
-#endif
-);
 
 class Context : public media::RenderableGpuMemoryBufferVideoFramePool::Context {
  public:
@@ -157,10 +149,10 @@ void SignalGpuCompletion(
 void CopyToGpuMemoryBuffer(
     base::WeakPtr<blink::WebGraphicsContext3DProviderWrapper> ctx_wrapper,
     media::VideoFrame* dst_frame,
+    const gpu::SyncToken& blit_done_sync_token,
     base::OnceClosure callback) {
-  CHECK(dst_frame->HasMappableGpuBuffer());
-  CHECK(!dst_frame->HasNativeGpuMemoryBuffer());
-  CHECK(dst_frame->HasSharedImage());
+  CHECK(dst_frame->HasMappableSharedImage());
+  CHECK(!dst_frame->HasNativeMappableSharedImage());
 
   DCHECK(ctx_wrapper);
   auto& context_provider = ctx_wrapper->ContextProvider();
@@ -168,9 +160,6 @@ void CopyToGpuMemoryBuffer(
   DCHECK(raster_context_provider);
   auto* ri = raster_context_provider->RasterInterface();
   DCHECK(ri);
-
-  gpu::SyncToken blit_done_sync_token;
-  ri->GenUnverifiedSyncTokenCHROMIUM(blit_done_sync_token.GetData());
 
   auto* sii = context_provider.SharedImageInterface();
   DCHECK(sii);
@@ -223,6 +212,14 @@ void CopyToGpuMemoryBuffer(
   }
 }
 }  // namespace
+
+BASE_FEATURE(kUseCopyToGpuMemoryBufferAsync,
+#if BUILDFLAG(IS_WIN)
+             base::FEATURE_ENABLED_BY_DEFAULT
+#else
+             base::FEATURE_DISABLED_BY_DEFAULT
+#endif
+);
 
 std::optional<gpu::SyncToken>
 WebGraphicsContext3DVideoFramePool::CopyRGBATextureToVideoFrame(
@@ -291,10 +288,11 @@ WebGraphicsContext3DVideoFramePool::CopyRGBATextureToVideoFrame(
           },
           std::move(dst_frame), std::move(callback), flow_id));
 
-  if (!dst_frame_ptr->HasNativeGpuMemoryBuffer()) {
+  if (!dst_frame_ptr->HasNativeMappableSharedImage()) {
     // For shared memory GMBs we needed to explicitly request a copy
     // from the shared image GPU texture to the GMB.
     CopyToGpuMemoryBuffer(weak_context_provider_, dst_frame_ptr,
+                          completion_sync_token.value(),
                           wrapped_callback->callback());
   } else {
     // QueryEXT functions are used to make sure that
@@ -339,7 +337,6 @@ void ApplyMetadataAndRunCallback(
 }
 
 BASE_FEATURE(kGpuMemoryBufferReadbackFromTexture,
-             "GpuMemoryBufferReadbackFromTexture",
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS) || \
     BUILDFLAG(IS_LINUX)
              base::FEATURE_ENABLED_BY_DEFAULT
@@ -363,8 +360,8 @@ bool WebGraphicsContext3DVideoFramePool::ConvertVideoFrame(
   return CopyRGBATextureToVideoFrame(
              src_video_frame->coded_size(), src_video_frame->shared_image(),
              src_video_frame->acquire_sync_token(), dst_color_space,
-             WTF::BindOnce(ApplyMetadataAndRunCallback, src_video_frame,
-                           std::move(callback)))
+             blink::BindOnce(ApplyMetadataAndRunCallback, src_video_frame,
+                             std::move(callback)))
       .has_value();
 }
 

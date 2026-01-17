@@ -10,6 +10,7 @@
 #include "third_party/blink/renderer/platform/fonts/shaping/font_features.h"
 #include "third_party/blink/renderer/platform/fonts/shaping/harfbuzz_shaper.h"
 #include "third_party/blink/renderer/platform/fonts/shaping/shape_result.h"
+#include "third_party/blink/renderer/platform/fonts/shaping/shape_result_cursor.h"
 #include "third_party/blink/renderer/platform/fonts/shaping/shape_result_run.h"
 #include "third_party/blink/renderer/platform/fonts/simple_font_data.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
@@ -189,10 +190,30 @@ HanKerning::CharType HanKerning::GetCharTypeWithCache(const String& text,
     return cached_type;
   }
   const CharType type = GetCharType(text[index], font_data);
-  if (type != cached_type) {
-    char_types_[index] = type;
-    // TODO(crbug.com/431660829): Support when `CharType` of already shaped
-    // ranges is changed.
+  if (type == cached_type) {
+    return type;
+  }
+
+  char_types_[index] = type;
+
+  // The `CharType` becomes different due to font changes. If it causes
+  // different kerning for the next or previous characters, keep their indexes.
+  if (cached_type != CharType::kInvalid &&
+      RuntimeEnabledFeatures::TextSpacingTrimFallback2Enabled()) {
+    if (index > segment_start_) {
+      const CharType prev_type = char_types_[index - 1];
+      if (prev_type != CharType::kInvalid && ShouldKernLast(type, prev_type) &&
+          !ShouldKernLast(cached_type, prev_type)) {
+        changed_indexes_.push_back(index - 1);
+      }
+    }
+    if (index + 1 < segment_end_) {
+      const CharType next_type = char_types_[index + 1];
+      if (next_type != CharType::kInvalid && ShouldKern(next_type, type) &&
+          !ShouldKern(next_type, cached_type)) {
+        changed_indexes_.push_back(index + 1);
+      }
+    }
   }
   return type;
 }
@@ -267,7 +288,9 @@ bool HanKerning::AppendFontFeatures(const String& text,
     last_type = GetCharType(text, start, font_data);
   }
 
-  if (font_data.has_contextual_spacing && char_types_.empty()) {
+  if (font_data.has_contextual_spacing &&
+      (char_types_.empty() ||
+       RuntimeEnabledFeatures::TextSpacingTrimFallbackChwsEnabled())) {
     // The `chws` feature can handle characters in a run.
     // Compute the end edge if there are following runs.
     if (options.apply_end) [[unlikely]] {
@@ -347,6 +370,45 @@ void HanKerning::PrepareFallback(const String& text) {
   }
 }
 
+// Apply kerning to indexes where actual `CharType`s are different from
+// predicted `CharType`s. Features can't be applied because shaping is already
+// done. Adjust letter spacing instead.
+void HanKerning::ApplyKerning(ShapeResult& result) {
+  DCHECK(!changed_indexes_.empty());
+  DCHECK(RuntimeEnabledFeatures::TextSpacingTrimFallback2Enabled());
+
+  ShapeResultCursor cursor(&result);
+  const float font_size = cursor.FontData().PlatformData().size();
+  const auto advance_min = TextRunLayoutUnit::FromFloatFloor(font_size * .9);
+  std::sort(changed_indexes_.begin(), changed_indexes_.end());
+  wtf_size_t last_index = kNotFound;
+  for (wtf_size_t i : changed_indexes_) {
+    if (i == last_index) [[unlikely]] {
+      continue;
+    }
+    last_index = i;
+
+    cursor.MoveToCharacter(i);
+    const TextRunLayoutUnit advance = cursor.ClusterAdvance();
+    if (advance < advance_min) {
+      continue;
+    }
+
+    cursor.SetUnsafeToBreakBefore();
+    switch (char_types_[i]) {
+      case CharType::kOpen:
+        cursor.AddSpaceToLeft(advance / -2);
+        break;
+      case CharType::kClose:
+        cursor.AddSpaceToRight(advance / -2);
+        break;
+      default:
+        NOTREACHED();
+    }
+  }
+  changed_indexes_.Shrink(0);
+}
+
 HanKerning::FontData::FontData(const SimpleFontData& font,
                                const LayoutLocale& locale,
                                bool is_horizontal) {
@@ -358,6 +420,17 @@ HanKerning::FontData::FontData(const SimpleFontData& font,
   if (!has_alternate_spacing) {
     return;
   }
+
+#if BUILDFLAG(IS_WIN)
+  if (RuntimeEnabledFeatures::TextSpacingTrimYuGothicUIEnabled()) {
+    // Exclude "Yu Gothic UI" until the fonts are fixed. crbug.com/331123676
+    const String postscript_name = font.PlatformData().GetPostScriptName();
+    if (postscript_name.StartsWith("YuGothicUI")) [[unlikely]] {
+      has_alternate_spacing = false;
+      return;
+    }
+  }
+#endif  // BUILDFLAG(IS_WIN)
 
   // Check if the font has `chws` (or `vchw` in vertical.)
   const hb_tag_t chws_tag =

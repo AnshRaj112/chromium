@@ -19,6 +19,8 @@
 #include "gpu/command_buffer/common/scheduling_priority.h"
 #include "gpu/config/gpu_preferences.h"
 #include "third_party/perfetto/include/perfetto/tracing/traced_value.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
+#include "third_party/perfetto/include/perfetto/tracing/track_event_args.h"
 
 namespace gpu {
 namespace {
@@ -145,13 +147,12 @@ void Scheduler::Sequence::SetEnabled(bool enabled) {
     return;
   enabled_ = enabled;
   if (enabled) {
-    TRACE_EVENT_NESTABLE_ASYNC_BEGIN1("gpu", "SequenceEnabled",
-                                      TRACE_ID_LOCAL(this), "sequence_id",
-                                      sequence_id_.GetUnsafeValue());
+    TRACE_EVENT_BEGIN("gpu", "SequenceEnabled",
+                      perfetto::Track::FromPointer(this), "sequence_id",
+                      sequence_id_.GetUnsafeValue());
   } else {
-    TRACE_EVENT_NESTABLE_ASYNC_END1("gpu", "SequenceEnabled",
-                                    TRACE_ID_LOCAL(this), "sequence_id",
-                                    sequence_id_.GetUnsafeValue());
+    TRACE_EVENT_END("gpu", perfetto::Track::FromPointer(this), "sequence_id",
+                    sequence_id_.GetUnsafeValue());
   }
   scheduler_->TryScheduleSequence(this);
 }
@@ -176,10 +177,9 @@ void Scheduler::Sequence::UpdateRunningPriority() {
 
 void Scheduler::Sequence::ContinueTask(base::OnceClosure task_closure) {
   DCHECK_EQ(running_state_, RUNNING);
-  TRACE_EVENT_WITH_FLOW0(
-      "gpu,toplevel.flow", "Scheduler::ContinueTask",
-      GetTaskFlowId(sequence_id_.value(), order_data_->current_order_num()),
-      TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT);
+  TRACE_EVENT("gpu,toplevel.flow", "Scheduler::ContinueTask",
+              perfetto::Flow::Global(GetTaskFlowId(
+                  sequence_id_.value(), order_data_->current_order_num())));
   TaskGraph::Sequence::ContinueTask(std::move(task_closure));
 }
 
@@ -196,9 +196,9 @@ void Scheduler::Sequence::FinishTask() {
 }
 
 void Scheduler::Sequence::OnFrontTaskUnblocked(uint32_t order_num) {
-  TRACE_EVENT_WITH_FLOW0("gpu,toplevel.flow", "Scheduler::SequenceUnblocked",
-                         GetTaskFlowId(sequence_id_.value(), order_num),
-                         TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT);
+  TRACE_EVENT(
+      "gpu,toplevel.flow", "Scheduler::SequenceUnblocked",
+      perfetto::Flow::Global(GetTaskFlowId(sequence_id_.value(), order_num)));
   scheduler_->TryScheduleSequence(this);
 }
 
@@ -329,10 +329,9 @@ void Scheduler::ScheduleTaskHelper(Task task) {
         task.release, std::move(task.report_callback));
   }
 
-  TRACE_EVENT_WITH_FLOW0(
-      "gpu,toplevel.flow", "Scheduler::ScheduleTask",
-      GetTaskFlowId(sequence->sequence_id().value(), order_num),
-      TRACE_EVENT_FLAG_FLOW_OUT);
+  TRACE_EVENT("gpu,toplevel.flow", "Scheduler::ScheduleTask",
+              perfetto::Flow::Global(
+                  GetTaskFlowId(sequence->sequence_id().value(), order_num)));
 
   TryScheduleSequence(sequence);
 }
@@ -404,8 +403,8 @@ void Scheduler::TryScheduleSequence(Sequence* sequence) {
     // running, that means that all other sequences were either empty, or
     // waiting for work to be done on another thread).
     if (!thread_state.running && HasAnyUnblockedTasksOnRunner(task_runner)) {
-      TRACE_EVENT_NESTABLE_ASYNC_BEGIN0("gpu", "Scheduler::Running",
-                                        TRACE_ID_LOCAL(this));
+      TRACE_EVENT_BEGIN("gpu", "Scheduler::Running",
+                        perfetto::Track::FromPointer(this));
       DVLOG(10) << "Waking up thread because there is work to do.";
       thread_state.running = true;
       thread_state.run_next_task_scheduled = base::TimeTicks::Now();
@@ -576,8 +575,8 @@ void Scheduler::RunNextTask() {
              "if it did not have any unblocked tasks.";
       */
 
-      TRACE_EVENT_NESTABLE_ASYNC_END0("gpu", "Scheduler::Running",
-                                      TRACE_ID_LOCAL(this));
+      TRACE_EVENT_END("gpu", /*"Scheduler::Running"*/
+                      perfetto::Track::FromPointer(this));
 
       DVLOG(10) << "Empty scheduling queue. Sleeping.";
       thread_state->running = false;
@@ -600,8 +599,8 @@ void Scheduler::RunNextTask() {
     auto* thread_state = &per_thread_state_map_[task_runner];
 
     if (!HasAnyUnblockedTasksOnRunner(task_runner)) {
-      TRACE_EVENT_NESTABLE_ASYNC_END0("gpu", "Scheduler::Running",
-                                      TRACE_ID_LOCAL(this));
+      TRACE_EVENT_END("gpu", /*"Scheduler::Running"*/
+                      perfetto::Track::FromPointer(this));
       DVLOG(10) << "Thread has no runnable sequences. Sleeping.";
       thread_state->running = false;
       return;
@@ -663,9 +662,8 @@ void Scheduler::ExecuteSequence(const SequenceId sequence_id) {
   {
     base::AutoUnlock auto_unlock(lock());
 
-    TRACE_EVENT_WITH_FLOW0(
-        "gpu,toplevel.flow", "Scheduler::RunTask", task_flow_id,
-        TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT);
+    TRACE_EVENT("gpu,toplevel.flow", "Scheduler::RunTask",
+                perfetto::Flow::Global(task_flow_id));
 
     order_data->BeginProcessingOrderNumber(order_num);
 
@@ -679,8 +677,8 @@ void Scheduler::ExecuteSequence(const SequenceId sequence_id) {
 
       order_data->FinishProcessingOrderNumber(order_num);
 
-      TRACE_EVENT_WITH_FLOW0("gpu,toplevel.flow", "Scheduler::FinishTask",
-                             task_flow_id, TRACE_EVENT_FLAG_FLOW_IN);
+      TRACE_EVENT("gpu,toplevel.flow", "Scheduler::FinishTask",
+                  perfetto::TerminatingFlow::Global(task_flow_id));
     }
   }
 

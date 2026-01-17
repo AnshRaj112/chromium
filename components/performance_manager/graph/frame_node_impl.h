@@ -7,14 +7,17 @@
 
 #include <memory>
 
+#include "base/byte_size.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/scoped_observation.h"
 #include "base/types/pass_key.h"
 #include "base/unguessable_token.h"
 #include "components/performance_manager/execution_context/execution_context_impl.h"
 #include "components/performance_manager/graph/node_attached_data_storage.h"
 #include "components/performance_manager/graph/node_base.h"
 #include "components/performance_manager/graph/node_inline_data.h"
+#include "components/performance_manager/graph/tracing_observer.h"
 #include "components/performance_manager/public/graph/frame_node.h"
 #include "components/performance_manager/public/graph/node_attached_data.h"
 #include "components/performance_manager/public/mojom/coordination_unit.mojom.h"
@@ -26,6 +29,7 @@
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "third_party/blink/public/common/tokens/tokens.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
 #include "url/gurl.h"
 #include "url/origin.h"
 
@@ -43,7 +47,8 @@ class FrameNodeImpl
           execution_context::FrameExecutionContext,
           resource_attribution::SharedCPUTimeResultData,
           // Keep this last to avoid merge conflicts.
-          NodeAttachedDataStorage> {
+          NodeAttachedDataStorage>,
+      public TracingObserver {
  public:
   static const char kDefaultPriorityReason[];
 
@@ -63,7 +68,8 @@ class FrameNodeImpl
                 const blink::LocalFrameToken& frame_token,
                 content::BrowsingInstanceId browsing_instance_id,
                 content::SiteInstanceGroupId site_instance_group_id,
-                bool is_current);
+                bool is_current,
+                bool is_active);
 
   FrameNodeImpl(const FrameNodeImpl&) = delete;
   FrameNodeImpl& operator=(const FrameNodeImpl&) = delete;
@@ -100,6 +106,7 @@ class FrameNodeImpl
   const GURL& GetURL() const override;
   const std::optional<url::Origin>& GetOrigin() const override;
   bool IsCurrent() const override;
+  bool IsActive() const override;
   const PriorityAndReason& GetPriorityAndReason() const override;
   bool GetNetworkAlmostIdle() const override;
   bool IsAdFrame() const override;
@@ -115,10 +122,15 @@ class FrameNodeImpl
   ViewportIntersection GetViewportIntersection() const override;
   Visibility GetVisibility() const override;
   bool IsIntersectingLargeArea() const override;
+  bool IsRendered() const override;
   bool IsImportant() const override;
   const RenderFrameHostProxy& GetRenderFrameHostProxy() const override;
-  uint64_t GetResidentSetKbEstimate() const override;
-  uint64_t GetPrivateFootprintKbEstimate() const override;
+  base::ByteSize GetResidentSetEstimate() const override;
+  base::ByteSize GetPrivateFootprintEstimate() const override;
+  void CrossProcessSubframeRenderProcessGone() override;
+
+  // TracingObserver implementation:
+  void OnTraceSessionStart() override;
 
   // Getters for const properties.
   FrameNodeImpl* parent_frame_node() const;
@@ -126,6 +138,7 @@ class FrameNodeImpl
   PageNodeImpl* page_node() const;
   ProcessNodeImpl* process_node() const;
   int render_frame_id() const;
+  perfetto::Track tracing_track() const;
 
   // Getters for non-const properties. These are not thread safe.
   NodeSetView<FrameNodeImpl*> child_frame_nodes() const;
@@ -139,6 +152,7 @@ class FrameNodeImpl
   static void UpdateCurrentFrame(FrameNodeImpl* previous_frame_node,
                                  FrameNodeImpl* current_frame_node,
                                  GraphImpl* graph);
+  void SetIsActive(bool is_active);
   void SetHadUserActivation();
   void SetIsHoldingWebLock(bool is_holding_weblock);
   void SetIsHoldingBlockingIndexedDBLock(
@@ -148,10 +162,11 @@ class FrameNodeImpl
   void SetViewportIntersection(ViewportIntersection viewport_intersection);
   void SetInitialVisibility(Visibility visibility);
   void SetVisibility(Visibility visibility);
+  void SetIsRendered(bool is_rendered);
   void SetIsIntersectingLargeArea(bool is_intersecting_large_area);
   void SetIsImportant(bool is_important);
-  void SetResidentSetKbEstimate(uint64_t rss_estimate);
-  void SetPrivateFootprintKbEstimate(uint64_t private_footprint_estimate);
+  void SetResidentSetEstimate(base::ByteSize rss_estimate);
+  void SetPrivateFootprintEstimate(base::ByteSize private_footprint_estimate);
 
   // Invoked when a navigation is committed in the frame.
   void OnNavigationCommitted(GURL url,
@@ -190,6 +205,9 @@ class FrameNodeImpl
                        PageNodeImpl* page_node);
   void RemoveEmbeddedPage(base::PassKey<PageNodeImpl> key,
                           PageNodeImpl* page_node);
+
+  // Returns true if the mojom::DocumentCoordinationUnit connection is bound.
+  bool IsDocumentCoordinationUnitBoundForTesting() const;
 
  private:
   friend class FrameNodeImplDescriber;
@@ -283,6 +301,8 @@ class FrameNodeImpl
   // even if it is not current.
   FrameNodeImpl* GetFrameTreeRoot() const;
 
+  void TraceEdges();
+
   bool HasFrameNodeInAncestors(FrameNodeImpl* frame_node) const;
   bool HasFrameNodeInDescendants(FrameNodeImpl* frame_node) const;
   bool HasFrameNodeInTree(FrameNodeImpl* frame_node) const;
@@ -326,6 +346,13 @@ class FrameNodeImpl
   // UI thread.
   const RenderFrameHostProxy render_frame_host_proxy_;
 
+  // Perfetto track that can record trace events for the page.
+  const base::trace_event::TrackRegistration<perfetto::NamedTrack>
+      tracing_track_;
+
+  base::ScopedObservation<TracingObserverList, TracingObserver>
+      tracing_observation_{this};
+
   NodeSet child_frame_nodes_;
 
   // The set of pages that have been opened by this frame.
@@ -334,9 +361,9 @@ class FrameNodeImpl
   // The set of pages that have been embedded by this frame.
   NodeSet embedded_page_nodes_;
 
-  uint64_t resident_set_kb_estimate_ = 0;
+  base::ByteSize resident_set_estimate_;
 
-  uint64_t private_footprint_kb_estimate_ = 0;
+  base::ByteSize private_footprint_estimate_;
 
   // Does *not* change when a navigation is committed.
   ObservedProperty::NotifiesOnlyOnChanges<
@@ -367,6 +394,7 @@ class FrameNodeImpl
       is_holding_blocking_indexeddb_lock_{false};
 
   bool is_current_{false};
+  bool is_active_{false};
 
   // Properties associated with a Document, which are reset when a
   // different-document navigation is committed in the frame.
@@ -381,17 +409,18 @@ class FrameNodeImpl
   // Frame priority information. Set via ExecutionContextPriorityDecorator.
   ObservedProperty::NotifiesOnlyOnChangesWithPreviousValue<
       PriorityAndReason,
-      const PriorityAndReason&,
-      &FrameNodeObserver::OnPriorityAndReasonChanged>
-      priority_and_reason_{PriorityAndReason(base::TaskPriority::LOWEST,
-                                             kDefaultPriorityReason)};
+      &FrameNodeObserver::OnPriorityAndReasonChanged,
+      TracedWrapper<PriorityAndReason>>
+      priority_and_reason_;
 
   // Indicates if the frame is audible. This is tracked independently of a
   // document, and if a document swap occurs the audio stream monitor machinery
   // will keep this up to date.
-  ObservedProperty::
-      NotifiesOnlyOnChanges<bool, &FrameNodeObserver::OnIsAudibleChanged>
-          is_audible_{false};
+  ObservedProperty::NotifiesOnlyOnChanges<
+      bool,
+      &FrameNodeObserver::OnIsAudibleChanged,
+      TracedWrapper<bool>>
+      is_audible_;
 
   // Indicates if the frame is capturing at least one media stream.
   ObservedProperty::NotifiesOnlyOnChanges<
@@ -414,9 +443,12 @@ class FrameNodeImpl
   // FrameVisibilityDecorator.
   ObservedProperty::NotifiesOnlyOnChangesWithPreviousValue<
       Visibility,
-      Visibility,
-      &FrameNodeObserver::OnFrameVisibilityChanged>
-      visibility_{Visibility::kUnknown};
+      &FrameNodeObserver::OnFrameVisibilityChanged,
+      TracedWrapper<Visibility>>
+      visibility_;
+
+  // Indicates if this frame is rendered.
+  bool is_rendered_ = false;
 
   // Indicates if this frame intersects with a large area of the viewport.
   // Defaults to true when its value is unknown.

@@ -19,7 +19,6 @@
 #include "chrome/browser/performance_manager/test_support/site_data_utils.h"
 #endif
 #include "chrome/browser/resource_coordinator/tab_helper.h"
-#include "chrome/browser/resource_coordinator/tab_manager_features.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
 #include "components/performance_manager/persistence/site_data/site_data_impl.h"
 #include "components/performance_manager/persistence/site_data/site_data_writer.h"
@@ -253,8 +252,8 @@ class SessionRestorePolicyTest : public ChromeRenderViewHostTestHarness {
   void WaitForFinalTabScores() {
     base::RunLoop run_loop;
     EXPECT_CALL(mock_, NotifyTabScoreChanged(nullptr, 0.0))
-        .WillOnce(::testing::Invoke(
-            [&run_loop](content::WebContents*, float) { run_loop.Quit(); }));
+        .WillOnce(
+            [&run_loop](content::WebContents*, float) { run_loop.Quit(); });
     run_loop.Run();
   }
 

@@ -7,8 +7,6 @@
 
 #include <memory>
 
-#include "base/callback_list.h"
-#include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/ui/page_info/page_info_dialog.h"
 #include "chrome/browser/ui/views/page_info/page_info_bubble_view_base.h"
@@ -35,20 +33,11 @@ class PageInfoBubbleView : public PageInfoBubbleViewBase,
   ~PageInfoBubbleView() override;
 
   // Creates the appropriate page info bubble for the given |url|.
-  // |anchor_view| will be used to place the bubble.  If |anchor_view| is null,
+  // |anchor| will be used to place the bubble.  If |anchor| is null,
   // |anchor_rect| will be used instead.  |parent_window| will become the
   // parent of the widget hosting the bubble view.
   static views::BubbleDialogDelegateView* CreatePageInfoBubble(
       std::unique_ptr<PageInfoBubbleSpecification> specification);
-
-  using PageInfoBubbleCreatedCallbackList =
-      base::RepeatingCallbackList<void(content::WebContents* web_contents,
-                                       views::Widget* bubble_widget)>;
-  using PageInfoBubbleCreatedCallback =
-      PageInfoBubbleCreatedCallbackList::CallbackType;
-
-  static base::CallbackListSubscription RegisterPageInfoCreatedCallback(
-      PageInfoBubbleCreatedCallback callback);
 
   // PageInfoNavigationHandler:
   void OpenMainPage(base::OnceClosure initialized_callback) override;
@@ -56,7 +45,6 @@ class PageInfoBubbleView : public PageInfoBubbleViewBase,
   void OpenPermissionPage(ContentSettingsType type) override;
   void OpenAdPersonalizationPage() override;
   void OpenCookiesPage() override;
-  void OpenPrivacyAndSiteDataPage() override;
   void OpenMerchantTrustPage(
       page_info::MerchantBubbleOpenReferrer referrer) override;
   void CloseBubble() override;
@@ -67,7 +55,7 @@ class PageInfoBubbleView : public PageInfoBubbleViewBase,
   PageInfo* presenter_for_testing() { return presenter_.get(); }
 
  private:
-  PageInfoBubbleView(views::View* anchor_view,
+  PageInfoBubbleView(views::BubbleAnchor anchor,
                      const gfx::Rect& anchor_rect,
                      gfx::NativeView parent_window,
                      content::WebContents* web_contents,

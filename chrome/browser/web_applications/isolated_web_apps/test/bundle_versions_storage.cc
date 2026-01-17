@@ -5,7 +5,6 @@
 #include "chrome/browser/web_applications/isolated_web_apps/test/bundle_versions_storage.h"
 
 #include "base/check_deref.h"
-#include "base/containers/contains.h"
 #include "base/containers/map_util.h"
 #include "base/containers/to_value_list.h"
 #include "base/json/json_writer.h"
@@ -29,7 +28,7 @@ std::string GetRelativeUpdateManifestUrl(
 
 std::string GetRelativeWebBundleUrl(
     const web_package::SignedWebBundleId& web_bundle_id,
-    const base::Version& version) {
+    const IwaVersion& version) {
   return base::StringPrintf("%s/%s.swbn", web_bundle_id.id(),
                             version.GetString());
 }
@@ -61,9 +60,23 @@ GURL BundleVersionsStorage::GetUpdateManifestUrl(
   return base_url.Resolve(GetRelativeUpdateManifestUrl(web_bundle_id));
 }
 
+// static
+GURL BundleVersionsStorage::GetBundleUrl(
+    const GURL& base_url,
+    const web_package::SignedWebBundleId& web_bundle_id,
+    const IwaVersion& version) {
+  return base_url.Resolve(GetRelativeWebBundleUrl(web_bundle_id, version));
+}
+
 GURL BundleVersionsStorage::GetUpdateManifestUrl(
     const web_package::SignedWebBundleId& web_bundle_id) const {
   return GetUpdateManifestUrl(*base_url_, web_bundle_id);
+}
+
+GURL BundleVersionsStorage::GetBundleUrl(
+    const web_package::SignedWebBundleId& web_bundle_id,
+    const IwaVersion& version) const {
+  return GetBundleUrl(*base_url_, web_bundle_id, version);
 }
 
 base::Value::Dict BundleVersionsStorage::GetUpdateManifest(
@@ -96,12 +109,12 @@ GURL BundleVersionsStorage::AddBundle(
     std::optional<std::vector<UpdateChannel>> update_channels) {
   CHECK(base_url_)
       << "SetBaseUrl() must be invoked prior to the first call to AddBundle(). "
-         "If you're using IsolatedWebAppUpdateServerMixin, make sure that "
+         "If you're using IsolatedWebAppTestUpdateServer, make sure that "
          "AddBundle() is called from SetUpOnMainThread() and not from the "
          "constructor.";
 
   auto web_bundle_id = bundle->web_bundle_id();
-  auto version = bundle->version();
+  auto version = IwaVersion::Create(bundle->version().GetString()).value();
   bundle_versions_per_id_[web_bundle_id][version] =
       std::make_unique<BundleInfo>(std::move(bundle),
                                    std::move(update_channels));
@@ -110,10 +123,10 @@ GURL BundleVersionsStorage::AddBundle(
 
 void BundleVersionsStorage::RemoveBundle(
     const web_package::SignedWebBundleId& web_bundle_id,
-    const base::Version& version) {
-  CHECK(base::Contains(bundle_versions_per_id_, web_bundle_id));
+    const IwaVersion& version) {
+  CHECK(bundle_versions_per_id_.contains(web_bundle_id));
   auto& bundle_versions = bundle_versions_per_id_[web_bundle_id];
-  CHECK(base::Contains(bundle_versions, version));
+  CHECK(bundle_versions.contains(version));
   bundle_versions.erase(version);
   if (bundle_versions.empty()) {
     bundle_versions_per_id_.erase(web_bundle_id);
@@ -123,8 +136,8 @@ void BundleVersionsStorage::RemoveBundle(
 std::optional<BundleVersionsStorage::BundleOrUpdateManifest>
 BundleVersionsStorage::GetResource(const std::string& route) {
   // Parses /<web_bundle_id>/<file_name> into { <web_bundle_id>, <file_name> }.
-  auto pieces = base::SplitString(route, "/", base::TRIM_WHITESPACE,
-                                  base::SPLIT_WANT_NONEMPTY);
+  const std::vector<std::string_view> pieces = base::SplitStringPiece(
+      route, "/", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
   if (pieces.size() != 2) {
     return std::nullopt;
   }
@@ -140,13 +153,14 @@ BundleVersionsStorage::GetResource(const std::string& route) {
     return std::nullopt;
   }
 
-  const auto& path = pieces[1];
+  const std::string_view path = pieces[1];
   if (path == kUpdateManifestFileName) {
     return GetUpdateManifest(web_bundle_id);
   } else if (path.ends_with(".swbn")) {
-    base::Version version(path.substr(0, path.size() - 5));
-    if (version.IsValid()) {
-      if (auto* bundle_info = base::FindPtrOrNull(*bundle_versions, version)) {
+    auto iwa_version = IwaVersion::Create(path.substr(0, path.size() - 5));
+    if (iwa_version.has_value()) {
+      if (auto* bundle_info =
+              base::FindPtrOrNull(*bundle_versions, *std::move(iwa_version))) {
         return bundle_info->bundle.get();
       }
     }

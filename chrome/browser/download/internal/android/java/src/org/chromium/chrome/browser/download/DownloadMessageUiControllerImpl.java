@@ -458,11 +458,12 @@ public class DownloadMessageUiControllerImpl implements DownloadMessageUiControl
 
     /**
      * Returns true if the given download information matches an interstitial download.
+     *
      * @param originalUrl The URL of the download.
      * @param guid Unique GUID of the download.
      */
     @Override
-    public boolean isDownloadInterstitialItem(GURL originalUrl, String guid) {
+    public boolean isDownloadInterstitialItem(GURL originalUrl, @Nullable String guid) {
         if (mDownloadInterstitialSources != null
                 && mDownloadInterstitialSources.contains(originalUrl)) {
             return true;
@@ -568,7 +569,9 @@ public class DownloadMessageUiControllerImpl implements DownloadMessageUiControl
             }
         }
 
-        return !MimeUtils.canAutoOpenMimeType(offlineItem.mimeType) || !offlineItem.hasUserGesture;
+        return !MimeUtils.canAutoOpenMimeType(offlineItem.mimeType)
+                || !offlineItem.hasUserGesture
+                || !offlineItem.allowAutoOpenAfterCompletion;
     }
 
     private void computeNextStepForUpdate(OfflineItem updatedItem) {
@@ -751,7 +754,7 @@ public class DownloadMessageUiControllerImpl implements DownloadMessageUiControl
             info.iconType = IconType.ANIMATED_VECTOR_DRAWABLE;
         } else if (resultState == ResultState.COMPLETE) {
             stringRes = R.plurals.download_message_multiple_download_complete;
-            info.icon = R.drawable.infobar_download_complete;
+            info.icon = R.drawable.ic_download_done_24dp;
             info.iconType = IconType.VECTOR_DRAWABLE;
         } else if (resultState == ResultState.FAILED) {
             stringRes = R.plurals.download_message_multiple_download_failed;
@@ -809,7 +812,7 @@ public class DownloadMessageUiControllerImpl implements DownloadMessageUiControl
                                         displayUrl != null ? displayUrl : "");
                 info.id = itemToShow.id;
                 info.link = getContext().getString(R.string.open_downloaded_label);
-                info.icon = R.drawable.infobar_download_complete_animation;
+                info.icon = R.drawable.ic_download_done_24dp_anim;
             } else if (resultState == ResultState.FAILED) {
                 // TODO(shaktisahu): Incorporate various types of failure messages.
                 // TODO(shaktisahu, xingliu): Consult UX to handle multiple schedule variations.

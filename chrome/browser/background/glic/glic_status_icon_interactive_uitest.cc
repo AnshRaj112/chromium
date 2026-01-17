@@ -5,6 +5,7 @@
 #include "base/functional/callback.h"
 #include "base/scoped_observation.h"
 #include "base/test/scoped_feature_list.h"
+#include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/background/glic/glic_background_mode_manager.h"
 #include "chrome/browser/background/glic/glic_status_icon.h"
@@ -23,7 +24,8 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
-#include "chrome/browser/ui/views/tabs/glic_button.h"
+#include "chrome/browser/ui/views/interaction/browser_elements_views.h"
+#include "chrome/browser/ui/views/tabs/glic/glic_button.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/test/interaction/interactive_browser_test.h"
 #include "components/prefs/pref_service.h"
@@ -93,10 +95,9 @@ class GlicStatusIconUiTest : public test::InteractiveGlicTest,
 
   auto ForceEmptyButtonBounds(Browser* browser) {
     return Do([browser] {
-      auto* glic_button = browser->window()
-                              ->AsBrowserView()
-                              ->tab_strip_region_view()
-                              ->GetGlicButton();
+      auto* glic_button =
+          BrowserElementsViews::From(browser)->GetViewAs<glic::GlicButton>(
+              kGlicButtonElementId);
       glic_button->SetSize(gfx::Size(0, 0));
     });
   }
@@ -131,7 +132,17 @@ class GlicStatusIconUiTest : public test::InteractiveGlicTest,
 // context menu item in this case). This could naturally happen, racily, if the
 // show button is clicked before the button view is shown, but to reliably
 // reproduce the issue, we force the view to have zero bounds here.
-IN_PROC_BROWSER_TEST_P(GlicStatusIconUiTest, ShowClose) {
+// TODO(crbug.com/460824441): Enable on ChromeOS.
+#if BUILDFLAG(IS_CHROMEOS)
+#define MAYBE_ShowClose DISABLED_ShowClose
+#else
+#define MAYBE_ShowClose ShowClose
+#endif
+IN_PROC_BROWSER_TEST_P(GlicStatusIconUiTest, MAYBE_ShowClose) {
+  if (base::FeatureList::IsEnabled(features::kGlicMultiInstance)) {
+    // TODO(b/453696965): Broken in multi-instance.
+    GTEST_SKIP() << "Skipping for kGlicMultiInstance";
+  }
   Profile* other_profile = CreateSecondProfile();
   RunTestSequence(
       VerifyStatusIconVisibility(false), EnableGlicLauncher(),

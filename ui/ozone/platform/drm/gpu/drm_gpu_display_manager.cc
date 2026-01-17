@@ -14,7 +14,6 @@
 #include <vector>
 
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/containers/flat_map.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
@@ -45,7 +44,8 @@ constexpr char kMultipleDisplayIdsCollisionDetected[] =
 
 // A list of property names that are blocked from issuing a full display
 // configuration (modeset) via a udev display CHANGE event.
-const char* kBlockedEventsByTriggerProperty[] = {"Content Protection"};
+constexpr const char* kBlockedEventsByTriggerProperty[] = {
+    "Content Protection"};
 
 struct DrmDisplayParams {
   scoped_refptr<DrmDevice> drm;
@@ -334,11 +334,11 @@ MovableDisplaySnapshots DrmGpuDisplayManager::GetDisplays() {
     // Make sure that the display infos we got have valid connector IDs.
     // If not, we need to remove the display info from the list. This removes
     // any zombie connectors.
-    std::erase_if(
-        display_infos, [&valid_connector_ids](const auto& display_info) {
-          return !base::Contains(valid_connector_ids,
-                                 display_info->connector()->connector_id);
-        });
+    std::erase_if(display_infos,
+                  [&valid_connector_ids](const auto& display_info) {
+                    return !valid_connector_ids.contains(
+                        display_info->connector()->connector_id);
+                  });
 
     // Consolidate all display infos that belong to the same tiled display into
     // one.
@@ -422,14 +422,14 @@ bool DrmGpuDisplayManager::TakeDisplayControl() {
   return status;
 }
 
-void DrmGpuDisplayManager::RelinquishDisplayControl() {
+bool DrmGpuDisplayManager::RelinquishDisplayControl() {
   const bool detach_planes_before_dropping =
       display::features::IsFastDrmMasterDropEnabled();
   if (detach_planes_before_dropping &&
       !screen_manager_->DetachPlanesFromAllControllers()) {
     LOG(ERROR) << __func__
                << ": unable to detach planes from all enabled controllers.";
-    return;
+    return false;
   }
 
   const DrmDeviceVector& devices = drm_device_manager_->GetDrmDevices();
@@ -437,6 +437,7 @@ void DrmGpuDisplayManager::RelinquishDisplayControl() {
     if (!drm->DropMaster()) {
       LOG(ERROR) << __func__ << "Drm drop master failed for: "  // nocheck
                  << drm->device_path().value();
+      return false;
     }
   }
 
@@ -446,6 +447,8 @@ void DrmGpuDisplayManager::RelinquishDisplayControl() {
   if (detach_planes_before_dropping) {
     screen_manager_->UpdateControllerToWindowMapping();
   }
+
+  return true;
 }
 
 bool DrmGpuDisplayManager::ShouldDisplayEventTriggerConfiguration(
@@ -589,12 +592,10 @@ bool DrmGpuDisplayManager::ConfigureDisplays(
   bool config_success = screen_manager_->ConfigureDisplayControllers(
       controllers_to_configure, modeset_flags);
 
-  // Only attempt to fallback on using different CRTC-connector pairings if
-  // hardware mirroring is disabled as hardware mirroring has multiple
-  // connectors assigned to one CRTC, and the fallback assumes 1:1 pairing.
+  // TODO: crbug.com/441557393 - Properly handle tiled displays in BigJoiner
+  // fallback instead of skipping the entire fallback.
   const bool should_try_test_fallback =
-      !is_commit && !config_success &&
-      !display::features::IsHardwareMirrorModeEnabled();
+      !is_commit && !config_success && !HasTiledDisplay();
   bool did_test_modeset_with_fallback = false;
   if (should_try_test_fallback) {
     did_test_modeset_with_fallback = true;
@@ -1074,6 +1075,15 @@ std::unique_ptr<drmModeModeInfo> DrmGpuDisplayManager::FindModeForDisplay(
   auto out_mode = std::make_unique<drmModeModeInfo>();
   *out_mode = *matching_modes.front();
   return out_mode;
+}
+
+bool DrmGpuDisplayManager::HasTiledDisplay() const {
+  for (const auto& display : displays_) {
+    if (display->GetTileProperty().has_value()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace ui

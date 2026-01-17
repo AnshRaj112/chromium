@@ -266,6 +266,7 @@ function setUpAutofillInternals(onLoadArgument: OnLoadArgument) {
   setUpScopeCheckboxes();
   setUpSettingCheckboxe();
   setUpMarker();
+  setUpDumpAddressesButton();
   setUpSubmittedFormsJSONDataDownload();
   setUpCheckAutofillAiPermissions();
   if (onLoadArgument.showDomNodeIDsEnabled) {
@@ -408,7 +409,7 @@ function getSubmittedFormTopLevelData(form: HTMLElement):
   // Include the submission timestamp information.
   const getSubmissionTimestamp = (): string => {
     // Find the substring "timestamp: 123456789";
-    const timestampSection = form.textContent!.match(/timestamp: ([0-9]+)/);
+    const timestampSection = form.textContent.match(/timestamp: ([0-9]+)/);
     return timestampSection ? timestampSection[1]! : 'Not found';
   };
 
@@ -597,6 +598,7 @@ function setUpScopeCheckboxes() {
     {id: 'FastCheckout', uncheckedByDefault: true},
     {id: 'TouchToFill'},
     {id: 'AutofillAi'},
+    {id: 'AutofillActor'},
   ];
   for (const scope of SCOPES) {
     const input = createCheckbox(scope);
@@ -746,4 +748,14 @@ document.addEventListener('DOMContentLoaded', () => {
   resetCacheFakeButton.addEventListener('click', () => {
     chrome.send('resetCache');
   });
+
+  const dumpAddressesFakeButton =
+      getRequiredElement('dump-addresses-fake-button');
+  dumpAddressesFakeButton.addEventListener('click', () => {
+    chrome.send('dumpAddresses');
+  });
 });
+
+function setUpDumpAddressesButton() {
+  getRequiredElement('dump-addresses-fake-button').style.display = 'inline';
+}

@@ -32,6 +32,7 @@
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/layout/box_layout.h"
+#include "ui/views/metadata/view_factory.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/dialog_client_view.h"
@@ -257,15 +258,13 @@ void PermissionPromptBubbleBaseView::RunButtonCallback(int button_id) {
   const bool is_deny_supported =
       request_type() != permissions::RequestTypeForUma::PERMISSION_SMART_CARD;
 #endif  // BUILDFLAG(IS_CHROMEOS)
-  if (browser_view && browser_view->GetLocationBarView()->GetChipController() &&
-      browser_view->GetLocationBarView()
+  if (browser_view && browser_view->GetLocationBar()->GetChipController() &&
+      browser_view->GetLocationBar()
           ->GetChipController()
           ->IsPermissionPromptChipVisible() &&
-      browser_view->GetLocationBarView()
-          ->GetChipController()
-          ->IsBubbleShowing()) {
+      browser_view->GetLocationBar()->GetChipController()->IsBubbleShowing()) {
     ChipController* chip_controller =
-        browser_view->GetLocationBarView()->GetChipController();
+        browser_view->GetLocationBar()->GetChipController();
     switch (button) {
       case PermissionDialogButton::kAccept:
         chip_controller->PromptDecided(permissions::PermissionAction::GRANTED);

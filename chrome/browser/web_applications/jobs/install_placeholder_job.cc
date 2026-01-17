@@ -7,6 +7,8 @@
 #include <memory>
 #include <utility>
 
+#include "base/functional/callback_helpers.h"
+#include "base/strings/to_string.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/profiles/profile.h"
@@ -55,6 +57,9 @@ InstallPlaceholderJob::InstallPlaceholderJob(
       install_options_(install_options),
       callback_(std::move(callback)),
       web_contents_(&lock_->shared_web_contents()),
+      url_loader_(WebAppProvider::GetForWebApps(&profile_.get())
+                      ->web_contents_manager()
+                      .CreateUrlLoader()),
       data_retriever_(WebAppProvider::GetForWebApps(&profile_.get())
                           ->web_contents_manager()
                           .CreateDataRetriever()) {
@@ -65,7 +70,6 @@ InstallPlaceholderJob::InstallPlaceholderJob(
 InstallPlaceholderJob::~InstallPlaceholderJob() = default;
 
 void InstallPlaceholderJob::Start() {
-  url_loader_ = lock_->web_contents_manager().CreateUrlLoader();
   url_loader_->LoadUrl(install_options_.install_url, web_contents_,
                        webapps::WebAppUrlLoader::UrlComparison::kSameOrigin,
                        base::BindOnce(&InstallPlaceholderJob::OnUrlLoaded,
@@ -75,6 +79,11 @@ void InstallPlaceholderJob::Start() {
 void InstallPlaceholderJob::SetDataRetrieverForTesting(
     std::unique_ptr<WebAppDataRetriever> data_retriever) {
   data_retriever_ = std::move(data_retriever);
+}
+
+void InstallPlaceholderJob::SetUrlLoaderForTesting(
+    std::unique_ptr<webapps::WebAppUrlLoader> url_loader) {
+  url_loader_ = std::move(url_loader);
 }
 
 void InstallPlaceholderJob::Abort(webapps::InstallResultCode code) {
@@ -103,6 +112,22 @@ void InstallPlaceholderJob::OnUrlLoaded(
 
 void InstallPlaceholderJob::FetchCustomIcon(const GURL& url, int retries_left) {
   CHECK(web_contents_ && !web_contents_->IsBeingDestroyed());
+  // Navigate the web contents to the icon origin such that the content security
+  // policy of the web app page can't prevent a cross-origin download.
+  url_loader_->LoadUrl(
+      url, web_contents_, webapps::WebAppUrlLoader::UrlComparison::kSameOrigin,
+      base::BindOnce(&InstallPlaceholderJob::OnIconNavigationCompleted,
+                     weak_factory_.GetWeakPtr(), url, retries_left));
+}
+
+void InstallPlaceholderJob::OnIconNavigationCompleted(
+    const GURL& url,
+    int retries_left,
+    webapps::WebAppUrlLoaderResult load_url_result) {
+  if (load_url_result != webapps::WebAppUrlLoaderResult::kUrlLoaded) {
+    MaybeRetryFetchCustomIcon(url, retries_left);
+    return;
+  }
 
   data_retriever_->GetIcons(
       web_contents_.get(), {IconUrlWithSize::CreateForUnspecifiedSize(url)},
@@ -110,6 +135,23 @@ void InstallPlaceholderJob::FetchCustomIcon(const GURL& url, int retries_left) {
       /*fail_all_if_any_fail=*/false,
       base::BindOnce(&InstallPlaceholderJob::OnCustomIconFetched,
                      weak_factory_.GetWeakPtr(), url, retries_left));
+}
+
+void InstallPlaceholderJob::MaybeRetryFetchCustomIcon(const GURL& url,
+                                                      int retries_left) {
+  if (retries_left <= 0) {
+    // Download failed.
+    debug_value_->Set("custom_icon_download_success", false);
+    FinalizeInstall(std::nullopt);
+    return;
+  }
+
+  // Retry download.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE,
+      base::BindOnce(&InstallPlaceholderJob::FetchCustomIcon,
+                     weak_factory_.GetWeakPtr(), url, retries_left - 1),
+      ICON_DOWNLOAD_RETRY_DELAY);
 }
 
 void InstallPlaceholderJob::OnCustomIconFetched(
@@ -125,18 +167,8 @@ void InstallPlaceholderJob::OnCustomIconFetched(
     FinalizeInstall(bitmaps_it->second);
     return;
   }
-  if (retries_left <= 0) {
-    // Download failed.
-    debug_value_->Set("custom_icon_download_success", false);
-    FinalizeInstall(std::nullopt);
-    return;
-  }
-  // Retry download.
-  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
-      FROM_HERE,
-      base::BindOnce(&InstallPlaceholderJob::FetchCustomIcon,
-                     weak_factory_.GetWeakPtr(), image_url, retries_left - 1),
-      ICON_DOWNLOAD_RETRY_DELAY);
+
+  MaybeRetryFetchCustomIcon(image_url, retries_left);
 }
 
 void InstallPlaceholderJob::FinalizeInstall(
@@ -160,6 +192,14 @@ void InstallPlaceholderJob::FinalizeInstall(
     icons_map.emplace(GURL(install_options_.override_icon_url.value()),
                       bitmaps.value());
     PopulateProductIcons(web_app_info.get(), &icons_map);
+
+    // For icon overrides, the app icon needs to be used as the trusted icon,
+    // since it's guaranteed that the icon is coming from a trusted source, as
+    // it is externally installed.
+    apps::IconInfo trusted_bitmap;
+    trusted_bitmap.url = GURL(install_options_.override_icon_url.value());
+    web_app_info->trusted_icons = {trusted_bitmap};
+    PopulateTrustedIconBitmaps(*web_app_info.get(), icons_map);
   }
 
   web_app_info->install_url = install_options_.install_url;

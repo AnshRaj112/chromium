@@ -73,12 +73,6 @@ class WebContentsDelegateAndroid : public content::WebContentsDelegate {
   void RendererResponsive(
       content::WebContents* source,
       content::RenderWidgetHost* render_widget_host) override;
-  void WebContentsCreated(content::WebContents* source_contents,
-                          int opener_render_process_id,
-                          int opener_render_frame_id,
-                          const std::string& frame_name,
-                          const GURL& target_url,
-                          content::WebContents* new_contents) override;
   bool IsWebContentsCreationOverridden(
       content::RenderFrameHost* opener,
       content::SiteInstance* source_site_instance,
@@ -93,9 +87,6 @@ class WebContentsDelegateAndroid : public content::WebContentsDelegate {
                               int32_t line_no,
                               const std::u16string& source_id) override;
   void UpdateTargetURL(content::WebContents* source, const GURL& url) override;
-  content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
-      content::WebContents* source,
-      const input::NativeWebKeyboardEvent& event) override;
   bool HandleKeyboardEvent(content::WebContents* source,
                            const input::NativeWebKeyboardEvent& event) override;
   bool TakeFocus(content::WebContents* source, bool reverse) override;
@@ -110,9 +101,11 @@ class WebContentsDelegateAndroid : public content::WebContentsDelegate {
   void ExitFullscreenModeForTab(content::WebContents* web_contents) override;
   bool IsFullscreenForTabOrPending(
       const content::WebContents* web_contents) override;
-  void RequestPointerLock(content::WebContents* web_contents,
-                          bool user_gesture,
-                          bool last_unlocked_by_target) override;
+  content::FullscreenState GetFullscreenState(
+      const content::WebContents* web_contents) const override;
+  void RequestKeyboardLock(content::WebContents* web_contents,
+                           bool esc_key_locked) override;
+  void CancelKeyboardLockRequest(content::WebContents* web_contents) override;
   void OnDidBlockNavigation(
       content::WebContents* web_contents,
       const GURL& blocked_url,
@@ -134,12 +127,20 @@ class WebContentsDelegateAndroid : public content::WebContentsDelegate {
   // empty bitmap if the capture fails) only if this returns true.
   bool MaybeCopyContentAreaAsBitmap(
       base::OnceCallback<void(const SkBitmap&)> callback) override;
+  bool MaybeCopyContentAreaAsHardwareBuffer(
+      content::HardwareBufferResultCallback callback) override;
   SkBitmap MaybeCopyContentAreaAsBitmapSync() override;
   SkBitmap GetBackForwardTransitionFallbackUXInternalPageIcon() override;
   void DidBackForwardTransitionAnimationChange() override;
   content::BackForwardTransitionAnimationManager::FallbackUXConfig
   GetBackForwardTransitionFallbackUXConfig() override;
   void ContentsZoomChange(bool zoom_in) override;
+  content::NavigationController::UserAgentOverrideOption
+  ShouldOverrideUserAgentForPreloading(const GURL& url) override;
+  // TODO(crbug.com/466004152): WebContents shouldn't be null, pass it by
+  // reference instead.
+  void SetContentsBounds(content::WebContents* source,
+                         const gfx::Rect& bounds) override;
 
  protected:
   base::android::ScopedJavaLocalRef<jobject> GetJavaDelegate(JNIEnv* env) const;
@@ -149,9 +150,6 @@ class WebContentsDelegateAndroid : public content::WebContentsDelegate {
   // strong reference to that object as long as they want to receive callbacks
   // on it. Using a weak ref here allows it to be correctly GCed.
   JavaObjectWeakGlobalRef weak_java_delegate_;
-
-  // Timestamp when the user last successfully escaped from a lock request.
-  base::TimeTicks pointer_lock_last_user_escape_time_;
 };
 
 }  // namespace web_contents_delegate_android

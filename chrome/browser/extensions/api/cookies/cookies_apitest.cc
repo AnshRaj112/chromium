@@ -7,6 +7,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/test/bind.h"
 #include "build/build_config.h"
+#include "chrome/browser/extensions/api/cookies/cookies_api.h"
 #include "chrome/browser/extensions/extension_apitest.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_destroyer.h"
@@ -16,18 +17,16 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "extensions/browser/extension_registry_observer.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/test/extension_test_message_listener.h"
+#include "extensions/test/test_extension_dir.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/default_handlers.h"
 #include "services/network/public/mojom/cookie_manager.mojom.h"
 #include "services/network/public/mojom/network_context.mojom.h"
 
-#if BUILDFLAG(IS_ANDROID)
-#else
-#include "chrome/browser/ui/browser.h"
-#include "chrome/test/base/ui_test_utils.h"
-#endif
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -122,7 +121,6 @@ INSTANTIATE_TEST_SUITE_P(
                        ::testing::Values(SameSiteCookieSemantics::kLegacy,
                                          SameSiteCookieSemantics::kModern)));
 
-#if !BUILDFLAG(IS_ANDROID)
 // A test suite that only runs with MV3 extensions.
 using CookiesApiMV3Test = CookiesApiTest;
 INSTANTIATE_TEST_SUITE_P(
@@ -131,7 +129,6 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Combine(::testing::Values(ContextType::kServiceWorker),
                        ::testing::Values(SameSiteCookieSemantics::kLegacy,
                                          SameSiteCookieSemantics::kModern)));
-#endif
 
 // TODO(crbug.com/40839864): Flaky on Windows.
 // TODO(crbug.com/371423073): Flaky on desktop Android.
@@ -196,8 +193,6 @@ IN_PROC_BROWSER_TEST_P(CookiesApiTest, CookiesEventsObservePrimaryOTROnly) {
   }
 }
 
-#if !BUILDFLAG(IS_ANDROID)
-// TODO(crbug.com/371423073): Enable this test on desktop android.
 IN_PROC_BROWSER_TEST_P(CookiesApiTest, CookiesEventsSpanning) {
   // We need to initialize an incognito mode window in order have an initialized
   // incognito cookie store. Otherwise, the chrome.cookies.set operation is just
@@ -209,17 +204,14 @@ IN_PROC_BROWSER_TEST_P(CookiesApiTest, CookiesEventsSpanning) {
       << message_;
 }
 
-// TODO(crbug.com/371423073): Enable this test on desktop android after the
-// tabs and webNavigation APIs are enabled.
 IN_PROC_BROWSER_TEST_P(CookiesApiMV3Test, TestGetPartitionKey) {
   // Before running test, set up a top-level site (a.com) that embeds a
   // cross-site (b.com). To test the cookies.getPartitionKey() api.
+  content::WebContents* contents = GetActiveWebContents();
   const std::string default_response = "/defaultresponse";
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(
-      browser(), embedded_test_server()->GetURL("a.com", default_response)));
+  ASSERT_TRUE(NavigateToURL(
+      contents, embedded_test_server()->GetURL("a.com", default_response)));
 
-  content::WebContents* contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
   // Inject two iframes and navigate one to a cross-site with host permissions
   // (b.com) and the other to a cross-site (c.com) with no host permissions.
   const GURL cross_site_url =
@@ -243,6 +235,69 @@ IN_PROC_BROWSER_TEST_P(CookiesApiMV3Test, TestGetPartitionKey) {
   EXPECT_TRUE(WaitForLoadStop(contents));
   ASSERT_TRUE(RunTest("cookies/get_partition_key")) << message_;
 }
-#endif  // !BUILDFLAG(IS_ANDROID)
+
+IN_PROC_BROWSER_TEST_F(ExtensionApiTest, OTRReceiverMojoConnectionError) {
+  // Test that simulates a mojo connection error with an existing OTR profile.
+  // This test verifies that the fix for crbug.com/472076020 works correctly:
+  // when MaybeStartListening() is called after a connection error, it should
+  // not try to add an observation for the OTR profile again because
+  // OnOffTheRecordProfileCreated() already added it.
+
+  // First, install an extension with cookie permissions to trigger
+  // CookiesEventRouter creation.
+  static constexpr char kManifest[] = R"({
+    "name": "Cookies API Test",
+    "version": "1.0",
+    "manifest_version": 3,
+    "permissions": ["cookies"],
+    "host_permissions": ["<all_urls>"],
+    "background": {"service_worker": "background.js"}
+  })";
+
+  static constexpr char kBackgroundJs[] = R"(
+    chrome.cookies.onChanged.addListener((changeInfo) => {
+      // Listener to trigger CookiesEventRouter creation
+    });
+    chrome.test.sendMessage('listener_registered');
+  )";
+
+  TestExtensionDir test_dir;
+  test_dir.WriteManifest(kManifest);
+  test_dir.WriteFile(FILE_PATH_LITERAL("background.js"), kBackgroundJs);
+
+  // Load the extension with a listener to ensure CookiesEventRouter is created.
+  ExtensionTestMessageListener listener_registered("listener_registered");
+  const Extension* extension = LoadExtension(
+      test_dir.UnpackedPath(),
+      {.allow_in_incognito = true, .wait_for_registration_stored = true});
+  ASSERT_TRUE(extension);
+  ASSERT_TRUE(listener_registered.WaitUntilSatisfied());
+
+  // Get the CookiesAPI instance which owns the CookiesEventRouter.
+  CookiesAPI* cookies_api = CookiesAPI::GetFactoryInstance()->Get(profile());
+  ASSERT_TRUE(cookies_api);
+
+  CookiesEventRouter* event_router =
+      cookies_api->GetCookiesEventRouterForTesting();
+  ASSERT_TRUE(event_router);
+
+  // Create an OTR profile. This should trigger OnOffTheRecordProfileCreated()
+  // which starts observing the OTR profile and binds the OTR mojo receiver.
+  Profile* otr_profile =
+      profile()->GetPrimaryOTRProfile(/*create_if_needed=*/true);
+  mojo::Receiver<network::mojom::CookieChangeListener>& otr_receiver =
+      event_router->otr_receiver_;
+  const base::ScopedObservation<Profile, ProfileObserver>&
+      otr_profile_observation = event_router->otr_profile_observation_;
+  ASSERT_TRUE(otr_profile);
+  EXPECT_TRUE(otr_profile_observation.IsObservingSource(otr_profile));
+  EXPECT_TRUE(otr_receiver.is_bound());
+
+  // Simulate a mojo connection error and verify that the OTR receiver is
+  // re-bound and the observation is still active.
+  event_router->OnConnectionError(&otr_receiver);
+  EXPECT_TRUE(otr_receiver.is_bound());
+  EXPECT_TRUE(otr_profile_observation.IsObservingSource(otr_profile));
+}
 
 }  // namespace extensions

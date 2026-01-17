@@ -29,7 +29,7 @@ using std::ranges::count_if;
 
 PasswordForm ConvertJavaObjectToPasswordForm(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& credential) {
+    const base::android::JavaRef<jobject>& credential) {
   PasswordForm form;
 
   form.url = url::GURLAndroid::ToNativeGURL(
@@ -57,14 +57,14 @@ PasswordForm Blocklist(JNIEnv* env, std::string url) {
 // static
 static jlong JNI_PasswordStoreBridge_Init(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& java_bridge,
+    const base::android::JavaRef<jobject>& java_bridge,
     Profile* profile) {
   return reinterpret_cast<intptr_t>(
       new PasswordStoreBridge(java_bridge, profile));
 }
 
 PasswordStoreBridge::PasswordStoreBridge(
-    const base::android::JavaParamRef<jobject>& java_bridge,
+    const base::android::JavaRef<jobject>& java_bridge,
     Profile* profile)
     : java_bridge_(java_bridge),
       profile_(profile),
@@ -86,28 +86,28 @@ PasswordStoreBridge::~PasswordStoreBridge() = default;
 
 void PasswordStoreBridge::InsertPasswordCredentialInProfileStoreForTesting(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& credential) {
+    const base::android::JavaRef<jobject>& credential) {
   profile_store_->AddLogin(ConvertJavaObjectToPasswordForm(env, credential));
 }
 
 void PasswordStoreBridge::InsertPasswordCredentialInAccountStoreForTesting(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& credential) {
+    const base::android::JavaRef<jobject>& credential) {
   CHECK(account_store_);
   account_store_->AddLogin(ConvertJavaObjectToPasswordForm(env, credential));
 }
 
 void PasswordStoreBridge::BlocklistForTesting(
     JNIEnv* env,
-    const base::android::JavaParamRef<jstring>& jurl) {
+    const base::android::JavaRef<jstring>& jurl) {
   profile_store_->AddLogin(
       Blocklist(env, base::android::ConvertJavaStringToUTF8(env, jurl)));
 }
 
 bool PasswordStoreBridge::EditPassword(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& credential,
-    const base::android::JavaParamRef<jstring>& new_password) {
+    const base::android::JavaRef<jobject>& credential,
+    const base::android::JavaRef<jstring>& new_password) {
   password_manager::CredentialUIEntry original_credential(
       ConvertJavaObjectToPasswordForm(env, credential));
   password_manager::CredentialUIEntry updated_credential = original_credential;
@@ -118,13 +118,13 @@ bool PasswordStoreBridge::EditPassword(
          password_manager::SavedPasswordsPresenter::EditResult::kSuccess;
 }
 
-jint PasswordStoreBridge::GetPasswordStoreCredentialsCountForAllStores(
+int32_t PasswordStoreBridge::GetPasswordStoreCredentialsCountForAllStores(
     JNIEnv* env) const {
   return static_cast<int>(
       saved_passwords_presenter_.GetSavedPasswords().size());
 }
 
-jint PasswordStoreBridge::GetPasswordStoreCredentialsCountForAccountStore(
+int32_t PasswordStoreBridge::GetPasswordStoreCredentialsCountForAccountStore(
     JNIEnv* env) const {
   auto in_account_store = [](const auto& credential) {
     return credential.stored_in.contains(Store::kAccountStore);
@@ -133,7 +133,7 @@ jint PasswordStoreBridge::GetPasswordStoreCredentialsCountForAccountStore(
                   in_account_store);
 }
 
-jint PasswordStoreBridge::GetPasswordStoreCredentialsCountForProfileStore(
+int32_t PasswordStoreBridge::GetPasswordStoreCredentialsCountForProfileStore(
     JNIEnv* env) const {
   auto in_account_store = [](const auto& credential) {
     return credential.stored_in.contains(Store::kProfileStore);
@@ -144,7 +144,7 @@ jint PasswordStoreBridge::GetPasswordStoreCredentialsCountForProfileStore(
 
 void PasswordStoreBridge::GetAllCredentials(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobjectArray>& java_credentials) const {
+    const base::android::JavaRef<jobjectArray>& java_credentials) const {
   const auto credentials = saved_passwords_presenter_.GetSavedPasswords();
   for (size_t i = 0; i < credentials.size(); ++i) {
     const auto& credential = credentials[i];
@@ -195,3 +195,6 @@ void PasswordStoreBridge::OnEdited(
           base::android::ConvertUTF16ToJavaString(env, credential.username),
           base::android::ConvertUTF16ToJavaString(env, credential.password)));
 }
+
+DEFINE_JNI(PasswordStoreBridge)
+DEFINE_JNI(PasswordStoreCredential)

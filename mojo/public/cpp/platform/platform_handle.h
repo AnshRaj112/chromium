@@ -105,7 +105,7 @@ class COMPONENT_EXPORT(MOJO_CPP_PLATFORM) PlatformHandle {
 
 #if BUILDFLAG(IS_WIN)
   bool is_valid() const { return is_valid_handle(); }
-  bool is_valid_handle() const { return handle_.IsValid(); }
+  bool is_valid_handle() const { return handle_.is_valid(); }
   bool is_handle() const { return type_ == Type::kHandle; }
   bool is_pseudo_handle() const {
     return base::win::IsPseudoHandle(handle_.get());
@@ -127,13 +127,15 @@ class COMPONENT_EXPORT(MOJO_CPP_PLATFORM) PlatformHandle {
   bool is_handle() const { return type_ == Type::kHandle; }
   const zx::handle& GetHandle() const { return handle_; }
   zx::handle TakeHandle() {
-    if (type_ == Type::kHandle)
+    if (type_ == Type::kHandle) {
       type_ = Type::kNone;
+    }
     return std::move(handle_);
   }
   [[nodiscard]] zx_handle_t ReleaseHandle() {
-    if (type_ == Type::kHandle)
+    if (type_ == Type::kHandle) {
       type_ = Type::kNone;
+    }
     return handle_.release();
   }
 #elif BUILDFLAG(IS_APPLE)
@@ -148,8 +150,9 @@ class COMPONENT_EXPORT(MOJO_CPP_PLATFORM) PlatformHandle {
     return mach_send_;
   }
   base::apple::ScopedMachSendRight TakeMachSendRight() {
-    if (type_ == Type::kMachSend)
+    if (type_ == Type::kMachSend) {
       type_ = Type::kNone;
+    }
     return std::move(mach_send_);
   }
   [[nodiscard]] mach_port_t ReleaseMachSendRight() {
@@ -162,8 +165,9 @@ class COMPONENT_EXPORT(MOJO_CPP_PLATFORM) PlatformHandle {
     return mach_receive_;
   }
   base::apple::ScopedMachReceiveRight TakeMachReceiveRight() {
-    if (type_ == Type::kMachReceive)
+    if (type_ == Type::kMachReceive) {
       type_ = Type::kNone;
+    }
     return std::move(mach_receive_);
   }
   [[nodiscard]] mach_port_t ReleaseMachReceiveRight() {
@@ -180,13 +184,15 @@ class COMPONENT_EXPORT(MOJO_CPP_PLATFORM) PlatformHandle {
   bool is_fd() const { return type_ == Type::kFd; }
   const base::ScopedFD& GetFD() const { return fd_; }
   base::ScopedFD TakeFD() {
-    if (type_ == Type::kFd)
+    if (type_ == Type::kFd) {
       type_ = Type::kNone;
+    }
     return std::move(fd_);
   }
   [[nodiscard]] int ReleaseFD() {
-    if (type_ == Type::kFd)
+    if (type_ == Type::kFd) {
       type_ = Type::kNone;
+    }
     return fd_.release();
   }
 #endif

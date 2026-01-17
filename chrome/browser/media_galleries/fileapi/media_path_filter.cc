@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "chrome/browser/media_galleries/fileapi/media_path_filter.h"
 
 #include <algorithm>
@@ -18,10 +13,6 @@
 #include "build/build_config.h"
 #include "net/base/mime_util.h"
 #include "third_party/blink/public/common/mime_util/mime_util.h"
-
-#if BUILDFLAG(IS_WIN)
-#include <windows.h>
-#endif
 
 namespace {
 
@@ -115,12 +106,6 @@ bool MediaPathFilter::ShouldSkip(const base::FilePath& path) {
   if (base_name == FILE_PATH_LITERAL("__MACOSX"))
     return true;
 
-#if BUILDFLAG(IS_WIN)
-  DWORD file_attributes = ::GetFileAttributes(path.value().c_str());
-  if ((file_attributes != INVALID_FILE_ATTRIBUTES) &&
-      ((file_attributes & FILE_ATTRIBUTE_HIDDEN) != 0))
-    return true;
-#else
   // Windows always creates a recycle bin folder in the attached device to store
   // all the deleted contents. On non-windows operating systems, there is no way
   // to get the hidden attribute of windows recycle bin folders that are present
@@ -135,9 +120,9 @@ bool MediaPathFilter::ShouldSkip(const base::FilePath& path) {
       base::StartsWith(base_name, win_xp_recycle_bin_name,
                        base::CompareCase::INSENSITIVE_ASCII) ||
       base::StartsWith(base_name, win_vista_recycle_bin_name,
-                       base::CompareCase::INSENSITIVE_ASCII))
+                       base::CompareCase::INSENSITIVE_ASCII)) {
     return true;
-#endif  // BUILDFLAG(IS_WIN)
+  }
   return false;
 }
 
@@ -175,15 +160,12 @@ void MediaPathFilter::EnsureInitialized() {
                                        MEDIA_GALLERY_FILE_TYPE_AUDIO);
   AddExtensionsToMediaFileExtensionMap(GetMediaExtensionList("video/*"),
                                        MEDIA_GALLERY_FILE_TYPE_VIDEO);
-  AddAdditionalExtensionsToMediaFileExtensionMap(
-      kExtraSupportedImageExtensions, std::size(kExtraSupportedImageExtensions),
-      MEDIA_GALLERY_FILE_TYPE_IMAGE);
-  AddAdditionalExtensionsToMediaFileExtensionMap(
-      kExtraSupportedAudioExtensions, std::size(kExtraSupportedAudioExtensions),
-      MEDIA_GALLERY_FILE_TYPE_AUDIO);
-  AddAdditionalExtensionsToMediaFileExtensionMap(
-      kExtraSupportedVideoExtensions, std::size(kExtraSupportedVideoExtensions),
-      MEDIA_GALLERY_FILE_TYPE_VIDEO);
+  AddAdditionalExtensionsToMediaFileExtensionMap(kExtraSupportedImageExtensions,
+                                                 MEDIA_GALLERY_FILE_TYPE_IMAGE);
+  AddAdditionalExtensionsToMediaFileExtensionMap(kExtraSupportedAudioExtensions,
+                                                 MEDIA_GALLERY_FILE_TYPE_AUDIO);
+  AddAdditionalExtensionsToMediaFileExtensionMap(kExtraSupportedVideoExtensions,
+                                                 MEDIA_GALLERY_FILE_TYPE_VIDEO);
 
   initialized_ = true;
 }
@@ -197,16 +179,9 @@ void MediaPathFilter::AddExtensionsToMediaFileExtensionMap(
 
 void MediaPathFilter::AddAdditionalExtensionsToMediaFileExtensionMap(
     base::span<const base::FilePath::CharType* const> extensions_list,
-    size_t spanification_suspected_redundant_extensions_list_size,
     MediaGalleryFileType type) {
-  // TODO(crbug.com/431824301): Remove unneeded parameter once validated to be
-  // redundant in M143.
-  CHECK(spanification_suspected_redundant_extensions_list_size ==
-            extensions_list.size(),
-        base::NotFatalUntil::M143);
-  for (size_t i = 0; i < spanification_suspected_redundant_extensions_list_size;
-       ++i) {
-    AddExtensionToMediaFileExtensionMap(extensions_list[i], type);
+  for (auto* extension : extensions_list) {
+    AddExtensionToMediaFileExtensionMap(extension, type);
   }
 }
 

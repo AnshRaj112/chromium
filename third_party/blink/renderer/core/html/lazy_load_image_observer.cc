@@ -68,8 +68,8 @@ void LazyLoadImageObserver::StartMonitoringNearViewport(Document* root_document,
     };
     lazy_load_intersection_observer_ = IntersectionObserver::Create(
         *root_document,
-        WTF::BindRepeating(&LazyLoadImageObserver::LoadIfNearViewport,
-                           WrapWeakPersistent(this)),
+        BindRepeating(&LazyLoadImageObserver::LoadIfNearViewport,
+                      WrapWeakPersistent(this)),
         LocalFrameUkmAggregator::kLazyLoadIntersectionObserver,
         std::move(params));
   }
@@ -99,10 +99,6 @@ bool LazyLoadImageObserver::LoadAllImagesAndBlockLoadEvent(
     if (auto* image_element = DynamicTo<HTMLImageElement>(element)) {
       const_cast<HTMLImageElement*>(image_element)
           ->LoadDeferredImageBlockingLoad();
-      resources_have_started_loading = true;
-    }
-    if (const ComputedStyle* style = element->GetComputedStyle()) {
-      style->LoadDeferredImages(element->GetDocument());
       resources_have_started_loading = true;
     }
     to_be_unobserved.push_back(element);
@@ -141,10 +137,6 @@ void LazyLoadImageObserver::LoadIfNearViewport(
       continue;
     if (image_element)
       image_element->LoadDeferredImageFromMicrotask();
-
-    // Load the background image if the element has one deferred.
-    if (const ComputedStyle* style = element->GetComputedStyle())
-      style->LoadDeferredImages(element->GetDocument());
 
     lazy_load_intersection_observer_->unobserve(element);
   }

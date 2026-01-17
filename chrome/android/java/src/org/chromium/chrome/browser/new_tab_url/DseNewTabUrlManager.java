@@ -9,7 +9,7 @@ import static org.chromium.build.NullUtil.assumeNonNull;
 import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Callback;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.MonotonicNonNull;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
@@ -18,7 +18,6 @@ import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.regional_capabilities.RegionalCapabilitiesServiceFactory;
 import org.chromium.chrome.browser.search_engines.TemplateUrlServiceFactory;
-import org.chromium.components.omnibox.OmniboxFeatures;
 import org.chromium.components.regional_capabilities.RegionalCapabilitiesService;
 import org.chromium.components.search_engines.TemplateUrl;
 import org.chromium.components.search_engines.TemplateUrlService;
@@ -31,13 +30,13 @@ import org.chromium.components.search_engines.TemplateUrlService.TemplateUrlServ
  */
 @NullMarked
 public class DseNewTabUrlManager {
-    private ObservableSupplier<Profile> mProfileSupplier;
+    private MonotonicObservableSupplier<Profile> mProfileSupplier;
     private @Nullable Callback<Profile> mProfileCallback;
     private @MonotonicNonNull RegionalCapabilitiesService mRegionalCapabilities;
     private @MonotonicNonNull TemplateUrlService mTemplateUrlService;
     private @MonotonicNonNull TemplateUrlServiceObserver mTemplateUrlServiceObserver;
 
-    public DseNewTabUrlManager(ObservableSupplier<Profile> profileSupplier) {
+    public DseNewTabUrlManager(MonotonicObservableSupplier<Profile> profileSupplier) {
         mProfileSupplier = profileSupplier;
         mProfileCallback = this::onProfileAvailable;
         mProfileSupplier.addObserver(mProfileCallback);
@@ -60,10 +59,7 @@ public class DseNewTabUrlManager {
 
     /** Returns whether the feature NewTabSearchEngineUrlAndroid is enabled. */
     public static boolean isNewTabSearchEngineUrlAndroidEnabled() {
-        return ChromeSharedPreferences.getInstance()
-                        .readBoolean(ChromePreferenceKeys.IS_EEA_CHOICE_COUNTRY, false)
-                || (OmniboxFeatures.sOmniboxMobileParityUpdate.isEnabled()
-                        && OmniboxFeatures.sOmniboxParityEnableFeedOnlyForGoogle.getValue());
+        return true;
     }
 
     /**

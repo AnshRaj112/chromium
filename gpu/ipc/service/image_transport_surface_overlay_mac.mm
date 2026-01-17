@@ -24,6 +24,7 @@
 #include "gpu/ipc/service/gpu_channel_manager.h"
 #include "gpu/ipc/service/gpu_channel_manager_delegate.h"
 #include "ui/accelerated_widget_mac/ca_layer_tree_coordinator.h"
+#include "ui/accelerated_widget_mac/ca_renderer_layer_tree.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/gpu_fence.h"
 #include "ui/gfx/overlay_plane_data.h"
@@ -115,9 +116,13 @@ ImageTransportSurfaceOverlayMacEGL::ImageTransportSurfaceOverlayMacEGL(
       base::BindRepeating(&ImageTransportSurfaceOverlayMacEGL::BufferPresented,
                           weak_ptr_factory_.GetWeakPtr());
 
+  auto gl_make_current_callback =
+      base::BindRepeating(&SharedContextState::MakeCurrent, context_state,
+                          /*surface=*/nullptr, /*needs_gl=*/true);
+
   ca_layer_tree_coordinator_ = std::make_unique<ui::CALayerTreeCoordinator>(
       !av_disabled_at_command_line, std::move(buffer_presented_callback),
-      GetMTLDevice(std::move(context_state)));
+      std::move(gl_make_current_callback), GetMTLDevice(context_state));
 
 #if BUILDFLAG(IS_IOS) && !BUILDFLAG(IS_IOS_TVOS)
   // The BELayerHierarchy needs to be created on a thread that supports
@@ -207,7 +212,7 @@ void ImageTransportSurfaceOverlayMacEGL::Present(
             weak_ptr_factory_.GetWeakPtr()));
   }
 
-  bool delay_presenetation_until_next_vsync =
+  bool delay_presentation_until_next_vsync =
       features::IsVSyncAlignedPresentEnabled() && data.is_handling_interaction;
 
   // The current frame has been added to
@@ -217,12 +222,12 @@ void ImageTransportSurfaceOverlayMacEGL::Present(
   // the queue if there is already one before this.
   if (features::IsVSyncAlignedPresentEnabled() &&
       ca_layer_tree_coordinator_->NumPendingSwaps() > 1) {
-    delay_presenetation_until_next_vsync = true;
+    delay_presentation_until_next_vsync = true;
   }
 
   if (vsync_callback_mac_) {
     vsync_callback_mac_keep_alive_counter_ = kMaxKeepAliveCounter;
-    if (delay_presenetation_until_next_vsync) {
+    if (delay_presentation_until_next_vsync) {
       // Delay CommitPresentedFrameToCA() until OnVSyncPresentation().
       return;
     }
@@ -257,44 +262,11 @@ void ImageTransportSurfaceOverlayMacEGL::CommitPresentedFrameToCA() {
   }
 }
 
-bool ImageTransportSurfaceOverlayMacEGL::ScheduleOverlayPlane(
-    gl::OverlayImage image,
-    std::unique_ptr<gfx::GpuFence> gpu_fence,
-    const gfx::OverlayPlaneData& overlay_plane_data) {
-  if (std::get<gfx::OverlayTransform>(overlay_plane_data.plane_transform) !=
-      gfx::OVERLAY_TRANSFORM_NONE) {
-    DLOG(ERROR) << "Invalid overlay plane transform.";
-    return false;
-  }
-  if (overlay_plane_data.z_order) {
-    DLOG(ERROR) << "Invalid non-zero Z order.";
-    return false;
-  }
-  // TODO(crbug.com/40818047): the display_bounds might not need to be rounded
-  // to the nearest rect as this eventually gets made into a CALayer. CALayers
-  // work in floats.
-  const ui::CARendererLayerParams overlay_as_calayer_params(
-      /*is_clipped=*/false,
-      /*clip_rect=*/gfx::Rect(),
-      /*rounded_corner_bounds=*/gfx::RRectF(),
-      /*sorting_context_id=*/0, gfx::Transform(), image,
-      overlay_plane_data.color_space,
-      /*contents_rect=*/overlay_plane_data.crop_rect,
-      /*rect=*/gfx::ToNearestRect(overlay_plane_data.display_bounds),
-      /*background_color=*/SkColors::kTransparent,
-      /*edge_aa_mask=*/0,
-      /*opacity=*/1.f,
-      /*nearest_neighbor_filter=*/GL_LINEAR,
-      /*hdr_metadata=*/gfx::HDRMetadata(),
-      /*protected_video_type=*/gfx::ProtectedVideoType::kClear,
-      /*is_render_pass_draw_quad=*/false);
-
-  return ca_layer_tree_coordinator_->GetPendingCARendererLayerTree()
-      ->ScheduleCALayer(overlay_as_calayer_params);
-}
-
 bool ImageTransportSurfaceOverlayMacEGL::ScheduleCALayer(
-    const ui::CARendererLayerParams& params) {
+    const ui::CARendererLayerParams& params,
+    std::vector<gfx::MTLSharedEventFence> backpressure_fences) {
+  ca_layer_tree_coordinator_->EnqueueBackpressureFences(
+      std::move(backpressure_fences));
   return ca_layer_tree_coordinator_->GetPendingCARendererLayerTree()
       ->ScheduleCALayer(params);
 }
@@ -321,8 +293,7 @@ void ImageTransportSurfaceOverlayMacEGL::SetMaxPendingSwaps(
 
 #if BUILDFLAG(IS_MAC)
 void ImageTransportSurfaceOverlayMacEGL::SetVSyncDisplayID(int64_t display_id) {
-  if ((!display_link_mac_ || display_id != display_id_) &&
-      display_id != display::kInvalidDisplayId) {
+  if (!display_link_mac_ || display_id != display_id_) {
     vsync_callback_mac_ = nullptr;
 
     // Commit all pending frames before switching to the new monitor.

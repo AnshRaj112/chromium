@@ -7,14 +7,12 @@ package org.chromium.chrome.browser.modaldialog;
 import static org.chromium.build.NullUtil.assumeNonNull;
 
 import android.app.Activity;
-import android.content.res.Resources;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewGroup.MarginLayoutParams;
 import android.view.ViewStub;
 
-import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.Supplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.cc.input.BrowserControlsState;
@@ -43,6 +41,8 @@ import org.chromium.content_public.browser.WebContents;
 import org.chromium.ui.UiUtils;
 import org.chromium.ui.modelutil.PropertyModel;
 
+import java.util.function.Supplier;
+
 /**
  * This presenter creates tab modality by blocking interaction with select UI elements while a
  * dialog is visible.
@@ -58,10 +58,11 @@ public class ChromeTabModalPresenter extends TabModalPresenter
     private final Runnable mHideContextualSearch;
     private final FullscreenManager mFullscreenManager;
     private final BrowserControlsVisibilityManager mBrowserControlsVisibilityManager;
-    private final TabModalBrowserControlsVisibilityDelegate mVisibilityDelegate;
+    private final BrowserControlsVisibilityDelegate mVisibilityDelegate =
+            new BrowserControlsVisibilityDelegate();
     private final TabModelSelector mTabModelSelector;
-    private final ObservableSupplier<ScrimManager> mScrimManagerSupplier;
-    private final ObservableSupplier<EdgeToEdgeController> mEdgeToEdgeControllerSupplier;
+    private final MonotonicObservableSupplier<ScrimManager> mScrimManagerSupplier;
+    private final MonotonicObservableSupplier<EdgeToEdgeController> mEdgeToEdgeControllerSupplier;
 
     /** The active tab of which the dialog will be shown on top. */
     private @Nullable Tab mActiveTab;
@@ -117,8 +118,8 @@ public class ChromeTabModalPresenter extends TabModalPresenter
             FullscreenManager fullscreenManager,
             BrowserControlsVisibilityManager browserControlsVisibilityManager,
             TabModelSelector tabModelSelector,
-            ObservableSupplier<ScrimManager> scrimManagerSupplier,
-            ObservableSupplier<EdgeToEdgeController> edgeToEdgeControllerSupplier) {
+            MonotonicObservableSupplier<ScrimManager> scrimManagerSupplier,
+            MonotonicObservableSupplier<EdgeToEdgeController> edgeToEdgeControllerSupplier) {
         super(activity);
         mActivity = activity;
         mTabObscuringHandlerSupplier = tabObscuringHandlerSupplier;
@@ -126,7 +127,6 @@ public class ChromeTabModalPresenter extends TabModalPresenter
         mFullscreenManager = fullscreenManager;
         mBrowserControlsVisibilityManager = browserControlsVisibilityManager;
         mBrowserControlsVisibilityManager.addObserver(this);
-        mVisibilityDelegate = new TabModalBrowserControlsVisibilityDelegate();
         mHideContextualSearch = hideContextualSearch;
         mTabModelSelector = tabModelSelector;
         mScrimManagerSupplier = scrimManagerSupplier;
@@ -162,12 +162,10 @@ public class ChromeTabModalPresenter extends TabModalPresenter
                 mActivity.findViewById(R.id.tab_modal_dialog_container_sibling_view);
         assert mDefaultNextSiblingView != null;
 
-        Resources resources = mActivity.getResources();
-
         MarginLayoutParams params = (MarginLayoutParams) dialogContainer.getLayoutParams();
         params.width = ViewGroup.MarginLayoutParams.MATCH_PARENT;
         params.height = ViewGroup.MarginLayoutParams.MATCH_PARENT;
-        params.topMargin = getContainerTopMargin(resources, mBrowserControlsVisibilityManager);
+        params.topMargin = getContainerTopMargin(mBrowserControlsVisibilityManager);
         params.bottomMargin = getContainerBottomMargin(mBrowserControlsVisibilityManager);
         dialogContainer.setLayoutParams(params);
 
@@ -232,7 +230,8 @@ public class ChromeTabModalPresenter extends TabModalPresenter
 
     @Override
     protected void setBrowserControlsAccess(boolean restricted) {
-        if (!mToolbarManagerSupplier.hasValue()) return;
+        var toolbarManager = mToolbarManagerSupplier.get();
+        if (toolbarManager == null) return;
 
         View menuButton = mToolbarManagerSupplier.get().getMenuButtonView();
 
@@ -344,15 +343,12 @@ public class ChromeTabModalPresenter extends TabModalPresenter
     /**
      * Calculate the top margin of the dialog container and the dialog scrim so that the scrim
      * doesn't overlap the toolbar.
-     * @param resources {@link Resources} to use to get the scrim vertical margin.
+     *
      * @param provider {@link BrowserControlsStateProvider} for browser controls heights.
      * @return The container top margin.
      */
-    public static int getContainerTopMargin(
-            Resources resources, BrowserControlsStateProvider provider) {
-        int scrimVerticalMargin =
-                resources.getDimensionPixelSize(R.dimen.tab_modal_scrim_vertical_margin);
-        return provider.getTopControlsHeight() - scrimVerticalMargin;
+    public static int getContainerTopMargin(BrowserControlsStateProvider provider) {
+        return provider.getTopControlsHeight();
     }
 
     /**
@@ -373,7 +369,10 @@ public class ChromeTabModalPresenter extends TabModalPresenter
     private void onTabModalDialogStateChanged(boolean isShowing) {
         assumeNonNull(mActiveTab);
         TabAttributes.from(mActiveTab).set(TabAttributeKeys.MODAL_DIALOG_SHOWING, isShowing);
-        mVisibilityDelegate.updateConstraintsForTab(mActiveTab);
+        mVisibilityDelegate.set(
+                isDialogShowing(mActiveTab)
+                        ? BrowserControlsState.SHOWN
+                        : BrowserControlsState.BOTH);
 
         // AR Sessions are fullscreen sessions where it's okay to show the TabModal dialog
         // without exiting fullscreen. So if we are in one we need to ensure that we:
@@ -412,9 +411,7 @@ public class ChromeTabModalPresenter extends TabModalPresenter
     private void maybeUpdateDialogLayout() {
         if (mShouldUpdateContainerLayoutParams && getDialogContainer() != null) {
             MarginLayoutParams params = (MarginLayoutParams) getDialogContainer().getLayoutParams();
-            params.topMargin =
-                    getContainerTopMargin(
-                            mActivity.getResources(), mBrowserControlsVisibilityManager);
+            params.topMargin = getContainerTopMargin(mBrowserControlsVisibilityManager);
             params.bottomMargin = mBottomControlsHeight;
             getDialogContainer().setLayoutParams(params);
             mShouldUpdateContainerLayoutParams = false;
@@ -423,19 +420,5 @@ public class ChromeTabModalPresenter extends TabModalPresenter
 
     @Nullable ViewGroup getContainerParentForTest() {
         return mContainerParent;
-    }
-
-    /** Handles browser controls constraints for the TabModal dialogs. */
-    static class TabModalBrowserControlsVisibilityDelegate
-            extends BrowserControlsVisibilityDelegate {
-        public TabModalBrowserControlsVisibilityDelegate() {
-            super(BrowserControlsState.BOTH);
-        }
-
-        /** Updates the tab modal browser constraints for the given tab. */
-        public void updateConstraintsForTab(Tab tab) {
-            if (tab == null) return;
-            set(isDialogShowing(tab) ? BrowserControlsState.SHOWN : BrowserControlsState.BOTH);
-        }
     }
 }

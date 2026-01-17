@@ -18,11 +18,12 @@ import java.lang.annotation.RetentionPolicy;
 /** The interface for magic stack which owns a list of modules. */
 @NullMarked
 public interface ModuleDelegate {
+    // LINT.IfChange(HomeModuleTypes)
     /**
      * Module types that are shown in the magic stack on the home surfaces.
      *
      * <p>These values are persisted to logs. Entries should not be renumbered and numeric values
-     * should never be reused. See tools/metrics/histograms/enums.xml.
+     * should never be reused. See tools/metrics/histograms/metadata/magic_stack/enums.xml.
      */
     @IntDef({
         ModuleType.SINGLE_TAB,
@@ -36,6 +37,10 @@ public interface ModuleDelegate {
         ModuleType.TAB_GROUP_SYNC_PROMO,
         ModuleType.QUICK_DELETE_PROMO,
         ModuleType.HISTORY_SYNC_PROMO,
+        ModuleType.TIPS_NOTIFICATIONS_PROMO,
+        ModuleType.ENHANCED_SAFE_BROWSING_PROMO,
+        ModuleType.ADDRESS_BAR_PLACEMENT_PROMO,
+        ModuleType.SETUP_LIST_TWO_CELL_CONTAINER,
         ModuleType.NUM_ENTRIES
     })
     @Retention(RetentionPolicy.SOURCE)
@@ -51,8 +56,14 @@ public interface ModuleDelegate {
         int TAB_GROUP_SYNC_PROMO = 8;
         int QUICK_DELETE_PROMO = 9;
         int HISTORY_SYNC_PROMO = 10;
-        int NUM_ENTRIES = 11;
+        int TIPS_NOTIFICATIONS_PROMO = 11;
+        int ENHANCED_SAFE_BROWSING_PROMO = 12;
+        int ADDRESS_BAR_PLACEMENT_PROMO = 13;
+        int SETUP_LIST_TWO_CELL_CONTAINER = 14;
+        int NUM_ENTRIES = 15;
     }
+
+    // LINT.ThenChange(//chrome/browser/ntp_customization/java/src/org/chromium/chrome/browser/ntp_customization/ntp_cards/NtpCardsMediator.java:HomeModuleTypes)
 
     /**
      * Called when a module has a PropertyModel ready. This could be called multiple times from the

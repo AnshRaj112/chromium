@@ -31,6 +31,7 @@
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/webdata_services/web_data_service_factory.h"
+#include "chrome/test/base/chrome_test_utils.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/test_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -178,7 +179,7 @@ class AutofillTest : public InProcessBrowserTest {
     test_api(personal_data_manager()->address_data_manager())
         .set_auto_accept_address_imports(true);
     TestAutofillManagerSingleEventWaiter submission_waiter(
-        *autofill_manager(), &AutofillManager::Observer::OnFormSubmitted);
+        *autofill_manager(), &AutofillManager::Observer::OnAfterFormSubmitted);
     ASSERT_TRUE(
         content::ExecJs(web_contents(), GetJSToFillForm(data) + submit_js));
     if (simulate_click) {
@@ -201,9 +202,9 @@ class AutofillTest : public InProcessBrowserTest {
   // of parsed profiles.
   int AggregateProfilesIntoAutofillPrefs(const std::string& filename) {
     std::string data;
-    base::FilePath data_file =
-        ui_test_utils::GetTestFilePath(base::FilePath().AppendASCII("autofill"),
-                                       base::FilePath().AppendASCII(filename));
+    base::FilePath data_file = chrome_test_utils::GetTestFilePath(
+        base::FilePath().AppendASCII("autofill"),
+        base::FilePath().AppendASCII(filename));
     {
       base::ScopedAllowBlockingForTesting allow_blocking;
       CHECK(base::ReadFileToString(data_file, &data));
@@ -869,7 +870,7 @@ IN_PROC_BROWSER_TEST_F(AutofillTestPrerendering, DeferWhilePrerendering) {
   GURL initial_url = embedded_test_server()->GetURL("/empty.html");
   prerender_helper().NavigatePrimaryPage(initial_url);
 
-  content::FrameTreeNodeId host_id =
+  content::PrerenderHostId host_id =
       prerender_helper().AddPrerender(prerender_url);
   auto* rfh = prerender_helper().GetPrerenderedMainFrameHost(host_id);
   MockAutofillManager* mock = autofill_manager(rfh);

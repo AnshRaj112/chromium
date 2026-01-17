@@ -4,12 +4,13 @@
 
 #include "chrome/browser/win/conflicts/enumerate_shell_extensions.h"
 
+#include <algorithm>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/path_service.h"
+#include "base/strings/strcat.h"
 #include "base/strings/strcat_win.h"
 #include "base/test/task_environment.h"
 #include "base/test/test_reg_util_win.h"
@@ -133,8 +134,8 @@ TEST_F(EnumerateShellExtensionsTest, EnumerateApprovedShellExtensionPaths) {
   ASSERT_EQ(3u, shell_extension_paths.size());
   for (const auto& test_case : kTestCases) {
     // The inefficiency is fine as long as the number of test cases stays small.
-    EXPECT_TRUE(
-        base::Contains(shell_extension_paths, base::FilePath(test_case.path)));
+    EXPECT_TRUE(std::ranges::contains(shell_extension_paths,
+                                      base::FilePath(test_case.path)));
   }
 }
 
@@ -192,7 +193,7 @@ TEST_F(EnumerateShellExtensionsTest, EnumerateShellExtensionPaths) {
   ASSERT_EQ(5u, shell_extension_paths.size());
   for (const auto& test_case : kTestCases) {
     // The inefficiency is fine as long as the number of test cases stays small.
-    EXPECT_TRUE(
-        base::Contains(shell_extension_paths, base::FilePath(test_case.path)));
+    EXPECT_TRUE(std::ranges::contains(shell_extension_paths,
+                                      base::FilePath(test_case.path)));
   }
 }

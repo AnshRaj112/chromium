@@ -9,12 +9,18 @@
 
 extern const CGFloat kOmniboxPlaceholderAlpha;
 
+extern NSString* const kOmniboxCancelButtonAccessibilityIdentifier;
+
+extern NSString* const kOmniboxClearButtonAccessibilityIdentifier;
+
 extern NSString* const kOmniboxLeadingImageDefaultAccessibilityIdentifier;
 
 extern NSString* const kOmniboxLeadingImageEmptyTextAccessibilityIdentifier;
 
 extern NSString* const
     kOmniboxLeadingImageSuggestionImageAccessibilityIdentifier;
+
+extern NSString* const kOmniboxPopupCloseButtonAccessibilityIdentifier;
 
 // Size of the leading image view.
 extern const CGFloat kOmniboxLeadingImageSize;
@@ -33,5 +39,8 @@ extern const CGFloat kOmniboxTextFieldLeadingOffsetImage;
 // This is a sum of kOmniboxLeadingImageViewEdgeOffset,
 // kOmniboxLeadingImageSize, and kOmniboxTextFieldLeadingOffsetImage.
 extern const CGFloat kOmniboxEditOffset;
+
+// The top padding of the omnibox popup tableview.
+extern const CGFloat kOmniboxPopupTopPadding;
 
 #endif  // IOS_CHROME_BROWSER_OMNIBOX_PUBLIC_OMNIBOX_CONSTANTS_H_

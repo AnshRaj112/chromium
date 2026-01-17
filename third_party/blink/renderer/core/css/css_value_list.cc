@@ -20,6 +20,7 @@
 
 #include "third_party/blink/renderer/core/css/css_value_list.h"
 
+#include "third_party/blink/renderer/core/css/css_property_name.h"
 #include "third_party/blink/renderer/platform/wtf/size_assertions.h"
 #include "third_party/blink/renderer/platform/wtf/text/string_builder.h"
 
@@ -39,6 +40,13 @@ CSSValueList::CSSValueList(ClassType class_type,
 CSSValueList::CSSValueList(ValueListSeparator list_separator)
     : CSSValue(kValueListClass) {
   value_list_separator_ = list_separator;
+}
+
+CSSValueList::CSSValueList(ValueListSeparator list_separator,
+                           bool needs_tree_scope_population)
+    : CSSValue(kValueListClass) {
+  value_list_separator_ = list_separator;
+  needs_tree_scope_population_ = needs_tree_scope_population;
 }
 
 CSSValueList::CSSValueList(ValueListSeparator list_separator,

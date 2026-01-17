@@ -81,15 +81,20 @@ class WebTextCheckingCompletionImpl : public WebTextCheckingCompletion {
 
 }  // namespace
 
-SpellCheckRequest::SpellCheckRequest(Range* checking_range,
-                                     const String& text,
-                                     int request_number)
+SpellCheckRequest::SpellCheckRequest(
+    Range* checking_range,
+    const String& text,
+    const blink::Vector<gfx::Range>& spelling_markers,
+    int request_number,
+    bool should_force_refresh)
     : requester_(nullptr),
       checking_range_(checking_range),
       root_editable_element_(
           blink::RootEditableElement(*checking_range_->startContainer())),
       text_(text),
-      request_number_(request_number) {
+      spelling_markers_(spelling_markers),
+      request_number_(request_number),
+      should_force_refresh_(should_force_refresh) {
   DCHECK(checking_range_);
   DCHECK(checking_range_->IsConnected());
 }
@@ -110,7 +115,9 @@ void SpellCheckRequest::Dispose() {
 // static
 SpellCheckRequest* SpellCheckRequest::Create(
     const EphemeralRange& checking_range,
-    int request_number) {
+    const std::vector<gfx::Range>& spelling_markers,
+    int request_number,
+    bool should_force_refresh) {
   if (checking_range.IsNull())
     return nullptr;
   if (!blink::RootEditableElement(
@@ -126,8 +133,15 @@ SpellCheckRequest* SpellCheckRequest::Create(
 
   Range* checking_range_object = CreateRange(checking_range);
 
+  blink::Vector<gfx::Range> blink_ranges;
+
+  for (const auto& range : spelling_markers) {
+    blink_ranges.push_back(range);
+  }
+
   SpellCheckRequest* request = MakeGarbageCollected<SpellCheckRequest>(
-      checking_range_object, text, request_number);
+      checking_range_object, text, blink_ranges, request_number,
+      should_force_refresh);
   if (request->RootEditableElement())
     return request;
 
@@ -166,6 +180,14 @@ void SpellCheckRequest::SetCheckerAndSequence(SpellCheckRequester* requester,
   sequence_ = sequence;
 }
 
+std::vector<gfx::Range> SpellCheckRequest::GetSpellingMarkers() {
+  std::vector<gfx::Range> ranges;
+  for (const auto& range : spelling_markers_) {
+    ranges.push_back(range);
+  }
+  return ranges;
+}
+
 SpellCheckRequester::SpellCheckRequester(LocalDOMWindow& window)
     : window_(&window) {}
 
@@ -184,12 +206,17 @@ void SpellCheckRequester::TimerFiredToProcessQueuedRequest() {
 }
 
 bool SpellCheckRequester::RequestCheckingFor(const EphemeralRange& range) {
-  return RequestCheckingFor(range, 0);
+  return RequestCheckingFor(range, /*spelling_markers=*/{}, /*request_num=*/0,
+                            /*should_force_refresh=*/false);
 }
 
-bool SpellCheckRequester::RequestCheckingFor(const EphemeralRange& range,
-                                             int request_num) {
-  SpellCheckRequest* request = SpellCheckRequest::Create(range, request_num);
+bool SpellCheckRequester::RequestCheckingFor(
+    const EphemeralRange& range,
+    const std::vector<gfx::Range>& spelling_markers,
+    int request_num,
+    bool should_force_refresh) {
+  SpellCheckRequest* request = SpellCheckRequest::Create(
+      range, spelling_markers, request_num, should_force_refresh);
   if (!request)
     return false;
 
@@ -232,6 +259,10 @@ void SpellCheckRequester::InvokeRequest(SpellCheckRequest* request) {
   if (WebTextCheckClient* text_checker_client = GetTextCheckerClient()) {
     text_checker_client->RequestCheckingOfText(
         processing_request_->GetText(),
+        processing_request_->GetSpellingMarkers(),
+        processing_request_->ShouldForceRefresh()
+            ? WebTextCheckClient::ShouldForceRefreshTextCheckService::kYes
+            : WebTextCheckClient::ShouldForceRefreshTextCheckService::kNo,
         std::make_unique<WebTextCheckingCompletionImpl>(request));
   }
 }
@@ -284,8 +315,8 @@ void SpellCheckRequester::DidCheck(int sequence) {
   if (!request_queue_.empty()) {
     timer_to_process_queued_request_ = PostCancellableTask(
         *window_->GetTaskRunner(TaskType::kInternalDefault), FROM_HERE,
-        WTF::BindOnce(&SpellCheckRequester::TimerFiredToProcessQueuedRequest,
-                      WrapPersistent(this)));
+        BindOnce(&SpellCheckRequester::TimerFiredToProcessQueuedRequest,
+                 WrapPersistent(this)));
   }
 }
 

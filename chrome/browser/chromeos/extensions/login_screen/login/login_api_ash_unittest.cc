@@ -53,7 +53,6 @@
 #include "ui/base/user_activity/user_activity_detector.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;
@@ -883,19 +882,19 @@ class LoginApiSharedSessionUnittest : public LoginApiUnittest {
     std::unique_ptr<chromeos::MockCleanupHandler> mock_cleanup_handler1 =
         std::make_unique<StrictMock<chromeos::MockCleanupHandler>>();
     EXPECT_CALL(*mock_cleanup_handler1, Cleanup(_))
-        .WillOnce(Invoke(
-            ([error1](
-                 chromeos::CleanupHandler::CleanupHandlerCallback callback) {
+        .WillOnce(
+            [error1](
+                chromeos::CleanupHandler::CleanupHandlerCallback callback) {
               std::move(callback).Run(error1);
-            })));
+            });
     std::unique_ptr<chromeos::MockCleanupHandler> mock_cleanup_handler2 =
         std::make_unique<StrictMock<chromeos::MockCleanupHandler>>();
     EXPECT_CALL(*mock_cleanup_handler2, Cleanup(_))
-        .WillOnce(Invoke(
-            ([error2](
-                 chromeos::CleanupHandler::CleanupHandlerCallback callback) {
+        .WillOnce(
+            [error2](
+                chromeos::CleanupHandler::CleanupHandlerCallback callback) {
               std::move(callback).Run(error2);
-            })));
+            });
 
     std::map<std::string, std::unique_ptr<chromeos::CleanupHandler>>
         cleanup_handlers;
@@ -1417,8 +1416,8 @@ TEST_F(LoginApiUnittest, CallsOnRequestExternalLogout) {
 
   // Make sure events are routed to all profiles.
   for (const auto& observer : observers) {
-    EXPECT_TRUE(base::Contains(
-        observer->events(), api::login::OnRequestExternalLogout::kEventName));
+    EXPECT_TRUE(observer->events().contains(
+        api::login::OnRequestExternalLogout::kEventName));
   }
 }
 
@@ -1448,8 +1447,8 @@ TEST_F(LoginApiUnittest, CallsOnExternalLogoutDone) {
 
   // Make sure events are routed to all profiles.
   for (const auto& observer : observers) {
-    EXPECT_TRUE(base::Contains(observer->events(),
-                               api::login::OnExternalLogoutDone::kEventName));
+    EXPECT_TRUE(observer->events().contains(
+        api::login::OnExternalLogoutDone::kEventName));
   }
 }
 

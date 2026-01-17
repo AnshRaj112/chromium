@@ -9,16 +9,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 
-import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import org.chromium.base.IntentUtils;
+import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.autofill.settings.AutofillPaymentMethodsFragment;
 import org.chromium.chrome.browser.autofill.settings.FinancialAccountsManagementFragment;
 import org.chromium.chrome.browser.autofill.settings.NonCardPaymentMethodsManagementFragment;
 import org.chromium.chrome.browser.browsing_data.ClearBrowsingDataFragment;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.chrome.browser.safety_check.SafetyCheckSettingsFragment;
 import org.chromium.chrome.browser.safety_hub.SafetyHubFragment;
 import org.chromium.chrome.browser.sync.settings.GoogleServicesSettings;
 import org.chromium.chrome.browser.sync.settings.ManageSyncSettings;
@@ -27,6 +26,7 @@ import org.chromium.components.browser_ui.settings.SettingsNavigation;
 import org.chromium.components.browser_ui.site_settings.SiteSettings;
 
 /** Implementation class for launching a {@link SettingsActivity}. */
+@NullMarked
 public class SettingsNavigationImpl implements SettingsNavigation {
 
     /** Instantiated through SettingsNavigationFactory. */
@@ -39,19 +39,21 @@ public class SettingsNavigationImpl implements SettingsNavigation {
 
     @Override
     public void startSettings(Context context, @SettingsFragment int settingsFragment) {
+        startSettings(context, settingsFragment, /* addToBackStack= */ false);
+    }
+
+    @Override
+    public void startSettings(
+            Context context, @SettingsFragment int settingsFragment, boolean addToBackStack) {
         Bundle fragmentArgs = null;
         switch (settingsFragment) {
             case SettingsFragment.CLEAR_BROWSING_DATA:
                 fragmentArgs =
                         ClearBrowsingDataFragment.createFragmentArgs(context.getClass().getName());
                 break;
-            case SettingsFragment.SAFETY_CHECK:
-                if (!ChromeFeatureList.sSafetyHub.isEnabled()) {
-                    fragmentArgs = SafetyCheckSettingsFragment.createBundle(true);
-                }
-                break;
             case SettingsFragment.MAIN:
             case SettingsFragment.PAYMENT_METHODS:
+            case SettingsFragment.SAFETY_CHECK:
             case SettingsFragment.SITE:
             case SettingsFragment.ACCESSIBILITY:
             case SettingsFragment.GOOGLE_SERVICES:
@@ -60,7 +62,8 @@ public class SettingsNavigationImpl implements SettingsNavigation {
             case SettingsFragment.NON_CARD_PAYMENT_METHODS:
                 break;
         }
-        startSettings(context, getFragmentClassFromEnum(settingsFragment), fragmentArgs);
+        startSettings(
+                context, getFragmentClassFromEnum(settingsFragment), fragmentArgs, addToBackStack);
     }
 
     @Override
@@ -73,7 +76,26 @@ public class SettingsNavigationImpl implements SettingsNavigation {
             Context context,
             @Nullable Class<? extends Fragment> fragment,
             @Nullable Bundle fragmentArgs) {
-        Intent intent = createSettingsIntent(context, fragment, fragmentArgs);
+        startSettings(context, fragment, fragmentArgs, /* addToBackStack= */ false);
+    }
+
+    @Override
+    public void startSettings(
+            Context context,
+            @Nullable Class<? extends Fragment> fragment,
+            @Nullable Bundle fragmentArgs,
+            boolean addToBackStack) {
+        startSettings(context, fragment, fragmentArgs, addToBackStack, /* tag= */ null);
+    }
+
+    @Override
+    public void startSettings(
+            Context context,
+            @Nullable Class<? extends Fragment> fragment,
+            @Nullable Bundle fragmentArgs,
+            boolean addToBackStack,
+            @Nullable String tag) {
+        Intent intent = createSettingsIntent(context, fragment, fragmentArgs, addToBackStack, tag);
         IntentUtils.safeStartActivity(context, intent);
     }
 
@@ -88,8 +110,29 @@ public class SettingsNavigationImpl implements SettingsNavigation {
             Context context,
             @Nullable Class<? extends Fragment> fragment,
             @Nullable Bundle fragmentArgs) {
+        return createSettingsIntent(context, fragment, fragmentArgs, /* addToBackStack= */ false);
+    }
+
+    @Override
+    public Intent createSettingsIntent(
+            Context context,
+            @Nullable Class<? extends Fragment> fragment,
+            @Nullable Bundle fragmentArgs,
+            boolean addToBackStack) {
+        return createSettingsIntent(
+                context, fragment, fragmentArgs, addToBackStack, /* tag= */ null);
+    }
+
+    @Override
+    public Intent createSettingsIntent(
+            Context context,
+            @Nullable Class<? extends Fragment> fragment,
+            @Nullable Bundle fragmentArgs,
+            boolean addToBackStack,
+            @Nullable String tag) {
         String fragmentName = fragment == null ? null : fragment.getName();
-        return SettingsIntentUtil.createIntent(context, fragmentName, fragmentArgs);
+        return SettingsIntentUtil.createIntent(
+                context, fragmentName, fragmentArgs, addToBackStack, tag);
     }
 
     @Override
@@ -108,11 +151,7 @@ public class SettingsNavigationImpl implements SettingsNavigation {
             case SettingsFragment.PAYMENT_METHODS:
                 return AutofillPaymentMethodsFragment.class;
             case SettingsFragment.SAFETY_CHECK:
-                if (ChromeFeatureList.sSafetyHub.isEnabled()) {
-                    return SafetyHubFragment.class;
-                } else {
-                    return SafetyCheckSettingsFragment.class;
-                }
+                return SafetyHubFragment.class;
             case SettingsFragment.SITE:
                 return SiteSettings.class;
             case SettingsFragment.ACCESSIBILITY:

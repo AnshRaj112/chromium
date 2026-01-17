@@ -2,21 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "components/open_from_clipboard/clipboard_recent_content_ios.h"
+#import "components/open_from_clipboard/clipboard_recent_content_ios.h"
 
 #import <CoreGraphics/CoreGraphics.h>
 #import <UIKit/UIKit.h>
 
-#include <memory>
+#import <memory>
 
-#include "base/functional/bind.h"
-#include "base/strings/sys_string_conversions.h"
-#include "base/strings/utf_string_conversions.h"
+#import "base/functional/bind.h"
+#import "base/strings/sys_string_conversions.h"
+#import "base/strings/utf_string_conversions.h"
 #import "base/test/ios/wait_util.h"
-#include "base/test/task_environment.h"
+#import "base/test/run_until.h"
+#import "base/test/task_environment.h"
 #import "components/open_from_clipboard/clipboard_recent_content_impl_ios.h"
-#include "testing/gtest/include/gtest/gtest.h"
-#include "testing/platform_test.h"
+#import "testing/gtest/include/gtest/gtest.h"
+#import "testing/platform_test.h"
 
 using base::test::ios::WaitUntilConditionOrTimeout;
 using base::test::ios::kWaitForCookiesTimeout;
@@ -64,7 +65,6 @@ NSTimeInterval kMaxAge = 60 * 60 * 1;
 - (instancetype)initWithMaxAge:(NSTimeInterval)maxAge
              authorizedSchemes:(NSArray*)authorizedSchemes
                   userDefaults:(NSUserDefaults*)groupUserDefaults
-         onlyUseClipboardAsync:(BOOL)onlyUseClipboardAsync
                         uptime:(NSTimeInterval)uptime;
 
 @end
@@ -76,12 +76,10 @@ NSTimeInterval kMaxAge = 60 * 60 * 1;
 - (instancetype)initWithMaxAge:(NSTimeInterval)maxAge
              authorizedSchemes:(NSSet*)authorizedSchemes
                   userDefaults:(NSUserDefaults*)groupUserDefaults
-         onlyUseClipboardAsync:(BOOL)onlyUseClipboardAsync
                         uptime:(NSTimeInterval)uptime {
   self = [super initWithMaxAge:maxAge
              authorizedSchemes:authorizedSchemes
                   userDefaults:groupUserDefaults
-         onlyUseClipboardAsync:onlyUseClipboardAsync
                       delegate:nil];
   if (self) {
     _fakeUptime = uptime;
@@ -125,7 +123,6 @@ class ClipboardRecentContentIOSTest : public ::testing::Test {
                       base::SysUTF8ToNSString(application_scheme)
                     ]
                          userDefaults:[NSUserDefaults standardUserDefaults]
-                onlyUseClipboardAsync:NO
                                uptime:time_delta.InSecondsF()];
 
     clipboard_content_ =
@@ -214,7 +211,7 @@ class ClipboardRecentContentIOSTest : public ::testing::Test {
   }
 
   bool WaitForClipboardContentTypesRefresh() {
-    bool success = WaitUntilConditionOrTimeout(kWaitForActionTimeout, ^bool() {
+    bool success = base::test::RunUntil([&]() {
       return clipboard_content_->GetCachedClipboardContentTypes().has_value();
     });
 

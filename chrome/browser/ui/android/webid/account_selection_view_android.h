@@ -7,7 +7,6 @@
 
 #include <string>
 
-#include "base/functional/callback.h"
 #include "chrome/browser/ui/webid/account_selection_view.h"
 #include "content/public/browser/web_contents.h"
 #include "third_party/blink/public/mojom/webid/federated_auth_request.mojom-shared.h"
@@ -66,7 +65,7 @@ class AccountSelectionViewAndroid : public AccountSelectionView {
                          const GURL& idp_config_url,
                          const std::string& account_id,
                          bool is_sign_in);
-  void OnDismiss(JNIEnv* env, jint dismiss_reason);
+  void OnDismiss(JNIEnv* env, int32_t dismiss_reason);
   void OnLoginToIdP(JNIEnv* env,
                     const GURL& idp_config_url,
                     const GURL& idp_login_url);

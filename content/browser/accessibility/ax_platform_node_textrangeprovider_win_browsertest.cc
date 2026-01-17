@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/342213636): Remove this and spanify to fix the errors.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "ui/accessibility/platform/ax_platform_node_textrangeprovider_win.h"
 
 #include "base/command_line.h"
+#include "base/compiler_specific.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/win/scoped_bstr.h"
 #include "base/win/scoped_safearray.h"
@@ -521,7 +517,7 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
   std::vector<ComPtr<IRawElementProviderSimple>> expected_values = {};
 
   EXPECT_HRESULT_SUCCEEDED(text_range->GetChildren(children.Receive()));
-  EXPECT_UIA_SAFEARRAY_EQ(children.Get(), expected_values);
+  UNSAFE_TODO(EXPECT_UIA_SAFEARRAY_EQ(children.Get(), expected_values));
 
   // 2. Validate that both the link and image objects are returned when the
   // range spans the document.
@@ -536,7 +532,7 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
   EXPECT_HRESULT_SUCCEEDED(text_range->GetChildren(children.Receive()));
 
   expected_values = {link_raw, image_raw};
-  EXPECT_UIA_SAFEARRAY_EQ(children.Get(), expected_values);
+  UNSAFE_TODO(EXPECT_UIA_SAFEARRAY_EQ(children.Get(), expected_values));
 
   // 3. Validate that no object is returned when the range is inside the textual
   // content of an embedded object.
@@ -553,7 +549,7 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
   EXPECT_HRESULT_SUCCEEDED(text_range->GetChildren(children.Receive()));
 
   expected_values = {};
-  EXPECT_UIA_SAFEARRAY_EQ(children.Get(), expected_values);
+  UNSAFE_TODO(EXPECT_UIA_SAFEARRAY_EQ(children.Get(), expected_values));
 
   // 4. Validate that the link object is returned when the text range contains
   // a link object.
@@ -572,7 +568,7 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
   EXPECT_HRESULT_SUCCEEDED(text_range->GetChildren(children.Receive()));
 
   expected_values = {link_raw};
-  EXPECT_UIA_SAFEARRAY_EQ(children.Get(), expected_values);
+  UNSAFE_TODO(EXPECT_UIA_SAFEARRAY_EQ(children.Get(), expected_values));
 
   // 5. Validate that the link object is included even if it is partially
   // included in the range.
@@ -589,7 +585,7 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
   EXPECT_HRESULT_SUCCEEDED(text_range->GetChildren(children.Receive()));
 
   expected_values = {link_raw};
-  EXPECT_UIA_SAFEARRAY_EQ(children.Get(), expected_values);
+  UNSAFE_TODO(EXPECT_UIA_SAFEARRAY_EQ(children.Get(), expected_values));
 }
 
 IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
@@ -1266,7 +1262,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
   std::vector<double> expected_values = {
       8 + view_offset.x(), 16 + view_offset.y(), 49, 17,
       8 + view_offset.x(), 34 + view_offset.y(), 44, 17};
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 }
 
 IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
@@ -3532,7 +3529,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
                                  .OffsetFromOrigin());
   std::vector<double> expected_values = {85 + view_offset.x(),
                                          16 + view_offset.y(), 20, 17};
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 
   EXPECT_UIA_MOVE(text_range_provider, TextUnit_Character,
                   /*count*/ 19,
@@ -3544,7 +3542,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
   ASSERT_HRESULT_SUCCEEDED(
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
   expected_values = {105 + view_offset.x(), 50 + view_offset.y(), 28, 17};
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 }
 
 IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
@@ -3895,7 +3894,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
                                          bounding_box_char_height};
   EXPECT_HRESULT_SUCCEEDED(
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 
   // Range spans character "H".
   // |-|
@@ -3911,7 +3911,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
                      bounding_box_char_width, bounding_box_char_height};
   EXPECT_HRESULT_SUCCEEDED(
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 
   // Range is degenerate and position is before "H".
   // ||
@@ -3926,7 +3927,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
   expected_values = {total_left_offset, total_top_offset, 1,
                      bounding_box_char_height};
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 
   // Range is degenerate and position is after ",".
   //             ||
@@ -3940,7 +3942,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
   expected_values = {total_left_offset + 6 * bounding_box_char_width,
                      total_top_offset, 1, bounding_box_char_height};
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 
   // Range spans character ",".
   //           |-|
@@ -3956,7 +3959,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
                      bounding_box_char_height};
   EXPECT_HRESULT_SUCCEEDED(
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 
   // Range spans character "\n".
   //             |-|
@@ -3966,10 +3970,12 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
                   /*count*/ 1,
                   /*expected_text*/ L"\n",
                   /*expected_count*/ 1);
-  expected_values = {};
+  expected_values = {total_left_offset + 6 * bounding_box_char_width,
+                     total_top_offset, 1, bounding_box_char_height};
   EXPECT_HRESULT_SUCCEEDED(
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 
   // Range spans character "W".
   //  H e l l o ,
@@ -3984,7 +3990,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
                      bounding_box_char_width, bounding_box_char_height};
   EXPECT_HRESULT_SUCCEEDED(
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 
   // Range is degenerate and position is before "W".
   //  H e l l o ,
@@ -4000,7 +4007,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
                      bounding_box_char_height};
   EXPECT_HRESULT_SUCCEEDED(
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 
   // Range is degenerate and position is after "d".
   //  H e l l o ,
@@ -4015,7 +4023,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
                      bounding_box_char_height};
   EXPECT_HRESULT_SUCCEEDED(
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 
   // Range spans character "d".
   //  H e l l o ,
@@ -4031,7 +4040,8 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
                      bounding_box_char_width, bounding_box_char_height};
   EXPECT_HRESULT_SUCCEEDED(
       text_range_provider->GetBoundingRectangles(rectangles.Receive()));
-  EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values);
+  UNSAFE_TODO(
+      EXPECT_UIA_DOUBLE_SAFEARRAY_EQ(rectangles.Get(), expected_values));
 }
 
 // TODO(crbug.com/340389557): This test is flaky.
@@ -4243,10 +4253,10 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
   wchar_t text[11] = L"go ";
   wchar_t non_breaking_space[2] = L"\xA0";
   wchar_t blue[5] = L"blue";
-  wcscat(text, non_breaking_space);
-  wcscat(text, blue);
+  UNSAFE_TODO(wcscat(text, non_breaking_space));
+  UNSAFE_TODO(wcscat(text, blue));
   wchar_t text_2[7] = L"\xA0";
-  wcscat(text_2, blue);
+  UNSAFE_TODO(wcscat(text_2, blue));
   EXPECT_UIA_TEXTRANGE_EQ(blink_selection_text_range_provider, text);
   EXPECT_UIA_MOVE_ENDPOINT_BY_UNIT(blink_selection_text_range_provider,
                                    TextPatternRangeEndpoint_Start,
@@ -4283,6 +4293,98 @@ IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
                                    /*count*/ 4,
                                    /*expected_text*/ L"blue",
                                    /*expected_count*/ 4);
+}
+
+IN_PROC_BROWSER_TEST_F(AXPlatformNodeTextRangeProviderWinBrowserTest,
+                       GetBoundingRectanglesOnTrailingWhitespace) {
+  LoadInitialAccessibilityTreeFromHtml(R"HTML(
+      <p style="width:30ch">
+        Hello World, this is a longer
+        paragraph that has trailing
+        whitespace in between lines.
+      </p>
+      )HTML");
+
+  ui::BrowserAccessibility* root = GetManager()->GetBrowserAccessibilityRoot();
+  ASSERT_NE(nullptr, root);
+
+  ui::BrowserAccessibility* paragraph = root->PlatformGetChild(0);
+  ASSERT_NE(nullptr, paragraph);
+
+  ui::BrowserAccessibility* text_node = paragraph->PlatformGetChild(0);
+  ASSERT_NE(nullptr, text_node);
+
+  ComPtr<ITextRangeProvider> text_range_provider;
+  GetTextRangeProviderFromTextNode(*text_node, &text_range_provider);
+  ASSERT_NE(nullptr, text_range_provider.Get());
+
+  base::win::ScopedBstr full_text;
+  EXPECT_HRESULT_SUCCEEDED(
+      text_range_provider->GetText(-1, full_text.Receive()));
+
+  int units_moved = 0;
+  EXPECT_HRESULT_SUCCEEDED(text_range_provider->MoveEndpointByUnit(
+      TextPatternRangeEndpoint_Start, TextUnit_Line, 1, &units_moved));
+  EXPECT_EQ(1, units_moved);
+
+  EXPECT_HRESULT_SUCCEEDED(text_range_provider->MoveEndpointByUnit(
+      TextPatternRangeEndpoint_End, TextUnit_Line, -1, &units_moved));
+  EXPECT_EQ(-1, units_moved);
+
+  EXPECT_HRESULT_SUCCEEDED(text_range_provider->MoveEndpointByUnit(
+      TextPatternRangeEndpoint_Start, TextUnit_Character, -1, &units_moved));
+  EXPECT_EQ(-1, units_moved);
+
+  {
+    base::win::ScopedBstr text;
+    EXPECT_HRESULT_SUCCEEDED(text_range_provider->GetText(-1, text.Receive()));
+    // Non-breaking space is \xA0
+    EXPECT_STREQ(L" paragraph that has trailing ", text.Get());
+  }
+
+  EXPECT_HRESULT_SUCCEEDED(text_range_provider->MoveEndpointByUnit(
+      TextPatternRangeEndpoint_End, TextUnit_Line, -1, &units_moved));
+  EXPECT_EQ(-1, units_moved);
+
+  {
+    base::win::ScopedBstr text;
+    EXPECT_HRESULT_SUCCEEDED(text_range_provider->GetText(-1, text.Receive()));
+    // Non-breaking space is \xA0
+    EXPECT_STREQ(L" ", text.Get());
+  }
+
+  base::win::ScopedSafearray rectangles;
+  EXPECT_HRESULT_SUCCEEDED(
+      text_range_provider->GetBoundingRectangles(rectangles.Receive()));
+
+  // We expect at least one rectangle.
+  ASSERT_EQ(1u, SafeArrayGetDim(rectangles.Get()));
+  LONG array_lower_bound;
+  ASSERT_HRESULT_SUCCEEDED(
+      SafeArrayGetLBound(rectangles.Get(), 1, &array_lower_bound));
+  LONG array_upper_bound;
+  ASSERT_HRESULT_SUCCEEDED(
+      SafeArrayGetUBound(rectangles.Get(), 1, &array_upper_bound));
+
+  // Each rectangle has 4 doubles (x, y, w, h).
+  // So the number of elements should be a multiple of 4.
+  size_t count = array_upper_bound - array_lower_bound + 1;
+  ASSERT_GT(count, 0u);
+  ASSERT_EQ(0u, count % 4);
+
+  double* array_data;
+  ASSERT_HRESULT_SUCCEEDED(::SafeArrayAccessData(
+      rectangles.Get(), reinterpret_cast<void**>(&array_data)));
+
+  // Check that the rectangle has non-zero width and height.
+  // x, y, w, h
+  double width = UNSAFE_TODO(array_data[2]);
+  double height = UNSAFE_TODO(array_data[3]);
+
+  EXPECT_GT(width, 0);
+  EXPECT_GT(height, 0);
+
+  ASSERT_HRESULT_SUCCEEDED(::SafeArrayUnaccessData(rectangles.Get()));
 }
 
 }  // namespace content

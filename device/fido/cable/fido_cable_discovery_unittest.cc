@@ -9,7 +9,6 @@
 #include <string_view>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/run_loop.h"
 #include "base/task/single_thread_task_runner.h"
@@ -112,8 +111,8 @@ MATCHER_P2(IsAdvertisementContent,
            expected_uuid_formatted_client_eid,
            "") {
 #if BUILDFLAG(IS_MAC)
-  return base::Contains(*arg->service_uuids(),
-                        expected_uuid_formatted_client_eid);
+  return std::ranges::contains(*arg->service_uuids(),
+                               expected_uuid_formatted_client_eid);
 
 #elif BUILDFLAG(IS_WIN)
   const auto manufacturer_data = arg->manufacturer_data();
@@ -161,10 +160,10 @@ class CableMockBluetoothAdvertisement : public BluetoothAdvertisement {
 
   void ExpectUnregisterAndSucceed() {
     EXPECT_CALL(*this, Unregister(_, _))
-        .WillOnce(::testing::WithArg<0>(::testing::Invoke([](auto success_cb) {
+        .WillOnce(::testing::WithArg<0>([](auto success_cb) {
           base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
               FROM_HERE, std::move(success_cb));
-        })));
+        }));
   }
 
  private:

@@ -6,17 +6,21 @@
 
 #import <UserNotifications/UserNotifications.h>
 
+#import "base/functional/callback_helpers.h"
 #import "base/test/metrics/histogram_tester.h"
 #import "base/test/scoped_feature_list.h"
 #import "base/test/scoped_mock_clock_override.h"
+#import "base/test/simple_test_clock.h"
 #import "base/threading/thread_restrictions.h"
+#import "components/feature_engagement/public/tracker.h"
 #import "components/prefs/scoped_user_pref_update.h"
 #import "components/safe_browsing/core/common/safe_browsing_prefs.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin_presenter.h"
-#import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_commands.h"
+#import "ios/chrome/browser/content_suggestions/ui/content_suggestions_commands.h"
 #import "ios/chrome/browser/default_browser/model/promo_source.h"
 #import "ios/chrome/browser/default_browser/model/utils.h"
 #import "ios/chrome/browser/default_browser/model/utils_test_support.h"
+#import "ios/chrome/browser/feature_engagement/model/tracker_factory.h"
 #import "ios/chrome/browser/first_run/model/first_run.h"
 #import "ios/chrome/browser/push_notification/model/constants.h"
 #import "ios/chrome/browser/push_notification/model/push_notification_util.h"
@@ -28,11 +32,11 @@
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_ios.h"
 #import "ios/chrome/browser/shared/model/profile/test/test_profile_manager_ios.h"
-#import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/credential_provider_promo_commands.h"
 #import "ios/chrome/browser/shared/public/commands/docking_promo_commands.h"
+#import "ios/chrome/browser/shared/public/commands/scene_commands.h"
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/shared/public/commands/whats_new_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
@@ -87,6 +91,16 @@ class TipsNotificationClientTest : public PlatformTest {
     ScopedDictPrefUpdate update(GetApplicationContext()->GetLocalState(),
                                 prefs::kAppLevelPushNotificationPermissions);
     update->Set(kTipsNotificationKey, true);
+
+    // Create the feature engagement tracker and wait to initialize.
+    tracker_ =
+        feature_engagement::TrackerFactory::GetForProfile(profile_.get());
+    test_clock_.SetNow(base::Time::Now());
+    tracker_->SetClockForTesting(test_clock_, test_clock_.Now());
+    base::RunLoop run_loop;
+    tracker_->AddOnInitializedCallback(
+        base::IgnoreArgs<bool>(run_loop.QuitClosure()));
+    run_loop.Run();
   }
 
   // Sets up a mock notification center, so notification requests can be
@@ -206,12 +220,12 @@ class TipsNotificationClientTest : public PlatformTest {
   }
 
   // Stubs the `-prepareToPresentModalWithSnackbarDismissal:` method from
-  // `ApplicationCommands` so that it immediately calls the completion block.
+  // `SceneCommands` so that it immediately calls the completion block.
   void StubPrepareToPresentModal() {
     prepare_to_present_modal_stub_ = [[PrepareToPresentModalStub alloc] init];
     [browser_->GetCommandDispatcher()
         startDispatchingToTarget:prepare_to_present_modal_stub_
-                     forProtocol:@protocol(ApplicationCommands)];
+                     forProtocol:@protocol(SceneCommands)];
   }
 
   // Sets up an OCMock expectation that a notification will be requested.
@@ -287,6 +301,8 @@ class TipsNotificationClientTest : public PlatformTest {
   const base::HistogramTester histogram_tester_;
   IOSChromeScopedTestingLocalState scoped_testing_local_state_;
   TestProfileManagerIOS profile_manager_;
+  raw_ptr<feature_engagement::Tracker> tracker_;
+  base::SimpleTestClock test_clock_;
   id mock_scene_state_;
   UNNotificationResponse* mock_notification_response_;
   std::unique_ptr<TestBrowser> browser_;
@@ -756,4 +772,112 @@ TEST_F(TipsNotificationClientTest, LensOverlayHandle) {
   EXPECT_OCMOCK_VERIFY(mock_handler);
   histogram_tester_.ExpectUniqueSample("IOS.Notifications.Tips.Interaction",
                                        TipsNotificationType::kLensOverlay, 1);
+}
+
+// Tests that the client can request a one-time default browser notification.
+TEST_F(TipsNotificationClientTest, OneTimeDefaultBrowserNotification) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(kIOSOneTimeDefaultBrowserNotification);
+  SetFalseChromeLikelyDefaultBrowser();
+  RecordDefaultBrowserPromoLastAction(IOSDefaultBrowserPromoAction::kCancel);
+
+  StubGetPendingRequests(nil);
+  ExpectNotificationRequest(TipsNotificationType::kDefaultBrowser);
+
+  SimulateForegroundingApp();
+
+  EXPECT_OCMOCK_VERIFY(mock_notification_center_);
+
+  // Verify that it sends the next available notification afterwards.
+  ExpectNotificationRequest(TipsNotificationType::kEnhancedSafeBrowsing);
+  SimulateForegroundingApp();
+  EXPECT_OCMOCK_VERIFY(mock_notification_center_);
+}
+
+// Tests that a pending notification is cleared for the one-time default
+// browser notification.
+TEST_F(TipsNotificationClientTest,
+       OneTimeDefaultBrowserNotificationClearsPending) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(kIOSOneTimeDefaultBrowserNotification);
+  SetFalseChromeLikelyDefaultBrowser();
+
+  UNNotificationRequest* request = [UNNotificationRequest
+      requestWithIdentifier:kTipsNotificationId
+                    content:ContentForTipsNotificationType(
+                                TipsNotificationType::kWhatsNew, false,
+                                GetProfileName())
+                    trigger:nil];
+  StubGetPendingRequests(@[ request ]);
+  ExpectNotificationRequest(TipsNotificationType::kDefaultBrowser);
+  OCMExpect([mock_notification_center_
+      removePendingNotificationRequestsWithIdentifiers:@[
+        kTipsNotificationId
+      ]]);
+
+  SimulateForegroundingApp();
+
+  EXPECT_OCMOCK_VERIFY(mock_notification_center_);
+}
+
+// Tests that the client will not request a one-time default browser
+// notification within 7 days of FRE.
+TEST_F(TipsNotificationClientTest,
+       OneTimeDefaultBrowserNotificationWithinFRECooldown) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(kIOSOneTimeDefaultBrowserNotification);
+  SetFalseChromeLikelyDefaultBrowser();
+  tracker_->NotifyEvent("default_browser_fre_shown");
+  RecordDefaultBrowserPromoLastAction(IOSDefaultBrowserPromoAction::kCancel);
+
+  StubGetPendingRequests(nil);
+
+  // Default browser notification should be skippd and next in line should be
+  // scheduled.
+  ExpectNotificationRequest(TipsNotificationType::kEnhancedSafeBrowsing);
+  SimulateForegroundingApp();
+  EXPECT_OCMOCK_VERIFY(mock_notification_center_);
+}
+
+// Tests that the client will request a one-time default browser notification 7
+// days after the FRE.
+TEST_F(TipsNotificationClientTest,
+       OneTimeDefaultBrowserNotificationAfterFRECooldown) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(kIOSOneTimeDefaultBrowserNotification);
+  SetFalseChromeLikelyDefaultBrowser();
+  tracker_->NotifyEvent("default_browser_fre_shown");
+  test_clock_.Advance(base::Days(8));
+  RecordDefaultBrowserPromoLastAction(IOSDefaultBrowserPromoAction::kCancel);
+
+  StubGetPendingRequests(nil);
+
+  // Default browser notification should be scheduled.
+  ExpectNotificationRequest(TipsNotificationType::kDefaultBrowser);
+  SimulateForegroundingApp();
+  EXPECT_OCMOCK_VERIFY(mock_notification_center_);
+}
+
+// Tests that a pending notification is cleared if trigger criteria is not valid
+// anymore.
+TEST_F(TipsNotificationClientTest, ClearInvalidPendingNotification) {
+  // Enable Enhanced Safe Browsing, which should invalidate the pending
+  // notification.
+  profile_->GetPrefs()->SetBoolean(prefs::kSafeBrowsingEnhanced, true);
+
+  UNNotificationRequest* request = [UNNotificationRequest
+      requestWithIdentifier:kTipsNotificationId
+                    content:ContentForTipsNotificationType(
+                                TipsNotificationType::kEnhancedSafeBrowsing,
+                                false, GetProfileName())
+                    trigger:nil];
+  StubGetPendingRequests(@[ request ]);
+  OCMExpect([mock_notification_center_
+      removePendingNotificationRequestsWithIdentifiers:@[
+        kTipsNotificationId
+      ]]);
+
+  SimulateForegroundingApp();
+
+  EXPECT_OCMOCK_VERIFY(mock_notification_center_);
 }

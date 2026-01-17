@@ -62,10 +62,10 @@ public interface WebContents extends Parcelable {
     }
 
     /**
-     * @return a default implementation of {@link InternalsHolder} that holds a reference to
-     * {@link WebContentsInternals} object owned by {@link WebContents} instance.
+     * @return a default implementation of {@link InternalsHolder} that holds a reference to {@link
+     *     WebContentsInternals} object owned by {@link WebContents} instance.
      */
-    public static InternalsHolder createDefaultInternalsHolder() {
+    static InternalsHolder createDefaultInternalsHolder() {
         return new InternalsHolder() {
             private @Nullable WebContentsInternals mInternals;
 
@@ -216,6 +216,15 @@ public interface WebContents extends Parcelable {
      * @return The character encoding for the current visible page.
      */
     String getEncoding();
+
+    /**
+     * Discards the RenderFrameHost associated with this WebContents.
+     *
+     * @param onDiscarded a callback to be called when the RenderFrameHost is discarded. May never
+     *     be called if the operation fails.
+     *     <p>TODO(crbug.com/441841249): Change the runnable to a callback.
+     */
+    void discard(Runnable onDiscarded);
 
     /**
      * @return Whether this WebContents is loading a resource.
@@ -617,6 +626,15 @@ public interface WebContents extends Parcelable {
     void setLongPressLinkSelectText(boolean enabled);
 
     /**
+     * Allow drag-drop of files such as an image to load and replace contents.
+     *
+     * @param enabled whether the behavior should be enabled.
+     */
+    void setCanAcceptLoadDrops(boolean enabled);
+
+    boolean getCanAcceptLoadDropsForTesting();
+
+    /**
      * Update the OffsetTagDefinitions. This could be because the controls' visibility constraints
      * have changed, which requires adding/removing the OffsetTags, or because the
      * OffsetTagConstraints have changed due to a change in the controls' scrollable height.
@@ -634,6 +652,12 @@ public interface WebContents extends Parcelable {
     boolean hasOpener();
 
     /**
+     * @return The opener WebContents if this WebContents is in Document Picture-in-Picture mode, or
+     *     {@code null} otherwise.
+     */
+    @Nullable WebContents getDocumentPictureInPictureOpener();
+
+    /**
      * Returns the window open disposition that was originally requested when this WebContents was
      * created or navigated to. This method provides the disposition specified by the opener of this
      * WebContents, indicating how the content was initially intended to be displayed (e.g., as a
@@ -645,6 +669,16 @@ public interface WebContents extends Parcelable {
      * @return an integer constant representing the original window open disposition.
      */
     int getOriginalWindowOpenDisposition();
+
+    /**
+     * Updates the Window Controls Overlay rect for a PWA.
+     *
+     * @param rect The rect of the overlay.
+     */
+    void updateWindowControlsOverlay(Rect rect);
+
+    /** Enables draggable region calculation in this WebContents' primary main frame. */
+    void setSupportsDraggableRegions(boolean supportsDraggableRegions);
 
     /**
      * Factory interface passed to {@link #getOrSetUserData()} for instantiation of class as user
@@ -666,7 +700,7 @@ public interface WebContents extends Parcelable {
      *
      * @param <T> Class to instantiate.
      */
-    public interface UserDataFactory<T> {
+    interface UserDataFactory<T> {
         T create(WebContents webContents);
     }
 
@@ -680,7 +714,7 @@ public interface WebContents extends Parcelable {
      *     yet, or {@code userDataFactory} is null, or the internal data storage is already
      *     garbage-collected.
      */
-    public <T extends UserData> @Nullable T getOrSetUserData(
+    <T extends UserData> @Nullable T getOrSetUserData(
             Class<T> key, @Nullable UserDataFactory<T> userDataFactory);
 
     /**
@@ -690,5 +724,5 @@ public interface WebContents extends Parcelable {
      * @param key The class object representing the type of user data to remove. If no user data
      *     object of this type exists, this method has no effect.
      */
-    public <T extends UserData> void removeUserData(Class<T> key);
+    <T extends UserData> void removeUserData(Class<T> key);
 }

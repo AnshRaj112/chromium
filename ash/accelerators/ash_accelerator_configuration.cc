@@ -13,12 +13,10 @@
 #include "ash/constants/ash_pref_names.h"
 #include "ash/public/cpp/accelerators.h"
 #include "ash/public/cpp/accelerators_util.h"
-#include "ash/public/mojom/accelerator_configuration.mojom-shared.h"
 #include "ash/public/mojom/accelerator_configuration.mojom.h"
 #include "ash/public/mojom/accelerator_info.mojom.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
-#include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
@@ -26,7 +24,6 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
-#include "chromeos/ash/services/assistant/public/cpp/features.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
 #include "ui/base/accelerators/accelerator.h"
@@ -169,11 +166,6 @@ std::vector<ash::AcceleratorData> GetDefaultAccelerators() {
   if (ash::features::IsToggleCameraShortcutEnabled()) {
     AppendAcceleratorData(accelerators,
                           ash::kToggleCameraAllowedAcceleratorData);
-  }
-
-  if (!ash::assistant::features::IsNewEntryPointEnabled()) {
-    AppendAcceleratorData(accelerators,
-                          ash::kAssistantSearchPlusAAcceleratorData);
   }
 
   return accelerators;

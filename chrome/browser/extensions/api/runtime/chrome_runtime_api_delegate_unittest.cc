@@ -8,7 +8,6 @@
 #include <set>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -31,10 +30,13 @@
 #include "extensions/browser/update_install_gate.h"
 #include "extensions/browser/updater/extension_downloader.h"
 #include "extensions/browser/updater/extension_downloader_test_delegate.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_id.h"
 #include "extensions/common/verifier_formats.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -57,7 +59,7 @@ class TestEventRouter : public EventRouter {
 
   bool ExtensionHasEventListener(const ExtensionId& extension_id,
                                  const std::string& event_name) const override {
-    return base::Contains(fake_registry_, Entry(extension_id, event_name));
+    return fake_registry_.contains(Entry(extension_id, event_name));
   }
 
   // Pretend that |extension_id| is listening for |event_name|.
@@ -231,6 +233,8 @@ class ChromeRuntimeAPIDelegateTest : public ExtensionServiceTestWithInstall {
   }
 
   void TearDown() override {
+    update_install_gate_.reset();
+    runtime_delegate_.reset();
     ExtensionDownloader::set_test_delegate(nullptr);
     ChromeRuntimeAPIDelegate::set_tick_clock_for_tests(nullptr);
     ExtensionServiceTestWithInstall::TearDown();

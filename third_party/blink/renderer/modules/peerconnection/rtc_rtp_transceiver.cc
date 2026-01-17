@@ -136,6 +136,7 @@ RTCRtpReceiver* RTCRtpTransceiver::receiver() const {
 bool RTCRtpTransceiver::stopped() const {
   // Non-standard attribute reflecting being "stopping", whether or not we are
   // "stopped" per current_direction_.
+  // TODO(hbos): deprecate and remove.
   return direction_ == V8RTCRtpTransceiverDirection::Enum::kStopped;
 }
 
@@ -285,7 +286,7 @@ void RTCRtpTransceiver::setCodecPreferences(
         // Some parameters don't follow the key=value form.
         webrtc_codec.parameters.emplace("", sdpFmtpLine.Ascii());
       } else {
-        WTF::Vector<WTF::String> parameters;
+        Vector<String> parameters;
         sdpFmtpLine.Split(';', parameters);
         for (const auto& parameter : parameters) {
           auto equal_position = parameter.find('=');

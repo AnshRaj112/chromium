@@ -133,11 +133,11 @@ public class BaseSuggestionViewBinderUnitTest {
                                 callback));
         mModel.set(BaseSuggestionViewProperties.ACTION_BUTTONS, list);
 
-        List<ImageView> actionButtons = mBaseView.getActionButtons();
+        List<ActionButtonView> actionButtons = mBaseView.getActionButtons();
         Assert.assertEquals(1, actionButtons.size());
         Assert.assertEquals(View.VISIBLE, actionButtons.get(0).getVisibility());
         Assert.assertEquals(list.get(0).icon.drawable, actionButtons.get(0).getDrawable());
-        Assert.assertNotNull(actionButtons.get(0).getBackground());
+        Assert.assertNull(actionButtons.get(0).getBackground());
         verify(mBaseView, times(1)).addView(actionButtons.get(0));
 
         Assert.assertTrue(actionButtons.get(0).performClick());
@@ -171,7 +171,7 @@ public class BaseSuggestionViewBinderUnitTest {
                                 call3));
         mModel.set(BaseSuggestionViewProperties.ACTION_BUTTONS, list);
 
-        List<ImageView> actionButtons = mBaseView.getActionButtons();
+        List<ActionButtonView> actionButtons = mBaseView.getActionButtons();
         Assert.assertEquals(3, actionButtons.size());
         Assert.assertEquals(View.VISIBLE, actionButtons.get(0).getVisibility());
         Assert.assertEquals(View.VISIBLE, actionButtons.get(1).getVisibility());
@@ -213,7 +213,7 @@ public class BaseSuggestionViewBinderUnitTest {
                                 R.string.accessibility_omnibox_btn_refine,
                                 CallbackUtils.emptyRunnable()));
 
-        final List<ImageView> actionButtons = mBaseView.getActionButtons();
+        final List<ActionButtonView> actionButtons = mBaseView.getActionButtons();
         mModel.set(BaseSuggestionViewProperties.ACTION_BUTTONS, list);
         Assert.assertEquals(3, actionButtons.size());
         final View actionButton1 = actionButtons.get(0);

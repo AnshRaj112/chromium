@@ -5,7 +5,6 @@
 #include "components/autofill/core/browser/metrics/per_fill_metrics.h"
 
 #include "base/metrics/histogram_functions.h"
-#include "base/metrics/histogram_functions_internal_overloads.h"
 #include "base/notreached.h"
 #include "base/strings/strcat.h"
 #include "components/autofill/core/browser/filling/form_filler.h"
@@ -23,6 +22,8 @@ std::string RefillTriggerReasonToString(
       return "SelectOptionsChanged";
     case RefillTriggerReason::kExpirationDateFormatted:
       return "ExpirationDateFormatted";
+    case RefillTriggerReason::kProgrammaticRefill:
+      return "ProgrammaticRefill";
   }
   NOTREACHED();
 }

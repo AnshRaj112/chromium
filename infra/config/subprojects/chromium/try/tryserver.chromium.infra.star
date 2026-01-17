@@ -28,6 +28,7 @@ try_.builder(
     builderless = False,
     cores = 8,
     os = os.LINUX_DEFAULT,
+    execution_timeout = 6 * time.hour,
     properties = {
         "$build/chromium_3pp": {
             "platform": "linux-amd64",
@@ -172,6 +173,7 @@ try_.builder(
         ],
     },
     service_account = try_constants.DEFAULT_SERVICE_ACCOUNT,
+    siso_keep_going = siso.KEEP_GOING,
     siso_project = siso.project.DEFAULT_UNTRUSTED,
     tryjob = try_.job(
         location_filters = [
@@ -235,6 +237,7 @@ try_.builder(
         ],
     },
     service_account = try_constants.DEFAULT_SERVICE_ACCOUNT,
+    siso_keep_going = siso.KEEP_GOING,
     siso_project = siso.project.DEFAULT_UNTRUSTED,
     tryjob = try_.job(
         location_filters = [
@@ -290,5 +293,6 @@ try_.builder(
         ],
     },
     service_account = try_constants.DEFAULT_SERVICE_ACCOUNT,
+    siso_keep_going = siso.KEEP_GOING,
     siso_project = siso.project.DEFAULT_UNTRUSTED,
 )

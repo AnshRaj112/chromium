@@ -18,11 +18,23 @@ try_.defaults.set(
     pool = try_constants.DEFAULT_POOL,
     builderless = False,
     os = os.LINUX_DEFAULT,
+    # These builders test GPU configurations. These configurations have very
+    # limited hardware, due to the hardware needing specific GPUs. The pool of
+    # machines to run builds for these builders is intentionally limited to
+    # avoid concurrent builds from oversubscribing the test capacity. As a
+    # consequence, pending times are expected for these builders. These builder
+    # haven't been long poles in the CQ, and developers haven't complained about
+    # them, so there's no need to page for them.
+    alerts_enabled = False,
     check_for_flakiness = False,
     check_for_flakiness_with_resultdb = False,
     contact_team_email = "chrome-gpu-infra@google.com",
     execution_timeout = try_constants.DEFAULT_EXECUTION_TIMEOUT,
+    experiments = {
+        "chromium_tests.resultdb_module": 100,
+    },
     service_account = gpu.try_.SERVICE_ACCOUNT,
+    siso_keep_going = siso.KEEP_GOING,
     siso_project = siso.project.DEFAULT_UNTRUSTED,
     siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
 )
@@ -61,14 +73,6 @@ def dawn_win_builderless_builder(*, name, **kwargs):
         builderless = True,
         os = os.WINDOWS_ANY,
         pool = "luci.chromium.gpu.try",
-        **kwargs
-    )
-
-def dawn_win_builderful_builder(*, name, **kwargs):
-    return try_.builder(
-        name = name,
-        builderless = False,
-        os = os.WINDOWS_ANY,
         **kwargs
     )
 
@@ -348,15 +352,15 @@ dawn_win_builderless_builder(
     ),
 )
 
-try_.builder(
+dawn_win_builderless_builder(
     name = "dawn-win11-arm64-deps-rel",
     branch_selector = branches.selector.WINDOWS_BRANCHES,
     mirrors = [
         "ci/Dawn Win11 arm64 DEPS Builder",
     ],
     gn_args = "ci/Dawn Win11 arm64 DEPS Builder",
-    os = os.WINDOWS_ANY,
     main_list_view = "try",
+    max_concurrent_builds = 5,
     test_presentation = resultdb.test_presentation(
         grouping_keys = ["status", "v.test_suite", "v.gpu"],
     ),
@@ -420,6 +424,23 @@ try_.builder(
     mirrors = [
         "ci/Dawn Android arm64 Builder",
         "ci/Dawn Android arm64 Experimental Release (Pixel 6)",
+    ],
+    gn_args = "ci/Dawn Android arm64 Builder",
+    pool = "luci.chromium.gpu.try",
+    builderless = True,
+    os = os.LINUX_DEFAULT,
+    max_concurrent_builds = 1,
+    test_presentation = resultdb.test_presentation(
+        grouping_keys = ["status", "v.test_suite", "v.gpu"],
+    ),
+)
+
+try_.builder(
+    name = "android-dawn-arm64-p10-rel",
+    description_html = "Runs ToT Dawn tests on Pixel 10 devices",
+    mirrors = [
+        "ci/Dawn Android arm64 Builder",
+        "ci/Dawn Android arm64 Release (Pixel 10)",
     ],
     gn_args = "ci/Dawn Android arm64 Builder",
     pool = "luci.chromium.gpu.try",
@@ -542,20 +563,6 @@ try_.builder(
 )
 
 try_.builder(
-    name = "dawn-try-chromeos-volteer-rel",
-    mirrors = [
-        "ci/Dawn ChromeOS Skylab Release (volteer)",
-    ],
-    gn_args = "ci/Dawn ChromeOS Skylab Release (volteer)",
-    pool = "luci.chromium.gpu.try",
-    builderless = True,
-    max_concurrent_builds = 1,
-    test_presentation = resultdb.test_presentation(
-        grouping_keys = ["status", "v.test_suite", "v.gpu"],
-    ),
-)
-
-try_.builder(
     name = "dawn-try-linux-x64-intel-uhd770-rel",
     description_html = "Runs ToT Dawn tests on 12th gen Intel CPUs with UHD 770 GPUs",
     mirrors = [
@@ -571,15 +578,13 @@ try_.builder(
     ),
 )
 
-try_.builder(
-    name = "dawn-try-linux-tsan-rel",
+dawn_mac_builder(
+    name = "dawn-try-mac-amd-555x-rel",
     mirrors = [
-        "ci/Dawn Linux TSAN Release",
+        "ci/Dawn Mac x64 Builder",
+        "ci/Dawn Mac x64 Release (AMD Radeon Pro 555X)",
     ],
-    gn_args = "ci/Dawn Linux TSAN Release",
-    pool = "luci.chromium.gpu.try",
-    builderless = True,
-    max_concurrent_builds = 1,
+    gn_args = "ci/Dawn Mac x64 Builder",
     test_presentation = resultdb.test_presentation(
         grouping_keys = ["status", "v.test_suite", "v.gpu"],
     ),
@@ -641,6 +646,20 @@ dawn_mac_builder(
         "ci/Dawn Mac x64 Experimental Release (Intel)",
     ],
     gn_args = "ci/Dawn Mac x64 Builder",
+    test_presentation = resultdb.test_presentation(
+        grouping_keys = ["status", "v.test_suite", "v.gpu"],
+    ),
+)
+
+# This will be moved into dawn-win11-arm64-deps-rel once the tests have been
+# confirmed to be stable enough.
+dawn_win_builderless_builder(
+    name = "dawn-try-win11-arm64-snapdragon-x-elite-deps-rel",
+    mirrors = [
+        "ci/Dawn Win11 arm64 DEPS Builder",
+        "ci/Dawn Win11 arm64 DEPS Release (Qualcomm Snapdragon X Elite)",
+    ],
+    gn_args = "ci/Dawn Win11 arm64 DEPS Builder",
     test_presentation = resultdb.test_presentation(
         grouping_keys = ["status", "v.test_suite", "v.gpu"],
     ),
@@ -727,12 +746,13 @@ dawn_win_builderless_builder(
     ),
 )
 
-dawn_win_builderful_builder(
+dawn_win_builderless_builder(
     name = "win11-arm64-dawn-rel",
     mirrors = [
         "ci/Dawn Win11 arm64 Builder",
     ],
     gn_args = "ci/Dawn Win11 arm64 Builder",
+    max_concurrent_builds = 6,
     test_presentation = resultdb.test_presentation(
         grouping_keys = ["status", "v.test_suite", "v.gpu"],
     ),

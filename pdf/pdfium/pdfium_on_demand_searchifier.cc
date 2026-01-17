@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "pdf/pdfium/pdfium_searchify.h"
@@ -109,16 +108,15 @@ void PDFiumOnDemandSearchifier::OnOcrDisconnected() {
   NOTREACHED();
 }
 
-bool PDFiumOnDemandSearchifier::IsPageScheduled(int page_index) const {
+bool PDFiumOnDemandSearchifier::IsPageScheduled(uint32_t page_index) const {
   if (current_page_ && current_page_->index() == page_index) {
     return true;
   }
 
-  return base::Contains(pages_queue_, page_index);
+  return std::ranges::contains(pages_queue_, page_index);
 }
 
-void PDFiumOnDemandSearchifier::SchedulePage(int page_index) {
-  CHECK_GE(page_index, 0);
+void PDFiumOnDemandSearchifier::SchedulePage(uint32_t page_index) {
   CHECK_NE(state_, State::kFailed);
   if (IsPageScheduled(page_index)) {
     return;
@@ -251,9 +249,10 @@ void PDFiumOnDemandSearchifier::CommitResultsToPage() {
   // Searchify next page.
   // If none of the scheduled pages are visible, post the task with more delay
   // to reduce CPU load.
-  bool long_delay = std::ranges::none_of(pages_queue_, [this](int page_index) {
-    return this->engine_->IsPageVisible(page_index);
-  });
+  bool long_delay =
+      std::ranges::none_of(pages_queue_, [this](uint32_t page_index) {
+        return this->engine_->IsPageVisible(page_index);
+      });
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
       FROM_HERE,
       base::BindOnce(&PDFiumOnDemandSearchifier::SearchifyNextPage,

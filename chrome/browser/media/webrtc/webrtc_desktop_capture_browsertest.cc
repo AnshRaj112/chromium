@@ -7,7 +7,6 @@
 #include "base/barrier_closure.h"
 #include "base/command_line.h"
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
@@ -135,16 +134,17 @@ class InfobarUIChangeObserver : public TabStripModelObserver {
       }
     }
   }
-  void TabChangedAt(content::WebContents* contents,
-                    int index,
-                    TabChangeType change_type) override {
-    if (observers_.find(contents) == observers_.end()) {
-      observers_[contents] =
+  void OnTabChangedAt(tabs::TabInterface* tab,
+                      int index,
+                      TabChangeType change_type) override {
+    if (observers_.find(tab->GetContents()) == observers_.end()) {
+      observers_[tab->GetContents()] =
           std::make_unique<InfoBarChangeObserver>(base::BindOnce(
               &InfobarUIChangeObserver::EraseObserver, base::Unretained(this)));
-      GetInfoBarManager(contents)->AddObserver(observers_[contents].get());
+      GetInfoBarManager(tab->GetContents())
+          ->AddObserver(observers_[tab->GetContents()].get());
       if (!barrier_closure_.is_null()) {
-        observers_[contents]->SetCallback(barrier_closure_);
+        observers_[tab->GetContents()]->SetCallback(barrier_closure_);
       }
     }
   }
@@ -190,7 +190,7 @@ class InfobarUIChangeObserver : public TabStripModelObserver {
       NOTREACHED();
     }
 
-    void OnManagerShuttingDown(infobars::InfoBarManager* manager) override {
+    void OnManagerWillBeDestroyed(infobars::InfoBarManager* manager) override {
       manager->RemoveObserver(this);
       DCHECK(!shutdown_callback_.is_null());
       std::move(shutdown_callback_).Run(this);

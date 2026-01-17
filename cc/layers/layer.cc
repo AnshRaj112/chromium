@@ -1187,6 +1187,21 @@ void Layer::SetCaptureBounds(viz::RegionCaptureBounds bounds) {
   SetSubtreePropertyChanged();
 }
 
+void Layer::SetTrackedElementBounds(TrackedElementBounds bounds) {
+  DCHECK(IsPropertyChangeAllowed());
+  const auto& rare_inputs = inputs_.Read(*this).rare_inputs;
+  if (!rare_inputs && bounds.empty()) {
+    return;
+  }
+  if (rare_inputs && rare_inputs->tracked_element_bounds == bounds) {
+    return;
+  }
+  EnsureRareInputs().tracked_element_bounds = std::move(bounds);
+  SetPropertyTreesNeedRebuild();
+  SetNeedsCommit();
+  SetSubtreePropertyChanged();
+}
+
 void Layer::SetWheelEventRegion(Region wheel_event_region) {
   DCHECK(IsPropertyChangeAllowed());
   const auto& rare_inputs = inputs_.Read(*this).rare_inputs;
@@ -1197,6 +1212,20 @@ void Layer::SetWheelEventRegion(Region wheel_event_region) {
   EnsureRareInputs().wheel_event_region = std::move(wheel_event_region);
   SetNeedsCommit();
 }
+
+#if BUILDFLAG(IS_ANDROID)
+void Layer::SetXrHitTestOrder(std::vector<ElementId> xr_hit_test_order) {
+  CHECK(IsPropertyChangeAllowed());
+  const auto& rare_inputs = inputs_.Read(*this).rare_inputs;
+  if (!rare_inputs && xr_hit_test_order.empty()) {
+    return;
+  }
+  if (rare_inputs && rare_inputs->xr_hit_test_order == xr_hit_test_order) {
+    return;
+  }
+  EnsureRareInputs().xr_hit_test_order = std::move(xr_hit_test_order);
+}
+#endif
 
 RenderSurfaceReason Layer::GetRenderSurfaceReason() const {
   if (!IsAttached())
@@ -1504,6 +1533,8 @@ void Layer::PushDirtyPropertiesTo(LayerImpl* layer,
       layer->SetNonCompositedScrollHitTestRects(
           inputs.rare_inputs->non_composited_scroll_hit_test_rects);
       layer->SetCaptureBounds(inputs.rare_inputs->capture_bounds);
+      layer->SetTrackedElementBounds(
+          inputs.rare_inputs->tracked_element_bounds);
       layer->SetWheelEventHandlerRegion(inputs.rare_inputs->wheel_event_region);
     } else {
       layer->ResetRareProperties();
@@ -1514,7 +1545,7 @@ void Layer::PushDirtyPropertiesTo(LayerImpl* layer,
     update_rect_.Write(*this) = gfx::Rect();
   }
 
-  layer->SetNeedsPushProperties();
+  layer->SetNeedsPushProperties(dirty_flag);
 }
 
 void Layer::PushPropertiesTo(LayerImpl* layer_impl,

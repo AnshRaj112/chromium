@@ -63,7 +63,7 @@ class ManifestTest : public testing::Test {
   };
 
   // Allows the test implementation to override a loaded test manifest's
-  // extension ID. Useful for testing features behind a allowlist.
+  // extension ID. Useful for testing features behind an allowlist.
   virtual std::string GetTestExtensionID() const;
 
   // Returns the path in which to find test manifest data files, for example
@@ -147,11 +147,7 @@ class ManifestTest : public testing::Test {
 
   // used to differentiate between calls to LoadAndExpectError,
   // LoadAndExpectWarning and LoadAndExpectSuccess via function RunTestcases.
-  enum ExpectType {
-    EXPECT_TYPE_ERROR,
-    EXPECT_TYPE_WARNING,
-    EXPECT_TYPE_SUCCESS
-  };
+  enum class ExpectType { kError, kWarning, kSuccess };
 
   struct Testcase {
     const std::string manifest_filename_;

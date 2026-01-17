@@ -5,7 +5,6 @@
 #include "components/viz/test/test_gles2_interface.h"
 
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/containers/heap_array.h"
 #include "base/containers/span.h"
 #include "base/functional/bind.h"
@@ -112,7 +111,7 @@ GLuint TestGLES2Interface::CreateProgram() {
 void TestGLES2Interface::BindTexture(GLenum target, GLuint texture) {
   if (!texture)
     return;
-  DCHECK(base::Contains(textures_, texture));
+  DCHECK(textures_.contains(texture));
   used_textures_.insert(texture);
 }
 
@@ -433,10 +432,6 @@ void TestGLES2Interface::set_support_texture_norm16(bool support) {
   test_capabilities_.texture_norm16 = support;
 }
 
-void TestGLES2Interface::set_gpu_rasterization(bool gpu_rasterization) {
-  test_capabilities_.gpu_rasterization = gpu_rasterization;
-}
-
 void TestGLES2Interface::set_max_texture_size(int size) {
   test_gl_capabilities_.max_texture_size = size;
   test_capabilities_.max_texture_size = size;
@@ -514,7 +509,7 @@ GLuint TestGLES2Interface::NextFramebufferId() {
 }
 
 void TestGLES2Interface::RetireFramebufferId(GLuint id) {
-  DCHECK(base::Contains(framebuffer_set_, id));
+  DCHECK(framebuffer_set_.contains(id));
   framebuffer_set_.erase(id);
 }
 
@@ -527,7 +522,7 @@ GLuint TestGLES2Interface::NextRenderbufferId() {
 }
 
 void TestGLES2Interface::RetireRenderbufferId(GLuint id) {
-  DCHECK(base::Contains(renderbuffer_set_, id));
+  DCHECK(renderbuffer_set_.contains(id));
   renderbuffer_set_.erase(id);
 }
 

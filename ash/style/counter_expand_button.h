@@ -5,11 +5,14 @@
 #ifndef ASH_STYLE_COUNTER_EXPAND_BUTTON_H_
 #define ASH_STYLE_COUNTER_EXPAND_BUTTON_H_
 
+#include <optional>
 #include <string>
 
 #include "ash/ash_export.h"
+#include "base/auto_reset.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "ui/gfx/image/image_skia.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/metadata/view_factory.h"
 
@@ -44,6 +47,11 @@ class ASH_EXPORT CounterExpandButton : public views::Button {
   CounterExpandButton(const CounterExpandButton&) = delete;
   CounterExpandButton& operator=(const CounterExpandButton&) = delete;
   ~CounterExpandButton() override;
+
+  // Forcibly enable/disable tooltip for testing.
+  // Destroying the return object unsets the state.
+  [[nodiscard]] static base::AutoReset<std::optional<bool>>
+  SetTooltipEnabledForTesting(bool value);
 
   void set_label_fading_out(bool label_fading_out) {
     label_fading_out_ = label_fading_out;
@@ -102,8 +110,6 @@ class ASH_EXPORT CounterExpandButton : public views::Button {
   virtual std::u16string GetCollapsedStateTooltipText() const;
 
  private:
-  void UpdateBackgroundColor();
-
   // Owned by views hierarchy.
   raw_ptr<views::Label> label_;
   raw_ptr<views::ImageView> image_;

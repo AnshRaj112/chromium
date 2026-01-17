@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 // Instructions for adding new entries to this file:
 // https://chromium.googlesource.com/chromium/src/+/main/docs/how_to_add_your_feature_flag.md#step-2_adding-the-feature-flag-to-the-chrome_flags-ui
 
@@ -16,6 +11,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <utility>
 
 #include "base/allocator/partition_alloc_features.h"
@@ -40,12 +36,13 @@
 #include "chrome/browser/apps/app_discovery_service/app_discovery_service.h"
 #include "chrome/browser/browser_features.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/default_browser/default_browser_features.h"
 #include "chrome/browser/devtools/features.h"
 #include "chrome/browser/flag_descriptions.h"
-#include "chrome/browser/ip_protection/ip_protection_switches.h"
 #include "chrome/browser/login_detection/login_detection_util.h"
 #include "chrome/browser/media/router/discovery/access_code/access_code_cast_constants.h"
 #include "chrome/browser/media/router/discovery/access_code/access_code_cast_feature.h"
+#include "chrome/browser/media/webrtc/desktop_media_picker.h"
 #include "chrome/browser/navigation_predictor/navigation_predictor_features.h"
 #include "chrome/browser/navigation_predictor/search_engine_preconnector.h"
 #include "chrome/browser/net/stub_resolver_config_reader.h"
@@ -58,18 +55,18 @@
 #include "chrome/browser/preloading/prefetch/search_prefetch/field_trial_settings.h"
 #include "chrome/browser/preloading/preloading_features.h"
 #include "chrome/browser/preloading/search_preload/search_preload_features.h"
-#include "chrome/browser/resource_coordinator/tab_manager_features.h"
 #include "chrome/browser/sharing_hub/sharing_hub_features.h"
 #include "chrome/browser/site_isolation/about_flags.h"
 #include "chrome/browser/task_manager/common/task_manager_features.h"
-#include "chrome/browser/tpcd/experiment/tpcd_experiment_features.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
+#include "chrome/browser/ui/omnibox/omnibox_next_features.h"
 #include "chrome/browser/ui/tabs/tab_group_home/constants.h"
 #include "chrome/browser/ui/toasts/toast_features.h"
 #include "chrome/browser/ui/ui_features.h"
-#include "chrome/browser/ui/webui/new_tab_page/composebox/composebox_fieldtrial.h"
+#include "chrome/browser/ui/webui/new_tab_page/composebox/variations/composebox_fieldtrial.h"
 #include "chrome/browser/unexpire_flags.h"
 #include "chrome/browser/unexpire_flags_gen.h"
+#include "chrome/browser/web_applications/isolated_web_apps/key_distribution/features.h"
 #include "chrome/browser/web_applications/link_capturing_features.h"
 #include "chrome/browser/webauthn/webauthn_switches.h"
 #include "chrome/common/buildflags.h"
@@ -79,12 +76,15 @@
 #include "chrome/common/chrome_switches.h"
 #include "components/android_autofill/browser/android_autofill_features.h"
 #include "components/assist_ranker/predictor_config_definitions.h"
+#include "components/autofill/core/browser/manual_testing_import.h"
 #include "components/autofill/core/browser/studies/autofill_experiments.h"
+#include "components/autofill/core/common/autofill_debug_features.h"
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/autofill/core/common/autofill_payments_features.h"
 #include "components/autofill/core/common/autofill_switches.h"
 #include "components/autofill/core/common/autofill_util.h"
 #include "components/browser_sync/browser_sync_switches.h"
+#include "components/browser_ui/accessibility/android/features.h"
 #include "components/browsing_data/core/features.h"
 #include "components/collaboration/public/features.h"
 #include "components/commerce/core/commerce_feature_list.h"
@@ -94,22 +94,20 @@
 #include "components/compose/buildflags.h"
 #include "components/compose/core/browser/compose_features.h"
 #include "components/content_settings/core/common/features.h"
-#include "components/contextual_search/core/browser/contextual_search_field_trial.h"
-#include "components/contextual_search/core/browser/public.h"
+#include "components/contextual_tasks/public/features.h"
 #include "components/data_sharing/public/features.h"
 #include "components/data_sharing/public/switches.h"
+#include "components/desktop_to_mobile_promos/features.h"
+#include "components/device_signals/core/common/signals_features.h"
 #include "components/dom_distiller/core/dom_distiller_features.h"
 #include "components/dom_distiller/core/dom_distiller_switches.h"
 #include "components/download/public/common/download_features.h"
-#include "components/enterprise/buildflags/buildflags.h"
+#include "components/enterprise/client_certificates/core/features.h"
 #include "components/enterprise/data_controls/core/browser/features.h"
-#include "components/enterprise/obfuscation/core/utils.h"
 #include "components/error_page/common/error_page_switches.h"
 #include "components/feature_engagement/public/feature_constants.h"
 #include "components/feature_engagement/public/feature_list.h"
 #include "components/feed/feed_feature_list.h"
-#include "components/fingerprinting_protection_filter/common/fingerprinting_protection_filter_features.h"
-#include "components/fingerprinting_protection_filter/interventions/common/interventions_features.h"
 #include "components/heavy_ad_intervention/heavy_ad_features.h"
 #include "components/history/core/browser/features.h"
 #include "components/history_clusters/core/config.h"
@@ -121,22 +119,23 @@
 #include "components/lens/buildflags.h"
 #include "components/lens/lens_features.h"
 #include "components/manta/features.h"
+#include "components/metrics/private_metrics/private_metrics_features.h"
 #include "components/mirroring/service/mirroring_features.h"
-#include "components/network_session_configurator/common/network_features.h"
 #include "components/network_session_configurator/common/network_switches.h"
 #include "components/no_state_prefetch/browser/no_state_prefetch_field_trial.h"
 #include "components/ntp_tiles/features.h"
 #include "components/offline_pages/core/offline_page_feature.h"
+#include "components/omnibox/browser/aim_eligibility_service_features.h"
 #include "components/omnibox/browser/omnibox_field_trial.h"
 #include "components/omnibox/common/omnibox_feature_configs.h"
 #include "components/omnibox/common/omnibox_features.h"
+#include "components/on_device_translation/buildflags/buildflags.h"
 #include "components/open_from_clipboard/clipboard_recent_content_features.h"
 #include "components/optimization_guide/core/model_execution/model_execution_features.h"
 #include "components/optimization_guide/core/optimization_guide_features.h"
 #include "components/optimization_guide/core/optimization_guide_switches.h"
 #include "components/page_content_annotations/core/page_content_annotations_features.h"
 #include "components/page_content_annotations/core/page_content_annotations_switches.h"
-#include "components/page_image_service/features.h"
 #include "components/page_info/core/features.h"
 #include "components/paint_preview/buildflags/buildflags.h"
 #include "components/paint_preview/features/features.h"
@@ -145,16 +144,20 @@
 #include "components/payments/core/features.h"
 #include "components/performance_manager/public/features.h"
 #include "components/permissions/features.h"
-#include "components/plus_addresses/features.h"
+#include "components/plus_addresses/core/common/features.h"
+#include "components/policy/core/common/features.h"
 #include "components/power_bookmarks/core/power_bookmark_features.h"
 #include "components/privacy_sandbox/privacy_sandbox_features.h"
 #include "components/regional_capabilities/regional_capabilities_switches.h"
 #include "components/remote_cocoa/app_shim/features.h"
 #include "components/safe_browsing/core/common/features.h"
+#include "components/safe_browsing/core/common/safebrowsing_switches.h"
+#include "components/safety_check/features.h"
 #include "components/saved_tab_groups/public/features.h"
 #include "components/search/ntp_features.h"
 #include "components/search_engines/search_engines_switches.h"
 #include "components/security_interstitials/content/stateful_ssl_host_state_delegate.h"
+#include "components/security_interstitials/core/features.h"
 #include "components/security_state/core/security_state.h"
 #include "components/segmentation_platform/embedder/home_modules/constants.h"
 #include "components/segmentation_platform/public/features.h"
@@ -171,10 +174,14 @@
 #include "components/soda/soda_features.h"
 #include "components/spellcheck/common/spellcheck_features.h"
 #include "components/spellcheck/spellcheck_buildflags.h"
+#include "components/strike_database/strike_database_features.h"
 #include "components/supervised_user/core/common/features.h"
 #include "components/supervised_user/core/common/supervised_user_constants.h"
 #include "components/sync/base/command_line_switches.h"
 #include "components/sync/base/features.h"
+#include "components/sync_preferences/features.h"
+#include "components/touch_to_search/core/browser/contextual_search_field_trial.h"
+#include "components/touch_to_search/core/browser/public.h"
 #include "components/tracing/common/tracing_switches.h"
 #include "components/translate/core/browser/translate_prefs.h"
 #include "components/translate/core/browser/translate_ranker_impl.h"
@@ -188,7 +195,6 @@
 #include "components/viz/common/features.h"
 #include "components/viz/common/switches.h"
 #include "components/webapps/browser/features.h"
-#include "components/webapps/isolated_web_apps/features.h"
 #include "components/webui/flags/feature_entry.h"
 #include "components/webui/flags/feature_entry_macros.h"
 #include "components/webui/flags/flags_state.h"
@@ -196,14 +202,14 @@
 #include "components/webui/flags/flags_ui_metrics.h"
 #include "components/webui/flags/flags_ui_switches.h"
 #include "components/webui/flags/pref_service_flags_storage.h"
-#include "content/public/common/buildflags.h"
+#include "content/common/features.h"
 #include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
 #include "device/base/features.h"
 #include "device/bluetooth/bluez/bluez_features.h"
 #include "device/bluetooth/chromeos_platform_features.h"
 #include "device/bluetooth/floss/floss_features.h"
-#include "device/fido/features.h"
+#include "device/fido/public/features.h"
 #include "device/gamepad/public/cpp/gamepad_features.h"
 #include "device/vr/buildflags/buildflags.h"
 #include "extensions/buildflags/buildflags.h"
@@ -232,12 +238,11 @@
 #include "services/network/public/cpp/network_switches.h"
 #include "services/tracing/public/cpp/tracing_features.h"
 #include "services/webnn/public/mojom/features.mojom-features.h"
-#include "skia/rusty_png_feature.h"
 #include "storage/browser/blob/features.h"
 #include "storage/browser/quota/quota_features.h"
+#include "third_party/blink/public/common/buildflags.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/common/features_generated.h"
-#include "third_party/blink/public/common/forcedark/forcedark_switches.h"
 #include "third_party/blink/public/common/switches.h"
 #include "ui/accessibility/accessibility_features.h"
 #include "ui/accessibility/accessibility_switches.h"
@@ -262,7 +267,6 @@
 #include "chrome/browser/contextmenu/context_menu_features.h"
 #include "chrome/browser/flags/android/chrome_feature_list.h"
 #include "chrome/browser/notifications/chime/android/features.h"
-#include "chrome/browser/push_messaging/push_messaging_features.h"
 #include "components/browser_ui/photo_picker/android/features.h"
 #include "components/credential_management/android/features.h"
 #include "components/enterprise/connectors/core/features.h"
@@ -270,7 +274,10 @@
 #include "components/facilitated_payments/core/features/features.h"
 #include "components/messages/android/messages_feature.h"
 #include "components/payments/content/android/payment_feature_map.h"
+#include "components/permissions/android/permissions_android_feature_map.h"
+#include "components/push_messaging/push_messaging_features.h"
 #include "components/translate/content/android/translate_message.h"
+#include "components/variations/net/omnibox_autofocus_http_headers.h"
 #include "ui/android/ui_android_features.h"
 #else  // BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/component_updater/iwa_key_distribution_component_installer.h"
@@ -286,7 +293,7 @@
 #include "ash/constants/ash_switches.h"
 #include "ash/public/cpp/app_list/app_list_features.h"
 #include "ash/public/cpp/keyboard/keyboard_switches.h"
-#include "base/process/process.h"
+#include "base/system/sys_info.h"
 #include "chrome/browser/apps/app_service/chrome_app_deprecation/chrome_app_deprecation.h"
 #include "chrome/browser/ash/app_list/search/search_features.h"
 #include "chrome/browser/ash/crostini/crostini_util.h"
@@ -298,11 +305,9 @@
 #include "chrome/browser/component_updater/cros_component_installer_chromeos.h"
 #include "chrome/browser/nearby_sharing/common/nearby_share_features.h"
 #include "chrome/common/webui_url_constants.h"
-#include "chromeos/ash/components/assistant/buildflags.h"
 #include "chromeos/ash/components/memory/swap_configuration.h"
 #include "chromeos/ash/experiences/arc/arc_features.h"
 #include "chromeos/ash/experiences/arc/arc_util.h"
-#include "chromeos/ash/services/assistant/public/cpp/features.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "chromeos/constants/chromeos_switches.h"
 #include "components/app_restore/features.h"
@@ -331,11 +336,19 @@
 #include "ui/ozone/public/ozone_switches.h"
 #endif
 
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || \
+    BUILDFLAG(IS_WIN)
 #include "chrome/browser/contextual_cueing/contextual_cueing_features.h"  // nogncheck
+#include "chrome/browser/enterprise/data_protection/data_protection_features.h"
 #include "chrome/browser/enterprise/profile_management/profile_management_features.h"
 #include "chrome/browser/enterprise/webstore/features.h"
-#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+#include "components/infobars/core/features.h"
+#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) ||
+        // BUILDFLAG(IS_WIN)
+
+#if BUILDFLAG(ENABLE_ON_DEVICE_TRANSLATION)
+#include "components/on_device_translation/features.h"
+#endif  // BUILDFLAG(ENABLE_ON_DEVICE_TRANSLATION)
 
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 #include "chrome/browser/enterprise/platform_auth/platform_auth_features.h"
@@ -345,11 +358,11 @@
 #include "components/unexportable_keys/features.h"  // nogncheck
 #endif
 
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 #include "chrome/browser/extensions/cws_info_service.h"
 #include "extensions/common/extension_features.h"
 #include "extensions/common/switches.h"
-#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 
 #if BUILDFLAG(ENABLE_PDF)
 #include "pdf/pdf_features.h"
@@ -436,41 +449,14 @@ const FeatureEntry::Choice kTouchTextSelectionStrategyChoices[] = {
      blink::switches::kTouchTextSelectionStrategy_Direction}};
 
 #if BUILDFLAG(IS_WIN)
-const FeatureEntry::FeatureParam kMediaFoundationClearStrategyUseFrameServer[] =
-    {{"strategy", "frame-server"}};
-
-const FeatureEntry::FeatureParam
-    kMediaFoundationClearStrategyUseDirectComposition[] = {
-        {"strategy", "direct-composition"}};
-
-const FeatureEntry::FeatureParam kMediaFoundationClearStrategyUseDynamic[] = {
-    {"strategy", "dynamic"}};
-
-const FeatureEntry::FeatureVariation kMediaFoundationClearStrategyVariations[] =
-    {{"Direct Composition", kMediaFoundationClearStrategyUseDirectComposition,
-      std::size(kMediaFoundationClearStrategyUseDirectComposition), nullptr},
-     {"Frame Server", kMediaFoundationClearStrategyUseFrameServer,
-      std::size(kMediaFoundationClearStrategyUseFrameServer), nullptr},
-     {"Dynamic", kMediaFoundationClearStrategyUseDynamic,
-      std::size(kMediaFoundationClearStrategyUseDynamic), nullptr}};
-
 const FeatureEntry::Choice kUseAngleChoicesWindows[] = {
     {flag_descriptions::kUseAngleDefault, "", ""},
-    {flag_descriptions::kUseAngleGL, switches::kUseANGLE,
-     gl::kANGLEImplementationOpenGLName},
     {flag_descriptions::kUseAngleD3D11, switches::kUseANGLE,
      gl::kANGLEImplementationD3D11Name},
     {flag_descriptions::kUseAngleD3D9, switches::kUseANGLE,
      gl::kANGLEImplementationD3D9Name},
-    {flag_descriptions::kUseAngleD3D11on12, switches::kUseANGLE,
-     gl::kANGLEImplementationD3D11on12Name}};
-#elif BUILDFLAG(IS_MAC)
-const FeatureEntry::Choice kUseAngleChoicesMac[] = {
-    {flag_descriptions::kUseAngleDefault, "", ""},
-    {flag_descriptions::kUseAngleGL, switches::kUseANGLE,
-     gl::kANGLEImplementationOpenGLName},
-    {flag_descriptions::kUseAngleMetal, switches::kUseANGLE,
-     gl::kANGLEImplementationMetalName}};
+    {flag_descriptions::kUseAngleD3D11Warp, switches::kUseANGLE,
+     gl::kANGLEImplementationD3D11WarpName}};
 #elif BUILDFLAG(IS_ANDROID)
 const FeatureEntry::Choice kUseAngleChoicesAndroid[] = {
     {flag_descriptions::kUseAngleDefault, "", ""},
@@ -506,22 +492,6 @@ const FeatureEntry::FeatureVariation kDXGIWaitableSwapChainVariations[] = {
     {"Max 1 Frame", &kDXGIWaitableSwapChain1Frame, 1, nullptr},
     {"Max 2 Frames", &kDXGIWaitableSwapChain2Frames, 1, nullptr},
     {"Max 3 Frames", &kDXGIWaitableSwapChain3Frames, 1, nullptr}};
-#endif
-
-#if BUILDFLAG(IS_LINUX)
-const FeatureEntry::Choice kOzonePlatformHintRuntimeChoices[] = {
-    {flag_descriptions::kOzonePlatformHintChoiceDefault, "", ""},
-    {flag_descriptions::kOzonePlatformHintChoiceAuto,
-     switches::kOzonePlatformHint, "auto"},
-#if BUILDFLAG(IS_OZONE_X11)
-    {flag_descriptions::kOzonePlatformHintChoiceX11,
-     switches::kOzonePlatformHint, "x11"},
-#endif
-#if BUILDFLAG(IS_OZONE_WAYLAND)
-    {flag_descriptions::kOzonePlatformHintChoiceWayland,
-     switches::kOzonePlatformHint, "wayland"},
-#endif
-};
 #endif
 
 #if BUILDFLAG(ENABLE_VR)
@@ -560,45 +530,32 @@ const FeatureEntry::Choice KWebXrHandAnonymizationChoices[] = {
 #endif  // ENABLE_VR
 
 #if BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kCCTAdaptiveButtonEnable[] = {
-    {"open_in_browser", "true"}};
-const FeatureEntry::FeatureParam kCCTAdaptiveButtonCPAOnly[] = {
-    {"contextual_only", "true"}};
-const FeatureEntry::FeatureParam kCCTAdaptiveButtonOpenInBrowserCPA[] = {
-    {"open_in_browser", "true"},
+const FeatureEntry::FeatureParam kCCTAdaptiveButton_CPA[] = {
     {"default_variant", "15"},  // 15 == Open In Browser
     {"contextual_only", "true"}};
-const FeatureEntry::FeatureParam kCCTAdaptiveButtonMenuOpenInBrowserTop[] = {
-    {"open_in_browser", "true"},
+const FeatureEntry::FeatureParam kCCTAdaptiveButton_CPA_RMFallbackMenu[] = {
+    {"default_variant", "15"},
+    {"contextual_only", "true"},
+    {"reader_mode_fallback_menu", "true"}};
+const FeatureEntry::FeatureParam kCCTAdaptiveButton_MenuOIB[] = {
     {"show_open_in_browser_menu_top", "true"}};
-const FeatureEntry::FeatureParam kCCTAdaptiveButtonMenuRemoval[] = {
-    {"open_in_browser", "true"},
-    {"remove_find_in_page_menu_item", "true"},
-    {"remove_desktop_site_menu_item", "true"}};
-const FeatureEntry::FeatureParam kCCTAdaptiveButtonMenuCombo[] = {
-    {"open_in_browser", "true"},
-    {"show_open_in_browser_menu_top", "true"},
-    {"remove_find_in_page_menu_item", "true"},
-    {"remove_desktop_site_menu_item", "true"}};
-const FeatureEntry::FeatureParam kCCTAdaptiveButtonMLTraining[] = {
-    {"ml_training", "true"},
-    {"open_in_browser", "true"}};
 const FeatureEntry::FeatureVariation kCCTAdaptiveButtonVariations[] = {
-    {"+OpenInBrowser", kCCTAdaptiveButtonEnable,
-     std::size(kCCTAdaptiveButtonEnable), nullptr},
-    {"CPA only", kCCTAdaptiveButtonCPAOnly,
-     std::size(kCCTAdaptiveButtonCPAOnly), nullptr},
-    {"CPA+OpenInBrowser", kCCTAdaptiveButtonOpenInBrowserCPA,
-     std::size(kCCTAdaptiveButtonOpenInBrowserCPA), nullptr},
-    {"Menu: OpenInBrowser at Top", kCCTAdaptiveButtonMenuOpenInBrowserTop,
-     std::size(kCCTAdaptiveButtonMenuOpenInBrowserTop), nullptr},
-    {"Menu: Remove FineInPage/DesktopSite", kCCTAdaptiveButtonMenuRemoval,
-     std::size(kCCTAdaptiveButtonMenuRemoval), nullptr},
-    {"Menu: Combine above 2", kCCTAdaptiveButtonMenuCombo,
-     std::size(kCCTAdaptiveButtonMenuCombo), nullptr},
-    {"for ML training", kCCTAdaptiveButtonMLTraining,
-     std::size(kCCTAdaptiveButtonMLTraining), nullptr},
+    {"Menu OIB moved up", kCCTAdaptiveButton_MenuOIB,
+     std::size(kCCTAdaptiveButton_MenuOIB), nullptr},
+    {"CPA+OIB", kCCTAdaptiveButton_CPA, std::size(kCCTAdaptiveButton_CPA),
+     nullptr},
+    {"CPA+OIB+RMFallbackMenu", kCCTAdaptiveButton_CPA_RMFallbackMenu,
+     std::size(kCCTAdaptiveButton_CPA_RMFallbackMenu), nullptr},
 };
+
+const FeatureEntry::Choice kAdpfEfficiencyChoices[] = {
+    {flags_ui::kGenericExperimentChoiceDefault, "", ""},
+    {"High Efficiency", switches::kEnableFeatures,
+     "EnableAdpfEfficiencyMode:mode/always_efficient"},
+    {"Adaptive", switches::kEnableFeatures,
+     "EnableAdpfEfficiencyMode:mode/adaptive"},
+    {"High Performance", switches::kEnableFeatures,
+     "EnableAdpfEfficiencyMode:mode/never"}};
 
 const FeatureEntry::FeatureParam kCCTAdaptiveButtonTestSwitchHide[] = {
     {"hide-button", "true"},
@@ -703,6 +660,26 @@ const FeatureEntry::FeatureVariation
          std::size(kCCTSingleDeckerBottomBarWithButtonsOnRightParam), nullptr},
 };
 
+const FeatureEntry::FeatureParam
+    kAndroidBottomToolbarV2ForceBottomForFocusedOmniboxParam[] = {
+        {"force_bottom_for_focused_omnibox", "true"}};
+const FeatureEntry::FeatureParam kAndroidBottomToolbarV2ReverseListParam[] = {
+    {"reverse_order_suggestions_list", "true"}};
+const FeatureEntry::FeatureParam kAndroidBottomToolbarV2ReverseAndForce[] = {
+    {"force_bottom_for_focused_omnibox", "true"},
+    {"reverse_order_suggestions_list", "true"}};
+
+const FeatureEntry::FeatureVariation kAndroidBottomToolbarV2Variations[] = {
+    {"Force bottom for focused omnibox",
+     kAndroidBottomToolbarV2ForceBottomForFocusedOmniboxParam,
+     std::size(kAndroidBottomToolbarV2ForceBottomForFocusedOmniboxParam),
+     nullptr},
+    {"Reverse List", kAndroidBottomToolbarV2ReverseListParam,
+     std::size(kAndroidBottomToolbarV2ReverseListParam), nullptr},
+    {"Reverse list and force bottom for focused omnibox",
+     kAndroidBottomToolbarV2ReverseAndForce,
+     std::size(kAndroidBottomToolbarV2ReverseAndForce), nullptr}};
+
 const FeatureEntry::Choice kReaderModeHeuristicsChoices[] = {
     {flags_ui::kGenericExperimentChoiceDefault, "", ""},
     {flag_descriptions::kReaderModeHeuristicsMarkup,
@@ -793,16 +770,6 @@ const FeatureEntry::FeatureVariation kOmahaMinSdkVersionAndroidVariations[] = {
      std::size(kOmahaMinSdkVersionAndroidMinSdk1000), nullptr},
 };
 
-const FeatureEntry::FeatureParam
-    kOptimizationGuidePersonalizedFetchingAllowPageInsights[] = {
-        {"allowed_contexts", "CONTEXT_PAGE_INSIGHTS_HUB"}};
-const FeatureEntry::FeatureVariation
-    kOptimizationGuidePersonalizedFetchingAllowPageInsightsVariations[] = {
-        {"for Page Insights",
-         kOptimizationGuidePersonalizedFetchingAllowPageInsights,
-         std::size(kOptimizationGuidePersonalizedFetchingAllowPageInsights),
-         nullptr}};
-
 const FeatureEntry::FeatureParam kFeedHeaderRemovalParam1 = {
     feed::kFeedHeaderRemovalTreatmentParam,
     feed::kFeedHeaderRemovalTreatmentValue1};
@@ -823,69 +790,6 @@ const FeatureEntry::Choice kSafetyHubUnifiedPasswordsModuleChoices[] = {
 };
 
 #endif  // BUILDFLAG(IS_ANDROID)
-
-#if !BUILDFLAG(IS_CHROMEOS)
-const FeatureEntry::FeatureParam kForceDark_SimpleHsl[] = {
-    {"inversion_method", "hsl_based"},
-    {"image_behavior", "none"},
-    {"foreground_lightness_threshold", "150"},
-    {"background_lightness_threshold", "205"}};
-
-const FeatureEntry::FeatureParam kForceDark_SimpleCielab[] = {
-    {"inversion_method", "cielab_based"},
-    {"image_behavior", "none"},
-    {"foreground_lightness_threshold", "150"},
-    {"background_lightness_threshold", "205"}};
-
-const FeatureEntry::FeatureParam kForceDark_SimpleRgb[] = {
-    {"inversion_method", "rgb_based"},
-    {"image_behavior", "none"},
-    {"foreground_lightness_threshold", "150"},
-    {"background_lightness_threshold", "205"}};
-
-// Keep in sync with the kForceDark_SelectiveImageInversion
-// in aw_feature_entries.cc if you tweak these parameters.
-const FeatureEntry::FeatureParam kForceDark_SelectiveImageInversion[] = {
-    {"inversion_method", "cielab_based"},
-    {"image_behavior", "selective"},
-    {"foreground_lightness_threshold", "150"},
-    {"background_lightness_threshold", "205"}};
-
-const FeatureEntry::FeatureParam kForceDark_SelectiveElementInversion[] = {
-    {"inversion_method", "cielab_based"},
-    {"image_behavior", "none"},
-    {"foreground_lightness_threshold", "150"},
-    {"background_lightness_threshold", "205"}};
-
-const FeatureEntry::FeatureParam kForceDark_SelectiveGeneralInversion[] = {
-    {"inversion_method", "cielab_based"},
-    {"image_behavior", "selective"},
-    {"foreground_lightness_threshold", "150"},
-    {"background_lightness_threshold", "205"}};
-
-const FeatureEntry::FeatureParam kForceDark_TransparencyAndNumColors[] = {
-    {"classifier_policy", "transparency_and_num_colors"}};
-
-const FeatureEntry::FeatureVariation kForceDarkVariations[] = {
-    {"with simple HSL-based inversion", kForceDark_SimpleHsl,
-     std::size(kForceDark_SimpleHsl), nullptr},
-    {"with simple CIELAB-based inversion", kForceDark_SimpleCielab,
-     std::size(kForceDark_SimpleCielab), nullptr},
-    {"with simple RGB-based inversion", kForceDark_SimpleRgb,
-     std::size(kForceDark_SimpleRgb), nullptr},
-    {"with selective image inversion", kForceDark_SelectiveImageInversion,
-     std::size(kForceDark_SelectiveImageInversion), nullptr},
-    {"with selective inversion of non-image elements",
-     kForceDark_SelectiveElementInversion,
-     std::size(kForceDark_SelectiveElementInversion), nullptr},
-    {"with selective inversion of everything",
-     kForceDark_SelectiveGeneralInversion,
-     std::size(kForceDark_SelectiveGeneralInversion), nullptr},
-    {"with selective image inversion based on transparency and number of "
-     "colors",
-     kForceDark_TransparencyAndNumColors,
-     std::size(kForceDark_TransparencyAndNumColors), nullptr}};
-#endif  // !BUILDFLAG(IS_CHROMEOS)
 
 const FeatureEntry::FeatureParam
     kWebIdentityDigitalIdentityCredentialNoDialogParam[] = {
@@ -967,6 +871,71 @@ const FeatureEntry::FeatureVariation
         {"with holdback", kSearchPrefetchWithHoldback,
          std::size(kSearchPrefetchWithHoldback), nullptr}};
 
+#if !BUILDFLAG(IS_ANDROID)
+const FeatureEntry::FeatureParam
+    kWebUIOmniboxAimPopupAddContextButtonBelowResults[] = {
+        {"AddContextButtonVariant", "below_results"},
+};
+const FeatureEntry::FeatureParam kWebUIOmniboxAimPopupAddContextButtonInline[] =
+    {
+        {"AddContextButtonVariant", "inline"},
+};
+const FeatureEntry::FeatureParam
+    kWebUIOmniboxAimPopupAddContextButtonAboveResults[] = {
+        {"AddContextButtonVariant", "above_results"},
+};
+const FeatureEntry::FeatureParam
+    kWebUIOmniboxAimPopupAddContextButtonBelowResultsNoContextualChips[] = {
+        {"AddContextButtonVariant", "below_results"},
+        {"ShowRecentTabChip", "false"},
+        {"ShowLensSearchChip", "false"},
+};
+const FeatureEntry::FeatureParam
+    kWebUIOmniboxAimPopupAddContextButtonInlineNoContextualChips[] = {
+        {"AddContextButtonVariant", "inline"},
+        {"ShowRecentTabChip", "false"},
+        {"ShowLensSearchChip", "false"},
+};
+const FeatureEntry::FeatureParam
+    kWebUIOmniboxAimPopupAddContextButtonAboveResultsNoContextualChips[] = {
+        {"AddContextButtonVariant", "above_results"},
+        {"ShowRecentTabChip", "false"},
+        {"ShowLensSearchChip", "false"},
+};
+
+const FeatureEntry::FeatureVariation kWebUIOmniboxAimPopupVariations[] = {
+    {"- \"Add Context\" button below results",
+     kWebUIOmniboxAimPopupAddContextButtonBelowResults,
+     std::size(kWebUIOmniboxAimPopupAddContextButtonBelowResults), nullptr},
+    {"- \"Add Context\" button below results - no contextual chips",
+     kWebUIOmniboxAimPopupAddContextButtonBelowResultsNoContextualChips,
+     std::size(
+         kWebUIOmniboxAimPopupAddContextButtonBelowResultsNoContextualChips),
+     nullptr},
+    {"- \"Add Context\" button inline",
+     kWebUIOmniboxAimPopupAddContextButtonInline,
+     std::size(kWebUIOmniboxAimPopupAddContextButtonInline), nullptr},
+    {"- \"Add Context\" button inline - no contextual chips",
+     kWebUIOmniboxAimPopupAddContextButtonInlineNoContextualChips,
+     std::size(kWebUIOmniboxAimPopupAddContextButtonInlineNoContextualChips),
+     nullptr},
+    {"- \"Add Context\" button above results [deprecated]",
+     kWebUIOmniboxAimPopupAddContextButtonAboveResults,
+     std::size(kWebUIOmniboxAimPopupAddContextButtonAboveResults), nullptr},
+    {"- \"Add Context\" button above results - no contextual chips "
+     "[deprecated]",
+     kWebUIOmniboxAimPopupAddContextButtonAboveResultsNoContextualChips,
+     std::size(
+         kWebUIOmniboxAimPopupAddContextButtonAboveResultsNoContextualChips),
+     nullptr}};
+
+const FeatureEntry::FeatureParam kWebUIOmniboxPopupDebugSxS[] = {
+    {"SxS", "true"}};
+const FeatureEntry::FeatureVariation kWebUIOmniboxPopupDebugVariations[] = {
+    {"Side by Side", kWebUIOmniboxPopupDebugSxS,
+     std::size(kWebUIOmniboxPopupDebugSxS), nullptr}};
+#endif  // !BUILDFLAG(IS_ANDROID)
+
 #if BUILDFLAG(IS_CHROMEOS)
 const FeatureEntry::FeatureParam kArcVmMemorySizeShift_200[] = {
     {"shift_mib", "-200"}};
@@ -1005,25 +974,6 @@ const FeatureEntry::FeatureVariation
         {"for prerendering page", kEnableLazyLoadImageForPrerenderPage,
          std::size(kEnableLazyLoadImageForPrerenderPage), nullptr}};
 
-const FeatureEntry::FeatureParam kSoftNavigationHeuristicsBasic[] = {
-    {"mode", "basic"}};
-const FeatureEntry::FeatureParam
-    kSoftNavigationHeuristicsAdvancedPaintAttribution[] = {
-        {"mode", "advanced_paint_attribution"}};
-const FeatureEntry::FeatureParam
-    kSoftNavigationHeuristicsPrePaintBasedAttribution[] = {
-        {"mode", "pre_paint_based_attribution"}};
-
-const FeatureEntry::FeatureVariation kSoftNavigationHeuristicsVariations[] = {
-    {"Basic (default)", kSoftNavigationHeuristicsBasic,
-     std::size(kSoftNavigationHeuristicsBasic), nullptr},
-    {"Advanced Paint Attribution (Lazy Uncached Paint Walk)",
-     kSoftNavigationHeuristicsAdvancedPaintAttribution,
-     std::size(kSoftNavigationHeuristicsAdvancedPaintAttribution), nullptr},
-    {"Advanced Paint Attribution (Eager Cached Pre-Paint Walk)",
-     kSoftNavigationHeuristicsPrePaintBasedAttribution,
-     std::size(kSoftNavigationHeuristicsPrePaintBasedAttribution), nullptr}};
-
 const FeatureEntry::Choice kTopChromeTouchUiChoices[] = {
     {flags_ui::kGenericExperimentChoiceDefault, "", ""},
     {flags_ui::kGenericExperimentChoiceAutomatic, switches::kTopChromeTouchUi,
@@ -1032,26 +982,6 @@ const FeatureEntry::Choice kTopChromeTouchUiChoices[] = {
      switches::kTopChromeTouchUiDisabled},
     {flags_ui::kGenericExperimentChoiceEnabled, switches::kTopChromeTouchUi,
      switches::kTopChromeTouchUiEnabled}};
-
-#if BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kCctSignInPromptAlways[] = {
-    {"cadence_day", "0"},
-    {"show_limit", "10000"},
-    {"user_act_count", "10000"},
-    {"if_allowed_by_embedder", "true"},
-    {"if_enabled_by_embedder", "true"}};
-const FeatureEntry::FeatureParam kCctSignInTestOnly[] = {
-    {"cadence_day", "0"},
-    {"show_limit", "4"},
-    {"user_act_count", "2"},
-    {"if_allowed_by_embedder", "true"},
-    {"if_enabled_by_embedder", "true"}};
-
-const FeatureEntry::FeatureVariation kCctSignInPromptVariations[] = {
-    {"always show", kCctSignInPromptAlways, std::size(kCctSignInPromptAlways),
-     nullptr},
-    {"for test", kCctSignInTestOnly, std::size(kCctSignInTestOnly), nullptr}};
-#endif
 
 #if BUILDFLAG(IS_CHROMEOS)
 
@@ -1089,12 +1019,6 @@ const FeatureEntry::Choice kForceTextDirectionChoices[] = {
      switches::kForceDirectionLTR},
     {flag_descriptions::kForceDirectionRtl, switches::kForceTextDirection,
      switches::kForceDirectionRTL},
-};
-
-const FeatureEntry::Choice kIpProtectionProxyOptOutChoices[] = {
-    {flag_descriptions::kIpProtectionProxyOptOutChoiceDefault, "", ""},
-    {flag_descriptions::kIpProtectionProxyOptOutChoiceOptOut,
-     switches::kDisableIpProtectionProxy, ""},
 };
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1160,6 +1084,10 @@ const FeatureEntry::Choice kMemlogModeChoices[] = {
      heap_profiling::kMemlogModeAllRenderers},
     {flag_descriptions::kMemlogModeRendererSampling,
      heap_profiling::kMemlogMode, heap_profiling::kMemlogModeRendererSampling},
+    {flag_descriptions::kMemlogModeUtilitySampling, heap_profiling::kMemlogMode,
+     heap_profiling::kMemlogModeUtilitySampling},
+    {flag_descriptions::kMemlogModeAllUtilities, heap_profiling::kMemlogMode,
+     heap_profiling::kMemlogModeAllUtilities},
 };
 
 const FeatureEntry::Choice kMemlogStackModeChoices[] = {
@@ -1214,19 +1142,31 @@ const FeatureEntry::FeatureVariation kTextSafetyClassifierVariations[] = {
 };
 
 const FeatureEntry::FeatureParam kPageActionsMigrationParams[] = {
+    {"ai_mode", "true"},
     {"autofill_address", "true"},
+    {"bookmark_star", "true"},
+    {"cookie_controls", "true"},
+    {"click_to_call", "true"},
+    {"collaboration_messaging", "true"},
     {"discounts", "true"},
     {"file_system_access", "true"},
+    {"filled_card_information", "true"},
     {"find", "true"},
     {"intent_picker", "true"},
     {"lens_overlay", "true"},
+    {"lens_overlay_homework", "true"},
+    {"manage_passwords", "true"},
+    {"mandatory_reauth", "true"},
     {"memory_saver", "true"},
     {"offer_notification", "true"},
     {"price_insights", "true"},
     {"price_tracking", "true"},
-    {"product_specifications", "true"},
     {"pwa_install", "true"},
+    {"reading_mode", "true"},
+    {"save_payments", "true"},
+    {"sharing_hub", "true"},
     {"translate", "true"},
+    {"virtual_card", "true"},
     {"zoom", "true"},
 };
 const FeatureEntry::FeatureVariation kPageActionsMigrationVariations[] = {
@@ -1288,9 +1228,55 @@ const FeatureEntry::FeatureVariation kJourneysVariations[] = {
      std::size(kJourneysAllLocalesParams), nullptr},
 };
 
-const FeatureEntry::FeatureVariation
-    kImageServiceOptimizationGuideSalientImagesVariations[] = {
-        {"High Performance Canonicalization", nullptr, 0, "3362133"},
+const FeatureEntry::FeatureParam
+    kLensAimSuggestionsTypeContextualWith3Suggestions[] = {
+        {"lens-aim-suggestions-type", "Contextual"},
+        {"number-of-aim-suggestions", "3"}};
+
+const FeatureEntry::FeatureParam
+    kLensAimSuggestionsTypeContextualWith5Suggestions[] = {
+        {"lens-aim-suggestions-type", "Contextual"},
+        {"number-of-aim-suggestions", "5"}};
+
+const FeatureEntry::FeatureParam
+    kLensAimSuggestionsTypeContextualWith8Suggestions[] = {
+        {"lens-aim-suggestions-type", "Contextual"},
+        {"number-of-aim-suggestions", "8"}};
+
+const FeatureEntry::FeatureParam
+    kLensAimSuggestionsTypeMultimodalWith3Suggestions[] = {
+        {"lens-aim-suggestions-type", "Multimodal"},
+        {"number-of-aim-suggestions", "3"}};
+
+const FeatureEntry::FeatureParam
+    kLensAimSuggestionsTypeMultimodalWith5Suggestions[] = {
+        {"lens-aim-suggestions-type", "Multimodal"},
+        {"number-of-aim-suggestions", "5"}};
+
+const FeatureEntry::FeatureParam
+    kLensAimSuggestionsTypeMultimodalWith8Suggestions[] = {
+        {"lens-aim-suggestions-type", "Multimodal"},
+        {"number-of-aim-suggestions", "8"}};
+
+const FeatureEntry::FeatureVariation kLensAimSuggestionsVariations[] = {
+    {"with Contextual - 3 suggestions",
+     kLensAimSuggestionsTypeContextualWith3Suggestions,
+     std::size(kLensAimSuggestionsTypeContextualWith3Suggestions), nullptr},
+    {"with Contextual - 5 suggestions",
+     kLensAimSuggestionsTypeContextualWith5Suggestions,
+     std::size(kLensAimSuggestionsTypeContextualWith5Suggestions), nullptr},
+    {"with Contextual - 8 suggestions",
+     kLensAimSuggestionsTypeContextualWith8Suggestions,
+     std::size(kLensAimSuggestionsTypeContextualWith8Suggestions), nullptr},
+    {"with Multimodal - 3 suggestions",
+     kLensAimSuggestionsTypeMultimodalWith3Suggestions,
+     std::size(kLensAimSuggestionsTypeMultimodalWith3Suggestions), nullptr},
+    {"with Multimodal - 5 suggestions",
+     kLensAimSuggestionsTypeMultimodalWith5Suggestions,
+     std::size(kLensAimSuggestionsTypeMultimodalWith5Suggestions), nullptr},
+    {"with Multimodal - 8 suggestions",
+     kLensAimSuggestionsTypeMultimodalWith8Suggestions,
+     std::size(kLensAimSuggestionsTypeMultimodalWith8Suggestions), nullptr},
 };
 
 const FeatureEntry::FeatureVariation kRemotePageMetadataVariations[] = {
@@ -1338,47 +1324,6 @@ const FeatureEntry::FeatureVariation kOmniboxStarterPackExpansionVariations[] =
       std::size(kOmniboxStarterPackExpansionPreProdUrl), nullptr},
      {"staging url", kOmniboxStarterPackExpansionStagingUrl,
       std::size(kOmniboxStarterPackExpansionStagingUrl), nullptr}};
-
-const FeatureEntry::FeatureParam kOmniboxSearchAggregatorProdParams[] = {
-    {"name", "Agentspace"},
-    {"shortcut", "agentspace"},
-    {"search_url",
-     "https://vertexaisearch.cloud.google.com/home/cid/"
-     "8884f744-aae1-4fbc-8a64-b8bf7cbf270e?q={searchTerms}"},
-    {"suggest_url",
-     "https://discoveryengine.googleapis.com/v1alpha/projects/862721868538/"
-     "locations/global/collections/default_collection/engines/"
-     "teamfood-v11_1720671063545/completionConfig:completeQuery"}};
-const FeatureEntry::FeatureParam kOmniboxSearchAggregatorStagingParams[] = {
-    {"name", "Agentspace (staging)"},
-    {"shortcut", "agentspace"},
-    {"icon_url", "https://gstatic.com/vertexaisearch/favicon.png"},
-    {"search_url",
-     "https://vertexaisearch.cloud.google.com/home/cid/"
-     "3abd7045-7845-4f83-b204-e39fcbca3494?q={searchTerms}&mods=widget_staging_"
-     "api_mod"},
-    {"suggest_url",
-     "https://staging-discoveryengine.sandbox.googleapis.com/v1alpha/projects/"
-     "862721868538/locations/global/collections/default_collection/engines/"
-     "teamfood-v11/completionConfig:completeQuery"}};
-const FeatureEntry::FeatureParam kOmniboxSearchAggregatorDemoParams[] = {
-    {"name", "Neuravibe"},
-    {"shortcut", "neura"},
-    {"icon_url", "https://gstatic.com/vertexaisearch/favicon.png"},
-    {"search_url",
-     "https://vertexaisearch.cloud.google.com/home/cid/"
-     "8e21c7cd-cbfe-4162-baf4-3381fc43546e?q={searchTerms}"},
-    {"suggest_url",
-     "https://discoveryengine.googleapis.com/v1alpha/projects/977834784893/"
-     "locations/global/collections/default_collection/engines/"
-     "neuravibeenterprisesearch_1732204320742/completionConfig:completeQuery"}};
-const FeatureEntry::FeatureVariation kOmniboxSearchAggregatorVariations[] = {
-    {"prod", kOmniboxSearchAggregatorProdParams,
-     std::size(kOmniboxSearchAggregatorProdParams), nullptr},
-    {"staging", kOmniboxSearchAggregatorStagingParams,
-     std::size(kOmniboxSearchAggregatorStagingParams), nullptr},
-    {"demo", kOmniboxSearchAggregatorDemoParams,
-     std::size(kOmniboxSearchAggregatorDemoParams), nullptr}};
 
 const FeatureEntry::FeatureParam kOmniboxUrlSuggestionsOnFocusTwoDayWindow[] = {
     {"OnFocusMostVisitedRecencyWindow", "1"},
@@ -1498,6 +1443,32 @@ const FeatureEntry::FeatureVariation
          std::size(kOmniboxContextualSearchOnFocusSuggestionsLimit4), nullptr},
 };
 
+const FeatureEntry::FeatureParam kOmniboxAimEntryPointHintLimitsDaily1[] = {
+    {"HideAimHintText", "false"},
+    {"HideAimHintTextOnNtpOpen", "false"},
+    {"AimHintImpressionLimitDaily", "1"},
+    {"AimHintImpressionLimitTotal", "5"},
+    {"EnableHintImpressionLimits", "true"}};
+const FeatureEntry::FeatureParam kOmniboxAimEntryPointHintLimitsDaily3[] = {
+    {"HideAimHintText", "false"},
+    {"HideAimHintTextOnNtpOpen", "false"},
+    {"AimHintImpressionLimitDaily", "3"},
+    {"AimHintImpressionLimitTotal", "10"},
+    {"EnableHintImpressionLimits", "true"}};
+const FeatureEntry::FeatureParam kOmniboxAimEntryPointHintLimitsUnlimited[] = {
+    {"HideAimHintText", "false"},
+    {"HideAimHintTextOnNtpOpen", "false"},
+    {"EnableHintImpressionLimits", "false"}};
+
+const FeatureEntry::FeatureVariation kOmniboxAiModeEntryPointVariations[] = {
+    {"Hint Limits Daily 1 Total 5", kOmniboxAimEntryPointHintLimitsDaily1,
+     std::size(kOmniboxAimEntryPointHintLimitsDaily1), nullptr},
+    {"Hint Limits Daily 3 Total 10", kOmniboxAimEntryPointHintLimitsDaily3,
+     std::size(kOmniboxAimEntryPointHintLimitsDaily3), nullptr},
+    {"Hint Limits Unlimited", kOmniboxAimEntryPointHintLimitsUnlimited,
+     std::size(kOmniboxAimEntryPointHintLimitsUnlimited), nullptr},
+};
+
 const FeatureEntry::FeatureParam
     kContextualSuggestionsAblateOthersWhenPresentAblateAll[] = {
         {"AblateSearchOnly", "false"},
@@ -1529,37 +1500,42 @@ const FeatureEntry::FeatureVariation
          nullptr},
 };
 
-const FeatureEntry::FeatureParam kOmniboxToolbeltVariant1[] = {
+const FeatureEntry::Choice kContextualSuggestionsUiImprovementsChoices[] = {
+    {flags_ui::kGenericExperimentChoiceDefault, "", ""},
+    {flags_ui::kGenericExperimentChoiceEnabled, switches::kEnableFeatures,
+     "LoadingSuggestionsAnimation,SuggestionsFulfilledByLensSupported,"
+     "OpenLensActionUITweaks"},
+};
+
+const FeatureEntry::FeatureParam kOmniboxToolbeltLensActionsZeroInputs[] = {
     {"KeepToolbeltAfterInput", "false"},
-    {"AlwaysIncludeLensAction", "false"},
     {"ShowLensActionOnNonNtp", "true"},
     {"ShowLensActionOnNtp", "false"},
-    {"ShowAiModeActionOnNonNtp", "true"},
-    {"ShowAiModeActionOnNtp", "true"},
+    {"ShowAiModeActionOnNonNtp", "false"},
+    {"ShowAiModeActionOnNtp", "false"},
     {"ShowHistoryActionOnNonNtp", "true"},
     {"ShowHistoryActionOnNtp", "true"},
     {"ShowBookmarksActionOnNonNtp", "true"},
     {"ShowBookmarksActionOnNtp", "true"},
-    {"ShowTabsActionOnNonNtp", "false"},
-    {"ShowTabsActionOnNtp", "false"},
+    {"ShowTabsActionOnNonNtp", "true"},
+    {"ShowTabsActionOnNtp", "true"},
 };
-const FeatureEntry::FeatureParam kOmniboxToolbeltVariant2[] = {
-    {"KeepToolbeltAfterInput", "true"},
-    {"AlwaysIncludeLensAction", "false"},
-    {"ShowLensActionOnNonNtp", "true"},
-    {"ShowLensActionOnNtp", "false"},
-    {"ShowAiModeActionOnNonNtp", "true"},
-    {"ShowAiModeActionOnNtp", "true"},
-    {"ShowHistoryActionOnNonNtp", "true"},
-    {"ShowHistoryActionOnNtp", "true"},
-    {"ShowBookmarksActionOnNonNtp", "true"},
-    {"ShowBookmarksActionOnNtp", "true"},
-    {"ShowTabsActionOnNonNtp", "false"},
-    {"ShowTabsActionOnNtp", "false"},
+const FeatureEntry::FeatureParam kOmniboxToolbeltLensActionsZeroTypedInputs[] =
+    {
+        {"KeepToolbeltAfterInput", "true"},
+        {"ShowLensActionOnNonNtp", "true"},
+        {"ShowLensActionOnNtp", "false"},
+        {"ShowAiModeActionOnNonNtp", "false"},
+        {"ShowAiModeActionOnNtp", "false"},
+        {"ShowHistoryActionOnNonNtp", "true"},
+        {"ShowHistoryActionOnNtp", "true"},
+        {"ShowBookmarksActionOnNonNtp", "true"},
+        {"ShowBookmarksActionOnNtp", "true"},
+        {"ShowTabsActionOnNonNtp", "true"},
+        {"ShowTabsActionOnNtp", "true"},
 };
-const FeatureEntry::FeatureParam kOmniboxToolbeltVariant3[] = {
+const FeatureEntry::FeatureParam kOmniboxToolbeltAiActionsZeroInputs[] = {
     {"KeepToolbeltAfterInput", "false"},
-    {"AlwaysIncludeLensAction", "false"},
     {"ShowLensActionOnNonNtp", "false"},
     {"ShowLensActionOnNtp", "false"},
     {"ShowAiModeActionOnNonNtp", "true"},
@@ -1571,9 +1547,8 @@ const FeatureEntry::FeatureParam kOmniboxToolbeltVariant3[] = {
     {"ShowTabsActionOnNonNtp", "true"},
     {"ShowTabsActionOnNtp", "true"},
 };
-const FeatureEntry::FeatureParam kOmniboxToolbeltVariant4[] = {
+const FeatureEntry::FeatureParam kOmniboxToolbeltAiActionsZeroTypedInputs[] = {
     {"KeepToolbeltAfterInput", "true"},
-    {"AlwaysIncludeLensAction", "false"},
     {"ShowLensActionOnNonNtp", "false"},
     {"ShowLensActionOnNtp", "false"},
     {"ShowAiModeActionOnNonNtp", "true"},
@@ -1584,10 +1559,36 @@ const FeatureEntry::FeatureParam kOmniboxToolbeltVariant4[] = {
     {"ShowBookmarksActionOnNtp", "true"},
     {"ShowTabsActionOnNonNtp", "true"},
     {"ShowTabsActionOnNtp", "true"},
+};
+const FeatureEntry::FeatureParam kOmniboxToolbeltLensAiActionsZeroInputs[] = {
+    {"KeepToolbeltAfterInput", "false"},
+    {"ShowLensActionOnNonNtp", "true"},
+    {"ShowLensActionOnNtp", "false"},
+    {"ShowAiModeActionOnNonNtp", "true"},
+    {"ShowAiModeActionOnNtp", "true"},
+    {"ShowHistoryActionOnNonNtp", "true"},
+    {"ShowHistoryActionOnNtp", "true"},
+    {"ShowBookmarksActionOnNonNtp", "true"},
+    {"ShowBookmarksActionOnNtp", "true"},
+    {"ShowTabsActionOnNonNtp", "false"},
+    {"ShowTabsActionOnNtp", "false"},
+};
+const FeatureEntry::FeatureParam
+    kOmniboxToolbeltLensAiActionsZeroTypedInputs[] = {
+        {"KeepToolbeltAfterInput", "true"},
+        {"ShowLensActionOnNonNtp", "true"},
+        {"ShowLensActionOnNtp", "false"},
+        {"ShowAiModeActionOnNonNtp", "true"},
+        {"ShowAiModeActionOnNtp", "true"},
+        {"ShowHistoryActionOnNonNtp", "true"},
+        {"ShowHistoryActionOnNtp", "true"},
+        {"ShowBookmarksActionOnNonNtp", "true"},
+        {"ShowBookmarksActionOnNtp", "true"},
+        {"ShowTabsActionOnNonNtp", "false"},
+        {"ShowTabsActionOnNtp", "false"},
 };
 const FeatureEntry::FeatureParam kOmniboxToolbeltAllActionsZeroInputs[] = {
     {"KeepToolbeltAfterInput", "false"},
-    {"AlwaysIncludeLensAction", "false"},
     {"ShowLensActionOnNonNtp", "true"},
     {"ShowLensActionOnNtp", "true"},
     {"ShowAiModeActionOnNonNtp", "true"},
@@ -1599,53 +1600,292 @@ const FeatureEntry::FeatureParam kOmniboxToolbeltAllActionsZeroInputs[] = {
     {"ShowTabsActionOnNonNtp", "true"},
     {"ShowTabsActionOnNtp", "true"},
 };
-const FeatureEntry::FeatureParam
-    kOmniboxToolbeltAllActionsZeroAndTypedInputs[] = {
-        {"KeepToolbeltAfterInput", "true"},
-        {"AlwaysIncludeLensAction", "false"},
-        {"ShowLensActionOnNonNtp", "true"},
-        {"ShowLensActionOnNtp", "true"},
-        {"ShowAiModeActionOnNonNtp", "true"},
-        {"ShowAiModeActionOnNtp", "true"},
-        {"ShowHistoryActionOnNonNtp", "true"},
-        {"ShowHistoryActionOnNtp", "true"},
-        {"ShowBookmarksActionOnNonNtp", "true"},
-        {"ShowBookmarksActionOnNtp", "true"},
-        {"ShowTabsActionOnNonNtp", "true"},
-        {"ShowTabsActionOnNtp", "true"},
+const FeatureEntry::FeatureParam kOmniboxToolbeltAllActionsZeroTypedInputs[] = {
+    {"KeepToolbeltAfterInput", "true"},
+    {"ShowLensActionOnNonNtp", "true"},
+    {"ShowLensActionOnNtp", "true"},
+    {"ShowAiModeActionOnNonNtp", "true"},
+    {"ShowAiModeActionOnNtp", "true"},
+    {"ShowHistoryActionOnNonNtp", "true"},
+    {"ShowHistoryActionOnNtp", "true"},
+    {"ShowBookmarksActionOnNonNtp", "true"},
+    {"ShowBookmarksActionOnNtp", "true"},
+    {"ShowTabsActionOnNonNtp", "true"},
+    {"ShowTabsActionOnNtp", "true"},
 };
 const FeatureEntry::FeatureVariation kOmniboxToolbeltVariations[] = {
-    {"Variant 1: ContextualAndAIMode - ZeroPrefixStateOnly",
-     kOmniboxToolbeltVariant1, std::size(kOmniboxToolbeltVariant1), nullptr},
-    {"Variant 2: ContextualAndAIMode - ZeroPrefixAndTypedState",
-     kOmniboxToolbeltVariant2, std::size(kOmniboxToolbeltVariant2), nullptr},
-    {"Variant 3: AIModeOnly - ZeroPrefixStateOnly", kOmniboxToolbeltVariant3,
-     std::size(kOmniboxToolbeltVariant3), nullptr},
-    {"Variant 4: AIModeOnly - ZeroPrefixAndTypedState",
-     kOmniboxToolbeltVariant4, std::size(kOmniboxToolbeltVariant4), nullptr},
-    {"All actions - ZeroPrefixStateOnly", kOmniboxToolbeltAllActionsZeroInputs,
+    {"1 - Lens Action - Zero Inputs (Default)",
+     kOmniboxToolbeltLensActionsZeroInputs,
+     std::size(kOmniboxToolbeltLensActionsZeroInputs), nullptr},
+    {"2 - Lens Action - Zero + Typed Inputs",
+     kOmniboxToolbeltLensActionsZeroTypedInputs,
+     std::size(kOmniboxToolbeltLensActionsZeroTypedInputs), nullptr},
+    {"3 - AI Action - Zero Inputs", kOmniboxToolbeltAiActionsZeroInputs,
+     std::size(kOmniboxToolbeltAiActionsZeroInputs), nullptr},
+    {"4 - AI Action - Zero + Typed Inputs",
+     kOmniboxToolbeltAiActionsZeroTypedInputs,
+     std::size(kOmniboxToolbeltAiActionsZeroTypedInputs), nullptr},
+    {"5 - Lens + AI Actions - Zero Inputs",
+     kOmniboxToolbeltLensAiActionsZeroInputs,
+     std::size(kOmniboxToolbeltLensAiActionsZeroInputs), nullptr},
+    {"6 - Lens + AI Actions - Zero + Typed Inputs",
+     kOmniboxToolbeltLensAiActionsZeroTypedInputs,
+     std::size(kOmniboxToolbeltLensAiActionsZeroTypedInputs), nullptr},
+    {"7 - All Actions - Zero Inputs", kOmniboxToolbeltAllActionsZeroInputs,
      std::size(kOmniboxToolbeltAllActionsZeroInputs), nullptr},
-    {"All actions - ZeroPrefixAndTypedState",
-     kOmniboxToolbeltAllActionsZeroAndTypedInputs,
-     std::size(kOmniboxToolbeltAllActionsZeroAndTypedInputs), nullptr},
+    {"8 - All Actions - Zero + Typed Inputs",
+     kOmniboxToolbeltAllActionsZeroTypedInputs,
+     std::size(kOmniboxToolbeltAllActionsZeroTypedInputs), nullptr},
 };
 
-const FeatureEntry::FeatureParam kComposeboxShowZps[] = {
+const FeatureEntry::FeatureParam
+    kComposeboxShowContextMenuAndSuggestMultiFile[] = {
+        {"ShowComposeboxZps", "true"},
+        {"ShowComposeboxTypedSuggest", "true"},
+        {"ShowContextMenu", "true"},
+        {"ShowRecentTabChip", "true"},
+};
+const FeatureEntry::FeatureParam
+    kComposeboxShowContextMenuAndSuggestMultiFileNoViewport[] = {
+        {"ShowComposeboxZps", "true"},
+        {"ShowComposeboxTypedSuggest", "true"},
+        {"ShowContextMenu", "true"},
+        {"ShowRecentTabChip", "true"},
+        {"EnableViewportImages", "false"},
+};
+const FeatureEntry::FeatureParam
+    kComposeboxShowContextMenuAndSuggestMultiFileAndTabPreviews[] = {
+        {"ShowComposeboxZps", "true"},
+        {"ShowComposeboxTypedSuggest", "true"},
+        {"ShowContextMenu", "true"},
+        {"ShowRecentTabChip", "true"},
+        {"ShowContextMenuTabPreviews", "true"},
+};
+const FeatureEntry::FeatureParam kShowToolsAndModels[] = {
+    {"ShowContextMenu", "true"},     {"ShowToolsAndModels", "true"},
+    {"ShowComposeboxZps", "true"},   {"ShowComposeboxTypedSuggest", "true"},
+};
+const FeatureEntry::FeatureParam kShowCanvasAndModelPicker[] = {
+    {"ShowContextMenu", "true"},   {"ShowToolsAndModels", "true"},
+    {"ShowCanvas", "true"},        {"ShowModelPicker", "true"},
+    {"ShowComposeboxZps", "true"}, {"ShowComposeboxTypedSuggest", "true"},
+};
+const FeatureEntry::FeatureParam kComposeboxNext[] = {
+    {"ShowContextMenu", "true"},
+    {"ShowContextMenuTabPreviews", "true"},
     {"ShowComposeboxZps", "true"},
+    {"ShowComposeboxTypedSuggest", "true"},
+    {"ShowToolsAndModels", "true"},
+    {"ShowRecentTabChip", "true"},
+    {"CloseComposeboxByEscape", "false"},
+    {"CloseComposeboxByClickOutside", "false"},
+    {"ContextMenuEnableMultiTabSelection", "true"},
+    {"EnableThreadsRail", "true"},
 };
-const FeatureEntry::FeatureParam kComposeboxNoClickOutsideClosure[] = {
-    {"ConfigParam", "EgIQAA=="},
+const FeatureEntry::FeatureParam kComposeboxNextSingleContext[] = {
+    {"MaxNumFiles", "1"},
+    {"ShowContextMenu", "true"},
+    {"ShowContextMenuTabPreviews", "true"},
+    {"ShowComposeboxZps", "true"},
+    {"ShowComposeboxTypedSuggest", "true"},
+    {"ShowToolsAndModels", "true"},
+    {"ShowRecentTabChip", "true"},
+    {"CloseComposeboxByEscape", "false"},
+    {"CloseComposeboxByClickOutside", "false"},
+    {"EnableThreadsRail", "true"},
 };
-const FeatureEntry::FeatureParam kComposeboxNoEscClosure[] = {
-    {"ConfigParam", "EgIIAA=="},
+const FeatureEntry::FeatureParam kComposeboxNextSingleContextForRealboxNext[] =
+    {
+        {"MaxNumFiles", "1"},           {"ShowContextMenu", "true"},
+        {"ShowComposeboxZps", "true"},  {"ShowComposeboxTypedSuggest", "true"},
+        {"ShowToolsAndModels", "true"}, {"ShowRecentTabChip", "true"},
+        {"ShowSubmit", "true"},         {"EnableThreadsRail", "true"},
+};
+const FeatureEntry::FeatureParam kComposeboxNextForRealboxNext[] = {
+    {"ShowContextMenu", "true"},
+    {"ShowComposeboxZps", "true"},
+    {"ShowComposeboxTypedSuggest", "true"},
+    {"ShowToolsAndModels", "true"},
+    {"ShowRecentTabChip", "true"},
+    {"ContextMenuEnableMultiTabSelection", "true"},
+    {"ShowSubmit", "true"},
+    {"EnableEphemeralContextMenuDescription", "true"},
+    {"EnableThreadsRail", "true"},
 };
 
 const FeatureEntry::FeatureVariation kNtpComposeboxVariations[] = {
-    {"- Show ZPS", kComposeboxShowZps, std::size(kComposeboxShowZps), nullptr},
-    {"- Disable Click Outside Closure", kComposeboxNoClickOutsideClosure,
-     std::size(kComposeboxNoClickOutsideClosure), nullptr},
-    {"- Disable Escape Closure", kComposeboxNoEscClosure,
-     std::size(kComposeboxNoEscClosure), nullptr},
+    {"- Show Contextual Input Menu and Suggest, 5 File Limit",
+     kComposeboxShowContextMenuAndSuggestMultiFile,
+     std::size(kComposeboxShowContextMenuAndSuggestMultiFile), nullptr},
+    {"- Show Contextual Input Menu and Suggest, 5 File Limit, no viewport "
+     "uploading",
+     kComposeboxShowContextMenuAndSuggestMultiFileNoViewport,
+     std::size(kComposeboxShowContextMenuAndSuggestMultiFileNoViewport),
+     nullptr},
+    {"- Show Contextual Input Menu and Suggest, Tab Previews, 5 File Limit",
+     kComposeboxShowContextMenuAndSuggestMultiFileAndTabPreviews,
+     std::size(kComposeboxShowContextMenuAndSuggestMultiFileAndTabPreviews),
+     nullptr},
+    {"- Show Contextual Input Menu and Suggest with Tools and Models",
+     kShowToolsAndModels, std::size(kShowToolsAndModels), nullptr},
+    {"- Show Contextual Input Menu with Canvas and Model Picker",
+     kShowCanvasAndModelPicker, std::size(kShowCanvasAndModelPicker), nullptr},
+    {"- Next Experience", kComposeboxNext, std::size(kComposeboxNext), nullptr},
+    {"- Next Experience Single Context", kComposeboxNextSingleContext,
+     std::size(kComposeboxNextSingleContext), nullptr},
+    {"- Next Experience for Realbox Next", kComposeboxNextForRealboxNext,
+     std::size(kComposeboxNextForRealboxNext), nullptr},
+    {"- Next Experience Single Context for Realbox Next",
+     kComposeboxNextSingleContextForRealboxNext,
+     std::size(kComposeboxNextSingleContextForRealboxNext), nullptr},
+};
+
+const FeatureEntry::FeatureParam kShowNextRealboxTallBottomContext[] = {
+    {"RealboxLayoutMode", ntp_realbox::kRealboxLayoutModeTallBottomContext},
+};
+const FeatureEntry::FeatureParam
+    kShowNextRealboxTallBottomContextCyclingPlaceholders[] = {
+        {"RealboxLayoutMode", ntp_realbox::kRealboxLayoutModeTallBottomContext},
+        {"CyclingPlaceholders", "true"},
+};
+const FeatureEntry::FeatureParam kShowNextRealboxTallBottomContextMultiLine[] =
+    {
+        {"RealboxLayoutMode", ntp_realbox::kRealboxLayoutModeTallBottomContext},
+        {"MultiLineEnabled", "true"},
+};
+const FeatureEntry::FeatureParam kShowNextRealboxTallTopContext[] = {
+    {"RealboxLayoutMode", ntp_realbox::kRealboxLayoutModeTallTopContext},
+};
+const FeatureEntry::FeatureParam
+    kShowNextRealboxTallTopContextCyclingPlaceholders[] = {
+        {"RealboxLayoutMode", ntp_realbox::kRealboxLayoutModeTallTopContext},
+        {"CyclingPlaceholders", "true"},
+};
+const FeatureEntry::FeatureParam kShowNextRealboxTallTopContextMultiLine[] = {
+    {"RealboxLayoutMode", ntp_realbox::kRealboxLayoutModeTallTopContext},
+    {"MultiLineEnabled", "true"},
+};
+const FeatureEntry::FeatureParam kShowNextRealboxCompact[] = {
+    {"RealboxLayoutMode", ntp_realbox::kRealboxLayoutModeCompact},
+};
+const FeatureEntry::FeatureParam kShowNextRealboxCompactCyclingPlaceholders[] =
+    {
+        {"RealboxLayoutMode", ntp_realbox::kRealboxLayoutModeCompact},
+        {"CyclingPlaceholders", "true"},
+};
+const FeatureEntry::FeatureParam kShowNextRealboxCompactMultiLine[] = {
+    {"RealboxLayoutMode", ntp_realbox::kRealboxLayoutModeCompact},
+    {"MultiLineEnabled", "true"},
+};
+
+const FeatureEntry::FeatureVariation kNtpRealboxNextVariations[] = {
+    {"- Show Next Realbox with Bottom Context Button (TallBottomContext)",
+     kShowNextRealboxTallBottomContext,
+     std::size(kShowNextRealboxTallBottomContext), nullptr},
+    {"- Show Next Realbox with Top Context Button (TallTopContext)",
+     kShowNextRealboxTallTopContext, std::size(kShowNextRealboxTallTopContext),
+     nullptr},
+    {"- Show Next Realbox (Compact)", kShowNextRealboxCompact,
+     std::size(kShowNextRealboxCompact), nullptr},
+    {"- Show Next Realbox: Bottom Context, Cycling placeholders",
+     kShowNextRealboxTallBottomContextCyclingPlaceholders,
+     std::size(kShowNextRealboxTallBottomContextCyclingPlaceholders), nullptr},
+    {"- Show Next Realbox: Top Context, Cycling placeholders",
+     kShowNextRealboxTallTopContextCyclingPlaceholders,
+     std::size(kShowNextRealboxTallTopContextCyclingPlaceholders), nullptr},
+    {"- Show Next Realbox: Compact, Cycling placeholders",
+     kShowNextRealboxCompactCyclingPlaceholders,
+     std::size(kShowNextRealboxCompactCyclingPlaceholders), nullptr},
+    {"- Show Next Realbox: Bottom Context, Multiline",
+     kShowNextRealboxTallBottomContextMultiLine,
+     std::size(kShowNextRealboxTallBottomContextMultiLine), nullptr},
+    {"- Show Next Realbox: Top Context, Multiline",
+     kShowNextRealboxTallTopContextMultiLine,
+     std::size(kShowNextRealboxTallTopContextMultiLine), nullptr},
+    {"- Show Next Realbox: Compact, Multiline",
+     kShowNextRealboxCompactMultiLine,
+     std::size(kShowNextRealboxCompactMultiLine), nullptr},
+};
+
+const FeatureEntry::FeatureParam kNtpNextShowStaticText[] = {
+    {"NtpNextShowStaticTextParam", "true"},
+};
+
+const FeatureEntry::FeatureParam kNtpNextShowDeepDiveSuggestions[] = {
+    {"NtpNextShowDeepDiveSuggestionsParam", "true"},
+    {"NtpNextSuggestionsFromNewSearchSuggestionsEndpointParam", "false"},
+};
+const FeatureEntry::FeatureParam kNtpNextShowSimplificationUI[] = {
+    {"NtpNextShowSimplificationUIParam", "true"},
+};
+const FeatureEntry::FeatureParam kNtpNextShowSimplificationUIWithDeepDive[] = {
+    {"NtpNextShowSimplificationUIParam", "true"},
+    {"NtpNextShowDeepDiveSuggestionsParam", "true"},
+    {"NtpNextSuggestionsFromNewSearchSuggestionsEndpointParam", "false"},
+};
+const FeatureEntry::FeatureParam kNtpNextShowSimplificationUIWithDismissal[] = {
+    {"NtpNextShowSimplificationUIParam", "true"},
+    {"NtpNextShowDeepDiveSuggestionsParam", "true"},
+    {"NtpNextSuggestionsFromNewSearchSuggestionsEndpointParam", "true"},
+    {"NtpNextClientSensitivityCheckParam", "true"},
+    {"NtpNextShowDismissalUIParam", "true"},
+};
+
+const FeatureEntry::FeatureVariation kNtpNextVariations[] = {
+    {"- Show Static Text", kNtpNextShowStaticText,
+     std::size(kNtpNextShowStaticText), nullptr},
+    {"- Show Deep Dive Suggestions", kNtpNextShowDeepDiveSuggestions,
+     std::size(kNtpNextShowDeepDiveSuggestions), nullptr},
+    {"- Show Row UI", kNtpNextShowSimplificationUI,
+     std::size(kNtpNextShowSimplificationUI), nullptr},
+    {"- Show Row UI With Deep Dive", kNtpNextShowSimplificationUIWithDeepDive,
+     std::size(kNtpNextShowSimplificationUIWithDeepDive), nullptr},
+    {"- Show Dismissal UI", kNtpNextShowSimplificationUIWithDismissal,
+     std::size(kNtpNextShowSimplificationUIWithDismissal), nullptr},
+};
+
+const FeatureEntry::FeatureParam
+    kNtpFeatureOptimizationModuleRemovalDefault[] = {
+        {"ModuleMinStalenessUpdateTimeInterval", "24h"},
+        {"StaleModulesCountThreshold", "14"},
+};
+
+const FeatureEntry::FeatureParam
+    kNtpFeatureOptimizationModuleRemovalTesting[] = {
+        {"ModuleMinStalenessUpdateTimeInterval", "1s"},
+        {"StaleModulesCountThreshold", "2"},
+};
+
+const FeatureEntry::FeatureVariation
+    kNtpFeatureOptimizationModuleRemovalVariations[] = {
+        {"- Default Auto-Removal Timing",
+        kNtpFeatureOptimizationModuleRemovalDefault,
+        std::size(kNtpFeatureOptimizationModuleRemovalDefault), nullptr},
+        {"- Auto-Removal Timing for Testing",
+        kNtpFeatureOptimizationModuleRemovalTesting,
+        std::size(kNtpFeatureOptimizationModuleRemovalTesting), nullptr},
+};
+
+const FeatureEntry::FeatureParam
+    kNtpFeatureOptimizationShortcutsRemovalDefault[] = {
+        {"ShortcutsMinStalenessUpdateTimeInterval", "24h"},
+        {"StaleShortcutsCountThreshold", "60"},
+};
+
+const FeatureEntry::FeatureParam
+    kNtpFeatureOptimizationShortcutsRemovalTesting[] = {
+        {"ShortcutsMinStalenessUpdateTimeInterval", "1s"},
+        {"StaleShortcutsCountThreshold", "5"},
+};
+
+const FeatureEntry::FeatureVariation
+    kNtpFeatureOptimizationShortcutsRemovalVariations[] = {
+        {"- Default Auto-Removal Timing",
+        kNtpFeatureOptimizationShortcutsRemovalDefault,
+        std::size(kNtpFeatureOptimizationShortcutsRemovalDefault), nullptr},
+        {"- Auto-Removal Timing for Testing",
+        kNtpFeatureOptimizationShortcutsRemovalTesting,
+        std::size(kNtpFeatureOptimizationShortcutsRemovalTesting), nullptr},
 };
 
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) ||
@@ -1789,18 +2029,25 @@ const FeatureEntry::FeatureVariation kMlUrlSearchBlendingVariations[] = {
      std::size(kMlUrlSearchBlendingMappedAggressiveUrls), nullptr},
 };
 
-constexpr FeatureEntry::FeatureParam
-    kMostVitedTilesNewScoring_DecayStaircaseCap10[] = {
-        {history::kMvtScoringParamRecencyFactor.name,
-         history::kMvtScoringParamRecencyFactor_DecayStaircase},
-        {history::kMvtScoringParamDailyVisitCountCap.name, "10"},
+const FeatureEntry::FeatureParam kMostVitedTilesNewScoring_DecayStaircaseCap10[] = {
+    {
+        "recency_factor",  // history::kMvtScoringParamRecencyFactor.name
+        "decay_staircase"  // history::kMvtScoringParamRecencyFactor_DecayStaircase
+    },
+    {"daily_visit_count_cap",  // history::kMvtScoringParamDailyVisitCountCap.name
+     "10"},
 };
-constexpr FeatureEntry::FeatureParam kMostVitedTilesNewScoring_DecayCap1[] = {
-    {history::kMvtScoringParamRecencyFactor.name,
-     history::kMvtScoringParamRecencyFactor_Decay},
-    // exp(-1.0 / 11).
-    {history::kMvtScoringParamDecayPerDay.name, "0.9131007162822623"},
-    {history::kMvtScoringParamDailyVisitCountCap.name, "1"},
+const FeatureEntry::FeatureParam kMostVitedTilesNewScoring_DecayCap1[] = {
+    {
+        "recency_factor",  // history::kMvtScoringParamRecencyFactor.name
+        "decay"            // history::kMvtScoringParamRecencyFactor_Decay
+    },
+    {
+        "decay_per_day",      // history::kMvtScoringParamDecayPerDay.name
+        "0.9131007162822623"  // exp(-1.0 / 11).
+    },
+    {"daily_visit_count_cap",  // history::kMvtScoringParamDailyVisitCountCap.name
+     "1"},
 };
 constexpr FeatureEntry::FeatureVariation
     kMostVisitedTilesNewScoringVariations[] = {
@@ -1882,52 +2129,6 @@ const FeatureEntry::FeatureVariation
 };
 
 #if BUILDFLAG(IS_ANDROID)
-constexpr FeatureEntry::FeatureParam kOmniboxAnswerActionsCounterfactual[] = {
-    {OmniboxFieldTrial::kAnswerActionsCounterfactual.name, "true"}};
-constexpr FeatureEntry::FeatureParam kOmniboxAnswerActionsTreatment1[] = {
-    {OmniboxFieldTrial::kAnswerActionsShowAboveKeyboard.name, "true"},
-    {OmniboxFieldTrial::kAnswerActionsShowIfUrlsPresent.name, "false"},
-    {OmniboxFieldTrial::kAnswerActionsShowRichCard.name, "false"}};
-
-constexpr FeatureEntry::FeatureParam kOmniboxAnswerActionsTreatment2[] = {
-    {OmniboxFieldTrial::kAnswerActionsShowAboveKeyboard.name, "false"},
-    {OmniboxFieldTrial::kAnswerActionsShowIfUrlsPresent.name, "true"},
-    {OmniboxFieldTrial::kAnswerActionsShowRichCard.name, "false"}};
-
-constexpr FeatureEntry::FeatureParam kOmniboxAnswerActionsTreatment3[] = {
-    {OmniboxFieldTrial::kAnswerActionsShowAboveKeyboard.name, "false"},
-    {OmniboxFieldTrial::kAnswerActionsShowIfUrlsPresent.name, "false"},
-    {OmniboxFieldTrial::kAnswerActionsShowRichCard.name, "false"}};
-
-constexpr FeatureEntry::FeatureParam kOmniboxAnswerActionsTreatment4[] = {
-    {OmniboxFieldTrial::kAnswerActionsShowAboveKeyboard.name, "true"},
-    {OmniboxFieldTrial::kAnswerActionsShowIfUrlsPresent.name, "false"},
-    {OmniboxFieldTrial::kAnswerActionsShowRichCard.name, "true"}};
-
-constexpr FeatureEntry::FeatureParam kOmniboxAnswerActionsTreatment5[] = {
-    {OmniboxFieldTrial::kAnswerActionsShowAboveKeyboard.name, "false"},
-    {OmniboxFieldTrial::kAnswerActionsShowIfUrlsPresent.name, "false"},
-    {OmniboxFieldTrial::kAnswerActionsShowRichCard.name, "true"}};
-
-constexpr FeatureEntry::FeatureVariation kOmniboxAnswerActionsVariants[] = {
-    {"Counterfactual: fetch without rendering ",
-     kOmniboxAnswerActionsCounterfactual,
-     std::size(kOmniboxAnswerActionsCounterfactual), "t3379046"},
-    {"T1: Show chips above keyboard when there are no url matches",
-     kOmniboxAnswerActionsTreatment1,
-     std::size(kOmniboxAnswerActionsTreatment1), "t3379047"},
-    {"T2: Show chips at position 0", kOmniboxAnswerActionsTreatment2,
-     std::size(kOmniboxAnswerActionsTreatment2), "t3379048"},
-    {"T3: Show chips at position 0 when there are no url matches",
-     kOmniboxAnswerActionsTreatment3,
-     std::size(kOmniboxAnswerActionsTreatment3), "t3379049"},
-    {"T4: Show rich card above keyboard when there are no url matches",
-     kOmniboxAnswerActionsTreatment4,
-     std::size(kOmniboxAnswerActionsTreatment4), "t3379050"},
-    {"T5: Show rich card at position 0 when there are no url matches",
-     kOmniboxAnswerActionsTreatment5,
-     std::size(kOmniboxAnswerActionsTreatment5), "t3379051"},
-};
 
 constexpr FeatureEntry::FeatureParam kOmniboxDiagInputConnection[]{
     {OmniboxFieldTrial::kAndroidDiagInputConnection.name, "true"}};
@@ -1936,28 +2137,6 @@ constexpr FeatureEntry::FeatureVariation kOmniboxDiagnosticsAndroidVaiants[] = {
     {"- InputConnection", kOmniboxDiagInputConnection,
      std::size(kOmniboxDiagInputConnection), nullptr}};
 
-// Omnibox Mobile Parity Update -->
-const FeatureEntry::FeatureParam kOmniboxMobileParityRetrieveTrueFavicon[] = {
-    {OmniboxFieldTrial::kMobileParityEnableFeedForGoogleOnly.name, "false"},
-    {OmniboxFieldTrial::kMobileParityRetrieveTrueFavicon.name, "true"}};
-
-const FeatureEntry::FeatureParam kOmniboxMobileParityEnableFeedForGoogleOnly[] =
-    {{OmniboxFieldTrial::kMobileParityEnableFeedForGoogleOnly.name, "true"},
-     {OmniboxFieldTrial::kMobileParityRetrieveTrueFavicon.name, "false"}};
-
-const FeatureEntry::FeatureParam kOmniboxMobileParityEnableEverything[] = {
-    {OmniboxFieldTrial::kMobileParityEnableFeedForGoogleOnly.name, "true"},
-    {OmniboxFieldTrial::kMobileParityRetrieveTrueFavicon.name, "true"}};
-
-const FeatureEntry::FeatureVariation kOmniboxMobileParityVariants[] = {
-    {"with True Favicon", kOmniboxMobileParityRetrieveTrueFavicon,
-     std::size(kOmniboxMobileParityRetrieveTrueFavicon)},
-    {"with Feed only for Google", kOmniboxMobileParityEnableFeedForGoogleOnly,
-     std::size(kOmniboxMobileParityEnableFeedForGoogleOnly)},
-    {"everything", kOmniboxMobileParityEnableEverything,
-     std::size(kOmniboxMobileParityEnableEverything)},
-};
-// <-- Omnibox Mobile Parity Update
 // Omnibox Mobile Parity Update V2 -->
 
 const FeatureEntry::FeatureParam
@@ -1968,6 +2147,98 @@ const FeatureEntry::FeatureVariation kOmniboxMobileParityV2Variants[] = {
     {"with Builtin Favicon", kOmniboxMobileParityV2RetrieveBuiltinFavicon,
      std::size(kOmniboxMobileParityV2RetrieveBuiltinFavicon)}};
 // <-- Omnibox Mobile Parity Update V2
+
+#if !IS_OFFICIAL_BUILD
+const FeatureEntry::FeatureParam
+    kOmniboxRemoveSearchReadyOmniboxNoMatchParam[] = {
+        {"remove_sro_including_verbatim_match", "true"}};
+
+const FeatureEntry::FeatureVariation
+    kOmniboxRemoveSearchReadyOmniboxVariations[] = {
+        {"No Match", kOmniboxRemoveSearchReadyOmniboxNoMatchParam,
+         std::size(kOmniboxRemoveSearchReadyOmniboxNoMatchParam), nullptr}};
+#endif
+
+const FeatureEntry::FeatureParam kOmniboxAimDedicatedModeButton[] = {
+    {"show_dedicated_mode_button", "true"}};
+const FeatureEntry::FeatureParam kOmniboxAimDedicatedModeButtonWithHint[] = {
+    {"show_dedicated_mode_button", "true"},
+    {"show_try_aimode_hint_in_mode_button", "true"}};
+const FeatureEntry::FeatureParam kOmniboxAimCompactFusebox[] = {
+    {"compact_fusebox", "true"}};
+const FeatureEntry::FeatureParam kOmniboxAimMultiContext[] = {
+    {"multi_context", "true"}};
+const FeatureEntry::FeatureParam kOmniboxAimMultiContextDedicatedModeButton[] =
+    {{"multi_context", "true"}, {"show_dedicated_mode_button", "true"}};
+const FeatureEntry::FeatureParam
+    kOmniboxAimMultiContextDedicatedModeButtonWithHint[] = {
+        {"multi_context", "true"},
+        {"show_dedicated_mode_button", "true"},
+        {"show_try_aimode_hint_in_mode_button", "true"}};
+const FeatureEntry::FeatureParam kOmniboxAimMultiContextCompactFusebox[] = {
+    {"multi_context", "true"},
+    {"compact_fusebox", "true"}};
+
+const FeatureEntry::FeatureVariation kOmniboxMultimodalInputVariants[] = {
+    {"Dedicated Button", kOmniboxAimDedicatedModeButton,
+     std::size(kOmniboxAimDedicatedModeButton), "3395755"},
+    {"Button with Hint", kOmniboxAimDedicatedModeButtonWithHint,
+     std::size(kOmniboxAimDedicatedModeButtonWithHint), "3395755"},
+    {"Compact", kOmniboxAimCompactFusebox, std::size(kOmniboxAimCompactFusebox),
+     "3395755"},
+    {"MC (Multi context)", kOmniboxAimMultiContext,
+     std::size(kOmniboxAimMultiContext), "3395755"},
+    {"MC Dedicated Button", kOmniboxAimMultiContextDedicatedModeButton,
+     std::size(kOmniboxAimMultiContextDedicatedModeButton), "3395755"},
+    {"MC Button with Hint", kOmniboxAimMultiContextDedicatedModeButtonWithHint,
+     std::size(kOmniboxAimMultiContextDedicatedModeButtonWithHint), "3395755"},
+    {"MC Compact", kOmniboxAimMultiContextCompactFusebox,
+     std::size(kOmniboxAimMultiContextCompactFusebox), "3395755"},
+};
+
+const FeatureEntry::FeatureParam kOmniboxMultilineEditFieldForAutocomplete[] = {
+    {"wrap_autocomplete_text", "true"}};
+
+const FeatureEntry::FeatureVariation kOmniboxMultilineEditFieldVariants[] = {
+    {"For Autocomplete", kOmniboxMultilineEditFieldForAutocomplete,
+     std::size(kOmniboxMultilineEditFieldForAutocomplete), nullptr}};
+
+const FeatureEntry::FeatureParam kOmniboxImprovementForLFFVariationsAll[] = {
+    {OmniboxFieldTrial::kOmniboxImprovementForLFFSwitchToTabChip.name, "true"},
+    {OmniboxFieldTrial::kOmniboxImprovementForLFFRemoveSuggestionViaButton.name,
+     "true"},
+    {OmniboxFieldTrial::kOmniboxImprovementForLFFPersistEditingState.name,
+     "true"}};
+
+const FeatureEntry::FeatureParam
+    kOmniboxImprovementForLFFVariationsSwitchToTabChip[] = {
+        {OmniboxFieldTrial::kOmniboxImprovementForLFFSwitchToTabChip.name,
+         "true"}};
+
+const FeatureEntry::FeatureParam
+    kOmniboxImprovementForLFFVariationsRemoveSuggestionViaButton[] = {
+        {OmniboxFieldTrial::kOmniboxImprovementForLFFRemoveSuggestionViaButton
+             .name,
+         "true"}};
+
+const FeatureEntry::FeatureParam
+    kOmniboxImprovementForLFFVariationsPersistEditingState[] = {
+        {OmniboxFieldTrial::kOmniboxImprovementForLFFPersistEditingState.name,
+         "true"}};
+
+const FeatureEntry::FeatureVariation kOmniboxImprovementForLFFVariations[] = {
+    {"All", kOmniboxImprovementForLFFVariationsAll,
+     std::size(kOmniboxImprovementForLFFVariationsAll), nullptr},
+    {"Switch to Tab Chip", kOmniboxImprovementForLFFVariationsSwitchToTabChip,
+     std::size(kOmniboxImprovementForLFFVariationsSwitchToTabChip), nullptr},
+    {"Remove Suggestion",
+     kOmniboxImprovementForLFFVariationsRemoveSuggestionViaButton,
+     std::size(kOmniboxImprovementForLFFVariationsRemoveSuggestionViaButton),
+     nullptr},
+    {"Persist Editing State",
+     kOmniboxImprovementForLFFVariationsPersistEditingState,
+     std::size(kOmniboxImprovementForLFFVariationsPersistEditingState),
+     nullptr}};
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -2053,29 +2324,6 @@ const FeatureEntry::FeatureVariation
         {"12 matches", kOmniboxUIMaxAutocompleteMatches12,
          std::size(kOmniboxUIMaxAutocompleteMatches12), nullptr}};
 
-const FeatureEntry::FeatureParam kOmniboxMaxURLMatches2[] = {
-    {OmniboxFieldTrial::kOmniboxMaxURLMatchesParam, "2"}};
-const FeatureEntry::FeatureParam kOmniboxMaxURLMatches3[] = {
-    {OmniboxFieldTrial::kOmniboxMaxURLMatchesParam, "3"}};
-const FeatureEntry::FeatureParam kOmniboxMaxURLMatches4[] = {
-    {OmniboxFieldTrial::kOmniboxMaxURLMatchesParam, "4"}};
-const FeatureEntry::FeatureParam kOmniboxMaxURLMatches5[] = {
-    {OmniboxFieldTrial::kOmniboxMaxURLMatchesParam, "5"}};
-const FeatureEntry::FeatureParam kOmniboxMaxURLMatches6[] = {
-    {OmniboxFieldTrial::kOmniboxMaxURLMatchesParam, "6"}};
-
-const FeatureEntry::FeatureVariation kOmniboxMaxURLMatchesVariations[] = {
-    {"2 matches", kOmniboxMaxURLMatches2, std::size(kOmniboxMaxURLMatches2),
-     nullptr},
-    {"3 matches", kOmniboxMaxURLMatches3, std::size(kOmniboxMaxURLMatches3),
-     nullptr},
-    {"4 matches", kOmniboxMaxURLMatches4, std::size(kOmniboxMaxURLMatches4),
-     nullptr},
-    {"5 matches", kOmniboxMaxURLMatches5, std::size(kOmniboxMaxURLMatches5),
-     nullptr},
-    {"6 matches", kOmniboxMaxURLMatches6, std::size(kOmniboxMaxURLMatches6),
-     nullptr}};
-
 #if BUILDFLAG(IS_ANDROID)
 const FeatureEntry::FeatureParam kOmniboxMiaZpsEnabledWithHistoryAblation[] = {
     {OmniboxFieldTrial::kSuppressPsuggestBackfillWithMIAParam, "true"}};
@@ -2083,15 +2331,6 @@ const FeatureEntry::FeatureVariation kOmniboxMiaZpsVariations[] = {
     {"with History Ablation", kOmniboxMiaZpsEnabledWithHistoryAblation,
      std::size(kOmniboxMiaZpsEnabledWithHistoryAblation), nullptr}};
 #endif
-
-const FeatureEntry::FeatureParam
-    kOmniboxAimShortcutTypedStateEnabledForTypedLength15[] = {
-        {OmniboxFieldTrial::kMinimumTypedCharactersToInvokeAimShortcut.name,
-         "15"}};
-const FeatureEntry::FeatureVariation kOmniboxAimShortcutTypedStateVariations[] =
-    {{"for 15+ chars", kOmniboxAimShortcutTypedStateEnabledForTypedLength15,
-      std::size(kOmniboxAimShortcutTypedStateEnabledForTypedLength15),
-      nullptr}};
 
 const FeatureEntry::FeatureParam kOmniboxDynamicMaxAutocomplete90[] = {
     {"OmniboxDynamicMaxAutocompleteUrlCutoff", "0"},
@@ -2258,27 +2497,6 @@ const FeatureEntry::FeatureVariation kNumSrpZpsRelatedSearches[] = {
 };
 
 #if !BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kMinimumTabWidthSettingPinned[] = {
-    {tabs::kMinimumTabWidthFeatureParameterName, "54"}};
-const FeatureEntry::FeatureParam kMinimumTabWidthSettingMedium[] = {
-    {tabs::kMinimumTabWidthFeatureParameterName, "72"}};
-const FeatureEntry::FeatureParam kMinimumTabWidthSettingLarge[] = {
-    {tabs::kMinimumTabWidthFeatureParameterName, "140"}};
-const FeatureEntry::FeatureParam kMinimumTabWidthSettingFull[] = {
-    {tabs::kMinimumTabWidthFeatureParameterName, "256"}};
-
-const FeatureEntry::FeatureVariation kTabScrollingVariations[] = {
-    {" - tabs shrink to pinned tab width", kMinimumTabWidthSettingPinned,
-     std::size(kMinimumTabWidthSettingPinned), nullptr},
-    {" - tabs shrink to a medium width", kMinimumTabWidthSettingMedium,
-     std::size(kMinimumTabWidthSettingMedium), nullptr},
-    {" - tabs shrink to a large width", kMinimumTabWidthSettingLarge,
-     std::size(kMinimumTabWidthSettingLarge), nullptr},
-    {" - tabs don't shrink", kMinimumTabWidthSettingFull,
-     std::size(kMinimumTabWidthSettingFull), nullptr}};
-#endif
-
-#if !BUILDFLAG(IS_ANDROID)
 const FeatureEntry::FeatureParam kTabSearchToolbarButton[] = {
     {"tab_search_toolbar_button", "true"}};
 
@@ -2288,69 +2506,17 @@ const FeatureEntry::FeatureVariation kTabstripComboButtonVariations[] = {
 };
 #endif
 
-const FeatureEntry::FeatureParam kTabScrollingButtonPositionRight[] = {
-    {features::kTabScrollingButtonPositionParameterName, "0"}};
-const FeatureEntry::FeatureParam kTabScrollingButtonPositionLeft[] = {
-    {features::kTabScrollingButtonPositionParameterName, "1"}};
-const FeatureEntry::FeatureParam kTabScrollingButtonPositionSplit[] = {
-    {features::kTabScrollingButtonPositionParameterName, "2"}};
-
-const FeatureEntry::FeatureVariation kTabScrollingButtonPositionVariations[] = {
-    {" - to the right of the tabstrip", kTabScrollingButtonPositionRight,
-     std::size(kTabScrollingButtonPositionRight), nullptr},
-    {" - to the left of the tabstrip", kTabScrollingButtonPositionLeft,
-     std::size(kTabScrollingButtonPositionLeft), nullptr},
-    {" - on both sides of the tabstrip", kTabScrollingButtonPositionSplit,
-     std::size(kTabScrollingButtonPositionSplit), nullptr}};
-
 #if !BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kTabScrollingWithDraggingWithConstantSpeed[] =
-    {{tabs::kTabScrollingWithDraggingModeName, "1"}};
-const FeatureEntry::FeatureParam kTabScrollingWithDraggingWithVariableSpeed[] =
-    {{tabs::kTabScrollingWithDraggingModeName, "2"}};
+const FeatureEntry::FeatureParam kShowSidePanelsOnSameSide[] = {
+    {"side_panel_relative_alignment", "same"}};
+const FeatureEntry::FeatureParam kShowSidePanelsOnOppositeSide[] = {
+    {"side_panel_relative_alignment", "opposite"}};
 
-const FeatureEntry::FeatureVariation kTabScrollingWithDraggingVariations[] = {
-    {" - tabs scrolling with constant speed",
-     kTabScrollingWithDraggingWithConstantSpeed,
-     std::size(kTabScrollingWithDraggingWithConstantSpeed), nullptr},
-    {" - tabs scrolling with variable speed region",
-     kTabScrollingWithDraggingWithVariableSpeed,
-     std::size(kTabScrollingWithDraggingWithVariableSpeed), nullptr}};
-
-const FeatureEntry::FeatureParam kScrollableTabStripOverflowDivider[] = {
-    {tabs::kScrollableTabStripOverflowModeName, "1"}};
-const FeatureEntry::FeatureParam kScrollableTabStripOverflowFade[] = {
-    {tabs::kScrollableTabStripOverflowModeName, "2"}};
-const FeatureEntry::FeatureParam kScrollableTabStripOverflowShadow[] = {
-    {tabs::kScrollableTabStripOverflowModeName, "3"}};
-
-const FeatureEntry::FeatureVariation kScrollableTabStripOverflowVariations[] = {
-    {" - Divider", kScrollableTabStripOverflowDivider,
-     std::size(kScrollableTabStripOverflowDivider), nullptr},  // Divider
-    {" - Fade", kScrollableTabStripOverflowFade,
-     std::size(kScrollableTabStripOverflowFade), nullptr},  // Fade
-    {" - Shadow", kScrollableTabStripOverflowShadow,
-     std::size(kScrollableTabStripOverflowShadow), nullptr},  // Shadow
-};
-#endif
-
-#if !BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kMiniToolbarHiddenOnActiveView[] = {
-    {"mini_toolbar_active_config", "hide"}};
-const FeatureEntry::FeatureParam kMiniToolbarWithMenuOnActiveView[] = {
-    {"mini_toolbar_active_config", "showmenu"}};
-const FeatureEntry::FeatureParam kMiniToolbarWithCloseOnActiveView[] = {
-    {"mini_toolbar_active_config", "showclose"}};
-
-const FeatureEntry::FeatureVariation kSideBySideVariations[] = {
-    {" - hide mini toolbar on active view", kMiniToolbarHiddenOnActiveView,
-     std::size(kMiniToolbarHiddenOnActiveView)},
-    {" - show mini toolbar with menu button on active view",
-     kMiniToolbarWithMenuOnActiveView,
-     std::size(kMiniToolbarWithMenuOnActiveView)},
-    {" - show mini toolbar with close button on active view",
-     kMiniToolbarWithCloseOnActiveView,
-     std::size(kMiniToolbarWithCloseOnActiveView)},
+const FeatureEntry::FeatureVariation kSidePanelRelativeAlignmentVariants[] = {
+    {" - show panels on the same side", kShowSidePanelsOnSameSide,
+     std::size(kShowSidePanelsOnSameSide)},
+    {" - show panels on opposite side", kShowSidePanelsOnOppositeSide,
+     std::size(kShowSidePanelsOnOppositeSide)},
 };
 #endif
 
@@ -2720,6 +2886,14 @@ const FeatureEntry::FeatureParam kQuickDeletePromoHideArm[] = {
     {segmentation_platform::features::kEphemeralCardRankerForceHideCardParam,
      segmentation_platform::kQuickDeletePromo},
 };
+const FeatureEntry::FeatureParam kTipsNotificationsPromoShowArm[] = {
+    {segmentation_platform::features::kEphemeralCardRankerForceShowCardParam,
+     segmentation_platform::kTipsNotificationsPromo},
+};
+const FeatureEntry::FeatureParam kTipsNotificationsPromoHideArm[] = {
+    {segmentation_platform::features::kEphemeralCardRankerForceHideCardParam,
+     segmentation_platform::kTipsNotificationsPromo},
+};
 
 const FeatureEntry::FeatureVariation kEphemeralCardRankerCardOverrideOptions[] =
     {
@@ -2739,6 +2913,12 @@ const FeatureEntry::FeatureVariation kEphemeralCardRankerCardOverrideOptions[] =
          std::size(kQuickDeletePromoShowArm), nullptr},
         {"- Force hide quick delete promo", kQuickDeletePromoHideArm,
          std::size(kQuickDeletePromoHideArm), nullptr},
+        {"- Force show tips notifications promo",
+         kTipsNotificationsPromoShowArm,
+         std::size(kTipsNotificationsPromoShowArm), nullptr},
+        {"- Force hide tips notifications promo",
+         kTipsNotificationsPromoHideArm,
+         std::size(kTipsNotificationsPromoHideArm), nullptr},
 };
 #endif  // BUILDFLAG(IS_ANDROID)
 #if BUILDFLAG(IS_ANDROID)
@@ -2851,57 +3031,6 @@ const FeatureEntry::FeatureVariation
          nullptr}};
 
 const FeatureEntry::FeatureParam
-    kAndroidAppIntegrationWithFavicon_UseLargeFavicon[] = {
-        {"use_large_favicon", "true"}};
-const FeatureEntry::FeatureParam
-    kAndroidAppIntegrationWithFavicon_UseLargeFavicon_SkipDeviceCheck[] = {
-        {"skip_device_check", "true"},
-        {"use_large_favicon", "true"}};
-const FeatureEntry::FeatureParam
-    kAndroidAppIntegrationWithFavicon_UseLargeFavicon_SkipSchemaCheck[] = {
-        {"skip_schema_check", "true"},
-        {"use_large_favicon", "true"}};
-const FeatureEntry::FeatureParam
-    kAndroidAppIntegrationWithFavicon_UseLargeFavicon_SkipDeviceAndSchemaChecks
-        [] = {{"skip_device_check", "true"},
-              {"skip_schema_check", "true"},
-              {"use_large_favicon", "true"}};
-const FeatureEntry::FeatureParam
-    kAndroidAppIntegrationWithFavicon_DelayTime200Ms[] = {
-        {"schedule_delay_time_ms", "200"}};
-const FeatureEntry::FeatureParam
-    kAndroidAppIntegrationWithFavicon_DelayTime200Ms_UseLargeFavicon[] = {
-        {"schedule_delay_time_ms", "200"},
-        {"use_large_favicon", "true"}};
-
-const FeatureEntry::FeatureVariation kAndroidAppIntegrationWithFaviconVariations[] =
-    {{"Use large favicon (no delay)",
-      kAndroidAppIntegrationWithFavicon_UseLargeFavicon,
-      std::size(kAndroidAppIntegrationWithFavicon_UseLargeFavicon), nullptr},
-     {"Skip device check + use large favicon (no delay)",
-      kAndroidAppIntegrationWithFavicon_UseLargeFavicon_SkipDeviceCheck,
-      std::size(
-          kAndroidAppIntegrationWithFavicon_UseLargeFavicon_SkipDeviceCheck),
-      nullptr},
-     {"Skip schema check + use large favicon (no delay)",
-      kAndroidAppIntegrationWithFavicon_UseLargeFavicon_SkipSchemaCheck,
-      std::size(
-          kAndroidAppIntegrationWithFavicon_UseLargeFavicon_SkipSchemaCheck),
-      nullptr},
-     {"Skip both device and schema checks + use large favicon (no delay)",
-      kAndroidAppIntegrationWithFavicon_UseLargeFavicon_SkipDeviceAndSchemaChecks,
-      std::size(
-          kAndroidAppIntegrationWithFavicon_UseLargeFavicon_SkipDeviceAndSchemaChecks),
-      nullptr},
-     {"200ms delay", kAndroidAppIntegrationWithFavicon_DelayTime200Ms,
-      std::size(kAndroidAppIntegrationWithFavicon_DelayTime200Ms), nullptr},
-     {"200ms delay with large favicon",
-      kAndroidAppIntegrationWithFavicon_DelayTime200Ms_UseLargeFavicon,
-      std::size(
-          kAndroidAppIntegrationWithFavicon_DelayTime200Ms_UseLargeFavicon),
-      nullptr}};
-
-const FeatureEntry::FeatureParam
     kAndroidAppIntegrationModule_ForceCardShown_Pixel[] = {
         {"force_card_shown", "true"}};
 
@@ -2919,12 +3048,37 @@ const FeatureEntry::FeatureVariation kAndroidAppIntegrationModuleVariations[] =
       std::size(kAndroidAppIntegrationModule_ForceCardShown_NonPixel),
       nullptr}};
 
+const FeatureEntry::FeatureParam kNewTabPageCustomizationV2_ShowColorPicker[] =
+    {{"show_color_picker", "true"}};
+
+const FeatureEntry::FeatureParam
+    kNewTabPageCustomizationV2_DailyRefreshThresholdMs[] = {
+        {"daily_refresh_threshold_ms", "20000"}};
+
+const FeatureEntry::FeatureParam
+    kNewTabPageCustomizationV2_ShowLogoAndSearchBox[] = {
+        {"show_logo_and_search_box", "true"}};
+
+const FeatureEntry::FeatureVariation kNewTabPageCustomizationV2Variations[] = {
+    {"Show color picker", kNewTabPageCustomizationV2_ShowColorPicker,
+     std::size(kNewTabPageCustomizationV2_ShowColorPicker), nullptr},
+    {"Daily refresh after 20s",
+     kNewTabPageCustomizationV2_DailyRefreshThresholdMs,
+     std::size(kNewTabPageCustomizationV2_DailyRefreshThresholdMs), nullptr},
+    {"Show logo and search box in the preview dialog",
+     kNewTabPageCustomizationV2_ShowLogoAndSearchBox,
+     std::size(kNewTabPageCustomizationV2_ShowLogoAndSearchBox), nullptr}};
+
+const FeatureEntry::FeatureParam kAndroidComposeplate_V2Enabled[] = {
+    {"v2_enabled", "true"}};
 const FeatureEntry::FeatureParam kAndroidComposeplate_HideIncognitoButton[] = {
     {"hide_incognito_button", "true"}};
 const FeatureEntry::FeatureParam kAndroidComposeplate_SkipLocaleCheck[] = {
     {"skip_locale_check", "true"}};
 
 const FeatureEntry::FeatureVariation kAndroidComposeplateVariations[] = {
+    {"V2 enabled", kAndroidComposeplate_V2Enabled,
+     std::size(kAndroidComposeplate_V2Enabled), nullptr},
     {"Hide incognito button", kAndroidComposeplate_HideIncognitoButton,
      std::size(kAndroidComposeplate_HideIncognitoButton), nullptr},
     {"Skip locale check", kAndroidComposeplate_SkipLocaleCheck,
@@ -2956,13 +3110,6 @@ const FeatureEntry::FeatureVariation
          std::size(
              kAndroidAppIntegrationMultiDataSource_SkipBothDeviceAndSchemaCheck),
          nullptr}};
-
-const FeatureEntry::FeatureParam kAndroidBottomToolbar_DefaultToBottom[] = {
-    {"default_to_top", "false"}};
-
-const FeatureEntry::FeatureVariation kAndroidBottomToolbarVariations[] = {
-    {"default to bottom", kAndroidBottomToolbar_DefaultToBottom,
-     std::size(kAndroidBottomToolbar_DefaultToBottom), nullptr}};
 
 const FeatureEntry::FeatureParam kAuxiliarySearchDonation_MaxDonation_20[] = {
     {chrome::android::kAuxiliarySearchMaxBookmarksCountParam.name, "20"},
@@ -3005,16 +3152,23 @@ const FeatureEntry::FeatureVariation kBoardingPassDetectorVariations[] = {
 };
 #endif  // BUILDFLAG(IS_ANDROID)
 
-// TODO(crbug.com/991082,1015377): Remove after proper support for back/forward
-// cache is implemented.
-const FeatureEntry::FeatureParam kBackForwardCache_ForceCaching[] = {
-    {"TimeToLiveInBackForwardCacheInSeconds", "300"},
-    {"should_ignore_blocklists", "true"}};
+#if BUILDFLAG(IS_ANDROID)
 
-const FeatureEntry::FeatureVariation kBackForwardCacheVariations[] = {
-    {"force caching all pages (experimental)", kBackForwardCache_ForceCaching,
-     std::size(kBackForwardCache_ForceCaching), nullptr},
-};
+const FeatureEntry::FeatureParam kShowNewTabAnimationsLogs[] = {
+    {"logs", "true"}};
+const FeatureEntry::FeatureVariation kShowNewTabAnimationsVariations[] = {
+    {"- Add logs", kShowNewTabAnimationsLogs,
+     std::size(kShowNewTabAnimationsLogs), nullptr}};
+
+const FeatureEntry::FeatureParam
+    kTabStorageSqlitePrototypeAuthoritativeReads[] = {
+        {"authoritative_read_source", "true"}};
+const FeatureEntry::FeatureVariation kTabStorageSqlitePrototypeVariations[] = {
+    {"- Authoritative Read Source",
+     kTabStorageSqlitePrototypeAuthoritativeReads,
+     std::size(kTabStorageSqlitePrototypeAuthoritativeReads), nullptr}};
+
+#endif  // BUILDFLAG(IS_ANDROID)
 
 const FeatureEntry::FeatureParam kRenderDocument_Subframe[] = {
     {"level", "subframe"}};
@@ -3309,8 +3463,6 @@ constexpr char kBorealisProvisionInternalName[] = "borealis-provision";
 constexpr char kBorealisScaleClientByDPIInternalName[] =
     "borealis-scale-client-by-dpi";
 constexpr char kBorealisZinkGlDriverInternalName[] = "borealis-zink-gl-driver";
-constexpr char kClipboardHistoryLongpressInternalName[] =
-    "clipboard-history-longpress";
 constexpr char kBluetoothUseFlossInternalName[] = "bluetooth-use-floss";
 constexpr char kBluetoothUseLLPrivacyInternalName[] = "bluetooth-use-llprivacy";
 constexpr char kAssistantIphInternalName[] = "assistant-iph";
@@ -3345,18 +3497,6 @@ const FeatureEntry::FeatureVariation kLensOverlayVariations[] = {
 };
 #endif  // !BUILDFLAG(IS_ANDROID)
 
-#if BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kDeleteLegacyMigratedTabStatesAfterRestore[] =
-    {
-        {"delete_migrated_files_after_restore", "true"},
-};
-
-const FeatureEntry::FeatureVariation kLegacyTabStateDeprecationVariations[] = {
-    {"Delete migrated files", kDeleteLegacyMigratedTabStatesAfterRestore,
-     std::size(kDeleteLegacyMigratedTabStatesAfterRestore), nullptr},
-};
-#endif  // BUILDFLAG(IS_ANDROID)
-
 #if !BUILDFLAG(IS_ANDROID)
 const FeatureEntry::FeatureParam kLensOverlayImageContextMenuActionsCopy[] = {
     {"enable-copy-as-image", "true"},
@@ -3383,6 +3523,22 @@ const FeatureEntry::FeatureVariation
         {"copy and save as image",
          kLensOverlayImageContextMenuActionsCopyAndSave,
          std::size(kLensOverlayImageContextMenuActionsCopyAndSave), nullptr},
+};
+
+const FeatureEntry::FeatureParam
+    kLensOverlayTextSelectionContextMenuEntrypointContextualized{
+        "contextualize", "true"};
+const FeatureEntry::FeatureParam
+    kLensOverlayTextSelectionContextMenuEntrypointNonContextualized{
+        "contextualize", "false"};
+const FeatureEntry::FeatureVariation
+    kLensOverlayTextSelectionContextMenuEntrypointVariations[] = {
+        {"contextualized",
+         &kLensOverlayTextSelectionContextMenuEntrypointContextualized, 1,
+         nullptr},
+        {"non-contextualized",
+         &kLensOverlayTextSelectionContextMenuEntrypointNonContextualized, 1,
+         nullptr},
 };
 #endif  // !BUILDFLAG(IS_ANDROID)
 
@@ -3480,111 +3636,12 @@ const FeatureEntry::FeatureVariation
          std::size(kSafetyCheckUnusedSitePermissionsWithDelayParam), nullptr},
 };
 
-const FeatureEntry::FeatureParam kSafetyHub_NoDelay[] = {
-    {features::kPasswordCheckNotificationIntervalName, "0d"},
-    {features::kRevokedPermissionsNotificationIntervalName, "0d"},
-    {features::kNotificationPermissionsNotificationIntervalName, "0d"},
-    {features::kSafeBrowsingNotificationIntervalName, "0d"}};
-const FeatureEntry::FeatureParam kSafetyHub_WithDelay[] = {
-    {features::kPasswordCheckNotificationIntervalName, "0d"},
-    {features::kRevokedPermissionsNotificationIntervalName, "5m"},
-    {features::kNotificationPermissionsNotificationIntervalName, "5m"},
-    {features::kSafeBrowsingNotificationIntervalName, "5m"}};
-const FeatureEntry::FeatureVariation kSafetyHubVariations[] = {
-    {"for testing no delay", kSafetyHub_NoDelay, std::size(kSafetyHub_NoDelay),
-     nullptr},
-    {"for testing with delay", kSafetyHub_WithDelay,
-     std::size(kSafetyHub_WithDelay), nullptr},
-};
-
-const FeatureEntry::FeatureParam kTPCPhaseOutFacilitatedTestingControl1[] = {
-    {tpcd::experiment::kForceEligibleForTestingName, "false"},
-    {tpcd::experiment::kDisable3PCookiesName, "false"},
-    {features::kCookieDeprecationTestingDisableAdsAPIsName, "false"},
-    {features::kCookieDeprecationLabelName, "fake_control_1.1"},
-    {tpcd::experiment::kVersionName, "9990"}};
-const FeatureEntry::FeatureParam kTPCPhaseOutFacilitatedTestingLabelOnly[] = {
-    {tpcd::experiment::kForceEligibleForTestingName, "false"},
-    {tpcd::experiment::kDisable3PCookiesName, "false"},
-    {features::kCookieDeprecationTestingDisableAdsAPIsName, "false"},
-    {features::kCookieDeprecationLabelName, "fake_label_only_1.1"},
-    {tpcd::experiment::kVersionName, "9991"}};
-const FeatureEntry::FeatureParam kTPCPhaseOutFacilitatedTestingTreatment[] = {
-    {tpcd::experiment::kForceEligibleForTestingName, "false"},
-    {tpcd::experiment::kDisable3PCookiesName, "true"},
-    {features::kCookieDeprecationTestingDisableAdsAPIsName, "false"},
-    {features::kCookieDeprecationLabelName, "fake_treatment_1.1"},
-    {tpcd::experiment::kVersionName, "9992"}};
-const FeatureEntry::FeatureParam kTPCPhaseOutFacilitatedTestingControl2[] = {
-    {tpcd::experiment::kForceEligibleForTestingName, "false"},
-    {tpcd::experiment::kDisable3PCookiesName, "true"},
-    {features::kCookieDeprecationTestingDisableAdsAPIsName, "true"},
-    {features::kCookieDeprecationLabelName, "fake_control_2"},
-    {tpcd::experiment::kVersionName, "9993"}};
-const FeatureEntry::FeatureParam kTPCPhaseOutFacilitatedTestingForceControl1[] =
-    {{tpcd::experiment::kForceEligibleForTestingName, "true"},
-     {tpcd::experiment::kDisable3PCookiesName, "false"},
-     {features::kCookieDeprecationTestingDisableAdsAPIsName, "false"},
-     {features::kCookieDeprecationLabelName, "fake_control_1.1"},
-     {tpcd::experiment::kVersionName, "9994"}};
-const FeatureEntry::FeatureParam
-    kTPCPhaseOutFacilitatedTestingForceLabelOnly[] = {
-        {tpcd::experiment::kForceEligibleForTestingName, "true"},
-        {tpcd::experiment::kDisable3PCookiesName, "false"},
-        {features::kCookieDeprecationTestingDisableAdsAPIsName, "false"},
-        {features::kCookieDeprecationLabelName, "fake_label_only_1.1"},
-        {tpcd::experiment::kVersionName, "9995"}};
-const FeatureEntry::FeatureParam
-    kTPCPhaseOutFacilitatedTestingForceTreatment[] = {
-        {tpcd::experiment::kForceEligibleForTestingName, "true"},
-        {tpcd::experiment::kDisable3PCookiesName, "true"},
-        {features::kCookieDeprecationTestingDisableAdsAPIsName, "false"},
-        {features::kCookieDeprecationLabelName, "fake_treatment_1.1"},
-        {tpcd::experiment::kVersionName, "9996"}};
-const FeatureEntry::FeatureParam kTPCPhaseOutFacilitatedTestingForceControl2[] =
-    {{tpcd::experiment::kForceEligibleForTestingName, "true"},
-     {tpcd::experiment::kDisable3PCookiesName, "true"},
-     {features::kCookieDeprecationTestingDisableAdsAPIsName, "true"},
-     {features::kCookieDeprecationLabelName, "fake_control_2"},
-     {tpcd::experiment::kVersionName, "9997"}};
-
-const FeatureEntry::FeatureVariation
-    kTPCPhaseOutFacilitatedTestingVariations[] = {
-        {"Control 1", kTPCPhaseOutFacilitatedTestingControl1,
-         std::size(kTPCPhaseOutFacilitatedTestingControl1), nullptr},
-        {"LabelOnly", kTPCPhaseOutFacilitatedTestingLabelOnly,
-         std::size(kTPCPhaseOutFacilitatedTestingLabelOnly), nullptr},
-        {"Treatment", kTPCPhaseOutFacilitatedTestingTreatment,
-         std::size(kTPCPhaseOutFacilitatedTestingTreatment), nullptr},
-        {"Control 2", kTPCPhaseOutFacilitatedTestingControl2,
-         std::size(kTPCPhaseOutFacilitatedTestingControl2), nullptr},
-        {"Force Control 1", kTPCPhaseOutFacilitatedTestingForceControl1,
-         std::size(kTPCPhaseOutFacilitatedTestingForceControl1), nullptr},
-        {"Force LabelOnly", kTPCPhaseOutFacilitatedTestingForceLabelOnly,
-         std::size(kTPCPhaseOutFacilitatedTestingForceLabelOnly), nullptr},
-        {"Force Treatment", kTPCPhaseOutFacilitatedTestingForceTreatment,
-         std::size(kTPCPhaseOutFacilitatedTestingForceTreatment), nullptr},
-        {"Force Control 2", kTPCPhaseOutFacilitatedTestingForceControl2,
-         std::size(kTPCPhaseOutFacilitatedTestingForceControl2), nullptr},
-};
-
-#if BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kTabStateFlatBufferMigrateStaleTabs[] = {
-    {"migrate_stale_tabs", "true"}};
-
-const FeatureEntry::FeatureVariation kTabStateFlatBufferVariations[] = {
-    {"Migrate Stale Tabs", kTabStateFlatBufferMigrateStaleTabs,
-     std::size(kTabStateFlatBufferMigrateStaleTabs), nullptr}};
-#endif
-
 const FeatureEntry::FeatureParam
     kTpcdHeuristicsGrants_CurrentInteraction_ShortRedirect_MainFrameInitiator
         [] = {
             {content_settings::features::kTpcdReadHeuristicsGrantsName, "true"},
             {content_settings::features::
                  kTpcdWritePopupCurrentInteractionHeuristicsGrantsName,
-             "30d"},
-            {content_settings::features::kTpcdBackfillPopupHeuristicsGrantsName,
              "30d"},
             {content_settings::features::
                  kTpcdPopupHeuristicEnableForIframeInitiatorName,
@@ -3603,8 +3660,6 @@ const FeatureEntry::FeatureParam
          {content_settings::features::
               kTpcdWritePopupCurrentInteractionHeuristicsGrantsName,
           "30d"},
-         {content_settings::features::kTpcdBackfillPopupHeuristicsGrantsName,
-          "30d"},
          {content_settings::features::
               kTpcdPopupHeuristicEnableForIframeInitiatorName,
           "none"},
@@ -3621,8 +3676,6 @@ const FeatureEntry::FeatureParam
          {content_settings::features::
               kTpcdWritePopupCurrentInteractionHeuristicsGrantsName,
           "30d"},
-         {content_settings::features::kTpcdBackfillPopupHeuristicsGrantsName,
-          "30d"},
          {content_settings::features::
               kTpcdPopupHeuristicEnableForIframeInitiatorName,
           "all"},
@@ -3638,8 +3691,6 @@ const FeatureEntry::FeatureParam
         {{content_settings::features::kTpcdReadHeuristicsGrantsName, "true"},
          {content_settings::features::
               kTpcdWritePopupCurrentInteractionHeuristicsGrantsName,
-          "30d"},
-         {content_settings::features::kTpcdBackfillPopupHeuristicsGrantsName,
           "30d"},
          {content_settings::features::
               kTpcdPopupHeuristicEnableForIframeInitiatorName,
@@ -3823,47 +3874,12 @@ const FeatureEntry::Choice kCastMirroringTargetPlayoutDelayChoices[] = {
 
 #endif  // !BUILDFLAG(IS_ANDROID)
 
-#if BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
-const FeatureEntry::FeatureParam
-    kEnableBoundSessionCredentialsWithMultiSessionSupport[] = {
-        {"exclusive-registration-path", ""}};
-
-const FeatureEntry::FeatureVariation
-    kEnableBoundSessionCredentialsVariations[] = {
-        {"with multi-session",
-         kEnableBoundSessionCredentialsWithMultiSessionSupport,
-         std::size(kEnableBoundSessionCredentialsWithMultiSessionSupport),
-         nullptr}};
-#endif  // BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
-
 #if BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kEdgeToEdgeBottomChinDebugFeatureParams[] = {
-    {chrome::android::kEdgeToEdgeBottomChinDebugParam.name, "true"}};
-const FeatureEntry::FeatureVariation kEdgeToEdgeBottomChinVariations[] = {
-    {"debug", kEdgeToEdgeBottomChinDebugFeatureParams,
-     std::size(kEdgeToEdgeBottomChinDebugFeatureParams), nullptr},
-};
-
-const FeatureEntry::FeatureParam kEdgeToEdgeEverywhereDebugFeatureParams[] = {
-    {"e2e_everywhere_debug", "true"}};
-const FeatureEntry::FeatureVariation kEdgeToEdgeEverywhereVariations[] = {
-    {"debug", kEdgeToEdgeEverywhereDebugFeatureParams,
-     std::size(kEdgeToEdgeEverywhereDebugFeatureParams), nullptr},
-};
-
 const FeatureEntry::FeatureParam kEdgeToEdgeTabletFeatureParams[] = {
     {"e2e_tablet_invisible_bottom_chin_min_width", "768"}};
 const FeatureEntry::FeatureVariation kEdgeToEdgeTabletVariations[] = {
     {"chin on smaller screens", kEdgeToEdgeTabletFeatureParams,
      std::size(kEdgeToEdgeTabletFeatureParams), nullptr},
-};
-
-const FeatureEntry::FeatureParam kBottomBrowserControlsRefactorParams[] = {
-    {"disable_bottom_controls_stacker_y_offset", "false"}};
-const FeatureEntry::FeatureVariation
-    kBottomBrowserControlsRefactorVariations[] = {
-        {"Dispatch yOffset", kBottomBrowserControlsRefactorParams,
-         std::size(kBottomBrowserControlsRefactorParams), nullptr},
 };
 
 const FeatureEntry::FeatureParam sAndroidThemeModuleParams[] = {
@@ -3873,19 +3889,13 @@ const FeatureEntry::FeatureVariation kAndroidThemeModuleVariations[] = {
      std::size(sAndroidThemeModuleParams), nullptr},
 };
 
-const FeatureEntry::FeatureParam
-    kAuxiliaryNavigationStaysInBrowserOnForDesktopWindowing[] = {
-        {"auxiliary_navigation_stays_in_browser", "desktop_wm"}};
-const FeatureEntry::FeatureParam kAuxiliaryNavigationStaysInBrowserOn[] = {
-    {"auxiliary_navigation_stays_in_browser", "all_wm"}};
-const FeatureEntry::FeatureVariation
-    kAuxiliaryNavigationStaysInBrowserVariations[] = {
-        {" - desktop windowing mode",
-         kAuxiliaryNavigationStaysInBrowserOnForDesktopWindowing,
-         std::size(kAuxiliaryNavigationStaysInBrowserOnForDesktopWindowing),
-         nullptr},
-        {" - all windowing modes", kAuxiliaryNavigationStaysInBrowserOn,
-         std::size(kAuxiliaryNavigationStaysInBrowserOn), nullptr}};
+const FeatureEntry::FeatureParam sAndroidThemeResourceProviderParams[] = {
+    {"force_light_theme", "true"}};
+const FeatureEntry::FeatureVariation kAndroidThemeResourceProviderVariations[] =
+    {
+        {"force light theme", sAndroidThemeResourceProviderParams,
+         std::size(sAndroidThemeResourceProviderParams), nullptr},
+};
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -3920,20 +3930,16 @@ const flags_ui::FeatureEntry::FeatureVariation
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) ||
         // BUILDFLAG(IS_CHROMEOS)
 
-#if BUILDFLAG(IS_ANDROID)
-
-// UnoPhase2FollowUp flags.
-const char kFastFollowFeatures[] =
-    "UnoForAuto,"
-    "UnoPhase2FollowUp,"
-    "UseHostedDomainForManagementCheckOnSignin";
-
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 const FeatureEntry::Choice kReplaceSyncPromosWithSignInPromosChoices[] = {
     {"Default", "", ""},
-    {"Follow-ups disabled", "disable-features", kFastFollowFeatures},
-    {"Follow-ups enabled", "enable-features", kFastFollowFeatures},
+    {"Disabled", switches::kDisableFeatures,
+     "ReplaceSyncPromosWithSignInPromos"},
+    {"Enabled", switches::kEnableFeatures, "ReplaceSyncPromosWithSignInPromos"},
+    {"Enabled with follow-ups", switches::kEnableFeatures,
+     "ReplaceSyncPromosWithSignInPromos,UnoPhase2FollowUp"},
 };
-#endif  // BUILDFLAG(IS_ANDROID)
+#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 
 #if !BUILDFLAG(IS_ANDROID)
 const FeatureEntry::FeatureParam kLinkPreviewTriggerTypeAltClick[] = {
@@ -3953,24 +3959,6 @@ const FeatureEntry::FeatureVariation kLinkPreviewTriggerTypeVariations[] = {
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
-inline constexpr flags_ui::FeatureEntry::FeatureParam
-    kAutofillVirtualViewStructureAndroidSkipCompatibilityCheck = {
-        autofill::features::
-            kAutofillVirtualViewStructureAndroidSkipsCompatibilityCheck.name,
-        "skip_all_checks"};
-inline constexpr flags_ui::FeatureEntry::FeatureParam
-    kAutofillVirtualViewStructureAndroidOnlySkipAwgCheck = {
-        autofill::features::
-            kAutofillVirtualViewStructureAndroidSkipsCompatibilityCheck.name,
-        "only_skip_awg_check"};
-
-inline constexpr flags_ui::FeatureEntry::FeatureVariation
-    kAutofillVirtualViewStructureVariation[] = {
-        {" without any compatibility check",
-         &kAutofillVirtualViewStructureAndroidSkipCompatibilityCheck, 1,
-         nullptr},
-        {" without AwG restriction",
-         &kAutofillVirtualViewStructureAndroidOnlySkipAwgCheck, 1, nullptr}};
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -4106,24 +4094,6 @@ const FeatureEntry::FeatureVariation
          std::size(kVisitedURLRankingDomainDeduplicationIncludePathQueryParam),
          nullptr}};
 
-// LINT.IfChange(AutofillUploadCardRequestTimeouts)
-const FeatureEntry::FeatureParam
-    kAutofillUploadCardRequestTimeout_6Point5Seconds[] = {
-        {"autofill_upload_card_request_timeout_milliseconds", "6500"}};
-const FeatureEntry::FeatureParam kAutofillUploadCardRequestTimeout_7Seconds[] =
-    {{"autofill_upload_card_request_timeout_milliseconds", "7000"}};
-const FeatureEntry::FeatureParam kAutofillUploadCardRequestTimeout_9Seconds[] =
-    {{"autofill_upload_card_request_timeout_milliseconds", "9000"}};
-const FeatureEntry::FeatureVariation
-    kAutofillUploadCardRequestTimeoutOptions[] = {
-        {"6.5 seconds", kAutofillUploadCardRequestTimeout_6Point5Seconds,
-         std::size(kAutofillUploadCardRequestTimeout_6Point5Seconds), nullptr},
-        {"7 seconds", kAutofillUploadCardRequestTimeout_7Seconds,
-         std::size(kAutofillUploadCardRequestTimeout_7Seconds), nullptr},
-        {"9 seconds", kAutofillUploadCardRequestTimeout_9Seconds,
-         std::size(kAutofillUploadCardRequestTimeout_9Seconds), nullptr}};
-// LINT.ThenChange(//ios/chrome/browser/flags/about_flags.mm:AutofillUploadCardRequestTimeouts)
-
 const FeatureEntry::FeatureParam
     kAutofillImprovedLabelsWithoutMainTextChanges[] = {
         {"autofill_improved_labels_without_main_text_changes", "true"},
@@ -4186,16 +4156,6 @@ const FeatureEntry::FeatureVariation kSkiaGraphiteVariations[] = {
      std::size(kSkiaGraphite_DebugLabelsEnabled), nullptr},
 };
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-const FeatureEntry::FeatureParam kTranslationAPI_SkipLanguagePackLimit[] = {
-    {"TranslationAPIAcceptLanguagesCheck", "false"},
-    {"TranslationAPILimitLanguagePackCount", "false"}};
-
-const FeatureEntry::FeatureVariation kTranslationAPIVariations[] = {
-    {"without language pack limit", kTranslationAPI_SkipLanguagePackLimit,
-     std::size(kTranslationAPI_SkipLanguagePackLimit), nullptr}};
-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-
 #if BUILDFLAG(IS_ANDROID)
 const FeatureEntry::FeatureParam kSensitiveContentUsePwmHeuristics[] = {
     {"sensitive_content_use_pwm_heuristics", "true"}};
@@ -4206,28 +4166,8 @@ const FeatureEntry::FeatureVariation kSensitiveContentVariations[] = {
 };
 #endif  // BUILDFLAG(IS_ANDROID)
 
-// Feature variations for kSubframeProcessReuseThresholds.
-const FeatureEntry::FeatureParam kSubframeProcessReuseMemoryThreshold512MB{
-    "SubframeProcessReuseMemoryThreshold", "536870912"};
-const FeatureEntry::FeatureParam kSubframeProcessReuseMemoryThreshold1GB{
-    "SubframeProcessReuseMemoryThreshold", "1073741824"};
-const FeatureEntry::FeatureParam kSubframeProcessReuseMemoryThreshold2GB{
-    "SubframeProcessReuseMemoryThreshold", "2147483648"};
-const FeatureEntry::FeatureParam kSubframeProcessReuseMemoryThreshold4GB{
-    "SubframeProcessReuseMemoryThreshold", "4294967296"};
-const FeatureEntry::FeatureVariation
-    kSubframeProcessReuseThresholdsVariations[] = {
-        {"with 512MB memory threshold",
-         &kSubframeProcessReuseMemoryThreshold512MB, 1, nullptr},
-        {"with 1GB memory threshold", &kSubframeProcessReuseMemoryThreshold1GB,
-         1, nullptr},
-        {"with 2GB memory threshold", &kSubframeProcessReuseMemoryThreshold2GB,
-         1, nullptr},
-        {"with 4GB memory threshold", &kSubframeProcessReuseMemoryThreshold4GB,
-         1, nullptr},
-};
-
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
 const FeatureEntry::FeatureParam kContextualCueingEnabledNoEngagementCap[] = {
     {"BackoffTime", "0h"},
     {"BackoffMultiplierBase", "0.0"},
@@ -4239,7 +4179,8 @@ const FeatureEntry::FeatureVariation kContextualCueingEnabledOptions[] = {
     {"no engagement caps", kContextualCueingEnabledNoEngagementCap,
      std::size(kContextualCueingEnabledNoEngagementCap), nullptr},
 };
-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+        // BUILDFLAG(IS_CHROMEOS)
 
 #if PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
 const FeatureEntry::FeatureParam
@@ -4342,54 +4283,7 @@ const FeatureEntry::FeatureVariation
 #endif  // BUILDFLAG(IS_ANDROID) && PA_BUILDFLAG(HAS_MEMORY_TAGGING) &&
         // PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
 
-const FeatureEntry::FeatureParam kServiceWorkerAutoPreload_SWNotRunningOnly[] =
-    {
-        {"enable_only_when_service_worker_not_running", "true"},
-};
-const FeatureEntry::FeatureVariation kServiceWorkerAutoPreloadVariations[] = {
-    {"only when SW is not running", kServiceWorkerAutoPreload_SWNotRunningOnly,
-     std::size(kServiceWorkerAutoPreload_SWNotRunningOnly), nullptr},
-};
-
-// LINT.IfChange(FingerprintingProtectionFilterFeatureParams)
-const FeatureEntry::FeatureParam
-    kEnableFingerprintingProtectionFilter_WithLogging[] = {
-        {"activation_level", "enabled"},
-        {"enable_console_logging", "true"}};
-const FeatureEntry::FeatureParam
-    kEnableFingerprintingProtectionFilter_DryRunWithLogging[] = {
-        {"activation_level", "dry_run"},
-        {"enable_console_logging", "true"}};
-const FeatureEntry::FeatureVariation
-    kEnableFingerprintingProtectionFilterVariations[] = {
-        {" - with Console Logs",
-         kEnableFingerprintingProtectionFilter_WithLogging,
-         std::size(kEnableFingerprintingProtectionFilter_WithLogging), nullptr},
-        {" - Dry Run with Console Logs",
-         kEnableFingerprintingProtectionFilter_DryRunWithLogging,
-         std::size(kEnableFingerprintingProtectionFilter_DryRunWithLogging),
-         nullptr}};
-
-const FeatureEntry::FeatureParam
-    kEnableFingerprintingProtectionFilterInIncognito_WithLogging[] = {
-        {"activation_level", "enabled"},
-        {"enable_console_logging", "true"}};
-const FeatureEntry::FeatureVariation
-    kEnableFingerprintingProtectionFilterInIncognitoVariations[] = {
-        {" - with Console Logs",
-         kEnableFingerprintingProtectionFilterInIncognito_WithLogging,
-         std::size(
-             kEnableFingerprintingProtectionFilterInIncognito_WithLogging),
-         nullptr}};
-// LINT.ThenChange(//ios/chrome/browser/flags/about_flags.mm:FingerprintingProtectionFilterFeatureParams)
-
 #if !BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kMerchantTrustEnabledWithSampleData[] = {
-    {page_info::kMerchantTrustEnabledWithSampleDataName, "true"}};
-const FeatureEntry::FeatureVariation kMerchantTrustVariations[] = {
-    {"Enabled with sample data", kMerchantTrustEnabledWithSampleData,
-     std::size(kMerchantTrustEnabledWithSampleData), nullptr}};
-
 const FeatureEntry::FeatureParam kAudioDuckingAttenuation_60[] = {
     {"attenuation", "60"}};
 const FeatureEntry::FeatureParam kAudioDuckingAttenuation_70[] = {
@@ -4447,63 +4341,30 @@ constexpr char kDisableFacilitatedPaymentsMerchantAllowlistInternalName[] =
     "disable-facilitated-payments-merchant-allowlist";
 #endif  // BUILDFLAG(IS_ANDROID)
 
-#if BUILDFLAG(IS_ANDROID)
-
-const char kHistoryPagePromoVariationFeatures[] =
-    "HistoryPageHistorySyncPromo,"
-    "HistoryPagePromoCtaStringVariation";
-
-const FeatureEntry::Choice kHistoryOptInEntryPointChoices[] = {
-    {"Default", "", ""},
-    {"Enabled with Turn On CTA", "enable-features",
-     "HistoryPageHistorySyncPromo"},
-    {"Enabled with Continue CTA", "enable-features",
-     kHistoryPagePromoVariationFeatures},
-    {"Disabled", "disable-features", kHistoryPagePromoVariationFeatures},
-};
-
-const FeatureEntry::FeatureParam kHistoryOptInEducationalTipTurnOn[] = {
-    {"history_opt_in_educational_tip_param", "0"}};
-const FeatureEntry::FeatureParam kHistoryOptInEducationalTipLetsGo[] = {
-    {"history_opt_in_educational_tip_param", "1"}};
-const FeatureEntry::FeatureParam kHistoryOptInEducationalTipContinue[] = {
-    {"history_opt_in_educational_tip_param", "2"}};
-
-const FeatureEntry::FeatureVariation kHistoryOptInEducationalTipVariations[] = {
-    {"Enable with \"Turn on\" string variant",
-     kHistoryOptInEducationalTipTurnOn,
-     std::size(kHistoryOptInEducationalTipTurnOn), nullptr},
-    {"Enable with \"Let's go\" string variant",
-     kHistoryOptInEducationalTipLetsGo,
-     std::size(kHistoryOptInEducationalTipLetsGo), nullptr},
-    {"Enable with \"Continue\" string variant",
-     kHistoryOptInEducationalTipContinue,
-     std::size(kHistoryOptInEducationalTipContinue), nullptr}};
-#endif  // BUILDFLAG(IS_ANDROID)
-
 const FeatureEntry::FeatureParam
-    kStandardBoundSessionCredentialsEnabledNoOriginTrialToken[] = {
-        {"ForceEnableForTesting", "true"}};
-const FeatureEntry::FeatureParam
-    kStandardBoundSessionCredentialsEnabledOriginTrialToken[] = {
-        {"ForceEnableForTesting", "false"}};
+    kStandardBoundSessionCredentialsForDevelopers[] = {
+        {"RequireOriginTrialTokens", "false"},
+        {"RefreshQuota", "false"},
+        {"CheckSubdomainRegistration", "false"},
+        {"OriginTrialFeedback", "true"},
+        {"SchemaVersion", "2"}};
 
 const FeatureEntry::FeatureVariation
     kStandardBoundSessionCredentialsVariations[] = {
-        {"- Without Origin Trial tokens",
-         kStandardBoundSessionCredentialsEnabledNoOriginTrialToken,
-         std::size(kStandardBoundSessionCredentialsEnabledNoOriginTrialToken),
-         nullptr},
-        {"- With Origin Trial tokens",
-         kStandardBoundSessionCredentialsEnabledOriginTrialToken,
-         std::size(kStandardBoundSessionCredentialsEnabledOriginTrialToken),
-         nullptr}};
+        {"- For developers", kStandardBoundSessionCredentialsForDevelopers,
+         std::size(kStandardBoundSessionCredentialsForDevelopers), nullptr}};
 
-const FeatureEntry::FeatureParam kEnableCanvasNoiseInAllModes[] = {
-    {"enable_in_regular_mode", "true"}};
-const FeatureEntry::FeatureVariation kEnableCanvasNoiseVariations[] = {
-    {" - In all browsing modes", kEnableCanvasNoiseInAllModes,
-     std::size(kEnableCanvasNoiseInAllModes), nullptr}};
+const FeatureEntry::FeatureParam
+    kStandardBoundSessionCredentialsFederatedSessionsForDevelopers[] = {
+        {"CheckWellKnown", "false"}};
+
+const FeatureEntry::FeatureVariation
+    kStandardBoundSessionCredentialsFederatedSessionsVariations[] = {
+        {"- For developers",
+         kStandardBoundSessionCredentialsFederatedSessionsForDevelopers,
+         std::size(
+             kStandardBoundSessionCredentialsFederatedSessionsForDevelopers),
+         nullptr}};
 
 // LINT.IfChange(AutofillVcnEnrollStrikeExpiryTime)
 const FeatureEntry::FeatureParam kAutofillVcnEnrollStrikeExpiryTime_120Days[] =
@@ -4611,6 +4472,92 @@ const FeatureEntry::FeatureParam kGlicWarmingShorterDelays[] = {
 const FeatureEntry::FeatureVariation kGlicWarmingVariations[] = {
     {"with shorter delays", kGlicWarmingShorterDelays,
      std::size(kGlicWarmingShorterDelays), nullptr}};
+
+const char kGlicEntrypointVariationsShowLabel[] =
+    "glic-entrypoint-variations-show-label";
+const char kGlicEntrypointVariationsAltIcon[] =
+    "glic-entrypoint-variations-alt-icon";
+const char kGlicEntrypointVariationsHighlightNudge[] =
+    "glic-entrypoint-variations-highlight-nudge";
+const FeatureEntry::FeatureParam kGlicEntrypointVariationsHighlightOnly[] = {
+    {kGlicEntrypointVariationsHighlightNudge, "true"},
+    {kGlicEntrypointVariationsAltIcon, "false"},
+    {kGlicEntrypointVariationsShowLabel, "false"},
+};
+const FeatureEntry::FeatureParam kGlicEntrypointVariationsLabelOnly[] = {
+    {kGlicEntrypointVariationsHighlightNudge, "false"},
+    {kGlicEntrypointVariationsAltIcon, "false"},
+    {kGlicEntrypointVariationsShowLabel, "true"},
+};
+const FeatureEntry::FeatureParam kGlicEntrypointVariationsLabelAndHighlight[] =
+    {
+        {kGlicEntrypointVariationsHighlightNudge, "true"},
+        {kGlicEntrypointVariationsAltIcon, "false"},
+        {kGlicEntrypointVariationsShowLabel, "true"},
+};
+const FeatureEntry::FeatureParam kGlicEntrypointVariationsLabelAndIcon[] = {
+    {kGlicEntrypointVariationsHighlightNudge, "false"},
+    {kGlicEntrypointVariationsAltIcon, "true"},
+    {kGlicEntrypointVariationsShowLabel, "true"},
+};
+const FeatureEntry::FeatureParam
+    kGlicEntrypointVariationsLabelAndIconAndHighlight[] = {
+        {kGlicEntrypointVariationsHighlightNudge, "true"},
+        {kGlicEntrypointVariationsAltIcon, "true"},
+        {kGlicEntrypointVariationsShowLabel, "true"},
+};
+
+const FeatureEntry::FeatureVariation kGlicEntrypointVariations[] = {
+    {"highlight nudge only", kGlicEntrypointVariationsHighlightOnly,
+     std::size(kGlicEntrypointVariationsHighlightOnly), nullptr},
+    {"label only", kGlicEntrypointVariationsLabelOnly,
+     std::size(kGlicEntrypointVariationsLabelOnly), nullptr},
+    {"label, highlight nudge", kGlicEntrypointVariationsLabelAndHighlight,
+     std::size(kGlicEntrypointVariationsLabelAndHighlight), nullptr},
+    {"label, alt icon", kGlicEntrypointVariationsLabelAndIcon,
+     std::size(kGlicEntrypointVariationsLabelAndIcon), nullptr},
+    {"label, icon, highlight nudge",
+     kGlicEntrypointVariationsLabelAndIconAndHighlight,
+     std::size(kGlicEntrypointVariationsLabelAndIconAndHighlight), nullptr},
+};
+
+const FeatureEntry::FeatureParam kGlicButtonAltLabelVariant0[] = {
+    {"glic-button-alt-label-variant", "0"}};
+const FeatureEntry::FeatureParam kGlicButtonAltLabelVariant1[] = {
+    {"glic-button-alt-label-variant", "1"}};
+const FeatureEntry::FeatureParam kGlicButtonAltLabelVariant2[] = {
+    {"glic-button-alt-label-variant", "2"}};
+
+const FeatureEntry::FeatureVariation kGlicButtonAltLabelVariations[] = {
+    {"A", kGlicButtonAltLabelVariant0, std::size(kGlicButtonAltLabelVariant0),
+     nullptr},
+    {"B", kGlicButtonAltLabelVariant1, std::size(kGlicButtonAltLabelVariant1),
+     nullptr},
+    {"C", kGlicButtonAltLabelVariant2, std::size(kGlicButtonAltLabelVariant2),
+     nullptr}};
+
+const FeatureEntry::FeatureParam kGlicTrustFirstOnboardingArm1Params[] = {
+    {"arm", "1"}};
+const FeatureEntry::FeatureParam kGlicTrustFirstOnboardingArm2Params[] = {
+    {"arm", "2"}};
+const FeatureEntry::FeatureParam kGlicTrustFirstOnboardingArm3Params[] = {
+    {"arm", "3"}};
+
+const FeatureEntry::FeatureVariation kGlicTrustFirstOnboardingVariations[] = {
+    {"- Arm 1: Start Chat", kGlicTrustFirstOnboardingArm1Params,
+     std::size(kGlicTrustFirstOnboardingArm1Params), nullptr},
+    {"- Arm 2: Welcome Screen", kGlicTrustFirstOnboardingArm2Params,
+     std::size(kGlicTrustFirstOnboardingArm2Params), nullptr},
+    {"- Arm 3: In-Flow opt-in", kGlicTrustFirstOnboardingArm3Params,
+     std::size(kGlicTrustFirstOnboardingArm3Params), nullptr},
+};
+
+const FeatureEntry::Choice kGlicSetG1ForMultiInstance[] = {
+    {flags_ui::kGenericExperimentChoiceDefault, "", ""},
+    {"Force G1 status", switches::kGlicForceG1StatusForMultiInstance, "true"},
+    {"Force non-G1 status", switches::kGlicForceG1StatusForMultiInstance,
+     "false"},
+};
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
 const FeatureEntry::FeatureParam kAutofillShowTypePredictionsAsTitle[] = {
@@ -4633,36 +4580,16 @@ const FeatureEntry::FeatureVariation kAILangsVariation[] = {
     {"Multilingual", kAILangsParam, std::size(kAILangsParam), nullptr},
 };
 
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
-const FeatureEntry::FeatureParam
-    kHistorySyncOptinExpansionPillBrowseAcrossDevices[] = {
-        {"history-sync-optin-expansion-pill-option", "browse-across-devices"}};
-const FeatureEntry::FeatureParam kHistorySyncOptinExpansionPillSyncHistory[] = {
-    {"history-sync-optin-expansion-pill-option", "sync-history"}};
-const FeatureEntry::FeatureParam
-    kHistorySyncOptinExpansionPillSeeTabsFromOtherDevices[] = {
-        {"history-sync-optin-expansion-pill-option",
-         "see-tabs-from-other-devices"}};
-const FeatureEntry::FeatureParam
-    kHistorySyncOptinExpansionPillBrowseAcrossDevicesNewProfileMenuPromoVariant
-        [] = {{"history-sync-optin-expansion-pill-option",
-               "browse-across-devices-new-profile-menu-promo-variant"}};
+#if BUILDFLAG(IS_WIN)
+const FeatureEntry::FeatureParam kAvatarButtonSyncPromoMinimumCookeAge[] = {
+    // 30 seconds to simplify testing.
+    {"minimum-cookie-age", "30s"}};
 
-const FeatureEntry::FeatureVariation kHistorySyncOptinExpansionPillVariations[] = {
-    {"- Browse across devices",
-     kHistorySyncOptinExpansionPillBrowseAcrossDevices,
-     std::size(kHistorySyncOptinExpansionPillBrowseAcrossDevices), nullptr},
-    {"- Sync history", kHistorySyncOptinExpansionPillSyncHistory,
-     std::size(kHistorySyncOptinExpansionPillSyncHistory), nullptr},
-    {"- See tabs from other devices",
-     kHistorySyncOptinExpansionPillSeeTabsFromOtherDevices,
-     std::size(kHistorySyncOptinExpansionPillSeeTabsFromOtherDevices), nullptr},
-    {"- Browse across devices (Profile Menu Variant)",
-     kHistorySyncOptinExpansionPillBrowseAcrossDevicesNewProfileMenuPromoVariant,
-     std::size(
-         kHistorySyncOptinExpansionPillBrowseAcrossDevicesNewProfileMenuPromoVariant),
-     nullptr}};
-#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
+const FeatureEntry::FeatureVariation kAvatarButtonSyncPromoVariations[] = {
+    {"with short minimum cookie age (for testing)",
+     kAvatarButtonSyncPromoMinimumCookeAge,
+     std::size(kAvatarButtonSyncPromoMinimumCookeAge), nullptr}};
+#endif
 
 #if BUILDFLAG(IS_ANDROID)
 
@@ -4724,15 +4651,20 @@ const FeatureEntry::FeatureVariation
         {"Search this page with Google Lens", kLensOverlayEntrypointLabelAlt3,
          std::size(kLensOverlayEntrypointLabelAlt3), nullptr},
 };
-#endif  // !BUILDFLAG(IS_ANDROID)
 
-const FeatureEntry::Choice kActFeaturesChoices[] = {
-    {"Default", "", ""},
-    {"Enabled", switches::kEnableFeatures,
-     "IpProtectionUx, FingerprintingProtectionUx, ActUserBypassUx"},
-    {"Disabled", switches::kDisableFeatures,
-     "IpProtectionUx, FingerprintingProtectionUx, ActUserBypassUx"},
+const FeatureEntry::FeatureParam kEnableNtpBrowserPromosVariationSimple[] = {
+    {"promo-type", "simple"}};
+
+const FeatureEntry::FeatureParam kEnableNtpBrowserPromosVariationSetupList[] = {
+    {"promo-type", "setuplist"}};
+
+const FeatureEntry::FeatureVariation kEnableNtpBrowserPromosVariations[] = {
+    {"Single-promo", kEnableNtpBrowserPromosVariationSimple,
+     std::size(kEnableNtpBrowserPromosVariationSimple)},
+    {"Setup List", kEnableNtpBrowserPromosVariationSetupList,
+     std::size(kEnableNtpBrowserPromosVariationSetupList)},
 };
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 // LINT.IfChange(DataSharingVersioningChoices)
 const FeatureEntry::Choice kDataSharingVersioningStateChoices[] = {
@@ -4857,16 +4789,435 @@ const FeatureEntry::FeatureVariation kCCTResetTimeoutVariations[] = {
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kAndroidTabDeclutterAutoDeleteTesting[] = {
-    {"android_tab_declutter_auto_delete_promo_test", "true"}};
+const FeatureEntry::FeatureParam kAndroidHubSearchTabGroupsPane[] = {
+    {"enable_hub_search_tab_groups_pane", "true"}};
+const FeatureEntry::FeatureParam kAndroidHubSearchTabGroupStrings[] = {
+    {"enable_hub_search_tab_group_strings", "true"}};
+const FeatureEntry::FeatureVariation kAndroidHubSearchTabGroupsVariations[] = {
+    {"on Tab Groups Pane", kAndroidHubSearchTabGroupsPane,
+     std::size(kAndroidHubSearchTabGroupsPane), nullptr},
+    {"with Tab Group Strings", kAndroidHubSearchTabGroupStrings,
+     std::size(kAndroidHubSearchTabGroupStrings), nullptr},
+};
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+const FeatureEntry::FeatureParam kAndroidTabHighlightingForceCtrlClick[] = {
+    {"force_ctrl_click", "true"}};
+const FeatureEntry::FeatureParam kAndroidTabHighlightingForceShiftClick[] = {
+    {"force_shift_click", "true"}};
+const FeatureEntry::FeatureVariation kAndroidTabHighlightingVariations[] = {
+    {"Force Ctrl Click", kAndroidTabHighlightingForceCtrlClick,
+     std::size(kAndroidTabHighlightingForceCtrlClick), nullptr},
+    {"Force Shift Click", kAndroidTabHighlightingForceShiftClick,
+     std::size(kAndroidTabHighlightingForceShiftClick), nullptr}};
+
+const FeatureEntry::FeatureParam kAndroidPinnedTabsSearchBoxMovement[] = {
+    {"search_box_movement", "true"}};
+const FeatureEntry::FeatureParam kAndroidPinnedTabsSearchBoxSquishAnimation[] =
+    {{"search_box_squish_animation", "true"}};
+const FeatureEntry::FeatureParam
+    kAndroidPinnedTabsSearchBoxMovementWithSquishAnimation[] = {
+        {"search_box_movement", "true"},
+        {"search_box_squish_animation", "true"}};
+const FeatureEntry::FeatureVariation kAndroidPinnedTabsVariations[] = {
+    {"Enable search box movement", kAndroidPinnedTabsSearchBoxMovement,
+     std::size(kAndroidPinnedTabsSearchBoxMovement), nullptr},
+    {"Enable search box squish animation",
+     kAndroidPinnedTabsSearchBoxSquishAnimation,
+     std::size(kAndroidPinnedTabsSearchBoxSquishAnimation), nullptr},
+    {"Enable search box movement with squish animation",
+     kAndroidPinnedTabsSearchBoxMovementWithSquishAnimation,
+     std::size(kAndroidPinnedTabsSearchBoxMovementWithSquishAnimation),
+     nullptr},
+};
+
+const FeatureEntry::FeatureParam kAndroidTipsNotificationsTrustAndSafety[] = {
+    {"trust_and_safety", "true"}};
+const FeatureEntry::FeatureParam kAndroidTipsNotificationsEssential[] = {
+    {"essential", "true"}};
+const FeatureEntry::FeatureParam kAndroidTipsNotificationsNewFeatures[] = {
+    {"new_features", "true"}};
+const FeatureEntry::FeatureParam
+    kAndroidTipsNotificationsAlwaysShowOptInPromo[] = {
+        {"always_show_opt_in_promo", "true"},
+        {"trust_and_safety", "true"}};
+const FeatureEntry::FeatureParam
+    kAndroidTipsNotificationsScheduleInstantNotification[] = {
+        {"start_time_minutes", "0"},
+        {"window_time_minutes", "1"},
+        {"trust_and_safety", "true"}};
+const FeatureEntry::FeatureParam
+    kAndroidTipsNotificationsScheduleDelayedNotification[] = {
+        {"start_time_minutes", "2"},
+        {"window_time_minutes", "4"},
+        {"trust_and_safety", "true"}};
+const FeatureEntry::FeatureParam
+    kAndroidTipsNotificationsResetFeatureTipShown[] = {
+        {"reset_feature_tip_shown", "true"}};
+
+const FeatureEntry::FeatureVariation kAndroidTipsNotificationsVariations[] = {
+    {" - Trust and Safety", kAndroidTipsNotificationsTrustAndSafety,
+     std::size(kAndroidTipsNotificationsTrustAndSafety), nullptr},
+    {" - Essential", kAndroidTipsNotificationsEssential,
+     std::size(kAndroidTipsNotificationsEssential), nullptr},
+    {" - New Features", kAndroidTipsNotificationsNewFeatures,
+     std::size(kAndroidTipsNotificationsNewFeatures), nullptr},
+    {" - Always Show Opt In", kAndroidTipsNotificationsAlwaysShowOptInPromo,
+     std::size(kAndroidTipsNotificationsAlwaysShowOptInPromo), nullptr},
+    {" - Schedule Instant Notification",
+     kAndroidTipsNotificationsScheduleInstantNotification,
+     std::size(kAndroidTipsNotificationsScheduleInstantNotification), nullptr},
+    {" - Schedule Delayed Notification",
+     kAndroidTipsNotificationsScheduleDelayedNotification,
+     std::size(kAndroidTipsNotificationsScheduleDelayedNotification), nullptr},
+    {" - Reset Feature Tip Shown",
+     kAndroidTipsNotificationsResetFeatureTipShown,
+     std::size(kAndroidTipsNotificationsResetFeatureTipShown), nullptr},
+};
+
+const FeatureEntry::FeatureParam kRobustWindowManagementBulkCloseEnabled[] = {
+    {"bulk_close", "true"}};
+const FeatureEntry::FeatureVariation kRobustWindowManagementVariations[] = {
+    {"Bulk Close", kRobustWindowManagementBulkCloseEnabled,
+     std::size(kRobustWindowManagementBulkCloseEnabled), nullptr}};
+
+const FeatureEntry::FeatureParam
+    kRobustWindowManagementExperimentalOpenAdjacently[] = {
+        {"open_adjacently", "false"}};
 const FeatureEntry::FeatureVariation
-    kAndroidTabDeclutterAutoDeleteVariations[] = {
-        {"Testing", kAndroidTabDeclutterAutoDeleteTesting,
-         std::size(kAndroidTabDeclutterAutoDeleteTesting), nullptr}};
+    kRobustWindowManagementExperimentalVariations[] = {
+        {"Open Fullscreen",
+         kRobustWindowManagementExperimentalOpenAdjacently,
+         std::size(kRobustWindowManagementExperimentalOpenAdjacently),
+         nullptr}};
+
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if !BUILDFLAG(IS_ANDROID)
 constexpr char kWebiumFlag[] = "webium";
+constexpr char kWebiumFeatures[] =
+    "Webium,AttachUnownedInnerWebContents,ExtensionsMenuAccessControl";
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopForcePromoTypeQRCode[] = {
+    {kMobilePromoOnDesktopForcePromoTypeParam, "0"}};
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopForcePromoTypeReminder[] =
+    {{kMobilePromoOnDesktopForcePromoTypeParam, "1"}};
+
+const FeatureEntry::FeatureVariation
+    kMobilePromoOnDesktopForcePromoTypeVariations[] = {
+        {"QRCode", kMobilePromoOnDesktopForcePromoTypeQRCode,
+         std::size(kMobilePromoOnDesktopForcePromoTypeQRCode), nullptr},
+        {"Reminder", kMobilePromoOnDesktopForcePromoTypeReminder,
+         std::size(kMobilePromoOnDesktopForcePromoTypeReminder), nullptr},
+};
+
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopLens[] = {
+    {kMobilePromoOnDesktopPromoTypeParam, "1"},
+    {kMobilePromoOnDesktopNotificationParam, "false"}};
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopLensNotification[] = {
+    {kMobilePromoOnDesktopPromoTypeParam, "1"},
+    {kMobilePromoOnDesktopNotificationParam, "true"}};
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopESB[] = {
+    {kMobilePromoOnDesktopPromoTypeParam, "2"},
+    {kMobilePromoOnDesktopNotificationParam, "false"}};
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopESBNotification[] = {
+    {kMobilePromoOnDesktopPromoTypeParam, "2"},
+    {kMobilePromoOnDesktopNotificationParam, "true"}};
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopAutofill[] = {
+    {kMobilePromoOnDesktopPromoTypeParam, "3"},
+    {kMobilePromoOnDesktopNotificationParam, "false"}};
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopAutofillNotification[] = {
+    {kMobilePromoOnDesktopPromoTypeParam, "3"},
+    {kMobilePromoOnDesktopNotificationParam, "true"}};
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopTabGroups[] = {
+    {kMobilePromoOnDesktopPromoTypeParam, "4"},
+    {kMobilePromoOnDesktopNotificationParam, "false"}};
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopTabGroupsNotification[] =
+    {{kMobilePromoOnDesktopPromoTypeParam, "4"},
+     {kMobilePromoOnDesktopNotificationParam, "true"}};
+const FeatureEntry::FeatureParam kMobilePromoOnDesktopPriceTracking[] = {
+    {kMobilePromoOnDesktopPromoTypeParam, "5"},
+    {kMobilePromoOnDesktopNotificationParam, "false"}};
+const FeatureEntry::FeatureParam
+    kMobilePromoOnDesktopPriceTrackingNotification[] = {
+        {kMobilePromoOnDesktopPromoTypeParam, "5"},
+        {kMobilePromoOnDesktopNotificationParam, "true"}};
+
+const FeatureEntry::FeatureVariation kMobilePromoOnDesktopVariations[] = {
+    {" - Lens Promo", kMobilePromoOnDesktopLens,
+     std::size(kMobilePromoOnDesktopLens), nullptr},
+    {" - Lens Promo with push notification",
+     kMobilePromoOnDesktopLensNotification,
+     std::size(kMobilePromoOnDesktopLensNotification), nullptr},
+    {" - ESB", kMobilePromoOnDesktopESB, std::size(kMobilePromoOnDesktopESB),
+     nullptr},
+    {" - ESB with push notification", kMobilePromoOnDesktopESBNotification,
+     std::size(kMobilePromoOnDesktopESBNotification), nullptr},
+    {" - PW Autofill", kMobilePromoOnDesktopAutofill,
+     std::size(kMobilePromoOnDesktopAutofill), nullptr},
+    {" - PW Autofill with push notification",
+     kMobilePromoOnDesktopAutofillNotification,
+     std::size(kMobilePromoOnDesktopAutofillNotification), nullptr},
+    {" - Tab Groups", kMobilePromoOnDesktopTabGroups,
+     std::size(kMobilePromoOnDesktopTabGroups), nullptr},
+    {" - Tab Groups with push notification",
+     kMobilePromoOnDesktopTabGroupsNotification,
+     std::size(kMobilePromoOnDesktopTabGroupsNotification), nullptr},
+    {" - Price Tracking", kMobilePromoOnDesktopPriceTracking,
+     std::size(kMobilePromoOnDesktopPriceTracking), nullptr},
+    {" - Price Tracking with push notification",
+     kMobilePromoOnDesktopPriceTrackingNotification,
+     std::size(kMobilePromoOnDesktopPriceTrackingNotification), nullptr},
+};
+
+const FeatureEntry::FeatureVariation
+    kMobilePromoOnDesktopWithQRCodeVariations[] = {
+        {" - Lens Promo", kMobilePromoOnDesktopLens,
+         std::size(kMobilePromoOnDesktopLens), nullptr},
+        {" - ESB", kMobilePromoOnDesktopESB,
+         std::size(kMobilePromoOnDesktopESB), nullptr},
+        {" - PW Autofill", kMobilePromoOnDesktopAutofill,
+         std::size(kMobilePromoOnDesktopAutofill), nullptr},
+        {" - Tab Groups", kMobilePromoOnDesktopTabGroups,
+         std::size(kMobilePromoOnDesktopTabGroups), nullptr},
+        {" - Price Tracking", kMobilePromoOnDesktopPriceTracking,
+         std::size(kMobilePromoOnDesktopPriceTracking), nullptr},
+};
+
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || \
+    BUILDFLAG(IS_CHROMEOS)
+const FeatureEntry::FeatureParam kNtpCustomizeChromeAutoOpenOnEveryNTP[] = {
+    {"max_customize_chrome_auto_shown_count", "5"},
+    {"max_customize_chrome_auto_shown_session_count", "5"}};
+const FeatureEntry::FeatureParam kNtpCustomizeChromeAutoOpenOnFirstNTPOnly[] = {
+    {"max_customize_chrome_auto_shown_count", "5"},
+    {"max_customize_chrome_auto_shown_session_count", "1"}};
+const FeatureEntry::FeatureParam kNtpCustomizeChromeAutoOpenIPHOnly[] = {
+    {"max_customize_chrome_auto_shown_count", "0"},
+    {"max_customize_chrome_auto_shown_session_count", "0"}};
+const FeatureEntry::FeatureVariation kNtpCustomizeChromeAutoOpenVariations[] = {
+    {"- On every NTP", kNtpCustomizeChromeAutoOpenOnEveryNTP,
+     std::size(kNtpCustomizeChromeAutoOpenOnEveryNTP), nullptr},
+    {"- First NTP only", kNtpCustomizeChromeAutoOpenOnFirstNTPOnly,
+     std::size(kNtpCustomizeChromeAutoOpenOnFirstNTPOnly), nullptr},
+    {"- IPH only", kNtpCustomizeChromeAutoOpenIPHOnly,
+     std::size(kNtpCustomizeChromeAutoOpenIPHOnly), nullptr},
+};
+#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || \
+        // BUILDFLAG(IS_CHROMEOS)
+
+const FeatureEntry::FeatureParam kPolicyRegistrationDelay2m[] = {
+    {"PolicyRegistrationDelay", "2m"}};
+const FeatureEntry::FeatureParam kPolicyRegistrationDelay1h[] = {
+    {"PolicyRegistrationDelay", "1h"}};
+const FeatureEntry::FeatureParam kPolicyRegistrationDelay6h[] = {
+    {"PolicyRegistrationDelay", "6h"}};
+const FeatureEntry::FeatureParam kPolicyRegistrationDelay12h[] = {
+    {"PolicyRegistrationDelay", "12h"}};
+const FeatureEntry::FeatureParam kPolicyRegistrationDelay24h[] = {
+    {"PolicyRegistrationDelay", "24h"}};
+
+const FeatureEntry::FeatureVariation kPolicyRegistrationDelayVariations[] = {
+    {"2 minutes", kPolicyRegistrationDelay2m,
+     std::size(kPolicyRegistrationDelay2m), nullptr},
+    {"1 hour", kPolicyRegistrationDelay1h,
+     std::size(kPolicyRegistrationDelay1h), nullptr},
+    {"6 hours", kPolicyRegistrationDelay6h,
+     std::size(kPolicyRegistrationDelay6h), nullptr},
+    {"12 hours", kPolicyRegistrationDelay12h,
+     std::size(kPolicyRegistrationDelay12h), nullptr},
+    {"24 hours", kPolicyRegistrationDelay24h,
+     std::size(kPolicyRegistrationDelay24h), nullptr},
+};
+
+#if BUILDFLAG(ENABLE_DICE_SUPPORT)
+const FeatureEntry::FeatureParam kPolicyDisclaimerRegistrationRetryDelay2m[] = {
+    {"PolicyDisclaimerRegistrationRetryDelay", "2m"}};
+const FeatureEntry::FeatureParam kPolicyDisclaimerRegistrationRetryDelay1h[] = {
+    {"PolicyDisclaimerRegistrationRetryDelay", "1h"}};
+const FeatureEntry::FeatureParam kPolicyDisclaimerRegistrationRetryDelay6h[] = {
+    {"PolicyDisclaimerRegistrationRetryDelay", "6h"}};
+const FeatureEntry::FeatureParam kPolicyDisclaimerRegistrationRetryDelay12h[] =
+    {{"PolicyDisclaimerRegistrationRetryDelay", "12h"}};
+const FeatureEntry::FeatureParam kPolicyDisclaimerRegistrationRetryDelay24h[] =
+    {{"PolicyDisclaimerRegistrationRetryDelay", "24h"}};
+
+const FeatureEntry::FeatureVariation
+    kPolicyDisclaimerRegistrationRetryDelayVariations[] = {
+        {"Enabled - Retry every 2 minutes",
+         kPolicyDisclaimerRegistrationRetryDelay2m,
+         std::size(kPolicyDisclaimerRegistrationRetryDelay2m), nullptr},
+        {"Enabled - Retry every 1 hour",
+         kPolicyDisclaimerRegistrationRetryDelay1h,
+         std::size(kPolicyDisclaimerRegistrationRetryDelay1h), nullptr},
+        {"Enabled - Retry every 6 hours",
+         kPolicyDisclaimerRegistrationRetryDelay6h,
+         std::size(kPolicyDisclaimerRegistrationRetryDelay6h), nullptr},
+        {"Enabled - Retry every 12 hours",
+         kPolicyDisclaimerRegistrationRetryDelay12h,
+         std::size(kPolicyDisclaimerRegistrationRetryDelay12h), nullptr},
+        {"Enabled - Retry every 24 hours",
+         kPolicyDisclaimerRegistrationRetryDelay24h,
+         std::size(kPolicyDisclaimerRegistrationRetryDelay24h), nullptr},
+};
+
+const FeatureEntry::FeatureParam
+    kOAuthMultiloginCookieBindingWithoutEnforcement[] = {{"enforced", "false"}};
+const FeatureEntry::FeatureParam
+    kOAuthMultiloginCookieBindingWithEnforcement[] = {{"enforced", "true"}};
+
+const FeatureEntry::FeatureVariation
+    kOAuthMultiloginCookieBindingEnforcementVariations[] = {
+        {"without enforcement", kOAuthMultiloginCookieBindingWithoutEnforcement,
+         std::size(kOAuthMultiloginCookieBindingWithoutEnforcement), nullptr},
+        {"with enforcement", kOAuthMultiloginCookieBindingWithEnforcement,
+         std::size(kOAuthMultiloginCookieBindingWithEnforcement), nullptr},
+};
+#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
+
+#if BUILDFLAG(IS_ANDROID)
+const FeatureEntry::FeatureParam kSeamlessSigninTwoButtonsContinue[] = {
+    {"seamless-signin-promo-type", "twoButtons"},
+    {"seamless-signin-string-type", "continueButton"}};
+const FeatureEntry::FeatureParam kSeamlessSigninCompactContinue[] = {
+    {"seamless-signin-promo-type", "compact"},
+    {"seamless-signin-string-type", "continueButton"}};
+const FeatureEntry::FeatureParam kSeamlessSigninTwoButtonsSignin[] = {
+    {"seamless-signin-promo-type", "twoButtons"},
+    {"seamless-signin-string-type", "signinButton"}};
+const FeatureEntry::FeatureParam kSeamlessSigninCompactSignin[] = {
+    {"seamless-signin-promo-type", "compact"},
+    {"seamless-signin-string-type", "signinButton"}};
+const FeatureEntry::FeatureVariation kSeamlessSigninVariations[] = {
+    {"with two buttons layout and \"Continue as\" button (group 1)",
+     kSeamlessSigninTwoButtonsContinue,
+     std::size(kSeamlessSigninTwoButtonsContinue), nullptr},
+    {"with compact layout and \"Continue as\" button (group 2)",
+     kSeamlessSigninCompactContinue, std::size(kSeamlessSigninCompactContinue),
+     nullptr},
+    {"with two buttons layout and \"Sign in as\" button (group 3)",
+     kSeamlessSigninTwoButtonsSignin,
+     std::size(kSeamlessSigninTwoButtonsSignin), nullptr},
+    {"with compact layout and \"Sign in as\" button (group 4)",
+     kSeamlessSigninCompactSignin, std::size(kSeamlessSigninCompactSignin),
+     nullptr}};
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+const FeatureEntry::FeatureParam kProfilePickerTextVariation1[] = {
+    {"profile-picker-variation", "keep-work-and-life-separate"}};
+const FeatureEntry::FeatureParam kProfilePickerTextVariation2[] = {
+    {"profile-picker-variation", "got-another-google-account"}};
+const FeatureEntry::FeatureParam kProfilePickerTextVariation3[] = {
+    {"profile-picker-variation", "keep-tasks-separate"}};
+const FeatureEntry::FeatureParam kProfilePickerTextVariation4[] = {
+    {"profile-picker-variation", "sharing-a-computer"}};
+const FeatureEntry::FeatureParam kProfilePickerTextVariation5[] = {
+    {"profile-picker-variation", "keep-everything-in-chrome"}};
+
+const FeatureEntry::FeatureVariation kProfilePickerTextVariations[] = {
+    {"V1: Keep work and life separate", kProfilePickerTextVariation1,
+     std::size(kProfilePickerTextVariation1), nullptr},
+    {"V2: Got another Google Account?", kProfilePickerTextVariation2,
+     std::size(kProfilePickerTextVariation2), nullptr},
+    {"V3: Keep school, side projects, and other tasks separate",
+     kProfilePickerTextVariation3, std::size(kProfilePickerTextVariation3),
+     nullptr},
+    {"V4: Sharing a computer?", kProfilePickerTextVariation4,
+     std::size(kProfilePickerTextVariation4), nullptr},
+    {"V5: Keep everything in Chrome", kProfilePickerTextVariation5,
+     std::size(kProfilePickerTextVariation5), nullptr},
+};
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+
+#if BUILDFLAG(IS_ANDROID)
+const FeatureEntry::FeatureParam kAndroidBookmarkBarFastFollowStandard[] = {
+    {"dynamic_width_enabled", "false"}};
+const FeatureEntry::FeatureVariation kAndroidBookmarkBarFastFollowVariations[] =
+    {{"(Standard Width - with animations)",
+      kAndroidBookmarkBarFastFollowStandard,
+      std::size(kAndroidBookmarkBarFastFollowStandard), nullptr}};
+const FeatureEntry::FeatureParam kDefaultBrowserPromoEntryPointSettingsOnly[] =
+    {{"show_app_menu_item", "false"}};
+const FeatureEntry::FeatureVariation
+    kDefaultBrowserPromoEntryPointVariations[] = {
+        {"(Settings Only - No App Menu)",
+         kDefaultBrowserPromoEntryPointSettingsOnly,
+         std::size(kDefaultBrowserPromoEntryPointSettingsOnly), nullptr}};
+const FeatureEntry::FeatureParam kAndroidDesktopZoomScalingFactorSmall[] = {
+    {"desktop-zoom-scaling-factor", "109"},
+    {"monitor-zoom-scaling-factor", "120"}};
+const FeatureEntry::FeatureParam kAndroidDesktopZoomScalingFactorMedium[] = {
+    {"desktop-zoom-scaling-factor", "115"},
+    {"monitor-zoom-scaling-factor", "125"}};
+const FeatureEntry::FeatureParam kAndroidDesktopZoomScalingFactorLarge[] = {
+    {"desktop-zoom-scaling-factor", "120"},
+    {"monitor-zoom-scaling-factor", "130"}};
+const FeatureEntry::FeatureVariation kAndroidDesktopZoomScalingVariations[] = {
+    {"with 109 scaling, 120 monitor", kAndroidDesktopZoomScalingFactorSmall,
+     std::size(kAndroidDesktopZoomScalingFactorSmall), nullptr},
+    {"with 115 scaling, 125 monitor", kAndroidDesktopZoomScalingFactorMedium,
+     std::size(kAndroidDesktopZoomScalingFactorMedium), nullptr},
+    {"with 120 scaling, 130 monitor", kAndroidDesktopZoomScalingFactorLarge,
+     std::size(kAndroidDesktopZoomScalingFactorLarge), nullptr}};
+#endif  // BUILDFLAG(IS_ANDROID)
+
+const FeatureEntry::FeatureParam kContextualTaskPermanentButton[] = {
+    {"ContextualTasksEntryPoint", "toolbar-permanent"}};
+const FeatureEntry::FeatureParam kContextualTaskEphemeralButton[] = {
+    {"ContextualTasksEntryPoint", "toolbar-revisit"}};
+const FeatureEntry::FeatureParam kContextualTaskPageAction[] = {
+    {"ContextualTasksEntryPoint", "page-action-revisit"}};
+
+const FeatureEntry::FeatureVariation kContextualTaskEntryPointVariations[] = {
+    {"permanent toolbar button", kContextualTaskPermanentButton,
+     std::size(kContextualTaskPermanentButton), nullptr},
+    {"ephemeral toolbar button", kContextualTaskEphemeralButton,
+     std::size(kContextualTaskEphemeralButton), nullptr},
+    {"page action chip", kContextualTaskPageAction,
+     std::size(kContextualTaskPageAction), nullptr}};
+
+const FeatureEntry::FeatureParam kTaskScopedSidePanel[] = {
+    {"TaskScopedSidePanel", "true"}};
+const FeatureEntry::FeatureParam kTabScopedSidePanel[] = {
+    {"TaskScopedSidePanel", "false"}};
+
+const FeatureEntry::FeatureVariation kContextualTaskContextVariations[] = {
+    {" - Task scoped side panel", kTaskScopedSidePanel,
+     std::size(kTaskScopedSidePanel), nullptr},
+    {" - Tab scoped side panel", kTabScopedSidePanel,
+     std::size(kTabScopedSidePanel), nullptr}};
+
+#if BUILDFLAG(IS_ANDROID)
+const FeatureEntry::FeatureParam kAnimatedProgressBar30FpsCap[] = {
+    {"fps_cap", "30"}};
+const FeatureEntry::FeatureParam kAnimatedProgressBar60FpsCap[] = {
+    {"fps_cap", "60"}};
+
+const FeatureEntry::FeatureVariation
+    kAndroidAnimatedProgressBarInBrowserVariations[] = {
+        {"with 30fps cap", kAnimatedProgressBar30FpsCap,
+         std::size(kAnimatedProgressBar30FpsCap), nullptr},
+        {"with 60fsp cap", kAnimatedProgressBar60FpsCap,
+         std::size(kAnimatedProgressBar60FpsCap), nullptr}};
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+const FeatureEntry::Choice kOmniboxAutofocusOnIncognitoNtpChoices[] = {
+    {flags_ui::kGenericExperimentChoiceDefault, "", ""},
+    {flags_ui::kGenericExperimentChoiceDisabled, switches::kDisableFeatures,
+     "OmniboxAutofocusOnIncognitoNtp"},
+    {"Autofocus when physical keyboard attached or not first tab",
+     switches::kEnableFeatures,
+     "OmniboxAutofocusOnIncognitoNtp:not_first_tab/true/with_prediction/false/"
+     "with_hardware_keyboard/true"},
+    {"Autofocus when physical keyboard attached or prediction condition met",
+     switches::kEnableFeatures,
+     "OmniboxAutofocusOnIncognitoNtp:not_first_tab/false/with_prediction/true/"
+     "with_hardware_keyboard/true"},
+};
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 // RECORDING USER METRICS FOR FLAGS:
@@ -4921,13 +5272,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"show-overdraw-feedback", flag_descriptions::kShowOverdrawFeedbackName,
      flag_descriptions::kShowOverdrawFeedbackDescription, kOsAll,
      SINGLE_VALUE_TYPE(switches::kShowOverdrawFeedback)},
-#if !BUILDFLAG(IS_CHROMEOS)
-    {"feedback-include-variations",
-     flag_descriptions::kFeedbackIncludeVariationsName,
-     flag_descriptions::kFeedbackIncludeVariationsDescription,
-     kOsWin | kOsLinux | kOsMac | kOsAndroid,
-     FEATURE_VALUE_TYPE(variations::kFeedbackIncludeVariations)},
-#endif
     {"ui-disable-partial-swap", flag_descriptions::kUiPartialSwapName,
      flag_descriptions::kUiPartialSwapDescription, kOsAll,
      SINGLE_DISABLE_VALUE_TYPE(switches::kUIDisablePartialSwap)},
@@ -4979,6 +5323,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kExtensionsOnExtensionUrlsName,
      flag_descriptions::kExtensionsOnExtensionUrlsDescription, kOsAll,
      SINGLE_VALUE_TYPE(extensions::switches::kExtensionsOnExtensionURLs)},
+    {"web-request-security-info",
+     flag_descriptions::kWebRequestSecurityInfoName,
+     flag_descriptions::kWebRequestSecurityInfoDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(extensions_features::kWebRequestSecurityInfo)},
 #endif  // ENABLE_EXTENSIONS
 #if BUILDFLAG(IS_ANDROID)
     {"contextual-search-suppress-short-view",
@@ -5004,6 +5352,14 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kOmniboxShortcutsAndroidName,
      flag_descriptions::kOmniboxShortcutsAndroidDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(omnibox::kOmniboxShortcutsAndroid)},
+    {"safe-browsing-scam-detection-keyboard-lock-trigger-android",
+     flag_descriptions::
+         kSafeBrowsingScamDetectionKeyboardLockTriggerAndroidName,
+     flag_descriptions::
+         kSafeBrowsingScamDetectionKeyboardLockTriggerAndroidDescription,
+     kOsAndroid,
+     SINGLE_VALUE_TYPE(
+         safe_browsing::switches::kScamDetectionKeyboardLockTriggerAndroid)},
     {"safe-browsing-sync-checker-check-allowlist",
      flag_descriptions::kSafeBrowsingSyncCheckerCheckAllowlistName,
      flag_descriptions::kSafeBrowsingSyncCheckerCheckAllowlistDescription,
@@ -5014,7 +5370,7 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kShowAutofillTypePredictionsName,
      flag_descriptions::kShowAutofillTypePredictionsDescription, kOsAll,
      FEATURE_WITH_PARAMS_VALUE_TYPE(
-         autofill::features::test::kAutofillShowTypePredictions,
+         autofill::features::debug::kAutofillShowTypePredictions,
          kAutofillShowTypePredictionsVariations,
          "AutofillShowTypePredictions")},
     {"autofill-more-prominent-popup",
@@ -5025,6 +5381,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAutofillPaymentsFieldSwappingName,
      flag_descriptions::kAutofillPaymentsFieldSwappingDescription, kOsAll,
      FEATURE_VALUE_TYPE(autofill::features::kAutofillPaymentsFieldSwapping)},
+    {"autofill-show-bubbles-based-on-priorities",
+     flag_descriptions::kAutofillShowBubblesBasedOnPrioritiesName,
+     flag_descriptions::kAutofillShowBubblesBasedOnPrioritiesDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillShowBubblesBasedOnPriorities)},
     {"backdrop-filter-mirror-edge",
      flag_descriptions::kBackdropFilterMirrorEdgeName,
      flag_descriptions::kBackdropFilterMirrorEdgeDescription, kOsAll,
@@ -5045,6 +5407,17 @@ const FeatureEntry kFeatureEntries[] = {
      // Uses the system preference on Mac (a different implementation).
      // On Android, this is always enabled.
      kOsAura, FEATURE_VALUE_TYPE(features::kOverlayScrollbar)},
+    {"overlay-scrollbars-flash-when-mouse-enter",
+     flag_descriptions::kOverlayScrollbarsFlashWhenMouseEnterName,
+     flag_descriptions::kOverlayScrollbarsFlashWhenMouseEnterDescription,
+     kOsAura,
+     FEATURE_VALUE_TYPE(features::kOverlayScrollbarFlashWhenMouseEnter)},
+    {"overlay-scrollbars-flash-once-visible-on-viewport",
+     flag_descriptions::kOverlayScrollbarsFlashOnceVisibleOnViewportName,
+     flag_descriptions::kOverlayScrollbarsFlashOnceVisibleOnViewportDescription,
+     kOsAura,
+     FEATURE_VALUE_TYPE(
+         features::kOverlayScrollbarFlashOnlyOnceVisibleOnViewport)},
 #endif  // USE_AURA
     {"enable-lazy-load-image-for-invisible-pages",
      flag_descriptions::kEnableLazyLoadImageForInvisiblePageName,
@@ -5053,12 +5426,15 @@ const FeatureEntry kFeatureEntries[] = {
          blink::features::kEnableLazyLoadImageForInvisiblePage,
          kSearchSuggsetionPrerenderTypeVariations,
          "EnableLazyLoadImageForInvisiblePage")},
+#if BUILDFLAG(ENABLE_JXL_DECODER)
+    {"enable-jxl-image-format", flag_descriptions::kJxlImageFormatName,
+     flag_descriptions::kJxlImageFormatDescription, kOsAll,
+     FEATURE_VALUE_TYPE(blink::features::kJXLImageFormat)},
+#endif  // BUILDFLAG(ENABLE_JXL_DECODER)
     {"soft-navigation-heuristics",
      flag_descriptions::kSoftNavigationHeuristicsName,
      flag_descriptions::kSoftNavigationHeuristicsDescription, kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(blink::features::kSoftNavigationHeuristics,
-                                    kSoftNavigationHeuristicsVariations,
-                                    "SoftNavigationHeuristics")},
+     FEATURE_VALUE_TYPE(blink::features::kSoftNavigationHeuristics)},
     {"enable-quic", flag_descriptions::kQuicName,
      flag_descriptions::kQuicDescription, kOsAll,
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableQuic, switches::kDisableQuic)},
@@ -5066,6 +5442,9 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kWebTransportDeveloperModeName,
      flag_descriptions::kWebTransportDeveloperModeDescription, kOsAll,
      SINGLE_VALUE_TYPE(switches::kWebTransportDeveloperMode)},
+    {"structured-dns-errors", flag_descriptions::kStructuredDnsErrorsName,
+     flag_descriptions::kStructuredDnsErrorsDescription, kOsAll,
+     FEATURE_VALUE_TYPE(net::features::kUseStructuredDnsErrors)},
     {"disable-javascript-harmony-shipping",
      flag_descriptions::kJavascriptHarmonyShippingName,
      flag_descriptions::kJavascriptHarmonyShippingDescription, kOsAll,
@@ -5073,35 +5452,25 @@ const FeatureEntry kFeatureEntries[] = {
     {"enable-javascript-harmony", flag_descriptions::kJavascriptHarmonyName,
      flag_descriptions::kJavascriptHarmonyDescription, kOsAll,
      SINGLE_VALUE_TYPE(switches::kJavaScriptHarmony)},
-    {"enable-enterprise-profile-badging-for-avatar",
-     flag_descriptions::kEnterpriseProfileBadgingForAvatarName,
-     flag_descriptions::kEnterpriseProfileBadgingForAvatarDescription,
-     kOsMac | kOsWin | kOsLinux,
-     FEATURE_VALUE_TYPE(features::kEnterpriseProfileBadgingForAvatar)},
     {"enable-enterprise-badging-for-ntp-footer",
      flag_descriptions::kEnterpriseBadgingForNtpFooterName,
      flag_descriptions::kEnterpriseBadgingForNtpFooterDescription,
      kOsMac | kOsWin | kOsLinux,
      FEATURE_VALUE_TYPE(features::kEnterpriseBadgingForNtpFooter)},
-    {"enable-enterprise-profile-required-interstitial",
-     flag_descriptions::kManagedProfileRequiredInterstitialName,
-     flag_descriptions::kManagedProfileRequiredInterstitialDescription,
-     kOsMac | kOsWin | kOsLinux,
-     FEATURE_VALUE_TYPE(features::kManagedProfileRequiredInterstitial)},
     {"enable-experimental-webassembly-features",
      flag_descriptions::kExperimentalWebAssemblyFeaturesName,
      flag_descriptions::kExperimentalWebAssemblyFeaturesDescription, kOsAll,
      SINGLE_VALUE_TYPE(switches::kEnableExperimentalWebAssemblyFeatures)},
-    {"enable-experimental-webassembly-jspi",
-     flag_descriptions::kExperimentalWebAssemblyJSPIName,
-     flag_descriptions::kExperimentalWebAssemblyJSPIDescription, kOsAll,
-     FEATURE_VALUE_TYPE(features::kEnableExperimentalWebAssemblyJSPI)},
     {"enable-experimental-webassembly-shared-everything",
      flag_descriptions::kExperimentalWebAssemblySharedEverythingName,
      flag_descriptions::kExperimentalWebAssemblySharedEverythingDescription,
      kOsAll,
      FEATURE_VALUE_TYPE(
          features::kEnableExperimentalWebAssemblySharedEverything)},
+    {"enable-experimental-webassembly-stack-switching",
+     flag_descriptions::kEnableWasmStackSwitchingName,
+     flag_descriptions::kEnableWasmStackSwitchingDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kWebAssemblyStackSwitching)},
     {"enable-webassembly-baseline", flag_descriptions::kEnableWasmBaselineName,
      flag_descriptions::kEnableWasmBaselineDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kWebAssemblyBaseline)},
@@ -5130,18 +5499,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"top-chrome-touch-ui", flag_descriptions::kTopChromeTouchUiName,
      flag_descriptions::kTopChromeTouchUiDescription, kOsDesktop,
      MULTI_VALUE_TYPE(kTopChromeTouchUiChoices)},
-
-#if BUILDFLAG(ENABLE_WEBUI_TAB_STRIP)
-    {flag_descriptions::kWebUITabStripFlagId,
-     flag_descriptions::kWebUITabStripName,
-     flag_descriptions::kWebUITabStripDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kWebUITabStrip)},
-    {"webui-tab-strip-context-menu-after-tap",
-     flag_descriptions::kWebUITabStripContextMenuAfterTapName,
-     flag_descriptions::kWebUITabStripContextMenuAfterTapDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kWebUITabStripContextMenuAfterTap)},
-#endif  // BUILDFLAG(ENABLE_WEBUI_TAB_STRIP)
 #if BUILDFLAG(IS_CHROMEOS)
     {"allow-apn-modification-policy",
      flag_descriptions::kAllowApnModificationPolicyName,
@@ -5151,9 +5508,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAltClickAndSixPackCustomizationName,
      flag_descriptions::kAltClickAndSixPackCustomizationDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kAltClickAndSixPackCustomization)},
-    {"apn-policies", flag_descriptions::kApnPoliciesName,
-     flag_descriptions::kApnPoliciesDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::features::kApnPolicies)},
     {"apn-revamp", flag_descriptions::kApnRevampName,
      flag_descriptions::kApnRevampDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kApnRevamp)},
@@ -5243,9 +5597,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kCellularUseSecondEuiccName,
      flag_descriptions::kCellularUseSecondEuiccDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kCellularUseSecondEuicc)},
-    {"enable-cros-privacy-hub", flag_descriptions::kCrosPrivacyHubName,
-     flag_descriptions::kCrosPrivacyHubDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kCrosPrivacyHub)},
     {"enable-cros-separate-geo-api-key",
      flag_descriptions::kCrosSeparateGeoApiKeyName,
      flag_descriptions::kCrosSeparateGeoApiKeyDescription, kOsCrOS,
@@ -5262,22 +5613,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kDisableCancelAllTouchesDescription, kOsCrOS,
      SINGLE_VALUE_TYPE(switches::kDisableCancelAllTouches)},
     {
-        "enable-background-blur",
-        flag_descriptions::kEnableBackgroundBlurName,
-        flag_descriptions::kEnableBackgroundBlurDescription,
-        kOsCrOS,
-        FEATURE_VALUE_TYPE(ash::features::kEnableBackgroundBlur),
-    },
-    {
         "enable-brightness-control-in-settings",
         flag_descriptions::kEnableBrightnessControlInSettingsName,
         flag_descriptions::kEnableBrightnessControlInSettingsDescription,
         kOsCrOS,
         FEATURE_VALUE_TYPE(ash::features::kEnableBrightnessControlInSettings),
     },
-    {"list-all-display-modes", flag_descriptions::kListAllDisplayModesName,
-     flag_descriptions::kListAllDisplayModesDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(display::features::kListAllDisplayModes)},
     {"enable-edid-based-display-ids",
      flag_descriptions::kEnableEdidBasedDisplayIdsName,
      flag_descriptions::kEnableEdidBasedDisplayIdsDescription, kOsCrOS,
@@ -5353,18 +5694,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kDisconnectWiFiOnEthernetConnectedName,
      flag_descriptions::kDisconnectWiFiOnEthernetConnectedDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kDisconnectWiFiOnEthernetConnected)},
-    {"disable-idle-sockets-close-on-memory-pressure",
-     flag_descriptions::kDisableIdleSocketsCloseOnMemoryPressureName,
-     flag_descriptions::kDisableIdleSocketsCloseOnMemoryPressureDescription,
-     kOsCrOS,
-     FEATURE_VALUE_TYPE(
-         chromeos::features::kDisableIdleSocketsCloseOnMemoryPressure)},
-    {"one-group-per-renderer", flag_descriptions::kOneGroupPerRendererName,
-     flag_descriptions::kOneGroupPerRendererDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(base::kOneGroupPerRenderer)},
     {"use-dhcpcd10", flag_descriptions::kUseDHCPCD10Name,
      flag_descriptions::kUseDHCPCD10Description, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kUseDHCPCD10)},
+    {"jupiter-screensaver", flag_descriptions::kJupiterScreensaverName,
+     flag_descriptions::kJupiterScreensaverDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(ash::features::kJupiterScreensaver)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
     {
         "disable-accelerated-video-decode",
@@ -5403,19 +5738,6 @@ const FeatureEntry kFeatureEntries[] = {
         FEATURE_VALUE_TYPE(media::kHardwareSecureDecryptionFallback),
     },
     {
-        "enable-media-foundation-clear",
-        flag_descriptions::kMediaFoundationClearName,
-        flag_descriptions::kMediaFoundationClearDescription,
-        kOsWin,
-        FEATURE_VALUE_TYPE(media::kMediaFoundationClearPlayback),
-    },
-    {"enable-media-foundation-clear-rendering-strategy",
-     flag_descriptions::kMediaFoundationClearStrategyName,
-     flag_descriptions::kMediaFoundationClearStrategyDescription, kOsWin,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(media::kMediaFoundationClearRendering,
-                                    kMediaFoundationClearStrategyVariations,
-                                    "MediaFoundationClearRendering")},
-    {
         "enable-media-foundation-camera-usage-monitoring",
         flag_descriptions::kMediaFoundationCameraUsageMonitoringName,
         flag_descriptions::kMediaFoundationCameraUsageMonitoringDescription,
@@ -5440,13 +5762,6 @@ const FeatureEntry kFeatureEntries[] = {
         flag_descriptions::kFluentOverlayScrollbarsDescription,
         kOsWin | kOsLinux,
         FEATURE_VALUE_TYPE(features::kFluentOverlayScrollbar),
-    },
-    {
-        "fluent-scrollbars",
-        flag_descriptions::kFluentScrollbarsName,
-        flag_descriptions::kFluentScrollbarsDescription,
-        kOsWin | kOsLinux,
-        FEATURE_VALUE_TYPE(features::kFluentScrollbar),
     },
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
 #if BUILDFLAG(IS_CHROMEOS)
@@ -5481,6 +5796,14 @@ const FeatureEntry kFeatureEntries[] = {
         FEATURE_VALUE_TYPE(media::kMediaFoundationD3D11VideoCapture),
     },
 #endif  // BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_ANDROID)
+    {"zero-copy-video-encoding", flag_descriptions::kZeroCopyVideoEncodingName,
+     flag_descriptions::kZeroCopyVideoEncodingDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(media::kSurfaceInputForAndroidVEA)},
+    {"zero-copy-video-capture", flag_descriptions::kZeroCopyVideoCaptureName,
+     flag_descriptions::kZeroCopyVideoCaptureDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(media::kAndroidZeroCopyVideoCapture)},
+#endif  // BUILDFLAG(IS_ANDROID)
     {"enable-show-autofill-signatures",
      flag_descriptions::kShowAutofillSignaturesName,
      flag_descriptions::kShowAutofillSignaturesDescription, kOsAll,
@@ -5544,16 +5867,13 @@ const FeatureEntry kFeatureEntries[] = {
      ENABLE_DISABLE_VALUE_TYPE(blink::switches::kEnableZeroCopy,
                                blink::switches::kDisableZeroCopy)},
     {"enable-vulkan", flag_descriptions::kEnableVulkanName,
-     flag_descriptions::kEnableVulkanDescription,
-     kOsWin | kOsLinux | kOsAndroid | kOsCrOS,
+     flag_descriptions::kEnableVulkanDescription, kOsLinux | kOsAndroid,
      FEATURE_VALUE_TYPE(features::kVulkan)},
     {"default-angle-vulkan", flag_descriptions::kDefaultAngleVulkanName,
-     flag_descriptions::kDefaultAngleVulkanDescription,
-     kOsLinux | kOsAndroid | kOsCrOS,
+     flag_descriptions::kDefaultAngleVulkanDescription, kOsLinux | kOsAndroid,
      FEATURE_VALUE_TYPE(features::kDefaultANGLEVulkan)},
     {"vulkan-from-angle", flag_descriptions::kVulkanFromAngleName,
-     flag_descriptions::kVulkanFromAngleDescription,
-     kOsLinux | kOsAndroid | kOsCrOS,
+     flag_descriptions::kVulkanFromAngleDescription, kOsLinux | kOsAndroid,
      FEATURE_VALUE_TYPE(features::kVulkanFromANGLE)},
 
 #if !BUILDFLAG(IS_CHROMEOS)
@@ -5577,12 +5897,6 @@ const FeatureEntry kFeatureEntries[] = {
          chrome::android::kAdaptiveButtonInTopToolbarPageSummary,
          kAdaptiveButtonInTopToolbarPageSummaryVariations,
          "AdaptiveButtonInTopToolbarPageSummary")},
-    {"contextual-page-actions-share-model",
-     flag_descriptions::kContextualPageActionsShareModelName,
-     flag_descriptions::kContextualPageActionsShareModelDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         segmentation_platform::features::kContextualPageActionShareModel)},
-
     {"reader-mode-distill-in-app",
      flag_descriptions::kReaderModeDistillInAppName,
      flag_descriptions::kReaderModeDistillInAppDescription, kOsAndroid,
@@ -5595,12 +5909,19 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(dom_distiller::kReaderModeImprovements,
                                     kReaderModeImprovementsChoices,
                                     "Reader Mode Improvements")},
+    {"reader-mode-support-new-fonts",
+     flag_descriptions::kReaderModeSupportNewFontsName,
+     flag_descriptions::kReaderModeSupportNewFontsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(dom_distiller::kReaderModeSupportNewFonts)},
     {"reader-mode-use-readability",
      flag_descriptions::kReaderModeUseReadabilityName,
      flag_descriptions::kReaderModeUseReadabilityDescription, kOsAndroid,
      FEATURE_WITH_PARAMS_VALUE_TYPE(dom_distiller::kReaderModeUseReadability,
                                     kReaderModeUseReadabilityChoices,
                                     "Reader Mode use readability")},
+    {"submenus-in-app-menu", flag_descriptions::kSubmenusInAppMenuName,
+     flag_descriptions::kSubmenusInAppMenuDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kSubmenusInAppMenu)},
     {"submenus-tab-context-menu-lff-tab-strip",
      flag_descriptions::kSubmenusTabContextMenuLffTabStripName,
      flag_descriptions::kSubmenusTabContextMenuLffTabStripDescription,
@@ -5677,10 +5998,10 @@ const FeatureEntry kFeatureEntries[] = {
 
 #endif  // BUILDFLAG(IS_CHROMEOS)
 #if (BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_ANDROID))
-    {"mojo-linux-sharedmem", flag_descriptions::kMojoLinuxChannelSharedMemName,
-     flag_descriptions::kMojoLinuxChannelSharedMemDescription,
+    {"mojo-use-eventfd", flag_descriptions::kMojoUseEventFdName,
+     flag_descriptions::kMojoUseEventFdDescription,
      kOsCrOS | kOsLinux | kOsAndroid,
-     FEATURE_VALUE_TYPE(mojo::core::kMojoLinuxChannelSharedMem)},
+     FEATURE_VALUE_TYPE(mojo::core::kMojoUseEventFd)},
 #endif
 #if BUILDFLAG(IS_ANDROID)
     {"enable-site-isolation-for-password-sites",
@@ -5718,11 +6039,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnableIsolatedWebAppUnmanagedInstallName,
      flag_descriptions::kEnableIsolatedWebAppUnmanagedInstallDescription,
      kOsCrOS, FEATURE_VALUE_TYPE(features::kIsolatedWebAppUnmanagedInstall)},
-    {"web-app-manifest-protocol-handlers",
-     flag_descriptions::kWebAppManifestProtocolHandlersName,
-     flag_descriptions::kWebAppManifestProtocolHandlersDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(
-         chromeos::features::kWebAppManifestProtocolHandlerSupport)},
 #endif
     {"enable-isolated-web-app-allowlist",
      flag_descriptions::kEnableIsolatedWebAppAllowlistName,
@@ -5745,6 +6061,9 @@ const FeatureEntry kFeatureEntries[] = {
      kOsDesktop,
      STRING_VALUE_TYPE(component_updater::kIwaKeyDistributionComponentExpCohort,
                        "")},
+    {"enable-unframed-iwa", flag_descriptions::kEnableUnframedIwaName,
+     flag_descriptions::kEnableUnframedIwaDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(blink::features::kUnframedIwa)},
 #endif
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -5760,9 +6079,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kSiteIsolationOptOutName,
      flag_descriptions::kSiteIsolationOptOutDescription, kOsAll,
      MULTI_VALUE_TYPE(kSiteIsolationOptOutChoices)},
-    {"isolation-by-default", flag_descriptions::kIsolationByDefaultName,
-     flag_descriptions::kIsolationByDefaultDescription, kOsAll,
-     SINGLE_VALUE_TYPE(switches::kIsolationByDefault)},
     {"allow-insecure-localhost", flag_descriptions::kAllowInsecureLocalhostName,
      flag_descriptions::kAllowInsecureLocalhostDescription, kOsAll,
      SINGLE_VALUE_TYPE(switches::kAllowInsecureLocalhost)},
@@ -5794,10 +6110,7 @@ const FeatureEntry kFeatureEntries[] = {
     {"enable-desktop-pwas-sub-apps", flag_descriptions::kDesktopPWAsSubAppsName,
      flag_descriptions::kDesktopPWAsSubAppsDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(blink::features::kDesktopPWAsSubApps)},
-    {"enable-desktop-pwas-scope-extensions",
-     flag_descriptions::kDesktopPWAsScopeExtensionsName,
-     flag_descriptions::kDesktopPWAsScopeExtensionsDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(blink::features::kWebAppEnableScopeExtensions)},
+    // TODO(crbug.com/466441366): Remove "borderless".
     {"enable-desktop-pwas-borderless",
      flag_descriptions::kDesktopPWAsBorderlessName,
      flag_descriptions::kDesktopPWAsBorderlessDescription, kOsDesktop,
@@ -5821,13 +6134,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kMediaRouterCastAllowAllIPsName,
      flag_descriptions::kMediaRouterCastAllowAllIPsDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(media_router::kCastAllowAllIPsFeature)},
-    {"media-remoting-without-fullscreen",
-     flag_descriptions::kMediaRemotingWithoutFullscreenName,
-     flag_descriptions::kMediaRemotingWithoutFullscreenDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(media::kMediaRemotingWithoutFullscreen)},
-    {"remote-playback-backend", flag_descriptions::kRemotePlaybackBackendName,
-     flag_descriptions::kRemotePlaybackBackendDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(blink::features::kRemotePlaybackBackend)},
     {"allow-all-sites-to-initiate-mirroring",
      flag_descriptions::kAllowAllSitesToInitiateMirroringName,
      flag_descriptions::kAllowAllSitesToInitiateMirroringDescription,
@@ -5837,14 +6143,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kDialMediaRouteProviderName,
      flag_descriptions::kDialMediaRouteProviderDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(media_router::kDialMediaRouteProvider)},
-    {"delay-media-sink-discovery",
-     flag_descriptions::kDelayMediaSinkDiscoveryName,
-     flag_descriptions::kDelayMediaSinkDiscoveryDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(media_router::kDelayMediaSinkDiscovery)},
-    {"show-cast-permission-rejected-error",
-     flag_descriptions::kShowCastPermissionRejectedErrorName,
-     flag_descriptions::kShowCastPermissionRejectedErrorDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(media_router::kShowCastPermissionRejectedError)},
     {"cast-message-logging", flag_descriptions::kCastMessageLoggingName,
      flag_descriptions::kCastMessageLoggingDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(media_router::kCastMessageLogging)},
@@ -5894,11 +6192,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kCastStreamingMacHardwareH264Name,
      flag_descriptions::kCastStreamingMacHardwareH264Description, kOsMac,
      FEATURE_VALUE_TYPE(media::kCastStreamingMacHardwareH264)},
-    {"use-network-framework-for-local-discovery",
-     flag_descriptions::kUseNetworkFrameworkForLocalDiscoveryName,
-     flag_descriptions::kUseNetworkFrameworkForLocalDiscoveryDescription,
-     kOsMac,
-     FEATURE_VALUE_TYPE(media_router::kUseNetworkFrameworkForLocalDiscovery)},
 #endif
 
 #if BUILDFLAG(IS_WIN)
@@ -5957,27 +6250,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kPulseaudioLoopbackForScreenShareDescription, kOsLinux,
      FEATURE_VALUE_TYPE(media::kPulseaudioLoopbackForScreenShare)},
 
-    {"ozone-platform-hint", flag_descriptions::kOzonePlatformHintName,
-     flag_descriptions::kOzonePlatformHintDescription, kOsLinux,
-     MULTI_VALUE_TYPE(kOzonePlatformHintRuntimeChoices)},
-
-    {"simplified-tab-drag-ui", flag_descriptions::kSimplifiedTabDragUIName,
-     flag_descriptions::kSimplifiedTabDragUIDescription, kOsLinux,
-     FEATURE_VALUE_TYPE(features::kAllowWindowDragUsingSystemDragDrop)},
-
     {"wayland-per-window-scaling",
      flag_descriptions::kWaylandPerWindowScalingName,
      flag_descriptions::kWaylandPerWindowScalingDescription, kOsLinux,
      FEATURE_VALUE_TYPE(features::kWaylandPerSurfaceScale)},
-
-    {"wayland-ui-scaling", flag_descriptions::kWaylandUiScalingName,
-     flag_descriptions::kWaylandUiScalingDescription, kOsLinux,
-     FEATURE_VALUE_TYPE(features::kWaylandUiScale)},
-
-    {"wayland-linux-drm-syncobj",
-     flag_descriptions::kWaylandLinuxDrmSyncobjName,
-     flag_descriptions::kWaylandLinuxDrmSyncobjDescription, kOsLinux,
-     FEATURE_VALUE_TYPE(features::kWaylandLinuxDrmSyncobj)},
 
     {"wayland-session-management",
      flag_descriptions::kWaylandSessionManagementName,
@@ -5986,15 +6262,25 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_LINUX)
 
 #if BUILDFLAG(ENABLE_VR)
+#if BUILDFLAG(ENABLE_OPENXR)
+    {"openxr-spatial-entities", flag_descriptions::kOpenXrSpatialEntitiesName,
+     flag_descriptions::kOpenXrSpatialEntitiesDescription, kOsWin | kOsAndroid,
+     FEATURE_VALUE_TYPE(device::features::kOpenXrSpatialEntities)},
+    {"spatial-entities-depth-hit-test",
+     flag_descriptions::kSpatialEntitesDepthHitTestName,
+     flag_descriptions::kSpatialEntitesDepthHitTestDescription,
+     kOsWin | kOsAndroid,
+     FEATURE_VALUE_TYPE(device::features::kSpatialEntitesDepthHitTest)},
+#endif  // BUILDFLAG(ENABLE_OPENXR)
     {"webxr-projection-layers", flag_descriptions::kWebXrProjectionLayersName,
      flag_descriptions::kWebXrProjectionLayersDescription, kOsWin | kOsAndroid,
-     FEATURE_VALUE_TYPE(device::features::kWebXrLayers)},
+     FEATURE_VALUE_TYPE(device::features::kWebXRLayers)},
     {"webxr-webgpu-binding", flag_descriptions::kWebXrWebGpuBindingName,
      flag_descriptions::kWebXrWebGpuBindingDescription, kOsWin | kOsAndroid,
-     FEATURE_VALUE_TYPE(device::features::kWebXrWebGpuBinding)},
+     FEATURE_VALUE_TYPE(device::features::kWebXRWebGPUBinding)},
     {"webxr-incubations", flag_descriptions::kWebXrIncubationsName,
      flag_descriptions::kWebXrIncubationsDescription, kOsAll,
-     FEATURE_VALUE_TYPE(device::features::kWebXrIncubations)},
+     FEATURE_VALUE_TYPE(device::features::kWebXRIncubations)},
     {"webxr-internals", flag_descriptions::kWebXrInternalsName,
      flag_descriptions::kWebXrInternalsDescription, kOsDesktop | kOsAndroid,
      FEATURE_VALUE_TYPE(device::features::kWebXrInternals)},
@@ -6005,14 +6291,7 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kWebXrHandAnonymizationStrategyName,
      flag_descriptions::kWebXrHandAnonymizationStrategyDescription,
      kOsDesktop | kOsAndroid, MULTI_VALUE_TYPE(KWebXrHandAnonymizationChoices)},
-    {"webxr-depth-performance", flag_descriptions::kWebXRDepthPerformanceName,
-     flag_descriptions::kWebXRDepthPerformanceDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(blink::features::kWebXRDepthPerformance)},
-#if BUILDFLAG(IS_ANDROID)
-    {"webxr-shared-buffers", flag_descriptions::kWebXrSharedBuffersName,
-     flag_descriptions::kWebXrSharedBuffersDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(device::features::kWebXrSharedBuffers)},
-#if BUILDFLAG(ENABLE_OPENXR)
+#if BUILDFLAG(IS_ANDROID) && BUILDFLAG(ENABLE_OPENXR)
     {"enable-openxr-android", flag_descriptions::kOpenXRName,
      flag_descriptions::kOpenXRDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(device::features::kOpenXR)},
@@ -6023,8 +6302,7 @@ const FeatureEntry kFeatureEntries[] = {
     {"enable-openxr-extended", flag_descriptions::kOpenXRExtendedFeaturesName,
      flag_descriptions::kOpenXRExtendedFeaturesDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(device::features::kOpenXrExtendedFeatureSupport)},
-#endif
-#endif  // BUILDFLAG(IS_ANDROID)
+#endif  // BUILDFLAG(IS_ANDROID) && BUILDFLAG(ENABLE_OPENXR)
 #endif  // ENABLE_VR
 #if BUILDFLAG(IS_CHROMEOS)
     {"disable-accelerated-mjpeg-decode",
@@ -6075,38 +6353,15 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(chrome::android::kDrawChromePagesEdgeToEdge)},
     {"edge-to-edge-bottom-chin", flag_descriptions::kEdgeToEdgeBottomChinName,
      flag_descriptions::kEdgeToEdgeBottomChinDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kEdgeToEdgeBottomChin,
-                                    kEdgeToEdgeBottomChinVariations,
-                                    "EdgeToEdgeBottomChin")},
+     FEATURE_VALUE_TYPE(chrome::android::kEdgeToEdgeBottomChin)},
     {"edge-to-edge-everywhere", flag_descriptions::kEdgeToEdgeEverywhereName,
      flag_descriptions::kEdgeToEdgeEverywhereDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kEdgeToEdgeEverywhere,
-                                    kEdgeToEdgeEverywhereVariations,
-                                    "EdgeToEdgeEverywhere")},
+     FEATURE_VALUE_TYPE(chrome::android::kEdgeToEdgeEverywhere)},
     {"edge-to-edge-tablet", flag_descriptions::kEdgeToEdgeTabletName,
      flag_descriptions::kEdgeToEdgeTabletDescription, kOsAndroid,
      FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kEdgeToEdgeTablet,
                                     kEdgeToEdgeTabletVariations,
                                     "EdgeToEdgeTablet")},
-    {"dynamic-safe-area-insets", flag_descriptions::kDynamicSafeAreaInsetsName,
-     flag_descriptions::kDynamicSafeAreaInsetsDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(blink::features::kDynamicSafeAreaInsets)},
-    {"dynamic-safe-area-insets-on-scroll",
-     flag_descriptions::kDynamicSafeAreaInsetsOnScrollName,
-     flag_descriptions::kDynamicSafeAreaInsetsOnScrollDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(blink::features::kDynamicSafeAreaInsetsOnScroll)},
-    {"bottom-browser-controls-refactor",
-     flag_descriptions::kBottomBrowserControlsRefactorName,
-     flag_descriptions::kBottomBrowserControlsRefactorDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         chrome::android::kBottomBrowserControlsRefactor,
-         kBottomBrowserControlsRefactorVariations,
-         "BottomBrowserControlsRefactor")},
-
-    // Android floating snackbar
-    {"floating-snackbar", flag_descriptions::kFloatingSnackbarName,
-     flag_descriptions::kFloatingSnackbarDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kFloatingSnackbar)},
 
     // Android nav bar color animation
     {"nav-bar-color-animation", flag_descriptions::kNavBarColorAnimationName,
@@ -6124,39 +6379,44 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kGridTabSwitcherUpdateDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kGridTabSwitcherUpdate)},
 
-    // Predictive back gesture
-    {"allow-tab-closing-upon-minimization",
-     flag_descriptions::kAllowTabClosingUponMinimizationName,
-     flag_descriptions::kAllowTabClosingUponMinimizationDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAllowTabClosingUponMinimization)},
-
     // Pinned tabs.
     {"android-pinned-tabs", flag_descriptions::kAndroidPinnedTabsName,
      flag_descriptions::kAndroidPinnedTabsDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAndroidPinnedTabs)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kAndroidPinnedTabs,
+                                    kAndroidPinnedTabsVariations,
+                                    "AndroidPinnedTabsVariations")},
 
-    {"hub-back-button", flag_descriptions::kHubBackButtonName,
-     flag_descriptions::kHubBackButtonDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kHubBackButton)},
+    // Pinned tabs on tablet tab strip.
+    {"android-pinned-tabs-tablet-tab-strip",
+     flag_descriptions::kAndroidPinnedTabsTabletTabStripName,
+     flag_descriptions::kAndroidPinnedTabsTabletTabStripDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidPinnedTabsTabletTabStrip)},
 
-    // Hub slide animation.
-    {"hub-slide-animation", flag_descriptions::kHubSlideAnimationName,
-     flag_descriptions::kHubSlideAnimationDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kHubSlideAnimation)},
+    // Home module pref refactor
+    {"home-module-pref-refactor",
+     flag_descriptions::kHomeModulePrefRefactorName,
+     flag_descriptions::kHomeModulePrefRefactorDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kHomeModulePrefRefactor)},
 
-    {"tab-collection-android", flag_descriptions::kTabCollectionAndroidName,
-     flag_descriptions::kTabCollectionAndroidDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabCollectionAndroid)},
+    {"tab-freezing-uses-discard",
+     flag_descriptions::kTabFreezingUsesDiscardName,
+     flag_descriptions::kTabFreezingUsesDiscardDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kTabFreezingUsesDiscard)},
 
     {"toolbar-phone-animation-refactor",
      flag_descriptions::kToolbarPhoneAnimationRefactorName,
      flag_descriptions::kToolbarPhoneAnimationRefactorDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kToolbarPhoneAnimationRefactor)},
 
-    {"form-factor-use-window-metrics",
-     flag_descriptions::kFormFactorUseMaxWindowMetricsName,
-     flag_descriptions::kFormFactorUseMaxWindowMetricsDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(ui::kFormFactorUseMaxWindowMetrics)},
+    {"refactor-min-width-context-override",
+     flag_descriptions::kRefactorMinWidthContextOverrideName,
+     flag_descriptions::kRefactorMinWidthContextOverrideDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(ui::kRefactorMinWidthContextOverride)},
+
+    {"toolbar-stale-capture-bug-fix",
+     flag_descriptions::kToolbarStaleCaptureBugFixName,
+     flag_descriptions::kToolbarStaleCaptureBugFixDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kToolbarStaleCaptureBugFix)},
 
     {"toolbar-tablet-resize-refactor",
      flag_descriptions::kToolbarTabletResizeRefactorName,
@@ -6229,6 +6489,9 @@ const FeatureEntry kFeatureEntries[] = {
     {"enable-tls13-early-data", flag_descriptions::kEnableTLS13EarlyDataName,
      flag_descriptions::kEnableTLS13EarlyDataDescription, kOsAll,
      FEATURE_VALUE_TYPE(net::features::kEnableTLS13EarlyData)},
+    {"tls-trust-anchor-ids", flag_descriptions::kTLSTrustAnchorIDsName,
+     flag_descriptions::kTLSTrustAnchorIDsDescription, kOsAll,
+     FEATURE_VALUE_TYPE(net::features::kTLSTrustAnchorIDs)},
 #if BUILDFLAG(IS_ANDROID)
     {"feed-loading-placeholder", flag_descriptions::kFeedLoadingPlaceholderName,
      flag_descriptions::kFeedLoadingPlaceholderDescription, kOsAndroid,
@@ -6278,26 +6541,30 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_ANDROID)
     {"enable-force-dark", flag_descriptions::kAutoWebContentsDarkModeName,
      flag_descriptions::kAutoWebContentsDarkModeDescription, kOsAll,
-#if BUILDFLAG(IS_CHROMEOS)
-     // TODO(crbug.com/40651782): Investigate crash reports and
-     // re-enable variations for ChromeOS.
      FEATURE_VALUE_TYPE(blink::features::kForceWebContentsDarkMode)},
-#else
-     FEATURE_WITH_PARAMS_VALUE_TYPE(blink::features::kForceWebContentsDarkMode,
-                                    kForceDarkVariations,
-                                    "ForceDarkVariations")},
-#endif  // BUILDFLAG(IS_CHROMEOS)
 #if BUILDFLAG(IS_ANDROID)
     {"enable-accessibility-deprecate-type-announce",
      flag_descriptions::kAccessibilityDeprecateTypeAnnounceName,
      flag_descriptions::kAccessibilityDeprecateTypeAnnounceDescription,
      kOsAndroid,
      FEATURE_VALUE_TYPE(features::kAccessibilityDeprecateTypeAnnounce)},
-    {"enable-accessibility-include-long-click-action",
-     flag_descriptions::kAccessibilityIncludeLongClickActionName,
-     flag_descriptions::kAccessibilityIncludeLongClickActionDescription,
+    {"enable-accessibility-extended-selection",
+     flag_descriptions::kAccessibilityExtendedSelectionName,
+     flag_descriptions::kAccessibilityExtendedSelectionDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAccessibilityExtendedSelection)},
+    {"enable-accessibility-improve-live-region-announce",
+     flag_descriptions::kAccessibilityImproveLiveRegionAnnounceName,
+     flag_descriptions::kAccessibilityImproveLiveRegionAnnounceDescription,
      kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kAccessibilityIncludeLongClickAction)},
+     FEATURE_VALUE_TYPE(features::kAccessibilityImproveLiveRegionAnnounce)},
+    {"enable-accessibility-atomic-live-regions",
+     flag_descriptions::kAccessibilityAtomicLiveRegionsName,
+     flag_descriptions::kAccessibilityAtomicLiveRegionsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAccessibilityAtomicLiveRegions)},
+    {"enable-accessibility-labeledby",
+     flag_descriptions::kEnableAccessibilityLabeledByName,
+     flag_descriptions::kEnableAccessibilityLabeledByDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAccessibilityLabeledBy)},
     {"enable-accessibility-populate-supplemental-description-api",
      flag_descriptions::kAccessibilityPopulateSupplementalDescriptionApiName,
      flag_descriptions::
@@ -6305,6 +6572,21 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAndroid,
      FEATURE_VALUE_TYPE(
          features::kAccessibilityPopulateSupplementalDescriptionApi)},
+    {"enable-accessibility-sequential-focus",
+     flag_descriptions::kAccessibilitySequentialFocusName,
+     flag_descriptions::kAccessibilitySequentialFocusDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAccessibilitySequentialFocus)},
+    {"enable-accessibility-set-selectable-on-all-nodes-with-text",
+     flag_descriptions::kAccessibilitySetSelectableOnAllNodesWithTextName,
+     flag_descriptions::
+         kAccessibilitySetSelectableOnAllNodesWithTextDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         features::kAccessibilitySetSelectableOnAllNodesWithText)},
+    {"enable-accessibility-text-change-types",
+     flag_descriptions::kAccessibilityTextChangeTypesName,
+     flag_descriptions::kAccessibilityTextChangeTypesDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAccessibilityTextChangeTypes)},
     {"enable-accessibility-text-formatting",
      flag_descriptions::kAccessibilityTextFormattingName,
      flag_descriptions::kAccessibilityTextFormattingDescription, kOsAndroid,
@@ -6337,10 +6619,7 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAll,
      SINGLE_VALUE_TYPE(
          ::switches::kEnableExperimentalAccessibilityLanguageDetectionDynamic)},
-    {"enable-aria-element-reflection",
-     flag_descriptions::kAriaElementReflectionName,
-     flag_descriptions::kAriaElementReflectionDescription, kOsAll,
-     FEATURE_VALUE_TYPE(features::kEnableAriaElementReflection)},
+
 #if BUILDFLAG(IS_CHROMEOS)
     {"enable-cros-autocorrect-params-tuning",
      flag_descriptions::kAutocorrectParamsTuningName,
@@ -6350,10 +6629,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAutocorrectByDefaultName,
      flag_descriptions::kAutocorrectByDefaultDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kAutocorrectByDefault)},
-    {"enable-cros-first-party-vietnamese-input",
-     flag_descriptions::kFirstPartyVietnameseInputName,
-     flag_descriptions::kFirstPartyVietnameseInputDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kFirstPartyVietnameseInput)},
     {"enable-cros-hindi-inscript-layout",
      flag_descriptions::kHindiInscriptLayoutName,
      flag_descriptions::kHindiInscriptLayoutDescription, kOsCrOS,
@@ -6362,13 +6637,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kImeAssistMultiWordName,
      flag_descriptions::kImeAssistMultiWordDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kAssistMultiWord)},
-    {"enable-cros-ime-fst-decoder-params-update",
-     flag_descriptions::kImeFstDecoderParamsUpdateName,
-     flag_descriptions::kImeFstDecoderParamsUpdateDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kImeFstDecoderParamsUpdate)},
-    {"enable-cros-ime-manifest-v3", flag_descriptions::kImeManifestV3Name,
-     flag_descriptions::kImeManifestV3Description, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kImeManifestV3)},
     {"enable-cros-ime-system-emoji-picker-gif-support",
      flag_descriptions::kImeSystemEmojiPickerGIFSupportName,
      flag_descriptions::kImeSystemEmojiPickerGIFSupportDescription, kOsCrOS,
@@ -6386,39 +6654,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kImeSystemEmojiPickerVariantGroupingDescription,
      kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kImeSystemEmojiPickerVariantGrouping)},
-    {"enable-cros-ime-us-english-model-update",
-     flag_descriptions::kImeUsEnglishModelUpdateName,
-     flag_descriptions::kImeUsEnglishModelUpdateDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kImeUsEnglishModelUpdate)},
-    {"enable-cros-ime-korean-only-mode-switch-on-right-alt",
-     flag_descriptions::kImeKoreanOnlyModeSwitchOnRightAltName,
-     flag_descriptions::kImeKoreanOnlyModeSwitchOnRightAltDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kImeKoreanOnlyModeSwitchOnRightAlt)},
     {"enable-cros-ime-switch-check-connection-status",
      flag_descriptions::kImeSwitchCheckConnectionStatusName,
      flag_descriptions::kImeSwitchCheckConnectionStatusDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kImeSwitchCheckConnectionStatus)},
-    {"enable-cros-japanese-os-settings",
-     flag_descriptions::kJapaneseOSSettingsName,
-     flag_descriptions::kJapaneseOSSettingsDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kJapaneseOSSettings)},
-    {"enable-cros-system-japanese-physical-typing",
-     flag_descriptions::kSystemJapanesePhysicalTypingName,
-     flag_descriptions::kSystemJapanesePhysicalTypingDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kSystemJapanesePhysicalTyping)},
-    {"enable-cros-virtual-keyboard-global-emoji-preferences",
-     flag_descriptions::kVirtualKeyboardGlobalEmojiPreferencesName,
-     flag_descriptions::kVirtualKeyboardGlobalEmojiPreferencesDescription,
-     kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kVirtualKeyboardGlobalEmojiPreferences)},
-    {"enable-accessibility-bounce-keys",
-     flag_descriptions::kAccessibilityBounceKeysName,
-     flag_descriptions::kAccessibilityBounceKeysDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kAccessibilityBounceKeys)},
-    {"enable-accessibility-slow-keys",
-     flag_descriptions::kAccessibilitySlowKeysName,
-     flag_descriptions::kAccessibilitySlowKeysDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kAccessibilitySlowKeys)},
     {"enable-experimental-accessibility-dictation-context-checking",
      flag_descriptions::kExperimentalAccessibilityDictationContextCheckingName,
      flag_descriptions::
@@ -6460,10 +6699,21 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAndroidGrammarCheckName,
      flag_descriptions::kAndroidGrammarCheckDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(spellcheck::kAndroidGrammarCheck)},
+    {"enable-android-media-insertion",
+     flag_descriptions::kAndroidMediaInsertionName,
+     flag_descriptions::kAndroidMediaInsertionDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAndroidMediaInsertion)},
     {"enable-android-spellcheck-native-ui",
      flag_descriptions::kAndroidSpellcheckNativeUiName,
      flag_descriptions::kAndroidSpellcheckNativeUiDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(spellcheck::kAndroidSpellcheckNativeUi)},
+     FEATURE_VALUE_TYPE(blink::features::kAndroidSpellcheckNativeUi)},
+    {"enable-android-spellcheck-full-api-blink",
+     flag_descriptions::kAndroidSpellcheckFullApiBlinkName,
+     flag_descriptions::kAndroidSpellcheckFullApiBlinkDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(blink::features::kAndroidSpellcheckFullApiBlink)},
+    {"search-in-settings", flag_descriptions::kSearchInSettingsName,
+     flag_descriptions::kSearchInSettingsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidSearchInSettings)},
 #endif  // BUILDFLAG(IS_ANDROID)
     {"enable-cros-touch-text-editing-redesign",
      flag_descriptions::kTouchTextEditingRedesignName,
@@ -6487,14 +6737,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAppStoreBillingDebugName,
      flag_descriptions::kAppStoreBillingDebugDescription, kOsAll,
      FEATURE_VALUE_TYPE(payments::features::kAppStoreBillingDebug)},
-    {"enable-debug-for-secure-payment-confirmation",
-     flag_descriptions::kSecurePaymentConfirmationDebugName,
-     flag_descriptions::kSecurePaymentConfirmationDebugDescription, kOsAll,
-     FEATURE_VALUE_TYPE(features::kSecurePaymentConfirmationDebug)},
     {"enable-secure-payment-confirmation-browser-bound-key",
      flag_descriptions::kSecurePaymentConfirmationBrowserBoundKeysName,
      flag_descriptions::kSecurePaymentConfirmationBrowserBoundKeysDescription,
-     kOsAndroid,
+     kOsAndroid | kOsMac | kOsWin,
      FEATURE_VALUE_TYPE(
          blink::features::kSecurePaymentConfirmationBrowserBoundKeys)},
 #if BUILDFLAG(IS_ANDROID)
@@ -6511,10 +6757,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kArcAAudioMMAPLowLatencyName,
      flag_descriptions::kArcAAudioMMAPLowLatencyDescription, kOsCrOS,
      PLATFORM_FEATURE_NAME_TYPE("CrOSLateBootArcVmAAudioMMAPLowLatency")},
-    {"arc-custom-tabs-experiment",
-     flag_descriptions::kArcCustomTabsExperimentName,
-     flag_descriptions::kArcCustomTabsExperimentDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(arc::kCustomTabsExperimentFeature)},
     {kArcEnableAttestationFlag, flag_descriptions::kArcEnableAttestationName,
      flag_descriptions::kArcEnableAttestationDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(arc::kEnableArcAttestation)},
@@ -6553,14 +6795,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"arc-rt-vcpu-quad-core", flag_descriptions::kArcRtVcpuQuadCoreName,
      flag_descriptions::kArcRtVcpuQuadCoreDesc, kOsCrOS,
      FEATURE_VALUE_TYPE(arc::kRtVcpuQuadCore)},
-    {"arc-switch-to-keymint-daemon",
-     flag_descriptions::kArcSwitchToKeyMintDaemonName,
-     flag_descriptions::kArcSwitchToKeyMintDaemonDesc, kOsCrOS,
-     PLATFORM_FEATURE_NAME_TYPE("CrOSLateBootArcSwitchToKeyMintDaemon")},
-    {"arc-switch-to-keymint-on-t-override",
-     flag_descriptions::kArcSwitchToKeyMintOnTOverrideName,
-     flag_descriptions::kArcSwitchToKeyMintOnTOverrideDesc, kOsCrOS,
-     FEATURE_VALUE_TYPE(arc::kSwitchToKeyMintOnTOverride)},
     {"arc-sync-install-priority",
      flag_descriptions::kArcSyncInstallPriorityName,
      flag_descriptions::kArcSyncInstallPriorityDescription, kOsCrOS,
@@ -6569,10 +6803,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kArcUnthrottleOnActiveAudioV2Name,
      flag_descriptions::kArcUnthrottleOnActiveAudioV2Description, kOsCrOS,
      FEATURE_VALUE_TYPE(arc::kUnthrottleOnActiveAudioV2)},
-    {"arc-video-encode-use-mappable-si",
-     flag_descriptions::kArcVideoEncodeUseMappableSIName,
-     flag_descriptions::kArcVideoEncodeUseMappableSIDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(arc::kVideoEncodeUseMappableSI)},
     {"arc-vmm-swap-keyboard-shortcut",
      flag_descriptions::kArcVmmSwapKBShortcutName,
      flag_descriptions::kArcVmmSwapKBShortcutDesc, kOsCrOS,
@@ -6585,17 +6815,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kUiDevToolsDescription, kOsCrOS,
      SINGLE_VALUE_TYPE(ui_devtools::switches::kEnableUiDevTools)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
-
-#if BUILDFLAG(IS_ANDROID)
-    {"enable-autofill-virtual-view-structure",
-     flag_descriptions::kAutofillVirtualViewStructureAndroidName,
-     flag_descriptions::kAutofillVirtualViewStructureAndroidDescription,
-     kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         autofill::features::kAutofillVirtualViewStructureAndroid,
-         kAutofillVirtualViewStructureVariation,
-         "Skip AutofillService Check")},
-#endif
 
 #if BUILDFLAG(IS_CHROMEOS)
     {"enable-touchscreen-calibration",
@@ -6617,14 +6836,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"crostini-gpu-support", flag_descriptions::kCrostiniGpuSupportName,
      flag_descriptions::kCrostiniGpuSupportDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kCrostiniGpuSupport)},
-    {"file-transfer-enterprise-connector",
-     flag_descriptions::kFileTransferEnterpriseConnectorName,
-     flag_descriptions::kFileTransferEnterpriseConnectorDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kFileTransferEnterpriseConnector)},
-    {"file-transfer-enterprise-connector-ui",
-     flag_descriptions::kFileTransferEnterpriseConnectorUIName,
-     flag_descriptions::kFileTransferEnterpriseConnectorUIDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kFileTransferEnterpriseConnectorUI)},
     {"files-conflict-dialog", flag_descriptions::kFilesConflictDialogName,
      flag_descriptions::kFilesConflictDialogDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kFilesConflictDialog)},
@@ -6669,9 +6880,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"eche-swa", flag_descriptions::kEcheSWAName,
      flag_descriptions::kEcheSWADescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kEcheSWA)},
-    {"eche-launcher", flag_descriptions::kEcheLauncherName,
-     flag_descriptions::kEcheLauncherDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kEcheLauncherListView)},
     {"eche-swa-check-android-network-info",
      flag_descriptions::kEcheSWACheckAndroidNetworkInfoName,
      flag_descriptions::kEcheSWACheckAndroidNetworkInfoDescription, kOsCrOS,
@@ -6713,10 +6921,6 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_ANDROID)
-    {"android-app-integration", flag_descriptions::kAndroidAppIntegrationName,
-     flag_descriptions::kAndroidAppIntegrationDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAndroidAppIntegration)},
-
     {"android-app-integration-module",
      flag_descriptions::kAndroidAppIntegrationModuleName,
      flag_descriptions::kAndroidAppIntegrationModuleDescription, kOsAndroid,
@@ -6724,6 +6928,15 @@ const FeatureEntry kFeatureEntries[] = {
          segmentation_platform::features::kAndroidAppIntegrationModule,
          kAndroidAppIntegrationModuleVariations,
          "AndroidAppIntegrationModule")},
+
+    {"android-media-picker", flag_descriptions::kAndroidMediaPickerName,
+     flag_descriptions::kAndroidMediaPickerDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(kAndroidMediaPicker)},
+
+    {"user-media-screen-capturing",
+     flag_descriptions::kUserMediaScreenCapturingName,
+     flag_descriptions::kUserMediaScreenCapturingDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kUserMediaScreenCapturing)},
 
     {"android-app-integration-multi-data-source",
      flag_descriptions::kAndroidAppIntegrationMultiDataSourceName,
@@ -6734,11 +6947,6 @@ const FeatureEntry kFeatureEntries[] = {
          kAndroidAppIntegrationMultiDataSourceVariations,
          "AndroidAppIntegrationMultiDataSource")},
 
-    {"android-app-integration-v2",
-     flag_descriptions::kAndroidAppIntegrationV2Name,
-     flag_descriptions::kAndroidAppIntegrationV2Description, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAndroidAppIntegrationV2)},
-
     {"new-tab-page-customization",
      flag_descriptions::kNewTabPageCustomizationName,
      flag_descriptions::kNewTabPageCustomizationDescription, kOsAndroid,
@@ -6747,13 +6955,19 @@ const FeatureEntry kFeatureEntries[] = {
     {"new-tab-page-customization-v2",
      flag_descriptions::kNewTabPageCustomizationV2Name,
      flag_descriptions::kNewTabPageCustomizationV2Description, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kNewTabPageCustomizationV2)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kNewTabPageCustomizationV2,
+                                    kNewTabPageCustomizationV2Variations,
+                                    "NewTabPageCustomizationV2")},
 
     {"android-composeplate", flag_descriptions::kAndroidComposeplateName,
      flag_descriptions::kAndroidComposeplateDescription, kOsAndroid,
      FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kAndroidComposeplate,
                                     kAndroidComposeplateVariations,
                                     "AndroidComposeplate")},
+
+    {"android-composeplate-lff", flag_descriptions::kAndroidComposeplateLFFName,
+     flag_descriptions::kAndroidComposeplateLFFDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidComposeplateLFF)},
 
     {"new-tab-page-customization-for-mvt",
      flag_descriptions::kNewTabPageCustomizationForMvtName,
@@ -6767,20 +6981,12 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          chrome::android::kNewTabPageCustomizationToolbarButton)},
 
-    {"android-app-integration-with-favicon",
-     flag_descriptions::kAndroidAppIntegrationWithFaviconName,
-     flag_descriptions::kAndroidAppIntegrationWithFaviconDescription,
-     kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         chrome::android::kAndroidAppIntegrationWithFavicon,
-         kAndroidAppIntegrationWithFaviconVariations,
-         "AndroidAppIntegrationWithFavicon")},
-
-    {"android-bottom-toolbar", flag_descriptions::kAndroidBottomToolbarName,
-     flag_descriptions::kAndroidBottomToolbarDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kAndroidBottomToolbar,
-                                    kAndroidBottomToolbarVariations,
-                                    "AndroidBottomToolbar")},
+    {"android-bottom-toolbar-v2",
+     flag_descriptions::kAndroidBottomToolbarV2Name,
+     flag_descriptions::kAndroidBottomToolbarV2Description, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kAndroidBottomToolbarV2,
+                                    kAndroidBottomToolbarV2Variations,
+                                    "BottomToolbarV2")},
 
     {"auxiliary-search-donation",
      flag_descriptions::kAuxiliarySearchDonationName,
@@ -6788,6 +6994,11 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kAuxiliarySearchDonation,
                                     kAuxiliarySearchDonationVariations,
                                     "AuxiliarySearchDonation")},
+
+    {"auxiliary-search-history-donation",
+     flag_descriptions::kAuxiliarySearchHistoryDonationName,
+     flag_descriptions::kAuxiliarySearchHistoryDonationDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAuxiliarySearchHistoryDonation)},
 
     {"disable-instance-limit", flag_descriptions::kDisableInstanceLimitName,
      flag_descriptions::kDisableInstanceLimitDescription, kOsAndroid,
@@ -6804,6 +7015,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kChangeUnfocusedPriorityName,
      flag_descriptions::kChangeUnfocusedPriorityDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kChangeUnfocusedPriority)},
+
+    {"chrome-item-picker-ui", flag_descriptions::kChromeItemPickerUiName,
+     flag_descriptions::kChromeItemPickerUiDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kChromeItemPickerUi)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
     {"most-visited-tiles-new-scoring",
@@ -6812,11 +7027,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(history::kMostVisitedTilesNewScoring,
                                     kMostVisitedTilesNewScoringVariations,
                                     "MostVisitedTilesNewScoring")},
-
-    {"most-visited-tiles-visual-deduplication",
-     flag_descriptions::kMostVisitedTilesVisualDeduplicationName,
-     flag_descriptions::kMostVisitedTilesVisualDeduplicationDescription, kOsAll,
-     FEATURE_VALUE_TYPE(history::kMostVisitedTilesVisualDeduplication)},
 
     {"omnibox-local-history-zero-suggest-beyond-ntp",
      flag_descriptions::kOmniboxLocalHistoryZeroSuggestBeyondNTPName,
@@ -6838,11 +7048,6 @@ const FeatureEntry kFeatureEntries[] = {
          kOmniboxZeroSuggestPrefetchDebouncingVariations,
          "OmniboxZeroSuggestPrefetchDebouncing")},
 
-    {"omnibox-zero-suggest-prefetching",
-     flag_descriptions::kOmniboxZeroSuggestPrefetchingName,
-     flag_descriptions::kOmniboxZeroSuggestPrefetchingDescription, kOsAll,
-     FEATURE_VALUE_TYPE(omnibox::kZeroSuggestPrefetching)},
-
     {"omnibox-zero-suggest-prefetching-on-srp",
      flag_descriptions::kOmniboxZeroSuggestPrefetchingOnSRPName,
      flag_descriptions::kOmniboxZeroSuggestPrefetchingOnSRPDescription, kOsAll,
@@ -6852,11 +7057,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kOmniboxZeroSuggestPrefetchingOnWebName,
      flag_descriptions::kOmniboxZeroSuggestPrefetchingOnWebDescription, kOsAll,
      FEATURE_VALUE_TYPE(omnibox::kZeroSuggestPrefetchingOnWeb)},
-
-    {"omnibox-zero-suggest-in-memory-caching",
-     flag_descriptions::kOmniboxZeroSuggestInMemoryCachingName,
-     flag_descriptions::kOmniboxZeroSuggestInMemoryCachingDescription, kOsAll,
-     FEATURE_VALUE_TYPE(omnibox::kZeroSuggestInMemoryCaching)},
 
     {"omnibox-ml-log-url-scoring-signals",
      flag_descriptions::kOmniboxMlLogUrlScoringSignalsName,
@@ -6920,6 +7120,12 @@ const FeatureEntry kFeatureEntries[] = {
          kContextualSuggestionsAblateOthersWhenPresentVariations,
          "ContextualSuggestionsAblateOthersWhenPresent")},
 
+    {"enable-force-download-to-onedrive",
+     flag_descriptions::kEnableForceDownloadToOneDriveName,
+     flag_descriptions::kEnableForceDownloadToOneDriveDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(
+         enterprise_data_protection::kEnableForceDownloadToOneDrive)},
+
     {"omnibox-contextual-search-on-focus-suggestions",
      flag_descriptions::kOmniboxContextualSearchOnFocusSuggestionsName,
      flag_descriptions::kOmniboxContextualSearchOnFocusSuggestionsDescription,
@@ -6941,12 +7147,29 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kLensOverlayOmniboxEntryPointDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(lens::features::kLensOverlayOmniboxEntryPoint)},
 
+    {"ai-mode-omnibox-entry-point",
+     flag_descriptions::kAiModeOmniboxEntryPointName,
+     flag_descriptions::kAiModeOmniboxEntryPointDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kAiModeOmniboxEntryPoint,
+                                    kOmniboxAiModeEntryPointVariations,
+                                    "OmniboxAiModeEntryPointVariations")},
+
+    {"hide-aim-omnibox-entrypoint-on-user-input",
+     flag_descriptions::kHideAimOmniboxEntrypointOnUserInputName,
+     flag_descriptions::kHideAimOmniboxEntrypointOnUserInputDescription,
+     kOsDesktop, FEATURE_VALUE_TYPE(omnibox::kHideAimEntrypointOnUserInput)},
+
     {"omnibox-toolbelt", flag_descriptions::kOmniboxToolbeltName,
      flag_descriptions::kOmniboxToolbeltDescription, kOsDesktop,
      FEATURE_WITH_PARAMS_VALUE_TYPE(
          omnibox_feature_configs::Toolbelt::kOmniboxToolbelt,
          kOmniboxToolbeltVariations,
          "OmniboxToolbelt")},
+
+    {"omnibox-allow-ai-mode-matches",
+     flag_descriptions::kOmniboxAllowAiModeMatchesName,
+     flag_descriptions::kOmniboxAllowAiModeMatchesDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(omnibox_feature_configs::AiMode::kAllowAiModeMatches)},
 
     {"omnibox-drive-suggestions-no-sync-requirement",
      flag_descriptions::kOmniboxDriveSuggestionsNoSyncRequirementName,
@@ -7014,11 +7237,8 @@ const FeatureEntry kFeatureEntries[] = {
     {"omnibox-enterprise-search-aggregator",
      flag_descriptions::kOmniboxSearchAggregatorName,
      flag_descriptions::kOmniboxSearchAggregatorDescription, kOsDesktop,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         omnibox_feature_configs::SearchAggregatorProvider::
-             kSearchAggregatorProvider,
-         kOmniboxSearchAggregatorVariations,
-         "SearchAggregatorProvider")},
+     FEATURE_VALUE_TYPE(omnibox_feature_configs::SearchAggregatorProvider::
+                            kSearchAggregatorProvider)},
 
     {"omnibox-adjust-indentation",
      flag_descriptions::kOmniboxAdjustIndentationName,
@@ -7028,18 +7248,17 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) ||
         // BUILDFLAG(IS_WIN)
 
+    {"aim-server-eligibility",
+     flag_descriptions::kOmniboxAimServerEligibilityName,
+     flag_descriptions::kOmniboxAimServerEligibilityDescription, kOsAll,
+     FEATURE_VALUE_TYPE(omnibox::kAimServerEligibilityEnabled)},
+
 #if BUILDFLAG(IS_ANDROID)
     {"animate-suggestions-list-appearance",
      flag_descriptions::kAnimateSuggestionsListAppearanceName,
      flag_descriptions::kAnimateSuggestionsListAppearanceDescription,
      kOsAndroid,
      FEATURE_VALUE_TYPE(omnibox::kAnimateSuggestionsListAppearance)},
-
-    {"omnibox-answer-actions", flag_descriptions::kOmniboxAnswerActionsName,
-     flag_descriptions::kOmniboxAnswerActionsDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kOmniboxAnswerActions,
-                                    kOmniboxAnswerActionsVariants,
-                                    "OmniboxBundledExperimentV1")},
 
     {"omnibox-asynchronous-view-inflation",
      flag_descriptions::kOmniboxAsyncViewInflationName,
@@ -7049,7 +7268,26 @@ const FeatureEntry kFeatureEntries[] = {
     {"omnibox-multiline-edit-field",
      flag_descriptions::kOmniboxMultilineEditFieldName,
      flag_descriptions::kOmniboxMultilineEditFieldDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(omnibox::kMultilineEditField)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kMultilineEditField,
+                                    kOmniboxMultilineEditFieldVariants,
+                                    "BottomToolbarV2")},
+
+    {"omnibox-multimodal-input", flag_descriptions::kOmniboxMultimodalInputName,
+     flag_descriptions::kOmniboxMultimodalInputDescription, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kOmniboxMultimodalInput,
+                                    kOmniboxMultimodalInputVariants,
+                                    "OmniboxMultiModalInput")},
+
+    {"omnibox-remove-search-ready-omnibox",
+     flag_descriptions::kOmniboxRemoveSearchReadyOmniboxName,
+     flag_descriptions::kOmniboxRemoveSearchReadyOmniboxDescription, kOsAndroid,
+#if IS_OFFICIAL_BUILD
+     FEATURE_VALUE_TYPE(omnibox::kRemoveSearchReadyOmnibox)},
+#else
+     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kRemoveSearchReadyOmnibox,
+                                    kOmniboxRemoveSearchReadyOmniboxVariations,
+                                    "RemoveSearchReadyOmnibox")},
+#endif
 
     {"omnibox-site-search", flag_descriptions::kOmniboxSiteSearchName,
      flag_descriptions::kOmniboxSiteSearchDescription, kOsAndroid,
@@ -7061,13 +7299,6 @@ const FeatureEntry kFeatureEntries[] = {
                                     kOmniboxDiagnosticsAndroidVaiants,
                                     "Diagnostics")},
 
-    {"omnibox-mobile-parity-update",
-     flag_descriptions::kOmniboxMobileParityUpdateName,
-     flag_descriptions::kOmniboxMobileParityUpdateDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kOmniboxMobileParityUpdate,
-                                    kOmniboxMobileParityVariants,
-                                    "OmniboxMobileParityUpdate")},
-
     {"omnibox-mobile-parity-update-v2",
      flag_descriptions::kOmniboxMobileParityUpdateV2Name,
      flag_descriptions::kOmniboxMobileParityUpdateV2Description, kOsAndroid,
@@ -7075,6 +7306,12 @@ const FeatureEntry kFeatureEntries[] = {
                                     kOmniboxMobileParityV2Variants,
                                     "OmniboxMobileParityUpdateV2")},
 
+    {"omnibox-improvement-for-lff",
+     flag_descriptions::kOmniboxImprovementForLFFName,
+     flag_descriptions::kOmniboxImprovementForLFFDescription, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kOmniboxImprovementForLFF,
+                                    kOmniboxImprovementForLFFVariations,
+                                    "OmniboxImprovementForLFF")},
 #endif  // BUILDFLAG(IS_ANDROID)
 #if BUILDFLAG(IS_WIN)
     {"omnibox-on-device-head-suggestions",
@@ -7092,12 +7329,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kOmniboxOnDeviceTailSuggestionsDescription, kOsAll,
      FEATURE_VALUE_TYPE(omnibox::kOnDeviceTailModel)},
 
-    {"omnibox-restore-invisible-focus-only",
-     flag_descriptions::kOmniboxRestoreInvisibleFocusOnlyName,
-     flag_descriptions::kOmniboxRestoreInvisibleFocusOnlyDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(omnibox::kOmniboxRestoreInvisibleFocusOnly)},
-
 #if BUILDFLAG(IS_CHROMEOS)
     {"scheduler-configuration", flag_descriptions::kSchedulerConfigurationName,
      flag_descriptions::kSchedulerConfigurationDescription, kOsCrOS,
@@ -7109,6 +7340,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnableCommandLineOnNonRootedName,
      flag_descriptions::kEnableCommandLineOnNoRootedDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kCommandLineOnNonRooted)},
+    {"enable-escape-handling-for-secondary-activities",
+     flag_descriptions::kEnableEscapeHandlingForSecondaryActivitiesName,
+     flag_descriptions::kEnableEscapeHandlingForSecondaryActivitiesDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         chrome::android::kEnableEscapeHandlingForSecondaryActivities)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
     {"force-color-profile", flag_descriptions::kForceColorProfileName,
@@ -7118,12 +7355,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"forced-colors", flag_descriptions::kForcedColorsName,
      flag_descriptions::kForcedColorsDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kForcedColors)},
-
-#if BUILDFLAG(IS_ANDROID)
-    {"dynamic-color-gamut", flag_descriptions::kDynamicColorGamutName,
-     flag_descriptions::kDynamicColorGamutDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kDynamicColorGamut)},
-#endif
 
     {"hdr-agtm", flag_descriptions::kHdrAgtmName,
      flag_descriptions::kHdrAgtmDescription, kOsAll,
@@ -7158,12 +7389,6 @@ const FeatureEntry kFeatureEntries[] = {
          kOmniboxUIMaxAutocompleteMatchesVariations,
          "OmniboxBundledExperimentV1")},
 
-    {"omnibox-max-url-matches", flag_descriptions::kOmniboxMaxURLMatchesName,
-     flag_descriptions::kOmniboxMaxURLMatchesDescription, kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kOmniboxMaxURLMatches,
-                                    kOmniboxMaxURLMatchesVariations,
-                                    "OmniboxMaxURLMatchesVariations")},
-
     {"omnibox-mia-zps", flag_descriptions::kOmniboxMiaZps,
      flag_descriptions::kOmniboxMiaZpsDescription, kOsAll,
 #if BUILDFLAG(IS_ANDROID)
@@ -7175,13 +7400,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(omnibox_feature_configs::MiaZPS::kOmniboxMiaZPS)
 #endif
     },
-
-    {"omnibox-aim-shortcut-typed-state",
-     flag_descriptions::kOmniboxAimShortcutTypedStateName,
-     flag_descriptions::kOmniboxAimShortcutTypedStateDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kOmniboxAimShortcutTypedState,
-                                    kOmniboxAimShortcutTypedStateVariations,
-                                    "OmniboxAimShortcutTypedState")},
 
     {"omnibox-dynamic-max-autocomplete",
      flag_descriptions::kOmniboxDynamicMaxAutocompleteName,
@@ -7204,12 +7422,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kOptimizationGuideDebugLogsDescription, kOsAll,
      SINGLE_VALUE_TYPE(optimization_guide::switches::kDebugLoggingEnabled)},
 
-    {"optimization-guide-model-execution",
-     flag_descriptions::kOptimizationGuideModelExecutionName,
-     flag_descriptions::kOptimizationGuideModelExecutionDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(
-         optimization_guide::features::kOptimizationGuideModelExecution)},
-
     {"optimization-guide-on-device-model",
      flag_descriptions::kOptimizationGuideOnDeviceModelName,
      flag_descriptions::kOptimizationGuideOnDeviceModelDescription, kOsDesktop,
@@ -7217,6 +7429,13 @@ const FeatureEntry kFeatureEntries[] = {
          optimization_guide::features::kOnDeviceModelPerformanceParams,
          kOptimizationGuideOnDeviceModelVariations,
          "OptimizationGuideOnDeviceModel")},
+
+    {"optimization-guide-on-device-model-android",
+     flag_descriptions::kOptimizationGuideOnDeviceModelAndroidName,
+     flag_descriptions::kOptimizationGuideOnDeviceModelAndroidDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         optimization_guide::features::kOptimizationGuideOnDeviceModel)},
 
     {"text-safety-classifier", flag_descriptions::kTextSafetyClassifierName,
      flag_descriptions::kTextSafetyClassifierDescription, kOsDesktop,
@@ -7294,6 +7513,12 @@ const FeatureEntry kFeatureEntries[] = {
                                     kJourneysVariations,
                                     "HistoryJourneys")},
 
+    {"annotated-page-content-extraction",
+     flag_descriptions::kAnnotatedPageContentExtractionName,
+     flag_descriptions::kAnnotatedPageContentExtractionDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         page_content_annotations::features::kAnnotatedPageContentExtraction)},
+
     {"extract-related-searches-from-prefetched-zps-response",
      flag_descriptions::kExtractRelatedSearchesFromPrefetchedZPSResponseName,
      flag_descriptions::
@@ -7301,22 +7526,6 @@ const FeatureEntry kFeatureEntries[] = {
      kOsDesktop | kOsAndroid,
      FEATURE_VALUE_TYPE(page_content_annotations::features::
                             kExtractRelatedSearchesFromPrefetchedZPSResponse)},
-
-    {"page-image-service-optimization-guide-salient-images",
-     flag_descriptions::kPageImageServiceOptimizationGuideSalientImagesName,
-     flag_descriptions::
-         kPageImageServiceOptimizationGuideSalientImagesDescription,
-     kOsDesktop | kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         page_image_service::kImageServiceOptimizationGuideSalientImages,
-         kImageServiceOptimizationGuideSalientImagesVariations,
-         "PageImageService")},
-
-    {"page-image-service-suggest-powered-images",
-     flag_descriptions::kPageImageServiceSuggestPoweredImagesName,
-     flag_descriptions::kPageImageServiceSuggestPoweredImagesDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(page_image_service::kImageServiceSuggestPoweredImages)},
 
     {"page-content-annotations", flag_descriptions::kPageContentAnnotationsName,
      flag_descriptions::kPageContentAnnotationsDescription,
@@ -7326,15 +7535,6 @@ const FeatureEntry kFeatureEntries[] = {
          kPageContentAnnotationsVariations,
          "PageContentAnnotations")},
 
-    {"page-content-annotations-persist-salient-image-metadata",
-     flag_descriptions::kPageContentAnnotationsPersistSalientImageMetadataName,
-     flag_descriptions::
-         kPageContentAnnotationsPersistSalientImageMetadataDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(
-         page_content_annotations::features::
-             kPageContentAnnotationsPersistSalientImageMetadata)},
-
     {"page-content-annotations-remote-page-metadata",
      flag_descriptions::kPageContentAnnotationsRemotePageMetadataName,
      flag_descriptions::kPageContentAnnotationsRemotePageMetadataDescription,
@@ -7343,6 +7543,10 @@ const FeatureEntry kFeatureEntries[] = {
          page_content_annotations::features::kRemotePageMetadata,
          kRemotePageMetadataVariations,
          "RemotePageMetadata")},
+
+    {"page-content-cache", flag_descriptions::kPageContentCacheName,
+     flag_descriptions::kPageContentCacheDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(page_content_annotations::features::kPageContentCache)},
 
     {"page-visibility-page-content-annotations",
      flag_descriptions::kPageVisibilityPageContentAnnotationsName,
@@ -7356,13 +7560,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kLanguagePacksInSettingsName,
      flag_descriptions::kLanguagePacksInSettingsDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kLanguagePacksInSettings)},
-    {"use-ml-service-for-non-longform-handwriting-on-all-boards",
-     flag_descriptions::kUseMlServiceForNonLongformHandwritingOnAllBoardsName,
-     flag_descriptions::
-         kUseMlServiceForNonLongformHandwritingOnAllBoardsDescription,
-     kOsCrOS,
-     FEATURE_VALUE_TYPE(
-         ash::features::kUseMlServiceForNonLongformHandwritingOnAllBoards)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
     {"mbi-mode", flag_descriptions::kMBIModeName,
@@ -7371,42 +7568,7 @@ const FeatureEntry kFeatureEntries[] = {
                                     kMBIModeVariations,
                                     "MBIMode")},
 
-#if BUILDFLAG(IS_CHROMEOS)
-    {"double-tap-to-zoom-in-tablet-mode",
-     flag_descriptions::kDoubleTapToZoomInTabletModeName,
-     flag_descriptions::kDoubleTapToZoomInTabletModeDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kDoubleTapToZoomInTabletMode)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-    {flag_descriptions::kTabGroupSyncServiceDesktopMigrationId,
-     flag_descriptions::kTabGroupSyncServiceDesktopMigrationName,
-     flag_descriptions::kTabGroupSyncServiceDesktopMigrationDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(tab_groups::kTabGroupSyncServiceDesktopMigration)},
-
 #if !BUILDFLAG(IS_ANDROID)
-    {flag_descriptions::kScrollableTabStripFlagId,
-     flag_descriptions::kScrollableTabStripName,
-     flag_descriptions::kScrollableTabStripDescription, kOsDesktop,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(tabs::kScrollableTabStrip,
-                                    kTabScrollingVariations,
-                                    "TabScrolling")},
-#endif
-    {flag_descriptions::kTabScrollingButtonPositionFlagId,
-     flag_descriptions::kTabScrollingButtonPositionName,
-     flag_descriptions::kTabScrollingButtonPositionDescription, kOsDesktop,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kTabScrollingButtonPosition,
-                                    kTabScrollingButtonPositionVariations,
-                                    "TabScrollingButtonPosition")},
-
-#if !BUILDFLAG(IS_ANDROID)
-    {flag_descriptions::kScrollableTabStripWithDraggingFlagId,
-     flag_descriptions::kScrollableTabStripWithDraggingName,
-     flag_descriptions::kScrollableTabStripWithDraggingDescription, kOsDesktop,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(tabs::kScrollableTabStripWithDragging,
-                                    kTabScrollingWithDraggingVariations,
-                                    "TabScrollingWithDragging")},
-
     {"tabsearch-toolbar-button",
      flag_descriptions::kLaunchedTabSearchToolbarName,
      flag_descriptions::kLaunchedTabSearchToolbarDescription, kOsDesktop,
@@ -7419,31 +7581,35 @@ const FeatureEntry kFeatureEntries[] = {
                                     kTabstripComboButtonVariations,
                                     "TabstripComboButton")},
 
-    {flag_descriptions::kScrollableTabStripOverflowFlagId,
-     flag_descriptions::kScrollableTabStripOverflowName,
-     flag_descriptions::kScrollableTabStripOverflowDescription, kOsDesktop,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(tabs::kScrollableTabStripOverflow,
-                                    kScrollableTabStripOverflowVariations,
-                                    "ScrollableTabStripOverflow")},
+    {"tab-groups-focusing", flag_descriptions::kTabGroupsFocusingName,
+     flag_descriptions::kTabGroupsFocusingDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kTabGroupsFocusing)},
 
-    {"split-tabstrip", flag_descriptions::kSplitTabStripName,
-     flag_descriptions::kSplitTabStripDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(tabs::kSplitTabStrip)},
+    {"vertical-tabs", flag_descriptions::kVerticalTabsName,
+     flag_descriptions::kVerticalTabsDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(tabs::kVerticalTabs)},
+
+#endif
+
+#if !BUILDFLAG(IS_ANDROID)
+    {"side-panel-relative-alignment",
+     flag_descriptions::kSidePanelRelativeAlignmentName,
+     flag_descriptions::kSidePanelRelativeAlignmentDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kToolbarHeightSidePanel,
+                                    kSidePanelRelativeAlignmentVariants,
+                                    "SidePanelRelativeAlignment")},
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
     {"tab-storage-sqlite-prototype",
      flag_descriptions::kTabStorageSqlitePrototypeName,
      flag_descriptions::kTabStorageSqlitePrototypeDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabStorageSqlitePrototype)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kTabStorageSqlitePrototype,
+                                    kTabStorageSqlitePrototypeVariations,
+                                    "TabStorageSqlitePrototype")},
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if !BUILDFLAG(IS_ANDROID)
-    {flag_descriptions::kSidePanelResizingFlagId,
-     flag_descriptions::kSidePanelResizingName,
-     flag_descriptions::kSidePanelResizingDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kSidePanelResizing)},
-
     {"by-date-history-in-side-panel",
      flag_descriptions::kByDateHistoryInSidePanelName,
      flag_descriptions::kByDateHistoryInSidePanelDescription, kOsDesktop,
@@ -7461,11 +7627,6 @@ const FeatureEntry kFeatureEntries[] = {
      commerce::flag_descriptions::kProductSpecificationsName,
      commerce::flag_descriptions::kProductSpecificationsDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(commerce::kProductSpecifications)},
-
-    {"compare-confirmation-toast",
-     commerce::flag_descriptions::kCompareConfirmationToastName,
-     commerce::flag_descriptions::kCompareConfirmationToastDescription,
-     kOsDesktop, FEATURE_VALUE_TYPE(commerce::kCompareConfirmationToast)},
 
     {"shopping-list", commerce::flag_descriptions::kShoppingListName,
      commerce::flag_descriptions::kShoppingListDescription,
@@ -7494,12 +7655,11 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          commerce::kPriceTrackingSubscriptionServiceProductVersion)},
 
-#if BUILDFLAG(IS_ANDROID)
-    {"track-by-default-mobile",
-     commerce::flag_descriptions::kTrackByDefaultOnMobileName,
-     commerce::flag_descriptions::kTrackByDefaultOnMobileDescription,
-     kOsAndroid, FEATURE_VALUE_TYPE(commerce::kTrackByDefaultOnMobile)},
-#endif  // BUILDFLAG(IS_ANDROID)
+    {"composebox-uses-chrome-compose-client",
+     flag_descriptions::kNtpComposeboxUsesChromeComposeClientName,
+     flag_descriptions::kNtpComposeboxUsesChromeComposeClientDescription,
+     kOsDesktop | kOsAndroid,
+     FEATURE_VALUE_TYPE(omnibox::kComposeboxUsesChromeComposeClient)},
 
 #if !BUILDFLAG(IS_ANDROID)
     {"ntp-alpha-background-collections",
@@ -7519,27 +7679,33 @@ const FeatureEntry kFeatureEntries[] = {
                                     kNtpCalendarModuleVariations,
                                     "DesktopNtpModules")},
 
-    {"ntp-compose-entrypoint",
-     flag_descriptions::kNtpSearchboxComposeEntrypointName,
-     flag_descriptions::kNtpSearchboxComposeEntrypointDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(ntp_composebox::kNtpSearchboxComposeEntrypoint)},
-
     {"ntp-composebox", flag_descriptions::kNtpComposeboxName,
      flag_descriptions::kNtpComposeboxDescription, kOsDesktop,
      FEATURE_WITH_PARAMS_VALUE_TYPE(ntp_composebox::kNtpComposebox,
                                     kNtpComposeboxVariations,
                                     "NtpComposebox")},
 
+    {"ntp-realbox-next", flag_descriptions::kNtpRealboxNextName,
+     flag_descriptions::kNtpRealboxNextDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(ntp_realbox::kNtpRealboxNext,
+                                    kNtpRealboxNextVariations,
+                                    "NtpRealboxNext")},
+
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"ntp-customize-chrome-auto-open",
+     flag_descriptions::kNtpCustomizeChromeAutoOpenName,
+     flag_descriptions::kNtpCustomizeChromeAutoOpenDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(ntp_features::kNtpCustomizeChromeAutoOpen,
+                                    kNtpCustomizeChromeAutoOpenVariations,
+                                    "NtpCustomizeChromeAutoOpen")},
+#endif
+
     {"ntp-drive-module", flag_descriptions::kNtpDriveModuleName,
      flag_descriptions::kNtpDriveModuleDescription, kOsDesktop,
      FEATURE_WITH_PARAMS_VALUE_TYPE(ntp_features::kNtpDriveModule,
                                     kNtpDriveModuleVariations,
                                     "DesktopNtpModules")},
-
-    {"ntp-drive-module-no-sync-requirement",
-     flag_descriptions::kNtpDriveModuleNoSyncRequirementName,
-     flag_descriptions::kNtpDriveModuleNoSyncRequirementDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(ntp_features::kNtpDriveModuleNoSyncRequirement)},
 
     {"ntp-drive-module-segmentation",
      flag_descriptions::kNtpDriveModuleSegmentationName,
@@ -7557,6 +7723,31 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(ntp_features::kNtpDummyModules)},
 #endif
 
+    {"ntp-feature-optimization-module-removal",
+     flag_descriptions::kNtpFeatureOptimizationModuleRemovalName,
+     flag_descriptions::kNtpFeatureOptimizationModuleRemovalDescription,
+     kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         ntp_features::kNtpFeatureOptimizationModuleRemoval,
+         kNtpFeatureOptimizationModuleRemovalVariations,
+         "NtpFeatureOptimizationModuleRemoval")},
+
+    {"ntp-feature-optimization-shortcuts-removal",
+     flag_descriptions::kNtpFeatureOptimizationShortcutsRemovalName,
+     flag_descriptions::kNtpFeatureOptimizationShortcutsRemovalDescription,
+     kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         ntp_features::kNtpFeatureOptimizationShortcutsRemoval,
+         kNtpFeatureOptimizationShortcutsRemovalVariations,
+         "NtpFeatureOptimizationShortcutsRemoval")},
+
+    {"ntp-feature-optimization-dismiss-modules-removal",
+     flag_descriptions::kNtpFeatureOptimizationDismissModulesRemovalName,
+     flag_descriptions::kNtpFeatureOptimizationDismissModulesRemovalDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(
+         ntp_features::kNtpFeatureOptimizationDismissModulesRemoval)},
+
     {"ntp-footer", flag_descriptions::kNtpFooterName,
      flag_descriptions::kNtpFooterDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(ntp_features::kNtpFooter)},
@@ -7569,17 +7760,23 @@ const FeatureEntry kFeatureEntries[] = {
                                     "DesktopNtpModules")},
 
     {"ntp-mobile-promo", flag_descriptions::kNtpMobilePromoName,
-     flag_descriptions::kNtpMobilePromoName, kOsDesktop,
+     flag_descriptions::kNtpMobilePromoDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(ntp_features::kNtpMobilePromo)},
 
     {"force-ntp-mobile-promo", flag_descriptions::kForceNtpMobilePromoName,
-     flag_descriptions::kForceNtpMobilePromoName, kOsDesktop,
+     flag_descriptions::kForceNtpMobilePromoDescription, kOsDesktop,
      SINGLE_VALUE_TYPE(switches::kForceNtpMobilePromo)},
 
     {"ntp-module-sign-in-requirement",
      flag_descriptions::kNtpModuleSignInRequirementName,
      flag_descriptions::kNtpModuleSignInRequirementDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(ntp_features::kNtpModuleSignInRequirement)},
+
+    {"ntp-next-features", flag_descriptions::kNtpNextFeaturesName,
+     flag_descriptions::kNtpNextFeaturesDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(ntp_features::kNtpNextFeatures,
+                                    kNtpNextVariations,
+                                    "NtpNextFeatures")},
 
     {"ntp-modules-drag-and-drop", flag_descriptions::kNtpModulesDragAndDropName,
      flag_descriptions::kNtpModulesDragAndDropDescription, kOsDesktop,
@@ -7656,6 +7853,11 @@ const FeatureEntry kFeatureEntries[] = {
                                     kNtpTabGroupsModuleVariations,
                                     "DesktopNtpModules")},
 
+    {"ntp-tab-groups-module-zero-state",
+     flag_descriptions::kNtpTabGroupsModuleZeroStateName,
+     flag_descriptions::kNtpTabGroupsModuleZeroStateDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(ntp_features::kNtpTabGroupsModuleZeroState)},
+
     {"ntp-wallpaper-search-button",
      flag_descriptions::kNtpWallpaperSearchButtonName,
      flag_descriptions::kNtpWallpaperSearchButtonDescription, kOsDesktop,
@@ -7694,28 +7896,21 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnablePixelCanvasRecordingDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kEnablePixelCanvasRecording)},
 
+#if BUILDFLAG(IS_ANDROID)
+    {"fluid-resize", flag_descriptions::kFluidResizeName,
+     flag_descriptions::kFluidResizeDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kFluidResize)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
     {"enable-parallel-downloading", flag_descriptions::kParallelDownloadingName,
      flag_descriptions::kParallelDownloadingDescription, kOsAll,
      FEATURE_VALUE_TYPE(download::features::kParallelDownloading)},
-
     {"download-notification-service-unified-api",
      flag_descriptions::kDownloadNotificationServiceUnifiedAPIName,
      flag_descriptions::kDownloadNotificationServiceUnifiedAPIDescription,
      kOsAndroid,
      FEATURE_VALUE_TYPE(
          download::features::kDownloadNotificationServiceUnifiedAPI)},
-
-    {"tab-hover-card-images", flag_descriptions::kTabHoverCardImagesName,
-     flag_descriptions::kTabHoverCardImagesDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kTabHoverCardImages)},
-
-#if !BUILDFLAG(IS_ANDROID)
-    {flag_descriptions::kTabSearchPositionSettingId,
-     flag_descriptions::kTabSearchPositionSettingName,
-     flag_descriptions::kTabSearchPositionSettingDescription,
-     kOsCrOS | kOsWin | kOsLinux,
-     FEATURE_VALUE_TYPE(tabs::kTabSearchPositionSetting)},
-#endif
 
     {"enable-network-logging-to-file",
      flag_descriptions::kEnableNetworkLoggingToFileName,
@@ -7733,13 +7928,10 @@ const FeatureEntry kFeatureEntries[] = {
          "")},
 #endif
 
-    {
-        "zero-copy-tab-capture",
-        flag_descriptions::kEnableZeroCopyTabCaptureName,
-        flag_descriptions::kEnableZeroCopyTabCaptureDescription,
-        kOsMac | kOsWin | kOsCrOS,
-        FEATURE_VALUE_TYPE(blink::features::kZeroCopyTabCapture),
-    },
+    {"exclude-pip-from-screen-capture",
+     flag_descriptions::kExcludePipFromScreenCaptureName,
+     flag_descriptions::kExcludePipFromScreenCaptureDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kExcludePipFromScreenCapture)},
 
 #if BUILDFLAG(ENABLE_PDF)
     {"accessible-pdf-form", flag_descriptions::kAccessiblePDFFormName,
@@ -7775,13 +7967,6 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(ENABLE_PDF)
 
 #if BUILDFLAG(ENABLE_PRINTING)
-#if BUILDFLAG(IS_CHROMEOS)
-    {"add-printer-via-printscanmgr",
-     flag_descriptions::kAddPrinterViaPrintscanmgrName,
-     flag_descriptions::kAddPrinterViaPrintscanmgrDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(printing::features::kAddPrinterViaPrintscanmgr)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
 #if BUILDFLAG(IS_LINUX)
     {"cups-ipp-printing-backend",
      flag_descriptions::kCupsIppPrintingBackendName,
@@ -7834,20 +8019,6 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAndroid,
      FEATURE_VALUE_TYPE(external_intents::kNavigationCaptureRefactorAndroid)},
 
-    {"enable-auxiliary-navigation-stays-in-browser",
-     flag_descriptions::kAuxiliaryNavigationStaysInBrowserName,
-     flag_descriptions::kAuxiliaryNavigationStaysInBrowserDescription,
-     kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         external_intents::kAuxiliaryNavigationStaysInBrowser,
-         kAuxiliaryNavigationStaysInBrowserVariations,
-         "AuxiliaryNavigationStaysInBrowser")},
-
-    {"enable-auxiliary-navigation-stays-in-PWA",
-     flag_descriptions::kAuxiliaryNavigationStaysInPWAName,
-     flag_descriptions::kAuxiliaryNavigationStaysInPWADescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(external_intents::kAuxiliaryNavigationStaysInPWA)},
-
     {"enable-magic-stack-android", flag_descriptions::kMagicStackAndroidName,
      flag_descriptions::kMagicStackAndroidDescription, kOsAndroid,
      FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kMagicStackAndroid,
@@ -7867,18 +8038,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          chrome::android::kEducationalTipDefaultBrowserPromoCard)},
 
-    {"enable-reparent-auxiliary-navigation-from-pwa",
-     flag_descriptions::kReparentAuxiliaryNavigationFromPWAName,
-     flag_descriptions::kReparentAuxiliaryNavigationFromPWADescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(external_intents::kReparentAuxiliaryNavigationFromPWA)},
-
-    {"enable-reparent-top-level-navigation-from-pwa",
-     flag_descriptions::kReparentTopLevelNavigationFromPWAName,
-     flag_descriptions::kReparentTopLevelNavigationFromPWADescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(external_intents::kReparentTopLevelNavigationFromPWA)},
-
     {"enable-segmentation-platform-ephemeral_card_ranker",
      flag_descriptions::kSegmentationPlatformEphemeralCardRankerName,
      flag_descriptions::kSegmentationPlatformEphemeralCardRankerDescription,
@@ -7895,10 +8054,6 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAndroid,
      FEATURE_VALUE_TYPE(
          chrome::android::kMayLaunchUrlUsesSeparateStoragePartition)},
-
-    {"mini-origin-bar", flag_descriptions::kMiniOriginBarName,
-     flag_descriptions::kMiniOriginBarDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kMiniOriginBar)},
 
     {"enable-segmentation-platform-android-home-module-ranker-v2",
      flag_descriptions::kSegmentationPlatformAndroidHomeModuleRankerV2Name,
@@ -7917,6 +8072,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kSearchInCCTAlternateTapHandlingDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kSearchInCCTAlternateTapHandling)},
 
+    {"settings-multi-column", flag_descriptions::kSettingsMultiColumnName,
+     flag_descriptions::kSettingsMultiColumnDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kSettingsMultiColumn)},
+
     {"settings-single-activity", flag_descriptions::kSettingsSingleActivityName,
      flag_descriptions::kSettingsSingleActivityDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kSettingsSingleActivity)},
@@ -7926,6 +8085,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAndroidSettingsContainmentDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kAndroidSettingsContainment)},
 
+    {"android-setup-list", flag_descriptions::kAndroidSetupListName,
+     flag_descriptions::kAndroidSetupListDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidSetupList)},
+
     {"enable-search-resumption-module",
      flag_descriptions::kSearchResumptionModuleAndroidName,
      flag_descriptions::kSearchResumptionModuleAndroidDescription, kOsAndroid,
@@ -7933,12 +8096,6 @@ const FeatureEntry kFeatureEntries[] = {
          chrome::android::kSearchResumptionModuleAndroid,
          kSearchResumptionModuleAndroidVariations,
          "kSearchResumptionModuleAndroid")},
-
-    {"enable-tabstate-flatbuffer", flag_descriptions::kTabStateFlatBufferName,
-     flag_descriptions::kTabStateFlatBufferDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kTabStateFlatBuffer,
-                                    kTabStateFlatBufferVariations,
-                                    "TabStateFlatBuffer")},
 
     {"price-insights", commerce::flag_descriptions::kPriceInsightsName,
      commerce::flag_descriptions::kPriceInsightsDescription, kOsAndroid,
@@ -7955,11 +8112,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kTabSwitcherDragDropDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kTabSwitcherDragDropAndroid)},
 
-    {"tab-archival-drag-drop-android",
-     flag_descriptions::kTabArchivalDragDropAndroidName,
-     flag_descriptions::kTabArchivalDragDropAndroidDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabArchivalDragDropAndroid)},
-
     {"most-visited-tiles-customization",
      flag_descriptions::kMostVisitedTilesCustomizationName,
      flag_descriptions::kMostVisitedTilesCustomizationDescription, kOsAndroid,
@@ -7974,7 +8126,9 @@ const FeatureEntry kFeatureEntries[] = {
 
     {"show-new-tab-animations", flag_descriptions::kShowNewTabAnimationsName,
      flag_descriptions::kShowNewTabAnimationsDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kShowNewTabAnimations)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kShowNewTabAnimations,
+                                    kShowNewTabAnimationsVariations,
+                                    "ShowNewTabAnimations")},
 
     {"global-cache-list-for-gating-notification-protections",
      flag_descriptions::kGlobalCacheListForGatingNotificationProtectionsName,
@@ -7983,6 +8137,19 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAndroid,
      FEATURE_VALUE_TYPE(
          safe_browsing::kGlobalCacheListForGatingNotificationProtections)},
+
+    {"enable-annotated-page-contents-for-virtual-structure",
+     flag_descriptions::kAnnotatedPageContentsForVirtualStructureName,
+     flag_descriptions::kAnnotatedPageContentsForVirtualStructureDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         chrome::android::kAnnotatedPageContentsVirtualStructure)},
+
+    {"auto-revoke-suspicious-notification",
+     flag_descriptions::kAutoRevokeSuspiciousNotificationName,
+     flag_descriptions::kAutoRevokeSuspiciousNotificationDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(safe_browsing::kAutoRevokeSuspiciousNotification)},
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -8015,14 +8182,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kDisableProcessReuseDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kDisableProcessReuse)},
 
-    {"subframe-process-reuse-thresholds",
-     flag_descriptions::kSubframeProcessReuseThresholds,
-     flag_descriptions::kSubframeProcessReuseThresholdsDescription, kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         features::kSubframeProcessReuseThresholds,
-         kSubframeProcessReuseThresholdsVariations,
-         "SubframeProcessReuseThresholds" /* trial name */)},
-
 #if BUILDFLAG(IS_WIN)
     {"stylus-handwriting-win", flag_descriptions::kStylusHandwritingWinName,
      flag_descriptions::kStylusHandwritingWinDescription, kOsWin,
@@ -8030,11 +8189,6 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_WIN)
 
 #if !BUILDFLAG(IS_ANDROID)
-    {"enable-live-caption-multilang",
-     flag_descriptions::kEnableLiveCaptionMultilangName,
-     flag_descriptions::kEnableLiveCaptionMultilangDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(media::kLiveCaptionMultiLanguage)},
-
     {"enable-headless-live-caption",
      flag_descriptions::kEnableHeadlessLiveCaptionName,
      flag_descriptions::kEnableHeadlessLiveCaptionDescription, kOsDesktop,
@@ -8050,19 +8204,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnableCrOSLiveTranslateName,
      flag_descriptions::kEnableCrOSLiveTranslateDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(media::kLiveTranslate)},
-    {"enable-chromeos-soda-languages",
-     flag_descriptions::kEnableCrOSSodaLanguagesName,
-     flag_descriptions::kEnableCrOSSodaLanguagesDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(speech::kCrosExpandSodaLanguages)},
+
     {"enable-chromeos-soda-conch",
      flag_descriptions::kEnableCrOSSodaConchLanguagesName,
      flag_descriptions::kEnableCrOSSodaConchLanguagesDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(speech::kCrosSodaConchLanguages)},
 #endif
-
-    {"read-anything-read-aloud", flag_descriptions::kReadAnythingReadAloudName,
-     flag_descriptions::kReadAnythingReadAloudDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kReadAnythingReadAloud)},
 
     {"read-anything-read-aloud-phrase-highlighting",
      flag_descriptions::kReadAnythingReadAloudPhraseHighlightingName,
@@ -8084,11 +8231,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kReadAnythingDocsLoadMoreButtonName,
      flag_descriptions::kReadAnythingDocsLoadMoreButtonDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kReadAnythingDocsLoadMoreButton)},
-
-    {"support-tool-screenshot", flag_descriptions::kSupportToolScreenshot,
-     flag_descriptions::kSupportToolScreenshotDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kSupportToolScreenshot)},
-
 #endif  // !BUILDFLAG(IS_ANDROID)
 
     {"enable-auto-disable-accessibility",
@@ -8182,19 +8324,18 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAndroid,
      FEATURE_VALUE_TYPE(
          chrome::android::kCCTOpenInBrowserButtonIfEnabledByEmbedder)},
-    {"cct-predictive-back-gesture",
-     flag_descriptions::kCCTPredictiveBackGestureName,
-     flag_descriptions::kCCTPredictiveBackGestureDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kCCTPredictiveBackGesture)},
-    {"cct-revamped-branding", flag_descriptions::kCCTRevampedBrandingName,
-     flag_descriptions::kCCTRevampedBrandingDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kCCTRevampedBranding)},
+    {"cct-navigation-metrics", flag_descriptions::kCCTNavigationMetricsName,
+     flag_descriptions::kCCTNavigationMetricsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kCCTNavigationMetrics)},
     {"cct-nested-security-icon", flag_descriptions::kCCTNestedSecurityIconName,
      flag_descriptions::kCCTNestedSecurityIconDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kCCTNestedSecurityIcon)},
     {"cct-toolbar-refactor", flag_descriptions::kCCTToolbarRefactorName,
      flag_descriptions::kCCTToolbarRefactorDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kCCTToolbarRefactor)},
+    {"pcct-minimum-height", flag_descriptions::kPCCTMinimumHeightName,
+     flag_descriptions::kPCCTMinimumHeightDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kPCCTMinimumHeight)},
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
@@ -8281,13 +8422,6 @@ const FeatureEntry kFeatureEntries[] = {
          kResamplingScrollEventsExperimentalPredictionVariations,
          "ResamplingScrollEventsExperimentalLatency")},
 
-#if BUILDFLAG(IS_WIN)
-    {"calculate-native-win-occlusion",
-     flag_descriptions::kCalculateNativeWinOcclusionName,
-     flag_descriptions::kCalculateNativeWinOcclusionDescription, kOsWin,
-     FEATURE_VALUE_TYPE(features::kCalculateNativeWinOcclusion)},
-#endif  // BUILDFLAG(IS_WIN)
-
 #if !BUILDFLAG(IS_ANDROID)
     {"happiness-tracking-surveys-for-desktop-demo",
      flag_descriptions::kHappinessTrackingSurveysForDesktopDemoName,
@@ -8311,20 +8445,13 @@ const FeatureEntry kFeatureEntries[] = {
     {"use-angle", flag_descriptions::kUseAngleName,
      flag_descriptions::kUseAngleDescriptionWindows, kOsWin,
      MULTI_VALUE_TYPE(kUseAngleChoicesWindows)},
-#elif BUILDFLAG(IS_MAC)
-    {"use-angle", flag_descriptions::kUseAngleName,
-     flag_descriptions::kUseAngleDescriptionMac, kOsMac,
-     MULTI_VALUE_TYPE(kUseAngleChoicesMac)},
 #elif BUILDFLAG(IS_ANDROID)
-        {"use-angle", flag_descriptions::kUseAngleName,
-         flag_descriptions::kUseAngleDescriptionAndroid, kOsAndroid,
-         MULTI_VALUE_TYPE(kUseAngleChoicesAndroid)},
+    {"use-angle", flag_descriptions::kUseAngleName,
+     flag_descriptions::kUseAngleDescriptionAndroid, kOsAndroid,
+     MULTI_VALUE_TYPE(kUseAngleChoicesAndroid)},
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)
-    {"enable-assistant-dsp", flag_descriptions::kEnableGoogleAssistantDspName,
-     flag_descriptions::kEnableGoogleAssistantDspDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::assistant::features::kEnableDspHotword)},
     {"disable-quick-answers-v2-translation",
      flag_descriptions::kDisableQuickAnswersV2TranslationName,
      flag_descriptions::kDisableQuickAnswersV2TranslationDescription, kOsCrOS,
@@ -8359,10 +8486,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnterOverviewFromWallpaperName,
      flag_descriptions::kEnterOverviewFromWallpaperDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kEnterOverviewFromWallpaper)},
-    {"enable-assistant-stereo-input",
-     flag_descriptions::kEnableGoogleAssistantStereoInputName,
-     flag_descriptions::kEnableGoogleAssistantStereoInputDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::assistant::features::kEnableStereoAudioInput)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
     {"enable-gpu-service-logging",
@@ -8435,15 +8558,22 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kFileHandlingIconsDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(blink::features::kFileHandlingIcons)},
 
-    {"file-system-observer", flag_descriptions::kFileSystemObserverName,
-     flag_descriptions::kFileSystemObserverDescription, kOsAll,
-     FEATURE_VALUE_TYPE(blink::features::kFileSystemObserver)},
-
     {"strict-origin-isolation", flag_descriptions::kStrictOriginIsolationName,
      flag_descriptions::kStrictOriginIsolationDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kStrictOriginIsolation)},
 
 #if BUILDFLAG(IS_ANDROID)
+    {"load-all-tabs-at-startup", flag_descriptions::kLoadAllTabsAtStartupName,
+     flag_descriptions::kLoadAllTabsAtStartupDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kLoadAllTabsAtStartup)},
+    {"lock-controls-on-tablets",
+     flag_descriptions::kLockTopControlsOnLargeTabletsName,
+     flag_descriptions::kLockTopControlsOnLargeTabletsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kLockTopControlsOnLargeTablets)},
+    {"lock-controls-on-tablets-v2",
+     flag_descriptions::kLockTopControlsOnLargeTabletsV2Name,
+     flag_descriptions::kLockTopControlsOnLargeTabletsV2Description, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kLockTopControlsOnLargeTabletsV2)},
     {"enable-logging-js-console-messages",
      flag_descriptions::kLogJsConsoleMessagesName,
      flag_descriptions::kLogJsConsoleMessagesDescription, kOsAndroid,
@@ -8557,10 +8687,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kExperimentalRgbKeyboardPatternsDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kExperimentalRgbKeyboardPatterns)},
 
-    {"enable-hostname-setting", flag_descriptions::kEnableHostnameSettingName,
-     flag_descriptions::kEnableHostnameSettingDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kEnableHostnameSetting)},
-
     {"enable-oauth-ipp", flag_descriptions::kEnableOAuthIppName,
      flag_descriptions::kEnableOAuthIppDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kEnableOAuthIpp)},
@@ -8600,11 +8726,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAccessibilityShakeToLocateDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(features::kAccessibilityShakeToLocate)},
 
-    {"enable-accessibility-service",
-     flag_descriptions::kAccessibilityServiceName,
-     flag_descriptions::kAccessibilityServiceDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kAccessibilityService)},
-
     {"enable-accessibility-reduced-animations",
      flag_descriptions::kAccessibilityReducedAnimationsName,
      flag_descriptions::kAccessibilityReducedAnimationsDescription, kOsCrOS,
@@ -8615,11 +8736,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAccessibilityReducedAnimationsInKioskDescription,
      kOsCrOS,
      FEATURE_VALUE_TYPE(features::kAccessibilityReducedAnimationsInKiosk)},
-
-    {"enable-accessibility-facegaze",
-     flag_descriptions::kAccessibilityFaceGazeName,
-     flag_descriptions::kAccessibilityFaceGazeDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kAccessibilityFaceGaze)},
 
     {"enable-accessibility-magnifier-follows-chromevox",
      flag_descriptions::kAccessibilityMagnifierFollowsChromeVoxName,
@@ -8633,21 +8749,10 @@ const FeatureEntry kFeatureEntries[] = {
      kOsCrOS,
      FEATURE_VALUE_TYPE(features::kAccessibilityManifestV3AccessibilityCommon)},
 
-    {"enable-accessibility-manifest-v3-braille-ime",
-     flag_descriptions::kAccessibilityManifestV3BrailleImeName,
-     flag_descriptions::kAccessibilityManifestV3BrailleImeDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kAccessibilityManifestV3BrailleIme)},
-
     {"enable-accessibility-manifest-v3-chromevox",
      flag_descriptions::kAccessibilityManifestV3ChromeVoxName,
      flag_descriptions::kAccessibilityManifestV3ChromeVoxDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(features::kAccessibilityManifestV3ChromeVox)},
-
-    {"enable-accessibility-manifest-v3-enhanced-network-tts",
-     flag_descriptions::kAccessibilityManifestV3EnhancedNetworkTtsName,
-     flag_descriptions::kAccessibilityManifestV3EnhancedNetworkTtsDescription,
-     kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kAccessibilityManifestV3EnhancedNetworkTts)},
 
     {"enable-accessibility-manifest-v3-espeakng",
      flag_descriptions::kAccessibilityManifestV3EspeakNGName,
@@ -8658,12 +8763,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAccessibilityManifestV3GoogleTtsName,
      flag_descriptions::kAccessibilityManifestV3GoogleTtsDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(::features::kAccessibilityManifestV3GoogleTts)},
-
-    {"enable-accessibility-manifest-v3-select-to-speak",
-     flag_descriptions::kAccessibilityManifestV3SelectToSpeakName,
-     flag_descriptions::kAccessibilityManifestV3SelectToSpeakDescription,
-     kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kAccessibilityManifestV3SelectToSpeak)},
 
     {"enable-accessibility-manifest-v3-switch-access",
      flag_descriptions::kAccessibilityManifestV3SwitchAccessName,
@@ -8708,19 +8807,10 @@ const FeatureEntry kFeatureEntries[] = {
      SINGLE_VALUE_TYPE(switches::kEnableWebGPUDeveloperFeatures)},
 
 #if BUILDFLAG(IS_CHROMEOS)
-    {"game-dashboard-game-pwas", flag_descriptions::kGameDashboardGamePWAs,
-     flag_descriptions::kGameDashboardGamePWAsDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kGameDashboardGamePWAs)},
-
     {"game-dashboard-gamepad-support",
      flag_descriptions::kGameDashboardGamepadSupport,
      flag_descriptions::kGameDashboardGamepadSupport, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kGameDashboardGamepadSupport)},
-
-    {"game-dashboard-games-in-test",
-     flag_descriptions::kGameDashboardGamesInTest,
-     flag_descriptions::kGameDashboardGamesInTestDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kGameDashboardGamesInTest)},
 
     {"game-dashboard-utilities", flag_descriptions::kGameDashboardUtilities,
      flag_descriptions::kGameDashboardUtilitiesDescription, kOsCrOS,
@@ -8732,13 +8822,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(ash::features::kGesturePropertiesDBusService)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
-#if !BUILDFLAG(IS_CHROMEOS)
-    {"global-media-controls-updated-ui",
-     flag_descriptions::kGlobalMediaControlsUpdatedUIName,
-     flag_descriptions::kGlobalMediaControlsUpdatedUIDescription,
-     kOsLinux | kOsMac | kOsWin,
-     FEATURE_VALUE_TYPE(media::kGlobalMediaControlsUpdatedUI)},
-#endif  // !BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
     {"enable-network-service-sandbox",
@@ -8754,6 +8837,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kUseOutOfProcessVideoDecodingDescription,
      kOsLinux | kOsCrOS,
      FEATURE_VALUE_TYPE(media::kUseOutOfProcessVideoDecoding)},
+    {"use-shared-image-in-oop-vd",
+     flag_descriptions::kUseSharedImageInOOPVDName,
+     flag_descriptions::kUseSharedImageInOOPVDDescription, kOsLinux | kOsCrOS,
+     FEATURE_VALUE_TYPE(media::kUseSharedImageInOOPVDProcess)},
 #endif  // BUILDFLAG(ALLOW_OOP_VIDEO_DECODER)
 
     {"notification-scheduler", flag_descriptions::kNotificationSchedulerName,
@@ -8779,20 +8866,11 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS)
-    {"scalable-iph-debug", flag_descriptions::kScalableIphDebugName,
-     flag_descriptions::kScalableIphDebugDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kScalableIphDebug)},
     {"settings-app-notification-settings",
      flag_descriptions::kSettingsAppNotificationSettingsName,
      flag_descriptions::kSettingsAppNotificationSettingsDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kSettingsAppNotificationSettings)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
-
-    {"sync-point-graph-validation",
-     flag_descriptions::kSyncPointGraphValidationName,
-     flag_descriptions::kSyncPointGraphValidationDescription,
-     kOsLinux | kOsMac | kOsWin | kOsCrOS | kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kSyncPointGraphValidation)},
 
 #if BUILDFLAG(IS_ANDROID)
     {"web-otp-backend", flag_descriptions::kWebOtpBackendName,
@@ -8808,21 +8886,6 @@ const FeatureEntry kFeatureEntries[] = {
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
-    {"back-forward-cache", flag_descriptions::kBackForwardCacheName,
-     flag_descriptions::kBackForwardCacheDescription, kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kBackForwardCache,
-                                    kBackForwardCacheVariations,
-                                    "BackForwardCache")},
-#if BUILDFLAG(IS_ANDROID)
-    {"back-forward-transitions", flag_descriptions::kBackForwardTransitionsName,
-     flag_descriptions::kBackForwardTransitionsDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(blink::features::kBackForwardTransitions)},
-    {"mirror-back-forward-gestures-in-rtl",
-     flag_descriptions::kMirrorBackForwardGesturesInRTLName,
-     flag_descriptions::kMirrorBackForwardGesturesInRTLDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(ui::kMirrorBackForwardGesturesInRTL)},
-#endif
-
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
     {"elastic-overscroll", flag_descriptions::kElasticOverscrollName,
      flag_descriptions::kElasticOverscrollDescription, kOsWin | kOsAndroid,
@@ -8830,10 +8893,6 @@ const FeatureEntry kFeatureEntries[] = {
 #endif
 
 #if !BUILDFLAG(IS_ANDROID)
-    {"element-capture", flag_descriptions::kElementCaptureName,
-     flag_descriptions::kElementCaptureDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(blink::features::kElementCapture)},
-
     {"element-capture-cross-tab",
      flag_descriptions::kCrossTabElementCaptureName,
      flag_descriptions::kCrossTabElementCaptureDescription, kOsDesktop,
@@ -8847,12 +8906,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"viewport-segments", flag_descriptions::kViewportSegmentsName,
      flag_descriptions::kViewportSegmentsDescription, kOsAll,
      FEATURE_VALUE_TYPE(blink::features::kViewportSegments)},
-
-#if BUILDFLAG(IS_CHROMEOS)
-    {"enable-assistant-aec", flag_descriptions::kEnableGoogleAssistantAecName,
-     flag_descriptions::kEnableGoogleAssistantAecDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::assistant::features::kAssistantAudioEraser)},
-#endif
 
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
     {"enable-location-provider-manager",
@@ -8870,11 +8923,12 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(features::kMuteNotificationSnoozeAction)},
 #endif  // !BUILDFLAG(IS_ANDROID)
 
-#if BUILDFLAG(IS_ANDROID)
-    {"notification-one-tap-unsubscribe",
-     flag_descriptions::kNotificationOneTapUnsubscribeName,
-     flag_descriptions::kNotificationOneTapUnsubscribeDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kNotificationOneTapUnsubscribe)},
+#if !BUILDFLAG(IS_ANDROID)
+    {"notification-one-tap-unsubscribe-on-desktop",
+     flag_descriptions::kNotificationOneTapUnsubscribeOnDesktopName,
+     flag_descriptions::kNotificationOneTapUnsubscribeOnDesktopDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kNotificationOneTapUnsubscribeOnDesktop)},
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_MAC)
@@ -8935,10 +8989,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"media-app-pdf-mahi", flag_descriptions::kMediaAppPdfMahiName,
      flag_descriptions::kMediaAppPdfMahiDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kMediaAppPdfMahi)},
-    {"media-app-image-mantis-reimagine",
-     flag_descriptions::kMediaAppImageMantisReimagineName,
-     flag_descriptions::kMediaAppImageMantisReimagineDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kMediaAppImageMantisReimagine)},
     {"on-device-app-controls", flag_descriptions::kOnDeviceAppControlsName,
      flag_descriptions::kOnDeviceAppControlsDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kForceOnDeviceAppControlsForAllRegions)},
@@ -8978,12 +9028,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(display::features::kPanelSelfRefresh2)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
-    {"automatic-fullscreen-content-setting",
-     flag_descriptions::kAutomaticFullscreenContentSettingName,
-     flag_descriptions::kAutomaticFullscreenContentSettingDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kAutomaticFullscreenContentSetting)},
-
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS)
     {"run-video-capture-service-in-browser",
      flag_descriptions::kRunVideoCaptureServiceInBrowserProcessName,
@@ -8996,20 +9040,8 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kDoubleBufferCompositingDescription, kOsCrOS,
      SINGLE_VALUE_TYPE(switches::kDoubleBufferCompositing)},
 
-    {"act-features", flag_descriptions::kActFeaturesName,
-     flag_descriptions::kActFeaturesDescription, kOsDesktop | kOsAndroid,
-     MULTI_VALUE_TYPE(kActFeaturesChoices)},
-
-    {"tracking-protection-3pcd", flag_descriptions::kTrackingProtection3pcdName,
-     flag_descriptions::kTrackingProtection3pcdDescription,
-     kOsDesktop | kOsAndroid,
-     FEATURE_VALUE_TYPE(content_settings::features::kTrackingProtection3pcd)},
-
 #if BUILDFLAG(IS_CHROMEOS)
-    {kClipboardHistoryLongpressInternalName,
-     flag_descriptions::kClipboardHistoryLongpressName,
-     flag_descriptions::kClipboardHistoryLongpressDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kClipboardHistoryLongpress)},
+
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_WIN)
@@ -9018,10 +9050,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnableMediaFoundationVideoCaptureDescription, kOsWin,
      FEATURE_VALUE_TYPE(media::kMediaFoundationVideoCapture)},
 #endif  // BUILDFLAG(IS_WIN)
-    {"shared-highlighting-manager",
-     flag_descriptions::kSharedHighlightingManagerName,
-     flag_descriptions::kSharedHighlightingManagerDescription, kOsAll,
-     FEATURE_VALUE_TYPE(shared_highlighting::kSharedHighlightingManager)},
 
 #if BUILDFLAG(IS_CHROMEOS)
     {"reset-shortcut-customizations",
@@ -9039,6 +9067,15 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kShimlessRMADynamicDeviceInfoInputsName,
      flag_descriptions::kShimlessRMADynamicDeviceInfoInputsDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kShimlessRMADynamicDeviceInfoInputs)},
+    {"shimless-rma-flexible-serial-number-name",
+     flag_descriptions::kShimlessRMAFlexibleSerialNumberNameName,
+     flag_descriptions::kShimlessRMAFlexibleSerialNumberNameDescription,
+     kOsCrOS,
+     FEATURE_VALUE_TYPE(ash::features::kShimlessRMAFlexibleSerialNumberName)},
+    {"shimless-rma-hide-google-sku",
+     flag_descriptions::kShimlessRMAHideGoogleSKUName,
+     flag_descriptions::kShimlessRMAHideGoogleSKUDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(ash::features::kShimlessRMAHideGoogleSKU)},
     {"quick-share-v2", flag_descriptions::kQuickShareV2Name,
      flag_descriptions::kQuickShareV2Description, kOsCrOS,
      FEATURE_VALUE_TYPE(chromeos::features::kQuickShareV2)},
@@ -9051,6 +9088,13 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnableExperimentalCookieFeaturesName,
      flag_descriptions::kEnableExperimentalCookieFeaturesDescription, kOsAll,
      MULTI_VALUE_TYPE(kEnableExperimentalCookieFeaturesChoices)},
+
+    {"enable-extension-install-policy-fetching",
+     flag_descriptions::kEnableExtensionInstallPolicyFetchingName,
+     flag_descriptions::kEnableExtensionInstallPolicyFetchingDescription,
+     kOsWin | kOsMac | kOsLinux | kOsCrOS,
+     FEATURE_VALUE_TYPE(
+         policy::features::kEnableExtensionInstallPolicyFetching)},
 
     {"canvas-2d-layers", flag_descriptions::kCanvas2DLayersName,
      flag_descriptions::kCanvas2DLayersDescription, kOsAll,
@@ -9099,7 +9143,7 @@ const FeatureEntry kFeatureEntries[] = {
     {"geolocation-element",
      flag_descriptions::kGeolocationPermissionControlName,
      flag_descriptions::kGeolocationPermissionControlDescription,
-     kOsMac | kOsWin | kOsLinux,
+     kOsMac | kOsWin | kOsLinux | kOsAndroid,
      FEATURE_VALUE_TYPE(blink::features::kGeolocationElement)},
 
     {"permission-promise-lifetime-modulation",
@@ -9114,14 +9158,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kLeftHandSideActivityIndicatorsDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(
          content_settings::features::kLeftHandSideActivityIndicators)},
-
-#if !BUILDFLAG(IS_ANDROID)
-    {"merchant-trust", flag_descriptions::kMerchantTrustName,
-     flag_descriptions::kMerchantTrustDescription, kOsDesktop,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(page_info::kMerchantTrust,
-                                    kMerchantTrustVariations,
-                                    "MerchantTrust")},
-#endif  // !BUILDFLAG(IS_ANDROID)
 
 #if !BUILDFLAG(IS_ANDROID)
     {"privacy-policy-insights", flag_descriptions::kPrivacyPolicyInsightsName,
@@ -9148,24 +9184,15 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(ash::kLauncherItemSuggest,
                                     kLauncherItemSuggestVariations,
                                     "LauncherItemSuggest")},
-    {"shelf-auto-hide-separation",
-     flag_descriptions::kShelfAutoHideSeparationName,
-     flag_descriptions::kShelfAutoHideSeparationDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kShelfAutoHideSeparation)},
+
     {"launcher-keyword-extraction-scoring",
      flag_descriptions::kLauncherKeywordExtractionScoring,
      flag_descriptions::kLauncherKeywordExtractionScoringDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(search_features::kLauncherKeywordExtractionScoring)},
-    {"launcher-search-control", flag_descriptions::kLauncherSearchControlName,
-     flag_descriptions::kLauncherSearchControlDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kLauncherSearchControl)},
-    {"launcher-nudge-session-reset",
-     flag_descriptions::kLauncherNudgeSessionResetName,
-     flag_descriptions::kLauncherNudgeSessionResetDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kLauncherNudgeSessionReset)},
-    {"text-in-shelf", flag_descriptions::kTextInShelfName,
-     flag_descriptions::kTextInShelfDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kHomeButtonWithText)},
+    {"hybrid-charger-notifications",
+     flag_descriptions::kHybridChargerNotificationsName,
+     flag_descriptions::kHybridChargerNotificationsDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(ash::features::kHybridChargerNotifications)},
     {"launcher-local-image-search",
      flag_descriptions::kLauncherLocalImageSearchName,
      flag_descriptions::kLauncherLocalImageSearchDescription, kOsCrOS,
@@ -9220,35 +9247,17 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_ANDROID)
-    {"enable-surface-control", flag_descriptions::kAndroidSurfaceControlName,
-     flag_descriptions::kAndroidSurfaceControlDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kAndroidSurfaceControl)},
     {"smart-suggestion-for-large-downloads",
      flag_descriptions::kSmartSuggestionForLargeDownloadsName,
      flag_descriptions::kSmartSuggestionForLargeDownloadsDescription,
      kOsAndroid,
      FEATURE_VALUE_TYPE(download::features::kSmartSuggestionForLargeDownloads)},
-
-    {"quick-delete-android-survey",
-     flag_descriptions::kQuickDeleteAndroidSurveyName,
-     flag_descriptions::kQuickDeleteAndroidSurveyDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kQuickDeleteAndroidSurvey)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
     {"pwa-update-dialog-for-icon",
      flag_descriptions::kPwaUpdateDialogForAppIconName,
      flag_descriptions::kPwaUpdateDialogForAppIconDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kPwaUpdateDialogForIcon)},
-
-    {"keyboard-lock-prompt", flag_descriptions::kKeyboardLockPromptName,
-     flag_descriptions::kKeyboardLockPromptDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(permissions::features::kKeyboardLockPrompt)},
-
-    {"press-and-hold-esc-to-exit-browser-fullscreen",
-     flag_descriptions::kPressAndHoldEscToExitBrowserFullscreenName,
-     flag_descriptions::kPressAndHoldEscToExitBrowserFullscreenDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kPressAndHoldEscToExitBrowserFullscreen)},
 
 #if BUILDFLAG(ENABLE_OOP_PRINTING)
     {"enable-oop-print-drivers", flag_descriptions::kEnableOopPrintDriversName,
@@ -9270,11 +9279,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kPrivacySandboxInternalsDescription, kOsAll,
      FEATURE_VALUE_TYPE(privacy_sandbox::kPrivacySandboxInternalsDevUI)},
 
-    {"align-surface-layer-impl-to-pixel-grid",
-     flag_descriptions::kAlignSurfaceLayerImplToPixelGridName,
-     flag_descriptions::kAlignSurfaceLayerImplToPixelGridDescription, kOsAll,
-     FEATURE_VALUE_TYPE(features::kAlignSurfaceLayerImplToPixelGrid)},
-
 #if !BUILDFLAG(IS_ANDROID)
     {"sct-auditing", flag_descriptions::kSCTAuditingName,
      flag_descriptions::kSCTAuditingDescription, kOsDesktop,
@@ -9289,21 +9293,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(chrome::android::kIncognitoScreenshot)},
 #endif
 
-    {"increment-local-surface-id-for-mainframe-same-doc-navigation",
-     flag_descriptions::
-         kIncrementLocalSurfaceIdForMainframeSameDocNavigationName,
-     flag_descriptions::
-         kIncrementLocalSurfaceIdForMainframeSameDocNavigationDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         blink::features::
-             kIncrementLocalSurfaceIdForMainframeSameDocNavigation)},
-
-    {"enable-speculation-rules-prerendering-target-hint",
-     flag_descriptions::kSpeculationRulesPrerenderingTargetHintName,
-     flag_descriptions::kSpeculationRulesPrerenderingTargetHintDescription,
-     kOsAll, FEATURE_VALUE_TYPE(blink::features::kPrerender2InNewTab)},
-
     {"prerender-early-document-lifecycle-update",
      flag_descriptions::kPrerender2EarlyDocumentLifecycleUpdateName,
      flag_descriptions::kPrerender2EarlyDocumentLifecycleUpdateDescription,
@@ -9314,14 +9303,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"trees-in-viz", flag_descriptions::kTreesInVizName,
      flag_descriptions::kTreesInVizDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kTreesInViz)},
-
-#if BUILDFLAG(IS_ANDROID)
-    {"prerender2-new-tab-page-android",
-     flag_descriptions::kPrerender2ForNewTabPageAndroidName,
-     flag_descriptions::kPrerender2ForNewTabPageAndroidDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         chrome::android::kNewTabPageAndroidTriggerForPrerender2)},
-#endif
 
     {"omnibox-search-prefetch",
      flag_descriptions::kEnableOmniboxSearchPrefetchName,
@@ -9344,6 +9325,16 @@ const FeatureEntry kFeatureEntries[] = {
          autofill::features::kAutofillEnableOffersInClankKeyboardAccessory)},
 #endif
 
+#if BUILDFLAG(IS_CHROMEOS)
+    {"autofill-enable-payments-mandatory-reauth-chromeos",
+     flag_descriptions::kAutofillEnablePaymentsMandatoryReauthChromeOsName,
+     flag_descriptions::
+         kAutofillEnablePaymentsMandatoryReauthChromeOsDescription,
+     kOsCrOS,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillEnablePaymentsMandatoryReauthChromeOs)},
+#endif
+
 #if BUILDFLAG(ENABLE_PDF)
     {"pdf-xfa-forms", flag_descriptions::kPdfXfaFormsName,
      flag_descriptions::kPdfXfaFormsDescription, kOsDesktop,
@@ -9355,14 +9346,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnableManagedConfigurationWebApiDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(blink::features::kManagedConfiguration)},
 
-    {"clear-cross-site-cross-browsing-context-group-window-name",
-     flag_descriptions::kClearCrossSiteCrossBrowsingContextGroupWindowNameName,
-     flag_descriptions::
-         kClearCrossSiteCrossBrowsingContextGroupWindowNameDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         features::kClearCrossSiteCrossBrowsingContextGroupWindowName)},
-
 #if BUILDFLAG(IS_CHROMEOS)
     {kWallpaperFastRefreshInternalName,
      flag_descriptions::kWallpaperFastRefreshName,
@@ -9372,27 +9355,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kWallpaperGooglePhotosSharedAlbumsName,
      flag_descriptions::kWallpaperGooglePhotosSharedAlbumsDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kWallpaperGooglePhotosSharedAlbums)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX)
-    {"enable-get-all-screens-media", flag_descriptions::kGetAllScreensMediaName,
-     flag_descriptions::kGetAllScreensMediaDescription, kOsCrOS | kOsLinux,
-     FEATURE_VALUE_TYPE(blink::features::kGetAllScreensMedia)},
-#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX)
-
-#if BUILDFLAG(IS_CHROMEOS)
-    {"enable-run-on-os-login", flag_descriptions::kRunOnOsLoginName,
-     flag_descriptions::kRunOnOsLoginDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kDesktopPWAsRunOnOsLogin)},
-    {"enable-prevent-close", flag_descriptions::kPreventCloseName,
-     flag_descriptions::kPreventCloseDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kDesktopPWAsPreventClose)},
-
-    {"enable-cloud-identifiers",
-     flag_descriptions::kFileSystemAccessGetCloudIdentifiersName,
-     flag_descriptions::kFileSystemAccessGetCloudIdentifiersDescription,
-     kOsCrOS,
-     FEATURE_VALUE_TYPE(blink::features::kFileSystemAccessGetCloudIdentifiers)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
     {"enable-global-vaapi-lock", flag_descriptions::kGlobalVaapiLockName,
@@ -9409,46 +9371,27 @@ const FeatureEntry kFeatureEntries[] = {
     },
 
 #endif
-#if BUILDFLAG(IS_ANDROID)
-    {"optimization-guide-personalized-fetching",
-     flag_descriptions::kOptimizationGuidePersonalizedFetchingName,
-     flag_descriptions::kOptimizationGuidePersonalizedFetchingDescription,
-     kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         optimization_guide::features::kOptimizationGuidePersonalizedFetching,
-         kOptimizationGuidePersonalizedFetchingAllowPageInsightsVariations,
-         "OptimizationGuidePersonalizedFetchingAllowPageInsights")},
-    {"optimization-guide-push-notifications",
-     flag_descriptions::kOptimizationGuidePushNotificationName,
-     flag_descriptions::kOptimizationGuidePushNotificationDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(optimization_guide::features::kPushNotifications)},
-#endif
-
-    {"fedcm-alternative-identifiers",
-     flag_descriptions::kFedCmAlternativeIdentifiersName,
-     flag_descriptions::kFedCmAlternativeIdentifiersDescription, kOsAll,
-     FEATURE_VALUE_TYPE(features::kFedCmAlternativeIdentifiers)},
 
     {"fedcm-autofill", flag_descriptions::kFedCmAutofillName,
      flag_descriptions::kFedCmAutofillDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kFedCmAutofill)},
 
-    {"fedcm-cooldown-on-ignore", flag_descriptions::kFedCmCooldownOnIgnoreName,
-     flag_descriptions::kFedCmCooldownOnIgnoreDescription, kOsAll,
-     FEATURE_VALUE_TYPE(features::kFedCmCooldownOnIgnore)},
-
     {"fedcm-delegation", flag_descriptions::kFedCmDelegationName,
      flag_descriptions::kFedCmDelegationDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kFedCmDelegation)},
 
+    {"email-verification-protocol",
+     flag_descriptions::kEmailVerificationProtocolName,
+     flag_descriptions::kEmailVerificationProtocolDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kEmailVerificationProtocol)},
+
+    {"fedcm-error-attribute", flag_descriptions::kFedCmErrorAttributeName,
+     flag_descriptions::kFedCmErrorAttributeDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kFedCmErrorAttribute)},
+
     {"fedcm-idp-registration", flag_descriptions::kFedCmIdPRegistrationName,
      flag_descriptions::kFedCmIdPRegistrationDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kFedCmIdPRegistration)},
-
-    {"fedcm-iframe-origin", flag_descriptions::kFedCmIframeOriginName,
-     flag_descriptions::kFedCmIframeOriginDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kFedCmIframeOrigin)},
 
     {"fedcm-lightweight-mode", flag_descriptions::kFedCmLightweightModeName,
      flag_descriptions::kFedCmLightweightModeDescription, kOsDesktop,
@@ -9457,6 +9400,15 @@ const FeatureEntry kFeatureEntries[] = {
     {"fedcm-metrics-endpoint", flag_descriptions::kFedCmMetricsEndpointName,
      flag_descriptions::kFedCmMetricsEndpointDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kFedCmMetricsEndpoint)},
+
+    {"fedcm-nonce-in-params", flag_descriptions::kFedCmNonceInParamsName,
+     flag_descriptions::kFedCmNonceInParamsDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kFedCmNonceInParams)},
+
+    {"fedcm-well-known-endpoint-validation",
+     flag_descriptions::kFedCmWellKnownEndpointValidationName,
+     flag_descriptions::kFedCmWellKnownEndpointValidationDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kFedCmWellKnownEndpointValidation)},
 
     {"fedcm-without-well-known-enforcement",
      flag_descriptions::kFedCmWithoutWellKnownEnforcementName,
@@ -9468,6 +9420,11 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kFedCmSegmentationPlatformDescription, kOsAll,
      FEATURE_VALUE_TYPE(
          segmentation_platform::features::kSegmentationPlatformFedCmUser)},
+
+    {"fedcm-navigation-interception",
+     flag_descriptions::kFedCmNavigationInterceptionName,
+     flag_descriptions::kFedCmNavigationInterceptionDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kFedCmNavigationInterception)},
 
     {"web-identity-digital-credentials",
      flag_descriptions::kWebIdentityDigitalCredentialsName,
@@ -9482,10 +9439,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kWebIdentityDigitalCredentialsCreationDescription,
      kOsAll,
      FEATURE_VALUE_TYPE(features::kWebIdentityDigitalCredentialsCreation)},
-
-    {"sanitizer-api", flag_descriptions::kSanitizerApiName,
-     flag_descriptions::kSanitizerApiDescription, kOsAll,
-     FEATURE_VALUE_TYPE(blink::features::kSanitizerAPI)},
 
 #if BUILDFLAG(IS_CHROMEOS)
     {"enable-input-event-logging",
@@ -9508,13 +9461,6 @@ const FeatureEntry kFeatureEntries[] = {
 #endif
 
 #if BUILDFLAG(IS_ANDROID)
-    {"enable-legacy-tabstate-deprecation",
-     flag_descriptions::kLegacyTabStateDeprecationName,
-     flag_descriptions::kLegacyTabStateDeprecationDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kLegacyTabStateDeprecation,
-                                    kLegacyTabStateDeprecationVariations,
-                                    "LegacyTabStateDeprecation")},
-
     {"biometric-reauth-password-filling",
      flag_descriptions::kBiometricReauthForPasswordFillingName,
      flag_descriptions::kBiometricReauthForPasswordFillingDescription,
@@ -9530,13 +9476,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kBindCookiesToSchemeDescription, kOsAll,
      FEATURE_VALUE_TYPE(net::features::kEnableSchemeBoundCookies)},
 
-#if BUILDFLAG(IS_CHROMEOS)
-    {"enable-keyboard-rewriter-fix",
-     flag_descriptions::kEnableKeyboardRewriterFixName,
-     flag_descriptions::kEnableKeyboardRewriterFixDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kEnableKeyboardRewriterFix)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
     {"align-wakeups", flag_descriptions::kAlignWakeUpsName,
      flag_descriptions::kAlignWakeUpsDescription, kOsAll,
      FEATURE_VALUE_TYPE(base::kAlignWakeUps)},
@@ -9548,12 +9487,37 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(features::kDefaultPassthroughCommandDecoder)},
 #endif  // BUILDFLAG(ENABLE_VALIDATING_COMMAND_DECODER)
 
+    {"use-primary-and-tonal-buttons-for-promos",
+     flag_descriptions::kUsePrimaryAndTonalButtonsForPromosName,
+     flag_descriptions::kUsePrimaryAndTonalButtonsForPromosDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(switches::kUsePrimaryAndTonalButtonsForPromos)},
+
 #if BUILDFLAG(ENABLE_SWIFTSHADER)
     {"enable-unsafe-swiftshader",
      flag_descriptions::kEnableUnsafeSwiftShaderName,
      flag_descriptions::kEnableUnsafeSwiftShaderDescription, kOsAll,
      SINGLE_VALUE_TYPE(switches::kEnableUnsafeSwiftShader)},
 #endif  // BUILDFLAG(ENABLE_SWIFTSHADER)
+
+    // The entry in kFeatureEntries
+    {"policy-registration-delay",
+     flag_descriptions::kPolicyRegistrationDelayName,
+     flag_descriptions::kPolicyRegistrationDelayDescription, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         policy::features::kCustomPolicyRegistrationDelay,
+         kPolicyRegistrationDelayVariations,
+         "CustomPolicyRegistrationDelay")},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"try-initialize-policy-service-for-signed-in-user-in-new-entry-points",
+     flag_descriptions::kInitializePoliciesForSignedInUserInNewEntryPointsName,
+     flag_descriptions::
+         kInitializePoliciesForSignedInUserInNewEntryPointsDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         policy::features::kInitializePoliciesForSignedInUserInNewEntryPoints)},
+#endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS)
     {"focus-follows-cursor", flag_descriptions::kFocusFollowsCursorName,
@@ -9573,6 +9537,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kPrerender2ReuseHostDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kPrerender2ReuseHost)},
 
+    {"prerender-until-script", flag_descriptions::kPrerenderUntilScriptName,
+     flag_descriptions::kPrerenderUntilScriptDescription, kOsAll,
+     FEATURE_VALUE_TYPE(blink::features::kPrerenderUntilScript)},
+
 #if BUILDFLAG(IS_CHROMEOS)
     {"enable-phone-hub-call-notification",
      flag_descriptions::kPhoneHubCallNotificationName,
@@ -9584,14 +9552,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kTestThirdPartyCookiePhaseoutName,
      flag_descriptions::kTestThirdPartyCookiePhaseoutDescription, kOsAll,
      SINGLE_VALUE_TYPE(network::switches::kTestThirdPartyCookiePhaseout)},
-
-    {"tpc-phase-out-facilitated-testing",
-     flag_descriptions::kTPCPhaseOutFacilitatedTestingName,
-     flag_descriptions::kTPCPhaseOutFacilitatedTestingDescription, kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         features::kCookieDeprecationFacilitatedTesting,
-         kTPCPhaseOutFacilitatedTestingVariations,
-         "TPCPhaseOutFacilitatedTesting")},
 
     {"tpcd-heuristics-grants", flag_descriptions::kTpcdHeuristicsGrantsName,
      flag_descriptions::kTpcdHeuristicsGrantsDescription, kOsAll,
@@ -9655,7 +9615,7 @@ const FeatureEntry kFeatureEntries[] = {
 
     {"https-first-dialog-ui", flag_descriptions::kHttpsFirstDialogUiName,
      flag_descriptions::kHttpsFirstDialogUiDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kHttpsFirstDialogUi)},
+     FEATURE_VALUE_TYPE(security_interstitials::features::kHttpsFirstDialogUi)},
 
     {"https-first-mode-v2-for-engaged-sites",
      flag_descriptions::kHttpsFirstModeV2ForEngagedSitesName,
@@ -9738,13 +9698,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          feature_engagement::kIPHExtensionsRequestAccessButtonFeature)},
 
-    {"extension-manifest-v2-deprecation-warning",
-     flag_descriptions::kExtensionManifestV2DeprecationWarningName,
-     flag_descriptions::kExtensionManifestV2DeprecationWarningDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(
-         extensions_features::kExtensionManifestV2DeprecationWarning)},
-
     {"extension-manifest-v2-deprecation-disabled",
      flag_descriptions::kExtensionManifestV2DeprecationDisabledName,
      flag_descriptions::kExtensionManifestV2DeprecationDisabledDescription,
@@ -9756,14 +9709,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kExtensionManifestV2DeprecationUnsupportedDescription,
      kOsDesktop,
      FEATURE_VALUE_TYPE(extensions_features::kExtensionManifestV2Unsupported)},
-
-#if BUILDFLAG(IS_WIN)
-    {"launch-windows-native-hosts-directly",
-     flag_descriptions::kLaunchWindowsNativeHostsDirectlyName,
-     flag_descriptions::kLaunchWindowsNativeHostsDirectlyDescription, kOsWin,
-     FEATURE_VALUE_TYPE(
-         extensions_features::kLaunchWindowsNativeHostsDirectly)},
-#endif  // IS_WIN
 #endif  // ENABLE_EXTENSIONS
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -9856,23 +9801,11 @@ const FeatureEntry kFeatureEntries[] = {
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || \
     BUILDFLAG(IS_CHROMEOS)
-    {"media-session-enter-picture-in-picture",
-     flag_descriptions::kMediaSessionEnterPictureInPictureName,
-     flag_descriptions::kMediaSessionEnterPictureInPictureDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(blink::features::kMediaSessionEnterPictureInPicture)},
-
     {"auto-picture-in-picture-for-video-playback",
      flag_descriptions::kAutoPictureInPictureForVideoPlaybackName,
      flag_descriptions::kAutoPictureInPictureForVideoPlaybackDescription,
      kOsDesktop,
      FEATURE_VALUE_TYPE(media::kAutoPictureInPictureForVideoPlayback)},
-
-    {"video-picture-in-picture-controls-update-2024",
-     flag_descriptions::kVideoPictureInPictureControlsUpdate2024Name,
-     flag_descriptions::kVideoPictureInPictureControlsUpdate2024Description,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(media::kVideoPictureInPictureControlsUpdate2024)},
 
     {"document-picture-in-picture-animate-resize",
      flag_descriptions::kDocumentPictureInPictureAnimateResizeName,
@@ -9896,9 +9829,20 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) ||
         // BUILDFLAG(IS_CHROMEOS)
 
+#if BUILDFLAG(IS_ANDROID)
+    {"auto-picture-in-picture-android",
+     flag_descriptions::kAutoPictureInPictureAndroidName,
+     flag_descriptions::kAutoPictureInPictureAndroidDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(media::kAutoPictureInPictureAndroid)},
+#endif
+
     {"document-patching", flag_descriptions::kDocumentPatchingName,
      flag_descriptions::kDocumentPatchingDescription, kOsAll,
      FEATURE_VALUE_TYPE(blink::features::kDocumentPatching)},
+
+    {"route-matching", flag_descriptions::kRouteMatchingName,
+     flag_descriptions::kRouteMatchingDescription, kOsAll,
+     FEATURE_VALUE_TYPE(blink::features::kRouteMatching)},
 
     {"dse-preload2", flag_descriptions::kDsePreload2Name,
      flag_descriptions::kDsePreload2Description, kOsAll,
@@ -10123,24 +10067,14 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kPwaRestoreUiAtStartupDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kPwaRestoreUiAtStartup)},
 #endif  // BUILDFLAG(IS_ANDROID)
-    {"autofill-enable-ranking-formula-address-profiles",
-     flag_descriptions::kAutofillEnableRankingFormulaAddressProfilesName,
-     flag_descriptions::kAutofillEnableRankingFormulaAddressProfilesDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillEnableRankingFormulaAddressProfiles)},
-
-    {"autofill-enable-ranking-formula-credit-cards",
-     flag_descriptions::kAutofillEnableRankingFormulaCreditCardsName,
-     flag_descriptions::kAutofillEnableRankingFormulaCreditCardsDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillEnableRankingFormulaCreditCards)},
 
     {"safe-browsing-local-lists-use-sbv5",
      flag_descriptions::kSafeBrowsingLocalListsUseSBv5Name,
      flag_descriptions::kSafeBrowsingLocalListsUseSBv5Description, kOsAll,
      FEATURE_VALUE_TYPE(safe_browsing::kLocalListsUseSBv5)},
+
+    {"xslt", flag_descriptions::kXSLTName, flag_descriptions::kXSLTDescription,
+     kOsAll, FEATURE_VALUE_TYPE(blink::features::kXSLT)},
 
 #if BUILDFLAG(ENABLE_SYMPHONIA)
     {"symphonia-audio-decoding", flag_descriptions::kSymphoniaAudioDecodingName,
@@ -10155,13 +10089,6 @@ const FeatureEntry kFeatureEntries[] = {
          content_settings::features::kSafetyCheckUnusedSitePermissions,
          kSafetyCheckUnusedSitePermissionsVariations,
          "SafetyCheckUnusedSitePermissions")},
-
-    {"safety-hub", flag_descriptions::kSafetyHubName,
-     flag_descriptions::kSafetyHubDescription, kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kSafetyHub,
-                                    kSafetyHubVariations,
-                                    "SafetyHub")},
-
     {"permission-site-settings-radio-button",
      flag_descriptions::kPermissionSiteSettingsRadioButtonName,
      flag_descriptions::kPermissionSiteSettingsRadioButtonDescription, kOsAll,
@@ -10169,24 +10096,6 @@ const FeatureEntry kFeatureEntries[] = {
          permissions::features::kPermissionSiteSettingsRadioButton)},
 
 #if BUILDFLAG(IS_ANDROID)
-    {"safety-hub-magic-stack", flag_descriptions::kSafetyHubMagicStackName,
-     flag_descriptions::kSafetyHubMagicStackDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kSafetyHubMagicStack)},
-
-    {"safety-hub-followup", flag_descriptions::kSafetyHubFollowupName,
-     flag_descriptions::kSafetyHubFollowupDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kSafetyHubFollowup)},
-
-    {"safety-hub-android-survey",
-     flag_descriptions::kSafetyHubAndroidSurveyName,
-     flag_descriptions::kSafetyHubAndroidSurveyDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kSafetyHubAndroidSurvey)},
-
-    {"safety-hub-android-survey-v2",
-     flag_descriptions::kSafetyHubAndroidSurveyV2Name,
-     flag_descriptions::kSafetyHubAndroidSurveyV2Description, kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kSafetyHubAndroidSurveyV2)},
-
     {"safety-hub-weak-reused-passwords",
      flag_descriptions::kSafetyHubWeakAndReusedPasswordsName,
      flag_descriptions::kSafetyHubWeakAndReusedPasswordsDescription, kOsAndroid,
@@ -10201,11 +10110,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kSafetyHubUnifiedPasswordsModuleName,
      flag_descriptions::kSafetyHubUnifiedPasswordsModuleDescription, kOsAndroid,
      MULTI_VALUE_TYPE(kSafetyHubUnifiedPasswordsModuleChoices)},
-#else
-    {"safety-hub-one-off-survey",
-     flag_descriptions::kSafetyHubHaTSOneOffSurveyName,
-     flag_descriptions::kSafetyHubHaTSOneOffSurveyDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kSafetyHubHaTSOneOffSurvey)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
@@ -10264,14 +10168,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kRendererSideContentDecodingDescription, kOsAll,
      FEATURE_VALUE_TYPE(network::features::kRendererSideContentDecoding)},
 
-    {"device-bound-session-access-observer-shared-remote",
-     flag_descriptions::kDeviceBoundSessionAccessObserverSharedRemoteName,
-     flag_descriptions::
-         kDeviceBoundSessionAccessObserverSharedRemoteDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         network::features::kDeviceBoundSessionAccessObserverSharedRemote)},
-
 #if BUILDFLAG(IS_ANDROID)
     {"external-navigation-debug-logs",
      flag_descriptions::kExternalNavigationDebugLogsName,
@@ -10279,9 +10175,39 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(external_intents::kExternalNavigationDebugLogs)},
 #endif
 
+#if !BUILDFLAG(IS_ANDROID)
+    {"aim-entry-point-direct-navigation",
+     flag_descriptions::kAiModeEntryPointAlwaysNavigatesName,
+     flag_descriptions::kAiModeEntryPointAlwaysNavigatesDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(omnibox::kAiModeEntryPointAlwaysNavigates)},
+
+    {"webui-omnibox-aim-popup", flag_descriptions::kWebUIOmniboxAimPopupName,
+     flag_descriptions::kWebUIOmniboxAimPopupDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::internal::kWebUIOmniboxAimPopup,
+                                    kWebUIOmniboxAimPopupVariations,
+                                    "WebUIOmniboxAimPopupVariations")},
+
+    {"webui-omnibox-aim-popup-disable-animation",
+     flag_descriptions::kWebUIOmniboxAimPopupDisableAnimationName,
+     flag_descriptions::kWebUIOmniboxAimPopupDisableAnimationDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(omnibox::kWebUIOmniboxAimPopupDisableAnimation)},
+
+    {"webui-omnibox-full-popup", flag_descriptions::kWebUIOmniboxFullPopupName,
+     flag_descriptions::kWebUIOmniboxFullPopupDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(omnibox::kWebUIOmniboxFullPopup)},
+
     {"webui-omnibox-popup", flag_descriptions::kWebUIOmniboxPopupName,
      flag_descriptions::kWebUIOmniboxPopupDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(omnibox::kWebUIOmniboxPopup)},
+
+    {"webui-omnibox-popup-debug",
+     flag_descriptions::kWebUIOmniboxPopupDebugName,
+     flag_descriptions::kWebUIOmniboxPopupDebugDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kWebUIOmniboxPopupDebug,
+                                    kWebUIOmniboxPopupDebugVariations,
+                                    "WebUIOmniboxPopupDebugVariations")},
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS)
     {"arc-vm-memory-size", flag_descriptions::kArcVmMemorySizeName,
@@ -10292,47 +10218,28 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_ANDROID)
-    {"tab-group-entry-points-android",
-     flag_descriptions::kTabGroupEntryPointsAndroidName,
-     flag_descriptions::kTabGroupEntryPointsAndroidDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabGroupEntryPointsAndroid)},
 
-    {"tab-group-parity-bottom-sheet-android",
-     flag_descriptions::kTabGroupParityBottomSheetAndroidName,
-     flag_descriptions::kTabGroupParityBottomSheetAndroidDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabGroupParityBottomSheetAndroid)},
+    {"tab-strip-close-refactor-android",
+     flag_descriptions::kTabStripCloseRefactorAndroidName,
+     flag_descriptions::kTabStripCloseRefactorAndroidDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kTabStripCloseRefactorAndroid)},
 
     {"tab-strip-density-change-android",
      flag_descriptions::kTabStripDensityChangeAndroidName,
      flag_descriptions::kTabStripDensityChangeAndroidDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kTabStripDensityChangeAndroid)},
 
-    {"tab-strip-group-drag-drop-android",
-     flag_descriptions::kTabStripGroupDragDropAndroidName,
-     flag_descriptions::kTabStripGroupDragDropAndroidDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabStripGroupDragDropAndroid)},
+    {"tab-strip-empty-space-context-menu-android",
+     flag_descriptions::kTabStripEmptySpaceContextMenuAndroidName,
+     flag_descriptions::kTabStripEmptySpaceContextMenuAndroidDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         chrome::android::kTabStripEmptySpaceContextMenuAndroid)},
 
     {"tab-strip-incognito-migration",
      flag_descriptions::kTabStripIncognitoMigrationName,
      flag_descriptions::kTabStripIncognitoMigrationDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kTabStripIncognitoMigration)},
-
-    {"tab-strip-layout-optimization",
-     flag_descriptions::kTabStripLayoutOptimizationName,
-     flag_descriptions::kTabStripLayoutOptimizationDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabStripLayoutOptimization)},
-
-    {"tab-strip-mouse-close-resize-delay",
-     flag_descriptions::kTabStripMouseCloseResizeDelayName,
-     flag_descriptions::kTabStripMouseCloseResizeDelayDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabStripMouseCloseResizeDelay)},
-
-    {"tab-strip-transition-in-desktop-window",
-     flag_descriptions::kTabStripTransitionInDesktopWindowName,
-     flag_descriptions::kTabStripTransitionInDesktopWindowDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabStripTransitionInDesktopWindow)},
 
     {"tab-switcher-group-suggestions-android",
      flag_descriptions::kTabSwitcherGroupSuggestionsAndroidName,
@@ -10411,15 +10318,9 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kSameAppWindowCycleName,
      flag_descriptions::kSameAppWindowCycleDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kSameAppWindowCycle)},
-    {"promise-icons", flag_descriptions::kPromiseIconsName,
-     flag_descriptions::kPromiseIconsDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kPromiseIcons)},
     {"printing-ppd-channel", flag_descriptions::kPrintingPpdChannelName,
      flag_descriptions::kPrintingPpdChannelDescription, kOsCrOS,
      MULTI_VALUE_TYPE(kPrintingPpdChannelChoices)},
-    {"arc-idle-manager", flag_descriptions::kArcIdleManagerName,
-     flag_descriptions::kArcIdleManagerDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(arc::kEnableArcIdleManager)},
 #endif
 
     {"power-bookmark-backend", flag_descriptions::kPowerBookmarkBackendName,
@@ -10452,52 +10353,16 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kCompressionDictionaryTransportDescription, kOsAll,
      FEATURE_VALUE_TYPE(network::features::kCompressionDictionaryTransport)},
 
-    {"enable-compression-dictionary-transport-backend",
-     flag_descriptions::kCompressionDictionaryTransportBackendName,
-     flag_descriptions::kCompressionDictionaryTransportBackendDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         network::features::kCompressionDictionaryTransportBackend)},
-
-    {"enable-compression-dictionary-transport-allow-http1",
-     flag_descriptions::kCompressionDictionaryTransportOverHttp1Name,
-     flag_descriptions::kCompressionDictionaryTransportOverHttp1Description,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         net::features::kCompressionDictionaryTransportOverHttp1)},
-
-    {"enable-compression-dictionary-transport-allow-http2",
-     flag_descriptions::kCompressionDictionaryTransportOverHttp2Name,
-     flag_descriptions::kCompressionDictionaryTransportOverHttp2Description,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         net::features::kCompressionDictionaryTransportOverHttp2)},
-
-    {"enable-compression-dictionary-transport-require-known-root-cert",
-     flag_descriptions::kCompressionDictionaryTransportRequireKnownRootCertName,
-     flag_descriptions::
-         kCompressionDictionaryTransportRequireKnownRootCertDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         net::features::kCompressionDictionaryTransportRequireKnownRootCert)},
-
-    {"enable-container-type-no-layout-containment",
-     flag_descriptions::kContainerTypeNoLayoutContainmentName,
-     flag_descriptions::kContainerTypeNoLayoutContainmentDescription, kOsAll,
-     FEATURE_VALUE_TYPE(blink::features::kContainerTypeNoLayoutContainment)},
+    {"enable-compression-dictionary-ttl",
+     flag_descriptions::kCompressionDictionaryTTLName,
+     flag_descriptions::kCompressionDictionaryTTLDescription, kOsAll,
+     FEATURE_VALUE_TYPE(network::features::kCompressionDictionaryTTL)},
 
 #if BUILDFLAG(IS_ANDROID)
     {"deprecated-external-picker-function",
      flag_descriptions::kDeprecatedExternalPickerFunctionName,
      flag_descriptions::kDeprecatedExternalPickerFunctionDescription,
      kOsAndroid, FEATURE_VALUE_TYPE(ui::kDeprecatedExternalPickerFunction)},
-#endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_ANDROID)
-    {"android-native-pages-in-new-tab",
-     flag_descriptions::kAndroidNativePagesInNewTabName,
-     flag_descriptions::kAndroidNativePagesInNewTabDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAndroidNativePagesInNewTab)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
@@ -10540,30 +10405,11 @@ const FeatureEntry kFeatureEntries[] = {
      kOsDesktop | kOsAndroid,
      FEATURE_VALUE_TYPE(features::kProcessPerSiteUpToMainFrameThreshold)},
 
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
-    {"camera-mic-effects", flag_descriptions::kCameraMicEffectsName,
-     flag_descriptions::kCameraMicEffectsDescription,
-     static_cast<unsigned short>(kOsMac | kOsWin | kOsLinux),
-     FEATURE_VALUE_TYPE(media::kCameraMicEffects)},
-
-    {"camera-mic-preview", flag_descriptions::kCameraMicPreviewName,
-     flag_descriptions::kCameraMicPreviewDescription,
-     static_cast<unsigned short>(kOsMac | kOsWin | kOsLinux),
-     FEATURE_VALUE_TYPE(blink::features::kCameraMicPreview)},
-
 #if !BUILDFLAG(IS_ANDROID)
     {"get-display-media-confers-activation",
      flag_descriptions::kGetDisplayMediaConfersActivationName,
      flag_descriptions::kGetDisplayMediaConfersActivationDescription,
      kOsDesktop, FEATURE_VALUE_TYPE(media::kGetDisplayMediaConfersActivation)},
-#endif
-
-    {"get-user-media-deferred-device-settings-selection",
-     flag_descriptions::kGetUserMediaDeferredDeviceSettingsSelectionName,
-     flag_descriptions::kGetUserMediaDeferredDeviceSettingsSelectionDescription,
-     static_cast<unsigned short>(kOsMac | kOsWin | kOsLinux),
-     FEATURE_VALUE_TYPE(
-         blink::features::kGetUserMediaDeferredDeviceSettingsSelection)},
 #endif
 
     {"render-document", flag_descriptions::kRenderDocumentName,
@@ -10597,9 +10443,6 @@ const FeatureEntry kFeatureEntries[] = {
          autofill::features::kAutofillEnableCvcStorageAndFilling)},
 
 #if BUILDFLAG(IS_CHROMEOS)
-    {"drive-fs-show-cse-files", flag_descriptions::kDriveFsShowCSEFilesName,
-     flag_descriptions::kDriveFsShowCSEFilesDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kDriveFsShowCSEFiles)},
     {"drive-fs-mirroring", flag_descriptions::kDriveFsMirroringName,
      flag_descriptions::kDriveFsShowCSEFilesDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kDriveFsMirroring)},
@@ -10643,19 +10486,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"read-aloud", flag_descriptions::kReadAloudName,
      flag_descriptions::kReadAloudDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kReadAloud)},
-
-    {"read-aloud-background-playback",
-     flag_descriptions::kReadAloudBackgroundPlaybackName,
-     flag_descriptions::kReadAloudBackgroundPlaybackDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kReadAloudBackgroundPlayback)},
-
-    {"read-aloud-in-cct", flag_descriptions::kReadAloudInCCTName,
-     flag_descriptions::kReadAloudInCCTDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kReadAloudInOverflowMenuInCCT)},
-
-    {"read-aloud-tap-to-seek", flag_descriptions::kReadAloudTapToSeekName,
-     flag_descriptions::kReadAloudTapToSeekDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kReadAloudTapToSeek)},
 #endif
 
     {"rcaps-dynamic-profile-country",
@@ -10664,20 +10494,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(switches::kDynamicProfileCountry)},
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
-    {"third-party-profile-management",
-     flag_descriptions::kThirdPartyProfileManagementName,
-     flag_descriptions::kThirdPartyProfileManagementDescription,
-     kOsLinux | kOsMac | kOsWin,
-     FEATURE_VALUE_TYPE(
-         profile_management::features::kThirdPartyProfileManagement)},
-
-    {"oidc-auth-profile-management",
-     flag_descriptions::kOidcAuthProfileManagementName,
-     flag_descriptions::kOidcAuthProfileManagementDescription,
-     kOsLinux | kOsMac | kOsWin,
-     FEATURE_VALUE_TYPE(
-         profile_management::features::kOidcAuthProfileManagement)},
-
     {"enable-generic-oidc-auth-profile-management",
      flag_descriptions::kEnableGenericOidcAuthProfileManagementName,
      flag_descriptions::kEnableGenericOidcAuthProfileManagementDescription,
@@ -10703,11 +10519,6 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) ||
         // BUILDFLAG(IS_CHROMEOS)
 
-    {"ip-protection-proxy-opt-out",
-     flag_descriptions::kIpProtectionProxyOptOutName,
-     flag_descriptions::kIpProtectionProxyOptOutDescription, kOsAll,
-     MULTI_VALUE_TYPE(kIpProtectionProxyOptOutChoices)},
-
     {"protected-audience-debug-token",
      flag_descriptions::kProtectedAudiencesConsentedDebugTokenName,
      flag_descriptions::kProtectedAudiencesConsentedDebugTokenDescription,
@@ -10725,16 +10536,11 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          autofill::features::kAutofillEnableFpanRiskBasedAuthentication)},
 
-    {"draw-immediately-when-interactive",
-     flag_descriptions::kDrawImmediatelyWhenInteractiveName,
-     flag_descriptions::kDrawImmediatelyWhenInteractiveDescription, kOsAll,
-     FEATURE_VALUE_TYPE(features::kDrawImmediatelyWhenInteractive)},
-
-    {"ack-on-surface-activation-when-interactive",
-     flag_descriptions::kAckOnSurfaceActivationWhenInteractiveName,
-     flag_descriptions::kAckOnSurfaceActivationWhenInteractiveDescription,
+    {"ack-copy-output-request-early-for-view-transition",
+     flag_descriptions::kAckCopyOutputRequestEarlyForViewTransitionName,
+     flag_descriptions::kAckCopyOutputRequestEarlyForViewTransitionDescription,
      kOsAll,
-     FEATURE_VALUE_TYPE(features::kAckOnSurfaceActivationWhenInteractive)},
+     FEATURE_VALUE_TYPE(features::kAckCopyOutputRequestEarlyForViewTransition)},
 
 #if BUILDFLAG(IS_MAC)
     {"enable-mac-pwas-notification-attribution",
@@ -10751,33 +10557,15 @@ const FeatureEntry kFeatureEntries[] = {
 #if !BUILDFLAG(IS_CHROMEOS)
     {"profiles-reordering", flag_descriptions::kProfilesReorderingName,
      flag_descriptions::kProfilesReorderingDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(kProfilesReordering)},
+     FEATURE_VALUE_TYPE(switches::kProfilesReordering)},
 #endif
 
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
-    {"enable-history-sync-optin-expansion-pill",
-     flag_descriptions::kEnableHistorySyncOptinExpansionPillName,
-     flag_descriptions::kEnableHistorySyncOptinExpansionPillDescription,
-     kOsWin | kOsMac | kOsLinux,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         switches::kEnableHistorySyncOptinExpansionPill,
-         kHistorySyncOptinExpansionPillVariations,
-         "EnableHistorySyncOptinExpansionPill")},
-#endif
-
-#if BUILDFLAG(ENABLE_DICE_SUPPORT) && BUILDFLAG(ENABLE_EXTENSIONS)
-    {"enable-extensions-explicit-browser-signin",
-     flag_descriptions::kEnableExtensionsExplicitBrowserSigninName,
-     flag_descriptions::kEnableExtensionsExplicitBrowserSigninDescription,
-     kOsMac | kOsWin | kOsLinux | kOsCrOS,
-     FEATURE_VALUE_TYPE(switches::kEnableExtensionsExplicitBrowserSignin)},
-#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT) && BUILDFLAG(ENABLE_EXTENSIONS)
-
-#if BUILDFLAG(ENABLE_HLS_DEMUXER)
-    {"enable-hls-playback", flag_descriptions::kEnableHlsPlaybackName,
-     flag_descriptions::kEnableHlsPlaybackDescription,
-     kOsMac | kOsWin | kOsLinux | kOsCrOS,
-     FEATURE_VALUE_TYPE(media::kBuiltInHlsPlayer)},
+#if BUILDFLAG(IS_WIN)
+    {"avatar-button-sync-promo", flag_descriptions::kAvatarButtonSyncPromoName,
+     flag_descriptions::kAvatarButtonSyncPromoDescription, kOsWin,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(switches::kAvatarButtonSyncPromo,
+                                    kAvatarButtonSyncPromoVariations,
+                                    "AvatarButtonSyncPromo")},
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -10795,10 +10583,8 @@ const FeatureEntry kFeatureEntries[] = {
     {"enable-bound-session-credentials",
      flag_descriptions::kEnableBoundSessionCredentialsName,
      flag_descriptions::kEnableBoundSessionCredentialsDescription,
-     kOsMac | kOsWin | kOsLinux,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(switches::kEnableBoundSessionCredentials,
-                                    kEnableBoundSessionCredentialsVariations,
-                                    "EnableBoundSessionCredentials")},
+     kOsMac | kOsLinux,
+     FEATURE_VALUE_TYPE(switches::kEnableBoundSessionCredentials)},
     {"enable-bound-session-credentials-software-keys-for-manual-testing",
      flag_descriptions::
          kEnableBoundSessionCredentialsSoftwareKeysForManualTestingName,
@@ -10810,22 +10596,14 @@ const FeatureEntry kFeatureEntries[] = {
              kEnableBoundSessionCredentialsSoftwareKeysForManualTesting)},
 #endif  // BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
 
-#if BUILDFLAG(IS_CHROMEOS)
-    {"cros-soul", flag_descriptions::kCrosSoulName,
-     flag_descriptions::kCrosSoulDescription, kOsCrOS,
-     PLATFORM_FEATURE_NAME_TYPE("CrOSLateBootCrOSSOUL")},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-    {"menu-elements", flag_descriptions::kMenuElementsName,
-     flag_descriptions::kMenuElementsDescription, kOsAll,
-     FEATURE_VALUE_TYPE(blink::features::kMenuElements)},
-
 #if BUILDFLAG(IS_ANDROID)
     {"android-hub-search-tab-groups",
      flag_descriptions::kAndroidHubSearchTabGroupsName,
      flag_descriptions::kAndroidHubSearchTabGroupsDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(omnibox::kAndroidHubSearchTabGroups)},
-#endif  // !BUILDFLAG(IS_ANDROID)
+     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kAndroidHubSearchTabGroups,
+                                    kAndroidHubSearchTabGroupsVariations,
+                                    "AndroidHubSearchTabGroups")},
+#endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(ENABLE_COMPOSE)
     {"compose-selection-nudge", flag_descriptions::kComposeSelectionNudgeName,
@@ -10854,24 +10632,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(chromeos::features::kPlatformKeysChangesWave1)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
-    {"autofill-enable-email-or-loyalty-cards-filling",
-     flag_descriptions::kAutofillEnableEmailOrLoyaltyCardsFillingName,
-     flag_descriptions::kAutofillEnableEmailOrLoyaltyCardsFillingDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillEnableEmailOrLoyaltyCardsFilling)},
-
-    {"autofill-enable-loyalty-cards-filling",
-     flag_descriptions::kAutofillEnableLoyaltyCardsFillingName,
-     flag_descriptions::kAutofillEnableLoyaltyCardsFillingDescription, kOsAll,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillEnableLoyaltyCardsFilling)},
-
-    {"autofill-enable-syncing-of-loyalty-cards",
-     flag_descriptions::kAutofillEnableLoyaltyCardSyncName,
-     flag_descriptions::kAutofillEnableLoyaltyCardSyncDescription, kOsAll,
-     FEATURE_VALUE_TYPE(syncer::kSyncAutofillLoyaltyCard)},
-
 #if BUILDFLAG(IS_ANDROID)
     {"background-not-perceptible-binding",
      flag_descriptions::kBackgroundNotPerceptibleBindingName,
@@ -10890,12 +10650,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(chromeos::features::kCloudGamingDevice)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
-    {"content-settings-partitioning",
-     flag_descriptions::kContentSettingsPartitioningName,
-     flag_descriptions::kContentSettingsPartitioningDescription, kOsAll,
-     FEATURE_VALUE_TYPE(
-         content_settings::features::kContentSettingsPartitioning)},
-
 #if BUILDFLAG(IS_ANDROID)
     {"use-fullscreen-insets-api",
      flag_descriptions::kFullscreenInsetsApiMigrationName,
@@ -10910,18 +10664,6 @@ const FeatureEntry kFeatureEntries[] = {
          chrome::android::kFullscreenInsetsApiMigrationOnAutomotive)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
-#if BUILDFLAG(IS_MAC)
-    {"enable-mac-ime-live-conversion-fix",
-     flag_descriptions::kMacImeLiveConversionFixName,
-     flag_descriptions::kMacImeLiveConversionFixDescription, kOsMac,
-     FEATURE_VALUE_TYPE(features::kMacImeLiveConversionFix)},
-#endif
-
-    {"tear-off-web-app-tab-opens-web-app-window",
-     flag_descriptions::kTearOffWebAppAppTabOpensWebAppWindowName,
-     flag_descriptions::kTearOffWebAppAppTabOpensWebAppWindowDescription,
-     kOsAll, FEATURE_VALUE_TYPE(features::kTearOffWebAppTabOpensWebAppWindow)},
-
 #if BUILDFLAG(IS_ANDROID)
     {"offline-auto-fetch", flag_descriptions::kOfflineAutoFetchName,
      flag_descriptions::kOfflineAutoFetchDescription, kOsAndroid,
@@ -10933,18 +10675,9 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAssistantIphDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(feature_engagement::kIPHLauncherSearchHelpUiFeature)},
 
-    {"battery-badge-icon", flag_descriptions::kBatteryBadgeIconName,
-     flag_descriptions::kBatteryBadgeIconDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::features::kBatteryBadgeIcon)},
-
     {"battery-charge-limit", flag_descriptions::kBatteryChargeLimitName,
      flag_descriptions::kBatteryChargeLimitDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kBatteryChargeLimit)},
-
-    {"bluetooth-wifi-qs-pod-refresh",
-     flag_descriptions::kBluetoothWifiQSPodRefreshName,
-     flag_descriptions::kBluetoothWifiQSPodRefreshDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::features::kBluetoothWifiQSPodRefresh)},
 
     {"mahi", flag_descriptions::kMahiName, flag_descriptions::kMahiDescription,
      kOsCrOS, FEATURE_VALUE_TYPE(chromeos::features::kMahi)},
@@ -10956,11 +10689,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"mahi-panel-resizable", flag_descriptions::kMahiPanelResizableName,
      flag_descriptions::kMahiPanelResizableDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(chromeos::features::kMahiPanelResizable)},
-
-    {"notification-width-increase",
-     flag_descriptions::kNotificationWidthIncreaseName,
-     flag_descriptions::kNotificationWidthIncreaseDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::features::kNotificationWidthIncrease)},
 
     {"pompano", flag_descriptions::kPompanoName,
      flag_descriptions::kPompanoDescritpion, kOsCrOS,
@@ -11049,60 +10777,32 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_ANDROID)
-    {"android-tab-declutter-archive-all-but-active-tab",
-     flag_descriptions::kAndroidTabDeclutterArchiveAllButActiveTabName,
-     flag_descriptions::kAndroidTabDeclutterArchiveAllButActiveTabDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         chrome::android::kAndroidTabDeclutterArchiveAllButActiveTab)},
-
-    {"android-tab-declutter-archive-tab-groups",
-     flag_descriptions::kAndroidTabDeclutterArchiveTabGroupsName,
-     flag_descriptions::kAndroidTabDeclutterArchiveTabGroupsDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAndroidTabDeclutterArchiveTabGroups)},
-
-    {"android-tab-declutter-auto-delete",
-     flag_descriptions::kAndroidTabDeclutterAutoDeleteName,
-     flag_descriptions::kAndroidTabDeclutterAutoDeleteDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         chrome::android::kAndroidTabDeclutterAutoDelete,
-         kAndroidTabDeclutterAutoDeleteVariations,
-         "AndroidTabDeclutterAutoDeleteVariations")},
-
-    {"android-tab-declutter-auto-delete-kill-switch",
-     flag_descriptions::kAndroidTabDeclutterAutoDeleteKillSwitchName,
-     flag_descriptions::kAndroidTabDeclutterAutoDeleteKillSwitchDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         chrome::android::kAndroidTabDeclutterAutoDeleteKillSwitch)},
-
-    {"android-tab-declutter-performance-improvements",
-     flag_descriptions::kAndroidTabDeclutterPerformanceImprovementsName,
-     flag_descriptions::kAndroidTabDeclutterPerformanceImprovementsDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         chrome::android::kAndroidTabDeclutterPerformanceImprovements)},
-
-    {"android-tab-groups-color-update-gm3",
-     flag_descriptions::kAndroidTabGroupsColorUpdateGM3Name,
-     flag_descriptions::kAndroidTabGroupsColorUpdateGM3Description, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAndroidTabGroupsColorUpdateGM3)},
-
     {"android-tab-highlighting", flag_descriptions::kAndroidTabHighlightingName,
      flag_descriptions::kAndroidTabHighlightingDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAndroidTabHighlighting)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kAndroidTabHighlighting,
+                                    kAndroidTabHighlightingVariations,
+                                    "AndroidTabHighlightingVariations")},
 
-    {"tab-group-sync-disable-network-layer",
-     flag_descriptions::kTabGroupSyncDisableNetworkLayerName,
-     flag_descriptions::kTabGroupSyncDisableNetworkLayerDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(tab_groups::kTabGroupSyncDisableNetworkLayer)},
+    {"android-zoom-indicator", flag_descriptions::kAndroidZoomIndicatorName,
+     flag_descriptions::kAndroidZoomIndicatorDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(browser_ui::kAndroidZoomIndicator)},
 
-    {"swap-new-tab-and-new-tab-in-group-android",
-     flag_descriptions::kSwapNewTabAndNewTabInGroupAndroidName,
-     flag_descriptions::kSwapNewTabAndNewTabInGroupAndroidDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kSwapNewTabAndNewTabInGroupAndroid)},
+    {"android-history-pane-favicons",
+     flag_descriptions::kAndroidHistoryPaneFaviconsName,
+     flag_descriptions::kAndroidHistoryPaneFaviconsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(ui::kAndroidHistoryPaneFavicons)},
+
+    {"tab-bottom-sheet", flag_descriptions::kTabBottomSheetName,
+     flag_descriptions::kTabBottomSheetDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kTabBottomSheet)},
+
+    {"android-tips-notifications",
+     flag_descriptions::kAndroidTipsNotificationsName,
+     flag_descriptions::kAndroidTipsNotificationsDescription, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         segmentation_platform::features::kAndroidTipsNotifications,
+         kAndroidTipsNotificationsVariations,
+         "AndroidTipsNotifications")},
 
     {"history-pane-android", flag_descriptions::kHistoryPaneAndroidName,
      flag_descriptions::kHistoryPaneAndroidDescription, kOsAndroid,
@@ -11111,10 +10811,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"bookmark-pane-android", flag_descriptions::kBookmarkPaneAndroidName,
      flag_descriptions::kBookmarkPaneAndroidDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kBookmarkPaneAndroid)},
-
-    {"batch-tab-restore", flag_descriptions::kBatchTabRestoreName,
-     flag_descriptions::kBatchTabRestoreDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kBatchTabRestore)},
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -11128,22 +10824,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          autofill::features::kAutofillSharedStorageServerCardData)},
 
-#if BUILDFLAG(IS_ANDROID)
-    {"android-open-pdf-inline", flag_descriptions::kAndroidOpenPdfInlineName,
-     flag_descriptions::kAndroidOpenPdfInlineDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kAndroidOpenPdfInline)},
-
-    {"android-open-pdf-inline-backport",
-     flag_descriptions::kAndroidOpenPdfInlineBackportName,
-     flag_descriptions::kAndroidOpenPdfInlineBackportDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAndroidOpenPdfInlineBackport)},
-
-    {"android-pdf-assist-content",
-     flag_descriptions::kAndroidPdfAssistContentName,
-     flag_descriptions::kAndroidPdfAssistContentDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAndroidPdfAssistContent)},
-#endif  // BUILDFLAG(IS_ANDROID)
-
 #if BUILDFLAG(IS_CHROMEOS)
     {"multi-calendar-in-quick-settings",
      flag_descriptions::kMultiCalendarSupportName,
@@ -11152,13 +10832,6 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_ANDROID)
-    {"autofill-enable-syncing-of-pix-bank-accounts",
-     flag_descriptions::kAutofillEnableSyncingOfPixBankAccountsName,
-     flag_descriptions::kAutofillEnableSyncingOfPixBankAccountsDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillEnableSyncingOfPixBankAccounts)},
-
     {"enable-pix-account-linking",
      flag_descriptions::kEnablePixAccountLinkingName,
      flag_descriptions::kEnablePixAccountLinkingDescription, kOsAndroid,
@@ -11170,6 +10843,15 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAndroid,
      FEATURE_VALUE_TYPE(
          payments::facilitated::kEnablePixPaymentsInLandscapeMode)},
+
+    {"enable-static-qr-code-for-pix",
+     flag_descriptions::kEnableStaticQrCodeForPixName,
+     flag_descriptions::kEnableStaticQrCodeForPixDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(payments::facilitated::kEnableStaticQrCodeForPix)},
+
+    {"enable-iframe-for-pix", flag_descriptions::kEnableIframeForPixName,
+     flag_descriptions::kEnableIframeForPixDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(payments::facilitated::kEnableIframeForPix)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
     {"autofill-enable-card-benefits-for-american-express",
@@ -11185,45 +10867,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAutofillEnableCardBenefitsSyncDescription, kOsAll,
      FEATURE_VALUE_TYPE(autofill::features::kAutofillEnableCardBenefitsSync)},
 
-    {"linked-services-setting", flag_descriptions::kLinkedServicesSettingName,
-     flag_descriptions::kLinkedServicesSettingDescription, kOsAll,
-     FEATURE_VALUE_TYPE(features::kLinkedServicesSetting)},
-
-#if BUILDFLAG(IS_CHROMEOS)
-    {"cros-mall", flag_descriptions::kCrosMallName,
-     flag_descriptions::kCrosMallDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::features::kCrosMall)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
 #if BUILDFLAG(IS_MAC)
     {"reduce-ip-address-change-notification",
      flag_descriptions::kReduceIPAddressChangeNotificationName,
      flag_descriptions::kReduceIPAddressChangeNotificationDescription, kOsMac,
      FEATURE_VALUE_TYPE(net::features::kReduceIPAddressChangeNotification)},
 #endif  // BUILDFLAG(IS_MAC)
-
-    // LINT.IfChange(FingerprintingProtectionFilterFeatureEntries)
-    {"enable-fingerprinting-protection-blocklist",
-     flag_descriptions::kEnableFingerprintingProtectionBlocklistName,
-     flag_descriptions::kEnableFingerprintingProtectionBlocklistDescription,
-     kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         fingerprinting_protection_filter::features::
-             kEnableFingerprintingProtectionFilter,
-         kEnableFingerprintingProtectionFilterVariations,
-         "EnableFingerprintingProtectionFilter")},
-
-    {"enable-fingerprinting-protection-blocklist-incognito",
-     flag_descriptions::kEnableFingerprintingProtectionBlocklistInIncognitoName,
-     flag_descriptions::
-         kEnableFingerprintingProtectionBlocklistInIncognitoDescription,
-     kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         fingerprinting_protection_filter::features::
-             kEnableFingerprintingProtectionFilterInIncognito,
-         kEnableFingerprintingProtectionFilterInIncognitoVariations,
-         "EnableFingerprintingProtectionFilterInIncognito")},
-    // LINT.ThenChange(//ios/chrome/browser/flags/about_flags.mm:FingerprintingProtectionFeatureEntries)
 
     {"enable-standard-device-bound-session-credentials",
      flag_descriptions::kEnableStandardBoundSessionCredentialsName,
@@ -11237,31 +10886,32 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnableStandardBoundSessionPersistenceDescription,
      kOsMac | kOsWin | kOsLinux,
      FEATURE_VALUE_TYPE(net::features::kPersistDeviceBoundSessions)},
-    {"enable-standard-device-bound-sesssion-refresh-quota",
-     flag_descriptions::kEnableStandardBoundSessionRefreshQuotaName,
-     flag_descriptions::kEnableStandardBoundSessionRefreshQuotaDescription,
+    {"enable-standard-device-bound-session-credentials-federated-sessions",
+     flag_descriptions::
+         kEnableStandardBoundSessionCredentialsFederatedSessionsName,
+     flag_descriptions::
+         kEnableStandardBoundSessionCredentialsFederatedSessionsDescription,
      kOsMac | kOsWin | kOsLinux,
-     FEATURE_VALUE_TYPE(net::features::kDeviceBoundSessionsRefreshQuota)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         net::features::kDeviceBoundSessionsFederatedRegistration,
+         kStandardBoundSessionCredentialsFederatedSessionsVariations,
+         "standard-device-bound-sessions-federated-sessions")},
+    {"enable-standard-device-bound-session-devtools-debugging",
+     flag_descriptions::kEnableStandardBoundSessionDevToolsDebuggingName,
+     flag_descriptions::kEnableStandardBoundSessionDevToolsDebuggingDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(features::kDeviceBoundSessionsDevTools)},
 
-#if BUILDFLAG(IS_CHROMEOS)
-    {"cros-soul-gd", flag_descriptions::kCrosSoulGravediggerName,
-     flag_descriptions::kCrosSoulGravediggerDescription, kOsCrOS,
-     PLATFORM_FEATURE_NAME_TYPE("CrOSLateBootGravedigger")},
-#endif  // BUILDFLAG(IS_CHROMEOS)
+    {"responsive-iframes", flag_descriptions::kResponsiveIframesName,
+     flag_descriptions::kResponsiveIframesDescription, kOsAll,
+     FEATURE_VALUE_TYPE(blink::features::kResponsiveIframes)},
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
     {"replace-sync-promos-with-sign-in-promos-desktop",
      flag_descriptions::kReplaceSyncPromosWithSignInPromosName,
      flag_descriptions::kReplaceSyncPromosWithSignInPromosDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(syncer::kReplaceSyncPromosWithSignInPromos)},
-#elif BUILDFLAG(IS_ANDROID)
-    {"replace-sync-promos-with-sign-in-promos",
-     flag_descriptions::kReplaceSyncPromosWithSignInPromosName,
-     flag_descriptions::kReplaceSyncPromosWithSignInPromosDescription,
-     kOsAndroid, MULTI_VALUE_TYPE(kReplaceSyncPromosWithSignInPromosChoices)},
-#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) ||
-        // BUILDFLAG(IS_ANDROID)
+     kOsDesktop, MULTI_VALUE_TYPE(kReplaceSyncPromosWithSignInPromosChoices)},
+#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 
     {"pwm-show-suggestions-on-autofocus",
      flag_descriptions::kPasswordManagerShowSuggestionsOnAutofocusName,
@@ -11275,11 +10925,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAndroidBrowserControlsInVizName,
      flag_descriptions::kAndroidBrowserControlsInVizDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(features::kAndroidBrowserControlsInViz)},
+#endif
 
-    {"android-browser-controls-in-viz-bottom-controls",
-     flag_descriptions::kAndroidBcivBottomControlsName,
-     flag_descriptions::kAndroidBcivBottomControlsDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(features::kAndroidBcivBottomControls)},
+#if BUILDFLAG(IS_ANDROID)
+    {"android-desktop-density", flag_descriptions::kAndroidDesktopDensityName,
+     flag_descriptions::kAndroidDesktopDensityDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidDesktopDensity)},
 #endif
 
     {"optimization-guide-enable-dogfood-logging",
@@ -11297,10 +10948,6 @@ const FeatureEntry kFeatureEntries[] = {
      kOsDesktop,
      FEATURE_VALUE_TYPE(password_manager::features::
                             kWebAuthnUsePasskeyFromAnotherDeviceInContextMenu)},
-    {"web-authentication-passkey-upgrade",
-     flag_descriptions::kWebAuthnPasskeyUpgradeName,
-     flag_descriptions::kWebAuthnPasskeyUpgradeDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(device::kWebAuthnPasskeyUpgrade)},
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -11315,19 +10962,6 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_ANDROID)
-    {"autofill-sync-ewallet-accounts",
-     flag_descriptions::kAutofillSyncEwalletAccountsName,
-     flag_descriptions::kAutofillSyncEwalletAccountsDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(autofill::features::kAutofillSyncEwalletAccounts)},
-
-    {"ewallet-payments", flag_descriptions::kEwalletPaymentsName,
-     flag_descriptions::kEwalletPaymentsDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(payments::facilitated::kEwalletPayments)},
-
-    {"payment-link-detection", flag_descriptions::kPaymentLinkDetectionName,
-     flag_descriptions::kPaymentLinkDetectionDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(blink::features::kPaymentLinkDetection)},
-
     {"process-rank-policy-android",
      flag_descriptions::kProcessRankPolicyAndroidName,
      flag_descriptions::kProcessRankPolicyAndroidDescription, kOsAndroid,
@@ -11337,16 +10971,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kProtectedTabsAndroidDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kProtectedTabsAndroid)},
 #endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_CHROMEOS)
-    {"screenlock-reauth", flag_descriptions::kScreenlockReauthCardName,
-     flag_descriptions::kScreenlockReauthCardDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(password_manager::features::kBiometricsAuthForPwdFill)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-    {"ruby-short-heuristics", flag_descriptions::kRubyShortHeuristicsName,
-     flag_descriptions::kRubyShortHeuristicsDescription, kOsAll,
-     FEATURE_VALUE_TYPE(blink::features::kRubyShortHeuristics)},
 
     {"prompt-api-for-gemini-nano",
      flag_descriptions::kPromptAPIForGeminiNanoName,
@@ -11361,14 +10985,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kPromptAPIForGeminiNanoMultimodalInputDescription,
      kOsDesktop,
      FEATURE_VALUE_TYPE(blink::features::kAIPromptAPIMultimodalInput),
-     flag_descriptions::kAIAPIsForGeminiNanoLinks},
-
-    {"summarization-api-for-gemini-nano",
-     flag_descriptions::kSummarizationAPIForGeminiNanoName,
-     flag_descriptions::kSummarizationAPIForGeminiNanoDescription, kOsDesktop,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(blink::features::kAISummarizationAPI,
-                                    kAILangsVariation,
-                                    "kAISummarizationAPI"),
      flag_descriptions::kAIAPIsForGeminiNanoLinks},
 
     {"writer-api-for-gemini-nano",
@@ -11393,39 +11009,13 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(blink::features::kAIProofreadingAPI),
      flag_descriptions::kAIAPIsForGeminiNanoLinks},
 
-    {"css-masonry-layout", flag_descriptions::kCssMasonryLayoutName,
-     flag_descriptions::kCssMasonryLayoutDescription, kOsAll,
-     FEATURE_VALUE_TYPE(blink::features::kCSSMasonryLayout)},
-
-    {"storage-access-api-follows-same-origin-policy",
-     flag_descriptions::kStorageAccessApiFollowsSameOriginPolicyName,
-     flag_descriptions::kStorageAccessApiFollowsSameOriginPolicyDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         net::features::kStorageAccessApiFollowsSameOriginPolicy)},
+    {"css-grid-lanes-layout", flag_descriptions::kCSSGridLanesLayoutName,
+     flag_descriptions::kCSSGridLanesLayoutDescription, kOsAll,
+     FEATURE_VALUE_TYPE(blink::features::kCSSGridLanesLayout)},
 
     {"canvas-2d-hibernation", flag_descriptions::kCanvasHibernationName,
      flag_descriptions::kCanvasHibernationDescription, kOsAll,
      FEATURE_VALUE_TYPE(blink::features::kCanvas2DHibernation)},
-
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-    {"enable-history-sync-optin",
-     flag_descriptions::kEnableHistorySyncOptinName,
-     flag_descriptions::kEnableHistorySyncOptinDescription,
-     kOsWin | kOsMac | kOsLinux,
-     FEATURE_VALUE_TYPE(switches::kEnableHistorySyncOptin)},
-    {"sync-enable-bookmarks-in-transport-mode",
-     flag_descriptions::kSyncEnableBookmarksInTransportModeName,
-     flag_descriptions::kSyncEnableBookmarksInTransportModeDescription,
-     kOsWin | kOsMac | kOsLinux,
-     FEATURE_VALUE_TYPE(switches::kSyncEnableBookmarksInTransportMode)},
-    {"reading-list-enable-sync-transport-mode-upon-sign-in",
-     flag_descriptions::kReadingListEnableSyncTransportModeUponSignInName,
-     flag_descriptions::
-         kReadingListEnableSyncTransportModeUponSignInDescription,
-     kOsWin | kOsMac | kOsLinux,
-     FEATURE_VALUE_TYPE(syncer::kReadingListEnableSyncTransportModeUponSignIn)},
-#endif
 
     {"visited-url-ranking-service-domain-deduplication",
      flag_descriptions::kVisitedURLRankingServiceDeduplicationName,
@@ -11444,14 +11034,6 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAll,
      FEATURE_VALUE_TYPE(visited_url_ranking::features::
                             kVisitedURLRankingHistoryVisibilityScoreFilter)},
-
-    {"autofill-upload-card-request-timeout",
-     flag_descriptions::kAutofillUploadCardRequestTimeoutName,
-     flag_descriptions::kAutofillUploadCardRequestTimeoutDescription, kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         autofill::features::kAutofillUploadCardRequestTimeout,
-         kAutofillUploadCardRequestTimeoutOptions,
-         "AutofillUploadCardRequestTimeout")},
 
     {"autofill-unmask-card-request-timeout",
      flag_descriptions::kAutofillUnmaskCardRequestTimeoutName,
@@ -11493,32 +11075,17 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(language::kTranslateOpenSettings)},
 #endif
 
-    {"language-detection-api", flag_descriptions::kLanguageDetectionAPIName,
-     flag_descriptions::kLanguageDetectionAPIDescription, kOsAll,
-     FEATURE_VALUE_TYPE(blink::features::kLanguageDetectionAPI)},
+    {"lens-aim-suggestions", flag_descriptions::kLensAimSuggestionsName,
+     flag_descriptions::kLensAimSuggestionsDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(lens::features::kLensAimSuggestions,
+                                    kLensAimSuggestionsVariations,
+                                    "LensAimSuggestions")},
 
-#if BUILDFLAG(IS_ANDROID)
-    {"history-page-history-sync-promo",
-     flag_descriptions::kHistoryPageHistorySyncPromoName,
-     flag_descriptions::kHistoryPageHistorySyncPromoDescription, kOsAndroid,
-     MULTI_VALUE_TYPE(kHistoryOptInEntryPointChoices)},
-
-    {"history-opt-in-educational-tip",
-     flag_descriptions::kHistoryOptInEducationalTipName,
-     flag_descriptions::kHistoryOptInEducationalTipDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(switches::kHistoryOptInEducationalTip,
-                                    kHistoryOptInEducationalTipVariations,
-                                    "HistoryOptInEducationalTipVariations")},
-#endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN)
-    {"supervised-user-local-web-approvals",
-     flag_descriptions::kSupervisedUserLocalWebApprovalsName,
-     flag_descriptions::kSupervisedUserLocalWebApprovalsDescription,
-     kOsLinux | kOsMac | kOsWin,
-     FEATURE_VALUE_TYPE(supervised_user::kLocalWebApprovals)},
-
-#endif
+    {"lens-aim-gradient-suggest-background",
+     flag_descriptions::kLensAimSuggestionsGradientBackgroundName,
+     flag_descriptions::kLensAimSuggestionsGradientBackgroundDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(lens::features::kLensAimSuggestionsGradientBackground)},
 
 #if BUILDFLAG(IS_ANDROID)
     {"sensitive-content", flag_descriptions::kSensitiveContentName,
@@ -11574,11 +11141,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kHistorySyncAlternativeIllustrationDescription, kOsAll,
      FEATURE_VALUE_TYPE(tab_groups::kUseAlternateHistorySyncIllustration)},
 
-    {"left-click-opens-tab-group-bubble",
-     flag_descriptions::kLeftClickOpensTabGroupBubbleName,
-     flag_descriptions::kLeftClickOpensTabGroupBubbleDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(tab_groups::kLeftClickOpensTabGroupBubble)},
-
 #if BUILDFLAG(IS_CHROMEOS)
     {"cros-content-adjusted-refresh-rate",
      flag_descriptions::kCrosContentAdjustedRefreshRateName,
@@ -11616,24 +11178,37 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kDevToolsPrivacyUIDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kDevToolsPrivacyUI)},
 
-    {"permissions-ai-v1", flag_descriptions::kPermissionsAIv1Name,
-     flag_descriptions::kPermissionsAIv1Description, kOsDesktop,
-     FEATURE_VALUE_TYPE(permissions::features::kPermissionsAIv1)},
+    {"devtools-individual-request-throttling",
+     flag_descriptions::kDevToolsIndividualRequestThrottlingName,
+     flag_descriptions::kDevToolsIndividualRequestThrottlingDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kDevToolsIndividualRequestThrottling)},
+
+    {"devtools-live-edit", flag_descriptions::kDevToolsLiveEditName,
+     flag_descriptions::kDevToolsLiveEditDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kDevToolsLiveEdit)},
 
     {"permissions-ai-v3", flag_descriptions::kPermissionsAIv3Name,
      flag_descriptions::kPermissionsAIv3Description, kOsDesktop,
      FEATURE_VALUE_TYPE(permissions::features::kPermissionsAIv3)},
 
     {"permissions-ai-v4", flag_descriptions::kPermissionsAIv4Name,
-     flag_descriptions::kPermissionsAIv4Description, kOsDesktop,
+     flag_descriptions::kPermissionsAIv4Description, kOsAll,
      FEATURE_VALUE_TYPE(permissions::features::kPermissionsAIv4)},
 
-#if BUILDFLAG(IS_CHROMEOS)
-    {"exclude-display-in-mirror-mode",
-     flag_descriptions::kExcludeDisplayInMirrorModeName,
-     flag_descriptions::kExcludeDisplayInMirrorModeDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(display::features::kExcludeDisplayInMirrorMode)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
+    {"permissions-ai-p92", flag_descriptions::kPermissionsAIP92Name,
+     flag_descriptions::kPermissionsAIP92Description, kOsAll,
+     FEATURE_VALUE_TYPE(permissions::features::kPermissionsAIP92)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"permissions-android-clapper-loud",
+     flag_descriptions::kPermissionsAndroidClapperLoudName,
+     flag_descriptions::kPermissionsAndroidClapperLoudDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(permissions::kPermissionsAndroidClapperLoud)},
+    {"permissions-android-clapper-quiet",
+     flag_descriptions::kPermissionsAndroidClapperQuietName,
+     flag_descriptions::kPermissionsAndroidClapperQuietDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(permissions::kPermissionsAndroidClapperQuiet)},
+#endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
     {"enable-task-manager-clank", flag_descriptions::kTaskManagerClankName,
@@ -11646,24 +11221,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(features::kTaskManagerDesktopRefresh)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
-#if BUILDFLAG(IS_ANDROID)
-    {"autofill-enable-payment-settings-card-promo-and-scan-card",
-     flag_descriptions::kAutofillEnablePaymentSettingsCardPromoAndScanCardName,
-     flag_descriptions::
-         kAutofillEnablePaymentSettingsCardPromoAndScanCardDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         autofill::features::
-             kAutofillEnablePaymentSettingsCardPromoAndScanCard)},
-
-    {"autofill-enable-payment-settings-server-card-save",
-     flag_descriptions::kAutofillEnablePaymentSettingsServerCardSaveName,
-     flag_descriptions::kAutofillEnablePaymentSettingsServerCardSaveDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillEnablePaymentSettingsServerCardSave)},
-#endif  // BUILDFLAG(IS_ANDROID)
-
     {"cert-verification-network-time",
      flag_descriptions::kCertVerificationNetworkTimeName,
      flag_descriptions::kCertVerificationNetworkTimeDescription,
@@ -11671,11 +11228,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(features::kCertVerificationNetworkTime)},
 
 #if !BUILDFLAG(IS_ANDROID)
-    {"enable-lens-overlay-simplified-selection",
-     flag_descriptions::kLensOverlaySimplifiedSelectionName,
-     flag_descriptions::kLensOverlaySimplifiedSelectionDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(lens::features::kLensOverlaySimplifiedSelection)},
-
     {"enable-lens-overlay-translate-button",
      flag_descriptions::kLensOverlayTranslateButtonName,
      flag_descriptions::kLensOverlayTranslateButtonDescription, kOsDesktop,
@@ -11717,18 +11269,7 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kJumpStartOmnibox,
                                     kJumpStartOmniboxVariations,
                                     "JumpStartOmnibox")},
-    {"retain-omnibox-on-focus", flag_descriptions::kRetainOmniboxOnFocusName,
-     flag_descriptions::kRetainOmniboxOnFocusDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(omnibox::kRetainOmniboxOnFocus)},
 #endif  // BUILDFLAG(IS_ANDROID)
-
-    {"autofill-enable-log-form-events-to-all-parsed-form-types",
-     flag_descriptions::kAutofillEnableLogFormEventsToAllParsedFormTypesName,
-     flag_descriptions::
-         kAutofillEnableLogFormEventsToAllParsedFormTypesDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillEnableLogFormEventsToAllParsedFormTypes)},
 
     {"enable-segmentation-internals-survey",
      flag_descriptions::kSegmentationSurveyPageName,
@@ -11737,28 +11278,21 @@ const FeatureEntry kFeatureEntries[] = {
          segmentation_platform::features::kSegmentationSurveyPage)},
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
-    BUILDFLAG(IS_CHROMEOS)
+    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
     {"autofill-enable-buy-now-pay-later",
      flag_descriptions::kAutofillEnableBuyNowPayLaterName,
-     flag_descriptions::kAutofillEnableBuyNowPayLaterDescription, kOsDesktop,
+     flag_descriptions::kAutofillEnableBuyNowPayLaterDescription,
+     kOsDesktop | kOsAndroid,
      FEATURE_VALUE_TYPE(autofill::features::kAutofillEnableBuyNowPayLater)},
 
     {"autofill-enable-buy-now-pay-later-syncing",
      flag_descriptions::kAutofillEnableBuyNowPayLaterSyncingName,
      flag_descriptions::kAutofillEnableBuyNowPayLaterSyncingDescription,
-     kOsDesktop,
+     kOsDesktop | kOsAndroid,
      FEATURE_VALUE_TYPE(
          autofill::features::kAutofillEnableBuyNowPayLaterSyncing)},
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
-        // BUILDFLAG(IS_CHROMEOS)
-
-#if BUILDFLAG(IS_ANDROID)
-    {"biometric-auth-identity-check",
-     flag_descriptions::kBiometricAuthIdentityCheckName,
-     flag_descriptions::kBiometricAuthIdentityCheckDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         password_manager::features::kBiometricAuthIdentityCheck)},
-#endif  // BUILDFLAG(IS_ANDROID)
+        // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
 
     {"autofill-enable-cvc-storage-and-filling-standalone-form-enhancement",
      flag_descriptions::
@@ -11769,21 +11303,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          autofill::features::
              kAutofillEnableCvcStorageAndFillingStandaloneFormEnhancement)},
-#if BUILDFLAG(IS_ANDROID)
-    {"cct-sign-in-prompt", flag_descriptions::kCCTSignInPromptName,
-     flag_descriptions::kCCTSignInPromptDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(switches::kCctSignInPrompt,
-                                    kCctSignInPromptVariations,
-                                    "CctSignInPrompt")},
-#endif
-
-    {"enable-bookmarks-selected-type-on-signin-for-testing",
-     flag_descriptions::kEnableBookmarksSelectedTypeOnSigninForTestingName,
-     flag_descriptions::
-         kEnableBookmarksSelectedTypeOnSigninForTestingDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(
-         syncer::kEnableBookmarksSelectedTypeOnSigninForTesting)},
 
 #if !BUILDFLAG(IS_ANDROID)
     {"separate-local-and-account-themes",
@@ -11803,31 +11322,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kClankDefaultBrowserPromoName,
      flag_descriptions::kClankDefaultBrowserPromoDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kDefaultBrowserPromoAndroid2)},
+
+    {"desktop-ua-on-connected-display",
+     flag_descriptions::kDesktopUAOnConnectedDisplayName,
+     flag_descriptions::kDesktopUAOnConnectedDisplayDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kDesktopUAOnConnectedDisplay)},
 #endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_CHROMEOS)
-    {"cros-mall-url", flag_descriptions::kCrosMallUrlName,
-     flag_descriptions::kCrosMallUrlDescription, kOsCrOS,
-     STRING_VALUE_TYPE(ash::switches::kMallUrl, "")},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-    {"autofill-enable-card-benefits-iph",
-     flag_descriptions::kAutofillEnableCardBenefitsIphName,
-     flag_descriptions::kAutofillEnableCardBenefitsIphDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(autofill::features::kAutofillEnableCardBenefitsIph)},
-
-#if BUILDFLAG(IS_ANDROID)
-    {"support-multiple-server-requests-for-pix-payments",
-     flag_descriptions::kSupportMultipleServerRequestsForPixPaymentsName,
-     flag_descriptions::kSupportMultipleServerRequestsForPixPaymentsDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         payments::facilitated::kSupportMultipleServerRequestsForPixPayments)},
-#endif  // BUILDFLAG(IS_ANDROID)
-
-    {"rusty-png", flag_descriptions::kRustyPngName,
-     flag_descriptions::kRustyPngDescription, kOsAll,
-     FEATURE_VALUE_TYPE(skia::kRustyPngFeature)},
 
     {"autofill-enable-card-info-runtime-retrieval",
      flag_descriptions::kAutofillEnableCardInfoRuntimeRetrievalName,
@@ -11836,13 +11336,13 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          autofill::features::kAutofillEnableCardInfoRuntimeRetrieval)},
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-    {"translation-api", flag_descriptions::kTranslationAPIName,
-     flag_descriptions::kTranslationAPIDescription, kOsMac | kOsWin | kOsLinux,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(blink::features::kTranslationAPI,
-                                    kTranslationAPIVariations,
-                                    "TranslationAPI")},
-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(ENABLE_ON_DEVICE_TRANSLATION)
+    {"translation-api-streaming-by-sentence",
+     flag_descriptions::kTranslationAPIStreamingBySentenceName,
+     flag_descriptions::kTranslationAPIStreamingBySentenceDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(on_device_translation::kTranslateStreamingBySentence)},
+#endif  // BUILDFLAG(ENABLE_ON_DEVICE_TRANSLATION)
 
     {"password-form-grouped-affiliations",
      flag_descriptions::kPasswordFormGroupedAffiliationsName,
@@ -11850,38 +11350,21 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          password_manager::features::kPasswordFormGroupedAffiliations)},
 
-#if !BUILDFLAG(IS_ANDROID)
-    {"privacy-guide-ai-settings",
-     flag_descriptions::kPrivacyGuideAiSettingsName,
-     flag_descriptions::kPrivacyGuideAiSettingsDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(optimization_guide::features::kPrivacyGuideAiSettings)},
-    {"ai-settings-enterprise-disabled-ui",
-     flag_descriptions::kAiSettingsPageEnterpriseDisabledName,
-     flag_descriptions::kAiSettingsPageEnterpriseDisabledDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(
-         optimization_guide::features::kAiSettingsPageEnterpriseDisabledUi)},
-
-#endif  // !BUILDFLAG(IS_ANDROID)
-
     {"password-form-clientside-classifier",
      flag_descriptions::kPasswordFormClientsideClassifierName,
      flag_descriptions::kPasswordFormClientsideClassifierDescription, kOsAll,
      FEATURE_VALUE_TYPE(
          password_manager::features::kPasswordFormClientsideClassifier)},
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
     {"contextual-cueing", flag_descriptions::kContextualCueingName,
-     flag_descriptions::kContextualCueingDescription,
-     kOsLinux | kOsMac | kOsWin,
+     flag_descriptions::kContextualCueingDescription, kOsDesktop,
      FEATURE_WITH_PARAMS_VALUE_TYPE(contextual_cueing::kContextualCueing,
                                     kContextualCueingEnabledOptions,
                                     "ContextualCueingEnabledOptions")},
-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-
-    {"partitioned-popins", flag_descriptions::kPartitionedPopinsName,
-     flag_descriptions::kPartitionedPopinsDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(blink::features::kPartitionedPopins)},
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+        // BUILDFLAG(IS_CHROMEOS)
 
 #if !BUILDFLAG(IS_ANDROID)
     {"separate-local-and-account-search-engines",
@@ -11913,13 +11396,15 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kPredictableReportedQuotaDescription, kOsAll,
      FEATURE_VALUE_TYPE(storage::features::kStaticStorageQuota)},
 
-#if BUILDFLAG(IS_ANDROID)
-    {"use-ahardwarebuffer-usage-flags-from-vulkan",
-     flag_descriptions::kUseHardwareBufferUsageFlagsFromVulkanName,
-     flag_descriptions::kUseHardwareBufferUsageFlagsFromVulkanDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(::features::kUseHardwareBufferUsageFlagsFromVulkan)},
-#endif  // !BUILDFLAG(IS_ANDROID)
+    {"prefetch-bookmarkbar-trigger",
+     flag_descriptions::kBookmarkBarPrefetchName,
+     flag_descriptions::kBookmarkBarPrefetchDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kBookmarkTriggerForPrefetch)},
+
+    {"prefetch-new-tab-page-trigger",
+     flag_descriptions::kNewTabPagePrefetchName,
+     flag_descriptions::kNewTabPagePrefetchDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kNewTabPageTriggerForPrefetch)},
 
 #if BUILDFLAG(IS_ANDROID) && PA_BUILDFLAG(HAS_MEMORY_TAGGING) && \
     PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
@@ -11940,13 +11425,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(features::kMacAccessibilityAPIMigration)},
 #endif  // BUILDFLAG(IS_MAC)
 
-#if BUILDFLAG(ENABLE_EXTENSIONS)
-    {"allow-legacy-mv2-extensions",
-     flag_descriptions::kAllowLegacyMV2ExtensionsName,
-     flag_descriptions::kAllowLegacyMV2ExtensionsDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(extensions_features::kAllowLegacyMV2Extensions)},
-#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
-
 #if !BUILDFLAG(IS_ANDROID)
     {"enable-lens-overlay-translate-languages",
      flag_descriptions::kLensOverlayTranslateLanguagesName,
@@ -11956,63 +11434,140 @@ const FeatureEntry kFeatureEntries[] = {
 
 #if BUILDFLAG(ENABLE_GLIC)
     {"glic", flag_descriptions::kGlicName, flag_descriptions::kGlicDescription,
-     kOsMac | kOsWin | kOsLinux, FEATURE_VALUE_TYPE(features::kGlic)},
+     kOsDesktop, FEATURE_VALUE_TYPE(features::kGlic)},
     {"glic-z-order-changes", flag_descriptions::kGlicZOrderChangesName,
-     flag_descriptions::kGlicZOrderChangesDescription,
-     kOsMac | kOsWin | kOsLinux,
+     flag_descriptions::kGlicZOrderChangesDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kGlicZOrderChanges)},
     {"glic-actor", flag_descriptions::kGlicActorName,
-     flag_descriptions::kGlicActorDescription, kOsMac | kOsWin | kOsLinux,
+     flag_descriptions::kGlicActorDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kGlicActor)},
+    {"glic-actor-autofill", flag_descriptions::kGlicActorAutofillName,
+     flag_descriptions::kGlicActorAutofillDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicActorAutofill)},
+    {"glic-actor-cursor", flag_descriptions::kGlicActorCursorName,
+     flag_descriptions::kGlicActorCursorDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicActorUiOverlayMagicCursor)},
+    {"glic-detached", flag_descriptions::kGlicDetachedName,
+     flag_descriptions::kGlicDetachedDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicDetached)},
     {"glic-panel-reset-top-chrome-button",
      flag_descriptions::kGlicPanelResetTopChromeButtonName,
-     flag_descriptions::kGlicPanelResetTopChromeButtonDescription,
-     kOsMac | kOsWin | kOsLinux,
+     flag_descriptions::kGlicPanelResetTopChromeButtonDescription, kOsDesktop,
      FEATURE_WITH_PARAMS_VALUE_TYPE(features::kGlicPanelResetTopChromeButton,
                                     kGlicPanelResetTopChromeButtonVariations,
                                     "GlicPanelResetTopChromeButton")},
     {"glic-panel-reset-on-start", flag_descriptions::kGlicPanelResetOnStartName,
-     flag_descriptions::kGlicPanelResetOnStartDescription,
-     kOsMac | kOsWin | kOsLinux,
+     flag_descriptions::kGlicPanelResetOnStartDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kGlicPanelResetOnStart)},
     {"glic-panel-set-position-on-drag",
      flag_descriptions::kGlicPanelSetPositionOnDragName,
-     flag_descriptions::kGlicPanelSetPositionOnDragDescription,
-     kOsMac | kOsWin | kOsLinux,
+     flag_descriptions::kGlicPanelSetPositionOnDragDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kGlicPanelSetPositionOnDrag)},
     {"glic-panel-reset-on-session-timeout",
      flag_descriptions::kGlicPanelResetOnSessionTimeoutName,
-     flag_descriptions::kGlicPanelResetOnSessionTimeoutDescription,
-     kOsMac | kOsWin | kOsLinux,
+     flag_descriptions::kGlicPanelResetOnSessionTimeoutDescription, kOsDesktop,
      FEATURE_WITH_PARAMS_VALUE_TYPE(features::kGlicPanelResetOnSessionTimeout,
                                     kGlicPanelResetOnSessionTimeoutVariations,
                                     "GlicPanelResetOnSessionTimeout")},
+    {"glic-panel-reset-size-and-location-on-open",
+     flag_descriptions::kGlicPanelResetSizeAndLocationName,
+     flag_descriptions::kGlicPanelResetSizeAndLocationDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicPanelResetSizeAndLocationOnOpen)},
+    {"glic-print-menu-item", flag_descriptions::kGlicPrintMenuItemName,
+     flag_descriptions::kGlicPrintMenuItemDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(features::kGlicPrintMenuItem)},
     {"glic-pre-warming", flag_descriptions::kGlicWarmingName,
-     flag_descriptions::kGlicWarmingDescription, kOsMac | kOsWin | kOsLinux,
+     flag_descriptions::kGlicWarmingDescription, kOsDesktop,
      FEATURE_WITH_PARAMS_VALUE_TYPE(features::kGlicWarming,
                                     kGlicWarmingVariations,
                                     "GlicWarming")},
+    {"glic-side-panel", flag_descriptions::kGlicSidePanelName,
+     flag_descriptions::kGlicSidePanelDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicMultiInstance)},
     {"glic-fre-pre-warming", flag_descriptions::kGlicFreWarmingName,
-     flag_descriptions::kGlicFreWarmingDescription, kOsMac | kOsWin | kOsLinux,
+     flag_descriptions::kGlicFreWarmingDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kGlicFreWarming)},
+    {"glic-entrypoint-variations",
+     flag_descriptions::kGlicEntrypointVariationsName,
+     flag_descriptions::kGlicEntrypointVariationsDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kGlicEntrypointVariations,
+                                    kGlicEntrypointVariations,
+                                    "GlicEntrypointVariations")},
+    {"glic-default-to-last-active-conversation",
+     flag_descriptions::kGlicDefaultToLastActiveConversationName,
+     flag_descriptions::kGlicDefaultToLastActiveConversationDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicDefaultToLastActiveConversation)},
+    {"glic-bind-pinned-unbound-tab",
+     flag_descriptions::kGlicBindPinnedUnboundTabName,
+     flag_descriptions::kGlicBindPinnedUnboundTabDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicBindPinnedUnboundTab)},
+    {"glic-button-pressed-state",
+     flag_descriptions::kGlicButtonPressedStateName,
+     flag_descriptions::kGlicButtonPressedStateDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicButtonPressedState)},
+    {"glic-button-alt-label", flag_descriptions::kGlicButtonAltLabelName,
+     flag_descriptions::kGlicButtonAltLabelDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kGlicButtonAltLabel,
+                                    kGlicButtonAltLabelVariations,
+                                    "GlicButtonAltLabel")},
+    {"glic-capture-region", flag_descriptions::kGlicCaptureRegionName,
+     flag_descriptions::kGlicCaptureRegionDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kGlicCaptureRegion)},
+    {"glic-daisy-chain-new-tabs", flag_descriptions::kGlicDaisyChainNewTabsName,
+     flag_descriptions::kGlicDaisyChainNewTabsDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicDaisyChainNewTabs)},
+    {"glic-toolbar-height-side-panel",
+     flag_descriptions::kGlicUseToolbarHeightSidePanelName,
+     flag_descriptions::kGlicUseToolbarHeightSidePanelDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicUseToolbarHeightSidePanel)},
+    {"glic-unified-fre-screen", flag_descriptions::kGlicUnifiedFreScreenName,
+     flag_descriptions::kGlicUnifiedFreScreenDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicUnifiedFreScreen)},
+    {"glic-live-mode-only-glow", flag_descriptions::kGlicLiveModeOnlyGlowName,
+     flag_descriptions::kGlicLiveModeOnlyGlowDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicLiveModeOnlyGlow)},
+    {"glic-mi-tab-context-menu", flag_descriptions::kGlicMITabContextMenuName,
+     flag_descriptions::kGlicMITabContextMenuDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicMITabContextMenu)},
+    {"glic-trust-first-onboarding",
+     flag_descriptions::kGlicTrustFirstOnboardingName,
+     flag_descriptions::kGlicTrustFirstOnboardingDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kGlicTrustFirstOnboarding,
+                                    kGlicTrustFirstOnboardingVariations,
+                                    "GlicTrustFirstOnboarding")},
+    {"glic-default-tab-context-setting",
+     flag_descriptions::kGlicDefaultTabContextSettingName,
+     flag_descriptions::kGlicDefaultTabContextSettingDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kGlicDefaultTabContextSetting)},
+
+    {"glic-reset-mi-enablement-by-tier",
+     flag_descriptions::kGlicResetMultiInstanceEnabledByTierName,
+     flag_descriptions::kGlicResetMultiInstanceEnabledByTierDescription,
+     kOsDesktop,
+     SINGLE_VALUE_TYPE(switches::kGlicResetMultiInstanceEnabledByTier)},
+
+    {"glic-set-g1-for-mi",
+     flag_descriptions::kGlicForceG1StatusForMultiInstanceName,
+     flag_descriptions::kGlicForceG1StatusForMultiInstanceDescription,
+     kOsDesktop, MULTI_VALUE_TYPE(kGlicSetG1ForMultiInstance)},
+#if BUILDFLAG(IS_CHROMEOS)
+    {"glic-use-non-client", flag_descriptions::kGlicUseNonClientName,
+     flag_descriptions::kGlicUseNonClientDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(features::kGlicUseNonClient)},
+#endif  // BUILDFLAG(IS_CHROMEOS)
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
 #if BUILDFLAG(IS_ANDROID)
-    {"enterprise-security-event-reporting-on-android",
-     flag_descriptions::kEnterpriseSecurityEventReportingOnAndroidName,
-     flag_descriptions::kEnterpriseSecurityEventReportingOnAndroidDescription,
+    {"enable-client-certificate-provisioning-on-android",
+     flag_descriptions::kEnableClientCertificateProvisioningOnAndroidName,
+     flag_descriptions::
+         kEnableClientCertificateProvisioningOnAndroidDescription,
      kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         enterprise_connectors::kEnterpriseSecurityEventReportingOnAndroid)},
-
+     FEATURE_VALUE_TYPE(client_certificates::features::
+                            kEnableClientCertificateProvisioningOnAndroid)},
 #endif  // BUILDFLAG(IS_ANDROID)
-
-    {"service-worker-auto-preload",
-     flag_descriptions::kServiceWorkerAutoPreloadName,
-     flag_descriptions::kServiceWorkerAutoPreloadDescription, kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kServiceWorkerAutoPreload,
-                                    kServiceWorkerAutoPreloadVariations,
-                                    "ServiceWorkerAutoPreload")},
 
     {"autofill-enable-save-and-fill",
      flag_descriptions::kAutofillEnableSaveAndFillName,
@@ -12034,27 +11589,27 @@ const FeatureEntry kFeatureEntries[] = {
     {"android-bookmark-bar", flag_descriptions::kAndroidBookmarkBarName,
      flag_descriptions::kAndroidBookmarkBarDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kAndroidBookmarkBar)},
-#endif  // BUILDFLAG(IS_ANDROID)
 
-#if BUILDFLAG(IS_CHROMEOS)
-    {"cros-mall-managed", flag_descriptions::kCrosMallManagedName,
-     flag_descriptions::kCrosMallManagedDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::features::kCrosMallManaged)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
+    {"android-bookmark-bar-fast-follow",
+     flag_descriptions::kAndroidBookmarkBarFastFollowName,
+     flag_descriptions::kAndroidBookmarkBarFastFollowDescription, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         chrome::android::kAndroidBookmarkBarFastFollow,
+         kAndroidBookmarkBarFastFollowVariations,
+         "AndroidBookmarkBarFastFollow")},
+
+    {"default-browser-promo-entry-point",
+     flag_descriptions::kDefaultBrowserPromoEntryPointName,
+     flag_descriptions::kDefaultBrowserPromoEntryPointDescription, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         chrome::android::kDefaultBrowserPromoEntryPoint,
+         kDefaultBrowserPromoEntryPointVariations,
+         "DefaultBrowserPromoEntryPoint")},
+#endif  // BUILDFLAG(IS_ANDROID)
 
     {"happy-eyeballs-v3", flag_descriptions::kHappyEyeballsV3Name,
      flag_descriptions::kHappyEyeballsV3Description, kOsAll,
      FEATURE_VALUE_TYPE(net::features::kHappyEyeballsV3)},
-
-#if BUILDFLAG(IS_CHROMEOS)
-    {"mantis-feature-key", flag_descriptions::kMantisFeatureKeyName,
-     flag_descriptions::kMantisFeatureKeyDescription, kOsCrOS,
-     STRING_VALUE_TYPE(ash::switches::kMantisFeatureKey, "")},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-    {"signature-based-sri", flag_descriptions::kSignatureBasedSriName,
-     flag_descriptions::kSignatureBasedSriDescription, kOsAll,
-     FEATURE_VALUE_TYPE(network::features::kSRIMessageSignatureEnforcement)},
 
 #if !BUILDFLAG(IS_ANDROID)
     {"policy-promotion-banner-flag",
@@ -12072,37 +11627,30 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kPrivacySandboxAdsApiUxEnhancementsDescription, kOsAll,
      FEATURE_VALUE_TYPE(privacy_sandbox::kPrivacySandboxAdsApiUxEnhancements)},
 
-#if !BUILDFLAG(IS_ANDROID)
-    {"safety-hub-services-on-start-up",
-     flag_descriptions::kSafetyHubServicesOnStartUpName,
-     flag_descriptions::kSafetyHubServicesOnStartUpDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kSafetyHubServicesOnStartUp)},
-#endif  // !BUILDFLAG(IS_ANDROID)
-
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
+    {"enable-oauth-multilogin-cookies-binding",
+     flag_descriptions::kEnableOAuthMultiloginCookiesBindingName,
+     flag_descriptions::kEnableOAuthMultiloginCookiesBindingDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(switches::kEnableOAuthMultiloginCookiesBinding)},
+
+    {"enable-oauth-multilogin-cookies-binding-server-experiment",
+     flag_descriptions::
+         kEnableOAuthMultiloginCookiesBindingServerExperimentName,
+     flag_descriptions::
+         kEnableOAuthMultiloginCookiesBindingServerExperimentDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         switches::kEnableOAuthMultiloginCookiesBindingServerExperiment,
+         kOAuthMultiloginCookieBindingEnforcementVariations,
+         "EnableOAuthMultiloginCookiesBindingServerExperiment")},
+
     {"enable-chrome-refresh-token-binding",
      flag_descriptions::kEnableChromeRefreshTokenBindingName,
      flag_descriptions::kEnableChromeRefreshTokenBindingDescription,
-     kOsMac | kOsWin | kOsLinux,
+     kOsMac | kOsLinux,
      FEATURE_VALUE_TYPE(switches::kEnableChromeRefreshTokenBinding)},
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
-
-#if BUILDFLAG(IS_CHROMEOS)
-    {"use-managed-print-job-options-in-print-preview",
-     flag_descriptions::kUseManagedPrintJobOptionsInPrintPreviewName,
-     flag_descriptions::kUseManagedPrintJobOptionsInPrintPreviewDescription,
-     kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kUseManagedPrintJobOptionsInPrintPreview)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-#if BUILDFLAG(IS_ANDROID)
-    {"autofill-third-party-mode-content-provider",
-     flag_descriptions::kAutofillThirdPartyModeContentProviderName,
-     flag_descriptions::kAutofillThirdPartyModeContentProviderDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillThirdPartyModeContentProvider)},
-#endif
 
 #if !BUILDFLAG(IS_ANDROID)
     {"three-button-password-save-dialog",
@@ -12124,20 +11672,33 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kThrottleMainTo60HzDescription, kOsAll,
      FEATURE_VALUE_TYPE(features::kThrottleMainFrameTo60Hz)},
 
-    {"client-side-detection-brand-and-page-intent",
-     flag_descriptions::kClientSideDetectionBrandAndIntentForScamDetectionName,
+#if BUILDFLAG(IS_ANDROID)
+    {"client-side-detection-send-intelligent-scan-info-android",
+     flag_descriptions::kClientSideDetectionSendIntelligentScanInfoAndroidName,
      flag_descriptions::
-         kClientSideDetectionBrandAndIntentForScamDetectionDescription,
-     kOsMac | kOsWin | kOsLinux,
+         kClientSideDetectionSendIntelligentScanInfoAndroidDescription,
+     kOsAndroid,
      FEATURE_VALUE_TYPE(
-         safe_browsing::kClientSideDetectionBrandAndIntentForScamDetection)},
+         safe_browsing::kClientSideDetectionSendIntelligentScanInfoAndroid)},
 
-    {"client-side-detection-show-scam-verdict-warning",
-     flag_descriptions::kClientSideDetectionShowScamVerdictWarningName,
-     flag_descriptions::kClientSideDetectionShowScamVerdictWarningDescription,
-     kOsMac | kOsWin | kOsLinux,
+    {"client-side-detection-server-model-for-scam-detection-android",
+     flag_descriptions::
+         kClientSideDetectionServerModelForScamDetectionAndroidName,
+     flag_descriptions::
+         kClientSideDetectionServerModelForScamDetectionAndroidDescription,
+     kOsAndroid,
      FEATURE_VALUE_TYPE(
-         safe_browsing::kClientSideDetectionShowScamVerdictWarning)},
+         safe_browsing::
+             kClientSideDetectionServerModelForScamDetectionAndroid)},
+
+    {"client-side-detection-show-scam-verdict-warning-android",
+     flag_descriptions::kClientSideDetectionShowScamVerdictWarningAndroidName,
+     flag_descriptions::
+         kClientSideDetectionShowScamVerdictWarningAndroidDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         safe_browsing::kClientSideDetectionShowScamVerdictWarningAndroid)},
+#endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS)
     {"enable-keyboard-used-palm-suppression",
@@ -12169,26 +11730,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(features::kBookmarksTreeView)},
 #endif
 
-    {"enable-secure-payment-confirmation-availability-api",
-     flag_descriptions::kSecurePaymentConfirmationAvailabilityAPIName,
-     flag_descriptions::kSecurePaymentConfirmationAvailabilityAPIDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         blink::features::kSecurePaymentConfirmationAvailabilityAPI)},
-
-    {"copy-image-filename-to-clipboard",
-     flag_descriptions::kCopyImageFilenameToClipboardName,
-     flag_descriptions::kCopyImageFilenameToClipboardDescription, kOsAll,
-     FEATURE_VALUE_TYPE(download::features::kCopyImageFilenameToClipboard)},
-
-    {"autofill-enable-allowlist-for-bmo-card-category-benefits",
-     flag_descriptions::kAutofillEnableAllowlistForBmoCardCategoryBenefitsName,
-     flag_descriptions::
-         kAutofillEnableAllowlistForBmoCardCategoryBenefitsDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         autofill::features::
-             kAutofillEnableAllowlistForBmoCardCategoryBenefits)},
 #if BUILDFLAG(IS_ANDROID)
     {"new-etc1-encoder", flag_descriptions::kNewEtc1EncoderName,
      flag_descriptions::kNewEtc1EncoderDescription, kOsAndroid,
@@ -12208,14 +11749,6 @@ const FeatureEntry kFeatureEntries[] = {
      kOsDesktop,
      FEATURE_VALUE_TYPE(lens::features::kLensOverlaySidePanelOpenInNewTab)},
 #endif  // !BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
-    {"enforce-system-echo-cancellation",
-     flag_descriptions::kEnforceSystemEchoCancellationName,
-     flag_descriptions::kEnforceSystemEchoCancellationDescription,
-     kOsWin | kOsMac,
-     FEATURE_VALUE_TYPE(media::kEnforceSystemEchoCancellation)},
-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
 
 #if !BUILDFLAG(IS_ANDROID)
     {"improved-password-change-service",
@@ -12239,14 +11772,21 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
-    BUILDFLAG(IS_CHROMEOS)
-    {"autofill-enable-amount-extraction-desktop",
-     flag_descriptions::kAutofillEnableAmountExtractionDesktopName,
-     flag_descriptions::kAutofillEnableAmountExtractionDesktopDescription,
-     kOsDesktop,
+    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
+    {"autofill-enable-amount-extraction",
+     flag_descriptions::kAutofillEnableAmountExtractionName,
+     flag_descriptions::kAutofillEnableAmountExtractionDescription,
+     kOsDesktop | kOsAndroid,
+     FEATURE_VALUE_TYPE(autofill::features::kAutofillEnableAmountExtraction)},
+    {"autofill-enable-non-affiliated-loyalty-cards",
+     flag_descriptions::kAutofillEnableNonAffiliatedLoyaltyCardsFillingName,
+     flag_descriptions::
+         kAutofillEnableNonAffiliatedLoyaltyCardsFillingDescription,
+     kOsDesktop | kOsAndroid,
      FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillEnableAmountExtractionDesktop)},
-#endif
+         autofill::features::kAutofillEnableNonAffiliatedLoyaltyCardsFilling)},
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+        // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
 
 #if !BUILDFLAG(IS_ANDROID)
     {"enable-ax-tree-fixing", flag_descriptions::kAXTreeFixingName,
@@ -12258,30 +11798,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kClipboardChangeEventDescription, kOsAll,
      FEATURE_VALUE_TYPE(blink::features::kClipboardChangeEvent)},
 
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
-    BUILDFLAG(IS_CHROMEOS)
-    {"autofill-enable-amount-extraction-allowlist-desktop",
-     flag_descriptions::kAutofillEnableAmountExtractionAllowlistDesktopName,
-     flag_descriptions::
-         kAutofillEnableAmountExtractionAllowlistDesktopDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillEnableAmountExtractionAllowlistDesktop)},
-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
-        // BUILDFLAG(IS_CHROMEOS)
-
 #if !BUILDFLAG(IS_ANDROID)
     {"devtools-project-settings",
      flag_descriptions::kDevToolsProjectSettingsName,
      flag_descriptions::kDevToolsProjectSettingsDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(features::kDevToolsWellKnown)},
 #endif  // !BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(ENABLE_PWA_INSTALL_ON_CROS_TEST)
-    {"devtools-pwa-handler", "DevTools PWA Handler",
-     "Enables creating PWA handler for DevTools.", kOsCrOS,
-     FEATURE_VALUE_TYPE(features::kDevToolsPwaHandler)},
-#endif  // BUILDFLAG(ENABLE_PWA_INSTALL_ON_CROS_TEST)
 
 #if BUILDFLAG(IS_ANDROID)
     {"malicious-apk-download-check",
@@ -12312,6 +11834,19 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(browsing_data::features::kDbdRevampDesktop)},
 #endif  // !BUILDFLAG(IS_ANDROID)
 
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS)
+    {"default-browser-changed-os-notification",
+     flag_descriptions::kDefaultBrowserChangedOsNotificationName,
+     flag_descriptions::kDefaultBrowserChangedOsNotificationDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(default_browser::kDefaultBrowserChangedOsNotification)},
+
+    {"default-browser-framework",
+     flag_descriptions::kDefaultBrowserFrameworkName,
+     flag_descriptions::kDefaultBrowserFrameworkDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(default_browser::kDefaultBrowserFramework)},
+#endif  // !BUILDFLAG(IS_ANDROID) && ! BUILDFLAG(IS_CHROMEOS)
+
     {"privacy-sandbox-ad-topics-content-parity",
      flag_descriptions::kPrivacySandboxAdTopicsContentParityName,
      flag_descriptions::kPrivacySandboxAdTopicsContentParityDescription, kOsAll,
@@ -12323,10 +11858,15 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAndroidDocumentPictureInPictureDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(blink::features::kDocumentPictureInPictureAPI)},
 
-    {"enable-android-mininal-ui-large-screen",
-     flag_descriptions::kAndroidMinimalUiLargeScreenName,
-     flag_descriptions::kAndroidMinimalUiLargeScreenDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(webapps::features::kAndroidMinimalUiLargeScreen)},
+    {"enable-android-new-media-picker",
+     flag_descriptions::kAndroidNewMediaPickerName,
+     flag_descriptions::kAndroidNewMediaPickerDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidNewMediaPicker)},
+
+    {"enable-android-window-controls-overlay",
+     flag_descriptions::kAndroidWindowControlsOverlayName,
+     flag_descriptions::kAndroidWindowControlsOverlayDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(blink::features::kAndroidWindowControlsOverlay)},
 
     {"credential-management-third-party-web-api-request-forwarding",
      flag_descriptions::
@@ -12337,14 +11877,13 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          credential_management::features::
              kCredentialManagementThirdPartyWebApiRequestForwarding)},
+#endif  // BUILDFLAG(IS_ANDROID)
 
-    {"third-party-disable-chrome-autofill-settings-screen",
-     flag_descriptions::kThirdPartyDisableChromeAutofillSettingsScreenName,
-     flag_descriptions::
-         kThirdPartyDisableChromeAutofillSettingsScreenDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         chrome::android::kThirdPartyDisableChromeAutofillSettingsScreen)},
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-android-window-popup-custom-tab-ui",
+     flag_descriptions::kAndroidWindowPopupCustomTabUiName,
+     flag_descriptions::kAndroidWindowPopupCustomTabUiDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidWindowPopupCustomTabUi)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
@@ -12355,18 +11894,28 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
+    {"enable-android-window-popup-predict-final-bounds",
+     flag_descriptions::kAndroidWindowPopupPredictFinalBoundsName,
+     flag_descriptions::kAndroidWindowPopupPredictFinalBoundsDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         chrome::android::kAndroidWindowPopupPredictFinalBounds)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-android-window-popup-resize-after-spawn",
+     flag_descriptions::kAndroidWindowPopupResizeAfterSpawnName,
+     flag_descriptions::kAndroidWindowPopupResizeAfterSpawnDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidWindowPopupResizeAfterSpawn)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
     {"enable-android-window-occlusion",
      flag_descriptions::kAndroidWindowOcclusionName,
      flag_descriptions::kAndroidWindowOcclusionDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(ui::kAndroidWindowOcclusion)},
 #endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(ENTERPRISE_CONTENT_ANALYSIS)
-    {"enterprise-file-obfuscation",
-     flag_descriptions::kEnterpriseFileObfuscationName,
-     flag_descriptions::kEnterpriseFileObfuscationDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(enterprise_obfuscation::kEnterpriseFileObfuscation)},
-#endif  // BUILDFLAG(ENTERPRISE_CONTENT_ANALYSIS)
 
     {"iph-autofill-credit-card-benefit-feature",
      flag_descriptions::kIPHAutofillCreditCardBenefitFeatureName,
@@ -12392,13 +11941,6 @@ const FeatureEntry kFeatureEntries[] = {
          enterprise::webstore::kChromeWebStoreNavigationThrottle)},
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 
-    {"autofill-enable-new-fop-display-desktop",
-     flag_descriptions::kAutofillEnableNewFopDisplayDesktopName,
-     flag_descriptions::kAutofillEnableNewFopDisplayDesktopDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillEnableNewFopDisplayDesktop)},
-
 #if BUILDFLAG(IS_CHROMEOS)
     {"enable-printing-margins-and-scale",
      flag_descriptions::kEnablePrintingMarginsAndScale,
@@ -12406,17 +11948,17 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(printing::features::kApiPrintingMarginsAndScale)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
+    {"align-pdf-default-print-settings-with-html",
+     flag_descriptions::kAlignPdfDefaultPrintSettingsWithHTMLName,
+     flag_descriptions::kAlignPdfDefaultPrintSettingsWithHTMLDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         printing::features::kAlignPdfDefaultPrintSettingsWithHTML)},
+
     {"supervised-user-block-interstitial-v3",
      flag_descriptions::kSupervisedUserBlockInterstitialV3Name,
      flag_descriptions::kSupervisedUserBlockInterstitialV3Description, kOsAll,
      FEATURE_VALUE_TYPE(supervised_user::kSupervisedUserBlockInterstitialV3)},
-
-#if BUILDFLAG(IS_ANDROID)
-    {"web-serial-over-bluetooth",
-     flag_descriptions::kWebSerialOverBluetoothName,
-     flag_descriptions::kWebSerialOverBluetoothDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(device::features::kBluetoothRfcommAndroid)},
-#endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
     BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
@@ -12448,7 +11990,13 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kAndroidThemeModule,
                                     kAndroidThemeModuleVariations,
                                     "AndroidThemeModule")},
-
+    {"android-theme-resource-provider",
+     flag_descriptions::kAndroidThemeResourceProviderName,
+     flag_descriptions::kAndroidThemeResourceProviderDescription, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         chrome::android::kAndroidThemeResourceProvider,
+         kAndroidThemeResourceProviderVariations,
+         "AndroidThemeResourceProvider")},
     {"display-edge-to-edge-fullscreen",
      flag_descriptions::kDisplayEdgeToEdgeFullscreenName,
      flag_descriptions::kDisplayEdgeToEdgeFullscreenDescription, kOsAndroid,
@@ -12466,20 +12014,23 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kLocalNetworkAccessChecksWebRTCName,
      flag_descriptions::kLocalNetworkAccessChecksWebRTCDescription, kOsAll,
      FEATURE_VALUE_TYPE(network::features::kLocalNetworkAccessChecksWebRTC)},
-
-#if BUILDFLAG(IS_CHROMEOS)
-    {"notebook-lm-app-preinstall",
-     flag_descriptions::kNotebookLmAppPreinstallName,
-     flag_descriptions::kNotebookLmAppPreinstallDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::features::kNotebookLmAppPreinstall)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-    {"enable-canvas-noise", flag_descriptions::kEnableCanvasNoiseName,
-     flag_descriptions::kEnableCanvasNoiseDescription, kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         fingerprinting_protection_interventions::features::kCanvasNoise,
-         kEnableCanvasNoiseVariations,
-         "EnableCanvasNoise")},
+    {"local-network-access-check-websockets",
+     flag_descriptions::kLocalNetworkAccessChecksWebSocketsName,
+     flag_descriptions::kLocalNetworkAccessChecksWebSocketsDescription, kOsAll,
+     FEATURE_VALUE_TYPE(
+         network::features::kLocalNetworkAccessChecksWebSockets)},
+    {"local-network-access-check-webtransport",
+     flag_descriptions::kLocalNetworkAccessChecksWebTransportName,
+     flag_descriptions::kLocalNetworkAccessChecksWebTransportDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         network::features::kLocalNetworkAccessChecksWebTransport)},
+    {"local-network-access-check-split-permissions",
+     flag_descriptions::kLocalNetworkAccessChecksSplitPermissionsName,
+     flag_descriptions::kLocalNetworkAccessChecksSplitPermissionsDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         network::features::kLocalNetworkAccessChecksSplitPermissions)},
 
 #if !BUILDFLAG(IS_ANDROID)
     {"tab-capture-infobar-links",
@@ -12564,11 +12115,6 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kGridTabSwitcherSurfaceColorUpdate)},
 
-    // Contextual Page Action button.
-    {"cpa-spec-update", flag_descriptions::kCpaSpecUpdateName,
-     flag_descriptions::kCpaSpecUpdateDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kCpaSpecUpdate)},
-
     // Android Automotive back button bar streamline.
     {"automotive-back-button-bar-streamline",
      flag_descriptions::kAutomotiveBackButtonBarStreamlineName,
@@ -12577,13 +12123,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(chrome::android::kAutomotiveBackButtonBarStreamline)},
 
 #endif  // BUILDFLAG(IS_ANDROID)
-
-#if !BUILDFLAG(IS_ANDROID)
-    {flag_descriptions::kTabGroupShorcutsId,
-     flag_descriptions::kTabGroupShorcutsName,
-     flag_descriptions::kTabGroupShorcutsDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(tabs::kTabGroupShortcuts)},
-#endif  // !BUILDFLAG(IS_ANDROID)
 
     {"bundled-security-settings",
      flag_descriptions::kBundledSecuritySettingsName,
@@ -12632,22 +12171,27 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAndroidAdaptiveFrameRateDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(features::kUseFrameIntervalDeciderAdaptiveFrameRate)},
 
-    {"instance-switcher-v2", flag_descriptions::kInstanceSwitcherV2Name,
-     flag_descriptions::kInstanceSwitcherV2Description, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kInstanceSwitcherV2)},
+    {"robust-window-management", flag_descriptions::kRobustWindowManagementName,
+     flag_descriptions::kRobustWindowManagementDescription, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kRobustWindowManagement,
+                                    kRobustWindowManagementVariations,
+                                    "RobustWindowManagement")},
+
+    {"robust-window-management-experimental",
+     flag_descriptions::kRobustWindowManagementExperimentalName,
+     flag_descriptions::kRobustWindowManagementExperimentalDescription,
+     kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         chrome::android::kRobustWindowManagementExperimental,
+         kRobustWindowManagementExperimentalVariations,
+         "RobustWindowManagementExperimental")},
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if !BUILDFLAG(IS_ANDROID)
-    {"side-by-side", flag_descriptions::kSideBySideName,
-     flag_descriptions::kSideBySideDescription, kOsDesktop,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kSideBySide,
-                                    kSideBySideVariations,
-                                    "SideBySide")},
-
-    {"side-by-side-session-restore",
-     flag_descriptions::kSideBySideSessionRestoreName,
-     flag_descriptions::kSideBySideSessionRestoreDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kSideBySideSessionRestore)},
+    {"open-dragged-links-same-tab",
+     flag_descriptions::kOpenDraggedLinksSameTabName,
+     flag_descriptions::kOpenDraggedLinksSameTabDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(blink::features::kSupportOpeningDraggedLinksInSameTab)},
 #endif
 
     {"enable-secure-payment-confirmation-fallback-ux",
@@ -12657,10 +12201,15 @@ const FeatureEntry kFeatureEntries[] = {
          payments::features::kSecurePaymentConfirmationFallback)},
 
 #if BUILDFLAG(IS_ANDROID)
+    {"android-use-display-topology",
+     flag_descriptions::kAndroidUseDisplayTopologyName,
+     flag_descriptions::kAndroidUseDisplayTopologyDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(ui::kAndroidUseDisplayTopology)},
+
     {"android-window-management-web-api",
      flag_descriptions::kAndroidWindowManagementWebApiName,
      flag_descriptions::kAndroidWindowManagementWebApiDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(ui::kAndroidWindowManagementWebApi)},
+     FEATURE_VALUE_TYPE(permissions::features::kAndroidWindowManagementWebApi)},
 
     {"browser-controls-debugging",
      flag_descriptions::kBrowserControlsDebuggingName,
@@ -12688,19 +12237,13 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) ||
         // BUILDFLAG(IS_CHROMEOS)
 
-#if !BUILDFLAG(IS_ANDROID)
-    {"pinned-tab-toast-on-close", flag_descriptions::kPinnedTabToastOnCloseName,
-     flag_descriptions::kPinnedTabToastOnCloseDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(toast_features::kPinnedTabToastOnClose)},
-#endif  // !BUILDFLAG(IS_ANDROID)
-
     {"discount-autofill", commerce::flag_descriptions::kDiscountAutofillName,
      commerce::flag_descriptions::kDiscountAutofillDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(commerce::kDiscountAutofill)},
 
 #if BUILDFLAG(IS_ANDROID)
     {"android-web-app-launch-handler",
-     flag_descriptions::kAndroidWebAppLaunchHandler,
+     flag_descriptions::kAndroidWebAppLaunchHandlerName,
      flag_descriptions::kAndroidWebAppLaunchHandlerDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(features::kAndroidWebAppLaunchHandler)},
 #endif  // BUILDFLAG(IS_ANDROID)
@@ -12715,6 +12258,9 @@ const FeatureEntry kFeatureEntries[] = {
     {"top-controls-refactor", flag_descriptions::kTopControlsRefactorName,
      flag_descriptions::kTopControlsRefactorDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kTopControlsRefactor)},
+    {"top-controls-refactor-v2", flag_descriptions::kTopControlsRefactorV2Name,
+     flag_descriptions::kTopControlsRefactorV2Description, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kTopControlsRefactorV2)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
@@ -12726,13 +12272,6 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS)
-    {"notebook-lm-app-shelf-pin", flag_descriptions::kNotebookLmAppShelfPinName,
-     flag_descriptions::kNotebookLmAppShelfPinDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::features::kNotebookLmAppShelfPin)},
-    {"notebook-lm-app-shelf-pin-reset",
-     flag_descriptions::kNotebookLmAppShelfPinResetName,
-     flag_descriptions::kNotebookLmAppShelfPinResetDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(chromeos::features::kNotebookLmAppShelfPinReset)},
     {"preinstalled-web-app-always-migrate-calculator",
      flag_descriptions::kPreinstalledWebAppAlwaysMigrateCalculatorName,
      flag_descriptions::kPreinstalledWebAppAlwaysMigrateCalculatorDescription,
@@ -12740,17 +12279,10 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(features::kPreinstalledWebAppAlwaysMigrateCalculator)},
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
-#if BUILDFLAG(IS_ANDROID)
-    {"tablet-tab-strip-animation",
-     flag_descriptions::kTabletTabStripAnimationName,
-     flag_descriptions::kTabletTabStripAnimationDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabletTabStripAnimation)},
-#endif  // BUILDFLAG(IS_ANDROID)
-
     {"enable-secure-payment-confirmation-ux-refresh",
      flag_descriptions::kSecurePaymentConfirmationUxRefreshName,
      flag_descriptions::kSecurePaymentConfirmationUxRefreshDescription,
-     kOsAndroid,
+     kOsAndroid | kOsMac | kOsWin,
      FEATURE_VALUE_TYPE(blink::features::kSecurePaymentConfirmationUxRefresh)},
 
 #if BUILDFLAG(IS_ANDROID)
@@ -12764,6 +12296,13 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAndroidUseCorrectDisplayWorkAreaName,
      flag_descriptions::kAndroidUseCorrectDisplayWorkAreaDescription,
      kOsAndroid, FEATURE_VALUE_TYPE(ui::kAndroidUseCorrectDisplayWorkArea)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"android-use-correct-window-bounds",
+     flag_descriptions::kAndroidUseCorrectWindowBoundsName,
+     flag_descriptions::kAndroidUseCorrectWindowBoundsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(ui::kAndroidUseCorrectWindowBounds)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || \
@@ -12785,28 +12324,6 @@ const FeatureEntry kFeatureEntries[] = {
         FEATURE_VALUE_TYPE(features::kNewContentForCheckerboardedScrolls),
     },
 
-    {"autofill-enable-multiple-request-in-virtual-card-downstream-enrollment",
-     flag_descriptions::
-         kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentName,
-     flag_descriptions::
-         kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         autofill::features::
-             kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollment)},
-
-#if BUILDFLAG(IS_ANDROID)
-    {"mvc-update-view-when-model-changed",
-     flag_descriptions::kMvcUpdateViewWhenModelChangedName,
-     flag_descriptions::kMvcUpdateViewWhenModelChangedDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kMvcUpdateViewWhenModelChanged)},
-
-    {"reload-tab-ui-resources-if-changed",
-     flag_descriptions::kReloadTabUiResourcesIfChangedName,
-     flag_descriptions::kReloadTabUiResourcesIfChangedDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kReloadTabUiResourcesIfChanged)},
-#endif  // BUILDFLAG(IS_ANDROID)
-
     {"page-actions-migration", flag_descriptions::kPageActionsMigrationName,
      flag_descriptions::kPageActionsMigrationDescription, kOsDesktop,
      FEATURE_WITH_PARAMS_VALUE_TYPE(features::kPageActionsMigration,
@@ -12818,33 +12335,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kFieldClassificationModelCachingDescription, kOsAll,
      FEATURE_VALUE_TYPE(autofill::features::kFieldClassificationModelCaching)},
 
-#if BUILDFLAG(IS_ANDROID)
-    {"android-restore-tabs-promo-on-fre-bypassed-kill-switch",
-     flag_descriptions::kAndroidShowRestoreTabsPromoOnFREBypassedKillSwitchName,
-     flag_descriptions::
-         kAndroidShowRestoreTabsPromoOnFREBypassedKillSwitchDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(
-         chrome::android::kAndroidShowRestoreTabsPromoOnFREBypassedKillSwitch)},
-#endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_MAC)
-    {"web-authentication-large-blob-for-icloudkeychain",
-     flag_descriptions::kWebAuthnLargeBlobForICloudKeychainName,
-     flag_descriptions::kWebAuthnLargeBlobForICloudKeychainDescription, kOsMac,
-     FEATURE_VALUE_TYPE(device::kWebAuthnLargeBlobForICloudKeychain)},
-#endif  // BUILDFLAG(IS_MAC)
-
-    {"autofill-require-cvc-for-possible-card-update",
-     flag_descriptions::kAutofillRequireCvcForPossibleCardUpdateName,
-     flag_descriptions::kAutofillRequireCvcForPossibleCardUpdateDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         autofill::features::kAutofillRequireCvcForPossibleCardUpdate)},
     {"disable-autofill-strike-system",
      flag_descriptions::kDisableAutofillStrikeSystemName,
      flag_descriptions::kDisableAutofillStrikeSystemDescription, kOsAll,
-     FEATURE_VALUE_TYPE(autofill::features::kDisableAutofillStrikeSystem)},
+     FEATURE_VALUE_TYPE(strike_database::features::kDisableStrikeSystem)},
 
 #if BUILDFLAG(IS_ANDROID)
     {"allow-non-family-link-url-filter-mode",
@@ -12887,24 +12381,11 @@ const FeatureEntry kFeatureEntries[] = {
     {"web-app-installation-api", flag_descriptions::kWebAppInstallationApiName,
      flag_descriptions::kWebAppInstallationApiDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(blink::features::kWebAppInstallation)},
+
+    {"web-app-migration-api", flag_descriptions::kWebAppMigrationApiName,
+     flag_descriptions::kWebAppMigrationApiDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(blink::features::kWebAppMigrationApi)},
 #endif  // !BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) || \
-    BUILDFLAG(IS_WIN)
-    {"lens-search-side-panel-default-width-change",
-     flag_descriptions::kLensSearchSidePanelDefaultWidthChangeName,
-     flag_descriptions::kLensSearchSidePanelDefaultWidthChangeDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(
-         lens::features::kLensSearchSidePanelDefaultWidthChange)},
-#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) ||
-        // BUILDFLAG(IS_WIN)
-
-    {"transferable-resource-pass-alpha-type-directly",
-     flag_descriptions::kTransferableResourcePassAlphaTypeDirectlyName,
-     flag_descriptions::kTransferableResourcePassAlphaTypeDirectlyDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(features::kTransferableResourcePassAlphaTypeDirectly)},
 
 #if BUILDFLAG(IS_ANDROID)
     {"enable-exclusive-access-manager-on-android",
@@ -12913,16 +12394,23 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(features::kEnableExclusiveAccessManager)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
+#if BUILDFLAG(IS_ANDROID)
+    {"keyboard-lock-api-on-android",
+     flag_descriptions::kKeyboardLockApiOnAndroidName,
+     flag_descriptions::kKeyboardLockApiOnAndroidDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kKeyboardLockApiOnAndroid)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
-    BUILDFLAG(IS_CHROMEOS)
+    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
     {"autofill-enable-buy-now-pay-later-for-klarna",
      flag_descriptions::kAutofillEnableBuyNowPayLaterForKlarnaName,
      flag_descriptions::kAutofillEnableBuyNowPayLaterForKlarnaDescription,
-     kOsDesktop,
+     kOsDesktop | kOsAndroid,
      FEATURE_VALUE_TYPE(
          autofill::features::kAutofillEnableBuyNowPayLaterForKlarna)},
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
-        // BUILDFLAG(IS_CHROMEOS)
+        // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
 
     {"customize-tab-group-color-palette",
      flag_descriptions::kCustomizeTabGroupColorPaletteName,
@@ -12951,15 +12439,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          autofill::features::kAutofillEnableDownstreamCardAwarenessIph)},
 
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) || \
-    BUILDFLAG(IS_WIN)
-    {"enable-lens-overlay-back-to-page",
-     flag_descriptions::kLensOverlayBackToPageName,
-     flag_descriptions::kLensOverlayBackToPageDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(lens::features::kLensOverlayBackToPage)},
-#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) ||
-        // BUILDFLAG(IS_WIN)
-
 #if BUILDFLAG(IS_ANDROID)
     {"supervised-user-interstitial-without-approvals",
      flag_descriptions::kSupervisedUserInterstitialWithoutApprovalsName,
@@ -12973,16 +12452,11 @@ const FeatureEntry kFeatureEntries[] = {
     {"enable-ntp-browser-promos",
      flag_descriptions::kEnableNtpBrowserPromosName,
      flag_descriptions::kEnableNtpBrowserPromosDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(user_education::features::kEnableNtpBrowserPromos)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         user_education::features::kEnableNtpBrowserPromos,
+         kEnableNtpBrowserPromosVariations,
+         "EnableNtpBrowserPromos")},
 #endif
-
-#if BUILDFLAG(IS_CHROMEOS)
-    {"enable-multi-capture-notification-update",
-     flag_descriptions::kMultiCaptureUsageIndicatorUpdateName,
-     flag_descriptions::kMultiCaptureUsageIndicatorUpdateDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(
-         chromeos::features::kMultiCaptureReworkedUsageIndicators)},
-#endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if !BUILDFLAG(IS_ANDROID)
     {"enable-devtools-deep-link-via-extensibility-api",
@@ -13001,18 +12475,17 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
-    BUILDFLAG(IS_CHROMEOS)
-    {"autofill-enable-buy-now-pay-later-for-externally-linked-klarna",
+    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
+    {"autofill-enable-buy-now-pay-later-for-externally-linked",
+     flag_descriptions::kAutofillEnableBuyNowPayLaterForExternallyLinkedName,
      flag_descriptions::
-         kAutofillEnableBuyNowPayLaterForExternallyLinkedKlarnaName,
-     flag_descriptions::
-         kAutofillEnableBuyNowPayLaterForExternallyLinkedKlarnaDescription,
-     kOsDesktop,
+         kAutofillEnableBuyNowPayLaterForExternallyLinkedDescription,
+     kOsDesktop | kOsAndroid,
      FEATURE_VALUE_TYPE(
-         autofill::features::
-             kAutofillEnableBuyNowPayLaterForExternallyLinkedKlarna)},
+         autofill::features::kAutofillEnableBuyNowPayLaterForExternallyLinked)},
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
-        // BUILDFLAG(IS_CHROMEOS)
+        // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
+
 #if BUILDFLAG(IS_ANDROID)
     {"autofill-enable-separate-pix-preference-item",
      flag_descriptions::kAutofillEnableSeparatePixPreferenceItemName,
@@ -13024,7 +12497,7 @@ const FeatureEntry kFeatureEntries[] = {
     {"android-open-incognito-as-window",
      flag_descriptions::kAndroidOpenIncognitoAsWindowName,
      flag_descriptions::kAndroidOpenIncognitoAsWindowDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kAndroidOpenIncognitoAsWindow)},
+     FEATURE_VALUE_TYPE(feed::kAndroidOpenIncognitoAsWindow)},
 
     {"android-desktop-webprefs-large-display",
      flag_descriptions::kAndroidDesktopWebPrefsLargeDisplaysName,
@@ -13034,10 +12507,27 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
+    {"enable-seamless-signin", flag_descriptions::kEnableSeamlessSigninName,
+     flag_descriptions::kEnableSeamlessSigninDescription, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(switches::kEnableSeamlessSignin,
+                                    kSeamlessSigninVariations,
+                                    "SeamlessSigninVariations")},
+
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
     {"force-history-opt-in-screen",
      flag_descriptions::kForceHistoryOptInScreenName,
      flag_descriptions::kForceHistoryOptInScreenDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(switches::kForceHistoryOptInScreen)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"fre-signin-alternative-secondary-button-text",
+     flag_descriptions::kFRESignInAlternativeSecondaryButtonTextName,
+     flag_descriptions::kFRESignInAlternativeSecondaryButtonTextDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(switches::kFRESignInAlternativeSecondaryButtonText)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -13065,6 +12555,15 @@ const FeatureEntry kFeatureEntries[] = {
          features::kSafetyHubDisruptiveNotificationRevocation,
          kSafetyHubDisruptiveNotificationRevocationVariations,
          "SafetyHubDisruptiveNotificationRevocation")},
+
+    {"safety-hub-unused-permission-revocation-for-all-surfaces",
+     flag_descriptions::kSafetyHubUnusedPermissionRevocationForAllSurfacesName,
+     flag_descriptions::
+         kSafetyHubUnusedPermissionRevocationForAllSurfacesDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         permissions::features::
+             kSafetyHubUnusedPermissionRevocationForAllSurfaces)},
 
 #if BUILDFLAG(IS_ANDROID)
     {"android-data-importer-service",
@@ -13117,7 +12616,10 @@ const FeatureEntry kFeatureEntries[] = {
 #if !BUILDFLAG(IS_ANDROID)
     {kWebiumFlag, flag_descriptions::kWebiumName,
      flag_descriptions::kWebiumDescription, kOsDesktop,
-     FEATURE_VALUE_TYPE(features::kWebium)},
+     ENABLE_DISABLE_VALUE_TYPE_AND_VALUE(switches::kEnableFeatures,
+                                         kWebiumFeatures,
+                                         switches::kDisableFeatures,
+                                         kWebiumFeatures)},
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
@@ -13135,8 +12637,874 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(features::kPrewarm)},
 #endif  // !BUILDFLAG(IS_ANDROID)
 
-    // Add new entries above this line.
+    {"apply-clientside-model-predictions-for-password-types",
+     flag_descriptions::kApplyClientsideModelPredictionsForPasswordTypesName,
+     flag_descriptions::
+         kApplyClientsideModelPredictionsForPasswordTypesDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(password_manager::features::
+                            kApplyClientsideModelPredictionsForPasswordTypes)},
 
+    {"canvas-draw-element", flag_descriptions::kCanvasDrawElementName,
+     flag_descriptions::kCanvasDrawElementDescription, kOsAll,
+     FEATURE_VALUE_TYPE(blink::features::kCanvasDrawElement)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"toolbar-snapshot-refactor",
+     flag_descriptions::kToolbarSnapshotRefactorName,
+     flag_descriptions::kToolbarSnapshotRefactorDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kToolbarSnapshotRefactor)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(ENABLE_DICE_SUPPORT)
+    {"enforce-management-disclaimer",
+     flag_descriptions::kEnforceManagementDisclaimerName,
+     flag_descriptions::kEnforceManagementDisclaimerDescription, kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         switches::kEnforceManagementDisclaimer,
+         kPolicyDisclaimerRegistrationRetryDelayVariations,
+         "PolicyDisclaimerRegistrationRetryDelayVariations")},
+
+#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
+
+#if !BUILDFLAG(IS_ANDROID)
+    {"enable-lens-overlay-force-empty-csb-query",
+     flag_descriptions::kLensOverlayForceEmptyCsbQueryName,
+     flag_descriptions::kLensOverlayForceEmptyCsbQueryDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(lens::features::kLensOverlayForceEmptyCsbQuery)},
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"android-audio-device-listener",
+     flag_descriptions::kAndroidAudioDeviceListenerName,
+     flag_descriptions::kAndroidAudioDeviceListenerDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAndroidAudioDeviceListener)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if !BUILDFLAG(IS_ANDROID)
+    {"browsing-history-actor-integration-M1",
+     flag_descriptions::kBrowsingHistoryActorIntegrationM1Name,
+     flag_descriptions::kBrowsingHistoryActorIntegrationM1Description,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(history::kBrowsingHistoryActorIntegrationM1)},
+
+    {"browsing-history-actor-integration-M2",
+     flag_descriptions::kBrowsingHistoryActorIntegrationM2Name,
+     flag_descriptions::kBrowsingHistoryActorIntegrationM2Description,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(history::kBrowsingHistoryActorIntegrationM2)},
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+    {"autofill-manual-testing-data",
+     flag_descriptions::kAutofillManualTestingDataName,
+     flag_descriptions::kAutofillManualTestingDataDescription, kOsAll,
+     STRING_VALUE_TYPE(autofill::kManualContentImportForTestingFlag, "")},
+
+    {"autofill-enable-support-for-home-and-work",
+     flag_descriptions::kAutofillEnableSupportForHomeAndWorkName,
+     flag_descriptions::kAutofillEnableSupportForHomeAndWorkDescription, kOsAll,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillEnableSupportForHomeAndWork)},
+
+#if !BUILDFLAG(IS_ANDROID)
+    {"new-tab-adds-to-active-group",
+     flag_descriptions::kNewTabAddsToActiveGroupName,
+     flag_descriptions::kNewTabAddsToActiveGroupDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kNewTabAddsToActiveGroup)},
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"incognito-theme-overlay-testing",
+     flag_descriptions::kIncognitoThemeOverlayTestingName,
+     flag_descriptions::kIncognitoThemeOverlayTestingDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kIncognitoThemeOverlayTesting)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+    {"autofill-enable-support-for-name-and-email-profile",
+     flag_descriptions::kAutofillEnableSupportForNameAndEmailName,
+     flag_descriptions::kAutofillEnableSupportForNameAndEmailDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillEnableSupportForNameAndEmail)},
+    {"mobile-promo-on-desktop-force-promo-type",
+     flag_descriptions::kMobilePromoOnDesktopForcePromoTypeName,
+     flag_descriptions::kMobilePromoOnDesktopForcePromoTypeDescription, kOsAll,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         kMobilePromoOnDesktopForcePromoType,
+         kMobilePromoOnDesktopForcePromoTypeVariations,
+         "MobilePromoOnDesktopForcePromo")},
+    {"mobile-promo-on-desktop-with-qr-code",
+     flag_descriptions::kMobilePromoOnDesktopWithQRCodeName,
+     flag_descriptions::kMobilePromoOnDesktopWithQRCodeDescription, kOsAll,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(kMobilePromoOnDesktopWithQRCode,
+                                    kMobilePromoOnDesktopWithQRCodeVariations,
+                                    "MobilePromoOnDesktopWithQRCode")},
+    {"mobile-promo-on-desktop-with-reminder",
+     flag_descriptions::kMobilePromoOnDesktopWithReminderName,
+     flag_descriptions::kMobilePromoOnDesktopWithReminderDescription, kOsAll,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(kMobilePromoOnDesktopWithReminder,
+                                    kMobilePromoOnDesktopVariations,
+                                    "MobilePromoOnDesktopWithReminder")},
+
+#if !BUILDFLAG(IS_ANDROID)
+    {"reintroduce-hybrid-passkey-entry-point",
+     flag_descriptions::kAutofillReintroduceHybridPasskeyDropdownItemName,
+     flag_descriptions::
+         kAutofillReintroduceHybridPasskeyDropdownItemDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(password_manager::features::
+                            kAutofillReintroduceHybridPasskeyDropdownItem)},
+    {"enable-lens-overlay-text-selection-context-menu-entrypoint",
+     flag_descriptions::kLensOverlayTextSelectionContextMenuEntrypointName,
+     flag_descriptions::
+         kLensOverlayTextSelectionContextMenuEntrypointDescription,
+     kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         lens::features::kLensOverlayTextSelectionContextMenuEntrypoint,
+         kLensOverlayTextSelectionContextMenuEntrypointVariations,
+         "LensOverlayTextSelectionContextMenuEntrypoint")},
+#endif  // !BUILDFLAG(IS_ANDROID),
+
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"enable-ntp-enterprise-shortcuts",
+     flag_descriptions::kEnableNtpEnterpriseShortcutsName,
+     flag_descriptions::kEnableNtpEnterpriseShortcutsDescription,
+     static_cast<unsigned short>(kOsCrOS | kOsLinux | kOsMac | kOsWin),
+     FEATURE_VALUE_TYPE(ntp_tiles::kNtpEnterpriseShortcuts)},
+#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) ||\
+        // BUILDFLAG(IS_CHROMEOS)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"web-serial-wired-devices-android",
+     flag_descriptions::kWebSerialWiredDevicesAndroidName,
+     flag_descriptions::kWebSerialWiredDevicesAndroidDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(device::features::kWebSerialWiredDevicesAndroid)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if !BUILDFLAG(IS_ANDROID)
+    {"tab-group-menu-improvements",
+     flag_descriptions::kTabGroupMenuImprovementsName,
+     flag_descriptions::kTabGroupMenuImprovementsDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kTabGroupMenuImprovements)},
+
+    {"tab-group-more-entry-points",
+     flag_descriptions::kTabGroupMenuMoreEntryPointsName,
+     flag_descriptions::kTabGroupMenuMoreEntryPointsDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kTabGroupMenuMoreEntryPoints)},
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_MAC)
+    {"show-tab-groups-mac-system-menu",
+     flag_descriptions::kShowTabGroupsMacSystemMenuName,
+     flag_descriptions::kShowTabGroupsMacSystemMenuDescription, kOsMac,
+     FEATURE_VALUE_TYPE(features::kShowTabGroupsMacSystemMenu)},
+#endif  // BUILDFLAG(IS_MAC)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"autofill-android-desktop-keyboard-accessory-revamp",
+     flag_descriptions::kAutofillAndroidDesktopKeyboardAccessoryRevampName,
+     flag_descriptions::
+         kAutofillAndroidDesktopKeyboardAccessoryRevampDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillAndroidDesktopKeyboardAccessoryRevamp)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"autofill-android-keyboard-accessory-dynamic-positioning",
+     flag_descriptions::kAutofillAndroidKeyboardAccessoryDynamicPositioningName,
+     flag_descriptions::
+         kAutofillAndroidKeyboardAccessoryDynamicPositioningDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         autofill::features::
+             kAutofillAndroidKeyboardAccessoryDynamicPositioning)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if !BUILDFLAG(IS_ANDROID)
+    {"multicast-in-direct-sockets",
+     flag_descriptions::kMulticastInDirectSocketsName,
+     flag_descriptions::kMulticastInDirectSocketsDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(blink::features::kMulticastInDirectSockets)},
+    {"controlled-frame-web-request-security-info",
+     flag_descriptions::kControlledFrameWebRequestSecurityInfoName,
+     flag_descriptions::kControlledFrameWebRequestSecurityInfoDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(
+         blink::features::kControlledFrameWebRequestSecurityInfo)},
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-minimal-ui-menu-button",
+     flag_descriptions::kAndroidWebAppMenuButtonName,
+     flag_descriptions::kAndroidWebAppMenuButtonDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(webapps::features::kAndroidWebAppMenuButton)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"use-web-app-header-for-standalone-mode",
+     flag_descriptions::kAndroidWebAppHeaderForStandaloneModeName,
+     flag_descriptions::kAndroidWebAppHeaderForStandaloneModeDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         webapps::features::kAndroidWebAppHeaderForStandaloneMode)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-twa-origin-display",
+     flag_descriptions::kAndroidEnableTWAOriginDisplayName,
+     flag_descriptions::kAndroidEnableTWAOriginDisplayDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(webapps::features::kAndroidTWAOriginDisplay)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"android-animated-progress-bar-in-browser",
+     flag_descriptions::kAndroidAnimatedProgressBarInBrowserName,
+     flag_descriptions::kAndroidAnimatedProgressBarInBrowserDescription,
+     kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         features::kAndroidAnimatedProgressBarInBrowser,
+         kAndroidAnimatedProgressBarInBrowserVariations,
+         "AndroidAnimatedProgressBarInBrowser")},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+    {"enable-cross-device-pref-tracker",
+     flag_descriptions::kEnableCrossDevicePrefTrackerName,
+     flag_descriptions::kEnableCrossDevicePrefTrackerDescription, kOsAll,
+     FEATURE_VALUE_TYPE(
+         sync_preferences::features::kEnableCrossDevicePrefTracker)},
+
+#if BUILDFLAG(IS_WIN)
+    {
+        "enable-d3d12-video-encoder",
+        flag_descriptions::kD3D12VideoEncoderName,
+        flag_descriptions::kD3D12VideoEncoderDescription,
+        kOsWin,
+        FEATURE_VALUE_TYPE(media::kD3D12VideoEncodeAccelerator),
+    },
+#endif  // BUILDFLAG(IS_WIN)
+
+#if BUILDFLAG(IS_ANDROID)
+    {"media-codec-low-delay-mode",
+     flag_descriptions::kMediaCodecLowDelayModeName,
+     flag_descriptions::kMediaCodecLowDelayModeDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(media::kMediaCodecLowDelayMode)},
+#endif
+
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) || \
+    BUILDFLAG(IS_WIN)
+    {"contextual-suggestion-ui-improvements",
+     flag_descriptions::kContextualSuggestionsUiImprovementsName,
+     flag_descriptions::kContextualSuggestionsUiImprovementsDescription,
+     kOsDesktop, MULTI_VALUE_TYPE(kContextualSuggestionsUiImprovementsChoices)},
+#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) ||
+        // BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+
+    {"verify-qwacs", flag_descriptions::kVerifyQWACsName,
+     flag_descriptions::kVerifyQWACsDescription, kOsAll,
+     FEATURE_VALUE_TYPE(net::features::kVerifyQWACs)},
+
+    {"autofill-prefer-buy-now-pay-later-blocklists",
+     flag_descriptions::kAutofillPreferBuyNowPayLaterBlocklistsName,
+     flag_descriptions::kAutofillPreferBuyNowPayLaterBlocklistsDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillPreferBuyNowPayLaterBlocklists)},
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"autofill-enable-ai-based-amount-extraction",
+     flag_descriptions::kAutofillEnableAiBasedAmountExtractionName,
+     flag_descriptions::kAutofillEnableAiBasedAmountExtractionDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillEnableAiBasedAmountExtraction)},
+#endif
+
+    {"contextual-tasks",
+     contextual_tasks::flag_descriptions::kContextualTasksName,
+     contextual_tasks::flag_descriptions::kContextualTasksDescription,
+     kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(contextual_tasks::kContextualTasks,
+                                    kContextualTaskEntryPointVariations,
+                                    "ContextualTasks")},
+
+    {"contextual-tasks-context",
+     contextual_tasks::flag_descriptions::kContextualTasksContextName,
+     contextual_tasks::flag_descriptions::kContextualTasksContextDescription,
+     kOsDesktop,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(contextual_tasks::kContextualTasksContext,
+                                    kContextualTaskContextVariations,
+                                    "ContextualTasks")},
+
+    {"contextual-tasks-suggestions-enabled",
+     contextual_tasks::flag_descriptions::
+         kContextualTasksSuggestionsEnabledName,
+     contextual_tasks::flag_descriptions::
+         kContextualTasksSuggestionsEnabledDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(contextual_tasks::kContextualTasksSuggestionsEnabled)},
+
+    {"contextual-tasks-context-library",
+     contextual_tasks::flag_descriptions::kContextualTasksContextLibraryName,
+     contextual_tasks::flag_descriptions::
+         kContextualTasksContextLibraryDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(contextual_tasks::kContextualTasksContextLibrary)},
+
+#if !BUILDFLAG(IS_ANDROID)
+    {"create-new-tab-group-app-menu-top-level",
+     flag_descriptions::kCreateNewTabGroupAppMenuTopLevelName,
+     flag_descriptions::kCreateNewTabGroupAppMenuTopLevelDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kCreateNewTabGroupAppMenuTopLevel)},
+#endif  // !BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_CHROMEOS)
+    {"enable-unicorn-chrome-activity-reporting",
+     flag_descriptions::kUnicornChromeActivityReportingName,
+     flag_descriptions::kUnicornChromeActivityReportingDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(features::kUnicornChromeActivityReporting)},
+#endif  // BUILDFLAG(IS_CHROMEOS)
+
+    {"autofill-enable-buy-now-pay-later-updated-suggestion-second-line-string",
+     flag_descriptions::
+         kAutofillEnableBuyNowPayLaterUpdatedSuggestionSecondLineStringName,
+     flag_descriptions::
+         kAutofillEnableBuyNowPayLaterUpdatedSuggestionSecondLineStringDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         autofill::features::
+             kAutofillEnableBuyNowPayLaterUpdatedSuggestionSecondLineString)},
+
+    {"cryptography-compliance-cnsa",
+     flag_descriptions::kCryptographyComplianceCnsaName,
+     flag_descriptions::kCryptographyComplianceCnsaDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kCryptographyComplianceCnsa)},
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"lens-reinvocation-affordance",
+     flag_descriptions::kLensSearchReinvocationAffordanceName,
+     flag_descriptions::kLensSearchReinvocationAffordanceDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(lens::features::kLensSearchReinvocationAffordance)},
+
+    {"lens-search-zero-state-csb",
+     flag_descriptions::kLensSearchZeroStateCsbName,
+     flag_descriptions::kLensSearchZeroStateCsbDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(lens::features::kLensSearchZeroStateCsb)},
+
+    {"lens-updated-feedback-entrypoint",
+     flag_descriptions::kLensUpdatedFeedbackEntrypointName,
+     flag_descriptions::kLensUpdatedFeedbackEntrypointDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(lens::features::kLensUpdatedFeedbackEntrypoint)},
+
+    {"lens-video-citations", flag_descriptions::kLensVideoCitationsName,
+     flag_descriptions::kLensVideoCitationsDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(lens::features::kLensVideoCitations)},
+#endif
+
+    {"autofill-prioritize-save-card-over-mandatory-reauth",
+     flag_descriptions::kAutofillPrioritizeSaveCardOverMandatoryReauthName,
+     flag_descriptions::
+         kAutofillPrioritizeSaveCardOverMandatoryReauthDescription,
+     kOsMac | kOsWin | kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillPrioritizeSaveCardOverMandatoryReauth)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"autofill-enable-keyboard-accessory-chip-redesign",
+     flag_descriptions::kAutofillEnableKeyboardAccessoryChipRedesignName,
+     flag_descriptions::kAutofillEnableKeyboardAccessoryChipRedesignDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillEnableKeyboardAccessoryChipRedesign)},
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+    {"trusted-web-activity-contacts-delegation",
+     flag_descriptions::kTrustedWebActivityContactsDelegationName,
+     flag_descriptions::kTrustedWebActivityContactsDelegationDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         chrome::android::kTrustedWebActivityContactsDelegation)},
+
+    {"migrate-account-manager-delegate",
+     flag_descriptions::kMigrateAccountManagerDelegateName,
+     flag_descriptions::kMigrateAccountManagerDelegateDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(switches::kMigrateAccountManagerDelegate)},
+#endif
+
+    {"variations-seed-corpus", flag_descriptions::kVariationsSeedCorpusName,
+     flag_descriptions::kVariationsSeedCorpusDescription, kOsAll,
+     STRING_VALUE_TYPE(variations::switches::kVariationsSeedCorpus, "")},
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"passkey-unlock-manager", flag_descriptions::kPasskeyUnlockManagerName,
+     flag_descriptions::kPasskeyUnlockManagerDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(device::kPasskeyUnlockManager)},
+
+    {"passkey-unlock-error-ui", flag_descriptions::kPasskeyUnlockErrorUiName,
+     flag_descriptions::kPasskeyUnlockErrorUiDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(device::kPasskeyUnlockErrorUi)},
+#endif
+
+#if BUILDFLAG(IS_CHROMEOS)
+    {"vids-app-preinstall", flag_descriptions::kVidsAppPreinstallName,
+     flag_descriptions::kVidsAppPreinstallDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(chromeos::features::kVidsAppPreinstall)},
+#endif
+
+#if (BUILDFLAG(IS_ANDROID))
+    {"android-context-menu-duplicate-tabs",
+     flag_descriptions::kAndroidContextMenuDuplicateTabsName,
+     flag_descriptions::kAndroidContextMenuDuplicateTabsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidContextMenuDuplicateTabs)},
+#endif
+
+    {"block-v8-optimizer-on-unfamiliar-sites",
+     flag_descriptions::kBlockV8OptimizerOnUnfamiliarSitesSettingName,
+     flag_descriptions::kBlockV8OptimizerOnUnfamiliarSitesSettingDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(content_settings::features::
+                            kBlockV8OptimizerOnUnfamiliarSitesSetting)},
+
+    {"service-worker-synthetic-response",
+     flag_descriptions::kServiceWorkerSyntheticResponseName,
+     flag_descriptions::kServiceWorkerSyntheticResponseDescription, kOsAll,
+     FEATURE_VALUE_TYPE(blink::features::kServiceWorkerSyntheticResponse)},
+
+    {"user-value-default-browser-strings",
+     flag_descriptions::kUserValueDefaultBrowserStringsName,
+     flag_descriptions::kUserValueDefaultBrowserStringsDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kUserValueDefaultBrowserStrings)},
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"read-anything-read-aloud-ts-text-segmentation",
+     flag_descriptions::kReadAnythingReadAloudTsTextSegmentationName,
+     flag_descriptions::kReadAnythingReadAloudTsTextSegmentationDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kReadAnythingReadAloudTSTextSegmentation)},
+#endif
+    {"mdm-errors-for-dasher-accounts-handling",
+     flag_descriptions::kHandleMdmErrorsForDasherAccountsName,
+     flag_descriptions::kHandleMdmErrorsForDasherAccountsDescription, kOsAll,
+     FEATURE_VALUE_TYPE(switches::kHandleMdmErrorsForDasherAccounts)},
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+    {"profile-creation-decline-signin-cta-experiment",
+     flag_descriptions::kProfileCreationDeclineSigninCTAExperimentName,
+     flag_descriptions::kProfileCreationDeclineSigninCTAExperimentDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(switches::kProfileCreationDeclineSigninCTAExperiment)},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+    {"profile-creation-friction-reduction-experiment-prefill-name-requirement",
+     flag_descriptions::
+         kProfileCreationFrictionReductionExperimentPrefillNameRequirementName,
+     flag_descriptions::
+         kProfileCreationFrictionReductionExperimentPrefillNameRequirementDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(
+         switches::
+             kProfileCreationFrictionReductionExperimentPrefillNameRequirement)},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+    {"profile-creation-friction-reduction-experiment-remove-signin-step",
+     flag_descriptions::
+         kProfileCreationFrictionReductionExperimentRemoveSigninStepName,
+     flag_descriptions::
+         kProfileCreationFrictionReductionExperimentRemoveSigninStepDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(
+         switches::
+             kProfileCreationFrictionReductionExperimentRemoveSigninStep)},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+    {"profile-creation-friction-reduction-experiment-skip-customize-profile",
+     flag_descriptions::
+         kProfileCreationFrictionReductionExperimentSkipCustomizeProfileName,
+     flag_descriptions::
+         kProfileCreationFrictionReductionExperimentSkipCustomizeProfileDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(
+         switches::
+             kProfileCreationFrictionReductionExperimentSkipCustomizeProfile)},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+    {"show-profile-picker-to-all-users-experiment",
+     flag_descriptions::kShowProfilePickerToAllUsersExperimentName,
+     flag_descriptions::kShowProfilePickerToAllUsersExperimentDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(switches::kShowProfilePickerToAllUsersExperiment)},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+    {"open-all-profiles-from-profile-picker-experiment",
+     flag_descriptions::kOpenAllProfilesFromProfilePickerExperimentName,
+     flag_descriptions::kOpenAllProfilesFromProfilePickerExperimentDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(switches::kOpenAllProfilesFromProfilePickerExperiment)},
+#endif
+
+    {"profile-signals-reporting-enabled",
+     flag_descriptions::kProfileSignalsReportingEnabledName,
+     flag_descriptions::kProfileSignalsReportingEnabledDescription, kOsAll,
+     FEATURE_VALUE_TYPE(
+         enterprise_signals::features::kProfileSignalsReportingEnabled)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"autofill-enable-keyboard-accessory-chip-width-adjustment",
+     flag_descriptions::kAutofillEnableKeyboardAccessoryChipWidthAdjustmentName,
+     flag_descriptions::
+         kAutofillEnableKeyboardAccessoryChipWidthAdjustmentDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         autofill::features::
+             kAutofillEnableKeyboardAccessoryChipWidthAdjustment)},
+#endif
+
+#if BUILDFLAG(ENABLE_DEVICE_BOUND_SESSIONS)
+    {"use-unexportable-key-service-in-browser-process",
+     flag_descriptions::kUseUnexportableKeyServiceInBrowserProcessName,
+     flag_descriptions::kUseUnexportableKeyServiceInBrowserProcessDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(
+         network::features::kUseUnexportableKeyServiceInBrowserProcess)},
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+    {"android-desktop-zoom-scaling",
+     flag_descriptions::kAndroidDesktopZoomScalingName,
+     flag_descriptions::kAndroidDesktopZoomScalingDescription, kOsAndroid,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(features::kAndroidDesktopZoomScaling,
+                                    kAndroidDesktopZoomScalingVariations,
+                                    "AndroidDesktopZoomScaling")},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+    {"profile-picker-text-variations",
+     flag_descriptions::kProfilePickerTextVariationsName,
+     flag_descriptions::kProfilePickerTextVariationsDescription,
+     kOsLinux | kOsMac | kOsWin,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(switches::kProfilePickerTextVariations,
+                                    kProfilePickerTextVariations,
+                                    "ProfilePickerTextVariations")},
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"lens-overlay-optimization-filter",
+     flag_descriptions::kLensOverlayOptimizationFilterName,
+     flag_descriptions::kLensOverlayOptimizationFilterDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(lens::features::kLensOverlayOptimizationFilter)},
+#endif
+
+#if !BUILDFLAG(IS_ANDROID)
+    {"web-app-migrate-preinstalled-chat",
+     flag_descriptions::kWebAppMigratePreinstalledChatName,
+     flag_descriptions::kWebAppMigratePreinstalledChatDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kWebAppMigratePreinstalledChat)},
+#endif
+
+    {"connection-allowlists", flag_descriptions::kConnectionAllowlistsName,
+     flag_descriptions::kConnectionAllowlistsDescription, kOsAll,
+     FEATURE_VALUE_TYPE(network::features::kConnectionAllowlists)},
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"read-anything-with-readability-enabled",
+     flag_descriptions::kReadAnythingWithReadabilityName,
+     flag_descriptions::kReadAnythingWithReadabilityDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kReadAnythingWithReadability)},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"read-anything-omnibox-chip",
+     flag_descriptions::kReadAnythingOmniboxChipName,
+     flag_descriptions::kReadAnythingOmniboxChipDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kReadAnythingOmniboxChip)},
+#endif
+
+#if BUILDFLAG(IS_MAC)
+    {"unexportable-key-deletion",
+     flag_descriptions::kUnexportableKeyDeletionName,
+     flag_descriptions::kUnexportableKeyDeletionDescription, kOsMac,
+     FEATURE_VALUE_TYPE(unexportable_keys::kUnexportableKeyDeletion)},
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-audio-monitoring-on-android",
+     flag_descriptions::kEnableAudioMonitoringOnAndroidName,
+     flag_descriptions::kEnableAudioMonitoringOnAndroidDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(media::kEnableAudioMonitoringOnAndroid)},
+#endif
+
+    {"autofill-disable-bnpl-country-check-for-testing",
+     flag_descriptions::kAutofillDisableBnplCountryCheckForTestingName,
+     flag_descriptions::kAutofillDisableBnplCountryCheckForTestingDescription,
+     kOsDesktop | kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillDisableBnplCountryCheckForTesting)},
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"infobar-prioritization", flag_descriptions::kInfobarPrioritizationName,
+     flag_descriptions::kInfobarPrioritizationDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(infobars::features::kInfobarPrioritization)},
+#endif
+
+    {"infobar-refresh", flag_descriptions::kInfobarRefreshName,
+     flag_descriptions::kInfobarRefreshDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kInfobarRefresh)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"recently-closed-tabs-and-windows",
+     flag_descriptions::kRecentlyClosedTabsAndWindowsName,
+     flag_descriptions::kRecentlyClosedTabsAndWindowsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kRecentlyClosedTabsAndWindows)},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"read-anything-immersive-reading-mode",
+     flag_descriptions::kReadAnythingImmersiveReadingModeName,
+     flag_descriptions::kReadAnythingImmersiveReadingModeDescription,
+     kOsDesktop, FEATURE_VALUE_TYPE(features::kImmersiveReadAnything)},
+#endif
+#if BUILDFLAG(IS_ANDROID)
+    {"xplat-synced-setup", flag_descriptions::kXplatSyncedSetupName,
+     flag_descriptions::kXplatSyncedSetupDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kXplatSyncedSetup)},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"lens-overlay-non-blocking-privacy-notice",
+     flag_descriptions::kLensOverlayNonBlockingPrivacyNoticeName,
+     flag_descriptions::kLensOverlayNonBlockingPrivacyNoticeDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(lens::features::kLensOverlayNonBlockingPrivacyNotice)},
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+    {"android-pb-disable-pulse-animation",
+     flag_descriptions::kAndroidPbDisablePulseAnimationName,
+     flag_descriptions::kAndroidPbDisablePulseAnimationDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidPbDisablePulseAnimation)},
+
+    {"android-pb-disable-smooth-animation",
+     flag_descriptions::kAndroidPbDisableSmoothAnimationName,
+     flag_descriptions::kAndroidPbDisableSmoothAnimationDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidPbDisableSmoothAnimation)},
+#endif
+
+    {"migrate-syncing-user-to-signed-in",
+     flag_descriptions::kMigrateSyncingUserToSignedInName,
+     flag_descriptions::kMigrateSyncingUserToSignedInDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(switches::kMigrateSyncingUserToSignedIn)},
+
+    {"undo-migration-of-syncing-user-to-signed-in",
+     flag_descriptions::kUndoMigrationOfSyncingUserToSignedInName,
+     flag_descriptions::kUndoMigrationOfSyncingUserToSignedInDescription,
+     kOsMac | kOsWin | kOsLinux,
+     FEATURE_VALUE_TYPE(switches::kUndoMigrationOfSyncingUserToSignedIn)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-auto-minted-twa", flag_descriptions::kAndroidAutoMintedTWAName,
+     flag_descriptions::kAndroidAutoMintedTWADescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(webapps::features::kAndroidAutoMintedTWA)},
+
+    {"autofill-enable-new-fop-display-android",
+     flag_descriptions::kAutofillEnableNewFopDisplayAndroidName,
+     flag_descriptions::kAutofillEnableNewFopDisplayAndroidDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillEnableNewFopDisplayAndroid)},
+#endif
+
+    {"idb-sqlite-backing-store", flag_descriptions::kIdbSqliteBackingStoreName,
+     flag_descriptions::kIdbSqliteBackingStoreDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kIdbSqliteBackingStore)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"android-caret-browsing", flag_descriptions::kAndroidCaretBrowsingName,
+     flag_descriptions::kAndroidCaretBrowsingDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAndroidCaretBrowsing)},
+#endif
+
+    // On other platforms, this requires --enable-features=ElasticOverscroll to
+    // have an effect.
+    {"overscroll-effect-on-non-root-scrollers",
+     flag_descriptions::kOverscrollEffectOnNonRootScrollersName,
+     flag_descriptions::kOverscrollEffectOnNonRootScrollersDescription,
+     kOsMac | kOsAndroid | kOsWin,
+     FEATURE_VALUE_TYPE(features::kOverscrollEffectOnNonRootScrollers)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"autofill-enable-touch-to-fill-reshow-for-bnpl",
+     flag_descriptions::kAutofillEnableTouchToFillReshowForBnplName,
+     flag_descriptions::kAutofillEnableTouchToFillReshowForBnplDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillEnableTouchToFillReshowForBnpl)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"enable-your-saved-info-settings-page",
+     flag_descriptions::kYourSavedInfoSettingsPageName,
+     flag_descriptions::kYourSavedInfoSettingsPageDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(autofill::features::kYourSavedInfoSettingsPage)},
+#endif
+
+#if !BUILDFLAG(IS_ANDROID)
+    {"cws-promotion-banner-flag",
+     flag_descriptions::kEnableShouldShowPromotionName,
+     flag_descriptions::kEnableShouldShowPromotionDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(extensions_features::kEnableShouldShowPromotion)},
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+    {"persist-across-reboots", flag_descriptions::kPersistAcrossRebootsName,
+     flag_descriptions::kPersistAcrossRebootsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kPersistAcrossReboots)},
+
+    {"android-adpf-efficiency-mode",
+     flag_descriptions::kEnableAdpfEfficiencyModeName,
+     flag_descriptions::kEnableAdpfEfficiencyModeDescription, kOsAndroid,
+     MULTI_VALUE_TYPE(kAdpfEfficiencyChoices)},
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-android-physical-keyboard-autocorrect-underline",
+     flag_descriptions::kAndroidPkAutocorrectUnderlineName,
+     flag_descriptions::kAndroidPkAutocorrectUnderlineDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAndroidPkAutocorrectUnderline)},
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-android-spelling-underline-in-composition-mode",
+     flag_descriptions::kAndroidSpellingUnderlineInCompositionModeName,
+     flag_descriptions::kAndroidSpellingUnderlineInCompositionModeDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAndroidSpellingUnderlineInCompositionMode)},
+#endif
+
+#if BUILDFLAG(IS_MAC)
+    {"mac-enable-okta-sso", flag_descriptions::kEnableOktaSSOName,
+     flag_descriptions::kEnableOktaSSODescription, kOsMac,
+     FEATURE_VALUE_TYPE(enterprise_auth::kOktaSSO)},
+#endif
+
+    {"autofill-enable-wallet-branding",
+     flag_descriptions::kAutofillEnableWalletBrandingName,
+     flag_descriptions::kAutofillEnableWalletBrandingDescription, kOsAll,
+     FEATURE_VALUE_TYPE(autofill::features::kAutofillEnableWalletBranding)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-android-omnibox-autofocus-on-incognito-ntp",
+     flag_descriptions::kOmniboxAutofocusOnIncognitoNtpName,
+     flag_descriptions::kOmniboxAutofocusOnIncognitoNtpDescription, kOsAndroid,
+     MULTI_VALUE_TYPE(kOmniboxAutofocusOnIncognitoNtpChoices)},
+
+    {"enable-android-reporting-omnibox-autofocus-header",
+     flag_descriptions::kReportOmniboxAutofocusHeaderName,
+     flag_descriptions::kReportOmniboxAutofocusHeaderDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(variations::kReportOmniboxAutofocusHeader)},
+#endif
+
+#if BUILDFLAG(IS_WIN)
+    {"enable-arabic-indic-digit-input",
+     flag_descriptions::kArabicIndicDigitInputName,
+     flag_descriptions::kArabicIndicDigitInputDescription, kOsWin,
+     FEATURE_VALUE_TYPE(features::kArabicIndicDigitInput)},
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-swipe-to-switch-pane",
+     flag_descriptions::kEnableSwipeToSwitchPaneName,
+     flag_descriptions::kEnableSwipeToSwitchPaneDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kEnableSwipeToSwitchPane)},
+#endif
+
+    {"private-metrics-enable-puma",
+     flag_descriptions::kPrivateMetricsEnablePumaName,
+     flag_descriptions::kPrivateMetricsEnablePumaDescription, kOsAll,
+     FEATURE_VALUE_TYPE(metrics::private_metrics::kPrivateMetricsPuma)},
+
+    {"private-metrics-enable-puma-rc",
+     flag_descriptions::kPrivateMetricsEnablePumaRcName,
+     flag_descriptions::kPrivateMetricsEnablePumaRcDescription, kOsAll,
+     FEATURE_VALUE_TYPE(metrics::private_metrics::kPrivateMetricsPumaRc)},
+
+    {"autofill-ai-based-amount-extraction-ignore-seen-terms-for-testing",
+     flag_descriptions::
+         kAutofillAiBasedAmountExtractionIgnoreSeenTermsForTestingName,
+     flag_descriptions::
+         kAutofillAiBasedAmountExtractionIgnoreSeenTermsForTestingDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(
+         autofill::features::
+             kAutofillAiBasedAmountExtractionIgnoreSeenTermsForTesting)},
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+    {"updater-ui", flag_descriptions::kUpdaterUIName,
+     flag_descriptions::kUpdaterUIDescription, kOsLinux | kOsMac | kOsWin,
+     FEATURE_VALUE_TYPE(features::kUpdaterUI)},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+    BUILDFLAG(IS_CHROMEOS)
+    {"read-anything-line-focus", flag_descriptions::kReadAnythingLineFocusName,
+     flag_descriptions::kReadAnythingLineFocusDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kReadAnythingLineFocus)},
+#endif
+
+    {"verify-mtcs", flag_descriptions::kVerifyMTCsName,
+     flag_descriptions::kVerifyMTCsDescription, kOsDesktop | kOsAndroid,
+     FEATURE_VALUE_TYPE(net::features::kVerifyMTCs)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"desktop-android-link-capturing",
+     flag_descriptions::kDesktopAndroidLinkCapturingName,
+     flag_descriptions::kDesktopAndroidLinkCapturingDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kDesktopAndroidLinkCapturing)},
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-payment-request-deduplicate-native-payment-apps",
+     flag_descriptions::kDeduplicateNativePaymentAppsName,
+     flag_descriptions::kDeduplicateNativePaymentAppsDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(payments::android::kDeduplicateNativePaymentApps)},
+#endif
+
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+    {"password-upload-ui-update",
+     flag_descriptions::kPasswordUploadUiUpdateName,
+     flag_descriptions::kPasswordUploadUiUpdateDescription,
+     kOsLinux | kOsMac | kOsWin,
+     FEATURE_VALUE_TYPE(switches::kPasswordUploadUiUpdate)},
+#endif
+
+#if BUILDFLAG(IS_ANDROID)
+    {"enable-android-side-panel",
+     flag_descriptions::kEnableAndroidSidePanelName,
+     flag_descriptions::kEnableAndroidSidePanelDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kEnableAndroidSidePanel)},
+#endif
+
+    // Add new entries above this line.
     // NOTE: Adding a new flag requires adding a corresponding entry to enum
     // "LoginCustomFlags" in tools/metrics/histograms/enums.xml. See "Flag
     // Histograms" in tools/metrics/histograms/README.md (run the
@@ -13240,32 +13608,38 @@ bool ShouldSkipConditionalFeatureEntry(const flags_ui::FlagsStorage* storage,
                                        const FeatureEntry& entry) {
 #if BUILDFLAG(IS_CHROMEOS)
   version_info::Channel channel = chrome::GetChannel();
-  // enable-projector-server-side-speech-recognition is only available if
-  // the InternalServerSideSpeechRecognitionControl flag is enabled as well.
-  if (!strcmp(kProjectorServerSideSpeechRecognition, entry.internal_name)) {
-    return !ash::features::
-        IsInternalServerSideSpeechRecognitionControlEnabled();
+  // enable-projector-server-side-speech-recognition is only available in Chrome
+  // branded builds.
+  if (std::string_view(kProjectorServerSideSpeechRecognition) ==
+      entry.internal_name) {
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+    return false;
+#else
+    return true;
+#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
   }
 
   // enable-ui-devtools is only available on for non Stable channels.
-  if (!strcmp(ui_devtools::switches::kEnableUiDevTools, entry.internal_name) &&
+  if (std::string_view(ui_devtools::switches::kEnableUiDevTools) ==
+          entry.internal_name &&
       channel == version_info::Channel::STABLE) {
     return true;
   }
 
   // Skip arc-enable-attestation if it is enabled by ash switch.
-  if (!strcmp(kArcEnableAttestationFlag, entry.internal_name)) {
+  if (std::string_view(kArcEnableAttestationFlag) == entry.internal_name) {
     return base::CommandLine::ForCurrentProcess()->HasSwitch(
         ash::switches::kArcEnableAttestation);
   }
 
-  if (!strcmp(kArcEnableVirtioBlkForDataInternalName, entry.internal_name)) {
+  if (std::string_view(kArcEnableVirtioBlkForDataInternalName) ==
+      entry.internal_name) {
     return !arc::IsArcVmEnabled();
   }
 
   // Only show the Background Listening flag if channel is one of
   // Beta/Dev/Canary/Unknown (non-stable).
-  if (!strcmp(kBackgroundListeningName, entry.internal_name)) {
+  if (std::string_view(kBackgroundListeningName) == entry.internal_name) {
     return channel != version_info::Channel::BETA &&
            channel != version_info::Channel::DEV &&
            channel != version_info::Channel::CANARY &&
@@ -13273,40 +13647,37 @@ bool ShouldSkipConditionalFeatureEntry(const flags_ui::FlagsStorage* storage,
   }
 
   // Only show Borealis flags on enabled devices.
-  if (!strcmp(kBorealisBigGlInternalName, entry.internal_name) ||
-      !strcmp(kBorealisDGPUInternalName, entry.internal_name) ||
-      !strcmp(kBorealisEnableUnsupportedHardwareInternalName,
-              entry.internal_name) ||
-      !strcmp(kBorealisForceBetaClientInternalName, entry.internal_name) ||
-      !strcmp(kBorealisForceDoubleScaleInternalName, entry.internal_name) ||
-      !strcmp(kBorealisLinuxModeInternalName, entry.internal_name) ||
-      !strcmp(kBorealisPermittedInternalName, entry.internal_name) ||
-      !strcmp(kBorealisProvisionInternalName, entry.internal_name) ||
-      !strcmp(kBorealisScaleClientByDPIInternalName, entry.internal_name) ||
-      !strcmp(kBorealisZinkGlDriverInternalName, entry.internal_name)) {
+  if (std::string_view(kBorealisBigGlInternalName) == entry.internal_name ||
+      std::string_view(kBorealisDGPUInternalName) == entry.internal_name ||
+      std::string_view(kBorealisEnableUnsupportedHardwareInternalName) ==
+          entry.internal_name ||
+      std::string_view(kBorealisForceBetaClientInternalName) ==
+          entry.internal_name ||
+      std::string_view(kBorealisForceDoubleScaleInternalName) ==
+          entry.internal_name ||
+      std::string_view(kBorealisLinuxModeInternalName) == entry.internal_name ||
+      std::string_view(kBorealisPermittedInternalName) == entry.internal_name ||
+      std::string_view(kBorealisProvisionInternalName) == entry.internal_name ||
+      std::string_view(kBorealisScaleClientByDPIInternalName) ==
+          entry.internal_name ||
+      std::string_view(kBorealisZinkGlDriverInternalName) ==
+          entry.internal_name) {
     return !base::FeatureList::IsEnabled(features::kBorealis);
   }
 
   // Only show wallpaper fast refresh flag if channel is one of
   // Dev/Canary/Unknown.
-  if (!strcmp(kWallpaperFastRefreshInternalName, entry.internal_name)) {
+  if (std::string_view(kWallpaperFastRefreshInternalName) ==
+      entry.internal_name) {
     return (channel != version_info::Channel::DEV &&
             channel != version_info::Channel::CANARY &&
             channel != version_info::Channel::UNKNOWN);
   }
 
-  // Only show clipboard history longpress flag if channel is one of
-  // Beta/Dev/Canary/Unknown.
-  if (!strcmp(kClipboardHistoryLongpressInternalName, entry.internal_name)) {
-    return channel != version_info::Channel::BETA &&
-           channel != version_info::Channel::DEV &&
-           channel != version_info::Channel::CANARY &&
-           channel != version_info::Channel::UNKNOWN;
-  }
-
   // Disable and prevent users from enabling LL privacy on boards that were
   // explicitly built without floss or hardware does not support LL privacy.
-  if (!strcmp(kBluetoothUseLLPrivacyInternalName, entry.internal_name)) {
+  if (std::string_view(kBluetoothUseLLPrivacyInternalName) ==
+      entry.internal_name) {
     return (
         base::FeatureList::GetInstance()->IsFeatureOverriddenFromCommandLine(
             floss::features::kLLPrivacyIsAvailable.name,
@@ -13315,7 +13686,7 @@ bool ShouldSkipConditionalFeatureEntry(const flags_ui::FlagsStorage* storage,
 
   // Only show Assistant Launcher search IPH flag if channel is one of
   // Beta/Dev/Canary/Unknown.
-  if (!strcmp(kAssistantIphInternalName, entry.internal_name)) {
+  if (std::string_view(kAssistantIphInternalName) == entry.internal_name) {
     return channel != version_info::Channel::BETA &&
            channel != version_info::Channel::DEV &&
            channel != version_info::Channel::CANARY &&
@@ -13324,7 +13695,7 @@ bool ShouldSkipConditionalFeatureEntry(const flags_ui::FlagsStorage* storage,
 
   // Only show Growth campaigns flag if channel is one of Beta/Dev/Canary/
   // Unknown.
-  if (!strcmp(kGrowthCampaigns, entry.internal_name)) {
+  if (std::string_view(kGrowthCampaigns) == entry.internal_name) {
     return channel != version_info::Channel::BETA &&
            channel != version_info::Channel::DEV &&
            channel != version_info::Channel::CANARY &&
@@ -13333,7 +13704,7 @@ bool ShouldSkipConditionalFeatureEntry(const flags_ui::FlagsStorage* storage,
 
   // Only show Growth campaigns test tag flag if channel is one of
   // Beta/Dev/Canary/ Unknown.
-  if (!strcmp(kGrowthCampaignsTestTag, entry.internal_name)) {
+  if (std::string_view(kGrowthCampaignsTestTag) == entry.internal_name) {
     return channel != version_info::Channel::BETA &&
            channel != version_info::Channel::DEV &&
            channel != version_info::Channel::CANARY &&
@@ -13343,7 +13714,7 @@ bool ShouldSkipConditionalFeatureEntry(const flags_ui::FlagsStorage* storage,
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   version_info::Channel chrome_channel = chrome::GetChannel();
   // Only show extension AI data flag in non-stable channels.
-  if (!strcmp(kExtensionAiDataInternalName, entry.internal_name)) {
+  if (std::string_view(kExtensionAiDataInternalName) == entry.internal_name) {
     return chrome_channel != version_info::Channel::BETA &&
            chrome_channel != version_info::Channel::DEV &&
            chrome_channel != version_info::Channel::CANARY &&
@@ -13355,8 +13726,9 @@ bool ShouldSkipConditionalFeatureEntry(const flags_ui::FlagsStorage* storage,
   // Only show the payments test flag to disable merchant allowlists if channel
   // is one of Beta/Dev/Canary/ Unknown.
   version_info::Channel channel = chrome::GetChannel();
-  if (!strcmp(kDisableFacilitatedPaymentsMerchantAllowlistInternalName,
-              entry.internal_name)) {
+  if (std::string_view(
+          kDisableFacilitatedPaymentsMerchantAllowlistInternalName) ==
+      entry.internal_name) {
     return channel != version_info::Channel::BETA &&
            channel != version_info::Channel::DEV &&
            channel != version_info::Channel::CANARY &&
@@ -13365,10 +13737,10 @@ bool ShouldSkipConditionalFeatureEntry(const flags_ui::FlagsStorage* storage,
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if !BUILDFLAG(IS_ANDROID)
-  // The Webium flag is only for dev testing at the moment.
-  // TODO(crbug.com/394476530): make the flag available on Canary again.
-  if (!strcmp(kWebiumFlag, entry.internal_name)) {
-    return version_info::IsOfficialBuild();
+  // Only show Webium flag for Canary channel and developer builds.
+  if (std::string_view(kWebiumFlag) == entry.internal_name) {
+    return chrome::GetChannel() != version_info::Channel::CANARY &&
+           version_info::IsOfficialBuild();
   }
 #endif  // !BUILDFLAG(IS_ANDROID)
 
@@ -13478,9 +13850,8 @@ std::vector<FeatureEntry>* GetEntriesForTesting() {
 void SetFeatureEntries(const std::vector<FeatureEntry>& entries) {
   auto* entries_for_testing = GetEntriesForTesting();  // IN-TEST
   CHECK(entries_for_testing->empty());
-  for (const auto& entry : entries) {
-    entries_for_testing->push_back(entry);
-  }
+  entries_for_testing->insert(entries_for_testing->end(), entries.begin(),
+                              entries.end());
   FlagsStateSingleton::GetInstance()->RebuildState(*entries_for_testing);
 }
 

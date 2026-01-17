@@ -9,7 +9,6 @@
 #include <string_view>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/containers/fixed_flat_set.h"
 #include "base/json/json_reader.h"
 #include "base/logging.h"
@@ -339,15 +338,15 @@ bool ParseJSON(std::string_view hsts_json,
       "test",        "public-suffix", "google",      "custom",
       "bulk-legacy", "bulk-18-weeks", "bulk-1-year", "public-suffix-requested"};
 
-  std::optional<base::Value::Dict> hsts_dict =
-      base::JSONReader::ReadDict(hsts_json);
+  std::optional<base::Value::Dict> hsts_dict = base::JSONReader::ReadDict(
+      hsts_json, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!hsts_dict) {
     LOG(ERROR) << "Could not parse the input HSTS JSON file";
     return false;
   }
 
-  std::optional<base::Value::Dict> pins_dict =
-      base::JSONReader::ReadDict(pins_json);
+  std::optional<base::Value::Dict> pins_dict = base::JSONReader::ReadDict(
+      pins_json, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
   if (!pins_dict) {
     LOG(ERROR) << "Could not parse the input pins JSON file";
     return false;
@@ -381,7 +380,7 @@ bool ParseJSON(std::string_view hsts_json,
     }
 
     for (auto entry_value : *parsed) {
-      if (!base::Contains(valid_pins_keys, entry_value.first)) {
+      if (!valid_pins_keys.contains(entry_value.first)) {
         LOG(ERROR) << "The entry for " << *maybe_hostname
                    << " contains an unknown " << entry_value.first << " field";
         return false;
@@ -437,7 +436,7 @@ bool ParseJSON(std::string_view hsts_json,
     }
 
     for (auto entry_value : *parsed) {
-      if (!base::Contains(valid_hsts_keys, entry_value.first)) {
+      if (!valid_hsts_keys.contains(entry_value.first)) {
         LOG(ERROR) << "The entry for " << entry->hostname
                    << " contains an unknown " << entry_value.first << " field";
         return false;
@@ -445,7 +444,7 @@ bool ParseJSON(std::string_view hsts_json,
     }
 
     const std::string* policy = parsed->FindString(kPolicyJSONKey);
-    if (!policy || !base::Contains(valid_policies, *policy)) {
+    if (!policy || !valid_policies.contains(*policy)) {
       LOG(ERROR) << "The entry for " << entry->hostname
                  << " does not have a valid policy";
       return false;

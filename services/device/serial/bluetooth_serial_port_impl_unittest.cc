@@ -37,7 +37,6 @@ namespace {
 
 using ::base::test::RunOnceCallback;
 using ::testing::_;
-using ::testing::Invoke;
 using ::testing::Return;
 using ::testing::WithArgs;
 
@@ -224,18 +223,14 @@ TEST_F(BluetoothSerialPortImplTest, StartWritingTest) {
   EXPECT_EQ(result, MOJO_RESULT_OK);
 
   EXPECT_CALL(mock_socket(), Send)
-      .WillOnce(WithArgs<0, 1, 2>(Invoke(
+      .WillOnce(WithArgs<0, 1, 2>(
           [&](scoped_refptr<net::IOBuffer> buf, int buffer_size,
               MockBluetoothSocket::SendCompletionCallback success_callback) {
             ASSERT_EQ(buffer_size, static_cast<int>(bytes_read));
-            // EXPECT_EQ only does a shallow comparison, so it's necessary to
-            // iterate through both objects and compare each character.
-            for (int i = 0; i < buffer_size; i++) {
-              UNSAFE_TODO(EXPECT_EQ(buf->data()[i], kBuffer[i]))
-                  << "buffer comparison failed at index " << i;
-            }
+            EXPECT_EQ(std::string_view(buf->data(), buf->size()),
+                      std::string_view(kBuffer));
             std::move(success_callback).Run(buffer_size);
-          })));
+          }));
 
   EXPECT_CALL(mock_socket(), Disconnect(_)).WillOnce(RunOnceCallback<0>());
 
@@ -271,10 +266,7 @@ TEST_F(BluetoothSerialPortImplTest, StartReadingTest) {
   std::string consumer_data;
   EXPECT_EQ(MOJO_RESULT_OK, ReadConsumerData(consumer, &consumer_data));
   ASSERT_EQ(kBufferNumBytes, consumer_data.size());
-  for (size_t i = 0; i < consumer_data.size(); i++) {
-    UNSAFE_TODO(EXPECT_EQ(consumer_data[i], kBuffer[i]))
-        << "buffer comparison failed at index " << i;
-  }
+  EXPECT_EQ(std::string_view(consumer_data), std::string_view(kBuffer));
 
   base::RunLoop disconnect_loop;
   watcher->set_connection_error_handler(disconnect_loop.QuitClosure());
@@ -474,16 +466,14 @@ TEST_F(BluetoothSerialPortImplTest, FlushWriteAndWriteNewPipe) {
 
     EXPECT_CALL(mock_socket(), Send)
         .WillOnce(WithArgs<0, 1, 2>(
-            Invoke([&](scoped_refptr<net::IOBuffer> buf, int buffer_size,
-                       MockBluetoothSocket::SendCompletionCallback callback) {
+            [&](scoped_refptr<net::IOBuffer> buf, int buffer_size,
+                MockBluetoothSocket::SendCompletionCallback callback) {
               EXPECT_EQ(buffer_size, static_cast<int>(actually_written_bytes1));
               DCHECK(!pre_flush_send_callback);
-              for (int i = 0; i < buffer_size; i++) {
-                UNSAFE_TODO(EXPECT_EQ(buf->data()[i], pre_flush_data[i]))
-                    << "buffer comparison failed at index " << i;
-              }
+              EXPECT_EQ(std::string_view(buf->data(), buf->size()),
+                        std::string_view(pre_flush_data));
               pre_flush_send_callback = std::move(callback);
-            })));
+            }));
 
     result = pre_flush_producer->WriteData(base::as_byte_span(pre_flush_data),
                                            MOJO_WRITE_DATA_FLAG_NONE,
@@ -535,17 +525,15 @@ TEST_F(BluetoothSerialPortImplTest, FlushWriteAndWriteNewPipe) {
 
   EXPECT_CALL(mock_socket(), Send)
       .WillOnce(WithArgs<0, 1, 2>(
-          Invoke([&](scoped_refptr<net::IOBuffer> buf, int buffer_size,
-                     MockBluetoothSocket::SendCompletionCallback callback) {
+          [&](scoped_refptr<net::IOBuffer> buf, int buffer_size,
+              MockBluetoothSocket::SendCompletionCallback callback) {
             EXPECT_EQ(buffer_size, static_cast<int>(actually_written_bytes1));
             DCHECK(!pre_flush_send_callback);
-            for (int i = 0; i < buffer_size; i++) {
-              UNSAFE_TODO(EXPECT_EQ(buf->data()[i], post_flush_data[i]))
-                  << "buffer comparison failed at index " << i;
-            }
+            EXPECT_EQ(std::string_view(buf->data(), buf->size()),
+                      std::string_view(post_flush_data));
             std::move(callback).Run(buffer_size);
             post_flush_send_run_loop.Quit();
-          })));
+          }));
 
   serial_port->StartWriting(std::move(post_flush_consumer));
   // Wait for StartWriting to start on the remote end before directly calling

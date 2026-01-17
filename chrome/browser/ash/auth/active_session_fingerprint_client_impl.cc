@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ash/auth/active_session_fingerprint_client_impl.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "ash/constants/ash_pref_names.h"
@@ -15,8 +16,6 @@
 #include "base/check.h"
 #include "base/check_is_test.h"
 #include "base/check_op.h"
-#include "base/containers/contains.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/notreached.h"
@@ -97,8 +96,8 @@ bool ActiveSessionFingerprintClientImpl::IsFingerprintAvailable(
               password_manager::prefs::kBiometricAuthenticationBeforeFilling)) {
         const base::Value::List& factors =
             pref_service->GetList(prefs::kQuickUnlockModeAllowlist);
-        if (base::Contains(factors, base::Value(kFactorsOptionAll)) ||
-            base::Contains(factors, base::Value(kFactorsOptionFingerprint))) {
+        if (factors.contains(kFactorsOptionAll) ||
+            factors.contains(kFactorsOptionFingerprint)) {
           return true;
         }
       }
@@ -107,8 +106,18 @@ bool ActiveSessionFingerprintClientImpl::IsFingerprintAvailable(
     case AuthRequest::Reason::kWebAuthN: {
       const base::Value::List& factors =
           pref_service->GetList(prefs::kWebAuthnFactors);
-      if (base::Contains(factors, base::Value(kFactorsOptionAll)) ||
-          base::Contains(factors, base::Value(kFactorsOptionFingerprint))) {
+      if (factors.contains(kFactorsOptionAll) ||
+          factors.contains(kFactorsOptionFingerprint)) {
+        return true;
+      }
+      return false;
+    }
+    case AuthRequest::Reason::kPaymentsAutofill: {
+      const base::Value::List& factors =
+          pref_service->GetList(prefs::kQuickUnlockModeAllowlist);
+      if (std::ranges::contains(factors, base::Value(kFactorsOptionAll)) ||
+          std::ranges::contains(factors,
+                                base::Value(kFactorsOptionFingerprint))) {
         return true;
       }
       return false;

@@ -44,15 +44,17 @@ class WaitSet::State : public base::RefCountedThreadSafe<State> {
 
   MojoResult AddEvent(base::WaitableEvent* event) {
     auto result = user_events_.insert(event);
-    if (result.second)
+    if (result.second) {
       return MOJO_RESULT_OK;
+    }
     return MOJO_RESULT_ALREADY_EXISTS;
   }
 
   MojoResult RemoveEvent(base::WaitableEvent* event) {
     auto it = user_events_.find(event);
-    if (it == user_events_.end())
+    if (it == user_events_.end()) {
       return MOJO_RESULT_NOT_FOUND;
+    }
     user_events_.erase(it);
     return MOJO_RESULT_OK;
   }
@@ -65,8 +67,9 @@ class WaitSet::State : public base::RefCountedThreadSafe<State> {
     {
       base::AutoLock lock(lock_);
 
-      if (handle_to_context_.count(handle))
+      if (handle_to_context_.count(handle)) {
         return MOJO_RESULT_ALREADY_EXISTS;
+      }
       DCHECK(!contexts_.count(context->context_value()));
 
       handle_to_context_[handle] = context;
@@ -109,8 +112,9 @@ class WaitSet::State : public base::RefCountedThreadSafe<State> {
       cancelled_contexts_.clear();
 
       auto it = handle_to_context_.find(handle);
-      if (it == handle_to_context_.end())
+      if (it == handle_to_context_.end()) {
         return MOJO_RESULT_NOT_FOUND;
+      }
 
       context = std::move(it->second);
       handle_to_context_.erase(it);
@@ -138,7 +142,7 @@ class WaitSet::State : public base::RefCountedThreadSafe<State> {
             size_t* num_ready_handles,
             base::span<Handle> ready_handles,
             base::span<MojoResult> ready_results,
-            MojoHandleSignalsState* signals_states) {
+            base::span<HandleSignalsState> signals_states) {
     DCHECK(trap_handle_.is_valid());
     DCHECK(num_ready_handles);
     DCHECK(!ready_handles.empty());
@@ -179,8 +183,9 @@ class WaitSet::State : public base::RefCountedThreadSafe<State> {
         } else if (rv == MOJO_RESULT_NOT_FOUND) {
           // Nothing to watch. If there are no user events, always signal to
           // avoid deadlock.
-          if (user_events_.empty())
+          if (user_events_.empty()) {
             handle_event_.Signal();
+          }
         } else {
           // Watcher must be armed now. No need to manually signal.
           DCHECK_EQ(MOJO_RESULT_OK, rv);
@@ -195,8 +200,9 @@ class WaitSet::State : public base::RefCountedThreadSafe<State> {
 
     absl::InlinedVector<base::WaitableEvent*, 4> events;
     events.resize(user_events_.size() + 1);
-    if (waitable_index_shift_ > user_events_.size())
+    if (waitable_index_shift_ > user_events_.size()) {
       waitable_index_shift_ = 0;
+    }
 
     size_t dest_index = waitable_index_shift_++;
     events[dest_index] = &handle_event_;
@@ -205,7 +211,7 @@ class WaitSet::State : public base::RefCountedThreadSafe<State> {
       events[dest_index] = e;
     }
 
-    size_t index = base::WaitableEvent::WaitMany(events.data(), events.size());
+    size_t index = base::WaitableEvent::WaitMany(events);
     base::AutoLock lock(lock_);
 
     // Pop as many handles as we can out of the ready set and return them. Note
@@ -216,8 +222,9 @@ class WaitSet::State : public base::RefCountedThreadSafe<State> {
       auto it = ready_handles_.begin();
       ready_handles[i] = it->first;
       ready_results[i] = it->second.result;
-      if (signals_states)
-        UNSAFE_TODO(signals_states[i]) = it->second.signals_state;
+      if (!signals_states.empty()) {
+        signals_states[i] = it->second.signals_state;
+      }
       ready_handles_.erase(it);
     }
 
@@ -361,7 +368,7 @@ void WaitSet::Wait(base::WaitableEvent** ready_event,
                    size_t* num_ready_handles,
                    base::span<Handle> ready_handles,
                    base::span<MojoResult> ready_results,
-                   MojoHandleSignalsState* signals_states) {
+                   base::span<HandleSignalsState> signals_states) {
   state_->Wait(ready_event, num_ready_handles, ready_handles, ready_results,
                signals_states);
 }

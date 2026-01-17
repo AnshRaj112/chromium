@@ -12,7 +12,6 @@
 #include <string>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/containers/heap_array.h"
 #include "base/format_macros.h"
 #include "base/memory/raw_ptr.h"
@@ -38,6 +37,7 @@
 #include "third_party/blink/renderer/platform/media/testing/mock_resource_fetch_context.h"
 #include "third_party/blink/renderer/platform/media/testing/mock_web_associated_url_loader.h"
 #include "third_party/blink/renderer/platform/media/url_index.h"
+#include "third_party/blink/renderer/platform/weborigin/kurl.h"
 #include "third_party/blink/renderer/platform/wtf/functional.h"
 
 namespace blink {
@@ -63,8 +63,7 @@ static bool CorrectAcceptEncoding(const WebURLRequest& request) {
                           .HttpHeaderField(WebString::FromUTF8(
                               net::HttpRequestHeaders::kAcceptEncoding))
                           .Utf8();
-  return (base::Contains(value, "identity;q=1")) &&
-         (base::Contains(value, "*;q=0"));
+  return (value.contains("identity;q=1")) && (value.contains("*;q=0"));
 }
 
 class ResourceMultiBufferDataProviderTest : public testing::Test {
@@ -95,8 +94,8 @@ class ResourceMultiBufferDataProviderTest : public testing::Test {
     url_data_->set_etag(kEtag);
     DCHECK(url_data_);
     url_data_->OnRedirect(
-        WTF::BindOnce(&ResourceMultiBufferDataProviderTest::RedirectCallback,
-                      WTF::Unretained(this)));
+        blink::BindOnce(&ResourceMultiBufferDataProviderTest::RedirectCallback,
+                        Unretained(this)));
 
     first_position_ = first_position;
 

@@ -4,10 +4,10 @@
 
 #include "chrome/browser/ash/child_accounts/time_limit_consistency_test/consistency_golden_loader.h"
 
-#include "base/containers/contains.h"
+#include <algorithm>
+
 #include "base/files/dir_reader_posix.h"
 #include "base/files/file.h"
-#include "base/files/file_util.h"
 #include "base/path_service.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
@@ -52,7 +52,7 @@ std::vector<GoldenParam> LoadGoldenCasesFromPath(
 
     // Ignore suites that don't include CHROME_OS as a supported platform.
     bool chromeos_supported =
-        base::Contains(golden_suite.supported_platforms(), CHROME_OS);
+        std::ranges::contains(golden_suite.supported_platforms(), CHROME_OS);
     if (!chromeos_supported)
       continue;
 

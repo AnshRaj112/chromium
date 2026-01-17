@@ -11,8 +11,10 @@
 
 #include "base/containers/flat_map.h"
 #include "base/containers/span.h"
+#include "base/gtest_prod_util.h"
 #include "base/values.h"
 #include "build/build_config.h"
+#include "components/signin/internal/identity_manager/account_info_util.h"
 #include "components/signin/public/identity_manager/tribool.h"
 
 #if BUILDFLAG(IS_ANDROID)
@@ -47,8 +49,9 @@ class AccountCapabilities {
       JNIEnv* env) const;
 #endif
 
+  explicit AccountCapabilities(base::flat_map<std::string, bool> capabilities);
+
 #if BUILDFLAG(IS_IOS)
-  AccountCapabilities(base::flat_map<std::string, bool> capabilities);
   const base::flat_map<std::string, bool>& ConvertToAccountCapabilitiesIOS();
 #endif
 
@@ -59,22 +62,31 @@ class AccountCapabilities {
   // group for accounts with this capability.
   signin::Tribool can_fetch_family_member_info() const;
 
+#if !BUILDFLAG(IS_IOS)
   // Chrome can display the email address for accounts with this capability.
   signin::Tribool can_have_email_address_displayed() const;
+#endif
 
+#if !BUILDFLAG(IS_ANDROID)
+  // The primary account type is suitable for choice screens. Signals that are
+  // not account-type specific should be checked separately.
+  signin::Tribool can_make_chrome_search_engine_choice_screen_choice() const;
+#endif
+
+#if !BUILDFLAG(IS_IOS)
   // Chrome can run privacy sandbox trials for accounts with this capability.
   signin::Tribool can_run_chrome_privacy_sandbox_trials() const;
+#endif
 
   // Chrome can show history sync opt in screens without minor mode
   // restrictions with this capability.
   signin::Tribool
   can_show_history_sync_opt_ins_without_minor_mode_restrictions() const;
 
+#if BUILDFLAG(IS_CHROMEOS)
   // Chrome can toggle auto updates with this capability.
   signin::Tribool can_toggle_auto_updates() const;
-
-  // The user account is able to use IP Protection.
-  signin::Tribool can_use_chrome_ip_protection() const;
+#endif
 
 #if BUILDFLAG(IS_CHROMEOS)
   // The user account is able to use generative AI features. Since many
@@ -84,20 +96,30 @@ class AccountCapabilities {
   signin::Tribool can_use_chromeos_generative_ai() const;
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
-  // The user account is able to use copyeditor feature.
-  signin::Tribool can_use_copyeditor_feature() const;
-
+#if !BUILDFLAG(IS_IOS)
   // The user account is able to use DevTools AI features.
   signin::Tribool can_use_devtools_generative_ai_features() const;
+#endif
 
+#if !BUILDFLAG(IS_IOS)
   // The user account is able to use edu features.
   signin::Tribool can_use_edu_features() const;
+#endif
 
+#if !BUILDFLAG(IS_IOS)
+  // The user account is able to use Gemini in Chrome.
+  signin::Tribool can_use_gemini_in_chrome() const;
+#endif
+
+#if BUILDFLAG(IS_CHROMEOS)
   // The user account is able to use generative AI in recorder app.
   signin::Tribool can_use_generative_ai_in_recorder_app() const;
+#endif
 
+#if BUILDFLAG(IS_CHROMEOS)
   // The user account is able to use generative AI photo editing.
   signin::Tribool can_use_generative_ai_photo_editing() const;
+#endif
 
   // The user account is able to use manta service.
   signin::Tribool can_use_manta_service() const;
@@ -115,6 +137,10 @@ class AccountCapabilities {
   // The user account has opted in to parental supervision (Geller account).
   // Chrome applies parental controls to accounts with this capability.
   signin::Tribool is_opted_in_to_parental_supervision() const;
+
+  // Chrome applies account level enterprise policies to profiles signed in
+  // with accounts with this capability.
+  signin::Tribool is_subject_to_account_level_enterprise_policies() const;
 
   // Chrome must show the notice before using the privacy sandbox restricted
   // measurement API
@@ -147,24 +173,39 @@ class AccountCapabilities {
   bool operator==(const AccountCapabilities& other) const;
 
  private:
-  friend std::optional<AccountCapabilities> AccountCapabilitiesFromValue(
+  // Returns the list of account capability service names supported in Chrome.
+  static base::span<const std::string_view>
+  GetSupportedAccountCapabilityNames();
+
+  // Internal version of GetSupportedAccountCapabilityNames that calculates the
+  // list on each call, rather than returning a cached value.
+  static std::vector<std::string_view>
+  GetSupportedAccountCapabilityNamesInternal();
+
+  // Returns the capability state using the service name.
+  signin::Tribool GetCapabilityByName(std::string_view name) const;
+
+  friend std::optional<AccountCapabilities>
+  signin::AccountCapabilitiesFromServerResponse(
       const base::Value::Dict& account_capabilities);
+  friend base::Value::Dict signin::SerializeAccountCapabilities(
+      const AccountCapabilities& account_capabilities);
+  friend AccountCapabilities signin::DeserializeAccountCapabilities(
+      const base::Value::Dict& dict);
   friend class AccountCapabilitiesFetcherGaia;
 #if BUILDFLAG(IS_IOS)
   friend base::span<const std::string_view>
   GetAccountCapabilityNamesForPrefetch();
   friend class ios::AccountCapabilitiesFetcherIOS;
 #endif
+  FRIEND_TEST_ALL_PREFIXES(AccountCapabilitiesTest,
+                           GetSupportedAccountCapabilityNames);
+  FRIEND_TEST_ALL_PREFIXES(AccountCapabilitiesTest,
+                           GetSupportedAccountCapabilityNames_FlagDisabled);
+  FRIEND_TEST_ALL_PREFIXES(AccountCapabilitiesTest,
+                           GetSupportedAccountCapabilityNames_FlagEnabled);
   friend class AccountCapabilitiesTestMutator;
-  friend class AccountTrackerService;
   friend class supervised_user::FamilyLinkUserCapabilitiesObserver;
-
-  // Returns the capability state using the service name.
-  signin::Tribool GetCapabilityByName(std::string_view name) const;
-
-  // Returns the list of account capability service names supported in Chrome.
-  static base::span<const std::string_view>
-  GetSupportedAccountCapabilityNames();
 
   base::flat_map<std::string, bool> capabilities_map_;
 };

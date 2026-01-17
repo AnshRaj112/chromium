@@ -6,13 +6,11 @@ package org.chromium.chrome.browser.keyboard_accessory;
 
 import android.util.SparseArray;
 
-import androidx.annotation.Nullable;
-
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.keyboard_accessory.data.CachedProviderAdapter;
 import org.chromium.chrome.browser.keyboard_accessory.data.ConditionalProviderAdapter;
 import org.chromium.chrome.browser.keyboard_accessory.data.KeyboardAccessoryData;
 import org.chromium.chrome.browser.keyboard_accessory.data.KeyboardAccessoryData.AccessorySheetData;
-import org.chromium.chrome.browser.keyboard_accessory.data.PropertyProvider;
 import org.chromium.chrome.browser.keyboard_accessory.data.Provider;
 import org.chromium.content_public.browser.Visibility;
 import org.chromium.content_public.browser.WebContents;
@@ -32,12 +30,12 @@ class ManualFillingState {
     private final SparseArray<Provider<AccessorySheetData>> mSheetDataProviders =
             new SparseArray<>();
     private final SparseArray<KeyboardAccessoryData.Tab> mAvailableTabs = new SparseArray<>();
-    private @Nullable ManualFillingComponent.UpdateAccessorySheetDelegate mUpdater;
-    private @Nullable CachedProviderAdapter<KeyboardAccessoryData.Action[]> mActionsProvider;
+    private ManualFillingComponent.@Nullable UpdateAccessorySheetDelegate mUpdater;
+    @Nullable private CachedProviderAdapter<KeyboardAccessoryData.Action[]> mActionsProvider;
     private boolean mWebContentsShowing;
 
     private class Observer extends WebContentsObserver {
-        public Observer(WebContents webContents) {
+        Observer(WebContents webContents) {
             super(webContents);
         }
 
@@ -108,11 +106,11 @@ class ManualFillingState {
     /**
      * Wraps the given ActionProvider in a {@link CachedProviderAdapter} and stores it.
      *
-     * @param provider A {@link PropertyProvider} providing actions.
+     * @param provider A {@link Provider} providing actions.
      * @param defaultActions A default set of actions to prepopulate the adapter's cache.
      */
     void wrapActionsProvider(
-            PropertyProvider<KeyboardAccessoryData.Action[]> provider,
+            Provider<KeyboardAccessoryData.Action[]> provider,
             KeyboardAccessoryData.Action[] defaultActions) {
         mActionsProvider =
                 new CachedProviderAdapter<>(
@@ -121,7 +119,8 @@ class ManualFillingState {
 
     /**
      * Returns the wrapped provider set with {@link #wrapActionsProvider}.
-     * @return A {@link CachedProviderAdapter} wrapping a {@link PropertyProvider}.
+     *
+     * @return A {@link CachedProviderAdapter} wrapping a {@link Provider}.
      */
     Provider<KeyboardAccessoryData.Action[]> getActionsProvider() {
         return mActionsProvider;
@@ -131,10 +130,10 @@ class ManualFillingState {
      * Wraps the given provider for sheet data in a {@link ConditionalProviderAdapter} and stores
      * it.
      *
-     * @param provider A {@link PropertyProvider} providing sheet data.
+     * @param provider A {@link Provider} providing sheet data.
      */
     void wrapSheetDataProvider(
-            @AccessoryTabType int tabType, PropertyProvider<AccessorySheetData> provider) {
+            @AccessoryTabType int tabType, Provider<AccessorySheetData> provider) {
         mSheetDataProviders.put(
                 tabType, new ConditionalProviderAdapter<>(provider, () -> mWebContentsShowing));
     }
@@ -142,7 +141,7 @@ class ManualFillingState {
     /**
      * Returns the wrapped provider set with {@link #wrapSheetDataProvider}.
      *
-     * @return A {@link CachedProviderAdapter} wrapping a {@link PropertyProvider}.
+     * @return A {@link CachedProviderAdapter} wrapping a {@link Provider}.
      */
     @Nullable
     Provider<AccessorySheetData> getSheetDataProvider(@AccessoryTabType int tabType) {

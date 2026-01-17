@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 
+#include "base/functional/callback_helpers.h"
 #include "gpu/command_buffer/service/scheduler.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_manager.h"
 #include "third_party/skia/include/core/SkImage.h"
@@ -82,12 +83,12 @@ void DisplayResourceProviderSoftware::UnlockForRead(ResourceId id,
   TryReleaseResource(id, resource);
 }
 
-std::vector<ReturnedResource>
+std::vector<ReturnedResourceViz>
 DisplayResourceProviderSoftware::DeleteAndReturnUnusedResourcesToChildImpl(
     Child& child_info,
     DeleteStyle style,
     const std::vector<ResourceId>& unused) {
-  std::vector<ReturnedResource> to_return;
+  std::vector<ReturnedResourceViz> to_return;
   // Reserve enough space to avoid re-allocating, so we can keep item pointers
   // for later using.
   to_return.reserve(unused.size());

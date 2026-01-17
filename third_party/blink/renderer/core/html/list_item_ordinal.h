@@ -9,6 +9,7 @@
 
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/platform/heap/persistent.h"
+#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 
 namespace blink {
 
@@ -38,7 +39,10 @@ class CORE_EXPORT ListItemOrdinal {
   // element.
   std::optional<int> ExplicitValue() const;
   void SetExplicitValue(int, const Element&);
-  bool UseExplicitValue() const { return type_ == kExplicit; }
+  bool UseExplicitValue() const {
+    DCHECK(!RuntimeEnabledFeatures::CSSListCounterAccountingEnabled());
+    return type_ == kExplicit;
+  }
   void ClearExplicitValue(const Node&);
   void MarkDirty() { SetType(kNeedsUpdate); }
 
@@ -46,8 +50,8 @@ class CORE_EXPORT ListItemOrdinal {
   static bool IsListItem(const LayoutObject*);
   static bool IsInReversedOrderedList(const Node&);
 
-  // Compute the total item count of a list.
-  static unsigned ItemCountForOrderedList(const HTMLOListElement*);
+  // Compute the initial counter value of a reversed list.
+  static int InitialCounterForReversedOrderedList(const HTMLOListElement*);
 
   // Invalidate all ordinal values of a list.
   static void InvalidateAllItemsForOrderedList(const HTMLOListElement*);
@@ -71,14 +75,22 @@ class CORE_EXPORT ListItemOrdinal {
     STACK_ALLOCATED();
 
    public:
-    Persistent<const Node> node;
+    const Node* node = nullptr;
     ListItemOrdinal* ordinal = nullptr;
     operator bool() const { return node; }
   };
+  struct NodeAndOrdinalWithIntermediateSum : NodeAndOrdinal {
+    STACK_ALLOCATED();
+
+   public:
+    int64_t intermediate_sum = 0;
+    bool counter_set_seen = false;
+  };
   static NodeAndOrdinal NextListItem(const Node* list_node,
                                      const Node* item_node = nullptr);
-  static NodeAndOrdinal PreviousListItem(const Node* list_node,
-                                         const Node* item_node);
+  static NodeAndOrdinalWithIntermediateSum PreviousListItem(
+      const Node* list_node,
+      const Node* item_node);
   static NodeAndOrdinal NextOrdinalItem(bool is_reversed,
                                         const Node* list_node,
                                         const Node* item_node = nullptr);
@@ -96,6 +108,9 @@ class CORE_EXPORT ListItemOrdinal {
   mutable int value_ = 0;
   // `explicit_value_` represents the value of li elements. When the `type` is
   // set to `kExplicit`, the value of `value_` is the same as `explicit_value_`.
+  //
+  // TODO(crbug.com/40760770): Remove `explicit_value_` when
+  // CSSListCounterAccounting is enabled by default and removed.
   mutable std::optional<int> explicit_value_;
   mutable unsigned type_ : 2;  // ValueType
 };

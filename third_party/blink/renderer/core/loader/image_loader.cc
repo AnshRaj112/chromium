@@ -42,6 +42,7 @@
 #include "third_party/blink/renderer/core/dom/increment_load_event_delay_count.h"
 #include "third_party/blink/renderer/core/execution_context/agent.h"
 #include "third_party/blink/renderer/core/frame/attribution_src_loader.h"
+#include "third_party/blink/renderer/core/frame/deprecation/deprecation.h"
 #include "third_party/blink/renderer/core/frame/frame_owner.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
 #include "third_party/blink/renderer/core/frame/local_frame_client.h"
@@ -115,7 +116,8 @@ class ImageLoader::Task {
   Task(ImageLoader* loader, UpdateFromElementBehavior update_behavior)
       : loader_(loader), update_behavior_(update_behavior) {
     ExecutionContext* context = loader_->GetElement()->GetExecutionContext();
-    async_task_context_.Schedule(context, "Image");
+    async_task_context_.Schedule(context, "Image",
+                                 probe::AsyncTaskContext::ScanForAds::kTrue);
     world_ = context->GetCurrentWorld();
   }
 
@@ -189,40 +191,40 @@ void ImageLoader::DispatchDecodeRequestsIfComplete() {
   }
 
   LocalFrame* frame = GetElement()->GetDocument().GetFrame();
-  WTF::EraseIf(decode_requests_, ([&](const auto& request) {
-                 // If the image already in kDispatched state or still in
-                 // kPendingMicrotask
-                 // state, then we don't dispatch decodes for it. So, the only
-                 // case to handle is if we're in kPendingLoad state.
-                 if (request->state() != DecodeRequest::kPendingLoad) {
-                   return false;
-                 }
-                 Image* image = GetContent()->GetImage();
-                 if (!ImageTypeNeedsDecode(*image)) {
-                   // If the image is of a type that doesn't need decode,
-                   // resolve the promise.
-                   request->Resolve();
-                   return true;
-                 }
-                 cc::DrawImage draw_image(
-                     image->PaintImageForCurrentFrame(),
-                     /*use_dark_mode=*/false,
-                     SkIRect::MakeWH(image->width(), image->height()),
-                     cc::PaintFlags::FilterQuality::kNone, SkM44(),
-                     PaintImage::kDefaultFrameIndex);
-                 // ImageLoader should be kept alive when decode is still
-                 // pending. JS may invoke 'decode' without capturing the Image
-                 // object. If GC kicks in, ImageLoader will be destroyed,
-                 // leading to unresolved/unrejected Promise.
-                 frame->GetChromeClient().RequestDecode(
-                     frame, draw_image,
-                     WTF::BindOnce(&ImageLoader::DecodeRequestFinished,
-                                   MakeUnwrappingCrossThreadHandle(this),
-                                   request->request_id()),
-                     /*speculative*/ false);
-                 request->NotifyDecodeDispatched();
-                 return false;
-               }));
+  EraseIf(decode_requests_, ([&](const auto& request) {
+            // If the image already in kDispatched state or still in
+            // kPendingMicrotask
+            // state, then we don't dispatch decodes for it. So, the only
+            // case to handle is if we're in kPendingLoad state.
+            if (request->state() != DecodeRequest::kPendingLoad) {
+              return false;
+            }
+            Image* image = GetContent()->GetImage();
+            if (!ImageTypeNeedsDecode(*image)) {
+              // If the image is of a type that doesn't need decode,
+              // resolve the promise.
+              request->Resolve();
+              return true;
+            }
+            cc::DrawImage draw_image(
+                image->PaintImageForCurrentFrame(),
+                /*use_dark_mode=*/false,
+                SkIRect::MakeWH(image->width(), image->height()),
+                cc::PaintFlags::FilterQuality::kNone, SkM44(),
+                PaintImage::kDefaultFrameIndex);
+            // ImageLoader should be kept alive when decode is still
+            // pending. JS may invoke 'decode' without capturing the Image
+            // object. If GC kicks in, ImageLoader will be destroyed,
+            // leading to unresolved/unrejected Promise.
+            frame->GetChromeClient().RequestDecode(
+                frame, draw_image,
+                BindOnce(&ImageLoader::DecodeRequestFinished,
+                         MakeUnwrappingCrossThreadHandle(this),
+                         request->request_id()),
+                /*speculative*/ false);
+            request->NotifyDecodeDispatched();
+            return false;
+          }));
 }
 
 void ImageLoader::DecodeRequestFinished(uint64_t request_id, bool success) {
@@ -253,14 +255,14 @@ void ImageLoader::RejectPendingDecodes(UpdateType update_type) {
   // have to reject even the pending mutation requests because conceptually they
   // would have been scheduled before the synchronous update ran, so they
   // referred to the old image.
-  WTF::EraseIf(decode_requests_, ([&](const auto& request) {
-                 if (update_type == UpdateType::kAsync &&
-                     request->state() == DecodeRequest::kPendingMicrotask) {
-                   return false;
-                 }
-                 request->Reject();
-                 return true;
-               }));
+  EraseIf(decode_requests_, ([&](const auto& request) {
+            if (update_type == UpdateType::kAsync &&
+                request->state() == DecodeRequest::kPendingMicrotask) {
+              return false;
+            }
+            request->Reject();
+            return true;
+          }));
 }
 
 void ImageLoader::Trace(Visitor* visitor) const {
@@ -274,6 +276,9 @@ void ImageLoader::Trace(Visitor* visitor) const {
 void ImageLoader::SetImageForTest(ImageResourceContent* new_image) {
   DCHECK(new_image);
   SetImageWithoutConsideringPendingLoadEvent(new_image);
+  // This is needed if the `new_image` is pending, since setting the image this
+  // way will only update the layout object if the image is fully loaded.
+  UpdateLayoutObject();
 }
 
 bool ImageLoader::ImageIsPotentiallyAvailable() const {
@@ -371,10 +376,9 @@ inline void ImageLoader::QueuePendingErrorEvent() {
   pending_error_event_ = PostCancellableTask(
       *GetElement()->GetDocument().GetTaskRunner(TaskType::kDOMManipulation),
       FROM_HERE,
-      WTF::BindOnce(&ImageLoader::DispatchPendingErrorEvent,
-                    WrapPersistent(this),
-                    std::make_unique<IncrementLoadEventDelayCount>(
-                        GetElement()->GetDocument())));
+      BindOnce(&ImageLoader::DispatchPendingErrorEvent, WrapPersistent(this),
+               std::make_unique<IncrementLoadEventDelayCount>(
+                   GetElement()->GetDocument())));
 }
 
 inline void ImageLoader::CrossSiteOrCSPViolationOccurred(
@@ -391,7 +395,7 @@ inline void ImageLoader::EnqueueImageLoadingMicroTask(
   auto task = std::make_unique<Task>(this, update_behavior);
   pending_task_ = task->GetWeakPtr();
   element_->GetDocument().GetAgent().event_loop()->EnqueueMicrotask(
-      WTF::BindOnce(&Task::Run, std::move(task)));
+      BindOnce(&Task::Run, std::move(task)));
   delay_until_do_update_from_element_ =
       std::make_unique<IncrementLoadEventDelayCount>(element_->GetDocument());
 }
@@ -407,8 +411,16 @@ void ImageLoader::UpdateImageState(ImageResourceContent* new_image_content) {
     }
   } else {
     image_complete_ = false;
-    if (lazy_image_load_state_ == LazyImageLoadState::kDeferred)
-      LazyImageHelper::StartMonitoring(GetElement());
+    if (lazy_image_load_state_ == LazyImageLoadState::kDeferred) {
+      if (new_image_content->IsLoaded() &&
+          RuntimeEnabledFeatures::LazyImageConformantLoadEventTimingEnabled()) {
+        LazyImageHelper::StopMonitoring(GetElement());
+        lazy_image_load_state_ = LazyImageLoadState::kFullImage;
+        EnqueueImageLoadingMicroTask(kUpdateNormal);
+      } else {
+        LazyImageHelper::StartMonitoring(GetElement());
+      }
+    }
   }
   delay_until_image_notify_finished_ = nullptr;
 }
@@ -517,7 +529,8 @@ void ImageLoader::DoUpdateFromElement(const DOMWrapperWorld* world,
           GetElement()->GetExecutionContext()->IsSecureContext()) {
         resource_request.SetBrowsingTopics(true);
         UseCounter::Count(document, mojom::blink::WebFeature::kTopicsAPIImg);
-        UseCounter::Count(document, mojom::blink::WebFeature::kTopicsAPIAll);
+        Deprecation::CountDeprecation(GetElement()->GetExecutionContext(),
+                                      WebFeature::kTopicsAPIAll);
       }
     }
 
@@ -619,7 +632,7 @@ void ImageLoader::DoUpdateFromElement(const DOMWrapperWorld* world,
     // dispatched.
     if (new_image_content) {
       new_image_content->AddObserver(this);
-      document.Fetcher()->MaybeStartSpeculativeImageDecode();
+      document.Fetcher()->StartSpeculativeImageDecodes();
     }
     if (old_image_content) {
       old_image_content->RemoveObserver(this);
@@ -763,8 +776,11 @@ void ImageLoader::ImageChanged(ImageResourceContent* content,
   if (!document.IsActive())
     return;
 
-  delay_until_image_notify_finished_ =
-      std::make_unique<IncrementLoadEventDelayCount>(document);
+  if (lazy_image_load_state_ != LazyImageLoadState::kDeferred ||
+      !RuntimeEnabledFeatures::LazyImageConformantLoadEventTimingEnabled()) {
+    delay_until_image_notify_finished_ =
+        std::make_unique<IncrementLoadEventDelayCount>(document);
+  }
 }
 
 void ImageLoader::ImageNotifyFinished(ImageResourceContent* content) {
@@ -778,9 +794,23 @@ void ImageLoader::ImageNotifyFinished(ImageResourceContent* content) {
   CHECK(!image_complete_);
 
   if (lazy_image_load_state_ == LazyImageLoadState::kDeferred) {
-    // A placeholder was requested, but the result was an error or a full image.
-    // In these cases, consider this as the final image and suppress further
-    // reloading and proceed to the image load completion process below.
+    // Some other content may have triggered the load of this image, but that
+    // shouldn't fire this <img loading="lazy">'s load event at this time,
+    // because in the spec this <img> is still in Step 25 of
+    // https://html.spec.whatwg.org/#update-the-image-data.
+    // When LazyLoadImageObserver reports it to be intersecting (or close to)
+    // the viewport later (i.e. this <img> proceeds to Step 26 of the spec),
+    // actual load/error event will be fired, by going through the loading
+    // process again from `UpdateFromElement()`. Note that in Chromium
+    // implementation (unlike in the spec), the image content itself can be
+    // still loaded/updated even in this case, which can be observed via e.g.
+    // <img>'s width/height.
+    if (RuntimeEnabledFeatures::LazyImageConformantLoadEventTimingEnabled()) {
+      return;
+    }
+    // TODO(paint-dev): This is incorrect legacy behavior: the loading="lazy"
+    // <img> will fire its load event immediately. If the above feature flag
+    // doesn't cause breakage this should be removed.
     LazyImageHelper::StopMonitoring(GetElement());
     lazy_image_load_state_ = LazyImageLoadState::kFullImage;
   }
@@ -802,7 +832,6 @@ void ImageLoader::ImageNotifyFinished(ImageResourceContent* content) {
     }
   }
 
-
   DispatchDecodeRequestsIfComplete();
 
   if (content->ErrorOccurred()) {
@@ -823,10 +852,9 @@ void ImageLoader::ImageNotifyFinished(ImageResourceContent* content) {
   pending_load_event_ = PostCancellableTask(
       *GetElement()->GetDocument().GetTaskRunner(TaskType::kDOMManipulation),
       FROM_HERE,
-      WTF::BindOnce(&ImageLoader::DispatchPendingLoadEvent,
-                    WrapPersistent(this),
-                    std::make_unique<IncrementLoadEventDelayCount>(
-                        GetElement()->GetDocument())));
+      BindOnce(&ImageLoader::DispatchPendingLoadEvent, WrapPersistent(this),
+               std::make_unique<IncrementLoadEventDelayCount>(
+                   GetElement()->GetDocument())));
 }
 
 LayoutImageResource* ImageLoader::GetLayoutImageResource() const {
@@ -997,8 +1025,8 @@ ScriptPromise<IDLUndefined> ImageLoader::Decode(
   auto* request = MakeGarbageCollected<DecodeRequest>(
       this, MakeGarbageCollected<ScriptPromiseResolver<IDLUndefined>>(
                 script_state, exception_state.GetContext()));
-  execution_context->GetAgent()->event_loop()->EnqueueMicrotask(WTF::BindOnce(
-      &DecodeRequest::ProcessForTask, WrapWeakPersistent(request)));
+  execution_context->GetAgent()->event_loop()->EnqueueMicrotask(
+      BindOnce(&DecodeRequest::ProcessForTask, WrapWeakPersistent(request)));
   decode_requests_.push_back(request);
   return request->promise();
 }

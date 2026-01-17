@@ -8,7 +8,6 @@
 #include <memory>
 #include <utility>
 
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -29,6 +28,7 @@
 #include "content/public/browser/media_session.h"
 #include "content/public/browser/media_session_client.h"
 #include "content/public/browser/navigation_handle.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/common/content_client.h"
@@ -39,10 +39,13 @@
 #include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "services/media_session/public/cpp/media_image_manager.h"
 #include "services/media_session/public/mojom/audio_focus.mojom.h"
+#include "services/metrics/public/cpp/ukm_builders.h"
+#include "services/metrics/public/cpp/ukm_recorder.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/mojom/favicon/favicon_url.mojom.h"
 #include "third_party/blink/public/strings/grit/blink_strings.h"
 #include "ui/gfx/favicon_size.h"
+#include "url/url_constants.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "content/browser/media/session/media_session_android.h"
@@ -277,8 +280,13 @@ void MediaSessionImpl::WebContentsDestroyed() {
 
 void MediaSessionImpl::RenderFrameDeleted(RenderFrameHost* rfh) {
   const auto rfh_id = rfh->GetGlobalId();
-  if (services_.count(rfh_id))
-    OnServiceDestroyed(services_[rfh_id]);
+  if (auto it = services_.find(rfh_id); it != services_.end()) {
+    OnServiceDestroyed(it->second);
+  }
+}
+
+void MediaSessionImpl::PrimaryPageChanged(content::Page& page) {
+  last_auto_picture_in_picture_info_.reset();
 }
 
 void MediaSessionImpl::DidFinishNavigation(
@@ -296,8 +304,9 @@ void MediaSessionImpl::DidFinishNavigation(
   }
 
   const auto rfh_id = navigation_handle->GetRenderFrameHost()->GetGlobalId();
-  if (services_.count(rfh_id))
-    services_[rfh_id]->DidFinishNavigation();
+  if (auto it = services_.find(rfh_id); it != services_.end()) {
+    it->second->DidFinishNavigation();
+  }
 
   RebuildAndNotifyMetadataChanged();
 }
@@ -459,10 +468,12 @@ bool MediaSessionImpl::AddPlayer(MediaSessionPlayerObserver* observer,
     if (current_focus_type == AudioFocusType::kGain ||
         current_focus_type == required_audio_focus_type) {
       auto iter = normal_players_.find(key);
-      if (iter == normal_players_.end())
+      if (iter == normal_players_.end()) {
         normal_players_.emplace(std::move(key), required_audio_focus_type);
-      else
+        NotifyPlayerOfAutoPictureInPictureInfo(observer, player_id);
+      } else {
         iter->second = required_audio_focus_type;
+      }
 
       UpdateRoutedService();
       RebuildAndNotifyMediaSessionInfoChanged();
@@ -500,10 +511,12 @@ bool MediaSessionImpl::AddPlayer(MediaSessionPlayerObserver* observer,
   }
 
   auto iter = normal_players_.find(key);
-  if (iter == normal_players_.end())
+  if (iter == normal_players_.end()) {
     normal_players_.emplace(std::move(key), required_audio_focus_type);
-  else
+    NotifyPlayerOfAutoPictureInPictureInfo(observer, player_id);
+  } else {
     iter->second = required_audio_focus_type;
+  }
 
   UpdateRoutedService();
   RebuildAndNotifyMediaSessionInfoChanged();
@@ -564,9 +577,15 @@ void MediaSessionImpl::OnPlayerPaused(MediaSessionPlayerObserver* observer,
   // to this session (e.g. a silent video) is paused. MediaSessionImpl
   // should ignore the paused player for this case.
   PlayerIdentifier identifier(observer, player_id);
-  if (!normal_players_.count(identifier) &&
-      !one_shot_players_.count(identifier) &&
-      !ambient_players_.count(identifier)) {
+  bool normal_players_contains_identifier =
+      normal_players_.contains(identifier);
+  bool one_shot_players_contains_identifier =
+      one_shot_players_.contains(identifier);
+  bool ambient_players_contains_identifier =
+      ambient_players_.contains(identifier);
+  if (!normal_players_contains_identifier &&
+      !one_shot_players_contains_identifier &&
+      !ambient_players_contains_identifier) {
     return;
   }
 
@@ -578,14 +597,14 @@ void MediaSessionImpl::OnPlayerPaused(MediaSessionPlayerObserver* observer,
 
   // If the player is a one-shot player, just remove it since it is not expected
   // to resume a one-shot player via resuming MediaSession.
-  if (one_shot_players_.count(identifier)) {
+  if (one_shot_players_contains_identifier) {
     RemovePlayer(observer, player_id);
     return;
   }
 
   // If the player is an ambient player, just remove it since it is not expected
   // to resume an ambient player via resuming MediaSession.
-  if (ambient_players_.count(identifier)) {
+  if (ambient_players_contains_identifier) {
     RemovePlayer(observer, player_id);
     return;
   }
@@ -1142,6 +1161,9 @@ MediaSessionImpl::GetMediaSessionInfoSync() {
 
   info->meets_visibility_threshold = HasSufficientlyVisibleVideo();
 
+  info->can_enter_browser_initiated_autopip =
+      CanEnterBrowserInitiatedAutomaticPictureInPicture();
+
   return info;
 }
 
@@ -1254,12 +1276,14 @@ void MediaSessionImpl::ScrubTo(base::TimeDelta seek_time) {
 }
 
 void MediaSessionImpl::EnterPictureInPicture() {
-  if (base::FeatureList::IsEnabled(
-          blink::features::kMediaSessionEnterPictureInPicture) &&
-      ShouldRouteAction(
+  if (ShouldRouteAction(
           media_session::mojom::MediaSessionAction::kEnterPictureInPicture)) {
     DidReceiveAction(
-        media_session::mojom::MediaSessionAction::kEnterPictureInPicture);
+        media_session::mojom::MediaSessionAction::kEnterPictureInPicture,
+        blink::mojom::MediaSessionActionDetails::NewEnterPictureInPicture(
+            blink::mojom::MediaSessionEnterPictureInPictureDetails::New(
+                blink::mojom::MediaSessionEnterPictureInPictureReason::
+                    kUserAction)));
     uma_helper_.RecordEnterPictureInPicture(
         MediaSessionUmaHelper::EnterPictureInPictureType::kRegisteredManual);
     return;
@@ -1274,7 +1298,7 @@ void MediaSessionImpl::EnterPictureInPicture() {
   normal_players_.begin()->first.observer->OnEnterPictureInPicture(
       normal_players_.begin()->first.player_id);
   uma_helper_.RecordEnterPictureInPicture(
-      MediaSessionUmaHelper::EnterPictureInPictureType::kDefaultHandler);
+      MediaSessionUmaHelper::EnterPictureInPictureType::kDefaultManual);
 }
 
 void MediaSessionImpl::ExitPictureInPicture() {
@@ -1282,10 +1306,6 @@ void MediaSessionImpl::ExitPictureInPicture() {
 }
 
 void MediaSessionImpl::EnterAutoPictureInPicture() {
-  if (!base::FeatureList::IsEnabled(
-          blink::features::kMediaSessionEnterPictureInPicture)) {
-    return;
-  }
   if (!ShouldRouteAction(
           media_session::mojom::MediaSessionAction::kEnterPictureInPicture)) {
     MaybeEnterBrowserInitiatedAutomaticPictureInPicture();
@@ -1293,7 +1313,11 @@ void MediaSessionImpl::EnterAutoPictureInPicture() {
   }
 
   DidReceiveAction(
-      media_session::mojom::MediaSessionAction::kEnterPictureInPicture);
+      media_session::mojom::MediaSessionAction::kEnterPictureInPicture,
+      blink::mojom::MediaSessionActionDetails::NewEnterPictureInPicture(
+          blink::mojom::MediaSessionEnterPictureInPictureDetails::New(
+              blink::mojom::MediaSessionEnterPictureInPictureReason::
+                  kContentOccluded)));
   uma_helper_.RecordEnterPictureInPicture(
       MediaSessionUmaHelper::EnterPictureInPictureType::kRegisteredAutomatic);
   ReportAutoPictureInPictureInfoChanged();
@@ -1360,7 +1384,7 @@ void MediaSessionImpl::GetMediaImageBitmap(
   bool found = false;
   bool source_icon = false;
   for (auto& image_type : images_) {
-    if (base::Contains(image_type.second, image)) {
+    if (std::ranges::contains(image_type.second, image)) {
       found = true;
 
       if (image_type.first ==
@@ -1374,7 +1398,7 @@ void MediaSessionImpl::GetMediaImageBitmap(
   // Or the `image` is in chapters.
   if (!found) {
     for (auto& chapter : metadata_.chapters) {
-      if (base::Contains(chapter.artwork(), image)) {
+      if (std::ranges::contains(chapter.artwork(), image)) {
         found = true;
         break;
       }
@@ -1411,6 +1435,12 @@ void MediaSessionImpl::ReportAutoPictureInPictureInfoChanged() {
   const auto auto_picture_in_picture_info =
       media::PictureInPictureEventsInfo::AutoPipInfo{
           content_client->browser()->GetAutoPipInfo(*web_contents())};
+
+  if (last_auto_picture_in_picture_info_ == auto_picture_in_picture_info) {
+    return;
+  }
+
+  last_auto_picture_in_picture_info_ = auto_picture_in_picture_info;
 
   ForAllPlayers(base::BindRepeating(
       [](const media::PictureInPictureEventsInfo::AutoPipInfo&
@@ -1499,7 +1529,11 @@ bool MediaSessionImpl::AddOneShotPlayer(MediaSessionPlayerObserver* observer,
   if (result == AudioFocusDelegate::AudioFocusResult::kFailed)
     return false;
 
-  one_shot_players_.insert(PlayerIdentifier(observer, player_id));
+  const PlayerIdentifier identifier(observer, player_id);
+  if (!one_shot_players_.contains(identifier)) {
+    one_shot_players_.insert(identifier);
+    NotifyPlayerOfAutoPictureInPictureInfo(observer, player_id);
+  }
 
   UpdateRoutedService();
   RebuildAndNotifyMediaSessionInfoChanged();
@@ -1582,6 +1616,7 @@ void MediaSessionImpl::OnMediaSessionInfoChanged(
     return;
 
   RebuildAndNotifyMediaSessionInfoChanged();
+  RebuildAndNotifyActionsChanged();
 }
 
 void MediaSessionImpl::DidReceiveAction(
@@ -1683,8 +1718,7 @@ RenderFrameHost* MediaSessionImpl::ComputeFrameForRouting(bool ensure_service) {
 
   // If we cannot find a suitable frame, take the top-most frame with an active
   // MediaSessionService.
-  if (!best_frame && base::FeatureList::IsEnabled(
-                         blink::features::kMediaSessionEnterPictureInPicture)) {
+  if (!best_frame) {
     // `FrameTree::Nodes()` iterates in breadth-first order, so this is
     // guaranteed to find the topmost (or tied topmost) frame with an active
     // MediaSessionService.
@@ -1742,7 +1776,7 @@ void MediaSessionImpl::SetRemotePlaybackMetadata(
 
 bool MediaSessionImpl::ShouldRouteAction(
     media_session::mojom::MediaSessionAction action) const {
-  return routed_service_ && base::Contains(routed_service_->actions(), action);
+  return routed_service_ && routed_service_->actions().contains(action);
 }
 
 const base::UnguessableToken& MediaSessionImpl::GetSourceId() const {
@@ -1798,10 +1832,7 @@ void MediaSessionImpl::RebuildAndNotifyActionsChanged() {
 
   // If the website has specified an action handler for 'enterpictureinpicture',
   // then we should expose EnterAutoPictureInPicture as an available action.
-  if (base::FeatureList::IsEnabled(
-          blink::features::kMediaSessionEnterPictureInPicture) &&
-      base::Contains(
-          actions,
+  if (actions.contains(
           media_session::mojom::MediaSessionAction::kEnterPictureInPicture)) {
     actions.insert(
         media_session::mojom::MediaSessionAction::kEnterAutoPictureInPicture);
@@ -1809,25 +1840,22 @@ void MediaSessionImpl::RebuildAndNotifyActionsChanged() {
         media_session::mojom::MediaSessionAction::kExitPictureInPicture);
   }
 
-  if (base::FeatureList::IsEnabled(
-          media::kGlobalMediaControlsPictureInPicture)) {
-    if (IsPictureInPictureAvailable()) {
-      actions.insert(
-          media_session::mojom::MediaSessionAction::kEnterPictureInPicture);
-      actions.insert(
-          media_session::mojom::MediaSessionAction::kExitPictureInPicture);
-    } else if (web_contents()->HasPictureInPictureVideo() ||
-               web_contents()->HasPictureInPictureDocument()) {
-      // If the media is already in the picture-in-picture state, we allow the
-      // player to exit it.
-      actions.insert(
-          media_session::mojom::MediaSessionAction::kExitPictureInPicture);
-    }
+  if (IsPictureInPictureAvailable()) {
+    actions.insert(
+        media_session::mojom::MediaSessionAction::kEnterPictureInPicture);
+    actions.insert(
+        media_session::mojom::MediaSessionAction::kExitPictureInPicture);
+  } else if (web_contents()->HasPictureInPictureVideo() ||
+             web_contents()->HasPictureInPictureDocument()) {
+    // If the media is already in the picture-in-picture state, we allow the
+    // player to exit it.
+    actions.insert(
+        media_session::mojom::MediaSessionAction::kExitPictureInPicture);
   }
 
-  // If the website could enter browser initiated automatic picture in picture,
+  // If the website could enter browser-initiated automatic picture in picture,
   // then we should expose EnterAutoPictureInPicture as an available action.
-  if (CouldEnterBrowserInitiatedAutomaticPictureInPicture()) {
+  if (CanEnterBrowserInitiatedAutomaticPictureInPicture()) {
     actions.insert(
         media_session::mojom::MediaSessionAction::kEnterAutoPictureInPicture);
     actions.insert(
@@ -1950,16 +1978,21 @@ void MediaSessionImpl::BuildMetadata(
   }
 
   if (source_title.empty()) {
-    // If the url is a file then we should display a placeholder.
-    source_title =
-        url.SchemeIsFile()
-            ? content_client->GetLocalizedString(IDS_MEDIA_SESSION_FILE_SOURCE)
-            : url_formatter::FormatUrl(
-                  url::Origin::Create(url).GetURL(),
-                  url_formatter::kFormatUrlOmitDefaults |
-                      url_formatter::kFormatUrlOmitHTTPS |
-                      url_formatter::kFormatUrlOmitTrivialSubdomains,
-                  base::UnescapeRule::SPACES, nullptr, nullptr, nullptr);
+    // If the url is a file or a data url then we should display a placeholder.
+    if (url.SchemeIsFile()) {
+      source_title =
+          content_client->GetLocalizedString(IDS_MEDIA_SESSION_FILE_SOURCE);
+    } else if (url.SchemeIs(url::kDataScheme)) {
+      source_title =
+          content_client->GetLocalizedString(IDS_MEDIA_SESSION_DATA_SOURCE);
+    } else {
+      source_title = url_formatter::FormatUrl(
+          url::Origin::Create(url).GetURL(),
+          url_formatter::kFormatUrlOmitDefaults |
+              url_formatter::kFormatUrlOmitHTTPS |
+              url_formatter::kFormatUrlOmitTrivialSubdomains,
+          base::UnescapeRule::SPACES, nullptr, nullptr, nullptr);
+    }
   }
 
   metadata.source_title = source_title;
@@ -2128,14 +2161,36 @@ void MediaSessionImpl::SetShouldThrottleDurationUpdateForTest(
   should_throttle_duration_update_ = should_throttle;
 }
 
-bool MediaSessionImpl::CouldEnterBrowserInitiatedAutomaticPictureInPicture()
+bool MediaSessionImpl::IsActivelyUsingCameraOrMicrophone() const {
+  if (!routed_service_) {
+    return false;
+  }
+
+  return routed_service_->microphone_state() ==
+             media_session::mojom::MicrophoneState::kUnmuted ||
+         routed_service_->camera_state() ==
+             media_session::mojom::CameraState::kTurnedOn;
+}
+
+bool MediaSessionImpl::CanEnterBrowserInitiatedAutomaticPictureInPicture()
     const {
-  if (!base::FeatureList::IsEnabled(
-          blink::features::kBrowserInitiatedAutomaticPictureInPicture)) {
+  if (!IsBrowserInitiatedPictureInPictureEnabled()) {
+    return false;
+  }
+
+  // If the website has specified an action handler for 'enterpictureinpicture',
+  // then we should not enter browser-initiated automatic picture-in-picture.
+  if (routed_service_ &&
+      routed_service_->actions().contains(
+          media_session::mojom::MediaSessionAction::kEnterPictureInPicture)) {
     return false;
   }
 
   if (!IsPictureInPictureAvailable()) {
+    return false;
+  }
+
+  if (IsActivelyUsingCameraOrMicrophone()) {
     return false;
   }
 
@@ -2148,7 +2203,7 @@ bool MediaSessionImpl::CouldEnterBrowserInitiatedAutomaticPictureInPicture()
     return false;
   }
 
-  // Ensure that browser initiated automatic picture-in-picture is only allowed
+  // Ensure that browser-initiated automatic picture-in-picture is only allowed
   // for the primary main frame.
   RenderFrameHost* frame = first.observer->render_frame_host();
   if (!frame || !frame->IsInPrimaryMainFrame()) {
@@ -2158,9 +2213,33 @@ bool MediaSessionImpl::CouldEnterBrowserInitiatedAutomaticPictureInPicture()
   return true;
 }
 
-void MediaSessionImpl::MaybeEnterBrowserInitiatedAutomaticPictureInPicture()
-    const {
-  if (!CouldEnterBrowserInitiatedAutomaticPictureInPicture()) {
+void MediaSessionImpl::RecordBrowserInitiatedAutomaticPictureInPictureUkm(
+    bool is_dry_run) {
+  ukm::UkmRecorder* ukm_recorder = ukm::UkmRecorder::Get();
+  if (!ukm_recorder) {
+    return;
+  }
+
+  ukm::SourceId source_id = GetRoutedFrame()->GetPageUkmSourceId();
+  if (source_id == ukm::kInvalidSourceId) {
+    return;
+  }
+
+  ukm::builders::
+      Media_AutoPictureInPicture_EnterPictureInPicture_AutomaticReason_BrowserInitiated(
+          source_id)
+          .SetIsDryRun(is_dry_run)
+          .Record(ukm_recorder);
+}
+
+void MediaSessionImpl::MaybeEnterBrowserInitiatedAutomaticPictureInPicture() {
+  if (!IsBrowserInitiatedPictureInPictureEnabled()) {
+    return;
+  }
+
+  ReportAutoPictureInPictureInfoChanged();
+
+  if (!CanEnterBrowserInitiatedAutomaticPictureInPicture()) {
     return;
   }
 
@@ -2168,8 +2247,34 @@ void MediaSessionImpl::MaybeEnterBrowserInitiatedAutomaticPictureInPicture()
   // initiated automatic picture-in-picture.
   CHECK_EQ(normal_players_.size(), 1u);
 
-  auto& first = normal_players_.begin()->first;
-  first.observer->OnEnterPictureInPicture(first.player_id);
+  if (base::FeatureList::IsEnabled(
+          blink::features::kBrowserInitiatedAutomaticPictureInPicture)) {
+    auto& first = normal_players_.begin()->first;
+    first.observer->OnEnterPictureInPicture(first.player_id);
+    RecordBrowserInitiatedAutomaticPictureInPictureUkm(false);
+  } else {
+    RecordBrowserInitiatedAutomaticPictureInPictureUkm(true);
+  }
+
+  uma_helper_.RecordEnterPictureInPicture(
+      MediaSessionUmaHelper::EnterPictureInPictureType::kDefaultAutomatic);
+}
+
+bool MediaSessionImpl::IsBrowserInitiatedPictureInPictureEnabled() const {
+  return base::FeatureList::IsEnabled(
+             blink::features::kBrowserInitiatedAutomaticPictureInPicture) ||
+         base::FeatureList::IsEnabled(
+             media::kBrowserInitiatedAutomaticPictureInPictureDryRun);
+}
+
+void MediaSessionImpl::NotifyPlayerOfAutoPictureInPictureInfo(
+    MediaSessionPlayerObserver* observer,
+    int player_id) {
+  if (!last_auto_picture_in_picture_info_) {
+    return;
+  }
+  observer->OnAutoPictureInPictureInfoChanged(
+      player_id, *last_auto_picture_in_picture_info_);
 }
 
 bool MediaSessionImpl::HasImageCacheForTest(const GURL& image_url) const {

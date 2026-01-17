@@ -13,6 +13,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.chromium.base.test.util.CommandLineFlags;
+import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.autofill.AutofillTestHelper;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
@@ -57,6 +58,7 @@ public class PaymentRequestPaymentAppsSortingTest {
     @Test
     @MediumTest
     @Feature({"Payments"})
+    @DisabledTest(message = "Flaky test, see crbug.com/441324330")
     public void testPaymentAppsSortingByFrecency() throws TimeoutException {
         // Install a payment app with Bob Pay and Alice Pay, and another payment app with Charlie
         // Pay.
@@ -64,7 +66,7 @@ public class PaymentRequestPaymentAppsSortingTest {
         TestPay appB = new TestPay("https://bobpay.test", AppSpeed.FAST_APP);
         TestPay appC = new TestPay("https://charliepay.test", AppSpeed.FAST_APP);
         PaymentAppService.getInstance()
-                .addFactory(
+                .addUniqueFactory(
                         new PaymentAppFactoryInterface() {
                             @Override
                             public void create(PaymentAppFactoryDelegate delegate) {
@@ -74,7 +76,8 @@ public class PaymentRequestPaymentAppsSortingTest {
                                 delegate.onPaymentAppCreated(appC);
                                 delegate.onDoneCreatingPaymentApps(/* factory= */ this);
                             }
-                        });
+                        },
+                        "testFactoryId");
         String alicePayId = appA.getIdentifier();
         String bobPayId = appB.getIdentifier();
         String charliePayId = appC.getIdentifier();

@@ -66,6 +66,7 @@ class TestImageBacking : public SharedImageBacking {
     in_use_by_window_server_ = in_use_by_window_server;
   }
   bool in_use_by_window_server() const { return in_use_by_window_server_; }
+  void MarkBackingInUse(bool in_use) { in_use_by_window_server_ = in_use; }
 #endif  // BUILDFLAG(IS_APPLE)
 
  protected:
@@ -109,7 +110,7 @@ class TestImageBacking : public SharedImageBacking {
 #endif
 
   bool upload_from_memory_called_ = false;
-  bool readback_to_memory_called_ = true;
+  bool readback_to_memory_called_ = false;
   PurgeableCallback set_purgeable_callback_;
   PurgeableCallback set_not_purgeable_callback_;
 };

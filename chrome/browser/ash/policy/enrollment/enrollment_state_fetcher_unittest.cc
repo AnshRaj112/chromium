@@ -417,13 +417,18 @@ TEST_F(EnrollmentStateFetcherTest, OwnershipTaken) {
 
   const AutoEnrollmentState state = FetchEnrollmentState();
 
-  EXPECT_EQ(state, AutoEnrollmentResult::kNoEnrollment);
+  EXPECT_EQ(state, AutoEnrollmentResult::kDeviceAlreadyOwned);
 }
 
 TEST_F(EnrollmentStateFetcherTest, OwnershipUnknown) {
   EXPECT_CALL(device_settings_service_, GetOwnershipStatusAsync)
       .WillOnce(RunOnceCallback<0>(
           ash::DeviceSettingsService::OwnershipStatus::kOwnershipUnknown));
+
+  // In case of unknown ownership, we continue with state determination:
+  psm_test_case_ = psm::testing::LoadTestCase(/*is_member=*/false);
+  ExpectOprfRequest();
+  ExpectQueryRequest();
 
   const AutoEnrollmentState state = FetchEnrollmentState();
 
@@ -718,21 +723,6 @@ TEST_F(EnrollmentStateFetcherTest, UmaHistogramsTimes) {
   histograms.ExpectTotalCount(base::StrCat({ds, kUMASuffixEnrollment}), 0);
   histograms.ExpectTotalCount(base::StrCat({ds, kUMASuffixServerError}), 0);
   histograms.ExpectTotalCount(kUMAStateDeterminationTotalDuration, 1);
-
-  const char* step_d = kUMAStateDeterminationStepDuration;
-  histograms.ExpectUniqueTimeSample(
-      base::StrCat({step_d, kUMASuffixOwnershipCheck}), base::Seconds(1), 1);
-  histograms.ExpectUniqueTimeSample(
-      base::StrCat({step_d, kUMASuffixOPRFRequest}), base::Seconds(2), 1);
-  histograms.ExpectUniqueTimeSample(
-      base::StrCat({step_d, kUMASuffixQueryRequest}), base::Seconds(3), 1);
-  if (AutoEnrollmentTypeChecker::AreFREStateKeysSupported()) {
-    histograms.ExpectUniqueTimeSample(
-        base::StrCat({step_d, kUMASuffixStateKeysRetrieval}), base::Seconds(4),
-        1);
-  }
-  histograms.ExpectUniqueTimeSample(
-      base::StrCat({step_d, kUMASuffixStateRequest}), base::Seconds(5), 1);
 }
 
 TEST_F(EnrollmentStateFetcherTest, PackagedLicenseWithoutEnrollment) {

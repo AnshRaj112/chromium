@@ -33,6 +33,7 @@ class ClientNativePixmapCast : public gfx::ClientNativePixmap {
   void Unmap() override { NOTREACHED(); }
   int GetStride(size_t plane) const override { NOTREACHED(); }
   gfx::NativePixmapHandle CloneHandleForIPC() const override { NOTREACHED(); }
+  uint64_t GetPlaneSize(size_t plane) const override { NOTREACHED(); }
 
  private:
   gfx::NativePixmapHandle pixmap_handle_;
@@ -44,7 +45,7 @@ class ClientNativePixmapFactoryCast : public gfx::ClientNativePixmapFactory {
   std::unique_ptr<gfx::ClientNativePixmap> ImportFromHandle(
       gfx::NativePixmapHandle handle,
       const gfx::Size& size,
-      gfx::BufferFormat format,
+      viz::SharedImageFormat format,
       gfx::BufferUsage usage) override {
     return std::make_unique<ClientNativePixmapCast>(std::move(handle));
   }

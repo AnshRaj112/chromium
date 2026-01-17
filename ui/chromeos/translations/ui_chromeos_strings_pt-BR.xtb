@@ -35,6 +35,7 @@
 <translation id="1249250836236328755">Gênero</translation>
 <translation id="1254593899333212300">Conexão direta à Internet</translation>
 <translation id="1272293450992660632">Os valores do PIN não correspondem.</translation>
+<translation id="1279040297980392566">Aguardando o término da verificação. Tente outra vez mais tarde</translation>
 <translation id="1280820357415527819">Pesquisando redes móveis</translation>
 <translation id="1293556467332435079">Arquivos</translation>
 <translation id="1297922636971898492">O Google Drive não está disponível no momento. O upload será reiniciado automaticamente assim que o Google Drive estiver de volta.</translation>
@@ -47,7 +48,7 @@
 <translation id="1363028406613469049">Rastrear</translation>
 <translation id="1378727793141957596">Bem-vindo ao Google Drive!</translation>
 <translation id="1379911846207762492">É possível disponibilizar arquivos off-line para permitir o acesso quando não houver uma conexão de Internet.</translation>
-<translation id="1383876407941801731">Pesquisar</translation>
+<translation id="1383876407941801731">Pesquise</translation>
 <translation id="1388045380422025115">Todos os tipos</translation>
 <translation id="1395262318152388157">Controle deslizante de busca</translation>
 <translation id="1399511500114202393">Nenhum certificado do usuário</translation>
@@ -64,7 +65,7 @@
 <translation id="1497522201463361063">Não foi possível renomear "<ph name="FILE_NAME" />". <ph name="ERROR_MESSAGE" /></translation>
 <translation id="1499943022354839699">Inglês (EUA) com teclado Dvorak</translation>
 <translation id="1515909359182093592"><ph name="INPUT_LABEL" /> - Host</translation>
-<translation id="1521655867290435174">Planilhas Google</translation>
+<translation id="1521655867290435174">Google Planilhas</translation>
 <translation id="1547964879613821194">Inglês canadense</translation>
 <translation id="1556189134700913550">Aplicar a todas</translation>
 <translation id="1561842594491319104">Dispositivos Chrome</translation>
@@ -109,7 +110,6 @@
 <translation id="1813278315230285598">Serviços</translation>
 <translation id="181434555916624618">Por enquanto, os resultados com pessoas não vão aparecer. Tente algo diferente.</translation>
 <translation id="1829129547161959350">Pinguim</translation>
-<translation id="183183971458492120">Carregando informações…</translation>
 <translation id="1832073788765803750">Katakana com meia largura</translation>
 <translation id="1834290891154666894">Entrada inválida de correspondência do nome alternativo do assunto</translation>
 <translation id="1838709767668011582">Site Google</translation>
@@ -146,13 +146,13 @@
 <translation id="2142680004883808240">Russo com teclado fonético YaZHert</translation>
 <translation id="2143778271340628265">Configuração manual de proxy</translation>
 <translation id="2148716181193084225">Hoje</translation>
+<translation id="2161573825856688200">Projeto do Google</translation>
 <translation id="2163152940313951844">Caractere inválido: <ph name="CHARACTER_NAME" /></translation>
 <translation id="2178056538281447670">Microsoft 365</translation>
 <translation id="2184934335987813305">Português com teclado internacional de PC dos EUA</translation>
 <translation id="2193661397560634290">Uso: <ph name="SPACE_USED" /></translation>
 <translation id="2198315389084035571">Chinês simplificado</translation>
 <translation id="22085916256174561">Coreano</translation>
-<translation id="2208919847696382164">Instalar com o Linux</translation>
 <translation id="2215692307449050019">A bateria está fraca. A sincronização será retomada quando o dispositivo estiver conectado a uma fonte de energia.</translation>
 <translation id="2225536596944493418">Tem certeza de que quer excluir <ph name="NUMBER_OF_ITEMS" /> itens?</translation>
 <translation id="2230062665678605299">Não é possível criar a pasta "<ph name="FOLDER_NAME" />". <ph name="ERROR_MESSAGE" /></translation>
@@ -213,7 +213,6 @@
 <translation id="2653059201992392941">Você tem <ph name="RETRIES" /> tentativas restantes.</translation>
 <translation id="2663066752008346276">Birmanês (Mianmar) com teclado Myansan</translation>
 <translation id="2664412712123763093">Localização do arquivo</translation>
-<translation id="2718540689505416944">Instalar o app com o Linux</translation>
 <translation id="2719020180254996569">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, detalhes</translation>
 <translation id="2724954091494693138">Turco com teclado padrão F</translation>
 <translation id="2732288874651063549">Gerenciar compartilhamento de <ph name="VM_NAME" /></translation>
@@ -222,7 +221,6 @@
 <translation id="2764206540577097904">Você usou todo o armazenamento individual do Google Workspace.</translation>
 <translation id="2771816809568414714">Queijo</translation>
 <translation id="2781645665747935084">Belga</translation>
-<translation id="2782104745158847185">Erro ao instalar o aplicativo Linux</translation>
 <translation id="2802583107108007218">Saiba mais sobre essas restrições</translation>
 <translation id="2803375539583399270">Insira o PIN</translation>
 <translation id="2819519502129272135">Sincronização de arquivos desativada</translation>
@@ -249,7 +247,7 @@
 <translation id="3003189754374775221">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="NETWORK_PROVIDER_NAME" />, intensidade do sinal em <ph name="SIGNAL_STRENGTH" />%, conectar</translation>
 <translation id="3003633581067744647">Mudar para a visualização de miniaturas</translation>
 <translation id="3016566519832145558">Atenção: esses arquivos são temporários e podem ser excluídos automaticamente para liberar espaço em disco.</translation>
-<translation id="3029114385395636667">Ative o Documentos Google off-line para usar o Documentos, Planilhas e Apresentações off-line.</translation>
+<translation id="3029114385395636667">Ative o Google Docs off-line para usar o Documentos, Planilhas e Apresentações off-line.</translation>
 <translation id="303198083543495566">Região geográfica</translation>
 <translation id="3044404008258011032">Para restaurar esses itens, arraste-os para uma nova pasta fora da lixeira. A pasta original "<ph name="PARENT_FOLDER_NAME" />" foi excluída.</translation>
 <translation id="3047197340186497470">Chinês (dayi)</translation>
@@ -345,7 +343,6 @@
 <translation id="3786301125658655746">Você está off-line</translation>
 <translation id="3789841737615482174">Instalar</translation>
 <translation id="3793469551756281394">Tempo restante aproximado: <ph name="REMAINING_TIME_HOUR" /> <ph name="REMAINING_TIME_MINUTE" /></translation>
-<translation id="3798449238516105146">Versão</translation>
 <translation id="3801082500826908679">Faroês</translation>
 <translation id="3809272675881623365">Coelho</translation>
 <translation id="3810973564298564668">Gerenciar</translation>
@@ -353,14 +350,12 @@
 <translation id="3811494700605067549">1 arquivo selecionado</translation>
 <translation id="3817579325494460411">Não fornecido</translation>
 <translation id="3819448694985509187">PIN incorreto. Você tem 1 tentativa restante.</translation>
-<translation id="3822559385185038546">Este proxy é aplicado pelo seu administrador</translation>
 <translation id="3830674330436234648">Nenhuma reprodução disponível</translation>
 <translation id="383652340667548381">Sérvio</translation>
 <translation id="3839045880592694915">A operadora não permite que o modem se conecte. Entre em contato com a operadora para saber mais.</translation>
 <translation id="385051799172605136">Voltar</translation>
 <translation id="3855472144336161447">Alemão (Neo 2)</translation>
 <translation id="3858860766373142691">Nome</translation>
-<translation id="3866249974567520381">Descrição</translation>
 <translation id="3899991606604168269">Francês (Canadá) com teclado multilíngue</translation>
 <translation id="3901991538546252627">Conectando-se a <ph name="NAME" /></translation>
 <translation id="3906232975181435906">Instalando perfil móvel, rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" /></translation>
@@ -438,7 +433,6 @@
 <translation id="4477219268485577442">Búlgaro fonético</translation>
 <translation id="4508265954913339219">Falha na ativação</translation>
 <translation id="4509667233588080747">Inglês (EUA) com teclado Workman International</translation>
-<translation id="4522570452068850558">Saiba mais</translation>
 <translation id="4527800702232535228">Esta pasta está sendo compartilhada com o Parallels Desktop</translation>
 <translation id="4552678318981539154">Comprar mais espaço</translation>
 <translation id="4552759165874948005">Rede <ph name="NETWORK_TYPE" />, intensidade do sinal em <ph name="SIGNAL_STRENGTH" />%</translation>
@@ -456,7 +450,7 @@
 <translation id="4656777537938206294">Disponibilizar arquivos off-line</translation>
 <translation id="4658782175094886150">Pessoa na neve</translation>
 <translation id="4669606053856530811">Membros de '<ph name="SOURCE_NAME" />' perderão acesso a menos que esses itens sejam compartilhados com eles.</translation>
-<translation id="467809019005607715">Apresentações Google</translation>
+<translation id="467809019005607715">Google Slides</translation>
 <translation id="4690246192099372265">Sueco</translation>
 <translation id="4693155481716051732">Sushi</translation>
 <translation id="4694604912444486114">Macaco</translation>
@@ -596,13 +590,13 @@
 <translation id="5596627076506792578">Mais opções</translation>
 <translation id="5602622065581044566">Búlgaro com teclado fonético</translation>
 <translation id="5605830556594064952">Dvorak americano</translation>
+<translation id="560739212255190568">Seu admin definiu regras de substituição de proxy além de aplicar o seguinte proxy</translation>
 <translation id="5618330573454123917">Esse arquivo foi criado para computadores que usam o software Macintosh. Ele não é compatível com seu dispositivo ChromeOS. <ph name="BEGIN_LINK_HELP" />Saiba mais<ph name="END_LINK_HELP" /> sobre como abrir arquivos no ChromeOS.</translation>
 <translation id="5625294776298156701">Tâmil com teclado Tamil99</translation>
 <translation id="5633226425545095130">Se você mover esse item, ele será compartilhado com todos que podem ver a pasta compartilhada "<ph name="DESTINATION_NAME" />".</translation>
 <translation id="5649768706273821470">Ouvir</translation>
 <translation id="5650895901941743674">Verifique a configuração do APN</translation>
 <translation id="5669691691057771421">Digite o novo PIN</translation>
-<translation id="5678784840044122290">O aplicativo Linux estará disponível no seu terminal e também poderá mostrar um ícone no acesso rápido.</translation>
 <translation id="5686799162999241776"><ph name="BEGIN_BOLD" />Não é possível desconectar de um arquivo ou disco virtual<ph name="END_BOLD" />
    <ph name="LINE_BREAKS" />
    Feche todos os itens do arquivo ou disco virtual e tente novamente.</translation>
@@ -637,7 +631,6 @@
 <translation id="5861477046012235702">Gamer</translation>
 <translation id="5864471791310927901">Falha ao procurar DHCP</translation>
 <translation id="5896749729057314184">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, inativa, intensidade do sinal <ph name="SIGNAL_STRENGTH" />%, detalhes</translation>
-<translation id="5911887972742538906">Ocorreu um erro durante a instalação do aplicativo Linux.</translation>
 <translation id="5912396950572065471">Formato</translation>
 <translation id="5918480239180455431">Novos recursos de pesquisa disponíveis</translation>
 <translation id="5926082595146149752">Holandês (Países Baixos) com teclado internacional de PC dos EUA</translation>
@@ -787,7 +780,7 @@
 <translation id="7075931588889865715">Tailandês com teclado TIS 820-2531</translation>
 <translation id="708278670402572152">Desconectar para ativar a verificação</translation>
 <translation id="7086590977277044826">Tâmil com teclado InScript</translation>
-<translation id="7088615885725309056">Mais antigo</translation>
+<translation id="7088615885725309056">Mais antiga</translation>
 <translation id="7103992300314999525">Macedônio</translation>
 <translation id="7104338189998813914">Ocorreu um problema ao acessar sua conta do OneDrive</translation>
 <translation id="7106346894903675391">Adquirir mais espaço de armazenamento...</translation>
@@ -806,7 +799,6 @@
 <translation id="7238097264433196391">Nome do drive</translation>
 <translation id="7238643356913091553"><ph name="NETWORK_NAME" />, detalhes</translation>
 <translation id="7246947237293279874">Proxy FTP</translation>
-<translation id="7248671827512403053">Aplicativo</translation>
 <translation id="7256405249507348194">Erro não reconhecido: <ph name="DESC" /></translation>
 <translation id="7268659760406822741">Serviços disponíveis</translation>
 <translation id="7291818353625820805">Quer repetir teclas? Desative os acentos nas configurações do teclado</translation>
@@ -845,7 +837,7 @@
 <translation id="7547811415869834682">Holandês</translation>
 <translation id="7551643184018910560">Fixar na estante</translation>
 <translation id="7553492409867692754">Conceder aos apps do Linux permissão para acessar arquivos na pasta <ph name="FOLDER_NAME" /></translation>
-<translation id="7555339735447658365">No momento, você está off-line. A sincronização de arquivos será retomada quando houver uma conexão com a Internet.</translation>
+<translation id="7555339735447658365">No momento, você está off-line. A sincronização de arquivos será retomada quando houver uma conexão com a internet.</translation>
 <translation id="7589661784326793847">Aguarde um segundo</translation>
 <translation id="7600126690270271294">Sérvio</translation>
 <translation id="7603724359189955920">Grades</translation>
@@ -933,7 +925,6 @@
 <translation id="8151638057146502721">Configurar</translation>
 <translation id="8154666764013920974">{NUM_ERROR,plural, =1{1 erro.}one{# erro.}other{# erros.}}</translation>
 <translation id="8154842056504218462">Todas as entradas selecionadas.</translation>
-<translation id="8157684860301034423">Falha ao recuperar informações do app.</translation>
 <translation id="8175731104491895765">Francês (Bélgica)</translation>
 <translation id="8175799081768705361">Sincronizando <ph name="NUMBER_OF_FILES_SYNCING" /> arquivos do Drive</translation>
 <translation id="8179976553408161302">Entrar</translation>
@@ -995,6 +986,7 @@
 <translation id="8540608333167683902">Rede <ph name="NETWORK_INDEX" /> de <ph name="NETWORK_COUNT" />, <ph name="NETWORK_NAME" />, <ph name="CONNECTION_STATUS" />, intensidade do sinal em <ph name="SIGNAL_STRENGTH" />%, detalhes</translation>
 <translation id="8545476925160229291">Inglês (EUA)</translation>
 <translation id="854655314928502177">URL de descoberta automática de proxies da Web</translation>
+<translation id="8547747809824590510">Seu admin definiu regras de substituição de proxy</translation>
 <translation id="8549186985808798022">Italiano</translation>
 <translation id="8551494947769799688">Letão</translation>
 <translation id="8560515948038859357">Cantonês</translation>
@@ -1055,6 +1047,7 @@
 <translation id="9038620279323455325">O arquivo chamado "<ph name="FILE_NAME" />" já existe. Escolha outro nome.</translation>
 <translation id="9046895021617826162">Falha na conexão</translation>
 <translation id="9065512565307033593">Se você não conseguir fazer a verificação, o acesso à rede será desativado.</translation>
+<translation id="9079844694307518094">Seu admin está aplicando o seguinte proxy</translation>
 <translation id="908378762078012445">Russo com teclado fonético AATSEEL</translation>
 <translation id="9086302186042011942">Sincronizando</translation>
 <translation id="9099674669267916096">Contagem de páginas</translation>
@@ -1072,12 +1065,12 @@
 <translation id="9171921933192916600">Pessoa que ama ler</translation>
 <translation id="9172592259078059678">Guzerate (transliteração)</translation>
 <translation id="9173120999827300720">Inglês (EUA) com teclado internacional</translation>
-<translation id="9183302530794969518">Documentos Google</translation>
+<translation id="9183302530794969518">Google Docs</translation>
 <translation id="9189836632794948435">Cazaque</translation>
 <translation id="9200427192836333033"><ph name="NUMBER_OF_ITEMS" /> itens extraídos.</translation>
-<translation id="9213073329713032541">Instalação iniciada.</translation>
 <translation id="9219103736887031265">Imagens</translation>
 <translation id="9219908252191632183">Lunar</translation>
+<translation id="931652069802536959">A rede foi bloqueada por uma política</translation>
 <translation id="938470336146445890">Instale um certificado do usuário.</translation>
 <translation id="939736085109172342">Nova pasta</translation>
 <translation id="943972244133411984">Modificado por</translation>

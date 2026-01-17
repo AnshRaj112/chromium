@@ -5,6 +5,7 @@
 #include "chrome/browser/ui/views/tab_sharing/tab_sharing_status_message_view.h"
 
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/ui_features.h"
 #include "chrome/grit/generated_resources.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
@@ -14,16 +15,19 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/separator.h"
 #include "ui/views/layout/flex_layout.h"
+#include "ui/views/metadata/view_factory.h"
 #include "ui/views/view_class_properties.h"
 
 namespace {
 using EndpointInfo = ::TabSharingStatusMessageView::EndpointInfo;
+using InteractionWithControls = ::GetDisplayMediaUserInteractionWithControls;
 using MessageInfo = ::TabSharingStatusMessageView::MessageInfo;
 using TabRole = ::TabSharingInfoBarDelegate::TabRole;
 
 constexpr auto kButtonInsets = gfx::Insets::VH(2, 8);
+constexpr auto kRefreshButtonInsets = gfx::Insets::VH(4, 8);
+constexpr auto kRefreshSeparatorInsets = gfx::Insets::TLBR(12, 12, 12, 0);
 constexpr auto kSeparatorInsets = gfx::Insets::TLBR(0, 16, 0, 0);
-
 std::vector<std::u16string> EndpointInfosToStrings(
     const std::vector<EndpointInfo>& endpoint_infos) {
   std::vector<std::u16string> res;
@@ -33,24 +37,24 @@ std::vector<std::u16string> EndpointInfosToStrings(
   return res;
 }
 
-TabSharingInfoBarInteraction GetTabSharingInfoBarInteraction(
+InteractionWithControls GetTabSharingInfoBarInteraction(
     TabRole tab_role_for_uma,
     EndpointInfo::TargetType target_type) {
   switch (tab_role_for_uma) {
     case TabRole::kCapturingTab:
       CHECK_EQ(target_type, EndpointInfo::TargetType::kCapturedTab);
-      return TabSharingInfoBarInteraction::kCapturingToCaptured;
+      return InteractionWithControls::kCapturingToCapturedClicked;
     case TabRole::kCapturedTab:
       CHECK_EQ(target_type, EndpointInfo::TargetType::kCapturingTab);
-      return TabSharingInfoBarInteraction::kCapturedToCapturing;
+      return InteractionWithControls::kCapturedToCapturingClicked;
     case TabRole::kSelfCapturingTab:
       NOTREACHED();
     case TabRole::kOtherTab:
       switch (target_type) {
         case EndpointInfo::TargetType::kCapturedTab:
-          return TabSharingInfoBarInteraction::kOtherToCaptured;
+          return InteractionWithControls::kOtherToCapturedClicked;
         case EndpointInfo::TargetType::kCapturingTab:
-          return TabSharingInfoBarInteraction::kOtherToCapturing;
+          return InteractionWithControls::kOtherToCapturingClicked;
       }
   }
   NOTREACHED();
@@ -58,10 +62,14 @@ TabSharingInfoBarInteraction GetTabSharingInfoBarInteraction(
 
 void ActivateWebContents(
     content::GlobalRenderFrameHostId focus_target_id,
+    EndpointInfo::TargetType target_type,
     std::optional<TabSharingInfoBarDelegate::TabRole> tab_role_for_uma,
-    EndpointInfo::TargetType target_type) {
+    base::WeakPtr<ScreensharingControlsHistogramLogger> uma_logger) {
   if (tab_role_for_uma) {
-    RecordUma(GetTabSharingInfoBarInteraction(*tab_role_for_uma, target_type));
+    if (uma_logger) {
+      uma_logger->Log(
+          GetTabSharingInfoBarInteraction(*tab_role_for_uma, target_type));
+    }
   }
 
   content::RenderFrameHost* const rfh =
@@ -208,9 +216,12 @@ std::unique_ptr<views::View> TabSharingStatusMessageView::Create(
     const EndpointInfo& capturer_info,
     const std::u16string& capturer_name,
     TabSharingInfoBarDelegate::TabRole role,
-    TabSharingInfoBarDelegate::TabShareType capture_type) {
-  return std::make_unique<TabSharingStatusMessageView>(GetMessageInfo(
-      shared_tab_info, capturer_info, capturer_name, role, capture_type));
+    TabSharingInfoBarDelegate::TabShareType capture_type,
+    base::WeakPtr<ScreensharingControlsHistogramLogger> uma_logger) {
+  return std::make_unique<TabSharingStatusMessageView>(
+      GetMessageInfo(shared_tab_info, capturer_info, capturer_name, role,
+                     capture_type),
+      uma_logger);
 }
 
 std::u16string TabSharingStatusMessageView::GetMessageText(
@@ -226,10 +237,16 @@ std::u16string TabSharingStatusMessageView::GetMessageText(
 }
 
 TabSharingStatusMessageView::TabSharingStatusMessageView(
-    const MessageInfo& info) {
+    const MessageInfo& info,
+    base::WeakPtr<ScreensharingControlsHistogramLogger> uma_logger)
+    : uma_logger_(uma_logger) {
   SetupMessage(info);
+  const auto& separator_insets =
+      base::FeatureList::IsEnabled(features::kInfobarRefresh)
+          ? kRefreshSeparatorInsets
+          : kSeparatorInsets;
   AddChildView(views::Builder<views::Separator>()
-                   .SetProperty(views::kMarginsKey, kSeparatorInsets)
+                   .SetProperty(views::kMarginsKey, separator_insets)
                    .SetProperty(views::kFlexBehaviorKey,
                                 views::FlexSpecification(
                                     views::MinimumFlexSizeRule::kPreferred))
@@ -320,19 +337,28 @@ void TabSharingStatusMessageView::AddButton(
     std::optional<TabSharingInfoBarDelegate::TabRole> tab_role_for_uma) {
   views::MdTextButton* button =
       AddChildView(std::make_unique<views::MdTextButton>(
-          base::BindRepeating(&ActivateWebContents,
-                              endpoint_info.focus_target_id, tab_role_for_uma,
-                              endpoint_info.target_type),
+          base::BindRepeating(
+              &ActivateWebContents, endpoint_info.focus_target_id,
+              endpoint_info.target_type, tab_role_for_uma, uma_logger_),
           endpoint_info.text, views::style::CONTEXT_LABEL));
+
   button->SetStyle(ui::ButtonStyle::kTonal);
-  button->SetCustomPadding(kButtonInsets);
+
+  if (base::FeatureList::IsEnabled(features::kInfobarRefresh)) {
+    button->SetCustomPadding(kRefreshButtonInsets);
+    button->SetProperty(views::kCrossAxisAlignmentKey,
+                        views::LayoutAlignment::kCenter);
+    button->SetBgColorIdOverride(ui::kColorSysBaseContainerElevated);
+  } else {
+    button->SetCustomPadding(kButtonInsets);
+    button->SetBgColorIdOverride(ui::kColorSysNeutralContainer);
+  }
   button->SetTextColor(views::Button::ButtonState::STATE_NORMAL,
                        ui::kColorLinkForeground);
   button->SetTextColor(views::Button::ButtonState::STATE_HOVERED,
                        ui::kColorLinkForeground);
   button->SetTextColor(views::Button::ButtonState::STATE_PRESSED,
                        ui::kColorLinkForeground);
-  button->SetBgColorIdOverride(ui::kColorSysNeutralContainer);
   button->SetLabelStyle(views::style::STYLE_BODY_5_MEDIUM);
   button->SetProperty(
       views::kFlexBehaviorKey,

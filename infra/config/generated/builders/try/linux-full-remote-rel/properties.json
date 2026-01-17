@@ -17,7 +17,6 @@
               "project": "chromium"
             },
             "builder_spec": {
-              "build_gs_bucket": "chromium-gpu-archive",
               "builder_group": "chromium.gpu",
               "execution_mode": "COMPILE_AND_TEST",
               "legacy_chromium_config": {
@@ -45,7 +44,6 @@
               "project": "chromium"
             },
             "builder_spec": {
-              "build_gs_bucket": "chromium-linux-archive",
               "builder_group": "chromium.linux",
               "execution_mode": "COMPILE_AND_TEST",
               "legacy_chromium_config": {
@@ -73,7 +71,6 @@
               "project": "chromium"
             },
             "builder_spec": {
-              "build_gs_bucket": "chromium-gpu-archive",
               "builder_group": "chromium.gpu",
               "execution_mode": "TEST",
               "legacy_chromium_config": {
@@ -105,7 +102,6 @@
               "project": "chromium"
             },
             "builder_spec": {
-              "build_gs_bucket": "chromium-linux-archive",
               "builder_group": "chromium.linux",
               "execution_mode": "TEST",
               "legacy_chromium_config": {
@@ -157,7 +153,7 @@
         }
       ],
       "is_compile_only": true,
-      "targets_spec_directory": "src/infra/config/generated/builders/try/linux-full-remote-rel/targets"
+      "targets_spec_directory": "infra/config/generated/builders/try/linux-full-remote-rel/targets"
     }
   },
   "$build/code_coverage": {
@@ -173,11 +169,11 @@
       "remote-link"
     ],
     "enable_cloud_monitoring": true,
-    "enable_cloud_profiler": true,
     "enable_cloud_trace": true,
     "experiments": [],
-    "metrics_project": "chromium-reclient-metrics",
+    "keep_going": 3,
     "output_local_strategy": "minimum",
+    "profile_mode": "cloud",
     "project": "rbe-chromium-untrusted",
     "remote_jobs": -1
   },

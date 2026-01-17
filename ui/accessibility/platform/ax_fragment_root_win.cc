@@ -6,7 +6,6 @@
 
 #include <limits>
 
-#include "base/containers/contains.h"
 #include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_number_conversions.h"
@@ -17,7 +16,6 @@
 #include "base/trace_event/typed_macros.h"
 #include "base/win/scoped_safearray.h"
 #include "third_party/abseil-cpp/absl/container/flat_hash_map.h"
-#include "ui/accessibility/accessibility_features.h"
 #include "ui/accessibility/platform/ax_fragment_root_delegate_win.h"
 #include "ui/accessibility/platform/ax_platform.h"
 #include "ui/accessibility/platform/ax_platform_node_win.h"
@@ -338,9 +336,11 @@ AXFragmentRootWin* AXFragmentRootWin::GetFragmentRootParentOf(
 }
 
 gfx::NativeViewAccessible AXFragmentRootWin::GetNativeViewAccessible() {
-  // The fragment root is the entry point from the operating system for UI
-  // Automation. Signal when we're asked for a platform object on it.
-  AXPlatform::GetInstance().OnPropertiesUsedInBrowserUI();
+  if (!AXPlatformNodeWin::AreAXModeChangesPaused()) {
+    // The fragment root is the entry point from the operating system for UI
+    // Automation. Signal when we're asked for a platform object on it.
+    AXPlatform::GetInstance().OnPropertiesUsedInBrowserUI();
+  }
   return static_cast<AXFragmentRootPlatformNodeWin*>(platform_node_.get());
 }
 
@@ -462,11 +462,15 @@ void AXFragmentRootWin::OnEventListenerRemoved(
 }
 
 bool AXFragmentRootWin::HasEventListenerForEvent(EVENTID event_id) {
-  return base::Contains(event_listener_count_, event_id);
+  return event_listener_count_.contains(event_id);
 }
 
 bool AXFragmentRootWin::HasEventListenerForProperty(PROPERTYID property_id) {
-  return base::Contains(property_listener_count_, property_id);
+  return property_listener_count_.contains(property_id);
+}
+
+IRawElementProviderSimple* AXFragmentRootWin::GetProvider() {
+  return static_cast<AXFragmentRootPlatformNodeWin*>(platform_node_.get());
 }
 
 size_t AXFragmentRootWin::GetIndexInParentOfChild() const {

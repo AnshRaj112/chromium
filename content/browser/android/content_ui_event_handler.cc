@@ -17,13 +17,13 @@
 #include "ui/events/android/motion_event_android_java.h"
 #include "ui/events/android/motion_event_android_source_java.h"
 #include "ui/events/base_event_utils.h"
+#include "ui/events/event_constants.h"
 #include "ui/events/event_utils.h"
 
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "content/public/android/content_jni_headers/ContentUiEventHandler_jni.h"
 
 using base::android::AttachCurrentThread;
-using base::android::JavaParamRef;
 using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 
@@ -88,7 +88,7 @@ bool ContentUiEventHandler::ScrollTo(float x, float y) {
 
 void ContentUiEventHandler::SendMouseWheelEvent(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& motion_event,
+    const base::android::JavaRef<jobject>& motion_event,
     jlong time_ns) {
   auto* event_handler = GetRenderWidgetHostView();
   if (!event_handler)
@@ -136,10 +136,10 @@ void ContentUiEventHandler::SendMouseWheelEvent(
 
 void ContentUiEventHandler::SendMouseEvent(
     JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& motion_event,
+    const base::android::JavaRef<jobject>& motion_event,
     jlong time_ns,
-    jint android_action_button,
-    jint android_tool_type) {
+    int32_t android_action_button,
+    int32_t android_tool_type) {
   auto* event_handler = GetRenderWidgetHostView();
   if (!event_handler)
     return;
@@ -192,16 +192,16 @@ void ContentUiEventHandler::SendScrollEvent(JNIEnv* env,
   constexpr bool prevent_boosting = false;
   event_handler->OnGestureEvent(ui::GestureEventAndroid(
       ui::GESTURE_EVENT_TYPE_SCROLL_START, gfx::PointF(), gfx::PointF(),
-      time_ms, 0, -delta_xdip, -delta_ydip, 0, 0, target_viewport,
-      synthetic_scroll, prevent_boosting));
+      time_ms, ui::GestureDeviceType::DEVICE_TOUCHSCREEN, 0, -delta_xdip,
+      -delta_ydip, 0, 0, target_viewport, synthetic_scroll, prevent_boosting));
   event_handler->OnGestureEvent(ui::GestureEventAndroid(
       ui::GESTURE_EVENT_TYPE_SCROLL_BY, gfx::PointF(), gfx::PointF(), time_ms,
-      0, -delta_xdip, -delta_ydip, 0, 0, target_viewport, synthetic_scroll,
-      prevent_boosting));
+      ui::GestureDeviceType::DEVICE_TOUCHSCREEN, 0, -delta_xdip, -delta_ydip, 0,
+      0, target_viewport, synthetic_scroll, prevent_boosting));
   event_handler->OnGestureEvent(ui::GestureEventAndroid(
       ui::GESTURE_EVENT_TYPE_SCROLL_END, gfx::PointF(), gfx::PointF(), time_ms,
-      0, -delta_xdip, -delta_ydip, 0, 0, target_viewport, synthetic_scroll,
-      prevent_boosting));
+      ui::GestureDeviceType::DEVICE_TOUCHSCREEN, 0, -delta_xdip, -delta_ydip, 0,
+      0, target_viewport, synthetic_scroll, prevent_boosting));
 }
 
 void ContentUiEventHandler::CancelFling(JNIEnv* env, jlong time_ms) {
@@ -210,14 +210,15 @@ void ContentUiEventHandler::CancelFling(JNIEnv* env, jlong time_ms) {
     return;
   event_handler->OnGestureEvent(ui::GestureEventAndroid(
       ui::GESTURE_EVENT_TYPE_FLING_CANCEL, gfx::PointF(), gfx::PointF(),
-      time_ms, 0, 0, 0, 0, 0, /*target_viewport*/ false,
+      time_ms, ui::GestureDeviceType::DEVICE_TOUCHSCREEN, 0, 0, 0, 0, 0,
+      /*target_viewport*/ false,
       /*synthetic_scroll*/ false, true));
 }
 
-jlong JNI_ContentUiEventHandler_Init(
+static jlong JNI_ContentUiEventHandler_Init(
     JNIEnv* env,
-    const JavaParamRef<jobject>& obj,
-    const JavaParamRef<jobject>& jweb_contents) {
+    const JavaRef<jobject>& obj,
+    const JavaRef<jobject>& jweb_contents) {
   WebContentsImpl* web_contents = static_cast<WebContentsImpl*>(
       WebContents::FromJavaWebContents(jweb_contents));
   CHECK(web_contents)
@@ -231,3 +232,5 @@ jlong JNI_ContentUiEventHandler_Init(
 }
 
 }  // namespace content
+
+DEFINE_JNI(ContentUiEventHandler)

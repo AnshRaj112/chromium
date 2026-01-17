@@ -48,14 +48,14 @@ namespace media {
 enum class MediaContentType;
 enum class VideoCodec;
 enum class AudioCodec;
-class MediaTrack;
 }  // namespace media
 
 namespace blink {
 
 class WebMediaSource;
 
-class PLATFORM_EXPORT MediaPlayerClient : public WebMediaPlayerClient {
+class PLATFORM_EXPORT MediaPlayerClient : public WebMediaPlayerClient,
+                                          public media::TrackManager {
  public:
   enum VideoTrackKind {
     kVideoTrackKindNone,
@@ -86,9 +86,6 @@ class PLATFORM_EXPORT MediaPlayerClient : public WebMediaPlayerClient {
   virtual void DurationChanged() = 0;
   virtual void SizeChanged() = 0;
   virtual void SetCcLayer(cc::Layer*) = 0;
-
-  virtual void AddMediaTrack(const media::MediaTrack&) = 0;
-  virtual void RemoveMediaTrack(const media::MediaTrack&) = 0;
 
   virtual void MediaSourceOpened(std::unique_ptr<WebMediaSource>) = 0;
   virtual void RemotePlaybackCompatibilityChanged(const KURL&,
@@ -183,7 +180,7 @@ class PLATFORM_EXPORT MediaPlayerClient : public WebMediaPlayerClient {
   virtual void DidUseAudioServiceChange(bool uses_audio_service) = 0;
 
   // Notify the client that the size of the media player has changed.
-  // TODO(crbug.com/1039252): Remove by merging this method into SizeChanged().
+  // TODO(crbug.com/40113516): Remove by merging this method into SizeChanged().
   virtual void DidPlayerSizeChange(const gfx::Size& size) = 0;
 
   virtual void OnFirstFrame(base::TimeTicks first_frame,
@@ -207,7 +204,7 @@ class PLATFORM_EXPORT MediaPlayerClient : public WebMediaPlayerClient {
   virtual void OnRemotePlaybackDisabled(bool disabled) = 0;
 
  protected:
-  ~MediaPlayerClient() = default;
+  ~MediaPlayerClient() override = default;
 };
 
 }  // namespace blink

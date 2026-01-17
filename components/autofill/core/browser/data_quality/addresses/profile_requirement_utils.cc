@@ -4,10 +4,10 @@
 
 #include "components/autofill/core/browser/data_quality/addresses/profile_requirement_utils.h"
 
+#include <algorithm>
 #include <string_view>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/debug/crash_logging.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -113,6 +113,39 @@ ValidateProfileImportRequirements(const AutofillProfile& profile,
   return address_import_requirements;
 }
 
+void RemoveInvalidValues(AutofillProfile& profile,
+                         LogBuffer* log_buffer,
+                         const ProfileImportMetadata& import_metadata) {
+  auto remove_and_log_message = [&](FieldType type) {
+    profile.ClearFields({type});
+    LOG_AF(log_buffer)
+        << LogMessage::kImportAddressProfileFromFormRemoveInvalidValue
+        << "Invalid " << FieldTypeToStringView(type) << "." << CTag{};
+  };
+  auto remove_if_invalid_and_log = [&](FieldType type,
+                                       AddressImportRequirement valid,
+                                       AddressImportRequirement invalid) {
+    if (profile.IsPresentButInvalid(type)) {
+      autofill_metrics::LogAddressFormImportRequirementMetric(invalid);
+      remove_and_log_message(type);
+    } else {
+      autofill_metrics::LogAddressFormImportRequirementMetric(valid);
+    }
+  };
+
+  if (import_metadata.phone_import_status == PhoneImportStatus::kInvalid) {
+    remove_and_log_message(PHONE_HOME_WHOLE_NUMBER);
+  }
+
+  if (base::FeatureList::IsEnabled(
+          features::kAutofillExtendZipCodeValidation)) {
+    remove_if_invalid_and_log(
+        ADDRESS_HOME_ZIP,
+        AddressImportRequirement::kZipValidRequirementFulfilled,
+        AddressImportRequirement::kZipValidRequirementViolated);
+  }
+}
+
 bool ValidateNonEmptyValues(const AutofillProfile& profile,
                             LogBuffer* log_buffer) {
   // Returns false if `profile` has invalid information for `type`.
@@ -141,9 +174,13 @@ bool ValidateNonEmptyValues(const AutofillProfile& profile,
                      AddressImportRequirement::kStateValidRequirementFulfilled,
                      AddressImportRequirement::kStateValidRequirementViolated);
 
-  all_requirements_satisfied &= ValidateAndLog(
-      ADDRESS_HOME_ZIP, AddressImportRequirement::kZipValidRequirementFulfilled,
-      AddressImportRequirement::kZipValidRequirementViolated);
+  if (!base::FeatureList::IsEnabled(
+          features::kAutofillExtendZipCodeValidation)) {
+    all_requirements_satisfied &=
+        ValidateAndLog(ADDRESS_HOME_ZIP,
+                       AddressImportRequirement::kZipValidRequirementFulfilled,
+                       AddressImportRequirement::kZipValidRequirementViolated);
+  }
 
   return all_requirements_satisfied;
 }
@@ -151,8 +188,9 @@ bool ValidateNonEmptyValues(const AutofillProfile& profile,
 bool IsMinimumAddress(const AutofillProfile& profile, LogBuffer* log_buffer) {
   const std::vector<std::string>& country_codes =
       CountryDataMap::GetInstance()->country_codes();
-  if (!base::Contains(country_codes, base::UTF16ToUTF8(profile.GetRawInfo(
-                                         ADDRESS_HOME_COUNTRY)))) {
+  if (!std::ranges::contains(
+          country_codes,
+          base::UTF16ToUTF8(profile.GetRawInfo(ADDRESS_HOME_COUNTRY)))) {
     return false;
   }
   std::vector<AddressImportRequirement> address_requirements =
@@ -160,8 +198,8 @@ bool IsMinimumAddress(const AutofillProfile& profile, LogBuffer* log_buffer) {
   return std::ranges::none_of(
       kMinimumAddressRequirementViolations,
       [&](AddressImportRequirement address_requirement_violation) {
-        return base::Contains(address_requirements,
-                              address_requirement_violation);
+        return std::ranges::contains(address_requirements,
+                                     address_requirement_violation);
       });
 }
 

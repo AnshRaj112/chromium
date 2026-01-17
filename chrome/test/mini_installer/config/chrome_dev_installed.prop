@@ -10,8 +10,6 @@
         {"exists": true},
     "$LOCAL_APPDATA\\$CHROME_DIR_DEV\\Application\\$MINI_INSTALLER_FILE_VERSION\\chrome_wer.dll":
         {"exists": true},
-    "$LOCAL_APPDATA\\$CHROME_DIR_DEV\\Application\\$MINI_INSTALLER_FILE_VERSION\\Installer\\chrome.7z":
-        {"exists": true},
     "$LOCAL_APPDATA\\$CHROME_DIR_DEV\\Application\\$MINI_INSTALLER_FILE_VERSION\\Installer\\setup.exe":
         {"exists": true},
     "$LOCAL_APPDATA\\$CHROME_DIR_DEV\\Application\\$MINI_INSTALLER_FILE_VERSION\\IwaKeyDistribution\\iwa-key-distribution.pb":
@@ -77,6 +75,15 @@
       "values": {
         "$LOCAL_APPDATA\\$CHROME_DIR_DEV\\Application\\$MINI_INSTALLER_FILE_VERSION\\chrome_wer.dll": {
           "type": "DWORD"
+        }
+      }
+    },
+    "HKEY_CURRENT_USER\\Software\\Classes\\.pdf\\OpenWithProgids": {
+      "exists": "required",
+      "values": {
+        "$CHROME_HTML_PROG_ID_DEV$USER_SPECIFIC_REGISTRY_SUFFIX": {},
+        "$CHROME_PDF_PROG_ID_DEV$USER_SPECIFIC_REGISTRY_SUFFIX": {
+          "type": "SZ"
         }
       }
     },

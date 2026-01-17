@@ -9,7 +9,6 @@
 #include <utility>
 
 #include "base/check.h"
-#include "base/containers/contains.h"
 #include "base/files/file_path.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/path_service.h"
@@ -35,6 +34,7 @@
 #include "chrome/browser/web_applications/test/web_app_test_utils.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_command_manager.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_icon_generator.h"
 #include "chrome/browser/web_applications/web_app_icon_manager.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
@@ -327,13 +327,17 @@ IN_PROC_BROWSER_TEST_F(CreateShortcutBrowserTest, UseHostWhenTitleIsUrl) {
       browser(), https_server()->GetURL("example.com", "/empty.html"));
   webapps::AppId app_id = InstallDiyAppForCurrentUrl();
 
-  base::test::TestFuture<std::map<SquareSizePx, SkBitmap>> future;
-  WebAppProvider::GetForTest(profile())->icon_manager().ReadIcons(
-      app_id, IconPurpose::ANY, {icon_size::k128}, future.GetCallback());
+  base::test::TestFuture<IconMetadataFromDisk> future;
+  WebAppProvider::GetForTest(profile())
+      ->icon_manager()
+      .ReadTrustedIconsWithFallbackToManifestIcons(
+          app_id, {icon_size::k128}, IconPurpose::ANY, future.GetCallback());
 
-  std::map<SquareSizePx, SkBitmap> icon_bitmaps = future.Get();
-  DCHECK(base::Contains(icon_bitmaps, icon_size::k128));
-  SkBitmap bitmap = std::move(icon_bitmaps.at(icon_size::k128));
+  IconMetadataFromDisk icon_metadata = future.Take();
+  SizeToBitmap icon_bitmaps = std::move(icon_metadata.icons_map);
+  auto icon_it = icon_bitmaps.find(icon_size::k128);
+  ASSERT_TRUE(icon_it != icon_bitmaps.end());
+  SkBitmap bitmap = icon_it->second;
 
   // The letter for https://example.com should be the first letter of the host,
   // which is "E".
@@ -362,7 +366,8 @@ IN_PROC_BROWSER_TEST_F(CreateShortcutBrowserTest, InstallOverTabShortcutApp) {
   NavigateViaLinkClickToURLAndWait(browser(), GetInstallableAppURL());
   webapps::AppId app_installed_from_menu = InstallDiyAppForCurrentUrl();
 
-  EXPECT_TRUE(registrar().IsDiyApp(app_installed_from_menu));
+  EXPECT_FALSE(registrar().AppMatches(app_installed_from_menu,
+                                      WebAppFilter::IsCraftedApp()));
 
   Browser* new_browser =
       NavigateInNewWindowAndAwaitInstallabilityCheck(GetInstallableAppURL());
@@ -375,7 +380,7 @@ IN_PROC_BROWSER_TEST_F(CreateShortcutBrowserTest, InstallOverTabShortcutApp) {
   webapps::AppId web_app_id = test::InstallPwaForCurrentUrl(new_browser);
 
   EXPECT_EQ(app_installed_from_menu, web_app_id);
-  EXPECT_FALSE(registrar().IsDiyApp(web_app_id));
+  EXPECT_TRUE(registrar().AppMatches(web_app_id, WebAppFilter::IsCraftedApp()));
 }
 
 }  // namespace web_app

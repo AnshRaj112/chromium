@@ -4,12 +4,12 @@
 
 #include "services/webnn/dml/command_queue.h"
 
-#include "base/check_is_test.h"
 #include "base/containers/span.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/trace_event/trace_event.h"
+#include "third_party/perfetto/include/perfetto/tracing/track.h"
 
 namespace webnn::dml {
 
@@ -109,9 +109,11 @@ scoped_refptr<CommandQueue> CommandQueue::Create(ID3D12Device* d3d12_device) {
     return nullptr;
   }
 
+  // WebGPU interop requires WebNN's submission fence to be shared via shared
+  // handle.
   ComPtr<ID3D12Fence> fence;
-  hr =
-      d3d12_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+  hr = d3d12_device->CreateFence(0, D3D12_FENCE_FLAG_SHARED,
+                                 IID_PPV_ARGS(&fence));
   if (FAILED(hr)) {
     LOG(ERROR) << "[WebNN] Failed to create ID3D12Fence: "
                << logging::SystemErrorCodeToString(hr);
@@ -158,8 +160,7 @@ HRESULT CommandQueue::WaitSync() {
 
 void CommandQueue::OnObjectSignaled(HANDLE object) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  TRACE_EVENT_NESTABLE_ASYNC_END0("gpu", "dml::CommandQueue::WaitAsync",
-                                  TRACE_ID_LOCAL(this));
+  TRACE_EVENT_END("gpu", perfetto::Track::FromPointer(this));
   CHECK_EQ(object, fence_event_.get());
   ReleaseCompletedResources();
 
@@ -193,8 +194,8 @@ void CommandQueue::WaitAsync(base::OnceCallback<void(HRESULT hr)> callback) {
     std::move(callback).Run(hr);
     return;
   }
-  TRACE_EVENT_NESTABLE_ASYNC_BEGIN0("gpu", "dml::CommandQueue::WaitAsync",
-                                    TRACE_ID_LOCAL(this));
+  TRACE_EVENT_BEGIN("gpu", "dml::CommandQueue::WaitAsync",
+                    perfetto::Track::FromPointer(this));
   queued_callbacks_.push_back(
       {last_fence_value_, base::BindOnce(std::move(callback), S_OK)});
 }
@@ -220,13 +221,6 @@ uint64_t CommandQueue::GetCompletedValue() const {
 uint64_t CommandQueue::GetLastFenceValue() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return last_fence_value_;
-}
-
-const std::deque<CommandQueue::QueuedObject>&
-CommandQueue::GetQueuedObjectsForTesting() const {
-  CHECK_IS_TEST();
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  return queued_objects_;
 }
 
 HRESULT CommandQueue::WaitForFence(

@@ -4,7 +4,6 @@
 
 #include "third_party/blink/renderer/core/css/style_environment_variables.h"
 
-#include "base/containers/contains.h"
 #include "third_party/blink/renderer/core/css/parser/css_tokenizer.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 namespace blink {
@@ -28,16 +27,14 @@ void SetDefaultEnvironmentVariables(StyleEnvironmentVariables* instance) {
                         kSafeAreaInsetDefault);
   instance->SetVariable(UADefinedVariable::kSafeAreaInsetRight,
                         kSafeAreaInsetDefault);
-  if (RuntimeEnabledFeatures::CSSSafeAreaMaxInsetEnabled()) {
-    instance->SetVariable(UADefinedVariable::kSafeAreaMaxInsetTop,
-                          kSafeAreaInsetDefault);
-    instance->SetVariable(UADefinedVariable::kSafeAreaMaxInsetLeft,
-                          kSafeAreaInsetDefault);
-    instance->SetVariable(UADefinedVariable::kSafeAreaMaxInsetBottom,
-                          kSafeAreaInsetDefault);
-    instance->SetVariable(UADefinedVariable::kSafeAreaMaxInsetRight,
-                          kSafeAreaInsetDefault);
-  }
+  instance->SetVariable(UADefinedVariable::kSafeAreaMaxInsetTop,
+                        kSafeAreaInsetDefault);
+  instance->SetVariable(UADefinedVariable::kSafeAreaMaxInsetLeft,
+                        kSafeAreaInsetDefault);
+  instance->SetVariable(UADefinedVariable::kSafeAreaMaxInsetBottom,
+                        kSafeAreaInsetDefault);
+  instance->SetVariable(UADefinedVariable::kSafeAreaMaxInsetRight,
+                        kSafeAreaInsetDefault);
   instance->SetVariable(UADefinedVariable::kKeyboardInsetTop,
                         kKeyboardInsetDefault);
   instance->SetVariable(UADefinedVariable::kKeyboardInsetLeft,
@@ -51,9 +48,7 @@ void SetDefaultEnvironmentVariables(StyleEnvironmentVariables* instance) {
   instance->SetVariable(UADefinedVariable::kKeyboardInsetHeight,
                         kKeyboardInsetDefault);
 
-  if (RuntimeEnabledFeatures::CSSPreferredTextScaleEnabled()) {
-    instance->SetVariable(UADefinedVariable::kPreferredTextScale, "1");
-  }
+  instance->SetVariable(UADefinedVariable::kPreferredTextScale, "1");
 }
 
 }  // namespace.
@@ -112,8 +107,6 @@ const AtomicString StyleEnvironmentVariables::GetVariableName(
       return AtomicString("titlebar-area-height");
     case UADefinedVariable::kPreferredTextScale:
       return AtomicString("preferred-text-scale");
-    case UADefinedVariable::kSafePrintableInset:
-      return AtomicString("safe-printable-inset");
     default:
       break;
   }
@@ -237,7 +230,7 @@ void StyleEnvironmentVariables::RemoveVariable(const AtomicString& name) {
 
 CSSVariableData* StyleEnvironmentVariables::ResolveVariable(
     const AtomicString& name,
-    WTF::Vector<unsigned> indices) {
+    Vector<unsigned> indices) {
   if (indices.size() == 0u) {
     auto result = data_.find(name);
     if (result == data_.end() && parent_) {
@@ -305,8 +298,7 @@ void StyleEnvironmentVariables::ParentInvalidatedVariable(
     const AtomicString& name) {
   // If we have not overridden the variable then we should invalidate it
   // locally.
-  if (!base::Contains(data_, name) &&
-      !base::Contains(two_dimension_data_, name)) {
+  if (!data_.Contains(name) && !two_dimension_data_.Contains(name)) {
     InvalidateVariable(name);
   }
 }

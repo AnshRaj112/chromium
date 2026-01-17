@@ -4,8 +4,14 @@
 
 #include "ui/android/modal_dialog_wrapper.h"
 
+#include <jni.h>
+
+#include "base/android/callback_android.h"
 #include "base/android/jni_android.h"
+#include "base/android/jni_array.h"
+#include "base/android/jni_callback.h"
 #include "base/android/scoped_java_ref.h"
+#include "base/functional/bind.h"
 #include "ui/android/modal_dialog_manager_bridge.h"
 #include "ui/android/window_android.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -15,14 +21,17 @@
 #include "ui/color/color_provider.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/color/color_provider_manager.h"
+#include "ui/events/base_event_utils.h"
+#include "ui/events/event.h"
 #include "ui/gfx/android/java_bitmap.h"
+#include "ui/gfx/image/image_skia.h"
 #include "ui/strings/grit/ui_strings.h"
 
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "ui/android/ui_android_jni_headers/ModalDialogWrapper_jni.h"
 
 using base::android::ConvertUTF16ToJavaString;
-using base::android::JavaParamRef;
+using base::android::JavaRef;
 using base::android::ScopedJavaLocalRef;
 
 namespace ui {
@@ -77,22 +86,71 @@ ScopedJavaLocalRef<jstring> GetButtonLabel(JNIEnv* env,
                               : label_text);
 }
 
-std::u16string getMessageParagraph(DialogModelField* field) {
-  const DialogModelLabel& label = field->AsParagraph()->label();
+// A helper struct to hold the deconstructed data for a single paragraph.
+struct ParagraphData {
+  std::vector<std::u16string> spans;
+  std::vector<base::RepeatingClosure> closures;
+};
 
-  std::u16string text;
-  auto replacements = label.replacements();
+// Processes a paragraph field, deconstructing it into spans and closures.
+ParagraphData getParagraphData(DialogModelField* field) {
+  ParagraphData data;
+  const DialogModelLabel& label = field->AsParagraph()->label();
+  const auto& replacements = label.replacements();
+
   if (replacements.empty()) {
-    text = label.GetString();
+    data.spans.push_back(label.GetString());
+    data.closures.emplace_back();  // Add a null closure.
   } else {
-    std::vector<std::u16string> string_replacements;
-    for (auto replacement : replacements) {
-      string_replacements.push_back(replacement.text());
+    std::vector<std::u16string> replacement_texts;
+    for (const auto& replacement : replacements) {
+      replacement_texts.push_back(replacement.text());
     }
-    text = l10n_util::GetStringFUTF16(label.message_id(), string_replacements,
-                                      nullptr);
+
+    // Find the offsets of the replacements in the localized string.
+    std::vector<size_t> offsets;
+    const std::u16string final_text = l10n_util::GetStringFUTF16(
+        label.message_id(), replacement_texts, &offsets);
+
+    // Slice the final text into spans based on the offsets of the replacements.
+    // This allows Java to build a SpannableString where only the replacement
+    // portions are clickable/styled.
+    // Note: This assumes replacements appear in numerical order ($1 before $2).
+    size_t current_pos = 0;
+    for (size_t i = 0; i < offsets.size(); ++i) {
+      size_t start = offsets[i];
+      // Capture the plain text preceding the replacement.
+      if (start > current_pos) {
+        data.spans.push_back(
+            final_text.substr(current_pos, start - current_pos));
+        data.closures.emplace_back();
+      }
+
+      // Handle the current replacement.
+      const auto& replacement = replacements[i];
+      data.spans.push_back(replacement.text());
+      if (replacement.callback().has_value()) {
+        data.closures.push_back(base::BindRepeating(
+            [](const DialogModelLabel::Callback& cb) {
+              cb.Run(ui::TouchEvent(
+                  ui::EventType::kTouchReleased, gfx::Point(),
+                  ui::EventTimeForNow(),
+                  ui::PointerDetails(ui::EventPointerType::kTouch), 0));
+            },
+            replacement.callback().value()));
+      } else {
+        data.closures.emplace_back();
+      }
+      current_pos = start + replacement.text().length();
+    }
+
+    // Capture trailing text after all replacements.
+    if (current_pos < final_text.length()) {
+      data.spans.push_back(final_text.substr(current_pos));
+      data.closures.emplace_back();
+    }
   }
-  return text;
+  return data;
 }
 
 const SkBitmap* getIconBitmap(const ui::ImageModel& icon_model) {
@@ -170,7 +228,7 @@ void ModalDialogWrapper::BuildPropertyModel() {
 
   Java_ModalDialogWrapper_withTitleAndButtons(
       env, java_obj_, title, ok_button_label, cancel_button_label,
-      (int)buttonStyles);
+      static_cast<int>(buttonStyles));
 
   const SkBitmap* bitmap =
       getIconBitmap(dialog_model_->icon(DialogModelHost::GetPassKey()));
@@ -180,13 +238,20 @@ void ModalDialogWrapper::BuildPropertyModel() {
   }
 
   std::u16string checkbox_text;
-  jboolean checked = false;
-  std::vector<std::u16string> paragraphs;
+  bool checked = false;
+  std::vector<std::vector<std::u16string>> all_paragraph_spans;
+  std::vector<std::vector<base::RepeatingClosure>> all_paragraph_closures;
+  std::vector<const SkBitmap*> menu_item_icons;
+  std::vector<std::u16string> menu_item_labels;
+  menu_items_.clear();
+
   for (const auto& field :
        dialog_model_->fields(DialogModelHost::GetPassKey())) {
     switch (field->type()) {
       case DialogModelField::kParagraph: {
-        paragraphs.push_back(getMessageParagraph(field.get()));
+        ParagraphData paragraph_data = getParagraphData(field.get());
+        all_paragraph_spans.push_back(std::move(paragraph_data.spans));
+        all_paragraph_closures.push_back(std::move(paragraph_data.closures));
         break;
       }
       case DialogModelField::kCheckbox: {
@@ -194,16 +259,28 @@ void ModalDialogWrapper::BuildPropertyModel() {
         // checkbox.
         CHECK(checkbox_text.empty())
             << "Dialogs with more than one checkbox are "
-               "not supported on Android.";
+               "not yet supported on Android.";
         DialogModelCheckbox* checkbox_field = field->AsCheckbox();
 
         const DialogModelLabel& label = checkbox_field->label();
-        // Checkboxes with replacements (links) are not supported on Android.
+        // Checkboxes with replacements (links) are not yet supported on
+        // Android.
         CHECK(label.replacements().empty());
 
         checkbox_text = label.GetString();
         checked = checkbox_field->is_checked();
         checkbox_id_ = checkbox_field->id();
+        break;
+      }
+      case DialogModelField::kMenuItem: {
+        DialogModelMenuItem* menu_item = field->AsMenuItem();
+        const SkBitmap* icon_bitmap = getIconBitmap(menu_item->icon());
+        // Menu items without icons are not yet handled on Android.
+        if (icon_bitmap && !icon_bitmap->isNull()) {
+          menu_item_icons.push_back(icon_bitmap);
+          menu_item_labels.push_back(menu_item->label());
+          menu_items_.push_back(menu_item);
+        }
         break;
       }
       default:
@@ -213,12 +290,57 @@ void ModalDialogWrapper::BuildPropertyModel() {
     }
   }
 
-  if (paragraphs.size() > 0) {
-    ScopedJavaLocalRef<jobjectArray> java_paragraphs_array =
-        base::android::ToJavaArrayOfStrings(env, paragraphs);
+  if (!all_paragraph_spans.empty()) {
+    // vector<vector<u16string>> -> String[][]
+    ScopedJavaLocalRef<jclass> string_array_class =
+        base::android::GetClass(env, "[Ljava/lang/String;");
+    auto java_spans_array = ScopedJavaLocalRef<jobjectArray>::Adopt(
+        env, env->NewObjectArray(all_paragraph_spans.size(),
+                                 string_array_class.obj(), nullptr));
+    for (size_t i = 0; i < all_paragraph_spans.size(); ++i) {
+      ScopedJavaLocalRef<jobjectArray> inner_array =
+          base::android::ToJavaArrayOfStrings(env, all_paragraph_spans[i]);
+      env->SetObjectArrayElement(java_spans_array.obj(), i, inner_array.obj());
+    }
 
-    Java_ModalDialogWrapper_withMessageParagraphs(env, java_obj_,
-                                                  java_paragraphs_array);
+    // Create the 2D Java array for callbacks.
+    ScopedJavaLocalRef<jclass> jni_callback_class =
+        base::android::GetClass(env, "org/chromium/base/JniRepeatingCallback");
+
+    // To get the class for an array of JniRepeatingCallback, we can create a
+    // dummy array and get its class. This is necessary because the standard
+    // "[Lorg/chromium/base/JniRepeatingCallback;" does not work.
+    ScopedJavaLocalRef<jobjectArray> dummy_array =
+        ScopedJavaLocalRef<jobjectArray>::Adopt(
+            env, env->NewObjectArray(0, jni_callback_class.obj(), nullptr));
+    CHECK(dummy_array);
+    ScopedJavaLocalRef<jclass> jni_callback_array_class =
+        ScopedJavaLocalRef<jclass>::Adopt(
+            env, env->GetObjectClass(dummy_array.obj()));
+    CHECK(jni_callback_array_class);
+
+    auto java_callbacks_array = ScopedJavaLocalRef<jobjectArray>::Adopt(
+        env, env->NewObjectArray(all_paragraph_closures.size(),
+                                 jni_callback_array_class.obj(), nullptr));
+
+    for (size_t i = 0; i < all_paragraph_closures.size(); ++i) {
+      std::vector<ScopedJavaLocalRef<jobject>> jobjects;
+      for (const auto& closure : all_paragraph_closures[i]) {
+        if (closure) {
+          jobjects.push_back(base::android::ToJniCallback(env, closure));
+        } else {
+          jobjects.push_back(nullptr);
+        }
+      }
+      ScopedJavaLocalRef<jobjectArray> inner_array =
+          base::android::ToJavaArrayOfObjects(env, jni_callback_class.obj(),
+                                              jobjects);
+      env->SetObjectArrayElement(java_callbacks_array.obj(), i,
+                                 inner_array.obj());
+    }
+
+    Java_ModalDialogWrapper_withMessageParagraphs(
+        env, java_obj_, java_spans_array, java_callbacks_array);
   }
 
   if (!checkbox_text.empty()) {
@@ -226,6 +348,25 @@ void ModalDialogWrapper::BuildPropertyModel() {
         ConvertUTF16ToJavaString(env, checkbox_text);
     Java_ModalDialogWrapper_withCheckbox(env, java_obj_, java_checkbox_label,
                                          checked);
+  }
+
+  if (!menu_item_icons.empty()) {
+    ScopedJavaLocalRef<jclass> bitmap_class =
+        base::android::GetClass(env, "android/graphics/Bitmap");
+    auto java_icons_array = ScopedJavaLocalRef<jobjectArray>::Adopt(
+        env, env->NewObjectArray(menu_item_icons.size(), bitmap_class.obj(),
+                                 nullptr));
+    for (size_t i = 0; i < menu_item_icons.size(); ++i) {
+      env->SetObjectArrayElement(
+          java_icons_array.obj(), i,
+          gfx::ConvertToJavaBitmap(*menu_item_icons[i]).obj());
+    }
+
+    ScopedJavaLocalRef<jobjectArray> java_labels_array =
+        base::android::ToJavaArrayOfStrings(env, menu_item_labels);
+
+    Java_ModalDialogWrapper_withMenuItems(env, java_obj_, java_icons_array,
+                                          java_labels_array);
   }
 }
 
@@ -237,13 +378,18 @@ void ModalDialogWrapper::NegativeButtonClicked(JNIEnv* env) {
   dialog_model_->OnDialogCancelAction(DialogModelHost::GetPassKey());
 }
 
-void ModalDialogWrapper::CheckboxToggled(JNIEnv* env, jboolean is_checked) {
+void ModalDialogWrapper::CheckboxToggled(JNIEnv* env, bool is_checked) {
   if (!checkbox_id_) {
     return;
   }
   dialog_model_->GetCheckboxByUniqueId(checkbox_id_)
-      ->OnChecked(DialogModelFieldHost::GetPassKey(),
-                  static_cast<bool>(is_checked));
+      ->OnChecked(DialogModelFieldHost::GetPassKey(), is_checked);
+}
+
+void ModalDialogWrapper::MenuItemClicked(JNIEnv* env, int32_t index) {
+  CHECK_GE(index, 0);
+  CHECK_LT(static_cast<size_t>(index), menu_items_.size());
+  menu_items_[index]->OnActivated(DialogModelFieldHost::GetPassKey(), 0);
 }
 
 void ModalDialogWrapper::Dismissed(JNIEnv* env) {
@@ -264,3 +410,5 @@ void ModalDialogWrapper::Close() {
 void ModalDialogWrapper::OnDialogButtonChanged() {}
 
 }  // namespace ui
+
+DEFINE_JNI(ModalDialogWrapper)

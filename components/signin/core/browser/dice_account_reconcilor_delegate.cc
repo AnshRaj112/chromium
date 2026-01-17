@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/feature_list.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_macros.h"
@@ -144,9 +143,9 @@ DiceAccountReconcilorDelegate::GetInconsistencyReason(
   bool primary_account_has_token = false;
   if (!primary_account.empty()) {
     primary_account_has_token =
-        base::Contains(chrome_accounts, primary_account);
+        std::ranges::contains(chrome_accounts, primary_account);
     bool primary_account_has_cookie =
-        base::Contains(valid_gaia_accounts_ids, primary_account);
+        std::ranges::contains(valid_gaia_accounts_ids, primary_account);
     if (primary_account_has_token && !primary_account_has_cookie) {
       return InconsistencyReason::kMissingSyncCookie;
     }
@@ -159,7 +158,7 @@ DiceAccountReconcilorDelegate::GetInconsistencyReason(
   bool missing_first_web_account_token =
       primary_account.empty() && !gaia_accounts.empty() &&
       gaia_accounts[0].valid &&
-      !base::Contains(chrome_accounts, gaia_accounts[0].id);
+      !std::ranges::contains(chrome_accounts, gaia_accounts[0].id);
 
   if (missing_first_web_account_token) {
     return InconsistencyReason::kMissingFirstWebAccountToken;
@@ -204,7 +203,7 @@ bool DiceAccountReconcilorDelegate::ShouldDeleteAccountsFromGaia(
   // account.
   for (const gaia::ListedAccount& gaia_account : gaia_accounts) {
     if (gaia_account.valid &&
-        !base::Contains(chrome_accounts, gaia_account.id)) {
+        !std::ranges::contains(chrome_accounts, gaia_account.id)) {
       return true;
     }
   }
@@ -266,10 +265,37 @@ ConsentLevel DiceAccountReconcilorDelegate::GetConsentLevelForPrimaryAccount()
   // regardless of the consent.
   // TODO(https://crbug.com.1464264): Migrate away from `ConsentLevel::kSync`
   // on desktop platforms.
-  return signin_client_->IsClearPrimaryAccountAllowed(
-             identity_manager_->HasPrimaryAccount(ConsentLevel::kSync))
-             ? ConsentLevel::kSync
-             : ConsentLevel::kSignin;
+  return signin_client_->IsClearPrimaryAccountAllowed() ? ConsentLevel::kSync
+                                                        : ConsentLevel::kSignin;
+}
+
+void DiceAccountReconcilorDelegate::OnReconcileError(
+    const GoogleServiceAuthError& error) {
+  if (error.state() != GoogleServiceAuthError::State::SERVICE_ERROR) {
+    return;
+  }
+  // Reconcilor will end up in a `GoogleServiceAuthError::State::SERVICE_ERROR`
+  // if the OAuthMultilogin call fails with a persistent error (i.e. retrying
+  // with the same parameters won't help).
+  if (identity_manager_->AllBoundTokensShareSameBindingKey()) {
+    return;
+  }
+  // If the source of the error is LSTs bound to different keys, revoke all
+  // secondary tokens and invalidate the refresh token for the primary account
+  // to avoid having Chrome in an inconsistent state.
+  //
+  // TODO(https://crbug.com/443200058): Consider applying the same logic for all
+  // persistent errors no matter the source.
+  RevokeAllSecondaryTokens(
+      identity_manager_, GetConsentLevelForPrimaryAccount(),
+      signin_metrics::SourceForRefreshTokenOperation::
+          kDiceAccountReconcilorDelegate_RefreshTokensBoundToDifferentKeys,
+      signin_metrics::ProfileSignout::kAccountReconcilorReconcile,
+      /*revoke_only_if_in_error=*/false);
+  identity_manager_->GetAccountsMutator()
+      ->InvalidateRefreshTokenForPrimaryAccount(
+          signin_metrics::SourceForRefreshTokenOperation::
+              kDiceAccountReconcilorDelegate_RefreshTokensBoundToDifferentKeys);
 }
 
 bool DiceAccountReconcilorDelegate::ShouldRevokeTokensBeforeMultilogin(
@@ -304,7 +330,7 @@ bool DiceAccountReconcilorDelegate::ShouldRevokeTokensBeforeMultilogin(
   }
 
   // The default gaia account doesn't have token.
-  if (!base::Contains(chrome_accounts, gaia_accounts[0].id)) {
+  if (!std::ranges::contains(chrome_accounts, gaia_accounts[0].id)) {
     if (IsCookieBasedConsistencyMode()) {
       // Logout only if the default cookie account is valid.
       return gaia_accounts[0].valid;
@@ -334,7 +360,7 @@ CoreAccountId DiceAccountReconcilorDelegate::GetFirstGaiaAccountForMultilogin(
   // should try to put cached first account first since Gaia has no information
   // about it.
   if (gaia_accounts.empty() && !last_known_first_account_.empty() &&
-      base::Contains(chrome_accounts, last_known_first_account_)) {
+      std::ranges::contains(chrome_accounts, last_known_first_account_)) {
     // last_known_account_ is always empty on first execution.
     DCHECK(!first_execution);
     return last_known_first_account_;

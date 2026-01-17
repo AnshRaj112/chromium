@@ -14,7 +14,6 @@
 #include "base/containers/extend.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
-#include "base/files/file_util.h"
 #include "base/json/json_reader.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
@@ -41,6 +40,7 @@
 #include "chrome/browser/web_applications/test/web_app_test_utils.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_command_manager.h"
+#include "chrome/browser/web_applications/web_app_filter.h"
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/browser/web_applications/web_app_install_utils.h"
 #include "chrome/browser/web_applications/web_app_management_type.h"
@@ -51,10 +51,8 @@
 #include "chrome/browser/web_applications/web_app_sync_bridge.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/test/base/chrome_render_view_host_test_harness.h"
-#include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
-#include "chrome/test/base/testing_profile.h"
+#include "components/prefs/pref_service.h"
 #include "components/sync_preferences/testing_pref_service_syncable.h"
 #include "components/webapps/browser/install_result_code.h"
 #include "components/webapps/common/web_app_id.h"
@@ -214,10 +212,9 @@ void SetWebAppInstallForceListPref(Profile* profile, std::string_view pref) {
 
 }  // namespace
 
-class WebAppPolicyManagerTestBase : public ChromeRenderViewHostTestHarness {
+class WebAppPolicyManagerTestBase : public WebAppTest {
  public:
-  WebAppPolicyManagerTestBase()
-      : testing_local_state_(TestingBrowserProcess::GetGlobal()) {}
+  WebAppPolicyManagerTestBase() = default;
   WebAppPolicyManagerTestBase(const WebAppPolicyManagerTestBase&) = delete;
   WebAppPolicyManagerTestBase& operator=(const WebAppPolicyManagerTestBase&) =
       delete;
@@ -225,7 +222,7 @@ class WebAppPolicyManagerTestBase : public ChromeRenderViewHostTestHarness {
 
   void SetUp() override {
 #if BUILDFLAG(IS_CHROMEOS)
-    // Need to run the ChromeRenderViewHostTestHarness::SetUp() after the fake
+    // Need to run the WebAppTest::SetUp() after the fake
     // user manager set up so that the scoped_user_manager can be destructed in
     // the correct order.
     // TODO(crbug.com/40275387): Consider setting up a fake user in all Ash web
@@ -241,31 +238,27 @@ class WebAppPolicyManagerTestBase : public ChromeRenderViewHostTestHarness {
             user_manager::StubAccountId()));
 #endif
 
-    ChromeRenderViewHostTestHarness::SetUp();
-    provider_ = FakeWebAppProvider::Get(profile());
+    WebAppTest::SetUp();
 #if BUILDFLAG(IS_CHROMEOS)
     test_system_app_manager_ =
         std::make_unique<ash::TestSystemWebAppManager>(profile());
 #endif
     auto web_app_policy_manager =
         std::make_unique<WebAppPolicyManager>(profile());
-    web_app_policy_manager_ = web_app_policy_manager.get();
-    provider_->SetWebAppPolicyManager(std::move(web_app_policy_manager));
-
 #if BUILDFLAG(IS_CHROMEOS)
-    web_app_policy_manager_->SetSystemWebAppDelegateMap(
+    web_app_policy_manager->SetSystemWebAppDelegateMap(
         &system_app_manager().system_app_delegates());
 #endif
+    fake_provider().SetWebAppPolicyManager(std::move(web_app_policy_manager));
 
     test::AwaitStartWebAppProviderAndSubsystems(profile());
   }
 
   void TearDown() override {
-    provider_->Shutdown();
 #if BUILDFLAG(IS_CHROMEOS)
     test_system_app_manager_.reset();
 #endif
-    ChromeRenderViewHostTestHarness::TearDown();
+    WebAppTest::TearDown();
   }
 
   void SimulatePreviouslyInstalledApp(const GURL& url,
@@ -299,11 +292,15 @@ class WebAppPolicyManagerTestBase : public ChromeRenderViewHostTestHarness {
   }
 #endif
 
-  WebAppRegistrar& app_registrar() { return provider()->registrar_unsafe(); }
-  WebAppSyncBridge& sync_bridge() { return provider()->sync_bridge_unsafe(); }
-  WebAppPolicyManager& policy_manager() { return provider()->policy_manager(); }
-
-  WebAppProvider* provider() { return WebAppProvider::GetForTest(profile()); }
+  WebAppRegistrar& app_registrar() {
+    return fake_provider().registrar_unsafe();
+  }
+  WebAppSyncBridge& sync_bridge() {
+    return fake_provider().sync_bridge_unsafe();
+  }
+  WebAppPolicyManager& policy_manager() {
+    return fake_provider().policy_manager();
+  }
 
   void ValidateEmptyWebAppSettingsPolicy() {
     EXPECT_TRUE(policy_manager().settings_by_url_.empty());
@@ -356,22 +353,12 @@ class WebAppPolicyManagerTestBase : public ChromeRenderViewHostTestHarness {
 
   FakeWebContentsManager& web_contents_manager() {
     return static_cast<FakeWebContentsManager&>(
-        provider_->web_contents_manager());
+        fake_provider().web_contents_manager());
   }
 
-  ScopedTestingLocalState testing_local_state_;
   data_decoder::test::InProcessDataDecoder data_decoder_;
 
  private:
-  raw_ptr<FakeWebAppProvider, DanglingUntriaged> provider_ = nullptr;
-  raw_ptr<WebAppPolicyManager, DanglingUntriaged> web_app_policy_manager_ =
-      nullptr;
-
-#if BUILDFLAG(IS_WIN)
-  // This is used to prevent creating shortcuts in the start menu dir.
-  base::ScopedPathOverride override_start_dir_{base::DIR_START_MENU};
-#endif  // BUILDFLAG(IS_WIN)
-
 #if BUILDFLAG(IS_CHROMEOS)
   std::unique_ptr<ash::TestSystemWebAppManager> test_system_app_manager_;
   std::unique_ptr<user_manager::ScopedUserManager> scoped_user_manager_;
@@ -400,7 +387,8 @@ TEST_F(WebAppPolicyManagerTest, GetPolicyIdsForWebApp) {
   const GURL kManifestUrl = GURL("https://www.example.com/manifest.json");
 
   webapps::AppId app_id =
-      static_cast<FakeWebContentsManager&>(provider()->web_contents_manager())
+      static_cast<FakeWebContentsManager&>(
+          fake_provider().web_contents_manager())
           .CreateBasicInstallPageState(kInstallUrl, kManifestUrl, kWebAppUrl);
 
   ExternalInstallOptions template_options(
@@ -413,11 +401,11 @@ TEST_F(WebAppPolicyManagerTest, GetPolicyIdsForWebApp) {
                                     /*user_display_mode=*/std::nullopt,
                                     ExternalInstallSource::kExternalPolicy);
 
-  provider()->externally_managed_app_manager().SynchronizeInstalledApps(
+  fake_provider().externally_managed_app_manager().SynchronizeInstalledApps(
       std::move(install_options_list), ExternalInstallSource::kExternalPolicy,
       result.GetCallback());
   ASSERT_TRUE(result.Wait());
-  const WebApp* app = provider()->registrar_unsafe().GetAppById(app_id);
+  const WebApp* app = fake_provider().registrar_unsafe().GetAppById(app_id);
 
   EXPECT_EQ(
       WebAppPolicyManager::GetPolicyIds(profile(), *app),
@@ -432,7 +420,8 @@ TEST_F(WebAppPolicyManagerTest, GetPolicyIdsForIsolatedWebApp) {
           ->InstallWithSource(profile(),
                               &IsolatedWebAppInstallSource::FromExternalPolicy)
           .value();
-  const WebApp* app = provider()->registrar_unsafe().GetAppById(info.app_id());
+  const WebApp* app =
+      fake_provider().registrar_unsafe().GetAppById(info.app_id());
 
   EXPECT_EQ(WebAppPolicyManager::GetPolicyIds(profile(), *app),
             std::vector<std::string>({info.web_bundle_id().id()}));
@@ -593,9 +582,9 @@ TEST_F(WebAppPolicyManagerTest, ForceInstallAppWithCreateDesktopShortcut) {
   WaitForAppsToSynchronize();
 
   EXPECT_NE(GetPolicyInstalledNoContainerApp(), nullptr);
-  EXPECT_EQ(proto::INSTALLED_WITH_OS_INTEGRATION,
-            app_registrar().GetInstallState(
-                GetPolicyInstalledNoContainerApp()->app_id()));
+  EXPECT_TRUE(app_registrar().AppMatches(
+      GetPolicyInstalledNoContainerApp()->app_id(),
+      WebAppFilter::InstalledInOperatingSystemForTesting()));
 }
 
 TEST_F(WebAppPolicyManagerTest, ForceInstallAppWithFallbackAppName) {
@@ -1071,7 +1060,7 @@ TEST_F(WebAppPolicyManagerTest, WebAppSettingsForceInstallNewApps) {
     loop.Run();
   }
 
-  provider()->command_manager().AwaitAllCommandsCompleteForTesting();
+  fake_provider().command_manager().AwaitAllCommandsCompleteForTesting();
 
   EXPECT_NE(GetPolicyInstalledWindowedApp(), nullptr);
   EXPECT_NE(GetPolicyInstalledTabbedApp(), nullptr);
@@ -1104,7 +1093,7 @@ TEST_F(WebAppPolicyManagerDisableListTest, DisableSystemWebApps) {
   EXPECT_TRUE(disabled_apps.empty());
 
   // Add supported system web apps to system features disable list policy.
-  testing_local_state_.Get()->SetUserPref(
+  TestingBrowserProcess::GetGlobal()->GetTestingLocalState()->SetUserPref(
       policy::policy_prefs::kSystemFeaturesDisableList,
       base::Value::List()
           .Append(static_cast<int>(policy::SystemFeature::kCamera))
@@ -1181,7 +1170,7 @@ TEST_F(WebAppPolicyManagerWithGraduationTest,
   auto disabled_apps = policy_manager().GetDisabledSystemWebApps();
   EXPECT_TRUE(disabled_apps.empty());
 
-  testing_local_state_.Get()->SetUserPref(
+  TestingBrowserProcess::GetGlobal()->GetTestingLocalState()->SetUserPref(
       policy::policy_prefs::kSystemFeaturesDisableList,
       base::Value::List()
           .Append(static_cast<int>(policy::SystemFeature::kCamera))
@@ -1201,7 +1190,7 @@ TEST_F(WebAppPolicyManagerWithGraduationTest, GraduationDisabledWhenBlocked) {
   EXPECT_TRUE(disabled_apps.empty());
 
   // Add supported system web apps to system features disable list policy.
-  testing_local_state_.Get()->SetUserPref(
+  TestingBrowserProcess::GetGlobal()->GetTestingLocalState()->SetUserPref(
       policy::policy_prefs::kSystemFeaturesDisableList,
       base::Value::List()
           .Append(static_cast<int>(policy::SystemFeature::kCamera))
@@ -1247,9 +1236,7 @@ TEST_F(WebAppPolicyManagerWithBocaTest, BocaDisabledWhenDisabledFromPolicy) {
 
 class WebAppPolicyManagerPreventCloseTest
     : public WebAppPolicyManagerTestBase,
-      public testing::WithParamInterface<
-          std::tuple<bool /*prevent_close_enabled*/,
-                     bool /*run_on_os_login_enabled*/>> {
+      public testing::WithParamInterface<bool /*prevent_close_enabled*/> {
  public:
   WebAppPolicyManagerPreventCloseTest() = default;
   WebAppPolicyManagerPreventCloseTest(
@@ -1263,9 +1250,7 @@ class WebAppPolicyManagerPreventCloseTest
     WebAppPolicyManagerTestBase::SetUp();
   }
 
-  bool prevent_close_enabled() const { return std::get<0>(GetParam()); }
-
-  bool run_on_os_login_enabled() const { return std::get<1>(GetParam()); }
+  bool prevent_close_enabled() const { return GetParam(); }
 
  private:
   void BuildAndInitFeatureList() {
@@ -1276,12 +1261,6 @@ class WebAppPolicyManagerPreventCloseTest
       enabled_features.push_back(features::kDesktopPWAsPreventClose);
     } else {
       disabled_features.push_back(features::kDesktopPWAsPreventClose);
-    }
-
-    if (run_on_os_login_enabled()) {
-      enabled_features.push_back(features::kDesktopPWAsRunOnOsLogin);
-    } else {
-      disabled_features.push_back(features::kDesktopPWAsRunOnOsLogin);
     }
 
     scoped_feature_list_.InitWithFeatures(enabled_features, disabled_features);
@@ -1404,7 +1383,7 @@ TEST_P(WebAppPolicyManagerPreventCloseTest, WebAppSettingsPreventClose) {
 
   bool expected_windowed_url_status = false;
 #if BUILDFLAG(IS_CHROMEOS)
-  if (prevent_close_enabled() && run_on_os_login_enabled()) {
+  if (prevent_close_enabled()) {
     expected_windowed_url_status = true;
   }
 #endif  // BUILDFLAG(IS_CHROMEOS)
@@ -1417,22 +1396,14 @@ TEST_P(WebAppPolicyManagerPreventCloseTest, WebAppSettingsPreventClose) {
 INSTANTIATE_TEST_SUITE_P(
     WebAppPolicyManagerPreventCloseTestWithParams,
     WebAppPolicyManagerPreventCloseTest,
-    testing::Combine(testing::Bool(), testing::Bool()),
-    [](const ::testing::TestParamInfo<
-        std::tuple<bool /*prevent_close_enabled*/,
-                   bool /*run_on_os_login_enabled*/>>& info) {
+    testing::Bool(),
+    [](const ::testing::TestParamInfo<bool /*prevent_close_enabled*/>& info) {
       std::string test_name = "Test_";
 
-      if (std::get<0>(info.param)) {
-        test_name.append("PreventCloseEnabled_");
+      if (info.param) {
+        test_name.append("PreventCloseEnabled");
       } else {
-        test_name.append("PreventCloseDisabled_");
-      }
-
-      if (std::get<1>(info.param)) {
-        test_name.append("RunOnOsLoginEnabled");
-      } else {
-        test_name.append("RunOnOsLoginDisabled");
+        test_name.append("PreventCloseDisabled");
       }
 
       return test_name;
@@ -1451,7 +1422,6 @@ class WebAppPolicyForceUnregistrationTest : public WebAppTest {
       base::ScopedAllowBlockingForTesting allow_blocking;
       test_override_ = OsIntegrationTestOverrideImpl::OverrideForTesting();
     }
-    provider_ = FakeWebAppProvider::Get(profile());
 
     auto file_handler_manager =
         std::make_unique<WebAppFileHandlerManager>(profile());
@@ -1461,7 +1431,7 @@ class WebAppPolicyForceUnregistrationTest : public WebAppTest {
         profile(), std::move(file_handler_manager),
         std::move(protocol_handler_manager));
 
-    provider_->SetOsIntegrationManager(std::move(os_integration_manager));
+    fake_provider().SetOsIntegrationManager(std::move(os_integration_manager));
     test::AwaitStartWebAppProviderAndSubsystems(profile());
   }
 
@@ -1473,13 +1443,10 @@ class WebAppPolicyForceUnregistrationTest : public WebAppTest {
       base::ScopedAllowBlockingForTesting allow_blocking;
       test_override_.reset();
     }
-    provider_ = nullptr;
     WebAppTest::TearDown();
   }
 
  protected:
-  WebAppProvider& provider() { return *provider_; }
-
   SkBitmap CreateSolidColorIcon(int size, SkColor color) {
     SkBitmap bitmap;
     bitmap.allocN32Pixels(size, size);
@@ -1495,7 +1462,7 @@ class WebAppPolicyForceUnregistrationTest : public WebAppTest {
                                             /*start_url=*/manifest_id);
     // The name of the app should also change, otherwise on Mac and Windows, the
     // shortcuts are stored as name(1) and gets wiped out with name.
-    info->title = base::UTF8ToUTF16(manifest_id.host());
+    info->title = base::UTF8ToUTF16(manifest_id.GetHost());
     info->user_display_mode = web_app::mojom::UserDisplayMode::kStandalone;
     info->icon_bitmaps.any = std::move(icon_map);
     base::test::TestFuture<const webapps::AppId&, webapps::InstallResultCode>
@@ -1525,7 +1492,6 @@ class WebAppPolicyForceUnregistrationTest : public WebAppTest {
   const GURL kWebAppUrl = GURL("https://example.com/path/index.html");
 
  private:
-  raw_ptr<FakeWebAppProvider> provider_ = nullptr;
   std::unique_ptr<OsIntegrationTestOverrideImpl::BlockingRegistration>
       test_override_;
   base::test::ScopedFeatureList scoped_feature_list_;

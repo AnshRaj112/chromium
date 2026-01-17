@@ -32,9 +32,11 @@ namespace {
 
 // Creates the Feature Engagement Mock Tracker.
 std::unique_ptr<KeyedService> BuildFeatureEngagementMockTracker(
-    web::BrowserState* browser_state) {
+    ProfileIOS* profile) {
   return std::make_unique<feature_engagement::test::MockTracker>();
 }
+
+const int kSessionImpressionLimit = 5;
 
 }  // namespace
 
@@ -87,7 +89,9 @@ class DefaultBrowserBannerPromoAppAgentTest : public PlatformTest {
         feature_engagement::TrackerFactory::GetForProfile(profile_.get()));
   }
 
-  ~DefaultBrowserBannerPromoAppAgentTest() override = default;
+  ~DefaultBrowserBannerPromoAppAgentTest() override {
+    profile_state_.profile = nullptr;
+  }
 
   // Returns the WebStateList for the given SceneState.
   WebStateList* GetWebStateList(SceneState* scene_state) {
@@ -118,8 +122,6 @@ class DefaultBrowserBannerPromoAppAgentTest : public PlatformTest {
   }
 
   web::WebTaskEnvironment task_env_;
-  base::test::ScopedFeatureList scoped_feature_list_{
-      kDefaultBrowserBannerPromo};
 
   const GURL url_ = GURL("http://www.example.com");
 
@@ -180,8 +182,7 @@ TEST_F(DefaultBrowserBannerPromoAppAgentTest,
   context.SetIsSameDocument(false);
 
   // Navigate enough times to use up all promo views.
-  for (int navigation_count = 1;
-       navigation_count < kDefaultBrowserBannerPromoImpressionLimit.Get();
+  for (int navigation_count = 1; navigation_count < kSessionImpressionLimit;
        navigation_count++) {
     web_state->OnNavigationFinished(&context);
 
@@ -419,8 +420,7 @@ TEST_F(DefaultBrowserBannerPromoAppAgentTest,
   navigation_count++;
 
   // Navigate in the second web state enough times to use up all promo views.
-  for (; navigation_count < kDefaultBrowserBannerPromoImpressionLimit.Get();
-       navigation_count++) {
+  for (; navigation_count < kSessionImpressionLimit; navigation_count++) {
     web_state_2->OnNavigationFinished(&context);
 
     EXPECT_TRUE(observer_.promoDisplayed);
@@ -520,8 +520,7 @@ TEST_F(DefaultBrowserBannerPromoAppAgentTest,
   navigation_count++;
 
   // Navigate in the second scene enough times to use up all promo views.
-  for (; navigation_count < kDefaultBrowserBannerPromoImpressionLimit.Get();
-       navigation_count++) {
+  for (; navigation_count < kSessionImpressionLimit; navigation_count++) {
     web_state_2->OnNavigationFinished(&context);
 
     EXPECT_TRUE(observer_.promoDisplayed);

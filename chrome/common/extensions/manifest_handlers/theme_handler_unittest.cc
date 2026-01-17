@@ -10,10 +10,13 @@
 #include "base/test/scoped_feature_list.h"
 #include "base/values.h"
 #include "chrome/common/chrome_features.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/manifest_constants.h"
 #include "extensions/common/mojom/manifest.mojom-shared.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 
@@ -23,8 +26,10 @@ namespace errors = manifest_errors;
 class ThemeHandlerTest : public testing::Test {
  protected:
   // Creates a dummy extension for the given theme dictionary.
+  // TODO(crbug.com/41317803): Consider changing the return type to
+  // base::expected<scoped_refptr<Extension>, std::u16string>.
   scoped_refptr<Extension> CreateExtension(base::Value::Dict&& theme_dict,
-                                           std::string& error) {
+                                           std::u16string& error) {
     base::Value::Dict manifest;
     manifest.Set(keys::kManifestVersion, 3);
     manifest.Set(keys::kName, "My Theme");
@@ -41,7 +46,7 @@ TEST_F(ThemeHandlerTest, EmptyThemeDictionary) {
   // Empty |theme| dictionary should be considered valid and thus create an
   // |extension|.
   base::Value::Dict theme = base::Value::Dict();
-  std::string error;
+  std::u16string error;
   scoped_refptr<Extension> extension = CreateExtension(std::move(theme), error);
   EXPECT_TRUE(extension);
 }
@@ -55,7 +60,7 @@ TEST_F(ThemeHandlerTest, ValidInputWithCustomizeTabGroupColorPaletteEnabled) {
   // considered valid and thus create an |extension|.
   base::Value::Dict theme = base::Value::Dict().Set(
       "tab_group_color_palette", base::Value::Dict().Set("red_override", 50));
-  std::string error;
+  std::u16string error;
   scoped_refptr<Extension> extension = CreateExtension(std::move(theme), error);
   EXPECT_TRUE(extension);
 
@@ -76,11 +81,10 @@ TEST_F(ThemeHandlerTest, InvalidInputWithCustomizeTabGroupColorPaletteEnabled) {
   base::Value::Dict theme = base::Value::Dict().Set(
       "tab_group_color_palette",
       base::Value::Dict().Set("red_override", "invalid value"));
-  std::string error;
+  std::u16string error;
   scoped_refptr<Extension> extension = CreateExtension(std::move(theme), error);
   EXPECT_FALSE(extension);
-  EXPECT_EQ(error,
-            base::UTF16ToUTF8(errors::kInvalidThemeTabGroupColorPalette));
+  EXPECT_EQ(error, errors::kInvalidThemeTabGroupColorPalette);
 }
 
 TEST_F(ThemeHandlerTest,
@@ -96,7 +100,7 @@ TEST_F(ThemeHandlerTest,
   base::Value::Dict theme = base::Value::Dict().Set(
       "tab_group_color_palette",
       base::Value::Dict().Set("red_override", "invalid value"));
-  std::string error;
+  std::u16string error;
   scoped_refptr<Extension> extension = CreateExtension(std::move(theme), error);
   EXPECT_TRUE(extension);
 }

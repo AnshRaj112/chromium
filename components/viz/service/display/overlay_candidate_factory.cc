@@ -4,9 +4,9 @@
 
 #include "components/viz/service/display/overlay_candidate_factory.h"
 
+#include <algorithm>
 #include <variant>
 
-#include "base/containers/contains.h"
 #include "build/build_config.h"
 #include "cc/base/math_util.h"
 #include "components/viz/common/quads/aggregated_render_pass_draw_quad.h"
@@ -21,7 +21,6 @@
 #include "components/viz/service/debugger/viz_debugger.h"
 #include "components/viz/service/display/display_resource_provider.h"
 #include "third_party/skia/include/core/SkColor.h"
-#include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/rect_f.h"
@@ -357,7 +356,7 @@ OverlayCandidate::CandidateStatus OverlayCandidateFactory::FromDrawQuadResource(
         resource_provider_->IsLowLatencyRendering(resource_id);
 
     if (!context_.is_delegated_context &&
-        !base::Contains(kOverlayFormats, candidate.format)) {
+        !std::ranges::contains(kOverlayFormats, candidate.format)) {
       return CandidateStatus::kFailBufferFormat;
     }
   }
@@ -662,7 +661,11 @@ OverlayCandidate::CandidateStatus OverlayCandidateFactory::FromTextureQuad(
     return CandidateStatus::kFailBlending;
   }
 
-  candidate.uv_rect = BoundingRect(quad->uv_top_left, quad->uv_bottom_right);
+  if (quad->resource_id != kInvalidResourceId) {
+    auto resource_size_in_pixels =
+        resource_provider_->GetResourceBackedSize(quad->resource_id);
+    candidate.uv_rect = quad->GetNormalizedTexCoords(resource_size_in_pixels);
+  }
 
   const bool y_flipped = resource_provider_->GetOrigin(quad->resource_id) ==
                          kBottomLeft_GrSurfaceOrigin;

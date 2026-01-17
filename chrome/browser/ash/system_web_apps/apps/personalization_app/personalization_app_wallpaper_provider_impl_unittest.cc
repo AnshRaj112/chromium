@@ -19,7 +19,6 @@
 #include "ash/wallpaper/test_sea_pen_wallpaper_manager_session_delegate.h"
 #include "ash/wallpaper/wallpaper_constants.h"
 #include "ash/wallpaper/wallpaper_pref_manager.h"
-#include "ash/webui/common/mojom/sea_pen.mojom-forward.h"
 #include "ash/webui/common/mojom/sea_pen.mojom.h"
 #include "ash/webui/common/mojom/sea_pen_generated.mojom-shared.h"
 #include "ash/webui/personalization_app/mojom/personalization_app.mojom.h"
@@ -27,7 +26,6 @@
 #include "base/containers/flat_map.h"
 #include "base/containers/span.h"
 #include "base/files/file_util.h"
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted_memory.h"
@@ -38,7 +36,6 @@
 #include "base/test/bind.h"
 #include "base/test/test_future.h"
 #include "chrome/browser/ash/login/users/fake_chrome_user_manager.h"
-#include "chrome/browser/ash/policy/external_data/handlers/device_wallpaper_image_external_data_handler.h"
 #include "chrome/browser/ash/settings/cros_settings_holder.h"
 #include "chrome/browser/ash/settings/device_settings_service.h"
 #include "chrome/browser/ash/settings/scoped_cros_settings_test_helper.h"
@@ -99,8 +96,6 @@ TestingPrefServiceSimple* RegisterPrefs(TestingPrefServiceSimple* local_state) {
   ash::device_settings_cache::RegisterPrefs(local_state->registry());
   user_manager::KnownUser::RegisterPrefs(local_state->registry());
   ash::WallpaperPrefManager::RegisterLocalStatePrefs(local_state->registry());
-  policy::DeviceWallpaperImageExternalDataHandler::RegisterPrefs(
-      local_state->registry());
   ProfileAttributesStorage::RegisterPrefs(local_state->registry());
   return local_state;
 }

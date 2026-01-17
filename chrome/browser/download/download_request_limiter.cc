@@ -8,7 +8,7 @@
 #include <memory>
 #include <utility>
 
-#include "base/containers/contains.h"
+#include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "build/build_config.h"
 #include "chrome/browser/content_settings/chrome_content_settings_utils.h"
@@ -16,6 +16,11 @@
 #include "chrome/browser/download/download_permission_request.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/tab_contents/tab_util.h"
+#include "components/content_settings/core/browser/content_settings_utils.h"
+#include "components/content_settings/core/common/content_settings_constraints.h"
+#include "components/content_settings/core/common/content_settings_types.h"
+#include "components/content_settings/core/common/content_settings_utils.h"
+#include "components/permissions/features.h"
 #include "components/permissions/permission_request_manager.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_task_traits.h"
@@ -236,9 +241,24 @@ void DownloadRequestLimiter::TabDownloadState::SetContentSetting(
       DownloadRequestLimiter::GetContentSettings(web_contents_);
   if (!settings)
     return;
+
+  content_settings::ContentSettingConstraints constraints;
+
+  // Enable last-visit tracking for eligible permissions granted from
+  // Permission Prompt UI. This allows Safety Hub to auto-revoke the permission
+  // if the site is not visited for a finite amount of time.
+  if (base::FeatureList::IsEnabled(
+          permissions::features::
+              kSafetyHubUnusedPermissionRevocationForAllSurfaces) &&
+      content_settings::CanBeAutoRevokedAsUnusedPermission(
+          ContentSettingsType::AUTOMATIC_DOWNLOADS,
+          content_settings::ContentSettingToValue(setting))) {
+    constraints.set_track_last_visit_for_autoexpiration(true);
+  }
+
   settings->SetContentSettingDefaultScope(
       request_origin.GetURL(), GURL(), ContentSettingsType::AUTOMATIC_DOWNLOADS,
-      setting);
+      setting, constraints);
 }
 
 void DownloadRequestLimiter::TabDownloadState::Cancel(
@@ -702,7 +722,7 @@ void DownloadRequestLimiter::CanDownloadImpl(
 
 void DownloadRequestLimiter::Remove(TabDownloadState* state,
                                     content::WebContents* contents) {
-  DCHECK(base::Contains(state_map_, contents));
+  DCHECK(state_map_.contains(contents));
   state_map_.erase(contents);
   delete state;
 }

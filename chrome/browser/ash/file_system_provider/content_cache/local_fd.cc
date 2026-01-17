@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "chrome/browser/ash/file_system_provider/content_cache/local_fd.h"
 
 #include "base/files/file_error_or.h"
 #include "base/logging.h"
+#include "base/numerics/safe_conversions.h"
 
 namespace ash::file_system_provider {
 
@@ -30,7 +26,8 @@ base::FileErrorOr<std::unique_ptr<base::File>> WriteBytesBlocking(
         path, base::File::FLAG_OPEN_ALWAYS | base::File::FLAG_WRITE);
   }
 
-  if (file->Write(offset, buffer->data(), length) != length) {
+  if (!file->WriteAndCheck(offset,
+                           buffer->first(base::checked_cast<size_t>(length)))) {
     PLOG(ERROR) << "Failed to write bytes to file";
     return base::unexpected(base::File::FILE_ERROR_FAILED);
   }
@@ -48,16 +45,17 @@ FileErrorOrFileAndBytesRead ReadBytesBlocking(
     file = std::make_unique<base::File>(
         path, base::File::FLAG_OPEN | base::File::FLAG_READ);
   }
-  int bytes_read = file->Read(offset, buffer->data(), length);
-  if (bytes_read < 0) {
+  const std::optional<size_t> bytes_read =
+      file->Read(offset, buffer->first(length));
+  if (!bytes_read) {
     PLOG(ERROR) << "Failed to read bytes from file";
     return base::unexpected(base::File::FILE_ERROR_FAILED);
   }
 
-  VLOG(2) << "ReadBytesBlocking: {bytes_read = '" << bytes_read
+  VLOG(2) << "ReadBytesBlocking: {bytes_read = '" << *bytes_read
           << "', file.GetLength = '" << file->GetLength() << "', offset = '"
           << offset << "', length = '" << length << "'}";
-  return std::make_pair(std::move(file), bytes_read);
+  return std::make_pair(std::move(file), *bytes_read);
 }
 
 }  // namespace

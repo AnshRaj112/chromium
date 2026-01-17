@@ -7,7 +7,6 @@
 #include <memory>
 
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/app/vector_icons/vector_icons.h"
@@ -41,6 +40,7 @@
 #include "ui/views/controls/textarea/textarea.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/layout/flex_layout_view.h"
+#include "ui/views/metadata/view_factory.h"
 #include "ui/views/style/typography.h"
 #include "ui/views/style/typography_provider.h"
 #include "ui/views/vector_icons.h"
@@ -240,10 +240,11 @@ std::unique_ptr<views::View> CreatePasswordLabelWithEyeIconView(
   eye_icon->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
   eye_icon->SetID(
       static_cast<int>(ManagePasswordsViewIDs::kRevealPasswordButton));
-  views::SetImageFromVectorIconWithColorId(
-      eye_icon, views::kEyeIcon, ui::kColorIcon, ui::kColorIconDisabled);
-  views::SetToggledImageFromVectorIconWithColorId(
-      eye_icon, views::kEyeCrossedIcon, ui::kColorIcon, ui::kColorIconDisabled);
+  views::SetImageFromVectorIconWithColor(
+      eye_icon, views::kEyeIcon, {ui::kColorIcon, ui::kColorIconDisabled});
+  views::SetToggledImageFromVectorIconWithColor(
+      eye_icon, views::kEyeCrossedIcon,
+      {ui::kColorIcon, ui::kColorIconDisabled});
   views::InstallCircleHighlightPathGenerator(eye_icon);
   eye_icon->SetCallback(
       base::BindRepeating(
@@ -484,9 +485,9 @@ std::unique_ptr<RichHoverButton> CreateManagePasswordRow(
       l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_MANAGE_PASSWORD_BUTTON),
       /*subtitle_text=*/std::u16string(),
       /*action_image_icon=*/
-      ui::ImageModel::FromVectorIcon(vector_icons::kLaunchIcon,
-                                     ui::kColorIconSecondary,
-                                     GetLayoutConstant(PAGE_INFO_ICON_SIZE)));
+      ui::ImageModel::FromVectorIcon(
+          vector_icons::kLaunchIcon, ui::kColorIconSecondary,
+          GetLayoutConstant(LayoutConstant::kPageInfoIconSize)));
   manage_password_row->SetID(static_cast<int>(
       password_manager::ManagePasswordsViewIDs::kManagePasswordButton));
   manage_password_row->SetTooltipText(
@@ -525,8 +526,12 @@ std::unique_ptr<views::View> ManagePasswordsDetailsView::CreateTitleView(
 
   std::string shown_origin = password_manager::GetShownOrigin(
       password_manager::CredentialUIEntry(password_form));
-  header->AddChildView(views::BubbleFrameView::CreateDefaultTitleLabel(
-      base::UTF8ToUTF16(shown_origin)));
+  views::Label* title_label =
+      header->AddChildView(views::BubbleFrameView::CreateDefaultTitleLabel(
+          base::UTF8ToUTF16(shown_origin)));
+  // Multiline doesn't work well with eliding the URL from the left.
+  title_label->SetMultiLine(false);
+  title_label->SetElideBehavior(gfx::ELIDE_HEAD);
   return header;
 }
 

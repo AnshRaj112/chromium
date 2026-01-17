@@ -7,7 +7,6 @@
 #import <algorithm>
 
 #import "base/check.h"
-#import "base/containers/contains.h"
 #import "base/containers/flat_set.h"
 #import "base/functional/bind.h"
 #import "base/memory/raw_ptr.h"
@@ -219,8 +218,8 @@ bool CheckForDuplicates(
 }
 
 - (BOOL)isTLDMissing {
-  std::string hostname = self.URL.host();
-  return !base::Contains(hostname, '.');
+  std::string hostname = self.URL.GetHost();
+  return !hostname.contains('.');
 }
 
 - (BOOL)shouldShowSuggestPasswordItem {

@@ -150,10 +150,9 @@ void InstanceIDAndroid::DeleteIDImpl(DeleteIDCallback callback) {
   Java_InstanceIDBridge_deleteInstanceID(env, java_ref_, request_id);
 }
 
-void InstanceIDAndroid::DidGetID(
-    JNIEnv* env,
-    jint request_id,
-    const base::android::JavaParamRef<jstring>& jid) {
+void InstanceIDAndroid::DidGetID(JNIEnv* env,
+                                 int32_t request_id,
+                                 const base::android::JavaRef<jstring>& jid) {
   DCHECK(thread_checker_.CalledOnValidThread());
 
   GetIDCallback* callback = get_id_callbacks_.Lookup(request_id);
@@ -163,7 +162,7 @@ void InstanceIDAndroid::DidGetID(
 }
 
 void InstanceIDAndroid::DidGetCreationTime(JNIEnv* env,
-                                           jint request_id,
+                                           int32_t request_id,
                                            jlong creation_time_unix_ms) {
   DCHECK(thread_checker_.CalledOnValidThread());
 
@@ -184,8 +183,8 @@ void InstanceIDAndroid::DidGetCreationTime(JNIEnv* env,
 
 void InstanceIDAndroid::DidGetToken(
     JNIEnv* env,
-    jint request_id,
-    const base::android::JavaParamRef<jstring>& jtoken) {
+    int32_t request_id,
+    const base::android::JavaRef<jstring>& jtoken) {
   DCHECK(thread_checker_.CalledOnValidThread());
 
   GetTokenCallback* callback = get_token_callbacks_.Lookup(request_id);
@@ -197,8 +196,8 @@ void InstanceIDAndroid::DidGetToken(
 }
 
 void InstanceIDAndroid::DidDeleteToken(JNIEnv* env,
-                                       jint request_id,
-                                       jboolean success) {
+                                       int32_t request_id,
+                                       bool success) {
   DCHECK(thread_checker_.CalledOnValidThread());
 
   DeleteTokenCallback* callback = delete_token_callbacks_.Lookup(request_id);
@@ -209,8 +208,8 @@ void InstanceIDAndroid::DidDeleteToken(JNIEnv* env,
 }
 
 void InstanceIDAndroid::DidDeleteID(JNIEnv* env,
-                                    jint request_id,
-                                    jboolean success) {
+                                    int32_t request_id,
+                                    bool success) {
   DCHECK(thread_checker_.CalledOnValidThread());
 
   DeleteIDCallback* callback = delete_id_callbacks_.Lookup(request_id);
@@ -221,3 +220,5 @@ void InstanceIDAndroid::DidDeleteID(JNIEnv* env,
 }
 
 }  // namespace instance_id
+
+DEFINE_JNI(InstanceIDBridge)

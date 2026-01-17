@@ -10,7 +10,6 @@
 #include <utility>
 
 #include "base/compiler_specific.h"
-#include "base/containers/contains.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/memory/ptr_util.h"
@@ -19,7 +18,7 @@
 #include "build/build_config.h"
 #include "ipc/ipc_channel_factory.h"
 #include "ipc/ipc_listener.h"
-#include "ipc/ipc_message_macros.h"
+#include "ipc/param_traits_macros.h"
 #include "mojo/public/cpp/bindings/pending_associated_receiver.h"
 
 namespace IPC {
@@ -59,21 +58,14 @@ void ChannelProxy::Context::CreateChannel(
   DCHECK_EQ(factory->GetIPCTaskRunner(), ipc_task_runner_);
   channel_ = factory->BuildChannel(this);
   channel_->SetUrgentMessageObserver(urgent_message_observer_);
+  thread_safe_channel_ = channel_->CreateThreadSafeChannel();
 
-  Channel::AssociatedInterfaceSupport* support =
-      channel_->GetAssociatedInterfaceSupport();
-  if (support) {
-    thread_safe_channel_ = support->CreateThreadSafeChannel();
-
-    base::AutoLock filter_lock(pending_filters_lock_);
-    for (auto& entry : pending_io_thread_interfaces_)
-      support->AddGenericAssociatedInterface(entry.first, entry.second);
-    pending_io_thread_interfaces_.clear();
+  base::AutoLock filter_lock(pending_filters_lock_);
+  for (auto& entry : pending_io_thread_interfaces_) {
+    channel_->AddGenericAssociatedInterface(entry.first, entry.second);
   }
-}
 
-bool ChannelProxy::Context::TryFilters(const Message& message) {
-  return false;
+  pending_io_thread_interfaces_.clear();
 }
 
 // Called on the IPC::Channel thread
@@ -92,22 +84,6 @@ void ChannelProxy::Context::UnpauseChannel(bool flush) {
 void ChannelProxy::Context::FlushChannel() {
   DCHECK(channel_);
   channel_->Flush();
-}
-
-// Called on the IPC::Channel thread
-bool ChannelProxy::Context::OnMessageReceived(const Message& message) {
-  // First give a chance to the filters to process this message.
-  if (!TryFilters(message))
-    OnMessageReceivedNoFilter(message);
-  return true;
-}
-
-// Called on the IPC::Channel thread
-bool ChannelProxy::Context::OnMessageReceivedNoFilter(const Message& message) {
-  GetTaskRunner(message.routing_id())
-      ->PostTask(FROM_HERE,
-                 base::BindOnce(&Context::OnDispatchMessage, this, message));
-  return true;
 }
 
 // Called on the IPC::Channel thread
@@ -171,62 +147,6 @@ void ChannelProxy::Context::Clear() {
   listener_ = nullptr;
 }
 
-// Called on the IPC::Channel thread
-void ChannelProxy::Context::OnSendMessage(std::unique_ptr<Message> message) {
-  if (!channel_) {
-    OnChannelClosed();
-    return;
-  }
-
-  if (!channel_->Send(message.release()))
-    OnChannelError();
-}
-
-// Called on the listener's thread
-void ChannelProxy::Context::OnDispatchMessage(const Message& message) {
-  if (!listener_)
-    return;
-
-  OnDispatchConnected();
-
-  listener_->OnMessageReceived(message);
-  if (message.dispatch_error())
-    listener_->OnBadMessageReceived(message);
-}
-
-// Called on the listener's thread.
-void ChannelProxy::Context::AddListenerTaskRunner(
-    int32_t routing_id,
-    scoped_refptr<base::SingleThreadTaskRunner> task_runner) {
-  DCHECK(default_listener_task_runner_->BelongsToCurrentThread());
-  DCHECK(task_runner);
-  base::AutoLock lock(listener_thread_task_runners_lock_);
-  if (!base::Contains(listener_thread_task_runners_, routing_id))
-    listener_thread_task_runners_.insert({routing_id, std::move(task_runner)});
-}
-
-// Called on the listener's thread.
-void ChannelProxy::Context::RemoveListenerTaskRunner(int32_t routing_id) {
-  DCHECK(default_listener_task_runner_->BelongsToCurrentThread());
-  base::AutoLock lock(listener_thread_task_runners_lock_);
-  listener_thread_task_runners_.erase(routing_id);
-}
-
-// Called on the IPC::Channel thread.
-scoped_refptr<base::SingleThreadTaskRunner>
-ChannelProxy::Context::GetTaskRunner(int32_t routing_id) {
-  DCHECK(ipc_task_runner_->BelongsToCurrentThread());
-  if (routing_id == MSG_ROUTING_NONE)
-    return default_listener_task_runner_;
-
-  base::AutoLock lock(listener_thread_task_runners_lock_);
-  auto task_runner = listener_thread_task_runners_.find(routing_id);
-  if (task_runner == listener_thread_task_runners_.end())
-    return default_listener_task_runner_;
-  DCHECK(task_runner->second);
-  return task_runner->second;
-}
-
 // Called on the listener's thread
 void ChannelProxy::Context::OnDispatchConnected() {
   if (channel_connected_called_)
@@ -246,12 +166,6 @@ void ChannelProxy::Context::OnDispatchConnected() {
 void ChannelProxy::Context::OnDispatchError() {
   if (listener_)
     listener_->OnChannelError();
-}
-
-// Called on the listener's thread
-void ChannelProxy::Context::OnDispatchBadMessage(const Message& message) {
-  if (listener_)
-    listener_->OnBadMessageReceived(message);
 }
 
 // Called on the listener's thread
@@ -276,16 +190,7 @@ void ChannelProxy::Context::AddGenericAssociatedInterfaceForIOThread(
     pending_io_thread_interfaces_.emplace_back(name, factory);
     return;
   }
-  Channel::AssociatedInterfaceSupport* support =
-      channel_->GetAssociatedInterfaceSupport();
-  if (support)
-    support->AddGenericAssociatedInterface(name, factory);
-}
-
-void ChannelProxy::Context::Send(Message* message) {
-  ipc_task_runner()->PostTask(
-      FROM_HERE, base::BindOnce(&ChannelProxy::Context::OnSendMessage, this,
-                                base::WrapUnique(message)));
+  channel_->AddGenericAssociatedInterface(name, factory);
 }
 
 // Called on the listener's thread.
@@ -298,7 +203,7 @@ void ChannelProxy::Context::SetUrgentMessageObserver(
 
 // static
 std::unique_ptr<ChannelProxy> ChannelProxy::Create(
-    const IPC::ChannelHandle& channel_handle,
+    const mojo::MessagePipeHandle& channel_handle,
     Channel::Mode mode,
     Listener* listener,
     const scoped_refptr<base::SingleThreadTaskRunner>& ipc_task_runner,
@@ -335,7 +240,7 @@ ChannelProxy::~ChannelProxy() {
   Close();
 }
 
-void ChannelProxy::Init(const IPC::ChannelHandle& channel_handle,
+void ChannelProxy::Init(const mojo::MessagePipeHandle& channel_handle,
                         Channel::Mode mode,
                         bool create_pipe_now) {
 #if BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
@@ -374,7 +279,6 @@ void ChannelProxy::Init(std::unique_ptr<ChannelFactory> factory,
       FROM_HERE, base::BindOnce(&Context::OnChannelOpened, context_));
 
   did_init_ = true;
-  OnChannelInit();
 }
 
 void ChannelProxy::Pause() {
@@ -406,21 +310,6 @@ void ChannelProxy::Close() {
   }
 }
 
-bool ChannelProxy::Send(Message* message) {
-  DCHECK(!message->is_sync()) << "Need to use IPC::SyncChannel";
-  SendInternal(message);
-  return true;
-}
-
-void ChannelProxy::SendInternal(Message* message) {
-  DCHECK(did_init_);
-
-  // TODO(alexeypa): add DCHECK(CalledOnValidThread()) here. Currently there are
-  // tests that call Send() from a wrong thread. See http://crbug.com/163523.
-
-  context_->Send(message);
-}
-
 void ChannelProxy::AddGenericAssociatedInterfaceForIOThread(
     const std::string& name,
     const GenericAssociatedInterfaceFactory& factory) {
@@ -436,9 +325,6 @@ void ChannelProxy::GetRemoteAssociatedInterface(
 void ChannelProxy::ClearIPCTaskRunner() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   context()->ClearIPCTaskRunner();
-}
-
-void ChannelProxy::OnChannelInit() {
 }
 
 void ChannelProxy::SetUrgentMessageObserver(UrgentMessageObserver* observer) {

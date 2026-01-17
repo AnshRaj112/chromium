@@ -12,9 +12,9 @@
 
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/memory/ref_counted.h"
 #include "base/memory/ref_counted_delete_on_sequence.h"
 #include "base/memory/scoped_refptr.h"
-#include "base/memory/weak_ptr.h"
 #include "base/types/expected.h"
 #include "base/values.h"
 #include "extensions/browser/api/declarative_net_request/install_index_helper.h"
@@ -26,7 +26,6 @@
 #include "extensions/common/extension_id.h"
 #include "extensions/common/manifest.h"
 #include "extensions/common/mojom/manifest.mojom-shared.h"
-#include "mojo/public/cpp/bindings/remote.h"
 #include "services/data_decoder/public/cpp/data_decoder.h"
 
 class SkBitmap;
@@ -200,11 +199,11 @@ class SandboxedUnpacker : public ImageSanitizer::Client {
 
   // Unpacks the extension in directory and returns the manifest.
   void Unpack(const base::FilePath& directory);
-  void ReadManifestDone(base::expected<base::Value, std::string> result);
+  void ReadManifestDone(base::expected<base::Value, std::u16string> result);
   void UnpackExtensionSucceeded(base::Value::Dict manifest);
 
   // Helper which calls ReportFailure.
-  void ReportUnpackExtensionFailed(std::string_view error);
+  void ReportUnpackExtensionFailed(const std::u16string& error);
 
   // Implementation of ImageSanitizer::Client:
   data_decoder::DataDecoder* GetDataDecoder() override;

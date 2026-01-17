@@ -29,18 +29,19 @@ class PLATFORM_EXPORT BitmapImageMetrics {
     kICO = 5,
     kBMP = 6,
     kAVIF = 7,
-    kREMOVED_JXL = 8,
-    kMaxValue = kREMOVED_JXL,
+    kJXLDeprecated = 8,
+    kJXL = 9,
+    kMaxValue = kJXL,
   };
 
   // |type| is the return value of ImageDecoder::FilenameExtension().
-  static DecodedImageType StringToDecodedImageType(const WTF::String& type);
+  static DecodedImageType StringToDecodedImageType(const String& type);
 
   // |type| is the return value of ImageDecoder::FilenameExtension().
-  static void CountDecodedImageType(const WTF::String& type);
+  static void CountDecodedImageType(const String& type);
   // |type| is the return value of ImageDecoder::FilenameExtension().
   // |use_counter| may be a null pointer.
-  static void CountDecodedImageType(const WTF::String& type,
+  static void CountDecodedImageType(const String& type,
                                     UseCounter* use_counter);
   // |use_counter| may be a null pointer.
   static void CountDecodedImageC2PA(UseCounter* use_counter);
@@ -48,7 +49,7 @@ class PLATFORM_EXPORT BitmapImageMetrics {
   // with a smallest side (width or length) of |image_min_side| and total size
   // in bytes |image_size_bytes|. Only certain image types and minimum image
   // size are reported.
-  static void CountDecodedImageDensity(const WTF::String& type,
+  static void CountDecodedImageDensity(const String& type,
                                        int image_min_side,
                                        uint64_t density_centi_bpp,
                                        size_t image_size_bytes);

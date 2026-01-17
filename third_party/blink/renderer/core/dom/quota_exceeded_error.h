@@ -11,7 +11,6 @@
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
-#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 
 namespace blink {
 
@@ -24,6 +23,11 @@ class CORE_EXPORT QuotaExceededError : public DOMException {
   // Constructor exposed to script. Called by the V8 bindings.
   static QuotaExceededError* Create(const String& message,
                                     const QuotaExceededErrorOptions* options);
+
+  // For creating a QuotaExceededError from C++ for deserialization.
+  static QuotaExceededError* Create(const String& message,
+                                    std::optional<double> quota,
+                                    std::optional<double> requested);
 
   // For creating a QuotaExceededError from C++ to be immediately passed to
   // ScriptPromiseResolverBase::Reject or ExceptionState::ThrowDOMException.
@@ -44,8 +48,6 @@ class CORE_EXPORT QuotaExceededError : public DOMException {
                      std::optional<double> quota = std::nullopt,
                      std::optional<double> requested = std::nullopt);
 
-  QuotaExceededError(const String& message,
-                     const QuotaExceededErrorOptions* options);
   QuotaExceededError(const String& message,
                      std::optional<double> quota,
                      std::optional<double> requested);

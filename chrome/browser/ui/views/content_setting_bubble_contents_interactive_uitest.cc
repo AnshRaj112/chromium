@@ -6,6 +6,7 @@
 
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/ui/views/content_setting_bubble_contents.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/test/base/in_process_browser_test.h"
@@ -133,7 +134,7 @@ IN_PROC_BROWSER_TEST_F(ContentSettingBubbleContentsInteractiveTest,
 
   // Start a prerender.
   auto prerender_url = embedded_test_server()->GetURL("/empty.html");
-  content::FrameTreeNodeId host_id =
+  content::PrerenderHostId host_id =
       prerender_helper()->AddPrerender(prerender_url);
   content::test::PrerenderHostObserver host_observer(*web_contents(), host_id);
   EXPECT_FALSE(host_observer.was_activated());

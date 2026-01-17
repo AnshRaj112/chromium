@@ -6,12 +6,12 @@
 
 #include <stdint.h>
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "base/containers/contains.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/memory/ptr_util.h"
@@ -210,9 +210,7 @@ class TestPerfCollector : public PerfCollector {
   using PerfCollector::EventType;
   using PerfCollector::Init;
   using PerfCollector::IsRunning;
-  using PerfCollector::LacrosChannelAndVersion;
   using PerfCollector::max_frequencies_mhz;
-  using PerfCollector::ParseLacrosPath;
   using PerfCollector::ParseOutputProtoIfValid;
   using PerfCollector::ParsePSICPUStatus;
   using PerfCollector::RecordUserLogin;
@@ -506,12 +504,12 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_IvyBridge) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLLCMissesCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfITLBMissCyclesCmdIvyBridge,
-                             &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLLCMissesCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfITLBMissCyclesCmdIvyBridge,
+                                    &RandomSelector::WeightAndValue::value));
 }
 
 TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_SandyBridge) {
@@ -529,12 +527,12 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_SandyBridge) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLLCMissesCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfITLBMissCyclesCmdIvyBridge,
-                             &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLLCMissesCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfITLBMissCyclesCmdIvyBridge,
+                                    &RandomSelector::WeightAndValue::value));
 }
 
 TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Haswell) {
@@ -553,16 +551,16 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Haswell) {
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
   // No LBR callstacks because the kernel is old.
-  EXPECT_FALSE(base::Contains(cmds, kPerfLBRCallgraphCmd,
-                              &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLLCMissesCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfITLBMissCyclesCmdIvyBridge,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfDTLBMissesDAPHaswell,
-                             &RandomSelector::WeightAndValue::value));
+  EXPECT_FALSE(std::ranges::contains(cmds, kPerfLBRCallgraphCmd,
+                                     &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLLCMissesCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfITLBMissCyclesCmdIvyBridge,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfDTLBMissesDAPHaswell,
+                                    &RandomSelector::WeightAndValue::value));
 }
 
 TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Skylake) {
@@ -582,14 +580,14 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Skylake) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[2].value, kPerfLBRCallgraphCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLLCMissesCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfITLBMissCyclesCmdSkylake,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfDTLBMissesDAPSkylake,
-                             &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLLCMissesCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfITLBMissCyclesCmdSkylake,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfDTLBMissesDAPSkylake,
+                                    &RandomSelector::WeightAndValue::value));
 }
 
 TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Tigerlake) {
@@ -609,14 +607,14 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Tigerlake) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[2].value, kPerfLBRCallgraphPPPCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLLCMissesCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfITLBMissCyclesCmdSkylake,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfDTLBMissesDAPSkylake,
-                             &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLLCMissesCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfITLBMissCyclesCmdSkylake,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfDTLBMissesDAPSkylake,
+                                    &RandomSelector::WeightAndValue::value));
 }
 
 TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Goldmont) {
@@ -635,16 +633,16 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Goldmont) {
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphPPPHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
   // No LBR callstacks because the microarchitecture doesn't support it.
-  EXPECT_FALSE(base::Contains(cmds, kPerfLBRCallgraphCmd,
-                              &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCmdAtom,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLLCMissesPreciseCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfITLBMissCyclesCmdAtom,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfDTLBMissesDAPGoldmont,
-                             &RandomSelector::WeightAndValue::value));
+  EXPECT_FALSE(std::ranges::contains(cmds, kPerfLBRCallgraphCmd,
+                                     &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCmdAtom,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLLCMissesPreciseCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfITLBMissCyclesCmdAtom,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfDTLBMissesDAPGoldmont,
+                                    &RandomSelector::WeightAndValue::value));
 }
 
 TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_GoldmontPlus) {
@@ -663,16 +661,16 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_GoldmontPlus) {
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphPPPHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
   // No LBR callstacks because the microarchitecture doesn't support it.
-  EXPECT_FALSE(base::Contains(cmds, kPerfLBRCallgraphCmd,
-                              &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCmdAtom,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLLCMissesPreciseCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfITLBMissCyclesCmdSkylake,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfDTLBMissesDAPGoldmont,
-                             &RandomSelector::WeightAndValue::value));
+  EXPECT_FALSE(std::ranges::contains(cmds, kPerfLBRCallgraphCmd,
+                                     &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCmdAtom,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLLCMissesPreciseCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfITLBMissCyclesCmdSkylake,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfDTLBMissesDAPGoldmont,
+                                    &RandomSelector::WeightAndValue::value));
 }
 
 TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Tremont) {
@@ -690,16 +688,16 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Tremont) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphPPPHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCallgraphPPPCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCmdTremont,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLLCMissesPreciseCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfITLBMissCyclesCmdTremont,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfDTLBMissesDAPTremont,
-                             &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCallgraphPPPCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCmdTremont,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLLCMissesPreciseCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfITLBMissCyclesCmdTremont,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfDTLBMissesDAPTremont,
+                                    &RandomSelector::WeightAndValue::value));
 }
 
 TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_AlderLake) {
@@ -717,16 +715,16 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_AlderLake) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphPPPHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCallgraphPPPCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCmdAlderLake,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLLCMissesPreciseCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfITLBMissCyclesCmdAlderLake,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfDTLBMissesDAPTremont,
-                             &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCallgraphPPPCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCmdAlderLake,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLLCMissesPreciseCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfITLBMissCyclesCmdAlderLake,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfDTLBMissesDAPTremont,
+                                    &RandomSelector::WeightAndValue::value));
 }
 
 TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Gracemont) {
@@ -744,16 +742,16 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Gracemont) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphPPPHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCallgraphPPPCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLBRCmdTremont,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfLLCMissesPreciseCmd,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfITLBMissCyclesCmdTremont,
-                             &RandomSelector::WeightAndValue::value));
-  EXPECT_TRUE(base::Contains(cmds, kPerfDTLBMissesDAPTremont,
-                             &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCallgraphPPPCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLBRCmdTremont,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfLLCMissesPreciseCmd,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfITLBMissCyclesCmdTremont,
+                                    &RandomSelector::WeightAndValue::value));
+  EXPECT_TRUE(std::ranges::contains(cmds, kPerfDTLBMissesDAPTremont,
+                                    &RandomSelector::WeightAndValue::value));
 }
 
 TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Excavator) {
@@ -770,8 +768,8 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnUarch_Excavator) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_FALSE(base::Contains(cmds, kPerfLLCMissesCmd,
-                              &RandomSelector::WeightAndValue::value))
+  EXPECT_FALSE(std::ranges::contains(cmds, kPerfLLCMissesCmd,
+                                     &RandomSelector::WeightAndValue::value))
       << "Excavator does not support this command";
 }
 
@@ -789,11 +787,11 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnArch_Arm32) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_FALSE(
-      base::Contains(cmds, kPerfLBRCmd, &RandomSelector::WeightAndValue::value))
+  EXPECT_FALSE(std::ranges::contains(cmds, kPerfLBRCmd,
+                                     &RandomSelector::WeightAndValue::value))
       << "ARM32 does not support this command";
-  EXPECT_FALSE(base::Contains(cmds, kPerfLLCMissesCmd,
-                              &RandomSelector::WeightAndValue::value))
+  EXPECT_FALSE(std::ranges::contains(cmds, kPerfLLCMissesCmd,
+                                     &RandomSelector::WeightAndValue::value))
       << "ARM32 does not support this command";
 }
 
@@ -811,11 +809,11 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnArch_Arm64) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_FALSE(
-      base::Contains(cmds, kPerfLBRCmd, &RandomSelector::WeightAndValue::value))
+  EXPECT_FALSE(std::ranges::contains(cmds, kPerfLBRCmd,
+                                     &RandomSelector::WeightAndValue::value))
       << "ARM64 does not support this command";
-  EXPECT_FALSE(base::Contains(cmds, kPerfLLCMissesCmd,
-                              &RandomSelector::WeightAndValue::value))
+  EXPECT_FALSE(std::ranges::contains(cmds, kPerfLLCMissesCmd,
+                                     &RandomSelector::WeightAndValue::value))
       << "ARM64 does not support this command";
 }
 
@@ -851,11 +849,11 @@ TEST_F(PerfCollectorTest, DefaultCommandsBasedOnArch_x86_32) {
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[0].value));
   EXPECT_EQ(cmds[1].value, kPerfFPCallgraphHGCmd);
   EXPECT_TRUE(DoesCommandSampleCycles(cmds[1].value));
-  EXPECT_FALSE(
-      base::Contains(cmds, kPerfLBRCmd, &RandomSelector::WeightAndValue::value))
+  EXPECT_FALSE(std::ranges::contains(cmds, kPerfLBRCmd,
+                                     &RandomSelector::WeightAndValue::value))
       << "x86_32 does not support this command";
-  EXPECT_FALSE(base::Contains(cmds, kPerfLLCMissesCmd,
-                              &RandomSelector::WeightAndValue::value))
+  EXPECT_FALSE(std::ranges::contains(cmds, kPerfLLCMissesCmd,
+                                     &RandomSelector::WeightAndValue::value))
       << "x86_32 does not support this command";
 }
 
@@ -1111,74 +1109,6 @@ TEST_F(PerfCollectorTest, JankinessCollectionDurationElapsed) {
   EXPECT_FALSE(perf_collector_->collection_stopped());
 }
 
-TEST_F(PerfCollectorTest, LacrosPathRootfs) {
-  base::HistogramTester histogram_tester;
-  const char rootfs_path[] = "/run/lacros/chrome";
-  metrics::SystemProfileProto_Channel rootfs_lacros_channel;
-  std::string rootfs_lacros_version;
-  EXPECT_FALSE(TestPerfCollector::LacrosChannelAndVersion(
-      rootfs_path, rootfs_lacros_channel, rootfs_lacros_version));
-  histogram_tester.ExpectUniqueSample(
-      "ChromeOS.CWP.ParseLacrosPath",
-      TestPerfCollector::ParseLacrosPath::kRootfs, 1);
-}
-
-TEST_F(PerfCollectorTest, LacrosChannelAndVersion) {
-  base::HistogramTester histogram_tester;
-
-  const char stable_path[] =
-      "/run/imageloader/lacros-dogfood-stable/95.0.4623.2/chrome";
-  metrics::SystemProfileProto_Channel stable_channel;
-  std::string stable_version;
-  EXPECT_TRUE(TestPerfCollector::LacrosChannelAndVersion(
-      stable_path, stable_channel, stable_version));
-  EXPECT_EQ(stable_channel, metrics::SystemProfileProto_Channel_CHANNEL_STABLE);
-  EXPECT_EQ(stable_version, "95.0.4623.2");
-
-  const char beta_path[] =
-      "/run/imageloader/lacros-dogfood-beta/97.0.4623.2/chrome";
-  metrics::SystemProfileProto_Channel beta_channel;
-  std::string beta_version;
-  EXPECT_TRUE(TestPerfCollector::LacrosChannelAndVersion(
-      beta_path, beta_channel, beta_version));
-  EXPECT_EQ(beta_channel, metrics::SystemProfileProto_Channel_CHANNEL_BETA);
-  EXPECT_EQ(beta_version, "97.0.4623.2");
-
-  const char dev_path[] =
-      "/run/imageloader/lacros-dogfood-dev/99.0.4623.2/chrome";
-  metrics::SystemProfileProto_Channel dev_channel;
-  std::string dev_version;
-  EXPECT_TRUE(TestPerfCollector::LacrosChannelAndVersion(dev_path, dev_channel,
-                                                         dev_version));
-  EXPECT_EQ(dev_channel, metrics::SystemProfileProto_Channel_CHANNEL_DEV);
-  EXPECT_EQ(dev_version, "99.0.4623.2");
-
-  const char canary_path[] =
-      "/run/imageloader/lacros-dogfood-canary/100.0.4623.2/chrome";
-  metrics::SystemProfileProto_Channel canary_channel;
-  std::string canary_version;
-  EXPECT_TRUE(TestPerfCollector::LacrosChannelAndVersion(
-      canary_path, canary_channel, canary_version));
-  EXPECT_EQ(canary_channel, metrics::SystemProfileProto_Channel_CHANNEL_CANARY);
-  EXPECT_EQ(canary_version, "100.0.4623.2");
-
-  histogram_tester.ExpectUniqueSample(
-      "ChromeOS.CWP.ParseLacrosPath",
-      TestPerfCollector::ParseLacrosPath::kStateful, 4);
-}
-
-TEST_F(PerfCollectorTest, LacrosPathUnrecognized) {
-  base::HistogramTester histogram_tester;
-  const char unrecognized_path[] = "/run/imageloader/lacros/chrome";
-  metrics::SystemProfileProto_Channel unrecognized_channel;
-  std::string unrecognized_version;
-  EXPECT_FALSE(TestPerfCollector::LacrosChannelAndVersion(
-      unrecognized_path, unrecognized_channel, unrecognized_version));
-  histogram_tester.ExpectUniqueSample(
-      "ChromeOS.CWP.ParseLacrosPath",
-      TestPerfCollector::ParseLacrosPath::kUnrecognized, 1);
-}
-
 TEST_F(PerfCollectorTest, CommandEventType) {
   using EventType = TestPerfCollector::EventType;
   EXPECT_EQ(TestPerfCollector::CommandEventType({"--duration", "0", "--",
@@ -1277,7 +1207,7 @@ class PerfCollectorCollectionParamsTest : public testing::Test {
       const PerfCollectorCollectionParamsTest&) = delete;
 
   void TearDown() override {
-    variations::testing::ClearAllVariationParams();
+    variations::test::ClearAllVariationParams();
   }
 
  protected:

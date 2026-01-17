@@ -14,10 +14,19 @@
 #include "chrome/browser/ui/tabs/public/tab_features.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_coordinator.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_entry.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_entry_key.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_registry.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_ui.h"
 #include "chrome/browser/ui/webui/webui_embedding_context.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "content/public/test/browser_test.h"
+#include "content/public/test/browser_test_utils.h"
+#include "extensions/buildflags/buildflags.h"
+
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+#include "chrome/browser/extensions/window_controller.h"
+#include "extensions/browser/extension_web_contents_observer.h"
+#endif
 
 namespace {
 
@@ -62,6 +71,34 @@ class TestSidePanelWebUIView : public SidePanelWebUIView {
   std::unique_ptr<TestWebUIContentsWrapper> contents_wrapper_;
 };
 
+void QueryTabsForCurrentWindowAndCheckResults(
+    content::WebContents* contents,
+    Browser* browser,
+    const std::string& first_tab_expected_url,
+    bool first_tab_should_be_active,
+    const std::string& second_tab_expected_url,
+    bool second_tab_should_be_active) {
+  base::ListValue list(
+      content::EvalJs(contents, "chrome.tabs.query({currentWindow: true})")
+          .ExtractList()
+          .Clone());
+  EXPECT_EQ(list.size(), browser->tab_strip_model()->count());
+  EXPECT_TRUE(list[0].is_dict());
+  EXPECT_TRUE(list[1].is_dict());
+  {
+    const base::DictValue& dict = list[0].GetDict();
+    EXPECT_TRUE(dict.FindString("url"));
+    EXPECT_EQ(*dict.FindString("url"), first_tab_expected_url);
+    EXPECT_EQ(dict.FindBool("active"), first_tab_should_be_active);
+  }
+  {
+    const base::DictValue& dict = list[1].GetDict();
+    EXPECT_TRUE(dict.FindString("url"));
+    EXPECT_EQ(*dict.FindString("url"), second_tab_expected_url);
+    EXPECT_EQ(dict.FindBool("active"), second_tab_should_be_active);
+  }
+}
+
 }  // namespace
 
 class SidePanelWebUIViewTest : public InProcessBrowserTest {
@@ -74,8 +111,9 @@ class SidePanelWebUIViewTest : public InProcessBrowserTest {
   // InProcessBrowserTest:
   void SetUpOnMainThread() override {
     InProcessBrowserTest::SetUpOnMainThread();
-    GetSidePanelCoordinator()->SetNoDelaysForTesting(true);
-    GetSidePanelCoordinator()->DisableAnimationsForTesting();
+    SidePanelUI* const side_panel_ui = browser()->GetFeatures().side_panel_ui();
+    side_panel_ui->SetNoDelaysForTesting(true);
+    side_panel_ui->DisableAnimationsForTesting();
   }
 
   // Registers a per-browser-window side panel entry with the test's default
@@ -90,9 +128,9 @@ class SidePanelWebUIViewTest : public InProcessBrowserTest {
                   scope, std::make_unique<TestWebUIContentsWrapper>(profile));
             },
             browser()->profile()),
-        SidePanelEntry::kSidePanelDefaultContentWidth);
+        /*default_content_width_callback=*/base::NullCallback());
 
-    GetSidePanelCoordinator()->GetWindowRegistry()->Register(std::move(entry));
+    SidePanelRegistry::From(browser())->Register(std::move(entry));
   }
 
   // Registers a per-tab side panel entry with the test's default browser active
@@ -107,7 +145,7 @@ class SidePanelWebUIViewTest : public InProcessBrowserTest {
                   scope, std::make_unique<TestWebUIContentsWrapper>(profile));
             },
             browser()->profile()),
-        SidePanelEntry::kSidePanelDefaultContentWidth);
+        /*default_content_width_callback=*/base::NullCallback());
     browser()
         ->tab_strip_model()
         ->GetActiveTab()
@@ -115,20 +153,18 @@ class SidePanelWebUIViewTest : public InProcessBrowserTest {
         ->side_panel_registry()
         ->Register(std::move(entry));
   }
-
-  SidePanelCoordinator* GetSidePanelCoordinator() {
-    return browser()->GetFeatures().side_panel_coordinator();
-  }
 };
 
 IN_PROC_BROWSER_TEST_F(SidePanelWebUIViewTest,
                        BrowserInterfaceSetForWindowSidePanels) {
   // Register and show a window scoped side panel.
   RegisterBrowserSidePanelEntry();
-  GetSidePanelCoordinator()->Show(kTestGlobalEntryId);
-  EXPECT_EQ(GetSidePanelCoordinator()->GetCurrentEntryId(), kTestGlobalEntryId);
+  SidePanelUI* const side_panel_ui = browser()->GetFeatures().side_panel_ui();
+  side_panel_ui->Show(kTestGlobalEntryId);
+  EXPECT_TRUE(side_panel_ui->IsSidePanelEntryShowing(
+      SidePanelEntryKey(kTestGlobalEntryId)));
   content::WebContents* side_panel_webui_contents =
-      GetSidePanelCoordinator()->GetWebContentsForTest(kTestGlobalEntryId);
+      side_panel_ui->GetWebContentsForTest(kTestGlobalEntryId);
   EXPECT_TRUE(side_panel_webui_contents);
 
   // The browser window interface should be correctly set on the webview's
@@ -137,14 +173,131 @@ IN_PROC_BROWSER_TEST_F(SidePanelWebUIViewTest,
             webui::GetBrowserWindowInterface(side_panel_webui_contents));
 }
 
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+IN_PROC_BROWSER_TEST_F(SidePanelWebUIViewTest,
+                       SidePanelVerifyWindowController) {
+  // Register and show a window scoped side panel.
+  RegisterBrowserSidePanelEntry();
+  SidePanelUI* const side_panel_ui = browser()->GetFeatures().side_panel_ui();
+  side_panel_ui->Show(kTestGlobalEntryId);
+  EXPECT_TRUE(side_panel_ui->IsSidePanelEntryShowing(
+      SidePanelEntryKey(kTestGlobalEntryId)));
+  content::WebContents* side_panel_webui_contents =
+      side_panel_ui->GetWebContentsForTest(kTestGlobalEntryId);
+  EXPECT_TRUE(side_panel_webui_contents);
+
+  // The browser window interface should be correctly set on the webview's
+  // hosted WebContents.
+  EXPECT_EQ(browser(),
+            webui::GetBrowserWindowInterface(side_panel_webui_contents));
+
+  // Create another browser as a test interference.
+  Browser* another_browser = CreateBrowser(browser()->profile());
+  EXPECT_TRUE(another_browser);
+  EXPECT_NE(browser(), another_browser);
+
+  // Verify whether the `dispatcher` related information points to the current
+  // browser's context.
+  extensions::ExtensionFunctionDispatcher* const dispatcher =
+      extensions::ExtensionWebContentsObserver::GetForWebContents(
+          side_panel_webui_contents)
+          ->dispatcher();
+  EXPECT_TRUE(dispatcher);
+  extensions::WindowController* window_controller =
+      dispatcher->GetExtensionWindowController();
+  EXPECT_TRUE(window_controller);
+  EXPECT_EQ(browser(), window_controller->GetBrowserWindowInterface());
+}
+
+IN_PROC_BROWSER_TEST_F(SidePanelWebUIViewTest,
+                       SidePanelQueryTabsForCurrentWindow) {
+  // Register and show a window scoped side panel.
+  RegisterBrowserSidePanelEntry();
+  constexpr char kTestUrl1ForThisBrowser[] = "chrome://bookmarks/";
+  constexpr char kTestUrl2ForThisBrowser[] = "chrome://settings/";
+  constexpr char kTestUrl1ForNewBrowser[] = "chrome://history/";
+  constexpr char kTestUrl2ForNewBrowser[] = "chrome://downloads/";
+  SidePanelUI* const side_panel_ui = browser()->GetFeatures().side_panel_ui();
+  side_panel_ui->Show(kTestGlobalEntryId);
+  EXPECT_TRUE(side_panel_ui->IsSidePanelEntryShowing(
+      SidePanelEntryKey(kTestGlobalEntryId)));
+
+  content::WebContents* side_panel_webui_contents =
+      side_panel_ui->GetWebContentsForTest(kTestGlobalEntryId);
+  EXPECT_TRUE(side_panel_webui_contents);
+
+  // The browser window interface should be correctly set on the webview's
+  // hosted WebContents.
+  EXPECT_EQ(browser(),
+            webui::GetBrowserWindowInterface(side_panel_webui_contents));
+
+  // Wait for load stop, because we need use `chrome.tabs` API later.
+  content::WaitForLoadStop(side_panel_webui_contents);
+
+  // Create tabs, and new window for testing.
+  browser()->OpenGURL(GURL(kTestUrl1ForThisBrowser),
+                      WindowOpenDisposition::CURRENT_TAB);
+  browser()->OpenGURL(GURL(kTestUrl2ForThisBrowser),
+                      WindowOpenDisposition::NEW_BACKGROUND_TAB);
+  EXPECT_EQ(browser()->tab_strip_model()->count(), 2);
+  EXPECT_EQ(browser()->tab_strip_model()->active_index(), 0);
+  content::WaitForLoadStop(
+      browser()->tab_strip_model()->GetTabAtIndex(0)->GetContents());
+  content::WaitForLoadStop(
+      browser()->tab_strip_model()->GetTabAtIndex(1)->GetContents());
+
+  // Test for current browser's tab.
+  QueryTabsForCurrentWindowAndCheckResults(side_panel_webui_contents, browser(),
+                                           kTestUrl1ForThisBrowser, true,
+                                           kTestUrl2ForThisBrowser, false);
+
+  // Activate the second tab.
+  browser()->tab_strip_model()->ActivateTabAt(1);
+  EXPECT_EQ(browser()->tab_strip_model()->active_index(), 1);
+
+  // The second tab should be activated.
+  QueryTabsForCurrentWindowAndCheckResults(side_panel_webui_contents, browser(),
+                                           kTestUrl1ForThisBrowser, false,
+                                           kTestUrl2ForThisBrowser, true);
+
+  // A new browser instance is created as a confounding variable, and it should
+  // not interfere with API calls in the `side_panel_webui_contents`.
+  Browser* new_browser = CreateBrowser(browser()->profile());
+  EXPECT_TRUE(new_browser);
+  new_browser->OpenGURL(GURL(kTestUrl1ForNewBrowser),
+                        WindowOpenDisposition::CURRENT_TAB);
+  new_browser->OpenGURL(GURL(kTestUrl2ForNewBrowser),
+                        WindowOpenDisposition::NEW_BACKGROUND_TAB);
+  EXPECT_EQ(new_browser->tab_strip_model()->count(), 2);
+  EXPECT_EQ(new_browser->tab_strip_model()->active_index(), 0);
+  content::WaitForLoadStop(
+      new_browser->tab_strip_model()->GetTabAtIndex(0)->GetContents());
+  content::WaitForLoadStop(
+      new_browser->tab_strip_model()->GetTabAtIndex(1)->GetContents());
+
+  // No matter how we activate the tab in the new browser, the result should
+  // still remain unchanged.
+  QueryTabsForCurrentWindowAndCheckResults(side_panel_webui_contents, browser(),
+                                           kTestUrl1ForThisBrowser, false,
+                                           kTestUrl2ForThisBrowser, true);
+
+  new_browser->tab_strip_model()->ActivateTabAt(1);
+  QueryTabsForCurrentWindowAndCheckResults(side_panel_webui_contents, browser(),
+                                           kTestUrl1ForThisBrowser, false,
+                                           kTestUrl2ForThisBrowser, true);
+}
+#endif
+
 IN_PROC_BROWSER_TEST_F(SidePanelWebUIViewTest,
                        TabScopedSidePanel_WebUIContextSetCorrectlyOnShow) {
   // Register and show a tab scoped side panel.
   RegisterTabSidePanelEntry();
-  GetSidePanelCoordinator()->Show(kTestTabEntryId);
-  EXPECT_EQ(GetSidePanelCoordinator()->GetCurrentEntryId(), kTestTabEntryId);
+  SidePanelUI* const side_panel_ui = browser()->GetFeatures().side_panel_ui();
+  side_panel_ui->Show(kTestTabEntryId);
+  EXPECT_TRUE(side_panel_ui->IsSidePanelEntryShowing(
+      SidePanelEntryKey(kTestTabEntryId)));
   content::WebContents* side_panel_webui_contents =
-      GetSidePanelCoordinator()->GetWebContentsForTest(kTestTabEntryId);
+      side_panel_ui->GetWebContentsForTest(kTestTabEntryId);
   EXPECT_TRUE(side_panel_webui_contents);
 
   // The browser and window interface should be correctly set on the webview's
@@ -169,10 +322,12 @@ IN_PROC_BROWSER_TEST_F(
 
   // Register and show a tab scoped side panel.
   RegisterTabSidePanelEntry();
-  GetSidePanelCoordinator()->Show(kTestTabEntryId);
-  EXPECT_EQ(GetSidePanelCoordinator()->GetCurrentEntryId(), kTestTabEntryId);
+  SidePanelUI* const side_panel_ui = browser()->GetFeatures().side_panel_ui();
+  side_panel_ui->Show(kTestTabEntryId);
+  EXPECT_TRUE(side_panel_ui->IsSidePanelEntryShowing(
+      SidePanelEntryKey(kTestTabEntryId)));
   content::WebContents* side_panel_webui_contents =
-      GetSidePanelCoordinator()->GetWebContentsForTest(kTestTabEntryId);
+      side_panel_ui->GetWebContentsForTest(kTestTabEntryId);
   EXPECT_TRUE(side_panel_webui_contents);
 
   // The browser and window interface should be correctly set on the webview's

@@ -41,6 +41,42 @@ enum class OnboardingEvents {
   kMaxValue = kFailure,
   // LINT.ThenChange(//tools/metrics/histograms/metadata/webauthn/enums.xml)
 };
+
+// Enum for the WebAuthentication.StoreKeysFlowType histogram.
+enum class WebAuthenticationGPMRecoveryEvent {
+  // LINT.IfChange(WebAuthenticationGPMRecoveryEvent)
+  kStoreKeysFromExplicitFlowStarted = 0,
+  kStoreKeysFromExplicitFlowSucceeded = 1,
+  kStoreKeysFromOpportunisticFlowStarted = 2,
+  kStoreKeysFromOpportunisticFlowSucceeded = 3,
+  kStoreKeysFromOpportunisticFlowIgnoredRedundant = 4,
+  kStoreKeysFromOpportunisticFlowIgnoredNoUV = 5,
+  kStoreKeysFromOpportunisticFlowFailed = 6,
+  kStoreKeysFromOpportunisticFlowCachedKeysBecauseAccountDoesNotMatch = 7,
+  kMaxValue =
+      kStoreKeysFromOpportunisticFlowCachedKeysBecauseAccountDoesNotMatch,
+  // LINT.ThenChange(//tools/metrics/histograms/metadata/webauthn/enums.xml:WebAuthenticationGPMRecoveryEvent)
+};
+
+// Enum for the WebAuthentication.StoreKeysFlowType histogram.
+enum class WebAuthenticationGPMCachedOpportunisticallyRetrievedKeyEvent {
+  // LINT.IfChange(WebAuthenticationGPMCachedOpportunisticallyRetrievedKeyEvent)
+  kStoreKeysFromOpportunisticFlowCachedKeysRemovedAfterTimeout = 0,
+  kStoreKeysFromOpportunisticFlowCachedKeysStoringAfterSignIn = 1,
+  kStoreKeysFromOpportunisticFlowCachedKeysHaveBeenOverwritten = 2,
+  kMaxValue = kStoreKeysFromOpportunisticFlowCachedKeysHaveBeenOverwritten,
+  // LINT.ThenChange(//tools/metrics/histograms/metadata/webauthn/enums.xml:WebAuthenticationGPMCachedOpportunisticallyRetrievedKeyEvent)
+};
+
+void RecordGPMRecoveryEvent(WebAuthenticationGPMRecoveryEvent event);
+void RecordGPMCachedOpportunisticallyRetrievedKeyEvent(
+    webauthn::metrics::
+        WebAuthenticationGPMCachedOpportunisticallyRetrievedKeyEvent event);
+
+void RecordCombinedSelectorShown(int credential_count);
+void RecordCombinedSelectorAccept(int credential_count, bool default_selected);
+void RecordCombinedSelectorCancelButtonClicked();
+
 }  // namespace webauthn::metrics
 
 void ReportConditionalUiPasskeyCount(int passkey_count);

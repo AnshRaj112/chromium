@@ -85,10 +85,10 @@ void LocationBarBubbleDelegateView::WebContentMouseHandler::OnEvent(
 }
 
 LocationBarBubbleDelegateView::LocationBarBubbleDelegateView(
-    views::View* anchor_view,
+    views::BubbleAnchor anchor,
     content::WebContents* web_contents,
     bool autosize)
-    : BubbleDialogDelegateView(anchor_view,
+    : BubbleDialogDelegateView(anchor,
                                views::BubbleBorder::TOP_RIGHT,
                                views::BubbleBorder::DIALOG_SHADOW,
                                autosize),
@@ -186,7 +186,8 @@ void LocationBarBubbleDelegateView::DidFinishNavigation(
 gfx::Rect LocationBarBubbleDelegateView::GetAnchorBoundsInScreen() const {
   gfx::Rect bounds = GetBoundsInScreen();
   bounds.Inset(gfx::Insets::VH(
-      GetLayoutConstant(LOCATION_BAR_BUBBLE_ANCHOR_VERTICAL_INSET), 0));
+      GetLayoutConstant(LayoutConstant::kLocationBarBubbleAnchorVerticalInset),
+      0));
   return bounds;
 }
 

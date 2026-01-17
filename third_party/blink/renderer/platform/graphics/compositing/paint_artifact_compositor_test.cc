@@ -59,9 +59,10 @@ gfx::Transform Translation(SkScalar x, SkScalar y) {
 
 class MockScrollCallbacks : public CompositorScrollCallbacks {
  public:
-  MOCK_METHOD3(DidCompositorScroll,
+  MOCK_METHOD4(DidCompositorScroll,
                void(CompositorElementId,
                     const gfx::PointF&,
+                    cc::ScrollSourceType type,
                     const std::optional<cc::TargetSnapAreaElementIds>&));
   MOCK_METHOD2(DidChangeScrollbarsHidden, void(CompositorElementId, bool));
 
@@ -152,7 +153,8 @@ class PaintArtifactCompositorTest : public testing::Test,
     paint_artifact_compositor_->SetNeedsUpdate();
     paint_artifact_compositor_->Update(artifact, viewport_properties,
                                        scroll_translation_nodes, {});
-    layer_tree_->layer_tree_host()->LayoutAndUpdateLayers();
+    layer_tree_->layer_tree_host()->RequestMainFrameUpdate(false);
+    layer_tree_->layer_tree_host()->UpdateLayers();
   }
 
   void WillBeRemovedFromFrame() {
@@ -1158,11 +1160,12 @@ TEST_P(PaintArtifactCompositorTest, OneScrollNodeComposited) {
   EXPECT_EQ(scroll_layer->scroll_tree_index(), scroll_node.id);
 
   std::optional<cc::TargetSnapAreaElementIds> targets;
-  EXPECT_CALL(
-      ScrollCallbacks(),
-      DidCompositorScroll(scroll_node.element_id, gfx::PointF(1, 2), targets));
+  EXPECT_CALL(ScrollCallbacks(),
+              DidCompositorScroll(scroll_node.element_id, gfx::PointF(1, 2),
+                                  cc::ScrollSourceType::kNone, targets));
   GetPropertyTrees().scroll_tree_mutable().NotifyDidCompositorScroll(
-      scroll_node.element_id, gfx::PointF(1, 2), targets);
+      scroll_node.element_id, gfx::PointF(1, 2), cc::ScrollSourceType::kNone,
+      targets);
 
   EXPECT_CALL(ScrollCallbacks(),
               DidChangeScrollbarsHidden(scroll_node.element_id, true));
@@ -4329,7 +4332,7 @@ TEST_P(PaintArtifactCompositorTest, ViewportPageScale) {
   // 27x32.
   ScrollPaintPropertyNode::State scroll_state;
   scroll_state.container_rect = gfx::Rect(5, 5, 20, 10);
-  scroll_state.contents_size = gfx::Size(27, 32);
+  scroll_state.contents_rect = gfx::Rect(gfx::Size(27, 32));
   scroll_state.user_scrollable_vertical = true;
   scroll_state.max_scroll_offset_affected_by_page_scale = true;
   auto scroll_element_id = CompositorElementIdFromUniqueObjectId(

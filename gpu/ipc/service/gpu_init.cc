@@ -27,6 +27,7 @@
 #include "build/chromecast_buildflags.h"
 #include "build/chromeos_buildflags.h"
 #include "components/crash/core/common/crash_key.h"
+#include "components/viz/common/resources/shared_image_format.h"
 #include "gpu/command_buffer/service/gpu_switches.h"
 #include "gpu/config/gpu_driver_bug_list.h"
 #include "gpu/config/gpu_driver_bug_workaround_type.h"
@@ -54,7 +55,9 @@
 #endif
 
 #if BUILDFLAG(IS_OZONE)
-#include "gpu/vulkan/drm_modifiers_filter_vulkan.h"
+#if BUILDFLAG(ENABLE_VULKAN)
+#include "gpu/command_buffer/service/drm_modifiers_filter_vulkan.h"
+#endif
 #include "ui/ozone/public/drm_modifiers_filter.h"
 #include "ui/ozone/public/ozone_platform.h"
 #include "ui/ozone/public/surface_factory_ozone.h"
@@ -473,8 +476,6 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
   params.single_process = false;
   params.enable_native_gpu_memory_buffers =
       gpu_preferences_.enable_native_gpu_memory_buffers;
-  params.handle_overlays_swap_failure =
-      base::FeatureList::IsEnabled(features::kHandleOverlaysSwapFailure);
 
 #if BUILDFLAG(IS_CHROMEOS)
   params.allow_sync_and_real_buffer_page_flip_testing = true;
@@ -712,11 +713,29 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
   }
 #endif  // BUILDFLAG(IS_WIN)
 
-  if (gpu_feature_info_.status_values[GPU_FEATURE_TYPE_VULKAN] !=
-          kGpuFeatureStatusEnabled ||
+#if BUILDFLAG(USE_WEBGPU_ON_VULKAN_VIA_GL_INTEROP)
+  if (gpu_feature_info_
+          .status_values[GPU_FEATURE_TYPE_WEBGPU_ON_VK_VIA_GL_INTEROP] ==
+      kGpuFeatureStatusEnabled) {
+    if (gpu_preferences_.use_vulkan == gpu::VulkanImplementationName::kNone) {
+      gpu_preferences_.use_vulkan = gpu::VulkanImplementationName::kNative;
+    }
+    gpu_preferences_.enable_webgpu_on_vk_via_gl_interop = true;
+  }
+#endif
+
+  if (!(gpu_feature_info_.status_values[GPU_FEATURE_TYPE_VULKAN] ==
+            kGpuFeatureStatusEnabled ||
+        gpu_feature_info_
+                .status_values[GPU_FEATURE_TYPE_WEBGPU_ON_VK_VIA_GL_INTEROP] ==
+            kGpuFeatureStatusEnabled) ||
       !InitializeVulkan()) {
     gpu_preferences_.use_vulkan = VulkanImplementationName::kNone;
+    gpu_preferences_.enable_webgpu_on_vk_via_gl_interop = false;
     gpu_feature_info_.status_values[GPU_FEATURE_TYPE_VULKAN] =
+        kGpuFeatureStatusDisabled;
+    gpu_feature_info_
+        .status_values[GPU_FEATURE_TYPE_WEBGPU_ON_VK_VIA_GL_INTEROP] =
         kGpuFeatureStatusDisabled;
     if (gpu_preferences_.gr_context_type == GrContextType::kVulkan) {
 #if BUILDFLAG(IS_FUCHSIA)
@@ -763,16 +782,21 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
 #if BUILDFLAG(IS_OZONE)
   // We need to get supported formats before sandboxing to avoid an known
   // issue which breaks the camera preview. (b/166850715)
-  std::vector<gfx::BufferFormat> supported_buffer_formats_for_texturing;
+  bool supports_nv12_for_allocation_and_texturing;
+  bool supports_p010_for_allocation_and_texturing;
   {
-    TRACE_EVENT("gpu,startup", "ui::ozone::GetSupportedFormatsForTexturing");
-    supported_buffer_formats_for_texturing =
+    TRACE_EVENT("gpu,startup", "ui::ozone::IsFormatSupportedForTexturing");
+    supports_nv12_for_allocation_and_texturing =
         ui::OzonePlatform::GetInstance()
             ->GetSurfaceFactoryOzone()
-            ->GetSupportedFormatsForTexturing();
+            ->IsFormatSupportedForTexturing(viz::MultiPlaneFormat::kNV12);
+    supports_p010_for_allocation_and_texturing =
+        ui::OzonePlatform::GetInstance()
+            ->GetSurfaceFactoryOzone()
+            ->IsFormatSupportedForTexturing(viz::MultiPlaneFormat::kP010);
   }
-  std::vector<gfx::BufferFormat>
-      supported_buffer_formats_for_gl_native_pixmap_import =
+  std::vector<viz::SharedImageFormat>
+      supported_formats_for_gl_native_pixmap_import =
           ui::OzonePlatform::GetInstance()
               ->GetSurfaceFactoryOzone()
               ->GetSupportedFormatsForGLNativePixmapImport();
@@ -802,6 +826,12 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
 
   if (gl_use_swiftshader_) {
     AdjustInfoToSwiftShader();
+  }
+  if (gl_disabled) {
+    // GL is disabled in display compositor mode, typically due to repeated GPU
+    // crashes. Disable WebNN to ensure stability in this state.
+    gpu_feature_info_.status_values[GPU_FEATURE_TYPE_WEBNN] =
+        kGpuFeatureStatusDisabled;
   }
 
   if (kGpuFeatureStatusEnabled !=
@@ -910,10 +940,12 @@ bool GpuInit::InitializeAndStartSandbox(base::CommandLine* command_line,
   SetSkiaBackendType();
 #if BUILDFLAG(IS_OZONE)
   ui::OzonePlatform::GetInstance()->AfterSandboxEntry();
-  gpu_feature_info_.supported_buffer_formats_for_allocation_and_texturing =
-      std::move(supported_buffer_formats_for_texturing);
-  gpu_feature_info_.supported_buffer_formats_for_gl_native_pixmap_import =
-      std::move(supported_buffer_formats_for_gl_native_pixmap_import);
+  gpu_feature_info_.supports_nv12_for_allocation_and_texturing =
+      supports_nv12_for_allocation_and_texturing;
+  gpu_feature_info_.supports_p010_for_allocation_and_texturing =
+      supports_p010_for_allocation_and_texturing;
+  gpu_feature_info_.supported_formats_for_gl_native_pixmap_import =
+      std::move(supported_formats_for_gl_native_pixmap_import);
   [[maybe_unused]] auto* factory =
       ui::OzonePlatform::GetInstance()->GetSurfaceFactoryOzone();
   bool filter_set = false;
@@ -991,8 +1023,6 @@ void GpuInit::InitializeInProcess(base::CommandLine* command_line,
 #if BUILDFLAG(IS_OZONE)
   ui::OzonePlatform::InitParams params;
   params.single_process = true;
-  params.handle_overlays_swap_failure =
-      base::FeatureList::IsEnabled(features::kHandleOverlaysSwapFailure);
 
 #if BUILDFLAG(IS_CHROMEOS)
   params.allow_sync_and_real_buffer_page_flip_testing = true;
@@ -1117,21 +1147,29 @@ void GpuInit::InitializeInProcess(base::CommandLine* command_line,
   if (gl_use_swiftshader_) {
     AdjustInfoToSwiftShader();
   }
+  if (gl_disabled) {
+    // GL is disabled in display compositor mode, typically due to repeated GPU
+    // crashes. Disable WebNN to ensure stability in this state.
+    gpu_feature_info_.status_values[GPU_FEATURE_TYPE_WEBNN] =
+        kGpuFeatureStatusDisabled;
+  }
 
 #if BUILDFLAG(IS_OZONE)
-  const std::vector<gfx::BufferFormat> supported_buffer_formats_for_texturing =
-      ui::OzonePlatform::GetInstance()
-          ->GetSurfaceFactoryOzone()
-          ->GetSupportedFormatsForTexturing();
-  const std::vector<gfx::BufferFormat>
-      supported_buffer_formats_for_gl_native_pixmap_import =
+  const std::vector<viz::SharedImageFormat>
+      supported_formats_for_gl_native_pixmap_import =
           ui::OzonePlatform::GetInstance()
               ->GetSurfaceFactoryOzone()
               ->GetSupportedFormatsForGLNativePixmapImport();
-  gpu_feature_info_.supported_buffer_formats_for_allocation_and_texturing =
-      std::move(supported_buffer_formats_for_texturing);
-  gpu_feature_info_.supported_buffer_formats_for_gl_native_pixmap_import =
-      std::move(supported_buffer_formats_for_gl_native_pixmap_import);
+  gpu_feature_info_.supports_nv12_for_allocation_and_texturing =
+      ui::OzonePlatform::GetInstance()
+          ->GetSurfaceFactoryOzone()
+          ->IsFormatSupportedForTexturing(viz::MultiPlaneFormat::kNV12);
+  gpu_feature_info_.supports_p010_for_allocation_and_texturing =
+      ui::OzonePlatform::GetInstance()
+          ->GetSurfaceFactoryOzone()
+          ->IsFormatSupportedForTexturing(viz::MultiPlaneFormat::kP010);
+  gpu_feature_info_.supported_formats_for_gl_native_pixmap_import =
+      std::move(supported_formats_for_gl_native_pixmap_import);
 #endif  // BUILDFLAG(IS_OZONE)
 
   DisableInProcessGpuVulkan(&gpu_feature_info_, &gpu_preferences_);
@@ -1170,6 +1208,11 @@ void GpuInit::RecordUMA() {
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CASTOS)
 
   UMA_HISTOGRAM_ENUMERATION("GPU.GLImplementation", gl::GetGLImplementation());
+
+#if BUILDFLAG(IS_WIN)
+  UMA_HISTOGRAM_BOOLEAN("GPU.DirectComposition.Supported",
+                        gl::DirectCompositionSupported());
+#endif
 
   UMA_HISTOGRAM_BOOLEAN("GPU.Sandboxed", gpu_info_.sandboxed);
   // Record the Skia backend type on GPU initialization.
@@ -1289,8 +1332,20 @@ bool GpuInit::InitializeDawn() {
   auto validate_adapter_fn = DawnContextProvider::DefaultValidateAdapterFn;
 #endif  // BUILDFLAG(IS_ANDROID)
 
-  dawn_context_provider_ = gpu::DawnContextProvider::Create(
-      gpu_preferences_, gpu_feature_info_, validate_adapter_fn);
+  static BASE_FEATURE(kGraphiteDawnReportWorkerTaskProgressToWatchdog,
+                      "GraphiteDawnReportWorkerTaskProgressToWatchdog",
+                      base::FEATURE_ENABLED_BY_DEFAULT);
+
+  gl::ProgressReporter* progress_reporter = nullptr;
+  if (base::FeatureList::IsEnabled(
+          kGraphiteDawnReportWorkerTaskProgressToWatchdog)) {
+    // TODO(crbug.com/439913491): Wire this up for the DrDC thread watchdog.
+    progress_reporter = watchdog_thread_.get();
+  }
+
+  dawn_context_provider_ =
+      DawnContextProvider::Create(gpu_preferences_, gpu_feature_info_,
+                                  progress_reporter, validate_adapter_fn);
   if (dawn_context_provider_) {
     return true;
   }
@@ -1303,8 +1358,11 @@ bool GpuInit::InitializeDawn() {
 bool GpuInit::InitializeVulkan() {
 #if BUILDFLAG(ENABLE_VULKAN)
   TRACE_EVENT("gpu,startup", "gpu::GpuInit::InitializeVulkan");
-  DCHECK_EQ(gpu_feature_info_.status_values[GPU_FEATURE_TYPE_VULKAN],
-            kGpuFeatureStatusEnabled);
+  DCHECK(gpu_feature_info_.status_values[GPU_FEATURE_TYPE_VULKAN] ==
+             kGpuFeatureStatusEnabled ||
+         gpu_feature_info_
+                 .status_values[GPU_FEATURE_TYPE_WEBGPU_ON_VK_VIA_GL_INTEROP] ==
+             kGpuFeatureStatusEnabled);
   DCHECK_NE(gpu_preferences_.use_vulkan, VulkanImplementationName::kNone);
   bool vulkan_use_swiftshader =
       gpu_preferences_.use_vulkan == VulkanImplementationName::kSwiftshader;

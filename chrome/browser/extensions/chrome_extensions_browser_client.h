@@ -37,6 +37,10 @@ namespace url {
 class Origin;
 }  // namespace url
 
+namespace update_client {
+class Configurator;
+}
+
 namespace extensions {
 class ComponentExtensionResourceManager;
 class EventRouterForwarder;
@@ -55,6 +59,25 @@ class UserScriptListener;
 // browser process (see chrome/common/extensions/chrome_extensions_client.h).
 class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
  public:
+  // Manifest settings override types.
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
+  //
+  // LINT.IfChange(ManifestSettingsOverrideType)
+  enum ManifestSettingsOverrideType {
+    // No overrides.
+    kNoOverride = 0,
+    // Overrides the default search engine.
+    kSearchEngine = 1,
+    // Overrides the new tab page.
+    kNewTabPage = 2,
+    // Overrides the default search engine and new tab page.
+    kSearchEngineAndNewTabPage = 3,
+
+    kMaxValue = kSearchEngineAndNewTabPage,
+  };
+  // LINT.ThenChange(/tools/metrics/histograms/metadata/extensions/enums.xml:ManifestSettingsOverrideType)
+
   ChromeExtensionsBrowserClient();
 
   ChromeExtensionsBrowserClient(const ChromeExtensionsBrowserClient&) = delete;
@@ -164,6 +187,8 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
   void AttachExtensionTaskManagerTag(content::WebContents* web_contents,
                                      mojom::ViewType view_type) override;
   scoped_refptr<update_client::UpdateClient> CreateUpdateClient(
+      scoped_refptr<update_client::Configurator>) override;
+  scoped_refptr<update_client::Configurator> CreateUpdateClientConfigurator(
       content::BrowserContext* context) override;
   std::unique_ptr<ScopedExtensionUpdaterKeepAlive> CreateUpdaterKeepAlive(
       content::BrowserContext* context) override;
@@ -248,7 +273,35 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
       bool in_memory,
       base::OnceCallback<void(std::optional<content::StoragePartitionConfig>)>
           callback) override;
+  custom_handlers::ProtocolHandlerRegistry* GetProtocolHandlerRegistry(
+      content::BrowserContext* context) override;
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+
+  void CheckManagementPolicy(content::BrowserContext* context) override;
+  scoped_refptr<safe_browsing::SafeBrowsingDatabaseManager>
+  GetSafeBrowsingDatabaseManager() const override;
+  std::optional<safe_browsing::V4ProtocolConfig> GetV4ProtocolConfig()
+      const override;
+  void OnActiveTabPermissionGranted(
+      const Extension* extension,
+      content::WebContents* web_contents) const override;
+  ExtensionManagementClient* GetExtensionManagementClient(
+      content::BrowserContext* context) override;
+  void RunBlockActionsIfNeeded(const Extension* extension,
+                               content::WebContents* web_contents,
+                               SitePermissionsHelper* permission_helper,
+                               bool* reload_required) override;
+  void ShowReloadBubbleForAllExtensions(
+      const std::vector<const Extension*>& extensions,
+      content::WebContents* web_contents) override;
+  bool HasBeenBlocked(const Extension& extension,
+                      content::WebContents* web_contents) const override;
+  void ShowWarningMessageBox(const std::u16string& title,
+                             const std::u16string& message) override;
+  void RecordCommandLineMetricsOnUnpackedInstallation(
+      content::BrowserContext* context,
+      const Extension* extension) const override;
+  ExtensionAssetsManager* GetAssetsManager() override;
 
   static void set_did_chrome_update_for_testing(bool did_update);
 

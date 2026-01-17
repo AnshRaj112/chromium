@@ -6,7 +6,6 @@
 
 #include <optional>
 
-#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/test/bind.h"
 #include "base/time/time.h"
@@ -83,6 +82,7 @@ TEST_F(ArcVmmSwapSchedulerTest, SetSwapEnableDisable) {
   int enable_count = 0, disable_count = 0;
 
   auto scheduler = std::make_unique<ArcVmmSwapScheduler>(
+      TestingBrowserProcess::GetGlobal()->local_state(),
       base::BindLambdaForTesting([&](bool enabled) {
         if (enabled) {
           enable_count++;
@@ -119,6 +119,7 @@ TEST_F(ArcVmmSwapSchedulerTest, EnableSwap) {
   int swap_count = 0;
 
   auto scheduler = std::make_unique<ArcVmmSwapScheduler>(
+      TestingBrowserProcess::GetGlobal()->local_state(),
       base::BindLambdaForTesting([&](bool enabled) {
         if (enabled) {
           swap_count++;
@@ -149,6 +150,7 @@ TEST_F(ArcVmmSwapSchedulerTest, NeverEnableSwap) {
   int swap_count = 0;
 
   auto scheduler = std::make_unique<ArcVmmSwapScheduler>(
+      TestingBrowserProcess::GetGlobal()->local_state(),
       base::BindLambdaForTesting([&](bool enabled) {
         if (enabled) {
           swap_count++;
@@ -179,6 +181,7 @@ TEST_F(ArcVmmSwapSchedulerTest, EnableSwapAndDisableSwap) {
   int swap_count = 0;
 
   auto scheduler = std::make_unique<ArcVmmSwapScheduler>(
+      TestingBrowserProcess::GetGlobal()->local_state(),
       base::BindLambdaForTesting([&](bool enabled) {
         if (enabled) {
           swap_count++;
@@ -210,7 +213,7 @@ TEST_F(ArcVmmSwapSchedulerTest, EnableSwapAndDisableSwap) {
 
 TEST_F(ArcVmmSwapSchedulerTest, ReceiveSignalAndSave) {
   auto scheduler = std::make_unique<ArcVmmSwapScheduler>(
-      base::NullCallback(),
+      TestingBrowserProcess::GetGlobal()->local_state(), base::NullCallback(),
       /* minimum_swapout_interval= */ std::nullopt,
       /* swappable_checking_period= */ std::nullopt, nullptr);
 
@@ -234,6 +237,7 @@ TEST_F(ArcVmmSwapSchedulerTest, SetDisableVmStateWhenDurationReset) {
   int swap_count = 0;
   auto* provider_raw = provider.get();
   auto scheduler = std::make_unique<ArcVmmSwapScheduler>(
+      TestingBrowserProcess::GetGlobal()->local_state(),
       base::BindLambdaForTesting([&](bool enabled) {
         if (enabled) {
           swap_count++;

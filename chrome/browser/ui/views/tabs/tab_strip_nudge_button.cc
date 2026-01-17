@@ -8,7 +8,7 @@
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/tabs/organization/tab_organization_service.h"
-#include "chrome/browser/ui/views/tabs/tab_strip_controller.h"
+#include "chrome/browser/ui/views/tabs/tab_strip_control_button.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -25,13 +25,24 @@ namespace {
 constexpr int kTabStripNudgeCornerRadius = 10;
 constexpr int kTabStripNudgeFlatCornerRadius = 4;
 constexpr int kTabStripNudgeIconMargin = 6;
-constexpr int kTabStripNudgeLabelMargin = 4;
+constexpr int kTabStripNudgeLabelLeftMargin = 4;
+constexpr int kTabStripNudgeLabelRightMargin = 12;
 constexpr int kTabStripNudgeCloseButtonMargin = 8;
 constexpr int kTabStripNudgeCloseButtonSize = 16;
+
+constexpr gfx::Insets GetLabelInsets(bool show_close_button) {
+  return show_close_button
+             ? gfx::Insets().set_left(kTabStripNudgeLabelLeftMargin)
+             :
+             // Set a right margin on the label when the close button is hidden.
+             gfx::Insets().set_left_right(kTabStripNudgeLabelLeftMargin,
+                                          kTabStripNudgeLabelRightMargin);
+}
+
 }  // namespace
 
 TabStripNudgeButton::TabStripNudgeButton(
-    TabStripController* tab_strip_controller,
+    BrowserWindowInterface* browser_window_interface,
     PressedCallback pressed_callback,
     PressedCallback close_pressed_callback,
     const std::u16string& label_text,
@@ -39,7 +50,7 @@ TabStripNudgeButton::TabStripNudgeButton(
     Edge flat_edge,
     const gfx::VectorIcon& icon,
     const bool show_close_button)
-    : TabStripControlButton(tab_strip_controller,
+    : TabStripControlButton(browser_window_interface,
                             std::move(pressed_callback),
                             icon,
                             label_text,
@@ -60,15 +71,7 @@ TabStripNudgeButton::TabStripNudgeButton(
 
   SetLabelStyle(views::style::STYLE_BODY_3_EMPHASIS);
   label()->SetElideBehavior(gfx::ElideBehavior::NO_ELIDE);
-
-  const gfx::Insets label_margin =
-      show_close_button
-          ? gfx::Insets().set_left(kTabStripNudgeLabelMargin)
-          :
-          // Set a right margin on the label when the close button is hidden.
-          gfx::Insets().set_left_right(kTabStripNudgeLabelMargin,
-                                       kTabStripNudgeCloseButtonMargin);
-  label()->SetProperty(views::kMarginsKey, label_margin);
+  label()->SetProperty(views::kMarginsKey, GetLabelInsets(show_close_button));
 
   SetForegroundFrameActiveColorId(kColorTabSearchButtonCRForegroundFrameActive);
   SetForegroundFrameInactiveColorId(
@@ -89,7 +92,9 @@ TabStripNudgeButton::TabStripNudgeButton(
 TabStripNudgeButton::~TabStripNudgeButton() = default;
 
 void TabStripNudgeButton::SetOpacity(float factor) {
-  label()->layer()->SetOpacity(factor);
+  if (label()->layer()) {
+    label()->layer()->SetOpacity(factor);
+  }
   close_button_->layer()->SetOpacity(factor);
 }
 void TabStripNudgeButton::SetWidthFactor(float factor) {
@@ -139,7 +144,7 @@ void TabStripNudgeButton::SetCloseButton(PressedCallback pressed_callback) {
   views::InkDrop::Get(close_button.get())->SetHighlightOpacity(0.16f);
   views::InkDrop::Get(close_button.get())->SetVisibleOpacity(0.14f);
   views::InkDrop::Get(close_button.get())
-      ->SetBaseColorId(kColorTabSearchButtonCRForegroundFrameActive);
+      ->SetBaseColor(kColorTabSearchButtonCRForegroundFrameActive);
 
   auto ink_drop_highlight_path =
       std::make_unique<views::CircleHighlightPathGenerator>(gfx::Insets());
@@ -169,9 +174,17 @@ void TabStripNudgeButton::SetIsShowingNudge(bool is_showing) {
   }
 }
 
+bool TabStripNudgeButton::GetIsShowingNudge() const {
+  return is_showing_nudge_;
+}
+
 void TabStripNudgeButton::SetCloseButtonFocusBehavior(
     views::View::FocusBehavior focus_behavior) {
   close_button_->SetFocusBehavior(focus_behavior);
+}
+
+gfx::SlideAnimation* TabStripNudgeButton::GetExpansionAnimationForTesting() {
+  return nullptr;
 }
 
 BEGIN_METADATA(TabStripNudgeButton)

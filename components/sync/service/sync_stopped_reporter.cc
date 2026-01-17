@@ -4,6 +4,7 @@
 
 #include "components/sync/service/sync_stopped_reporter.h"
 
+#include <string>
 #include <utility>
 
 #include "base/check.h"
@@ -14,6 +15,7 @@
 #include "components/sync/protocol/sync.pb.h"
 #include "google_apis/credentials_mode.h"
 #include "net/base/load_flags.h"
+#include "net/http/http_response_headers.h"
 #include "net/http/http_status_code.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "services/network/public/cpp/resource_request.h"
@@ -25,7 +27,7 @@ namespace syncer {
 
 namespace {
 
-const char kEventEndpoint[] = "event";
+constexpr char kEventEndpoint[] = "event";
 
 // The request is tiny, so even on poor connections 10 seconds should be
 // plenty of time. Since sync is off when this request is started, we don't
@@ -37,12 +39,13 @@ void LogSyncStoppedRequestTimeout(bool timed_out) {
   base::UmaHistogramBoolean("Sync.SyncStoppedURLFetchTimedOut", timed_out);
 }
 
-void LogSyncStoppedRequestResult(const network::SimpleURLLoader& url_loader) {
+void LogSyncStoppedRequestResult(
+    scoped_refptr<net::HttpResponseHeaders> headers,
+    int net_error_code) {
   int http_status_code = -1;
-  if (url_loader.ResponseInfo() && url_loader.ResponseInfo()->headers) {
-    http_status_code = url_loader.ResponseInfo()->headers->response_code();
+  if (headers) {
+    http_status_code = headers->response_code();
   }
-  const int net_error_code = url_loader.NetError();
   const bool request_succeeded =
       net_error_code == net::OK && http_status_code != -1;
   if (request_succeeded) {
@@ -113,7 +116,7 @@ void SyncStoppedReporter::ReportSyncStopped(const std::string& access_token,
       net::LOAD_BYPASS_CACHE | net::LOAD_DISABLE_CACHE;
   resource_request->credentials_mode =
       google_apis::GetOmitCredentialsModeForGaiaRequests();
-  resource_request->method = "POST";
+  resource_request->method = net::HttpRequestHeaders::kPostMethod;
   resource_request->headers.SetHeader(
       net::HttpRequestHeaders::kAuthorization,
       base::StringPrintf("Bearer %s", access_token.c_str()));
@@ -122,7 +125,7 @@ void SyncStoppedReporter::ReportSyncStopped(const std::string& access_token,
   simple_url_loader_ = network::SimpleURLLoader::Create(
       std::move(resource_request), traffic_annotation);
   simple_url_loader_->AttachStringForUpload(msg, "application/octet-stream");
-  simple_url_loader_->DownloadToStringOfUnboundedSizeUntilCrashAndDie(
+  simple_url_loader_->DownloadHeadersOnly(
       url_loader_factory_.get(),
       base::BindOnce(&SyncStoppedReporter::OnSimpleLoaderComplete,
                      base::Unretained(this)));
@@ -131,9 +134,10 @@ void SyncStoppedReporter::ReportSyncStopped(const std::string& access_token,
 }
 
 void SyncStoppedReporter::OnSimpleLoaderComplete(
-    std::unique_ptr<std::string> response_body) {
+    scoped_refptr<net::HttpResponseHeaders> headers) {
   DCHECK(simple_url_loader_);
-  LogSyncStoppedRequestResult(*simple_url_loader_);
+  LogSyncStoppedRequestResult(std::move(headers),
+                              simple_url_loader_->NetError());
   simple_url_loader_.reset();
   timer_.Stop();
 }
@@ -145,7 +149,7 @@ void SyncStoppedReporter::OnTimeout() {
 
 // Static.
 GURL SyncStoppedReporter::GetSyncEventURL(const GURL& sync_service_url) {
-  std::string path = sync_service_url.path();
+  std::string path = sync_service_url.GetPath();
   if (path.empty() || *path.rbegin() != '/') {
     path += '/';
   }

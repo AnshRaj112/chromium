@@ -26,6 +26,7 @@ class SignoutConfirmationHandler
       mojo::PendingRemote<signout_confirmation::mojom::Page> page,
       Browser* browser,
       ChromeSignoutConfirmationPromptVariant variant,
+      size_t unsynced_data_count,
       SignoutConfirmationCallback callback);
   ~SignoutConfirmationHandler() override;
 
@@ -37,6 +38,7 @@ class SignoutConfirmationHandler
   void UpdateViewHeight(uint32_t height) override;
   void Accept(bool uninstall_account_extensions) override;
   void Cancel(bool uninstall_account_extensions) override;
+  void PerformReauth() override;
   void Close() override;
 
  private:
@@ -66,6 +68,11 @@ class SignoutConfirmationHandler
   // are taken when the user accepts or cancels the prompt, and the strings that
   // are displayed inside the prompt itself.
   ChromeSignoutConfirmationPromptVariant variant_;
+
+  // Used in the case of
+  // `ChromeSignoutConfirmationPromptVariant::kUnsyncedDataWithReauthButton` to
+  // show the count of data that would be lost if the user signs out.
+  size_t unsynced_data_count_;
 
   // Called when the user accepts, cancels or closes the prompt.
   SignoutConfirmationCallback completion_callback_;

@@ -4,16 +4,19 @@
 
 #import "base/ios/ios_util.h"
 #import "base/strings/sys_string_conversions.h"
+#import "ios/chrome/browser/history/ui_bundled/history_ui_constants.h"
 #import "ios/chrome/browser/omnibox/eg_tests/omnibox_app_interface.h"
+#import "ios/chrome/browser/omnibox/eg_tests/omnibox_matchers.h"
 #import "ios/chrome/browser/omnibox/public/omnibox_popup_accessibility_identifier_constants.h"
-#import "ios/chrome/browser/settings/ui_bundled/clear_browsing_data/features.h"
 #import "ios/chrome/browser/settings/ui_bundled/password/password_settings_app_interface.h"
+#import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/common/ui/confirmation_alert/constants.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey.h"
 #import "ios/chrome/test/earl_grey/chrome_earl_grey_ui.h"
 #import "ios/chrome/test/earl_grey/chrome_matchers.h"
+#import "ios/chrome/test/earl_grey/chrome_matchers_app_interface.h"
 #import "ios/chrome/test/earl_grey/chrome_test_case.h"
 #import "ios/testing/earl_grey/app_launch_manager.h"
 #import "ios/testing/earl_grey/earl_grey_test.h"
@@ -22,8 +25,25 @@
 
 namespace {
 
-NSString* kDinoPedalString = @"chrome://dino";
-NSString* kDinoSearchString = @"dino game";
+// Generic matcher for an Omnibox pedal suggestion based on its subtitle String.
+id<GREYMatcher> OmniboxPedalSuggestionMatcherWithSubtitleString(
+    NSString* subtitle) {
+  return grey_allOf(
+      chrome_test_util::OmniboxPopupRow(),
+      grey_descendant(grey_allOf(omnibox::PopupRowSecondaryTextMatcher(),
+                                 grey_accessibilityLabel(subtitle), nil)),
+      nil);
+}
+
+// Generic matcher for an Omnibox pedal suggestion based on its subtitle String
+// ID.
+id<GREYMatcher> OmniboxPedalSuggestionMatcherWithSubtitleID(int subtitleID) {
+  return OmniboxPedalSuggestionMatcherWithSubtitleString(
+      l10n_util::GetNSString(subtitleID));
+}
+
+NSString* const kDinoPedalString = @"chrome://dino";
+NSString* const kDinoSearchString = @"dino game";
 
 }  // namespace
 
@@ -34,7 +54,6 @@ NSString* kDinoSearchString = @"dino game";
 - (AppLaunchConfiguration)appConfigurationForTestCase {
   AppLaunchConfiguration config = [super appConfigurationForTestCase];
   config.relaunch_policy = ForceRelaunchByCleanShutdown;
-  config.features_enabled.push_back(kIOSQuickDelete);
 
   return config;
 }
@@ -62,7 +81,7 @@ NSString* kDinoSearchString = @"dino game";
 
   // Matcher for the dino pedal and search suggestions.
   id<GREYMatcher> dinoPedal =
-      chrome_test_util::OmniboxPopupRowWithString(kDinoPedalString);
+      OmniboxPedalSuggestionMatcherWithSubtitleString(kDinoPedalString);
   id<GREYMatcher> dinoSearch =
       chrome_test_util::OmniboxPopupRowWithString(kDinoSearchString);
 
@@ -75,10 +94,7 @@ NSString* kDinoSearchString = @"dino game";
   [[EarlGrey selectElementWithMatcher:dinoPedal] performAction:grey_tap()];
 
   // The dino game should be loaded.
-  [ChromeEarlGrey waitForPageToFinishLoading];
-  [[EarlGrey selectElementWithMatcher:chrome_test_util::Omnibox()]
-      assertWithMatcher:chrome_test_util::OmniboxContainingText(
-                            base::SysNSStringToUTF8(kDinoPedalString))];
+  [ChromeEarlGrey waitForWebStateVisibleURL:GURL(kChromeDinoGameURL)];
 
   [ChromeEarlGrey closeCurrentTab];
 }
@@ -89,12 +105,9 @@ NSString* kDinoSearchString = @"dino game";
   [ChromeEarlGrey loadURL:GURL("about:blank")];
   [ChromeEarlGreyUI focusOmniboxAndReplaceText:@"pedalincognitotab"];
 
-  NSString* incognitoPedalString =
-      l10n_util::GetNSString(IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_LAUNCH_INCOGNITO);
-
   // Matcher for the incognito pedal suggestion.
-  id<GREYMatcher> incognitoPedal =
-      chrome_test_util::OmniboxPopupRowWithString(incognitoPedalString);
+  id<GREYMatcher> incognitoPedal = OmniboxPedalSuggestionMatcherWithSubtitleID(
+      IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_LAUNCH_INCOGNITO);
 
   // Incognito pedal should be visible.
   [ChromeEarlGrey waitForUIElementToAppearWithMatcher:incognitoPedal];
@@ -116,12 +129,10 @@ NSString* kDinoSearchString = @"dino game";
   [ChromeEarlGrey loadURL:GURL("about:blank")];
   [ChromeEarlGreyUI focusOmniboxAndReplaceText:@"passwords"];
 
-  NSString* managePasswordsPedalString =
-      l10n_util::GetNSString(IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_MANAGE_PASSWORDS);
-
   // Matcher for the manage passwords pedal suggestion.
   id<GREYMatcher> managePasswordsPedal =
-      chrome_test_util::OmniboxPopupRowWithString(managePasswordsPedalString);
+      OmniboxPedalSuggestionMatcherWithSubtitleID(
+          IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_MANAGE_PASSWORDS);
 
   // Manage passwords pedal should be visible.
   [ChromeEarlGrey waitForUIElementToAppearWithMatcher:managePasswordsPedal];
@@ -141,7 +152,7 @@ NSString* kDinoSearchString = @"dino game";
 
   // Close the password manager.
   [[EarlGrey
-      selectElementWithMatcher:chrome_test_util::NavigationBarDoneButton()]
+      selectElementWithMatcher:[ChromeMatchersAppInterface settingsDoneButton]]
       performAction:grey_tap()];
   [ChromeEarlGrey waitForUIElementToDisappearWithMatcher:
                       chrome_test_util::PasswordsTableViewMatcher()];
@@ -159,12 +170,10 @@ NSString* kDinoSearchString = @"dino game";
   [ChromeEarlGrey loadURL:GURL("about:blank")];
   [ChromeEarlGreyUI focusOmniboxAndReplaceText:@"pedalclearbrowsing"];
 
-  NSString* clearBrowsingDataPedalString = l10n_util::GetNSString(
-      IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_CLEAR_BROWSING_DATA);
-
   // Matcher for the clear browsing data pedal suggestion.
   id<GREYMatcher> clearBrowsingDataPedal =
-      chrome_test_util::OmniboxPopupRowWithString(clearBrowsingDataPedalString);
+      OmniboxPedalSuggestionMatcherWithSubtitleID(
+          IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_CLEAR_BROWSING_DATA);
 
   // Clear browsing data pedal should be visible.
   [ChromeEarlGrey waitForUIElementToAppearWithMatcher:clearBrowsingDataPedal];
@@ -197,12 +206,10 @@ NSString* kDinoSearchString = @"dino game";
   [ChromeEarlGrey loadURL:GURL("about:blank")];
   [ChromeEarlGreyUI focusOmniboxAndReplaceText:@"pedaldefaultbrowser"];
 
-  NSString* defaultBrowserPedalString =
-      l10n_util::GetNSString(IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_DEFAULT_BROWSER);
-
   // Matcher for the set default browser pedal suggestion.
   id<GREYMatcher> setDefaultBrowserPedal =
-      chrome_test_util::OmniboxPopupRowWithString(defaultBrowserPedalString);
+      OmniboxPedalSuggestionMatcherWithSubtitleID(
+          IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_DEFAULT_BROWSER);
 
   // Set default browser pedal should be visible.
   [ChromeEarlGrey waitForUIElementToAppearWithMatcher:setDefaultBrowserPedal];
@@ -234,12 +241,10 @@ NSString* kDinoSearchString = @"dino game";
   [ChromeEarlGrey loadURL:GURL("about:blank")];
   [ChromeEarlGreyUI focusOmniboxAndReplaceText:@"pedalsettings"];
 
-  NSString* manageSettingsPedalString = l10n_util::GetNSString(
-      IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_MANAGE_CHROME_SETTINGS);
-
   // Matcher for the manage settings pedal suggestion.
   id<GREYMatcher> manageSettingsPedal =
-      chrome_test_util::OmniboxPopupRowWithString(manageSettingsPedalString);
+      OmniboxPedalSuggestionMatcherWithSubtitleID(
+          IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_MANAGE_CHROME_SETTINGS);
 
   // Manage settings pedal should be visible.
   [ChromeEarlGrey waitForUIElementToAppearWithMatcher:manageSettingsPedal];
@@ -269,13 +274,10 @@ NSString* kDinoSearchString = @"dino game";
   [ChromeEarlGrey loadURL:GURL("about:blank")];
   [ChromeEarlGreyUI focusOmniboxAndReplaceText:@"pedalmanagepayment"];
 
-  NSString* managePaymenyMethodsPedalString =
-      l10n_util::GetNSString(IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_UPDATE_CREDIT_CARD);
-
   // Matcher for the manage payment methods pedal suggestion.
   id<GREYMatcher> managePaymentMethodsPedal =
-      chrome_test_util::OmniboxPopupRowWithString(
-          managePaymenyMethodsPedalString);
+      OmniboxPedalSuggestionMatcherWithSubtitleID(
+          IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_UPDATE_CREDIT_CARD);
 
   // Manage payment methods pedal should be visible.
   [ChromeEarlGrey
@@ -305,12 +307,10 @@ NSString* kDinoSearchString = @"dino game";
   [ChromeEarlGrey loadURL:GURL("about:blank")];
   [ChromeEarlGreyUI focusOmniboxAndReplaceText:@"pedalsafetycheck"];
 
-  NSString* safetyCheckPedalString = l10n_util::GetNSString(
-      IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_RUN_CHROME_SAFETY_CHECK);
-
   // Matcher for safety check pedal suggestion.
   id<GREYMatcher> safetyCheckPedal =
-      chrome_test_util::OmniboxPopupRowWithString(safetyCheckPedalString);
+      OmniboxPedalSuggestionMatcherWithSubtitleID(
+          IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_RUN_CHROME_SAFETY_CHECK);
 
   // Safety check pedal should be visible.
   [ChromeEarlGrey waitForUIElementToAppearWithMatcher:safetyCheckPedal];
@@ -340,12 +340,10 @@ NSString* kDinoSearchString = @"dino game";
   [ChromeEarlGrey loadURL:GURL("about:blank")];
   [ChromeEarlGreyUI focusOmniboxAndReplaceText:@"history"];
 
-  NSString* visitHistoryPedalString = l10n_util::GetNSString(
-      IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_VIEW_CHROME_HISTORY);
-
   // Matcher for visit history pedal suggestion.
   id<GREYMatcher> visitHistoryPedal =
-      chrome_test_util::OmniboxPopupRowWithString(visitHistoryPedalString);
+      OmniboxPedalSuggestionMatcherWithSubtitleID(
+          IDS_IOS_OMNIBOX_PEDAL_SUBTITLE_VIEW_CHROME_HISTORY);
 
   // Visit history pedal should be visible.
   [ChromeEarlGrey waitForUIElementToAppearWithMatcher:visitHistoryPedal];
@@ -359,8 +357,9 @@ NSString* kDinoSearchString = @"dino game";
       waitForUIElementToAppearWithMatcher:chrome_test_util::HistoryTableView()];
 
   // Close the Visit history page.
-  [[EarlGrey
-      selectElementWithMatcher:chrome_test_util::NavigationBarDoneButton()]
+  [[EarlGrey selectElementWithMatcher:
+                 grey_accessibilityID(
+                     kHistoryNavigationControllerDoneButtonIdentifier)]
       performAction:grey_tap()];
   [ChromeEarlGrey waitForUIElementToDisappearWithMatcher:
                       chrome_test_util::HistoryTableView()];

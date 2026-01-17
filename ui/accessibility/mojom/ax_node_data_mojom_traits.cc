@@ -53,14 +53,9 @@ bool StructTraits<ax::mojom::AXNodeDataDataView, ui::AXNodeData>::Read(
   if (!data.ReadBoolAttributesData(&bitset_from_mojo)) {
     return false;
   }
+
   if (bitset_from_mojo.has_value()) {
-    out->bool_attributes->PopulateFromBitset(bitset_from_mojo.value());
-  } else {
-    base::flat_map<ax::mojom::BoolAttribute, bool> bool_attributes_from_mojo;
-    if (!data.ReadBoolAttributes(&bool_attributes_from_mojo)) {
-      return false;
-    }
-    out->bool_attributes->PopulateFromMap(bool_attributes_from_mojo);
+    out->bool_attributes = bitset_from_mojo.value();
   }
 
   auto& intlist_attributes = out->intlist_attributes.container();

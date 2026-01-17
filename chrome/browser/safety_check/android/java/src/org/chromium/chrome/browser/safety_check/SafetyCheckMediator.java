@@ -23,18 +23,16 @@ import org.chromium.base.ContextUtils;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.shared_preferences.SharedPreferencesManager;
-import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.MonotonicObservableSupplier;
 import org.chromium.build.BuildConfig;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.chrome.browser.password_manager.GmsUpdateLauncher;
 import org.chromium.chrome.browser.password_manager.ManagePasswordsReferrer;
 import org.chromium.chrome.browser.password_manager.PasswordCheckReferrer;
 import org.chromium.chrome.browser.password_manager.PasswordManagerHelper;
 import org.chromium.chrome.browser.password_manager.PasswordStoreBridge;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
-import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.pwd_check_wrapper.PasswordCheckController;
 import org.chromium.chrome.browser.pwd_check_wrapper.PasswordCheckController.PasswordCheckResult;
 import org.chromium.chrome.browser.pwd_check_wrapper.PasswordCheckController.PasswordStorageType;
@@ -45,15 +43,7 @@ import org.chromium.chrome.browser.safety_check.PasswordsCheckPreferenceProperti
 import org.chromium.chrome.browser.safety_check.SafetyCheckProperties.SafeBrowsingState;
 import org.chromium.chrome.browser.safety_check.SafetyCheckProperties.UpdatesState;
 import org.chromium.chrome.browser.settings.SettingsNavigationFactory;
-import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncConfig;
-import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncConfig.NoAccountSigninMode;
-import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncConfig.WithAccountSigninMode;
-import org.chromium.chrome.browser.ui.signin.SigninAndHistorySyncActivityLauncher;
-import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetStrings;
-import org.chromium.chrome.browser.ui.signin.history_sync.HistorySyncConfig;
 import org.chromium.components.browser_ui.settings.SettingsCustomTabLauncher;
-import org.chromium.components.prefs.PrefService;
-import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.sync.SyncService;
 import org.chromium.content_public.common.ContentUrlConstants;
 import org.chromium.ui.modaldialog.ModalDialogManager;
@@ -78,9 +68,6 @@ class SafetyCheckMediator {
 
     private static final String SAFETY_CHECK_INTERACTIONS = "Settings.SafetyCheck.Interactions";
 
-    /** Profile to launch SigninActivity. */
-    private final Profile mProfile;
-
     /** Model representing the current state of the update and safe browsing checks. */
     private PropertyModel mSafetyCheckModel;
 
@@ -102,9 +89,6 @@ class SafetyCheckMediator {
     /** Provides access to C++ APIs. */
     private final SafetyCheckBridge mBridge;
 
-    /** Client to launch a SigninActivity. */
-    private final SigninAndHistorySyncActivityLauncher mSigninLauncher;
-
     /** Async logic for password check. */
     private boolean mShowSafePasswordState;
 
@@ -119,7 +103,7 @@ class SafetyCheckMediator {
      */
     private final SettingsCustomTabLauncher mSettingsCustomTabLauncher;
 
-    private final ObservableSupplier<ModalDialogManager> mModalDialogManagerSupplier;
+    private final MonotonicObservableSupplier<ModalDialogManager> mModalDialogManagerSupplier;
 
     /** Callbacks and related objects to show the checking state for at least 1 second. */
     private Handler mHandler;
@@ -193,42 +177,35 @@ class SafetyCheckMediator {
     /**
      * Creates a new instance given a model, an updates client, and a settings launcher.
      *
-     * @param profile Profile to launch SigninActivity.
      * @param safetyCheckModel A model instance.
      * @param client An updates client.
-     * @param signinLauncher An instance implementing {@link SigninAndHistorySyncActivityLauncher}.
      * @param passwordStoreBridge Provides access to stored passwords.
      * @param modalDialogManagerSupplier A supplier for the {@link ModalDialogManager}.
      */
     public SafetyCheckMediator(
-            Profile profile,
             PropertyModel safetyCheckModel,
             @Nullable PropertyModel passwordsCheckAccountModel,
             @Nullable PropertyModel passwordsCheckLocalModel,
             SafetyCheckUpdatesDelegate client,
             SafetyCheckBridge bridge,
-            SigninAndHistorySyncActivityLauncher signinLauncher,
             @Nullable SyncService syncService,
-            PrefService prefService,
             Handler handler,
             PasswordStoreBridge passwordStoreBridge,
             PasswordCheckControllerFactory passwordCheckControllerFactory,
             PasswordManagerHelper passwordManagerHelper,
-            ObservableSupplier<ModalDialogManager> modalDialogManagerSupplier,
+            MonotonicObservableSupplier<ModalDialogManager> modalDialogManagerSupplier,
             SettingsCustomTabLauncher settingsCustomTabLauncher) {
-        mProfile = profile;
         mSafetyCheckModel = safetyCheckModel;
         mPasswordsCheckAccountStorageModel = passwordsCheckAccountModel;
         mPasswordsCheckLocalStorageModel = passwordsCheckLocalModel;
         mUpdatesClient = client;
         mBridge = bridge;
-        mSigninLauncher = signinLauncher;
         mSyncService = syncService;
         mHandler = handler;
         mPreferenceManager = ChromeSharedPreferences.getInstance();
         mPasswordCheckController =
                 passwordCheckControllerFactory.create(
-                        syncService, prefService, passwordStoreBridge, passwordManagerHelper);
+                        syncService, passwordStoreBridge, passwordManagerHelper);
         mPasswordManagerHelper = passwordManagerHelper;
         mModalDialogManagerSupplier = modalDialogManagerSupplier;
         mSettingsCustomTabLauncher = settingsCustomTabLauncher;
@@ -440,10 +417,10 @@ class SafetyCheckMediator {
         PropertyModel passwordsCheckModel = getPasswordsCheckModelForStoreType(passwordStorageType);
         if (passwordsCheckModel == null) return;
 
-        if (passwordSafetyCheckResult.getBreachedCount().isPresent()) {
+        if (passwordSafetyCheckResult.getBreachedCount() != null) {
             passwordsCheckModel.set(
                     PasswordsCheckPreferenceProperties.COMPROMISED_PASSWORDS_COUNT,
-                    passwordSafetyCheckResult.getBreachedCount().getAsInt());
+                    passwordSafetyCheckResult.getBreachedCount());
         }
 
         @PasswordsState int passwordsState;
@@ -464,19 +441,12 @@ class SafetyCheckMediator {
 
     private @PasswordsState int getPasswordStateWhenInitialLoad(
             PasswordCheckResult passwordCheckResult) {
-        if (passwordCheckResult.getBreachedCount().isPresent()
-                && passwordCheckResult.getBreachedCount().getAsInt() > 0) {
+        if (passwordCheckResult.getBreachedCount() != null
+                && passwordCheckResult.getBreachedCount() > 0) {
             return PasswordsState.COMPROMISED_EXIST;
         }
         @PasswordsState
         int passwordsState = passwordsStateFromPasswordCheckResult(passwordCheckResult);
-        if (passwordsState == PasswordsState.SIGNED_OUT) {
-            RecordHistogram.recordEnumeratedHistogram(
-                    "Settings.SafetyCheck.PasswordsResult2",
-                    PasswordsStatus.SIGNED_OUT,
-                    PasswordsStatus.MAX_VALUE);
-            return passwordsState;
-        }
         if (!mShowSafePasswordState) {
             return PasswordsState.UNCHECKED;
         }
@@ -509,39 +479,10 @@ class SafetyCheckMediator {
                         mPasswordManagerHelper.showPasswordSettings(
                                 p.getContext(),
                                 ManagePasswordsReferrer.SAFETY_CHECK,
-                                mModalDialogManagerSupplier,
+                                mModalDialogManagerSupplier.asNonNull(),
                                 /* managePasskeys= */ false,
                                 account,
                                 mSettingsCustomTabLauncher);
-                        return true;
-                    };
-        } else if (state == PasswordsState.SIGNED_OUT) {
-            listener =
-                    (p) -> {
-                        AccountPickerBottomSheetStrings strings =
-                                new AccountPickerBottomSheetStrings.Builder(
-                                                R.string.signin_account_picker_bottom_sheet_title)
-                                        .setSubtitleStringId(
-                                                R.string.safety_check_passwords_error_signed_out)
-                                        .build();
-                        BottomSheetSigninAndHistorySyncConfig config =
-                                new BottomSheetSigninAndHistorySyncConfig.Builder(
-                                                strings,
-                                                NoAccountSigninMode.BOTTOM_SHEET,
-                                                WithAccountSigninMode.DEFAULT_ACCOUNT_BOTTOM_SHEET,
-                                                HistorySyncConfig.OptInMode.NONE)
-                                        .build();
-                        // Open the sign-in page.
-
-                        @Nullable Intent intent =
-                                mSigninLauncher.createBottomSheetSigninIntentOrShowError(
-                                        p.getContext(),
-                                        mProfile,
-                                        config,
-                                        SigninAccessPoint.SAFETY_CHECK);
-                        if (intent != null) {
-                            p.getContext().startActivity(intent);
-                        }
                         return true;
                     };
         } else if (state == PasswordsState.COMPROMISED_EXIST || state == PasswordsState.SAFE) {
@@ -565,15 +506,9 @@ class SafetyCheckMediator {
                         mPasswordManagerHelper.showPasswordCheckup(
                                 p.getContext(),
                                 PasswordCheckReferrer.SAFETY_CHECK,
-                                mModalDialogManagerSupplier,
+                                mModalDialogManagerSupplier.asNonNull(),
                                 account,
                                 mSettingsCustomTabLauncher);
-                        return true;
-                    };
-        } else if (state == PasswordsState.BACKEND_VERSION_NOT_SUPPORTED) {
-            listener =
-                    (p) -> {
-                        GmsUpdateLauncher.launch(p.getContext());
                         return true;
                     };
         }

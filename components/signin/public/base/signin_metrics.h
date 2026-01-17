@@ -7,10 +7,13 @@
 
 #include <limits.h>
 
-#include "base/time/time.h"
 #include "build/build_config.h"
 #include "components/signin/public/base/consent_level.h"
 #include "google_apis/gaia/google_service_auth_error.h"
+
+namespace base {
+class TimeDelta;
+}  // namespace base
 
 namespace signin_metrics {
 
@@ -66,8 +69,8 @@ enum class ProfileSignout {
   kUserClickedRevokeSyncConsentSettings = 16,
   // User clicked to signout from the settings page.
   kUserClickedSignoutProfileMenu = 17,
-  // User retriggered signin from the Android web sign-in bottomsheet.
-  kSigninRetriggeredFromWebSignin = 18,
+  // User retriggered signin from the Android sign-in bottomsheet.
+  kSigninRetriggered = 18,
   // User clicked on sign-out from the notification dialog for User Policy. The
   // notification informs the user that from now on user policies may be
   // effective on their browser if they Sync with their managed account. The
@@ -88,7 +91,7 @@ enum class ProfileSignout {
   // sign out.
   kUserDeletedAccountCookies = 25,
   // User tapped 'Undo' in a snackbar that is shown right after sign-in through
-  // promo in bookmarks and reading list page. (iOS only).
+  // promo in bookmarks and reading list page. iOS only.
   kUserTappedUndoRightAfterSignIn = 26,
   // User has signed-in previously for the sole purpose of enabling history sync
   // (eg. using history sync promo in recent tabs), but declined history sync
@@ -132,8 +135,19 @@ enum class ProfileSignout {
   kSignoutFromWidgets = 39,
   // User declined the enterprise management disclaimer.
   kUserDeclinedEnterpriseManagementDisclaimer = 40,
+  // DICe user was forcefully signed out.
+  kForcedDiceMigration = 41,
+  // User tapped 'Undo' in a snackbar that is shown right after sign-in through
+  // bookmark promo. Android only.
+  kUserTappedUndoRightAfterSignInFromBookmarks = 42,
+  // User tapped 'Undo' in a snackbar that is shown right after sign-in through
+  // ntp promo. Android only.
+  kUserTappedUndoRightAfterSignInFromNtp = 43,
+  // User tapped 'Undo' in a snackbar that is shown right after sign-in through
+  // recent tabs promo. Android only.
+  kUserTappedUndoRightAfterSignInFromRecentTabs = 44,
   // Keep this as the last enum.
-  kMaxValue = kUserDeclinedEnterpriseManagementDisclaimer,
+  kMaxValue = kUserTappedUndoRightAfterSignInFromRecentTabs,
 };
 // LINT.ThenChange(/tools/metrics/histograms/metadata/signin/enums.xml)
 
@@ -145,11 +159,11 @@ enum class ProfileSignout {
 // LINT.IfChange
 enum class AccessPoint : int {
   kStartPage = 0,
-  kNtpLink = 1,
+  // kNtpLink = 1, no longer used.
   // Access point from the three dot app menu.
   kMenu = 2,
   kSettings = 3,
-  kSupervisedUser = 4,
+  // kSupervisedUser = 4, no longer used.
   kExtensionInstallBubble = 5,
   kExtensions = 6,
   // kAppsPageLink = 7, no longer used.
@@ -157,10 +171,10 @@ enum class AccessPoint : int {
   kBookmarkManager = 9,
   kAvatarBubbleSignIn = 10,
   kUserManager = 11,
-  kDevicesPage = 12,
+  // kDevicesPage = 12, no longer used.
   // kCloudPrint = 13, no longer used.
   // kContentArea = 14, no longer used.
-  kSigninPromo = 15,
+  kFullscreenSigninPromo = 15,
   kRecentTabs = 16,
   // This should never have been used to get signin URL.
   kUnknown = 17,
@@ -168,19 +182,19 @@ enum class AccessPoint : int {
   kAutofillDropdown = 19,
   // kNtpContentSuggestions = 20, no longer used.
   kResigninInfobar = 21,
-  kTabSwitcher = 22,
+  // kTabSwitcher = 22, no longer used.
   // kForceSigninWarning = 23, no longer used.
   // kSaveCardBubble = 24, no longer used
   // kManageCardsBubble = 25, no longer used
   kMachineLogon = 26,
-  kGoogleServicesSettings = 27,
-  kSyncErrorCard = 28,
+  // kGoogleServicesSettings = 27, no longer used.
+  // kSyncErrorCard = 28, no longer used.
   kForcedSignin = 29,
-  kAccountRenamed = 30,
+  // kAccountRenamed = 30, no longer used.
   kWebSignin = 31,
   kSafetyCheck = 32,
-  kKaleidoscope = 33,
-  kEnterpriseSignoutCoordinator = 34,
+  // kKaleidoscope = 33, no longer used.
+  // kEnterpriseSignoutCoordinator = 34, no longer used.
   kSigninInterceptFirstRunExperience = 35,
   kSendTabToSelfPromo = 36,
   kNtpFeedTopPromo = 37,
@@ -203,8 +217,7 @@ enum class AccessPoint : int {
   kReauthInfoBar = 48,
   // Access point for the consistency service.
   kAccountConsistencyService = 49,
-  // Access point for the search companion sign-in promo.
-  kSearchCompanion = 50,
+  // kSearchCompanion = 50, no longer used.
   // Access point for the IOS Set Up List on the NTP.
   kSetUpList = 51,
   // Access point for the local password migration warning on Android.
@@ -232,7 +245,7 @@ enum class AccessPoint : int {
   kSettingsSignoutConfirmationPrompt = 62,
   // The identity disc (avatar) on the New Tab page. Note that this only covers
   // SignedIn avatars - interactions with the signed-out avatar are instead
-  kNtpIdentityDisc = 63,
+  // kNtpIdentityDisc = 63, no longer used.
   // The identity is received through an interception of a 3rd party OIDC auth
   // redirection.
   kOidcRedirectionInterception = 64,
@@ -243,13 +256,13 @@ enum class AccessPoint : int {
   // Signin button from the profile menu that is labelled as a "Signin" button,
   // but is followed by a Sync confirmation screen as a promo.
   kAvatarBubbleSignInWithSyncPromo = 66,
-  // Signin using the account menu.
-  kAccountMenu = 67,
+  // Signin as part of switching accounts via the account menu.
+  kAccountMenuSwitchAccount = 67,
   // Signin via Product Specifications.
   kProductSpecifications = 68,
   // The user is signed-back into their previous account after failing to switch
   // to a new one.
-  kAccountMenuFailedSwitch = 69,
+  kAccountMenuSwitchAccountFailed = 69,
   // The user signs in from a sign in promo after an address save.
   kAddressBubble = 70,
   // A message notification displayed on CCTs embedded in 1P apps when there is
@@ -279,7 +292,7 @@ enum class AccessPoint : int {
   kCollaborationLeaveOrDeleteTabGroup = 79,
   // Access point triggered when a user attempts to opt-in to history sync from
   // the history sync opt-in expanded pill (expanded on inactivity).
-  kHistorySyncOptinExpansionPillOnInactivity = 80,
+  // kHistorySyncOptinExpansionPillOnInactivity = 80, // no longer used
   // History sync education tip is shown on the NTP to users who have history
   // sync disabled. Android only.
   kHistorySyncEducationalTip = 81,
@@ -300,10 +313,18 @@ enum class AccessPoint : int {
   kEnterpriseManagementDisclaimerAfterSignin = 88,
   // New Tab Page sign-in feature promotion.
   kNtpFeaturePromo = 89,
+  // Access point for the enterprise interception that result in profile
+  // separation.
+  kEnterpriseDialogAfterSigninInterception = 90,
+  // "Your saved info" settings page.
+  kSettingsYourSavedInfo = 91,
+  // Triggered when the user attempts to import credentials through the
+  // ASCredentialImportManager without being signed in.
+  kCredentialExchangeImport = 92,
   // Add values above this line with a corresponding label to the
   // "SigninAccessPoint" enum in
   // tools/metrics/histograms/metadata/signin/enums.xml.
-  kMaxValue = kNtpFeaturePromo,  // This must be last.
+  kMaxValue = kCredentialExchangeImport,  // This must be last.
 };
 // LINT.ThenChange(/tools/metrics/histograms/metadata/signin/enums.xml)
 
@@ -485,6 +506,7 @@ enum class AccountRelation : int {
 // credentials).
 // These values are persisted to logs. Entries should not be renumbered and
 // numeric values should never be reused.
+// LINT.IfChange(SourceForRefreshTokenOperation)
 enum class SourceForRefreshTokenOperation {
   kUnknown = 0,
   kTokenService_LoadCredentials = 1,
@@ -516,9 +538,11 @@ enum class SourceForRefreshTokenOperation {
   // kDiceResponseHandler_PasswordPromoSignin = 22,
   kEnterpriseForcedProfileCreation_UserDecline = 23,
   kEnterprisePolicy_AccountNotAllowedInContentArea = 24,
+  kDiceAccountReconcilorDelegate_RefreshTokensBoundToDifferentKeys = 25,
 
-  kMaxValue = kEnterprisePolicy_AccountNotAllowedInContentArea,
+  kMaxValue = kDiceAccountReconcilorDelegate_RefreshTokensBoundToDifferentKeys,
 };
+// LINT.ThenChange(//tools/metrics/histograms/metadata/signin/enums.xml:SourceForRefreshTokenOperation)
 
 // Different types of reporting. This is used as a histogram suffix.
 enum class ReportingType { PERIODIC, ON_CHANGE };
@@ -573,25 +597,6 @@ enum class SyncButtonsType : int {
   kMaxValue = kHistorySyncEqualWeightedFromCapability,
 };
 
-// Tracks type of the button that was clicked by the user.
-// GENERATED_JAVA_ENUM_PACKAGE: org.chromium.components.signin.metrics
-enum class SyncButtonClicked : int {
-  // These values are persisted to logs. Entries should not be renumbered and
-  // numeric values should never be reused.
-  kSyncOptInEqualWeighted = 0,
-  kSyncCancelEqualWeighted = 1,
-  kSyncSettingsEqualWeighted = 2,
-  kSyncOptInNotEqualWeighted = 3,
-  kSyncCancelNotEqualWeighted = 4,
-  kSyncSettingsNotEqualWeighted = 5,
-  kHistorySyncOptInEqualWeighted = 6,
-  kHistorySyncCancelEqualWeighted = 7,
-  kHistorySyncOptInNotEqualWeighted = 8,
-  kHistorySyncCancelNotEqualWeighted = 9,
-  kSyncSettingsUnknownWeighted = 10,
-  kMaxValue = kSyncSettingsUnknownWeighted,
-};
-
 #if BUILDFLAG(IS_IOS)
 // The reason an alert dialog is shown when the user is about to sign out.
 enum class SignoutDataLossAlertReason : int {
@@ -641,7 +646,9 @@ enum class ReauthFlowEvent : int {
 enum class ReauthAccessPoint : int {
   // Error card in the account menu.
   kAccountMenu = 0,
-  kMaxValue = kAccountMenu,
+  kAccountSettings = 1,
+  kRecentTabs = 2,
+  kMaxValue = kRecentTabs,
 };
 // LINT.ThenChange(//tools/metrics/histograms/metadata/signin/enums.xml:ReauthAccessPoint)
 #endif  // BUILDFLAG(IS_IOS)
@@ -668,6 +675,9 @@ void LogSignInOffered(AccessPoint access_point, PromoAction promo_action);
 // changes, see `signin::PrimaryAccountMutator`.
 void LogSignInStarted(AccessPoint access_point);
 
+// Logs that sign in was offered when the user is in SigninPending state.
+void LogSigninPendingOffered(AccessPoint access_point);
+
 #if BUILDFLAG(IS_IOS)
 // Records the account type when the user signs in.
 void LogSigninWithAccountType(SigninAccountType account_type);
@@ -681,6 +691,10 @@ void LogSyncOptInStarted(AccessPoint access_point);
 // Logs a sync opt-in offered event (`Signin.SyncOptIn.Offered` histogram)
 // and its associated access point.
 void LogSyncOptInOffered(AccessPoint access_point);
+
+// Logs a sync opt-in offered event (`Signin.HistorySyncOptIn.Offered`
+// histogram) and its associated access point.
+void LogHistorySyncOptInOffered(AccessPoint access_point);
 
 // Logs that the sync settings were opened at the end of the sync opt-in flow,
 // and the associated access points.

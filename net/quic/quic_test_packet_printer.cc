@@ -197,12 +197,12 @@ class QuicPacketPrinter : public QuicFramerVisitorInterface {
     *output_ << "OnBlockedFrame: " << frame;
     return true;
   }
-  bool OnMessageFrame(const QuicMessageFrame& frame) override {
+  bool OnDatagramFrame(const QuicDatagramFrame& frame) override {
     *output_ << "OnMessageFrame: " << frame;
     // In a test context, `frame.data` should always be set.
     CHECK(frame.data);
     *output_ << "         data: { "
-             << base::HexEncode(frame.data, frame.message_length) << " }\n";
+             << base::HexEncode(frame.data, frame.datagram_length) << " }\n";
     return true;
   }
   bool OnHandshakeDoneFrame(const QuicHandshakeDoneFrame& frame) override {
@@ -263,7 +263,7 @@ std::string QuicPacketPrinter::PrintWithQuicSession(
   quic::QuicPacketPrinter visitor(&framer, &stream, session);
   framer.set_visitor(&visitor);
 
-  if (version_.KnowsWhichDecrypterToUse()) {
+  if (version_.IsIetfQuic()) {
     framer.InstallDecrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
         std::make_unique<quic::test::TaggingDecrypter>());  // IN-TEST

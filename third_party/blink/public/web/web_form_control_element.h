@@ -47,7 +47,9 @@ class HTMLFormControlElement;
 // node.
 class BLINK_EXPORT WebFormControlElement : public WebElement {
  public:
-  WebFormControlElement() : WebElement() {}
+  explicit WebFormControlElement(
+      cppgc::SourceLocation loc = BLINK_WEB_NODE_LOCATION_FROM_HERE)
+      : WebElement(loc) {}
   WebFormControlElement(const WebFormControlElement& e) = default;
 
   WebFormControlElement& operator=(const WebFormControlElement& e) {
@@ -93,6 +95,8 @@ class BLINK_EXPORT WebFormControlElement : public WebElement {
   void DispatchFocusEvent();
   // Triggers the emission of a blur event.
   void DispatchBlurEvent();
+  // Triggers the emission of a verified event.
+  void DispatchEmailVerifiedEvent(const WebString& presentation_token);
   // Returns value of element. For select element, it returns the value of
   // the selected option if present. If no selected option, an empty string
   // is returned. If element doesn't fall into input element, textarea element

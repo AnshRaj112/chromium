@@ -9,7 +9,9 @@
 #include <string>
 
 #include "base/run_loop.h"
+#include "components/permissions/prediction_service/permissions_aiv3_executor.h"
 #include "components/permissions/prediction_service/permissions_aiv3_handler.h"
+#include "components/permissions/prediction_service/permissions_aiv4_executor.h"
 #include "components/permissions/prediction_service/permissions_aiv4_handler.h"
 
 // Contains fake classes to be used in tests for AIvX model handlers.
@@ -24,7 +26,7 @@ class PermissionsAivXHandlerFakeBase {
 
   void ExecuteModelWrapper(
       ExecutionCallback callback,
-      const std::optional<permissions::PermissionsAiv3Encoder::ModelOutput>&
+      const std::optional<permissions::PermissionsAiv3Executor::ModelOutput>&
           output);
 
   void OnModelUpdated(
@@ -54,10 +56,32 @@ class PermissionsAiv3HandlerFake : public permissions::PermissionsAiv3Handler,
       override;
 
   void ExecuteModel(PermissionsAiv3Handler::ExecutionCallback callback,
-                    std::unique_ptr<SkBitmap> snapshot) override;
+                    ModelInput model_input) override;
 
  private:
   base::WeakPtrFactory<PermissionsAiv3HandlerFake> weak_ptr_factory_{this};
+};
+
+class PermissionsAiv4HandlerFake : public permissions::PermissionsAiv4Handler,
+                                   public PermissionsAivXHandlerFakeBase {
+ public:
+  PermissionsAiv4HandlerFake(
+      optimization_guide::OptimizationGuideModelProvider* model_provider,
+      optimization_guide::proto::OptimizationTarget optimization_target,
+      permissions::RequestType request_type);
+
+  ~PermissionsAiv4HandlerFake() override;
+
+  void OnModelUpdated(
+      optimization_guide::proto::OptimizationTarget optimization_target,
+      base::optional_ref<const optimization_guide::ModelInfo> model_info)
+      override;
+
+  void ExecuteModel(PermissionsAiv4Handler::ExecutionCallback callback,
+                    ModelInput model_input) override;
+
+ private:
+  base::WeakPtrFactory<PermissionsAiv4HandlerFake> weak_ptr_factory_{this};
 };
 
 }  // namespace test

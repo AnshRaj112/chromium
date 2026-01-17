@@ -15,8 +15,9 @@
 #include "base/message_loop/message_pump_type.h"
 #include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
+#include "components/viz/common/resources/shared_image_format.h"
 #include "ui/gfx/buffer_types.h"
-#include "ui/gfx/native_widget_types.h"
+#include "ui/gfx/native_ui_types.h"
 #include "ui/platform_window/platform_window.h"
 #include "ui/platform_window/platform_window_delegate.h"
 
@@ -96,13 +97,6 @@ class COMPONENT_EXPORT(OZONE) OzonePlatform {
     // TODO(fangzhoug): Some Chrome OS boards still use the legacy video
     // decoder. Remove this once ChromeOSVideoDecoder is on everywhere.
     bool allow_sync_and_real_buffer_page_flip_testing = false;
-
-    // TODO(b/331237773): Unfortunately, the kHandleOverlaysSwapFailure feature
-    // cannot be checked by the overlay manager in ozone/drm directly as it
-    // creates a circular dependency that gn complains about. That's why this
-    // control bool is here. Remove this once kHandleOverlaysSwapFailure is
-    // removed and DrmOverlayManager is always handling swap failures.
-    bool handle_overlays_swap_failure = false;
   };
 
   // Struct used to indicate platform properties.
@@ -111,6 +105,13 @@ class COMPONENT_EXPORT(OZONE) OzonePlatform {
     PlatformProperties(const PlatformProperties& other) = delete;
     PlatformProperties& operator=(const PlatformProperties& other) = delete;
     ~PlatformProperties();
+
+    // Values to override the value of a property in tests.
+    enum class SupportsForTest {
+      kNotSet,  // The property is not overridden.
+      kYes,     // The platform should return true.
+      kNo,      // The platform should return false.
+    };
 
     // Determines whether we should default to native decorations or the custom
     // frame based on the currently-running window manager.
@@ -136,16 +137,18 @@ class COMPONENT_EXPORT(OZONE) OzonePlatform {
     // should be given parents explicitly.
     bool set_parent_for_non_top_level_windows = false;
 
+    // Allows overriding whether `set_parent_for_non_top_level_windows` is
+    // enabled in tests. This value must be reset at the end of each test to
+    // avoid affecting subsequent tests.
+    static SupportsForTest
+        override_set_parent_for_non_top_level_windows_for_test;
+
     // If true, the platform shows and updates the drag image.
     bool platform_shows_drag_image = true;
 
     // Determines if the application modal dialogs should use the event blocker
     // to allow the only browser window receiving UI events.
     bool app_modal_dialogs_use_event_blocker = false;
-
-    // Determines whether buffer formats should be fetched on GPU and passed
-    // back via gpu extra info.
-    bool fetch_buffer_formats_for_gmb_on_gpu = false;
 
     // Indicates that the platform allows client applications to manipulate
     // global screen coordinates. Wayland, for example, disallow it by design.
@@ -154,10 +157,6 @@ class COMPONENT_EXPORT(OZONE) OzonePlatform {
     // Whether the platform supports system/shell integrated color picker
     // dialog. An example is XDG Desktop Portal provided PickColor dialog.
     bool supports_color_picker_dialog = true;
-
-    // Whether the platform supports drag and drop as an entrypoint to create
-    // new Split Views.
-    bool supports_split_view_drag_and_drop = true;
   };
 
   // Groups platform properties that can only be known at run time.
@@ -168,7 +167,7 @@ class COMPONENT_EXPORT(OZONE) OzonePlatform {
     enum class SupportsForTest {
       kNotSet,  // The property is not overridden.
       kYes,     // The platform should return true.
-      kNo,      // The plafrorm should return false.
+      kNo,      // The platform should return false.
     };
 
     // Whether the underlying platform supports deferring compositing of buffers
@@ -317,8 +316,8 @@ class COMPONENT_EXPORT(OZONE) OzonePlatform {
   // management is supported, null otherwise.
   virtual PlatformSessionManager* GetSessionManager();
 
-  // Returns true if the specified buffer format is supported.
-  virtual bool IsNativePixmapConfigSupported(gfx::BufferFormat format,
+  // Returns true if the specified format is supported.
+  virtual bool IsNativePixmapConfigSupported(viz::SharedImageFormat format,
                                              gfx::BufferUsage usage) const;
 
   // Whether the platform supports compositing windows with transparency.

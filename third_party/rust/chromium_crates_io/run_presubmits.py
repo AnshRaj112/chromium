@@ -60,6 +60,15 @@ def _GetRealCrateNames(crate_ids):
         map(crate_utils.ConvertCrateIdToCrateName, non_placeholder_crate_ids))
 
 
+def _GetRealCrateNamesWithEpochs(crate_ids):
+    non_placeholder_crate_ids = filter(
+        lambda crate_id: not crate_utils.IsPlaceholderCrate(crate_id),
+        crate_ids)
+    return set(
+        map(crate_utils.ConvertCrateIdToCrateNameWithEpoch,
+            non_placeholder_crate_ids))
+
+
 def _GetExtraKvForCrateName(crate_name, gnrt_config):
     crate_cfg = _GetCrateConfigForCrateName(crate_name, gnrt_config)
     extra_kv = crate_cfg.get("extra_kv")
@@ -129,8 +138,10 @@ def CheckCargoTomlIsSorted(crate_toml):
         return "Malformed `Cargo.toml` file?  `dependencies` is not a table."
     problem = _CheckTomlTableIsSorted(deps)
     if problem:
-        return ("Please sort `[dependencies]` table in "
-                f"`{CARGO_TOML_RELATIVE_PATH}`.  Example problem: {problem}")
+        return ("Please sort `[dependencies]` tables in "
+                f"`{CARGO_TOML_RELATIVE_PATH}`.  "
+                f"Example problem: {problem}  "
+                "Try running `tools/crates/run_gnrt.py fmt`.")
 
     return ""
 
@@ -144,8 +155,10 @@ def CheckGnrtConfigTomlIsSorted(_crate_ids, gnrt_config):
     crates = _GetCratesConfigDict(gnrt_config)
     problem = _CheckTomlTableIsSorted(crates)
     if problem:
-        return ("Please sort `[crates]` table in "
-                f"`{GNRT_CONFIG_RELATIVE_PATH}`.  Example problem: {problem}")
+        return ("Please sort `[crate]` tables in "
+                f"`{GNRT_CONFIG_RELATIVE_PATH}`.  "
+                f"Example problem: {problem}  "
+                "Try running `tools/crates/run_gnrt.py fmt`.")
 
     return ""
 
@@ -178,29 +191,7 @@ def CheckNonapplicablePatches(crate_ids, gnrt_config):
        Returns an error message if a problem is detected.
        Returns an empty string if there are no problems.
     """
-    real_crate_names = _GetRealCrateNames(crate_ids)
-
-    patched_crate_names = set(
-        filter(lambda filename: filename != "README.md",
-               os.listdir(PATCHES_DIR)))
-
-    nonapplicable_patches = patched_crate_names - real_crate_names
-    if nonapplicable_patches:
-        return (f"Some files/directories under `{PATCHES_DIR}` are not "
-                "needed, because they don't apply to actual crates: "
-                f'{", ".join(sorted(nonapplicable_patches))}')
-
-    return ""
-
-
-def CheckNonapplicablePatches(crate_ids, gnrt_config):
-    """Checks that each directory under `chromium_crates_io/patches/`
-       corresponds to an actual depedency of `chromium_crates_io/Cargo.toml`.
-
-       Returns an error message if a problem is detected.
-       Returns an empty string if there are no problems.
-    """
-    real_crate_names = _GetRealCrateNames(crate_ids)
+    real_crate_names = _GetRealCrateNamesWithEpochs(crate_ids)
 
     patched_crate_names = set(
         filter(lambda filename: filename != "README.md",

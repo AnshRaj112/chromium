@@ -13,11 +13,11 @@
               "project": "chromium"
             },
             "builder_spec": {
-              "build_gs_bucket": "chromium-memory-archive",
               "builder_group": "chromium.memory",
               "execution_mode": "COMPILE_AND_TEST",
               "legacy_chromium_config": {
                 "apply_configs": [
+                  "clobber",
                   "mb"
                 ],
                 "build_config": "Release",
@@ -46,7 +46,8 @@
         }
       ],
       "retry_failed_shards": true,
-      "targets_spec_directory": "src/infra/config/generated/builders/ci/win-asan/targets"
+      "retry_invalid_shards": true,
+      "targets_spec_directory": "infra/config/generated/builders/ci/win-asan/targets"
     }
   },
   "$build/siso": {
@@ -54,10 +55,9 @@
       "builder"
     ],
     "enable_cloud_monitoring": true,
-    "enable_cloud_profiler": true,
     "enable_cloud_trace": true,
     "experiments": [],
-    "metrics_project": "chromium-reclient-metrics",
+    "profile_mode": "cloud",
     "project": "rbe-chromium-trusted",
     "remote_jobs": 250
   },

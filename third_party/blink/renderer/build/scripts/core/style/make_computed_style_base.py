@@ -36,7 +36,7 @@ ALIGNMENT_ORDER = [
     'double',
     'StyleViewTransitionGroup',
     'Superellipse',
-    'ItemTolerance',
+    'FlowTolerance',
     # Aligns like a pointer (can be 32 or 64 bits)
     'NamedGridLinesMap',
     'NamedGridAreaMap',
@@ -46,9 +46,8 @@ ALIGNMENT_ORDER = [
     'Vector<TimelineAttachment>',
     'Vector<TimelineAxis>',
     'Vector<TimelineInset>',
-    'Vector<std::optional<Vector<AtomicString>>>',
+    'HeapVector<Member<StyleTriggerAttachmentVector>>',
     'GridPosition',
-    'ScrollStartData',
     'AtomicString',
     'scoped_refptr',
     'std::unique_ptr',
@@ -64,12 +63,19 @@ ALIGNMENT_ORDER = [
     'StyleAnchorScope',
     'StyleAspectRatio',
     'StyleIntrinsicLength',
+    'StyleInheritedVariables',
+    'StyleNameScope',
+    'StyleNonInheritedVariables',
+    'StylePositionAnchor',
+    'StyleTimelineScope',
+    'StyleTriggerScope',
     'std::optional<StyleOverflowClipMargin>',
     'std::optional<blink::PositionAreaOffsets>',
     'std::optional<PhysicalOffset>',
     'GapDataList<StyleColor>',
     'GapDataList<int>',
     'GapDataList<EBorderStyle>',
+    'gfx::Size',
     # Compressed builds a Member can be 32 bits, vs. a pointer will be 64.
     'Member',
     # Aligns like float
@@ -89,6 +95,7 @@ ALIGNMENT_ORDER = [
     'FitText',
     'TabSize',
     'float',
+    'StyleInterestDelay',
     # Aligns like int
     'cc::ScrollSnapType',
     'cc::ScrollSnapAlign',
@@ -105,6 +112,7 @@ ALIGNMENT_ORDER = [
     'wtf_size_t',
     'int',
     'PositionArea',
+    'GridLanesDirection',
     # Aligns like short
     'StyleFlexWrapData',
     'unsigned short',
@@ -296,6 +304,8 @@ def _create_property_field(property_):
         derived_from=property_.derived_from,
         reset_on_new_style=property_.reset_on_new_style,
         custom_compare=property_.custom_compare,
+        highlight_style_comes_from_originating_element=property_.
+        highlight_style_comes_from_originating_element,
         mutable=property_.mutable,
         getter_method_name=property_.getter,
         setter_method_name=property_.setter,
@@ -329,6 +339,7 @@ def _create_inherited_flag_field(property_):
         invalidate=[],
         reset_on_new_style=False,
         custom_compare=False,
+        highlight_style_comes_from_originating_element=False,
         mutable=False,
         getter_method_name=name_source.to_function_name(),
         setter_method_name=name_source.to_function_name(prefix='set'),
@@ -376,7 +387,11 @@ def _reorder_bit_fields(bit_fields):
     field_buckets = []
     # Consider fields in descending order of size to reduce fragmentation
     # when they are selected. Ties broken in alphabetical order by name.
-    for field in sorted(bit_fields, key=lambda f: (-f.size, f.name)):
+    # We also try to group together inherited and non-inherited fields
+    # if possible, so that the compiler can generate cleaner bit masks
+    # when dealing with them as a group.
+    for field in sorted(bit_fields,
+                        key=lambda f: (f.is_inherited, -f.size, f.name)):
         added_to_bucket = False
         # Go through each bucket and add this field if it will not increase
         # the bucket's size to larger than 32 bits. Otherwise, make a new

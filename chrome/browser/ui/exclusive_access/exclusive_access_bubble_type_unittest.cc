@@ -4,7 +4,6 @@
 
 #include "chrome/browser/ui/exclusive_access/exclusive_access_bubble_type.h"
 
-#include "base/containers/contains.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
 #include "chrome/grit/generated_resources.h"
@@ -42,10 +41,10 @@ TEST_F(ExclusiveAccessBubbleTypeTest, GetBubbleTextEmptyURL) {
   bool notify_overridden = false;
   std::u16string actual_text = GetInstructionTextForType(
       EXCLUSIVE_ACCESS_BUBBLE_TYPE_FULLSCREEN_EXIT_INSTRUCTION, accelerator,
-      url::Origin(), has_download, notify_overridden);
+      std::nullopt, has_download, notify_overridden);
 
-  EXPECT_TRUE(base::Contains(actual_text, accelerator));
-  EXPECT_TRUE(base::Contains(actual_text, kExitFullscreenString));
+  EXPECT_TRUE(actual_text.contains(accelerator));
+  EXPECT_TRUE(actual_text.contains(kExitFullscreenString));
 }
 
 // Test GetBubbleText with a non-empty URL.
@@ -56,11 +55,12 @@ TEST_F(ExclusiveAccessBubbleTypeTest, GetBubbleTextNonEmptyURL) {
   bool notify_overridden = false;
   std::u16string actual_text = GetInstructionTextForType(
       EXCLUSIVE_ACCESS_BUBBLE_TYPE_FULLSCREEN_EXIT_INSTRUCTION, accelerator,
-      origin, has_download, notify_overridden);
+      std::make_optional<std::u16string>(base::UTF8ToUTF16(origin.Serialize())),
+      has_download, notify_overridden);
 
-  EXPECT_TRUE(base::Contains(actual_text, accelerator));
-  EXPECT_TRUE(base::Contains(actual_text, u"example.com"));
-  EXPECT_TRUE(base::Contains(actual_text, kExitFullscreenString));
+  EXPECT_TRUE(actual_text.contains(accelerator));
+  EXPECT_TRUE(actual_text.contains(u"example.com"));
+  EXPECT_TRUE(actual_text.contains(kExitFullscreenString));
 }
 
 // Test GetBubbleText with a download and no override.
@@ -70,10 +70,10 @@ TEST_F(ExclusiveAccessBubbleTypeTest, GetBubbleTextWithDownloadNoOverride) {
   bool notify_overridden = false;
   std::u16string actual_text = GetInstructionTextForType(
       EXCLUSIVE_ACCESS_BUBBLE_TYPE_FULLSCREEN_EXIT_INSTRUCTION, accelerator,
-      url::Origin(), has_download, notify_overridden);
+      std::nullopt, has_download, notify_overridden);
 
-  EXPECT_TRUE(base::Contains(actual_text, accelerator));
-  EXPECT_TRUE(base::Contains(actual_text, kDownloadString));
+  EXPECT_TRUE(actual_text.contains(accelerator));
+  EXPECT_TRUE(actual_text.contains(kDownloadString));
 }
 
 // Test GetInstructionTextForType for pointer lock exit instruction.
@@ -85,11 +85,12 @@ TEST_F(ExclusiveAccessBubbleTypeTest,
   bool notify_overridden = false;
   std::u16string actual_text = GetInstructionTextForType(
       EXCLUSIVE_ACCESS_BUBBLE_TYPE_POINTERLOCK_EXIT_INSTRUCTION, accelerator,
-      origin, has_download, notify_overridden);
+      std::make_optional<std::u16string>(base::UTF8ToUTF16(origin.Serialize())),
+      has_download, notify_overridden);
 
-  EXPECT_TRUE(base::Contains(actual_text, accelerator));
-  EXPECT_TRUE(base::Contains(actual_text, u"example.com"));
-  EXPECT_TRUE(base::Contains(actual_text, kPointerLockString));
+  EXPECT_TRUE(actual_text.contains(accelerator));
+  EXPECT_TRUE(actual_text.contains(u"example.com"));
+  EXPECT_TRUE(actual_text.contains(kPointerLockString));
 }
 
 // Test GetInstructionTextForType for keyboard lock exit instruction.
@@ -101,11 +102,12 @@ TEST_F(ExclusiveAccessBubbleTypeTest,
   bool notify_overridden = false;
   std::u16string actual_text = GetInstructionTextForType(
       EXCLUSIVE_ACCESS_BUBBLE_TYPE_KEYBOARD_LOCK_EXIT_INSTRUCTION, accelerator,
-      origin, has_download, notify_overridden);
+      std::make_optional<std::u16string>(base::UTF8ToUTF16(origin.Serialize())),
+      has_download, notify_overridden);
 
-  EXPECT_TRUE(base::Contains(actual_text, accelerator));
-  EXPECT_TRUE(base::Contains(actual_text, u"example.com"));
-  EXPECT_TRUE(base::Contains(actual_text, kExitFullscreenString));
+  EXPECT_TRUE(actual_text.contains(accelerator));
+  EXPECT_TRUE(actual_text.contains(u"example.com"));
+  EXPECT_TRUE(actual_text.contains(kExitFullscreenString));
 }
 
 }  // namespace

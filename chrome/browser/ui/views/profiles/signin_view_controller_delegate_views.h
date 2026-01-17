@@ -61,7 +61,10 @@ class SigninViewControllerDelegateViews
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
   static std::unique_ptr<views::WebView> CreateHistorySyncOptInWebView(
       Browser* browser,
-      HistorySyncOptinLaunchContext launch_context);
+      bool should_close_modal_dialog,
+      HistorySyncOptinLaunchContext launch_context,
+      HistorySyncOptinHelper::FlowCompletedCallback
+          history_optin_completed_callback);
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
   static std::unique_ptr<views::WebView> CreateSigninErrorWebView(
@@ -77,6 +80,7 @@ class SigninViewControllerDelegateViews
   static std::unique_ptr<views::WebView> CreateSignoutConfirmationWebView(
       Browser* browser,
       ChromeSignoutConfirmationPromptVariant variant,
+      size_t unsynced_data_count,
       SignoutConfirmationCallback callback);
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
@@ -112,8 +116,8 @@ class SigninViewControllerDelegateViews
       bool* was_blocked) override;
 
   // ChromeWebModalDialogManagerDelegate:
-  web_modal::WebContentsModalDialogHost* GetWebContentsModalDialogHost()
-      override;
+  web_modal::WebContentsModalDialogHost* GetWebContentsModalDialogHost(
+      content::WebContents* web_contents) override;
 
   // views::ViewObserver:
   void OnViewAddedToWidget(views::View* observed_view) override;

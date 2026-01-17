@@ -178,6 +178,19 @@ TEST_F(PageLoadTrackerTest, PrimaryPageTypeDataScheme) {
   EXPECT_FALSE(GetEvents().was_committed);
 }
 
+TEST_F(PageLoadTrackerTest, NotReloadAfterDiscard) {
+  SetTargetUrl(kTestUrl);
+  NavigateAndCommit(GURL(kTestUrl));
+  EXPECT_FALSE(tester()->GetDelegateForCommittedLoad().IsReloadAfterDiscard());
+}
+
+TEST_F(PageLoadTrackerTest, ReloadAfterDiscard) {
+  SetTargetUrl(kTestUrl);
+  web_contents()->SetWasDiscarded(true);
+  NavigateAndCommit(GURL(kTestUrl));
+  EXPECT_TRUE(tester()->GetDelegateForCommittedLoad().IsReloadAfterDiscard());
+}
+
 TEST_F(PageLoadTrackerTest, EventForwarding) {
   ScopedPrerenderWebContentsDelegate web_contents_delegate(*web_contents());
 
@@ -292,8 +305,12 @@ TEST_F(PageLoadTrackerTest, EventForwarding) {
 
   EXPECT_EQ(0u, GetEvents().sub_frame_deleted_count);
 
-  // Remove C.
-  content::RenderFrameHostTester::For(rfh_c)->Detach();
+  {
+    content::RenderFrameDeletedObserver delete_observer(rfh_c);
+    // Remove C.
+    content::RenderFrameHostTester::For(rfh_c)->Detach();
+    delete_observer.WaitUntilDeleted();
+  }
 
 #if BUILDFLAG(IS_ANDROID)
   if (base::FeatureList::IsEnabled(features::kDefaultSiteInstanceGroups)) {
@@ -308,8 +325,12 @@ TEST_F(PageLoadTrackerTest, EventForwarding) {
   EXPECT_EQ(3u, GetEvents().render_frame_deleted_count);
 #endif
 
-  // Remove B.
-  content::RenderFrameHostTester::For(rfh_b)->Detach();
+  {
+    content::RenderFrameDeletedObserver delete_observer(rfh_b);
+    // Remove B.
+    content::RenderFrameHostTester::For(rfh_b)->Detach();
+    delete_observer.WaitUntilDeleted();
+  }
 
 #if BUILDFLAG(IS_ANDROID)
   if (base::FeatureList::IsEnabled(features::kDefaultSiteInstanceGroups)) {

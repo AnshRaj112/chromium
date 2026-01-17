@@ -30,7 +30,10 @@ source_set("impl") {
   ]
 
   if (is_android) {
-    deps += [ "//base" ]
+    deps += [
+      "//base",
+      "//chrome/browser/flags:flags_android",
+    ]
   }
 }
 
@@ -470,7 +473,7 @@ if (enable_vr) {
         "//device/vr/buildflags",
         "//device/vr/orientation",
         "//device/vr/public/mojom:isolated_xr_service",
-        "//device/vr/public/mojom:test_mojom",
+        "//device/vr/public/mojom/test:test_mojom",
       ]
 
       data_deps = []

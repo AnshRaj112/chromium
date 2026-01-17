@@ -8,7 +8,6 @@
 #include <string>
 
 #include "base/functional/bind.h"
-#include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/scoped_observation.h"
@@ -469,11 +468,10 @@ TEST_F(ProfileOAuth2TokenServiceTest, NotificationOrderOnRefreshTokenRevoked) {
     EXPECT_CALL(*observer, OnRefreshTokenRevoked(account_id_));
   }
   // Then, all ongoing requests get cancelled.
-  EXPECT_CALL(
-      consumer,
-      OnGetTokenFailure(
-          ::testing::_,
-          GoogleServiceAuthError(GoogleServiceAuthError::USER_NOT_SIGNED_UP)))
+  EXPECT_CALL(consumer,
+              OnGetTokenFailure(::testing::_,
+                                GoogleServiceAuthError(
+                                    GoogleServiceAuthError::ACCOUNT_NOT_FOUND)))
       .Times(1);
   // Finally, `OnEndBatchChanges()` is called.
   for (auto& observer : observers) {
@@ -586,7 +584,7 @@ TEST_F(ProfileOAuth2TokenServiceTest, StartRequestForMultiloginDesktop) {
     ASSERT_FALSE(future.Get<1>().has_value());
     EXPECT_EQ(
         future.Get<1>().error(),
-        GoogleServiceAuthError(GoogleServiceAuthError::USER_NOT_SIGNED_UP));
+        GoogleServiceAuthError(GoogleServiceAuthError::ACCOUNT_NOT_FOUND));
   }
 }
 
@@ -880,7 +878,7 @@ TEST_F(ProfileOAuth2TokenServiceTest, SameScopesRequestedForDifferentClients) {
   std::string client_secret_1("secret1");
   std::string client_id_2("client2");
   std::string client_secret_2("secret2");
-  std::set<std::string> scope_set;
+  OAuth2AccessTokenManager::ScopeSet scope_set;
   scope_set.insert("scope1");
   scope_set.insert("scope2");
 

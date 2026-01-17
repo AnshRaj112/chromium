@@ -6,9 +6,11 @@
 
 #import "base/check_op.h"
 #import "base/functional/bind.h"
+#import "base/functional/callback_helpers.h"
 #import "base/task/single_thread_task_runner.h"
 #import "base/time/time.h"
 #import "ios/chrome/browser/shared/ui/util/named_guide.h"
+#import "ios/chrome/browser/snapshots/model/features.h"
 #import "ios/chrome/browser/snapshots/model/snapshot_tab_helper.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/web/public/ui/crw_web_view_proxy.h"
@@ -180,9 +182,11 @@ void PagePlaceholderTabHelper::FetchPlaceholderIfNecessary() {
 
   placeholder_fetch_in_progress_ = true;
   if (!web_state_->IsRealized() || web_state_->IsLoading()) {
-    snapshot_tab_helper->RetrieveGreySnapshot(base::CallbackToBlock(
-        base::BindOnce(&PagePlaceholderTabHelper::OnImageRetrieved,
-                       weak_factory_.GetWeakPtr(), placeholder_request_id_)));
+    if (!base::FeatureList::IsEnabled(kRemoveGreySnapshot)) {
+      snapshot_tab_helper->RetrieveGreySnapshot(base::CallbackToBlock(
+          base::BindOnce(&PagePlaceholderTabHelper::OnImageRetrieved,
+                         weak_factory_.GetWeakPtr(), placeholder_request_id_)));
+    }
   } else {
     snapshot_tab_helper->RetrieveColorSnapshot(base::CallbackToBlock(
         base::BindOnce(&PagePlaceholderTabHelper::OnImageRetrieved,

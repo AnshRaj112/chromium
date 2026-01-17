@@ -43,7 +43,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterListPref(kBrowsingDataLifetime);
   registry->RegisterBooleanPref(kClearBrowsingDataOnExitDeletionPending, false);
   registry->RegisterListPref(kClearBrowsingDataOnExitList);
-  // TODO(crbug.com/335387869): When MaybeMigrateToQuickDeletePrefValues is
+  // TODO(crbug.com/471197613): When MaybeMigrateToQuickDeletePrefValues is
   // removed, set default value in iOS for the `kDeleteTimePeriod` pref to 15
   // minutes.
   registry->RegisterIntegerPref(
@@ -81,6 +81,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
 #endif  // BUILDFLAG(IS_IOS)
 
   registry->RegisterIntegerPref(kLastClearBrowsingDataTab, 0);
+  registry->RegisterBooleanPref(kQuickDeleteEverUsed, false);
 }
 
 #if BUILDFLAG(IS_IOS)
